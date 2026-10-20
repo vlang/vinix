@@ -13829,10 +13829,45 @@ artifacts and original-image traces are retained under
 The C review verifies explicit stack scratch and rejects hidden helper heap
 allocations on the printing paths.
 
-The fresh launch exits 1 during linking at the `IndexingIterator` descriptor,
-`_$ss16IndexingIteratorVMn`. Its required cell `0x10dc9b8e8` and indirect
+`IndexingIterator` now exports its generic nominal descriptor, metadata accessor
+and `IteratorProtocol` conformance. The descriptor records one type parameter
+and its `Collection` requirement, with two key arguments: `Elements` metadata
+and its canonical Collection witness. Array, ArraySlice and Range<Int> iterators
+share this nominal identity and reuse the existing Sequence/Collection caches.
+Their metadata preserves the native generic arguments and field-offset vector;
+all supported metadata requests return the same complete specialization.
+
+Array iterator metadata does not complete or read Element metadata. Foreign
+collections and mismatched witnesses fail before reading their records.
+Publication seals both metadata pages under the existing recursive registry
+lock, with no callback across it; quiescent shutdown retires the pages and
+rejects stale conformance lookups. General Collection conformances, generic
+mangled-name substitution and field reflection remain unsupported.
+
+```sh
+v run tests/ios/native-checks.v build-indexing-iterator-metadata
+```
+
+Installed ARM64 Swift comparisons cover the generic signature, accessor ABI,
+three metadata layouts and exact single-payload enum bytes through UINT32_MAX.
+The existing iterator witnesses now clear unused payload bytes when an external
+tag is required, matching native storage. Compatibility checks cover protected
+generic inputs, ownership transfer, eight concurrent publishers and two fully
+retired runtime lifetimes; Array Sequence, Collection and Array metadata provide
+regression coverage.
+
+The original required descriptor cell `0x10dc9b8e8` and indirect
 `__swift5_typeref` reference at `0x10dc7fb74` were inspected without executing
-application code.
+application code. Its expression is `IndexingIterator<Array<T>>`.
+Evidence is retained under
+`build/ios/fortnite/indexing-iterator-metadata-checks`.
+Ten ASan/UBSan host runs and four isolated ARM64 phases pass, including the
+fixture, fresh launch probe and both import audits. Generated C/ARM64 reviews
+verify the metadata helpers introduce no hidden allocations.
+
+The fresh launch exits 1 during linking at `_DictionaryStorage.copy(original:)`,
+`_$ss18_DictionaryStorageC4copy8originalAByxq_Gs05__RawaB0C_tFZ`.
+Both required IndexingIterator imports now resolve.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13840,12 +13875,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,921 | 240 | 78 |
+| Fortnite executable | 1,923 | 238 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,761 | 243 | 114 |
+| All images | 2,763 | 241 | 114 |
 
-The C++/GLES/Text variant reports 2,775 resolved imports, 229 unresolved strong
+The C++/GLES/Text variant reports 2,777 resolved imports, 227 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

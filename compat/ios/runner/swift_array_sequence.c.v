@@ -69,6 +69,7 @@ fn swift_array_iterator_enum_get(value u64, empty_cases u32, _metadata u64) u32 
 }
 fn swift_array_iterator_enum_store(value u64, which_case u32, empty_cases u32, _metadata u64) {
 	if empty_cases > 0x7fffffff { unsafe { *(&u8(value + 16)) = if which_case > 0x7fffffff { u8(1) } else { u8(0) } } }
+	if which_case > 0x7fffffff { C.memset(voidptr(value), 0, 16) }
 	if which_case != 0 { unsafe { *(&u64(value)) = if which_case <= 0x7fffffff { u64(which_case - 1) } else { u64(which_case - 0x80000000) } } }
 }
 
@@ -152,9 +153,13 @@ fn swift_array_sequence_storage(body u64, context u64, result u64, metadata u64,
 }
 
 fn swift_array_sequence_table_checked(metadata u64) !u64 {
+	return read64(swift_collection_table_checked(metadata)! + 8)
+}
+
+fn swift_array_sequence_build_checked(metadata u64, collection u64) !u64 {
 	element := swift_array_sequence_element_checked(metadata, false)!
-	swift_sequence_value_checked(element)!
-	swift_array_layout(0, element)!
+	// Iterator layout depends on Array and Int, never on completing Element.
+	// Operations that actually read elements validate their witnesses separately.
 	swift_array_sequence_arena()
 	C.ios_objc_initialize_lock(); defer { C.ios_objc_initialize_unlock() }
 	if base := ios_runtime.swift_array_sequence_metadata[element] { return base + 256 }
@@ -165,8 +170,9 @@ fn swift_array_sequence_table_checked(metadata u64) !u64 {
 	unsafe {
 		*(&u64(base)) = base + 64
 		*(&u64(base + 8)) = 0x200
-		*(&u64(base + 16)) = data + 160 // Private IndexingIterator descriptor; reflection unsupported.
+		*(&u64(base + 16)) = ios_runtime.swift_collection_arena + u64(page) + 3840
 		*(&u64(base + 24)) = metadata
+		*(&u64(base + 32)) = collection
 		*(&u32(base + 44)) = 8 // Frozen field offsets: owner at zero, position at eight.
 	}
 	for i, witness in [u64(unsafe { voidptr(swift_array_iterator_copy) }),
@@ -176,7 +182,7 @@ fn swift_array_sequence_table_checked(metadata u64) !u64 {
 		u64(unsafe { voidptr(swift_array_iterator_enum_store) })]! { unsafe { *(&u64(base + 64 + u64(i * 8))) = witness } }
 	unsafe { *(&u64(base + 128)) = 16; *(&u64(base + 136)) = 16 }
 	write32(base + 144, 0x10007); write32(base + 148, 0x7fffffff)
-	unsafe { *(&u64(base + 160)) = data + 192; *(&u64(base + 168)) = element; *(&u64(base + 176)) = code + 64 }
+	unsafe { *(&u64(base + 160)) = ios_runtime.swift_collection_arena + u64(page) + 3968; *(&u64(base + 168)) = element; *(&u64(base + 176)) = code + 64 }
 	for i, word in [data + 128, base + 160, element, base + 8, code, code + 128,
 		code + 160, code + 192, code + 224, code + 288]! { unsafe { *(&u64(base + 256 + u64(i * 8))) = word } }
 	if C.mprotect(allocation, page, C.PROT_READ) != 0 {

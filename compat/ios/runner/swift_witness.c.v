@@ -7,6 +7,10 @@ module main
 // path. Resilient/generic tables must be instantiated, never returned as-is.
 fn swift_witness_table_checked(conformance u64, metadata u64, arguments u64) !u64 {
 	if ios_runtime != unsafe { nil } && conformance != 0
+		&& conformance == ios_runtime.swift_indexing_iterator_conformance_descriptor {
+		return swift_indexing_iterator_table_checked(metadata)
+	}
+	if ios_runtime != unsafe { nil } && conformance != 0
 		&& conformance == ios_runtime.swift_merge_error_conformance_descriptor {
 		return swift_merge_error_table_checked(metadata)
 	}

@@ -94,9 +94,10 @@ fn swift_collection_value_store(value u64, which u32, cases u32, metadata u64) {
 	size := swift_collection_value_size(metadata)
 	if !swift_collection_value_owned(metadata) {
 		unsafe { *(&u8(value + size)) = if which == 0 {u8(0)} else {u8(1)} }
-		if which != 0 { unsafe { *(&u64(value)) = u64(which - 1) } }; return
+		if which != 0 { C.memset(voidptr(value), 0, usize(size)); unsafe { *(&u64(value)) = u64(which - 1) } }; return
 	}
 	if cases > 0x7fffffff { unsafe { *(&u8(value + size)) = if which > 0x7fffffff {u8(1)} else {u8(0)} } }
+	if which > 0x7fffffff { C.memset(voidptr(value), 0, usize(size)) }
 	if which != 0 { unsafe { *(&u64(value)) = if which <= 0x7fffffff {u64(which - 1)} else {u64(which - 0x80000000)} } }
 }
 fn swift_collection_index_get(metadata u64, _table u64, receiver u64, output u64, end bool) {
@@ -255,17 +256,20 @@ fn swift_collection_table_checked(metadata u64) !u64 {
 		C.ios_objc_initialize_lock(); defer { C.ios_objc_initialize_unlock() }
 		for _, base in ios_runtime.swift_collection_metadata { if metadata == base + 8 { return base + 528 } }; return swift_sequence_failure()
 	}
-	sequence := swift_array_sequence_table_checked(metadata)!; element := read64(metadata + 16); swift_collection_arena()
+	element := read64(metadata + 16); swift_collection_arena()
 	C.ios_objc_initialize_lock(); defer { C.ios_objc_initialize_unlock() }
 	if base := ios_runtime.swift_collection_metadata[element] { return base + 320 }
 	page := usize(C.getpagesize()); allocation := C.mmap(unsafe { nil }, page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
 	if allocation == voidptr(-1) { return swift_sequence_failure() }
 	base := u64(allocation); code := ios_runtime.swift_collection_arena; data := code + u64(page)
+	sequence := swift_array_sequence_build_checked(metadata, base + 320) or {
+		C.munmap(allocation, page); return err
+	}
 	unsafe {
 		*(&u64(base)) = base + 64; *(&u64(base + 8)) = 0x200; *(&u64(base + 16)) = data + 160; *(&u64(base + 24)) = element
-		*(&u64(base + 160)) = base + 224; *(&u64(base + 168)) = 0x200; *(&u64(base + 176)) = data + 192; *(&u64(base + 184)) = base + 8
+		*(&u64(base + 160)) = base + 224; *(&u64(base + 168)) = 0x200; *(&u64(base + 176)) = data + 3840; *(&u64(base + 184)) = base + 8
 		*(&u64(base + 192)) = base + 528; *(&u64(base + 200)) = u64(32) << 32
-		*(&u64(base + 824)) = data + 704; *(&u64(base + 832)) = element; *(&u64(base + 840)) = code + 1600
+		*(&u64(base + 824)) = data + 3968; *(&u64(base + 832)) = element; *(&u64(base + 840)) = code + 1600
 		*(&u64(base + 880)) = code + 1792; *(&u64(base + 896)) = 0x400; *(&u64(base + 904)) = base + 8
 		*(&u64(base + 912)) = code + 1792; *(&u64(base + 928)) = 0x400; *(&u64(base + 936)) = base + 168
 	}
@@ -275,7 +279,13 @@ fn swift_collection_table_checked(metadata u64) !u64 {
 	for i, entry in [data + 64, base + 736, data + 920, data + 1200, base + 528, ios_runtime.swift_integer_arena + u64(page) + 16, base + 8, data + 1024]! { unsafe { *(&u64(base + 528 + u64(i * 8))) = entry } }
 	for address in [base + 320, base + 528]! { for i in 0 .. 17 { unsafe { *(&u64(address + u64((i + 8) * 8))) = code + u64(i * 64) } } }
 	swift_collection_sequence_emit(base + 736, data + 640, element, base + 168, base + 824, code)
-	if C.mprotect(allocation, page, C.PROT_READ) != 0 { C.munmap(allocation, page); return swift_sequence_failure() }
+	if C.mprotect(allocation, page, C.PROT_READ) != 0 {
+		// The outer publication lock still hides the newly built iterator page.
+		iterator := ios_runtime.swift_array_sequence_metadata[element] or { panic('iOS: missing unpublished iterator') }
+		ios_runtime.swift_array_sequence_metadata.delete(element)
+		C.munmap(voidptr(iterator), page); C.munmap(allocation, page)
+		return swift_sequence_failure()
+	}
 	ios_runtime.swift_collection_metadata[element] = base; return base + 320
 }
 fn swift_collection_sequence_checked(metadata u64) !u64 {
@@ -364,9 +374,9 @@ fn swift_collection_arena() u64 {
 	unsafe {
 		*(&u64(data + 1016)) = data + 1600; *(&u64(data + 1024)) = 0x200; *(&u64(data + 1032)) = data + 224
 		*(&u64(data + 1040)) = int_type; *(&u64(data + 1048)) = data + 920; *(&u64(data + 1056)) = u64(8) << 32
-		*(&u64(data + 1080)) = data + 1696; *(&u64(data + 1088)) = 0x200; *(&u64(data + 1096)) = data + 192
+		*(&u64(data + 1080)) = data + 1696; *(&u64(data + 1088)) = 0x200; *(&u64(data + 1096)) = data + 3840
 		*(&u64(data + 1104)) = data + 1024; *(&u64(data + 1112)) = data + 1200; *(&u64(data + 1120)) = u64(16) << 32
-		*(&u64(data + 1504)) = data + 736; *(&u64(data + 1512)) = int_type; *(&u64(data + 1520)) = code + 1600
+		*(&u64(data + 1504)) = data + 3968; *(&u64(data + 1512)) = int_type; *(&u64(data + 1520)) = code + 1600
 	}
 	swift_collection_vwt(data + 1600, 16, false); swift_collection_vwt(data + 1696, 24, false)
 	for i, entry in [data + 96, data + 1408, data + 920, data + 1200, data + 1200, int_type, data + 1024, data + 1024]! { unsafe { *(&u64(data + 1200 + u64(i * 8))) = entry } }
@@ -386,11 +396,13 @@ fn swift_collection_arena() u64 {
 	for i, text in ['Collection', 'Comparable', 'Index Indices SubSequence', 'ArraySlice', 'IndexingIterator', 'Range']! { offsets := [u64(1888), 1904, 1920, 1952, 1984, 2016]!; C.memcpy(voidptr(data + offsets[i]), text.str, usize(text.len + 1)) }
 	for i, text in ['x', '7ElementSTQz', '5IndexSlQz', '5IndexSlQz', '7IndicesSlQz', '7IndicesSlQz', '11SubSequenceSlQz', '11SubSequenceSlQz', '5IndexSlQz', '5IndexSlQz']! { C.memcpy(voidptr(data + 2112 + u64(i * 64)), text.str, usize(text.len + 1)) }
 	for i, text in ['', '11SubSequenceSl_7ElementSTQZ', '', '7IndicesSl_7ElementSTQZ', '', '7IndicesSl_11SubSequenceSlQZ', '', '11SubSequenceSl_AASlQZ', '7IndicesSl_5IndexSlQZ', '11SubSequenceSl_5IndexSlQZ']! { C.memcpy(voidptr(data + 2752 + u64(i * 64)), text.str, usize(text.len + 1)) }
-	C.__builtin___clear_cache(allocation, voidptr(code + 2232))
+	swift_indexing_iterator_metadata_emit(code, data)
+	C.__builtin___clear_cache(allocation, voidptr(code + 2320))
 	if C.mprotect(allocation, page, C.PROT_READ | C.PROT_EXEC) != 0 || C.mprotect(voidptr(data), page, C.PROT_READ) != 0 { C.munmap(allocation, page * 3); panic('iOS: cannot seal Collection records') }
 	ios_runtime.swift_collection_arena = code; return code
 }
 fn swift_collection_symbol(symbol string) ?u64 {
+	if address := swift_indexing_iterator_metadata_symbol(symbol) { return address }
 	if symbol == '_$sSlsE5first7ElementQzSgvg' { return swift_collection_arena() + 2112 }
 	offset := match symbol {
 		'_$sSayxGSlsMc' {32} '_$ss10ArraySliceVyxGSlsMc' {64} '_$sSnyxGSlsSxRzSZ6StrideRpzrlMc' {96}
