@@ -176,6 +176,7 @@ fn swift_metadata_stop() {
 	// owned buffers have drained.
 	swift_array_stop()
 	swiftui_vstack_stop()
+	swiftui_vstack_nominal_stop()
 	swiftui_tree_stop()
 	swiftui_zstack_stop()
 	swiftui_opacity_stop()

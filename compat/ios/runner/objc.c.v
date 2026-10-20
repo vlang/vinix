@@ -221,8 +221,10 @@ mut:
 	swift_integer_arena u64 // Int metadata, value witnesses and Equatable/Hashable conformances.
 	swift_dispatch_flags_arena u64 // Sealed DispatchWorkItemFlags metadata/accessor pages.
 	swift_dispatch_flags_retired bool // Reject resolution after quiescent metadata teardown.
-	swiftui_vstack_arena u64 // Sealed nongeneric SwiftUI VStack descriptor/metadata and accessor.
+	swiftui_vstack_arena u64 // Sealed nongeneric SwiftUI _VStackLayout descriptor/metadata and accessor.
 	swiftui_vstack_retired bool
+	swiftui_vstack_nominal_arena u64 // Sealed constrained VStack descriptor; no specialization.
+	swiftui_vstack_nominal_retired bool
 	swiftui_tree_arena u64 // Sealed generic Tree identity/signature; instantiation is unsupported.
 	swiftui_tree_retired bool
 	swiftui_zstack_arena u64 // Sealed nongeneric SwiftUI ZStack descriptor/metadata and accessor.
