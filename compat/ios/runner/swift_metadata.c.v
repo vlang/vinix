@@ -197,6 +197,7 @@ fn swift_metadata_stop() {
 	swiftui_text_view_stop()
 	swift_nsobject_hashable_stop()
 	swift_bool_metadata_stop()
+	swift_static_string_metadata_stop()
 	swift_merge_error_metadata_stop()
 	swift_integer_stop()
 	swift_void_stop()

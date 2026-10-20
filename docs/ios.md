@@ -13748,9 +13748,45 @@ Generated C/ARM64 reviews, primary contracts, native comparisons, compressed
 artifacts and original-image traces are retained under
 `build/ios/fortnite/string-grow-checks`.
 
-The fresh launch exits 1 during linking at the `StaticString` type descriptor,
-`_$ss12StaticStringVMn`. Its required cell `0x10dc9b8d8` is referenced indirectly
-from `__swift5_typeref` at `0x10dc7fa50`; this trace executes no application code.
+The `StaticString` nominal descriptor `_$ss12StaticStringVMn`, canonical metadata
+and complete accessor now work. The frozen value contains two words and a flag
+byte: size 17, stride 24, alignment 8, POD, inline, and no extra inhabitants.
+The descriptor exposes three field offsets, 0, 8 and 16, matching the
+[Swift StaticString layout](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/StaticString.swift).
+
+Copy and take witnesses preserve exactly 17 initialized bytes without reading
+the borrowed pointer or interpreting scalar/count/flag bits. Destruction does
+not access the value. Enclosing single-payload enums use one external tag byte
+when empty cases exist, with UInt32 indices encoded in the payload. The
+accessor is sealed RX and metadata/descriptors/witnesses are sealed RO before
+publication. Both pages retire after Optional/Array users and callbacks drain;
+retired exports cannot recreate them. Reflection and protocol conformances
+remain unsupported.
+
+```sh
+v run tests/ios/native-checks.v build-static-string-metadata
+```
+
+Native macOS comparisons cover complete metadata responses, field offsets,
+all eight witnesses, protected 17-byte copy/take boundaries, inaccessible
+destruction, UInt32 enum tags, three nested Optional layouts and x20/x21.
+Compatibility checks add symbolic descriptor lookup, typed Array/POD
+destruction, RX/RO mappings, scoped exports, eight cold publishers/readers and
+two drained/unmapped lifetimes. The original required cell `0x10dc9b8d8` and
+indirect `__swift5_typeref` reference at `0x10dc7fa50` were inspected without
+executing application code.
+
+Ten ASan/UBSan runs pass across both C++ backend configurations and Bool,
+Optional and Array metadata regressions. Four isolated ARM64 phases pass:
+the metadata fixture, fresh launch probe and both import audits. Generated
+C/ARM64 reviews, primary contracts, native measurements, compressed artifacts
+and original-image traces are retained under
+`build/ios/fortnite/static-string-metadata-checks`.
+
+The fresh launch exits 1 during linking at `_print_unlocked`,
+`_$ss15_print_unlockedyyx_q_zts16TextOutputStreamR_r0_lF`. Its required cell
+`0x10dc9b8e0`, stub `0x10c63ae48`, branch island `0x107c28744` and caller
+`0x1000686ec` were inspected without executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13758,12 +13794,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,919 | 242 | 78 |
+| Fortnite executable | 1,920 | 241 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,759 | 245 | 114 |
+| All images | 2,760 | 244 | 114 |
 
-The C++/GLES/Text variant reports 2,773 resolved imports, 231 unresolved strong
+The C++/GLES/Text variant reports 2,774 resolved imports, 230 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

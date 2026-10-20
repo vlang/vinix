@@ -240,6 +240,8 @@ mut:
 	swift_empty_set u64 // Immutable native empty singleton; retired with Set records.
 	swift_bool_metadata_arena u64 // Sealed Swift.Bool nominal metadata, accessor and byte value witnesses.
 	swift_bool_metadata_retired bool // Reject recreation after quiescent metadata retirement.
+	swift_static_string_metadata_arena u64 // Frozen three-field POD metadata, witnesses and accessor.
+	swift_static_string_metadata_retired bool
 	swift_merge_error_metadata_arena u64 // Sealed _MergeError enum metadata, accessor and zero-size witnesses.
 	swift_merge_error_metadata_retired bool
 	swift_merge_error_conformance_descriptor u64 // Remember through retirement before any stale descriptor read.
