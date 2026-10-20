@@ -12712,12 +12712,44 @@ isolated ARM64 phases are retained under `build/ios/fortnite/objc-personality-ch
 Its required cell is `0x10dc9b458` in `__DATA_CONST,__got`. The compact-unwind
 personality entry at `0x10dc81200` references this cell as personality index
 zero. These unwind data were inspected without executing application code.
-The fresh launch resolves this import and exits 1 during linking at
-`_imp_implementationWithBlock`, Objective-C's block-to-method adapter.
+The next required import was `_imp_implementationWithBlock`, Objective-C's
+block-to-method adapter.
 Its required cell is `0x10dc9b498`, stub `0x10c63dd4c` and branch forwarder
 `0x107c28ddc`. Calls at `0x10833f5a4` and `0x10008b258` pass Blocks and use
 the resulting IMP for method replacement or installation. These references
 were inspected without executing application code.
+`imp_implementationWithBlock`, `imp_getBlock` and `imp_removeBlock` now resolve
+through libobjc.A.dylib. The adapter copies its Block and emits a four-instruction
+ARM64 tail call from `(self, _cmd, args...)` to `(block, self, args...)`.
+It discards the selector, preserves x2..x8, q0..q7 and the original stack and
+link register, and leaves the Block's return convention intact. Each live IMP
+owns one page sealed read/execute after emission; no writable executable page
+is published. Global Blocks retain their identity and heap Blocks share their
+existing copy reference. This follows the [Apple SDK/runtime contract](https://github.com/apple-oss-distributions/objc4/blob/main/runtime/objc-block-trampolines.mm).
+
+Lookup returns a borrowed Block. Removal drops the registry entry before
+releasing its copy and unmapping the adapter. Callers must detach the IMP and
+drain its invocations before removal, and coordinate borrowed Block use with
+removal. Copy and disposal helpers run outside the runtime lock. Quiescent
+shutdown releases remaining IMPs after ordinary app owners and threads drain,
+while class metadata, Foundation objects and autorelease pools remain available
+to capture destructors. Those destructors must not invoke retired IMPs.
+
+`tests/ios/native-checks.v build-objc-block-imp` compares raw ARM64 x0..x8,
+all eight SIMD argument registers, four stack words and result bits against
+Apple's native adapter. It also checks stack/global/shared heap Block ownership,
+four concurrent creators, real method installation and replacement, cross-thread
+copy/dispose reentry, captured-object weak lifetime, invalid identities and two
+drained runtimes. Six sanitizer runs, property/monitor regressions, generated C,
+native source snapshots and four isolated ARM64 phases are retained under
+`build/ios/fortnite/objc-block-imp-checks`.
+
+The fresh launch exits 1 during linking at `_objc_begin_catch`. Its required
+cell is `0x10dc9b508`, stub `0x10c63e190` and branch forwarder `0x107c28288`.
+The inspector found 27 direct calls, including `0x100008668`, followed by
+exception cleanup and `_objc_end_catch` paths. These references were inspected
+without executing application code. Objective-C throwing/catching and Mach-O
+unwinding remain unsupported.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12725,12 +12757,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,867 | 294 | 78 |
+| Fortnite executable | 1,869 | 292 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,707 | 297 | 114 |
+| All images | 2,709 | 295 | 114 |
 
-The C++/GLES/Text variant reports 2,721 resolved imports, 283 unresolved strong
+The C++/GLES/Text variant reports 2,723 resolved imports, 281 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the

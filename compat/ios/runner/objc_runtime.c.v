@@ -357,6 +357,9 @@ fn objc_arc_register_symbol(symbol string) ?u64 {
 fn objc_runtime_symbol(symbol string) ?u64 {
 	if address := objc_arc_register_symbol(symbol) { return address }
 	return match symbol {
+		'_imp_implementationWithBlock' { u64(unsafe { voidptr(objc_imp_with_block) }) }
+		'_imp_getBlock' { u64(unsafe { voidptr(objc_imp_get_block) }) }
+		'_imp_removeBlock' { u64(unsafe { voidptr(objc_imp_remove_block) }) }
 		'___objc_personality_v0' { u64(unsafe { voidptr(objc_personality_unavailable) }) }
 		'_sel_registerName', '_sel_getUid' { u64(unsafe { voidptr(objc_selector) }) }
 		'_sel_getName' { u64(unsafe { voidptr(objc_selector_name) }) }

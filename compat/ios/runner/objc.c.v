@@ -351,6 +351,8 @@ mut:
 	first_responder u64
 	native_touch u64
 	block_refs   map[u64]int
+	block_imps map[u64]ObjBlockImp // Copied Blocks and sealed executable adapters.
+	block_imps_retired bool
 	block_isa    [3]u64
 	transform    [6]f64
 	bundle       string
@@ -721,6 +723,7 @@ fn objc_stop() {
 	objc_release(ios_runtime.run_loop)
 	webkit_stop()
 	ns_threads_stop()
+	objc_block_imps_stop()
 	objc_associations_stop()
 	// Keep the immortal empty dictionary available through all collection and
 	// autorelease teardown. Release its cache reference after those users stop.
