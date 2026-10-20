@@ -12457,8 +12457,8 @@ implementations. Native descriptor checks and EmptyView/Text specializations
 confirm the declaration and dependent sizes of 17/stride 24 and 56/stride 56.
 
 The descriptor occupies read-only storage; its accessor thunk occupies a
-separate executable page. No reflection records, instantiation cache, pattern,
-complete generic metadata or View conformance are supplied. The generic bit
+separate executable page. No reflection records, instantiation cache, generic
+metadata pattern or complete generic metadata are supplied. The generic bit
 keeps direct/indirect symbolic lookup from calling the nongeneric accessor ABI.
 Explicit specialization attempts diagnose before reading Content metadata or
 its View witness. Dependent Tree ownership, VStack specialization, construction
@@ -12474,24 +12474,49 @@ The required import cell is `0x10dc9b408` in `__DATA_CONST,__got`, referenced by
 five indirect context symbolic references in `__TEXT,__swift5_typeref`.
 These data references were inspected without executing application code.
 
-The fresh launch resolves VStack's nominal descriptor and exits 1 during linking
-at `_$s7SwiftUI6VStackVyxGAA4ViewAAMc`, its View conformance declaration.
-Its required fixup is `0x10dc9b410`; a consumer at `0x1015c1190` loads it before
+VStack's View conformance declaration, `_$s7SwiftUI6VStackVyxGAA4ViewAAMc`,
+now shares the nominal descriptor's sealed arena. Native measurement shows
+zero conformance flags and one static seven-word witness table: both EmptyView
+and Text specializations return the exact pattern pointer. Content's View
+constraint belongs to the nominal signature; there are no conditional
+requirements, generic witness controls or instantiation caches.
+
+The table preserves tagged Body/Never type and conformance-accessor records.
+Lookup returns the canonical table without reading unused metadata or argument
+pointers. Body/Never metadata and conformance access and all four graph witness
+slots diagnose before reading caller storage or writing results. No complete
+VStack/Never metadata, graph engine or rendering support is supplied.
+
+`tests/ios/native-checks.v build-swiftui-vstack-view` checks both resolution
+orders with eight cold readers, native static table and symbolic Never
+declarations, protected unused metadata/arguments, 256 terminal child calls,
+protected graph stack arguments, Self and x8, and unchanged shared writable/read-only
+result pages at both guard boundaries. Teardown callbacks and two drained/unmapped
+lifetimes use the existing arena. Native measurements, VStack nominal and
+Button View sanitizer regressions, generated C and isolated ARM64 results are
+retained under `build/ios/fortnite/swiftui-vstack-view-checks`.
+The required fixup is `0x10dc9b410`; a consumer at `0x1015c1190` loads it before
 calling `swift_getWitnessTable` at `0x1015c1198`. These references were inspected
-without executing application code. Fortnite still stops before application
-entry and remains unplayable.
+without executing application code.
+
+The fresh launch resolves VStack's View conformance and exits 1 during linking
+at `_$s7SwiftUI6ZStackV9alignment7contentACyxGAA9AlignmentV_xyXEtcfC`, the
+ZStack(alignment:content:) initializer. Its required fixup is `0x10dc9b418`,
+stub `0x10c63abc0`, forwarder `0x107c28ea4` and direct call `0x1015bf6f8`.
+These references were inspected without executing application code. Fortnite
+still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,858 | 303 | 78 |
+| Fortnite executable | 1,859 | 302 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,698 | 306 | 114 |
+| All images | 2,699 | 305 | 114 |
 
-The C++/GLES/Text variant reports 2,712 resolved imports, 292 unresolved strong
+The C++/GLES/Text variant reports 2,713 resolved imports, 291 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
