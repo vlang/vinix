@@ -13216,22 +13216,57 @@ generic witness regressions. Four isolated ARM64 phases, generated C/ARM64
 reviews, primary references and original-image traces are retained under
 `build/ios/fortnite/string-protocol-checks`.
 
+Sequence's `_copyContents(initializing:)` default now resolves as a functional
+generic operation. The original executable's required cell `0x10dc9b838`, stub
+`0x10c63ad04`, branch island `0x107c28d20` and consuming witness forwarder
+`0x100072f94` were traced without executing application code. The implementation
+follows the [Swift Sequence contract](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/Sequence.swift):
+it consumes Self through `makeIterator`, initializes the destination by moving
+owned elements and returns an owned iterator plus the number copied. Empty and
+partial buffers preserve the remaining elements; filling a buffer does not call
+`next()` again. The Iterator result is explicitly indirect in ARM64 `x0`, with
+the initialized count returned in `x0`; it does not use `x8` for that result.
+
+Complete direct associated witnesses use the existing checked Sequence profile;
+tagged/accessor entries still require separate instantiation. Alignment, extent,
+negative capacity and retired-runtime checks precede consuming callbacks.
+Optional scratch is bounded and allocated in the current frame, and registry
+locks do not cross user witnesses. The caller owns the returned Iterator and
+each initialized destination element.
+
+```sh
+v run tests/ios/native-checks.v build-sequence-contents
+```
+
+Native macOS comparisons cover 180 custom Sequence cases with Int, String and
+Objective-C elements and three Iterator sizes. The shim checks 360 cases per
+runtime lifetime, adding zero-sized, padded and 32-byte-aligned elements.
+Resumption, repeated exhaustion, exact ownership, protected `x8`, destination
+guards, invalid witnesses, eight concurrent readers, reentrant callbacks and two
+drained/unmapped lifetimes pass. Ten ASan/UBSan runs cover both C++ backend
+configurations and generic Sequence, Array Sequence and Collection regressions.
+Four isolated ARM64 phases, generated C/ARM64 reviews, native measurements and
+original-image traces are retained under
+`build/ios/fortnite/sequence-contents-checks`.
+
 The fresh launch exits 1 during linking at Sequence's
-`_copyContents(initializing:)` default,
-`_$sSTsE13_copyContents12initializing8IteratorQz_SitSry7ElementQzG_tF`.
-Fortnite still stops before application entry and remains unplayable.
+`withContiguousStorageIfAvailable` default,
+`_$sSTsE32withContiguousStorageIfAvailableyqd__Sgqd__SRy7ElementQzGKXEKlF`.
+Its required cell `0x10dc9b840`, stub `0x10c63ad10`, branch island `0x107c28d24`
+and caller `0x100072fac` were inspected without executing app code. Fortnite
+still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,903 | 258 | 78 |
+| Fortnite executable | 1,904 | 257 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,743 | 261 | 114 |
+| All images | 2,744 | 260 | 114 |
 
-The C++/GLES/Text variant reports 2,757 resolved imports, 247 unresolved strong
+The C++/GLES/Text variant reports 2,758 resolved imports, 246 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

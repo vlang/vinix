@@ -222,7 +222,13 @@ fn swift_sequence_arena() u64 {
 		0xa9425bf5, 0xa94153f3, 0xa8c37bfd, 0xd65f03c0]! {
 		write32(base + 320 + u64(i * 4), op)
 	}
-	C.__builtin___clear_cache(allocation, unsafe { voidptr(base + 372) })
+	// Swift consuming _copyContents -> C: the Iterator result is explicitly
+	// indirect in x0, count returns in x0, and only Self needs moving from x20.
+	for i, op in [u32(0xaa1403e5), 0x58000070, 0xd61f0200, 0xd503201f]! {
+		write32(base + 384 + u64(i * 4), op)
+	}
+	unsafe { *(&u64(base + 400)) = u64(voidptr(swift_sequence_contents)) }
+	C.__builtin___clear_cache(allocation, unsafe { voidptr(base + 408) })
 	if C.mprotect(allocation, page, C.PROT_READ | C.PROT_EXEC) != 0 {
 		C.munmap(allocation, page); panic('iOS: cannot seal Swift Sequence adapters')
 	}

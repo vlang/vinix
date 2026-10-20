@@ -274,6 +274,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 	return match symbol {
 		'_$sSTsE5first5where7ElementQzSgSbADKXE_tKF' { swift_sequence_arena() + 256 }
 		'_$sSTsE10compactMapySayqd__Gqd__Sg7ElementQzKXEKlF' { swift_sequence_arena() }
+		'_$sSTsE13_copyContents12initializing8IteratorQz_SitSry7ElementQzG_tF' { swift_sequence_arena() + 384 }
 		'_$sSS9UTF16ViewV5index_8offsetBySS5IndexVAF_SitF' { u64(unsafe { voidptr(swift_utf16_offset) }) }
 		'_$sSS8UTF8ViewV17_foreignSubscript8positions5UInt8VSS5IndexV_tF' { u64(unsafe { voidptr(swift_foreign_subscript) }) }
 		'_$sSS8UTF8ViewV13_foreignIndex_8offsetBySS0D0VAF_SitF' { u64(unsafe { voidptr(swift_foreign_offset) }) }
