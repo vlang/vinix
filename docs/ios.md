@@ -13396,10 +13396,54 @@ integer-backed decoding and Dictionary encoding conformance regressions.
 Four isolated ARM64 phases, generated C/ARM64 reviews, native measurements and
 original-image traces are retained under `build/ios/fortnite/array-encoding-checks`.
 
-The fresh launch exits 1 during linking at Array's conditional Decodable
-conformance, `_$sSayxGSesSeRzlMc`. Its required data cell `0x10dc9b878` has
-four inspected consumers at `0x100065fa8`, `0x10006f30c`, `0x100070950` and
-`0x100073268`, including generic witness lookup before keyed decoding.
+Array's conditional Decodable conformance, `_$sSayxGSesSeRzlMc`, now supplies
+its own descriptor and sealed canonical witness tables with a borrowed private
+Element:Decodable word. It uses the native throwing unkeyed-container getter,
+nonthrowing `isAtEnd` and generic `decode(Element.self)` requirements. Successful
+elements move into typed native Array storage; growing the buffer moves the
+initialized prefix without extra retains or destruction. The builder uses the
+existing 1 MiB storage bound.
+
+The decoding witness consumes the Decoder, releases its owned container and
+publishes an Array only on success. A throwing container getter initializes no
+container; a throwing element decode initializes no element. On an element
+error or checked growth failure, the current initialized temporary and partial
+Array are released before the container and Decoder. The original owned Swift
+error is forwarded unchanged, and the failure result remains unwritten. No
+registry lock spans application callbacks. This follows the
+[Swift Array decoding implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/Codable.swift).
+
+The supported profile includes inline and boxed/shared Decoders, inline mutable
+containers and empty boxed/shared containers. Nonempty boxed mutable containers
+stop explicitly after cleanup because they require copy-on-write support.
+This conformance does not add JSON serialization or the remaining decoding APIs.
+The required data cell `0x10dc9b878` and all four consumers at `0x100065fa8`,
+`0x10006f30c`, `0x100070950` and `0x100073268` were inspected without executing
+application code.
+
+```sh
+v run tests/ios/native-checks.v build-array-decoding
+```
+
+Native macOS comparisons cover 384 Int/String/Date cases, including empty
+arrays, inline/boxed/shared Decoders, guarded ABI records, throwing container
+getters and errors at different element positions. Additional 130-element
+cases check repeated growth and large partial-prefix cleanup. Compatibility
+checks cover expired conditional arguments, nested Array specialization,
+sealed descriptor/table publication, eight cold publishers and workers,
+reentrant callbacks, shared-box cleanup, missing dispatch, invalid output,
+bounded-growth failure and two drained/unmapped runtime lifetimes.
+
+Ten ASan/UBSan runs cover both C++ backend configurations and Array encoding,
+integer-backed decoding and Dictionary encoding regressions. Four isolated
+ARM64 phases pass: the decoding fixture, fresh launch probe and both import
+audits. Generated C/ARM64 reviews, native measurements, compressed artifacts
+and original-image traces are retained under
+`build/ios/fortnite/array-decoding-checks`.
+
+The fresh launch exits 1 during linking at Swift Bool metadata, `_$sSbN`.
+Its required data cell `0x10dc9b888` has one inspected consumer at `0x10003e810`,
+which stores the metadata beside a Bool payload in an existential value.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13407,12 +13451,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,908 | 253 | 78 |
+| Fortnite executable | 1,909 | 252 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,748 | 256 | 114 |
+| All images | 2,749 | 255 | 114 |
 
-The C++/GLES/Text variant reports 2,762 resolved imports, 242 unresolved strong
+The C++/GLES/Text variant reports 2,763 resolved imports, 241 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

@@ -216,6 +216,9 @@ mut:
 	swift_array_encoding_arena u64 // Encodable descriptor, dispatch adapters and generic cache pages.
 	swift_array_encoding_descriptor u64 // Remembered through retirement before stale descriptor reads.
 	swift_array_encoding map[u64]u64 // Array metadata -> sealed table with a private Element:Encodable word.
+	swift_array_decoding_arena u64 // Separate Decodable descriptor, generic cache and call adapters.
+	swift_array_decoding_descriptor u64 // Remembered for stale lookup rejection after quiescent retirement.
+	swift_array_decoding map[u64]u64 // Array metadata -> sealed table borrowing Element:Decodable.
 	swift_dictionary_metadata_arena u64 // Sealed Dictionary accessor/descriptor and writable generic cache.
 	swift_dictionary_metadata map[u64]SwiftDictionaryType // Sealed page -> exact Key/Value/Hashable identities.
 	swift_dictionary_metadata_retired bool
