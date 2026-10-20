@@ -1,0 +1,17 @@
+ANDROID-START
+Vinix vinix 0.1.0 Vinix 0.1.0 aarch64 aarch64 Linux
+ANDROID-MEMORY-LOW hint=0x10000000 address=0x10000000
+ANDROID-MEMORY-PASS page_size=16384
+ANDROID-STACK-MAPPING begin=6ffe1514000 end=6fff1514000 reserved=268435456 soft_limit=33554432
+ANDROID-STACK-FAIL metadata=0x6ffe1514000/268435456 mapping=6ffe1514000-6fff1514000
+ANDROID-STACK-RAW status=1
+ANDROID-STACK-MAPPING begin=6ffedc54000 end=6fffdc54000 reserved=268435456 soft_limit=33554432
+ANDROID-STACK worker base=0x8000d2b4000 size=277280 guard=16384
+ANDROID-STACK-PASS initial base=0x6fffbc54000 size=33554432
+ANDROID-MEMORY-LOW hint=0x10000000 address=0x10000000
+ANDROID-MEMORY-PASS page_size=16384
+ANDROID-ATFORK-FAIL Android ABI exports
+ANDROID-FAIL native ART stack, memory, fork callback, configuration, fortified I/O, allocator or netdb prerequisites failed
+ANDROID-DIAGNOSTICS-BEGIN
+Vinix vinix 0.1.0 Vinix 0.1.0 aarch64 aarch64 Linux
+ANDROID-DIAGNOSTICS-END

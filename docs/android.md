@@ -63,10 +63,10 @@ boot libraries using the pinned D8 compiler; this removes unresolved Java
 lambda bootstrap calls while retaining the classes and resources. Application
 APKs remain unchanged. This host step requires Java 17 or newer. Then stage
 the native runtime and optional calculator APK. The staging host also needs
-Python 3, curl and `aarch64-linux-musl-gcc`:
+the maintained V compiler, curl and `aarch64-linux-musl-gcc`:
 
 ```sh
-python3 build-support/android/art-bootclasspath.py \
+build-support/android/art-bootclasspath \
   --build-dir build-aarch64-android/aarch64/java-build --art-runtime /path/to/art-runtime
 ./scripts/build-android-aarch64.sh --art-runtime /path/to/art-runtime \
   --bionic-runtime /path/to/bionic-runtime --atl-runtime /path/to/atl-runtime \
@@ -107,6 +107,19 @@ developer's unchanged Arity 1.1 APK, extracted from its
 The archive and APK are verified against recorded SHA256 hashes. Click the
 input field above the history list before typing; this version uses keyboard
 input.
+
+![Arity 1.1 calculating 123+456 as 579 in the ARM64 Vinix desktop](screenshots/vinix-android-calculator-qemu.png)
+
+On 20 October 2026, the unchanged APK displayed `579` after QMP keyboard input
+of `123+456`, with zero key retries, using the current desktop and kernel
+binaries and the preserved 3 October ARM64 runtime. The screenshot above is
+the actual QEMU framebuffer. [Hashes, observed markers and the focused V
+driver](../tests/android/results/2026-10-20/calculator.json) retain the evidence.
+The full runtime preflight failed on `ANDROID-ATFORK-FAIL Android ABI exports`
+in that older runtime, before launching an APK. The separate calculator check
+retained stack/memory checks and the normal application/input/result path;
+it does not establish full runtime conformance or phone hardware support.
+Use matching rebuilt overlays for the complete guest test below.
 
 On an existing X11 display, including a session started with `startx`, launch
 another APK with:
@@ -156,10 +169,10 @@ Run the real guest test after building the runtime, desktop and kernel:
 
 ```sh
 build-support/run-v-tool.sh tests/android/launcher-test.v
-python3 tests/android/art-runtime-test.py
-python3 tests/android/bootclasspath-test.py
-python3 tests/android/musl-runtime-test.py
-python3 tests/android/run.py --memory 12288
+tests/android/art-runtime-test
+tests/android/bootclasspath-test
+tests/android/musl-runtime-test
+tests/android/run --memory 12288
 ```
 
 The guest test opens the unchanged calculator APK in the Vinix desktop,

@@ -1,0 +1,42 @@
+{
+    "date": "2026-10-20",
+    "application": "Arity 1.1 (unchanged upstream APK)",
+    "license": "Apache-2.0",
+    "source_archive_url": "https://storage.googleapis.com/google-code-archive-source/v2/code.google.com/arity-calculator/source-archive.zip",
+    "source_archive_sha256": "1b39e4f968e7d21602ea166f73a1b36c35213b78e9e3e06b74053cfdc98dfbe2",
+    "apk_archive_member": "arity-calculator/rel/Arity-1.1.apk",
+    "apk_sha256": "1928e65ced8cbe78be2ff3cb4c321e9e75d138e8e30ea1368fbb772a86827d1d",
+    "runtime": "Preserved 3 October native ARM64 ART/ATL stage in /Users/alex/code/vinix-android-native/build-aarch64-android/aarch64/staging",
+    "runtime_arch": "aarch64",
+    "memory_mb": 12288,
+    "calculator_passed": true,
+    "input": "123+456",
+    "expected": "579",
+    "key_retries": 0,
+    "checks": [
+        "APK and source archive SHA256 match repository pins",
+        "16 KiB memory pages and native ART mapping prerequisites",
+        "32 MiB initial stack and worker stack bounds",
+        "Real drawable 480x640 APK window inside Vinix desktop",
+        "Every character acknowledged through QMP keyboard input",
+        "APK rendered 579 observed through GTK/Pango text calls",
+        "QMP framebuffer screenshot visually inspected"
+    ],
+    "full_runtime_preflight_passed": false,
+    "full_runtime_preflight_failure": "ANDROID-ATFORK-FAIL Android ABI exports",
+    "full_runtime_checks_not_run": [
+        "configuration",
+        "fortified I/O",
+        "allocator statistics",
+        "netdb"
+    ],
+    "phone_hardware_tested": false,
+    "kernel_sha256": "a310a06243cd397bba18c8e594d55fb2c0cee4610b2fc64643e437720345da5e",
+    "desktop_sha256": "7e3537337b0a5b45b792c05e8f097de4e1683445e0e4342062b2bd8b9ba0a3e4",
+    "screenshot": "docs/screenshots/vinix-android-calculator-qemu.png",
+    "screenshot_sha256": "822a86fecbb9a5a3de49b1be8b8719938c2a98fed766e6144bcc888f96a27ac5",
+    "driver": "tests/android/results/2026-10-20/calculator-demo.v",
+    "driver_sha256": "ec02357e525512be302b606e27c827206d6b2113fedc477e1560ed18a276d490",
+    "guest_init_sha256": "b076e708078123841376258cc914cfa8774bdfe4b46e014953138aa143809388",
+    "launcher_checks": "Android launcher: 9 native launcher cases and concurrent output check completed"
+}

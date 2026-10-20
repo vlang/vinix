@@ -31,7 +31,11 @@ fn run() int {
 		os.join_path(source, 'launcherfixture/loader.v'): loader
 		os.join_path(source, 'launcher_fixture_test.v'):  test
 	} {
-		status := execute([@VEXE, '-d', 'use_bundled_libgc', '-cc', 'clang', '-o', output, input],
+		// A single _test.v also loads neighboring module-main sources. These
+		// are independent tools, including the retired runner ABI adapter.
+		// Keep the explicit fixture input and exclude that directory scan.
+		status := execute([@VEXE, '-exclude', os.join_path(source, '*.v'), '-d', 'use_bundled_libgc',
+			'-cc', 'clang', '-o', output, input],
 			environment)
 		if status != 0 { return status }
 	}
