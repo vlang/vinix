@@ -130,6 +130,14 @@ fn (mut filesystem EXT2Filesystem) enable_large_files() ? {
 }
 
 fn (mut filesystem EXT2Filesystem) raw_device_read(buf voidptr, loc u64, count u64) ?i64 {
+	bytes := u64(filesystem.backing_device.resource.stat.size)
+	if loc > bytes || count > bytes - loc || count > u64(0x7fffffffffffffff) {
+		errno.set(errno.eio); return none
+	}
+	if filesystem.ext4 && filesystem.block_size != 0 {
+		volume_bytes := u64(filesystem.superblock.block_cnt) * filesystem.block_size
+		if loc > volume_bytes || count > volume_bytes - loc { errno.set(errno.eio); return none }
+	}
 	if filesystem.journal != unsafe { nil } {
 		return filesystem.journal.read(journal_base_load, buf, loc, count)
 	}
