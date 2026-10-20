@@ -12595,7 +12595,7 @@ The generic bit stays set. Symbolic lookup rejects before attempting the
 nongeneric accessor ABI, and the two-argument generic accessor diagnoses
 without reading T metadata. No complete metadata, instantiation cache,
 generic metadata pattern or reflection is supplied. TupleView metadata
-instantiation, View conformance and rendering remain unsupported.
+instantiation and rendering remain unsupported.
 
 `tests/ios/native-checks.v build-swiftui-tuple-nominal` checks eight cold
 readers, the native declaration, read-only descriptor and executable accessor
@@ -12631,17 +12631,40 @@ unused protected registers/stack, warm teardown callbacks and two
 drained/unmapped lifetimes. Native measurements, TupleView nominal and State
 getter sanitizer regressions, generated C and isolated ARM64 results are
 retained under `build/ios/fortnite/swiftui-tuple-init-checks`.
-TupleView metadata instantiation, View conformance, graph execution and
-rendering remain unsupported. Its required
+TupleView metadata instantiation, graph execution and rendering remain
+unsupported. Its required
 import cell is `0x10dc9b440`, stub `0x10c63abd8`, forwarder `0x107c28ed4`
 and direct call `0x1015c053c`. These references were inspected without
 executing application code.
-The fresh launch resolves this initializer and exits 1 during linking at
-`_$s7SwiftUI9TupleViewVyxGAA0D0AAMc`, TupleView's View conformance descriptor.
-Its required cell is `0x10dc9b448`. Consumers at `0x1015c05d4` and
+
+TupleView's View conformance descriptor, `_$s7SwiftUI9TupleViewVyxGAA0D0AAMc`,
+now resolves through SwiftUI.framework in the existing sealed nominal arena.
+Native Bool, Int and String specializations share one static seven-word
+witness table. Conformance flags are zero, with no conditional requirements,
+generic witness control or instantiator; T remains unconstrained in the
+nominal signature. The declaration includes View's Body: View signature and
+tagged symbolic Body == Never records. Never metadata, its View conformance
+and all four graph witnesses terminate with explicit diagnostics when used.
+They do not read caller metadata or arguments or write an indirect result.
+
+`tests/ios/native-checks.v build-swiftui-tuple-view` checks eight cold readers
+in both resolution orders, canonical descriptors, the native static table,
+read-only data and executable thunk protections, protected unused arguments,
+256 terminal child calls, protected graph stack/Self/x8, unchanged shared
+writable/read-only result pages at both guard boundaries, teardown callbacks
+and two drained/unmapped lifetimes. Native measurements, TupleView nominal
+and initializer sanitizer regressions, generated C and four isolated ARM64
+phases are retained under `build/ios/fortnite/swiftui-tuple-view-checks`.
+TupleView metadata instantiation, graph execution and rendering remain unsupported.
+The conformance's required cell is `0x10dc9b448`. Consumers at `0x1015c05d4` and
 `0x1015c111c` load it before calling `swift_getWitnessTable` at `0x1015c05dc`
 and `0x1015c1124` respectively. These references were inspected without
 executing application code.
+The fresh launch resolves this conformance and exits 1 during linking at
+`_$ss5NeverO7SwiftUI4ViewACWP`, SwiftUI's Never: View witness table.
+Its required cell is `0x10dc9b450`; a consumer at `0x1015c103c` loads the
+table and returns it directly. This reference was inspected without executing
+application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12649,12 +12672,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,864 | 297 | 78 |
+| Fortnite executable | 1,865 | 296 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,704 | 300 | 114 |
+| All images | 2,705 | 299 | 114 |
 
-The C++/GLES/Text variant reports 2,718 resolved imports, 286 unresolved strong
+The C++/GLES/Text variant reports 2,719 resolved imports, 285 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
