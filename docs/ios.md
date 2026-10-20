@@ -12776,11 +12776,38 @@ source snapshots and four isolated ARM64 phases are retained under
 valid unwind records; full Objective-C throwing/catching and Mach-O frame
 unwinding remain unsupported.
 
-The fresh launch exits 1 during linking at `_objc_copyCppObjectAtomic`.
-Its required cell is `0x10dc9b518`, stub `0x10c63e1a8` and branch forwarder
+The atomic C++ property helper has required cell `0x10dc9b518`, stub
+`0x10c63e1a8` and branch forwarder
 `0x107c28cc0`. Four additional tail forwarders, including `0x100b60788` and
 `0x102155080`, pass storage and a copy callback to this atomic C++ property
 helper. These references were inspected without executing application code.
+
+`_objc_copyCppObjectAtomic` now resolves through libobjc.A.dylib. It locks
+both storage addresses in a consistent order and invokes the supplied copy
+callback exactly once, including for self-copy. Equal addresses and hash
+collisions acquire one lock. The callback defines the copy and C++ resource
+ownership; the helper neither reads storage itself nor retains Objective-C
+objects. This follows [Apple's accessor implementation](https://github.com/apple-oss-distributions/objc4/blob/main/runtime/objc-accessors.mm)
+and [lock ordering](https://github.com/apple-oss-distributions/objc4/blob/main/runtime/Threading/mixins.h).
+Eight padded native mutexes occupy a fixed 1 KiB table, use the iOS pointer
+hash and remain available before startup, during shutdown callbacks and across
+runtime lifetimes. The registry lock is released before locking storage or
+calling the callback, and the helper allocates no per-copy storage.
+
+`tests/ios/native-checks.v build-objc-cpp-copy` compares callback forwarding
+for null/invalid/protected identities, self-copy and callback-managed ownership
+with Apple's native runtime. It checks eight simultaneous cold callers,
+eight-worker torn-copy and opposing-pair stress, hash collisions, nested
+disjoint copies, cross-thread registry/independent-copy progress, shutdown
+callbacks and two drained runtimes. Six sanitizer runs, property/monitor
+regressions, generated C/ARM64 review, native sources and four isolated ARM64
+phases are retained under `build/ios/fortnite/objc-cpp-copy-checks`.
+
+The fresh launch exits 1 during linking at `_objc_copyStruct`. Its required
+cell is `0x10dc9b520`, stub `0x10c63e1b4` and branch forwarder `0x107c290fc`.
+The additional tail forwarder at `0x1020c18d0` passes a 32-byte size,
+atomic=true and hasStrong=false. These references were inspected without
+executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12788,12 +12815,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,871 | 290 | 78 |
+| Fortnite executable | 1,872 | 289 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,711 | 293 | 114 |
+| All images | 2,712 | 292 | 114 |
 
-The C++/GLES/Text variant reports 2,725 resolved imports, 279 unresolved strong
+The C++/GLES/Text variant reports 2,726 resolved imports, 278 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
