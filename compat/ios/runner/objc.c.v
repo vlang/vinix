@@ -233,6 +233,8 @@ mut:
 	swiftui_zstack_nominal_retired bool
 	swiftui_tuple_nominal_arena u64 // Sealed unconstrained TupleView descriptor; no specialization.
 	swiftui_tuple_nominal_retired bool
+	swiftui_tuple_init_arena u64 // Sealed consuming TupleView value initializer adapter.
+	swiftui_tuple_init_retired bool
 	swiftui_opacity_arena u64 // Sealed concrete ViewModifier table, opacity/Never metadata and diagnostics.
 	swiftui_opacity_retired bool
 	swiftui_state_value_arena u64 // Sealed State.wrappedValue adapter; values and locations stay borrowed.

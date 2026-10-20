@@ -99,5 +99,5 @@ fn test_swiftui_tuple_nominal(){
 		$if macos{assert C.mprotect(voidptr(base),page*2,C.PROT_READ)==-1}$else{mut residency:=[u8(0),0]!;assert C.mincore(voidptr(base),page*2,unsafe{&residency[0]})==-1}
 		if _:=swiftui_tuple_nominal_arena_checked(){assert false}
 	}
-	println('IOS-SWIFTUI-TUPLE-NOMINAL: eight cold readers, sealed module descriptor and native generic signature, generic bit retained, direct/indirect symbolic rejection before accessor, bounded names and 32 child calls with protected or invalid type metadata, explicit instantiation diagnostic, no fabricated metadata or ownership, retirement guards, callback access and two drained/unmapped lifetimes; TupleView specialization, construction, stored-value ownership, View conformance and rendering remain unsupported')
+	println('IOS-SWIFTUI-TUPLE-NOMINAL: eight cold readers, sealed module descriptor and native generic signature, generic bit retained, direct/indirect symbolic rejection before accessor, bounded names and 32 child calls with protected or invalid type metadata, explicit instantiation diagnostic, no fabricated metadata or ownership, retirement guards, callback access and two drained/unmapped lifetimes; TupleView metadata instantiation, View conformance and rendering remain unsupported')
 }

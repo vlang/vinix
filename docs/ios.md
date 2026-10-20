@@ -12594,9 +12594,8 @@ zero; T has no View constraint or witness argument.
 The generic bit stays set. Symbolic lookup rejects before attempting the
 nongeneric accessor ABI, and the two-argument generic accessor diagnoses
 without reading T metadata. No complete metadata, instantiation cache,
-generic metadata pattern or reflection is supplied. TupleView specialization,
-construction, stored-value ownership, View conformance and rendering remain
-unsupported.
+generic metadata pattern or reflection is supplied. TupleView metadata
+instantiation, View conformance and rendering remain unsupported.
 
 `tests/ios/native-checks.v build-swiftui-tuple-nominal` checks eight cold
 readers, the native declaration, read-only descriptor and executable accessor
@@ -12609,10 +12608,39 @@ ARM64 results are retained under
 required import cell is `0x10dc9b438` in `__DATA_CONST,__got`, referenced by
 seven indirect context symbolic references in `__TEXT,__swift5_typeref`.
 These data references were inspected without executing application code.
-The fresh launch resolves this nominal import and exits 1 during linking at
-`_$s7SwiftUI9TupleViewVyACyxGxcfC`, TupleView's value initializer. Its required
+
+TupleView's value initializer, `_$s7SwiftUI9TupleViewVyACyxGxcfC`, now
+constructs the stored value through T's `initializeWithTake` witness. Native
+ARM64 takes the consumed source address in x0, complete T metadata in x1 and
+the indirect result in x8. The sealed adapter rearranges these arguments and
+calls the take witness once, without retaining or releasing the moved value.
+The source becomes uninitialized. No TupleView metadata or View graph is
+needed for this operation.
+
+Native/Vinix comparisons cover seven layouts: Void, Bool, UInt8, Int,
+Optional<Int>, String and SIMD4<Float>. An owned native String moves without
+an extra retain; native TupleView copies and destruction balance ownership.
+Fifteen synthetic size/stride cases cover both guard boundaries, read-only
+POD sources, exact result spans and protected zero-size source/result pointers.
+A forbidden copy witness checks that construction uses the take slot, and a
+reentrant witness resolves the initializer from another thread.
+
+`tests/ios/native-checks.v build-swiftui-tuple-init` also checks eight cold
+readers, exact routing, executable adapter protection, preserved x20/x21,
+unused protected registers/stack, warm teardown callbacks and two
+drained/unmapped lifetimes. Native measurements, TupleView nominal and State
+getter sanitizer regressions, generated C and isolated ARM64 results are
+retained under `build/ios/fortnite/swiftui-tuple-init-checks`.
+TupleView metadata instantiation, View conformance, graph execution and
+rendering remain unsupported. Its required
 import cell is `0x10dc9b440`, stub `0x10c63abd8`, forwarder `0x107c28ed4`
 and direct call `0x1015c053c`. These references were inspected without
+executing application code.
+The fresh launch resolves this initializer and exits 1 during linking at
+`_$s7SwiftUI9TupleViewVyxGAA0D0AAMc`, TupleView's View conformance descriptor.
+Its required cell is `0x10dc9b448`. Consumers at `0x1015c05d4` and
+`0x1015c111c` load it before calling `swift_getWitnessTable` at `0x1015c05dc`
+and `0x1015c1124` respectively. These references were inspected without
 executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
@@ -12621,12 +12649,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,863 | 298 | 78 |
+| Fortnite executable | 1,864 | 297 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,703 | 301 | 114 |
+| All images | 2,704 | 300 | 114 |
 
-The C++/GLES/Text variant reports 2,717 resolved imports, 287 unresolved strong
+The C++/GLES/Text variant reports 2,718 resolved imports, 286 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
