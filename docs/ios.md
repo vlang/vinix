@@ -12851,9 +12851,34 @@ Six sanitizer runs, the catch bookkeeping regression, generated C/ARM64 review,
 native sources and four isolated ARM64 phases are retained under
 `build/ios/fortnite/objc-rethrow-checks`.
 
-The fresh launch exits 1 during linking at `_objc_exception_throw`. Its
-required cell is `0x10dc9b560`, stub `0x10c63e214`, branch forwarder
+The throw import has required cell `0x10dc9b560`, stub `0x10c63e214`, branch forwarder
 `0x107c28414` and direct call `0x10009f110`. These references were inspected
+without executing application code.
+
+`_objc_exception_throw` now binds a dedicated terminal diagnostic with its
+single object argument, in both C++ backend configurations. Actual throwing
+remains unsupported. The entry stops before reading the object, changing its
+ownership, invoking an uncaught handler or allocating exception metadata.
+[Apple's implementation](https://github.com/apple-oss-distributions/objc4/blob/main/runtime/objc-exception.mm)
+builds an Objective-C exception record, preprocesses and retains the object,
+and passes typeinfo plus a release destructor to the three-argument C++ throw
+entry. Those requirements prevent forwarding the raw object directly to
+`__cxa_throw`; Mach-O unwinding must be implemented before adding that path.
+
+`tests/ios/native-checks.v build-objc-throw` checks the exact diagnostic binding,
+192 terminal child calls per run with null/invalid/protected/managed/class
+objects and absent/trapping/protected uncaught handlers, protected values in
+unused registers/stack words/Self/x8 and unchanged writable/read-only pages
+at both guard boundaries. Eight concurrent resolver readers, shutdown callback
+access and two drained runtimes are also checked. Native exports and the Apple
+ownership contract were inspected without invoking native throwing/unwinding.
+Six sanitizer runs cover both backend configurations and the rethrow regression;
+generated C/ARM64 review, native sources and four isolated ARM64 phases are
+retained under `build/ios/fortnite/objc-throw-checks`.
+
+The fresh launch exits 1 during linking at `_objc_terminate`. Its required
+cell is `0x10dc9b6e8`, stub `0x10c63e454` and branch forwarder `0x107c28380`.
+Four direct calls, including `0x1000554b8` and `0x10005ebd0`, were inspected
 without executing application code. Full Objective-C throwing/catching and
 Mach-O frame unwinding remain unsupported.
 Fortnite still stops before application entry and remains unplayable.
@@ -12863,12 +12888,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,874 | 287 | 78 |
+| Fortnite executable | 1,875 | 286 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,714 | 290 | 114 |
+| All images | 2,715 | 289 | 114 |
 
-The C++/GLES/Text variant reports 2,728 resolved imports, 276 unresolved strong
+The C++/GLES/Text variant reports 2,729 resolved imports, 275 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
