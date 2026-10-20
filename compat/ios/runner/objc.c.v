@@ -229,6 +229,8 @@ mut:
 	swiftui_tree_retired bool
 	swiftui_zstack_arena u64 // Sealed nongeneric SwiftUI ZStack descriptor/metadata and accessor.
 	swiftui_zstack_retired bool
+	swiftui_zstack_nominal_arena u64 // Sealed constrained ZStack descriptor; no specialization.
+	swiftui_zstack_nominal_retired bool
 	swiftui_opacity_arena u64 // Sealed concrete ViewModifier table, opacity/Never metadata and diagnostics.
 	swiftui_opacity_retired bool
 	swiftui_state_value_arena u64 // Sealed State.wrappedValue adapter; values and locations stay borrowed.

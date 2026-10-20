@@ -12530,11 +12530,37 @@ Its required fixup is `0x10dc9b418`,
 stub `0x10c63abc0`, forwarder `0x107c28ea4` and direct call `0x1015bf6f8`.
 These references were inspected without executing application code.
 
-The fresh launch resolves this initializer import and exits 1 during linking
-at `_$s7SwiftUI6ZStackVMn`, ZStack's nominal type descriptor. Its required
+ZStack's nominal descriptor, `_$s7SwiftUI6ZStackVMn`, now resolves through
+SwiftUI.framework in sealed storage. Native ARM64 measurement confirms one
+generic Content parameter, its `Content: View` requirement, two key arguments
+(metadata and witness), and one field with its offset vector at metadata word
+four. The View declaration includes its six requirements and `Body: View`
+signature. Native EmptyView and Text specializations have size/stride 16 and
+48 respectively; their field offset is zero.
+
+The generic descriptor retains its generic bit. Symbolic lookup rejects it
+before attempting the nongeneric accessor ABI, and its three-argument generic
+accessor diagnoses without reading Content metadata or its witness. No
+complete metadata, instantiation cache, pattern or reflection is supplied.
+ZStack specialization, construction, dependent Tree ownership, View
+conformance and rendering remain unsupported.
+
+`tests/ios/native-checks.v build-swiftui-zstack-nominal` checks eight cold
+readers, the native declaration, read-only descriptor and executable accessor
+protections, direct/indirect symbolic rejection at a guard boundary, 128
+terminal child calls with protected metadata and witnesses, retirement
+guards, teardown callbacks and two drained/unmapped lifetimes. Native
+measurements, VStack nominal and ZStack initializer sanitizer regressions,
+generated C and isolated ARM64 results are retained under
+`build/ios/fortnite/swiftui-zstack-nominal-checks`. Its required
 import cell is `0x10dc9b420` in `__DATA_CONST,__got`, referenced by an indirect
 context symbolic reference at `0x10dc7fc5a` in `__TEXT,__swift5_typeref`.
 These data references were inspected without executing application code.
+The fresh launch resolves this nominal import and exits 1 during linking at
+`_$s7SwiftUI6ZStackVyxGAA4ViewAAMc`, ZStack's View conformance descriptor.
+Its required import cell is `0x10dc9b428`; a consumer at `0x1015c06b8` loads
+it before calling `swift_getWitnessTable` at `0x1015c06c0`. These references
+were inspected without executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12542,12 +12568,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,860 | 301 | 78 |
+| Fortnite executable | 1,861 | 300 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,700 | 304 | 114 |
+| All images | 2,701 | 303 | 114 |
 
-The C++/GLES/Text variant reports 2,714 resolved imports, 290 unresolved strong
+The C++/GLES/Text variant reports 2,715 resolved imports, 289 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
