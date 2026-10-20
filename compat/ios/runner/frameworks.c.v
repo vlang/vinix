@@ -30,6 +30,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		if address := swiftui_text_bold_symbol(symbol) { return address }
 		if address := swiftui_text_font_symbol(symbol) { return address }
 		if address := swiftui_text_view_symbol(symbol) { return address }
+		if address := swiftui_text_localized_symbol(symbol) { return address }
 	}
 	if library == '/System/Library/Frameworks/StoreKit.framework/StoreKit' {
 		if address := storekit_constant_symbol(symbol) { return address }

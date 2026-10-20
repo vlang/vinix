@@ -12065,17 +12065,43 @@ nil table/bundle/comment arguments and receive Text in x0-x3. These sites
 were inspected without executing application code. Fortnite remains
 unplayable, with Text construction and SwiftUI graph/rendering still absent.
 
+The localized Text initializer now has an exact SwiftUI diagnostic binding.
+Native ARM64 measurements cover 24 literal-key/table/comment combinations
+with a nil bundle. The result is an owned Text in x0-x3 with object storage
+and an empty modifier array. Its 72-byte LocalizedTextStorage provider consumes
+the key and optional table owners. Text copies retain the shared provider;
+final destruction releases its fields. The comment does not become a stored
+field. These observations do not provide provider construction or localization.
+
+`tests/ios/native-checks.v build-swiftui-text-localized` selects the new fixture.
+Normal and deterministic ASan/UBSan runs cover its O2 entry, Text metadata and
+literal-key regressions. Thirty-two terminal child probes verify the diagnostic
+with protected key/table/bundle/comment pointers, stack arguments, Self and x8,
+including unchanged shared result pages at both protected boundaries. Eight
+readers, exact framework routing and callbacks exercise two drained lifetimes.
+Native declarations and measurements, seven executable/generated-C pairs and
+joined logs are retained under `build/ios/fortnite/swiftui-text-localized-checks`.
+Localized provider construction, localization and rendering remain unsupported.
+
+The fresh launch resolves this diagnostic binding and exits 1 during linking
+at SwiftUI's default View graph factory,
+`_$s7SwiftUI4ViewPAAE05_makeC04view6inputsAA01_C7OutputsVAA11_GraphValueVyxG_AA01_C6InputsVtFZ`.
+Its fixup is `0x10dc9b3a0`, stub `0x10c63ab48` and forwarder `0x107c28ee4`.
+The call at `0x1015c0aa8` forwards the caller's arguments through a small wrapper.
+These sites were inspected without executing application code. Fortnite still
+stops before application entry and remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,843 | 318 | 78 |
+| Fortnite executable | 1,844 | 317 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,683 | 321 | 114 |
+| All images | 2,684 | 320 | 114 |
 
-The C++/GLES/Text variant reports 2,697 resolved imports, 307 unresolved strong
+The C++/GLES/Text variant reports 2,698 resolved imports, 306 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
