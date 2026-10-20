@@ -139,6 +139,7 @@ fn test_swift_keyed_container_metadata() {
 		entry := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$ss22KeyedDecodingContainerVMa') or { panic(err) }
 		access := unsafe { KcmAccess(voidptr(entry)) };assert kcm_metadata(access, guard, guard + 8) == metadata
 		d := read64(metadata + 8)
+		assert runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$ss22KeyedDecodingContainerVMn') or { panic(err) } == d
 		assert kcm_relative(d + 12) == entry
 		assert kcm_metadata(access, guard + 16, guard + 8) != metadata && kcm_metadata(access, guard, guard + 24) != metadata
 		mut arguments := [guard, guard + 8]!
@@ -151,7 +152,7 @@ fn test_swift_keyed_container_metadata() {
 			if _ := swift_keyed_container_metadata_checked(0, bad[0], bad[1]) { assert false }
 		}
 		if _ := swift_keyed_container_instantiate_checked(guard, guard, guard) { assert false }
-		for symbol in ['_$ss22KeyedDecodingContainerVMn', '_$ss22KeyedEncodingContainerVMa', '_$ss9CodingKeyMp']! { assert swift_keyed_container_metadata_symbol(symbol) == none }
+		for symbol in ['_$ss22KeyedDecodingContainerVN', '_$ss22KeyedEncodingContainerVMa', '_$ss9CodingKeyMp']! { assert swift_keyed_container_metadata_symbol(symbol) == none }
 		assert runtime_symbol('/usr/lib/swift/libswiftFoundation.dylib', '_$ss22KeyedDecodingContainerVMa') == none
 		ios_runtime.swift_concurrency_retired = true
 		assert swift_keyed_container_metadata_symbol('_$ss22KeyedDecodingContainerVMa') == none

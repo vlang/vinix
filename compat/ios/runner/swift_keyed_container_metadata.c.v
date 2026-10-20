@@ -86,6 +86,7 @@ fn swift_keyed_container_arena() u64 {
 	$if !arm64 { panic('iOS: keyed container metadata requires ARM64') }
 	if ios_runtime == unsafe { nil } || ios_runtime.swift_keyed_container_retired
 		|| ios_runtime.swift_concurrency_retired { panic('iOS: keyed container metadata outside runtime lifetime') }
+	string_protocol := swift_string_metadata() - 16 + 352
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if ios_runtime.swift_keyed_container_arena != 0 { return ios_runtime.swift_keyed_container_arena }
@@ -127,9 +128,9 @@ fn swift_keyed_container_arena() u64 {
 	write32(data + 312, 0x40000000);swift_protocol_relative(data + 316, data)
 	// Private declaration records describe the constraint, not executable
 	// CodingKey conformances or defaults. No protocol/witness exports are added.
-	for i, name in ['CodingKey', 'CustomDebugStringConvertible', 'CustomStringConvertible']! {
-		p := data + [u64(384), 576, 640]![i]
-		text := data + [u64(512), 608, 672]![i]
+	for i, name in ['CodingKey', 'CustomDebugStringConvertible']! {
+		p := data + [u64(384), 576]![i]
+		text := data + [u64(512), 608]![i]
 		write32(p, 0x30043);swift_protocol_relative(p + 4, data + 224)
 		swift_protocol_relative(p + 8, text)
 		write32(p + 16, if i == 0 { u32(6) } else { u32(1) })
@@ -137,7 +138,7 @@ fn swift_keyed_container_arena() u64 {
 		if i != 0 { write32(p + 24, 0x13) }
 	}
 	write32(data + 396, 2)
-	for i, parent in [data + 576, data + 640]! {
+	for i, parent in [data + 576, string_protocol]! {
 		r := data + 408 + u64(i * 12)
 		write32(r, 0x80);swift_protocol_relative(r + 4, data + 288);swift_protocol_relative(r + 8, parent)
 	}
@@ -151,9 +152,10 @@ fn swift_keyed_container_arena() u64 {
 	return base
 }
 fn swift_keyed_container_metadata_symbol(symbol string) ?u64 {
-	if symbol != '_$ss22KeyedDecodingContainerVMa' || ios_runtime == unsafe { nil }
+	if symbol !in ['_$ss22KeyedDecodingContainerVMa', '_$ss22KeyedDecodingContainerVMn']! || ios_runtime == unsafe { nil }
 		|| ios_runtime.swift_keyed_container_retired || ios_runtime.swift_concurrency_retired { return none }
-	return swift_keyed_container_arena()
+	base := swift_keyed_container_arena()
+	return if symbol == '_$ss22KeyedDecodingContainerVMn' { base + u64(C.getpagesize()) + 160 } else { base }
 }
 fn swift_keyed_container_metadata_stop() {
 	ios_runtime.swift_keyed_container_retired = true
