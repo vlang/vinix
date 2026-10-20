@@ -12660,11 +12660,41 @@ The conformance's required cell is `0x10dc9b448`. Consumers at `0x1015c05d4` and
 `0x1015c111c` load it before calling `swift_getWitnessTable` at `0x1015c05dc`
 and `0x1015c1124` respectively. These references were inspected without
 executing application code.
-The fresh launch resolves this conformance and exits 1 during linking at
-`_$ss5NeverO7SwiftUI4ViewACWP`, SwiftUI's Never: View witness table.
+SwiftUI's global Never: View witness table, `_$ss5NeverO7SwiftUI4ViewACWP`,
+now resolves in the existing opacity arena. The seven-word static table has
+conformance flags 8 and an indirect reference to the arena's Never descriptor.
+It shares complete zero-size, stride-one Never metadata and the existing
+View declaration. Body metadata lookup returns Never; the tagged `FF 07`
+associated-conformance accessor returns this same canonical table without
+reading caller metadata or arguments. No additional arena or owner is allocated.
+
+Native measurements confirm `Never.Body == Never`, recursive `Body: View`
+and a view-list count of `nil`. The count witness returns zero in x0 and the
+None tag in w1, without reading inputs or writing x8. The two graph factories
+and `Never.body` stop with explicit diagnostics. TupleView's dependent
+metadata and graph paths still diagnose as described above.
+
+`tests/ios/native-checks.v build-swiftui-never-view` checks eight cold readers
+in both opacity/table resolution orders, shared metadata, recursive conformance,
+protected arguments, native-compatible count results, x20/x21 preservation,
+120 terminal graph/body child calls, protected stack/Self/x8 and unchanged
+writable/read-only result pages at both guard boundaries. Native Swift's
+associated-conformance lookup caches authenticated pointers; its cross-check
+uses a writable table copy while Vinix's table remains read-only. Shutdown
+callbacks and two drained/unmapped lifetimes use the existing arena.
+Native measurements, opacity and TupleView View sanitizer regressions,
+generated C and four isolated ARM64 phases are retained under
+`build/ios/fortnite/swiftui-never-view-checks`. Graph construction and rendering
+remain unsupported.
+
 Its required cell is `0x10dc9b450`; a consumer at `0x1015c103c` loads the
 table and returns it directly. This reference was inspected without executing
 application code.
+The fresh launch resolves this witness table and exits 1 during linking at
+`___objc_personality_v0`, the Objective-C exception personality function.
+Its required cell is `0x10dc9b458` in `__DATA_CONST,__got`. The compact-unwind
+personality entry at `0x10dc81200` references this cell as personality index
+zero. These unwind data were inspected without executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12672,12 +12702,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,865 | 296 | 78 |
+| Fortnite executable | 1,866 | 295 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,705 | 299 | 114 |
+| All images | 2,706 | 298 | 114 |
 
-The C++/GLES/Text variant reports 2,719 resolved imports, 285 unresolved strong
+The C++/GLES/Text variant reports 2,720 resolved imports, 284 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the

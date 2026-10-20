@@ -92,7 +92,7 @@ fn swiftui_opacity_arena_checked() !u64 {
 	C.memcpy(voidptr(data + 432), c'Swift', 6); C.memcpy(voidptr(data + 440), c'Never', 6)
 	C.memcpy(voidptr(data + 736), c'ViewModifier', 13); C.memcpy(voidptr(data + 752), c'Body', 5); C.memcpy(voidptr(data + 768), c'View', 5)
 	// Preserve both protocol signatures: Self.Body: View. This is declaration
-	// metadata; graph/default implementation and Never:View tables are absent.
+	// metadata; graph/default implementations remain unsupported.
 	for i, protocol in [modifier, view]! {
 		write32(protocol, 0x30043); swift_protocol_relative(protocol + 4, module_descriptor)
 		swift_protocol_relative(protocol + 8, data + if i == 0 { u64(736) } else { u64(768) })
@@ -110,7 +110,8 @@ fn swiftui_opacity_arena_checked() !u64 {
 	unsafe { *(&u8(data + 896)) = 0xff; *(&u8(data + 897)) = 7 }
 	swiftui_opacity_symbolic_relative(data + 898, base + 80)
 	swiftui_view_opacity_emit(base + 128)
-	C.__builtin___clear_cache(allocation, voidptr(base + 160))
+	swiftui_never_view_emit(base, data, never, never_descriptor, view)
+	C.__builtin___clear_cache(allocation, voidptr(base + 224))
 	if C.mprotect(allocation, usize(page), C.PROT_READ | C.PROT_EXEC) != 0 || C.mprotect(voidptr(data), usize(page), C.PROT_READ) != 0 {
 		if C.munmap(allocation, usize(page * 2)) != 0 { panic('iOS: cannot retire unsealed SwiftUI opacity witnesses') }
 		return swiftui_opacity_failure()
@@ -120,6 +121,7 @@ fn swiftui_opacity_arena_checked() !u64 {
 }
 fn swiftui_opacity_symbol(symbol string) ?u64 {
 	offset := match symbol {
+		'_$ss5NeverO7SwiftUI4ViewACWP' { u64(960) }
 		'_$s7SwiftUI14_OpacityEffectVAA12ViewModifierAAWP' { u64(480) }
 		'_$s7SwiftUI14_OpacityEffectVMn' { u64(160) }
 		else { return none }
