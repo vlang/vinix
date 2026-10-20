@@ -281,6 +281,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_$sSS10describingSSx_tclufC' { u64(unsafe { voidptr(swift_string_describing) }) }
 		'_$sS2SycfC' { u64(unsafe { voidptr(swift_string_empty) }) }
 		'_$sBOWV' { swift_unknown_value_witnesses() }
+		'_$sBbWV' { swift_bridge_value_witnesses() }
 		// Darwin SwiftError owners use Cocoa ARC, including boxed Swift errors
 		// and toll-free NSError/CFError objects. These entries use ordinary C
 		// calls, rather than Swift's strong-word or bridge-object encoding.

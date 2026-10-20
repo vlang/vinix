@@ -68,6 +68,7 @@ fn swift_unknown_value_witnesses() u64 {
 	unsafe { *(&u64(table + 64)) = 8; *(&u64(table + 72)) = 8 }
 	write32(table + 80, 0x10007) // Non-POD, inline, bitwise-takable, alignment eight.
 	write32(table + 84, 0x7fffffff)
+	swift_bridge_value_publish(table + 128)
 	// The measured single-reference enum encoding matches Array and ObjC
 	// wrappers. memcpy also permits unaligned, exactly bounded enum storage.
 	if C.mprotect(allocation, page, C.PROT_READ) != 0 {

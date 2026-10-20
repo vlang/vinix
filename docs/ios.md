@@ -12971,7 +12971,35 @@ and the protocol-method regression. Four isolated ARM64 phases, generated C,
 resolver disassembly and the complete SQLite archive disassembly are retained
 under `build/ios/fortnite/sqlite-checks`; no engine instruction uses x18 or w18.
 
-The fresh launch exits 1 during linking at Swift core symbol `_$sBbWV`.
+The `_$sBbWV` data import has required cell `0x10dc9b7b8` and consumer
+`0x1000657d8`. The consumer passes the table's layout tail (offset 64) to
+`swift_initStructMetadata`; this was inspected without executing application
+code.
+
+`Builtin.BridgeObject` now has its own eight-slot value-witness table, following
+the [Swift runtime's bridge-aware ownership operations](https://github.com/swiftlang/swift/blob/main/stdlib/public/runtime/MetadataImpl.h).
+Copy and destroy preserve the encoded word while using bridge-object ARC.
+Assignment publishes the replacement before releasing the old owner, so
+reentrant destructors see the new value. Takes leave moved bytes unchanged.
+The table has size/stride eight, flags `0x10007` and `0x7fffffff` extra
+inhabitants. Its take and enum operations share the existing object-reference
+implementations; its ownership operations differ. Both tables are populated
+before sealing their shared page and retire together at quiescent shutdown.
+Resolving this import adds no extra mapping or per-witness allocation.
+
+`tests/ios/native-checks.v build-bridge-value` compares all eight native slots,
+encoded native/Objective-C ownership, spare bridge bits, self copy/take,
+null/tagged values and guarded eight/nine-byte enum boundaries. Raw ARM64 calls
+check protected unused inputs and result registers. Eight concurrent publishers
+and workers, destructor reentry, read-only tables and two unmapped runtime
+lifetimes are also checked. Six host sanitizer runs cover both C++ backend
+configurations and the existing UnknownObject regression. Native measurements,
+generated C/ARM64 review and four isolated ARM64 phases are retained under
+`build/ios/fortnite/bridge-value-checks`.
+
+The fresh launch exits 1 during linking at Swift core symbol `_$sSDMa`.
+Its required cell `0x10dc9b7c8`, stub `0x10c63ac80`, branch forwarder
+`0x107c28a50` and call `0x10006df64` were inspected without executing app code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12979,12 +13007,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,895 | 266 | 78 |
+| Fortnite executable | 1,896 | 265 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,735 | 269 | 114 |
+| All images | 2,736 | 268 | 114 |
 
-The C++/GLES/Text variant reports 2,749 resolved imports, 255 unresolved strong
+The C++/GLES/Text variant reports 2,750 resolved imports, 254 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
