@@ -12744,12 +12744,43 @@ drained runtimes. Six sanitizer runs, property/monitor regressions, generated C,
 native source snapshots and four isolated ARM64 phases are retained under
 `build/ios/fortnite/objc-block-imp-checks`.
 
-The fresh launch exits 1 during linking at `_objc_begin_catch`. Its required
-cell is `0x10dc9b508`, stub `0x10c63e190` and branch forwarder `0x107c28288`.
+The begin-catch import has required cell `0x10dc9b508`, stub `0x10c63e190`
+and branch forwarder `0x107c28288`.
 The inspector found 27 direct calls, including `0x100008668`, followed by
 exception cleanup and `_objc_end_catch` paths. These references were inspected
-without executing application code. Objective-C throwing/catching and Mach-O
+without executing application code. The paired end-catch import has cell
+`0x10dc9b548`, stub `0x10c63e1f0`, forwarder `0x107c2828c`, an additional tail
+forwarder at `0x1000555d8` and 45 direct calls.
+
+With `ios_cxx`, `_objc_begin_catch` and `_objc_end_catch` now resolve to the
+existing C++ backend's `__cxa_begin_catch` and `__cxa_end_catch` addresses.
+This matches [Apple's delegation](https://github.com/apple-oss-distributions/objc4/blob/main/runtime/objc-exception.mm):
+both languages share adjusted exception pointers, handler ownership and
+thread-local catch bookkeeping. The compatibility layer adds no private
+exception layout, TLS, Objective-C retain or pointer adjustment. In particular,
+a foreign catch-all result must not be interpreted as an Objective-C object.
+Builds without `ios_cxx` bind explicit terminal diagnostics before reading
+exception storage or returning a fabricated catch result.
+
+`tests/ios/native-checks.v build-objc-catch` checks exact backend aliases,
+four mixed-language begin/end combinations, foreign adjusted pointers,
+single cleanup, empty-stack end after a completed catch and four simultaneous
+thread-local catches. Native Apple comparisons use the same cases without
+throwing or unwinding. Eight resolver readers, exact library routing, shutdown
+callback access and two drained runtimes are also checked. The no-backend
+host variant checks 48 terminal child calls with null/invalid/protected storage,
+protected unused registers/stack/x8 and unchanged writable/read-only result
+pages. Six sanitizer runs, the personality regression, generated C, native
+source snapshots and four isolated ARM64 phases are retained under
+`build/ios/fortnite/objc-catch-checks`. This implements catch bookkeeping for
+valid unwind records; full Objective-C throwing/catching and Mach-O frame
 unwinding remain unsupported.
+
+The fresh launch exits 1 during linking at `_objc_copyCppObjectAtomic`.
+Its required cell is `0x10dc9b518`, stub `0x10c63e1a8` and branch forwarder
+`0x107c28cc0`. Four additional tail forwarders, including `0x100b60788` and
+`0x102155080`, pass storage and a copy callback to this atomic C++ property
+helper. These references were inspected without executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12757,12 +12788,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,869 | 292 | 78 |
+| Fortnite executable | 1,871 | 290 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,709 | 295 | 114 |
+| All images | 2,711 | 293 | 114 |
 
-The C++/GLES/Text variant reports 2,723 resolved imports, 281 unresolved strong
+The C++/GLES/Text variant reports 2,725 resolved imports, 279 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
