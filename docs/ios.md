@@ -12228,28 +12228,56 @@ Sanitizer regressions also cover opacity construction and disabled diagnostics.
 Native SDK/ABI measurements, generated C, isolated ARM64 runs, import audits and
 call-site evidence are retained under
 `build/ios/fortnite/swiftui-state-value-checks`. State construction, generic
-metadata instantiation, setters, bindings, live locations, graph execution and
+metadata instantiation, bindings, live locations, graph execution and
 rendering remain unsupported.
 
-The fresh launch resolves the getter and exits 1 during linking at
-`_$s7SwiftUI5StateV12wrappedValuexvs`, the matching setter. Its fixup is
+The matching setter, `_$s7SwiftUI5StateV12wrappedValuexvs`, now handles a nil
+location with native nonmutating semantics: cached `_value` remains unchanged,
+while the incoming Value is consumed through its own `destroy` witness. It
+receives the new Value indirectly in x0, complete State metadata in x1 and
+borrowed Self in x20; there is no result in x8. Its fixup is
 `0x10dc9b3d0`, stub `0x10c63ab90` and forwarder `0x107c28e68`. The calls at
 `0x1015bea28` and `0x1015bee20` pass the new Bool indirectly in x0, State
 metadata in x1 and borrowed State in x20. These sites were inspected without
-executing application code. Fortnite still stops before application entry and
-remains unplayable.
+executing application code.
+
+Native comparisons cover the same seven State specializations. Both native and
+Vinix leave read-only cached State intact and release exactly one incoming
+owned String reference without changing its bytes. Fifteen instrumented
+size/stride cases check the exact destroy argument and Value metadata, including
+a zero-sized Value with inaccessible storage. A reentrant destructor resolves
+the adapter on another thread without holding the initialization lock. Thirty-four
+child calls verify that non-nil locations and negative field offsets diagnose
+before accessing cached Value bytes, new Value metadata/owners or location
+objects. Live writes require AnyLocation virtual set and transaction behavior;
+they remain unsupported.
+
+`tests/ios/native-checks.v build-swiftui-state-set` selects the setter fixture.
+Its adapter is sealed RX before publication, remains available to drained
+teardown callbacks and is unmapped after owners retire. Native disassembly,
+six sanitizer runs including getter/opacity regressions, isolated ARM64 checks,
+generated C and call-site evidence are retained under
+`build/ios/fortnite/swiftui-state-set-checks`.
+
+The fresh launch resolves both wrapped-value accessors and exits 1 during
+linking at `_$s7SwiftUI5StateV14projectedValueAA7BindingVyxGvg`, the projected
+Binding getter. Its fixup is `0x10dc9b3d8`, stub `0x10c63ab9c`, forwarder
+`0x107c28e6c` and direct call `0x1015beac0`; inspection executes no application
+code. Fortnite still stops before application entry and remains
+unplayable. Nil-location accessors do not provide attached State, bindings,
+graph execution or rendering.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,850 | 311 | 78 |
+| Fortnite executable | 1,851 | 310 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,690 | 314 | 114 |
+| All images | 2,691 | 313 | 114 |
 
-The C++/GLES/Text variant reports 2,704 resolved imports, 300 unresolved strong
+The C++/GLES/Text variant reports 2,705 resolved imports, 299 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
