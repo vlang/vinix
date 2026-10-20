@@ -12373,26 +12373,61 @@ then unmaps both pages; fresh publication is rejected after retirement. Two
 runtime lifetimes and regressions for State descriptors and Button initializer
 diagnostics are recorded under
 `build/ios/fortnite/swiftui-button-nominal-checks`. Button specialization,
-construction, action storage, View conformance and rendering remain unsupported.
+construction, action storage, View witness specialization and rendering remain
+unsupported.
 
-The fresh launch resolves Button's nominal descriptor and exits 1 during
-linking at `_$s7SwiftUI6ButtonVyxGAA4ViewAAMc`, its View conformance descriptor.
+Button's View conformance descriptor, `_$s7SwiftUI6ButtonVyxGAA4ViewAAMc`, now
+shares the existing sealed Button arena, its nominal descriptor and its View
+protocol declaration. Native measurements show an unconditional conformance
+with a generic witness table: `Label: View` is already required by the nominal
+type, so there are no conditional or private witness arguments. Its control
+word is `0x10007` (seven copied words, RequiresInstantiation, zero private words),
+with no native instantiator. Native lookup returns stable, distinct cached
+tables for Button<EmptyView> and Button<Text>; both copy all seven pattern words.
+No witness methods, Button construction, graph or application code are invoked
+by these native comparisons.
+
+Vinix preserves the generic conformance flag `0x20000` and RequiresInstantiation,
+with zero copied words, a null pattern/cache and an explicit diagnostic
+instantiator. Witness lookup rejects the generic declaration before touching
+metadata, arguments or the pattern. The instantiator diagnoses before reading
+caller inputs or writing a table. This supplies the conformance declaration;
+Button witness specialization, construction, graph execution and rendering
+remain unsupported.
+
 The required GOT fixup is `0x10dc9b3f8`; the consumer at `0x1015c16f0` loads it
 before calling `swift_getWitnessTable` at `0x1015c16f8`. These references were
-inspected without executing application code. Fortnite still stops before
-application entry and remains unplayable.
+inspected without executing application code.
+
+`tests/ios/native-checks.v build-swiftui-button-view` checks eight concurrent
+cold readers resolving nominal/conformance descriptors in both orders, shared
+canonical identity, RX/RO protections and 192 child calls with protected
+metadata, arguments and table pointers. Shared writable/read-only table pages
+remain unchanged at both guard boundaries. Teardown callbacks retain descriptor
+access until users drain; both pages unmap across two runtime lifetimes.
+Measurements, native Button descriptor/ModifiedContent conformance regressions,
+generated C and isolated ARM64 results are retained under
+`build/ios/fortnite/swiftui-button-view-checks`.
+
+The fresh launch resolves Button's View conformance declaration and exits 1
+during linking at
+`_$s7SwiftUI6VStackV9alignment7spacing7contentACyxGAA19HorizontalAlignmentV_12CoreGraphics7CGFloatVSgxyXEtcfC`,
+the VStack(alignment:spacing:content:) initializer. Its required fixup is
+`0x10dc9b400`, stub `0x10c63abb4`, forwarder `0x107c28ea8` and direct call
+`0x1015bf9c0`. These references were inspected without executing application
+code. Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,855 | 306 | 78 |
+| Fortnite executable | 1,856 | 305 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,695 | 309 | 114 |
+| All images | 2,696 | 308 | 114 |
 
-The C++/GLES/Text variant reports 2,709 resolved imports, 295 unresolved strong
+The C++/GLES/Text variant reports 2,710 resolved imports, 294 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
