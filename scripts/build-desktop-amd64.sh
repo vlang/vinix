@@ -427,8 +427,8 @@ if [ -n "$X11_BUNDLE" ]; then
     fi
     mkdir -p "$(dirname "$X11_BUNDLE")"
     X11_BUNDLE_TMP="$(mktemp "$(dirname "$X11_BUNDLE")/.x11-bundle.XXXXXX")"
-    COPYFILE_DISABLE=1 tar --format=ustar --uid 0 --gid 0 --uname root --gname root \
-        -czf "$X11_BUNDLE_TMP" -C "$X11_ROOT" .
+    sh "$SCRIPT_DIR/build-support/run-v-tool.sh" \
+        "$SCRIPT_DIR/build-support/archive-x11-bundle.v" "$X11_ROOT" "$X11_BUNDLE_TMP"
     mv -f "$X11_BUNDLE_TMP" "$X11_BUNDLE"
     if command -v sha256sum >/dev/null 2>&1; then
         (cd "$(dirname "$X11_BUNDLE")" && sha256sum "$(basename "$X11_BUNDLE")")

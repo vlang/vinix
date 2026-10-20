@@ -208,6 +208,7 @@ fn test_bundle_from_full_and_compact_images() ! {
 		os.mkdir_all(work + '/build')!
 		mut environment := os.environ()
 		environment['SCRIPT_DIR'] = repo
+		environment['V'] = @VEXE
 		environment['BUILD_DIR'] = work + '/build'
 		environment['SYSROOT'] = base
 		environment['STAGING'] = staging
