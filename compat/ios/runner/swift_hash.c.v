@@ -37,6 +37,9 @@ fn swift_hash_emit(code u64) {
 }
 
 fn swift_hash_symbol(symbol string) ?u64 {
+	if symbol == '_$sSS4hash4intoys6HasherVz_tF' {
+		return u64(unsafe { voidptr(swift_string_hash_into) })
+	}
 	if entry := swift_raw_symbol(symbol) { return entry }
 	if entry := swift_hasher_symbol(symbol) { return entry }
 	offset := match symbol {
