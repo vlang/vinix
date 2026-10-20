@@ -24,6 +24,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		if address := swiftui_bridged_inputs_symbol(symbol) { return address }
 		if address := swiftui_body_symbol(symbol) { return address }
 		if address := swiftui_view_factory_symbol(symbol) { return address }
+		if address := swiftui_view_defaults_symbol(symbol) { return address }
 		if address := swiftui_coordinator_symbol(symbol) { return address }
 		if address := swiftui_environment_transform_symbol(symbol) { return address }
 		if address := swiftui_font_title_symbol(symbol) { return address }

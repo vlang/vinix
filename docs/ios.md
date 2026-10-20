@@ -12091,17 +12091,56 @@ The call at `0x1015c0aa8` forwards the caller's arguments through a small wrappe
 These sites were inspected without executing application code. Fortnite still
 stops before application entry and remains unplayable.
 
+The default `View._makeView`, `View._makeViewList` and `View._viewListCount`
+imports now have distinct terminal diagnostics. They require Body's View
+conformance and graph traversal, which remain unsupported. Native metadata
+inspection measures `_GraphValue<Int>` at 4 bytes, `_ViewInputs` at 84,
+`_ViewListInputs` at 129 and `_ViewListCountInputs` at 80. The native entries
+read graph values and inputs indirectly. `_ViewOutputs` and `_ViewListOutputs`
+are resilient owned values of 16 and 65 bytes; the count result is `Int?`,
+size 9 and stride 16. Binding these diagnostics does not construct graph
+outputs or supply a count.
+
+Fresh IPA inspection finds these required default View imports and calls:
+
+| Hook | GOT fixup | Stub | Forwarder | Calls |
+| --- | --- | --- | --- | --- |
+| `_makeView` | `0x10dc9b3a0` | `0x10c63ab48` | `0x107c28ee4` | `0x1015c0aa8` |
+| `_makeViewList` | `0x10dc9b3a8` | `0x10c63ab54` | `0x107c28ee8` | `0x1015c0abc` |
+| `_viewListCount` | `0x10dc9b3b0` | `0x10c63ab60` | `0x107c28e58` | `0x1015be82c`, `0x1015c0ad0` |
+
+The count hook also serves a UIViewRepresentable wrapper. Both callers mask
+the optional-result tag. No graph factory or application code was executed.
+
+`tests/ios/native-checks.v build-swiftui-view-defaults` selects the fixture.
+Normal and deterministic ASan/UBSan runs cover its O2 entry and the existing
+representable factory/list diagnostics. The fixture checks seven native ABI
+layouts and 96 terminal child calls with protected graph, inputs, metadata,
+witness, stack, Self and x8 values, unchanged shared result pages at both
+protected boundaries, exact routing, eight readers and two drained lifetimes.
+Seven executable/generated-C pairs, SDK/ABI snapshots, native measurements,
+call-site traces and joined logs are retained under
+`build/ios/fortnite/swiftui-view-defaults-checks`. Graph construction, count
+traversal and rendering remain unsupported.
+
+The fresh launch resolves all three diagnostic bindings and exits 1 during
+linking at `_$s7SwiftUI4ViewPAAE7opacityyQrSdF`, View's opacity modifier.
+Its fixup is `0x10dc9b3b8`, stub `0x10c63ab6c` and forwarder `0x107c28eac`.
+The call at `0x1015bfa7c` passes opacity 0 or 1 in d0, Self in x20 and an
+indirect result in x8. These sites were inspected without executing application
+code. Fortnite still stops before application entry and remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,844 | 317 | 78 |
+| Fortnite executable | 1,847 | 314 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,684 | 320 | 114 |
+| All images | 2,687 | 317 | 114 |
 
-The C++/GLES/Text variant reports 2,698 resolved imports, 306 unresolved strong
+The C++/GLES/Text variant reports 2,701 resolved imports, 303 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
