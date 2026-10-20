@@ -12499,24 +12499,55 @@ The required fixup is `0x10dc9b410`; a consumer at `0x1015c1190` loads it before
 calling `swift_getWitnessTable` at `0x1015c1198`. These references were inspected
 without executing application code.
 
-The fresh launch resolves VStack's View conformance and exits 1 during linking
-at `_$s7SwiftUI6ZStackV9alignment7contentACyxGAA9AlignmentV_xyXEtcfC`, the
-ZStack(alignment:content:) initializer. Its required fixup is `0x10dc9b418`,
+`ZStack(alignment:content:)` now has an explicit diagnostic binding. Frozen
+ZStack stores `_VariadicView.Tree<_ZStackLayout, Content>`. Native ARM64
+construction takes the two Alignment words in x0/x1, builder function/context
+in x2/x3, Content metadata and its View witness in x4/x5, and the indirect
+result in x8. EmptyView and Text specializations have size/stride 16 and 48
+respectively, with Content at offset 16 in both.
+
+Six native construction cases cover `.center`, `.topLeading` and `.bottomTrailing`
+alignments with both content types. Each calls the builder once with a
+protected borrowed context and temporary Content storage. Copies and
+destruction balance owned Text/String references, preserve x20/x21 and leave
+result canaries intact. No graph, rendering or application code executes.
+
+Vinix stops before calling the builder, reading Content metadata or its View
+witness, changing ownership or writing results. Generic Tree/ZStack metadata,
+Content ownership, construction and rendering remain unsupported.
+`tests/ios/native-checks.v build-swiftui-zstack-init` checks 136 terminal child
+calls, protected builder/context/metadata/witness/stack arguments/Self/x8,
+arbitrary alignment words, valid builders that must never run, unchanged
+shared writable/read-only result pages at both guard boundaries, eight
+readers, callbacks and two drained runtime lifetimes. Native measurements,
+_ZStackLayout and VStack initializer sanitizer regressions, generated C and
+isolated ARM64 results are retained under
+`build/ios/fortnite/swiftui-zstack-init-checks`.
+
+The import is
+`_$s7SwiftUI6ZStackV9alignment7contentACyxGAA9AlignmentV_xyXEtcfC`.
+Its required fixup is `0x10dc9b418`,
 stub `0x10c63abc0`, forwarder `0x107c28ea4` and direct call `0x1015bf6f8`.
-These references were inspected without executing application code. Fortnite
-still stops before application entry and remains unplayable.
+These references were inspected without executing application code.
+
+The fresh launch resolves this initializer import and exits 1 during linking
+at `_$s7SwiftUI6ZStackVMn`, ZStack's nominal type descriptor. Its required
+import cell is `0x10dc9b420` in `__DATA_CONST,__got`, referenced by an indirect
+context symbolic reference at `0x10dc7fc5a` in `__TEXT,__swift5_typeref`.
+These data references were inspected without executing application code.
+Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,859 | 302 | 78 |
+| Fortnite executable | 1,860 | 301 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,699 | 305 | 114 |
+| All images | 2,700 | 304 | 114 |
 
-The C++/GLES/Text variant reports 2,713 resolved imports, 291 unresolved strong
+The C++/GLES/Text variant reports 2,714 resolved imports, 290 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
