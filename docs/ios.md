@@ -13604,10 +13604,47 @@ reviews, primary contracts, native measurements, compressed artifacts and
 original-image traces are retained under
 `build/ios/fortnite/object-any-checks`.
 
-The fresh launch exits 1 during linking at `_HashTable.previousHole(before:)`,
-`_$ss10_HashTableV12previousHole6beforeAB6BucketVAF_tF`. Its required cell
+Swift core now exports `_HashTable.previousHole(before:)`,
+`_$ss10_HashTableV12previousHole6beforeAB6BucketVAF_tF`. The direct ARM64 entry
+accepts the bucket offset in x0 and the frozen table's words pointer and mask in
+x1/x2, returning the preceding hole in x0 while preserving x20/x21. It searches
+strictly before the given bucket, wraps through earlier words and can return
+the starting bucket after a full circle when that is the only hole. These
+semantics follow [Swift's HashTable implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/HashTable.swift).
+
+The caller borrows a complete, stable, aligned occupancy bitmap. Its bucket
+count must be a positive signed power of two; unused bits in a partial word
+must be set. Checked failures reject malformed arguments and full bitmaps
+finitely. Valid searches only read the bitmap, allocate no memory and use no
+locks, ARC or runtime-owned storage. Publication is scoped to the active Swift
+core runtime; an existing direct function pointer can still read caller-owned
+storage after runtime teardown. Other HashTable operations remain unsupported.
+
+```sh
+v run tests/ios/native-checks.v build-hash-previous-hole
+```
+
+Native macOS comparisons exhaust every nonfull bitmap with one, two, four,
+eight or sixteen buckets and every starting bucket. Both guarded readonly
+boundaries are checked through 32,768 buckets, including cross-word scans,
+wraparound, sole holes, random multiple holes and preserved x20/x21.
+Compatibility checks also cover finite full/malformed rejection, scoped
+exports, eight concurrent readers and two empty runtime teardowns. The required
+cell
 `0x10dc9b8b8`, stub `0x10c63ae30`, branch island `0x107c28b14` and two callers
 were inspected without executing application code.
+
+Ten ASan/UBSan runs pass across both C++ backend configurations and Set,
+Dictionary metadata and Hasher regressions. Four isolated ARM64 phases pass:
+the bitmap fixture, fresh launch probe and both import audits. Generated
+C/ARM64 reviews, primary contracts, native measurements, compressed artifacts
+and original-image traces are retained under
+`build/ios/fortnite/hash-previous-hole-checks`.
+
+The fresh launch exits 1 during linking at `_MergeError` metadata,
+`_$ss11_MergeErrorON`. Its required data cell `0x10dc9b8c0` and consumer
+`0x10006845c`, which passes the metadata to `swift_allocError`, were inspected
+without executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13615,12 +13652,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,915 | 246 | 78 |
+| Fortnite executable | 1,916 | 245 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,755 | 249 | 114 |
+| All images | 2,756 | 248 | 114 |
 
-The C++/GLES/Text variant reports 2,769 resolved imports, 235 unresolved strong
+The C++/GLES/Text variant reports 2,770 resolved imports, 234 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

@@ -37,6 +37,7 @@ fn swift_hash_emit(code u64) {
 }
 
 fn swift_hash_symbol(symbol string) ?u64 {
+	if entry := swift_hash_table_symbol(symbol) { return entry }
 	if symbol == '_$sSSSHsWP' {
 		return swift_string_hashable_table_checked() or { panic(err) }
 	}
