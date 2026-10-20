@@ -269,6 +269,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_fatal_symbol(symbol) { return address }
 	if address := swift_array_symbol(symbol) { return address }
 	if address := swift_optional_symbol(symbol) { return address }
+	if address := swift_object_any_symbol(symbol) { return address }
 	if address := swift_bool_metadata_symbol(symbol) { return address }
 	if address := swift_integer_symbol(symbol) { return address }
 	if address := swift_hash_symbol(symbol) { return address }

@@ -216,6 +216,8 @@ mut:
 	swift_optional_arena u64 // Optional accessor/descriptor and writable generic cache.
 	swift_optional_metadata map[u64]u64 // Wrapped metadata -> sealed complete Optional metadata/VWT.
 	swift_optional_retired bool
+	swift_object_any_arena u64 // RX bridge entry and RO AnyObject existential metadata.
+	swift_object_any_retired bool
 	swift_array_encoding_arena u64 // Encodable descriptor, dispatch adapters and generic cache pages.
 	swift_array_encoding_descriptor u64 // Remembered through retirement before stale descriptor reads.
 	swift_array_encoding map[u64]u64 // Array metadata -> sealed table with a private Element:Encodable word.

@@ -13566,12 +13566,48 @@ Generated C/ARM64 reviews, primary contracts, native measurements, compressed
 artifacts and original-image traces are retained under
 `build/ios/fortnite/optional-metadata-checks`.
 
-The fresh launch exits 1 during linking at `_bridgeAnyObjectToAny`,
-`_$ss018_bridgeAnyObjectToB0yypyXlSgF`. Its required cell `0x10dc9b8a8` routes
-through stub `0x10c63ae18` and branch island `0x107c29354` to two inspected
-callers that bridge Objective-C results into Swift Any values. The required
-operation accepts a possibly null object and returns Any, as specified by
+The Swift core `_bridgeAnyObjectToAny` entry,
+`_$ss018_bridgeAnyObjectToB0yypyXlSgF`, now returns owned Any values from borrowed
+object references. Its ARM64 adapter accepts the object in x0 and the indirect
+32-byte result in x8. It writes the object word and metadata at offset 24 while
+preserving the intervening padding. A nonnull result carries its dynamic/formal
+class metadata and one acquired strong reference. A null input becomes an Any
+containing Optional<AnyObject>.none, using canonical class-constrained AnyObject
+metadata and the existing generic Optional witnesses. This matches
 [Swift's Objective-C bridge](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/BridgeObjectiveC.swift).
+
+The bridge supports live registered Objective-C instances/constants and Swift
+class instances with complete one-reference witnesses. Tagged references,
+private buffers and nonclass contexts remain unsupported; rejected inputs leave
+the result untouched and do not consume the source. Formal-class callbacks run
+without a registry lock. The sealed RX/RO adapter and AnyObject metadata retire
+after Optional specializations and before their shared UnknownObject witnesses,
+once all values and callbacks have drained. The export is scoped to Swift core.
+
+```sh
+v run tests/ios/native-checks.v build-object-any
+```
+
+Native macOS comparisons cover nil and dynamic base/subclass objects, exact
+result metadata and padding, guarded result boundaries, readonly Any sources,
+copy/take/assignment/destruction ownership and preserved x20/x21. Compatibility
+checks additionally cover registered constants, a Swift heap class whose last
+owner is an Any, rejection during deallocation, unlocked formal-class reentry,
+eight cold publishers/workers and two drained/unmapped lifetimes. The original
+cell `0x10dc9b8a8`, stub `0x10c63ae18`, branch island `0x107c29354` and two callers
+were inspected without executing application code.
+
+Ten ASan/UBSan runs pass across both C++ backend configurations and Any,
+dynamic-cast and object-type regressions. Four isolated ARM64 phases pass: the
+bridge fixture, fresh launch probe and both import audits. Generated C/ARM64
+reviews, primary contracts, native measurements, compressed artifacts and
+original-image traces are retained under
+`build/ios/fortnite/object-any-checks`.
+
+The fresh launch exits 1 during linking at `_HashTable.previousHole(before:)`,
+`_$ss10_HashTableV12previousHole6beforeAB6BucketVAF_tF`. Its required cell
+`0x10dc9b8b8`, stub `0x10c63ae30`, branch island `0x107c28b14` and two callers
+were inspected without executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13579,12 +13615,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,914 | 247 | 78 |
+| Fortnite executable | 1,915 | 246 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,754 | 250 | 114 |
+| All images | 2,755 | 249 | 114 |
 
-The C++/GLES/Text variant reports 2,768 resolved imports, 236 unresolved strong
+The C++/GLES/Text variant reports 2,769 resolved imports, 235 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
