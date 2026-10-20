@@ -129,17 +129,42 @@ retained stack/memory checks and the normal application/input/result path;
 it does not establish full runtime conformance or phone hardware support.
 Use matching rebuilt overlays for the complete guest test below.
 
-Two more complex, unchanged open-source APKs were also tried on that runtime:
+The V framework extension now runs two larger, unchanged open-source APKs on
+the preserved ARM64 runtime. On 21 October 2026, QMP input exercised these
+workflows in the actual Vinix desktop:
 
-| APK | Startup result |
+| APK | Verified workflow |
 | --- | --- |
-| [Editor 1.98](https://github.com/billthefarmer/editor/tree/v1.98) | Stops on missing `ActionBar.setSubtitle(CharSequence)`. |
-| [Open Sudoku 2.5.2](https://gitlab.com/opensudoku/opensudoku/-/tree/2.5.2) | Stops on missing inherited `Activity.startManagingCursor(Cursor)`. |
+| [Editor 1.98](https://github.com/billthefarmer/editor/tree/v1.98) | Enter edit mode through Activity recreation, type text, save through the filename dialog, clear the document, and reopen the saved file. |
+| [Open Sudoku 2.5.2](https://gitlab.com/opensudoku/opensudoku/-/tree/2.5.2) | Open Easy and a puzzle, dismiss the reusable hints, select Single number mode, enter `7` by touch, return to the list, and reopen with that value retained. |
 
-Both failed before a usable application window was observed. The refreshed
-evidence records each download URL, APK hash, entry activity and first missing
-method. These attempts establish concrete framework gaps; editing, file
-operations and Sudoku gameplay remain unverified.
+![Editor APK after reopening its saved document](screenshots/vinix-android-editor-qemu.png)
+
+![Open Sudoku APK with an entered value retained after reopening](screenshots/vinix-android-opensudoku-qemu.png)
+
+These are QEMU framebuffer captures. The test uses the existing **Android
+Calculator** desktop launcher slot for each APK, so that outer caption remains
+in the captures. The APKs supply the document editor, puzzle boards and data.
+[Workflow evidence and reproduction instructions](../tests/android/results/2026-10-21/README.md)
+record APK hashes, framework provenance, screenshots and serial logs.
+Sudoku's popup tabs and advanced operations are outside these checks.
+
+The [V framework module](../build-support/android/atlframework/README.md)
+implements the missing ActionBar, options menus, cursor adapter/lifecycle,
+ListActivity row dispatch, callbacks and dialog behavior. Recreation delivers
+the saved Bundle to a new Activity and restores EditText values with stable
+IDs. ScrollView commands update real GTK scroll adjustments; smooth scrolling
+currently changes position immediately. Themes apply a system base before app
+overlays, buttons use their default style, and ICU charset enumeration excludes
+converters the installed Java provider cannot construct. The normal ATL build
+generates the JNI declarations and packages the V library with source/tool
+hashes in its manifest. APK files are not patched.
+
+GTK still uses X11 inside the Vinix desktop. Removing it requires a GTK display,
+input and rendering backend for Vinix WS. The app failures fixed here were in
+the Android framework layer. These focused application checks retain stack and
+memory probes; they do not establish complete runtime conformance or mobile
+hardware support.
 
 On an existing X11 display, including a session started with `startx`, launch
 another APK with:

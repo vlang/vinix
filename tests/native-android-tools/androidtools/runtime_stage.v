@@ -140,7 +140,7 @@ pub fn stage_runtime(options RuntimeOptions, package_lock ah.Value, downloads st
 	options.command([root() + '/build-support/java-cacerts', runtime + '/usr/share/ca-certificates/mozilla', runtime + '/etc/ssl/certs/java/cacerts'], os.environ())!
 	if os.exists(runtime + '/usr/share/atl') { copy_tree(runtime + '/usr/share/atl', staging + '/usr/share/atl', true)! }
 	commands := staging + '/usr/bin'; posix_parents(commands)!
-	os.cp(root() + '/build-support/android/run-android', commands + '/run-android')!
+	os.write_file(commands + '/run-android', framework_launcher(os.read_file(root() + '/build-support/android/run-android')!)!)!
 	os.chmod(commands + '/run-android', 0o755)!
 	mut manifest := json2.decode[ah.Value](ah.encode(package_lock), strict: true)!.object()
 	for name, value in {'runtime_prefix': ah.Value(runtime_prefix), 'execution': ah.Value('native'), 'page_size': ah.Value(16384), 'art': art, 'bionic': bionic, 'atl': atl, 'musl': musl, 'upstream': ah.Value('https://gitlab.com/android_translation_layer/android_translation_layer')} { manifest[name] = value }

@@ -1,0 +1,87 @@
+{
+  "date": "2026-10-21",
+  "timezone": "Europe/Moscow",
+  "scope": "Focused APK workflows in ARM64 Vinix QEMU using the preserved 3 October runtime plus the V framework extension; stack and memory probes retained.",
+  "full_runtime_conformance_passed": false,
+  "full_runtime_note": "The preserved base failed the newer fork ABI preflight on 20 October. The full preflight was not rerun here; use matching rebuilt overlays for full conformance.",
+  "display_backend": "GTK through embedded X11 in the native Vinix desktop",
+  "native_ws_backend_implemented": false,
+  "apks_modified": false,
+  "duplicate_inner_titlebar_visible": false,
+  "outer_caption": "The investigation uses the existing Android Calculator desktop entry for all three APKs.",
+  "host_checks": {
+    "framework_transformation": "PASS: lifecycle bodies preserved, static JNI factory, declaration guards, cursor constructors and launcher path",
+    "runtime_staging": "26 cases PASS",
+    "runner_session": "PASS: real PTY/QMP acknowledgements, shifted key, serial drain, screenshots, observation and failure cleanup",
+    "native_library": "ARM64 build passed -Wall -Wextra -Werror; LOAD alignment 65536; no V heap allocation imports",
+    "calculator_input": "Complete taps sent in a single QMP request, retaining per-character APK acknowledgements"
+  },
+  "applications": [
+    {
+      "id": "editor",
+      "application": "Editor",
+      "version": "1.98",
+      "apk": "build/android-complex/Editor-1.98.apk",
+      "apk_url": "https://f-droid.org/repo/org.billthefarmer.editor_198.apk",
+      "source_url": "https://github.com/billthefarmer/editor/tree/v1.98",
+      "activity": "org/billthefarmer/editor/Editor",
+      "state_dir": "build/android-framework/editor-final",
+      "workflow_passed": true,
+      "verification": "Real QMP input and manual inspection of successive framebuffer captures; delayed callbacks and serial log checked after reopening.",
+      "steps": [
+        "Choose Edit; Activity recreation retains edit mode.",
+        "Type Vinix Android APK test; word count becomes 4 words and 22 characters.",
+        "Open Save as; edit the actual filename field to Documents/Vinix.txt and press Save.",
+        "Choose New file; text clears and counts become 0 and 0.",
+        "Choose Open recent and Documents/Vinix.txt; a new Activity reads the saved document.",
+        "Observe the restored text, 4 words and 23 characters including the newline written by Editor; delayed scroll restoration completes without a JNI abort."
+      ],
+      "saved_text": "Vinix Android APK test\n",
+      "screenshots": [
+        "docs/screenshots/vinix-android-editor-qemu.png",
+        "tests/android/results/2026-10-21/editor-save-dialog.png",
+        "tests/android/results/2026-10-21/editor-cleared.png",
+        "tests/android/results/2026-10-21/editor-recent.png"
+      ]
+    },
+    {
+      "id": "opensudoku",
+      "application": "Open Sudoku",
+      "version": "2.5.2",
+      "apk": "build/android-complex/OpenSudoku-2.5.2.apk",
+      "apk_url": "https://f-droid.org/archive/org.moire.opensudoku_20180507.apk",
+      "source_url": "https://gitlab.com/opensudoku/opensudoku/-/tree/2.5.2",
+      "activity": "org/moire/opensudoku/gui/FolderListActivity",
+      "state_dir": "build/android-framework/sudoku-final",
+      "workflow_passed": true,
+      "verification": "Real QMP pointer input and manual inspection of the board, saved list preview and reopened puzzle; serial checked for linkage/JNI failures.",
+      "steps": [
+        "Dismiss the initial changelog dialog, open Easy and the first puzzle.",
+        "Dismiss the queued reusable hints and switch to Single number mode.",
+        "Select 7 and tap row 1, column 1; observe the inserted value.",
+        "Use Back; the list shows Playing 05:20 and a preview containing the new 7.",
+        "Reopen the first puzzle; row 1, column 1 still contains 7."
+      ],
+      "coverage_limit": "Single number touch workflow; popup tabs, import/export and other advanced operations are not covered.",
+      "screenshots": [
+        "docs/screenshots/vinix-android-opensudoku-qemu.png",
+        "tests/android/results/2026-10-21/sudoku-entered.png",
+        "tests/android/results/2026-10-21/sudoku-saved-list.png"
+      ]
+    },
+    {
+      "id": "arity",
+      "application": "Arity",
+      "version": "1.1",
+      "apk": "build/android-calculator-20261020-borderless-prepared/overlay/opt/android-test/application.apk",
+      "source_url": "https://code.google.com/archive/p/arity-calculator/",
+      "state_dir": "build/android-framework/calculator-final",
+      "workflow_passed": true,
+      "verification": "Automated per-key acknowledgement and test-only observation of actual APK text; the observer performs no calculation.",
+      "expression": "123+456",
+      "expected": "579",
+      "key_retries": 0,
+      "screenshots": ["docs/screenshots/vinix-android-calculator-framework-qemu.png"]
+    }
+  ]
+}

@@ -127,7 +127,7 @@ pub fn configuration_probe_digest(support string) !string {
 }
 
 pub fn dex_adapter_digest(support string) !string {
-	return native_producer_digest(support, ['tests/native-android-tools/main.v'], ['tests/native-android-tools/androidtools', 'build-support/android/androidhost', 'build-support/android/boothost', 'tools/sourcecommand', 'build-support/cachecli', 'build-support/cachekey', 'tests/linuxkpi/hosttest', 'build-support/tarcore', 'build-support/tarstream'])!
+	return native_producer_digest(support, ['tests/native-android-tools/main.v'], ['tests/native-android-tools/androidtools', 'build-support/android/androidhost', 'build-support/android/boothost', 'build-support/android/atlframework', 'tools/sourcecommand', 'build-support/cachecli', 'build-support/cachekey', 'tests/linuxkpi/hosttest', 'build-support/tarcore', 'build-support/tarstream'])!
 }
 
 fn producer_sources(root string, relative string, mut paths []string) ! {

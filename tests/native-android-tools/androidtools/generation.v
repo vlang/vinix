@@ -64,7 +64,7 @@ fn closure(directory string, mut paths []string) ! {
 
 pub fn runtime_inputs() ![]u8 {
 	mut paths := ['tests/native-android-tools/main.v', 'build-support/android/runtime-v-abi.h', 'build-support/android/musl-statistics.h', 'build-support/compile-v-module', 'tests/linuxkpi/generate_module.v', 'build-support/find-v.sh']
-	for directory in ['build-support/android/runtimecore', 'tests/native-android-tools/androidtools', 'tests/native-generators/generators', 'tests/linuxkpi/hosttest', 'tools/sourcecommand', 'build-support/cachecli', 'build-support/cachekey', 'tests/native-guest-tools/guesthost', 'tests/qemu-core/fixturehost', 'tests/host-policy/policyhost', 'tests/native-policy-tools/nativepolicy', 'compat/ios/plist', 'tools/qmpclient', 'build-support/tarcore', 'build-support/tarstream'] { closure(directory, mut paths)! }
+	for directory in ['build-support/android/runtimecore', 'build-support/android/atlframework', 'tests/native-android-tools/androidtools', 'tests/native-generators/generators', 'tests/linuxkpi/hosttest', 'tools/sourcecommand', 'build-support/cachecli', 'build-support/cachekey', 'tests/native-guest-tools/guesthost', 'tests/qemu-core/fixturehost', 'tests/host-policy/policyhost', 'tests/native-policy-tools/nativepolicy', 'compat/ios/plist', 'tools/qmpclient', 'build-support/tarcore', 'build-support/tarstream'] { closure(directory, mut paths)! }
 	version := checked(['sh', '-c', '. "$1/build-support/find-v.sh"; "$V" -version', 'find-v', root()])!.stdout.trim_space()
 	mut result := []u8{}
 	for path in paths { result << path.bytes(); result << u8(0); result << os.read_bytes(root() + '/' + path)!; result << u8(0) }
@@ -89,7 +89,9 @@ pub fn generation_cli(command string, argv []string) !int {
 	arch := args.value('--arch', 'arm64')
 	if arch !in ['arm64', 'amd64'] { return InputError{'unsupported Android runtime architecture'} }
 	output := hosttest.module_resolve(args.positional[0])!
-	if command == 'compile-atl-configuration' {
+	if command == 'compile-framework' {
+		build_framework_library(output, args.value('--cc', 'aarch64-linux-musl-gcc'), hosttest.module_resolve(args.value('--generated-dir', os.dir(output) + '/generated'))!, arch)!
+	} else if command == 'compile-atl-configuration' {
 		if '--cc' in args.options || '--generated-dir' in args.options { return error('configuration generation does not accept library build options') }
 		generators.generate_module(root() + '/build-support/android/atlconfiguration', output, arch, ['nofloat'])!
 	} else if '--cc' in args.options {

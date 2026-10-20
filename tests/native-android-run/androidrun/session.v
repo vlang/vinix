@@ -119,12 +119,9 @@ fn (mut session Session) keyboard() !int {
 		expected := characters[..index + 1].string()
 		for attempt in 0 .. 3 {
 			if attempt > 0 { retries++ }
-			for event in events {
-				session.command('input-send-event', {
-					'events': ah.Value([event])
-				})!
-				session.input_pause(0.35)!
-			}
+			// Deliver a complete tap together. Holding a key across host waits
+			// can trigger the guest's repeat timer under load.
+			session.command('input-send-event', {'events': ah.Value(events)})!
 			deadline := time.sys_mono_now() + 8 * time.second
 			mut actual := ''
 			for time.sys_mono_now() < deadline {

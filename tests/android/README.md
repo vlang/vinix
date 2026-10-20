@@ -1,5 +1,13 @@
 # Android calculator smoke test
 
+Editor 1.98 and Open Sudoku 2.5.2 also have retained
+[application workflow checks](results/2026-10-21/README.md): Editor saves and
+reopens a document; Sudoku accepts touch input in Single number mode and
+retains progress after returning to its list. Their observation runner keeps
+`passed: null`; the separate workflow verdicts describe the actions inspected
+in real QMP frames. The preserved runtime still needs matching rebuilt
+overlays for the full runtime preflight.
+
 Run the native host checks for launcher arguments, private environment,
 helper caches, status propagation and stack limits with:
 
