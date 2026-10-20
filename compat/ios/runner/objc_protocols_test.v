@@ -60,7 +60,7 @@ fn p_native_protocol(api PApi, name &char, parent u64) u64 {
 	assert p_get(api, name) == value
 	return value
 }
-fn p_class(api PApi, parent u64, name &char) u64 {
+fn p_fixture_class(api PApi, parent u64, name &char) u64 {
 	if api.native { return unsafe { PAllocateClass(C.dlsym(voidptr(api.objc), c'objc_allocateClassPair'))(parent, name, 0) } }
 	return objc_allocate_class(parent, name, 0)
 }
@@ -88,11 +88,11 @@ fn p_shared(api PApi, parent u64, child u64, unicode u64) {
 	assert p_bool(api, 4, child, parent) && p_bool(api, 4, child, child) && !p_bool(api, 4, parent, child)
 	assert !p_bool(api, 4, 0, child) && !p_bool(api, 4, child, 0)
 	root := if api.native { unsafe { PGet(C.dlsym(voidptr(api.objc), c'objc_getClass'))(c'NSObject') } } else { ios_runtime.names['NSObject'] }
-	cls := p_class(api, root, c'VinixProtocolFixtureClass')
+	cls := p_fixture_class(api, root, c'VinixProtocolFixtureClass')
 	assert cls != 0 && !p_bool(api, 5, cls, child)
 	assert p_bool(api, 6, cls, child) && !p_bool(api, 6, cls, child)
 	p_register(api, cls)
-	subclass := p_class(api, cls, c'VinixProtocolFixtureSubclass')
+	subclass := p_fixture_class(api, cls, c'VinixProtocolFixtureSubclass')
 	p_register(api, subclass)
 	assert p_bool(api, 5, cls, parent) && !p_bool(api, 5, subclass, child) && !p_bool(api, 5, root, child)
 	assert p_message(api, subclass, child) && !p_message(api, root, child)

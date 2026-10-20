@@ -12904,10 +12904,47 @@ Six sanitizer runs cover both backend configurations and the throw regression;
 generated C/ARM64 review, native sources and four isolated ARM64 phases are
 retained under `build/ios/fortnite/objc-terminate-checks`.
 
-The fresh launch exits 1 during linking at `_protocol_getMethodDescription`.
-Its required cell `0x10dc9b710`, stub `0x10c63e568`, branch forwarder
-`0x107c283c4` and two direct calls (`0x100055b28`, `0x100080f04`) were
-inspected without executing application code.
+The protocol-method import has required cell `0x10dc9b710`, stub `0x10c63e568`,
+branch forwarder `0x107c283c4` and two direct calls (`0x100055b28`, `0x100080f04`)
+that were inspected without executing application code.
+
+`_protocol_getMethodDescription` now returns the canonical selector and borrowed
+type-encoding pointer in ARM64 registers x0/x1. Required/optional and
+instance/class declarations use four separate lists. Lookup checks the protocol
+itself before walking adopted protocols depth first in declaration order,
+matching [Apple's runtime](https://github.com/apple-oss-distributions/objc4/blob/main/runtime/objc-runtime-new.mm).
+Nil protocols/selectors and missing methods return two null pointers. A found
+declaration preserves the distinction between null and empty type encodings.
+
+Image registration validates big and direct/indirect relative method lists
+before publishing protocol roots or rewriting references. Protocol declarations
+have no executable implementation to validate; their IMP fields are not followed.
+Selectors are interned and type encodings copied into protocol-owned storage.
+Duplicate aliases keep the first declaration, so returned pointers remain valid
+after source metadata is retired and until quiescent runtime shutdown. The six
+built-in protocols also carry their 26 ARM64 method declarations. Each list is
+limited to 4096 entries; names and type encodings retain the existing 1023-byte
+and 65535-byte limits. Lookup uses bounded stack scratch and allocates no heap
+storage. Shutdown frees every owned encoding and method map.
+
+`tests/ios/native-checks.v build-protocol-method` compares all four lookup modes,
+own/inherited/diamond precedence, Unicode and long encodings, nil/missing results
+and the raw x0/x1 ABI against the native Mac runtime. Private fixtures cover
+all three list formats, null/empty type strings, duplicate aliases, guarded
+limits, malformed registration without partial publication, protected source
+retirement, invalid identities, cycles, eight concurrent readers and callback
+access during two drained runtime lifetimes. Six sanitizer runs cover both C++
+backend configurations and the existing protocol lookup regression. Its test
+class helper was renamed to avoid a collision with the system resolver header.
+Generated C/ARM64 review, native sources and four isolated ARM64 phases are
+retained under `build/ios/fortnite/protocol-method-checks`.
+
+The fresh launch exits 1 during linking at the unsupported
+`/usr/lib/libsqlite3.dylib`, starting with `_sqlite3_bind_blob`.
+Its required cell `0x10dc9b720`, stub `0x10c63e8ec`, branch forwarder
+`0x107c28408` and direct call `0x100057980` were inspected without executing
+application code. That call passes the statement, index 3, borrowed blob bytes,
+byte length and a null destructor.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12915,12 +12952,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,876 | 285 | 78 |
+| Fortnite executable | 1,877 | 284 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,716 | 288 | 114 |
+| All images | 2,717 | 287 | 114 |
 
-The C++/GLES/Text variant reports 2,730 resolved imports, 274 unresolved strong
+The C++/GLES/Text variant reports 2,731 resolved imports, 273 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the

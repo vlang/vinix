@@ -8,6 +8,7 @@ mut:
 	name string
 	parents []u64
 	index int
+	descriptions [4]map[u64]ObjProtocolMethod
 }
 struct ObjProtocolFailure {}
 fn (_ &ObjProtocolFailure) msg() string { return 'iOS: unsupported Objective-C protocol metadata or name' }
@@ -30,6 +31,7 @@ fn objc_protocol_define(name string) !u64 {
 	info.index = ios_runtime.protocols.len
 	info.parents = []u64{}
 	info.parents.flags |= .noslices
+	for slot in 0 .. 4 { info.descriptions[slot] = map[u64]ObjProtocolMethod{} }
 	unsafe { *(&u64(address)) = ios_runtime.names['Protocol']; *(&u64(address + 8)) = u64(info.name.str) }
 	write32(address + 64, 96)
 	ios_runtime.protocol_names[info.name] = address
@@ -44,6 +46,7 @@ fn objc_protocols_start() {
 	mut root := ios_runtime.classes[ios_runtime.names['NSObject']] or { panic('iOS: missing protocol root class') }
 	root.protocols.flags |= .noslices
 	root.protocols << ios_runtime.protocol_names['NSObject']
+	objc_protocol_methods_start()
 }
 fn objc_protocol_canonical(protocol u64) u64 {
 	if protocol in ios_runtime.protocols { return protocol }
@@ -178,6 +181,7 @@ fn (m ObjMetadata) protocol_validate(address u64, depth int, mut seen map[u64]u8
 	m.range(address, size, false)!
 	name := m.string_at(read64(address + 8))!
 	if name.len == 0 || !utf8.validate_str(name) { return objc_protocol_failure() }
+	m.protocol_methods_validate(address)!
 	seen[address] = 1
 	list := read64(address + 16)
 	if list != 0 {
@@ -196,6 +200,7 @@ fn (m ObjMetadata) protocol_publish(address u64) !u64 {
 	value := objc_protocol_define(m.string_at(read64(address + 8))!)!
 	ios_runtime.protocol_aliases[address] = value
 	mut info := ios_runtime.protocols[value] or { return objc_protocol_failure() }
+	m.protocol_methods_publish(address, mut info)!
 	list := read64(address + 16)
 	if list != 0 {
 		for i in u64(0) .. read64(list) {
@@ -243,6 +248,7 @@ fn (m ObjMetadata) protocols_register() ! {
 fn objc_protocols_stop() {
 	for address, info in ios_runtime.protocols {
 		ios_runtime.constants.delete(address)
+		objc_protocol_methods_free(info)
 		unsafe { info.name.free(); info.parents.free() }
 		C.free(info)
 		C.free(unsafe { voidptr(address) })

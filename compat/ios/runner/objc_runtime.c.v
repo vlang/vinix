@@ -387,6 +387,7 @@ fn objc_runtime_symbol(symbol string) ?u64 {
 		'_method_getName' { u64(unsafe { voidptr(objc_method_name) }) }
 		'_objc_getProtocol' { u64(unsafe { voidptr(objc_get_protocol) }) }
 		'_protocol_getName' { u64(unsafe { voidptr(objc_protocol_name) }) }
+		'_protocol_getMethodDescription' { u64(unsafe { voidptr(objc_protocol_method_description) }) }
 		'_protocol_isEqual' { u64(unsafe { voidptr(objc_protocol_equal) }) }
 		'_protocol_conformsToProtocol' { u64(unsafe { voidptr(objc_protocol_conforms) }) }
 		'_class_conformsToProtocol' { u64(unsafe { voidptr(objc_class_conforms) }) }
