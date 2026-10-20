@@ -13641,10 +13641,48 @@ C/ARM64 reviews, primary contracts, native measurements, compressed artifacts
 and original-image traces are retained under
 `build/ios/fortnite/hash-previous-hole-checks`.
 
-The fresh launch exits 1 during linking at `_MergeError` metadata,
-`_$ss11_MergeErrorON`. Its required data cell `0x10dc9b8c0` and consumer
-`0x10006845c`, which passes the metadata to `swift_allocError`, were inspected
-without executing application code.
+Swift core now exports `_MergeError` metadata `_$ss11_MergeErrorON`, its
+complete accessor `_$ss11_MergeErrorOMa` and nominal descriptor
+`_$ss11_MergeErrorOMn`. The frozen enum has one `keyCollision` case, as defined
+in [Swift's Dictionary implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/Dictionary.swift).
+Its identity is distinct from Void, with enum metadata kind, size zero, stride
+one, alignment one and no extra inhabitants. All eleven value witnesses are
+implemented. Copies, takes, destruction, projection and injection need no value
+storage; the enum's own tag is always zero.
+
+Enclosing single-payload enum tags use one, two or four bytes as required.
+At UInt32.max empty cases, native `_MergeError` still uses one byte, unlike
+Void's zero-byte behavior. Dedicated tag witnesses preserve that distinction.
+Nested Optionals add a tag byte at each level, and typed Arrays use stride one
+with POD destruction. The canonical accessor is sealed RX; metadata,
+descriptors and witnesses are sealed RO before publication. Both pages retire
+after Array/Optional users and callbacks drain, and retired exports cannot
+recreate them. Reflection and the separate Error conformance remain unsupported.
+
+```sh
+v run tests/ios/native-checks.v build-merge-error-metadata
+```
+
+Native macOS comparisons cover complete metadata responses, all eleven
+witnesses, inaccessible zero-size storage, guarded tag-width boundaries and
+UInt32 wrap, three nested Optional representations and preserved x20/x21.
+Compatibility checks also cover symbolic descriptor lookup, typed Array
+destruction, RX/RO mappings, scoped exports, eight cold publishers/readers and
+two drained/unmapped lifetimes. The original required cell `0x10dc9b8c0` and
+consumer `0x10006845c`, which passes the metadata to `swift_allocError`, were
+inspected without executing application code.
+
+Ten ASan/UBSan runs pass across both C++ backend configurations and Void,
+Bool metadata and Optional metadata regressions. Four isolated ARM64 phases
+pass: the metadata fixture, fresh launch probe and both import audits.
+Generated C/ARM64 reviews, primary contracts, native measurements, compressed
+artifacts and original-image traces are retained under
+`build/ios/fortnite/merge-error-metadata-checks`.
+
+The fresh launch exits 1 during linking at the `_MergeError: Error` witness
+table, `_$ss11_MergeErrorOs0B0sWP`. Its required cell `0x10dc9b8c8` and consumer
+`0x100068464`, which loads the table alongside the enum metadata for
+`swift_allocError`, were inspected without executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13652,12 +13690,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,916 | 245 | 78 |
+| Fortnite executable | 1,917 | 244 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,756 | 248 | 114 |
+| All images | 2,757 | 247 | 114 |
 
-The C++/GLES/Text variant reports 2,770 resolved imports, 234 unresolved strong
+The C++/GLES/Text variant reports 2,771 resolved imports, 233 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
