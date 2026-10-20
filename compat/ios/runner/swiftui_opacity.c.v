@@ -109,7 +109,8 @@ fn swiftui_opacity_arena_checked() !u64 {
 	// Associated-conformance witnesses use tagged FF 07 relative accessor data.
 	unsafe { *(&u8(data + 896)) = 0xff; *(&u8(data + 897)) = 7 }
 	swiftui_opacity_symbolic_relative(data + 898, base + 80)
-	C.__builtin___clear_cache(allocation, voidptr(base + 96))
+	swiftui_view_opacity_emit(base + 128)
+	C.__builtin___clear_cache(allocation, voidptr(base + 160))
 	if C.mprotect(allocation, usize(page), C.PROT_READ | C.PROT_EXEC) != 0 || C.mprotect(voidptr(data), usize(page), C.PROT_READ) != 0 {
 		if C.munmap(allocation, usize(page * 2)) != 0 { panic('iOS: cannot retire unsealed SwiftUI opacity witnesses') }
 		return swiftui_opacity_failure()

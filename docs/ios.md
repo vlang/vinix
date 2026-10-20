@@ -12130,17 +12130,54 @@ The call at `0x1015bfa7c` passes opacity 0 or 1 in d0, Self in x20 and an
 indirect result in x8. These sites were inspected without executing application
 code. Fortnite still stops before application entry and remains unplayable.
 
+`View.opacity` now constructs its returned value. It borrows Self in x20,
+copies it once through `initializeWithCopy` using the caller's type metadata,
+and writes the opacity Double into the frozen
+`ModifiedContent<Self, _OpacityEffect>` result in x8. The modifier begins at
+Self's size rounded up to eight bytes; using Self's stride would misplace it
+for types with trailing padding. The adapter preserves x20/x21 and the
+opacity's exact bits, including signed zero, infinity and NaN payloads.
+It neither clamps the value nor changes ownership of the source.
+
+Native SwiftUI comparison covers five generic POD layouts (Void, UInt8, Int,
+Optional<Int> and SIMD4<Float>), EmptyView and a Color with an owned opacity
+provider. Both implementations copy that provider once and balance the result's
+destruction. Generic POD metadata exercises the value ABI with a protected,
+unused View table; it does not fabricate conformances for non-View types.
+The Vinix fixture also checks fifteen sizes with distinct strides, exact
+read-only sources, writable results and untouched alignment padding at both
+guard boundaries, ten IEEE bit patterns,
+overflow rejection before touching Self or result, an instrumented copy witness,
+native ARC, eight concurrent readers, and two drained/unmapped lifetimes.
+
+`tests/ios/native-checks.v build-swiftui-view-opacity` selects the fixture.
+Its sanitizer runs, neighboring opacity/ModifiedContent regressions, isolated
+ARM64 fixture and import audits, native SDK/ABI snapshots, generated C and
+call-site evidence are retained under
+`build/ios/fortnite/swiftui-view-opacity-checks`. The adapter shares the existing
+opacity arena's sealing and retirement. This implements value construction;
+generic ModifiedContent metadata and View conformance instantiation, graph
+construction and rendering remain unsupported.
+
+The new launch resolves `View.opacity` and exits 1 during linking at
+`_$s7SwiftUI4ViewPAAE8disabledyQrSbF`. Fresh IPA inspection locates its fixup
+at `0x10dc9b3c0`, stub at `0x10c63ab78`, forwarder at `0x107c28ecc` and call
+at `0x1015c0030`. The caller passes the disabled Bool in w0, type metadata in
+x1, a View table in x2, borrowed Self in x20 and the result in x8. These sites
+were inspected without executing application code. Fortnite still stops
+before application entry and remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,847 | 314 | 78 |
+| Fortnite executable | 1,848 | 313 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,687 | 317 | 114 |
+| All images | 2,688 | 316 | 114 |
 
-The C++/GLES/Text variant reports 2,701 resolved imports, 303 unresolved strong
+The C++/GLES/Text variant reports 2,702 resolved imports, 302 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
