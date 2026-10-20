@@ -13525,10 +13525,53 @@ Generated C/ARM64 reviews, primary contracts, native measurements, compressed
 artifacts and original-image traces are retained under
 `build/ios/fortnite/integer-description-checks`.
 
-The fresh launch exits 1 during linking at Optional's metadata accessor,
-`_$sSqMa`. Its required cell `0x10dc9b8a0` routes through stub `0x10c63ae00`
-and branch island `0x107c28d18` to four inspected callers, including construction
-of Array<Optional<Element>> and an Optional value-witness copy.
+Optional now exports its generic metadata accessor `_$sSqMa` and nominal
+descriptor `_$sSqMn`. Specializations are canonical by the exact Wrapped
+metadata pointer and return complete responses in x0/x1. Each has a sealed
+metadata/value-witness page with Optional's distinct metadata kind, its Wrapped
+argument, and the computed size, stride, flags and remaining extra inhabitants.
+Wrapped's first spare representation encodes nil; payloads without one gain a
+tag byte. Nested Optionals consume further spare representations before growing.
+This follows the [Swift single-payload enum implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/runtime/Enum.cpp).
+
+Copy, take, assignment and destruction operate on live payloads through Wrapped's
+witnesses. Nil values never retain or destroy a payload. Enum witnesses support
+projection, injection and enclosing single-payload enums, including native tag
+widths and UInt32 arithmetic. Some-to-nil assignment publishes nil before
+destroying the old payload from bounded stack storage, so destructor callbacks
+can reenter safely. Typed arrays use these witnesses to retire only live values.
+The profile requires complete, copyable, bitwise-takable inline Wrapped values,
+alignment at most eight, and an Optional layout fitting the 24-byte value buffer.
+Unsupported layouts fail explicitly. General generic metadata allocation,
+reflection and Optional protocol conformances remain unsupported.
+
+```sh
+v run tests/ios/native-checks.v build-optional-metadata
+```
+
+Native macOS comparisons cover three Optional nesting levels over Int, Bool,
+UInt8 and String: complete metadata responses, layouts/flags, remaining spare
+representations, byte footprints across tag-width/UInt32 boundaries, protected
+copy/take inputs, owned String payloads and x20/x21. Compatibility checks also
+cover Bool's spare-representation exhaustion through 256 levels, typed Array
+destruction, reentrant destructors, RX/RO mappings, eight cold publishers/workers
+and two drained/unmapped lifetimes. The original required cell `0x10dc9b8a0`,
+stub `0x10c63ae00`, branch island `0x107c28d18` and four callers were inspected,
+including Array<Optional<Element>> construction and a value-witness copy.
+
+Ten ASan/UBSan runs pass across both C++ backend configurations and Array
+Sequence, Bool metadata and Int description regressions. Four isolated ARM64
+phases pass: the Optional fixture, fresh launch probe and both import audits.
+Generated C/ARM64 reviews, primary contracts, native measurements, compressed
+artifacts and original-image traces are retained under
+`build/ios/fortnite/optional-metadata-checks`.
+
+The fresh launch exits 1 during linking at `_bridgeAnyObjectToAny`,
+`_$ss018_bridgeAnyObjectToB0yypyXlSgF`. Its required cell `0x10dc9b8a8` routes
+through stub `0x10c63ae18` and branch island `0x107c29354` to two inspected
+callers that bridge Objective-C results into Swift Any values. The required
+operation accepts a possibly null object and returns Any, as specified by
+[Swift's Objective-C bridge](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/BridgeObjectiveC.swift).
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13536,12 +13579,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,913 | 248 | 78 |
+| Fortnite executable | 1,914 | 247 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,753 | 251 | 114 |
+| All images | 2,754 | 250 | 114 |
 
-The C++/GLES/Text variant reports 2,767 resolved imports, 237 unresolved strong
+The C++/GLES/Text variant reports 2,768 resolved imports, 236 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
