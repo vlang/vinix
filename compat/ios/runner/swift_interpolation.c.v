@@ -279,7 +279,12 @@ fn swift_interpolation_metadata() u64 {
 			*(&u64(base + 344)) = u64(voidptr(swift_stream_ascii_literal))
 			*(&u64(base + 352)) = u64(voidptr(swift_bridge_release))
 		}
-		C.__builtin___clear_cache(arena, unsafe { voidptr(base + 360) })
+		// _StringGuts.grow: capacity in x0, inout String in Swift self x20.
+		write32(base + 384, 0xaa1403e1) // mov x1,x20
+		write32(base + 388, 0x58000070) // ldr x16,+16
+		write32(base + 392, 0xd61f0200) // br x16; C preserves x20/x21
+		unsafe { *(&u64(base + 400)) = u64(voidptr(swift_string_grow)) }
+		C.__builtin___clear_cache(arena, unsafe { voidptr(base + 408) })
 		if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 			|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 			C.munmap(arena, usize(page * 2))
@@ -305,6 +310,7 @@ fn swift_interpolation_symbol(symbol string) ?u64 {
 			-32
 		}
 		'_$ss26DefaultStringInterpolationV13appendLiteralyySSF', '_$sSS6appendyySSF' { -128 }
+		'_$ss11_StringGutsV4growyySiF' { -384 }
 		else { return none }
 	}
 	metadata := swift_interpolation_metadata()

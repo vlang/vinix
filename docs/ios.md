@@ -13714,10 +13714,43 @@ both import audits. Generated C/ARM64 reviews, primary contracts, native
 measurements, compressed artifacts and original-image traces are retained under
 `build/ios/fortnite/merge-error-conformance-checks`.
 
-The fresh launch exits 1 during linking at `_StringGuts.grow(_:)`,
-`_$ss11_StringGutsV4growyySiF`. Its required cell `0x10dc9b8d0`, stub
-`0x10c63ae3c`, branch island `0x107c2873c` and four callers were inspected
-without executing application code.
+`_StringGuts.grow(_:)`, `_$ss11_StringGutsV4growyySiF`, now creates uniquely
+owned native UTF-8 storage with the requested total capacity. Small and negative
+hints still convert the representation to native storage, preserving at least
+the current byte count. Unique native storage applies Swift's 1.625x geometric
+growth; retained aliases copy without inheriting spare capacity. This matches
+the [Swift String growth contract](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/StringGutsRangeReplaceable.swift).
+
+The sealed adapter receives signed capacity in x0 and the two-word inout value
+in x20, preserving x20/x21. Small Strings, borrowed immutable literals,
+registered native owners and checked foreign NSString storage are supported.
+Contents, ASCII flags and a trailing NUL survive the conversion. The replacement
+is published before the old owner is released. Invalid UTF-8, inconsistent
+native headers, unregistered native owners and capacities beyond the supported
+48-bit count fail explicitly; shared/custom storage remains unsupported.
+
+```sh
+v run tests/ios/native-checks.v build-string-grow
+```
+
+Native macOS comparisons cover negative, zero, small and large capacity hints,
+UTF-8 and embedded NULs, unique geometric growth, retained aliases and preserved
+registers. Compatibility checks add inaccessible source boundaries, foreign
+storage conversion, append after growth, rejected owners/headers, eight cold
+publishers/workers and two drained/unmapped lifetimes. The original required
+cell `0x10dc9b8d0`, stub `0x10c63ae3c`, branch island `0x107c2873c` and four
+callers were inspected without executing application code.
+
+Ten ASan/UBSan runs pass across both C++ backend configurations and interpolation,
+String replacement and NSString unbridging regressions. Four isolated ARM64
+phases pass: the growth fixture, fresh launch probe and both import audits.
+Generated C/ARM64 reviews, primary contracts, native comparisons, compressed
+artifacts and original-image traces are retained under
+`build/ios/fortnite/string-grow-checks`.
+
+The fresh launch exits 1 during linking at the `StaticString` type descriptor,
+`_$ss12StaticStringVMn`. Its required cell `0x10dc9b8d8` is referenced indirectly
+from `__swift5_typeref` at `0x10dc7fa50`; this trace executes no application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13725,12 +13758,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,918 | 243 | 78 |
+| Fortnite executable | 1,919 | 242 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,758 | 246 | 114 |
+| All images | 2,759 | 245 | 114 |
 
-The C++/GLES/Text variant reports 2,772 resolved imports, 232 unresolved strong
+The C++/GLES/Text variant reports 2,773 resolved imports, 231 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
