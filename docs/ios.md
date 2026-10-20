@@ -12690,11 +12690,34 @@ remain unsupported.
 Its required cell is `0x10dc9b450`; a consumer at `0x1015c103c` loads the
 table and returns it directly. This reference was inspected without executing
 application code.
-The fresh launch resolves this witness table and exits 1 during linking at
-`___objc_personality_v0`, the Objective-C exception personality function.
+The Objective-C exception personality import, `___objc_personality_v0`, now
+resolves through libobjc.A.dylib to an explicit terminal diagnostic. The
+unwinder supplies version, actions, exception class, exception storage and
+context in x0..x4. The diagnostic stops before reading or modifying exception
+state and returns no unwind reason code. It allocates no metadata or owners.
+Native export inspection and [Apple's runtime source](https://github.com/apple-oss-distributions/objc4/blob/main/runtime/objc-exception.mm)
+establish the ABI and alternate-handler/C++ personality delegation. Mach-O
+frame registration, exception throwing, catching and unwinding remain unsupported.
+
+`tests/ios/native-checks.v build-objc-personality` checks eight readers and
+16,384 concurrent resolutions, exact library routing and 180 terminal child
+calls across version/action/class combinations, null/invalid/protected
+exception/context pointers and protected unused registers, stack, Self and x8.
+Shared writable/read-only state stays unchanged at both guard boundaries.
+The entry remains stable before startup, in shutdown callbacks and after
+two drained runtimes. Native source/export measurements, NSException type
+metadata and uncaught-handler sanitizer regressions, generated C and four
+isolated ARM64 phases are retained under `build/ios/fortnite/objc-personality-checks`.
+
 Its required cell is `0x10dc9b458` in `__DATA_CONST,__got`. The compact-unwind
 personality entry at `0x10dc81200` references this cell as personality index
 zero. These unwind data were inspected without executing application code.
+The fresh launch resolves this import and exits 1 during linking at
+`_imp_implementationWithBlock`, Objective-C's block-to-method adapter.
+Its required cell is `0x10dc9b498`, stub `0x10c63dd4c` and branch forwarder
+`0x107c28ddc`. Calls at `0x10833f5a4` and `0x10008b258` pass Blocks and use
+the resulting IMP for method replacement or installation. These references
+were inspected without executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12702,12 +12725,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,866 | 295 | 78 |
+| Fortnite executable | 1,867 | 294 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,706 | 298 | 114 |
+| All images | 2,707 | 297 | 114 |
 
-The C++/GLES/Text variant reports 2,720 resolved imports, 284 unresolved strong
+The C++/GLES/Text variant reports 2,721 resolved imports, 283 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
