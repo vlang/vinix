@@ -358,6 +358,7 @@ fn objc_runtime_symbol(symbol string) ?u64 {
 	if address := objc_arc_register_symbol(symbol) { return address }
 	if address := objc_catch_symbol(symbol) { return address }
 	if address := objc_rethrow_symbol(symbol) { return address }
+	if address := objc_terminate_symbol(symbol) { return address }
 	return match symbol {
 		'_objc_exception_throw' { u64(unsafe { voidptr(objc_throw_unavailable) }) }
 		'_objc_copyStruct' { u64(unsafe { voidptr(objc_copy_struct) }) }

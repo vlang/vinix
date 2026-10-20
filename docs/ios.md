@@ -12876,11 +12876,38 @@ Six sanitizer runs cover both backend configurations and the rethrow regression;
 generated C/ARM64 review, native sources and four isolated ARM64 phases are
 retained under `build/ios/fortnite/objc-throw-checks`.
 
-The fresh launch exits 1 during linking at `_objc_terminate`. Its required
-cell is `0x10dc9b6e8`, stub `0x10c63e454` and branch forwarder `0x107c28380`.
+The terminate import has required cell `0x10dc9b6e8`, stub `0x10c63e454`
+and branch forwarder `0x107c28380`.
 Four direct calls, including `0x1000554b8` and `0x10005ebd0`, were inspected
-without executing application code. Full Objective-C throwing/catching and
-Mach-O frame unwinding remain unsupported.
+without executing application code.
+
+With `ios_cxx`, `_objc_terminate` now resolves to the existing backend's
+`__ZSt9terminatev` address, following [Apple's public entry](https://github.com/apple-oss-distributions/objc4/blob/main/runtime/objc-exception.mm).
+It shares the backend's C++ terminate-handler state. Custom handlers receive
+the call; default handlers and handlers that return end in SIGABRT. Builds
+without `ios_cxx` bind an explicit terminal backend-required diagnostic.
+The entry adds no separate handler registry, exception ownership or unwinder.
+Objective-C uncaught-handler delivery is not implemented by this binding;
+full Objective-C throwing/catching and Mach-O frame unwinding remain unsupported.
+
+`tests/ios/native-checks.v build-objc-terminate` checks the exact backend alias,
+384 terminal child calls with empty/foreign catch bookkeeping, two custom
+handlers, default/returning-handler SIGABRT, protected unused arguments, stack
+words, Swift Self and x8, and unchanged writable/read-only pages at both guard
+boundaries. The no-backend variant checks 192 terminal diagnostic calls even
+when C++ handlers are installed. Test-only typed declarations access the linked
+backend's handler state without exposing new application imports. Native Mac
+comparisons check both custom handlers and returning-handler SIGABRT in isolated
+children, without throwing or unwinding. Eight concurrent resolver readers,
+shutdown callback access and two drained runtimes are also checked.
+Six sanitizer runs cover both backend configurations and the throw regression;
+generated C/ARM64 review, native sources and four isolated ARM64 phases are
+retained under `build/ios/fortnite/objc-terminate-checks`.
+
+The fresh launch exits 1 during linking at `_protocol_getMethodDescription`.
+Its required cell `0x10dc9b710`, stub `0x10c63e568`, branch forwarder
+`0x107c283c4` and two direct calls (`0x100055b28`, `0x100080f04`) were
+inspected without executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12888,12 +12915,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,875 | 286 | 78 |
+| Fortnite executable | 1,876 | 285 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,715 | 289 | 114 |
+| All images | 2,716 | 288 | 114 |
 
-The C++/GLES/Text variant reports 2,729 resolved imports, 275 unresolved strong
+The C++/GLES/Text variant reports 2,730 resolved imports, 274 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
