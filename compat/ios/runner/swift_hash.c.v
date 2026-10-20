@@ -45,6 +45,7 @@ fn swift_hash_symbol(symbol string) ?u64 {
 	}
 	if entry := swift_raw_symbol(symbol) { return entry }
 	if entry := swift_raw_integer_encoding_symbol(symbol) { return entry }
+	if entry := swift_raw_integer_decoding_symbol(symbol) { return entry }
 	if entry := swift_hasher_symbol(symbol) { return entry }
 	offset := match symbol {
 		'_$sSYsSHRzSH8RawValueSYRpzrlE04hashB0Sivg' { 0 }
@@ -72,7 +73,8 @@ fn swift_hash_entry(offset u64) u64 {
 		swift_raw_emit(u64(code) + 640)
 		swift_raw_equality_emit(u64(code) + 800)
 		swift_raw_integer_encoding_emit(u64(code) + 896)
-		C.__builtin___clear_cache(code, unsafe { voidptr(u64(code) + 1088) })
+		swift_raw_integer_decoding_emit(u64(code) + 1152)
+		C.__builtin___clear_cache(code, unsafe { voidptr(u64(code) + 1440) })
 		if C.mprotect(code, page, C.PROT_READ | C.PROT_EXEC) != 0 {
 			C.munmap(code, page)
 			panic('iOS: cannot seal Swift hashing entries')

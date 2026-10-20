@@ -13312,24 +13312,64 @@ Dictionary conformance regressions. Four isolated ARM64 phases, generated
 C/ARM64 reviews, native measurements and original-image traces are retained
 under `build/ios/fortnite/raw-integer-encoding-checks`.
 
-The fresh launch exits 1 during linking at the integer-backed RawRepresentable
-`init(from:)` default,
-`_$sSYsSeRzSi8RawValueSYRtzrlE4fromxs7Decoder_p_tKcfC`.
-Its required cell `0x10dc9b850`, stub `0x10c63ad28`, branch island `0x107c284dc`
-and caller `0x10006596c` were inspected without executing app code. Fortnite
-still stops before application entry and remains unplayable.
+The integer-backed RawRepresentable `init(from:)` default now dispatches
+through the Decoder's single-value container, decodes Int, and calls the
+failable `init(rawValue:)` witness. It consumes Decoder exactly once on success,
+getter/decode throws and checked dispatch failures. The owned container is
+destroyed before the raw initializer runs, matching native Swift. Shared boxes
+release their owned reference without destroying another reader's payload.
+Successful Self values move through their value witness into the caller's
+indirect result; no result is written on failure. The associated RawValue
+metadata and Self Decodable conformance are unused under the Int constraint.
+
+This is a bounded decoding profile. When the raw initializer rejects a value,
+native Swift constructs `DecodingError.dataCorrupted` with the decoder's
+coding path and type/value description. Generic Swift error boxes and that
+Context metadata are still unsupported here. This branch consumes its owned
+temporaries, then stops with an explicit diagnostic; it does not return a
+substitute error or pretend the value decoded successfully. Errors thrown by
+the getter or Int decoder transfer unchanged with their original ownership.
+This default also does not implement the JSONDecoder serializer.
+
+```sh
+v run tests/ios/native-checks.v build-raw-integer-decoding
+```
+
+Native macOS comparisons cover 288 cases: six Int bit patterns, inline/boxed
+Decoder and container, unique/shared boxes, both guarded-record boundaries and
+success/getter-throw/decode-throw paths. Tests check callback order, non-POD
+Self ownership, original error transfer and unreadable unused generic arguments.
+Additional compatibility tests cover guarded 1/24/32-byte results, an enum
+with an extra inhabitant, rejected raw values, checked dispatch failures,
+initialized Self cleanup after invalid output, eight workers, reentrant
+callbacks and two drained/unmapped lifetimes. The original required cell
+`0x10dc9b850`, stub `0x10c63ad28`, branch island `0x107c284dc` and caller
+`0x10006596c` were inspected without executing app code.
+
+Ten ASan/UBSan runs cover both C++ backend configurations and integer-backed
+encoding, Date and Dictionary encoding conformance regressions. Four isolated
+ARM64 phases pass: the decoding fixture, launch probe and two import audits.
+Generated C/ARM64 reviews, native measurements, compressed artifacts and
+original-image traces are retained under
+`build/ios/fortnite/raw-integer-decoding-checks`.
+
+The fresh launch exits 1 during linking at Array's conditional Encodable
+conformance, `_$sSayxGSEsSERzlMc`. Its required data cell `0x10dc9b868` has
+four inspected consumers at `0x100065cc0`, `0x10006ed00`, `0x10006f1c0` and
+`0x1000730c4`, including generic witness-table lookup before keyed encoding.
+Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,906 | 255 | 78 |
+| Fortnite executable | 1,907 | 254 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,746 | 258 | 114 |
+| All images | 2,747 | 257 | 114 |
 
-The C++/GLES/Text variant reports 2,760 resolved imports, 244 unresolved strong
+The C++/GLES/Text variant reports 2,761 resolved imports, 243 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
