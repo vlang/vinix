@@ -14186,17 +14186,55 @@ accessor. Its required cell `0x10dc9b948`, stub `0x10c63aec0`, branch island
 `0x107c28d30` and caller `0x1000731b4` were inspected read-only. Application
 entry is still unreached; Fortnite remains unplayable.
 
+`_$ss22KeyedDecodingContainerVMa` now returns complete, canonical metadata for
+each borrowed key metadata/CodingKey witness pair. Its frozen payload is one
+eight-byte native Swift box reference, with field offset zero and the generic
+arguments at metadata words two and three. Its eight value witnesses retain
+copies, transfer takes, publish assignments before releasing the old owner and
+preserve native single-payload enum bytes. Completing the compatibility layout
+does not read key metadata or invoke the borrowed conformance.
+
+The accessor, private descriptor and reference witnesses are sealed before
+publication. Specialization pages and cache records retire after workers and
+owned values drain. Private CodingKey declaration records describe the generic
+constraint; CodingKey witnesses/defaults, field reflection and additional
+nominal/protocol exports remain unsupported.
+
+```sh
+v run tests/ios/native-checks.v build-keyed-container-metadata
+```
+
+The fixture compares native metadata request responses, field/generic layout,
+all eight ownership witnesses and protected eight/nine-byte enum storage.
+Compatibility checks cover paired cache identities, descriptor instantiation,
+eight cold publishers, assignment destructors that resolve/copy on another
+thread, invalid inputs and two drained/unmapped runtime lifetimes. Generic
+keyed decoding, Dictionary metadata and native heap ARC provide regressions.
+Evidence is retained under `build/ios/fortnite/keyed-container-metadata-checks`.
+
+Ten ASan/UBSan host runs pass in both hash modes, including the build without
+the optional C++ backend. The standalone ARM64 fixture, launch probe and both
+import audits complete in four isolated guests. Generated C/ARM64 review finds
+no hidden temporary allocations in the new cache or value-witness paths;
+cache records and sealed pages have explicit retirement after users drain.
+
+The fresh launch passes the accessor and stops during linking at
+`_$ss22KeyedDecodingContainerVMn`, the nominal descriptor data import. Its
+required GOT cell `0x10dc9b950` and four indirect context symbolic references
+in `__swift5_typeref` were inspected read-only. Application entry remains
+unreached; Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,931 | 230 | 78 |
+| Fortnite executable | 1,932 | 229 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,771 | 233 | 114 |
+| All images | 2,772 | 232 | 114 |
 
-The C++/GLES/Text variant reports 2,785 resolved imports, 219 unresolved strong
+The C++/GLES/Text variant reports 2,786 resolved imports, 218 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
