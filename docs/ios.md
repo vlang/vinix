@@ -13249,11 +13249,41 @@ Four isolated ARM64 phases, generated C/ARM64 reviews, native measurements and
 original-image traces are retained under
 `build/ios/fortnite/sequence-contents-checks`.
 
-The fresh launch exits 1 during linking at Sequence's
-`withContiguousStorageIfAvailable` default,
-`_$sSTsE32withContiguousStorageIfAvailableyqd__Sgqd__SRy7ElementQzGKXEKlF`.
-Its required cell `0x10dc9b840`, stub `0x10c63ad10`, branch island `0x107c28d24`
-and caller `0x100072fac` were inspected without executing app code. Fortnite
+Sequence's `withContiguousStorageIfAvailable` default now resolves as a
+functional generic operation. The [standard default](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/Sequence.swift)
+returns `nil` without invoking the closure or reading the borrowed Sequence,
+its metadata or its conformance table. Result metadata is in ARM64 `x3` and
+the indirect Optional output is in `x8`; the result's
+`storeEnumTagSinglePayload` witness encodes `.none` with its own spare
+inhabitants. The incoming Swift error register `x21` is preserved. No value is
+copied, retained or destroyed, and no registry lock crosses that witness.
+The existing bounded Result metadata profile applies; invalid layouts, store
+callbacks, output alignment/extents and retired runtimes are checked before
+output initialization. The original required cell `0x10dc9b840`, stub
+`0x10c63ad10`, branch island `0x107c28d24` and caller `0x100072fac` were traced
+without executing application code.
+
+```sh
+v run tests/ios/native-checks.v build-sequence-storage
+```
+
+Native macOS comparisons cover 96 cases with Int, String, Objective-C, Void
+and four custom Result layouts. Tests compare every output byte and its guards
+for three initial fills, preserve both zero and nonzero incoming `x21`, and
+place inaccessible pointers in all unused arguments. Read-only metadata,
+unchanged borrowed ownership, zero-sized/padded/aligned/spare-inhabitant
+layouts, invalid/retired inputs, eight cold publishers and workers, reentrant
+store callbacks and two drained/unmapped lifetimes pass. Ten ASan/UBSan runs
+cover both C++ backend configurations and `_copyContents`, Array Sequence and
+Collection regressions. Four isolated ARM64 phases, generated C/ARM64 reviews,
+native measurements and original-image traces are retained under
+`build/ios/fortnite/sequence-storage-checks`.
+
+The fresh launch exits 1 during linking at the integer-backed RawRepresentable
+`encode(to:)` default,
+`_$sSYsSERzSi8RawValueSYRtzrlE6encode2toys7Encoder_p_tKF`.
+Its required cell `0x10dc9b848`, stub `0x10c63ad1c`, branch island `0x107c284e0`
+and caller `0x1000659bc` were inspected without executing app code. Fortnite
 still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13261,12 +13291,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,904 | 257 | 78 |
+| Fortnite executable | 1,905 | 256 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,744 | 260 | 114 |
+| All images | 2,745 | 259 | 114 |
 
-The C++/GLES/Text variant reports 2,758 resolved imports, 246 unresolved strong
+The C++/GLES/Text variant reports 2,759 resolved imports, 245 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

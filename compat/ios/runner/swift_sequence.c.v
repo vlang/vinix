@@ -228,7 +228,13 @@ fn swift_sequence_arena() u64 {
 		write32(base + 384 + u64(i * 4), op)
 	}
 	unsafe { *(&u64(base + 400)) = u64(voidptr(swift_sequence_contents)) }
-	C.__builtin___clear_cache(allocation, unsafe { voidptr(base + 408) })
+	// Swift default contiguous-storage query -> C: borrowed Self in x20 and
+	// indirect Optional<Result> in x8; C preserves the incoming x21 unchanged.
+	for i, op in [u32(0xaa1403e5), 0xaa0803e6, 0x58000050, 0xd61f0200]! {
+		write32(base + 448 + u64(i * 4), op)
+	}
+	unsafe { *(&u64(base + 464)) = u64(voidptr(swift_sequence_storage)) }
+	C.__builtin___clear_cache(allocation, unsafe { voidptr(base + 472) })
 	if C.mprotect(allocation, page, C.PROT_READ | C.PROT_EXEC) != 0 {
 		C.munmap(allocation, page); panic('iOS: cannot seal Swift Sequence adapters')
 	}
