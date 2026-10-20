@@ -284,7 +284,11 @@ fn swift_interpolation_metadata() u64 {
 		write32(base + 388, 0x58000070) // ldr x16,+16
 		write32(base + 392, 0xd61f0200) // br x16; C preserves x20/x21
 		unsafe { *(&u64(base + 400)) = u64(voidptr(swift_string_grow)) }
-		C.__builtin___clear_cache(arena, unsafe { voidptr(base + 408) })
+		// C-to-Swift stream write: String x0/x1, metadata/table x2/x3,
+		// inout target x4, write entry x5. Preserve the caller's Swift context.
+		for i, op in [u32(0xa9be7bfd), 0xa90153f3, 0xaa0403f4, 0xd63f00a0,
+			0xa94153f3, 0xa8c27bfd, 0xd65f03c0]! { write32(base + 416 + u64(i * 4), op) }
+		C.__builtin___clear_cache(arena, unsafe { voidptr(base + 444) })
 		if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 			|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 			C.munmap(arena, usize(page * 2))

@@ -13783,10 +13783,56 @@ C/ARM64 reviews, primary contracts, native measurements, compressed artifacts
 and original-image traces are retained under
 `build/ios/fortnite/static-string-metadata-checks`.
 
-The fresh launch exits 1 during linking at `_print_unlocked`,
-`_$ss15_print_unlockedyyx_q_zts16TextOutputStreamR_r0_lF`. Its required cell
-`0x10dc9b8e0`, stub `0x10c63ae48`, branch island `0x107c28744` and caller
-`0x1000686ec` were inspected without executing application code.
+`_print_unlocked`, `_$ss15_print_unlockedyyx_q_zts16TextOutputStreamR_r0_lF`,
+now borrows supported values and calls the supplied TextOutputStream write
+witness. The generic ABI passes source, inout target, source metadata, target
+metadata and table in x0...x4. The shared sealed adapter supplies target self
+in x20 and preserves x20/x21. No registry lock spans the callback, so streams
+can reenter printing or retain the supplied String. Inputs remain owned by
+their callers; temporary owners retire after write returns. This follows
+[Swift's printing and stream contracts](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/OutputStream.swift).
+
+The concrete source profile covers String, Int, Bool, Void, StaticString and
+`_MergeError`. Pointer/scalar StaticStrings preserve Unicode and embedded NULs;
+copied text is bounded to 1 MiB. A reflection path handles single-case,
+zero-payload enums in loaded images. It checks aligned, file-backed metadata,
+zero-size POD witnesses, enum/field records and bounded UTF-8 case names.
+Static printing conformances prevent this fallback. Other source types,
+general reflection and custom source-conformance dispatch remain unsupported
+and fail explicitly.
+
+```sh
+v run tests/ios/native-checks.v build-print-unlocked
+```
+
+Native macOS comparisons cover the concrete source profile, arbitrary stream
+tables, retained callback Strings, Unicode/NUL text, zero-size inaccessible
+values and preserved context registers. Native reflection and Vinix both print
+a synthetic `TimePeriod.daily` enum as `daily`. Compatibility checks add owned
+input reference counts, malformed/unaligned image records, custom printing
+conformance rejection, reentrant callbacks, eight cold publishers/workers and
+two drained/unmapped lifetimes.
+
+The original required cell `0x10dc9b8e0`, stub `0x10c63ae48`, branch island
+`0x107c28744` and caller `0x1000686ec` were inspected without executing
+application code. That caller passes image metadata `0x10dc9e438` for
+`TimePeriod`: size zero, stride one, one empty case `daily`, and six non-printing
+static conformances. The implementation validates this representation rather
+than depending on its name or address.
+
+Ten ASan/UBSan runs pass across both C++ backend configurations and interpolation,
+Int description and StaticString metadata regressions. Four isolated ARM64
+phases pass: the printing fixture, fresh launch probe and both import audits.
+Generated C/ARM64 reviews, primary contracts, native comparisons, compressed
+artifacts and original-image traces are retained under
+`build/ios/fortnite/print-unlocked-checks`.
+The C review verifies explicit stack scratch and rejects hidden helper heap
+allocations on the printing paths.
+
+The fresh launch exits 1 during linking at the `IndexingIterator` descriptor,
+`_$ss16IndexingIteratorVMn`. Its required cell `0x10dc9b8e8` and indirect
+`__swift5_typeref` reference at `0x10dc7fb74` were inspected without executing
+application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13794,12 +13840,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,920 | 241 | 78 |
+| Fortnite executable | 1,921 | 240 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,760 | 244 | 114 |
+| All images | 2,761 | 243 | 114 |
 
-The C++/GLES/Text variant reports 2,774 resolved imports, 230 unresolved strong
+The C++/GLES/Text variant reports 2,775 resolved imports, 229 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

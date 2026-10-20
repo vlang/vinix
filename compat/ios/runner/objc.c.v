@@ -242,6 +242,7 @@ mut:
 	swift_bool_metadata_retired bool // Reject recreation after quiescent metadata retirement.
 	swift_static_string_metadata_arena u64 // Frozen three-field POD metadata, witnesses and accessor.
 	swift_static_string_metadata_retired bool
+	swift_print_unlocked_retired bool // Printing callbacks drain before the shared interpolation adapter retires.
 	swift_merge_error_metadata_arena u64 // Sealed _MergeError enum metadata, accessor and zero-size witnesses.
 	swift_merge_error_metadata_retired bool
 	swift_merge_error_conformance_descriptor u64 // Remember through retirement before any stale descriptor read.

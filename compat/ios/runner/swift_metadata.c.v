@@ -203,6 +203,7 @@ fn swift_metadata_stop() {
 	swift_void_stop()
 	swift_unknown_value_stop()
 	swift_interpolation_stop()
+	ios_runtime.swift_print_unlocked_retired = true
 	swift_error_metadata_stop()
 	if ios_runtime.swift_metadata_arena != 0 {
 		if C.munmap(unsafe { voidptr(ios_runtime.swift_metadata_arena) }, usize(C.getpagesize()) * 2) != 0 {
