@@ -12409,25 +12409,63 @@ Measurements, native Button descriptor/ModifiedContent conformance regressions,
 generated C and isolated ARM64 results are retained under
 `build/ios/fortnite/swiftui-button-view-checks`.
 
-The fresh launch resolves Button's View conformance declaration and exits 1
-during linking at
-`_$s7SwiftUI6VStackV9alignment7spacing7contentACyxGAA19HorizontalAlignmentV_12CoreGraphics7CGFloatVSgxyXEtcfC`,
-the VStack(alignment:spacing:content:) initializer. Its required fixup is
+`VStack(alignment:spacing:content:)` now has an explicit diagnostic binding.
+The SDK declares frozen VStack storage as
+`_VariadicView.Tree<_VStackLayout, Content>`, with a borrowed content builder.
+Native ARM64 construction takes alignment in x0, optional spacing payload/tag
+in x1/x2, builder function/context in x3/x4, Content metadata and its View
+witness in x5/x6, and the indirect result in x8. Native measurements show size
+17/stride 24 for VStack<EmptyView> and size/stride 56 for VStack<Text>, with
+Content offsets 17 and 24 respectively.
+
+Six native construction cases verify the 17-byte layout root, spacing payloads
+and optional tags, one builder evaluation with a protected borrowed context,
+and owned Text content copied and destroyed through native value witnesses.
+The builder receives temporary Content storage before the value is moved into
+VStack. Copies and destruction balance the String owner, and x20/x21 remain
+preserved. No graph, rendering or application code executes in these comparisons.
+
+Vinix diagnoses before invoking the builder, reading Content metadata or its
+View witness, changing ownership, or writing result storage. Frozen generic
+storage still needs dependent Tree/VStack metadata and ownership support;
+VStack construction, Tree specialization, graph execution and rendering remain
+unsupported.
+
+The import is
+`_$s7SwiftUI6VStackV9alignment7spacing7contentACyxGAA19HorizontalAlignmentV_12CoreGraphics7CGFloatVSgxyXEtcfC`.
+Its required fixup is
 `0x10dc9b400`, stub `0x10c63abb4`, forwarder `0x107c28ea8` and direct call
 `0x1015bf9c0`. These references were inspected without executing application
-code. Fortnite still stops before application entry and remains unplayable.
+code.
+
+`tests/ios/native-checks.v build-swiftui-vstack-init` checks 136 child calls with
+protected builder/context, Content metadata, View witness, stack, Self and x8,
+arbitrary alignment/spacing bits and valid builders that must never run.
+Shared writable/read-only result pages remain unchanged at both guard
+boundaries. Eight readers, exact routing, teardown callbacks and two drained
+runtime lifetimes are covered. Native preflight measurements, sanitizer
+regressions for _VStackLayout and Button construction diagnostics, generated C
+and isolated ARM64 results are retained under
+`build/ios/fortnite/swiftui-vstack-init-checks`.
+
+The fresh launch resolves this initializer import and exits 1 during linking
+at `_$s7SwiftUI6VStackVMn`, VStack's nominal type descriptor. Its required
+import cell is `0x10dc9b408` in `__DATA_CONST,__got`, referenced by five indirect
+context symbolic references in `__TEXT,__swift5_typeref`. These data references
+were inspected without executing application code. Fortnite still stops
+before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,856 | 305 | 78 |
+| Fortnite executable | 1,857 | 304 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,696 | 308 | 114 |
+| All images | 2,697 | 307 | 114 |
 
-The C++/GLES/Text variant reports 2,710 resolved imports, 294 unresolved strong
+The C++/GLES/Text variant reports 2,711 resolved imports, 293 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the

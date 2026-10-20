@@ -8,6 +8,7 @@ import os
 fn framework_symbol(library string, symbol string) ?u64 {
 	if library == '/System/Library/Frameworks/SwiftUI.framework/SwiftUI' {
 		if address := swiftui_vstack_symbol(symbol) { return address }
+		if address := swiftui_vstack_init_symbol(symbol) { return address }
 		if address := swiftui_tree_symbol(symbol) { return address }
 		if address := swiftui_zstack_symbol(symbol) { return address }
 		if address := swiftui_opacity_symbol(symbol) { return address }
