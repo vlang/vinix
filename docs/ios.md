@@ -13057,9 +13057,36 @@ and Date regressions. Four isolated ARM64 phases pass. Fresh binaries, generated
 C/ARM64 reviews, native measurements and logs are retained under
 `build/ios/fortnite/dictionary-encoding-checks`.
 
-The fresh launch exits 1 during linking at Dictionary's generic Decodable
-descriptor, `_$sSDyxq_GSesSeRzSeR_rlMc`. Its required cell `0x10dc9b7d8` and
-consumer `0x10006deec` were inspected without executing application code.
+Dictionary's generic Decodable descriptor `_$sSDyxq_GSesSeRzSeR_rlMc` now
+supports the same conditional specialization. Its required cell `0x10dc9b7d8`
+and consumer `0x10006deec` were inspected without executing application code.
+The descriptor names the canonical Decodable protocol and its Key/Value
+requirements. Encodable and Decodable share the descriptor/table construction
+code while keeping distinct method entries, patterns and caches. Both tables
+for a type remain canonical under concurrent mixed lookups; neither cache reads
+expired argument arrays. Both sets of sealed pages retire before Dictionary
+metadata, and stale descriptor lookups fail before reading unmapped storage.
+Calling the decoding initializer still stops with `iOS: Swift Dictionary
+decoding is not implemented`, without inspecting the Decoder or writing its
+indirect result. Dictionary construction, iteration, Encoder/Decoder containers
+and JSON serialization remain unsupported.
+
+`tests/ios/native-checks.v build-dictionary-decoding` compares six native
+String/Int-key and String/Int/Date-value specializations, conditional descriptor
+fields, private witness order, expired input hits and distinct Encodable and
+Decodable tables. Guarded witnesses and argument boundaries, x20/x21 preservation,
+read-only tables, eight cold publishers and mixed workers, invalid/foreign/retired
+requests, a diagnostic child with protected x8 output, and two drained/unmapped
+lifetimes are checked. Ten ASan/UBSan runs cover both C++ backend configurations
+and the existing Encodable, Dictionary metadata and Date fixtures. Four isolated
+ARM64 validation phases pass. Native measurements, binaries, generated C/ARM64
+reviews and logs are retained under
+`build/ios/fortnite/dictionary-decoding-checks`.
+
+The fresh launch exits 1 during linking at String's `hash(into:)` entry,
+`_$sSS4hash4intoys6HasherVz_tF`. Its required cell `0x10dc9b800`, stub
+`0x10c63acd4`, forwarder `0x107c2892c` and eight call sites were inspected
+without executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13067,12 +13094,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,898 | 263 | 78 |
+| Fortnite executable | 1,899 | 262 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,738 | 266 | 114 |
+| All images | 2,739 | 265 | 114 |
 
-The C++/GLES/Text variant reports 2,752 resolved imports, 252 unresolved strong
+The C++/GLES/Text variant reports 2,753 resolved imports, 251 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

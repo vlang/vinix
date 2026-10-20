@@ -132,7 +132,8 @@ fn swift_dictionary_metadata_arena() u64 {
 	write32(data + 280, 0x40000000)
 	swift_protocol_relative(data + 284, witness)
 	swift_dictionary_encoding_emit(base, data, encoding_protocol)
-	C.__builtin___clear_cache(allocation, voidptr(base + 80))
+	swift_dictionary_decoding_emit(base, data, encoding_protocol + 112)
+	C.__builtin___clear_cache(allocation, voidptr(base + 112))
 	if C.mprotect(allocation, page, C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(voidptr(data), page, C.PROT_READ) != 0 {
 		C.munmap(allocation, page * 3)
@@ -140,11 +141,13 @@ fn swift_dictionary_metadata_arena() u64 {
 	}
 	ios_runtime.swift_dictionary_metadata_arena = base
 	ios_runtime.swift_dictionary_encoding_descriptor = data + 320
+	ios_runtime.swift_dictionary_decoding_descriptor = data + 448
 	return base
 }
 
 fn swift_dictionary_metadata_stop() {
 	ios_runtime.swift_dictionary_metadata_retired = true
+	swift_dictionary_decoding_stop()
 	swift_dictionary_encoding_stop()
 	page := usize(C.getpagesize())
 	for base, _ in ios_runtime.swift_dictionary_metadata {

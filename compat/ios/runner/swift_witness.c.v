@@ -10,6 +10,10 @@ fn swift_witness_table_checked(conformance u64, metadata u64, arguments u64) !u6
 		return error('iOS: invalid Swift conformance descriptor')
 	}
 	if ios_runtime != unsafe { nil }
+		&& conformance == ios_runtime.swift_dictionary_decoding_descriptor {
+		return swift_dictionary_decoding_table_checked(metadata, arguments)
+	}
+	if ios_runtime != unsafe { nil }
 		&& conformance == ios_runtime.swift_dictionary_encoding_descriptor {
 		return swift_dictionary_encoding_table_checked(metadata, arguments)
 	}
@@ -86,6 +90,7 @@ fn swift_witness_table(conformance u64, metadata u64, arguments u64) u64 {
 }
 
 fn swift_witness_symbol(symbol string) ?u64 {
+	if address := swift_dictionary_decoding_symbol(symbol) { return address }
 	if address := swift_dictionary_encoding_symbol(symbol) { return address }
 	if address := swift_date_encoding_protocol_symbol(symbol) { return address }
 	if address := swift_date_decoding_protocol_symbol(symbol) { return address }

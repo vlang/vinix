@@ -216,6 +216,8 @@ mut:
 	swift_dictionary_metadata_retired bool
 	swift_dictionary_encoding map[u64]u64 // Dictionary metadata -> sealed Encodable table (two private words).
 	swift_dictionary_encoding_descriptor u64 // Remembered through retirement for stale lookup rejection.
+	swift_dictionary_decoding map[u64]u64 // Separate Decodable tables; borrows metadata and conditional witnesses.
+	swift_dictionary_decoding_descriptor u64 // Remembered through retirement before reading stale descriptors.
 	swift_array_sequence_arena u64 // Array Sequence/iterator descriptors, adapters and generic pattern.
 	swift_array_sequence_metadata map[u64]u64 // Element -> sealed iterator metadata and complete Sequence tables.
 	swift_collection_arena u64
