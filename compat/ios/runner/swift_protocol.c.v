@@ -33,7 +33,7 @@ fn swift_string_protocols_emit(code u64, data u64) {
 		swift_protocol_relative(protocol + 4, data + 192) // Swift module.
 		swift_protocol_relative(protocol + 8, text)
 		write32(protocol + 16, 1) // NumRequirements, following the 24-byte header.
-		write32(protocol + 24, if i == 0 { u32(0x11) } else { u32(0x13) })
+		write32(protocol + 24, if i == 0 { u32(0x11) } else { u32(0x8be30013) })
 		C.memcpy(unsafe { voidptr(text) }, name.str, usize(name.len + 1))
 	}
 	// TextOutputStreamable.write: x0 = target inout, x1 = Target metadata,
@@ -64,6 +64,10 @@ fn swift_string_protocols_emit(code u64, data u64) {
 }
 
 fn swift_string_protocol_symbol(symbol string) ?u64 {
+	if symbol == '_$ss23CustomStringConvertibleMp' && (ios_runtime == unsafe { nil }
+		|| ios_runtime.swift_integer_description_retired || ios_runtime.swift_concurrency_retired) {
+		return none
+	}
 	offset := match symbol {
 		'_$sSSs20TextOutputStreamablesWP' { 256 }
 		'_$sSSs23CustomStringConvertiblesWP' { 272 }

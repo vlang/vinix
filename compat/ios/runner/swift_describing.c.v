@@ -81,13 +81,7 @@ fn swift_string_describing_checked(source u64, metadata u64) !SwiftStringWords {
 	if source == 0 || source & 7 != 0 || source > ~u64(0) - 15 { return swift_describing_failure() }
 	if kind == 1 { return unsafe { *(&SwiftStringWords(source)) } } // Transfer, no retain or scratch owner.
 	if kind == 2 {
-		mut number := [32]u8{}
-		length := unsafe { C.snprintf(&char(&number[0]), 32, c'%lld', i64(read64(source))) }
-		if length < 1 || length >= 32 { return swift_describing_failure() }
-		words := unsafe { &SwiftStringWords(C.__builtin_alloca(16)) }
-		unsafe { *words = swift_interpolation_init(i64(length), 0) }
-		swift_string_append_bytes(u64(words), u64(unsafe { &number[0] }), u64(length))
-		return unsafe { *words }
+		return swift_integer_description_checked(i64(read64(source)))
 	}
 	owner := read64(source)
 	result := swift_describing_error(owner)!

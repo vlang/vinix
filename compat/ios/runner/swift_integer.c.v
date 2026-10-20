@@ -138,6 +138,7 @@ fn swift_integer_metadata() u64 {
 	return metadata
 }
 fn swift_integer_stop() {
+	swift_integer_description_stop()
 	if ios_runtime.swift_integer_arena == 0 { return }
 	if C.munmap(unsafe { voidptr(ios_runtime.swift_integer_arena) }, usize(C.getpagesize()) * 2) != 0 {
 		panic('iOS: cannot retire Swift Int metadata')
@@ -146,6 +147,7 @@ fn swift_integer_stop() {
 }
 
 fn swift_integer_symbol(symbol string) ?u64 {
+	if address := swift_integer_description_symbol(symbol) { return address }
 	if address := swift_byte_symbol(symbol) { return address }
 	function := match symbol {
 		'_$sSi10bitPatternSis13OpaquePointerVSg_tcfC' { u64(unsafe { voidptr(swift_integer_pointer_bits) }) }

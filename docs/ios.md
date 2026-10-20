@@ -13480,10 +13480,55 @@ C/ARM64 reviews, primary ABI references, native measurements, compressed
 artifacts and original-image traces are retained under
 `build/ios/fortnite/bool-metadata-checks`.
 
-The fresh launch exits 1 during linking at Int's CustomStringConvertible
-witness table, `_$sSis23CustomStringConvertiblesWP`. Its required cell
-`0x10dc9b898` has one inspected consumer at `0x10006aa60`, which passes the
-table and Int metadata to the generic description getter.
+Int now supplies a genuine CustomStringConvertible conformance and witness
+table through `_$sSis23CustomStringConvertiblesMc` and
+`_$sSis23CustomStringConvertiblesWP`. It references the canonical protocol
+already used by String. The shared declaration now carries the measured
+getter discriminator, and its requirement/base aliases are exported.
+The generic `description` dispatcher forwards the caller's metadata, witness
+table and borrowed Self to the selected getter, including application witnesses.
+
+The Int witness borrows exactly eight bytes and returns an owned decimal String
+in x0/x1. Values through 15 characters use inline text; larger results use the
+existing registered String owner and ARC. Decimal formatting uses stack scratch
+and the same formatter as the consuming Int branch of String(describing:).
+It covers Int.min without negating it or overflowing a signed magnitude.
+This follows the [Swift integer description implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/Integers.swift).
+
+A separate two-page arena holds RX call adapters and an RO concrete table and
+conformance. Int and String metadata initialize before publication, avoiding an
+initialization cycle. No registry lock spans generic getter callbacks. Owners
+and workers drain before this arena retires, while both metadata dependencies
+are still live; retired exports cannot recreate it. General conformance
+discovery, reflection and other types' description conformances remain outside
+this profile.
+
+```sh
+v run tests/ios/native-checks.v build-integer-description
+```
+
+Native macOS comparisons cover 247 integer inputs at both guarded record
+boundaries, through direct witnesses and generic dispatch: signed limits,
+powers of ten and neighboring values, and deterministic random bit patterns.
+They check exact decimal bytes, borrowed readonly inputs, owned inline/large
+results, retain/release balance and x20/x21. Generic dispatch also checks String's
+shared protocol and a caller-supplied owned String getter. Compatibility checks
+cover concrete lookup with protected unused arguments, RX/RO mappings, scoped
+exports, eight cold publishers/workers, reentrant callbacks and two drained,
+unmapped runtime lifetimes. The original required cell `0x10dc9b898` and its
+consumer `0x10006aa60` were inspected without running application code.
+
+Ten ASan/UBSan runs cover both C++ backend configurations and consuming
+descriptions, integer hashing and String protocol regressions. Four isolated
+ARM64 phases pass: the new fixture, fresh launch probe and both import audits.
+Generated C/ARM64 reviews, primary contracts, native measurements, compressed
+artifacts and original-image traces are retained under
+`build/ios/fortnite/integer-description-checks`.
+
+The fresh launch exits 1 during linking at Optional's metadata accessor,
+`_$sSqMa`. Its required cell `0x10dc9b8a0` routes through stub `0x10c63ae00`
+and branch island `0x107c28d18` to four inspected callers, including construction
+of Array<Optional<Element>> and an Optional value-witness copy.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13491,12 +13536,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,910 | 251 | 78 |
+| Fortnite executable | 1,913 | 248 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,750 | 254 | 114 |
+| All images | 2,753 | 251 | 114 |
 
-The C++/GLES/Text variant reports 2,764 resolved imports, 240 unresolved strong
+The C++/GLES/Text variant reports 2,767 resolved imports, 237 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

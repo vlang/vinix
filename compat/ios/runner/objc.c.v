@@ -236,6 +236,8 @@ mut:
 	swift_bool_metadata_arena u64 // Sealed Swift.Bool nominal metadata, accessor and byte value witnesses.
 	swift_bool_metadata_retired bool // Reject recreation after quiescent metadata retirement.
 	swift_integer_arena u64 // Int metadata, value witnesses and Equatable/Hashable conformances.
+	swift_integer_description_arena u64 // Sealed Int description table/adapter using String's canonical protocol.
+	swift_integer_description_retired bool // Reject description exports after quiescent retirement.
 	swift_dispatch_flags_arena u64 // Sealed DispatchWorkItemFlags metadata/accessor pages.
 	swift_dispatch_flags_retired bool // Reject resolution after quiescent metadata teardown.
 	swiftui_vstack_arena u64 // Sealed nongeneric SwiftUI _VStackLayout descriptor/metadata and accessor.
