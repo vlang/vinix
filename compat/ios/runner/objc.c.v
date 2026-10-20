@@ -229,6 +229,8 @@ mut:
 	swiftui_zstack_retired bool
 	swiftui_opacity_arena u64 // Sealed concrete ViewModifier table, opacity/Never metadata and diagnostics.
 	swiftui_opacity_retired bool
+	swiftui_state_value_arena u64 // Sealed State.wrappedValue adapter; values and locations stay borrowed.
+	swiftui_state_value_retired bool
 	swiftui_modified_arena u64 // Sealed generic ModifiedContent descriptor and diagnostic accessor.
 	swiftui_modified_retired bool
 	swiftui_environment_transform_arena u64 // Sealed generic environment modifier identity and diagnostic accessor.

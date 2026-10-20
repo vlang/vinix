@@ -27,6 +27,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		if address := swiftui_view_defaults_symbol(symbol) { return address }
 		if address := swiftui_view_opacity_symbol(symbol) { return address }
 		if address := swiftui_view_disabled_symbol(symbol) { return address }
+		if address := swiftui_state_value_symbol(symbol) { return address }
 		if address := swiftui_coordinator_symbol(symbol) { return address }
 		if address := swiftui_environment_transform_symbol(symbol) { return address }
 		if address := swiftui_font_title_symbol(symbol) { return address }

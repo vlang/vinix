@@ -12200,17 +12200,56 @@ indirect result in x8 and read its Bool byte afterward. These sites were
 inspected without executing application code. Fortnite still stops before
 application entry and remains unplayable.
 
+`State.wrappedValue` now reads a cached value when `_location` is nil. Its
+ARM64 argument is complete State<Value> metadata in x0, borrowed Self in x20
+and an indirect Value result in x8. The getter reads the signed location field
+offset from State metadata, then copies `_value` through Value's
+`initializeWithCopy` witness. That preserves the source and gives the result
+its own reference ownership. It copies Value's size rather than State's size
+or Value's stride.
+
+Native comparisons cover State<Void>, Bool, UInt8, Int, Optional<Int>, String
+and SIMD4<Float>. Their location offsets are 0, 8 or 16; State<SIMD4<Float>>
+has size 24 and stride 32. An owned native String confirms that both native and
+Vinix reads retain one result reference and balance destruction while the
+source remains intact. The fixture also covers fifteen instrumented size/stride
+cases, guard pages and untouched padding, zero-sized results, a reentrant copy
+witness, eight cold readers, RX publication and two drained/unmapped lifetimes.
+
+A non-nil location needs AnyLocation virtual calls and graph/update tracking.
+It now diagnoses before accessing the location object, Value's metadata or
+bytes, or result storage; negative field offsets also diagnose. Thirty-four
+child calls check these paths using protected values and shared writable/read-only
+results. The adapter remains available to teardown callbacks after concurrent
+work is retired, and is unmapped with the runtime's metadata after owners drain.
+
+`tests/ios/native-checks.v build-swiftui-state-value` selects the fixture.
+Sanitizer regressions also cover opacity construction and disabled diagnostics.
+Native SDK/ABI measurements, generated C, isolated ARM64 runs, import audits and
+call-site evidence are retained under
+`build/ios/fortnite/swiftui-state-value-checks`. State construction, generic
+metadata instantiation, setters, bindings, live locations, graph execution and
+rendering remain unsupported.
+
+The fresh launch resolves the getter and exits 1 during linking at
+`_$s7SwiftUI5StateV12wrappedValuexvs`, the matching setter. Its fixup is
+`0x10dc9b3d0`, stub `0x10c63ab90` and forwarder `0x107c28e68`. The calls at
+`0x1015bea28` and `0x1015bee20` pass the new Bool indirectly in x0, State
+metadata in x1 and borrowed State in x20. These sites were inspected without
+executing application code. Fortnite still stops before application entry and
+remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,849 | 312 | 78 |
+| Fortnite executable | 1,850 | 311 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,689 | 315 | 114 |
+| All images | 2,690 | 314 | 114 |
 
-The C++/GLES/Text variant reports 2,703 resolved imports, 301 unresolved strong
+The C++/GLES/Text variant reports 2,704 resolved imports, 300 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
