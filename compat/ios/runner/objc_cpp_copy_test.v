@@ -189,7 +189,7 @@ fn test_objc_cpp_copy() {
 	cpp_copy_wait(unsafe { &ready }, 8); C.ios_ref_change(unsafe { &gate }, 1)
 	cold.wait(); unsafe { cold.free() }
 	assert objc_cpp_copy_initialized && sizeof(ObjCppCopyLock) == 128 && sizeof(objc_cpp_copy_locks) == 1024
-	for symbol in ['objc_copyCppObjectAtomic', '_objc_copyCppObjectAtomicExtra', '_objc_copyStruct']! { if _ := objc_runtime_symbol(symbol) { assert false } }
+	for symbol in ['objc_copyCppObjectAtomic', '_objc_copyCppObjectAtomicExtra', '_objc_copyStructExtra']! { if _ := objc_runtime_symbol(symbol) { assert false } }
 	for _ in 0 .. 2 {
 		objc_start()
 		for library in ['/usr/lib/libSystem.B.dylib', '/usr/lib/libc++.1.dylib', '/System/Library/Frameworks/Foundation.framework/Foundation']! { if _ := runtime_symbol(library, '_objc_copyCppObjectAtomic') { assert false } }

@@ -12803,11 +12803,36 @@ callbacks and two drained runtimes. Six sanitizer runs, property/monitor
 regressions, generated C/ARM64 review, native sources and four isolated ARM64
 phases are retained under `build/ios/fortnite/objc-cpp-copy-checks`.
 
-The fresh launch exits 1 during linking at `_objc_copyStruct`. Its required
-cell is `0x10dc9b520`, stub `0x10c63e1b4` and branch forwarder `0x107c290fc`.
+The struct-copy helper has required cell `0x10dc9b520`, stub `0x10c63e1b4`
+and branch forwarder `0x107c290fc`.
 The additional tail forwarder at `0x1020c18d0` passes a 32-byte size,
 atomic=true and hasStrong=false. These references were inspected without
 executing application code.
+
+`_objc_copyStruct` now resolves through libobjc.A.dylib. It performs an
+overlap-safe `memmove` of the requested bytes. Atomic calls lock both endpoint
+addresses in a consistent order, acquiring equal or colliding stripes once.
+Nonatomic calls bypass initialization and all locks. As in [Apple's implementation](https://github.com/apple-oss-distributions/objc4/blob/main/runtime/objc-accessors.mm),
+the obsolete `hasStrong` flag is ignored: copied bytes receive no Objective-C
+ownership treatment. The eight native mutexes occupy a separate 1 KiB table
+and remain available across runtime lifetimes; the C++ callback-copy table is
+independent. There is no per-copy allocation.
+
+`tests/ios/native-checks.v build-objc-struct-copy` compares guard-page lengths,
+unaligned endpoints, zero-byte protected boundaries, self/overlapping moves,
+opaque pointer bytes with both flags and eight-worker 16 KiB copy contention
+against Apple's native runtime. It also checks eight simultaneous cold callers,
+hash collisions, nonatomic progress with the registry and all struct locks held,
+independence from the C++ copy table, unrelated-stripe progress, shutdown
+callbacks and two drained runtimes. Six sanitizer runs, C++ copy/property
+regressions, generated C/ARM64 review, native sources and four isolated ARM64
+phases are retained under `build/ios/fortnite/objc-struct-copy-checks`.
+
+The fresh launch exits 1 during linking at `_objc_exception_rethrow`. Its
+required cell is `0x10dc9b558`, stub `0x10c63e208` and branch forwarder
+`0x107c2837c`. Four direct calls, including `0x1000554a0` and `0x10005ebb8`,
+were inspected without executing application code. Full Objective-C exception
+throwing/catching and Mach-O frame unwinding remain unsupported.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12815,12 +12840,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,872 | 289 | 78 |
+| Fortnite executable | 1,873 | 288 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,712 | 292 | 114 |
+| All images | 2,713 | 291 | 114 |
 
-The C++/GLES/Text variant reports 2,726 resolved imports, 278 unresolved strong
+The C++/GLES/Text variant reports 2,727 resolved imports, 277 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
