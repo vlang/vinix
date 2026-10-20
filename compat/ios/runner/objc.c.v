@@ -206,6 +206,8 @@ mut:
 	swift_cstring_arena u64 // Sealed Swift closure/context/result adapter, retired after callbacks drain.
 	swift_sequence_arena u64 // Sealed Sequence witness/throwing transform adapters, retired after callbacks drain.
 	swift_metadata_arena u64 // Adjacent sealed String metadata/accessor pages, under the runtime lock.
+	swift_string_protocol_arena u64 // Sealed declaration graph; no StringProtocol witness table is published.
+	swift_string_protocol_descriptor u64 // Kept through retirement for stale witness-lookup rejection.
 	swift_foreign_metadata [64]SwiftForeignMetadataEntry // Borrowed complete imported scalar-enum identities.
 	swift_foreign_metadata_count u64 // Bounded canonical cache, cleared after workers drain.
 	swift_interpolation_arena u64 // Frozen interpolation metadata and TextOutputStream witnesses.

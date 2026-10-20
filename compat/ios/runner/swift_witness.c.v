@@ -6,6 +6,10 @@ module main
 // Swift context call. Metadata and instantiation arguments are unused on this
 // path. Resilient/generic tables must be instantiated, never returned as-is.
 fn swift_witness_table_checked(conformance u64, metadata u64, arguments u64) !u64 {
+	if ios_runtime != unsafe { nil } && conformance != 0
+		&& conformance == ios_runtime.swift_string_protocol_descriptor {
+		return swift_string_protocol_table_checked(metadata, arguments)
+	}
 	if conformance == 0 || conformance & 3 != 0 || conformance > ~u64(0) - 15 {
 		return error('iOS: invalid Swift conformance descriptor')
 	}
@@ -90,6 +94,7 @@ fn swift_witness_table(conformance u64, metadata u64, arguments u64) u64 {
 }
 
 fn swift_witness_symbol(symbol string) ?u64 {
+	if symbol == '_$sSSSysMc' { return swift_string_protocol_descriptor_checked() or { panic(err) } }
 	if address := swift_dictionary_decoding_symbol(symbol) { return address }
 	if address := swift_dictionary_encoding_symbol(symbol) { return address }
 	if address := swift_date_encoding_protocol_symbol(symbol) { return address }

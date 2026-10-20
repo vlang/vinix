@@ -13184,8 +13184,41 @@ and Int hashing regressions. Four ARM64 phases, original-image traces, native
 measurements and generated C/ARM64 reviews are retained under
 `build/ios/fortnite/string-hashable-checks`.
 
-The fresh launch exits 1 during linking at String's StringProtocol conformance
-descriptor, `_$sSSSysMc`; String's Hashable table no longer blocks linking.
+String's StringProtocol conformance descriptor `_$sSSSysMc` now resolves as a
+declaration-only data export. Its required cell `0x10dc9b828` and consumer
+`0x10006e198` were traced in the original executable. Native macOS 26.5
+measurements establish seven inherited conformances, 26 StringProtocol
+requirements and a 27-word generic witness pattern that requires instantiation.
+The checked-in schema covers all 20 reachable protocol declarations, including
+generic signatures, associated type names and requirement discriminators.
+It follows the [StringProtocol declaration](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/StringProtocol.swift)
+and [Swift's generic witness control layout](https://github.com/swiftlang/swift/blob/main/include/swift/ABI/Metadata.h).
+
+The schema generator is deterministic and checks the complete generated image:
+
+```sh
+v run tests/ios/string-protocol-schema.v check
+v run tests/ios/native-checks.v build-string-protocol
+```
+
+The declaration arena has separate executable and read-only pages and reuses
+the existing core protocol identities where implemented. Its uninstantiated
+pattern remains private. StringProtocol witness lookup and the instantiation
+callback stop with an explicit unsupported diagnostic; encoded views, character
+collections and the remaining inherited requirements still need implementation.
+No usable StringProtocol witness table is returned. Descriptor identity survives
+arena retirement so stale lookup is rejected before reading unmapped memory.
+
+Native schema comparisons, protected callback arguments, read-only mappings,
+eight cold readers and two drained/unmapped lifetimes pass. Ten ASan/UBSan runs
+cover both C++ backend configurations plus String Hashable, String metadata and
+generic witness regressions. Four isolated ARM64 phases, generated C/ARM64
+reviews, primary references and original-image traces are retained under
+`build/ios/fortnite/string-protocol-checks`.
+
+The fresh launch exits 1 during linking at Sequence's
+`_copyContents(initializing:)` default,
+`_$sSTsE13_copyContents12initializing8IteratorQz_SitSry7ElementQzG_tF`.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13193,18 +13226,19 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,902 | 259 | 78 |
+| Fortnite executable | 1,903 | 258 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,742 | 262 | 114 |
+| All images | 2,743 | 261 | 114 |
 
-The C++/GLES/Text variant reports 2,756 resolved imports, 248 unresolved strong
+The C++/GLES/Text variant reports 2,757 resolved imports, 247 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
-view and view-list factories and identified-tree hook still stop execution
-when reached; the count does not measure functional API coverage.
+StringProtocol witness instantiator, view and view-list factories and
+identified-tree hook still stop execution when reached; the count does not
+measure functional API coverage.
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on

@@ -1,0 +1,732 @@
+[
+    {
+        "name": "StringProtocol",
+        "flags": 196675,
+        "associated": "UTF8View UTF16View UnicodeScalarView",
+        "signature": [
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "BidirectionalCollection"
+            },
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "Comparable"
+            },
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "ExpressibleByStringInterpolation"
+            },
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "Hashable"
+            },
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "LosslessStringConvertible"
+            },
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "TextOutputStream"
+            },
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "TextOutputStreamable"
+            },
+            {
+                "flags": 1,
+                "parameter": "7ElementSTQz",
+                "target": "SJ",
+                "protocol_name": ""
+            },
+            {
+                "flags": 1,
+                "parameter": "5IndexSlQz",
+                "target": "SS5IndexV",
+                "protocol_name": ""
+            },
+            {
+                "flags": 1,
+                "parameter": "19StringInterpolations32ExpressibleByStringInterpolationQz",
+                "target": "s26DefaultStringInterpolationV",
+                "protocol_name": ""
+            },
+            {
+                "flags": 128,
+                "parameter": "11SubSequenceSlQz",
+                "target": "",
+                "protocol_name": "StringProtocol"
+            },
+            {
+                "flags": 128,
+                "parameter": "9UTF16ViewSyQz",
+                "target": "",
+                "protocol_name": "BidirectionalCollection"
+            },
+            {
+                "flags": 128,
+                "parameter": "8UTF8ViewSyQz",
+                "target": "",
+                "protocol_name": "Collection"
+            },
+            {
+                "flags": 128,
+                "parameter": "17UnicodeScalarViewSyQz",
+                "target": "",
+                "protocol_name": "BidirectionalCollection"
+            },
+            {
+                "flags": 1,
+                "parameter": "9UTF16ViewSy_7ElementSTQZ",
+                "target": "s6UInt16V",
+                "protocol_name": ""
+            },
+            {
+                "flags": 1,
+                "parameter": "9UTF16ViewSy_5IndexSlQZ",
+                "target": "SS5IndexV",
+                "protocol_name": ""
+            },
+            {
+                "flags": 1,
+                "parameter": "8UTF8ViewSy_7ElementSTQZ",
+                "target": "s5UInt8V",
+                "protocol_name": ""
+            },
+            {
+                "flags": 1,
+                "parameter": "8UTF8ViewSy_5IndexSlQZ",
+                "target": "SS5IndexV",
+                "protocol_name": ""
+            },
+            {
+                "flags": 1,
+                "parameter": "17UnicodeScalarViewSy_7ElementSTQZ",
+                "target": "s7UnicodeO6ScalarV",
+                "protocol_name": ""
+            },
+            {
+                "flags": 1,
+                "parameter": "17UnicodeScalarViewSy_5IndexSlQZ",
+                "target": "SS5IndexV",
+                "protocol_name": ""
+            }
+        ],
+        "requirements": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            440795144,
+            1641218056,
+            2437545992,
+            4164943880,
+            3920887815,
+            916193287,
+            1300627463,
+            1735589907,
+            2785476627,
+            2386558995,
+            700710929,
+            3105488913,
+            3534422033,
+            817168401,
+            1209466882,
+            458620930,
+            2224226306,
+            1335296017,
+            1350762513
+        ],
+        "defaults": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+        ]
+    },
+    {
+        "name": "BidirectionalCollection",
+        "flags": 196675,
+        "associated": "",
+        "signature": [
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "Collection"
+            },
+            {
+                "flags": 128,
+                "parameter": "7IndicesSlQz",
+                "target": "",
+                "protocol_name": "BidirectionalCollection"
+            },
+            {
+                "flags": 128,
+                "parameter": "11SubSequenceSlQz",
+                "target": "",
+                "protocol_name": "BidirectionalCollection"
+            }
+        ],
+        "requirements": [
+            0,
+            22544392,
+            3675914248,
+            1131610129,
+            3721723921,
+            3211722769,
+            552402961,
+            3018326033
+        ],
+        "defaults": [
+            false,
+            true,
+            true,
+            false,
+            true,
+            true,
+            true,
+            true
+        ]
+    },
+    {
+        "name": "Comparable",
+        "flags": 196675,
+        "associated": "",
+        "signature": [
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "Equatable"
+            }
+        ],
+        "requirements": [
+            0,
+            3900112897,
+            2522873857,
+            1109852161,
+            2636447745
+        ],
+        "defaults": [
+            false,
+            false,
+            true,
+            true,
+            true
+        ]
+    },
+    {
+        "name": "ExpressibleByStringInterpolation",
+        "flags": 196675,
+        "associated": "StringInterpolation",
+        "signature": [
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "ExpressibleByStringLiteral"
+            },
+            {
+                "flags": 128,
+                "parameter": "19StringInterpolations32ExpressibleByStringInterpolationQz",
+                "target": "",
+                "protocol_name": "StringInterpolationProtocol"
+            },
+            {
+                "flags": 1,
+                "parameter": "17StringLiteralTypes26ExpressibleByStringLiteralQz",
+                "target": "19StringInterpolations32ExpressibleByStringInterpolation_0A11LiteralTypes27StringInterpolationProtocolQZ",
+                "protocol_name": ""
+            }
+        ],
+        "requirements": [
+            0,
+            140967944,
+            1962541063,
+            3371302914
+        ],
+        "defaults": [
+            false,
+            true,
+            true,
+            false
+        ]
+    },
+    {
+        "name": "Hashable",
+        "flags": 196675,
+        "associated": "",
+        "signature": [
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "Equatable"
+            }
+        ],
+        "requirements": [
+            0,
+            40566803,
+            1032388625,
+            3290038289
+        ],
+        "defaults": [
+            false,
+            false,
+            false,
+            true
+        ]
+    },
+    {
+        "name": "LosslessStringConvertible",
+        "flags": 196675,
+        "associated": "",
+        "signature": [
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "CustomStringConvertible"
+            }
+        ],
+        "requirements": [
+            0,
+            2569469954
+        ],
+        "defaults": [
+            false,
+            false
+        ]
+    },
+    {
+        "name": "TextOutputStream",
+        "flags": 196675,
+        "associated": "",
+        "signature": [],
+        "requirements": [
+            1871773713,
+            629145617,
+            1659568145,
+            1370292241
+        ],
+        "defaults": [
+            true,
+            true,
+            false,
+            true
+        ]
+    },
+    {
+        "name": "TextOutputStreamable",
+        "flags": 196675,
+        "associated": "",
+        "signature": [],
+        "requirements": [
+            4251385873
+        ],
+        "defaults": [
+            false
+        ]
+    },
+    {
+        "name": "Collection",
+        "flags": 196675,
+        "associated": "Index SubSequence Indices",
+        "signature": [
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "Sequence"
+            },
+            {
+                "flags": 1,
+                "parameter": "7ElementSTQz",
+                "target": "11SubSequenceSl_7ElementSTQZ",
+                "protocol_name": ""
+            },
+            {
+                "flags": 128,
+                "parameter": "5IndexSlQz",
+                "target": "",
+                "protocol_name": "Comparable"
+            },
+            {
+                "flags": 1,
+                "parameter": "5IndexSlQz",
+                "target": "7IndicesSl_7ElementSTQZ",
+                "protocol_name": ""
+            },
+            {
+                "flags": 128,
+                "parameter": "7IndicesSlQz",
+                "target": "",
+                "protocol_name": "Collection"
+            },
+            {
+                "flags": 1,
+                "parameter": "7IndicesSlQz",
+                "target": "7IndicesSl_11SubSequenceSlQZ",
+                "protocol_name": ""
+            },
+            {
+                "flags": 128,
+                "parameter": "11SubSequenceSlQz",
+                "target": "",
+                "protocol_name": "Collection"
+            },
+            {
+                "flags": 1,
+                "parameter": "11SubSequenceSlQz",
+                "target": "11SubSequenceSl_AASlQZ",
+                "protocol_name": ""
+            },
+            {
+                "flags": 1,
+                "parameter": "7IndicesSl_7ElementSTQZ",
+                "target": "7IndicesSl_5IndexSlQZ",
+                "protocol_name": ""
+            },
+            {
+                "flags": 1,
+                "parameter": "7IndicesSl_5IndexSlQZ",
+                "target": "11SubSequenceSl_5IndexSlQZ",
+                "protocol_name": ""
+            }
+        ],
+        "requirements": [
+            0,
+            3498311688,
+            1311309832,
+            3692101640,
+            2466512903,
+            662110215,
+            3807051783,
+            1086849043,
+            509476883,
+            98959381,
+            1640038419,
+            2607415315,
+            2564358163,
+            1785724947,
+            2097414161,
+            989462545,
+            1318518801,
+            3722706961,
+            1759969297,
+            2102394897,
+            1088815121,
+            2276982801,
+            2162098193,
+            2216755217
+        ],
+        "defaults": [
+            false,
+            false,
+            true,
+            true,
+            false,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            false,
+            true
+        ]
+    },
+    {
+        "name": "Equatable",
+        "flags": 196675,
+        "associated": "",
+        "signature": [],
+        "requirements": [
+            2548760577
+        ],
+        "defaults": [
+            false
+        ]
+    },
+    {
+        "name": "ExpressibleByStringLiteral",
+        "flags": 196675,
+        "associated": "StringLiteralType",
+        "signature": [
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "ExpressibleByExtendedGraphemeClusterLiteral"
+            },
+            {
+                "flags": 128,
+                "parameter": "17StringLiteralTypes26ExpressibleByStringLiteralQz",
+                "target": "",
+                "protocol_name": "_ExpressibleByBuiltinStringLiteral"
+            }
+        ],
+        "requirements": [
+            0,
+            3314089992,
+            424542215,
+            1552941058
+        ],
+        "defaults": [
+            false,
+            false,
+            false,
+            false
+        ]
+    },
+    {
+        "name": "StringInterpolationProtocol",
+        "flags": 196675,
+        "associated": "StringLiteralType",
+        "signature": [
+            {
+                "flags": 128,
+                "parameter": "17StringLiteralTypes27StringInterpolationProtocolQz",
+                "target": "",
+                "protocol_name": "_ExpressibleByBuiltinStringLiteral"
+            }
+        ],
+        "requirements": [
+            1915551752,
+            1257046023,
+            4051173378,
+            4009820177
+        ],
+        "defaults": [
+            false,
+            false,
+            false,
+            false
+        ]
+    },
+    {
+        "name": "CustomStringConvertible",
+        "flags": 196675,
+        "associated": "",
+        "signature": [],
+        "requirements": [
+            2346909715
+        ],
+        "defaults": [
+            false
+        ]
+    },
+    {
+        "name": "Sequence",
+        "flags": 196675,
+        "associated": "Element Iterator",
+        "signature": [
+            {
+                "flags": 1,
+                "parameter": "7ElementSTQz",
+                "target": "8IteratorST_7ElementStQZ",
+                "protocol_name": ""
+            },
+            {
+                "flags": 128,
+                "parameter": "8IteratorSTQz",
+                "target": "",
+                "protocol_name": "IteratorProtocol"
+            }
+        ],
+        "requirements": [
+            3073638408,
+            3066363911,
+            213647367,
+            1831338001,
+            1140850707,
+            19922961,
+            932249617,
+            2343370769,
+            2290745361
+        ],
+        "defaults": [
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true
+        ]
+    },
+    {
+        "name": "ExpressibleByExtendedGraphemeClusterLiteral",
+        "flags": 196675,
+        "associated": "ExtendedGraphemeClusterLiteralType",
+        "signature": [
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "ExpressibleByUnicodeScalarLiteral"
+            },
+            {
+                "flags": 128,
+                "parameter": "34ExtendedGraphemeClusterLiteralTypes43ExpressibleByExtendedGraphemeClusterLiteralQz",
+                "target": "",
+                "protocol_name": "_ExpressibleByBuiltinExtendedGraphemeClusterLiteral"
+            }
+        ],
+        "requirements": [
+            0,
+            1322516488,
+            226623495,
+            4205903874
+        ],
+        "defaults": [
+            false,
+            false,
+            false,
+            false
+        ]
+    },
+    {
+        "name": "_ExpressibleByBuiltinStringLiteral",
+        "flags": 196675,
+        "associated": "",
+        "signature": [
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "_ExpressibleByBuiltinExtendedGraphemeClusterLiteral"
+            }
+        ],
+        "requirements": [
+            0,
+            1612513282
+        ],
+        "defaults": [
+            false,
+            false
+        ]
+    },
+    {
+        "name": "IteratorProtocol",
+        "flags": 196675,
+        "associated": "Element",
+        "signature": [],
+        "requirements": [
+            3109027847,
+            4267966481
+        ],
+        "defaults": [
+            false,
+            false
+        ]
+    },
+    {
+        "name": "ExpressibleByUnicodeScalarLiteral",
+        "flags": 196675,
+        "associated": "UnicodeScalarLiteralType",
+        "signature": [
+            {
+                "flags": 128,
+                "parameter": "24UnicodeScalarLiteralTypes33ExpressibleByUnicodeScalarLiteralQz",
+                "target": "",
+                "protocol_name": "_ExpressibleByBuiltinUnicodeScalarLiteral"
+            }
+        ],
+        "requirements": [
+            2538405896,
+            674365447,
+            2506489858
+        ],
+        "defaults": [
+            false,
+            false,
+            false
+        ]
+    },
+    {
+        "name": "_ExpressibleByBuiltinExtendedGraphemeClusterLiteral",
+        "flags": 196675,
+        "associated": "",
+        "signature": [
+            {
+                "flags": 128,
+                "parameter": "x",
+                "target": "",
+                "protocol_name": "_ExpressibleByBuiltinUnicodeScalarLiteral"
+            }
+        ],
+        "requirements": [
+            0,
+            2678128642
+        ],
+        "defaults": [
+            false,
+            false
+        ]
+    },
+    {
+        "name": "_ExpressibleByBuiltinUnicodeScalarLiteral",
+        "flags": 196675,
+        "associated": "",
+        "signature": [],
+        "requirements": [
+            2395144194
+        ],
+        "defaults": [
+            false
+        ]
+    }
+]
