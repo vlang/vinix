@@ -13657,7 +13657,7 @@ Nested Optionals add a tag byte at each level, and typed Arrays use stride one
 with POD destruction. The canonical accessor is sealed RX; metadata,
 descriptors and witnesses are sealed RO before publication. Both pages retire
 after Array/Optional users and callbacks drain, and retired exports cannot
-recreate them. Reflection and the separate Error conformance remain unsupported.
+recreate them. Reflection remains unsupported.
 
 ```sh
 v run tests/ios/native-checks.v build-merge-error-metadata
@@ -13679,10 +13679,45 @@ Generated C/ARM64 reviews, primary contracts, native measurements, compressed
 artifacts and original-image traces are retained under
 `build/ios/fortnite/merge-error-metadata-checks`.
 
-The fresh launch exits 1 during linking at the `_MergeError: Error` witness
-table, `_$ss11_MergeErrorOs0B0sWP`. Its required cell `0x10dc9b8c8` and consumer
-`0x100068464`, which loads the table alongside the enum metadata for
+The concrete `_MergeError: Error` witness table
+`_$ss11_MergeErrorOs0B0sWP` and conformance descriptor
+`_$ss11_MergeErrorOs0B0sMc` now work with the canonical enum metadata. All four
+requirements are implemented: domain `Swift._MergeError`, code zero, an owned
+empty NSDictionary for userInfo and nil for the embedded NSError. The domain
+is an owned immortal String literal that supports normal copy/take/destruction.
+These results match native Swift's [Error defaults](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/ErrorType.swift).
+
+The table and adapters share the enum's sealed RX/RO pages. A local indirect
+reference identifies the shared canonical Error protocol. Concrete witness
+lookup requires the exact live enum metadata and rejects remembered retired
+descriptors before reading unmapped bytes. The shared Error declaration outlives
+the conformance during teardown. General conformance discovery, native Swift
+error boxes and their NSError bridging remain unsupported.
+
+```sh
+v run tests/ios/native-checks.v build-merge-error-conformance
+```
+
+Native macOS comparisons check all four requirements, concrete table lookup,
+String copy/take/destruction, dictionary ownership, inaccessible zero-size Self
+and preserved x20/x21. Native Swift also consumes the compatibility descriptor
+and returned String. Compatibility checks cover RX/RO mappings, scoped exports,
+rejected foreign metadata/stale descriptors, eight cold publishers/workers and
+two drained/unmapped lifetimes. The original required cell `0x10dc9b8c8` and
+consumer `0x100068464`, which loads the table alongside the enum metadata for
 `swift_allocError`, were inspected without executing application code.
+
+Ten ASan/UBSan runs pass across both C++ backend configurations and enum
+metadata, CFError extraction and concrete witness lookup regressions. Four
+isolated ARM64 phases pass: the conformance fixture, fresh launch probe and
+both import audits. Generated C/ARM64 reviews, primary contracts, native
+measurements, compressed artifacts and original-image traces are retained under
+`build/ios/fortnite/merge-error-conformance-checks`.
+
+The fresh launch exits 1 during linking at `_StringGuts.grow(_:)`,
+`_$ss11_StringGutsV4growyySiF`. Its required cell `0x10dc9b8d0`, stub
+`0x10c63ae3c`, branch island `0x107c2873c` and four callers were inspected
+without executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13690,12 +13725,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,917 | 244 | 78 |
+| Fortnite executable | 1,918 | 243 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,757 | 247 | 114 |
+| All images | 2,758 | 246 | 114 |
 
-The C++/GLES/Text variant reports 2,771 resolved imports, 233 unresolved strong
+The C++/GLES/Text variant reports 2,772 resolved imports, 232 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

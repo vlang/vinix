@@ -242,6 +242,7 @@ mut:
 	swift_bool_metadata_retired bool // Reject recreation after quiescent metadata retirement.
 	swift_merge_error_metadata_arena u64 // Sealed _MergeError enum metadata, accessor and zero-size witnesses.
 	swift_merge_error_metadata_retired bool
+	swift_merge_error_conformance_descriptor u64 // Remember through retirement before any stale descriptor read.
 	swift_integer_arena u64 // Int metadata, value witnesses and Equatable/Hashable conformances.
 	swift_integer_description_arena u64 // Sealed Int description table/adapter using String's canonical protocol.
 	swift_integer_description_retired bool // Reject description exports after quiescent retirement.

@@ -59,6 +59,7 @@ fn swift_merge_error_metadata_arena_checked() !u64 {
 		return ios_runtime.swift_merge_error_metadata_arena
 	}
 	page := u64(C.getpagesize())
+	protocol := swift_error_metadata_arena() + page + 240
 	arena := C.mmap(unsafe { nil }, usize(page * 2), C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
 	if arena == unsafe { voidptr(-1) } { return swift_merge_error_metadata_failure() }
 	base := u64(arena)
@@ -100,7 +101,8 @@ fn swift_merge_error_metadata_arena_checked() !u64 {
 	swift_protocol_relative(module_descriptor + 8, data + 240)
 	C.memcpy(voidptr(data + 240), c'Swift', 6)
 	C.memcpy(voidptr(data + 256), c'_MergeError', 12)
-	C.__builtin___clear_cache(arena, voidptr(base + 24))
+	swift_merge_error_conformance_emit(base, data, protocol)
+	C.__builtin___clear_cache(arena, voidptr(base + 128))
 	if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(voidptr(data), usize(page), C.PROT_READ) != 0 {
 		if C.munmap(arena, usize(page * 2)) != 0 {
@@ -109,6 +111,7 @@ fn swift_merge_error_metadata_arena_checked() !u64 {
 		return swift_merge_error_metadata_failure()
 	}
 	ios_runtime.swift_merge_error_metadata_arena = base
+	ios_runtime.swift_merge_error_conformance_descriptor = data + 288
 	return base
 }
 
@@ -123,13 +126,16 @@ fn swift_merge_error_metadata_stop() {
 }
 
 fn swift_merge_error_metadata_symbol(symbol string) ?u64 {
-	if symbol !in ['_$ss11_MergeErrorON', '_$ss11_MergeErrorOMn', '_$ss11_MergeErrorOMa']! {
+	if symbol !in ['_$ss11_MergeErrorON', '_$ss11_MergeErrorOMn', '_$ss11_MergeErrorOMa',
+		'_$ss11_MergeErrorOs0B0sWP', '_$ss11_MergeErrorOs0B0sMc']! {
 		return none
 	}
 	base := swift_merge_error_metadata_arena_checked() or { return none }
 	return match symbol {
 		'_$ss11_MergeErrorOMa' { base }
 		'_$ss11_MergeErrorOMn' { base + u64(C.getpagesize()) + 192 }
+		'_$ss11_MergeErrorOs0B0sWP' { base + u64(C.getpagesize()) + 320 }
+		'_$ss11_MergeErrorOs0B0sMc' { base + u64(C.getpagesize()) + 288 }
 		else { base + u64(C.getpagesize()) + 16 }
 	}
 }

@@ -258,8 +258,7 @@ fn test_swift_merge_error_metadata() {
 				assert runtime_symbol(foreign, symbol) == none
 			}
 		}
-		for unsupported in ['_$ss11_MergeErrorOWV', '_$ss11_MergeErrorOs0B0sWP',
-			'_$ss11_MergeErrorOs0B0sMc']! {
+		for unsupported in ['_$ss11_MergeErrorOWV']! {
 			assert runtime_symbol(library, unsupported) == none
 		}
 		mut workers := []thread{}
