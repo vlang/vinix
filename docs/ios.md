@@ -12939,12 +12939,39 @@ class helper was renamed to avoid a collision with the system resolver header.
 Generated C/ARM64 review, native sources and four isolated ARM64 phases are
 retained under `build/ios/fortnite/protocol-method-checks`.
 
-The fresh launch exits 1 during linking at the unsupported
-`/usr/lib/libsqlite3.dylib`, starting with `_sqlite3_bind_blob`.
-Its required cell `0x10dc9b720`, stub `0x10c63e8ec`, branch forwarder
+Fortnite imports 18 fixed-argument functions from `/usr/lib/libsqlite3.dylib`.
+The `_sqlite3_bind_blob` required cell `0x10dc9b720`, stub `0x10c63e8ec`, branch forwarder
 `0x107c28408` and direct call `0x100057980` were inspected without executing
 application code. That call passes the statement, index 3, borrowed blob bytes,
 byte length and a null destructor.
+
+The optional `ios_sqlite` backend now binds all 18 functions directly to one
+native SQLite engine. Handles, error strings, statement storage and callbacks
+stay with that engine; Objective-C shutdown does not close database handles.
+Only the exact library and symbol names resolve. Without the backend the
+imports remain unresolved. Variadic APIs and extension-loading APIs are not
+exported. Static, transient and custom-destructor ownership follows the
+[SQLite binding API](https://www.sqlite.org/c3ref/bind_blob.html).
+
+`tests/ios/sqlite-build.v` builds the unmodified SQLite 3.53.4 amalgamation
+verified against `tests/packages/sqlite-source.json`. The ARM64 archive reserves
+x18, enables thread safety and omits extension loading. The public native-checks
+driver enables the backend when `build/ios/sqlite/build.status.txt` exists;
+`VINIX_IOS_SQLITE_SDK` selects another SDK directory. A host build using
+`-d ios_sqlite` links its system SQLite through `-lsqlite3`.
+
+`tests/ios/native-checks.v build-sqlite` checks all 18 aliases, signed integers,
+embedded-NUL text/blob bytes, null/empty/failed binds, destructor counts and
+guarded raw ARM64 calls. It also checks reentrant and aborting callbacks, owned
+errors, constraint failures, busy close, eight shared-connection writers,
+transaction rollback, persistent database files and read-only failures.
+The same cases run against native Mac SQLite, and handles survive two drained
+Objective-C runtimes. Six host sanitizer runs cover enabled/disabled backends
+and the protocol-method regression. Four isolated ARM64 phases, generated C,
+resolver disassembly and the complete SQLite archive disassembly are retained
+under `build/ios/fortnite/sqlite-checks`; no engine instruction uses x18 or w18.
+
+The fresh launch exits 1 during linking at Swift core symbol `_$sBbWV`.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12952,13 +12979,14 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,877 | 284 | 78 |
+| Fortnite executable | 1,895 | 266 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,717 | 287 | 114 |
+| All images | 2,735 | 269 | 114 |
 
-The C++/GLES/Text variant reports 2,731 resolved imports, 273 unresolved strong
+The C++/GLES/Text variant reports 2,749 resolved imports, 255 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
+Both measurements include the optional SQLite backend.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
 view and view-list factories and identified-tree hook still stop execution
@@ -12988,6 +13016,8 @@ native C++ archives, private GLES closure, preserved socket kernel, existing
 fixtures and extracted IPA under `build/ios/fortnite`:
 
 ```sh
+v -nocache -cc clang run tests/ios/sqlite-build.v \
+  build/package-sqlite-work/inputs/source build/ios/sqlite
 v -nocache -cc clang run tests/ios/native-checks.v build
 v -nocache -cc clang run tests/ios/native-checks.v regression
 v -nocache -cc clang run tests/ios/native-checks.v swift

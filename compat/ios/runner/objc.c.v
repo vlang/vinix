@@ -795,6 +795,11 @@ fn format_double(destination &char, size usize, format &char, value f64) int {
 }
 
 fn runtime_symbol(library string, symbol string) !u64 {
+	$if ios_sqlite ? {
+		if library == '/usr/lib/libsqlite3.dylib' {
+			if address := sqlite_symbol(symbol) { return address }
+		}
+	}
 	if library == '/usr/lib/libresolv.9.dylib' {
 		if address := resolver_query_symbol(symbol) { return address }
 	}
