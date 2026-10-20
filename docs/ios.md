@@ -12167,17 +12167,50 @@ x1, a View table in x2, borrowed Self in x20 and the result in x8. These sites
 were inspected without executing application code. Fortnite still stops
 before application entry and remains unplayable.
 
+`View.disabled` now has a terminal diagnostic for its missing environment
+transform construction. Native SwiftUI returns
+`ModifiedContent<Self, _EnvironmentKeyTransformModifier<Bool>>`, storing an
+owned writable key path to `EnvironmentValues.isEnabled` and a closure that
+captures the disabled Bool. Applying that closure computes
+`inheritedEnabled && !disabled`: passing false preserves a disabled ancestor.
+Native measurements put EnvironmentValues at 16 bytes and the transform at 24
+bytes, with the key path at offset zero and the closure at offset eight.
+For EmptyView, the complete returned value is also 24 bytes. Native copy/destroy
+checks confirm ownership of the captured context and a canonical key path
+across both Bool values.
+
+Key-path construction and environment execution remain unsupported. The new
+binding reports that limitation before reading Self, metadata or witnesses,
+changing ownership, or writing an indirect result. The public fixture
+`tests/ios/native-checks.v build-swiftui-view-disabled` checks the native
+layouts and four inherited-enabled cases, plus 128 diagnostic child calls
+with guarded inputs, unchanged shared writable/read-only result pages,
+four Bool register patterns, eight readers, exact routing, teardown callbacks
+and two drained lifetimes. Sanitizer runs also cover the existing opacity value
+constructor and environment-transform descriptor. Native measurements,
+SDK/ABI snapshots, isolated ARM64 results, generated C and call-site evidence
+are retained under `build/ios/fortnite/swiftui-view-disabled-checks`.
+Binding this diagnostic does not implement disabled controls or rendering.
+
+The new launch resolves this binding and exits 1 during linking at
+`_$s7SwiftUI5StateV12wrappedValuexvg`. Fresh IPA inspection locates its fixup
+at `0x10dc9b3c8`, stub at `0x10c63ab84` and forwarder at `0x107c28e60`.
+The three calls at `0x1015be924`, `0x1015bfa08` and `0x1015c0000` pass an
+indirect result in x8 and read its Bool byte afterward. These sites were
+inspected without executing application code. Fortnite still stops before
+application entry and remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,848 | 313 | 78 |
+| Fortnite executable | 1,849 | 312 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,688 | 316 | 114 |
+| All images | 2,689 | 315 | 114 |
 
-The C++/GLES/Text variant reports 2,702 resolved imports, 302 unresolved strong
+The C++/GLES/Text variant reports 2,703 resolved imports, 301 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
