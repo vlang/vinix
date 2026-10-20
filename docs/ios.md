@@ -14028,23 +14028,63 @@ helper bodies introduce no hidden V allocations or additional owner/cache
 lifetimes; the parser's pre-existing unsupported-expression error paths remain.
 The ARM64 fixture, fresh launch probe and both import audits pass. The required
 descriptor cell `0x10dc9b920` and four indirect context references were inspected
-without executing app code. The launch now stops at
+without executing app code. That launch stopped at
 `_$ss21_findStringSwitchCase5cases6stringSiSays06StaticB0VG_SStF`, before application
 entry. Its required cell `0x10dc9b928`, stub `0x10c63ae90`, branch island
-`0x107c28a74` and two caller sites were inspected read-only. Fortnite remains
-unplayable.
+`0x107c28a74` and two caller sites were inspected read-only.
+
+`_$ss21_findStringSwitchCase5cases6stringSiSays06StaticB0VG_SStF` now searches
+borrowed `[StaticString]` case tables through its concrete ARM64 ABI: table owner
+in x0, String words in x1/x2 and a signed index in x0. The first canonically equal
+case wins; a miss returns `-1`. Equality uses the existing NFC implementation,
+including different UTF-8 lengths, combining marks and Hangul. Embedded NULs
+remain part of the string. Comparison does not fold case or compatibility forms.
+
+Supported tables are registered typed `Array<StaticString>` owners and readable,
+file-backed loaded-image tables with the native 32-byte header and 24-byte stride.
+Only the 17 initialized bytes of each visited case are read. Cases must use the
+pointer representation; scalar StaticStrings, arbitrary owners, Cocoa arrays and
+the cached switch intrinsic remain unsupported. Empty tables return `-1` without
+reading the String, capacity or tail. A hit leaves later cases untouched.
+
+The String reader supports inline values, immortal literals, registered native
+tails and registered foreign NSStrings. Both arguments remain borrowed under the
+existing registry lock, without table caches or ARC mutation. NFC temporaries
+are freed by the existing equality helper. The supported profile caps tables at
+4,096 cases, each String/case at 1 MiB and visited case bytes at 16 MiB.
+
+```sh
+v run tests/ios/native-checks.v build-string-switch
+```
+
+String Hashable, StaticString metadata and Array storage provide regression
+coverage. Evidence is retained under `build/ios/fortnite/string-switch-checks`.
+
+Ten ASan/UBSan host runs pass, including installed ARM64 comparisons of first
+matches, misses, canonical duplicates, embedded NULs, foreign ownership, preserved
+x20/x21, unused x8 and protected empty-table/case boundaries. Compatibility
+checks add typed/image tables, native String tails, limits, eight readers and
+two drained runtimes. The standalone ARM64 fixture, launch probe and both import
+audits pass. Generated C/ARM64 review confirms no hidden allocations in the new
+helpers, both NFC temporaries freed, and no new owner/cache lifetime.
+
+The fresh launch passes the switch import and exits 1 during linking at
+`_$ss22KeyedDecodingContainerV6decode_6forKeyS2Sm_xtKF`, the String decoding
+overload. Its required cell `0x10dc9b930`, stub `0x10c63ae9c`, branch island
+`0x107c28500` and two caller sites were inspected read-only. Fortnite still
+stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,927 | 234 | 78 |
+| Fortnite executable | 1,928 | 233 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,767 | 237 | 114 |
+| All images | 2,768 | 236 | 114 |
 
-The C++/GLES/Text variant reports 2,781 resolved imports, 223 unresolved strong
+The C++/GLES/Text variant reports 2,782 resolved imports, 222 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

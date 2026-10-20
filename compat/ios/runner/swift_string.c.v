@@ -255,6 +255,7 @@ fn swift_buffers_stop() {
 }
 
 fn swift_core_symbol(symbol string) ?u64 {
+	if address := swift_string_switch_symbol(symbol) { return address }
 	if address := swift_dictionary_storage_copy_symbol(symbol) { return address }
 	if address := swift_dictionary_storage_resize_symbol(symbol) { return address }
 	if address := swift_dictionary_storage_allocate_symbol(symbol) { return address }
