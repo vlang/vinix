@@ -8,6 +8,7 @@ struct SwiftHeapStorage {
 	generation u64
 mut:
 	deiniting bool
+	dictionary_tail bool // Native class deallocation reports its fixed 64-byte header.
 }
 
 type SwiftHeapDestroyCall = fn (u64, u64)
@@ -35,6 +36,10 @@ fn swift_heap_layout(metadata u64, size u64, mask u64) ! {
 }
 
 fn swift_heap_allocate(metadata u64, size u64, mask u64) u64 {
+	return swift_heap_allocate_record(metadata, size, mask, false)
+}
+
+fn swift_heap_allocate_record(metadata u64, size u64, mask u64, dictionary_tail bool) u64 {
 	swift_heap_layout(metadata, size, mask) or { panic(err) }
 	// V would promote an ordinary address-taken local to the heap.
 	pointer := unsafe { &u64(C.__builtin_alloca(8)) }
@@ -56,7 +61,7 @@ fn swift_heap_allocate(metadata u64, size u64, mask u64) u64 {
 	}
 	ios_runtime.swift_heap_sequence++
 	ios_runtime.swift_heap[owner] = SwiftHeapStorage{ metadata: metadata, size: size, mask: mask,
-		generation: ios_runtime.swift_heap_sequence }
+		generation: ios_runtime.swift_heap_sequence, dictionary_tail: dictionary_tail }
 	C.ios_objc_initialize_unlock()
 	// Stored properties are uninitialized; their construction belongs to Swift.
 	return owner
@@ -81,6 +86,24 @@ fn swift_heap_deallocate_checked(owner u64, size u64, mask u64, uninitialized bo
 
 fn swift_heap_deallocate(owner u64, size u64, mask u64) {
 	swift_heap_deallocate_checked(owner, size, mask, false) or { panic(err) }
+}
+
+// Native Dictionary storage's deallocating destructor passes the fixed class
+// header (64,7), even for over-aligned tails. Only allocations made by our
+// checked copy factory carry this marker; ordinary allocObject stays exact.
+fn swift_heap_deallocate_class_checked(owner u64, size u64, mask u64) ! {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	storage := ios_runtime.swift_heap[owner] or { return swift_dictionary_storage_failure() }
+	if storage.dictionary_tail && size == 64 && mask == 7 {
+		swift_heap_deallocate_checked(owner, storage.size, storage.mask, false)!
+	} else {
+		swift_heap_deallocate_checked(owner, size, mask, false)!
+	}
+}
+
+fn swift_heap_deallocate_class(owner u64, size u64, mask u64) {
+	swift_heap_deallocate_class_checked(owner, size, mask) or { panic(err) }
 }
 fn swift_heap_deallocate_uninitialized(owner u64, size u64, mask u64) {
 	swift_heap_deallocate_checked(owner, size, mask, true) or { panic(err) }

@@ -13865,9 +13865,55 @@ Ten ASan/UBSan host runs and four isolated ARM64 phases pass, including the
 fixture, fresh launch probe and both import audits. Generated C/ARM64 reviews
 verify the metadata helpers introduce no hidden allocations.
 
-The fresh launch exits 1 during linking at `_DictionaryStorage.copy(original:)`,
-`_$ss18_DictionaryStorageC4copy8originalAByxq_Gs05__RawaB0C_tFZ`.
-Both required IndexingIterator imports now resolve.
+`_DictionaryStorage.copy(original:)` now implements the allocation half of
+Swift's dictionary copy and mapValues operations. Its Swift class-method ABI
+borrows the original in x0 and destination class metadata in x20, returning an
+owned storage object in x0. A sealed adapter preserves x20/x21 and ignores x8.
+
+The result preserves the original scale, age and hash seed, resets reserve and
+extra fields, and starts with zero entries and an empty occupancy bitmap with
+native padding bits. Key and Value tails use the destination metadata's strides
+and alignments, including zero-size values and 256-byte alignment. The caller
+copies occupancy and initializes entries after return; this helper never copies
+source entries, retains their owners or invokes Hashable/value witnesses.
+Source count, capacity and tail pointers remain unread.
+
+Source storage must be a registered live native dictionary or a canonical empty
+singleton. Class records remain borrowed; destination Key/Value metadata must
+remain readable and complete.
+The supported class layout has a 64-byte instance header, no instance prefix,
+and four immediate metadata members. Allocations are bounded to scale 14 and
+16 MiB. Other layouts fail explicitly; generic storage-class metadata accessors,
+resizing and general Dictionary operations still require further support.
+
+Native dictionary destruction passes `_swift_deallocClassInstance` the fixed
+header size 64 and alignment mask 7, including for larger, over-aligned tails.
+Only storage allocated by this helper receives a registry marker allowing that
+entry to use its actual recorded allocation extent. Ordinary heap allocations
+and `_swift_deallocObject` retain exact extent checks. The Dictionary bridge
+also accepts fresh scale-zero typed storage with zero capacity.
+
+```sh
+v run tests/ios/native-checks.v build-dictionary-storage-copy
+```
+
+Installed ARM64 Swift comparisons cover seven target layouts, boundary scales,
+protected source tails, unchanged source ownership and caller-initialized
+snapshots. Compatibility checks add overflow/size and lifetime rejection,
+reentrant element destruction, eight concurrent workers and two fully retired
+runtimes. Dictionary metadata, Dictionary bridging and Swift heap allocation
+provide regression coverage. Evidence is retained under
+`build/ios/fortnite/dictionary-storage-copy-checks`.
+Ten ASan/UBSan host runs and four isolated ARM64 phases pass: the fixture,
+fresh launch probe and both import audits. Generated C/ARM64 reviews verify
+one registered allocation per result, stack allocation bookkeeping and no
+hidden helper allocations.
+
+The original required cell `0x10dc9b908`, stub `0x10c63ae6c`, branch island
+`0x107c28a3c` and five caller sites were inspected without executing application
+code. The fresh launch passes this import and exits 1 during linking at
+`_DictionaryStorage.resize(original:capacity:move:)`,
+`_$ss18_DictionaryStorageC6resize8original8capacity4moveAByxq_Gs05__RawaB0C_SiSbtFZ`.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13875,12 +13921,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,923 | 238 | 78 |
+| Fortnite executable | 1,924 | 237 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,763 | 241 | 114 |
+| All images | 2,764 | 240 | 114 |
 
-The C++/GLES/Text variant reports 2,777 resolved imports, 227 unresolved strong
+The C++/GLES/Text variant reports 2,778 resolved imports, 226 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

@@ -255,6 +255,7 @@ fn swift_buffers_stop() {
 }
 
 fn swift_core_symbol(symbol string) ?u64 {
+	if address := swift_dictionary_storage_copy_symbol(symbol) { return address }
 	if symbol == '_$sSS5countSivg' {
 		return u64(unsafe { voidptr(swift_string_count) })
 	}
@@ -301,7 +302,8 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_swift_errorRelease' { u64(unsafe { voidptr(objc_release) }) }
 		'_swift_initStackObject' { u64(unsafe { voidptr(swift_stack_initialize) }) }
 		'_swift_allocObject' { u64(unsafe { voidptr(swift_heap_allocate) }) }
-		'_swift_deallocObject', '_swift_deallocClassInstance' { u64(unsafe { voidptr(swift_heap_deallocate) }) }
+		'_swift_deallocObject' { u64(unsafe { voidptr(swift_heap_deallocate) }) }
+		'_swift_deallocClassInstance' { u64(unsafe { voidptr(swift_heap_deallocate_class) }) }
 		'_swift_deallocUninitializedObject' { u64(unsafe { voidptr(swift_heap_deallocate_uninitialized) }) }
 		'__swift_stdlib_reportUnimplementedInitializerInFile' { u64(unsafe { voidptr(swift_initializer_report_in_file) }) }
 		'__swift_stdlib_reportUnimplementedInitializer' { u64(unsafe { voidptr(swift_initializer_report) }) }

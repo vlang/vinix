@@ -133,7 +133,13 @@ fn swift_dictionary_metadata_arena() u64 {
 	swift_protocol_relative(data + 284, witness)
 	swift_dictionary_encoding_emit(base, data, encoding_protocol)
 	swift_dictionary_decoding_emit(base, data, encoding_protocol + 112)
-	C.__builtin___clear_cache(allocation, voidptr(base + 112))
+	// Swift class static method: original in x0, metatype self in x20.
+	write32(base + 128, 0xaa1403e1)
+	write32(base + 132, 0x58000070)
+	write32(base + 136, 0xd61f0200)
+	write32(base + 140, 0xd503201f)
+	unsafe { *(&u64(base + 144)) = u64(voidptr(swift_dictionary_storage_copy)) }
+	C.__builtin___clear_cache(allocation, voidptr(base + 152))
 	if C.mprotect(allocation, page, C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(voidptr(data), page, C.PROT_READ) != 0 {
 		C.munmap(allocation, page * 3)

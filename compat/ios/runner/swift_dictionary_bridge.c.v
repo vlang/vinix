@@ -66,12 +66,12 @@ fn swift_dictionary_view_checked(owner u64, key u64, value u64, hashable u64) !S
 	layout := swift_sequence_value_checked(value)!
 	stride := read64(read64(value - 8) + 72)
 	scale := unsafe { *(&u8(owner + 32)) }
-	if scale == 0 || scale > 14 || layout.alignment > 8 { return error('iOS: Dictionary bridge storage exceeds supported scale or alignment') }
+	if scale > 14 || layout.alignment > 8 { return error('iOS: Dictionary bridge storage exceeds supported scale or alignment') }
 	buckets := u64(1) << scale; words := (buckets + 63) / 64
 	keys := u64(64) + words * 8
 	values := keys + buckets * 16
 	count := read64(owner + 16)
-	if count > 4096 || count > read64(owner + 24) || read64(owner + 24) != buckets - buckets / 4 - if buckets == 2 { u64(1) } else { u64(0) }
+	if count > 4096 || count > read64(owner + 24) || read64(owner + 24) != buckets - buckets / 4 - if buckets <= 2 { u64(1) } else { u64(0) }
 		|| values > storage.size || buckets > (storage.size - values) / stride
 		|| read64(owner + 48) != owner + keys || read64(owner + 56) != owner + values {
 		return error('iOS: Dictionary bridge storage fields are inconsistent')
