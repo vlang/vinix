@@ -12314,24 +12314,60 @@ under `build/ios/fortnite/swiftui-state-nominal-checks`. State specialization,
 construction, locations, DynamicProperty conformance and rendering remain
 unsupported.
 
-The fresh launch resolves State's descriptor and exits 1 during linking at
-`_$s7SwiftUI6ButtonV6action5labelACyxGyyc_xyXEtcfC`, the Button(action:label:)
-initializer. Its required fixup is `0x10dc9b3e8`, stub `0x10c63aba8`, forwarder
+`Button(action:label:)` now has an explicit diagnostic binding. The native
+initializer takes the escaping action function/context in x0/x1, the borrowed
+label function/context in x2/x3, Label metadata and its View witness in x4/x5,
+and an indirect result in x8. It evaluates the label once and transfers the
+action context into owned Button storage; construction does not invoke the
+action.
+
+Button is not frozen. Native measurements show private action storage larger
+than a closure pair: Button<EmptyView> has size 106, stride 112 and field
+offsets 0/8/106; Button<Text> has size/stride 144 and offsets 0/8/112. The native
+fixture obtains result size and label placement from metadata. An owned action
+context verifies transferred ownership, one retained reference per Button copy,
+balanced destruction, and a stored action that remains callable after the
+original Button is destroyed. The label builder runs once with a protected
+borrowed context and an empty result, using the measured arm64e closure signing
+discriminator `0x720f`. No Button graph, UI event loop or application code is
+executed by these comparisons.
+
+The required import is
+`_$s7SwiftUI6ButtonV6action5labelACyxGyyc_xyXEtcfC`. Its fixup is
+`0x10dc9b3e8`, stub `0x10c63aba8`, forwarder
 `0x107c28ec8` and direct call `0x1015bffc8`. These references were inspected
-without executing application code. Fortnite still stops before application
-entry and remains unplayable.
+without executing application code. Vinix diagnoses before invoking either
+closure, touching metadata or owners, or writing result storage. Button
+metadata, construction, action storage, graph execution and rendering remain
+unsupported.
+
+`tests/ios/native-checks.v build-swiftui-button` selects the fixture. It checks
+136 child calls with protected closures, contexts, Label metadata, View witness,
+stack and result pointers; shared writable/read-only result pages remain
+unchanged at both guard boundaries, and valid callbacks are never invoked.
+Eight readers, exact framework routing, teardown callbacks and two drained
+runtime lifetimes are covered. Native measurements, sanitizer regressions for
+State descriptors/projected-value diagnostics, generated C and isolated ARM64
+runs are retained under `build/ios/fortnite/swiftui-button-checks`.
+
+The fresh launch resolves the initializer import and exits 1 during linking at
+`_$s7SwiftUI6ButtonVMn`, Button's nominal descriptor. Its required GOT fixup is
+`0x10dc9b3f0`, referenced indirectly by ten context symbolic references in
+`__swift5_typeref`, from `0x10dc7fc84` through `0x10dc7feac`. These references
+were inspected without executing application code. Fortnite still stops before
+application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,853 | 308 | 78 |
+| Fortnite executable | 1,854 | 307 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,693 | 311 | 114 |
+| All images | 2,694 | 310 | 114 |
 
-The C++/GLES/Text variant reports 2,707 resolved imports, 297 unresolved strong
+The C++/GLES/Text variant reports 2,708 resolved imports, 296 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
