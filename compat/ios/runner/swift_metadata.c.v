@@ -180,6 +180,7 @@ fn swift_metadata_stop() {
 	swiftui_tree_stop()
 	swiftui_zstack_stop()
 	swiftui_zstack_nominal_stop()
+	swiftui_tuple_nominal_stop()
 	swiftui_opacity_stop()
 	swiftui_state_value_stop()
 	swiftui_state_set_stop()

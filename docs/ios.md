@@ -12582,11 +12582,38 @@ retained under `build/ios/fortnite/swiftui-zstack-view-checks`.
 Its required import cell is `0x10dc9b428`; a consumer at `0x1015c06b8` loads
 it before calling `swift_getWitnessTable` at `0x1015c06c0`. These references
 were inspected without executing application code.
-The fresh launch resolves this conformance import and exits 1 during linking
-at `_$s7SwiftUI9TupleViewVMn`, TupleView's nominal type descriptor. Its
+
+TupleView's nominal descriptor, `_$s7SwiftUI9TupleViewVMn`, now resolves
+through SwiftUI.framework in sealed storage. Native ARM64 measurement confirms
+one unconstrained T parameter, zero generic requirements, one metadata key
+argument and one field with its offset vector at metadata word three. Frozen
+TupleView stores its T value directly. Native Bool, Int and String
+specializations have size/stride 1, 8 and 16 respectively, with field offset
+zero; T has no View constraint or witness argument.
+
+The generic bit stays set. Symbolic lookup rejects before attempting the
+nongeneric accessor ABI, and the two-argument generic accessor diagnoses
+without reading T metadata. No complete metadata, instantiation cache,
+generic metadata pattern or reflection is supplied. TupleView specialization,
+construction, stored-value ownership, View conformance and rendering remain
+unsupported.
+
+`tests/ios/native-checks.v build-swiftui-tuple-nominal` checks eight cold
+readers, the native declaration, read-only descriptor and executable accessor
+protections, direct/indirect symbolic rejection at a guard boundary, 32
+terminal child calls with protected or invalid T metadata, retirement guards,
+teardown callbacks and two drained/unmapped lifetimes. Native measurements,
+State nominal and ZStack View sanitizer regressions, generated C and isolated
+ARM64 results are retained under
+`build/ios/fortnite/swiftui-tuple-nominal-checks`. Its
 required import cell is `0x10dc9b438` in `__DATA_CONST,__got`, referenced by
 seven indirect context symbolic references in `__TEXT,__swift5_typeref`.
 These data references were inspected without executing application code.
+The fresh launch resolves this nominal import and exits 1 during linking at
+`_$s7SwiftUI9TupleViewVyACyxGxcfC`, TupleView's value initializer. Its required
+import cell is `0x10dc9b440`, stub `0x10c63abd8`, forwarder `0x107c28ed4`
+and direct call `0x1015c053c`. These references were inspected without
+executing application code.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12594,12 +12621,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,862 | 299 | 78 |
+| Fortnite executable | 1,863 | 298 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,702 | 302 | 114 |
+| All images | 2,703 | 301 | 114 |
 
-The C++/GLES/Text variant reports 2,716 resolved imports, 288 unresolved strong
+The C++/GLES/Text variant reports 2,717 resolved imports, 287 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the
