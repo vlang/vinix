@@ -18,13 +18,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 . "$SCRIPT_DIR/build-support/find-v.sh"
 
-if [ -n "${VINIX_UI2_SOURCE:-}" ]; then
-    UI2_SOURCE="$VINIX_UI2_SOURCE"
-elif [ -f "$SCRIPT_DIR/../ui2/v.mod" ]; then
-    UI2_SOURCE="$SCRIPT_DIR/../ui2"
-else
-    UI2_SOURCE="$SCRIPT_DIR/third_party/ui2"
-fi
+UI2_SOURCE="$(sh "$SCRIPT_DIR/build-support/run-v-tool.sh" \
+    "$SCRIPT_DIR/build-support/resolve-ui2.v" "$SCRIPT_DIR")"
 
 BUILD_DIR="$SCRIPT_DIR/build"
 # Keep the completed compositor outside the disposable build/ workspace.
@@ -510,23 +505,7 @@ if [ -z "$GCCLIB" ] || [ ! -f "$GCCLIB/libgcc.a" ]; then
 fi
 
 # ── ui2 ──
-# The desktop is built on ui2's declarative element tree. It is not vendored;
-# check it out beside the sources and point V's module path at it.
-if [ ! -f "$UI2_SOURCE/v.mod" ]; then
-    echo "ERROR: ui2 not found at $UI2_SOURCE. Clone it at third_party/ui2:"
-    echo "    git clone https://github.com/vlang/ui2 third_party/ui2"
-    exit 1
-fi
-
-# Calculator uses the v3 compiler's direct `$vml` lowering. Check the renamed
-# API explicitly so an old QML checkout fails before the compiler does.
-if [ ! -f "$UI2_SOURCE/ui/vml_compiled.v" ] || \
-   [ ! -f "$UI2_SOURCE/examples/calculator/calculator.vml" ]; then
-    echo "ERROR: this ui2 checkout has no compile-time VML support."
-    echo "Update the checkout:"
-    echo "    git -C third_party/ui2 pull"
-    exit 1
-fi
+# The shared resolver selected and validated ui2 before any build work.
 
 if [ ! -x "$LLVM_BIN/clang" ] || [ ! -x "$LLVM_BIN/llvm-strip" ]; then
     echo "ERROR: LLVM clang and llvm-strip not found in $LLVM_BIN"
