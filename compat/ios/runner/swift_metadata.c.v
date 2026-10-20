@@ -155,7 +155,8 @@ fn swift_string_metadata() u64 {
 		swift_string_protocols_emit(base, data)
 		swift_raw_protocol_emit(data)
 		swift_string_guts_emit(base,data,witness,module_descriptor)
-		C.__builtin___clear_cache(arena, unsafe { voidptr(base + 216) })
+		swift_string_hashable_emit(base, data)
+		C.__builtin___clear_cache(arena, unsafe { voidptr(base + 320) })
 		if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 			|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 			C.munmap(arena, usize(page * 2))

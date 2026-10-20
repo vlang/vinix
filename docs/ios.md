@@ -13151,8 +13151,41 @@ Four isolated ARM64 phases, generated C/ARM64 reviews, pinned data, original
 image traces and native measurements are retained under
 `build/ios/fortnite/string-count-checks`.
 
-The fresh launch exits 1 during linking at String's Hashable witness table,
-`_$sSSSHsWP`; String's `count` getter no longer blocks linking.
+String's Hashable witness table `_$sSSSHsWP` now contains concrete `hashValue`,
+`hash(into:)` and `_rawHashValue(seed:)` witnesses plus its inherited Equatable
+table. The required cell `0x10dc9b820` and five consumers were traced in the
+original image without executing application code. Native Swift confirms the
+five-word Hashable layout, two-word Equatable layout and concrete conformance
+descriptors. The new records extend String's existing sealed metadata arena;
+local indirect relative references preserve the canonical core protocol
+identities without requiring nearby mappings. Existing metadata teardown
+retires all new records and thunks after readers drain.
+
+Instance witnesses borrow indirect Self in x20 and preserve x20/x21. They use
+the existing process-seeded Hasher and NFC String hashing implementation.
+Equality compares canonical Unicode forms, following
+[Swift's String comparison contract](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/StringComparison.swift);
+case folding and compatibility equivalence do not apply. Validated inline,
+literal, registered native-tail and registered foreign NSString storage retain
+the existing 1 MiB bound. ASCII equality allocates nothing, and Unicode
+comparison frees both normalization buffers before returning. Shared/custom
+storage and runtime-wide conformance discovery remain unsupported.
+
+`tests/ios/native-checks.v build-string-hashable` uses the existing pinned NFC
+data preflight. Its fixture checks canonical equality for all 20,034 Unicode
+normalization records through witnesses and protocol dispatch, in both argument
+orders. Native comparisons cover five signed seeds, complete 72-byte Hasher
+states, eight incoming tail lengths, repeated combines, inherited equality,
+default/generic hashing dispatch and unchanged borrowed ownership. Guarded
+source/receiver boundaries, read-only tables, eight cold publishers/workers,
+invalid/retired inputs and two drained/unmapped lifetimes pass. Ten ASan/UBSan
+runs cover both C++ backend configurations and String hashing, String metadata
+and Int hashing regressions. Four ARM64 phases, original-image traces, native
+measurements and generated C/ARM64 reviews are retained under
+`build/ios/fortnite/string-hashable-checks`.
+
+The fresh launch exits 1 during linking at String's StringProtocol conformance
+descriptor, `_$sSSSysMc`; String's Hashable table no longer blocks linking.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13160,12 +13193,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,901 | 260 | 78 |
+| Fortnite executable | 1,902 | 259 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,741 | 263 | 114 |
+| All images | 2,742 | 262 | 114 |
 
-The C++/GLES/Text variant reports 2,755 resolved imports, 249 unresolved strong
+The C++/GLES/Text variant reports 2,756 resolved imports, 248 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
