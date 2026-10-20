@@ -12350,11 +12350,36 @@ runtime lifetimes are covered. Native measurements, sanitizer regressions for
 State descriptors/projected-value diagnostics, generated C and isolated ARM64
 runs are retained under `build/ios/fortnite/swiftui-button-checks`.
 
-The fresh launch resolves the initializer import and exits 1 during linking at
-`_$s7SwiftUI6ButtonVMn`, Button's nominal descriptor. Its required GOT fixup is
+Button's nominal descriptor, `_$s7SwiftUI6ButtonVMn`, now supplies sealed
+`SwiftUI.Button` identity with the native generic signature: one Label type
+parameter, a `Label: View` requirement and two key arguments (Label metadata and
+its View witness). It records three fields with the offset vector at metadata
+word four. The requirement includes the native View declaration and its
+`Body: View` signature. It supplies no Button metadata, witness table, reflection
+record, instantiation cache or metadata pattern. The accessor explicitly
+diagnoses unsupported specialization; the generic bit makes direct/indirect
+symbolic lookup reject before attempting the nongeneric accessor ABI.
+
+The descriptor's required GOT fixup is
 `0x10dc9b3f0`, referenced indirectly by ten context symbolic references in
 `__swift5_typeref`, from `0x10dc7fc84` through `0x10dc7feac`. These references
-were inspected without executing application code. Fortnite still stops before
+were inspected without executing application code.
+
+`tests/ios/native-checks.v build-swiftui-button-nominal` checks native signature
+agreement, eight concurrent cold readers, data/code protections, protected
+symbolic inputs and 128 child accessor calls with protected Label metadata and
+View witnesses. Teardown retains the descriptor through drained callbacks,
+then unmaps both pages; fresh publication is rejected after retirement. Two
+runtime lifetimes and regressions for State descriptors and Button initializer
+diagnostics are recorded under
+`build/ios/fortnite/swiftui-button-nominal-checks`. Button specialization,
+construction, action storage, View conformance and rendering remain unsupported.
+
+The fresh launch resolves Button's nominal descriptor and exits 1 during
+linking at `_$s7SwiftUI6ButtonVyxGAA4ViewAAMc`, its View conformance descriptor.
+The required GOT fixup is `0x10dc9b3f8`; the consumer at `0x1015c16f0` loads it
+before calling `swift_getWitnessTable` at `0x1015c16f8`. These references were
+inspected without executing application code. Fortnite still stops before
 application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -12362,12 +12387,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,854 | 307 | 78 |
+| Fortnite executable | 1,855 | 306 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,694 | 310 | 114 |
+| All images | 2,695 | 309 | 114 |
 
-The C++/GLES/Text variant reports 2,708 resolved imports, 296 unresolved strong
+The C++/GLES/Text variant reports 2,709 resolved imports, 295 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 
 Resolved imports measure linker bindings. Diagnostic entries such as the

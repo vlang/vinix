@@ -32,6 +32,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		if address := swiftui_state_projected_symbol(symbol) { return address }
 		if address := swiftui_state_nominal_symbol(symbol) { return address }
 		if address := swiftui_button_symbol(symbol) { return address }
+		if address := swiftui_button_nominal_symbol(symbol) { return address }
 		if address := swiftui_coordinator_symbol(symbol) { return address }
 		if address := swiftui_environment_transform_symbol(symbol) { return address }
 		if address := swiftui_font_title_symbol(symbol) { return address }
