@@ -213,6 +213,9 @@ mut:
 	swift_interpolation_arena u64 // Frozen interpolation metadata and TextOutputStream witnesses.
 	swift_array_arena u64 // Array accessor/descriptor/witness pages and zero-filled generic cache.
 	swift_array_metadata map[u64]u64 // Element metadata -> sealed Array metadata, under the runtime lock.
+	swift_array_encoding_arena u64 // Encodable descriptor, dispatch adapters and generic cache pages.
+	swift_array_encoding_descriptor u64 // Remembered through retirement before stale descriptor reads.
+	swift_array_encoding map[u64]u64 // Array metadata -> sealed table with a private Element:Encodable word.
 	swift_dictionary_metadata_arena u64 // Sealed Dictionary accessor/descriptor and writable generic cache.
 	swift_dictionary_metadata map[u64]SwiftDictionaryType // Sealed page -> exact Key/Value/Hashable identities.
 	swift_dictionary_metadata_retired bool

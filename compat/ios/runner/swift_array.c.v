@@ -165,6 +165,7 @@ fn swift_array_symbol(symbol string) ?u64 {
 }
 
 fn swift_array_stop() {
+	swift_array_encoding_stop()
 	swift_set_stop()
 	swift_collection_stop()
 	swift_array_sequence_stop()
