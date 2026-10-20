@@ -134,7 +134,8 @@ fn mangled_suite(probe MangledProbe) {
 	assert lookup(u64('x'.str), 1, read64(text + 8), u64(unsafe { &args[0] })) == 0
 	assert lookup(u64('x'.str), 1, array_descriptor, 0) == 0 // Reject missing caller input safely.
 	mangled_reject(u64('x'.str), 1, 1, u64(unsafe { &args[0] }))
-	for name in ['Sb', 'SSSg', 'SaySSGG', 'SSx', 'q_', '$sSi']! { mangled_reject(u64(name.str), u64(name.len), 0, 0) }
+	for name in ['Sb', 'SSSg', 'SaySSGG', 'SSx', '$sSi']! { mangled_reject(u64(name.str), u64(name.len), 0, 0) }
+	assert swift_mangled_lookup(u64(c'q_'), 2, 0, 0) == 0
 	mangled_reject(0, 1, 0, 0); mangled_reject(1, 1048577, 0, 0); mangled_reject(~u64(0) - 1, 2, 0, 0)
 	page := usize(C.getpagesize())
 	base := u64(C.mmap(unsafe { nil }, page * 2, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))

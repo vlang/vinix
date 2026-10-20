@@ -133,6 +133,7 @@ fn swift_dictionary_metadata_arena() u64 {
 	swift_protocol_relative(data + 284, witness)
 	swift_dictionary_encoding_emit(base, data, encoding_protocol)
 	swift_dictionary_decoding_emit(base, data, encoding_protocol + 112)
+	swift_dictionary_storage_class_emit(data, hashable_protocol)
 	// Swift class static method: original in x0, metatype self in x20.
 	write32(base + 128, 0xaa1403e1)
 	write32(base + 132, 0x58000070)

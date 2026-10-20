@@ -113,7 +113,9 @@ fn state_suite(probe StateProbe) {
 	integer := swift_integer_metadata(); text := swift_string_metadata(); descriptor := swift_array_arena() + u64(C.getpagesize()) + 160
 	state_basics(lookup, probe, integer, text, swift_void_full_metadata() + 8, swift_array_access, descriptor); state_nominals(lookup, probe, integer, false)
 	for request in [u64(1), 0x42, 0x200, ~u64(0)]! { state_reject(request, 1, 1, 1, 1) }
-	for name in ['Sb', 'SSSg', 'SaySSGG', 'SSx', 'q_']! { state_reject(0xff, u64(name.str), u64(name.len), 0, 0) }
+	for name in ['Sb', 'SSSg', 'SaySSGG', 'SSx']! { state_reject(0xff, u64(name.str), u64(name.len), 0, 0) }
+	// Value is now recognized generic syntax; a missing context has no type.
+	assert lookup(0xff, u64(c'q_'), 2, 0, 0) == 0
 	state_reject(0, 0, 1, 0, 0); state_reject(0, 1, 1048577, 0, 0); state_reject(0, ~u64(0) - 1, 2, 0, 0)
 	page := usize(C.getpagesize()); base := u64(C.mmap(unsafe { nil }, page * 3, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)); assert base != u64(-1)
 	nominal := state_fixture(base, integer); name := base + u64(page) + 256; state_symbolic(name, 1, nominal)

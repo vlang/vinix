@@ -50,6 +50,8 @@ fn swift_mangled_parse(name u64, length u64) !SwiftMangledType {
 		kind = 3; offset += 2
 	} else if first == `x` {
 		kind = 4; offset++
+	} else if first == `q` && second == `_` {
+		kind = 10; offset += 2 // Second type parameter at depth zero.
 	} else if first == 1 || first == 2 {
 		if length - offset < 5 { return SwiftMangledType{} }
 		// Byte loads accept the unaligned signed relative offset after the tag
@@ -124,6 +126,34 @@ fn swift_mangled_nominal_request(descriptor u64, request u64) !u64 {
 	return response.metadata
 }
 
+// Compare known declarations before touching context/argument bytes. Only the
+// selected type word is borrowed: Key/Element at zero, Dictionary storage Value
+// at eight. Hashable and the other type's metadata are never read or invoked.
+// Child identities must remain live and complete, as for existing Element
+// substitution; this subset does not perform deferred child completion.
+fn swift_mangled_generic_type_checked(context u64, generic_args u64, value_parameter bool) !u64 {
+	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired {
+		return swift_dictionary_metadata_failure()
+	}
+	if context == 0 || generic_args == 0 { return 0 }
+	if context == read64(swift_string_metadata() + 8) { return 0 }
+	array_context := swift_array_arena() + u64(C.getpagesize()) + 160
+	if context == array_context || context == array_context + 160 {
+		if value_parameter { return swift_dictionary_metadata_failure() }
+	} else {
+		if ios_runtime.swift_dictionary_metadata_retired
+			|| ios_runtime.swift_dictionary_metadata_arena == 0
+			|| context != ios_runtime.swift_dictionary_metadata_arena + u64(C.getpagesize()) + 640 {
+			return swift_dictionary_metadata_failure()
+		}
+	}
+	offset := if value_parameter { u64(8) } else { u64(0) }
+	if generic_args & 7 != 0 || generic_args > ~u64(0) - offset - 7 {
+		return swift_dictionary_metadata_failure()
+	}
+	return read64(generic_args + offset)
+}
+
 fn swift_mangled_lookup_request_checked(request u64, name u64, length u64, context u64, generic_args u64) !u64 {
 	parsed := swift_mangled_parse(name, length)!
 	mut metadata := u64(0)
@@ -132,17 +162,8 @@ fn swift_mangled_lookup_request_checked(request u64, name u64, length u64, conte
 		1 { metadata = swift_string_metadata() }
 		2 { metadata = swift_integer_metadata() }
 		3 { metadata = swift_void_full_metadata() + 8 }
-		4 {
-			if context == 0 || generic_args == 0 { return 0 }
-			// Array and its storage class each have one key type parameter. This
-			// substitutes Element; it does not instantiate storage-class metadata.
-			// Compare canonical descriptors before reading any context bytes.
-			if context == read64(swift_string_metadata() + 8) { return 0 }
-			array_context := swift_array_arena() + u64(C.getpagesize()) + 160
-			if context != array_context && context != array_context + 160 {
-				return error('iOS: unsupported Swift generic type context')
-			}
-			metadata = read64(generic_args)
+		4, 10 {
+			metadata = swift_mangled_generic_type_checked(context, generic_args, parsed.kind == 10)!
 			if metadata == 0 { return 0 }
 		}
 		5 { metadata = swift_mangled_nominal_request(parsed.value, request)! }

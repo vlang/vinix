@@ -13883,7 +13883,7 @@ singleton. Class records remain borrowed; destination Key/Value metadata must
 remain readable and complete.
 The supported class layout has a 64-byte instance header, no instance prefix,
 and four immediate metadata members. Allocations are bounded to scale 14 and
-16 MiB. Other layouts fail explicitly; generic storage-class metadata accessors
+16 MiB. Other layouts fail explicitly; storage-class metadata instantiation
 and general Dictionary operations still require further support.
 
 Native dictionary destruction passes `_swift_deallocClassInstance` the fixed
@@ -13982,10 +13982,56 @@ fresh launch probe and both import audits. Generated C/ARM64 reviews verify
 one registered allocation per result and no hidden helper allocations.
 The original required allocation cell `0x10dc9b918`, stub `0x10c63ae84`, branch
 island `0x107c28710` and five caller sites were inspected without executing app
-code. The fresh launch passes allocation and exits 1 during linking at the
-`_DictionaryStorage` nominal descriptor, `_$ss18_DictionaryStorageCMn`.
+code. That launch passed allocation and identified the `_DictionaryStorage`
+nominal descriptor, `_$ss18_DictionaryStorageCMn`, as its next linking blocker.
 Its required cell `0x10dc9b920` has four indirect context references in
-`__swift5_typeref`. Fortnite still stops before application entry and remains
+`__swift5_typeref`.
+
+`_$ss18_DictionaryStorageCMn` now publishes a canonical nominal class
+declaration in the existing sealed Dictionary arena, separate from Dictionary
+value metadata and heap-owner headers. The declaration carries its Swift
+module/name, `__RawDictionaryStorage` superclass identity, metadata bounds
+(three prefix words, 26 suffix words and four immediate members), and two
+type parameters with the `Key: Hashable` requirement and three key arguments.
+Native complete storage metadata places Key, Value and Hashable at words
+22, 23 and 24.
+
+Bounded mangled-name lookup substitutes Key (`x`) and Value (`q_`) in this
+canonical class context, including nested Array expressions and the supported
+metadata-state requests. Protected-memory checks verify that scalar substitution
+reads only the selected argument word, without reading the other type word,
+Hashable record or child metadata. Callers must supply live, complete child
+metadata; deferred child completion is unsupported. Invalid contexts are rejected
+before reading their argument spans. Array contexts retain their single Element
+parameter and reject Value lookups.
+
+This declaration has no metadata accessor, reflection record, instantiation
+cache/pattern, or native override/vtable tables. Storage-class instantiation
+and Objective-C inheritance remain unsupported and fail explicitly; publishing
+the descriptor creates no class specialization or storage owner.
+
+```sh
+v run tests/ios/native-checks.v build-dictionary-storage-class
+```
+
+Installed ARM64 comparisons cover the declaration/signature, native argument
+positions, Key/Value and nested Array lookup, six request states and protected
+argument boundaries. Compatibility checks cover sealed publication, opaque
+children, invalid contexts/arguments, explicit unsupported instantiation,
+eight publishers/readers and two drained/unmapped lifetimes. Array storage
+declaration, both mangled-name lookup entry points and Dictionary capacity allocation
+provide regression coverage. Evidence is retained under
+`build/ios/fortnite/dictionary-storage-class-checks`.
+
+Twelve ASan/UBSan host runs pass. Generated C/ARM64 reviews confirm the new
+helper bodies introduce no hidden V allocations or additional owner/cache
+lifetimes; the parser's pre-existing unsupported-expression error paths remain.
+The ARM64 fixture, fresh launch probe and both import audits pass. The required
+descriptor cell `0x10dc9b920` and four indirect context references were inspected
+without executing app code. The launch now stops at
+`_$ss21_findStringSwitchCase5cases6stringSiSays06StaticB0VG_SStF`, before application
+entry. Its required cell `0x10dc9b928`, stub `0x10c63ae90`, branch island
+`0x107c28a74` and two caller sites were inspected read-only. Fortnite remains
 unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13993,12 +14039,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,926 | 235 | 78 |
+| Fortnite executable | 1,927 | 234 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,766 | 238 | 114 |
+| All images | 2,767 | 237 | 114 |
 
-The C++/GLES/Text variant reports 2,780 resolved imports, 224 unresolved strong
+The C++/GLES/Text variant reports 2,781 resolved imports, 223 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

@@ -258,6 +258,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_dictionary_storage_copy_symbol(symbol) { return address }
 	if address := swift_dictionary_storage_resize_symbol(symbol) { return address }
 	if address := swift_dictionary_storage_allocate_symbol(symbol) { return address }
+	if address := swift_dictionary_storage_class_symbol(symbol) { return address }
 	if symbol == '_$sSS5countSivg' {
 		return u64(unsafe { voidptr(swift_string_count) })
 	}
