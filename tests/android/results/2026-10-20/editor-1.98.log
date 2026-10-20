@@ -1,0 +1,16 @@
+ANDROID-START
+Vinix vinix 0.1.0 Vinix 0.1.0 aarch64 aarch64 Linux
+ANDROID-MEMORY-LOW hint=0x10000000 address=0x10000000
+ANDROID-MEMORY-PASS page_size=16384
+ANDROID-FOCUSED-CHECK scope=application
+ANDROID-STACK-MAPPING begin=6ffede4c000 end=6fffde4c000 reserved=268435456 soft_limit=33554432
+ANDROID-STACK worker base=0x80008b20000 size=277280 guard=16384
+ANDROID-STACK-PASS initial base=0x6fffbe4c000 size=33554432
+ANDROID-MEMORY-LOW hint=0x10000000 address=0x10000000
+ANDROID-MEMORY-PASS page_size=16384
+ANDROID-WAIT elapsed=15
+ANDROID-LOG /tmp/android-desktop.log
+ANDROID-LOG-TAIL /tmp/android-desktop.log
+ANDROID-LOG /tmp/vinix-android-49134-153.log
+java.lang.NoSuchMethodError: No virtual method setSubtitle(Ljava/lang/CharSequence;)V in class Landroid/app/ActionBar; or its super classes (declaration of 'android.app.ActionBar' appears in /opt/vinix-android-aarch64/usr/lib/art/../java/dex/android_translation_layer/api-impl.jar)
+ANDROID-LOG-TAIL /tmp/vinix-android-49134-153.log

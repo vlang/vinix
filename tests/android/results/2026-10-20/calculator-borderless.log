@@ -1,0 +1,57 @@
+ANDROID-START
+Vinix vinix 0.1.0 Vinix 0.1.0 aarch64 aarch64 Linux
+ANDROID-MEMORY-LOW hint=0x10000000 address=0x10000000
+ANDROID-MEMORY-PASS page_size=16384
+ANDROID-FOCUSED-CHECK scope=application
+ANDROID-STACK-MAPPING begin=6ffe5d7c000 end=6fff5d7c000 reserved=268435456 soft_limit=33554432
+ANDROID-STACK worker base=0x80004138000 size=277280 guard=16384
+ANDROID-STACK-PASS initial base=0x6fff3d7c000 size=33554432
+ANDROID-MEMORY-LOW hint=0x10000000 address=0x10000000
+ANDROID-MEMORY-PASS page_size=16384
+ANDROID-ACTIVITY-RESUMED
+ANDROID-WINDOW id=4194308 title=arity.calculator width=480 height=640
+ANDROID-PIXELS colours=195 hash=14358318897304200041
+ANDROID-SURFACE /tmp/vinix-android-15177-178/Xvfb_screen0
+ANDROID-DISPLAY :15177
+ANDROID-READY
+ANDROID-INPUT 1
+ANDROID-INPUT 12
+ANDROID-INPUT 123
+ANDROID-INPUT 123+
+ANDROID-INPUT 123+4
+ANDROID-INPUT 123+45
+ANDROID-INPUT 123+456
+ANDROID-ARITHMETIC expected=579
+ANDROID-WINDOW id=4194308 title=arity.calculator width=480 height=640
+ANDROID-PIXELS colours=207 hash=9587340942131169741
+ANDROID-DIAGNOSTICS-BEGIN
+Vinix vinix 0.1.0 Vinix 0.1.0 aarch64 aarch64 Linux
+ANDROID-LOG /tmp/android-desktop.log
+ANDROID-LOG-TAIL /tmp/android-desktop.log
+ANDROID-NATIVE-LOAD-DIAGNOSTICS /tmp/android-desktop.log
+ANDROID-LOG /tmp/android-text.log
+ANDROID-STACK pid=26662 local=0x6fffcad7898 result=0 base=0x6ffecad8000 size=268435456 guard=0 limit=33554432
+ANDROID-STACK-MAP 6ffecad8000-6fffcad8000 rw-p 00000000 00:00 0                            [stack]
+ANDROID-STACK pid=14187 local=0x6fff9f6f888 result=0 base=0x6ffe9f70000 size=268435456 guard=0 limit=33554432
+ANDROID-STACK-MAP 6ffe9f70000-6fff9f70000 rw-p 00000000 00:00 0                            [stack]
+ANDROID-STACK pid=22816 local=0x6fff3cb78a8 result=0 base=0x6ffe3cb8000 size=268435456 guard=0 limit=33554432
+ANDROID-STACK-MAP 6ffe3cb8000-6fff3cb8000 rw-p 00000000 00:00 0                            [stack]
+ANDROID-STACK pid=33984 local=0x6fff5bb71e8 result=0 base=0x6fff3bb8000 size=33554432 guard=0 limit=33554432
+ANDROID-STACK-MAP 6ffe5bb8000-6fff5bb8000 rw-p 00000000 00:00 0                            [stack]
+ANDROID-STACK pid=50831 local=0x6fff5423228 result=0 base=0x6fff3424000 size=33554432 guard=0 limit=33554432
+ANDROID-STACK-MAP 6ffe5424000-6fff5424000 rw-p 00000000 00:00 0                            [stack]
+ANDROID-STACK pid=53557 local=0x6fff3baf1e8 result=0 base=0x6fff1bb0000 size=33554432 guard=0 limit=33554432
+ANDROID-STACK-MAP 6ffe3bb0000-6fff3bb0000 rw-p 00000000 00:00 0                            [stack]
+ANDROID-STACK pid=26662 local=0x6fff468f158 result=0 base=0x6fff2690000 size=33554432 guard=0 limit=33554432
+ANDROID-STACK-MAP 6ffe4690000-6fff4690000 rw-p 00000000 00:00 0                            [stack]
+ANDROID-TEXT 579
+ANDROID-TEXT 579
+ANDROID-LOG-TAIL /tmp/android-text.log
+ANDROID-TEXT 579
+ANDROID-TEXT 579
+ANDROID-NATIVE-LOAD-DIAGNOSTICS /tmp/android-text.log
+ANDROID-LOG /tmp/vinix-android-15177-178.log
+ANDROID-LOG-TAIL /tmp/vinix-android-15177-178.log
+ANDROID-NATIVE-LOAD-DIAGNOSTICS /tmp/vinix-android-15177-178.log
+ANDROID-DIAGNOSTICS-END
+ANDROID-PASS

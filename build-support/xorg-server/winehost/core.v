@@ -253,7 +253,26 @@ fn open_display(name &char, pid i32) &C.Display {
 	unsafe { for attempt := 0; attempt < 300 && C.vwh_running() != 0; attempt++ { display := C.XOpenDisplay(name); if !is_null(display) { return display }; mut status := i32(0); if C.waitpid(pid, &status, C.WNOHANG) == pid { return nil }; sleep_10ms() }; return nil }
 }
 fn spawn_wine(name &char, command &char) i32 {
-	unsafe { private_group := C.strcmp(command, c'/usr/bin/run-roblox-client') == 0; pid := C.fork(); if pid != 0 { if pid > 0 && private_group { C.setpgid(pid, pid) }; return pid }; if private_group && C.setpgid(0, 0) != 0 { C._exit(127) }; C.setenv(c'DISPLAY', name, 1); C.setenv(c'LIBGL_ALWAYS_SOFTWARE', c'1', 1); C.unsetenv(c'LIBGL_ALWAYS_INDIRECT'); C.setenv(c'GALLIUM_DRIVER', c'llvmpipe', 1); C.setenv(c'WINEDEBUG', c'-all', 0); C.execl(command, command, voidptr(nil)); C._exit(127); return 127 }
+	unsafe {
+		private_group := C.strcmp(command, c'/usr/bin/run-roblox-client') == 0
+		pid := C.fork()
+		if pid != 0 {
+			if pid > 0 && private_group { C.setpgid(pid, pid) }
+			return pid
+		}
+		if private_group && C.setpgid(0, 0) != 0 { C._exit(127) }
+		C.setenv(c'DISPLAY', name, 1)
+		// The Vinix window already owns the title and window controls. ATL's
+		// GTK header bar would repeat them inside this embedded X11 surface.
+		C.setenv(c'ATL_DISABLE_WINDOW_DECORATIONS', c'1', 1)
+		C.setenv(c'LIBGL_ALWAYS_SOFTWARE', c'1', 1)
+		C.unsetenv(c'LIBGL_ALWAYS_INDIRECT')
+		C.setenv(c'GALLIUM_DRIVER', c'llvmpipe', 1)
+		C.setenv(c'WINEDEBUG', c'-all', 0)
+		C.execl(command, command, voidptr(nil))
+		C._exit(127)
+		return 127
+	}
 }
 fn fake_key(display &C.Display, symbol u64, pressed i32) {
 	code := C.XKeysymToKeycode(display, symbol)
@@ -618,14 +637,15 @@ fn paste_clipboard_kind(display &C.Display,kind u8,text &u8,length usize) {
 fn clipboard_copy_reply(display &C.Display,event &C.XSelectionEvent,directory &char) {
 	unsafe {
 		if event.requestor!=clipboard_window || event.selection!=clipboard_selection || event.target!=clipboard_copy_target || event.property==0 || clipboard_copy_deadline==0 || monotonic_millis()>clipboard_copy_deadline { return }
-		mut actual:=u64(0); mut format:=i32(0); mut count:=u64(0); mut after:=u64(0); mut data:=&u8(nil)
+		// Xlib returns unsigned long values (LP64), including Atom arrays.
+		mut actual:=usize(0); mut format:=i32(0); mut count:=usize(0); mut after:=usize(0); mut data:=&u8(nil)
 		if C.XGetWindowProperty(display,clipboard_window,event.property,0,16385,1,u64(C.AnyPropertyType),&actual,&format,&count,&after,&data)!=0 { return }
 		if !is_null(data) {
 			if event.target==clipboard_targets && actual==u64(C.XA_ATOM) && format==32 && count<=256 && after==0 {
 				clipboard_copy_target=clipboard_utf8; clipboard_copy_kind=0
-				atoms:=&u64(data)
-				for i in 0 .. count { if atoms[i]==clipboard_html { clipboard_copy_target=clipboard_html; clipboard_copy_kind=1 }; if atoms[i]==clipboard_uris { clipboard_copy_target=clipboard_uris; clipboard_copy_kind=2 } }
-				for i in 0 .. count { if atoms[i]==clipboard_png { clipboard_copy_target=clipboard_png; clipboard_copy_kind=3 } }
+				atoms:=&usize(data)
+				for i in 0 .. int(count) { if atoms[i]==clipboard_html { clipboard_copy_target=clipboard_html; clipboard_copy_kind=1 }; if atoms[i]==clipboard_uris { clipboard_copy_target=clipboard_uris; clipboard_copy_kind=2 } }
+				for i in 0 .. int(count) { if atoms[i]==clipboard_png { clipboard_copy_target=clipboard_png; clipboard_copy_kind=3 } }
 				C.XFree(data); C.XConvertSelection(display,clipboard_selection,clipboard_copy_target,clipboard_utf8,clipboard_window,0); C.XFlush(display); return
 			}
 			clipboard_copy_deadline=0

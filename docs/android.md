@@ -108,18 +108,38 @@ The archive and APK are verified against recorded SHA256 hashes. Click the
 input field above the history list before typing; this version uses keyboard
 input.
 
-![Arity 1.1 calculating 123+456 as 579 in the ARM64 Vinix desktop](screenshots/vinix-android-calculator-qemu.png)
+![Arity 1.1 calculating 123+456 as 579 with a single Vinix title bar](screenshots/vinix-android-calculator-borderless-qemu.png)
+
+The embedded X11 bridge sets `ATL_DISABLE_WINDOW_DECORATIONS=1` for its child.
+Vinix supplies the title bar and window controls, and ATL hides its inner GTK
+header bar. Standalone APK launches on another X11 display retain ATL's default
+decorations.
 
 On 20 October 2026, the unchanged APK displayed `579` after QMP keyboard input
-of `123+456`, with zero key retries, using the current desktop and kernel
-binaries and the preserved 3 October ARM64 runtime. The screenshot above is
-the actual QEMU framebuffer. [Hashes, observed markers and the focused V
-driver](../tests/android/results/2026-10-20/calculator.json) retain the evidence.
+of `123+456`, with zero key retries and a single title bar, using the current
+desktop and kernel binaries and the preserved 3 October ARM64 runtime. The
+screenshot above is the actual QEMU framebuffer. [Hashes, observed markers and
+the focused V driver](../tests/android/results/2026-10-20/embedded-apks.json)
+retain the refreshed evidence; the [initial calculator run](../tests/android/results/2026-10-20/calculator.json)
+retains its original capture. The direct X11 check also displayed `579` using
+XTEST and the updated input-field coordinates.
 The full runtime preflight failed on `ANDROID-ATFORK-FAIL Android ABI exports`
 in that older runtime, before launching an APK. The separate calculator check
 retained stack/memory checks and the normal application/input/result path;
 it does not establish full runtime conformance or phone hardware support.
 Use matching rebuilt overlays for the complete guest test below.
+
+Two more complex, unchanged open-source APKs were also tried on that runtime:
+
+| APK | Startup result |
+| --- | --- |
+| [Editor 1.98](https://github.com/billthefarmer/editor/tree/v1.98) | Stops on missing `ActionBar.setSubtitle(CharSequence)`. |
+| [Open Sudoku 2.5.2](https://gitlab.com/opensudoku/opensudoku/-/tree/2.5.2) | Stops on missing inherited `Activity.startManagingCursor(Cursor)`. |
+
+Both failed before a usable application window was observed. The refreshed
+evidence records each download URL, APK hash, entry activity and first missing
+method. These attempts establish concrete framework gaps; editing, file
+operations and Sudoku gameplay remain unverified.
 
 On an existing X11 display, including a session started with `startx`, launch
 another APK with:

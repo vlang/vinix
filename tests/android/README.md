@@ -70,8 +70,10 @@ probe checks actual file, symlink and socket transfers, Android standard-stream
 conversion, stream error flags and bounds aborts. Both probe verdicts are
 recorded in `result.json`. The legacy `--runtime-arch x86_64` diagnostic option requires
 `x86_64-linux-musl-gcc`; `--strace` applies to that translated diagnostic path.
-`--click X Y` changes the desktop screen position clicked before typing;
-`--focus X Y` changes the APK window position clicked in direct mode.
+`--click X Y` changes the desktop screen position clicked before typing
+(default `360 155`); `--focus X Y` changes the APK window position clicked in
+direct mode (default `240 72`). These defaults target Arity's input with the
+embedded GTK title bar hidden; the Vinix window supplies the desktop controls.
 
 `--boot-probe JAR` adds an optional Java platform preflight before opening the
 APK. Supply a DEX JAR containing [ArtBootProbe](ArtBootProbe.java). The guest

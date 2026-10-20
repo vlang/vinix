@@ -43,8 +43,10 @@ pub fn defaults(root string) map[string]ah.Value {
 	for key in ['runtime_arg', 'split_apk', 'split_apk_sha256'] {
 		result[key] = ah.Value([]ah.Value{})
 	}
-	result['click'] = ah.Value([ah.Value(360), ah.Value(202)])
-	result['focus'] = ah.Value([ah.Value(240), ah.Value(120)])
+	// The embedded ATL window has no inner GTK title bar. Target Arity's
+	// input below its result, in desktop and window-relative coordinates.
+	result['click'] = ah.Value([ah.Value(360), ah.Value(155)])
+	result['focus'] = ah.Value([ah.Value(240), ah.Value(72)])
 	return result
 }
 

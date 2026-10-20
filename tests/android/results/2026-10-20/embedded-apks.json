@@ -1,0 +1,51 @@
+{
+    "date": "2026-10-20",
+    "runtime": "Preserved 3 October native ARM64 ART/ATL; application-only checks retain stack and memory probes. Full runtime conformance still fails its newer fork ABI preflight.",
+    "full_runtime_conformance_passed": false,
+    "calculator_passed": true,
+    "calculator_expression": "123+456",
+    "calculator_result": "579",
+    "calculator_key_retries": 0,
+    "calculator_direct_passed": true,
+    "calculator_direct_focus": [
+        240,
+        72
+    ],
+    "embedded_decoration_environment": "ATL_DISABLE_WINDOW_DECORATIONS=1",
+    "duplicate_inner_titlebar_visible": false,
+    "screenshot": "docs/screenshots/vinix-android-calculator-borderless-qemu.png",
+    "screenshot_sha256": "bd322c86d64097f253c27f4023f504191d675018f5df2674429f789d985d0394",
+    "screenshot_bridge_sha256": "74fde3f4d3e050882be7409dadc85d0e3e3944e571604e71087dbb63eff89565",
+    "installed_bridge_sha256": "3b35eeb4da6822fe53a48f69f1830d9e5823f6ec8340b686b031c496d17b3ead",
+    "bridge_source_sha256": "71d8995a6270b4727915d07a6c0fdd279ea58e522e7014c1f5e43a488069761b",
+    "kernel_sha256": "a310a06243cd397bba18c8e594d55fb2c0cee4610b2fc64643e437720345da5e",
+    "desktop_sha256": "7e3537337b0a5b45b792c05e8f097de4e1683445e0e4342062b2bd8b9ba0a3e4",
+    "bridge_host_check": "Wine host: PASS (control/ASCII/escape input, split/invalid UTF-8, borrowed key reuse, UTF-8/Latin-1/target selections and pointer protocol)",
+    "runner_session_check": "NATIVE ANDROID SESSION / actual PTY and QMP calculator acknowledgements, shifted key, live 1.2 MB serial drain, ready and final screenshots / generic observation / input and screenshot failure cleanup: PASS",
+    "attempts": [
+        {
+            "application": "Editor",
+            "version": "1.98",
+            "apk_url": "https://f-droid.org/repo/org.billthefarmer.editor_198.apk",
+            "apk_sha256": "343d17e11d0914e1a7708df2781580a0413e52501c0a41d91f7ef725d9615fe9",
+            "activity": "org/billthefarmer/editor/Editor",
+            "observed": false,
+            "functional_pass": false,
+            "missing_api": "android.app.ActionBar.setSubtitle(java.lang.CharSequence)",
+            "diagnostic": "editor-1.98.log"
+        },
+        {
+            "application": "Open Sudoku",
+            "version": "2.5.2",
+            "apk_url": "https://f-droid.org/archive/org.moire.opensudoku_20180507.apk",
+            "apk_sha256": "a874f3c9abc7a91dc7d74bbd9bfe74b18a14e3e3ee997f329675e1c37db755bc",
+            "activity": "org/moire/opensudoku/gui/FolderListActivity",
+            "observed": false,
+            "functional_pass": false,
+            "missing_api": "android.app.Activity.startManagingCursor(android.database.Cursor)",
+            "diagnostic": "opensudoku-2.5.2.log"
+        }
+    ],
+    "driver": "tests/android/results/2026-10-20/embedded-apks-driver.v",
+    "driver_sha256": "849c9ff8577b9f3b28d6194ba68ecb46453af03c99e0814715ce6f87e373b415"
+}
