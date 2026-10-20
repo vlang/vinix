@@ -13883,13 +13883,13 @@ singleton. Class records remain borrowed; destination Key/Value metadata must
 remain readable and complete.
 The supported class layout has a 64-byte instance header, no instance prefix,
 and four immediate metadata members. Allocations are bounded to scale 14 and
-16 MiB. Other layouts fail explicitly; generic storage-class metadata accessors,
-resizing and general Dictionary operations still require further support.
+16 MiB. Other layouts fail explicitly; generic storage-class metadata accessors
+and general Dictionary operations still require further support.
 
 Native dictionary destruction passes `_swift_deallocClassInstance` the fixed
 header size 64 and alignment mask 7, including for larger, over-aligned tails.
-Only storage allocated by this helper receives a registry marker allowing that
-entry to use its actual recorded allocation extent. Ordinary heap allocations
+Only storage allocated by these raw storage helpers receives a registry marker
+allowing that entry to use its actual recorded allocation extent. Ordinary heap allocations
 and `_swift_deallocObject` retain exact extent checks. The Dictionary bridge
 also accepts fresh scale-zero typed storage with zero capacity.
 
@@ -13911,9 +13911,46 @@ hidden helper allocations.
 
 The original required cell `0x10dc9b908`, stub `0x10c63ae6c`, branch island
 `0x107c28a3c` and five caller sites were inspected without executing application
-code. The fresh launch passes this import and exits 1 during linking at
-`_DictionaryStorage.resize(original:capacity:move:)`,
-`_$ss18_DictionaryStorageC6resize8original8capacity4moveAByxq_Gs05__RawaB0C_SiSbtFZ`.
+code. That launch passed the copy import and identified
+`_DictionaryStorage.resize(original:capacity:move:)` as the next linking blocker.
+
+`_DictionaryStorage.resize(original:capacity:move:)` now implements its native
+allocation contract. Original, capacity and move arrive in x0/x1/x2, with class
+metadata in x20 and an owned result in x0. A sealed adapter preserves x20/x21.
+The helper leaves the original untouched and ignores the move flag; its caller
+rehashes and copies or moves initialized entries, then clears a moved source.
+
+Capacity is rounded to the smallest supported power-of-two bucket count with
+the native three-quarter load factor and at least one hole. Zero and negative
+capacities normalize to one. The result starts empty with fresh age (the low
+32 bits of its address hash), fresh seed (its address, or scale with deterministic
+hashing), zero reserve/extra fields and native bitmap padding. Copy and resize
+share checked tail allocation, including zero-size values and 256-byte
+alignment, with the existing scale-14 and 16-MiB bounds. Requested capacities
+above 12,288 fail before allocation. The unused source and Hashable witness
+may be inaccessible; destination class and complete Key/Value metadata remain
+borrowed and readable.
+
+```sh
+v run tests/ios/native-checks.v build-dictionary-storage-resize
+```
+
+Installed ARM64 comparisons cover seven layouts, capacity boundaries, fresh
+age/seed in normal and deterministic hashing modes, inaccessible source/x8,
+and caller-owned rehash copy/move lifecycles. Compatibility checks add rejected
+tail extents and retired lifetimes, reentrant destruction, eight concurrent
+workers and two drained/unmapped runtimes. Dictionary storage copy, Dictionary
+metadata and Swift heap allocation provide regression coverage. Evidence is
+retained under `build/ios/fortnite/dictionary-storage-resize-checks`.
+
+Ten ASan/UBSan host runs and four isolated ARM64 phases pass: the fixture,
+fresh launch probe and both import audits. Generated C/ARM64 review confirms
+one registered allocation per result and no hidden helper allocations. The
+original required resize cell `0x10dc9b910`, stub `0x10c63ae78`, branch island
+`0x107c28928` and four caller sites were inspected without executing app code.
+The fresh launch passes resize and exits 1 during linking at
+`_DictionaryStorage.allocate(capacity:)`,
+`_$ss18_DictionaryStorageC8allocate8capacityAByxq_GSi_tFZ`.
 Fortnite still stops before application entry and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -13921,12 +13958,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,924 | 237 | 78 |
+| Fortnite executable | 1,925 | 236 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,764 | 240 | 114 |
+| All images | 2,765 | 239 | 114 |
 
-The C++/GLES/Text variant reports 2,778 resolved imports, 226 unresolved strong
+The C++/GLES/Text variant reports 2,779 resolved imports, 225 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

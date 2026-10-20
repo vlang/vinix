@@ -4,7 +4,7 @@ module main
 struct SwiftDictionaryStorageFailure {}
 
 fn (_ &SwiftDictionaryStorageFailure) msg() string {
-	return 'iOS: unsupported or retired Dictionary storage copy layout'
+	return 'iOS: unsupported or retired Dictionary storage allocation layout'
 }
 
 fn (_ &SwiftDictionaryStorageFailure) code() int { return 1 }
@@ -79,6 +79,17 @@ fn swift_dictionary_storage_copy_checked(original u64, metadata u64) !u64 {
 	age := read32(original + 36)
 	seed := read64(original + 40)
 	C.ios_objc_initialize_unlock()
+	return swift_dictionary_storage_allocate_checked(metadata, scale, age, seed, false)
+}
+
+// Shared raw tail allocation for copy and resize. Only copy supplies the old
+// age/seed; resize derives both from this new owner, leaving rehashing and
+// element initialization to the caller. No element or Hashable witness runs.
+fn swift_dictionary_storage_allocate_checked(metadata u64, scale u8, age u32, seed u64, fresh bool) !u64 {
+	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired
+		|| ios_runtime.swift_dictionary_metadata_retired {
+		return swift_dictionary_storage_failure()
+	}
 	if scale > 14 { return swift_dictionary_storage_failure() }
 	types := swift_dictionary_storage_type_checked(metadata)!
 	key := swift_sequence_value_checked(types.key)!
@@ -96,7 +107,10 @@ fn swift_dictionary_storage_copy_checked(original u64, metadata u64) !u64 {
 	size := values + buckets * value_stride
 	if size > 16777216 { return swift_dictionary_storage_failure() }
 	mask := u64(7) | (key.alignment - 1) | (value.alignment - 1)
+	if fresh { swift_hasher_initialize() }
 	owner := swift_heap_allocate_record(metadata, size, mask, true)
+	initial_age := if fresh { u32(swift_hasher_hash_word(0, owner)) } else { age }
+	initial_seed := if !fresh { seed } else if swift_hasher_deterministic() { u64(scale) } else { owner }
 	unsafe {
 		*(&u64(owner + 16)) = 0
 		*(&u64(owner + 24)) = if scale == 0 {
@@ -104,8 +118,8 @@ fn swift_dictionary_storage_copy_checked(original u64, metadata u64) !u64 {
 		} else {
 			buckets - buckets / 4 - u64(scale == 1)
 		}
-		*(&u64(owner + 32)) = u64(scale) | (u64(age) << 32)
-		*(&u64(owner + 40)) = seed
+		*(&u64(owner + 32)) = u64(scale) | (u64(initial_age) << 32)
+		*(&u64(owner + 40)) = initial_seed
 		*(&u64(owner + 48)) = owner + keys
 		*(&u64(owner + 56)) = owner + values
 	}

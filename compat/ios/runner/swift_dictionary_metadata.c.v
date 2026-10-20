@@ -139,7 +139,13 @@ fn swift_dictionary_metadata_arena() u64 {
 	write32(base + 136, 0xd61f0200)
 	write32(base + 140, 0xd503201f)
 	unsafe { *(&u64(base + 144)) = u64(voidptr(swift_dictionary_storage_copy)) }
-	C.__builtin___clear_cache(allocation, voidptr(base + 152))
+	// Resize keeps original/capacity/move in x0/x1/x2; class self is x20.
+	write32(base + 160, 0xaa1403e3)
+	write32(base + 164, 0x58000070)
+	write32(base + 168, 0xd61f0200)
+	write32(base + 172, 0xd503201f)
+	unsafe { *(&u64(base + 176)) = u64(voidptr(swift_dictionary_storage_resize)) }
+	C.__builtin___clear_cache(allocation, voidptr(base + 184))
 	if C.mprotect(allocation, page, C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(voidptr(data), page, C.PROT_READ) != 0 {
 		C.munmap(allocation, page * 3)
