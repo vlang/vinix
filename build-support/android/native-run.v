@@ -72,6 +72,8 @@ fn run() ! {
 	os.setenv('XDG_DATA_DIRS', root + '/usr/share/vinix-android-ws', true)
 	os.setenv('ANDROID_APP_DATA_DIR', data, true)
 	os.setenv('VINIX_ANDROID_ROOT', root, true)
+	os.setenv('ANDROID_ROOT', root, true)
+	os.setenv('ANDROID_DATA', data, true)
 	os.setenv('VINIX_ALLOW_WX', '1', true)
 	os.setenv('LD_PRELOAD', root + '/usr/lib/libvinix-android-compat.so', true)
 	paths := root + '/usr/lib/art/native-ws:' + root + '/lib:' + root + '/usr/lib:' + root + '/usr/lib/art:' + root + '/usr/lib/java/dex/art/natives'

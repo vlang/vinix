@@ -71,6 +71,8 @@ pub fn write_build_manifest(kind string, arguments []string) ! {
 		os.cp(work + '/native-ws/libvinix-android-compat.so',output + '/usr/lib/libvinix-android-compat.so')!
 		os.cp(work + '/native-ws/vinix-android-native',output + '/usr/bin/vinix-android-native')!
 		os.cp(work + '/native-ws/run-android',output + '/usr/bin/run-android-native')!
+		os.mkdir_all(output + '/usr/share/zoneinfo')!
+		os.cp(work + '/native-ws/tzdata',output + '/usr/share/zoneinfo/tzdata')!
 		os.mkdir_all(output + '/usr/share/licenses/bionic-ws')!
 		os.cp(work + '/native-ws/bionic-ws-NOTICE', output + '/usr/share/licenses/bionic-ws/NOTICE')!
 		os.cp(work + '/native-ws/bionic-ws-manifest.json', output + '/usr/share/licenses/bionic-ws/build.json')!

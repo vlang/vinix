@@ -55,6 +55,12 @@ configured non-loopback interfaces. Local ContentProviderClient handles resolve
 registered authorities, dispatch type/call operations and release their provider
 reference on close. Uninstalled service providers return null.
 
+AssetManager directory enumeration uses the merged framework and APK assets.
+The build converts the pinned runtime's IANA TZif files and aliases into
+Android's indexed tzdata container, preserving transition records. The launcher
+sets Android's root/data paths so libcore finds it. Guest regression checks
+cover UTC, northern and southern daylight saving, and fractional-hour offsets.
+
 Bitmap-backed Canvas instances own independent pixel targets and save/restore
 stacks. Scoped thread-local selection keeps offscreen drawing separate from
 the WS framebuffer; native references keep the bitmap storage alive. Pixel

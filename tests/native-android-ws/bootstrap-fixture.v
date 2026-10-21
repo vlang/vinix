@@ -152,6 +152,58 @@ throw v0') +
 		'.method public static native nativeCheck(Landroid/content/res/AssetManager;)Z\n.end method\n' +
 		'.method public static native nativeBitmap(Landroid/graphics/Bitmap;)Z\n.end method\n' +
 		'.method public static native nativeGraphics()Z\n.end method\n' +
+		method('private static timezoneCheck()V', '
+invoke-static {}, Ljava/util/TimeZone;->getAvailableIDs()[Ljava/lang/String;
+move-result-object v0
+array-length v0, v0
+const/16 v1, 400
+if-lt v0, v1, :bad
+const-string v0, "UTC"
+invoke-static {v0}, Ljava/util/TimeZone;->getTimeZone(Ljava/lang/String;)Ljava/util/TimeZone;
+move-result-object v0
+const-wide v1, 1767225600000L
+invoke-virtual {v0, v1, v2}, Ljava/util/TimeZone;->getOffset(J)I
+move-result v3
+if-nez v3, :bad
+const-string v0, "America/New_York"
+invoke-static {v0}, Ljava/util/TimeZone;->getTimeZone(Ljava/lang/String;)Ljava/util/TimeZone;
+move-result-object v0
+invoke-virtual {v0, v1, v2}, Ljava/util/TimeZone;->getOffset(J)I
+move-result v3
+const v4, -18000000
+if-ne v3, v4, :bad
+const-wide v5, 1782864000000L
+invoke-virtual {v0, v5, v6}, Ljava/util/TimeZone;->getOffset(J)I
+move-result v3
+const v4, -14400000
+if-ne v3, v4, :bad
+const-string v0, "Australia/Sydney"
+invoke-static {v0}, Ljava/util/TimeZone;->getTimeZone(Ljava/lang/String;)Ljava/util/TimeZone;
+move-result-object v0
+invoke-virtual {v0, v1, v2}, Ljava/util/TimeZone;->getOffset(J)I
+move-result v3
+const v4, 39600000
+if-ne v3, v4, :bad
+invoke-virtual {v0, v5, v6}, Ljava/util/TimeZone;->getOffset(J)I
+move-result v3
+const v4, 36000000
+if-ne v3, v4, :bad
+const-string v0, "Asia/Kathmandu"
+invoke-static {v0}, Ljava/util/TimeZone;->getTimeZone(Ljava/lang/String;)Ljava/util/TimeZone;
+move-result-object v0
+invoke-virtual {v0, v1, v2}, Ljava/util/TimeZone;->getOffset(J)I
+move-result v3
+const v4, 20700000
+if-ne v3, v4, :bad
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-TIMEZONES-PASS utc north-dst south-dst fractional"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "IANA timezone database offsets"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
 		method('private static assetListCheck(Landroid/content/Context;)V', '
 invoke-virtual {p0}, Landroid/content/Context;->getAssets()Landroid/content/res/AssetManager;
 move-result-object v0
@@ -422,6 +474,7 @@ sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
 const-string v1, "BOOTSTRAP-API-PASS async-trace application-uids"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->assetListCheck(Landroid/content/Context;)V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->timezoneCheck()V
 new-instance v0, Landroid/graphics/Matrix;
 invoke-direct {v0}, Landroid/graphics/Matrix;-><init>()V
 const v1, 0x42b40000
