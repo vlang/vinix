@@ -15227,17 +15227,62 @@ General generic value metadata allocation remains unsupported. No application
 code was executed; application entry remains unreached and Fortnite is still
 unplayable.
 
+`_swift_allocateGenericValueMetadata` now implements the ordinary four-argument
+allocation ABI for version-zero generic struct and enum contexts. It creates a
+fresh, writable metadata record with the borrowed value-witness pattern, kind,
+descriptor and key argument words. A partial extra-data pattern has a zeroed
+prefix and copied suffix; argument installation follows that copy and takes
+precedence where they overlap. Instantiation and completion callbacks are not
+invoked, and incomplete witnesses and argument pointees are not dereferenced.
+This follows the allocation phase in the
+[Swift runtime](https://github.com/swiftlang/swift/blob/swift-5.10-RELEASE/stdlib/public/runtime/Metadata.cpp).
+
+The supported subset bounds extra storage to 64 KiB and parameter, requirement
+and key-argument counts to 64 each. Direct and indirect relative witness
+references are checked for alignment and address overflow, as are argument and
+partial-pattern spans. Generic packs, older extra arguments, newer pattern flags,
+class metadata, metadata uniquing and completion remain separate work. The
+allocator does not report a Complete metadata response or make an incomplete
+value layout usable. Fresh mappings remain writable for their owning completion
+machinery, and retire only after all metadata users drain at runtime shutdown.
+
+```sh
+v run tests/ios/native-checks.v build-generic-value-metadata
+```
+
+Evidence is retained under `build/ios/fortnite/generic-value-metadata-checks`.
+Native comparisons cover fresh struct/enum allocation, zero to 64 borrowed key
+arguments, direct/indirect guarded witnesses, 64 KiB extra storage, signed
+relative references in both directions, partial patterns and overlapping
+arguments. Tests exercise read-only descriptors and argument vectors, protected
+span ends, unused guarded inputs, writable output, rejected layouts, eight cold
+workers and two drained/unmapped lifetimes. Eight normal/deterministic ASan/UBSan
+runs passed with both C++ configurations, including existing error allocation
+and Optional metadata regressions. The ARM64 fixture, launch probe and both
+import audits passed; eight binary/generated-C pairs and five C/ARM64 reviews
+are retained.
+
+Static V/Mach-O inspection confirmed all four app descriptors and their
+instantiation patterns: two enums requesting eight extra bytes, and two structs
+requesting sixteen, including partial field-offset patterns. The next missing
+import is `_swift_arrayInitWithCopy`, at GOT cell `0x10dc9bac8` and stub
+`0x10c63eb38`. LLVM inspection found seven direct callers and the branch-island
+forwarder at `0x107c28930`; the calls supply destination, source, element count
+and value metadata in `x0` through `x3`. General runtime array initialization
+remains separate work. No application code was executed; application entry
+remains unreached and Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,959 | 202 | 78 |
+| Fortnite executable | 1,960 | 201 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,799 | 205 | 114 |
+| All images | 2,800 | 204 | 114 |
 
-The C++/GLES/Text variant reports 2,813 resolved imports, 191 unresolved strong
+The C++/GLES/Text variant reports 2,814 resolved imports, 190 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

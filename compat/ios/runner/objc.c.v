@@ -317,6 +317,8 @@ mut:
 	swift_error_allocation_arena u64 // Private heap destructor and immutable error box metadata.
 	swift_error_allocation_retired bool
 	swift_errors map[u64]SwiftErrorStorage // Owned generic Error payloads; metadata/witnesses are borrowed.
+	swift_generic_value_allocations map[u64]u64 // Fresh mutable metadata mappings, retained until quiescent teardown.
+	swift_generic_value_retired bool
 	swift_objc_metadata map[u64]u64 // Class -> canonical sealed Swift wrapper, under the runtime lock.
 	swift_concurrency_code u64 // Sealed actor witness dispatcher and indirect priority getter.
 	swift_concurrency_retired bool // Reject new resolution after quiescent teardown.

@@ -311,6 +311,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_swift_errorRetain' { u64(unsafe { voidptr(swift_error_retain) }) }
 		'_swift_errorRelease' { u64(unsafe { voidptr(swift_error_release) }) }
 		'_swift_allocError' { u64(unsafe { voidptr(swift_error_allocate) }) }
+		'_swift_allocateGenericValueMetadata' { u64(unsafe { voidptr(swift_generic_value_allocate) }) }
 		'_swift_initStackObject' { u64(unsafe { voidptr(swift_stack_initialize) }) }
 		'_swift_allocObject' { u64(unsafe { voidptr(swift_heap_allocate) }) }
 		'_swift_deallocObject' { u64(unsafe { voidptr(swift_heap_deallocate) }) }
