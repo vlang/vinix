@@ -15941,10 +15941,78 @@ two key arguments and two underlying entries. Its selected name at
 `0x1015c1004`. That thunk forwards x0 unchanged to a witness accessor and
 returns its scalar pointer. No application code is executed by inspection.
 
-The next missing import is `_swift_getSingletonMetadata`, at GOT cell
-`0x10dc9bb80`, stub `0x10c63ec4c` and branch island `0x107c284c8`. Inspected
-callers include `0x100065780` and `0x100073c18`, which pass a metadata request
-and descriptor after checking a cache. Singleton metadata lookup remains
+`_swift_getSingletonMetadata` now supports bounded in-place initialization of
+version-zero nongeneric struct and enum metadata. Its ARM64 SwiftCC entry takes
+a request and descriptor in x0/x1 and returns metadata/state in x0/x1. The
+eight supported Complete, NonTransitiveComplete, LayoutComplete and Abstract
+request forms include their nonblocking variants.
+
+The descriptor's singleton-initialization record supplies signed relative
+pointers to an initially zero 16-byte cache, writable metadata and completion
+code. The helper calls the completer once with the metadata, a writable zeroed
+four-word context and a null pattern. A nil dependency plus a valid completed
+value layout publishes the original metadata pointer with release ordering in
+the public cache word. The private cache word is left unchanged. Published
+results are recognized by `_swift_checkMetadataState` through the existing
+complete-cache identity checks.
+
+While a completer runs, nonblocking requests and requests already satisfied by
+the allocated state return Abstract or LayoutComplete without waiting. Other
+threads can wait for completion without holding the runtime registry lock.
+Same-thread satisfied requests can reenter; recursive blocking completion fails
+explicitly. Callback code can resolve symbols or initialize another descriptor
+without the outer registry lock. A reported dependency or invalid result rejects
+the entry without publishing it, and later calls do not repeat that callback.
+Dependency resumption and standalone deferred metadata-state queries remain
+unsupported.
+
+Singleton and generic metadata share the existing arena, user accounting and
+64-entry limit, including rejected entries. The generic path uses the same
+arena allocator and keeps its own descriptor/type-key matching. Quiescent
+teardown destroys the entry mutexes and unmaps only that arena. Descriptor,
+metadata, witnesses, public cache and callback storage remain borrowed; callers
+must drain before retirement or freeing those spans. The entry performs no ARC
+or hidden V heap allocations; cold use may allocate the bounded shared arena.
+
+Unsupported descriptor versions/flags, generics, classes and relocation
+patterns fail before callbacks. Struct field counts are limited to 64, with
+bounded field-offset-vector positions. Pointer alignment/relative bounds,
+metadata kind/descriptor identity and completed witness layout are checked.
+Nonempty foreign cache words, cache aliasing, capacity exhaustion, malformed
+completion results and retired runtimes fail explicitly. The helper does not
+implement class realization or general metadata dependency graphs.
+
+```sh
+v run tests/ios/native-checks.v build-singleton-metadata
+```
+
+Evidence is retained under `build/ios/fortnite/singleton-metadata-checks`, with
+the [Swift 5.10 singleton implementation](https://github.com/swiftlang/swift/blob/swift-5.10-RELEASE/stdlib/public/runtime/Metadata.cpp)
+and ABI declarations. Native comparisons cover both value kinds, all eight
+cold/warm requests, completion context and pattern, partial states while a
+callback is blocked, one completion across eight readers and raw register
+preservation. Compatibility checks add mixed generic/singleton caching,
+metadata-state recognition, nested and registry reentry, recursive rejection,
+failed-result isolation, capacity bounds, readonly descriptor/finished-metadata
+boundaries and two drained lifetimes with the shared arena unmapped.
+
+Eight normal/deterministic ASan/UBSan runs passed with both C++ configurations,
+including generic metadata and metadata-state regressions. The ARM64 fixture,
+launch probe and both import audits passed their checks. Eight compressed
+binary/generated-C pairs and five C/ARM64 reviews retain the tested artifacts,
+shared allocation/retirement paths and borrowed metadata lifetimes.
+
+Static inspection traces the required import through GOT cell `0x10dc9bb80`,
+stub `0x10c63ec4c`, branch island `0x107c284c8` and three consumer/forwarder
+sites. Caller `0x100065780` selects struct descriptor `0x10dc80294`, with four
+fields and an in-place singleton record. Caller `0x100073c18` selects class
+descriptor `0x10dc80568`; that class-initialization path remains unsupported.
+No application code is executed by inspection.
+
+The next missing import is `_swift_getTupleTypeMetadata`, at GOT cell
+`0x10dc9bb88`, stub `0x10c63ec58`, branch island `0x107c28ed0` and caller
+`0x1015c040c`. The caller forwards an element count/vector with a complete
+request and null labels/proposed witnesses. General tuple metadata remains
 unsupported. Application entry remains unreached and Fortnite is still unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -15952,12 +16020,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,973 | 188 | 78 |
+| Fortnite executable | 1,974 | 187 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,813 | 191 | 114 |
+| All images | 2,814 | 190 | 114 |
 
-The C++/GLES/Text variant reports 2,827 resolved imports, 177 unresolved strong
+The C++/GLES/Text variant reports 2,828 resolved imports, 176 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

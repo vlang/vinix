@@ -16,10 +16,24 @@ mut:
 	metadata u64
 	owner u64
 	phase u64 // 1 instantiating, 2 complete, 3 rejected result.
+	singleton_cache u64 // Nonzero for borrowed in-place singleton value metadata.
+	singleton_state u64 // Abstract/LayoutComplete while its completer runs.
 	mutex [8]u64
 }
 struct SwiftGenericMetadataCache { mut: entries [64]SwiftGenericMetadataEntry }
 struct SwiftGenericMetadataKey { count u64 kind u64 mut: arguments [64]u64 }
+
+// Both generic instantiations and in-place singleton values share this bounded
+// runtime-owned arena, user accounting and quiescent mutex/arena retirement.
+fn swift_generic_metadata_cache_locked() !&SwiftGenericMetadataCache {
+	if ios_runtime.swift_generic_metadata_arena == 0 {
+		page := u64(C.getpagesize()); length := (u64(sizeof(SwiftGenericMetadataCache)) + page - 1) & ~(page - 1)
+		allocation := C.mmap(unsafe { nil },usize(length),C.PROT_READ | C.PROT_WRITE,C.MAP_PRIVATE | C.MAP_ANONYMOUS,-1,0)
+		if allocation == unsafe { voidptr(-1) } { return swift_generic_metadata_failure() }
+		ios_runtime.swift_generic_metadata_arena = u64(allocation)
+	}
+	return unsafe { &SwiftGenericMetadataCache(ios_runtime.swift_generic_metadata_arena) }
+}
 
 fn swift_generic_metadata_begin() ! {
 	C.ios_objc_initialize_lock()
@@ -93,7 +107,7 @@ fn swift_generic_metadata_checked(request u64, arguments u64, descriptor u64) !S
 			cache := unsafe { &SwiftGenericMetadataCache(ios_runtime.swift_generic_metadata_arena) }
 			for i in u64(0)..ios_runtime.swift_generic_metadata_count {
 				candidate := unsafe { &cache.entries[int(i)] }
-				if candidate.descriptor != descriptor || candidate.count != key.count { continue }
+				if candidate.singleton_cache != 0 || candidate.descriptor != descriptor || candidate.count != key.count { continue }
 				mut equal := true
 				for j in u64(0)..key.count { if candidate.arguments[int(j)] != key.arguments[int(j)] { equal = false; break } }
 				if equal { entry = candidate; break }
@@ -114,13 +128,7 @@ fn swift_generic_metadata_checked(request u64, arguments u64, descriptor u64) !S
 		if read32(pattern + 4) != 0 || read32(pattern + 8) & 0x1ffffe != 0
 			|| u64(read32(pattern + 8) >> 21) != key.kind { C.ios_objc_initialize_unlock(); return swift_generic_metadata_failure() }
 		instantiate := swift_generic_metadata_relative(pattern,4) or { C.ios_objc_initialize_unlock(); return swift_generic_metadata_failure() }
-		if ios_runtime.swift_generic_metadata_arena == 0 {
-			page := u64(C.getpagesize()); length := (u64(sizeof(SwiftGenericMetadataCache)) + page - 1) & ~(page - 1)
-			allocation := C.mmap(unsafe { nil },usize(length),C.PROT_READ | C.PROT_WRITE,C.MAP_PRIVATE | C.MAP_ANONYMOUS,-1,0)
-			if allocation == unsafe { voidptr(-1) } { C.ios_objc_initialize_unlock(); return swift_generic_metadata_failure() }
-			ios_runtime.swift_generic_metadata_arena = u64(allocation)
-		}
-		cache := unsafe { &SwiftGenericMetadataCache(ios_runtime.swift_generic_metadata_arena) }
+		cache := swift_generic_metadata_cache_locked() or { C.ios_objc_initialize_unlock(); return swift_generic_metadata_failure() }
 		entry = unsafe { &cache.entries[int(ios_runtime.swift_generic_metadata_count)] }
 		if C.ios_sizeof_mutex() > 64 || C.ios_mutex_create(unsafe { &entry.mutex[0] },0) != 0 { C.ios_objc_initialize_unlock(); return swift_generic_metadata_failure() }
 		C.pthread_mutex_lock(unsafe { voidptr(&entry.mutex[0]) })
