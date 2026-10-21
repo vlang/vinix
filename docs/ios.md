@@ -14597,17 +14597,52 @@ forwarder `0x107c28738` and five direct calls, including `0x10003da44` and
 `0x1000717c8`. The loader stops at the unresolved binding; the diagnostic has
 not executed. Application entry remains unreached; Fortnite is still unplayable.
 
+`_$ss53KEY_TYPE_OF_DICTIONARY_VIOLATES_HASHABLE_REQUIREMENTSys5NeverOypXpF`
+now reports duplicate dictionary keys and traps. Native inspection confirms
+key-type metadata in x0; all five Fortnite callers pass String metadata.
+The bounded naming profile recognizes already-published canonical String,
+Int and Bool metadata. Other metadata produces an explicit unsupported-type
+fatal diagnostic without dereferencing the pointer. General type reflection
+remains unsupported.
+
+The entry shares the existing sealed assertion code page, calls an
+allocation-free V reporter and executes `BRK #1`. It traps again if a signal
+handler returns, and a failed stderr write cannot turn `Never` into a return.
+No new arena, owner or cache is added; runtime teardown unmaps the shared page.
+
+Native comparisons verify the exact three diagnostics and actual SIGTRAP,
+including closed stderr and a returning control. Compatibility checks also
+cover nil/interior/protected metadata, exact library/symbol routing, eight
+cold publishers and two drained lifetimes.
+
+```sh
+v run tests/ios/native-checks.v build-dictionary-hashable
+```
+
+Evidence is retained under `build/ios/fortnite/dictionary-hashable-checks`.
+Normal and deterministic ASan/UBSan runs passed with and without the C++
+backend and for assertion, String Hashable and generic hashing regressions
+(ten runs). The ARM64 fixture, launch probe and both import audits passed.
+Nine binary/generated-C archive pairs and five C/ARM64 reviews are retained.
+
+The next missing import is Error's `_getEmbeddedNSError`,
+`_$ss5ErrorPsE19_getEmbeddedNSErroryXlSgyF`. Read-only inspection found
+GOT cell `0x10dc9b9e8`, stub `0x10c63af68`, branch-island forwarder
+`0x107c28d14` and tail forwarders `0x100072b50` and `0x1000738c8`.
+The loader still stops before application entry; the dictionary diagnostic
+has not executed in Fortnite. Fortnite remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,942 | 219 | 78 |
+| Fortnite executable | 1,943 | 218 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,782 | 222 | 114 |
+| All images | 2,783 | 221 | 114 |
 
-The C++/GLES/Text variant reports 2,796 resolved imports, 208 unresolved strong
+The C++/GLES/Text variant reports 2,797 resolved imports, 207 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
