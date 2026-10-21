@@ -75,6 +75,13 @@ pub fn write_build_manifest(kind string, arguments []string) ! {
 		os.cp(work + '/native-ws/bionic-ws-manifest.json', output + '/usr/share/licenses/bionic-ws/build.json')!
 		os.mkdir_all(output + '/usr/share/vinix-android-ws/bionic_translation/cfg.d')!
 		os.cp(work + '/native-ws/bionic-ws.cfg', output + '/usr/share/vinix-android-ws/bionic_translation/cfg.d/native.cfg')!
+		for name in ['libglapi.so.0', 'libvinix-ws-GLESv1_CM.so', 'libvinix-ws-GLESv2.so'] {
+			os.cp(work + '/native-ws/' + name, output + '/usr/lib/art/native-ws/' + name)!
+		}
+		os.mkdir_all(output + '/usr/share/licenses/mesa-ws')!
+		for name in ['mesa-ws-NOTICE', 'mesa-ws-manifest.json', 'mesa-ws-sources.tar.gz'] {
+			os.cp(work + '/native-ws/' + name, output + '/usr/share/licenses/mesa-ws/' + name)!
+		}
 	}
 	mut paths := []string{}; descendants(output + '/usr', mut paths)!; paths.sort()
 	mut files := []ah.Value{}

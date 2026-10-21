@@ -95,6 +95,7 @@ throw v0') +
 		constructor('android/app/Activity', 'const/4 v0, 4\ninvoke-static {v0}, Lorg/vinix/bootstrap/App;->check(I)V') +
 		'.method public static native nativeCheck(Landroid/content/res/AssetManager;)Z\n.end method\n' +
 		'.method public static native nativeBitmap(Landroid/graphics/Bitmap;)Z\n.end method\n' +
+		'.method public static native nativeGraphics()Z\n.end method\n' +
 		method('protected onCreate(Landroid/os/Bundle;)V', '
 invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 invoke-static {}, Landroid/os/Process;->is64Bit()Z
@@ -207,6 +208,9 @@ cmp-long v6, v2, v4
 if-ltz v6, :bad
 const-string v0, "fixture"
 invoke-static {v0}, Ljava/lang/System;->loadLibrary(Ljava/lang/String;)V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->nativeGraphics()Z
+move-result v0
+if-eqz v0, :bad
 invoke-virtual {p0}, Landroid/app/Activity;->getAssets()Landroid/content/res/AssetManager;
 move-result-object v0
 invoke-static {v0}, Lorg/vinix/bootstrap/Main;->nativeCheck(Landroid/content/res/AssetManager;)Z
@@ -239,7 +243,7 @@ const-string v1, "Application bootstrap and NDK assets passed"
 invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
 invoke-virtual {p0, v0}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "BOOTSTRAP-NDK-PASS order paths clocks is64bit assets rtl webp matrix network bitmap clients"
+const-string v1, "BOOTSTRAP-NDK-PASS order paths clocks is64bit assets rtl webp matrix network bitmap clients graphics-unavailable"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void
 :bad

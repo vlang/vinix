@@ -9,7 +9,16 @@ module wsloader
 
 fn C.dlsym(voidptr, &char) voidptr
 
+type GlLookup = fn (&char) voidptr
+
 @[export: 'vinix_ws_gl_symbol']
 pub fn graphics_symbol(name &char) voidptr {
-	return unsafe { C.dlsym(nil, name) }
+	unsafe {
+		if name == nil { return nil }
+		resolved := C.dlsym(nil, name)
+		if resolved != nil { return resolved }
+		if name[0] != `g` || name[1] != `l` { return nil }
+		lookup := GlLookup(C.dlsym(nil, c'_glapi_get_proc_address'))
+		return if voidptr(lookup) == nil { nil } else { lookup(name) }
+	}
 }

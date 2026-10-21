@@ -22,6 +22,28 @@ mut:
 fn C.AndroidBitmap_getInfo(voidptr, voidptr, &BitmapInfo) i32
 fn C.AndroidBitmap_lockPixels(voidptr, voidptr, &voidptr) i32
 fn C.AndroidBitmap_unlockPixels(voidptr, voidptr) i32
+fn C.eglGetCurrentDisplay() voidptr
+fn C.eglGetCurrentContext() voidptr
+fn C.eglGetCurrentSurface(i32) voidptr
+fn C.eglGetProcAddress(&char) voidptr
+fn C.eglGetError() i32
+fn C.eglInitialize(voidptr, &i32, &i32) u32
+
+@[export: 'Java_org_vinix_bootstrap_Main_nativeGraphics']
+pub fn graphics_check(e voidptr, class voidptr) u8 {
+	unsafe {
+		if C.eglGetCurrentDisplay() != nil || C.eglGetCurrentContext() != nil
+			|| C.eglGetCurrentSurface(0x3059) != nil || C.eglGetError() != 0x3000 { return 0 }
+		if C.eglGetProcAddress(c'glCreateShader') == nil
+			|| C.eglGetProcAddress(c'glEGLImageTargetTexture2DOES') == nil { return 0 }
+		C.eglGetCurrentSurface(0)
+		if C.eglGetError() != 0x300c || C.eglGetError() != 0x3000 { return 0 }
+		mut major, mut minor := i32(-9), i32(-8)
+		if C.eglInitialize(nil, &major, &minor) != 0 || C.eglGetError() != 0x3008
+			|| major != -9 || minor != -8 || C.eglGetError() != 0x3000 { return 0 }
+		return 1
+	}
+}
 
 @[export: 'Java_org_vinix_bootstrap_Main_nativeBitmap']
 pub fn bitmap_check(e voidptr, class voidptr, bitmap voidptr) u8 {

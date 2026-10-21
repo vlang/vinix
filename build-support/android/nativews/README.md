@@ -31,9 +31,16 @@ the APK's ARM64 native libraries in an atomic, content-hashed directory and
 passes that directory to ART and Bionic. Its private library mapping routes
 `libandroid.so` asset operations to this backend's existing `libandroidfw`
 provider and `libjnigraphics.so` bitmap access to the WS CPU pixels. Pixel locks
-hold a native reference until the last unlock. GLES rendering remains unsupported
-and fails explicitly. This is a limited NDK subset, not compatibility with
+hold a native reference until the last unlock. OpenSL ES uses the runtime's
+packaged audio provider. This is a limited NDK subset, not compatibility with
 arbitrary native APK libraries.
+
+Pinned Mesa GLES entrypoint and dispatch libraries resolve native graphics
+imports without loading Gallium, an EGL vendor, X11 or GTK. The software WS
+Canvas has no current EGL display, context or surface. EGL queries report that
+state, and context/display creation fails with per-thread EGL error codes.
+GLES rendering, AR and video contexts remain unavailable. The staged Mesa
+receipt, license overview and dispatch/header sources accompany its binaries.
 
 Application attachment precedes main-process content providers (descending
 `initOrder`), then `Application.onCreate`, then Activity construction. Disabled
@@ -93,8 +100,7 @@ above should not be extrapolated to those applications.
 APK from smali and V. It checks provider ordering and filtering, startup paths,
 clock units, 64-bit process reporting, real NDK asset reads/seeks, inherited
 layout direction and lossless WebP decoding. It also checks pivot rotation, live
-network detection, provider-client lookup and
-actual NDK bitmap metadata, pixels and balanced nested locks.
+network detection, provider-client lookup, actual NDK bitmap metadata and pixels,
+balanced nested locks, graphics procedure lookup and explicit EGL unavailability.
 Pass its APK to the native WS suite; the assertion marker is `BOOTSTRAP-NDK-PASS`.
-This fixture does not modify or
-stand in for the publisher's WhatsApp APK.
+This fixture does not modify or stand in for the publisher's WhatsApp APK.

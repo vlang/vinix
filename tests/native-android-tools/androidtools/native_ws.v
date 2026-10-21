@@ -150,6 +150,7 @@ pub fn build_native_ws(smali string, runtime string, output string, compiler str
 	generators.generate_module(output + '/atlframework', output + '/android-native.c', arch, []string{})!
 	generators.generate_module(root() + '/build-support/android/wsloader', output + '/android-loader.c', arch, []string{})!
 	build_native_bionic(output, runtime, compiler, arch)!
+	build_native_gl_dispatch(output)!
 	checked([compiler, '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-unused-function', '-Wno-unused-label',
 		'-Wno-unused-parameter', '-fvisibility=hidden', '-shared', '-fPIC', '-I' + output,
 		'-Wl,-z,max-page-size=65536', '-Wl,--allow-shlib-undefined', output + '/android-native.c',

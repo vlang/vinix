@@ -286,6 +286,7 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 			C.puts(c'ANDROID-WS-FAIL WebP decoder')
 			return 1
 		}
+		if !ws_egl_init(root) { C.puts(c'ANDROID-WS-FAIL graphics dispatch'); return 1 }
 		// The framework enumerates ICU converters through the stable native
 		// provider API. ART loads javacore locally, so expose that provider
 		// explicitly instead of relying on another toolkit's dependency scope.

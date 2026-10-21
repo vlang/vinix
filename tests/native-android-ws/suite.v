@@ -148,6 +148,9 @@ fn prepare_module(settings map[string]json2.Any, app map[string]json2.Any, outpu
 		os.mkdir_all(config)!
 		os.cp(native + '/bionic-ws.cfg', config + '/native.cfg')!
 	}
+	for name in ['libglapi.so.0', 'libvinix-ws-GLESv1_CM.so', 'libvinix-ws-GLESv2.so'] {
+		if os.is_file(native + '/' + name) { os.cp(native + '/' + name, runtime + '/usr/lib/art/native-ws/' + name)! }
+	}
 	os.cp(native + '/vinix-desktop', module_root + '/usr/bin/vinix-android-calculator')!
 	os.cp(app['staged_apk']!.str(), module_root + '/opt/android-test/application.apk')!
 	os.write_file(module_root + '/opt/android-test/popular-id', app['id']!.str())!
