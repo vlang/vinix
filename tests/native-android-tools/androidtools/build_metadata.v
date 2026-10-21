@@ -70,6 +70,11 @@ pub fn write_build_manifest(kind string, arguments []string) ! {
 		os.cp(work + '/native-ws/libdl_bio.so.0',output + '/usr/lib/art/native-ws/libdl_bio.so.0')!
 		os.cp(work + '/native-ws/vinix-android-native',output + '/usr/bin/vinix-android-native')!
 		os.cp(work + '/native-ws/run-android',output + '/usr/bin/run-android-native')!
+		os.mkdir_all(output + '/usr/share/licenses/bionic-ws')!
+		os.cp(work + '/native-ws/bionic-ws-NOTICE', output + '/usr/share/licenses/bionic-ws/NOTICE')!
+		os.cp(work + '/native-ws/bionic-ws-manifest.json', output + '/usr/share/licenses/bionic-ws/build.json')!
+		os.mkdir_all(output + '/usr/share/vinix-android-ws/bionic_translation/cfg.d')!
+		os.cp(work + '/native-ws/bionic-ws.cfg', output + '/usr/share/vinix-android-ws/bionic_translation/cfg.d/native.cfg')!
 	}
 	mut paths := []string{}; descendants(output + '/usr', mut paths)!; paths.sort()
 	mut files := []ah.Value{}

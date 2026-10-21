@@ -149,10 +149,7 @@ pub fn build_native_ws(smali string, runtime string, output string, compiler str
 	os.write_file(output + '/atlframework/ws_generated.v', generated)!
 	generators.generate_module(output + '/atlframework', output + '/android-native.c', arch, []string{})!
 	generators.generate_module(root() + '/build-support/android/wsloader', output + '/android-loader.c', arch, []string{})!
-	checked([compiler, '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-unused-function',
-		'-Wno-unused-parameter', '-fvisibility=hidden', '-shared', '-fPIC', '-Wl,-soname,libdl_bio.so.0',
-		'-Wl,-z,max-page-size=65536', output + '/android-loader.c', '-ldl', '-o',
-		output + '/libdl_bio.so.0'])!
+	build_native_bionic(output, runtime, compiler, arch)!
 	checked([compiler, '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-unused-function', '-Wno-unused-label',
 		'-Wno-unused-parameter', '-fvisibility=hidden', '-shared', '-fPIC', '-I' + output,
 		'-Wl,-z,max-page-size=65536', '-Wl,--allow-shlib-undefined', output + '/android-native.c',
@@ -170,6 +167,6 @@ pub fn build_native_ws(smali string, runtime string, output string, compiler str
 	checked(['v', '-os', 'linux', '-arch', arch, '-cc', compiler, '-gc', 'none', '-o',
 		output + '/vinix-android-native', root() + '/build-support/android/native-entry.v'])!
 	checked(['v', '-os', 'linux', '-arch', arch, '-cc', compiler, '-gc', 'none', '-o',
-		output + '/run-android', root() + '/build-support/android/native-run.v'])!
+		output + '/run-android', '-cflags', '-O2', root() + '/build-support/android/native-run.v'])!
 	println('ANDROID-WS-BUILD bindings=${count} library_sha256=' + sha256.sum(os.read_bytes(output + '/libvinix-android-native.so')!).hex())
 }

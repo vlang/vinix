@@ -76,7 +76,9 @@ android/database/sqlite/SQLiteConnection|nativeResetCancel|ws_sql_reset_cancel(p
 android/database/sqlite/SQLiteConnection|nativeRegisterLocalizedCollators|locale := ws_utf(e,p1); ws_sql_collation(e,p0,c'LOCALIZED',locale); ws_release(e,p1,locale)
 android/database/sqlite/SQLiteGlobal|nativeReleaseMemory|return C.sqlite3_release_memory(0x7fffffff)
 android/os/SystemClock|uptimeMillis|return ws_millis()
-android/os/SystemClock|elapsedRealtime|return ws_millis()
+android/os/SystemClock|elapsedRealtime|return ws_nanos(7) / 1000000
+android/os/SystemClock|elapsedRealtimeNanos|return ws_nanos(7)
+android/os/Process|is64Bit|return u8(sizeof(voidptr) == 8)
 android/os/MessageQueue|nativeInit|return ws_queue_new()
 android/os/MessageQueue|nativeDestroy|ws_queue_destroy(p0)
 android/os/MessageQueue|nativeWake|ws_queue_wake(p0)

@@ -32,6 +32,7 @@ fn main() {
  androidtools.framework_launcher(launcher) or { rejected = true }
  assert rejected
  classes := androidtools.framework_extra_classes(os.read_file('build-support/android/atlframework/widgets.v')!)
+ assert classes['android/content/ContentProvider$PipeDataWriter']!.contains('writeDataToPipe(Landroid/os/ParcelFileDescriptor;Landroid/net/Uri;Ljava/lang/String;Landroid/os/Bundle;Ljava/lang/Object;)V')
  assert classes['android/widget/SearchView$OnQueryTextListener']!.contains('.method public abstract onQueryTextSubmit(Ljava/lang/String;)Z')
  assert classes['android/widget/SimpleCursorAdapter']!.contains('Landroid/widget/CursorAdapter;-><init>(Landroid/content/Context;Landroid/database/Cursor;I)V')
  println('Android framework: lifecycle preservation, static JNI factory, declaration guards, cursor constructors and launcher path: PASS')

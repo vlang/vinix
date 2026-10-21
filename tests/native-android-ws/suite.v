@@ -143,6 +143,11 @@ fn prepare_module(settings map[string]json2.Any, app map[string]json2.Any, outpu
 	} {
 		os.cp(native + '/' + source, target)!
 	}
+	if os.is_file(native + '/bionic-ws.cfg') {
+		config := runtime + '/usr/share/vinix-android-ws/bionic_translation/cfg.d'
+		os.mkdir_all(config)!
+		os.cp(native + '/bionic-ws.cfg', config + '/native.cfg')!
+	}
 	os.cp(native + '/vinix-desktop', module_root + '/usr/bin/vinix-android-calculator')!
 	os.cp(app['staged_apk']!.str(), module_root + '/opt/android-test/application.apk')!
 	os.write_file(module_root + '/opt/android-test/popular-id', app['id']!.str())!
@@ -158,6 +163,8 @@ fn prepare_module(settings map[string]json2.Any, app map[string]json2.Any, outpu
 
 fn run_app(settings map[string]json2.Any, app map[string]json2.Any, output string) !map[string]json2.Any {
 	id := app['id']!.str()
+	startup_seconds := (app['startup_seconds'] or { json2.Any(60) }).int()
+	if startup_seconds < 1 || startup_seconds > 900 { return error('startup_seconds must be between 1 and 900') }
 	state := output + '/' + id
 	os.mkdir_all(state)!
 	prepare_module(settings, app, output)!
@@ -182,7 +189,7 @@ fn run_app(settings map[string]json2.Any, app map[string]json2.Any, output strin
 	}
 	mut begin_at := time.now().unix()
 	mut entered := false
-	for time.now().unix() - begin_at < if entered { i64(60) } else { i64(120) } {
+	for time.now().unix() - begin_at < if entered { i64(startup_seconds) } else { i64(120) } {
 		log := os.read_file(serial_path) or { '' }
 		if !entered && log.contains('APK-SUITE-BEGIN id=' + id + ' ') {
 			entered = true
@@ -197,6 +204,7 @@ fn run_app(settings map[string]json2.Any, app map[string]json2.Any, output strin
 	}
 	frame := state + '/application.png'
 	mut result := observation(os.read_file(serial_path) or { '' }, id)
+	result['startup_timeout_seconds'] = json2.Any(startup_seconds)
 	capture := os.exec([settings['input_tool']!.str(), 'screenshot', '--socket', socket, '--destination',
 		frame])
 	if capture.exit_code == 0 {

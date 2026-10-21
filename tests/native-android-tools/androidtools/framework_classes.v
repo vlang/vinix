@@ -47,6 +47,7 @@ pub fn framework_extra_classes(source string) map[string]string {
   '.method public constructor <init>()V\n.locals 0\ninvoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void\n.end method\n' +
   native_declarations(widgets.all_after('fn register_search_callbacks(').all_before('\n}'))
  return {
+  'android/content/ContentProvider$PipeDataWriter': interface_class('android/content/ContentProvider$PipeDataWriter', ['writeDataToPipe(Landroid/os/ParcelFileDescriptor;Landroid/net/Uri;Ljava/lang/String;Landroid/os/Bundle;Ljava/lang/Object;)V'])
   'android/widget/SimpleCursorAdapter': simple
   'android/widget/SimpleCursorAdapter$ViewBinder': interface_class('android/widget/SimpleCursorAdapter$ViewBinder', ['setViewValue(Landroid/view/View;Landroid/database/Cursor;I)Z'])
   'android/widget/SearchView': search
@@ -102,7 +103,7 @@ pub fn write_framework_classes(smali string) ! {
  for class, function in {'android/view/View': 'register_view', 'android/app/ListActivity$2': 'register_list_click', 'android/widget/ScrollView': 'register_scroll'} {
   path := smali + '/' + class + '.smali'
   mut text := os.read_file(path)!
-  if class == 'android/view/View' { text += '\n.field private vinixHandler:Landroid/os/Handler;\n.field private vinixWsWatchers:Ljava/util/ArrayList;\n.field private vinixWsEditorAction:Ljava/lang/Object;\n' }
+  if class == 'android/view/View' { text += '\n.field private vinixHandler:Landroid/os/Handler;\n.field private vinixWsWatchers:Ljava/util/ArrayList;\n.field private vinixWsEditorAction:Ljava/lang/Object;\n.field private vinixRawDirection:I\n' }
   else if class == 'android/app/ListActivity$2' && !text.contains('this$0:Landroid/app/ListActivity;') { return error('unexpected ATL ListActivity click listener') }
   for block in native_declarations(views.all_after('fn ' + function + '(').all_before('\n}')).split('.method ')[1..] {
    text = framework_replace_method(text, block.all_before('\n').all_after('native '), '.method ' + block)!

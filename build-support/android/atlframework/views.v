@@ -47,13 +47,76 @@ fn list_item_click(e voidptr, listener voidptr, parent voidptr, view voidptr, po
     call(e, activity, c'android/app/ListActivity', c'onListItemClick', c'(Landroid/widget/ListView;Landroid/view/View;IJ)V', unsafe { &args[0] })
 }
 
+fn view_raw_direction(e voidptr, view voidptr) i32 {
+    stored := get_int(e, view, c'android/view/View', c'vinixRawDirection')
+    return if stored == 0 { i32(2) } else { stored - 1 }
+}
+
+// Resolve on demand so changing an ancestor's direction cannot leave cached
+// descendants stale. An unattached inheriting View has no resolved direction.
+fn view_resolved_direction(e voidptr, view voidptr) i32 {
+    unsafe {
+        if FramePush(slot(e, 19))(e, 32) != 0 { return -1 }
+        mut current := view
+        mut owned := false
+        mut result := i32(-1)
+        for depth := 0; depth < 256 && !pending(e); depth++ {
+            raw := view_raw_direction(e, current)
+            if raw == 0 || raw == 1 { result = raw; break }
+            if raw == 3 {
+                context := obj(e, current, c'android/view/View', c'getContext', c'()Landroid/content/Context;', nil)
+                resources := obj(e, context, c'android/content/Context', c'getResources', c'()Landroid/content/res/Resources;', nil)
+                config := obj(e, resources, c'android/content/res/Resources', c'getConfiguration', c'()Landroid/content/res/Configuration;', nil)
+                result = integer(e, config, c'android/content/res/Configuration', c'getLayoutDirection', c'()I', nil)
+                break
+            }
+            parent := get_object(e, current, c'android/view/View', c'parent', c'Landroid/view/ViewParent;')
+            if parent == nil || !instance_of(e, parent, c'android/view/View') { break }
+            if owned { Drop(slot(e, 23))(e, current) }
+            current = parent
+            owned = true
+        }
+        FramePop(slot(e, 20))(e, nil)
+        return result
+    }
+}
+
+fn view_direction(e voidptr, view voidptr) i32 {
+    resolved := view_resolved_direction(e, view)
+    return if resolved < 0 { i32(0) } else { resolved }
+}
+
+fn view_can_resolve_direction(e voidptr, view voidptr) u8 {
+    return u8(view_resolved_direction(e, view) >= 0 && !pending(e))
+}
+
+fn view_set_direction(e voidptr, view voidptr, direction i32) {
+    if direction < 0 || direction > 3 {
+        throw(e, c'java/lang/IllegalArgumentException', c'Invalid layout direction')
+        return
+    }
+    put_int(e, view, c'android/view/View', c'vinixRawDirection', direction + 1)
+    params := get_object(e, view, c'android/view/View', c'layout_params', c'Landroid/view/ViewGroup$LayoutParams;')
+    if params != unsafe { nil } {
+        args := [Value{i: view_direction(e, view)}]!
+        call(e, params, c'android/view/ViewGroup$LayoutParams', c'resolveLayoutDirection', c'(I)V', unsafe { &args[0] })
+    }
+    call(e, view, c'android/view/View', c'requestLayout', c'()V', unsafe { nil })
+    call(e, view, c'android/view/View', c'invalidate', c'()V', unsafe { nil })
+}
+
 fn register_view(e voidptr) i32 {
     methods := [
         NativeMethod{c'post', c'(Ljava/lang/Runnable;)Z', voidptr(view_post)},
         NativeMethod{c'postDelayed', c'(Ljava/lang/Runnable;J)Z', voidptr(view_post_delayed)},
         NativeMethod{c'removeCallbacks', c'(Ljava/lang/Runnable;)Z', voidptr(view_remove_callbacks)},
+        NativeMethod{c'getLayoutDirection', c'()I', voidptr(view_direction)},
+        NativeMethod{c'getRawLayoutDirection', c'()I', voidptr(view_raw_direction)},
+        NativeMethod{c'setLayoutDirection', c'(I)V', voidptr(view_set_direction)},
+        NativeMethod{c'canResolveLayoutDirection', c'()Z', voidptr(view_can_resolve_direction)},
+        NativeMethod{c'isLayoutDirectionResolved', c'()Z', voidptr(view_can_resolve_direction)},
     ]!
-    return register(e, c'android/view/View', unsafe { &methods[0] }, 3)
+    return register(e, c'android/view/View', unsafe { &methods[0] }, 8)
 }
 
 fn register_list_click(e voidptr) i32 {

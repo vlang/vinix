@@ -145,9 +145,13 @@ fn ws_log(e voidptr, tag voidptr, message voidptr) i32 {
 }
 
 fn ws_millis() i64 {
+	return ws_nanos(1) / 1000000
+}
+
+fn ws_nanos(clock i32) i64 {
 	mut now := WsTimespec{}
-	C.clock_gettime(1, voidptr(&now))
-	return now.seconds * 1000 + now.nanos / 1000000
+	C.clock_gettime(clock, voidptr(&now))
+	return now.seconds * 1000000000 + now.nanos
 }
 
 fn ws_failure(e voidptr, stage &char) bool {
@@ -278,6 +282,10 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		if ws.data == nil { ws.data = c'/root/.local/share/vinix/android/native' }
 		if !ws_open_surface() { return 1 }
 		if !ws_font_init(root) { return 1 }
+		if !ws_webp_init() {
+			C.puts(c'ANDROID-WS-FAIL WebP decoder')
+			return 1
+		}
 		// The framework enumerates ICU converters through the stable native
 		// provider API. ART loads javacore locally, so expose that provider
 		// explicitly instead of relying on another toolkit's dependency scope.
@@ -290,6 +298,16 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 			C.puts(C.dlerror())
 			return 1
 		}
+		// The Bionic linker publishes mapped APK libraries through the host's
+		// debugger rendezvous. ATL's executable normally supplies this pointer;
+		// our native entry point must initialize it before the first NDK load.
+		debug_target := C.dlsym(art, c'_r_debug_ptr')
+		debug_host := C.dlsym(nil, c'_dl_debug_addr')
+		if debug_target == nil || debug_host == nil || *(&voidptr(debug_host)) == nil {
+			C.puts(c'ANDROID-WS-FAIL native linker debugger ABI')
+			return 1
+		}
+		*(&voidptr(debug_target)) = *(&voidptr(debug_host))
 		options := &WsOption(C.alloca(16 * sizeof(WsOption)))
 		buffer := &char(C.alloca(32768))
 		C.snprintf(buffer, 8192, c'-Djava.class.path=%s/usr/lib/java/dex/android_translation_layer/api-impl.jar:%s/usr/lib/java/dex/android_translation_layer/framework-res.apk', root, root)
@@ -298,7 +316,10 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		options[1] = WsOption{&buffer[8192], nil}
 		C.snprintf(&buffer[16384], 8192, c'-Djava.library.path=%s/usr/lib/art', root)
 		options[2] = WsOption{&buffer[16384], nil}
-		options[3] = WsOption{c'-Datl.app.library.path=', nil}
+		mut native := C.getenv(c'VINIX_ANDROID_NATIVE_DIR')
+		if native == nil { native = c'' }
+		C.snprintf(&buffer[24576], 8192, c'-Datl.app.library.path=%s', native)
+		options[3] = WsOption{&buffer[24576], nil}
 		options[4] = WsOption{c'-Xcheck:jni', nil}
 		options[5] = WsOption{c'-Xnoimage-dex2oat', nil}
 		options[6] = WsOption{c'-Xusejit:false', nil}
@@ -319,6 +340,28 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		ws_static_int(e, c'android/view/Display', c'window_height', ws.height)
 		static_void(e, c'android/os/Looper', c'prepareMainLooper', c'()V', nil)
 		if ws_failure(e, c'ANDROID-WS-FAIL prepare main looper') { return 1 }
+		// Application.attachBaseContext and onCreate must complete before any
+		// Activity class initialization or constructor can access app globals.
+		// Context's class initializer creates the PackageManager from the primary
+		// package. Initialize it first: loading the primary package while Context
+		// is uninitialized recursively parses a second package, leaving the
+		// PackageManager and Application with different ApplicationInfo objects.
+		static_obj(e, c'android/content/Context', c'native_get_apk_path', c'()Ljava/lang/String;', nil)
+		if ws_failure(e, c'ANDROID-WS-FAIL initialize context') { return 1 }
+		loaded := static_obj(e, c'android/atl/ATLLoadedApp', c'getPrimaryApplication', c'()Landroid/atl/ATLLoadedApp;', nil)
+		pkg := get_object(e, loaded, c'android/atl/ATLLoadedApp', c'pkg', c'Landroid/content/pm/PackageParser$Package;')
+		info := get_object(e, pkg, c'android/content/pm/PackageParser$Package', c'applicationInfo', c'Landroid/content/pm/ApplicationInfo;')
+		put_object(e, info, c'android/content/pm/ApplicationInfo', c'dataDir', c'Ljava/lang/String;', ws_string(e, ws.data))
+		put_object(e, info, c'android/content/pm/ApplicationInfo', c'sourceDir', c'Ljava/lang/String;', ws_string(e, apk))
+		put_object(e, info, c'android/content/pm/ApplicationInfo', c'publicSourceDir', c'Ljava/lang/String;', ws_string(e, apk))
+		put_object(e, info, c'android/content/pm/ApplicationInfo', c'nativeLibraryDir', c'Ljava/lang/String;', ws_string(e, native))
+		if ws_failure(e, c'ANDROID-WS-FAIL application paths') { return 1 }
+		application := obj(e, loaded, c'android/atl/ATLLoadedApp', c'getApplication', c'()Landroid/app/Application;', nil)
+		if ws_failure(e, c'ANDROID-WS-FAIL attach application') { return 1 }
+		ws_install_providers(e, loaded, pkg, application)
+		if ws_failure(e, c'ANDROID-WS-FAIL install providers') { return 1 }
+		call(e, application, c'android/app/Application', c'onCreate', c'()V', nil)
+		if ws_failure(e, c'ANDROID-WS-FAIL application onCreate') { return 1 }
 		launch_args := [
 			Value{ l: if C.strlen(activity) > 0 { ws_string(e, activity) } else { nil } },
 			Value{ j: 1 },

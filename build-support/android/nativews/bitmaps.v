@@ -18,12 +18,44 @@ mut:
 	rgba       &u8
 }
 
+type WsWebPInfo = fn (&u8, usize, &i32, &i32) i32
+type WsWebPInto = fn (&u8, usize, &u8, usize, i32) &u8
+
+__global ws_webp_library voidptr
+__global ws_webp_info WsWebPInfo
+__global ws_webp_into WsWebPInto
+
+fn ws_webp_init() bool {
+	unsafe {
+		ws_webp_library = C.dlopen(c'libwebp.so.7', 2)
+		if ws_webp_library == nil { return false }
+		ws_webp_info = WsWebPInfo(C.dlsym(ws_webp_library, c'WebPGetInfo'))
+		ws_webp_into = WsWebPInto(C.dlsym(ws_webp_library, c'WebPDecodeRGBAInto'))
+		return voidptr(ws_webp_info) != nil && voidptr(ws_webp_into) != nil
+	}
+}
+
 fn ws_bitmap_decode(bytes &u8, length i32) i64 {
 	unsafe {
 		mut width := i32(0)
 		mut height := i32(0)
 		mut channels := i32(0)
-		pixels := C.stbi_load_from_memory(bytes, length, &width, &height, &channels, 4)
+		mut pixels := &u8(nil)
+		webp := length >= 12 && bytes[0] == `R` && bytes[1] == `I` && bytes[2] == `F`
+			&& bytes[3] == `F` && bytes[8] == `W` && bytes[9] == `E` && bytes[10] == `B` && bytes[11] == `P`
+		if webp {
+			if ws_webp_info(bytes, usize(length), &width, &height) == 0 || width <= 0 || height <= 0
+				|| width > 16384 || height > 16384 || i64(width) * height > 64 * 1024 * 1024 { return 0 }
+			capacity := usize(width) * usize(height) * 4
+			pixels = &u8(C.malloc(capacity))
+			if pixels == nil { return 0 }
+			if ws_webp_into(bytes, usize(length), pixels, capacity, width * 4) == nil {
+				C.free(pixels)
+				return 0
+			}
+		} else {
+			pixels = C.stbi_load_from_memory(bytes, length, &width, &height, &channels, 4)
+		}
 		if pixels == nil { return 0 }
 		bitmap := &WsBitmap(C.malloc(sizeof(WsBitmap)))
 		*bitmap = WsBitmap{ width: width, height: height, references: 1, rgba: pixels }

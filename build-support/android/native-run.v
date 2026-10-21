@@ -4,6 +4,7 @@
 module main
 
 import os
+import nativeapk
 
 #include <sys/resource.h>
 struct C.rlimit {
@@ -27,7 +28,7 @@ fn run() ! {
 		return
 	}
 	if os.args.len < 2 { return error('usage: run-android APK [-l ACTIVITY]') }
-	apk := os.args[1]
+	apk := os.abs_path(os.args[1])
 	if !os.is_file(apk) { return error('cannot read APK: ' + apk) }
 	mut activity := ''
 	mut at := 2
@@ -65,6 +66,10 @@ fn run() ! {
 	data_root := os.getenv_opt('XDG_DATA_HOME') or { (os.getenv_opt('HOME') or { '/root' }) + '/.local/share' }
 	data := os.getenv_opt('ANDROID_APP_DATA_DIR') or { data_root + '/vinix/android/' + os.base(apk) + '_' }
 	os.mkdir_all(data)!
+	native := nativeapk.install(apk, data, 'arm64-v8a')!
+	os.setenv('VINIX_ANDROID_NATIVE_DIR', native, true)
+	os.setenv('BIONIC_LD_LIBRARY_PATH', native + ':' + data + '/*', true)
+	os.setenv('XDG_DATA_DIRS', root + '/usr/share/vinix-android-ws', true)
 	os.setenv('ANDROID_APP_DATA_DIR', data, true)
 	os.setenv('VINIX_ANDROID_ROOT', root, true)
 	os.setenv('VINIX_ALLOW_WX', '1', true)
