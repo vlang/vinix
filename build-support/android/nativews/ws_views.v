@@ -24,6 +24,7 @@ mut:
 	broadcasting   bool
 	progress       f32
 	indeterminate  bool
+	window         &WsNativeWindow
 }
 
 fn ws_view(e voidptr, object voidptr) &WsView {
@@ -43,6 +44,7 @@ fn ws_view_free(pointer i64) {
 	unsafe {
 		if pointer == 0 { return }
 		view := &WsView(pointer)
+		ws_window_release(view.window)
 		C.free(view.text)
 		C.free(view.hint)
 		C.free(view)
@@ -190,6 +192,9 @@ fn ws_measure(e voidptr, object voidptr, width_spec i32, height_spec i32) {
 fn ws_layout(e voidptr, object voidptr, left i32, top i32, right i32, bottom i32) {
 	args := [Value{ i: right - left }, Value{ i: bottom - top }]!
 	call(e, object, c'android/view/View', c'layoutInternal', c'(II)V', unsafe { &args[0] })
+	if ws_view(e, object).kind == 10 && !pending(e) {
+		ws_surface_layout(e, object, right - left, bottom - top)
+	}
 	// ATL delegates ScrollView child placement to its display backend.
 	if ws_view(e, object).kind == 4 && !pending(e) {
 		unsafe {
@@ -241,6 +246,7 @@ fn ws_draw_background(e voidptr, object voidptr) {
 fn ws_draw_content(e voidptr, object voidptr) {
 	unsafe {
 		view := ws_view(e, object)
+		if view.kind == 10 { ws_surface_draw(e, object); return }
 		if view.kind == 9 { ws_progress_draw(e, object); return }
 		if view.kind == 5 {
 			ws_draw_image(e, object)

@@ -131,6 +131,12 @@ pub fn ws_egl_query_surface(display voidptr, surface voidptr, attribute i32, val
 	return 0
 }
 
+@[export: 'eglSurfaceAttrib']
+pub fn ws_egl_surface_attribute(display voidptr, surface voidptr, attribute i32, value i32) u32 {
+	ws_egl_error(0x3008)
+	return 0
+}
+
 @[export: 'eglQueryString']
 pub fn ws_egl_query_string(display voidptr, name i32) &char {
 	if display == unsafe { nil } && name == 0x3055 { return c'EGL_EXT_client_extensions' }

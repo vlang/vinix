@@ -35,6 +35,16 @@ hold a native reference until the last unlock. OpenSL ES uses the runtime's
 packaged audio provider. This is a limited NDK subset, not compatibility with
 arbitrary native APK libraries.
 
+`libnativewindow.so` maps to a CPU surface producer in this backend. SurfaceView
+layout notifies its holder callbacks; acquired NDK windows retain their buffer
+queue, and Java Surfaces retain their owning view. RGBA locks expose real pixel
+storage, expand the dirty rectangle to the full buffer, and post through the WS
+compositor. CPU-only, single-layer RGBA hardware buffers support reference
+counting, description and balanced locks; GPU usages and external fences fail.
+NDK one-shot frame callbacks run on the WS main Looper with monotonic timestamps.
+Secondary NDK Loopers, refresh-rate notifications, SurfaceHolder Canvas locking
+and EGL window rendering are not implemented.
+
 Handle-based JNI symbol lookup searches the library and its dependencies in
 breadth-first order, including defined weak symbols. The bootstrap APK includes
 a JNI method exported only by a dependent DSO to exercise this path in ART.

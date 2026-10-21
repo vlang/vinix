@@ -109,6 +109,7 @@ android/view/Window|set_title|// The desktop owns the sole window decoration.
 android/view/Window|remove_gtk_background|// Native surfaces have no toolkit background.
 android/view/Window|set_screen_brightness|// Display brightness is controlled by the desktop.
 android/view/View|native_constructor|return ws_view_new(0)
+android/view/SurfaceView|native_constructor|return ws_surface_new()
 android/view/View|native_destructor|ws_view_free(p0)
 android/view/View|native_measure|ws_measure(e,this,p1,p2)
 android/view/View|native_layout|ws_layout(e,this,p1,p2,p3,p4)

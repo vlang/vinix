@@ -286,6 +286,7 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		}
 		if !ws_egl_init(root) { C.puts(c'ANDROID-WS-FAIL graphics dispatch'); return 1 }
 		if !ws_draw_init() { C.puts(c'ANDROID-WS-FAIL Canvas state'); return 1 }
+		if !ws_frames_init() { C.puts(c'ANDROID-WS-FAIL frame queue'); return 1 }
 		// The framework enumerates ICU converters through the stable native
 		// provider API. ART loads javacore locally, so expose that provider
 		// explicitly instead of relying on another toolkit's dependency scope.
@@ -387,7 +388,9 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 				pop_frame(e)
 				return 1
 			}
+			ws_frames_dispatch()
 			if ws.animated && ws_millis() - ws.animation_last >= 80 { ws.dirty = true }
+			if C.__atomic_exchange_n(&ws_window_pending, 0, 5) != 0 { ws.dirty = true }
 			if ws.dirty { ws_render(e) }
 			ws_input(e)
 			if ws_failure(e, c'ANDROID-WS-FAIL input or render') {

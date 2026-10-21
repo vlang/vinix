@@ -138,6 +138,7 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 	os.write_file(output + '/bionic-ws.cfg',
 		'libc.so libc_bio.so.0\nlibstdc++.so libstdc++_bio.so.0\n' +
 		'libandroid.so libvinix-android-native.so\nlibjnigraphics.so libvinix-android-native.so\n' +
+		'libnativewindow.so libvinix-android-native.so\n' +
 		'libOpenSLES.so libOpenSLES.so.1\n' +
 		'libEGL.so libvinix-android-native.so\nlibEGL.so.1 libvinix-android-native.so\n' +
 		'libGLESv1_CM.so libvinix-ws-GLESv1_CM.so\nlibGLESv2.so libvinix-ws-GLESv2.so\nlibGLESv3.so libvinix-ws-GLESv2.so\n')!

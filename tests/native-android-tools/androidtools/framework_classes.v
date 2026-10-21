@@ -108,6 +108,16 @@ pub fn write_framework_classes(smali string) ! {
  canvas := smali + '/android/atl/GskCanvas.smali'
  canvas_text := os.read_file(canvas)! + '\n.field private vinixDrawState:J\n'
  os.write_file(canvas, framework_replace_method(canvas_text, 'finalize()V', '.method protected native finalize()V\n.end method')!)!
+ // A Java Surface may outlive its holder. Retain the view owning the native
+ // window, so Surface.widget cannot become a dangling WsView pointer.
+ surface := smali + '/android/view/Surface.smali'
+ os.write_file(surface, os.read_file(surface)! + '\n.field public vinixOwner:Landroid/view/SurfaceView;\n')!
+ surface_view := smali + '/android/view/SurfaceView.smali'
+ surface_view_text := os.read_file(surface_view)!
+ surface_assignment := 'iput-object v0, p0, Landroid/view/SurfaceView;->mSurface:Landroid/view/Surface;'
+ if surface_view_text.count(surface_assignment) != 3 { return error('unexpected ATL SurfaceView constructors') }
+ os.write_file(surface_view, surface_view_text.replace(surface_assignment,
+  surface_assignment + '\n\n    iput-object p0, v0, Landroid/view/Surface;->vinixOwner:Landroid/view/SurfaceView;'))!
  recreate := os.read_file(root() + '/build-support/android/atlframework/recreate.v')!
  task := '.class public Landroid/app/VinixRecreate;\n.super Ljava/lang/Object;\n.implements Ljava/lang/Runnable;\n' +
   '.field public old:Landroid/app/Activity;\n.field public next:Landroid/app/Activity;\n' + object_constructor +

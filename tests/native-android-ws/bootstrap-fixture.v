@@ -94,7 +94,7 @@ throw v0') +
 		os.write_file(smali + '/' + name + '.smali', source)!
 	}
 	main_class := '.class public Lorg/vinix/bootstrap/Main;\n.super Landroid/app/Activity;\n' +
-		'.implements Landroid/widget/CompoundButton$OnCheckedChangeListener;\n.field private changes:I\n' +
+		'.implements Landroid/widget/CompoundButton$OnCheckedChangeListener;\n.field private changes:I\n.field private static surface:Landroid/view/SurfaceView;\n' +
 		constructor('android/app/Activity', 'const/4 v0, 4\ninvoke-static {v0}, Lorg/vinix/bootstrap/App;->check(I)V') +
 		method('public onCheckedChanged(Landroid/widget/CompoundButton;Z)V', 'iget v0, p0, Lorg/vinix/bootstrap/Main;->changes:I\nadd-int/lit8 v0, v0, 1\niput v0, p0, Lorg/vinix/bootstrap/Main;->changes:I\nreturn-void') +
 		method('private checkWidget()V', '
@@ -152,6 +152,7 @@ throw v0') +
 		'.method public static native nativeCheck(Landroid/content/res/AssetManager;)Z\n.end method\n' +
 		'.method public static native nativeBitmap(Landroid/graphics/Bitmap;)Z\n.end method\n' +
 		'.method public static native nativeGraphics()Z\n.end method\n' +
+		'.method public static native nativeWindow(Landroid/view/Surface;)Z\n.end method\n' +
 		'.method public static native nativeDependency()I\n.end method\n' +
 		method('private static timezoneCheck()V', '
 invoke-static {}, Ljava/util/TimeZone;->getAvailableIDs()[Ljava/lang/String;
@@ -604,6 +605,23 @@ invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->nativeGraphics()Z
 move-result v0
 if-eqz v0, :bad
+new-instance v0, Landroid/view/SurfaceView;
+invoke-direct {v0, p0}, Landroid/view/SurfaceView;-><init>(Landroid/content/Context;)V
+sput-object v0, Lorg/vinix/bootstrap/Main;->surface:Landroid/view/SurfaceView;
+const/4 v1, 0
+const/16 v2, 32
+const/16 v3, 24
+invoke-virtual {v0, v1, v1, v2, v3}, Landroid/view/View;->layout(IIII)V
+invoke-virtual {v0}, Landroid/view/SurfaceView;->getHolder()Landroid/view/SurfaceHolder;
+move-result-object v0
+invoke-interface {v0}, Landroid/view/SurfaceHolder;->getSurface()Landroid/view/Surface;
+move-result-object v0
+invoke-static {v0}, Lorg/vinix/bootstrap/Main;->nativeWindow(Landroid/view/Surface;)Z
+move-result v0
+if-eqz v0, :bad
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-NATIVE-WINDOW-PASS geometry cpu-post hardware-buffer refs"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->bitmapCanvasCheck()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->textCheck(Landroid/content/Context;)V
 invoke-direct {p0}, Lorg/vinix/bootstrap/Main;->checkWidget()V
@@ -652,7 +670,18 @@ new-instance v0, Landroid/widget/TextView;
 invoke-direct {v0, p0}, Landroid/widget/TextView;-><init>(Landroid/content/Context;)V
 const-string v1, "Application bootstrap and NDK assets passed"
 invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
-invoke-virtual {p0, v0}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V
+new-instance v2, Landroid/widget/LinearLayout;
+invoke-direct {v2, p0}, Landroid/widget/LinearLayout;-><init>(Landroid/content/Context;)V
+const/4 v1, 1
+invoke-virtual {v2, v1}, Landroid/widget/LinearLayout;->setOrientation(I)V
+invoke-virtual {v2, v0}, Landroid/view/ViewGroup;->addView(Landroid/view/View;)V
+sget-object v0, Lorg/vinix/bootstrap/Main;->surface:Landroid/view/SurfaceView;
+new-instance v3, Landroid/view/ViewGroup$LayoutParams;
+const/4 v4, -1
+const/16 v5, 96
+invoke-direct {v3, v4, v5}, Landroid/view/ViewGroup$LayoutParams;-><init>(II)V
+invoke-virtual {v2, v0, v3}, Landroid/view/ViewGroup;->addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V
+invoke-virtual {p0, v2}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
 const-string v1, "BOOTSTRAP-NDK-PASS order paths clocks is64bit assets rtl webp matrix network bitmap clients graphics-unavailable bitmap-canvas notifications-queued"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
