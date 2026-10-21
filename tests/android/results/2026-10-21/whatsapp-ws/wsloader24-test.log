@@ -1,0 +1,6 @@
+---- Testing... ----------------------------------------------------------------
+OK    [1/3] C: 7528.516 ms, R:   828.428 ms /Users/alex/code/vinix/build-support/android/wsloader/segments_test.v
+OK    [2/3] C: 7679.681 ms, R:  1284.782 ms /Users/alex/code/vinix/build-support/android/wsloader/copy_segments_test.v
+OK    [3/3] C: 8607.13 ms, R:  1475.299 ms /Users/alex/code/vinix/build-support/android/wsloader/fortify_test.v
+--------------------------------------------------------------------------------
+Summary for all V _test.v files: 3 passed, 3 total. Elapsed time: 10086 ms, on 3 parallel jobs. Comptime: 23815 ms. Runtime: 3588 ms.

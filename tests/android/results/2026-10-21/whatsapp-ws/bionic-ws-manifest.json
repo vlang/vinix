@@ -1,0 +1,14 @@
+{
+    "EGL/egl.h": "a7c24c828bf2e1a4dfe6511b4f4812b948a285eb54787074015896976d4da076",
+    "EGL/eglplatform.h": "25b5391655effcf363a38fa00c3154f356a3eab3d35dc067847875513cf1e441",
+    "KHR/khrplatform.h": "7b1e01aaa7ad8f6fc34b5c7bdf79ebf5189bb09e2c4d2e79fc5d350623d11e83",
+    "bsd-compat-headers-0.7.2-r6.apk": "2ae95e33fd57930d8be3321b287a1149c852d98bc2184dd34a273313c9c7e2a4",
+    "compiler": "aarch64-linux-musl-gcc (GCC) 14.2.0",
+    "elfutils-dev-0.195-r0.apk": "6a9398f4b8b7abe6c3a41a1840d84c9e60f79598f5f8d4f225b5d8762dd03faa",
+    "libunwind-dev-1.8.3-r0.apk": "d5bbe71aa4ef87844518203038db988726fa44e0451aca825cfb5c7d001b471b",
+    "linker_with_v_bridge_sha256": "94a7c5a3c5cf59b5ed3cb189dfb245b30abaef74ec5371ef3c0e7e113b29b920",
+    "loader_sha256": "38fc428059f08233ab7ec7176bf2278d3bb5771e46b831791239d5f7c787892a",
+    "patch_sha256": "b33a69ee81a1d0e7e3a3f82adbd52cd8e5641491d89eb4378b3e5852ac71a388",
+    "segment_bridge_sha256": "b8a4e798be07c4d170990677eea2a00f02cfeea93a427b85d7f4072c452be7e1",
+    "source_sha256": "b1b2fa762485c1f33e71c0de6a4cbf4ca7006cfaec9c4c9cc20949393cbf49ef"
+}

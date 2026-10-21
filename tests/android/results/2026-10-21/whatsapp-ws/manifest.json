@@ -1,0 +1,41 @@
+{
+    "aapt2": "build/android-native-ws/aapt2",
+    "apksigner": "build/android-native-ws/android-15/lib/apksigner.jar",
+    "applications": [
+        {
+            "apk": "build/android-whatsapp/fixture/bootstrap.apk",
+            "id": "bootstrap-fixture",
+            "package": "org.vinix.bootstrap",
+            "startup_seconds": 20
+        },
+        {
+            "apk": "build/android-native-ws/WhatsApp.apk",
+            "distribution": "publisher direct APK; not a Google Play extraction",
+            "id": "whatsapp",
+            "name": "WhatsApp",
+            "package": "com.whatsapp",
+            "play": "https://play.google.com/store/apps/details?id=com.whatsapp",
+            "play_downloads": "10B+",
+            "source": "https://www.whatsapp.com/android/current/WhatsApp.apk",
+            "startup_seconds": 240
+        },
+        {
+            "apk": "build/android-calculator-20261020-borderless-prepared/overlay/opt/android-test/application.apk",
+            "distribution": "unchanged archived publisher APK; positive control",
+            "id": "calculator-control",
+            "name": "Arity control",
+            "package": "arity.calculator",
+            "source": "https://code.google.com/archive/p/arity-calculator/",
+            "startup_seconds": 90
+        }
+    ],
+    "base_module": "build/android-native-ws/original-qemu-runtime.tar",
+    "boot_image": "build/android-native-ws/vm/boot.img",
+    "efivars": "build/android-native-ws/vm/efivars.fd",
+    "firmware": "/opt/homebrew/share/qemu/edk2-aarch64-code.fd",
+    "input_tool": "build/android-run",
+    "java": "/opt/homebrew/opt/openjdk@25/bin/java",
+    "native_dir": "build/android-whatsapp/native",
+    "output": "build/android-whatsapp/attempt25",
+    "qemu": "build/qemu-horizontal/bin/qemu-system-aarch64"
+}

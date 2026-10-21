@@ -1,0 +1,59 @@
+Building vinix-session (native)
+Building vinix-timesync (native)
+Building vinix-service-runner (native)
+running tests in: /Users/alex/code/vinix/desktop/sessiondaemon/authorization_test.v
+     OK    [1/4]     2.759 ms     7 asserts | main.test_notification_cancellation_uses_kernel_peer_identity()
+     OK    [2/4]     1.998 ms     69 asserts | main.test_every_authorized_operation_has_one_direct_handler()
+     OK    [3/4]     1.996 ms     24 asserts | main.test_broker_selector_filters_run_before_argument_decoding_or_side_effects()
+     OK    [4/4]     2.238 ms     6 asserts | main.test_pid_equality_never_grants_the_compositor_domain()
+     Summary for running V tests in "authorization_test.v": 4 passed, 4 total. Elapsed time: 9.172 ms.
+checker summary: 0 V errors, 0 V warnings, 0 V notices
+running tests in: /Users/alex/code/vinix/desktop/sessiondaemon/migration_test.v
+     OK    [1/1]     2.709 ms     5 asserts | main.test_legacy_clock_migration_preserves_policy_and_server_and_custom_services()
+     Summary for running V tests in "migration_test.v": 1 passed, 1 total. Elapsed time: 5.320 ms.
+checker summary: 0 V errors, 0 V warnings, 0 V notices
+running tests in: /Users/alex/code/vinix/desktop/sessiondaemon/lifecycle_test.v
+vinix-session: request rejected: compositor/session/attach
+vinix-session: request rejected: compositor/session/shutdown
+vinix-session: request rejected: compositor/settings/set
+vinix-session: request rejected: compositor/policy/set
+vinix-session: request rejected: compositor/services/import
+vinix-session: request rejected: compositor/session/attach
+vinix-session: request rejected: compositor/session/shutdown
+vinix-session: request rejected: compositor/settings/set
+vinix-session: request rejected: compositor/policy/set
+vinix-session: request rejected: compositor/services/import
+vinix-session: request rejected: compositor/session/attach
+session request rejected
+Usage: vinix-session [--session-home=PATH] --session-control-fd=FD
+vinix-session: an inherited compositor connection is required
+vinix-session: request rejected: compositor/session/attach
+vinix-session: request rejected: compositor/session/shutdown
+     OK    [1/3]   759.079 ms     27 asserts | main.test_only_inherited_connection_grants_compositor_authority()
+ok
+vinix-session: request rejected: compositor/settings/set
+session request rejected
+vinix-session: request rejected: exchange permission denied
+vinix-session: request rejected: clipboard offer expired
+vinix-session: request rejected: application/clipboard/offer
+vinix-session: request rejected: application/clipboard/request
+vinix-session: request rejected: application/exchange/take
+vinix-session: request rejected: application/clipboard/read
+vinix-session: request rejected: unknown exchange token
+vinix-session: request rejected: clipboard offer expired
+     OK    [2/3]  1207.544 ms     38 asserts | main.test_broker_credentials_durable_alarms_dialogs_exchange_and_shutdown()
+     OK    [3/3]   450.558 ms     13 asserts | main.test_real_service_groups_restart_dependencies_and_broker_crash_cleanup()
+     Summary for running V tests in "lifecycle_test.v": 3 passed, 3 total. Elapsed time: 2417.328 ms.
+checker summary: 0 V errors, 0 V warnings, 0 V notices
+running tests in: /Users/alex/code/vinix/desktop/sessiondaemon/poll_memory_test.v
+     OK    [1/4]    45.965 ms     6003 asserts | main.test_broker_denied_socket_requests_and_logging_keep_no_allocations()
+     OK    [2/4]    14.506 ms     2405 asserts | main.test_private_control_reuses_frames_and_releases_transport_errors()
+     OK    [3/4]     2.858 ms     101 asserts | main.test_broker_idle_replies_keep_no_request_allocations()
+     OK    [4/4]     2.221 ms     18 asserts | main.test_broker_queues_copy_request_text_before_request_storage_is_freed()
+     Summary for running V tests in "poll_memory_test.v": 4 passed, 4 total. Elapsed time: 65.753 ms.
+checker summary: 0 V errors, 0 V warnings, 0 V notices
+running tests in: /Users/alex/code/vinix/build/android-whatsapp/session-host/control-start/control_start_test.v
+     OK    [1/1]    99.729 ms     9 asserts | main.test_compositor_startup_reuses_only_its_private_connection_and_recovers()
+     Summary for running V tests in "control_start_test.v": 1 passed, 1 total. Elapsed time: 99.802 ms.
+checker summary: 0 V errors, 0 V warnings, 0 V notices
+Session services: authorization, migration, persistence, restart, crash cleanup and allocation checks passed

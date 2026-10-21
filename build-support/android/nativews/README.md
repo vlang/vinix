@@ -144,3 +144,7 @@ network detection, provider-client lookup, actual NDK bitmap metadata and pixels
 balanced nested locks, graphics procedure lookup and explicit EGL unavailability.
 Pass its APK to the native WS suite; the assertion marker is `BOOTSTRAP-NDK-PASS`.
 This fixture does not modify or stand in for the publisher's WhatsApp APK.
+
+The subsequent [WhatsApp probe](../../../tests/android/results/2026-10-21/whatsapp-ws/README.md)
+records its welcome screen, scrolling and language selection on native WS.
+Account registration, messaging and calls remain untested.

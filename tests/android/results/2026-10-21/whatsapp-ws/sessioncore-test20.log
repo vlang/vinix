@@ -1,0 +1,13 @@
+---- Testing... ----------------------------------------------------------------
+OK    [ 1/10] C: 15300.206 ms, R:   290.919 ms /Users/alex/code/vinix/desktop/sessioncore/exchange_test.v
+OK    [ 2/10] C: 15308.831 ms, R:   564.905 ms /Users/alex/code/vinix/desktop/sessioncore/linux_units_test.v
+OK    [ 3/10] C: 15310.314 ms, R:   846.584 ms /Users/alex/code/vinix/desktop/sessioncore/extra_test.v
+OK    [ 4/10] C: 15398.558 ms, R:  1039.423 ms /Users/alex/code/vinix/desktop/sessioncore/notifications_test.v
+OK    [ 5/10] C: 2233.581 ms, R:   288.864 ms /Users/alex/code/vinix/desktop/sessioncore/policy_test.v
+OK    [ 6/10] C: 2085.147 ms, R:   441.489 ms /Users/alex/code/vinix/desktop/sessioncore/selectors_test.v
+OK    [ 7/10] C: 2269.004 ms, R:   289.996 ms /Users/alex/code/vinix/desktop/sessioncore/services_test.v
+OK    [ 8/10] C: 2180.76 ms, R:   385.530 ms /Users/alex/code/vinix/desktop/sessioncore/store_test.v
+OK    [ 9/10] C: 2025.318 ms, R:   285.387 ms /Users/alex/code/vinix/desktop/sessioncore/time_test.v
+OK    [10/10] C: 2462.896 ms, R:   289.939 ms /Users/alex/code/vinix/desktop/sessioncore/windows_test.v
+--------------------------------------------------------------------------------
+Summary for all V _test.v files: 10 passed, 10 total. Elapsed time: 21157 ms, on 4 parallel jobs. Comptime: 74574 ms. Runtime: 4723 ms.

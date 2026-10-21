@@ -1,0 +1,43 @@
+tests/native-android-tools/androidtools/boot_pipeline.v:89:7: notice: variable `arguments` shadows a function declaration
+   87 |         directory := work + '/' + name + '.dex'
+   88 |         os.mkdir(directory)!
+   89 |         mut arguments := [java, '-cp', archives[2], 'com.android.tools.r8.D8']
+      |             ~~~~~~~~~
+   90 |         arguments << c['COMPILER_ARGUMENTS']!.items().map(it.text())
+   91 |         arguments << ['--lib', raw, '--output', directory, inputs]
+tests/native-android-tools/androidtools/runtime_lock.v:115:7: notice: variable `copy` shadows a function declaration
+  113 |     mut pinned := []ah.Value{}
+  114 |     for index, record in records {
+  115 |         mut copy := record.object().clone()
+      |             ~~~~
+  116 |         copy['sha256'] = ah.digest(paths[index])!
+  117 |         pinned << ah.Value(copy)
+tests/native-android-tools/androidtools/runtime_vm.v:125:4: notice: variable `arguments` shadows a function declaration
+  123 |         script += 'echo ANDROID-RUNTIME-BEGIN:' + variant + '\n'
+  124 |         for probe in probes {
+  125 |             arguments := if probe == 'fortify-test' { ' /runtime/compat-' + variant + '.so /runtime/lib/libc_bio.so.0' } else if probe == 'mallinfo-test' { ' /runtime/compat-' + variant + '.so' } else { '' }
+      |             ~~~~~~~~~
+  126 |             script += 'LD_PRELOAD=/runtime/compat-' + variant + '.so /runtime/lib/' + loader_name + ' --library-path /runtime/lib /usr/bin/' + probe + arguments + '\necho ANDROID-RUNTIME-PASS:' + variant + ':' + probe + '\n'
+  127 |             expected << 'ANDROID-RUNTIME-PASS:' + variant + ':' + probe
+tools/sourcecommand/pty.v:30:6: notice: variable `arguments` shadows a function declaration
+   28 | pub fn spawn_pty(argv []string, environment map[string]string, directory string) !PtyChild {
+   29 |     if argv.len == 0 || argv.any(it.contains('\x00')) || directory.contains('\x00') { return error('invalid PTY command') }
+   30 |     mut arguments := []&char{}
+      |         ~~~~~~~~~
+   31 |     for value in argv { arguments << unsafe { &char(value.str) } }
+   32 |     arguments << &char(unsafe { nil })
+tools/sourcecommand/reader.v:94:6: notice: variable `arguments` shadows a function declaration
+   92 |         if status != 0 { return error_with_code('cannot configure reader group', int(status)) }
+   93 |     }
+   94 |     mut arguments := []&char{}
+      |         ~~~~~~~~~
+   95 |     for value in argv { arguments << unsafe { &char(value.str) } }
+   96 |     arguments << &char(unsafe { nil })
+build-support/tarstream/reader.v:278:4: notice: unused function: `parse_pax`
+  276 | }
+  277 | 
+  278 | fn parse_pax(data []u8) !map[string]string {return parse_pax_mode(data,false)!}
+      |    ~~~~~~~~~
+  279 | 
+  280 | fn parse_pax_mode(data []u8, allow_sparse bool) !map[string]string {
+Android framework: lifecycle preservation, static JNI factory, declaration guards, cursor constructors and launcher path: PASS
