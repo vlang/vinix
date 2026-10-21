@@ -15272,17 +15272,61 @@ and value metadata in `x0` through `x3`. General runtime array initialization
 remains separate work. No application code was executed; application entry
 remains unreached and Fortnite is still unplayable.
 
+`_swift_arrayInitWithCopy` now implements the ordinary C, void-returning entry
+for disjoint initialized source and uninitialized destination buffers. Zero
+elements returns without reading any pointer or metadata in an active runtime.
+For complete copyable values, POD copying includes all stride padding;
+non-POD copying calls `initializeWithCopy` in forward element order and leaves
+padding untouched. Copy callbacks run without a registry lock and may reenter
+runtime symbol lookup. The caller retains ownership of source and metadata,
+and owns every initialized destination value after the call.
+
+The implementation reuses the existing complete value-metadata checks, with
+value size bounded to 64 KiB and alignment to 256. Counts and total stride
+storage are limited to 1,048,576 elements and 1 MiB, respectively. Invalid
+layouts, noncopyable values, unaligned or overflowing spans, overlapping
+nonempty buffers and invalid non-POD copy entries reject before writes or
+callbacks. Non-POD span checks cover the last value's size without requiring
+its trailing padding to be readable. This entry allocates no Array owner,
+changes no source or storage counts, and adds no runtime arena or registry.
+Take and assignment runtime entries remain separate work.
+
+```sh
+v run tests/ios/native-checks.v build-array-init-copy
+```
+
+Evidence is retained under `build/ios/fortnite/array-init-copy-checks`.
+Native comparisons cover Int, String, empty `_MergeError`, Date and custom
+POD/owned values, zero/one/many counts, 64 KiB values, alignment 256 and 1 MiB
+spans. Checks verify exact copy order and retains, source preservation, POD
+padding versus witness copies, protected source and destination boundaries,
+zero-count guarded inputs, rejected layouts and overlap, unlocked reentrant
+callbacks, eight workers and two drained lifetimes.
+
+Eight normal/deterministic ASan/UBSan runs passed with both C++ configurations,
+including existing array storage and generic value metadata regressions. The
+ARM64 fixture, launch probe and both import audits passed. Eight compressed
+binary/generated-C pairs and five C/ARM64 reviews are retained; generated C
+confirms no allocation in the new checked copy path.
+
+The next missing import is `_swift_arrayInitWithTakeBackToFront`, at GOT cell
+`0x10dc9bad0` and stub `0x10c63eb44`. Static V/Mach-O/LLVM inspection found six
+direct callers and the branch-island forwarder at `0x107c28934`, with destination,
+source, element count and metadata supplied in `x0` through `x3`. Backward take
+initialization remains unsupported. No application code was executed;
+application entry remains unreached and Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,960 | 201 | 78 |
+| Fortnite executable | 1,961 | 200 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,800 | 204 | 114 |
+| All images | 2,801 | 203 | 114 |
 
-The C++/GLES/Text variant reports 2,814 resolved imports, 190 unresolved strong
+The C++/GLES/Text variant reports 2,815 resolved imports, 189 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
