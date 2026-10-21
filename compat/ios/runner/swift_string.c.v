@@ -293,6 +293,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {
+		'_swift_isaMask' { swift_isa_mask_address() }
 		'_$sSTsE5first5where7ElementQzSgSbADKXE_tKF' { swift_sequence_arena() + 256 }
 		'_$sSTsE10compactMapySayqd__Gqd__Sg7ElementQzKXEKlF' { swift_sequence_arena() }
 		'_$sSTsE13_copyContents12initializing8IteratorQz_SitSry7ElementQzG_tF' { swift_sequence_arena() + 384 }

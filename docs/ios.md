@@ -16262,23 +16262,47 @@ stub `0x10c63ecb8` and branch island `0x107c28624`. Inspected caller
 `0x100066e50` checks its boolean result after synchronous dispatch. This
 inspection executes no application code.
 
-The launch probe now stops at required data import `_swift_isaMask`, before
-application entry. Static inspection identifies GOT cell `0x10dc9bbd8` and five
-consumers, including `0x100064f78`, which load the mask, apply it to an object's
-first word and dispatch through the resulting metadata. Fortnite remains
-unplayable.
+`_swift_isaMask` now resolves as imported data from Swift Core. Its address
+points to one aligned, statically initialized 64-bit cell containing
+`0xfffffffffffffff8`. Vinix stores raw, aligned class pointers in object headers;
+the mask preserves all guest address bits and clears only the three alignment
+bits. The cell's address and value remain stable before runtime startup and
+across shutdown/restart, without allocation or ownership changes.
+
+```sh
+v run tests/ios/native-checks.v build-isa-mask
+```
+
+Evidence is retained under `build/ios/fortnite/isa-mask-checks`. The native
+comparison loads Swift's exported mask through a GOT cell and checks the decoded
+Objective-C class against `object_getClass`. The Vinix fixture covers synthetic
+full-width addresses, real Objective-C and Swift heap headers, borrowed Swift
+stack objects, virtual dispatch through `x20`, eight concurrent readers and two
+empty runtime lifetimes. Eight normal/deterministic ASan/UBSan runs passed across
+both C++ configurations, including stack and heap regressions. The ARM64
+fixture, launch probe and both import audits passed their checks. Eight
+compressed binary/generated-C pairs and five C/ARM64 reviews retain the tested
+paths.
+
+Static inspection identifies GOT cell `0x10dc9bbd8` and five consumers, including
+`0x100064f78`, which load the mask, apply it to an object's first word and
+dispatch through the resulting metadata. This inspection executes no
+application code.
+
+The launch probe now stops at required Swift Core import
+`_swift_lookUpClassMethod`, before application entry. Fortnite remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,980 | 181 | 78 |
+| Fortnite executable | 1,981 | 180 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,820 | 184 | 114 |
+| All images | 2,821 | 183 | 114 |
 
-The C++/GLES/Text variant reports 2,834 resolved imports, 170 unresolved strong
+The C++/GLES/Text variant reports 2,835 resolved imports, 169 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -16339,7 +16363,7 @@ CoreFoundation dictionary, supplied Objective-C storage, associated-object,
 property, object-monitor, Swift string/buffer and String metadata/witness checks before the
 existing Mach-O suite and requires the guest PASS marker.
 
-`swift` runs all twenty-eight Swift ABI checks in a small, independent guest and
+`swift` runs the Swift ABI checks in a small, independent guest and
 requires `VINIX iOS SWIFT: PASS`. It does not establish full regression success.
 Probe, audit and Swift modes retire their staging copies after archiving the
 root filesystem, before constructing the boot disk, to limit host disk use.
