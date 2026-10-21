@@ -314,6 +314,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_swift_allocateGenericValueMetadata' { u64(unsafe { voidptr(swift_generic_value_allocate) }) }
 		'_swift_arrayInitWithCopy' { u64(unsafe { voidptr(swift_array_init_copy) }) }
 		'_swift_arrayInitWithTakeBackToFront' { u64(unsafe { voidptr(swift_array_take_back) }) }
+		'_swift_arrayInitWithTakeFrontToBack' { u64(unsafe { voidptr(swift_array_take_front) }) }
 		'_swift_initStackObject' { u64(unsafe { voidptr(swift_stack_initialize) }) }
 		'_swift_allocObject' { u64(unsafe { voidptr(swift_heap_allocate) }) }
 		'_swift_deallocObject' { u64(unsafe { voidptr(swift_heap_deallocate) }) }
