@@ -111,7 +111,7 @@ fn swift_mangled_nominal_request(descriptor u64, request u64) !u64 {
 	// Generic nominals need argument/witness substitution and are not invoked
 	// through this nongeneric ABI. No lock crosses a borrowed accessor call.
 	flags := read32(descriptor)
-	if flags & 31 !in [u32(16), 17, 18] || flags & 0xff80 != 0 {
+	if flags & 31 !in [u32(16), 17, 18]! || flags & 0xff80 != 0 {
 		return error('iOS: unsupported Swift symbolic context descriptor')
 	}
 	delta := i32(read32(descriptor + 12))
@@ -210,6 +210,7 @@ fn swift_mangled_lookup(name u64, length u64, context u64, generic_args u64) u64
 
 fn swift_mangled_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_swift_getTypeByMangledNameInContext2' { u64(unsafe { voidptr(swift_context2_lookup) }) }
 		'_swift_getTypeByMangledNameInContextInMetadataState' { u64(unsafe { voidptr(swift_mangled_state_lookup) }) }
 		'_swift_getForeignTypeMetadata' { u64(unsafe { voidptr(swift_foreign_metadata) }) }
 		'_swift_getTypeByMangledNameInContext' { u64(unsafe { voidptr(swift_mangled_lookup) }) }

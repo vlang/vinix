@@ -16064,10 +16064,62 @@ The caller forwards an element count/vector with a complete request and null
 labels/proposed witnesses. Inspection does not establish that its runtime
 element types fit the supported subset, and executes no application code.
 
-The next missing import is `_swift_getTypeByMangledNameInContext2`, at GOT cell
-`0x10dc9bb98`, stub `0x10c63ec70`, branch island `0x107c28e64` and caller
-`0x1015be9a0`. The caller decodes a relative mangled-name address and length,
-passes null context/generic arguments and caches the returned metadata pointer.
+`_swift_getTypeByMangledNameInContext2` now resolves the established bounded
+mangled-type subset through the shared parser and metadata caches. Its SwiftCC
+entry receives name address, byte length, context descriptor and generic
+argument vector in `x0` through `x3`, returning one metadata pointer in `x0`.
+It checks the runtime lifetime before inspecting caller storage. Native traces
+confirm that symbolic nominal accessors receive request `0xff` (Abstract);
+the compatibility path requires their returned metadata to be Complete.
+
+The [Swift 5.10 version-2 entry](https://github.com/swiftlang/swift/blob/swift-5.10-RELEASE/stdlib/public/runtime/MetadataLookup.cpp#L2224-L2251)
+uses the signed context-descriptor ABI on arm64e. The runner targets plain ARM64
+and preserves its unsigned loaded descriptor identities. It does not add
+arm64e execution or a second name-resolution engine. String, Int, Void, nested
+Arrays, known generic substitutions, Objective-C names and supported direct or
+indirect symbolic references retain their existing canonical metadata identity.
+Unsupported expressions and contexts still fail explicitly; this is not a
+general Swift demangler or arbitrary generic-instantiation implementation.
+
+Names are bounded byte spans, including embedded symbolic-reference zeros.
+The parser validates supported syntax before calling accessors, limits name
+length to 1 MiB and Array nesting to 64, and leaves unused generic inputs
+untouched. Accessors run without the registry lock. Names, descriptors, generic
+arguments and callbacks remain borrowed and live until readers drain; returned
+metadata retains the ownership of the existing caches. The new entry owns no
+arena. The shared nominal-kind check now uses a fixed array, removing a V
+allocation on each successful symbolic lookup. Existing boxed literal-error
+diagnostics remain confined to rejection paths in the reviewed generated C.
+
+```sh
+v run tests/ios/native-checks.v build-context2
+```
+
+Evidence is retained under `build/ios/fortnite/context2-checks`, including native
+version-2 comparisons, ABI declarations and runtime sources. Tests cover raw
+scalar calls with inaccessible `x8`, preserved `x20`/`x21`/`x22`, canonical
+builtins/Arrays/Objective-C metadata, generic Array substitution, direct and
+indirect nominal references, native Abstract-request traces, protected span
+ends and ignored inputs, malformed syntax before callbacks, incomplete accessor
+responses, unlocked reentry, eight readers and two drained runtime lifetimes.
+Eight normal/deterministic ASan/UBSan runs passed across both C++ configurations,
+including legacy mangled and metadata-state lookup regressions. The ARM64
+fixture, launch probe and both import audits passed their checks. Eight
+compressed binary/generated-C pairs and five C/ARM64 reviews retain the tested
+entry, shared parser/accessor paths and lifetime checks.
+
+Static inspection traces this required import through GOT cell `0x10dc9bb98`,
+stub `0x10c63ec70`, branch island `0x107c28e64` and caller `0x1015be9a0`.
+The caller decodes a relative mangled-name address and length, passes null
+context/generic arguments and caches the returned metadata pointer. Inspection
+executes no application code and does not establish support for every name
+that helper may resolve.
+
+The next missing import is
+`_swift_getTypeByMangledNameInContextInMetadataState2`, at GOT cell
+`0x10dc9bba0`, stub `0x10c63ec7c`, branch island `0x107c28ee0` and caller
+`0x1015c0660`. It passes request `0xff`, a relative name/length pair and null
+context/generic arguments, then caches the returned metadata pointer.
 Application entry remains unreached and Fortnite is still unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -16075,12 +16127,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,975 | 186 | 78 |
+| Fortnite executable | 1,976 | 185 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,815 | 189 | 114 |
+| All images | 2,816 | 188 | 114 |
 
-The C++/GLES/Text variant reports 2,829 resolved imports, 175 unresolved strong
+The C++/GLES/Text variant reports 2,830 resolved imports, 174 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
