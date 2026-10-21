@@ -333,6 +333,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_swift_getSingletonMetadata' { u64(unsafe { voidptr(swift_singleton_metadata) }) }
 		'_swift_getTupleTypeMetadata' { u64(unsafe { voidptr(swift_tuple_metadata) }) }
 		'_swift_initStackObject' { u64(unsafe { voidptr(swift_stack_initialize) }) }
+		'_swift_setDeallocating' { u64(unsafe { voidptr(swift_set_deallocating) }) }
 		'_swift_initStaticObject' { u64(unsafe { voidptr(swift_static_initialize) }) }
 		'_swift_initStructMetadata' { u64(unsafe { voidptr(swift_struct_initialize) }) }
 		'_swift_allocObject' { u64(unsafe { voidptr(swift_heap_allocate) }) }

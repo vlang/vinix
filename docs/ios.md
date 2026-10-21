@@ -16354,20 +16354,54 @@ branch island `0x107c284b4` to caller `0x100064fe0`. The caller derives the
 alignment mask from the value witness flags and uses the payload returned in
 `x1`. This inspection executes no application code.
 
+`_swift_setDeallocating` now resolves from Swift Core with its one-argument,
+void-returning C ABI. It consumes the unique strong reference and marks the
+object as deinitializing. Borrowed frame headers initialized by
+`_swift_initStackObject` transition without allocation or registration;
+registered heap objects also update their tracked deinitializing state. The
+caller still destroys stored properties and deallocates heap storage afterward.
+This operation neither reads metadata nor invokes a destructor.
+
+The caller must supply a live writable header with exclusive access. Supported
+inline reference counts are the stack profile with two unowned references and
+the registered heap profile with one. Invalid, shared, already deinitializing
+and side-table states are rejected without changing the header; managed
+buffer, string, array and task owners cannot take the borrowed-frame path.
+
+```sh
+v run tests/ios/native-checks.v build-set-deallocating
+```
+
+Evidence is retained under `build/ios/fortnite/set-deallocating-checks`. Native
+Swift comparisons cover exact header/property preservation, inaccessible
+metadata, a header at a guarded page end, manual heap deallocation and ARM64
+register preservation. The Vinix fixture also checks eight private frame
+workers, invalid transitions and two drained runtime lifetimes. Ten
+normal/deterministic ASan/UBSan runs passed across both C++ configurations and
+heap, stack and box copy-on-write regressions. The ARM64 fixture, launch probe
+and both import audits passed their checks. Nine compressed binary/generated-C
+pairs retain the tested paths.
+
+Static inspection traces GOT cell `0x10dc9bc10` through stub `0x10c63ed18` and
+branch island `0x107c283a0` to four callers: `0x10003adc4`, `0x10003bb80`,
+`0x10003c154` and `0x10003d54c`. These paths initialize a stack object, mark it
+deinitializing, then destroy its array elements. This inspection executes no
+application code.
+
 The launch probe now stops at required Swift Core import
-`_swift_setDeallocating`, before application entry. Fortnite remains unplayable.
+`_swift_storeEnumTagMultiPayload`, before application entry. Fortnite remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,983 | 178 | 78 |
+| Fortnite executable | 1,984 | 177 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,823 | 181 | 114 |
+| All images | 2,824 | 180 | 114 |
 
-The C++/GLES/Text variant reports 2,837 resolved imports, 167 unresolved strong
+The C++/GLES/Text variant reports 2,838 resolved imports, 166 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
