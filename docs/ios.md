@@ -16461,20 +16461,49 @@ extra-inhabitant callback `0x1000656dc` and tail-calls the generic writer. The
 callback handles a `0x7fffffff` extra-inhabitant count and stores the case index
 minus one in the payload. This inspection executes no application code.
 
+`_swift_unexpectedError` now resolves from Swift Core. It consumes the error in
+`x0`, with the filename pointer/count, ASCII bit and line in `x1` through `x4`.
+Registered CFError values use the runtime's bounded concrete error description
+and report the failed `try!` expression with its source location. Other error
+values receive an explicit unsupported-reflection diagnostic without reading
+their opaque storage. The entry always traps, including when stderr is closed;
+it never returns to the caller. General Swift error reflection remains absent.
+
+```sh
+v run tests/ios/native-checks.v build-unexpected-error
+```
+
+Evidence is retained under `build/ios/fortnite/unexpected-error-checks`. Native
+Swift comparisons cover exact CFError diagnostics, protected non-terminated,
+Unicode, empty and embedded-NUL filenames, both ASCII bits, line boundaries,
+closed stderr and the actual trap. Eight cold publishers and two drained,
+unmapped runtime lifetimes pass, including consumed error and temporary String
+cleanup and protected opaque error rejection. Eight normal/deterministic
+ASan/UBSan runs passed across both C++ configurations and assertion/description
+regressions. The ARM64 fixture, launch probe and both import audits passed
+their checks. Eight compressed binary/generated-C pairs retain the tested paths;
+984 source/toolchain/runtime input hashes remained unchanged through validation.
+
+Static inspection traces GOT cell `0x10dc9bc40` through stub `0x10c63ed90` and
+branch island `0x107c28714` to caller `0x1000678f4`. The caller moves its error
+from `x21` into `x0`, supplies a 36-byte ASCII filename and line 6805, and places
+`brk #1` immediately after the call. This inspection executes no application code.
+
 The launch probe now stops at required Swift Core import
-`_swift_unexpectedError`, before application entry. Fortnite remains unplayable.
+`_swift_unknownObjectWeakCopyAssign`, before application entry. Fortnite remains
+unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,986 | 175 | 78 |
+| Fortnite executable | 1,987 | 174 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,826 | 178 | 114 |
+| All images | 2,827 | 177 | 114 |
 
-The C++/GLES/Text variant reports 2,840 resolved imports, 164 unresolved strong
+The C++/GLES/Text variant reports 2,841 resolved imports, 163 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

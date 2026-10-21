@@ -195,7 +195,8 @@ fn swift_fatal_entry(string_message bool) u64 {
 			swift_fatal_emit(u64(code), false)
 			swift_fatal_emit(u64(code) + 96, true)
 			swift_dictionary_hashable_emit(u64(code) + 192)
-			C.__builtin___clear_cache(code, unsafe { voidptr(u64(code) + 224) })
+			swift_unexpected_error_emit(u64(code) + 224)
+			C.__builtin___clear_cache(code, unsafe { voidptr(u64(code) + 256) })
 			if C.mprotect(code, page, C.PROT_READ | C.PROT_EXEC) != 0 {
 				C.munmap(code, page)
 				panic('iOS: cannot seal Swift assertion entry')
@@ -223,6 +224,7 @@ fn swift_fatal_symbol(symbol string) ?u64 {
 		'_$ss18_fatalErrorMessage__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF' { swift_fatal_entry(false) }
 		'_$ss17_assertionFailure__4file4line5flagss5NeverOs12StaticStringV_SSAHSus6UInt32VtF' { swift_fatal_entry(true) }
 		'_$ss53KEY_TYPE_OF_DICTIONARY_VIOLATES_HASHABLE_REQUIREMENTSys5NeverOypXpF' { swift_fatal_entry(false) + 192 }
+		'_swift_unexpectedError' { swift_fatal_entry(false) + 224 }
 		else { none }
 	}
 }
