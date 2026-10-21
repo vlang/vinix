@@ -118,7 +118,8 @@ fn swift_error_metadata_arena() u64 {
 	swift_error_domain_emit(code + 192)
 	swift_error_user_info_emit(code + 224)
 	swift_error_self_emit(code, data, protocol)
-	C.__builtin___clear_cache(allocation, unsafe { voidptr(code + 640) })
+	swift_result_nominal_emit(code, data, protocol)
+	C.__builtin___clear_cache(allocation, unsafe { voidptr(code + 656) })
 	if C.mprotect(allocation, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(allocation, usize(page * 2))

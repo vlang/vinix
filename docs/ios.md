@@ -14880,17 +14880,52 @@ at GOT cell `0x10dc9ba38`. Its indirect context symbolic reference is at
 `0x10dc7f940` in `__swift5_typeref`. Application entry remains unreached;
 Fortnite is still unplayable.
 
+`_$ss6ResultOMn` now exports Result's nominal identity and copyable generic
+signature: Success and Failure, with Failure constrained to the canonical
+Swift Error protocol. The descriptor records two payload cases, no empty
+cases and the payload-size metadata offset at word five. It shares Error's
+sealed arena and canonical Swift module; the added records need no separate
+allocation or retirement path. Cached identity remains readable by draining
+callbacks, and cold publication is rejected once retirement starts.
+
+The generic bit remains set. Direct/indirect symbolic lookup rejects this
+generic descriptor before invoking it as a nongeneric accessor. An explicit
+access attempt diagnoses unsupported Result specialization without reading
+its generic arguments. Complete Result metadata, value witnesses, reflection,
+and newer invertible-protocol trailers remain unsupported. Native comparisons
+check the stable copyable signature separately from those newer trailers;
+their format is described in Swift's [ABI declarations](https://github.com/swiftlang/swift/blob/main/include/swift/ABI/MetadataValues.h).
+
+```sh
+v run tests/ios/native-checks.v build-result-nominal
+```
+
+Evidence is retained under `build/ios/fortnite/result-nominal-checks`. Native
+signature comparisons and ten normal/deterministic ASan/UBSan runs passed
+with both C++ configurations, including Error ownership, Optional metadata
+and mangled-state regressions. Checks cover eight cold readers, both Error
+publication orders, read-only descriptor/executable adapter permissions,
+protected direct/indirect symbolic spans and unused generic arguments,
+explicit specialization diagnostics and two drained/unmapped lifetimes
+with callback access. The ARM64 fixture, launch probe and both import audits
+passed; nine binary/generated-C pairs and five C/ARM64 reviews are retained.
+
+The next missing import is UInt64's descriptor, `_$ss6UInt64VMn`, at GOT cell
+`0x10dc9ba40`. Its indirect context symbolic reference is at `0x10dc7fed8`
+in `__swift5_typeref`. Application entry remains unreached; Fortnite is still
+unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,950 | 211 | 78 |
+| Fortnite executable | 1,951 | 210 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,790 | 214 | 114 |
+| All images | 2,791 | 213 | 114 |
 
-The C++/GLES/Text variant reports 2,804 resolved imports, 200 unresolved strong
+The C++/GLES/Text variant reports 2,805 resolved imports, 199 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
