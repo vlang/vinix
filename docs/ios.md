@@ -14954,17 +14954,53 @@ found five actual call sites and a branch-island forwarder without executing
 application code. Application entry remains unreached; Fortnite is still
 unplayable.
 
+The Decoder dispatch entry now calls the supplied Decoder witness at byte 24
+of the witness table in `x4`. It forwards `x0` through `x8`, vector arguments,
+borrowed Self in `x20` and the incoming/returned error in `x21`. The witness
+initializes the indirect KeyedDecodingContainer result or throws its original
+error. The adapter does not inspect values, metadata, descriptors or results,
+and performs no ARC or error ownership work. It uses eight bytes in the
+existing sealed dispatch page, with no additional allocation or retirement
+path. Publication is rejected once runtime retirement starts.
+
+This implements protocol dispatch through a supplied conformance. A JSON
+decoder backend and unsupported Decoder witnesses remain separate work.
+
+```sh
+v run tests/ios/native-checks.v build-decoder-keyed-dispatch
+```
+
+Evidence is retained under `build/ios/fortnite/decoder-keyed-dispatch-checks`.
+Native slot and code-authentication measurements and eight normal/deterministic
+ASan/UBSan runs passed with both C++ configurations, including generic keyed
+decoding/encoding regressions. Two supplied witnesses are checked with
+read-only guarded table slots, protected values/types and exact eight-byte
+result spans at both page boundaries. Throwing callbacks leave the protected
+absent result untouched. Checks compare scalar/vector/indirect arguments,
+full-width returned bits, incoming/returned errors and preserved context.
+Eight publishers/callers, both publication orders, sealed pages and two
+drained/unmapped lifetimes passed. The ARM64 fixture, launch probe and both
+import audits passed; eight binary/generated-C pairs and five C/ARM64 reviews
+are retained.
+
+The next missing import is Encoder's `container(keyedBy:)` dispatch entry,
+`_$ss7EncoderP9container7keyedBys22KeyedEncodingContainerVyqd__Gqd__m_ts9CodingKeyRd__lFTj`,
+at GOT cell `0x10dc9ba50` and import stub `0x10c63afd4`. V/Mach-O/LLVM inspection
+found five actual call sites and a branch-island forwarder without executing
+application code. Application entry remains unreached; Fortnite is still
+unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,952 | 209 | 78 |
+| Fortnite executable | 1,953 | 208 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,792 | 212 | 114 |
+| All images | 2,793 | 211 | 114 |
 
-The C++/GLES/Text variant reports 2,806 resolved imports, 198 unresolved strong
+The C++/GLES/Text variant reports 2,807 resolved imports, 197 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
