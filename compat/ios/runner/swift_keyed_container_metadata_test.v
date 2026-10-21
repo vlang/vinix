@@ -152,7 +152,7 @@ fn test_swift_keyed_container_metadata() {
 			if _ := swift_keyed_container_metadata_checked(0, bad[0], bad[1]) { assert false }
 		}
 		if _ := swift_keyed_container_instantiate_checked(guard, guard, guard) { assert false }
-		for symbol in ['_$ss22KeyedDecodingContainerVN', '_$ss22KeyedEncodingContainerVMa', '_$ss9CodingKeyMp']! { assert swift_keyed_container_metadata_symbol(symbol) == none }
+		for symbol in ['_$ss22KeyedDecodingContainerVN', '_$ss22KeyedEncodingContainerVMn', '_$ss9CodingKeyMp']! { assert swift_keyed_container_metadata_symbol(symbol) == none }
 		assert runtime_symbol('/usr/lib/swift/libswiftFoundation.dylib', '_$ss22KeyedDecodingContainerVMa') == none
 		ios_runtime.swift_concurrency_retired = true
 		assert swift_keyed_container_metadata_symbol('_$ss22KeyedDecodingContainerVMa') == none

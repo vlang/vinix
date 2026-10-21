@@ -14364,17 +14364,49 @@ The next launch blocker is the keyed encoding container metadata accessor,
 and a direct call at `0x10007301c`. Application entry remains unreached;
 Fortnite is still unplayable.
 
+`_$ss22KeyedEncodingContainerVMa` now returns complete, canonical metadata
+for each borrowed K/CodingKey witness pair. Encoding and decoding containers
+have distinct nominal descriptors and specializations; they share the sealed
+arena, native-reference value witnesses and canonical CodingKey declaration.
+The encoding descriptor supplies its own accessor and guarded two-word
+instantiation factory. Its single box-reference field has size and stride 8.
+
+The installed Swift comparison covers metadata requests, the generic
+declaration graph, exact copy/take/destroy ownership and guarded enum bytes.
+The compatibility fixture also checks read-only metadata, executable accessor
+permissions, factories at both protected page boundaries, encoding/decoding
+identity separation, eight cold publishers, unlocked destructor reentry and
+two drained/unmapped lifetimes. Decoding metadata, its nominal descriptor and
+generic keyed encoding provide regression coverage.
+
+```sh
+v run tests/ios/native-checks.v build-keyed-encoding-metadata
+```
+
+Evidence is retained under `build/ios/fortnite/keyed-encoding-metadata-checks`.
+
+Normal and deterministic ASan/UBSan checks passed with and without the C++
+backend and for all three regressions (ten runs). The ARM64 fixture, launch
+probe and both import audits passed. Nine binary/generated-C archive pairs
+are retained. Generated C and ARM64 review cover specialization ownership,
+sealed publication and drained retirement without hidden temporary allocations.
+
+The next launch stops at `_$ss22KeyedEncodingContainerVMn`, the nominal
+descriptor data import. Read-only inspection found GOT cell `0x10dc9b978`
+and four indirect context symbolic references in `__swift5_typeref`.
+Application entry remains unreached; Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,936 | 225 | 78 |
+| Fortnite executable | 1,937 | 224 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,776 | 228 | 114 |
+| All images | 2,777 | 227 | 114 |
 
-The C++/GLES/Text variant reports 2,790 resolved imports, 214 unresolved strong
+The C++/GLES/Text variant reports 2,791 resolved imports, 213 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
