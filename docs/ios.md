@@ -14805,17 +14805,52 @@ at GOT cell `0x10dc9ba10`. Its indirect context symbolic reference is at
 `0x10dc7fe28` in `__swift5_typeref`. Application entry remains unreached;
 Fortnite is still unplayable.
 
+`_$ss5NeverOMn` now exports Never's nominal descriptor through Swift core.
+It shares the existing SwiftUI Never descriptor, complete accessor and
+zero-sized enum metadata, preserving the type identity used by Body witnesses.
+The accessor returns Complete in x0/x1; its eight value witnesses preserve
+zero-sized copies/destruction and native single-payload tag widths, including
+UInt32 population wrap. Direct and bound indirect symbolic references use the
+existing nongeneric metadata lookup.
+
+The descriptor remains nonreflectable. Only this exact Swift core import is
+added; standalone metadata/accessor imports and graph construction remain
+unsupported. The existing sealed opacity arena owns these records and stays
+available during draining callbacks before it is unmapped. No new arena,
+metadata owner or cache is introduced.
+
+```sh
+v run tests/ios/native-checks.v build-never-nominal
+```
+
+Evidence is retained under `build/ios/fortnite/never-nominal-checks`. Native
+comparisons and ten normal/deterministic ASan/UBSan runs passed, including
+both C++ configurations, opacity and Never/View witnesses, and mangled metadata
+state lookup. Checks cover complete accessor responses, eight zero-sized
+witnesses, protected tag spans and UInt32 wrap, bounded symbolic references,
+unused contexts/arguments, preserved registers and empty typed Array capacity.
+Eight concurrent publishers/readers, both resolution orders and two drained,
+unmapped lifetimes with callback access passed. The ARM64 fixture, launch probe
+and both import audits passed; nine binary/generated-C pairs and five C/ARM64
+reviews are retained.
+
+The next missing import is Swift's `print(_:separator:terminator:)`,
+`_$ss5print_9separator10terminatoryypd_S2StF`: GOT cell `0x10dc9ba18`, stub
+`0x10c63af98` and branch-island forwarder `0x107c29130`. Callers are at
+`0x10003ec84`, `0x1021507bc` and `0x1021509c0`. Application entry remains
+unreached; Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,948 | 213 | 78 |
+| Fortnite executable | 1,949 | 212 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,788 | 216 | 114 |
+| All images | 2,789 | 215 | 114 |
 
-The C++/GLES/Text variant reports 2,802 resolved imports, 202 unresolved strong
+The C++/GLES/Text variant reports 2,803 resolved imports, 201 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
