@@ -327,6 +327,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_swift_getGenericMetadata' { u64(unsafe { voidptr(swift_generic_metadata) }) }
 		'_swift_getInitializedObjCClass' { u64(unsafe { voidptr(swift_initialized_objc_class) }) }
 		'_swift_getObjCClassFromMetadata' { u64(unsafe { voidptr(swift_objc_class_from_metadata) }) }
+		'_swift_lookUpClassMethod' { u64(unsafe { voidptr(swift_class_method) }) }
 		'_swift_getOpaqueTypeConformance2' { u64(unsafe { voidptr(swift_opaque_conformance) }) }
 		'_swift_getSingletonMetadata' { u64(unsafe { voidptr(swift_singleton_metadata) }) }
 		'_swift_getTupleTypeMetadata' { u64(unsafe { voidptr(swift_tuple_metadata) }) }

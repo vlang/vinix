@@ -16289,20 +16289,49 @@ Static inspection identifies GOT cell `0x10dc9bbd8` and five consumers, includin
 dispatch through the resulting metadata. This inspection executes no
 application code.
 
+`_swift_lookUpClassMethod` now resolves from Swift Core using its ordinary
+three-argument C ABI. Lookup identifies the method's vtable slot from a borrowed
+class descriptor and reads the entry from the dynamic class metadata, preserving
+inherited overrides. The supported layout is initialized, immutable class
+metadata with a version-zero, nongeneric descriptor, a vtable and no resilient
+superclass or initialization trailer. Unsupported profiles, invalid bounds,
+unrelated or cyclic ancestry and retired runtimes are rejected. Lookup does not
+invoke methods or metadata accessors, allocate, or change ownership. Callers must
+drain readers before unmapping the borrowed metadata and descriptor.
+
+```sh
+v run tests/ios/native-checks.v build-class-method
+```
+
+Evidence is retained under `build/ios/fortnite/class-method-checks`. Native Swift
+comparisons cover all six measured Fortnite descriptor shapes, direct and
+inherited overridden slots, null entries, exact guarded read-only allocations,
+eight concurrent readers and ARM64 register preservation. The Vinix fixture
+also checks unsupported layouts, bounds, ancestry and two drained runtime
+lifetimes. Eight normal/deterministic ASan/UBSan runs passed across both C++
+configurations, including stack and heap regressions. The ARM64 fixture, launch
+probe and both import audits passed their checks. Eight compressed
+binary/generated-C pairs and five C/ARM64 reviews retain the tested paths.
+
+Static inspection traces GOT cell `0x10dc9bbe0` through stub `0x10c63ecd0` and
+branch island `0x107c284b0` to six lookup thunks. Their descriptor vtables contain
+one, three or four methods, with offsets measured from each metadata address
+point. This inspection executes no application code.
+
 The launch probe now stops at required Swift Core import
-`_swift_lookUpClassMethod`, before application entry. Fortnite remains unplayable.
+`_swift_makeBoxUnique`, before application entry. Fortnite remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,981 | 180 | 78 |
+| Fortnite executable | 1,982 | 179 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,821 | 183 | 114 |
+| All images | 2,822 | 182 | 114 |
 
-The C++/GLES/Text variant reports 2,835 resolved imports, 169 unresolved strong
+The C++/GLES/Text variant reports 2,836 resolved imports, 168 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
