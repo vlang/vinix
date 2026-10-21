@@ -14663,17 +14663,53 @@ The next missing import is Error's default `_code` getter,
 and tail forwarders `0x100072b48` and `0x1000738c0`. Application entry
 remains unreached; Fortnite is still unplayable.
 
+`_$ss5ErrorPsE5_codeSivg` now implements Error's default code getter.
+For enum metadata kind `0x201`, it calls the value-witness table's
+`getEnumTag` entry at byte 88 with borrowed Self and metadata. Its UInt32
+result zero-extends into Swift.Int, including `0xffffffff`. Other metadata
+kinds, including Optional, return one without reading Self or value witnesses.
+The Error protocol table and x8 are unused. The concrete CFError code witness
+continues to return its stored signed code, independently of this default.
+
+Metadata and enum witness tables are borrowed readable ABI records; the tag
+witness defines the payload layout. The implementation checks alignment,
+overflow and callback completeness, and rejects inactive runtimes before
+reading inputs. No registry lock crosses the callback. Its ARM64 adapter
+shares the existing sealed Error arena and teardown, adding no owner or cache.
+
+Native comparisons cover exact readable metadata/VWT/value boundaries, tags
+through UInt32.max, zero-sized _MergeError, protected unused arguments,
+x20/x21/x22 preservation and CFError ownership. Compatibility checks add a
+tag callback that resolves the getter from another thread, eight cold
+publishers and workers, invalid/retired inputs and two drained lifetimes.
+
+```sh
+v run tests/ios/native-checks.v build-error-code
+```
+
+Evidence is retained under `build/ios/fortnite/error-code-checks`.
+Normal and deterministic ASan/UBSan checks passed with and without the C++
+backend and for Error extraction, _MergeError conformance and CocoaError code
+regressions (ten runs). The ARM64 fixture, launch probe and both import audits
+passed. Nine binary/generated-C archive pairs and five C/ARM64 reviews are retained.
+
+The next missing import is Error's default `_domain` getter,
+`_$ss5ErrorPsE7_domainSSvg`. Read-only inspection found GOT cell
+`0x10dc9b9f8`, stub `0x10c63af80`, branch-island forwarder `0x107c28d08`
+and tail forwarders `0x100072b44` and `0x1000738bc`. The loader still stops
+before application entry; Fortnite remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,944 | 217 | 78 |
+| Fortnite executable | 1,945 | 216 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,784 | 220 | 114 |
+| All images | 2,785 | 219 | 114 |
 
-The C++/GLES/Text variant reports 2,798 resolved imports, 206 unresolved strong
+The C++/GLES/Text variant reports 2,799 resolved imports, 205 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
