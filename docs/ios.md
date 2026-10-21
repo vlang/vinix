@@ -15458,17 +15458,74 @@ direct callers and the branch-island forwarder at `0x107c28d2c`. Metadata-state
 checking remains unsupported. No application code was executed; application
 entry remains unreached and Fortnite is still unplayable.
 
+`_swift_checkMetadataState` now supports a bounded complete-type profile.
+Its two arguments are the metadata request and borrowed type metadata; the
+two-word result preserves that exact metadata identity and reports Complete
+(state zero). Complete, NonTransitiveComplete, LayoutComplete and Abstract
+requests are accepted with or without the nonblocking bit. The request does
+not weaken the reported state or copy its nonblocking flag into the response.
+
+Supported types include function, existential, metatype, Objective-C wrapper
+and existential-metatype metadata, the empty tuple, and version-zero
+nongeneric struct/enum metadata whose descriptor specifies
+NoMetadataInitialization. Only the kind/header and descriptor flags are read;
+value witnesses, generic arguments, accessor code and payloads are untouched.
+The runtime's published Array, Optional, Dictionary, Set, keyed-container,
+ArraySlice and iterator specializations are recognized by exact cached
+identity under the runtime lock.
+
+A usable value witness table does not establish transitive completion.
+Fresh `swift_allocateGenericValueMetadata` allocations are rejected by their
+allocation identity before their headers are read. External generic metadata,
+classes, nonempty tuples, singleton/foreign initialization, unsupported request
+bits and retired runtimes fail explicitly. This profile does not wait on
+private Swift caches or run completion callbacks. Metadata and descriptors
+remain borrowed; workers must drain before their owner or runtime retires.
+The check creates no arena, owner, cache entry or per-call allocation.
+
+```sh
+v run tests/ios/native-checks.v build-metadata-state
+```
+
+Evidence is retained under `build/ios/fortnite/metadata-state-checks`, including
+the [Swift 5.10 metadata runtime reference](https://github.com/swiftlang/swift/blob/swift-5.10-RELEASE/stdlib/public/runtime/Metadata.cpp)
+and ABI declarations. Native comparisons cover all eight request forms,
+canonical and generic metadata, minimal readonly headers at both protected
+page boundaries, the exact x0/x1 result, preserved x20/x21/x22 and an inaccessible
+indirect-result pointer. Compatibility checks also cover four-byte borrowed
+descriptor flags, rejected deferred initialization and unknown generics,
+protected raw allocations, exact cached iterator identities, eight concurrent
+readers and two drained lifetimes.
+
+Eight normal/deterministic ASan/UBSan runs passed with both C++ configurations plus
+generic-value allocation and mangled-state lookup regressions. The ARM64 fixture,
+launch probe and both import audits passed with separate joined logs. Eight compressed
+binary/generated-C pairs and five C/ARM64 reviews retain the tested artifacts
+and allocation-free checked paths.
+
+Static V/Mach-O/LLVM inspection traced the required import through GOT cell
+`0x10dc9bb00`, stub `0x10c63eb8c`, two direct callers and the branch-island
+forwarder at `0x107c28d2c`. Both callers request blocking Complete metadata for
+their keyed-container key type after obtaining Abstract metadata from its
+accessor. Static inspection executes no application code.
+
+The next missing import is `_swift_deallocPartialClassInstance`, at GOT cell
+`0x10dc9bb18` and stub `0x10c63ebb0`. Static inspection found two direct callers
+and the branch-island forwarder at `0x107c29358`. Partial-class-instance
+deallocation remains unsupported. Application entry remains unreached and
+Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,965 | 196 | 78 |
+| Fortnite executable | 1,966 | 195 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,805 | 199 | 114 |
+| All images | 2,806 | 198 | 114 |
 
-The C++/GLES/Text variant reports 2,819 resolved imports, 185 unresolved strong
+The C++/GLES/Text variant reports 2,820 resolved imports, 184 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
