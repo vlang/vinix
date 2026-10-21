@@ -35,6 +35,10 @@ hold a native reference until the last unlock. OpenSL ES uses the runtime's
 packaged audio provider. This is a limited NDK subset, not compatibility with
 arbitrary native APK libraries.
 
+Handle-based JNI symbol lookup searches the library and its dependencies in
+breadth-first order, including defined weak symbols. The bootstrap APK includes
+a JNI method exported only by a dependent DSO to exercise this path in ART.
+
 Pinned Mesa GLES entrypoint and dispatch libraries resolve native graphics
 imports without loading Gallium, an EGL vendor, X11 or GTK. The software WS
 Canvas has no current EGL display, context or surface. EGL queries report that

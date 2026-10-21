@@ -59,14 +59,27 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 		'if (vinix_ws_copy_required(si->phdr, si->phnum) &&\n' +
 		' vinix_ws_finish_copy_segments(si->phdr, si->phnum, si->base, si->size) < 0) goto fail;\n' + protection)
 	os.write_file(linker, bridged)!
+	dlfcn := source + '/linker/dlfcn.c'
+	mut dynamic_text := os.read_file(dlfcn)!
+	lookup := 'sym = apkenv_lookup_in_library(found, symbol);'
+	if dynamic_text.count(lookup) != 1 { return error('unexpected Bionic handle lookup') }
+	dynamic_text = dynamic_text.replace(lookup,
+		'sym = vinix_ws_lookup_dependencies(found, symbol, (void **)&found, offsetof(soinfo, dynamic), ' +
+		'(void *(*)(void *, const char *))apkenv_lookup_in_library);')
+	// Defined weak symbols are valid dlsym results as well as global symbols.
+	if dynamic_text.count('(bind == STB_GLOBAL)') != 1 { return error('unexpected Bionic symbol binding check') }
+	dynamic_text = dynamic_text.replace('(bind == STB_GLOBAL)', '(bind == STB_GLOBAL || bind == STB_WEAK)')
+	os.write_file(dlfcn, dynamic_text)!
 	bridge := work + '/vinix-segments.h'
 	os.write_file(bridge, '#include <stdint.h>\n#include <stddef.h>\n' +
 		'extern size_t vinix_ws_segment_extent(uintptr_t, size_t, uintptr_t, size_t, size_t);\n' +
 		'extern int vinix_ws_copy_required(const void *, size_t);\n' +
 		'extern int vinix_ws_copy_segments(int, const void *, size_t, uintptr_t, size_t, void **, uint32_t *, uint32_t *, uintptr_t *, unsigned *);\n' +
-		'extern int vinix_ws_finish_copy_segments(const void *, size_t, uintptr_t, size_t);\n')!
+		'extern int vinix_ws_finish_copy_segments(const void *, size_t, uintptr_t, size_t);\n' +
+		'extern void *vinix_ws_lookup_dependencies(void *, const char *, void **, size_t, void *(*)(void *, const char *));\n')!
 	inputs['segment_bridge_sha256'] = sha256.sum(os.read_bytes(bridge)!).hex()
 	inputs['linker_with_v_bridge_sha256'] = sha256.sum(os.read_bytes(linker)!).hex()
+	inputs['dlfcn_with_v_bridge_sha256'] = sha256.sum(os.read_bytes(dlfcn)!).hex()
 	headers := work + '/headers'
 	os.mkdir_all(headers)!
 	for record in [

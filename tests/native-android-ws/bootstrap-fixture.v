@@ -152,6 +152,7 @@ throw v0') +
 		'.method public static native nativeCheck(Landroid/content/res/AssetManager;)Z\n.end method\n' +
 		'.method public static native nativeBitmap(Landroid/graphics/Bitmap;)Z\n.end method\n' +
 		'.method public static native nativeGraphics()Z\n.end method\n' +
+		'.method public static native nativeDependency()I\n.end method\n' +
 		method('private static timezoneCheck()V', '
 invoke-static {}, Ljava/util/TimeZone;->getAvailableIDs()[Ljava/lang/String;
 move-result-object v0
@@ -582,6 +583,13 @@ cmp-long v6, v2, v4
 if-ltz v6, :bad
 const-string v0, "fixture"
 invoke-static {v0}, Ljava/lang/System;->loadLibrary(Ljava/lang/String;)V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->nativeDependency()I
+move-result v0
+const/16 v1, 0x5744
+if-ne v0, v1, :bad
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-DEPENDENCIES-PASS jni-through-needed"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->nativeGraphics()Z
 move-result v0
 if-eqz v0, :bad
@@ -649,15 +657,19 @@ throw v0')
 	checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', output + '/smali', '-o', output + '/classes.dex'])
 	checked([aapt, 'link', '-I', resources, '--manifest', output + '/AndroidManifest.xml', '-A', output + '/assets', '-o', output + '/unsigned.apk'])
 	checked(['build-support/compile-v-module', os.abs_path('tests/native-android-ws/assetprobe'), output + '/assetprobe.c', '--arch', 'arm64'])
+	checked(['build-support/compile-v-module', os.abs_path('tests/native-android-ws/dependencyprobe'), output + '/dependencyprobe.c', '--arch', 'arm64'])
+	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib', '-Wl,-z,max-page-size=4096',
+		'-Wl,-soname,libfixture-dependency.so', output + '/dependencyprobe.c', '-o', output + '/lib/arm64-v8a/libfixture-dependency.so'])
 	// Exercise the legacy NDK mapping path on a real 16 KiB Vinix guest as
 	// well as the Java framework APIs. This ELF intentionally uses 4 KiB pages.
 	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib', '-Wl,-z,max-page-size=4096',
-		'-Wl,-z,common-page-size=4096', output + '/assetprobe.c', '-o', output + '/lib/arm64-v8a/libfixture.so'])
+		'-Wl,-z,common-page-size=4096', output + '/assetprobe.c', '-Wl,--no-as-needed', '-L' + output + '/lib/arm64-v8a',
+		'-lfixture-dependency', '-o', output + '/lib/arm64-v8a/libfixture.so'])
 	checked(['zip', '-q', '-j', output + '/unsigned.apk', output + '/classes.dex'])
 	// zip's -j would discard the ABI directory. Run in the fixture directory.
 	mut zip := os.new_process('zip')
 	zip.set_work_folder(output)
-	zip.set_args(['-q', 'unsigned.apk', 'lib/arm64-v8a/libfixture.so'])
+	zip.set_args(['-q', 'unsigned.apk', 'lib/arm64-v8a/libfixture.so', 'lib/arm64-v8a/libfixture-dependency.so'])
 	zip.run()
 	zip.wait()
 	assert zip.code == 0
