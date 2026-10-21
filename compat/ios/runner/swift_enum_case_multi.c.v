@@ -16,11 +16,11 @@ fn swift_enum_case_multi_read(address u64, count u64) u32 {
 	}
 	return value
 }
-fn swift_enum_case_multi_checked(value u64, metadata u64) !u32 {
+struct SwiftEnumMultiLayout { payload u64 width u64 size u64 payloads u32 }
+// Caller holds the runtime lock and has checked its lifetime. Both tag entries
+// borrow the same initialized metadata layout; neither runs value witnesses.
+fn swift_enum_multi_layout(metadata u64) !SwiftEnumMultiLayout {
 	if metadata < 8 || metadata & 7 != 0 || metadata > ~u64(0) - 16 { return swift_enum_case_multi_failure() }
-	C.ios_objc_initialize_lock()
-	defer { C.ios_objc_initialize_unlock() }
-	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired { return swift_enum_case_multi_failure() }
 	if read64(metadata) != 0x201 { return swift_enum_case_multi_failure() }
 	descriptor := read64(metadata + 8)
 	if descriptor == 0 || descriptor & 3 != 0 || descriptor > ~u64(0) - 24 { return swift_enum_case_multi_failure() }
@@ -39,10 +39,17 @@ fn swift_enum_case_multi_checked(value u64, metadata u64) !u32 {
 	if payload > 1048576 || size < payload || size - payload > 4 || stride == 0 || stride < size
 		|| align & (align - 1) != 0 || stride & (align - 1) != 0
 		|| flags & 0x600000 != 0x200000 { return swift_enum_case_multi_failure() }
-	width := size - payload
+	return SwiftEnumMultiLayout{payload, size - payload, size, payloads}
+}
+fn swift_enum_case_multi_checked(value u64, metadata u64) !u32 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired { return swift_enum_case_multi_failure() }
+	layout := swift_enum_multi_layout(metadata)!
+	payload := layout.payload; width := layout.width; payloads := layout.payloads
 	// A zero-width tag selects payload case zero without reading a value.
 	if width == 0 { return u32(0) }
-	if value == 0 || value > ~u64(0) - size { return swift_enum_case_multi_failure() }
+	if value == 0 || value > ~u64(0) - layout.size { return swift_enum_case_multi_failure() }
 	tag := swift_enum_case_multi_read(value + payload, width)
 	if tag < payloads { return tag }
 	leading := swift_enum_case_multi_read(value, payload)
