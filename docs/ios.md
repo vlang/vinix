@@ -15882,22 +15882,82 @@ stub `0x10c63ec1c`, branch island `0x107c28e2c` and caller `0x1015be5d0`.
 The caller moves its metadata context from x20 to x0 and passes the returned
 class to `_objc_allocWithZone`. No application code is executed by inspection.
 
-The next missing import is `_swift_getOpaqueTypeConformance2`, at GOT cell
-`0x10dc9bb78`, stub `0x10c63ec40`, branch island `0x107c28eec` and caller
-`0x1015c1030`. Opaque-type conformance lookup remains unsupported. Application
-entry remains unreached and Fortnite is still unplayable.
+`_swift_getOpaqueTypeConformance2` now supports opaque descriptors whose selected
+underlying argument is a standalone symbolic C accessor. The ARM64 SwiftCC
+entry takes the original argument vector, descriptor and index in x0/x1/x2
+and returns a borrowed pointer in x0. The index uses its low 32 bits. The
+accessor receives exactly the original vector pointer, including nil, and its
+result is returned unchanged, including nil.
+
+Descriptors may have the ordinary nongeneric or generic layout. The helper
+uses the generic header's parameter and requirement counts to find the
+underlying argument table, including four-byte parameter padding. It accepts
+up to 64 parameters, 64 requirements, 128 key arguments and 64 underlying
+entries. Only the selected relative entry is resolved. The selected name may
+have up to 64 leading `0xff` alignment bytes, followed by `0x09`, a signed
+relative 32-bit accessor reference and an immediate null terminator. Unaligned
+reference fields and embedded zero bytes are handled with byte loads.
+
+The caller provides immutable readable descriptor/name spans and live accessor
+code. The helper reads no parent context, generic parameter/requirement bodies,
+unselected expressions, argument-vector contents or witness-table contents.
+It performs no generic substitution or conformance discovery; the supplied
+accessor owns that work. Other mangled expressions, trailing padding, packs,
+unsupported descriptor flags/versions, excessive counts, invalid indices,
+null/overflowing references, misalignment and retired runtimes fail explicitly
+before any callback. Other opaque-type lookup forms remain unsupported.
+
+Runtime validation releases its lock before parsing or calling the accessor.
+The entry creates no arena or cache, performs no allocation or ARC, and writes
+no caller storage. All storage remains borrowed; callers must drain before
+descriptor, name, code, result storage or runtime retirement.
+
+```sh
+v run tests/ios/native-checks.v build-opaque-conformance
+```
+
+Evidence is retained under `build/ios/fortnite/opaque-conformance-checks`,
+including [Swift 5.10 lookup and accessor dispatch](https://github.com/swiftlang/swift/blob/swift-5.10-RELEASE/stdlib/public/runtime/MetadataLookup.cpp),
+generic-layout declarations and mangling/parser sources. Native comparisons
+cover scalar registers, index wrapping, original vector identity, zero and
+inaccessible results, padded and unaligned names, descriptor counts through
+64, exact readonly boundaries, selected-entry isolation and eight readers.
+A separate native probe checks that trailing padding prevents accessor
+execution. Compatibility checks add malformed-input rejection before callbacks,
+registry lookup from another thread during a callback, unchanged borrowed
+storage after shutdown and two drained runtime lifetimes.
+
+Eight normal/deterministic ASan/UBSan runs passed with both C++ configurations,
+including mangled-state lookup and witness-table regressions. The ARM64 fixture,
+launch probe and both import audits passed their checks. Eight compressed
+binary/generated-C pairs and five C/ARM64 reviews retain the tested artifacts
+and allocation-free runtime paths.
+
+Static inspection traces this import through GOT cell `0x10dc9bb78`, stub
+`0x10c63ec40`, branch island `0x107c28eec` and caller `0x1015c1030`. That caller
+selects index one of descriptor `0x10dc806a8`: one parameter, one requirement,
+two key arguments and two underlying entries. Its selected name at
+`0x10dc7fdfe` encodes a leading padding byte and a direct accessor reference to
+`0x1015c1004`. That thunk forwards x0 unchanged to a witness accessor and
+returns its scalar pointer. No application code is executed by inspection.
+
+The next missing import is `_swift_getSingletonMetadata`, at GOT cell
+`0x10dc9bb80`, stub `0x10c63ec4c` and branch island `0x107c284c8`. Inspected
+callers include `0x100065780` and `0x100073c18`, which pass a metadata request
+and descriptor after checking a cache. Singleton metadata lookup remains
+unsupported. Application entry remains unreached and Fortnite is still unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,972 | 189 | 78 |
+| Fortnite executable | 1,973 | 188 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,812 | 192 | 114 |
+| All images | 2,813 | 191 | 114 |
 
-The C++/GLES/Text variant reports 2,826 resolved imports, 178 unresolved strong
+The C++/GLES/Text variant reports 2,827 resolved imports, 177 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
