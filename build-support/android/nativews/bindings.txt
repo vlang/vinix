@@ -80,6 +80,10 @@ android/os/SystemClock|uptimeMillis|return ws_millis()
 android/os/SystemClock|elapsedRealtime|return ws_nanos(7) / 1000000
 android/os/SystemClock|elapsedRealtimeNanos|return ws_nanos(7)
 android/os/Process|is64Bit|return u8(sizeof(voidptr) == 8)
+android/os/Process|getElapsedCpuTime|return ws_nanos(2) / 1000000
+android/accounts/AccountManager|addOnAccountsUpdatedListener|ws_accounts_add(e,this,p0,p1,p2)
+android/accounts/AccountManager|removeOnAccountsUpdatedListener|ws_accounts_remove(e,this,p0)
+android/atl/VinixAccountUpdate|run|ws_accounts_notify(e,this)
 android/app/NotificationManager|nativeCancel|ws_notification_cancel(e,p0)
 android/app/NotificationManager|nativeCancelMPRIS|ws_notification_cancel_key(e,c'android:media')
 android/app/NotificationManager|nativeInitBuilder|return 0 // Plain notification metadata remains Java-owned.

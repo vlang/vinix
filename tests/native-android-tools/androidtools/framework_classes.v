@@ -63,6 +63,8 @@ pub fn write_framework_classes(smali string) ! {
   '.method public native uncaughtException(Ljava/lang/Thread;Ljava/lang/Throwable;)V\n.end method\n')!
  framework_async_trace(smali)!
  framework_application_uid(smali)!
+ framework_account_listeners(smali)!
+ framework_storage_queries(smali)!
  framework_content_clients(smali)!
  framework_text_widgets(smali)!
  framework_check_widgets(smali)!

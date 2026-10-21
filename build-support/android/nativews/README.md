@@ -78,6 +78,11 @@ paths retain independent corner radii. Network availability reads the guest's
 configured non-loopback interfaces. Local ContentProviderClient handles resolve
 registered authorities, dispatch type/call operations and release their provider
 reference on close. Uninstalled service providers return null.
+Account listeners retain their registrations and deliver an empty snapshot on
+the requested Handler (or the main Looper). Duplicate registrations fail and
+removal permits registration again. Vinix has no account authenticator.
+External-storage path queries validate the runtime's ordinary, non-removable
+directory. Process CPU time reads the kernel's process CPU clock.
 
 AssetManager directory enumeration uses the merged framework and APK assets.
 The build converts the pinned runtime's IANA TZif files and aliases into

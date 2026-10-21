@@ -107,6 +107,39 @@ throw v0') +
 		constructor('java/lang/Thread', '') +
 		method('public run()V', 'new-instance v0, Ljava/lang/IllegalStateException;\nconst-string v1, "expected fixture exception"\ninvoke-direct {v0, v1}, Ljava/lang/IllegalStateException;-><init>(Ljava/lang/String;)V\nthrow v0') +
 		method('public uncaughtException(Ljava/lang/Thread;Ljava/lang/Throwable;)V', 'const/4 v0, 1\niput-boolean v0, p0, Lorg/vinix/bootstrap/CrashProbe;->handled:Z\nreturn-void'))!
+	os.write_file(smali + '/AccountProbe.smali',
+		'.class public Lorg/vinix/bootstrap/AccountProbe;\n.super Ljava/lang/Object;\n.implements Landroid/accounts/OnAccountsUpdateListener;\n.field private static count:I\n.field public manager:Landroid/accounts/AccountManager;\n' +
+		constructor('java/lang/Object', '') +
+		method('public onAccountsUpdated([Landroid/accounts/Account;)V', '
+array-length v0, p1
+if-nez v0, :bad
+invoke-static {}, Landroid/os/Looper;->myLooper()Landroid/os/Looper;
+move-result-object v0
+invoke-static {}, Landroid/os/Looper;->getMainLooper()Landroid/os/Looper;
+move-result-object v1
+if-ne v0, v1, :bad
+iget-object v0, p0, Lorg/vinix/bootstrap/AccountProbe;->manager:Landroid/accounts/AccountManager;
+invoke-virtual {v0, p0}, Landroid/accounts/AccountManager;->removeOnAccountsUpdatedListener(Landroid/accounts/OnAccountsUpdateListener;)V
+const/4 v1, 0
+const/4 v2, 0
+invoke-virtual {v0, p0, v1, v2}, Landroid/accounts/AccountManager;->addOnAccountsUpdatedListener(Landroid/accounts/OnAccountsUpdateListener;Landroid/os/Handler;Z)V
+invoke-virtual {v0, p0}, Landroid/accounts/AccountManager;->removeOnAccountsUpdatedListener(Landroid/accounts/OnAccountsUpdateListener;)V
+sget v0, Lorg/vinix/bootstrap/AccountProbe;->count:I
+add-int/lit8 v0, v0, 1
+sput v0, Lorg/vinix/bootstrap/AccountProbe;->count:I
+const/4 v1, 2
+if-gt v0, v1, :bad
+if-ne v0, v1, :done
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-ACCOUNTS-PASS empty callback-main-handler overloads remove readd"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+:done
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "account listener snapshot, handler or registration lifetime"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'))!
 	main_class := '.class public Lorg/vinix/bootstrap/Main;\n.super Landroid/app/Activity;\n' +
 		'.implements Landroid/widget/CompoundButton$OnCheckedChangeListener;\n.field private changes:I\n.field private static surface:Landroid/view/SurfaceView;\n' +
 		constructor('android/app/Activity', 'const/4 v0, 4\ninvoke-static {v0}, Lorg/vinix/bootstrap/App;->check(I)V') +
@@ -187,6 +220,87 @@ sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
 const-string v1, "BOOTSTRAP-EXCEPTIONS-PASS app-handler-preserved"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void') +
+		method('private static accountListenerCheck(Landroid/content/Context;)V', '
+invoke-static {p0}, Landroid/accounts/AccountManager;->get(Landroid/content/Context;)Landroid/accounts/AccountManager;
+move-result-object v0
+invoke-static {p0}, Landroid/accounts/AccountManager;->get(Landroid/content/Context;)Landroid/accounts/AccountManager;
+move-result-object v1
+if-ne v0, v1, :bad
+invoke-virtual {v0}, Landroid/accounts/AccountManager;->getAccounts()[Landroid/accounts/Account;
+move-result-object v1
+array-length v1, v1
+if-nez v1, :bad
+new-instance v1, Lorg/vinix/bootstrap/AccountProbe;
+invoke-direct {v1}, Lorg/vinix/bootstrap/AccountProbe;-><init>()V
+iput-object v0, v1, Lorg/vinix/bootstrap/AccountProbe;->manager:Landroid/accounts/AccountManager;
+const/4 v2, 0
+const/4 v3, 1
+invoke-virtual {v0, v1, v2, v3}, Landroid/accounts/AccountManager;->addOnAccountsUpdatedListener(Landroid/accounts/OnAccountsUpdateListener;Landroid/os/Handler;Z)V
+:duplicate
+invoke-virtual {v0, v1, v2, v3}, Landroid/accounts/AccountManager;->addOnAccountsUpdatedListener(Landroid/accounts/OnAccountsUpdateListener;Landroid/os/Handler;Z)V
+:duplicate_end
+.catch Ljava/lang/IllegalStateException; {:duplicate .. :duplicate_end} :duplicate_ok
+goto :bad
+:duplicate_ok
+move-exception v1
+new-instance v1, Lorg/vinix/bootstrap/AccountProbe;
+invoke-direct {v1}, Lorg/vinix/bootstrap/AccountProbe;-><init>()V
+iput-object v0, v1, Lorg/vinix/bootstrap/AccountProbe;->manager:Landroid/accounts/AccountManager;
+new-instance v2, Landroid/os/Handler;
+invoke-direct {v2}, Landroid/os/Handler;-><init>()V
+const/4 v4, 0
+new-array v4, v4, [Ljava/lang/String;
+invoke-virtual {v0, v1, v2, v3, v4}, Landroid/accounts/AccountManager;->addOnAccountsUpdatedListener(Landroid/accounts/OnAccountsUpdateListener;Landroid/os/Handler;Z[Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "account manager identity, empty accounts or duplicate listener"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
+		method('private static storageClockCheck()V', '
+invoke-static {}, Landroid/os/Environment;->getExternalStorageDirectory()Ljava/io/File;
+move-result-object v0
+new-instance v1, Ljava/io/File;
+const-string v2, "fixture/subdir"
+invoke-direct {v1, v0, v2}, Ljava/io/File;-><init>(Ljava/io/File;Ljava/lang/String;)V
+invoke-static {v1}, Landroid/os/Environment;->isExternalStorageEmulated(Ljava/io/File;)Z
+move-result v2
+if-nez v2, :bad
+invoke-static {v1}, Landroid/os/Environment;->isExternalStorageRemovable(Ljava/io/File;)Z
+move-result v2
+if-nez v2, :bad
+new-instance v1, Ljava/io/File;
+const-string v2, "../outside-external"
+invoke-direct {v1, v0, v2}, Ljava/io/File;-><init>(Ljava/io/File;Ljava/lang/String;)V
+:outside
+invoke-static {v1}, Landroid/os/Environment;->isExternalStorageEmulated(Ljava/io/File;)Z
+:outside_end
+.catch Ljava/lang/IllegalArgumentException; {:outside .. :outside_end} :outside_ok
+goto :bad
+:outside_ok
+move-exception v0
+invoke-static {}, Landroid/os/Process;->getElapsedCpuTime()J
+move-result-wide v0
+const-wide/16 v2, 0
+cmp-long v4, v0, v2
+if-ltz v4, :bad
+const v4, 100000
+:work
+add-int/lit8 v4, v4, -1
+if-nez v4, :work
+invoke-static {}, Landroid/os/Process;->getElapsedCpuTime()J
+move-result-wide v2
+cmp-long v4, v2, v0
+if-ltz v4, :bad
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-STORAGE-CLOCK-PASS external-path-validation nonremovable cpu-monotonic"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "external volume queries or process CPU clock"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
 		method('private static packagePresenceCheck(Landroid/content/Context;)V', '
 invoke-virtual {p0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
 move-result-object v0
@@ -548,6 +662,8 @@ invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->assetListCheck(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->packagePresenceCheck(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->exceptionReporterCheck()V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->accountListenerCheck(Landroid/content/Context;)V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->storageClockCheck()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->timezoneCheck()V
 new-instance v0, Landroid/graphics/Matrix;
 invoke-direct {v0}, Landroid/graphics/Matrix;-><init>()V
