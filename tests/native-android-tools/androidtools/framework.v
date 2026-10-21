@@ -38,6 +38,33 @@ pub fn framework_replace_method(source string, name string, declaration string) 
  return text
 }
 
+// Missing packages must stay missing. The upstream GStub fallback advertises
+// services that are not installed and starts a separate class loader while
+// holding the global package lock. Preserve normal APK loading and lock exits.
+pub fn framework_package_presence(source string) !string {
+ mut text := source
+ for name in ['loadApplication', 'loadPackage'] {
+  signature := '.method private static ' + name + '(Ljava/lang/String;)'
+  start := text.index(signature) or { return error('missing ATL package loader: ' + name) }
+  end := start + (text[start..].index('.end method') or { return error('unterminated ATL package loader') })
+  method := text[start..end]
+  fallback := '    sget-object v0, Landroid/atl/ATLLoadedApp;->play_services:Ljava/util/HashSet;'
+  first := method.index(fallback) or { return error('missing ATL package fallback: ' + name) }
+  tail := method[first..]
+  condition := tail.index('    if-eqz v0, :') or { return error('missing ATL package absence branch') }
+  label := tail[condition..].all_before('\n').all_after(', ')
+  mut last := first + (tail.index('\n    ' + label + '\n') or { return error('missing ATL package absence label') })
+  // loadApplication has a catch handler before its missing-package exit.
+  if handler := tail.index('\n    :catchall_') {
+   if first + handler < last { last = first + handler }
+  }
+  if !method[first..last].contains('->loadGStub(') { return error('unexpected ATL package fallback') }
+  replacement := method[..first] + '    goto/16 ' + label + '\n' + method[last..]
+  text = text[..start] + replacement + text[end..]
+ }
+ return text
+}
+
 pub fn framework_patch(activity_source string, bar_source string, cursor_v string, bar_v string) !(string, string) {
  if activity_source.contains('vinixActionBar:') { return error('framework is already extended; use the original ATL input') }
  mut activity := activity_source
@@ -102,6 +129,8 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  activity, bar := framework_patch(os.read_file(smali + '/android/app/Activity.smali')!, os.read_file(smali + '/android/app/ActionBar.smali')!, cursor_v, bar_v)!
  os.write_file(smali + '/android/app/Activity.smali', activity)!
  os.write_file(smali + '/android/app/ActionBar.smali', bar)!
+ packages := smali + '/android/atl/ATLLoadedAppManager.smali'
+ os.write_file(packages, framework_package_presence(os.read_file(packages)!)!)!
  write_framework_classes(smali)!
  checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', '--jobs', '2', smali, '-o', work + '/classes.dex'])!
  next := work + '/api-impl.jar'

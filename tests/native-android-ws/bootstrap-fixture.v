@@ -164,6 +164,39 @@ throw v0') +
 		'.method public static native nativeLibc()Z\n.end method\n' +
 		'.method public static native nativeTls()Z\n.end method\n' +
 		'.method public static native nativeDependency()I\n.end method\n' +
+		method('private static packagePresenceCheck(Landroid/content/Context;)V', '
+invoke-virtual {p0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
+move-result-object v0
+invoke-virtual {p0}, Landroid/content/Context;->getPackageName()Ljava/lang/String;
+move-result-object v1
+const/4 v2, 0
+invoke-virtual {v0, v1, v2}, Landroid/content/pm/PackageManager;->getPackageInfo(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;
+move-result-object v3
+if-eqz v3, :bad
+const-string v1, "com.google.android.gms"
+:try_start_package
+invoke-virtual {v0, v1, v2}, Landroid/content/pm/PackageManager;->getPackageInfo(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;
+:try_end_package
+.catch Landroid/content/pm/PackageManager$NameNotFoundException; {:try_start_package .. :try_end_package} :missing_package
+goto :bad
+:missing_package
+move-exception v3
+:try_start_application
+invoke-virtual {v0, v1, v2}, Landroid/content/pm/PackageManager;->getApplicationInfo(Ljava/lang/String;I)Landroid/content/pm/ApplicationInfo;
+:try_end_application
+.catch Landroid/content/pm/PackageManager$NameNotFoundException; {:try_start_application .. :try_end_application} :missing_application
+goto :bad
+:missing_application
+move-exception v3
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-PACKAGES-PASS installed-self missing-services"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "PackageManager must report actual installed packages"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
 		method('private static timezoneCheck()V', '
 invoke-static {}, Ljava/util/TimeZone;->getAvailableIDs()[Ljava/lang/String;
 move-result-object v0
@@ -486,6 +519,7 @@ sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
 const-string v1, "BOOTSTRAP-API-PASS async-trace application-uids"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->assetListCheck(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->packagePresenceCheck(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->timezoneCheck()V
 new-instance v0, Landroid/graphics/Matrix;
 invoke-direct {v0}, Landroid/graphics/Matrix;-><init>()V

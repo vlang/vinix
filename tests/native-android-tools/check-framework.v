@@ -25,6 +25,22 @@ fn main() {
  rejected = false
  androidtools.framework_patch(activity.replace('protected onStop', 'public onStop'), bar, cursor_v, bar_v) or { rejected = true }
  assert rejected
+ mut package_source := ''
+ for name in ['loadApplication', 'loadPackage'] {
+  package_source += '.method private static ' + name + '(Ljava/lang/String;)Ljava/lang/Object;\n' +
+   '    # normal APK lookup\n    sget-object v0, Landroid/atl/ATLLoadedApp;->play_services:Ljava/util/HashSet;\n' +
+   '    if-eqz v0, :absent\n    invoke-static {p0}, Landroid/atl/ATLLoadedAppManager;->loadGStub(Ljava/lang/String;)Landroid/atl/ATLLoadedApp;\n' +
+   '    monitor-exit v2\n    return-object v0\n    :catchall_1\n    move-exception v0\n    monitor-exit v2\n    throw v0\n' +
+   '    :absent\n    monitor-exit v2\n    const/4 v0, 0\n    return-object v0\n.end method\n'
+ }
+ packages := androidtools.framework_package_presence(package_source)!
+ assert !packages.contains('->loadGStub(')
+ assert packages.count('# normal APK lookup') == 2
+ assert packages.count(':catchall_1\n    move-exception v0\n    monitor-exit v2\n    throw v0') == 2
+ assert packages.count(':absent\n    monitor-exit v2\n    const/4 v0, 0\n    return-object v0') == 2
+ rejected = false
+ androidtools.framework_package_presence(package_source.replace('if-eqz v0, :absent', 'if-nez v0, :absent')) or { rejected = true }
+ assert rejected
  launcher := androidtools.framework_launcher(os.read_file('build-support/android/run-android')!)!
  assert launcher.contains('$runtime/usr/lib/art/libvinix-android-framework.so')
  assert launcher.contains('extra_preload=\${VINIX_ANDROID_TEST_PRELOAD:-}')
