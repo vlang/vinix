@@ -15062,17 +15062,54 @@ The next missing import is CodingKey's default `debugDescription` getter,
 and a branch-island forwarder. Application entry remains unreached; Fortnite
 is still unplayable.
 
+CodingKey's default `debugDescription` now forwards to the supplied inherited
+CustomStringConvertible table at byte 16 of the CodingKey witness, then its
+`description` getter at byte 8. It preserves Self metadata in `x0`, borrowed
+Self in `x20`, the nonthrowing `x21` context and the owned String result in
+`x0`/`x1`. The inherited getter supplies all formatting; a custom description
+is returned unchanged. The three-instruction adapter shares the existing
+sealed dispatch page and retirement path and performs no ARC work.
+
+This dispatch does not inspect type metadata or key properties. The bounded
+type-name support in CodingKey's default `description` still applies when
+that implementation is the inherited getter; generic CodingKeys metadata
+remains separate work.
+
+```sh
+v run tests/ios/native-checks.v build-coding-key-debug-description
+```
+
+Evidence is retained under
+`build/ios/fortnite/coding-key-debug-description-checks`. Native slot and code
+authentication measurements and eight normal/deterministic ASan/UBSan runs
+passed with both C++ configurations, including CodingKey and integer-description
+regressions. Checks cover two supplied getters, exact full-width results,
+protected Self/metadata and read-only eight-byte table slots at both page
+boundaries. Native and compatibility checks preserve `x20`/`x21`/`x22`, forward
+owned Int descriptions through the inherited table and release results after
+use. Eight publishers/callers, both publication orders, sealed pages and two
+drained/unmapped lifetimes passed. The ARM64 fixture, launch probe and both
+import audits passed; eight binary/generated-C pairs and five C/ARM64 reviews
+are retained.
+
+The next missing import is Optional's conditional Encodable conformance,
+`_$sxSgSEsSERzlMc`, at GOT cell `0x10dc9ba68`. Static V/Mach-O/LLVM inspection
+found its descriptor load at `0x1000730ac`, followed by `swift_getWitnessTable`
+and an Array Encodable witness lookup before generic keyed encoding. No
+application code was executed. Application entry remains unreached; Fortnite
+is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,955 | 206 | 78 |
+| Fortnite executable | 1,956 | 205 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,795 | 209 | 114 |
+| All images | 2,796 | 208 | 114 |
 
-The C++/GLES/Text variant reports 2,809 resolved imports, 195 unresolved strong
+The C++/GLES/Text variant reports 2,810 resolved imports, 194 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
