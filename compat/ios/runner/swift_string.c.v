@@ -326,6 +326,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_swift_getEnumCaseMultiPayload' { u64(unsafe { voidptr(swift_enum_case_multi) }) }
 		'_swift_storeEnumTagMultiPayload' { u64(unsafe { voidptr(swift_enum_store_multi) }) }
 		'_swift_getEnumTagSinglePayloadGeneric' { u64(unsafe { voidptr(swift_enum_tag_single) }) }
+		'_swift_storeEnumTagSinglePayloadGeneric' { u64(unsafe { voidptr(swift_enum_store_single) }) }
 		'_swift_getGenericMetadata' { u64(unsafe { voidptr(swift_generic_metadata) }) }
 		'_swift_getInitializedObjCClass' { u64(unsafe { voidptr(swift_initialized_objc_class) }) }
 		'_swift_getObjCClassFromMetadata' { u64(unsafe { voidptr(swift_objc_class_from_metadata) }) }

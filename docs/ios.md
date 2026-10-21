@@ -16423,20 +16423,58 @@ branch island `0x107c28918` to caller `0x100069bec`. The caller passes its value
 and metadata in `x0` and `x1`, sets `w2` to payload case zero and later calls
 `_swift_getEnumCaseMultiPayload`. This inspection executes no application code.
 
+`_swift_storeEnumTagSinglePayloadGeneric` now resolves from Swift Core with five
+scalar SwiftCC arguments: value in `x0`, case index in `w1`, empty-case count in
+`w2`, payload metadata in `x3` and the extra-inhabitant callback in `x4`. It
+shares the single-payload reader's borrowed value-witness layout checks and
+supports payloads up to 1 MiB with zero to four tag bytes. Payload case zero
+clears the tag while preserving the payload. Extra-inhabitant cases clear the
+tag before invoking the callback with value, case index, extra-inhabitant count
+and metadata in `x0/w1/w2/x3`. Other empty cases encode their UInt32 index in
+the payload, clear its remaining bytes and write the tag.
+
+The caller supplies live initialized metadata, exclusive access to writable
+value storage and a compatible callback when used. Zero-width tags and
+zero-sized payloads touch no corresponding value bytes. The layout lock is
+released before entering the callback, which can reenter the runtime. The
+writer allocates no storage and performs no ARC operations. Invalid layouts,
+callback addresses and retired runtime states are rejected before value writes.
+
+```sh
+v run tests/ios/native-checks.v build-enum-store-single
+```
+
+Evidence is retained under `build/ios/fortnite/enum-store-single-checks`. Native
+Swift comparisons cover exact bytes, UInt32 boundaries, guarded unaligned
+values, read-only borrowed metadata, tag clearing before callbacks and payload
+tail clearing. The ARM64 ABI probe checks all five arguments, low UInt32
+arguments and register preservation on return. Host and guest matrices agree
+on hash `a923b8b4fd5af3a5`; eight reentrant workers and two drained runtime
+lifetimes also pass. Eight normal/deterministic ASan/UBSan runs passed across
+both C++ configurations and multi-payload writer and single-payload reader
+regressions. The ARM64 fixture, launch probe and both import audits passed
+their checks. Eight compressed binary/generated-C pairs retain the tested paths.
+
+Static inspection traces GOT cell `0x10dc9bc38` through stub `0x10c63ed54` and
+branch island `0x107c284c4` to thunk `0x1000656d8`. The thunk sets `x4` to
+extra-inhabitant callback `0x1000656dc` and tail-calls the generic writer. The
+callback handles a `0x7fffffff` extra-inhabitant count and stores the case index
+minus one in the payload. This inspection executes no application code.
+
 The launch probe now stops at required Swift Core import
-`_swift_storeEnumTagSinglePayloadGeneric`, before application entry. Fortnite remains unplayable.
+`_swift_unexpectedError`, before application entry. Fortnite remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,985 | 176 | 78 |
+| Fortnite executable | 1,986 | 175 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,825 | 179 | 114 |
+| All images | 2,826 | 178 | 114 |
 
-The C++/GLES/Text variant reports 2,839 resolved imports, 165 unresolved strong
+The C++/GLES/Text variant reports 2,840 resolved imports, 164 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
