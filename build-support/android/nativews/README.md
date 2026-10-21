@@ -166,6 +166,12 @@ Delivery currently covers broadcasts sent inside the app process. Sticky system
 broadcasts, cross-process delivery and full IntentFilter data matching remain
 incomplete.
 
+AppOps validates the current APK package against the real Unix process UID.
+It permits the existing external-storage operations and reports unavailable
+location, phone, camera, microphone and sensor operations as ignored. Operations
+without a policy return the default mode for the caller's permission check;
+cross-process AppOps auditing is not implemented.
+
 The native loader checks mapped extents rather than adding page-rounded segment
 lengths. Shared PT_LOAD pages therefore do not falsely exceed the reserved
 mapping, while out-of-range and overflowing extents still fail validation.

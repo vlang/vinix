@@ -81,6 +81,10 @@ android/os/SystemClock|elapsedRealtime|return ws_nanos(7) / 1000000
 android/os/SystemClock|elapsedRealtimeNanos|return ws_nanos(7)
 android/os/Process|is64Bit|return u8(sizeof(voidptr) == 8)
 android/os/Process|getElapsedCpuTime|return ws_nanos(2) / 1000000
+android/os/Process|myUid|return i32(C.getuid())
+android/app/AppOpsManager|checkOpNoThrow|return ws_appops_check(e,p0,p1,p2)
+android/app/AppOpsManager|checkPackage|ws_appops_package(e,p0,p1)
+android/app/AppOpsManager|noteProxyOpNoThrow|return ws_appops_check(e,p0,i32(C.getuid()),p1)
 android/accounts/AccountManager|addOnAccountsUpdatedListener|ws_accounts_add(e,this,p0,p1,p2)
 android/accounts/AccountManager|removeOnAccountsUpdatedListener|ws_accounts_remove(e,this,p0)
 android/atl/VinixAccountUpdate|run|ws_accounts_notify(e,this)

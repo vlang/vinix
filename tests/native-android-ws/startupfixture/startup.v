@@ -41,6 +41,7 @@ invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0'))!
  os.write_file(dir + '/StartupProbe.smali', '.class public Lorg/vinix/bootstrap/StartupProbe;\n.super Ljava/lang/Object;\n' +
   method('public static check(Landroid/content/Context;)V', '
+invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->appops(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->fonts(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->broadcasts(Landroid/content/Context;)V
 new-instance v0, Landroid/hardware/SensorManager;
@@ -67,6 +68,60 @@ return-void
 :bad
 new-instance v0, Ljava/lang/AssertionError;
 const-string v1, "sensor availability"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
+  method('private static appops(Landroid/content/Context;)V', '
+new-instance v0, Landroid/app/AppOpsManager;
+invoke-direct {v0}, Landroid/app/AppOpsManager;-><init>()V
+invoke-static {}, Landroid/os/Process;->myUid()I
+move-result v2
+if-ltz v2, :bad
+invoke-virtual {p0}, Landroid/content/Context;->getPackageName()Ljava/lang/String;
+move-result-object v3
+invoke-virtual {v0, v2, v3}, Landroid/app/AppOpsManager;->checkPackage(ILjava/lang/String;)V
+invoke-virtual {p0}, Landroid/content/Context;->getApplicationInfo()Landroid/content/pm/ApplicationInfo;
+move-result-object v4
+iget v4, v4, Landroid/content/pm/ApplicationInfo;->uid:I
+if-ne v2, v4, :bad
+const-string v1, "android:coarse_location"
+invoke-virtual {v0, v1, v2, v3}, Landroid/app/AppOpsManager;->checkOpNoThrow(Ljava/lang/String;ILjava/lang/String;)I
+move-result v4
+const/4 v5, 1
+if-ne v4, v5, :bad
+const-string v1, "android:read_external_storage"
+invoke-virtual {v0, v1, v2, v3}, Landroid/app/AppOpsManager;->checkOpNoThrow(Ljava/lang/String;ILjava/lang/String;)I
+move-result v4
+if-nez v4, :bad
+const-string v3, "not.installed"
+invoke-virtual {v0, v1, v2, v3}, Landroid/app/AppOpsManager;->checkOpNoThrow(Ljava/lang/String;ILjava/lang/String;)I
+move-result v4
+const/4 v5, 2
+if-ne v4, v5, :bad
+:package
+invoke-virtual {v0, v2, v3}, Landroid/app/AppOpsManager;->checkPackage(ILjava/lang/String;)V
+:package_end
+.catch Ljava/lang/SecurityException; {:package .. :package_end} :package_ok
+goto :bad
+:package_ok
+move-exception v4
+const-string v1, "android.permission.ACCESS_FINE_LOCATION"
+invoke-static {v1}, Landroid/app/AppOpsManager;->permissionToOp(Ljava/lang/String;)Ljava/lang/String;
+move-result-object v1
+const-string v4, "android:fine_location"
+invoke-virtual {v4, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v4
+if-eqz v4, :bad
+const-string v1, "android.permission.INTERNET"
+invoke-static {v1}, Landroid/app/AppOpsManager;->permissionToOp(Ljava/lang/String;)Ljava/lang/String;
+move-result-object v1
+if-nez v1, :bad
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-APPOPS-PASS uid package-validation allowed-storage absent-location permission-mapping"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "AppOps policy or UID ownership"
 invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0') +
   method('private static fonts(Landroid/content/Context;)V', '
