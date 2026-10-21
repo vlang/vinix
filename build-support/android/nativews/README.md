@@ -172,6 +172,10 @@ location, phone, camera, microphone and sensor operations as ignored. Operations
 without a policy return the default mode for the caller's permission check;
 cross-process AppOps auditing is not implemented.
 
+URI delegation checks return permission denied because no Binder URI-grant
+service is connected. Ordinary access to a local provider is separate; these
+checks do not grant other processes access to it.
+
 The native loader checks mapped extents rather than adding page-rounded segment
 lengths. Shared PT_LOAD pages therefore do not falsely exceed the reserved
 mapping, while out-of-range and overflowing extents still fail validation.

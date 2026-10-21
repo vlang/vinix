@@ -42,6 +42,7 @@ throw v0'))!
  os.write_file(dir + '/StartupProbe.smali', '.class public Lorg/vinix/bootstrap/StartupProbe;\n.super Ljava/lang/Object;\n' +
   method('public static check(Landroid/content/Context;)V', '
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->appops(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->uriPermissions(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->fonts(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->broadcasts(Landroid/content/Context;)V
 new-instance v0, Landroid/hardware/SensorManager;
@@ -68,6 +69,46 @@ return-void
 :bad
 new-instance v0, Ljava/lang/AssertionError;
 const-string v1, "sensor availability"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
+  method('private static uriPermissions(Landroid/content/Context;)V', '
+const-string v0, "content://not.installed/private"
+invoke-static {v0}, Landroid/net/Uri;->parse(Ljava/lang/String;)Landroid/net/Uri;
+move-result-object v1
+invoke-static {}, Landroid/os/Process;->myPid()I
+move-result v2
+invoke-static {}, Landroid/os/Process;->myUid()I
+move-result v3
+const/4 v4, 3
+const/4 v5, -1
+invoke-virtual {p0, v1, v2, v3, v4}, Landroid/content/Context;->checkUriPermission(Landroid/net/Uri;III)I
+move-result v0
+if-ne v0, v5, :bad
+const/16 v3, 12345
+invoke-virtual {p0, v1, v2, v3, v4}, Landroid/content/Context;->checkUriPermission(Landroid/net/Uri;III)I
+move-result v0
+if-ne v0, v5, :bad
+invoke-virtual {p0, v1, v4}, Landroid/content/Context;->checkCallingOrSelfUriPermission(Landroid/net/Uri;I)I
+move-result v0
+if-ne v0, v5, :bad
+invoke-virtual {p0, v1, v4}, Landroid/content/Context;->checkCallingUriPermission(Landroid/net/Uri;I)I
+move-result v0
+if-ne v0, v5, :bad
+const/4 v1, 0
+:null_uri
+invoke-virtual {p0, v1, v2, v3, v4}, Landroid/content/Context;->checkUriPermission(Landroid/net/Uri;III)I
+:null_end
+.catch Ljava/lang/NullPointerException; {:null_uri .. :null_end} :null_ok
+goto :bad
+:null_ok
+move-exception v0
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-URI-PERMISSIONS-PASS absent-grants foreign-uid calling self null-uri"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "URI delegation permissions"
 invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0') +
   method('private static appops(Landroid/content/Context;)V', '
