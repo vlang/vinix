@@ -13542,8 +13542,9 @@ destroying the old payload from bounded stack storage, so destructor callbacks
 can reenter safely. Typed arrays use these witnesses to retire only live values.
 The profile requires complete, copyable, bitwise-takable inline Wrapped values,
 alignment at most eight, and an Optional layout fitting the 24-byte value buffer.
-Unsupported layouts fail explicitly. General generic metadata allocation,
-reflection and Optional protocol conformances remain unsupported.
+Unsupported layouts fail explicitly. General generic metadata allocation and
+reflection remain unsupported. Bounded Optional Encodable support is described
+below; other Optional protocol conformances remain unsupported.
 
 ```sh
 v run tests/ios/native-checks.v build-optional-metadata
@@ -15099,17 +15100,57 @@ and an Array Encodable witness lookup before generic keyed encoding. No
 application code was executed. Application entry remains unreached; Fortnite
 is still unplayable.
 
+Optional's conditional Encodable conformance, `_$sxSgSEsSERzlMc`, now has a
+native-layout declaration and canonical specialized witnesses. Each table owns
+its sealed allocation and borrows one Wrapped:Encodable witness in the private
+word preceding the table. Cache hits use Optional metadata identity without
+rereading expired instantiation arguments. Registered Optional identities are
+checked before metadata access; the existing complete, copyable inline Wrapped
+profile and 24-byte Optional buffer bound still apply.
+
+The encoding witness obtains an owned single-value container before copying
+the Optional. Nil calls `encodeNil`; some moves the copied Wrapped payload into
+temporary storage and calls generic `encode` with its metadata and Encodable
+witness. The payload is destroyed before the container on success, throw and
+checked dispatch failures. The original owned Swift error is transferred
+unchanged, and the incoming `x21` context survives the nonthrowing container
+getter. Borrowed Encoder boxes are supported; mutable boxed containers and
+unsupported Wrapped layouts fail explicitly. Specialized tables and declaration
+pages retire before Optional metadata after users and callbacks drain.
+
+```sh
+v run tests/ios/native-checks.v build-optional-encoding
+```
+
+Evidence is retained under `build/ios/fortnite/optional-encoding-checks`.
+Native comparisons cover 48 Int/String/Date some/nil cases with inline and
+boxed borrowed Encoders, success/throw and protected boundary placement.
+Eight normal/deterministic ASan/UBSan runs passed with both C++ configurations,
+including Array encoding and Optional metadata regressions. The metadata
+regression's obsolete assertion that this export was absent was updated; its
+initial failure log is retained. Checks cover nested conditional witnesses,
+expired argument cache hits, exact String retains/releases, reentrant callbacks,
+eight cold publishers/workers, sealed pages and two drained/unmapped lifetimes.
+The ARM64 fixture, launch probe and both import audits passed; eight
+binary/generated-C pairs and five C/ARM64 reviews are retained.
+
+The next missing import is Optional's conditional Decodable conformance,
+`_$sxSgSesSeRzlMc`, at GOT cell `0x10dc9ba70`. Static V/Mach-O/LLVM inspection
+found its descriptor load at `0x100073250`, followed by Optional and Array
+Decodable witness lookups before generic keyed decoding. No application code
+was executed. Application entry remains unreached; Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,956 | 205 | 78 |
+| Fortnite executable | 1,957 | 204 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,796 | 208 | 114 |
+| All images | 2,797 | 207 | 114 |
 
-The C++/GLES/Text variant reports 2,810 resolved imports, 194 unresolved strong
+The C++/GLES/Text variant reports 2,811 resolved imports, 193 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

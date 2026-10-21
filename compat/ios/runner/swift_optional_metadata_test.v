@@ -384,7 +384,7 @@ fn test_swift_optional_metadata() {
 			assert runtime_symbol('/usr/lib/swift/libswiftCore.dylib', symbol[1..]) == none
 			assert runtime_symbol('/usr/lib/swift/libswiftFoundation.dylib', symbol) == none
 		}
-		for symbol in ['_$sSqN', '_$sxSgSesSeRzlMc', '_$sxSgSEsSERzlMc']! {
+		for symbol in ['_$sSqN', '_$sxSgSesSeRzlMc']! {
 			assert runtime_symbol('/usr/lib/swift/libswiftCore.dylib', symbol) == none
 		}
 		assert ios_runtime.swift_strings.len == 0 && ios_runtime.swift_arrays.len == 0 && ios_runtime.swift_heap.len == 0 && ios_runtime.live == 0

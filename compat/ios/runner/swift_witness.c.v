@@ -7,6 +7,10 @@ module main
 // path. Resilient/generic tables must be instantiated, never returned as-is.
 fn swift_witness_table_checked(conformance u64, metadata u64, arguments u64) !u64 {
 	if ios_runtime != unsafe { nil } && conformance != 0
+		&& conformance == ios_runtime.swift_optional_encoding_descriptor {
+		return swift_optional_encoding_table_checked(metadata, arguments)
+	}
+	if ios_runtime != unsafe { nil } && conformance != 0
 		&& conformance == ios_runtime.swift_indexing_iterator_conformance_descriptor {
 		return swift_indexing_iterator_table_checked(metadata)
 	}
@@ -110,6 +114,7 @@ fn swift_witness_table(conformance u64, metadata u64, arguments u64) u64 {
 }
 
 fn swift_witness_symbol(symbol string) ?u64 {
+	if address := swift_optional_encoding_symbol(symbol) { return address }
 	if address := swift_array_decoding_symbol(symbol) { return address }
 	if address := swift_array_encoding_symbol(symbol) { return address }
 	if symbol == '_$sSSSysMc' { return swift_string_protocol_descriptor_checked() or { panic(err) } }
