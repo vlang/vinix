@@ -160,6 +160,13 @@ for complete runtime qualification. The [earlier GTK workflow report](../tests/a
 and [calculator report](../tests/android/results/2026-10-20/calculator.json)
 remain historical evidence for that separate implementation.
 
+The subsequent [popular-app startup matrix](../tests/android/results/2026-10-21/popular-ws/README.md)
+probed eleven widely installed Google Play app identities. None reached a
+usable UI on the native WS runtime. The report distinguishes standalone APKs
+from limited base-APK probes, records exact versions and signatures, and
+retains the first framework/JNI failure for each app. The Arity control still
+calculated `579` through the same runner.
+
 The desktop launches APKs with a WS surface and input pipe. Inside such a
 native client connection, the public launcher accepts:
 

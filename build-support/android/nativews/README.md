@@ -62,3 +62,9 @@ modern Android APIs remain incomplete. NinePatch images currently stretch.
 WebView supports static HTML/text help panels without JavaScript, CSS layout
 or network navigation. Unsupported native APIs fail explicitly. This backend
 does not establish general APK compatibility or phone hardware support.
+
+The [popular-app startup matrix](../../../tests/android/results/2026-10-21/popular-ws/README.md)
+records the current blockers for eleven widely installed Play app identities,
+including application initialization, resources, JNI clocks, launcher resolution
+and split delivery. None reached a usable UI in that run; the basic APK checks
+above should not be extrapolated to those applications.

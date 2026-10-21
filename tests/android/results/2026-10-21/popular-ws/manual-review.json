@@ -1,0 +1,15 @@
+{
+  "calculator-control": {"usable_ui_reached": true, "functional_passed": true, "review": "Real QMP input 123+456; inspected framebuffer result 579."},
+  "chrome": {"usable_ui_reached": false, "first_blocker": "ATL reports Failed to find main Activity, then System.exit(1). The supplied base declares ARMv7 only; a complete ARM64 input remains untested."},
+  "facebook": {"usable_ui_reached": false, "first_blocker": "FbMainTabActivity delegate initialization: IllegalStateException: AppContext.set has not been invoked."},
+  "facebook-lite": {"usable_ui_reached": false, "first_blocker": "ClassNotFoundException: com.facebook.lite.MainActivity during Activity construction."},
+  "instagram": {"usable_ui_reached": false, "first_blocker": "Null Resources.updateConfiguration call while attaching the AppCompat activity base context."},
+  "roblox": {"usable_ui_reached": false, "first_blocker": "Missing NativeSettingsInterface.nativeSetBaseUrl JNI implementation; this input is a base APK requiring its ABI split."},
+  "snapchat": {"usable_ui_reached": false, "first_blocker": "UnsatisfiedLinkError: android.os.SystemClock.elapsedRealtimeNanos during MainActivity construction."},
+  "spotify": {"usable_ui_reached": false, "first_blocker": "AssertionError: Don't call setTitle() directly, use setTitleForFragment() instead; called from ATLLoadedApp.createActivity."},
+  "telegram": {"usable_ui_reached": false, "first_blocker": "LaunchActivity constructor: Context.getSharedPreferences called on a null application context."},
+  "telegram-direct": {"usable_ui_reached": false, "first_blocker": "Publisher's complete APK reproduces the null Context.getSharedPreferences failure in LaunchActivity construction."},
+  "tiktok": {"usable_ui_reached": false, "first_blocker": "Activity static initialization: ApplicationContext is null when calling Context.getFilesDir."},
+  "whatsapp": {"usable_ui_reached": false, "first_blocker": "Main constructor: IllegalStateException: AppContext.set has not been invoked."},
+  "youtube": {"usable_ui_reached": false, "first_blocker": "UnsatisfiedLinkError: android.os.SystemClock.elapsedRealtimeNanos while attaching MainActivity's base context."}
+}

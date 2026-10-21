@@ -1,0 +1,98 @@
+{
+  "output": "build/android-popular-ws",
+  "native_dir": "build/android-native-ws",
+  "base_module": "build/android-native-ws/original-qemu-runtime.tar",
+  "boot_image": "build/android-native-ws/vm/boot.img",
+  "efivars": "build/android-native-ws/vm/efivars.fd",
+  "qemu": "build/qemu-horizontal/bin/qemu-system-aarch64",
+  "firmware": "/opt/homebrew/share/qemu/edk2-aarch64-code.fd",
+  "java": "/opt/homebrew/opt/openjdk@25/bin/java",
+  "aapt2": "build/android-native-ws/aapt2",
+  "apksigner": "build/android-native-ws/android-15/lib/apksigner.jar",
+  "input_tool": "build/android-run",
+  "applications": [
+    {
+      "id": "calculator-control", "name": "Arity control", "package": "arity.calculator",
+      "apk": "build/android-calculator-20261020-borderless-prepared/overlay/opt/android-test/application.apk",
+      "source": "https://code.google.com/archive/p/arity-calculator/",
+      "distribution": "unchanged archived publisher APK; positive control"
+    },
+    {
+      "id": "telegram", "name": "Telegram", "package": "org.telegram.messenger",
+      "apk": "build/android-native-ws/TelegramPlay.apk",
+      "source": "https://d.apkpure.net/b/APK/org.telegram.messenger?version=latest",
+      "play": "https://play.google.com/store/apps/details?id=org.telegram.messenger",
+      "play_downloads": "1B+", "distribution": "public APK mirror; signed APK"
+    },
+    {
+      "id": "roblox", "name": "Roblox", "package": "com.roblox.client",
+      "apk": "build/android-native-ws/Roblox.apk",
+      "source": "https://d.apkpure.net/b/APK/com.roblox.client?version=latest",
+      "play": "https://play.google.com/store/apps/details?id=com.roblox.client",
+      "play_downloads": "1B+", "distribution": "public APK mirror; signed APK"
+    },
+    {
+      "id": "facebook-lite", "name": "Facebook Lite", "package": "com.facebook.lite",
+      "apk": "build/android-native-ws/FacebookLite.apk",
+      "source": "https://d.apkpure.net/b/APK/com.facebook.lite?version=latest",
+      "play": "https://play.google.com/store/apps/details?id=com.facebook.lite",
+      "play_downloads": "1B+", "distribution": "public APK mirror; signed APK"
+    },
+    {
+      "id": "whatsapp", "name": "WhatsApp", "package": "com.whatsapp",
+      "apk": "build/android-native-ws/WhatsApp.apk",
+      "source": "https://www.whatsapp.com/android/current/WhatsApp.apk",
+      "play": "https://play.google.com/store/apps/details?id=com.whatsapp",
+      "play_downloads": "10B+", "distribution": "publisher direct APK; not a Google Play extraction"
+    },
+    {
+      "id": "instagram", "name": "Instagram", "package": "com.instagram.android",
+      "apk": "build/android-native-ws/Instagram.apk",
+      "source": "https://d.apkpure.net/b/APK/com.instagram.android?version=latest",
+      "play": "https://play.google.com/store/apps/details?id=com.instagram.android",
+      "play_downloads": "5B+", "distribution": "public APK mirror; signed APK"
+    },
+    {
+      "id": "facebook", "name": "Facebook", "package": "com.facebook.katana",
+      "apk": "build/android-native-ws/Facebook.apk",
+      "source": "https://d.apkpure.net/b/APK/com.facebook.katana?version=latest",
+      "play": "https://play.google.com/store/apps/details?id=com.facebook.katana",
+      "play_downloads": "10B+", "distribution": "public APK mirror; signed APK"
+    },
+    {
+      "id": "spotify", "name": "Spotify", "package": "com.spotify.music",
+      "apk": "build/android-native-ws/Spotify.apk",
+      "source": "https://d.apkpure.net/b/APK/com.spotify.music?version=latest",
+      "play": "https://play.google.com/store/apps/details?id=com.spotify.music",
+      "play_downloads": "1B+", "distribution": "public APK mirror; signed APK"
+    },
+    {
+      "id": "chrome", "name": "Chrome", "package": "com.android.chrome",
+      "apk": "build/android-native-ws/Chrome.apk",
+      "source": "https://d.apkpure.net/b/APK/com.android.chrome?version=latest",
+      "play": "https://play.google.com/store/apps/details?id=com.android.chrome",
+      "play_downloads": "10B+", "distribution": "public APK mirror; signed APK"
+    },
+    {
+      "id": "youtube", "name": "YouTube", "package": "com.google.android.youtube",
+      "apk": "build/android-native-ws/YouTube.apk",
+      "source": "https://d.apkpure.net/b/APK/com.google.android.youtube?version=latest",
+      "play": "https://play.google.com/store/apps/details?id=com.google.android.youtube",
+      "play_downloads": "10B+", "distribution": "public APK mirror; signed APK"
+    },
+    {
+      "id": "snapchat", "name": "Snapchat", "package": "com.snapchat.android",
+      "apk": "build/android-native-ws/Snapchat.apk",
+      "source": "https://d.apkpure.net/b/APK/com.snapchat.android?version=latest",
+      "play": "https://play.google.com/store/apps/details?id=com.snapchat.android",
+      "play_downloads": "1B+", "distribution": "public APK mirror; signed APK"
+    },
+    {
+      "id": "tiktok", "name": "TikTok", "package": "com.zhiliaoapp.musically",
+      "apk": "build/android-native-ws/TikTok.apk",
+      "source": "https://d.apkpure.net/b/APK/com.zhiliaoapp.musically?version=latest",
+      "play": "https://play.google.com/store/apps/details?id=com.zhiliaoapp.musically",
+      "play_downloads": "1B+", "distribution": "public APK mirror; signed APK"
+    }
+  ]
+}
