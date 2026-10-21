@@ -15024,17 +15024,55 @@ The next missing import is CodingKey's default `description` getter,
 branch-island forwarder without executing application code. Application entry
 remains unreached; Fortnite is still unplayable.
 
+CodingKey's default `description` now calls the supplied `intValue` getter at
+witness byte 40, then `stringValue` at byte 24, with borrowed Self in `x20`
+and Self metadata/conformance in `x0`/`x1`. It returns an owned String of the
+native form `CodingKeys(stringValue: "key", intValue: nil)`. String bytes,
+including quotes, backslashes, Unicode and embedded NULs, are copied verbatim;
+optional integers use signed decimal text. Getter results are released on
+success and checked failures, and no registry lock spans a witness callback.
+The adapter shares the existing sealed dispatch page and retirement path.
+
+Type names support canonical Int/Bool/_MergeError and readable, file-backed
+nongeneric struct/enum metadata. Nested names are unqualified; class, generic
+and foreign metadata names remain unsupported. Static inspection of Fortnite's
+five wrappers found four nongeneric `CodingKeys` enums and one generic enum.
+That generic consumer still requires metadata/type-name support. The complete
+description is bounded to one MiB, including its name and punctuation.
+
+```sh
+v run tests/ios/native-checks.v build-coding-key-description
+```
+
+Evidence is retained under `build/ios/fortnite/coding-key-description-checks`.
+Eight normal/deterministic ASan/UBSan runs passed with both C++ configurations,
+including Encoder dispatch and integer-description regressions. Native and
+compatibility checks cover getter order, exact text and signed limits,
+read-only guarded Self/table spans, owned results, cleanup after invalid UTF-8
+or excessive output, reentrant getters, eight publishers/callers and two
+drained/unmapped lifetimes. The ARM64 fixture, launch probe and both import
+audits passed; eight binary/generated-C pairs and five C/ARM64 reviews are
+retained. The first guest attempt exposed a test assumption about immediate
+allocator address reuse; the corrected fixture passed without an implementation
+change, and the failed serial log is retained.
+
+The next missing import is CodingKey's default `debugDescription` getter,
+`_$ss9CodingKeyPsE16debugDescriptionSSvg`, at GOT cell `0x10dc9ba60` and stub
+`0x10c63afec`. Static V/Mach-O/LLVM inspection found five tail-call wrappers
+and a branch-island forwarder. Application entry remains unreached; Fortnite
+is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,954 | 207 | 78 |
+| Fortnite executable | 1,955 | 206 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,794 | 210 | 114 |
+| All images | 2,795 | 209 | 114 |
 
-The C++/GLES/Text variant reports 2,808 resolved imports, 196 unresolved strong
+The C++/GLES/Text variant reports 2,809 resolved imports, 195 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
