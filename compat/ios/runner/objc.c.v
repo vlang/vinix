@@ -404,6 +404,7 @@ mut:
 	connections []u64 // Main-thread pending connections, one owning reference each.
 	connection_callbacks int
 	weak         map[u64]u64 // Location -> object; weak loads retain before returning.
+	swift_unknown_weak map[u64]u64 // Opaque Swift weak cells, zeroed before referent teardown.
 	timers       []u64
 	display_links []u64
 	run_loop u64
@@ -687,6 +688,7 @@ fn objc_release_regular(object u64) {
 	header.releasing = true
 	// Zero weak slots before destructors can observe a dying object.
 	C.ios_objc_initialize_lock()
+	swift_unknown_weak_retire_locked(object)
 	for location, referent in ios_runtime.weak {
 		if referent == object {
 			unsafe { *(&u64(location)) = 0 }

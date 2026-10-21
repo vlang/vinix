@@ -35,6 +35,7 @@ fn swift_set_deallocating_checked(owner u64) ! {
 	// destroys stored properties and, for heap storage, deallocates afterward.
 	// Do not dispatch a destructor, free bytes, or register borrowed frame memory.
 	C.ios_store_pointer(unsafe { &u64(owner + 8) }, bits | 0x100000000)
+	if heap { swift_unknown_weak_retire_locked(owner) }
 }
 
 fn swift_set_deallocating(owner u64) {

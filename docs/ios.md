@@ -16489,21 +16489,56 @@ branch island `0x107c28714` to caller `0x1000678f4`. The caller moves its error
 from `x21` into `x0`, supplies a 36-byte ASCII filename and line 6805, and places
 `brk #1` immediately after the call. This inspection executes no application code.
 
+All nine Swift Core `swift_unknownObjectWeak*` exports now resolve. Initialization,
+assignment, copy, move, retained load/take and destruction operate on an opaque
+eight-byte cell. Registered Swift heap objects, buffers, strings, arrays and tasks,
+Objective-C objects and supported immortal objects participate in zeroing weak
+references. Final release and explicit destruction clear every registered copy
+before calling user destructors or freeing the owner. Retained loads synchronize
+with final release and cannot resurrect an Objective-C object whose count reached
+zero. Unsupported ownership domains and forged nonzero cells fail without reading
+an unregistered owner header.
+
+Cells must remain writable and live until explicitly destroyed or consumed; callers
+must serialize operations on the same cell. This implements the exported API's
+observable behavior for supported owners, without adopting Apple's internal weak
+side-table representation. Borrowed stack objects, Blocks, dispatch and logging
+handles and pool-owned objects remain unsupported as weak referents.
+
+```sh
+v run tests/ios/native-checks.v build-swift-unknown-weak
+```
+
+Evidence is retained under `build/ios/fortnite/swift-unknown-weak-checks`. Native
+Swift comparisons cover all nine exports, native Swift and Objective-C owners,
+cross-domain assignment, copy independence, retained loads and takes, zeroed global
+cells and guarded eight-byte storage. Concurrent readers race final release in both
+ownership domains. Compatibility checks also cover supplied Objective-C storage,
+Swift heap deallocation, task destruction, reentrant destructor reads, invalid
+owners and two drained runtime lifetimes. Eight normal/deterministic ASan/UBSan
+runs passed across the weak-reference, heap, deallocation and supplied-storage
+fixtures. The ARM64 fixture, launch probe and both import audits passed their
+checks. Eight compressed binary/generated-C pairs retain the tested paths;
+988 source/toolchain/runtime input hashes remained unchanged through validation.
+
+Static inspection traces GOT cell `0x10dc9bc58` through stub `0x10c63edb4` and
+branch island `0x107c28d70` to tail caller `0x100074684` for
+`_swift_unknownObjectWeakCopyAssign`. This inspection executes no application code.
+
 The launch probe now stops at required Swift Core import
-`_swift_unknownObjectWeakCopyAssign`, before application entry. Fortnite remains
-unplayable.
+`_swift_updateClassMetadata2`, before application entry. Fortnite remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,987 | 174 | 78 |
+| Fortnite executable | 1,992 | 169 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,827 | 177 | 114 |
+| All images | 2,832 | 172 | 114 |
 
-The C++/GLES/Text variant reports 2,841 resolved imports, 163 unresolved strong
+The C++/GLES/Text variant reports 2,846 resolved imports, 158 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

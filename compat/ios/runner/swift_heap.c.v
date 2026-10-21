@@ -80,6 +80,7 @@ fn swift_heap_deallocate_checked(owner u64, size u64, mask u64, uninitialized bo
 	} else if !storage.deiniting || bits != 0x100000003 {
 		return error('iOS: Swift heap object is not ready for deallocation')
 	}
+	swift_unknown_weak_retire_locked(owner)
 	ios_runtime.swift_heap.delete(owner)
 	C.free(unsafe { voidptr(owner) })
 }

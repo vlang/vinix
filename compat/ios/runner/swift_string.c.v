@@ -146,6 +146,7 @@ fn swift_buffer_refs(object u64, delta i64) !u64 {
 		// Retire before callbacks. Keep the bytes alive until all Element
 		// witnesses return; callbacks may resolve symbols or release other owners.
 		C.ios_store_pointer(location, 3 | (u64(1) << 32))
+		swift_unknown_weak_retire_locked(object)
 		if mut storage := ios_runtime.swift_heap[object] {
 			storage.deiniting = true
 			ios_runtime.swift_heap[object] = storage
@@ -234,6 +235,7 @@ fn swift_buffers_stop() {
 	defer { C.ios_objc_initialize_unlock() }
 	swift_tasks_drain_checked() or { panic(err) }
 	storefront_stop()
+	swift_unknown_weak_stop()
 	if ios_runtime.swift_buffers.len != 0 { panic('iOS: Swift UTF-8 arrays still owned at shutdown') }
 	if ios_runtime.swift_strings.len != 0 { panic('iOS: Swift Strings still owned at shutdown') }
 	unsafe { ios_runtime.swift_buffers.free() }
@@ -260,6 +262,7 @@ fn swift_buffers_stop() {
 }
 
 fn swift_core_symbol(symbol string) ?u64 {
+	if address := swift_unknown_weak_symbol(symbol) { return address }
 	if address := swift_sequence_array_symbol(symbol) { return address }
 	if address := swift_keyed_container_metadata_symbol(symbol) { return address }
 	if address := swift_string_compare_symbol(symbol) { return address }

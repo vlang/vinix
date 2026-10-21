@@ -352,6 +352,7 @@ fn swift_task_refs(owner u64, delta i64) !u64 {
 		C.ios_objc_initialize_unlock(); return error('iOS: Swift task cannot be destroyed before completion')
 	}
 	unsafe { *(&u64(owner + 8)) = if updated == 0 { u64(0x100000003) } else { u64(3) | (updated - 1) << 33 } }
+	if updated == 0 { swift_unknown_weak_retire_locked(owner) }
 	C.ios_objc_initialize_unlock()
 	if updated == 0 { swift_task_destroy(owner) }
 	return updated

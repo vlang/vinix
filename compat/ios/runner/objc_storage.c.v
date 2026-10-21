@@ -74,6 +74,9 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	connection_dispose(header)
 	ns_pool_require_inactive(header)
 	header.destroying = true
+	C.ios_objc_initialize_lock()
+	swift_unknown_weak_retire_locked(object)
+	C.ios_objc_initialize_unlock()
 	swift_data_bridge_dispose(mut header)
 	if destructors {
 		mut cls := header.cls
