@@ -37,6 +37,7 @@ fn swift_hash_emit(code u64) {
 }
 
 fn swift_hash_symbol(symbol string) ?u64 {
+	if entry := swift_encoder_keyed_dispatch_symbol(symbol) { return entry }
 	if entry := swift_decoder_keyed_dispatch_symbol(symbol) { return entry }
 	if entry := swift_keyed_generic_encoding_symbol(symbol) { return entry }
 	if entry := swift_keyed_integer_encoding_symbol(symbol) { return entry }
