@@ -16194,10 +16194,42 @@ stub `0x10c63eca0` and branch island `0x107c28a70`. Inspected callers
 `0x10006ef94` and `0x10006f050` retain the returned object and use it in
 string-switch lookup. Inspection executes no application code.
 
-The next missing import is `_swift_initStructMetadata`, at GOT cell `0x10dc9bbc0`,
+`_swift_initStructMetadata` now initializes mutable Swift 5 struct layouts through
+the five-scalar, void-result C ABI. It accepts up to 64 fields and a layout of up
+to 1 MiB, uses field sizes to reuse tail padding, computes alignment and stride,
+combines supported value flags and extra inhabitants, and publishes UInt32 field
+offsets. Already-correct offsets can reside in read-only image storage.
+
+Inline POD layouts receive copy witnesses; supported non-POD layouts preserve
+their inherited callbacks, with a bitwise take callback where appropriate.
+Metadata, witnesses and field storage remain borrowed. Initialization allocates
+no runtime objects and adds no shutdown ownership; callers must drain runtime
+users before retiring that storage. Immutable witness-table cloning, out-of-line
+POD layouts and newer noncopyable layout traits remain unsupported.
+
+```sh
+v run tests/ios/native-checks.v build-struct-metadata
+```
+
+Evidence is retained under `build/ios/fortnite/struct-metadata-checks`. Native
+comparisons verify the void five-scalar ABI, preserved `x20`/`x21`, layout flags,
+tail padding, offsets, callbacks and scalar enum extra inhabitants. Guarded tests
+cover malformed inputs, retained callback validation, read-only offsets, 512
+repeated initializations and inaccessible borrowed storage across two drained
+lifetimes. Eight normal/deterministic ASan/UBSan runs passed across both C++
+configurations, including singleton and tuple regressions. The ARM64 fixture,
+launch probe and both import audits passed their checks. Eight compressed
+binary/generated-C pairs and five C/ARM64 reviews retain the tested paths.
+
+Static inspection traces this required import through GOT cell `0x10dc9bbc0`,
 stub `0x10c63ecac` and branch island `0x107c284cc`. Inspected caller
 `0x1000657f8` passes metadata, layout flags, four field layouts and a field-offset
-vector. General struct metadata initialization remains unsupported.
+vector. A synthetic fixture covers that four-field layout shape; inspection
+executes no application code.
+
+The next missing import is `_swift_isEscapingClosureAtFileLocation`, at GOT cell
+`0x10dc9bbc8`, stub `0x10c63ecb8` and branch island `0x107c28624`. Inspected caller
+`0x100066e50` checks its boolean result after synchronous dispatch.
 Application entry remains unreached and Fortnite is still unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -16205,12 +16237,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,978 | 183 | 78 |
+| Fortnite executable | 1,979 | 182 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,818 | 186 | 114 |
+| All images | 2,819 | 185 | 114 |
 
-The C++/GLES/Text variant reports 2,832 resolved imports, 172 unresolved strong
+The C++/GLES/Text variant reports 2,833 resolved imports, 171 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
