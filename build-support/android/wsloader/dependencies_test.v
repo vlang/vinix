@@ -1,5 +1,11 @@
 module wsloader
 
+fn test_dependency_failure_is_not_a_successful_host_load() {
+	assert dependency_loaded(voidptr(1), unsafe { nil }, c'child.so', c'parent.so', c'') == 1
+	assert dependency_loaded(unsafe { nil }, voidptr(1), c'libc.so', c'parent.so', c'') == 1
+	assert dependency_loaded(unsafe { nil }, unsafe { nil }, c'missing.so', c'parent.so', c'not found') == 0
+}
+
 struct LookupNode {
 mut:
 	dynamic &DynamicEntry = unsafe { nil }

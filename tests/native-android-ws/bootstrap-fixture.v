@@ -581,6 +581,17 @@ if-gtz v6, :bad
 const-wide/32 v4, -1000000
 cmp-long v6, v2, v4
 if-ltz v6, :bad
+:missing_dependency_begin
+const-string v0, "fixture-broken"
+invoke-static {v0}, Ljava/lang/System;->loadLibrary(Ljava/lang/String;)V
+:missing_dependency_end
+.catch Ljava/lang/UnsatisfiedLinkError; {:missing_dependency_begin .. :missing_dependency_end} :missing_dependency_rejected
+goto :bad
+:missing_dependency_rejected
+move-exception v0
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-MISSING-DEPENDENCY-PASS rejected"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 const-string v0, "fixture"
 invoke-static {v0}, Ljava/lang/System;->loadLibrary(Ljava/lang/String;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->nativeDependency()I
@@ -660,6 +671,13 @@ throw v0')
 	checked(['build-support/compile-v-module', os.abs_path('tests/native-android-ws/dependencyprobe'), output + '/dependencyprobe.c', '--arch', 'arm64'])
 	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib', '-Wl,-z,max-page-size=4096',
 		'-Wl,-soname,libfixture-dependency.so', output + '/dependencyprobe.c', '-o', output + '/lib/arm64-v8a/libfixture-dependency.so'])
+	// Link against a dependency deliberately excluded from the APK. Loading
+	// this parent must fail even though its own JNI exports could be resolved.
+	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib', '-Wl,-z,max-page-size=4096',
+		'-Wl,-soname,libfixture-absent.so', output + '/dependencyprobe.c', '-o', output + '/libfixture-absent.so'])
+	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib', '-Wl,-z,max-page-size=4096',
+		output + '/assetprobe.c', '-Wl,--no-as-needed', '-L' + output, '-lfixture-absent',
+		'-o', output + '/lib/arm64-v8a/libfixture-broken.so'])
 	// Exercise the legacy NDK mapping path on a real 16 KiB Vinix guest as
 	// well as the Java framework APIs. This ELF intentionally uses 4 KiB pages.
 	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib', '-Wl,-z,max-page-size=4096',
@@ -669,7 +687,8 @@ throw v0')
 	// zip's -j would discard the ABI directory. Run in the fixture directory.
 	mut zip := os.new_process('zip')
 	zip.set_work_folder(output)
-	zip.set_args(['-q', 'unsigned.apk', 'lib/arm64-v8a/libfixture.so', 'lib/arm64-v8a/libfixture-dependency.so'])
+	zip.set_args(['-q', 'unsigned.apk', 'lib/arm64-v8a/libfixture.so', 'lib/arm64-v8a/libfixture-dependency.so',
+		'lib/arm64-v8a/libfixture-broken.so'])
 	zip.run()
 	zip.wait()
 	assert zip.code == 0

@@ -2,6 +2,19 @@
 @[translated]
 module wsloader
 
+#include <stdio.h>
+
+fn C.dprintf(i32, &char, ...voidptr) i32
+
+// Host dlopen succeeds without a Bionic soinfo. Neither kind of handle means
+// the dependency failed: preserve its linker error and reject the parent.
+@[export: 'vinix_ws_dependency_loaded']
+pub fn dependency_loaded(own voidptr, host voidptr, name &char, parent &char, detail &char) i32 {
+	if own != unsafe { nil } || host != unsafe { nil } { return 1 }
+	C.dprintf(2, c'VINIX-ANDROID-DEPENDENCY-FAIL library=%s needed=%s error=%s\n', parent, name, detail)
+	return 0
+}
+
 type LibraryLookup = fn (voidptr, &char) voidptr
 
 struct DynamicEntry {

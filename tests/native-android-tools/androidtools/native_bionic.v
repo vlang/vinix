@@ -58,6 +58,14 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 	bridged = bridged.replace(protection,
 		'if (vinix_ws_copy_required(si->phdr, si->phnum) &&\n' +
 		' vinix_ws_finish_copy_segments(si->phdr, si->phnum, si->base, si->size) < 0) goto fail;\n' + protection)
+	// A host dependency has no soinfo, but a failed APK dependency must fail
+	// its parent instead of silently being replaced by the built-in libdl.
+	dependency := 'lsi = apkenv_find_library(si->strtab + d->d_un.d_val, true, RTLD_NOW, NULL);'
+	if bridged.count(dependency) != 1 { return error('unexpected Bionic dependency loading') }
+	bridged = bridged.replace(dependency,
+		'void *host_dependency = NULL;\n' +
+		'lsi = apkenv_find_library(si->strtab + d->d_un.d_val, true, RTLD_NOW | RTLD_GLOBAL, &host_dependency);\n' +
+		'if (!vinix_ws_dependency_loaded(lsi, host_dependency, si->strtab + d->d_un.d_val, si->name, apkenv_linker_get_error())) goto fail;')
 	os.write_file(linker, bridged)!
 	dlfcn := source + '/linker/dlfcn.c'
 	mut dynamic_text := os.read_file(dlfcn)!
@@ -76,6 +84,7 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 		'extern int vinix_ws_copy_required(const void *, size_t);\n' +
 		'extern int vinix_ws_copy_segments(int, const void *, size_t, uintptr_t, size_t, void **, uint32_t *, uint32_t *, uintptr_t *, unsigned *);\n' +
 		'extern int vinix_ws_finish_copy_segments(const void *, size_t, uintptr_t, size_t);\n' +
+		'extern int vinix_ws_dependency_loaded(void *, void *, const char *, const char *, const char *);\n' +
 		'extern void *vinix_ws_lookup_dependencies(void *, const char *, void **, size_t, void *(*)(void *, const char *));\n')!
 	inputs['segment_bridge_sha256'] = sha256.sum(os.read_bytes(bridge)!).hex()
 	inputs['linker_with_v_bridge_sha256'] = sha256.sum(os.read_bytes(linker)!).hex()
