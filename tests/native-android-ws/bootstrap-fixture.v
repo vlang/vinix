@@ -30,6 +30,8 @@ fn main() {
 	os.mkdir_all(smali)!
 	os.mkdir_all(output + '/lib/arm64-v8a')!
 	os.mkdir_all(output + '/assets')!
+	os.mkdir_all(output + '/assets/nested')!
+	os.write_file(output + '/assets/nested/item.txt', 'nested asset\n')!
 	os.write_file(output + '/assets/probe.txt', 'VINIX-ASSET-OK\n')!
 	// Lossless 2x1 red/green image, generated from our own PPM test pixels.
 	os.write_file_array(output + '/assets/probe.webp', base64.decode('UklGRh4AAABXRUJQVlA4TBEAAAAvAQAAAA+w//Mf8x8VMqL/AQA='))!
@@ -150,8 +152,58 @@ throw v0') +
 		'.method public static native nativeCheck(Landroid/content/res/AssetManager;)Z\n.end method\n' +
 		'.method public static native nativeBitmap(Landroid/graphics/Bitmap;)Z\n.end method\n' +
 		'.method public static native nativeGraphics()Z\n.end method\n' +
+		method('private static assetListCheck(Landroid/content/Context;)V', '
+invoke-virtual {p0}, Landroid/content/Context;->getAssets()Landroid/content/res/AssetManager;
+move-result-object v0
+const-string v1, ""
+invoke-virtual {v0, v1}, Landroid/content/res/AssetManager;->list(Ljava/lang/String;)[Ljava/lang/String;
+move-result-object v1
+array-length v2, v1
+const/4 v3, 3
+if-lt v2, v3, :bad
+invoke-static {v1}, Ljava/util/Arrays;->asList([Ljava/lang/Object;)Ljava/util/List;
+move-result-object v1
+const-string v2, "probe.txt"
+invoke-interface {v1, v2}, Ljava/util/List;->contains(Ljava/lang/Object;)Z
+move-result v2
+if-eqz v2, :bad
+const-string v2, "probe.webp"
+invoke-interface {v1, v2}, Ljava/util/List;->contains(Ljava/lang/Object;)Z
+move-result v2
+if-eqz v2, :bad
+const-string v2, "nested"
+invoke-interface {v1, v2}, Ljava/util/List;->contains(Ljava/lang/Object;)Z
+move-result v2
+if-eqz v2, :bad
+const-string v1, "nested"
+invoke-virtual {v0, v1}, Landroid/content/res/AssetManager;->list(Ljava/lang/String;)[Ljava/lang/String;
+move-result-object v1
+array-length v2, v1
+const/4 v3, 1
+if-ne v2, v3, :bad
+const/4 v2, 0
+aget-object v1, v1, v2
+const-string v2, "item.txt"
+invoke-virtual {v2, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v1
+if-eqz v1, :bad
+const-string v1, "absent"
+invoke-virtual {v0, v1}, Landroid/content/res/AssetManager;->list(Ljava/lang/String;)[Ljava/lang/String;
+move-result-object v1
+array-length v1, v1
+if-nez v1, :bad
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-ASSETS-PASS root nested absent"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "APK asset directory enumeration"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
 		method('private static textCheck(Landroid/content/Context;)V', '
-const-string v0, "&#128512; Read <a href=\"privacy&amp;policy\">Privacy &amp; Policy</a>."
+const-string v7, "HTML decoded text"
+const-string v0, "&#128512; Read <a href=\\\"privacy&amp;policy\\\">Privacy &amp; Policy</a>."
 const/4 v1, 0
 invoke-static {v0, v1}, Landroid/text/Html;->fromHtml(Ljava/lang/String;I)Landroid/text/Spanned;
 move-result-object v0
@@ -161,6 +213,7 @@ const-string v2, "😀 Read Privacy & Policy."
 invoke-virtual {v2, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 move-result v1
 if-eqz v1, :bad
+const-string v7, "HTML URL span count"
 const/4 v1, 0
 const/16 v2, 25
 const-class v3, Landroid/text/style/URLSpan;
@@ -169,16 +222,19 @@ move-result-object v1
 array-length v2, v1
 const/4 v3, 1
 if-ne v2, v3, :bad
+const-string v7, "HTML URL span UTF-16 start"
 const/4 v2, 0
 aget-object v1, v1, v2
 invoke-interface {v0, v1}, Landroid/text/Spanned;->getSpanStart(Ljava/lang/Object;)I
 move-result v2
 const/16 v3, 8
 if-ne v2, v3, :bad
+const-string v7, "HTML URL span UTF-16 end"
 invoke-interface {v0, v1}, Landroid/text/Spanned;->getSpanEnd(Ljava/lang/Object;)I
 move-result v2
 const/16 v3, 24
 if-ne v2, v3, :bad
+const-string v7, "HTML URL decoded attribute"
 check-cast v1, Landroid/text/style/URLSpan;
 invoke-virtual {v1}, Landroid/text/style/URLSpan;->getURL()Ljava/lang/String;
 move-result-object v1
@@ -186,6 +242,7 @@ const-string v2, "privacy&policy"
 invoke-virtual {v2, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 move-result v1
 if-eqz v1, :bad
+const-string v7, "TextView multiline measurement"
 new-instance v0, Landroid/widget/TextView;
 invoke-direct {v0, p0}, Landroid/widget/TextView;-><init>(Landroid/content/Context;)V
 const-string v1, "Native widgets wrap long words and sentences across several lines."
@@ -199,6 +256,7 @@ invoke-virtual {v0}, Landroid/view/View;->getMeasuredHeight()I
 move-result v3
 const/16 v4, 35
 if-le v3, v4, :bad
+const-string v7, "TextView single line measurement"
 const/4 v3, 1
 invoke-virtual {v0, v3}, Landroid/widget/TextView;->setSingleLine(Z)V
 invoke-virtual {v0, v1, v2}, Landroid/view/View;->measure(II)V
@@ -208,8 +266,7 @@ if-gt v3, v4, :bad
 return-void
 :bad
 new-instance v0, Ljava/lang/AssertionError;
-const-string v1, "HTML text, URL span UTF-16 offsets or multiline measurement"
-invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+invoke-direct {v0, v7}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0') +
 		method('private static bitmapCanvasCheck()V', '
 const/4 v1, 4
@@ -319,9 +376,52 @@ invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0').replace('.locals 8', '.locals 10') +
 		method('protected onCreate(Landroid/os/Bundle;)V', '
 invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
+const-string v0, "bootstrap-async"
+const/16 v1, 42
+invoke-static {v0, v1}, Landroid/os/Trace;->beginAsyncSection(Ljava/lang/String;I)V
+invoke-static {v0, v1}, Landroid/os/Trace;->endAsyncSection(Ljava/lang/String;I)V
+invoke-static {}, Landroid/os/Trace;->isEnabled()Z
+move-result v0
+if-nez v0, :bad
+const/4 v0, -1
+invoke-static {v0}, Landroid/os/Process;->isApplicationUid(I)Z
+move-result v0
+if-nez v0, :bad
+const/4 v0, 0
+invoke-static {v0}, Landroid/os/Process;->isApplicationUid(I)Z
+move-result v0
+if-nez v0, :bad
+const/16 v0, 9999
+invoke-static {v0}, Landroid/os/Process;->isApplicationUid(I)Z
+move-result v0
+if-nez v0, :bad
+const/16 v0, 10000
+invoke-static {v0}, Landroid/os/Process;->isApplicationUid(I)Z
+move-result v0
+if-eqz v0, :bad
+const/16 v0, 19999
+invoke-static {v0}, Landroid/os/Process;->isApplicationUid(I)Z
+move-result v0
+if-eqz v0, :bad
+const/16 v0, 20000
+invoke-static {v0}, Landroid/os/Process;->isApplicationUid(I)Z
+move-result v0
+if-nez v0, :bad
+const v0, 110000
+invoke-static {v0}, Landroid/os/Process;->isApplicationUid(I)Z
+move-result v0
+if-eqz v0, :bad
+const v0, 120000
+invoke-static {v0}, Landroid/os/UserHandle;->isApp(I)Z
+move-result v0
+if-nez v0, :bad
 invoke-static {}, Landroid/os/Process;->is64Bit()Z
 move-result v0
 if-eqz v0, :bad
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-API-PASS async-trace application-uids"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->assetListCheck(Landroid/content/Context;)V
 new-instance v0, Landroid/graphics/Matrix;
 invoke-direct {v0}, Landroid/graphics/Matrix;-><init>()V
 const v1, 0x42b40000

@@ -57,6 +57,8 @@ pub fn framework_extra_classes(source string) map[string]string {
 }
 
 pub fn write_framework_classes(smali string) ! {
+ framework_async_trace(smali)!
+ framework_application_uid(smali)!
  framework_content_clients(smali)!
  framework_text_widgets(smali)!
  framework_check_widgets(smali)!
@@ -127,6 +129,33 @@ pub fn write_framework_classes(smali string) ! {
   '.method public constructor <init>(Landroid/content/Context;Landroid/util/AttributeSet;)V\n.locals 1\n' +
   'sget v0, Landroid/R$attr;->buttonStyle:I\n' +
   'invoke-direct {p0, p1, p2, v0}, Landroid/widget/Button;-><init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V\nreturn-void\n.end method')!)!
+}
+
+// API 29 exposes application-tag aliases for the older async trace API.
+// Retain the provider's enabled-tag checks (tracing is disabled on Vinix).
+fn framework_async_trace(smali string) ! {
+ path := smali + '/android/os/Trace.smali'
+ mut text := os.read_file(path)!
+ for method, target in {'beginAsyncSection': 'asyncTraceBegin', 'endAsyncSection': 'asyncTraceEnd'} {
+  signature := method + '(Ljava/lang/String;I)V'
+  text = framework_replace_method(text, signature,
+   '.method public static ' + signature + '\n.locals 2\nconst-wide/16 v0, 0x1000\n' +
+   'invoke-static {v0, v1, p0, p1}, Landroid/os/Trace;->' + target + '(JLjava/lang/String;I)V\nreturn-void\n.end method')!
+ }
+ os.write_file(path, text)!
+}
+
+fn framework_application_uid(smali string) ! {
+ user := smali + '/android/os/UserHandle.smali'
+ os.write_file(user, framework_replace_method(os.read_file(user)!, 'isApp(I)Z',
+  '.method public static isApp(I)Z\n.locals 2\nif-lez p0, :no\n' +
+  'invoke-static {p0}, Landroid/os/UserHandle;->getAppId(I)I\nmove-result v0\n' +
+  'const/16 v1, 10000\nif-lt v0, v1, :no\nconst/16 v1, 19999\nif-gt v0, v1, :no\n' +
+  'const/4 v0, 1\nreturn v0\n:no\nconst/4 v0, 0\nreturn v0\n.end method')!)!
+ process := smali + '/android/os/Process.smali'
+ os.write_file(process, framework_replace_method(os.read_file(process)!, 'isApplicationUid(I)Z',
+  '.method public static isApplicationUid(I)Z\n.locals 1\n' +
+  'invoke-static {p0}, Landroid/os/UserHandle;->isApp(I)Z\nmove-result v0\nreturn v0\n.end method')!)!
 }
 
 fn framework_text_widgets(smali string) ! {
