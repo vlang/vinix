@@ -16115,11 +16115,52 @@ context/generic arguments and caches the returned metadata pointer. Inspection
 executes no application code and does not establish support for every name
 that helper may resolve.
 
-The next missing import is
-`_swift_getTypeByMangledNameInContextInMetadataState2`, at GOT cell
-`0x10dc9bba0`, stub `0x10c63ec7c`, branch island `0x107c28ee0` and caller
-`0x1015c0660`. It passes request `0xff`, a relative name/length pair and null
-context/generic arguments, then caches the returned metadata pointer.
+`_swift_getTypeByMangledNameInContextInMetadataState2` now resolves the shared
+bounded mangled-type subset through the existing metadata-state lookup engine.
+Its SwiftCC entry receives request, name address, byte length, context descriptor
+and generic argument vector in `x0` through `x4`, returning one metadata pointer
+in `x0`. Native comparisons cover requests `0`, `0x3f`, `0xff`, `0x100`, `0x13f`
+and `0x1ff`: Complete, LayoutComplete and Abstract, with their nonblocking forms.
+All supported requests use synchronous resolution and request `0xff` from
+nominal accessors; this subset requires their responses to be Complete.
+
+As in the [Swift 5.10 version-2 metadata-state entry](https://github.com/swiftlang/swift/blob/swift-5.10-RELEASE/stdlib/public/runtime/MetadataLookup.cpp#L2284-L2295),
+the versioned context uses the signed descriptor ABI on arm64e. This plain-ARM64
+runner preserves its loaded unsigned descriptor identities. Request/lifetime
+validation precedes caller-storage reads. Parsing, canonical metadata caches,
+generic substitution limits, complete-response checks and unlocked accessor
+calls remain shared with the existing engine. The entry owns no arena or cache;
+caller storage remains borrowed until readers drain. Other request states,
+unsupported expressions/contexts and deferred accessor responses fail explicitly.
+
+```sh
+v run tests/ios/native-checks.v build-mangled-state2
+```
+
+Evidence is retained under `build/ios/fortnite/mangled-state2-checks`. Native
+comparisons verify the five-scalar pointer-result ABI, all six request forms,
+Abstract accessor traces, canonical String/Int/Void/nested Arrays and generic
+Array substitution. Tests also cover direct/indirect symbolic class/struct/enum
+accessors, readonly names/descriptors, protected span ends and unused inputs,
+inaccessible `x8`, preserved `x20`/`x21`/`x22`, request/syntax rejection before
+callbacks, incomplete responses, unlocked reentry, eight readers and two drained
+runtime lifetimes. Eight normal/deterministic ASan/UBSan runs passed across both
+C++ configurations, including context2 and legacy metadata-state regressions.
+The ARM64 fixture, launch probe and both import audits passed their checks.
+Eight compressed binary/generated-C pairs and five C/ARM64 reviews retain the
+tested entry and shared request/parser/accessor paths. Existing boxed literal
+diagnostics occur only on rejection paths in the reviewed generated C.
+
+Static inspection traces this required import through GOT cell `0x10dc9bba0`,
+stub `0x10c63ec7c`, branch island `0x107c28ee0` and caller `0x1015c0660`.
+It passes request `0xff`, a relative name/length pair and null context/generic
+arguments, then caches the returned metadata pointer. Inspection executes no
+application code and does not establish support for every possible name.
+
+The next missing import is `_swift_initStaticObject`, at GOT cell `0x10dc9bbb8`,
+stub `0x10c63eca0` and branch island `0x107c28a70`. Inspected callers
+`0x10006ef94` and `0x10006f050` retain the returned object and use it in
+string-switch lookup. Static object initialization remains unsupported.
 Application entry remains unreached and Fortnite is still unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -16127,12 +16168,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,976 | 185 | 78 |
+| Fortnite executable | 1,977 | 184 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,816 | 188 | 114 |
+| All images | 2,817 | 187 | 114 |
 
-The C++/GLES/Text variant reports 2,830 resolved imports, 174 unresolved strong
+The C++/GLES/Text variant reports 2,831 resolved imports, 173 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
