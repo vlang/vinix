@@ -308,6 +308,7 @@ fn swift_optional_symbol(symbol string) ?u64 {
 fn swift_optional_stop() {
 	// Metadata users/typed owners have drained before this locked retirement.
 	ios_runtime.swift_optional_retired = true
+	swift_optional_decoding_stop()
 	swift_optional_encoding_stop()
 	page := usize(C.getpagesize())
 	for _, metadata in ios_runtime.swift_optional_metadata {
