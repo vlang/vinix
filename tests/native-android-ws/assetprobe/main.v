@@ -28,6 +28,16 @@ fn C.eglGetCurrentSurface(i32) voidptr
 fn C.eglGetProcAddress(&char) voidptr
 fn C.eglGetError() i32
 fn C.eglInitialize(voidptr, &i32, &i32) u32
+fn C.eglTerminate(voidptr) u32
+fn C.eglBindAPI(u32) u32
+fn C.eglQueryAPI() u32
+fn C.eglReleaseThread() u32
+fn C.ASurfaceTexture_fromSurfaceTexture(voidptr, voidptr) voidptr
+fn C.ASurfaceTexture_release(voidptr)
+fn C.ASurfaceTexture_attachToGLContext(voidptr, u32) i32
+fn C.ASurfaceTexture_detachFromGLContext(voidptr) i32
+fn C.ASurfaceTexture_updateTexImage(voidptr) i32
+fn C.ASurfaceTexture_getTimestamp(voidptr) i64
 
 @[export: 'Java_org_vinix_bootstrap_Main_nativeGraphics']
 pub fn graphics_check(e voidptr, class voidptr) u8 {
@@ -41,6 +51,19 @@ pub fn graphics_check(e voidptr, class voidptr) u8 {
 		mut major, mut minor := i32(-9), i32(-8)
 		if C.eglInitialize(nil, &major, &minor) != 0 || C.eglGetError() != 0x3008
 			|| major != -9 || minor != -8 || C.eglGetError() != 0x3000 { return 0 }
+		if C.eglTerminate(nil) != 0 || C.eglGetError() != 0x3008
+			|| C.eglBindAPI(0x30a0) != 1 || C.eglQueryAPI() != 0x30a0
+			|| C.eglBindAPI(0x30a2) != 0 || C.eglGetError() != 0x300c { return 0 }
+		C.eglBindAPI(0)
+		if C.eglReleaseThread() != 1 || C.eglGetError() != 0x3000
+			|| C.eglGetCurrentContext() != nil || C.eglQueryAPI() != 0x30a0 { return 0 }
+		if C.ASurfaceTexture_fromSurfaceTexture(e, nil) != nil
+			|| C.ASurfaceTexture_fromSurfaceTexture(e, class) != nil
+			|| C.ASurfaceTexture_attachToGLContext(nil, 1) != -22
+			|| C.ASurfaceTexture_detachFromGLContext(nil) != -22
+			|| C.ASurfaceTexture_updateTexImage(nil) != -22
+			|| C.ASurfaceTexture_getTimestamp(nil) != 0 { return 0 }
+		C.ASurfaceTexture_release(nil)
 		return 1
 	}
 }

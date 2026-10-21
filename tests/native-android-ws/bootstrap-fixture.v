@@ -153,6 +153,7 @@ throw v0') +
 		'.method public static native nativeBitmap(Landroid/graphics/Bitmap;)Z\n.end method\n' +
 		'.method public static native nativeGraphics()Z\n.end method\n' +
 		'.method public static native nativeWindow(Landroid/view/Surface;)Z\n.end method\n' +
+		'.method public static native nativeLibc()Z\n.end method\n' +
 		'.method public static native nativeDependency()I\n.end method\n' +
 		method('private static timezoneCheck()V', '
 invoke-static {}, Ljava/util/TimeZone;->getAvailableIDs()[Ljava/lang/String;
@@ -605,6 +606,12 @@ invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->nativeGraphics()Z
 move-result v0
 if-eqz v0, :bad
+invoke-static {}, Lorg/vinix/bootstrap/Main;->nativeLibc()Z
+move-result v0
+if-eqz v0, :bad
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-LIBC-PASS pread checked-offset short-read api-level allocator-options shared-memory"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 new-instance v0, Landroid/view/SurfaceView;
 invoke-direct {v0, p0}, Landroid/view/SurfaceView;-><init>(Landroid/content/Context;)V
 sput-object v0, Lorg/vinix/bootstrap/Main;->surface:Landroid/view/SurfaceView;

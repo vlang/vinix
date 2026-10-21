@@ -137,6 +137,30 @@ pub fn ws_egl_surface_attribute(display voidptr, surface voidptr, attribute i32,
 	return 0
 }
 
+@[export: 'eglTerminate']
+pub fn ws_egl_terminate(display voidptr) u32 {
+	ws_egl_error(0x3008)
+	return 0
+}
+
+// ES is the only client API exposed by this dispatch provider. Binding it
+// selects the API; it does not create a context or promise a usable display.
+@[export: 'eglBindAPI']
+pub fn ws_egl_bind(api u32) u32 {
+	if api == 0x30a0 { return 1 }
+	ws_egl_error(0x300c)
+	return 0
+}
+
+@[export: 'eglQueryAPI']
+pub fn ws_egl_api() u32 { return 0x30a0 }
+
+@[export: 'eglReleaseThread']
+pub fn ws_egl_release_thread() u32 {
+	unsafe { C.pthread_setspecific(ws_egl_error_key, nil) }
+	return 1
+}
+
 @[export: 'eglQueryString']
 pub fn ws_egl_query_string(display voidptr, name i32) &char {
 	if display == unsafe { nil } && name == 0x3055 { return c'EGL_EXT_client_extensions' }
