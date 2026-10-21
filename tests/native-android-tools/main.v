@@ -32,6 +32,8 @@ fn main() {
 		androidtools.runtime_cli(os.args[3..]) or { eprintln(err); exit(androidtools.failure_status(err)) }
 	} else if os.args[1] == 'extend-framework' {
 		androidtools.framework_cli(os.args[3..]) or { eprintln(err); exit(androidtools.failure_status(err)) }
+	} else if os.args[1] == 'compile-native-ws' {
+		androidtools.native_ws_cli(os.args[3..]) or { eprintln(err); exit(androidtools.failure_status(err)) }
 	} else if os.args[1] == 'art-bootclasspath' {
 		androidtools.boot_cli(os.args[3..]) or { eprintln(err); exit(androidtools.failure_status(err)) }
 	} else if os.args[1] == 'atl-dex' {

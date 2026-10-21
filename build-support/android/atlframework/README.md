@@ -34,9 +34,12 @@ and loops over ICU converters and recursive view state bound local references
 with JNI frames. The library requires no V heap/runtime allocation support.
 `jni.v` defines the stable JNI C ABI; Java `int` is explicitly `i32`.
 
-These are Android API implementations over ATL's existing GTK widgets. GTK
-still uses the embedded X11 bridge in Vinix. A native Vinix WS backend must
-also implement GTK's display, input and rendering integration.
+The default desktop launcher uses the [native WS backend](../nativews/README.md),
+which reuses this module's toolkit-independent framework APIs and supplies its
+own View, Canvas, dialog, resource, database and input implementations in V.
+It does not register this module's GTK-specific ScrollView/dialog functions
+or preload the legacy VM interposer. The GTK behavior described above belongs
+to the retained historical ATL entry point.
 
 For an existing original ATL JAR, use:
 

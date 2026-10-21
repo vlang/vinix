@@ -63,6 +63,13 @@ pub fn write_build_manifest(kind string, arguments []string) ! {
 		jar := output + '/usr/lib/java/dex/android_translation_layer/api-impl.jar'
 		framework = extend_framework(jar, jar, work, work + '/tools', os.getenv('VINIX_ATL_JAVA_D8'))!
 		build_framework_library(output + '/usr/lib/art/libvinix-android-framework.so', 'gcc', work + '/generated', 'arm64')!
+		build_native_ws(work + '/smali',arguments[11],work + '/native-ws','gcc','arm64')!
+		os.mkdir_all(output + '/usr/lib/art/native-ws')!
+		os.mkdir_all(output + '/usr/bin')!
+		os.cp(work + '/native-ws/libvinix-android-native.so',output + '/usr/lib/art/libvinix-android-native.so')!
+		os.cp(work + '/native-ws/libdl_bio.so.0',output + '/usr/lib/art/native-ws/libdl_bio.so.0')!
+		os.cp(work + '/native-ws/vinix-android-native',output + '/usr/bin/vinix-android-native')!
+		os.cp(work + '/native-ws/run-android',output + '/usr/bin/run-android-native')!
 	}
 	mut paths := []string{}; descendants(output + '/usr', mut paths)!; paths.sort()
 	mut files := []ah.Value{}

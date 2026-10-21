@@ -1,0 +1,109 @@
+{
+    "applications": [
+        {
+            "activity": "calculator/Calculator",
+            "apk": "build/android-calculator-20261020-borderless-prepared/overlay/opt/android-test/application.apk",
+            "apk_sha256": "1928e65ced8cbe78be2ff3cb4c321e9e75d138e8e30ea1368fbb772a86827d1d",
+            "id": "calculator",
+            "screenshots": [
+                {
+                    "path": "docs/screenshots/vinix-android-calculator-ws-qemu.png",
+                    "sha256": "99f475578df2b57653a73770132d18d12ae3b47ead75d9b9a717baca288275c2"
+                }
+            ],
+            "serial_log": "calculator.serial.log.gz",
+            "serial_sha256": "c22b31de143923d435e2189b4ace959a97307d1894ba0faa1c95186ca14faba9",
+            "serial_source": "build/android-native-ws/calculator-final.serial.log",
+            "verification": "Typed 123+456 through QMP; actual APK TextView trace and framebuffer show 579.",
+            "workflow_passed": true
+        },
+        {
+            "activity": "org/billthefarmer/editor/Editor",
+            "apk": "build/android-complex/Editor-1.98.apk",
+            "apk_sha256": "343d17e11d0914e1a7708df2781580a0413e52501c0a41d91f7ef725d9615fe9",
+            "id": "editor",
+            "screenshots": [
+                {
+                    "path": "docs/screenshots/vinix-android-editor-ws-qemu.png",
+                    "sha256": "831cd10e31bdd85d4064f431c7d3a64be4320cdf28481e3896d0aa2ef0ac9fe8"
+                }
+            ],
+            "serial_log": "editor.serial.log.gz",
+            "serial_sha256": "cfd2c3eef6d4a7e564ff273713e62c6c6fd9d35eb6eebda1c73efe5a4f42434f",
+            "serial_source": "build/android-native-ws/editor-final.serial.log",
+            "verification": "Real Activity recreation into Edit mode; typed Vinix native WS APK test, saved via filename dialog to Documents/VinixNative.txt, cleared through New, reopened Recent; real APK loaded the saved phrase with word count 5.",
+            "workflow_passed": true
+        },
+        {
+            "activity": "org/moire/opensudoku/gui/FolderListActivity",
+            "apk": "build/android-complex/OpenSudoku-2.5.2.apk",
+            "apk_sha256": "a874f3c9abc7a91dc7d74bbd9bfe74b18a14e3e3ee997f329675e1c37db755bc",
+            "id": "sudoku",
+            "screenshots": [
+                {
+                    "path": "docs/screenshots/vinix-android-opensudoku-ws-qemu.png",
+                    "sha256": "0d71b07ceadd4e04b761ee2d6dba6ab1b01668e64f5a932ed1e5319d94cc43ea"
+                }
+            ],
+            "serial_log": "sudoku.serial.log.gz",
+            "serial_sha256": "a43ccc09856ab1f97beca05a22381c4999b8151e4345dc54ea16babbca843cbc",
+            "serial_source": "build/android-native-ws/sudoku-final.serial.log",
+            "verification": "Real SQLite seed lists 3 folders with 30 puzzles each. Opened Easy first puzzle, dismissed hints, switched to Single number, chose 7 and touched blank top-left cell. Back to list and reopen retains 7 at row 1 column 1.",
+            "workflow_passed": true
+        }
+    ],
+    "artifacts_sha256": {
+        "androidfw_c_api.h": "e233a055133776838b8044ca43eb9e8dfac387a0580918786d60207276d37af4",
+        "api-impl.jar": "fefeab920c5c224443db79d1b4080bd21fa97dc8e51685b7d4caa8ab7a30a5ee",
+        "guest-kernel": "a310a06243cd397bba18c8e594d55fb2c0cee4610b2fc64643e437720345da5e",
+        "libdl_bio.so.0": "6c85192d8b11b81f7850399a447545eca6f7e6c6d4ed84d5daf420d5d50ac40c",
+        "libvinix-android-native.so": "ee6ccd3c7a87f7889e9585b3a9615292147befc4dc57c995a42114d41245f3a2",
+        "run-android": "9e41ee2ba2082f05674012fdb45fd4548f7d7495ec536824b66d4b443bea5ce2",
+        "sqlite3.h": "919e7f2e8ed1d8f56ac17b412b8971c76aa5d1a879752cc6058f75e7d5910e1d",
+        "stb_image.h": "0be21b50c4f55faef1ddbb91e1ad6ff094942069a54b77fe6bf1ead0286cdbb5",
+        "stb_truetype.h": "91bea13bf8bd94352f9465cb3ceaff998f0e10f68174098e39c930fab358e1e3",
+        "vinix-android-native": "611b0e74b21c669aad9d17cef0d3e83d93be6cb57c103cc3f1d3444015e4b5da",
+        "vinix-desktop": "6037ff8cb45ec044db42cc8deea414fbdf0e6a66d4b0588d5ac5bb1a366015bf"
+    },
+    "date": "2026-10-21",
+    "guest_memory_mib": 12288,
+    "guest_page_size": 16384,
+    "host_checks": [
+        "JNI ABI widths/mangling/descriptors PASS",
+        "Native runtime staging 26 cases PASS",
+        "ARM64 desktop cross-build PASS",
+        "Native backend GCC Wall Wextra Werror PASS"
+    ],
+    "known_limits": [
+        "Preserved runtime fails newer ANDROID-ATFORK-FAIL Android ABI exports preflight",
+        "No phone hardware validation",
+        "No Bionic NDK/GLES backend",
+        "Static help HTML only; no JavaScript/network WebView",
+        "No popup tab, wheel/drag, full text selection/shaping or software keyboard qualification"
+    ],
+    "native_bindings": 273,
+    "runtime": "/Users/alex/code/vinix-android-native/build-aarch64-android/aarch64/staging/opt/vinix-android-aarch64",
+    "scope": "Native WS APK workflows on ARM64 Vinix in QEMU/HVF; manual functional verification with real QMP input. Not full runtime or phone qualification.",
+    "sources_sha256": {
+        "build-support/android/native-entry.v": "409b0c8fbfaaf9e7cf4caae7c6bf4f0847efbf0ef5d2abe3fd719e37aeb93e3b",
+        "build-support/android/native-run.v": "2dfee23a2e48b441a9a1931a1fa3b359273f9184a9ce713902f1c7b4e371c0da",
+        "build-support/android/nativews/bindings.txt": "8f7b994423cb25ef220e187bbc9cbd3dc1b03b3e8ec29a07968b5f96abc5424a",
+        "build-support/android/nativews/bitmaps.v": "dac0a37d1c1633c28c460a4fec7df187b296619c0e1530bc1323082573acc5f6",
+        "build-support/android/nativews/graphics.v": "72b36247a733c665fce5b23af8b482a3e3459dfb8ceb0dc3a6177ac6c660d9b3",
+        "build-support/android/nativews/html.v": "a2c135d430bfff7f08a32023f62c41c5843788c99ebcceb1f24c272c27e21ab8",
+        "build-support/android/nativews/images.v": "d9f9f52740605da726e9b81c6eabeafca3a49fe642f252f702715d97777d642a",
+        "build-support/android/nativews/matrix.v": "4b73914b7a9c575502c6fd156e41c65654bc1992fe2337c75ed3454940c97d76",
+        "build-support/android/nativews/paths.v": "2a5c201ecb4552446e8d667e06590aa1ef33adec10a90c8a3ad2bb9a80e64607",
+        "build-support/android/nativews/queue.v": "c0fb6b64f4ba991dc50bcbbe1233ef057102ad61223db6e972bc21e60b935903",
+        "build-support/android/nativews/resources.v": "ba47700cd307b1b87adfdbb2ebb52b83be4e9c743e44927316a424f3d64091e1",
+        "build-support/android/nativews/runtime.v": "fe3ae35b44a188a52c5898bfd72a543ee548d16cb7edfc61b9f11eda97b5b5c9",
+        "build-support/android/nativews/sqlite.v": "6120162336c42ff5e1526e371e61b4d3aa6111a6faea3121badde0e27a061c9d",
+        "build-support/android/nativews/text_layout.v": "444214eb56d814ce47aa1ce7f08428cce24fd8de85d4fb19e4cfc4a6389fa0ed",
+        "build-support/android/nativews/ws_dialogs.v": "9fe240c31d67ae7b25c7c5fbc8872b72ff9df774c5a5666f521fdc6ae2159e27",
+        "build-support/android/nativews/ws_views.v": "e626fef86bb5c5451b38d8c857b01ceec53a46a660f2280037249a714f075dc9",
+        "build-support/android/wsloader/loader.v": "50c53d4c7813cd47bfda47cf3ee219a375b5167d041ab5e6db59cfa188c1678c",
+        "desktop/android_app.v": "1f869a171a75c60799c2a0c3e78de07ee3594b9182e371a98db8d34221e0e697",
+        "tests/native-android-tools/androidtools/native_ws.v": "f90325d6d27fc1b1f0397a666dbd0814bf1c22f3db44e9a59adb055b33fd55b5",
+        "tests/native-android-ws/guest.v": "3567ce8c130680102d47585a6b2663c1fc2d8af764675bcd6fa12568715c9b37"
+    }
+}

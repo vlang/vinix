@@ -3,8 +3,10 @@
 Vinix's ARM64 desktop runs Android APKs with
 [Android Translation Layer](https://gitlab.com/android_translation_layer/android_translation_layer)
 and ART. ART executes the application's DEX bytecode; ATL implements Android
-framework calls using native Linux libraries and GTK. The runtime, its helpers
-and ARM64 JNI libraries execute directly on the ARM64 CPU. Java bytecode
+framework APIs. The desktop uses a V backend that renders directly into a
+Vinix WS surface and receives native WS input. GTK and X11 are absent from
+this APK execution path. The runtime, its helpers and ARM64 JNI libraries
+execute directly on the ARM64 CPU. Java bytecode
 interpretation is provided by ART with its JIT disabled.
 
 Vinix uses 16 KiB memory pages. The standard Alpine ART package assumes 4 KiB,
@@ -82,8 +84,10 @@ to `build-aarch64-android/aarch64/bionic-runtime`, and ATL defaults to
 `VINIX_ANDROID_BIONIC_RUNTIME` and `VINIX_ANDROID_ATL_RUNTIME` override those
 locations. The runtime builder installs the
 checksum-pinned Alpine ARM64 dependency closure and patched ART under
-`/opt/vinix-android-aarch64`. Its musl loader, GTK and libraries remain private
-to APK processes. It installs no CPU translator. `packages.lock.json`,
+`/opt/vinix-android-aarch64`. Its musl loader and libraries remain private
+to APK processes. Upstream ATL build dependencies still include GTK, but the
+native launcher does not load it or start an X server. It installs no CPU
+translator. `packages.lock.json`,
 `runtime-manifest.json`, `art-runtime-manifest.json`,
 `bionic-runtime-manifest.json` and `atl-runtime-manifest.json` preserve provenance.
 `--update-lock` explicitly regenerates the Alpine package selection.
@@ -108,75 +112,67 @@ The archive and APK are verified against recorded SHA256 hashes. Click the
 input field above the history list before typing; this version uses keyboard
 input.
 
-![Arity 1.1 calculating 123+456 as 579 with a single Vinix title bar](screenshots/vinix-android-calculator-borderless-qemu.png)
+![Arity 1.1 calculating 123+456 as 579 on native Vinix WS](screenshots/vinix-android-calculator-ws-qemu.png)
 
-The embedded X11 bridge sets `ATL_DISABLE_WINDOW_DECORATIONS=1` for its child.
-Vinix supplies the title bar and window controls, and ATL hides its inner GTK
-header bar. Standalone APK launches on another X11 display retain ATL's default
-decorations.
+Vinix supplies the single title bar and window controls. Android menus, views,
+dialogs and Canvas content render inside that native surface. The
+[native WS backend](../build-support/android/nativews/README.md) describes the
+implemented API subset, JNI build and surface protocol.
 
-On 20 October 2026, the unchanged APK displayed `579` after QMP keyboard input
-of `123+456`, with zero key retries and a single title bar, using the current
-desktop and kernel binaries and the preserved 3 October ARM64 runtime. The
-screenshot above is the actual QEMU framebuffer. [Hashes, observed markers and
-the focused V driver](../tests/android/results/2026-10-20/embedded-apks.json)
-retain the refreshed evidence; the [initial calculator run](../tests/android/results/2026-10-20/calculator.json)
-retains its original capture. The direct X11 check also displayed `579` using
-XTEST and the updated input-field coordinates.
-The full runtime preflight failed on `ANDROID-ATFORK-FAIL Android ABI exports`
-in that older runtime, before launching an APK. The separate calculator check
-retained stack/memory checks and the normal application/input/result path;
-it does not establish full runtime conformance or phone hardware support.
-Use matching rebuilt overlays for the complete guest test below.
-
-The V framework extension now runs two larger, unchanged open-source APKs on
-the preserved ARM64 runtime. On 21 October 2026, QMP input exercised these
-workflows in the actual Vinix desktop:
+On 21 October 2026, native WS checks exercised these unchanged open-source
+APKs through actual QMP keyboard/pointer input in an ARM64 Vinix guest:
 
 | APK | Verified workflow |
 | --- | --- |
+| Arity 1.1 | Type `123+456` and inspect the application’s `579` result. |
 | [Editor 1.98](https://github.com/billthefarmer/editor/tree/v1.98) | Enter edit mode through Activity recreation, type text, save through the filename dialog, clear the document, and reopen the saved file. |
 | [Open Sudoku 2.5.2](https://gitlab.com/opensudoku/opensudoku/-/tree/2.5.2) | Open Easy and a puzzle, dismiss the reusable hints, select Single number mode, enter `7` by touch, return to the list, and reopen with that value retained. |
 
-![Editor APK after reopening its saved document](screenshots/vinix-android-editor-qemu.png)
+![Editor APK after reopening its saved document](screenshots/vinix-android-editor-ws-qemu.png)
 
-![Open Sudoku APK with an entered value retained after reopening](screenshots/vinix-android-opensudoku-qemu.png)
+![Open Sudoku APK with an entered value retained after reopening](screenshots/vinix-android-opensudoku-ws-qemu.png)
 
 These are QEMU framebuffer captures. The test uses the existing **Android
 Calculator** desktop launcher slot for each APK, so that outer caption remains
 in the captures. The APKs supply the document editor, puzzle boards and data.
-[Workflow evidence and reproduction instructions](../tests/android/results/2026-10-21/README.md)
-record APK hashes, framework provenance, screenshots and serial logs.
-Sudoku's popup tabs and advanced operations are outside these checks.
+[Native workflow evidence and reproduction instructions](../tests/android/results/2026-10-21/native-ws/README.md)
+record APK hashes, backend provenance, screenshots and serial logs. The guest
+also inspects real process maps and rejects GTK/GDK/X11 libraries or X server
+processes. Sudoku’s popup tabs and advanced operations are outside these checks.
 
 The [V framework module](../build-support/android/atlframework/README.md)
 implements the missing ActionBar, options menus, cursor adapter/lifecycle,
 ListActivity row dispatch, callbacks and dialog behavior. Recreation delivers
 the saved Bundle to a new Activity and restores EditText values with stable
-IDs. ScrollView commands update real GTK scroll adjustments; smooth scrolling
-currently changes position immediately. Themes apply a system base before app
+IDs. The WS backend provides native views, software Canvas, in-surface dialogs,
+asset reads, real SQLite queries and wakeable Looper queues. ScrollView commands
+update native coordinates; smooth scrolling changes position immediately.
+Themes apply a system base before app
 overlays, buttons use their default style, and ICU charset enumeration excludes
 converters the installed Java provider cannot construct. The normal ATL build
 generates the JNI declarations and packages the V library with source/tool
 hashes in its manifest. APK files are not patched.
 
-GTK still uses X11 inside the Vinix desktop. Removing it requires a GTK display,
-input and rendering backend for Vinix WS. The app failures fixed here were in
-the Android framework layer. These focused application checks retain stack and
-memory probes; they do not establish complete runtime conformance or mobile
-hardware support.
+These application checks do not establish complete runtime conformance or
+mobile hardware support. The preserved runtime still fails the newer
+`ANDROID-ATFORK-FAIL Android ABI exports` preflight. Rebuild matching overlays
+for complete runtime qualification. The [earlier GTK workflow report](../tests/android/results/2026-10-21/README.md)
+and [calculator report](../tests/android/results/2026-10-20/calculator.json)
+remain historical evidence for that separate implementation.
 
-On an existing X11 display, including a session started with `startx`, launch
-another APK with:
+The desktop launches APKs with a WS surface and input pipe. Inside such a
+native client connection, the public launcher accepts:
 
 ```sh
 run-android /root/example.apk
 run-android /root/example.apk -l com/example/MainActivity -w 480 -h 640
 ```
 
-`-l` selects an activity using slash-separated names. Other arguments are
-passed to ATL. App data is stored under `$XDG_DATA_HOME/vinix/android`, normally
-`$HOME/.local/share/vinix/android`. `ANDROID_APP_DATA_DIR` selects another root.
+`-l` selects an activity using slash-separated names. `-w`/`-h` select surface
+dimensions between 64 and 4096 pixels. The launcher requires
+`VINIX_SURFACE_PATH` and WS input on stdin; an ordinary terminal does not
+provide that connection. App data is stored under `$XDG_DATA_HOME/vinix/android`,
+normally `$HOME/.local/share/vinix/android`. `ANDROID_APP_DATA_DIR` selects another root.
 The launcher supplies a finite 32 MiB stack limit; `VINIX_ANDROID_STACK_KB`
 overrides it. The compatibility library reports the usable initial stack
 within both Vinix's mapped reservation and that limit. Worker stack metadata
@@ -191,12 +187,16 @@ after finalization. The table supports 128 successful Android registrations
 per process; further registrations return `ENOMEM`. Registering or finalizing
 handlers from inside a running fork callback is unsupported.
 
-Compatibility follows ATL's implemented Android API subset. APKs containing
-native libraries need `arm64-v8a` libraries. Pure Java/DEX APKs do not require
-an architecture-specific native payload. Modern Android APIs, services and
-resource qualifiers can require additional ATL implementation; the presence
+Compatibility follows the implemented Android API subset. Pure Java/DEX APKs
+do not require an architecture-specific native payload. Modern Android APIs,
+services and resource qualifiers can require additional implementation; the presence
 of an APK launcher does not establish compatibility with every application.
-The unchanged Roblox 2.738.1397 APK initializes its content providers and
+The native WS loader supports Linux JNI providers, not Bionic NDK or GLES APK
+libraries. WebView only displays static HTML/text help content; modern web
+apps, advanced drawing and text editing remain incomplete.
+
+In the earlier GTK/ATL execution path, the unchanged Roblox 2.738.1397 APK
+initializes its content providers and
 completes the ARM64 engine's `JNI_OnLoad` through native ATL/ART. The coherent
 framework, fork callbacks, real NDK configuration API, fortified I/O wrappers
 and private allocator statistics resolve its earlier missing native imports.
@@ -208,9 +208,11 @@ untrusted local certificate. XML `<requestFocus />` tags are consumed during
 inflation and restore focus once children attach, respecting hidden views. The latest client launch then
 aborts on the missing `View.OnCapturedPointerListener` API. A usable Roblox
 screen, authentication and gameplay remain unverified. The [Roblox desktop entry](roblox.md) uses this
-same native ATL/ART runtime.
+private ATL/ART runtime. Its Bionic/GLES launch is not covered by the WS checks.
 
-Run the real guest test after building the runtime, desktop and kernel:
+The historical X11-oriented guest harness remains available for the legacy
+ATL path and runtime preflights. It has not been ported to the WS backend;
+use the native workflow procedure linked above for WS application checks:
 
 ```sh
 build-support/run-v-tool.sh tests/android/launcher-test.v

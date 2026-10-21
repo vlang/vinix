@@ -1,0 +1,274 @@
+# Class|method|V implementation body. Missing APIs produce UnsatisfiedLinkError.
+android/content/res/AssetManager|init|ws_resource_init(e,this,p0)
+android/content/res/AssetManager|native_setApkAssets|ws_assets(e,this,p0,p1)
+android/content/res/AssetManager|loadResourceValue|return ws_resource(e,this,p0,p1,p2,p3)
+android/content/res/AssetManager|loadResourceBagValue|return ws_bag_value(e,this,p0,p1,p2)
+android/content/res/AssetManager|getArraySize|bag := &C.ResolvedBag(C.AssetManager_getBag(ws_manager(e,this),u32(p0))); return if bag == nil { 0 } else { i32(bag.entry_count) }
+android/content/res/AssetManager|getArrayStringResource|return ws_resource_array(e,this,p0,nil,true)
+android/content/res/AssetManager|retrieveArray|ws_resource_array(e,this,p0,p1,false); bag := &C.ResolvedBag(C.AssetManager_getBag(ws_manager(e,this),u32(p0))); return if bag == nil { 0 } else { i32(bag.entry_count) }
+android/content/res/AssetManager|getResourceIdentifier|return ws_resource_id(e,this,p0,p1,p2)
+android/content/res/AssetManager|getResourcePackageName|return ws_resource_name(e,this,p0,0)
+android/content/res/AssetManager|getResourceTypeName|return ws_resource_name(e,this,p0,1)
+android/content/res/AssetManager|getResourceEntryName|return ws_resource_name(e,this,p0,2)
+android/content/res/AssetManager|getResourceName|return ws_resource_name(e,this,p0,3)
+android/content/res/AssetManager|getPooledString|return ws_pool_string(e,voidptr(C.AssetManager_getStringPoolForCookie(ws_manager(e,this),p0 - 1)),p1)
+android/content/res/AssetManager|newTheme|return i64(C.AssetManager_newTheme(ws_manager(e,this)))
+android/content/res/AssetManager|deleteTheme|C.Theme_delete(voidptr(p0))
+android/content/res/AssetManager|applyThemeStyle|C.Theme_applyStyle(voidptr(p0),u32(p1),p2 != 0)
+android/content/res/AssetManager|copyTheme|C.Theme_setTo(voidptr(p0),voidptr(p1))
+android/content/res/AssetManager|loadThemeAttributeValue|return ws_theme_value(e,this,p0,p1,p2,p3)
+android/content/res/AssetManager|applyStyle|ws_apply_style(e,p0,p1,p2,p3,p4,p5,p6,p7)
+android/content/res/AssetManager|retrieveAttributes|return ws_retrieve(e,this,p0,p1,p2,p3,p4)
+android/content/res/AssetManager|resolveAttrs|return ws_resolve_attrs(e,p0,p1,p2,p3,p4,p5,p6)
+android/content/res/AssetManager|openXmlAssetNative|return ws_open_xml(e,this,p1)
+android/content/res/AssetManager|openAsset|return ws_open_asset(e,this,p0,p1)
+android/content/res/AssetManager|readAsset|return ws_asset_read(e,p0,p1,p2,p3)
+android/content/res/AssetManager|getAssetLength|return C.Asset_getLength(voidptr(p0))
+android/content/res/AssetManager|getAssetRemainingLength|return C.Asset_getRemainingLength(voidptr(p0))
+android/content/res/AssetManager|seekAsset|return C.Asset_seek(voidptr(p0),p1,p2)
+android/content/res/AssetManager|destroyAsset|C.Asset_delete(voidptr(p0))
+android/content/res/AssetManager|isUpToDate|return 1
+android/content/res/AssetManager|setConfiguration|config := C.ResTable_config{mcc:u16(p0),mnc:u16(p1),orientation:u8(p3),touchscreen:u8(p4),density:u16(p5),keyboard:u8(p6),navigation:u8(p8),screenWidth:u16(p9),screenHeight:u16(p10),smallestScreenWidthDp:u16(p11),screenWidthDp:u16(p12),screenHeightDp:u16(p13),screenLayout:u8(p14),uiMode:u8(p15),sdkVersion:u16(p16)}; C.AssetManager_setConfiguration(ws_manager(e,this),&config)
+android/content/res/XmlBlock|nativeCreateParseState|parser := C.ResXMLParser_new(voidptr(p0)); C.ResXMLParser_restart(parser); return i64(parser)
+android/content/res/XmlBlock|nativeCreate|return ws_xml_create(e,p0,p1,p2)
+android/content/res/XmlBlock|nativeNext|return ws_xml_next(p0)
+android/content/res/XmlBlock|nativeGetPooledString|return ws_pool_string(e,voidptr(C.ResXMLParser_getStrings(voidptr(p0))),p1)
+android/content/res/XmlBlock|nativeGetName|return ws_pool_string(e,voidptr(C.ResXMLParser_getStrings(voidptr(p0))),C.ResXMLParser_getElementNameID(voidptr(p0)))
+android/content/res/XmlBlock|nativeGetAttributeCount|return i32(C.ResXMLParser_getAttributeCount(voidptr(p0)))
+android/content/res/XmlBlock|nativeGetAttributeResource|return i32(C.ResXMLParser_getAttributeNameResID(voidptr(p0),usize(p1)))
+android/content/res/XmlBlock|nativeGetAttributeIndex|return ws_xml_index(e,p0,p1,p2)
+android/content/res/XmlBlock|nativeGetAttributeStringValue|return ws_pool_string(e,voidptr(C.ResXMLParser_getStrings(voidptr(p0))),C.ResXMLParser_getAttributeValueStringID(voidptr(p0),usize(p1)))
+android/content/res/XmlBlock|nativeGetLineNumber|return i32(C.ResXMLParser_getLineNumber(voidptr(p0)))
+android/content/res/XmlBlock|nativeGetAttributeDataType|return C.ResXMLParser_getAttributeDataType(voidptr(p0),usize(p1))
+android/content/res/XmlBlock|nativeGetAttributeData|return C.ResXMLParser_getAttributeData(voidptr(p0),usize(p1))
+android/content/res/XmlBlock|nativeGetAttributeName|return i32(C.ResXMLParser_getAttributeNameID(voidptr(p0),usize(p1)))
+android/content/res/XmlBlock|nativeDestroyParseState|C.ResXMLParser_delete(voidptr(p0))
+android/content/res/XmlBlock|nativeDestroy|C.ResXMLTree_delete(voidptr(p0))
+android/content/res/XmlBlock|nativeGetClassAttribute|return ws_pool_string(e,voidptr(C.ResXMLParser_getStrings(voidptr(p0))),C.ResXMLParser_getAttributeValueStringID(voidptr(p0),usize(C.ResXMLParser_indexOfClass(voidptr(p0)))))
+android/content/res/XmlBlock|nativeGetStyleAttribute|mut value := C.Res_value{}; index := C.ResXMLParser_indexOfStyle(voidptr(p0)); if index < 0 { return 0 }; C.ResXMLParser_getAttributeValue(voidptr(p0),usize(index),&value); return i32(value.data)
+android/content/Context|native_get_apk_path|return ws_string(e,ws.apk)
+android/content/Context|native_updateConfig|ws_config(e,p0)
+android/os/Environment|native_get_app_data_dir|return ws_string(e,ws.data)
+android/database/sqlite/SQLiteConnection|nativeOpen|return ws_sql_open(e,p0,p1)
+android/database/sqlite/SQLiteConnection|nativeClose|ws_sql_close(e,p0)
+android/database/sqlite/SQLiteConnection|nativePrepareStatement|return ws_sql_prepare(e,p0,p1)
+android/database/sqlite/SQLiteConnection|nativeFinalizeStatement|C.sqlite3_finalize(voidptr(p1))
+android/database/sqlite/SQLiteConnection|nativeGetParameterCount|return C.sqlite3_bind_parameter_count(voidptr(p1))
+android/database/sqlite/SQLiteConnection|nativeIsReadOnly|return u8(C.sqlite3_stmt_readonly(voidptr(p1)) != 0)
+android/database/sqlite/SQLiteConnection|nativeGetColumnCount|return C.sqlite3_column_count(voidptr(p1))
+android/database/sqlite/SQLiteConnection|nativeGetColumnName|return ws_sql_column_name(e,p1,p2)
+android/database/sqlite/SQLiteConnection|nativeBindNull|ws_sql_error(e,p0,C.sqlite3_bind_null(voidptr(p1),p2))
+android/database/sqlite/SQLiteConnection|nativeBindLong|ws_sql_error(e,p0,C.sqlite3_bind_int64(voidptr(p1),p2,p3))
+android/database/sqlite/SQLiteConnection|nativeBindDouble|ws_sql_error(e,p0,C.sqlite3_bind_double(voidptr(p1),p2,p3))
+android/database/sqlite/SQLiteConnection|nativeBindString|ws_sql_bind_string(e,p0,p1,p2,p3)
+android/database/sqlite/SQLiteConnection|nativeBindBlob|ws_sql_bind_blob(e,p0,p1,p2,p3)
+android/database/sqlite/SQLiteConnection|nativeResetStatementAndClearBindings|status := C.sqlite3_reset(voidptr(p1)); ws_sql_error(e,p0,if status == 0 { C.sqlite3_clear_bindings(voidptr(p1)) } else { status })
+android/database/sqlite/SQLiteConnection|nativeExecute|ws_sql_execute(e,p0,p1)
+android/database/sqlite/SQLiteConnection|nativeExecuteForLong|return if ws_sql_one_row(e,p0,p1) { C.sqlite3_column_int64(voidptr(p1),0) } else { i64(-1) }
+android/database/sqlite/SQLiteConnection|nativeExecuteForString|return if ws_sql_one_row(e,p0,p1) { ws_sql_string(e,p1,0) } else { nil }
+android/database/sqlite/SQLiteConnection|nativeExecuteForChangedRowCount|return if ws_sql_execute(e,p0,p1) == 101 { C.sqlite3_changes(ws_sql_db(p0)) } else { -1 }
+android/database/sqlite/SQLiteConnection|nativeExecuteForLastInsertedRowId|return if ws_sql_execute(e,p0,p1) == 101 && C.sqlite3_changes(ws_sql_db(p0)) > 0 { C.sqlite3_last_insert_rowid(ws_sql_db(p0)) } else { i64(-1) }
+android/database/sqlite/SQLiteConnection|nativeExecuteForCursorWindow|return ws_sql_window(e,p0,p1,p2,p3,p4,p5)
+android/database/sqlite/SQLiteConnection|nativeGetDbLookaside|return ws_sql_lookaside(p0)
+android/database/sqlite/SQLiteConnection|nativeHasCodec|return 0 // The provider is ordinary SQLite, without SQLCipher.
+android/database/sqlite/SQLiteConnection|nativeCancel|state := &WsDatabase(p0); C.__atomic_store_n(&state.canceled,1,3); C.sqlite3_interrupt(state.db)
+android/database/sqlite/SQLiteConnection|nativeResetCancel|ws_sql_reset_cancel(p0,p1)
+android/database/sqlite/SQLiteConnection|nativeRegisterLocalizedCollators|locale := ws_utf(e,p1); ws_sql_collation(e,p0,c'LOCALIZED',locale); ws_release(e,p1,locale)
+android/database/sqlite/SQLiteGlobal|nativeReleaseMemory|return C.sqlite3_release_memory(0x7fffffff)
+android/os/SystemClock|uptimeMillis|return ws_millis()
+android/os/SystemClock|elapsedRealtime|return ws_millis()
+android/os/MessageQueue|nativeInit|return ws_queue_new()
+android/os/MessageQueue|nativeDestroy|ws_queue_destroy(p0)
+android/os/MessageQueue|nativeWake|ws_queue_wake(p0)
+android/os/MessageQueue|nativePollOnce|return ws_queue_poll(p0,p1)
+android/os/MessageQueue|nativeIsIdling|return if p0 == 0 { u8(0) } else { u8((&WsQueue(p0)).idling) }
+android/util/Log|println_native|return ws_log(e,p2,p3)
+android/view/Window|set_jobject|// The Activity owns its Java Window.
+android/view/Window|set_widget_as_root|ws_mark()
+android/view/Window|set_layout|ws_mark()
+android/view/Window|set_title|// The desktop owns the sole window decoration.
+android/view/Window|remove_gtk_background|// Native surfaces have no toolkit background.
+android/view/Window|set_screen_brightness|// Display brightness is controlled by the desktop.
+android/view/View|native_constructor|return ws_view_new(0)
+android/view/View|native_destructor|ws_view_free(p0)
+android/view/View|native_measure|ws_measure(e,this,p1,p2)
+android/view/View|native_layout|ws_layout(e,this,p1,p2,p3,p4)
+android/view/View|native_requestLayout|ws_mark()
+android/view/View|native_queueAllocate|ws_mark()
+android/view/View|native_setLayoutParams|ws_mark()
+android/view/View|native_setPadding|view := &WsView(p0); view.padding_left = p1; view.padding_top = p2; view.padding_right = p3; view.padding_bottom = p4; ws_mark()
+android/view/View|native_setBackgroundColor|(&WsView(p0)).background = u32(p1); ws_mark()
+android/view/View|native_setBackgroundDrawable|ws_mark()
+android/view/View|native_setVisibility|view := &WsView(p0); view.visible = p1 == 0; view.sensitive = p3 != 0; ws_mark()
+android/view/View|native_drawBackground|ws_draw_background(e,this)
+android/view/View|native_drawContent|ws_draw_content(e,this)
+android/view/View|nativeInvalidate|ws_mark()
+android/view/View|nativeSetOnClickListener|// View retains the listener in its Java field.
+android/view/View|nativeSetOnTouchListener|// View retains the listener in its Java field.
+android/view/View|nativeSetOnLongClickListener|// View retains the listener in its Java field.
+android/view/View|nativeRequestFocus|ws_focus(e,this)
+android/view/View|nativeIsFocused|return u8((&WsView(p0)).focused)
+android/view/View|nativeIsAttachedToWindow|return 1
+android/view/View|native_getMatrix|ws_matrix_reset(p1); return 0
+android/view/View|native_get_window|return obj(e,ws.activity,c'android/app/Activity',c'getWindow',c'()Landroid/view/Window;',nil)
+android/view/View|getWindowVisibleDisplayFrame|put_int(e,p0,c'android/graphics/Rect',c'left',0); put_int(e,p0,c'android/graphics/Rect',c'top',0); put_int(e,p0,c'android/graphics/Rect',c'right',ws.width); put_int(e,p0,c'android/graphics/Rect',c'bottom',ws.height)
+android/view/View|nativeSetFullscreen|// Desktop window policy controls fullscreen.
+android/view/View|native_addClass|// CSS style classes do not apply to native widgets.
+android/view/View|native_removeClass|// CSS style classes do not apply to native widgets.
+android/view/View|native_addClasses|// CSS style classes do not apply to native widgets.
+android/view/View|native_removeClasses|// CSS style classes do not apply to native widgets.
+android/view/View|native_keep_screen_on|// Power management remains with the desktop.
+android/view/ViewGroup|native_addView|ws_mark()
+android/view/ViewGroup|native_removeView|ws_mark()
+android/view/ViewGroup|native_drawChildren|ws_draw_children(e,this)
+android/widget/TextView|native_constructor|return ws_view_new(1)
+android/widget/TextView|native_setText|ws_set_text(e,this,p0)
+android/widget/TextView|setTextSize|ws_view(e,this).size = p0; ws_mark()
+android/widget/TextView|native_setTextColor|ws_view(e,this).color = u32(p0); ws_mark()
+android/widget/TextView|native_set_markup|// Text content stays plain Unicode.
+android/widget/TextView|native_setCompoundDrawables|ws_mark()
+android/widget/Button|native_constructor|return ws_view_new(2)
+android/widget/Button|native_setText|ws_set_text(e,this,p1)
+android/widget/Button|getText|return ws_string(e,ws_view(e,this).text)
+android/widget/Button|nativeSetOnClickListener|// View retains the listener in its Java field.
+android/widget/Button|native_setCompoundDrawables|ws_mark()
+android/widget/ImageView|native_constructor|return ws_view_new(5)
+android/widget/ImageView|native_setDrawable|ws_mark()
+android/widget/ImageView|native_setScaleType|ws_mark()
+android/widget/ImageButton|native_constructor|return ws_view_new(5)
+android/widget/ImageButton|native_setDrawable|ws_mark()
+android/widget/ImageButton|nativeSetOnClickListener|// Java View retains its click listener.
+android/widget/EditText|native_constructor|return ws_view_new(3)
+android/widget/EditText|native_getText|return ws_string(e,ws_view(e,this).text)
+android/widget/EditText|native_setText|ws_set_text(e,this,p1)
+android/widget/EditText|native_addTextChangedListener|ws_watcher(e,this,p1,false)
+android/widget/EditText|native_removeTextChangedListener|ws_watcher(e,this,p1,true)
+android/widget/EditText|native_setOnEditorActionListener|put_object(e,this,c'android/view/View',c'vinixWsEditorAction',c'Ljava/lang/Object;',p1)
+android/widget/EditText|native_setHint|view := ws_view(e,this); chars := ws_utf(e,p1); C.free(view.hint); view.hint = C.strdup(chars); ws_release(e,p1,chars)
+android/widget/EditText|native_getHint|return ws_string(e,ws_view(e,this).hint)
+android/widget/ScrollView|native_constructor|return ws_view_new(4)
+android/webkit/WebView|native_constructor|return ws_web_new(e,this)
+android/webkit/WebView|native_loadDataWithBaseURL|ws_web_data(e,this,p1,p2,p3)
+android/webkit/WebView|native_loadUrl|ThrowNew(slot(e,14))(e,cls(e,c'java/lang/UnsupportedOperationException'),c'Native WebView URL navigation is not implemented')
+android/widget/ScrollView|native_addView|ws_mark()
+android/widget/ScrollView|native_removeView|ws_mark()
+android/widget/ScrollView|scrollTo|put_int(e,this,c'android/view/View',c'scrollX',p0); put_int(e,this,c'android/view/View',c'scrollY',p1); ws_mark()
+android/widget/ScrollView|smoothScrollTo|put_int(e,this,c'android/view/View',c'scrollX',p0); put_int(e,this,c'android/view/View',c'scrollY',p1); ws_mark()
+android/graphics/Paint|native_create|return ws_paint_new()
+android/graphics/Matrix|native_create|return ws_matrix_new(p0)
+android/graphics/Matrix|finalizer|C.free(voidptr(p0))
+android/graphics/Matrix|native_isIdentity|return ws_matrix_identity(p0)
+android/graphics/Matrix|native_reset|ws_matrix_reset(p0)
+android/graphics/Matrix|native_getValues|ws_matrix_values(e,p0,p1,true)
+android/graphics/Matrix|native_setValues|ws_matrix_values(e,p0,p1,false)
+android/graphics/Matrix|native_set|C.memcpy(voidptr(p0),voidptr(p1),sizeof(WsMatrix))
+android/graphics/Matrix|native_setConcat|return ws_matrix_concat(p0,p1,p2)
+android/graphics/Matrix|native_preConcat|return ws_matrix_concat(p0,p0,p1)
+android/graphics/Matrix|native_postConcat|return ws_matrix_concat(p0,p1,p0)
+android/graphics/Matrix|native_setTranslate|ws_matrix_transform(p0,0,p1,p2,false,true)
+android/graphics/Matrix|native_preTranslate|return ws_matrix_transform(p0,0,p1,p2,false,false)
+android/graphics/Matrix|native_postTranslate|return ws_matrix_transform(p0,0,p1,p2,true,false)
+android/graphics/Matrix|native_setScale(JFF)V|ws_matrix_transform(p0,1,p1,p2,false,true)
+android/graphics/Matrix|native_preScale(JFF)Z|return ws_matrix_transform(p0,1,p1,p2,false,false)
+android/graphics/Matrix|native_postScale(JFF)Z|return ws_matrix_transform(p0,1,p1,p2,true,false)
+android/graphics/Matrix|native_setRotate(JF)V|ws_matrix_transform(p0,2,p1,0,false,true)
+android/graphics/Matrix|native_preRotate(JF)Z|return ws_matrix_transform(p0,2,p1,0,false,false)
+android/graphics/Matrix|native_postRotate(JF)Z|return ws_matrix_transform(p0,2,p1,0,true,false)
+android/graphics/drawable/Drawable|native_constructor|return 0 // Pure Java drawables need no native toolkit object.
+android/graphics/drawable/Drawable|native_ref|ws_bitmap_ref(p0)
+android/graphics/drawable/Drawable|native_unref|ws_bitmap_unref(p0)
+android/graphics/drawable/Drawable|native_invalidate|ws_mark()
+android/graphics/drawable/Drawable|native_draw|ws_draw_bitmap(p0,0,0,p2,p3)
+android/graphics/drawable/DrawableContainer|native_constructor|return 0 // Selection and children belong to Java.
+android/graphics/drawable/DrawableContainer|native_selectChild|// Java selects the drawable before calling draw.
+android/graphics/BitmapFactory|nativeDecodeStream|return ws_bitmap_stream(e,p0,p1)
+android/graphics/BitmapFactory|nativeDecodeByteArray|return ws_bitmap_bytes(e,p0,p1,p2)
+android/graphics/Bitmap|native_get_width|return if p0 == 0 { 0 } else { (&WsBitmap(p0)).width }
+android/graphics/Bitmap|native_get_height|return if p0 == 0 { 0 } else { (&WsBitmap(p0)).height }
+android/graphics/Bitmap|native_ref_texture|return ws_bitmap_ref(p0)
+android/graphics/Bitmap|native_recycle|ws_bitmap_unref(p0)
+android/graphics/drawable/NinePatchDrawable|nativeCreate([BJ)J|return ws_bitmap_ref(p1)
+android/graphics/drawable/NinePatchDrawable|nativeCreate(Ljava/lang/String;)J|return ws_bitmap_file(e,p0)
+android/graphics/drawable/Drawable|native_paintable_from_path|return ws_bitmap_file(e,p0)
+android/atl/GskCanvas|native_drawBitmap(JJIIIIJ)V|ws_draw_bitmap(p1,p2,p3,p4,p5)
+android/graphics/Paint|native_clone|return ws_paint_clone(p0)
+android/graphics/Paint|native_recycle|C.free(voidptr(p0))
+android/graphics/Paint|native_set_color|(&WsPaint(p0)).color = u32(p1)
+android/graphics/Paint|native_get_color|return i32((&WsPaint(p0)).color)
+android/graphics/Paint|native_set_alpha|paint := &WsPaint(p0); paint.color = (paint.color & 0xffffff) + (u32(p1) << 24)
+android/graphics/Paint|native_get_alpha|return i32((&WsPaint(p0)).color >> 24)
+android/graphics/Paint|native_set_style|(&WsPaint(p0)).style = p1
+android/graphics/Paint|native_get_style|return (&WsPaint(p0)).style
+android/graphics/Paint|native_set_stroke_width|(&WsPaint(p0)).stroke = p1
+android/graphics/Paint|native_get_stroke_width|return (&WsPaint(p0)).stroke
+android/graphics/Paint|native_set_text_size|(&WsPaint(p0)).size = p1
+android/graphics/Paint|native_get_text_size|return (&WsPaint(p0)).size
+android/graphics/Paint|native_set_text_align|(&WsPaint(p0)).align = p1
+android/graphics/Paint|native_set_stroke_cap|(&WsPaint(p0)).cap = p1
+android/graphics/Paint|native_get_stroke_cap|return (&WsPaint(p0)).cap
+android/graphics/Paint|native_set_stroke_join|(&WsPaint(p0)).join_ = p1
+android/graphics/Paint|native_get_stroke_join|return (&WsPaint(p0)).join_
+android/graphics/Paint|native_get_text_bounds|ws_bounds(e,p0,p1,p2)
+android/text/Layout|native_constructor|return ws_layout_new(e,p0,p1,p2)
+android/text/Layout|native_free|ws_layout_free(p0)
+android/text/Layout|native_set_width|layout := &WsTextLayout(p0); layout.width = p1; ws_layout_build(layout)
+android/text/Layout|native_get_width|return (&WsTextLayout(p0)).width
+android/text/Layout|native_get_height|layout := &WsTextLayout(p0); return i32(f32(layout.count) * layout.size * 1.25)
+android/text/Layout|native_get_line_count|return (&WsTextLayout(p0)).count
+android/text/Layout|native_get_line_start|return (&WsTextLayout(p0)).lines[ws_layout_index(p0,p1)].first
+android/text/Layout|native_get_line_end|return (&WsTextLayout(p0)).lines[ws_layout_index(p0,p1)].last
+android/text/Layout|native_get_line_top|return i32(f32(p1) * (&WsTextLayout(p0)).size * 1.25)
+android/text/Layout|native_get_line_bottom|return i32(f32(p1 + 1) * (&WsTextLayout(p0)).size * 1.25)
+android/text/Layout|native_get_line_baseline|layout := &WsTextLayout(p0); return i32(f32(p1) * layout.size * 1.25 + layout.size)
+android/text/Layout|native_get_line_ascent|return -i32((&WsTextLayout(p0)).size)
+android/text/Layout|native_get_line_descent|return i32((&WsTextLayout(p0)).size * 0.25)
+android/text/Layout|native_get_line_left|return 0 // WS layout starts each line at its origin.
+android/text/Layout|native_get_line_right|return i32((&WsTextLayout(p0)).lines[ws_layout_index(p0,p1)].width + 0.999)
+android/text/Layout|native_get_line_width|return i32((&WsTextLayout(p0)).lines[ws_layout_index(p0,p1)].width + 0.999)
+android/text/Layout|native_get_line_for_vertical|return ws_layout_index(p0,i32(f32(p1) / ((&WsTextLayout(p0)).size * 1.25)))
+android/text/Layout|native_get_line_for_offset|return ws_layout_line_for_offset(p0,p1)
+android/text/Layout|native_get_primary_horizontal|return ws_layout_horizontal(p0,p1)
+android/text/Layout|native_get_secondary_horizontal|return ws_layout_horizontal(p0,p1)
+android/text/Layout|native_get_offset_for_horizontal|return ws_layout_offset(p0,p1,p2)
+android/text/Layout|native_get_desired_width|return ws_layout_desired_width(p0)
+android/text/Layout|native_get_ellipsis_count|return 0 // This renderer wraps rather than truncating lines.
+android/text/Layout|native_draw|ws_layout_draw(p0,(&WsPaint(p2)).color,0,(&WsTextLayout(p0)).size)
+android/graphics/Paint|native_set_color_filter|paint := &WsPaint(p0); paint.filter_mode = p1; paint.filter_color = u32(p2)
+android/graphics/Path|native_reset|ws_path_unref(p0); if p1 != p0 { ws_path_unref(p1) }
+android/graphics/Path|native_create_builder|return ws_path_builder(p0,p1)
+android/graphics/Path|native_create_path|return if p0 == 0 { ws_path_new() } else { p0 }
+android/graphics/Path|native_ref_path|return ws_path_ref(p0)
+android/graphics/Path|native_move_to|ws_path_point(p0,p1,p2,true)
+android/graphics/Path|native_line_to|ws_path_point(p0,p1,p2,false)
+android/graphics/Path|native_add_rect|ws_path_rect(p0,p1,p2,p3,p4)
+android/graphics/Path|native_close|ws_path_close(p0)
+android/atl/GskCanvas|native_drawPath|ws_draw_path(p1,p2)
+android/atl/GskCanvas|native_save|ws_save()
+android/atl/GskCanvas|native_restore|ws_restore()
+android/atl/GskCanvas|native_translate|ws_translate(p1,p2)
+android/atl/GskCanvas|native_scale|ws.transform.sx *= p1; ws.transform.sy *= p2
+android/atl/GskCanvas|native_clipRect|ws_clip(p1,p2,p3,p4)
+android/atl/GskCanvas|native_pop|// Clipping state is restored by native_restore.
+android/atl/GskCanvas|native_drawRect|ws_canvas_rect(p1,p2,p3,p4,p5)
+android/atl/GskCanvas|native_drawRoundRect|ws_canvas_round_rect(p1,p2,p3,p4,p5,p6,p7)
+android/atl/GskCanvas|native_drawLine|ws_canvas_line(p1,p2,p3,p4,p5)
+android/atl/GskCanvas|native_drawText|ws_canvas_text(e,p1,p2,p3,p4)
+android/app/Activity|nativeStartActivity|ws_start(e,p0)
+android/app/Activity|nativeFinish|ws_finish(e,this,p0)
+android/app/Activity|isTaskRoot|return u8(ws.back_count == 0)
+android/app/Activity|isInMultiWindowMode|return 0
+android/app/Dialog|nativeInit|return i64(2)
+android/app/Dialog|nativeSetTitle|ws_dialog_text(e,this,0,p1)
+android/app/Dialog|nativeSetContentView|ws_mark()
+android/app/Dialog|nativeShow|ws_dialog_show(e,this)
+android/app/Dialog|nativeClose|ws_dialog_close(e,this)
+android/app/Dialog|nativeIsShowing|return if ws.dialog == nil { u8(0) } else { Same(slot(e,24))(e,this,ws.dialog) }
+android/app/AlertDialog|nativeConstruct|ws_dialog_construct(e,this)
+android/app/AlertDialog|nativeSetMessage|ws_dialog_text(e,this,1,p1)
+android/app/AlertDialog|setView|ws_dialog_set_view(e,this,p0)
+android/app/AlertDialog|setButton|dialog_button(e,this,p0,p1,p2)
+android/app/AlertDialog|findViewById|return dialog_find_view(e,this,p0)
+android/view/ViewTreeObserver|native_set_have_global_layout_listeners|ws_mark()
+android/view/inputmethod/InputMethodManager|nativeInit|return 1
+android/view/inputmethod/InputMethodManager|nativeShowSoftInput|return 1
+android/view/inputmethod/InputMethodManager|nativeHideSoftInput|// Hardware keyboard input uses the WS channel.

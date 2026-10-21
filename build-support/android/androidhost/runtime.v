@@ -20,6 +20,8 @@ const bionic_libraries = ['usr/lib/libc_bio.so', 'usr/lib/libc_bio.so.0', 'usr/l
 const atl_elfs = ['usr/bin/android-translation-layer', 'usr/lib/libandroid.so',
 	'usr/lib/libandroid.so.0', 'usr/libexec/vinix-android/atl-configuration-test',
 	'usr/lib/art/libvinix-android-framework.so',
+	'usr/lib/art/libvinix-android-native.so', 'usr/lib/art/native-ws/libdl_bio.so.0',
+	'usr/bin/vinix-android-native', 'usr/bin/run-android-native',
 	'usr/lib/java/dex/android_translation_layer/natives/libtranslation_layer_main.so']
 const atl_jars = ['usr/lib/java/dex/android_translation_layer/api-impl.jar',
 	'usr/lib/java/dex/android_translation_layer/gstub.jar',

@@ -59,6 +59,9 @@ enum SurfaceText {
 	blender_not_staged
 	blender_data_missing
 	blender_client_failed
+	android_starting
+	android_missing
+	android_exited
 }
 
 fn (t SurfaceText) text() string {
@@ -69,6 +72,9 @@ fn (t SurfaceText) text() string {
 		.blender_not_staged { tr('surface.blender.not_staged') }
 		.blender_data_missing { tr('surface.blender.data_missing') }
 		.blender_client_failed { tr('surface.blender.client_failed') }
+		.android_starting { tr('android.starting') }
+		.android_missing { tr('android.missing') }
+		.android_exited { tr('android.exited') }
 	}
 }
 

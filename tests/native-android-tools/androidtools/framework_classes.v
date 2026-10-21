@@ -102,7 +102,7 @@ pub fn write_framework_classes(smali string) ! {
  for class, function in {'android/view/View': 'register_view', 'android/app/ListActivity$2': 'register_list_click', 'android/widget/ScrollView': 'register_scroll'} {
   path := smali + '/' + class + '.smali'
   mut text := os.read_file(path)!
-  if class == 'android/view/View' { text += '\n.field private vinixHandler:Landroid/os/Handler;\n' }
+  if class == 'android/view/View' { text += '\n.field private vinixHandler:Landroid/os/Handler;\n.field private vinixWsWatchers:Ljava/util/ArrayList;\n.field private vinixWsEditorAction:Ljava/lang/Object;\n' }
   else if class == 'android/app/ListActivity$2' && !text.contains('this$0:Landroid/app/ListActivity;') { return error('unexpected ATL ListActivity click listener') }
   for block in native_declarations(views.all_after('fn ' + function + '(').all_before('\n}')).split('.method ')[1..] {
    text = framework_replace_method(text, block.all_before('\n').all_after('native '), '.method ' + block)!
