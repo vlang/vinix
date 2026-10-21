@@ -115,7 +115,8 @@ fn swift_error_metadata_arena() u64 {
 	}
 	swift_any_emit(code,data)
 	swift_error_code_emit(code + 160)
-	C.__builtin___clear_cache(allocation, unsafe { voidptr(code + 184) })
+	swift_error_domain_emit(code + 192)
+	C.__builtin___clear_cache(allocation, unsafe { voidptr(code + 216) })
 	if C.mprotect(allocation, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(allocation, usize(page * 2))
@@ -174,6 +175,7 @@ fn swift_error_value(owner u64, scratch &u64, output &SwiftErrorValue) {
 
 fn swift_error_value_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_$ss5ErrorPsE7_domainSSvg' { swift_error_domain_entry() or { return none } }
 		'_$ss5ErrorPsE5_codeSivg' { swift_error_code_entry() or { return none } }
 		'_$ss5ErrorPsE19_getEmbeddedNSErroryXlSgyF' { u64(unsafe { voidptr(swift_error_embedded) }) }
 		'__swift_stdlib_bridgeErrorToNSError' { u64(unsafe { voidptr(swift_error_bridge) }) }

@@ -14699,17 +14699,56 @@ The next missing import is Error's default `_domain` getter,
 and tail forwarders `0x100072b44` and `0x1000738bc`. The loader still stops
 before application entry; Fortnite remains unplayable.
 
+`_$ss5ErrorPsE7_domainSSvg` now implements Error's default domain getter for
+file-backed, non-generic Swift enum and struct metadata with named nominal
+parents and a module context, plus the runtime's canonical `_MergeError`.
+It returns the qualified type name, including nested and Unicode names.
+Native Swift obtains the dynamic type before naming it; this value-type
+profile never reads Self, the Error table or x8. Class values, generic,
+private/anonymous, extension and imported C contexts are explicitly unsupported.
+
+Every metadata, descriptor and terminated name read requires a readable,
+file-backed image range. Names are bounded to 1,023 bytes each, 32 contexts
+and 8,192 result bytes; cycles, malformed relatives, invalid UTF-8 and inactive
+runtimes fail before returning a result. Stack scratch holds the borrowed
+parts. The returned String copies their bytes into its own small representation
+or the existing String owner registry, so it survives loss of access to the
+metadata. The ARM64 adapter shares the sealed Error arena and its teardown.
+
+Read-only conformance inspection identifies the two Fortnite witness contexts
+as `FirebaseCoreInternal.StorageError` (descriptor flags `0x52`) and
+`FirebaseCoreInternal.RingBuffer.Error` (generic descriptors `0xd1`/`0xd2`).
+The first fits this profile; naming the second with its substituted generic
+arguments remains unsupported. Resolving the getter does not establish that
+both error paths can execute.
+
+```sh
+v run tests/ios/native-checks.v build-error-domain
+```
+
+Evidence is retained under `build/ios/fortnite/error-domain-checks`.
+Native comparisons and normal/deterministic ASan/UBSan checks passed with and
+without the C++ backend, together with Error code/extraction and _MergeError
+conformance regressions (ten runs). The ARM64 fixture, launch probe and both
+import audits passed. Nine binary/generated-C pairs and five C/ARM64 reviews
+retain the bounded reads, owned result path and shared arena lifetime evidence.
+
+The next missing import is Error's default `_userInfo` getter,
+`_$ss5ErrorPsE9_userInfoyXlSgvg`: GOT cell `0x10dc9ba00`, stub `0x10c63af8c`,
+branch-island forwarder `0x107c28d10`, and tail forwarders `0x100072b4c`
+and `0x1000738c4`. Application entry remains unreached; Fortnite is unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,945 | 216 | 78 |
+| Fortnite executable | 1,946 | 215 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,785 | 219 | 114 |
+| All images | 2,786 | 218 | 114 |
 
-The C++/GLES/Text variant reports 2,799 resolved imports, 205 unresolved strong
+The C++/GLES/Text variant reports 2,800 resolved imports, 204 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
