@@ -14461,17 +14461,59 @@ GOT cell `0x10dc9b998`, stub `0x10c63af14`, branch-island forwarder
 `0x107c29128` and direct calls at `0x10215070c` and `0x102150910`.
 Application entry remains unreached; Fortnite is still unplayable.
 
+`_$ss26DefaultStringInterpolationV06appendC0yyxlF` now implements generic
+`DefaultStringInterpolation.appendInterpolation` for the existing bounded
+printing profile. It borrows the value in x0 and its type in x1, and appends
+through the inout interpolation in x20. Native inspection confirms delegation
+to `_print_unlocked`; the compatibility path uses that same formatter and
+releases its temporary String after writing. It preserves the source's
+ownership instead of using the consuming `String.init(describing:)` path.
+
+Supported values are String, Int, Bool, Void, StaticString, `_MergeError` and
+validated zero-payload, single-case image enums, including the required
+`TimePeriod.daily` shape. Arbitrary reflection and custom printing
+conformances remain unsupported and are rejected. The new entry shares the
+sealed interpolation arena and its existing retirement; it adds no owner or
+cache.
+
+The native comparison checks Unicode, embedded NULs, signed extrema, both
+protected page boundaries, preserved x20/x21/x22, exact source reference counts
+and retained destination aliases during copy-on-write growth. Compatibility
+checks also cover invalid metadata and values, eight cold publishers,
+independent workers and two drained/unmapped lifetimes. Literal interpolation,
+`_print_unlocked` and `String.init(describing:)` provide regression coverage.
+
+```sh
+v run tests/ios/native-checks.v build-generic-interpolation
+```
+
+Evidence is retained under `build/ios/fortnite/generic-interpolation-checks`.
+
+Normal and deterministic ASan/UBSan checks passed with and without the C++
+backend and for all three regressions (ten runs). The ARM64 fixture, launch
+probe and both import audits passed. Nine binary/generated-C archive pairs
+are retained. Generated C and ARM64 review confirm the borrowed formatting
+path, deferred temporary release and shared arena lifetime without hidden
+temporary allocations or a new owner/cache.
+
+The next launch stops at Swift's `_stringCompareWithSmolCheck` helper,
+`_$ss27_stringCompareWithSmolCheck__9expectingSbs11_StringGutsV_ADs01_G16ComparisonResultOtF`.
+Read-only inspection found GOT cell `0x10dc9b9c8`, stub `0x10c63af44`,
+branch-island forwarder `0x107c2853c` and 23 direct calls, including
+`0x10003d8fc`. Application entry remains unreached; Fortnite is still
+unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,939 | 222 | 78 |
+| Fortnite executable | 1,940 | 221 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,779 | 225 | 114 |
+| All images | 2,780 | 224 | 114 |
 
-The C++/GLES/Text variant reports 2,793 resolved imports, 211 unresolved strong
+The C++/GLES/Text variant reports 2,794 resolved imports, 210 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

@@ -288,7 +288,13 @@ fn swift_interpolation_metadata() u64 {
 		// inout target x4, write entry x5. Preserve the caller's Swift context.
 		for i, op in [u32(0xa9be7bfd), 0xa90153f3, 0xaa0403f4, 0xd63f00a0,
 			0xa94153f3, 0xa8c27bfd, 0xd65f03c0]! { write32(base + 416 + u64(i * 4), op) }
-		C.__builtin___clear_cache(arena, unsafe { voidptr(base + 444) })
+		// Generic appendInterpolation: borrowed value/type in x0/x1,
+		// inout interpolation in x20. The C tail preserves x20/x21.
+		write32(base + 448, 0xaa1403e2)
+		write32(base + 452, 0x58000070)
+		write32(base + 456, 0xd61f0200)
+		unsafe { *(&u64(base + 464)) = u64(voidptr(swift_generic_interpolation)) }
+		C.__builtin___clear_cache(arena, unsafe { voidptr(base + 472) })
 		if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 			|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 			C.munmap(arena, usize(page * 2))
@@ -300,6 +306,9 @@ fn swift_interpolation_metadata() u64 {
 }
 
 fn swift_interpolation_symbol(symbol string) ?u64 {
+	if symbol == '_$ss26DefaultStringInterpolationV06appendC0yyxlF' {
+		swift_print_active() or { return none }
+	}
 	if symbol == '_$ss26DefaultStringInterpolationV15literalCapacity18interpolationCountABSi_SitcfC' {
 		return u64(unsafe { voidptr(swift_interpolation_init) })
 	}
@@ -315,6 +324,7 @@ fn swift_interpolation_symbol(symbol string) ?u64 {
 		}
 		'_$ss26DefaultStringInterpolationV13appendLiteralyySSF', '_$sSS6appendyySSF' { -128 }
 		'_$ss11_StringGutsV4growyySiF' { -384 }
+		'_$ss26DefaultStringInterpolationV06appendC0yyxlF' { -448 }
 		else { return none }
 	}
 	metadata := swift_interpolation_metadata()
