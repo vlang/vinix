@@ -337,6 +337,9 @@ mut:
 	swift_task_arena u64 // Sealed async adapters and read-only Task heap metadata.
 	swift_task_key u64
 	swift_task_key_live bool
+	swift_access_key u64 // Per-thread head of caller-owned synchronous access records.
+	swift_access_key_live bool
+	swift_access_count u64 // Protected by the runtime lock; must drain before TLS retirement.
 	swift_task_sync u64 // Mutex/condition for queued and executing task callbacks.
 	swift_task_jobs u64 // Protected by the task synchronization mutex.
 	swift_task_main_jobs u64 // Queued main-executor callbacks, under the same mutex.
@@ -438,6 +441,7 @@ fn objc_start() {
 	}
 	if C.ios_key_create(unsafe { &ios_runtime.graphics_key }, unsafe { voidptr(ui_context_cleanup) }) != 0 { panic('iOS: cannot create graphics TLS') }
 	if C.ios_key_create(unsafe { &ios_runtime.thread_key }, unsafe { voidptr(ns_thread_cleanup) }) != 0 { panic('iOS: cannot create Foundation thread TLS') }
+	swift_access_start()
 	ios_runtime.timers.flags |= .noslices
 	ios_runtime.load_classes.flags |= .noslices
 	ios_runtime.load_categories.flags |= .noslices
@@ -829,6 +833,7 @@ fn objc_stop() {
 	// V's []string.free() also frees the owned strings.
 	unsafe { ios_runtime.selectors.free(); ios_runtime.selector_names.free() }
 	ns_uncaught_handler_stop()
+	swift_access_stop()
 }
 
 @[export: 'ios_format_double']

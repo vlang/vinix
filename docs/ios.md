@@ -15404,17 +15404,71 @@ and the branch-island forwarder at `0x107c28ab4`. Dynamic access tracking remain
 unsupported. No application code was executed; application entry remains
 unreached and Fortnite is still unplayable.
 
+`_swift_beginAccess` and `_swift_endAccess` now implement bounded synchronous
+Swift access scopes through their ordinary C, void-returning entries. Flags
+0/1 check an instantaneous read/modification against the current thread's
+tracked scopes and write only a zero Pointer word to scratch. Flags 32/33
+also track the scope using the caller's three-word Pointer, diagnostic PC,
+and tagged next-pointer record. A null diagnostic PC uses the caller's return
+address. The identity pointer is compared without reading its payload.
+
+Nested reads of the same identity are allowed; any simultaneous modification
+on that thread fails explicitly. Different threads have independent sets.
+End supports both stack order and removal from the middle of the chain,
+preserving the removed record's bytes while updating the live predecessor.
+An untracked end reads only its zero Pointer word. Scratch remains borrowed
+and must stay valid for the scope; no record, value owner or registry entry
+is allocated per access.
+
+The profile supports at most 4,096 tracked scopes per thread. Unsupported
+flags, null identities, invalid or overlapping scratch, active scratch reuse,
+foreign/double endings, retired runtimes and current Swift task contexts
+reject explicitly. Task-local migration and the debugger's global disable
+switch remain unsupported. One runtime-owned TLS key is created at startup;
+all scopes must drain before it is deleted at shutdown. A thread exiting
+with tracked scopes also fails explicitly.
+
+```sh
+v run tests/ios/native-checks.v build-swift-access
+```
+
+Evidence is retained under `build/ios/fortnite/swift-access-checks`, including
+the [Swift 5.10 runtime reference](https://github.com/swiftlang/swift/blob/swift-5.10-RELEASE/stdlib/public/runtime/Exclusivity.cpp)
+and ABI declarations. Native comparisons cover exact scratch fields and
+writes, read nesting, fatal read/write conflicts in separate processes,
+non-LIFO removal, readonly ending records, guarded identity and scratch,
+diagnostic PCs and eight concurrently active threads. Compatibility checks
+also cover rejected inputs before writes, the 4,096-scope limit, undrained
+shutdown, current-task rejection, scratch reuse and two drained lifetimes.
+
+Eight normal/deterministic ASan/UBSan runs passed with both C++ configurations,
+including forward array take and task-switch regressions. The ARM64 fixture,
+launch probe and both import audits passed. Eight compressed binary/generated-C
+pairs and five C/ARM64 reviews are retained; generated C confirms no per-access
+allocation and lock release on every checked failure.
+
+Static inspection traced the begin entry through GOT cell `0x10dc9bae0`, stub
+`0x10c63eb5c`, 21 direct callers and the island at `0x107c28ab4`. The paired end
+uses cell `0x10dc9bb28` and stub `0x10c63ebc8`; its seven consumer/forwarder sites
+include a returned function address and four direct calls.
+
+The next missing import is `_swift_checkMetadataState`, at GOT cell
+`0x10dc9bb00` and stub `0x10c63eb8c`. Static V/Mach-O/LLVM inspection found two
+direct callers and the branch-island forwarder at `0x107c28d2c`. Metadata-state
+checking remains unsupported. No application code was executed; application
+entry remains unreached and Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,963 | 198 | 78 |
+| Fortnite executable | 1,965 | 196 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,803 | 201 | 114 |
+| All images | 2,805 | 199 | 114 |
 
-The C++/GLES/Text variant reports 2,817 resolved imports, 187 unresolved strong
+The C++/GLES/Text variant reports 2,819 resolved imports, 185 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
