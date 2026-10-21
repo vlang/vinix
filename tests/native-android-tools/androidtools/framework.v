@@ -110,6 +110,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  mut sources := map[string]ah.Value{}
  for file in ['jni.v', 'cursors.v', 'actionbar.v', 'widgets.v', 'dialogs.v', 'menus.v', 'charsets.v', 'themes.v', 'recreate.v', 'views.v'] { sources['build-support/android/atlframework/' + file] = ah.Value(framework_digest(root() + '/build-support/android/atlframework/' + file)!) }
  sources['tests/native-android-tools/androidtools/framework_classes.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_classes.v')!)
+ sources['tests/native-android-tools/androidtools/framework_content.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_content.v')!)
  sources['tests/native-android-tools/androidtools/framework.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework.v')!)
  receipt := ah.Value({
   'schema': ah.Value(1)

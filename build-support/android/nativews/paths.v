@@ -97,6 +97,44 @@ fn ws_path_rect(pointer i64, left f32, top f32, right f32, bottom f32) {
 	ws_path_point(pointer, left, top, false)
 }
 
+fn ws_path_round_rect(e voidptr, pointer i64, left f32, top f32, right f32, bottom f32, radii voidptr) {
+	if ws_array_len(e, radii) < 8 {
+		throw(e, c'java/lang/ArrayIndexOutOfBoundsException', c'Eight corner radii required')
+		return
+	}
+	if right <= left || bottom <= top { return }
+	unsafe {
+		mut radius := [8]f32{}
+		WsFloatRegion(slot(e, 205))(e, radii, 0, 8, &radius[0])
+		for i := 0; i < 8; i++ {
+			if radius[i] != radius[i] { return }
+			if radius[i] < 0 { radius[i] = 0 }
+		}
+		// Preserve the relative corner sizes when adjacent radii overlap.
+		mut factor := f32(1)
+		for corner := 0; corner < 4; corner++ {
+			a := corner * 2
+			b := ((corner + 1) % 4) * 2
+			vertical := corner % 2 == 1
+			sum := radius[a + int(vertical)] + radius[b + int(vertical)]
+			limit := if vertical { bottom - top } else { right - left }
+			if sum > limit && limit / sum < factor { factor = limit / sum }
+		}
+		for i := 0; i < 8; i++ { radius[i] *= factor }
+		for corner := 0; corner < 4; corner++ {
+			rx, ry := radius[corner * 2], radius[corner * 2 + 1]
+			cx := if corner == 0 || corner == 3 { left + rx } else { right - rx }
+			cy := if corner < 2 { top + ry } else { bottom - ry }
+			start := f32(corner * 90 + 180)
+			for step := 0; step <= 8; step++ {
+				angle := (start + f32(step) * 90 / 8) * 0.017453292519943295
+				ws_path_point(pointer, cx + rx * C.cosf(angle), cy + ry * C.sinf(angle), corner == 0 && step == 0)
+			}
+		}
+		ws_path_close(pointer)
+	}
+}
+
 fn ws_draw_path(pointer i64, paint_pointer i64) {
 	unsafe {
 		if pointer == 0 { return }

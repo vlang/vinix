@@ -30,8 +30,10 @@ an optional V symbol lookup that does not load EGL or X11. The launcher installs
 the APK's ARM64 native libraries in an atomic, content-hashed directory and
 passes that directory to ART and Bionic. Its private library mapping routes
 `libandroid.so` asset operations to this backend's existing `libandroidfw`
-provider. GLES remains unsupported and fails explicitly. This is a limited NDK
-subset, not compatibility with arbitrary native APK libraries.
+provider and `libjnigraphics.so` bitmap access to the WS CPU pixels. Pixel locks
+hold a native reference until the last unlock. GLES rendering remains unsupported
+and fails explicitly. This is a limited NDK subset, not compatibility with
+arbitrary native APK libraries.
 
 Application attachment precedes main-process content providers (descending
 `initOrder`), then `Application.onCreate`, then Activity construction. Disabled
@@ -40,6 +42,11 @@ ApplicationInfo and PackageManager share the actual APK, data and native library
 paths. Elapsed realtime uses the boot clock in the API's requested units.
 View layout direction inherits from ancestors on demand. WebP images decode
 through the runtime's libwebp alongside the existing bitmap decoders.
+Matrix rotation/scaling supports pivots and overlap-safe point mapping; rounded
+paths retain independent corner radii. Network availability reads the guest's
+configured non-loopback interfaces. Local ContentProviderClient handles resolve
+registered authorities, dispatch type/call operations and release their provider
+reference on close. Uninstalled service providers return null.
 
 The normal ATL build assembles this backend and hashes its output with the
 framework. Runtime staging installs the native executable as `run-android`.
@@ -85,6 +92,9 @@ above should not be extrapolated to those applications.
 `tests/native-android-ws/bootstrap-fixture.v` builds a separate signed regression
 APK from smali and V. It checks provider ordering and filtering, startup paths,
 clock units, 64-bit process reporting, real NDK asset reads/seeks, inherited
-layout direction and lossless WebP decoding. Pass its APK to the native WS suite;
-the assertion marker is `BOOTSTRAP-NDK-PASS`. This fixture does not modify or
+layout direction and lossless WebP decoding. It also checks pivot rotation, live
+network detection, provider-client lookup and
+actual NDK bitmap metadata, pixels and balanced nested locks.
+Pass its APK to the native WS suite; the assertion marker is `BOOTSTRAP-NDK-PASS`.
+This fixture does not modify or
 stand in for the publisher's WhatsApp APK.

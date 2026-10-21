@@ -9,6 +9,8 @@ module atlframework
 fn C.stbi_load_from_memory(&u8, i32, &i32, &i32, &i32, i32) &u8
 fn C.stbi_image_free(voidptr)
 fn C.realloc(voidptr, usize) voidptr
+fn C.__atomic_add_fetch(&i32, i32, i32) i32
+fn C.__atomic_sub_fetch(&i32, i32, i32) i32
 
 struct WsBitmap {
 mut:
@@ -67,8 +69,7 @@ fn ws_bitmap_unref(pointer i64) {
 	unsafe {
 		if pointer == 0 { return }
 		bitmap := &WsBitmap(pointer)
-		bitmap.references--
-		if bitmap.references == 0 {
+		if C.__atomic_sub_fetch(&bitmap.references, 1, 5) == 0 {
 			C.stbi_image_free(bitmap.rgba)
 			C.free(bitmap)
 		}
@@ -99,8 +100,32 @@ fn ws_bitmap_file(e voidptr, name voidptr) i64 {
 
 fn ws_bitmap_ref(pointer i64) i64 {
 	unsafe {
-		if pointer != 0 { (&WsBitmap(pointer)).references++ }
+		if pointer != 0 { C.__atomic_add_fetch(&(&WsBitmap(pointer)).references, 1, 5) }
 		return pointer
+	}
+}
+
+fn ws_bitmap_create(e voidptr, snapshot i64, width i32, height i32, stride i32, format i32) i64 {
+	if snapshot != 0 { return snapshot } // ownership moves between texture and snapshot
+	if width <= 0 || height <= 0 || width > 16384 || height > 16384 || i64(width) * height > 64 * 1024 * 1024 {
+		throw(e, c'java/lang/IllegalArgumentException', c'Invalid bitmap dimensions')
+		return 0
+	}
+	if format != 5 || stride != width * 4 {
+		throw(e, c'java/lang/UnsupportedOperationException', c'Native WS bitmap storage requires ARGB_8888')
+		return 0
+	}
+	unsafe {
+		pixels := &u8(C.calloc(usize(width) * usize(height), 4))
+		bitmap := &WsBitmap(C.malloc(sizeof(WsBitmap)))
+		if pixels == nil || bitmap == nil {
+			C.free(pixels)
+			C.free(bitmap)
+			throw(e, c'java/lang/OutOfMemoryError', c'Bitmap pixels')
+			return 0
+		}
+		*bitmap = WsBitmap{width: width, height: height, references: 1, rgba: pixels}
+		return i64(bitmap)
 	}
 }
 

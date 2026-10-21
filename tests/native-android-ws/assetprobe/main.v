@@ -10,6 +10,43 @@ fn C.AAsset_read(voidptr, voidptr, usize) i32
 fn C.AAsset_seek64(voidptr, i64, i32) i64
 fn C.AAsset_close(voidptr)
 
+struct BitmapInfo {
+mut:
+	width u32
+	height u32
+	stride u32
+	format i32
+	flags u32
+}
+
+fn C.AndroidBitmap_getInfo(voidptr, voidptr, &BitmapInfo) i32
+fn C.AndroidBitmap_lockPixels(voidptr, voidptr, &voidptr) i32
+fn C.AndroidBitmap_unlockPixels(voidptr, voidptr) i32
+
+@[export: 'Java_org_vinix_bootstrap_Main_nativeBitmap']
+pub fn bitmap_check(e voidptr, class voidptr, bitmap voidptr) u8 {
+	unsafe {
+		mut info := BitmapInfo{}
+		if C.AndroidBitmap_getInfo(e, bitmap, &info) != 0 || info.width != 2
+			|| info.height != 1 || info.stride != 8 || info.format != 1 || info.flags != 2 { return 0 }
+		mut first := voidptr(nil)
+		mut second := voidptr(nil)
+		if C.AndroidBitmap_lockPixels(e, bitmap, &first) != 0 { return 0 }
+		if C.AndroidBitmap_lockPixels(e, bitmap, &second) != 0 {
+			C.AndroidBitmap_unlockPixels(e, bitmap)
+			return 0
+		}
+		pixels := &u8(first)
+		valid := first == second && pixels[0] == 255 && pixels[1] == 0
+			&& pixels[2] == 0 && pixels[3] == 255 && pixels[4] == 0
+			&& pixels[5] == 255 && pixels[6] == 0 && pixels[7] == 255
+		one := C.AndroidBitmap_unlockPixels(e, bitmap)
+		two := C.AndroidBitmap_unlockPixels(e, bitmap)
+		extra := C.AndroidBitmap_unlockPixels(e, bitmap)
+		return u8(valid && one == 0 && two == 0 && extra == -1)
+	}
+}
+
 @[export: 'Java_org_vinix_bootstrap_Main_nativeCheck']
 pub fn check(e voidptr, class voidptr, java_assets voidptr) u8 {
 	unsafe {

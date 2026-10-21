@@ -87,7 +87,7 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 	os.cp(source + '/linker/NOTICE', output + '/bionic-ws-NOTICE')!
 	os.write_file(output + '/bionic-ws.cfg',
 		'libc.so libc_bio.so.0\nlibstdc++.so libstdc++_bio.so.0\n' +
-		'libandroid.so libvinix-android-native.so\n' +
+		'libandroid.so libvinix-android-native.so\nlibjnigraphics.so libvinix-android-native.so\n' +
 		'libEGL.so libvinix-ws-unsupported-egl.so\nlibEGL.so.1 libvinix-ws-unsupported-egl.so\n' +
 		'libGLESv1_CM.so libvinix-ws-unsupported-gles.so\nlibGLESv2.so libvinix-ws-unsupported-gles.so\nlibGLESv3.so libvinix-ws-unsupported-gles.so\n')!
 }

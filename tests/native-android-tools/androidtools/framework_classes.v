@@ -57,6 +57,7 @@ pub fn framework_extra_classes(source string) map[string]string {
 }
 
 pub fn write_framework_classes(smali string) ! {
+ framework_content_clients(smali)!
  source := os.read_file(root() + '/build-support/android/atlframework/widgets.v')!
  for name, text in framework_extra_classes(source) { os.write_file(smali + '/' + name + '.smali', text)! }
  dialogs := os.read_file(root() + '/build-support/android/atlframework/dialogs.v')!
@@ -94,6 +95,8 @@ pub fn write_framework_classes(smali string) ! {
  os.write_file(smali + '/android/view/VinixMenuClick.smali', menu_click)!
  context := smali + '/android/app/ContextImpl.smali'
  os.write_file(context, framework_replace_method(os.read_file(context)!, 'getTheme()Landroid/content/res/Resources$Theme;', '.method public native getTheme()Landroid/content/res/Resources$Theme;\n.end method')!)!
+ bitmap := smali + '/android/graphics/Bitmap.smali'
+ os.write_file(bitmap, os.read_file(bitmap)! + '\n.field private vinixPixelLock:J\n.field private vinixPixelLocks:I\n')!
  recreate := os.read_file(root() + '/build-support/android/atlframework/recreate.v')!
  task := '.class public Landroid/app/VinixRecreate;\n.super Ljava/lang/Object;\n.implements Ljava/lang/Runnable;\n' +
   '.field public old:Landroid/app/Activity;\n.field public next:Landroid/app/Activity;\n' + object_constructor +
