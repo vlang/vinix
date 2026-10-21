@@ -44,7 +44,9 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 	// guarded ABI hooks connect the pinned upstream loader to wsloader.
 	linker := source + '/linker/linker.c'
 	linker_text := os.read_file(linker)!
-	if linker_text.count('total_sz += len;') != 1 { return error('unexpected Bionic segment accounting') }
+	if linker_text.count('total_sz += len;') != 1 {
+		return error('unexpected Bionic segment accounting')
+	}
 	mut bridged := linker_text.replace('total_sz += len;',
 		'total_sz = vinix_ws_segment_extent(base, si->size, (uintptr_t)pbase, len, total_sz);')
 	mapper := 'ElfW(Addr) base = (ElfW(Addr))si->base;'
@@ -57,15 +59,34 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 	if bridged.count(protection) != 1 { return error('unexpected Bionic RELRO finalization') }
 	bridged = bridged.replace(protection,
 		'if (vinix_ws_copy_required(si->phdr, si->phnum) &&\n' +
-		' vinix_ws_finish_copy_segments(si->phdr, si->phnum, si->base, si->size) < 0) goto fail;\n' + protection)
+			' vinix_ws_finish_copy_segments(si->phdr, si->phnum, si->base, si->size) < 0) goto fail;\n' + protection)
 	// A host dependency has no soinfo, but a failed APK dependency must fail
 	// its parent instead of silently being replaced by the built-in libdl.
 	dependency := 'lsi = apkenv_find_library(si->strtab + d->d_un.d_val, true, RTLD_NOW, NULL);'
 	if bridged.count(dependency) != 1 { return error('unexpected Bionic dependency loading') }
 	bridged = bridged.replace(dependency,
 		'void *host_dependency = NULL;\n' +
-		'lsi = apkenv_find_library(si->strtab + d->d_un.d_val, true, RTLD_NOW | RTLD_GLOBAL, &host_dependency);\n' +
-		'if (!vinix_ws_dependency_loaded(lsi, host_dependency, si->strtab + d->d_un.d_val, si->name, apkenv_linker_get_error())) goto fail;')
+			'lsi = apkenv_find_library(si->strtab + d->d_un.d_val, true, RTLD_NOW | RTLD_GLOBAL, &host_dependency);\n' +
+			'if (!vinix_ws_dependency_loaded(lsi, host_dependency, si->strtab + d->d_un.d_val, si->name, apkenv_linker_get_error())) goto fail;')
+	// Modern ARM64 uses relocation 1031 for TLSDESC. The pinned loader
+	// mistakes it for an obsolete DTPREL32 no-op. Resolve TLS in V before
+	// its ordinary symbol path can turn a TLS offset into a virtual address.
+	tls_relocation := 'if (sym != 0) {'
+	if bridged.count(tls_relocation) != 1 { return error('unexpected Bionic TLS relocation entry') }
+	bridged = bridged.replace(tls_relocation,
+		'int tls_result = vinix_ws_relocate_tls(type, (uintptr_t *)reloc, si, sym ? &si->symtab[sym] : NULL, si->strtab, get_addend(rel), si->tls_slot_id, offsetof(soinfo, tls_slot_id),\n' +
+			' (void *(*)(void *, const char *, uintptr_t *))apkenv__do_lookup, (void *(*)(const void *))apkenv_find_containing_library);\n' +
+			'if (tls_result < 0) { DL_ERR("cannot resolve TLS relocation %u in %s", type, si->name); return -1; }\n' +
+			'if (tls_result > 0) continue;\n' + tls_relocation)
+	tls_registration := 'si->tls_slot_id = __tls_register_module(tls_init, tls_init_size, tls_size, tls_align);'
+	if bridged.count(tls_registration) != 1 {
+		return error('unexpected Bionic TLS module registration')
+	}
+	bridged = bridged.replace(tls_registration, tls_registration + '\n' +
+		'if (si->tls_slot_id == (size_t)-1) { DL_ERR("cannot register TLS for %s", si->name); goto fail; }')
+	tls_release := 'static void apkenv_free_info(soinfo *si)\n{'
+	if bridged.count(tls_release) != 1 { return error('unexpected Bionic TLS unload entry') }
+	bridged = bridged.replace(tls_release, tls_release + '\nvinix_ws_release_tls_descriptors(si);')
 	os.write_file(linker, bridged)!
 	dlfcn := source + '/linker/dlfcn.c'
 	mut dynamic_text := os.read_file(dlfcn)!
@@ -73,9 +94,11 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 	if dynamic_text.count(lookup) != 1 { return error('unexpected Bionic handle lookup') }
 	dynamic_text = dynamic_text.replace(lookup,
 		'sym = vinix_ws_lookup_dependencies(found, symbol, (void **)&found, offsetof(soinfo, dynamic), ' +
-		'(void *(*)(void *, const char *))apkenv_lookup_in_library);')
+			'(void *(*)(void *, const char *))apkenv_lookup_in_library);')
 	// Defined weak symbols are valid dlsym results as well as global symbols.
-	if dynamic_text.count('(bind == STB_GLOBAL)') != 1 { return error('unexpected Bionic symbol binding check') }
+	if dynamic_text.count('(bind == STB_GLOBAL)') != 1 {
+		return error('unexpected Bionic symbol binding check')
+	}
 	dynamic_text = dynamic_text.replace('(bind == STB_GLOBAL)', '(bind == STB_GLOBAL || bind == STB_WEAK)')
 	os.write_file(dlfcn, dynamic_text)!
 	bridge := work + '/vinix-segments.h'
@@ -85,6 +108,8 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 		'extern int vinix_ws_copy_segments(int, const void *, size_t, uintptr_t, size_t, void **, uint32_t *, uint32_t *, uintptr_t *, unsigned *);\n' +
 		'extern int vinix_ws_finish_copy_segments(const void *, size_t, uintptr_t, size_t);\n' +
 		'extern int vinix_ws_dependency_loaded(void *, void *, const char *, const char *, const char *);\n' +
+		'extern int vinix_ws_relocate_tls(uint32_t, uintptr_t *, void *, const void *, const char *, uintptr_t, size_t, size_t, void *(*)(void *, const char *, uintptr_t *), void *(*)(const void *));\n' +
+		'extern void vinix_ws_release_tls_descriptors(void *);\n' +
 		'extern void *vinix_ws_lookup_dependencies(void *, const char *, void **, size_t, void *(*)(void *, const char *));\n')!
 	inputs['segment_bridge_sha256'] = sha256.sum(os.read_bytes(bridge)!).hex()
 	inputs['linker_with_v_bridge_sha256'] = sha256.sum(os.read_bytes(linker)!).hex()
@@ -114,22 +139,32 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 		inputs[parts[0]] = parts[1]
 	}
 	mut objects := []string{}
-	for name in ['linker/dlfcn.c', 'linker/linker.c', 'linker/linker_environ.c', 'linker/linker_tls.c',
-		'linker/rt.c', 'linker/strlcpy.c', 'wrapper/wrapper.c', 'shared/config/config.c'] {
+	for name in ['linker/dlfcn.c', 'linker/linker.c', 'linker/linker_environ.c', 'linker/rt.c',
+		'linker/strlcpy.c', 'wrapper/wrapper.c', 'shared/config/config.c'] {
 		object := work + '/' + name.replace('/', '_') + '.o'
-		checked([compiler, '-O2', '-fPIC', '-D_GNU_SOURCE', '-D_LARGEFILE64_SOURCE', '-include', bridge,
-			'-DBIONIC_PAGE_SIZE=16384', '-DLINKER_DEBUG=1', '-I' + include,
-			'-I' + source + '/shared/config', '-DeglGetProcAddress=vinix_ws_gl_symbol',
-			'-c', source + '/' + name, '-o', object])!
+		checked([compiler, '-O2', '-fPIC', '-D_GNU_SOURCE', '-D_LARGEFILE64_SOURCE', '-include',
+			bridge, '-DBIONIC_PAGE_SIZE=16384', '-DLINKER_DEBUG=1', '-I' + include,
+			'-I' + source + '/shared/config', '-DeglGetProcAddress=vinix_ws_gl_symbol', '-c',
+			source + '/' + name, '-o', object])!
 		objects << object
 	}
-	mut link := [compiler, '-shared', '-fPIC', '-Wl,-soname,libdl_bio.so.0',
-		'-Wl,-z,max-page-size=65536', output + '/android-loader.c']
+	mut link := [compiler, '-O2', '-fomit-frame-pointer', '-fno-stack-protector', '-shared', '-fPIC',
+		'-Wl,-soname,libdl_bio.so.0', '-Wl,-z,max-page-size=65536', output + '/android-loader.c']
 	link << objects
 	link << [if os.is_file(runtime + '/usr/lib/libunwind.so.8') {
 		runtime + '/usr/lib/libunwind.so.8'
-	} else { '-lunwind' }, '-ldl', '-o', output + '/libdl_bio.so.0']
+	} else {
+		'-lunwind'
+	}, '-ldl', '-o', output + '/libdl_bio.so.0']
 	checked(link)!
+	// The resolver manages its whole ABI frame. GCC's ARM64 backend does
+	// not support the naked attribute: verify it emitted no extra prologue.
+	resolver := checked([compiler.replace('gcc', 'objdump'), '-d',
+		'--disassemble=wsloader__tlsdesc_resolver', output + '/libdl_bio.so.0'])!.stdout
+	entry := resolver.all_after('<wsloader__tlsdesc_resolver>:').split_into_lines().filter(it.trim_space() != '')
+	if entry.len < 2 || !entry[0].contains('sub\tsp, sp, #0x2a0') || !entry[1].contains('stp\tx29, x30, [sp]') {
+		return error('compiler inserted an incompatible TLSDESC resolver prologue')
+	}
 	inputs['loader_sha256'] = sha256.sum(os.read_bytes(output + '/libdl_bio.so.0')!).hex()
 	inputs['compiler'] = checked([compiler, '--version'])!.stdout.split_into_lines()[0]
 	os.write_file(output + '/bionic-ws-manifest.json', json2.encode(inputs, prettify: true) + '\n')!
@@ -137,9 +172,9 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 	os.cp(source + '/linker/NOTICE', output + '/bionic-ws-NOTICE')!
 	os.write_file(output + '/bionic-ws.cfg',
 		'libc.so libc_bio.so.0\nlibstdc++.so libstdc++_bio.so.0\n' +
-		'libandroid.so libvinix-android-native.so\nlibjnigraphics.so libvinix-android-native.so\n' +
-		'libnativewindow.so libvinix-android-native.so\n' +
-		'libOpenSLES.so libOpenSLES.so.1\n' +
-		'libEGL.so libvinix-android-native.so\nlibEGL.so.1 libvinix-android-native.so\n' +
-		'libGLESv1_CM.so libvinix-ws-GLESv1_CM.so\nlibGLESv2.so libvinix-ws-GLESv2.so\nlibGLESv3.so libvinix-ws-GLESv2.so\n')!
+			'libandroid.so libvinix-android-native.so\nlibjnigraphics.so libvinix-android-native.so\n' +
+			'libnativewindow.so libvinix-android-native.so\n' +
+			'libOpenSLES.so libOpenSLES.so.1\n' +
+			'libEGL.so libvinix-android-native.so\nlibEGL.so.1 libvinix-android-native.so\n' +
+			'libGLESv1_CM.so libvinix-ws-GLESv1_CM.so\nlibGLESv2.so libvinix-ws-GLESv2.so\nlibGLESv3.so libvinix-ws-GLESv2.so\n')!
 }

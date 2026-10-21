@@ -49,6 +49,16 @@ Handle-based JNI symbol lookup searches the library and its dependencies in
 breadth-first order, including defined weak symbols. The bootstrap APK includes
 a JNI method exported only by a dependent DSO to exercise this path in ART.
 
+The loader resolves ARM64 dynamic TLS and TLSDESC relocations using the
+defining library's TLS offsets. Per-thread blocks copy initialized data, zero
+BSS and honor alignment; the vector grows after later library loads. Thread
+exit frees those blocks, and library unload releases descriptor arguments.
+The TLSDESC entry preserves integer and SIMD registers and returns an offset
+from the host thread pointer. Undefined weak TLS addresses resolve to null.
+Initial-exec TLS is rejected because static TLS allocation is not implemented.
+The bootstrap fixture checks real compiler-generated descriptors across two
+libraries and eight worker threads (`BOOTSTRAP-TLSDESC-PASS`).
+
 Pinned Mesa GLES entrypoint and dispatch libraries resolve native graphics
 imports without loading Gallium, an EGL vendor, X11 or GTK. The software WS
 Canvas has no current EGL display, context or surface. EGL queries report that

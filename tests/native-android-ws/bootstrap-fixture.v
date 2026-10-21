@@ -80,15 +80,23 @@ invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0') +
 		method('public onCreate()V', stage(3, 4) + 'return-void')
 	os.write_file(smali + '/App.smali', app)!
-	for name, expected in {'High': 1, 'Low': 2} {
+	for name, expected in {
+		'High': 1
+		'Low':  2
+	} {
 		mut source := '.class public Lorg/vinix/bootstrap/' + name + ';\n.super Landroid/content/ContentProvider;\n' + constructor('android/content/ContentProvider', '')
 		source += method('public onCreate()Z', stage(expected, expected + 1) + 'const/4 v0, 1\nreturn v0')
-		for signature in ['query(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Landroid/database/Cursor;',
-			'insert(Landroid/net/Uri;Landroid/content/ContentValues;)Landroid/net/Uri;'] {
+		for signature in [
+			'query(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Landroid/database/Cursor;',
+			'insert(Landroid/net/Uri;Landroid/content/ContentValues;)Landroid/net/Uri;',
+		] {
 			source += method('public ' + signature, 'const/4 v0, 0\nreturn-object v0')
 		}
 		source += method('public getType(Landroid/net/Uri;)Ljava/lang/String;', 'const-string v0, "fixture/type"\nreturn-object v0')
-		for signature in ['delete(Landroid/net/Uri;Ljava/lang/String;[Ljava/lang/String;)I', 'update(Landroid/net/Uri;Landroid/content/ContentValues;Ljava/lang/String;[Ljava/lang/String;)I'] {
+		for signature in [
+			'delete(Landroid/net/Uri;Ljava/lang/String;[Ljava/lang/String;)I',
+			'update(Landroid/net/Uri;Landroid/content/ContentValues;Ljava/lang/String;[Ljava/lang/String;)I',
+		] {
 			source += method('public ' + signature, 'const/4 v0, 0\nreturn v0')
 		}
 		os.write_file(smali + '/' + name + '.smali', source)!
@@ -154,6 +162,7 @@ throw v0') +
 		'.method public static native nativeGraphics()Z\n.end method\n' +
 		'.method public static native nativeWindow(Landroid/view/Surface;)Z\n.end method\n' +
 		'.method public static native nativeLibc()Z\n.end method\n' +
+		'.method public static native nativeTls()Z\n.end method\n' +
 		'.method public static native nativeDependency()I\n.end method\n' +
 		method('private static timezoneCheck()V', '
 invoke-static {}, Ljava/util/TimeZone;->getAvailableIDs()[Ljava/lang/String;
@@ -612,6 +621,12 @@ if-eqz v0, :bad
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
 const-string v1, "BOOTSTRAP-LIBC-PASS pread checked-offset short-read api-level allocator-options shared-memory"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->nativeTls()Z
+move-result v0
+if-eqz v0, :bad
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-TLSDESC-PASS initialized bss aligned weak-null pthread-isolation"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 new-instance v0, Landroid/view/SurfaceView;
 invoke-direct {v0, p0}, Landroid/view/SurfaceView;-><init>(Landroid/content/Context;)V
 sput-object v0, Lorg/vinix/bootstrap/Main;->surface:Landroid/view/SurfaceView;
@@ -701,40 +716,61 @@ throw v0')
 	os.write_file(smali + '/Main.smali', main_class)!
 	manifest := '<?xml version="1.0"?><manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.vinix.bootstrap" android:versionCode="1" android:versionName="1"><uses-sdk android:minSdkVersion="23"/><application android:name=".App" android:label="Runtime fixture"><activity android:name=".Main" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity><provider android:name=".Low" android:authorities="fixture.low" android:initOrder="10"/><provider android:name=".High" android:authorities="fixture.high;fixture.alias" android:initOrder="100"/><provider android:name=".MustNotLoadDisabled" android:authorities="fixture.disabled" android:enabled="false"/><provider android:name=".MustNotLoadOtherProcess" android:authorities="fixture.other" android:process=":other"/></application></manifest>'
 	os.write_file(output + '/AndroidManifest.xml', manifest)!
-	checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', output + '/smali', '-o', output + '/classes.dex'])
-	checked([aapt, 'link', '-I', resources, '--manifest', output + '/AndroidManifest.xml', '-A', output + '/assets', '-o', output + '/unsigned.apk'])
-	checked(['build-support/compile-v-module', os.abs_path('tests/native-android-ws/assetprobe'), output + '/assetprobe.c', '--arch', 'arm64'])
-	checked(['build-support/compile-v-module', os.abs_path('tests/native-android-ws/dependencyprobe'), output + '/dependencyprobe.c', '--arch', 'arm64'])
-	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib', '-Wl,-z,max-page-size=4096',
-		'-Wl,-soname,libfixture-dependency.so', output + '/dependencyprobe.c', '-o', output + '/lib/arm64-v8a/libfixture-dependency.so'])
+	checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', output + '/smali', '-o',
+		output + '/classes.dex'])
+	checked([aapt, 'link', '-I', resources, '--manifest', output + '/AndroidManifest.xml', '-A',
+		output + '/assets', '-o', output + '/unsigned.apk'])
+	checked(['build-support/compile-v-module', os.abs_path('tests/native-android-ws/assetprobe'),
+		output + '/assetprobe.c', '--arch', 'arm64'])
+	checked(['build-support/compile-v-module', os.abs_path('tests/native-android-ws/dependencyprobe'),
+		output + '/dependencyprobe.c', '--arch', 'arm64'])
+	checked(['build-support/compile-v-module', os.abs_path('tests/native-android-ws/tlsprobe'),
+		output + '/tlsprobe.c', '--arch', 'arm64'])
+	// Only ELF storage/ABI declarations are generated here; tlsprobe supplies
+	// the V implementation. A separate DSO exercises symbol/module ownership.
+	os.write_file(output + '/tls-abi.h', '#include <stdint.h>\nextern __thread uint64_t fixture_tls;\nextern __thread uint64_t fixture_tls_bss;\nextern __thread uint64_t fixture_tls_weak __attribute__((weak));\n' +
+		'extern uint64_t vinix_fixture_tls_read(void);\nextern void vinix_fixture_tls_write(uint64_t);\nextern uint64_t vinix_fixture_tls_bss(void);\nextern uintptr_t vinix_fixture_tls_weak(void);\nextern uint8_t vinix_fixture_tls_aligned(void);\n')!
+	os.write_file(output + '/tls-storage.S', '.section .tdata,"awT",%progbits\n.balign 64\n.global fixture_tls\n.type fixture_tls,%tls_object\n.size fixture_tls,8\nfixture_tls: .quad 37\n.section .tbss,"awT",%nobits\n.balign 64\n.global fixture_tls_bss\n.type fixture_tls_bss,%tls_object\n.size fixture_tls_bss,8\nfixture_tls_bss: .zero 8\n.section .note.GNU-stack,"",%progbits\n')!
+	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib',
+		'-Wl,-z,max-page-size=4096', '-mtls-dialect=desc', '-I' + output,
+		'-Wl,-soname,libfixture-tls.so', output + '/tlsprobe.c', output + '/tls-storage.S', '-o',
+		output + '/lib/arm64-v8a/libfixture-tls.so'])
+	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib',
+		'-Wl,-z,max-page-size=4096', '-Wl,-soname,libfixture-dependency.so',
+		output + '/dependencyprobe.c', '-o', output + '/lib/arm64-v8a/libfixture-dependency.so'])
 	// Link against a dependency deliberately excluded from the APK. Loading
 	// this parent must fail even though its own JNI exports could be resolved.
-	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib', '-Wl,-z,max-page-size=4096',
-		'-Wl,-soname,libfixture-absent.so', output + '/dependencyprobe.c', '-o', output + '/libfixture-absent.so'])
-	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib', '-Wl,-z,max-page-size=4096',
-		output + '/assetprobe.c', '-Wl,--no-as-needed', '-L' + output, '-lfixture-absent',
-		'-o', output + '/lib/arm64-v8a/libfixture-broken.so'])
+	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib',
+		'-Wl,-z,max-page-size=4096', '-Wl,-soname,libfixture-absent.so', output + '/dependencyprobe.c',
+		'-o', output + '/libfixture-absent.so'])
+	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib',
+		'-Wl,-z,max-page-size=4096', output + '/assetprobe.c', '-Wl,--no-as-needed', '-L' + output,
+		'-lfixture-absent', '-o', output + '/lib/arm64-v8a/libfixture-broken.so'])
 	// Exercise the legacy NDK mapping path on a real 16 KiB Vinix guest as
 	// well as the Java framework APIs. This ELF intentionally uses 4 KiB pages.
-	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib', '-Wl,-z,max-page-size=4096',
-		'-Wl,-z,common-page-size=4096', output + '/assetprobe.c', '-Wl,--no-as-needed', '-L' + output + '/lib/arm64-v8a',
-		'-lfixture-dependency', '-o', output + '/lib/arm64-v8a/libfixture.so'])
+	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib',
+		'-Wl,-z,max-page-size=4096', '-Wl,-z,common-page-size=4096', output + '/assetprobe.c',
+		'-Wl,--no-as-needed', '-L' + output + '/lib/arm64-v8a', '-lfixture-dependency', '-lfixture-tls',
+		'-o', output + '/lib/arm64-v8a/libfixture.so'])
 	checked(['zip', '-q', '-j', output + '/unsigned.apk', output + '/classes.dex'])
 	// zip's -j would discard the ABI directory. Run in the fixture directory.
 	mut zip := os.new_process('zip')
 	zip.set_work_folder(output)
-	zip.set_args(['-q', 'unsigned.apk', 'lib/arm64-v8a/libfixture.so', 'lib/arm64-v8a/libfixture-dependency.so',
-		'lib/arm64-v8a/libfixture-broken.so'])
+	zip.set_args(['-q', 'unsigned.apk', 'lib/arm64-v8a/libfixture.so',
+		'lib/arm64-v8a/libfixture-dependency.so', 'lib/arm64-v8a/libfixture-broken.so',
+		'lib/arm64-v8a/libfixture-tls.so'])
 	zip.run()
 	zip.wait()
 	assert zip.code == 0
 	key := output + '/fixture.p12'
 	if !os.is_file(key) {
-		checked([os.join_path(os.dir(os.real_path(java)), 'keytool'), '-genkeypair', '-keystore', key,
-			'-storetype', 'PKCS12', '-storepass', 'android', '-keypass', 'android', '-alias', 'fixture',
-			'-dname', 'CN=Vinix Runtime Fixture', '-keyalg', 'RSA', '-keysize', '2048', '-validity', '3650'])
+		checked([os.join_path(os.dir(os.real_path(java)), 'keytool'), '-genkeypair', '-keystore',
+			key, '-storetype', 'PKCS12', '-storepass', 'android', '-keypass', 'android', '-alias',
+			'fixture', '-dname', 'CN=Vinix Runtime Fixture', '-keyalg', 'RSA', '-keysize', '2048',
+			'-validity', '3650'])
 	}
 	checked([java, '-jar', os.abs_path(os.args[6]), 'sign', '--ks', key, '--ks-key-alias', 'fixture',
-		'--ks-pass', 'pass:android', '--key-pass', 'pass:android', '--out', output + '/bootstrap.apk', output + '/unsigned.apk'])
+		'--ks-pass', 'pass:android', '--key-pass', 'pass:android', '--out', output + '/bootstrap.apk',
+		output + '/unsigned.apk'])
 	println(output + '/bootstrap.apk')
 }
