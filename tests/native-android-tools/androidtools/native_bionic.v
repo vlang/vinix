@@ -23,7 +23,8 @@ fn ws_fetch(path string, url string, expected string) ! {
 }
 
 // Compile the pinned upstream linker with the existing 16 KiB page patch.
-// Only the optional GL lookup is supplied by V. EGL is never linked or loaded.
+// V supplies optional GL lookup and mapped-segment range accounting. EGL is
+// never linked or loaded by this library.
 pub fn build_native_bionic(output string, runtime string, compiler string, arch string) ! {
 	if arch != 'arm64' { return error('native APK Bionic loader requires ARM64') }
 	work := output + '/bionic-ws'
@@ -39,6 +40,33 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 	patch := root() + '/build-support/android/bionic16k.patch'
 	checked(['patch', '--batch', '--fuzz=0', '-p1', '-d', source, '-i', patch])!
 	inputs['patch_sha256'] = sha256.sum(os.read_bytes(patch)!).hex()
+	// Keep range accounting, copy mapping and page protection in V. These
+	// guarded ABI hooks connect the pinned upstream loader to wsloader.
+	linker := source + '/linker/linker.c'
+	linker_text := os.read_file(linker)!
+	if linker_text.count('total_sz += len;') != 1 { return error('unexpected Bionic segment accounting') }
+	mut bridged := linker_text.replace('total_sz += len;',
+		'total_sz = vinix_ws_segment_extent(base, si->size, (uintptr_t)pbase, len, total_sz);')
+	mapper := 'ElfW(Addr) base = (ElfW(Addr))si->base;'
+	if bridged.count(mapper) != 1 { return error('unexpected Bionic segment mapper') }
+	bridged = bridged.replace(mapper, mapper + '\n' +
+		'if (vinix_ws_copy_required(phdr, ehdr->e_phnum))\n' +
+		' return vinix_ws_copy_segments(fd, phdr, ehdr->e_phnum, base, si->size, (void **)&si->dynamic,\n' +
+		'  &si->wrprotect_start, &si->wrprotect_end, &si->gnu_relro_start, &si->gnu_relro_len);')
+	protection := 'if (si->gnu_relro_start != 0 && si->gnu_relro_len != 0) {'
+	if bridged.count(protection) != 1 { return error('unexpected Bionic RELRO finalization') }
+	bridged = bridged.replace(protection,
+		'if (vinix_ws_copy_required(si->phdr, si->phnum) &&\n' +
+		' vinix_ws_finish_copy_segments(si->phdr, si->phnum, si->base, si->size) < 0) goto fail;\n' + protection)
+	os.write_file(linker, bridged)!
+	bridge := work + '/vinix-segments.h'
+	os.write_file(bridge, '#include <stdint.h>\n#include <stddef.h>\n' +
+		'extern size_t vinix_ws_segment_extent(uintptr_t, size_t, uintptr_t, size_t, size_t);\n' +
+		'extern int vinix_ws_copy_required(const void *, size_t);\n' +
+		'extern int vinix_ws_copy_segments(int, const void *, size_t, uintptr_t, size_t, void **, uint32_t *, uint32_t *, uintptr_t *, unsigned *);\n' +
+		'extern int vinix_ws_finish_copy_segments(const void *, size_t, uintptr_t, size_t);\n')!
+	inputs['segment_bridge_sha256'] = sha256.sum(os.read_bytes(bridge)!).hex()
+	inputs['linker_with_v_bridge_sha256'] = sha256.sum(os.read_bytes(linker)!).hex()
 	headers := work + '/headers'
 	os.mkdir_all(headers)!
 	for record in [
@@ -67,7 +95,7 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 	for name in ['linker/dlfcn.c', 'linker/linker.c', 'linker/linker_environ.c', 'linker/linker_tls.c',
 		'linker/rt.c', 'linker/strlcpy.c', 'wrapper/wrapper.c', 'shared/config/config.c'] {
 		object := work + '/' + name.replace('/', '_') + '.o'
-		checked([compiler, '-O2', '-fPIC', '-D_GNU_SOURCE', '-D_LARGEFILE64_SOURCE',
+		checked([compiler, '-O2', '-fPIC', '-D_GNU_SOURCE', '-D_LARGEFILE64_SOURCE', '-include', bridge,
 			'-DBIONIC_PAGE_SIZE=16384', '-DLINKER_DEBUG=1', '-I' + include,
 			'-I' + source + '/shared/config', '-DeglGetProcAddress=vinix_ws_gl_symbol',
 			'-c', source + '/' + name, '-o', object])!
