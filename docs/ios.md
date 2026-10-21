@@ -15515,17 +15515,77 @@ and the branch-island forwarder at `0x107c29358`. Partial-class-instance
 deallocation remains unsupported. Application entry remains unreached and
 Fortnite is still unplayable.
 
+`_swift_deallocPartialClassInstance` now implements bounded constructor-failure
+cleanup through its four-argument C, void-returning entry: object, cleanup
+boundary metadata, allocated size and alignment mask. Nil is a no-op without
+reading the other arguments or requiring a live runtime.
+
+For a registered ordinary Objective-C object, the entry releases one reference
+and ignores the boundary metadata and allocation layout, matching native Swift's
+pure-ObjC fast path. Shared objects survive until their last release; registered
+immutable placeholders remain untouched. Weak slots, associated references and
+custom deallocation use the existing Objective-C ownership path. Deallocation
+callbacks execute after the registry lock is released and may reenter runtime
+lookup or wait for another thread.
+
+For a registered native Swift class allocation, this profile requires the
+cleanup boundary to equal the allocated class, an exact size/alignment match,
+native reference counting, a zero instance address point and a unique live
+owner without side tables. That allocation is reclaimed without invoking its
+deallocating destructor, superclass or ivar destroyers. The failed initializer
+remains responsible for any values it initialized in its own class.
+
+Superclass-boundary cleanup, Swift/ObjC hierarchy traversal, native shared or
+deinitializing owners, private heap contexts, tagged/unknown pointers, invalid
+layouts and retired nonnull calls fail explicitly before ownership changes.
+Metadata stays borrowed; no new arena, owner or per-call allocation is created.
+This does not implement general Swift superclass ivar cleanup or ownership
+transitions between Swift and Objective-C classes.
+
+```sh
+v run tests/ios/native-checks.v build-partial-class
+```
+
+Evidence is retained under `build/ios/fortnite/partial-class-checks`, including
+the [Swift 5.10 heap runtime reference](https://github.com/swiftlang/swift/blob/swift-5.10-RELEASE/stdlib/public/runtime/HeapObject.cpp),
+class-metadata layout and ABI declarations. Native comparisons cover nil,
+shared CF ownership, ignored unreadable metadata and invalid ObjC layouts,
+custom Objective-C deallocation, forty native class layouts across two metadata
+positions, guarded superclass/destructor/ivar fields, x20/x21/x22 preservation
+and eight workers. Compatibility checks also cover rejected native ownership
+and layouts without mutation, protected immutable placeholders, weak and
+associated-object cleanup, unlocked reentrant deallocation and two drained
+lifetimes.
+
+Eight normal/deterministic ASan/UBSan runs passed with both C++ configurations,
+including native heap and object-type regressions. The ARM64 fixture, launch
+probe and both import audits passed. Eight compressed binary/generated-C pairs
+and five C/ARM64 reviews retain the tested artifacts, allocation-free checked
+paths and lock release before Objective-C callbacks.
+
+Static V/Mach-O/LLVM inspection traces the import through GOT cell
+`0x10dc9bb18`, stub `0x10c63ebb0`, two direct callers and the branch-island
+forwarder at `0x107c29358`. The callers supply an object, a previously queried
+type, size 12 and alignment mask 7; native's pure-ObjC path ignores those layout
+arguments. Static inspection executes no application code.
+
+The next missing import is `_swift_getEnumCaseMultiPayload`, at GOT cell
+`0x10dc9bb40` and stub `0x10c63ebec`. Static inspection found two direct callers
+and the branch-island forwarder at `0x107c2891c`. General multi-payload enum
+case lookup remains unsupported. Application entry remains unreached and
+Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,966 | 195 | 78 |
+| Fortnite executable | 1,967 | 194 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,806 | 198 | 114 |
+| All images | 2,807 | 197 | 114 |
 
-The C++/GLES/Text variant reports 2,820 resolved imports, 184 unresolved strong
+The C++/GLES/Text variant reports 2,821 resolved imports, 183 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

@@ -322,6 +322,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_swift_allocObject' { u64(unsafe { voidptr(swift_heap_allocate) }) }
 		'_swift_deallocObject' { u64(unsafe { voidptr(swift_heap_deallocate) }) }
 		'_swift_deallocClassInstance' { u64(unsafe { voidptr(swift_heap_deallocate_class) }) }
+		'_swift_deallocPartialClassInstance' { u64(unsafe { voidptr(swift_partial_class) }) }
 		'_swift_deallocUninitializedObject' { u64(unsafe { voidptr(swift_heap_deallocate_uninitialized) }) }
 		'__swift_stdlib_reportUnimplementedInitializerInFile' { u64(unsafe { voidptr(swift_initializer_report_in_file) }) }
 		'__swift_stdlib_reportUnimplementedInitializer' { u64(unsafe { voidptr(swift_initializer_report) }) }
