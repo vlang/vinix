@@ -15777,17 +15777,78 @@ class imports and app class addresses. Swift-mediated Objective-C class
 initialization remains unsupported. Application entry remains unreached and
 Fortnite is still unplayable.
 
+`_swift_getInitializedObjCClass` now supports registered ordinary Objective-C
+classes. Its ordinary C entry takes one class pointer in x0 and returns that
+same pointer in x0. Nil returns nil even outside the runtime lifetime, without
+inspecting class storage.
+
+The helper uses the existing Objective-C lifecycle to initialize superclasses
+before subclasses, once for each class. Inherited initializers receive the
+subclass as their receiver; same-thread recursive initialization uses the
+lifecycle's recursive serialization. After initialization, the helper looks up
+the inherited or overridden `+self` method and releases its lookup lock before
+calling it. This dispatch happens on every call, including for initialized
+classes. Its result is ignored, so an override returning another object or nil
+does not change the class returned by the helper. No `+class` message is sent.
+
+Only registered, non-metaclass class identities with bounded ordinary class
+ancestry and known metaclasses are accepted. Registration is checked before
+reading borrowed class headers. Unknown classes, unregistered dynamic pairs,
+Swift wrapper metadata, classes requiring Swift realization, cyclic ancestry
+and retired runtimes fail explicitly. Realization of Swift classes and arbitrary
+unregistered image metadata remain unsupported.
+
+The entry creates no Swift wrapper or metadata cache and performs no ARC,
+object allocation or class-header writes. Class storage and method implementations
+remain borrowed; callers must drain before classes, their implementations or
+the runtime retire. Initialization retains the existing Objective-C lifecycle's
+serialization rules. The helper adds no lock or arena requiring separate teardown.
+
+```sh
+v run tests/ios/native-checks.v build-initialized-objc-class
+```
+
+Evidence is retained under `build/ios/fortnite/initialized-objc-class-checks`,
+including the [Swift 5.10 implementation](https://github.com/swiftlang/swift/blob/swift-5.10-RELEASE/stdlib/public/runtime/SwiftObject.mm)
+and ABI declarations. Native comparisons cover exact scalar C registers,
+superclass ordering, inherited/overridden initialization, recursive entry,
+per-call `+self`, ignored inaccessible return values and absence of `+class`
+dispatch. Eight concurrent readers initialize a cold subclass once. Raw ARM64
+calls preserve x20/x21/x22 with an inaccessible indirect-result pointer.
+Compatibility checks additionally cover runtime lookup from a `+self` callback
+on another thread, rejected class forms and states, builtin Foundation classes,
+a readonly 40-byte borrowed class header at a protected boundary, unchanged
+borrowed storage after shutdown and two drained runtime lifetimes.
+
+Eight normal/deterministic ASan/UBSan runs passed with both C++ configurations,
+including object-type and partial-class deallocation regressions. The ARM64
+fixture, launch probe and both import audits passed their checks. Eight compressed
+binary/generated-C pairs and five C/ARM64 reviews retain the tested artifacts,
+borrowed lifetimes and allocation-free runtime paths.
+
+Static inspection traces this required import through GOT cell `0x10dc9bb58`,
+stub `0x10c63ec10`, branch island `0x107c284ac` and 18 consumer/forwarder sites.
+Callers include imported Foundation classes and app class addresses; the call at
+`0x10003cee4`, for example, uses the NSUserDefaults class import. No application
+code is executed by the inspection.
+
+The next missing import is `_swift_getObjCClassFromMetadata`, at GOT cell
+`0x10dc9bb60`, stub `0x10c63ec1c`, branch island `0x107c28e2c` and caller
+`0x1015be5d0`. This reverse conversion from Swift metadata to an Objective-C
+class remains unsupported. Application entry remains unreached and Fortnite is
+still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,970 | 191 | 78 |
+| Fortnite executable | 1,971 | 190 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,810 | 194 | 114 |
+| All images | 2,811 | 193 | 114 |
 
-The C++/GLES/Text variant reports 2,824 resolved imports, 180 unresolved strong
+The C++/GLES/Text variant reports 2,825 resolved imports, 179 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
