@@ -15639,17 +15639,81 @@ a callback address. General single-payload tag lookup with an app-supplied
 extra-inhabitant callback remains unsupported. Application entry remains
 unreached and Fortnite is still unplayable.
 
+`_swift_getEnumTagSinglePayloadGeneric` now supports bounded generic
+single-payload enum tag lookup. The entry takes a value pointer, UInt32 empty-case
+count, payload metadata and an app callback in x0/w1/x2/x3, returning a UInt32 in
+w0. Its scalar SwiftCC arguments and callback use the same ARM64 registers as
+the corresponding C function types; no indirect result or Swift self argument
+is required.
+
+The supported profile borrows an initialized payload VWT layout with a size up
+to 1 MiB and valid alignment/stride. Only the metadata's preceding VWT pointer,
+size, stride, flags and extra-inhabitant count are read. The metadata kind,
+descriptor, generic arguments and VWT function pointers stay opaque; the helper
+does not instantiate or complete metadata. Zero through four trailing tag bytes
+and the leading zero through four payload bytes are decoded little-endian,
+including native UInt32 rounding and overflow. Remaining payload storage and
+stride padding are untouched.
+
+A nonzero trailing tag returns its decoded case without invoking the callback.
+Otherwise, a payload with extra inhabitants invokes the supplied callback with
+the original value pointer, the payload's total extra-inhabitant count and its
+metadata. This also happens when the requested empty-case count is zero. The
+callback's UInt32 result is returned unchanged, without clamping it to the number
+of empty cases. With no extra inhabitants and no nonzero trailing tag, the
+helper returns zero. An unused callback is never inspected or invoked, and a
+zero-width tag does not read the value pointer.
+
+The layout lock is released before calling borrowed app code. Callbacks may
+perform runtime lookups and nested tag queries; owners and runtime users must
+drain before retiring the borrowed value, metadata or callback. Incomplete or
+oversized layouts, invalid alignment/stride, invalid required pointer forms,
+overflowing read spans and retired runtimes fail explicitly. No metadata cache,
+per-call allocation, value write, copying, destruction or reference counting is
+performed by the helper. Callback behavior remains the application's responsibility.
+
+```sh
+v run tests/ios/native-checks.v build-enum-tag-single
+```
+
+Evidence is retained under `build/ios/fortnite/enum-tag-single-checks`, including
+the [Swift 5.10 enum runtime](https://github.com/swiftlang/swift/blob/swift-5.10-RELEASE/stdlib/public/runtime/Enum.cpp)
+and its ABI declarations and tag-width calculation. Native and compatibility
+matrices match hash `163855d6a05abae5`, asserted on both hosts and Linux guests.
+The matrix covers zero to 1 MiB payloads, UInt32 case/extra-inhabitant boundaries,
+all tag widths, arbitrary callback returns, protected metadata/VWT/value ends,
+inaccessible unused callbacks and payloads, and preserved x20/x21/x22. Eight
+workers exercise concurrent callbacks that re-enter through runtime lookup and
+nested tag decoding, across two drained runtime lifetimes.
+
+Eight normal/deterministic ASan/UBSan runs passed with both C++ configurations,
+including Optional metadata and generic-value allocation regressions. The ARM64
+fixture, launch probe and both import audits passed their checks. Eight compressed
+binary/generated-C pairs and five C/ARM64 reviews retain the tested artifacts,
+allocation-free paths and callback invocation outside the layout lock.
+
+Static inspection traces the implemented import through GOT cell `0x10dc9bb48`,
+stub `0x10c63ebf8`, branch island `0x107c284c0` and tail forwarder `0x100065650`.
+The forwarder supplies the app callback at `0x100065654` in x3. No application
+code is executed by this inspection.
+
+The next missing import is `_swift_getGenericMetadata`, at GOT cell
+`0x10dc9bb50`, stub `0x10c63ec04` and branch island `0x107c28d3c`. Its caller at
+`0x1000737e8` assembles three generic arguments on the stack and forwards the
+descriptor in x2. General generic metadata lookup remains unsupported.
+Application entry remains unreached and Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,968 | 193 | 78 |
+| Fortnite executable | 1,969 | 192 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,808 | 196 | 114 |
+| All images | 2,809 | 195 | 114 |
 
-The C++/GLES/Text variant reports 2,822 resolved imports, 182 unresolved strong
+The C++/GLES/Text variant reports 2,823 resolved imports, 181 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
