@@ -14915,17 +14915,56 @@ The next missing import is UInt64's descriptor, `_$ss6UInt64VMn`, at GOT cell
 in `__swift5_typeref`. Application entry remains unreached; Fortnite is still
 unplayable.
 
+UInt64 now exports canonical metadata (`_$ss6UInt64VN`), its nominal descriptor
+(`_$ss6UInt64VMn`) and a complete metadata accessor (`_$ss6UInt64VMa`). UInt64
+keeps its own metadata and descriptor identity while sharing Int/Builtin.Int64's
+eight POD value witnesses, as native Swift does. Size and stride are eight bytes,
+alignment is eight, no extra inhabitants are available, and the one stored
+word has field offset zero. Copies preserve every unsigned bit, including the
+high bit and UInt64.max; single-payload enum operations use an external tag.
+
+The records share the existing sealed integer arena and canonical Swift module,
+with no new allocation or retirement path. Cached identity remains available
+to draining callbacks; cold publication is rejected after retirement starts.
+Direct and indirect symbolic references resolve to the same metadata, which
+the existing typed Array, Optional and Any paths can consume. Reflection,
+unsigned protocol conformances, arithmetic and formatting exports remain
+separate; signed integer formatting is not used for UInt64.
+
+```sh
+v run tests/ios/native-checks.v build-uint64-metadata
+```
+
+Evidence is retained under `build/ios/fortnite/uint64-metadata-checks`. Native
+layout/value comparisons and ten normal/deterministic ASan/UBSan runs passed
+with both C++ configurations, including Int/Builtin.Int64, byte metadata and
+Optional regressions. Checks cover exact eight-byte copies/aliases, nine-byte
+single-payload enums at UInt32 boundaries, protected absent values, read-only
+guarded words, preserved x20/x21/x22 and protected unused x8. Direct/indirect
+symbolic references use protected contexts and arguments; Array/Optional/Any
+retain UInt64's identity and full bit patterns. Eight cold readers, both integer
+publication orders, sealed pages and two drained/unmapped callback lifetimes
+passed. The ARM64 fixture, launch probe and both import audits passed;
+nine binary/generated-C pairs and five C/ARM64 reviews are retained.
+
+The next missing import is Decoder's `container(keyedBy:)` dispatch entry,
+`_$ss7DecoderP9container7keyedBys22KeyedDecodingContainerVyqd__Gqd__m_tKs9CodingKeyRd__lFTj`,
+at GOT cell `0x10dc9ba48` and import stub `0x10c63afc8`. V/Mach-O/LLVM inspection
+found five actual call sites and a branch-island forwarder without executing
+application code. Application entry remains unreached; Fortnite is still
+unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,951 | 210 | 78 |
+| Fortnite executable | 1,952 | 209 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,791 | 213 | 114 |
+| All images | 2,792 | 212 | 114 |
 
-The C++/GLES/Text variant reports 2,805 resolved imports, 199 unresolved strong
+The C++/GLES/Text variant reports 2,806 resolved imports, 198 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

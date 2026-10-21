@@ -128,7 +128,8 @@ fn swift_integer_metadata() u64 {
 	swift_hasher_default_emit(base + 160)
 	swift_vararg_emit(base, data)
 	swift_byte_metadata_emit(base, data)
-	C.__builtin___clear_cache(arena, unsafe { voidptr(base + 408) })
+	swift_uint64_metadata_emit(base, data)
+	C.__builtin___clear_cache(arena, unsafe { voidptr(base + 440) })
 	if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(arena, usize(page * 2))
@@ -147,6 +148,7 @@ fn swift_integer_stop() {
 }
 
 fn swift_integer_symbol(symbol string) ?u64 {
+	if address := swift_uint64_metadata_symbol(symbol) { return address }
 	if address := swift_integer_description_symbol(symbol) { return address }
 	if address := swift_byte_symbol(symbol) { return address }
 	function := match symbol {
