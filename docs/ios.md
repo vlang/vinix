@@ -16227,22 +16227,58 @@ stub `0x10c63ecac` and branch island `0x107c284cc`. Inspected caller
 vector. A synthetic fixture covers that four-field layout shape; inspection
 executes no application code.
 
-The next missing import is `_swift_isEscapingClosureAtFileLocation`, at GOT cell
-`0x10dc9bbc8`, stub `0x10c63ecb8` and branch island `0x107c28624`. Inspected caller
-`0x100066e50` checks its boolean result after synchronous dispatch.
-Application entry remains unreached and Fortnite is still unplayable.
+`_swift_isEscapingClosureAtFileLocation` now checks borrowed Swift closure
+headers without registering them for ARC or changing their reference counts.
+Nil and unique inline closures return false; nonunique and immortal closures
+write the appropriate `withoutActuallyEscaping` or Objective-C noescape
+diagnostic and return true. The caller decides whether to trap. The six-scalar
+C ABI uses explicit signed 32-bit filename length, line and column arguments;
+diagnostics print the line and column as unsigned values, matching Swift.
+Filenames are bounded by the supplied length and stop at an embedded NUL.
+
+Stack closures and read-only heap headers work without reading metadata.
+Side-table and deinitializing headers remain unsupported and are rejected;
+host debugger crash annotations and backtraces are unavailable. No allocation,
+ownership or shutdown cleanup is added to the query path.
+
+```sh
+v run tests/ios/native-checks.v build-escaping-closure
+```
+
+Evidence is retained under `build/ios/fortnite/escaping-closure-checks`. Native
+Swift comparisons cover both diagnostic modes, nil, inline uniqueness,
+immortality, protected metadata, read-only page-end headers, bounded filenames,
+the boolean return and preserved `x20`/`x21`. Tests also cover eight concurrent
+stack-closure workers, malformed arguments, unsupported headers and two empty
+runtime lifetimes. Eight normal/deterministic ASan/UBSan runs passed across both
+C++ configurations, including stack and heap regressions. Generated C checks
+verify the 32-bit arguments and allocation-free implementation. The ARM64
+fixture, launch probe and both import audits passed their checks. Eight
+compressed binary/generated-C pairs and five C/ARM64 reviews retain the tested
+paths.
+
+Static inspection traces this required import through GOT cell `0x10dc9bbc8`,
+stub `0x10c63ecb8` and branch island `0x107c28624`. Inspected caller
+`0x100066e50` checks its boolean result after synchronous dispatch. This
+inspection executes no application code.
+
+The launch probe now stops at required data import `_swift_isaMask`, before
+application entry. Static inspection identifies GOT cell `0x10dc9bbd8` and five
+consumers, including `0x100064f78`, which load the mask, apply it to an object's
+first word and dispatch through the resulting metadata. Fortnite remains
+unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,979 | 182 | 78 |
+| Fortnite executable | 1,980 | 181 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,819 | 185 | 114 |
+| All images | 2,820 | 184 | 114 |
 
-The C++/GLES/Text variant reports 2,833 resolved imports, 171 unresolved strong
+The C++/GLES/Text variant reports 2,834 resolved imports, 170 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

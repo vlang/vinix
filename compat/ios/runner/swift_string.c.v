@@ -361,6 +361,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_swift_unknownObjectRetain' { u64(unsafe { voidptr(swift_unknown_retain) }) }
 		'_swift_unknownObjectRelease' { u64(unsafe { voidptr(swift_unknown_release) }) }
 		'_swift_isUniquelyReferenced_nonNull_native' { u64(unsafe { voidptr(swift_is_unique_native) }) }
+		'_swift_isEscapingClosureAtFileLocation' { u64(unsafe { voidptr(swift_escaping_closure) }) }
 		else { none }
 	}
 }
