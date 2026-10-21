@@ -15575,17 +15575,81 @@ and the branch-island forwarder at `0x107c2891c`. General multi-payload enum
 case lookup remains unsupported. Application entry remains unreached and
 Fortnite is still unplayable.
 
+`_swift_getEnumCaseMultiPayload` now supports bounded case lookup for enums
+with an explicit payload-size metadata word and a trailing discriminator.
+Its ordinary C entry takes value and enum metadata pointers and returns the
+UInt32 case index in w0. The value, metadata, descriptor and layout witnesses
+remain borrowed and immutable for the call.
+
+The profile accepts version-zero enum descriptors with two or more payload
+cases, payload-size word offsets 2 through 255, payloads up to 1 MiB and zero
+through four trailing tag bytes. The enum witnesses must have an initialized
+layout, a valid alignment/stride and enum operations. Generic arguments,
+reflection names, the descriptor's empty-case count and witness callbacks are
+not read or invoked; this lookup does not instantiate or complete metadata.
+
+Tag bytes are read little-endian without requiring aligned value storage.
+A payload-case tag returns without inspecting its payload. An empty-case tag
+combines the leading zero to four payload bytes with the tag, matching native
+UInt32 arithmetic and wrap. For payloads of four bytes or more, only the leading
+four bytes contribute to the empty-case index. Zero tag bytes select case zero
+without reading the value pointer. Remaining payload bytes and stride padding
+are untouched; no copying, destruction, reference counting or writes occur.
+
+Missing payload-size words, single-payload or other metadata kinds, incomplete
+layouts, oversized payloads/tags, invalid pointer forms, overflowing spans and
+retired runtimes fail explicitly. Fixed layouts that encode cases in spare bits
+remain unsupported.
+As with the native helper, decoding does not validate the resulting case index
+against an empty-case count. Owners and runtime users must drain before the
+borrowed spans retire. No arena, specialization or per-call allocation is made.
+
+```sh
+v run tests/ios/native-checks.v build-enum-case-multi
+```
+
+Evidence is retained under `build/ios/fortnite/enum-case-multi-checks`, including
+the [Swift 5.10 enum runtime reference](https://github.com/swiftlang/swift/blob/swift-5.10-RELEASE/stdlib/public/runtime/Enum.cpp),
+byte-load helpers, metadata layouts and ABI declarations. Native comparisons
+cover exact matrix hashes across payload sizes, all five tag widths, 24-bit
+payload-case counts and UInt32 transitions. Readonly descriptors, metadata,
+witness layouts and values sit at protected boundaries; unused payload pages,
+generic context trailers and witness callbacks are inaccessible. Raw ARM64
+calls also preserve x20/x21/x22 with an inaccessible indirect-result pointer.
+Compatibility checks assert the native matrix hash `dc421a95655debe5` on both
+hosts and guests, reject unsupported layouts, and cover eight concurrent readers
+and two drained lifetimes without allocating a metadata cache entry or value owner.
+
+Eight normal/deterministic ASan/UBSan runs passed with both C++ configurations,
+including Optional metadata and generic-value allocation regressions. The ARM64
+fixture asserted the same native matrix hash in both lifetimes; the launch
+probe and both import audits passed. Eight compressed binary/generated-C pairs
+and five C/ARM64 reviews retain the tested artifacts and allocation-free paths.
+
+Static V/Mach-O/LLVM inspection traces the required import through GOT cell
+`0x10dc9bb40`, stub `0x10c63ebec`, two direct callers and the branch-island
+forwarder at `0x107c2891c`. Each caller supplies value and metadata pointers
+and compares the returned w0 with case one. Static inspection executes no
+application code.
+
+The next missing import is `_swift_getEnumTagSinglePayloadGeneric`, at GOT cell
+`0x10dc9bb48` and stub `0x10c63ebf8`. Static inspection found the branch-island
+forwarder at `0x107c284c0` and another forwarder at `0x100065650` that supplies
+a callback address. General single-payload tag lookup with an app-supplied
+extra-inhabitant callback remains unsupported. Application entry remains
+unreached and Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,967 | 194 | 78 |
+| Fortnite executable | 1,968 | 193 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,807 | 197 | 114 |
+| All images | 2,808 | 196 | 114 |
 
-The C++/GLES/Text variant reports 2,821 resolved imports, 183 unresolved strong
+The C++/GLES/Text variant reports 2,822 resolved imports, 182 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
