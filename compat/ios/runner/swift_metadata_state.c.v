@@ -10,6 +10,7 @@ fn swift_metadata_state_failure() IError { return unsafe { &swift_metadata_state
 // These constructors and cache publications establish complete metadata. Match
 // exact registered identities; an external descriptor or usable VWT is not proof.
 fn swift_metadata_state_known_complete_locked(metadata u64) bool {
+	if swift_tuple_metadata_complete_locked(metadata) { return true }
 	if swift_generic_metadata_complete_locked(metadata) { return true }
 	base := metadata - 8
 	if ios_runtime.swift_dictionary_metadata_arena != 0 && !ios_runtime.swift_dictionary_metadata_retired

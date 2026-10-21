@@ -16009,23 +16009,78 @@ fields and an in-place singleton record. Caller `0x100073c18` selects class
 descriptor `0x10dc80568`; that class-initialization path remains unsupported.
 No application code is executed by inspection.
 
-The next missing import is `_swift_getTupleTypeMetadata`, at GOT cell
-`0x10dc9bb88`, stub `0x10c63ec58`, branch island `0x107c28ed0` and caller
-`0x1015c040c`. The caller forwards an element count/vector with a complete
-request and null labels/proposed witnesses. General tuple metadata remains
-unsupported. Application entry remains unreached and Fortnite is still unplayable.
+`_swift_getTupleTypeMetadata` now constructs bounded unlabelled inline tuple
+metadata. The SwiftCC entry accepts request, flags/count, ordered element
+vector, labels and proposed witnesses in `x0` through `x4`, returning metadata
+and Complete state in `x0`/`x1`. All eight supported metadata request modes
+return complete records. Empty tuples use canonical Void metadata without
+reading the element, label or proposed-witness pointers.
+
+Nonempty tuples accept up to 64 complete child types whose combined layout fits
+the 24-byte, eight-aligned Swift value buffer. Layout rounds each element offset
+to its alignment, keeps interior padding, computes final stride and combines
+POD/extra-inhabitant properties. POD witnesses copy Size bytes; non-POD copy,
+assignment, take and destruction compose child witnesses in element order.
+Buffer copying uses the inline value address. Enum witnesses select the child
+with the most extra inhabitants, favoring the first on ties, and implement the
+native UInt32 discriminator-width and wrapping rules.
+
+The registry lock protects a 64-entry canonical cache keyed by ordered child
+identities and arity. Each cold entry owns one anonymous page, sealed readonly
+before publication; warm lookups allocate nothing. Exact cache identities are
+recognized by metadata-state checks. Value callbacks run without holding the
+registry lock. Child metadata, witness tables and callback code remain borrowed
+and immutable for the entire lifetime. Shutdown requires drained users and
+destroyed values, then unmaps every owned tuple page before child metadata is
+retired. Generated-C review found no hidden V heap allocations on these paths.
+
+Labels, nonconstant-label flags, proposed witnesses, larger or more aligned
+values, noncopyable/non-bitwise-takable children, deferred child completion,
+unknown witness flags and cache exhaustion fail explicitly. This does not
+implement boxed tuple buffers or general metadata dependency resolution.
+
+```sh
+v run tests/ios/native-checks.v build-tuple-metadata
+```
+
+Evidence is retained under `build/ios/fortnite/tuple-metadata-checks`, including
+the [Swift 5.10 tuple implementation](https://github.com/swiftlang/swift/blob/swift-5.10-RELEASE/stdlib/public/runtime/Metadata.cpp)
+and ABI layouts. Native comparisons cover scalar register passing, all eight
+request modes, padded element layouts, POD copying, composed foreign String
+ownership across copy/assignment/take/destruction, Bool/String extra inhabitants
+and enum count transitions. Compatibility checks also cover canonical results
+across eight readers, metadata-state recognition, 64 zero-sized elements,
+invalid/inaccessible inputs, capacity and two drained/unmapped lifetimes.
+
+Eight normal/deterministic ASan/UBSan runs passed across both C++ configurations,
+with generic-metadata and metadata-state regressions. The ARM64 tuple fixture,
+launch probe and both import audits passed their checks. Eight compressed
+binary/generated-C pairs and five C/ARM64 reviews retain the tested artifacts
+and allocation/retirement paths.
+
+Static inspection traces this required import through GOT cell `0x10dc9bb88`,
+stub `0x10c63ec58`, branch island `0x107c28ed0` and caller `0x1015c040c`.
+The caller forwards an element count/vector with a complete request and null
+labels/proposed witnesses. Inspection does not establish that its runtime
+element types fit the supported subset, and executes no application code.
+
+The next missing import is `_swift_getTypeByMangledNameInContext2`, at GOT cell
+`0x10dc9bb98`, stub `0x10c63ec70`, branch island `0x107c28e64` and caller
+`0x1015be9a0`. The caller decodes a relative mangled-name address and length,
+passes null context/generic arguments and caches the returned metadata pointer.
+Application entry remains unreached and Fortnite is still unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,974 | 187 | 78 |
+| Fortnite executable | 1,975 | 186 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,814 | 190 | 114 |
+| All images | 2,815 | 189 | 114 |
 
-The C++/GLES/Text variant reports 2,828 resolved imports, 176 unresolved strong
+The C++/GLES/Text variant reports 2,829 resolved imports, 175 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

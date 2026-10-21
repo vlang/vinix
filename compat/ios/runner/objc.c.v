@@ -312,6 +312,9 @@ mut:
 	swift_cocoa_error_retired_arena u64 // Recognize retired descriptors before any unmapped read.
 	swift_cocoa_error_retired bool
 	swift_void_arena u64 // Sealed empty-tuple full metadata and zero-size value witnesses.
+	swift_tuple_metadata_pages [64]u64 // Canonical, sealed inline tuple records, under the registry lock.
+	swift_tuple_metadata_count u64
+	swift_tuple_metadata_retired bool
 	swift_unknown_value_arena u64 // Sealed Builtin.UnknownObject value witnesses.
 	swift_error_arena u64 // Sealed ObjC value witnesses and the concrete CFError: Error conformance.
 	swift_error_allocation_arena u64 // Private heap destructor and immutable error box metadata.

@@ -170,6 +170,7 @@ fn swift_string_metadata() u64 {
 fn swift_string_guts_metadata() u64 { return swift_string_metadata() - 16 + 648 }
 
 fn swift_metadata_stop() {
+	swift_tuple_metadata_stop()
 	swift_generic_metadata_stop()
 	swift_generic_value_metadata_stop()
 	swift_keyed_container_metadata_stop()
