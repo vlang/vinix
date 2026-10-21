@@ -201,6 +201,8 @@ mut:
 	swift_arrays map[u64]SwiftArrayStorage // Typed tails and Element destruction witnesses, under the same lock.
 	swift_heap map[u64]SwiftHeapStorage // Real app heap metadata and deallocation layout, under the same lock.
 	swift_heap_sequence u64 // Distinguishes reentrant allocations that reuse a freed address.
+	swift_static_objects [1024]u64 // Borrowed immortal static headers, protected by the runtime lock.
+	swift_static_object_count int // Fixed capacity; cleared after users drain, without touching storage.
 	swift_empty_array u64 // Canonical sealed immortal empty storage, retired at quiescent shutdown.
 	swift_arc_code u64 // Sealed ARM64 preserve-most entry points, released at quiescent teardown.
 	swift_cstring_arena u64 // Sealed Swift closure/context/result adapter, retired after callbacks drain.

@@ -116,7 +116,8 @@ fn swift_buffer_refs(object u64, delta i64) !u64 {
 	if object == ios_runtime.swift_empty_array || object == ios_runtime.swift_empty_set
 		|| swift_dictionary_empty_locked(object)
 		|| swift_json_decoder_empty_locked(object) || swift_json_encoder_empty_locked(object)
-		|| swift_main_actor_is_singleton_locked(object) || swift_main_executor_is_singleton_locked(object) {
+		|| swift_main_actor_is_singleton_locked(object) || swift_main_executor_is_singleton_locked(object)
+		|| swift_static_object_registered_locked(object) {
 		C.ios_objc_initialize_unlock()
 		return swift_strong_limit // Immortal storage never reports unique.
 	}
@@ -211,6 +212,7 @@ fn swift_unknown_is_native(object u64) bool {
 	if swift_main_actor_is_singleton_locked(object) { return true }
 	if swift_main_executor_is_singleton_locked(object) { return true }
 	if swift_json_decoder_empty_locked(object) || swift_json_encoder_empty_locked(object) { return true }
+	if swift_static_object_registered_locked(object) { return true }
 	if object == ios_runtime.swift_empty_array || object == ios_runtime.swift_empty_set || object in ios_runtime.swift_buffers
 		|| object in ios_runtime.swift_strings || object in ios_runtime.swift_arrays
 		|| object in ios_runtime.swift_heap { return true }
@@ -252,6 +254,7 @@ fn swift_buffers_stop() {
 	swift_metadata_stop()
 	swift_hash_stop()
 	swift_fatal_stop()
+	swift_static_objects_stop()
 	swift_concurrency_stop()
 }
 
@@ -327,6 +330,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_swift_getSingletonMetadata' { u64(unsafe { voidptr(swift_singleton_metadata) }) }
 		'_swift_getTupleTypeMetadata' { u64(unsafe { voidptr(swift_tuple_metadata) }) }
 		'_swift_initStackObject' { u64(unsafe { voidptr(swift_stack_initialize) }) }
+		'_swift_initStaticObject' { u64(unsafe { voidptr(swift_static_initialize) }) }
 		'_swift_allocObject' { u64(unsafe { voidptr(swift_heap_allocate) }) }
 		'_swift_deallocObject' { u64(unsafe { voidptr(swift_heap_deallocate) }) }
 		'_swift_deallocClassInstance' { u64(unsafe { voidptr(swift_heap_deallocate_class) }) }

@@ -16157,10 +16157,47 @@ It passes request `0xff`, a relative name/length pair and null context/generic
 arguments, then caches the returned metadata pointer. Inspection executes no
 application code and does not establish support for every possible name.
 
-The next missing import is `_swift_initStaticObject`, at GOT cell `0x10dc9bbb8`,
+`_swift_initStaticObject` now initializes caller-owned static object storage.
+Its SwiftCC entry takes metadata and an object address in `x0`/`x1` and returns
+the object in `x0`. The caller supplies an aligned writable once word immediately
+before the 16-byte object header and keeps the storage alive until runtime users
+drain. The first initialization publishes metadata and the native immortal
+refcount header; later calls preserve the winning metadata and payload.
+Completed compatible storage can be registered again across runtime lifetimes.
+
+A fixed registry holds up to 1,024 borrowed objects. Registry membership grants
+immortal retain/release, bridge and unknown-object ARC behavior without reading
+the caller's header. Header-shaped values alone grant no ARC provenance.
+Invalid tokens, exhausted capacity, owned-object collisions and retired runtimes
+fail explicitly. Shutdown clears only the registry, without reading, modifying,
+destroying or freeing caller storage. This plain-ARM64 implementation stores
+unsigned metadata identities; native arm64e comparisons account for metadata PAC.
+
+```sh
+v run tests/ios/native-checks.v build-static-object
+```
+
+Evidence is retained under `build/ios/fortnite/static-object-checks`. Native
+comparisons verify the two-scalar pointer-result ABI, preserved `x20`/`x21`,
+first-winner metadata, the exact immortal header, payload guards and repeated ARC.
+Tests cover opaque nil/protected metadata, eight concurrent callers, completed
+tokens, registry limits, fake immortals, guarded header boundaries, rejected heap
+deallocation and inaccessible borrowed storage during retirement across two
+drained lifetimes. Eight normal/deterministic ASan/UBSan runs passed across both
+C++ configurations, including stack-object and heap-object regressions. The
+ARM64 fixture, launch probe and both import audits passed their checks. Eight
+compressed binary/generated-C pairs and five C/ARM64 reviews retain the tested
+entry and allocation-free initialization, ARC provenance and retirement paths.
+
+Static inspection traces this required import through GOT cell `0x10dc9bbb8`,
 stub `0x10c63eca0` and branch island `0x107c28a70`. Inspected callers
 `0x10006ef94` and `0x10006f050` retain the returned object and use it in
-string-switch lookup. Static object initialization remains unsupported.
+string-switch lookup. Inspection executes no application code.
+
+The next missing import is `_swift_initStructMetadata`, at GOT cell `0x10dc9bbc0`,
+stub `0x10c63ecac` and branch island `0x107c284cc`. Inspected caller
+`0x1000657f8` passes metadata, layout flags, four field layouts and a field-offset
+vector. General struct metadata initialization remains unsupported.
 Application entry remains unreached and Fortnite is still unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -16168,12 +16205,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,977 | 184 | 78 |
+| Fortnite executable | 1,978 | 183 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,817 | 187 | 114 |
+| All images | 2,818 | 186 | 114 |
 
-The C++/GLES/Text variant reports 2,831 resolved imports, 173 unresolved strong
+The C++/GLES/Text variant reports 2,832 resolved imports, 172 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
