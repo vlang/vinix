@@ -14503,17 +14503,66 @@ branch-island forwarder `0x107c2853c` and 23 direct calls, including
 `0x10003d8fc`. Application entry remains unreached; Fortnite is still
 unplayable.
 
+`_$ss27_stringCompareWithSmolCheck__9expectingSbs11_StringGutsV_ADs01_G16ComparisonResultOtF`
+now provides checked canonical String equality and ASCII less-than comparison.
+The two borrowed String values arrive in x0/x1 and x2/x3; the low byte of x4
+selects equality (0) or less-than (1), and x0 returns Bool. Read-only inspection
+verified 17 equality calls and six less-than calls in Fortnite's 23 direct
+call sites. The entry needs no new thunk, arena, owner or cache.
+
+Equality reuses the existing checked String reader and Unicode 17 NFC helper,
+including deferred normalization-buffer frees. Inline, immortal literal,
+registered native tail and registered foreign NSString storage remain borrowed.
+ASCII ordering compares length-delimited bytes, including embedded NULs, with
+a prefix-length tie-break. Invalid tags, malformed/unsupported storage and
+calls outside the runtime lifetime are rejected.
+
+Unicode less-than remains explicitly unsupported. The installed native helper
+and public String `<` both report false in both directions for `E\u0304\u0300`
+versus `\u1E14\u0304`, while replacing the first value with its canonically equal
+`\u1E14` changes the result. The retained native measurements document this
+mixed-normalization discrepancy. Complete NFC scalar-array ordering is not
+used as a substitute. A Unicode value reaching one of the six sorting calls
+will still stop execution.
+
+Native and compatibility fixtures check all 20,034 normalization records,
+canonical equality and adjacent canonical distinctions, ASCII ordering and
+case sensitivity, Unicode/NULs, 15/16-byte storage boundaries, exact native and
+foreign reference counts, protected nonterminated spans, ignored x8 and
+preserved x20/x21/x22. Compatibility checks also cover invalid/retired inputs,
+eight cold publishers and workers, and two drained runtime lifetimes.
+
+```sh
+v run tests/ios/native-checks.v build-string-compare
+```
+
+Evidence is retained under `build/ios/fortnite/string-compare-checks`.
+
+Normal and deterministic ASan/UBSan checks passed with and without the C++
+backend and for String Hashable/equality, String switch tables and String
+hashing (ten runs). The ARM64 fixture, launch probe and both import audits
+passed. Nine binary/generated-C archive pairs are retained. Generated C and
+ARM64 review cover borrowed storage, deferred NFC frees and allocation-free
+ASCII comparison; the new entry adds no owner or cache.
+
+The next launch stops at Swift's `_copySequenceToContiguousArray`,
+`_$ss30_copySequenceToContiguousArrayys0dE0Vy7ElementQzGxSTRzlF`.
+Read-only inspection found GOT cell `0x10dc9b9d0`, stub `0x10c63af50`,
+forwarders at `0x107c28d38` and `0x100073774`, and a direct call at
+`0x100072f74`. Application entry remains unreached; Fortnite is still
+unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,940 | 221 | 78 |
+| Fortnite executable | 1,941 | 220 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,780 | 224 | 114 |
+| All images | 2,781 | 223 | 114 |
 
-The C++/GLES/Text variant reports 2,794 resolved imports, 210 unresolved strong
+The C++/GLES/Text variant reports 2,795 resolved imports, 209 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
