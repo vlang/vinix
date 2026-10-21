@@ -14738,17 +14738,50 @@ The next missing import is Error's default `_userInfo` getter,
 branch-island forwarder `0x107c28d10`, and tail forwarders `0x100072b4c`
 and `0x1000738c4`. Application entry remains unreached; Fortnite is unplayable.
 
+`_$ss5ErrorPsE9_userInfoyXlSgvg` now implements the default getter for the
+runtime's concrete CFError and `_MergeError` conformances. Native Swift forwards
+to Foundation's generic default-userInfo helper; for these types the result is
+an owned empty NSDictionary. It differs from CFError's concrete userInfo
+witness, which returns the error's stored dictionary. Both results remain
+valid after the Error is destroyed and require their own release.
+
+The implementation checks the canonical metadata/table pair before reading
+Self. CFError requires a borrowed readable reference word and a live registered
+owner. Zero-sized `_MergeError` reads no Self bytes. Unknown metadata, witness
+tables, owners and retired runtimes fail explicitly. General value errors,
+LocalizedError, CustomNSError, RecoverableError and Swift error boxes still
+need protocol discovery and property dispatch; the empty fallback is not used
+for those unsupported inputs. The ARM64 adapter reuses the sealed Error arena.
+
+```sh
+v run tests/ios/native-checks.v build-error-user-info
+```
+
+Evidence is retained under `build/ios/fortnite/error-user-info-checks`.
+Native comparisons and normal/deterministic ASan/UBSan checks passed with and
+without the C++ backend, with Error domain/extraction and _MergeError
+conformance regressions (ten runs). Checks cover exact read-only input bounds,
+preserved registers, owned dictionaries after Error destruction, concurrent
+resolution/allocation, invalid inputs and two drained lifetimes. The ARM64
+fixture, launch probe and both import audits passed; nine binary/generated-C
+pairs and five C/ARM64 reviews are retained.
+
+The next missing import is Error's self-conformance witness data,
+`_$ss5ErrorWS`, at GOT cell `0x10dc9ba08`. It has no call stub; four GOT
+consumers include async task operations. No application code has executed,
+and Fortnite remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,946 | 215 | 78 |
+| Fortnite executable | 1,947 | 214 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,786 | 218 | 114 |
+| All images | 2,787 | 217 | 114 |
 
-The C++/GLES/Text variant reports 2,800 resolved imports, 204 unresolved strong
+The C++/GLES/Text variant reports 2,801 resolved imports, 203 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
