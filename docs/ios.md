@@ -15832,23 +15832,72 @@ Callers include imported Foundation classes and app class addresses; the call at
 `0x10003cee4`, for example, uses the NSUserDefaults class import. No application
 code is executed by the inspection.
 
-The next missing import is `_swift_getObjCClassFromMetadata`, at GOT cell
-`0x10dc9bb60`, stub `0x10c63ec1c`, branch island `0x107c28e2c` and caller
-`0x1015be5d0`. This reverse conversion from Swift metadata to an Objective-C
-class remains unsupported. Application entry remains unreached and Fortnite is
-still unplayable.
+`_swift_getObjCClassFromMetadata` now converts bounded Swift metadata to a
+borrowed Objective-C class pointer. Its ordinary C entry accepts metadata in
+x0 and returns the class in x0. Nil returns nil even outside the runtime
+lifetime, matching native Swift's preserved historical behavior.
+
+An Objective-C wrapper has kind `0x305` and a class pointer at offset eight.
+Both canonical runtime wrappers and caller-owned 16-byte wrappers are accepted
+when their payload names a registered ordinary class. Unknown payloads,
+metaclasses and unregistered dynamic classes fail before payload storage is
+dereferenced. A Swift class instead returns its own address: its first word
+must be zero or above the enumerated-kind limit `0x7ff`, and its class-data
+word at offset 32 must carry the Swift type-metadata bit. This path also
+accepts borrowed artificial class prefixes without a nominal descriptor.
+
+Callers provide immutable readable metadata spans: eight bytes for the kind,
+16 for a wrapper or 40 for a Swift class prefix. Alignment and address overflow,
+unsupported kinds, pure Objective-C class inputs and retired runtimes are
+checked explicitly. The conversion reads no value witnesses, nominal
+descriptor or superclass chain. It performs no initialization, realization,
+Objective-C message dispatch, ARC, allocation, cache publication or metadata
+writes. Conversion alone does not add Swift class allocation or realization
+support. Metadata and class storage remain borrowed; callers must drain before
+either storage or the runtime retires.
+
+```sh
+v run tests/ios/native-checks.v build-objc-class-from-metadata
+```
+
+Evidence is retained under `build/ios/fortnite/objc-class-from-metadata-checks`,
+including the [Swift 5.10 implementation](https://github.com/swiftlang/swift/blob/swift-5.10-RELEASE/stdlib/public/runtime/Metadata.cpp)
+and metadata/ABI declarations. Native comparisons cover canonical and borrowed
+wrappers, genuine Swift array-storage class metadata, zero/isa class kinds,
+exact readonly wrapper and class-prefix boundaries, nil and eight concurrent
+readers. Raw ARM64 calls preserve x20/x21/x22 with an inaccessible x8 result
+pointer. Cold classes have forbidden `+initialize`, `+self` and `+class`
+callbacks to check that conversion sends no messages. Compatibility checks
+also cover rejected forms and states, unchanged borrowed storage after shutdown
+and two drained runtime lifetimes.
+
+Eight normal/deterministic ASan/UBSan runs passed with both C++ configurations,
+including object-type and partial-class deallocation regressions. The ARM64
+fixture, launch probe and both import audits passed their checks. Eight
+compressed binary/generated-C pairs and five C/ARM64 reviews retain the tested
+artifacts and allocation-free conversion paths.
+
+Static inspection traces this required import through GOT cell `0x10dc9bb60`,
+stub `0x10c63ec1c`, branch island `0x107c28e2c` and caller `0x1015be5d0`.
+The caller moves its metadata context from x20 to x0 and passes the returned
+class to `_objc_allocWithZone`. No application code is executed by inspection.
+
+The next missing import is `_swift_getOpaqueTypeConformance2`, at GOT cell
+`0x10dc9bb78`, stub `0x10c63ec40`, branch island `0x107c28eec` and caller
+`0x1015c1030`. Opaque-type conformance lookup remains unsupported. Application
+entry remains unreached and Fortnite is still unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,971 | 190 | 78 |
+| Fortnite executable | 1,972 | 189 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,811 | 193 | 114 |
+| All images | 2,812 | 192 | 114 |
 
-The C++/GLES/Text variant reports 2,825 resolved imports, 179 unresolved strong
+The C++/GLES/Text variant reports 2,826 resolved imports, 178 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
