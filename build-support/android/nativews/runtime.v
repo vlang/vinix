@@ -100,15 +100,11 @@ mut:
 	apk           &char
 	data          &char
 	surface       &WsSurface
-	pixels        &u32
 	width         i32
 	height        i32
 	input         i32
 	dirty         bool
 	running       bool
-	transform     WsTransform
-	transforms    [64]WsTransform
-	save_count    i32
 }
 
 __global ws &WsState
@@ -287,6 +283,7 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 			return 1
 		}
 		if !ws_egl_init(root) { C.puts(c'ANDROID-WS-FAIL graphics dispatch'); return 1 }
+		if !ws_draw_init() { C.puts(c'ANDROID-WS-FAIL Canvas state'); return 1 }
 		// The framework enumerates ICU converters through the stable native
 		// provider API. ART loads javacore locally, so expose that provider
 		// explicitly instead of relying on another toolkit's dependency scope.

@@ -4,6 +4,22 @@ module sessiondaemon
 import desktop.sessionipc
 import desktop.sessioncore
 
+fn test_notification_cancellation_uses_kernel_peer_identity() {
+	mut daemon := &SessionDaemon{}
+	defer { unsafe { free(daemon) } }
+	peer := sessionipc.SessionCredentials{pid: C.getpid(), uid: C.getuid(), gid: C.getgid()}
+	other := sessionipc.SessionCredentials{pid: peer.pid + 1, uid: peer.uid, gid: peer.gid}
+	// Encoded key/title/body/urgency/progress/action, using the real wire parser.
+	post := 'notify\t616e64726f69643a3432\t54657374\t426f6479\t31\t2d31\t'
+	assert daemon.handle(peer, post, false)! == 'ok'
+	assert daemon.handle(other, post, false)! == 'ok'
+	assert daemon.handle(peer, 'notify.cancel\t616e64726f69643a3432', false)! == 'ok'
+	assert daemon.notifications.items[0].dismissed
+	assert !daemon.notifications.items[1].dismissed
+	assert daemon.handle(peer, 'notify.cancel\t616e64726f69643a3432', false)! == 'ok'
+	assert !daemon.notifications.items[1].dismissed
+}
+
 fn test_every_authorized_operation_has_one_direct_handler() {
 	assert session_routes.len == int(sessioncore.SessionOperation.shutdown) + 1
 	for i, route in session_routes {

@@ -163,6 +163,19 @@ pub fn (mut n Notifications) dismiss(id i64) bool {
 	return false
 }
 
+// An application may withdraw only its own keyed notification. Compositor
+// dismissal remains the separate operation that accepts a global numeric ID.
+pub fn (mut n Notifications) withdraw(owner string, key string) bool {
+	for i in 0 .. n.count {
+		if !n.items[i].dismissed && n.items[i].owner.str() == owner && n.items[i].key.str() == key {
+			n.items[i].read = true
+			n.items[i].dismissed = true
+			return true
+		}
+	}
+	return false
+}
+
 pub fn (n &Notifications) encode() string {
 	mut w := &Writer{}
 	defer { unsafe { free(w) } }

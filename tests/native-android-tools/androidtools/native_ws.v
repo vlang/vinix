@@ -138,7 +138,11 @@ pub fn build_native_ws(smali string, runtime string, output string, compiler str
 			mut args := ['e voidptr', 'this voidptr']
 			for index, kind in native_ws_abi(parameters)! { args << 'p${index} ${kind}' }
 			symbol := 'Java_' + native_ws_jni_escape(class_name) + '_' + native_ws_jni_escape(signature.all_before('(')) + '__' + native_ws_jni_escape(parameters)
-			generated += "\n@[export: '${symbol}']\nfn ws_binding_${count}(${args.join(', ')}) ${result} {\n    unsafe {\n ${body}\n }\n}\n"
+			mut native_body := body
+			if class_name == 'android/atl/GskCanvas' && method_name != 'finalize' {
+				native_body = 'previous := ws_canvas_enter(e,this,p0); defer { ws_canvas_leave(previous) }; if pending(e) { return };\n' + native_body
+			}
+			generated += "\n@[export: '${symbol}']\nfn ws_binding_${count}(${args.join(', ')}) ${result} {\n    unsafe {\n ${native_body}\n }\n}\n"
 			count++
 			found = true
 		}

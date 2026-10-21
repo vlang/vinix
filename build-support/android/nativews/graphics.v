@@ -82,13 +82,25 @@ fn ws_font_init(root &char) bool {
 }
 
 fn ws_blend(x i32, y i32, color u32, coverage u32) {
+	mut draw := ws_draw_state()
 	unsafe {
-		if x < ws.transform.left || y < ws.transform.top || x >= ws.transform.right || y >= ws.transform.bottom || x < 0 || y < 0 || x >= ws.width || y >= ws.height {
+		if x < draw.transform.left || y < draw.transform.top || x >= draw.transform.right || y >= draw.transform.bottom || x < 0 || y < 0 || x >= draw.width || y >= draw.height {
 			return
 		}
 		alpha := (color >> 24) * coverage / 255
 		if alpha == 0 { return }
-		target := &ws.pixels[y * ws.width + x]
+		if draw.bitmap != 0 {
+			bitmap := &WsBitmap(draw.bitmap)
+			target := &bitmap.rgba[(y * draw.width + x) * 4]
+			before := u32(target[3]) * (255 - alpha) / 255
+			combined := alpha + before
+			target[0] = u8((((color >> 16) & 255) * alpha + u32(target[0]) * before) / combined)
+			target[1] = u8((((color >> 8) & 255) * alpha + u32(target[1]) * before) / combined)
+			target[2] = u8(((color & 255) * alpha + u32(target[2]) * before) / combined)
+			target[3] = u8(combined)
+			return
+		}
+		target := &draw.pixels[y * draw.width + x]
 		before := *target
 		r := (((color >> 16) & 255) * alpha + ((before >> 16) & 255) * (255 - alpha)) / 255
 		g := (((color >> 8) & 255) * alpha + ((before >> 8) & 255) * (255 - alpha)) / 255
@@ -98,12 +110,13 @@ fn ws_blend(x i32, y i32, color u32, coverage u32) {
 }
 
 fn ws_rect(left f32, top f32, right f32, bottom f32, color u32) {
-	x0 := i32(left * ws.transform.sx + ws.transform.x)
-	y0 := i32(top * ws.transform.sy + ws.transform.y)
-	x1 := i32(right * ws.transform.sx + ws.transform.x)
-	y1 := i32(bottom * ws.transform.sy + ws.transform.y)
-	for y := if y0 < ws.transform.top { ws.transform.top } else { y0 }; y < y1 && y < ws.transform.bottom; y++ {
-		for x := if x0 < ws.transform.left { ws.transform.left } else { x0 }; x < x1 && x < ws.transform.right; x++ {
+	mut draw := ws_draw_state()
+	x0 := i32(left * draw.transform.sx + draw.transform.x)
+	y0 := i32(top * draw.transform.sy + draw.transform.y)
+	x1 := i32(right * draw.transform.sx + draw.transform.x)
+	y1 := i32(bottom * draw.transform.sy + draw.transform.y)
+	for y := if y0 < draw.transform.top { draw.transform.top } else { y0 }; y < y1 && y < draw.transform.bottom; y++ {
+		for x := if x0 < draw.transform.left { draw.transform.left } else { x0 }; x < x1 && x < draw.transform.right; x++ {
 			ws_blend(x, y, color, 255)
 		}
 	}
@@ -154,16 +167,17 @@ fn ws_text_width(text &char, size f32) f32 {
 }
 
 fn ws_text(text &char, x f32, baseline f32, size f32, color u32) {
+	mut draw := ws_draw_state()
 	if ws_font == unsafe { nil } { return }
-	scale := C.stbtt_ScaleForPixelHeight(ws_font, size * ws.transform.sy)
+	scale := C.stbtt_ScaleForPixelHeight(ws_font, size * draw.transform.sy)
 	mut position := usize(0)
 	length := C.strlen(text)
-	mut pen := x * ws.transform.sx + ws.transform.x
-	mut line := baseline * ws.transform.sy + ws.transform.y
+	mut pen := x * draw.transform.sx + draw.transform.x
+	mut line := baseline * draw.transform.sy + draw.transform.y
 	for position < length {
 		code := ws_codepoint(unsafe { &u8(text) }, length, &position)
 		if code == 10 {
-			pen = x * ws.transform.sx + ws.transform.x
+			pen = x * draw.transform.sx + draw.transform.x
 			line += size * 1.25
 			continue
 		}
@@ -276,29 +290,49 @@ fn ws_canvas_text(e voidptr, text voidptr, x f32, y f32, pointer i64) {
 }
 
 fn ws_save() {
-	if ws.save_count >= 64 { return }
-	unsafe { ws.transforms[ws.save_count] = ws.transform }
-	ws.save_count++
+	mut draw := ws_draw_state()
+	if draw.save_count >= 64 { return }
+	unsafe { draw.transforms[draw.save_count] = draw.transform }
+	draw.save_count++
 }
 
 fn ws_restore() {
-	if ws.save_count > 0 {
-		ws.save_count--
-		unsafe { ws.transform = ws.transforms[ws.save_count] }
+	mut draw := ws_draw_state()
+	if draw.save_count > 0 {
+		draw.save_count--
+		unsafe { draw.transform = draw.transforms[draw.save_count] }
 	}
 }
 
 fn ws_translate(x f32, y f32) {
-	ws.transform.x += x * ws.transform.sx
-	ws.transform.y += y * ws.transform.sy
+	mut draw := ws_draw_state()
+	draw.transform.x += x * draw.transform.sx
+	draw.transform.y += y * draw.transform.sy
 }
 
 fn ws_clip(left f32, top f32, right f32, bottom f32) {
-	l, t, r, b := i32(left * ws.transform.sx + ws.transform.x), i32(top * ws.transform.sy + ws.transform.y), i32(right * ws.transform.sx + ws.transform.x), i32(bottom * ws.transform.sy + ws.transform.y)
-	if l > ws.transform.left { ws.transform.left = l }
-	if t > ws.transform.top { ws.transform.top = t }
-	if r < ws.transform.right { ws.transform.right = r }
-	if b < ws.transform.bottom { ws.transform.bottom = b }
+	mut draw := ws_draw_state()
+	l, t, r, b := i32(left * draw.transform.sx + draw.transform.x), i32(top * draw.transform.sy + draw.transform.y), i32(right * draw.transform.sx + draw.transform.x), i32(bottom * draw.transform.sy + draw.transform.y)
+	if l > draw.transform.left { draw.transform.left = l }
+	if t > draw.transform.top { draw.transform.top = t }
+	if r < draw.transform.right { draw.transform.right = r }
+	if b < draw.transform.bottom { draw.transform.bottom = b }
+}
+
+fn ws_canvas_concat(e voidptr, pointer i64) {
+	mut draw := ws_draw_state()
+	unsafe {
+		matrix := &WsMatrix(pointer)
+		if matrix.values[1] != 0 || matrix.values[3] != 0 || matrix.values[6] != 0
+			|| matrix.values[7] != 0 || matrix.values[8] != 1 {
+			throw(e, c'java/lang/UnsupportedOperationException', c'Canvas concat requires translation and scaling')
+			return
+		}
+		draw.transform.x += draw.transform.sx * matrix.values[2]
+		draw.transform.y += draw.transform.sy * matrix.values[5]
+		draw.transform.sx *= matrix.values[0]
+		draw.transform.sy *= matrix.values[4]
+	}
 }
 
 fn ws_canvas_line(x0 f32, y0 f32, x1 f32, y1 f32, pointer i64) {

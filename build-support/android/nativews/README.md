@@ -55,6 +55,20 @@ configured non-loopback interfaces. Local ContentProviderClient handles resolve
 registered authorities, dispatch type/call operations and release their provider
 reference on close. Uninstalled service providers return null.
 
+Bitmap-backed Canvas instances own independent pixel targets and save/restore
+stacks. Scoped thread-local selection keeps offscreen drawing separate from
+the WS framebuffer; native references keep the bitmap storage alive. Pixel
+array reads/writes, cropped blits, paint alpha and cubic/quadratic vector paths
+use the same CPU renderer. Canvas matrix concatenation currently accepts
+translation and scaling; rotation, skew and perspective remain unsupported.
+
+Plain Android notifications post to the native Vinix session broker and cancel
+by Android ID. The broker authenticates the posting PID and permits withdrawal
+only of that process's keyed notices. The runtime requires an available broker
+and reports service failures. PendingIntent actions and media notifications
+remain unsupported. The bootstrap APK exercises real posting/cancellation as
+well as bitmap pixels, Canvas target isolation and save/restore in a Vinix VM.
+
 The normal ATL build assembles this backend and hashes its output with the
 framework. Runtime staging installs the native executable as `run-android`.
 For an isolated build against an existing private runtime:

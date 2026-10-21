@@ -289,10 +289,15 @@ fn ws_render(e voidptr) {
 		surface := ws.surface
 		target := C.__atomic_load_n(&surface.active, 2) ^ 1
 		if C.__atomic_load_n(&surface.reader, 2) == target { return }
-		ws.pixels = &u32(usize(surface) + 48 + usize(target) * usize(surface.buffer_size))
-		ws.transform = WsTransform{ right: ws.width, bottom: ws.height }
-		ws.save_count = 0
-		for i := i32(0); i < ws.width * ws.height; i++ { ws.pixels[i] = 0xfffafafa }
+		previous := C.pthread_getspecific(ws_draw_key)
+		C.pthread_setspecific(ws_draw_key, ws_root_draw)
+		defer { ws_canvas_leave(previous) }
+		ws_root_draw.width = ws.width
+		ws_root_draw.height = ws.height
+		ws_root_draw.pixels = &u32(usize(surface) + 48 + usize(target) * usize(surface.buffer_size))
+		ws_root_draw.transform = WsTransform{ right: ws.width, bottom: ws.height }
+		ws_root_draw.save_count = 0
+		for i := i32(0); i < ws.width * ws.height; i++ { ws_root_draw.pixels[i] = 0xfffafafa }
 		decor := activity_decor(e, ws.activity)
 		measure := [Value{ i: ws.width | 0x40000000 }, Value{ i: ws.height | 0x40000000 }]!
 		call(e, decor, c'android/view/View', c'measure', c'(II)V', &measure[0])

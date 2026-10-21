@@ -19,6 +19,7 @@ pub enum SessionOperation {
 	dialog_take
 	services
 	notify
+	notify_cancel
 	alarm
 	alarm_cancel
 	action
@@ -87,6 +88,7 @@ const session_rules = {
 	'dialog.take':        &SessionRule{.dialog_take, 'dialog.take', 'application/dialog/take', .application, 2, 2}
 	'services':           &SessionRule{.services, 'services', 'application/services/list', .application, 1, 1}
 	'notify':             &SessionRule{.notify, 'notify', 'application/notifications/post', .application, 7, 7}
+	'notify.cancel':      &SessionRule{.notify_cancel, 'notify.cancel', 'application/notifications/cancel', .application, 2, 2}
 	'alarm':              &SessionRule{.alarm, 'alarm', 'application/alarms/schedule', .application, 5, 5}
 	'alarm.cancel':       &SessionRule{.alarm_cancel, 'alarm.cancel', 'application/alarms/cancel', .application, 2, 2}
 	'action':             &SessionRule{.action, 'action', 'application/actions/enqueue', .application, 2, 24}

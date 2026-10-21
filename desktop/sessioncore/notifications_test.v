@@ -1,6 +1,19 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module sessioncore
 
+fn test_application_withdrawal_is_owned_keyed_and_idempotent() {
+	mut n := Notifications{}
+	n.post('pid.10', 'android:42', 'One', '', .normal, -1, '', 100) or { panic(err) }
+	n.post('pid.11', 'android:42', 'Other owner', '', .normal, -1, '', 100) or { panic(err) }
+	n.post('pid.10', 'android:43', 'Other key', '', .normal, -1, '', 100) or { panic(err) }
+	assert !n.withdraw('pid.12', 'android:42')
+	assert !n.withdraw('pid.10', 'missing')
+	assert n.withdraw('pid.10', 'android:42')
+	assert n.items[0].dismissed && n.items[0].read
+	assert !n.items[1].dismissed && !n.items[2].dismissed
+	assert !n.withdraw('pid.10', 'android:42')
+}
+
 fn test_history_coalesces_progress_and_quiet_preserves_notifications() {
 	mut n := Notifications{}
 	id := n.post('editor', 'save', 'Saving', 'Document', .normal, 10, '', 100) or { panic(err) }

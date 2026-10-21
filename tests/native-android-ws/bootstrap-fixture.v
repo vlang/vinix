@@ -96,6 +96,112 @@ throw v0') +
 		'.method public static native nativeCheck(Landroid/content/res/AssetManager;)Z\n.end method\n' +
 		'.method public static native nativeBitmap(Landroid/graphics/Bitmap;)Z\n.end method\n' +
 		'.method public static native nativeGraphics()Z\n.end method\n' +
+		method('private static bitmapCanvasCheck()V', '
+const/4 v1, 4
+const/4 v2, 4
+sget-object v3, Landroid/graphics/Bitmap$Config;->ARGB_8888:Landroid/graphics/Bitmap$Config;
+invoke-static {v1, v2, v3}, Landroid/graphics/Bitmap;->createBitmap(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;
+move-result-object v8
+const/4 v1, 0
+invoke-virtual {v8, v1}, Landroid/graphics/Bitmap;->eraseColor(I)V
+new-instance v9, Landroid/graphics/Canvas;
+invoke-direct {v9, v8}, Landroid/graphics/Canvas;-><init>(Landroid/graphics/Bitmap;)V
+new-instance v5, Landroid/graphics/Paint;
+invoke-direct {v5}, Landroid/graphics/Paint;-><init>()V
+const v1, 0xffff0000
+invoke-virtual {v5, v1}, Landroid/graphics/Paint;->setColor(I)V
+move-object v0, v9
+const v1, 0x3f800000
+const v2, 0x3f800000
+const v3, 0x40400000
+const v4, 0x40400000
+invoke-virtual/range {v0 .. v5}, Landroid/graphics/Canvas;->drawRect(FFFFLandroid/graphics/Paint;)V
+invoke-virtual {v9}, Landroid/graphics/Canvas;->save()I
+const v1, 0x3f800000
+const v2, 0x3f800000
+invoke-virtual {v9, v1, v2}, Landroid/graphics/Canvas;->translate(FF)V
+const v1, 0xff0000ff
+invoke-virtual {v5, v1}, Landroid/graphics/Paint;->setColor(I)V
+const/4 v1, 0
+const/4 v2, 0
+const v3, 0x3f800000
+const v4, 0x3f800000
+invoke-virtual/range {v0 .. v5}, Landroid/graphics/Canvas;->drawRect(FFFFLandroid/graphics/Paint;)V
+invoke-virtual {v9}, Landroid/graphics/Canvas;->restore()V
+const/4 v1, 4
+const/4 v2, 4
+sget-object v3, Landroid/graphics/Bitmap$Config;->ARGB_8888:Landroid/graphics/Bitmap$Config;
+invoke-static {v1, v2, v3}, Landroid/graphics/Bitmap;->createBitmap(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;
+move-result-object v7
+const v1, 0x7f00ff00
+invoke-virtual {v7, v1}, Landroid/graphics/Bitmap;->eraseColor(I)V
+new-instance v0, Landroid/graphics/Canvas;
+invoke-direct {v0, v7}, Landroid/graphics/Canvas;-><init>(Landroid/graphics/Bitmap;)V
+const/4 v1, 0
+const/4 v2, 0
+const v3, 0x3f800000
+const v4, 0x3f800000
+invoke-virtual/range {v0 .. v5}, Landroid/graphics/Canvas;->drawRect(FFFFLandroid/graphics/Paint;)V
+move-object v0, v7
+const/16 v1, 16
+new-array v1, v1, [I
+const/4 v2, 0
+const/4 v3, 4
+const/4 v4, 0
+const/4 v5, 0
+const/4 v6, 4
+const/4 v7, 4
+invoke-virtual/range {v0 .. v7}, Landroid/graphics/Bitmap;->getPixels([IIIIIII)V
+const/4 v2, 0
+aget v2, v1, v2
+const v3, 0xff0000ff
+if-ne v2, v3, :bad
+const/16 v2, 15
+aget v2, v1, v2
+const v3, 0x7f00ff00
+if-ne v2, v3, :bad
+new-instance v5, Landroid/graphics/Paint;
+invoke-direct {v5}, Landroid/graphics/Paint;-><init>()V
+const v1, 0xff00ff00
+invoke-virtual {v5, v1}, Landroid/graphics/Paint;->setColor(I)V
+move-object v0, v9
+const/4 v1, 0
+const/4 v2, 0
+const v3, 0x3f800000
+const v4, 0x3f800000
+invoke-virtual/range {v0 .. v5}, Landroid/graphics/Canvas;->drawRect(FFFFLandroid/graphics/Paint;)V
+move-object v0, v8
+const/16 v1, 16
+new-array v1, v1, [I
+const/4 v2, 0
+const/4 v3, 4
+const/4 v4, 0
+const/4 v5, 0
+const/4 v6, 4
+const/4 v7, 4
+invoke-virtual/range {v0 .. v7}, Landroid/graphics/Bitmap;->getPixels([IIIIIII)V
+const/4 v2, 0
+aget v2, v1, v2
+const v3, 0xff00ff00
+if-ne v2, v3, :bad
+const/4 v2, 5
+aget v2, v1, v2
+const v3, 0xff0000ff
+if-ne v2, v3, :bad
+const/4 v2, 6
+aget v2, v1, v2
+const v3, 0xffff0000
+if-ne v2, v3, :bad
+const/16 v2, 15
+aget v2, v1, v2
+if-nez v2, :bad
+invoke-virtual {v8}, Landroid/graphics/Bitmap;->recycle()V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "Bitmap Canvas pixels, alpha, save/restore or target isolation"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0').replace('.locals 8', '.locals 10') +
 		method('protected onCreate(Landroid/os/Bundle;)V', '
 invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 invoke-static {}, Landroid/os/Process;->is64Bit()Z
@@ -211,6 +317,22 @@ invoke-static {v0}, Ljava/lang/System;->loadLibrary(Ljava/lang/String;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->nativeGraphics()Z
 move-result v0
 if-eqz v0, :bad
+invoke-static {}, Lorg/vinix/bootstrap/Main;->bitmapCanvasCheck()V
+new-instance v0, Landroid/app/Notification$Builder;
+invoke-direct {v0, p0}, Landroid/app/Notification$Builder;-><init>(Landroid/content/Context;)V
+const-string v1, "Vinix Android runtime"
+invoke-virtual {v0, v1}, Landroid/app/Notification$Builder;->setContentTitle(Ljava/lang/CharSequence;)Landroid/app/Notification$Builder;
+const-string v1, "Native WS notification probe"
+invoke-virtual {v0, v1}, Landroid/app/Notification$Builder;->setContentText(Ljava/lang/CharSequence;)Landroid/app/Notification$Builder;
+invoke-virtual {v0}, Landroid/app/Notification$Builder;->build()Landroid/app/Notification;
+move-result-object v1
+const-string v0, "notification"
+invoke-virtual {p0, v0}, Landroid/app/Activity;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v0
+check-cast v0, Landroid/app/NotificationManager;
+const/16 v2, 42
+invoke-virtual {v0, v2, v1}, Landroid/app/NotificationManager;->notify(ILandroid/app/Notification;)V
+invoke-virtual {v0, v2}, Landroid/app/NotificationManager;->cancel(I)V
 invoke-virtual {p0}, Landroid/app/Activity;->getAssets()Landroid/content/res/AssetManager;
 move-result-object v0
 invoke-static {v0}, Lorg/vinix/bootstrap/Main;->nativeCheck(Landroid/content/res/AssetManager;)Z
@@ -243,7 +365,7 @@ const-string v1, "Application bootstrap and NDK assets passed"
 invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
 invoke-virtual {p0, v0}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "BOOTSTRAP-NDK-PASS order paths clocks is64bit assets rtl webp matrix network bitmap clients graphics-unavailable"
+const-string v1, "BOOTSTRAP-NDK-PASS order paths clocks is64bit assets rtl webp matrix network bitmap clients graphics-unavailable bitmap-canvas notifications-queued"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void
 :bad

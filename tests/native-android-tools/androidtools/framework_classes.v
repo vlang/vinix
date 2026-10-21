@@ -96,7 +96,14 @@ pub fn write_framework_classes(smali string) ! {
  context := smali + '/android/app/ContextImpl.smali'
  os.write_file(context, framework_replace_method(os.read_file(context)!, 'getTheme()Landroid/content/res/Resources$Theme;', '.method public native getTheme()Landroid/content/res/Resources$Theme;\n.end method')!)!
  bitmap := smali + '/android/graphics/Bitmap.smali'
- os.write_file(bitmap, os.read_file(bitmap)! + '\n.field private vinixPixelLock:J\n.field private vinixPixelLocks:I\n')!
+ mut bitmap_text := os.read_file(bitmap)! + '\n.field private vinixPixelLock:J\n.field private vinixPixelLocks:I\n'
+ for signature in ['getSnapshot()J', 'getTexture()J', 'eraseColor(I)V'] {
+  bitmap_text = framework_replace_method(bitmap_text, signature, '.method public native ' + signature + '\n.end method')!
+ }
+ os.write_file(bitmap, bitmap_text)!
+ canvas := smali + '/android/atl/GskCanvas.smali'
+ canvas_text := os.read_file(canvas)! + '\n.field private vinixDrawState:J\n'
+ os.write_file(canvas, framework_replace_method(canvas_text, 'finalize()V', '.method protected native finalize()V\n.end method')!)!
  recreate := os.read_file(root() + '/build-support/android/atlframework/recreate.v')!
  task := '.class public Landroid/app/VinixRecreate;\n.super Ljava/lang/Object;\n.implements Ljava/lang/Runnable;\n' +
   '.field public old:Landroid/app/Activity;\n.field public next:Landroid/app/Activity;\n' + object_constructor +

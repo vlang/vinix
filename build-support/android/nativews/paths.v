@@ -136,6 +136,7 @@ fn ws_path_round_rect(e voidptr, pointer i64, left f32, top f32, right f32, bott
 }
 
 fn ws_draw_path(pointer i64, paint_pointer i64) {
+	mut draw := ws_draw_state()
 	unsafe {
 		if pointer == 0 { return }
 		path := &WsPath(pointer)
@@ -150,8 +151,8 @@ fn ws_draw_path(pointer i64, paint_pointer i64) {
 		// Scanline nonzero winding fill, clipped by the current Canvas state.
 		crossings := &WsCrossing(C.malloc(usize(path.count + 1) * sizeof(WsCrossing)))
 		defer { C.free(crossings) }
-		for y := i32(0); y < ws.height; y++ {
-			local_y := (f32(y) + 0.5 - ws.transform.y) / ws.transform.sy
+		for y := i32(0); y < draw.height; y++ {
+			local_y := (f32(y) + 0.5 - draw.transform.y) / draw.transform.sy
 			mut count := i32(0)
 			for i := i32(1); i < path.count; i++ {
 				a, b := path.points[i - 1], path.points[i]
@@ -174,8 +175,8 @@ fn ws_draw_path(pointer i64, paint_pointer i64) {
 			mut winding := i32(0)
 			for i := i32(0); i < count; i++ {
 				if i > 0 && winding != 0 {
-					left := i32(crossings[i - 1].x * ws.transform.sx + ws.transform.x)
-					right := i32(crossings[i].x * ws.transform.sx + ws.transform.x)
+					left := i32(crossings[i - 1].x * draw.transform.sx + draw.transform.x)
+					right := i32(crossings[i].x * draw.transform.sx + draw.transform.x)
 					for x := left; x < right; x++ { ws_blend(x, y, paint.color, 255) }
 				}
 				winding += crossings[i].direction

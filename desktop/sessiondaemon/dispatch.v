@@ -37,6 +37,7 @@ const session_routes = [
 	SessionRoute{.dialog_take, session_handle_dialog_take, false},
 	SessionRoute{.services, session_handle_services, false},
 	SessionRoute{.notify, session_handle_notify, false},
+	SessionRoute{.notify_cancel, session_handle_notify_cancel, false},
 	SessionRoute{.alarm, session_handle_alarm, false},
 	SessionRoute{.alarm_cancel, session_handle_alarm_cancel, false},
 	SessionRoute{.action, session_handle_action, false},
@@ -227,6 +228,18 @@ fn session_handle_notify(mut daemon SessionDaemon, mut request SessionRequest) !
 	epoch, _ := sessionipc.desktop_realtime()
 	_ = daemon.notifications.post(owner, message.fields[1].str(), message.fields[2].str(), message.fields[3].str(), unsafe { sessioncore.Urgency(sessioncore.number(message.fields[4].str(), 0, 2)!) }, int(sessioncore.number(message.fields[5].str(), -1, 100)!), message.fields[6].str(), epoch)!
 	daemon.changed = true
+	return 'ok'
+}
+
+fn session_handle_notify_cancel(mut daemon SessionDaemon, mut request SessionRequest) !string {
+	mut writer := sessioncore.Writer{}
+	writer.add('pid.')
+	writer.number(request.peer.pid)
+	owner := writer.finish()
+	defer { unsafe { owner.free() } }
+	if daemon.notifications.withdraw(owner, request.message.fields[1].str()) {
+		daemon.changed = true
+	}
 	return 'ok'
 }
 
