@@ -50,6 +50,10 @@ fn ws_layout_build(layout &WsTextLayout) {
 		mut first := i32(0)
 		mut index := i32(0)
 		mut width := f32(0)
+		mut break_end := usize(0)
+		mut break_next := usize(0)
+		mut break_index := i32(0)
+		mut break_width := f32(0)
 		for pos < length {
 			begin := pos
 			code := ws_codepoint(&u8(layout.text), length, &pos)
@@ -59,14 +63,31 @@ fn ws_layout_build(layout &WsTextLayout) {
 				first = index
 				start = pos
 				width = 0
+				break_next = 0
 				continue
 			}
 			advance := ws_glyph_advance(code, layout.size)
 			if layout.width > 0 && width > 0 && width + advance > f32(layout.width) {
+				if break_next > start {
+					ws_layout_line(layout, start, break_end, first, break_index, break_width)
+					pos = break_next
+					start = pos
+					index = break_index
+					first = index
+					width = 0
+					break_next = 0
+					continue
+				}
 				ws_layout_line(layout, start, begin, first, index, width)
 				first = index
 				start = begin
 				width = 0
+			}
+			if code == 32 || code == 9 {
+				break_end = begin
+				break_next = pos
+				break_index = index + 1
+				break_width = width
 			}
 			width += advance
 			index += if code > 0xffff { 2 } else { 1 }

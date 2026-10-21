@@ -185,6 +185,14 @@ fn options_init(e voidptr, activity voidptr) {
     if created == 0 || pending(e) { return }
     boolean(e, activity, c'android/app/Activity', c'onPrepareOptionsMenu', c'(Landroid/view/Menu;)Z', unsafe { &args[0] })
     if pending(e) { return }
+    // AppCompat and other apps provide their own toolbar in a no-title theme.
+    // Their menu callbacks still run, but adding another header steals content
+    // height and duplicates the app's navigation controls.
+    theme := obj(e, activity, c'android/content/Context', c'getTheme', c'()Landroid/content/res/Resources$Theme;', unsafe { nil })
+    value := new_object(e, c'android/util/TypedValue', c'()V', unsafe { nil })
+    theme_args := [Value{i: 0x01010056}, Value{l: value}, Value{i: 1}]!
+    if boolean(e, theme, c'android/content/res/Resources$Theme', c'resolveAttribute', c'(ILandroid/util/TypedValue;Z)Z', unsafe { &theme_args[0] }) != 0
+        && get_int(e, value, c'android/util/TypedValue', c'data') != 0 { return }
     bar := action_bar(e, activity)
     intent := obj(e, activity, c'android/app/Activity', c'getIntent', c'()Landroid/content/Intent;', unsafe { nil })
     action := obj(e, intent, c'android/content/Intent', c'getAction', c'()Ljava/lang/String;', unsafe { nil })

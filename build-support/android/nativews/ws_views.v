@@ -17,6 +17,13 @@ mut:
 	visible        bool = true
 	sensitive      bool = true
 	focused        bool
+	max_lines      i32
+	min_lines      i32
+	single_line    bool
+	checked        bool
+	broadcasting   bool
+	progress       f32
+	indeterminate  bool
 }
 
 fn ws_view(e voidptr, object voidptr) &WsView {
@@ -119,6 +126,16 @@ fn ws_measure(e voidptr, object voidptr, width_spec i32, height_spec i32) {
 		text_width := i32(ws_text_width(view.text, view.size) + 0.999)
 		mut width := text_width + view.padding_left + view.padding_right + 6
 		mut height := i32(view.size * 1.5) + view.padding_top + view.padding_bottom
+		if view.kind == 1 && !view.single_line {
+			limit := if u32(width_spec) >> 30 == 0 { width } else { width_spec & 0x3fffffff }
+			content_width := limit - view.padding_left - view.padding_right - 6
+			layout := ws_text_layout(view.text, view.size, if content_width > 0 { content_width } else { 1 })
+			mut lines := (&WsTextLayout(layout)).count
+			if lines < view.min_lines { lines = view.min_lines }
+			if view.max_lines > 0 && lines > view.max_lines { lines = view.max_lines }
+			height = i32(view.size * (1.5 + f32(lines - 1) * 1.25)) + view.padding_top + view.padding_bottom
+			ws_layout_free(layout)
+		}
 		if view.kind == 2 {
 			width += 24
 			height += 16
@@ -126,6 +143,14 @@ fn ws_measure(e voidptr, object voidptr, width_spec i32, height_spec i32) {
 		if view.kind == 3 {
 			if width < 100 { width = 100 }
 			height += 12
+		}
+		if view.kind == 7 || view.kind == 8 {
+			width += 30
+			if height < 32 { height = 32 }
+		}
+		if view.kind == 9 {
+			width = if view.indeterminate { i32(32) } else { i32(120) }
+			height = if view.indeterminate { i32(32) } else { i32(8) }
 		}
 		if view.kind == 5 {
 			drawable := obj(e, object, c'android/widget/ImageView', c'getDrawable', c'()Landroid/graphics/drawable/Drawable;', nil)
@@ -195,7 +220,7 @@ fn ws_draw_background(e voidptr, object voidptr) {
 		}
 		if view.background >> 24 != 0 {
 			ws_rect(0, 0, f32(width), f32(height), view.background)
-		} else if view.kind == 2 {
+		} else if view.kind == 2 && background == nil {
 			ws_rect(2, 2, f32(width - 2), f32(height - 2), if view.sensitive {
 				u32(0xffe4e7ec)
 			} else {
@@ -216,6 +241,7 @@ fn ws_draw_background(e voidptr, object voidptr) {
 fn ws_draw_content(e voidptr, object voidptr) {
 	unsafe {
 		view := ws_view(e, object)
+		if view.kind == 9 { ws_progress_draw(e, object); return }
 		if view.kind == 5 {
 			ws_draw_image(e, object)
 			return
@@ -227,11 +253,44 @@ fn ws_draw_content(e voidptr, object voidptr) {
 			ws_layout_free(layout)
 			return
 		}
-		if view.kind < 1 || view.kind > 3 { return }
+		if (view.kind < 1 || view.kind > 3) && view.kind != 7 && view.kind != 8 { return }
 		width := integer(e, object, c'android/view/View', c'getWidth', c'()I', nil)
 		height := integer(e, object, c'android/view/View', c'getHeight', c'()I', nil)
+		if view.kind == 1 {
+			content_width := width - view.padding_left - view.padding_right - 6
+			layout := ws_text_layout(view.text, view.size, if view.single_line { 0 } else if content_width > 0 { content_width } else { 1 })
+			gravity := integer(e, object, c'android/widget/TextView', c'getGravity', c'()I', nil)
+			alignment := integer(e, object, c'android/view/View', c'getTextAlignment', c'()I', nil)
+			mut lines := (&WsTextLayout(layout)).count
+			if view.max_lines > 0 && lines > view.max_lines { lines = view.max_lines }
+			block_height := view.size * (1.5 + f32(lines - 1) * 1.25)
+			available := height - view.padding_top - view.padding_bottom
+			extra := if f32(available) > block_height { f32(available) - block_height } else { f32(0) }
+			y := f32(view.padding_top) + view.size + if gravity & 0x70 == 0x50 { extra } else if gravity & 0x70 == 0x10 { extra / 2 } else { f32(0) }
+			for line := i32(0); line < lines; line++ {
+				entry := (&WsTextLayout(layout)).lines[line]
+				horizontal := if alignment == 4 { i32(1) } else if alignment == 3 || alignment == 6 { i32(5) } else if alignment == 2 || alignment == 5 { i32(3) } else { gravity & 7 }
+				x := f32(view.padding_left + 3) + if horizontal == 1 { (f32(content_width) - entry.width) / 2 } else if horizontal == 5 { f32(content_width) - entry.width } else { f32(0) }
+				text := (&WsTextLayout(layout)).text
+				end := text[entry.end]
+				text[entry.end] = 0
+				ws_text(&text[entry.start], x, y + f32(line) * view.size * 1.25, view.size, view.color)
+				text[entry.end] = end
+			}
+			ws_layout_free(layout)
+			return
+		}
 		text_width := ws_text_width(view.text, view.size)
-		left := if view.kind == 2 {
+		if view.kind == 7 || view.kind == 8 {
+			left := f32(view.padding_left + 3)
+			top := (f32(height) - 18) / 2
+			ws_rect(left, top, left + 18, top + 18, 0xff66736c)
+			ws_rect(left + 2, top + 2, left + 16, top + 16, if view.checked { u32(0xff00a884) } else { u32(0xffffffff) })
+			if view.checked { ws_rect(left + 6, top + 6, left + 12, top + 12, 0xffffffff) }
+		}
+		left := if view.kind == 7 || view.kind == 8 {
+			f32(view.padding_left + 30)
+		} else if view.kind == 2 {
 			(f32(width) - text_width) / 2
 		} else {
 			f32(view.padding_left + 3)
@@ -254,9 +313,7 @@ fn ws_draw_children(e voidptr, object voidptr) {
 		// ViewGroup whose content belongs to this renderer.
 		if ws_view(e, object).kind == 6 { ws_draw_content(e, object) }
 		ws_save()
-		if ws_view(e, object).kind == 4 {
-			ws_translate(-f32(get_int(e, object, c'android/view/View', c'scrollX')), -f32(get_int(e, object, c'android/view/View', c'scrollY')))
-		}
+		ws_translate(-f32(get_int(e, object, c'android/view/View', c'scrollX')), -f32(get_int(e, object, c'android/view/View', c'scrollY')))
 		count := integer(e, object, c'android/view/ViewGroup', c'getChildCount', c'()I', nil)
 		for i := i32(0); i < count; i++ {
 			push_frame(e)
@@ -297,6 +354,7 @@ fn ws_render(e voidptr) {
 		ws_root_draw.pixels = &u32(usize(surface) + 48 + usize(target) * usize(surface.buffer_size))
 		ws_root_draw.transform = WsTransform{ right: ws.width, bottom: ws.height }
 		ws_root_draw.save_count = 0
+		ws.animated = false
 		for i := i32(0); i < ws.width * ws.height; i++ { ws_root_draw.pixels[i] = 0xfffafafa }
 		decor := activity_decor(e, ws.activity)
 		measure := [Value{ i: ws.width | 0x40000000 }, Value{ i: ws.height | 0x40000000 }]!
@@ -310,6 +368,7 @@ fn ws_render(e voidptr) {
 		surface.sequence++
 		C.__atomic_store_n(&surface.active, target, 3)
 		ws.dirty = false
+		ws.animation_last = ws_millis()
 	}
 }
 
@@ -338,16 +397,8 @@ fn ws_hit(e voidptr, view voidptr, x i32, y i32, depth i32) voidptr {
 	unsafe {
 		if depth > 64 { return nil }
 		if instance_of(e, view, c'android/view/ViewGroup') {
-			hit_x := x + if ws_view(e, view).kind == 4 {
-				get_int(e, view, c'android/view/View', c'scrollX')
-			} else {
-				i32(0)
-			}
-			hit_y := y + if ws_view(e, view).kind == 4 {
-				get_int(e, view, c'android/view/View', c'scrollY')
-			} else {
-				i32(0)
-			}
+			hit_x := x + get_int(e, view, c'android/view/View', c'scrollX')
+			hit_y := y + get_int(e, view, c'android/view/View', c'scrollY')
 			count := integer(e, view, c'android/view/ViewGroup', c'getChildCount', c'()I', nil)
 			for i := count - 1; i >= 0; i-- {
 				args := &Value(C.alloca(sizeof(Value)))
@@ -384,10 +435,8 @@ fn ws_local_point(e voidptr, view voidptr, x i32, y i32) WsPoint {
 			local_y -= integer(e, node, c'android/view/View', c'getTop', c'()I', nil)
 			parent := obj(e, node, c'android/view/View', c'getParent', c'()Landroid/view/ViewParent;', nil)
 			if parent == nil || !instance_of(e, parent, c'android/view/View') { break }
-			if ws_view(e, parent).kind == 4 {
-				local_x += get_int(e, parent, c'android/view/View', c'scrollX')
-				local_y += get_int(e, parent, c'android/view/View', c'scrollY')
-			}
+			local_x += get_int(e, parent, c'android/view/View', c'scrollX')
+			local_y += get_int(e, parent, c'android/view/View', c'scrollY')
 			node = parent
 		}
 		return WsPoint{local_x, local_y}
@@ -442,7 +491,7 @@ fn ws_list_activate(e voidptr, leaf voidptr) {
 
 fn ws_pointer(e voidptr, event &WsEvent) {
 	unsafe {
-		if event.kind != 2 && event.kind != 3 { return }
+		if event.kind != 2 && event.kind != 3 && event.kind != 5 { return }
 		if ws.dialog != nil && (event.x < ws.dialog_x || event.y < ws.dialog_y || event.x >= ws.dialog_x + ws.dialog_width || event.y >= ws.dialog_y + ws.dialog_height) {
 			return
 		}
@@ -457,6 +506,7 @@ fn ws_pointer(e voidptr, event &WsEvent) {
 			ws.dialog_y
 		}, 0)
 		if target == nil { return }
+		if event.kind == 5 { ws_wheel(e, target, event.value); return }
 		if !ws_view(e, target).sensitive { return }
 		if event.kind == 2 {
 			if ws.pressed != nil { Drop(slot(e, 22))(e, ws.pressed) }

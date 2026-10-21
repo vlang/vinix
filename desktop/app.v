@@ -699,6 +699,10 @@ fn open_settings_app(mut desktop Desktop) !NativeApp {
 // windows by them and `--open` names applications by them. Product names read
 // the same in every language and are shown as they are.
 fn app_title_text(title string) string {
+	if title == 'Android Calculator' {
+		label := android_application_label()
+		if label != '' { return label }
+	}
 	key := match title {
 		'Files' { 'app.files' }
 		'Calculator' { 'app.calculator' }

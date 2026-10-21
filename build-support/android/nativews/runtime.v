@@ -105,6 +105,8 @@ mut:
 	input         i32
 	dirty         bool
 	running       bool
+	animated      bool
+	animation_last i64
 }
 
 __global ws &WsState
@@ -367,6 +369,9 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		]!
 		app := static_obj(e, c'android/app/Activity', c'createMainActivity', c'(Ljava/lang/String;JLjava/lang/String;)Landroid/app/Activity;', &launch_args[0])
 		if ws_failure(e, c'ANDROID-WS-FAIL create activity') { return 1 }
+		intent := obj(e, app, c'android/app/Activity', c'getIntent', c'()Landroid/content/Intent;', nil)
+		main_action := [Value{ l: ws_string(e, c'android.intent.action.MAIN') }]!
+		obj(e, intent, c'android/content/Intent', c'setAction', c'(Ljava/lang/String;)Landroid/content/Intent;', &main_action[0])
 		ws_start(e, app)
 		if ws_failure(e, c'ANDROID-WS-FAIL start activity') { return 1 }
 		canvas_args := &Value(C.alloca(sizeof(Value)))
@@ -382,6 +387,7 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 				pop_frame(e)
 				return 1
 			}
+			if ws.animated && ws_millis() - ws.animation_last >= 80 { ws.dirty = true }
 			if ws.dirty { ws_render(e) }
 			ws_input(e)
 			if ws_failure(e, c'ANDROID-WS-FAIL input or render') {

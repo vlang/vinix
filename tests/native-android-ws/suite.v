@@ -155,6 +155,10 @@ fn prepare_module(settings map[string]json2.Any, app map[string]json2.Any, outpu
 	os.cp(native + '/vinix-desktop', module_root + '/usr/bin/vinix-android-calculator')!
 	os.cp(app['staged_apk']!.str(), module_root + '/opt/android-test/application.apk')!
 	os.write_file(module_root + '/opt/android-test/popular-id', app['id']!.str())!
+	os.mkdir_all(module_root + '/usr/share/vinix')!
+	label := (app['name'] or { app['package']! }).str()
+	if label.len == 0 || label.len > 128 || label.bytes().any(it < 32 || it == 127) { return error('invalid APK display label') }
+	os.write_file(module_root + '/usr/share/vinix/android-app-label', label)!
 	os.write_file(module_root + '/opt/android-test/native-mode', 'desktop')!
 	os.write_file(module_root + '/sbin/init', '#!/bin/sh\nexec /opt/android-test/native-guest\n')!
 	os.chmod(module_root + '/sbin/init', 0o755)!

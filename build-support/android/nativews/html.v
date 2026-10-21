@@ -38,17 +38,68 @@ fn ws_html_utf8(buffer &u8, code u32) usize {
 }
 
 fn ws_html_text(source &char) &char {
+	return ws_html_parse(source, unsafe { nil })
+}
+
+struct WsHtmlLink {
+mut:
+	next  &WsHtmlLink
+	url   &char
+	start usize
+	end   usize
+}
+
+fn ws_html_attribute(source &char, start usize, end usize, requested &char) &char {
+	unsafe {
+		mut at := start
+		for at < end {
+			for at < end && (u8(source[at]) <= 32 || source[at] == `/`) { at++ }
+			name := at
+			for at < end && u8(source[at]) > 32 && source[at] != `=` && source[at] != `/` { at++ }
+			size := at - name
+			for at < end && u8(source[at]) <= 32 { at++ }
+			if at == end { break }
+			if source[at] != `=` { at++; continue }
+			at++
+			for at < end && u8(source[at]) <= 32 { at++ }
+			quote := if at < end && (source[at] == `"` || source[at] == 39) { source[at] } else { char(0) }
+			if quote != 0 { at++ }
+			value := at
+			for at < end && (if quote == 0 { u8(source[at]) > 32 } else { source[at] != quote }) { at++ }
+			if ws_html_name(&source[name], size, requested) {
+				copy := &char(C.malloc(at - value + 1))
+				C.memcpy(copy, &source[value], at - value)
+				copy[at - value] = 0
+				decoded := ws_html_text(copy)
+				C.free(copy)
+				return decoded
+			}
+			if quote != 0 && at < end { at++ }
+		}
+		return nil
+	}
+}
+
+fn ws_html_parse(source &char, links &WsHtmlLink) &char {
 	unsafe {
 		length := C.strlen(source)
 		output := &u8(C.malloc(length + 1))
 		mut used := usize(0)
 		mut at := usize(0)
 		mut skip := i32(0)
+		mut tail := links
+		mut anchor := &WsHtmlLink(nil)
 		for at < length {
 			c := source[at]
 			if c == `<` {
 				mut end := at + 1
-				for end < length && source[end] != `>` { end++ }
+				mut quote := char(0)
+				for end < length {
+					if quote == 0 && source[end] == `>` { break }
+					if quote == 0 && (source[end] == `"` || source[end] == 39) { quote = source[end] }
+					else if quote != 0 && source[end] == quote { quote = 0 }
+					end++
+				}
 				if end == length { break }
 				mut start := at + 1
 				closing := source[start] == `/`
@@ -73,6 +124,20 @@ fn ws_html_text(source &char) &char {
 					if closing && hidden == skip { skip = 0 }
 				} else if !closing && hidden != 0 {
 					skip = hidden
+				} else if links != nil && ws_html_name(name, size, c'a') {
+					if anchor != nil { anchor.end = used; anchor = nil }
+					if !closing {
+						url := ws_html_attribute(source, name_end, end, c'href')
+						if url != nil {
+							node := &WsHtmlLink(C.calloc(1, sizeof(WsHtmlLink)))
+							node.url = url
+							node.start = used
+							node.end = used
+							tail.next = node
+							tail = node
+							anchor = node
+						}
+					}
 				} else if ws_html_name(name, size, c'p') || ws_html_name(name, size, c'div') || ws_html_name(name, size, c'br') || ws_html_name(name, size, c'li') || ws_html_name(name, size, c'tr') || (size == 2 && (name[0] == `h` || name[0] == `H`) && name[1] >= `1` && name[1] <= `6`) {
 					if used > 0 && output[used - 1] != 10 {
 						output[used] = 10
@@ -158,7 +223,53 @@ fn ws_html_text(source &char) &char {
 			at++
 		}
 		output[used] = 0
+		if anchor != nil { anchor.end = used }
 		return &char(output)
+	}
+}
+
+fn ws_html_utf16(text &char, bytes usize) i32 {
+	mut at := usize(0)
+	mut count := i32(0)
+	for at < bytes {
+		code := ws_codepoint(unsafe { &u8(text) }, bytes, &at)
+		count += if code > 0xffff { 2 } else { 1 }
+	}
+	return count
+}
+
+fn ws_html_spanned(e voidptr, source voidptr) voidptr {
+	if source == unsafe { nil } { throw(e, c'java/lang/NullPointerException', c'HTML source'); return unsafe { nil } }
+	unsafe {
+		chars := ws_utf(e, source)
+		defer { ws_release(e, source, chars) }
+		head := &WsHtmlLink(C.calloc(1, sizeof(WsHtmlLink)))
+		text := ws_html_parse(chars, head)
+		defer {
+			mut node := head
+			for node != nil {
+				next := node.next
+				C.free(node.url)
+				C.free(node)
+				node = next
+			}
+			C.free(text)
+		}
+		args := &Value(C.alloca(4 * sizeof(Value)))
+		args[0] = Value{ l: ws_string(e, text) }
+		result := new_object(e, c'android/text/SpannableString', c'(Ljava/lang/CharSequence;)V', args)
+		mut node := head.next
+		for node != nil && !pending(e) {
+			args[0] = Value{ l: ws_string(e, node.url) }
+			span := new_object(e, c'android/text/style/URLSpan', c'(Ljava/lang/String;)V', args)
+			args[0] = Value{ l: span }
+			args[1] = Value{ i: ws_html_utf16(text, node.start) }
+			args[2] = Value{ i: ws_html_utf16(text, node.end) }
+			args[3] = Value{ i: 33 }
+			call(e, result, c'android/text/SpannableString', c'setSpan', c'(Ljava/lang/Object;III)V', args)
+			node = node.next
+		}
+		return result
 	}
 }
 

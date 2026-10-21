@@ -98,14 +98,40 @@ activity name. `ANDROID_APP_DATA_DIR` overrides the per-APK directory under
 
 The verified subset covers Arity calculation, Editor save/reopen and Open
 Sudoku touch entry/database persistence. Advanced Canvas paths/transforms,
-text selection/shaping, on-screen keyboards, mouse wheel/drag scrolling, popup tabs, services and
+text selection/shaping, on-screen keyboards, drag scrolling, popup tabs, services and
 modern Android APIs remain incomplete. NinePatch images currently stretch.
 WebView supports static HTML/text help panels without JavaScript, CSS layout
 or network navigation. Unsupported native APIs fail explicitly. This backend
 does not establish general APK compatibility or phone hardware support.
 
+TextView measurement and painting wrap at word boundaries, honor line limits
+and gravity, and preserve explicit single-line controls. `Html.fromHtml` decodes
+text/entities and retains anchor URL spans with UTF-16 offsets; rich font styling
+and link interaction remain incomplete. No-title themes keep their app-owned
+toolbar without a second runtime header. An image selecting another APK may
+write its label (up to 128 bytes, without a newline) to
+`/usr/share/vinix/android-app-label` for the outer title bar and taskbar.
+
+The native loader checks mapped extents rather than adding page-rounded segment
+lengths. Shared PT_LOAD pages therefore do not falsely exceed the reserved
+mapping, while out-of-range and overflowing extents still fail validation.
+Libraries aligned to 4 KiB use an anonymous copy mapping when their file and
+virtual offsets cannot share a 16 KiB file mapping. The mapper preserves BSS
+and adjacent segment bytes, flushes executable code, and protects complete
+RELRO pages after relocation. A host page shared by executable and writable
+segments needs their combined permissions, including RWX in that case.
+
+CheckBox and RadioButton retain checked state, deliver change listeners and
+toggle through Android clicks. Native wheel input scrolls the nearest scrollable
+ancestor through its Java scroll methods. Rendering and hit testing account for
+scroll offsets in custom ViewGroups, including AndroidX NestedScrollView.
+ProgressBar exposes determinate progress and animates visible indeterminate
+indicators. App-supplied button backgrounds are drawn without a generic button
+fill covering them. The bootstrap fixture's NDK library intentionally uses
+4 KiB ELF alignment to exercise executable copy mapping in a 16 KiB guest.
+
 The [popular-app startup matrix](../../../tests/android/results/2026-10-21/popular-ws/README.md)
-records the current blockers for eleven widely installed Play app identities,
+records baseline blockers for eleven widely installed Play app identities,
 including application initialization, resources, JNI clocks, launcher resolution
 and split delivery. None reached a usable UI in that run; the basic APK checks
 above should not be extrapolated to those applications.

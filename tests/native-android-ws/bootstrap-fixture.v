@@ -92,10 +92,125 @@ throw v0') +
 		os.write_file(smali + '/' + name + '.smali', source)!
 	}
 	main_class := '.class public Lorg/vinix/bootstrap/Main;\n.super Landroid/app/Activity;\n' +
+		'.implements Landroid/widget/CompoundButton$OnCheckedChangeListener;\n.field private changes:I\n' +
 		constructor('android/app/Activity', 'const/4 v0, 4\ninvoke-static {v0}, Lorg/vinix/bootstrap/App;->check(I)V') +
+		method('public onCheckedChanged(Landroid/widget/CompoundButton;Z)V', 'iget v0, p0, Lorg/vinix/bootstrap/Main;->changes:I\nadd-int/lit8 v0, v0, 1\niput v0, p0, Lorg/vinix/bootstrap/Main;->changes:I\nreturn-void') +
+		method('private checkWidget()V', '
+new-instance v0, Landroid/widget/CheckBox;
+invoke-direct {v0, p0}, Landroid/widget/CheckBox;-><init>(Landroid/content/Context;)V
+invoke-virtual {v0, p0}, Landroid/widget/CheckBox;->setOnCheckedChangeListener(Landroid/widget/CompoundButton$OnCheckedChangeListener;)V
+invoke-virtual {v0}, Landroid/widget/CheckBox;->performClick()Z
+invoke-virtual {v0}, Landroid/widget/CheckBox;->isChecked()Z
+move-result v1
+if-eqz v1, :bad
+const/4 v1, 1
+invoke-virtual {v0, v1}, Landroid/widget/CheckBox;->setChecked(Z)V
+iget v1, p0, Lorg/vinix/bootstrap/Main;->changes:I
+const/4 v2, 1
+if-ne v1, v2, :bad
+invoke-virtual {v0}, Landroid/widget/CheckBox;->performClick()Z
+invoke-virtual {v0}, Landroid/widget/CheckBox;->isChecked()Z
+move-result v1
+if-nez v1, :bad
+iget v1, p0, Lorg/vinix/bootstrap/Main;->changes:I
+const/4 v2, 2
+if-ne v1, v2, :bad
+new-instance v0, Landroid/widget/RadioButton;
+invoke-direct {v0, p0}, Landroid/widget/RadioButton;-><init>(Landroid/content/Context;)V
+invoke-virtual {v0}, Landroid/widget/RadioButton;->performClick()Z
+invoke-virtual {v0}, Landroid/widget/RadioButton;->performClick()Z
+invoke-virtual {v0}, Landroid/widget/RadioButton;->isChecked()Z
+move-result v1
+if-eqz v1, :bad
+new-instance v0, Landroid/widget/ProgressBar;
+invoke-direct {v0, p0}, Landroid/widget/ProgressBar;-><init>(Landroid/content/Context;)V
+const/16 v1, 200
+invoke-virtual {v0, v1}, Landroid/widget/ProgressBar;->setMax(I)V
+const/16 v1, 50
+invoke-virtual {v0, v1}, Landroid/widget/ProgressBar;->setProgress(I)V
+invoke-virtual {v0}, Landroid/widget/ProgressBar;->getProgress()I
+move-result v2
+if-ne v1, v2, :bad
+const/4 v1, 1
+invoke-virtual {v0, v1}, Landroid/widget/ProgressBar;->setIndeterminate(Z)V
+invoke-virtual {v0}, Landroid/widget/ProgressBar;->isIndeterminate()Z
+move-result v1
+if-eqz v1, :bad
+const/4 v1, 0
+invoke-virtual {v0, v1}, Landroid/widget/ProgressBar;->setIndeterminate(Z)V
+invoke-virtual {v0}, Landroid/widget/ProgressBar;->isIndeterminate()Z
+move-result v1
+if-nez v1, :bad
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "CheckBox/RadioButton state, clicks and change callbacks"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
 		'.method public static native nativeCheck(Landroid/content/res/AssetManager;)Z\n.end method\n' +
 		'.method public static native nativeBitmap(Landroid/graphics/Bitmap;)Z\n.end method\n' +
 		'.method public static native nativeGraphics()Z\n.end method\n' +
+		method('private static textCheck(Landroid/content/Context;)V', '
+const-string v0, "&#128512; Read <a href=\"privacy&amp;policy\">Privacy &amp; Policy</a>."
+const/4 v1, 0
+invoke-static {v0, v1}, Landroid/text/Html;->fromHtml(Ljava/lang/String;I)Landroid/text/Spanned;
+move-result-object v0
+invoke-virtual {v0}, Ljava/lang/Object;->toString()Ljava/lang/String;
+move-result-object v1
+const-string v2, "😀 Read Privacy & Policy."
+invoke-virtual {v2, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v1
+if-eqz v1, :bad
+const/4 v1, 0
+const/16 v2, 25
+const-class v3, Landroid/text/style/URLSpan;
+invoke-interface {v0, v1, v2, v3}, Landroid/text/Spanned;->getSpans(IILjava/lang/Class;)[Ljava/lang/Object;
+move-result-object v1
+array-length v2, v1
+const/4 v3, 1
+if-ne v2, v3, :bad
+const/4 v2, 0
+aget-object v1, v1, v2
+invoke-interface {v0, v1}, Landroid/text/Spanned;->getSpanStart(Ljava/lang/Object;)I
+move-result v2
+const/16 v3, 8
+if-ne v2, v3, :bad
+invoke-interface {v0, v1}, Landroid/text/Spanned;->getSpanEnd(Ljava/lang/Object;)I
+move-result v2
+const/16 v3, 24
+if-ne v2, v3, :bad
+check-cast v1, Landroid/text/style/URLSpan;
+invoke-virtual {v1}, Landroid/text/style/URLSpan;->getURL()Ljava/lang/String;
+move-result-object v1
+const-string v2, "privacy&policy"
+invoke-virtual {v2, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v1
+if-eqz v1, :bad
+new-instance v0, Landroid/widget/TextView;
+invoke-direct {v0, p0}, Landroid/widget/TextView;-><init>(Landroid/content/Context;)V
+const-string v1, "Native widgets wrap long words and sentences across several lines."
+invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
+const/high16 v1, 0x41a00000
+invoke-virtual {v0, v1}, Landroid/widget/TextView;->setTextSize(F)V
+const v1, 0x40000078
+const v2, 0x800003e8
+invoke-virtual {v0, v1, v2}, Landroid/view/View;->measure(II)V
+invoke-virtual {v0}, Landroid/view/View;->getMeasuredHeight()I
+move-result v3
+const/16 v4, 35
+if-le v3, v4, :bad
+const/4 v3, 1
+invoke-virtual {v0, v3}, Landroid/widget/TextView;->setSingleLine(Z)V
+invoke-virtual {v0, v1, v2}, Landroid/view/View;->measure(II)V
+invoke-virtual {v0}, Landroid/view/View;->getMeasuredHeight()I
+move-result v3
+if-gt v3, v4, :bad
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "HTML text, URL span UTF-16 offsets or multiline measurement"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
 		method('private static bitmapCanvasCheck()V', '
 const/4 v1, 4
 const/4 v2, 4
@@ -318,6 +433,8 @@ invoke-static {}, Lorg/vinix/bootstrap/Main;->nativeGraphics()Z
 move-result v0
 if-eqz v0, :bad
 invoke-static {}, Lorg/vinix/bootstrap/Main;->bitmapCanvasCheck()V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->textCheck(Landroid/content/Context;)V
+invoke-direct {p0}, Lorg/vinix/bootstrap/Main;->checkWidget()V
 new-instance v0, Landroid/app/Notification$Builder;
 invoke-direct {v0, p0}, Landroid/app/Notification$Builder;-><init>(Landroid/content/Context;)V
 const-string v1, "Vinix Android runtime"
@@ -379,7 +496,10 @@ throw v0')
 	checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', output + '/smali', '-o', output + '/classes.dex'])
 	checked([aapt, 'link', '-I', resources, '--manifest', output + '/AndroidManifest.xml', '-A', output + '/assets', '-o', output + '/unsigned.apk'])
 	checked(['build-support/compile-v-module', os.abs_path('tests/native-android-ws/assetprobe'), output + '/assetprobe.c', '--arch', 'arm64'])
-	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib', '-Wl,-z,max-page-size=65536', output + '/assetprobe.c', '-o', output + '/lib/arm64-v8a/libfixture.so'])
+	// Exercise the legacy NDK mapping path on a real 16 KiB Vinix guest as
+	// well as the Java framework APIs. This ELF intentionally uses 4 KiB pages.
+	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib', '-Wl,-z,max-page-size=4096',
+		'-Wl,-z,common-page-size=4096', output + '/assetprobe.c', '-o', output + '/lib/arm64-v8a/libfixture.so'])
 	checked(['zip', '-q', '-j', output + '/unsigned.apk', output + '/classes.dex'])
 	// zip's -j would discard the ABI directory. Run in the fixture directory.
 	mut zip := os.new_process('zip')

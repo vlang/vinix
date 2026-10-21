@@ -58,6 +58,8 @@ pub fn framework_extra_classes(source string) map[string]string {
 
 pub fn write_framework_classes(smali string) ! {
  framework_content_clients(smali)!
+ framework_text_widgets(smali)!
+ framework_check_widgets(smali)!
  source := os.read_file(root() + '/build-support/android/atlframework/widgets.v')!
  for name, text in framework_extra_classes(source) { os.write_file(smali + '/' + name + '.smali', text)! }
  dialogs := os.read_file(root() + '/build-support/android/atlframework/dialogs.v')!
@@ -125,4 +127,46 @@ pub fn write_framework_classes(smali string) ! {
   '.method public constructor <init>(Landroid/content/Context;Landroid/util/AttributeSet;)V\n.locals 1\n' +
   'sget v0, Landroid/R$attr;->buttonStyle:I\n' +
   'invoke-direct {p0, p1, p2, v0}, Landroid/widget/Button;-><init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V\nreturn-void\n.end method')!)!
+}
+
+fn framework_text_widgets(smali string) ! {
+ path := smali + '/android/widget/TextView.smali'
+ mut text := os.read_file(path)!
+ for signature in ['setMaxLines(I)V', 'getMaxLines()I', 'setMinLines(I)V', 'getMinLines()I',
+  'setSingleLine()V', 'setSingleLine(Z)V', 'setHorizontallyScrolling(Z)V', 'getHorizontallyScrolling()Z'] {
+  text = framework_replace_method(text, signature, '.method public native ' + signature + '\n.end method')!
+ }
+ text += '\n.method public setGravity(I)V\n.locals 0\niput p1, p0, Landroid/widget/TextView;->gravity:I\n' +
+  'invoke-virtual {p0}, Landroid/view/View;->requestLayout()V\nreturn-void\n.end method\n'
+ os.write_file(path, text)!
+ html := smali + '/android/text/Html.smali'
+ os.write_file(html, framework_replace_method(os.read_file(html)!, 'fromHtml(Ljava/lang/String;I)Landroid/text/Spanned;',
+  '.method public static native fromHtml(Ljava/lang/String;I)Landroid/text/Spanned;\n.end method')!)!
+}
+
+fn framework_check_widgets(smali string) ! {
+ for class in ['CompoundButton', 'CheckBox', 'RadioButton'] {
+  path := smali + '/android/widget/' + class + '.smali'
+  mut text := os.read_file(path)!
+  if class == 'CompoundButton' {
+   text += '\n.field private vinixWsCheckedListener:Landroid/widget/CompoundButton$OnCheckedChangeListener;\n'
+   text = framework_replace_method(text, 'getText()Ljava/lang/CharSequence;',
+    '.method public native getText()Ljava/lang/CharSequence;\n.end method')!
+   text += '\n.method public performClick()Z\n.locals 1\n' +
+    'invoke-virtual {p0}, Landroid/widget/CompoundButton;->toggle()V\n' +
+    'invoke-super {p0}, Landroid/widget/Button;->performClick()Z\nconst/4 v0, 1\nreturn v0\n.end method\n'
+  }
+  for signature in ['setTextColor(I)V', 'setTextSize(F)V'] {
+   text = framework_replace_method(text, signature, '.method public native ' + signature + '\n.end method')!
+  }
+  parent := if class == 'CompoundButton' { 'Button' } else { 'CompoundButton' }
+  text = framework_replace_method(text, 'setOnClickListener(Landroid/view/View$OnClickListener;)V',
+   '.method public setOnClickListener(Landroid/view/View$OnClickListener;)V\n.locals 0\n' +
+   'invoke-super {p0, p1}, Landroid/widget/' + parent + ';->setOnClickListener(Landroid/view/View$OnClickListener;)V\nreturn-void\n.end method')!
+  if class == 'RadioButton' {
+   text += '\n.method public toggle()V\n.locals 1\ninvoke-virtual {p0}, Landroid/widget/RadioButton;->isChecked()Z\n' +
+    'move-result v0\nif-nez v0, :done\nconst/4 v0, 1\ninvoke-virtual {p0, v0}, Landroid/widget/RadioButton;->setChecked(Z)V\n:done\nreturn-void\n.end method\n'
+  }
+  os.write_file(path, text)!
+ }
 }
