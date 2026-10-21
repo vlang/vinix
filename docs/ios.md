@@ -14396,17 +14396,50 @@ descriptor data import. Read-only inspection found GOT cell `0x10dc9b978`
 and four indirect context symbolic references in `__swift5_typeref`.
 Application entry remains unreached; Fortnite is still unplayable.
 
+`_$ss22KeyedEncodingContainerVMn` now exports the canonical read-only nominal
+descriptor from the existing keyed-container metadata arena. It identifies
+the Swift struct, its K parameter and CodingKey constraint, the two generic
+arguments and its accessor/instantiation pattern. Encoding and decoding keep
+distinct nominal identities while sharing the same CodingKey declaration and
+canonical CustomStringConvertible parent. Looking up the descriptor does not
+instantiate a specialization or add another arena/cache owner.
+
+The native comparison checks the declaration graph and complete responses
+through both the direct and descriptor accessors. The compatibility fixture
+also checks read-only descriptor/metadata and executable accessor permissions,
+factory arguments at both protected page boundaries, generic-ABI rejection,
+eight cold publishers and two drained/unmapped lifetimes. Encoding metadata
+and the decoding metadata/descriptor fixtures provide regression coverage.
+
+```sh
+v run tests/ios/native-checks.v build-keyed-encoding-nominal
+```
+
+Evidence is retained under `build/ios/fortnite/keyed-encoding-nominal-checks`.
+
+Normal and deterministic ASan/UBSan checks passed with and without the C++
+backend and for all three regressions (ten runs). The ARM64 fixture, launch
+probe and both import audits passed. Nine binary/generated-C archive pairs
+are retained. Generated C and ARM64 review cover canonical publication,
+existing owner/cache retirement and symbol lookup without temporary allocations.
+
+The next launch stops at Swift's `_minimumMergeRunLength` sorting helper,
+`_$ss22_minimumMergeRunLengthyS2iF`. Read-only inspection found GOT cell
+`0x10dc9b980`, stub `0x10c63aefc`, branch-island forwarder `0x107c28a44`
+and a direct call at `0x10006c458`. Application entry remains unreached;
+Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,937 | 224 | 78 |
+| Fortnite executable | 1,938 | 223 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,777 | 227 | 114 |
+| All images | 2,778 | 226 | 114 |
 
-The C++/GLES/Text variant reports 2,791 resolved imports, 213 unresolved strong
+The C++/GLES/Text variant reports 2,792 resolved imports, 212 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

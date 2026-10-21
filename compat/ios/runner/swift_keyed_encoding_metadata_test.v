@@ -14,8 +14,6 @@ fn C.mach_task_self() u32
 fn C.vm_region_64(u32, &u64, &u64, i32, &i32, &u32, &u32) i32
 fn C.mach_port_deallocate(u32, u32) i32
 
-fn C.dlopen(&char, i32) voidptr
-fn C.dlsym(voidptr, &char) voidptr
 type KemAccess = fn (u64, u64, u64) SwiftAssociatedMetadata
 type KemCopy = fn (u64, u64, u64) u64
 type KemDestroy = fn (u64, u64)
@@ -202,7 +200,7 @@ fn test_swift_keyed_encoding_metadata() {
 		entry := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$ss22KeyedEncodingContainerVMa') or { panic(err) }
 		access := unsafe { KemAccess(voidptr(entry)) };assert kem_metadata(access, guard, guard + 8) == metadata
 		d := read64(metadata + 8)
-		assert swift_keyed_container_metadata_symbol('_$ss22KeyedEncodingContainerVMn') == none
+		assert runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$ss22KeyedEncodingContainerVMn') or { panic(err) } == d
 		decoding := swift_keyed_container_metadata_access(0, guard, guard + 8).metadata
 		decoding_descriptor := read64(decoding + 8)
 		assert decoding != metadata && decoding_descriptor != d
@@ -233,7 +231,7 @@ fn test_swift_keyed_encoding_metadata() {
 			if _ := swift_keyed_encoding_metadata_checked(0, bad[0], bad[1]) { assert false }
 		}
 		if _ := swift_keyed_encoding_instantiate_checked(guard, guard, guard) { assert false }
-		for symbol in ['_$ss22KeyedEncodingContainerVN', '_$ss22KeyedEncodingContainerVMn', '_$ss9CodingKeyMp']! { assert swift_keyed_container_metadata_symbol(symbol) == none }
+		for symbol in ['_$ss22KeyedEncodingContainerVN', '_$ss22KeyedDecodingContainerVN', '_$ss9CodingKeyMp']! { assert swift_keyed_container_metadata_symbol(symbol) == none }
 		assert runtime_symbol('/usr/lib/swift/libswiftFoundation.dylib', '_$ss22KeyedEncodingContainerVMa') == none
 		ios_runtime.swift_concurrency_retired = true
 		assert swift_keyed_container_metadata_symbol('_$ss22KeyedEncodingContainerVMa') == none

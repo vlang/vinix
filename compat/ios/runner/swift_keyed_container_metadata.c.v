@@ -181,12 +181,13 @@ fn swift_keyed_container_arena() u64 {
 	return base
 }
 fn swift_keyed_container_metadata_symbol(symbol string) ?u64 {
-	if symbol !in ['_$ss22KeyedDecodingContainerVMa', '_$ss22KeyedDecodingContainerVMn', '_$ss22KeyedEncodingContainerVMa']! || ios_runtime == unsafe { nil }
+	if symbol !in ['_$ss22KeyedDecodingContainerVMa', '_$ss22KeyedDecodingContainerVMn', '_$ss22KeyedEncodingContainerVMa', '_$ss22KeyedEncodingContainerVMn']! || ios_runtime == unsafe { nil }
 		|| ios_runtime.swift_keyed_container_retired || ios_runtime.swift_concurrency_retired { return none }
 	base := swift_keyed_container_arena()
 	return match symbol {
 		'_$ss22KeyedDecodingContainerVMn' { base + u64(C.getpagesize()) + 160 }
 		'_$ss22KeyedEncodingContainerVMa' { base + 64 }
+		'_$ss22KeyedEncodingContainerVMn' { base + u64(C.getpagesize()) + 704 }
 		else { base }
 	}
 }

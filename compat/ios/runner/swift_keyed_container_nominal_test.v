@@ -115,7 +115,7 @@ fn test_swift_keyed_container_nominal() {
 		}
 		// Generic descriptors cannot be invoked through the nongeneric ABI.
 		if _ := swift_mangled_nominal_request(d, 0) { assert false }
-		for symbol in ['_$ss22KeyedDecodingContainerVN', '_$ss22KeyedEncodingContainerVMn', '_$ss9CodingKeyMp']! { assert swift_keyed_container_metadata_symbol(symbol) == none }
+		for symbol in ['_$ss22KeyedDecodingContainerVN', '_$ss22KeyedEncodingContainerVN', '_$ss9CodingKeyMp']! { assert swift_keyed_container_metadata_symbol(symbol) == none }
 		assert runtime_symbol('/usr/lib/swift/libswiftFoundation.dylib', '_$ss22KeyedDecodingContainerVMn') == none
 		ios_runtime.swift_concurrency_retired = true;assert swift_keyed_container_metadata_symbol('_$ss22KeyedDecodingContainerVMn') == none
 		ios_runtime.swift_concurrency_retired = false
