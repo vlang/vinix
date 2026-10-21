@@ -320,6 +320,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_swift_checkMetadataState' { u64(unsafe { voidptr(swift_metadata_state) }) }
 		'_swift_getEnumCaseMultiPayload' { u64(unsafe { voidptr(swift_enum_case_multi) }) }
 		'_swift_getEnumTagSinglePayloadGeneric' { u64(unsafe { voidptr(swift_enum_tag_single) }) }
+		'_swift_getGenericMetadata' { u64(unsafe { voidptr(swift_generic_metadata) }) }
 		'_swift_initStackObject' { u64(unsafe { voidptr(swift_stack_initialize) }) }
 		'_swift_allocObject' { u64(unsafe { voidptr(swift_heap_allocate) }) }
 		'_swift_deallocObject' { u64(unsafe { voidptr(swift_heap_deallocate) }) }

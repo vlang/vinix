@@ -15703,17 +15703,91 @@ The next missing import is `_swift_getGenericMetadata`, at GOT cell
 descriptor in x2. General generic metadata lookup remains unsupported.
 Application entry remains unreached and Fortnite is still unplayable.
 
+`_swift_getGenericMetadata` now supports bounded generic struct/enum metadata
+lookup for patterns that produce complete metadata directly. Its scalar SwiftCC
+entry takes request, argument vector and descriptor in x0/x1/x2 and returns the
+metadata/Complete pair in x0/x1. The pattern's ordinary C instantiator receives
+the original descriptor, argument vector and pattern pointers.
+
+The supported signature is a version-zero generic value descriptor with zero
+through 64 type parameters, all of them key arguments, and no requirements or
+old extra arguments. Each type key must already be complete according to the
+supported metadata-state profile. Class contexts, packs, constrained signatures,
+witness-table equivalence and newer descriptor extensions remain unsupported.
+The pattern must have a null completion function and the matching value metadata
+kind. Deferred completion, dependency scheduling and allocation cycles require
+separate support; a usable VWT alone does not establish transitive completeness.
+
+An owned cache holds up to 64 descriptor/type-key combinations. Equal argument
+values in different vectors select the same specialization; different descriptors
+or type keys select different entries. The instantiator runs once for each new
+key, outside the runtime registry lock. Other callers wait on that entry's mutex,
+also outside the registry lock, then receive the same complete result. This
+includes nonblocking requests, which must still wait for allocation to finish.
+All eight supported metadata request forms return state zero for this profile.
+Callbacks can perform runtime lookup and instantiate another supported key;
+same-thread recursive allocation of the current key fails explicitly.
+
+Before publication, the result must have the matching value kind, descriptor and
+generic arguments, plus an initialized VWT with valid alignment/stride and size
+up to 1 MiB. Malformed results are recorded as failed entries and never returned
+or instantiated again. Cache exhaustion rejects new keys while keeping existing
+entries usable. Unsupported requests, signatures, patterns, type keys and numeric
+pointer forms fail before instantiation.
+
+Descriptors, patterns, arguments and returned metadata remain borrowed. The cache
+does not overwrite the descriptor's private cache storage, retain type arguments,
+take ownership of callback results, or invoke value witnesses, completion or ARC.
+One mapping holds the cache and mutex storage; successful lookups allocate no V
+heap objects. Cached complete results are recognized by `_swift_checkMetadataState`,
+including results created by the otherwise incomplete generic-value allocator.
+Teardown requires all users to drain, destroys each cache mutex and unmaps cache
+storage before metadata providers retire. Borrowed metadata stays with its owner.
+
+```sh
+v run tests/ios/native-checks.v build-generic-metadata
+```
+
+Evidence is retained under `build/ios/fortnite/generic-metadata-checks`, including
+the [Swift 5.10 generic metadata runtime](https://github.com/swiftlang/swift/blob/swift-5.10-RELEASE/stdlib/public/runtime/Metadata.cpp)
+and metadata/ABI declarations. Native comparisons cover both value kinds,
+zero/one/three/64 type keys, all request forms, exact response registers,
+argument-vector identity independence and one instantiation across eight readers.
+Readonly descriptors, patterns and argument vectors sit at protected boundaries;
+raw ARM64 callers preserve x20/x21/x22 with an inaccessible indirect-result pointer.
+Compatibility checks also cover runtime lookup from another thread during a
+callback, nested instantiation, recursive-allocation rejection, malformed results,
+the 64-entry limit, readonly borrowed results and two drained/unmapped lifetimes.
+
+Eight normal/deterministic ASan/UBSan runs passed with both C++ configurations,
+including metadata-state and generic-value allocation regressions. The ARM64
+fixture, launch probe and both import audits passed their checks. Eight compressed
+binary/generated-C pairs and five C/ARM64 reviews retain the tested cache,
+allocation, locking and teardown paths.
+
+Static inspection traces this required import through GOT cell `0x10dc9bb50`,
+stub `0x10c63ec04`, branch island `0x107c28d3c` and caller `0x1000737e8`.
+The caller assembles three generic arguments on the stack and forwards the
+descriptor in x2. No application code is executed by the inspection.
+
+The next missing import is `_swift_getInitializedObjCClass`, at GOT cell
+`0x10dc9bb58`, stub `0x10c63ec10` and branch island `0x107c284ac`. Static
+inspection found 18 consumer/forwarder sites, including calls with Foundation
+class imports and app class addresses. Swift-mediated Objective-C class
+initialization remains unsupported. Application entry remains unreached and
+Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,969 | 192 | 78 |
+| Fortnite executable | 1,970 | 191 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,809 | 195 | 114 |
+| All images | 2,810 | 194 | 114 |
 
-The C++/GLES/Text variant reports 2,823 resolved imports, 181 unresolved strong
+The C++/GLES/Text variant reports 2,824 resolved imports, 180 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

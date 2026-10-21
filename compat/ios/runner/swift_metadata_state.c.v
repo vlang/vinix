@@ -7,9 +7,10 @@ fn (_ &SwiftMetadataStateFailure) code() int { return 1 }
 __global swift_metadata_state_failure_value = SwiftMetadataStateFailure{}
 fn swift_metadata_state_failure() IError { return unsafe { &swift_metadata_state_failure_value } }
 
-// These constructors publish complete metadata. Match exact owned identities;
-// an external generic descriptor or a usable VWT does not prove completion.
+// These constructors and cache publications establish complete metadata. Match
+// exact registered identities; an external descriptor or usable VWT is not proof.
 fn swift_metadata_state_known_complete_locked(metadata u64) bool {
+	if swift_generic_metadata_complete_locked(metadata) { return true }
 	base := metadata - 8
 	if ios_runtime.swift_dictionary_metadata_arena != 0 && !ios_runtime.swift_dictionary_metadata_retired
 		&& base in ios_runtime.swift_dictionary_metadata { return true }
@@ -44,9 +45,9 @@ fn swift_metadata_state_checked(request u64, metadata u64) !SwiftAssociatedMetad
 	defer { C.ios_objc_initialize_unlock() }
 	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired
 		|| ios_runtime.swift_generic_value_retired { return swift_metadata_state_failure() }
-	// Allocation establishes identity, not a cache entry or completion state.
-	if metadata - 8 in ios_runtime.swift_generic_value_allocations { return swift_metadata_state_failure() }
 	if swift_metadata_state_known_complete_locked(metadata) { return SwiftAssociatedMetadata{metadata:metadata} }
+	// Allocation alone establishes identity, not a cache entry or completion state.
+	if metadata - 8 in ios_runtime.swift_generic_value_allocations { return swift_metadata_state_failure() }
 	kind := read64(metadata)
 	if kind in [u64(0x302),0x303,0x304,0x305,0x306]! { return SwiftAssociatedMetadata{metadata:metadata} }
 	if metadata > ~u64(0) - 16 { return swift_metadata_state_failure() }
