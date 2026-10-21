@@ -310,7 +310,7 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		}
 		*(&voidptr(debug_target)) = *(&voidptr(debug_host))
 		options := &WsOption(C.alloca(16 * sizeof(WsOption)))
-		buffer := &char(C.alloca(32768))
+		buffer := &char(C.alloca(40960))
 		C.snprintf(buffer, 8192, c'-Djava.class.path=%s/usr/lib/java/dex/android_translation_layer/api-impl.jar:%s/usr/lib/java/dex/android_translation_layer/framework-res.apk', root, root)
 		options[0] = WsOption{buffer, nil}
 		C.snprintf(&buffer[8192], 8192, c'-Datl.app.class.path=%s', apk)
@@ -324,12 +324,20 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		options[4] = WsOption{c'-Xcheck:jni', nil}
 		options[5] = WsOption{c'-Xnoimage-dex2oat', nil}
 		options[6] = WsOption{c'-Xusejit:false', nil}
-		mut args := WsVmArgs{ version: 0x10006, count: 7, options: options }
+		// ART's upstream ANDROID_ROOT fallback concatenates "dex2oat"
+		// directly to the root. Use the executable in our private runtime.
+		C.snprintf(&buffer[32768], 8192, c'-Xcompiler:%s/usr/bin/dex2oat', root)
+		options[7] = WsOption{&buffer[32768], nil}
+		options[8] = WsOption{c'exit', voidptr(ws_vm_exit)}
+		mut args := WsVmArgs{ version: 0x10006, count: 9, options: options }
 		create := CreateVM(C.dlsym(art, c'JNI_CreateJavaVM'))
 		if create(&ws.vm, &ws.e, &args) != 0 { return 1 }
+		ws_start_diagnostics(ws.vm)
 		e := ws.e
 		C.snprintf(&buffer[24576], 8192, c'%s/usr/lib/art/libvinix-android-native.so', root)
 		if !ws_load_jni(e, &buffer[24576]) { return 1 }
+		ws_install_exception_reporter(e)
+		if ws_failure(e, c'ANDROID-WS-FAIL exception reporter') { return 1 }
 		if register_activity(e) != 0 || register_action_bar(e) != 0 || register_menu(e) != 0 || register_menu_item(e) != 0 || register_menu_click(e) != 0 || register_theme(e) != 0 || register_view(e) != 0 || register_list_click(e) != 0 || register_search(e) != 0 || register_search_callbacks(e) != 0 || register_simple_cursor(e) != 0 || register_charsets(e) != 0 {
 			ws_failure(e, c'ANDROID-WS-FAIL framework')
 			return 1

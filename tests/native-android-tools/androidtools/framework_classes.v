@@ -57,6 +57,10 @@ pub fn framework_extra_classes(source string) map[string]string {
 }
 
 pub fn write_framework_classes(smali string) ! {
+ os.write_file(smali + '/android/atl/VinixUncaughtException.smali',
+  '.class public final Landroid/atl/VinixUncaughtException;\n.super Ljava/lang/Object;\n.implements Ljava/lang/Thread$UncaughtExceptionHandler;\n' +
+  '.method public constructor <init>()V\n.locals 0\ninvoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void\n.end method\n' +
+  '.method public native uncaughtException(Ljava/lang/Thread;Ljava/lang/Throwable;)V\n.end method\n')!
  framework_async_trace(smali)!
  framework_application_uid(smali)!
  framework_content_clients(smali)!
@@ -152,6 +156,11 @@ fn framework_async_trace(smali string) ! {
    '.method public static ' + signature + '\n.locals 2\nconst-wide/16 v0, 0x1000\n' +
    'invoke-static {v0, v1, p0, p1}, Landroid/os/Trace;->' + target + '(JLjava/lang/String;I)V\nreturn-void\n.end method')!
  }
+ // This provider has no tracing backend: cacheEnabledTags always returns zero.
+ // The API 29 counter therefore records nothing, including for 64-bit values.
+ // Do not narrow it through the older traceCounter(..., int) overload.
+ text = framework_replace_method(text, 'setCounter(Ljava/lang/String;J)V',
+  '.method public static setCounter(Ljava/lang/String;J)V\n.locals 0\nreturn-void\n.end method')!
  os.write_file(path, text)!
 }
 

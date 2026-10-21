@@ -102,6 +102,7 @@ android/os/MessageQueue|nativeWake|ws_queue_wake(p0)
 android/os/MessageQueue|nativePollOnce|return ws_queue_poll(p0,p1)
 android/os/MessageQueue|nativeIsIdling|return if p0 == 0 { u8(0) } else { u8((&WsQueue(p0)).idling) }
 android/util/Log|println_native|return ws_log(e,p2,p3)
+android/atl/VinixUncaughtException|uncaughtException|ws_uncaught(e,p0,p1)
 android/view/Window|set_jobject|// The Activity owns its Java Window.
 android/view/Window|set_widget_as_root|ws_mark()
 android/view/Window|set_layout|ws_mark()

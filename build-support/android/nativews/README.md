@@ -125,6 +125,12 @@ dimensions default to 480 by 640 and can be supplied through
 activity name. `ANDROID_APP_DATA_DIR` overrides the per-APK directory under
 `$XDG_DATA_HOME/vinix/android`. `VINIX_ANDROID_TRACE_TEXT` and
 `VINIX_ANDROID_TRACE_TREE` enable test-only diagnostic logging of app content.
+`VINIX_ANDROID_TRACE_THREADS` logs Java thread stacks every 30 seconds for the
+first five minutes, including before the main Looper starts. Its diagnostic
+worker attaches as an ART daemon and keeps a separate JNI environment.
+Uncaught Java exceptions are printed before the app's crash handler runs;
+the app's handler still receives the exception. Thread tracing also records
+VM-requested exits with their Java stacks.
 
 The verified subset covers Arity calculation, Editor save/reopen and Open
 Sudoku touch entry/database persistence. Advanced Canvas paths/transforms,

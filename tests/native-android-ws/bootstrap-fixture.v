@@ -101,6 +101,12 @@ throw v0') +
 		}
 		os.write_file(smali + '/' + name + '.smali', source)!
 	}
+	os.write_file(smali + '/CrashProbe.smali',
+		'.class public Lorg/vinix/bootstrap/CrashProbe;\n.super Ljava/lang/Thread;\n' +
+		'.implements Ljava/lang/Thread$UncaughtExceptionHandler;\n.field public handled:Z\n' +
+		constructor('java/lang/Thread', '') +
+		method('public run()V', 'new-instance v0, Ljava/lang/IllegalStateException;\nconst-string v1, "expected fixture exception"\ninvoke-direct {v0, v1}, Ljava/lang/IllegalStateException;-><init>(Ljava/lang/String;)V\nthrow v0') +
+		method('public uncaughtException(Ljava/lang/Thread;Ljava/lang/Throwable;)V', 'const/4 v0, 1\niput-boolean v0, p0, Lorg/vinix/bootstrap/CrashProbe;->handled:Z\nreturn-void'))!
 	main_class := '.class public Lorg/vinix/bootstrap/Main;\n.super Landroid/app/Activity;\n' +
 		'.implements Landroid/widget/CompoundButton$OnCheckedChangeListener;\n.field private changes:I\n.field private static surface:Landroid/view/SurfaceView;\n' +
 		constructor('android/app/Activity', 'const/4 v0, 4\ninvoke-static {v0}, Lorg/vinix/bootstrap/App;->check(I)V') +
@@ -164,6 +170,23 @@ throw v0') +
 		'.method public static native nativeLibc()Z\n.end method\n' +
 		'.method public static native nativeTls()Z\n.end method\n' +
 		'.method public static native nativeDependency()I\n.end method\n' +
+		method('private static exceptionReporterCheck()V', '
+new-instance v0, Lorg/vinix/bootstrap/CrashProbe;
+invoke-direct {v0}, Lorg/vinix/bootstrap/CrashProbe;-><init>()V
+invoke-virtual {v0, v0}, Ljava/lang/Thread;->setUncaughtExceptionHandler(Ljava/lang/Thread$UncaughtExceptionHandler;)V
+invoke-virtual {v0}, Ljava/lang/Thread;->start()V
+invoke-virtual {v0}, Ljava/lang/Thread;->join()V
+iget-boolean v1, v0, Lorg/vinix/bootstrap/CrashProbe;->handled:Z
+if-nez v1, :ok
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "Exception reporter must preserve application crash handlers"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0
+:ok
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-EXCEPTIONS-PASS app-handler-preserved"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void') +
 		method('private static packagePresenceCheck(Landroid/content/Context;)V', '
 invoke-virtual {p0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
 move-result-object v0
@@ -477,6 +500,10 @@ const-string v0, "bootstrap-async"
 const/16 v1, 42
 invoke-static {v0, v1}, Landroid/os/Trace;->beginAsyncSection(Ljava/lang/String;I)V
 invoke-static {v0, v1}, Landroid/os/Trace;->endAsyncSection(Ljava/lang/String;I)V
+const-wide v1, 0x7fffffffffffffffL
+invoke-static {v0, v1, v2}, Landroid/os/Trace;->setCounter(Ljava/lang/String;J)V
+const-wide v1, -0x8000000000000000L
+invoke-static {v0, v1, v2}, Landroid/os/Trace;->setCounter(Ljava/lang/String;J)V
 invoke-static {}, Landroid/os/Trace;->isEnabled()Z
 move-result v0
 if-nez v0, :bad
@@ -520,6 +547,7 @@ const-string v1, "BOOTSTRAP-API-PASS async-trace application-uids"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->assetListCheck(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->packagePresenceCheck(Landroid/content/Context;)V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->exceptionReporterCheck()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->timezoneCheck()V
 new-instance v0, Landroid/graphics/Matrix;
 invoke-direct {v0}, Landroid/graphics/Matrix;-><init>()V
