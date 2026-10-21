@@ -238,6 +238,7 @@ fn swift_buffers_stop() {
 	unsafe { ios_runtime.swift_strings.free() }
 	swiftui_localized_key_stop()
 	swift_array_storage_stop()
+	swift_error_allocation_stop()
 	swift_heap_stop()
 	swift_json_encoder_stop()
 	swift_json_decoder_stop()
@@ -305,11 +306,11 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_$sBOWV' { swift_unknown_value_witnesses() }
 		'_$sBbWV' { swift_bridge_value_witnesses() }
 		'_$sSDMa' { swift_dictionary_metadata_arena() }
-		// Darwin SwiftError owners use Cocoa ARC, including boxed Swift errors
-		// and toll-free NSError/CFError objects. These entries use ordinary C
-		// calls, rather than Swift's strong-word or bridge-object encoding.
-		'_swift_errorRetain' { u64(unsafe { voidptr(objc_retain) }) }
-		'_swift_errorRelease' { u64(unsafe { voidptr(objc_release) }) }
+		// Error entries use ordinary C calls. Dispatch generic boxes to their
+		// native heap lifetime and toll-free NSError/CFError owners to Cocoa ARC.
+		'_swift_errorRetain' { u64(unsafe { voidptr(swift_error_retain) }) }
+		'_swift_errorRelease' { u64(unsafe { voidptr(swift_error_release) }) }
+		'_swift_allocError' { u64(unsafe { voidptr(swift_error_allocate) }) }
 		'_swift_initStackObject' { u64(unsafe { voidptr(swift_stack_initialize) }) }
 		'_swift_allocObject' { u64(unsafe { voidptr(swift_heap_allocate) }) }
 		'_swift_deallocObject' { u64(unsafe { voidptr(swift_heap_deallocate) }) }

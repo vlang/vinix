@@ -2137,12 +2137,12 @@ The heap probe now exits with status 1 before entry at EOSSDK's
 real CFError reference counts and final domain disposal. Full regression remains
 unpassed, and the five published runners retain their last passing hashes.
 
-V now supplies `_swift_errorRetain` and `_swift_errorRelease` through the existing
-Objective-C ownership functions, matching Darwin's ordinary C error ARC ABI.
+V supplies `_swift_errorRetain` and `_swift_errorRelease` with Darwin's ordinary
+C error ARC ABI. Toll-free owners use the existing Objective-C ownership functions;
+generic value boxes use the native heap lifetime described below.
 Error retain returns the same owner; final release runs the existing dealloc,
-weak-slot and owned-field cleanup. These exports add no Swift arenas, allocation
-registries or ARC adapters. Native Swift error boxes remain unsupported;
-the CFError extraction support below adds concrete Error protocol witnesses.
+weak-slot and owned-field cleanup. The CFError extraction support below adds
+concrete Error protocol witnesses without allocating generic error boxes.
 
 Installed SwiftCore and V error ARC, String and typed Array suites pass
 ASAN/UBSAN in both seed modes. Error checks cover real native CFErrors, reference
@@ -2169,8 +2169,9 @@ borrows a live VinixCFError into caller scratch and returns that address, its
 canonical type metadata and a complete Error witness table. The four witnesses
 return an owned domain String, signed code, owned user-info dictionary and owned
 embedded error. Long domain text is copied into owned Swift storage so it remains
-valid after the error and its NSString are destroyed. Native Swift error boxes,
-arbitrary NSError subclasses and general conformance discovery remain unsupported.
+valid after the error and its NSString are destroyed. Generic value boxes return
+their borrowed payload directly, as described below. Arbitrary NSError subclasses
+and general conformance discovery remain unsupported.
 
 Objective-C class metadata uses sealed wrapper kind `0x305`, the actual registered
 class pointer and a complete eight-byte reference value witness table. Swift
@@ -15183,17 +15184,60 @@ in `x1`. Generic Swift error allocation remains unsupported. No application
 code was executed; application entry remains unreached and Fortnite is still
 unplayable.
 
+`_swift_allocError` now returns an opaque owner and aligned payload address in
+`x0`/`x1`. A null source leaves payload construction to the caller; otherwise
+the supplied value is copied or taken through its value witnesses. The existing
+complete-value layout checks bound payloads to 64 KiB and alignment 256. Value
+metadata and the supplied Error conformance remain borrowed for the box's lifetime.
+The payload must be initialized before the final release.
+
+Generic boxes use the existing native Swift heap registry and ARC states.
+Error retain/release and Error existential copy/assignment witnesses distinguish
+these boxes from toll-free NSError/CFError owners. Final release marks the owner
+as deinitializing, calls its payload destructor outside the registry lock, then
+removes and frees both allocation records. Initializer callbacks also run outside
+that lock. `_swift_getErrorValue` borrows the payload, metadata and supplied
+Error witness directly and leaves scratch untouched, including absent or guarded
+scratch. CFError extraction keeps its existing scratch representation. The
+private box metadata retires only after error owners and callbacks drain.
+
+```sh
+v run tests/ios/native-checks.v build-error-allocation
+```
+
+Generic error-to-NSError bridging, lazy domain/code/userInfo caches, Error dynamic
+casts and arbitrary application class payload metadata remain separate work.
+
+Evidence is retained under `build/ios/fortnite/error-allocation-checks`.
+Native comparisons cover 54 uninitialized/copy/take cases over Int, String,
+empty `_MergeError` and custom owned values through 64 KiB/alignment 256.
+Checks cover protected source and scratch, exact initializer/destructor calls,
+payload retains/releases, borrowed extraction, Error existential assignments,
+eight cold allocation workers, shared-owner ARC and reentrant callbacks, with
+two drained/unmapped lifetimes. Eight normal/deterministic ASan/UBSan runs
+passed with both C++ configurations, including existing CFError ownership and
+extraction regressions. The ARM64 fixture, launch probe and both import audits
+passed; eight binary/generated-C pairs and five C/ARM64 reviews are retained.
+
+The next missing import is `_swift_allocateGenericValueMetadata`, at GOT cell
+`0x10dc9bab8` and stub `0x10c63eb20`. Static V/Mach-O/LLVM inspection found four
+allocation wrappers and the branch-island forwarder at `0x107c28d34`. The
+wrappers place eight or sixteen in `w3` before tail-calling the allocator.
+General generic value metadata allocation remains unsupported. No application
+code was executed; application entry remains unreached and Fortnite is still
+unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,958 | 203 | 78 |
+| Fortnite executable | 1,959 | 202 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,798 | 206 | 114 |
+| All images | 2,799 | 205 | 114 |
 
-The C++/GLES/Text variant reports 2,812 resolved imports, 192 unresolved strong
+The C++/GLES/Text variant reports 2,813 resolved imports, 191 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
