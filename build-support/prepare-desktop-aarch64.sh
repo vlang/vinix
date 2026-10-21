@@ -85,28 +85,8 @@ if ! x11_ready; then
         "$SCRIPT_DIR/build-aarch64-x11"
     NEED_X11=1
 fi
-if [ -n "${VINIX_UI2_SOURCE:-}" ]; then
-    UI2_SOURCE="$VINIX_UI2_SOURCE"
-elif [ -f "$SCRIPT_DIR/../ui2/v.mod" ]; then
-    UI2_SOURCE="$SCRIPT_DIR/../ui2"
-else
-    UI2_SOURCE="$SCRIPT_DIR/third_party/ui2"
-    if [ ! -f "$UI2_SOURCE/v.mod" ]; then
-        if [ -e "$UI2_SOURCE" ]; then
-            echo "ERROR: ui2 directory is incomplete: $UI2_SOURCE" >&2
-            exit 1
-        fi
-        echo "==> Fetching ui2 for the desktop..."
-        mkdir -p "$SCRIPT_DIR/third_party"
-        git clone --depth 1 https://github.com/vlang/ui2 "$UI2_SOURCE"
-    fi
-fi
-if [ ! -f "$UI2_SOURCE/v.mod" ] || [ ! -f "$UI2_SOURCE/ui/vml_compiled.v" ] ||
-   [ ! -f "$UI2_SOURCE/examples/calculator/calculator.vml" ]; then
-    echo "ERROR: ui2 checkout needs current compile-time VML support: $UI2_SOURCE" >&2
-    echo "Update that checkout before running the desktop." >&2
-    exit 1
-fi
+UI2_SOURCE="$(sh "$SCRIPT_DIR/build-support/run-v-tool.sh" \
+    "$SCRIPT_DIR/build-support/resolve-ui2.v" "$SCRIPT_DIR")"
 
 build_userland() {
     VINIX_AARCH64_USERLAND_BUILD_DIR="$USERLAND_BUILD_DIR" \
