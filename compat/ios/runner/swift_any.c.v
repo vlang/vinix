@@ -27,8 +27,9 @@ fn swift_any_box_checked(owner u64,metadata u64,size u64) ! {
 	box_metadata := swift_any_box_metadata_checked(metadata)!
 	C.ios_objc_initialize_lock()
 	storage := ios_runtime.swift_heap[owner] or { C.ios_objc_initialize_unlock();return swift_any_failure() }
-	valid := !storage.deiniting && storage.metadata == box_metadata && storage.size == size + 16
-		&& storage.mask == 7 && read64(owner) == box_metadata
+	valid := !storage.deiniting && read64(owner) == storage.metadata
+		&& ((storage.metadata == box_metadata && storage.size == size + 16 && storage.mask == 7)
+			|| swift_box_matches(storage,metadata,size))
 	C.ios_objc_initialize_unlock()
 	if !valid { return swift_any_failure() }
 }

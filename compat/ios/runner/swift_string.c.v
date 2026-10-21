@@ -242,6 +242,7 @@ fn swift_buffers_stop() {
 	swift_array_storage_stop()
 	swift_error_allocation_stop()
 	swift_heap_stop()
+	swift_box_stop()
 	swift_json_encoder_stop()
 	swift_json_decoder_stop()
 	swift_json_date_stop()
@@ -335,6 +336,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_swift_initStaticObject' { u64(unsafe { voidptr(swift_static_initialize) }) }
 		'_swift_initStructMetadata' { u64(unsafe { voidptr(swift_struct_initialize) }) }
 		'_swift_allocObject' { u64(unsafe { voidptr(swift_heap_allocate) }) }
+		'_swift_makeBoxUnique' { u64(unsafe { voidptr(swift_box_unique) }) }
 		'_swift_deallocObject' { u64(unsafe { voidptr(swift_heap_deallocate) }) }
 		'_swift_deallocClassInstance' { u64(unsafe { voidptr(swift_heap_deallocate_class) }) }
 		'_swift_deallocPartialClassInstance' { u64(unsafe { voidptr(swift_partial_class) }) }

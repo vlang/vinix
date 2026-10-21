@@ -322,6 +322,9 @@ mut:
 	swift_error_allocation_arena u64 // Private heap destructor and immutable error box metadata.
 	swift_error_allocation_retired bool
 	swift_errors map[u64]SwiftErrorStorage // Owned generic Error payloads; metadata/witnesses are borrowed.
+	swift_box_code u64 // Shared Swift-self destructor thunk for generic value boxes.
+	swift_box_metadata map[u64]SwiftBoxMetadata // Sealed per-value-type descriptors, under the registry lock.
+	swift_box_retired bool
 	swift_generic_value_allocations map[u64]u64 // Fresh mutable metadata mappings, retained until quiescent teardown.
 	swift_generic_value_retired bool
 	swift_generic_metadata_arena u64 // Bounded cache; returned metadata remains owned by its instantiator.

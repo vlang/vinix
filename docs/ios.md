@@ -16318,20 +16318,56 @@ branch island `0x107c284b0` to six lookup thunks. Their descriptor vtables conta
 one, three or four methods, with offsets measured from each metadata address
 point. This inspection executes no application code.
 
+`_swift_makeBoxUnique` now resolves from Swift Core. Unique boxes preserve their
+owner and payload without writing to the value buffer. Shared boxes allocate a
+generic box, initialize its payload through the value's copy witness, publish the
+new owner and release the old one. The ARM64 result returns the owner and payload
+in `x0` and `x1`. Compiler-local and generic boxes are supported for registered
+heap storage and copyable values up to 64 KiB with alignment up to 256 bytes.
+Value metadata and witnesses remain borrowed and immutable through teardown.
+
+Generic descriptors are cached per value type in read-only mappings. A shared
+executable destructor thunk invokes the exact value destructor and deallocates
+the box with its original size and alignment. Witness callbacks run outside the
+registry lock. Any's buffer operations accept these cached generic boxes with
+the exact value type and layout. Shutdown requires drained owners and readers
+before retiring the descriptor cache and code mapping.
+
+```sh
+v run tests/ios/native-checks.v build-box-unique
+```
+
+Evidence is retained under `build/ios/fortnite/box-unique-checks`. Native Swift
+comparisons cover 36 guarded unique/shared cases with Int, String, Void and
+owned custom values through the supported size and alignment limits. Checks
+cover a read-only unique buffer, inaccessible `x8`, saved ARM64 registers,
+canonical metadata reuse and exact copy/destruction counts. The Vinix fixture
+also covers Any interoperability, eight cold workers with reentrant callbacks,
+bounded invalid-input rejection and two drained, unmapped runtime lifetimes.
+Ten normal/deterministic ASan/UBSan runs passed across both C++ configurations
+and heap, error-allocation and Any regressions. The ARM64 fixture, launch probe
+and both import audits passed their checks. Nine compressed binary/generated-C
+pairs and five C/ARM64 reviews retain the tested paths.
+
+Static inspection traces GOT cell `0x10dc9bbe8` through stub `0x10c63ecdc` and
+branch island `0x107c284b4` to caller `0x100064fe0`. The caller derives the
+alignment mask from the value witness flags and uses the payload returned in
+`x1`. This inspection executes no application code.
+
 The launch probe now stops at required Swift Core import
-`_swift_makeBoxUnique`, before application entry. Fortnite remains unplayable.
+`_swift_setDeallocating`, before application entry. Fortnite remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,982 | 179 | 78 |
+| Fortnite executable | 1,983 | 178 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,822 | 182 | 114 |
+| All images | 2,823 | 181 | 114 |
 
-The C++/GLES/Text variant reports 2,836 resolved imports, 168 unresolved strong
+The C++/GLES/Text variant reports 2,837 resolved imports, 167 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
