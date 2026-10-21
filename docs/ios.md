@@ -14261,17 +14261,52 @@ found GOT cell `0x10dc9b958`, stub `0x10c63aecc`, branch-island forwarder
 `0x107c284f0` and calls at `0x100065be8` and `0x10006ecbc`. Application
 entry remains unreached; Fortnite is still unplayable.
 
+`_$ss22KeyedEncodingContainerV6encode_6forKeyySS_xtKF` now forwards String
+encoding to the container box's virtual slot 112. It borrows the String in
+`x0/x1`, key in `x2` and one-word container in `x20`; container metadata in
+`x3` supplies K in `x3/x8` and K:CodingKey in `x4`. The entry restores the
+caller's `x20` and forwards the override's exact `x21` error. It does not read
+key bytes, String storage or refcounts, or add ARC, allocation or another owner.
+The existing sealed dispatch page owns and retires the entry.
+
+The native comparison checks all sixteen placements of the exact readable
+container/header/metadata/slot spans at protected boundaries, inline and long
+Strings, inaccessible String storage, success/error channels and scalar/vector
+forwarding. Eight cold publishers/readers and two drained/unmapped lifetimes
+exercise the compatibility entry. Keyed String decoding, RawRepresentable Int
+encoding and JSONEncoder virtual dispatch provide regression coverage. The
+default JSON encoding backend remains unsupported.
+
+```sh
+v run tests/ios/native-checks.v build-keyed-string-encoding
+```
+
+Evidence is retained under `build/ios/fortnite/keyed-string-encoding-checks`.
+
+The normal and deterministic ASan/UBSan checks passed with and without the
+C++ backend and for all three regressions (ten runs). The ARM64 fixture,
+launch probe and both import audits passed. Generated C and ARM64 review found
+no hidden temporary allocations in the forwarding/resolution paths or shared
+page setup. Nine binary/generated-C archive pairs are retained.
+
+The next launch blocker is keyed Int encoding:
+`_$ss22KeyedEncodingContainerV6encode_6forKeyySi_xtKF`. Read-only inspection
+found GOT cell `0x10dc9b960`, stub `0x10c63aed8`, branch-island forwarder
+`0x107c284f8` and calls at `0x100065c80`, `0x10006ac7c`, `0x10006f210`
+and `0x10007311c`. Application entry remains unreached; Fortnite is still
+unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,933 | 228 | 78 |
+| Fortnite executable | 1,934 | 227 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,773 | 231 | 114 |
+| All images | 2,774 | 230 | 114 |
 
-The C++/GLES/Text variant reports 2,787 resolved imports, 217 unresolved strong
+The C++/GLES/Text variant reports 2,788 resolved imports, 216 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
