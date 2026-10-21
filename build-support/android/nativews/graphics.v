@@ -36,6 +36,7 @@ mut:
 
 struct WsPaint {
 mut:
+	font &WsFont
 	color        u32 = 0xff000000
 	size         f32 = 16
 	stroke       f32 = 1
@@ -150,9 +151,10 @@ fn ws_codepoint(text &u8, length usize, position &usize) i32 {
 	}
 }
 
-fn ws_text_width(text &char, size f32) f32 {
-	if ws_font == unsafe { nil } { return 0 }
-	scale := C.stbtt_ScaleForPixelHeight(ws_font, size)
+fn ws_text_width(text &char, size f32, font &WsFont) f32 {
+ info := ws_font_info(font)
+	if info == unsafe { nil } { return 0 }
+	scale := C.stbtt_ScaleForPixelHeight(info, size)
 	length := C.strlen(text)
 	mut pos := usize(0)
 	mut width := f32(0)
@@ -160,16 +162,17 @@ fn ws_text_width(text &char, size f32) f32 {
 		code := ws_codepoint(unsafe { &u8(text) }, length, &pos)
 		mut advance := i32(0)
 		mut bearing := i32(0)
-		C.stbtt_GetCodepointHMetrics(ws_font, code, &advance, &bearing)
+		C.stbtt_GetCodepointHMetrics(info, code, &advance, &bearing)
 		width += f32(advance) * scale
 	}
 	return width
 }
 
-fn ws_text(text &char, x f32, baseline f32, size f32, color u32) {
+fn ws_text(text &char, x f32, baseline f32, size f32, color u32, font &WsFont) {
+ info := ws_font_info(font)
 	mut draw := ws_draw_state()
-	if ws_font == unsafe { nil } { return }
-	scale := C.stbtt_ScaleForPixelHeight(ws_font, size * draw.transform.sy)
+	if info == unsafe { nil } { return }
+	scale := C.stbtt_ScaleForPixelHeight(info, size * draw.transform.sy)
 	mut position := usize(0)
 	length := C.strlen(text)
 	mut pen := x * draw.transform.sx + draw.transform.x
@@ -185,7 +188,7 @@ fn ws_text(text &char, x f32, baseline f32, size f32, color u32) {
 		mut height := i32(0)
 		mut xo := i32(0)
 		mut yo := i32(0)
-		bitmap := C.stbtt_GetCodepointBitmap(ws_font, scale, scale, code, &width, &height, &xo, &yo)
+		bitmap := C.stbtt_GetCodepointBitmap(info, scale, scale, code, &width, &height, &xo, &yo)
 		for row := i32(0); row < height; row++ {
 			for column := i32(0); column < width; column++ {
 				unsafe { ws_blend(i32(pen) + xo + column, i32(line) + yo + row, color, u32(bitmap[row * width + column])) }
@@ -194,7 +197,7 @@ fn ws_text(text &char, x f32, baseline f32, size f32, color u32) {
 		C.stbtt_FreeBitmap(bitmap, unsafe { nil })
 		mut advance := i32(0)
 		mut bearing := i32(0)
-		C.stbtt_GetCodepointHMetrics(ws_font, code, &advance, &bearing)
+		C.stbtt_GetCodepointHMetrics(info, code, &advance, &bearing)
 		pen += f32(advance) * scale
 	}
 }
@@ -210,6 +213,7 @@ fn ws_paint_new() i64 {
 fn ws_paint_clone(pointer i64) i64 {
 	paint := ws_paint_new()
 	C.memcpy(voidptr(paint), voidptr(pointer), sizeof(WsPaint))
+ unsafe { ws_font_ref((&WsPaint(paint)).font) }
 	return paint
 }
 
@@ -219,7 +223,7 @@ fn ws_bounds(e voidptr, pointer i64, text voidptr, bounds voidptr) {
 		chars := ws_utf(e, text)
 		put_int(e, bounds, c'android/graphics/Rect', c'left', 0)
 		put_int(e, bounds, c'android/graphics/Rect', c'top', -i32(paint.size * 0.8))
-		put_int(e, bounds, c'android/graphics/Rect', c'right', i32(ws_text_width(chars, paint.size)))
+		put_int(e, bounds, c'android/graphics/Rect', c'right', i32(ws_text_width(chars, paint.size, paint.font)))
 		put_int(e, bounds, c'android/graphics/Rect', c'bottom', i32(paint.size * 0.2))
 		ws_release(e, text, chars)
 	}
@@ -276,7 +280,7 @@ fn ws_canvas_text(e voidptr, text voidptr, x f32, y f32, pointer i64) {
 	unsafe {
 		paint := &WsPaint(pointer)
 		chars := ws_utf(e, text)
-		width := ws_text_width(chars, paint.size)
+		width := ws_text_width(chars, paint.size, paint.font)
 		start := if paint.align == 1 {
 			x - width / 2
 		} else if paint.align == 2 {
@@ -284,7 +288,7 @@ fn ws_canvas_text(e voidptr, text voidptr, x f32, y f32, pointer i64) {
 		} else {
 			x
 		}
-		ws_text(chars, start, y, paint.size, paint.color)
+		ws_text(chars, start, y, paint.size, paint.color, paint.font)
 		ws_release(e, text, chars)
 	}
 }

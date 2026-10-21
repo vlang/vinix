@@ -4,6 +4,7 @@ module atlframework
 
 struct WsView {
 mut:
+ font &WsFont
 	kind           i32 // 0 custom/container, 1 label, 2 button, 3 editable, 4 scroll
 	text           &char
 	hint           &char
@@ -45,7 +46,8 @@ fn ws_view_free(pointer i64) {
 		if pointer == 0 { return }
 		view := &WsView(pointer)
 		ws_window_release(view.window)
-		C.free(view.text)
+		ws_font_unref(view.font)
+ C.free(view.text)
 		C.free(view.hint)
 		C.free(view)
 	}
@@ -125,13 +127,13 @@ fn ws_focus(e voidptr, object voidptr) {
 fn ws_measure(e voidptr, object voidptr, width_spec i32, height_spec i32) {
 	unsafe {
 		view := ws_view(e, object)
-		text_width := i32(ws_text_width(view.text, view.size) + 0.999)
+		text_width := i32(ws_text_width(view.text, view.size, view.font) + 0.999)
 		mut width := text_width + view.padding_left + view.padding_right + 6
 		mut height := i32(view.size * 1.5) + view.padding_top + view.padding_bottom
 		if view.kind == 1 && !view.single_line {
 			limit := if u32(width_spec) >> 30 == 0 { width } else { width_spec & 0x3fffffff }
 			content_width := limit - view.padding_left - view.padding_right - 6
-			layout := ws_text_layout(view.text, view.size, if content_width > 0 { content_width } else { 1 })
+			layout := ws_text_layout(view.text, view.size, if content_width > 0 { content_width } else { 1 }, view.font)
 			mut lines := (&WsTextLayout(layout)).count
 			if lines < view.min_lines { lines = view.min_lines }
 			if view.max_lines > 0 && lines > view.max_lines { lines = view.max_lines }
@@ -171,7 +173,7 @@ fn ws_measure(e voidptr, object voidptr, width_spec i32, height_spec i32) {
 			width = ws.width - 96
 			available := width_spec & 0x3fffffff
 			if u32(width_spec) >> 30 != 0 && width > available { width = available }
-			layout := ws_text_layout(view.text, view.size, width - 6)
+			layout := ws_text_layout(view.text, view.size, width - 6, view.font)
 			height = i32(f32((&WsTextLayout(layout)).count) * view.size * 1.25) + 12
 			if height > ws.height / 2 { height = ws.height / 2 }
 			ws_layout_free(layout)
@@ -254,7 +256,7 @@ fn ws_draw_content(e voidptr, object voidptr) {
 		}
 		if view.kind == 6 {
 			width := integer(e, object, c'android/view/View', c'getWidth', c'()I', nil)
-			layout := ws_text_layout(view.text, view.size, width - 6)
+			layout := ws_text_layout(view.text, view.size, width - 6, view.font)
 			ws_layout_draw(layout, view.color, 3, view.size)
 			ws_layout_free(layout)
 			return
@@ -264,7 +266,7 @@ fn ws_draw_content(e voidptr, object voidptr) {
 		height := integer(e, object, c'android/view/View', c'getHeight', c'()I', nil)
 		if view.kind == 1 {
 			content_width := width - view.padding_left - view.padding_right - 6
-			layout := ws_text_layout(view.text, view.size, if view.single_line { 0 } else if content_width > 0 { content_width } else { 1 })
+			layout := ws_text_layout(view.text, view.size, if view.single_line { 0 } else if content_width > 0 { content_width } else { 1 }, view.font)
 			gravity := integer(e, object, c'android/widget/TextView', c'getGravity', c'()I', nil)
 			alignment := integer(e, object, c'android/view/View', c'getTextAlignment', c'()I', nil)
 			mut lines := (&WsTextLayout(layout)).count
@@ -280,13 +282,13 @@ fn ws_draw_content(e voidptr, object voidptr) {
 				text := (&WsTextLayout(layout)).text
 				end := text[entry.end]
 				text[entry.end] = 0
-				ws_text(&text[entry.start], x, y + f32(line) * view.size * 1.25, view.size, view.color)
+				ws_text(&text[entry.start], x, y + f32(line) * view.size * 1.25, view.size, view.color, view.font)
 				text[entry.end] = end
 			}
 			ws_layout_free(layout)
 			return
 		}
-		text_width := ws_text_width(view.text, view.size)
+		text_width := ws_text_width(view.text, view.size, view.font)
 		if view.kind == 7 || view.kind == 8 {
 			left := f32(view.padding_left + 3)
 			top := (f32(height) - 18) / 2
@@ -306,7 +308,7 @@ fn ws_draw_content(e voidptr, object voidptr) {
 		} else {
 			f32(view.padding_top) + view.size
 		}
-		ws_text(view.text, left, top, view.size, view.color)
+		ws_text(view.text, left, top, view.size, view.color, view.font)
 		if view.kind == 3 && view.focused {
 			ws_rect(left + text_width + 1, top - view.size * 0.8, left + text_width + 2, top + 2, view.color)
 		}

@@ -5,6 +5,7 @@ module main
 
 import os
 import encoding.base64
+import startupfixture
 
 fn checked(args []string) {
 	result := os.exec(args)
@@ -28,6 +29,7 @@ fn main() {
 	output, aapt, resources, tools, java := os.abs_path(os.args[1]), os.abs_path(os.args[2]), os.abs_path(os.args[3]), os.abs_path(os.args[4]), os.args[5]
 	smali := output + '/smali/org/vinix/bootstrap'
 	os.mkdir_all(smali)!
+ startupfixture.install(output, resources)!
 	os.mkdir_all(output + '/lib/arm64-v8a')!
 	os.mkdir_all(output + '/assets')!
 	os.mkdir_all(output + '/assets/nested')!
@@ -664,6 +666,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/Main;->packagePresenceCheck(Landroid/co
 invoke-static {}, Lorg/vinix/bootstrap/Main;->exceptionReporterCheck()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->accountListenerCheck(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->storageClockCheck()V
+invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->timezoneCheck()V
 new-instance v0, Landroid/graphics/Matrix;
 invoke-direct {v0}, Landroid/graphics/Matrix;-><init>()V
@@ -896,8 +899,12 @@ throw v0')
 	os.write_file(output + '/AndroidManifest.xml', manifest)!
 	checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', output + '/smali', '-o',
 		output + '/classes.dex'])
-	checked([aapt, 'link', '-I', resources, '--manifest', output + '/AndroidManifest.xml', '-A',
-		output + '/assets', '-o', output + '/unsigned.apk'])
+ os.mkdir_all(output + '/compiled-res')!
+ checked([aapt, 'compile', '--dir', output + '/res', '-o', output + '/compiled-res'])
+ mut link_args := [aapt, 'link', '-I', resources, '--manifest', output + '/AndroidManifest.xml', '-A',
+  output + '/assets', '-o', output + '/unsigned.apk']
+ link_args << os.walk_ext(output + '/compiled-res', '.flat')
+ checked(link_args)
 	checked(['build-support/compile-v-module', os.abs_path('tests/native-android-ws/assetprobe'),
 		output + '/assetprobe.c', '--arch', 'arm64'])
 	checked(['build-support/compile-v-module', os.abs_path('tests/native-android-ws/dependencyprobe'),

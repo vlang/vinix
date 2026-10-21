@@ -14,6 +14,7 @@ struct WsTextLine {
 
 struct WsTextLayout {
 mut:
+ font &WsFont
 	text     &char
 	size     f32
 	width    i32
@@ -22,11 +23,12 @@ mut:
 	capacity i32
 }
 
-fn ws_glyph_advance(code i32, size f32) f32 {
+fn ws_glyph_advance(code i32, size f32, font &WsFont) f32 {
+ info := ws_font_info(font)
 	mut advance := i32(0)
 	mut bearing := i32(0)
-	C.stbtt_GetCodepointHMetrics(ws_font, code, &advance, &bearing)
-	return f32(advance) * C.stbtt_ScaleForPixelHeight(ws_font, size)
+	C.stbtt_GetCodepointHMetrics(info, code, &advance, &bearing)
+	return f32(advance) * C.stbtt_ScaleForPixelHeight(info, size)
 }
 
 fn ws_layout_line(layout &WsTextLayout, start usize, end usize, first i32, last i32, width f32) {
@@ -66,7 +68,7 @@ fn ws_layout_build(layout &WsTextLayout) {
 				break_next = 0
 				continue
 			}
-			advance := ws_glyph_advance(code, layout.size)
+			advance := ws_glyph_advance(code, layout.size, layout.font)
 			if layout.width > 0 && width > 0 && width + advance > f32(layout.width) {
 				if break_next > start {
 					ws_layout_line(layout, start, break_end, first, break_index, break_width)
@@ -96,10 +98,12 @@ fn ws_layout_build(layout &WsTextLayout) {
 	}
 }
 
-fn ws_text_layout(text &char, size f32, width i32) i64 {
+fn ws_text_layout(text &char, size f32, width i32, font &WsFont) i64 {
 	unsafe {
 		layout := &WsTextLayout(C.calloc(1, sizeof(WsTextLayout)))
-		layout.text = C.strdup(text)
+		layout.font = font
+ ws_font_ref(font)
+ layout.text = C.strdup(text)
 		layout.size = size
 		layout.width = width
 		ws_layout_build(layout)
@@ -110,7 +114,7 @@ fn ws_text_layout(text &char, size f32, width i32) i64 {
 fn ws_layout_new(e voidptr, text voidptr, paint i64, width i32) i64 {
 	chars := ws_utf(e, text)
 	size := unsafe { (&WsPaint(paint)).size }
-	result := ws_text_layout(chars, size, width)
+	result := ws_text_layout(chars, size, width, unsafe { (&WsPaint(paint)).font })
 	ws_release(e, text, chars)
 	return result
 }
@@ -119,7 +123,8 @@ fn ws_layout_free(pointer i64) {
 	unsafe {
 		if pointer == 0 { return }
 		layout := &WsTextLayout(pointer)
-		C.free(layout.text)
+		ws_font_unref(layout.font)
+ C.free(layout.text)
 		C.free(layout.lines)
 		C.free(layout)
 	}
@@ -157,7 +162,7 @@ fn ws_layout_horizontal(pointer i64, offset i32) f32 {
 		mut x := f32(0)
 		for pos < line.end && index < offset {
 			code := ws_codepoint(&u8(layout.text), line.end, &pos)
-			x += ws_glyph_advance(code, layout.size)
+			x += ws_glyph_advance(code, layout.size, layout.font)
 			index += if code > 0xffff { 2 } else { 1 }
 		}
 		return x
@@ -173,7 +178,7 @@ fn ws_layout_offset(pointer i64, requested i32, x f32) i32 {
 		mut advance := f32(0)
 		for pos < line.end {
 			code := ws_codepoint(&u8(layout.text), line.end, &pos)
-			width := ws_glyph_advance(code, layout.size)
+			width := ws_glyph_advance(code, layout.size, layout.font)
 			if advance + width / 2 > x { break }
 			advance += width
 			index += if code > 0xffff { 2 } else { 1 }
@@ -189,7 +194,7 @@ fn ws_layout_draw(pointer i64, color u32, x f32, y f32) {
 			line := layout.lines[i]
 			end := layout.text[line.end]
 			layout.text[line.end] = 0
-			ws_text(&layout.text[line.start], x, y + f32(i) * layout.size * 1.25, layout.size, color)
+			ws_text(&layout.text[line.start], x, y + f32(i) * layout.size * 1.25, layout.size, color, layout.font)
 			layout.text[line.end] = end
 		}
 	}

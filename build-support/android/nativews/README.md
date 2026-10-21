@@ -153,6 +153,19 @@ toolbar without a second runtime header. An image selecting another APK may
 write its label (up to 128 bytes, without a newline) to
 `/usr/share/vinix/android-app-label` for the outer title bar and taskbar.
 
+`Resources.getFont` loads bundled TTF files and the first font in an XML family.
+Paint, text layouts and TextView retain their native font while it is in use,
+including across Paint copies. Provider families with a system fallback use
+the backend's default font; remote font downloads, weight selection and shaping
+remain incomplete. SensorManager reports an empty device list and rejects
+registration because this backend has no sensor driver.
+
+Dynamic receivers support the registration overloads with flags and handlers,
+main-Looper delivery by default, action and package filtering, and unregistering.
+Delivery currently covers broadcasts sent inside the app process. Sticky system
+broadcasts, cross-process delivery and full IntentFilter data matching remain
+incomplete.
+
 The native loader checks mapped extents rather than adding page-rounded segment
 lengths. Shared PT_LOAD pages therefore do not falsely exceed the reserved
 mapping, while out-of-range and overflowing extents still fail validation.

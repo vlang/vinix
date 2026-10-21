@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module androidtools
+
+import os
+
+fn framework_startup_apis(smali string) ! {
+ listener := smali + '/android/hardware/SensorEventListener.smali'
+ mut text := os.read_file(listener)!
+ if !text.contains('onAccuracyChanged(') {
+  text += '\n.method public abstract onAccuracyChanged(Landroid/hardware/Sensor;I)V\n.end method\n'
+ }
+ os.write_file(listener, text)!
+ os.write_file(smali + '/android/hardware/SensorEventListener2.smali',
+  '.class public interface abstract Landroid/hardware/SensorEventListener2;\n.super Ljava/lang/Object;\n.implements Landroid/hardware/SensorEventListener;\n' +
+  '.method public abstract onFlushCompleted(Landroid/hardware/Sensor;)V\n.end method\n')!
+ // No sensor driver is connected to this backend. Advertise no devices.
+ sensors := smali + '/android/hardware/SensorManager.smali'
+ mut sensor_text := os.read_file(sensors)!
+ for signature in ['getDefaultSensor(I)Landroid/hardware/Sensor;', 'getDefaultSensor(IZ)Landroid/hardware/Sensor;'] {
+  sensor_text = framework_replace_method(sensor_text, signature, '.method public ' + signature + '\n.locals 1\nconst/4 v0, 0\nreturn-object v0\n.end method')!
+ }
+ sensor_text = framework_replace_method(sensor_text, 'getSensorList(I)Ljava/util/List;',
+  '.method public getSensorList(I)Ljava/util/List;\n.locals 1\ninvoke-static {}, Ljava/util/Collections;->emptyList()Ljava/util/List;\nmove-result-object v0\nreturn-object v0\n.end method')!
+ for signature in ['registerListener(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;I)Z',
+  'registerListener(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;ILandroid/os/Handler;)Z',
+  'registerListener(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;II)Z',
+  'registerListener(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;IILandroid/os/Handler;)Z',
+  'flush(Landroid/hardware/SensorEventListener;)Z'] {
+  sensor_text = framework_replace_method(sensor_text, signature, '.method public ' + signature + '\n.locals 1\nconst/4 v0, 0\nreturn v0\n.end method')!
+ }
+ os.write_file(sensors, sensor_text)!
+ context := smali + '/android/content/Context.smali'
+ mut context_text := os.read_file(context)!
+ for signature in ['registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;)Landroid/content/Intent;',
+  'registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;I)Landroid/content/Intent;',
+  'registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;)Landroid/content/Intent;',
+  'registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;',
+  'unregisterReceiver(Landroid/content/BroadcastReceiver;)V', 'sendBroadcast(Landroid/content/Intent;)V'] {
+  context_text = framework_replace_method(context_text, signature, '.method public native ' + signature + '\n.end method')!
+ }
+ os.write_file(context, context_text)!
+ os.write_file(smali + '/android/atl/VinixBroadcast.smali',
+  '.class public final Landroid/atl/VinixBroadcast;\n.super Ljava/lang/Object;\n.implements Ljava/lang/Runnable;\n' +
+  '.field public static final registrations:Ljava/util/concurrent/CopyOnWriteArrayList;\n' +
+  '.field public receiver:Landroid/content/BroadcastReceiver;\n.field public context:Landroid/content/Context;\n' +
+  '.field public filter:Landroid/content/IntentFilter;\n.field public handler:Landroid/os/Handler;\n.field public intent:Landroid/content/Intent;\n' +
+  '.method static constructor <clinit>()V\n.locals 1\nnew-instance v0, Ljava/util/concurrent/CopyOnWriteArrayList;\ninvoke-direct {v0}, Ljava/util/concurrent/CopyOnWriteArrayList;-><init>()V\n' +
+  'sput-object v0, Landroid/atl/VinixBroadcast;->registrations:Ljava/util/concurrent/CopyOnWriteArrayList;\nreturn-void\n.end method\n' +
+  '.method public constructor <init>()V\n.locals 0\ninvoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void\n.end method\n' +
+  '.method public static getRegistrations()Ljava/util/concurrent/CopyOnWriteArrayList;\n.locals 1\nsget-object v0, Landroid/atl/VinixBroadcast;->registrations:Ljava/util/concurrent/CopyOnWriteArrayList;\nreturn-object v0\n.end method\n' +
+  '.method public native run()V\n.end method\n')!
+}
