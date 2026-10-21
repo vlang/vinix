@@ -282,6 +282,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_static_string_metadata_symbol(symbol) { return address }
 	if address := swift_never_nominal_symbol(symbol) { return address }
 	if address := swift_print_unlocked_symbol(symbol) { return address }
+	if address := swift_print_console_symbol(symbol) { return address }
 	if address := swift_merge_error_metadata_symbol(symbol) { return address }
 	if address := swift_integer_symbol(symbol) { return address }
 	if address := swift_hash_symbol(symbol) { return address }

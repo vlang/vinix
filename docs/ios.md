@@ -14840,17 +14840,57 @@ The next missing import is Swift's `print(_:separator:terminator:)`,
 `0x10003ec84`, `0x1021507bc` and `0x1021509c0`. Application entry remains
 unreached; Fortnite is still unplayable.
 
+`_$ss5print_9separator10terminatoryypd_S2StF` now implements public console
+printing for the existing bounded value profile: String, Int, Bool,
+StaticString, Void, _MergeError and reflected zero-sized single-case image
+enums without custom printing conformances. It borrows Array<Any> and both
+String arguments, preserves Unicode and embedded NULs, inserts separators
+between values and always appends the terminator. Zero/one-item calls never
+open the unused separator.
+
+Inputs require registered typed Array<Any> storage, the canonical empty Array,
+or a registered heap allocation with file-backed native storage metadata
+referring to the canonical _ContiguousArrayStorage declaration and Any type.
+Generic storage-class instantiation remains separate. The renderer validates
+up to 512 items and 1 MiB of output, releases all temporary Strings on failure,
+and finishes one owned message before locking stdout. The registry lock never
+crosses stdio. Complete messages serialize, and write errors have no result,
+matching native print. General boxed values, other printing conformances,
+unregistered/native static storage and debug/to-stream overloads remain
+unsupported.
+
+```sh
+v run tests/ios/native-checks.v build-print-console
+```
+
+Evidence is retained under `build/ios/fortnite/print-console-checks`. Native
+stdout comparisons and ten normal/deterministic ASan/UBSan runs passed with
+both C++ configurations, plus _print_unlocked, generic interpolation and Any
+ownership regressions. Checks cover mixed values, signed extrema, Unicode/NUL
+separators and terminators, protected literal bounds, preserved x20/x21/x22
+and unused x8, unchanged borrowed owners and reference counts, exact limits,
+late-failure cleanup and failed stdout. Eight concurrent publishers/writers
+and two drained runtime lifetimes passed. Native inspection confirmed the
+storage header and stdio locking. The ARM64 fixture, launch probe and both
+import audits passed; nine binary/generated-C pairs and five C/ARM64 reviews
+are retained.
+
+The next missing import is Result's generic enum descriptor, `_$ss6ResultOMn`,
+at GOT cell `0x10dc9ba38`. Its indirect context symbolic reference is at
+`0x10dc7f940` in `__swift5_typeref`. Application entry remains unreached;
+Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,949 | 212 | 78 |
+| Fortnite executable | 1,950 | 211 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,789 | 215 | 114 |
+| All images | 2,790 | 214 | 114 |
 
-The C++/GLES/Text variant reports 2,803 resolved imports, 201 unresolved strong
+The C++/GLES/Text variant reports 2,804 resolved imports, 200 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
