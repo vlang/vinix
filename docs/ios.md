@@ -14552,17 +14552,62 @@ forwarders at `0x107c28d38` and `0x100073774`, and a direct call at
 `0x100072f74`. Application entry remains unreached; Fortnite is still
 unplayable.
 
+`_$ss30_copySequenceToContiguousArrayys0dE0Vy7ElementQzGxSTRzlF` now builds
+owned contiguous storage from a borrowed Sequence. The indirect source, Self
+metadata and Sequence table arrive in x0/x1/x2; the result's owned storage word
+returns in x0. The source is copied before consuming `makeIterator`, preserving
+the caller's value and any retained aliases. Each `next` payload moves into the
+result, and the iterator is destroyed on completion or failure.
+
+The implementation shares the existing direct-associated-witness Sequence
+profile, typed Array storage, geometric growth and sealed callback adapter.
+Each result buffer is bounded to 1 MiB including capacity. Invalid estimates,
+incomplete/tagged metadata, unsupported storage layouts and retired calls are
+rejected. Partial results and a pending owned payload are released on failure.
+No registry lock crosses a value witness or Sequence callback. General tagged
+associated metadata and storage-class reflection remain unsupported; no new
+arena or cache is added.
+
+Native comparisons cover Int, String and Objective-C element ownership,
+retained source aliases, protected source boundaries, ignored x8 and preserved
+x20/x21/x22. Compatibility checks also exercise zero estimates and repeated
+growth, cleanup after a 65,536-element partial result and one pending payload,
+empty/padded/32-byte-aligned elements, a count callback that reenters metadata
+lookup on another thread, eight cold publishers and workers, and two drained
+runtime lifetimes with the shared adapter unmapped at teardown.
+
+```sh
+v run tests/ios/native-checks.v build-sequence-array
+```
+
+Evidence is retained under `build/ios/fortnite/sequence-array-checks`.
+
+Normal and deterministic ASan/UBSan checks passed with and without the C++
+backend and for Array Sequence, generic Sequence helpers and consuming
+`_copyContents` regressions (ten runs). The ARM64 fixture, launch probe and
+both import audits passed. Nine binary/generated-C archive pairs are retained.
+Generated C and ARM64 review confirm stack scratch, source borrowing,
+iterator/payload/result cleanup and bounded growth without hidden temporary
+allocations or a new cache/arena.
+
+The next missing import is Swift's dictionary Hashable-violation diagnostic,
+`_$ss53KEY_TYPE_OF_DICTIONARY_VIOLATES_HASHABLE_REQUIREMENTSys5NeverOypXpF`.
+Read-only inspection found GOT cell `0x10dc9b9d8`, stub `0x10c63af5c`,
+forwarder `0x107c28738` and five direct calls, including `0x10003da44` and
+`0x1000717c8`. The loader stops at the unresolved binding; the diagnostic has
+not executed. Application entry remains unreached; Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,941 | 220 | 78 |
+| Fortnite executable | 1,942 | 219 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,781 | 223 | 114 |
+| All images | 2,782 | 222 | 114 |
 
-The C++/GLES/Text variant reports 2,795 resolved imports, 209 unresolved strong
+The C++/GLES/Text variant reports 2,796 resolved imports, 208 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
