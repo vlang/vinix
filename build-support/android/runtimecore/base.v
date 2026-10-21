@@ -40,10 +40,10 @@ __global initial_stack_anchor usize
 __global next_getattr GetAttributes
 
 fn init() {
+    mut stack_local := usize(0)
+    initial_stack_anchor = usize(unsafe { &stack_local })
     unsafe {
         initial_thread = C.pthread_self()
-        mut stack_local := usize(0)
-        initial_stack_anchor = usize(&stack_local)
         next_getattr = GetAttributes(C.dlsym(voidptr(usize(-1)), c'pthread_getattr_np'))
         $if arm64 {
             fork_guard_error = C.pthread_atfork(fork_registry_prepare,

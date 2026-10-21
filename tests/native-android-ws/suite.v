@@ -143,6 +143,9 @@ fn prepare_module(settings map[string]json2.Any, app map[string]json2.Any, outpu
 	} {
 		os.cp(native + '/' + source, target)!
 	}
+	if os.is_file(native + '/libvinix-android-compat.so') {
+		os.cp(native + '/libvinix-android-compat.so', runtime + '/usr/lib/libvinix-android-compat.so')!
+	}
 	if os.is_file(native + '/bionic-ws.cfg') {
 		config := runtime + '/usr/share/vinix-android-ws/bionic_translation/cfg.d'
 		os.mkdir_all(config)!
