@@ -152,6 +152,7 @@ fn swift_array_symbol(symbol string) ?u64 {
 	if address := swift_collection_symbol(symbol) { return address }
 	if address := swift_array_sequence_symbol(symbol) { return address }
 	return match symbol {
+		'_$ss22_minimumMergeRunLengthyS2iF' { u64(unsafe { voidptr(swift_minimum_merge_run_length) }) }
 		// This data symbol denotes the object itself, not a pointer cell. All
 		// zero-capacity factories and imported Array payloads share its identity.
 		'__swiftEmptyArrayStorage' { swift_array_empty() }

@@ -14429,17 +14429,49 @@ The next launch stops at Swift's `_minimumMergeRunLength` sorting helper,
 and a direct call at `0x10006c458`. Application entry remains unreached;
 Fortnite is still unplayable.
 
+`_$ss22_minimumMergeRunLengthyS2iF` now computes Swift's minimum merge-run
+length as a signed scalar function. Counts below 64 pass through unchanged,
+including negative values. Larger counts retain the highest six bits and
+round up if any discarded bits were set, without overflowing at Int.max.
+The function has no runtime state, arena, cache, ARC or pointer accesses.
+
+The native comparison checks every count from -1,024 through 65,535, signed
+extrema, rounding boundaries for every positive exponent and retained prefix,
+and 32,768 concurrent full-width patterns. A guarded ARM64 adapter checks the
+scalar result and preserved x20/x21/x22 with inaccessible unused arguments
+and indirect-result storage. Compatibility checks include concurrent symbol
+resolution, a stable entry across two empty runtime lifetimes, and regression
+coverage for Int, Array storage/buffer allocation and Array encoding.
+
+```sh
+v run tests/ios/native-checks.v build-minimum-merge-run
+```
+
+Evidence is retained under `build/ios/fortnite/minimum-merge-run-checks`.
+
+Normal and deterministic ASan/UBSan checks passed with and without the C++
+backend and for all three regressions (ten runs). The ARM64 fixture, launch
+probe and both import audits passed. Nine binary/generated-C archive pairs
+are retained. Generated C and ARM64 review confirm that the scalar helper
+adds no temporary allocations, ARC, runtime state or owner/cache lifetime.
+
+The next launch stops at generic DefaultStringInterpolation.appendInterpolation,
+`_$ss26DefaultStringInterpolationV06appendC0yyxlF`. Read-only inspection found
+GOT cell `0x10dc9b998`, stub `0x10c63af14`, branch-island forwarder
+`0x107c29128` and direct calls at `0x10215070c` and `0x102150910`.
+Application entry remains unreached; Fortnite is still unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,938 | 223 | 78 |
+| Fortnite executable | 1,939 | 222 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,778 | 226 | 114 |
+| All images | 2,779 | 225 | 114 |
 
-The C++/GLES/Text variant reports 2,792 resolved imports, 212 unresolved strong
+The C++/GLES/Text variant reports 2,793 resolved imports, 211 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
