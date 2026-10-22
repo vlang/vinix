@@ -168,7 +168,7 @@ pub fn reap_removed() {
 		items = unsafe { removed_items }
 		removed_items = []RetiredItem{}
 	} else {
-		items = []RetiredItem{len: due}
+		items = []RetiredItem{len: due} @[freed]
 		// Transfer the original owned strings. V deep-clones a string-bearing
 		// struct pushed directly from an array index, losing the original names.
 		unsafe { C.memcpy(items.data, removed_items.data, usize(due) * sizeof(RetiredItem)) }
