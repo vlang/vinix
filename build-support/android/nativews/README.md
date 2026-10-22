@@ -160,6 +160,19 @@ Telephony carrier queries return `UNKNOWN_CARRIER_ID` and null names because
 no modem backend is connected. The ContextHubManager API type resolves for
 optional hardware checks, while the service remains unavailable and no
 context-hub feature is advertised.
+Geofence callback base classes provide the Android default notifications, including
+both monitor callback overloads. Monitor events preserve their type, status,
+source technologies and nullable Location in the Android Parcelable format.
+The guest fixture checks callback inheritance, overrides calling `super`, and
+independently encoded and decoded event parcels. These follow the
+[AOSP callback contract](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-11.0.0_r1/core/java/android/hardware/location/GeofenceHardwareCallback.java);
+Vinix still has no geofence HAL.
+Location values retain their provider, timestamps, coordinates, optional
+measurements and extras. Copies own their extras Bundle, setters track presence,
+and Parcelable uses the
+[Android 11 wire layout](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-11.0.0_r1/location/java/android/location/Location.java).
+The regression compares serialization against fixed independent wire vectors;
+this value support does not provide location fixes.
 LocationManager enabled queries report false and best-provider discovery returns
 null because the native WS backend has no location provider. PendingIntent's
 OnFinished callback interface is present for class loading; callback send

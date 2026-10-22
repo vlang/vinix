@@ -181,6 +181,7 @@ throw v0'
 }
 
 fn geofence_classes(dir string) ! {
+	geofence_callback_classes(dir)!
 	os.write_file(dir + '/GeofenceProvider.smali', '.class public Lorg/vinix/service/GeofenceProvider;\n.super Lcom/android/location/provider/GeofenceProvider;\n' +
 		'.field public calls:I\n.field public hardware:Landroid/hardware/location/GeofenceHardware;\n' +
 		method('public constructor <init>()V', 'invoke-direct {p0}, Lcom/android/location/provider/GeofenceProvider;-><init>()V\nreturn-void') +
@@ -193,6 +194,166 @@ fn geofence_classes(dir string) ! {
 		method('private checkFailure()V', 'iget v0, p0, Lorg/vinix/service/GeofenceBackend;->failure:I\nif-eqz v0, :ok\nconst/4 v1, 1\nif-ne v0, v1, :security\nnew-instance v0, Landroid/os/RemoteException;\ninvoke-direct {v0}, Landroid/os/RemoteException;-><init>()V\nthrow v0\n:security\nnew-instance v0, Ljava/lang/SecurityException;\ninvoke-direct {v0}, Ljava/lang/SecurityException;-><init>()V\nthrow v0\n:ok\nreturn-void') +
 		method('public getMonitoringTypes()[I', 'invoke-direct {p0}, Lorg/vinix/service/GeofenceBackend;->checkFailure()V\nconst/4 v0, 2\nnew-array v0, v0, [I\nconst/4 v1, 1\naput v1, v0, v1\nreturn-object v0') +
 		method('public getStatusOfMonitoringType(I)I', 'invoke-direct {p0}, Lorg/vinix/service/GeofenceBackend;->checkFailure()V\nconst/4 v0, 1\nif-ne p1, v0, :unsupported\nconst/4 v0, 0\nreturn v0\n:unsupported\nconst/4 v0, 2\nreturn v0'))!
+}
+
+fn geofence_callback_classes(dir string) ! {
+	for name in ['GeofenceHardwareCallback', 'GeofenceHardwareMonitorCallback'] {
+		os.write_file(dir + '/Default' + name + '.smali', '.class public Lorg/vinix/service/Default' + name + ';\n.super Landroid/hardware/location/' + name + ';\n' +
+			method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/hardware/location/' + name + ';-><init>()V\nreturn-void'))!
+	}
+	os.write_file(dir + '/GeofenceCallback.smali', '.class public Lorg/vinix/service/GeofenceCallback;\n.super Lorg/vinix/service/DefaultGeofenceHardwareCallback;\n.field public id:I\n.field public status:I\n' +
+		method('public constructor <init>()V', 'invoke-direct {p0}, Lorg/vinix/service/DefaultGeofenceHardwareCallback;-><init>()V\nreturn-void') +
+		method('public onGeofenceAdd(II)V', 'invoke-super {p0, p1, p2}, Landroid/hardware/location/GeofenceHardwareCallback;->onGeofenceAdd(II)V\niput p1, p0, Lorg/vinix/service/GeofenceCallback;->id:I\niput p2, p0, Lorg/vinix/service/GeofenceCallback;->status:I\nreturn-void'))!
+}
+
+fn geofence_callback_checks() string {
+	mut body := 'new-instance v0, Lorg/vinix/service/DefaultGeofenceHardwareCallback;
+invoke-direct {v0}, Lorg/vinix/service/DefaultGeofenceHardwareCallback;-><init>()V
+const/16 v1, 37
+const/4 v2, 4
+new-instance v3, Landroid/location/Location;
+const-string v7, "vinix-geofence"
+invoke-direct {v3, v7}, Landroid/location/Location;-><init>(Ljava/lang/String;)V
+const-wide v4, 0x100000001L
+const/4 v6, 1
+invoke-virtual/range {v0 .. v6}, Landroid/hardware/location/GeofenceHardwareCallback;->onGeofenceTransition(IILandroid/location/Location;JI)V
+'
+	for name in ['Add', 'Remove', 'Pause', 'Resume'] {
+		body += 'invoke-virtual {v0, v1, v2}, Landroid/hardware/location/GeofenceHardwareCallback;->onGeofence' + name + '(II)V\n'
+	}
+	body += 'new-instance v0, Lorg/vinix/service/GeofenceCallback;
+invoke-direct {v0}, Lorg/vinix/service/GeofenceCallback;-><init>()V
+invoke-virtual {v0, v1, v2}, Landroid/hardware/location/GeofenceHardwareCallback;->onGeofenceAdd(II)V
+iget v7, v0, Lorg/vinix/service/GeofenceCallback;->id:I
+if-ne v7, v1, :bad
+iget v7, v0, Lorg/vinix/service/GeofenceCallback;->status:I
+if-ne v7, v2, :bad
+new-instance v0, Lorg/vinix/service/DefaultGeofenceHardwareMonitorCallback;
+invoke-direct {v0}, Lorg/vinix/service/DefaultGeofenceHardwareMonitorCallback;-><init>()V
+invoke-virtual {v0, v1, v6, v3}, Landroid/hardware/location/GeofenceHardwareMonitorCallback;->onMonitoringSystemChange(IZLandroid/location/Location;)V
+const/4 v7, 0
+invoke-virtual {v0, v7}, Landroid/hardware/location/GeofenceHardwareMonitorCallback;->onMonitoringSystemChange(Landroid/hardware/location/GeofenceHardwareMonitorEvent;)V
+invoke-direct {p0, v3}, Lorg/vinix/service/Main;->checkGeofenceEvent(Landroid/location/Location;)V
+invoke-direct {p0, v7}, Lorg/vinix/service/Main;->checkGeofenceEvent(Landroid/location/Location;)V
+const-string v0, "GEOFENCE-CALLBACK-PASS defaults override super event-wire null-location"
+sget-object v1, Ljava/lang/System;->out:Ljava/io/PrintStream;
+invoke-virtual {v1, v0}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "geofence callback inheritance and override dispatch"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+	return body
+}
+
+fn geofence_event_checks() string {
+	owner := 'Landroid/hardware/location/GeofenceHardwareMonitorEvent;'
+	mut body := 'new-instance v0, ' + owner + '\nconst/4 v1, 1\nconst/4 v2, 2\nconst/16 v3, 17\n' +
+		'invoke-direct {v0, v1, v2, v3, p1}, ' + owner + '-><init>(IIILandroid/location/Location;)V\n'
+	// Check the value object, then decode its wire fields without its own Creator.
+	for index, name in ['MonitoringType', 'MonitoringStatus', 'SourceTechnologies'] {
+		body += 'invoke-virtual {v0}, ' + owner + '->get' + name + '()I\nmove-result v4\nif-ne v4, v' + (index + 1).str() + ', :bad\n'
+	}
+	body += 'invoke-virtual {v0}, ' + owner + '->getLocation()Landroid/location/Location;\nmove-result-object v4\nif-ne v4, p1, :bad\n' +
+		'invoke-virtual {v0}, ' + owner + '->describeContents()I\nmove-result v4\nif-nez v4, :bad\n' +
+		'invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;\nmove-result-object v4\nconst/4 v5, 0\n' +
+		'invoke-virtual {v0, v4, v5}, ' + owner + '->writeToParcel(Landroid/os/Parcel;I)V\ninvoke-virtual {v4, v5}, Landroid/os/Parcel;->setDataPosition(I)V\n'
+	for index in 1 .. 4 {
+		body += 'invoke-virtual {v4}, Landroid/os/Parcel;->readInt()I\nmove-result v0\nif-ne v0, v' + index.str() + ', :bad\n'
+	}
+	body += 'const-class v0, Landroid/location/Location;\ninvoke-virtual {v0}, Ljava/lang/Class;->getClassLoader()Ljava/lang/ClassLoader;\nmove-result-object v0\n' +
+		'invoke-virtual {v4, v0}, Landroid/os/Parcel;->readParcelable(Ljava/lang/ClassLoader;)Landroid/os/Parcelable;\nmove-result-object v0\ncheck-cast v0, Landroid/location/Location;\n' + geofence_location_check('written') +
+		'invoke-virtual {v4}, Landroid/os/Parcel;->dataAvail()I\nmove-result v0\nif-nez v0, :bad\n' +
+		'invoke-virtual {v4}, Landroid/os/Parcel;->recycle()V\ninvoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;\nmove-result-object v4\n'
+	// Feed the Creator independently written Android wire data.
+	for index in 1 .. 4 { body += 'invoke-virtual {v4, v' + index.str() + '}, Landroid/os/Parcel;->writeInt(I)V\n' }
+	body += 'const/4 v5, 0\ninvoke-virtual {v4, p1, v5}, Landroid/os/Parcel;->writeParcelable(Landroid/os/Parcelable;I)V\ninvoke-virtual {v4, v5}, Landroid/os/Parcel;->setDataPosition(I)V\n' +
+		'sget-object v0, ' + owner + '->CREATOR:Landroid/os/Parcelable$Creator;\ninvoke-interface {v0, v4}, Landroid/os/Parcelable$Creator;->createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;\nmove-result-object v0\ncheck-cast v0, ' + owner + '\n'
+	for index, name in ['MonitoringType', 'MonitoringStatus', 'SourceTechnologies'] {
+		body += 'invoke-virtual {v0}, ' + owner + '->get' + name + '()I\nmove-result v5\nif-ne v5, v' + (index + 1).str() + ', :bad\n'
+	}
+	body += 'invoke-virtual {v0}, ' + owner + '->getLocation()Landroid/location/Location;\nmove-result-object v0\n' + geofence_location_check('created') +
+		'invoke-virtual {v4}, Landroid/os/Parcel;->dataAvail()I\nmove-result v0\nif-nez v0, :bad\ninvoke-virtual {v4}, Landroid/os/Parcel;->recycle()V\n' +
+		'sget-object v0, ' + owner + '->CREATOR:Landroid/os/Parcelable$Creator;\ninvoke-interface {v0, v2}, Landroid/os/Parcelable$Creator;->newArray(I)[Ljava/lang/Object;\nmove-result-object v0\ninstance-of v1, v0, [' + owner + '\nif-eqz v1, :bad\narray-length v1, v0\nif-ne v1, v2, :bad\n' +
+		'return-void\n:bad\nnew-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "geofence monitor event value and independent Parcel wire"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0'
+	return body
+}
+
+fn geofence_location_check(label string) string {
+	return 'if-eqz p1, :null_' + label + '\nif-eqz v0, :bad\ninvoke-virtual {v0}, Landroid/location/Location;->getProvider()Ljava/lang/String;\nmove-result-object v0\nconst-string v5, "vinix-geofence"\ninvoke-virtual {v5, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\nmove-result v0\nif-eqz v0, :bad\ngoto :done_' + label + '\n:null_' + label + '\nif-nez v0, :bad\n:done_' + label + '\n'
+}
+
+fn location_value_checks() string {
+	owner := 'Landroid/location/Location;'
+	// Fixed Android wire vectors, independent of the framework field generator.
+	fields := [
+		['Time', 'J', '0x100000001L', 'Long'],
+		['ElapsedRealtimeNanos', 'J', '0x200000001L', 'Long'],
+		['ElapsedRealtimeUncertaintyNanos', 'D', '0x4029000000000000L', 'Double'],
+		['', 'I', '511', 'Int'],
+		['Latitude', 'D', '0x4049c00000000000L', 'Double'],
+		['Longitude', 'D', '-0x4040000000000000L', 'Double'],
+		['Altitude', 'D', '0x4045200000000000L', 'Double'],
+		['Speed', 'F', '0x40600000', 'Float'],
+		['Bearing', 'F', '0x43af0000', 'Float'],
+		['Accuracy', 'F', '0x40b00000', 'Float'],
+		['VerticalAccuracyMeters', 'F', '0x40d00000', 'Float'],
+		['SpeedAccuracyMetersPerSecond', 'F', '0x3f000000', 'Float'],
+		['BearingAccuracyDegrees', 'F', '0x3fc00000', 'Float'],
+	]
+	presence := ['Altitude', 'Speed', 'Bearing', 'Accuracy', 'VerticalAccuracy', 'SpeedAccuracy', 'BearingAccuracy', 'ElapsedRealtimeUncertaintyNanos']
+	mut body := 'new-instance v0, ' + owner + '\nconst-string v2, "test-provider"\ninvoke-direct {v0, v2}, ' + owner + '-><init>(Ljava/lang/String;)V\n'
+	for name in presence { body += 'invoke-virtual {v0}, ' + owner + '->has' + name + '()Z\nmove-result v2\nif-nez v2, :bad\n' }
+	for field in fields {
+		if field[0] == '' { continue }
+		wide := field[1] in ['J', 'D']
+		body += (if wide { 'const-wide' } else { 'const' }) + ' v2, ' + field[2] + '\ninvoke-virtual {v0, v2' + if wide { ', v3' } else { '' } + '}, ' + owner + '->set' + field[0] + '(' + field[1] + ')V\n'
+	}
+	body += 'const v2, -0x3ee00000\ninvoke-virtual {v0, v2}, ' + owner + '->setBearing(F)V\nconst/4 v2, 1\ninvoke-virtual {v0, v2}, ' + owner + '->setIsFromMockProvider(Z)V\n' +
+		'new-instance v7, Landroid/os/Bundle;\ninvoke-direct {v7}, Landroid/os/Bundle;-><init>()V\nconst-string v2, "key"\nconst-string v3, "initial"\ninvoke-virtual {v7, v2, v3}, Landroid/os/Bundle;->putString(Ljava/lang/String;Ljava/lang/String;)V\n' +
+		'invoke-virtual {v0, v7}, ' + owner + '->setExtras(Landroid/os/Bundle;)V\nconst-string v3, "changed"\ninvoke-virtual {v7, v2, v3}, Landroid/os/Bundle;->putString(Ljava/lang/String;Ljava/lang/String;)V\n' +
+		'new-instance v8, ' + owner + '\ninvoke-direct {v8, v0}, ' + owner + '-><init>(' + owner + ')V\n' +
+		'invoke-virtual {v8}, ' + owner + '->getExtras()Landroid/os/Bundle;\nmove-result-object v7\ninvoke-virtual {v7, v2, v3}, Landroid/os/Bundle;->putString(Ljava/lang/String;Ljava/lang/String;)V\n' +
+		'invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;\nmove-result-object v1\nconst/4 v2, 0\ninvoke-virtual {v0, v1, v2}, ' + owner + '->writeToParcel(Landroid/os/Parcel;I)V\ninvoke-virtual {v1, v2}, Landroid/os/Parcel;->setDataPosition(I)V\n' +
+		'invoke-virtual {v1}, Landroid/os/Parcel;->readString()Ljava/lang/String;\nmove-result-object v2\nconst-string v3, "test-provider"\ninvoke-virtual {v3, v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\nmove-result v2\nif-eqz v2, :bad\n'
+	for field in fields {
+		wide := field[1] in ['J', 'D']
+		body += 'invoke-virtual {v1}, Landroid/os/Parcel;->read' + field[3] + '()' + field[1] + '\nmove-result' + if wide { '-wide' } else { '' } + ' v2\n' +
+			(if wide { 'const-wide' } else { 'const' }) + ' v4, ' + field[2] + '\n' + location_compare(field[1])
+	}
+	body += 'invoke-virtual {v1}, Landroid/os/Parcel;->readBundle()Landroid/os/Bundle;\nmove-result-object v7\nconst-string v2, "key"\ninvoke-virtual {v7, v2}, Landroid/os/Bundle;->getString(Ljava/lang/String;)Ljava/lang/String;\nmove-result-object v2\nconst-string v3, "initial"\ninvoke-virtual {v3, v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\nmove-result v2\nif-eqz v2, :bad\n' +
+		'invoke-virtual {v1}, Landroid/os/Parcel;->dataAvail()I\nmove-result v2\nif-nez v2, :bad\ninvoke-virtual {v1}, Landroid/os/Parcel;->recycle()V\ninvoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;\nmove-result-object v1\n' +
+		'const-string v2, "test-provider"\ninvoke-virtual {v1, v2}, Landroid/os/Parcel;->writeString(Ljava/lang/String;)V\n'
+	for field in fields {
+		wide := field[1] in ['J', 'D']
+		body += (if wide { 'const-wide' } else { 'const' }) + ' v2, ' + field[2] + '\ninvoke-virtual {v1, v2' + if wide { ', v3' } else { '' } + '}, Landroid/os/Parcel;->write' + field[3] + '(' + field[1] + ')V\n'
+	}
+	body += 'const/4 v2, 0\ninvoke-virtual {v1, v2}, Landroid/os/Parcel;->writeBundle(Landroid/os/Bundle;)V\ninvoke-virtual {v1, v2}, Landroid/os/Parcel;->setDataPosition(I)V\n' +
+		'sget-object v2, ' + owner + '->CREATOR:Landroid/os/Parcelable$Creator;\ninvoke-interface {v2, v1}, Landroid/os/Parcelable$Creator;->createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;\nmove-result-object v0\ncheck-cast v0, ' + owner + '\n'
+	for field in fields {
+		if field[0] == '' { continue }
+		wide := field[1] in ['J', 'D']
+		body += 'invoke-virtual {v0}, ' + owner + '->get' + field[0] + '()' + field[1] + '\nmove-result' + if wide { '-wide' } else { '' } + ' v2\n' +
+			(if wide { 'const-wide' } else { 'const' }) + ' v4, ' + field[2] + '\n' + location_compare(field[1])
+	}
+	body += 'invoke-virtual {v0}, ' + owner + '->isFromMockProvider()Z\nmove-result v2\nif-eqz v2, :bad\ninvoke-virtual {v0}, ' + owner + '->getExtras()Landroid/os/Bundle;\nmove-result-object v2\nif-nez v2, :bad\n'
+	for name in presence {
+		body += 'invoke-virtual {v0}, ' + owner + '->has' + name + '()Z\nmove-result v2\nif-eqz v2, :bad\ninvoke-virtual {v0}, ' + owner + '->remove' + name + '()V\ninvoke-virtual {v0}, ' + owner + '->has' + name + '()Z\nmove-result v2\nif-nez v2, :bad\n'
+	}
+	body += 'invoke-virtual {v0}, ' + owner + '->reset()V\ninvoke-virtual {v0}, ' + owner + '->getProvider()Ljava/lang/String;\nmove-result-object v2\nif-nez v2, :bad\ninvoke-virtual {v0}, ' + owner + '->isFromMockProvider()Z\nmove-result v2\nif-nez v2, :bad\n' +
+		'invoke-virtual {v1}, Landroid/os/Parcel;->recycle()V\nconst-string v0, "LOCATION-VALUE-PASS provider optional-fields copy extras bearing raw-wire creator reset"\nsget-object v1, Ljava/lang/System;->out:Ljava/io/PrintStream;\ninvoke-virtual {v1, v0}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\nreturn-void\n' +
+		':bad\nnew-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "Location value semantics and independent Android wire vectors"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0'
+	return body
+}
+
+fn location_compare(kind string) string {
+	return match kind {
+		'D' { 'cmpl-double v6, v2, v4\nif-nez v6, :bad\n' }
+		'J' { 'cmp-long v6, v2, v4\nif-nez v6, :bad\n' }
+		'F' { 'cmpl-float v6, v2, v4\nif-nez v6, :bad\n' }
+		else { 'if-ne v2, v4, :bad\n' }
+	}
 }
 
 fn geofence_wire_checks() string {
@@ -1903,6 +2064,9 @@ return-object v0'))!
 		method('private checkParcel()V', parcel_checks()) +
 		method('private checkTypedParcel()V', typed_parcel_checks()) +
 		method('private checkGeofence()V', geofence_checks()) +
+		'.method private checkGeofenceCallbacks()V\n.locals 10\n' + geofence_callback_checks() + '\n.end method\n' +
+		method('private checkGeofenceEvent(Landroid/location/Location;)V', geofence_event_checks()) +
+		'.method private checkLocationValue()V\n.locals 10\n' + location_value_checks() + '\n.end method\n' +
 		method('private checkGeofenceWire(Landroid/os/IBinder;)V', geofence_wire_checks()) +
 		method('private checkUser()V', user_checks()) +
 		method('private checkDevicePolicy(Landroid/content/Context;)V', device_policy_checks()) +
@@ -1984,6 +2148,8 @@ invoke-direct {p0}, Lorg/vinix/service/Main;->checkProxyListener()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkParcel()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkTypedParcel()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkGeofence()V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkGeofenceCallbacks()V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkLocationValue()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkUser()V
 invoke-direct {p0, p0}, Lorg/vinix/service/Main;->checkDevicePolicy(Landroid/content/Context;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkWorkSource()V

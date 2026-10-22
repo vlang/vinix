@@ -81,6 +81,7 @@ fn geofence_binder(smali string, name string, methods []GeofenceMethod) ! {
 }
 
 fn framework_geofence(smali string) ! {
+	framework_geofence_callbacks(smali)!
 	geofence_binder(smali, 'android/location/IGeofenceProvider', [GeofenceMethod{'setGeofenceHardware', 1, 'Landroid/hardware/location/IGeofenceHardware;', 'V'}])!
 	// There is no Vinix geofence HAL. Only capability queries are exposed here;
 	// they forward to a supplied backend, rather than advertising a fake device.
@@ -115,4 +116,52 @@ fn framework_geofence(smali string) ! {
 		'.method public setGeofenceHardware(Landroid/hardware/location/IGeofenceHardware;)V\n.locals 2\n' +
 		'new-instance v0, ' + hardware + '\ninvoke-direct {v0, p1}, ' + hardware + '-><init>(Landroid/hardware/location/IGeofenceHardware;)V\n' +
 		'iget-object v1, p0, ' + binder + '->owner:' + provider + '\ninvoke-virtual {v1, v0}, ' + provider + '->onGeofenceHardwareChange(' + hardware + ')V\nreturn-void\n.end method\n')!
+}
+
+fn geofence_method(signature string, body string) string {
+	return '.method public ' + signature + '\n.locals 6\n' + body + '\n.end method\n'
+}
+
+// AOSP callback bases intentionally provide empty defaults, so subclasses can
+// override only the notifications they need and can safely call super.
+fn framework_geofence_callbacks(smali string) ! {
+	dir := smali + '/android/hardware/location'
+	os.mkdir_all(dir)!
+	for name, signatures in {
+		'GeofenceHardwareCallback': ['onGeofenceTransition(IILandroid/location/Location;JI)V', 'onGeofenceAdd(II)V', 'onGeofenceRemove(II)V', 'onGeofencePause(II)V', 'onGeofenceResume(II)V']
+		'GeofenceHardwareMonitorCallback': ['onMonitoringSystemChange(IZLandroid/location/Location;)V', 'onMonitoringSystemChange(Landroid/hardware/location/GeofenceHardwareMonitorEvent;)V']
+	} {
+		mut text := '.class public abstract Landroid/hardware/location/' + name + ';\n.super Ljava/lang/Object;\n' +
+			geofence_method('constructor <init>()V', 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void')
+		for signature in signatures { text += geofence_method(signature, 'return-void') }
+		os.write_file(dir + '/' + name + '.smali', text)!
+	}
+	owner := 'Landroid/hardware/location/GeofenceHardwareMonitorEvent;'
+	creator := 'Landroid/hardware/location/VinixGeofenceMonitorEventCreator;'
+	mut event := '.class public ' + owner + '\n.super Ljava/lang/Object;\n.implements Landroid/os/Parcelable;\n' +
+		'.field public static final CREATOR:Landroid/os/Parcelable$Creator;\n.field private final location:Landroid/location/Location;\n'
+	mut ctor := 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\n'
+	mut write := ''
+	mut read := ''
+	for index, name in ['MonitoringType', 'MonitoringStatus', 'SourceTechnologies'] {
+		field := name.to_lower()
+		event += '.field private final ' + field + ':I\n' +
+			geofence_method('get' + name + '()I', 'iget v0, p0, ' + owner + '->' + field + ':I\nreturn v0')
+		ctor += 'iput p' + (index + 1).str() + ', p0, ' + owner + '->' + field + ':I\n'
+		write += 'iget v0, p0, ' + owner + '->' + field + ':I\ninvoke-virtual {p1, v0}, Landroid/os/Parcel;->writeInt(I)V\n'
+		read += 'invoke-virtual {p1}, Landroid/os/Parcel;->readInt()I\nmove-result v' + (index + 1).str() + '\n'
+	}
+	event += geofence_method('constructor <init>(IIILandroid/location/Location;)V', ctor + 'iput-object p4, p0, ' + owner + '->location:Landroid/location/Location;\nreturn-void') +
+		geofence_method('static constructor <clinit>()V', 'new-instance v0, ' + creator + '\ninvoke-direct {v0}, ' + creator + '-><init>()V\nsput-object v0, ' + owner + '->CREATOR:Landroid/os/Parcelable$Creator;\nreturn-void') +
+		geofence_method('getLocation()Landroid/location/Location;', 'iget-object v0, p0, ' + owner + '->location:Landroid/location/Location;\nreturn-object v0') +
+		geofence_method('describeContents()I', 'const/4 v0, 0\nreturn v0') +
+		geofence_method('writeToParcel(Landroid/os/Parcel;I)V', write + 'iget-object v0, p0, ' + owner + '->location:Landroid/location/Location;\ninvoke-virtual {p1, v0, p2}, Landroid/os/Parcel;->writeParcelable(Landroid/os/Parcelable;I)V\nreturn-void')
+	os.write_file(dir + '/GeofenceHardwareMonitorEvent.smali', event)!
+	os.write_file(dir + '/VinixGeofenceMonitorEventCreator.smali', '.class public final ' + creator + '\n.super Ljava/lang/Object;\n.implements Landroid/os/Parcelable$Creator;\n' +
+		geofence_method('constructor <init>()V', 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void') +
+		geofence_method('createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;', read +
+			'const-class v4, ' + owner + '\ninvoke-virtual {v4}, Ljava/lang/Class;->getClassLoader()Ljava/lang/ClassLoader;\nmove-result-object v4\n' +
+			'invoke-virtual {p1, v4}, Landroid/os/Parcel;->readParcelable(Ljava/lang/ClassLoader;)Landroid/os/Parcelable;\nmove-result-object v4\ncheck-cast v4, Landroid/location/Location;\n' +
+			'new-instance v0, ' + owner + '\ninvoke-direct {v0, v1, v2, v3, v4}, ' + owner + '-><init>(IIILandroid/location/Location;)V\nreturn-object v0') +
+		geofence_method('newArray(I)[Ljava/lang/Object;', 'new-array v0, p1, [' + owner + '\nreturn-object v0'))!
 }
