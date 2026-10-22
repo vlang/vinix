@@ -105,6 +105,30 @@ goto :loop
 :done
 return-object v1') +
 		signature_method('public static verify(Ljava/lang/String;)' + info, '
+const-string v0, "VinixApkSignatures"
+const-string v1, "Verifying "
+invoke-virtual {v1, p0}, Ljava/lang/String;->concat(Ljava/lang/String;)Ljava/lang/String;
+move-result-object v1
+invoke-static {v0, v1}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
+invoke-static {}, Ljava/lang/System;->nanoTime()J
+move-result-wide v1
+invoke-static {p0}, Landroid/atl/VinixApkSignatures;->verifyContents(Ljava/lang/String;)Landroid/content/pm/SigningInfo;
+move-result-object v0
+invoke-static {}, Ljava/lang/System;->nanoTime()J
+move-result-wide v4
+sub-long/2addr v4, v1
+const-wide/32 v1, 1000000
+div-long/2addr v4, v1
+new-instance v3, Ljava/lang/StringBuilder;
+const-string v1, "Verified in milliseconds: "
+invoke-direct {v3, v1}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V
+invoke-virtual {v3, v4, v5}, Ljava/lang/StringBuilder;->append(J)Ljava/lang/StringBuilder;
+invoke-virtual {v3}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+move-result-object v1
+const-string v2, "VinixApkSignatures"
+invoke-static {v2, v1}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
+return-object v0') +
+		signature_method('private static verifyContents(Ljava/lang/String;)' + info, '
 new-instance v0, Ljava/io/File;
 invoke-direct {v0, p0}, Ljava/io/File;-><init>(Ljava/lang/String;)V
 new-instance v1, Lcom/android/apksig/ApkVerifier$Builder;
