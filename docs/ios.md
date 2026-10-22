@@ -16634,7 +16634,7 @@ Dispatch. The `OS_dispatch_queue.Attributes` accessor returns complete UInt64
 POD8 metadata with a distinct nominal descriptor nested in Dispatch's extension
 of the imported queue class. It shares the existing ownership-free value
 witnesses and sealed accessor/data arena, without adding heap or ARC ownership.
-Separate descriptor and metadata exports, conformances, constructors and
+Separate metadata exports, conformances, constructors and
 attribute constant getters remain unsupported.
 
 The existing Dispatch flags fixture exercises both nominal types:
@@ -16662,9 +16662,30 @@ table plus 64 bytes and rounds it to a 16-byte stack allocation. Three
 consumer/forwarder sites were checked. This inspection executes no application
 code; the launch probe has not reached this accessor in Fortnite.
 
+`_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMn` now exports the same
+canonical type descriptor referenced by the Attributes accessor's metadata.
+Native Swift comparisons check Ma/Mn identity and indirect symbolic lookup;
+compatibility checks also cover eight concurrent workers beginning with either
+nominal type's accessor or descriptor, Dispatch-only resolution and rejection
+before initialization and after two runtime teardowns. The export reuses the
+existing sealed metadata arena without adding allocation or ownership.
+
+Evidence is retained under
+`build/ios/fortnite/dispatch-attributes-descriptor-checks`. Eight
+normal/deterministic ASan/UBSan runs passed across the attributes/flags, QoS,
+algebra and async fixtures. The ARM64 fixture, launch probe and both import
+audits passed their checks. All 988 pinned source, toolchain and runtime inputs
+remained unchanged; eight archived binary/generated-C pairs and four retained
+guest serial logs passed SHA256 verification.
+
+Static inspection traces Fortnite's required descriptor import to GOT cell
+`0x10dc9bcd0`, referenced by the indirect context symbolic reference at
+`0x10dc7fb31` in `__TEXT,__swift5_typeref`. This inspection executes no
+application code.
+
 The launch probe now stops at required Swift Dispatch import
-`_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMn`
-(`OS_dispatch_queue.Attributes` type descriptor), before application entry.
+`_$sSo17OS_dispatch_queueC8DispatchE10AttributesVs10SetAlgebraACMc`
+(`OS_dispatch_queue.Attributes` SetAlgebra conformance), before application entry.
 Fortnite remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -16672,12 +16693,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,997 | 164 | 78 |
+| Fortnite executable | 1,998 | 163 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,837 | 167 | 114 |
+| All images | 2,838 | 166 | 114 |
 
-The C++/GLES/Text variant reports 2,851 resolved imports, 153 unresolved strong
+The C++/GLES/Text variant reports 2,852 resolved imports, 152 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

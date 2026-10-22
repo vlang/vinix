@@ -103,7 +103,7 @@ fn swift_dispatch_symbol(symbol string) !u64 {
 			swift_dispatch_main_queue_checked()!
 			u64(800)
 		}
-		'_$s8Dispatch0A13WorkItemFlagsVMn', '_$s8Dispatch0A13WorkItemFlagsVs10SetAlgebraAAMc', '_$s8Dispatch0A3QoSVMn' { ~u64(0) }
+		'_$s8Dispatch0A13WorkItemFlagsVMn', '_$s8Dispatch0A13WorkItemFlagsVs10SetAlgebraAAMc', '_$s8Dispatch0A3QoSVMn', '_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMn' { ~u64(0) }
 		else { return error('iOS: Swift Dispatch symbol is not implemented: ${symbol}') }
 	}
 	base := swift_dispatch_flags_arena_checked()!
@@ -111,6 +111,7 @@ fn swift_dispatch_symbol(symbol string) !u64 {
 	data_offset := match symbol {
 		'_$s8Dispatch0A13WorkItemFlagsVMn' { u64(160) }
 		'_$s8Dispatch0A3QoSVMn' { u64(1184) }
+		'_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMn' { u64(1312) }
 		else { u64(256) }
 	}
 	return base + u64(C.getpagesize()) + data_offset
