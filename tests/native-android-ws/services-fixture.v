@@ -18,6 +18,163 @@ fn check_stage(expected int, next int) string {
 		'const/4 v0, ${next}\nsput v0, Lorg/vinix/service/App;->stage:I\n'
 }
 
+fn binder_checks() string {
+	return 'new-instance v0, Lorg/vinix/service/LocalBinder;
+invoke-direct {v0}, Lorg/vinix/service/LocalBinder;-><init>()V
+const-string v1, "org.vinix.local"
+invoke-interface {v0, v1}, Landroid/os/IBinder;->queryLocalInterface(Ljava/lang/String;)Landroid/os/IInterface;
+move-result-object v2
+if-ne v0, v2, :bad
+invoke-interface {v0}, Landroid/os/IBinder;->getInterfaceDescriptor()Ljava/lang/String;
+move-result-object v2
+invoke-virtual {v1, v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v2
+if-eqz v2, :bad
+const-string v2, "different"
+invoke-interface {v0, v2}, Landroid/os/IBinder;->queryLocalInterface(Ljava/lang/String;)Landroid/os/IInterface;
+move-result-object v2
+if-nez v2, :bad
+invoke-interface {v0}, Landroid/os/IBinder;->pingBinder()Z
+move-result v2
+if-eqz v2, :bad
+invoke-interface {v0}, Landroid/os/IBinder;->isBinderAlive()Z
+move-result v2
+if-eqz v2, :bad
+new-instance v2, Landroid/os/Binder;
+invoke-direct {v2}, Landroid/os/Binder;-><init>()V
+invoke-virtual {v0, v2}, Ljava/lang/Object;->equals(Ljava/lang/Object;)Z
+move-result v2
+if-nez v2, :bad
+invoke-virtual {v0, v0}, Ljava/lang/Object;->equals(Ljava/lang/Object;)Z
+move-result v2
+if-eqz v2, :bad
+invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;
+move-result-object v1
+invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;
+move-result-object v2
+const-string v3, "org.vinix.local"
+invoke-virtual {v1, v3}, Landroid/os/Parcel;->writeInterfaceToken(Ljava/lang/String;)V
+const/4 v3, 7
+invoke-virtual {v1, v3}, Landroid/os/Parcel;->writeInt(I)V
+const/4 v3, 1
+const/4 v4, 0
+invoke-interface {v0, v3, v1, v2, v4}, Landroid/os/IBinder;->transact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z
+move-result v3
+if-eqz v3, :bad
+invoke-virtual {v2}, Landroid/os/Parcel;->dataPosition()I
+move-result v3
+if-nez v3, :bad
+invoke-virtual {v2}, Landroid/os/Parcel;->readException()V
+invoke-virtual {v2}, Landroid/os/Parcel;->readInt()I
+move-result v3
+const/16 v4, 14
+if-ne v3, v4, :bad
+invoke-virtual {v1}, Landroid/os/Parcel;->recycle()V
+invoke-virtual {v2}, Landroid/os/Parcel;->recycle()V
+invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;
+move-result-object v2
+const v3, 0x5f4e5446
+const/4 v4, 0
+const/4 v1, 0
+invoke-interface {v0, v3, v1, v2, v4}, Landroid/os/IBinder;->transact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z
+move-result v3
+if-eqz v3, :bad
+invoke-virtual {v2}, Landroid/os/Parcel;->readString()Ljava/lang/String;
+move-result-object v3
+const-string v4, "org.vinix.local"
+invoke-virtual {v4, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v3
+if-eqz v3, :bad
+invoke-virtual {v2}, Landroid/os/Parcel;->recycle()V
+const/4 v2, 0
+const/16 v3, 99
+const/4 v4, 0
+invoke-interface {v0, v3, v1, v2, v4}, Landroid/os/IBinder;->transact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z
+move-result v3
+if-nez v3, :bad
+const/4 v3, 3
+const/4 v4, 1
+invoke-interface {v0, v3, v1, v2, v4}, Landroid/os/IBinder;->transact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z
+move-result v3
+if-eqz v3, :bad
+const/4 v3, 2
+const/4 v4, 0
+:exception_start
+invoke-interface {v0, v3, v1, v2, v4}, Landroid/os/IBinder;->transact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z
+:exception_end
+.catch Ljava/lang/IllegalStateException; {:exception_start .. :exception_end} :expected
+goto :bad
+:expected
+move-exception v3
+invoke-virtual {v3}, Ljava/lang/Throwable;->getMessage()Ljava/lang/String;
+move-result-object v3
+const-string v4, "local failure"
+invoke-virtual {v4, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v3
+if-eqz v3, :bad
+const/4 v3, 0
+invoke-interface {v0, v1, v3}, Landroid/os/IBinder;->linkToDeath(Landroid/os/IBinder$DeathRecipient;I)V
+invoke-interface {v0, v1, v3}, Landroid/os/IBinder;->unlinkToDeath(Landroid/os/IBinder$DeathRecipient;I)Z
+move-result v3
+if-eqz v3, :bad
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "local Binder ownership, identity, transaction dispatch and exception propagation"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+}
+
+fn local_binder_fixture() string {
+	return '.class public Lorg/vinix/service/LocalBinder;\n.super Landroid/os/Binder;\n.implements Landroid/os/IInterface;\n.field private caller:Ljava/lang/Thread;\n' +
+		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/os/Binder;-><init>()V
+const-string v0, "org.vinix.local"
+invoke-virtual {p0, p0, v0}, Landroid/os/Binder;->attachInterface(Landroid/os/IInterface;Ljava/lang/String;)V
+invoke-static {}, Ljava/lang/Thread;->currentThread()Ljava/lang/Thread;
+move-result-object v0
+iput-object v0, p0, Lorg/vinix/service/LocalBinder;->caller:Ljava/lang/Thread;
+return-void') +
+		method('public asBinder()Landroid/os/IBinder;', 'return-object p0') +
+		method('protected onTransact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z', 'invoke-static {}, Ljava/lang/Thread;->currentThread()Ljava/lang/Thread;
+move-result-object v0
+iget-object v1, p0, Lorg/vinix/service/LocalBinder;->caller:Ljava/lang/Thread;
+if-ne v0, v1, :bad
+const/4 v0, 1
+if-eq p1, v0, :request
+const/4 v0, 2
+if-eq p1, v0, :exception
+const/4 v0, 3
+if-eq p1, v0, :oneway
+invoke-super {p0, p1, p2, p3, p4}, Landroid/os/Binder;->onTransact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z
+move-result v0
+return v0
+:request
+const-string v0, "org.vinix.local"
+invoke-virtual {p2, v0}, Landroid/os/Parcel;->enforceInterface(Ljava/lang/String;)V
+invoke-virtual {p2}, Landroid/os/Parcel;->readInt()I
+move-result v0
+mul-int/lit8 v0, v0, 2
+invoke-virtual {p3}, Landroid/os/Parcel;->writeNoException()V
+invoke-virtual {p3, v0}, Landroid/os/Parcel;->writeInt(I)V
+const/4 v0, 1
+return v0
+:exception
+new-instance v0, Ljava/lang/IllegalStateException;
+const-string v1, "local failure"
+invoke-direct {v0, v1}, Ljava/lang/IllegalStateException;-><init>(Ljava/lang/String;)V
+throw v0
+:oneway
+if-nez p3, :bad
+const/4 v0, 1
+if-ne p4, v0, :bad
+return v0
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "local Binder caller thread and one-way arguments"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0')
+}
+
 fn component_checks() string {
 	mut body := 'invoke-virtual {p0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;\nmove-result-object v0\n'
 	for kind in ['Provider', 'Service'] {
@@ -264,6 +421,7 @@ throw v0')
 	}
 	os.write_file(companion + 'Provider.smali', provider + operations)!
 	client := out + '/client/smali/org/vinix/service/'
+	os.write_file(client + 'LocalBinder.smali', local_binder_fixture())!
 	os.write_file(client + 'Provider.smali', '.class public Lorg/vinix/service/Provider;\n.super Landroid/content/ContentProvider;\n' +
 		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/content/ContentProvider;-><init>()V\nreturn-void') +
 		method('public onCreate()Z', 'const/4 v0, 1\nreturn v0') + operations)!
@@ -310,10 +468,12 @@ return-object v0'))!
 		'.field private label:Landroid/widget/TextView;\n.field private callbacks:I\n.field private worker:Landroid/os/Handler;\n' +
 		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/app/Activity;-><init>()V\nreturn-void') +
 		method('private checkComponents()V', component_checks()) +
+		method('private checkBinder()V', binder_checks()) +
 		method('private checkStorage(Landroid/content/Context;)V', storage_checks()) +
 		method('public onCreate(Landroid/os/Bundle;)V', '
 invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkComponents()V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkBinder()V
 new-instance v0, Landroid/widget/TextView;
 invoke-direct {v0, p0}, Landroid/widget/TextView;-><init>(Landroid/content/Context;)V
 iput-object v0, p0, Lorg/vinix/service/Main;->label:Landroid/widget/TextView;
@@ -423,7 +583,7 @@ iget-object v0, p0, Lorg/vinix/service/Main;->label:Landroid/widget/TextView;
 const-string v1, "Companion service startup passed"
 invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread provider-context provider-resources attach-once bind-executor-thread component-package component-metadata component-missing package-data package-files package-preferences split-info-copy"
+const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread provider-context provider-resources attach-once bind-executor-thread component-package component-metadata component-missing package-data package-files package-preferences split-info-copy local-binder-interface local-binder-identity local-binder-transact local-binder-exception"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void'))!
 	for name in ['client', 'companion'] {

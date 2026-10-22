@@ -110,6 +110,10 @@ isolation, main-thread binding callbacks and callbacks on a supplied executor.
 Provider and service metadata lookups honor both parts of `ComponentName`,
 including identical class names in different APKs, and preserve lookup flags.
 Unknown packages and components raise `NameNotFoundException`.
+Local Binder objects retain their interface owner and descriptor. Transactions
+dispatch on the calling thread, rewind request/reply Parcels and propagate local
+exceptions. Identity comparisons distinguish different Binder objects. This
+in-process dispatch does not implement cross-process Binder transport.
 Package visibility also honors legacy target SDKs and `QUERY_ALL_PACKAGES`.
 ApplicationInfo and PackageManager share the actual APK, data and native library
 paths. Elapsed realtime uses the boot clock in the API's requested units.
