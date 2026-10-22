@@ -18,6 +18,19 @@ fn check_stage(expected int, next int) string {
 		'const/4 v0, ${next}\nsput v0, Lorg/vinix/service/App;->stage:I\n'
 }
 
+fn absent_hardware_checks() string {
+	mut body := 'const-string v0, "contexthub"\ninvoke-virtual {p1, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;\nmove-result-object v0\ncheck-cast v0, Landroid/hardware/location/ContextHubManager;\nif-nez v0, :bad\n'
+	body += 'const-string v0, "android.hardware.context_hub"\ninvoke-virtual {p1}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;\nmove-result-object v1\ninvoke-virtual {v1, v0}, Landroid/content/pm/PackageManager;->hasSystemFeature(Ljava/lang/String;)Z\nmove-result v0\nif-nez v0, :bad\n'
+	body += 'const-string v0, "phone"\ninvoke-virtual {p1, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;\nmove-result-object v0\ncheck-cast v0, Landroid/telephony/TelephonyManager;\nif-eqz v0, :bad\n'
+	for name in ['getSimCarrierId', 'getSimSpecificCarrierId', 'getCarrierIdFromSimMccMnc'] {
+		body += 'invoke-virtual {v0}, Landroid/telephony/TelephonyManager;->' + name + '()I\nmove-result v1\nconst/4 v2, -1\nif-ne v1, v2, :bad\n'
+	}
+	for name in ['getSimCarrierIdName', 'getSimSpecificCarrierIdName'] {
+		body += 'invoke-virtual {v0}, Landroid/telephony/TelephonyManager;->' + name + '()Ljava/lang/CharSequence;\nmove-result-object v1\nif-nez v1, :bad\n'
+	}
+	return body + 'return-void\n:bad\nnew-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "unavailable context hub and SIM carrier state"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0'
+}
+
 fn proxy_listener_checks() string {
 	return 'new-instance v0, Lorg/vinix/service/ProxyListener;
 invoke-direct {v0}, Lorg/vinix/service/ProxyListener;-><init>()V
@@ -1884,6 +1897,7 @@ return-object v0'))!
 		'.field private priorityMain:I\n.field private priorityWorker:I\n.field private priorityOriginal:I\n' +
 		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/app/Activity;-><init>()V\nreturn-void') +
 		method('private checkComponents()V', component_checks()) +
+		method('private checkAbsentHardware(Landroid/content/Context;)V', absent_hardware_checks()) +
 		method('private checkBinder()V', binder_checks()) +
 		method('private checkProxyListener()V', proxy_listener_checks()) +
 		method('private checkParcel()V', parcel_checks()) +
@@ -1965,6 +1979,7 @@ throw v0') +
 		method('public onCreate(Landroid/os/Bundle;)V', '
 invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkComponents()V
+invoke-direct {p0, p0}, Lorg/vinix/service/Main;->checkAbsentHardware(Landroid/content/Context;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkProxyListener()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkParcel()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkTypedParcel()V
@@ -1993,6 +2008,7 @@ const/4 v1, 3
 invoke-virtual {p0, v0, v1}, Landroid/content/Context;->createPackageContext(Ljava/lang/String;I)Landroid/content/Context;
 move-result-object v0
 invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkStorage(Landroid/content/Context;)V
+invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkAbsentHardware(Landroid/content/Context;)V
 invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkDirectories(Landroid/content/Context;)V
 invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkDevicePolicy(Landroid/content/Context;)V
 invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkPackageEnumeration(Landroid/content/Context;)V

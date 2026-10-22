@@ -156,6 +156,10 @@ fixture checks persistence, transaction rollback, read-only enforcement, a
 custom cursor factory, idle closure and reopening, and timeout exclusions.
 UserManager returns a fresh profile list containing the current user. UserHandle
 owner/system queries use the handle's user ID; managed profiles are unavailable.
+Telephony carrier queries return `UNKNOWN_CARRIER_ID` and null names because
+no modem backend is connected. The ContextHubManager API type resolves for
+optional hardware checks, while the service remains unavailable and no
+context-hub feature is advertised.
 LocationManager enabled queries report false and best-provider discovery returns
 null because the native WS backend has no location provider. PendingIntent's
 OnFinished callback interface is present for class loading; callback send
