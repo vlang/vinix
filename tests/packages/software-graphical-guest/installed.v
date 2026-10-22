@@ -91,6 +91,11 @@ fn retain_installed() ! {
 		'/root/software-graphical-disk-canary'] {
 		files << observed_file(path)!
 	}
+	if os.exists('/etc/software-graphical-first-run') {
+		check_first_run_decision()!
+		files << observed_file(release_decision)!
+		files << observed_file(release_declaration)!
+	}
 	os.write_file(observation_path, json2.encode(InstalledObservation{
 		current: os.readlink('/var/lib/vinix-packages/current')!, files: files}) + '\n')!
 }

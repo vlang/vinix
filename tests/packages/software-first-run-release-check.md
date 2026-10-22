@@ -33,8 +33,11 @@ bundled glyphs, and complete warning/button layout at 320×240, 320×768, 640×4
 arguments, duplicate handoff suppression, catalog failure recovery, cancellation,
 absence of automatic apply, and the separate Confirm/administrator boundary.
 
-Both target compositors cross-compile from the admitted production sources.
-Native framebuffer acceptance of this first-run prompt and its reboot behavior
-is a separate pending gate; the earlier installed-Software acceptance does not
-qualify this new prompt. The host report also records the broader broker and
+The [native installed-session qualification](software-first-run-native-check.md)
+now covers both architectures: the real ordinary-account Review card, complete
+read-only Counter proposal, separate Confirm and administrator password, signed
+installation, retained private Review decision and no repeated prompt across two
+cold boots. Both guests reopen exact saved Counter labels and complete real QMP
+guest shutdown. This native result covers Review; durable Skip remains covered
+by the host checkpoint. The host report also records the broader broker and
 translation-suite failures rather than claiming a full-suite pass.

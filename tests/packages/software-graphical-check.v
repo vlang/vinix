@@ -273,6 +273,17 @@ fn label_ink(image screenshotcore.Image) bool {
 	return dark >= 8
 }
 
+fn release_card(image screenshotcore.Image) bool {
+	// Fixed production card at 1024x768: backdrop, ordinary card, Review/Skip.
+	for point in [[100, 300, 0x172235], [180, 300, 0xfbfcfe],
+		[210, 439, 0x5b9cf8], [210, 491, 0xffffff]] {
+		at := (point[1] * image.width + point[0]) * 3
+		color := int(image.pixels[at]) << 16 | int(image.pixels[at + 1]) << 8 | int(image.pixels[at + 2])
+		if color != point[2] { return false }
+	}
+	return true
+}
+
 fn wait_label(mut child os.Process, mut monitor qmpclient.Monitor, log string,
 	deadline u64, work string, name string, expected screenshotcore.Image) !screenshotcore.Image {
 	// Launch is asynchronous, especially under TCG. Keep the canonical image
@@ -288,7 +299,7 @@ fn wait_label(mut child os.Process, mut monitor qmpclient.Monitor, log string,
 }
 
 fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work string, ordinary bool,
-	installed bool, boot int, previous screenshotcore.Image) !screenshotcore.Image {
+	installed bool, first_run bool, boot int, previous screenshotcore.Image) !screenshotcore.Image {
 	log := work + if boot == 1 { '/serial.log' } else { '/serial-2.log' }
 	mut child := os.new_process(qemu)
 	defer {
@@ -301,25 +312,49 @@ fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work
 	child.run()
 	// Full-strength scrypt for setup and approval executes through x86 TCG.
 	deadline := u64(time.sys_mono_now() + 1200 * time.second)
-	wait_marker(mut child, log, deadline, 'vinix-desktop: ready')!
-	if ordinary { wait_marker(mut child, log, deadline, 'SOFTWARE GRAPHICAL ordinary-compositor')! }
+	// Guest entry proves QEMU has created both monitor listeners. The first-run
+	// card still precedes desktop readiness and receives no input until identity.
+	wait_marker(mut child, log, deadline, 'SOFTWARE GRAPHICAL START')!
 	mut monitor := qmpclient.connect_bounded(qmp, deadline, unsafe { nil })!
 	defer { monitor.close() }
 	mut shutdown_log := os.create(work + '/shutdown-' + boot.str() + '.jsonl')!
 	defer { shutdown_log.close() }
 	mut shutdown := shutdown_connect(qmp + '.power', mut shutdown_log, deadline, boot)!
 	defer { shutdown.close() or {} }
+	if first_run && boot == 1 {
+		wait_marker(mut child, log, deadline, 'SOFTWARE FIRST RUN pre-ready compositor')!
+		for {
+			healthy(mut child, log, deadline)!
+			if release_card(shot(mut monitor, work, 'first-run-01-card')!) { break }
+			time.sleep(200 * time.millisecond)
+		}
+		click(mut monitor, 512, 439)!
+	}
+	wait_marker(mut child, log, deadline, 'vinix-desktop: ready')!
+	if ordinary { wait_marker(mut child, log, deadline, 'SOFTWARE GRAPHICAL ordinary-compositor')! }
 	time.sleep(2 * time.second)
+	if first_run && boot == 2 {
+		wait_marker(mut child, log, deadline, 'SOFTWARE FIRST RUN BOOT 2 retained review decision no repeated prompt PASS')!
+		shot(mut monitor, work, 'first-run-03-reboot-desktop')!
+		// Explicitly open Software through the normal Start search, after ready.
+		click(mut monitor, 24, 744)!
+		for byte in 'software'.bytes() { key(mut monitor, byte.ascii_str())! }
+		key(mut monitor, 'ret')!
+		time.sleep(2 * time.second)
+	}
 	shot(mut monitor, work, if boot == 1 { '01-catalog' } else { '09-reboot-catalog' })!
 	click(mut monitor, if ordinary { 984 } else { 975 }, if ordinary { 57 } else { 49 })!
 	time.sleep(time.second)
 	mut catalog := screenshotcore.Image{}
 	if boot == 1 { catalog = shot(mut monitor, work, '02-maximized')! }
-	click(mut monitor, 140, 138)!
+	if !first_run || boot == 2 { click(mut monitor, 140, 138)! }
 	if installed && boot == 1 {
 		// The fixed 1024x768 layout exposes Install, then the frozen review's
 		// Confirm action. Real key events enter this account's password.
-		click(mut monitor, 350, 562)!
+		if first_run {
+			wait_marker(mut child, log, deadline, 'SOFTWARE FIRST RUN review handed to Software without activation or approval PASS')!
+			shot(mut monitor, work, 'first-run-02-proposal')!
+		} else { click(mut monitor, 350, 562)! }
 		time.sleep(2 * time.second)
 		shot(mut monitor, work, 'install-01-review')!
 		click(mut monitor, 340, 600)!
@@ -438,9 +473,13 @@ fn check() ! {
 	arch := options['--arch'] or { 'aarch64' }
 	ordinary := options['--ordinary'] or { 'false' }
 	installed := options['--installed'] or { 'false' }
+	first_run := options['--first-run'] or { 'false' }
 	if ordinary !in ['true', 'false'] { return error('--ordinary must be true or false') }
 	if installed !in ['true', 'false'] || (installed == 'true' && ordinary != 'true') {
 		return error('--installed=true requires --ordinary=true')
+	}
+	if first_run !in ['true', 'false'] || (first_run == 'true' && installed != 'true') {
+		return error('--first-run=true requires --installed=true')
 	}
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported architecture') }
 	root := hwhost.find_root(@FILE)!
@@ -496,6 +535,15 @@ fn check() ! {
 		pin(mut artifacts, mut artifact_paths, 'source/guest/' + os.file_name(path), path)!
 	}
 	invoke('cp', ['-Rp', input + '/.', work + '/rootfs'])!
+	if first_run == 'true' {
+		if os.exists(work + '/rootfs/usr/bin/pkg') { return error('first-run fixture requires no legacy pkg') }
+		declaration := work + '/rootfs/usr/share/vinix-packages/applications.json'
+		os.write_file(declaration, json2.encode({'format': json2.Any(1),
+			'architecture': json2.Any(arch), 'packages': json2.Any([json2.Any('org.vinix.counter')])}) + '\n')!
+		os.chmod(declaration, 0o644)!
+		os.write_file(work + '/rootfs/etc/software-graphical-first-run', '1\n')!
+		pin(mut artifacts, mut artifact_paths, 'release-declaration', declaration)!
+	}
 	os.write_file(work + '/rootfs/etc/software-graphical-mode', if ordinary == 'true' {
 		'ordinary\n'
 	} else {
@@ -526,6 +574,9 @@ fn check() ! {
 			'/usr/sbin/vinix-session', '/usr/share/vinix/actions/packages-change',
 			'/usr/share/vinix/actions/packages-launch', '/etc/vinix-packages/config.json'] {
 			proof[path] = sha256.sum(os.read_bytes(work + '/rootfs' + path)!).hex()
+		}
+		if first_run == 'true' {
+			proof['/usr/share/vinix-packages/applications.json'] = artifacts['release-declaration']
 		}
 		os.write_file(work + '/rootfs/usr/share/software-graphical-installed.json', json2.encode(proof) + '\n')!
 		os.write_file(work + '/system.vjfs', '')!
@@ -561,9 +612,9 @@ fn check() ! {
 		} else { ['-drive', 'if=ide,format=raw,cache=writeback,file=' + work + '/system.vjfs'] }
 	}
 	checkpoint := graphical_boot(arch, host.qemu, arguments, qmp, work, ordinary == 'true',
-		installed == 'true', 1, screenshotcore.Image{})!
+		installed == 'true', first_run == 'true', 1, screenshotcore.Image{})!
 	if installed == 'true' {
-		graphical_boot(arch, host.qemu, arguments, qmp, work, true, true, 2, checkpoint)!
+		graphical_boot(arch, host.qemu, arguments, qmp, work, true, true, first_run == 'true', 2, checkpoint)!
 		pin(mut artifacts, mut artifact_paths, 'system-disk', work + '/system.vjfs')!
 		pin(mut artifacts, mut artifact_paths, 'serial-2', work + '/serial-2.log')!
 		pin(mut artifacts, mut artifact_paths, 'shutdown-2', work + '/shutdown-2.jsonl')!
@@ -609,7 +660,9 @@ fn check() ! {
 	}
 	os.write_file(work + '/qualification.json', json2.encode(GraphicalReceipt{
 		architecture: arch
-		platform:     if installed == 'true' {
+		platform:     if first_run == 'true' {
+			'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
+		} else if installed == 'true' {
 			'qemu-framebuffer-ordinary-seat-installed-root-two-boots'
 		} else if ordinary == 'true' {
 			'qemu-framebuffer-ordinary-seat'

@@ -37,7 +37,50 @@ fn exact_marker(transcript string, marker string) ! {
 	}
 }
 
-fn admit_serial(path string, installed bool, boot int, arch string) ! {
+fn admit_first_run_serial(transcript string, boot int, arch string) ! {
+	decision := 'SOFTWARE FIRST RUN private decision owner=1000 mode=0600 value=review PASS'
+	exact_marker(transcript, decision)!
+	if boot == 2 {
+		exact_marker(transcript, 'SOFTWARE FIRST RUN BOOT 2 retained review decision no repeated prompt PASS')!
+		if transcript.contains('SOFTWARE FIRST RUN pre-ready') || transcript.contains('SOFTWARE FIRST RUN PROPOSAL ') {
+			return error('first-run prompt or proposal repeated on boot 2')
+		}
+		return
+	}
+	identity := 'SOFTWARE FIRST RUN pre-ready compositor uid=1000 home=/home/alex runtime=0700 PASS'
+	unchanged := 'SOFTWARE FIRST RUN review handed to Software without activation or approval PASS'
+	exact_marker(transcript, identity)!
+	exact_marker(transcript, unchanged)!
+	proposals := transcript.split_into_lines().filter(it.starts_with('SOFTWARE FIRST RUN PROPOSAL '))
+	if proposals.len != 1 { return error('missing or duplicated complete first-run proposal') }
+	review := json2.decode[json2.Any](proposals[0].all_after('SOFTWARE FIRST RUN PROPOSAL '))!.as_map()
+	if review['operation']!.str() != 'deploy' || review['architecture']!.str() != arch ||
+		review['generation']!.f64() != 0 || review['fingerprint']!.str().len != 64 ||
+		review['names']!.as_array().map(it.str()) != ['org.vinix.counter'] ||
+		review['requested']!.as_array().map(it.str()) != ['org.vinix.counter'] ||
+		review['rows']!.as_array().len != 1 {
+		return error('first-run proposal differs from the complete declared Counter set')
+	}
+	row := review['rows']!.as_array()[0].as_map()
+	if row['id']!.str() != 'org.vinix.counter' || row['version']!.str() != '1.0.0' ||
+		row['installed_version']!.str() != '' || row['architecture']!.str() != arch ||
+		row['kind']!.str() != 'native' || row['repository']!.str() != 'native' ||
+		row['license']!.str() != 'MIT' || row['public_key']!.str().len != 64 ||
+		row['permissions']!.as_array().map(it.str()) != ['display'] ||
+		row['requested']! != json2.Any(true) || row['action']!.str() != 'install' {
+		return error('first-run proposal has incomplete publisher, permission or install details')
+	}
+	ready := transcript.index('SOFTWARE GRAPHICAL ordinary-compositor') or { return error('missing first-run ordinary ready identity') }
+	approved := transcript.index('SOFTWARE GRAPHICAL INSTALLED reviewed-password-approved') or { return error('missing first-run approval result') }
+	before := transcript.index(identity) or { return error('missing first-run pre-ready identity') }
+	proposal := transcript.index(proposals[0]) or { return error('missing first-run proposal') }
+	after := transcript.index(unchanged) or { return error('missing first-run unchanged-state gate') }
+	if before >= ready || ready >= proposal || proposal >= after || after >= approved {
+		return error('first-run identity, proposal and approval order differs')
+	}
+}
+
+fn admit_serial(path string, installed bool, first_run bool, boot int, arch string) ! {
 	transcript := os.read_file(path)!
 	mut forbidden := ['SOFTWARE GRAPHICAL FAIL', 'KERNEL PANIC', 'V panic:', 'FATAL EXCEPTION']
 	if installed { forbidden << ['sysdisk: running from memory', 'sysdisk: updating the system on'] }
@@ -45,6 +88,7 @@ fn admit_serial(path string, installed bool, boot int, arch string) ! {
 		if transcript.contains(marker) { return error('forbidden serial marker: ' + marker) }
 	}
 	exact_marker(transcript, 'SOFTWARE GRAPHICAL ordinary-compositor uid=1000 home=/home/alex PASS')!
+	if first_run { admit_first_run_serial(transcript, boot, arch)! }
 	if installed { exact_marker(transcript, 'SOFTWARE GRAPHICAL native Counter launch child closed PASS')! }
 	if installed && arch == 'aarch64' { exact_marker(transcript, 'syspower: power off: stopping devices')! }
 	if boot == 1 {
@@ -102,7 +146,8 @@ fn retain() ! {
 	arch := os.args[6]
 	receipt := json2.decode[Receipt](os.read_file(run + '/qualification.json')!)!
 	if receipt.architecture != arch || receipt.platform !in ['qemu-framebuffer-ordinary-seat',
-		'qemu-framebuffer-ordinary-seat-installed-root-two-boots'] {
+		'qemu-framebuffer-ordinary-seat-installed-root-two-boots',
+		'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'] {
 		return error('requires the selected architecture ordinary-seat receipt')
 	}
 	for name, expected in {
@@ -110,6 +155,7 @@ fn retain() ! {
 		'software-graphical-build.v': $embed_file('software-graphical-build.v').to_string()
 		'guest/main.v': $embed_file('software-graphical-guest/main.v').to_string()
 		'guest/installed.v': $embed_file('software-graphical-guest/installed.v').to_string()
+		'guest/first_run.v': $embed_file('software-graphical-guest/first_run.v').to_string()
 	} {
 		if digest(run + '/source/' + name)! != sha256.sum(expected.bytes()).hex() {
 			return error('qualified graphical fixture differs from the embedded source: ' + name)
@@ -120,9 +166,10 @@ fn retain() ! {
 		return error('qualified graphical fixture differs from the embedded source: plainiso.v')
 	}
 	installed := receipt.platform.ends_with('installed-root-two-boots')
-	admit_serial(run + '/serial.log', installed, 1, arch)!
+	first_run := receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
+	admit_serial(run + '/serial.log', installed, first_run, 1, arch)!
 	if installed {
-		admit_serial(run + '/serial-2.log', true, 2, arch)!
+		admit_serial(run + '/serial-2.log', true, first_run, 2, arch)!
 		admit_shutdown(run + '/shutdown-1.jsonl', 1)!
 		admit_shutdown(run + '/shutdown-2.jsonl', 2)!
 	}
@@ -157,6 +204,15 @@ fn retain() ! {
 		paths['shutdown-2'] = run + '/shutdown-2.jsonl'
 		paths['installed-declaration'] = run + '/rootfs/usr/share/software-graphical-installed.json'
 	}
+	if first_run {
+		paths['release-declaration'] = run + '/rootfs/usr/share/vinix-packages/applications.json'
+		declaration := json2.decode[json2.Any](os.read_file(paths['release-declaration'])!)!.as_map()
+		if declaration.len != 3 || declaration['format']! != json2.Any(f64(1)) ||
+			declaration['architecture']!.str() != arch ||
+			declaration['packages']!.as_array().map(it.str()) != ['org.vinix.counter'] {
+			return error('first-run declaration differs from the complete architecture-matched Counter set')
+		}
+	}
 	repository := run + '/rootfs/usr/share/vinix-packages/repositories/native'
 	for path in os.walk_ext(repository, '') {
 		if os.is_file(path) { paths['repository/' + path[repository.len + 1..]] = path }
@@ -175,6 +231,7 @@ fn retain() ! {
 			'11-reboot-counter-four', 'install-01-review', 'install-02-administrator',
 			'install-03-password-mask', 'install-04-acquired']
 	}
+	if first_run { required_shots << ['first-run-01-card', 'first-run-02-proposal', 'first-run-03-reboot-desktop'] }
 	shots.sort()
 	required_shots.sort()
 	if shots != required_shots { return error('graphical run lacks the exact required screenshot set') }
@@ -201,15 +258,19 @@ fn retain() ! {
 	if manifest['vinix-desktop'] != receipt.artifacts['desktop'] {
 		return error('desktop receipt does not bind the qualified executable')
 	}
-	for name in ['main.v', 'terminal.v', 'platform.c.v', 'registration.v', 'registration_store.v', 'gpucore/core.v',
-		'sessionruntime/runtime.c.v', 'sessionipc/client.c.v', 'windowfb/transport.c.v'] {
+	mut source_names := ['main.v', 'terminal.v', 'platform.c.v', 'registration.v', 'registration_store.v', 'gpucore/core.v',
+		'sessionruntime/runtime.c.v', 'sessionipc/client.c.v', 'windowfb/transport.c.v']
+	if first_run {
+		source_names << ['app_selection.v', 'app_selection_release.v', 'software_release.v', 'software_app.v']
+	}
+	for name in source_names {
 		if digest('desktop/' + name)! != manifest['desktop/' + name] ||
 			digest(build + '/source/desktop/' + name)! != manifest['desktop/' + name] {
 			return error('qualified desktop identity source differs: ' + name)
 		}
 	}
 	os.mkdir_all(out)!
-	prefix := out + '/software-graphical-' + arch
+	prefix := out + if first_run { '/software-first-run-native-' + arch } else { '/software-graphical-' + arch }
 	for name, suffix in {
 		'qualification.json': '.json'
 		'desktop-build.json': '.desktop-build.json'
@@ -222,5 +283,5 @@ fn retain() ! {
 	}
 	for name in shots { os.cp(run + '/' + name + '.png', prefix + '.' + name + '.png')! }
 	println('SOFTWARE GRAPHICAL RETAIN PASS ' + arch + ': ' + receipt.artifacts.len.str() +
-		' artifact digests and all nine current desktop identity/seat/runtime sources match')
+		' artifact digests and ' + source_names.len.str() + ' current desktop identity/seat/runtime/release sources match')
 }
