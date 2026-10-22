@@ -280,7 +280,7 @@ fn terminal_take_rebuild_snapshot() string {
 
 fn terminal_take_rebuild_message() string {
 	if !desktop_is_development_session()
-		|| C.access(c'/run/vinix-desktop-ready', 0) != 0 {
+		|| C.access(&char(desktop_session_ready_path.str), 0) != 0 {
 		return ''
 	}
 	mut data := []u8{len: 64}

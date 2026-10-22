@@ -26,12 +26,6 @@ const default_frame_interval_ms = i64(16)
 // refresh immediate; only genuinely background output waits for the cadence.
 const default_idle_interval_ms = i64(1000)
 
-// The reload helper removes this before asking PID 1 to replace the session.
-// Recreate it only after the replacement has painted its first frame and
-// completed the startup application handshakes, so an out-of-group watchdog
-// can distinguish a responsive desktop from a process that merely exec'd.
-const desktop_session_ready_path = '/run/vinix-desktop-ready'
-
 struct Options {
 	framebuffer     string = '/dev/fb0'
 	pointer         string = '/dev/pointer'
@@ -186,6 +180,10 @@ fn main() {
 	}
 	gpu_present_startup_stage(c'application subprocess mode not requested')
 	gpu_present_startup_stage(c'desktop process selected')
+	// Installed roots can retain /run across boots. A previous compositor's
+	// marker must not make this replacement look ready before it has painted.
+	// Helpers and application subprocesses leave their compositor's marker alone.
+	desktop_unlink(desktop_session_ready_path)
 	desktop_ignore_broken_pipe()
 	gpu_present_startup_stage(c'SIGPIPE ignored')
 	desktop_install_power_signals()

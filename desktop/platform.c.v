@@ -465,6 +465,19 @@ fn desktop_session_identity() DesktopSessionIdentity {
 
 const desktop_identity = desktop_session_identity()
 const desktop_home = desktop_identity.home
+
+// Ordinary seats can write only inside the runtime directory prepared by the
+// account service. Keep the root marker used by the PID 1 reload watchdog.
+fn desktop_ready_path(uid u32) string {
+	if uid == 0 {
+		return '/run/vinix-desktop-ready'
+	}
+	text := uid.str()
+	defer { unsafe { text.free() } }
+	return '/run/user/' + text + '/vinix-desktop-ready'
+}
+
+const desktop_session_ready_path = desktop_ready_path(desktop_identity.uid)
 const desktop_user_entry = 'USER=${desktop_identity.name}'
 const desktop_logname_entry = 'LOGNAME=${desktop_identity.name}'
 const desktop_shell_entry = 'SHELL=${desktop_identity.shell}'

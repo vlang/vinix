@@ -16,7 +16,7 @@ fn main() {
 	workflowbuild.run('git', ['archive', 'HEAD', 'desktop', 'tools/accounts', 'tools/packages',
 		'-o', '${work}/source.tar'])!
 	workflowbuild.run('tar', ['-xf', '${work}/source.tar', '-C', '${work}/source'])!
-	for name in ['platform.c.v', 'registration.v', 'registration_store.v'] {
+	for name in ['platform.c.v', 'main.v', 'terminal.v', 'registration.v', 'registration_store.v'] {
 		os.cp('${root}/desktop/${name}', '${work}/source/desktop/${name}')!
 	}
 	ui := os.getenv_opt('VINIX_UI2_SOURCE') or {

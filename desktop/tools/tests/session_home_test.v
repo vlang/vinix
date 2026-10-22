@@ -3,6 +3,19 @@ module main
 
 import os
 
+fn test_ready_marker_uses_the_effective_account_runtime_directory() {
+	assert desktop_ready_path(0) == '/run/vinix-desktop-ready'
+	assert desktop_ready_path(1000) == '/run/user/1000/vinix-desktop-ready'
+	assert desktop_ready_path(1001) == '/run/user/1001/vinix-desktop-ready'
+	previous := os.getenv_opt('XDG_RUNTIME_DIR')
+	os.setenv('XDG_RUNTIME_DIR', '/run/user/0', true)
+	defer {
+		if value := previous { os.setenv('XDG_RUNTIME_DIR', value, true) } else { os.unsetenv('XDG_RUNTIME_DIR') }
+	}
+	assert desktop_ready_path(1000) == '/run/user/1000/vinix-desktop-ready'
+	assert desktop_session_ready_path == desktop_ready_path(u32(C.geteuid()))
+}
+
 fn test_session_identity_requires_an_effective_account_for_ordinary_users() {
 	root := desktop_missing_identity(0)!
 	assert root.uid == 0 && root.name == 'root' && root.home == '/root'
