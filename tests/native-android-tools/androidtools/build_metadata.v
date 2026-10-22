@@ -81,6 +81,9 @@ pub fn write_build_manifest(kind string, arguments []string) ! {
 		for name in ['libglapi.so.0', 'libvinix-ws-GLESv1_CM.so', 'libvinix-ws-GLESv2.so'] {
 			os.cp(work + '/native-ws/' + name, output + '/usr/lib/art/native-ws/' + name)!
 		}
+		for provider in ['egl-ws', 'vulkan-ws'] {
+			os.cp_all(work + '/native-ws/' + provider, output + '/usr/lib/art/native-ws', false)!
+		}
 		os.mkdir_all(output + '/usr/share/licenses/mesa-ws')!
 		for name in ['mesa-ws-NOTICE', 'mesa-ws-manifest.json', 'mesa-ws-sources.tar.gz'] {
 			os.cp(work + '/native-ws/' + name, output + '/usr/share/licenses/mesa-ws/' + name)!

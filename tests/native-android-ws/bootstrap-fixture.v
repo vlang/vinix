@@ -203,6 +203,7 @@ throw v0') +
 		'.method public static native nativeCheck(Landroid/content/res/AssetManager;)Z\n.end method\n' +
 		'.method public static native nativeBitmap(Landroid/graphics/Bitmap;)Z\n.end method\n' +
 		'.method public static native nativeGraphics()Z\n.end method\n' +
+		'.method public static native nativeVulkan()Z\n.end method\n' +
 		'.method public static native nativeEglWindow(Landroid/view/Surface;)Z\n.end method\n' +
 		'.method public static native nativeWindow(Landroid/view/Surface;)Z\n.end method\n' +
 		'.method public static native nativeLibc()Z\n.end method\n' +
@@ -802,6 +803,9 @@ invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->nativeGraphics()Z
 move-result v0
 if-eqz v0, :bad
+invoke-static {}, Lorg/vinix/bootstrap/Main;->nativeVulkan()Z
+move-result v0
+if-eqz v0, :bad
 invoke-static {}, Lorg/vinix/bootstrap/Main;->nativeLibc()Z
 move-result v0
 if-eqz v0, :bad
@@ -952,9 +956,15 @@ throw v0')
 		'-lfixture-absent', '-o', output + '/lib/arm64-v8a/libfixture-broken.so'])
 	// Exercise the legacy NDK mapping path on a real 16 KiB Vinix guest as
 	// well as the Java framework APIs. This ELF intentionally uses 4 KiB pages.
+	// This link-only import library supplies the Android SONAME; it is never
+	// packaged. The guest must resolve DT_NEEDED and Vulkan symbols against
+	// the real runtime Khronos loader, which has a different host SONAME.
+	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib',
+		'-Wl,-soname,libvulkan.so', output + '/dependencyprobe.c', '-o', output + '/libvulkan.so'])
 	checked(['aarch64-linux-musl-gcc', '-O2', '-fPIC', '-shared', '-nostdlib',
 		'-Wl,-z,max-page-size=4096', '-Wl,-z,common-page-size=4096', output + '/assetprobe.c',
 		'-Wl,--no-as-needed', '-L' + output + '/lib/arm64-v8a', '-lfixture-dependency', '-lfixture-tls',
+		'-L' + output, '-lvulkan',
 		'-o', output + '/lib/arm64-v8a/libfixture.so'])
 	checked(['zip', '-q', '-j', output + '/unsigned.apk', output + '/classes.dex'])
 	// zip's -j would discard the ABI directory. Run in the fixture directory.

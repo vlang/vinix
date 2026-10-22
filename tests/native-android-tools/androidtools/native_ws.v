@@ -164,6 +164,7 @@ pub fn build_native_ws(smali string, runtime string, output string, compiler str
 	build_runtime(output + '/libvinix-android-compat.so', compiler, output + '/runtime-generated', arch)!
 	build_native_gl_dispatch(output, compiler, arch)!
 	build_native_egl_provider(output, runtime, compiler)!
+	build_native_vulkan_loader(output, compiler, arch)!
 	checked([compiler, '-D_GNU_SOURCE', '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-unused-function', '-Wno-unused-label',
 		'-Wno-unused-parameter', '-fvisibility=hidden', '-shared', '-fPIC', '-I' + output,
 		'-Wl,-z,max-page-size=65536', '-Wl,--allow-shlib-undefined', output + '/android-native.c',

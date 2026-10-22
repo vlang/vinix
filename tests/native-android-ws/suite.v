@@ -201,8 +201,10 @@ fn prepare_module(settings map[string]json2.Any, app map[string]json2.Any, outpu
 	for name in ['libglapi.so.0', 'libvinix-ws-GLESv1_CM.so', 'libvinix-ws-GLESv2.so'] {
 		if os.is_file(native + '/' + name) { os.cp(native + '/' + name, runtime + '/usr/lib/art/native-ws/' + name)! }
 	}
-	if os.is_dir(native + '/egl-ws') {
-		os.cp_all(native + '/egl-ws', runtime + '/usr/lib/art/native-ws', false)!
+	for provider in ['egl-ws', 'vulkan-ws'] {
+		if os.is_dir(native + '/' + provider) {
+			os.cp_all(native + '/' + provider, runtime + '/usr/lib/art/native-ws', false)!
+		}
 	}
 	if os.is_file(native + '/vinix-session') { os.cp(native + '/vinix-session', module_root + '/usr/bin/vinix-session')! }
 	os.cp(native + '/vinix-desktop', module_root + '/usr/bin/vinix-android-calculator')!

@@ -92,6 +92,15 @@ software DRI closure, verifies its ELF dependencies, and retains upstream
 sources, notices and a SHA256 receipt. The regression APK checks shader output,
 window presentation, thread isolation, deferred destruction and Java array
 validation; these checks alone do not establish compatibility with Maps.
+
+APKs which link `libvulkan.so` use the pinned Khronos Vulkan 1.3.261 loader
+from Alpine's ARM64 musl package. The builder checks the package and upstream
+source hashes, ELF architecture and dependency closure, and retains sources,
+license notices and a build receipt. This loader has no X11/GTK dependency.
+No Vulkan ICD is installed; instance creation returns
+`VK_ERROR_INCOMPATIBLE_DRIVER`. Vulkan rendering and WS presentation remain
+unavailable. The signed guest fixture checks actual Android `DT_NEEDED`
+imports, loader version, procedure lookup and rejection without an ICD.
 View drawing preserves the destination Canvas through backgrounds and child
 views, including bitmap targets used by the window composition regression.
 
