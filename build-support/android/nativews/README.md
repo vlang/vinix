@@ -103,7 +103,10 @@ construction. Package contexts remain lazy; repeated service starts reuse the
 initialized Application and providers. Content providers retain their owning
 package context and resources; attachment calls `onCreate` once.
 Companion package contexts use their own `ApplicationInfo.dataDir` for private
-files and preferences. The preference cache is keyed by the private file path,
+files and preferences. Custom directories use `dataDir/app_<name>` and the
+cache uses `dataDir/cache`, alongside `files`. Custom names reject path
+separators; target SDK 24 and above rejects world-readable/writeable modes.
+The preference cache is keyed by the private file path,
 so identical preference names in different APKs remain independent.
 `services-fixture.v` checks this ordering with two signed APKs, package resource
 isolation, main-thread binding callbacks and callbacks on a supplied executor.

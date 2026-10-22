@@ -396,6 +396,97 @@ invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0'
 }
 
+fn directory_checks() string {
+	mut body := ''
+	for index, context in ['p0', 'p1'] {
+		body += 'invoke-virtual {' + context + '}, Landroid/content/Context;->getDataDir()Ljava/io/File;\nmove-result-object v0\n'
+		for kind in ['custom', 'cache'] {
+			call := if kind == 'custom' {
+				'const-string v2, "fixture"\nconst/4 v3, 0\ninvoke-virtual {' + context + ', v2, v3}, Landroid/content/Context;->getDir(Ljava/lang/String;I)Ljava/io/File;\n'
+			} else {
+				'invoke-virtual {' + context + '}, Landroid/content/Context;->getCacheDir()Ljava/io/File;\n'
+			}
+			name := if kind == 'custom' { 'app_fixture' } else { 'cache' }
+			body += call + 'move-result-object v1
+invoke-virtual {v1}, Ljava/io/File;->isDirectory()Z
+move-result v2
+if-eqz v2, :bad
+invoke-virtual {v1}, Ljava/io/File;->getParentFile()Ljava/io/File;
+move-result-object v2
+invoke-virtual {v0, v2}, Ljava/io/File;->equals(Ljava/lang/Object;)Z
+move-result v2
+if-eqz v2, :bad
+invoke-virtual {v1}, Ljava/io/File;->getName()Ljava/lang/String;
+move-result-object v2
+const-string v3, "' + name + '"
+invoke-virtual {v2, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v2
+if-eqz v2, :bad
+' + call + 'move-result-object v2
+invoke-virtual {v1, v2}, Ljava/io/File;->equals(Ljava/lang/Object;)Z
+move-result v2
+if-eqz v2, :bad
+new-instance v2, Ljava/io/File;
+const-string v3, "owner.bin"
+invoke-direct {v2, v1, v3}, Ljava/io/File;-><init>(Ljava/io/File;Ljava/lang/String;)V
+new-instance v3, Ljava/io/FileOutputStream;
+invoke-direct {v3, v2}, Ljava/io/FileOutputStream;-><init>(Ljava/io/File;)V
+const/16 v4, ' + (49 + index).str() + '
+invoke-virtual {v3, v4}, Ljava/io/FileOutputStream;->write(I)V
+invoke-virtual {v3}, Ljava/io/FileOutputStream;->close()V
+'
+		}
+	}
+	// Reopen after both packages wrote the same relative names.
+	for index, context in ['p0', 'p1'] {
+		for kind in ['custom', 'cache'] {
+			body += if kind == 'custom' {
+				'const-string v0, "fixture"\nconst/4 v1, 0\ninvoke-virtual {' + context + ', v0, v1}, Landroid/content/Context;->getDir(Ljava/lang/String;I)Ljava/io/File;\n'
+			} else {
+				'invoke-virtual {' + context + '}, Landroid/content/Context;->getCacheDir()Ljava/io/File;\n'
+			}
+			body += 'move-result-object v0
+new-instance v1, Ljava/io/File;
+const-string v2, "owner.bin"
+invoke-direct {v1, v0, v2}, Ljava/io/File;-><init>(Ljava/io/File;Ljava/lang/String;)V
+new-instance v0, Ljava/io/FileInputStream;
+invoke-direct {v0, v1}, Ljava/io/FileInputStream;-><init>(Ljava/io/File;)V
+invoke-virtual {v0}, Ljava/io/FileInputStream;->read()I
+move-result v1
+invoke-virtual {v0}, Ljava/io/FileInputStream;->close()V
+const/16 v2, ' + (49 + index).str() + '
+if-ne v1, v2, :bad
+'
+		}
+	}
+	for index, mode in [1, 2] {
+		body += 'const-string v0, "forbidden"\nconst/4 v1, ' + mode.str() + '
+:mode_start_' + index.str() + '
+invoke-virtual {p0, v0, v1}, Landroid/content/Context;->getDir(Ljava/lang/String;I)Ljava/io/File;
+:mode_end_' + index.str() + '
+.catch Ljava/lang/SecurityException; {:mode_start_' + index.str() + ' .. :mode_end_' + index.str() + '} :mode_caught_' + index.str() + '
+goto :bad
+:mode_caught_' + index.str() + '
+move-exception v0
+'
+	}
+	return body + 'const-string v0, "../escape"
+const/4 v1, 0
+:name_start
+invoke-virtual {p0, v0, v1}, Landroid/content/Context;->getDir(Ljava/lang/String;I)Ljava/io/File;
+:name_end
+.catch Ljava/lang/IllegalArgumentException; {:name_start .. :name_end} :name_caught
+goto :bad
+:name_caught
+move-exception v0
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "custom/cache directory layout, isolation or mode validation"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+}
+
 fn storage_checks() string {
 	mut body := 'invoke-virtual {p1}, Landroid/content/Context;->getApplicationInfo()Landroid/content/pm/ApplicationInfo;
 move-result-object v0
@@ -639,6 +730,7 @@ return-object v0'))!
 		method('private checkParcel()V', parcel_checks()) +
 		method('private checkUser()V', user_checks()) +
 		method('private checkStorage(Landroid/content/Context;)V', storage_checks()) +
+		method('private checkDirectories(Landroid/content/Context;)V', directory_checks()) +
 		method('public onCreate(Landroid/os/Bundle;)V', '
 invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkComponents()V
@@ -656,6 +748,7 @@ const/4 v1, 3
 invoke-virtual {p0, v0, v1}, Landroid/content/Context;->createPackageContext(Ljava/lang/String;I)Landroid/content/Context;
 move-result-object v0
 invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkStorage(Landroid/content/Context;)V
+invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkDirectories(Landroid/content/Context;)V
 invoke-virtual {v0}, Landroid/content/Context;->getClassLoader()Ljava/lang/ClassLoader;
 move-result-object v0
 const-string v1, "org.vinix.service.App"
@@ -754,7 +847,7 @@ iget-object v0, p0, Lorg/vinix/service/Main;->label:Landroid/widget/TextView;
 const-string v1, "Companion service startup passed"
 invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread provider-context provider-resources attach-once bind-executor-thread component-package component-metadata component-missing package-data package-files package-preferences split-info-copy local-binder-interface local-binder-identity local-binder-transact local-binder-exception user-identity system-user uid-ranges parcel-binder-identity parcel-binder-copy parcel-binder-lifetime parcel-binder-callback"
+const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread provider-context provider-resources attach-once bind-executor-thread component-package component-metadata component-missing package-data package-files package-preferences split-info-copy local-binder-interface local-binder-identity local-binder-transact local-binder-exception user-identity system-user uid-ranges parcel-binder-identity parcel-binder-copy parcel-binder-lifetime parcel-binder-callback custom-directory cache-directory directory-isolation directory-mode directory-name"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void'))!
 	for name in ['client', 'companion'] {
@@ -768,7 +861,7 @@ return-void'))!
 		} else {
 			'<application android:name="org.vinix.service.App" android:label="Companion fixture">' + components + '</application>'
 		}
-		os.write_file(dir + '/AndroidManifest.xml', '<?xml version="1.0"?><manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.vinix.service.' + name + '" android:versionCode="1"><uses-sdk android:minSdkVersion="23"/>' + application + '</manifest>')!
+		os.write_file(dir + '/AndroidManifest.xml', '<?xml version="1.0"?><manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.vinix.service.' + name + '" android:versionCode="1"><uses-sdk android:minSdkVersion="23" android:targetSdkVersion="35"/><uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>' + application + '</manifest>')!
 		checked([aapt, 'link', '-I', resources, dir + '/resources.zip', '--manifest', dir + '/AndroidManifest.xml', '-o',
 			dir + '/unsigned.apk'])
 		checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', dir + '/smali', '-o',
