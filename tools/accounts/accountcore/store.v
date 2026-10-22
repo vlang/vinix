@@ -39,19 +39,19 @@ pub:
 }
 
 pub fn (s Store) passwd_path() string {
-	return os.join_path(s.etc, 'passwd')
+	return s.etc + '/passwd'
 }
 
 pub fn (s Store) group_path() string {
-	return os.join_path(s.etc, 'group')
+	return s.etc + '/group'
 }
 
 pub fn (s Store) shadow_path() string {
-	return os.join_path(s.etc, 'shadow')
+	return s.etc + '/shadow'
 }
 
 fn (s Store) lock_path() string {
-	return os.join_path(s.etc, '.pwd.lock')
+	return s.etc + '/.pwd.lock'
 }
 
 // A lock held on the store. Readers share it, a writer has it alone, and it
@@ -63,6 +63,7 @@ pub struct Lock {
 
 pub fn (s Store) lock(exclusive bool) !Lock {
 	path := s.lock_path()
+	defer { unsafe { path.free() } }
 	fd := C.open(&char(path.str), C.O_RDWR | C.O_CREAT | C.O_CLOEXEC | C.O_NOFOLLOW, 0o600)
 	if fd < 0 {
 		return error('cannot open ${path}')
@@ -93,7 +94,7 @@ pub fn read_trusted(path string, private bool, owned bool) !string {
 	}
 	defer { C.close(fd) }
 	mut info := C.stat{}
-	if C.fstat(fd, &info) != 0 {
+	if C.fstat(fd, unsafe { &info }) != 0 {
 		return error('cannot inspect ${path}')
 	}
 	if u32(info.st_mode) & 0o170000 != 0o100000 {
@@ -112,6 +113,7 @@ pub fn read_trusted(path string, private bool, owned bool) !string {
 		return error('${path} is too large')
 	}
 	mut data := []u8{len: int(info.st_size)}
+	defer { unsafe { data.free() } }
 	mut done := 0
 	for done < data.len {
 		got := C.read(fd, unsafe { &data[done] }, usize(data.len - done))
@@ -176,28 +178,46 @@ fn (s Store) replace(path string, text string, mode u32) ! {
 // The database as the files have it. A missing shadow file is an empty one:
 // every account is then one nobody can log in to.
 pub fn (s Store) load() !Database {
-	passwd := read_trusted(s.passwd_path(), false, s.owned)!
-	group := read_trusted(s.group_path(), false, s.owned)!
+	passwd_path := s.passwd_path()
+	group_path := s.group_path()
+	shadow_path := s.shadow_path()
+	defer { unsafe { passwd_path.free(); group_path.free(); shadow_path.free() } }
+	passwd := read_trusted(passwd_path, false, s.owned)!
+	defer { unsafe { passwd.free() } }
+	group := read_trusted(group_path, false, s.owned)!
+	defer { unsafe { group.free() } }
 	mut shadow := ''
-	if os.exists(s.shadow_path()) || os.is_link(s.shadow_path()) {
-		shadow = read_trusted(s.shadow_path(), true, s.owned)!
+	defer { unsafe { shadow.free() } }
+	if os.exists(shadow_path) || os.is_link(shadow_path) {
+		shadow = read_trusted(shadow_path, true, s.owned)!
 	}
-	db := Database{
-		users:   parse_passwd(passwd)!
-		groups:  parse_group(group)!
-		shadows: parse_shadow(shadow)!
-	}
+	mut db := Database{}
+	mut complete := false
+	defer { if !complete { db.close() } }
+	db.users = parse_passwd(passwd)!
+	db.groups = parse_group(group)!
+	db.shadows = parse_shadow(shadow)!
 	db.validate()!
+	complete = true
 	return db
 }
 
 // Only what everyone may read: for a program that is not root.
 pub fn (s Store) load_public() !Database {
-	db := Database{
-		users:  parse_passwd(read_trusted(s.passwd_path(), false, s.owned)!)!
-		groups: parse_group(read_trusted(s.group_path(), false, s.owned)!)!
-	}
+	passwd_path := s.passwd_path()
+	group_path := s.group_path()
+	defer { unsafe { passwd_path.free(); group_path.free() } }
+	passwd := read_trusted(passwd_path, false, s.owned)!
+	defer { unsafe { passwd.free() } }
+	group := read_trusted(group_path, false, s.owned)!
+	defer { unsafe { group.free() } }
+	mut db := Database{}
+	mut complete := false
+	defer { if !complete { db.close() } }
+	db.users = parse_passwd(passwd)!
+	db.groups = parse_group(group)!
 	db.validate()!
+	complete = true
 	return db
 }
 

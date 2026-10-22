@@ -6,6 +6,12 @@
 // account record is how a malformed line becomes a second root.
 module accountcore
 
+fn line_error(source string, index int, detail string) IError {
+	number := (index + 1).str()
+	defer { unsafe { number.free() } }
+	return error('${source} line ${number}: ${detail}')
+}
+
 fn parse_id(text string) !u32 {
 	if text.len == 0 || text.len > 10 {
 		return error('invalid number')
@@ -42,15 +48,18 @@ fn file_lines(text string) ![]string {
 		return error('last line is not terminated')
 	}
 	mut lines := []string{}
+	lines.flags |= .noslices
+	mut complete := false
+	defer { if !complete { unsafe { lines.free() } } }
 	mut start := 0
 	for i in 0 .. text.len {
 		ch := text[i]
 		if ch == 0 || ch == `\r` {
-			return error('line ${lines.len + 1}: control character')
+			return line_error('account', lines.len, 'control character')
 		}
 		if ch == `\n` {
 			if i - start > max_line {
-				return error('line ${lines.len + 1}: too long')
+				return line_error('account', lines.len, 'too long')
 			}
 			lines << text[start..i]
 			start = i + 1
@@ -59,33 +68,41 @@ fn file_lines(text string) ![]string {
 			}
 		}
 	}
+	complete = true
 	return lines
 }
 
 pub fn parse_passwd(text string) ![]User {
 	mut users := []User{}
-	for index, line in file_lines(text)! {
+	users.flags |= .noslices
+	mut complete := false
+	defer { if !complete { close_users(mut users) } }
+	lines := file_lines(text)!
+	defer { unsafe { lines.free() } }
+	for index, line in lines {
 		fields := line.split(':')
+		defer { unsafe { fields.free() } }
 		if fields.len != 7 {
-			return error('passwd line ${index + 1}: expected 7 fields')
+			return line_error('passwd', index, 'expected 7 fields')
 		}
-		uid := parse_id(fields[2]) or { return error('passwd line ${index + 1}: invalid uid') }
-		gid := parse_id(fields[3]) or { return error('passwd line ${index + 1}: invalid gid') }
+		uid := parse_id(fields[2]) or { unsafe { err.free() }; return line_error('passwd', index, 'invalid uid') }
+		gid := parse_id(fields[3]) or { unsafe { err.free() }; return line_error('passwd', index, 'invalid gid') }
 		// The second field once held the password. Anything but the marker
 		// that says "look in shadow" would be a password these tools never
 		// check, so it is not accepted.
 		if fields[1] != 'x' {
-			return error('passwd line ${index + 1}: password field must be x')
+			return line_error('passwd', index, 'password field must be x')
 		}
 		users << User{
-			name:  fields[0]
+			name:  fields[0].clone()
 			uid:   uid
 			gid:   gid
-			gecos: fields[4]
-			home:  fields[5]
-			shell: fields[6]
+			gecos: fields[4].clone()
+			home:  fields[5].clone()
+			shell: fields[6].clone()
 		}
 	}
+	complete = true
 	return users
 }
 
@@ -100,28 +117,35 @@ pub fn format_passwd(users []User) string {
 
 pub fn parse_group(text string) ![]Group {
 	mut groups := []Group{}
-	for index, line in file_lines(text)! {
+	groups.flags |= .noslices
+	mut complete := false
+	defer { if !complete { close_groups(mut groups) } }
+	lines := file_lines(text)!
+	defer { unsafe { lines.free() } }
+	for index, line in lines {
 		fields := line.split(':')
+		defer { unsafe { fields.free() } }
 		if fields.len != 4 {
-			return error('group line ${index + 1}: expected 4 fields')
+			return line_error('group', index, 'expected 4 fields')
 		}
-		gid := parse_id(fields[2]) or { return error('group line ${index + 1}: invalid gid') }
+		gid := parse_id(fields[2]) or { unsafe { err.free() }; return line_error('group', index, 'invalid gid') }
 		// Group passwords are not a thing here: a field that held one would
 		// be a credential nothing checks, and would be lost when the file
 		// is next written.
 		if fields[1] != 'x' {
-			return error('group line ${index + 1}: password field must be x')
+			return line_error('group', index, 'password field must be x')
 		}
 		mut members := []string{}
 		if fields[3] != '' {
 			members = fields[3].split(',')
 		}
 		groups << Group{
-			name:    fields[0]
+			name:    fields[0].clone()
 			gid:     gid
 			members: members
 		}
 	}
+	complete = true
 	return groups
 }
 
@@ -136,18 +160,27 @@ pub fn format_group(groups []Group) string {
 
 pub fn parse_shadow(text string) ![]Shadow {
 	mut shadows := []Shadow{}
-	for index, line in file_lines(text)! {
+	shadows.flags |= .noslices
+	mut complete := false
+	defer { if !complete { close_shadows(mut shadows) } }
+	lines := file_lines(text)!
+	defer { unsafe { lines.free() } }
+	for index, line in lines {
 		fields := line.split(':')
+		defer { unsafe { fields.free() } }
 		if fields.len != 9 {
-			return error('shadow line ${index + 1}: expected 9 fields')
+			return line_error('shadow', index, 'expected 9 fields')
 		}
+		mut ageing := []string{cap: 6}
+		for i in 3 .. 9 { ageing << fields[i].clone() }
 		shadows << Shadow{
-			name:    fields[0]
-			hash:    fields[1]
-			changed: fields[2]
-			ageing:  fields[3..9].clone()
+			name:    fields[0].clone()
+			hash:    fields[1].clone()
+			changed: fields[2].clone()
+			ageing:  ageing
 		}
 	}
+	complete = true
 	return shadows
 }
 

@@ -139,10 +139,13 @@ pub fn valid_path(path string) bool {
 	if path == '/' {
 		return true
 	}
-	for part in path[1..].split('/') {
-		if part == '' || part == '.' || part == '..' {
-			return false
-		}
+	mut start := 1
+	for i in 1 .. path.len + 1 {
+		if i < path.len && path[i] != `/` { continue }
+		length := i - start
+		if length == 0 || (length == 1 && path[start] == `.`)
+			|| (length == 2 && path[start] == `.` && path[start + 1] == `.`) { return false }
+		start = i + 1
 	}
 	return true
 }
@@ -249,15 +252,20 @@ pub fn (db &Database) validate() ! {
 	}
 	mut names := map[string]bool{}
 	mut uids := map[u32]bool{}
+	defer { unsafe { names.free(); uids.free() } }
 	for user in db.users {
 		if !valid_name(user.name) {
-			return error('invalid user name "${printable(user.name)}"')
+			name := printable(user.name)
+			defer { unsafe { name.free() } }
+			return error('invalid user name "${name}"')
 		}
 		if user.name in names {
 			return error('user ${user.name} is listed twice')
 		}
 		if user.uid in uids {
-			return error('uid ${user.uid} is used twice')
+			number := user.uid.str()
+			defer { unsafe { number.free() } }
+			return error('uid ${number} is used twice')
 		}
 		if !valid_field(user.gecos, max_gecos) {
 			return error('user ${user.name}: invalid description')
@@ -273,20 +281,26 @@ pub fn (db &Database) validate() ! {
 	}
 	mut group_names := map[string]bool{}
 	mut gids := map[u32]bool{}
+	defer { unsafe { group_names.free(); gids.free() } }
 	for group in db.groups {
 		if !valid_name(group.name) {
-			return error('invalid group name "${printable(group.name)}"')
+			name := printable(group.name)
+			defer { unsafe { name.free() } }
+			return error('invalid group name "${name}"')
 		}
 		if group.name in group_names {
 			return error('group ${group.name} is listed twice')
 		}
 		if group.gid in gids {
-			return error('gid ${group.gid} is used twice')
+			number := group.gid.str()
+			defer { unsafe { number.free() } }
+			return error('gid ${number} is used twice')
 		}
 		if group.members.len > max_members {
 			return error('group ${group.name} has too many members')
 		}
 		mut seen := map[string]bool{}
+		defer { unsafe { seen.free() } }
 		for member in group.members {
 			if !valid_name(member) {
 				return error('group ${group.name}: invalid member name')
@@ -301,10 +315,13 @@ pub fn (db &Database) validate() ! {
 	}
 	for user in db.users {
 		if user.gid !in gids {
-			return error('user ${user.name}: primary group ${user.gid} does not exist')
+			number := user.gid.str()
+			defer { unsafe { number.free() } }
+			return error('user ${user.name}: primary group ${number} does not exist')
 		}
 	}
 	mut shadow_names := map[string]bool{}
+	defer { unsafe { shadow_names.free() } }
 	for shadow in db.shadows {
 		if !valid_name(shadow.name) {
 			return error('invalid name in the password file')
@@ -330,6 +347,7 @@ pub fn (db &Database) validate() ! {
 // A name that failed validation, made safe to put in a message.
 fn printable(text string) string {
 	mut out := []u8{cap: text.len}
+	defer { unsafe { out.free() } }
 	for i in 0 .. text.len {
 		if i == 40 {
 			break
