@@ -642,6 +642,7 @@ const available_apps = [
 		height: 690
 		process_name: 'vinix-software'
 		keyboard: true
+		pointer: true
 		polling: true
 		poll_interval_ms: 100
 		open: open_software
