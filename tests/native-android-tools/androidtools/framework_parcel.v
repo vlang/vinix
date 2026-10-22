@@ -8,6 +8,21 @@ import os
 fn framework_parcel_binders(smali string) ! {
 	path := smali + '/android/os/Parcel.smali'
 	mut text := os.read_file(path)!
+	// SafeParcel writers use int presence markers, including nonzero object
+	// sizes rather than just 1. A byte boolean consumes only part of the marker.
+	for signature in ['createTypedArray(Landroid/os/Parcelable$Creator;)[Ljava/lang/Object;',
+		'createTypedArrayList(Landroid/os/Parcelable$Creator;)Ljava/util/ArrayList;',
+		'readTypedArray([Ljava/lang/Object;Landroid/os/Parcelable$Creator;)V',
+		'readTypedList(Ljava/util/List;Landroid/os/Parcelable$Creator;)V',
+		'writeTypedArray([Landroid/os/Parcelable;I)V', 'writeTypedList(Ljava/util/List;)V'] {
+		start := text.index('.method public ' + signature + '\n') or { return error('missing Parcel method: ' + signature) }
+		end := start + (text[start..].index('.end method') or { return error('unterminated Parcel method') })
+		body := text[start..end]
+		old := if signature.starts_with('write') { '->writeBoolean(Z)V' } else { '->readBoolean()Z' }
+		new := if signature.starts_with('write') { '->writeInt(I)V' } else { '->readInt()I' }
+		if body.count(old) != 1 { return error('unexpected Parcel typed marker: ' + signature) }
+		text = text[..start] + body.replace(old, new) + text[end..]
+	}
 	text += '\n.field private vinixBinders:Landroid/util/SparseArray;\n'
 	methods := {
 		'readStrongBinder()Landroid/os/IBinder;': '.locals 3

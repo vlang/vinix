@@ -233,6 +233,71 @@ throw v0'
 	return body
 }
 
+fn typed_parcel_checks() string {
+	mut body := 'invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;\nmove-result-object v0\nnew-instance v1, Lorg/vinix/service/ParcelCreator;\ninvoke-direct {v1}, Lorg/vinix/service/ParcelCreator;-><init>()V\n'
+	// Decode independently written SafeParcel-style markers, including a size
+	// marker of 8 and a null between two objects. Check complete consumption.
+	for reader in ['createTypedArray', 'readTypedArray', 'createTypedArrayList', 'readTypedList'] {
+		body += 'invoke-virtual {v0}, Landroid/os/Parcel;->recycle()V\n'
+		for value in [3, 8, 41, 7, 0, 1, 42, 9] {
+			body += 'const/16 v4, ${value}\ninvoke-virtual {v0, v4}, Landroid/os/Parcel;->writeInt(I)V\n'
+		}
+		body += 'const/4 v4, 0\ninvoke-virtual {v0, v4}, Landroid/os/Parcel;->setDataPosition(I)V\n'
+		body += match reader {
+			'createTypedArray' { 'invoke-virtual {v0, v1}, Landroid/os/Parcel;->createTypedArray(Landroid/os/Parcelable\$Creator;)[Ljava/lang/Object;\nmove-result-object v2\n' }
+			'readTypedArray' { 'const/4 v4, 3\nnew-array v2, v4, [Lorg/vinix/service/ParcelValue;\ninvoke-virtual {v0, v2, v1}, Landroid/os/Parcel;->readTypedArray([Ljava/lang/Object;Landroid/os/Parcelable\$Creator;)V\n' }
+			'createTypedArrayList' { 'invoke-virtual {v0, v1}, Landroid/os/Parcel;->createTypedArrayList(Landroid/os/Parcelable\$Creator;)Ljava/util/ArrayList;\nmove-result-object v2\n' }
+			else { 'new-instance v2, Ljava/util/ArrayList;\ninvoke-direct {v2}, Ljava/util/ArrayList;-><init>()V\ninvoke-virtual {v0, v2, v1}, Landroid/os/Parcel;->readTypedList(Ljava/util/List;Landroid/os/Parcelable\$Creator;)V\n' }
+		}
+		if reader.ends_with('List') { body += 'invoke-interface {v2}, Ljava/util/List;->toArray()[Ljava/lang/Object;\nmove-result-object v2\n' }
+		body += 'array-length v3, v2\nconst/4 v4, 3\nif-ne v3, v4, :bad\n'
+		for index, value in [41, 0, 42] {
+			body += 'const/4 v4, ${index}\naget-object v3, v2, v4\n'
+			if value == 0 { body += 'if-nez v3, :bad\n' }
+			else { body += 'check-cast v3, Lorg/vinix/service/ParcelValue;\niget v3, v3, Lorg/vinix/service/ParcelValue;->value:I\nconst/16 v4, ${value}\nif-ne v3, v4, :bad\n' }
+		}
+		body += 'invoke-virtual {v0}, Landroid/os/Parcel;->dataAvail()I\nmove-result v3\nif-nez v3, :bad\n'
+	}
+	// Inspect writers with a raw int decoder, rather than round-tripping through
+	// the reader under test. Also check Parcelable flags and null/empty arrays.
+	for writer in ['writeTypedArray', 'writeTypedList'] {
+		body += 'invoke-virtual {v0}, Landroid/os/Parcel;->recycle()V\nconst/4 v4, 3\nnew-array v2, v4, [Lorg/vinix/service/ParcelValue;\n'
+		for index, value in [41, 0, 42] {
+			if value == 0 { continue }
+			body += 'new-instance v3, Lorg/vinix/service/ParcelValue;\ninvoke-direct {v3}, Lorg/vinix/service/ParcelValue;-><init>()V\nconst/16 v4, ${value}\niput v4, v3, Lorg/vinix/service/ParcelValue;->value:I\nconst/4 v4, ${index}\naput-object v3, v2, v4\n'
+		}
+		if writer == 'writeTypedArray' { body += 'const/4 v4, 2\ninvoke-virtual {v0, v2, v4}, Landroid/os/Parcel;->writeTypedArray([Landroid/os/Parcelable;I)V\n' }
+		else { body += 'invoke-static {v2}, Ljava/util/Arrays;->asList([Ljava/lang/Object;)Ljava/util/List;\nmove-result-object v2\ninvoke-virtual {v0, v2}, Landroid/os/Parcel;->writeTypedList(Ljava/util/List;)V\n' }
+		flags := if writer == 'writeTypedArray' { 2 } else { 0 }
+		body += 'const/4 v4, 0\ninvoke-virtual {v0, v4}, Landroid/os/Parcel;->setDataPosition(I)V\n'
+		for value in [3, 1, 41, flags, 0, 1, 42, flags] {
+			body += 'invoke-virtual {v0}, Landroid/os/Parcel;->readInt()I\nmove-result v3\nconst/16 v4, ${value}\nif-ne v3, v4, :bad\n'
+		}
+		body += 'invoke-virtual {v0}, Landroid/os/Parcel;->dataAvail()I\nmove-result v3\nif-nez v3, :bad\n'
+		for size in [-1, 0] {
+			body += 'invoke-virtual {v0}, Landroid/os/Parcel;->recycle()V\nconst/4 v2, 0\nconst/4 v4, 0\n'
+			if size == 0 {
+				body += if writer == 'writeTypedArray' { 'new-array v2, v4, [Lorg/vinix/service/ParcelValue;\n' } else { 'new-instance v2, Ljava/util/ArrayList;\ninvoke-direct {v2}, Ljava/util/ArrayList;-><init>()V\n' }
+			}
+			body += if writer == 'writeTypedArray' { 'invoke-virtual {v0, v2, v4}, Landroid/os/Parcel;->writeTypedArray([Landroid/os/Parcelable;I)V\n' } else { 'invoke-virtual {v0, v2}, Landroid/os/Parcel;->writeTypedList(Ljava/util/List;)V\n' }
+			body += 'invoke-virtual {v0, v4}, Landroid/os/Parcel;->setDataPosition(I)V\ninvoke-virtual {v0}, Landroid/os/Parcel;->readInt()I\nmove-result v3\nconst/4 v4, ${size}\nif-ne v3, v4, :bad\n'
+		}
+	}
+	body += 'invoke-virtual {v0}, Landroid/os/Parcel;->recycle()V\nreturn-void\n:bad\nnew-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "Parcel typed collection markers, nulls, payload and flags"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0'
+	return body
+}
+
+fn typed_parcel_classes(dir string) ! {
+	os.write_file(dir + '/ParcelValue.smali', '.class public Lorg/vinix/service/ParcelValue;\n.super Ljava/lang/Object;\n.implements Landroid/os/Parcelable;\n.field public value:I\n' +
+		method('public constructor <init>()V', 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void') +
+		method('public describeContents()I', 'const/4 v0, 0\nreturn v0') +
+		method('public writeToParcel(Landroid/os/Parcel;I)V', 'iget v0, p0, Lorg/vinix/service/ParcelValue;->value:I\ninvoke-virtual {p1, v0}, Landroid/os/Parcel;->writeInt(I)V\ninvoke-virtual {p1, p2}, Landroid/os/Parcel;->writeInt(I)V\nreturn-void'))!
+	os.write_file(dir + '/ParcelCreator.smali', '.class public Lorg/vinix/service/ParcelCreator;\n.super Ljava/lang/Object;\n.implements Landroid/os/Parcelable$Creator;\n' +
+		method('public constructor <init>()V', 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void') +
+		method('public newArray(I)[Ljava/lang/Object;', 'new-array v0, p1, [Lorg/vinix/service/ParcelValue;\nreturn-object v0') +
+		method('public createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;', 'new-instance v0, Lorg/vinix/service/ParcelValue;\ninvoke-direct {v0}, Lorg/vinix/service/ParcelValue;-><init>()V\ninvoke-virtual {p1}, Landroid/os/Parcel;->readInt()I\nmove-result v1\niput v1, v0, Lorg/vinix/service/ParcelValue;->value:I\ninvoke-virtual {p1}, Landroid/os/Parcel;->readInt()I\nreturn-object v0'))!
+}
+
 fn user_checks() string {
 	return 'invoke-static {}, Landroid/os/Process;->myUid()I
 move-result v0
@@ -963,6 +1028,7 @@ return-object v0'))!
 		method('private checkComponents()V', component_checks()) +
 		method('private checkBinder()V', binder_checks()) +
 		method('private checkParcel()V', parcel_checks()) +
+		method('private checkTypedParcel()V', typed_parcel_checks()) +
 		method('private checkUser()V', user_checks()) +
 		method('private checkPriority()V', priority_checks()) +
 		method('private checkImportance()V', importance_checks()) +
@@ -1008,6 +1074,7 @@ invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkComponents()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkBinder()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkParcel()V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkTypedParcel()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkUser()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkImportance()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkPriority()V
@@ -1131,6 +1198,7 @@ const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void'))!
 	importance_listener(out + '/client/smali/org/vinix/service')!
+	typed_parcel_classes(out + '/client/smali/org/vinix/service')!
 	for name in ['client', 'companion'] {
 		dir := out + '/' + name
 		os.mkdir_all(dir + '/res/values')!
