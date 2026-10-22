@@ -86,6 +86,9 @@ const-string v0, "VinixTLS"
 invoke-static {v0}, Ljava/security/Security;->getProvider(Ljava/lang/String;)Ljava/security/Provider;
 move-result-object v0
 if-nez v0, :done
+const-string v0, "keystore.type"
+const-string v1, "JKS"
+invoke-static {v0, v1}, Ljava/security/Security;->setProperty(Ljava/lang/String;Ljava/lang/String;)V
 new-instance v0, ${provider}
 invoke-direct {v0}, ${provider}-><init>()V
 invoke-static {}, Ljava/security/Security;->getProviders()[Ljava/security/Provider;

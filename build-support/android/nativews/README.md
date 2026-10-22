@@ -249,6 +249,11 @@ has no Data Saver policy. This is independent of the metered-link classification
 ART receives the private runtime's generated JKS path, type and password before
 WolfJSSE creates its default SSLContext. Native builds also carry `cacerts` into
 the APK suite's staged runtime, including when its baseline image is older.
+The platform keystore default is JKS to match that store. Conscrypt's default
+context uses `KeyStore.getDefaultType()` rather than the separate JSSE
+`trustStoreType` property (see
+[Conscrypt's implementation](https://github.com/google/conscrypt/blob/master/common/src/main/java/org/conscrypt/DefaultSSLContextImpl.java));
+explicitly requested BKS stores remain available.
 An Android `OpenSSLProvider` adapter exposes TLS contexts as `VinixTLS`, just
 before wolfJSSE in the provider list. It advertises only SSLContext algorithms
 that wolfJSSE supports; other provider services retain their precedence. Each
@@ -262,7 +267,10 @@ without mistaking a missing method for a fatal TLS failure.
 as the HTTPS generator below. Run it with at least 100 startup seconds and
 Internet access. It waits for the kernel default route, checks background
 policy and callback contracts, and negotiates real TLS `h2` with Google through
-the adapter. Require both `BOOTSTRAP-CONNECTIVITY-PASS` (including
+the adapter. It also loads the real CA store using `KeyStore.getDefaultType()`,
+checks explicit BKS support, and checks that provider reinstallation preserves
+an application's later default-type override (`KEYSTORE-DEFAULT-PASS`).
+Require both `BOOTSTRAP-CONNECTIVITY-PASS` (including
 `background-policy`) and `TLS-ALPN-PASS`; the latter checks idempotent provider
 installation, default-context wrapping, pre-handshake ALPN/NPN reflection,
 socket state/options/I/O, default certificate trust, correct/wrong hostname

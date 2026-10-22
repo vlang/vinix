@@ -77,6 +77,7 @@ const-wide/16 v2, 200
 invoke-static {v2, v3}, Ljava/lang/Thread;->sleep(J)V
 goto :route
 :connected
+invoke-static {}, ${probe}->checkDefaultKeyStore()V
 const-string v0, "VinixTLS"
 invoke-static {v0}, Ljava/security/Security;->getProvider(Ljava/lang/String;)Ljava/security/Provider;
 move-result-object v6
@@ -262,6 +263,61 @@ add-int/lit8 v0, v0, 1
 const/16 v1, 9
 if-lt v0, v1, :stream
 return-void
+' + failure) + method('private static checkDefaultKeyStore()V', '
+invoke-static {}, Ljava/security/KeyStore;->getDefaultType()Ljava/lang/String;
+move-result-object v0
+const-string v1, "JKS"
+invoke-virtual {v1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v1
+if-eqz v1, :bad
+invoke-static {v0}, Ljava/security/KeyStore;->getInstance(Ljava/lang/String;)Ljava/security/KeyStore;
+move-result-object v0
+const-string v1, "javax.net.ssl.trustStore"
+invoke-static {v1}, Ljava/lang/System;->getProperty(Ljava/lang/String;)Ljava/lang/String;
+move-result-object v1
+new-instance v2, Ljava/io/FileInputStream;
+invoke-direct {v2, v1}, Ljava/io/FileInputStream;-><init>(Ljava/lang/String;)V
+const-string v1, "javax.net.ssl.trustStorePassword"
+invoke-static {v1}, Ljava/lang/System;->getProperty(Ljava/lang/String;)Ljava/lang/String;
+move-result-object v1
+invoke-virtual {v1}, Ljava/lang/String;->toCharArray()[C
+move-result-object v1
+:load
+invoke-virtual {v0, v2, v1}, Ljava/security/KeyStore;->load(Ljava/io/InputStream;[C)V
+:loaded
+invoke-virtual {v2}, Ljava/io/InputStream;->close()V
+invoke-virtual {v0}, Ljava/security/KeyStore;->size()I
+move-result v1
+if-lez v1, :bad
+const-string v0, "BKS"
+invoke-static {v0}, Ljava/security/KeyStore;->getInstance(Ljava/lang/String;)Ljava/security/KeyStore;
+move-result-object v0
+const/4 v1, 0
+invoke-virtual {v0, v1, v1}, Ljava/security/KeyStore;->load(Ljava/io/InputStream;[C)V
+invoke-virtual {v0}, Ljava/security/KeyStore;->size()I
+move-result v0
+if-nez v0, :bad
+# Reinstalling an existing provider must preserve later application policy.
+const-string v0, "keystore.type"
+const-string v1, "BKS"
+invoke-static {v0, v1}, Ljava/security/Security;->setProperty(Ljava/lang/String;Ljava/lang/String;)V
+invoke-static {}, ${provider}->install()V
+invoke-static {}, Ljava/security/KeyStore;->getDefaultType()Ljava/lang/String;
+move-result-object v2
+invoke-virtual {v1, v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v2
+const-string v1, "JKS"
+invoke-static {v0, v1}, Ljava/security/Security;->setProperty(Ljava/lang/String;Ljava/lang/String;)V
+if-eqz v2, :bad
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "KEYSTORE-DEFAULT-PASS jks-roots explicit-bks install-preserves-policy"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+.catchall {:load .. :loaded} :close
+:close
+move-exception v0
+invoke-virtual {v2}, Ljava/io/InputStream;->close()V
+throw v0
 ' + failure))!
 	for name in ['App', 'High', 'Low'] { os.cp(fixture + '/smali/org/vinix/bootstrap/' + name + '.smali', dir + '/' + name + '.smali')! }
 	dex := out + '/classes.dex'
