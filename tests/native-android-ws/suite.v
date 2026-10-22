@@ -170,6 +170,10 @@ fn prepare_module(settings map[string]json2.Any, app map[string]json2.Any, outpu
 	if label.len == 0 || label.len > 128 || label.bytes().any(it < 32 || it == 127) { return error('invalid APK display label') }
 	os.write_file(module_root + '/usr/share/vinix/android-app-label', label)!
 	os.write_file(module_root + '/opt/android-test/native-mode', 'desktop')!
+	// This harness always boots QEMU user networking, whose DNS proxy is
+	// 10.0.2.3. Seed it before kernel resolver publication, including for
+	// older baseline kernels that do not publish their DHCP DNS settings.
+	os.write_file(module_root + '/etc/resolv.conf', 'nameserver 10.0.2.3\n')!
 	os.write_file(module_root + '/sbin/init', '#!/bin/sh\nexec /opt/android-test/native-guest\n')!
 	os.chmod(module_root + '/sbin/init', 0o755)!
 	archive := output + '/module.tar'
