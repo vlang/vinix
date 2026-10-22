@@ -23,6 +23,17 @@ surface. Keyboard edits notify real TextWatchers; pointer events reach Android
 MotionEvent handlers and adapter row callbacks. Closing the WS input pipe
 delivers pause, stop and destroy callbacks before the process exits.
 
+Weighted Typeface factories retain family, requested weight and slant. System
+sans, serif and monospace resolve lazily to the nearest installed DejaVu
+regular/bold/italic face; unknown families fall back to sans. A bounded cache
+owns the twelve installed faces, while Java typefaces, Paint and TextView hold
+their own references. Deriving an asset-backed typeface retains its actual
+font. Arbitrary variable weights and synthetic styles for custom fonts are
+not implemented. Paint measurement uses real glyph advances with UTF-16 range
+and surrogate-pair handling; it does not provide complex text shaping. The
+signed fixture checks style pixels, family metrics, resource retention,
+substring/array ranges, embedded NUL, null arguments and invalid bounds.
+
 View layers preserve the requested NONE/SOFTWARE/HARDWARE type and reject
 invalid values. Both enabled types use bitmap composition on this software
 Canvas, including subclass drawing and layer paint alpha. Storage is reused

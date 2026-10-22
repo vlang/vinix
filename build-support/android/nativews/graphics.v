@@ -20,6 +20,7 @@ fn C.stbtt_GetCodepointBitmap(voidptr, f32, f32, i32, &i32, &i32, &i32, &i32) &u
 fn C.stbtt_FreeBitmap(voidptr, voidptr)
 fn C.lseek(i32, i64, i32) i64
 fn C.floorf(f32) f32
+fn C.ceilf(f32) f32
 fn C.sqrtf(f32) f32
 
 struct WsTransform {
@@ -53,6 +54,7 @@ __global ws_font_data &u8
 
 fn ws_font_init(root &char) bool {
 	unsafe {
+		if C.pthread_mutex_init(&ws_font_mutex, nil) != 0 { return false }
 		path := &char(C.alloca(8192))
 		C.snprintf(path, 8192, c'%s/usr/share/fonts/dejavu/DejaVuSans.ttf', root)
 		fd := C.open(path, 0)
