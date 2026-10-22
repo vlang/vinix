@@ -1,0 +1,412 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module smb2
+
+import encoding.hex
+import crypto.hmac
+import crypto.sha256
+
+fn expect(p &u8, n int, value string) {
+	want := hex.decode(value) or { panic(err) }
+	assert want.len == n
+	for i in 0 .. n {
+		assert unsafe { p[i] } == want[i], 'vector mismatch at ${i}'
+	}
+}
+
+fn test_rfc1320_md4() {
+	mut out := [16]u8{}
+	md4(c'', 0, unsafe { &out[0] })
+	expect(unsafe { &out[0] }, 16, '31d6cfe0d16ae931b73c59d7e0c089c0')
+	md4(c'a', 1, unsafe { &out[0] })
+	expect(unsafe { &out[0] }, 16, 'bde52cb31de33e46245e05fbdbd6fb24')
+	md4(c'abc', 3, unsafe { &out[0] })
+	expect(unsafe { &out[0] }, 16, 'a448017aaf21d8525fc10ae87aa6729d')
+	md4(c'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', 62, unsafe { &out[0] })
+	expect(unsafe { &out[0] }, 16, '043f8582f241db351ce627e153e7f0e4')
+}
+
+fn test_rfc1321_md5_and_rfc2202_hmac() {
+	mut out := [16]u8{}
+	md5(c'', 0, unsafe { &out[0] })
+	expect(unsafe { &out[0] }, 16, 'd41d8cd98f00b204e9800998ecf8427e')
+	md5(c'abc', 3, unsafe { &out[0] })
+	expect(unsafe { &out[0] }, 16, '900150983cd24fb0d6963f7d28e17f72')
+	mut key := [16]u8{}
+	for i in 0 .. 16 {
+		key[i] = 0x0b
+	}
+	hmac_md5(unsafe { &key[0] }, 16, c'Hi There', 8, unsafe { &out[0] })
+	expect(unsafe { &out[0] }, 16, '9294727a3638bb1c13f48ef8158bfc9d')
+	hmac_md5(c'Jefe', 4, c'what do ya want for nothing?', 28, unsafe { &out[0] })
+	expect(unsafe { &out[0] }, 16, '750c783e6ab0b503eaa86e310a5db738')
+}
+
+fn test_rc4_rfc6229() {
+	key := [u8(1), 2, 3, 4, 5]!
+	mut input := [32]u8{}
+	mut out := [32]u8{}
+	assert rc4(unsafe { &key[0] }, 5, unsafe { &input[0] }, 32, unsafe { &out[0] })
+	expect(unsafe { &out[0] }, 32,
+		'b2396305f03dc027ccc3524a0a1118a86982944f18fc82d589c403a47a0d0919')
+	assert !rc4(unsafe { &key[0] }, 0, unsafe { &input[0] }, 32, unsafe { &out[0] })
+}
+
+fn test_ms_nlmp_response_key_vector() {
+	mut out := [16]u8{}
+	assert ntlmv2_hash('User', 'Domain', 'Password', unsafe { &out[0] })
+	expect(unsafe { &out[0] }, 16, '0c868a403bfd7a93a3001ef22ef02e3f')
+}
+
+fn test_ms_nlmp_published_ntlmv2_response() {
+	// MS-NLMP 4.2.4.3 Messages, User / Domain / Password, zero FILETIME.
+	// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/bc612491-fb0b-4829-91bc-7c6b95ff67fe
+	raw := hex.decode('4e544c4d53535000020000000c000c003800000033828ae20123456789abcdef00000000000000002400240044000000060070170000000f53006500720076006500720002000c0044006f006d00610069006e0001000c0053006500720076006500720000000000') or {
+		panic(err)
+	}
+	mut c := Challenge{}
+	assert parse_challenge(raw.data, raw.len, unsafe { &c })
+	nonce := [u8(0xaa), 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa]!
+	mut out := [4096]u8{}
+	mut key := [16]u8{}
+	n := ntlm_authenticate(unsafe { &c }, raw.data, raw.len, 'User', 'Domain', 'Password', false,
+		unsafe { &nonce[0] }, 0, unsafe { &out[0] }, 4096, unsafe { &key[0] }) or {
+		panic('authenticate')
+	}
+	nt_at, nt_len := security_buffer(unsafe { &out[0] }, n, 20) or { panic('security buffer') }
+	assert nt_len == 84
+	expect(unsafe { &out[nt_at] }, 84,
+		'68cd0ab851e51c96aabc927bebef6a1c01010000000000000000000000000000aaaaaaaaaaaaaaaa0000000002000c0044006f006d00610069006e0001000c005300650072007600650072000000000000000000')
+	lm_at, lm_len := security_buffer(unsafe { &out[0] }, n, 12) or { panic('lm buffer') }
+	assert lm_len == 24
+	expect(unsafe { &out[lm_at] }, 24, '86c35097ac9cec102554764a57cccc19aaaaaaaaaaaaaaaa')
+}
+
+fn test_spnego_der_rejects_scanning_and_bad_lengths() {
+	mut p := [256]u8{}
+	raw := ntlm_negotiate(unsafe { &p[0] })
+	n := spnego_response(unsafe { &p[0] }, raw, 256) or { panic('wrap') }
+	at, len := spnego_token(unsafe { &p[0] }, n) or { panic('DER') }
+	assert len == 40 && get32(unsafe { &p[0] }, at + 8) == 1
+	for truncated in 0 .. n {
+		if _, _ := spnego_token(unsafe { &p[0] }, truncated) { assert false
+		 }
+	}
+	if _, _ := spnego_token(unsafe { &p[0] }, n + 1) { assert false
+	 }
+	p[1] = 0x80
+	if _, _ := spnego_token(unsafe { &p[0] }, n) { assert false
+	 }
+	zero(unsafe { &p[0] }, 256)
+	ntlm_negotiate(unsafe { &p[20] })
+	if _, _ := spnego_token(unsafe { &p[0] }, 60) { assert false
+	 }
+}
+
+fn test_production_header_signature_matches_sha256_hmac() {
+	mut tx := [capacity]u8{}
+	mut scratch := [capacity + 64]u8{}
+	mut signature := [16]u8{}
+	mut c := Client{
+		tx:      unsafe { &tx[0] }
+		scratch: unsafe { &scratch[0] }
+	}
+	for i in 0 .. 16 {
+		c.key[i] = u8(i)
+	}
+	c.header(8, 49)
+	c.signature(c.tx, 113, unsafe { &signature[0] })
+	expected := hmac.new(c.key[..], tx[..113], sha256.sum, 64)
+	for i in 0 .. 16 {
+		assert signature[i] == expected[i]
+	}
+}
+
+fn test_challenge_parser_malformed() {
+	mut p := [128]u8{}
+	mut c := Challenge{}
+	move(unsafe { &p[0] }, c'NTLMSSP\x00', 8)
+	put32(unsafe { &p[0] }, 8, 2)
+	put32(unsafe { &p[0] }, 20, ntlm_flags & ~u32(0x02000000))
+	secbuf(unsafe { &p[0] }, 40, 48, 4)
+	assert parse_challenge(unsafe { &p[0] }, 52, unsafe { &c })
+	secbuf(unsafe { &p[0] }, 12, 127, 2)
+	assert !parse_challenge(unsafe { &p[0] }, 52, unsafe { &c })
+	secbuf(unsafe { &p[0] }, 12, 0, 0)
+	for n in 0 .. 52 {
+		assert !parse_challenge(unsafe { &p[0] }, n, unsafe { &c })
+	}
+	put32(unsafe { &p[0] }, 44, 0xffffffff)
+	assert !parse_challenge(unsafe { &p[0] }, 52, unsafe { &c })
+	secbuf(unsafe { &p[0] }, 40, 48, 4)
+	put16(unsafe { &p[0] }, 50, 65535)
+	assert !parse_challenge(unsafe { &p[0] }, 52, unsafe { &c })
+	put16(unsafe { &p[0] }, 50, 0)
+	put16(unsafe { &p[0] }, 48, 7)
+	assert !parse_challenge(unsafe { &p[0] }, 52, unsafe { &c })
+}
+
+fn test_timestamp_mic_av_flag_and_zero_version_slot() {
+	mut raw := [64]u8{}
+	p := unsafe { &raw[0] }
+	move(p, c'NTLMSSP\x00', 8)
+	put32(p, 8, 2)
+	put32(p, 20, ntlm_flags & ~u32(0x02000000))
+	secbuf(p, 40, 48, 16)
+	put16(p, 48, 7)
+	put16(p, 50, 8)
+	put64(p, 52, 123456)
+	mut challenge := Challenge{}
+	assert parse_challenge(p, 64, unsafe { &challenge })
+	mut nonce := [8]u8{}
+	mut out := [4096]u8{}
+	mut key := [16]u8{}
+	n := ntlm_authenticate(unsafe { &challenge }, p, 64, 'User', 'Domain', 'Password', false,
+		unsafe { &nonce[0] }, 0, unsafe { &out[0] }, 4096, unsafe { &key[0] }) or {
+		panic('MIC authenticate')
+	}
+	assert get64(unsafe { &out[0] }, 64) == 0
+	nt_at, _ := security_buffer(unsafe { &out[0] }, n, 20) or { panic('NT response') }
+	assert get16(unsafe { &out[0] }, nt_at + 56) == 6
+		&& get32(unsafe { &out[0] }, nt_at + 60) & 2 != 0
+	mut received := [16]u8{}
+	move(unsafe { &received[0] }, unsafe { &out[72] }, 16)
+	zero(unsafe { &out[72] }, 16)
+	mut nego := [40]u8{}
+	ntlm_negotiate(unsafe { &nego[0] })
+	mut transcript := []u8{}
+	transcript << nego[..]
+	transcript << raw[..]
+	transcript << out[..n]
+	expected := hmac.new(key[..], transcript, crypto_md5, 64)
+	for i in 0 .. 16 {
+		assert expected[i] == received[i]
+	}
+}
+
+fn crypto_md5(data []u8) []u8 {
+	mut result := []u8{len: 16}
+	md5(data.data, data.len, result.data)
+	return result
+}
+
+fn test_directory_parser_malformed_and_external_layout() {
+	// Independently specified FILE_ID_BOTH_DIR_INFORMATION layout (MS-FSCC 2.4.17).
+	mut p := [120]u8{}
+	mut e := DirEntry{}
+	put64(unsafe { &p[0] }, 40, 123)
+	put32(unsafe { &p[0] }, 56, 0x20)
+	put32(unsafe { &p[0] }, 60, 6)
+	put64(unsafe { &p[0] }, 96, 0x1234)
+	put16(unsafe { &p[0] }, 104, u16(`a`))
+	put16(unsafe { &p[0] }, 106, u16(`b`))
+	put16(unsafe { &p[0] }, 108, u16(`c`))
+	assert parse_entry(unsafe { &p[0] }, 110, unsafe { &e })
+	assert e.length == 3 && e.attr.size == 123 && e.attr.ino == 0x1234
+	for n in 0 .. 110 {
+		assert !parse_entry(unsafe { &p[0] }, n, unsafe { &e })
+	}
+	put32(unsafe { &p[0] }, 0, 104)
+	assert !parse_entry(unsafe { &p[0] }, 110, unsafe { &e })
+	put32(unsafe { &p[0] }, 0, 0xffffffff)
+	assert !parse_entry(unsafe { &p[0] }, 110, unsafe { &e })
+	put32(unsafe { &p[0] }, 0, 0)
+	put32(unsafe { &p[0] }, 60, 0xfffffffe)
+	assert !parse_entry(unsafe { &p[0] }, 110, unsafe { &e })
+	put32(unsafe { &p[0] }, 60, 6)
+	put16(unsafe { &p[0] }, 104, u16(`/`))
+	assert !parse_entry(unsafe { &p[0] }, 110, unsafe { &e })
+}
+
+fn test_options_source_and_utf16_limits() {
+	mut o := Options{}
+	mut address := u32(0)
+	mut share := ''
+	mut host := ''
+	assert parse_options('domain=Domain,user=User,password=Password,ro', unsafe { &o }) && o.ro
+	assert !parse_options('user=x,password=x,password=y', unsafe { &o })
+	assert !parse_options('guest,guest', unsafe { &o })
+	assert !parse_options('sec=krb5', unsafe { &o })
+	assert parse_source('//192.168.1.4/share', unsafe { &address }, unsafe { &share },
+		unsafe { &host })
+	assert address == 0x0401a8c0 && share == 'share'
+	assert !parse_source('//256.1.1.1/share', unsafe { &address }, unsafe { &share },
+		unsafe { &host })
+	assert !parse_source('//1.1.1.1/share/path', unsafe { &address }, unsafe { &share },
+		unsafe { &host })
+	mut buf := [8]u8{}
+	assert utf16('😀', unsafe { &buf[0] }, 4, false) or { -1 } == 4
+	assert (utf16('abc', unsafe { &buf[0] }, 5, false) or { -1 }) == -1
+	assert !span(100, 99, 2) && !span(100, -1, 1) && !span(100, 1, -1)
+}
+
+struct Fake {
+mut:
+	frame    [512]u8
+	length   int
+	position int
+}
+
+fn fake_transfer(ctx voidptr, p &u8, n int, sending bool) bool {
+	mut f := unsafe { &Fake(ctx) }
+	if sending { return true }
+	if !span(f.length, f.position, n) { return false }
+	move(p, unsafe { &f.frame[f.position] }, n)
+	f.position += n
+	return true
+}
+
+fn test_production_client_rejects_bad_frame_and_identity() {
+	mut tx := [capacity]u8{}
+	mut rx := [capacity]u8{}
+	mut scratch := [capacity + 64]u8{}
+	mut fake := Fake{}
+	mut c := Client{
+		context:  unsafe { &fake }
+		transfer: fake_transfer
+		tx:       unsafe { &tx[0] }
+		rx:       unsafe { &rx[0] }
+		scratch:  unsafe { &scratch[0] }
+	}
+	fake.length = 4
+	fake.frame[1] = 1
+	fake.frame[2] = 0
+	fake.frame[3] = 1
+	c.header(8, 49)
+	_ := c.call(8, 113) or { u32(0) }
+	assert c.dead
+	c.dead = false
+	fake.position = 0
+	fake.length = 68
+	zero(unsafe { &fake.frame[0] }, 256)
+	fake.frame[3] = 64
+	p := unsafe { &fake.frame[4] }
+	put32(p, 0, 0x424d53fe)
+	put16(p, 4, 64)
+	put16(p, 12, 8)
+	put32(p, 16, 1)
+	put64(p, 24, 999)
+	_ = c.call(8, 113) or { u32(0) }
+	assert c.dead
+}
+
+fn test_status_mapping() {
+	assert status_errno(0xc000006d) == 13
+	assert status_errno(0xc00000cc) == 2
+	assert status_errno(0xc00000a2) == 30
+}
+
+fn test_final_spnego_requires_accept_complete_without_mic() {
+	mut response := [u8(0xa1), 7, 0x30, 5, 0xa0, 3, 0x0a, 1, 0]!
+	assert spnego_complete(unsafe { &response[0] }, response.len)
+	for state in 1 .. 4 {
+		response[8] = u8(state)
+		assert !spnego_complete(unsafe { &response[0] }, response.len)
+	}
+	response[8] = 0
+	for length in 0 .. response.len {
+		assert !spnego_complete(unsafe { &response[0] }, length)
+	}
+	mic := [u8(0xa1), 13, 0x30, 11, 0xa0, 3, 0x0a, 1, 0, 0xa3, 4, 4, 2, 0, 0]!
+	assert !spnego_complete(unsafe { &mic[0] }, mic.len)
+}
+
+fn test_final_response_signature_and_failure_erasure() {
+	mut tx := [capacity]u8{}
+	mut rx := [capacity]u8{}
+	mut scratch := [capacity + 64]u8{}
+	mut fake := Fake{}
+	mut c := Client{
+		context:  unsafe { &fake }
+		transfer: fake_transfer
+		tx:       unsafe { &tx[0] }
+		rx:       unsafe { &rx[0] }
+		scratch:  unsafe { &scratch[0] }
+	}
+	put32(c.rx, 16, 8)
+	c.signature(c.rx, 72, unsafe { &c.rx[48] })
+	assert c.verify_signature(c.rx, 72)
+	rx[64] ^= 1
+	assert !c.verify_signature(c.rx, 72)
+	put32(c.rx, 16, 0)
+	assert !c.verify_signature(c.rx, 72)
+	for i in 0 .. 16 {
+		c.key[i] = 0xaa
+	}
+	mut nonce := [8]u8{}
+	c.login('User', 'Domain', 'Password', false, unsafe { &nonce[0] }) or {}
+	assert !c.authenticated && c.session == 0
+	for byte in c.key {
+		assert byte == 0
+	}
+}
+
+fn test_unused_file_name_and_short_name_lengths() {
+	mut data := [128]u8{}
+	mut attr := Attr{}
+	mut entry := DirEntry{}
+	p := unsafe { &data[0] }
+	assert parse_all_info(p, 100, unsafe { &attr })
+	put32(p, 96, 0xffffffff)
+	assert !parse_all_info(p, 128, unsafe { &attr })
+	zero(p, 128)
+	data[68] = 25
+	assert !parse_entry(p, 104, unsafe { &entry })
+	data[68] = 1
+	assert !parse_entry(p, 104, unsafe { &entry })
+}
+
+fn frame(f &Fake, command u16, size int, structure u16) {
+	unsafe {
+		*f = Fake{
+			length: size + 4
+		}
+	}
+	p := unsafe { &f.frame[4] }
+	unsafe {
+		f.frame[2] = u8(size >> 8)
+		f.frame[3] = u8(size)
+	}
+	put32(p, 0, 0x424d53fe)
+	put16(p, 4, 64)
+	put16(p, 12, command)
+	put32(p, 16, 1)
+	put16(p, 64, structure)
+}
+
+fn test_unused_negotiate_blob_and_create_context_bounds() {
+	mut tx := [capacity]u8{}
+	mut rx := [capacity]u8{}
+	mut scratch := [capacity + 64]u8{}
+	mut fake := Fake{}
+	mut nonce := [16]u8{}
+	mut c := Client{
+		context:  unsafe { &fake }
+		transfer: fake_transfer
+		tx:       unsafe { &tx[0] }
+		rx:       unsafe { &rx[0] }
+		scratch:  unsafe { &scratch[0] }
+	}
+	frame(unsafe { &fake }, 0, 128, 65)
+	p := unsafe { &fake.frame[4] }
+	put16(p, 68, 0x0210)
+	put32(p, 96, 32768)
+	put32(p, 100, 32768)
+	put16(p, 120, 127)
+	put16(p, 122, 2)
+	c.negotiate(unsafe { &nonce[0] }) or {}
+	assert c.dead
+	c.dead = false
+	c.message = 0
+	frame(unsafe { &fake }, 5, 152, 89)
+	put32(p, 144, 0xffffffff)
+	put32(p, 148, 16)
+	_ := c.create('x', 0x80, 1, false) or { FileId{} }
+	assert c.dead
+	c.dead = false
+	c.message = 0
+	frame(unsafe { &fake }, 5, 160, 89)
+	put32(p, 144, 152)
+	put32(p, 148, 8)
+	_ = c.create('x', 0x80, 1, false) or { FileId{} }
+	assert c.fault == 95
+}
