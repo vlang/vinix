@@ -30,15 +30,52 @@ pub:
 // Say who is at the machine, for the authentication service's `session`
 // rule; '' when nobody is.
 pub fn mark_active(uid string) {
-	os.mkdir_all(os.dir(active_file), mode: 0o755) or {}
+	os.mkdir_all('/run/vinix/session', mode: 0o755) or { discard_manager_error(err) }
 	if uid == '' {
-		os.rm(active_file) or {}
+		os.rm(active_file) or { discard_manager_error(err) }
 		return
 	}
-	temporary := active_file + '.new'
-	os.write_file(temporary, uid + '\n') or { return }
-	os.chmod(temporary, 0o644) or {}
-	os.rename(temporary, active_file) or {}
+	temporary := '/run/vinix/session/active.new'
+	text := uid + '\n'
+	defer { unsafe { text.free() } }
+	os.write_file(temporary, text) or {
+		discard_manager_error(err)
+		return
+	}
+	os.chmod(temporary, 0o644) or { discard_manager_error(err) }
+	os.rename(temporary, active_file) or { discard_manager_error(err) }
+}
+
+// Keep one owned copy of each inherited entry. os.environ() also allocates
+// a map, keys and values, which are unnecessary in a long-lived manager.
+fn inherited_environment() []string {
+	entries := unsafe { &&char(voidptr(C.environ)) }
+	mut count := 0
+	for unsafe { entries[count] } != unsafe { nil } { count++ }
+	mut result := []string{cap: count}
+	for index in 0 .. count {
+		entry := unsafe { cstring_to_vstring(entries[index]) }
+		unsafe { result.push_many(&entry, 1) }
+	}
+	return result
+}
+
+// The child writes a positive u32 and a newline in one pipe write. Decode
+// without slices or temporary strings in the manager, and refuse truncation,
+// overflow and trailing bytes rather than accepting a partial session id.
+fn reported_session(bytes &u8, length int) u32 {
+	if length < 2 || length > 11 || unsafe { bytes[0] } == `0`
+		|| unsafe { bytes[length - 1] } != `\n` {
+		return 0
+	}
+	mut value := u64(0)
+	for index in 0 .. length - 1 {
+		digit := unsafe { bytes[index] }
+		if digit < `0` || digit > `9` { return 0 }
+		value = value * 10 + u64(digit - `0`)
+		if value > u64(0xffffffff) { return 0 }
+	}
+	return u32(value)
 }
 
 // What a login was made with, to be handed to one program of the session
@@ -142,11 +179,10 @@ fn start_profile(db accountcore.Database, user accountcore.User, argv []string, 
 		return error('an isolated session requires an ordinary account and group')
 	}
 	make_runtime_directory(user)!
-	mut inherited := []string{}
-	for name, value in os.environ() {
-		inherited << '${name}=${value}'
-	}
+	inherited := inherited_environment()
+	defer { unsafe { inherited.free() } }
 	mut environment := session_environment(user, inherited)
+	defer { unsafe { environment.free() } }
 	if control >= 0 {
 		environment << 'VINIX_SESSION_FD=3'
 	}
@@ -193,15 +229,17 @@ fn start_profile(db accountcore.Database, user accountcore.User, argv []string, 
 		// As the account, and before its first program: the store is open
 		// by the time anything asks it.
 		run_unlock_helper(unlock, environment)
+		retire_login_password(unlock.secret)
 		exec_as(user, argv, environment, control >= 0)
 		eprintln('vinix-session: cannot run ${argv[0]}')
 		C._exit(127)
 	}
 	C.close(report[1])
-	mut digits := []u8{len: 16}
-	got := C.read(report[0], digits.data, 16)
+	mut digits := [16]u8{}
+	mut got := C.read(report[0], &digits[0], 16)
+	for got < 0 && C.errno == C.EINTR { got = C.read(report[0], &digits[0], 16) }
 	C.close(report[0])
-	session := if got > 0 { u32(digits[..got].bytestr().trim_space().u64()) } else { u32(0) }
+	session := reported_session(&digits[0], int(got))
 	if session == 0 {
 		// The child could not become a login and has said why.
 		wait(child)
