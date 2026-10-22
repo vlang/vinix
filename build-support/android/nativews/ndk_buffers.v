@@ -24,6 +24,19 @@ mut:
 	bitmap i64
 }
 
+struct WsHardwareBufferPlane {
+mut:
+	data voidptr
+	pixel_stride u32
+	row_stride u32
+}
+
+struct WsHardwareBufferPlanes {
+mut:
+	count u32
+	planes [4]WsHardwareBufferPlane
+}
+
 @[export: 'AHardwareBuffer_isSupported']
 pub fn ws_hardware_supported(desc &WsHardwareBufferDesc) i32 {
 	if desc == unsafe { nil } { return 0 }
@@ -81,7 +94,7 @@ pub fn ws_hardware_lock(buffer &WsHardwareBuffer, usage u64, fence i32, rect &Ws
 	if buffer == unsafe { nil } || output == unsafe { nil } || usage == 0 || usage & ~u64(0xff) != 0 { return -22 }
 	if (usage & 15 != 0 && usage & 15 != 2 && usage & 15 != 3)
 		|| (usage & 240 != 0 && usage & 240 != 32 && usage & 240 != 48) { return -22 }
-	if fence != -1 { return -38 }
+	if fence >= 0 { return -38 }
 	if (usage & 15 != 0 && buffer.desc.usage & 15 == 0)
 		|| (usage & 240 != 0 && buffer.desc.usage & 240 == 0) { return -22 }
 	if rect != unsafe { nil } && (rect.left < 0 || rect.top < 0 || rect.right < rect.left || rect.bottom < rect.top
@@ -92,6 +105,24 @@ pub fn ws_hardware_lock(buffer &WsHardwareBuffer, usage u64, fence i32, rect &Ws
 	unsafe {
 		buffer.locked = true
 		*output = (&WsBitmap(buffer.bitmap)).rgba
+	}
+	return 0
+}
+
+@[export: 'AHardwareBuffer_lockPlanes']
+pub fn ws_hardware_lock_planes(buffer &WsHardwareBuffer, usage u64, fence i32, rect &WsNativeRect, output &WsHardwareBufferPlanes) i32 {
+	if output == unsafe { nil } { return -22 }
+	unsafe { *output = WsHardwareBufferPlanes{} }
+	mut pixels := unsafe { voidptr(nil) }
+	result := ws_hardware_lock(buffer, usage, fence, rect, &pixels)
+	if result != 0 { return result }
+	unsafe {
+		output.planes[0] = WsHardwareBufferPlane{
+			data: pixels
+			pixel_stride: 4
+			row_stride: buffer.desc.stride * 4
+		}
+		output.count = 1
 	}
 	return 0
 }

@@ -35,6 +35,14 @@ hold a native reference until the last unlock. OpenSL ES uses the runtime's
 packaged audio provider. This is a limited NDK subset, not compatibility with
 arbitrary native APK libraries.
 
+CPU RGBA hardware buffers also expose the NDK plane-lock ABI, including byte
+strides and zero planes on failure. Java `HardwareBuffer` wrappers share the
+same pixel allocation: each wrapper owns a reference, `close` is idempotent,
+and an explicitly acquired NDK reference survives Java close. Java descriptor
+queries reject closed buffers. GPU/YUV/multilayer allocations, external fences
+and hardware-buffer parcel transport remain unsupported. The signed bootstrap
+APK checks plane layout, shared pixels, multiple wrappers and acquired lifetime.
+
 The [NDK `ATrace` API](https://developer.android.com/ndk/reference/group/tracing)
 section, asynchronous section and counter entry points are
 available. `ATrace_isEnabled` returns false because this runtime has no Android

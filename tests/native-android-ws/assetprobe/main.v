@@ -43,6 +43,7 @@ fn C.ASurfaceTexture_getTimestamp(voidptr) i64
 pub fn graphics_check(e voidptr, class voidptr) u8 {
 	unsafe {
 		if !trace_check() { return 0 }
+		if !hardware_java_check(e, class) { C.puts(c'HARDWARE-BUFFER-PROBE failed'); return 0 }
 		if C.eglGetCurrentDisplay() != nil || C.eglGetCurrentContext() != nil
 			|| C.eglGetCurrentSurface(0x3059) != nil || C.eglGetError() != 0x3000 { C.puts(c'EGL-PROBE initial-state'); return 0 }
 		if C.eglGetProcAddress(c'glCreateShader') == nil

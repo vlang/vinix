@@ -546,3 +546,7 @@ android/atl/VinixUidImportance|add(Landroid/app/ActivityManager;Landroid/app/Act
 android/atl/VinixUidImportance|remove(Landroid/app/ActivityManager;Landroid/app/ActivityManager$OnUidImportanceListener;)V|ws_uid_listener(e,p0,p1,0,true)
 android/atl/VinixUidImportance|update(I)V|ws_uid_update(e,p0)
 android/atl/VinixUidUpdate|run()V|ws_uid_notify(e,this)
+android/hardware/HardwareBuffer|create(IIIIJ)Landroid/hardware/HardwareBuffer;|return ws_hardware_java_create(e,p0,p1,p2,p3,p4)
+android/hardware/HardwareBuffer|isSupported(IIIIJ)Z|return u8(ws_hardware_java_supported(p0,p1,p2,p3,p4))
+android/hardware/HardwareBuffer|vinixRelease(J)V|ws_hardware_release(&WsHardwareBuffer(p0))
+android/hardware/HardwareBuffer|vinixProperty(JI)J|return ws_hardware_java_property(p0,p1)

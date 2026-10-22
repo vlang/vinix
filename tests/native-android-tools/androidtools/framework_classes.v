@@ -93,6 +93,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_storage_queries(smali)!
  framework_startup_apis(smali)!
  framework_absent_hardware(smali)!
+ framework_hardware_buffer(smali)!
  framework_time_animator(smali)!
  framework_message_queue(smali)!
  framework_resource_fonts(smali)!
