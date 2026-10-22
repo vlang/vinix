@@ -91,6 +91,7 @@ mut:
 	canvas        voidptr
 	focused       voidptr
 	pressed       voidptr
+	press_time    i64
 	dialog        voidptr
 	dialog_x      i32
 	dialog_y      i32

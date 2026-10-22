@@ -82,6 +82,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_view_configuration(smali)!
  framework_egl(smali)!
  framework_view_attachment(smali)!
+ framework_view_touch(smali)!
  framework_gradient_colors(smali)!
  framework_paths(smali)!
  framework_pictures(smali)!

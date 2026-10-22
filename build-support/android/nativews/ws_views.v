@@ -390,6 +390,11 @@ fn ws_debug_tree(e voidptr, view voidptr, depth i32) {
 		name := obj(e, class_object, c'java/lang/Class', c'getName', c'()Ljava/lang/String;', nil)
 		chars := ws_utf(e, name)
 		C.printf(c'ANDROID-WS-TREE depth=%d class=%s rect=%d,%d,%d,%d visible=%d\n', depth, chars, get_int(e, view, c'android/view/View', c'left'), get_int(e, view, c'android/view/View', c'top'), get_int(e, view, c'android/view/View', c'right'), get_int(e, view, c'android/view/View', c'bottom'), integer(e, view, c'android/view/View', c'getVisibility', c'()I', nil))
+		if instance_of(e, view, c'android/view/SurfaceView') {
+			native := ws_view(e, view)
+			C.printf(c'ANDROID-WS-SURFACE kind=%d window=%p\n', native.kind, native.window)
+			ws_dump_surface(e, view)
+		}
 		ws_release(e, name, chars)
 		if instance_of(e, view, c'android/view/ViewGroup') {
 			count := integer(e, view, c'android/view/ViewGroup', c'getChildCount', c'()I', nil)
@@ -466,43 +471,25 @@ fn ws_motion(e voidptr, target voidptr, action i32, x i32, y i32) u8 {
 		args[5] = Value{ f: f32(x) }
 		args[6] = Value{ f: f32(y) }
 		event := new_object(e, c'android/view/MotionEvent', c'(IIJFFFF)V', args)
+		ws_put_long(e, event, c'android/view/MotionEvent', c'vinixDownTime', ws.press_time)
 		args[0] = Value{ l: event }
-		args[1] = Value{ i: 1 }
-		return boolean(e, target, c'android/view/View', c'onTouchEventInternal', c'(Landroid/view/MotionEvent;Z)Z', args)
-	}
-}
-
-fn ws_list_activate(e voidptr, leaf voidptr) {
-	unsafe {
-		mut row := leaf
-		for depth := 0; depth < 64; depth++ {
-			parent := obj(e, row, c'android/view/View', c'getParent', c'()Landroid/view/ViewParent;', nil)
-			if parent == nil || !instance_of(e, parent, c'android/view/View') { return }
-			if instance_of(e, parent, c'android/widget/ListView') {
-				count := integer(e, parent, c'android/view/ViewGroup', c'getChildCount', c'()I', nil)
-				for i := i32(0); i < count; i++ {
-					args := [Value{ i: i }]!
-					child := obj(e, parent, c'android/view/ViewGroup', c'getChildAt', c'(I)Landroid/view/View;', &args[0])
-					if Same(slot(e, 24))(e, child, row) == 0 { continue }
-					position := integer(e, parent, c'android/widget/AdapterView', c'getFirstVisiblePosition', c'()I', nil) + i
-					id_args := [Value{ i: position }]!
-					id_method := method(e, c'android/widget/AdapterView', c'getItemIdAtPosition', c'(I)J')
-					if id_method == nil { return }
-					id := WsLongCall(slot(e, 54))(e, parent, id_method, &id_args[0])
-					click := [Value{ l: row }, Value{ i: position }, Value{ j: id }]!
-					boolean(e, parent, c'android/widget/AdapterView', c'performItemClick', c'(Landroid/view/View;IJ)Z', &click[0])
-					return
-				}
-				return
-			}
-			row = parent
-		}
+		return boolean(e, target, c'android/view/View', c'dispatchTouchEvent', c'(Landroid/view/MotionEvent;)Z', args)
 	}
 }
 
 fn ws_pointer(e voidptr, event &WsEvent) {
 	unsafe {
-		if event.kind != 2 && event.kind != 3 && event.kind != 5 { return }
+		if event.kind == 1 || event.kind == 3 {
+			if ws.pressed == nil { return }
+			ws_motion(e, ws.pressed, if event.kind == 1 { 2 } else { 1 }, event.x, event.y)
+			if event.kind == 3 {
+				Drop(slot(e, 22))(e, ws.pressed)
+				ws.pressed = nil
+			}
+			ws_mark()
+			return
+		}
+		if event.kind != 2 && event.kind != 5 { return }
 		if ws.dialog != nil && (event.x < ws.dialog_x || event.y < ws.dialog_y || event.x >= ws.dialog_x + ws.dialog_width || event.y >= ws.dialog_y + ws.dialog_height) {
 			return
 		}
@@ -518,18 +505,14 @@ fn ws_pointer(e voidptr, event &WsEvent) {
 		}, 0)
 		if target == nil { return }
 		if event.kind == 5 { ws_wheel(e, target, event.value); return }
-		if !ws_view(e, target).sensitive { return }
-		if event.kind == 2 {
-			if ws.pressed != nil { Drop(slot(e, 22))(e, ws.pressed) }
-			ws.pressed = WsRef(slot(e, 21))(e, target)
-			if ws_view(e, target).kind == 3 { ws_focus(e, target) }
-			ws_motion(e, target, 0, event.x, event.y)
-		} else if ws.pressed != nil {
-			if Same(slot(e, 24))(e, ws.pressed, target) != 0 && ws_motion(e, target, 1, event.x, event.y) == 0 {
-				ws_list_activate(e, target)
-			}
+		if ws.pressed != nil {
+			ws_motion(e, ws.pressed, 3, event.x, event.y)
 			Drop(slot(e, 22))(e, ws.pressed)
 			ws.pressed = nil
+		}
+		ws.press_time = ws_millis()
+		if ws_motion(e, root, 0, event.x, event.y) != 0 {
+			ws.pressed = WsRef(slot(e, 21))(e, root)
 		}
 		ws_mark()
 	}

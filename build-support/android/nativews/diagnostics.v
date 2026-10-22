@@ -11,6 +11,29 @@ fn C.pthread_detach(C.pthread_t) i32
 fn C.exit(i32)
 
 type WsGetEnv = fn (voidptr, &voidptr, i32) i32
+type WsObjectClass = fn (voidptr, voidptr) voidptr
+
+__global ws_surface_dump_count i32
+
+// An explicitly selected application diagnostic method, with the usual
+// (String, PrintWriter) dump signature. Never enabled by production launchers.
+fn ws_dump_surface(e voidptr, view voidptr) {
+	unsafe {
+		name := C.getenv(c'VINIX_ANDROID_TRACE_SURFACE_DUMP')
+		if name == nil || ws_surface_dump_count >= 3 || pending(e) { return }
+		ws_surface_dump_count++
+		class_object := WsObjectClass(slot(e, 31))(e, view)
+		m := Member(slot(e, 33))(e, class_object, name, c'(Ljava/lang/String;Ljava/io/PrintWriter;)V')
+		defer { Drop(slot(e, 23))(e, class_object) }
+		if pending(e) { ExceptionClear(slot(e, 17))(e); return }
+		stream := static_object(e, c'java/lang/System', c'out', c'Ljava/io/PrintStream;')
+		args := [Value{ l: stream }, Value{ i: 1 }]!
+		writer := new_object(e, c'java/io/PrintWriter', c'(Ljava/io/OutputStream;Z)V', &args[0])
+		dump_args := [Value{ l: WsNewUtf(slot(e, 167))(e, c'ANDROID-WS-SURFACE-DUMP ') }, Value{ l: writer }]!
+		VoidCall(slot(e, 63))(e, view, m, &dump_args[0])
+		call(e, writer, c'java/io/PrintWriter', c'flush', c'()V', nil)
+	}
+}
 
 fn ws_vm_exit(status i32) {
 	unsafe {

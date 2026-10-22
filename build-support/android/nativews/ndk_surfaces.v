@@ -195,6 +195,11 @@ fn ws_surface_layout(e voidptr, object voidptr, width i32, height i32) {
 		window.height = height
 		C.pthread_mutex_unlock(&window.mutex)
 		if width <= 0 || height <= 0 { return }
+		if C.getenv(c'VINIX_ANDROID_TRACE_TREE') != nil && (created || changed) {
+			callbacks := get_object(e, object, c'android/view/SurfaceView', c'mCallbacks', c'Ljava/util/ArrayList;')
+			count := integer(e, callbacks, c'java/util/ArrayList', c'size', c'()I', nil)
+			C.printf(c'ANDROID-WS-SURFACE created=%d changed=%d size=%dx%d callbacks=%d\n', i32(created), i32(changed), width, height, count)
+		}
 		if created { call(e, object, c'android/view/SurfaceView', c'surfaceCreated', c'()V', nil) }
 		if changed && !pending(e) {
 			args := [Value{ i: 1 }, Value{ i: width }, Value{ i: height }]!

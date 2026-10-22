@@ -179,6 +179,18 @@ worker attaches as an ART daemon and keeps a separate JNI environment.
 Uncaught Java exceptions are printed before the app's crash handler runs;
 the app's handler still receives the exception. Thread tracing also records
 VM-requested exits with their Java stacks.
+With tree tracing enabled, `VINIX_ANDROID_TRACE_SURFACE_DUMP` selects an
+application SurfaceView diagnostic method with a `(String, PrintWriter)`
+signature. At most three calls report the application's own surface state;
+production launchers leave this unset.
+
+Single-pointer WS input enters `dispatchTouchEvent` at the window root.
+ViewGroups retain the consuming child for the gesture, translate local
+coordinates, preserve raw coordinates/downTime and deliver cancellation when
+intercepted. Passive overlays fall through to lower children. The guest
+bootstrap fixture checks capture outside bounds, interception/disallow,
+cancellation, disabled controls and click delivery. Multitouch splitting,
+transformed hit testing and long-press gestures remain incomplete.
 
 The verified subset covers Arity calculation, Editor save/reopen and Open
 Sudoku touch entry/database persistence. Advanced Canvas paths/transforms,
