@@ -58,17 +58,26 @@ adds signed refresh, update, rollback, uninstall and cache-only reinstall throug
 visible controls and separate administrator approvals on both architectures.
 Two boots preserve private data; independent complete proposals leave activation
 and approvals unchanged. Retained proof binds screenshots, every frozen compositor
-input and guest shutdowns, with 50 altered-proof refusals per target. Complete
-installed login acceptance, production catalog migration, foreign runtimes and
+input and guest shutdowns, with 50 altered-proof refusals per target. Production
+catalog migration, foreign runtimes and
 broader device/crash acceptance remain release gates.
 
 Normal desktop init now starts the [graphical session manager](accounts.md#the-session-manager),
 which runs exclusive registration when needed, an ordinary greeter and the
 authenticated ordinary desktop. The [paired graphical login fixture](../tests/graphical-login/check.md)
 drives real registration, wrong-password refusal, switching, same-session resume,
-logout and fresh login with retained home data. This directly invoked manager
-fixture and the installed Software fixtures qualify separate boundaries; a
-complete installed-system login workflow remains open.
+logout and fresh login with retained home data.
+
+The [production-init Software check](../tests/normal-init-software/check.md)
+joins the installed workflow on both architectures. The real ARM PID 1 and x86
+production init script install an ext2 root, start registration and the greeter,
+and supervise the authenticated ordinary desktop. Visible Software controls and
+separate password approvals install, uninstall and reinstall signed Counter.
+Two cold boots preserve exact accounts, trust, package state and private data;
+both terminate through real desktop shutdown. The retained evidence includes
+30 screenshots and 32 altered-proof refusals per target. Autonomous firmware
+boot, other root/volume configurations and broader catalog/device acceptance
+remain separate gates.
 
 Release staging also accepts `--repositories DIRECTORY` or
 `VINIX_PACKAGE_IMAGE_REPOSITORIES` for a complete signed offline bundle. It
@@ -279,8 +288,8 @@ password prompt starts no authorized transaction. Once approved, a transaction
 keeps its normal lock/journal lifetime even if its client disconnects; a missing
 completion receipt instructs the caller to check installed state before retrying.
 Application launches, private-data operations and publisher tools stay outside
-this administrative interface. Full ordinary-user graphical login/application
-launch qualification remains a separate release gate.
+this administrative interface. The production-init check above qualifies the
+ordinary login and signed native example; broader application coverage remains open.
 
 Ordinary-account application launches now use a separate fixed `packages-launch`
 action when account memberships need stripping. It asks for no password and
@@ -289,8 +298,8 @@ CLI after the checked isolated identity transition. Existing standard streams
 travel as descriptors, preserving native-window input/output and terminal I/O.
 The completion supervisor also drops privileges. Package trust, policy, payload
 and generation-lease admission repeat as the ordinary user. See
-[launch qualification](../tests/packages/isolated-launch-check.md); a full graphical
-login/display workflow remains a release requirement.
+[launch qualification](../tests/packages/isolated-launch-check.md) and the joined
+production-init workflow above.
 
 The [pinned catalog builder](../tools/packages/SDK.md#build-a-pinned-application-catalog)
 assembles a complete publisher workspace atomically from reviewed prepared-root
@@ -2365,8 +2374,8 @@ completed checkpoints passed on both targets; interruptions inside filesystem or
 device operations and physical write-cache loss remain outside this fixture.
 
 The release gate remains open: enroll a release publisher, migrate/qualify the
-advertised native/Linux/Wine/Apple catalog, qualify complete installed graphical
-login workflows, wider filesystem/device crash windows and wider
+advertised native/Linux/Wine/Apple catalog, qualify wider installed-system
+configurations, filesystem/device crash windows and wider
 runtime sandbox profiles. Apple packaging does not provide general macOS/AppKit
 compatibility; Windows/Linux packaging does not expand runtime API coverage.
 

@@ -603,7 +603,7 @@ manages system ports. Installed apps integrate with Start, Quick Launch and
 shared MIME choices; an administrator-selected `launch_user` runs them through
 an isolated ordinary account session. The default graphical manager and bounded
 authenticated X11 hosting are implemented below. Release publisher enrollment,
-catalog migration, complete installed login acceptance, audio services and
+catalog migration, broader installed-system acceptance, audio services and
 broader guest/runtime qualification remain required before this acceptance gate
 is complete. Host lifecycle/UI
 fixtures and both target builds are available in
@@ -650,8 +650,10 @@ console access and private readiness allow the compositor to run without root.
 The [installed graphical Software check](tests/packages/software-graphical-check.md)
 then installs the signed Counter example through visible Software controls and
 administrator approval, saves its private data and reopens it after an installed
-root reboot. Complete installed login acceptance, production catalog migration,
-foreign runtimes and broader device/crash acceptance remain open.
+root reboot. The [production-init Software check](tests/normal-init-software/check.md)
+joins installation, registration, ordinary login and signed Software operations
+across two cold boots on both targets, including real guest shutdown. Production
+catalog migration, foreign runtimes and broader device/crash acceptance remain open.
 
 Release image builders can now [bundle signed offline repositories](tools/packages/SDK.md#offline-repository-bundles-in-release-images)
 through the production staging tool. The bundle retains the reviewed publisher
@@ -922,6 +924,15 @@ architectures; broader release/catalog/runtime acceptance remains open.
     Exact signed state, 32 screenshots per target, all frozen compositor inputs
     and boot-bound guest shutdowns are retained, with 50 altered-proof refusals
     per architecture. Production catalogs and broader runtime acceptance remain open.
+  - [x] [Production-init installed login and Software](tests/normal-init-software/check.md)
+    boot the real ARM PID 1 and x86 production init script, install an ext2 root,
+    register the initial administrator and reach an ordinary authenticated desktop.
+    Both targets use visible Software controls and separate password approvals for
+    signed install, uninstall and cached reinstall. Two cold boots preserve exact
+    accounts, trust, package state and private Counter data. Actual child reaping,
+    30 screenshots per target and guest-initiated shutdowns are retained; independent
+    admission rejects 32 altered proofs per architecture. Autonomous firmware boot,
+    other root/volume configurations and broader catalog/device acceptance remain open.
   - [x] [Reviewed permission changes](tests/packages/review-permissions-check.md)
     compare frozen installed and target declarations across dependencies,
     updates, repair, rollback and removal. Format 2 carries owned prior facts;
