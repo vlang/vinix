@@ -51,4 +51,5 @@ fn framework_sqlite_params(smali string) ! {
 		'invoke-static {v0, p1}, Landroid/database/sqlite/SQLiteDatabase;->openDatabase(Ljava/lang/String;' + params + ')Landroid/database/sqlite/SQLiteDatabase;\nmove-result-object v0\nreturn-object v0\n.end method')!
 	os.write_file(path, db)!
 	framework_sqlite_idle(smali)!
+	framework_sqlite_helper(smali)!
 }
