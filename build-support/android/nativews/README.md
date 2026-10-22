@@ -87,6 +87,8 @@ Application attachment precedes main-process content providers (descending
 providers and providers assigned to another process are not instantiated.
 ApplicationInfo and PackageManager share the actual APK, data and native library
 paths. Elapsed realtime uses the boot clock in the API's requested units.
+Current-thread CPU clocks use the kernel's thread clock in milliseconds or
+microseconds, excluding time spent asleep.
 View layout direction inherits from ancestors on demand. WebP images decode
 through the runtime's libwebp alongside the existing bitmap decoders.
 Matrix rotation/scaling supports pivots and overlap-safe point mapping; rounded
