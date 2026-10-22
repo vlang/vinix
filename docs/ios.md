@@ -16721,22 +16721,51 @@ consumer supplies the conformance record to a witness lookup helper and uses the
 result for a generic constructor. This inspection executes no application code;
 the launch probe has not reached this conformance in Fortnite.
 
-The launch probe now stops at the required Swift Dispatch import
 `_$sSo17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyO7inherityA2EmFWC`
-(`DispatchQueue.AutoreleaseFrequency.inherit`). This remains a linking failure
-before application entry; Fortnite is not playable.
+now exports `DispatchQueue.AutoreleaseFrequency.inherit` as a canonical,
+aligned, read-only UInt32 zero in the existing sealed Dispatch data page. Native
+Swift comparisons distinguish the four-byte exported case discriminator from
+the enum's one-byte payload and verify tag injection. The export adds no
+allocation or ownership.
+
+The attributes/flags fixture also checks guarded ARM64 four-byte reads/stores,
+concurrent reads, accessor/descriptor/constant-first canonical publication,
+Dispatch-only resolution, unsupported exports and rejection before initialization
+and after two unmapped runtime teardowns:
+
+```sh
+v run tests/ios/native-checks.v build-swift-dispatch-flags
+```
+
+Evidence is retained under
+`build/ios/fortnite/dispatch-autorelease-checks`. Eight normal/deterministic
+ASan/UBSan runs passed across the attributes/flags, QoS, algebra and async
+fixtures. The ARM64 fixture, launch probe and both import audits passed their
+checks. All 990 pinned source, toolchain and runtime inputs remained unchanged;
+eight archived binary/generated-C pairs and four retained guest serial logs
+passed SHA256 verification.
+
+Static inspection traces the case discriminator from GOT cell `0x10dc9bce0`
+to the four-byte load at `0x100072448`. The caller then invokes the enum's tag
+injection witness at value-witness table plus 104 bytes. This inspection executes
+no application code; the launch probe has not reached this consumer in Fortnite.
+
+The launch probe now stops at the required Swift Dispatch import
+`_$sSo17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyOMa`
+(`DispatchQueue.AutoreleaseFrequency` metadata accessor). This remains a linking
+failure before application entry; Fortnite is not playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,999 | 162 | 78 |
+| Fortnite executable | 2,000 | 161 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,839 | 165 | 114 |
+| All images | 2,840 | 164 | 114 |
 
-The C++/GLES/Text variant reports 2,853 resolved imports, 151 unresolved strong
+The C++/GLES/Text variant reports 2,854 resolved imports, 150 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

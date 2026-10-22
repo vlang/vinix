@@ -20,6 +20,51 @@ type DispatchFlagsDestroy = fn (u64, u64)
 type DispatchFlagsGetTag = fn (u64, u32, u64) u32
 type DispatchFlagsStoreTag = fn (u64, u32, u32, u64)
 type DispatchFlagsLookup = fn (u64, u64, u64, u64, u64) u64
+type DispatchCaseLoad = fn (u64, u64, u64, &u64)
+type DispatchCaseInject = fn (u64, u32, u64)
+type DispatchCaseTag = fn (u64, u64) u32
+
+const dispatch_inherit_case_symbol = '_$sSo17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyO7inherityA2EmFWC'
+
+fn dispatch_case_load(entry u64, probe DispatchCaseLoad, protected u64) {
+	mut output := [u32(0xcafe), 0xdeadbeef, 0xbeef]!
+	mut observations := [u64(0xcafe), 0, 0, 0, 0, 0xbeef]!
+	destination := u64(unsafe { &output[1] })
+	probe(entry, destination, protected, unsafe { &observations[1] })
+	assert output == [u32(0xcafe), 0, 0xbeef]!
+	assert observations == [u64(0xcafe), entry, destination, protected, 0x5021, 0xbeef]!
+}
+
+fn dispatch_case_worker(entry u64, probe DispatchCaseLoad, protected u64) {
+	for _ in 0 .. 128 { dispatch_case_load(entry, probe, protected) }
+}
+
+fn dispatch_case_spans(entry u64, probe DispatchCaseLoad) {
+	assert entry != 0 && entry % 4 == 0 && read32(entry) == 0
+	page := usize(C.getpagesize())
+	source := u64(C.mmap(unsafe { nil }, page * 3, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	destination := u64(C.mmap(unsafe { nil }, page * 3, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	assert source != u64(-1) && destination != u64(-1)
+	assert C.mprotect(voidptr(destination + u64(page)), page, C.PROT_READ | C.PROT_WRITE) == 0
+	for source_end in [false, true]! {
+		assert C.mprotect(voidptr(source + u64(page)), page, C.PROT_READ | C.PROT_WRITE) == 0
+		input := source + u64(page) + if source_end { u64(page) - 4 } else { u64(0) }
+		write32(input, read32(entry))
+		assert C.mprotect(voidptr(source + u64(page)), page, C.PROT_READ) == 0
+		dispatch_case_load(input, probe, source)
+		for output_end in [false, true]! {
+			output := destination + u64(page) + if output_end { u64(page) - 4 } else { u64(0) }
+			write32(output, 0xdeadbeef)
+			mut observations := [4]u64{}
+			probe(input, output, source, unsafe { &observations[0] })
+			assert read32(output) == 0 && observations == [input, output, source, u64(0x5021)]!
+		}
+	}
+	mut workers := []thread{}
+	for _ in 0 .. 8 { workers << spawn dispatch_case_worker(entry, probe, source) }
+	workers.wait()
+	assert C.munmap(voidptr(source), page * 3) == 0 && C.munmap(voidptr(destination), page * 3) == 0
+}
 
 fn dispatch_flags_relative(p u64) u64 { d:=i32(read32(p)); return if d==0 {u64(0)} else {u64(i64(p)+d)} }
 fn dispatch_flags_name(p u64) string { return unsafe {(&char(p)).vstring()} }
@@ -129,7 +174,7 @@ fn dispatch_flags_symbolic(lookup DispatchFlagsLookup, descriptor u64, metadata 
 
 fn dispatch_flags_worker(first_kind int) u64 {
 	library:='/usr/lib/swift/libswiftDispatch.dylib'
-	first:=['_$s8Dispatch0A13WorkItemFlagsVMa','_$s8Dispatch0A13WorkItemFlagsVMn','_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMa','_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMn']![first_kind]
+	first:=['_$s8Dispatch0A13WorkItemFlagsVMa','_$s8Dispatch0A13WorkItemFlagsVMn','_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMa','_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMn',dispatch_inherit_case_symbol]![first_kind]
 	initial:=runtime_symbol(library,first) or {panic(err)}; assert initial!=0
 	mut entry:=u64(0)
 	mut attributes_metadata:=u64(0)
@@ -142,7 +187,9 @@ fn dispatch_flags_worker(first_kind int) u64 {
 		attributes_descriptor:=runtime_symbol(library,'_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMn') or {panic(err)}
 		attributes:=unsafe {DispatchFlagsAccess(voidptr(attributes_entry))(0x13f)}
 		assert attributes.state==0 && attributes.metadata!=result.metadata && read64(attributes.metadata+8)==attributes_descriptor
-		assert initial==[entry,descriptor,attributes_entry,attributes_descriptor]![first_kind]
+		inherit_case:=runtime_symbol(library,dispatch_inherit_case_symbol) or {panic(err)}
+		assert inherit_case%4==0 && read32(inherit_case)==0
+		assert initial==[entry,descriptor,attributes_entry,attributes_descriptor,inherit_case]![first_kind]
 		if attributes_metadata==0 {attributes_metadata=attributes.metadata} else {assert attributes.metadata==attributes_metadata}
 	}
 	return entry
@@ -150,7 +197,7 @@ fn dispatch_flags_worker(first_kind int) u64 {
 
 fn dispatch_flags_reject_lifetime() {
 	if _:=swift_dispatch_flags_arena_checked() {assert false,'retired Dispatch metadata recreated'}
-	for symbol in ['_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMa','_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMn']! {
+	for symbol in ['_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMa','_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMn',dispatch_inherit_case_symbol]! {
 		if _:=runtime_symbol('/usr/lib/swift/libswiftDispatch.dylib',symbol) {assert false}
 	}
 }
@@ -158,8 +205,11 @@ fn dispatch_flags_reject_lifetime() {
 fn test_swift_dispatch_flags_metadata() {
 	page:=usize(C.getpagesize()); code:=u64(C.mmap(unsafe {nil},page,C.PROT_READ|C.PROT_WRITE,C.MAP_PRIVATE|C.MAP_ANONYMOUS,-1,0)); assert code!=u64(-1)
 	for i, word in [u32(0xa9bd7bfd),0xa90153f3,0xa9025bf5,0xaa0203f3,0xaa0103f0,0xd28a0414,0xd28a0435,0xd63f0200,0xa9000660,0xa9015674,0xa94153f3,0xa9425bf5,0xa8c37bfd,0xd65f03c0]! {write32(code+u64(i*4),word)}
-	C.__builtin___clear_cache(voidptr(code),voidptr(code+56)); assert C.mprotect(voidptr(code),page,C.PROT_READ|C.PROT_EXEC)==0
+	// Match Fortnite's UInt32 load; place source and destination against guards.
+	for i, word in [u32(0xa9bf57f4),0xb9400004,0xb9000024,0xa9000460,0xaa0203f4,0xd28a0435,0xa9015474,0xa8c157f4,0xd65f03c0]! {write32(code+128+u64(i*4),word)}
+	C.__builtin___clear_cache(voidptr(code),voidptr(code+164)); assert C.mprotect(voidptr(code),page,C.PROT_READ|C.PROT_EXEC)==0
 	probe:=unsafe {DispatchFlagsProbe(voidptr(code))}
+	case_probe:=unsafe {DispatchCaseLoad(voidptr(code+128))}
 	$if macos {
 		lib:=C.dlopen(c'/usr/lib/swift/libswiftDispatch.dylib',2); core:=C.dlopen(c'/usr/lib/swift/libswiftCore.dylib',2); assert lib!=unsafe {nil} && core!=unsafe {nil}
 		entry:=u64(C.dlsym(lib,c'$s8Dispatch0A13WorkItemFlagsVMa')); descriptor:=u64(C.dlsym(lib,c'$s8Dispatch0A13WorkItemFlagsVMn')); assert entry!=0 && descriptor!=0
@@ -172,17 +222,29 @@ fn test_swift_dispatch_flags_metadata() {
 		assert dispatch_flags_layout(attributes_entry,attributes_descriptor,probe,true,true)==attributes
 		assert attributes!=metadata && attributes_descriptor!=descriptor
 		dispatch_flags_values(attributes); dispatch_flags_symbolic(lookup,attributes_descriptor,attributes)
-		println('IOS-DISPATCH-FLAGS-NATIVE: Flags and Queue.Attributes Ma/Mn export identity, complete pointer/state accessor ABI, UInt64 POD8 witnesses/flags, distinct Dispatch nominal identities and nested extension context, rawValue offset, every metadata request, x20/x21 and result guards, exact copy/take/self-assignment, no-op destruction, protected eight-byte payloads/unused metadata, single-payload tag branches/UInt32 wrapping, indirect symbolic lookup')
+		inherit_case:=u64(C.dlsym(lib,c'$sSo17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyO7inherityA2EmFWC'))
+		assert inherit_case==u64(C.dlsym(lib,dispatch_inherit_case_symbol[1..].str))
+		dispatch_case_spans(inherit_case,case_probe)
+		enum_entry:=C.dlsym(lib,c'$sSo17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyOMa'); assert enum_entry!=unsafe {nil}
+		enum_result:=unsafe {DispatchFlagsAccess(enum_entry)(0)}; assert enum_result.metadata!=0 && enum_result.state==0
+		enum_witness:=read64(enum_result.metadata-8)
+		assert read64(enum_witness+64)==1 && read64(enum_witness+72)==1
+		inject:=unsafe {DispatchCaseInject(voidptr(read64(enum_witness+104)))}
+		tag:=unsafe {DispatchCaseTag(voidptr(read64(enum_witness+88)))}
+		mut payload:=[u8(0xca),0xdd,0xfe]!
+		inject(u64(unsafe {&payload[1]}),read32(inherit_case),enum_result.metadata)
+		assert payload==[u8(0xca),0,0xfe]! && tag(u64(unsafe {&payload[1]}),enum_result.metadata)==0
+		println('IOS-DISPATCH-FLAGS-NATIVE: Flags and Queue.Attributes Ma/Mn export identity, complete pointer/state accessor ABI, UInt64 POD8 witnesses/flags, distinct Dispatch nominal identities and nested extension context, rawValue offset, every metadata request, x20/x21 and result guards, exact copy/take/self-assignment, no-op destruction, protected eight-byte payloads/unused metadata, single-payload tag branches/UInt32 wrapping, indirect symbolic lookup; AutoreleaseFrequency.inherit canonical UInt32 zero, guarded ARM64 four-byte reads/stores, concurrent reads and native one-byte enum tag injection')
 	}
 	dispatch_flags_reject_lifetime()
 	for _ in 0..2 {
 		objc_start()
-		for unknown in ['_$s8Dispatch0A13WorkItemFlagsVN','_$s8Dispatch0A3QoSVN','_$sSo17OS_dispatch_queueC8DispatchE10AttributesVN']! {
+		for unknown in ['_$s8Dispatch0A13WorkItemFlagsVN','_$s8Dispatch0A3QoSVN','_$sSo17OS_dispatch_queueC8DispatchE10AttributesVN','_$sSo17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyOMa','_$sSo17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyOMn','_$sSo17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyO8workItemyA2EmFWC','_$sSo17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyO5neveryA2EmFWC']! {
 			if _:=runtime_symbol('/usr/lib/swift/libswiftDispatch.dylib',unknown) {assert false}
 		}
 		assert ios_runtime.swift_dispatch_flags_arena==0
 		mut workers:=[]thread u64{}
-		for i in 0..8 {workers<<spawn dispatch_flags_worker(i%4)}
+		for i in 0..8 {workers<<spawn dispatch_flags_worker(i%5)}
 		entries:=workers.wait(); entry:=entries[0]; for candidate in entries {assert candidate==entry}
 		descriptor:=runtime_symbol('/usr/lib/swift/libswiftDispatch.dylib','_$s8Dispatch0A13WorkItemFlagsVMn') or {panic(err)}
 		metadata:=dispatch_flags_layout(entry,descriptor,probe,false,false); dispatch_flags_values(metadata)
@@ -197,9 +259,13 @@ fn test_swift_dispatch_flags_metadata() {
 		qos_entry:=runtime_symbol('/usr/lib/swift/libswiftDispatch.dylib','_$s8Dispatch0A3QoSVMa') or {panic(err)}
 		assert attributes!=unsafe {DispatchFlagsAccess(voidptr(qos_entry))(0)}.metadata
 		dispatch_flags_values(attributes); dispatch_flags_symbolic(lookup,attributes_descriptor,attributes)
+		inherit_case:=runtime_symbol('/usr/lib/swift/libswiftDispatch.dylib',dispatch_inherit_case_symbol) or {panic(err)}
+		dispatch_flags_protection(inherit_case,4,false)
+		dispatch_case_spans(inherit_case,case_probe)
 		if _:=runtime_symbol('/usr/lib/swift/libswiftCore.dylib','_$s8Dispatch0A13WorkItemFlagsVMa') {assert false}
 		if _:=runtime_symbol('/usr/lib/swift/libswiftCore.dylib','_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMa') {assert false}
 		if _:=runtime_symbol('/usr/lib/swift/libswiftCore.dylib','_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMn') {assert false}
+		if _:=runtime_symbol('/usr/lib/swift/libswiftCore.dylib',dispatch_inherit_case_symbol) {assert false}
 		assert ios_runtime.swift_heap.len==0 && ios_runtime.swift_buffers.len==0 && ios_runtime.swift_arrays.len==0 && ios_runtime.live==0
 		base:=ios_runtime.swift_dispatch_flags_arena
 		$if !macos {mut residency:=[u8(0),0]!; assert C.mincore(voidptr(base),page*2,unsafe {&residency[0]})==0}
@@ -210,5 +276,5 @@ fn test_swift_dispatch_flags_metadata() {
 		dispatch_flags_reject_lifetime(); assert ios_runtime.swift_dispatch_flags_arena==0
 	}
 	assert C.munmap(voidptr(code),page)==0
-	println('IOS-DISPATCH-FLAGS: exact Dispatch-only Flags and Queue.Attributes Ma/Mn exports, distinct complete POD8 nominal metadata and nested extension context, existing ownership-free witnesses and exact tag store, sealed adjacent accessor/data pages, canonical eight-worker accessor/descriptor-first publication, shared symbolic metadata-state lookup, no heap/ARC ownership, rejected unsupported exports/lifetimes and two unmapped runtime teardowns')
+	println('IOS-DISPATCH-FLAGS: exact Dispatch-only Flags and Queue.Attributes Ma/Mn exports, distinct complete POD8 nominal metadata and nested extension context, existing ownership-free witnesses and exact tag store, sealed adjacent accessor/data pages, canonical eight-worker accessor/descriptor/constant-first publication, shared symbolic metadata-state lookup; AutoreleaseFrequency.inherit read-only aligned UInt32 zero, guarded ARM64 four-byte reads/stores and concurrent reads; no heap/ARC ownership, rejected unsupported exports/lifetimes and two unmapped runtime teardowns')
 }

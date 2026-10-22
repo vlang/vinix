@@ -69,6 +69,9 @@ fn swift_dispatch_flags_arena_checked() !u64 {
 	swift_dispatch_main_build(base)
 	swift_dispatch_async_build(base)
 	swift_dispatch_attributes_build(base, data)
+	// Swift exports enum case discriminators as UInt32 data. The inherit case
+	// is tag zero, loaded by the caller before invoking the enum's tag witness.
+	write32(data + 1760, 0)
 	C.__builtin___clear_cache(arena, voidptr(base + 896))
 	if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(voidptr(data), usize(page), C.PROT_READ) != 0 {
@@ -103,7 +106,7 @@ fn swift_dispatch_symbol(symbol string) !u64 {
 			swift_dispatch_main_queue_checked()!
 			u64(800)
 		}
-		'_$s8Dispatch0A13WorkItemFlagsVMn', '_$s8Dispatch0A13WorkItemFlagsVs10SetAlgebraAAMc', '_$s8Dispatch0A3QoSVMn', '_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMn', '_$sSo17OS_dispatch_queueC8DispatchE10AttributesVs10SetAlgebraACMc' { ~u64(0) }
+		'_$s8Dispatch0A13WorkItemFlagsVMn', '_$s8Dispatch0A13WorkItemFlagsVs10SetAlgebraAAMc', '_$s8Dispatch0A3QoSVMn', '_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMn', '_$sSo17OS_dispatch_queueC8DispatchE10AttributesVs10SetAlgebraACMc', '_$sSo17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyO7inherityA2EmFWC' { ~u64(0) }
 		else { return error('iOS: Swift Dispatch symbol is not implemented: ${symbol}') }
 	}
 	base := swift_dispatch_flags_arena_checked()!
@@ -113,6 +116,7 @@ fn swift_dispatch_symbol(symbol string) !u64 {
 		'_$s8Dispatch0A3QoSVMn' { u64(1184) }
 		'_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMn' { u64(1312) }
 		'_$sSo17OS_dispatch_queueC8DispatchE10AttributesVs10SetAlgebraACMc' { u64(1440) }
+		'_$sSo17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyO7inherityA2EmFWC' { u64(1760) }
 		else { u64(256) }
 	}
 	return base + u64(C.getpagesize()) + data_offset
