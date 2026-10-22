@@ -77,7 +77,12 @@ View layout direction inherits from ancestors on demand. WebP images decode
 through the runtime's libwebp alongside the existing bitmap decoders.
 Matrix rotation/scaling supports pivots and overlap-safe point mapping; rounded
 paths retain independent corner radii. Network availability reads the guest's
-configured non-loopback interfaces. Local ContentProviderClient handles resolve
+configured non-loopback interfaces. Connectivity callbacks poll that state on
+their Handler, filter requests against capability snapshots, and report link
+arrival, changes and loss. Unregistering cancels queued and future delivery,
+including when called inside a callback. Internet capability requires a kernel
+default route; validation and unmetered access are not advertised. Link snapshots
+include the interface name, MTU and addresses. Local ContentProviderClient handles resolve
 registered authorities, dispatch type/call operations and release their provider
 reference on close. Uninstalled service providers return null.
 Account listeners retain their registrations and deliver an empty snapshot on

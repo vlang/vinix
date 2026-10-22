@@ -22,6 +22,7 @@ pub fn install(output string, resources string) ! {
  install_rect_parcel_probe(dir)!
  install_notification_channel_probe(dir)!
  install_network_request_probe(dir)!
+ install_connectivity_probe(dir)!
  install_media_probe(dir)!
  os.mkdir_all(output + '/res/font')!
  runtime := resources.all_before('/usr/lib/java/dex/')
@@ -72,6 +73,7 @@ invoke-static {}, Lorg/vinix/bootstrap/PaintColorProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/RectParcelProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/NotificationChannelProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/NetworkRequestProbe;->check()V
+invoke-static {}, Lorg/vinix/bootstrap/ConnectivityProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->haptics(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/MediaProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->fonts(Landroid/content/Context;)V

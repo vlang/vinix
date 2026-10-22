@@ -119,6 +119,7 @@ android/content/ContentProviderClient|getType|return ws_client_type(e,this,p0)
 android/content/ContentProviderClient|call|return ws_client_call(e,this,p0,p1,p2)
 android/content/ContentProvider|call|return nil // The base provider defines no custom call operations.
 android/net/ConnectivityManager|nativeGetNetworkAvailable|return ws_network_available()
+android/net/ConnectivityManager|nativeGetNetworkState|return ws_network_state()
 android/os/MessageQueue|nativeInit|return ws_queue_new()
 android/os/MessageQueue|nativeDestroy|ws_queue_destroy(p0)
 android/os/MessageQueue|nativeWake|ws_queue_wake(p0)
