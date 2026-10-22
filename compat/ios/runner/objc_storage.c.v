@@ -4,6 +4,7 @@ module main
 fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	dispatch_objc_allocation_checked(cls) or { panic(err) }
 	url_session_require_class(cls)
+	url_session_configuration_require_class(cls)
 	sort_descriptor_require_class(cls)
 	regular_expression_require_class(cls)
 	mutable_string_require_class(cls)
@@ -40,6 +41,8 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	header.input_stream_owned = ns_input_stream_family(cls)
 	header.connection_owned = connection_family(cls)
 	header.url_session_owned = url_session_family(cls)
+	header.url_session_configuration_owned = url_session_configuration_family(cls)
+	if header.url_session_configuration_owned { url_session_configuration_initialize(object) }
 	header.sort_descriptor_owned = sort_descriptor_family(cls)
 	header.regular_expression_owned = regular_expression_family(cls)
 	header.regex_result_owned = regex_result_family(cls)
@@ -126,6 +129,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	image_view_dispose(mut header)
 	ns_input_stream_dispose(mut header)
 	url_session_dispose(object, header)
+	url_session_configuration_dispose(object, header)
 	sort_descriptor_dispose(object, header)
 	regular_expression_dispose(object, mut header)
 	cookie_dispose(object, mut header)

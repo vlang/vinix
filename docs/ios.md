@@ -17534,17 +17534,70 @@ detection was disabled.
 v run tests/ios/native-checks.v build-mutable-string
 ```
 
+V now supplies Foundation's public base `NSURLSessionConfiguration`, its
+measured 560-byte instance, 131 ivars and typed accessors for 23 properties.
+Allocation initializes the measured connection-limit record; `init` preserves
+existing settings. Scalar accessors preserve the measured Boolean, integer and
+double ABI, including signed 32-bit truncation for the connection limit and
+unsigned 32-bit returns for the legacy TLS protocol properties. Finite negative
+timeouts are accepted; rejecting nonfinite values is a Vinix policy.
+
+The five object properties copy strings, dictionaries and protocol arrays.
+Mutable inputs produce snapshots; configuration copies own independent records
+and retain their stored immutable values. Collections require at most 1,024
+owned entries. Setters pin their receiver across copy callbacks, and copying
+captures the source before allocation callbacks can mutate or release it.
+Callbacks and retired-reference releases run outside the runtime lock.
+Allocation provenance keeps cleanup correct after isa replacement and for
+caller-owned storage; failed constructors also retire their property owners.
+
+Default, ephemeral and background factories, cookie/cache/credential stores,
+modern TLS properties, proxy configurations, extended background idle mode,
+coding, mutable copies, custom subclass construction, descriptions, equality
+and hashing fail explicitly. Configured `NSURLSession` and networking remain
+unsupported. Inspection of the preserved Fortnite executable found 17 direct
+configuration-class consumers, using factories outside this base profile;
+resolving the class import does not implement those call paths.
+
+The shared fixture passes against Apple Foundation. Both macOS ASan+UBSan
+runs pass with ordinary and deterministic Swift hashing, and the ARM64 guest
+fixture passes. Checks cover all 46 property method encodings, copied owners
+after pool drainage, guarded caller storage, callback mutation and last-owner
+release, failed constructors, 64 isa
+replacements, two drained runtimes and 29 explicit rejection cases.
+Independent source and final generated-C lifetime review found no unresolved
+issue in this profile.
+
+Local evidence is recorded in
+`build/ios/fortnite/session-configuration-checks/proof.log`: 31 sealed native
+and static evidence files, 19,241 unchanged source/toolchain/runtime inputs,
+five archived binary/generated-C pairs and four sequential ARM64 guest phases.
+The first preflight's live-count assertion exposed undrained fixture
+autorelease pools; its generated C, sanitizer binary, dSYM and log are
+preserved alongside the passing final runs. Host leak detection was disabled.
+The input manifest covers the declared inputs, not the full host dynamic
+runtime closure. Guest serial/config hashes remain available after VM
+artifacts were retired and the owned RAM disk detached.
+
+The final launch probe resolves `NSURLSessionConfiguration` and stops at
+`_OBJC_CLASS_$_NSRecursiveLock`, before application entry. Fortnite remains
+unplayable.
+
+```sh
+v run tests/ios/native-checks.v build-session-configuration
+```
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,061 | 100 | 78 |
+| Fortnite executable | 2,062 | 99 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,901 | 103 | 114 |
+| All images | 2,902 | 102 | 114 |
 
-The C++/GLES/Text variant reports 2,915 resolved imports, 89 unresolved strong
+The C++/GLES/Text variant reports 2,916 resolved imports, 88 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -17594,7 +17647,8 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 `file-time-checks`, the audio constants use `audio-session-checks`,
 base URL sessions use `url-session-checks`, sort descriptors use
 `sort-descriptor-checks`, regular expressions use `regular-expression-checks`,
-mutable strings use `mutable-string-checks`,
+mutable strings use `mutable-string-checks`, session configurations use
+`session-configuration-checks`,
 CoreFoundation dictionaries use
 `cf-dictionary-checks`, constant integers use
 `constant-integer-checks`, constant arrays use `constant-array-checks`, supplied
@@ -17607,7 +17661,7 @@ object monitors use `objc-sync-checks`, Swift strings/buffers use
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
-URL session, sort descriptor, regular expression, mutable string,
+URL session, session configuration, sort descriptor, regular expression, mutable string,
 CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String

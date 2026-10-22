@@ -145,6 +145,7 @@ mut:
 	connection_scheduled bool
 	connection_cancelled bool
 	url_session_owned bool
+	url_session_configuration_owned bool
 	sort_descriptor_owned bool
 	sort_descriptor_initialized bool
 	sort_descriptor_initializing bool
@@ -500,7 +501,7 @@ fn objc_start() {
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
-        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSUserDefaults',
+        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
         'UIScreenEdgePanGestureRecognizer', 'UISelectionFeedbackGenerator', 'CADisplayLink',
@@ -590,6 +591,7 @@ fn objc_start() {
 			'NSHTTPURLResponse' { u32(32) }
 			'NSURLConnection' { u32(16) }
 			'NSURLSession' { u32(160) }
+			'NSURLSessionConfiguration' { u32(560) }
 			'NSSortDescriptor' { u32(40) }
 			'NSRegularExpression' { u32(40) }
 			'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult' { u32(8) }
@@ -634,6 +636,7 @@ fn objc_start() {
 	cookie_class.ivars['_cookiePrivate'] = &ObjIvar{name:'_cookiePrivate'.clone(), types:'@"NSHTTPCookieInternal"'.clone(), offset:8, size:8}
 	webkit_metadata()
 	url_session_metadata()
+	url_session_configuration_metadata()
 	sort_descriptor_metadata()
 	regular_expression_metadata()
 	mut request_class := ios_runtime.classes[ios_runtime.names['NSURLRequest']] or { panic('iOS: missing request class') }
@@ -672,6 +675,7 @@ fn objc_allocate(cls u64) u64 {
 	dispatch_objc_allocation_checked(cls) or { panic(err) }
 	if connection_family(cls) && cls != ios_runtime.names['NSURLConnection'] { panic('iOS: custom connection subclass construction is not implemented') }
 	url_session_require_class(cls)
+	url_session_configuration_require_class(cls)
 	sort_descriptor_require_class(cls)
 	regular_expression_require_class(cls)
 	mutable_string_require_class(cls)
@@ -769,6 +773,7 @@ fn objc_store_strong(location &u64, object u64) {
 
 fn objc_new(cls u64) u64 {
 	object := objc_allocate(cls)
+	if object == 0 { return 0 }
 	imp := native_method(cls, 'init')
 	if imp != 0 { return unsafe { ObjInit(voidptr(imp))(object, c'init') } }
 	game_keyboard_require_discovery(cls)
