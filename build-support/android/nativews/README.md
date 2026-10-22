@@ -6,6 +6,16 @@ with a VSF1 double-buffered XRGB surface and a VNI1 input pipe. The desktop owns
 the sole title bar and close controls. No X server or GTK display backend is
 started.
 
+Opt-in diagnostics use the real runtime state. With `VINIX_ANDROID_TRACE_TREE`
+enabled, `VINIX_ANDROID_TRACE_SURFACE_FIELDS` accepts comma-separated field
+paths such as `mSurfaceHolder.this$0.left`. It reads private and inherited
+fields, boxes primitives and prints their descriptions. Missing fields and
+null intermediate objects report `unavailable` without leaving a Java exception
+pending. Sampling stops after three surface visits; each sample allows sixteen
+paths, eight fields per path and 1,024 output bytes per value. Descriptions may
+invoke the object's `toString`; this is intended for selected diagnostic builds.
+Production launchers leave these variables unset.
+
 `runtime.v` creates the real ART VM, loads the extended ATL framework DEX,
 registers the reusable V framework APIs, and runs Android lifecycle callbacks
 and the main Looper. Secondary Loopers have wakeable native queues. Resources

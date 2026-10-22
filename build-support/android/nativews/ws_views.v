@@ -428,6 +428,7 @@ fn ws_debug_tree(e voidptr, view voidptr, depth i32) {
 			native := ws_view(e, view)
 			C.printf(c'ANDROID-WS-SURFACE kind=%d window=%p\n', native.kind, native.window)
 			ws_dump_surface(e, view)
+			ws_dump_surface_fields(e, view)
 		}
 		ws_release(e, name, chars)
 		if instance_of(e, view, c'android/view/ViewGroup') {
