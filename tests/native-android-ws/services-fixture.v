@@ -1,0 +1,181 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Two signed APKs exercise lazy companion Application/provider/service startup.
+module main
+
+import os
+
+fn checked(args []string) {
+	r := os.exec(args)
+	if r.exit_code != 0 { panic(r.output) }
+}
+
+fn method(signature string, body string) string {
+	return '.method ' + signature + '\n.locals 6\n' + body + '\n.end method\n'
+}
+
+fn check_stage(expected int, next int) string {
+	return 'const/4 v0, ${expected}\ninvoke-static {v0}, Lorg/vinix/service/App;->check(I)V\n' +
+		'const/4 v0, ${next}\nsput v0, Lorg/vinix/service/App;->stage:I\n'
+}
+
+fn main() {
+	if os.args.len != 8 {
+		panic('OUTPUT FIXTURE_DIR SMALI_TOOLS JAVA APKSIGNER AAPT2 FRAMEWORK_RES')
+	}
+	out, fixture, tools := os.abs_path(os.args[1]), os.abs_path(os.args[2]), os.abs_path(os.args[3])
+	java, signer, aapt, resources := os.args[4], os.abs_path(os.args[5]), os.abs_path(os.args[6]), os.abs_path(os.args[7])
+	for name in ['client', 'companion'] {
+		os.mkdir_all(out + '/' + name + '/smali/org/vinix/service')!
+	}
+	companion := out + '/companion/smali/org/vinix/service/'
+	os.write_file(companion + 'App.smali', '.class public Lorg/vinix/service/App;\n.super Landroid/app/Application;\n.field public static stage:I\n.field public static starts:I\n' +
+		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/app/Application;-><init>()V\nreturn-void') +
+		method('public static check(I)V', '
+sget v0, Lorg/vinix/service/App;->stage:I
+if-eq v0, p0, :ok
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "companion Application/provider/service startup order"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0
+:ok
+return-void') +
+		method('protected attachBaseContext(Landroid/content/Context;)V', 'invoke-super {p0, p1}, Landroid/content/ContextWrapper;->attachBaseContext(Landroid/content/Context;)V\n' + check_stage(0, 1) + 'return-void') +
+		method('public onCreate()V', check_stage(2, 3) + 'return-void'))!
+	mut provider := '.class public Lorg/vinix/service/Provider;\n.super Landroid/content/ContentProvider;\n' +
+		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/content/ContentProvider;-><init>()V\nreturn-void') +
+		method('public onCreate()Z', check_stage(1, 2) + 'const/4 v0, 1\nreturn v0')
+	for signature in [
+		'query(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Landroid/database/Cursor;',
+		'insert(Landroid/net/Uri;Landroid/content/ContentValues;)Landroid/net/Uri;',
+		'getType(Landroid/net/Uri;)Ljava/lang/String;',
+	] {
+		provider += method('public ' + signature, 'const/4 v0, 0\nreturn-object v0')
+	}
+	for signature in ['delete(Landroid/net/Uri;Ljava/lang/String;[Ljava/lang/String;)I',
+		'update(Landroid/net/Uri;Landroid/content/ContentValues;Ljava/lang/String;[Ljava/lang/String;)I'] {
+		provider += method('public ' + signature, 'const/4 v0, 0\nreturn v0')
+	}
+	os.write_file(companion + 'Provider.smali', provider)!
+	os.write_file(companion + 'Worker.smali', '.class public Lorg/vinix/service/Worker;\n.super Landroid/app/Service;\n' +
+		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/app/Service;-><init>()V\n' + check_stage(3, 4) + 'return-void') +
+		method('public onCreate()V', check_stage(4, 5) + '
+invoke-virtual {p0}, Landroid/app/Service;->getApplication()Landroid/app/Application;
+move-result-object v0
+invoke-virtual {p0}, Landroid/content/Context;->getApplicationContext()Landroid/content/Context;
+move-result-object v1
+if-eq v0, v1, :ok
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "service Application context identity"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0
+:ok
+return-void') +
+		method('public onStartCommand(Landroid/content/Intent;II)I', '
+const/4 v0, 5
+invoke-static {v0}, Lorg/vinix/service/App;->check(I)V
+sget v0, Lorg/vinix/service/App;->starts:I
+add-int/lit8 v0, v0, 1
+sput v0, Lorg/vinix/service/App;->starts:I
+const/4 v0, 0
+return v0') +
+		method('public onBind(Landroid/content/Intent;)Landroid/os/IBinder;', '
+const/4 v0, 5
+invoke-static {v0}, Lorg/vinix/service/App;->check(I)V
+sget v0, Lorg/vinix/service/App;->starts:I
+const/4 v1, 2
+if-eq v0, v1, :ok
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "service must start twice without recreating Application or providers"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0
+:ok
+new-instance v0, Landroid/os/Binder;
+invoke-direct {v0}, Landroid/os/Binder;-><init>()V
+return-object v0'))!
+	os.write_file(out + '/client/smali/org/vinix/service/Main.smali', '.class public Lorg/vinix/service/Main;\n.super Landroid/app/Activity;\n.implements Landroid/content/ServiceConnection;\n' +
+		'.field private label:Landroid/widget/TextView;\n' +
+		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/app/Activity;-><init>()V\nreturn-void') +
+		method('public onCreate(Landroid/os/Bundle;)V', '
+invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
+new-instance v0, Landroid/widget/TextView;
+invoke-direct {v0, p0}, Landroid/widget/TextView;-><init>(Landroid/content/Context;)V
+iput-object v0, p0, Lorg/vinix/service/Main;->label:Landroid/widget/TextView;
+const-string v1, "Checking companion services"
+invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
+invoke-virtual {p0, v0}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V
+const-string v0, "org.vinix.service.companion"
+const/4 v1, 3
+invoke-virtual {p0, v0, v1}, Landroid/content/Context;->createPackageContext(Ljava/lang/String;I)Landroid/content/Context;
+move-result-object v0
+invoke-virtual {v0}, Landroid/content/Context;->getClassLoader()Ljava/lang/ClassLoader;
+move-result-object v0
+const-string v1, "org.vinix.service.App"
+invoke-virtual {v0, v1}, Ljava/lang/ClassLoader;->loadClass(Ljava/lang/String;)Ljava/lang/Class;
+move-result-object v0
+const-string v1, "stage"
+invoke-virtual {v0, v1}, Ljava/lang/Class;->getField(Ljava/lang/String;)Ljava/lang/reflect/Field;
+move-result-object v0
+const/4 v1, 0
+invoke-virtual {v0, v1}, Ljava/lang/reflect/Field;->getInt(Ljava/lang/Object;)I
+move-result v0
+if-eqz v0, :lazy
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "package context must not start companion Application"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0
+:lazy
+new-instance v0, Landroid/content/Intent;
+invoke-direct {v0}, Landroid/content/Intent;-><init>()V
+const-string v1, "org.vinix.service.companion"
+const-string v2, "org.vinix.service.Worker"
+invoke-virtual {v0, v1, v2}, Landroid/content/Intent;->setClassName(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;
+invoke-virtual {p0, v0}, Landroid/content/Context;->startService(Landroid/content/Intent;)Landroid/content/ComponentName;
+invoke-virtual {p0, v0}, Landroid/content/Context;->startService(Landroid/content/Intent;)Landroid/content/ComponentName;
+const/4 v1, 1
+invoke-virtual {p0, v0, p0, v1}, Landroid/content/Context;->bindService(Landroid/content/Intent;Landroid/content/ServiceConnection;I)Z
+return-void') +
+		method('public onServiceDisconnected(Landroid/content/ComponentName;)V', 'return-void') +
+		method('public onServiceConnected(Landroid/content/ComponentName;Landroid/os/IBinder;)V', '
+invoke-static {}, Landroid/os/Looper;->myLooper()Landroid/os/Looper;
+move-result-object v0
+invoke-static {}, Landroid/os/Looper;->getMainLooper()Landroid/os/Looper;
+move-result-object v1
+if-ne v0, v1, :bad
+if-eqz p2, :bad
+invoke-virtual {p1}, Landroid/content/ComponentName;->getPackageName()Ljava/lang/String;
+move-result-object v0
+const-string v1, "org.vinix.service.companion"
+invoke-virtual {v1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v0
+if-eqz v0, :bad
+iget-object v0, p0, Lorg/vinix/service/Main;->label:Landroid/widget/TextView;
+const-string v1, "Companion service startup passed"
+invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "companion service binding callback"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'))!
+	for name in ['client', 'companion'] {
+		dir := out + '/' + name
+		application := if name == 'client' {
+			'<application android:label="Service fixture"><activity android:name="org.vinix.service.Main" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application>'
+		} else {
+			'<application android:name="org.vinix.service.App" android:label="Companion fixture"><service android:name="org.vinix.service.Worker" android:exported="true"/><provider android:name="org.vinix.service.Provider" android:authorities="fixture.service"/></application>'
+		}
+		os.write_file(dir + '/AndroidManifest.xml', '<?xml version="1.0"?><manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.vinix.service.' + name + '" android:versionCode="1"><uses-sdk android:minSdkVersion="23"/>' + application + '</manifest>')!
+		checked([aapt, 'link', '-I', resources, '--manifest', dir + '/AndroidManifest.xml', '-o',
+			dir + '/unsigned.apk'])
+		checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', dir + '/smali', '-o',
+			dir + '/classes.dex'])
+		checked(['zip', '-q', '-j', dir + '/unsigned.apk', dir + '/classes.dex'])
+		checked([java, '-jar', signer, 'sign', '--ks', fixture + '/fixture.p12', '--ks-key-alias',
+			'fixture', '--ks-pass', 'pass:android', '--key-pass', 'pass:android', '--out',
+			dir + '/probe.apk', dir + '/unsigned.apk'])
+	}
+	println('SERVICE-FIXTURE-APKS ' + out)
+}

@@ -133,6 +133,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  packages := smali + '/android/atl/ATLLoadedAppManager.smali'
  os.write_file(packages, framework_package_presence(os.read_file(packages)!)!)!
  write_framework_classes(smali)!
+ framework_application_startup(smali)!
  framework_package_signatures(smali)!
  checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', '--jobs', '2', smali, '-o', work + '/classes.dex'])!
  next := work + '/api-impl.jar'
@@ -145,6 +146,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  sources['tests/native-android-tools/androidtools/framework_content.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_content.v')!)
  sources['tests/native-android-tools/androidtools/framework.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework.v')!)
  sources['tests/native-android-tools/androidtools/framework_signatures.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_signatures.v')!)
+ sources['tests/native-android-tools/androidtools/framework_application.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_application.v')!)
  receipt := ah.Value({
   'schema': ah.Value(1)
   'input_sha256': ah.Value(input_hash)

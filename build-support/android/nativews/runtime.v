@@ -381,12 +381,8 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		put_object(e, info, c'android/content/pm/ApplicationInfo', c'publicSourceDir', c'Ljava/lang/String;', ws_string(e, apk))
 		put_object(e, info, c'android/content/pm/ApplicationInfo', c'nativeLibraryDir', c'Ljava/lang/String;', ws_string(e, native))
 		if ws_failure(e, c'ANDROID-WS-FAIL application paths') { return 1 }
-		application := obj(e, loaded, c'android/atl/ATLLoadedApp', c'getApplication', c'()Landroid/app/Application;', nil)
-		if ws_failure(e, c'ANDROID-WS-FAIL attach application') { return 1 }
-		ws_install_providers(e, loaded, pkg, application)
-		if ws_failure(e, c'ANDROID-WS-FAIL install providers') { return 1 }
-		call(e, application, c'android/app/Application', c'onCreate', c'()V', nil)
-		if ws_failure(e, c'ANDROID-WS-FAIL application onCreate') { return 1 }
+		ws_ensure_application(e, loaded)
+		if ws_failure(e, c'ANDROID-WS-FAIL application startup') { return 1 }
 		launch_args := [
 			Value{ l: if C.strlen(activity) > 0 { ws_string(e, activity) } else { nil } },
 			Value{ j: 1 },

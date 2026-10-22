@@ -3,6 +3,46 @@
 module atlframework
 
 type WsBoolField = fn (voidptr, voidptr, voidptr) u8
+type WsApplicationException = fn (voidptr) voidptr
+type WsApplicationClear = fn (voidptr)
+type WsApplicationThrow = fn (voidptr, voidptr) i32
+
+// The primary Activity and lazily started companion services share this path.
+// The object monitor serializes startup, with reentry on the main thread
+// allowed while providers or Application.onCreate are initializing.
+fn ws_ensure_application(e voidptr, loaded voidptr) {
+	unsafe {
+		if Monitor(slot(e, 217))(e, loaded) != 0 { return }
+		defer { Monitor(slot(e, 218))(e, loaded) }
+		state := get_int(e, loaded, c'android/atl/ATLLoadedApp', c'vinixApplicationState')
+		if state > 0 { return }
+		if state < 0 {
+			throw(e, c'java/lang/IllegalStateException', c'Application initialization previously failed')
+			return
+		}
+		main := static_obj(e, c'android/os/Looper', c'getMainLooper', c'()Landroid/os/Looper;', nil)
+		current := static_obj(e, c'android/os/Looper', c'myLooper', c'()Landroid/os/Looper;', nil)
+		if Same(slot(e, 24))(e, main, current) == 0 {
+			throw(e, c'java/lang/IllegalStateException', c'Application must start on the main thread')
+			return
+		}
+		put_int(e, loaded, c'android/atl/ATLLoadedApp', c'vinixApplicationState', 1)
+		pkg := get_object(e, loaded, c'android/atl/ATLLoadedApp', c'pkg', c'Landroid/content/pm/PackageParser$Package;')
+		application := obj(e, loaded, c'android/atl/ATLLoadedApp', c'getApplication', c'()Landroid/app/Application;', nil)
+		if !pending(e) { ws_install_providers(e, loaded, pkg, application) }
+		if !pending(e) { call(e, application, c'android/app/Application', c'onCreate', c'()V', nil) }
+		if pending(e) {
+			// JNI field writes require clearing a pending exception. Preserve the
+			// original cause and prevent retries against a partially started app.
+			failure := WsApplicationException(slot(e, 15))(e)
+			WsApplicationClear(slot(e, 17))(e)
+			put_int(e, loaded, c'android/atl/ATLLoadedApp', c'vinixApplicationState', -1)
+			WsApplicationThrow(slot(e, 13))(e, failure)
+			return
+		}
+		put_int(e, loaded, c'android/atl/ATLLoadedApp', c'vinixApplicationState', 2)
+	}
+}
 
 fn ws_enabled(e voidptr, info voidptr) bool {
 	f := field(e, c'android/content/pm/ComponentInfo', c'enabled', c'Z')

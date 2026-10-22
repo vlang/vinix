@@ -1,4 +1,5 @@
 # Class|method|V implementation body. Missing APIs produce UnsatisfiedLinkError.
+android/atl/ATLLoadedApp|vinixEnsureApplicationStarted|ws_ensure_application(e,this)
 android/content/res/AssetManager|init|ws_resource_init(e,this,p0)
 android/content/res/AssetManager|list|return ws_asset_list(e,this,p0)
 android/content/res/AssetManager|native_setApkAssets|ws_assets(e,this,p0,p1)

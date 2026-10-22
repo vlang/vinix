@@ -98,6 +98,11 @@ views, including bitmap targets used by the window composition regression.
 Application attachment precedes main-process content providers (descending
 `initOrder`), then `Application.onCreate`, then Activity construction. Disabled
 providers and providers assigned to another process are not instantiated.
+Companion services start their Application through the same path before service
+construction. Package contexts remain lazy; repeated service starts reuse the
+initialized Application and providers. `services-fixture.v` checks this ordering
+with two signed APKs and verifies binding callbacks run on the main thread.
+Package visibility also honors legacy target SDKs and `QUERY_ALL_PACKAGES`.
 ApplicationInfo and PackageManager share the actual APK, data and native library
 paths. Elapsed realtime uses the boot clock in the API's requested units.
 Current-thread CPU clocks use the kernel's thread clock in milliseconds or
