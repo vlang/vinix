@@ -18,6 +18,7 @@ pub fn install(output string, resources string) ! {
  install_typeface_probe(dir)!
  install_text_metrics_probe(dir)!
  install_size_span_probe(dir)!
+ install_static_layout_probe(dir)!
  install_view_configuration_probe(dir)!
  install_egl_probe(dir)!
  install_gles_probe(dir)!
@@ -111,6 +112,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->fonts(Landroid/content/C
 invoke-static {p0}, Lorg/vinix/bootstrap/TypefaceProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/TextMetricsProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/SizeSpanProbe;->check()V
+invoke-static {}, Lorg/vinix/bootstrap/StaticLayoutProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->broadcasts(Landroid/content/Context;)V
 new-instance v0, Landroid/hardware/SensorManager;
 invoke-direct {v0}, Landroid/hardware/SensorManager;-><init>()V
