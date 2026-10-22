@@ -74,6 +74,13 @@
       "play_downloads": "10B+", "distribution": "public APK mirror; signed APK"
     },
     {
+      "id": "google-maps", "name": "Google Maps", "package": "com.google.android.apps.maps",
+      "apk": "build/android-maps/GoogleMaps.apk",
+      "source": "https://d.apkpure.net/b/APK/com.google.android.apps.maps?version=latest",
+      "play": "https://play.google.com/store/apps/details?id=com.google.android.apps.maps",
+      "distribution": "public APK mirror; signed APK"
+    },
+    {
       "id": "youtube", "name": "YouTube", "package": "com.google.android.youtube",
       "apk": "build/android-native-ws/YouTube.apk",
       "source": "https://d.apkpure.net/b/APK/com.google.android.youtube?version=latest",
