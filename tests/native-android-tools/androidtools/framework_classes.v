@@ -96,6 +96,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_hardware_buffer(smali)!
  framework_time_animator(smali)!
  framework_path_animator(smali)!
+ framework_layout_suppression(smali)!
  framework_message_queue(smali)!
  framework_resource_fonts(smali)!
  framework_font_metrics(smali)!

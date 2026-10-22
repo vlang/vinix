@@ -36,6 +36,7 @@ pub fn install(output string, resources string) ! {
  install_traversal_probe(dir)!
  install_frame_bounds_probe(dir)!
  install_path_animator_probe(dir)!
+ install_layout_suppression_probe(dir)!
  install_touch_probe(dir)!
  install_editor_probe(dir)!
  install_window_probe(dir)!
@@ -130,6 +131,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/ShadowColorProbe;->check(Landroid/conte
 invoke-static {p0}, Lorg/vinix/bootstrap/ChildStatesProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/FrameBoundsProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/PathAnimatorProbe;->check()V
+invoke-static {p0}, Lorg/vinix/bootstrap/LayoutSuppressionProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->broadcasts(Landroid/content/Context;)V
 new-instance v0, Landroid/hardware/SensorManager;
 invoke-direct {v0}, Landroid/hardware/SensorManager;-><init>()V

@@ -45,6 +45,12 @@ moves consume no distance. Clones own independent temporary points. The fixture
 checks endpoints, uneven segments, curves, contour jumps, zero-length paths,
 conversion, cloning, path mutation, invalid inputs and scheduled frame callbacks.
 
+`ViewGroup.suppressLayout` defers container layout without changing its bounds,
+children or size callbacks. Releasing suppression requests one fresh traversal
+when layout was attempted; it never replays stale bounds. Explicit animation
+bounds and requestLayout remain available. Suppression state is per container.
+The fixture checks these effects and repeated suppression/release calls.
+
 Weighted Typeface factories retain family, requested weight and slant. System
 sans, serif and monospace resolve lazily to the nearest installed DejaVu
 regular/bold/italic face; unknown families fall back to sans. A bounded cache
