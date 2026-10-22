@@ -125,6 +125,35 @@ verified HTTPS response from Google and certificate failures for both
 `self-signed.badssl.com` and `wrong.host.badssl.com`; socket timeouts do not count
 as certificate rejection. The probe leaves the default trust manager and
 hostname verifier intact. TCP diagnostics separately expose unreachable routes.
+
+Package loading authenticates APK contents using pinned AOSP apksig 8.7.3,
+converted to DEX by pinned D8. The framework receipt records both tool hashes;
+the generated JAR includes apksig's Apache license. Verification uses Android
+15's signing policy independently of ATL's historical Java compatibility SDK.
+Unsigned APKs, invalid digests and invalid signing-block proofs fail loading.
+PackageInfo exposes the verified signers and rotation history when requested;
+legacy GET_SIGNATURES uses the oldest certificate in a verified lineage.
+No Google certificate is substituted for an application's actual signer.
+Missing package contexts throw NameNotFoundException.
+
+`tests/native-android-ws/signatures-fixture.v` takes the same five arguments as
+the HTTPS generator. Its guest assertions cover v1/v2/v3 signatures, v3.1 key
+rotation, certificate identity, defensive array copies, unsigned/tampered APK
+rejection and missing package contexts. Run the generated APK as
+`org.vinix.bootstrap`; require `SIGNATURE-FIXTURE-PASS` in the guest log.
+
+The native APK suite accepts an optional `companion_apks` array on each
+application, with `apk`, `package` and `source` fields per entry. These are real
+standalone APKs: host verification checks the package identity and signatures,
+the existing installer validates/extracts ARM64 ELF libraries, and guest package
+loading authenticates the APK again. Results retain companion metadata and
+library hashes. Companions requiring additional splits are rejected. Compile
+the suite with the installer module on V's path:
+
+```sh
+v -cc cc -path '@vlib|@vmodules|build-support/android' -o build/android-maps/suite-fast tests/native-android-ws/suite.v
+```
+
 Account listeners retain their registrations and deliver an empty snapshot on
 the requested Handler (or the main Looper). Duplicate registrations fail and
 removal permits registration again. Vinix has no account authenticator.

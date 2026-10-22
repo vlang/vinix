@@ -6,6 +6,7 @@ module main
 import compress.gzip
 import crypto.sha256
 import json2
+import nativeapk
 import os
 import time
 
@@ -119,11 +120,49 @@ fn observation(log string, id string) map[string]json2.Any {
 	}
 }
 
+// Real companion packages, installed at the paths consumed by ATL's package
+// loader. PackageManager still authenticates them in guest ART before use.
+fn stage_companions(settings map[string]json2.Any, app map[string]json2.Any, output string) ![]json2.Any {
+	mut records := []json2.Any{}
+	companions := (app['companion_apks'] or { json2.Any([]json2.Any{}) }).as_array()
+	data := output + '/module/root/.local/share/vinix/android/application.apk_'
+	mut packages := map[string]bool{}
+	for item in companions {
+		mut record := item.as_map().clone()
+		apk := os.abs_path(record['apk']!.str())
+		name := record['package']!.str()
+		if name.len == 0 || name.split('.').any(it.len == 0 || !it.bytes().all(it.is_alnum() || it == `_`))
+			|| name in packages || name == app['package']!.str() {
+			return error('invalid or duplicate companion package identity')
+		}
+		packages[name] = true
+		metadata := inspect_apk(apk, settings['aapt2']!.str(), settings['apksigner']!.str(), settings['java']!.str())!
+		if metadata['name']!.str() != name || metadata['split_required']!.bool() {
+			return error('companion identity mismatch or missing required splits: ' + name)
+		}
+		libraries := nativeapk.install(apk, output + '/companion-native/' + name, 'arm64-v8a')!
+		os.mkdir_all(data + '/_installed_apks_')!
+		os.mkdir_all(data + '/' + name + '_/lib')!
+		os.cp(apk, data + '/_installed_apks_/' + name + '.apk')!
+		mut hashes := map[string]json2.Any{}
+		for library in os.ls(libraries)! {
+			os.cp(libraries + '/' + library, data + '/' + name + '_/lib/' + library)!
+			hashes[library] = digest(libraries + '/' + library)!
+		}
+		record['metadata'] = metadata
+		record['native_libraries'] = hashes
+		records << json2.Any(record)
+	}
+	return records
+}
+
 fn prepare_module(settings map[string]json2.Any, app map[string]json2.Any, output string) ! {
 	native := os.abs_path(settings['native_dir']!.str())
 	module_root := output + '/module'
 	// Reuse one module directory, replacing the single APK for every fresh boot.
 	os.mkdir_all(module_root)!
+	data := module_root + '/root/.local/share/vinix/android/application.apk_'
+	if os.exists(data) { os.rmdir_all(data)! }
 	checked(['tar', '-xf', settings['base_module']!.str(), '-C', module_root])!
 	runtime := module_root + '/opt/vinix-android-aarch64'
 	for path in ['/opt/android-test', '/usr/bin', '/sbin', '/opt/vinix-android-aarch64/usr/bin',
@@ -180,11 +219,15 @@ fn prepare_module(settings map[string]json2.Any, app map[string]json2.Any, outpu
 	os.write_file(module_root + '/etc/resolv.conf', 'nameserver 10.0.2.3\n')!
 	os.write_file(module_root + '/sbin/init', '#!/bin/sh\nexec /opt/android-test/native-guest\n')!
 	os.chmod(module_root + '/sbin/init', 0o755)!
+	companions := stage_companions(settings, app, output)!
+	os.write_file(output + '/companion-packages.json', json2.encode(companions, prettify: true))!
 	archive := output + '/module.tar'
 	checked(['tar', '--format=ustar', '-cf', archive, '-C', module_root, '.'])!
 	checked(['mcopy', '-o', '-i', settings['boot_image']!.str(), archive, '::/boot/qemu-runtime.tar'])!
 	os.rm(archive)!
 	os.rm(module_root + '/opt/android-test/application.apk')!
+	// Retain hashes and source metadata, rather than another private APK copy.
+	if os.exists(data) { os.rmdir_all(data)! }
 }
 
 fn run_app(settings map[string]json2.Any, app map[string]json2.Any, output string) !map[string]json2.Any {
@@ -230,6 +273,7 @@ fn run_app(settings map[string]json2.Any, app map[string]json2.Any, output strin
 	}
 	frame := state + '/application.png'
 	mut result := observation(os.read_file(serial_path) or { '' }, id)
+	result['companion_packages'] = json2.decode[json2.Any](os.read_file(output + '/companion-packages.json')!)!
 	result['startup_timeout_seconds'] = json2.Any(startup_seconds)
 	capture := os.exec([settings['input_tool']!.str(), 'screenshot', '--socket', socket, '--destination',
 		frame])

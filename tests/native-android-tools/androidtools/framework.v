@@ -124,6 +124,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  smali := work + '/smali'
  if os.exists(smali) { os.rmdir_all(smali)! }
  checked([java, '-cp', tools + '/*', 'org.jf.baksmali.Main', 'disassemble', '--jobs', '2', input, '-o', smali])!
+ for name, hash in framework_signature_dependency(smali, work, tools, java)! { tool_hashes[name] = ah.Value(hash) }
  cursor_v := os.read_file(root() + '/build-support/android/atlframework/cursors.v')!
  bar_v := os.read_file(root() + '/build-support/android/atlframework/actionbar.v')!
  activity, bar := framework_patch(os.read_file(smali + '/android/app/Activity.smali')!, os.read_file(smali + '/android/app/ActionBar.smali')!, cursor_v, bar_v)!
@@ -132,15 +133,18 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  packages := smali + '/android/atl/ATLLoadedAppManager.smali'
  os.write_file(packages, framework_package_presence(os.read_file(packages)!)!)!
  write_framework_classes(smali)!
+ framework_package_signatures(smali)!
  checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', '--jobs', '2', smali, '-o', work + '/classes.dex'])!
  next := work + '/api-impl.jar'
  os.cp(input, next)!
  checked(['zip', '-q', '-j', next, work + '/classes.dex'])!
+ framework_signature_notice(next, work, tools)!
  mut sources := map[string]ah.Value{}
  for file in ['jni.v', 'cursors.v', 'actionbar.v', 'widgets.v', 'dialogs.v', 'menus.v', 'charsets.v', 'themes.v', 'recreate.v', 'views.v'] { sources['build-support/android/atlframework/' + file] = ah.Value(framework_digest(root() + '/build-support/android/atlframework/' + file)!) }
  sources['tests/native-android-tools/androidtools/framework_classes.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_classes.v')!)
  sources['tests/native-android-tools/androidtools/framework_content.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_content.v')!)
  sources['tests/native-android-tools/androidtools/framework.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework.v')!)
+ sources['tests/native-android-tools/androidtools/framework_signatures.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_signatures.v')!)
  receipt := ah.Value({
   'schema': ah.Value(1)
   'input_sha256': ah.Value(input_hash)
