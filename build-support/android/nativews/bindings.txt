@@ -104,6 +104,10 @@ android/graphics/Paint|getTypeface|return get_object(e,this,c'android/graphics/P
 android/graphics/Paint|setTypeface|return ws_paint_typeface(e,this,p0)
 android/graphics/Paint|measureText(Ljava/lang/String;II)F|return ws_measure_text(e,this,p0,p1,p2,false)
 android/graphics/Paint|measureText([CII)F|return ws_measure_text(e,this,p0,p1,p2,true)
+android/graphics/Paint|getFontMetrics(Landroid/graphics/Paint$FontMetrics;)F|return ws_font_metrics(e,this,p0)
+android/graphics/Paint|getFontMetricsInt(Landroid/graphics/Paint$FontMetricsInt;)I|return ws_font_metrics_int(e,this,p0)
+android/graphics/Paint|ascent|return ws_paint_metrics(e,this).ascent
+android/graphics/Paint|descent|return ws_paint_metrics(e,this).descent
 android/widget/TextView|getTypeface|return get_object(e,this,c'android/widget/TextView',c'vinixTypeface',c'Landroid/graphics/Typeface;')
 android/widget/TextView|setTypeface|ws_view_typeface(e,this,p0)
 android/content/Context|registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;)Landroid/content/Intent;|return ws_broadcast_register(e,this,p0,p1,nil,0)

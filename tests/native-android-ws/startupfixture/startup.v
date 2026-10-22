@@ -47,6 +47,7 @@ pub fn install(output string, resources string) ! {
  install_media_probe(dir)!
  os.mkdir_all(output + '/res/font')!
  runtime := resources.all_before('/usr/lib/java/dex/')
+ install_font_metrics_probe(dir, runtime)!
  os.cp(runtime + '/usr/share/fonts/dejavu/DejaVuSansMono.ttf', output + '/res/font/fixture_font.ttf')!
  os.write_file(output + '/res/font/fixture_family.xml', '<font-family xmlns:android="http://schemas.android.com/apk/res/android"><font android:font="@font/fixture_font" android:fontWeight="400"/></font-family>')!
  os.write_file(output + '/res/font/fixture_fallback.xml', '<font-family xmlns:android="http://schemas.android.com/apk/res/android" android:fontProviderAuthority="absent.fonts" android:fontProviderPackage="absent.fonts" android:fontProviderQuery="Absent" android:fontProviderSystemFontFamily="sans-serif"/>')!
@@ -112,6 +113,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/MediaProbe;->check(Landroid/content/Con
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->fonts(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/TypefaceProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/TextMetricsProbe;->check()V
+invoke-static {p0}, Lorg/vinix/bootstrap/FontMetricsProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/SizeSpanProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/StaticLayoutProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/ShadowColorProbe;->check(Landroid/content/Context;)V
