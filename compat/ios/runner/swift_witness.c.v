@@ -61,7 +61,13 @@ fn swift_witness_table_checked(conformance u64, metadata u64, arguments u64) !u6
 		data := ios_runtime.swift_dispatch_flags_arena + u64(C.getpagesize())
 		if conformance in [data + 256, data + 272, data + 288]! {
 			swift_dispatch_algebra_table_checked(metadata)!
+			if metadata != data + 16 { return swift_dispatch_metadata_failure() }
 			return if conformance == data + 256 { data + 320 } else if conformance == data + 272 { data + 512 } else { data + 544 }
+		}
+		if conformance in [data + 1440, data + 1456, data + 1472]! {
+			swift_dispatch_algebra_table_checked(metadata)!
+			if metadata != data + 1280 { return swift_dispatch_metadata_failure() }
+			return if conformance == data + 1440 { data + 1504 } else if conformance == data + 1456 { data + 1696 } else { data + 1728 }
 		}
 	}
 	if ios_runtime != unsafe { nil } && ios_runtime.swift_set_arena != 0 {

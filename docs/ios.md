@@ -16634,8 +16634,9 @@ Dispatch. The `OS_dispatch_queue.Attributes` accessor returns complete UInt64
 POD8 metadata with a distinct nominal descriptor nested in Dispatch's extension
 of the imported queue class. It shares the existing ownership-free value
 witnesses and sealed accessor/data arena, without adding heap or ARC ownership.
-Separate metadata exports, conformances, constructors and
-attribute constant getters remain unsupported.
+The separate `VN` metadata export, directly exported constructors and attribute
+constant getters remain unsupported. The descriptor and SetAlgebra conformance
+are described below.
 
 The existing Dispatch flags fixture exercises both nominal types:
 
@@ -16683,22 +16684,59 @@ Static inspection traces Fortnite's required descriptor import to GOT cell
 `0x10dc7fb31` in `__TEXT,__swift5_typeref`. This inspection executes no
 application code.
 
-The launch probe now stops at required Swift Dispatch import
-`_$sSo17OS_dispatch_queueC8DispatchE10AttributesVs10SetAlgebraACMc`
-(`OS_dispatch_queue.Attributes` SetAlgebra conformance), before application entry.
-Fortnite remains unplayable.
+`_$sSo17OS_dispatch_queueC8DispatchE10AttributesVs10SetAlgebraACMc` now
+exports the Attributes SetAlgebra conformance. Its SetAlgebra, Equatable and
+array-literal witness tables retain distinct nominal descriptors and associated
+Self metadata while sharing Flags' ownership-free scalar operations and canonical
+protocol descriptors. Literal and generic Array constructors combine the bits
+and consume exactly one source reference. They validate the exact nominal type,
+registered Array storage and Sequence witness identity before reading a foreign
+source or changing the output. The records, tables and literal bridge fit in the
+existing sealed arena without adding allocation or ownership.
+
+The algebra fixture compares both nominal types with native Swift:
+
+```sh
+v run tests/ios/native-checks.v build-swift-dispatch-algebra
+```
+
+Native comparisons cover the scalar/equality witnesses, zero, overlapping and
+high bits, optional payload/tag guards, preserved `x20`/`x21`, associated Self
+metadata and literal/direct/forwarded Array constructors. Compatibility checks
+also reject protected foreign and cross-nominal inputs without consuming their
+owners or modifying output, exercise eight-worker canonical publication and
+verify two unmapped runtime teardowns.
+
+Evidence is retained under
+`build/ios/fortnite/dispatch-attributes-algebra-checks`. Eight
+normal/deterministic ASan/UBSan runs passed across the algebra, attributes/flags,
+QoS and async fixtures. The ARM64 algebra fixture, launch probe and both import
+audits passed their checks. All 988 pinned source, toolchain and runtime inputs
+remained unchanged; eight archived binary/generated-C pairs and four retained
+guest serial logs passed SHA256 verification.
+
+Static inspection traces the required conformance import to GOT cell
+`0x10dc9bcd8`, loaded at `0x1000723d8` in Fortnite's queue setup code. The
+consumer supplies the conformance record to a witness lookup helper and uses the
+result for a generic constructor. This inspection executes no application code;
+the launch probe has not reached this conformance in Fortnite.
+
+The launch probe now stops at the required Swift Dispatch import
+`_$sSo17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyO7inherityA2EmFWC`
+(`DispatchQueue.AutoreleaseFrequency.inherit`). This remains a linking failure
+before application entry; Fortnite is not playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,998 | 163 | 78 |
+| Fortnite executable | 1,999 | 162 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,838 | 166 | 114 |
+| All images | 2,839 | 165 | 114 |
 
-The C++/GLES/Text variant reports 2,852 resolved imports, 152 unresolved strong
+The C++/GLES/Text variant reports 2,853 resolved imports, 151 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

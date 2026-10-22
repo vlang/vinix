@@ -15,6 +15,7 @@ type DispatchAlgebraDrop = fn (u64)
 type DispatchAlgebraAssociated = fn (u64, u64, u64, u64, u64) SwiftAssociatedMetadata
 
 fn dispatch_algebra_mov(destination u32, source u32) u32 { return 0xaa0003e0 | (source << 16) | destination }
+fn dispatch_algebra_relative(field u64) u64 { return u64(i64(field) + i64(i32(read32(field)))) }
 fn dispatch_algebra_pair(op u32, first u32, second u32, base u32, offset u32) u32 { return op | ((offset / 8) << 15) | (second << 10) | (base << 5) | first }
 fn dispatch_algebra_probe(code u64) DispatchAlgebraProbe {
 	for i, op in [u32(0xa9bc7bfd),0xa90153f3,0xa9025bf5,0xa90363f7,
@@ -97,12 +98,16 @@ fn dispatch_algebra_constructors(probe DispatchAlgebraProbe, table u64, metadata
 		}
 	}
 }
-fn dispatch_algebra_worker(first bool) u64 {
+fn dispatch_algebra_worker(first int) u64 {
 	for _ in 0..256 {
-		if first { runtime_symbol('/usr/lib/swift/libswiftDispatch.dylib','_$s8Dispatch0A13WorkItemFlagsVs10SetAlgebraAAMc') or { panic(err) } }
+		if first < 2 {
+			symbol := if first == 0 { '_$s8Dispatch0A13WorkItemFlagsVs10SetAlgebraAAMc' } else { '_$sSo17OS_dispatch_queueC8DispatchE10AttributesVs10SetAlgebraACMc' }
+			runtime_symbol('/usr/lib/swift/libswiftDispatch.dylib',symbol) or { panic(err) }
+		}
 		base := swift_dispatch_flags_arena_checked() or { panic(err) }
-		metadata := base + u64(C.getpagesize()) + 16
-		assert swift_witness_table_checked(base + u64(C.getpagesize()) + 256,metadata,0) or { panic(err) } == base + u64(C.getpagesize()) + 320
+		data := base + u64(C.getpagesize())
+		assert swift_witness_table_checked(data + 256,data + 16,0) or { panic(err) } == data + 320
+		assert swift_witness_table_checked(data + 1440,data + 1280,0) or { panic(err) } == data + 1504
 	}
 	return ios_runtime.swift_dispatch_flags_arena
 }
@@ -114,51 +119,81 @@ fn test_swift_dispatch_algebra() {
 	$if macos {
 		lib := C.dlopen(c'/usr/lib/swift/libswiftDispatch.dylib',2); core := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib',2)
 		assert lib != unsafe { nil } && core != unsafe { nil }
-		access := unsafe { DispatchAlgebraAccess(C.dlsym(lib,c'$s8Dispatch0A13WorkItemFlagsVMa')) }; metadata := access(0).metadata
 		lookup := unsafe { DispatchAlgebraLookup(C.dlsym(core,c'swift_getWitnessTable')) }
-		table := lookup(u64(C.dlsym(lib,c'$s8Dispatch0A13WorkItemFlagsVs10SetAlgebraAAMc')),metadata,0)
-		dispatch_algebra_scalar(probe,table,metadata); dispatch_algebra_constructors(probe,table,metadata,core,true,guard)
 		associated := unsafe { DispatchAlgebraAssociated(C.dlsym(core,c'swift_getAssociatedTypeWitness')) }
 		protocol := u64(C.dlsym(core,c'$ss10SetAlgebraMp'))
-		assert associated(0,table,metadata,protocol + 40,protocol + 64).metadata == metadata
-		println('IOS-DISPATCH-ALGEBRA-NATIVE: all scalar/inherited equality witnesses, zero/overlap/high-bit matrix, optional payload/tag guards, x20/x21 preservation, literal/direct/forwarded Array constructors and exact source consumption')
+		literal_protocol := u64(C.dlsym(core,c'$ss25ExpressibleByArrayLiteralMp'))
+		for name in ['8Dispatch0A13WorkItemFlagsV','So17OS_dispatch_queueC8DispatchE10AttributesV']! {
+			accessor := C.dlsym(lib,('\$s' + name + 'Ma').str)
+			conformance := C.dlsym(lib,('\$s' + name + if name.starts_with('8') { 's10SetAlgebraAAMc' } else { 's10SetAlgebraACMc' }).str)
+			assert accessor != unsafe { nil } && conformance != unsafe { nil }
+			access := unsafe { DispatchAlgebraAccess(accessor) }; metadata := access(0).metadata
+			table := lookup(u64(conformance),metadata,0)
+			dispatch_algebra_scalar(probe,table,metadata); dispatch_algebra_constructors(probe,table,metadata,core,true,guard)
+			assert associated(0,table,metadata,protocol + 40,protocol + 64).metadata == metadata
+			assert associated(0,read64(table + 16),metadata,literal_protocol + 16,literal_protocol + 24).metadata == metadata
+		}
+		println('IOS-DISPATCH-ALGEBRA-NATIVE: Flags and Attributes scalar/inherited equality witnesses, zero/overlap/high-bit matrix, optional payload/tag guards, x20/x21 preservation, literal/direct/forwarded Array constructors and exact source consumption')
 	}
 	for _ in 0..2 {
 		objc_start(); mut workers := []thread u64{}
-		for i in 0..8 { workers << spawn dispatch_algebra_worker(i % 2 == 0) }
+		for i in 0..8 { workers << spawn dispatch_algebra_worker(i % 3) }
 		bases := workers.wait(); base := bases[0]; for candidate in bases { assert candidate == base }
-		data := base + u64(page); metadata := data + 16; record := data + 256
-		table := swift_witness_table_checked(record,metadata,guard) or { panic(err) }; assert table == data + 320
-		assert read32(record + 12) == 0 && read64(table) == record
-		assert read32(data + 576) == 0x30043 && read32(data + 588) == 2 && read32(data + 592) == 21
-		assert swift_associated_type(0x1ff,table,metadata,data + 616,data + 640).metadata == metadata
-		assert swift_associated_type(0,read64(table + 16),metadata,data + 816,data + 824).metadata == metadata
-		assert read64(table + 8) == swift_witness_table_checked(data + 288,metadata,guard) or { panic(err) }
-		dispatch_algebra_scalar(probe,table,metadata); dispatch_algebra_constructors(probe,table,metadata,unsafe { nil },false,guard)
-		// Invalid identities reject before a protected source is ever read.
-		for bad in [u64(0),guard,metadata + 8,swift_integer_metadata()]! {
-			if _ := swift_witness_table_checked(record,bad,0) { assert false }
-			if _ := swift_dispatch_sequence_checked(guard,bad,guard,guard,table,guard) { assert false }
+		data := base + u64(page)
+		for kind in 0..2 {
+			metadata := data + if kind == 0 { u64(16) } else { u64(1280) }
+			other_metadata := data + if kind == 0 { u64(1280) } else { u64(16) }
+			record := data + if kind == 0 { u64(256) } else { u64(1440) }
+			table := swift_witness_table_checked(record,metadata,guard) or { panic(err) }
+			assert table == data + if kind == 0 { u64(320) } else { u64(1504) }
+			assert read32(record + 12) == 0 && read64(table) == record
+			assert dispatch_algebra_relative(record) == data + 576 && dispatch_algebra_relative(record + 4) == read64(metadata + 8)
+			assert read32(data + 576) == 0x30043 && read32(data + 588) == 2 && read32(data + 592) == 21
+			assert swift_associated_type(0x1ff,table,metadata,data + 616,data + 640).metadata == metadata
+			assert swift_associated_type(0,read64(table + 16),metadata,data + 816,data + 824).metadata == metadata
+			assert read64(table + 8) == swift_witness_table_checked(record + 32,metadata,guard) or { panic(err) }
+			assert read64(table + 16) == swift_witness_table_checked(record + 16,metadata,guard) or { panic(err) }
+			dispatch_algebra_scalar(probe,table,metadata); dispatch_algebra_constructors(probe,table,metadata,unsafe { nil },false,guard)
+			// Invalid identities reject before a protected source is ever read.
+			for bad in [u64(0),guard,metadata + 8,swift_integer_metadata(),other_metadata]! {
+				for i in 0..3 { if _ := swift_witness_table_checked(record + u64(i * 16),bad,0) { assert false } }
+				if _ := swift_dispatch_sequence_checked(guard,bad,guard,guard,table,guard) { assert false }
+			}
+			for bad in [u64(0),guard,table + 8]! { if _ := swift_dispatch_sequence_checked(guard,metadata,guard,guard,bad,guard) { assert false } }
+			if _ := swift_dispatch_sequence_checked(guard,metadata,guard,guard,table,guard) { assert false }
+			if _ := swift_dispatch_array_fold_checked(guard,metadata,guard) { assert false }
+			mut result := [u64(0xcafe),0xa5,0xbeef]!
+			for bad in [u64(0),guard,~u64(0) - 7]! { if _ := swift_dispatch_array_fold_checked(bad,metadata,u64(unsafe { &result[1] })) { assert false } }
+			foreign := swift_array_allocate(1,swift_integer_metadata()); unsafe { *(&u64(foreign.bytes)) = 0 }
+			if _ := swift_dispatch_array_fold_checked(foreign.owner,metadata,u64(unsafe { &result[1] })) { assert false }
+			swift_bridge_release(foreign.owner)
+			foreign_nominal := swift_array_allocate(1,other_metadata)
+			foreign_array := swift_array_access(0,other_metadata).metadata
+			foreign_sequence := swift_array_sequence_table_checked(foreign_array) or { panic(err) }
+			if _ := swift_dispatch_array_fold_checked(foreign_nominal.owner,metadata,u64(unsafe { &result[1] })) { assert false }
+			if _ := swift_dispatch_array_fold_checked(guard,guard,u64(unsafe { &result[1] })) { assert false }
+			canonical_array := swift_array_access(0,metadata).metadata
+			canonical_sequence := swift_array_sequence_table_checked(canonical_array) or { panic(err) }
+			other_table := swift_dispatch_algebra_table_checked(other_metadata) or { panic(err) }
+			for identity in [[foreign_array,canonical_sequence,table]!,[canonical_array,foreign_sequence,table]!,[canonical_array,canonical_sequence,other_table]!]! {
+				if _ := swift_dispatch_sequence_checked(guard,metadata,identity[0],identity[1],identity[2],u64(unsafe { &result[1] })) { assert false }
+			}
+			mut source := foreign_nominal.owner
+			if _ := swift_dispatch_sequence_checked(u64(unsafe { &source }),metadata,canonical_array,canonical_sequence,table,u64(unsafe { &result[1] })) { assert false }
+			assert read64(foreign_nominal.owner + 8) == 3
+			swift_bridge_release(foreign_nominal.owner)
+			owned := swift_array_allocate(1,metadata); unsafe { *(&u64(owned.bytes)) = 3; *(&u64(owned.owner + 16)) = 2 }
+			if _ := swift_dispatch_array_fold_checked(owned.owner,metadata,u64(unsafe { &result[1] })) { assert false }
+			assert result == [u64(0xcafe),0xa5,0xbeef]! && read64(owned.owner + 8) == 3
+			unsafe { *(&u64(owned.owner + 16)) = 1 }; swift_bridge_release(owned.owner)
+			assert ios_runtime.swift_arrays.len == 0 && ios_runtime.swift_heap.len == 0
 		}
-		for bad in [u64(0),guard,table + 8]! { if _ := swift_dispatch_sequence_checked(guard,metadata,guard,guard,bad,guard) { assert false } }
-		if _ := swift_dispatch_sequence_checked(guard,metadata,guard,guard,table,guard) { assert false }
-		if _ := swift_dispatch_array_fold_checked(guard,guard) { assert false }
-		mut result := [u64(0xcafe),0xa5,0xbeef]!
-		for bad in [u64(0),guard,~u64(0) - 7]! { if _ := swift_dispatch_array_fold_checked(bad,u64(unsafe { &result[1] })) { assert false } }
-		foreign := swift_array_allocate(1,swift_integer_metadata()); unsafe { *(&u64(foreign.bytes)) = 0 }
-		if _ := swift_dispatch_array_fold_checked(foreign.owner,u64(unsafe { &result[1] })) { assert false }
-		swift_bridge_release(foreign.owner)
-		owned := swift_array_allocate(1,metadata); unsafe { *(&u64(owned.bytes)) = 3; *(&u64(owned.owner + 16)) = 2 }
-		if _ := swift_dispatch_array_fold_checked(owned.owner,u64(unsafe { &result[1] })) { assert false }
-		assert result == [u64(0xcafe),0xa5,0xbeef]! && read64(owned.owner + 8) == 3
-		unsafe { *(&u64(owned.owner + 16)) = 1 }; swift_bridge_release(owned.owner)
-		assert ios_runtime.swift_arrays.len == 0 && ios_runtime.swift_heap.len == 0
 		objc_stop(); assert ios_runtime.swift_dispatch_flags_arena == 0
 		$if macos { assert C.mprotect(voidptr(base),page * 2,C.PROT_READ) == -1 }
 		$else { mut residency := [u8(0),0]!; assert C.mincore(voidptr(base),page * 2,unsafe { &residency[0] }) == -1 }
-		if _ := swift_dispatch_algebra_table_checked(metadata) { assert false }
+		for metadata in [data + 16,data + 1280]! { if _ := swift_dispatch_algebra_table_checked(metadata) { assert false } }
 		if _ := swift_dispatch_flags_arena_checked() { assert false }
 	}
 	assert C.munmap(voidptr(code),page) == 0 && C.munmap(voidptr(guard),page) == 0
-	println('IOS-DISPATCH-ALGEBRA: complete concrete SetAlgebra/Equatable/array-literal tables, canonical associated Flags metadata, scalar/optional ABI, owned Array OR/one-release constructors, protected foreign-profile rejection, eight-worker identity and two quiescent unmapped lifetimes')
+	println('IOS-DISPATCH-ALGEBRA: distinct Flags and Attributes SetAlgebra/Equatable/array-literal tables, canonical associated Self metadata, scalar/optional ABI, owned Array OR/one-release constructors, protected foreign and cross-nominal rejection, eight-worker identity and two quiescent unmapped lifetimes')
 }

@@ -35,24 +35,27 @@ fn swift_dispatch_algebra_table_checked(metadata u64) !u64 {
 	if ios_runtime == unsafe { nil } { return swift_dispatch_metadata_failure() }
 	C.ios_objc_initialize_lock(); defer { C.ios_objc_initialize_unlock() }
 	base := ios_runtime.swift_dispatch_flags_arena
-	if ios_runtime.swift_dispatch_flags_retired || base == 0
-		|| metadata != base + u64(C.getpagesize()) + 16 { return swift_dispatch_metadata_failure() }
-	return base + u64(C.getpagesize()) + 320
+	if ios_runtime.swift_dispatch_flags_retired || base == 0 { return swift_dispatch_metadata_failure() }
+	data := base + u64(C.getpagesize())
+	if metadata == data + 16 { return data + 320 }
+	if metadata == data + 1280 { return data + 1504 }
+	return swift_dispatch_metadata_failure()
 }
 
 fn swift_dispatch_word_span(address u64) bool { return address != 0 && address & 7 == 0 && address <= ~u64(0) - 7 }
 
-// This profile accepts only registered native Array<Flags> storage. Validate
+// This profile accepts only registered native Array<Self> storage. Validate
 // identity before reading any foreign metadata, table, source or owner header.
 // The caller transfers one Array reference, which is consumed exactly once.
-fn swift_dispatch_array_fold_checked(owner u64, output u64) ! {
+fn swift_dispatch_array_fold_checked(owner u64, metadata u64, output u64) ! {
 	if ios_runtime == unsafe { nil } || !swift_dispatch_word_span(output) { return swift_dispatch_metadata_failure() }
 	C.ios_objc_initialize_lock()
 	mut locked := true
 	defer { if locked { C.ios_objc_initialize_unlock() } }
 	base := ios_runtime.swift_dispatch_flags_arena
 	if base == 0 || ios_runtime.swift_dispatch_flags_retired { return swift_dispatch_metadata_failure() }
-	metadata := base + u64(C.getpagesize()) + 16
+	data := base + u64(C.getpagesize())
+	if metadata !in [data + 16, data + 1280]! { return swift_dispatch_metadata_failure() }
 	mut bits := u64(0)
 	if owner == 0 || owner != ios_runtime.swift_empty_array {
 		storage := ios_runtime.swift_arrays[owner] or { return swift_dispatch_metadata_failure() }
@@ -66,7 +69,14 @@ fn swift_dispatch_array_fold_checked(owner u64, output u64) ! {
 	C.ios_objc_initialize_unlock(); locked = false
 	swift_bridge_release(owner)
 }
-fn swift_dispatch_literal(owner u64, output u64) { swift_dispatch_array_fold_checked(owner, output) or { panic(err) } }
+fn swift_dispatch_literal(owner u64, output u64) {
+	base := swift_dispatch_flags_arena_checked() or { panic(err) }
+	swift_dispatch_array_fold_checked(owner, base + u64(C.getpagesize()) + 16, output) or { panic(err) }
+}
+fn swift_dispatch_attributes_literal(owner u64, output u64) {
+	base := swift_dispatch_flags_arena_checked() or { panic(err) }
+	swift_dispatch_array_fold_checked(owner, base + u64(C.getpagesize()) + 1280, output) or { panic(err) }
+}
 
 fn swift_dispatch_sequence_checked(source u64, metadata u64, sequence_metadata u64,
 	sequence_table u64, table u64, output u64) ! {
@@ -78,7 +88,7 @@ fn swift_dispatch_sequence_checked(source u64, metadata u64, sequence_metadata u
 	valid := sequence_metadata == array_metadata && sequence_table == sequence + 256
 	C.ios_objc_initialize_unlock()
 	if !valid { return swift_dispatch_metadata_failure() }
-	swift_dispatch_array_fold_checked(read64(source), output)!
+	swift_dispatch_array_fold_checked(read64(source), metadata, output)!
 }
 fn swift_dispatch_sequence(source u64, sequence_metadata u64, sequence_table u64,
 	metadata u64, table u64, output u64) {
