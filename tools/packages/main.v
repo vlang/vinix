@@ -10,6 +10,7 @@ import tools.packages.pkgcore
 import tools.packages.pkgprotocol
 
 const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progress] COMMAND [ARGS]\n' +
+	'  capabilities (read-only JSON supported interface versions)\n' +
 	'  update | search [QUERY] | info ID | list | status | updates | view\n' +
 	'  admin [--progress] [--offline] update|apply|cleanup-apply|repo-apply|deployment-apply|policy-apply|mirror-apply|mirror-deployment-apply ...\n' +
 	'  install ID... | remove ID... | upgrade | repair | rollback | gc | verify | health\n' +
@@ -59,12 +60,14 @@ fn publisher_reply[T](mut info T) {
 fn checked(arguments []string) !int {
 	mut args := arguments.clone()
 	mut root := ''
+	mut root_option := false
 	mut offline := false
 	mut as_json := false
 	mut progress := false
 	for args.len > 0 && args[0].starts_with('--') {
 		match args[0] {
 			'--root' {
+				root_option = true
 				if args.len < 2 || !args[1].starts_with('/') || args[1].contains('\x00') {
 					return error('--root requires an absolute directory')
 				}
@@ -111,6 +114,14 @@ fn checked(arguments []string) !int {
 		return admin_authorize()
 	}
 	match command {
+		'capabilities' {
+			if names.len != 0 || root_option || offline || progress {
+				return error('capabilities takes no arguments or installation/transport options')
+			}
+			mut supported := pkgcore.capabilities()
+			publisher_reply(mut supported)
+			return 0
+		}
 		'keygen' {
 			if names.len != 1 { return error('keygen requires a new signing seed filename') }
 			println(pkgcore.keygen(names[0])!)
