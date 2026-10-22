@@ -16907,21 +16907,61 @@ pointer fixups in constant tables and class metadata, with no direct call stub.
 Eager binding needs the symbol before these slots are called. This inspection
 executes no application code.
 
+`_$ss12CaseIterableMp` now exports the canonical Swift `CaseIterable`
+declaration. Its two generic constraints preserve `Self == AllCases.Element`
+and `AllCases: Collection`, including symbolic references back to the same
+protocol and the existing Collection identity. The four resilient aliases
+identify the witness-table base, associated conformance, associated type and
+static getter requirement. The `AllCases` default remains `Array<Self>`;
+its conformance accessor accepts existing Array metadata and returns the
+canonical Array:Collection table. The getter has no default implementation.
+The descriptor page is read-only, the adapter page is read/execute, and both
+retire after workers drain and before their borrowed declaration dependencies.
+
+The fixture compares the graph, relative references, aliases and default
+accessor with Apple's runtime. It also checks canonical Array tables for
+multiple element types, sealed page permissions, concurrent publication,
+rejected names/libraries and two drained/unmapped lifetimes:
+
+```sh
+v run tests/ios/native-checks.v build-swift-case-iterable
+```
+
+Evidence is retained in `build/ios/fortnite/case-iterable-checks-v2`. The
+CaseIterable, protocol and Array/Sequence fixtures passed normal and
+deterministic ASan/UBSan host runs. The ARM64 CaseIterable fixture passed;
+the launch probe and both import audits completed. All 1,048 pinned source,
+toolchain and runtime inputs remained unchanged. Seven archived binary/generated-C
+pairs and four retained serial logs passed SHA256 verification. All four
+temporary VMs and their RAM disk were retired. The initial native page-permission
+assertion failure remains preserved in `build/ios/fortnite/case-iterable-checks`,
+including its original manifest, exact source copies, logs and scratch archive.
+
+Static inspection of the executable with SHA256
+`6aae5109d316864fb67bea6a92046c347edbb04dc2a104c6666713da989cd373`
+finds four required data fixups at `0x10dc9e480` through `0x10dc9e498`: the
+protocol descriptor and three resilient requirement aliases. The `TimePeriod`
+enum's conformance at `0x10d234468` has flags `0x30000`, a null witness pattern
+and three resilient witness entries referring to those aliases. This change
+supplies the declaration and associated defaults; synthesis of arbitrary
+generic/resilient conformance tables remains unsupported. The inspection
+executes no application code.
+
 The launch probe now stops at the required Swift core import
-`_$ss12CaseIterableMp`. This remains a linking failure before application
-entry; Fortnite is not playable.
+`_$ss28CustomDebugStringConvertibleMp`. This remains a linking failure before
+application entry; Fortnite is not playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,005 | 156 | 78 |
+| Fortnite executable | 2,009 | 152 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,845 | 159 | 114 |
+| All images | 2,849 | 155 | 114 |
 
-The C++/GLES/Text variant reports 2,859 resolved imports, 145 unresolved strong
+The C++/GLES/Text variant reports 2,863 resolved imports, 141 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

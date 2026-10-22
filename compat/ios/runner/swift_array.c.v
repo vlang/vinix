@@ -169,6 +169,7 @@ fn swift_array_stop() {
 	swift_array_decoding_stop()
 	swift_array_encoding_stop()
 	swift_set_stop()
+	swift_case_iterable_stop()
 	swift_collection_stop()
 	swift_array_sequence_stop()
 	// Shutdown has joined workers and drained all owners/callbacks. Retire

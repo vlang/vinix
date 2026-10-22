@@ -248,6 +248,8 @@ mut:
 	swift_array_sequence_metadata map[u64]u64 // Element -> sealed iterator metadata and complete Sequence tables.
 	swift_collection_arena u64
 	swift_collection_metadata map[u64]u64
+	swift_case_iterable_arena u64 // Sealed CaseIterable declaration and default AllCases conformance adapter.
+	swift_case_iterable_retired bool // Reject declaration recreation after quiescent metadata retirement.
 	swift_indexing_iterator_conformance_descriptor u64 // Remember for stale lookup rejection after retirement.
 	swift_set_arena u64
 	swift_set_metadata map[u64]SwiftSetType // Sealed specialization page -> exact Element/Hashable pair.
