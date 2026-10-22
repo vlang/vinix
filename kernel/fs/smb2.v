@@ -3,6 +3,7 @@
 module fs
 
 import errno
+import devcore
 import event.eventstruct
 import file
 import fs.smb2
@@ -89,6 +90,10 @@ fn (mut b SMB2FS) mount(_ &VFSNode, _ string, _ &VFSNode) ?&VFSNode {
 }
 
 fn (mut b SMB2FS) error() {
+	if b.client.diagnostic.len > 0 {
+		C.kprintf(c'smb2: request failed errno=%d reason=%s\n', b.client.fault,
+			b.client.diagnostic.str)
+	}
 	errno.set(if b.client.fault > 0 && b.client.fault < 4096 {
 		u64(b.client.fault)
 	} else {
@@ -99,17 +104,37 @@ fn (mut b SMB2FS) error() {
 fn smb2_transfer(context voidptr, p &u8, n int, sending bool) bool {
 	mut b := unsafe { &SMB2FS(context) }
 	mut done := 0
-	// Each socket call has a timeout; the outer deadline also bounds a peer
-	// dribbling one byte per successful call. No global network lock is held.
+	// Nonblocking calls plus a bounded retry avoid losing an ACK/readiness
+	// edge between a full TCP send queue and the generic socket's wait setup.
+	// Sleeping yields to network progress; no global network lock is held.
 	deadline := time.monotonic_ns() + u64(15_000_000_000)
 	for done < n {
-		if time.monotonic_ns() >= deadline { return false }
+		if time.monotonic_ns() >= deadline {
+			C.kprintf(c'smb2: TCP deadline sending=%d done=%d length=%d\n', int(sending), done, n)
+			return false
+		}
 		amount := if sending {
 			b.stream.sendto(unsafe { &b.handle }, unsafe { &p[done] }, u64(n - done),
-				unsafe { nil }, 0) or { return false }
+				unsafe { nil }, 0) or {
+				if errno.get() == errno.eagain {
+					devcore.sleep_ms(1)
+					continue
+				}
+				C.kprintf(c'smb2: TCP send failed errno=%lu done=%d length=%d\n', errno.get(),
+					done, n)
+				return false
+			}
 		} else {
 			b.stream.recvfrom(unsafe { &b.handle }, unsafe { &p[done] }, u64(n - done),
-				unsafe { nil }, unsafe { nil }) or { return false }
+				unsafe { nil }, unsafe { nil }) or {
+				if errno.get() == errno.eagain {
+					devcore.sleep_ms(1)
+					continue
+				}
+				C.kprintf(c'smb2: TCP receive failed errno=%lu done=%d length=%d\n', errno.get(),
+					done, n)
+				return false
+			}
 		}
 		if amount <= 0 || amount > n - done { return false }
 		done += int(amount)
@@ -215,6 +240,8 @@ fn (mut b SMB2FS) mount_specifier(parent &VFSNode, name string, source string, f
 		sin_addr:   address
 	}
 	b.socket.connect(unsafe { &b.handle }, unsafe { &endpoint }, u32(sizeof(inet.SockaddrIn)))?
+	// Connect remains bounded/blocking; framed traffic is retried explicitly.
+	b.handle.flags = resource.o_nonblock
 	b.client = smb2.Client{
 		context:  voidptr(b)
 		transfer: smb2_transfer
