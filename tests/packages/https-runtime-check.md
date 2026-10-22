@@ -77,6 +77,15 @@ the [hash ledger](results/2026-10-22/https-runtime-ledger.json). The
 serial output, requires all cases and settled reservations, and supports
 `--verify` while the pinned artifacts remain available.
 
+Later account fixes changed seven original source paths. Their
+[content-addressed historical copies](results/2026-10-22/https-runtime-inputs/README.md)
+preserve the exact qualified bytes without changing any original run receipt.
+The retainer permits this fallback only for account sources with exact recorded
+digests. The [historical-input controls](results/2026-10-22/https-runtime-input-check.txt)
+admit three exact cases and refuse seven missing, corrupt, out-of-scope or
+malformed alternatives. These copies preserve the historical run; they do not
+qualify later account code.
+
 The [evidence controls](https-runtime-evidence-check.v) exercise the actual
 retainer with five admitted boundaries and 29 refusals, including missing or
 duplicate cases, unsettled/excessive reservations, retained allocations,

@@ -303,6 +303,12 @@ external framebuffer acknowledgements on both architectures. The
 [installed graphical Software check](../../tests/packages/software-graphical-check.md)
 uses the production compositor and actual review/administrator dialogs to install
 signed Counter and retain its private data across an installed-root reboot.
+The [installed graphical maintenance check](../../tests/packages/software-maintenance-native-check.md)
+adds visible refresh, update, rollback, uninstall and cache-only reinstall with
+separate approvals on both architectures. Five independent complete proposals
+preserve activation and approval state; two boots preserve private Counter data.
+Its retained proof binds all frozen compositor inputs, screenshots and guest
+shutdowns, with 50 altered-proof refusals per target.
 These fixtures use their own publisher and account configuration; release builders
 must still select reviewed production trust and catalogs. Graphical login,
 foreign runtime services and broader device/crash acceptance remain open.

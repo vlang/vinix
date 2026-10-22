@@ -897,6 +897,14 @@ architectures; broader release/catalog/runtime acceptance remains open.
     an installed-root reboot. Retained screenshots, exact state/ownership checks
     and sealed source/artifact receipts qualify this native example; whole-catalog,
     graphical-login and device/crash acceptance remain open.
+  - [x] [Installed graphical maintenance](tests/packages/software-maintenance-native-check.md)
+    uses visible Software controls and separate administrator approvals to
+    refresh, update, roll back, uninstall and reinstall signed Counter from
+    cache on both architectures. Two installed-root boots preserve private data;
+    five independent complete proposals leave activation and approvals unchanged.
+    Exact signed state, 32 screenshots per target, all frozen compositor inputs
+    and boot-bound guest shutdowns are retained, with 50 altered-proof refusals
+    per architecture. Production catalogs and broader runtime acceptance remain open.
   - [x] [Reviewed permission changes](tests/packages/review-permissions-check.md)
     compare frozen installed and target declarations across dependencies,
     updates, repair, rollback and removal. Format 2 carries owned prior facts;

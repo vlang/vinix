@@ -41,6 +41,23 @@ fn verify(pins []Pin) ! {
 	}
 }
 
+// Historical build receipts retain their original paths and hashes. Account
+// sources can advance independently; an exact content-addressed copy preserves
+// those old inputs without attributing an old run to the new implementation.
+fn verify_inputs(pins []Pin, archive string, source_prefix string) ! {
+	for item in pins {
+		assert item.sha256.len == 64
+		for byte in item.sha256.bytes() {
+			assert (byte >= `0` && byte <= `9`) || (byte >= `a` && byte <= `f`)
+		}
+		assert os.abs_path(item.path) == item.path
+		current := pin(item.path) or { Pin{} }
+		if current == item { continue }
+		assert item.path.starts_with(source_prefix), item.path
+		assert pin(archive + '/' + item.sha256)!.sha256 == item.sha256, item.path
+	}
+}
+
 fn save(source string, target string, mut evidence []Pin) ! {
 	os.cp(source, target)!
 	evidence << pin(target)!
@@ -202,6 +219,11 @@ fn requests(text string, digest string, repetitions int) {
 fn retain() ! {
 	root := os.dir(os.dir(os.dir(@FILE)))
 	prefix := root + '/tests/packages/results/2026-10-22/https-runtime-'
+	if os.args.len == 5 && os.args[1] == '--check-inputs' {
+		verify_inputs(json2.decode[[]Pin](os.read_file(os.args[2])!)!, os.args[3], os.args[4])!
+		println('GUEST TLS historical input evidence PASS')
+		return
+	}
 	if os.args.len == 3 && os.args[1] == '--check-native' {
 		native(os.read_file(os.args[2])!)!
 		println('GUEST TLS native evidence PASS')
@@ -215,7 +237,7 @@ fn retain() ! {
 	if os.args.len == 2 && os.args[1] == '--verify' {
 		ledger := json2.decode[Ledger](os.read_file(prefix + 'ledger.json')!)!
 		assert ledger.format == 1
-		verify(ledger.inputs)!
+		verify_inputs(ledger.inputs, prefix + 'inputs', root + '/tools/accounts/')!
 		verify(ledger.evidence)!
 		println('GUEST TLS retained hashes PASS')
 		return
@@ -227,6 +249,9 @@ fn retain() ! {
 	controls := prefix + 'evidence-check.txt'
 	assert os.read_file(controls)!.contains('GUEST TLS evidence controls PASS')
 	evidence << pin(controls)!
+	input_controls := prefix + 'input-check.txt'
+	assert os.read_file(input_controls)!.contains('GUEST TLS historical input controls PASS')
+	evidence << pin(input_controls)!
 	cleanup := prefix + 'cleanup-check.txt'
 	cleanup_text := os.read_file(cleanup)!
 	assert cleanup_text.contains('GUEST TLS controller failure cleanup PASS')
@@ -247,7 +272,7 @@ fn retain() ! {
 		}
 		receipt := json2.decode[Receipt](os.read_file(work + '/qualification.json')!)!
 		assert receipt.format == 1 && receipt.checks.len == if i == 0 { 51 } else { 4 }
-		verify(receipt.inputs)!
+		verify_inputs(receipt.inputs, prefix + 'inputs', root + '/tools/accounts/')!
 		inputs << receipt.inputs
 		fixture := json2.decode[tlsruntime.Fixture](os.read_file(work + if i == 0 {
 			'/probe.json'
@@ -301,6 +326,8 @@ fn retain() ! {
 		}
 	}
 	for path in [@FILE, root + '/tests/packages/https-runtime-evidence-check.v',
+		root + '/tests/packages/https-runtime-input-check.v',
+		prefix + 'inputs/README.md',
 		root + '/tests/packages/https-runtime-cleanup-check.v',
 		root + '/tools/packages/pkgcore/removal_test.v',
 		root + '/tests/packages/https-runtime-check.md', root + '/roadmap.md',

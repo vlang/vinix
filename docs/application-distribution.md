@@ -52,7 +52,13 @@ from a second ordinary account. The
 [installed graphical Software check](../tests/packages/software-graphical-check.md)
 uses visible Software controls and administrator approval to install signed
 Counter, save its private data and reopen it after an installed-root reboot.
-It retains framebuffer screenshots and exact state/ownership evidence. Graphical
+It retains framebuffer screenshots and exact state/ownership evidence. The
+[installed graphical maintenance check](../tests/packages/software-maintenance-native-check.md)
+adds signed refresh, update, rollback, uninstall and cache-only reinstall through
+visible controls and separate administrator approvals on both architectures.
+Two boots preserve private data; independent complete proposals leave activation
+and approvals unchanged. Retained proof binds screenshots, every frozen compositor
+input and guest shutdowns, with 50 altered-proof refusals per target. Graphical
 login, production catalog migration, foreign runtimes and broader device/crash
 acceptance remain release gates.
 

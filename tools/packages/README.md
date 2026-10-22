@@ -880,8 +880,14 @@ readiness and the production broker/external framebuffer transports on both
 targets. The [installed graphical check](../../tests/packages/software-graphical-check.md)
 drives the real Software review and approval dialogs to install signed Counter,
 save its private data and reopen it after an installed-root reboot. Retained
-screenshots and exact signed state checks cover this native example; graphical
-login, production catalogs and foreign runtime/device qualification remain open.
+screenshots and exact signed state checks cover this native example. The
+[installed maintenance check](../../tests/packages/software-maintenance-native-check.md)
+adds GUI refresh, update, rollback, removal and cache-only reinstall on both
+architectures, with separate approvals and preserved private Counter data across
+two boots. Five independent complete proposals check read-only review; sealed
+proof and 50 corruption refusals per target bind the frozen build and shutdowns.
+Graphical login, production catalogs and foreign runtime/device qualification
+remain open.
 
 Administrator request decoding and completion receipts retire partial fields,
 hash state and temporary storage after success or refusal. Canonical bytes and
