@@ -13,6 +13,63 @@ fn method(signature string, body string) string {
 	return '.method ' + signature + '\n.locals 6\n' + body + '\n.end method\n'
 }
 
+fn alarm_classes(dir string) ! {
+	probe := 'Lorg/vinix/service/AlarmProbe;'
+	os.write_file(dir + '/AlarmProbe.smali', '.class public ' + probe + '\n.super Ljava/lang/Object;\n.implements Landroid/app/AlarmManager$OnAlarmListener;\n.field public volatile calls:I\n.field public volatile failed:Z\n.field public expected:Landroid/os/Looper;\n.field public latch:Ljava/util/concurrent/CountDownLatch;\n' +
+		method('public constructor <init>(Landroid/os/Looper;I)V', 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\niput-object p1, p0, ' + probe + '->expected:Landroid/os/Looper;\nnew-instance v0, Ljava/util/concurrent/CountDownLatch;\ninvoke-direct {v0, p2}, Ljava/util/concurrent/CountDownLatch;-><init>(I)V\niput-object v0, p0, ' + probe + '->latch:Ljava/util/concurrent/CountDownLatch;\nreturn-void') +
+		method('public onAlarm()V', 'invoke-static {}, Landroid/os/Looper;->myLooper()Landroid/os/Looper;\nmove-result-object v0\niget-object v1, p0, ' + probe + '->expected:Landroid/os/Looper;\nif-eq v0, v1, :thread_ok\nconst/4 v0, 1\niput-boolean v0, p0, ' + probe + '->failed:Z\n:thread_ok\niget v0, p0, ' + probe + '->calls:I\nadd-int/lit8 v0, v0, 1\niput v0, p0, ' + probe + '->calls:I\niget-object v0, p0, ' + probe + '->latch:Ljava/util/concurrent/CountDownLatch;\ninvoke-virtual {v0}, Ljava/util/concurrent/CountDownLatch;->countDown()V\nreturn-void') +
+		method('public await()V', 'iget-object v0, p0, ' + probe + '->latch:Ljava/util/concurrent/CountDownLatch;\nconst-wide/16 v1, 10\nsget-object v3, Ljava/util/concurrent/TimeUnit;->SECONDS:Ljava/util/concurrent/TimeUnit;\ninvoke-virtual {v0, v1, v2, v3}, Ljava/util/concurrent/CountDownLatch;->await(JLjava/util/concurrent/TimeUnit;)Z\nmove-result v0\nif-eqz v0, :bad\niget-boolean v0, p0, ' + probe + '->failed:Z\nif-nez v0, :bad\nreturn-void\n:bad\nnew-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "alarm delivery timed out or used the wrong Handler"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0'))!
+	os.write_file(dir + '/AlarmReceiver.smali', '.class public Lorg/vinix/service/AlarmReceiver;\n.super Landroid/content/BroadcastReceiver;\n.field public probe:' + probe + '\n.field public manager:Landroid/app/AlarmManager;\n.field public operation:Landroid/app/PendingIntent;\n' +
+		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V\nreturn-void') +
+		method('public onReceive(Landroid/content/Context;Landroid/content/Intent;)V', 'iget-object v0, p0, Lorg/vinix/service/AlarmReceiver;->probe:' + probe + '\ninvoke-virtual {v0}, ' + probe + '->onAlarm()V\niget v0, v0, ' + probe + '->calls:I\nconst/4 v1, 3\nif-lt v0, v1, :done\niget-object v0, p0, Lorg/vinix/service/AlarmReceiver;->manager:Landroid/app/AlarmManager;\niget-object v1, p0, Lorg/vinix/service/AlarmReceiver;->operation:Landroid/app/PendingIntent;\ninvoke-virtual {v0, v1}, Landroid/app/AlarmManager;->cancel(Landroid/app/PendingIntent;)V\n:done\nreturn-void'))!
+}
+
+fn alarm_probe(handler bool, count int) string {
+	return 'new-instance v8, Lorg/vinix/service/AlarmProbe;\n' +
+		if handler { 'invoke-virtual {v9}, Landroid/os/Handler;->getLooper()Landroid/os/Looper;\n' } else { 'invoke-static {}, Landroid/os/Looper;->getMainLooper()Landroid/os/Looper;\n' } +
+		'move-result-object v12\nconst/16 v13, ' + count.str() + '\ninvoke-direct {v8, v12, v13}, Lorg/vinix/service/AlarmProbe;-><init>(Landroid/os/Looper;I)V\n'
+}
+
+fn alarm_time(wall bool, delay int) string {
+	return 'const/4 v1, ' + if wall { '1' } else { '3' } + '\ninvoke-static {}, ' +
+		if wall { 'Ljava/lang/System;->currentTimeMillis()J\n' } else { 'Landroid/os/SystemClock;->elapsedRealtime()J\n' } +
+		'move-result-wide v2\nconst-wide/16 v12, ' + delay.str() + '\nadd-long/2addr v2, v12\n'
+}
+
+fn alarm_checks() string {
+	owner := 'Landroid/app/AlarmManager;'
+	probe := 'Lorg/vinix/service/AlarmProbe;'
+	mut body := 'move-object/from16 v15, p0\nnew-instance v0, ' + owner + '\ninvoke-direct {v0}, ' + owner + '-><init>()V\nconst-wide/16 v4, 0\nconst-wide/16 v6, 0\nconst/4 v9, 0\nnew-instance v10, Landroid/os/WorkSource;\ninvoke-direct {v10}, Landroid/os/WorkSource;-><init>()V\n'
+	// Both hidden listener signatures and the public tagged overload use real
+	// queues; the waiting test runs on the service worker, not the main looper.
+	body += alarm_probe(false, 1) + alarm_time(false, 40) + 'invoke-virtual/range {v0 .. v10}, ' + owner + '->set(IJJJLandroid/app/AlarmManager$OnAlarmListener;Landroid/os/Handler;Landroid/os/WorkSource;)V\ninvoke-virtual {v8}, ' + probe + '->await()V\n'
+	body += alarm_probe(false, 1) + alarm_time(false, 40) + 'move-object v11, v10\nmove-object v10, v9\nmove-object v9, v8\nconst-string v8, "tagged-hidden"\ninvoke-virtual/range {v0 .. v11}, ' + owner + '->set(IJJJLjava/lang/String;Landroid/app/AlarmManager$OnAlarmListener;Landroid/os/Handler;Landroid/os/WorkSource;)V\ninvoke-virtual {v9}, ' + probe + '->await()V\nmove-object v10, v11\nconst/4 v9, 0\n'
+	body += 'new-instance v14, Landroid/os/HandlerThread;\nconst-string v12, "alarm-fixture"\ninvoke-direct {v14, v12}, Landroid/os/HandlerThread;-><init>(Ljava/lang/String;)V\ninvoke-virtual {v14}, Ljava/lang/Thread;->start()V\ninvoke-virtual {v14}, Landroid/os/HandlerThread;->getLooper()Landroid/os/Looper;\nmove-result-object v12\nnew-instance v9, Landroid/os/Handler;\ninvoke-direct {v9, v12}, Landroid/os/Handler;-><init>(Landroid/os/Looper;)V\n'
+	body += alarm_probe(true, 1) + alarm_time(true, 40) + 'const-string v4, "rtc-listener"\nmove-object v5, v8\nmove-object v6, v9\ninvoke-virtual/range {v0 .. v6}, ' + owner + '->setExact(IJLjava/lang/String;Landroid/app/AlarmManager$OnAlarmListener;Landroid/os/Handler;)V\ninvoke-virtual {v8}, ' + probe + '->await()V\nconst-wide/16 v4, 0\nconst-wide/16 v6, 0\n'
+	// Replacing an existing listener must remove the original queue entry.
+	body += alarm_probe(true, 1) + alarm_time(false, 500) + 'invoke-virtual/range {v0 .. v10}, ' + owner + '->set(IJJJLandroid/app/AlarmManager$OnAlarmListener;Landroid/os/Handler;Landroid/os/WorkSource;)V\n' +
+		alarm_time(false, 40) + 'invoke-virtual/range {v0 .. v10}, ' + owner + '->set(IJJJLandroid/app/AlarmManager$OnAlarmListener;Landroid/os/Handler;Landroid/os/WorkSource;)V\ninvoke-virtual {v8}, ' + probe + '->await()V\nmove-object v11, v8\n'
+	// A barrier on the same queue follows the replaced alarm's old deadline.
+	body += alarm_probe(true, 1) + alarm_time(false, 650) + 'invoke-virtual/range {v0 .. v10}, ' + owner + '->set(IJJJLandroid/app/AlarmManager$OnAlarmListener;Landroid/os/Handler;Landroid/os/WorkSource;)V\ninvoke-virtual {v8}, ' + probe + '->await()V\niget v12, v11, ' + probe + '->calls:I\nconst/4 v13, 1\nif-ne v12, v13, :bad\n'
+	// Cancellation works through another manager instance.
+	body += alarm_probe(true, 1) + alarm_time(false, 100) + 'invoke-virtual/range {v0 .. v10}, ' + owner + '->set(IJJJLandroid/app/AlarmManager$OnAlarmListener;Landroid/os/Handler;Landroid/os/WorkSource;)V\nnew-instance v12, ' + owner + '\ninvoke-direct {v12}, ' + owner + '-><init>()V\ninvoke-virtual {v12, v8}, ' + owner + '->cancel(Landroid/app/AlarmManager$OnAlarmListener;)V\nmove-object v11, v8\n' +
+		alarm_probe(true, 1) + alarm_time(false, 200) + 'invoke-virtual/range {v0 .. v10}, ' + owner + '->set(IJJJLandroid/app/AlarmManager$OnAlarmListener;Landroid/os/Handler;Landroid/os/WorkSource;)V\ninvoke-virtual {v8}, ' + probe + '->await()V\niget v12, v11, ' + probe + '->calls:I\nif-nez v12, :bad\n'
+	// A past RTC trigger is immediate, even at the signed long minimum.
+	body += alarm_probe(true, 1) + 'const/4 v1, 1\nconst-wide v2, -0x8000000000000000L\ninvoke-virtual/range {v0 .. v10}, ' + owner + '->set(IJJJLandroid/app/AlarmManager$OnAlarmListener;Landroid/os/Handler;Landroid/os/WorkSource;)V\ninvoke-virtual {v8}, ' + probe + '->await()V\n'
+	// Hidden PendingIntent overload: real broadcast delivery and repeating
+	// cancellation inside onReceive, followed by a barrier proving it stops.
+	body += alarm_probe(false, 3) + 'new-instance v11, Lorg/vinix/service/AlarmReceiver;\ninvoke-direct {v11}, Lorg/vinix/service/AlarmReceiver;-><init>()V\niput-object v8, v11, Lorg/vinix/service/AlarmReceiver;->probe:' + probe + '\niput-object v0, v11, Lorg/vinix/service/AlarmReceiver;->manager:' + owner + '\nnew-instance v12, Landroid/content/IntentFilter;\nconst-string v13, "org.vinix.fixture.ALARM"\ninvoke-direct {v12, v13}, Landroid/content/IntentFilter;-><init>(Ljava/lang/String;)V\ninvoke-virtual {v15, v11, v12}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;)Landroid/content/Intent;\nnew-instance v12, Landroid/content/Intent;\ninvoke-direct {v12, v13}, Landroid/content/Intent;-><init>(Ljava/lang/String;)V\nconst/16 v13, 871\nconst v8, 0x4000000\ninvoke-static {v15, v13, v12, v8}, Landroid/app/PendingIntent;->getBroadcast(Landroid/content/Context;ILandroid/content/Intent;I)Landroid/app/PendingIntent;\nmove-result-object v8\niput-object v8, v11, Lorg/vinix/service/AlarmReceiver;->operation:Landroid/app/PendingIntent;\n' +
+		alarm_time(false, 40) + 'const-wide/16 v6, 60\nmove-object v9, v10\ninvoke-virtual/range {v0 .. v9}, ' + owner + '->set(IJJJLandroid/app/PendingIntent;Landroid/os/WorkSource;)V\niget-object v8, v11, Lorg/vinix/service/AlarmReceiver;->probe:' + probe + '\ninvoke-virtual {v8}, ' + probe + '->await()V\nconst/4 v9, 0\nconst-wide/16 v6, 0\n' +
+		alarm_probe(false, 1) + alarm_time(false, 200) + 'invoke-virtual/range {v0 .. v10}, ' + owner + '->set(IJJJLandroid/app/AlarmManager$OnAlarmListener;Landroid/os/Handler;Landroid/os/WorkSource;)V\ninvoke-virtual {v8}, ' + probe + '->await()V\niget-object v8, v11, Lorg/vinix/service/AlarmReceiver;->probe:' + probe + '\niget v12, v8, ' + probe + '->calls:I\nconst/4 v13, 3\nif-ne v12, v13, :bad\ninvoke-virtual {v15, v11}, Landroid/content/Context;->unregisterReceiver(Landroid/content/BroadcastReceiver;)V\ninvoke-virtual {v14}, Landroid/os/HandlerThread;->quitSafely()Z\n' +
+		'sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v1, "ALARM-PASS hidden-overloads elapsed rtc handler replacement cancellation past-time pending-intent repeating"\ninvoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\nreturn-void\n:bad\nnew-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "alarm replacement cancellation or repeating delivery"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0'
+	// A huge repeat interval must remain in the future rather than overflow
+	// Handler uptime arithmetic and create an immediate broadcast loop.
+	large_repeat := alarm_probe(false, 1) + 'iput-object v8, v11, Lorg/vinix/service/AlarmReceiver;->probe:' + probe + '\niget-object v8, v11, Lorg/vinix/service/AlarmReceiver;->operation:Landroid/app/PendingIntent;\n' +
+		alarm_time(false, 40) + 'const-wide v6, 0x7fffffffffffffffL\nmove-object v9, v10\ninvoke-virtual/range {v0 .. v9}, ' + owner + '->set(IJJJLandroid/app/PendingIntent;Landroid/os/WorkSource;)V\niget-object v8, v11, Lorg/vinix/service/AlarmReceiver;->probe:' + probe + '\ninvoke-virtual {v8}, ' + probe + '->await()V\nconst/4 v9, 0\nconst-wide/16 v6, 0\n' +
+		alarm_probe(false, 1) + alarm_time(false, 200) + 'invoke-virtual/range {v0 .. v10}, ' + owner + '->set(IJJJLandroid/app/AlarmManager$OnAlarmListener;Landroid/os/Handler;Landroid/os/WorkSource;)V\ninvoke-virtual {v8}, ' + probe + '->await()V\niget-object v8, v11, Lorg/vinix/service/AlarmReceiver;->probe:' + probe + '\niget v12, v8, ' + probe + '->calls:I\nconst/4 v13, 1\nif-ne v12, v13, :bad\niget-object v8, v11, Lorg/vinix/service/AlarmReceiver;->operation:Landroid/app/PendingIntent;\ninvoke-virtual {v0, v8}, ' + owner + '->cancel(Landroid/app/PendingIntent;)V\n'
+	return body.replace('invoke-virtual {v15, v11}, Landroid/content/Context;->unregisterReceiver', large_repeat + 'invoke-virtual {v15, v11}, Landroid/content/Context;->unregisterReceiver').replace('past-time pending-intent repeating"', 'past-time pending-intent repeating overflow"')
+}
+
 fn check_stage(expected int, next int) string {
 	return 'const/4 v0, ${expected}\ninvoke-static {v0}, Lorg/vinix/service/App;->check(I)V\n' +
 		'const/4 v0, ${next}\nsput v0, Lorg/vinix/service/App;->stage:I\n'
@@ -2071,6 +2128,7 @@ return-object v0'))!
 		method('private checkUser()V', user_checks()) +
 		method('private checkDevicePolicy(Landroid/content/Context;)V', device_policy_checks()) +
 		method('private checkWorkSource()V', work_source_checks()) +
+		'.method private checkAlarms()V\n.locals 16\n' + alarm_checks() + '\n.end method\n' +
 		method('private checkWorkParcel(Landroid/os/WorkSource;)V', work_parcel_checks()) +
 		method('private checkSQLiteParams()V', sqlite_params_checks()) +
 		method('private checkSQLiteIdle()V', sqlite_idle_checks()) +
@@ -2222,6 +2280,7 @@ goto :identity
 :executor
 if-eq v0, v1, :bad
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkWorkerPriority()V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkAlarms()V
 invoke-static {}, Ljava/lang/Thread;->currentThread()Ljava/lang/Thread;
 move-result-object v0
 invoke-virtual {v0}, Ljava/lang/Thread;->getName()Ljava/lang/String;
@@ -2284,6 +2343,7 @@ return-void'))!
 	importance_listener(out + '/client/smali/org/vinix/service')!
 	typed_parcel_classes(out + '/client/smali/org/vinix/service')!
 	geofence_classes(out + '/client/smali/org/vinix/service')!
+	alarm_classes(out + '/client/smali/org/vinix/service')!
 	proxy_listener_class(out + '/client/smali/org/vinix/service')!
 	os.write_file(client + 'DatabaseCallbacks.smali', '.class public Lorg/vinix/service/DatabaseCallbacks;\n.super Ljava/lang/Object;\n.implements Landroid/database/sqlite/SQLiteDatabase$CursorFactory;\n.implements Landroid/database/DatabaseErrorHandler;\n.field public static cursors:I\n' +
 		method('public constructor <init>()V', 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void') +

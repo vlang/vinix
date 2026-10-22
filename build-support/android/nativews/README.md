@@ -173,6 +173,15 @@ and Parcelable uses the
 [Android 11 wire layout](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-11.0.0_r1/location/java/android/location/Location.java).
 The regression compares serialization against fixed independent wire vectors;
 this value support does not provide location fixes.
+AlarmManager shares a process-wide Handler scheduler across manager instances.
+PendingIntent and listener alarms support elapsed or wall-clock triggers,
+one-shot replacement, cancellation and repeating PendingIntent delivery. Listener
+callbacks use the supplied Handler or the main Looper. The hidden WorkSource
+overloads follow the same scheduling path; distant deadlines saturate instead
+of overflowing. The signed guest regression checks these behaviors, including
+cancellation from a broadcast callback. This implements process-lifetime alarms;
+suspend wakeups, power accounting and rescheduling after wall-clock changes
+are unavailable. PendingIntent matching currently uses the same token object.
 LocationManager enabled queries report false and best-provider discovery returns
 null because the native WS backend has no location provider. PendingIntent's
 OnFinished callback interface is present for class loading; callback send

@@ -24,6 +24,14 @@ const framework_tools = [
 
 fn framework_digest(path string) !string { return sha256.sum(os.read_bytes(path)!).hex() }
 
+pub fn framework_assemble(smali string, dex string, tools string, java string) ! {
+ // Smali can report syntax errors and exit zero. Never package stale output
+ // left by an earlier build when assembly did not produce a new DEX.
+ if os.exists(dex) { os.rm(dex)! }
+ assembly := checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', '--jobs', '2', smali, '-o', dex])!
+ if !os.is_file(dex) { return error('framework assembly produced no DEX: ' + assembly.stdout + assembly.stderr) }
+}
+
 pub fn framework_replace_method(source string, name string, declaration string) !string {
  mut text := source
  mut found := false
@@ -141,7 +149,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_parcel_binders(smali)!
  framework_user_identity(smali)!
  framework_package_signatures(smali)!
- checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', '--jobs', '2', smali, '-o', work + '/classes.dex'])!
+ framework_assemble(smali, work + '/classes.dex', tools, java)!
  next := work + '/api-impl.jar'
  os.cp(input, next)!
  checked(['zip', '-q', '-j', next, work + '/classes.dex'])!
@@ -162,7 +170,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  sources['tests/native-android-tools/androidtools/framework_activity_manager.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_activity_manager.v')!)
  sources['tests/native-android-tools/androidtools/framework_geofence.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_geofence.v')!)
  sources['tests/native-android-tools/androidtools/framework_device_policy.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_device_policy.v')!)
- for name in ['sqlite_params', 'sqlite_idle', 'location_state', 'location_value', 'work_source', 'package_enumeration', 'absent_hardware'] {
+ for name in ['sqlite_params', 'sqlite_idle', 'location_state', 'location_value', 'alarm', 'work_source', 'package_enumeration', 'absent_hardware'] {
   path := 'tests/native-android-tools/androidtools/framework_' + name + '.v'
   sources[path] = ah.Value(framework_digest(root() + '/' + path)!)
  }

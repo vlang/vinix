@@ -75,6 +75,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_sqlite_params(smali)!
  framework_location_state(smali)!
  framework_location_value(smali)!
+ framework_alarm(smali)!
  framework_work_source(smali)!
  framework_package_enumeration(smali)!
  framework_vibrator(smali)!
