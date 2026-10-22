@@ -1508,9 +1508,18 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   caller IPC identity.
   Qualify 1,872 controls per native architecture against identical Linux ELFs,
   supervise/reap the originals' unwanted children and keep identical refusal/fork
-  cleanup flat. NEWUSER, full SEM_UNDO/isolation, repeated IPC namespace
-  construction and per-call proc identity retention remain separate.
+  cleanup flat. NEWUSER, full SEM_UNDO/isolation and repeated IPC namespace
+  construction remain separate; proc identity retention is qualified below.
   See [the IPC clone receipts](docs/linux-posix-qualification.md#native-clone-ipc-namespace-and-semaphore-undo-conflicts).
+
+- [x] Reclaim retired procfs process subtrees and empty retirement buffers,
+  preserving held O_PATH links, cwd/parent and inherited-cwd lifetimes. Qualify
+  stable reads, fork/reap, child namespace reads and concurrent exit lookups
+  with four 200-cycle cohorts on both architectures: all slab classes and
+  big-heap pages stay flat, with zero unexpected errors or writes after free.
+  Identical native probe ELFs pass Linux reference checks; original retention
+  failures remain visible. The existing timed reader grace and mount pins
+  remain bounded assumptions. See [the procfs receipts and limits](docs/linux-posix-qualification.md#procfs-process-subtree-reclamation).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
