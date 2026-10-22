@@ -27,6 +27,7 @@ fn C.longjmp(C.vinix_init_escape, i32)
 fn C.puts(&char) i32
 fn C.vinix_init_shell()
 fn C.vinix_init_full()
+fn C.vinix_init_desktop()
 fn C.vinix_init_power_signal(i32)
 fn C.vinix_init_child_signal(i32)
 fn C.initcore__prepare_desktop_boot()
@@ -61,6 +62,8 @@ __global stop_sleep bool
 __global full_echo bool
 __global volume_missing bool
 __global volume_status i32
+__global graphical_gpu bool
+__global graphical_gpu_binary bool
 const basic = i32(0)
 const shell = i32(1)
 const full = i32(2)
@@ -70,6 +73,7 @@ const sleep = i32(5)
 const spawn_mode = i32(6)
 const group = i32(7)
 const volumes = i32(8)
+const graphical = i32(9)
 const shell_input = [&char(c' \t\r\n'), &char(c'help\n'), &char(c'hello\r\n'), &char(c'uname\n'), &char(c'echo   hello world\n'), &char(c'echo\n'), &char(c'echoes\n'), &char(c'missing\n'), &char(c'exit\n'), &char(nil)]!
 const shell_eof = [&char(nil)]!
 const signals = [u64(1), u64(15), u64(10), u64(12), u64(17)]!
@@ -83,6 +87,7 @@ fn reset(next i32) {
   symlink_failure = 0; link_failure = 0; mount_failure = 0
   cloned = 77; stop_sleep = false; C.vinit_reload = 0; C.vinit_power = 0
   volume_missing = false; volume_status = 0
+  graphical_gpu = false; graphical_gpu_binary = false
  }
 }
 fn text_copy(out &char, ptr u64) {
@@ -108,7 +113,13 @@ pub fn syscall(nr u64, a0 u64, a1 u64, a2 u64, a3 u64, a4 u64) i64 {
   if nr == 56 {
    C.assert(a0 == u64(i64(-100))); text_copy(&r.path[0], a1)
    if mode == volumes { C.assert(C.strcmp(&r.path[0], c'/usr/sbin/vinix-volume') == 0 && a2 == 0); return if volume_missing { i64(-2) } else { i64(8) } }
-   if a2 == 0x41 { C.assert(a3 == 0o600); return 9 }; return 8
+   if a2 == 0x41 { C.assert(a3 == 0o600); return 9 }
+   if mode == graphical {
+    if C.strcmp(&r.path[0], c'/dev/dri/renderD128') == 0 { return if graphical_gpu { i64(8) } else { i64(-2) } }
+    if C.strcmp(&r.path[0], c'/usr/bin/vinix-desktop-gpu') == 0 { return if graphical_gpu_binary { i64(8) } else { i64(-2) } }
+    return -2
+   }
+   return 8
   }
   if nr == 57 { C.assert(a0 == 8 || a0 == 9); return 0 }
   if nr == 35 || nr == 34 {
@@ -157,6 +168,15 @@ pub fn syscall(nr u64, a0 u64, a1 u64, a2 u64, a3 u64, a4 u64) i64 {
     C.assert(C.strcmp(environment[1], c'HOME=/root') == 0 && C.strcmp(environment[2], c'TERM=linux') == 0 && C.strcmp(environment[3], c'PS1=vinix# ') == 0)
     C.assert(C.strcmp(environment[4], c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules') == 0)
     C.assert(C.strcmp(environment[5], c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri') == 0 && environment[6] == nil)
+   } else if mode == graphical {
+    C.assert(C.strcmp(&r.path[0], c'/usr/sbin/vinix-session') == 0)
+    C.assert(C.strcmp(arguments[1], c'graphical') == 0 && C.strcmp(arguments[2], c'--desktop') == 0)
+    if graphical_gpu && graphical_gpu_binary {
+     C.assert(C.strcmp(arguments[3], c'/usr/bin/vinix-desktop-gpu') == 0 && C.strcmp(arguments[4], c'--fallback-desktop') == 0)
+     C.assert(C.strcmp(arguments[5], c'/usr/bin/vinix-desktop') == 0 && arguments[6] == nil)
+    } else { C.assert(C.strcmp(arguments[3], c'/usr/bin/vinix-desktop') == 0 && arguments[4] == nil) }
+    C.assert(C.strcmp(environment[1], c'HOME=/root') == 0 && C.strcmp(environment[13], c'VINIX_SYSTEM_SESSION=1') == 0 && environment[14] == nil)
+    C.longjmp(finished, 1)
    } else if mode == volumes {
     C.assert(C.strcmp(&r.path[0], c'/usr/sbin/vinix-volume') == 0)
     C.assert(C.strcmp(arguments[1], c'boot-restore') == 0 && arguments[2] == nil)
@@ -281,9 +301,20 @@ fn volume_boot_test() {
  }
 }
 
+fn graphical_boot_test() {
+ unsafe {
+  for variant := 0; variant < 3; variant++ {
+   reset(graphical); cloned = 0
+   graphical_gpu = variant != 0; graphical_gpu_binary = variant == 1
+   if C.setjmp(finished) == 0 { C.vinix_init_desktop() }
+   C.assert(count(221) == 1 && count(220) == 1 && count(154) == 1)
+  }
+ }
+}
+
 @[export: 'main']
 pub fn entry(argc i32, argv &&char) i32 {
  unsafe { full_echo = argc > 1 && C.strcmp(argv[1], c'echo') == 0 }
- shell_test(); full_test(); boot_test(); signal_test(); process_test(); volume_boot_test()
+ shell_test(); full_test(); boot_test(); signal_test(); process_test(); volume_boot_test(); graphical_boot_test()
  C.puts(c'INIT POLICY TEST: PASS'); return 0
 }

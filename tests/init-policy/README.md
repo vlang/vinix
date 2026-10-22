@@ -107,6 +107,14 @@ architecture; x86 runs require host support for that architecture. Use
 The existing `--reference-dir` option retains its historical C policy control
 adapter; those generated C control bodies receive no V algorithm credit.
 
+The current V host recorder also enters the production desktop boot loop and
+checks the exact graphical session-manager arguments, root supervisor environment
+and process group. It covers software selection, an available GPU compositor,
+and a GPU device whose compositor binary is absent. Both echo variants pass
+under ASan/UBSan; all three freestanding ARM policies compile and link without
+undefined symbols or implicit allocator calls. These recorder checks qualify
+init wiring, separately from the [native graphical login workflow](../graphical-login/check.md).
+
 The host reference is the 178-line `tests/init-policy/test.c` at
 `8fd0f13a90d87e2841608a46f83142a252534757`, blob
 `884c399f152f1ecf5440a9d2571f163618d4b1bf`. All 72 assertion call sites and

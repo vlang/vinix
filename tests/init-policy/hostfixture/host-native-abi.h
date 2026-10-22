@@ -12,7 +12,7 @@
 typedef jmp_buf vinix_init_escape;
 struct delay { int64_t seconds, nanoseconds; };
 struct action { void (*handler)(int); uint64_t flags; void (*restorer)(void); uint64_t mask; };
-void vinix_init_shell(void), vinix_init_full(void);
+void vinix_init_shell(void), vinix_init_full(void), vinix_init_desktop(void);
 void vinix_init_power_signal(int), vinix_init_child_signal(int);
 void initcore__prepare_desktop_boot(void), initcore__prepare_hosted_x11_storage(void);
 void initcore__prepare_environment(void), initcore__restore_boot_volumes(void);
