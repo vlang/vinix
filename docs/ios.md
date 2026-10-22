@@ -16809,22 +16809,63 @@ The caller supplies a closure with stack captures, generic Result metadata and
 inspection executes no application code; it does not establish that Fortnite
 has reached this consumer.
 
-The launch probe now stops at the required Swift Dispatch import
 `_$sSo17OS_dispatch_queueC8DispatchE5label3qos10attributes20autoreleaseFrequency6targetABSS_AC0D3QoSVAbCE10AttributesVAbCE011AutoreleaseI0OABSgtcfC`
-(`DispatchQueue(label:qos:attributes:autoreleaseFrequency:target:)`). This
-remains a linking failure before application entry; Fortnite is not playable.
+now implements the allocating `DispatchQueue` initializer for supported UTF-8
+labels, `.unspecified` QoS with zero relative priority, empty attributes (a
+serial queue), `.inherit` autorelease frequency and a nil or registered active
+target. The ARM64 bridge consumes the String in `x0`/`x1` and optional target
+in `x5`, reads the borrowed QoS, attributes and enum storage through `x2`–`x4`,
+and preserves `x20`/`x21`. The unused metatype in `x20` is never dereferenced.
+Unsupported String representations, options, targets and inactive runtime
+lifetimes are rejected before consuming the inputs.
+
+The returned owned queue has an independently copied C label, including native
+Swift's truncation at the first embedded NUL. Its target remains retained until
+the child queue is released. Submissions use the existing serial scheduler and
+inherit queue-specific context through the target chain; callbacks and symbol
+resolution run without holding runtime locks.
+
+The fixture compares the allocating ABI with Apple's runtime, including empty,
+Unicode, heap and embedded-NUL labels, consumed String/target ownership, target
+finalization, serial ordering, inherited context and preserved registers. It
+also checks read-only option storage at protected page boundaries, unsupported
+input rejection without consuming owners, concurrent symbol publication and
+two complete runtime retirements with unmapped executable arenas:
+
+```sh
+v run tests/ios/native-checks.v build-swift-dispatch-initializer
+```
+
+Evidence is retained under `build/ios/fortnite/dispatch-initializer-checks`.
+The initializer, QoS, algebra and async fixtures passed normal and deterministic
+host runs under ASan/UBSan. The ARM64 initializer fixture, launch probe and both
+import audits completed, with the launch failure recorded below. All 995 pinned
+source, toolchain and runtime inputs remained unchanged. Eight archived binary
+and generated-C pairs and four retained guest serial logs passed SHA256 checks;
+all four temporary VMs and their RAM disk were retired.
+
+Static inspection traces the import through GOT cell `0x10dc9bd08`, stub
+`0x10c63adf4` and forwarder `0x107c28b8c` to the call at `0x100072478`.
+The caller supplies the three option storage pointers and a nil target, then
+moves the returned queue into `x20`. This inspection executes no application
+code and does not establish that Fortnite has reached this consumer.
+
+The launch probe now stops at the required Swift core data import `_$sytWV`,
+the value-witness table for `Void` (the empty tuple). Native `swift-demangle`
+confirms the symbol's identity. This remains a linking failure before
+application entry; Fortnite is not playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,002 | 159 | 78 |
+| Fortnite executable | 2,003 | 158 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,842 | 162 | 114 |
+| All images | 2,843 | 161 | 114 |
 
-The C++/GLES/Text variant reports 2,856 resolved imports, 148 unresolved strong
+The C++/GLES/Text variant reports 2,857 resolved imports, 147 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
