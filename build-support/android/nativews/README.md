@@ -172,6 +172,10 @@ fail. Vinix has no temperature driver or thermal feedback loop, so this status
 does not measure physical device temperature or provide overheating protection.
 Vibrator reports no motor or amplitude control. Haptic requests and cancellation
 have no effect; they do not call a missing driver or spawn pattern threads.
+MediaRouter shares one disabled default route between service instances. It
+advertises no supported media types and no presentation display; callback
+registration does not invent output devices. Remote and app-provided routes
+remain unimplemented.
 
 Dynamic receivers support the registration overloads with flags and handlers,
 main-Looper delivery by default, action and package filtering, and unregistering.

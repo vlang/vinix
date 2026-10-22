@@ -69,6 +69,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_traffic_stats(smali)!
  framework_power(smali)!
  framework_vibrator(smali)!
+ framework_media_router(smali)!
  framework_account_listeners(smali)!
  framework_storage_queries(smali)!
  framework_startup_apis(smali)!

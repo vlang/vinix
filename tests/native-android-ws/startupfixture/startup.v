@@ -11,6 +11,7 @@ pub fn install(output string, resources string) ! {
  dir := output + '/smali/org/vinix/bootstrap'
  install_io_probe(dir)!
  install_power_probe(dir)!
+ install_media_probe(dir)!
  os.mkdir_all(output + '/res/font')!
  runtime := resources.all_before('/usr/lib/java/dex/')
  os.cp(runtime + '/usr/share/fonts/dejavu/DejaVuSansMono.ttf', output + '/res/font/fixture_font.ttf')!
@@ -49,6 +50,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/IoProbe;->check(Landroid/content/Contex
 invoke-static {}, Lorg/vinix/bootstrap/StartupProbe;->altitude()V
 invoke-static {p0}, Lorg/vinix/bootstrap/PowerProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->haptics(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/MediaProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->fonts(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->broadcasts(Landroid/content/Context;)V
 new-instance v0, Landroid/hardware/SensorManager;
