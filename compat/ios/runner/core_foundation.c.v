@@ -333,7 +333,8 @@ fn cf_copy_description(object u64) u64 {
 	mut bytes := [128]u8{}
 	if objc_is_kind(object, ios_runtime.names['NSNumber']) {
 		header := obj_header(object)
-		if header.is_real { unsafe { C.snprintf(&char(&bytes[0]), 128, c'%.17g', header.real_number) } }
+		if header.image_integer { constant_integer_format(header, unsafe { &char(&bytes[0]) }, 128) }
+		else if header.is_real { unsafe { C.snprintf(&char(&bytes[0]), 128, c'%.17g', header.real_number) } }
 		else if header.unsigned_number { unsafe { C.snprintf(&char(&bytes[0]), 128, c'%llu', u64(header.number)) } }
 		else { unsafe { C.snprintf(&char(&bytes[0]), 128, c'%lld', header.number) } }
 	} else {

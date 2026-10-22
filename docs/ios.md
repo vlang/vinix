@@ -17256,12 +17256,55 @@ Seven binary/generated-C pairs, two host dSYMs, 33 native/static evidence files
 and four guest serial/configuration pairs passed verification. All four
 temporary VMs, their scratch storage and the owned RAM disk were retired.
 
-The launch probe now stops at Foundation's
-`_OBJC_CLASS_$_NSConstantIntegerNumber`, before application entry. Fortnite
-remains unplayable.
+That launch probe stopped at Foundation's
+`_OBJC_CLASS_$_NSConstantIntegerNumber`.
+
+Foundation now exports `NSConstantIntegerNumber` with Apple's twenty-four-byte
+`isa/encoding/value` layout, `NSNumber` superclass and native ivar offsets/types.
+The loader validates all `__objc_intobj`, `__objc_arrayobj` and `__objc_dictobj`
+records before publishing any of their metadata. Image bytes stay borrowed and
+unchanged; separately allocated numeric metadata has an immortal image lifetime.
+Collections can contain these numbers without retaining or releasing the
+borrowed records.
+
+Integer records support all eleven scalar integer encodings, signed and
+unsigned accessors, ARM64 float/double returns, exact-width `getValue:` writes,
+source encoding pointer identity, CF number identity, numeric equality/hash,
+immutable copies and width-aware descriptions and JSON output. Native checks
+show that full-width getters and floating conversions use the signed value
+field, while text formatting follows the source encoding; only `Q` makes
+negative stored bits unsigned for numeric equality. Vinix preserves equal-number
+hash consistency even for noncanonical narrow unsigned records where Apple's
+opaque hashes differ. Unsupported encodings, mismatched destination sizes,
+`isEqualToNumber:nil`, initialization, mutation and explicit destruction of
+image storage are rejected.
+
+Static inspection finds two integer records in the exact Fortnite executable:
+encoding `I` with value `0x42475241` and encoding `i` with value `1`. EOSSDK and
+MarketplaceKitWrapper contain no integer records. Native layout, conversion,
+ownership, description, JSON and static-image measurements are retained in
+`build/ios/fortnite/constant-integer-checks/native`; the native nil-comparison
+checks are in `build/ios/fortnite/constant-integer-nil-native`.
+
+The integer, array and dictionary fixtures passed six normal/deterministic
+macOS ASan+UBSan executions and the ARM64 guest. Both platforms rebased, sealed
+read-only, registered and retired the two actual Fortnite integers, six arrays
+and three EOSSDK dictionaries without executing app code. Synthetic cases cover
+signed boundaries, all eleven encodings, noncanonical raw bits, exact ABI and
+destination writes, numeric collection members, eight concurrent registrars,
+atomic malformed-record rejection and two fully drained runtime lifetimes.
+
+Evidence is retained in `build/ios/fortnite/constant-integer-checks`. The launch
+probe and both import audits completed with all 20,197 listed inputs unchanged.
+Nine binary/generated-C pairs, three host dSYMs, sealed native evidence and four
+guest serial/configuration sets passed verification. All four temporary VMs,
+their scratch storage and the owned RAM disk were retired.
+
+The launch probe now stops at Foundation's `_OBJC_CLASS_$_NSURLSession`, before
+application entry. Fortnite remains unplayable.
 
 ```sh
-v run tests/ios/native-checks.v build-objc-constant-array
+v run tests/ios/native-checks.v build-objc-constant-integer
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -17269,12 +17312,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,056 | 105 | 78 |
+| Fortnite executable | 2,057 | 104 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,896 | 108 | 114 |
+| All images | 2,897 | 107 | 114 |
 
-The C++/GLES/Text variant reports 2,910 resolved imports, 94 unresolved strong
+The C++/GLES/Text variant reports 2,911 resolved imports, 93 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -17322,8 +17365,9 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 `VINIX_IOS_CHECK_NAME` selects a single output directory name under
 `build/ios/fortnite` (default `select-checks`; the timestamp/UUID verification uses
 `file-time-checks`, the audio constants use `audio-session-checks`, and
-CoreFoundation dictionaries use `cf-dictionary-checks`, constant arrays use
-`constant-array-checks`, supplied Objective-C storage uses `objc-storage-checks`,
+CoreFoundation dictionaries use `cf-dictionary-checks`, constant integers use
+`constant-integer-checks`, constant arrays use `constant-array-checks`, supplied
+Objective-C storage uses `objc-storage-checks`,
 associated objects use
 `objc-associated-checks`, property access uses `objc-property-checks`,
 object monitors use `objc-sync-checks`, Swift strings/buffers use
@@ -17332,7 +17376,8 @@ object monitors use `objc-sync-checks`, Swift strings/buffers use
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant and
-CoreFoundation dictionary and constant array, supplied Objective-C storage,
+CoreFoundation dictionary, constant array and constant integer, supplied
+Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String
 metadata/witness checks before the existing Mach-O suite and requires the
 guest PASS marker.

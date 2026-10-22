@@ -374,6 +374,7 @@ fn test_constant_array_invalid_image_records_do_not_publish_metadata() {
 fn constant_array_fixture_resolve(_ string, symbol string) !u64 {
 	if symbol == '_OBJC_CLASS_$_NSConstantArray' { return ios_runtime.names['NSConstantArray'] }
 	if symbol == '_OBJC_CLASS_$_NSConstantDictionary' { return ios_runtime.names['NSConstantDictionary'] }
+	if symbol == '_OBJC_CLASS_$_NSConstantIntegerNumber' { return ios_runtime.names['NSConstantIntegerNumber'] }
 	if symbol == '___CFConstantStringClassReference' { return ios_runtime.names['NSString'] }
 	// Other fixups are never dereferenced or executed by this metadata-only case.
 	return 0
@@ -428,7 +429,7 @@ fn test_constant_array_records_from_supplied_image() {
 	}
 	assert count == 6 && members == 11
 	objc_stop()
-	assert ios_runtime.live == 0 && ios_runtime.objects.len == 0 && ios_runtime.image_arrays == 0 && ios_runtime.image_dictionaries == 0
+	assert ios_runtime.live == 0 && ios_runtime.objects.len == 0 && ios_runtime.image_arrays == 0 && ios_runtime.image_dictionaries == 0 && ios_runtime.image_integers == 0
 	assert C.munmap(voidptr(base), usize(layout.size)) == 0
 	println('IOS-CONSTANT-ARRAY-IMAGE: ${count} actual read-only image records rebased, registered, indexed and retired; input SHA256=${sha256.sum(data).hex()}; no app code executed')
 }

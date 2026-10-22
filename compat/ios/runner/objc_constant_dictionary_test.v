@@ -340,6 +340,7 @@ fn test_constant_dictionary_invalid_image_records_do_not_publish_metadata() {
 fn constant_dictionary_fixture_resolve(_ string, symbol string) !u64 {
 	if symbol == '_OBJC_CLASS_$_NSConstantDictionary' { return ios_runtime.names['NSConstantDictionary'] }
 	if symbol == '_OBJC_CLASS_$_NSConstantArray' { return ios_runtime.names['NSConstantArray'] }
+	if symbol == '_OBJC_CLASS_$_NSConstantIntegerNumber' { return ios_runtime.names['NSConstantIntegerNumber'] }
 	if symbol == '___CFConstantStringClassReference' { return ios_runtime.names['NSString'] }
 	// Other fixups are inspected/rebased but never used or executed by this
 	// metadata-only fixture. Required runtime bindings remain checked by probe.
@@ -378,9 +379,11 @@ fn test_constant_dictionary_records_from_supplied_image() {
 	m.constant_dictionaries() or { panic(err) }
 	mut count := 0
 	mut arrays := u64(0)
+	mut integers := u64(0)
 	for segment in image.segments {
 		for section in segment.sections {
 			if section.name == '__objc_arrayobj' { arrays += section.size / 24 }
+			if section.name == '__objc_intobj' { integers += section.size / 24 }
 			if section.name != '__objc_dictobj' { continue }
 			for offset := u64(0); offset < section.size; offset += 40 {
 				object := base + section.address - layout.base + offset
@@ -395,9 +398,9 @@ fn test_constant_dictionary_records_from_supplied_image() {
 			}
 		}
 	}
-	assert count == 3 && ios_runtime.live == 3 + i64(arrays)
+	assert count == 3 && ios_runtime.live == 3 + i64(arrays + integers)
 	objc_stop()
-	assert ios_runtime.live == 0 && ios_runtime.objects.len == 0 && ios_runtime.image_dictionaries == 0 && ios_runtime.image_arrays == 0
+	assert ios_runtime.live == 0 && ios_runtime.objects.len == 0 && ios_runtime.image_dictionaries == 0 && ios_runtime.image_arrays == 0 && ios_runtime.image_integers == 0
 	assert C.munmap(voidptr(base), usize(layout.size)) == 0
 	println('IOS-CONSTANT-DICTIONARY-IMAGE: three actual read-only image records rebased and registered, equal-key lookups passed and metadata retired; input SHA256=${sha256.sum(data).hex()}; no app code executed')
 }

@@ -56,6 +56,9 @@ mut:
 	refs        i64
 	cls u64
 	caller_storage bool
+	image_integer bool // Immortal image bytes; separate numeric metadata.
+	image_integer_next u64
+	image_integer_encoding u8
 	image_array bool // Immortal image bytes; owned metadata borrows its members.
 	image_array_next u64
 	image_dictionary bool // Immortal image bytes; owned metadata borrows its members.
@@ -446,6 +449,7 @@ mut:
 	webkit_default_store u64
 	webkit_worlds [128]u64 // Owned interned page/client/named worlds, retired at shutdown.
 	webkit_world_count int = 2
+	image_integers u64 // Intrusive list retired after all collection/pool users.
 	image_arrays u64 // Intrusive list retired after all collection/pool users.
 	image_dictionaries u64 // Intrusive list retired after all collection/pool users.
 	observers []&NotificationObserver
@@ -479,7 +483,7 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
+		'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
@@ -509,6 +513,7 @@ fn objc_start() {
 			'VinixMetalTextureDescriptor' { ios_runtime.names['MTLTextureDescriptor'] }
 			'NSInputStream' { ios_runtime.names['NSStream'] }
 			'NSNumber', 'NSConcreteValue' { ios_runtime.names['NSValue'] }
+			'NSConstantIntegerNumber' { ios_runtime.names['NSNumber'] }
 			'_NSUUIDBridge' { ios_runtime.names['NSUUID'] }
 			'__NSConcreteUUID' { ios_runtime.names['_NSUUIDBridge'] }
 			'UIView', 'UIViewController', 'UIApplication' { ios_runtime.names['UIResponder'] }
@@ -546,7 +551,7 @@ fn objc_start() {
 			'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global' { u32(8) }
 			'_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty' { u32(8) }
 			'NSConstantDictionary' { u32(40) }
-			'NSConstantArray' { u32(24) }
+			'NSConstantArray', 'NSConstantIntegerNumber' { u32(24) }
 			'_NSZeroData' { u32(8) }
 			'_NSInlineData' { u32(16) }
 			'Foundation.__NSSwiftData' { u32(40) }
@@ -585,6 +590,10 @@ fn objc_start() {
 	dispatch_objc_publish_classes()
 	mut root := ios_runtime.classes[ios_runtime.names['NSObject']] or { panic('iOS: missing NSObject') }
 	root.ivars['isa'] = &ObjIvar{name: 'isa'.clone(), types: '#'.clone(), offset: 0, size: 8}
+	mut integer := ios_runtime.classes[ios_runtime.names['NSConstantIntegerNumber']] or { panic('iOS: missing constant integer class') }
+	for i, pair in [['_encoding', 'r*']!, ['_value', 'q']!]! {
+		integer.ivars[pair[0]] = &ObjIvar{name: pair[0].clone(), types: pair[1].clone(), offset: i64((i + 1) * 8), size: 8}
+	}
 	mut array := ios_runtime.classes[ios_runtime.names['NSConstantArray']] or { panic('iOS: missing constant array class') }
 	for i, pair in [['_count', 'Q']!, ['_objects', 'r^@']!]! {
 		array.ivars[pair[0]] = &ObjIvar{name: pair[0].clone(), types: pair[1].clone(), offset: i64((i + 1) * 8), size: 8}
@@ -832,6 +841,7 @@ fn objc_stop() {
 	}
 	objc_constant_arrays_stop()
 	objc_constant_dictionaries_stop()
+	objc_constant_integers_stop()
 	objc_protocols_stop()
 	swift_data_bridge_stop()
 	// Swift closure/context destruction can still read Foundation globals.

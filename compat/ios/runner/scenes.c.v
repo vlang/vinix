@@ -19,6 +19,8 @@ fn objc_is_kind(object u64, cls u64) bool {
 fn objc_responds(object u64, selector &char) bool {
 	if object == 0 || selector == unsafe { nil } { return false }
 	name := ctext(u64(selector))
+	if object in ios_runtime.objects && obj_header(object).image_integer
+		&& constant_integer_types('NSConstantIntegerNumber', false, name) != none { return true }
 	if ns_empty_array_selector(object, name) { return true }
 	if _ := dispatch_objc_view(object) { return dispatch_objc_types('OS_dispatch_queue',false,name) != none }
 	if ns_pool_family(if object in ios_runtime.classes { object } else { read64(object) }) {

@@ -41,7 +41,7 @@ fn (m ObjMetadata) dictionary_validate(object u64) ! {
 			return error('iOS: unsupported constant dictionary key')
 		}
 		if value == 0 { return error('iOS: nil constant dictionary value') }
-		if value !in ios_runtime.constants && !m.dictionary_address(value) && !m.array_address(value) {
+		if value !in ios_runtime.constants && !m.integer_address(value) && !m.dictionary_address(value) && !m.array_address(value) {
 			info := ios_runtime.classes[value] or { return error('iOS: unsupported constant dictionary value') }
 			// Compiled class descriptors share the image lifetime. Disposable
 			// classes and ordinary owned objects cannot be borrowed safely.

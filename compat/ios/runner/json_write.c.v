@@ -85,6 +85,11 @@ fn json_number_equal(a &ObjHeader, b &ObjHeader) bool {
 
 fn (mut writer JsonWriter) numeric(header &ObjHeader) ! {
 	mut buffer := [128]u8{}
+	if header.image_integer {
+		constant_integer_format(header, unsafe { &char(&buffer[0]) }, 128)
+		writer.append(ctext(u64(unsafe { &buffer[0] })))!
+		return
+	}
 	if header.cf_boolean {
 		writer.append(if header.number != 0 { 'true' } else { 'false' })!
 		return

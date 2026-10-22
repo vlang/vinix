@@ -83,6 +83,7 @@ fn objc_record_method(cls u64, name &char, imp u64, types &char, builtin bool) &
 fn C.ios_objc_builtin()
 fn objc_builtin_types(cls u64, selector string) ?string {
 	info := ios_runtime.classes[cls] or { return none }
+	if types := constant_integer_types(info.name, info.meta, selector) { return types }
 	if types := swift_data_bridge_types(info.name, info.meta, selector) { return types }
 	if types := dispatch_objc_types(info.name,info.meta,selector) { return types }
 	if types := ns_pool_types(info.name, info.meta, selector) { return types }

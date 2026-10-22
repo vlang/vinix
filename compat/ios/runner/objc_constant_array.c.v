@@ -33,7 +33,7 @@ fn (m ObjMetadata) array_validate(object u64) ! {
 	for i := u64(0); i < count; i++ {
 		value := read64(values + i * 8)
 		if value == 0 { return error('iOS: nil constant array value') }
-		if value !in ios_runtime.constants && !m.array_address(value) && !m.dictionary_address(value) {
+		if value !in ios_runtime.constants && !m.integer_address(value) && !m.array_address(value) && !m.dictionary_address(value) {
 			info := ios_runtime.classes[value] or { return error('iOS: unsupported constant array value') }
 			if info.dynamic { return error('iOS: disposable constant array value') }
 		}
@@ -102,10 +102,12 @@ fn (m ObjMetadata) constant_arrays() ! {
 fn (m ObjMetadata) constant_collections() ! {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
-	// Both families can borrow one another. Validate every record before
-	// publishing either family, so a malformed later record leaves no owners.
+	// Collections can borrow numbers and one another. Validate every record
+	// before publishing any family, so a malformed later record leaves no owners.
+	m.integers_validate()!
 	m.arrays_validate()!
 	m.dictionaries_validate()!
+	m.integers_publish()
 	m.arrays_publish()
 	m.dictionaries_publish()
 }
