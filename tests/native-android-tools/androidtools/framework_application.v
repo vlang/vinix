@@ -25,6 +25,23 @@ invoke-virtual {v0}, Landroid/atl/ATLLoadedApp;->getApplication()Landroid/app/Ap
 move-result-object v0
 return-object v0
 .end method')!)!
+	// ContextWrapper must preserve a base context's application-context override
+	// (module containers use it to retain their own resources and class loader).
+	wrapper := smali + '/android/content/ContextWrapper.smali'
+	mut wrapper_text := os.read_file(wrapper)!
+	if wrapper_text.contains('getApplicationContext()Landroid/content/Context;') {
+		return error('ContextWrapper application-context delegation already exists')
+	}
+	wrapper_text += '
+.method public getApplicationContext()Landroid/content/Context;
+.locals 1
+iget-object v0, p0, Landroid/content/ContextWrapper;->baseContext:Landroid/content/Context;
+invoke-virtual {v0}, Landroid/content/Context;->getApplicationContext()Landroid/content/Context;
+move-result-object v0
+return-object v0
+.end method
+'
+	os.write_file(wrapper, wrapper_text)!
 	impl := smali + '/android/app/ContextImpl.smali'
 	os.write_file(impl, framework_replace_method(os.read_file(impl)!,
 		'bindService(Landroid/content/Intent;Landroid/content/ServiceConnection;I)Z', '.method public bindService(Landroid/content/Intent;Landroid/content/ServiceConnection;I)Z
