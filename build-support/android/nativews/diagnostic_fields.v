@@ -30,7 +30,7 @@ fn ws_dump_surface_fields(e voidptr, view voidptr) {
 			mut value := view
 			mut start := usize(0)
 			mut valid := true
-			for hop in 0 .. 8 {
+			for hop in 0 .. 16 {
 				if value == nil {
 					valid = false
 					break
@@ -95,7 +95,7 @@ fn ws_dump_surface_fields(e voidptr, view voidptr) {
 				}
 				if start == size { break }
 				start++
-				if hop == 7 { valid = false }
+				if hop == 15 { valid = false }
 			}
 			if valid && !pending(e) {
 				args := [Value{ l: value }]!

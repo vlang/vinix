@@ -14,7 +14,7 @@ null intermediate objects report `unavailable` without leaving a Java exception
 pending. Numeric components select List or array elements, for example
 `mCallbacks.0`; primitive array elements are boxed. Invalid indices also report
 `unavailable`. Sampling stops after three surface visits; each sample allows sixteen
-paths, eight components per path and 1,024 output bytes per value. Descriptions may
+paths, sixteen components per path and 1,024 output bytes per value. Descriptions may
 invoke the object's `toString`; this is intended for selected diagnostic builds.
 Production launchers leave these variables unset.
 

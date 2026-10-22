@@ -9,8 +9,9 @@ fn read_log(path string) !string {
 }
 
 fn main() {
-	assert os.args.len in [3, 4], 'usage: check-surface-fields.v enabled.log[.gz] disabled.log[.gz] [indexed]'
-	indexed := os.args.len == 4 && os.args[3] == 'indexed'
+	assert os.args.len in [3, 4], 'usage: check-surface-fields.v enabled.log[.gz] disabled.log[.gz] [indexed|depth]'
+	depth := os.args.len == 4 && os.args[3] == 'depth'
+	indexed := depth || (os.args.len == 4 && os.args[3] == 'indexed')
 	log := read_log(os.args[1])!
 	for expected in [
 		'path=mSurface value=android.view.Surface@',
@@ -40,6 +41,13 @@ fn main() {
 		last_query = log.last_index('path=left value=0') or { panic('missing index recovery') }
 		assert array_failure < list_failure && list_failure < last_query
 	}
+	if depth {
+		path := ['mSurfaceHolder.this$0'].repeat(8).join('.')
+		assert log.contains('path=' + path + ' value=android.view.SurfaceView@')
+		too_deep := log.index('path=' + path + '.left unavailable') or { panic('missing depth limit') }
+		last_query = log.last_index('path=left value=0') or { panic('missing depth recovery') }
+		assert too_deep < last_query
+	}
 	for marker in ['BOOTSTRAP-TRAVERSAL-PASS', 'BOOTSTRAP-PATH-ANIMATOR-FRAMES-PASS'] {
 		callback := log.index(marker) or { panic('missing callback ' + marker) }
 		assert last_query < callback, marker
@@ -47,7 +55,9 @@ fn main() {
 	for marker in ['BOOTSTRAP-LAYOUT-SUPPRESSION-PASS', 'BOOTSTRAP-EGL-COMPOSITION-PASS'] {
 		assert log.contains(marker), marker
 	}
-	assert log.split_into_lines().filter(it.starts_with('ANDROID-WS-SURFACE-FIELD ')).len <= if indexed {
+	assert log.split_into_lines().filter(it.starts_with('ANDROID-WS-SURFACE-FIELD ')).len <= if depth {
+		45
+	} else if indexed {
 		36
 	} else {
 		24
@@ -58,5 +68,5 @@ fn main() {
 	disabled := read_log(os.args[2])!
 	assert disabled.contains('BOOTSTRAP-EGL-COMPOSITION-PASS')
 	assert !disabled.contains('ANDROID-WS-SURFACE-FIELD ')
-	println('SURFACE-FIELDS-PASS private inherited boxed nested missing recovery opt-in indexed=${indexed}')
+	println('SURFACE-FIELDS-PASS private inherited boxed nested missing recovery opt-in indexed=${indexed} depth=${depth}')
 }
