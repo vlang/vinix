@@ -101,6 +101,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := ns_timezone_types(info.name, info.meta, selector) { return types }
 	if types := ns_input_stream_types(info.name, info.meta, selector) { return types }
 	if types := connection_types(info.name, info.meta, selector) { return types }
+	if types := url_session_types(info.name, info.meta, selector) { return types }
 	if types := cookie_builtin_types(info.name, info.meta, selector) { return types }
 	if types := webkit_builtin_types(info.name, info.meta, selector) { return types }
 	if types := http_url_builtin_types(info.name, info.meta, selector) { return types }
@@ -138,6 +139,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if !info.meta && info.name == 'NSFileManager' && name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
 		if !info.meta && info.name == 'NSInputStream' && name in ['init', 'copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
 		if !info.meta && info.name == 'NSURLConnection' && name in ['init', 'copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
+		if info.name == 'NSURLSession' && url_session_unsupported(name) { return 0 }
 		if !info.meta && info.name == 'NSProcessInfo' && name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
 		if info.name == 'NSTimeZone' && name in ['init', 'new', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
 		if !info.meta && webkit_name(info.name) && name == 'copy' && webkit_builtin_types(info.name, false, name) == none { return 0 }

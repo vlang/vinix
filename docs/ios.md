@@ -17300,11 +17300,55 @@ Nine binary/generated-C pairs, three host dSYMs, sealed native evidence and four
 guest serial/configuration sets passed verification. All four temporary VMs,
 their scratch storage and the owned RAM disk were retired.
 
-The launch probe now stops at Foundation's `_OBJC_CLASS_$_NSURLSession`, before
-application entry. Fortnite remains unplayable.
+The integer launch probe stopped at Foundation's `_OBJC_CLASS_$_NSURLSession`,
+before application entry.
 
 ```sh
 v run tests/ios/native-checks.v build-objc-constant-integer
+```
+
+V now supplies the public base `NSURLSession` class with the measured 160-byte
+record, superclass, ivars and supported method encodings. Direct allocation,
+initialization and `new` produce a base session with nil delegate and
+configuration. Repeated initialization preserves its state. Immutable copies
+retain the same session. `sessionDescription` copies its NSString input;
+`delegateQueue` lazily creates one serial NSOperationQueue per session. Both
+getters retain and autorelease their results, and destruction releases the
+session's owned description and queue even after an isa replacement.
+
+Property access and lazy publication use the runtime lock. Queue construction,
+description copying and retiring references run outside that lock so replaced
+initializers, copy methods and deallocation callbacks can reenter the runtime.
+The allocation retains its ownership metadata independently of its current
+class, including when its 160 bytes belong to a caller.
+
+Shared and configured sessions, tasks, mutable copies, lifecycle callbacks,
+coding and custom subclass construction remain explicit unsupported paths.
+The base class does not provide networking or operation scheduling. Native
+Foundation measurements show that both invalidation methods crash on a plain
+base session; Vinix rejects those calls instead of treating them as completed
+work. The exact Fortnite executable imports this class and also uses shared
+and configured session factories, task creation, task enumeration and
+invalidation, which still require implementation.
+
+The base session and existing session-constant fixtures passed four macOS
+ASan+UBSan executions and both ARM64 guest runs. Tests compare supported APIs
+against Apple Foundation and exercise concurrent property access, callback
+reentry, caller-supplied storage, isa replacement, shutdown and nineteen
+explicit rejection cases. The launch probe now stops at Foundation's
+`_OBJC_CLASS_$_NSSortDescriptor`, before application entry. Fortnite remains
+unplayable.
+
+Evidence is retained in `build/ios/fortnite/url-session-checks`: seven archived
+binary/generated-C pairs, two host dSYMs, 63 sealed native/static artifacts
+and four guest serial/configuration sets passed verification. All 19,212
+original inputs outside the measurement helper remained unchanged. Its source
+and binary were corrected to compare exact symbol tokens; the earlier prefix
+match failure and original hashes are preserved. All temporary VMs, scratch
+storage and the owned RAM disk were retired.
+
+```sh
+v run tests/ios/native-checks.v build-url-session
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -17312,12 +17356,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,057 | 104 | 78 |
+| Fortnite executable | 2,058 | 103 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,897 | 107 | 114 |
+| All images | 2,898 | 106 | 114 |
 
-The C++/GLES/Text variant reports 2,911 resolved imports, 93 unresolved strong
+The C++/GLES/Text variant reports 2,912 resolved imports, 92 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -17364,8 +17408,9 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 
 `VINIX_IOS_CHECK_NAME` selects a single output directory name under
 `build/ios/fortnite` (default `select-checks`; the timestamp/UUID verification uses
-`file-time-checks`, the audio constants use `audio-session-checks`, and
-CoreFoundation dictionaries use `cf-dictionary-checks`, constant integers use
+`file-time-checks`, the audio constants use `audio-session-checks`,
+base URL sessions use `url-session-checks`, CoreFoundation dictionaries use
+`cf-dictionary-checks`, constant integers use
 `constant-integer-checks`, constant arrays use `constant-array-checks`, supplied
 Objective-C storage uses `objc-storage-checks`,
 associated objects use
@@ -17375,8 +17420,8 @@ object monitors use `objc-sync-checks`, Swift strings/buffers use
 `swift-metadata-checks`). Each
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
-terminal, thread-policy, file timestamp, UUID, audio-session constant and
-CoreFoundation dictionary, constant array and constant integer, supplied
+terminal, thread-policy, file timestamp, UUID, audio-session constant,
+URL session, CoreFoundation dictionary, constant array and constant integer, supplied
 Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String
 metadata/witness checks before the existing Mach-O suite and requires the
