@@ -231,6 +231,10 @@ fn write_ffmpeg_profile(runtime_version string, roots map[string]int, target str
 		transferred = true
 		exporting.checkpoint('packed', options)!
 	}
+	objects := C.open(object_path.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
+	if objects < 0 { return error('cannot inspect FFmpeg profile dependency closure') }
+	defer { C.close(objects) }
+	profile_linux_closures(objects, plan.packages, ffmpeg_runtime_id)!
 	canonical := plan.canonical()!
 	mut published := false
 	defer { if !published { unsafe { canonical.free() } } }

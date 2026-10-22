@@ -127,6 +127,7 @@ fn builder_reset(fixture string, target string) ! {
 fn builder_prepare(mode string, fixture string) ! {
 	roots := fixture + '/roots'; path := roots + '/x86_64/licenses/musl-COPYRIGHT'
 	match mode {
+		'closure-needed' { os.write_file_array(roots + '/x86_64/bin/sqlite3', elffixture.missing_library('x86_64'))! }
 		'missing-architecture' { os.rename(roots + '/x86_64', fixture + '/saved-root')! }
 		'wrong-target' { os.write_file_array(roots + '/x86_64/bin/sqlite3', elffixture.image('aarch64', 'pie'))! }
 		'wrong-mode' { os.chmod(roots + '/x86_64/bin/sqlite3', 0o644)! }
@@ -152,6 +153,7 @@ fn builder_attempt(mode string, roots string, target string) {
 	} else {
 		message := err.msg(); defer { unsafe { message.free(); err.free() } }; assert mode !in ['complete', 'nested']!
 		expected := match mode {
+			'closure-needed' { 'ELF closure missing library missing.so' }
 			'version', 'runtime-version' { 'invalid version' } 'runtime-range' { 'supported 1.x' } 'missing-root' { 'prepared root' } 'missing-architecture' { 'ordinary architecture roots' }
 			'wrong-target' { 'wrong ELF target/type' } 'wrong-mode' { 'ordinary executable' }
 			'missing-notice' { 'cannot open prepared guest path' } 'empty-notice', 'notice-directory' { 'nonempty redistribution notice' }
@@ -169,7 +171,7 @@ fn builder_attempt(mode string, roots string, target string) {
 
 fn test_complete_sqlite_builder_retires_success_partial_import_and_publication_refusal_storage() {
 	defer { for key in ['MODE', 'ROOTS', 'TARGET', 'PARENT', 'STAGE', 'SAVED']! { os.unsetenv('VINIX_SQLITE_BUILDER_' + key) } }
-	for mode in ['complete', 'nested', 'version', 'runtime-version', 'runtime-range', 'missing-root', 'missing-architecture', 'wrong-target', 'wrong-mode',
+	for mode in ['complete', 'nested', 'closure-needed', 'version', 'runtime-version', 'runtime-range', 'missing-root', 'missing-architecture', 'wrong-target', 'wrong-mode',
 		'missing-notice', 'empty-notice', 'notice-directory', 'no-output-space', 'no-temp-space', 'space-error', 'created',
 		'packed-1', 'packed-2', 'packed-3', 'packed-4', 'ready', 'import-elf', 'import-notice',
 		'import-directory', 'changed-lock', 'occupied', 'raced-target', 'flush', 'cleanup', 'root-replaced', 'inventory-replaced', 'lock-replaced']! {
@@ -198,7 +200,7 @@ fn test_complete_sqlite_builder_retires_success_partial_import_and_publication_r
 			assert builder_descriptors() == before
 			published := mode in ['complete', 'nested', 'flush', 'cleanup']!
 			assert os.is_file(target + '/catalog.json') == published
-			if published { assert index_digest(os.read_file(target + '/catalog.json')!) == '359e8ab218db656657a0b64cca63263e6b589397960b9503e953a65c10fc86e2' }
+			if published { assert index_digest(os.read_file(target + '/catalog.json')!) == '262cec39b9eec78382a43173df580c83accfd807d4710ca67fcef4601ffafc3a' }
 			if mode == 'occupied' { assert os.read_file(target)! == 'preserved replacement' }
 			if mode == 'raced-target' { assert os.read_file(target + '/keep')! == 'preserved replacement' }
 			if mode in ['cleanup', 'root-replaced', 'inventory-replaced', 'lock-replaced']! {
@@ -214,7 +216,7 @@ fn test_complete_sqlite_builder_retires_success_partial_import_and_publication_r
 		}
 		builder_reset(fixture, target)!; builder_restore(fixture)!; os.unsetenv('VINIX_SQLITE_BUILDER_MODE')
 		mut retried := sqlite_catalog('3.53.4', '1.0.0', roots, target)!; $if !sqlite_builder_baseline ? { retried.close(); retried.close() }
-		assert index_digest(os.read_file(target + '/catalog.json')!) == '359e8ab218db656657a0b64cca63263e6b589397960b9503e953a65c10fc86e2'
+		assert index_digest(os.read_file(target + '/catalog.json')!) == '262cec39b9eec78382a43173df580c83accfd807d4710ca67fcef4601ffafc3a'
 		assert os.read_file(roots + '/aarch64/licenses/musl-COPYRIGHT')! == 'musl-COPYRIGHT'
 		assert os.read_bytes(roots + '/aarch64/bin/vinix-linux-runner')! == elffixture.image('aarch64', 'static')
 		println('SQLITE BUILDER ' + mode + ' canonical retry, saved output, source and descriptor preservation PASS')

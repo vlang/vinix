@@ -25,5 +25,26 @@ pub fn image(architecture string, kind string) []u8 {
 		put(mut bytes, 160, u64(name.len + 1)); put(mut bytes, 168, 1)
 		for i, byte in name.bytes() { bytes[320 + i] = byte }
 	}
+	// Dynamic profile admission also needs a real, terminated dynamic table.
+	// Empty dependencies are intentional for these structural-only images.
+	if kind != 'static' {
+		ph := 64 + int(bytes[56]) * 56
+		bytes[56]++
+		bytes[ph] = 2; bytes[ph + 4] = 4
+		put(mut bytes, ph + 8, 352); put(mut bytes, ph + 16, 0x100160)
+		put(mut bytes, ph + 32, 48); put(mut bytes, ph + 40, 48); put(mut bytes, ph + 48, 8)
+		put(mut bytes, 352, 5); put(mut bytes, 360, 0x100190)
+		put(mut bytes, 368, 10); put(mut bytes, 376, 1)
+	}
+	return bytes
+}
+
+// A real missing DT_NEEDED edge for complete publisher refusal/ownership tests.
+pub fn missing_library(architecture string) []u8 {
+	mut bytes := image(architecture, 'pie')
+	put(mut bytes, 208, 64); put(mut bytes, 216, 64)
+	put(mut bytes, 360, 0x1001c0); put(mut bytes, 376, 12)
+	put(mut bytes, 384, 1); put(mut bytes, 392, 1)
+	for i, c in 'missing.so' { bytes[449 + i] = c }
 	return bytes
 }

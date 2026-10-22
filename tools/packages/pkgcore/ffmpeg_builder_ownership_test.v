@@ -144,6 +144,7 @@ fn builder_prepare(mode string, fixture string) ! {
 	roots := fixture + '/roots'; path := roots + '/x86_64/licenses/ffmpeg-COPYING.LGPLv2.1'
 	source := roots + '/x86_64/sources/ffmpeg.tar.xz'
 	match mode {
+		'closure-needed' { os.write_file_array(roots + '/x86_64/bin/ffmpeg', elffixture.missing_library('x86_64'))! }
 		'missing-source' { os.rm(source)! } 'source-size' { os.write_file(source, 'wrong size')! }
 		'source-executable' { os.chmod(source, 0o755)! } 'source-pin' { builder_corrupt_source(source)! }
 		'missing-architecture' { os.rename(roots + '/x86_64', fixture + '/saved-root')! }
@@ -174,6 +175,7 @@ fn builder_attempt(mode string, roots string, target string) {
 	} else {
 		message := err.msg(); defer { unsafe { message.free(); err.free() } }; assert mode !in ['complete', 'nested']!
 		expected := match mode {
+			'closure-needed' { 'ELF closure missing library missing.so' }
 			'version' { 'invalid version' } 'runtime-range' { 'supported 1.x' } 'missing-root' { 'prepared root' } 'missing-architecture' { 'ordinary architecture roots' }
 			'wrong-target' { 'wrong ELF target/type' } 'wrong-mode' { 'ordinary executable' }
 			'missing-notice' { 'cannot open prepared guest path' } 'empty-notice', 'notice-directory' { 'nonempty redistribution/build notice' }
@@ -194,7 +196,7 @@ fn builder_attempt(mode string, roots string, target string) {
 
 fn test_complete_ffmpeg_builder_retires_success_partial_import_and_publication_refusal_storage() {
 	defer { for key in ['MODE', 'ROOTS', 'TARGET', 'PARENT', 'STAGE', 'SAVED']! { os.unsetenv('VINIX_FFMPEG_OWNER_' + key) } }
-	for mode in ['complete', 'nested', 'version', 'runtime-range', 'missing-root', 'missing-architecture', 'wrong-target', 'wrong-mode',
+	for mode in ['complete', 'nested', 'closure-needed', 'version', 'runtime-range', 'missing-root', 'missing-architecture', 'wrong-target', 'wrong-mode',
 		'missing-notice', 'empty-notice', 'notice-directory', 'missing-source', 'source-size', 'source-executable', 'source-pin', 'import-source',
 		'no-output-space', 'no-temp-space', 'space-error', 'created',
 		'packed-1', 'packed-2', 'packed-3', 'packed-4', 'packed-5', 'packed-6', 'ready', 'import-elf', 'import-notice',
@@ -224,7 +226,7 @@ fn test_complete_ffmpeg_builder_retires_success_partial_import_and_publication_r
 			assert builder_descriptors() == before
 			published := mode in ['complete', 'nested', 'flush', 'cleanup']!
 			assert os.is_file(target + '/catalog.json') == published
-			if published { assert index_digest(os.read_file(target + '/catalog.json')!) == '3e143c0de9b7304576820a7dd70ad5949b23525211ca30a40a6791e8ccfc6431' }
+			if published { assert index_digest(os.read_file(target + '/catalog.json')!) == '52e1ce43f7e52205655ea33fde374a623df23063dcd1a6275a785be61416b2f8' }
 			if mode == 'occupied' { assert os.read_file(target)! == 'preserved replacement' }
 			if mode == 'raced-target' { assert os.read_file(target + '/keep')! == 'preserved replacement' }
 			if mode in ['cleanup', 'root-replaced', 'inventory-replaced', 'lock-replaced']! {
@@ -240,7 +242,7 @@ fn test_complete_ffmpeg_builder_retires_success_partial_import_and_publication_r
 		}
 		builder_reset(fixture, target)!; builder_restore(fixture)!; os.unsetenv('VINIX_FFMPEG_OWNER_MODE')
 		mut retried := ffmpeg_catalog('1.0.0', roots, target)!; $if !ffmpeg_owner_baseline ? { retried.close(); retried.close() }
-		assert index_digest(os.read_file(target + '/catalog.json')!) == '3e143c0de9b7304576820a7dd70ad5949b23525211ca30a40a6791e8ccfc6431'
+		assert index_digest(os.read_file(target + '/catalog.json')!) == '52e1ce43f7e52205655ea33fde374a623df23063dcd1a6275a785be61416b2f8'
 		assert os.read_file(roots + '/aarch64/licenses/ffmpeg-COPYING.LGPLv2.1')! == 'licenses/ffmpeg-COPYING.LGPLv2.1'
 		assert os.read_bytes(roots + '/aarch64/bin/vinix-linux-runner')! == elffixture.image('aarch64', 'static')
 		println('FFMPEG OWNER ' + mode + ' canonical retry, saved output, source and descriptor preservation PASS')

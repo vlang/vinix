@@ -203,6 +203,10 @@ fn write_sqlite_profile(sqlite_version string, runtime_version string, roots map
 		transferred = true
 		exporting.checkpoint('packed', options)!
 	}
+	objects := C.open(object_path.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
+	if objects < 0 { return error('cannot inspect SQLite profile dependency closure') }
+	defer { C.close(objects) }
+	profile_linux_closures(objects, plan.packages, sqlite_runtime_id)!
 	canonical := plan.canonical()!
 	mut published := false
 	defer { if !published { unsafe { canonical.free() } } }
