@@ -16976,11 +16976,50 @@ and failure status remain preserved and hash-verified in the same directory.
 Static inspection of the executable identified above finds four data fixups
 for the descriptor and four for its getter alias. Five `CodingKeys`
 conformances refer to the descriptor cells; each has a null witness pattern
-and a resilient getter entry. The related CodingKey base-protocol descriptor
-remains unsupported, as does generic/resilient conformance-table synthesis.
+and a resilient getter entry. Generic/resilient conformance-table synthesis
+remains unsupported. This inspection executes no application code.
+
+`_$ss9CodingKeyMp` now exports the canonical Swift `CodingKey` declaration.
+Its two generic signature requirements identify the existing public
+`CustomDebugStringConvertible` and `CustomStringConvertible` declarations.
+The six protocol requirements describe those inherited witness tables,
+`stringValue`, `intValue` and their failable initializers. All six default
+implementation fields are null, matching Apple's runtime. The witness-table
+base, inherited-protocol and four requirement aliases point into the same
+96-byte declaration. Both keyed container nominal descriptors now reference
+this public declaration instead of private copies.
+
+The fixture compares the native graph and all eight aliases, checks the full
+read-only page and both keyed container constraints, and exercises concurrent
+descriptor/alias/dependency/nominal-first lookup. Rejected lookups allocate no
+declaration storage. Two runtime lifetimes drain and unmap the declaration and
+its dependencies; keyed containers retire before CodingKey, which retires
+before its borrowed protocol and Swift module pages.
+
+```sh
+v run tests/ios/native-checks.v build-swift-coding-key-protocol
+```
+
+Evidence is retained in `build/ios/fortnite/coding-key-checks`. The CodingKey,
+keyed decoding and encoding container nominal, and CustomDebugStringConvertible
+fixtures passed eight normal and deterministic ASan/UBSan host runs. The ARM64
+CodingKey fixture passed; the launch probe and both import audits completed.
+All 1,085 pinned source, toolchain and runtime inputs remained unchanged.
+Eight archived binary/generated-C pairs and four retained serial logs passed
+SHA256 verification. All four temporary VMs and their RAM disk were retired.
+Four initial setup/static helper failures and their 18 manifest artifact
+hashes remain preserved and verified in the same directory.
+
+Static inspection of the same executable finds seven required CodingKey
+declaration imports, each with four data fixups. Five `CodingKeys` conformances
+have flags `0x30000`, a null witness pattern and six resilient witness entries
+referring to these aliases. Their generic/resilient conformance tables still
+require runtime synthesis. The four existing keyed-container dispatch and
+description getter function imports are separate from these declarations.
 This inspection executes no application code.
 
-The launch probe now stops at the next required import, `_$ss9CodingKeyMp`,
+The launch probe now stops at the next required import,
+`_$sST12makeIterator0B0QzyFTq`, the Swift `Sequence.makeIterator` requirement,
 before application entry. Fortnite is not playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -16988,12 +17027,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,011 | 150 | 78 |
+| Fortnite executable | 2,018 | 143 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,851 | 153 | 114 |
+| All images | 2,858 | 146 | 114 |
 
-The C++/GLES/Text variant reports 2,865 resolved imports, 139 unresolved strong
+The C++/GLES/Text variant reports 2,872 resolved imports, 132 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

@@ -174,6 +174,7 @@ fn swift_metadata_stop() {
 	swift_generic_metadata_stop()
 	swift_generic_value_metadata_stop()
 	swift_keyed_container_metadata_stop()
+	swift_coding_key_protocol_stop()
 	swift_string_protocol_stop()
 	swift_objc_bool_metadata_stop()
 	swift_dispatch_flags_stop()

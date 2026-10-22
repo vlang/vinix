@@ -252,6 +252,8 @@ mut:
 	swift_case_iterable_retired bool // Reject declaration recreation after quiescent metadata retirement.
 	swift_custom_debug_arena u64 // Sealed CustomDebugStringConvertible declaration and resilient aliases.
 	swift_custom_debug_retired bool // Reject declaration recreation after quiescent metadata retirement.
+	swift_coding_key_protocol_arena u64 // Canonical CodingKey declaration shared by keyed container constraints.
+	swift_coding_key_protocol_retired bool // Reject recreation after quiescent metadata retirement.
 	swift_indexing_iterator_conformance_descriptor u64 // Remember for stale lookup rejection after retirement.
 	swift_set_arena u64
 	swift_set_metadata map[u64]SwiftSetType // Sealed specialization page -> exact Element/Hashable pair.

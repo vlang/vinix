@@ -106,10 +106,10 @@ fn swift_keyed_container_arena() u64 {
 	$if !arm64 { panic('iOS: keyed container metadata requires ARM64') }
 	if ios_runtime == unsafe { nil } || ios_runtime.swift_keyed_container_retired
 		|| ios_runtime.swift_concurrency_retired { panic('iOS: keyed container metadata outside runtime lifetime') }
-	string_protocol := swift_string_metadata() - 16 + 352
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if ios_runtime.swift_keyed_container_arena != 0 { return ios_runtime.swift_keyed_container_arena }
+	coding_key_protocol := swift_coding_key_protocol_arena_checked() or { panic(err) }
 	page := usize(C.getpagesize())
 	allocation := C.mmap(unsafe { nil }, page * 3, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
 	if allocation == unsafe { voidptr(-1) } { panic('iOS: cannot allocate keyed container metadata') }
@@ -147,7 +147,7 @@ fn swift_keyed_container_arena() u64 {
 	write32(descriptor + 36, 0x10001);write32(descriptor + 40, 2)
 	write32(descriptor + 44, 0x80);write32(descriptor + 48, 0x80)
 	swift_protocol_relative(descriptor + 52, data + 288)
-	swift_protocol_relative(descriptor + 56, data + 384)
+	swift_protocol_relative(descriptor + 56, coding_key_protocol)
 	C.memcpy(voidptr(name), if encoding { c'KeyedEncodingContainer' } else { c'KeyedDecodingContainer' }, 22)
 	swift_protocol_relative(pattern, entry + 32)
 	write32(pattern + 8, 0x40000000);swift_protocol_relative(pattern + 12, data)
@@ -155,23 +155,6 @@ fn swift_keyed_container_arena() u64 {
 	swift_protocol_relative(data + 232, data + 240)
 	C.memcpy(voidptr(data + 240), c'Swift', 6)
 	C.memcpy(voidptr(data + 288), c'x', 2)
-	// Private declaration records describe the constraint, not executable
-	// CodingKey conformances or defaults. No protocol/witness exports are added.
-	for i, name in ['CodingKey', 'CustomDebugStringConvertible']! {
-		p := data + [u64(384), 576]![i]
-		text := data + [u64(512), 608]![i]
-		write32(p, 0x30043);swift_protocol_relative(p + 4, data + 224)
-		swift_protocol_relative(p + 8, text)
-		write32(p + 16, if i == 0 { u32(6) } else { u32(1) })
-		C.memcpy(voidptr(text), name.str, usize(name.len + 1))
-		if i != 0 { write32(p + 24, 0x13) }
-	}
-	write32(data + 396, 2)
-	for i, parent in [data + 576, string_protocol]! {
-		r := data + 408 + u64(i * 12)
-		write32(r, 0x80);swift_protocol_relative(r + 4, data + 288);swift_protocol_relative(r + 8, parent)
-	}
-	for i, flags in [u32(0), 0, 0xdcb00013, 0x32b70002, 0xbeb70013, 0xf36c0002]! { write32(data + 432 + u64(i * 8), flags) }
 	C.__builtin___clear_cache(allocation, voidptr(base + 112))
 	if C.mprotect(allocation, page, C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(voidptr(data), page, C.PROT_READ) != 0 {
