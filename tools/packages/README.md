@@ -5,6 +5,12 @@ support a disposable `--root /absolute/root`. Launch uses the real root and an
 ordinary identity. The root desktop can hand off to an administrator-configured
 `launch_user` through the isolated account session runner.
 
+`vinix-package capabilities` emits the package tool's accepted package, SDK,
+native window and deployment interface versions as JSON without loading
+configuration or package state. Select exact versions from the reported lists;
+the response does not advertise installed runtimes or publisher trust. See the
+[interface discovery contract](CAPABILITIES.md).
+
 An ordinary caller with account groups automatically uses the fixed
 `packages-launch` account action to strip them before launch. It preserves the
 caller's identity and existing standard streams, including terminals and native

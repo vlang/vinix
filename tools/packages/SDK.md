@@ -6,6 +6,15 @@ link desktop internals or write the database. Breaking changes require a new
 `format`/`sdk` value; unknown versions are rejected. This does not freeze kernel,
 Apple or internal compositor interfaces.
 
+Call `vinix-package capabilities` to discover accepted package, application SDK,
+native window and deployment versions before choosing an interface. The command
+always emits JSON, reads no configuration and changes no package state. Match
+versions by exact membership; compatibility still requires ordinary package,
+architecture, policy and signature admission. The
+[discovery contract](CAPABILITIES.md) includes a bounded V decoder, ownership
+rules and qualification evidence. Runtime availability and publisher trust are
+separate from interface support.
+
 Installed `state.json` files are service-generated records, rather than publisher
 templates. Every state envelope field is required; duplicate/unknown nested
 fields, invalid provenance, orphaned packages and inconsistent runtime/root

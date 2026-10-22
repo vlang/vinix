@@ -1030,6 +1030,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     Apple framework/application and graphical coverage remain open.
 - [ ] Establish a supported application SDK/protocol, stable public interfaces,
   package format, signing/publishing process and developer documentation.
+  - [x] [Read-only package-tool interface discovery](tools/packages/CAPABILITIES.md)
+    reports exact supported package, SDK, native window and deployment versions
+    without configuration or state access. A strict owned decoder, repeated
+    zero-retention checks, sanitizers, real normal/production CLI refusals and
+    both target CLI builds qualify this contract. Runtime availability,
+    publisher enrollment and broader SDK acceptance remain separate gates.
 - [ ] Support offline repositories/caches and organization-managed deployment;
   keep firmware, proprietary payload licensing and runtime updates explicit.
   - [x] [Installed payload disclosure](tests/packages/software-payload-check.md)

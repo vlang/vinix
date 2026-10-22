@@ -7,6 +7,12 @@ installs the service, sandbox launcher, Software process link and XDG registrati
 directory. It preserves existing configuration; a fresh image enrolls no keys
 unless its builder supplies an explicit reviewed release configuration.
 
+The read-only [`vinix-package capabilities` query](../tools/packages/CAPABILITIES.md)
+reports accepted package, application SDK, native window and deployment interface
+versions without configuration or package-state access. Host decoder, allocation,
+sanitizer and actual CLI checks pass, with both target CLI builds retained.
+Interface support does not establish runtime availability or publisher trust.
+
 Release image staging accepts `--config FILE` or `VINIX_PACKAGE_IMAGE_CONFIG` to
 seed the normal repository keys, policy and launch account before first boot.
 It captures and validates the input before compiling, checks new publisher keys,
