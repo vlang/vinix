@@ -163,6 +163,11 @@ the backend's default font; remote font downloads, weight selection and shaping
 remain incomplete. SensorManager reports an empty device list and rejects
 registration because this backend has no sensor driver. Its barometric altitude
 calculation works on supplied pressure values without requiring a device.
+PowerManager reports the guest's current policy: no thermal throttling, device
+idle or location power saving. Thermal listeners receive this initial policy on
+their Executor or the main Handler; duplicate registrations and missing removals
+fail. Vinix has no temperature driver or thermal feedback loop, so this status
+does not measure physical device temperature or provide overheating protection.
 
 Dynamic receivers support the registration overloads with flags and handlers,
 main-Looper delivery by default, action and package filtering, and unregistering.
