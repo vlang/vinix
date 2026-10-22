@@ -31,7 +31,10 @@ fn ws_dump_surface_fields(e voidptr, view voidptr) {
 			mut start := usize(0)
 			mut valid := true
 			for hop in 0 .. 8 {
-				if value == nil { valid = false; break }
+				if value == nil {
+					valid = false
+					break
+				}
 				mut name := [256]char{}
 				mut length := usize(0)
 				for start < size && path[start] != `.` {
@@ -39,24 +42,57 @@ fn ws_dump_surface_fields(e voidptr, view voidptr) {
 					length++
 					start++
 				}
-				if length == 0 { valid = false; break }
-				name_args := [Value{ l: ws_string(e, &name[0]) }]!
-				mut cls := WsObjectClass(slot(e, 31))(e, value)
-				mut member := voidptr(nil)
-				for _ in 0 .. 16 {
-					if cls == nil { break }
-					member = obj(e, cls, c'java/lang/Class', c'getDeclaredField', c'(Ljava/lang/String;)Ljava/lang/reflect/Field;', &name_args[0])
-					if !pending(e) { break }
-					ExceptionClear(slot(e, 17))(e)
-					cls = obj(e, cls, c'java/lang/Class', c'getSuperclass', c'()Ljava/lang/Class;', nil)
+				if length == 0 {
+					valid = false
+					break
 				}
-				if member == nil || pending(e) { valid = false; break }
-				access := [Value{ i: 1 }]!
-				call(e, member, c'java/lang/reflect/Field', c'setAccessible', c'(Z)V', &access[0])
-				if pending(e) { valid = false; break }
-				owner := [Value{ l: value }]!
-				value = obj(e, member, c'java/lang/reflect/Field', c'get', c'(Ljava/lang/Object;)Ljava/lang/Object;', &owner[0])
-				if pending(e) { valid = false; break }
+				// Numeric components select a List or array element. Array.get
+				// also boxes primitive array elements, like Field.get does.
+				mut indexed := true
+				mut index := i32(0)
+				for n := usize(0); n < length; n++ {
+					if name[n] < `0` || name[n] > `9` || index > 6553 {
+						indexed = false
+						break
+					}
+					index = index * 10 + i32(name[n] - `0`)
+				}
+				if indexed {
+					if instance_of(e, value, c'java/util/List') {
+						args := [Value{ i: index }]!
+						value = obj(e, value, c'java/util/List', c'get', c'(I)Ljava/lang/Object;', &args[0])
+					} else {
+						args := [Value{ l: value }, Value{ i: index }]!
+						value = static_obj(e, c'java/lang/reflect/Array', c'get', c'(Ljava/lang/Object;I)Ljava/lang/Object;', &args[0])
+					}
+				} else {
+					name_args := [Value{ l: ws_string(e, &name[0]) }]!
+					mut cls := WsObjectClass(slot(e, 31))(e, value)
+					mut member := voidptr(nil)
+					for _ in 0 .. 16 {
+						if cls == nil { break }
+						member = obj(e, cls, c'java/lang/Class', c'getDeclaredField', c'(Ljava/lang/String;)Ljava/lang/reflect/Field;', &name_args[0])
+						if !pending(e) { break }
+						ExceptionClear(slot(e, 17))(e)
+						cls = obj(e, cls, c'java/lang/Class', c'getSuperclass', c'()Ljava/lang/Class;', nil)
+					}
+					if member == nil || pending(e) {
+						valid = false
+						break
+					}
+					access := [Value{ i: 1 }]!
+					call(e, member, c'java/lang/reflect/Field', c'setAccessible', c'(Z)V', &access[0])
+					if pending(e) {
+						valid = false
+						break
+					}
+					owner := [Value{ l: value }]!
+					value = obj(e, member, c'java/lang/reflect/Field', c'get', c'(Ljava/lang/Object;)Ljava/lang/Object;', &owner[0])
+				}
+				if pending(e) {
+					valid = false
+					break
+				}
 				if start == size { break }
 				start++
 				if hop == 7 { valid = false }

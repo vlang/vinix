@@ -11,8 +11,10 @@ enabled, `VINIX_ANDROID_TRACE_SURFACE_FIELDS` accepts comma-separated field
 paths such as `mSurfaceHolder.this$0.left`. It reads private and inherited
 fields, boxes primitives and prints their descriptions. Missing fields and
 null intermediate objects report `unavailable` without leaving a Java exception
-pending. Sampling stops after three surface visits; each sample allows sixteen
-paths, eight fields per path and 1,024 output bytes per value. Descriptions may
+pending. Numeric components select List or array elements, for example
+`mCallbacks.0`; primitive array elements are boxed. Invalid indices also report
+`unavailable`. Sampling stops after three surface visits; each sample allows sixteen
+paths, eight components per path and 1,024 output bytes per value. Descriptions may
 invoke the object's `toString`; this is intended for selected diagnostic builds.
 Production launchers leave these variables unset.
 
