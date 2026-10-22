@@ -251,6 +251,14 @@ verified HTTPS response from Google and certificate failures for both
 as certificate rejection. The probe leaves the default trust manager and
 hostname verifier intact. TCP diagnostics separately expose unreachable routes.
 
+ClipData factories retain Intent, text and URI payloads with their label and
+MIME type; descriptions copy the supplied MIME array. Item access checks bounds
+and rejects null items. Full Intent copies copy the item list, while filter
+copies omit clip data. This supports location-service Intent construction;
+cross-process clipboard delivery and resolver-based MIME inference remain
+unsupported. `tests/native-android-ws/clipdata-fixture.v` takes the same five
+arguments as the HTTPS generator and requires `CLIPDATA-PASS` in the guest log.
+
 Package loading authenticates APK contents using pinned AOSP apksig 8.7.3,
 converted to DEX by pinned D8. The framework receipt records both tool hashes;
 the generated JAR includes apksig's Apache license. Verification uses Android

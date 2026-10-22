@@ -10,7 +10,7 @@ fn framework_intent(smali string) ! {
  path := smali + '/android/content/Intent.smali'
  owner := 'Landroid/content/Intent;'
  mut text := os.read_file(path)!
- text += '\n.field private vinixCategories:Ljava/util/HashSet;\n.field private vinixIdentifier:Ljava/lang/String;\n'
+ text += '\n.field private vinixCategories:Ljava/util/HashSet;\n.field private vinixIdentifier:Ljava/lang/String;\n.field private vinixClipData:Landroid/content/ClipData;\n'
  fields := ['action:Ljava/lang/String;', 'data:Landroid/net/Uri;', 'type:Ljava/lang/String;',
   'packageName:Ljava/lang/String;', 'component:Landroid/content/ComponentName;', 'vinixIdentifier:Ljava/lang/String;']
  mut copy := ''
@@ -26,6 +26,9 @@ fn framework_intent(smali string) ! {
   'iget-object v0, p1, ' + owner + '->extras:Landroid/os/Bundle;\nif-eqz v0, :extras_done\n' +
   'new-instance v1, Landroid/os/Bundle;\ninvoke-direct {v1, v0}, Landroid/os/Bundle;-><init>(Landroid/os/Bundle;)V\n' +
   'iput-object v1, p0, ' + owner + '->extras:Landroid/os/Bundle;\n:extras_done\n' +
+  'iget-object v0, p1, ' + owner + '->vinixClipData:Landroid/content/ClipData;\nif-eqz v0, :clip_done\n' +
+  'new-instance v1, Landroid/content/ClipData;\ninvoke-direct {v1, v0}, Landroid/content/ClipData;-><init>(Landroid/content/ClipData;)V\n' +
+  'iput-object v1, p0, ' + owner + '->vinixClipData:Landroid/content/ClipData;\n:clip_done\n' +
   'iget-object v0, p1, ' + owner + '->selector:Landroid/content/Intent;\nif-eqz v0, :done\n' +
   'new-instance v1, ' + owner + '\ninvoke-direct {v1, v0}, ' + owner + '-><init>(Landroid/content/Intent;)V\n' +
   'iput-object v1, p0, ' + owner + '->selector:Landroid/content/Intent;\n:done\nreturn-void\n.end method\n'
@@ -38,6 +41,10 @@ fn framework_intent(smali string) ! {
    'new-instance v0, ' + owner + '\nconst/4 v1, ' + (if mode == 'cloneFilter' { '1' } else { '0' }) + '\n' +
    'invoke-direct {v0, p0, v1}, ' + owner + '-><init>(Landroid/content/Intent;Z)V\nreturn-object v0\n.end method')!
  }
+ text = framework_replace_method(text, 'getClipData()Landroid/content/ClipData;', signature_method('public getClipData()Landroid/content/ClipData;',
+  'iget-object v0, p0, ' + owner + '->vinixClipData:Landroid/content/ClipData;\nreturn-object v0'))!
+ text = framework_replace_method(text, 'setClipData(Landroid/content/ClipData;)V', signature_method('public setClipData(Landroid/content/ClipData;)V',
+  'iput-object p1, p0, ' + owner + '->vinixClipData:Landroid/content/ClipData;\nreturn-void'))!
  text = framework_replace_method(text, 'addCategory(Ljava/lang/String;)Landroid/content/Intent;',
   '.method public addCategory(Ljava/lang/String;)Landroid/content/Intent;\n.locals 1\n' +
   'iget-object v0, p0, ' + owner + '->vinixCategories:Ljava/util/HashSet;\nif-nez v0, :ready\n' +
