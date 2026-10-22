@@ -17136,21 +17136,70 @@ and resilient conformance-table synthesis remains unsupported. The inspection
 finds no declaration call stubs or direct code references and executes no
 application code.
 
-The launch probe now stops at SwiftUI's required
-`_$s7SwiftUI19UIViewRepresentableMp` protocol descriptor. Fortnite has not
-reached application entry and is not playable.
+SwiftUI's `UIViewRepresentable` declaration now exports its 16 public aliases,
+including the inherited View requirement, two associated types and 11 method
+requirements. Its three signature constraints preserve `Self: View`,
+`Self.Body == Never` and `Self.UIViewType: UIKit.UIView`, sharing the canonical
+View and Never descriptors. Coordinator's default is the mangled Void type,
+not an executable default for `makeCoordinator`. The declaration extends the
+existing sealed opacity/Never arena without another allocation or lifetime.
+
+The private defaults include a synchronous `_resetUIView` callback that calls
+the destroy closure once with its Swift context in `x20`, preserving the
+caller's self and frame. The four empty defaults share one private thunk;
+sizing returns nil and layout initializes its indirect result. The
+identified-tree default retains its explicit unsupported diagnostic. Private
+defaults remain distinct from the public protocol-extension exports. Apple's
+installed Catalyst SwiftUI framework supplies the native declaration evidence;
+the ordinary macOS framework does not export this UIKit protocol. Inspection
+does not execute native defaults or application code.
+
+```sh
+v run tests/ios/native-checks.v build-swiftui-uiview-representable
+```
+
+Evidence is retained in `build/ios/fortnite/uiview-representable-checks-v2`.
+The new declaration and existing View protocol, opacity and Never fixtures
+passed eight normal and deterministic ASan/UBSan host runs. The ARM64 fixture
+passed; the launch probe and both import audits completed. All 19,204 listed
+inputs remained unchanged. Eight binary/generated-C pairs, four host dSYM
+archives, 41 native/static evidence hashes and four guest serial logs passed
+verification. All four temporary VMs, their scratch storage and the owned RAM
+disk were retired.
+
+The original failed ARM64 fixture is preserved in
+`uiview-representable-checks`, with its allocation diagnostic in
+`uiview-representable-diagnostic` beside it. Its permission parser kept
+temporary strings under `-gc none`; the corrected fixture reads
+`/proc/self/maps` once per graph and frees the snapshot. After 1,000 reads,
+the diagnostic measured a 176 KiB decrease in `MemFree` with the corrected
+parser, compared with 97,536 KiB with the original parser. The stress still runs
+128 lookups per reader with eight concurrent readers.
+
+Static inspection finds 14 strong declaration imports with 14 data fixups in
+`__DATA_CONST,__const`, including one descriptor reference. `LaunchSwift.UEView`
+has a conformance at `0x10d3596c8` with flags `0x30000`, a null witness pattern,
+13 resilient witnesses and an instantiation-required generic witness control.
+It supplies no reset witness, making the protocol's default relevant to
+resilient evolution. The inspection finds no declaration call stubs or direct
+code references. Generic and resilient conformance-table synthesis remains
+unsupported.
+
+The launch probe advances to CoreMedia's
+`_kCMFormatDescriptionColorPrimaries_P3_D65` constant. Fortnite has not reached
+application entry and is not playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,037 | 124 | 78 |
+| Fortnite executable | 2,051 | 110 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,877 | 127 | 114 |
+| All images | 2,891 | 113 | 114 |
 
-The C++/GLES/Text variant reports 2,891 resolved imports, 113 unresolved strong
+The C++/GLES/Text variant reports 2,905 resolved imports, 99 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

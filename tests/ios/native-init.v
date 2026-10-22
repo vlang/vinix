@@ -171,6 +171,7 @@ fn main() {
 		require_child('/opt/ios/swift-sequence-requirement-checks')
 		require_child('/opt/ios/swift-localized-error-protocol-checks')
 		require_child('/opt/ios/swiftui-view-protocol-checks')
+		require_child('/opt/ios/swiftui-uiview-representable-checks')
 		require_child('/opt/ios/swift-hash-checks')
 		require_child('/opt/ios/swift-hasher-checks')
 		require_child('/opt/ios/swift-raw-representable-checks')
@@ -276,6 +277,7 @@ fn main() {
 		require_child('/opt/ios/dispatch-queue-class-checks')
 		require_child('/opt/ios/swift-cocoa-match-checks')
 		require_child('/opt/ios/swiftui-view-protocol-checks')
+		require_child('/opt/ios/swiftui-uiview-representable-checks')
 		println('VINIX iOS SWIFT: PASS')
 		C.fflush(unsafe { nil })
 	} else {
