@@ -443,6 +443,10 @@ intercepted. Passive overlays fall through to lower children. The guest
 bootstrap fixture checks capture outside bounds, interception/disallow,
 cancellation, disabled controls and click delivery. Multitouch splitting,
 transformed hit testing and long-press gestures remain incomplete.
+`View.isContextClickable()` and `setContextClickable()` retain independent,
+per-view state, initially false. The signed touch regression checks defaults,
+view isolation, toggling and independence from ordinary clickability. This
+state contract does not implement secondary-button context-click delivery.
 WS Enter dispatches TextView editor actions, preserving IME options and flags.
 Explicit actions such as Search and Done call the registered listener with a
 null KeyEvent; ordinary Enter uses IME_NULL and KEYCODE_ENTER. Unconsumed Enter

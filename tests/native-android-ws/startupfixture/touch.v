@@ -105,7 +105,17 @@ invoke-virtual {v1, v3, v3, v4, v4}, Landroid/view/View;->layout(IIII)V
 	check += 'const/4 v3, 1\ninvoke-virtual {v1, v3}, Landroid/view/View;->setEnabled(Z)V\nconst/4 v3, 0\niput v3, v1, Lorg/vinix/bootstrap/TouchLeaf;->actions:I\n'
 	check += touch_send(0, 5, 5) + touch_send(1, 30, 30)
 	check += touch_expect('iget v7, v1, Lorg/vinix/bootstrap/TouchLeaf;->actions:I', 0, 'unowned release ignored')
-	check += 'sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v1, "BOOTSTRAP-TOUCH-PASS overlay capture coordinates downTime interception cancellation disabled"\ninvoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\nreturn-void'
+	// Context click state is independent of ordinary clicks and other views.
+	check += touch_expect('invoke-virtual {v1}, Landroid/view/View;->isContextClickable()Z\nmove-result v7', 0, 'default context click state')
+	check += 'const/4 v3, 1\ninvoke-virtual {v1, v3}, Landroid/view/View;->setContextClickable(Z)V\n'
+	check += touch_expect('invoke-virtual {v1}, Landroid/view/View;->isContextClickable()Z\nmove-result v7', 1, 'enabled context click state')
+	check += touch_expect('invoke-virtual {v2}, Landroid/view/View;->isContextClickable()Z\nmove-result v7', 0, 'context click view isolation')
+	check += touch_expect('invoke-virtual {v1}, Landroid/view/View;->isClickable()Z\nmove-result v7', 1, 'ordinary click state retained')
+	check += 'const/4 v3, 0\ninvoke-virtual {v1, v3}, Landroid/view/View;->setClickable(Z)V\n'
+	check += touch_expect('invoke-virtual {v1}, Landroid/view/View;->isContextClickable()Z\nmove-result v7', 1, 'ordinary click flag independence')
+	check += 'invoke-virtual {v1, v3}, Landroid/view/View;->setContextClickable(Z)V\n'
+	check += touch_expect('invoke-virtual {v1}, Landroid/view/View;->isContextClickable()Z\nmove-result v7', 0, 'disabled context click state')
+	check += 'sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v1, "BOOTSTRAP-TOUCH-PASS overlay capture coordinates downTime interception cancellation disabled context-flags"\ninvoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\nreturn-void'
 	os.write_file(dir + '/TouchProbe.smali', '.class public Lorg/vinix/bootstrap/TouchProbe;\n.super Ljava/lang/Object;\n' +
 		method('private static expect(IILjava/lang/String;)V', 'if-eq p0, p1, :done\nnew-instance v0, Ljava/lang/AssertionError;\ninvoke-direct {v0, p2}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0\n:done\nreturn-void') +
 		method('private static send(Landroid/view/View;III)Z', '

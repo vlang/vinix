@@ -12,8 +12,10 @@ fn touch_method(signature string, body string) string {
 // interception, cancellation and coordinates relative to each receiving view.
 fn framework_view_touch(smali string) ! {
 	path := smali + '/android/view/View.smali'
-	mut view := os.read_file(path)! + '\n.field private vinixClickable:I\n'
+	mut view := os.read_file(path)! + '\n.field private vinixClickable:I\n.field private vinixContextClickable:Z\n'
 	for signature, body in {
+		'isContextClickable()Z': 'iget-boolean v0, p0, Landroid/view/View;->vinixContextClickable:Z\nreturn v0'
+		'setContextClickable(Z)V': 'iput-boolean p1, p0, Landroid/view/View;->vinixContextClickable:Z\nreturn-void'
 		'isClickable()Z': '
 iget v0, p0, Landroid/view/View;->vinixClickable:I
 if-eqz v0, :default
