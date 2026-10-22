@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Compile this host driver with `v -backend c -o /tmp/distribution-check ...`.
+// The qualification broker also selects the target's C backend explicitly.
 module main
 
 import os
@@ -415,7 +417,9 @@ fn check() ! {
 		software_modules, '-o', work + '/software-check',
 		work + '/software'])!
 	run(work + '/software-check', [])!
-	run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-enable-globals', '-path', '@vlib|@vmodules|' + repository,
+	// Use the same C backend as the target broker. A host-native backend can
+	// compile the broker's large inline records but fail before serving requests.
+	run(v, [...helper_flags, '-backend', 'c', '-gc', 'none', '-manualfree', '-enable-globals', '-path', '@vlib|@vmodules|' + repository,
 		'-o', work + '/session-broker', repository + '/desktop/services/session/main.v'])!
 	run(work + '/software-check', ['deployment-chooser', work + '/session-broker'])!
 	run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-enable-globals', '-d', 'ui2_headless', '-d', 'track_heap',

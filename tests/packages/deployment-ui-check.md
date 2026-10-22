@@ -10,7 +10,7 @@ Run the maintained V driver with a staged headless ui2 module and generated
 desktop assets, using the same environment as the full distribution suite:
 
 ```sh
-v -o /tmp/distribution-check tests/packages/distribution-check.v
+v -backend c -o /tmp/distribution-check tests/packages/distribution-check.v
 /tmp/distribution-check --direct-tests --software-only --desktop
 ```
 
@@ -21,6 +21,13 @@ Set `CPATH` to the repository's `desktop` directory for the native fixture's GPU
 ABI headers; `VINIX_PACKAGE_TEST_WORK` can select a private temporary parent.
 `--software-only` skips unchanged core/protocol/CLI runners; omitting it runs
 those checks as well. All runners remain V implementations.
+
+Select the C backend for the host driver as shown above. The broker fixture also
+selects it explicitly, matching target builds. With pinned V `fd996fc42`, a
+default-backend host invocation can terminate the broker before its readiness
+message; this does not qualify the file chooser. On 2026-10-22 the C-built driver
+completed the full `--software-only --direct-tests` suite, including the real
+broker chooser and all repeated allocation checks, with exit status zero.
 
 The Software fixture checks asynchronous read-only review, complete dependency
 permissions and proprietary licenses, frozen literal argv with spaces and shell
