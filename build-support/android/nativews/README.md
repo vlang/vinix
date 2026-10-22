@@ -321,6 +321,8 @@ dimensions default to 480 by 640 and can be supplied through
 activity name. `ANDROID_APP_DATA_DIR` overrides the per-APK directory under
 `$XDG_DATA_HOME/vinix/android`. `VINIX_ANDROID_TRACE_TEXT` and
 `VINIX_ANDROID_TRACE_TREE` enable test-only diagnostic logging of app content.
+Tree snapshots are limited to one every 30 seconds so serial logging does not
+delay rendering. Surface lifecycle changes are still logged as they happen.
 `VINIX_ANDROID_TRACE_THREADS` logs Java thread stacks every 30 seconds for the
 first five minutes, including before the main Looper starts. Its diagnostic
 worker attaches as an ART daemon and keeps a separate JNI environment.

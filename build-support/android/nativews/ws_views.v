@@ -372,7 +372,7 @@ fn ws_render(e voidptr) {
 		call(e, decor, c'android/view/View', c'measure', c'(II)V', &measure[0])
 		layout := [Value{ i: 0 }, Value{ i: 0 }, Value{ i: ws.width }, Value{ i: ws.height }]!
 		call(e, decor, c'android/view/View', c'layout', c'(IIII)V', &layout[0])
-		if C.getenv(c'VINIX_ANDROID_TRACE_TREE') != nil { ws_debug_tree(e, decor, 0) }
+		ws_trace_tree(e, decor)
 		args := [Value{ l: ws.canvas }]!
 		call(e, decor, c'android/view/View', c'draw', c'(Landroid/graphics/Canvas;)V', &args[0])
 		if ws.dialog != nil && !pending(e) { ws_render_dialog(e) }

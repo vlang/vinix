@@ -14,6 +14,19 @@ type WsGetEnv = fn (voidptr, &voidptr, i32) i32
 type WsObjectClass = fn (voidptr, voidptr) voidptr
 
 __global ws_surface_dump_count i32
+__global ws_tree_trace_at i64
+
+// Rendering can run continuously. Sample the tree so diagnostics do not drown
+// the serial port or hold up the same UI/render callbacks being investigated.
+fn ws_trace_tree(e voidptr, root voidptr) {
+	unsafe {
+		if C.getenv(c'VINIX_ANDROID_TRACE_TREE') == nil { return }
+		now := ws_millis()
+		if ws_tree_trace_at != 0 && now - ws_tree_trace_at < 30000 { return }
+		ws_tree_trace_at = now
+		ws_debug_tree(e, root, 0)
+	}
+}
 
 // An explicitly selected application diagnostic method, with the usual
 // (String, PrintWriter) dump signature. Never enabled by production launchers.
