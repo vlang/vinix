@@ -100,8 +100,10 @@ Application attachment precedes main-process content providers (descending
 providers and providers assigned to another process are not instantiated.
 Companion services start their Application through the same path before service
 construction. Package contexts remain lazy; repeated service starts reuse the
-initialized Application and providers. `services-fixture.v` checks this ordering
-with two signed APKs and verifies binding callbacks run on the main thread.
+initialized Application and providers. Content providers retain their owning
+package context and resources; attachment calls `onCreate` once.
+`services-fixture.v` checks this ordering with two signed APKs, package resource
+isolation, main-thread binding callbacks and callbacks on a supplied executor.
 Package visibility also honors legacy target SDKs and `QUERY_ALL_PACKAGES`.
 ApplicationInfo and PackageManager share the actual APK, data and native library
 paths. Elapsed realtime uses the boot clock in the API's requested units.

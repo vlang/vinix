@@ -42,8 +42,46 @@ return-void') +
 		method('protected attachBaseContext(Landroid/content/Context;)V', 'invoke-super {p0, p1}, Landroid/content/ContextWrapper;->attachBaseContext(Landroid/content/Context;)V\n' + check_stage(0, 1) + 'return-void') +
 		method('public onCreate()V', check_stage(2, 3) + 'return-void'))!
 	mut provider := '.class public Lorg/vinix/service/Provider;\n.super Landroid/content/ContentProvider;\n' +
-		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/content/ContentProvider;-><init>()V\nreturn-void') +
-		method('public onCreate()Z', check_stage(1, 2) + 'const/4 v0, 1\nreturn v0')
+		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/content/ContentProvider;-><init>()V
+invoke-virtual {p0}, Landroid/content/ContentProvider;->getContext()Landroid/content/Context;
+move-result-object v0
+if-eqz v0, :unattached
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "provider context before attachment"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0
+:unattached
+return-void') +
+		method('public onCreate()Z', check_stage(1, 2) + '
+invoke-virtual {p0}, Landroid/content/ContentProvider;->getContext()Landroid/content/Context;
+move-result-object v0
+invoke-virtual {v0}, Landroid/content/Context;->getPackageName()Ljava/lang/String;
+move-result-object v1
+const-string v2, "org.vinix.service.companion"
+invoke-virtual {v2, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v1
+if-eqz v1, :bad
+invoke-virtual {v0}, Landroid/content/Context;->getResources()Landroid/content/res/Resources;
+move-result-object v1
+const-string v3, "provider_owner"
+const-string v4, "string"
+invoke-virtual {v1, v3, v4, v2}, Landroid/content/res/Resources;->getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I
+move-result v1
+invoke-virtual {v0, v1}, Landroid/content/Context;->getString(I)Ljava/lang/String;
+move-result-object v1
+const-string v2, "companion resource"
+invoke-virtual {v2, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v1
+if-eqz v1, :bad
+const/4 v1, 0
+invoke-virtual {p0, v0, v1}, Landroid/content/ContentProvider;->attachInfo(Landroid/content/Context;Landroid/content/pm/ProviderInfo;)V
+const/4 v0, 1
+return v0
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "provider owning package and resources"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0')
 	for signature in [
 		'query(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Landroid/database/Cursor;',
 		'insert(Landroid/net/Uri;Landroid/content/ContentValues;)Landroid/net/Uri;',
@@ -92,8 +130,8 @@ throw v0
 new-instance v0, Landroid/os/Binder;
 invoke-direct {v0}, Landroid/os/Binder;-><init>()V
 return-object v0'))!
-	os.write_file(out + '/client/smali/org/vinix/service/Main.smali', '.class public Lorg/vinix/service/Main;\n.super Landroid/app/Activity;\n.implements Landroid/content/ServiceConnection;\n' +
-		'.field private label:Landroid/widget/TextView;\n' +
+	os.write_file(out + '/client/smali/org/vinix/service/Main.smali', '.class public Lorg/vinix/service/Main;\n.super Landroid/app/Activity;\n.implements Landroid/content/ServiceConnection;\n.implements Ljava/util/concurrent/Executor;\n.implements Ljava/lang/Runnable;\n' +
+		'.field private label:Landroid/widget/TextView;\n.field private callbacks:I\n.field private worker:Landroid/os/Handler;\n' +
 		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/app/Activity;-><init>()V\nreturn-void') +
 		method('public onCreate(Landroid/os/Bundle;)V', '
 invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
@@ -135,12 +173,30 @@ const/4 v1, 1
 invoke-virtual {p0, v0, p0, v1}, Landroid/content/Context;->bindService(Landroid/content/Intent;Landroid/content/ServiceConnection;I)Z
 return-void') +
 		method('public onServiceDisconnected(Landroid/content/ComponentName;)V', 'return-void') +
+		method('public execute(Ljava/lang/Runnable;)V', '
+iget-object v0, p0, Lorg/vinix/service/Main;->worker:Landroid/os/Handler;
+invoke-virtual {v0, p1}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
+return-void') +
 		method('public onServiceConnected(Landroid/content/ComponentName;Landroid/os/IBinder;)V', '
+iget v2, p0, Lorg/vinix/service/Main;->callbacks:I
 invoke-static {}, Landroid/os/Looper;->myLooper()Landroid/os/Looper;
 move-result-object v0
 invoke-static {}, Landroid/os/Looper;->getMainLooper()Landroid/os/Looper;
 move-result-object v1
+if-nez v2, :executor
 if-ne v0, v1, :bad
+goto :identity
+:executor
+if-eq v0, v1, :bad
+invoke-static {}, Ljava/lang/Thread;->currentThread()Ljava/lang/Thread;
+move-result-object v0
+invoke-virtual {v0}, Ljava/lang/Thread;->getName()Ljava/lang/String;
+move-result-object v0
+const-string v1, "service-executor"
+invoke-virtual {v1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v0
+if-eqz v0, :bad
+:identity
 if-eqz p2, :bad
 invoke-virtual {p1}, Landroid/content/ComponentName;->getPackageName()Ljava/lang/String;
 move-result-object v0
@@ -148,27 +204,60 @@ const-string v1, "org.vinix.service.companion"
 invoke-virtual {v1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 move-result v0
 if-eqz v0, :bad
-iget-object v0, p0, Lorg/vinix/service/Main;->label:Landroid/widget/TextView;
-const-string v1, "Companion service startup passed"
-invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
-sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread"
-invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+if-nez v2, :passed
+const/4 v0, 1
+iput v0, p0, Lorg/vinix/service/Main;->callbacks:I
+new-instance v0, Landroid/os/HandlerThread;
+const-string v1, "service-executor"
+invoke-direct {v0, v1}, Landroid/os/HandlerThread;-><init>(Ljava/lang/String;)V
+invoke-virtual {v0}, Ljava/lang/Thread;->start()V
+invoke-virtual {v0}, Landroid/os/HandlerThread;->getLooper()Landroid/os/Looper;
+move-result-object v0
+new-instance v1, Landroid/os/Handler;
+invoke-direct {v1, v0}, Landroid/os/Handler;-><init>(Landroid/os/Looper;)V
+iput-object v1, p0, Lorg/vinix/service/Main;->worker:Landroid/os/Handler;
+new-instance v0, Landroid/content/Intent;
+invoke-direct {v0}, Landroid/content/Intent;-><init>()V
+const-string v1, "org.vinix.service.companion"
+const-string v2, "org.vinix.service.Worker"
+invoke-virtual {v0, v1, v2}, Landroid/content/Intent;->setClassName(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;
+const/4 v1, 1
+invoke-virtual {p0, v0, v1, p0, p0}, Landroid/content/Context;->bindService(Landroid/content/Intent;ILjava/util/concurrent/Executor;Landroid/content/ServiceConnection;)Z
+move-result v0
+if-eqz v0, :bad
+return-void
+:passed
+new-instance v0, Landroid/os/Handler;
+invoke-static {}, Landroid/os/Looper;->getMainLooper()Landroid/os/Looper;
+move-result-object v1
+invoke-direct {v0, v1}, Landroid/os/Handler;-><init>(Landroid/os/Looper;)V
+invoke-virtual {v0, p0}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
 return-void
 :bad
 new-instance v0, Ljava/lang/AssertionError;
 const-string v1, "companion service binding callback"
 invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
-throw v0'))!
+throw v0') +
+		method('public run()V', '
+iget-object v0, p0, Lorg/vinix/service/Main;->label:Landroid/widget/TextView;
+const-string v1, "Companion service startup passed"
+invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread provider-context provider-resources attach-once bind-executor-thread"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void'))!
 	for name in ['client', 'companion'] {
 		dir := out + '/' + name
+		os.mkdir_all(dir + '/res/values')!
+		os.write_file(dir + '/res/values/strings.xml', '<resources><string name="provider_owner">' + name + ' resource</string></resources>')!
+		checked([aapt, 'compile', '--dir', dir + '/res', '-o', dir + '/resources.zip'])
 		application := if name == 'client' {
 			'<application android:label="Service fixture"><activity android:name="org.vinix.service.Main" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application>'
 		} else {
 			'<application android:name="org.vinix.service.App" android:label="Companion fixture"><service android:name="org.vinix.service.Worker" android:exported="true"/><provider android:name="org.vinix.service.Provider" android:authorities="fixture.service"/></application>'
 		}
 		os.write_file(dir + '/AndroidManifest.xml', '<?xml version="1.0"?><manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.vinix.service.' + name + '" android:versionCode="1"><uses-sdk android:minSdkVersion="23"/>' + application + '</manifest>')!
-		checked([aapt, 'link', '-I', resources, '--manifest', dir + '/AndroidManifest.xml', '-o',
+		checked([aapt, 'link', '-I', resources, dir + '/resources.zip', '--manifest', dir + '/AndroidManifest.xml', '-o',
 			dir + '/unsigned.apk'])
 		checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', dir + '/smali', '-o',
 			dir + '/classes.dex'])

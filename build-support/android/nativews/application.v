@@ -133,7 +133,6 @@ fn ws_install_providers(e voidptr, loaded voidptr, pkg voidptr, application void
 			args[0] = Value{ l: application }
 			args[1] = Value{ l: info }
 			call(e, provider, c'android/content/ContentProvider', c'attachInfo', c'(Landroid/content/Context;Landroid/content/pm/ProviderInfo;)V', args)
-			if !pending(e) { boolean(e, provider, c'android/content/ContentProvider', c'onCreate', c'()Z', nil) }
 			pop_frame(e)
 		}
 	}
