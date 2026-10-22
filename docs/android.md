@@ -161,6 +161,11 @@ contents and certificates. The signed `tests/native-android-ws/digests-fixture.v
 guest regression compares known vectors and Bouncy Castle results and checks
 streaming, byte buffers, cloning, reset, invalid input and native handle cleanup.
 
+Wi-Fi scanning returns unavailable with empty results. The RTT API type resolves
+while its service and hardware feature remain absent. The signed Wi-Fi fixture
+checks both service lookup forms and these capability contracts. Android
+companions see Vinix's single foreground user through `ActivityManager.getCurrentUser()`.
+
 These application checks do not establish complete runtime conformance or
 mobile hardware support. The preserved runtime still fails the newer
 `ANDROID-ATFORK-FAIL Android ABI exports` preflight. Rebuild matching overlays

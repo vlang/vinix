@@ -6,6 +6,9 @@ import os
 fn framework_activity_manager(smali string) ! {
  path := smali + '/android/app/ActivityManager.smali'
  mut text := os.read_file(path)!
+ // Android companions share Vinix's single foreground Android user.
+ text = framework_replace_method(text, 'getCurrentUser()I',
+  '.method public static getCurrentUser()I\n.locals 1\ninvoke-static {}, Landroid/os/UserHandle;->myUserId()I\nmove-result v0\nreturn v0\n.end method')!
  for signature in ['getUidImportance(I)I', 'getMyMemoryState(Landroid/app/ActivityManager$RunningAppProcessInfo;)V', 'getRunningAppProcesses()Ljava/util/List;'] {
   text = framework_replace_method(text, signature, '.method public ' + if signature.starts_with('getMy') { 'static ' } else { '' } + 'native ' + signature + '\n.end method')!
  }

@@ -58,8 +58,29 @@ if-nez v1, :bad
 invoke-virtual {v0}, Landroid/net/wifi/WifiManager;->isScanAlwaysAvailable()Z
 move-result v1
 if-nez v1, :bad
+const-string v0, "wifirtt"
+invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v0
+check-cast v0, Landroid/net/wifi/rtt/WifiRttManager;
+if-nez v0, :bad
+const-class v0, Landroid/net/wifi/rtt/WifiRttManager;
+invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/Class;)Ljava/lang/Object;
+move-result-object v0
+check-cast v0, Landroid/net/wifi/rtt/WifiRttManager;
+if-nez v0, :bad
+invoke-virtual {p0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
+move-result-object v0
+const-string v1, "android.hardware.wifi.rtt"
+invoke-virtual {v0, v1}, Landroid/content/pm/PackageManager;->hasSystemFeature(Ljava/lang/String;)Z
+move-result v1
+if-nez v1, :bad
+invoke-static {}, Landroid/app/ActivityManager;->getCurrentUser()I
+move-result v0
+invoke-static {}, Landroid/os/UserHandle;->myUserId()I
+move-result v1
+if-ne v0, v1, :bad
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "WIFI-SCAN-PASS unavailable scan-rejected empty-results independent-snapshots"
+const-string v1, "WIFI-SCAN-PASS unavailable scan-rejected empty-results independent-snapshots rtt-type-resolved rtt-service-absent rtt-feature-absent current-user"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 new-instance v0, Landroid/widget/TextView;
 invoke-direct {v0, p0}, Landroid/widget/TextView;-><init>(Landroid/content/Context;)V
