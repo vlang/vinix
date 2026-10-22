@@ -117,6 +117,10 @@ Local Binder objects retain their interface owner and descriptor. Transactions
 dispatch on the calling thread, rewind request/reply Parcels and propagate local
 exceptions. Identity comparisons distinguish different Binder objects. This
 in-process dispatch does not implement cross-process Binder transport.
+Binder accepts a process-wide ProxyTransactListener, including replacement and
+removal. Its three-argument default callback delegates to the two-argument API.
+Local Binder calls do not trigger proxy listeners, matching Android; remote
+proxy notification requires the still-unimplemented remote Binder transport.
 Parcel retains local Binder references with their data offsets, including
 interface writes, array/list elements and copied ranges. Overwrites, truncation,
 unmarshalling and recycling release affected references. Raw marshalling rejects

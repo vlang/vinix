@@ -8,6 +8,18 @@ fn framework_local_binder(smali string) ! {
 	path := smali + '/android/os/Binder.smali'
 	mut text := os.read_file(path)!
 	text += '\n.field private vinixOwner:Landroid/os/IInterface;\n.field private vinixDescriptor:Ljava/lang/String;\n'
+	// Android observes BinderProxy calls only. Local Binder.transact must not
+	// notify this listener; this runtime currently has no remote Binder transport.
+	text += '\n.field private static volatile vinixProxyTransactListener:Landroid/os/Binder$ProxyTransactListener;\n' +
+		'.method public static setProxyTransactListener(Landroid/os/Binder$ProxyTransactListener;)V\n.locals 0\n' +
+		'sput-object p0, Landroid/os/Binder;->vinixProxyTransactListener:Landroid/os/Binder$ProxyTransactListener;\nreturn-void\n.end method\n'
+	os.write_file(smali + '/android/os/Binder$ProxyTransactListener.smali',
+		'.class public interface abstract Landroid/os/Binder$ProxyTransactListener;\n.super Ljava/lang/Object;\n' +
+		'.method public abstract onTransactStarted(Landroid/os/IBinder;I)Ljava/lang/Object;\n.end method\n' +
+		'.method public abstract onTransactEnded(Ljava/lang/Object;)V\n.end method\n' +
+		'.method public onTransactStarted(Landroid/os/IBinder;II)Ljava/lang/Object;\n.locals 1\n' +
+		'invoke-interface {p0, p1, p2}, Landroid/os/Binder$ProxyTransactListener;->onTransactStarted(Landroid/os/IBinder;I)Ljava/lang/Object;\n' +
+		'move-result-object v0\nreturn-object v0\n.end method\n')!
 	methods := {
 		'attachInterface(Landroid/os/IInterface;Ljava/lang/String;)V': '.locals 0
 iput-object p1, p0, Landroid/os/Binder;->vinixOwner:Landroid/os/IInterface;

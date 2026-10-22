@@ -18,6 +18,53 @@ fn check_stage(expected int, next int) string {
 		'const/4 v0, ${next}\nsput v0, Lorg/vinix/service/App;->stage:I\n'
 }
 
+fn proxy_listener_checks() string {
+	return 'new-instance v0, Lorg/vinix/service/ProxyListener;
+invoke-direct {v0}, Lorg/vinix/service/ProxyListener;-><init>()V
+new-instance v1, Landroid/os/Binder;
+invoke-direct {v1}, Landroid/os/Binder;-><init>()V
+const/4 v2, 7
+const/4 v3, 1
+invoke-interface {v0, v1, v2, v3}, Landroid/os/Binder$ProxyTransactListener;->onTransactStarted(Landroid/os/IBinder;II)Ljava/lang/Object;
+move-result-object v4
+if-ne v4, v0, :bad
+iget v4, v0, Lorg/vinix/service/ProxyListener;->code:I
+if-ne v4, v2, :bad
+iget-object v4, v0, Lorg/vinix/service/ProxyListener;->binder:Landroid/os/IBinder;
+if-ne v4, v1, :bad
+invoke-interface {v0, v0}, Landroid/os/Binder$ProxyTransactListener;->onTransactEnded(Ljava/lang/Object;)V
+iget-object v4, v0, Lorg/vinix/service/ProxyListener;->session:Ljava/lang/Object;
+if-ne v4, v0, :bad
+invoke-static {v0}, Landroid/os/Binder;->setProxyTransactListener(Landroid/os/Binder$ProxyTransactListener;)V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkBinder()V
+iget v4, v0, Lorg/vinix/service/ProxyListener;->started:I
+if-ne v4, v3, :bad
+iget v4, v0, Lorg/vinix/service/ProxyListener;->ended:I
+if-ne v4, v3, :bad
+new-instance v1, Lorg/vinix/service/ProxyListener;
+invoke-direct {v1}, Lorg/vinix/service/ProxyListener;-><init>()V
+invoke-static {v1}, Landroid/os/Binder;->setProxyTransactListener(Landroid/os/Binder$ProxyTransactListener;)V
+const/4 v2, 0
+invoke-static {v2}, Landroid/os/Binder;->setProxyTransactListener(Landroid/os/Binder$ProxyTransactListener;)V
+return-void
+:bad
+const/4 v0, 0
+invoke-static {v0}, Landroid/os/Binder;->setProxyTransactListener(Landroid/os/Binder$ProxyTransactListener;)V
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "proxy listener default overload and local Binder exclusion"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+}
+
+fn proxy_listener_class(dir string) ! {
+	os.write_file(dir + '/ProxyListener.smali', '.class public Lorg/vinix/service/ProxyListener;\n.super Ljava/lang/Object;\n' +
+		'.implements Landroid/os/Binder$ProxyTransactListener;\n.field public started:I\n.field public ended:I\n.field public code:I\n' +
+		'.field public binder:Landroid/os/IBinder;\n.field public session:Ljava/lang/Object;\n' +
+		method('public constructor <init>()V', 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void') +
+		method('public onTransactStarted(Landroid/os/IBinder;I)Ljava/lang/Object;', 'iget v0, p0, Lorg/vinix/service/ProxyListener;->started:I\nadd-int/lit8 v0, v0, 1\niput v0, p0, Lorg/vinix/service/ProxyListener;->started:I\niput p2, p0, Lorg/vinix/service/ProxyListener;->code:I\niput-object p1, p0, Lorg/vinix/service/ProxyListener;->binder:Landroid/os/IBinder;\nreturn-object p0') +
+		method('public onTransactEnded(Ljava/lang/Object;)V', 'iget v0, p0, Lorg/vinix/service/ProxyListener;->ended:I\nadd-int/lit8 v0, v0, 1\niput v0, p0, Lorg/vinix/service/ProxyListener;->ended:I\niput-object p1, p0, Lorg/vinix/service/ProxyListener;->session:Ljava/lang/Object;\nreturn-void'))!
+}
+
 fn geofence_checks() string {
 	return 'new-instance v0, Lorg/vinix/service/GeofenceProvider;
 invoke-direct {v0}, Lorg/vinix/service/GeofenceProvider;-><init>()V
@@ -1168,6 +1215,7 @@ return-object v0'))!
 		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/app/Activity;-><init>()V\nreturn-void') +
 		method('private checkComponents()V', component_checks()) +
 		method('private checkBinder()V', binder_checks()) +
+		method('private checkProxyListener()V', proxy_listener_checks()) +
 		method('private checkParcel()V', parcel_checks()) +
 		method('private checkTypedParcel()V', typed_parcel_checks()) +
 		method('private checkGeofence()V', geofence_checks()) +
@@ -1215,7 +1263,7 @@ throw v0') +
 		method('public onCreate(Landroid/os/Bundle;)V', '
 invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkComponents()V
-invoke-direct {p0}, Lorg/vinix/service/Main;->checkBinder()V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkProxyListener()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkParcel()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkTypedParcel()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkGeofence()V
@@ -1344,6 +1392,7 @@ return-void'))!
 	importance_listener(out + '/client/smali/org/vinix/service')!
 	typed_parcel_classes(out + '/client/smali/org/vinix/service')!
 	geofence_classes(out + '/client/smali/org/vinix/service')!
+	proxy_listener_class(out + '/client/smali/org/vinix/service')!
 	for name in ['client', 'companion'] {
 		dir := out + '/' + name
 		os.mkdir_all(dir + '/res/values')!
