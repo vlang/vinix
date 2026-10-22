@@ -16564,20 +16564,52 @@ branch island `0x107c28d5c` to caller `0x100073c74`. The caller supplies algorit
 at metadata plus 80 bytes. This inspection executes no application code; the
 launch probe has not reached this metadata update in Fortnite.
 
+All nine native Swift `swift_weak*` exports now resolve from Swift Core. They
+share the unknown-object weak registry and zeroing hooks, while accepting only
+registered native Swift owners and supported native immortal objects. Native
+operations validate both an existing destination and its new referent before
+mutation; Objective-C owners, classes, tagged pointers and unregistered pointers
+are rejected without reading their object headers. Native and unknown-object
+operations can copy, move, load and destroy each other's cells for native owners.
+Both families preserve self copy/take assignment, matching native Swift.
+
+The existing fixture exercises both families:
+
+```sh
+v run tests/ios/native-checks.v build-swift-unknown-weak
+```
+
+Evidence is retained under `build/ios/fortnite/swift-weak-checks`. Native Swift
+comparisons cover all eighteen exports, destination returns, self assignment,
+retained loads, native/unknown-object interoperability, immortal storage and
+concurrent final release. Compatibility checks also cover rejection before
+mutation, guarded pointers, destructor reentry, explicit teardown and two drained
+runtime lifetimes. Eight normal/deterministic ASan/UBSan runs passed across the
+weak-reference, heap, deallocating-state and supplied-storage fixtures. The ARM64
+fixture, launch probe and both import audits passed their checks. Eight compressed
+binary/generated-C pairs retain the tested paths; 989 source/toolchain/runtime
+input hashes remained unchanged through validation.
+
+Static inspection traces `_swift_weakInit` from GOT cell `0x10dc9bc88` through
+stub `0x10c63edfc` and branch island `0x107c28b94` to caller `0x100072628`.
+The caller supplies an eight-byte stack cell and the owner returned by an earlier
+call. This inspection executes no application code; the launch probe has not
+reached this weak-reference initialization in Fortnite.
+
 The launch probe now stops at required Swift Core import
-`_swift_weakInit`, before application entry. Fortnite remains unplayable.
+`_swift_willThrow`, before application entry. Fortnite remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,993 | 168 | 78 |
+| Fortnite executable | 1,995 | 166 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,833 | 171 | 114 |
+| All images | 2,835 | 169 | 114 |
 
-The C++/GLES/Text variant reports 2,847 resolved imports, 157 unresolved strong
+The C++/GLES/Text variant reports 2,849 resolved imports, 155 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

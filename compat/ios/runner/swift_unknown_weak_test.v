@@ -15,8 +15,10 @@ type WeakDestroy = fn (u64)
 type WeakAllocate = fn (i64, u64) SwiftArrayAllocation
 struct WeakApi {
 	native bool
+	native_only bool
 	entries [9]u64
 	integer u64
+	empty_array u64
 	@[required]
 	allocate WeakAllocate
 	@[required]
@@ -27,22 +29,23 @@ struct WeakApi {
 fn weak_send(owner u64, selector &char) u64 {
 	return unsafe { WeakBinary(C.dlsym(voidptr(-2), c'objc_msgSend'))(owner, u64(C.sel_registerName(selector))) }
 }
-fn weak_api(native bool) WeakApi {
-	mut entries := [13]u64{}
+fn weak_api(native bool, native_only bool) WeakApi {
+	mut entries := [14]u64{}
 	for i, name in ['_swift_unknownObjectWeakInit', '_swift_unknownObjectWeakAssign',
 		'_swift_unknownObjectWeakCopyInit', '_swift_unknownObjectWeakTakeInit',
 		'_swift_unknownObjectWeakCopyAssign', '_swift_unknownObjectWeakTakeAssign',
 		'_swift_unknownObjectWeakLoadStrong', '_swift_unknownObjectWeakTakeStrong',
 		'_swift_unknownObjectWeakDestroy', '_$ss27_allocateUninitializedArrayySayxG_BptBwlF',
-		'_$sSiN', '_swift_unknownObjectRelease', '_swift_retainCount']! {
+		'_$sSiN', '_swift_unknownObjectRelease', '_swift_retainCount', '__swiftEmptyArrayStorage']! {
+		symbol := if native_only { name.replace('_swift_unknownObjectWeak', '_swift_weak') } else { name }
 		if native {
 			lib := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', C.RTLD_NOW); assert lib != unsafe { nil }
-			entries[i] = u64(C.dlsym(lib, name[1..].str))
-		} else if i != 12 { entries[i] = runtime_symbol('/usr/lib/swift/libswiftCore.dylib', name) or { panic(err) } }
+			entries[i] = u64(C.dlsym(lib, symbol[1..].str))
+		} else if i != 12 { entries[i] = runtime_symbol('/usr/lib/swift/libswiftCore.dylib', symbol) or { panic(err) } }
 		assert entries[i] != 0 || (!native && i == 12)
 	}
 	mut operations := [9]u64{}; for i in 0 .. 9 { operations[i] = entries[i] }
-	return WeakApi{ native: native, entries: operations, integer: entries[10],
+	return WeakApi{ native: native, native_only: native_only, entries: operations, integer: entries[10], empty_array: entries[13],
 		allocate: unsafe { WeakAllocate(voidptr(entries[9])) }, release: unsafe { WeakDestroy(voidptr(entries[11])) },
 		retain_count: unsafe { WeakUnary(voidptr(entries[12])) } }
 }
@@ -83,8 +86,11 @@ fn weak_ownership(api WeakApi, native_heap bool) {
 		api.release(owner); assert api.refs(owner, native_heap) == 1
 	}
 	api.binary(4, src, src) // Self copy assignment preserves ownership.
-	other := api.owner(!native_heap)
-	api.binary(1, dst, other); assert api.refs(other, !native_heap) == 1
+	api.binary(5, src, src) // Self take assignment also preserves ownership.
+	assert api.load(src, false) == owner; api.release(owner)
+	other_native := api.native_only || !native_heap
+	other := api.owner(other_native)
+	api.binary(1, dst, other); assert api.refs(other, other_native) == 1
 	api.binary(4, dst, src); api.release(other)
 	assert api.load(dst, false) == owner; api.release(owner)
 	api.destroy(dst)
@@ -125,6 +131,11 @@ fn weak_empty(api WeakApi) {
 	// Valid zero-initialized global weak storage needs no separate init call.
 	api.binary(4, dst, src); assert api.load(dst, false) == 0
 	api.destroy(dst); api.destroy(src)
+	api.binary(0, src, api.empty_array); api.binary(2, dst, src)
+	assert api.load(src, false) == api.empty_array; api.release(api.empty_array)
+	api.destroy(src)
+	assert api.load(dst, true) == api.empty_array; api.release(api.empty_array)
+	if api.native_only { return }
 	mut cls := u64(0)
 	$if macos { if api.native { cls = u64(C.objc_getClass(c'NSObject')) } }
 	if !api.native { cls = ios_runtime.names['NSObject'] }
@@ -158,15 +169,17 @@ fn weak_heap_callback(owner u64) {
 }
 fn weak_lifetimes(api WeakApi) {
 	mut word := u64(0); location := u64(unsafe { &word })
-	cls := objc_allocate_class(ios_runtime.names['NSObject'], c'VinixUnknownWeakReentry', 0)
-	assert cls != 0; objc_register_class(cls)
-	objc_replace_method(cls, objc_selector(c'dealloc'), u64(unsafe { voidptr(weak_reentry_dealloc) }), c'v16@0:8')
-	mut state := WeakReentry{ location: location }; owner := objc_allocate(cls); obj_header(owner).tag = i64(unsafe { &state })
-	api.binary(0, location, owner); api.release(owner); assert state.calls == 1; api.destroy(location)
-	mut bytes := [64]u64{}; borrowed := u64(unsafe { &bytes[0] })
-	assert objc_construct_instance(ios_runtime.names['NSObject'], borrowed) == borrowed
-	api.binary(0, location, borrowed); assert objc_destruct_instance(borrowed) == borrowed
-	assert api.load(location, false) == 0; api.destroy(location)
+	if !api.native_only {
+		cls := objc_allocate_class(ios_runtime.names['NSObject'], c'VinixUnknownWeakReentry', 0)
+		assert cls != 0; objc_register_class(cls)
+		objc_replace_method(cls, objc_selector(c'dealloc'), u64(unsafe { voidptr(weak_reentry_dealloc) }), c'v16@0:8')
+		mut state := WeakReentry{ location: location }; owner := objc_allocate(cls); obj_header(owner).tag = i64(unsafe { &state })
+		api.binary(0, location, owner); api.release(owner); assert state.calls == 1; api.destroy(location)
+		mut bytes := [64]u64{}; borrowed := u64(unsafe { &bytes[0] })
+		assert objc_construct_instance(ios_runtime.names['NSObject'], borrowed) == borrowed
+		api.binary(0, location, borrowed); assert objc_destruct_instance(borrowed) == borrowed
+		assert api.load(location, false) == 0; api.destroy(location)
+	}
 	page := usize(C.getpagesize())
 	code := u64(C.mmap(unsafe { nil }, page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)); assert code != u64(-1)
 	for i, instruction in [u32(0xaa1403e0), 0x58000070, 0xd61f0200, 0xd503201f]! { write32(code + u64(i * 4), instruction) }
@@ -197,40 +210,90 @@ fn weak_rejections(api WeakApi) {
 	protected := u64(C.mmap(unsafe { nil }, page, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)); assert protected != u64(-1)
 	mut word := u64(0x12345678); location := u64(unsafe { &word })
 	for owner in [u64(1), 7, protected, ~u64(0) >> 1]! {
-		if _ := swift_unknown_weak_update_checked(location, 0, owner, .initialize) { assert false }
+		if _ := swift_weak_update_checked(location, 0, owner, .initialize, api.native_only) { assert false }
 		assert word == 0x12345678 && location !in ios_runtime.swift_unknown_weak
 	}
 	for bad in [u64(0), 1, 7, ~u64(0) - 7]! { if _ := swift_unknown_weak_address(bad) { assert false } }
-	if _ := swift_unknown_weak_load_checked(location, false) { assert false }
-	if _ := swift_unknown_weak_destroy_checked(location) { assert false }
+	if _ := swift_weak_load_checked(location, false, api.native_only) { assert false }
+	if _ := swift_weak_destroy_checked(location, api.native_only) { assert false }
 	api.binary(0, location, 0)
-	if _ := swift_unknown_weak_update_checked(location, 0, 0, .initialize) { assert false }
-	if _ := swift_unknown_weak_update_checked(location, location, 0, .take_assign) { assert false }
+	if _ := swift_weak_update_checked(location, 0, 0, .initialize, api.native_only) { assert false }
+	api.binary(5, location, location)
 	word = protected
-	if _ := swift_unknown_weak_load_checked(location, false) { assert false }
+	if _ := swift_weak_load_checked(location, false, api.native_only) { assert false }
 	word = 0; api.destroy(location)
+	if api.native_only {
+		objc_owner := objc_allocate(ios_runtime.names['NSObject'])
+		mut other := u64(0); source := u64(unsafe { &other })
+		swift_unknown_weak_initialize(source, objc_owner)
+		for object in [objc_owner, ios_runtime.names['NSObject'], u64(0x8000000000000000)]! {
+			if _ := swift_weak_update_checked(location, 0, object, .initialize, true) { assert false }
+			assert word == 0 && location !in ios_runtime.swift_unknown_weak
+			api.binary(0, location, 0)
+			if _ := swift_weak_update_checked(location, 0, object, .assign, true) { assert false }
+			assert word == 0; api.destroy(location)
+		}
+		for operation in [SwiftUnknownWeakOperation.copy_initialize, .take_initialize, .copy_assign, .take_assign]! {
+			initializing := operation in [.copy_initialize, .take_initialize]
+			if !initializing { api.binary(0, location, 0) }
+			if _ := swift_weak_update_checked(location, source, 0, operation, true) { assert false }
+			assert word == 0 && other == objc_owner
+			assert (location in ios_runtime.swift_unknown_weak) == !initializing
+			if !initializing { api.destroy(location) }
+			// Native assignment must reject an old Objective-C destination too.
+			if !initializing {
+				api.binary(0, location, 0)
+				if _ := swift_weak_update_checked(source, location, 0, operation, true) { assert false }
+				assert other == objc_owner && word == 0; api.destroy(location)
+			}
+		}
+		if _ := swift_weak_update_checked(source, 0, 0, .assign, true) { assert false }
+		if _ := swift_weak_update_checked(source, source, 0, .take_assign, true) { assert false }
+		if _ := swift_weak_load_checked(source, false, true) { assert false }
+		if _ := swift_weak_load_checked(source, true, true) { assert false }
+		if _ := swift_weak_destroy_checked(source, true) { assert false }
+		assert other == objc_owner && ios_runtime.swift_unknown_weak[source] == objc_owner
+		swift_unknown_weak_destroy(source); objc_release(objc_owner)
+	}
 	assert C.munmap(voidptr(protected), page) == 0
 	assert swift_unknown_weak_symbol('__swift_unknownObjectWeakInit') == none
+	assert swift_unknown_weak_symbol('__swift_weakInit') == none
 	if _ := runtime_symbol('/usr/lib/swift/libswiftFoundation.dylib', '_swift_unknownObjectWeakInit') { assert false }
+	if _ := runtime_symbol('/usr/lib/swift/libswiftFoundation.dylib', '_swift_weakInit') { assert false }
 }
 fn weak_suite(api WeakApi) {
 	for native_heap in [false, true]! {
+		if api.native_only && !native_heap { continue }
 		for _ in 0 .. 64 { weak_ownership(api, native_heap) }
 		weak_concurrent(api, native_heap)
 	}
 	weak_empty(api); weak_boundary(api)
 	if !api.native { weak_lifetimes(api); weak_rejections(api) }
 }
+fn weak_interoperability(native bool) {
+	native_api := weak_api(native, true); unknown_api := weak_api(native, false)
+	owner := native_api.owner(true)
+	mut source := u64(0); mut destination := u64(0)
+	src := u64(unsafe { &source }); dst := u64(unsafe { &destination })
+	native_api.binary(0, src, owner); unknown_api.binary(2, dst, src)
+	assert unknown_api.load(dst, false) == owner; native_api.release(owner)
+	native_api.binary(5, src, dst); unknown_api.binary(0, dst, 0)
+	unknown_api.binary(4, dst, src); native_api.release(owner)
+	assert native_api.load(dst, false) == 0 && unknown_api.load(src, false) == 0
+	native_api.destroy(dst); unknown_api.destroy(src)
+}
 fn test_swift_unknown_weak() {
 	$if macos {
-		weak_suite(weak_api(true))
-		println('IOS-SWIFT-UNKNOWN-WEAK-NATIVE: all nine exports, destination returns, cross-domain copy/move, retained loads, zeroing, guarded cells and concurrent release')
+		weak_suite(weak_api(true, false)); weak_suite(weak_api(true, true))
+		weak_interoperability(true)
+		println('IOS-SWIFT-UNKNOWN-WEAK-NATIVE: all eighteen native/unknown-object exports, destination returns, self assignments, cross-domain copy/move, retained loads, zeroing, guarded cells and concurrent release')
 	}
 	for _ in 0 .. 2 {
-		objc_start(); weak_suite(weak_api(false))
+		objc_start(); weak_suite(weak_api(false, false)); weak_suite(weak_api(false, true))
+		weak_interoperability(false)
 		assert ios_runtime.swift_unknown_weak.len == 0 && ios_runtime.swift_heap.len == 0
 		assert ios_runtime.swift_arrays.len == 0 && ios_runtime.live == 0
 		objc_stop(); assert ios_runtime.swift_unknown_weak.len == 0
 	}
-	println('IOS-SWIFT-UNKNOWN-WEAK: native parity, nine exports, nonowning copies/moves, retained loads/takes, zeroing before destructor reentry, explicit teardown, guarded pointers, eight workers and two drained lifetimes')
+	println('IOS-SWIFT-UNKNOWN-WEAK: native parity, eighteen exports, nonowning copies/moves, self assignments, retained loads/takes, zeroing before destructor reentry, explicit teardown, guarded native-only pointers, eight workers and two drained lifetimes')
 }

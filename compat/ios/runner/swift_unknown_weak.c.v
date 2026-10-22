@@ -14,7 +14,7 @@ enum SwiftUnknownWeakOperation {
 }
 
 struct SwiftUnknownWeakFailure {}
-fn (_ &SwiftUnknownWeakFailure) msg() string { return 'iOS: invalid or unsupported Swift unknown-object weak reference' }
+fn (_ &SwiftUnknownWeakFailure) msg() string { return 'iOS: invalid or unsupported Swift weak reference' }
 fn (_ &SwiftUnknownWeakFailure) code() int { return 1 }
 __global swift_unknown_weak_failure_value = SwiftUnknownWeakFailure{}
 fn swift_unknown_weak_failure() IError { return unsafe { &swift_unknown_weak_failure_value } }
@@ -36,13 +36,23 @@ fn swift_unknown_weak_read_locked(location u64) !u64 {
 	return 0
 }
 
-fn swift_unknown_weak_immortal_locked(object u64) bool {
-	return object == 0 || object >> 63 != 0 || object in ios_runtime.classes
-		|| object in ios_runtime.constants || object == ios_runtime.swift_empty_array
+fn swift_weak_native_immortal_locked(object u64) bool {
+	return object == 0 || object == ios_runtime.swift_empty_array
 		|| object == ios_runtime.swift_empty_set || swift_dictionary_empty_locked(object)
 		|| swift_json_decoder_empty_locked(object) || swift_json_encoder_empty_locked(object)
 		|| swift_main_actor_is_singleton_locked(object) || swift_main_executor_is_singleton_locked(object)
 		|| swift_static_object_registered_locked(object)
+}
+
+fn swift_unknown_weak_immortal_locked(object u64) bool {
+	return swift_weak_native_immortal_locked(object) || object >> 63 != 0
+		|| object in ios_runtime.classes || object in ios_runtime.constants
+}
+
+fn swift_weak_require_native_locked(object u64) ! {
+	if !swift_weak_native_immortal_locked(object) && !swift_unknown_weak_native_locked(object) {
+		return swift_unknown_weak_failure()
+	}
 }
 
 fn swift_unknown_weak_native_locked(object u64) bool {
@@ -82,6 +92,10 @@ fn swift_unknown_weak_retire_locked(object u64) {
 }
 
 fn swift_unknown_weak_update_checked(destination u64, source u64, object u64, operation SwiftUnknownWeakOperation) !u64 {
+	return swift_weak_update_checked(destination, source, object, operation, false)
+}
+
+fn swift_weak_update_checked(destination u64, source u64, object u64, operation SwiftUnknownWeakOperation, native_only bool) !u64 {
 	swift_unknown_weak_address(destination)!
 	copying := operation in [.copy_initialize, .take_initialize, .copy_assign, .take_assign]
 	initializing := operation in [.initialize, .copy_initialize, .take_initialize]
@@ -92,9 +106,18 @@ fn swift_unknown_weak_update_checked(destination u64, source u64, object u64, op
 	if initializing {
 		// Initialization may receive arbitrary uninitialized bytes. Never read them.
 		if destination in ios_runtime.swift_unknown_weak { return swift_unknown_weak_failure() }
-	} else { swift_unknown_weak_read_locked(destination)! }
-	if copying && destination == source && (initializing || taking) { return swift_unknown_weak_failure() }
-	value := swift_unknown_weak_live_locked(if copying { swift_unknown_weak_read_locked(source)! } else { object })!
+	} else {
+		previous := swift_unknown_weak_read_locked(destination)!
+		if native_only { swift_weak_require_native_locked(previous)! }
+	}
+	if copying && destination == source {
+		if initializing { return swift_unknown_weak_failure() }
+		// Both native and unknown-object Swift copy/take assignment preserve self.
+		return destination
+	}
+	referent := if copying { swift_unknown_weak_read_locked(source)! } else { object }
+	if native_only { swift_weak_require_native_locked(referent)! }
+	value := swift_unknown_weak_live_locked(referent)!
 	swift_unknown_weak_write_locked(destination, value)
 	if taking {
 		ios_runtime.swift_unknown_weak.delete(source)
@@ -104,10 +127,16 @@ fn swift_unknown_weak_update_checked(destination u64, source u64, object u64, op
 }
 
 fn swift_unknown_weak_load_checked(location u64, taking bool) !u64 {
+	return swift_weak_load_checked(location, taking, false)
+}
+
+fn swift_weak_load_checked(location u64, taking bool, native_only bool) !u64 {
 	swift_unknown_weak_address(location)!
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
-	mut value := swift_unknown_weak_live_locked(swift_unknown_weak_read_locked(location)!)!
+	referent := swift_unknown_weak_read_locked(location)!
+	if native_only { swift_weak_require_native_locked(referent)! }
+	mut value := swift_unknown_weak_live_locked(referent)!
 	if !swift_unknown_weak_immortal_locked(value) {
 		if swift_unknown_weak_native_locked(value) {
 			// Retain under the same lock as final-release invalidation. Never
@@ -126,10 +155,15 @@ fn swift_unknown_weak_load_checked(location u64, taking bool) !u64 {
 }
 
 fn swift_unknown_weak_destroy_checked(location u64) ! {
+	swift_weak_destroy_checked(location, false)!
+}
+
+fn swift_weak_destroy_checked(location u64, native_only bool) ! {
 	swift_unknown_weak_address(location)!
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
-	swift_unknown_weak_read_locked(location)!
+	referent := swift_unknown_weak_read_locked(location)!
+	if native_only { swift_weak_require_native_locked(referent)! }
 	ios_runtime.swift_unknown_weak.delete(location)
 	unsafe { *(&u64(location)) = 0 }
 }
@@ -169,6 +203,15 @@ fn swift_unknown_weak_stop() {
 
 fn swift_unknown_weak_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_swift_weakInit' { u64(unsafe { voidptr(swift_weak_initialize) }) }
+		'_swift_weakAssign' { u64(unsafe { voidptr(swift_weak_assign) }) }
+		'_swift_weakLoadStrong' { u64(unsafe { voidptr(swift_weak_load) }) }
+		'_swift_weakTakeStrong' { u64(unsafe { voidptr(swift_weak_take) }) }
+		'_swift_weakDestroy' { u64(unsafe { voidptr(swift_weak_destroy) }) }
+		'_swift_weakCopyInit' { u64(unsafe { voidptr(swift_weak_copy_initialize) }) }
+		'_swift_weakTakeInit' { u64(unsafe { voidptr(swift_weak_take_initialize) }) }
+		'_swift_weakCopyAssign' { u64(unsafe { voidptr(swift_weak_copy_assign) }) }
+		'_swift_weakTakeAssign' { u64(unsafe { voidptr(swift_weak_take_assign) }) }
 		'_swift_unknownObjectWeakInit' { u64(unsafe { voidptr(swift_unknown_weak_initialize) }) }
 		'_swift_unknownObjectWeakAssign' { u64(unsafe { voidptr(swift_unknown_weak_assign) }) }
 		'_swift_unknownObjectWeakLoadStrong' { u64(unsafe { voidptr(swift_unknown_weak_load) }) }
