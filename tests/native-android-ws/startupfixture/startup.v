@@ -16,6 +16,7 @@ pub fn install(output string, resources string) ! {
  install_view_configuration_probe(dir)!
  install_egl_probe(dir)!
  install_gles_probe(dir)!
+ install_gles_shader_probe(dir)!
  install_clock_probe(dir)!
  install_attachment_probe(dir)!
  install_drawable_probe(dir)!

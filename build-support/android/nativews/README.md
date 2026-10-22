@@ -70,6 +70,10 @@ renderer, and GLES20 error queries consume its actual error state. GLES20 intege
 queries copy renderer state into Java arrays or heap/direct IntBuffers, respect
 positions and limits, and reject undersized or read-only output. Variable format
 lists use the renderer's advertised element count.
+Java GLES20 scalar state, object and uniform calls use the same renderer. Shader
+source, compilation, linking, locations, status and compiler logs come from Mesa;
+the regression APK checks valid and invalid shaders, array offsets and object
+lifetimes through the Java APIs.
 Destruction retains a current window until every thread
 unbinds it. Readback preserves framebuffer and ES3 pixel-pack state. CPU and EGL
 producers cannot own the same window simultaneously.
