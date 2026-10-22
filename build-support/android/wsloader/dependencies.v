@@ -6,6 +6,11 @@ module wsloader
 
 fn C.dprintf(i32, &char, ...voidptr) i32
 
+@[export: 'vinix_ws_link_failure']
+pub fn link_failure(name &char, detail &char) {
+	C.dprintf(2, c'VINIX-ANDROID-LINK-FAIL library=%s error=%s\n', name, detail)
+}
+
 // Host dlopen succeeds without a Bionic soinfo. Neither kind of handle means
 // the dependency failed: preserve its linker error and reject the parent.
 @[export: 'vinix_ws_dependency_loaded']

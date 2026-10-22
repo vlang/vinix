@@ -87,6 +87,13 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 	tls_release := 'static void apkenv_free_info(soinfo *si)\n{'
 	if bridged.count(tls_release) != 1 { return error('unexpected Bionic TLS unload entry') }
 	bridged = bridged.replace(tls_release, tls_release + '\nvinix_ws_release_tls_descriptors(si);')
+	// Applications may catch the first dlopen failure and retry later. The
+	// upstream FLAG_ERROR cache then loses the actionable error. Emit it at
+	// the original failure, independently of verbose linker diagnostics.
+	link_failure := 'ERROR("failed to link %s\\n", si->name);'
+	if bridged.count(link_failure) != 1 { return error('unexpected Bionic link failure entry') }
+	bridged = bridged.replace(link_failure,
+		'vinix_ws_link_failure(si->name, apkenv_linker_get_error());\n' + link_failure)
 	os.write_file(linker, bridged)!
 	dlfcn := source + '/linker/dlfcn.c'
 	mut dynamic_text := os.read_file(dlfcn)!
@@ -108,6 +115,7 @@ pub fn build_native_bionic(output string, runtime string, compiler string, arch 
 		'extern int vinix_ws_copy_segments(int, const void *, size_t, uintptr_t, size_t, void **, uint32_t *, uint32_t *, uintptr_t *, unsigned *);\n' +
 		'extern int vinix_ws_finish_copy_segments(const void *, size_t, uintptr_t, size_t);\n' +
 		'extern int vinix_ws_dependency_loaded(void *, void *, const char *, const char *, const char *);\n' +
+		'extern void vinix_ws_link_failure(const char *, const char *);\n' +
 		'extern int vinix_ws_relocate_tls(uint32_t, uintptr_t *, void *, const void *, const char *, uintptr_t, size_t, size_t, void *(*)(void *, const char *, uintptr_t *), void *(*)(const void *));\n' +
 		'extern void vinix_ws_release_tls_descriptors(void *);\n' +
 		'extern void *vinix_ws_lookup_dependencies(void *, const char *, void **, size_t, void *(*)(void *, const char *));\n')!

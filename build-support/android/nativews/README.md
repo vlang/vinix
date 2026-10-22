@@ -35,6 +35,14 @@ hold a native reference until the last unlock. OpenSL ES uses the runtime's
 packaged audio provider. This is a limited NDK subset, not compatibility with
 arbitrary native APK libraries.
 
+The [NDK `ATrace` API](https://developer.android.com/ndk/reference/group/tracing)
+section, asynchronous section and counter entry points are
+available. `ATrace_isEnabled` returns false because this runtime has no Android
+trace session or trace sink; events are discarded without retaining names or
+allocating thread state. The bootstrap APK imports the real native symbols and
+checks disabled tracing with nested sections, concurrent threads and full-width
+cookies and counters. This does not provide trace collection.
+
 `libnativewindow.so` maps to a CPU surface producer in this backend. SurfaceView
 layout notifies its holder callbacks; acquired NDK windows retain their buffer
 queue, and Java Surfaces retain their owning view. RGBA locks expose real pixel
