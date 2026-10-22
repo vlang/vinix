@@ -72,6 +72,10 @@ pub fn write_framework_classes(smali string) ! {
  framework_power(smali)!
  framework_battery(smali)!
  framework_device_policy(smali)!
+ framework_sqlite_params(smali)!
+ framework_location_state(smali)!
+ framework_work_source(smali)!
+ framework_package_enumeration(smali)!
  framework_vibrator(smali)!
  framework_media_router(smali)!
  framework_account_listeners(smali)!

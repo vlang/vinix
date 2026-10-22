@@ -486,6 +486,443 @@ fn typed_parcel_classes(dir string) ! {
 		method('public createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;', 'new-instance v0, Lorg/vinix/service/ParcelValue;\ninvoke-direct {v0}, Lorg/vinix/service/ParcelValue;-><init>()V\ninvoke-virtual {p1}, Landroid/os/Parcel;->readInt()I\nmove-result v1\niput v1, v0, Lorg/vinix/service/ParcelValue;->value:I\ninvoke-virtual {p1}, Landroid/os/Parcel;->readInt()I\nreturn-object v0'))!
 }
 
+fn work_source_checks() string {
+	mut body := 'new-instance v0, Landroid/os/WorkSource;
+const/4 v1, 0
+invoke-direct {v0, v1}, Landroid/os/WorkSource;-><init>(Landroid/os/WorkSource;)V
+invoke-virtual {v0}, Landroid/os/WorkSource;->isEmpty()Z
+move-result v1
+if-eqz v1, :bad
+const/16 v1, 42
+const-string v2, "b"
+invoke-virtual {v0, v1, v2}, Landroid/os/WorkSource;->add(ILjava/lang/String;)Z
+move-result v3
+if-eqz v3, :bad
+invoke-virtual {v0, v1, v2}, Landroid/os/WorkSource;->add(ILjava/lang/String;)Z
+move-result v3
+if-nez v3, :bad
+const-string v2, "a"
+invoke-virtual {v0, v1, v2}, Landroid/os/WorkSource;->add(ILjava/lang/String;)Z
+const/4 v1, 7
+const-string v2, "c"
+invoke-virtual {v0, v1, v2}, Landroid/os/WorkSource;->add(ILjava/lang/String;)Z
+invoke-virtual {v0}, Landroid/os/WorkSource;->size()I
+move-result v1
+const/4 v2, 3
+if-ne v1, v2, :bad
+const/4 v1, 0
+invoke-virtual {v0, v1}, Landroid/os/WorkSource;->getUid(I)I
+move-result v1
+const/4 v2, 7
+if-ne v1, v2, :bad
+const/4 v1, 1
+invoke-virtual {v0, v1}, Landroid/os/WorkSource;->getName(I)Ljava/lang/String;
+move-result-object v1
+const-string v2, "a"
+invoke-virtual {v2, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v1
+if-eqz v1, :bad
+:mixed
+const/16 v1, 55
+invoke-virtual {v0, v1}, Landroid/os/WorkSource;->add(I)Z
+:mixed_end
+goto :bad
+.catch Ljava/lang/IllegalArgumentException; {:mixed .. :mixed_end} :mixed_caught
+:mixed_caught
+move-exception v1
+invoke-virtual {v0}, Landroid/os/WorkSource;->createWorkChain()Landroid/os/WorkSource$WorkChain;
+move-result-object v1
+const/16 v2, 100
+const-string v3, "caller"
+invoke-virtual {v1, v2, v3}, Landroid/os/WorkSource$WorkChain;->addNode(ILjava/lang/String;)Landroid/os/WorkSource$WorkChain;
+move-result-object v2
+if-ne v1, v2, :bad
+const/16 v2, 101
+const/4 v3, 0
+invoke-virtual {v1, v2, v3}, Landroid/os/WorkSource$WorkChain;->addNode(ILjava/lang/String;)Landroid/os/WorkSource$WorkChain;
+new-instance v2, Landroid/os/WorkSource;
+invoke-direct {v2, v0}, Landroid/os/WorkSource;-><init>(Landroid/os/WorkSource;)V
+invoke-virtual {v0, v2}, Landroid/os/WorkSource;->equals(Ljava/lang/Object;)Z
+move-result v3
+if-eqz v3, :bad
+invoke-virtual {v0}, Landroid/os/WorkSource;->hashCode()I
+move-result v3
+invoke-virtual {v2}, Landroid/os/WorkSource;->hashCode()I
+move-result v4
+if-ne v3, v4, :bad
+const/16 v3, 102
+const-string v4, "last"
+invoke-virtual {v1, v3, v4}, Landroid/os/WorkSource$WorkChain;->addNode(ILjava/lang/String;)Landroid/os/WorkSource$WorkChain;
+invoke-virtual {v0, v2}, Landroid/os/WorkSource;->equals(Ljava/lang/Object;)Z
+move-result v3
+if-nez v3, :bad
+invoke-virtual {v0, v2}, Landroid/os/WorkSource;->diff(Landroid/os/WorkSource;)Z
+move-result v3
+if-nez v3, :bad
+invoke-virtual {v2}, Landroid/os/WorkSource;->getWorkChains()Ljava/util/List;
+move-result-object v1
+const/4 v3, 0
+invoke-interface {v1, v3}, Ljava/util/List;->get(I)Ljava/lang/Object;
+move-result-object v1
+check-cast v1, Landroid/os/WorkSource$WorkChain;
+invoke-virtual {v1}, Landroid/os/WorkSource$WorkChain;->getSize()I
+move-result v3
+const/4 v4, 2
+if-ne v3, v4, :bad
+invoke-virtual {v1}, Landroid/os/WorkSource$WorkChain;->getUids()[I
+move-result-object v3
+const/4 v4, 0
+const/4 v5, 5
+aput v5, v3, v4
+invoke-virtual {v1}, Landroid/os/WorkSource$WorkChain;->getAttributionUid()I
+move-result v3
+const/16 v4, 100
+if-ne v3, v4, :bad
+invoke-virtual {v1}, Landroid/os/WorkSource$WorkChain;->getAttributionTag()Ljava/lang/String;
+move-result-object v3
+const-string v4, "caller"
+invoke-virtual {v4, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v3
+if-eqz v3, :bad
+invoke-direct {p0, v2}, Lorg/vinix/service/Main;->checkWorkParcel(Landroid/os/WorkSource;)V
+invoke-virtual {v2}, Landroid/os/WorkSource;->withoutNames()Landroid/os/WorkSource;
+move-result-object v1
+invoke-virtual {v1}, Landroid/os/WorkSource;->size()I
+move-result v3
+const/4 v4, 2
+if-ne v3, v4, :bad
+const/4 v3, 0
+invoke-virtual {v1, v3}, Landroid/os/WorkSource;->getName(I)Ljava/lang/String;
+move-result-object v3
+if-nez v3, :bad
+invoke-virtual {v0}, Landroid/os/WorkSource;->clear()V
+invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkWorkParcel(Landroid/os/WorkSource;)V
+invoke-virtual {v2}, Landroid/os/WorkSource;->size()I
+move-result v3
+const/4 v4, 3
+if-ne v3, v4, :bad
+invoke-virtual {v0, v2}, Landroid/os/WorkSource;->set(Landroid/os/WorkSource;)V
+invoke-virtual {v0, v2}, Landroid/os/WorkSource;->equals(Ljava/lang/Object;)Z
+move-result v3
+if-eqz v3, :bad
+const/4 v3, 0
+invoke-virtual {v0, v3}, Landroid/os/WorkSource;->set(Landroid/os/WorkSource;)V
+invoke-virtual {v0}, Landroid/os/WorkSource;->isEmpty()Z
+move-result v3
+if-eqz v3, :bad
+invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkWorkParcel(Landroid/os/WorkSource;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "WorkSource sorted set, deep copy, chains and parcel"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+	return body
+}
+
+fn work_parcel_checks() string {
+	// Decode the writer with raw Parcel APIs before exercising the CREATOR.
+	return 'invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;
+move-result-object v0
+const/4 v1, 0
+invoke-virtual {p1, v0, v1}, Landroid/os/WorkSource;->writeToParcel(Landroid/os/Parcel;I)V
+const/16 v2, 1234
+invoke-virtual {v0, v2}, Landroid/os/Parcel;->writeInt(I)V
+invoke-virtual {v0, v1}, Landroid/os/Parcel;->setDataPosition(I)V
+invoke-virtual {v0}, Landroid/os/Parcel;->readInt()I
+move-result v1
+invoke-virtual {p1}, Landroid/os/WorkSource;->size()I
+move-result v2
+if-ne v1, v2, :bad
+invoke-virtual {v0}, Landroid/os/Parcel;->createIntArray()[I
+move-result-object v2
+array-length v2, v2
+if-lt v2, v1, :bad
+invoke-virtual {v0}, Landroid/os/Parcel;->createStringArray()[Ljava/lang/String;
+invoke-virtual {v0}, Landroid/os/Parcel;->readInt()I
+move-result v1
+if-lez v1, :sentinel
+invoke-virtual {v0}, Landroid/os/Parcel;->readInt()I
+move-result v2
+if-ne v1, v2, :bad
+const-class v2, Landroid/os/WorkSource$WorkChain;
+invoke-virtual {v2}, Ljava/lang/Class;->getClassLoader()Ljava/lang/ClassLoader;
+move-result-object v2
+:chain
+invoke-virtual {v0, v2}, Landroid/os/Parcel;->readParcelable(Ljava/lang/ClassLoader;)Landroid/os/Parcelable;
+move-result-object v3
+instance-of v3, v3, Landroid/os/WorkSource$WorkChain;
+if-eqz v3, :bad
+add-int/lit8 v1, v1, -1
+if-nez v1, :chain
+:sentinel
+invoke-virtual {v0}, Landroid/os/Parcel;->readInt()I
+move-result v1
+const/16 v2, 1234
+if-ne v1, v2, :bad
+const/4 v1, 0
+invoke-virtual {v0, v1}, Landroid/os/Parcel;->setDataPosition(I)V
+sget-object v1, Landroid/os/WorkSource;->CREATOR:Landroid/os/Parcelable$Creator;
+invoke-interface {v1, v0}, Landroid/os/Parcelable$Creator;->createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;
+move-result-object v1
+invoke-virtual {p1, v1}, Landroid/os/WorkSource;->equals(Ljava/lang/Object;)Z
+move-result v1
+if-eqz v1, :bad
+invoke-virtual {v0}, Landroid/os/Parcel;->readInt()I
+move-result v1
+if-ne v1, v2, :bad
+invoke-virtual {v0}, Landroid/os/Parcel;->dataAvail()I
+move-result v1
+if-nez v1, :bad
+invoke-virtual {v0}, Landroid/os/Parcel;->recycle()V
+invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;
+move-result-object v0
+const/4 v1, 2
+invoke-virtual {v0, v1}, Landroid/os/Parcel;->writeInt(I)V
+const/4 v1, 3
+new-array v3, v1, [I
+const/4 v1, 0
+const/4 v4, 7
+aput v4, v3, v1
+const/4 v1, 1
+const/16 v4, 42
+aput v4, v3, v1
+const/4 v1, 2
+const/16 v4, 99
+aput v4, v3, v1
+invoke-virtual {v0, v3}, Landroid/os/Parcel;->writeIntArray([I)V
+const/4 v1, 0
+invoke-virtual {v0, v1}, Landroid/os/Parcel;->writeStringArray([Ljava/lang/String;)V
+invoke-virtual {v0, v1}, Landroid/os/Parcel;->writeInt(I)V
+invoke-virtual {v0, v2}, Landroid/os/Parcel;->writeInt(I)V
+invoke-virtual {v0, v1}, Landroid/os/Parcel;->setDataPosition(I)V
+sget-object v1, Landroid/os/WorkSource;->CREATOR:Landroid/os/Parcelable$Creator;
+invoke-interface {v1, v0}, Landroid/os/Parcelable$Creator;->createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;
+move-result-object v1
+check-cast v1, Landroid/os/WorkSource;
+invoke-virtual {v1}, Landroid/os/WorkSource;->size()I
+move-result v3
+const/4 v4, 2
+if-ne v3, v4, :bad
+const/4 v3, 1
+invoke-virtual {v1, v3}, Landroid/os/WorkSource;->get(I)I
+move-result v3
+const/16 v4, 42
+if-ne v3, v4, :bad
+const/4 v3, 0
+invoke-virtual {v1, v3}, Landroid/os/WorkSource;->getName(I)Ljava/lang/String;
+move-result-object v1
+if-nez v1, :bad
+invoke-virtual {v0}, Landroid/os/Parcel;->readInt()I
+move-result v1
+if-ne v1, v2, :bad
+invoke-virtual {v0}, Landroid/os/Parcel;->dataAvail()I
+move-result v1
+if-nez v1, :bad
+invoke-virtual {v0}, Landroid/os/Parcel;->recycle()V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "WorkSource independent Parcel decoder and complete consumption"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+}
+
+fn sqlite_params_checks() string {
+	return 'new-instance v0, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+invoke-direct {v0}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;-><init>()V
+new-instance v3, Lorg/vinix/service/DatabaseCallbacks;
+invoke-direct {v3}, Lorg/vinix/service/DatabaseCallbacks;-><init>()V
+invoke-virtual {v0, v3}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->setCursorFactory(Landroid/database/sqlite/SQLiteDatabase$CursorFactory;)Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+invoke-virtual {v0, v3}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->setErrorHandler(Landroid/database/DatabaseErrorHandler;)Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+const v1, 0x10000010
+invoke-virtual {v0, v1}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->setOpenFlags(I)Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+const/high16 v1, 0x20000000
+invoke-virtual {v0, v1}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->addOpenFlags(I)Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->isWriteAheadLoggingEnabled()Z
+move-result v2
+if-eqz v2, :bad
+invoke-virtual {v0, v1}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->removeOpenFlags(I)Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->build()Landroid/database/sqlite/SQLiteDatabase$OpenParams;
+move-result-object v1
+invoke-virtual {v1}, Landroid/database/sqlite/SQLiteDatabase$OpenParams;->getCursorFactory()Landroid/database/sqlite/SQLiteDatabase$CursorFactory;
+move-result-object v2
+if-ne v2, v3, :bad
+invoke-virtual {v1}, Landroid/database/sqlite/SQLiteDatabase$OpenParams;->getErrorHandler()Landroid/database/DatabaseErrorHandler;
+move-result-object v2
+if-ne v2, v3, :bad
+const/4 v2, 0
+invoke-virtual {v0, v2}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->setCursorFactory(Landroid/database/sqlite/SQLiteDatabase$CursorFactory;)Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+invoke-virtual {v0, v2}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->setErrorHandler(Landroid/database/DatabaseErrorHandler;)Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+const/4 v2, 1
+invoke-virtual {v0, v2}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->setWriteAheadLoggingEnabled(Z)V
+invoke-virtual {v1}, Landroid/database/sqlite/SQLiteDatabase$OpenParams;->getOpenFlags()I
+move-result v2
+const v3, 0x10000010
+if-ne v2, v3, :bad
+const-string v2, "open-params.db"
+invoke-virtual {p0, v2}, Landroid/content/Context;->getDatabasePath(Ljava/lang/String;)Ljava/io/File;
+move-result-object v2
+invoke-virtual {v2}, Ljava/io/File;->delete()Z
+invoke-static {v2, v1}, Landroid/database/sqlite/SQLiteDatabase;->openDatabase(Ljava/io/File;Landroid/database/sqlite/SQLiteDatabase$OpenParams;)Landroid/database/sqlite/SQLiteDatabase;
+move-result-object v0
+const-string v3, "CREATE TABLE probe(value INTEGER)"
+invoke-virtual {v0, v3}, Landroid/database/sqlite/SQLiteDatabase;->execSQL(Ljava/lang/String;)V
+const-string v3, "INSERT INTO probe VALUES (42)"
+invoke-virtual {v0, v3}, Landroid/database/sqlite/SQLiteDatabase;->execSQL(Ljava/lang/String;)V
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase;->beginTransaction()V
+const-string v3, "UPDATE probe SET value=99"
+invoke-virtual {v0, v3}, Landroid/database/sqlite/SQLiteDatabase;->execSQL(Ljava/lang/String;)V
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase;->endTransaction()V
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase;->close()V
+invoke-virtual {v1}, Landroid/database/sqlite/SQLiteDatabase$OpenParams;->toBuilder()Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+move-result-object v0
+const/16 v3, 17
+invoke-virtual {v0, v3}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->setOpenFlags(I)Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->build()Landroid/database/sqlite/SQLiteDatabase$OpenParams;
+move-result-object v0
+invoke-virtual {v2}, Ljava/io/File;->getPath()Ljava/lang/String;
+move-result-object v3
+invoke-static {v3, v0}, Landroid/database/sqlite/SQLiteDatabase;->openDatabase(Ljava/lang/String;Landroid/database/sqlite/SQLiteDatabase$OpenParams;)Landroid/database/sqlite/SQLiteDatabase;
+move-result-object v0
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase;->isReadOnly()Z
+move-result v3
+if-eqz v3, :bad
+const-string v3, "SELECT value FROM probe"
+const/4 v4, 0
+invoke-virtual {v0, v3, v4}, Landroid/database/sqlite/SQLiteDatabase;->rawQuery(Ljava/lang/String;[Ljava/lang/String;)Landroid/database/Cursor;
+move-result-object v3
+invoke-interface {v3}, Landroid/database/Cursor;->moveToFirst()Z
+move-result v4
+if-eqz v4, :bad
+const/4 v4, 0
+invoke-interface {v3, v4}, Landroid/database/Cursor;->getInt(I)I
+move-result v4
+const/16 v5, 42
+if-ne v4, v5, :bad
+invoke-interface {v3}, Landroid/database/Cursor;->close()V
+sget v3, Lorg/vinix/service/DatabaseCallbacks;->cursors:I
+const/4 v4, 1
+if-ne v3, v4, :bad
+:readonly
+const-string v3, "INSERT INTO probe VALUES (1)"
+invoke-virtual {v0, v3}, Landroid/database/sqlite/SQLiteDatabase;->execSQL(Ljava/lang/String;)V
+:readonly_end
+goto :bad
+.catch Landroid/database/sqlite/SQLiteException; {:readonly .. :readonly_end} :readonly_caught
+:readonly_caught
+move-exception v3
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase;->close()V
+invoke-virtual {v2}, Ljava/io/File;->delete()Z
+invoke-virtual {v1}, Landroid/database/sqlite/SQLiteDatabase$OpenParams;->getOpenFlags()I
+move-result v1
+const v2, 0x10000010
+if-ne v1, v2, :bad
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "SQLite parameter snapshots, persistent data, rollback and readonly opens"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+}
+
+fn location_state_checks() string {
+	mut body := 'const-string v0, "location"
+invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v0
+check-cast v0, Landroid/location/LocationManager;
+invoke-virtual {v0}, Landroid/location/LocationManager;->isLocationEnabled()Z
+move-result v1
+if-nez v1, :bad
+invoke-virtual {v0}, Landroid/location/LocationManager;->getAllProviders()Ljava/util/List;
+move-result-object v1
+invoke-interface {v1}, Ljava/util/List;->isEmpty()Z
+move-result v1
+if-eqz v1, :bad
+new-instance v1, Landroid/location/Criteria;
+invoke-direct {v1}, Landroid/location/Criteria;-><init>()V
+const/4 v2, 0
+invoke-virtual {v0, v1, v2}, Landroid/location/LocationManager;->getBestProvider(Landroid/location/Criteria;Z)Ljava/lang/String;
+move-result-object v1
+if-nez v1, :bad
+'
+	for name in ['gps', 'network', 'passive', 'xdgportal', 'missing'] {
+		body += 'const-string v1, "' + name + '"\ninvoke-virtual {v0, v1}, Landroid/location/LocationManager;->isProviderEnabled(Ljava/lang/String;)Z\nmove-result v1\nif-nez v1, :bad\n'
+	}
+	return body + ':null_provider
+const/4 v1, 0
+invoke-virtual {v0, v1}, Landroid/location/LocationManager;->isProviderEnabled(Ljava/lang/String;)Z
+:null_provider_end
+goto :bad
+.catch Ljava/lang/IllegalArgumentException; {:null_provider .. :null_provider_end} :caught
+:caught
+move-exception v0
+const-class v0, Landroid/app/PendingIntent$OnFinished;
+invoke-virtual {v0}, Ljava/lang/Class;->isInterface()Z
+move-result v1
+if-eqz v1, :bad
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "location provider discovery and disabled state"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+}
+
+fn package_enumeration_checks() string {
+	mut body := 'invoke-virtual {p1}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
+move-result-object v0
+const/4 v1, 0
+invoke-virtual {v0, v1}, Landroid/content/pm/PackageManager;->getInstalledApplications(I)Ljava/util/List;
+move-result-object v1
+new-instance v2, Ljava/util/HashSet;
+invoke-direct {v2}, Ljava/util/HashSet;-><init>()V
+invoke-interface {v1}, Ljava/util/List;->iterator()Ljava/util/Iterator;
+move-result-object v1
+:next
+invoke-interface {v1}, Ljava/util/Iterator;->hasNext()Z
+move-result v3
+if-eqz v3, :done
+invoke-interface {v1}, Ljava/util/Iterator;->next()Ljava/lang/Object;
+move-result-object v3
+check-cast v3, Landroid/content/pm/ApplicationInfo;
+iget-object v3, v3, Landroid/content/pm/ApplicationInfo;->packageName:Ljava/lang/String;
+invoke-virtual {v2, v3}, Ljava/util/HashSet;->add(Ljava/lang/Object;)Z
+move-result v3
+if-eqz v3, :bad
+goto :next
+:done
+'
+	for pkg in ['org.vinix.service.client', 'org.vinix.service.companion'] {
+		body += 'const-string v3, "' + pkg + '"\ninvoke-virtual {v2, v3}, Ljava/util/HashSet;->contains(Ljava/lang/Object;)Z\nmove-result v3\nif-eqz v3, :bad\n'
+	}
+	return body + 'const/4 v1, 4
+invoke-virtual {v0, v1}, Landroid/content/pm/PackageManager;->getInstalledPackages(I)Ljava/util/List;
+move-result-object v1
+invoke-interface {v1}, Ljava/util/List;->size()I
+move-result v1
+invoke-virtual {v2}, Ljava/util/HashSet;->size()I
+move-result v2
+if-ne v1, v2, :bad
+invoke-static {}, Landroid/os/Process;->myUid()I
+move-result v1
+invoke-virtual {v0, v1}, Landroid/content/pm/PackageManager;->getPackagesForUid(I)[Ljava/lang/String;
+move-result-object v1
+if-eqz v1, :bad
+array-length v1, v1
+if-ne v1, v2, :bad
+const v1, 0x7fffffff
+invoke-virtual {v0, v1}, Landroid/content/pm/PackageManager;->getPackagesForUid(I)[Ljava/lang/String;
+move-result-object v1
+if-nez v1, :bad
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "installed application enumeration, deduplication and UID filtering"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+}
+
 fn device_policy_checks() string {
 	mut body := 'sget-object v0, Landroid/content/Context;->DEVICE_POLICY_SERVICE:Ljava/lang/String;
 invoke-virtual {p1, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
@@ -1274,6 +1711,11 @@ return-object v0'))!
 		method('private checkGeofenceWire(Landroid/os/IBinder;)V', geofence_wire_checks()) +
 		method('private checkUser()V', user_checks()) +
 		method('private checkDevicePolicy(Landroid/content/Context;)V', device_policy_checks()) +
+		method('private checkWorkSource()V', work_source_checks()) +
+		method('private checkWorkParcel(Landroid/os/WorkSource;)V', work_parcel_checks()) +
+		method('private checkSQLiteParams()V', sqlite_params_checks()) +
+		method('private checkLocationState()V', location_state_checks()) +
+		method('private checkPackageEnumeration(Landroid/content/Context;)V', package_enumeration_checks()) +
 		method('private checkPriority()V', priority_checks()) +
 		method('private checkImportance()V', importance_checks()) +
 		method('private checkWorkerPriority()V', '
@@ -1322,6 +1764,10 @@ invoke-direct {p0}, Lorg/vinix/service/Main;->checkTypedParcel()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkGeofence()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkUser()V
 invoke-direct {p0, p0}, Lorg/vinix/service/Main;->checkDevicePolicy(Landroid/content/Context;)V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkWorkSource()V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkSQLiteParams()V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkLocationState()V
+invoke-direct {p0, p0}, Lorg/vinix/service/Main;->checkPackageEnumeration(Landroid/content/Context;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkImportance()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkPriority()V
 const/4 v0, 0
@@ -1341,6 +1787,7 @@ move-result-object v0
 invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkStorage(Landroid/content/Context;)V
 invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkDirectories(Landroid/content/Context;)V
 invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkDevicePolicy(Landroid/content/Context;)V
+invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkPackageEnumeration(Landroid/content/Context;)V
 invoke-virtual {v0}, Landroid/content/Context;->getClassLoader()Ljava/lang/ClassLoader;
 move-result-object v0
 const-string v1, "org.vinix.service.App"
@@ -1448,6 +1895,10 @@ return-void'))!
 	typed_parcel_classes(out + '/client/smali/org/vinix/service')!
 	geofence_classes(out + '/client/smali/org/vinix/service')!
 	proxy_listener_class(out + '/client/smali/org/vinix/service')!
+	os.write_file(client + 'DatabaseCallbacks.smali', '.class public Lorg/vinix/service/DatabaseCallbacks;\n.super Ljava/lang/Object;\n.implements Landroid/database/sqlite/SQLiteDatabase$CursorFactory;\n.implements Landroid/database/DatabaseErrorHandler;\n.field public static cursors:I\n' +
+		method('public constructor <init>()V', 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void') +
+		method('public newCursor(Landroid/database/sqlite/SQLiteDatabase;Landroid/database/sqlite/SQLiteCursorDriver;Ljava/lang/String;Landroid/database/sqlite/SQLiteQuery;)Landroid/database/Cursor;', 'sget v0, Lorg/vinix/service/DatabaseCallbacks;->cursors:I\nadd-int/lit8 v0, v0, 1\nsput v0, Lorg/vinix/service/DatabaseCallbacks;->cursors:I\nnew-instance v0, Landroid/database/sqlite/SQLiteCursor;\ninvoke-direct {v0, p2, p3, p4}, Landroid/database/sqlite/SQLiteCursor;-><init>(Landroid/database/sqlite/SQLiteCursorDriver;Ljava/lang/String;Landroid/database/sqlite/SQLiteQuery;)V\nreturn-object v0') +
+		method('public onCorruption(Landroid/database/sqlite/SQLiteDatabase;)V', 'new-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "unexpected database corruption"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0'))!
 	for name in ['client', 'companion'] {
 		dir := out + '/' + name
 		os.mkdir_all(dir + '/res/values')!

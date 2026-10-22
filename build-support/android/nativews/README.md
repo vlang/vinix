@@ -140,6 +140,21 @@ replies and exception propagation. There is no Vinix geofence HAL; device
 registration and geofence monitoring are not implemented. The bridge follows
 the [AOSP provider interface](https://android.googlesource.com/platform/frameworks/base/+/22626107841e928d472e8258c0d2cefccf9c9b81/location/lib/java/com/android/location/provider/GeofenceProvider.java).
 Package visibility also honors legacy target SDKs and `QUERY_ALL_PACKAGES`.
+Installed package and application enumeration parses staged APK metadata through
+that visibility filter, deduplicates package names and honors lookup flags.
+UID queries filter the resulting application metadata; absent UIDs return null.
+Enumeration does not start companion Applications or services.
+WorkSource stores sorted UID/name entries and ordered attribution chains, with
+deep copies and Parcelable support following the
+[AOSP value model](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-11.0.0_r1/core/java/android/os/WorkSource.java).
+It does not provide battery accounting. SQLite OpenParams snapshots preserve
+open flags, cursor factories and error handlers and open databases through the
+existing SQLite engine. The guest fixture checks persistence, transaction
+rollback, read-only enforcement and a custom cursor factory.
+LocationManager enabled queries report false and best-provider discovery returns
+null because the native WS backend has no location provider. PendingIntent's
+OnFinished callback interface is present for class loading; callback send
+overloads are not implemented.
 ApplicationInfo and PackageManager share the actual APK, data and native library
 paths. Elapsed realtime uses the boot clock in the API's requested units.
 Current-thread CPU clocks use the kernel's thread clock in milliseconds or
