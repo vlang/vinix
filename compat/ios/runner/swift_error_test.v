@@ -21,6 +21,7 @@ fn C.CFRelease(voidptr)
 type ErrorRetain = fn (u64) u64
 type ErrorRelease = fn (u64)
 type ErrorProbe = fn (u64, u64, &u64)
+type ErrorThrowProbe = fn (u64, u64, u64, &u64)
 
 struct ErrorApi {
 	native bool
@@ -28,11 +29,12 @@ struct ErrorApi {
 	retain ErrorRetain
 	@[required]
 	release ErrorRelease
+	will_throw u64
 }
 
 fn error_api(native bool) ErrorApi {
-	mut entries := [2]u64{}
-	for i, name in ['_swift_errorRetain', '_swift_errorRelease']! {
+	mut entries := [3]u64{}
+	for i, name in ['_swift_errorRetain', '_swift_errorRelease', '_swift_willThrow']! {
 		if native {
 			library := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', C.RTLD_NOW)
 			assert library != unsafe { nil }
@@ -41,7 +43,34 @@ fn error_api(native bool) ErrorApi {
 		assert entries[i] != 0
 	}
 	return ErrorApi{ native: native, retain: unsafe { ErrorRetain(voidptr(entries[0])) },
-		release: unsafe { ErrorRelease(voidptr(entries[1])) } }
+		release: unsafe { ErrorRelease(voidptr(entries[1])) }, will_throw: entries[2] }
+}
+
+fn error_throw_call(api ErrorApi, probe ErrorThrowProbe, object u64, guard u64) {
+	mut registers := [3]u64{}
+	probe(object, api.will_throw, guard, unsafe { &registers[0] })
+	assert registers[0] == 0x5020 && registers[1] == object
+	assert registers[2] & 15 == 0
+}
+
+fn error_throw_worker(api ErrorApi, probe ErrorThrowProbe, object u64, guard u64) {
+	for _ in 0 .. 1000 { error_throw_call(api, probe, object, guard) }
+}
+
+fn error_throw_suite(api ErrorApi, probe ErrorThrowProbe, guard u64) {
+	// A missing debugger handler must not inspect an error or an ordinary x0
+	// argument. Neither guard address is readable, even for one byte.
+	for object in [u64(0), guard, guard + 1]! { error_throw_call(api, probe, object, guard) }
+	object := api.make(42)
+	before := api.refs(object)
+	domain := api.domain(object)
+	domain_refs := api.refs(domain)
+	mut workers := []thread{}
+	for _ in 0 .. 8 { workers << spawn error_throw_worker(api, probe, object, guard) }
+	workers.wait()
+	assert api.refs(object) == before && api.refs(domain) == domain_refs
+	assert api.code(object) == 42 && api.domain(object) == domain
+	api.release(object)
 }
 
 fn (api ErrorApi) make(code i64) u64 {
@@ -194,26 +223,48 @@ fn test_swift_error() {
 	for i, word in [u32(0xa9bd7bfd), 0xa90153f3, 0xa9025bf5, 0xaa0203f3, 0xaa0103f0,
 		0xd28a0414, 0xd28a0435, 0xd63f0200, 0xa9005260, 0xf9000a75,
 		0xa94153f3, 0xa9425bf5, 0xa8c37bfd, 0xd65f03c0]! { write32(code + u64(i) * 4, word) }
-	C.__builtin___clear_cache(unsafe { voidptr(code) }, unsafe { voidptr(code + 56) })
+	// Swift call: x21 is the error, x20 is context, x0 is deliberately unrelated.
+	// Save the enclosing C caller's registers and keep a 16-byte-aligned stack.
+	for i, word in [u32(0xa9bd7bfd), 0xa90153f3, 0xa9025bf5,
+		0xaa0303f3, 0xaa0003f5, 0xaa0103f0, 0xaa0203e0, 0xd28a0414,
+		0xd63f0200, 0xa9005674, 0x910003e0, 0xf9000a60,
+		0xa94153f3, 0xa9425bf5, 0xa8c37bfd, 0xd65f03c0]! {
+		write32(code + 64 + u64(i) * 4, word)
+	}
+	C.__builtin___clear_cache(unsafe { voidptr(code) }, unsafe { voidptr(code + 128) })
 	assert C.mprotect(unsafe { voidptr(code) }, page, C.PROT_READ | C.PROT_EXEC) == 0
 	probe := unsafe { ErrorProbe(voidptr(code)) }
+	throw_probe := unsafe { ErrorThrowProbe(voidptr(code + 64)) }
+	guard := u64(C.mmap(unsafe { nil }, page, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	assert guard != u64(-1)
 	$if macos {
 		error_suite(error_api(true), probe)
+		error_throw_suite(error_api(true), throw_probe, guard)
+		println('IOS-SWIFT-WILL-THROW-NATIVE: returning debugger notification, borrowed errors, guarded pointers, preserved x20/x21 and eight concurrent workers')
 		println('IOS-SWIFT-ERROR-NATIVE: ordinary C error ARC, genuine CFError owners, exact ObjC reference counts, final domain disposal, preserved x20/x21 and eight creation/shared-owner workers')
 	}
 	for _ in 0 .. 2 {
 		api := error_api(false)
 		assert api.retain(0) == 0
 		api.release(0)
+		error_throw_call(api, throw_probe, guard, guard)
 		objc_start()
 		live := ios_runtime.live
 		error_suite(api, probe)
+		error_throw_suite(api, throw_probe, guard)
 		assert ios_runtime.live == live && ios_runtime.swift_arc_code == 0 && ios_runtime.swift_heap.len == 0
 		objc_stop()
 		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
 		assert api.retain(0) == 0
 		api.release(0)
+		error_throw_call(api, throw_probe, guard, guard)
 	}
+	// Do not advertise handler installation, a handler data slot or typed throws.
+	for symbol in ['__swift_willThrow', '__swift_setWillThrowHandler', '_swift_willThrowTypedImpl']! {
+		if _ := swift_core_symbol(symbol) { panic('unsupported throw hook resolved: ' + symbol) }
+	}
+	assert C.munmap(unsafe { voidptr(guard) }, page) == 0
 	assert C.munmap(unsafe { voidptr(code) }, page) == 0
+	println('IOS-SWIFT-WILL-THROW: native default-hook differential, borrowed ownership, inaccessible errors/x0, preserved Swift context/error, concurrency and calls before/after two drained runtime lifetimes')
 	println('IOS-SWIFT-ERROR: native error ARC differential, final owned-field cleanup, nil before/after runtime, preserved Swift context through dealloc, weak zeroing, unlocked reentrant destruction, eight creation/shared-owner workers and two drained cycles without Swift allocations or thunks')
 }

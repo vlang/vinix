@@ -318,6 +318,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		// native heap lifetime and toll-free NSError/CFError owners to Cocoa ARC.
 		'_swift_errorRetain' { u64(unsafe { voidptr(swift_error_retain) }) }
 		'_swift_errorRelease' { u64(unsafe { voidptr(swift_error_release) }) }
+		'_swift_willThrow' { u64(unsafe { voidptr(swift_will_throw) }) }
 		'_swift_allocError' { u64(unsafe { voidptr(swift_error_allocate) }) }
 		'_swift_allocateGenericValueMetadata' { u64(unsafe { voidptr(swift_generic_value_allocate) }) }
 		'_swift_arrayInitWithCopy' { u64(unsafe { voidptr(swift_array_init_copy) }) }

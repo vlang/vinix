@@ -16596,20 +16596,55 @@ The caller supplies an eight-byte stack cell and the owner returned by an earlie
 call. This inspection executes no application code; the launch probe has not
 reached this weak-reference initialization in Fortnite.
 
-The launch probe now stops at required Swift Core import
-`_swift_willThrow`, before application entry. Fortnite remains unplayable.
+`_swift_willThrow` now resolves from Swift Core. It implements native Swift's
+default debugger notification when no handler is installed: return normally,
+preserve the context in `x20` and borrowed error in `x21`, and leave ownership
+unchanged. It does not inspect the error, unwind the stack or initialize the
+runtime. The separate handler data slot, handler-installation SPI and typed
+throw notification remain unsupported.
+
+The existing error ARC fixture also exercises this notification:
+
+```sh
+v run tests/ios/native-checks.v build-swift-error
+```
+
+Evidence is retained under `build/ios/fortnite/will-throw-checks`. Native Swift
+comparisons cover borrowed ownership, inaccessible error and ordinary argument
+pointers, preserved `x20`/`x21`, stack alignment and eight concurrent workers.
+Compatibility checks also exercise calls before initialization and after teardown
+across two drained runtime lifetimes. Eight normal/deterministic ASan/UBSan runs
+passed across the error ARC/throw notification, error-value, error-allocation and
+unexpected-error fixtures.
+
+The ARM64 guest error fixture passed, and the launch probe and both import audits
+confirmed the next linking failure. All 990 pinned source, toolchain and runtime
+inputs remained unchanged throughout validation. Eight archived binary/generated-C
+pairs and four retained guest serial logs passed their SHA256 checks.
+
+Static inspection traces `_swift_willThrow` from GOT cell `0x10dc9bc98`
+through stub `0x10c63ee14` and branch island `0x107c28728`. Caller
+`0x100068484` supplies a boxed Swift `_MergeError` in `x21`, then retains and
+releases that owner explicitly. Thirteen consumer/forwarder sites were checked.
+This inspection executes no application code; the launch probe has not reached
+this throw notification in Fortnite.
+
+The launch probe now stops at required Swift Dispatch import
+`_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMa`
+(`OS_dispatch_queue.Attributes` metadata accessor), before application entry.
+Fortnite remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,995 | 166 | 78 |
+| Fortnite executable | 1,996 | 165 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,835 | 169 | 114 |
+| All images | 2,836 | 168 | 114 |
 
-The C++/GLES/Text variant reports 2,849 resolved imports, 155 unresolved strong
+The C++/GLES/Text variant reports 2,850 resolved imports, 154 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
