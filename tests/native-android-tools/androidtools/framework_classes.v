@@ -83,6 +83,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_alarm(smali)!
  framework_intent(smali)!
  framework_clipdata(smali)!
+ framework_pending_intent(smali)!
  framework_work_source(smali)!
  framework_package_enumeration(smali)!
  framework_vibrator(smali)!

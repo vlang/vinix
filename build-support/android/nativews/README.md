@@ -191,6 +191,16 @@ of overflowing. The signed guest regression checks these behaviors, including
 cancellation from a broadcast callback. This implements process-lifetime alarms;
 suspend wakeups, power accounting and rescheduling after wall-clock changes
 are unavailable. PendingIntent matching currently uses the same token object.
+PendingIntent implements `CREATOR`, typed arrays, `describeContents`,
+`writeToParcel` and the nullable parcel helpers. A local Binder token retains
+the original operation through Parcel and `appendFrom`; restored references
+share cancellation, and `send()` dispatches the actual Activity, Service or
+broadcast. Canceled actions throw `CanceledException`. Foreign Binder tokens
+fail explicitly because cross-process transport is unavailable. The signed
+[parcel regression](../../../tests/native-android-ws/pending-intent-fixture.v)
+checks actual broadcast delivery and cancellation after restoration. Token
+matching across separate factory calls, factory flag policies, persistence and
+the additional `send` overloads remain unimplemented.
 Intent filter copies preserve action, URI, MIME type, package, component,
 identifier and an independent category set. They omit extras, flags and the
 selector. Full copies retain flags and own their extras and selector snapshots;
