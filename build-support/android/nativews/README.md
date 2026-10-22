@@ -13,6 +13,10 @@ use the existing toolkit-independent `libandroidfw` ABI. SQLite connections,
 statements, cursor windows and ICU collations use real database providers.
 
 Android's Java view trees retain layout, listeners and application state.
+Exceptions from measurement, size and layout callbacks propagate unchanged
+through native layout; the bridge checks for pending Java exceptions before
+reading native view state. The signed bootstrap checks throwable identity and
+recovery by laying out the same view again after each failed callback.
 Native widgets and Canvas rasterize text, rectangles, lines, simple paths and
 bitmaps into WS pixels. Dialogs compose another Java view tree within the same
 surface. Keyboard edits notify real TextWatchers; pointer events reach Android

@@ -13,6 +13,7 @@ pub fn install(output string, resources string) ! {
  install_power_probe(dir)!
  install_battery_probe(dir)!
  install_geometry_probe(dir)!
+ install_layout_exception_probe(dir)!
  install_view_configuration_probe(dir)!
  install_egl_probe(dir)!
  install_gles_probe(dir)!
@@ -78,6 +79,7 @@ invoke-static {}, Lorg/vinix/bootstrap/StartupProbe;->altitude()V
 invoke-static {p0}, Lorg/vinix/bootstrap/PowerProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/BatteryProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/GeometryProbe;->check(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/LayoutExceptionProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/ViewConfigurationProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/EglProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/ClockProbe;->check()V

@@ -194,11 +194,21 @@ fn ws_measure(e voidptr, object voidptr, width_spec i32, height_spec i32) {
 fn ws_layout(e voidptr, object voidptr, left i32, top i32, right i32, bottom i32) {
 	args := [Value{ i: right - left }, Value{ i: bottom - top }]!
 	call(e, object, c'android/view/View', c'layoutInternal', c'(II)V', unsafe { &args[0] })
-	if ws_view(e, object).kind == 10 && !pending(e) {
+	// onMeasure/onSizeChanged/onLayout can throw. JNI field lookup then returns
+	// zero while the exception is pending; preserve it before reading native state.
+	if pending(e) { return }
+	view := ws_view(e, object)
+	if pending(e) { return }
+	if view == unsafe { nil } {
+		throw(e, c'java/lang/IllegalStateException', c'View has no native WS state')
+		return
+	}
+	if view.kind == 10 {
 		ws_surface_layout(e, object, right - left, bottom - top)
+		if pending(e) { return }
 	}
 	// ATL delegates ScrollView child placement to its display backend.
-	if ws_view(e, object).kind == 4 && !pending(e) {
+	if view.kind == 4 {
 		unsafe {
 			zero := [Value{ i: 0 }]!
 			child := obj(e, object, c'android/view/ViewGroup', c'getChildAt', c'(I)Landroid/view/View;', &zero[0])
