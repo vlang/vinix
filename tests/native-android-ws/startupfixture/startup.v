@@ -18,6 +18,7 @@ pub fn install(output string, resources string) ! {
  install_typeface_probe(dir)!
  install_text_metrics_probe(dir)!
  install_size_span_probe(dir)!
+ install_character_style_probe(dir)!
  install_static_layout_probe(dir)!
  install_shadow_color_probe(dir)!
  install_view_configuration_probe(dir)!
@@ -118,6 +119,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/TypefaceProbe;->check(Landroid/content/
 invoke-static {}, Lorg/vinix/bootstrap/TextMetricsProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/FontMetricsProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/SizeSpanProbe;->check()V
+invoke-static {}, Lorg/vinix/bootstrap/CharacterStyleProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/StaticLayoutProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/ShadowColorProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/ChildStatesProbe;->check(Landroid/content/Context;)V
