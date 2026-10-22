@@ -25,9 +25,10 @@ android/content/res/AssetManager|openXmlAssetNative|return ws_open_xml(e,this,p1
 android/content/res/AssetManager|openAsset|return ws_open_asset(e,this,p0,p1)
 android/content/res/AssetManager|openAssetFd|return ws_asset_descriptor(e,this,p0,p1,p2,p3)
 android/content/res/AssetManager|readAsset|return ws_asset_read(e,p0,p1,p2,p3)
+android/content/res/AssetManager|readAssetChar|value := &u8(C.alloca(1)); return if C.Asset_read(voidptr(p0),value,1) == 1 { i32(*value) } else { -1 }
 android/content/res/AssetManager|getAssetLength|return C.Asset_getLength(voidptr(p0))
 android/content/res/AssetManager|getAssetRemainingLength|return C.Asset_getRemainingLength(voidptr(p0))
-android/content/res/AssetManager|seekAsset|return C.Asset_seek(voidptr(p0),p1,p2)
+android/content/res/AssetManager|seekAsset|return C.Asset_seek(voidptr(p0),p1,if p2 < 0 { 0 } else if p2 > 0 { 2 } else { 1 })
 android/content/res/AssetManager|destroyAsset|C.Asset_delete(voidptr(p0))
 android/content/res/AssetManager|isUpToDate|return 1
 android/content/res/AssetManager|setConfiguration|config := C.ResTable_config{mcc:u16(p0),mnc:u16(p1),orientation:u8(p3),touchscreen:u8(p4),density:u16(p5),keyboard:u8(p6),navigation:u8(p8),screenWidth:u16(p9),screenHeight:u16(p10),smallestScreenWidthDp:u16(p11),screenWidthDp:u16(p12),screenHeightDp:u16(p13),screenLayout:u8(p14),uiMode:u8(p15),sdkVersion:u16(p16)}; C.AssetManager_setConfiguration(ws_manager(e,this),&config)

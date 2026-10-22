@@ -4,6 +4,7 @@ module startupfixture
 import os
 
 fn install_io_probe(dir string) ! {
+ install_stream_probe(dir)!
  os.write_file(dir + '/TrafficWorker.smali', '.class public Lorg/vinix/bootstrap/TrafficWorker;\n.super Ljava/lang/Thread;\n.field public passed:Z\n' +
   method('public constructor <init>()V', 'invoke-direct {p0}, Ljava/lang/Thread;-><init>()V\nreturn-void') +
   method('public run()V', '
@@ -24,6 +25,7 @@ return-void'))!
   method('public static check(Landroid/content/Context;)V', '
 invoke-static {p0}, Lorg/vinix/bootstrap/IoProbe;->atomic(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/IoProbe;->assetDescriptors(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/StreamProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/IoProbe;->traffic()V
 return-void') +
   method('private static assetDescriptors(Landroid/content/Context;)V', '

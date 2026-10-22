@@ -36,6 +36,7 @@ fn main() {
 	os.write_file(output + '/assets/nested/item.txt', 'nested asset\n')!
 	os.write_file(output + '/assets/probe.txt', 'VINIX-ASSET-OK\n')!
 	os.write_file(output + '/assets/compressed.bin', 'compressed descriptor probe\n'.repeat(512))!
+ os.write_file(output + '/assets/stream.xml', '<?xml version="1.0" encoding="UTF-8"?><stream>asset reset</stream>')!
 	// Lossless 2x1 red/green image, generated from our own PPM test pixels.
 	os.write_file_array(output + '/assets/probe.webp', base64.decode('UklGRh4AAABXRUJQVlA4TBEAAAAvAQAAAA+w//Mf8x8VMqL/AQA='))!
 	app := '.class public Lorg/vinix/bootstrap/App;\n.super Landroid/app/Application;\n.field public static stage:I\n' +
