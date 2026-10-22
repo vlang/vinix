@@ -16765,22 +16765,66 @@ from GOT cell `0x10dc9bce0` at `0x100072448` and invokes the tag injection
 witness at value-witness table plus 104 bytes. This inspection executes no
 application code; the launch probe has not reached this consumer in Fortnite.
 
-The launch probe now stops at the required Swift Dispatch import
 `_$sSo17OS_dispatch_queueC8DispatchE4sync7executexxyKXE_tKlF`
-(`DispatchQueue.sync(execute:)`). This remains a linking
-failure before application entry; Fortnite is not playable.
+now implements generic, throwing `DispatchQueue.sync(execute:)`. The ARM64
+bridge supplies the borrowed queue in `x20`, closure context in `x20` during
+the callback, indirect result storage in `x8` and owned thrown errors in `x21`.
+Successful calls preserve the caller's incoming `x21`. The existing synchronous
+scheduler retains the queue, preserves serial ordering and queue-specific
+context, and calls the closure without holding runtime locks. Background
+submissions to queues targeting the main queue complete when the main thread
+drains its work.
+
+The result uses bounded, aligned stack storage and complete value witnesses.
+Success copies the initialized temporary, destroys the original and takes the
+copy into the caller's output, matching native Swift's result staging. Throws
+return the owned error without destroying uninitialized result storage or
+touching caller output. Unsupported layouts, missing witnesses and inactive
+queues are rejected; this does not add arbitrary Swift type support. The two
+bridges fit in the existing sealed Dispatch executable arena.
+
+The fixture compares Int, Void, String and a four-word tuple with native Swift,
+including result/error ownership, untouched throwing outputs, protected Void
+output, preserved registers, serial ordering, queue-specific context and nested
+calls. Compatibility checks also cover exact copy/destroy/take counts, null
+closure context, background-to-main completion, concurrent symbol publication,
+malformed layouts and two unmapped runtime teardowns:
+
+```sh
+v run tests/ios/native-checks.v build-swift-dispatch-sync
+```
+
+Evidence is retained under `build/ios/fortnite/dispatch-sync-checks`.
+Eight normal/deterministic ASan/UBSan runs passed across the sync, QoS,
+algebra and async fixtures. The ARM64 fixture, launch probe and both import
+audits passed their checks. All 994 pinned source, toolchain and runtime inputs
+remained unchanged; eight archived binary/generated-C pairs and four retained
+guest serial logs passed SHA256 verification. All four owned VMs and their
+temporary RAM disk were retired.
+
+Static inspection traces the import through GOT cell `0x10dc9bcf8`, stub
+`0x10c63addc` and forwarder `0x107c28558` to the call at `0x100066bc0`.
+The caller supplies a closure with stack captures, generic Result metadata and
+32 bytes of indirect output, then checks `x21` for a thrown error. This
+inspection executes no application code; it does not establish that Fortnite
+has reached this consumer.
+
+The launch probe now stops at the required Swift Dispatch import
+`_$sSo17OS_dispatch_queueC8DispatchE5label3qos10attributes20autoreleaseFrequency6targetABSS_AC0D3QoSVAbCE10AttributesVAbCE011AutoreleaseI0OABSgtcfC`
+(`DispatchQueue(label:qos:attributes:autoreleaseFrequency:target:)`). This
+remains a linking failure before application entry; Fortnite is not playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,001 | 160 | 78 |
+| Fortnite executable | 2,002 | 159 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,841 | 163 | 114 |
+| All images | 2,842 | 162 | 114 |
 
-The C++/GLES/Text variant reports 2,855 resolved imports, 149 unresolved strong
+The C++/GLES/Text variant reports 2,856 resolved imports, 148 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
