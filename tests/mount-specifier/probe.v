@@ -16,7 +16,8 @@ fn checked(args []string) ! {
 
 fn main() {
 	root := if os.args.len > 1 { os.abs_path(os.args[1]) } else { os.getwd() }
-	work := os.join_path(os.temp_dir(), 'vinix-mount-specifier-${os.getpid()}')
+	scratch := os.getenv_opt('TMPDIR') or { os.temp_dir() }
+	work := os.join_path(scratch, 'vinix-mount-specifier-${os.getpid()}')
 	os.mkdir_all(work + '/errno')!
 	defer { os.rmdir_all(work) or {} }
 	os.write_file(work + '/v.mod', "Module { name: 'mount_specifier_probe' }")!
