@@ -65,7 +65,9 @@ Pinned Mesa GLES dispatch libraries and a surfaceless EGL provider run software
 GLES through Gallium softpipe. EGL windows render to pbuffers and post flipped
 RGBA pixels through the native WS buffer queue; X11, GTK and Wayland are absent.
 The Java EGL10 bridge handles displays, configurations, contexts, surfaces and
-current-thread queries. Destruction retains a current window until every thread
+current-thread queries. Java GL10 and GLES20 string queries use the current
+renderer, and GLES20 error queries consume its actual error state.
+Destruction retains a current window until every thread
 unbinds it. Readback preserves framebuffer and ES3 pixel-pack state. CPU and EGL
 producers cannot own the same window simultaneously.
 
@@ -250,7 +252,7 @@ APK from smali and V. It checks provider ordering and filtering, startup paths,
 clock units, 64-bit process reporting, real NDK asset reads/seeks, inherited
 layout direction and lossless WebP decoding. It also checks pivot rotation, live
 network detection, provider-client lookup, actual NDK bitmap metadata and pixels,
-balanced nested locks, graphics procedure lookup and explicit EGL unavailability.
+balanced nested locks, graphics procedure lookup and software EGL rendering.
 Pass its APK to the native WS suite; the assertion marker is `BOOTSTRAP-NDK-PASS`.
 This fixture does not modify or stand in for the publisher's WhatsApp APK.
 

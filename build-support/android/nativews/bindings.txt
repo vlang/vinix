@@ -415,3 +415,5 @@ com/google/android/gles_jni/EGLImpl|eglReleaseThread|return u8(ws_egl_release_th
 com/google/android/gles_jni/EGLImpl|eglWaitGL|return u8(ws_egl_wait_gl())
 com/google/android/gles_jni/EGLImpl|eglWaitNative|return u8(ws_egl_wait_native(p0))
 com/google/android/gles_jni/GLImpl|_glGetString|return ws_gl_java_string(e,p0)
+android/opengl/GLES20|glGetString|return ws_gl_java_string(e,p0)
+android/opengl/GLES20|glGetError|return WsGlGetError(ws_egl_proc(c'glGetError'))()

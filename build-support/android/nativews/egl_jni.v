@@ -3,6 +3,7 @@
 module atlframework
 
 type WsEglObjectArraySet = fn (voidptr, voidptr, i32, voidptr)
+type WsGlGetError = fn () i32
 
 fn static_object(e voidptr, class_name &char, name &char, signature &char) voidptr {
 	unsafe {

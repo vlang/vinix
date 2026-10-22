@@ -31,4 +31,11 @@ fn framework_egl(smali string) ! {
 		'eglGetError()I', 'eglReleaseThread()Z', 'eglWaitGL()Z', 'eglWaitNative(ILjava/lang/Object;)Z',
 	] { text += '.method public native ' + signature + '\n.end method\n' }
 	os.write_file(smali + '/com/google/android/gles_jni/EGLImpl.smali', text)!
+	// The baseline GL10 wrapper returns a placeholder instead of calling its
+	// native query. Both Java APIs must report the current renderer's string.
+	gl := smali + '/com/google/android/gles_jni/GLImpl.smali'
+	os.write_file(gl, framework_replace_method(os.read_file(gl)!, 'glGetString(I)Ljava/lang/String;',
+		'.method public glGetString(I)Ljava/lang/String;\n.locals 1\n' +
+		'invoke-virtual {p0, p1}, Lcom/google/android/gles_jni/GLImpl;->_glGetString(I)Ljava/lang/String;\n' +
+		'move-result-object v0\nreturn-object v0\n.end method')!)!
 }

@@ -68,6 +68,22 @@ const/16 v8, 0x1f02
 invoke-interface {v3, v8}, Ljavax/microedition/khronos/opengles/GL10;->glGetString(I)Ljava/lang/String;
 move-result-object v3
 if-eqz v3, :bad
+invoke-static {v8}, Landroid/opengl/GLES20;->glGetString(I)Ljava/lang/String;
+move-result-object v8
+invoke-virtual {v3, v8}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v8
+if-eqz v8, :bad
+const/4 v8, 0
+invoke-static {v8}, Landroid/opengl/GLES20;->glGetString(I)Ljava/lang/String;
+move-result-object v8
+if-nez v8, :bad
+invoke-static {}, Landroid/opengl/GLES20;->glGetError()I
+move-result v8
+const/16 v9, 0x500
+if-ne v8, v9, :bad
+invoke-static {}, Landroid/opengl/GLES20;->glGetError()I
+move-result v8
+if-nez v8, :bad
 '
 	for method_name, kind in {'eglQuerySurface': 'EGLSurface', 'eglQueryContext': 'EGLContext', 'eglGetConfigAttrib': 'EGLConfig'} {
 		target := if kind == 'EGLSurface' { 'v7' } else if kind == 'EGLContext' { 'v6' } else { 'v2' }
@@ -91,6 +107,10 @@ invoke-virtual {v0}, Lcom/google/android/gles_jni/EGLImpl;->eglGetCurrentContext
 move-result-object v8
 sget-object v9, Ljavax/microedition/khronos/egl/EGL10;->EGL_NO_CONTEXT:Ljavax/microedition/khronos/egl/EGLContext;
 if-ne v8, v9, :bad
+const/16 v8, 0x1f02
+invoke-static {v8}, Landroid/opengl/GLES20;->glGetString(I)Ljava/lang/String;
+move-result-object v8
+if-nez v8, :bad
 invoke-virtual {v0, v1}, Lcom/google/android/gles_jni/EGLImpl;->eglTerminate(Ljavax/microedition/khronos/egl/EGLDisplay;)Z
 move-result v8
 if-eqz v8, :bad
@@ -108,7 +128,7 @@ goto :bad
 :short_ok
 move-exception v8
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "BOOTSTRAP-JAVA-EGL-PASS config-capacity context surface current GL-string deferred-destroy array-validation"
+const-string v1, "BOOTSTRAP-JAVA-EGL-PASS config-capacity context surface current GL-string GLES20-errors no-current-context deferred-destroy array-validation"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void
 :bad
