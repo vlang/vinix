@@ -137,7 +137,7 @@ pub mut:
 	// and kept across exec, so `chrt -f 50 ./program` gives the program the
 	// priority and not just the shell that asked for it.
 	sched SchedParams
-	// Per-thread kernel-worker weight; userspace retains Process.nice.
+	// Per-task nice weight, including userspace threads and kernel workers.
 	sched_nice_override      int
 	sched_has_nice_override  bool
 	kernel_thread_fail_stage int

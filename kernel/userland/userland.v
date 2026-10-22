@@ -601,6 +601,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		inherited_usage := t.usage
 		inherited_user_ns := t.cpu_user_ns
 		inherited_system_ns := t.cpu_system_ns
+		inherited_nice := proc.nice_value(t)
 		t.process = kernel_process
 
 		mmap.delete_pagemap(mut old_pagemap) or {
@@ -640,6 +641,8 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		new_thread.cpu_user_ns = inherited_user_ns
 		new_thread.cpu_system_ns = inherited_system_ns
 		new_thread.cpu_time_ns = inherited_user_ns + inherited_system_ns
+		new_thread.sched_nice_override = inherited_nice
+		new_thread.sched_has_nice_override = true
 		proc.set_thread_sched_params_with_util(new_thread.tid, inherited_sched, true)
 		new_thread.timer_slack_ns = katomic.load(&t.timer_slack_ns)
 

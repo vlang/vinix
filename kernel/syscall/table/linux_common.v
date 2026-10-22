@@ -1094,8 +1094,7 @@ fn syscall_linux_setpriority(_ voidptr, raw_which int, raw_local_who int, raw_pr
 	if which != prio_process {
 		return errno.err, errno.einval
 	}
-	mut caller := proc.current_thread().process
-	target_pid := if who == 0 { caller.pid } else { who }
+	target_tid := if who == 0 { proc.current_thread().tid } else { who }
 	mut wanted := prio
 	if wanted < -20 {
 		wanted = -20
@@ -1104,22 +1103,7 @@ fn syscall_linux_setpriority(_ voidptr, raw_which int, raw_local_who int, raw_pr
 		wanted = 19
 	}
 
-	proc.lock_table()
-	defer { proc.unlock_table() }
-	mut target := proc.process_at(target_pid)
-	if target == unsafe { nil } {
-		return errno.err, errno.esrch
-	}
-	if !proc.mac_peer_allowed(caller, target) { return errno.err, errno.eperm }
-	privileged := proc.has_capability(caller, proc.cap_sys_nice)
-	if !privileged && caller.euid != target.euid && caller.euid != target.uid {
-		return errno.err, errno.eperm
-	}
-	if wanted < target.nice && !privileged
-		&& !proc.limit_allows(target, proc.rlimit_nice, u64(20 - wanted)) {
-		return errno.err, errno.eacces
-	}
-	target.nice = wanted
+	if !proc.set_thread_nice(target_tid, wanted) { return errno.err, errno.get() }
 	return 0, 0
 }
 
@@ -1130,16 +1114,8 @@ fn syscall_linux_getpriority(_ voidptr, raw_which int, raw_local_who int) (u64, 
 	if which != prio_process {
 		return errno.err, errno.einval
 	}
-	target_pid := if who == 0 { proc.current_thread().process.pid } else { who }
-	proc.lock_table()
-	defer { proc.unlock_table() }
-	target := proc.process_at(target_pid)
-	if target == unsafe { nil } {
-		return errno.err, errno.esrch
-	}
-	if !proc.mac_peer_allowed(proc.current_thread().process, target) {
-		return errno.err, errno.eperm
-	}
+	target_tid := if who == 0 { proc.current_thread().tid } else { who }
+	nice := proc.thread_nice(target_tid) or { return errno.err, errno.get() }
 	// The raw syscall returns 20 - nice so every successful result is positive.
-	return u64(20 - target.nice), 0
+	return u64(20 - nice), 0
 }

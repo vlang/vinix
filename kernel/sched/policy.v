@@ -326,10 +326,7 @@ fn effective_timeslice(t &proc.Thread) u64 {
 			slice = idle_policy_slice_us
 		}
 		else {
-			mut nice := t.process.nice
-			if katomic.load(&t.sched_has_nice_override) {
-				nice = katomic.load(&t.sched_nice_override)
-			}
+			nice := proc.nice_value(t)
 			weight := u64(20 - nice)
 			slice = t.timeslice * weight / 20
 		}

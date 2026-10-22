@@ -1271,6 +1271,8 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		securebits: proc.securebits_state(proc.current_thread())
 		process: process
 		ttbr0: process.pagemap.tagged_root()
+		sched_nice_override: initial_user_nice(process)
+		sched_has_nice_override: true
 		gpr_state: gpr_state
 		timeslice: 5000
 		running_on: u64(-1)
@@ -1394,6 +1396,8 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		comm_named: source.comm_named
 		affinity_mask: source.affinity_mask
 		sched: inherited_sched_params(source)
+		sched_nice_override: inherited_nice(source)
+		sched_has_nice_override: true
 		timer_slack_ns: source.timer_slack_ns
 	} }
 	charge_transferred = true

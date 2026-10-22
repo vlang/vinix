@@ -383,8 +383,8 @@ pub mut:
 	children_usage UsageCounters
 	peak_rss_bytes u64
 	children_peak_rss_bytes u64
-	// POSIX nice value. The scheduler scales this process' timeslices from
-	// -20 (highest normal priority) through 19 (lowest).
+	// Initial nice value for fresh tasks. Individual tasks keep their own
+	// override, from -20 (highest normal priority) through 19 (lowest).
 	nice int
 	// NUMA memory policy, from set_mempolicy(2) and mbind(2). Zero is
 	// MPOL_DEFAULT: an anonymous page comes from the node the faulting thread
@@ -1507,7 +1507,8 @@ pub fn process_stat_line(pid int, tid int, viewer &Namespace) string {
 	} else {
 		user_ns, system_ns = thread_cpu_times(target, 0)
 	}
-	mut priority := 20 + process.nice
+	nice := if target == unsafe { nil } { process.nice } else { nice_value(target) }
+	mut priority := 20 + nice
 	if params.policy == sched_fifo || params.policy == sched_rr {
 		priority = -1 - params.priority
 	}
@@ -1552,7 +1553,7 @@ pub fn process_stat_line(pid int, tid int, viewer &Namespace) string {
 	text.add_byte(` `)
 	text.add_decimal(priority)
 	text.add_byte(` `)
-	text.add_decimal(process.nice)
+	text.add_decimal(nice)
 	text.add_byte(` `)
 	text.add_decimal(threads)
 	text.add(' 0 ')

@@ -36,6 +36,19 @@ fn inherited_sched_params(source &proc.Thread) proc.SchedParams {
 	return inherited
 }
 
+fn inherited_nice(source &proc.Thread) int {
+	nice := proc.nice_value(source)
+	return if source.sched.reset_on_fork && nice < 0 { 0 } else { nice }
+}
+
+fn initial_user_nice(process &proc.Process) int {
+	source := proc.current_thread()
+	if source != unsafe { nil } && source.process == process {
+		return inherited_nice(source)
+	}
+	return process.nice
+}
+
 // Publish the identity and first runnable thread together. A signal through
 // the new pidfd may otherwise finish and free t before the creator enqueues it.
 pub fn publish_user_thread(mut process proc.Process, t &proc.Thread) {
@@ -124,14 +137,14 @@ pub fn new_process_with_vm(old_process &proc.Process, pagemap &memory.Pagemap, a
 		new_proc.sgid = old_process.sgid
 		new_proc.groups = old_process.groups.clone()
 		new_proc.umask = old_process.umask
-		new_proc.nice = old_process.nice
+		new_proc.nice = inherited_nice(proc.current_thread())
 		new_proc.executable_path = old_process.executable_path.clone()
 		new_proc.rlimits = old_process.rlimits
 		proc.set_cpu_limit(mut new_proc, new_proc.rlimits[proc.rlimit_cpu])
 		new_proc.allow_wx = old_process.allow_wx
 		new_proc.dumpable = proc.dumpability(old_process)
 		new_proc.sigreturn_page = old_process.sigreturn_page
-		// A NUMA memory policy is process state, like nice and the rlimits, so
+		// A NUMA memory policy is process state, like the rlimits, so
 		// a fork keeps the placement its parent asked for.
 		new_proc.mempolicy_mode = old_process.mempolicy_mode
 		new_proc.mempolicy_nodemask = old_process.mempolicy_nodemask

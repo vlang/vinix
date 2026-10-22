@@ -167,8 +167,8 @@ pub mut:
 	// and kept across exec, so `chrt -f 50 ./program` gives the program the
 	// priority and not just the shell that asked for it.
 	sched SchedParams
-	// Kernel workers can request an ordinary nice weight without changing
-	// the shared kernel Process or the scheduling policy of other threads.
+	// Tasks can request an ordinary nice weight without changing the weight
+	// or scheduling policy of other threads in their process.
 	sched_nice_override     int
 	sched_has_nice_override bool
 	// Native constructor fault injection belongs to its calling task.

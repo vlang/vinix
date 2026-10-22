@@ -81,7 +81,7 @@ fn may_set_sched_params(target_tid int, policy int, priority int) bool {
 	// Leaving IDLE needs the target's current nice to fit its nice limit,
 	// even when the request would otherwise retain or lower priority.
 	if target.sched.policy == proc.sched_idle && policy != proc.sched_idle
-		&& !proc.limit_allows(owner, proc.rlimit_nice, u64(20 - owner.nice)) {
+		&& !proc.limit_allows(owner, proc.rlimit_nice, u64(20 - proc.nice_value(target))) {
 		return false
 	}
 	if policy != proc.sched_fifo && policy != proc.sched_rr {
@@ -107,7 +107,7 @@ fn sched_nice_permission(tid int, wanted int) u64 {
 	if !proc.mac_peer_allowed(caller, owner) { return errno.eperm }
 	privileged := proc.has_capability(caller, proc.cap_sys_nice)
 	if !privileged && caller.euid != owner.euid && caller.euid != owner.uid { return errno.eperm }
-	if wanted < owner.nice && !privileged
+	if wanted < proc.nice_value(target) && !privileged
 		&& !proc.limit_allows(owner, proc.rlimit_nice, u64(20 - wanted)) { return errno.eperm }
 	return 0
 }
@@ -434,11 +434,12 @@ fn syscall_linux_sched_setattr(_ voidptr, raw_pid int, attr_ptr u64, flags u32) 
 	// accepted requests must apply the normalized value rather than ignore it.
 	if policy == proc.sched_other || policy == proc.sched_batch {
 		proc.lock_table()
-		target := threads_by_tid[tid]
+		mut target := threads_by_tid[tid]
 		if target != unsafe { nil } {
 			mut owner := target.process
 			if owner != unsafe { nil } && proc.mac_peer_allowed(proc.current_thread().process, owner) {
-				owner.nice = int(attr.sched_nice)
+				katomic.store(mut &target.sched_nice_override, int(attr.sched_nice))
+				katomic.store(mut &target.sched_has_nice_override, true)
 			}
 		}
 		proc.unlock_table()
@@ -468,7 +469,7 @@ fn syscall_linux_sched_getattr(_ voidptr, raw_pid int, attr_ptr u64, size u32, f
 				proc.unlock_table()
 				return errno.err, errno.eperm
 			}
-			nice = owner.nice
+			nice = proc.nice_value(target)
 		}
 	}
 	proc.unlock_table()

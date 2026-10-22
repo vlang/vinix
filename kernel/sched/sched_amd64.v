@@ -686,6 +686,8 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		no_new_privs: proc.no_new_privs_state(proc.current_thread())
 		securebits: proc.securebits_state(proc.current_thread())
 		process:      process
+		sched_nice_override: initial_user_nice(process)
+		sched_has_nice_override: true
 		cr3:          process.pagemap.tagged_root()
 		gpr_state:    gpr_state
 		timeslice:    5000
@@ -815,6 +817,8 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		masked_signals: source.masked_signals
 		affinity_mask:  source.affinity_mask
 		sched:          inherited_sched_params(source)
+		sched_nice_override: inherited_nice(source)
+		sched_has_nice_override: true
 		timer_slack_ns: source.timer_slack_ns
 		comm:           source.comm.clone()
 		comm_named:     source.comm_named
