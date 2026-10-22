@@ -23,6 +23,14 @@ surface. Keyboard edits notify real TextWatchers; pointer events reach Android
 MotionEvent handlers and adapter row callbacks. Closing the WS input pipe
 delivers pause, stop and destroy callbacks before the process exits.
 
+WS traversals dispatch global-layout observers after layout, then pre-draw and
+draw observers before drawing the view tree. Registering a pre-draw listener
+does not invoke it synchronously. A canceled pre-draw keeps the
+previous front buffer and requests another traversal. Invalidations issued by
+observers or drawing survive publication. Callback exceptions stop the frame
+before publication and retain the original Java exception. The signed fixture
+checks laid-out bounds, callback order, cancellation and drawing invalidation.
+
 Weighted Typeface factories retain family, requested weight and slant. System
 sans, serif and monospace resolve lazily to the nearest installed DejaVu
 regular/bold/italic face; unknown families fall back to sans. A bounded cache
@@ -441,6 +449,10 @@ activity name. `ANDROID_APP_DATA_DIR` overrides the per-APK directory under
 `VINIX_ANDROID_TRACE_TREE` enable test-only diagnostic logging of app content.
 Tree snapshots are limited to one every 30 seconds so serial logging does not
 delay rendering. Surface lifecycle changes are still logged as they happen.
+Tree tracing also samples the existing EGL readback and composed SurfaceView
+buffers: dimensions, frame counts, RGB variation, alpha coverage and two RGBA
+pixels. Each surface logs its first three frames, then at most once per 30
+seconds. These diagnostics issue no GL calls and do not consume GL errors.
 `VINIX_ANDROID_TRACE_THREADS` logs Java thread stacks every 30 seconds for the
 first five minutes, including before the main Looper starts. Its diagnostic
 worker attaches as an ART daemon and keeps a separate JNI environment.

@@ -359,6 +359,24 @@ fn ws_draw_children(e voidptr, object voidptr, canvas voidptr) {
 	}
 }
 
+// dispatchOnPreDraw returns cancellation, the inverse of onPreDraw's result.
+// Keep the old front buffer until a later traversal accepts the frame.
+fn ws_dispatch_traversal(e voidptr, window voidptr) bool {
+	observer := get_object(e, window, c'android/view/Window', c'view_tree_observer', c'Landroid/view/ViewTreeObserver;')
+	if pending(e) { return false }
+	if observer == unsafe { nil } { return true }
+	call(e, observer, c'android/view/ViewTreeObserver', c'dispatchOnGlobalLayout', c'()V', unsafe { nil })
+	if pending(e) { return false }
+	cancel := boolean(e, observer, c'android/view/ViewTreeObserver', c'dispatchOnPreDraw', c'()Z', unsafe { nil })
+	if pending(e) { return false }
+	if cancel != 0 {
+		ws.dirty = true
+		return false
+	}
+	call(e, observer, c'android/view/ViewTreeObserver', c'dispatchOnDraw', c'()V', unsafe { nil })
+	return !pending(e)
+}
+
 fn ws_render(e voidptr) {
 	unsafe {
 		surface := ws.surface
@@ -380,15 +398,21 @@ fn ws_render(e voidptr) {
 		if pending(e) { return }
 		measure := [Value{ i: ws.width | 0x40000000 }, Value{ i: ws.height | 0x40000000 }]!
 		call(e, decor, c'android/view/View', c'measure', c'(II)V', &measure[0])
+		if pending(e) { return }
 		layout := [Value{ i: 0 }, Value{ i: 0 }, Value{ i: ws.width }, Value{ i: ws.height }]!
 		call(e, decor, c'android/view/View', c'layout', c'(IIII)V', &layout[0])
+		if pending(e) { return }
+		// Layout itself marks the window dirty. Preserve subsequent invalidations
+		// from observers and drawing so they request another traversal.
+		ws.dirty = false
+		if !ws_dispatch_traversal(e, window) { return }
 		ws_trace_tree(e, decor)
 		args := [Value{ l: ws.canvas }]!
 		call(e, decor, c'android/view/View', c'vinixDrawLayer', c'(Landroid/graphics/Canvas;)V', &args[0])
-		if ws.dialog != nil && !pending(e) { ws_render_dialog(e) }
+		if pending(e) { return }
+		if ws.dialog != nil && !ws_render_dialog(e) { return }
 		surface.sequence++
 		C.__atomic_store_n(&surface.active, target, 3)
-		ws.dirty = false
 		ws.animation_last = ws_millis()
 	}
 }

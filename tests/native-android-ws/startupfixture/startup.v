@@ -33,6 +33,7 @@ pub fn install(output string, resources string) ! {
  install_time_animator_probe(dir)!
  install_message_queue_probe(dir)!
  install_attachment_probe(dir)!
+ install_traversal_probe(dir)!
  install_touch_probe(dir)!
  install_editor_probe(dir)!
  install_window_probe(dir)!

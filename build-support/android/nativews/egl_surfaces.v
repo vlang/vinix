@@ -14,6 +14,7 @@ mut:
 	width i32
 	height i32
 	pixels &u8
+	trace WsPixelTrace
 }
 struct WsEglBinding {
 mut:
@@ -217,6 +218,7 @@ fn ws_egl_present(item &WsEglWindow) bool {
 			get_integer(0x0d04, &skip_pixels); store(0x0d04, 0)
 		}
 		WsGlRead(ws_egl_proc(c'glReadPixels'))(0, 0, item.width, item.height, 0x1908, 0x1401, item.pixels)
+		ws_trace_pixels(c'EGL', &item.trace, item.width, item.height, item.pixels)
 		store(0x0d05, alignment)
 		if es3 {
 			store(0x0d02, row_length); store(0x0d03, skip_rows); store(0x0d04, skip_pixels)

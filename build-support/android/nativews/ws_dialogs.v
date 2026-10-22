@@ -84,15 +84,17 @@ fn ws_dialog_close(e voidptr, dialog voidptr) {
 	}
 }
 
-fn ws_render_dialog(e voidptr) {
+fn ws_render_dialog(e voidptr) bool {
 	unsafe {
+		needs_redraw := ws.dirty
 		decor := ws_dialog_decor(e, ws.dialog)
 		window := obj(e, ws.dialog, c'android/app/Dialog', c'getWindow', c'()Landroid/view/Window;', nil)
 		ws_attach_window(e, window, decor)
-		if pending(e) { return }
+		if pending(e) { return false }
 		measure := [Value{ i: i32(u32(ws.width - 32) + 0x80000000) },
 			Value{ i: i32(u32(ws.height - 32) + 0x80000000) }]!
 		call(e, decor, c'android/view/View', c'measure', c'(II)V', &measure[0])
+		if pending(e) { return false }
 		width := integer(e, decor, c'android/view/View', c'getMeasuredWidth', c'()I', nil)
 		height := integer(e, decor, c'android/view/View', c'getMeasuredHeight', c'()I', nil)
 		ws.dialog_x = (ws.width - width) / 2
@@ -101,6 +103,9 @@ fn ws_render_dialog(e voidptr) {
 		ws.dialog_height = height
 		layout := [Value{ i: 0 }, Value{ i: 0 }, Value{ i: width }, Value{ i: height }]!
 		call(e, decor, c'android/view/View', c'layout', c'(IIII)V', &layout[0])
+		if pending(e) { return false }
+		ws.dirty = needs_redraw
+		if !ws_dispatch_traversal(e, window) { return false }
 		ws_rect(0, 0, f32(ws.width), f32(ws.height), 0x66000000)
 		ws_save()
 		ws_translate(f32(ws.dialog_x), f32(ws.dialog_y))
@@ -109,5 +114,6 @@ fn ws_render_dialog(e voidptr) {
 		args := [Value{ l: ws.canvas }]!
 		call(e, decor, c'android/view/View', c'vinixDrawLayer', c'(Landroid/graphics/Canvas;)V', &args[0])
 		ws_restore()
+		return !pending(e)
 	}
 }

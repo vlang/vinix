@@ -36,6 +36,7 @@ mut:
 	egl_connected bool
 	front      i64
 	back       i64
+	trace      WsPixelTrace
 }
 
 struct WsNativeBuffer {
@@ -215,6 +216,8 @@ fn ws_surface_draw(e voidptr, object voidptr) {
 		C.pthread_mutex_lock(&window.mutex)
 		defer { C.pthread_mutex_unlock(&window.mutex) }
 		if window.front == 0 { return }
+		bitmap := &WsBitmap(window.front)
+		ws_trace_pixels(c'COMPOSE', &window.trace, bitmap.width, bitmap.height, bitmap.rgba)
 		ws_draw_bitmap(window.front, 0, 0, window.width, window.height)
 	}
 }

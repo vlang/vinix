@@ -908,6 +908,7 @@ const/16 v5, 96
 invoke-direct {v3, v4, v5}, Landroid/view/ViewGroup$LayoutParams;-><init>(II)V
 invoke-virtual {v2, v0, v3}, Landroid/view/ViewGroup;->addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V
 invoke-virtual {p0, v2}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V
+invoke-static {p0, v2}, Lorg/vinix/bootstrap/TraversalProbe;->install(Landroid/content/Context;Landroid/view/ViewGroup;)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
 const-string v1, "BOOTSTRAP-NDK-PASS order paths clocks is64bit assets rtl webp matrix network bitmap clients EGL-software-rendering bitmap-canvas notifications-queued"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V

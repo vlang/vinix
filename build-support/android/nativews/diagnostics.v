@@ -16,6 +16,40 @@ type WsObjectClass = fn (voidptr, voidptr) voidptr
 __global ws_surface_dump_count i32
 __global ws_tree_trace_at i64
 
+struct WsPixelTrace {
+mut:
+	frames usize
+	at i64
+}
+
+// Inspect the existing readback/front buffer without issuing GL calls or
+// changing its state. The caller holds the surface/window lock. Counters are
+// per surface; only the first three frames and one per 30 seconds are scanned.
+fn ws_trace_pixels(stage &char, trace &WsPixelTrace, width i32, height i32, pixels &u8) {
+	unsafe {
+		if C.getenv(c'VINIX_ANDROID_TRACE_TREE') == nil { return }
+		trace.frames++
+		now := ws_millis()
+		if trace.frames > 3 && now - trace.at < 30000 { return }
+		trace.at = now
+		if pixels == nil || width <= 0 || height <= 0 { return }
+		mut different := i32(0)
+		mut opaque := i32(0)
+		mut transparent := i32(0)
+		for i in 0 .. width * height {
+			p := pixels + usize(i) * 4
+			if p[0] != pixels[0] || p[1] != pixels[1] || p[2] != pixels[2] { different++ }
+			if p[3] == 255 { opaque++ }
+			if p[3] == 0 { transparent++ }
+		}
+		center := pixels + usize((height / 2) * width + width / 2) * 4
+		C.printf(c'ANDROID-WS-PIXELS stage=%s frame=%zu size=%dx%d different_rgb=%d opaque=%d transparent=%d first=%02x%02x%02x%02x center=%02x%02x%02x%02x\n',
+			stage, trace.frames, width, height, different, opaque, transparent,
+			u32(pixels[0]), u32(pixels[1]), u32(pixels[2]), u32(pixels[3]),
+			u32(center[0]), u32(center[1]), u32(center[2]), u32(center[3]))
+	}
+}
+
 // Rendering can run continuously. Sample the tree so diagnostics do not drown
 // the serial port or hold up the same UI/render callbacks being investigated.
 fn ws_trace_tree(e voidptr, root voidptr) {
