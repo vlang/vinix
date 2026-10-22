@@ -178,29 +178,54 @@ fn ws_resource_init(e voidptr, object voidptr, sdk i32) {
 	ws_put_long(e, object, c'android/content/res/AssetManager', c'mObject', i64(manager))
 }
 
-fn ws_assets(e voidptr, object voidptr, paths voidptr, count i32) {
+fn ws_load_apk_asset(e voidptr, path voidptr) voidptr {
 	unsafe {
-		if count < 0 || count > 4096 { return }
+		if path == nil { return nil }
+		text := ws_utf(e, path)
+		if text == nil { return nil }
+		defer { ws_release(e, path, text) }
+		length := C.strlen(text)
+		return if length > 0 && text[length - 1] == `/` {
+			voidptr(C.ApkAssets_loadDir(text))
+		} else {
+			voidptr(C.ApkAssets_load(text, false))
+		}
+	}
+}
+
+fn ws_assets(e voidptr, object voidptr, paths voidptr, count i32, target i32) i32 {
+	unsafe {
+		if count < 0 || count > 4096 || target >= count { return 0 }
 		assets := &voidptr(C.alloca(usize(count + 1) * sizeof(voidptr)))
+		cookie_paths := WsNewArray(slot(e, 172))(e, count, cls(e, c'java/lang/Object'), nil)
+		if cookie_paths == nil { return 0 }
+		defer { Drop(slot(e, 23))(e, cookie_paths) }
+		// Reject a bad addition before reloading any existing APKs.
+		mut addition := voidptr(nil)
+		if target >= 0 {
+			path := WsArrayGet(slot(e, 173))(e, paths, target)
+			addition = ws_load_apk_asset(e, path)
+			if path != nil { Drop(slot(e, 23))(e, path) }
+			if addition == nil { return 0 }
+		}
 		mut actual := usize(0)
+		mut cookie := i32(0)
 		for i := i32(0); i < count; i++ {
 			path := WsArrayGet(slot(e, 173))(e, paths, i)
 			if path == nil { continue }
-			text := ws_utf(e, path)
-			length := C.strlen(text)
-			asset := if length > 0 && text[length - 1] == `/` {
-				voidptr(C.ApkAssets_loadDir(text))
-			} else {
-				voidptr(C.ApkAssets_load(text, false))
-			}
-			ws_release(e, path, text)
-			Drop(slot(e, 23))(e, path)
+			asset := if i == target { addition } else { ws_load_apk_asset(e, path) }
 			if asset != nil {
 				assets[actual] = asset
+				WsArraySet(slot(e, 174))(e, cookie_paths, i32(actual), path)
 				actual++
+				if i == target { cookie = i32(actual) }
 			}
+			Drop(slot(e, 23))(e, path)
 		}
-		C.AssetManager_setApkAssets(ws_manager(e, object), voidptr(assets), actual, true, true)
+		if target >= 0 && cookie == 0 { return 0 }
+		if !C.AssetManager_setApkAssets(ws_manager(e, object), voidptr(assets), actual, true, true) { return 0 }
+		put_object(e, object, c'android/content/res/AssetManager', c'vinixCookiePaths', c'[Ljava/lang/Object;', cookie_paths)
+		return cookie
 	}
 }
 
@@ -346,7 +371,14 @@ fn ws_open_asset(e voidptr, object voidptr, name voidptr, mode i32) i64 {
 	return i64(asset)
 }
 
-fn ws_open_xml(e voidptr, object voidptr, name voidptr) i64 {
+fn ws_open_xml(e voidptr, object voidptr, cookie i32, name voidptr) i64 {
+	if cookie != 0 {
+		args := [Value{i: cookie}, Value{l: name}]!
+		bytes := obj(e, object, c'android/content/res/AssetManager', c'vinixReadXmlAsset', c'(ILjava/lang/String;)[B', &args[0])
+		if pending(e) || bytes == unsafe { nil } { return 0 }
+		defer { unsafe { Drop(slot(e, 23))(e, bytes) } }
+		return ws_xml_create(e, bytes, 0, ws_array_len(e, bytes))
+	}
 	asset := voidptr(ws_open_asset(e, object, name, 3))
 	if asset == unsafe { nil } { return 0 }
 	tree := C.ResXMLTree_new()

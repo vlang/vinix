@@ -2,7 +2,8 @@
 android/atl/ATLLoadedApp|vinixEnsureApplicationStarted|ws_ensure_application(e,this)
 android/content/res/AssetManager|init|ws_resource_init(e,this,p0)
 android/content/res/AssetManager|list|return ws_asset_list(e,this,p0)
-android/content/res/AssetManager|native_setApkAssets|ws_assets(e,this,p0,p1)
+android/content/res/AssetManager|native_setApkAssets|ws_assets(e,this,p0,p1,-1)
+android/content/res/AssetManager|vinixSetAssetPaths|return ws_assets(e,this,p0,ws_array_len(e,p0),p1)
 android/content/res/AssetManager|loadResourceValue|return ws_resource(e,this,p0,p1,p2,p3)
 android/content/res/AssetManager|loadResourceBagValue|return ws_bag_value(e,this,p0,p1,p2)
 android/content/res/AssetManager|getArraySize|bag := &C.ResolvedBag(C.AssetManager_getBag(ws_manager(e,this),u32(p0))); return if bag == nil { 0 } else { i32(bag.entry_count) }
@@ -22,7 +23,7 @@ android/content/res/AssetManager|loadThemeAttributeValue|return ws_theme_value(e
 android/content/res/AssetManager|applyStyle|ws_apply_style(e,p0,p1,p2,p3,p4,p5,p6,p7)
 android/content/res/AssetManager|retrieveAttributes|return ws_retrieve(e,this,p0,p1,p2,p3,p4)
 android/content/res/AssetManager|resolveAttrs|return ws_resolve_attrs(e,p0,p1,p2,p3,p4,p5,p6)
-android/content/res/AssetManager|openXmlAssetNative|return ws_open_xml(e,this,p1)
+android/content/res/AssetManager|openXmlAssetNative|return ws_open_xml(e,this,p0,p1)
 android/content/res/AssetManager|openAsset|return ws_open_asset(e,this,p0,p1)
 android/content/res/AssetManager|openAssetFd|return ws_asset_descriptor(e,this,p0,p1,p2,p3)
 android/content/res/AssetManager|readAsset|return ws_asset_read(e,p0,p1,p2,p3)
