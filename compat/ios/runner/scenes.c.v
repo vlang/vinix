@@ -56,6 +56,14 @@ fn objc_responds(object u64, selector &char) bool {
 		if sort_descriptor_unsupported(name) { return native_method(read64(object), name) != 0 }
 		if sort_descriptor_selector(object, name) { return true }
 	}
+	if regular_expression_family(if object in ios_runtime.classes { object } else { read64(object) }) {
+		if regular_expression_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if regular_expression_selector(object, name) { return true }
+	}
+	if regex_result_family(if object in ios_runtime.classes { object } else { read64(object) }) {
+		if regex_result_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if regular_expression_selector(object, name) { return true }
+	}
 	if ns_process_info_family(if object in ios_runtime.classes { object } else { read64(object) }) {
 		if name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return native_method(read64(object), name) != 0 }
 		if ns_process_info_selector(object, name) { return true }

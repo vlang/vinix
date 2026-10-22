@@ -148,6 +148,10 @@ mut:
 	sort_descriptor_owned bool
 	sort_descriptor_initialized bool
 	sort_descriptor_initializing bool
+	regular_expression_owned bool
+	regular_expression_initializing bool
+	regular_expression &NSRegexProgram = unsafe { nil }
+	regex_result_owned bool
 	uuid_owned bool
 	pool_owned bool
 	pool_initialized bool
@@ -493,7 +497,7 @@ fn objc_start() {
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
-        'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSSortDescriptor',
+        'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
@@ -518,6 +522,7 @@ fn objc_start() {
 			'NSInputStream' { ios_runtime.names['NSStream'] }
 			'NSNumber', 'NSConcreteValue' { ios_runtime.names['NSValue'] }
 			'NSConstantIntegerNumber' { ios_runtime.names['NSNumber'] }
+			'VinixRegularExpressionCheckingResult' { ios_runtime.names['NSTextCheckingResult'] }
 			'_NSUUIDBridge' { ios_runtime.names['NSUUID'] }
 			'__NSConcreteUUID' { ios_runtime.names['_NSUUIDBridge'] }
 			'UIView', 'UIViewController', 'UIApplication' { ios_runtime.names['UIResponder'] }
@@ -582,6 +587,8 @@ fn objc_start() {
 			'NSURLConnection' { u32(16) }
 			'NSURLSession' { u32(160) }
 			'NSSortDescriptor' { u32(40) }
+			'NSRegularExpression' { u32(40) }
+			'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult' { u32(8) }
 			'UIAlertController' { u32(1400) }
 			'UIAlertAction' { u32(144) }
 			'NSLayoutConstraint' { u32(sizeof(AbiLayoutConstraint)) }
@@ -624,6 +631,7 @@ fn objc_start() {
 	webkit_metadata()
 	url_session_metadata()
 	sort_descriptor_metadata()
+	regular_expression_metadata()
 	mut request_class := ios_runtime.classes[ios_runtime.names['NSURLRequest']] or { panic('iOS: missing request class') }
 	for i, pair in [['_internal', '@"NSURLRequestInternal"']!, ['_cookiePartitionIdentifier', '@"NSString"']!]! {
 		request_class.ivars[pair[0]] = &ObjIvar{name:pair[0].clone(), types:pair[1].clone(), offset:i64(8 + i * 8), size:8}
@@ -661,6 +669,7 @@ fn objc_allocate(cls u64) u64 {
 	if connection_family(cls) && cls != ios_runtime.names['NSURLConnection'] { panic('iOS: custom connection subclass construction is not implemented') }
 	url_session_require_class(cls)
 	sort_descriptor_require_class(cls)
+	regular_expression_require_class(cls)
 	ns_input_stream_require_class(cls)
 	ns_pool_require_class(cls)
 	ns_timezone_require_class(cls)

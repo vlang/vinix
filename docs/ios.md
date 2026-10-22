@@ -17387,7 +17387,7 @@ The initial native fixture run caught an eager access to uninitialized Vinix
 block metadata; that failed attempt is preserved separately from the corrected
 runs.
 
-The corrected launch probe resolves `NSSortDescriptor` and now stops at
+That corrected launch probe resolved `NSSortDescriptor` and stopped at
 `_OBJC_CLASS_$_NSRegularExpression`, before application entry. Fortnite remains
 unplayable.
 
@@ -17404,17 +17404,86 @@ the full host dynamic runtime closure. ASan leak detection was disabled.
 v run tests/ios/native-checks.v build-sort-descriptor
 ```
 
+V now supplies Foundation's public base `NSRegularExpression`, its measured
+40-byte record and four ivars, typed compilation and query methods, escaping,
+and immutable match-result objects. Patterns are copied; regex and result
+copies retain the same object. Invalid supported syntax returns Cocoa error
+2048 and consumes the initializer's receiver. Successful initialization leaves
+the caller's NSError slot unchanged. Results retain their regex and own their
+capture ranges, including after autorelease-pool drainage or an isa replacement.
+Application pattern-copy callbacks run outside the runtime lock.
+
+The pure V engine supports scalar literals, character classes, alternation,
+capturing and noncapturing groups, greedy and lazy repetition, anchors and
+single-digit backreferences. Query ranges and capture offsets use UTF-16 code
+units; unmatched captures use NSNotFound with zero length. Compile options
+cover ASCII case folding, ICU-style comments, literal patterns, dot-all,
+multiline anchors and Unix line endings. Matching supports the default and
+anchored options, including Apple's empty-match enumeration behavior. Static
+inspection of the exact Fortnite executable finds five nearby regex class-load
+sites and patterns for currency codes, authorization URLs, identifiers and
+topic paths; these patterns are included in the shared fixture. Proximity in
+the binary does not establish that those paths executed.
+
+ASCII shorthand classes and case folding require entirely ASCII patterns and
+subjects. Unicode properties and word boundaries, named groups, lookaround,
+inline flags, possessive repetition, class set operations and ambiguous
+multi-digit backreferences are explicitly unsupported. Surrogate-interior
+ranges, unsupported options and operations, designated reinitialization and
+custom subclass construction also fail explicitly. Replacement, block
+enumeration, coding and named capture lookup remain unimplemented. Result
+objects use private Vinix storage rather than claiming Apple's concrete
+class-cluster layouts.
+
+The supported profile bounds patterns to 4,096 bytes, subjects to 65,536 bytes,
+captures to 32 and returned matches to 4,096. Parser, bytecode, nesting,
+repetition and backtracking limits, plus per-search and whole-query work
+budgets, bound resource use and reject larger workloads explicitly.
+
+The shared fixture passes against Apple Foundation and the Vinix runtime with
+40 matching vectors and four invalid-pattern cases, including incomplete
+octal escapes and literal digit escapes inside character classes. Both macOS
+ASan+UBSan runs pass, with ordinary and deterministic Swift hashing; the ARM64
+guest fixture also passes. Runtime checks cover callback reentry, eight
+concurrent readers, copied mutable patterns, result ownership after pool
+drainage, guarded caller storage, 64 isa
+replacements, two drained runtimes and 28 explicit rejection cases. Independent
+source and generated-C review found no unresolved lifetime issue.
+
+The first sanitizer attempt caught an empty-string escaping crash. Its exact
+sources and failed artifacts remain under `failed-attempt-1`; the successful
+empty-string correction was then superseded by the final native escape-rule
+corrections and preserved under `superseded-attempt-2`. Final host results use
+the corrected sources and refreshed native evidence.
+
+The final launch probe resolves `NSRegularExpression` and stops at
+`_OBJC_CLASS_$_NSMutableString`, before application entry. Fortnite remains
+unplayable.
+
+`build/ios/fortnite/regular-expression-checks/proof.log` verifies 21,878 unchanged
+listed inputs, 203 sealed native evidence files with preserved failed-attempt
+statuses, both sanitizer runs, five binary/generated-C archive pairs and the
+host dSYM. The fixture, launch probe and both import audits completed as four
+sequential ARM64 guest phases. Serial/configuration hashes are retained; VM
+payloads and scratch storage were retired, and the owned RAM disk was detached.
+The input manifest covers the categories listed in its provenance rather than
+the full host dynamic runtime closure. ASan leak detection was disabled.
+
+```sh
+v run tests/ios/native-checks.v build-regular-expression
+```
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,059 | 102 | 78 |
+| Fortnite executable | 2,060 | 101 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,899 | 105 | 114 |
+| All images | 2,900 | 104 | 114 |
 
-The C++/GLES/Text variant reports 2,913 resolved imports, 91 unresolved strong
+The C++/GLES/Text variant reports 2,914 resolved imports, 90 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -17463,7 +17532,8 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 `build/ios/fortnite` (default `select-checks`; the timestamp/UUID verification uses
 `file-time-checks`, the audio constants use `audio-session-checks`,
 base URL sessions use `url-session-checks`, sort descriptors use
-`sort-descriptor-checks`, CoreFoundation dictionaries use
+`sort-descriptor-checks`, regular expressions use `regular-expression-checks`,
+CoreFoundation dictionaries use
 `cf-dictionary-checks`, constant integers use
 `constant-integer-checks`, constant arrays use `constant-array-checks`, supplied
 Objective-C storage uses `objc-storage-checks`,
@@ -17475,8 +17545,8 @@ object monitors use `objc-sync-checks`, Swift strings/buffers use
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
-URL session, sort descriptor, CoreFoundation dictionary, constant array and constant integer, supplied
-Objective-C storage,
+URL session, sort descriptor, regular expression, CoreFoundation dictionary,
+constant array and constant integer, supplied Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String
 metadata/witness checks before the existing Mach-O suite and requires the
 guest PASS marker.

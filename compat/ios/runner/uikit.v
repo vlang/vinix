@@ -114,6 +114,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if connection_dispatch(object, selector, mut frame) { return true }
 	if url_session_dispatch(object, selector, mut frame) { return true }
 	if sort_descriptor_dispatch(object, selector, mut frame) { return true }
+	if regular_expression_dispatch(object, selector, mut frame) { return true }
 	if cookie_dispatch(object, selector, mut frame) { return true }
 	if webkit_dispatch(object, selector, mut frame) { return true }
 	if http_url_dispatch(object, selector, mut frame) { return true }
