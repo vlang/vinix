@@ -15,6 +15,7 @@ import time as platform_time
 import term.termios
 import desktop.ptycore
 import tools.packages.x11auth
+import loginchannel
 
 #include <dirent.h>
 
@@ -872,17 +873,38 @@ fn desktop_is_development_session() bool {
 fn desktop_exec_replacement() {
 	argv := [c'/usr/bin/vinix-desktop', &char(unsafe { nil })]
 	home_entry := 'HOME=${desktop_home}'
+	defer { unsafe { argv.free(); home_entry.free() } }
 	mut envp := [c'PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', &char(home_entry.str),
 		c'TERM=linux', &char(desktop_user_entry.str), &char(desktop_logname_entry.str), &char(desktop_shell_entry.str),
 		c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		&char(desktop_runtime_entry.str), &char(desktop_config_entry.str),
 		&char(desktop_cache_entry.str), &char(desktop_data_entry.str), &char(desktop_state_entry.str), c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
+	defer { unsafe { envp.free() } }
+	envp.flags |= .noslices
 	if desktop_is_system_session() {
 		envp << c'VINIX_SYSTEM_SESSION=1'
 	}
+	if desktop_managed_session {
+		loginchannel.prepare_replacement() or {
+			message := err.msg()
+			eprintln(message)
+			unsafe { message.free(); err.free() }
+			return
+		}
+		envp << c'VINIX_SESSION_FD=3'
+	}
 	envp << &char(unsafe { nil })
 	C.execve(argv[0], argv.data, envp.data)
+	if desktop_managed_session {
+		// A failed replacement keeps running this compositor. Restore CLOEXEC
+		// before it can launch another application with the manager capability.
+		loginchannel.inherited() or {
+			message := err.msg()
+			eprintln(message)
+			unsafe { message.free(); err.free() }
+		}
+	}
 	eprintln('vinix-desktop: could not execute the replacement desktop')
 }
 

@@ -169,6 +169,11 @@ fn main() {
 	if args == ['package-launch'] {
 		exit(package_launch() or { eprintln('vinix-session: ${err}'); 126 })
 	}
+	if args.len > 0 && args[0] == 'graphical' {
+		if args.len != 3 || args[1] != '--desktop' { fail('usage: vinix-session graphical --desktop /usr/bin/vinix-desktop') }
+		sessioncore.graphical(args[2]) or { fail(err.msg()) }
+		return
+	}
 	if args.len >= 1 && args[0] == 'console' {
 		console()
 		return

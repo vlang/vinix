@@ -13,6 +13,7 @@
 module main
 
 import os
+import loginchannel
 
 // What the loop asks to wait after a frame changed. Vinix wakes a sleeping
 // thread on the scheduler's timeslice, so the shortest sleep that actually
@@ -180,6 +181,21 @@ fn main() {
 	}
 	gpu_present_startup_stage(c'application subprocess mode not requested')
 	gpu_present_startup_stage(c'desktop process selected')
+	greeter_mode := '--greeter' in all_args
+	register_only := '--register-only' in all_args
+	if greeter_mode {
+		if register_only || desktop_identity.uid == 0 || desktop_identity.name != 'greeter' {
+			eprintln('vinix-desktop: the login screen requires its ordinary greeter account')
+			exit(1)
+		}
+		loginchannel.inherited() or { eprintln('vinix-desktop: ${err}'); exit(1) }
+	} else if register_only && desktop_identity.uid != 0 {
+		eprintln('vinix-desktop: initial account setup must be started by root')
+		exit(1)
+	} else if os.getenv('VINIX_SESSION_FD') != '' {
+		loginchannel.inherited() or { eprintln('vinix-desktop: ${err}'); exit(1) }
+		desktop_managed_session = true
+	}
 	// Installed roots can retain /run across boots. A previous compositor's
 	// marker must not make this replacement look ready before it has painted.
 	// Helpers and application subprocesses leave their compositor's marker alone.
@@ -247,6 +263,10 @@ fn main() {
 		keyboard.close()
 	}
 	gpu_present_startup_stage(c'keyboard device ready')
+	if greeter_mode {
+		desktop.run_greeter(mut fb, mut pointer, mut keyboard, options.frame_interval)
+		return
+	}
 
 	// First launch is an exclusive setup mode: ordinary windows, shortcuts and
 	// the taskbar do not exist until a persistent user profile has been created.
@@ -257,6 +277,7 @@ fn main() {
 	if !desktop.running {
 		return
 	}
+	if register_only { return }
 	// The Desktop and Files show the user's /home/<user>/Desktop, Documents,
 	// Downloads and so on from here on.
 	desktop_use_user_home(desktop_prepare_user_home(desktop_home, desktop_users_directory))
@@ -601,6 +622,16 @@ fn main() {
 	// Nothing above has to be undone afterwards: this does not return unless
 	// the kernel refuses, and it is keep_running for a session that was only
 	// closed rather than asked to take the machine with it.
+	if desktop_managed_session {
+		if desktop.power in [.power_off, .halt, .restart] {
+			loginchannel.power(if desktop.power == .restart { 'restart' } else { 'off' }) or {
+				eprintln('vinix-desktop: ${err}')
+			}
+		} else {
+			loginchannel.command(loginchannel.op_logout) or { eprintln('vinix-desktop: ${err}') }
+		}
+		return
+	}
 	desktop_power_apply(desktop.power)
 }
 

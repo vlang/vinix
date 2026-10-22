@@ -315,7 +315,7 @@ fn (d &Desktop) luna_menu_session(mut children []ui2.Element, id string, title s
 
 // Keep restart and suspend available behind Turn Off Computer, as in XP.
 fn (d &Desktop) luna_menu_power_choices(mut children []ui2.Element, width int, bottom int) {
-	count := if d.idle.sleep_available { 3 } else { 2 }
+	count := 2 + (if d.idle.sleep_available { 1 } else { 0 }) + (if desktop_managed_session { 2 } else { 0 })
 	height := count * luna_menu_place_height + 8
 	x := if width > 188 { width - 188 } else { 1 }
 	popup_width := width - x - 2
@@ -333,16 +333,22 @@ fn (d &Desktop) luna_menu_power_choices(mut children []ui2.Element, width int, b
 		action := match slot {
 			0 { action_start_shutdown }
 			1 { action_start_restart }
+			2 { if desktop_managed_session { action_start_switch_user } else { action_start_sleep } }
+			3 { action_start_logoff }
 			else { action_start_sleep }
 		}
 		title := match slot {
 			0 { tr('start.shut_down') }
 			1 { tr('start.restart') }
+			2 { if desktop_managed_session { 'Switch user' } else { tr('start.sleep') } }
+			3 { tr('start.xp.log_off') }
 			else { tr('start.sleep') }
 		}
 		icon := match slot {
 			0 { 'builtin:luna_power' }
 			1 { 'builtin:luna_restart' }
+			2 { if desktop_managed_session { 'builtin:luna_logoff' } else { 'builtin:luna_sleep' } }
+			3 { 'builtin:luna_logoff' }
 			else { 'builtin:luna_sleep' }
 		}
 		d.luna_menu_row(mut children, action, title, icon, x + 4, y + 4 + slot * luna_menu_place_height,

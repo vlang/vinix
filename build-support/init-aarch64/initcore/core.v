@@ -152,8 +152,8 @@ fn prepare_environment() {
 @[export: 'vinix_init_desktop']
 pub fn desktop_start() {
  unsafe {
-  desktop := [&char(c'/usr/bin/vinix-desktop'),&char(nil)]!
-  gpu := [&char(c'/usr/bin/vinix-desktop-gpu'),&char(nil)]!
+  desktop := [&char(c'/usr/sbin/vinix-session'),&char(c'graphical'),&char(c'--desktop'),&char(c'/usr/bin/vinix-desktop'),&char(nil)]!
+  gpu := [&char(c'/usr/sbin/vinix-session'),&char(c'graphical'),&char(c'--desktop'),&char(c'/usr/bin/vinix-desktop-gpu'),&char(nil)]!
   hyprland := [&char(c'/usr/bin/start-hyprland-vinix'),&char(nil)]!
   shell := [&char(c'/bin/zsh'),&char(c'-l'),&char(nil)]!
   mut status := i32(0)
@@ -177,7 +177,7 @@ pub fn desktop_start() {
   for {
    mut selected := &desktop[0]; mut fallback := &&char(nil)
    if requested_power != 0 { apply_power_request() }
-   if gpu_available() && !executable_available(c'/run/vinix-desktop-development') { selected = &gpu[0]; fallback = &desktop[0]; init_print(c'\nVinix: starting the GPU-enabled desktop\n') }
+   if gpu_available() && executable_available(c'/usr/bin/vinix-desktop-gpu') && !executable_available(c'/run/vinix-desktop-development') { selected = &gpu[0]; fallback = &desktop[0]; init_print(c'\nVinix: starting the GPU-enabled desktop\n') }
    else { init_print(c'\nVinix: starting the desktop\n') }
    status = 0
    mut child := spawn_program(selected,fallback,true,&status,&vinit_environment[0],voidptr(selected) == voidptr(&gpu[0]))

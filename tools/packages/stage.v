@@ -24,7 +24,7 @@ fn compile_image_tools(build &pkgcore.ImageToolBuild, architecture string, repos
 		defer { unsafe { source.free(); binary.free() } }
 		build.check()!
 		invoke(v, ['-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
-			'-gc', 'none', '-d', 'no_backtrace', '-d', 'no_segfault_handler', '-os', 'linux', '-arch',
+			'-enable-globals', '-gc', 'none', '-d', 'no_backtrace', '-d', 'no_segfault_handler', '-os', 'linux', '-arch',
 			if architecture == 'aarch64' { 'arm64' } else { 'amd64' }, '-o', source, repository + '/' + pair[1]])!
 		build.check()!
 		invoke(cc, [...compiler_args[1..], '-static', '-O2', '-std=gnu11', '-D_GNU_SOURCE', source,

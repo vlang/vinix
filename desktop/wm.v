@@ -1157,7 +1157,7 @@ fn (mut d Desktop) end_session(action PowerAction) {
 			return
 		}
 	}
-	if desktop_is_system_session() {
+	if desktop_is_system_session() || desktop_managed_session {
 		d.power = action
 	}
 	d.running = false

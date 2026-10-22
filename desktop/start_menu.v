@@ -229,6 +229,9 @@ fn (mut d Desktop) start_menu_element() ui2.Element {
 		size: 15
 		bold: true
 	})
+	if desktop_managed_session {
+		children << d.start_menu_power_button(action_start_power, 'Account…', right_x, 17, right_width)
+	}
 
 	if d.start_menu_recent_app != start_recent_none {
 		d.start_menu_recent_pane(mut children, right_x, 76, right_width, height - 62 - 76 - d.start_menu_power_rise())
@@ -269,6 +272,9 @@ fn (mut d Desktop) start_menu_element() ui2.Element {
 	if d.idle.sleep_available {
 		power_y -= start_menu_power_pitch
 		children << d.start_menu_power_button(action_start_sleep, tr('start.sleep'), power_x, power_y, power_width)
+	}
+	if desktop_managed_session && d.start_menu_power_open {
+		d.luna_menu_power_choices(mut children, width, height - 49)
 	}
 
 	// Clickable rather than a plain view so empty space in the menu consumes a
@@ -889,6 +895,7 @@ fn (mut d Desktop) start_menu_key_input(keys string) {
 fn (mut d Desktop) handle_start_action(action string) {
 	if action != action_start_power { d.start_menu_power_open = false }
 	match action {
+		action_start_switch_user { d.switch_login_user() }
 		action_start_panel, action_start_search, action_start_power_panel {
 			d.start_menu_searching = action == action_start_search
 			d.dirty = true

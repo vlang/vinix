@@ -17,7 +17,7 @@ fn test_both_login_paths_refuse_ordinary_authentication_service_before_sending_p
 	mut manager := Manager{ config: ManagerConfig{ socket: listener.path } }
 	mut request := authproto.text_frame(op_login, 'somebody', 'manager secret')
 	defer { request.close() }
-	mut answer, user := manager.check_login(mut request)
+	mut answer, user := manager.check_login(request)
 	defer { answer.close() }
 	assert answer.code == authproto.status_failed
 	assert user == none
