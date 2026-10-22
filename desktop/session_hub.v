@@ -264,10 +264,17 @@ fn (mut d Desktop) perform_session_action(m SessionMessage) {
 	// External callers may show help or request a user-confirmed dialog.
 	// Changes to another window or the session require recent focused input.
 	if m.pid > 0 && action !in ['shell', 'notifications', 'services', 'help', 'dialog',
-		'clipboard.offer', 'clipboard.request', 'settings'] && !d.session_sender_has_gesture(m.pid) {
+		'clipboard.offer', 'clipboard.request', 'settings', first_run_release_review_action] && !d.session_sender_has_gesture(m.pid) {
 		return
 	}
 	match action {
+		first_run_release_review_action {
+			// The broker admits only this account. Recheck the fixed declaration;
+			// callers cannot supply another path, package, approval or apply action.
+			if m.count == 1 && first_run_signed_release_required('neovim', FirstRunReleaseRoute{}) or { unsafe { err.free() }; false } {
+				d.open_first_run_release_review()
+			}
+		}
 		'shell' { d.open_session_hub(0) }
 		'notifications' { d.open_session_hub(1) }
 		'clipboard' { d.open_session_hub(2) }

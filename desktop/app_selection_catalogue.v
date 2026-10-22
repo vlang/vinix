@@ -132,6 +132,7 @@ const first_run_app_catalogue = [
 		title:           'Neovim'
 		icon:            'asset:neovim'
 		package_name:    'neovim'
+		signed_package_id: 'org.neovim.editor'
 		open_source:     true
 		action:          'apps.toggle.neovim'
 		installed_paths: ['/usr/bin/nvim']

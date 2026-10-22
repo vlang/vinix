@@ -300,7 +300,12 @@ fn first_run_publish_vendor(name string, download FirstRunDownload, payload stri
 }
 
 fn first_run_install_vendor(name string) ! {
+	first_run_install_vendor_with_release(name, FirstRunReleaseRoute{})!
+}
+
+fn first_run_install_vendor_with_release(name string, route FirstRunReleaseRoute) ! {
 	if !first_run_apps.any(it.package_name == name) { return error('unknown setup app: ${name}') }
+	if first_run_redirect_release(name, route)! { return }
 	if name == 'ios-runtime' {
 		first_run_install_ios_runtime('')!
 		if os.is_executable('/usr/libexec/vinix-persist-packages') {

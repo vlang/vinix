@@ -237,17 +237,22 @@ fn test_first_run_install_reports_in_russian() {
 	fake_pkg := os.join_path(work, 'bin', 'pkg')
 	os.write_file(fake_pkg, '#!/bin/sh\n[ "\$2" != chromium ]\n') or { panic(err) }
 	os.chmod(fake_pkg, 0o755) or { panic(err) }
+	// The installer also verifies an executable was installed. Keep this host
+	// fixture private instead of depending on the catalogue path on the host.
+	firefox := os.join_path(work, 'bin', 'firefox')
+	os.write_file(firefox, '#!/bin/sh\nexit 0\n') or { panic(err) }
+	os.chmod(firefox, 0o755) or { panic(err) }
 
 	set_desktop_language(.ru)
 	command := first_run_install_command('firefox chromium')
-	script := command.replace('exec /bin/zsh -i', 'exit 0')
+	script := command.replace('exec /bin/zsh -i', 'exit 0').replace('/usr/lib/firefox-esr/firefox-esr', firefox)
 	result := os.execute('PATH="${work}/bin:\$PATH" sh -c ${os.quoted_path(script)}')
 	assert result.exit_code == 0
 	assert result.output.contains('Установка приложений, выбранных при настройке: firefox chromium')
 	assert result.output.contains('Не установлены: chromium. Чтобы повторить попытку, выполните vinix-desktop --install-setup-app chromium.')
 
 	set_desktop_language(.es)
-	success := first_run_install_command('firefox').replace('exec /bin/zsh -i', 'exit 0')
+	success := first_run_install_command('firefox').replace('exec /bin/zsh -i', 'exit 0').replace('/usr/lib/firefox-esr/firefox-esr', firefox)
 	ok := os.execute('PATH="${work}/bin:\$PATH" sh -c ${os.quoted_path(success)}')
 	assert ok.exit_code == 0
 	assert ok.output.contains('Las aplicaciones seleccionadas están instaladas.')

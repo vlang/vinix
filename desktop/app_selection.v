@@ -73,6 +73,7 @@ struct FirstRunApp {
 	title           string
 	icon            string
 	package_name    string
+	signed_package_id string // Explicit release root that replaces this legacy acquisition.
 	action          string
 	installed_paths []string
 	arm64_only      bool
@@ -754,13 +755,17 @@ fn desktop_request_first_run_install(packages []string) bool {
 // desktop_take_first_run_install claims a pending setup request and returns
 // the shell command that installs it, or '' when there is none.
 fn desktop_take_first_run_install() string {
-	if !os.is_file(app_selection_request_path) {
+	return desktop_take_first_run_install_at(app_selection_request_path, FirstRunReleaseRoute{})
+}
+
+fn desktop_take_first_run_install_at(path string, route FirstRunReleaseRoute) string {
+	if !os.is_file(path) {
 		return ''
 	}
-	request := os.read_file(app_selection_request_path) or { return '' }
-	os.rm(app_selection_request_path) or {}
+	request := os.read_file(path) or { return '' }
+	os.rm(path) or {}
 	defer { unsafe { request.free() } }
-	return first_run_install_command(request)
+	return first_run_install_command_with_release(request, route)
 }
 
 // first_run_install_command turns a request into the Terminal's command. Only
@@ -825,7 +830,7 @@ fn first_run_install_command(request string) string {
 		'failed=; for app in ${names}; do ' +
 		'case "\$app" in ios-runtime) /usr/bin/vinix-desktop --install-ios-runtime && ' +
 		'{ if [ -x /usr/libexec/vinix-persist-packages ]; then /usr/libexec/vinix-persist-packages save; fi; } ;; ' +
-		'vscodium|zed|discord|slack|spotify|steam) /usr/bin/vinix-desktop --install-setup-app "\$app" ;; ' +
+		'neovim|vscodium|zed|discord|slack|spotify|steam) /usr/bin/vinix-desktop --install-setup-app "\$app" ;; ' +
 		'libreoffice) pkg install "\$app" libreoffice-gtk libreoffice-lang-en_us ttf-liberation font-dejavu adwaita-icon-theme ;; ' +
 		'vlc-qt|keepassxc) pkg install "\$app" qt5-qtbase-x11 font-dejavu ;; ' +
 		'telegram-desktop) pkg install "\$app" qt6-qtbase-x11 font-dejavu ;; ' +

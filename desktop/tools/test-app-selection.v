@@ -7,13 +7,21 @@ import workflowbuild
 
 fn main() {
 	root := os.real_path('.')
-	v := os.getenv_opt('V') or { 'v' }
+	v := os.real_path(os.find_abs_path_of_executable(os.getenv_opt('V') or { 'v' })!)
+	// A delegated `v run` restores its caller environment. Restore the selected
+	// compiler's root too, so child builds use its adjacent pinned vlib.
+	os.setenv('VEXE', v, true)
+	os.setenv('V_MACOS_V3_CALLER_VEXE_PRESENT', '1', true)
+	os.setenv('V_MACOS_V3_CALLER_VEXE', v, true)
+	os.setenv('V_MACOS_V3_CALLER_VCHILD_PRESENT', '0', true)
+	os.setenv('V_MACOS_V3_NO_FALLBACK', '1', true)
+	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
 	work := os.join_path(os.temp_dir(), 'vinix-app-selection-${os.getpid()}')
 	defer { if os.getenv('VINIX_SETUP_KEEP') != '1' { os.rmdir_all(work) or {} } }
 	os.mkdir_all('${work}/source')!
 	workflowbuild.run('git', ['archive', 'HEAD', 'desktop', '-o', '${work}/source.tar'])!
 	workflowbuild.run('tar', ['-xf', '${work}/source.tar', '-C', '${work}/source'])!
-	for name in ['main.v', 'app_selection.v', 'app_selection_release.v', 'app_selection_catalogue.v', 'app_selection_runtime.v',
+	for name in ['main.v', 'app_selection.v', 'app_selection_release.v', 'app_selection_migration.v', 'app_selection_catalogue.v', 'app_selection_runtime.v', 'app_selection_download.v', 'session_hub.v',
 		'software_app.v', 'software_release.v',
 		'app_icon.v', 'font_data.v', 'app.v', 'wine_app.v', 'zed_app.v', 'session_paste.v'] {
 		os.cp('${root}/desktop/${name}', '${work}/source/desktop/${name}')!
@@ -38,7 +46,17 @@ fn main() {
 	os.rm('${app}/main.v')!
 	mut tests := os.args[1..].clone()
 	if tests.len == 0 {
-		tests = ['app_selection', 'app_selection_release', 'app_icon', 'app_selection_i18n', 'i18n_apps', 'registration']
+		tests = ['app_selection', 'app_selection_release', 'app_selection_migration', 'app_icon', 'app_selection_i18n', 'i18n_apps', 'registration']
+	}
+	if 'app_selection_migration' in tests {
+		os.mkdir_all(work + '/bin')!
+		workflowbuild.run(v, ['-backend', 'c', '-o', work + '/bin/pkg', root + '/desktop/tools/tests/fixtures/setup-pkg/main.v'])!
+		// Use and retain the same C backend as the target broker.
+		workflowbuild.run(v, ['-backend', 'c', '-keepc', '-no-skip-unused', '-gc', 'none', '-manualfree', '-enable-globals', '-path', '@vlib|' + root + '|@vmodules',
+			'-o', work + '/session-broker', root + '/desktop/services/session/main.v'])!
+		os.setenv('PATH', work + '/bin:' + os.getenv('PATH'), true)
+		os.setenv('VINIX_SETUP_TOOL_LOG', work + '/tool.log', true)
+		os.setenv('VINIX_SETUP_BROKER', work + '/session-broker', true)
 	}
 	for name in tests {
 		os.cp('${root}/desktop/tools/tests/${name}_test.v', '${app}/${name}_test.v')!
@@ -48,6 +66,7 @@ fn main() {
 		setup_test(v, args, app, name)!
 		os.rm('${app}/${name}_test.v')!
 	}
+	println('Setup checks PASS: ${tests.len} suites')
 }
 
 fn setup_test(v string, args []string, work string, name string) ! {
@@ -74,4 +93,9 @@ fn setup_test(v string, args []string, work string, name string) ! {
 	workflowbuild.run('clang', flags)!
 	println('Running ${name}')
 	workflowbuild.run('${work}/test', [])!
+	if name == 'app_selection_migration' && os.getenv('VINIX_SETUP_KEEP') == '1' {
+		os.cp('${work}/test.c', '${work}/migration.c')!
+		os.cp('${work}/test', '${work}/migration')!
+	}
+	println('PASS ${name}')
 }
