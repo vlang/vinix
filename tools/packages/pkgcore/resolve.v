@@ -90,13 +90,19 @@ pub fn resolve(catalog Catalog, config Config, current State, requested []string
 	return Plan{ requested: roots, packages: packages }
 }
 
+// Cloning a nested array receiver can promote its complete parent State to an
+// unowned heap box. This synchronous clone copies only the borrowed ID array.
+fn clone_root_ids(ids []string) []string {
+	return ids.clone()
+}
+
 pub fn desired_roots(state State, operation string, names []string) ![]string {
 	// Returned arrays own their storage and borrow ID strings, like Plan roots.
 	mut roots := []string{}
 	match operation {
 		'install' {
 			if names.len == 0 { return error('install requires package IDs') }
-			roots = state.requested.clone()
+			roots = clone_root_ids(state.requested)
 			unsafe { roots.flags |= .noslices }
 			for id in names {
 				if id in roots { continue }
@@ -121,7 +127,7 @@ pub fn desired_roots(state State, operation string, names []string) ![]string {
 				roots = names.clone()
 			} else if names.len != 0 {
 				return error('upgrade updates the complete installed closure')
-			} else { roots = state.requested.clone() }
+			} else { roots = clone_root_ids(state.requested) }
 		}
 		else { return error('unknown package operation: ${operation}') }
 	}

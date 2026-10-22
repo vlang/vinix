@@ -2680,8 +2680,12 @@ retire on success or refusal. See
 HTTPS request arguments and Range-fallback messages also retire on completion
 or refusal. Repeated public fetch, signed refresh and install operations against
 local TLS retain zero scoped V request/reply storage while preserving certificate,
-redirect, size, resume and activation checks. Curl/OpenSSL process memory and
-guest TLS are separate boundaries. See
+redirect, size, resume and activation checks. The
+[native TLS qualification](../../tests/packages/https-runtime-check.md) repeats
+these public calls using real target curl/OpenSSL on both architectures,
+including retrying an interrupted transfer from its exact retained prefix.
+Curl/OpenSSL process memory remains outside the scoped parent allocation
+measurement. See
 [HTTPS ownership qualification](../../tests/packages/https-owner-check.md).
 Internal activation states, low-level fresh `read_state` values and caller-built
 states can borrow metadata and retain their existing lifetimes. Public preview

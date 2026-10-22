@@ -839,21 +839,29 @@ architectures; broader release/catalog/runtime acceptance remains open.
     writer-lock ordering across 64 calls in each of 72 file-repository/offline
     cases. Late publication failures retire decoded replies; abandoned nested
     work retires without following aliases or shared writable roots.
-    Guest TLS and broader release acceptance remain separate.
+    Native TLS is qualified separately below; broader release acceptance remains open.
   - [x] [Owned activation, rollback and deployment requests](tests/packages/activation-request-check.md)
     return independent complete states retired with `State.close()`, including
     no-ops. Configuration, source states, prepared plans, deployment documents,
     staging paths and file-download scratch retire on success/refusal. Repeated
     requests preserve writer-lock ordering, stale-review and disk preflight,
-    interrupted stages and retained failed publications. Guest TLS,
-    production catalog migration and broader graphical/runtime gates remain open.
+    interrupted stages and retained failed publications. Production catalog
+    migration and broader graphical/runtime gates remain open.
   - [x] [Owned complete HTTPS acquisition](tests/packages/https-owner-check.md)
     retires argument construction and Range-fallback messages across complete
     success, transport failure and captured-output refusal paths. Repeated
     process cases check child/descriptor retirement on both native targets;
     host TLS repetition checks public fetch, signed refresh and installation,
     certificate/hostname refusal, bounded recovery and independent replies.
-    Guest TLS, public repositories/proxy fleets and broader release gates remain open.
+    Public repositories/proxy fleets and broader release gates remain open.
+  - [x] [Real native HTTPS acquisition](tests/packages/https-runtime-check.md)
+    uses target `/usr/bin/curl` and OpenSSL on both architectures against a local
+    signed repository. All 23 cases preserve authenticated state, certificate
+    and hostname refusal, exact interrupted-prefix retries, bounded recovery,
+    child retirement and zero scoped parent request/reply allocations across
+    200 measured calls per guest. Creator file reservations settle between
+    cases; ordinary and ASan/UBSan host runs cover the same case list.
+    Public repository/proxy qualification and production catalog rollout remain open.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
   - [x] [Reviewed permission changes](tests/packages/review-permissions-check.md)

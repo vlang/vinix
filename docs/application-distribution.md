@@ -787,8 +787,11 @@ borrowed plan contract. See
 HTTPS acquisition also retires argument construction and Range-fallback messages.
 Repeated local TLS fetch, signed refresh and installation requests check parent V
 storage through reply/error retirement, with preserved trust, byte bounds,
-recovery and activation. Both native targets exercise the shared process/output
-paths; real TLS repetition is host-qualified. See
+recovery and activation. Both native targets also exercise real target
+curl/OpenSSL against a local signed repository, including certificate refusal,
+interrupted-prefix recovery, bounded retries and settled creator file
+reservations. See [native TLS qualification](../tests/packages/https-runtime-check.md)
+and
 [HTTPS request ownership](../tests/packages/https-owner-check.md).
 
 Software keeps a proposal readable when its space estimate does not fit. Its

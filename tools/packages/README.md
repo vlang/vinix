@@ -414,6 +414,11 @@ across complete transfers and refusals. Scoped repeated process checks and live
 host TLS fetch/refresh/install requests preserve byte bounds, signed state,
 output guards and child/descriptor retirement. See
 [HTTPS ownership checks](../../tests/packages/https-owner-check.md).
+The [native TLS fixture](../../tests/packages/https-runtime-check.md) also runs
+real `/usr/bin/curl` and OpenSSL on both architectures against a local signed
+repository. It measures parent request storage, certificate refusals, exact
+interrupted-prefix recovery and bounded object retries; guest creator file
+reservations settle between all 23 cases.
 
 Software releases rejected progress-frame errors under manual memory management.
 Malformed frames keep the last valid progress, and oversized lines recover at
