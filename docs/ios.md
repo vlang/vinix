@@ -16879,8 +16879,36 @@ pointers for the empty `DMAConstants` enum and `UEView` struct metadata. The
 accessor at `0x10003e034` returns the `DMAConstants` metadata address. This
 inspection executes no application code.
 
+`_swift_deletedMethodError` now resolves to a no-argument fatal handler. Like
+Apple's runtime, it writes `Fatal error: Call of deleted method` to stderr and
+terminates with SIGABRT. Closing stderr does not alter termination. It ignores
+method arguments and allocates no assertion entry or runtime-owned storage.
+
+The dedicated fixture compares the native and compatibility diagnostics and
+signals, poisons argument registers with null, opaque and protected addresses,
+checks a returning positive control, closed stderr, exact name/library scoping,
+eight concurrent resolvers and stable resolution across two drained runtimes:
+
+```sh
+v run tests/ios/native-checks.v build-swift-deleted-method
+```
+
+Evidence is retained under `build/ios/fortnite/deleted-method-checks`. The
+deleted-method, assertion and unexpected-error fixtures passed normal and
+deterministic ASan/UBSan host runs. The ARM64 deleted-method fixture passed;
+the launch probe and both import audits completed with the linking failure
+recorded below. All 1,045 pinned source, toolchain and runtime inputs remained
+unchanged. Seven archived binary/generated-C pairs and four retained serial
+logs passed SHA256 verification. All four temporary VMs and their RAM disk
+were retired.
+
+Static inspection finds twelve required `_swift_deletedMethodError` function
+pointer fixups in constant tables and class metadata, with no direct call stub.
+Eager binding needs the symbol before these slots are called. This inspection
+executes no application code.
+
 The launch probe now stops at the required Swift core import
-`_swift_deletedMethodError`. This remains a linking failure before application
+`_$ss12CaseIterableMp`. This remains a linking failure before application
 entry; Fortnite is not playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -16888,12 +16916,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,004 | 157 | 78 |
+| Fortnite executable | 2,005 | 156 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,844 | 160 | 114 |
+| All images | 2,845 | 159 | 114 |
 
-The C++/GLES/Text variant reports 2,858 resolved imports, 146 unresolved strong
+The C++/GLES/Text variant reports 2,859 resolved imports, 145 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

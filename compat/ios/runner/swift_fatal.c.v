@@ -183,6 +183,15 @@ fn swift_fatal_emit(code u64, string_message bool) {
 	}
 }
 
+// Native swift_deletedMethodError takes no arguments and reports through the
+// runtime's abort path, unlike Swift assertion entries that execute BRK.
+@[noreturn]
+fn swift_deleted_method_failure() {
+	text := 'Fatal error: Call of deleted method\n'
+	swift_fatal_write(u64(text.str), u64(text.len))
+	for { C.abort() }
+}
+
 fn swift_fatal_entry(string_message bool) u64 {
 	$if arm64 {
 		C.ios_objc_initialize_lock()
@@ -225,6 +234,7 @@ fn swift_fatal_symbol(symbol string) ?u64 {
 		'_$ss17_assertionFailure__4file4line5flagss5NeverOs12StaticStringV_SSAHSus6UInt32VtF' { swift_fatal_entry(true) }
 		'_$ss53KEY_TYPE_OF_DICTIONARY_VIOLATES_HASHABLE_REQUIREMENTSys5NeverOypXpF' { swift_fatal_entry(false) + 192 }
 		'_swift_unexpectedError' { swift_fatal_entry(false) + 224 }
+		'_swift_deletedMethodError' { u64(unsafe { voidptr(swift_deleted_method_failure) }) }
 		else { none }
 	}
 }
