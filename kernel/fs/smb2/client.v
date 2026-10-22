@@ -93,7 +93,8 @@ fn (mut c Client) verify_signature(p &u8, length int) bool {
 	return mismatch == 0
 }
 
-// One synchronous request, no compounds/async/unsolicited messages. Any framing
+// One request, optionally one async STATUS_PENDING then its final response.
+// No compounds or unsolicited messages. Any framing
 // or identity failure kills the stream so no later call consumes stale bytes.
 fn (mut c Client) call(command u16, n int) ?u32 {
 	if c.dead || n < 64 || n > capacity {
@@ -113,44 +114,81 @@ fn (mut c Client) call(command u16, n int) ?u32 {
 	// request. The existing serialized scratch buffer has capacity + 64 bytes.
 	move(c.scratch, unsafe { &prefix[0] }, 4)
 	move(unsafe { &c.scratch[4] }, c.tx, n)
-	if !c.transfer(c.context, c.scratch, n + 4, true)
-		|| !c.transfer(c.context, unsafe { &prefix[0] }, 4, false) {
+	if !c.transfer(c.context, c.scratch, n + 4, true) {
+		c.diagnostic = 'TCP request or response-prefix transfer failed'
 		c.broken()
 		return none
 	}
-	len := int((u32(prefix[1]) << 16) | (u32(prefix[2]) << 8) | u32(prefix[3]))
-	if prefix[0] != 0 || len < 64 || len > capacity {
-		c.broken()
-		return none
-	}
-	if !c.transfer(c.context, c.rx, len, false) {
-		c.broken()
-		return none
-	}
-	if get32(c.rx, 0) != 0x424d53fe || get16(c.rx, 4) != 64 || get16(c.rx, 12) != command
-		|| get64(c.rx, 24) != c.message || get32(c.rx, 16) & 3 != 1 || get32(c.rx, 20) != 0 {
-		c.broken()
-		return none
-	}
-	if command > 1 && (get64(c.rx, 40) != c.session || get32(c.rx, 36) != c.tree) && command != 3 {
-		c.broken()
-		return none
-	}
-	if command == 3 && get64(c.rx, 40) != c.session {
-		c.broken()
-		return none
-	}
-	if c.authenticated && c.signing {
-		if !c.verify_signature(c.rx, len) {
+	mut async_id := u64(0)
+	for _ in 0 .. 2 {
+		if !c.transfer(c.context, unsafe { &prefix[0] }, 4, false) {
+			c.diagnostic = 'TCP response-prefix transfer failed'
 			c.broken()
 			return none
 		}
+		len := int((u32(prefix[1]) << 16) | (u32(prefix[2]) << 8) | u32(prefix[3]))
+		if prefix[0] != 0 || len < 64 || len > capacity {
+			c.diagnostic = 'Invalid direct-TCP frame length'
+			c.broken()
+			return none
+		}
+		if !c.transfer(c.context, c.rx, len, false) {
+			c.diagnostic = 'TCP response-body transfer failed'
+			c.broken()
+			return none
+		}
+		if get32(c.rx, 0) != 0x424d53fe || get16(c.rx, 4) != 64 || get16(c.rx, 12) != command
+			|| get64(c.rx, 24) != c.message || get32(c.rx, 16) & 1 != 1 || get32(c.rx, 20) != 0 {
+			c.diagnostic = 'SMB2 response header identity mismatch'
+			c.broken()
+			return none
+		}
+		async := get32(c.rx, 16) & 2 != 0
+		if (command > 1 || c.authenticated) && get64(c.rx, 40) != c.session {
+			c.diagnostic = 'SMB2 response session identity mismatch'
+			c.broken()
+			return none
+		}
+		if !async && command > 1 && command != 3 && get32(c.rx, 36) != c.tree {
+			c.diagnostic = 'SMB2 response tree identity mismatch'
+			c.broken()
+			return none
+		}
+		status := get32(c.rx, 8)
+		if status == 0x00000103 {
+			// MS-SMB2 3.2.5.1.3 excludes STATUS_PENDING from signature checks.
+			// Its optional error body must still be bounded before waiting again.
+			if !async || async_id != 0 || get64(c.rx, 32) == 0
+				|| (len != 64 && (len < 72 || get16(c.rx, 64) != 9
+					|| get32(c.rx, 68) > u32(len - 72))) {
+				c.diagnostic = 'SMB2 invalid async pending identity or body'
+				c.broken()
+				return none
+			}
+			async_id = get64(c.rx, 32)
+			continue
+		}
+		if (async_id != 0 && (!async || get64(c.rx, 32) != async_id))
+			|| (async && get64(c.rx, 32) == 0) {
+			c.diagnostic = 'SMB2 final async identity mismatch'
+			c.broken()
+			return none
+		}
+		if c.authenticated && c.signing {
+			if !c.verify_signature(c.rx, len) {
+				c.diagnostic = 'SMB2 response signature mismatch'
+				c.broken()
+				return none
+			}
+		}
+		c.message++
+		c.response_len = len
+		c.fault = status_errno(status)
+		return status
 	}
-	c.message++
-	c.response_len = len
-	status := get32(c.rx, 8)
-	c.fault = status_errno(status)
-	return status
+	c.diagnostic = 'SMB2 async response limit exceeded'
+	c.broken()
+	return none
 }
 
 fn (mut c Client) success(command u16, n int, minimum int, structure u16) ? {

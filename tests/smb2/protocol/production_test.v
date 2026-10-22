@@ -309,6 +309,147 @@ fn test_status_mapping() {
 	assert status_errno(0xc00000a2) == 30
 }
 
+// Append wire frames consumed by the actual production Client.call path.
+fn append_async(mut fake Fake, mut signer Client, pending bool, length int) {
+	at := fake.length
+	assert length >= 64 && at + 4 + length <= 512
+	p := unsafe { &fake.frame[at + 4] }
+	put32(p, 0, 0x424d53fe)
+	put16(p, 4, 64)
+	put32(p, 8, if pending { u32(0x103) } else { u32(0) })
+	put16(p, 12, 9)
+	put32(p, 16, if pending { u32(3) } else { u32(11) })
+	put64(p, 24, signer.message)
+	put64(p, 32, 0x123456789abcdef0)
+	put64(p, 40, signer.session)
+	if length >= 72 { put16(p, 64, if pending { u16(9) } else { u16(17) }) }
+	if !pending { signer.signature(p, length, unsafe { &p[48] }) }
+	fake.frame[at + 2] = u8(length >> 8)
+	fake.frame[at + 3] = u8(length)
+	fake.length += 4 + length
+}
+
+fn test_production_async_pending_signed_final_and_rejections() {
+	for mode in 0 .. 26 {
+		mut tx := [capacity]u8{}
+		mut rx := [capacity]u8{}
+		mut scratch := [capacity + 64]u8{}
+		mut fake := Fake{}
+		mut c := Client{
+			context: unsafe { &fake }
+			transfer: fake_transfer
+			tx: unsafe { &tx[0] }
+			rx: unsafe { &rx[0] }
+			scratch: unsafe { &scratch[0] }
+			message: 19
+			session: 7
+			tree: 42
+			authenticated: true
+			signing: true
+		}
+		for i in 0 .. 16 { c.key[i] = 0xaa }
+		pending_len := if mode == 21 { 64 } else if mode == 22 { 73 } else if mode == 12 { 65 } else { 72 }
+		if mode < 24 { append_async(mut fake, mut c, true, pending_len) }
+		final_at := fake.length + 4
+		append_async(mut fake, mut c, false, 80)
+		p := unsafe { &fake.frame[4] }
+		q := unsafe { &fake.frame[final_at] }
+		match mode {
+			1 { unsafe { q[48] ^= 1 } }
+			2 { put32(q, 16, 3) }
+			3 { put64(q, 32, 99) }
+			4 { put64(q, 24, 20) }
+			5 { put64(q, 40, 8) }
+			6 { put32(q, 8, 0x103) }
+			7 { put32(q, 16, 9) }
+			8 { put64(p, 32, 0) }
+			9 { put32(p, 16, 1) }
+			10 { put64(p, 24, 20) }
+			11 { put64(p, 40, 8) }
+			13 { put32(p, 68, 1) }
+			14 { put32(p, 20, 72) }
+			15 { put32(p, 16, 2) }
+			16 { put32(p, 0, 0) }
+			17 { put16(p, 4, 63) }
+			18 { put16(p, 12, 8) }
+			19 { put32(q, 20, 80) }
+			20 { put32(q, 16, 10) }
+			22 { put32(p, 68, 1) }
+			23 { put16(p, 64, 8) }
+			25 { put64(q, 32, 0) }
+			else {}
+		}
+		c.header(9, 48)
+		result := c.call(9, 112) or { u32(0xffffffff) }
+		if mode == 0 || mode == 21 || mode == 22 || mode == 24 {
+			assert result == 0 && !c.dead && c.message == 20
+			assert c.response_len == 80 && fake.position == fake.length
+			assert get64(c.rx, 32) == 0x123456789abcdef0
+		} else {
+			assert result == 0xffffffff && c.dead && c.message == 19
+			assert c.response_len == 0 && fake.position <= fake.length
+			assert c.diagnostic.len > 0
+		}
+	}
+}
+
+fn test_production_async_frames_truncation_and_length_bounds() {
+	// Every cut through either prefix, header or body must fail closed.
+	for cut in 0 .. 160 {
+		mut tx := [capacity]u8{}
+		mut rx := [capacity]u8{}
+		mut scratch := [capacity + 64]u8{}
+		mut fake := Fake{}
+		mut c := Client{
+			context: unsafe { &fake }
+			transfer: fake_transfer
+			tx: unsafe { &tx[0] }
+			rx: unsafe { &rx[0] }
+			scratch: unsafe { &scratch[0] }
+			message: 19
+			session: 7
+			authenticated: true
+			signing: true
+		}
+		append_async(mut fake, mut c, true, 72)
+		append_async(mut fake, mut c, false, 80)
+		assert fake.length == 160
+		fake.length = cut
+		c.header(9, 48)
+		assert (c.call(9, 112) or { u32(0xffffffff) }) == 0xffffffff
+		assert c.dead && c.message == 19 && fake.position <= cut
+	}
+	for mode in 0 .. 5 {
+		mut tx := [capacity]u8{}
+		mut rx := [capacity]u8{}
+		mut scratch := [capacity + 64]u8{}
+		mut fake := Fake{}
+		mut c := Client{
+			context: unsafe { &fake }
+			transfer: fake_transfer
+			tx: unsafe { &tx[0] }
+			rx: unsafe { &rx[0] }
+			scratch: unsafe { &scratch[0] }
+			session: 7
+			authenticated: true
+			signing: true
+		}
+		append_async(mut fake, mut c, true, 72)
+		append_async(mut fake, mut c, false, 80)
+		at := if mode < 2 { 0 } else { 76 }
+		if mode == 0 || mode == 2 { fake.frame[at] = 1 }
+		if mode == 1 || mode == 3 { fake.frame[at + 3] = 63 }
+		if mode == 4 {
+			fake.frame[at + 1] = 0xff
+			fake.frame[at + 2] = 0xff
+			fake.frame[at + 3] = 0xff
+		}
+		c.header(9, 48)
+		assert (c.call(9, 112) or { u32(0xffffffff) }) == 0xffffffff
+		assert c.dead && c.message == 0
+	}
+}
+
 fn test_readonly_share_may_retain_acl_and_delete_rights() {
 	for index, rights in [u32(0x001f00a9), u32(0x001f01ff)] {
 		mut tx := [capacity]u8{}
