@@ -135,6 +135,8 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  write_framework_classes(smali)!
  framework_application_startup(smali)!
  framework_companion_contexts(smali)!
+ framework_package_storage(smali)!
+ framework_application_info(smali)!
  framework_package_signatures(smali)!
  checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', '--jobs', '2', smali, '-o', work + '/classes.dex'])!
  next := work + '/api-impl.jar'
@@ -149,6 +151,8 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  sources['tests/native-android-tools/androidtools/framework_signatures.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_signatures.v')!)
  sources['tests/native-android-tools/androidtools/framework_application.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_application.v')!)
  sources['tests/native-android-tools/androidtools/framework_services.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_services.v')!)
+ sources['tests/native-android-tools/androidtools/framework_package_storage.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_package_storage.v')!)
+ sources['tests/native-android-tools/androidtools/framework_package_info.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_package_info.v')!)
  receipt := ah.Value({
   'schema': ah.Value(1)
   'input_sha256': ah.Value(input_hash)

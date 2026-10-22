@@ -72,6 +72,120 @@ invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0'
 }
 
+fn storage_checks() string {
+	mut body := 'invoke-virtual {p1}, Landroid/content/Context;->getApplicationInfo()Landroid/content/pm/ApplicationInfo;
+move-result-object v0
+iget-object v1, v0, Landroid/content/pm/ApplicationInfo;->splitNames:[Ljava/lang/String;
+if-nez v1, :bad
+new-instance v0, Landroid/content/pm/ApplicationInfo;
+invoke-direct {v0}, Landroid/content/pm/ApplicationInfo;-><init>()V
+const/4 v1, 1
+new-array v1, v1, [Ljava/lang/String;
+const/4 v2, 0
+const-string v3, "feature"
+aput-object v3, v1, v2
+'
+	for field in ['splitNames', 'splitSourceDirs', 'splitPublicSourceDirs'] {
+		body += 'iput-object v1, v0, Landroid/content/pm/ApplicationInfo;->' + field + ':[Ljava/lang/String;\n'
+	}
+	body += 'new-instance v2, Landroid/content/pm/ApplicationInfo;
+invoke-direct {v2, v0}, Landroid/content/pm/ApplicationInfo;-><init>(Landroid/content/pm/ApplicationInfo;)V
+'
+	for field in ['splitNames', 'splitSourceDirs', 'splitPublicSourceDirs'] {
+		body += 'iget-object v3, v2, Landroid/content/pm/ApplicationInfo;->' + field + ':[Ljava/lang/String;\nif-ne v1, v3, :bad\n'
+	}
+	for index, context in ['p0', 'p1'] {
+		body += 'invoke-virtual {' + context + '}, Landroid/content/Context;->getDataDir()Ljava/io/File;
+move-result-object v0
+invoke-virtual {' + context + '}, Landroid/content/Context;->getApplicationInfo()Landroid/content/pm/ApplicationInfo;
+move-result-object v1
+iget-object v1, v1, Landroid/content/pm/ApplicationInfo;->dataDir:Ljava/lang/String;
+new-instance v2, Ljava/io/File;
+invoke-direct {v2, v1}, Ljava/io/File;-><init>(Ljava/lang/String;)V
+invoke-virtual {v0, v2}, Ljava/io/File;->equals(Ljava/lang/Object;)Z
+move-result v1
+if-eqz v1, :bad
+invoke-virtual {' + context + '}, Landroid/content/Context;->getFilesDir()Ljava/io/File;
+move-result-object v1
+invoke-virtual {v1}, Ljava/io/File;->getParentFile()Ljava/io/File;
+move-result-object v2
+invoke-virtual {v0, v2}, Ljava/io/File;->equals(Ljava/lang/Object;)Z
+move-result v2
+if-eqz v2, :bad
+new-instance v2, Ljava/io/File;
+const-string v3, "same-name.bin"
+invoke-direct {v2, v1, v3}, Ljava/io/File;-><init>(Ljava/io/File;Ljava/lang/String;)V
+new-instance v3, Ljava/io/FileOutputStream;
+invoke-direct {v3, v2}, Ljava/io/FileOutputStream;-><init>(Ljava/io/File;)V
+const/16 v4, ' + (49 + index).str() + '
+invoke-virtual {v3, v4}, Ljava/io/FileOutputStream;->write(I)V
+invoke-virtual {v3}, Ljava/io/FileOutputStream;->close()V
+const-string v1, "same-name"
+const/4 v2, 0
+invoke-virtual {' + context + ', v1, v2}, Landroid/content/Context;->getSharedPreferences(Ljava/lang/String;I)Landroid/content/SharedPreferences;
+move-result-object v1
+invoke-interface {v1}, Landroid/content/SharedPreferences;->edit()Landroid/content/SharedPreferences$Editor;
+move-result-object v1
+const-string v2, "owner"
+invoke-interface {v1, v2, v4}, Landroid/content/SharedPreferences$Editor;->putInt(Ljava/lang/String;I)Landroid/content/SharedPreferences$Editor;
+invoke-interface {v1}, Landroid/content/SharedPreferences$Editor;->commit()Z
+move-result v1
+if-eqz v1, :bad
+'
+	}
+	body += 'invoke-virtual {p0}, Landroid/content/Context;->getDataDir()Ljava/io/File;
+move-result-object v0
+invoke-virtual {p1}, Landroid/content/Context;->getDataDir()Ljava/io/File;
+move-result-object v1
+invoke-virtual {v0, v1}, Ljava/io/File;->equals(Ljava/lang/Object;)Z
+move-result v0
+if-nez v0, :bad
+'
+	for index, context in ['p0', 'p1'] {
+		body += 'invoke-virtual {' + context + '}, Landroid/content/Context;->getFilesDir()Ljava/io/File;
+move-result-object v0
+new-instance v1, Ljava/io/File;
+const-string v2, "same-name.bin"
+invoke-direct {v1, v0, v2}, Ljava/io/File;-><init>(Ljava/io/File;Ljava/lang/String;)V
+new-instance v0, Ljava/io/FileInputStream;
+invoke-direct {v0, v1}, Ljava/io/FileInputStream;-><init>(Ljava/io/File;)V
+invoke-virtual {v0}, Ljava/io/FileInputStream;->read()I
+move-result v1
+invoke-virtual {v0}, Ljava/io/FileInputStream;->close()V
+const/16 v2, ' + (49 + index).str() + '
+if-ne v1, v2, :bad
+const-string v0, "same-name"
+const/4 v1, 0
+invoke-virtual {' + context + ', v0, v1}, Landroid/content/Context;->getSharedPreferences(Ljava/lang/String;I)Landroid/content/SharedPreferences;
+move-result-object v3
+invoke-virtual {' + context + ', v0, v1}, Landroid/content/Context;->getSharedPreferences(Ljava/lang/String;I)Landroid/content/SharedPreferences;
+move-result-object v0
+if-ne v0, v3, :bad
+invoke-virtual {' + context + '}, Landroid/content/Context;->getPackageName()Ljava/lang/String;
+move-result-object v0
+const/4 v1, 0
+invoke-virtual {p0, v0, v1}, Landroid/content/Context;->createPackageContext(Ljava/lang/String;I)Landroid/content/Context;
+move-result-object v0
+const-string v1, "same-name"
+const/4 v4, 0
+invoke-virtual {v0, v1, v4}, Landroid/content/Context;->getSharedPreferences(Ljava/lang/String;I)Landroid/content/SharedPreferences;
+move-result-object v0
+if-ne v0, v3, :bad
+const-string v1, "owner"
+const/4 v4, -1
+invoke-interface {v0, v1, v4}, Landroid/content/SharedPreferences;->getInt(Ljava/lang/String;I)I
+move-result v1
+if-ne v1, v2, :bad
+'
+	}
+	return body + 'return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "package-private data, files and preferences"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+}
+
 fn main() {
 	if os.args.len != 8 {
 		panic('OUTPUT FIXTURE_DIR SMALI_TOOLS JAVA APKSIGNER AAPT2 FRAMEWORK_RES')
@@ -196,6 +310,7 @@ return-object v0'))!
 		'.field private label:Landroid/widget/TextView;\n.field private callbacks:I\n.field private worker:Landroid/os/Handler;\n' +
 		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/app/Activity;-><init>()V\nreturn-void') +
 		method('private checkComponents()V', component_checks()) +
+		method('private checkStorage(Landroid/content/Context;)V', storage_checks()) +
 		method('public onCreate(Landroid/os/Bundle;)V', '
 invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkComponents()V
@@ -209,6 +324,7 @@ const-string v0, "org.vinix.service.companion"
 const/4 v1, 3
 invoke-virtual {p0, v0, v1}, Landroid/content/Context;->createPackageContext(Ljava/lang/String;I)Landroid/content/Context;
 move-result-object v0
+invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkStorage(Landroid/content/Context;)V
 invoke-virtual {v0}, Landroid/content/Context;->getClassLoader()Ljava/lang/ClassLoader;
 move-result-object v0
 const-string v1, "org.vinix.service.App"
@@ -307,7 +423,7 @@ iget-object v0, p0, Lorg/vinix/service/Main;->label:Landroid/widget/TextView;
 const-string v1, "Companion service startup passed"
 invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread provider-context provider-resources attach-once bind-executor-thread component-package component-metadata component-missing"
+const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread provider-context provider-resources attach-once bind-executor-thread component-package component-metadata component-missing package-data package-files package-preferences split-info-copy"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void'))!
 	for name in ['client', 'companion'] {

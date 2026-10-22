@@ -102,6 +102,9 @@ Companion services start their Application through the same path before service
 construction. Package contexts remain lazy; repeated service starts reuse the
 initialized Application and providers. Content providers retain their owning
 package context and resources; attachment calls `onCreate` once.
+Companion package contexts use their own `ApplicationInfo.dataDir` for private
+files and preferences. The preference cache is keyed by the private file path,
+so identical preference names in different APKs remain independent.
 `services-fixture.v` checks this ordering with two signed APKs, package resource
 isolation, main-thread binding callbacks and callbacks on a supplied executor.
 Provider and service metadata lookups honor both parts of `ComponentName`,
