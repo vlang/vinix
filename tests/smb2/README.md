@@ -22,9 +22,10 @@ libraries are needed. Local checks can generate Linux C with `v -os linux
 
 Requirements: `tar`, `xorriso`, `qemu-system-x86_64` with slirp and virtio networking,
 an existing bootable amd64 ISO template from `build-support/build-amd64-iso.sh`, and the parent's SMB2-capable
-kernel ELF. The rig replays the ISO template's boot metadata and maps in the
-provided kernel, plain minimal initramfs, and repository `build-support/limine.conf`.
-It leaves the template untouched. BIOS is the default; pass `--firmware` for a
+kernel ELF. The rig uses the maintained `build-support/build-amd64-iso.sh`
+assembler with explicit kernel, minimal initramfs, build-directory and output
+overrides. The required reference template is checked but left untouched; its
+hybrid partition metadata is not replayed. BIOS is the default; pass `--firmware` for a
 read-only OVMF CODE image if needed. No guest data disk is attached. Default
 acceleration is KVM; `--accel tcg` is available. Budget 2 GiB guest RAM, 200 MiB
 local guest `/tmp`, and several hundred MiB host disk plus the template's size.
@@ -39,7 +40,8 @@ The parent must configure a **private disposable Samba container** before boot:
 - `[guest]` exports **the same backing directory**, anonymous `guest ok = yes`,
   **server `read only = yes`**. Samba's Unix identity must read the fixture files;
   the authenticated identity must create, rename and delete files. Configure
-  `map to guest = Bad User`, not `Bad Password`, so the wrong-password case fails.
+  `map to guest = Never` and use an anonymous guest-only share, so named
+  wrong-password authentication cannot silently become a guest session.
 - Do not define `m17a-missing-share`. The driver must support anonymous mount
   option `guest` and translate server write denial on a read-only share to EROFS.
 
@@ -62,7 +64,7 @@ Run entirely on fecv3, with fresh absolute paths, for example:
 `--out` must be new and its basename must start `m17a-`; it is created mode 0700.
 All run artifacts and logs use `m17a-*` names. QEMU runs as a direct child with
 `-netdev user,id=m17anet,net=10.0.2.0/24,host=10.0.2.2,dhcpstart=10.0.2.15`
-and `-device virtio-net-pci,netdev=m17anet`. There is no SMB forwarding helper,
+and `-device virtio-net-pci,netdev=m17anet`. The rig creates no SMB forwarding helper,
 virtio shared filesystem, QEMU daemon, shared process-name kill, or port scan.
 The guest connects to `//10.0.2.2/share` on direct TCP 445; slirp's host address
 reaches the container's loopback publication. No alternate server port is assumed.
@@ -77,7 +79,9 @@ is the network-ready signal. The initial real libc call is
 It makes at most three attempts, retrying only ENETUNREACH, EHOSTUNREACH,
 ENETDOWN, ETIMEDOUT or ECONNREFUSED, with one-second pauses. EACCES is never
 retried. Subsequent mounts each get one attempt: five SMB2 attempts normally,
-at most seven including startup retries, within the driver's eight-session budget.
+at most seven including startup retries. Failed mounts release their session slot;
+the authenticated remount reuses its session. The driver retains at most four
+published sessions, not one slot per attempted mount.
 The host watchdog bounds a blocked syscall as well as a hung kernel.
 
 Every accepted guest stage emits `M17A:` only after its assertions:

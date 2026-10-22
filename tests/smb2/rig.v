@@ -158,14 +158,13 @@ fn build_iso(repo string, kernel string, init string, template string, out strin
 	os.chmod(out + '/m17a-root/sbin/init', 0o755)!
 	run(['tar', '--format=ustar', '-cf', out + '/m17a-initramfs.tar', '-C', out + '/m17a-root',
 		'.'], out + '/m17a-tar.log', 60)!
-	// Replay an existing Limine ISO's boot metadata; replace only boot inputs.
-	config := os.read_file(repo + '/build-support/limine.conf')!
-	check(config.contains('module_path: boot():/boot/initramfs.tar'), 'unexpected Limine template')!
-	os.write_file(out + '/m17a-limine.conf', config)!
-	run(['xorriso', '-indev', template, '-outdev', out + '/m17a-smb2.iso', '-boot_image', 'any',
-		'replay', '-map', kernel, '/boot/vinix', '-map', out + '/m17a-initramfs.tar',
-		'/boot/initramfs.tar', '-map', out + '/m17a-limine.conf', '/boot/limine.conf'], out +
-		'/m17a-iso-build.log', 120)!
+	// Use the maintained hybrid BIOS/UEFI assembler. Replaying a hybrid
+	// image's partition metadata can fail even when xorriso emits an image.
+	os.setenv('VINIX_AMD64_ISO_BUILD_DIR', out + '/m17a-iso-build', true)
+	os.setenv('VINIX_AMD64_KERNEL', kernel, true)
+	os.setenv('VINIX_AMD64_INITRAMFS', out + '/m17a-initramfs.tar', true)
+	os.setenv('VINIX_AMD64_ISO', out + '/m17a-smb2.iso', true)
+	run([repo + '/build-support/build-amd64-iso.sh'], out + '/m17a-iso-build.log', 120)!
 }
 
 fn boot(out string, share string, qemu string, accel string, firmware string, seconds int, start u64) ! {

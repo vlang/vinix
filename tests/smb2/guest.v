@@ -412,7 +412,8 @@ fn qualify() ! {
 	log_line('network-ready PASS elapsed_ms=${(time.sys_mono_now() - started) / u64(time.millisecond)}')
 	mount_share(true)!
 	log_line('mount PASS source=//10.0.2.2/share fs=smb2 flags=0 auth_fixture=NTLMv2 credentials=redacted elapsed_ms=${(time.sys_mono_now() - started) / u64(time.millisecond)}')
-	if C.mount(c'proc', c'/proc', c'procfs', 0, unsafe { nil }) != 0 {
+	if !os.exists('/proc/self/mountinfo')
+		&& C.mount(c'proc', c'/proc', c'procfs', 0, unsafe { nil }) != 0 {
 		return syscall_error('mount proc for privacy regression')
 	}
 	check_mount_privacy()!
