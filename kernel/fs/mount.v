@@ -206,7 +206,7 @@ fn record_mount(mut table MountTable, covered &VFSNode, root &VFSNode, source st
 		source:  source.clone()
 		fstype:  fstype.clone()
 		flags:   flags & ms_per_mount
-		options: options.clone()
+		options: public_mount_options(root, options).clone()
 	}
 	lib.copy_mount_context(&entry.parent, parent_mount)
 	if voidptr(covered) != voidptr(root) {
@@ -373,6 +373,7 @@ fn optional_user_string(pointer charptr, limit int) string {
 	// Sized up front: a buffer that grows leaves each outgrown one behind.
 	mut bytes := []u8{cap: limit} @[freed]
 	defer {
+		erase_mount_scratch(bytes.data, usize(bytes.len))
 		unsafe { bytes.free() }
 	}
 	for i := 0; i < limit; i++ {
@@ -413,7 +414,7 @@ pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mount
 	}
 	defer { unsafe { fstype.free() } }
 	options := optional_user_string(charptr(data), 4096)
-	defer { unsafe { options.free() } }
+	defer { free_mount_options(options) }
 	mut flags := mountflags
 	// Old programs still put MS_MGC_VAL in the top half of the flags.
 	if flags & 0xffff0000 == 0xc0ed0000 {
@@ -1106,7 +1107,7 @@ fn remount(parent &VFSNode, target string, flags u64, options string) ? {
 	entry.flags = flags & ms_per_mount
 	if flags & ms_bind == 0 && options.len > 0 && options != entry.options {
 		// The old options may be another namespace's too, so they stay.
-		entry.options = options.clone()
+		entry.options = public_mount_options(entry.root, options).clone()
 	}
 }
 
