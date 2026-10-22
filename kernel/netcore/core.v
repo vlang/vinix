@@ -1100,11 +1100,18 @@ pub fn tcp_failed(argument voidptr, error_ Err_t) {
 		if usize(socket) == 0 {
 			return
 		}
+		// lwIP reports ERR_RST for both a refused SYN and an established reset.
+		// Preserve the connect context for connect() and nonblocking SO_ERROR;
+		// error callbacks do not guarantee that the PCB is still alive.
+		socket.error = if socket.connecting && i32(error_) == Err_enum_t.err_rst {
+			111 // ECONNREFUSED
+		} else {
+			linux_error(error_)
+		}
 		socket.tcp = nil
 		socket.connecting = 0
 		socket.connected = 0
 		socket.peer_closed = 1
-		socket.error = linux_error(error_)
 	}
 }
 
