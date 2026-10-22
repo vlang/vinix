@@ -4,6 +4,7 @@ module smb2
 import encoding.hex
 import crypto.hmac
 import crypto.sha256
+import crypto.md5 as md5_std
 
 fn expect(p &u8, n int, value string) {
 	want := hex.decode(value) or { panic(err) }
@@ -244,11 +245,19 @@ mut:
 	frame    [512]u8
 	length   int
 	position int
+	mic_sent bool
 }
 
 fn fake_transfer(ctx voidptr, p &u8, n int, sending bool) bool {
 	mut f := unsafe { &Fake(ctx) }
-	if sending { return true }
+	if sending {
+		if n > 88 && get16(p, 12) == 1 {
+			if r := spnego_parse(unsafe { &p[88] }, n - 88) {
+				if r.mic_len == 16 && r.token_len == 0 { f.mic_sent = true }
+			}
+		}
+		return true
+	}
 	if !span(f.length, f.position, n) { return false }
 	move(p, unsafe { &f.frame[f.position] }, n)
 	f.position += n
@@ -293,6 +302,27 @@ fn test_status_mapping() {
 	assert status_errno(0xc000006d) == 13
 	assert status_errno(0xc00000cc) == 2
 	assert status_errno(0xc00000a2) == 30
+}
+
+fn test_readonly_share_may_retain_acl_and_delete_rights() {
+	for index, rights in [u32(0x001f00a9), u32(0x001f01ff)] {
+		mut tx := [capacity]u8{}
+		mut rx := [capacity]u8{}
+		mut scratch := [capacity + 64]u8{}
+		mut fake := Fake{}
+		mut c := Client{
+			context:  unsafe { &fake }
+			transfer: fake_transfer
+			tx:       unsafe { &tx[0] }
+			rx:       unsafe { &rx[0] }
+			scratch:  unsafe { &scratch[0] }
+		}
+		frame(unsafe { &fake }, 3, 80, 16)
+		fake.frame[4 + 66] = 1
+		put32(unsafe { &fake.frame[4] }, 76, rights)
+		c.tree_connect(r'\\server\share') or { panic('tree') }
+		assert c.readonly == (index == 0)
+	}
 }
 
 fn test_final_spnego_requires_accept_complete_without_mic() {
@@ -409,4 +439,170 @@ fn test_unused_negotiate_blob_and_create_context_bounds() {
 	put32(p, 148, 8)
 	_ = c.create('x', 0x80, 1, false) or { FileId{} }
 	assert c.fault == 95
+}
+
+fn test_spnego_mic_crypto_and_bounded_fields() {
+	mut key := [16]u8{}
+	for i in 0 .. 16 {
+		key[i] = u8(i)
+	}
+	mut mic := [16]u8{}
+	// Independent stdlib MD5/HMAC oracle, including the terminating magic NUL.
+	for server in [false, true] {
+		magic := if server {
+			'session key to server-to-client signing key magic constant\x00'
+		} else {
+			'session key to client-to-server signing key magic constant\x00'
+		}
+		mut material := key[..].clone()
+		material << magic.bytes()
+		derived := md5_std.sum(material)
+		message := hex.decode('00000000300c060a2b06010401823702020a') or { panic(err) }
+		checksum := hmac.new(derived, message, md5_std.sum, 64)
+		mechlist_mic(unsafe { &key[0] }, server, unsafe { &mic[0] })
+		assert get32(unsafe { &mic[0] }, 0) == 1
+		assert get32(unsafe { &mic[0] }, 12) == 0
+		for i in 0 .. 8 {
+			assert mic[4 + i] == checksum[i]
+		}
+	}
+	assert verify_mechlist_mic(unsafe { &key[0] }, unsafe { &mic[0] })
+	for i in 0 .. 16 {
+		mic[i] ^= 1
+		assert !verify_mechlist_mic(unsafe { &key[0] }, unsafe { &mic[0] })
+		mic[i] ^= 1
+	}
+	mut token := [256]u8{}
+	raw := ntlm_negotiate(unsafe { &token[0] })
+	n := spnego_token_mic_response(unsafe { &key[0] }, unsafe { &token[0] }, raw, 256) or {
+		panic('wrap')
+	}
+	r := spnego_parse(unsafe { &token[0] }, n) or { panic('parse') }
+	assert r.state == -1 && r.token_len == 40 && r.mic_len == 16
+	for size in 0 .. n {
+		if _ := spnego_parse(unsafe { &token[0] }, size) { assert false
+		 }
+	}
+	// Even the unused MIC must have a valid, completely bounded inner length.
+	token[r.mic_at - 1] = 17
+	if _ := spnego_parse(unsafe { &token[0] }, n) { assert false
+	 }
+}
+
+fn append_setup(mut fake Fake, mut signer Client, id u64, status u32, blob &u8, size int, sign bool) {
+	at := fake.length
+	p := unsafe { &fake.frame[at + 4] }
+	length := 72 + size
+	unsafe {
+		fake.frame[at + 2] = u8(length >> 8)
+		fake.frame[at + 3] = u8(length)
+	}
+	put32(p, 0, 0x424d53fe)
+	put16(p, 4, 64)
+	put32(p, 8, status)
+	put16(p, 12, 1)
+	put32(p, 16, if sign { u32(9) } else { u32(1) })
+	put64(p, 24, id)
+	put64(p, 40, 7)
+	put16(p, 64, 9)
+	put16(p, 68, 72)
+	put16(p, 70, u16(size))
+	move(unsafe { &p[72] }, blob, size)
+	if sign { signer.signature(p, length, unsafe { &p[48] }) }
+	fake.length += 4 + length
+}
+
+fn test_login_mic_continuation_signed_completion_and_rejections() {
+	// Script complete framed production SESSION_SETUP exchanges. Mutations test
+	// server MIC, final SMB signature, repeated request-mic, and rejected state.
+	for mode in 0 .. 6 {
+		mut tx := [capacity]u8{}
+		mut rx := [capacity]u8{}
+		mut scratch := [capacity + 64]u8{}
+		mut fake := Fake{}
+		mut c := Client{
+			context:  unsafe { &fake }
+			transfer: fake_transfer
+			tx:       unsafe { &tx[0] }
+			rx:       unsafe { &rx[0] }
+			scratch:  unsafe { &scratch[0] }
+		}
+		mut raw := [256]u8{}
+		move(unsafe { &raw[0] }, c'NTLMSSP\x00', 8)
+		put32(unsafe { &raw[0] }, 8, 2)
+		put32(unsafe { &raw[0] }, 20, ntlm_flags)
+		secbuf(unsafe { &raw[0] }, 40, 56, 4)
+		mut challenge := Challenge{}
+		assert parse_challenge(unsafe { &raw[0] }, 60, unsafe { &challenge })
+		mut nonce := [8]u8{}
+		mut auth := [4096]u8{}
+		_ := ntlm_authenticate(unsafe { &challenge }, unsafe { &raw[0] }, 60, 'User', 'Domain',
+			'Password', false, unsafe { &nonce[0] }, 0, unsafe { &auth[0] }, 4096,
+			unsafe { &c.key[0] }) or { panic('auth') }
+		// First reply: accept-incomplete plus a challenge.
+		n := spnego_response(unsafe { &raw[0] }, 60, 256) or { panic('wrap') }
+		// Insert negState before the responseToken inside the short DER sequence.
+		for i := n - 1; i >= 4; i-- {
+			raw[i + 5] = raw[i]
+		}
+		raw[1] += 5
+		raw[3] += 5
+		raw[4] = 0xa0
+		raw[5] = 3
+		raw[6] = 0x0a
+		raw[7] = 1
+		raw[8] = 1
+		append_setup(mut fake, mut c, 0, 0xc0000016, unsafe { &raw[0] }, n + 5, false)
+		mut request := [u8(0xa1), 27, 0x30, 25, 0xa0, 3, 0x0a, 1, 3, 0xa3, 18, 4, 16, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]!
+		mechlist_mic(unsafe { &c.key[0] }, true, unsafe { &request[13] })
+		if mode == 1 { request[17] ^= 1 }
+		if mode == 4 { request[8] = 2 }
+		if mode == 5 { request[8] = 1 } // Samba accept-incomplete with a verified MIC.
+		append_setup(mut fake, mut c, 1, 0xc0000016, unsafe { &request[0] }, 29, false)
+		complete := [u8(0xa1), 7, 0x30, 5, 0xa0, 3, 0x0a, 1, 0]!
+		if mode == 3 {
+			append_setup(mut fake, mut c, 2, 0xc0000016, unsafe { &request[0] }, 29, false)
+		} else {
+			append_setup(mut fake, mut c, 2, 0, unsafe { &complete[0] }, 9, true)
+		}
+		if mode == 2 { fake.frame[fake.length - 1] ^= 1 }
+		// login itself must derive the key before verifying the server MIC/signature.
+		zero(unsafe { &c.key[0] }, 16)
+		c.login('User', 'Domain', 'Password', false, unsafe { &nonce[0] }) or {}
+		assert c.authenticated == (mode == 0 || mode == 5)
+		if mode == 0 || mode == 5 {
+			assert c.signing && c.message == 3 && fake.mic_sent
+		} else {
+			assert c.session == 0
+			for byte in c.key {
+				assert byte == 0
+			}
+		}
+	}
+}
+
+fn test_anonymous_ntlm_has_no_identity_or_session_key() {
+	mut challenge := Challenge{
+		flags:    ntlm_flags
+		info_len: 4
+	}
+	mut raw := [60]u8{}
+	mut output := [4096]u8{}
+	mut nonce := [8]u8{}
+	mut key := [16]u8{}
+	for i in 0 .. 16 {
+		key[i] = 0xaa
+	}
+	n := ntlm_authenticate(unsafe { &challenge }, unsafe { &raw[0] }, 60, 'ignored-user',
+		'ignored-domain', 'ignored-password', true, unsafe { &nonce[0] }, 0, unsafe { &output[0] },
+		4096, unsafe { &key[0] }) or { panic('anonymous') }
+	for at in [20, 28, 36, 44, 52] {
+		_, size := security_buffer(unsafe { &output[0] }, n, at) or { panic('buffer') }
+		assert size == 0
+	}
+	assert get32(unsafe { &output[0] }, 60) & 0x810 == 0x800
+	for byte in key {
+		assert byte == 0
+	}
 }

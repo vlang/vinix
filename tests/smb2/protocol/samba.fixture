@@ -1,0 +1,72 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Actual production protocol over host TCP; not a guest mount receipt.
+module main
+import net
+import smb2
+import time
+
+struct Connection { mut: tcp &net.TcpConn }
+fn transfer(context voidptr, data &u8, length int, sending bool) bool {
+	mut connection := unsafe { &Connection(context) }
+	mut done := 0
+	for done < length {
+		amount := if sending {
+			connection.tcp.write_ptr(unsafe { &data[done] }, length - done) or { return false }
+		} else {
+			connection.tcp.read_ptr(unsafe { &data[done] }, length - done) or { return false }
+		}
+		if amount <= 0 { return false }
+		done += amount
+	}
+	return true
+}
+fn smoke(guest bool, password string) ! {
+	mut socket := net.dial_tcp('127.0.0.1:445')!
+	socket.set_read_timeout(5 * time.second)
+	socket.set_write_timeout(5 * time.second)
+	defer { socket.close() or {} }
+	mut connection := Connection{ tcp: socket }
+	mut tx := []u8{len: smb2.capacity}
+	mut rx := []u8{len: smb2.capacity}
+	mut scratch := []u8{len: smb2.capacity + 64}
+	mut client := smb2.Client{ context: unsafe { &connection }, transfer: transfer,
+		tx: tx.data, rx: rx.data, scratch: scratch.data }
+	// Public test-only nonce; never a production RNG replacement.
+	nonce := [u8(0x45),0x88,0x1a,0x5e,0x9b,0xc3,0x20,0x4f,0x12,0x69,0x7e,0x2a,0x61,0x44,0x85,0x33]!
+	client.negotiate(unsafe { &nonce[0] }) or { return error('negotiate errno=${client.fault}') }
+	println('M17A-HOST-TCP:negotiate dialect=2.1')
+	client.login('m17a', 'WORKGROUP', password, guest, unsafe { &nonce[0] }) or {
+		return error('login errno=${client.fault} diagnostic=${client.diagnostic} response_bytes=${client.response_len} status=${smb2.get32(client.rx,8):08x} flags=${smb2.get32(client.rx,16):08x} structure=${smb2.get16(client.rx,64)} session_flags=${smb2.get16(client.rx,66)} token_offset=${smb2.get16(client.rx,68)} token_length=${smb2.get16(client.rx,70)}')
+	}
+	println('M17A-HOST-TCP:login guest=${guest} signing=${client.signing}')
+	unc := if guest { r'\\127.0.0.1\guest' } else { r'\\127.0.0.1\share' }
+	client.tree_connect(unc) or { return error('tree errno=${client.fault}') }
+	println('M17A-HOST-TCP:maximal_access=${smb2.get32(client.rx,76):08x}')
+	volume_ro := client.volume_readonly() or { return error('volume errno=${client.fault}') }
+	client.readonly = client.readonly || volume_ro
+	println('M17A-HOST-TCP:volume readonly=${volume_ro}')
+	println('M17A-HOST-TCP:tree readonly=${client.readonly}')
+	if guest {
+		if !client.readonly { return error('server read-only access not honored') }
+		return
+	}
+	id := client.create('m17a-host-smoke.txt', 0x0013019f, 3, false) or { return error('create errno=${client.fault}') }
+	text := 'm17a actual host TCP protocol smoke\n'
+	written := client.write(id, 0, text.str, text.len) or { return error('write errno=${client.fault}') }
+	if written != text.len { return error('short write') }
+	mut output := [128]u8{}
+	got := client.read(id, 0, unsafe { &output[0] }, 128) or { return error('read errno=${client.fault}') }
+	if got != text.len || unsafe { tos(&output[0], got) } != text { return error('read mismatch') }
+	mut attr := smb2.Attr{}
+	client.query_info(id, unsafe { &attr }) or { return error('query errno=${client.fault}') }
+	if attr.size != u64(text.len) { return error('size mismatch') }
+	mut remove := u8(1)
+	client.set_info(id, 13, unsafe { &remove }, 1) or { return error('delete errno=${client.fault}') }
+	client.close(id) or { return error('close errno=${client.fault}') }
+	println('M17A-HOST-TCP:file-work PASS bytes=${got}')
+}
+fn main() {
+	smoke(false, 'M17a-disposable-only!') or { eprintln('M17A-HOST-TCP:FAIL ${err}'); exit(1) }
+	smoke(true, '') or { eprintln('M17A-HOST-TCP:FAIL ${err}'); exit(1) }
+	println('M17A-HOST-TCP:PASS not-a-guest-mount-receipt')
+}

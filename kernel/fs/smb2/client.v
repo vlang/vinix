@@ -243,10 +243,16 @@ pub fn (mut c Client) login(user string, domain string, password string, guest b
 		c.broken()
 		return none
 	}
-	start, raw_len := spnego_token(unsafe { &c.rx[off] }, len) or {
+	first_reply := spnego_parse(unsafe { &c.rx[off] }, len) or {
 		c.broken()
 		return none
 	}
+	if first_reply.state != 1 && first_reply.state != 3 {
+		c.broken()
+		return none
+	}
+	start := first_reply.token_at
+	raw_len := first_reply.token_len
 	if raw_len == 0 {
 		c.diagnostic = 'Server did not offer NTLMv2 (Kerberos-only authentication is unsupported)'
 		c.fail(95)
@@ -262,30 +268,63 @@ pub fn (mut c Client) login(user string, domain string, password string, guest b
 		c.fail(22)
 		return none
 	}
-	w := spnego_response(unsafe { &token[0] }, n, 8192) or {
-		c.fail(22)
-		return none
-	}
-	last := c.setup(unsafe { &token[0] }, w)?
-	if last != 0 {
-		zero(unsafe { &c.key[0] }, 16)
-		return none
-	}
-	if c.response_len < 72 || get16(c.rx, 64) != 9 || get64(c.rx, 40) != c.session {
+	if first_reply.mic_len != 0 && (guest
+		|| !verify_mechlist_mic(unsafe { &c.key[0] }, unsafe { &c.rx[off + first_reply.mic_at] })) {
 		c.broken()
 		return none
 	}
-	last_off := int(get16(c.rx, 68))
-	last_len := int(get16(c.rx, 70))
-	if (last_len > 0 && last_off < 72) || !span(c.response_len, last_off, last_len) {
+	if guest && first_reply.state == 3 {
+		c.fail(95)
+		return none
+	}
+	w := if first_reply.state == 3 {
+		spnego_token_mic_response(unsafe { &c.key[0] }, unsafe { &token[0] }, n, 8192) or {
+			c.fail(22)
+			return none
+		}
+	} else {
+		spnego_response(unsafe { &token[0] }, n, 8192) or {
+			c.fail(22)
+			return none
+		}
+	}
+	mut last := c.setup(unsafe { &token[0] }, w)?
+	if last != 0 && last != 0xc0000016 { return none }
+	mut reply := c.setup_response()?
+	if reply.mic_len != 0
+		&& (guest || !verify_mechlist_mic(unsafe { &c.key[0] }, unsafe { &c.rx[reply.mic_at] })) {
+		c.diagnostic = 'SPNEGO server mechanism-list MIC mismatch'
 		c.broken()
 		return none
 	}
-	if last_len > 0 {
-		if !spnego_complete(unsafe { &c.rx[last_off] }, last_len) {
+	if last == 0xc0000016 {
+		// Exactly one MIC continuation, never an unbounded authentication loop.
+		if guest || first_reply.state == 3
+			|| (reply.state != 3 && !(reply.state == 1 && reply.mic_len == 16))
+			|| reply.token_len != 0 {
+			c.diagnostic = 'Unexpected SPNEGO mechanism-list continuation state'
 			c.broken()
 			return none
 		}
+		mic_len := spnego_mic_response(unsafe { &c.key[0] }, unsafe { &token[0] }, 8192) or {
+			c.broken()
+			return none
+		}
+		last = c.setup(unsafe { &token[0] }, mic_len)?
+		if last != 0 {
+			c.fail(13)
+			return none
+		}
+		reply = c.setup_response()?
+		if reply.mic_len != 0
+			&& !verify_mechlist_mic(unsafe { &c.key[0] }, unsafe { &c.rx[reply.mic_at] }) {
+			c.broken()
+			return none
+		}
+	}
+	if reply.state != 0 || reply.token_len != 0 {
+		c.broken()
+		return none
 	}
 	flags := get16(c.rx, 66)
 	if flags & 4 != 0 || (flags & 3 != 0 && (!guest || c.signing)) {
@@ -293,7 +332,7 @@ pub fn (mut c Client) login(user string, domain string, password string, guest b
 		c.fail(95)
 		return none
 	}
-	if flags & 3 == 0 {
+	if !guest {
 		// SESSION_SETUP establishes the signing key: verify its successful
 		// completion before publishing the session, not only later responses.
 		if !c.verify_signature(c.rx, c.response_len) {
@@ -301,6 +340,16 @@ pub fn (mut c Client) login(user string, domain string, password string, guest b
 			return none
 		}
 		c.signing = true
+	} else {
+		// Some SMB2.1 servers omit IS_NULL for an explicitly anonymous NTLM
+		// session. No named identity/key was sent; never accept this when the
+		// server required signing, regardless of the reported session flags.
+		if c.signing {
+			c.fail(95)
+			return none
+		}
+		zero(unsafe { &c.key[0] }, 16)
+		c.signing = false
 	}
 	c.authenticated = true
 	completed = true
@@ -322,7 +371,9 @@ pub fn (mut c Client) tree_connect(unc string) ? {
 	}
 	c.tree = get32(c.rx, 36)
 	// TREE_CONNECT.MaximalAccess, never a fabricated share read-only flag.
-	c.readonly = get32(c.rx, 76) & 0x000d0116 == 0
+	// DELETE/WRITE_DAC/WRITE_OWNER can remain granted on a read-only share.
+	// Data, append, EA, child-delete and attribute writes govern this mount.
+	c.readonly = get32(c.rx, 76) & 0x00000156 == 0
 }
 
 fn fid_put(p &u8, at int, id FileId) {
@@ -349,7 +400,9 @@ pub fn (mut c Client) create(path string, access u32, disposition u32, directory
 	}
 	put16(c.tx, 108, 120)
 	put16(c.tx, 110, u16(n))
-	c.success(5, 120 + n, 152, 89)?
+	// CREATE's StructureSize is 57: even the share-root empty name carries
+	// its one-byte Buffer field. A 120-byte request is truncated.
+	c.success(5, 120 + if n == 0 { 1 } else { n }, 152, 89)?
 	context_off := get32(c.rx, 144)
 	context_len := get32(c.rx, 148)
 	if context_off > u32(c.response_len) || context_len > u32(c.response_len)

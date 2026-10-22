@@ -113,7 +113,9 @@ pub fn ntlm_authenticate(c &Challenge, challenge &u8, challenge_len int, user st
 		put16(out, 66, 19041)
 	}
 	mut at := 88 // MS-NLMP 2.2.1.3: zero Version slot when not negotiated, MIC at 72.
-	d := utf16(domain, unsafe { &out[at] }, cap - at, false) or { return none }
+	d := utf16(if guest { '' } else { domain }, unsafe { &out[at] }, cap - at, false) or {
+		return none
+	}
 	secbuf(out, 28, at, d)
 	at += d
 	u := utf16(if guest { '' } else { user }, unsafe { &out[at] }, cap - at, false) or {
@@ -124,6 +126,7 @@ pub fn ntlm_authenticate(c &Challenge, challenge &u8, challenge_len int, user st
 	secbuf(out, 44, at, 0)
 	secbuf(out, 52, at, 0)
 	if guest {
+		put32(out, 60, (flags | 0x800) & ~u32(0x10)) // Anonymous, no signing key.
 		secbuf(out, 12, at, 1)
 		at++
 		secbuf(out, 20, at, 0)
@@ -284,15 +287,24 @@ fn der_element(p &u8, n int, at int) ?(u8, int, int, int) {
 
 // Only NegTokenResp.sequence.responseToken may contain the NTLM challenge.
 // Missing token is distinct from malformed DER, for mechanism diagnostics.
-fn spnego_token(p &u8, n int) ?(int, int) {
+struct NegTokenResp {
+mut:
+	state     int = -1
+	token_at  int
+	token_len int
+	mic_at    int
+	mic_len   int
+}
+
+fn spnego_parse(p &u8, n int) ?NegTokenResp {
+	if n < 0 || n > 8192 { return none }
 	tag, start, length, end := der_element(p, n, 0)?
 	if tag != 0xa1 || end != n { return none }
 	tag2, seq, seq_len, seq_end := der_element(p, end, start)?
 	if tag2 != 0x30 || seq_end != start + length { return none }
 	mut at := seq
 	mut previous := int(0x9f)
-	mut token_at := 0
-	mut token_len := 0
+	mut result := NegTokenResp{}
 	for at < seq + seq_len {
 		field, body, size, next := der_element(p, seq_end, at)?
 		if int(field) <= previous || field < 0xa0 || field > 0xa3 { return none }
@@ -301,6 +313,7 @@ fn spnego_token(p &u8, n int) ?(int, int) {
 		if inner_end != body + size { return none }
 		if field == 0xa0 {
 			if inner != 0x0a || data_len != 1 || unsafe { p[data] } > 3 { return none }
+			result.state = int(unsafe { p[data] })
 		} else if field == 0xa1 {
 			if inner != 6 || data_len != 10 { return none }
 			oid := [u8(0x2b), 6, 1, 4, 1, 0x82, 0x37, 2, 2, 0x0a]!
@@ -310,13 +323,22 @@ fn spnego_token(p &u8, n int) ?(int, int) {
 		} else {
 			if inner != 4 { return none }
 			if field == 0xa2 {
-				token_at = data
-				token_len = data_len
+				result.token_at = data
+				result.token_len = data_len
+			} else {
+				if data_len != 16 { return none }
+				result.mic_at = data
+				result.mic_len = data_len
 			}
 		}
 		at = next
 	}
-	return token_at, token_len
+	return result
+}
+
+fn spnego_token(p &u8, n int) ?(int, int) {
+	r := spnego_parse(p, n)?
+	return r.token_at, r.token_len
 }
 
 pub fn spnego_initial(p &u8, cap int) ?int {
