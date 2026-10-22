@@ -138,6 +138,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_package_storage(smali)!
  framework_application_info(smali)!
  framework_local_binder(smali)!
+ framework_parcel_binders(smali)!
  framework_user_identity(smali)!
  framework_package_signatures(smali)!
  checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', '--jobs', '2', smali, '-o', work + '/classes.dex'])!
@@ -156,6 +157,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  sources['tests/native-android-tools/androidtools/framework_package_storage.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_package_storage.v')!)
  sources['tests/native-android-tools/androidtools/framework_package_info.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_package_info.v')!)
  sources['tests/native-android-tools/androidtools/framework_binder.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_binder.v')!)
+ sources['tests/native-android-tools/androidtools/framework_parcel.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_parcel.v')!)
  sources['tests/native-android-tools/androidtools/framework_users.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_users.v')!)
  receipt := ah.Value({
   'schema': ah.Value(1)

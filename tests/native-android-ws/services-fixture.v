@@ -125,6 +125,114 @@ invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0'
 }
 
+fn parcel_checks() string {
+	mut body := 'new-instance v0, Lorg/vinix/service/LocalBinder;
+invoke-direct {v0}, Lorg/vinix/service/LocalBinder;-><init>()V
+new-instance v1, Landroid/os/Binder;
+invoke-direct {v1}, Landroid/os/Binder;-><init>()V
+invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;
+move-result-object v2
+invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;
+move-result-object v3
+const/16 v4, 123
+invoke-virtual {v2, v4}, Landroid/os/Parcel;->writeInt(I)V
+invoke-virtual {v2, v0}, Landroid/os/Parcel;->writeStrongBinder(Landroid/os/IBinder;)V
+invoke-virtual {v2, v0}, Landroid/os/Parcel;->writeStrongInterface(Landroid/os/IInterface;)V
+invoke-virtual {v2, v1}, Landroid/os/Parcel;->writeStrongBinder(Landroid/os/IBinder;)V
+const/4 v4, 0
+invoke-virtual {v2, v4}, Landroid/os/Parcel;->writeStrongInterface(Landroid/os/IInterface;)V
+:marshall_start
+invoke-virtual {v2}, Landroid/os/Parcel;->marshall()[B
+:marshall_end
+.catch Ljava/lang/RuntimeException; {:marshall_start .. :marshall_end} :marshall_rejected
+goto/16 :bad
+:marshall_rejected
+move-exception v4
+const/16 v4, 99
+invoke-virtual {v3, v4}, Landroid/os/Parcel;->writeInt(I)V
+invoke-virtual {v3, v4}, Landroid/os/Parcel;->writeInt(I)V
+const/4 v4, 4
+const/16 v5, 16
+invoke-virtual {v3, v2, v4, v5}, Landroid/os/Parcel;->appendFrom(Landroid/os/Parcel;II)V
+invoke-virtual {v2}, Landroid/os/Parcel;->recycle()V
+const/16 v4, 8
+invoke-virtual {v3, v4}, Landroid/os/Parcel;->setDataPosition(I)V
+'
+	for expected in ['v0', 'v0', 'v1', 'null'] {
+		body += 'invoke-virtual {v3}, Landroid/os/Parcel;->readStrongBinder()Landroid/os/IBinder;\nmove-result-object v4\n'
+		body += if expected == 'null' { 'if-nez v4, :bad\n' } else { 'if-ne v4, ${expected}, :bad\n' }
+	}
+	body += 'const/16 v4, 8
+const/16 v5, 8
+invoke-virtual {v3, v3, v4, v5}, Landroid/os/Parcel;->appendFrom(Landroid/os/Parcel;II)V
+const/16 v4, 24
+invoke-virtual {v3, v4}, Landroid/os/Parcel;->setDataPosition(I)V
+invoke-virtual {v3}, Landroid/os/Parcel;->readStrongBinder()Landroid/os/IBinder;
+move-result-object v4
+if-ne v4, v0, :bad
+invoke-virtual {v3}, Landroid/os/Parcel;->readStrongBinder()Landroid/os/IBinder;
+move-result-object v4
+if-ne v4, v0, :bad
+const/16 v4, 9
+invoke-virtual {v3, v4}, Landroid/os/Parcel;->setDataPosition(I)V
+const/4 v4, 0
+invoke-virtual {v3, v4}, Landroid/os/Parcel;->writeByte(B)V
+const/16 v4, 8
+invoke-virtual {v3, v4}, Landroid/os/Parcel;->setDataPosition(I)V
+invoke-virtual {v3}, Landroid/os/Parcel;->readStrongBinder()Landroid/os/IBinder;
+move-result-object v4
+if-nez v4, :bad
+invoke-virtual {v3}, Landroid/os/Parcel;->readStrongBinder()Landroid/os/IBinder;
+move-result-object v4
+if-ne v4, v0, :bad
+const/16 v4, 13
+invoke-virtual {v3, v4}, Landroid/os/Parcel;->setDataSize(I)V
+const/16 v4, 32
+invoke-virtual {v3, v4}, Landroid/os/Parcel;->setDataSize(I)V
+const/16 v4, 12
+invoke-virtual {v3, v4}, Landroid/os/Parcel;->setDataPosition(I)V
+invoke-virtual {v3}, Landroid/os/Parcel;->readStrongBinder()Landroid/os/IBinder;
+move-result-object v4
+if-nez v4, :bad
+invoke-virtual {v3}, Landroid/os/Parcel;->marshall()[B
+const/4 v4, 0
+invoke-virtual {v2, v4}, Landroid/os/Parcel;->writeInt(I)V
+invoke-virtual {v2, v4}, Landroid/os/Parcel;->setDataPosition(I)V
+invoke-virtual {v2}, Landroid/os/Parcel;->readStrongBinder()Landroid/os/IBinder;
+move-result-object v4
+if-nez v4, :bad
+invoke-virtual {v2}, Landroid/os/Parcel;->recycle()V
+invoke-virtual {v3}, Landroid/os/Parcel;->recycle()V
+invoke-virtual {v2, v0}, Landroid/os/Parcel;->writeStrongBinder(Landroid/os/IBinder;)V
+const/4 v4, 4
+const/4 v5, 0
+invoke-interface {v0, v4, v2, v3, v5}, Landroid/os/IBinder;->transact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z
+move-result v4
+if-eqz v4, :bad
+invoke-virtual {v3}, Landroid/os/Parcel;->readException()V
+invoke-virtual {v3}, Landroid/os/Parcel;->readStrongBinder()Landroid/os/IBinder;
+move-result-object v4
+if-ne v4, v0, :bad
+const/4 v4, 4
+new-array v4, v4, [B
+const/4 v5, 0
+const/4 v1, 4
+invoke-virtual {v2, v4, v5, v1}, Landroid/os/Parcel;->unmarshall([BII)V
+invoke-virtual {v2}, Landroid/os/Parcel;->readStrongBinder()Landroid/os/IBinder;
+move-result-object v4
+if-nez v4, :bad
+invoke-virtual {v2}, Landroid/os/Parcel;->marshall()[B
+invoke-virtual {v2}, Landroid/os/Parcel;->recycle()V
+invoke-virtual {v3}, Landroid/os/Parcel;->recycle()V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "Parcel Binder identity, copy offsets, self copy, overwrite, truncation, lifetime and callback round trip"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+	return body
+}
+
 fn user_checks() string {
 	return 'invoke-static {}, Landroid/os/Process;->myUid()I
 move-result v0
@@ -194,6 +302,8 @@ const/4 v0, 2
 if-eq p1, v0, :exception
 const/4 v0, 3
 if-eq p1, v0, :oneway
+const/4 v0, 4
+if-eq p1, v0, :callback
 invoke-super {p0, p1, p2, p3, p4}, Landroid/os/Binder;->onTransact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z
 move-result v0
 return v0
@@ -212,6 +322,14 @@ new-instance v0, Ljava/lang/IllegalStateException;
 const-string v1, "local failure"
 invoke-direct {v0, v1}, Ljava/lang/IllegalStateException;-><init>(Ljava/lang/String;)V
 throw v0
+:callback
+invoke-virtual {p2}, Landroid/os/Parcel;->readStrongBinder()Landroid/os/IBinder;
+move-result-object v0
+if-ne v0, p0, :bad
+invoke-virtual {p3}, Landroid/os/Parcel;->writeNoException()V
+invoke-virtual {p3, p0}, Landroid/os/Parcel;->writeStrongInterface(Landroid/os/IInterface;)V
+const/4 v0, 1
+return v0
 :oneway
 if-nez p3, :bad
 const/4 v0, 1
@@ -518,12 +636,14 @@ return-object v0'))!
 		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/app/Activity;-><init>()V\nreturn-void') +
 		method('private checkComponents()V', component_checks()) +
 		method('private checkBinder()V', binder_checks()) +
+		method('private checkParcel()V', parcel_checks()) +
 		method('private checkUser()V', user_checks()) +
 		method('private checkStorage(Landroid/content/Context;)V', storage_checks()) +
 		method('public onCreate(Landroid/os/Bundle;)V', '
 invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkComponents()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkBinder()V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkParcel()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkUser()V
 new-instance v0, Landroid/widget/TextView;
 invoke-direct {v0, p0}, Landroid/widget/TextView;-><init>(Landroid/content/Context;)V
@@ -634,7 +754,7 @@ iget-object v0, p0, Lorg/vinix/service/Main;->label:Landroid/widget/TextView;
 const-string v1, "Companion service startup passed"
 invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread provider-context provider-resources attach-once bind-executor-thread component-package component-metadata component-missing package-data package-files package-preferences split-info-copy local-binder-interface local-binder-identity local-binder-transact local-binder-exception user-identity system-user uid-ranges"
+const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread provider-context provider-resources attach-once bind-executor-thread component-package component-metadata component-missing package-data package-files package-preferences split-info-copy local-binder-interface local-binder-identity local-binder-transact local-binder-exception user-identity system-user uid-ranges parcel-binder-identity parcel-binder-copy parcel-binder-lifetime parcel-binder-callback"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void'))!
 	for name in ['client', 'companion'] {
