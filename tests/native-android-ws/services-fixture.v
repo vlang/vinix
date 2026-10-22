@@ -404,9 +404,40 @@ throw v0')
 
 fn component_checks() string {
 	mut body := 'invoke-virtual {p0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;\nmove-result-object v0\n'
+	// Check metadata only: named companion processes still share this ART VM.
+	for name in ['client', 'companion'] {
+		process := 'org.vinix.service.' + name + if name == 'companion' { ':worker' } else { '' }
+		body += 'const-string v2, "org.vinix.service.' + name + '"
+const-string v3, "' + process + '"
+const/4 v4, 0
+invoke-virtual {v0, v2, v4}, Landroid/content/pm/PackageManager;->getApplicationInfo(Ljava/lang/String;I)Landroid/content/pm/ApplicationInfo;
+move-result-object v1
+iget-object v4, v1, Landroid/content/pm/ApplicationInfo;->processName:Ljava/lang/String;
+invoke-virtual {v3, v4}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v4
+if-eqz v4, :bad
+new-instance v4, Landroid/content/pm/ApplicationInfo;
+invoke-direct {v4, v1}, Landroid/content/pm/ApplicationInfo;-><init>(Landroid/content/pm/ApplicationInfo;)V
+iget-object v4, v4, Landroid/content/pm/ApplicationInfo;->processName:Ljava/lang/String;
+invoke-virtual {v3, v4}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v4
+if-eqz v4, :bad
+const/4 v4, 0
+invoke-virtual {p0, v2, v4}, Landroid/content/Context;->createPackageContext(Ljava/lang/String;I)Landroid/content/Context;
+move-result-object v5
+invoke-virtual {v5}, Landroid/content/Context;->getApplicationInfo()Landroid/content/pm/ApplicationInfo;
+move-result-object v1
+iget-object v4, v1, Landroid/content/pm/ApplicationInfo;->processName:Ljava/lang/String;
+invoke-virtual {v3, v4}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v4
+if-eqz v4, :bad
+'
+	}
 	for kind in ['Provider', 'Service'] {
 		class := if kind == 'Provider' { 'Provider' } else { 'Worker' }
 		for package_name in ['client', 'companion'] {
+			app_process := 'org.vinix.service.' + package_name + if package_name == 'companion' { ':worker' } else { '' }
+			component_process := if kind == 'Provider' { app_process } else if package_name == 'client' { 'org.vinix.service.global' } else { 'org.vinix.service.companion:service' }
 			body += 'new-instance v1, Landroid/content/ComponentName;
 const-string v2, "org.vinix.service.' + package_name + '"
 const-string v3, "org.vinix.service.' + class + '"
@@ -416,6 +447,17 @@ invoke-virtual {v0, v1, v3}, Landroid/content/pm/PackageManager;->get' + kind + 
 move-result-object v1
 iget-object v3, v1, Landroid/content/pm/PackageItemInfo;->packageName:Ljava/lang/String;
 invoke-virtual {v2, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v3
+if-eqz v3, :bad
+iget-object v3, v1, Landroid/content/pm/ComponentInfo;->processName:Ljava/lang/String;
+const-string v4, "' + component_process + '"
+invoke-virtual {v4, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v3
+if-eqz v3, :bad
+iget-object v3, v1, Landroid/content/pm/ComponentInfo;->applicationInfo:Landroid/content/pm/ApplicationInfo;
+iget-object v3, v3, Landroid/content/pm/ApplicationInfo;->processName:Ljava/lang/String;
+const-string v4, "' + app_process + '"
+invoke-virtual {v4, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 move-result v3
 if-eqz v3, :bad
 iget-object v1, v1, Landroid/content/pm/PackageItemInfo;->metaData:Landroid/os/Bundle;
@@ -959,11 +1001,12 @@ return-void'))!
 		os.mkdir_all(dir + '/res/values')!
 		os.write_file(dir + '/res/values/strings.xml', '<resources><string name="provider_owner">' + name + ' resource</string></resources>')!
 		checked([aapt, 'compile', '--dir', dir + '/res', '-o', dir + '/resources.zip'])
-		components := '<service android:name="org.vinix.service.Worker" android:exported="true"><meta-data android:name="owner" android:value="' + name + '"/></service><provider android:name="org.vinix.service.Provider" android:authorities="fixture.service.' + name + '"><meta-data android:name="owner" android:value="' + name + '"/></provider>'
+		service_process := if name == 'client' { 'org.vinix.service.global' } else { ':service' }
+		components := '<service android:name="org.vinix.service.Worker" android:process="' + service_process + '" android:exported="true"><meta-data android:name="owner" android:value="' + name + '"/></service><provider android:name="org.vinix.service.Provider" android:authorities="fixture.service.' + name + '"><meta-data android:name="owner" android:value="' + name + '"/></provider>'
 		application := if name == 'client' {
 			'<application android:label="Service fixture"><activity android:name="org.vinix.service.Main" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>' + components + '</application>'
 		} else {
-			'<application android:name="org.vinix.service.App" android:label="Companion fixture">' + components + '</application>'
+			'<application android:name="org.vinix.service.App" android:process=":worker" android:label="Companion fixture">' + components + '</application>'
 		}
 		os.write_file(dir + '/AndroidManifest.xml', '<?xml version="1.0"?><manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.vinix.service.' + name + '" android:versionCode="1"><uses-sdk android:minSdkVersion="23" android:targetSdkVersion="35"/><uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>' + application + '</manifest>')!
 		checked([aapt, 'link', '-I', resources, dir + '/resources.zip', '--manifest', dir + '/AndroidManifest.xml', '-o',

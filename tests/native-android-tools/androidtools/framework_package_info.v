@@ -21,4 +21,14 @@ fn framework_application_info(smali string) ! {
 	}
 	text = text[..start] + body.replace('    return-void', copy + '    return-void') + text[end..]
 	os.write_file(path, text)!
+	// PackageManager normally fills the default application process after
+	// parsing. ATL exposes parsed metadata directly, including to companions.
+	// Use the package name before parsing components so they inherit it too;
+	// explicit global/private process names still use buildProcessName.
+	parser := smali + '/android/content/pm/PackageParser.smali'
+	mut parsed := os.read_file(parser)!
+	anchor := '    iget-object v2, v8, Landroid/content/pm/ApplicationInfo;->packageName:Ljava/lang/String;\n\n    const/4 v3, 0x0\n\n    move-object/from16 v0, p0\n\n    iget-object v6, v0, Landroid/content/pm/PackageParser;->mSeparateProcesses:[Ljava/lang/String;'
+	if parsed.count(anchor) != 1 { return error('application process default anchor changed') }
+	parsed = parsed.replace(anchor, anchor.replace('const/4 v3, 0x0', 'move-object v3, v2'))
+	os.write_file(parser, parsed)!
 }
