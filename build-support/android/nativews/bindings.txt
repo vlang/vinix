@@ -558,3 +558,4 @@ android/hardware/HardwareBuffer|create(IIIIJ)Landroid/hardware/HardwareBuffer;|r
 android/hardware/HardwareBuffer|isSupported(IIIIJ)Z|return u8(ws_hardware_java_supported(p0,p1,p2,p3,p4))
 android/hardware/HardwareBuffer|vinixRelease(J)V|ws_hardware_release(&WsHardwareBuffer(p0))
 android/hardware/HardwareBuffer|vinixProperty(JI)J|return ws_hardware_java_property(p0,p1)
+android/animation/VinixPathValues|nativePath|return ws_path_animation(e,p1)

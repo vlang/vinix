@@ -37,6 +37,14 @@ checks laid-out bounds, callback order, cancellation and drawing invalidation.
 window. Measured dimensions and pending layout requests are preserved. The
 fixture checks callback state, no-op updates and native Canvas pixel coverage.
 
+Path-based `ObjectAnimator.ofObject` and `PropertyValuesHolder.ofObject` accept
+an explicit Property and optional TypeConverter. They snapshot native WS path
+geometry, interpolate by arc length, and apply PointF or converted values through
+the existing animator scheduler. Curves use WS's adaptive subdivision; contour
+moves consume no distance. Clones own independent temporary points. The fixture
+checks endpoints, uneven segments, curves, contour jumps, zero-length paths,
+conversion, cloning, path mutation, invalid inputs and scheduled frame callbacks.
+
 Weighted Typeface factories retain family, requested weight and slant. System
 sans, serif and monospace resolve lazily to the nearest installed DejaVu
 regular/bold/italic face; unknown families fall back to sans. A bounded cache
