@@ -16850,22 +16850,50 @@ The caller supplies the three option storage pointers and a nil target, then
 moves the returned queue into `x20`. This inspection executes no application
 code and does not establish that Fortnite has reached this consumer.
 
-The launch probe now stops at the required Swift core data import `_$sytWV`,
-the value-witness table for `Void` (the empty tuple). Native `swift-demangle`
-confirms the symbol's identity. This remains a linking failure before
-application entry; Fortnite is not playable.
+`_$sytWV` now exports Void's existing value-witness table directly. Its address
+matches the pointer in the `_$sytN` full-metadata header. The compatibility
+exports share one sealed page and drained runtime lifetime.
+
+The Void fixture resolves the native and compatibility data exports and calls
+every witness through the exported table. It checks both read-only extents,
+zero-size values at null and protected addresses, exact enum tag widths,
+`Array<Void>` and nested ownership, concurrent table-first and metadata-first
+publication, rejected names/libraries, and two drained/unmapped lifetimes:
+
+```sh
+v run tests/ios/native-checks.v build-swift-void
+```
+
+Evidence is retained under `build/ios/fortnite/void-witness-checks`. The Void,
+Array and Dispatch sync fixtures passed normal and deterministic ASan/UBSan
+host runs. The ARM64 Void fixture, launch probe and both import audits completed.
+Two obsolete unsupported-import assertions in the Void and Array fixtures were
+removed; both failed attempts and their immutable input manifests are preserved.
+Final verification checked all 1,042 source, toolchain and runtime hashes, seven
+archived binary/generated-C pairs and four retained serial logs. All four
+temporary VMs and their RAM disk were retired.
+
+Static inspection finds two required `_$sytWV` fixups in `__DATA_CONST,__const`,
+at `0x10dc9d5c8` and `0x10e09d9e0`. They supply the preceding witness-table
+pointers for the empty `DMAConstants` enum and `UEView` struct metadata. The
+accessor at `0x10003e034` returns the `DMAConstants` metadata address. This
+inspection executes no application code.
+
+The launch probe now stops at the required Swift core import
+`_swift_deletedMethodError`. This remains a linking failure before application
+entry; Fortnite is not playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,003 | 158 | 78 |
+| Fortnite executable | 2,004 | 157 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,843 | 161 | 114 |
+| All images | 2,844 | 160 | 114 |
 
-The C++/GLES/Text variant reports 2,857 resolved imports, 147 unresolved strong
+The C++/GLES/Text variant reports 2,858 resolved imports, 146 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

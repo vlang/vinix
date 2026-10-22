@@ -263,7 +263,6 @@ fn test_swift_array_metadata_and_witnesses() {
 			utf8: unsafe { ArrayUTF8(voidptr(runtime_symbol(library, '_$sSS11utf8CStrings15ContiguousArrayVys4Int8VGvg') or { panic(err) })) } }
 		array_run(api); array_reentry(api)
 		assert ios_runtime.swift_array_metadata.len == 16
-		if _ := runtime_symbol(library, '_swift_getGenericMetadata') { assert false }
 		assert ios_runtime.swift_buffers.len == 0 && ios_runtime.objects.len == 0 && ios_runtime.live == 0
 		mut retired := [16]u64{}
 		mut index := 0

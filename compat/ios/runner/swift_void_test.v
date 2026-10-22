@@ -25,6 +25,7 @@ type VoidArray = fn (u64, u64) SwiftAssociatedMetadata
 
 struct VoidApi {
 	full u64
+	witness u64
 	@[required]
 	allocate VoidAllocate
 	@[required]
@@ -35,16 +36,27 @@ struct VoidApi {
 	array VoidArray
 }
 fn void_witness(metadata u64) u64 { return read64(metadata - 8) & 0x0000ffffffffffff }
-fn void_resolve() u64 {
-	return runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sytN') or { panic(err) }
+fn void_export() u64 {
+	return runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sytWV') or { panic(err) }
 }
-fn void_readonly(full u64) {
+fn void_resolve(witness_first bool) u64 {
+	mut full := u64(0)
+	for _ in 0 .. 64 {
+		mut witness := u64(0)
+		if witness_first { witness = void_export() }
+		full = runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sytN') or { panic(err) }
+		if !witness_first { witness = void_export() }
+		assert witness == void_witness(full + 8)
+	}
+	return full
+}
+fn void_readonly(full u64, bytes u64) {
 	$if macos {
 		mut address := full; mut size := u64(0); mut info := [16]i32{}
 		mut count := u32(C.VM_REGION_BASIC_INFO_COUNT_64); mut object := u32(0)
 		task := C.mach_task_self()
 		assert C.vm_region_64(task, &address, &size, C.VM_REGION_BASIC_INFO_64, unsafe { &info[0] }, &count, &object) == 0
-		assert address <= full && full + 120 <= address + size && info[0] == C.PROT_READ
+		assert address <= full && full + bytes <= address + size && info[0] == C.PROT_READ
 		if object != 0 { assert C.mach_port_deallocate(task, object) == 0 }
 	} $else {
 		maps := os.read_file('/proc/self/maps') or { panic(err) }
@@ -55,7 +67,7 @@ fn void_readonly(full u64) {
 			start := strconv.parse_uint(range[0], 16, 64) or { panic(err) }
 			end := strconv.parse_uint(range[1], 16, 64) or { panic(err) }
 			if full >= start && full < end {
-				assert full + 120 <= end && fields[1] == 'r--p'
+				assert full + bytes <= end && fields[1] == 'r--p'
 				found = true; break
 			}
 		}
@@ -63,10 +75,14 @@ fn void_readonly(full u64) {
 	}
 }
 fn void_values(api VoidApi, inaccessible u64) {
-	void_readonly(api.full)
+	void_readonly(api.full, 32)
+	void_readonly(api.witness, 88)
 	metadata := api.full + 8
 	assert read64(metadata) == 0x301 && read64(metadata + 8) == 0 && read64(metadata + 16) == 0
-	witness := void_witness(metadata)
+	// The exported data symbol is the table itself, not a pointer cell or
+	// metadata address point. Exercise every entry through that direct export.
+	witness := api.witness
+	assert witness != 0 && witness == void_witness(metadata)
 	assert read64(witness + 64) == 0 && read64(witness + 72) == 1 && read64(witness + 80) == 0
 	mut source := [u8(0xa5)].repeat(16)
 	mut destination := [u8(0x5a)].repeat(16)
@@ -160,27 +176,31 @@ fn test_swift_void() {
 		assert lib != unsafe { nil }
 		assert C.dlsym(lib, c'swift_getTupleTypeMetadata') != unsafe { nil }
 		full := u64(C.dlsym(lib, c'$sytN')); assert full != 0
-		void_run(VoidApi{ full: full, allocate: unsafe { VoidAllocate(C.dlsym(lib, c'$ss27_allocateUninitializedArrayySayxG_BptBwlF')) },
+		witness := u64(C.dlsym(lib, c'$sytWV')); assert witness != 0
+		void_run(VoidApi{ full: full, witness: witness, allocate: unsafe { VoidAllocate(C.dlsym(lib, c'$ss27_allocateUninitializedArrayySayxG_BptBwlF')) },
 			retain: unsafe { VoidRetain(C.dlsym(lib, c'swift_bridgeObjectRetain')) },
 			release: unsafe { VoidRelease(C.dlsym(lib, c'swift_bridgeObjectRelease')) },
 			array: unsafe { VoidArray(C.dlsym(lib, c'$sSaMa')) } }, inaccessible)
-		println('IOS-SWIFT-VOID-NATIVE: installed full metadata, no-touch zero-size witnesses, exact tag widths with protected boundaries, Array<Void> and nested ownership, eight workers')
+		println('IOS-SWIFT-VOID-NATIVE: direct exported VWT aliases full metadata, both read-only extents, no-touch zero-size witnesses, exact tag widths with protected boundaries, Array<Void> and nested ownership, eight workers')
 	}
-	for _ in 0 .. 2 {
+	for cycle in 0 .. 2 {
 		objc_start()
+		assert swift_core_symbol('_$sytWVunknown') == none && ios_runtime.swift_void_arena == 0
+		assert runtime_symbol('/usr/lib/swift/libswiftDispatch.dylib', '_$sytWV') == none
+		assert ios_runtime.swift_void_arena == 0
 		mut resolvers := []thread u64{}
-		for _ in 0 .. 8 { resolvers << spawn void_resolve() }
+		for _ in 0 .. 8 { resolvers << spawn void_resolve(cycle == 0) }
 		resolved := resolvers.wait()
 		for full in resolved { assert full == resolved[0] && full != 0 }
-		void_run(VoidApi{ full: resolved[0], allocate: swift_array_allocate,
+		assert void_export() == ios_runtime.swift_void_arena + 32
+		void_run(VoidApi{ full: resolved[0], witness: void_export(), allocate: swift_array_allocate,
 			retain: swift_bridge_retain, release: swift_bridge_release, array: swift_array_access }, inaccessible)
 		assert ios_runtime.swift_arrays.len == 0 && ios_runtime.swift_buffers.len == 0 && ios_runtime.swift_strings.len == 0 && ios_runtime.objects.len == 0
-		assert runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_swift_getTupleTypeMetadata') == none
 		arena := ios_runtime.swift_void_arena
 		objc_stop()
 		assert ios_runtime.swift_void_arena == 0 && ios_runtime.swift_array_arena == 0 && ios_runtime.live == 0
 		$if macos { assert C.mprotect(unsafe { voidptr(arena) }, page, C.PROT_READ) == -1 }
 		$else { mut residency := u8(0); assert C.mincore(unsafe { voidptr(arena) }, page, &residency) == -1 }
 	}
-	println('IOS-SWIFT-VOID: canonical full metadata/address point, no-touch POD witnesses, exact enum tags including UInt32 wrap, protected/unaligned storage, nested Array ownership, eight workers and two drained/unmapped teardowns')
+	println('IOS-SWIFT-VOID: canonical direct VWT export/full metadata alias, read-only extents, table-first and metadata-first concurrent publication, no-touch POD witnesses, exact enum tags including UInt32 wrap, protected/unaligned storage, nested Array ownership, eight workers and two drained/unmapped teardowns')
 }

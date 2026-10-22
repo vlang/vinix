@@ -353,6 +353,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'__swift_stdlib_reportUnimplementedInitializer' { u64(unsafe { voidptr(swift_initializer_report) }) }
 		'__swift_stdlib_operatingSystemVersion' { u64(unsafe { voidptr(ios_operating_system_version) }) }
 		'_$sytN' { swift_void_full_metadata() }
+		'_$sytWV' { read64(swift_void_full_metadata()) }
 		'_$sSSN' { swift_string_metadata() }
 		'_$sSSMn' { read64(swift_string_metadata() + 8) }
 		'_$sSSMa' { swift_string_metadata(); ios_runtime.swift_metadata_arena }
