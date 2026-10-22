@@ -127,6 +127,11 @@ unmarshalling and recycling release affected references. Raw marshalling rejects
 live Binder objects, since byte arrays cannot preserve their identity.
 UserHandle derives current and calling Android user IDs from the corresponding
 UID ranges. UserManager identifies user zero as the system user.
+Context supplies a cached DevicePolicyManager through string and class lookups.
+Its read-only administrator and ownership queries report the unmanaged guest:
+no active admins, device owner or profile owner. Android policy enrollment and
+enforcement are unavailable. The null/false query results follow the
+[AOSP no-administrator contract](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-11.0.0_r1/core/java/android/app/admin/DevicePolicyManager.java).
 GeofenceProvider exposes a stable local Binder and forwards supplied hardware
 interfaces to its callback. GeofenceHardware capability queries preserve the
 AIDL transaction IDs and return Android's fallback values on RemoteException.

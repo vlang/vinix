@@ -486,6 +486,58 @@ fn typed_parcel_classes(dir string) ! {
 		method('public createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;', 'new-instance v0, Lorg/vinix/service/ParcelValue;\ninvoke-direct {v0}, Lorg/vinix/service/ParcelValue;-><init>()V\ninvoke-virtual {p1}, Landroid/os/Parcel;->readInt()I\nmove-result v1\niput v1, v0, Lorg/vinix/service/ParcelValue;->value:I\ninvoke-virtual {p1}, Landroid/os/Parcel;->readInt()I\nreturn-object v0'))!
 }
 
+fn device_policy_checks() string {
+	mut body := 'sget-object v0, Landroid/content/Context;->DEVICE_POLICY_SERVICE:Ljava/lang/String;
+invoke-virtual {p1, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v0
+if-eqz v0, :bad
+check-cast v0, Landroid/app/admin/DevicePolicyManager;
+const-class v1, Landroid/app/admin/DevicePolicyManager;
+invoke-virtual {p1, v1}, Landroid/content/Context;->getSystemService(Ljava/lang/Class;)Ljava/lang/Object;
+move-result-object v1
+if-ne v0, v1, :bad
+const-string v1, "device_policy"
+invoke-virtual {p1, v1}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v1
+if-ne v0, v1, :bad
+'
+	for signature in ['getActiveAdmins()Ljava/util/List;',
+		'getDeviceOwnerComponentOnCallingUser()Landroid/content/ComponentName;',
+		'getDeviceOwnerComponentOnAnyUser()Landroid/content/ComponentName;',
+		'getProfileOwner()Landroid/content/ComponentName;'] {
+		body += 'invoke-virtual {v0}, Landroid/app/admin/DevicePolicyManager;->' + signature + '\nmove-result-object v1\nif-nez v1, :bad\n'
+	}
+	body += 'invoke-virtual {v0}, Landroid/app/admin/DevicePolicyManager;->isDeviceManaged()Z\nmove-result v1\nif-nez v1, :bad\n'
+	for signature in ['isProfileOwnerApp', 'isDeviceOwnerApp'] {
+		for value in ['invoke-virtual {p1}, Landroid/content/Context;->getPackageName()Ljava/lang/String;\nmove-result-object v1', 'const-string v1, "missing.policy.package"', 'const/4 v1, 0'] {
+			body += value + '\ninvoke-virtual {v0, v1}, Landroid/app/admin/DevicePolicyManager;->' + signature + '(Ljava/lang/String;)Z\nmove-result v2\nif-nez v2, :bad\n'
+		}
+	}
+	body += 'new-instance v1, Landroid/content/ComponentName;
+const-string v2, "missing.policy.package"
+const-string v3, "Admin"
+invoke-direct {v1, v2, v3}, Landroid/content/ComponentName;-><init>(Ljava/lang/String;Ljava/lang/String;)V
+invoke-virtual {v0, v1}, Landroid/app/admin/DevicePolicyManager;->isAdminActive(Landroid/content/ComponentName;)Z
+move-result v1
+if-nez v1, :bad
+const-string v0, "user"
+invoke-virtual {p1, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v0
+instance-of v0, v0, Landroid/os/UserManager;
+if-eqz v0, :bad
+const-string v0, "VinixMissingService"
+invoke-virtual {p1, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v0
+if-nez v0, :bad
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "device policy lookup, caching and unmanaged guest state"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+	return body
+}
+
 fn user_checks() string {
 	return 'invoke-static {}, Landroid/os/Process;->myUid()I
 move-result v0
@@ -1221,6 +1273,7 @@ return-object v0'))!
 		method('private checkGeofence()V', geofence_checks()) +
 		method('private checkGeofenceWire(Landroid/os/IBinder;)V', geofence_wire_checks()) +
 		method('private checkUser()V', user_checks()) +
+		method('private checkDevicePolicy(Landroid/content/Context;)V', device_policy_checks()) +
 		method('private checkPriority()V', priority_checks()) +
 		method('private checkImportance()V', importance_checks()) +
 		method('private checkWorkerPriority()V', '
@@ -1268,6 +1321,7 @@ invoke-direct {p0}, Lorg/vinix/service/Main;->checkParcel()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkTypedParcel()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkGeofence()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkUser()V
+invoke-direct {p0, p0}, Lorg/vinix/service/Main;->checkDevicePolicy(Landroid/content/Context;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkImportance()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkPriority()V
 const/4 v0, 0
@@ -1286,6 +1340,7 @@ invoke-virtual {p0, v0, v1}, Landroid/content/Context;->createPackageContext(Lja
 move-result-object v0
 invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkStorage(Landroid/content/Context;)V
 invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkDirectories(Landroid/content/Context;)V
+invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkDevicePolicy(Landroid/content/Context;)V
 invoke-virtual {v0}, Landroid/content/Context;->getClassLoader()Ljava/lang/ClassLoader;
 move-result-object v0
 const-string v1, "org.vinix.service.App"
