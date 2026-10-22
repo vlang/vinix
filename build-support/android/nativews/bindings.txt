@@ -264,6 +264,7 @@ android/graphics/Matrix|native_postScale(JFFFF)Z|return ws_matrix_pivot(p0,1,p1,
 android/graphics/Matrix|native_mapPoints|ws_matrix_map_points(e,p0,p1,p2,p3,p4,p5,p6)
 android/graphics/Matrix|native_rectStaysRect|return ws_matrix_rect_stays(p0)
 android/graphics/Matrix|native_mapRect|return ws_matrix_map_rect(e,p0,p1,p2)
+android/graphics/Matrix|native_invert|return ws_matrix_invert(p0,p1)
 android/graphics/drawable/Drawable|native_constructor|return 0 // Pure Java drawables need no native toolkit object.
 android/graphics/drawable/Drawable|native_ref|ws_bitmap_ref(p0)
 android/graphics/drawable/Drawable|native_unref|ws_bitmap_unref(p0)

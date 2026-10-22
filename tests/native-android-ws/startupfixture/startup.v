@@ -27,6 +27,7 @@ pub fn install(output string, resources string) ! {
  install_drawable_probe(dir)!
  install_path_probe(dir)!
  install_matrix_probe(dir)!
+ install_matrix_inversion_probe(dir)!
  install_picture_probe(dir)!
  install_paint_color_probe(dir)!
  install_rect_parcel_probe(dir)!
@@ -84,6 +85,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/AttachmentProbe;->check(Landroid/conten
 invoke-static {}, Lorg/vinix/bootstrap/DrawableProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/PathProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/MatrixProbe;->check()V
+invoke-static {}, Lorg/vinix/bootstrap/MatrixInverseProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/PictureProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/PaintColorProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/RectParcelProbe;->check()V
