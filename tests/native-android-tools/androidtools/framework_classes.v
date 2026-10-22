@@ -76,6 +76,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_location_state(smali)!
  framework_gnss(smali)!
  framework_wifi(smali)!
+ framework_time_utils(smali)!
  framework_location_value(smali)!
  framework_alarm(smali)!
  framework_intent(smali)!
