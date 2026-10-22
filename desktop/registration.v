@@ -191,12 +191,14 @@ fn (mut r RegistrationState) backspace() {
 		}
 		.password {
 			if r.password.len > 0 {
+				wipe_login_input(unsafe { tos(&u8(r.password.data) + r.password.len - 1, 1) })
 				r.password.delete_last()
 				r.password_mask.delete_last()
 			}
 		}
 		.confirm {
 			if r.confirm.len > 0 {
+				wipe_login_input(unsafe { tos(&u8(r.confirm.data) + r.confirm.len - 1, 1) })
 				r.confirm.delete_last()
 				r.confirm_mask.delete_last()
 			}
@@ -443,10 +445,12 @@ fn (mut d Desktop) ensure_registered_user(mut fb Framebuffer, mut pointer Pointe
 		if registration.poll_pointer(mut d, mut pointer, desktop_home) {
 			dirty = true
 		}
-		keys := keyboard.poll_text()
+		keys := keyboard.poll_secret_text()
 		if keys.len > 0 {
 			registration.key_input(keys, desktop_home)
 			dirty = true
+			wipe_login_input(keys)
+			unsafe { keys.free() }
 		}
 		if registration.complete || !dirty {
 			continue

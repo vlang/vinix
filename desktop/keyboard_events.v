@@ -169,10 +169,34 @@ fn (kbd &Keyboard) packet_physical(count int) bool {
 // key events on, the console sends key records instead of text; type them as
 // the console would have, in the US layout, and leave out key releases.
 fn (mut kbd Keyboard) poll_text() string {
-	raw := kbd.poll()
+	return kbd.poll_setup_text(false)
+}
+
+// Setup screens must retire both the raw physical records and their text
+// translation. The returned text is owned by its caller, which wipes it too.
+fn (mut kbd Keyboard) poll_secret_text() string {
+	return kbd.poll_setup_text(true)
+}
+
+fn wipe_login_input(text string) {
+	if text.len == 0 { return }
+	$if linux { unsafe { C.explicit_bzero(text.str, usize(text.len)) } }
+	$else { unsafe { C.memset_s(text.str, usize(text.len), 0, usize(text.len)) } }
+}
+
+fn (mut kbd Keyboard) poll_setup_text(secret bool) string {
+	raw := kbd.poll_owned(secret)
 	if !kbd.key_events { return raw }
-	defer { if raw.len > 0 { unsafe { raw.free() } } }
-	mut out := []u8{cap: 64}
+	defer {
+		if secret {
+			wipe_login_input(raw)
+			for i in kbd.packet_used .. kbd.packet.len { kbd.packet[i] = 0 }
+		}
+		if raw.len > 0 { unsafe { raw.free() } }
+	}
+	// Each physical record emits fewer bytes than its input. Reserving the
+	// complete poll plus the pending packet avoids reallocating plaintext.
+	mut out := []u8{cap: if secret { raw.len + kbd.packet.len } else { 64 }}
 	out.flags |= .noslices
 	if raw.len == 0 && kbd.packet_used > 0 && monotonic_millis() - kbd.packet_ms >= keyboard_sequence_gap_ms {
 		// A lone Escape, or serial input beside the physical records.
@@ -200,6 +224,12 @@ fn (mut kbd Keyboard) poll_text() string {
 		return ''
 	}
 	text := out.bytestr()
+	if secret {
+		wipe_login_input(unsafe { tos(out.data, out.len) })
+		// Keep an incomplete escape packet for the next poll, but erase every
+		// completed record. No password text survives in the packet buffer.
+		for i in kbd.packet_used .. kbd.packet.len { kbd.packet[i] = 0 }
+	}
 	unsafe { out.free() }
 	return text
 }

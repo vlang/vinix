@@ -46,10 +46,16 @@ const desktop_user_folders = [
 // see desktop_use_user_home.
 __global desktop_user_home = ''
 
-fn registration_zero_and_free(mut value []u8) {
-	for i in 0 .. value.len {
-		value[i] = 0
+// Deleting input changes its length, but the old bytes still occupy capacity.
+// Use the same non-elidable erase as the login keyboard before releasing it.
+fn registration_zero(value []u8) {
+	if value.cap > 0 {
+		wipe_login_input(unsafe { tos(value.data, value.cap) })
 	}
+}
+
+fn registration_zero_and_free(mut value []u8) {
+	registration_zero(value)
 	if value.cap > 0 {
 		unsafe { value.free() }
 	}

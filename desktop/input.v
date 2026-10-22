@@ -105,12 +105,18 @@ fn open_keyboard() Keyboard {
 
 // poll returns every byte waiting on the terminal, or an empty string.
 fn (mut kbd Keyboard) poll() string {
+	return kbd.poll_owned(false)
+}
+
+fn (mut kbd Keyboard) poll_owned(secret bool) string {
 	mut buf := [64]u8{}
 	n := desktop_read(kbd.fd, &buf[0], 64)
 	if n <= 0 {
 		return ''
 	}
-	return unsafe { tos(&buf[0], int(n)).clone() }
+	text := unsafe { tos(&buf[0], int(n)).clone() }
+	if secret { wipe_login_input(unsafe { tos(&buf[0], int(n)) }) }
+	return text
 }
 
 fn (mut kbd Keyboard) close() {
