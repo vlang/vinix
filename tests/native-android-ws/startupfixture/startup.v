@@ -48,6 +48,7 @@ pub fn install(output string, resources string) ! {
  os.mkdir_all(output + '/res/font')!
  runtime := resources.all_before('/usr/lib/java/dex/')
  install_font_metrics_probe(dir, runtime)!
+ install_child_states_probe(dir)!
  os.cp(runtime + '/usr/share/fonts/dejavu/DejaVuSansMono.ttf', output + '/res/font/fixture_font.ttf')!
  os.write_file(output + '/res/font/fixture_family.xml', '<font-family xmlns:android="http://schemas.android.com/apk/res/android"><font android:font="@font/fixture_font" android:fontWeight="400"/></font-family>')!
  os.write_file(output + '/res/font/fixture_fallback.xml', '<font-family xmlns:android="http://schemas.android.com/apk/res/android" android:fontProviderAuthority="absent.fonts" android:fontProviderPackage="absent.fonts" android:fontProviderQuery="Absent" android:fontProviderSystemFontFamily="sans-serif"/>')!
@@ -117,6 +118,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/FontMetricsProbe;->check(Landroid/conte
 invoke-static {}, Lorg/vinix/bootstrap/SizeSpanProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/StaticLayoutProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/ShadowColorProbe;->check(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/ChildStatesProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->broadcasts(Landroid/content/Context;)V
 new-instance v0, Landroid/hardware/SensorManager;
 invoke-direct {v0}, Landroid/hardware/SensorManager;-><init>()V

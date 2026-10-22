@@ -76,7 +76,7 @@ return-void
 new-instance v0, Ljava/lang/AssertionError;
 const-string v1, "gradient stateful colors"
 invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
-throw v0') + method('private static pixel(Landroid/graphics/drawable/GradientDrawable;I)V', '
+throw v0') + method('public static pixel(Landroid/graphics/drawable/GradientDrawable;I)V', '
 const/4 v0, 4
 sget-object v1, Landroid/graphics/Bitmap$Config;->ARGB_8888:Landroid/graphics/Bitmap$Config;
 invoke-static {v0, v0, v1}, Landroid/graphics/Bitmap;->createBitmap(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;
