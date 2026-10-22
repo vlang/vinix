@@ -187,6 +187,9 @@ activity name. `ANDROID_APP_DATA_DIR` overrides the per-APK directory under
 `VINIX_ANDROID_TRACE_THREADS` logs Java thread stacks every 30 seconds for the
 first five minutes, including before the main Looper starts. Its diagnostic
 worker attaches as an ART daemon and keeps a separate JNI environment.
+`VINIX_ANDROID_TRACE_TLS=1` enables WolfJSSE and wolfJNI diagnostics before
+the VM initializes its TLS provider, plus Java logging at FINE level to expose
+connection errors that clients catch internally.
 Uncaught Java exceptions are printed before the app's crash handler runs;
 the app's handler still receives the exception. Thread tracing also records
 VM-requested exits with their Java stacks.

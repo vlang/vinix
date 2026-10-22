@@ -339,8 +339,15 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		options[10] = WsOption{c'-Djavax.net.ssl.trustStoreType=JKS', nil}
 		options[11] = WsOption{c'-Djavax.net.ssl.trustStorePassword=changeit', nil}
 		mut args := WsVmArgs{ version: 0x10006, count: 12, options: options }
+		trace_tls := C.getenv(c'VINIX_ANDROID_TRACE_TLS')
+		if trace_tls != nil && trace_tls[0] == `1` {
+			options[12] = WsOption{c'-Dwolfjsse.debug=true', nil}
+			options[13] = WsOption{c'-Dwolfssljni.debug=true', nil}
+			args.count = 14
+		}
 		create := CreateVM(C.dlsym(art, c'JNI_CreateJavaVM'))
 		if create(&ws.vm, &ws.e, &args) != 0 { return 1 }
+		ws_trace_tls_logging(ws.e)
 		ws_start_diagnostics(ws.vm)
 		e := ws.e
 		C.snprintf(&buffer[24576], 8192, c'%s/usr/lib/art/libvinix-android-native.so', root)

@@ -67,6 +67,31 @@ fn ws_install_exception_reporter(e voidptr) {
 	}
 }
 
+// TLS clients often catch connection errors and expose only a generic status.
+// JUL diagnostics preserve those causes without changing the app's TLS policy.
+fn ws_trace_tls_logging(e voidptr) {
+	unsafe {
+		trace := C.getenv(c'VINIX_ANDROID_TRACE_TLS')
+		if trace == nil || trace[0] != `1` { return }
+		push_frame(e)
+		defer { pop_frame(e) }
+		args := [Value{ l: WsNewUtf(slot(e, 167))(e, c'') }]!
+		logger := static_obj(e, c'java/util/logging/Logger', c'getLogger', c'(Ljava/lang/String;)Ljava/util/logging/Logger;', &args[0])
+		level := static_object(e, c'java/util/logging/Level', c'FINE', c'Ljava/util/logging/Level;')
+		level_args := [Value{ l: level }]!
+		call(e, logger, c'java/util/logging/Logger', c'setLevel', c'(Ljava/util/logging/Level;)V', &level_args[0])
+		handlers := obj(e, logger, c'java/util/logging/Logger', c'getHandlers', c'()[Ljava/util/logging/Handler;', nil)
+		if ws_failure(e, c'ANDROID-WS-TLS-TRACE-FAIL logger') { return }
+		for i := i32(0); i < ws_array_len(e, handlers); i++ {
+			handler := WsArrayGet(slot(e, 173))(e, handlers, i)
+			call(e, handler, c'java/util/logging/Handler', c'setLevel', c'(Ljava/util/logging/Level;)V', &level_args[0])
+		}
+		if !ws_failure(e, c'ANDROID-WS-TLS-TRACE-FAIL handlers') {
+			C.puts(c'ANDROID-WS-TLS-TRACE wolfjsse=enabled jul=FINE')
+		}
+	}
+}
+
 // Opt-in startup diagnostics use a separate JNI environment. This also works
 // before the application's main Looper starts, when a UI callback cannot run.
 fn ws_dump_threads(e voidptr) {
