@@ -4,6 +4,50 @@ module androidtools
 import os
 
 fn framework_companion_contexts(smali string) ! {
+	// Component classes can have identical names in different installed APKs.
+	// Resolve the complete ComponentName through normal package visibility and
+	// PackageParser flag handling, rather than searching the foreground APK.
+	manager := smali + '/android/content/pm/PackageManager.smali'
+	mut manager_text := os.read_file(manager)!
+	for kind, flag in {'Provider': 8, 'Service': 4} {
+		field_name := kind.to_lower() + 's'
+		info := 'Landroid/content/pm/' + kind + 'Info;'
+		manager_text = framework_replace_method(manager_text,
+			'get' + kind + 'Info(Landroid/content/ComponentName;I)' + info,
+			'.method public get' + kind + 'Info(Landroid/content/ComponentName;I)' + info + '
+.locals 5
+invoke-virtual {p1}, Landroid/content/ComponentName;->getPackageName()Ljava/lang/String;
+move-result-object v0
+or-int/lit8 v1, p2, ' + flag.str() + '
+invoke-virtual {p0, v0, v1}, Landroid/content/pm/PackageManager;->getPackageInfo(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;
+move-result-object v0
+iget-object v0, v0, Landroid/content/pm/PackageInfo;->' + field_name + ':[' + info + '
+if-eqz v0, :missing
+invoke-virtual {p1}, Landroid/content/ComponentName;->getClassName()Ljava/lang/String;
+move-result-object v1
+array-length v2, v0
+const/4 v3, 0
+:next
+if-ge v3, v2, :missing
+aget-object v4, v0, v3
+iget-object v4, v4, Landroid/content/pm/PackageItemInfo;->name:Ljava/lang/String;
+invoke-virtual {v1, v4}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v4
+if-nez v4, :found
+add-int/lit8 v3, v3, 1
+goto :next
+:found
+aget-object v0, v0, v3
+return-object v0
+:missing
+new-instance v0, Landroid/content/pm/PackageManager$NameNotFoundException;
+invoke-virtual {p1}, Landroid/content/ComponentName;->toString()Ljava/lang/String;
+move-result-object v1
+invoke-direct {v0, v1}, Landroid/content/pm/PackageManager$NameNotFoundException;-><init>(Ljava/lang/String;)V
+throw v0
+.end method')!
+	}
+	os.write_file(manager, manager_text)!
 	provider := smali + '/android/content/ContentProvider.smali'
 	mut text := os.read_file(provider)! + '\n.field private vinixContext:Landroid/content/Context;\n'
 	text = framework_replace_method(text, 'getContext()Landroid/content/Context;', '.method public getContext()Landroid/content/Context;

@@ -104,6 +104,9 @@ initialized Application and providers. Content providers retain their owning
 package context and resources; attachment calls `onCreate` once.
 `services-fixture.v` checks this ordering with two signed APKs, package resource
 isolation, main-thread binding callbacks and callbacks on a supplied executor.
+Provider and service metadata lookups honor both parts of `ComponentName`,
+including identical class names in different APKs, and preserve lookup flags.
+Unknown packages and components raise `NameNotFoundException`.
 Package visibility also honors legacy target SDKs and `QUERY_ALL_PACKAGES`.
 ApplicationInfo and PackageManager share the actual APK, data and native library
 paths. Elapsed realtime uses the boot clock in the API's requested units.
