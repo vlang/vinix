@@ -45,6 +45,8 @@ mut:
 	registered bool
 	instances i64
 	protocols []u64 // Owned array of canonical adopted protocol identities.
+	swift_ivar_list u64 // Owned copy; image class/descriptor/offset cells stay borrowed.
+	swift_layout_complete bool
 }
 
 // Metadata is private to Vinix and stored separately from object bytes. The

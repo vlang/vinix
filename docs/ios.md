@@ -16525,20 +16525,59 @@ Static inspection traces GOT cell `0x10dc9bc58` through stub `0x10c63edb4` and
 branch island `0x107c28d70` to tail caller `0x100074684` for
 `_swift_unknownObjectWeakCopyAssign`. This inspection executes no application code.
 
+`_swift_updateClassMetadata2` now resolves from Swift Core for already registered,
+nongeneric formal root classes using SwiftObject and layout algorithm `0x100`.
+It computes up to 64 field offsets from Swift type layouts, uses field size
+rather than stride, and publishes the instance size, alignment mask, UInt64
+field-offset vector and exported Objective-C offset cells. Its five-argument C entry returns
+a nil metadata dependency in `x0`; the compatibility entry also clears `x1`.
+Native Swift leaves the dependency state unspecified when `x0` is nil.
+
+The runtime copies the ivar list only when a field's size changes. Only those
+entries lose their type encoding and receive a new size and alignment; unchanged
+entries preserve their image data. The registry reflects the completed layout
+without running `+initialize`. Validation precedes every mutation, and first
+completion rejects initialized classes or classes with live instances. Identical
+repeat calls support read-only image storage and concurrent callers. The runtime
+owns and frees only its copied list; image metadata and offset cells stay borrowed.
+Superclass resolution, resilient and generic classes, and realization of Swift
+classes from loaded images remain unsupported.
+
+```sh
+v run tests/ios/native-checks.v build-class-update
+```
+
+Evidence is retained under `build/ios/fortnite/class-update-checks`. Native Swift
+comparisons cover zero and 64 fields, empty fields, tail padding, large alignment,
+existing instance starts, selective ivar copying, UInt64 writes and preserved
+callee-saved registers. Compatibility checks cover rejection before writes, live
+layouts, 512 concurrent repeat calls, read-only unchanged storage and two runtime
+lifetimes with image pages inaccessible during cleanup. Eight normal/deterministic
+ASan/UBSan runs passed across the class-update, struct-metadata, initialized-class
+and supplied-storage fixtures. The ARM64 fixture, launch probe and both import
+audits passed their checks. Eight compressed binary/generated-C pairs retain the
+tested paths; 991 source/toolchain/runtime input hashes remained unchanged.
+
+Static inspection traces GOT cell `0x10dc9bc80` through stub `0x10c63edf0` and
+branch island `0x107c28d5c` to caller `0x100073c74`. The caller supplies algorithm
+`0x100`, two type-layout pointers for URL and NativeObject, and an offset vector
+at metadata plus 80 bytes. This inspection executes no application code; the
+launch probe has not reached this metadata update in Fortnite.
+
 The launch probe now stops at required Swift Core import
-`_swift_updateClassMetadata2`, before application entry. Fortnite remains unplayable.
+`_swift_weakInit`, before application entry. Fortnite remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,992 | 169 | 78 |
+| Fortnite executable | 1,993 | 168 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,832 | 172 | 114 |
+| All images | 2,833 | 171 | 114 |
 
-The C++/GLES/Text variant reports 2,846 resolved imports, 158 unresolved strong
+The C++/GLES/Text variant reports 2,847 resolved imports, 157 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

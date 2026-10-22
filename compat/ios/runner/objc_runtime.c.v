@@ -226,6 +226,9 @@ fn objc_register_class(cls u64) {
 }
 
 fn objc_class_metadata_free(info &ObjClass) {
+	// Workers have drained before teardown. Never revisit the borrowed class
+	// bytes: its image may already be inaccessible at this point.
+	if info.swift_ivar_list != 0 { C.free(voidptr(info.swift_ivar_list)) }
 	for _, method in info.method_info { unsafe { method.types.free() }; C.free(method) }
 	for _, ivar in info.ivars { unsafe { ivar.name.free(); ivar.types.free() }; C.free(ivar) }
 	unsafe { info.method_info.free(); info.ivars.free(); info.methods.free(); info.protocols.free() }

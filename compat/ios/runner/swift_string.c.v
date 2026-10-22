@@ -341,6 +341,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_swift_setDeallocating' { u64(unsafe { voidptr(swift_set_deallocating) }) }
 		'_swift_initStaticObject' { u64(unsafe { voidptr(swift_static_initialize) }) }
 		'_swift_initStructMetadata' { u64(unsafe { voidptr(swift_struct_initialize) }) }
+		'_swift_updateClassMetadata2' { u64(unsafe { voidptr(swift_class_update) }) }
 		'_swift_allocObject' { u64(unsafe { voidptr(swift_heap_allocate) }) }
 		'_swift_makeBoxUnique' { u64(unsafe { voidptr(swift_box_unique) }) }
 		'_swift_deallocObject' { u64(unsafe { voidptr(swift_heap_deallocate) }) }
