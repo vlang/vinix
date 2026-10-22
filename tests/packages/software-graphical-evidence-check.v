@@ -65,7 +65,10 @@ fn save_receipt(work string, receipt Receipt, artifacts map[string]string,
 }
 
 fn replace_artifact(work string, receipt Receipt, name string, text string) ! {
-	file := work + '/' + os.file_name(receipt.artifact_paths[name])
+	original := os.abs_path(os.args[2])
+	path := receipt.artifact_paths[name]
+	if !path.starts_with(original + '/') { return error('replacement is outside the native run') }
+	file := work + path[original.len..]
 	os.rm(file)!
 	os.write_file(file, text)!
 	mut artifacts := receipt.artifacts.clone()
@@ -101,6 +104,7 @@ fn check() ! {
 	os.mkdir_all(proof)!
 	receipt := json2.decode[Receipt](os.read_file(original + '/qualification.json')!)!
 	installed := receipt.platform.ends_with('installed-root-two-boots')
+	first_run := receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
 	base := [original, build, os.abs_path(os.args[4]), os.abs_path(os.args[5]), proof + '/baseline',
 		os.args[7]]
 	baseline := call(program, base)
@@ -110,12 +114,21 @@ fn check() ! {
 		'desktop-source-mismatch', 'frozen-source-mismatch', 'artifact-path-mismatch',
 		'missing-success-marker', 'duplicate-identity-marker', 'kernel-panic']
 	if installed {
-		names << ['missing-reboot-success-marker', 'reboot-kernel-panic',
-			'missing-shutdown-event', 'missing-reboot-shutdown-event',
-			'non-guest-shutdown-event', 'non-guest-reboot-shutdown-event',
-			'wrong-shutdown-reason', 'wrong-reboot-shutdown-reason',
+		names << ['missing-reboot-success-marker', 'reboot-kernel-panic', 'missing-shutdown-event',
+			'missing-reboot-shutdown-event', 'non-guest-shutdown-event',
+			'non-guest-reboot-shutdown-event', 'wrong-shutdown-reason', 'wrong-reboot-shutdown-reason',
 			'reset-event', 'panic-event', 'wrong-shutdown-boot', 'string-shutdown-boot',
 			'duplicate-shutdown-event']
+	}
+	if first_run {
+		names << ['missing-first-run-card', 'missing-first-run-proposal-shot',
+			'missing-first-run-reboot-shot', 'declaration-architecture', 'declaration-packages',
+			'declaration-extra-field', 'missing-pre-ready-identity', 'missing-first-run-proposal',
+			'duplicate-first-run-proposal', 'proposal-requested-set', 'proposal-generation',
+			'proposal-permissions', 'proposal-publisher', 'missing-unchanged-state',
+			'missing-private-decision', 'invalid-private-decision', 'first-run-order',
+			'missing-reboot-no-repeat', 'missing-reboot-private-decision', 'reboot-repeated-prompt',
+			'reboot-repeated-proposal']
 	}
 	identity := 'SOFTWARE GRAPHICAL ordinary-compositor uid=1000 home=/home/alex PASS'
 	success := if installed {
@@ -131,6 +144,121 @@ fn check() ! {
 		args[4] = work + '/retained'
 		mut reason := ''
 		match name {
+			'missing-first-run-card', 'missing-first-run-proposal-shot',
+			'missing-first-run-reboot-shot' {
+				shot := match name {
+					'missing-first-run-card' { 'first-run-01-card' }
+					'missing-first-run-proposal-shot' { 'first-run-02-proposal' }
+					else { 'first-run-03-reboot-desktop' }
+				}
+				os.rm(work + '/' + shot + '.png')!
+				reason = 'exact required screenshot set'
+			}
+			'declaration-architecture', 'declaration-packages', 'declaration-extra-field' {
+				mut declaration := json2.decode[json2.Any](os.read_file(receipt.artifact_paths['release-declaration'])!)!.as_map()
+				match name {
+					'declaration-architecture' {
+						declaration['architecture'] = json2.Any('wrong-architecture')
+					}
+					'declaration-packages' {
+						declaration['packages'] = json2.Any([json2.Any('undeclared.package')])
+					}
+					else { declaration['extra'] = json2.Any(true) }
+				}
+				replace_artifact(work, receipt, 'release-declaration', json2.encode(declaration) + '\n')!
+				reason = 'first-run declaration differs from the complete architecture-matched Counter set'
+			}
+			'missing-pre-ready-identity', 'missing-first-run-proposal',
+			'duplicate-first-run-proposal', 'proposal-requested-set', 'proposal-generation',
+			'proposal-permissions', 'proposal-publisher', 'missing-unchanged-state',
+			'missing-private-decision', 'invalid-private-decision', 'first-run-order',
+			'missing-reboot-no-repeat', 'missing-reboot-private-decision',
+			'reboot-repeated-prompt', 'reboot-repeated-proposal' {
+				key := if name.contains('reboot-') { 'serial-2' } else { 'serial' }
+				prefix := 'SOFTWARE FIRST RUN PROPOSAL '
+				pre_ready := 'SOFTWARE FIRST RUN pre-ready compositor uid=1000 home=/home/alex runtime=0700 PASS'
+				unchanged := 'SOFTWARE FIRST RUN review handed to Software without activation or approval PASS'
+				decision := 'SOFTWARE FIRST RUN private decision owner=1000 mode=0600 value=review PASS'
+				no_repeat := 'SOFTWARE FIRST RUN BOOT 2 retained review decision no repeated prompt PASS'
+				mut lines := os.read_file(receipt.artifact_paths[key])!.split_into_lines()
+				reason = 'missing or duplicated exact marker'
+				match name {
+					'missing-pre-ready-identity' {
+						lines = lines.filter(it.trim_right('\r') != pre_ready)
+					}
+					'missing-unchanged-state' {
+						lines = lines.filter(it.trim_right('\r') != unchanged)
+					}
+					'missing-private-decision', 'missing-reboot-private-decision' {
+						lines = lines.filter(it.trim_right('\r') != decision)
+					}
+					'invalid-private-decision' {
+						lines = lines.map(if it.trim_right('\r') == decision {
+							decision.replace('mode=0600', 'mode=0666')
+						} else {
+							it
+						})
+					}
+					'missing-reboot-no-repeat' {
+						lines = lines.filter(it.trim_right('\r') != no_repeat)
+					}
+					'first-run-order' {
+						lines = lines.filter(it.trim_right('\r') != pre_ready)
+						lines << pre_ready
+						reason = 'first-run identity, proposal and approval order differs'
+					}
+					'reboot-repeated-prompt', 'reboot-repeated-proposal' {
+						lines << if name == 'reboot-repeated-prompt' {
+							pre_ready
+						} else {
+							prefix + '{}'
+						}
+						reason = 'first-run prompt or proposal repeated on boot 2'
+					}
+					else {
+						proposals := lines.filter(it.starts_with(prefix))
+						if proposals.len != 1 {
+							return error('baseline lacks complete first-run proposal')
+						}
+						if name == 'missing-first-run-proposal' {
+							lines = lines.filter(!it.starts_with(prefix))
+						} else if name == 'duplicate-first-run-proposal' {
+							lines << proposals[0]
+						} else {
+							mut proposal := json2.decode[json2.Any](proposals[0].all_after(prefix))!.as_map()
+							if name == 'proposal-requested-set' {
+								proposal['requested'] = json2.Any([json2.Any('undeclared.package')])
+							} else if name == 'proposal-generation' {
+								proposal['generation'] = json2.Any(1)
+							} else {
+								mut rows := proposal['rows']!.as_array()
+								mut row := rows[0].as_map()
+								if name == 'proposal-permissions' {
+									row['permissions'] = json2.Any([]json2.Any{})
+								} else {
+									row['public_key'] = json2.Any('')
+								}
+								rows[0] = json2.Any(row)
+								proposal['rows'] = json2.Any(rows)
+							}
+							lines = lines.map(if it.starts_with(prefix) {
+								prefix + json2.encode(proposal)
+							} else {
+								it
+							})
+						}
+						reason = if name in ['missing-first-run-proposal',
+							'duplicate-first-run-proposal'] {
+							'missing or duplicated complete first-run proposal'
+						} else if name in ['proposal-permissions', 'proposal-publisher'] {
+							'first-run proposal has incomplete publisher, permission or install details'
+						} else {
+							'first-run proposal differs from the complete declared Counter set'
+						}
+					}
+				}
+				replace_artifact(work, receipt, key, lines.join('\n') + '\n')!
+			}
 			'missing-screenshot' {
 				os.rm(work + '/07-counter-reopened.png')!
 				reason = 'exact required screenshot set'
@@ -227,19 +355,26 @@ fn check() ! {
 					if event == 'SHUTDOWN' {
 						matched++
 						if name.starts_with('missing-') { continue }
-						if name.starts_with('non-guest-') ||
-							(name.starts_with('wrong-') && name != 'wrong-shutdown-boot') {
+						if name.starts_with('non-guest-')
+							|| (name.starts_with('wrong-') && name != 'wrong-shutdown-boot') {
 							mut data := (object['data'] or { return error('baseline shutdown lacks data') }).as_map()
-							if name.starts_with('non-guest-') { data['guest'] = json2.Any(false) }
-							else { data['reason'] = json2.Any('host-qmp-quit') }
+							if name.starts_with('non-guest-') {
+								data['guest'] = json2.Any(false)
+							} else {
+								data['reason'] = json2.Any('host-qmp-quit')
+							}
 							object['data'] = json2.Any(data)
 						}
 						if name == 'reset-event' { object['event'] = json2.Any('RESET') }
 						if name == 'panic-event' { object['event'] = json2.Any('GUEST_PANICKED') }
 						if name == 'duplicate-shutdown-event' { records << line }
 					}
-					if index == 0 && name == 'wrong-shutdown-boot' { object['graphical_boot'] = json2.Any(2) }
-					if index == 0 && name == 'string-shutdown-boot' { object['graphical_boot'] = json2.Any('1') }
+					if index == 0 && name == 'wrong-shutdown-boot' {
+						object['graphical_boot'] = json2.Any(2)
+					}
+					if index == 0 && name == 'string-shutdown-boot' {
+						object['graphical_boot'] = json2.Any('1')
+					}
 					records << json2.encode(object)
 				}
 				if matched != 1 { return error('baseline lacks one shutdown event: ' + key) }
