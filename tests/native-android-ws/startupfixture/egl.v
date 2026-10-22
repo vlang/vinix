@@ -86,6 +86,7 @@ move-result v8
 if-nez v8, :bad
 invoke-static {}, Lorg/vinix/bootstrap/GlesProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/GlesShaderProbe;->check()V
+invoke-static {}, Lorg/vinix/bootstrap/GlesNamesProbe;->check()V
 '
 	for method_name, kind in {'eglQuerySurface': 'EGLSurface', 'eglQueryContext': 'EGLContext', 'eglGetConfigAttrib': 'EGLConfig'} {
 		target := if kind == 'EGLSurface' { 'v7' } else if kind == 'EGLContext' { 'v6' } else { 'v2' }
