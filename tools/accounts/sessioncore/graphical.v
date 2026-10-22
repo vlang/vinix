@@ -50,6 +50,12 @@ fn has_person(db accountcore.Database) bool {
 	return false
 }
 
+// The argument strings remain owned by the caller. The runtime must retire
+// the array storage: managed arrays need not start at their allocation address.
+fn retire_graphical_arguments(arguments []string) {
+	unsafe { (&array(&arguments)).free() }
+}
+
 pub fn graphical(desktop string, fallback string) ! {
 	if !desktop.starts_with('/') || !os.is_executable(desktop) {
 		return error('the compositor must be an installed absolute executable')
@@ -64,13 +70,13 @@ pub fn graphical(desktop string, fallback string) ! {
 	account_command := ['/usr/sbin/vinix-account', 'init']
 	// These headers borrow command strings and permanent arguments. Retire
 	// only their buffers after the synchronous manager and all children finish.
-	defer { unsafe {
-		C.free(greeter_fallback.data)
-		C.free(desktop_fallback.data)
-		C.free(greeter_command.data)
-		C.free(desktop_command.data)
-		C.free(account_command.data)
-	} }
+	defer {
+		retire_graphical_arguments(greeter_fallback)
+		retire_graphical_arguments(desktop_fallback)
+		retire_graphical_arguments(greeter_command)
+		retire_graphical_arguments(desktop_command)
+		retire_graphical_arguments(account_command)
+	}
 	held_fd := graphical_lock()!
 	defer { C.close(held_fd) }
 	// Import a valid existing registration first. On a clean image no person
@@ -83,7 +89,10 @@ pub fn graphical(desktop string, fallback string) ! {
 	if needs_registration {
 		registration_fallback := if fallback == '' { []string{} } else { [fallback, '--register-only'] }
 		registration_command := [desktop, '--register-only']
-		defer { unsafe { C.free(registration_fallback.data); C.free(registration_command.data) } }
+		defer {
+			retire_graphical_arguments(registration_fallback)
+			retire_graphical_arguments(registration_command)
+		}
 		run_setup(registration_command, registration_fallback)!
 		run_setup(account_command, []string{})!
 		mut initialized := load_accounts()!
