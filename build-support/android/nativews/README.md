@@ -114,6 +114,8 @@ Local Binder objects retain their interface owner and descriptor. Transactions
 dispatch on the calling thread, rewind request/reply Parcels and propagate local
 exceptions. Identity comparisons distinguish different Binder objects. This
 in-process dispatch does not implement cross-process Binder transport.
+UserHandle derives current and calling Android user IDs from the corresponding
+UID ranges. UserManager identifies user zero as the system user.
 Package visibility also honors legacy target SDKs and `QUERY_ALL_PACKAGES`.
 ApplicationInfo and PackageManager share the actual APK, data and native library
 paths. Elapsed realtime uses the boot clock in the API's requested units.
