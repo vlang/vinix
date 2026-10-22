@@ -161,6 +161,12 @@ contents and certificates. The signed `tests/native-android-ws/digests-fixture.v
 guest regression compares known vectors and Bouncy Castle results and checks
 streaming, byte buffers, cloning, reset, invalid input and native handle cleanup.
 
+`Context.getMainExecutor()` queues work on the main looper, including submissions
+from the main thread. Context wrappers preserve virtual base-context overrides;
+null tasks and submissions to a stopped handler are rejected. The signed
+`tests/native-android-ws/executor-fixture.v` guest regression checks dispatch,
+FIFO ordering, wrapper delegation and rejection behavior.
+
 Wi-Fi scanning returns unavailable with empty results. The RTT API type resolves
 while its service and hardware feature remain absent. The signed Wi-Fi fixture
 checks both service lookup forms and these capability contracts. Android

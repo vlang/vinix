@@ -62,6 +62,7 @@ pub fn write_framework_classes(smali string) ! {
   '.method public constructor <init>()V\n.locals 0\ninvoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void\n.end method\n' +
   '.method public native uncaughtException(Ljava/lang/Thread;Ljava/lang/Throwable;)V\n.end method\n')!
  framework_async_trace(smali)!
+ framework_main_executor(smali)!
  framework_application_uid(smali)!
  framework_appops(smali)!
  framework_activity_manager(smali)!
