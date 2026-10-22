@@ -383,6 +383,14 @@ fn directory_ops() ! {
 	log_line('directory-ops PASS mkdir create rename unlink rmdir')
 }
 
+fn check_mount_privacy() ! {
+	info := read_text('/proc/self/mountinfo')!
+	require(info.contains(' - smb2 '), 'SMB2 mount missing from mountinfo')!
+	require(!info.contains('password=') && !info.contains('M17a-disposable-only!')
+		&& !info.contains('domain=WORKGROUP'), 'private mount options escaped through procfs')!
+	log_line('mount-privacy PASS raw-options-not-published')
+}
+
 fn qualify() ! {
 	started := time.sys_mono_now()
 	require(os.args.len == 1,
@@ -404,6 +412,10 @@ fn qualify() ! {
 	log_line('network-ready PASS elapsed_ms=${(time.sys_mono_now() - started) / u64(time.millisecond)}')
 	mount_share(true)!
 	log_line('mount PASS source=//10.0.2.2/share fs=smb2 flags=0 auth_fixture=NTLMv2 credentials=redacted elapsed_ms=${(time.sys_mono_now() - started) / u64(time.millisecond)}')
+	if C.mount(c'proc', c'/proc', c'procfs', 0, unsafe { nil }) != 0 {
+		return syscall_error('mount proc for privacy regression')
+	}
+	check_mount_privacy()!
 	// /tmp belongs to the local root filesystem, outside the mounted share.
 	if !os.is_dir('/tmp') && C.mkdir(c'/tmp', 0o755) != 0 {
 		return syscall_error('mkdir /tmp')
@@ -426,6 +438,7 @@ fn qualify() ! {
 	}
 	log_line('umount PASS')
 	mount_share(false)!
+	check_mount_privacy()!
 	require(read_text('/mnt/guest-small.txt')! == small_text, 'remount lost guest-small.txt')!
 	require(read_text('/mnt/guest-ready')! == 'ready\n', 'remount lost guest-ready')!
 	log_line('remount PASS marker_sha256=${sha256.hexhash(small_text)}')
