@@ -251,10 +251,15 @@ mut:
 fn fake_transfer(ctx voidptr, p &u8, n int, sending bool) bool {
 	mut f := unsafe { &Fake(ctx) }
 	if sending {
-		if n > 88 && get16(p, 12) == 1 {
-			if r := spnego_parse(unsafe { &p[88] }, n - 88) {
+		assert n >= 68 && unsafe { p[0] } == 0
+		assert (int(unsafe { p[1] }) << 16 | int(unsafe { p[2] }) << 8 | int(unsafe { p[3] })) == n - 4
+		if n > 92 && get16(p, 16) == 1 {
+			if r := spnego_parse(unsafe { &p[92] }, n - 92) {
 				if r.mic_len == 16 && r.token_len == 0 { f.mic_sent = true }
 			}
+		}
+		if n >= 125 && get16(p, 16) == 5 && get16(p, 114) == 0 {
+			assert n == 125 && unsafe { p[124] } == 0
 		}
 		return true
 	}

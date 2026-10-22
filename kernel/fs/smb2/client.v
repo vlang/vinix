@@ -108,8 +108,12 @@ fn (mut c Client) call(command u16, n int) ?u32 {
 	prefix[1] = u8(n >> 16)
 	prefix[2] = u8(n >> 8)
 	prefix[3] = u8(n)
-	if !c.transfer(c.context, unsafe { &prefix[0] }, 4, true)
-		|| !c.transfer(c.context, c.tx, n, true)
+	// Send the direct-TCP prefix and SMB message together. A prefix-only
+	// segment otherwise waits for a delayed ACK under Nagle on every small
+	// request. The existing serialized scratch buffer has capacity + 64 bytes.
+	move(c.scratch, unsafe { &prefix[0] }, 4)
+	move(unsafe { &c.scratch[4] }, c.tx, n)
+	if !c.transfer(c.context, c.scratch, n + 4, true)
 		|| !c.transfer(c.context, unsafe { &prefix[0] }, 4, false) {
 		c.broken()
 		return none
@@ -386,7 +390,7 @@ pub fn (mut c Client) create(path string, access u32, disposition u32, directory
 		c.fail(30)
 		return none
 	}
-	c.header(5, 56)
+	c.header(5, 57)
 	put16(c.tx, 64, 57)
 	put32(c.tx, 68, 2)
 	put32(c.tx, 88, access)
