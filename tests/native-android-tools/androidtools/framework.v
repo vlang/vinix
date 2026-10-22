@@ -170,7 +170,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  sources['tests/native-android-tools/androidtools/framework_activity_manager.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_activity_manager.v')!)
  sources['tests/native-android-tools/androidtools/framework_geofence.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_geofence.v')!)
  sources['tests/native-android-tools/androidtools/framework_device_policy.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_device_policy.v')!)
- for name in ['sqlite_params', 'sqlite_idle', 'location_state', 'location_value', 'alarm', 'accounts', 'work_source', 'package_enumeration', 'absent_hardware'] {
+ for name in ['sqlite_params', 'sqlite_idle', 'location_state', 'location_value', 'alarm', 'accounts', 'intent', 'work_source', 'package_enumeration', 'absent_hardware'] {
   path := 'tests/native-android-tools/androidtools/framework_' + name + '.v'
   sources[path] = ah.Value(framework_digest(root() + '/' + path)!)
  }

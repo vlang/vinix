@@ -182,6 +182,12 @@ of overflowing. The signed guest regression checks these behaviors, including
 cancellation from a broadcast callback. This implements process-lifetime alarms;
 suspend wakeups, power accounting and rescheduling after wall-clock changes
 are unavailable. PendingIntent matching currently uses the same token object.
+Intent filter copies preserve action, URI, MIME type, package, component,
+identifier and an independent category set. They omit extras, flags and the
+selector. Full copies retain flags and own their extras and selector snapshots;
+typed extra getters and first writes also work on filter-only copies. These
+semantics follow [Android's Intent implementation](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-11.0.0_r1/core/java/android/content/Intent.java)
+and are exercised by the signed guest fixture.
 LocationManager enabled queries report false and best-provider discovery returns
 null because the native WS backend has no location provider. PendingIntent's
 OnFinished callback interface is present for class loading; callback send

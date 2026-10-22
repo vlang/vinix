@@ -13,6 +13,78 @@ fn method(signature string, body string) string {
 	return '.method ' + signature + '\n.locals 6\n' + body + '\n.end method\n'
 }
 
+fn intent_filter_checks() string {
+ owner := 'Landroid/content/Intent;'
+ mut body := 'new-instance v0, ' + owner + '\ninvoke-direct {v0}, ' + owner + '-><init>()V\n' +
+  'const-string v2, "fixture.action"\ninvoke-virtual {v0, v2}, ' + owner + '->setAction(Ljava/lang/String;)Landroid/content/Intent;\n' +
+  'const-string v2, "org.vinix.service"\ninvoke-virtual {v0, v2}, ' + owner + '->setPackage(Ljava/lang/String;)Landroid/content/Intent;\n' +
+  'const-string v2, "fixture.identifier"\ninvoke-virtual {v0, v2}, ' + owner + '->setIdentifier(Ljava/lang/String;)Landroid/content/Intent;\n' +
+  'const-string v2, "content://fixture/item"\ninvoke-static {v2}, Landroid/net/Uri;->parse(Ljava/lang/String;)Landroid/net/Uri;\nmove-result-object v2\n' +
+  'const-string v3, "text/plain"\ninvoke-virtual {v0, v2, v3}, ' + owner + '->setDataAndType(Landroid/net/Uri;Ljava/lang/String;)Landroid/content/Intent;\n' +
+  'new-instance v2, Landroid/content/ComponentName;\nconst-string v3, "org.vinix.service"\nconst-string v4, "org.vinix.service.Main"\n' +
+  'invoke-direct {v2, v3, v4}, Landroid/content/ComponentName;-><init>(Ljava/lang/String;Ljava/lang/String;)V\n' +
+  'invoke-virtual {v0, v2}, ' + owner + '->setComponent(Landroid/content/ComponentName;)Landroid/content/Intent;\n' +
+  'const-string v2, "fixture.category"\ninvoke-virtual {v0, v2}, ' + owner + '->addCategory(Ljava/lang/String;)Landroid/content/Intent;\n' +
+  'const/16 v2, 0x123\ninvoke-virtual {v0, v2}, ' + owner + '->setFlags(I)Landroid/content/Intent;\n' +
+  'const-string v2, "secret"\nconst-string v3, "source only"\ninvoke-virtual {v0, v2, v3}, ' + owner + '->putExtra(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;\n' +
+  'new-instance v2, ' + owner + '\nconst-string v3, "selector"\ninvoke-direct {v2, v3}, ' + owner + '-><init>(Ljava/lang/String;)V\n' +
+  'invoke-virtual {v0, v2}, ' + owner + '->setSelector(Landroid/content/Intent;)V\n'
+ clone := 'invoke-virtual {v0}, ' + owner + '->cloneFilter()Landroid/content/Intent;\nmove-result-object v1\n'
+ body += clone + 'if-eq v0, v1, :bad\ninvoke-virtual {v0, v1}, ' + owner + '->filterEquals(Landroid/content/Intent;)Z\nmove-result v2\nif-eqz v2, :bad\n'
+ // Check each preserved field through its public accessor, not only equality.
+ for item in ['Action|Ljava/lang/String;', 'Data|Landroid/net/Uri;', 'Type|Ljava/lang/String;', 'Identifier|Ljava/lang/String;', 'Package|Ljava/lang/String;', 'Component|Landroid/content/ComponentName;', 'Categories|Ljava/util/Set;'] {
+  parts := item.split('|')
+  getter := '->get' + parts[0] + '()' + parts[1]
+  body += 'invoke-virtual {v0}, ' + owner + getter + '\nmove-result-object v2\ninvoke-virtual {v1}, ' + owner + getter + '\nmove-result-object v3\n' +
+   'if-eqz v3, :bad\ninvoke-virtual {v2, v3}, Ljava/lang/Object;->equals(Ljava/lang/Object;)Z\nmove-result v2\nif-eqz v2, :bad\n'
+ }
+ for item in ['Flags|I', 'Extras|Landroid/os/Bundle;', 'Selector|Landroid/content/Intent;'] {
+  parts := item.split('|')
+  body += 'invoke-virtual {v1}, ' + owner + '->get' + parts[0] + '()' + parts[1] + '\n' +
+   if parts[1] == 'I' { 'move-result v2\nif-nez v2, :bad\n' } else { 'move-result-object v2\nif-nez v2, :bad\n' }
+ }
+ body += 'const/4 v2, 0\ninvoke-virtual {v1, v2}, ' + owner + '->filterEquals(Landroid/content/Intent;)Z\nmove-result v2\nif-nez v2, :bad\n'
+ // Empty extras retain typed defaults and accept a first write after cloning.
+ body += 'const-string v2, "secret"\ninvoke-virtual {v1, v2}, ' + owner + '->hasExtra(Ljava/lang/String;)Z\nmove-result v3\nif-nez v3, :bad\n' +
+  'const/16 v3, 91\ninvoke-virtual {v1, v2, v3}, ' + owner + '->getIntExtra(Ljava/lang/String;I)I\nmove-result v4\nif-ne v3, v4, :bad\n' +
+  'const-wide/16 v3, 712\ninvoke-virtual {v1, v2, v3, v4}, ' + owner + '->getLongExtra(Ljava/lang/String;J)J\nmove-result-wide v5\ncmp-long v7, v3, v5\nif-nez v7, :bad\n' +
+  'const/4 v3, 1\ninvoke-virtual {v1, v2, v3}, ' + owner + '->getBooleanExtra(Ljava/lang/String;Z)Z\nmove-result v4\nif-ne v3, v4, :bad\n'
+ for item in ['String|Ljava/lang/String;', 'IntArray|[I', 'Parcelable|Landroid/os/Parcelable;', 'Bundle|Landroid/os/Bundle;'] {
+  parts := item.split('|')
+  body += 'invoke-virtual {v1, v2}, ' + owner + '->get' + parts[0] + 'Extra(Ljava/lang/String;)' + parts[1] + '\nmove-result-object v3\nif-nez v3, :bad\n'
+ }
+ body += 'invoke-virtual {v1, v2}, ' + owner + '->removeExtra(Ljava/lang/String;)V\nconst-string v3, "copy only"\n' +
+  'invoke-virtual {v1, v2, v3}, ' + owner + '->putExtra(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;\n' +
+  'invoke-virtual {v1, v2}, ' + owner + '->getStringExtra(Ljava/lang/String;)Ljava/lang/String;\nmove-result-object v4\ninvoke-virtual {v3, v4}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\nmove-result v3\nif-eqz v3, :bad\n' +
+  'invoke-virtual {v0, v2}, ' + owner + '->getStringExtra(Ljava/lang/String;)Ljava/lang/String;\nmove-result-object v3\nconst-string v4, "source only"\ninvoke-virtual {v4, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\nmove-result v3\nif-eqz v3, :bad\n' +
+  'invoke-virtual {v0}, ' + owner + '->filterHashCode()I\nmove-result v2\ninvoke-virtual {v1}, ' + owner + '->filterHashCode()I\nmove-result v3\nif-ne v2, v3, :bad\n'
+ // Every matching field affects equality, whereas extras and flags do not.
+ for item in ['Action|Ljava/lang/String;', 'Data|Landroid/net/Uri;', 'Type|Ljava/lang/String;', 'Identifier|Ljava/lang/String;', 'Package|Ljava/lang/String;', 'Component|Landroid/content/ComponentName;'] {
+  parts := item.split('|')
+  body += clone + (if parts[0] == 'Package' { 'const-string v2, "other.package"\n' } else { 'const/4 v2, 0\n' }) + 'invoke-virtual {v1, v2}, ' + owner + '->set' + parts[0] + '(' + parts[1] + ')Landroid/content/Intent;\n' +
+   'invoke-virtual {v0, v1}, ' + owner + '->filterEquals(Landroid/content/Intent;)Z\nmove-result v2\nif-nez v2, :bad\n'
+ }
+ body += clone + 'const-string v2, "fixture.category"\ninvoke-virtual {v1, v2}, ' + owner + '->removeCategory(Ljava/lang/String;)V\n' +
+  'invoke-virtual {v1}, ' + owner + '->getCategories()Ljava/util/Set;\nmove-result-object v3\nif-nez v3, :bad\n' +
+  'invoke-virtual {v0, v2}, ' + owner + '->hasCategory(Ljava/lang/String;)Z\nmove-result v3\nif-eqz v3, :bad\n' +
+  'invoke-virtual {v0, v1}, ' + owner + '->filterEquals(Landroid/content/Intent;)Z\nmove-result v3\nif-nez v3, :bad\n' +
+  'invoke-virtual {v1, v2}, ' + owner + '->addCategory(Ljava/lang/String;)Landroid/content/Intent;\n' +
+  'invoke-virtual {v1, v2}, ' + owner + '->addCategory(Ljava/lang/String;)Landroid/content/Intent;\n' +
+  'invoke-virtual {v1}, ' + owner + '->getCategories()Ljava/util/Set;\nmove-result-object v3\ninvoke-interface {v3}, Ljava/util/Set;->size()I\nmove-result v3\nconst/4 v4, 1\nif-ne v3, v4, :bad\n' +
+  'invoke-virtual {v0, v1}, ' + owner + '->filterEquals(Landroid/content/Intent;)Z\nmove-result v3\nif-eqz v3, :bad\n'
+ // A full copy preserves flags and owns its extras and selector snapshots.
+ body += 'new-instance v1, ' + owner + '\ninvoke-direct {v1, v0}, ' + owner + '-><init>(Landroid/content/Intent;)V\n' +
+  'invoke-virtual {v1}, ' + owner + '->getFlags()I\nmove-result v2\nconst/16 v3, 0x123\nif-ne v2, v3, :bad\n' +
+  'const-string v2, "secret"\ninvoke-virtual {v1, v2}, ' + owner + '->removeExtra(Ljava/lang/String;)V\ninvoke-virtual {v0, v2}, ' + owner + '->hasExtra(Ljava/lang/String;)Z\nmove-result v2\nif-eqz v2, :bad\n' +
+  'invoke-virtual {v1}, ' + owner + '->getSelector()Landroid/content/Intent;\nmove-result-object v2\nconst-string v3, "changed"\ninvoke-virtual {v2, v3}, ' + owner + '->setAction(Ljava/lang/String;)Landroid/content/Intent;\n' +
+  'invoke-virtual {v0}, ' + owner + '->getSelector()Landroid/content/Intent;\nmove-result-object v2\ninvoke-virtual {v2}, ' + owner + '->getAction()Ljava/lang/String;\nmove-result-object v2\nconst-string v3, "selector"\n' +
+  'invoke-virtual {v3, v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\nmove-result v2\nif-eqz v2, :bad\n' +
+  'sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v1, "INTENT-FILTER-PASS fields categories identifier extras flags selector independent-copies typed-defaults"\n' +
+  'invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\nreturn-void\n:bad\n' +
+  'new-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "Intent filter copy values or ownership"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0'
+ return body
+}
+
 fn alarm_classes(dir string) ! {
 	probe := 'Lorg/vinix/service/AlarmProbe;'
 	os.write_file(dir + '/AlarmProbe.smali', '.class public ' + probe + '\n.super Ljava/lang/Object;\n.implements Landroid/app/AlarmManager$OnAlarmListener;\n.field public volatile calls:I\n.field public volatile failed:Z\n.field public expected:Landroid/os/Looper;\n.field public latch:Ljava/util/concurrent/CountDownLatch;\n' +
@@ -2140,6 +2212,7 @@ return-object v0'))!
 		method('private checkGeofenceWire(Landroid/os/IBinder;)V', geofence_wire_checks()) +
 		method('private checkUser()V', user_checks()) +
 		method('private checkAccountQueries(Landroid/content/Context;)V', account_query_checks()) +
+		'.method private checkIntentFilters()V\n.locals 8\n' + intent_filter_checks() + '\n.end method\n' +
 		method('private checkDevicePolicy(Landroid/content/Context;)V', device_policy_checks()) +
 		method('private checkWorkSource()V', work_source_checks()) +
 		'.method private checkAlarms()V\n.locals 16\n' + alarm_checks() + '\n.end method\n' +
@@ -2214,6 +2287,7 @@ throw v0') +
 		method('private checkDirectories(Landroid/content/Context;)V', directory_checks()) +
 		method('public onCreate(Landroid/os/Bundle;)V', '
 invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkIntentFilters()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkComponents()V
 invoke-direct {p0, p0}, Lorg/vinix/service/Main;->checkAbsentHardware(Landroid/content/Context;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkProxyListener()V
