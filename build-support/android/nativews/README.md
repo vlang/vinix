@@ -224,17 +224,24 @@ has no Data Saver policy. This is independent of the metered-link classification
 ART receives the private runtime's generated JKS path, type and password before
 WolfJSSE creates its default SSLContext. Native builds also carry `cacerts` into
 the APK suite's staged runtime, including when its baseline image is older.
-An Android `OpenSSLProvider` adapter exposes the installed wolfJSSE services as
-`VinixTLS` so Android clients can discover its existing ALPN socket methods.
-It is appended to the provider list, preserving provider precedence, default
-trust managers and cryptography implementations.
+An Android `OpenSSLProvider` adapter exposes TLS contexts as `VinixTLS`, just
+before wolfJSSE in the provider list. It advertises only SSLContext algorithms
+that wolfJSSE supports; other provider services retain their precedence. Each
+context explicitly delegates to wolfJSSE, retaining its trust managers and
+cryptography. Socket wrappers forward I/O, options, state and ALPN, expose
+Android's SNI/session-ticket methods, accept obsolete NPN configuration without
+changing ALPN, and return null for NPN selection (which is unsupported).
+This lets gRPC configure and probe both protocols before handshaking
+without mistaking a missing method for a fatal TLS failure.
 `tests/native-android-ws/network-tls-fixture.v` takes the same five arguments
 as the HTTPS generator below. Run it with at least 100 startup seconds and
 Internet access. It waits for the kernel default route, checks background
 policy and callback contracts, and negotiates real TLS `h2` with Google through
 the adapter. Require both `BOOTSTRAP-CONNECTIVITY-PASS` (including
 `background-policy`) and `TLS-ALPN-PASS`; the latter checks idempotent provider
-installation, default certificate trust and correct/wrong hostname verification.
+installation, default-context wrapping, pre-handshake ALPN/NPN reflection,
+socket state/options/I/O, default certificate trust, correct/wrong hostname
+verification, and a real HTTP/2 SETTINGS response.
 `tests/native-android-ws/https-fixture.v` builds a separate network regression
 APK from an existing bootstrap fixture directory. Its arguments are `OUTPUT
 FIXTURE_DIR SMALI_TOOLS JAVA APKSIGNER`. Run it as `org.vinix.bootstrap` with at
