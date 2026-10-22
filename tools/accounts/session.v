@@ -170,8 +170,11 @@ fn main() {
 		exit(package_launch() or { eprintln('vinix-session: ${err}'); 126 })
 	}
 	if args.len > 0 && args[0] == 'graphical' {
-		if args.len != 3 || args[1] != '--desktop' { fail('usage: vinix-session graphical --desktop /usr/bin/vinix-desktop') }
-		sessioncore.graphical(args[2]) or { fail(err.msg()) }
+		if (args.len != 3 && args.len != 5) || args[1] != '--desktop'
+			|| (args.len == 5 && args[3] != '--fallback-desktop') {
+			fail('usage: vinix-session graphical --desktop /usr/bin/vinix-desktop [--fallback-desktop /usr/bin/vinix-desktop]')
+		}
+		sessioncore.graphical(args[2], if args.len == 5 { args[4] } else { '' }) or { fail(err.msg()) }
 		return
 	}
 	if args.len >= 1 && args[0] == 'console' {

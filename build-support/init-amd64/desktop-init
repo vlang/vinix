@@ -105,7 +105,11 @@ while :; do
 	# A non-interactive shell starts a background command with stdin on
 	# /dev/null. The compositor reads the keyboard from stdin, so hand it the
 	# console explicitly.
-	/usr/sbin/vinix-session graphical --desktop "$desktop" </dev/console &
+	if [ "$desktop" = /usr/bin/vinix-desktop-gpu ]; then
+		/usr/sbin/vinix-session graphical --desktop "$desktop" --fallback-desktop /usr/bin/vinix-desktop </dev/console &
+	else
+		/usr/sbin/vinix-session graphical --desktop "$desktop" </dev/console &
+	fi
 	desktop_pid=$!
 	exited_pid=$desktop_pid
 	wait "$desktop_pid"

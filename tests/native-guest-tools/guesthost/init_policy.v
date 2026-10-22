@@ -41,6 +41,9 @@ fn init_policy_checked(arguments []string) !int {
 	for name in ['--kernel-dir', '--state-dir'] {
 		if !parsed.has(name) { return SerialArgumentError{'missing required ' + name} }
 	}
+	if parsed.has('--reference-guest') {
+		return SerialArgumentError{'the historical direct-desktop C control requires its matching historical init producer; current init executes the graphical manager'}
+	}
 	timeout := serial_timeout(parsed, 600)!
 	kernel := resolve(parsed.value('--kernel-dir', ''))!
 	state_root := resolve(parsed.value('--state-dir', ''))!
@@ -76,13 +79,15 @@ fn init_policy_checked(arguments []string) !int {
 			'-O2', '-fno-builtin', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror', ...extra,
 			source, '-L' + sdk + '/lib', '-fuse-ld=lld', '-o', fixture])!
 		rootfs := state + '/rootfs'
-		for name in ['sbin', 'bin', 'usr/bin', 'dev', 'proc', 'sys', 'tmp', 'root', 'run'] { mkdir_literal(rootfs + '/' + name)! }
+		for name in ['sbin', 'bin', 'usr/bin', 'usr/sbin', 'dev', 'proc', 'sys', 'tmp', 'root', 'run'] { mkdir_literal(rootfs + '/' + name)! }
 		if policy == 'shell' {
 			hosttest.module_copy_file_preserving_stat(fixture, rootfs + '/sbin/init')!
 			hosttest.module_copy_file_preserving_stat(binary, rootfs + '/shell-init')!
 		} else {
 			hosttest.module_copy_file_preserving_stat(binary, rootfs + '/sbin/init')!
-			hosttest.module_copy_file_preserving_stat(fixture, rootfs + if policy == 'full' { '/bin/busybox' } else { '/usr/bin/vinix-desktop' })!
+			// The maintained desktop stand-in verifies the manager entry argv.
+			path := if policy == 'full' { '/bin/busybox' } else { '/usr/sbin/vinix-session' }
+			hosttest.module_copy_file_preserving_stat(fixture, rootfs + path)!
 		}
 		archive := archive_tree(rootfs, state + '/initramfs.tar')!
 		println('Init policy guest artifacts: ' + state)

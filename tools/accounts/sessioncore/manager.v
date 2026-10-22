@@ -93,6 +93,8 @@ pub struct ManagerConfig {
 pub:
 	greeter []string // the login screen's program and arguments
 	desktop []string // a session's first program and arguments
+	greeter_fallback []string // tried in the same child only if execve fails
+	desktop_fallback []string
 	socket  string = authclient.default_socket
 	system  string = '/usr/sbin/vinix-system'
 	// Started in each new session with the password that was typed, to
@@ -297,7 +299,7 @@ fn (mut m Manager) greet() (accountcore.User, []u8) {
 			continue
 		}
 		mark_active('')
-		started := start(db, greeter, m.config.greeter, true, int(line[1]), Unlock{}) or {
+		started := start_fallback(db, greeter, m.config.greeter, m.config.greeter_fallback, true, int(line[1]), Unlock{}) or {
 			report_manager_error(err, 'vinix-session: the login screen could not be started: ')
 			C.close(line[0])
 			C.close(line[1])
@@ -409,7 +411,7 @@ fn (mut m Manager) prepare_session(user accountcore.User, typed []u8) ?int {
 			C.close(line[1])
 			return none
 		}
-		started := start(db, user, m.config.desktop, true, int(line[1]), Unlock{
+		started := start_fallback(db, user, m.config.desktop, m.config.desktop_fallback, true, int(line[1]), Unlock{
 			secret: typed
 			helper: m.config.keyring
 		}) or {

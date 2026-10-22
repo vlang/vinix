@@ -162,16 +162,20 @@ fn run_unlock_helper(unlock Unlock, environment []string) {
 // (and is told of in VINIX_SESSION_FD): its line to whoever started it.
 // Returns once the child has become a login, before it has become the user.
 pub fn start(db accountcore.Database, user accountcore.User, argv []string, at_seat bool, control int, unlock Unlock) !Started {
-	return start_profile(db, user, argv, at_seat, control, unlock, false)
+	return start_profile(db, user, argv, []string{}, at_seat, control, unlock, false)
+}
+
+fn start_fallback(db accountcore.Database, user accountcore.User, argv []string, fallback []string, at_seat bool, control int, unlock Unlock) !Started {
+	return start_profile(db, user, argv, fallback, at_seat, control, unlock, false)
 }
 
 // The same login attribution and checked identity transition, without any
 // supplementary account groups. This profile does not take the display seat.
 pub fn start_isolated(db accountcore.Database, user accountcore.User, argv []string) !Started {
-	return start_profile(db, user, argv, false, -1, Unlock{}, true)
+	return start_profile(db, user, argv, []string{}, false, -1, Unlock{}, true)
 }
 
-fn start_profile(db accountcore.Database, user accountcore.User, argv []string, at_seat bool, control int, unlock Unlock, isolated bool) !Started {
+fn start_profile(db accountcore.Database, user accountcore.User, argv []string, fallback []string, at_seat bool, control int, unlock Unlock, isolated bool) !Started {
 	if !accountcore.is_person(user) && user.name != 'greeter' {
 		return error('${user.name} is not an account sessions are for')
 	}
@@ -230,7 +234,7 @@ fn start_profile(db accountcore.Database, user accountcore.User, argv []string, 
 		// by the time anything asks it.
 		run_unlock_helper(unlock, environment)
 		retire_login_password(unlock.secret)
-		exec_as(user, argv, environment, control >= 0)
+		exec_as_fallback(user, argv, fallback, environment, control >= 0)
 		eprintln('vinix-session: cannot run ${argv[0]}')
 		C._exit(127)
 	}

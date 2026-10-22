@@ -153,7 +153,7 @@ fn prepare_environment() {
 pub fn desktop_start() {
  unsafe {
   desktop := [&char(c'/usr/sbin/vinix-session'),&char(c'graphical'),&char(c'--desktop'),&char(c'/usr/bin/vinix-desktop'),&char(nil)]!
-  gpu := [&char(c'/usr/sbin/vinix-session'),&char(c'graphical'),&char(c'--desktop'),&char(c'/usr/bin/vinix-desktop-gpu'),&char(nil)]!
+  gpu := [&char(c'/usr/sbin/vinix-session'),&char(c'graphical'),&char(c'--desktop'),&char(c'/usr/bin/vinix-desktop-gpu'),&char(c'--fallback-desktop'),&char(c'/usr/bin/vinix-desktop'),&char(nil)]!
   hyprland := [&char(c'/usr/bin/start-hyprland-vinix'),&char(nil)]!
   shell := [&char(c'/bin/zsh'),&char(c'-l'),&char(nil)]!
   mut status := i32(0)

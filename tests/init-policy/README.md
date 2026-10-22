@@ -1,5 +1,32 @@
 # Init policy fixtures
 
+The current desktop fixture is a stand-in for `/usr/sbin/vinix-session` and
+requires the exact `graphical --desktop /usr/bin/vinix-desktop` entry command.
+It checks init's supervision boundary; it does not execute the account manager
+or graphical login. The separate [graphical login checks](../graphical-login/check.md)
+cover those programs. The historical direct-compositor C guest is incompatible
+with this entry contract, so `--reference-guest` now refuses before boot; its
+original receipts below describe the matching historical init producer.
+
+For frozen kernels that predate gzip initramfs support, first create the three
+policy artifacts with `--build-only`, then run the V fixture media adapter:
+
+```sh
+$V -cc clang -nocache \
+  -path '@vlib|tests/native-guest-tools|build-support|@vmodules' \
+  -o build/init-policy-raw tests/init-policy/raw-module-check.v
+build/init-policy-raw BUILD_ONLY_STATE KERNEL_DIR NEW_RUN
+```
+
+It retains the production builder's boot inputs, rebuilds only disposable
+fixture media with the raw archive and matching Limine module path, and runs
+all three serial checks with bounded cleanup. The 2026-10-22 manager-entry
+follow-up passed all three guests, including reload forwarding and desktop
+restart; [captured logs](../graphical-login/results/2026-10-22/fallback/logs/checks.json)
+describe its scope. The desktop stand-in does not qualify an actual manager or
+installed normal-init boot. Host assertion-based fixtures must be built without
+`-prod`.
+
 The native V storage controller now also runs the production init host policy
 with ASan/UBSan, including its synchronous volume restore hook:
 
@@ -38,8 +65,8 @@ Use a fresh, short state path: QEMU's Unix monitor socket is limited to
 104 bytes on macOS. The default allowance remains 600 seconds per policy.
 `VINIX_V_COMPILER` selects V, `VINIX_AARCH64_SYSROOT` selects musl headers
 and libraries, and `LD_AARCH64` selects the freestanding policy linker.
-`--reference-guest=/path/to/original-guest.c` builds the independent C
-control with its original three mode defines and every original assertion.
+The historical `--reference-guest=/path/to/original-guest.c` control used its
+original three mode defines and every original assertion.
 `compile-guest` can emit either ARM or x86 fixture artifacts for SDK checks.
 The production policies use the raw ARM syscall ABI; x86 evidence is compile
 validation only.
@@ -101,8 +128,8 @@ Source, ABI and lifetime peer review accompanies these results.
 Host receipts are under the adjacent `init-policy-host-fixture/` cache.
 An exact repeat of the earlier ARM guest production build reproduced all
 three policy sources, objects, ABI objects and entire ELFs byte for byte.
-The prior ARM guest evidence remains applicable to that unchanged production
-policy; no new guest or kernel run is claimed for this host fixture port.
+That historical identity check covered the production policy at the time;
+it does not qualify the later graphical-manager entry change.
 An initial repeat using the current default Apple Clang instead of the prior
 Homebrew Clang produced different object metadata and was retained; the final
 identity check uses the original compiler and source basenames. A supplemental

@@ -129,3 +129,35 @@ inventories. Account/channel receipts describe their narrower captured inputs;
 they do not imply a complete underlying wrapper compiler or account sysroot
 inventory. Historical paths and repository HEAD are provenance metadata,
 while frozen source/content digests bind the qualified bytes.
+
+## Compositor exec recovery follow-up
+
+Normal GPU startup additionally passes
+`--fallback-desktop /usr/bin/vinix-desktop` to the graphical manager. The
+already-dropped greeter or ordinary session child tries that compositor only
+when the primary `execve` returns an error. Both attempts keep the same PID,
+account, seat and control descriptor. A program that starts and later exits,
+including exit 127, does not trigger recovery. Initial root registration uses
+the same exec-only rule. The manager remains responsible for one authentication
+daemon and one graphical lock throughout.
+
+The focused host fixture extracts the actual exec and registration functions
+and uses real fork/exec children. ASan/UBSan checks malformed executables and
+missing interpreters, literal arguments/environment, home, UID, PID and fd 3;
+an intentionally disabled recovery path must fail. The updated manager secret
+and blocking-reap regression also passes with sanitizers. Compile and run these
+tests **without `-prod`**, so their assertions remain enabled:
+
+```sh
+$V -cc clang -nocache -o build/login-exec-check tests/graphical-login/exec-check.v
+build/login-exec-check --sanitize
+build/login-exec-check --negative-no-fallback
+```
+
+Both session target programs cross-compiled. All three ARM init-policy guests
+also passed; the desktop guest verifies init's exact manager argv, reload
+forwarding and restart through a stand-in. A fixture-only raw-module ISO permits
+the frozen kernel to boot those current policy artifacts. These checks do not
+extend the native GUI pair above to GPU recovery or installed normal-init login.
+[Follow-up logs and captured hashes](results/2026-10-22/fallback/logs/checks.json)
+record the observed successful commands and their narrower evidence scope.

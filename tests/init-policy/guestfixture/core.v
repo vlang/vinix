@@ -107,7 +107,9 @@ fn phase_write(phase i32) {
 fn desktop_entry(argc i32, argv &&char) i32 {
 	unsafe {
 		C.setvbuf(C.stdout, nil, C._IONBF, 0)
-		require(argc == 1 && C.strcmp(argv[0], c'/usr/bin/vinix-desktop') == 0, c'desktop args')
+		require(argc == 4 && C.strcmp(argv[0], c'/usr/sbin/vinix-session') == 0
+			&& C.strcmp(argv[1], c'graphical') == 0 && C.strcmp(argv[2], c'--desktop') == 0
+			&& C.strcmp(argv[3], c'/usr/bin/vinix-desktop') == 0, c'graphical manager args')
 		require(C.getppid() == 1 && C.getpgrp() == C.getpid(), c'desktop owner/group')
 		require(C.getenv(c'VINIX_SYSTEM_SESSION') != nil && C.strcmp(C.getenv(c'VINIX_SYSTEM_SESSION'), c'1') == 0, c'desktop environment')
 		require(C.fcntl(0, C.F_GETFD) >= 0 && C.fcntl(1, C.F_GETFD) >= 0 && C.fcntl(2, C.F_GETFD) >= 0, c'desktop console descriptors')

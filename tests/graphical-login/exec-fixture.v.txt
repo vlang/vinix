@@ -1,0 +1,86 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module main
+
+import accountcore
+import os
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <stdlib.h>
+
+fn C.fork() int
+fn C.pipe(&i32) int
+fn C.dup2(int, int) int
+fn C.close(int) int
+fn C.chdir(&char) int
+fn C.execve(&char, &&char, &&char) int
+fn C.read(int, voidptr, usize) isize
+fn C.write(int, voidptr, usize) isize
+fn C.getpid() int
+fn C.getuid() u32
+fn C.waitpid(int, &i32, int) int
+fn C._exit(int)
+@[c_extern] __global C.environ &&char
+
+fn fixture() {
+	assert os.args[1..] == ['--fixture', 'literal space;$(false)']
+	assert os.getenv('VINIX_EXEC_VALUE') == 'literal space;$(false)'
+	assert os.getenv('VINIX_EXEC_UID').u32() == C.getuid()
+	assert os.getenv('VINIX_EXEC_PID').int() == C.getpid()
+	assert os.getwd() == os.getenv('VINIX_EXEC_HOME')
+	bytes := [C.getpid(), int(C.getuid())]!
+	assert C.write(3, &bytes[0], sizeof(bytes)) == isize(sizeof(bytes))
+	C._exit(37)
+}
+
+fn attempt(primary []string, fallback []string, home string, expected int, communicates bool) {
+	mut line := [2]i32{}
+	assert C.pipe(&line[0]) == 0
+	child := C.fork()
+	assert child >= 0
+	if child == 0 {
+		C.close(line[0])
+		assert C.dup2(line[1], 3) == 3
+		if line[1] != 3 { C.close(line[1]) }
+		environment := ['VINIX_EXEC_VALUE=literal space;$(false)', 'VINIX_EXEC_UID=' + C.getuid().str(),
+			'VINIX_EXEC_PID=' + C.getpid().str(), 'VINIX_EXEC_HOME=' + home]
+		exec_as_fallback(accountcore.User{home: home}, primary, fallback, environment, true)
+		C._exit(127)
+	}
+	C.close(line[1])
+	mut response := [2]int{}
+	got := C.read(line[0], &response[0], sizeof(response))
+	C.close(line[0])
+	assert wait(child) == expected
+	if communicates {
+		assert got == isize(sizeof(response)) && response[0] == child && response[1] == int(C.getuid())
+	} else { assert got == 0 }
+}
+
+fn main() {
+	if os.args.len > 1 && os.args[1] == '--fixture' { fixture(); return }
+	if os.args.len > 1 && os.args[1] == '--exit127' { C._exit(127) }
+	work := os.dir(os.executable())
+	broken := work + '/broken'
+	missing_interpreter := work + '/missing-interpreter'
+	os.write_file(broken, 'this is not an executable image\n') or { panic(err) }
+	os.write_file(missing_interpreter, '#!/vinix-intentionally-missing-interpreter\n') or { panic(err) }
+	os.chmod(broken, 0o755) or { panic(err) }
+	os.chmod(missing_interpreter, 0o755) or { panic(err) }
+	fallback := [os.executable(), '--fixture', 'literal space;$(false)']
+	attempt([broken], fallback, work, 37, true)
+	attempt([missing_interpreter], fallback, work, 37, true)
+	attempt(fallback, ['/vinix-intentionally-missing'], work, 37, true)
+	attempt([os.executable(), '--exit127'], fallback, work, 127, false)
+	attempt([broken], [missing_interpreter], work, 127, false)
+	// Registration/account setup uses the same exact exec-only recovery rule.
+	run_setup([broken], ['/usr/bin/true']) or { panic(err) }
+	run_setup([missing_interpreter], ['/usr/bin/true']) or { panic(err) }
+	run_setup([os.executable(), '--exit127'], ['/usr/bin/true']) or {
+		unsafe { err.free() }
+		println('PASS compositor exec: malformed/missing-interpreter recovery, same PID/UID/home/fd3/literal argv/env, no recovery after exit127, registration parity')
+		return
+	}
+	panic('registration incorrectly recovered a program exit127')
+}

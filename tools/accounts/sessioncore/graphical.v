@@ -33,12 +33,16 @@ fn graphical_lock() !int {
 	return fd
 }
 
-fn run_setup(command string, arguments []string) ! {
-	mut child := os.new_process(command)
-	defer { child.close() }
-	child.set_args(arguments)
-	child.wait()
-	if child.code != 0 { return error('initial account setup did not complete') }
+fn run_setup(arguments []string, fallback []string) ! {
+	environment := inherited_environment()
+	defer { unsafe { environment.free() } }
+	child := C.fork()
+	if child < 0 { return error('cannot fork initial account setup') }
+	if child == 0 {
+		exec_as_fallback(accountcore.User{home: '/root'}, arguments, fallback, environment, false)
+		C._exit(127)
+	}
+	if wait(child) != 0 { return error('initial account setup did not complete') }
 }
 
 fn has_person(db accountcore.Database) bool {
@@ -46,22 +50,42 @@ fn has_person(db accountcore.Database) bool {
 	return false
 }
 
-pub fn graphical(desktop string) ! {
+pub fn graphical(desktop string, fallback string) ! {
 	if !desktop.starts_with('/') || !os.is_executable(desktop) {
 		return error('the compositor must be an installed absolute executable')
 	}
+	if fallback != '' && (!fallback.starts_with('/') || !os.is_executable(fallback) || fallback == desktop) {
+		return error('the fallback compositor must be a different installed absolute executable')
+	}
+	greeter_fallback := if fallback == '' { []string{} } else { [fallback, '--greeter'] }
+	desktop_fallback := if fallback == '' { []string{} } else { [fallback] }
+	greeter_command := [desktop, '--greeter']
+	desktop_command := [desktop]
+	account_command := ['/usr/sbin/vinix-account', 'init']
+	// These headers borrow command strings and permanent arguments. Retire
+	// only their buffers after the synchronous manager and all children finish.
+	defer { unsafe {
+		C.free(greeter_fallback.data)
+		C.free(desktop_fallback.data)
+		C.free(greeter_command.data)
+		C.free(desktop_command.data)
+		C.free(account_command.data)
+	} }
 	held_fd := graphical_lock()!
 	defer { C.close(held_fd) }
 	// Import a valid existing registration first. On a clean image no person
 	// exists yet: root runs only its exclusive registration screen, then the
 	// account tool imports that hash and owns the home before login begins.
-	run_setup('/usr/sbin/vinix-account', ['init'])!
+	run_setup(account_command, []string{})!
 	mut db := load_accounts()!
 	needs_registration := !has_person(db)
 	db.close()
 	if needs_registration {
-		run_setup(desktop, ['--register-only'])!
-		run_setup('/usr/sbin/vinix-account', ['init'])!
+		registration_fallback := if fallback == '' { []string{} } else { [fallback, '--register-only'] }
+		registration_command := [desktop, '--register-only']
+		defer { unsafe { C.free(registration_fallback.data); C.free(registration_command.data) } }
+		run_setup(registration_command, registration_fallback)!
+		run_setup(account_command, []string{})!
 		mut initialized := load_accounts()!
 		created := has_person(initialized)
 		initialized.close()
@@ -104,5 +128,6 @@ pub fn graphical(desktop string) ! {
 		}
 		if !ready { return error('the root authentication service did not become ready') }
 	}
-	run_manager(greeter: [desktop, '--greeter'], desktop: [desktop])
+	run_manager(greeter: greeter_command, desktop: desktop_command,
+		greeter_fallback: greeter_fallback, desktop_fallback: desktop_fallback)
 }

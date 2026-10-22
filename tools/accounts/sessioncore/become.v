@@ -246,6 +246,17 @@ pub fn exec_as(user accountcore.User, argv []string, environment []string, keep_
 	C.execve(c_argv[0], &c_argv[0], &c_env[0])
 }
 
+// Try the recovery compositor only when execve itself fails. An executable
+// that starts and later exits, even with status 127, never reaches this code.
+// Both attempts run in this same account, login session and control channel.
+pub fn exec_as_fallback(user accountcore.User, argv []string, fallback []string, environment []string, keep_control bool) {
+	exec_as(user, argv, environment, keep_control)
+	if fallback.len > 0 {
+		eprintln('vinix-session: compositor exec failed; trying the software desktop')
+		exec_as(user, fallback, environment, keep_control)
+	}
+}
+
 // One write() of `text` to a file that exists, with the kernel's answer: the
 // buffered writes of the library report success for a write the kernel
 // refused.
