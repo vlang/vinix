@@ -977,6 +977,14 @@ architectures; broader release/catalog/runtime acceptance remains open.
     complete help and diagnostics, with approval on the full reviewed plan.
 - [ ] Package native, Linux, Windows and Apple-compatible apps with isolated
   runtimes, launcher/association registration and clean uninstall behavior.
+  - [x] [Signed Neovim terminal packages](tests/packages/neovim-check.md)
+    retain the real 0.12.5 static editor, complete upstream runtime, pinned
+    sources and redistribution notices for both architectures. Ordinary-user
+    PTY input/resize/save, live leases through uninstall/reinstall, signed
+    runtime update/rollback and offline cached document reopen pass on both
+    guests, with twelve altered-evidence refusals per target. Lua/LPeg and
+    Vimscript syntax are qualified; grammar DSOs, LuaJIT, external providers,
+    release catalog selection and the legacy picker migration remain open.
   - [x] [Authenticated hosted X11 launches](tests/wine-host/README.md)
     create a private per-account authority and fresh random cookie, grant only
     its exact socket/authority, and forward the validated pair through the

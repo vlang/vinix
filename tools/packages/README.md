@@ -689,6 +689,15 @@ versioned musl/library runtime, with notices, upstream source and V build tools.
 See the [profile](SDK.md#ffmpeg-local-media-publisher-profile) and
 [qualification](../../tests/packages/ffmpeg-profile-check.md).
 
+`neovim-catalog RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY` pins Neovim
+0.12.5 and its complete upstream runtime for both hosts. The static editor and
+V adapter use generation-specific data, literal terminal arguments and explicit
+`files`/`process` permissions. The V builder retains eight pinned source archives,
+licenses, inventories and build commands. See the
+[profile](SDK.md#neovim-terminal-publisher-profile) and
+[real terminal qualification](../../tests/packages/neovim-check.md) for actual
+PTY save/resize, signed runtime update/rollback and offline cached reinstall.
+
 `wine-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY` pins a reviewed
 Win64 application and explicit Wine runtime for both hosts. It checks PE32+
 application structure, matching native static launchers, notices, runtime bounds

@@ -265,6 +265,16 @@ targets and storage failures return diagnostics before a caller reports success.
 See [durability qualification](../tests/packages/durability-check.md), including
 ext2 interruption/recovery at the staged, published and activated checkpoints.
 
+The [Neovim profile](../tools/packages/SDK.md#neovim-terminal-publisher-profile)
+adds the real 0.12.5 editor and its complete installed runtime as signed isolated
+packages for both hosts. [Native qualification](../tests/packages/neovim-check.md)
+checks ordinary-user PTY input, resize and exact saves, live generation leases
+through removal/reinstall, signed runtime update/rollback and offline cached
+reopening with retained data. Each target also refuses twelve altered evidence
+cases. The static Lua/LPeg/Vimscript build includes tree-sitter core but no
+grammar DSOs, LuaJIT, external providers or language servers. Release catalog
+selection and migration of the legacy picker remain separate work.
+
 This application store is separate from the Alpine `pkg`/`apk` system layer.
 Existing Alpine ports and special downloads still use that frontend and its
 persistence rules. They do **not** acquire these rollback guarantees. Release

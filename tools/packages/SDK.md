@@ -1618,6 +1618,42 @@ Authenticate upstream delivery and review the configuration before public
 publication. [Qualification](../../tests/packages/ffmpeg-profile-check.md)
 covers the retained compiler/kernel tuple and enabled media subset.
 
+### Neovim terminal publisher profile
+
+`neovim-catalog RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY` pins Neovim
+**0.12.5** as `org.neovim.editor` and its separately versioned
+`org.vinix.neovim-runtime` on AArch64 and x86_64. The application declares
+`files` and `process`, requires runtime `>=1.0.0,<2.0.0`, and requests no network
+or display access. Both editor and V adapter must be static target ELF files;
+the profile checks their captured load/entry structure and refuses dynamic
+metadata before and after import.
+
+The [V builder](neovim-build.v) acquires eight SHA-pinned upstream archives,
+extracts fresh target source trees and builds with host generators and target
+musl tools. It retains source inventories, literal build commands and licenses,
+including the GCC runtime exception. Each prepared architecture root contains
+`bin/nvim`, `bin/vinix-neovim-runner`, the complete installed
+`share/nvim/runtime`, redistribution notices and the pinned sources/build tools.
+The profile checks required runtime data, nonexecutable data modes, bounded
+notices and exact archive pins through the captured importer. `pack-catalog`
+then rechecks the resulting lock's complete file inventory.
+
+The signed manifest supplies generation-specific runtime data and editor paths
+to the adapter. It sets `VIMRUNTIME`, removes ambient `VIM` and executes the
+editor directly with literal user arguments, preserving `/proc/self/exe` for
+the TUI subprocess. The build selects libuv's existing no-io_uring fallback
+through one exact, drift-checked branch change without changing sandbox grants.
+Lua 5.1, LPeg, Vimscript syntax and tree-sitter core are included; grammar DSOs,
+LuaJIT, external providers and language servers are not bundled.
+
+See [build, publication and qualification commands](../../tests/packages/neovim-check.md).
+The paired native check covers real ordinary-user terminal input, resize and
+save, live generation leases, signed runtime update/rollback and offline cached
+reinstall with retained documents. Its kernels require the PTY epoll correction
+in `a83652ec9`. Retained source/tool/output pins do not establish a hermetic
+toolchain build, and these raw-initramfs fixtures do not qualify release-image
+boot or the whole advertised catalog. Publisher enrollment remains separate.
+
 ### Wine Win64 publisher profile
 
 `wine-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY` inventories a
