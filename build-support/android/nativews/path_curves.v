@@ -45,6 +45,8 @@ fn ws_path_cubic(pointer i64, x1 f32, y1 f32, x2 f32, y2 f32, x3 f32, y3 f32, re
 		p := &f32(C.alloca(2 * sizeof(f32)))
 		ws_path_last(pointer, p)
 		dx, dy := if relative { p[0] } else { f32(0) }, if relative { p[1] } else { f32(0) }
+		ws_path_control(pointer, x1 + dx, y1 + dy)
+		ws_path_control(pointer, x2 + dx, y2 + dy)
 		ws_cubic_segment(pointer, p[0], p[1], x1 + dx, y1 + dy, x2 + dx, y2 + dy, x3 + dx, y3 + dy, 0)
 	}
 }
@@ -55,6 +57,7 @@ fn ws_path_quad(pointer i64, x1 f32, y1 f32, x2 f32, y2 f32, relative bool) {
 		ws_path_last(pointer, p)
 		dx, dy := if relative { p[0] } else { f32(0) }, if relative { p[1] } else { f32(0) }
 		cx, cy, end_x, end_y := x1 + dx, y1 + dy, x2 + dx, y2 + dy
+		ws_path_control(pointer, cx, cy)
 		ws_cubic_segment(pointer, p[0], p[1], p[0] + (cx - p[0]) * 2 / 3, p[1] + (cy - p[1]) * 2 / 3,
 			end_x + (cx - end_x) * 2 / 3, end_y + (cy - end_y) * 2 / 3, end_x, end_y, 0)
 	}
@@ -65,11 +68,17 @@ fn ws_path_add(pointer i64, source i64, matrix i64) {
 		if source == 0 { return }
 		path := &WsPath(source)
 		count := path.count
+		control_count := path.control_count
 		mapped := &f32(C.alloca(2 * sizeof(f32)))
 		for i := i32(0); i < count; i++ {
 			point := path.points[i]
 			ws_matrix_map_point(matrix, point.x, point.y, false, mapped)
 			ws_path_point(pointer, mapped[0], mapped[1], point.move)
+		}
+		for i := i32(0); i < control_count; i++ {
+			point := path.controls[i]
+			ws_matrix_map_point(matrix, point.x, point.y, false, mapped)
+			ws_path_control(pointer, mapped[0], mapped[1])
 		}
 	}
 }

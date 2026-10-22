@@ -331,6 +331,7 @@ android/graphics/Path|native_reset|ws_path_unref(p0); if p1 != p0 { ws_path_unre
 android/graphics/Path|native_create_builder|return ws_path_builder(p0,p1)
 android/graphics/Path|native_create_path|return if p0 == 0 { ws_path_new() } else { p0 }
 android/graphics/Path|native_ref_path|return ws_path_ref(p0)
+android/graphics/Path|native_get_bounds|ws_path_bounds(e,p0,p1)
 android/graphics/Path|native_move_to|ws_path_point(p0,p1,p2,true)
 android/graphics/Path|native_line_to|ws_path_line(p0,p1,p2,false,false)
 android/graphics/Path|native_rel_move_to|ws_path_line(p0,p1,p2,true,true)

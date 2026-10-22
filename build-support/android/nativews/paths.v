@@ -14,6 +14,9 @@ mut:
 	count      i32
 	capacity   i32
 	references i32
+	controls &WsVertex
+	control_count i32
+	control_capacity i32
 }
 
 struct WsCrossing {
@@ -36,6 +39,7 @@ fn ws_path_unref(pointer i64) {
 		path.references--
 		if path.references == 0 {
 			C.free(path.points)
+			C.free(path.controls)
 			C.free(path)
 		}
 	}
@@ -69,6 +73,10 @@ fn ws_path_builder(pointer i64, builder i64) i64 {
 			for i := i32(0); i < path.count; i++ {
 				p := path.points[i]
 				ws_path_point(result, p.x, p.y, p.move)
+			}
+			for i := i32(0); i < path.control_count; i++ {
+				p := path.controls[i]
+				ws_path_control(result, p.x, p.y)
 			}
 			ws_path_unref(pointer)
 		}
