@@ -39,6 +39,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  native-catalog VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  sqlite-catalog SQLITE_VERSION RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  ffmpeg-catalog RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
+	'  neovim-catalog RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  wine-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  apple-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n' +
@@ -177,6 +178,12 @@ fn checked(arguments []string) !int {
 		'ffmpeg-catalog' {
 			if names.len != 3 { return error('ffmpeg-catalog requires runtime version, prepared roots and a new lock directory') }
 			mut info := pkgcore.ffmpeg_catalog(names[0], names[1], names[2])!
+			publisher_reply(mut info)
+			return 0
+		}
+		'neovim-catalog' {
+			if names.len != 3 { return error('neovim-catalog requires runtime version, prepared roots and a new lock directory') }
+			mut info := pkgcore.neovim_catalog(names[0], names[1], names[2])!
 			publisher_reply(mut info)
 			return 0
 		}
