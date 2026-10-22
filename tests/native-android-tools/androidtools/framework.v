@@ -159,22 +159,12 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_signature_notice(next, work, tools)!
  mut sources := map[string]ah.Value{}
  for file in ['jni.v', 'cursors.v', 'actionbar.v', 'widgets.v', 'dialogs.v', 'menus.v', 'charsets.v', 'themes.v', 'recreate.v', 'views.v'] { sources['build-support/android/atlframework/' + file] = ah.Value(framework_digest(root() + '/build-support/android/atlframework/' + file)!) }
- sources['tests/native-android-tools/androidtools/framework_classes.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_classes.v')!)
- sources['tests/native-android-tools/androidtools/framework_content.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_content.v')!)
- sources['tests/native-android-tools/androidtools/framework.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework.v')!)
- sources['tests/native-android-tools/androidtools/framework_signatures.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_signatures.v')!)
- sources['tests/native-android-tools/androidtools/framework_application.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_application.v')!)
- sources['tests/native-android-tools/androidtools/framework_services.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_services.v')!)
- sources['tests/native-android-tools/androidtools/framework_package_storage.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_package_storage.v')!)
- sources['tests/native-android-tools/androidtools/framework_package_info.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_package_info.v')!)
- sources['tests/native-android-tools/androidtools/framework_binder.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_binder.v')!)
- sources['tests/native-android-tools/androidtools/framework_parcel.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_parcel.v')!)
- sources['tests/native-android-tools/androidtools/framework_users.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_users.v')!)
- sources['tests/native-android-tools/androidtools/framework_activity_manager.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_activity_manager.v')!)
- sources['tests/native-android-tools/androidtools/framework_geofence.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_geofence.v')!)
- sources['tests/native-android-tools/androidtools/framework_device_policy.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_device_policy.v')!)
- for name in ['tls', 'tls_trust', 'connectivity', 'sqlite_params', 'sqlite_idle', 'sqlite_helper', 'location_state', 'location_value', 'gnss', 'gnss_values', 'wifi', 'time_utils', 'alarm', 'accounts', 'intent', 'clipdata', 'pending_intent', 'strict_mode', 'work_source', 'package_enumeration', 'absent_hardware', 'hardware_buffer', 'assets', 'digests', 'main_executor', 'permission_listeners'] {
-  path := 'tests/native-android-tools/androidtools/framework_' + name + '.v'
+ // Discover generators so new framework patches cannot silently miss the receipt.
+ directory := 'tests/native-android-tools/androidtools'
+ mut generator_files := os.ls(root() + '/' + directory)!.filter(it.starts_with('framework') && it.ends_with('.v'))
+ generator_files.sort()
+ for file in generator_files {
+  path := directory + '/' + file
   sources[path] = ah.Value(framework_digest(root() + '/' + path)!)
  }
  receipt := ah.Value({

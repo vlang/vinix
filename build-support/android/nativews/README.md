@@ -23,6 +23,14 @@ surface. Keyboard edits notify real TextWatchers; pointer events reach Android
 MotionEvent handlers and adapter row callbacks. Closing the WS input pipe
 delivers pause, stop and destroy callbacks before the process exits.
 
+View layers preserve the requested NONE/SOFTWARE/HARDWARE type and reject
+invalid values. Both enabled types use bitmap composition on this software
+Canvas, including subclass drawing and layer paint alpha. Storage is reused
+until resize or disable; drawing repaints each frame. Cached Canvas references
+are released on disable so ART can finalize their native targets after active
+draws finish. Pixel regressions cover overlapping content, paint replacement,
+resize and recovery after a drawing exception. GPU layer caching is not provided.
+
 `bindings.txt` explicitly selects implemented native methods. The build reads
 their descriptors from the extended framework's smali and generates exact JNI
 wrappers, including overload suffixes and UTF-16 name mangling. An absent API

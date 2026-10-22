@@ -107,7 +107,7 @@ fn ws_render_dialog(e voidptr) {
 		ws_clip(0, 0, f32(width), f32(height))
 		ws_rect(0, 0, f32(width), f32(height), 0xfffafafa)
 		args := [Value{ l: ws.canvas }]!
-		call(e, decor, c'android/view/View', c'draw', c'(Landroid/graphics/Canvas;)V', &args[0])
+		call(e, decor, c'android/view/View', c'vinixDrawLayer', c'(Landroid/graphics/Canvas;)V', &args[0])
 		ws_restore()
 	}
 }

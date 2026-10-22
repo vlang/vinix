@@ -346,7 +346,7 @@ fn ws_draw_children(e voidptr, object voidptr, canvas voidptr) {
 				ws_translate(f32(left), f32(top))
 				ws_clip(0, 0, f32(width), f32(height))
 				draw_args := [Value{ l: canvas }]!
-				call(e, child, c'android/view/View', c'draw', c'(Landroid/graphics/Canvas;)V', &draw_args[0])
+				call(e, child, c'android/view/View', c'vinixDrawLayer', c'(Landroid/graphics/Canvas;)V', &draw_args[0])
 				ws_restore()
 			}
 			pop_frame(e)
@@ -384,7 +384,7 @@ fn ws_render(e voidptr) {
 		call(e, decor, c'android/view/View', c'layout', c'(IIII)V', &layout[0])
 		ws_trace_tree(e, decor)
 		args := [Value{ l: ws.canvas }]!
-		call(e, decor, c'android/view/View', c'draw', c'(Landroid/graphics/Canvas;)V', &args[0])
+		call(e, decor, c'android/view/View', c'vinixDrawLayer', c'(Landroid/graphics/Canvas;)V', &args[0])
 		if ws.dialog != nil && !pending(e) { ws_render_dialog(e) }
 		surface.sequence++
 		C.__atomic_store_n(&surface.active, target, 3)
