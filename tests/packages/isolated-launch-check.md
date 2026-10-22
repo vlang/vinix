@@ -35,6 +35,14 @@ shadow records enter processes that shed root. A nonce/request-digest/code recei
 and EOF distinguish completion from lost output; application stdout/stderr remain
 separate from that receipt.
 
+An empty completion stream reports that the isolated application supervisor
+closed before reporting completion. A nonempty malformed receipt still reports
+its protocol validation error. `pkglaunch/streams_test.v` checks both cases with
+real half-closed sockets; neither can be accepted as a successful application exit.
+The tracked ownership suite repeats accepted and refused completion paths 1,000
+times each with no retained V allocations or descriptors, including the explicit
+synchronous request borrow used by completion validation.
+
 The host protocol fixtures cover every launch mode, literal empty/quoted/UTF-8
 arguments, count/byte bounds, a command over the authentication input limit,
 escaped 64 KiB input, invalid/noncanonical requests and bound completion codes.

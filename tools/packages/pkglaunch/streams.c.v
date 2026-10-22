@@ -157,11 +157,14 @@ pub fn receive_result(fd int, request Request) !int {
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count < 0 { return error('isolated application completion was interrupted') }
 		if count == 0 {
+			if used == 0 { return error('isolated application supervisor closed before reporting completion') }
 			// Keep the fixed receive buffer on the stack. A borrowed view passed
 			// directly to result() escapes in the manual-free compiler.
 			text := unsafe { tos(&bytes[0], used).clone() }
 			defer { unsafe { text.free() } }
-			return request.result(text)
+			// result() borrows this parameter only for its synchronous check.
+			// An implicit receiver address promotes the whole request to the heap.
+			return unsafe { &request }.result(text)
 		}
 		used += int(count)
 	}

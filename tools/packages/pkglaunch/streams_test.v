@@ -92,6 +92,25 @@ fn test_half_closed_partial_request_is_interrupted_promptly() {
 	}
 }
 
+fn test_completion_distinguishes_missing_and_malformed_receipts() {
+	request := Request{ nonce: 'd'.repeat(32), arguments: ['run', 'org.fixture.app'] }
+	for text in ['', 'invalid']! {
+		mut pair := [2]i32{}
+		assert C.socketpair(C.AF_UNIX, C.SOCK_STREAM, 0, &pair[0]) == 0
+		defer { C.close(pair[0]); C.close(pair[1]) }
+		if text.len > 0 { assert C.write(pair[1], text.str, usize(text.len)) == text.len }
+		assert C.shutdown(pair[1], C.SHUT_WR) == 0
+		if _ := receive_result(pair[0], request) { assert false }
+		else {
+			message := err.msg()
+			defer { unsafe { message.free(); err.free() } }
+			assert message == if text.len == 0 {
+				'isolated application supervisor closed before reporting completion'
+			} else { 'invalid isolated package result code' }
+		}
+	}
+}
+
 fn test_descriptor_transport_keeps_streams_separate_and_closes_on_exec() {
 	mut pair := [2]i32{}
 	assert C.socketpair(C.AF_UNIX, C.SOCK_STREAM, 0, &pair[0]) == 0
