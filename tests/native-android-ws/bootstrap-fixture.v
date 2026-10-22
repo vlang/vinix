@@ -613,6 +613,9 @@ invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0').replace('.locals 8', '.locals 10') +
 		method('protected onCreate(Landroid/os/Bundle;)V', '
 invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
+invoke-virtual {p0}, Landroid/app/Activity;->isInPictureInPictureMode()Z
+move-result v0
+if-nez v0, :bad
 const-string v0, "bootstrap-async"
 const/16 v1, 42
 invoke-static {v0, v1}, Landroid/os/Trace;->beginAsyncSection(Ljava/lang/String;I)V

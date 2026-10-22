@@ -4,6 +4,10 @@ module androidtools
 import os
 
 fn framework_startup_apis(smali string) ! {
+ // Native WS does not implement Android picture-in-picture window mode.
+ activity := smali + '/android/app/Activity.smali'
+ os.write_file(activity, framework_replace_method(os.read_file(activity)!, 'isInPictureInPictureMode()Z',
+  '.method public isInPictureInPictureMode()Z\n.locals 1\nconst/4 v0, 0\nreturn v0\n.end method')!)!
  listener := smali + '/android/hardware/SensorEventListener.smali'
  mut text := os.read_file(listener)!
  if !text.contains('onAccuracyChanged(') {
