@@ -10,13 +10,42 @@ fn install_media_probe(dir string) ! {
   method('public onRouteGrouped(Landroid/media/MediaRouter;Landroid/media/MediaRouter$RouteInfo;Landroid/media/MediaRouter$RouteGroup;I)V', 'return-void') +
   method('public onRouteAdded(Landroid/media/MediaRouter;Landroid/media/MediaRouter$RouteInfo;)V', 'new-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "unexpected media device discovery"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0') +
   method('public static check(Landroid/content/Context;)V', '
-const-string v0, "media_router"
 const-class v0, Landroid/media/MediaRouter$VolumeCallback;
 const-string v0, "media_router"
 invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
 move-result-object v0
 check-cast v0, Landroid/media/MediaRouter;
 if-eqz v0, :bad
+const-string v1, "Fixture routes"
+const/4 v2, 1
+invoke-virtual {v0, v1, v2}, Landroid/media/MediaRouter;->createRouteCategory(Ljava/lang/CharSequence;Z)Landroid/media/MediaRouter$RouteCategory;
+move-result-object v2
+invoke-virtual {v2}, Landroid/media/MediaRouter$RouteCategory;->getName()Ljava/lang/CharSequence;
+move-result-object v3
+if-ne v1, v3, :bad
+invoke-virtual {v2}, Landroid/media/MediaRouter$RouteCategory;->isGroupable()Z
+move-result v3
+if-eqz v3, :bad
+invoke-virtual {v2}, Landroid/media/MediaRouter$RouteCategory;->getSupportedTypes()I
+move-result v3
+const v4, 0x800000
+if-ne v3, v4, :bad
+const/4 v3, 0
+invoke-virtual {v2, v3}, Landroid/media/MediaRouter$RouteCategory;->getRoutes(Ljava/util/List;)Ljava/util/List;
+move-result-object v3
+invoke-interface {v3, p0}, Ljava/util/List;->add(Ljava/lang/Object;)Z
+invoke-virtual {v2, v3}, Landroid/media/MediaRouter$RouteCategory;->getRoutes(Ljava/util/List;)Ljava/util/List;
+move-result-object v4
+if-ne v3, v4, :bad
+invoke-interface {v4}, Ljava/util/List;->isEmpty()Z
+move-result v4
+if-eqz v4, :bad
+const/4 v2, 0
+invoke-virtual {v0, v1, v2}, Landroid/media/MediaRouter;->createRouteCategory(Ljava/lang/CharSequence;Z)Landroid/media/MediaRouter$RouteCategory;
+move-result-object v2
+invoke-virtual {v2}, Landroid/media/MediaRouter$RouteCategory;->isGroupable()Z
+move-result v2
+if-nez v2, :bad
 invoke-virtual {v0}, Landroid/media/MediaRouter;->getDefaultRoute()Landroid/media/MediaRouter$RouteInfo;
 move-result-object v1
 if-eqz v1, :bad

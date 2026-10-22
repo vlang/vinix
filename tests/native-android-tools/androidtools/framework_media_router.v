@@ -34,6 +34,9 @@ fn framework_media_router(smali string) ! {
  text += media_method('getSelectedRoute(I)' + route, 'const v0, 0x800000\nif-eq p1, v0, :user\n' +
   'sget-object v0, ' + router + '->defaultRoute:' + route + '\nreturn-object v0\n:user\nconst/4 v0, 0\nreturn-object v0')
  text += media_method('getRouteCount()I', 'const/4 v0, 1\nreturn v0')
+ text += media_method('createRouteCategory(Ljava/lang/CharSequence;Z)Landroid/media/MediaRouter$RouteCategory;',
+  'new-instance v0, Landroid/media/MediaRouter$RouteCategory;\n' +
+  'invoke-direct {v0, p1, p2}, Landroid/media/MediaRouter$RouteCategory;-><init>(Ljava/lang/CharSequence;Z)V\nreturn-object v0')
  text += media_method('getRouteAt(I)' + route, 'if-nez p1, :bad\nsget-object v0, ' + router + '->defaultRoute:' + route + '\n' +
   'return-object v0\n:bad\nnew-instance v0, Ljava/lang/IndexOutOfBoundsException;\n' +
   'invoke-direct {v0}, Ljava/lang/IndexOutOfBoundsException;-><init>()V\nthrow v0')
@@ -110,4 +113,21 @@ fn framework_media_router(smali string) ! {
   media_method('constructor <init>()V', 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void') +
   '.method public abstract onVolumeSetRequest(' + route + 'I)V\n.end method\n' +
   '.method public abstract onVolumeUpdateRequest(' + route + 'I)V\n.end method\n')!
+ category := 'Landroid/media/MediaRouter$RouteCategory;'
+ mut category_text := '.class public ' + category + '\n.super Ljava/lang/Object;\n' +
+  '.field private name:Ljava/lang/CharSequence;\n.field private groupable:Z\n' +
+  media_method('constructor <init>(Ljava/lang/CharSequence;Z)V',
+   'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\niput-object p1, p0, ' + category + '->name:Ljava/lang/CharSequence;\n' +
+   'iput-boolean p2, p0, ' + category + '->groupable:Z\nreturn-void')
+ for signature in ['getName()Ljava/lang/CharSequence;', 'getName(Landroid/content/Context;)Ljava/lang/CharSequence;'] {
+  category_text += media_method(signature, 'iget-object v0, p0, ' + category + '->name:Ljava/lang/CharSequence;\nreturn-object v0')
+ }
+ category_text += media_method('isGroupable()Z', 'iget-boolean v0, p0, ' + category + '->groupable:Z\nreturn v0')
+ category_text += media_method('getSupportedTypes()I', 'const v0, 0x800000\nreturn v0')
+ // Categories describe app routes, not discovered hardware. Creating one does
+ // not register it or a route. This provider currently has no app-route API.
+ category_text += media_method('getRoutes(Ljava/util/List;)Ljava/util/List;',
+  'if-nez p1, :clear\nnew-instance p1, Ljava/util/ArrayList;\ninvoke-direct {p1}, Ljava/util/ArrayList;-><init>()V\n' +
+  ':clear\ninvoke-interface {p1}, Ljava/util/List;->clear()V\nreturn-object p1')
+ os.write_file(smali + '/android/media/MediaRouter$RouteCategory.smali', category_text)!
 }
