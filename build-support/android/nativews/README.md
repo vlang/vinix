@@ -44,6 +44,8 @@ counting, description and balanced locks; GPU usages and external fences fail.
 NDK one-shot frame callbacks run on the WS main Looper with monotonic timestamps.
 Secondary NDK Loopers, refresh-rate notifications, SurfaceHolder Canvas locking
 and EGL window rendering are not implemented.
+Window refresh-rate preferences are retained as Java attributes; the native
+compositor does not currently select display modes from these hints.
 
 Handle-based JNI symbol lookup searches the library and its dependencies in
 breadth-first order, including defined weak symbols. The bootstrap APK includes

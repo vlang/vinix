@@ -8,6 +8,9 @@ fn framework_startup_apis(smali string) ! {
  activity := smali + '/android/app/Activity.smali'
  os.write_file(activity, framework_replace_method(os.read_file(activity)!, 'isInPictureInPictureMode()Z',
   '.method public isInPictureInPictureMode()Z\n.locals 1\nconst/4 v0, 0\nreturn v0\n.end method')!)!
+ // A refresh preference is advisory; WS currently keeps its fixed rate.
+ params := smali + '/android/view/WindowManager$LayoutParams.smali'
+ os.write_file(params, os.read_file(params)! + '\n.field public preferredRefreshRate:F\n')!
  listener := smali + '/android/hardware/SensorEventListener.smali'
  mut text := os.read_file(listener)!
  if !text.contains('onAccuracyChanged(') {
