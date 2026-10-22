@@ -272,8 +272,14 @@ checks ordinary-user PTY input, resize and exact saves, live generation leases
 through removal/reinstall, signed runtime update/rollback and offline cached
 reopening with retained data. Each target also refuses twelve altered evidence
 cases. The static Lua/LPeg/Vimscript build includes tree-sitter core but no
-grammar DSOs, LuaJIT, external providers or language servers. Release catalog
-selection and migration of the legacy picker remain separate work.
+grammar DSOs, LuaJIT, external providers or language servers. When the protected
+target release declaration selects `org.neovim.editor` as an explicit locked
+root, [setup acquisition](../tests/packages/signed-legacy-routing-check.md)
+opens Software's read-only signed release review. Explicit installers and stale
+legacy requests recheck this route before execution; invalid declarations or
+failed review delivery refuse fallback. Confirmation and administrator approval
+remain required. Production publisher selection and other legacy applications
+remain release work.
 
 This application store is separate from the Alpine `pkg`/`apk` system layer.
 Existing Alpine ports and special downloads still use that frontend and its

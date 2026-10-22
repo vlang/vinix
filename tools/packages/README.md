@@ -697,6 +697,11 @@ licenses, inventories and build commands. See the
 [profile](SDK.md#neovim-terminal-publisher-profile) and
 [real terminal qualification](../../tests/packages/neovim-check.md) for actual
 PTY save/resize, signed runtime update/rollback and offline cached reinstall.
+An explicit locked `org.neovim.editor` root in the protected target release
+declaration also routes legacy Neovim acquisition to Software's signed review;
+see [routing checks](../../tests/packages/signed-legacy-routing-check.md).
+This route preserves confirmation and approval and refuses fallback when the
+declaration or review delivery fails.
 
 `wine-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY` pins a reviewed
 Win64 application and explicit Wine runtime for both hosts. It checks PE32+

@@ -1654,6 +1654,18 @@ in `a83652ec9`. Retained source/tool/output pins do not establish a hermetic
 toolchain build, and these raw-initramfs fixtures do not qualify release-image
 boot or the whole advertised catalog. Publisher enrollment remains separate.
 
+An explicit `org.neovim.editor` root and matching lock in the protected format-2
+target release declaration selects signed acquisition for legacy `neovim` setup
+requests. The explicit installer and pending-request execution both recheck it
+and ask Software to show its existing read-only release review. The fixed
+same-account broker action accepts no package, path, confirmation or apply
+argument. Invalid declarations and failed delivery refuse fallback; absent
+declarations and unrelated legacy choices keep their existing behavior. The
+service validates the signed closure and still requires confirmation and
+administrator approval. See [routing qualification](../../tests/packages/signed-legacy-routing-check.md)
+for host behavior, sanitizer coverage and both target builds; this does not
+enroll a publisher or qualify a new native routing UI workflow.
+
 ### Wine Win64 publisher profile
 
 `wine-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY` inventories a
