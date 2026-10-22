@@ -12,11 +12,18 @@ module gpucore
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include "gpu_egl_abi.h"
 
 @[typedef]
 struct C.vinix_gpu_egl_attribute {}
+struct C.stat {
+    st_mode u32
+    st_dev u64
+    st_ino u64
+    st_rdev u64
+}
 $if gpu_presenter_enabled ? {
     #include <EGL/egl.h>
     #include <EGL/eglext.h>
@@ -32,6 +39,8 @@ fn C.strstr(&char, &char) &char
 fn C.open(&char, i32, ...voidptr) i32
 fn C.close(i32) i32
 fn C.ioctl(i32, usize, ...voidptr) i32
+fn C.stat(&char, &C.stat) i32
+fn C.fstat(i32, &C.stat) i32
 fn C.calloc(usize, usize) voidptr
 fn C.malloc(usize) voidptr
 fn C.free(voidptr)
@@ -104,10 +113,30 @@ __global presenter_vertices = [f32(-1), f32(-1), f32(0), f32(0), f32(1), f32(-1)
 
 @[export: 'vinix_desktop_set_console_mode']
 pub fn console_mode(graphics i32) {
+    mode := i32(if graphics != 0 { 1 } else { 0 })
     fd := C.open(c'/dev/console', C.O_RDWR | C.O_CLOEXEC)
-    if fd < 0 { return }
-    C.ioctl(fd, usize(0x4b3a), i32(if graphics != 0 { 1 } else { 0 }))
-    C.close(fd)
+    if fd >= 0 {
+        C.ioctl(fd, usize(0x4b3a), mode)
+        C.close(fd)
+        return
+    }
+    // An ordinary login inherits init's console, but cannot reopen its
+    // root-owned pathname. The kernel checks seat ownership on every ioctl,
+    // including descriptors inherited from init, so this remains revocable.
+    // Borrow only the actual console: redirected streams and other terminals
+    // must never receive KDSETMODE. Inherited descriptors belong to the caller.
+    mut console := C.stat{}
+    if C.stat(c'/dev/console', &console) != 0
+        || (u32(console.st_mode) & u32(C.S_IFMT)) != u32(C.S_IFCHR) { return }
+    for stream := i32(0); stream < 3; stream++ {
+        mut inherited := C.stat{}
+        if C.fstat(stream, &inherited) != 0
+            || (u32(inherited.st_mode) & u32(C.S_IFMT)) != u32(C.S_IFCHR)
+            || inherited.st_dev != console.st_dev || inherited.st_ino != console.st_ino
+            || inherited.st_rdev != console.st_rdev { continue }
+        C.ioctl(stream, usize(0x4b3a), mode)
+        return
+    }
 }
 
 @[export: 'vinix_gpu_present_startup_stage']

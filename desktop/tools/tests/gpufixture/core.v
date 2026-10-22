@@ -6,10 +6,12 @@ module gpufixture
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include "gpu_egl_abi.h"
 
 @[typedef]
 struct C.vinix_gpu_egl_attribute {}
+struct C.stat {}
 fn C.printf(&char, ...voidptr) i32
 fn C.fprintf(voidptr, &char, ...voidptr) i32
 fn C.abort()
@@ -116,6 +118,20 @@ pub fn open(path &char, flags i32) i32 {
 pub fn close(fd i32) i32 {
  check((fd == 81 || fd == 82) && fixture_descriptors > 0, c'close descriptor')
  fixture_descriptors--; trace(c'close', fd, 0); return 0
+}
+// Keep the frozen C/V comparison's denied-open case isolated from the host's
+// real console. Inherited-console coverage lives in consolefixture.
+@[export: 'gpf_stat']
+pub fn console_stat(path &char, state &C.stat) i32 {
+ check(C.strcmp(path, c'/dev/console') == 0 && fixture_failure == 28, c'console fallback stat')
+ _ = state
+ return -1
+}
+@[export: 'gpf_fstat']
+pub fn inherited_stat(fd i32, state &C.stat) i32 {
+ _ = fd; _ = state
+ check(false, c'inherited console examined after failed stat')
+ return -1
 }
 fn ioctl_model(fd i32, request usize, mode i32) i32 {
  check(fd == 82 && request == 0x4b3a && mode == 1, c'graphics console handoff')

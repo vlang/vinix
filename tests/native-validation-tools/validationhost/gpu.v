@@ -99,7 +99,7 @@ pub fn exercise_gpu(root string, state string, headers string, compiler string) 
 		'-fno-omit-frame-pointer']
 	if os.user_os() == 'macos' { flags << ['-arch', if arm { 'arm64' } else { 'x86_64' }] }
 	if os.user_os() == 'macos' { flags << '-Wno-non-literal-null-conversion' }
-	remaps := ['malloc', 'calloc', 'free', 'getenv', 'open', 'close', 'ioctl'].map('-D' + it + '=gpf_' + it)
+	remaps := ['malloc', 'calloc', 'free', 'getenv', 'open', 'close', 'ioctl', 'stat', 'fstat'].map('-D' + it + '=gpf_' + it)
 	driver.command([...flags, '-include', api, '-c', fixture, '-o', destination + '/fixture.o'])!
 	mut objects := [destination + '/fixture.o']
 	if arm {
