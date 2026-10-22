@@ -87,6 +87,9 @@ android/os/SystemClock|currentThreadTimeMicro|return ws_nanos(3) / 1000
 android/os/Process|is64Bit|return u8(sizeof(voidptr) == 8)
 android/os/Process|getElapsedCpuTime|return ws_nanos(2) / 1000000
 android/os/Process|myUid|return i32(C.getuid())
+android/os/Process|getThreadPriority|return ws_thread_priority(e,p0)
+android/os/Process|setThreadPriority(I)V|ws_set_thread_priority(e,0,p0)
+android/os/Process|setThreadPriority(II)V|ws_set_thread_priority(e,p0,p1)
 android/app/AppOpsManager|checkOpNoThrow|return ws_appops_check(e,p0,p1,p2)
 android/app/AppOpsManager|checkPackage|ws_appops_package(e,p0,p1)
 android/app/AppOpsManager|noteProxyOpNoThrow|return ws_appops_check(e,p0,i32(C.getuid()),p1)

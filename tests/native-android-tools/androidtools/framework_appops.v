@@ -30,6 +30,11 @@ fn framework_appops(smali string) ! {
  os.write_file(path, text)!
  process := smali + '/android/os/Process.smali'
  os.write_file(process, framework_replace_method(os.read_file(process)!, 'myUid()I', '.method public static native myUid()I\n.end method')!)!
+ mut process_text := os.read_file(process)!
+ for signature in ['getThreadPriority(I)I', 'setThreadPriority(I)V', 'setThreadPriority(II)V'] {
+  process_text = framework_replace_method(process_text, signature, '.method public static native ' + signature + '\n.end method')!
+ }
+ os.write_file(process, process_text)!
  // All APK code in this backend executes as the launching Unix user. Keep
  // package metadata consistent with the actual process instead of UID -1.
  pkg := smali + '/android/content/pm/PackageParser$Package.smali'

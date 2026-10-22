@@ -282,6 +282,66 @@ invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0'
 }
 
+fn priority_checks() string {
+	return 'invoke-static {}, Landroid/os/Process;->myTid()I
+move-result v0
+invoke-static {v0}, Landroid/os/Process;->getThreadPriority(I)I
+move-result v1
+const/4 v2, 0
+invoke-static {v2}, Landroid/os/Process;->getThreadPriority(I)I
+move-result v3
+if-ne v1, v3, :bad
+const/4 v2, -1
+invoke-static {v2}, Landroid/os/Process;->setThreadPriority(I)V
+invoke-static {v0}, Landroid/os/Process;->getThreadPriority(I)I
+move-result v3
+if-ne v2, v3, :bad
+invoke-static {v0, v1}, Landroid/os/Process;->setThreadPriority(II)V
+const/16 v2, 19
+invoke-static {v0, v2}, Landroid/os/Process;->setThreadPriority(II)V
+invoke-static {v0}, Landroid/os/Process;->getThreadPriority(I)I
+move-result v3
+if-ne v2, v3, :bad
+invoke-static {v1}, Landroid/os/Process;->setThreadPriority(I)V
+const v2, 0x7fffffff
+:missing_start
+invoke-static {v2}, Landroid/os/Process;->getThreadPriority(I)I
+:missing_end
+.catch Ljava/lang/IllegalArgumentException; {:missing_start .. :missing_end} :missing_ok
+goto :bad
+:missing_ok
+move-exception v3
+:set_missing_start
+invoke-static {v2, v1}, Landroid/os/Process;->setThreadPriority(II)V
+:set_missing_end
+.catch Ljava/lang/IllegalArgumentException; {:set_missing_start .. :set_missing_end} :set_missing_ok
+goto :bad
+:set_missing_ok
+move-exception v3
+const/16 v2, 20
+invoke-static {v2}, Landroid/os/Process;->setThreadPriority(I)V
+invoke-static {v0}, Landroid/os/Process;->getThreadPriority(I)I
+move-result v3
+const/16 v2, 19
+if-ne v2, v3, :bad
+const/16 v2, -21
+invoke-static {v0, v2}, Landroid/os/Process;->setThreadPriority(II)V
+invoke-static {v0}, Landroid/os/Process;->getThreadPriority(I)I
+move-result v3
+const/16 v2, -20
+if-ne v2, v3, :bad
+invoke-static {v1}, Landroid/os/Process;->setThreadPriority(I)V
+invoke-static {v0}, Landroid/os/Process;->getThreadPriority(I)I
+move-result v2
+if-ne v1, v2, :bad
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "thread priority read, write, minus-one, missing TID and clamping"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+}
+
 fn local_binder_fixture() string {
 	return '.class public Lorg/vinix/service/LocalBinder;\n.super Landroid/os/Binder;\n.implements Landroid/os/IInterface;\n.field private caller:Ljava/lang/Thread;\n' +
 		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/os/Binder;-><init>()V
@@ -724,11 +784,48 @@ invoke-direct {v0}, Landroid/os/Binder;-><init>()V
 return-object v0'))!
 	os.write_file(out + '/client/smali/org/vinix/service/Main.smali', '.class public Lorg/vinix/service/Main;\n.super Landroid/app/Activity;\n.implements Landroid/content/ServiceConnection;\n.implements Ljava/util/concurrent/Executor;\n.implements Ljava/lang/Runnable;\n' +
 		'.field private label:Landroid/widget/TextView;\n.field private callbacks:I\n.field private worker:Landroid/os/Handler;\n' +
+		'.field private priorityMain:I\n.field private priorityWorker:I\n.field private priorityOriginal:I\n' +
 		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/app/Activity;-><init>()V\nreturn-void') +
 		method('private checkComponents()V', component_checks()) +
 		method('private checkBinder()V', binder_checks()) +
 		method('private checkParcel()V', parcel_checks()) +
 		method('private checkUser()V', user_checks()) +
+		method('private checkPriority()V', priority_checks()) +
+		method('private checkWorkerPriority()V', '
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkPriority()V
+invoke-static {}, Landroid/os/Process;->myTid()I
+move-result v0
+iput v0, p0, Lorg/vinix/service/Main;->priorityWorker:I
+invoke-static {v0}, Landroid/os/Process;->getThreadPriority(I)I
+move-result v1
+iput v1, p0, Lorg/vinix/service/Main;->priorityOriginal:I
+const/4 v1, 7
+invoke-static {v1}, Landroid/os/Process;->setThreadPriority(I)V
+return-void') +
+		method('private checkPriorityIsolation()V', '
+const/4 v0, 0
+invoke-static {v0}, Landroid/os/Process;->getThreadPriority(I)I
+move-result v0
+iget v1, p0, Lorg/vinix/service/Main;->priorityMain:I
+if-ne v0, v1, :bad
+iget v0, p0, Lorg/vinix/service/Main;->priorityWorker:I
+invoke-static {v0}, Landroid/os/Process;->getThreadPriority(I)I
+move-result v1
+const/4 v2, 7
+if-ne v1, v2, :bad
+const/16 v2, 12
+invoke-static {v0, v2}, Landroid/os/Process;->setThreadPriority(II)V
+invoke-static {v0}, Landroid/os/Process;->getThreadPriority(I)I
+move-result v1
+if-ne v1, v2, :bad
+iget v1, p0, Lorg/vinix/service/Main;->priorityOriginal:I
+invoke-static {v0, v1}, Landroid/os/Process;->setThreadPriority(II)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "per-thread priority isolation and remote TID"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
 		method('private checkStorage(Landroid/content/Context;)V', storage_checks()) +
 		method('private checkDirectories(Landroid/content/Context;)V', directory_checks()) +
 		method('public onCreate(Landroid/os/Bundle;)V', '
@@ -737,6 +834,11 @@ invoke-direct {p0}, Lorg/vinix/service/Main;->checkComponents()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkBinder()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkParcel()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkUser()V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkPriority()V
+const/4 v0, 0
+invoke-static {v0}, Landroid/os/Process;->getThreadPriority(I)I
+move-result v0
+iput v0, p0, Lorg/vinix/service/Main;->priorityMain:I
 new-instance v0, Landroid/widget/TextView;
 invoke-direct {v0, p0}, Landroid/widget/TextView;-><init>(Landroid/content/Context;)V
 iput-object v0, p0, Lorg/vinix/service/Main;->label:Landroid/widget/TextView;
@@ -792,6 +894,7 @@ if-ne v0, v1, :bad
 goto :identity
 :executor
 if-eq v0, v1, :bad
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkWorkerPriority()V
 invoke-static {}, Ljava/lang/Thread;->currentThread()Ljava/lang/Thread;
 move-result-object v0
 invoke-virtual {v0}, Ljava/lang/Thread;->getName()Ljava/lang/String;
@@ -843,11 +946,12 @@ const-string v1, "companion service binding callback"
 invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0') +
 		method('public run()V', '
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkPriorityIsolation()V
 iget-object v0, p0, Lorg/vinix/service/Main;->label:Landroid/widget/TextView;
 const-string v1, "Companion service startup passed"
 invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread provider-context provider-resources attach-once bind-executor-thread component-package component-metadata component-missing package-data package-files package-preferences split-info-copy local-binder-interface local-binder-identity local-binder-transact local-binder-exception user-identity system-user uid-ranges parcel-binder-identity parcel-binder-copy parcel-binder-lifetime parcel-binder-callback custom-directory cache-directory directory-isolation directory-mode directory-name"
+const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread provider-context provider-resources attach-once bind-executor-thread component-package component-metadata component-missing package-data package-files package-preferences split-info-copy local-binder-interface local-binder-identity local-binder-transact local-binder-exception user-identity system-user uid-ranges parcel-binder-identity parcel-binder-copy parcel-binder-lifetime parcel-binder-callback custom-directory cache-directory directory-isolation directory-mode directory-name thread-priority priority-minus-one priority-errors priority-isolation priority-remote-tid"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void'))!
 	for name in ['client', 'companion'] {
