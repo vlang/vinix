@@ -3,7 +3,7 @@ module startupfixture
 
 import os
 
-fn install_connectivity_probe(dir string) ! {
+pub fn install_connectivity_probe(dir string) ! {
  probe := 'Lorg/vinix/bootstrap/ConnectivityProbe;'
  manager := 'Lorg/vinix/bootstrap/TestConnectivity;'
  cm := 'Landroid/net/ConnectivityManager;'
@@ -208,7 +208,7 @@ invoke-virtual {v1, v2}, ${caps}->hasCapability(I)Z
 move-result v2
 if-nez v2, :bad
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "BOOTSTRAP-CONNECTIVITY-PASS kernel-route offline snapshots ordering handler capability-change filtering loss unregister reentrant-cancel"
+const-string v1, "BOOTSTRAP-CONNECTIVITY-PASS kernel-route offline snapshots ordering handler capability-change filtering loss unregister reentrant-cancel background-policy"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void
 :again
@@ -223,6 +223,21 @@ return-void
  mut check := '
 new-instance v0, ${manager}
 invoke-direct {v0}, ${manager}-><init>()V
+invoke-virtual {v0}, ${cm}->getRestrictBackgroundStatus()I
+move-result v1
+sget v2, ${cm}->RESTRICT_BACKGROUND_STATUS_DISABLED:I
+const/4 v3, 1
+if-ne v2, v3, :bad
+if-ne v1, v2, :bad
+sget v2, ${cm}->RESTRICT_BACKGROUND_STATUS_WHITELISTED:I
+const/4 v3, 2
+if-ne v2, v3, :bad
+sget v2, ${cm}->RESTRICT_BACKGROUND_STATUS_ENABLED:I
+const/4 v3, 3
+if-ne v2, v3, :bad
+invoke-virtual {v0}, ${cm}->getBackgroundDataSetting()Z
+move-result v1
+if-eqz v1, :bad
 invoke-virtual {v0}, ${cm}->getActiveNetwork()${network}
 move-result-object v1
 if-nez v1, :bad
@@ -235,6 +250,10 @@ array-length v1, v1
 if-nez v1, :bad
 const v1, 0x10403
 iput v1, v0, ${manager}->state:I
+invoke-virtual {v0}, ${cm}->getRestrictBackgroundStatus()I
+move-result v1
+const/4 v2, 1
+if-ne v1, v2, :bad
 invoke-virtual {v0}, ${cm}->getActiveNetwork()${network}
 move-result-object v1
 invoke-virtual {v0}, ${cm}->getActiveNetwork()${network}

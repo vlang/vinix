@@ -367,6 +367,8 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 			ws_failure(e, c'ANDROID-WS-FAIL native digests')
 			return 1
 		}
+		static_void(e, c'com/android/org/conscrypt/OpenSSLProvider', c'install', c'()V', nil)
+		if ws_failure(e, c'ANDROID-WS-FAIL TLS provider adapter') { return 1 }
 		ws_static_int(e, c'android/view/Display', c'window_width', ws.width)
 		ws_static_int(e, c'android/view/Display', c'window_height', ws.height)
 		static_void(e, c'android/os/Looper', c'prepareMainLooper', c'()V', nil)

@@ -219,9 +219,22 @@ default route; validation and unmetered access are not advertised. Link snapshot
 include the interface name, MTU and addresses. Local ContentProviderClient handles resolve
 registered authorities, dispatch type/call operations and release their provider
 reference on close. Uninstalled service providers return null.
+`ConnectivityManager.getRestrictBackgroundStatus()` reports disabled: Vinix
+has no Data Saver policy. This is independent of the metered-link classification.
 ART receives the private runtime's generated JKS path, type and password before
 WolfJSSE creates its default SSLContext. Native builds also carry `cacerts` into
 the APK suite's staged runtime, including when its baseline image is older.
+An Android `OpenSSLProvider` adapter exposes the installed wolfJSSE services as
+`VinixTLS` so Android clients can discover its existing ALPN socket methods.
+It is appended to the provider list, preserving provider precedence, default
+trust managers and cryptography implementations.
+`tests/native-android-ws/network-tls-fixture.v` takes the same five arguments
+as the HTTPS generator below. Run it with at least 100 startup seconds and
+Internet access. It waits for the kernel default route, checks background
+policy and callback contracts, and negotiates real TLS `h2` with Google through
+the adapter. Require both `BOOTSTRAP-CONNECTIVITY-PASS` (including
+`background-policy`) and `TLS-ALPN-PASS`; the latter checks idempotent provider
+installation, default certificate trust and correct/wrong hostname verification.
 `tests/native-android-ws/https-fixture.v` builds a separate network regression
 APK from an existing bootstrap fixture directory. Its arguments are `OUTPUT
 FIXTURE_DIR SMALI_TOOLS JAVA APKSIGNER`. Run it as `org.vinix.bootstrap` with at

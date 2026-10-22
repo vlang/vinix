@@ -20,6 +20,9 @@ fn framework_connectivity(smali string) ! {
  handler := 'Landroid/os/Handler;'
  registry := 'Ljava/util/concurrent/ConcurrentHashMap;'
  mut text := '.class public ${cm}\n.super Ljava/lang/Object;\n.field private static callbacks:${registry}\n'
+ for index, name in ['DISABLED', 'WHITELISTED', 'ENABLED'] {
+  text += '.field public static final RESTRICT_BACKGROUND_STATUS_${name}:I = ${index + 1}\n'
+ }
  text += connectivity_method('static constructor <clinit>()V', 'new-instance v0, ${registry}\ninvoke-direct {v0}, ${registry}-><init>()V\nsput-object v0, ${cm}->callbacks:${registry}\nreturn-void')
  text += connectivity_method('public constructor <init>()V', 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void')
  text += '.method protected native nativeGetNetworkAvailable()Z\n.end method\n.method protected native nativeGetNetworkState()I\n.end method\n'
@@ -70,6 +73,9 @@ return-object v0')
  for signature in ['isActiveNetworkMetered()Z', 'getBackgroundDataSetting()Z'] {
   text += connectivity_method('public ${signature}', 'const/4 v0, 1\nreturn v0')
  }
+ // Vinix has no Data Saver policy or background network restriction. This
+ // policy is independent of the conservative metered-link classification.
+ text += connectivity_method('public getRestrictBackgroundStatus()I', 'const/4 v0, 1\nreturn v0')
  text += connectivity_method('public getDefaultProxy()Landroid/net/ProxyInfo;', 'const/4 v0, 0\nreturn-object v0')
  // Reports cannot promote an unvalidated link: validation is not implemented.
  text += connectivity_method('public reportNetworkConnectivity(${network}Z)V', 'return-void')
