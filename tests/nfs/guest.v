@@ -150,9 +150,9 @@ fn mount_share(source string, retry_network bool) ! {
 	started := time.sys_mono_now()
 	limit := if retry_network { 3 } else { 1 }
 	for attempt in 1 .. limit + 1 {
-		rc := unsafe { C.mount(source.str, c'/mnt', c'nfs', 0, mount_options.str) }
+		rc := unsafe { C.mount(source.str, c'/mnt/nfs', c'nfs', 0, mount_options.str) }
 		saved := if rc == 0 { 0 } else { C.errno }
-		log_line('mount-call source=${source} rc=${rc} errno=${saved} attempt=${attempt}')
+		log_line('mount-call source=${source} target=/mnt/nfs rc=${rc} errno=${saved} attempt=${attempt}')
 		if rc == 0 { return }
 		transient := saved in [C.ENETUNREACH, C.EHOSTUNREACH, C.ENETDOWN, C.ETIMEDOUT, C.ECONNREFUSED]
 		if !transient || attempt == limit {
@@ -195,20 +195,20 @@ fn server_readonly(source string) ! {
 }
 
 fn host_edit() ! {
-	ensure_absent('/mnt/guest-ready')!
-	ensure_absent('/mnt/host-updated.txt')!
-	fd := open_read('/mnt/host-small.txt')!
+	ensure_absent('/mnt/nfs/guest-ready')!
+	ensure_absent('/mnt/nfs/host-updated.txt')!
+	fd := open_read('/mnt/nfs/host-small.txt')!
 	defer { C.close(fd) }
 	before := read_text_fd(fd)!
 	require(before == 'host-edit-v1\n', 'host-small.txt must contain exact initial fixture')!
 	log_line('host-small initial bytes=${before.len} text_hex=${before.bytes().hex()} sha256=${sha256.hexhash(before)}')
-	write_text('/mnt/guest-ready', 'ready\n')!
+	write_text('/mnt/nfs/guest-ready', 'ready\n')!
 	log_line('guest-ready PASS waiting_seconds=90')
 	started := time.sys_mono_now()
 	deadline := started + u64(90 * time.second)
 	mut seen := false
 	for time.sys_mono_now() < deadline {
-		marker := unsafe { C.open(c'/mnt/host-updated.txt', C.O_RDONLY) }
+		marker := unsafe { C.open(c'/mnt/nfs/host-updated.txt', C.O_RDONLY) }
 		if marker >= 0 {
 			close_checked(marker)!
 			seen = true
@@ -252,7 +252,7 @@ fn hash_file(path string) !StreamHash {
 
 fn host_big() ! {
 	started := time.sys_mono_now()
-	input := open_read('/mnt/host-big.bin')!
+	input := open_read('/mnt/nfs/host-big.bin')!
 	output := create_file('/tmp/guest-copy.bin') or {
 		C.close(input)
 		return err
@@ -278,7 +278,7 @@ fn host_big() ! {
 	// Complete the same-file roundtrip as well as testing a distinct guest source.
 	back_started := time.sys_mono_now()
 	back_input := open_read('/tmp/guest-copy.bin')!
-	back_output := create_file('/mnt/host-roundtrip.bin') or {
+	back_output := create_file('/mnt/nfs/host-roundtrip.bin') or {
 		C.close(back_input)
 		return err
 	}
@@ -292,7 +292,7 @@ fn host_big() ! {
 		return err
 	}
 	close_checked(back_output)!
-	readback := hash_file('/mnt/host-roundtrip.bin')!
+	readback := hash_file('/mnt/nfs/host-roundtrip.bin')!
 	require(returned.bytes == big_size && returned.sha256 == expected && readback.bytes == big_size
 		&& readback.sha256 == expected, 'host same-file roundtrip size/SHA256 mismatch')!
 	log_line('host-roundtrip PASS bytes=${returned.bytes} sha256=${readback.sha256} elapsed_ms=${(time.sys_mono_now() - back_started) / u64(time.millisecond)}')
@@ -337,7 +337,7 @@ fn guest_big() ! {
 	close_checked(fd)!
 	expected := hash.sum([]).hex()
 	input := open_read('/tmp/guest-source.bin')!
-	output := create_file('/mnt/guest-big.bin') or {
+	output := create_file('/mnt/nfs/guest-big.bin') or {
 		C.close(input)
 		return err
 	}
@@ -355,35 +355,35 @@ fn guest_big() ! {
 	write_ms := (time.sys_mono_now() - copy_started) / u64(time.millisecond)
 	require(copied.bytes == big_size && copied.sha256 == expected,
 		'local-to-share copy source size/SHA-256 mismatch')!
-	observed := hash_file('/mnt/guest-big.bin')!
+	observed := hash_file('/mnt/nfs/guest-big.bin')!
 	require(observed.bytes == big_size && observed.sha256 == expected,
 		'guest-big.bin readback size/SHA-256 mismatch')!
 	log_line('guest-big PASS bytes=${big_size} generated_sha256=${expected} readback_sha256=${observed.sha256} write_ms=${write_ms} elapsed_ms=${(time.sys_mono_now() - started) / u64(time.millisecond)}')
 }
 
 fn directory_ops() ! {
-	if C.mkdir(c'/mnt/m17b-directory', 0o755) != 0 {
-		return syscall_error('mkdir /mnt/m17b-directory')
+	if C.mkdir(c'/mnt/nfs/m17b-directory', 0o755) != 0 {
+		return syscall_error('mkdir /mnt/nfs/m17b-directory')
 	}
-	write_text('/mnt/m17b-directory/before.txt', small_text)!
-	if C.rename(c'/mnt/m17b-directory/before.txt', c'/mnt/m17b-directory/after.txt') != 0 {
+	write_text('/mnt/nfs/m17b-directory/before.txt', small_text)!
+	if C.rename(c'/mnt/nfs/m17b-directory/before.txt', c'/mnt/nfs/m17b-directory/after.txt') != 0 {
 		return syscall_error('rename before.txt to after.txt')
 	}
-	ensure_absent('/mnt/m17b-directory/before.txt')!
-	require(read_text('/mnt/m17b-directory/after.txt')! == small_text,
+	ensure_absent('/mnt/nfs/m17b-directory/before.txt')!
+	require(read_text('/mnt/nfs/m17b-directory/after.txt')! == small_text,
 		'renamed file contents differ')!
-	names := os.ls('/mnt/m17b-directory')!
+	names := os.ls('/mnt/nfs/m17b-directory')!
 	require('after.txt' in names && 'before.txt' !in names,
 		'directory listing does not reflect rename')!
 	log_line('directory-list PASS names=${names.join(',')}')
-	if C.unlink(c'/mnt/m17b-directory/after.txt') != 0 {
+	if C.unlink(c'/mnt/nfs/m17b-directory/after.txt') != 0 {
 		return syscall_error('unlink after.txt')
 	}
-	ensure_absent('/mnt/m17b-directory/after.txt')!
-	if C.rmdir(c'/mnt/m17b-directory') != 0 {
+	ensure_absent('/mnt/nfs/m17b-directory/after.txt')!
+	if C.rmdir(c'/mnt/nfs/m17b-directory') != 0 {
 		return syscall_error('rmdir m17b-directory')
 	}
-	ensure_absent('/mnt/m17b-directory')!
+	ensure_absent('/mnt/nfs/m17b-directory')!
 	log_line('directory-ops PASS mkdir create rename unlink rmdir')
 }
 
@@ -391,7 +391,7 @@ fn directory_ops() ! {
 // shutdown reads real uncached file content, rather than a negative lookup or a
 // cached inode attribute. No NFS calls occur during the eight-second quiet period.
 fn stopped_server() ! {
-	fd := open_read('/mnt/m17b-stop-probe.bin')!
+	fd := open_read('/mnt/nfs/m17b-stop-probe.bin')!
 	log_line('stop-server-ready quiet_seconds=2 wait_seconds=8 retained_rw_mount=1')
 	time.sleep(8 * time.second)
 	mut buffer := []u8{len: 4096}
@@ -418,7 +418,7 @@ fn qualify() ! {
 	started := time.sys_mono_now()
 	require(os.args.len == 1, 'this static PID1 accepts no arguments')!
 	require(C.getuid() == 0 && C.geteuid() == 0, 'AUTH_SYS qualification requires uid=0 euid=0')!
-	for path in ['/mnt', '/mnt-ro', '/mnt-negative', '/tmp', '/etc'] {
+	for path in ['/mnt/nfs', '/mnt-ro', '/mnt-negative', '/tmp', '/etc'] {
 		require(os.is_dir(path), 'initramfs missing ${path}')!
 	}
 	// /etc/hosts includes fecv3, but raw IP avoids assuming kernel hosts support.
@@ -437,30 +437,30 @@ fn qualify() ! {
 	require(ready, 'DHCP resolver publication timeout after 30 seconds')!
 	log_line('network-ready PASS elapsed_ms=${(time.sys_mono_now() - started) / u64(time.millisecond)}')
 	mount_share(sources[0], true)!
-	log_line('mount PASS source=${sources[0]} fs=nfs flags=0 auth=AUTH_SYS uid=0 euid=0 options=${mount_options} hostname_mode=${if sources[0].starts_with('10.0.2.2:') {
+	log_line('mount PASS source=${sources[0]} target=/mnt/nfs fs=nfs flags=0 auth=AUTH_SYS uid=0 euid=0 options=${mount_options} hostname_mode=${if sources[0].starts_with('10.0.2.2:') {
 		'raw-ip-hosts-unproven'
 	} else {
 		'configured-hostname'
 	}}')
-	write_text('/mnt/guest-small.txt', small_text)!
-	require(read_text('/mnt/guest-small.txt')! == small_text, 'guest-small.txt readback mismatch')!
+	write_text('/mnt/nfs/guest-small.txt', small_text)!
+	require(read_text('/mnt/nfs/guest-small.txt')! == small_text, 'guest-small.txt readback mismatch')!
 	log_line('guest-small PASS bytes=${small_text.len} sha256=${sha256.hexhash(small_text)}')
 	host_edit()!
 	directory_ops()!
 	host_big()!
 	guest_big()!
-	root_names := os.ls('/mnt')!
+	root_names := os.ls('/mnt/nfs')!
 	for name in ['host-small.txt', 'guest-small.txt', 'host-big.bin', 'guest-big.bin',
 		'host-roundtrip.bin', 'guest-ready', 'host-updated.txt', 'm17b-stop-probe.bin'] {
 		require(name in root_names, 'root listing missing ${name}')!
 	}
 	log_line('root-list PASS names=${root_names.join(',')}')
-	if C.umount(c'/mnt') != 0 { return syscall_error('umount before remount') }
+	if C.umount(c'/mnt/nfs') != 0 { return syscall_error('umount before remount') }
 	log_line('umount PASS rc=0 errno=0')
 	mount_share(sources[0], false)!
-	require(read_text('/mnt/guest-small.txt')! == small_text, 'remount lost guest-small.txt')!
-	require(read_text('/mnt/guest-ready')! == 'ready\n', 'remount lost ready marker')!
-	remount_hash := hash_file('/mnt/host-roundtrip.bin')!
+	require(read_text('/mnt/nfs/guest-small.txt')! == small_text, 'remount lost guest-small.txt')!
+	require(read_text('/mnt/nfs/guest-ready')! == 'ready\n', 'remount lost ready marker')!
+	remount_hash := hash_file('/mnt/nfs/host-roundtrip.bin')!
 	require(remount_hash.bytes == big_size, 'remount roundtrip length mismatch')!
 	log_line('remount PASS marker_sha256=${sha256.hexhash(small_text)} roundtrip_sha256=${remount_hash.sha256}')
 	// Independent mountpoints preserve the real RW mount until shutdown testing.

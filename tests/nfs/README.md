@@ -1,7 +1,7 @@
 # Mission17B disposable NFSv3 qualification tools
 
 `guest.v` and `rig.v` are independent V programs. Compile each file separately.
-The guest is a static Linux ABI PID 1 that calls libc `mount`, `open`, `read`,
+The RW mountpoint is `/mnt/nfs`. The guest is a static Linux ABI PID 1 that calls libc `mount`, `open`, `read`,
 `write`, `lseek`, `mkdir`, `rename`, `unlink`, `rmdir`, and `umount`; directory
 enumeration uses V's libc-backed `os.ls`. There is no guest shell, mount helper,
 Python, PVE deployment, host service management, or persistent guest disk.
@@ -116,7 +116,7 @@ configured source. There is no silent hostname-to-IP fallback.
 PID 1 mounts devtmpfs if needed, redirects stdout/stderr to `/dev/com1`, checks
 uid=0/euid=0, and waits up to 30 seconds for the kernel DHCP publication of a
 nameserver in `/etc/resolv.conf`. Every NFS mount is a real libc
-`mount(source, target, "nfs", 0, "soft,rsize=65536,wsize=65536")` call. The
+`mount(source, target, "nfs", 0, "soft,rsize=65536,wsize=65536")` call, with the RW target `/mnt/nfs`. The
 first RW mount retries only network reachability/connection errors, at most
 three attempts with one-second pauses. The remount and both other export mounts
 each get exactly one attempt. All mount calls report rc/errno; successful

@@ -171,7 +171,7 @@ fn verify(out string, share string, readonly string) ! {
 	sources := os.read_file(out + '/m17b-sources.txt')!.split_into_lines()
 	check(sources.len == 3, 'source manifest malformed')!
 	mount := receipt(serial, 'mount PASS')!
-	check(field(mount, 'source')! == sources[0] && field(mount, 'fs')! == 'nfs'
+	check(field(mount, 'source')! == sources[0] && field(mount, 'target')! == '/mnt/nfs' && field(mount, 'fs')! == 'nfs'
 		&& field(mount, 'flags')! == '0' && field(mount, 'auth')! == 'AUTH_SYS'
 		&& field(mount, 'uid')! == '0' && field(mount, 'euid')! == '0'
 		&& field(mount, 'options')! == 'soft,rsize=65536,wsize=65536', 'mount receipt differs')!
@@ -322,7 +322,7 @@ fn build_iso(kernel string, init string, template string, out string, sources []
 	}
 	root := out + '/m17b-root'
 	stage := out + '/m17b-iso-root'
-	for dir in ['sbin', 'dev', 'proc', 'mnt', 'mnt-ro', 'mnt-negative', 'tmp', 'etc'] {
+	for dir in ['sbin', 'dev', 'proc', 'mnt/nfs', 'mnt-ro', 'mnt-negative', 'tmp', 'etc'] {
 		os.mkdir_all(root + '/' + dir)!
 	}
 	for dir in ['boot', 'EFI/BOOT'] {
