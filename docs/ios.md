@@ -16947,21 +16947,53 @@ supplies the declaration and associated defaults; synthesis of arbitrary
 generic/resilient conformance tables remains unsupported. The inspection
 executes no application code.
 
-The launch probe now stops at the required Swift core import
-`_$ss28CustomDebugStringConvertibleMp`. This remains a linking failure before
-application entry; Fortnite is not playable.
+`_$ss28CustomDebugStringConvertibleMp` now exports the canonical Swift
+`CustomDebugStringConvertible` declaration. It has one instance
+`debugDescription` getter, with no generic signature requirements, associated
+types or default getter implementation. Its resilient witness-table base and
+getter aliases identify the measured offsets within the same declaration.
+The page is read-only and retires after workers drain, before Array releases
+the borrowed Swift module descriptor.
+
+The fixture compares the descriptor and aliases with Apple's runtime and checks
+page permissions, concurrent descriptor/alias/dependency-first resolution,
+rejection without allocation and two drained/unmapped lifetimes:
+
+```sh
+v run tests/ios/native-checks.v build-swift-custom-debug
+```
+
+Evidence is retained in `build/ios/fortnite/custom-debug-checks`. The
+CustomDebugStringConvertible, protocol and CaseIterable fixtures passed normal
+and deterministic ASan/UBSan host runs. The ARM64 CustomDebugStringConvertible
+fixture passed; the launch probe and both import audits completed. All 1,064
+pinned source, toolchain and runtime inputs remained unchanged. Seven archived
+binary/generated-C pairs and four retained serial logs passed SHA256 verification.
+All four temporary VMs and their RAM disk were retired. The initial static
+helper's incorrect single-cell assertion and its original source, binary, log
+and failure status remain preserved and hash-verified in the same directory.
+
+Static inspection of the executable identified above finds four data fixups
+for the descriptor and four for its getter alias. Five `CodingKeys`
+conformances refer to the descriptor cells; each has a null witness pattern
+and a resilient getter entry. The related CodingKey base-protocol descriptor
+remains unsupported, as does generic/resilient conformance-table synthesis.
+This inspection executes no application code.
+
+The launch probe now stops at the next required import, `_$ss9CodingKeyMp`,
+before application entry. Fortnite is not playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,009 | 152 | 78 |
+| Fortnite executable | 2,011 | 150 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,849 | 155 | 114 |
+| All images | 2,851 | 153 | 114 |
 
-The C++/GLES/Text variant reports 2,863 resolved imports, 141 unresolved strong
+The C++/GLES/Text variant reports 2,865 resolved imports, 139 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

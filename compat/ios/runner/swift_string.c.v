@@ -297,6 +297,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	if address := swift_case_iterable_symbol(symbol) { return address }
+	if address := swift_custom_debug_symbol(symbol) { return address }
 	return match symbol {
 		'_swift_isaMask' { swift_isa_mask_address() }
 		'_$sSTsE5first5where7ElementQzSgSbADKXE_tKF' { swift_sequence_arena() + 256 }
