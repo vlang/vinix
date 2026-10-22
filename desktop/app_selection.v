@@ -12,6 +12,7 @@ module main
 import math
 import os
 import ui2
+import tools.packages.pkgprotocol
 
 // Registration leaves this marker in the persistent home before saving the
 // user, so a restart between creating the user and choosing apps still shows
@@ -840,12 +841,19 @@ fn first_run_install_command(request string) string {
 }
 
 // The picker runs between registration and the first ordinary desktop frame,
-// with the same exclusive ownership of the display and input. It returns
-// whether a Terminal should be opened to install the chosen apps.
+// with the same exclusive ownership of the display and input. Native releases
+// hand off to Software's read-only review; older images retain the pkg picker.
 fn (mut d Desktop) choose_first_run_apps(mut fb Framebuffer, mut pointer PointerDevice,
-	mut keyboard Keyboard, frame_interval i64, idle_interval i64) bool {
+	mut keyboard Keyboard, frame_interval i64, idle_interval i64) FirstRunAppsAction {
+	if first_run_release_pending(desktop_home, desktop_identity.uid, pkgprotocol.image_applications_path) {
+		return d.choose_first_run_release(mut fb, mut pointer, mut keyboard, frame_interval, idle_interval)
+	}
+	if first_run_release_available(pkgprotocol.image_applications_path) && first_run_release_decided(desktop_home) {
+		if desktop_app_selection_pending(desktop_home) { desktop_finish_app_selection(desktop_home) }
+		return .none
+	}
 	if !desktop_app_selection_pending(desktop_home) {
-		return false
+		return .none
 	}
 	// Without pkg nothing on offer can be installed, and with everything
 	// already present there is nothing to choose.
@@ -853,7 +861,7 @@ fn (mut d Desktop) choose_first_run_apps(mut fb Framebuffer, mut pointer Pointer
 	defer { selection.close() }
 	if C.access(c'/usr/bin/pkg', C.X_OK) != 0 || selection.all_installed() {
 		desktop_finish_app_selection(desktop_home)
-		return false
+		return .none
 	}
 	mut dirty := true
 	for !selection.complete {
@@ -863,7 +871,7 @@ fn (mut d Desktop) choose_first_run_apps(mut fb Framebuffer, mut pointer Pointer
 		power := desktop_pending_power_action()
 		if power == .reload_desktop {
 			d.end_session(power)
-			return false
+			return .none
 		}
 		if power != .keep_running {
 			desktop_power_apply(power)
@@ -896,5 +904,5 @@ fn (mut d Desktop) choose_first_run_apps(mut fb Framebuffer, mut pointer Pointer
 	}
 	unsafe { packages.free() }
 	desktop_finish_app_selection(desktop_home)
-	return requested
+	return if requested { .install_legacy } else { .none }
 }

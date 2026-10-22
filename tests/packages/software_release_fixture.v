@@ -4,8 +4,105 @@ module main
 import os
 import ui2
 import tools.packages.pkgprotocol
+import json2
+
+// The same executable is the actual child service. Record only literal argv
+// admitted by the test, so a queued proposal cannot silently become an apply.
+fn software_first_run_release_service_fixture(args []string) !bool {
+	receipt := os.getenv('VINIX_SOFTWARE_FIRST_RUN_RECEIPT')
+	if receipt == '' { return false }
+	path := os.getenv('VINIX_SOFTWARE_FIRST_RUN_DECLARATION')
+	if args[1] == 'view' {
+		assert args.len == 2
+		os.write_file(receipt, (os.read_file(receipt) or { '' }) + 'view\n')!
+		if os.getenv('VINIX_SOFTWARE_FIRST_RUN_FAIL_VIEW') == '1' { eprintln('fixture: catalog unavailable'); exit(17) }
+		println(json2.encode(SoftwareView{format: 1, architecture: 'aarch64'}))
+		return true
+	}
+	if args[1] == 'deployment-review' {
+		assert args == [args[0], 'deployment-review', path]
+		os.write_file(receipt, (os.read_file(receipt) or { '' }) + 'deployment-review\n')!
+		println(json2.encode(fixture_review('deploy', ['editor'])))
+		return true
+	}
+	if args[1] == 'admin' {
+		assert args[2..] == ['--progress', 'deployment-apply', 'c'.repeat(64), path]
+		mut byte := u8(0)
+		// Confirm starts only the unprivileged credential client. Cancellation
+		// kills this blocked child before credentials or mutation are possible.
+		assert C.read(0, &byte, 1) == 1
+		os.write_file(receipt, 'unexpected credential submission')!
+		return true
+	}
+	panic('unexpected first-run package command: ' + args[1])
+}
+
+fn check_software_first_run_release() ! {
+	base := os.temp_dir() + '/vinix-software-first-run-' + os.getpid().str()
+	os.mkdir(base)!
+	defer { os.rmdir_all(base) or {}; unsafe { base.free() } }
+	path := base + '/release apps ; $literal.json'
+	receipt := base + '/commands'
+	defer { unsafe { path.free(); receipt.free() } }
+	declaration := '{"format":1,"architecture":"aarch64","packages":["editor"]}\n'
+	os.write_file(path, declaration)!
+	os.setenv('VINIX_SOFTWARE_FIRST_RUN_RECEIPT', receipt, true)
+	os.setenv('VINIX_SOFTWARE_FIRST_RUN_DECLARATION', path, true)
+	defer {
+		os.unsetenv('VINIX_SOFTWARE_FIRST_RUN_RECEIPT')
+		os.unsetenv('VINIX_SOFTWARE_FIRST_RUN_DECLARATION')
+		os.unsetenv('VINIX_SOFTWARE_FIRST_RUN_FAIL_VIEW')
+	}
+	for catalog_fails in [false, true] {
+		os.write_file(receipt, '')!
+		os.setenv('VINIX_SOFTWARE_FIRST_RUN_FAIL_VIEW', if catalog_fails { '1' } else { '0' }, true)
+		mut app := SoftwareApp{ service_path: os.executable(), release_deployment_path: path.clone(),
+			administration_required: true, output: []u8{cap: 8192} }
+		app.start(['view'], true)
+		assert app.worker != unsafe { nil } && app.worker_view
+		app.handle(software_first_run_release_action)!
+		app.handle(software_first_run_release_action)!
+		assert app.release_review_requested && app.worker_view && app.review == '' && !app.admin_prompt
+		app.handle('software.confirm')!
+		assert app.worker_view && !app.admin_prompt
+		wait_for_software(mut app)
+		assert !app.release_review_requested && app.review_ready && app.deployment_pending == path
+		assert app.review_snapshot.operation == 'deploy' && app.review_snapshot.rows.len == 2
+		assert os.read_file(receipt)! == 'view\ndeployment-review\n'
+		assert !app.admin_prompt && app.prepare_close()
+		app.handle('software.cancel')!
+		assert app.review == '' && app.worker == unsafe { nil }
+		assert os.read_file(receipt)! == 'view\ndeployment-review\n'
+		// The saved one-shot decision is recoverable through Software's normal
+		// release-review action if the handoff is lost or the review is canceled.
+		app.handle('software.deployment.release')!
+		wait_for_software(mut app)
+		assert app.review_ready && !app.admin_prompt
+		app.handle('software.confirm')!
+		assert app.admin_prompt && app.worker.args == ['admin', '--progress', 'deployment-apply', 'c'.repeat(64), path]
+		app.handle('software.admin.cancel')!
+		assert !app.admin_prompt && app.worker == unsafe { nil }
+		assert os.read_file(receipt)! == 'view\ndeployment-review\ndeployment-review\n'
+		assert os.read_file(path)! == declaration
+		app.close_app()
+	}
+	// Search, which is available during catalog loading, wins over the handoff.
+	os.write_file(receipt, '')!
+	os.unsetenv('VINIX_SOFTWARE_FIRST_RUN_FAIL_VIEW')
+	mut interrupted := SoftwareApp{ service_path: os.executable(), release_deployment_path: path.clone(), output: []u8{cap: 8192} }
+	interrupted.start(['view'], true)
+	interrupted.handle(software_first_run_release_action)!
+	interrupted.handle('software.search')!
+	assert interrupted.focus
+	wait_for_software(mut interrupted)
+	assert !interrupted.release_review_requested && interrupted.focus && interrupted.review == ''
+	assert os.read_file(receipt)! == 'view\n'
+	interrupted.close_app()
+	println('Software first-run release: real queued view to literal full-set review, catalog failure recovery, duplicate delivery, no autoapply, cancel and separate administrator approval PASS')
+}
 
 fn check_software_release() ! {
+	check_software_first_run_release()!
 	base := os.temp_dir() + '/vinix-software-release-' + os.getpid().str()
 	os.mkdir(base)!
 	defer { os.rmdir_all(base) or {}; unsafe { base.free() } }

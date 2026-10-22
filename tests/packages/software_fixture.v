@@ -420,6 +420,7 @@ fn main() {
 	// This same executable is a literal-argv service fixture for asynchronous
 	// view/run transitions. It deliberately returns useful launch diagnostics.
 	if args.len > 1 {
+		if software_first_run_release_service_fixture(args) or { panic(err) } { return }
 		if software_verify_navigation_service_fixture(args) or { panic(err) } { return }
 		if software_cleanup_navigation_service_fixture(args) or { panic(err) } { return }
 		if software_launch_navigation_service_fixture(args) or { panic(err) } { return }

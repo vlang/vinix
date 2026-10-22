@@ -262,11 +262,12 @@ fn main() {
 	desktop_use_user_home(desktop_prepare_user_home(desktop_home, desktop_users_directory))
 	_ = session_start(desktop.home)
 	gpu_present_startup_stage(c'user home ready')
-	// A newly created user then chooses which optional apps to install. The
-	// install itself runs in a Terminal once the ordinary desktop is up.
+	// A new account can review the native release applications in Software;
+	// legacy optional installs run in a Terminal after the desktop is up.
 	gpu_present_startup_stage(c'checking first-run app choice')
-	launch_install_terminal := desktop.choose_first_run_apps(mut fb, mut pointer, mut keyboard,
+	first_run_action := desktop.choose_first_run_apps(mut fb, mut pointer, mut keyboard,
 		options.frame_interval, options.idle_interval)
+	launch_install_terminal := first_run_action == .install_legacy
 	gpu_present_startup_stage(c'first-run app choice ready')
 	if !desktop.running {
 		return
@@ -278,7 +279,6 @@ fn main() {
 	mut launch_default_files := false
 	if options.open.len == 0 && desktop.restore_shell_session() {
 		if launch_install_terminal { desktop.launch_titled_at_startup('Terminal') }
-		desktop_publish_session_ready()
 	} else if options.open.len == 0 {
 		gpu_present_startup_stage(c'creating initial System window')
 		desktop.spawn('System', .system, 580, 60, 372, 232)
@@ -296,6 +296,9 @@ fn main() {
 		if launch_install_terminal {
 			desktop.launch_titled_at_startup('Terminal')
 		}
+	}
+	if !launch_default_files {
+		if first_run_action == .review_release { desktop.open_first_run_release_review() }
 		desktop_publish_session_ready()
 	}
 
@@ -557,6 +560,7 @@ fn main() {
 		if launch_default_files {
 			launch_default_files = false
 			desktop.launch_configured_startup(launch_install_terminal)
+			if first_run_action == .review_release { desktop.open_first_run_release_review() }
 			desktop_publish_session_ready()
 		}
 

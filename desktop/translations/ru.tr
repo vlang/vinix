@@ -4938,3 +4938,25 @@ start.xp.log_off
 -----
 start.xp.internet
 Интернет
+-----
+app_selection.release.heading
+Приложения выпуска
+-----
+app_selection.release.intro
+Просмотрите полный набор приложений этого выпуска.
+-----
+app_selection.release.removals
+Предложение может удалить другие установленные пакеты.
+-----
+app_selection.release.confirm
+Изменения требуют подтверждения в программе «Приложения».
+-----
+app_selection.release.review
+Просмотреть приложения выпуска
+-----
+app_selection.release.skip
+Пока пропустить
+-----
+app_selection.release.save_failed
+Не удалось сохранить выбор. Проверьте домашнюю папку и повторите.
+-----

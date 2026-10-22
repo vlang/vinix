@@ -13,7 +13,8 @@ fn main() {
 	os.mkdir_all('${work}/source')!
 	workflowbuild.run('git', ['archive', 'HEAD', 'desktop', '-o', '${work}/source.tar'])!
 	workflowbuild.run('tar', ['-xf', '${work}/source.tar', '-C', '${work}/source'])!
-	for name in ['main.v', 'app_selection.v', 'app_selection_catalogue.v', 'app_selection_runtime.v',
+	for name in ['main.v', 'app_selection.v', 'app_selection_release.v', 'app_selection_catalogue.v', 'app_selection_runtime.v',
+		'software_app.v', 'software_release.v',
 		'app_icon.v', 'font_data.v', 'app.v', 'wine_app.v', 'zed_app.v', 'session_paste.v'] {
 		os.cp('${root}/desktop/${name}', '${work}/source/desktop/${name}')!
 	}
@@ -37,13 +38,13 @@ fn main() {
 	os.rm('${app}/main.v')!
 	mut tests := os.args[1..].clone()
 	if tests.len == 0 {
-		tests = ['app_selection', 'app_icon', 'app_selection_i18n', 'i18n_apps', 'registration']
+		tests = ['app_selection', 'app_selection_release', 'app_icon', 'app_selection_i18n', 'i18n_apps', 'registration']
 	}
 	for name in tests {
 		os.cp('${root}/desktop/tools/tests/${name}_test.v', '${app}/${name}_test.v')!
 		args := ['-new-compiler', '-nocache', '-cc', 'clang', '-gc', 'none', '-manualfree',
 			'-enable-globals', '-d', 'ui2_headless', '-d', 'no_segfault_handler', '-path',
-			'@vlib|${app}/modules|@vmodules|${root}|${root}/third_party', '${app}/${name}_test.v']
+			'@vlib|${app}/modules|@vmodules|${root}|${root}/tools/accounts|${root}/third_party', '${app}/${name}_test.v']
 		setup_test(v, args, app, name)!
 		os.rm('${app}/${name}_test.v')!
 	}

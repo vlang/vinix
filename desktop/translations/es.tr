@@ -4938,3 +4938,25 @@ Cerrar sesión
 -----
 start.xp.internet
 Internet
+-----
+app_selection.release.heading
+Aplicaciones de esta versión
+-----
+app_selection.release.intro
+Revise el conjunto completo de aplicaciones de esta versión.
+-----
+app_selection.release.removals
+La propuesta puede eliminar otros paquetes instalados.
+-----
+app_selection.release.confirm
+Nada cambia hasta que confirme en Software.
+-----
+app_selection.release.review
+Revisar aplicaciones de la versión
+-----
+app_selection.release.skip
+Omitir por ahora
+-----
+app_selection.release.save_failed
+No se pudo guardar su elección. Revise su carpeta personal y reintente.
+-----

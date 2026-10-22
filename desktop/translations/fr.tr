@@ -4937,3 +4937,25 @@ Fermer la session
 -----
 start.xp.internet
 Internet
+-----
+app_selection.release.heading
+Applications de cette version
+-----
+app_selection.release.intro
+Examinez toutes les applications prévues par cette version.
+-----
+app_selection.release.removals
+La proposition peut supprimer d’autres paquets installés.
+-----
+app_selection.release.confirm
+Aucun changement avant votre confirmation dans Logiciels.
+-----
+app_selection.release.review
+Examiner les applications de la version
+-----
+app_selection.release.skip
+Ignorer pour le moment
+-----
+app_selection.release.save_failed
+Choix non enregistré. Vérifiez votre dossier personnel et réessayez.
+-----

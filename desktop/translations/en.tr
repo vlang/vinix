@@ -4947,3 +4947,25 @@ Log Off
 -----
 start.xp.internet
 Internet
+-----
+app_selection.release.heading
+Release applications
+-----
+app_selection.release.intro
+Review the complete application set declared by this release.
+-----
+app_selection.release.removals
+The proposal may remove other installed packages.
+-----
+app_selection.release.confirm
+Nothing changes until you confirm in Software.
+-----
+app_selection.release.review
+Review release applications
+-----
+app_selection.release.skip
+Skip for now
+-----
+app_selection.release.save_failed
+Your choice could not be saved. Check your home folder and try again.
+-----

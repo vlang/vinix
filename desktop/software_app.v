@@ -171,6 +171,7 @@ mut:
 	deployment_choice_current bool // intervening input/navigation invalidates a late selection
 	release_deployment_path string = pkgprotocol.image_applications_path
 	release_deployment_available bool
+	release_review_requested bool
 	mirror_mode bool
 	mirror_path []u8
 	mirror_all bool
@@ -753,6 +754,7 @@ fn (mut a SoftwareApp) poll() bool {
 	} else {
 		a.start(['view'], true)
 	}
+	if view && a.release_review_requested { a.take_first_run_release_review() }
 	if view && a.launch_request.len > 0 { a.run_requested() }
 	return true
 }
@@ -866,11 +868,15 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		a.stop_verification()
 		return
 	}
+	if event_id == software_first_run_release_action {
+		a.request_first_run_release_review()
+		return
+	}
 	if event_id.starts_with(packagecore.request_prefix) {
 		if a.policy_mode { a.set_status('Return to the catalog before opening an application.'); return }
 		if a.data_mode { a.set_status('Return to the catalog before opening an application.'); return }
 		if a.launch_mode { a.set_status('Close launch options before opening another application.'); return }
-		if a.launch_request.len > 0 || (a.worker != unsafe { nil } && !a.worker_view) {
+		if a.release_review_requested || a.launch_request.len > 0 || (a.worker != unsafe { nil } && !a.worker_view) {
 			a.set_status('An operation is already running in this window.')
 			return
 		}
@@ -883,6 +889,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	}
 	if event_id == 'software.search' && a.review == '' && (a.worker == unsafe { nil } || a.worker_view)
 		&& !a.policy_mode && !a.data_mode && !a.deployment_mode && !a.mirror_mode {
+		a.release_review_requested = false
 		a.focus = true
 		return
 	}
