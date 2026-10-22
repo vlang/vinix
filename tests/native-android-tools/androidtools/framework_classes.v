@@ -91,6 +91,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_connectivity(smali)!
  framework_content_clients(smali)!
  framework_text_widgets(smali)!
+ framework_image_filters(smali)!
  framework_check_widgets(smali)!
  source := os.read_file(root() + '/build-support/android/atlframework/widgets.v')!
  for name, text in framework_extra_classes(source) { os.write_file(smali + '/' + name + '.smali', text)! }

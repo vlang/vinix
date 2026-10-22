@@ -18,6 +18,8 @@ pub fn install(output string, resources string) ! {
  install_gles_probe(dir)!
  install_gles_shader_probe(dir)!
  install_gles_names_probe(dir)!
+ install_gles_upload_probe(dir)!
+ install_image_filter_probe(dir)!
  install_clock_probe(dir)!
  install_time_animator_probe(dir)!
  install_attachment_probe(dir)!
@@ -75,6 +77,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/ViewConfigurationProbe;->check(Landroid
 invoke-static {}, Lorg/vinix/bootstrap/EglProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/ClockProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/TimeAnimatorProbe;->check()V
+invoke-static {p0}, Lorg/vinix/bootstrap/ImageFilterProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/AttachmentProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/DrawableProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/PathProbe;->check()V

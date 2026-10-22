@@ -4,7 +4,7 @@ module startupfixture
 import os
 
 fn install_gles_shader_probe(dir string) ! {
-	os.write_file(dir + '/GlesShaderProbe.smali', '.class public Lorg/vinix/bootstrap/GlesShaderProbe;\n.super Ljava/lang/Object;\n' + method('private static shader(ILjava/lang/String;)I', '
+	os.write_file(dir + '/GlesShaderProbe.smali', '.class public Lorg/vinix/bootstrap/GlesShaderProbe;\n.super Ljava/lang/Object;\n' + method('public static shader(ILjava/lang/String;)I', '
 invoke-static {p0}, Landroid/opengl/GLES20;->glCreateShader(I)I
 move-result v0
 if-eqz v0, :bad

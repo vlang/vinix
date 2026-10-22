@@ -74,6 +74,12 @@ Java GLES20 scalar state, object and uniform calls use the same renderer. Shader
 source, compilation, linking, locations, status and compiler logs come from Mesa;
 the regression APK checks valid and invalid shaders, array offsets and object
 lifetimes through the Java APIs.
+Buffer and texture uploads accept heap and direct NIO storage with byte-range
+validation and preserve Java buffer cursors. Heap storage is copied and unpinned
+before calling Mesa. ReadPixels copies results back to writable buffers;
+integer vertex and index offsets address bound GL buffers. The fixture checks
+an indexed triangle and a texture subimage through actual pixel readback.
+Client-memory vertex arrays are not implemented by these offset overloads.
 Destruction retains a current window until every thread
 unbinds it. Readback preserves framebuffer and ES3 pixel-pack state. CPU and EGL
 producers cannot own the same window simultaneously.
