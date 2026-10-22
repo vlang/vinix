@@ -17098,21 +17098,59 @@ thunks to the existing protocol-extension imports. Generic/resilient
 conformance-table synthesis remains unsupported. This inspection executes no
 application code.
 
-The launch probe now stops at SwiftUI's required `_$s7SwiftUI4ViewMp`
-protocol descriptor. Fortnite has not reached application entry and is not
-playable.
+SwiftUI's `View` protocol now exports its eight public declaration aliases:
+the descriptor, requirement base, `Body: View` conformance, associated `Body`
+type and four method requirements. The exports share the existing read-only
+declaration used by Never's concrete conformance and the opacity modifier's
+Body constraint, including the `Body: View` symbolic signature. Resolution uses
+the existing opacity/Never arena and creates no owned values. Other standalone
+SwiftUI declarations retain their existing layouts.
+
+The three private graph-default thunks now point to the existing distinct
+make-view, make-list and list-count diagnostics. Apple's native defaults also
+use private thunks leading to the public protocol-extension methods; the
+private symbols are not exported. Graph execution remains unsupported and
+stops before reading caller inputs or writing indirect output. The shared
+arena remains available while callbacks drain and retires with its existing
+opacity/Never metadata.
+
+```sh
+v run tests/ios/native-checks.v build-swiftui-view-protocol
+```
+
+Evidence is retained in `build/ios/fortnite/view-protocol-checks`. The new
+fixture and existing opacity, Never View and View defaults fixtures passed
+eight normal and deterministic ASan/UBSan host runs. The ARM64 fixture passed;
+the launch probe and both import audits completed. All 1,078 listed inputs
+remained unchanged. Eight binary/generated-C pairs, four host dSYM archives,
+21 native/static evidence hashes and four guest serial logs passed
+verification. All four temporary VMs, their scratch storage and the owned RAM
+disk were retired.
+
+Static inspection of the same executable finds seven required View declaration
+imports and 44 data fixups in `__DATA_CONST,__const`, including 38 references to
+the descriptor. `LaunchSwift.SwiftUIView` and `LaunchSwift.UEView` each have a
+`View` conformance with flags `0x30000`, a null witness pattern and six resilient
+witness entries. Both generic witness controls require instantiation. Generic
+and resilient conformance-table synthesis remains unsupported. The inspection
+finds no declaration call stubs or direct code references and executes no
+application code.
+
+The launch probe now stops at SwiftUI's required
+`_$s7SwiftUI19UIViewRepresentableMp` protocol descriptor. Fortnite has not
+reached application entry and is not playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,030 | 131 | 78 |
+| Fortnite executable | 2,037 | 124 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,870 | 134 | 114 |
+| All images | 2,877 | 127 | 114 |
 
-The C++/GLES/Text variant reports 2,884 resolved imports, 120 unresolved strong
+The C++/GLES/Text variant reports 2,891 resolved imports, 113 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

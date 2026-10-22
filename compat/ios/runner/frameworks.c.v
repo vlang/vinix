@@ -17,6 +17,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		if address := swiftui_tuple_nominal_symbol(symbol) { return address }
 		if address := swiftui_tuple_init_symbol(symbol) { return address }
 		if address := swiftui_opacity_symbol(symbol) { return address }
+		if address := swiftui_view_protocol_symbol(symbol) { return address }
 		if address := swiftui_modified_symbol(symbol) { return address }
 		if address := swiftui_localized_key_symbol(symbol) { return address }
 		if address := swiftui_alignment_symbol(symbol) { return address }

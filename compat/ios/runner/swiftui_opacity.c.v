@@ -111,7 +111,8 @@ fn swiftui_opacity_arena_checked() !u64 {
 	swiftui_opacity_symbolic_relative(data + 898, base + 80)
 	swiftui_view_opacity_emit(base + 128)
 	swiftui_never_view_emit(base, data, never, never_descriptor, view)
-	C.__builtin___clear_cache(allocation, voidptr(base + 224))
+	swiftui_view_protocol_emit(base, view)
+	C.__builtin___clear_cache(allocation, voidptr(base + 272))
 	if C.mprotect(allocation, usize(page), C.PROT_READ | C.PROT_EXEC) != 0 || C.mprotect(voidptr(data), usize(page), C.PROT_READ) != 0 {
 		if C.munmap(allocation, usize(page * 2)) != 0 { panic('iOS: cannot retire unsealed SwiftUI opacity witnesses') }
 		return swiftui_opacity_failure()
