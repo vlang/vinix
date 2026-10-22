@@ -25,6 +25,8 @@ fn objc_responds(object u64, selector &char) bool {
 		if name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return false }
 		if ns_pool_selector(object, name) { return true }
 	}
+	if object in ios_runtime.objects && obj_header(object).image_array
+		&& name in ['copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:', 'lastObject', 'getObjects:range:'] { return true }
 	if object in ios_runtime.objects && obj_header(object).image_dictionary
 		&& name in ['copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:', 'allKeys', 'allValues', 'getObjects:andKeys:count:'] { return true }
 	if image_selector(object, name) { return true }

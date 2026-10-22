@@ -3,7 +3,7 @@ module main
 
 // Native NSConstantDictionary is isa/options/count/keys/objects. The compiler
 // emits these forty-byte objects in __objc_dictobj; member arrays are borrowed
-// for the image lifetime. Validate the whole image's dictionary records before
+// for the image lifetime. Validate the whole image's collection records before
 // publishing any owned metadata. No mapped object or array bytes are changed.
 fn (m ObjMetadata) dictionary_address(object u64) bool {
 	for segment in m.image.segments {
@@ -41,7 +41,7 @@ fn (m ObjMetadata) dictionary_validate(object u64) ! {
 			return error('iOS: unsupported constant dictionary key')
 		}
 		if value == 0 { return error('iOS: nil constant dictionary value') }
-		if value !in ios_runtime.constants && !m.dictionary_address(value) {
+		if value !in ios_runtime.constants && !m.dictionary_address(value) && !m.array_address(value) {
 			info := ios_runtime.classes[value] or { return error('iOS: unsupported constant dictionary value') }
 			// Compiled class descriptors share the image lifetime. Disposable
 			// classes and ordinary owned objects cannot be borrowed safely.
@@ -61,8 +61,10 @@ fn (m ObjMetadata) dictionary_validate(object u64) ! {
 }
 
 fn (m ObjMetadata) constant_dictionaries() ! {
-	C.ios_objc_initialize_lock()
-	defer { C.ios_objc_initialize_unlock() }
+	m.constant_collections()!
+}
+
+fn (m ObjMetadata) dictionaries_validate() ! {
 	for segment in m.image.segments {
 		for section in segment.sections {
 			if section.name != '__objc_dictobj' { continue }
@@ -74,6 +76,9 @@ fn (m ObjMetadata) constant_dictionaries() ! {
 			for offset := u64(0); offset < section.size; offset += 40 { m.dictionary_validate(start + offset)! }
 		}
 	}
+}
+
+fn (m ObjMetadata) dictionaries_publish() {
 	for segment in m.image.segments {
 		for section in segment.sections {
 			if section.name != '__objc_dictobj' { continue }

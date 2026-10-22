@@ -229,6 +229,13 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 	if header.process_arguments_array && selector in ['addObject:', 'removeObjectAtIndex:', 'removeAllObjects', 'setObject:atIndexedSubscript:'] { panic('iOS: process argument snapshot is read-only') }
 	if header.json_immutable && selector in ['setObject:forKeyedSubscript:', 'setObject:forKey:', 'removeObjectForKey:',
 		'removeAllObjects', 'addObject:', 'removeObjectAtIndex:', 'setObject:atIndexedSubscript:'] { panic('iOS: mutation of an immutable JSON collection') }
+	if header.image_array {
+		if constant_array_dispatch(object, selector, mut frame) { return true }
+		if selector in ['setObject:forKeyedSubscript:', 'setObject:forKey:', 'removeObjectForKey:',
+			'removeAllObjects', 'addObject:', 'removeObjectAtIndex:', 'setObject:atIndexedSubscript:'] {
+			panic('iOS: mutation of an immutable image array')
+		}
+	}
 	if header.image_dictionary {
 		if constant_dictionary_dispatch(object, selector, mut frame) { return true }
 		if selector in ['setObject:forKeyedSubscript:', 'setObject:forKey:', 'removeObjectForKey:',

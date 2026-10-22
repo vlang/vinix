@@ -61,6 +61,7 @@ fn objc_construct_instance(cls u64, bytes u64) u64 {
 fn objc_destruct_instance(object u64) u64 {
 	if object == 0 { return 0 }
 	mut header := obj_header(object)
+	if header.image_array { panic('iOS: cannot destruct image array storage') }
 	if header.image_dictionary { panic('iOS: cannot destruct image dictionary storage') }
 	objc_destroy_contents(object, mut header, true)
 	// A dealloc callback can still be running in objc_release. Defer metadata
@@ -127,7 +128,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 		child.parent_view = 0
 		objc_release(header.children[i])
 	}
-	if !header.image_dictionary {
+	if !header.image_array && !header.image_dictionary {
 		if !header.cf_raw_values { for item in header.items { objc_release(item) } }
 		if !header.cf_raw_keys { for key in header.keys { objc_release(key) } }
 	}

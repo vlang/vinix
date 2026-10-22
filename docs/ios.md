@@ -17218,20 +17218,63 @@ evidence files and four guest serial/configuration pairs passed verification.
 All four temporary VMs, their scratch storage and the owned RAM disk were
 retired.
 
-The launch probe now stops at CoreFoundation's `_OBJC_CLASS_$_NSConstantArray`.
-Fortnite has not reached application entry and is not playable.
+That launch probe stopped at CoreFoundation's `_OBJC_CLASS_$_NSConstantArray`.
+
+CoreFoundation now exports `NSConstantArray` with Apple's twenty-four-byte
+`isa/count/objects` layout, `NSArray` superclass and native ivar offsets/types.
+The loader validates all `__objc_arrayobj` and `__objc_dictobj` records before
+publishing either collection family. Its separate owned metadata borrows image
+members without changing mapped records or member arrays. Nested arrays and
+dictionaries, empty arrays and static class members are supported; malformed
+records and disposable members are rejected before publication.
+
+Constant arrays support CF array reads, Objective-C indexing, first/last object,
+range extraction, batched fast enumeration, CF equality/hash, immortal immutable
+copies and independent mutable copies. Mutation and explicit destruction of
+image storage are rejected. Autorelease owners drain before collection metadata
+retires, without releasing borrowed members.
+
+Native measurements verify the record layout, range ABI, copies, enumeration
+and member ownership against Apple's runtime. Static inspection finds six
+constant arrays in the Fortnite executable: eleven members, comprising nine
+CFStrings and two nested-array references. EOSSDK has three constant
+dictionaries and no constant arrays; MarketplaceKitWrapper has neither. Native
+and static evidence is retained in
+`build/ios/fortnite/constant-array-checks/native`.
+
+The constant-array and existing dictionary fixtures passed normal and
+deterministic macOS ASan+UBSan runs and an ARM64 guest. Both platforms rebased,
+sealed read-only, registered and retired the six actual Fortnite arrays and
+three EOSSDK dictionaries without executing app code. Synthetic cases cover
+mixed nested collections, exact range writes, independent mutable copies,
+eight concurrent registrars, malformed-record rejection before publication,
+unchanged mapped bytes and two fully drained runtime lifetimes.
+
+Evidence is retained in `build/ios/fortnite/constant-array-checks`. The launch
+probe and both import audits completed with all 19,169 listed inputs unchanged.
+Seven binary/generated-C pairs, two host dSYMs, 33 native/static evidence files
+and four guest serial/configuration pairs passed verification. All four
+temporary VMs, their scratch storage and the owned RAM disk were retired.
+
+The launch probe now stops at Foundation's
+`_OBJC_CLASS_$_NSConstantIntegerNumber`, before application entry. Fortnite
+remains unplayable.
+
+```sh
+v run tests/ios/native-checks.v build-objc-constant-array
+```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,055 | 106 | 78 |
+| Fortnite executable | 2,056 | 105 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,895 | 109 | 114 |
+| All images | 2,896 | 108 | 114 |
 
-The C++/GLES/Text variant reports 2,909 resolved imports, 95 unresolved strong
+The C++/GLES/Text variant reports 2,910 resolved imports, 94 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -17279,8 +17322,9 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 `VINIX_IOS_CHECK_NAME` selects a single output directory name under
 `build/ios/fortnite` (default `select-checks`; the timestamp/UUID verification uses
 `file-time-checks`, the audio constants use `audio-session-checks`, and
-CoreFoundation dictionaries use `cf-dictionary-checks`, supplied Objective-C
-storage uses `objc-storage-checks`, associated objects use
+CoreFoundation dictionaries use `cf-dictionary-checks`, constant arrays use
+`constant-array-checks`, supplied Objective-C storage uses `objc-storage-checks`,
+associated objects use
 `objc-associated-checks`, property access uses `objc-property-checks`,
 object monitors use `objc-sync-checks`, Swift strings/buffers use
 `swift-string-checks`, and String metadata/witnesses use
@@ -17288,9 +17332,10 @@ object monitors use `objc-sync-checks`, Swift strings/buffers use
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant and
-CoreFoundation dictionary, supplied Objective-C storage, associated-object,
-property, object-monitor, Swift string/buffer and String metadata/witness checks before the
-existing Mach-O suite and requires the guest PASS marker.
+CoreFoundation dictionary and constant array, supplied Objective-C storage,
+associated-object, property, object-monitor, Swift string/buffer and String
+metadata/witness checks before the existing Mach-O suite and requires the
+guest PASS marker.
 
 `swift` runs the Swift ABI checks in a small, independent guest and
 requires `VINIX iOS SWIFT: PASS`. It does not establish full regression success.
