@@ -31,6 +31,12 @@ observers or drawing survive publication. Callback exceptions stop the frame
 before publication and retain the original Java exception. The signed fixture
 checks laid-out bounds, callback order, cancellation and drawing invalidation.
 
+`View.setLeftTopRightBottom` applies temporary animation bounds through
+`setFrame`, without measuring or laying out children. Changed dimensions invoke
+`onSizeChanged` after all bounds are stored, and changed bounds invalidate the
+window. Measured dimensions and pending layout requests are preserved. The
+fixture checks callback state, no-op updates and native Canvas pixel coverage.
+
 Weighted Typeface factories retain family, requested weight and slant. System
 sans, serif and monospace resolve lazily to the nearest installed DejaVu
 regular/bold/italic face; unknown families fall back to sans. A bounded cache
