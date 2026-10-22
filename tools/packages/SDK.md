@@ -2145,6 +2145,17 @@ package CLI both revalidate the pair. Closing the hosted window reaps Xvfb and
 waits briefly for the launcher; it does not terminate a surviving package child,
 which keeps its generation lease until natural exit.
 
+The [native Software interaction check](../../tests/software-hosted-x11/README.md)
+qualifies visible Launch and pointer input against a real signed Xlib client on
+both installed targets. Actual framebuffer colors distinguish initial painting
+from ButtonPress repaint. Window close must reap the bridge and Xvfb and remove
+the private authority/socket while the deliberately surviving child retains its
+lease; natural child exit and actual reap must release it. The check retains
+four screenshots and forty altered-evidence refusals per target, plus independent
+guest-shutdown/QEMU-exit records. Its application is preinstalled from a local
+test publisher and its ordinary session starts directly. It does not establish
+acquisition, arbitrary foreign runtime compatibility or production enrollment.
+
 Ordinary login sessions retain their account memberships. If the package CLI
 finds supplementary groups, every launch mode automatically uses the fixed
 `packages-launch` action with `auth = account`. The authentication service checks

@@ -920,8 +920,13 @@ display packages a fresh private authority/cookie and an exact socket grant.
 Software uses the real signed launcher with literal arguments, and the isolated
 account transport validates the display/authority pair before forwarding it.
 Both native targets check authentication refusals, account separation, framebuffer
-damage and generation lease lifetime. Native Software clicks, audio and arbitrary
-foreign applications still need qualification.
+damage and generation lease lifetime. A separate
+[native Software interaction check](../../tests/software-hosted-x11/README.md)
+clicks Launch, admits actual Xlib painting and pointer repaint, closes the hosted
+window and verifies cleanup/reaping while the child retains its generation lease
+until natural exit. Both installed guests retain four screenshots and forty
+altered-proof refusals each. This preinstalled local fixture does not qualify
+acquisition, audio or arbitrary foreign applications.
 
 Administrator request decoding and completion receipts retire partial fields,
 hash state and temporary storage after success or refusal. Canonical bytes and

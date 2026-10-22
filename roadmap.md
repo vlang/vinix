@@ -1000,7 +1000,15 @@ architectures; broader release/catalog/runtime acceptance remains open.
     presentation, wrong/missing-cookie and second-account refusals, and generation
     lease retention until natural child exit after the display server is reaped.
     Host sanitizer routing and both compositor builds supplement the native CLI
-    fixture; native Software clicks, audio and arbitrary catalog apps remain open.
+    fixture; audio and arbitrary catalog apps remain open.
+  - [x] [Native Software hosted X11 interaction](tests/software-hosted-x11/README.md)
+    launches a locally signed Xlib client through visible Software controls as
+    an ordinary account on both installed guests. Actual child painting and
+    pointer repaint, bridge/server reap and private-object cleanup after window
+    close, and generation lease retention through natural child exit pass.
+    Eight screenshots, guest shutdowns and forty altered-evidence refusals per
+    target are retained. Acquisition, production publishers and arbitrary foreign
+    applications remain separate gates.
   - [x] [A Win64 publisher profile](tools/packages/SDK.md#wine-win64-publisher-profile)
     pins publisher-supplied application/runtime closures for both hosts, checks
     PE32+ payloads and native launchers, and retains explicit licensing and

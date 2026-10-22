@@ -1811,8 +1811,15 @@ cookie, starts Xvfb with authentication, and forwards only the validated
 grants the selected socket and authority rather than the shared socket directory.
 The actual signed package CLI retains its generation lease through natural child
 exit, including after the hosted window closes and its display server is reaped.
-Both guests qualify this CLI/bridge path; native Software clicks, arbitrary
-foreign apps and audio remain separate work. Native SDK apps can instead
+Both guests qualify this CLI/bridge path. The separate
+[native Software check](../tests/software-hosted-x11/README.md) clicks a signed
+Xlib fixture's Launch control, observes actual painting and pointer repaint,
+then closes its window and verifies bridge/server reap, private-object cleanup
+and the surviving child's lease through natural exit. Both installed targets
+retain screenshots, guest shutdowns and forty altered-proof refusals each.
+The fixture preinstalls its local publisher/application and starts a direct
+ordinary session; acquisition, arbitrary foreign apps and audio remain separate
+work. Native SDK apps can instead
 declare signed `window_protocol:1` metadata and `display` permission. Software
 then runs `run-window` through the same ordinary session and renders bounded
 labels, buttons and rectangles from the application's standard output. Input is
