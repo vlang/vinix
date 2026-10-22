@@ -8,6 +8,46 @@ fn ws_rect_float(e voidptr, rect voidptr, name &char) f32 {
  unsafe { return WsFloatField(slot(e, 102))(e, rect, field(e, c'android/graphics/RectF', name, c'F')) }
 }
 
+fn ws_matrix_set_rect(e voidptr, pointer i64, source voidptr, destination voidptr, align i32) u8 {
+ if source == unsafe { nil } || destination == unsafe { nil } {
+  throw(e, c'java/lang/NullPointerException', c'Matrix rectangle')
+  return 0
+ }
+ left, top := ws_rect_float(e, source, c'left'), ws_rect_float(e, source, c'top')
+ right, bottom := ws_rect_float(e, source, c'right'), ws_rect_float(e, source, c'bottom')
+ dl, dt := ws_rect_float(e, destination, c'left'), ws_rect_float(e, destination, c'top')
+ dr, db := ws_rect_float(e, destination, c'right'), ws_rect_float(e, destination, c'bottom')
+ ws_matrix_reset(pointer)
+ // Android 15 resets to identity for an empty source, but collapses to
+ // the origin (successfully) for an empty destination.
+ if !(left < right && top < bottom) { return 0 }
+ unsafe {
+  matrix := &WsMatrix(pointer)
+  if !(dl < dr && dt < db) {
+   matrix.values[0] = 0
+   matrix.values[4] = 0
+   return 1
+  }
+  mut sx, mut sy := (dr - dl) / (right - left), (db - dt) / (bottom - top)
+  mut horizontal := false
+  if align != 0 {
+   if sx > sy { horizontal = true; sx = sy } else { sy = sx }
+  }
+  mut tx, mut ty := dl - left * sx, dt - top * sy
+  if align == 2 || align == 3 {
+   mut remaining := if horizontal { dr - dl - (right - left) * sy }
+    else { db - dt - (bottom - top) * sy }
+   if align == 2 { remaining *= 0.5 }
+   if horizontal { tx += remaining } else { ty += remaining }
+  }
+  matrix.values[0] = sx
+  matrix.values[4] = sy
+  matrix.values[2] = tx
+  matrix.values[5] = ty
+ }
+ return 1
+}
+
 fn ws_matrix_map_rect(e voidptr, pointer i64, destination voidptr, source voidptr) u8 {
  if destination == unsafe { nil } || source == unsafe { nil } {
   throw(e, c'java/lang/NullPointerException', c'Matrix rectangle')

@@ -38,6 +38,7 @@ pub fn install(output string, resources string) ! {
  install_path_probe(dir)!
  install_matrix_probe(dir)!
  install_matrix_inversion_probe(dir)!
+ install_matrix_fit_probe(dir)!
  install_picture_probe(dir)!
  install_paint_color_probe(dir)!
  install_rect_parcel_probe(dir)!
@@ -103,6 +104,7 @@ invoke-static {}, Lorg/vinix/bootstrap/DrawableProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/PathProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/MatrixProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/MatrixInverseProbe;->check()V
+invoke-static {}, Lorg/vinix/bootstrap/MatrixFitProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/PictureProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/PaintColorProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/RectParcelProbe;->check()V
