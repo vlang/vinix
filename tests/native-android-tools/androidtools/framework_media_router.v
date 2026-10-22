@@ -97,4 +97,17 @@ fn framework_media_router(smali string) ! {
  cb += media_method('onRoutePresentationDisplayChanged(' + router + route + ')V', 'return-void')
  os.write_file(smali + '/android/media/MediaRouter$Callback.smali', cb)!
  os.write_file(smali + '/android/media/MediaRouter$SimpleCallback.smali', simple)!
+ // Callback overrides resolve their argument types when ART links subclasses.
+ // No group instances are created by the provider, but the public signature's
+ // type must exist even when the device has no grouped routes.
+ os.write_file(smali + '/android/media/MediaRouter$RouteGroup.smali',
+  '.class public Landroid/media/MediaRouter$RouteGroup;\n.super ' + route + '\n' +
+  media_method('getRouteCount()I', 'const/4 v0, 0\nreturn v0') +
+  media_method('getRouteAt(I)' + route, 'new-instance v0, Ljava/lang/IndexOutOfBoundsException;\n' +
+   'invoke-direct {v0}, Ljava/lang/IndexOutOfBoundsException;-><init>()V\nthrow v0'))!
+ os.write_file(smali + '/android/media/MediaRouter$VolumeCallback.smali',
+  '.class public abstract Landroid/media/MediaRouter$VolumeCallback;\n.super Ljava/lang/Object;\n' +
+  media_method('constructor <init>()V', 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void') +
+  '.method public abstract onVolumeSetRequest(' + route + 'I)V\n.end method\n' +
+  '.method public abstract onVolumeUpdateRequest(' + route + 'I)V\n.end method\n')!
 }

@@ -6,8 +6,12 @@ import os
 fn install_media_probe(dir string) ! {
  os.write_file(dir + '/MediaProbe.smali', '.class public Lorg/vinix/bootstrap/MediaProbe;\n.super Landroid/media/MediaRouter$SimpleCallback;\n' +
   method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/media/MediaRouter$SimpleCallback;-><init>()V\nreturn-void') +
+  method('public onRouteUngrouped(Landroid/media/MediaRouter;Landroid/media/MediaRouter$RouteInfo;Landroid/media/MediaRouter$RouteGroup;)V', 'return-void') +
+  method('public onRouteGrouped(Landroid/media/MediaRouter;Landroid/media/MediaRouter$RouteInfo;Landroid/media/MediaRouter$RouteGroup;I)V', 'return-void') +
   method('public onRouteAdded(Landroid/media/MediaRouter;Landroid/media/MediaRouter$RouteInfo;)V', 'new-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "unexpected media device discovery"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0') +
   method('public static check(Landroid/content/Context;)V', '
+const-string v0, "media_router"
+const-class v0, Landroid/media/MediaRouter$VolumeCallback;
 const-string v0, "media_router"
 invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
 move-result-object v0
