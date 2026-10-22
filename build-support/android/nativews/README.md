@@ -85,6 +85,10 @@ the requested Handler (or the main Looper). Duplicate registrations fail and
 removal permits registration again. Vinix has no account authenticator.
 External-storage path queries validate the runtime's ordinary, non-removable
 directory. Process CPU time reads the kernel's process CPU clock.
+BatteryManager is available through both Context service lookup forms. With
+no battery driver, properties return Android's unsupported sentinels (including
+the older target-SDK integer behavior), charging is false and the remaining
+charge-time estimate is unavailable.
 
 AssetManager directory enumeration uses the merged framework and APK assets.
 Asset file descriptors expose stored APK entries through the provider's real
