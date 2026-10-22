@@ -201,6 +201,21 @@ fail explicitly because cross-process transport is unavailable. The signed
 checks actual broadcast delivery and cancellation after restoration. Token
 matching across separate factory calls, factory flag policies, persistence and
 the additional `send` overloads remain unimplemented.
+StrictMode thread policies use ART's per-thread BlockGuard hooks for real
+libcore disk reads/writes, network operations and unbuffered I/O, plus explicit
+`noteSlowCall` reports. Builder copies and permits preserve independent masks;
+temporary disk permissions return the policy to restore. Typed violations go
+through the supplied executor with recursive detection suppressed, and the
+callback thread's policy is restored even if the listener throws. Rejected
+executions are logged. Log and death penalties, including death on network,
+are implemented. The signed
+[StrictMode regression](../../../tests/native-android-ws/strict-mode-fixture.v)
+checks real file I/O, callback types and messages, worker isolation, rejection
+and restoration. Resource-mismatch instrumentation, explicit GC detection,
+VM policies, cross-process propagation, UI/DropBox penalties and Android's
+Looper batching/rate limiting remain unavailable. JNI I/O does not necessarily
+pass through BlockGuard. Contracts follow
+[AOSP StrictMode](https://android.googlesource.com/platform/frameworks/base/+/master/core/java/android/os/StrictMode.java).
 Intent filter copies preserve action, URI, MIME type, package, component,
 identifier and an independent category set. They omit extras, flags and the
 selector. Full copies retain flags and own their extras and selector snapshots;
