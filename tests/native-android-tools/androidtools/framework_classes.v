@@ -77,6 +77,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_resource_fonts(smali)!
  framework_asset_streams(smali)!
  framework_view_geometry(smali)!
+ framework_view_configuration(smali)!
  framework_view_attachment(smali)!
  framework_gradient_colors(smali)!
  framework_paths(smali)!
