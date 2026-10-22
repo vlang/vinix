@@ -419,3 +419,6 @@ com/google/android/gles_jni/EGLImpl|eglWaitNative|return u8(ws_egl_wait_native(p
 com/google/android/gles_jni/GLImpl|_glGetString|return ws_gl_java_string(e,p0)
 android/opengl/GLES20|glGetString|return ws_gl_java_string(e,p0)
 android/opengl/GLES20|glGetError|return WsGlGetError(ws_egl_proc(c'glGetError'))()
+android/opengl/GLES20|glGetIntegerv(I[II)V|ws_gl_integer_query(e,p0,p1,p2,false)
+android/opengl/GLES20|glGetIntegerv(ILjava/nio/IntBuffer;)V|ws_gl_integer_query(e,p0,p1,0,true)
+android/opengl/GLES20|glViewport|WsGlViewport(ws_egl_proc(c'glViewport'))(p0,p1,p2,p3)

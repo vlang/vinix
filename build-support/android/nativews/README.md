@@ -66,7 +66,10 @@ GLES through Gallium softpipe. EGL windows render to pbuffers and post flipped
 RGBA pixels through the native WS buffer queue; X11, GTK and Wayland are absent.
 The Java EGL10 bridge handles displays, configurations, contexts, surfaces and
 current-thread queries. Java GL10 and GLES20 string queries use the current
-renderer, and GLES20 error queries consume its actual error state.
+renderer, and GLES20 error queries consume its actual error state. GLES20 integer
+queries copy renderer state into Java arrays or heap/direct IntBuffers, respect
+positions and limits, and reject undersized or read-only output. Variable format
+lists use the renderer's advertised element count.
 Destruction retains a current window until every thread
 unbinds it. Readback preserves framebuffer and ES3 pixel-pack state. CPU and EGL
 producers cannot own the same window simultaneously.
