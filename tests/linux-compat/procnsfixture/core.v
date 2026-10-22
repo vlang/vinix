@@ -131,7 +131,9 @@ fn walker(pointer voidptr) voidptr {
 				n := C.readlink(&path[0], &data[0], 63)
 				code := *C.__errno_location()
 				C.increment(&shared.calls[worker.index], 1, 0)
-				if !(n > 0 && n < 63) && !(n == -1 && (code == C.ENOENT || code == C.ESRCH)) {
+				// Linux can lose the task after lookup but before its access check.
+				if !(n > 0 && n < 63) && !(n == -1 && (code == C.ENOENT || code == C.ESRCH
+					|| code == C.EACCES)) {
 					C.increment(&shared.failures, 1, 0)
 				}
 			}

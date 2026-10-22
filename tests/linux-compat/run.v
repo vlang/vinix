@@ -110,6 +110,8 @@ fn main() {
 			exit(1)
 		}
 		marker := 'LINUX ' + name.to_upper() + ': PASS'
+		// procns waits through several reclamation grace periods (> 247 seconds).
+		case_timeout := if name == 'procns' && !options.has('--timeout') { 1200 } else { timeout }
 		mut detail := ''
 		code := guesthost.guest(frozen_source + '/core.v', '', work + '/' + name, work + '/kernel', arch,
 			if name == 'runtime' {
@@ -119,7 +121,7 @@ fn main() {
 			} else {
 				[marker]
 			},
-			['LINUX ' + name.to_upper() + ' FAIL'], false, true, timeout) or {
+			['LINUX ' + name.to_upper() + ' FAIL'], false, true, case_timeout) or {
 			detail = err.msg()
 			1
 		}
