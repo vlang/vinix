@@ -176,6 +176,13 @@ URI delegation checks return permission denied because no Binder URI-grant
 service is connected. Ordinary access to a local provider is separate; these
 checks do not grant other processes access to it.
 
+AtomicFile writes a sibling `.new` file, syncs and closes it, then replaces the
+base file with a filesystem rename. Failed writes preserve the committed copy;
+reads recover legacy `.bak` files and discard interrupted replacements. Callers
+must serialize access. TrafficStats retains tags separately for each thread;
+per-UID byte counters return `UNSUPPORTED` because Vinix does not account for
+traffic by UID. Tags are not yet attached to kernel sockets.
+
 The native loader checks mapped extents rather than adding page-rounded segment
 lengths. Shared PT_LOAD pages therefore do not falsely exceed the reserved
 mapping, while out-of-range and overflowing extents still fail validation.

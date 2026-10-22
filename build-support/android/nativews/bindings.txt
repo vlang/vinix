@@ -376,3 +376,11 @@ android/view/ViewTreeObserver|native_set_have_global_layout_listeners|ws_mark()
 android/view/inputmethod/InputMethodManager|nativeInit|return 1
 android/view/inputmethod/InputMethodManager|nativeShowSoftInput|return 1
 android/view/inputmethod/InputMethodManager|nativeHideSoftInput|// Hardware keyboard input uses the WS channel.
+android/util/AtomicFile|vinixInit|ws_atomic_init(e, this, p0)
+android/util/AtomicFile|getBaseFile|return ws_atomic_file(e, this, c'base')
+android/util/AtomicFile|startWrite|return ws_atomic_start(e, this)
+android/util/AtomicFile|finishWrite|ws_atomic_finish(e, this, p0)
+android/util/AtomicFile|failWrite|ws_atomic_fail(e, this, p0)
+android/util/AtomicFile|openRead|return ws_atomic_open(e, this)
+android/util/AtomicFile|readFully|return ws_atomic_read(e, this)
+android/util/AtomicFile|delete|ws_atomic_delete(e, this)
