@@ -297,6 +297,16 @@ ui2 through `VINIX_PACKAGE_TEST_UI2`; see [the integration check](../../tests/pa
 Its UI trees and service transports are qualified separately from graphical
 login, compositor presentation and foreign display/audio brokers.
 
+The [ordinary-account session check](../../tests/packages/software-session-check.md)
+adds native compositor execution, private readiness, broker peer checks and
+external framebuffer acknowledgements on both architectures. The
+[installed graphical Software check](../../tests/packages/software-graphical-check.md)
+uses the production compositor and actual review/administrator dialogs to install
+signed Counter and retain its private data across an installed-root reboot.
+These fixtures use their own publisher and account configuration; release builders
+must still select reviewed production trust and catalogs. Graphical login,
+foreign runtime services and broader device/crash acceptance remain open.
+
 ### Offline repository bundles in release images
 
 Add `--repositories DIRECTORY` to the staging command, or set
@@ -618,6 +628,21 @@ administrator approval. Current publisher trust, policy and exact metadata pins
 remain mandatory. Missing declarations leave manual/file-dialog workflows
 available. This does not enroll a production publisher or migrate the legacy
 Alpine/vendor catalog.
+
+On an ordinary account's first desktop start, a staged declaration also enables
+the **Review release applications / Skip for now** choice without requiring
+legacy registration or `/usr/bin/pkg`. A saved per-home decision prevents the
+prompt returning after reboot. Review hands the exact complete set to Software
+after its initial catalog read; it cannot apply changes or request approval
+until the user confirms the resulting proposal. Images without the declaration
+retain the legacy first-run picker.
+
+The [native first-run check](../../tests/packages/software-first-run-native-check.md)
+drives this flow on both installed target systems without legacy registration
+or `pkg`. It checks the real proposal plus an independent production CLI review,
+unchanged package state and approval audit before confirmation, the signed
+Counter install after password approval, and the private Review choice across
+reboot. Host checks additionally cover saved Skip and failed publication.
 
 **Deployment → Check release apps** compares recorded installed metadata with
 the same exact image lock as an ordinary user, without administrator approval

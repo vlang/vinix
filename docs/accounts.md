@@ -251,10 +251,13 @@ restarted. The requests are frames of the authentication service's format;
 `sessioncore/manager.v` lists them.
 
 The programs the manager starts are arguments (`--greeter`, `--desktop`), by
-default `vinix-desktop --greeter` and `vinix-desktop`. **Neither exists in
-that form yet**: the desktop has no login screen and has never run as
-anything but root. The manager is tested with stand-ins that speak its
-protocol and write down what they see.
+default `vinix-desktop --greeter` and `vinix-desktop`. The desktop can now run
+as an ordinary account: its native qualification covers private account
+runtime directories, broker and framebuffer access, and an installed
+application across reboot. It still has no `--greeter` login screen or
+manager logout/switch controls, and normal boot still starts the desktop as
+root. The manager's login protocol is tested with stand-ins that write down
+what they see; the graphical login path remains unfinished.
 
 ### Becoming the account
 

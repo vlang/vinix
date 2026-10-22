@@ -602,7 +602,7 @@ enrollment/revocation with retained replay history, and
 manages system ports. Installed apps integrate with Start, Quick Launch and
 shared MIME choices; an administrator-selected `launch_user` runs them through
 an isolated ordinary account session. Release publisher enrollment, catalog migration,
-graphical login/display-broker integration and broader guest/runtime qualification
+graphical login, foreign display/audio services and broader guest/runtime qualification
 remain required before this acceptance gate is complete. Host lifecycle/UI
 fixtures and both target builds are available in
 [the V qualification driver](tests/packages/distribution-check.v).
@@ -640,6 +640,16 @@ the native SDK catalog. It checks staged tools, accounts, trust, package state
 and private data across install, upgrade, rollback, removal and cached reinstall.
 Autonomous firmware boot, graphical presentation, production catalog migration
 and broader runtime/device acceptance remain open.
+
+The [ordinary-account session check](tests/packages/software-session-check.md)
+qualifies the production compositor's broker and external framebuffer transport
+on both architectures. Account-derived homes and child identities, inherited
+console access and private readiness allow the compositor to run without root.
+The [installed graphical Software check](tests/packages/software-graphical-check.md)
+then installs the signed Counter example through visible Software controls and
+administrator approval, saves its private data and reopens it after an installed
+root reboot. Graphical login, production catalog migration, foreign runtimes and
+broader device/crash acceptance remain open.
 
 Release image builders can now [bundle signed offline repositories](tools/packages/SDK.md#offline-repository-bundles-in-release-images)
 through the production staging tool. The bundle retains the reviewed publisher
@@ -864,6 +874,29 @@ architectures; broader release/catalog/runtime acceptance remains open.
     Public repository/proxy qualification and production catalog rollout remain open.
 - [ ] Provide a graphical software manager with search, descriptions, provenance,
   permissions, progress, uninstall, updates and useful failure diagnostics.
+  - [x] [Native release first-run review](tests/packages/software-first-run-native-check.md)
+    offers ordinary accounts the staged
+    complete application set without requiring legacy registration or `pkg`.
+    Review opens Software's read-only deployment proposal; confirmation and
+    administrator approval remain separate. A saved per-home skip choice
+    prevents the prompt returning after reboot. Both native targets exercise
+    the actual first-run card, read-only proposal, separate signed install and
+    saved Review choice across two installed-root boots; host checks also cover
+    saved Skip and failed choice publication. Production publisher selection
+    and migration of the legacy catalog remain open.
+  - [x] [Ordinary-account graphical sessions](tests/packages/software-session-check.md)
+    use the effective account's home and child environment, inherited console
+    descriptors, private readiness and shared numeric broker/framebuffer paths.
+    Both native targets check actual external frame acknowledgements, broker
+    peer identity and refusal from a second ordinary account. Graphical login
+    and foreign display/audio services remain separate gates.
+  - [x] [Installed graphical acquisition and persistence](tests/packages/software-graphical-check.md)
+    run the production compositor and Software as an ordinary administrator on
+    both targets. Pointer and keyboard input confirm a signed Counter install
+    through the real approval dialog, reopen its saved data and verify it after
+    an installed-root reboot. Retained screenshots, exact state/ownership checks
+    and sealed source/artifact receipts qualify this native example; whole-catalog,
+    graphical-login and device/crash acceptance remain open.
   - [x] [Reviewed permission changes](tests/packages/review-permissions-check.md)
     compare frozen installed and target declarations across dependencies,
     updates, repair, rollback and removal. Format 2 carries owned prior facts;

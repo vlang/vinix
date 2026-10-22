@@ -44,6 +44,18 @@ hashes and retained trust, accounts, package state and user data. Test boot medi
 still supplies the kernel; graphical sessions, autonomous firmware boot and
 broader catalog/runtime/device acceptance remain separate gates.
 
+The [ordinary-account session check](../tests/packages/software-session-check.md)
+boots the production compositor with account-derived home and child identity,
+inherited console access and private readiness. Both targets exercise its real
+broker and external framebuffer sockets, frame acknowledgements and separation
+from a second ordinary account. The
+[installed graphical Software check](../tests/packages/software-graphical-check.md)
+uses visible Software controls and administrator approval to install signed
+Counter, save its private data and reopen it after an installed-root reboot.
+It retains framebuffer screenshots and exact state/ownership evidence. Graphical
+login, production catalog migration, foreign runtimes and broader device/crash
+acceptance remain release gates.
+
 Release staging also accepts `--repositories DIRECTORY` or
 `VINIX_PACKAGE_IMAGE_REPOSITORIES` for a complete signed offline bundle. It
 captures reviewed publisher exports before compilation and publishes them at the
@@ -88,6 +100,23 @@ compilation, publishes it after matching trust/bundle publication, and preserves
 existing identical declarations. Check reports expose its path, action, byte
 count and digest. See [the contract](../tools/packages/SDK.md#declare-release-applications-in-an-image)
 and [qualification](../tests/packages/image-catalog-check.md).
+
+When that declaration is present, an ordinary account's first desktop start
+offers **Review release applications** or **Skip for now**, including images
+without the legacy `pkg` tool. Review opens Software's read-only proposal for
+the complete declared set, which can include removals. Applying it still needs
+confirmation and administrator approval. The choice is saved in that account's
+home; skipping does not return the prompt after reboot. Images without a native
+declaration keep the legacy app picker.
+
+The [native first-run check](../tests/packages/software-first-run-native-check.md)
+boots both targets without legacy registration or `pkg`, drives the real
+first-run card and proposal, verifies that review leaves package state and the
+approval audit unchanged, and applies the signed Counter set only after separate
+confirmation and password approval. A second installed-root boot retains the
+private Review choice and application data without repeating the card. Host
+checks separately exercise saved Skip, all six translations and failed choice
+publication.
 
 **Deployment → Check release apps** compares the installed generation with the
 image's declaration using the existing read-only deployment audit. Ordinary

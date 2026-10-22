@@ -106,6 +106,15 @@ path, publish/preserve decision, byte count and digest. See
 [the contract](SDK.md#declare-release-applications-in-an-image) and
 [qualification](../../tests/packages/image-catalog-check.md).
 
+An ordinary account's first desktop start offers to review this complete release
+set or skip for now. The choice is saved per home, independently of the legacy
+`pkg` picker. Review opens Software without applying changes; confirmation and
+administrator approval remain separate, and the proposal discloses removals.
+The [native first-run check](../../tests/packages/software-first-run-native-check.md)
+drives this card, unchanged-state proposal and separate signed installation on
+both architectures, then checks the saved Review choice after an installed-root
+reboot. Host checks cover saved Skip and choice-publication failures.
+
 **Deployment → Check release apps** reports missing apps and installed metadata
 drift from that exact image lock without administrator approval or state changes.
 See [installed-release checks](../../tests/packages/release-audit-check.md).
@@ -864,6 +873,15 @@ a private, kernel-peer-checked runtime socket; passwords stay off command lines
 and the desktop clears them after submission or cancellation. CLI clients use
 `vinix-package admin [--progress] [--offline] COMMAND ...` for the same bounded
 reviewed-operation transport. See [administrator qualification](../../tests/packages/admin-check.md).
+
+The [ordinary-account compositor check](../../tests/packages/software-session-check.md)
+qualifies account homes and child identity, inherited console access, private
+readiness and the production broker/external framebuffer transports on both
+targets. The [installed graphical check](../../tests/packages/software-graphical-check.md)
+drives the real Software review and approval dialogs to install signed Counter,
+save its private data and reopen it after an installed-root reboot. Retained
+screenshots and exact signed state checks cover this native example; graphical
+login, production catalogs and foreign runtime/device qualification remain open.
 
 Administrator request decoding and completion receipts retire partial fields,
 hash state and temporary storage after success or refusal. Canonical bytes and
