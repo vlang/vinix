@@ -23,6 +23,7 @@ android/content/res/AssetManager|retrieveAttributes|return ws_retrieve(e,this,p0
 android/content/res/AssetManager|resolveAttrs|return ws_resolve_attrs(e,p0,p1,p2,p3,p4,p5,p6)
 android/content/res/AssetManager|openXmlAssetNative|return ws_open_xml(e,this,p1)
 android/content/res/AssetManager|openAsset|return ws_open_asset(e,this,p0,p1)
+android/content/res/AssetManager|openAssetFd|return ws_asset_descriptor(e,this,p0,p1,p2,p3)
 android/content/res/AssetManager|readAsset|return ws_asset_read(e,p0,p1,p2,p3)
 android/content/res/AssetManager|getAssetLength|return C.Asset_getLength(voidptr(p0))
 android/content/res/AssetManager|getAssetRemainingLength|return C.Asset_getRemainingLength(voidptr(p0))

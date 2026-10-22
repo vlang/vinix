@@ -85,6 +85,9 @@ External-storage path queries validate the runtime's ordinary, non-removable
 directory. Process CPU time reads the kernel's process CPU clock.
 
 AssetManager directory enumeration uses the merged framework and APK assets.
+Asset file descriptors expose stored APK entries through the provider's real
+backing descriptor, offset and length; compressed or missing entries fail with
+FileNotFoundException. Each descriptor owns its duplicate until closed.
 The build converts the pinned runtime's IANA TZif files and aliases into
 Android's indexed tzdata container, preserving transition records. The launcher
 sets Android's root/data paths so libcore finds it. Guest regression checks

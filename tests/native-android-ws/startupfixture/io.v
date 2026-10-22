@@ -23,8 +23,74 @@ return-void'))!
  os.write_file(dir + '/IoProbe.smali', '.class public Lorg/vinix/bootstrap/IoProbe;\n.super Ljava/lang/Object;\n' +
   method('public static check(Landroid/content/Context;)V', '
 invoke-static {p0}, Lorg/vinix/bootstrap/IoProbe;->atomic(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/IoProbe;->assetDescriptors(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/IoProbe;->traffic()V
 return-void') +
+  method('private static assetDescriptors(Landroid/content/Context;)V', '
+invoke-virtual {p0}, Landroid/content/Context;->getAssets()Landroid/content/res/AssetManager;
+move-result-object v0
+const-string v1, "probe.txt"
+invoke-virtual {v0, v1}, Landroid/content/res/AssetManager;->openFd(Ljava/lang/String;)Landroid/content/res/AssetFileDescriptor;
+move-result-object v2
+invoke-virtual {v2}, Landroid/content/res/AssetFileDescriptor;->getLength()J
+move-result-wide v3
+const-wide/16 v5, 15
+cmp-long v3, v3, v5
+if-nez v3, :bad
+invoke-virtual {v2}, Landroid/content/res/AssetFileDescriptor;->getStartOffset()J
+move-result-wide v3
+const-wide/16 v5, 0
+cmp-long v3, v3, v5
+if-lez v3, :bad
+invoke-virtual {v0, v1}, Landroid/content/res/AssetManager;->openFd(Ljava/lang/String;)Landroid/content/res/AssetFileDescriptor;
+move-result-object v3
+invoke-virtual {v2}, Landroid/content/res/AssetFileDescriptor;->close()V
+invoke-virtual {v3}, Landroid/content/res/AssetFileDescriptor;->createInputStream()Ljava/io/FileInputStream;
+move-result-object v2
+const/16 v3, 32
+new-array v3, v3, [B
+invoke-virtual {v2, v3}, Ljava/io/FileInputStream;->read([B)I
+move-result v4
+const/16 v5, 15
+if-ne v4, v5, :bad
+new-instance v5, Ljava/lang/String;
+const/4 v6, 0
+const-string v7, "UTF-8"
+invoke-direct {v5, v3, v6, v4, v7}, Ljava/lang/String;-><init>([BIILjava/lang/String;)V
+const-string v3, "VINIX-ASSET-OK\\n"
+invoke-virtual {v5, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v3
+if-eqz v3, :bad
+invoke-virtual {v2}, Ljava/io/FileInputStream;->read()I
+move-result v3
+const/4 v4, -1
+if-ne v3, v4, :bad
+invoke-virtual {v2}, Ljava/io/FileInputStream;->close()V
+:missing_start
+const-string v1, "absent-file.bin"
+invoke-virtual {v0, v1}, Landroid/content/res/AssetManager;->openFd(Ljava/lang/String;)Landroid/content/res/AssetFileDescriptor;
+:missing_end
+.catch Ljava/io/FileNotFoundException; {:missing_start .. :missing_end} :missing_ok
+goto :bad
+:missing_ok
+move-exception v1
+:compressed_start
+const-string v1, "compressed.bin"
+invoke-virtual {v0, v1}, Landroid/content/res/AssetManager;->openFd(Ljava/lang/String;)Landroid/content/res/AssetFileDescriptor;
+:compressed_end
+.catch Ljava/io/FileNotFoundException; {:compressed_start .. :compressed_end} :compressed_ok
+goto :bad
+:compressed_ok
+move-exception v1
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-ASSET-FD-PASS offset length independent-close bounded-read compressed missing"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "APK asset file descriptors"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
   method('private static traffic()V', '
 invoke-static {}, Landroid/net/TrafficStats;->clearThreadStatsTag()V
 invoke-static {}, Landroid/net/TrafficStats;->getThreadStatsTag()I

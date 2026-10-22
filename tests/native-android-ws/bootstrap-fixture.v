@@ -35,6 +35,7 @@ fn main() {
 	os.mkdir_all(output + '/assets/nested')!
 	os.write_file(output + '/assets/nested/item.txt', 'nested asset\n')!
 	os.write_file(output + '/assets/probe.txt', 'VINIX-ASSET-OK\n')!
+	os.write_file(output + '/assets/compressed.bin', 'compressed descriptor probe\n'.repeat(512))!
 	// Lossless 2x1 red/green image, generated from our own PPM test pixels.
 	os.write_file_array(output + '/assets/probe.webp', base64.decode('UklGRh4AAABXRUJQVlA4TBEAAAAvAQAAAA+w//Mf8x8VMqL/AQA='))!
 	app := '.class public Lorg/vinix/bootstrap/App;\n.super Landroid/app/Application;\n.field public static stage:I\n' +
@@ -902,7 +903,7 @@ throw v0')
  os.mkdir_all(output + '/compiled-res')!
  checked([aapt, 'compile', '--dir', output + '/res', '-o', output + '/compiled-res'])
  mut link_args := [aapt, 'link', '-I', resources, '--manifest', output + '/AndroidManifest.xml', '-A',
-  output + '/assets', '-o', output + '/unsigned.apk']
+  output + '/assets', '-0', 'txt', '-o', output + '/unsigned.apk']
  link_args << os.walk_ext(output + '/compiled-res', '.flat')
  checked(link_args)
 	checked(['build-support/compile-v-module', os.abs_path('tests/native-android-ws/assetprobe'),
