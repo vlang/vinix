@@ -167,6 +167,12 @@ null tasks and submissions to a stopped handler are rejected. The signed
 `tests/native-android-ws/executor-fixture.v` guest regression checks dispatch,
 FIFO ordering, wrapper delegation and rejection behavior.
 
+`PackageManager.OnPermissionsChangedListener` and its add/remove APIs resolve.
+Subscriptions are synchronized and duplicate registration is idempotent;
+removal releases the listener. Permission decisions remain fixed during the
+runtime's lifetime, so registration emits no change callback. This does not
+provide Android's runtime permission controller or grant/revoke service.
+
 Wi-Fi scanning returns unavailable with empty results. The RTT API type resolves
 while its service and hardware feature remain absent. The signed Wi-Fi fixture
 checks both service lookup forms and these capability contracts. Android
