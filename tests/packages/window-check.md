@@ -5,7 +5,8 @@ permission. Software selects `run-window` from installed metadata, including
 Start/Quick Launch/document requests, and renders bounded labels, buttons and
 rectangles within its own window. The ordinary-account package service retains
 trust, policy, payload checks and its generation lease. Window mode grants no
-X11 socket, Unix/TTY promise or hardware display/input device.
+X11 socket, TTY promise or hardware display/input device. A separate declared
+`process` grant permits child creation and local Unix IPC in this mode too.
 
 The SDK uses complete format-1 display-list frames and frame-bound button/close
 events over standard streams. Input writes are bounded below PIPE_BUF and use a

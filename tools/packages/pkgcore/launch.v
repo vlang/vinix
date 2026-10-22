@@ -144,7 +144,9 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	if input.terminal { promises << 'tty' }
 	if 'network' in p.permissions { promises << 'inet'; promises << 'dns' }
 	if 'process' in p.permissions { promises << 'proc' }
-	if 'display' in p.permissions && !input.window { promises << 'unix' }
+	// Child processes use socketpair and local RPC as well as fork/exec. This
+	// grants no extra paths; pathname sockets remain subject to unveil.
+	if 'process' in p.permissions || ('display' in p.permissions && !input.window) { promises << 'unix' }
 	args << '--promises'; args << promises.join(' ')
 	launch_unveil(mut args, app, 'rx')
 	launch_unveil(mut args, data, 'rwc')

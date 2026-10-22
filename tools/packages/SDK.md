@@ -1875,7 +1875,8 @@ update to present these apps.
 It repeats current policy/trust/payload validation and holds the normal generation
 lease until the child exits. Root delegates through `launch_user`; the ordinary
 process gets `VINIX_WINDOW_PROTOCOL=1` alongside its normal SDK context. This mode
-does not unveil X11 sockets or grant Unix/TTY/display-device access. Documents
+does not unveil X11 sockets or add TTY/display-device access. The separate
+`process` grant still permits local Unix IPC. Documents
 still require declared `files` permission and ordinary-account accessibility.
 Do not combine this stream with terminal mode or shell commands.
 
@@ -2025,8 +2026,12 @@ The explicit environment includes `HOME`, `TMPDIR`, `WINEPREFIX`, `PATH`,
 `@APP@`, `@DATA@`, `@RUNTIME@` are literal paths, never shell evaluation. Supplied
 document paths follow those arguments. Apps receive read/execute payload/runtime
 access and write/create private-data access, including advisory file locking.
-`files` grants supplied documents, not the entire home; `network`, `process`,
-`display`, `audio` request corresponding sandbox promises/device or IPC paths.
+`files` grants supplied documents, not the entire home. `process` grants child
+creation (`proc`) and local Unix IPC (`unix`), including socket pairs and local
+RPC used by multiprocess applications. It adds no filesystem paths, network
+promises, display authority or devices. Pathname sockets remain subject to
+unveil; abstract Unix sockets have no filesystem path. `network`, `display` and
+`audio` request their corresponding sandbox promises/device or IPC paths.
 Organization policy can refuse requests.
 See [actual enforcement limits](../sandbox/README.md).
 

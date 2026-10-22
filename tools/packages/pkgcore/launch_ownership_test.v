@@ -103,9 +103,9 @@ fn test_launch_plan_matrix_retires_success_storage_and_keeps_inputs_literal() {
 					mut plan := application_launch_plan(config, '/var/lib/vinix-packages', selected, 'app', '/home/user/data', 1000, 1000, input)!
 					assert plan.program == '/usr/bin/vinix-sandbox'
 					assert plan.directory == if input.data_cwd { '/home/user/data' } else { '/var/lib/vinix-packages/generations/42/apps/app' }
-					assert plan.arguments[5] == if input.window { 'stdio rpath wpath cpath flock exec prot_exec inet dns proc' }
-						else if input.terminal { 'stdio rpath wpath cpath flock exec prot_exec tty inet dns proc' }
-						else { 'stdio rpath wpath cpath flock exec prot_exec inet dns proc' }
+					assert plan.arguments[5] == if input.window { 'stdio rpath wpath cpath flock exec prot_exec inet dns proc unix' }
+						else if input.terminal { 'stdio rpath wpath cpath flock exec prot_exec tty inet dns proc unix' }
+						else { 'stdio rpath wpath cpath flock exec prot_exec inet dns proc unix' }
 					assert ('TERM=linux' in plan.arguments) == input.terminal
 					assert !plan.arguments.any(it.starts_with('DISPLAY=') || it.starts_with('XAUTHORITY='))
 					assert plan.arguments.last() == if input.command { '@DATA@/literal' } else { '/tmp/launch-owned-matrix' }
@@ -117,6 +117,45 @@ fn test_launch_plan_matrix_retires_success_storage_and_keeps_inputs_literal() {
 	}
 	$if track_heap ? { println('LAUNCH OWNERSHIP 36 architecture/kind/mode cases: 1000 plan/close cycles each retained 0 bytes') }
 	println('LAUNCH OWNERSHIP both architectures and native/Linux/Windows/Apple plans preserve promises, environment, templates and literal tails PASS')
+}
+
+fn test_process_grant_allows_local_ipc_without_additional_paths_or_display_context() {
+	for architecture in ['aarch64', 'x86_64']! {
+		for kind in ['native', 'linux', 'windows', 'apple']! {
+			config, fixture := launch_owned_fixture(architecture, kind, 0)
+			for mode in 0 .. if kind == 'native' { 4 } else { 2 } {
+				for process in [false, true]! {
+					window := mode >= 2
+					mut permissions := []string{}
+					if window { permissions << 'display' }
+					if process { permissions << 'process' }
+					mut packages := fixture.packages.clone()
+					last := packages.len - 1
+					packages[last] = Installed{ ...packages[last], package: Package{ ...packages[last].package,
+						permissions: permissions, window_protocol: if window { mode - 1 } else { 0 } } }
+					state := State{ ...fixture, packages: packages }
+					mut plan := application_launch_plan(config, '/packages', state, 'app', '/private/app', 1000, 1000,
+						LaunchInput{ terminal: mode == 1, window: window })!
+					promises := plan.arguments[5].split(' ')
+					assert ('proc' in promises) == process
+					assert ('unix' in promises) == process
+					assert promises.filter(it == 'unix').len <= 1
+					assert 'inet' !in promises && 'dns' !in promises
+					assert ('tty' in promises) == (mode == 1)
+					assert !plan.arguments.any(it.starts_with('DISPLAY=') || it.starts_with('XAUTHORITY='))
+					mut paths := []string{}
+					for i, argument in plan.arguments {
+						if argument == '--unveil' { paths << plan.arguments[i + 1]; paths << plan.arguments[i + 2] }
+					}
+					mut expected := ['/packages/generations/42/apps/app', 'rx', '/private/app', 'rwc']
+					if kind != 'native' { expected << '/packages/generations/42/apps/runtime'; expected << 'rx' }
+					assert paths == expected, paths.str()
+					plan.close()
+				}
+			}
+		}
+	}
+	println('PROCESS IPC 40 plans: explicit child/local IPC grant, no additional paths, network or X11 context; absent grant omits IPC PASS')
 }
 
 fn test_launch_plan_dependency_and_document_growth_retires_storage() {
