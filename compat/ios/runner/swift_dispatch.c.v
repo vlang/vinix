@@ -68,7 +68,8 @@ fn swift_dispatch_flags_arena_checked() !u64 {
 	swift_dispatch_qos_build(base, data)
 	swift_dispatch_main_build(base)
 	swift_dispatch_async_build(base)
-	C.__builtin___clear_cache(arena, voidptr(base + 832))
+	swift_dispatch_attributes_build(base, data)
+	C.__builtin___clear_cache(arena, voidptr(base + 864))
 	if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(voidptr(data), usize(page), C.PROT_READ) != 0 {
 		if C.munmap(arena, usize(page * 2)) != 0 { panic('iOS: cannot retire unsealed Swift Dispatch metadata') }
@@ -93,6 +94,7 @@ fn swift_dispatch_symbol(symbol string) !u64 {
 		'_$s8Dispatch0A13WorkItemFlagsVMa' { u64(0) }
 		'_$s8Dispatch0A3QoSV11unspecifiedACvgZ' { u64(704) }
 		'_$s8Dispatch0A3QoSVMa' { u64(736) }
+		'_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMa' { u64(832) }
 		'_$sSo17OS_dispatch_queueC8DispatchE4mainABvgZ' {
 			swift_dispatch_main_queue_checked()!
 			u64(768)

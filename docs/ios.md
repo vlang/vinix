@@ -16629,9 +16629,42 @@ releases that owner explicitly. Thirteen consumer/forwarder sites were checked.
 This inspection executes no application code; the launch probe has not reached
 this throw notification in Fortnite.
 
+`_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMa` now resolves from Swift
+Dispatch. The `OS_dispatch_queue.Attributes` accessor returns complete UInt64
+POD8 metadata with a distinct nominal descriptor nested in Dispatch's extension
+of the imported queue class. It shares the existing ownership-free value
+witnesses and sealed accessor/data arena, without adding heap or ARC ownership.
+Separate descriptor and metadata exports, conformances, constructors and
+attribute constant getters remain unsupported.
+
+The existing Dispatch flags fixture exercises both nominal types:
+
+```sh
+v run tests/ios/native-checks.v build-swift-dispatch-flags
+```
+
+Evidence is retained under `build/ios/fortnite/dispatch-attributes-checks`.
+Native Swift comparisons cover metadata layout, the nested extension context,
+completion state, preserved `x20`/`x21`, exact value-witness operations and all
+attribute bits. Compatibility checks also cover sealed pages, eight-worker
+canonical publication, rejected unsupported exports and two unmapped runtime
+teardowns. Eight normal/deterministic ASan/UBSan runs passed across the
+attributes/flags, QoS, algebra and async fixtures. The ARM64 fixture, launch
+probe and both import audits passed their checks. All 989 pinned source,
+toolchain and runtime inputs remained unchanged; eight archived
+binary/generated-C pairs and four retained guest serial logs passed SHA256
+verification.
+
+Static inspection traces the accessor from GOT cell `0x10dc9bcc8` through
+stub `0x10c63adb8` and branch island `0x107c28b1c` to caller `0x1000722bc`.
+The caller requests complete metadata, reads the size slot at value-witness
+table plus 64 bytes and rounds it to a 16-byte stack allocation. Three
+consumer/forwarder sites were checked. This inspection executes no application
+code; the launch probe has not reached this accessor in Fortnite.
+
 The launch probe now stops at required Swift Dispatch import
-`_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMa`
-(`OS_dispatch_queue.Attributes` metadata accessor), before application entry.
+`_$sSo17OS_dispatch_queueC8DispatchE10AttributesVMn`
+(`OS_dispatch_queue.Attributes` type descriptor), before application entry.
 Fortnite remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -16639,12 +16672,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,996 | 165 | 78 |
+| Fortnite executable | 1,997 | 164 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,836 | 168 | 114 |
+| All images | 2,837 | 167 | 114 |
 
-The C++/GLES/Text variant reports 2,850 resolved imports, 154 unresolved strong
+The C++/GLES/Text variant reports 2,851 resolved imports, 153 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
