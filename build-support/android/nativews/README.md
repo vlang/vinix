@@ -123,6 +123,13 @@ unmarshalling and recycling release affected references. Raw marshalling rejects
 live Binder objects, since byte arrays cannot preserve their identity.
 UserHandle derives current and calling Android user IDs from the corresponding
 UID ranges. UserManager identifies user zero as the system user.
+GeofenceProvider exposes a stable local Binder and forwards supplied hardware
+interfaces to its callback. GeofenceHardware capability queries preserve the
+AIDL transaction IDs and return Android's fallback values on RemoteException.
+The signed services fixture checks local and forwarded Binder paths, raw wire
+replies and exception propagation. There is no Vinix geofence HAL; device
+registration and geofence monitoring are not implemented. The bridge follows
+the [AOSP provider interface](https://android.googlesource.com/platform/frameworks/base/+/22626107841e928d472e8258c0d2cefccf9c9b81/location/lib/java/com/android/location/provider/GeofenceProvider.java).
 Package visibility also honors legacy target SDKs and `QUERY_ALL_PACKAGES`.
 ApplicationInfo and PackageManager share the actual APK, data and native library
 paths. Elapsed realtime uses the boot clock in the API's requested units.

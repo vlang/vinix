@@ -18,6 +18,147 @@ fn check_stage(expected int, next int) string {
 		'const/4 v0, ${next}\nsput v0, Lorg/vinix/service/App;->stage:I\n'
 }
 
+fn geofence_checks() string {
+	return 'new-instance v0, Lorg/vinix/service/GeofenceProvider;
+invoke-direct {v0}, Lorg/vinix/service/GeofenceProvider;-><init>()V
+invoke-virtual {v0}, Lcom/android/location/provider/GeofenceProvider;->getBinder()Landroid/os/IBinder;
+move-result-object v1
+invoke-virtual {v0}, Lcom/android/location/provider/GeofenceProvider;->getBinder()Landroid/os/IBinder;
+move-result-object v2
+if-ne v1, v2, :bad
+invoke-static {v1}, Landroid/location/IGeofenceProvider$Stub;->asInterface(Landroid/os/IBinder;)Landroid/location/IGeofenceProvider;
+move-result-object v2
+invoke-interface {v2}, Landroid/os/IInterface;->asBinder()Landroid/os/IBinder;
+move-result-object v2
+if-ne v1, v2, :bad
+const/4 v2, 0
+invoke-static {v2}, Landroid/location/IGeofenceProvider$Stub;->asInterface(Landroid/os/IBinder;)Landroid/location/IGeofenceProvider;
+move-result-object v2
+if-nez v2, :bad
+new-instance v2, Lorg/vinix/service/ForwardBinder;
+invoke-direct {v2, v1}, Lorg/vinix/service/ForwardBinder;-><init>(Landroid/os/IBinder;)V
+invoke-static {v2}, Landroid/location/IGeofenceProvider$Stub;->asInterface(Landroid/os/IBinder;)Landroid/location/IGeofenceProvider;
+move-result-object v2
+new-instance v3, Lorg/vinix/service/GeofenceBackend;
+invoke-direct {v3}, Lorg/vinix/service/GeofenceBackend;-><init>()V
+invoke-direct {p0, v3}, Lorg/vinix/service/Main;->checkGeofenceWire(Landroid/os/IBinder;)V
+new-instance v4, Lorg/vinix/service/ForwardBinder;
+invoke-direct {v4, v3}, Lorg/vinix/service/ForwardBinder;-><init>(Landroid/os/IBinder;)V
+invoke-static {v4}, Landroid/hardware/location/IGeofenceHardware$Stub;->asInterface(Landroid/os/IBinder;)Landroid/hardware/location/IGeofenceHardware;
+move-result-object v4
+invoke-interface {v2, v4}, Landroid/location/IGeofenceProvider;->setGeofenceHardware(Landroid/hardware/location/IGeofenceHardware;)V
+iget v4, v0, Lorg/vinix/service/GeofenceProvider;->calls:I
+const/4 v5, 1
+if-ne v4, v5, :bad
+iget-object v4, v0, Lorg/vinix/service/GeofenceProvider;->hardware:Landroid/hardware/location/GeofenceHardware;
+if-eqz v4, :bad
+invoke-virtual {v4}, Landroid/hardware/location/GeofenceHardware;->getMonitoringTypes()[I
+move-result-object v2
+array-length v5, v2
+const/4 v1, 2
+if-ne v5, v1, :bad
+const/4 v5, 0
+aget v1, v2, v5
+if-nez v1, :bad
+const/4 v5, 1
+aget v1, v2, v5
+if-ne v1, v5, :bad
+invoke-virtual {v4, v5}, Landroid/hardware/location/GeofenceHardware;->getStatusOfMonitoringType(I)I
+move-result v1
+if-nez v1, :bad
+const/16 v5, 99
+invoke-virtual {v4, v5}, Landroid/hardware/location/GeofenceHardware;->getStatusOfMonitoringType(I)I
+move-result v1
+const/4 v5, 2
+if-ne v1, v5, :bad
+const/4 v1, 1
+iput v1, v3, Lorg/vinix/service/GeofenceBackend;->failure:I
+invoke-virtual {v4}, Landroid/hardware/location/GeofenceHardware;->getMonitoringTypes()[I
+move-result-object v1
+array-length v1, v1
+if-nez v1, :bad
+const/4 v5, 0
+invoke-virtual {v4, v5}, Landroid/hardware/location/GeofenceHardware;->getStatusOfMonitoringType(I)I
+move-result v1
+const/4 v5, 2
+if-ne v1, v5, :bad
+iput v5, v3, Lorg/vinix/service/GeofenceBackend;->failure:I
+:security_start
+invoke-virtual {v4}, Landroid/hardware/location/GeofenceHardware;->getMonitoringTypes()[I
+:security_end
+.catch Ljava/lang/SecurityException; {:security_start .. :security_end} :security
+goto :bad
+:security
+move-exception v1
+invoke-virtual {v0}, Lcom/android/location/provider/GeofenceProvider;->getBinder()Landroid/os/IBinder;
+move-result-object v0
+invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;
+move-result-object v1
+const-string v2, "wrong.descriptor"
+invoke-virtual {v1, v2}, Landroid/os/Parcel;->writeInterfaceToken(Ljava/lang/String;)V
+const/4 v2, 1
+const/4 v3, 0
+const/4 v4, 0
+:token_start
+invoke-interface {v0, v2, v1, v3, v4}, Landroid/os/IBinder;->transact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z
+:token_end
+.catch Ljava/lang/SecurityException; {:token_start .. :token_end} :token
+goto :bad
+:token
+move-exception v2
+invoke-virtual {v1}, Landroid/os/Parcel;->recycle()V
+const/16 v2, 99
+const/4 v1, 0
+invoke-interface {v0, v2, v1, v3, v4}, Landroid/os/IBinder;->transact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z
+move-result v1
+if-nez v1, :bad
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "geofence provider Binder and capability forwarding"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+}
+
+fn geofence_classes(dir string) ! {
+	os.write_file(dir + '/GeofenceProvider.smali', '.class public Lorg/vinix/service/GeofenceProvider;\n.super Lcom/android/location/provider/GeofenceProvider;\n' +
+		'.field public calls:I\n.field public hardware:Landroid/hardware/location/GeofenceHardware;\n' +
+		method('public constructor <init>()V', 'invoke-direct {p0}, Lcom/android/location/provider/GeofenceProvider;-><init>()V\nreturn-void') +
+		method('public onGeofenceHardwareChange(Landroid/hardware/location/GeofenceHardware;)V', 'iget v0, p0, Lorg/vinix/service/GeofenceProvider;->calls:I\nadd-int/lit8 v0, v0, 1\niput v0, p0, Lorg/vinix/service/GeofenceProvider;->calls:I\niput-object p1, p0, Lorg/vinix/service/GeofenceProvider;->hardware:Landroid/hardware/location/GeofenceHardware;\nreturn-void'))!
+	os.write_file(dir + '/ForwardBinder.smali', '.class public Lorg/vinix/service/ForwardBinder;\n.super Landroid/os/Binder;\n.field private target:Landroid/os/IBinder;\n' +
+		method('public constructor <init>(Landroid/os/IBinder;)V', 'invoke-direct {p0}, Landroid/os/Binder;-><init>()V\niput-object p1, p0, Lorg/vinix/service/ForwardBinder;->target:Landroid/os/IBinder;\nreturn-void') +
+		method('protected onTransact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z', 'iget-object v0, p0, Lorg/vinix/service/ForwardBinder;->target:Landroid/os/IBinder;\ninvoke-interface {v0, p1, p2, p3, p4}, Landroid/os/IBinder;->transact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z\nmove-result v0\nreturn v0'))!
+	os.write_file(dir + '/GeofenceBackend.smali', '.class public Lorg/vinix/service/GeofenceBackend;\n.super Landroid/hardware/location/IGeofenceHardware$Stub;\n.field public failure:I\n' +
+		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/hardware/location/IGeofenceHardware$Stub;-><init>()V\nreturn-void') +
+		method('private checkFailure()V', 'iget v0, p0, Lorg/vinix/service/GeofenceBackend;->failure:I\nif-eqz v0, :ok\nconst/4 v1, 1\nif-ne v0, v1, :security\nnew-instance v0, Landroid/os/RemoteException;\ninvoke-direct {v0}, Landroid/os/RemoteException;-><init>()V\nthrow v0\n:security\nnew-instance v0, Ljava/lang/SecurityException;\ninvoke-direct {v0}, Ljava/lang/SecurityException;-><init>()V\nthrow v0\n:ok\nreturn-void') +
+		method('public getMonitoringTypes()[I', 'invoke-direct {p0}, Lorg/vinix/service/GeofenceBackend;->checkFailure()V\nconst/4 v0, 2\nnew-array v0, v0, [I\nconst/4 v1, 1\naput v1, v0, v1\nreturn-object v0') +
+		method('public getStatusOfMonitoringType(I)I', 'invoke-direct {p0}, Lorg/vinix/service/GeofenceBackend;->checkFailure()V\nconst/4 v0, 1\nif-ne p1, v0, :unsupported\nconst/4 v0, 0\nreturn v0\n:unsupported\nconst/4 v0, 2\nreturn v0'))!
+}
+
+fn geofence_wire_checks() string {
+	mut body := ''
+	// Independent AIDL wire checks: IDs 3 and 4 follow the two HAL setters.
+	for code in [3, 4] {
+		body += 'invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;\nmove-result-object v0\n' +
+			'invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;\nmove-result-object v1\n' +
+			'const-string v2, "android.hardware.location.IGeofenceHardware"\ninvoke-virtual {v0, v2}, Landroid/os/Parcel;->writeInterfaceToken(Ljava/lang/String;)V\n'
+		if code == 4 { body += 'const/4 v2, 1\ninvoke-virtual {v0, v2}, Landroid/os/Parcel;->writeInt(I)V\n' }
+		body += 'const/4 v2, ' + code.str() + '\nconst/4 v3, 0\n' +
+			'invoke-interface {p1, v2, v0, v1, v3}, Landroid/os/IBinder;->transact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z\nmove-result v2\nif-eqz v2, :bad\n' +
+			'invoke-virtual {v1}, Landroid/os/Parcel;->readException()V\n'
+		if code == 3 {
+			body += 'invoke-virtual {v1}, Landroid/os/Parcel;->readInt()I\nmove-result v2\nconst/4 v3, 2\nif-ne v2, v3, :bad\n' +
+				'invoke-virtual {v1}, Landroid/os/Parcel;->readInt()I\nmove-result v2\nif-nez v2, :bad\n' +
+				'invoke-virtual {v1}, Landroid/os/Parcel;->readInt()I\nmove-result v2\nconst/4 v3, 1\nif-ne v2, v3, :bad\n'
+		} else {
+			body += 'invoke-virtual {v1}, Landroid/os/Parcel;->readInt()I\nmove-result v2\nif-nez v2, :bad\n'
+		}
+		body += 'invoke-virtual {v1}, Landroid/os/Parcel;->dataAvail()I\nmove-result v2\nif-nez v2, :bad\n' +
+			'invoke-virtual {v0}, Landroid/os/Parcel;->recycle()V\ninvoke-virtual {v1}, Landroid/os/Parcel;->recycle()V\n'
+	}
+	return body + 'return-void\n:bad\nnew-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "geofence hardware AIDL wire"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0'
+}
+
 fn binder_checks() string {
 	return 'new-instance v0, Lorg/vinix/service/LocalBinder;
 invoke-direct {v0}, Lorg/vinix/service/LocalBinder;-><init>()V
@@ -1029,6 +1170,8 @@ return-object v0'))!
 		method('private checkBinder()V', binder_checks()) +
 		method('private checkParcel()V', parcel_checks()) +
 		method('private checkTypedParcel()V', typed_parcel_checks()) +
+		method('private checkGeofence()V', geofence_checks()) +
+		method('private checkGeofenceWire(Landroid/os/IBinder;)V', geofence_wire_checks()) +
 		method('private checkUser()V', user_checks()) +
 		method('private checkPriority()V', priority_checks()) +
 		method('private checkImportance()V', importance_checks()) +
@@ -1075,6 +1218,7 @@ invoke-direct {p0}, Lorg/vinix/service/Main;->checkComponents()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkBinder()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkParcel()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkTypedParcel()V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkGeofence()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkUser()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkImportance()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkPriority()V
@@ -1199,6 +1343,7 @@ invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void'))!
 	importance_listener(out + '/client/smali/org/vinix/service')!
 	typed_parcel_classes(out + '/client/smali/org/vinix/service')!
+	geofence_classes(out + '/client/smali/org/vinix/service')!
 	for name in ['client', 'companion'] {
 		dir := out + '/' + name
 		os.mkdir_all(dir + '/res/values')!

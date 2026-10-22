@@ -160,6 +160,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  sources['tests/native-android-tools/androidtools/framework_parcel.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_parcel.v')!)
  sources['tests/native-android-tools/androidtools/framework_users.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_users.v')!)
  sources['tests/native-android-tools/androidtools/framework_activity_manager.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_activity_manager.v')!)
+ sources['tests/native-android-tools/androidtools/framework_geofence.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_geofence.v')!)
  receipt := ah.Value({
   'schema': ah.Value(1)
   'input_sha256': ah.Value(input_hash)
