@@ -31,7 +31,7 @@ fn install_services(output string, staging string) ! {
 
 fn stage_client_modules(root string, staging string) ! {
 	// The editable in-guest desktop also needs its shared client imports.
-	for name in ['sessioncore', 'sessionipc'] {
+	for name in ['sessioncore', 'sessionipc', 'sessionruntime'] {
 		destination := staging + '/usr/share/vinix/desktop-dev/vmodules/desktop/' + name
 		if os.is_dir(destination) { os.rmdir_all(destination)! }
 		os.mkdir_all(os.dir(destination))!
@@ -128,7 +128,7 @@ fn main() {
 	// Cache only service source/modules and the selected compiler/runtime inputs.
 	mut inputs := [compiler, arch, sysroot, clang]
 	for directory in ['services', 'sessiondaemon', 'sessionipc', 'serviceprocess', 'servicerunner',
-		'timesync', 'sessioncore'] {
+		'timesync', 'sessioncore', 'sessionruntime'] {
 		mut files := os.walk_ext(root + '/desktop/' + directory, '.v')
 		files.sort()
 		for path in files {

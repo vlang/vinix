@@ -5,8 +5,11 @@ without ui2, X11, or Wayland. Connect to the desktop's Unix stream socket,
 request a pixel buffer, map it with `mmap(MAP_SHARED)`, and draw XRGB pixels.
 The same socket is a waitable event descriptor for `poll`, `select`, or `epoll`.
 
-The default socket is `/run/vinix-session.<uid>/windows`. Both client and desktop
-honor `VINIX_WINDOW_SOCKET`; `VINIX_SESSION_RUNTIME` changes the `/run` base.
+The ordinary-account default socket is
+`/run/user/<uid>/vinix-session.<uid>/windows`; root uses
+`/run/vinix-session.0/windows`. Both client and desktop honor
+`VINIX_WINDOW_SOCKET`; `VINIX_SESSION_RUNTIME` preserves the explicit runtime
+base-directory override. The ordinary default validates its trusted parent chain.
 The desktop starts the service after user registration. Connections must belong
 to its user. A process can open multiple connections, one per window, and can
 start from a shell or any other launcher.

@@ -146,7 +146,7 @@ fn stage(root string, dest string) ! {
 		if baseline.exit_code != 0 { return error('could not isolate module ${path}') }
 		os.write_file(output, baseline.output)!
 	}
-	for name in ['sessioncore', 'sessionipc'] {
+	for name in ['sessioncore', 'sessionipc', 'sessionruntime'] {
 		os.cp_all('${root}/desktop/${name}', '${dest}/modules/desktop/${name}', true)!
 	}
 	// Its ABI is generated independently of the desktop's libc declarations.

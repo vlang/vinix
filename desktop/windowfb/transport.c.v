@@ -2,6 +2,7 @@
 module windowfb
 
 import os
+import desktop.sessionruntime
 import net as _
 
 #include <errno.h>
@@ -53,11 +54,7 @@ fn address(path string) !Address {
 }
 
 pub fn runtime_directory() string {
-	base := os.getenv_opt('VINIX_SESSION_RUNTIME') or { '/run' }
-	defer { unsafe { base.free() } }
-	uid := C.getuid().str()
-	defer { unsafe { uid.free() } }
-	return base + '/vinix-session.' + uid
+	return sessionruntime.directory()
 }
 
 pub fn socket_path() string {
@@ -105,6 +102,9 @@ pub fn adopt(fd int) !&Connection {
 
 pub fn connect(path string) !&Connection {
 	addr := address(path)!
+	if !sessionruntime.socket_directory(path, 'windows') {
+		return error('unsafe window session directory')
+	}
 	fd := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
 	if fd < 0 { return error('cannot create window socket') }
 	// A local Unix connect completes before switching to nonblocking I/O.
@@ -211,6 +211,9 @@ mut:
 
 pub fn listen(path string) !Listener {
 	addr := address(path)!
+	if !sessionruntime.socket_directory(path, 'windows') {
+		return error('unsafe window session directory')
+	}
 	lock_path := path + '.lock'
 	defer { unsafe { lock_path.free() } }
 	lock_fd := C.open(&char(lock_path.str), C.O_RDWR | C.O_CREAT | C.O_NOFOLLOW | C.O_CLOEXEC, 0o600)

@@ -79,8 +79,10 @@ Use the guest's C compiler/sysroot to build the application, adding
 `-I<SDK>/include -L<SDK>/lib -lvinix-window`. Deploy the shared library to the
 guest's library path, or link the static archive with `-lpthread -lm`.
 
-`vinix_window_open` reads `VINIX_WINDOW_SOCKET`, otherwise it connects to
-`/run/vinix-session.<uid>/windows`. `vinix_window_open_at` takes an explicit
+`vinix_window_open` reads `VINIX_WINDOW_SOCKET`, otherwise an ordinary account
+connects to `/run/user/<uid>/vinix-session.<uid>/windows` and root connects to
+`/run/vinix-session.0/windows`. `VINIX_SESSION_RUNTIME` preserves the explicit
+runtime base-directory override. `vinix_window_open_at` takes an explicit
 socket pathname. Creation returns a handle or NULL; other fallible calls return
 -1 and optionally write a NUL-terminated message to the supplied error struct.
 Passing NULL for error output is supported. Successful calls clear that message.

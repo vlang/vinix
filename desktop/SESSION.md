@@ -111,9 +111,11 @@ longer accepted. Closing or losing the connection saves session state and shuts
 down supervised services. A restarted compositor launches a fresh broker and
 connection, restoring durable alarms and service configuration from snapshots.
 
-The private 0700 runtime directory is `/run/vinix-session.<uid>`; its Unix socket
-is 0600. Kernel peer credentials supply identity. `VINIX_SESSION_RUNTIME` can
-select a test directory. Frames have a four-byte little-endian length followed
+The private 0700 runtime directory is `/run/user/<uid>/vinix-session.<uid>` for
+ordinary accounts and `/run/vinix-session.0` for root; its Unix socket is 0600.
+The ordinary default validates the trusted `/run/user/<uid>` parent chain.
+Kernel peer credentials supply identity. `VINIX_SESSION_RUNTIME` preserves the
+explicit base-directory override. Frames have a four-byte little-endian length followed
 by a bounded UTF-8 record; text arguments are hex-encoded tab fields. General
 records are limited to 256 KiB. Clipboard bytes use a separate bounded encoding.
 

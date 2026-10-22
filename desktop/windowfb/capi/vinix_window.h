@@ -54,7 +54,9 @@ uint32_t vinix_window_api_version(void);
 
 /* Blocking creation, with a five-second handshake wait. Returns NULL on error.
  * Strings need only remain valid for this call. error may be NULL on all calls.
- * open uses VINIX_WINDOW_SOCKET or /run/vinix-session.<uid>/windows. */
+ * open honors VINIX_WINDOW_SOCKET and VINIX_SESSION_RUNTIME; otherwise it uses
+ * /run/user/<uid>/vinix-session.<uid>/windows, or /run/vinix-session.0/windows
+ * for root. */
 vinix_window *vinix_window_open(const char *title, int32_t width, int32_t height,
                               vinix_window_error *error);
 vinix_window *vinix_window_open_at(const char *socket_path, const char *title,

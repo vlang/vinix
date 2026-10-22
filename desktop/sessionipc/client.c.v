@@ -2,7 +2,7 @@
 module sessionipc
 
 import desktop.sessioncore
-import os
+import desktop.sessionruntime
 import net as _
 
 pub struct SessionAddress {
@@ -26,14 +26,7 @@ pub mut:
 }
 
 pub fn session_runtime_directory() string {
-	base := os.getenv_opt('VINIX_SESSION_RUNTIME') or { '/run' }
-	defer { unsafe { base.free() } }
-	mut writer := &sessioncore.Writer{}
-	defer { unsafe { free(writer) } }
-	writer.add(base)
-	writer.add('/vinix-session.')
-	writer.number(C.getuid())
-	return writer.finish()
+	return sessionruntime.directory()
 }
 
 pub fn session_address(path string) ?SessionAddress {
@@ -51,13 +44,7 @@ pub fn session_address(path string) ?SessionAddress {
 }
 
 pub fn session_private_directory(directory string) bool {
-	if unsafe { C.mkdir(&char(directory.str), u32(0o700)) } != 0 && C.errno != C.EEXIST {
-		return false
-	}
-	mut info := &C.stat{}
-	defer { unsafe { free(info) } }
-	return unsafe { C.lstat(&char(directory.str), info) } == 0 && u32(info.st_mode) & C.S_IFMT == C.S_IFDIR
-		&& u32(info.st_uid) == C.getuid() && u32(info.st_mode) & 0o077 == 0
+	return sessionruntime.private_directory(directory)
 }
 
 pub fn session_connect() ?int {
