@@ -28,6 +28,10 @@ fn build() !int {
 		configured_cc := os.getenv('CC_AMD64')
 		cc = [if configured_cc == '' { 'x86_64-linux-musl-gcc' } else { configured_cc }]
 	}
+	// The frozen V library emits an i64 wait status for C's int pointer. Keep
+	// that generated-C diagnostic nonfatal on current Clang and GCC, as the
+	// compatibility builder did before staging captured its output paths.
+	cc << ['-w', '-Wno-error=incompatible-pointer-types']
 	configured_v := os.getenv('V')
 	v := os.find_abs_path_of_executable(if configured_v == '' { @VEXE } else { configured_v })!
 	os.mkdir_all(root, mode: 0o755)!
