@@ -42,8 +42,8 @@ storage, expand the dirty rectangle to the full buffer, and post through the WS
 compositor. CPU-only, single-layer RGBA hardware buffers support reference
 counting, description and balanced locks; GPU usages and external fences fail.
 NDK one-shot frame callbacks run on the WS main Looper with monotonic timestamps.
-Secondary NDK Loopers, refresh-rate notifications, SurfaceHolder Canvas locking
-and EGL window rendering are not implemented.
+Secondary NDK Loopers, refresh-rate notifications and SurfaceHolder Canvas
+locking are not implemented.
 Window refresh-rate preferences are retained as Java attributes; the native
 compositor does not currently select display modes from these hints.
 
@@ -61,12 +61,24 @@ Initial-exec TLS is rejected because static TLS allocation is not implemented.
 The bootstrap fixture checks real compiler-generated descriptors across two
 libraries and eight worker threads (`BOOTSTRAP-TLSDESC-PASS`).
 
-Pinned Mesa GLES entrypoint and dispatch libraries resolve native graphics
-imports without loading Gallium, an EGL vendor, X11 or GTK. The software WS
-Canvas has no current EGL display, context or surface. EGL queries report that
-state, and context/display creation fails with per-thread EGL error codes.
-GLES rendering, AR and video contexts remain unavailable. The staged Mesa
-receipt, license overview and dispatch/header sources accompany its binaries.
+Pinned Mesa GLES dispatch libraries and a surfaceless EGL provider run software
+GLES through Gallium softpipe. EGL windows render to pbuffers and post flipped
+RGBA pixels through the native WS buffer queue; X11, GTK and Wayland are absent.
+The Java EGL10 bridge handles displays, configurations, contexts, surfaces and
+current-thread queries. Destruction retains a current window until every thread
+unbinds it. Readback preserves framebuffer and ES3 pixel-pack state. CPU and EGL
+producers cannot own the same window simultaneously.
+
+The backing pbuffer retains its creation dimensions; a resized WS view scales
+that buffer until the app recreates its EGL surface. Pixmaps, native fences,
+external images, Vulkan, AR and video contexts remain unavailable. This is a
+CPU renderer; no GPU acceleration is selected. The V build packages the pinned
+software DRI closure, verifies its ELF dependencies, and retains upstream
+sources, notices and a SHA256 receipt. The regression APK checks shader output,
+window presentation, thread isolation, deferred destruction and Java array
+validation; these checks alone do not establish compatibility with Maps.
+View drawing preserves the destination Canvas through backgrounds and child
+views, including bitmap targets used by the window composition regression.
 
 Application attachment precedes main-process content providers (descending
 `initOrder`), then `Application.onCreate`, then Activity construction. Disabled

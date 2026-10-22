@@ -78,6 +78,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_asset_streams(smali)!
  framework_view_geometry(smali)!
  framework_view_configuration(smali)!
+ framework_egl(smali)!
  framework_view_attachment(smali)!
  framework_gradient_colors(smali)!
  framework_paths(smali)!
@@ -136,6 +137,7 @@ pub fn write_framework_classes(smali string) ! {
  canvas := smali + '/android/atl/GskCanvas.smali'
  canvas_text := os.read_file(canvas)! + '\n.field private vinixDrawState:J\n'
  os.write_file(canvas, framework_replace_method(canvas_text, 'finalize()V', '.method protected native finalize()V\n.end method')!)!
+ framework_view_canvas(smali)!
  // A Java Surface may outlive its holder. Retain the view owning the native
  // window, so Surface.widget cannot become a dangling WsView pointer.
  surface := smali + '/android/view/Surface.smali'

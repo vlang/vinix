@@ -142,6 +142,8 @@ pub fn build_native_ws(smali string, runtime string, output string, compiler str
 			mut native_body := body
 			if class_name == 'android/atl/GskCanvas' && method_name != 'finalize' {
 				native_body = 'previous := ws_canvas_enter(e,this,p0); defer { ws_canvas_leave(previous) }; if pending(e) { return };\n' + native_body
+			} else if class_name in ['android/view/View', 'android/view/ViewGroup'] && method_name in ['native_drawBackground', 'native_drawContent', 'native_drawChildren'] {
+				native_body = "previous := ws_canvas_enter(e,p1,get_long(e,p1,c'android/atl/GskCanvas',c'snapshot')); defer { ws_canvas_leave(previous) }; if pending(e) { return };\n" + native_body
 			}
 			generated += "\n@[export: '${symbol}']\nfn ws_binding_${count}(${args.join(', ')}) ${result} {\n    unsafe {\n ${native_body}\n }\n}\n"
 			count++
@@ -157,7 +159,8 @@ pub fn build_native_ws(smali string, runtime string, output string, compiler str
 	build_native_bionic(output, runtime, compiler, arch)!
 	// Keep the preloaded Bionic ABI provider in step with the native loader.
 	build_runtime(output + '/libvinix-android-compat.so', compiler, output + '/runtime-generated', arch)!
-	build_native_gl_dispatch(output)!
+	build_native_gl_dispatch(output, compiler, arch)!
+	build_native_egl_provider(output, runtime, compiler)!
 	checked([compiler, '-D_GNU_SOURCE', '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-unused-function', '-Wno-unused-label',
 		'-Wno-unused-parameter', '-fvisibility=hidden', '-shared', '-fPIC', '-I' + output,
 		'-Wl,-z,max-page-size=65536', '-Wl,--allow-shlib-undefined', output + '/android-native.c',

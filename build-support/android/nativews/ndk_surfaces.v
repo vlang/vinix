@@ -33,6 +33,7 @@ mut:
 	buffer_width i32
 	buffer_height i32
 	locked     bool
+	egl_connected bool
 	front      i64
 	back       i64
 }
@@ -132,11 +133,15 @@ pub fn ws_window_geometry(window &WsNativeWindow, width i32, height i32, format 
 
 @[export: 'ANativeWindow_lock']
 pub fn ws_window_lock(window &WsNativeWindow, buffer &WsNativeBuffer, dirty &WsNativeRect) i32 {
+	return ws_window_lock_pixels(window, buffer, dirty, false)
+}
+
+fn ws_window_lock_pixels(window &WsNativeWindow, buffer &WsNativeBuffer, dirty &WsNativeRect, egl bool) i32 {
 	if window == unsafe { nil } || buffer == unsafe { nil } { return -22 }
 	C.pthread_mutex_lock(&window.mutex)
 	defer { C.pthread_mutex_unlock(&window.mutex) }
 	unsafe {
-		if window.locked { return -16 }
+		if window.locked || (window.egl_connected && !egl) { return -16 }
 		width := if window.buffer_width > 0 { window.buffer_width } else { window.width }
 		height := if window.buffer_height > 0 { window.buffer_height } else { window.height }
 		if width <= 0 || height <= 0 { return -22 }

@@ -203,6 +203,7 @@ throw v0') +
 		'.method public static native nativeCheck(Landroid/content/res/AssetManager;)Z\n.end method\n' +
 		'.method public static native nativeBitmap(Landroid/graphics/Bitmap;)Z\n.end method\n' +
 		'.method public static native nativeGraphics()Z\n.end method\n' +
+		'.method public static native nativeEglWindow(Landroid/view/Surface;)Z\n.end method\n' +
 		'.method public static native nativeWindow(Landroid/view/Surface;)Z\n.end method\n' +
 		'.method public static native nativeLibc()Z\n.end method\n' +
 		'.method public static native nativeTls()Z\n.end method\n' +
@@ -830,6 +831,19 @@ if-eqz v0, :bad
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
 const-string v1, "BOOTSTRAP-NATIVE-WINDOW-PASS geometry cpu-post hardware-buffer refs"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+sget-object v0, Lorg/vinix/bootstrap/Main;->surface:Landroid/view/SurfaceView;
+invoke-virtual {v0}, Landroid/view/SurfaceView;->getHolder()Landroid/view/SurfaceHolder;
+move-result-object v0
+invoke-interface {v0}, Landroid/view/SurfaceHolder;->getSurface()Landroid/view/Surface;
+move-result-object v0
+invoke-static {v0}, Lorg/vinix/bootstrap/Main;->nativeEglWindow(Landroid/view/Surface;)Z
+move-result v0
+if-eqz v0, :bad
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-EGL-WINDOW-PASS shaders pixels swap pack-state"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+sget-object v0, Lorg/vinix/bootstrap/Main;->surface:Landroid/view/SurfaceView;
+invoke-static {v0}, Lorg/vinix/bootstrap/EglProbe;->composition(Landroid/view/SurfaceView;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->bitmapCanvasCheck()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->textCheck(Landroid/content/Context;)V
 invoke-direct {p0}, Lorg/vinix/bootstrap/Main;->checkWidget()V
@@ -891,7 +905,7 @@ invoke-direct {v3, v4, v5}, Landroid/view/ViewGroup$LayoutParams;-><init>(II)V
 invoke-virtual {v2, v0, v3}, Landroid/view/ViewGroup;->addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V
 invoke-virtual {p0, v2}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "BOOTSTRAP-NDK-PASS order paths clocks is64bit assets rtl webp matrix network bitmap clients graphics-unavailable bitmap-canvas notifications-queued"
+const-string v1, "BOOTSTRAP-NDK-PASS order paths clocks is64bit assets rtl webp matrix network bitmap clients EGL-software-rendering bitmap-canvas notifications-queued"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void
 :bad

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Optional graphics-symbol lookup for the headless Bionic linker. The WS
-// backend has no EGL context or GLES implementation. Missing symbols remain
-// linkage failures; resolving a symbol never loads a display library.
+// Graphics-symbol lookup for the Bionic linker. The native WS runtime loads
+// its software EGL/GLES provider before APK libraries. Missing symbols remain
+// linkage failures; lookup itself does not load another window system.
 @[translated]
 module wsloader
 

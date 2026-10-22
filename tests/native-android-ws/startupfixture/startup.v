@@ -14,6 +14,7 @@ pub fn install(output string, resources string) ! {
  install_battery_probe(dir)!
  install_geometry_probe(dir)!
  install_view_configuration_probe(dir)!
+ install_egl_probe(dir)!
  install_attachment_probe(dir)!
  install_drawable_probe(dir)!
  install_path_probe(dir)!
@@ -66,6 +67,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/PowerProbe;->check(Landroid/content/Con
 invoke-static {p0}, Lorg/vinix/bootstrap/BatteryProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/GeometryProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/ViewConfigurationProbe;->check(Landroid/content/Context;)V
+invoke-static {}, Lorg/vinix/bootstrap/EglProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/AttachmentProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/DrawableProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/PathProbe;->check()V

@@ -213,7 +213,7 @@ fn ws_layout(e voidptr, object voidptr, left i32, top i32, right i32, bottom i32
 	ws_mark()
 }
 
-fn ws_draw_background(e voidptr, object voidptr) {
+fn ws_draw_background(e voidptr, object voidptr, canvas voidptr) {
 	unsafe {
 		view := ws_view(e, object)
 		width := integer(e, object, c'android/view/View', c'getWidth', c'()I', nil)
@@ -222,7 +222,7 @@ fn ws_draw_background(e voidptr, object voidptr) {
 		if background != nil {
 			bounds := [Value{ i: 0 }, Value{ i: 0 }, Value{ i: width }, Value{ i: height }]!
 			call(e, background, c'android/graphics/drawable/Drawable', c'setBounds', c'(IIII)V', &bounds[0])
-			draw := [Value{ l: ws.canvas }]!
+			draw := [Value{ l: canvas }]!
 			call(e, background, c'android/graphics/drawable/Drawable', c'draw', c'(Landroid/graphics/Canvas;)V', &draw[0])
 		}
 		if view.background >> 24 != 0 {
@@ -315,7 +315,7 @@ fn ws_draw_content(e voidptr, object voidptr) {
 	}
 }
 
-fn ws_draw_children(e voidptr, object voidptr) {
+fn ws_draw_children(e voidptr, object voidptr, canvas voidptr) {
 	unsafe {
 		// ViewGroup's Java native_drawContent is empty; WebView is a leaf
 		// ViewGroup whose content belongs to this renderer.
@@ -335,7 +335,7 @@ fn ws_draw_children(e voidptr, object voidptr) {
 				ws_save()
 				ws_translate(f32(left), f32(top))
 				ws_clip(0, 0, f32(width), f32(height))
-				draw_args := [Value{ l: ws.canvas }]!
+				draw_args := [Value{ l: canvas }]!
 				call(e, child, c'android/view/View', c'draw', c'(Landroid/graphics/Canvas;)V', &draw_args[0])
 				ws_restore()
 			}

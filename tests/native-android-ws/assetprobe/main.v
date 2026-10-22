@@ -43,20 +43,20 @@ fn C.ASurfaceTexture_getTimestamp(voidptr) i64
 pub fn graphics_check(e voidptr, class voidptr) u8 {
 	unsafe {
 		if C.eglGetCurrentDisplay() != nil || C.eglGetCurrentContext() != nil
-			|| C.eglGetCurrentSurface(0x3059) != nil || C.eglGetError() != 0x3000 { return 0 }
+			|| C.eglGetCurrentSurface(0x3059) != nil || C.eglGetError() != 0x3000 { C.puts(c'EGL-PROBE initial-state'); return 0 }
 		if C.eglGetProcAddress(c'glCreateShader') == nil
-			|| C.eglGetProcAddress(c'glEGLImageTargetTexture2DOES') == nil { return 0 }
+			|| C.eglGetProcAddress(c'glEGLImageTargetTexture2DOES') == nil { C.puts(c'EGL-PROBE procedures'); return 0 }
 		C.eglGetCurrentSurface(0)
-		if C.eglGetError() != 0x300c || C.eglGetError() != 0x3000 { return 0 }
+		if C.eglGetError() != 0x300c || C.eglGetError() != 0x3000 { C.puts(c'EGL-PROBE invalid-current'); return 0 }
 		mut major, mut minor := i32(-9), i32(-8)
 		if C.eglInitialize(nil, &major, &minor) != 0 || C.eglGetError() != 0x3008
-			|| major != -9 || minor != -8 || C.eglGetError() != 0x3000 { return 0 }
+			|| major != -9 || minor != -8 || C.eglGetError() != 0x3000 { C.puts(c'EGL-PROBE invalid-display'); return 0 }
 		if C.eglTerminate(nil) != 0 || C.eglGetError() != 0x3008
 			|| C.eglBindAPI(0x30a0) != 1 || C.eglQueryAPI() != 0x30a0
-			|| C.eglBindAPI(0x30a2) != 0 || C.eglGetError() != 0x300c { return 0 }
+			|| C.eglBindAPI(0x30a2) != 0 || C.eglGetError() != 0x300c { C.puts(c'EGL-PROBE API'); return 0 }
 		C.eglBindAPI(0)
 		if C.eglReleaseThread() != 1 || C.eglGetError() != 0x3000
-			|| C.eglGetCurrentContext() != nil || C.eglQueryAPI() != 0x30a0 { return 0 }
+			|| C.eglGetCurrentContext() != nil || C.eglQueryAPI() != 0x30a0 { C.puts(c'EGL-PROBE release'); return 0 }
 		if C.ASurfaceTexture_fromSurfaceTexture(e, nil) != nil
 			|| C.ASurfaceTexture_fromSurfaceTexture(e, class) != nil
 			|| C.ASurfaceTexture_attachToGLContext(nil, 1) != -22
@@ -64,6 +64,8 @@ pub fn graphics_check(e voidptr, class voidptr) u8 {
 			|| C.ASurfaceTexture_updateTexImage(nil) != -22
 			|| C.ASurfaceTexture_getTimestamp(nil) != 0 { return 0 }
 		C.ASurfaceTexture_release(nil)
+		if !egl_render_check(nil) { return 0 }
+		C.puts(c'BOOTSTRAP-EGL-PBUFFER-PASS shaders pixels thread-isolation')
 		return 1
 	}
 }
