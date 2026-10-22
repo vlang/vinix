@@ -150,6 +150,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_parcel_binders(smali)!
  framework_user_identity(smali)!
  framework_package_signatures(smali)!
+ framework_native_digests(smali)!
  framework_assemble(smali, work + '/classes.dex', tools, java)!
  next := work + '/api-impl.jar'
  os.cp(input, next)!
@@ -171,7 +172,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  sources['tests/native-android-tools/androidtools/framework_activity_manager.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_activity_manager.v')!)
  sources['tests/native-android-tools/androidtools/framework_geofence.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_geofence.v')!)
  sources['tests/native-android-tools/androidtools/framework_device_policy.v'] = ah.Value(framework_digest(root() + '/tests/native-android-tools/androidtools/framework_device_policy.v')!)
- for name in ['sqlite_params', 'sqlite_idle', 'location_state', 'location_value', 'gnss', 'gnss_values', 'wifi', 'time_utils', 'alarm', 'accounts', 'intent', 'work_source', 'package_enumeration', 'absent_hardware', 'assets'] {
+ for name in ['sqlite_params', 'sqlite_idle', 'location_state', 'location_value', 'gnss', 'gnss_values', 'wifi', 'time_utils', 'alarm', 'accounts', 'intent', 'work_source', 'package_enumeration', 'absent_hardware', 'assets', 'digests'] {
   path := 'tests/native-android-tools/androidtools/framework_' + name + '.v'
   sources[path] = ah.Value(framework_digest(root() + '/' + path)!)
  }

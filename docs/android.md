@@ -153,6 +153,14 @@ converters the installed Java provider cannot construct. The normal ATL build
 generates the JNI declarations and packages the V library with source/tool
 hashes in its manifest. APK files are not patched.
 
+The native WS runner installs a streaming JCA provider for SHA-256, SHA-384
+and SHA-512 before APK loading. It uses the private runtime's OpenSSL EVP
+implementation, including independent cloned digest state and reset after
+finalization. APK signature verification still authenticates the original
+contents and certificates. The signed `tests/native-android-ws/digests-fixture.v`
+guest regression compares known vectors and Bouncy Castle results and checks
+streaming, byte buffers, cloning, reset, invalid input and native handle cleanup.
+
 These application checks do not establish complete runtime conformance or
 mobile hardware support. The preserved runtime still fails the newer
 `ANDROID-ATFORK-FAIL Android ABI exports` preflight. Rebuild matching overlays

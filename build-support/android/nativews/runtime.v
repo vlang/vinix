@@ -363,6 +363,10 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		if register_dialog_builder(e) != 0 || register_dialog_click(e) != 0 || register_recreate(e) != 0 {
 			return 1
 		}
+		if !ws_install_digests(e, root) {
+			ws_failure(e, c'ANDROID-WS-FAIL native digests')
+			return 1
+		}
 		ws_static_int(e, c'android/view/Display', c'window_width', ws.width)
 		ws_static_int(e, c'android/view/Display', c'window_height', ws.height)
 		static_void(e, c'android/os/Looper', c'prepareMainLooper', c'()V', nil)
