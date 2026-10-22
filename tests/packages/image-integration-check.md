@@ -107,6 +107,49 @@ to recheck an existing ledger while those local artifacts remain available.
 
 ```sh
 v -nocache -prod -o /tmp/image-integration-retain tests/packages/image-integration-retain.v
-/tmp/image-integration-retain /build/host /build/arm /build/x86
-/tmp/image-integration-retain --verify
+/tmp/image-integration-retain /build/host /build/arm /build/x86 --output /build/new-evidence
+/tmp/image-integration-retain --verify /build/new-evidence/image-integration-ledger.json
 ```
+
+## Validator build modes, 2026-10-23
+
+The retainer now uses explicit errors for every admission check. The previous
+documented `-prod` command compiled away its assertions, including ledger
+format, hashes, guest success/failure and denial counters. The
+[mode controls](image-integration-evidence-check.v) reproduce that defect with
+the original retainer: its production build accepts an invalid ledger with a
+wrong input digest; its normal build refuses it. Both fixed builds refuse it.
+
+The fixed normal and production builds each accept a private validator replay
+and reject **25 corruptions**. These include wrong receipts, altered artifact
+digests/stager, fully resealed missing/duplicated success markers, guest failure,
+panic, allocation failure, denial counters and ledger corruption. Receipt and
+serial refusals happen before retained output is created. Reports bind the
+validator/control sources, executables, current compiler and original receipts:
+[normal](results/2026-10-23/image-integration-retainer-normal.controls.json),
+[production](results/2026-10-23/image-integration-retainer-prod.controls.json).
+
+This is a validator-only replay, **not a new historical build or guest run**.
+All 32 original native artifacts remain byte-identical. Thirty-five changed
+V source inputs were recovered from commit
+`539b659b61296e93b974c8360b83cca2fb24bb86` with their original SHA-256 digests
+and relocated into private replay receipts. The unavailable historical compiler
+(`d88f743f74a74289a5ae6d151df4b056f09bf6ccd21e8f28137017891d2cb0af`) is
+explicitly omitted only from those separate replay receipts and recorded as
+unavailable. The original receipts and ledger are unchanged; original ledger
+verification still refuses the missing compiler. Production pin matching has no
+fallback or omission rule.
+
+To check fully available inputs, build the controller without `-prod` (keeping
+assertions enabled in any future control code) and run it against either
+retainer build. The validator itself has no assertion-dependent checks.
+
+```sh
+v -nocache -o /tmp/image-integration-evidence-check tests/packages/image-integration-evidence-check.v
+/tmp/image-integration-evidence-check /tmp/image-integration-retain /build/host /build/arm /build/x86 /build/new-controls
+```
+
+For this disclosed historical replay only, append
+`--replay /Users/alex/code/vinix 539b659b61296e93b974c8360b83cca2fb24bb86`.
+That mode also checks original-ledger refusal and reproduces the old build-mode
+defect in an isolated directory. It never changes or executes native artifacts.
