@@ -47,6 +47,7 @@ invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0'))!
  os.write_file(dir + '/StartupProbe.smali', '.class public Lorg/vinix/bootstrap/StartupProbe;\n.super Ljava/lang/Object;\n' +
   method('public static check(Landroid/content/Context;)V', '
+invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->accessibility(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->appops(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->uriPermissions(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/IoProbe;->check(Landroid/content/Context;)V
@@ -83,6 +84,55 @@ return-void
 :bad
 new-instance v0, Ljava/lang/AssertionError;
 const-string v1, "sensor availability"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
+  method('private static accessibility(Landroid/content/Context;)V', '
+const-string v0, "accessibility"
+invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v0
+check-cast v0, Landroid/view/accessibility/AccessibilityManager;
+if-eqz v0, :bad
+invoke-virtual {v0}, Landroid/view/accessibility/AccessibilityManager;->isEnabled()Z
+move-result v1
+if-nez v1, :bad
+invoke-virtual {v0}, Landroid/view/accessibility/AccessibilityManager;->isTouchExplorationEnabled()Z
+move-result v1
+if-nez v1, :bad
+invoke-virtual {v0}, Landroid/view/accessibility/AccessibilityManager;->getInstalledAccessibilityServiceList()Ljava/util/List;
+move-result-object v1
+invoke-static {v1}, Lorg/vinix/bootstrap/StartupProbe;->emptyServices(Ljava/util/List;)V
+const/4 v1, -1
+invoke-virtual {v0, v1}, Landroid/view/accessibility/AccessibilityManager;->getEnabledAccessibilityServiceList(I)Ljava/util/List;
+move-result-object v1
+invoke-static {v1}, Lorg/vinix/bootstrap/StartupProbe;->emptyServices(Ljava/util/List;)V
+invoke-virtual {v0}, Landroid/view/accessibility/AccessibilityManager;->getAccessibilityServiceList()Ljava/util/List;
+move-result-object v1
+invoke-static {v1}, Lorg/vinix/bootstrap/StartupProbe;->emptyServices(Ljava/util/List;)V
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-ACCESSIBILITY-PASS disabled empty-installed empty-enabled immutable-lists"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "absent accessibility services"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
+  method('private static emptyServices(Ljava/util/List;)V', '
+invoke-interface {p0}, Ljava/util/List;->isEmpty()Z
+move-result v0
+if-eqz v0, :bad
+const/4 v0, 0
+:try_start
+invoke-interface {p0, v0}, Ljava/util/List;->add(Ljava/lang/Object;)Z
+:try_end
+.catch Ljava/lang/UnsupportedOperationException; {:try_start .. :try_end} :immutable
+goto :bad
+:immutable
+move-exception v0
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "accessibility service list must be empty and immutable"
 invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0') +
   method('private static haptics(Landroid/content/Context;)V', '

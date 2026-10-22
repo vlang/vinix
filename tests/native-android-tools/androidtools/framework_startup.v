@@ -4,6 +4,16 @@ module androidtools
 import os
 
 fn framework_startup_apis(smali string) ! {
+ // No Android accessibility services are installed in the native WS backend.
+ // Android exposes immutable snapshots for both installed and enabled lists.
+ accessibility := smali + '/android/view/accessibility/AccessibilityManager.smali'
+ mut accessibility_text := os.read_file(accessibility)!
+ for signature in ['getInstalledAccessibilityServiceList()Ljava/util/List;',
+  'getAccessibilityServiceList()Ljava/util/List;', 'getEnabledAccessibilityServiceList(I)Ljava/util/List;'] {
+  accessibility_text = framework_replace_method(accessibility_text, signature,
+   '.method public ' + signature + '\n.locals 1\ninvoke-static {}, Ljava/util/Collections;->emptyList()Ljava/util/List;\nmove-result-object v0\nreturn-object v0\n.end method')!
+ }
+ os.write_file(accessibility, accessibility_text)!
  // Native WS does not implement Android picture-in-picture window mode.
  activity := smali + '/android/app/Activity.smali'
  os.write_file(activity, framework_replace_method(os.read_file(activity)!, 'isInPictureInPictureMode()Z',
