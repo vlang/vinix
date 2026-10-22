@@ -312,7 +312,7 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		}
 		*(&voidptr(debug_target)) = *(&voidptr(debug_host))
 		options := &WsOption(C.alloca(16 * sizeof(WsOption)))
-		buffer := &char(C.alloca(40960))
+		buffer := &char(C.alloca(49152))
 		C.snprintf(buffer, 8192, c'-Djava.class.path=%s/usr/lib/java/dex/android_translation_layer/api-impl.jar:%s/usr/lib/java/dex/android_translation_layer/framework-res.apk', root, root)
 		options[0] = WsOption{buffer, nil}
 		C.snprintf(&buffer[8192], 8192, c'-Datl.app.class.path=%s', apk)
@@ -331,7 +331,14 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		C.snprintf(&buffer[32768], 8192, c'-Xcompiler:%s/usr/bin/dex2oat', root)
 		options[7] = WsOption{&buffer[32768], nil}
 		options[8] = WsOption{c'exit', voidptr(ws_vm_exit)}
-		mut args := WsVmArgs{ version: 0x10006, count: 9, options: options }
+		// WolfJSSE uses JVM trust-store properties rather than SSL_CERT_FILE.
+		// Use the private JKS generated when staging this runtime, just as the
+		// command-line launcher does, before any default SSLContext is created.
+		C.snprintf(&buffer[40960], 8192, c'-Djavax.net.ssl.trustStore=%s/etc/ssl/certs/java/cacerts', root)
+		options[9] = WsOption{&buffer[40960], nil}
+		options[10] = WsOption{c'-Djavax.net.ssl.trustStoreType=JKS', nil}
+		options[11] = WsOption{c'-Djavax.net.ssl.trustStorePassword=changeit', nil}
+		mut args := WsVmArgs{ version: 0x10006, count: 12, options: options }
 		create := CreateVM(C.dlsym(art, c'JNI_CreateJavaVM'))
 		if create(&ws.vm, &ws.e, &args) != 0 { return 1 }
 		ws_start_diagnostics(ws.vm)

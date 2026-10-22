@@ -85,6 +85,9 @@ pub fn native_ws_cli(argv []string) !int {
 pub fn build_native_ws(smali string, runtime string, output string, compiler string, arch string) ! {
 	os.mkdir_all(output + '/atlframework')!
 	build_native_timezones(runtime, output)!
+	// Carry the runtime's generated Java trust store when updating older
+	// guest images, which may predate JKS staging.
+	os.cp(runtime + '/etc/ssl/certs/java/cacerts', output + '/cacerts')!
 	vcompiler := os.real_path(os.find_abs_path_of_executable('v')!)
 	os.cp(os.dir(vcompiler) + '/thirdparty/fontstash/stb_truetype.h', output + '/stb_truetype.h')!
 	os.cp(os.dir(vcompiler) + '/thirdparty/stb_image/stb_image.h', output + '/stb_image.h')!

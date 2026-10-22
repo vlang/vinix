@@ -150,6 +150,10 @@ fn prepare_module(settings map[string]json2.Any, app map[string]json2.Any, outpu
 		os.mkdir_all(runtime + '/usr/share/zoneinfo')!
 		os.cp(native + '/tzdata', runtime + '/usr/share/zoneinfo/tzdata')!
 	}
+	if os.is_file(native + '/cacerts') {
+		os.mkdir_all(runtime + '/etc/ssl/certs/java')!
+		os.cp(native + '/cacerts', runtime + '/etc/ssl/certs/java/cacerts')!
+	}
 	if os.is_file(native + '/bionic-ws.cfg') {
 		config := runtime + '/usr/share/vinix-android-ws/bionic_translation/cfg.d'
 		os.mkdir_all(config)!
