@@ -72,6 +72,7 @@ fn ws_dialog_show(e voidptr, dialog voidptr) {
 fn ws_dialog_close(e voidptr, dialog voidptr) {
 	unsafe {
 		if ws.dialog != nil && Same(slot(e, 24))(e, dialog, ws.dialog) != 0 {
+			ws_detach_view(e, ws_dialog_decor(e, dialog))
 			Drop(slot(e, 22))(e, ws.dialog)
 			ws.dialog = nil
 			if ws.focused != nil {
@@ -86,6 +87,9 @@ fn ws_dialog_close(e voidptr, dialog voidptr) {
 fn ws_render_dialog(e voidptr) {
 	unsafe {
 		decor := ws_dialog_decor(e, ws.dialog)
+		window := obj(e, ws.dialog, c'android/app/Dialog', c'getWindow', c'()Landroid/view/Window;', nil)
+		ws_attach_window(e, window, decor)
+		if pending(e) { return }
 		measure := [Value{ i: i32(u32(ws.width - 32) + 0x80000000) },
 			Value{ i: i32(u32(ws.height - 32) + 0x80000000) }]!
 		call(e, decor, c'android/view/View', c'measure', c'(II)V', &measure[0])

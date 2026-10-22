@@ -365,6 +365,9 @@ fn ws_render(e voidptr) {
 		ws.animated = false
 		for i := i32(0); i < ws.width * ws.height; i++ { ws_root_draw.pixels[i] = 0xfffafafa }
 		decor := activity_decor(e, ws.activity)
+		window := obj(e, ws.activity, c'android/app/Activity', c'getWindow', c'()Landroid/view/Window;', nil)
+		ws_attach_window(e, window, decor)
+		if pending(e) { return }
 		measure := [Value{ i: ws.width | 0x40000000 }, Value{ i: ws.height | 0x40000000 }]!
 		call(e, decor, c'android/view/View', c'measure', c'(II)V', &measure[0])
 		layout := [Value{ i: 0 }, Value{ i: 0 }, Value{ i: ws.width }, Value{ i: ws.height }]!

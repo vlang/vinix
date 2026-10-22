@@ -151,7 +151,7 @@ android/view/View|nativeSetOnTouchListener|// View retains the listener in its J
 android/view/View|nativeSetOnLongClickListener|// View retains the listener in its Java field.
 android/view/View|nativeRequestFocus|ws_focus(e,this)
 android/view/View|nativeIsFocused|return u8((&WsView(p0)).focused)
-android/view/View|nativeIsAttachedToWindow|return 1
+android/view/View|nativeIsAttachedToWindow|return u8(get_object(e, this, c'android/view/View', c'vinixWindowToken', c'Landroid/os/IBinder;') != nil)
 android/view/View|native_getMatrix|ws_matrix_reset(p1); return 0
 android/view/View|native_get_window|return obj(e,ws.activity,c'android/app/Activity',c'getWindow',c'()Landroid/view/Window;',nil)
 android/view/View|getWindowVisibleDisplayFrame|put_int(e,p0,c'android/graphics/Rect',c'left',0); put_int(e,p0,c'android/graphics/Rect',c'top',0); put_int(e,p0,c'android/graphics/Rect',c'right',ws.width); put_int(e,p0,c'android/graphics/Rect',c'bottom',ws.height)
@@ -161,7 +161,7 @@ android/view/View|native_removeClass|// CSS style classes do not apply to native
 android/view/View|native_addClasses|// CSS style classes do not apply to native widgets.
 android/view/View|native_removeClasses|// CSS style classes do not apply to native widgets.
 android/view/View|native_keep_screen_on|// Power management remains with the desktop.
-android/view/ViewGroup|native_addView|ws_mark()
+android/view/ViewGroup|native_addView|ws_attach_children(e, this); ws_mark()
 android/view/ViewGroup|native_removeView|ws_mark()
 android/view/ViewGroup|native_drawChildren|ws_draw_children(e,this)
 android/widget/TextView|native_constructor|return ws_view_new(1)

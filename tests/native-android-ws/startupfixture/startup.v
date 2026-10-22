@@ -13,6 +13,7 @@ pub fn install(output string, resources string) ! {
  install_power_probe(dir)!
  install_battery_probe(dir)!
  install_geometry_probe(dir)!
+ install_attachment_probe(dir)!
  install_media_probe(dir)!
  os.mkdir_all(output + '/res/font')!
  runtime := resources.all_before('/usr/lib/java/dex/')
@@ -53,6 +54,7 @@ invoke-static {}, Lorg/vinix/bootstrap/StartupProbe;->altitude()V
 invoke-static {p0}, Lorg/vinix/bootstrap/PowerProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/BatteryProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/GeometryProbe;->check(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/AttachmentProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->haptics(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/MediaProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->fonts(Landroid/content/Context;)V

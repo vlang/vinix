@@ -206,6 +206,7 @@ fn ws_finish(e voidptr, activity voidptr, window i64) {
 		if ws.activity == nil || Same(slot(e, 24))(e, activity, ws.activity) == 0 { return }
 		call(e, activity, c'android/app/Activity', c'onPause', c'()V', nil)
 		call(e, activity, c'android/app/Activity', c'onStop', c'()V', nil)
+		ws_detach_view(e, activity_decor(e, activity))
 		call(e, activity, c'android/app/Activity', c'onDestroy', c'()V', nil)
 		Drop(slot(e, 22))(e, ws.activity)
 		ws.activity = nil
