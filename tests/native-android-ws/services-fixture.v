@@ -703,6 +703,138 @@ invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0'
 }
 
+fn importance_checks() string {
+ return 'new-instance v0, Landroid/app/ActivityManager;
+invoke-direct {v0}, Landroid/app/ActivityManager;-><init>()V
+invoke-static {}, Landroid/os/Process;->myUid()I
+move-result v1
+invoke-virtual {v0, v1}, Landroid/app/ActivityManager;->getUidImportance(I)I
+move-result v2
+const/16 v3, 100
+if-ne v2, v3, :bad
+const/4 v2, -1
+invoke-virtual {v0, v2}, Landroid/app/ActivityManager;->getUidImportance(I)I
+move-result v2
+const/16 v3, 1000
+if-ne v2, v3, :bad
+new-instance v2, Landroid/app/ActivityManager$RunningAppProcessInfo;
+invoke-direct {v2}, Landroid/app/ActivityManager$RunningAppProcessInfo;-><init>()V
+invoke-static {v2}, Landroid/app/ActivityManager;->getMyMemoryState(Landroid/app/ActivityManager$RunningAppProcessInfo;)V
+iget v3, v2, Landroid/app/ActivityManager$RunningAppProcessInfo;->uid:I
+if-ne v1, v3, :bad
+invoke-static {}, Landroid/os/Process;->myPid()I
+move-result v3
+iget v4, v2, Landroid/app/ActivityManager$RunningAppProcessInfo;->pid:I
+if-ne v3, v4, :bad
+iget v3, v2, Landroid/app/ActivityManager$RunningAppProcessInfo;->importance:I
+const/16 v4, 100
+if-ne v3, v4, :bad
+iget-object v2, v2, Landroid/app/ActivityManager$RunningAppProcessInfo;->processName:Ljava/lang/String;
+const-string v3, "org.vinix.service.client"
+invoke-virtual {v3, v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v2
+if-eqz v2, :bad
+invoke-virtual {v0}, Landroid/app/ActivityManager;->getRunningAppProcesses()Ljava/util/List;
+move-result-object v2
+invoke-interface {v2}, Ljava/util/List;->size()I
+move-result v2
+const/4 v3, 1
+if-ne v2, v3, :bad
+new-instance v1, Lorg/vinix/service/UidListener;
+invoke-direct {v1}, Lorg/vinix/service/UidListener;-><init>()V
+const/16 v2, 200
+invoke-virtual {v0, v1, v2}, Landroid/app/ActivityManager;->addOnUidImportanceListener(Landroid/app/ActivityManager$OnUidImportanceListener;I)V
+:duplicate
+invoke-virtual {v0, v1, v2}, Landroid/app/ActivityManager;->addOnUidImportanceListener(Landroid/app/ActivityManager$OnUidImportanceListener;I)V
+:duplicate_end
+goto :bad
+.catch Ljava/lang/IllegalArgumentException; {:duplicate .. :duplicate_end} :duplicated
+:duplicated
+move-exception v3
+# Controlled threshold crossings; onCreate also checks the real WS transition.
+const/16 v2, 200
+invoke-static {v2}, Landroid/atl/VinixUidImportance;->update(I)V
+const/16 v2, 300
+invoke-static {v2}, Landroid/atl/VinixUidImportance;->update(I)V
+const/16 v2, 400
+invoke-static {v2}, Landroid/atl/VinixUidImportance;->update(I)V
+const/16 v2, 100
+invoke-static {v2}, Landroid/atl/VinixUidImportance;->update(I)V
+iget-object v2, v1, Lorg/vinix/service/UidListener;->latch:Ljava/util/concurrent/CountDownLatch;
+const-wide/16 v3, 10
+sget-object v5, Ljava/util/concurrent/TimeUnit;->SECONDS:Ljava/util/concurrent/TimeUnit;
+invoke-virtual {v2, v3, v4, v5}, Ljava/util/concurrent/CountDownLatch;->await(JLjava/util/concurrent/TimeUnit;)Z
+move-result v2
+if-eqz v2, :bad
+iget v2, v1, Lorg/vinix/service/UidListener;->calls:I
+const/4 v3, 2
+if-ne v2, v3, :bad
+iget v2, v1, Lorg/vinix/service/UidListener;->failed:I
+if-nez v2, :bad
+new-instance v2, Landroid/app/ActivityManager;
+invoke-direct {v2}, Landroid/app/ActivityManager;-><init>()V
+:other
+invoke-virtual {v2, v1}, Landroid/app/ActivityManager;->removeOnUidImportanceListener(Landroid/app/ActivityManager$OnUidImportanceListener;)V
+:other_end
+goto :bad
+.catch Ljava/lang/IllegalArgumentException; {:other .. :other_end} :other_caught
+:other_caught
+move-exception v3
+invoke-virtual {v0, v1}, Landroid/app/ActivityManager;->removeOnUidImportanceListener(Landroid/app/ActivityManager$OnUidImportanceListener;)V
+:absent
+invoke-virtual {v0, v1}, Landroid/app/ActivityManager;->removeOnUidImportanceListener(Landroid/app/ActivityManager$OnUidImportanceListener;)V
+:absent_end
+goto :bad
+.catch Ljava/lang/IllegalArgumentException; {:absent .. :absent_end} :absent_caught
+:absent_caught
+move-exception v2
+const/16 v2, 200
+invoke-virtual {v0, v1, v2}, Landroid/app/ActivityManager;->addOnUidImportanceListener(Landroid/app/ActivityManager$OnUidImportanceListener;I)V
+invoke-virtual {v0, v1}, Landroid/app/ActivityManager;->removeOnUidImportanceListener(Landroid/app/ActivityManager$OnUidImportanceListener;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "UID importance state, threshold, thread or registration"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+}
+
+fn importance_listener(dir string) ! {
+ os.write_file(dir + '/UidListener.smali', '.class public Lorg/vinix/service/UidListener;\n.super Ljava/lang/Object;\n.implements Landroid/app/ActivityManager$OnUidImportanceListener;\n' +
+  '.field public calls:I\n.field public failed:I\n.field public latch:Ljava/util/concurrent/CountDownLatch;\n' +
+  method('public constructor <init>()V', 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+new-instance v0, Ljava/util/concurrent/CountDownLatch;
+const/4 v1, 2
+invoke-direct {v0, v1}, Ljava/util/concurrent/CountDownLatch;-><init>(I)V
+iput-object v0, p0, Lorg/vinix/service/UidListener;->latch:Ljava/util/concurrent/CountDownLatch;
+return-void') +
+  method('public onUidImportance(II)V', 'invoke-static {}, Landroid/os/Looper;->myLooper()Landroid/os/Looper;
+move-result-object v0
+invoke-static {}, Landroid/os/Looper;->getMainLooper()Landroid/os/Looper;
+move-result-object v1
+if-eq v0, v1, :bad
+invoke-static {}, Landroid/os/Process;->myUid()I
+move-result v0
+if-ne v0, p1, :bad
+iget v0, p0, Lorg/vinix/service/UidListener;->calls:I
+const/16 v1, 300
+if-eqz v0, :expected
+const/16 v1, 100
+:expected
+if-ne v1, p2, :bad
+goto :done
+:bad
+const/4 v0, 1
+iput v0, p0, Lorg/vinix/service/UidListener;->failed:I
+:done
+iget v0, p0, Lorg/vinix/service/UidListener;->calls:I
+add-int/lit8 v0, v0, 1
+iput v0, p0, Lorg/vinix/service/UidListener;->calls:I
+iget-object v0, p0, Lorg/vinix/service/UidListener;->latch:Ljava/util/concurrent/CountDownLatch;
+invoke-virtual {v0}, Ljava/util/concurrent/CountDownLatch;->countDown()V
+return-void'))!
+}
+
 fn main() {
 	if os.args.len != 8 {
 		panic('OUTPUT FIXTURE_DIR SMALI_TOOLS JAVA APKSIGNER AAPT2 FRAMEWORK_RES')
@@ -833,6 +965,7 @@ return-object v0'))!
 		method('private checkParcel()V', parcel_checks()) +
 		method('private checkUser()V', user_checks()) +
 		method('private checkPriority()V', priority_checks()) +
+		method('private checkImportance()V', importance_checks()) +
 		method('private checkWorkerPriority()V', '
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkPriority()V
 invoke-static {}, Landroid/os/Process;->myTid()I
@@ -876,6 +1009,7 @@ invoke-direct {p0}, Lorg/vinix/service/Main;->checkComponents()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkBinder()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkParcel()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkUser()V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkImportance()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkPriority()V
 const/4 v0, 0
 invoke-static {v0}, Landroid/os/Process;->getThreadPriority(I)I
@@ -993,9 +1127,10 @@ iget-object v0, p0, Lorg/vinix/service/Main;->label:Landroid/widget/TextView;
 const-string v1, "Companion service startup passed"
 invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread provider-context provider-resources attach-once bind-executor-thread component-package component-metadata component-missing package-data package-files package-preferences split-info-copy local-binder-interface local-binder-identity local-binder-transact local-binder-exception user-identity system-user uid-ranges parcel-binder-identity parcel-binder-copy parcel-binder-lifetime parcel-binder-callback custom-directory cache-directory directory-isolation directory-mode directory-name thread-priority priority-minus-one priority-errors priority-isolation priority-remote-tid"
+const-string v1, "SERVICE-FIXTURE-PASS lazy-package-context application provider service constructor repeated-start bind-main-thread provider-context provider-resources attach-once bind-executor-thread component-package component-metadata component-missing package-data package-files package-preferences split-info-copy local-binder-interface local-binder-identity local-binder-transact local-binder-exception user-identity system-user uid-ranges parcel-binder-identity parcel-binder-copy parcel-binder-lifetime parcel-binder-callback custom-directory cache-directory directory-isolation directory-mode directory-name thread-priority priority-minus-one priority-errors priority-isolation priority-remote-tid uid-importance uid-listener-threshold uid-listener-thread uid-listener-registration"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void'))!
+	importance_listener(out + '/client/smali/org/vinix/service')!
 	for name in ['client', 'companion'] {
 		dir := out + '/' + name
 		os.mkdir_all(dir + '/res/values')!

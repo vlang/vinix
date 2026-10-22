@@ -193,6 +193,7 @@ fn ws_start(e voidptr, activity voidptr) {
 		ws.activity = WsRef(slot(e, 21))(e, activity)
 	}
 	ws.running = true
+	ws_uid_lifecycle(e, 100)
 	dispatch_create(e, activity, unsafe { nil })
 	if pending(e) { return }
 	dispatch_post_create(e, activity, unsafe { nil })
@@ -217,6 +218,7 @@ fn ws_finish(e voidptr, activity voidptr, window i64) {
 		}
 		if window == 0 { return } // recreation transfers saved state to a new instance
 		if ws.back_count == 0 {
+			ws_uid_lifecycle(e, 300)
 			ws.running = false
 			return
 		}
@@ -423,6 +425,7 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		// Closing the WS pipe must deliver the lifecycle callbacks that save
 		// application state. Native globals remain valid until process exit:
 		// Java worker threads can still reference their JNI providers.
+		ws_uid_lifecycle(e, 300)
 		if ws.activity != nil {
 			call(e, ws.activity, c'android/app/Activity', c'onPause', c'()V', nil)
 			call(e, ws.activity, c'android/app/Activity', c'onStop', c'()V', nil)
