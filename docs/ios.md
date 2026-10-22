@@ -17335,7 +17335,7 @@ The base session and existing session-constant fixtures passed four macOS
 ASan+UBSan executions and both ARM64 guest runs. Tests compare supported APIs
 against Apple Foundation and exercise concurrent property access, callback
 reentry, caller-supplied storage, isa replacement, shutdown and nineteen
-explicit rejection cases. The launch probe now stops at Foundation's
+explicit rejection cases. That launch probe stopped at Foundation's
 `_OBJC_CLASS_$_NSSortDescriptor`, before application entry. Fortnite remains
 unplayable.
 
@@ -17351,17 +17351,70 @@ storage and the owned RAM disk were retired.
 v run tests/ios/native-checks.v build-url-session
 ```
 
+V now supplies Foundation's public base `NSSortDescriptor`, including its
+measured 40-byte record, four ivars and typed constructor, property, copy,
+reverse and comparison methods. Descriptors copy their NSString keys and
+comparator blocks. Copies retain the same immutable descriptor; reversed
+descriptors own their shared key and block independently. An empty key becomes
+nil, an explicit nil selector becomes `compare:`, and reversing a default
+zero-state descriptor produces an ascending descriptor using `compare:`.
+
+Comparison extracts both key-path values before handling identity and nil
+ordering. Descending comparison negates the signed result without swapping
+the callback arguments. Extracted values, inputs and the descriptor stay alive
+across application callbacks, which run outside the runtime lock. Destruction
+releases owned keys and blocks even after an isa replacement or when the
+record belongs to caller-supplied storage.
+
+Key paths currently support dictionary traversal, `self` on other objects,
+and explicit application `valueForKeyPath:` methods. Dictionary `self` means
+its dictionary entry. Automatic NSObject KVC, collection operators, collection
+sorting, additional Foundation comparison selectors, coding, mutable copies,
+equality, descriptions, reverse-null ordering and custom subclass construction
+remain unsupported. Designated reinitialization and nil comparator blocks are
+rejected explicitly; plain `init` preserves existing state. Static inspection
+of the exact Fortnite executable finds two descriptor class loads, both near
+the `filePath` key, plus `initWithKey:ascending:` and
+`sortedArrayUsingDescriptors:` selectors. Resolving the class does not supply
+those broader KVC and sorting dependencies.
+
+The descriptor fixture passed two macOS ASan+UBSan runs, with ordinary and
+deterministic Swift hashing, and the ARM64 guest run. It compares the supported
+APIs against Apple Foundation and covers callback reentry, source-releasing
+key copies during reversal, concurrent readers, caller-supplied storage, isa
+replacement, drained runtime shutdown and eighteen explicit rejection cases.
+The initial native fixture run caught an eager access to uninitialized Vinix
+block metadata; that failed attempt is preserved separately from the corrected
+runs.
+
+The corrected launch probe resolves `NSSortDescriptor` and now stops at
+`_OBJC_CLASS_$_NSRegularExpression`, before application entry. Fortnite remains
+unplayable.
+
+`build/ios/fortnite/sort-descriptor-checks/proof.log` verifies 20,394 unchanged
+listed source, toolchain and runtime inputs, 97 sealed native/static evidence
+files, both sanitizer runs, five binary/generated-C archive pairs and the host
+dSYM. The fixture, launch probe and both import audits completed as four
+sequential ARM64 guest phases. Serial/configuration hashes are retained; VM
+payloads and scratch storage were retired, and the owned RAM disk was detached.
+The input manifest covers the categories listed in its provenance rather than
+the full host dynamic runtime closure. ASan leak detection was disabled.
+
+```sh
+v run tests/ios/native-checks.v build-sort-descriptor
+```
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,058 | 103 | 78 |
+| Fortnite executable | 2,059 | 102 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,898 | 106 | 114 |
+| All images | 2,899 | 105 | 114 |
 
-The C++/GLES/Text variant reports 2,912 resolved imports, 92 unresolved strong
+The C++/GLES/Text variant reports 2,913 resolved imports, 91 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -17409,7 +17462,8 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 `VINIX_IOS_CHECK_NAME` selects a single output directory name under
 `build/ios/fortnite` (default `select-checks`; the timestamp/UUID verification uses
 `file-time-checks`, the audio constants use `audio-session-checks`,
-base URL sessions use `url-session-checks`, CoreFoundation dictionaries use
+base URL sessions use `url-session-checks`, sort descriptors use
+`sort-descriptor-checks`, CoreFoundation dictionaries use
 `cf-dictionary-checks`, constant integers use
 `constant-integer-checks`, constant arrays use `constant-array-checks`, supplied
 Objective-C storage uses `objc-storage-checks`,
@@ -17421,7 +17475,7 @@ object monitors use `objc-sync-checks`, Swift strings/buffers use
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
-URL session, CoreFoundation dictionary, constant array and constant integer, supplied
+URL session, sort descriptor, CoreFoundation dictionary, constant array and constant integer, supplied
 Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String
 metadata/witness checks before the existing Mach-O suite and requires the

@@ -145,6 +145,9 @@ mut:
 	connection_scheduled bool
 	connection_cancelled bool
 	url_session_owned bool
+	sort_descriptor_owned bool
+	sort_descriptor_initialized bool
+	sort_descriptor_initializing bool
 	uuid_owned bool
 	pool_owned bool
 	pool_initialized bool
@@ -490,7 +493,7 @@ fn objc_start() {
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
-        'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
+        'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSSortDescriptor',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
@@ -578,6 +581,7 @@ fn objc_start() {
 			'NSHTTPURLResponse' { u32(32) }
 			'NSURLConnection' { u32(16) }
 			'NSURLSession' { u32(160) }
+			'NSSortDescriptor' { u32(40) }
 			'UIAlertController' { u32(1400) }
 			'UIAlertAction' { u32(144) }
 			'NSLayoutConstraint' { u32(sizeof(AbiLayoutConstraint)) }
@@ -619,6 +623,7 @@ fn objc_start() {
 	cookie_class.ivars['_cookiePrivate'] = &ObjIvar{name:'_cookiePrivate'.clone(), types:'@"NSHTTPCookieInternal"'.clone(), offset:8, size:8}
 	webkit_metadata()
 	url_session_metadata()
+	sort_descriptor_metadata()
 	mut request_class := ios_runtime.classes[ios_runtime.names['NSURLRequest']] or { panic('iOS: missing request class') }
 	for i, pair in [['_internal', '@"NSURLRequestInternal"']!, ['_cookiePartitionIdentifier', '@"NSString"']!]! {
 		request_class.ivars[pair[0]] = &ObjIvar{name:pair[0].clone(), types:pair[1].clone(), offset:i64(8 + i * 8), size:8}
@@ -655,6 +660,7 @@ fn objc_allocate(cls u64) u64 {
 	dispatch_objc_allocation_checked(cls) or { panic(err) }
 	if connection_family(cls) && cls != ios_runtime.names['NSURLConnection'] { panic('iOS: custom connection subclass construction is not implemented') }
 	url_session_require_class(cls)
+	sort_descriptor_require_class(cls)
 	ns_input_stream_require_class(cls)
 	ns_pool_require_class(cls)
 	ns_timezone_require_class(cls)

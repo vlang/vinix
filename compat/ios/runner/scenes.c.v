@@ -52,6 +52,10 @@ fn objc_responds(object u64, selector &char) bool {
 		if url_session_unsupported(name) { return native_method(read64(object), name) != 0 }
 		if url_session_selector(object, name) { return true }
 	}
+	if sort_descriptor_family(if object in ios_runtime.classes { object } else { read64(object) }) {
+		if sort_descriptor_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if sort_descriptor_selector(object, name) { return true }
+	}
 	if ns_process_info_family(if object in ios_runtime.classes { object } else { read64(object) }) {
 		if name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return native_method(read64(object), name) != 0 }
 		if ns_process_info_selector(object, name) { return true }
