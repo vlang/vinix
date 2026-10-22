@@ -158,7 +158,8 @@ Paint, text layouts and TextView retain their native font while it is in use,
 including across Paint copies. Provider families with a system fallback use
 the backend's default font; remote font downloads, weight selection and shaping
 remain incomplete. SensorManager reports an empty device list and rejects
-registration because this backend has no sensor driver.
+registration because this backend has no sensor driver. Its barometric altitude
+calculation works on supplied pressure values without requiring a device.
 
 Dynamic receivers support the registration overloads with flags and handlers,
 main-Looper delivery by default, action and package filtering, and unregistering.

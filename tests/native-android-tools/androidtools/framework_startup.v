@@ -28,6 +28,16 @@ fn framework_startup_apis(smali string) ! {
   'flush(Landroid/hardware/SensorEventListener;)Z'] {
   sensor_text = framework_replace_method(sensor_text, signature, '.method public ' + signature + '\n.locals 1\nconst/4 v0, 0\nreturn v0\n.end method')!
  }
+ // Standard-atmosphere barometric height. This pure calculation also works
+ // without a connected pressure sensor; preserve Android's float rounding.
+ sensor_text = framework_replace_method(sensor_text, 'getAltitude(FF)F',
+  '.method public static getAltitude(FF)F\n.locals 4\n' +
+  'div-float v0, p1, p0\nfloat-to-double v0, v0\n' +
+  'const/high16 v2, 0x3f800000\nconst v3, 0x40a828f6\n' +
+  'div-float v2, v2, v3\nfloat-to-double v2, v2\n' +
+  'invoke-static {v0, v1, v2, v3}, Ljava/lang/Math;->pow(DD)D\nmove-result-wide v0\n' +
+  'double-to-float v0, v0\nconst/high16 v1, 0x3f800000\nsub-float v0, v1, v0\n' +
+  'const v1, 0x472d2a00\nmul-float v0, v0, v1\nreturn v0\n.end method')!
  os.write_file(sensors, sensor_text)!
  context := smali + '/android/content/Context.smali'
  mut context_text := os.read_file(context)!

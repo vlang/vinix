@@ -45,6 +45,7 @@ throw v0'))!
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->appops(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->uriPermissions(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/IoProbe;->check(Landroid/content/Context;)V
+invoke-static {}, Lorg/vinix/bootstrap/StartupProbe;->altitude()V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->fonts(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->broadcasts(Landroid/content/Context;)V
 new-instance v0, Landroid/hardware/SensorManager;
@@ -71,6 +72,38 @@ return-void
 :bad
 new-instance v0, Ljava/lang/AssertionError;
 const-string v1, "sensor availability"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
+  method('private static altitude()V', '
+const v0, 0x447d5000
+invoke-static {v0, v0}, Landroid/hardware/SensorManager;->getAltitude(FF)F
+move-result v1
+const/4 v2, 0
+cmpl-float v1, v1, v2
+if-nez v1, :bad
+const v1, 0x4460b0a4
+invoke-static {v0, v1}, Landroid/hardware/SensorManager;->getAltitude(FF)F
+move-result v1
+const v2, 0x447a0000
+sub-float v1, v1, v2
+invoke-static {v1}, Ljava/lang/Math;->abs(F)F
+move-result v1
+const/high16 v2, 0x3f800000
+cmpg-float v1, v1, v2
+if-gtz v1, :bad
+const v1, 0x44834000
+invoke-static {v0, v1}, Landroid/hardware/SensorManager;->getAltitude(FF)F
+move-result v1
+const/4 v2, 0
+cmpg-float v1, v1, v2
+if-gez v1, :bad
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-ALTITUDE-PASS sea-level 1000m below-sea-level"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "barometric altitude"
 invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0') +
   method('private static uriPermissions(Landroid/content/Context;)V', '
