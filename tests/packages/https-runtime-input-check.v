@@ -21,13 +21,19 @@ fn check(program string, pins string, archive string, prefix string, name string
 	child.wait()
 	code := child.code
 	child.close()
-	assert (code == 0) == accepted, name + ': ' + output
-	if accepted { assert output.contains('GUEST TLS historical input evidence PASS') }
+	if (code == 0) != accepted {
+		return error(name + ': unexpected exit ' + code.str() + '\n' + output)
+	}
+	if accepted && !output.contains('GUEST TLS historical input evidence PASS') {
+		return error(name + ': missing historical input evidence completion\n' + output)
+	}
 	report.writeln(name + if accepted { ' accepted PASS' } else { ' refused PASS' })
 }
 
 fn run() ! {
-	assert os.args.len in [2, 3], 'usage: https-runtime-input-check RETAINER_BINARY [REPORT]'
+	if os.args.len !in [2, 3] {
+		return error('usage: https-runtime-input-check RETAINER_BINARY [REPORT]')
+	}
 	work := os.join_path(os.temp_dir(), 'vinix-tls-inputs-' + os.getpid().str() + '-' + time.now().unix_milli().str())
 	os.mkdir(work, mode: 0o700)!
 	defer { os.rmdir_all(work) or {} }

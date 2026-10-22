@@ -94,23 +94,20 @@ malformed versions, extra requests and wrong retry offsets. Their
 [retained report](results/2026-10-22/https-runtime-evidence-check.txt) records all
 34 controls. Admission uses explicit errors so `-prod` cannot remove the checks.
 Both normal and `-prod` retainer builds passed all 44 evidence and historical-input
-controls; the [build-mode report](results/2026-10-22/https-runtime-retainer-modes.txt)
-records the commands, source/compiler/binary hashes and exact outputs. Build the
-assertion-based control drivers without `-prod`:
+controls; the [retainer report](results/2026-10-22/https-runtime-retainer-modes.txt)
+records the commands, source/compiler/binary hashes and exact outputs. The control
+drivers also use explicit errors. Their [build-mode qualification](https-runtime-control-modes.v)
+runs all four driver/retainer build combinations: 176 real controls plus 20
+refusals for dishonest children, missing completion markers and invalid arguments.
+The [driver report](results/2026-10-22/https-runtime-control-modes.txt) pins sources,
+compiler and binaries, checks inputs again afterward, and requires refused suites
+to publish no report. Run from the repository root with a new work directory:
 
 ```sh
-v -cc clang -nocache -path '@vlib|@vmodules|tests/packages' \
-  -o /tmp/tls-input-check tests/packages/https-runtime-input-check.v
-v -cc clang -nocache -path '@vlib|@vmodules|tests/packages' \
-  -o /tmp/tls-evidence-check tests/packages/https-runtime-evidence-check.v
-v -cc clang -nocache -path '@vlib|@vmodules|tests/packages' \
-  -o /tmp/tls-retain tests/packages/https-runtime-retain.v
-v -prod -cc clang -nocache -path '@vlib|@vmodules|tests/packages' \
-  -o /tmp/tls-retain-prod tests/packages/https-runtime-retain.v
-/tmp/tls-input-check /tmp/tls-retain
-/tmp/tls-evidence-check /tmp/tls-retain
-/tmp/tls-input-check /tmp/tls-retain-prod
-/tmp/tls-evidence-check /tmp/tls-retain-prod
+v -cc clang -nocache -gc none -manualfree \
+  -o /tmp/tls-control-modes tests/packages/https-runtime-control-modes.v
+/tmp/tls-control-modes /absolute/path/to/v /absolute/path/to/clang \
+  /tmp/tls-control-work /tmp/tls-control-modes.txt
 ```
 
 The [failure cleanup check](https-runtime-cleanup-check.v) injects

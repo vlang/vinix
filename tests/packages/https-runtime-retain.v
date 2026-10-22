@@ -262,6 +262,15 @@ fn retain() ! {
 	require(mode_text.contains('GUEST TLS normal and prod retainer controls PASS'), 'missing retainer build-mode controls')!
 	require(mode_text.contains('Retainer source SHA256 ' + pin(@FILE)!.sha256 + '\n'), 'retainer build-mode source mismatch')!
 	evidence << pin(mode_controls)!
+	driver_controls := prefix + 'control-modes.txt'
+	driver_text := os.read_file(driver_controls)!
+	require(driver_text.contains('GUEST TLS normal/prod drivers and retainers: 176 real controls and 20 refusal controls PASS'), 'missing control-driver build-mode checks')!
+	for source in [@FILE, root + '/tests/packages/https-runtime-control-modes.v',
+		root + '/tests/packages/https-runtime-input-check.v',
+		root + '/tests/packages/https-runtime-evidence-check.v'] {
+		require(driver_text.contains('INPUT ' + source + ' SHA256 ' + pin(source)!.sha256 + '\n'), 'control-driver build-mode source mismatch: ' + source)!
+	}
+	evidence << pin(driver_controls)!
 	cleanup := prefix + 'cleanup-check.txt'
 	cleanup_text := os.read_file(cleanup)!
 	require(cleanup_text.contains('GUEST TLS controller failure cleanup PASS'), 'missing controller cleanup check')!
@@ -337,6 +346,7 @@ fn retain() ! {
 	}
 	for path in [@FILE, root + '/tests/packages/https-runtime-evidence-check.v',
 		root + '/tests/packages/https-runtime-input-check.v',
+		root + '/tests/packages/https-runtime-control-modes.v',
 		prefix + 'inputs/README.md',
 		root + '/tests/packages/https-runtime-cleanup-check.v',
 		root + '/tools/packages/pkgcore/removal_test.v',

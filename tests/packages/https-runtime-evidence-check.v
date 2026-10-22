@@ -32,9 +32,11 @@ fn (mut c Controls) check(name string, kind string, text string, repetitions int
 	child.wait()
 	code := child.code
 	child.close()
-	assert (code == 0) == accepted, name + ': unexpected exit ' + code.str() + '\n' + output
-	if accepted {
-		assert output.contains('GUEST TLS ' + kind + ' evidence PASS'), output
+	if (code == 0) != accepted {
+		return error(name + ': unexpected exit ' + code.str() + '\n' + output)
+	}
+	if accepted && !output.contains('GUEST TLS ' + kind + ' evidence PASS') {
+		return error(name + ': missing ' + kind + ' evidence completion\n' + output)
 	}
 	c.count++
 	c.report.writeln('EVIDENCE ' + name + if accepted { ' accepted PASS' } else { ' rejected PASS' })
@@ -105,7 +107,9 @@ fn request_log(repetitions int) string {
 }
 
 fn run() ! {
-	assert os.args.len in [2, 3], 'usage: https-runtime-evidence-check RETAINER_BINARY [REPORT_PATH]'
+	if os.args.len !in [2, 3] {
+		return error('usage: https-runtime-evidence-check RETAINER_BINARY [REPORT_PATH]')
+	}
 	program := os.abs_path(os.args[1])
 	work := os.join_path(os.temp_dir(), 'vinix-tls-evidence-' + os.getpid().str() + '-' + time.now().unix_milli().str())
 	os.mkdir_all(work)!
