@@ -113,7 +113,7 @@ pub fn syscall(nr u64, a0 u64, a1 u64, a2 u64, a3 u64, a4 u64) i64 {
   if nr == 57 { C.assert(a0 == 8 || a0 == 9); return 0 }
   if nr == 35 || nr == 34 {
    C.assert(a0 == u64(i64(-100))); text_copy(&r.path[0], a1)
-   if nr == 34 { C.assert(a2 == 0o700) }; return 0
+   if nr == 34 { C.assert(a2 == if C.strcmp(&r.path[0], c'/tmp/.X11-unix') == 0 { u64(0o1777) } else { u64(0o700) }) }; return 0
   }
   if nr == 36 {
    text_copy(&r.path[0], a0); text_copy(&r.other[0], a2); C.assert(a1 == u64(i64(-100)))
@@ -136,6 +136,7 @@ pub fn syscall(nr u64, a0 u64, a1 u64, a2 u64, a3 u64, a4 u64) i64 {
    C.assert(usize(voidptr(action.handler)) == usize(expected)); return 0
   }
   if nr == 81 { C.assert(a0 == 0); return 0 }
+  if nr == 166 { C.assert(a0 == 0 || a0 == 0o022); return 0o022 }
   if nr == 142 { C.assert(a0 == 0xfee1dead && a1 == 0x28121969 && a3 == 0); return -1 }
   if nr == 115 {
    C.assert(a0 == 1 && a1 == 0 && a2 == a3); mut d := &C.delay(usize(a2)); sleeps++
@@ -219,9 +220,9 @@ fn boot_test() {
   reset(basic); symlink_failure = 1; link_failure = 1; C.initcore__prepare_desktop_boot()
   C.assert(count(38) == 2 && count(37) == 1 && count(35) == 11 && C.strstr(&output[0], c'could not restore the packaged desktop') != nil)
   reset(basic); C.initcore__prepare_hosted_x11_storage()
-  C.assert(used == 4 && calls[0].nr == 34 && calls[1].nr == 40 && calls[2].nr == 56 && calls[3].nr == 57)
+  C.assert(used == 7 && calls[0].nr == 166 && calls[1].nr == 34 && calls[1].a[2] == 0o1777 && calls[2].nr == 166 && calls[2].a[0] == 0o022 && calls[3].nr == 34 && calls[4].nr == 40 && calls[5].nr == 56 && calls[6].nr == 57)
   reset(basic); mount_failure = 1; C.initcore__prepare_hosted_x11_storage()
-  C.assert(count(56) == 0 && C.strstr(&output[0], c'scratch mount unavailable; using /tmp') != nil)
+  C.assert(count(56) == 0 && C.strstr(&output[0], c'scratch mount unavailable; using private /run storage') != nil)
  }
 }
 fn signal_test() {

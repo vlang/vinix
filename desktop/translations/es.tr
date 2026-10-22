@@ -4960,3 +4960,14 @@ Omitir por ahora
 app_selection.release.save_failed
 No se pudo guardar su elección. Revise su carpeta personal y reintente.
 -----
+wine.package.starting
+Iniciando aplicación…
+-----
+wine.package.missing
+El iniciador de paquetes firmados no está disponible.
+-----
+wine.package.exited
+La aplicación se cerró. Consulte su registro privado de inicio.
+-----
+wine.package.back
+Volver a Software

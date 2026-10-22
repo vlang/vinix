@@ -35,7 +35,7 @@ import tools.packages.pkglaunch
 #include <sys/wait.h>
 #include <signal.h>
 
-fn C.geteuid() u32
+fn C.geteuid() i32
 fn C.tcgetattr(fd int, termios voidptr) int
 fn C.tcsetattr(fd int, action int, termios voidptr) int
 fn C.sleep(seconds u32) u32
@@ -289,6 +289,7 @@ fn package_launch_worker(fd int, nonce string, db accountcore.Database, user acc
 	// No inherited auth-service descriptor is passed to the session child;
 	// exec_as closes everything except the caller's three existing streams.
 	for descriptor in 3 .. 1024 { if descriptor != fd { C.close(descriptor) } }
+	request.forward_display(user.uid)!
 	started := sessioncore.start_isolated(db, user, ['/usr/bin/vinix-package', ...request.arguments])!
 	// The supervisor also sheds root and account memberships before waiting.
 	// Its cached socket peer credentials still prove who made the connection.

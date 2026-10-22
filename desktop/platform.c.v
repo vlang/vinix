@@ -14,6 +14,7 @@ import os as platform_os
 import time as platform_time
 import term.termios
 import desktop.ptycore
+import tools.packages.x11auth
 
 #include <dirent.h>
 
@@ -1276,8 +1277,25 @@ fn desktop_spawn_native_surface(path string, first_argument string, second_argum
 // Start the native Xvfb/Wine bridge with a private input pipe. The application
 // process retains only the write end; the host receives it as stdin and owns
 // every X11 and translated Wine child for the lifetime of the Vinix window.
+fn desktop_hosted_x11_root() ?string {
+	uid := u32(C.geteuid())
+	fd := x11auth.host_root(c'/', uid, 0, true)
+	if fd < 0 { return none }
+	C.close(fd)
+	return if uid == 0 { '/run/vinix-hosted-x11'.clone() } else { '/run/user/${uid}/vinix-hosted-x11' }
+}
+
 fn desktop_spawn_wine_host(directory string, width int, height int, command string, fill_surface bool, game_input bool, obs_capture bool) ?SpawnedWineHost {
-	host := '/usr/bin/vinix-wine-host'
+	return desktop_spawn_x11_command(directory, width, height, command, []string{}, false, fill_surface, game_input, obs_capture)
+}
+
+// Arguments are an execve vector all the way through the host. Package IDs and
+// documents never pass through a shell, command string or wrapper executable.
+fn desktop_spawn_x11_command(directory string, width int, height int, command string, arguments []string, literal bool, fill_surface bool, game_input bool, obs_capture bool) ?SpawnedWineHost {
+	return desktop_spawn_x11_program('/usr/bin/vinix-wine-host', directory, width, height, command, arguments, literal, fill_surface, game_input, obs_capture)
+}
+
+fn desktop_spawn_x11_program(host string, directory string, width int, height int, command string, arguments []string, literal bool, fill_surface bool, game_input bool, obs_capture bool) ?SpawnedWineHost {
 	if C.access(&char(host.str), C.X_OK) != 0 || C.access(&char(command.str), C.X_OK) != 0 {
 		return none
 	}
@@ -1288,18 +1306,20 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 	desktop_set_cloexec(input[0], true)
 	desktop_set_cloexec(input[1], true)
 
-	display_name := ':${C.getpid()}'
+	display_name := ':${1000 + C.getpid() % 60000}'
 	geometry := '${width}x${height}x24'
 	// Beside the surface directory rather than inside it: the host makes that
 	// directory itself, after this log has to be open.
 	log_path := '${directory}.log'
-	mut argv := [&char(host.str), &char(display_name.str), &char(directory.str), &char(geometry.str),
-		&char(command.str)]
-	if obs_capture {
+	mut argv := [&char(host.str), &char(display_name.str), &char(directory.str), &char(geometry.str)]
+	if literal { argv << c'--package' }
+	argv << &char(command.str)
+	for argument in arguments { argv << &char(argument.str) }
+	if !literal && obs_capture {
 		argv << c'--obs'
-	} else if fill_surface {
+	} else if !literal && fill_surface {
 		argv << c'--fill'
-	} else if game_input {
+	} else if !literal && game_input {
 		argv << c'--game-input'
 	}
 	argv << &char(unsafe { nil })
@@ -1333,6 +1353,7 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 			geometry.free()
 			log_path.free()
 			path_entry.free()
+			home_entry.free()
 			argv.free()
 			envp.free()
 		}
@@ -1346,7 +1367,10 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 		// framebuffer, not on the system console: the desktop owns the screen
 		// the console writes to, and a browser is talkative enough that
 		// rendering its warnings as console text costs more than running it.
-		log_fd := desktop_create_truncated(log_path)
+		// The parent was validated before this fresh launch. Never follow or
+		// truncate a previous diagnostic file, even inside the private parent.
+		log_fd := C.open(&char(log_path.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NOFOLLOW | C.O_CLOEXEC, 0o600)
+		if log_fd < 0 { C._exit(126) }
 		if log_fd >= 0 {
 			C.dup2(log_fd, C.STDOUT_FILENO)
 			C.dup2(log_fd, C.STDERR_FILENO)
@@ -1363,6 +1387,7 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 		geometry.free()
 		log_path.free()
 		path_entry.free()
+		home_entry.free()
 		argv.free()
 		envp.free()
 	}

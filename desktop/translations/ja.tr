@@ -4959,3 +4959,14 @@ app_selection.release.skip
 app_selection.release.save_failed
 選択を保存できません。ホームフォルダーを確認して再試行してください。
 -----
+wine.package.starting
+アプリケーションを起動しています…
+-----
+wine.package.missing
+パッケージの起動ツールを利用できません。
+-----
+wine.package.exited
+アプリケーションは終了しました。詳細は起動ログを確認してください。
+-----
+wine.package.back
+ソフトウェアに戻る

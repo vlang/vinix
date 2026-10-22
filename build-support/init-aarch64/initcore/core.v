@@ -133,7 +133,18 @@ fn prepare_desktop_boot() {
  }
 }
 fn prepare_hosted_x11_storage() {
- unsafe { at := u64(i64(-100)); call(34,at,u64(c'/run/vinix-hosted-x11'),0o700,0,0); if call(40,u64(c'/dev/null'),u64(c'/run/vinix-hosted-x11'),u64(c'tmpfs'),0,0) < 0 { init_print(c'init: hosted X11 scratch mount unavailable; using /tmp\n'); return }; fd := call(56,at,u64(c'/run/vinix-hosted-x11/.tmpfs-ready'),0x41,0o600,0); if fd >= 0 { call(57,u64(fd),0,0,0,0) } }
+ unsafe {
+  at := u64(i64(-100))
+  // Create the root-owned sticky transport before an ordinary session starts.
+  // Existing nodes are unchanged; each display host validates them before use.
+  mask := call(166,0,0,0,0,0)
+  call(34,at,u64(c'/tmp/.X11-unix'),0o1777,0,0)
+  call(166,u64(mask),0,0,0,0)
+  call(34,at,u64(c'/run/vinix-hosted-x11'),0o700,0,0)
+  if call(40,u64(c'/dev/null'),u64(c'/run/vinix-hosted-x11'),u64(c'tmpfs'),0,0) < 0 { init_print(c'init: hosted X11 scratch mount unavailable; using private /run storage\n'); return }
+  fd := call(56,at,u64(c'/run/vinix-hosted-x11/.tmpfs-ready'),0x41,0o600,0)
+  if fd >= 0 { call(57,u64(fd),0,0,0,0) }
+ }
 }
 fn prepare_environment() {
  unsafe { vinit_environment[0] = c'PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'; vinit_environment[1] = c'HOME=/root'; vinit_environment[2] = c'TERM=linux'; vinit_environment[3] = c'PS1=vinix# '; vinit_environment[4] = c'USER=root'; vinit_environment[5] = c'LOGNAME=root'; vinit_environment[6] = c'SHELL=/bin/zsh'; vinit_environment[7] = c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules'; vinit_environment[8] = c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri'; vinit_environment[9] = c'XDG_RUNTIME_DIR=/run/user/0'; vinit_environment[10] = c'XDG_CONFIG_HOME=/root/.config'; vinit_environment[11] = c'XDG_CACHE_HOME=/root/.cache'; vinit_environment[12] = c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt'; vinit_environment[13] = c'VINIX_SYSTEM_SESSION=1'; vinit_environment[14] = nil }

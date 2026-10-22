@@ -61,6 +61,7 @@ fn command_checked(args []string, family string) !int {
 		'n64-bridge' { return n64_bridge(args)! }
 		'security-compile' { return security_compile(args)! }
 		'x11-compile' { return x11_compile(args)! }
+		'x11-build' { return x11_build(args)! }
 		'security-stage' { return stage_command(args, true)! }
 		'volume-stage' { return stage_command(args, false)! }
 		'volume-host' { return volume_host(args)! }

@@ -4959,3 +4959,14 @@ Ignorer pour le moment
 app_selection.release.save_failed
 Choix non enregistré. Vérifiez votre dossier personnel et réessayez.
 -----
+wine.package.starting
+Démarrage de l’application…
+-----
+wine.package.missing
+Le lanceur de paquets signés est indisponible.
+-----
+wine.package.exited
+L’application est fermée. Consultez son journal privé de lancement.
+-----
+wine.package.back
+Retour aux logiciels

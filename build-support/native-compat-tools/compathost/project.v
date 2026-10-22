@@ -9,6 +9,9 @@ fn project(source string, name string, destination string, arch string, globals 
 	work := hosttest.work_dir('', 'vinix-compat-project-')!
 	defer { retire(work) }
 	hosttest.module_copy_tree(source, work + '/' + name)!
+	if name == 'winehost' {
+		hosttest.module_copy_tree(root() + '/tools/packages/x11auth', work + '/x11auth')!
+	}
 	write(work + '/v.mod', "Module { name: '" + if globals { 'security_core' } else { 'x11_bridge' } + "' }\n")!
 	write(work + '/entry.v', 'module main\nimport ' + name + ' as _\n')!
 	v := output(['sh', '-c', '. "$1/build-support/find-v.sh"; printf "%s" "$V"', 'find-v', root()])!
@@ -99,8 +102,10 @@ fn security_compile(args []string) !int {
 }
 
 fn x11_core(tool string, destination string, arch string, no_main bool) ! {
+	mut defines := if no_main { ['wine_host_no_main'] } else { []string{} }
+	if tool == 'winehost' { defines << 'x11_host_libc' }
 	project(root() + '/build-support/xorg-server/' + tool, tool, destination, arch, false, false,
-		if no_main { ['wine_host_no_main'] } else { []string{} })!
+		defines)!
 	write(destination, '#define VINIX_XINPUT_V_RUNTIME 1\n' + scaffold_warnings + read(destination)!)!
 }
 

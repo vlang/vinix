@@ -4,6 +4,8 @@
 @[translated]
 module winehost
 
+import x11auth
+
 #include "wine-host-v-abi.h"
 
 fn is_null(p voidptr) bool { unsafe { return p == nil } }
@@ -98,6 +100,9 @@ fn C.socket(i32, i32, i32) i32
 fn C.connect(i32, voidptr, u32) i32
 fn C.close(i32) i32
 fn C.open(&char, i32, ...) i32
+fn C.geteuid() i32
+fn C.lstat(&char, &C.stat) i32
+fn C.execv(&char, &&char) i32
 fn C.ftruncate(i32, i64) i32
 fn C.mmap(voidptr, usize, i32, i32, i32, i64) voidptr
 fn C.munmap(voidptr, usize) i32
@@ -173,20 +178,10 @@ fn display_number(name &char) i32 {
 		return number
 	}
 }
-fn remove_display_files(number i32) {
-	unsafe {
-		if number < 0 { return }
-		mut path := [64]char{}
-		C.snprintf(&path[0], sizeof(path), c'/tmp/.X11-unix/X%d', number)
-		C.unlink(&path[0])
-		C.snprintf(&path[0], sizeof(path), c'/tmp/.X%d-lock', number)
-		C.unlink(&path[0])
-	}
-}
 fn remove_surface_files(directory &char) {
 	unsafe {
 		mut path := [4096]char{}
-		names := [&char(c'Xvfb_screen0'), &char(c'Xvfb_screen1'), &char(c'damage'), &char(c'clipboard'), &char(c'.clipboard')]!
+		names := [&char(c'Xvfb_screen0'), &char(c'Xvfb_screen1'), &char(c'damage'), &char(c'clipboard'), &char(c'.clipboard'), &char(c'Xauthority')]!
 		for index := 0; index < names.len; index++ {
 			if C.snprintf(&path[0], sizeof(path), c'%s/%s', directory, names[index]) < i32(sizeof(path)) { C.unlink(&path[0]) }
 		}
@@ -195,24 +190,19 @@ fn remove_surface_files(directory &char) {
 fn claim_display_number(number i32) bool {
 	unsafe {
 		mut path := [64]char{}
-		mut address := C.sockaddr_un{}
+		mut info := C.stat{}
 		C.snprintf(&path[0], sizeof(path), c'/tmp/.X11-unix/X%d', number)
-		address.sun_family = u16(C.AF_UNIX)
-		C.snprintf(&address.sun_path[0], sizeof(address.sun_path), c'%s', &path[0])
-		probe := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
-		if probe >= 0 {
-			connected := C.connect(probe, voidptr(&address), u32(sizeof(address))) == 0
-			C.close(probe)
-			if connected { return false }
-		}
-		remove_display_files(number)
-		return true
+		if C.lstat(&path[0], &info) == 0 || C.vwh_errno() != C.ENOENT { return false }
+		C.snprintf(&path[0], sizeof(path), c'/tmp/.X%d-lock', number)
+		// A stale or unresponsive display belongs to its creator. Never unlink
+		// another host's socket/lock while searching for a free display.
+		return C.lstat(&path[0], &info) != 0 && C.vwh_errno() == C.ENOENT
 	}
 }
 fn claim_display(requested &char, storage &char, size usize) &char {
 	unsafe {
-		base := display_number(requested)
-		if base < 0 { return requested }
+		base := x11auth.display_number(requested)
+		if base < 0 { return nil }
 		for offset := i32(0); offset < 64; offset++ {
 			number := base + offset
 			if number > 65535 { break }
@@ -221,7 +211,7 @@ fn claim_display(requested &char, storage &char, size usize) &char {
 		return nil
 	}
 }
-fn spawn_xvfb(name &char, directory &char, geometry &char, game bool, obs bool, shm bool, glx bool) i32 {
+fn spawn_xvfb(name &char, directory &char, authority &char, geometry &char, game bool, obs bool, shm bool, glx bool) i32 {
 	unsafe {
 		pid := C.fork()
 		if pid != 0 { return pid }
@@ -231,13 +221,13 @@ fn spawn_xvfb(name &char, directory &char, geometry &char, game bool, obs bool, 
 		C.setenv(c'GALLIUM_DRIVER', c'softpipe', 1)
 		xvfb := if (!game || glx) && C.access(c'/usr/bin/Xvfb-glx', C.X_OK) == 0 { &char(c'/usr/bin/Xvfb-glx') } else { &char(c'/usr/bin/Xvfb') }
 		if obs {
-			C.execl(xvfb, c'Xvfb', name, c'-screen', c'0', geometry, c'-screen', c'1', c'1280x900x24', c'-fbdir', directory, c'-nolisten', c'tcp', c'-noreset', c'-ac', c'+extension', c'GLX', c'+iglx', c'-extension', c'RANDR', voidptr(nil))
+			C.execl(xvfb, c'Xvfb', name, c'-screen', c'0', geometry, c'-screen', c'1', c'1280x900x24', c'-fbdir', directory, c'-nolisten', c'tcp', c'-noreset', c'-auth', authority, c'+extension', c'GLX', c'+iglx', c'-extension', c'RANDR', voidptr(nil))
 		} else if shm {
-			C.execl(xvfb, c'Xvfb', name, c'-screen', c'0', geometry, c'-fbdir', directory, c'-nolisten', c'tcp', c'-noreset', c'-ac', voidptr(nil))
+			C.execl(xvfb, c'Xvfb', name, c'-screen', c'0', geometry, c'-fbdir', directory, c'-nolisten', c'tcp', c'-noreset', c'-auth', authority, voidptr(nil))
 		} else if game {
-			C.execl(xvfb, c'Xvfb', name, c'-screen', c'0', geometry, c'-fbdir', directory, c'-nolisten', c'tcp', c'-noreset', c'-ac', c'-extension', c'MIT-SHM', voidptr(nil))
+			C.execl(xvfb, c'Xvfb', name, c'-screen', c'0', geometry, c'-fbdir', directory, c'-nolisten', c'tcp', c'-noreset', c'-auth', authority, c'-extension', c'MIT-SHM', voidptr(nil))
 		} else {
-			C.execl(xvfb, c'Xvfb', name, c'-screen', c'0', geometry, c'-fbdir', directory, c'-nolisten', c'tcp', c'-noreset', c'-ac', c'-extension', c'MIT-SHM', c'+extension', c'GLX', c'+iglx', voidptr(nil))
+			C.execl(xvfb, c'Xvfb', name, c'-screen', c'0', geometry, c'-fbdir', directory, c'-nolisten', c'tcp', c'-noreset', c'-auth', authority, c'-extension', c'MIT-SHM', c'+extension', c'GLX', c'+iglx', voidptr(nil))
 		}
 		C._exit(127)
 		return 127
@@ -252,7 +242,7 @@ fn unpublish_obs_screen(directory &char) {
 fn open_display(name &char, pid i32) &C.Display {
 	unsafe { for attempt := 0; attempt < 300 && C.vwh_running() != 0; attempt++ { display := C.XOpenDisplay(name); if !is_null(display) { return display }; mut status := i32(0); if C.waitpid(pid, &status, C.WNOHANG) == pid { return nil }; sleep_10ms() }; return nil }
 }
-fn spawn_wine(name &char, command &char) i32 {
+fn spawn_wine(name &char, authority &char, command &char, arguments &&char) i32 {
 	unsafe {
 		private_group := C.strcmp(command, c'/usr/bin/run-roblox-client') == 0
 		pid := C.fork()
@@ -261,7 +251,7 @@ fn spawn_wine(name &char, command &char) i32 {
 			return pid
 		}
 		if private_group && C.setpgid(0, 0) != 0 { C._exit(127) }
-		C.setenv(c'DISPLAY', name, 1)
+		if C.setenv(c'DISPLAY', name, 1) != 0 || C.setenv(c'XAUTHORITY', authority, 1) != 0 { C._exit(127) }
 		// The Vinix window already owns the title and window controls. ATL's
 		// GTK header bar would repeat them inside this embedded X11 surface.
 		C.setenv(c'ATL_DISABLE_WINDOW_DECORATIONS', c'1', 1)
@@ -269,7 +259,7 @@ fn spawn_wine(name &char, command &char) i32 {
 		C.unsetenv(c'LIBGL_ALWAYS_INDIRECT')
 		C.setenv(c'GALLIUM_DRIVER', c'llvmpipe', 1)
 		C.setenv(c'WINEDEBUG', c'-all', 0)
-		C.execl(command, command, voidptr(nil))
+		C.execv(command, arguments)
 		C._exit(127)
 		return 127
 	}
@@ -761,12 +751,34 @@ fn stop_application(initial_pid i32, group i32) {
 		if pid > 0 { mut status := i32(0); for C.waitpid(pid, &status, 0) < 0 && C.vwh_errno() == C.EINTR { continue } }
 	}
 }
+// The signed launcher holds a generation lease until its sandboxed child exits.
+// Killing that launcher would drop the lease early. Closing its X server makes
+// ordinary X clients exit; a child which ignores that retains its live launcher
+// and lease until it finishes, even after this bridge is reaped.
+fn wait_signed_application(pid i32) {
+	unsafe {
+		if pid <= 0 { return }
+		mut status := i32(0)
+		for attempt := 0; attempt < 100; attempt++ {
+			if C.waitpid(pid, &status, C.WNOHANG) == pid { return }
+			sleep_10ms()
+		}
+	}
+}
 @[export: 'vinix_wine_host_main']
 pub fn host_main(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc == 2 && C.strcmp(argv[1], c'--prepare-socket-parent') == 0 {
+			fd := x11auth.prepare_socket_parent(c'/', 0)
+			if fd < 0 { C.fprintf(C.stderr, c'vinix-wine-host: root-owned trusted X11 socket directory required\n'); return 1 }
+			C.close(fd)
+			return 0
+		}
 		mut input := [65557]u8{}
 		mut used := usize(0)
 		mut chosen_display := [16]char{}
+		mut authority := [4096]char{}
+		mut legacy_arguments := [2]&char{}
 		mut wine_pid := i32(-1)
 		mut application_group := i32(-1)
 		mut status := i32(0)
@@ -777,11 +789,13 @@ pub fn host_main(argc i32, argv &&char) i32 {
 		mut game_input := false
 		mut obs_capture := false
 		mut fill_tick := u32(0)
-		if argc != 5 && argc != 6 {
-			C.fprintf(C.stderr, c'usage: %s DISPLAY FBDIR GEOMETRY COMMAND [--fill|--game-input|--obs]\n', argv[0])
+		signed_application := argc >= 6 && C.strcmp(argv[4], c'--package') == 0
+		literal_arguments := argc >= 6 && (C.strcmp(argv[4], c'--') == 0 || signed_application)
+		if !literal_arguments && argc != 5 && argc != 6 {
+			C.fprintf(C.stderr, c'usage: %s DISPLAY FBDIR GEOMETRY COMMAND [--fill|--game-input|--obs], or DISPLAY FBDIR GEOMETRY -- COMMAND [ARG...], or DISPLAY FBDIR GEOMETRY --package /usr/bin/vinix-package run ID [DOCUMENT]\n', argv[0])
 			return 2
 		}
-		if argc == 6 {
+		if !literal_arguments && argc == 6 {
 			if C.strcmp(argv[5], c'--fill') == 0 { fill_surface = true }
 			else if C.strcmp(argv[5], c'--game-input') == 0 { game_input = true }
 			else if C.strcmp(argv[5], c'--obs') == 0 { obs_capture = true }
@@ -790,16 +804,35 @@ pub fn host_main(argc i32, argv &&char) i32 {
 		mut display_name := argv[1]
 		directory := argv[2]
 		geometry := argv[3]
-		command := argv[4]
+		command := if literal_arguments { argv[5] } else { argv[4] }
+		if signed_application && (C.strcmp(command, c'/usr/bin/vinix-package') != 0 || argc < 8 || argc > 9 || C.strcmp(argv[6], c'run') != 0) {
+			C.fprintf(C.stderr, c'vinix-wine-host: --package requires /usr/bin/vinix-package run ID [DOCUMENT]\n')
+			return 2
+		}
+		if signed_application { fill_surface = true }
+		legacy_arguments[0] = command
+		command_arguments := if literal_arguments { argv + 5 } else { &legacy_arguments[0] }
 		hold_game_keys = game_input && C.strcmp(command, c'/usr/bin/run-roblox-client') != 0
 		C.vwh_install_signals()
-		if C.mkdir(directory, u32(0o700)) != 0 && C.vwh_errno() != C.EEXIST { C.perror(c'vinix-wine-host: mkdir'); return 1 }
+		sockets := if C.geteuid() == 0 { x11auth.prepare_socket_parent(c'/', 0) } else { x11auth.socket_parent(c'/', 0) }
+		if sockets < 0 { C.fprintf(C.stderr, c'vinix-wine-host: trusted X11 socket directory required\n'); return 1 }
+		C.close(sockets)
+		surface := x11auth.open_surface(c'/', directory, u32(C.geteuid()), 0, true)
+		if surface < 0 { C.fprintf(C.stderr, c'vinix-wine-host: a new private account-owned surface is required\n'); return 1 }
 		display_name = claim_display(display_name, &chosen_display[0], sizeof(chosen_display))
-		if is_null(display_name) { C.fprintf(C.stderr, c'vinix-wine-host: no free display near %s\n', argv[1]); C.rmdir(directory); return 1 }
-		xvfb_pid := spawn_xvfb(display_name, directory, geometry, game_input, obs_capture,
+		if is_null(display_name) { C.close(surface); C.fprintf(C.stderr, c'vinix-wine-host: no free display near %s\n', argv[1]); C.rmdir(directory); return 1 }
+		if C.snprintf(&authority[0], sizeof(authority), c'%s/Xauthority', directory) >= i32(sizeof(authority))
+			|| !x11auth.create_authority(surface, display_name) || !x11auth.authority_matches(surface, display_name, u32(C.geteuid())) {
+			C.close(surface); C.fprintf(C.stderr, c'vinix-wine-host: cannot create private X11 authority\n'); remove_surface_files(directory); C.rmdir(directory); return 1
+		}
+		C.close(surface)
+		if C.setenv(c'DISPLAY', display_name, 1) != 0 || C.setenv(c'XAUTHORITY', &authority[0], 1) != 0 {
+			remove_surface_files(directory); C.rmdir(directory); return 1
+		}
+		xvfb_pid := spawn_xvfb(display_name, directory, &authority[0], geometry, game_input, obs_capture,
 			C.strcmp(command, c'/usr/bin/run-opengothic') == 0 || C.strcmp(command, c'/usr/bin/run-roblox-client') == 0,
 			C.strcmp(command, c'/usr/bin/run-roblox-client') == 0)
-		if xvfb_pid < 0 { C.perror(c'vinix-wine-host: fork Xvfb'); C.rmdir(directory); return 1 }
+		if xvfb_pid < 0 { C.perror(c'vinix-wine-host: fork Xvfb'); remove_surface_files(directory); C.rmdir(directory); return 1 }
 		display := open_display(display_name, xvfb_pid)
 		if is_null(display) {
 			C.fprintf(C.stderr, c'vinix-wine-host: Xvfb did not become ready\n')
@@ -839,7 +872,7 @@ pub fn host_main(argc i32, argv &&char) i32 {
 			if is_null(damage_counter) { C.XDamageDestroy(display, damage); damage = 0 }
 			else { damage_sequence++; C.vwh_damage_store(damage_counter, damage_sequence) }
 		}
-		wine_pid = spawn_wine(display_name, command)
+		wine_pid = spawn_wine(display_name, &authority[0], command, command_arguments)
 		if wine_pid > 1 && C.strcmp(command, c'/usr/bin/run-roblox-client') == 0 { application_group = wine_pid }
 		if wine_pid < 0 { C.perror(c'vinix-wine-host: fork Wine'); C.vwh_set_running(0) }
 		stdin_flags := C.fcntl(0, C.F_GETFL)
@@ -881,12 +914,12 @@ pub fn host_main(argc i32, argv &&char) i32 {
 			if hold_game_keys { release_expired_game_keys(display) }
 			sleep_10ms()
 		}
-		stop_application(wine_pid, application_group)
+		if !signed_application { stop_application(wine_pid, application_group) }
 		if !is_null(damage_counter) { C.munmap(damage_counter, sizeof(u32)) }
 		C.XCloseDisplay(display)
 		if obs_capture { unpublish_obs_screen(directory) }
 		stop_child(xvfb_pid)
-		remove_display_files(display_number(display_name))
+		if signed_application { wait_signed_application(wine_pid) }
 		remove_surface_files(directory)
 		C.rmdir(directory)
 		return 0

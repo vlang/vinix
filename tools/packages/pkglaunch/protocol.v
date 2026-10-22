@@ -14,6 +14,16 @@ pub:
 	format int = 1
 	nonce string
 	arguments []string
+	display string
+	authority string
+}
+
+// Version one remains byte-for-byte compatible for non-X11 launches. Version
+// two adds one fixed private display pair, never an arbitrary environment map.
+struct LiteralRequest {
+	format int = 1
+	nonce string
+	arguments []string
 }
 
 pub fn valid_nonce(value string) bool {
@@ -29,7 +39,7 @@ fn identifier(value string) bool {
 }
 
 // Only an installed package and its literal launch input can be selected. No
-// executable, account, environment, sandbox flag or administrative command.
+// executable, account, sandbox flag or administrative command.
 pub fn validate_arguments(arguments []string) ! {
 	if arguments.len < 2 || arguments.len > 772 || !identifier(arguments[1]) { return error('invalid isolated package launch') }
 	if arguments[0] in ['run', 'run-terminal', 'run-window'] {
@@ -58,12 +68,15 @@ pub fn validate_arguments(arguments []string) ! {
 }
 
 pub fn (request &Request) encode() !string {
-	if request.format != 1 || !valid_nonce(request.nonce) { return error('invalid isolated package request identity') }
+	if !valid_nonce(request.nonce) { return error('invalid isolated package request identity') }
 	validate_arguments(request.arguments)!
+	request.validate_display_shape()!
 	mut bytes := []u8{cap: request_limit}
 	unsafe { bytes.flags |= .noslices }
 	defer { unsafe { bytes.free() } }
-	json2.encode_append(request, mut bytes)
+	if request.format == 1 {
+		json2.encode_append(LiteralRequest{ nonce: request.nonce, arguments: request.arguments }, mut bytes)
+	} else { json2.encode_append(request, mut bytes) }
 	text := bytes.bytestr()
 	if text.len > request_limit { unsafe { text.free() }; return error('isolated package request is too large') }
 	return text
@@ -106,6 +119,6 @@ pub fn (request &Request) result(text string) !int {
 }
 
 pub fn (mut request Request) close() {
-	unsafe { request.nonce.free(); for value in request.arguments { value.free() }; (&array(&request.arguments)).free() }
+	unsafe { request.nonce.free(); request.display.free(); request.authority.free(); for value in request.arguments { value.free() }; (&array(&request.arguments)).free() }
 	request = Request{}
 }

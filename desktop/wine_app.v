@@ -128,6 +128,7 @@ mut:
 	uri_due i64
 	portal_open bool
 	open_file bool
+	package_session bool
 }
 
 // HostedText is what a hosted window says in place of its surface. The window
@@ -194,6 +195,9 @@ enum HostedText {
 	dota2_exited
 	xvfb_missing
 	host_failed
+	package_starting
+	package_missing
+	package_exited
 }
 
 fn (t HostedText) text() string {
@@ -258,6 +262,9 @@ fn (t HostedText) text() string {
 		.dota2_exited { tr('wine.dota2.exited') }
 		.xvfb_missing { tr('wine.xvfb_missing') }
 		.host_failed { tr('wine.host_failed') }
+		.package_starting { tr('wine.package.starting') }
+		.package_missing { tr('wine.package.missing') }
+		.package_exited { tr('wine.package.exited') }
 	}
 }
 
@@ -438,22 +445,27 @@ fn open_doom(mut _ Desktop) !NativeApp {
 
 fn open_hosted_x11_app(name string, command string, surface_width int, surface_height int,
 	icon string, starting HostedText, missing HostedText, exited HostedText) &HostedX11App {
+	return open_hosted_x11_command(name, command, []string{}, false, surface_width, surface_height,
+		icon, starting, missing, exited)
+}
+
+fn open_hosted_x11_command(name string, command string, arguments []string, package_session bool, surface_width int, surface_height int,
+	icon string, starting HostedText, missing HostedText, exited HostedText) &HostedX11App {
 	mut app := &HostedX11App{
 		surface_width: surface_width
 		surface_height: surface_height
 		icon: icon
 		starting: starting
 		exited: exited
+		package_session: package_session
 	}
 	process_id := C.getpid()
-	// Xvfb writes its framebuffer through a shared mmap. Use the per-boot
-	// scratch mount when init provided it, keeping constant frame updates off
-	// the persistent root filesystem.
-	base := if C.access(c'/run/vinix-hosted-x11/.tmpfs-ready', C.R_OK) == 0 {
-		'/run/vinix-hosted-x11'
-	} else {
-		'/tmp'
+	base := desktop_hosted_x11_root() or {
+		app.failed = true
+		app.failure = .host_failed
+		return app
 	}
+	defer { unsafe { base.free() } }
 	// PIDs can be reused while the compositor still has the previous XWD file
 	// mapped. Give each launch a new path so its surface cannot resolve to a
 	// cached frame from an earlier X server.
@@ -476,7 +488,7 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 	// generated it. Ask the host to enforce the Xvfb dimensions as well as
 	// passing them to the launcher, so an old or ignored game-size option can
 	// never leave a smaller GLFW window floating in a white root surface.
-	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command,
+	host := desktop_spawn_x11_command(app.directory, surface_width, surface_height, command, arguments, package_session,
 		name == 'minecraft' || name == 'zed' || name == 'emacs', name == 'doom' || name == 'qemu' || name == 'opengothic'
 		|| name == 'roblox' || name == 'dota2', name == 'obs') or {
 		app.failed = true
@@ -507,6 +519,7 @@ fn (mut app HostedX11App) build(size ui2.Rect) !ui2.Element {
 }
 
 fn (mut app HostedX11App) handle(action string) ! {
+	if app.package_session { return }
 	if !action.starts_with(jump_open_prefix) { return }
 	value:=action[jump_open_prefix.len..]
 	if !value.starts_with('/') && (app.icon !in ['asset:firefox','asset:chromium'] || (!value.starts_with('https://') && !value.starts_with('http://'))) { return }
@@ -527,7 +540,7 @@ fn (mut app HostedX11App) poll() bool {
 		app.failure = app.exited
 		return true
 	}
-	if !app.ready {
+	if !app.ready && !app.failed {
 		desktop_stat(app.xwd_path) or { return false }
 		app.ready = true
 		return true
@@ -690,7 +703,7 @@ fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, button AppPointer
 
 fn (mut app HostedX11App) key_input(text string) {
 	// Emacs binds C-o to open-line; its own file command is C-x C-f.
-	if text=='\x0f' && app.starting != .emacs_starting && !app.portal_open { app.portal_open=session_dialog_open('hosted.open',0,'Open file',desktop_home,'',''); if app.portal_open { return } }
+	if text=='\x0f' && !app.package_session && app.starting != .emacs_starting && !app.portal_open { app.portal_open=session_dialog_open('hosted.open',0,'Open file',desktop_home,'',''); if app.portal_open { return } }
 	if text.len > 0 {
 		app.send_host_event(.keys, 0, 0, text)
 	}

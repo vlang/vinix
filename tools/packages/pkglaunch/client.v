@@ -15,6 +15,12 @@ fn run_with_socket(arguments []string, socket_path string) !int {
 	validate_arguments(arguments)!
 	uid := u32(os.geteuid())
 	if uid == 0 { return error('isolated launch transport requires an ordinary caller') }
+	display := os.getenv('DISPLAY')
+	authority := os.getenv('XAUTHORITY')
+	defer { unsafe { display.free(); authority.free() } }
+	// Refuse an ambient or incomplete display before contacting the service.
+	shape := Request{ format: if display == '' && authority == '' { 1 } else { 2 }, arguments: arguments, display: display, authority: authority }
+	shape.validate_display(uid)!
 	mut describe_request := authproto.Frame{ code: authproto.op_describe, fields: [action.bytes()] }
 	defer { describe_request.close() }
 	mut description := authclient.ask_root(socket_path, describe_request.code, ...describe_request.fields)!
@@ -29,7 +35,7 @@ fn run_with_socket(arguments []string, socket_path string) !int {
 	rand.read(mut random)!
 	nonce := random.hex()
 	defer { unsafe { nonce.free() } }
-	request := Request{ nonce: nonce, arguments: arguments }
+	request := Request{ format: shape.format, nonce: nonce, arguments: arguments, display: display, authority: authority }
 	mut listener := pkgadmin.listen_private(directory, uid, nonce)!
 	defer { listener.close() }
 	mut run_request := authproto.Frame{ code: authproto.op_run, fields: [action.bytes(), []u8{}, nonce.bytes()] }

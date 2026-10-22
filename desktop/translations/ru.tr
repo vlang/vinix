@@ -4960,3 +4960,14 @@ app_selection.release.skip
 app_selection.release.save_failed
 Не удалось сохранить выбор. Проверьте домашнюю папку и повторите.
 -----
+wine.package.starting
+Запуск приложения…
+-----
+wine.package.missing
+Средство запуска подписанных пакетов недоступно.
+-----
+wine.package.exited
+Приложение закрыто. Диагностика доступна в личном журнале запуска.
+-----
+wine.package.back
+Назад к программам

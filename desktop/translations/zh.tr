@@ -4959,3 +4959,14 @@ app_selection.release.skip
 app_selection.release.save_failed
 无法保存选择。请检查主文件夹后重试。
 -----
+wine.package.starting
+正在启动应用程序…
+-----
+wine.package.missing
+签名软件包启动器不可用。
+-----
+wine.package.exited
+应用程序已关闭。请查看其启动日志。
+-----
+wine.package.back
+返回软件中心

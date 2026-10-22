@@ -192,6 +192,7 @@ mut:
 	mirror_summary string
 	worker_mirror bool
 	terminal_app &TerminalApp = unsafe { nil }
+	hosted_app &HostedX11App = unsafe { nil }
 	launch_mode bool
 	launch_read_file int = -1
 	launch_id string
@@ -583,6 +584,7 @@ fn (mut a SoftwareApp) retire_worker() {
 fn (mut a SoftwareApp) poll() bool {
 	choice_changed := a.poll_deployment_choice()
 	if a.window_mode { return a.poll_window() || choice_changed }
+	if a.hosted_app != unsafe { nil } { return a.hosted_app.poll() || choice_changed }
 	if a.terminal_app != unsafe { nil } { return a.terminal_app.poll() || choice_changed }
 	if a.worker == unsafe { nil } { return choice_changed }
 	mut changed := choice_changed
@@ -789,6 +791,10 @@ fn (mut a SoftwareApp) run_requested() {
 			a.open_window(request, row.installed_window_protocol) or { a.set_status(err.msg()); unsafe { err.free() } }
 			return
 		}
+		if row.id == request.id && row.installed_version != '' && 'display' in row.installed_permissions {
+			a.open_hosted_package(request) or { a.set_status(err.msg()); unsafe { err.free() } }
+			return
+		}
 	}
 	a.start(if request.document.len > 0 {
 		['run', request.id, request.document]
@@ -801,7 +807,7 @@ fn (mut a SoftwareApp) run_requested() {
 	}
 }
 
-fn (a &SoftwareApp) next_poll_ms() u64 { return 100 }
+fn (a &SoftwareApp) next_poll_ms() u64 { return if a.hosted_app != unsafe { nil } { 20 } else { 100 } }
 
 fn (mut a SoftwareApp) handle(event_id string) ! {
 	if a.deployment_choice_pending && event_id != 'software.deployment.choose' {
@@ -809,6 +815,13 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	}
 	if a.admin_prompt { a.handle_admin(event_id); return }
 	if a.window_mode { a.handle_window(event_id); return }
+	if a.hosted_app != unsafe { nil } {
+		if event_id == 'software.hosted-back' && a.hosted_app.failed {
+			a.close_hosted_package()
+			a.load_view()
+		}
+		return
+	}
 	if a.terminal_app != unsafe { nil } {
 		if event_id == 'software.terminal-back' {
 			if !a.terminal_app.exited { a.set_status('Exit the application before returning to Software.'); return }
@@ -1115,6 +1128,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if input != '' { a.deployment_choice_current = false }
 	if a.admin_prompt { a.admin_key_input(input); return }
 	if a.window_mode { a.window_key_input(input); return }
+	if a.hosted_app != unsafe { nil } { a.hosted_app.key_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
 	if a.failure_mode { a.failure_key_input(input); return }
 	if a.status_reader.mode { a.status_reader.key_input(input); return }
@@ -1168,6 +1182,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if input != '' { a.deployment_choice_current = false }
 	if a.admin_prompt { a.admin_paste_input(input); return }
 	if a.window_mode { a.window_paste_input(input); return }
+	if a.hosted_app != unsafe { nil } { a.hosted_app.paste_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
 	if a.failure_mode { return }
 	if a.status_reader.mode { return }
@@ -1275,6 +1290,7 @@ fn software_review_row(row pkgprotocol.ReviewPackage) SoftwareRow {
 fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.admin_prompt { return a.build_admin(size) }
 	if a.window_mode { return a.build_window(size) }
+	if a.hosted_app != unsafe { nil } { return a.build_hosted_package(size) }
 	if a.terminal_app != unsafe { nil } { return a.build_terminal(size) }
 	if a.failure_mode { return a.build_failure(size) }
 	if a.status_reader.mode { return a.status_reader.build(size) }
@@ -1478,6 +1494,7 @@ fn (mut a SoftwareApp) prepare_close() bool {
 }
 
 fn (mut a SoftwareApp) close_app() {
+	a.close_hosted_package()
 	a.clear_admin_prompt()
 	a.clear_window()
 	a.clear_launch_options()

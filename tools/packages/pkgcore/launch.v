@@ -3,6 +3,7 @@ module pkgcore
 
 import os
 import tools.packages.appsdk
+import tools.packages.x11auth
 
 pub struct Launch {
 pub:
@@ -35,6 +36,24 @@ fn launch_unveil(mut args []string, path string, permissions string) {
 fn launch_environment(mut args []string, value string) {
 	args << '--env'
 	launch_take(mut args, value)
+}
+
+fn launch_x11(mut args []string, uid int, root string, system_owner u32) ! {
+	display := os.getenv('DISPLAY')
+	authority := os.getenv('XAUTHORITY')
+	defer { unsafe { display.free(); authority.free() } }
+	if uid != int(C.geteuid()) || !x11auth.admit(root.str, authority.str, display.str, u32(uid), system_owner) {
+		return error('graphical launch requires an authenticated private display owned by this account')
+	}
+	// Xlib's local socket and authority are the only X11 filesystem grants.
+	// Do not unveil the global socket directory or inherit an ambient authority.
+	number := unsafe { tos(display.str + 1, display.len - 1) }
+	socket := root + 'tmp/.X11-unix/X' + number
+	defer { unsafe { socket.free() } }
+	launch_unveil(mut args, socket, 'rw')
+	launch_unveil(mut args, authority, 'r')
+	launch_environment(mut args, 'DISPLAY=' + display)
+	launch_environment(mut args, 'XAUTHORITY=' + authority)
 }
 
 fn validate_launch_document(path string) ! {
@@ -172,10 +191,7 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	if input.terminal { launch_environment(mut args, 'TERM=linux') }
 	if input.window { launch_environment(mut args, if p.window_protocol == 1 { 'VINIX_WINDOW_PROTOCOL=1' } else { 'VINIX_WINDOW_PROTOCOL=2' }) }
 	if 'display' in p.permissions && !input.window {
-		launch_unveil(mut args, '/tmp/.X11-unix', 'rw')
-		display := os.getenv('DISPLAY')
-		defer { unsafe { display.free() } }
-		launch_environment(mut args, 'DISPLAY=' + display)
+		launch_x11(mut args, uid, '/', 0)!
 	}
 	if 'audio' in p.permissions { launch_unveil(mut args, '/dev/snd', 'rw') }
 	for document in input.documents {

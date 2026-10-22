@@ -4969,3 +4969,14 @@ Skip for now
 app_selection.release.save_failed
 Your choice could not be saved. Check your home folder and try again.
 -----
+wine.package.starting
+Starting application…
+-----
+wine.package.missing
+The signed package launcher is unavailable.
+-----
+wine.package.exited
+The application has closed. See its private launch log for diagnostics.
+-----
+wine.package.back
+Back to Software

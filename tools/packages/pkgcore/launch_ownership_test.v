@@ -34,7 +34,7 @@ fn launch_owned_fixture(architecture string, kind string, width int) (Config, St
 	packages << Installed{ repository: 'publisher', public_key: key, sequence: 7,
 		package: Package{ id: 'app', version: '1.2.3', architecture: architecture, name: 'App', license: 'MIT', kind: kind,
 			runtime: if kind == 'native' { '' } else { 'runtime' }, entrypoint: 'bin/runner', dependencies: dependencies,
-			window_protocol: if kind == 'native' { 1 } else { 0 }, permissions: ['files', 'display', 'audio', 'network', 'process'],
+			window_protocol: 0, permissions: ['files', 'audio', 'network', 'process'],
 			arguments: ['@APP@/a', '@DATA@/b', '@RUNTIME@/c', '@APP@:@DATA@:@RUNTIME@', '', '$(literal)'],
 			files: [Payload{ path: 'bin/runner', sha256: key, bytes: 1, executable: true }] } }
 	return Config{ architecture: architecture, launch_user: 'alex', repositories: [Repository{ id: 'publisher', url: 'https://example.invalid', public_key: key }] },
@@ -83,7 +83,6 @@ fn test_launch_plans_survive_source_state_and_sibling_retirement() {
 fn test_launch_plan_matrix_retires_success_storage_and_keeps_inputs_literal() {
 	os.write_file('/tmp/launch-owned-matrix', 'document')!
 	defer { os.rm('/tmp/launch-owned-matrix') or {} }
-	os.setenv('DISPLAY', ':fixture-display', true)
 	for architecture in ['aarch64', 'x86_64']! {
 		for kind in ['native', 'linux', 'windows', 'apple']! {
 			config, state := launch_owned_fixture(architecture, kind, 16)
@@ -92,10 +91,10 @@ fn test_launch_plan_matrix_retires_success_storage_and_keeps_inputs_literal() {
 					data_cwd: mode == 3, window: mode >= 4, documents: ['/tmp/launch-owned-matrix'],
 					arguments: if mode in [2, 3]! { ['', '--uid', '$(literal)', '@DATA@/literal'] } else { []string{} } }
 				mut selected := state
-				if mode == 5 {
+				if mode >= 4 {
 					mut packages := state.packages.clone()
 					last := packages.len - 1
-					packages[last] = Installed{ ...packages[last], package: Package{ ...packages[last].package, window_protocol: 2 } }
+					packages[last] = Installed{ ...packages[last], package: Package{ ...packages[last].package, window_protocol: if mode == 5 { 2 } else { 1 }, permissions: [...packages[last].package.permissions, 'display'] } }
 					selected = State{ ...state, packages: packages }
 				}
 				for _ in 0 .. 1 { mut warm := application_launch_plan(config, '/var/lib/vinix-packages', selected, 'app', '/home/user/data', 1000, 1000, input)!; warm.close() }
@@ -105,10 +104,10 @@ fn test_launch_plan_matrix_retires_success_storage_and_keeps_inputs_literal() {
 					assert plan.program == '/usr/bin/vinix-sandbox'
 					assert plan.directory == if input.data_cwd { '/home/user/data' } else { '/var/lib/vinix-packages/generations/42/apps/app' }
 					assert plan.arguments[5] == if input.window { 'stdio rpath wpath cpath flock exec prot_exec inet dns proc' }
-						else if input.terminal { 'stdio rpath wpath cpath flock exec prot_exec tty inet dns proc unix' }
-						else { 'stdio rpath wpath cpath flock exec prot_exec inet dns proc unix' }
+						else if input.terminal { 'stdio rpath wpath cpath flock exec prot_exec tty inet dns proc' }
+						else { 'stdio rpath wpath cpath flock exec prot_exec inet dns proc' }
 					assert ('TERM=linux' in plan.arguments) == input.terminal
-					assert ('DISPLAY=:fixture-display' in plan.arguments) == !input.window
+					assert !plan.arguments.any(it.starts_with('DISPLAY=') || it.starts_with('XAUTHORITY='))
 					assert plan.arguments.last() == if input.command { '@DATA@/literal' } else { '/tmp/launch-owned-matrix' }
 					plan.close(); plan.close()
 				}

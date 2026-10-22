@@ -62,14 +62,18 @@ fn (mut reader RequestReader) quoted(limit int) !string {
 fn decode_request(text string) !Request {
 	mut reader := &RequestReader{ text: text }
 	defer { unsafe { free(reader) } }
-	reader.expect('{"format":1,"nonce":')!
+	format := if text.starts_with('{"format":2,') { 2 } else { 1 }
+	if format == 2 { reader.expect('{"format":2,"nonce":')! }
+	else { reader.expect('{"format":1,"nonce":')! }
 	nonce := reader.quoted(32)!
+	mut display := ''
+	mut authority := ''
 	mut values := []string{cap: 16}
 	unsafe { values.flags |= .noslices }
 	mut accepted := false
 	defer {
 		if !accepted {
-			unsafe { nonce.free(); for value in values { value.free() }; (&array(&values)).free() }
+			unsafe { nonce.free(); display.free(); authority.free(); for value in values { value.free() }; (&array(&values)).free() }
 		}
 	}
 	if !valid_nonce(nonce) { return error('invalid isolated package request identity') }
@@ -79,9 +83,16 @@ fn decode_request(text string) !Request {
 		if values.len != 0 { reader.expect(',')! }
 		values << reader.quoted(4096)!
 	}
-	reader.expect(']}')!
+	reader.expect(']')!
+	if format == 2 {
+		reader.expect(',"display":')!
+		display = reader.quoted(6)!
+		reader.expect(',"authority":')!
+		authority = reader.quoted(192)!
+	}
+	reader.expect('}')!
 	if reader.at != text.len { return error('isolated package request is not canonical') }
-	request := Request{ nonce: nonce, arguments: values }
+	request := Request{ format: format, nonce: nonce, arguments: values, display: display, authority: authority }
 	canonical := request.encode()!
 	defer { unsafe { canonical.free() } }
 	if text != canonical { return error('isolated package request is not canonical') }
