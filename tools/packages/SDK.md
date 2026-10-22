@@ -1967,8 +1967,8 @@ package-manager operations: their IDs remain inside the broker's own namespace.
 payloads with SDK/V/musl notices for both targets, commits typed replacements and
 explicitly saves private data. [Text-entry qualification](../../tests/packages/window-input-check.md)
 records host codec/broker checks, repeated heap measurements and actual signed
-ordinary-account guest execution. This adds a bounded native interface; graphical
-foreign runtimes and full ordinary-user desktop login still need qualification.
+ordinary-account guest execution. This adds a bounded native interface; broader
+foreign runtime compatibility and complete installed login acceptance remain open.
 
 | Kind | Requirements |
 | --- | --- |
@@ -2013,7 +2013,8 @@ explicit qualified runner. Bundling libraries alone does not supply every Linux
 syscall, service, plugin/data search path or graphics API.
 
 The explicit environment includes `HOME`, `TMPDIR`, `WINEPREFIX`, `PATH`,
-`LD_LIBRARY_PATH`, `LANG`, and declared `DISPLAY`. Argument substitutions
+`LD_LIBRARY_PATH`, `LANG`, and, for hosted X11, the validated `DISPLAY` and
+`XAUTHORITY`. Argument substitutions
 `@APP@`, `@DATA@`, `@RUNTIME@` are literal paths, never shell evaluation. Supplied
 document paths follow those arguments. Apps receive read/execute payload/runtime
 access and write/create private-data access, including advisory file locking.
@@ -2068,8 +2069,21 @@ supplementary groups. An administrator may configure `launch_user` for the root
 desktop: the session runner drops credentials before re-executing the service,
 and the ordinary service rechecks trust and acquires its own generation lease.
 The chosen account cannot come from a package, an argument or an environment
-variable. This profile does not acquire the hardware seat; display/audio runtimes
-still require broker qualification. An ordinary caller uses its own identity.
+variable. This profile does not acquire the hardware seat. An ordinary caller
+uses its own identity. Display-capable foreign packages can use the
+[authenticated X11 bridge](../../tests/wine-host/README.md); audio and broader
+runtime compatibility remain separate qualification boundaries.
+
+For hosted X11, Software creates an exclusive 0700 surface beneath
+`/run/user/UID/vinix-hosted-x11/` and a 0600 `Xauthority` with a fresh kernel-random
+MIT cookie. Xvfb receives `-auth`; the launcher validates the authority and
+selected local display socket before granting those exact paths. The isolated
+account request uses format 2 only for `run`/`run-args` with a canonical local
+display and account-owned authority; format 1 retains its existing byte contract
+and clears ambient display variables. The authorization worker and isolated
+package CLI both revalidate the pair. Closing the hosted window reaps Xvfb and
+waits briefly for the launcher; it does not terminate a surviving package child,
+which keeps its generation lease until natural exit.
 
 Ordinary login sessions retain their account memberships. If the package CLI
 finds supplementary groups, every launch mode automatically uses the fixed

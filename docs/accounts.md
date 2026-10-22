@@ -254,10 +254,27 @@ The programs the manager starts are arguments (`--greeter`, `--desktop`), by
 default `vinix-desktop --greeter` and `vinix-desktop`. The desktop can now run
 as an ordinary account: its native qualification covers private account
 runtime directories, broker and framebuffer access, and an installed
-application across reboot. It still has no `--greeter` login screen or
-manager logout/switch controls, and normal boot still starts the desktop as
-root. The manager's login protocol is tested with stand-ins that write down
-what they see; the graphical login path remains unfinished.
+application across reboot. Normal desktop init now starts
+`vinix-session graphical --desktop /usr/bin/vinix-desktop` (or its selected
+GPU build). This root supervisor imports a valid existing registration, or
+runs the exclusive registration screen when there is no person account,
+then starts the authentication service and manager. A private root-owned
+lock prevents two graphical supervisors from owning the seat.
+
+The greeter runs as its own account and exposes login controls.
+It sends bounded requests over inherited descriptor 3 after checking the root
+peer and socket type; the descriptor is close-on-exec. Passwords are masked
+and explicitly erased after submission, refusal or cancellation. The ordinary
+desktop's Start menu offers **Switch user** and **Log out** through the same
+manager channel. Power requests also go through the manager.
+
+The [graphical login check](../tests/graphical-login/check.md) drives the real
+registration screen, greeter and ordinary desktop on both architectures. It
+checks wrong-password refusal, stopped sessions on switch, reauthentication
+resuming the same kernel session, complete logout reaping, and a fresh login
+with preserved home data. The fixture directly starts the production manager;
+normal init wiring is built separately. It does not establish a complete
+normal-init, installed-system login qualification.
 
 ### Becoming the account
 
@@ -313,15 +330,11 @@ Five things it found were open and are closed:
 
 ## What is not done
 
-- **The desktop is still root's.** Init starts the compositor and built-in
-  applications as root. [Managed packages](application-distribution.md) can
-  instead use an administrator-selected ordinary account through the isolated
-  application session profile; this does not create a graphical login. The session manager
-  exists and is tested, but nothing starts it: the desktop has no login
-  screen, no lock screen, and has not been taught to live without root
-  (it turns the machine off by signalling init, writes to `/sys` and
-  `/usr/bin`, and keeps its settings in `/root`). Until that is done the
-  accounts protect what runs through `vinix-session`, and nothing else.
+- **Complete installed-system graphical login acceptance remains open.**
+  The default graphical manager, ordinary desktop and login/switch/logout
+  path are implemented, with bounded paired native fixtures. Broader normal
+  init, installed-system, device and recovery workflows still need combined
+  qualification. There is no dedicated lock-screen flow.
 - **A session in the background is stopped**, for the reason given above.
 - **The seat is all or nothing.** Every program of the session at the
   machine can open the display and the pointer. Keeping an application

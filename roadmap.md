@@ -601,9 +601,11 @@ enrollment/revocation with retained replay history, and
 [package/launch SDK 1](tools/packages/SDK.md). The original Alpine frontend still
 manages system ports. Installed apps integrate with Start, Quick Launch and
 shared MIME choices; an administrator-selected `launch_user` runs them through
-an isolated ordinary account session. Release publisher enrollment, catalog migration,
-graphical login, foreign display/audio services and broader guest/runtime qualification
-remain required before this acceptance gate is complete. Host lifecycle/UI
+an isolated ordinary account session. The default graphical manager and bounded
+authenticated X11 hosting are implemented below. Release publisher enrollment,
+catalog migration, complete installed login acceptance, audio services and
+broader guest/runtime qualification remain required before this acceptance gate
+is complete. Host lifecycle/UI
 fixtures and both target builds are available in
 [the V qualification driver](tests/packages/distribution-check.v).
 
@@ -648,8 +650,8 @@ console access and private readiness allow the compositor to run without root.
 The [installed graphical Software check](tests/packages/software-graphical-check.md)
 then installs the signed Counter example through visible Software controls and
 administrator approval, saves its private data and reopens it after an installed
-root reboot. Graphical login, production catalog migration, foreign runtimes and
-broader device/crash acceptance remain open.
+root reboot. Complete installed login acceptance, production catalog migration,
+foreign runtimes and broader device/crash acceptance remain open.
 
 Release image builders can now [bundle signed offline repositories](tools/packages/SDK.md#offline-repository-bundles-in-release-images)
 through the production staging tool. The bundle retains the reviewed publisher
@@ -888,15 +890,24 @@ architectures; broader release/catalog/runtime acceptance remains open.
     use the effective account's home and child environment, inherited console
     descriptors, private readiness and shared numeric broker/framebuffer paths.
     Both native targets check actual external frame acknowledgements, broker
-    peer identity and refusal from a second ordinary account. Graphical login
-    and foreign display/audio services remain separate gates.
+    peer identity and refusal from a second ordinary account. Complete installed
+    login acceptance and foreign audio services remain separate gates.
+  - [x] [Graphical registration, login and session switching](tests/graphical-login/check.md)
+    start the manager from normal desktop init, use an exclusive first-account
+    registration screen and an ordinary greeter, and expose Switch user and
+    Log out in the managed desktop. The inherited root-peer-checked channel
+    keeps passwords off arguments and explicitly retires secret input. Both
+    targets drive the actual manager/compositor through refusal, stopped-session
+    switching, same-session resume, complete logout and fresh login with retained
+    home data. This direct-manager fixture does not qualify complete normal-init
+    or installed-system login acceptance.
   - [x] [Installed graphical acquisition and persistence](tests/packages/software-graphical-check.md)
     run the production compositor and Software as an ordinary administrator on
     both targets. Pointer and keyboard input confirm a signed Counter install
     through the real approval dialog, reopen its saved data and verify it after
     an installed-root reboot. Retained screenshots, exact state/ownership checks
     and sealed source/artifact receipts qualify this native example; whole-catalog,
-    graphical-login and device/crash acceptance remain open.
+    complete installed login and device/crash acceptance remain open.
   - [x] [Installed graphical maintenance](tests/packages/software-maintenance-native-check.md)
     uses visible Software controls and separate administrator approvals to
     refresh, update, roll back, uninstall and reinstall signed Counter from
@@ -949,6 +960,15 @@ architectures; broader release/catalog/runtime acceptance remains open.
     complete help and diagnostics, with approval on the full reviewed plan.
 - [ ] Package native, Linux, Windows and Apple-compatible apps with isolated
   runtimes, launcher/association registration and clean uninstall behavior.
+  - [x] [Authenticated hosted X11 launches](tests/wine-host/README.md)
+    create a private per-account authority and fresh random cookie, grant only
+    its exact socket/authority, and forward the validated pair through the
+    isolated package-account transport. Software routes signed display packages
+    through the bridge with literal arguments. Both guests check correct-cookie
+    presentation, wrong/missing-cookie and second-account refusals, and generation
+    lease retention until natural child exit after the display server is reaped.
+    Host sanitizer routing and both compositor builds supplement the native CLI
+    fixture; native Software clicks, audio and arbitrary catalog apps remain open.
   - [x] [A Win64 publisher profile](tools/packages/SDK.md#wine-win64-publisher-profile)
     pins publisher-supplied application/runtime closures for both hosts, checks
     PE32+ payloads and native launchers, and retains explicit licensing and

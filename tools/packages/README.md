@@ -886,8 +886,21 @@ adds GUI refresh, update, rollback, removal and cache-only reinstall on both
 architectures, with separate approvals and preserved private Counter data across
 two boots. Five independent complete proposals check read-only review; sealed
 proof and 50 corruption refusals per target bind the frozen build and shutdowns.
-Graphical login, production catalogs and foreign runtime/device qualification
-remain open.
+Complete installed login acceptance, production catalogs and foreign
+runtime/device qualification remain open.
+
+Normal init now starts the [graphical manager](../../docs/accounts.md), with
+exclusive registration, an ordinary greeter, Switch user and Log out. Its
+[paired native check](../../tests/graphical-login/check.md) drives the actual
+manager and compositor directly; complete installed login acceptance remains open.
+
+[Authenticated hosted X11](../../tests/wine-host/README.md) gives signed foreign
+display packages a fresh private authority/cookie and an exact socket grant.
+Software uses the real signed launcher with literal arguments, and the isolated
+account transport validates the display/authority pair before forwarding it.
+Both native targets check authentication refusals, account separation, framebuffer
+damage and generation lease lifetime. Native Software clicks, audio and arbitrary
+foreign applications still need qualification.
 
 Administrator request decoding and completion receipts retire partial fields,
 hash state and temporary storage after success or refusal. Canonical bytes and

@@ -58,9 +58,17 @@ adds signed refresh, update, rollback, uninstall and cache-only reinstall throug
 visible controls and separate administrator approvals on both architectures.
 Two boots preserve private data; independent complete proposals leave activation
 and approvals unchanged. Retained proof binds screenshots, every frozen compositor
-input and guest shutdowns, with 50 altered-proof refusals per target. Graphical
-login, production catalog migration, foreign runtimes and broader device/crash
-acceptance remain release gates.
+input and guest shutdowns, with 50 altered-proof refusals per target. Complete
+installed login acceptance, production catalog migration, foreign runtimes and
+broader device/crash acceptance remain release gates.
+
+Normal desktop init now starts the [graphical session manager](accounts.md#the-session-manager),
+which runs exclusive registration when needed, an ordinary greeter and the
+authenticated ordinary desktop. The [paired graphical login fixture](../tests/graphical-login/check.md)
+drives real registration, wrong-password refusal, switching, same-session resume,
+logout and fresh login with retained home data. This directly invoked manager
+fixture and the installed Software fixtures qualify separate boundaries; a
+complete installed-system login workflow remains open.
 
 Release staging also accepts `--repositories DIRECTORY` or
 `VINIX_PACKAGE_IMAGE_REPOSITORIES` for a complete signed offline bundle. It
@@ -1737,7 +1745,7 @@ The environment is explicit and arguments are literal. `files` authorizes only
 supplied documents. Display/audio paths are granted only when declared. See
 [the sandbox's enforcement boundaries](../tools/sandbox/README.md).
 
-For today's root desktop, an administrator can set `launch_user` to an existing
+For a legacy root desktop, an administrator can set `launch_user` to an existing
 ordinary account in the root-owned configuration. Software shows **Launch as
 NAME**. The service starts `vinix-session run --isolated NAME` and re-executes
 itself after the session tool has verified all user/group IDs, cleared account
@@ -1764,8 +1772,16 @@ account, including their parent directories.
 
 This application session does not take the hardware seat or authenticate a
 desktop login. Direct display/input/audio device access remains denied without
-the seat, even when a package declares those permissions. Graphical runtimes
-need a separately qualified display/audio broker. Native SDK apps can instead
+the seat, even when a package declares those permissions. Display-capable foreign
+packages can use [authenticated hosted X11](../tests/wine-host/README.md) from an
+ordinary Software session. The bridge creates a fresh private authority and
+cookie, starts Xvfb with authentication, and forwards only the validated
+`DISPLAY`/`XAUTHORITY` pair through the isolated account transport. The sandbox
+grants the selected socket and authority rather than the shared socket directory.
+The actual signed package CLI retains its generation lease through natural child
+exit, including after the hosted window closes and its display server is reaped.
+Both guests qualify this CLI/bridge path; native Software clicks, arbitrary
+foreign apps and audio remain separate work. Native SDK apps can instead
 declare signed `window_protocol:1` metadata and `display` permission. Software
 then runs `run-window` through the same ordinary session and renders bounded
 labels, buttons and rectangles from the application's standard output. Input is
@@ -1781,8 +1797,9 @@ Escape-to-discard editing. Software binds field/button identities to each displa
 frame and refuses a protocol differing from installed metadata. The
 [memo example](../examples/package-memo/README.md) keeps explicit Save behavior and
 ordinary-account private data; [text-entry qualification](../tests/packages/window-input-check.md)
-covers the codec, broker and both native guest workflows. Full ordinary-user desktop
-login and graphical Linux/Windows/Apple/audio runtime brokers remain release work.
+covers the codec, broker and both native guest workflows. Complete installed
+login acceptance and broader Linux/Windows/Apple/audio compatibility remain
+release work.
 
 Every admitted package process receives the
 [application-context interface](../tools/packages/SDK.md#application-context-interface):
@@ -2342,8 +2359,8 @@ completed checkpoints passed on both targets; interruptions inside filesystem or
 device operations and physical write-cache loss remain outside this fixture.
 
 The release gate remains open: enroll a release publisher, migrate/qualify the
-advertised native/Linux/Wine/Apple catalog, integrate ordinary-user graphical
-sessions, qualify wider filesystem/device crash windows and measure wider
+advertised native/Linux/Wine/Apple catalog, qualify complete installed graphical
+login workflows, wider filesystem/device crash windows and wider
 runtime sandbox profiles. Apple packaging does not provide general macOS/AppKit
 compatibility; Windows/Linux packaging does not expand runtime API coverage.
 

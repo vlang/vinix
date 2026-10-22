@@ -41,7 +41,7 @@ fn verify(pins []Pin) ! {
 	}
 }
 
-// Historical build receipts retain their original paths and hashes. Account
+// Historical build receipts retain their original paths and hashes. Tool
 // sources can advance independently; an exact content-addressed copy preserves
 // those old inputs without attributing an old run to the new implementation.
 fn verify_inputs(pins []Pin, archive string, source_prefix string) ! {
@@ -237,7 +237,7 @@ fn retain() ! {
 	if os.args.len == 2 && os.args[1] == '--verify' {
 		ledger := json2.decode[Ledger](os.read_file(prefix + 'ledger.json')!)!
 		assert ledger.format == 1
-		verify_inputs(ledger.inputs, prefix + 'inputs', root + '/tools/accounts/')!
+		verify_inputs(ledger.inputs, prefix + 'inputs', root + '/tools/')!
 		verify(ledger.evidence)!
 		println('GUEST TLS retained hashes PASS')
 		return
@@ -272,7 +272,7 @@ fn retain() ! {
 		}
 		receipt := json2.decode[Receipt](os.read_file(work + '/qualification.json')!)!
 		assert receipt.format == 1 && receipt.checks.len == if i == 0 { 51 } else { 4 }
-		verify_inputs(receipt.inputs, prefix + 'inputs', root + '/tools/accounts/')!
+		verify_inputs(receipt.inputs, prefix + 'inputs', root + '/tools/')!
 		inputs << receipt.inputs
 		fixture := json2.decode[tlsruntime.Fixture](os.read_file(work + if i == 0 {
 			'/probe.json'
