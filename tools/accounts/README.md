@@ -25,6 +25,26 @@ rules; this page is where things are.
 builds the five programs statically for a Vinix machine and lays them and
 the action files out under `ROOT` as they are installed.
 
+The command is a thin launcher for `build.v`, which invokes the V staging tool.
+It keeps `V`/`VINIX_V_COMPILER`, `CC` and `VINIX_AARCH64_SYSROOT` for AArch64,
+and `CC_AMD64` for x86_64. Compiler names and paths are literal arguments.
+For other cross compilers, invoke staging directly with an explicit argument list:
+
+```sh
+V=/path/to/v /path/to/v -path '@vlib|@vmodules|.|tools/accounts' \
+  run tools/accounts/stage.v --arch x86_64 --staging /existing/image \
+  --cc-argv '["x86_64-linux-musl-gcc"]' --include-session
+```
+
+Staging captures the image and destination directories before publication. It
+refuses symlinked, replaced, writable or cross-filesystem destination parents,
+and aliased existing tool files. A private file is written, synced and atomically
+renamed into place; failures before publication preserve the existing tool.
+A directory flush failure after rename reports that the new tool was published
+and image staging should be retried. Each file is published separately. Binaries
+are mode 0755 and action files 0644. The `stagecore/install_test.v` checks cover
+path replacements, outside-file preservation, short writes and flush failures.
+
 A system starts using them with, as root and in this order:
 
     vinix-account init      # at every boot
