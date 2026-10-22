@@ -84,6 +84,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_paint_color_longs(smali)!
  framework_rect_parcels(smali)!
  framework_notification_channels(smali)!
+ framework_network_requests(smali)!
  framework_content_clients(smali)!
  framework_text_widgets(smali)!
  framework_check_widgets(smali)!
