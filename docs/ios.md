@@ -17473,17 +17473,78 @@ the full host dynamic runtime closure. ASan leak detection was disabled.
 v run tests/ios/native-checks.v build-regular-expression
 ```
 
+V now supplies Foundation's public base `NSMutableString`, its measured
+eight-byte instance with `NSString` as superclass, typed constructors and
+UTF-16 range mutation methods. Allocation metadata owns the UTF-8 buffer;
+capacity is advisory. Input bytes are copied, including embedded NULs, and
+self-append, insertion, replacement and assignment preserve their source
+bytes until the edit completes. Copies of mutable strings own independent
+snapshots. Constructors and copies stabilize borrowed bytes before allocation
+callbacks run, and callbacks run outside the runtime lock. Mutable strings are
+excluded from Swift's borrowed shared-UTF8 representation, including after an
+isa replacement.
+
+The profile supports `init`, `new`, empty and capacity factories, string and
+UTF-8 constructors, UTF-8 or strict ASCII byte initialization, the five basic
+mutators, self-aliasing descriptions, string equality, append-to-new-string,
+byte and UTF-16 lengths, and copy/mutable-copy methods with or without a zone.
+Buffers and requested capacities are bounded to 16 MiB. Malformed UTF-8
+initialization returns nil; Apple's C-string initializer has
+allocation-dependent behavior for malformed
+input, so that nil result is a Vinix policy rather than a shared assertion.
+Non-ASCII input using the ASCII encoding fails explicitly; Apple's measured
+high-byte Latin-1 interpretation is outside this profile.
+
+Surrogate-interior ranges, unsupported encodings, formatted or no-copy
+construction, coding, search replacement, transforms, designated
+reinitialization, custom subclass construction and CoreFoundation diagnostic
+descriptions fail explicitly. Caller-owned instances require only eight bytes;
+their backing buffers use the existing object teardown path. Foundation
+mutable access still requires caller synchronization, and a borrowed
+`UTF8String` pointer expires on the next mutation.
+
+The shared constructor, mutation and copy fixture passes against Apple
+Foundation and the Vinix runtime. Both macOS ASan+UBSan runs pass with ordinary
+and deterministic Swift hashing; the ARM64 guest fixture also passes.
+Runtime checks cover allocation callbacks that mutate borrowed inputs,
+independent copies after pool drainage, embedded NULs, guarded caller storage,
+weak cleanup, 64 isa replacements, two drained
+runtimes and 25 explicit rejection cases. Independent source and generated-C
+lifetime review found no unresolved issue. The first host attempts exposed a
+native malformed-C-string assertion and missing `description` dispatch; their
+sources, logs and artifacts are preserved with the final evidence.
+
+The final launch probe resolves `NSMutableString` and stops at
+`_OBJC_CLASS_$_NSURLSessionConfiguration`, before application entry. Fortnite
+remains unplayable.
+
+`build/ios/fortnite/mutable-string-checks/proof-final.log` verifies 21,663
+unchanged listed inputs, 136 sealed native evidence files, 1,023 sealed failed
+preflight artifacts, both sanitizer runs, five binary/generated-C archive
+pairs and the host dSYM. The fixture, launch probe and two import audits ran
+as four sequential ARM64 guest phases. Serial/configuration hashes remain;
+VM payloads and scratch storage were retired, and the owned RAM disk was
+detached. A preserved proof-only failure incorrectly required an Apple-only
+marker in the Linux guest; correcting that assertion changed no runtime or
+guest artifacts. The input manifest covers the categories listed in its
+provenance rather than the full host dynamic runtime closure. ASan leak
+detection was disabled.
+
+```sh
+v run tests/ios/native-checks.v build-mutable-string
+```
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,060 | 101 | 78 |
+| Fortnite executable | 2,061 | 100 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,900 | 104 | 114 |
+| All images | 2,901 | 103 | 114 |
 
-The C++/GLES/Text variant reports 2,914 resolved imports, 90 unresolved strong
+The C++/GLES/Text variant reports 2,915 resolved imports, 89 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -17533,6 +17594,7 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 `file-time-checks`, the audio constants use `audio-session-checks`,
 base URL sessions use `url-session-checks`, sort descriptors use
 `sort-descriptor-checks`, regular expressions use `regular-expression-checks`,
+mutable strings use `mutable-string-checks`,
 CoreFoundation dictionaries use
 `cf-dictionary-checks`, constant integers use
 `constant-integer-checks`, constant arrays use `constant-array-checks`, supplied
@@ -17545,7 +17607,8 @@ object monitors use `objc-sync-checks`, Swift strings/buffers use
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
-URL session, sort descriptor, regular expression, CoreFoundation dictionary,
+URL session, sort descriptor, regular expression, mutable string,
+CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String
 metadata/witness checks before the existing Mach-O suite and requires the

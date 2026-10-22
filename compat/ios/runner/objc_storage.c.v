@@ -6,6 +6,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	url_session_require_class(cls)
 	sort_descriptor_require_class(cls)
 	regular_expression_require_class(cls)
+	mutable_string_require_class(cls)
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	info := ios_runtime.classes[cls] or { panic('iOS: construction of an unknown class') }
@@ -42,6 +43,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	header.sort_descriptor_owned = sort_descriptor_family(cls)
 	header.regular_expression_owned = regular_expression_family(cls)
 	header.regex_result_owned = regex_result_family(cls)
+	header.mutable_string_owned = mutable_string_family(cls)
 	if header.input_stream_owned { header.input_stream_fd = -1 }
 	header.pool_owned = objc_is_kind(object, ios_runtime.names['NSAutoreleasePool'])
 	header.cookie_owned = objc_is_kind(object, ios_runtime.names['NSHTTPCookie'])

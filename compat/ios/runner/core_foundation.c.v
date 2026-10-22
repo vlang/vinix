@@ -80,6 +80,8 @@ fn cf_string_bytes(allocator u64, bytes u64, length i64, encoding u32, external 
 }
 
 fn cf_string_length(object u64) i64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	mut length := i64(0)
 	for byte in string_text(object) {
 		if byte & 0xc0 != 0x80 { length += if byte >= 0xf0 { i64(2) } else { i64(1) } }
@@ -91,6 +93,8 @@ fn cf_string_length(object u64) i64 {
 // A sizing call ignores max_length. A partial UTF-8 conversion never splits a
 // scalar or consumes half a surrogate pair, even when a loss byte is supplied.
 fn cf_string_get_bytes(object u64, range CFRange, encoding u32, loss u8, external bool, buffer u64, max_length i64, used &i64) i64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	if encoding !in [u32(0x08000100), 0x0600] { panic('iOS: CFString output encoding is not implemented') }
 	length := cf_string_length(object)
 	if range.location < 0 || range.length < 0 || range.location > length || range.length > length - range.location || max_length < 0 {
@@ -134,6 +138,8 @@ fn cf_string_get_bytes(object u64, range CFRange, encoding u32, loss u8, externa
 }
 
 fn cf_string_get_cstring(object u64, buffer u64, capacity i64, encoding u32) bool {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	if buffer == 0 || capacity <= 0 { return false }
 	mut used := i64(0)
 	length := cf_string_length(object)
@@ -290,6 +296,8 @@ fn cf_callback_retain(allocator u64, value u64) u64 { _ = allocator; return objc
 fn cf_callback_release(allocator u64, value u64) { _ = allocator; objc_release(value) }
 
 fn cf_hash(object u64) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	if object == 0 { return 0 }
 	if read64(object) == cm_format_id() { return u64(cm_format_media(object)) ^ (u64(cm_format_subtype(object)) << 32) }
 	if objc_is_kind(object, ios_runtime.names['NSUUID']) { return ns_uuid_hash(object) }
@@ -327,6 +335,11 @@ fn cf_hash(object u64) u64 {
 }
 
 fn cf_copy_description(object u64) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	if header := ios_runtime.objects[object] {
+		if header.mutable_string_owned { panic('iOS: mutable string CF diagnostic description is not implemented') }
+	}
 	if objc_is_kind(object, ios_runtime.names['NSUUID']) { return ns_uuid_string(object) }
 	if ns_date_is_date(object) { return ns_date_description(object) }
 	if objc_is_kind(object, ios_runtime.names['NSString']) { return objc_retain(object) }

@@ -35,6 +35,9 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	}
 	if objc_is_kind(value, ios_runtime.names['NSURLRequest']) { return request_copy(value, false) }
 	if objc_is_kind(value, ios_runtime.names['NSURLSession']) { url_session_state(value); return objc_retain(value) }
+	if header := ios_runtime.objects[value] {
+		if header.mutable_string_owned { return mutable_string_snapshot(value, false) }
+	}
 	if objc_is_kind(value, ios_runtime.names['NSSortDescriptor']) { sort_descriptor_state(value); return objc_retain(value) }
 	if objc_is_kind(value, ios_runtime.names['NSRegularExpression']) { regular_expression_state(value); return objc_retain(value) }
 	if objc_is_kind(value, ios_runtime.names['NSTextCheckingResult']) { regex_result_state(value); return objc_retain(value) }

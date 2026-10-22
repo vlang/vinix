@@ -152,6 +152,8 @@ mut:
 	regular_expression_initializing bool
 	regular_expression &NSRegexProgram = unsafe { nil }
 	regex_result_owned bool
+	mutable_string_owned bool
+	mutable_string_initialized bool
 	uuid_owned bool
 	pool_owned bool
 	pool_initialized bool
@@ -492,7 +494,7 @@ fn objc_start() {
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
-		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
@@ -536,6 +538,7 @@ fn objc_start() {
 			'UIAccessibilityElement' { ios_runtime.names['UIResponder'] }
 			'NSMutableArray', 'NSConstantArray', 'WKNSArray' { ios_runtime.names['NSArray'] }
 			'NSMutableSet' { ios_runtime.names['NSSet'] }
+			'NSMutableString' { ios_runtime.names['NSString'] }
 			'NSMutableDictionary', 'NSConstantDictionary' { ios_runtime.names['NSDictionary'] }
 			'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { ios_runtime.names['NSLayoutAnchor'] }
 			'NSMutableData', '_NSDispatchData' { ios_runtime.names['NSData'] }
@@ -557,6 +560,7 @@ fn objc_start() {
 		metaclass.isa = if parent == 0 { meta } else { read64(parent) }
 		metaclass.parent = if parent == 0 { u64(cls) } else { read64(parent) }
 		size := match name {
+			'NSMutableString' { u32(8) }
 			'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global' { u32(8) }
 			'_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty' { u32(8) }
 			'NSConstantDictionary' { u32(40) }
@@ -670,6 +674,7 @@ fn objc_allocate(cls u64) u64 {
 	url_session_require_class(cls)
 	sort_descriptor_require_class(cls)
 	regular_expression_require_class(cls)
+	mutable_string_require_class(cls)
 	ns_input_stream_require_class(cls)
 	ns_pool_require_class(cls)
 	ns_timezone_require_class(cls)
@@ -770,6 +775,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).pool_owned { ns_pool_initialize(object); return object }
 	if obj_header(object).uuid_owned { ns_uuid_initialize(object, 0, true); return object }
 	if obj_header(object).date_owned { ns_date_initialize(object, cf_absolute_time()); return object }
+	if obj_header(object).mutable_string_owned { mutable_string_initialize(object, ''); return object }
 	if ns_timezone_family(cls) { panic('iOS: default timezone construction is not implemented') }
 	if obj_header(object).input_stream_owned { panic('iOS: input stream requires designated construction') }
 	if obj_header(object).connection_owned { panic('iOS: connection requires designated construction') }

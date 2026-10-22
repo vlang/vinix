@@ -104,6 +104,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := url_session_types(info.name, info.meta, selector) { return types }
 	if types := sort_descriptor_types(info.name, info.meta, selector) { return types }
 	if types := regular_expression_types(info.name, info.meta, selector) { return types }
+	if types := mutable_string_types(info.name, info.meta, selector) { return types }
 	if types := cookie_builtin_types(info.name, info.meta, selector) { return types }
 	if types := webkit_builtin_types(info.name, info.meta, selector) { return types }
 	if types := http_url_builtin_types(info.name, info.meta, selector) { return types }
@@ -143,6 +144,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if !info.meta && info.name == 'NSURLConnection' && name in ['init', 'copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
 		if info.name == 'NSURLSession' && url_session_unsupported(name) { return 0 }
 		if info.name == 'NSSortDescriptor' && sort_descriptor_unsupported(name) { return 0 }
+		if info.name == 'NSMutableString' && mutable_string_unsupported(name) { return 0 }
 		if info.name == 'NSRegularExpression' && regular_expression_unsupported(name) { return 0 }
 		if info.name == 'NSTextCheckingResult' && regex_result_unsupported(name) { return 0 }
 		if !info.meta && info.name == 'NSProcessInfo' && name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }

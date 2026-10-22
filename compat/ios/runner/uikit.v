@@ -36,12 +36,19 @@ fn make_string(text &char) u64 {
 
 // Store the byte count separately: NSString/CFString can contain U+0000.
 fn owned_string(text string) u64 {
+	// The source can borrow a mutable string's buffer. Object allocation can
+	// invoke application constructors, so finish reading it before allocation.
+	buffer := unsafe { &char(C.malloc(usize(text.len + 1))) }
+	if buffer == unsafe { nil } { panic('iOS: cannot allocate NSString') }
+	unsafe {
+		if text.len != 0 { C.memcpy(buffer, text.str, usize(text.len)) }
+		buffer[text.len] = 0
+	}
 	object := objc_allocate(ios_runtime.names['NSString'])
+	if object == 0 { unsafe { C.free(buffer) }; return 0 }
 	mut header := obj_header(object)
-	header.text = unsafe { &char(C.malloc(usize(text.len + 1))) }
-	if header.text == unsafe { nil } { panic('iOS: cannot allocate NSString') }
+	header.text = buffer
 	header.text_length = text.len
-	unsafe { C.memcpy(header.text, text.str, usize(text.len)); header.text[text.len] = 0 }
 	return object
 }
 
@@ -115,6 +122,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if url_session_dispatch(object, selector, mut frame) { return true }
 	if sort_descriptor_dispatch(object, selector, mut frame) { return true }
 	if regular_expression_dispatch(object, selector, mut frame) { return true }
+	if mutable_string_dispatch(object, selector, mut frame) { return true }
 	if cookie_dispatch(object, selector, mut frame) { return true }
 	if webkit_dispatch(object, selector, mut frame) { return true }
 	if http_url_dispatch(object, selector, mut frame) { return true }

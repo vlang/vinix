@@ -52,6 +52,12 @@ fn objc_responds(object u64, selector &char) bool {
 		if url_session_unsupported(name) { return native_method(read64(object), name) != 0 }
 		if url_session_selector(object, name) { return true }
 	}
+	if mutable_string_family(if object in ios_runtime.classes { object } else { read64(object) }) {
+		if mutable_string_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if mutable_string_types('NSMutableString', object in ios_runtime.classes, name) != none { return true }
+	}
+	if object !in ios_runtime.classes && objc_is_kind(object, ios_runtime.names['NSString'])
+		&& mutable_string_types('NSString', false, name) != none { return true }
 	if sort_descriptor_family(if object in ios_runtime.classes { object } else { read64(object) }) {
 		if sort_descriptor_unsupported(name) { return native_method(read64(object), name) != 0 }
 		if sort_descriptor_selector(object, name) { return true }

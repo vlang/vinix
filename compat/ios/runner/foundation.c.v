@@ -37,7 +37,11 @@ fn cf_equal_depth(left u64, right u64, depth int) bool {
 		cls := ios_runtime.names[name]
 		if !objc_is_kind(left, cls) { continue }
 		if !objc_is_kind(right, cls) { return false }
-		if name == 'NSString' { return string_text(left) == string_text(right) }
+		if name == 'NSString' {
+			C.ios_objc_initialize_lock()
+			defer { C.ios_objc_initialize_unlock() }
+			return string_text(left) == string_text(right)
+		}
 		a := obj_header(left)
 		b := obj_header(right)
 		if name == 'NSNumber' {

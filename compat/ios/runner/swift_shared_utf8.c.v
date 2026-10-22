@@ -38,9 +38,11 @@ fn swift_shared_utf8_checked(first u64, second u64) !SwiftStringBytes {
 				if owner in ios_runtime.constants && read32(owner + 8) == 0x7c8
 					&& read64(owner + 24) == count { address = read64(owner + 16) }
 			} else {
-				mut live := true
+				mut live := !mutable_string_family(read64(owner))
 				if header := ios_runtime.objects[owner] {
-					live = C.ios_ref_change(unsafe { &header.refs }, 0) > 0 && !header.destroying && !header.destroyed
+					// A retain cannot keep a mutable backing buffer stable. Also reject
+					// original mutable allocations after an isa replacement.
+					live = live && !header.mutable_string_owned && C.ios_ref_change(unsafe { &header.refs }, 0) > 0 && !header.destroying && !header.destroyed
 				}
 				if live {
 					imp = native_method(read64(owner), '_fastCStringContents:')
