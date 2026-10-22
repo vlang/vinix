@@ -1,0 +1,13 @@
+diff --git a/kernel/fs/removed.v b/kernel/fs/removed.v
+index 8ecdd2076..1d20e6612 100644
+--- a/kernel/fs/removed.v
++++ b/kernel/fs/removed.v
+@@ -168,7 +168,7 @@ pub fn reap_removed() {
+ 		items = unsafe { removed_items }
+ 		removed_items = []RetiredItem{}
+ 	} else {
+-		items = []RetiredItem{len: due}
++		items = []RetiredItem{len: due} @[freed]
+ 		// Transfer the original owned strings. V deep-clones a string-bearing
+ 		// struct pushed directly from an array index, losing the original names.
+ 		unsafe { C.memcpy(items.data, removed_items.data, usize(due) * sizeof(RetiredItem)) }

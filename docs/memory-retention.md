@@ -104,8 +104,31 @@ references before its final sync and consistency check. Crash-safe orphan
 recovery remains part of the filesystem roadmap.
 
 The static allocation allowance file predates the current source and compiler.
-Both architectures still report the same 170 inherited excess allocation groups;
+The 2026-10-10 qualification reported 170 inherited excess allocation groups;
 the allowance was not expanded to hide them. Generated C and live tracking are
 used to audit the new repeated paths and ownership transfers. Passing the
 measured workloads establishes their bounded retention, rather than proving
 that every possible kernel path is leak-free.
+
+## Procfs subtree follow-up
+
+Process-directory pruning uses the same removed-node queue for procfs subtrees.
+Descendants retire before their parent, retain their old parent while detached,
+and preserve the descriptor, cwd/root and mount protections above. Procfs resource
+backends own one shared interface box and release it after their final reference
+and reader grace. Removed directories cannot repopulate their child maps.
+
+The [2026-10-22 procfs qualification](linux-posix-qualification.md#procfs-process-subtree-reclamation)
+separates stable reads, plain fork/reap, child namespace reads and concurrent
+reads during child exit. Its snapshots park observers, prune the last cached
+child and wait 26 seconds for chained releases. Held symlink and inherited-cwd
+checks cross three 13-second intervals. The original per-child leak and initial
+failed measurements remain in the linked evidence. The x86 retry also exposed
+an empty retirement queue retaining its largest buffer: measured capacity and
+allocator metadata account for the exact 50-page increase. A complete drain now
+detaches that buffer under the queue lock and releases it after callbacks;
+partial drains retain their existing ownership transfer. This follow-up retains the
+five-second lookup assumption and the existing mount-lifetime limits.
+The final isolated follow-up keeps all 18 AArch64 and 14 x86-64 slab classes,
+and big-heap pages, exactly flat in all four cohorts; unexpected errors and
+writes after free remain zero.

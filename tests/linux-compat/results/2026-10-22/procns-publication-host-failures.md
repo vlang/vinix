@@ -1,0 +1,3 @@
+# Publication host correction
+
+The first publication exited 1 after its map preflight passed. It incorrectly required per-command compiler-wrapper JSON for the x86 fixture. The frozen host build module uses the receipt-emitting wrapper for AArch64 and invokes x86_64-linux-musl-gcc directly for x86; those x86 JSON files never existed. The corrected publisher retains both generated C files for x86, the original compile controller/module inputs, exact ELF hashes and the pinned GCC executable. It does not create retrospective compiler receipts. The initial publisher, output/status and successful preflight remain preserved. No kernel, fixture, ELF, workload or guest result changed.

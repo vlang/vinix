@@ -1,0 +1,29 @@
+diff --git a/kernel/fs/removed.v b/kernel/fs/removed.v
+index 53f7d6906..8ecdd2076 100644
+--- a/kernel/fs/removed.v
++++ b/kernel/fs/removed.v
+@@ -161,11 +161,19 @@ pub fn reap_removed() {
+ 		return
+ 	}
+ 	// Taken off the front, oldest first, and dealt with outside the lock.
+-	mut items := []RetiredItem{len: due} @[freed]
+-	// Transfer the original owned strings. V deep-clones a string-bearing
+-	// struct pushed directly from an array index, losing the original names.
+-	unsafe { C.memcpy(items.data, removed_items.data, usize(due) * sizeof(RetiredItem)) }
+-	removed_items.delete_many(0, due)
++	mut items := []RetiredItem{} @[freed]
++	if due == removed_items.len {
++		// Move the whole buffer when drained. Retiring and callbacks use a new
++		// queue after unlock; the detached batch owns and frees the old buffer.
++		items = unsafe { removed_items }
++		removed_items = []RetiredItem{}
++	} else {
++		items = []RetiredItem{len: due}
++		// Transfer the original owned strings. V deep-clones a string-bearing
++		// struct pushed directly from an array index, losing the original names.
++		unsafe { C.memcpy(items.data, removed_items.data, usize(due) * sizeof(RetiredItem)) }
++		removed_items.delete_many(0, due)
++	}
+ 	removed_lock.release()
+ 
+ 	mut nodes := []voidptr{cap: due} @[freed]

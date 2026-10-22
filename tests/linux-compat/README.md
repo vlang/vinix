@@ -2126,3 +2126,21 @@ Use `--cases cloneipc --timeout 1200` with fresh state;
 audits receipts without `-prod`. NEWUSER, full SEM_UNDO/isolation and repeated
 IPC namespace construction remain unqualified. Initial proc identity-loop
 retention failures are retained. See the [qualification report](../../docs/linux-posix-qualification.md#native-clone-ipc-namespace-and-semaphore-undo-conflicts).
+
+The `procns` case measures four independent 200-cycle cohorts after equal
+warmup: repeated namespace-link reads, plain fork/reap, children reading their
+namespace links, and the same children with four concurrent readers during
+exit. It parks readers and prunes the final cached child before both snapshots,
+then waits 26 seconds for deferred releases. Every slab class and big-heap
+page count must stay exactly flat, with no writes after free or unexpected
+lookup errors. Each reader must perform work. Separate held O_PATH-link and
+inherited-cwd checks cross three 13-second grace intervals.
+Concurrent reads of exiting children allow the Linux-observed ENOENT, ESRCH
+and EACCES outcomes; stable identity reads still require success.
+Run `--cases procns` with a fresh state directory; this case defaults to 1,200
+seconds because its intentional waits exceed the ordinary 180-second timeout.
+An explicit `--timeout` still overrides it. `procns-reference.v` runs the same
+ELF on Linux for held-reference and exit-race semantics, without comparing
+Linux's allocation counters. Compile `procns-check.v` without `-prod` to audit
+the published receipts and its deliberately failing controls. See the
+[reclamation qualification](../../docs/linux-posix-qualification.md#procfs-process-subtree-reclamation).

@@ -10602,8 +10602,10 @@ serial/aggregate logs, reproduced watcher refusal and hashes are retained.
 
 The final probe replaces per-call proc lookups with queue visibility and checks
 proc identity only outside the measured loop. Clone requests remain identical.
-This narrows the retention qualification; the per-call namespace-identity lookup
-retention remains unresolved and needs allocation-site diagnosis. The auditor
+This narrowed the retention qualification; per-call namespace-identity lookup
+retention was left for allocation-site diagnosis. The subsequent
+[procfs subtree qualification](#procfs-process-subtree-reclamation) addresses
+that retained storage. The auditor
 verifies the exact probe change, all initial semantic outcomes, each strict
 retention failure, the same kernel hashes and the initial passing regressions.
 See [initial input hashes](../tests/linux-compat/results/2026-10-16/cloneipc-identity-retention-inputs.json)
@@ -10633,3 +10635,152 @@ placement/lifetimes, independent sharing, supplied-stack threads, requested PID
 allocation, complete IPC/semaphore behavior, GNU libc and translated/32-bit paths
 remain separate. The broad libc, installation/sandbox/portal and translation
 gates remain open.
+
+## Procfs process subtree reclamation
+
+The per-child `/proc/self/ns/ipc` retention identified by the preceding
+`cloneipc` qualification is addressed by kernel commit
+`cf6426cf16657a6db8d5be8062ef82f170c6b48b`. Previously, procfs removed dead
+process directories from its lookup map but retained their nodes, child maps,
+resources and interface boxes indefinitely. Repeated reads in one process and
+plain fork/reap were flat; children reading their namespace links exposed the
+retained subtree.
+
+Pruning now retires non-dot descendants before their parent through the existing
+VFS removed-node queue. Detached children pin their old parent; open descriptions,
+cwd/root owners, inherited filesystem views and mounts retain the existing
+reclaimer protections. Each proc resource owns one shared interface box, released
+with its backend after the last reference and another reader grace. Removed
+directories cannot repopulate their cache. Procfs readlink access checks distinguish
+a missing target (`ENOENT`) from a live inaccessible target (`EACCES`).
+
+The native V `procns` probe uses four independent cohorts: repeated reads by one
+process, plain fork/reap, child namespace-link reads, and child reads with four
+concurrent observers during process exit. Each cohort warms 200 operations and
+measures another 200. Readers park at an acknowledged epoch, the last cached
+child is pruned, and each snapshot waits 26 seconds for chained deferred releases.
+Every slab class and big-heap page count must stay exactly flat; writes after
+free and unexpected lookup errors must remain zero. All four readers must do
+work. Separate O_PATH-link, cwd/parent and inherited-cwd checks cross three
+13-second intervals, exceeding the five-second reader grace.
+
+The race oracle accepts success or `ENOENT`, `ESRCH` or `EACCES` only while
+reading an exiting child. The first unchanged Linux x86 reference failed the
+previous two-error whitelist; a diagnostic probe captured `readlink = -1,
+errno = 13`. Stable namespace identity reads still require success. All original,
+corrected and Linux runs were repeated with the revised probe, reusing the exact
+same ELF within each architecture. This measures safe reclamation and valid
+race outcomes; it does not establish one exclusive error for every exit interleaving.
+
+The initial qualification on 2026-10-22 freezes both architecture worktrees at
+the procfs commit above, with dependency symlinks, V 0.5.2 `f6358ec`, SMP, production code
+generation and `KERNEL_LINK_SEED=42`. Tracking builds additionally enable
+`ALLOC_TRACK=1`. The retained baseline images are from
+`f3a29a7aa558d0325d5602f39f503d3449e5b56f`; receipts pin their exact kernel
+hashes rather than inferring a revision from their artifact directories.
+Kernel inputs and private host modules are hashed before and after each native
+run. Linux 6.12.51 references qualify held references and exit races, without
+comparing Linux allocation counters. AArch64 uses 16 KiB pages; x86-64 uses
+4 KiB pages.
+
+Both originals retain 3,401,600 bytes across 200 measured child namespace
+reads, or 17,008 bytes per operation, in both child cohorts. Their stable-read and
+plain-fork controls stay flat. The initial AArch64 fix keeps all 18 reported slab
+classes exactly flat in every cohort, with flat big-heap pages, zero writes after
+free and zero unexpected lookup errors. Both Linux references pass the held-link,
+inherited-cwd and four-reader exit-race checks with the identical native probe
+ELFs. Raw outcomes and failed attempts are retained in the
+[measurement summary](../tests/linux-compat/results/2026-10-22/procns-qualification-summary.md).
+
+The initial x86 fix keeps all 14 slab classes flat, but its complete strict
+retry fails: the child-link cohort retains 50 big-heap pages (201 to 251).
+A separate unchanged-operation diagnostic reproduces that growth and four
+additional idle snapshots retain it. Read-only QMP samples identify the retired
+node queue growing from 1,024 to 2,048 entries of 200 bytes, then remaining empty
+with the larger buffer. Allocator metadata records a 409,631-byte request:
+409,600 bytes of entries plus 31 bytes of managed-array overhead. On 4 KiB pages,
+the old and new buffers cost 52 and 102 pages including allocator metadata,
+exactly accounting for the retained 50 pages. The smaller-capacity sample was
+taken during measured work; it is not an atomic sample of the warm snapshot.
+
+The queue follow-up transfers its complete array to the reaper when every entry
+is due, resets the shared queue under its lock, and releases the detached buffer
+after callbacks. Partial drains keep the existing copy path. The follow-up test
+source is isolated commit `bd9aa1bc1d04eac1ce31e02ce8914969294566ff`, based on
+`ec5631d664a8148c063b1ef9ac3f9657a3a0386a` and the procfs commit. The final
+annotation-only revision restores allocation-inventory attribution on the
+already-freed partial-drain buffer. Shared-checkout commits
+`abaddb62f77048bbede574d9e31bdd134ff0cf30` and
+`d0e230dd7b56bf68ea55d418c142ed45aca08fd6` apply the identical one-file change
+among other sessions' work. Results for
+the isolated source do not qualify all intervening shared-checkout commits.
+
+Both production and allocation-tracking kernels build on both architectures.
+For the initial procfs change, the unchanged allocation allowance check still fails: the baseline has 179
+inherited excess groups and the candidate has 178. Reported sites decrease from
+398 to 384 on AArch64 and 290 to 276 on x86-64. No allocation group is added and
+the allowance is not expanded. An independent review of source and both generated
+C outputs found no new lifetime blocker; its
+[review and limits](../tests/linux-compat/results/2026-10-22/procns-lifetime-review.md)
+retain the existing five-second timed-reader assumption and permanent mount pins.
+This is not a quiescence-based RCU proof.
+
+The final queue follow-up also builds in all four profiles. Its inventory is
+identical to the procfs revision: 384 reported sites on AArch64, 276 on x86-64
+and 178 inherited excess groups. Both inventories exit 1; the comparison exits
+0 with no new allocation group. Its first inventory attempt exposed the missing
+partial-buffer annotation, and that failure is preserved beside the correction.
+Independent source and generated-C reviews verify header transfer under the
+queue lock, callbacks after unlock and buffer release after the final callback.
+
+The final isolated queue revision passes all four strict native cohorts on both
+architectures with the unchanged probe ELFs. All 18 AArch64 and 14 x86-64 slab
+classes stay exactly flat, as do big-heap pages: AArch64 reports 57/57, 63/63,
+63/63 and 71/71; x86-64 reports 149/149, 149/149, 149/149 and 165/165.
+Unexpected errors and writes after free remain zero. Every concurrent reader
+performs work, and the held-link and inherited-cwd protections pass. The earlier
+x86 201-to-251-page failure remains a negative control; it is not replaced by
+the successful follow-up.
+
+On AArch64, the initial procfs allocation-tracking kernel also completes all 36 operation
+cohorts with 200 measured iterations each and all four 300-execution program
+churn cohorts, with zero retained bytes and no size-class deltas. The cache
+scenario writes 32 MiB, retains 20 MiB overall and reports 16,384 KiB cached;
+adjacent slab samples differ by 32 KiB, inside the predeclared 1 MiB probe-skew
+bound. Idle, apps and drag desktop scenarios complete five-second measurements;
+an additional fresh drag run captures actual window displacement. The
+[performance notes](../tests/linux-compat/results/2026-10-22/procns-perf-qualification-notes.md)
+preserve the initial disk-space and cached-image setup failures. These short
+runs with cached desktop images qualify function and bounded retention, without
+establishing release performance or a long-term soak.
+
+The final isolated queue revision repeats the complete AArch64 performance
+suite: all 36 operation cohorts and four churn cohorts remain flat. Its cache
+run writes 32 MiB, retains 20 MiB and reports 16,384 KiB cached; adjacent slab
+readings differ by 32 KiB. All three desktop scenarios pass, and a separate
+fresh drag run visibly moves the System window. Input hashes remain unchanged
+through the run, and the raw-result auditor rejects both deliberate negative
+controls.
+
+The final x86-64 queue revision also completes 36 operation cohorts and all
+four program-churn cohorts with zero retained bytes and no slab deltas. The
+cache scenario writes 32 MiB, retains 6 MiB and reports 8,192 KiB cached, within
+the declared 64 MiB bound. Idle, apps and a fresh actual-drag scenario each
+complete five-second measurements. Independent image review confirms the
+System window moves from the upper center to the lower left. The
+[x86 audit](../tests/linux-compat/results/2026-10-22/procns-queue-x86-audit.txt)
+checks raw and JSON results, exact receipt/input hashes and two rejected
+negative controls. The initial missing-curl failure remains published; the
+successful replay supplies a pinned genuine curl and its complete runtime
+closure. A host auditor correction selects desktop rows from the combined
+result array; its earlier source and manifest are retained, and the finalizer
+verifies that runtime and workload inputs did not change.
+
+The [combined validation summary](../tests/linux-compat/results/2026-10-22/procns-qf-validation-summary.md)
+records the final source, build, lifetime, native, reference and performance
+outcomes. The published `procns-check.v` audit passes with all three deliberate
+failure controls rejected; its [output](../tests/linux-compat/results/2026-10-22/procns-check.log)
+and [status](../tests/linux-compat/results/2026-10-22/procns-check.status) are retained.
+The first publication attempt incorrectly required x86 compiler-wrapper JSON
+from a direct GCC build. Its failure and publisher are preserved beside the
+correction; no retrospective compiler receipts were created.
