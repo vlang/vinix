@@ -74,6 +74,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_account_listeners(smali)!
  framework_storage_queries(smali)!
  framework_startup_apis(smali)!
+ framework_time_animator(smali)!
  framework_resource_fonts(smali)!
  framework_asset_streams(smali)!
  framework_view_geometry(smali)!
