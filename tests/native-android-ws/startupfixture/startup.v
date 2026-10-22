@@ -16,6 +16,7 @@ pub fn install(output string, resources string) ! {
  install_attachment_probe(dir)!
  install_drawable_probe(dir)!
  install_path_probe(dir)!
+ install_matrix_probe(dir)!
  install_media_probe(dir)!
  os.mkdir_all(output + '/res/font')!
  runtime := resources.all_before('/usr/lib/java/dex/')
@@ -60,6 +61,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/GeometryProbe;->check(Landroid/content/
 invoke-static {p0}, Lorg/vinix/bootstrap/AttachmentProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/DrawableProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/PathProbe;->check()V
+invoke-static {}, Lorg/vinix/bootstrap/MatrixProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->haptics(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/MediaProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->fonts(Landroid/content/Context;)V
