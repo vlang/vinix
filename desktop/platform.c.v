@@ -23,6 +23,8 @@ import desktop.ptycore
 
 #include <poll.h>
 
+#include <pwd.h>
+
 #include <sys/ioctl.h>
 
 #include <sys/mman.h>
@@ -70,6 +72,14 @@ fn C.munmap(base voidptr, length usize) int
 fn C.lseek(fd int, offset i64, whence int) i64
 
 fn C.unlink(path &char) int
+
+struct C.passwd {
+	pw_name  &char
+	pw_dir   &char
+	pw_shell &char
+}
+
+fn C.getpwuid(uid u32) &C.passwd
 
 struct C.pollfd {
 	fd      int
@@ -380,10 +390,89 @@ mut:
 // Both architecture images follow Alpine's standard command layout.
 const desktop_command_path = '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
 
-// The session's home. On QEMU this is a separate writable volume; the rest of
-// the image is a read-only system loaded from the initramfs, so it is also the
-// only place a file created here survives a restart.
-const desktop_home = '/root'
+struct DesktopSessionIdentity {
+	uid   u32
+	name  string
+	home  string
+	shell string
+}
+
+// The effective account, rather than inherited HOME/USER values, owns the
+// desktop's files and child processes. Legacy images without passwd can still
+// start their root compositor; a missing ordinary account must fail closed.
+fn desktop_missing_identity(uid u32) !DesktopSessionIdentity {
+	if uid != 0 {
+		return error('no account for effective uid ${uid}')
+	}
+	return DesktopSessionIdentity{uid: 0, name: 'root', home: '/root', shell: '/bin/zsh'}
+}
+
+fn desktop_identity_path_valid(path string) bool {
+	if !path.starts_with('/') {
+		return false
+	}
+	for byte in path {
+		if byte < 0x20 || byte == 0x7f {
+			return false
+		}
+	}
+	return true
+}
+
+fn desktop_account_identity(uid u32, name string, home string, shell string) !DesktopSessionIdentity {
+	if name.len == 0 || name.contains('=') || name.contains(':') || name.contains('/') {
+		return error('invalid account name for effective uid ${uid}')
+	}
+	for byte in name {
+		if byte <= 0x20 || byte == 0x7f {
+			return error('invalid account name for effective uid ${uid}')
+		}
+	}
+	if !desktop_identity_path_valid(home) || (shell.len > 0 && !desktop_identity_path_valid(shell)) {
+		return error('invalid home or shell for effective uid ${uid}')
+	}
+	return DesktopSessionIdentity{
+		uid: uid
+		name: name.clone()
+		home: home.clone()
+		shell: if shell.len > 0 { shell.clone() } else { '/bin/sh' }
+	}
+}
+
+fn desktop_session_identity() DesktopSessionIdentity {
+	uid := u32(C.geteuid())
+	account := C.getpwuid(uid)
+	if account == unsafe { nil } {
+		return desktop_missing_identity(uid) or {
+			eprintln('vinix-desktop: ${err}')
+			exit(1)
+		}
+	}
+	if account.pw_name == unsafe { nil } || account.pw_dir == unsafe { nil } {
+		eprintln('vinix-desktop: incomplete account for effective uid ${uid}')
+		exit(1)
+	}
+	// getpwuid owns these static strings; desktop_account_identity copies them
+	// before another lookup can replace them.
+	name := unsafe { tos2(&u8(account.pw_name)) }
+	home := unsafe { tos2(&u8(account.pw_dir)) }
+	shell := if account.pw_shell == unsafe { nil } { '' } else { unsafe { tos2(&u8(account.pw_shell)) } }
+	return desktop_account_identity(uid, name, home, shell) or {
+		eprintln('vinix-desktop: ${err}')
+		exit(1)
+	}
+}
+
+const desktop_identity = desktop_session_identity()
+const desktop_home = desktop_identity.home
+const desktop_user_entry = 'USER=${desktop_identity.name}'
+const desktop_logname_entry = 'LOGNAME=${desktop_identity.name}'
+const desktop_shell_entry = 'SHELL=${desktop_identity.shell}'
+const desktop_runtime_entry = 'XDG_RUNTIME_DIR=/run/user/${desktop_identity.uid}'
+const desktop_config_entry = 'XDG_CONFIG_HOME=${desktop_home}/.config'
+const desktop_cache_entry = 'XDG_CACHE_HOME=${desktop_home}/.cache'
+const desktop_data_entry = 'XDG_DATA_HOME=${desktop_home}/.local/share'
+const desktop_state_entry = 'XDG_STATE_HOME=${desktop_home}/.local/state'
 
 enum ExternalProgramResult {
 	success
@@ -404,8 +493,8 @@ fn desktop_run_external(path string) ExternalProgramResult {
 	argv := [&char(path.str), &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
 	home_entry := 'HOME=${desktop_home}'
-	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=linux', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=linux', &char(desktop_user_entry.str), &char(desktop_logname_entry.str),
+		&char(desktop_shell_entry.str), &char(desktop_runtime_entry.str), &char(desktop_config_entry.str), &char(desktop_cache_entry.str), &char(desktop_data_entry.str), &char(desktop_state_entry.str), c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
 
@@ -483,8 +572,8 @@ fn desktop_spawn_shell(path string, command string, rows int, columns int, width
 	// A valid terminal type is required by terminal applications such as tmux.
 	// `linux` is available in ncurses-terminfo-base, including when tmux is
 	// installed through pkg, and the terminal parser accepts its ANSI output.
-	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=linux', c'USER=root',
-		c'LOGNAME=root', c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=linux', &char(desktop_user_entry.str),
+		&char(desktop_logname_entry.str), &char(desktop_shell_entry.str), &char(desktop_runtime_entry.str), &char(desktop_config_entry.str), &char(desktop_cache_entry.str), &char(desktop_data_entry.str), &char(desktop_state_entry.str), c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
 	// Commands in the shell can drive this window's taskbar button directly.
@@ -539,7 +628,9 @@ fn desktop_spawn_shell(path string, command string, rows int, columns int, width
 fn desktop_spawn_terminal_command(argv []string, rows int, columns int, width int, height int) ?SpawnedShell {
 	path := 'PATH=' + desktop_command_path
 	home := 'HOME=' + desktop_home
-	mut environment := [path, home, 'TERM=linux']
+	mut environment := [path, home, 'TERM=linux', desktop_user_entry, desktop_logname_entry,
+		desktop_shell_entry, desktop_runtime_entry, desktop_config_entry, desktop_cache_entry,
+		desktop_data_entry, desktop_state_entry]
 	defer { unsafe { path.free(); home.free(); (&array(&environment)).free() } }
 	child := ptycore.spawn(argv, environment, desktop_home, rows, columns, width, height) or { return none }
 	return SpawnedShell{ pid: child.pid, terminal: child.terminal }
@@ -766,13 +857,17 @@ fn desktop_is_development_session() bool {
 // stopped every application and closed its devices before entering here.
 fn desktop_exec_replacement() {
 	argv := [c'/usr/bin/vinix-desktop', &char(unsafe { nil })]
-	envp := [c'PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', c'HOME=/root',
-		c'TERM=linux', c'PS1=vinix# ', c'USER=root', c'LOGNAME=root', c'SHELL=/bin/zsh',
+	home_entry := 'HOME=${desktop_home}'
+	mut envp := [c'PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', &char(home_entry.str),
+		c'TERM=linux', &char(desktop_user_entry.str), &char(desktop_logname_entry.str), &char(desktop_shell_entry.str),
 		c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
-		c'XDG_RUNTIME_DIR=/run/user/0', c'XDG_CONFIG_HOME=/root/.config',
-		c'XDG_CACHE_HOME=/root/.cache', c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt',
-		c'VINIX_SYSTEM_SESSION=1', &char(unsafe { nil })]
+		&char(desktop_runtime_entry.str), &char(desktop_config_entry.str),
+		&char(desktop_cache_entry.str), &char(desktop_data_entry.str), &char(desktop_state_entry.str), c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
+	if desktop_is_system_session() {
+		envp << c'VINIX_SYSTEM_SESSION=1'
+	}
+	envp << &char(unsafe { nil })
 	C.execve(argv[0], argv.data, envp.data)
 	eprintln('vinix-desktop: could not execute the replacement desktop')
 }
@@ -921,8 +1016,8 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64, language strin
 			roblox_split_env.free()
 		}
 	}
-	mut envp := [&char(path_entry.str), &char(home_entry.str), &char(user_home_env.str), c'TERM=dumb', c'USER=root',
-		c'LOGNAME=root', c'SHELL=/bin/zsh',
+	mut envp := [&char(path_entry.str), &char(home_entry.str), &char(user_home_env.str), c'TERM=dumb', &char(desktop_user_entry.str),
+		&char(desktop_logname_entry.str), &char(desktop_shell_entry.str), &char(desktop_runtime_entry.str), &char(desktop_config_entry.str), &char(desktop_cache_entry.str), &char(desktop_data_entry.str), &char(desktop_state_entry.str),
 		if app_name == 'vinix-ios-ppsspp' { c'LD_LIBRARY_PATH=/usr/lib/vinix/ios-gles:/usr/lib' } else { c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules' },
 		if app_name == 'vinix-ios-ppsspp' { c'LIBGL_DRIVERS_PATH=/usr/lib/vinix/ios-gles/dri' } else { c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri' },
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
@@ -1097,8 +1192,8 @@ fn desktop_spawn_native_surface(path string, first_argument string, second_argum
 	surface_entry := 'VINIX_SURFACE_PATH=${surface_path}'
 	width_entry := 'VINIX_SURFACE_WIDTH=${width}'
 	height_entry := 'VINIX_SURFACE_HEIGHT=${height}'
-	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib', c'LIBGL_DRIVERS_PATH=/usr/lib/dri',
+	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', &char(desktop_user_entry.str), &char(desktop_logname_entry.str),
+		&char(desktop_shell_entry.str), &char(desktop_runtime_entry.str), &char(desktop_config_entry.str), &char(desktop_cache_entry.str), &char(desktop_data_entry.str), &char(desktop_state_entry.str), c'LD_LIBRARY_PATH=/usr/lib', c'LIBGL_DRIVERS_PATH=/usr/lib/dri',
 		c'EGL_PLATFORM=surfaceless', c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt',
 		// jemalloc's background thread never makes progress here. Native
 		// Blender links libjemalloc directly, and with the thread enabled the
@@ -1205,8 +1300,8 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 			roblox_split_env.free()
 		}
 	}
-	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', &char(desktop_user_entry.str), &char(desktop_logname_entry.str),
+		&char(desktop_shell_entry.str), &char(desktop_runtime_entry.str), &char(desktop_config_entry.str), &char(desktop_cache_entry.str), &char(desktop_data_entry.str), &char(desktop_state_entry.str), c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri']
 	if roblox_apk_env.len > 0 {
 		envp << &char(roblox_apk_env.str)

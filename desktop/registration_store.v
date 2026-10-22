@@ -21,8 +21,8 @@ const registration_scrypt_p = u32(1)
 const registration_user_home_mode = 0o700
 const registration_user_folder_mode = 0o755
 
-// Users' homes are named /home/<user>. Only /root is on persistent storage in
-// every layout, so the folders themselves are kept in /root/home/<user>.
+// The legacy root compositor keeps its profile under /root/home/<user>.
+// Account sessions use the home owned by their effective uid directly.
 const desktop_users_directory = '/home'
 const desktop_user_store_name = 'home'
 const desktop_user_dirs_name = '.config/user-dirs.dirs'
@@ -226,8 +226,8 @@ fn desktop_link_user_home(users string, name string, target string) ?string {
 	return path
 }
 
-// Programs run with HOME=/root, so tell those that follow XDG user-dirs, such
-// as Firefox and Chromium for their downloads, where the user's folders are.
+// Tell programs that follow XDG user-dirs, such as Firefox and Chromium for
+// their downloads, where the user's folders are.
 // A file that is already there is the user's, and is kept.
 fn desktop_write_user_dirs(home string, user_home string) bool {
 	path := '${home}/${desktop_user_dirs_name}'
@@ -261,6 +261,9 @@ fn desktop_write_user_dirs(home string, user_home string) bool {
 // /home/<user> link to them and XDG user-dirs. Without the link the folders are
 // still used where they are kept; without a user, `home` is.
 fn desktop_prepare_user_home(home string, users string) string {
+	if desktop_uses_account_home(home) {
+		return desktop_prepare_account_home(home)
+	}
 	name := desktop_load_user_name(home) or { return home.clone() }
 	defer { unsafe { name.free() } }
 	storage := desktop_user_storage_path(home, name)
@@ -282,9 +285,36 @@ fn desktop_prepare_user_home(home string, users string) string {
 	return user_home
 }
 
+fn desktop_uses_account_home(home string) bool {
+	return desktop_identity.uid != 0 && home == desktop_home
+}
+
+// vinix-session has already authenticated this account and prepared its home.
+// Add the desktop's ordinary folders without creating another profile or
+// touching the system-wide /home directory or the account home's permissions.
+fn desktop_prepare_account_home(home string) string {
+	for folder in desktop_user_folders {
+		path := '${home}/${folder.name}'
+		if !os.exists(path) && !os.is_link(path) {
+			registration_ensure_directory(path, registration_user_folder_mode) or {
+				eprintln('vinix-desktop: cannot create ${path}')
+				false
+			}
+		}
+		unsafe { path.free() }
+	}
+	if !desktop_write_user_dirs(home, home) {
+		eprintln('vinix-desktop: cannot write ${home}/${desktop_user_dirs_name}')
+	}
+	return home.clone()
+}
+
 // The home as desktop_prepare_user_home left it, for an application process:
 // the desktop has already set it up, so this only looks.
 fn desktop_find_user_home(home string, users string) string {
+	if desktop_uses_account_home(home) {
+		return home.clone()
+	}
 	name := desktop_load_user_name(home) or { return home.clone() }
 	defer { unsafe { name.free() } }
 	storage := desktop_user_storage_path(home, name)

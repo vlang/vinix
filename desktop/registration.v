@@ -422,7 +422,7 @@ fn (mut r RegistrationState) poll_pointer(mut d Desktop, mut pointer PointerDevi
 // and has no close/minimise path to bypass it.
 fn (mut d Desktop) ensure_registered_user(mut fb Framebuffer, mut pointer PointerDevice,
 	mut keyboard Keyboard, frame_interval i64, idle_interval i64) {
-	if desktop_user_registered(desktop_home) {
+	if desktop_identity.uid != 0 || desktop_user_registered(desktop_home) {
 		return
 	}
 	mut registration := new_registration_state()
