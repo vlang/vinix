@@ -1,0 +1,218 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module main
+
+import nfs
+
+struct Rig {
+mut:
+	tx [nfs.capacity+4]u8
+	rx [nfs.capacity]u8
+	reply [nfs.capacity+1024]u8
+	n int
+	at int
+	sends int
+	fail bool
+	procedure u32
+}
+
+fn transfer(context voidptr, p &u8, n int, send bool) bool {
+	mut rig := unsafe { &Rig(context) }
+	if rig.fail { return false }
+	if send {
+		rig.sends++
+		mut r := nfs.Xdr{p: unsafe { p }, n: n}
+		assert r.u32() == 0x80000000 | u32(n-4)
+		assert r.u32() != 0
+		assert r.u32() == 0 && r.u32() == 2
+		r.u32(); r.u32()
+		rig.procedure = r.u32()
+		assert r.u32() == 1
+		credential := r.opaque(400)
+		mut auth := nfs.Xdr{p: credential.str, n: credential.len}
+		auth.u32(); assert auth.opaque(255) == 'vinix'
+		auth.u32(); auth.u32()
+		groups := auth.u32()
+		for _ in 0 .. int(groups) { auth.u32() }
+		assert auth.finished()
+		assert r.u32() == 0 && r.u32() == 0
+		return true
+	}
+	if !nfs.span(rig.n, rig.at, n) { return false }
+	nfs.copy_bytes(p, unsafe { &rig.reply[rig.at] }, n)
+	rig.at += n
+	return true
+}
+
+fn client(rig &Rig) nfs.Client {
+	return nfs.Client{context: unsafe { rig }, transfer: transfer, tx: unsafe { &rig.tx[0] }, rx: unsafe { &rig.rx[0] }}
+}
+
+fn reply(rig &Rig, status u32) nfs.Xdr {
+	unsafe { rig.at = 0; rig.n = 0 }
+	mut w := nfs.Xdr{p: unsafe { &rig.reply[0] }, n: nfs.capacity}
+	w.put32(0) // record marker filled by end_reply
+	w.put32(1); w.put32(1); w.put32(0); w.put32(0); w.put32(0); w.put32(0)
+	w.put32(status)
+	return w
+}
+
+fn end_reply(rig &Rig, w &nfs.Xdr) {
+	assert !w.bad
+	mut m := nfs.Xdr{p: unsafe { &rig.reply[0] }, n: 4}
+	m.put32(0x80000000 | u32(w.at-4))
+	unsafe { rig.n = w.at }
+}
+
+fn fh() nfs.FileHandle {
+	mut h := nfs.FileHandle{len: 4}
+	h.bytes[0] = 42
+	return h
+}
+
+fn attributes(mut w nfs.Xdr) {
+	w.put32(1); w.put32(0o644); w.put32(1); w.put32(0); w.put32(0)
+	w.put64(42); w.put64(512); w.put32(0); w.put32(0)
+	w.put64(7); w.put64(9)
+	for _ in 0 .. 3 { w.put32(1); w.put32(0) }
+}
+
+fn test_xdr() {
+	mut data := [256]u8{}
+	for size in [u32(0x7fffffff), 0xffffffff, 65537] {
+		mut w := nfs.Xdr{p: unsafe { &data[0] }, n: 4}
+		w.put32(size)
+		mut r := nfs.Xdr{p: unsafe { &data[0] }, n: 4}
+		r.opaque(65536); assert r.bad
+	}
+	mut w := nfs.Xdr{p: unsafe { &data[0] }, n: 256}
+	w.text('abc', 255)
+	for n in 0 .. 8 {
+		mut r := nfs.Xdr{p: unsafe { &data[0] }, n: n}
+		r.opaque(255); assert r.bad
+	}
+	mut r := nfs.Xdr{p: unsafe { &data[0] }, n: 8}
+	assert r.opaque(255) == 'abc' && r.finished()
+	data[7] = 1
+	r = nfs.Xdr{p: unsafe { &data[0] }, n: 8}; r.opaque(255); assert r.bad
+	w = nfs.Xdr{p: unsafe { &data[0] }, n: 4}; w.put32(2)
+	r = nfs.Xdr{p: unsafe { &data[0] }, n: 4}; r.boolean(); assert r.bad
+	r = nfs.Xdr{p: unsafe { &data[0] }, n: 4, at: 2147483647}; r.u32(); assert r.bad
+	assert !nfs.span(2147483647, 2147483640, 10)
+	mut a := nfs.Attr{}
+	w = nfs.Xdr{p: unsafe { &data[0] }, n: 256}; attributes(mut w)
+	for n in 0 .. w.at {
+		r = nfs.Xdr{p: unsafe { &data[0] }, n: n}; r.attr(unsafe { &a }); assert r.bad
+	}
+	println('XDR: hostile lengths, overflow, truncated attributes, strict bool/padding')
+}
+
+fn test_options() {
+	mut o := nfs.Options{}
+	assert nfs.parse_options('ro,soft,rsize=512,wsize=65536,vers=3,proto=tcp,sec=sys', unsafe { &o })
+	assert o.ro && o.soft && o.rsize == 512 && o.wsize == 65536
+	for s in ['rsize=65537', 'wsize=4294967296', 'rsize=0', 'ro,rw', 'hard,soft', 'vers=4', 'sec=krb5', 'proto=udp', 'ro,', ',ro', 'timeo=1'] {
+		assert !nfs.parse_options(s, unsafe { &o }), s
+	}
+	mut address := u32(0)
+	mut path := ''
+	assert nfs.parse_source('192.168.1.2:/export/a', unsafe { &address }, unsafe { &path })
+	assert path == '/export/a' && address == 0x0201a8c0
+	for s in ['256.1.1.1:/a', '1.2.3:/a', '1.2.3.4:a', 'host:/a', '1.2.3.4:/a\x00'] {
+		assert !nfs.parse_source(s, unsafe { &address }, unsafe { &path })
+	}
+}
+
+fn test_rpc() {
+	mut rig := &Rig{}
+	defer { unsafe { free(rig) } }
+	mut c := client(rig)
+	mut w := reply(rig, 0)
+	w.at -= 4 // NULL has no NFS status
+	end_reply(rig, unsafe { &w })
+	c.null() or { panic('NULL') }
+	assert rig.procedure == 0 && !c.dead
+	// Two fragments, including an empty first fragment.
+	mut m := nfs.Xdr{p: unsafe { &rig.reply[0] }, n: 4}; m.put32(0)
+	mut tail := nfs.Xdr{p: unsafe { &rig.reply[4] }, n: 4}; tail.put32(0x80000018)
+	mut body := nfs.Xdr{p: unsafe { &rig.reply[8] }, n: 24}
+	body.put32(2); body.put32(1); body.put32(0); body.put32(0); body.put32(0); body.put32(0)
+	rig.n = 32; rig.at = 0
+	c.null() or { panic('fragments') }
+	// Oversized marker poisons, and subsequent operations do not send.
+	m = nfs.Xdr{p: unsafe { &rig.reply[0] }, n: 4}; m.put32(0xffffffff)
+	rig.n = 4; rig.at = 0
+	c.null() or {}
+	assert c.dead
+	sends := rig.sends
+	c.null() or {}; assert rig.sends == sends
+	c = client(rig)
+	for i in 0 .. nfs.max_fragments { rig.reply[i*4] = 0; rig.reply[i*4+1] = 0; rig.reply[i*4+2] = 0; rig.reply[i*4+3] = 0 }
+	rig.n = nfs.max_fragments*4; rig.at = 0
+	c.null() or {}; assert c.dead
+	c = client(rig); rig.fail = true
+	c.null() or {}; assert c.dead && c.fault == 110
+	println('RPC: AUTH_SYS, fragmented/empty records, budget, poison and no replay')
+}
+
+fn test_operations() {
+	mut rig := &Rig{}
+	defer { unsafe { free(rig) } }
+	h := fh()
+	mut a := nfs.Attr{}
+	mut out := [16]u8{}
+	mut c := client(rig)
+	mut w := reply(rig, 0); attributes(mut w); end_reply(rig, unsafe { &w })
+	c.getattr(unsafe { &h }, unsafe { &a }) or { panic('GETATTR') }
+	assert a.size == 42 && a.fileid == 9 && rig.procedure == 1
+	c = client(rig); w = reply(rig, 30); w.put32(0); w.put32(0); end_reply(rig, unsafe { &w })
+	c.write(unsafe { &h }, 0, unsafe { &out[0] }, 1) or {}
+	assert c.fault == 30 && !c.dead && rig.procedure == 7
+	c = client(rig); c.ro = true
+	sends := rig.sends
+	c.remove(unsafe { &h }, 'x', false) or {}; assert c.fault == 30 && rig.sends == sends
+	// READ count and opaque length must agree, and must not exceed request.
+	for n in [u32(4), 0xffffffff] {
+		c = client(rig); w = reply(rig, 0); w.put32(0); w.put32(n); w.put32(1); w.text('abc', 16); end_reply(rig, unsafe { &w })
+		c.read(unsafe { &h }, 0, unsafe { &out[0] }, 16) or {}; assert c.dead
+	}
+	c = client(rig); w = reply(rig, 0); w.put32(0); w.put32(3); w.put32(1); w.text('abc', 16); end_reply(rig, unsafe { &w })
+	assert c.read(unsafe { &h }, 0, unsafe { &out[0] }, 16) or { -1 } == 3
+	assert out[0] == `a`
+	// WRITE must honor FILE_SYNC and partial count bounds.
+	for stable in [u32(0), 1, 2, 3] {
+		c = client(rig); w = reply(rig, 0); w.put32(0); w.put32(0); w.put32(1); w.put32(stable); w.put64(7); end_reply(rig, unsafe { &w })
+		c.write(unsafe { &h }, 0, unsafe { &out[0] }, 1) or {}
+		assert c.dead == (stable != 2)
+	}
+	for s in [u32(1), 2, 5, 13, 17, 20, 21, 28, 30, 63, 66, 70, 10001, 10003, 10004, 10008, 0xffffffff] {
+		c = client(rig); w = reply(rig, s); end_reply(rig, unsafe { &w })
+		c.getattr(unsafe { &h }, unsafe { &a }) or {}; assert c.fault == nfs.status_errno(s) && !c.dead
+	}
+	println('NFS: attributes, errno statuses, ROFS/local ro, READ/WRITE bounds and FILE_SYNC')
+}
+
+fn test_directory() {
+	mut rig := &Rig{}
+	defer { unsafe { free(rig) } }
+	h := fh()
+	for cookie in [u64(0), 5, 0xffffffffffffffff] {
+		mut c := client(rig)
+		mut w := reply(rig, 0); w.put32(0); w.put64(7)
+		w.put32(1); w.put64(9); w.text('file',255); w.put64(cookie); w.put32(0); w.put32(0)
+		w.put32(0); w.put32(1); end_reply(rig, unsafe { &w })
+		mut verifier := u64(0)
+		mut eof := false
+		c.readdirplus(unsafe { &h }, 5, 7, unsafe { &verifier }, unsafe { &eof }) or {}
+		assert c.dead == (cookie == 0 || cookie == 5)
+	}
+	mut c := client(rig)
+	mut w := reply(rig, 0); w.put32(0); w.put64(9); w.put32(0); w.put32(0); end_reply(rig, unsafe { &w })
+	mut verifier := u64(0); mut eof := false
+	c.readdirplus(unsafe { &h }, 0, 0, unsafe { &verifier }, unsafe { &eof }) or {}; assert c.dead
+	println('READDIRPLUS: opaque high cookies, no-progress cookie and empty-page rejection')
+}
+
+fn main() {
+	test_xdr(); test_options(); test_rpc(); test_operations(); test_directory()
+	println('NFS protocol fixtures PASS')
+}
