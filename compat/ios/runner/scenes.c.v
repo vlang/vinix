@@ -85,6 +85,10 @@ fn objc_responds(object u64, selector &char) bool {
 	if layout_selector(object, name) { return true }
 	if json_selector(object, name) { return true }
 	if ns_condition_selector(object, name) { return true }
+	if ns_recursive_lock_family(if object in ios_runtime.classes { object } else { read64(object) }) {
+		if ns_recursive_lock_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if ns_recursive_lock_types('NSRecursiveLock', object in ios_runtime.classes, name) != none { return true }
+	}
 	if ns_thread_selector(object, name) { return true }
 	if web_auth_selector(object, name) { return true }
 	if cookie_selector(object, name) { return true }

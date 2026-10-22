@@ -119,6 +119,10 @@ mut:
 	set_mutating bool
 	condition_owned bool
 	condition_initialized bool
+	recursive_lock_owned bool
+	recursive_lock_retiring bool
+	recursive_lock_calls u64
+	recursive_lock &RecursiveLockState = unsafe { nil }
 	thread &FoundationThread = unsafe { nil }
 	auth_owned bool
 	auth &WebAuthState = unsafe { nil }
@@ -495,7 +499,7 @@ fn objc_start() {
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
-		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSRecursiveLock', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
@@ -572,6 +576,7 @@ fn objc_start() {
 			'NSConcreteValue' { u32(24) }
 			'NSError' { u32(sizeof(AbiNSError)) }
 			'NSCondition' { u32(sizeof(AbiNSCondition)) }
+			'NSRecursiveLock' { u32(sizeof(AbiNSRecursiveLock)) }
 			'NSThread' { u32(64) }
 			'ASWebAuthenticationSession' { u32(136) }
 			'UIImageView' { u32(512) }
@@ -637,6 +642,7 @@ fn objc_start() {
 	webkit_metadata()
 	url_session_metadata()
 	url_session_configuration_metadata()
+	ns_recursive_lock_metadata()
 	sort_descriptor_metadata()
 	regular_expression_metadata()
 	mut request_class := ios_runtime.classes[ios_runtime.names['NSURLRequest']] or { panic('iOS: missing request class') }
@@ -672,6 +678,7 @@ fn obj_header(object u64) &ObjHeader {
 }
 
 fn objc_allocate(cls u64) u64 {
+	ns_recursive_lock_require_class(cls)
 	dispatch_objc_allocation_checked(cls) or { panic(err) }
 	if connection_family(cls) && cls != ios_runtime.names['NSURLConnection'] { panic('iOS: custom connection subclass construction is not implemented') }
 	url_session_require_class(cls)
@@ -788,6 +795,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).auth_owned { panic('iOS: authentication session requires designated construction') }
 	if obj_header(object).image_view_owned { image_view_initialize(object, 0, 0, ObjRect{}, false) }
 	if objc_is_kind(object, ios_runtime.names['NSCondition']) { ns_condition_initialize(object) }
+	if ns_recursive_lock_family(read64(object)) { ns_recursive_lock_initialize(object) }
 	if obj_header(object).thread != unsafe { nil } { ns_thread_initialize(object, 0, 0, 0, 0) }
 	if objc_is_kind(object, ios_runtime.names['NSURLRequest']) { request_initialize(object, 0, 0, 60) }
 	if obj_header(object).response_owned { response_initialize(object) }

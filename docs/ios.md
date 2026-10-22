@@ -17579,7 +17579,7 @@ The input manifest covers the declared inputs, not the full host dynamic
 runtime closure. Guest serial/config hashes remain available after VM
 artifacts were retired and the owned RAM disk detached.
 
-The final launch probe resolves `NSURLSessionConfiguration` and stops at
+That increment's launch probe resolves `NSURLSessionConfiguration` and stops at
 `_OBJC_CLASS_$_NSRecursiveLock`, before application entry. Fortnite remains
 unplayable.
 
@@ -17587,17 +17587,69 @@ unplayable.
 v run tests/ios/native-checks.v build-session-configuration
 ```
 
+V now supplies the public base `NSRecursiveLock`, its measured 104-byte ARM64
+record and `_priv` ivar, and the seven typed instance methods for initialization,
+names, locking, unlocking, trying a lock and locking before a date. The preserved
+Fortnite executable uses this class in `AFSDKOperation`: cancellation calls state
+accessors while holding the same lock, so those methods require recursion.
+
+The implementation uses a native mutex as a state gate and a condition variable
+for contenders. Ownership and recursion depth are separate from that gate;
+waiting releases it, and final unlock wakes contenders to recheck ownership.
+Finite NSDate deadlines use the wall clock. Free or recursively owned locks
+acquire immediately even with past or nil deadlines. Names copy NSString inputs;
+first initialization clears any name set before init. Getters retain and
+autorelease their result so a concurrent setter cannot free it during return.
+
+Receiver pins protect blocking calls and name-copy callbacks. Allocation
+provenance controls cleanup after isa replacement and in supplied storage.
+Explicit destruction rejects held locks or active calls, without relying on
+host-specific behavior when destroying a busy pthread mutex. Reinitialization,
+foreign-thread unlocks, custom subclass construction, invalid names or dates,
+nonfinite/out-of-range deadlines, copying, coding and descriptions fail
+explicitly. Native Foundation is used as a behavioral reference; these rejection
+rules are Vinix's bounded profile.
+
+The shared fixture passes against Apple Foundation and in the ARM64 Vinix
+guest. Both macOS ASan+UBSan runs pass with ordinary and deterministic Swift
+hashing. Checks cover recursive ownership, foreign try-locks, timed waits and
+handoff, copied-name callbacks
+that release the receiver's last caller-owned reference, failed constructors,
+guarded supplied storage, 64 isa replacements, two drained runtimes and 23
+explicit rejection cases. Independent source and final generated-C lifetime
+review found no unresolved issue in this profile. Host leak detection was
+disabled.
+
+Local evidence is recorded in
+`build/ios/fortnite/recursive-lock-checks/proof.log`: 32 sealed native/static
+evidence files, 19,287 unchanged declared source/toolchain/runtime inputs, five
+archived binary/generated-C pairs, one host dSYM and four sequential ARM64 guest
+phases. Compile-preflight failures and the first ARM64 build's incompatible
+timed-wait pointer diagnostic are preserved, together with the preceding passing
+host runs and review. An explicit pointer cast fixed the ARM64 build; the final
+source was then revalidated. The input manifest covers declared inputs, not the
+full host dynamic runtime closure. VM serial/config hashes remain available;
+owned VM artifacts were retired and the RAM disk detached.
+
+The final launch probe resolves `NSRecursiveLock` and stops at
+`_OBJC_CLASS_$_NSInvocationOperation`, before application entry. Fortnite remains
+unplayable.
+
+```sh
+v run tests/ios/native-checks.v build-recursive-lock
+```
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,062 | 99 | 78 |
+| Fortnite executable | 2,063 | 98 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,902 | 102 | 114 |
+| All images | 2,903 | 101 | 114 |
 
-The C++/GLES/Text variant reports 2,916 resolved imports, 88 unresolved strong
+The C++/GLES/Text variant reports 2,917 resolved imports, 87 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -17648,7 +17700,7 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 base URL sessions use `url-session-checks`, sort descriptors use
 `sort-descriptor-checks`, regular expressions use `regular-expression-checks`,
 mutable strings use `mutable-string-checks`, session configurations use
-`session-configuration-checks`,
+`session-configuration-checks`, recursive locks use `recursive-lock-checks`,
 CoreFoundation dictionaries use
 `cf-dictionary-checks`, constant integers use
 `constant-integer-checks`, constant arrays use `constant-array-checks`, supplied
@@ -17661,7 +17713,7 @@ object monitors use `objc-sync-checks`, Swift strings/buffers use
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
-URL session, session configuration, sort descriptor, regular expression, mutable string,
+URL session, session configuration, recursive lock, sort descriptor, regular expression, mutable string,
 CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String
