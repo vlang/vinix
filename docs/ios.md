@@ -16728,31 +16728,46 @@ Swift comparisons distinguish the four-byte exported case discriminator from
 the enum's one-byte payload and verify tag injection. The export adds no
 allocation or ownership.
 
-The attributes/flags fixture also checks guarded ARM64 four-byte reads/stores,
-concurrent reads, accessor/descriptor/constant-first canonical publication,
-Dispatch-only resolution, unsupported exports and rejection before initialization
-and after two unmapped runtime teardowns:
+`_$sSo17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyOMa`
+now returns canonical, complete `DispatchQueue.AutoreleaseFrequency` metadata.
+The three-case enum has one-byte POD storage and 253 extra inhabitants. Its
+value witnesses copy exactly one byte, inject/read case tags and encode
+single-payload enum tags, including native width boundaries and UInt32 wrapping.
+The descriptor shares the existing Dispatch queue extension context. Accessor
+code and metadata occupy the existing sealed executable/read-only arena, with
+no new allocation or ownership. Reflection data, the descriptor export and the
+`workItem`/`never` discriminator exports remain unsupported.
+
+The attributes/flags fixture compares the enum metadata and witnesses with native
+Swift, including all 256 byte representations, protected payload boundaries,
+unused metadata, accessor result/register guards and indirect symbolic lookup.
+It also checks guarded ARM64 four-byte discriminator reads/stores, concurrent
+reads, accessor/descriptor/constant-first canonical publication, Dispatch-only
+resolution, unsupported exports and rejection before initialization and after
+two unmapped runtime teardowns:
 
 ```sh
 v run tests/ios/native-checks.v build-swift-dispatch-flags
 ```
 
 Evidence is retained under
-`build/ios/fortnite/dispatch-autorelease-checks`. Eight normal/deterministic
+`build/ios/fortnite/dispatch-autorelease-metadata-checks`. Eight normal/deterministic
 ASan/UBSan runs passed across the attributes/flags, QoS, algebra and async
 fixtures. The ARM64 fixture, launch probe and both import audits passed their
-checks. All 990 pinned source, toolchain and runtime inputs remained unchanged;
+checks. All 992 pinned source, toolchain and runtime inputs remained unchanged;
 eight archived binary/generated-C pairs and four retained guest serial logs
 passed SHA256 verification.
 
-Static inspection traces the case discriminator from GOT cell `0x10dc9bce0`
-to the four-byte load at `0x100072448`. The caller then invokes the enum's tag
-injection witness at value-witness table plus 104 bytes. This inspection executes
-no application code; the launch probe has not reached this consumer in Fortnite.
+Static inspection traces the metadata accessor through GOT cell `0x10dc9bce8`
+to the call at `0x100072294`. The caller reads the value-witness table and size
+to allocate enum storage on its stack. It then loads the case discriminator
+from GOT cell `0x10dc9bce0` at `0x100072448` and invokes the tag injection
+witness at value-witness table plus 104 bytes. This inspection executes no
+application code; the launch probe has not reached this consumer in Fortnite.
 
 The launch probe now stops at the required Swift Dispatch import
-`_$sSo17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyOMa`
-(`DispatchQueue.AutoreleaseFrequency` metadata accessor). This remains a linking
+`_$sSo17OS_dispatch_queueC8DispatchE4sync7executexxyKXE_tKlF`
+(`DispatchQueue.sync(execute:)`). This remains a linking
 failure before application entry; Fortnite is not playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -16760,12 +16775,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,000 | 161 | 78 |
+| Fortnite executable | 2,001 | 160 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,840 | 164 | 114 |
+| All images | 2,841 | 163 | 114 |
 
-The C++/GLES/Text variant reports 2,854 resolved imports, 150 unresolved strong
+The C++/GLES/Text variant reports 2,855 resolved imports, 149 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
