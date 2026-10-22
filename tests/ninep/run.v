@@ -26,12 +26,47 @@ fn digest(path string) !string {
 	defer { f.close() }
 	mut hash := sha256.new()
 	mut buffer := []u8{len: 65536}
-	for {
+	size := os.file_size(path)
+	mut consumed := u64(0)
+	for consumed < size {
 		n := f.read(mut buffer)!
-		if n == 0 { break }
+		if n <= 0 || u64(n) > size - consumed { return error('short or changing file: ${path}') }
 		hash.write(buffer[..n])!
+		consumed += u64(n)
 	}
+	if os.file_size(path) != size { return error('file size changed during hashing: ${path}') }
 	return hash.sum([]).hex()
+}
+
+// Finish host-only auditing of already-completed guest receipts. Never boot or
+// repeat guest work merely because a host-side audit was interrupted or failed.
+fn verify_existing(out string) ! {
+	serial := os.read_file(out + '/serial.log')!
+	if !serial.contains('M16A:OUTCOME PASS status=0') { return error('guest PASS receipt missing') }
+	expected := os.read_file(out + '/expected-sha256.txt')!
+	host_hash := expected.all_after('HOST_BIG:').all_before('\n')
+	guest_hash := expected.all_after('GUEST_BIG:').all_before('\n')
+	if host_hash.len != 64 || guest_hash.len != 64 {
+		return error('invalid fixture digest receipt')
+	}
+	if !serial.contains('source_sha256=' + host_hash) || !serial.contains('generated_sha256=' + guest_hash) {
+		return error('guest and original host digest receipts differ')
+	}
+	actual := digest(out + '/share/guest-big.bin')!
+	if actual != guest_hash || os.file_size(out + '/share/guest-big.bin') != 104857600 {
+		return error('host guest-big size/hash mismatch')
+	}
+	if digest(out + '/share/host-big.bin')! != host_hash || os.file_size(out + '/share/host-big.bin') != 104857600 {
+		return error('host source size/hash changed')
+	}
+	if os.read_file(out + '/share/guest-small.txt')! != 'mission16-a guest-small-v1\n'
+		|| os.read_file(out + '/share/host-small.txt')! != 'host-edit-v2\n'
+		|| os.read_file(out + '/share/guest-ready')! != 'ready\n'
+		|| !serial.contains('M16A:host-edit PASS') || !serial.contains('M16A:remount PASS') {
+		return error('small file or host-edit/remount evidence mismatch')
+	}
+	os.write_file(out + '/host-verification.txt', 'HOST_VERIFY:PASS\nAUDIT_MODE:existing-receipts-no-reboot\nHOST_BIG_SHA256:${host_hash}\nGUEST_BIG_SHA256:${actual}\nSMALL_SHA256:${digest(out + '/share/guest-small.txt')!}\n')!
+	println(os.read_file(out + '/host-verification.txt')!)
 }
 
 fn fixture(path string, guest bool) !string {
@@ -126,6 +161,14 @@ fn qualify(repo string, kernel string, init string, out string) ! {
 }
 
 fn main() {
+	if os.args.len == 3 && os.args[1] == '--verify' {
+		verify_existing(os.abs_path(os.args[2])) or {
+			eprintln('M16A-HOST:FAIL ${err}')
+			exit(1)
+		}
+		println('M16A-HOST:PASS existing receipts verified, no guest rerun')
+		return
+	}
 	if os.args.len != 5 {
 		eprintln('usage: run REPO KERNEL INIT NEW_OUTPUT_DIR')
 		exit(2)
