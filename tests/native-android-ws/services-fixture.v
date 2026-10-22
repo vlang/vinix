@@ -728,6 +728,141 @@ invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0'
 }
 
+// Reflection observes actual pool/connection lifetime independently of the
+// parameter getters; public SQL verifies persistent and in-memory data.
+fn sqlite_idle_checks() string {
+ mut body := 'new-instance v0, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+invoke-direct {v0}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;-><init>()V
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->build()Landroid/database/sqlite/SQLiteDatabase$OpenParams;
+move-result-object v1
+invoke-virtual {v1}, Landroid/database/sqlite/SQLiteDatabase$OpenParams;->getIdleConnectionTimeout()J
+move-result-wide v2
+const-wide/16 v4, -1
+cmp-long v1, v2, v4
+if-nez v1, :bad
+:negative
+invoke-virtual {v0, v4, v5}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->setIdleConnectionTimeout(J)Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+:negative_end
+goto :bad
+.catch Ljava/lang/IllegalArgumentException; {:negative .. :negative_end} :negative_caught
+:negative_caught
+move-exception v1
+const-wide/16 v2, 0
+invoke-virtual {v0, v2, v3}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->setIdleConnectionTimeout(J)Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+const-wide/16 v2, 200
+invoke-virtual {v0, v2, v3}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->setIdleConnectionTimeout(J)Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+const/high16 v1, 0x10000000
+invoke-virtual {v0, v1}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->setOpenFlags(I)Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->build()Landroid/database/sqlite/SQLiteDatabase$OpenParams;
+move-result-object v1
+const-wide v2, 0x7fffffffffffffffL
+invoke-virtual {v0, v2, v3}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->setIdleConnectionTimeout(J)Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+invoke-virtual {v1}, Landroid/database/sqlite/SQLiteDatabase$OpenParams;->toBuilder()Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
+move-result-object v0
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->build()Landroid/database/sqlite/SQLiteDatabase$OpenParams;
+move-result-object v1
+invoke-virtual {v1}, Landroid/database/sqlite/SQLiteDatabase$OpenParams;->getIdleConnectionTimeout()J
+move-result-wide v2
+const-wide/16 v4, 200
+cmp-long v0, v2, v4
+if-nez v0, :bad
+'
+ for mode in ['file', 'memory', 'disabled', 'closed'] {
+  body += if mode == 'memory' { 'const-string v0, ":memory:"\n' } else {
+   'const-string v0, "idle-${mode}.db"\ninvoke-virtual {p0, v0}, Landroid/content/Context;->deleteDatabase(Ljava/lang/String;)Z\ninvoke-virtual {p0, v0}, Landroid/content/Context;->getDatabasePath(Ljava/lang/String;)Ljava/io/File;\nmove-result-object v0\ninvoke-virtual {v0}, Ljava/io/File;->getPath()Ljava/lang/String;\nmove-result-object v0\n'
+  }
+  if mode in ['disabled', 'closed'] {
+   body += 'invoke-virtual {v1}, Landroid/database/sqlite/SQLiteDatabase$OpenParams;->toBuilder()Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;\nmove-result-object v1\nconst-wide v2, ' + if mode == 'closed' { '60000' } else { '0x7fffffffffffffffL' } + '\ninvoke-virtual {v1, v2, v3}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->setIdleConnectionTimeout(J)Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;\ninvoke-virtual {v1}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;->build()Landroid/database/sqlite/SQLiteDatabase$OpenParams;\nmove-result-object v1\n'
+  }
+  body += 'invoke-static {v0, v1}, Landroid/database/sqlite/SQLiteDatabase;->openDatabase(Ljava/lang/String;Landroid/database/sqlite/SQLiteDatabase$OpenParams;)Landroid/database/sqlite/SQLiteDatabase;
+move-result-object v0
+const-string v2, "CREATE TABLE probe(value INTEGER)"
+invoke-virtual {v0, v2}, Landroid/database/sqlite/SQLiteDatabase;->execSQL(Ljava/lang/String;)V
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase;->beginTransaction()V
+const-string v2, "INSERT INTO probe VALUES (42)"
+invoke-virtual {v0, v2}, Landroid/database/sqlite/SQLiteDatabase;->execSQL(Ljava/lang/String;)V
+const-string v2, "mConnectionPoolLocked"
+invoke-static {v0, v2}, Lorg/vinix/service/Main;->readField(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v2
+const-string v3, "mAcquiredConnections"
+invoke-static {v2, v3}, Lorg/vinix/service/Main;->readField(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v3
+check-cast v3, Ljava/util/WeakHashMap;
+invoke-virtual {v3}, Ljava/util/WeakHashMap;->keySet()Ljava/util/Set;
+move-result-object v3
+invoke-interface {v3}, Ljava/util/Set;->iterator()Ljava/util/Iterator;
+move-result-object v3
+invoke-interface {v3}, Ljava/util/Iterator;->next()Ljava/lang/Object;
+move-result-object v3
+const-wide/16 v4, 500
+invoke-static {v4, v5}, Ljava/lang/Thread;->sleep(J)V
+const-string v4, "mConnectionPtr"
+invoke-static {v3, v4}, Lorg/vinix/service/Main;->readField(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v4
+check-cast v4, Ljava/lang/Long;
+invoke-virtual {v4}, Ljava/lang/Long;->longValue()J
+move-result-wide v4
+invoke-static {v4, v5}, Ljava/lang/Long;->signum(J)I
+move-result v4
+if-eqz v4, :bad
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase;->setTransactionSuccessful()V
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase;->endTransaction()V
+'
+  body += if mode == 'file' { 'invoke-static {v2}, Lorg/vinix/service/Main;->waitSQLiteIdle(Ljava/lang/Object;)V\n' } else { 'const-wide/16 v4, 500\ninvoke-static {v4, v5}, Ljava/lang/Thread;->sleep(J)V\n' }
+  body += 'const-string v4, "mConnectionPtr"\ninvoke-static {v3, v4}, Lorg/vinix/service/Main;->readField(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;\nmove-result-object v4\ncheck-cast v4, Ljava/lang/Long;\ninvoke-virtual {v4}, Ljava/lang/Long;->longValue()J\nmove-result-wide v4\ninvoke-static {v4, v5}, Ljava/lang/Long;->signum(J)I
+move-result v4\n' + if mode=='file' { 'if-nez v4, :bad\n' } else { 'if-eqz v4, :bad\n' }
+  body += 'const-string v2, "SELECT value FROM probe"
+const/4 v3, 0
+invoke-virtual {v0, v2, v3}, Landroid/database/sqlite/SQLiteDatabase;->rawQuery(Ljava/lang/String;[Ljava/lang/String;)Landroid/database/Cursor;
+move-result-object v2
+invoke-interface {v2}, Landroid/database/Cursor;->moveToFirst()Z
+move-result v3
+if-eqz v3, :bad
+const/4 v3, 0
+invoke-interface {v2, v3}, Landroid/database/Cursor;->getInt(I)I
+move-result v3
+const/16 v4, 42
+if-ne v3, v4, :bad
+invoke-interface {v2}, Landroid/database/Cursor;->close()V
+'
+  if mode == 'closed' {
+   body += 'const-string v2, "mConnectionPoolLocked"
+invoke-static {v0, v2}, Lorg/vinix/service/Main;->readField(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v2
+const-string v3, "mAvailablePrimaryConnection"
+invoke-static {v2, v3}, Lorg/vinix/service/Main;->readField(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v3
+check-cast v3, Landroid/database/sqlite/SQLiteConnection;
+invoke-virtual {v3}, Landroid/database/sqlite/SQLiteConnection;->getConnectionId()I
+move-result v3
+const-string v4, "vinixIdleHandler"
+invoke-static {v2, v4}, Lorg/vinix/service/Main;->readField(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v4
+check-cast v4, Landroid/os/Handler;
+invoke-virtual {v4, v3}, Landroid/os/Handler;->hasMessages(I)Z
+move-result v5
+if-eqz v5, :bad
+invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase;->close()V
+invoke-virtual {v4, v3}, Landroid/os/Handler;->hasMessages(I)Z
+move-result v5
+if-nez v5, :bad
+'
+  } else {
+   body += 'invoke-virtual {v0}, Landroid/database/sqlite/SQLiteDatabase;->close()V\n'
+  }
+
+ }
+ return body + 'const-string v0, "ServiceFixture"
+const-string v1, "SQLITE-IDLE-PASS snapshot validation active-transaction eviction persistent-reopen in-memory disabled close-cancels"
+invoke-static {v0, v1}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "SQLite idle timeout must close unused disk connections and preserve active and in-memory connections"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+}
+
 fn sqlite_params_checks() string {
 	return 'new-instance v0, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;
 invoke-direct {v0}, Landroid/database/sqlite/SQLiteDatabase$OpenParams$Builder;-><init>()V
@@ -994,6 +1129,25 @@ const-string v0, "user"
 invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
 move-result-object v0
 check-cast v0, Landroid/os/UserManager;
+invoke-virtual {v0}, Landroid/os/UserManager;->getUserProfiles()Ljava/util/List;
+move-result-object v2
+invoke-interface {v2}, Ljava/util/List;->size()I
+move-result v3
+const/4 v4, 1
+if-ne v3, v4, :bad
+const/4 v3, 0
+invoke-interface {v2, v3}, Ljava/util/List;->get(I)Ljava/lang/Object;
+move-result-object v3
+check-cast v3, Landroid/os/UserHandle;
+invoke-virtual {v3}, Landroid/os/UserHandle;->getIdentifier()I
+move-result v3
+if-ne v3, v1, :bad
+invoke-interface {v2}, Ljava/util/List;->clear()V
+invoke-virtual {v0}, Landroid/os/UserManager;->getUserProfiles()Ljava/util/List;
+move-result-object v2
+invoke-interface {v2}, Ljava/util/List;->size()I
+move-result v2
+if-ne v2, v4, :bad
 invoke-virtual {v0}, Landroid/os/UserManager;->isSystemUser()Z
 move-result v0
 if-nez v1, :secondary
@@ -1002,6 +1156,33 @@ goto :ids
 :secondary
 if-nez v0, :bad
 :ids
+new-instance v0, Landroid/os/UserHandle;
+const/4 v1, 0
+invoke-direct {v0, v1}, Landroid/os/UserHandle;-><init>(I)V
+invoke-virtual {v0}, Landroid/os/UserHandle;->isOwner()Z
+move-result v1
+if-eqz v1, :bad
+invoke-virtual {v0}, Landroid/os/UserHandle;->isSystem()Z
+move-result v1
+if-eqz v1, :bad
+new-instance v0, Landroid/os/UserHandle;
+const/4 v1, 1
+invoke-direct {v0, v1}, Landroid/os/UserHandle;-><init>(I)V
+invoke-virtual {v0}, Landroid/os/UserHandle;->isOwner()Z
+move-result v1
+if-nez v1, :bad
+invoke-virtual {v0}, Landroid/os/UserHandle;->isSystem()Z
+move-result v1
+if-nez v1, :bad
+new-instance v0, Landroid/os/UserHandle;
+const/4 v1, -1
+invoke-direct {v0, v1}, Landroid/os/UserHandle;-><init>(I)V
+invoke-virtual {v0}, Landroid/os/UserHandle;->isOwner()Z
+move-result v1
+if-nez v1, :bad
+invoke-virtual {v0}, Landroid/os/UserHandle;->isSystem()Z
+move-result v1
+if-nez v1, :bad
 const v0, 201234
 invoke-static {v0}, Landroid/os/UserHandle;->getUserId(I)I
 move-result v1
@@ -1714,6 +1895,32 @@ return-object v0'))!
 		method('private checkWorkSource()V', work_source_checks()) +
 		method('private checkWorkParcel(Landroid/os/WorkSource;)V', work_parcel_checks()) +
 		method('private checkSQLiteParams()V', sqlite_params_checks()) +
+		method('private checkSQLiteIdle()V', sqlite_idle_checks()) +
+		method('private static readField(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;', 'invoke-virtual {p0}, Ljava/lang/Object;->getClass()Ljava/lang/Class;
+move-result-object v0
+invoke-virtual {v0, p1}, Ljava/lang/Class;->getDeclaredField(Ljava/lang/String;)Ljava/lang/reflect/Field;
+move-result-object v0
+const/4 v1, 1
+invoke-virtual {v0, v1}, Ljava/lang/reflect/AccessibleObject;->setAccessible(Z)V
+invoke-virtual {v0, p0}, Ljava/lang/reflect/Field;->get(Ljava/lang/Object;)Ljava/lang/Object;
+move-result-object v0
+return-object v0') +
+		method('private static waitSQLiteIdle(Ljava/lang/Object;)V', 'const/16 v2, 100
+:poll
+const-string v0, "mAvailablePrimaryConnection"
+invoke-static {p0, v0}, Lorg/vinix/service/Main;->readField(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v0
+if-eqz v0, :done
+const-wide/16 v0, 50
+invoke-static {v0, v1}, Ljava/lang/Thread;->sleep(J)V
+add-int/lit8 v2, v2, -1
+if-nez v2, :poll
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "Idle SQLite connection was not closed"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0
+:done
+return-void') +
 		method('private checkLocationState()V', location_state_checks()) +
 		method('private checkPackageEnumeration(Landroid/content/Context;)V', package_enumeration_checks()) +
 		method('private checkPriority()V', priority_checks()) +
@@ -1766,6 +1973,7 @@ invoke-direct {p0}, Lorg/vinix/service/Main;->checkUser()V
 invoke-direct {p0, p0}, Lorg/vinix/service/Main;->checkDevicePolicy(Landroid/content/Context;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkWorkSource()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkSQLiteParams()V
+invoke-direct {p0}, Lorg/vinix/service/Main;->checkSQLiteIdle()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkLocationState()V
 invoke-direct {p0, p0}, Lorg/vinix/service/Main;->checkPackageEnumeration(Landroid/content/Context;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkImportance()V

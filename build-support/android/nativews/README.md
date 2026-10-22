@@ -148,9 +148,14 @@ WorkSource stores sorted UID/name entries and ordered attribution chains, with
 deep copies and Parcelable support following the
 [AOSP value model](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-11.0.0_r1/core/java/android/os/WorkSource.java).
 It does not provide battery accounting. SQLite OpenParams snapshots preserve
-open flags, cursor factories and error handlers and open databases through the
-existing SQLite engine. The guest fixture checks persistence, transaction
-rollback, read-only enforcement and a custom cursor factory.
+open flags, cursor factories, error handlers and idle timeouts and open databases
+through the existing SQLite engine. A shared background Looper evicts only
+available disk connections under the pool lock. Acquired connections and
+in-memory databases remain open; Long.MAX_VALUE disables eviction. The guest
+fixture checks persistence, transaction rollback, read-only enforcement, a
+custom cursor factory, idle closure and reopening, and timeout exclusions.
+UserManager returns a fresh profile list containing the current user. UserHandle
+owner/system queries use the handle's user ID; managed profiles are unavailable.
 LocationManager enabled queries report false and best-provider discovery returns
 null because the native WS backend has no location provider. PendingIntent's
 OnFinished callback interface is present for class loading; callback send
