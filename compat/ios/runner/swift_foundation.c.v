@@ -305,6 +305,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	if symbol == '_$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ' { return u64(unsafe { voidptr(swift_foundation_array_unbridge) }) }
 	if symbol == '_$sSy10FoundationE20replacingOccurrences2of4with7options5rangeSSqd___qd_0_So22NSStringCompareOptionsVSnySS5IndexVGSgtSyRd__SyRd_0_r0_lF' { return swift_foundation_arena() + 3808 }
 	if address := swift_cocoa_error_symbol(symbol) { return address }
+	if address := swift_localized_error_protocol_symbol(symbol) { return address }
 	if address := swift_json_encoder_symbol(symbol) { return address }
 	if address := swift_json_decoder_symbol(symbol) { return address }
 	if address := swift_json_date_symbol(symbol) { return address }
@@ -377,6 +378,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	}
 }
 fn swift_foundation_stop() {
+	swift_localized_error_protocol_stop()
 	swift_cocoa_error_stop()
 	if ios_runtime.swift_foundation_arena == 0 { return }
 	if C.munmap(unsafe { voidptr(ios_runtime.swift_foundation_arena) }, usize(C.getpagesize()) * 2) != 0 { panic('iOS: cannot retire Swift Foundation entries') }

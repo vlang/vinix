@@ -310,6 +310,8 @@ mut:
 	swift_nsobject_hashable_tables map[u64]u64 // Canonical ObjC wrapper -> sealed Hashable/Equatable specialization page.
 	swift_nsobject_hashable_retired bool
 	swift_foundation_arena u64 // Sealed CVarArg calls and Foundation's concrete String conformance.
+	swift_localized_error_protocol_arena u64 // Sealed LocalizedError declaration and nil default witnesses.
+	swift_localized_error_protocol_retired bool
 	swift_data_zero u64 // Immortal NSData cache, retired after pool and association drains.
 	swift_json_encoder_arena u64 // Sealed base encoder construction and default constants.
 	swift_json_encoder_retired bool

@@ -75,7 +75,7 @@ fn swift_url_metadata_emit(code u64, data u64) {
 	entry := code + 928
 	metadata := data + 144
 	descriptor := data + 176
-	module_descriptor := data + 208
+	module_descriptor := data + 64 // Shared Foundation module, also used by Date.
 	witness := data + 256
 	write32(entry, 0x58000080)
 	write32(entry + 4, 0xd2800001)
@@ -95,9 +95,7 @@ fn swift_url_metadata_emit(code u64, data u64) {
 	swift_protocol_relative(descriptor + 12, entry)
 	write32(descriptor + 20, 1)
 	write32(descriptor + 24, 2)
-	swift_protocol_relative(module_descriptor + 8, data + 232)
 	C.memcpy(voidptr(data + 224), c'URL', 4)
-	C.memcpy(voidptr(data + 232), c'Foundation', 11)
 	for i, function in [u64(unsafe { voidptr(swift_url_copy) }),
 		u64(unsafe { voidptr(swift_url_destroy) }), u64(unsafe { voidptr(swift_url_copy) }),
 		u64(unsafe { voidptr(swift_url_assign_copy) }), u64(unsafe { voidptr(swift_url_take) }),

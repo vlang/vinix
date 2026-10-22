@@ -17059,21 +17059,60 @@ conformance-table synthesis remains unsupported. The inspection detects no
 call stubs or direct code references for these aliases and executes no
 application code.
 
-The launch probe now stops at the required Foundation declaration
-`_$s10Foundation14LocalizedErrorMp`. Fortnite has not reached application
-entry and is not playable.
+Foundation's `LocalizedError` declaration now supplies its seven public
+descriptor aliases, including its inherited `Error` requirement and four
+optional String getters. Its native requirement flags, tagged indirect
+reference to the canonical `Error` descriptor, and Foundation module parent
+match Apple's runtime. The four private default witnesses return nil in
+`x0`/`x1`, ignore all inputs and leave indirect output untouched. They remain
+distinct from the four existing exported protocol-extension defaults.
+
+The descriptor occupies a read-only page and its default witnesses a separate
+read/execute page. Checked publication rejects nil and retired runtimes before
+borrowing dependencies or returning cached storage. The declaration retires
+before both its Foundation module parent and the inherited `Error` descriptor.
+URL now shares this canonical Foundation module with Date instead of declaring
+a second module descriptor. Its metadata layout and value witnesses are unchanged.
+
+```sh
+v run tests/ios/native-checks.v build-swift-localized-error-protocol
+```
+
+Evidence is retained in `build/ios/fortnite/localized-error-protocol-checks-v2`,
+with the original failed attempt in `localized-error-protocol-checks` beside it.
+The new fixture and existing LocalizedError, Error and URL metadata fixtures
+passed eight normal and deterministic ASan/UBSan host runs. The ARM64 fixture,
+launch probe and both import audits completed. All 1,078 pinned source,
+toolchain and runtime inputs remained unchanged. Eight binary/generated-C
+pairs, four host dSYM archives and four guest serial logs passed verification.
+All four temporary VMs and both attempts' RAM scratch were retired. Three
+original failure causes, 19 provenance artifact hashes and 1,004 source copies
+from the failed snapshot remain preserved and verified.
+
+Static inspection of the same executable finds six required declaration
+imports with one data fixup each in `__DATA_CONST,__const`. The nested
+`FirebaseCoreInternal.RingBuffer.Error` enum's conformance at `0x10d234f68`
+has flags `0x30000`, a null witness pattern and five resilient witness entries
+referring to these cells. Its four getter witnesses lead through branch
+thunks to the existing protocol-extension imports. Generic/resilient
+conformance-table synthesis remains unsupported. This inspection executes no
+application code.
+
+The launch probe now stops at SwiftUI's required `_$s7SwiftUI4ViewMp`
+protocol descriptor. Fortnite has not reached application entry and is not
+playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,024 | 137 | 78 |
+| Fortnite executable | 2,030 | 131 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,864 | 140 | 114 |
+| All images | 2,870 | 134 | 114 |
 
-The C++/GLES/Text variant reports 2,878 resolved imports, 126 unresolved strong
+The C++/GLES/Text variant reports 2,884 resolved imports, 120 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

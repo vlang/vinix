@@ -169,6 +169,7 @@ fn main() {
 		require_child('/opt/ios/swift-custom-debug-checks')
 		require_child('/opt/ios/swift-coding-key-protocol-checks')
 		require_child('/opt/ios/swift-sequence-requirement-checks')
+		require_child('/opt/ios/swift-localized-error-protocol-checks')
 		require_child('/opt/ios/swift-hash-checks')
 		require_child('/opt/ios/swift-hasher-checks')
 		require_child('/opt/ios/swift-raw-representable-checks')
@@ -267,7 +268,7 @@ fn main() {
 	} else if mode == 'swift' {
 		if os.is_dir('/opt/ios/lookup-native') { os.setenv('VINIX_IOS_LOOKUP_NATIVE', '/opt/ios/lookup-native', true) }
 		require_child('/opt/ios/module-lookup-checks')
-		for name in ['unknown-value', 'string', 'empty-string', 'describing', 'cstring', 'empty-array', 'any', 'byte-metadata', 'raw-equality', 'array-class', 'shared-utf8', 'string-guts', 'foreign-copy', 'foreign-count', 'foreign-index', 'foreign-offset', 'foreign-subscript', 'utf16-offset', 'sequence', 'array-sequence', 'collection', 'set', 'metadata', 'protocol', 'case-iterable', 'custom-debug', 'coding-key-protocol', 'sequence-requirement', 'hash', 'hasher', 'raw-representable',
+		for name in ['unknown-value', 'string', 'empty-string', 'describing', 'cstring', 'empty-array', 'any', 'byte-metadata', 'raw-equality', 'array-class', 'shared-utf8', 'string-guts', 'foreign-copy', 'foreign-count', 'foreign-index', 'foreign-offset', 'foreign-subscript', 'utf16-offset', 'sequence', 'array-sequence', 'collection', 'set', 'metadata', 'protocol', 'case-iterable', 'custom-debug', 'coding-key-protocol', 'sequence-requirement', 'localized-error-protocol', 'hash', 'hasher', 'raw-representable',
 			'array', 'integer', 'integer-hash', 'fatal', 'deleted-method', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'set-algebra', 'raw-copy', 'pointer-alloc', 'pointer-deinit', 'raw-alloc', 'dispatch-initializer', 'dispatch-async', 'dispatch-main', 'dispatch-scheduler', 'dispatch-qos', 'dispatch-algebra', 'dispatch-flags', 'stack', 'heap', 'calendar-case', 'locale', 'date', 'data-write', 'data-unbridge', 'data-base64', 'data-bridge', 'data', 'url-metadata', 'url-path', 'url-bridge', 'error-bridge', 'error', 'error-value', 'dynamic-cast', 'objc-cast', 'foreign-metadata', 'object-type', 'mangled-state', 'mangled', 'witness', 'once', 'set-bridge', 'logger', 'main-actor-witness', 'main-actor', 'nsobject-hashable', 'objc-bool-metadata', 'objc-bool', 'actor-executor', 'task-priority', 'task-alloc', 'task-create', 'task-switch', 'nslog', 'string-unbridge', 'error-description', 'cocoa-error-code', 'cocoa-error-protocol', 'json-decoder-dispatch', 'json-decoder-initializer', 'json-encoder-date-case', 'json-date-strategy', 'json-encoder-date-dispatch', 'json-encoder-dispatch', 'json-encoder-initializer', 'localized-error'] {
 			require_child('/opt/ios/swift-' + name + '-checks')
 		}
