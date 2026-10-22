@@ -170,6 +170,8 @@ idle or location power saving. Thermal listeners receive this initial policy on
 their Executor or the main Handler; duplicate registrations and missing removals
 fail. Vinix has no temperature driver or thermal feedback loop, so this status
 does not measure physical device temperature or provide overheating protection.
+Vibrator reports no motor or amplitude control. Haptic requests and cancellation
+have no effect; they do not call a missing driver or spawn pattern threads.
 
 Dynamic receivers support the registration overloads with flags and handlers,
 main-Looper delivery by default, action and package filtering, and unregistering.

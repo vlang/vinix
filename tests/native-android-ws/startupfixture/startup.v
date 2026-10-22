@@ -48,6 +48,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->uriPermissions(Landroid/
 invoke-static {p0}, Lorg/vinix/bootstrap/IoProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/StartupProbe;->altitude()V
 invoke-static {p0}, Lorg/vinix/bootstrap/PowerProbe;->check(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->haptics(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->fonts(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->broadcasts(Landroid/content/Context;)V
 new-instance v0, Landroid/hardware/SensorManager;
@@ -74,6 +75,45 @@ return-void
 :bad
 new-instance v0, Ljava/lang/AssertionError;
 const-string v1, "sensor availability"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
+  method('private static haptics(Landroid/content/Context;)V', '
+const-string v0, "vibrator"
+invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v0
+check-cast v0, Landroid/os/Vibrator;
+if-eqz v0, :bad
+invoke-virtual {v0}, Landroid/os/Vibrator;->hasVibrator()Z
+move-result v1
+if-nez v1, :bad
+invoke-virtual {v0}, Landroid/os/Vibrator;->hasAmplitudeControl()Z
+move-result v1
+if-nez v1, :bad
+const-wide/16 v1, 10
+invoke-virtual {v0, v1, v2}, Landroid/os/Vibrator;->vibrate(J)V
+const/4 v3, -1
+invoke-static {v1, v2, v3}, Landroid/os/VibrationEffect;->createOneShot(JI)Landroid/os/VibrationEffect;
+move-result-object v1
+invoke-virtual {v0, v1}, Landroid/os/Vibrator;->vibrate(Landroid/os/VibrationEffect;)V
+const/4 v2, 0
+invoke-virtual {v0, v1, v2}, Landroid/os/Vibrator;->vibrate(Landroid/os/VibrationEffect;Landroid/media/AudioAttributes;)V
+const/4 v1, 2
+new-array v1, v1, [J
+const/4 v2, 1
+const-wide/16 v3, 10
+aput-wide v3, v1, v2
+const/4 v2, 0
+invoke-virtual {v0, v1, v2}, Landroid/os/Vibrator;->vibrate([JI)V
+const/4 v3, 0
+invoke-virtual {v0, v1, v2, v3}, Landroid/os/Vibrator;->vibrate([JILandroid/media/AudioAttributes;)V
+invoke-virtual {v0}, Landroid/os/Vibrator;->cancel()V
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-HAPTICS-PASS absent-device effects patterns cancel no-native-motor"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "haptic hardware availability"
 invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0') +
   method('private static altitude()V', '
