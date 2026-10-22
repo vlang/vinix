@@ -1096,7 +1096,10 @@ fn (mut this PtySlave) unref(handle voidptr) ? {
 		// re-enters unref with a nil handle. This callback's closer hold keeps
 		// the pair alive until pathname removal finishes.
 		fs.devtmpfs_remove_device(pair.path, this.box)
-	} else {
+	} else if handle != unsafe { nil } {
+		// A temporary resource pin (including an epoll snapshot) changes no
+		// open count or readiness. Waking it here makes the next epoll scan
+		// wake itself indefinitely, even after a finite timeout expires.
 		wake_pair(mut pair)
 	}
 	pair.l.acquire()

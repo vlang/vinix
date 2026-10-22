@@ -61,3 +61,36 @@ fixture includes the same fix; the C and V controls pass on both architectures.
 The [native V controller](../native-guest-tools/abi-guests.md) accepts
 `--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
 fixture separately. Every run snapshots an already-built matching kernel.
+
+An idle PTY slave also has a bounded epoll regression. Releasing an epoll
+snapshot's temporary resource pin must not wake the same slave again: that
+self-wake previously kept even a finite `epoll_wait` in the kernel indefinitely
+and stalled actual Neovim terminal input. The fixture checks a timed idle wait,
+input readiness and exact consumption, a second timed wait, master hangup, and
+a blocked master waking when another process closes the last slave. An alarm
+bounds the regression child, and its parent requires successful reaping. Actual
+descriptor closes retain their wake; pathname removal and closer holds are
+unchanged. Independent lifetime review checked those cases before commit.
+
+The [2026-10-23 receipts](results/2026-10-23/epoll/receipt.json) retain serial
+logs, results and source/toolchain/generated-C/ELF hashes. The same final ARM
+fixture refuses the old kernel after its five-second alarm. Patched kernels pass
+the complete suite on ARM and x86, including 100 concurrent terminal-close
+races. One earlier ARM run passed all epoll cases but exceeded the existing
+terminal-open slab allowance (2,832→2,848 KiB, allowance 8 KiB); the unchanged
+repeat was flat at 2,800 KiB. Both runs are retained, and the allowance is
+unchanged. This timing-dependent measurement remains a separate limitation;
+these runs do not establish that all kernel allocation paths are leak-free.
+
+For an already compiled static guest and kernel, build `check-prebuilt.v` with
+the `tests/hardware-platform` module path and invoke
+`check-prebuilt GUEST aarch64|x86_64 FRESH-OUT KERNEL`. It retains boot media,
+serial output and `result.json`, refusing any failure marker. Set `VINIX_ROOT`
+to the checkout containing the QEMU/firmware tools when building the controller
+in a sparse worktree. x86 uses the raw-initramfs ISO helper for older kernels.
+These receipts use the clean V `826e96f` kernel compiler rebuilt with fallback
+disabled, LLVM clang and LLD; the fixture, controller and x86 heap-sampler
+generator use pinned V `fd996fc`. Both architecture kernels force a fresh
+object build. The generated x86 heap sampler is preserved with make's
+`-o obj/heap_benchmark.c` because its host generator requires the newer V.
+This records the actual build inputs and makes no bit-reproducibility claim.

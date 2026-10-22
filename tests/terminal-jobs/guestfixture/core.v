@@ -350,10 +350,11 @@ fn permission_cases(master i32, slave i32) {
 		child = background()
 		if child == 0 {
 			handler(C.SIGTTOU)
-			mut changed := *settings
+			changed := &C.termios(C.__builtin_alloca(sizeof(C.termios)))
+			*changed = *settings
 			changed.c_lflag ^= u32(C.ECHO)
 			C.errno = 0
-			C._exit(if C.tcsetattr(slave, C.TCSANOW, &changed) == -1 && C.errno == C.EINTR && caught_signal.value == C.SIGTTOU {
+			C._exit(if C.tcsetattr(slave, C.TCSANOW, changed) == -1 && C.errno == C.EINTR && caught_signal.value == C.SIGTTOU {
 				0
 			} else {
 				1
@@ -974,8 +975,12 @@ pub fn entry(argc i32, argv &&char) i32 {
 		}
 		C.setvbuf(C.stdout, nil, C._IONBF, 0)
 		mut child := C.fork()
-		if child == 0 { C._exit(manager(argv[0])) }
+		if child == 0 { C._exit(epoll_slave_cases()) }
 		mut passed := child > 0 && exited_ok(child)
+		check(passed, c'bounded epoll slave regression child reaped')
+		child = C.fork()
+		if child == 0 { C._exit(manager(argv[0])) }
+		passed = (child > 0 && exited_ok(child)) && passed
 		passed = leader_hangup() && passed
 		child = C.fork()
 		if child == 0 { C._exit(console_cases()) }
