@@ -187,7 +187,9 @@ identifier and an independent category set. They omit extras, flags and the
 selector. Full copies retain flags and own their extras and selector snapshots;
 typed extra getters and first writes also work on filter-only copies. These
 semantics follow [Android's Intent implementation](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-11.0.0_r1/core/java/android/content/Intent.java)
-and are exercised by the signed guest fixture.
+and are exercised by the signed guest fixture. `Intent.FilterComparison` wraps
+the original Intent, compares its filter fields and caches its initial filter
+hash, so service-binding keys work in hash maps.
 LocationManager enabled queries report false and best-provider discovery returns
 null because the native WS backend has no location provider. PendingIntent's
 OnFinished callback interface is present for class loading; callback send

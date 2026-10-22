@@ -72,6 +72,22 @@ fn intent_filter_checks() string {
   'invoke-virtual {v1, v2}, ' + owner + '->addCategory(Ljava/lang/String;)Landroid/content/Intent;\n' +
   'invoke-virtual {v1}, ' + owner + '->getCategories()Ljava/util/Set;\nmove-result-object v3\ninvoke-interface {v3}, Ljava/util/Set;->size()I\nmove-result v3\nconst/4 v4, 1\nif-ne v3, v4, :bad\n' +
   'invoke-virtual {v0, v1}, ' + owner + '->filterEquals(Landroid/content/Intent;)Z\nmove-result v3\nif-eqz v3, :bad\n'
+ comparison := 'Landroid/content/Intent$FilterComparison;'
+ body += clone + 'new-instance v2, ' + comparison + '\ninvoke-direct {v2, v0}, ' + comparison + '-><init>(Landroid/content/Intent;)V\n' +
+  'new-instance v3, ' + comparison + '\ninvoke-direct {v3, v1}, ' + comparison + '-><init>(Landroid/content/Intent;)V\n' +
+  'invoke-virtual {v2}, ' + comparison + '->getIntent()Landroid/content/Intent;\nmove-result-object v4\nif-ne v0, v4, :bad\n' +
+  'invoke-virtual {v2, v3}, ' + comparison + '->equals(Ljava/lang/Object;)Z\nmove-result v4\nif-eqz v4, :bad\n' +
+  'const/4 v4, 0\ninvoke-virtual {v2, v4}, ' + comparison + '->equals(Ljava/lang/Object;)Z\nmove-result v4\nif-nez v4, :bad\n' +
+  'invoke-virtual {v2, v0}, ' + comparison + '->equals(Ljava/lang/Object;)Z\nmove-result v4\nif-nez v4, :bad\n' +
+  'new-instance v4, Ljava/util/HashMap;\ninvoke-direct {v4}, Ljava/util/HashMap;-><init>()V\nconst-string v5, "binding"\n' +
+  'invoke-virtual {v4, v2, v5}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;\n' +
+  'invoke-virtual {v4, v3}, Ljava/util/HashMap;->get(Ljava/lang/Object;)Ljava/lang/Object;\nmove-result-object v6\nif-ne v5, v6, :bad\n' +
+  'invoke-virtual {v3}, ' + comparison + '->hashCode()I\nmove-result v4\ninvoke-virtual {v1}, ' + owner + '->filterHashCode()I\nmove-result v5\nif-ne v4, v5, :bad\n' +
+  'const-string v5, "changed action"\ninvoke-virtual {v1, v5}, ' + owner + '->setAction(Ljava/lang/String;)Landroid/content/Intent;\n' +
+  'invoke-virtual {v3}, ' + comparison + '->hashCode()I\nmove-result v5\nif-ne v4, v5, :bad\n' +
+  'invoke-virtual {v2, v3}, ' + comparison + '->equals(Ljava/lang/Object;)Z\nmove-result v4\nif-nez v4, :bad\n' +
+  'sget-object v2, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v3, "INTENT-COMPARISON-PASS identity equality hashmap cached-hash"\n' +
+  'invoke-virtual {v2, v3}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\n'
  // A full copy preserves flags and owns its extras and selector snapshots.
  body += 'new-instance v1, ' + owner + '\ninvoke-direct {v1, v0}, ' + owner + '-><init>(Landroid/content/Intent;)V\n' +
   'invoke-virtual {v1}, ' + owner + '->getFlags()I\nmove-result v2\nconst/16 v3, 0x123\nif-ne v2, v3, :bad\n' +

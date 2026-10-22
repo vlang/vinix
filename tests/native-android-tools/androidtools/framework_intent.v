@@ -110,4 +110,16 @@ fn framework_intent(smali string) ! {
   }
  }
  os.write_file(path, text)!
+ comparison := 'Landroid/content/Intent$FilterComparison;'
+ os.write_file(smali + '/android/content/Intent$FilterComparison.smali',
+  '.class public final ' + comparison + '\n.super Ljava/lang/Object;\n' +
+  '.field private final intent:Landroid/content/Intent;\n.field private final hash:I\n' +
+  '.method public constructor <init>(Landroid/content/Intent;)V\n.locals 1\n' +
+  'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\niput-object p1, p0, ' + comparison + '->intent:Landroid/content/Intent;\n' +
+  'invoke-virtual {p1}, Landroid/content/Intent;->filterHashCode()I\nmove-result v0\niput v0, p0, ' + comparison + '->hash:I\nreturn-void\n.end method\n' +
+  '.method public getIntent()Landroid/content/Intent;\n.locals 1\niget-object v0, p0, ' + comparison + '->intent:Landroid/content/Intent;\nreturn-object v0\n.end method\n' +
+  '.method public hashCode()I\n.locals 1\niget v0, p0, ' + comparison + '->hash:I\nreturn v0\n.end method\n' +
+  '.method public equals(Ljava/lang/Object;)Z\n.locals 2\ninstance-of v0, p1, ' + comparison + '\nif-eqz v0, :different\ncheck-cast p1, ' + comparison + '\n' +
+  'iget-object v0, p0, ' + comparison + '->intent:Landroid/content/Intent;\niget-object v1, p1, ' + comparison + '->intent:Landroid/content/Intent;\n' +
+  'invoke-virtual {v0, v1}, Landroid/content/Intent;->filterEquals(Landroid/content/Intent;)Z\nmove-result v0\nreturn v0\n:different\nconst/4 v0, 0\nreturn v0\n.end method\n')!
 }
