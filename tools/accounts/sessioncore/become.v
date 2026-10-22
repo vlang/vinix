@@ -18,7 +18,9 @@ import os
 #include <unistd.h>
 #include <fcntl.h>
 #include <grp.h>
-#include <sys/prctl.h>
+$if linux {
+	#include <sys/prctl.h>
+}
 #include <sys/stat.h>
 
 fn C.setgroups(count usize, list &u32) int

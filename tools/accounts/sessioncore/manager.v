@@ -175,7 +175,7 @@ fn (m &Manager) check_login(mut request authproto.Frame) (authproto.Frame, ?acco
 		return authproto.text_frame(authproto.status_invalid, 'login takes a user and a password'), none
 	}
 	name := request.text(0)
-	answer := authclient.ask(m.config.socket, authproto.op_verify, name.bytes(), request.fields[1]) or {
+	answer := verify_login(m.config.socket, name, request.fields[1]) or {
 		return authproto.text_frame(authproto.status_failed, err.msg()), none
 	}
 	if answer.code != authproto.status_ok {

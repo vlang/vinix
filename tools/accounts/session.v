@@ -24,7 +24,6 @@
 module main
 
 import accountcore
-import authclient
 import authproto
 import os
 import sessioncore
@@ -136,7 +135,7 @@ fn console() {
 		}
 		print('Password: ')
 		password := read_line(false) or { return }
-		reply := authclient.ask(authclient.default_socket, authproto.op_verify, name.bytes(),
+		reply := sessioncore.verify_login('/run/vinix/auth.sock', name,
 			password) or {
 			println('Login is not possible: ${err.msg()}.')
 			C.sleep(2)
