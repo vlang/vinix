@@ -18,9 +18,11 @@ import os
 #include <unistd.h>
 #include <fcntl.h>
 #include <grp.h>
+
 $if linux {
 	#include <sys/prctl.h>
 }
+
 #include <sys/stat.h>
 
 fn C.setgroups(count usize, list &u32) int
@@ -55,25 +57,29 @@ pub const runtime_base = '/run/user'
 // account's.
 const dropped_variables = ['HOME', 'USER', 'LOGNAME', 'SHELL', 'MAIL', 'XDG_RUNTIME_DIR',
 	'XDG_CONFIG_HOME', 'XDG_CACHE_HOME', 'XDG_DATA_HOME', 'XDG_STATE_HOME', 'VINIX_SYSTEM_SESSION',
-	'PS1', 'ENV', 'BASH_ENV', 'LD_PRELOAD', 'LD_AUDIT']
+	'VINIX_SESSION_FD', 'PS1', 'ENV', 'BASH_ENV', 'LD_PRELOAD', 'LD_AUDIT']
 
 pub fn session_environment(user accountcore.User, inherited []string) []string {
 	mut environment := []string{cap: inherited.len + 8}
+	environment.flags |= .noslices
 	for variable in inherited {
-		name := variable.all_before('=')
+		length := variable.index_u8(`=`)
+		name := unsafe { tos(variable.str, if length < 0 { variable.len } else { length }) }
 		if name in dropped_variables {
 			continue
 		}
-		environment << variable
+		environment << variable.clone()
 	}
 	shell := if user.shell == '' { '/bin/sh' } else { user.shell }
 	environment << 'HOME=${user.home}'
 	environment << 'USER=${user.name}'
 	environment << 'LOGNAME=${user.name}'
 	environment << 'SHELL=${shell}'
-	environment << 'XDG_RUNTIME_DIR=${runtime_base}/${user.uid}'
+	number := user.uid.str()
+	environment << 'XDG_RUNTIME_DIR=' + runtime_base + '/' + number
+	unsafe { number.free() }
 	if !environment.any(it.starts_with('PATH=')) {
-		environment << 'PATH=/usr/local/bin:/usr/bin:/bin'
+		environment << 'PATH=/usr/local/bin:/usr/bin:/bin'.clone()
 	}
 	return environment
 }
@@ -81,22 +87,38 @@ pub fn session_environment(user accountcore.User, inherited []string) []string {
 // The account's private directory for sockets and the like, made by root
 // before the ids are dropped.
 pub fn make_runtime_directory(user accountcore.User) ! {
-	os.mkdir_all(runtime_base, mode: 0o755) or {}
-	path := '${runtime_base}/${user.uid}'
+	os.mkdir_all(runtime_base, mode: 0o755) or { discard_manager_error(err) }
+	number := user.uid.str()
+	path := runtime_base + '/' + number
+	defer { unsafe {
+		number.free()
+		path.free()
+	}
+	 }
 	if os.is_link(path) {
 		return error('${path} is a link')
 	}
 	if !os.is_dir(path) {
-		os.mkdir(path, mode: 0o700) or { return error('cannot create ${path}') }
+		os.mkdir(path, mode: 0o700) or {
+			discard_manager_error(err)
+			return error('cannot create ${path}')
+		}
 	}
-	os.chown(path, int(user.uid), int(user.gid)) or { return error('cannot give ${path} to ${user.name}') }
-	os.chmod(path, 0o700) or { return error('cannot protect ${path}') }
+	os.chown(path, int(user.uid), int(user.gid)) or {
+		discard_manager_error(err)
+		return error('cannot give ${path} to ${user.name}')
+	}
+	os.chmod(path, 0o700) or {
+		discard_manager_error(err)
+		return error('cannot protect ${path}')
+	}
 }
 
 // Become `user`. Does not return an error for the caller to ignore: the
 // string is why the caller must not go on.
 pub fn become(db accountcore.Database, user accountcore.User) ! {
 	groups := db.supplementary_gids(user)
+	defer { unsafe { groups.free() } }
 	become_with_groups(user, groups)!
 }
 
@@ -111,7 +133,7 @@ pub fn become_isolated(user accountcore.User) ! {
 
 fn become_with_groups(user accountcore.User, groups []u32) ! {
 	if user.uid == accountcore.uid_root {
-		return error('a session is never root\'s')
+		return error("a session is never root's")
 	}
 	// Capabilities that could come back through exec go first, while the
 	// process may still drop them: the bounding set, then ambient.
@@ -169,6 +191,7 @@ fn verify(user accountcore.User, groups []u32) ! {
 		return error('the group ids were not all changed')
 	}
 	mut held := []u32{len: 64}
+	defer { unsafe { held.free() } }
 	count := C.getgroups(64, unsafe { &held[0] })
 	if count != groups.len {
 		return error('the supplementary groups were not set')
@@ -209,11 +232,13 @@ pub fn exec_as(user accountcore.User, argv []string, environment []string, keep_
 		C.close(fd)
 	}
 	mut c_argv := []&char{cap: argv.len + 1}
+	defer { unsafe { c_argv.free() } }
 	for argument in argv {
 		c_argv << &char(argument.str)
 	}
 	c_argv << &char(unsafe { nil })
 	mut c_env := []&char{cap: environment.len + 1}
+	defer { unsafe { c_env.free() } }
 	for variable in environment {
 		c_env << &char(variable.str)
 	}
@@ -227,13 +252,17 @@ pub fn exec_as(user accountcore.User, argv []string, environment []string, keep_
 fn write_whole(path string, text string) ! {
 	fd := C.open(&char(path.str), C.O_WRONLY)
 	if fd < 0 {
-		return error('cannot open ${path} (errno ${C.errno})')
+		number := C.errno.str()
+		defer { unsafe { number.free() } }
+		return error('cannot open ${path} (errno ${number})')
 	}
 	put := C.write(fd, text.str, usize(text.len))
 	code := C.errno
 	C.close(fd)
 	if put != text.len {
-		return error('cannot write ${path} (errno ${code})')
+		number := code.str()
+		defer { unsafe { number.free() } }
+		return error('cannot write ${path} (errno ${number})')
 	}
 }
 
@@ -242,11 +271,27 @@ fn write_whole(path string, text string) ! {
 // those processes later do to their ids. It can be done once. Returns the
 // number the kernel gave the login session.
 pub fn start_login(uid u32) !u32 {
-	write_whole('/proc/self/loginuid', uid.str()) or {
-		return error('the kernel did not accept the login: ${err.msg()}')
+	number := uid.str()
+	defer { unsafe { number.free() } }
+	write_whole('/proc/self/loginuid', number) or {
+		message := err.msg()
+		defer { unsafe {
+			message.free()
+			err.free()
+		}
+		 }
+		return error('the kernel did not accept the login: ${message}')
 	}
-	text := os.read_file('/proc/self/sessionid') or { return error('cannot read the login session') }
-	session := u32(text.trim_space().u64())
+	text := os.read_file('/proc/self/sessionid') or {
+		discard_manager_error(err)
+		return error('cannot read the login session')
+	}
+	trimmed := text.trim_space()
+	session := u32(trimmed.u64())
+	unsafe {
+		trimmed.free()
+		text.free()
+	}
 	if session == 0 {
 		return error('the kernel started no login session')
 	}
@@ -258,13 +303,32 @@ const seat_file = '/proc/sys/kernel/seat_session'
 // Give the seat -- the display, the keyboard, the pointer, sound -- to a
 // login session. Whoever held it loses the use of those devices at once.
 pub fn give_seat(session u32) ! {
-	write_whole(seat_file, session.str()) or { return error('cannot give the seat: ${err.msg()}') }
+	number := session.str()
+	defer { unsafe { number.free() } }
+	write_whole(seat_file, number) or {
+		message := err.msg()
+		defer { unsafe {
+			message.free()
+			err.free()
+		}
+		 }
+		return error('cannot give the seat: ${message}')
+	}
 }
 
 // Take the seat back from `session` if it still holds it.
 pub fn release_seat(session u32) {
-	text := os.read_file(seat_file) or { return }
-	if u32(text.trim_space().u64()) == session {
-		write_whole(seat_file, '0') or {}
+	text := os.read_file(seat_file) or {
+		discard_manager_error(err)
+		return
+	}
+	trimmed := text.trim_space()
+	matched := u32(trimmed.u64()) == session
+	unsafe {
+		trimmed.free()
+		text.free()
+	}
+	if matched {
+		write_whole(seat_file, '0') or { discard_manager_error(err) }
 	}
 }
