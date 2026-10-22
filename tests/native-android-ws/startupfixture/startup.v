@@ -19,6 +19,7 @@ pub fn install(output string, resources string) ! {
  install_text_metrics_probe(dir)!
  install_size_span_probe(dir)!
  install_character_style_probe(dir)!
+ install_service_binding_probe(dir)!
  install_static_layout_probe(dir)!
  install_shadow_color_probe(dir)!
  install_view_configuration_probe(dir)!
@@ -82,6 +83,7 @@ throw v0'))!
  os.write_file(dir + '/StartupProbe.smali', '.class public Lorg/vinix/bootstrap/StartupProbe;\n.super Ljava/lang/Object;\n' +
   method('public static check(Landroid/content/Context;)V', '
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->accessibility(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/ServiceBindingProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->appops(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->uriPermissions(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/IoProbe;->check(Landroid/content/Context;)V
