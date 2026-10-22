@@ -244,7 +244,10 @@ v -cc cc -path '@vlib|@vmodules|build-support/android' -o build/android-maps/sui
 
 Account listeners retain their registrations and deliver an empty snapshot on
 the requested Handler (or the main Looper). Duplicate registrations fail and
-removal permits registration again. Vinix has no account authenticator.
+removal permits registration again. Vinix has no account authenticator or stored
+accounts. Package-scoped account queries return fresh empty snapshots for both
+typed and all-type requests. The service fixture checks these through the client
+and companion contexts and on the service executor.
 External-storage path queries validate the runtime's ordinary, non-removable
 directory. Process CPU time reads the kernel's process CPU clock.
 BatteryManager is available through both Context service lookup forms. With

@@ -24,6 +24,12 @@ fn framework_account_listeners(smali string) ! {
   text += '\n.method public synchronized native addOnAccountsUpdatedListener(Landroid/accounts/OnAccountsUpdateListener;Landroid/os/Handler;Z' + suffix + ')V\n.end method\n'
  }
  text += '\n.method public synchronized native removeOnAccountsUpdatedListener(Landroid/accounts/OnAccountsUpdateListener;)V\n.end method\n'
+ // The native backend has neither an authenticator nor stored accounts.
+ // Package visibility cannot expose any accounts in that empty store. Use
+ // the same fresh snapshot as the existing typed query, including null type.
+ text += '\n.method public getAccountsByTypeForPackage(Ljava/lang/String;Ljava/lang/String;)[Landroid/accounts/Account;\n.locals 1\n' +
+  'invoke-virtual {p0, p1}, Landroid/accounts/AccountManager;->getAccountsByType(Ljava/lang/String;)[Landroid/accounts/Account;\n' +
+  'move-result-object v0\nreturn-object v0\n.end method\n'
  os.write_file(path, text)!
  os.write_file(smali + '/android/atl/VinixAccountUpdate.smali',
   '.class public final Landroid/atl/VinixAccountUpdate;\n.super Ljava/lang/Object;\n.implements Ljava/lang/Runnable;\n' +

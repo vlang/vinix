@@ -24,6 +24,19 @@ fn alarm_classes(dir string) ! {
 		method('public onReceive(Landroid/content/Context;Landroid/content/Intent;)V', 'iget-object v0, p0, Lorg/vinix/service/AlarmReceiver;->probe:' + probe + '\ninvoke-virtual {v0}, ' + probe + '->onAlarm()V\niget v0, v0, ' + probe + '->calls:I\nconst/4 v1, 3\nif-lt v0, v1, :done\niget-object v0, p0, Lorg/vinix/service/AlarmReceiver;->manager:Landroid/app/AlarmManager;\niget-object v1, p0, Lorg/vinix/service/AlarmReceiver;->operation:Landroid/app/PendingIntent;\ninvoke-virtual {v0, v1}, Landroid/app/AlarmManager;->cancel(Landroid/app/PendingIntent;)V\n:done\nreturn-void'))!
 }
 
+fn account_query_checks() string {
+ mut body := 'invoke-static {p1}, Landroid/accounts/AccountManager;->get(Landroid/content/Context;)Landroid/accounts/AccountManager;\nmove-result-object v0\n'
+ for package_name in ['org.vinix.service.client', 'org.vinix.service.companion'] {
+  for account_type in ['', 'com.google', 'org.vinix.unknown'] {
+   body += if account_type == '' { 'const/4 v1, 0\n' } else { 'const-string v1, "' + account_type + '"\n' }
+   body += 'const-string v2, "' + package_name + '"\n' +
+    'invoke-virtual {v0, v1, v2}, Landroid/accounts/AccountManager;->getAccountsByTypeForPackage(Ljava/lang/String;Ljava/lang/String;)[Landroid/accounts/Account;\nmove-result-object v3\nif-eqz v3, :bad\narray-length v4, v3\nif-nez v4, :bad\n' +
+    'invoke-virtual {v0, v1, v2}, Landroid/accounts/AccountManager;->getAccountsByTypeForPackage(Ljava/lang/String;Ljava/lang/String;)[Landroid/accounts/Account;\nmove-result-object v4\nif-eq v3, v4, :bad\n'
+  }
+ }
+ return body + 'sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v1, "ACCOUNT-QUERY-PASS empty-store typed all-types package-visibility fresh-snapshots"\ninvoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\nreturn-void\n:bad\nnew-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "package account snapshot must be fresh non-null and empty"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0'
+}
+
 fn alarm_probe(handler bool, count int) string {
 	return 'new-instance v8, Lorg/vinix/service/AlarmProbe;\n' +
 		if handler { 'invoke-virtual {v9}, Landroid/os/Handler;->getLooper()Landroid/os/Looper;\n' } else { 'invoke-static {}, Landroid/os/Looper;->getMainLooper()Landroid/os/Looper;\n' } +
@@ -2126,6 +2139,7 @@ return-object v0'))!
 		'.method private checkLocationValue()V\n.locals 10\n' + location_value_checks() + '\n.end method\n' +
 		method('private checkGeofenceWire(Landroid/os/IBinder;)V', geofence_wire_checks()) +
 		method('private checkUser()V', user_checks()) +
+		method('private checkAccountQueries(Landroid/content/Context;)V', account_query_checks()) +
 		method('private checkDevicePolicy(Landroid/content/Context;)V', device_policy_checks()) +
 		method('private checkWorkSource()V', work_source_checks()) +
 		'.method private checkAlarms()V\n.locals 16\n' + alarm_checks() + '\n.end method\n' +
@@ -2209,6 +2223,7 @@ invoke-direct {p0}, Lorg/vinix/service/Main;->checkGeofence()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkGeofenceCallbacks()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkLocationValue()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkUser()V
+invoke-direct {p0, p0}, Lorg/vinix/service/Main;->checkAccountQueries(Landroid/content/Context;)V
 invoke-direct {p0, p0}, Lorg/vinix/service/Main;->checkDevicePolicy(Landroid/content/Context;)V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkWorkSource()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkSQLiteParams()V
@@ -2235,6 +2250,7 @@ invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkStorage(Landroid/content/
 invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkAbsentHardware(Landroid/content/Context;)V
 invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkDirectories(Landroid/content/Context;)V
 invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkDevicePolicy(Landroid/content/Context;)V
+invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkAccountQueries(Landroid/content/Context;)V
 invoke-direct {p0, v0}, Lorg/vinix/service/Main;->checkPackageEnumeration(Landroid/content/Context;)V
 invoke-virtual {v0}, Landroid/content/Context;->getClassLoader()Ljava/lang/ClassLoader;
 move-result-object v0
@@ -2281,6 +2297,7 @@ goto :identity
 if-eq v0, v1, :bad
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkWorkerPriority()V
 invoke-direct {p0}, Lorg/vinix/service/Main;->checkAlarms()V
+invoke-direct {p0, p0}, Lorg/vinix/service/Main;->checkAccountQueries(Landroid/content/Context;)V
 invoke-static {}, Ljava/lang/Thread;->currentThread()Ljava/lang/Thread;
 move-result-object v0
 invoke-virtual {v0}, Ljava/lang/Thread;->getName()Ljava/lang/String;
