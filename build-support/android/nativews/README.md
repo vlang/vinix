@@ -255,10 +255,19 @@ context uses `KeyStore.getDefaultType()` rather than the separate JSSE
 [Conscrypt's implementation](https://github.com/google/conscrypt/blob/master/common/src/main/java/org/conscrypt/DefaultSSLContextImpl.java));
 explicitly requested BKS stores remain available.
 An Android `OpenSSLProvider` adapter exposes TLS contexts as `VinixTLS`, just
-before wolfJSSE in the provider list. It advertises only SSLContext algorithms
-that wolfJSSE supports; other provider services retain their precedence. Each
-context explicitly delegates to wolfJSSE, retaining its trust managers and
-cryptography. Socket wrappers forward I/O, options, state and ALPN, expose
+before wolfJSSE in the provider list. It advertises SSLContext and
+TrustManagerFactory algorithms that wolfJSSE supports. Each context and trust
+factory delegates to wolfJSSE, retaining its certificate verification and
+cryptography. The trust adapter removes a redundant peer-supplied root and its
+suffix only when that CA's subject and encoded public key match a CA already
+in the trust manager's accepted issuers. WolfJSSE must still validate every
+remaining certificate against the original trust store. This lets a
+cross-signed root terminate at its locally trusted counterpart, without
+requiring the cross-signer to verify. The staged wolfSSL native callback's
+root-first chains are copied into leaf-first order before validation. Input
+arrays are unchanged; Android's three-argument trust method returns wolfJSSE's
+verified chain.
+Socket wrappers forward I/O, options, state and ALPN, expose
 Android's SNI/session-ticket methods, accept obsolete NPN configuration without
 changing ALPN, and return null for NPN selection (which is unsupported).
 This lets gRPC configure and probe both protocols before handshaking
@@ -270,6 +279,15 @@ policy and callback contracts, and negotiates real TLS `h2` with Google through
 the adapter. It also loads the real CA store using `KeyStore.getDefaultType()`,
 checks explicit BKS support, and checks that provider reinstallation preserves
 an application's later default-type override (`KEYSTORE-DEFAULT-PASS`).
+`TRUST-CHAIN-PASS` first reproduces the original trust manager's cross-signed
+root failure, then verifies server/client trust and Android's returned chain
+through the adapter, including root-first native callback chains. Wrong-key
+roots with the same subject, untrusted supplied roots, empty trust stores,
+corrupt signatures and missing intermediates must all be rejected.
+Public fixture certificates and the V regeneration tool are
+under `tests/native-android-ws/trust-certificates` and
+`tests/native-android-ws/trust-chain-certificates.v`; private keys are not stored
+with the fixtures.
 Require both `BOOTSTRAP-CONNECTIVITY-PASS` (including
 `background-policy`) and `TLS-ALPN-PASS`; the latter checks idempotent provider
 installation, default-context wrapping, pre-handshake ALPN/NPN reflection,

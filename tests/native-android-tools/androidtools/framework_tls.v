@@ -79,6 +79,7 @@ invoke-virtual {p0, v1, v2}, Ljava/security/Provider;->put(Ljava/lang/Object;Lja
 		os.write_file(smali + '/android/atl/${name}.smali', '.class public final ${child}\n.super ${context}\n' +
 			signature_method('public constructor <init>()V', 'const-string v0, "${algorithm}"\ninvoke-direct {p0, v0}, ${context}-><init>(Ljava/lang/String;)V\nreturn-void'))!
 	}
+	body += framework_tls_trust(smali)!
 	os.write_file(path, '.class public final ${provider}\n.super Ljava/security/Provider;\n' +
 		signature_method('public constructor <init>()V', body + 'return-void') +
 		signature_method('public static synchronized install()V', '

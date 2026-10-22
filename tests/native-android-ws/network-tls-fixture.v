@@ -21,6 +21,7 @@ fn main() {
 	dir := out + '/smali/org/vinix/bootstrap'
 	os.mkdir_all(dir)!
 	startupfixture.install_connectivity_probe(dir)!
+	startupfixture.install_trust_chain_probe(dir)!
 	activity := 'Lorg/vinix/bootstrap/Main;'
 	probe := 'Lorg/vinix/bootstrap/TlsProbe;'
 	provider := 'Lcom/android/org/conscrypt/OpenSSLProvider;'
@@ -57,6 +58,7 @@ const-string v1, "Verified TLS h2 and network policy checks passed"
 invoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
 return-void
 :test
+invoke-static {}, Lorg/vinix/bootstrap/TrustChainProbe;->check()V
 new-instance v0, Landroid/net/ConnectivityManager;
 invoke-direct {v0}, Landroid/net/ConnectivityManager;-><init>()V
 const/16 v1, 150
