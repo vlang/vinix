@@ -17018,21 +17018,62 @@ require runtime synthesis. The four existing keyed-container dispatch and
 description getter function imports are separate from these declarations.
 This inspection executes no application code.
 
-The launch probe now stops at the next required import,
-`_$sST12makeIterator0B0QzyFTq`, the Swift `Sequence.makeIterator` requirement,
-before application entry. Fortnite is not playable.
+The existing Swift `Sequence` declaration now exports its six method
+requirement aliases, from `makeIterator` through
+`withContiguousStorageIfAvailable`. They identify the records at descriptor
+offsets 72 through 112 in the same read-only declaration used by Array's
+conformance. All six requirement discriminators match Apple's runtime,
+including the previously missing high bits on the last three records.
+`makeIterator` has no default implementation. Apple's five other default
+witnesses remain unsupported for generic conformance synthesis; the existing
+Array tables explicitly supply all six executable operations.
+
+Checked publication rejects nil and retired runtimes before allocating or
+borrowing dependencies. Concurrent descriptor, requirement and dependency
+lookups share the same declaration. Collection retires before the Array
+Sequence records, which retire before their borrowed Array module page.
+The fixture compares the native graph and aliases, checks the full read-only
+page, exercises eight-worker publication and cached retirement rejection,
+and drains two runtime lifetimes with all six declaration/dependency pages
+unmapped. Existing Array/Sequence fixtures cover the executable operations.
+
+```sh
+v run tests/ios/native-checks.v build-swift-sequence-requirement
+```
+
+Evidence is retained in `build/ios/fortnite/sequence-requirement-checks`.
+The new fixture and existing Array/Sequence fixtures passed six normal and
+deterministic ASan/UBSan host runs. The ARM64 fixture passed; the launch probe
+and both import audits completed. All 1,097 pinned source, toolchain and runtime
+inputs remained unchanged. Seven archived binary/generated-C pairs and four
+retained serial logs passed SHA256 verification. All four temporary VMs and
+their RAM disk were retired. Five initial setup failure causes and their 26
+manifest artifact hashes remain preserved and verified in the same directory.
+
+Static inspection of the same executable finds ten required Sequence
+declaration imports with one data fixup each in `__DATA_CONST,__const`.
+Six are the new method aliases. The `RingBuffer` conformance at
+`0x10d234e48` has flags `0x30000`, a null witness pattern and nine resilient
+witness entries referring to these declaration cells. Generic/resilient
+conformance-table synthesis remains unsupported. The inspection detects no
+call stubs or direct code references for these aliases and executes no
+application code.
+
+The launch probe now stops at the required Foundation declaration
+`_$s10Foundation14LocalizedErrorMp`. Fortnite has not reached application
+entry and is not playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,018 | 143 | 78 |
+| Fortnite executable | 2,024 | 137 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,858 | 146 | 114 |
+| All images | 2,864 | 140 | 114 |
 
-The C++/GLES/Text variant reports 2,872 resolved imports, 132 unresolved strong
+The C++/GLES/Text variant reports 2,878 resolved imports, 126 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

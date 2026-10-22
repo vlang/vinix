@@ -245,6 +245,7 @@ mut:
 	swift_dictionary_decoding map[u64]u64 // Separate Decodable tables; borrows metadata and conditional witnesses.
 	swift_dictionary_decoding_descriptor u64 // Remembered through retirement before reading stale descriptors.
 	swift_array_sequence_arena u64 // Array Sequence/iterator descriptors, adapters and generic pattern.
+	swift_array_sequence_retired bool // Reject declaration recreation after quiescent metadata retirement.
 	swift_array_sequence_metadata map[u64]u64 // Element -> sealed iterator metadata and complete Sequence tables.
 	swift_collection_arena u64
 	swift_collection_metadata map[u64]u64

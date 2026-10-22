@@ -15,6 +15,7 @@ fn swift_array_sequence_element_checked(metadata u64, iterator bool) !u64 {
 	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired
 		|| metadata == 0 || metadata & 7 != 0 { return swift_sequence_failure() }
 	C.ios_objc_initialize_lock(); defer { C.ios_objc_initialize_unlock() }
+	if ios_runtime.swift_array_sequence_retired { return swift_sequence_failure() }
 	if iterator {
 		for element, base in ios_runtime.swift_array_sequence_metadata {
 			if metadata == base + 8 { return element }
@@ -208,12 +209,23 @@ fn swift_array_iterator_instantiate(table u64, metadata u64, _arguments u64) {
 }
 
 fn swift_array_sequence_arena() u64 {
-	swift_array_arena()
+	return swift_array_sequence_arena_checked() or { panic(err) }
+}
+
+fn swift_array_sequence_arena_checked() !u64 {
+	$if !arm64 { return swift_sequence_failure() }
+	if ios_runtime == unsafe { nil } { return swift_sequence_failure() }
 	C.ios_objc_initialize_lock(); defer { C.ios_objc_initialize_unlock() }
+	if ios_runtime.swift_array_sequence_retired || ios_runtime.swift_concurrency_retired {
+		return swift_sequence_failure()
+	}
 	if ios_runtime.swift_array_sequence_arena != 0 { return ios_runtime.swift_array_sequence_arena }
+	// Borrow Array's module while holding the recursive publication lock.
+	// Collection retires first, then these records, then Array's module page.
+	swift_array_arena()
 	page := usize(C.getpagesize())
 	allocation := C.mmap(unsafe { nil }, page * 3, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
-	if allocation == unsafe { voidptr(-1) } { panic('iOS: cannot allocate Array Sequence records') }
+	if allocation == unsafe { voidptr(-1) } { return swift_sequence_failure() }
 	base := u64(allocation); data := base + u64(page)
 	for i, target in [u64(unsafe { voidptr(swift_array_sequence_make) }), u64(unsafe { voidptr(swift_array_sequence_next) })]! {
 		offset := u64(i * 64)
@@ -247,7 +259,9 @@ fn swift_array_sequence_arena() u64 {
 	swift_protocol_relative(protocol + 20, data + 640)
 	write32(protocol + 24, 1); swift_protocol_relative(protocol + 28, data + 512); swift_protocol_relative(protocol + 32, data + 544)
 	write32(protocol + 36, 0x80); swift_protocol_relative(protocol + 40, data + 576); swift_protocol_relative(protocol + 44, iterator_protocol)
-	for i, flags in [u32(0xb7340008), 0xb6c50007, 0x0cbc0007, 0x6d280011, 0x44000013, 0x01300011, 0x11, 0x11, 0x11]! { write32(protocol + 48 + u64(i * 8), flags) }
+	for i, flags in [u32(0xb7340008), 0xb6c50007, 0x0cbc0007, 0x6d280011, 0x44000013, 0x01300011, 0x37910011, 0x8bad0011, 0x888a0011]! { write32(protocol + 48 + u64(i * 8), flags) }
+	// Generic default witness synthesis remains unsupported. Array's complete
+	// tables supply these operations explicitly; makeIterator has no default.
 	write32(iterator_protocol, 0x30043); swift_protocol_relative(iterator_protocol + 4, module_descriptor)
 	swift_protocol_relative(iterator_protocol + 8, data + 464); write32(iterator_protocol + 16, 2)
 	swift_protocol_relative(iterator_protocol + 20, data + 664); write32(iterator_protocol + 24, 7); write32(iterator_protocol + 32, 0x11)
@@ -273,7 +287,8 @@ fn swift_array_sequence_arena() u64 {
 	unsafe { *(&u64(data + 800)) = data + 192; *(&u64(data + 816)) = base + 64 }
 	C.__builtin___clear_cache(allocation, unsafe { voidptr(base + 496) })
 	if C.mprotect(allocation, page, C.PROT_READ | C.PROT_EXEC) != 0 || C.mprotect(unsafe { voidptr(data) }, page, C.PROT_READ) != 0 {
-		C.munmap(allocation, page * 3); panic('iOS: cannot seal Array Sequence records')
+		if C.munmap(allocation, page * 3) != 0 { panic('iOS: cannot retire unsealed Array Sequence records') }
+		return swift_sequence_failure()
 	}
 	ios_runtime.swift_array_sequence_arena = base; return base
 }
@@ -286,15 +301,25 @@ fn swift_array_sequence_symbol(symbol string) ?u64 {
 		'_$sST8IteratorST_StTn' { 304 }
 		'_$s7ElementSTTl' { 312 }
 		'_$s8IteratorSTTl' { 320 }
+		// Resilient requirement aliases identify descriptor records, not calls.
+		'_$sST12makeIterator0B0QzyFTq' { 328 }
+		'_$sST19underestimatedCountSivgTq' { 336 }
+		'_$sST31_customContainsEquatableElementySbSg0D0QzFTq' { 344 }
+		'_$sST22_copyToContiguousArrays0cD0Vy7ElementQzGyFTq' { 352 }
+		'_$sST13_copyContents12initializing8IteratorQz_SitSry7ElementQzG_tFTq' { 360 }
+		'_$sST32withContiguousStorageIfAvailableyqd__Sgqd__SRy7ElementQzGKXEKlFTq' { 368 }
 		'_$sStMp' { 384 }
 		'_$sStTL' { 400 }
 		'_$s7ElementStTl' { 408 }
 		'_$sSt4next7ElementQzSgyFTq' { 416 }
 		else { return none }
 	}
-	return swift_array_sequence_arena() + u64(C.getpagesize()) + u64(offset)
+	base := swift_array_sequence_arena_checked() or { return none }
+	return base + u64(C.getpagesize()) + u64(offset)
 }
 fn swift_array_sequence_stop() {
+	C.ios_objc_initialize_lock(); defer { C.ios_objc_initialize_unlock() }
+	ios_runtime.swift_array_sequence_retired = true
 	page := usize(C.getpagesize())
 	for _, base in ios_runtime.swift_array_sequence_metadata { if C.munmap(unsafe { voidptr(base) }, page) != 0 { panic('iOS: cannot retire Array Sequence metadata') } }
 	unsafe { ios_runtime.swift_array_sequence_metadata.free() }
