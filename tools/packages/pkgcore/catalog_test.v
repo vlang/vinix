@@ -51,7 +51,9 @@ fn catalog_refusal(work string, destination string, diagnostic string) {
 		refused = err.msg().contains(diagnostic)
 	}
 	assert refused && !os.exists(work + '/' + destination), diagnostic
-	assert os.ls(work)!.all(!it.starts_with('.vinix-catalog-'))
+	names := os.ls(work) or { panic(err) }
+	defer { unsafe { names.free() } }
+	assert names.all(!it.starts_with('.vinix-catalog-'))
 }
 
 fn test_catalog_pinned_import_reproducible_release_and_offline_install_on_both_targets() {

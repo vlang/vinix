@@ -103,6 +103,7 @@ fn publication_with_seed(repository string, id string, seed SigningSeed, sequenc
 			}
 		}
 	}
+	publication_catalog_matches(repository, packages)!
 	index := Index{ repository: id, sequence: sequence, expires: expires, packages: packages }
 	text := canonical_index(index)!
 	mut accepted := false

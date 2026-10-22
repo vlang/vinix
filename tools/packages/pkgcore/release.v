@@ -115,8 +115,8 @@ fn release_closures(index Index, public_key string) ! {
 			defer { unsafe { search.diagnostic.free(); free(search) } }
 			fixed[0] = root_index
 			result := search.solve_fixed(p.dependencies, fixed) or {
-				message := 'publisher dependency closure failed for ${p.id}/${p.architecture}/${p.version} on ${architecture}: ${err}'
 				cause := err.msg()
+				message := 'publisher dependency closure failed for ${p.id}/${p.architecture}/${p.version} on ${architecture}: ${cause}'
 				unsafe { cause.free(); err.free() }
 				return error(message)
 			}

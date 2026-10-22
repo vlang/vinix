@@ -395,13 +395,15 @@ fn close_canonical_package(p Package) {
 
 fn canonical_package(p Package) !Package {
 	p.validate()!
-	mut files := p.files.clone()
+	// Clone borrowed buffers without letting receiver addresses promote the
+	// whole Package parameter to an unretired heap cell under -manualfree.
+	mut files := unsafe { &p.files }.clone()
 	files.sort(a.path < b.path)
-	mut deps := p.dependencies.clone()
+	mut deps := unsafe { &p.dependencies }.clone()
 	deps.sort(a.id < b.id)
-	mut permissions := p.permissions.clone()
+	mut permissions := unsafe { &p.permissions }.clone()
 	permissions.sort()
-	mut associations := p.associations.clone()
+	mut associations := unsafe { &p.associations }.clone()
 	associations.sort()
 	return Package{ ...p, files: files, dependencies: deps, permissions: permissions, associations: associations }
 }
