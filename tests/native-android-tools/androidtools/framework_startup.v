@@ -11,6 +11,15 @@ fn framework_startup_apis(smali string) ! {
  // A refresh preference is advisory; WS currently keeps its fixed rate.
  params := smali + '/android/view/WindowManager$LayoutParams.smali'
  os.write_file(params, os.read_file(params)! + '\n.field public preferredRefreshRate:F\n')!
+ // Vinix owns the system chrome. Retain the app's divider color preference
+ // without introducing a second Android navigation bar inside its window.
+ window := smali + '/android/view/Window.smali'
+ mut window_text := os.read_file(window)! + '\n.field private vinixNavigationBarDividerColor:I\n'
+ window_text = framework_replace_method(window_text, 'setNavigationBarDividerColor(I)V',
+  '.method public setNavigationBarDividerColor(I)V\n.locals 0\niput p1, p0, Landroid/view/Window;->vinixNavigationBarDividerColor:I\nreturn-void\n.end method')!
+ window_text = framework_replace_method(window_text, 'getNavigationBarDividerColor()I',
+  '.method public getNavigationBarDividerColor()I\n.locals 1\niget v0, p0, Landroid/view/Window;->vinixNavigationBarDividerColor:I\nreturn v0\n.end method')!
+ os.write_file(window, window_text)!
  listener := smali + '/android/hardware/SensorEventListener.smali'
  mut text := os.read_file(listener)!
  if !text.contains('onAccuracyChanged(') {
