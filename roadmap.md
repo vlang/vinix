@@ -662,6 +662,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
 
 - [ ] Harden the existing package frontend with trusted repositories, dependency
   resolution, reproducible metadata and consistent architecture support.
+  - [x] [Packaged ELF dependency admission](tests/packages/elf-closure-check.md)
+    checks SQLite and FFmpeg direct/transitive libraries, loader aliases and
+    bounded dynamic metadata before catalog publication. Missing or ambiguous
+    libraries and ambient search paths refuse with an exact restored retry;
+    both architectures' real payload catalogs remain byte-identical. ABI,
+    plugin and broader application qualification remain separate gates.
   - [x] [Captured catalog publication](tests/packages/catalog-export-check.md)
     protects workspace construction and strict/selected-host composition with
     checked staging identities, bounded cleanup and captured-parent publication.

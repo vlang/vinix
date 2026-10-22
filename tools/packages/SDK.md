@@ -1421,6 +1421,13 @@ at most 1 MiB.
 The imported inventory must contain every declared file at its exact path, with
 notice sizes checked again. A directory substituted after preflight cannot
 replace a required notice, executable or library in the catalog lock.
+SQLite and FFmpeg additionally check every packaged `DT_NEEDED` dependency
+against the application and its declared runtime's library directories. Missing
+or ambiguous basenames/SONAMEs, invalid dynamic metadata, differing musl loader
+aliases and ambient search paths refuse publication. Only bounded `$ORIGIN`
+paths into those same packaged directories are accepted. See
+[ELF dependency admission](../../tests/packages/elf-closure-check.md) for limits,
+both-target real-input checks and ownership measurements.
 This structural check does not identify an arbitrary file as genuine SQLite,
 authenticate its source or certify its library ABI. The publisher declares the
 numeric SQLite version and a runtime version in `>=1.0.0,<2.0.0`, and must build

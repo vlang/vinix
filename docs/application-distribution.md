@@ -472,6 +472,12 @@ idempotent, preserves the published lock and owns its data independently of
 caller arguments. The CLI releases it after encoding; compatible runtime-only
 updates keep the application metadata unchanged. First-call JSON metadata and
 other complete publisher/catalog/release owners remain separate boundaries.
+The [ELF dependency checks](../tests/packages/elf-closure-check.md) also refuse
+SQLite and FFmpeg publication when a required packaged library is missing or
+ambiguous, dynamic metadata is malformed, loader aliases differ, or a search
+path reaches ambient files. They inspect the captured application/runtime
+inventories before publication; ABI, plugins and execution still require guest
+qualification. Real catalogs on both architectures remain byte-identical.
 The [FFmpeg ownership checks](../tests/packages/ffmpeg-owner-check.md) extend
 this to FFmpeg/FFprobe and their shared runtime. Independently closeable replies,
 templates, partial imports and canonicalization retain no tracked allocations in

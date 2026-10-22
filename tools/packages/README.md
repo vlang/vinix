@@ -353,6 +353,13 @@ canonical-index scratch now have measured owners across 304 calls and 448
 canonicalization cycles. See [release ownership checks](../../tests/packages/release-owner-check.md)
 for refusals, exact signed retry, both-guest coverage and retained evidence.
 
+SQLite and FFmpeg profile publication also verifies the packaged ELF library
+closure. Missing direct/transitive dependencies, conflicting library identities,
+invalid dynamic tables and ambient search paths refuse before publication.
+See [ELF dependency admission](../../tests/packages/elf-closure-check.md) for
+bounded search rules, exact restored retries and both architectures' unchanged
+real payload catalogs.
+
 Read [administration/recovery](../../docs/application-distribution.md) and
 [SDK 1](SDK.md) for enrollment, policy, packaging and limits. Release publisher
 enrollment and catalog/runtime guest qualification remain required.

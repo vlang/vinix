@@ -32,12 +32,17 @@ struct Ledger {
 }
 
 fn pin(path string) !Pin {
-	return Pin{ path: os.abs_path(path), sha256: sha256.sum(os.read_bytes(path)!).hex() }
+	return Pin{ path: os.abs_path(path), sha256: sha256.hexhash(os.read_file(path)!) }
+}
+
+// Admission checks must also run with -prod, which removes V assertions.
+fn require(condition bool, message string) ! {
+	if !condition { return error(message) }
 }
 
 fn verify(pins []Pin) ! {
 	for item in pins {
-		assert pin(item.path)! == item, item.path
+		require(pin(item.path)! == item, 'evidence digest mismatch: ' + item.path)!
 	}
 }
 
@@ -46,15 +51,15 @@ fn verify(pins []Pin) ! {
 // those old inputs without attributing an old run to the new implementation.
 fn verify_inputs(pins []Pin, archive string, source_prefix string) ! {
 	for item in pins {
-		assert item.sha256.len == 64
+		require(item.sha256.len == 64, 'invalid input digest length: ' + item.path)!
 		for byte in item.sha256.bytes() {
-			assert (byte >= `0` && byte <= `9`) || (byte >= `a` && byte <= `f`)
+			require((byte >= `0` && byte <= `9`) || (byte >= `a` && byte <= `f`), 'invalid input digest: ' + item.path)!
 		}
-		assert os.abs_path(item.path) == item.path
+		require(os.abs_path(item.path) == item.path, 'input path must be absolute: ' + item.path)!
 		current := pin(item.path) or { Pin{} }
 		if current == item { continue }
-		assert item.path.starts_with(source_prefix), item.path
-		assert pin(archive + '/' + item.sha256)!.sha256 == item.sha256, item.path
+		require(item.path.starts_with(source_prefix), 'changed input outside historical source scope: ' + item.path)!
+		require(pin(archive + '/' + item.sha256)!.sha256 == item.sha256, 'historical input digest mismatch: ' + item.path)!
 	}
 }
 
@@ -68,11 +73,11 @@ fn field(line string, name string) !u64 {
 	mut value := u64(0)
 	for part in line.fields() {
 		if !part.starts_with(name + '=') { continue }
-		assert !found, 'duplicate counter ' + name
+		require(!found, 'duplicate counter ' + name)!
 		text := part.all_after('=')
-		assert text.len > 0, 'empty counter ' + name
+		require(text.len > 0, 'empty counter ' + name)!
 		for byte in text {
-			assert byte >= `0` && byte <= `9`, 'invalid counter ' + name
+			require(byte >= `0` && byte <= `9`, 'invalid counter ' + name)!
 		}
 		value = strconv.parse_uint(text, 10, 64)!
 		found = true
@@ -85,9 +90,9 @@ const native_pass = 'GUEST TLS 23 cases with 8 measured cycles preserve authenti
 
 fn tracked_mode(line string) !string {
 	parts := line.fields()
-	assert parts.len == 7 && parts[0] == 'GUEST' && parts[1] == 'TLS'
-	assert parts[2] in tlsruntime.modes() && parts[3] == 'retained'
-	assert parts[4] == '0' && parts[5] == 'tracked' && parts[6] == 'bytes', line
+	require(parts.len == 7 && parts[0] == 'GUEST' && parts[1] == 'TLS', 'invalid tracked allocation marker: ' + line)!
+	require(parts[2] in tlsruntime.modes() && parts[3] == 'retained', 'invalid tracked mode: ' + line)!
+	require(parts[4] == '0' && parts[5] == 'tracked' && parts[6] == 'bytes', 'nonzero or invalid retained allocation: ' + line)!
 	return parts[2]
 }
 
@@ -100,10 +105,10 @@ fn probe(text string, mode string) ! {
 	mut found := false
 	for line in text.split_into_lines() {
 		if !line.starts_with('GUEST TLS ') { continue }
-		assert !found && tracked_mode(line)! == mode
+		require(!found && tracked_mode(line)! == mode, 'duplicate or unexpected probe mode: ' + line)!
 		found = true
 	}
-	assert found
+	require(found, 'missing probe allocation marker: ' + mode)!
 }
 
 fn native(text string) ! {
@@ -117,58 +122,58 @@ fn native(text string) ! {
 		// Certificate refusals also print "curl failed to verify ...". That
 		// explanation is not the single version banner required below.
 		if line.starts_with('curl ') && !line.starts_with('curl failed to verify ') {
-			assert !tls
+			require(!tls, 'duplicate curl version banner')!
 			parts := line.fields()
-			assert parts.len >= 4 && version(parts[1], '')
+			require(parts.len >= 4 && version(parts[1], ''), 'invalid curl version banner')!
 			mut libcurl := false
 			mut openssl := false
 			for part in parts {
 				if version(part, 'libcurl/') { libcurl = true }
 				if version(part, 'OpenSSL/') { openssl = true }
 			}
-			assert libcurl && openssl, 'missing curl TLS implementation version'
+			require(libcurl && openssl, 'missing curl TLS implementation version')!
 			tls = true
 		}
 		if line.starts_with('GUEST TLS file baseline=') {
-			assert !baseline && line.fields().len == 5
+			require(!baseline && line.fields().len == 5, 'duplicate or malformed file baseline')!
 			initial := field(line, 'baseline')!
-			assert initial <= ~u64(0) - 131072
+			require(initial <= ~u64(0) - 131072, 'file baseline overflows reservation ceiling')!
 			ceiling = field(line, 'ceiling')!
-			assert ceiling == initial + 131072
+			require(ceiling == initial + 131072, 'incorrect reservation ceiling')!
 			baseline = true
 		} else if line == native_pass {
-			assert !passed
+			require(!passed, 'duplicate native completion marker')!
 			passed = true
 		} else if line.starts_with('GUEST TLS ') {
 			mode := tracked_mode(line)!
-			assert baseline && mode !in tracked
+			require(baseline && mode !in tracked, 'missing baseline or duplicate tracked mode: ' + mode)!
 			tracked[mode] = true
 		}
 		if line.starts_with('COLLECTION STRESS settled ') {
 			mode := line.all_after('settled ').all_before(':')
-			assert mode in tlsruntime.modes() && mode !in settled && mode in tracked
-			assert line.fields().len == 7
+			require(mode in tlsruntime.modes() && mode !in settled && mode in tracked, 'invalid or duplicate settlement: ' + mode)!
+			require(line.fields().len == 7, 'malformed settlement: ' + mode)!
 			field(line, 'initial')!
-			assert baseline && field(line, 'bytes')! <= ceiling && field(line, 'waits')! <= 30
+			require(baseline && field(line, 'bytes')! <= ceiling && field(line, 'waits')! <= 30, 'unsettled reservation: ' + mode)!
 			settled[mode] = true
 		}
 	}
-	assert baseline && passed && tls && settled.len == tlsruntime.modes().len && tracked.len == tlsruntime.modes().len
-	assert text.contains('HWTEST PASS packages-https-runtime')
-	assert !text.contains('HWTEST FAIL') && !text.contains('V panic:') && !text.contains('Out of memory')
+	require(baseline && passed && tls && settled.len == tlsruntime.modes().len && tracked.len == tlsruntime.modes().len, 'incomplete native TLS evidence')!
+	require(text.contains('HWTEST PASS packages-https-runtime'), 'missing native hardware completion marker')!
+	require(!text.contains('HWTEST FAIL') && !text.contains('V panic:') && !text.contains('Out of memory'), 'native failure marker')!
 }
 
-fn requests(text string, digest string, repetitions int) {
-	assert repetitions in [1, 2]
+fn requests(text string, digest string, repetitions int) ! {
+	require(repetitions in [1, 2], 'invalid request repetition count')!
 	mut counts := map[string]int{}
 	mut setups := map[string]int{}
 	for line in text.split_into_lines() {
 		fields := line.fields()
-		assert fields.len == 4 && fields[0] in tlsruntime.modes(), line
+		require(fields.len == 4 && fields[0] in tlsruntime.modes(), 'malformed request: ' + line)!
 		mode := fields[0]
 		if fields[1] == 'setup' {
-			assert !mode.starts_with('fetch-') && fields[3] == '-'
-			assert fields[2] == if setups[mode] % 2 == 0 { 'index.json' } else { 'index.sig' }
+			require(!mode.starts_with('fetch-') && fields[3] == '-', 'invalid setup request: ' + line)!
+			require(fields[2] == if setups[mode] % 2 == 0 { 'index.json' } else { 'index.sig' }, 'incorrect setup resource: ' + line)!
 			setups[mode]++
 			continue
 		}
@@ -187,32 +192,32 @@ fn requests(text string, digest string, repetitions int) {
 		} else {
 			'ranges'
 		}
-		assert fields[1] == route, line
+		require(fields[1] == route, 'incorrect request route: ' + line)!
 		step := counts[mode] % 2
 		if mode.starts_with('refresh-') {
-			assert fields[2] == if step == 0 { 'index.json' } else { 'index.sig' }
-			assert fields[3] == '-', line
+			require(fields[2] == if step == 0 { 'index.json' } else { 'index.sig' }, 'incorrect refresh resource: ' + line)!
+			require(fields[3] == '-', 'unexpected refresh range: ' + line)!
 		} else {
 			resource := if mode.starts_with('install-') || mode.ends_with('-http') || mode.ends_with('-redirect') {
 				'objects/' + digest
 			} else {
 				'payload'
 			}
-			assert fields[2] == resource, line
+			require(fields[2] == resource, 'incorrect payload resource: ' + line)!
 			ranged := !mode.ends_with('-fresh') && !mode.ends_with('-size') && !(tlsruntime.requests(mode) == 2 && step == 1)
-			assert fields[3] == if mode.ends_with('-truncated') && step == 1 {
+			require(fields[3] == if mode.ends_with('-truncated') && step == 1 {
 				'bytes=1536-'
 			} else if ranged {
 				'bytes=512-'
 			} else {
 				'-'
-			}, line
+			}, 'incorrect request range: ' + line)!
 		}
 		counts[mode]++
 	}
 	for mode in tlsruntime.modes() {
-		assert counts[mode] == repetitions * (tlsruntime.cycles + tlsruntime.warmups) * tlsruntime.requests(mode), mode
-		assert setups[mode] == if mode.starts_with('fetch-') { 0 } else { 2 * repetitions }, mode
+		require(counts[mode] == repetitions * (tlsruntime.cycles + tlsruntime.warmups) * tlsruntime.requests(mode), 'incorrect request count: ' + mode)!
+		require(setups[mode] == if mode.starts_with('fetch-') { 0 } else { 2 * repetitions }, 'incorrect setup count: ' + mode)!
 	}
 }
 
@@ -230,35 +235,40 @@ fn retain() ! {
 		return
 	}
 	if os.args.len == 5 && os.args[1] == '--check-requests' {
-		requests(os.read_file(os.args[2])!, os.args[3], strconv.atoi(os.args[4])!)
+		requests(os.read_file(os.args[2])!, os.args[3], strconv.atoi(os.args[4])!)!
 		println('GUEST TLS request evidence PASS')
 		return
 	}
 	if os.args.len == 2 && os.args[1] == '--verify' {
 		ledger := json2.decode[Ledger](os.read_file(prefix + 'ledger.json')!)!
-		assert ledger.format == 1
+		require(ledger.format == 1, 'unsupported TLS ledger format')!
 		verify_inputs(ledger.inputs, prefix + 'inputs', root + '/tools/')!
 		verify(ledger.evidence)!
 		println('GUEST TLS retained hashes PASS')
 		return
 	}
-	assert os.args.len == 4, 'usage: https-runtime-retain HOST_WORK ARM_WORK X86_WORK | --verify'
+	require(os.args.len == 4, 'usage: https-runtime-retain HOST_WORK ARM_WORK X86_WORK | --verify')!
 	os.mkdir_all(os.dir(prefix))!
 	mut inputs := []Pin{}
 	mut evidence := []Pin{}
 	controls := prefix + 'evidence-check.txt'
-	assert os.read_file(controls)!.contains('GUEST TLS evidence controls PASS')
+	require(os.read_file(controls)!.contains('GUEST TLS evidence controls PASS'), 'missing evidence controls')!
 	evidence << pin(controls)!
 	input_controls := prefix + 'input-check.txt'
-	assert os.read_file(input_controls)!.contains('GUEST TLS historical input controls PASS')
+	require(os.read_file(input_controls)!.contains('GUEST TLS historical input controls PASS'), 'missing historical input controls')!
 	evidence << pin(input_controls)!
+	mode_controls := prefix + 'retainer-modes.txt'
+	mode_text := os.read_file(mode_controls)!
+	require(mode_text.contains('GUEST TLS normal and prod retainer controls PASS'), 'missing retainer build-mode controls')!
+	require(mode_text.contains('Retainer source SHA256 ' + pin(@FILE)!.sha256 + '\n'), 'retainer build-mode source mismatch')!
+	evidence << pin(mode_controls)!
 	cleanup := prefix + 'cleanup-check.txt'
 	cleanup_text := os.read_file(cleanup)!
-	assert cleanup_text.contains('GUEST TLS controller failure cleanup PASS')
-	assert cleanup_text.contains('Controller source SHA256 ' + pin(root + '/tests/packages/https-runtime-check.v')!.sha256 + '\n')
+	require(cleanup_text.contains('GUEST TLS controller failure cleanup PASS'), 'missing controller cleanup check')!
+	require(cleanup_text.contains('Controller source SHA256 ' + pin(root + '/tests/packages/https-runtime-check.v')!.sha256 + '\n'), 'controller cleanup source mismatch')!
 	evidence << pin(cleanup)!
 	planning := prefix + 'root-planning.txt'
-	assert os.read_file(planning)!.contains('1000 root-planning install/remove/upgrade/deploy and removal-plan success/refusal cycles retain zero tracked bytes and preserve borrowed inputs PASS')
+	require(os.read_file(planning)!.contains('1000 root-planning install/remove/upgrade/deploy and removal-plan success/refusal cycles retain zero tracked bytes and preserve borrowed inputs PASS'), 'missing root-planning ownership check')!
 	evidence << pin(planning)!
 	for i, directory in os.args[1..] {
 		state := os.abs_path(directory)
@@ -271,7 +281,7 @@ fn retain() ! {
 			'x86_64'
 		}
 		receipt := json2.decode[Receipt](os.read_file(work + '/qualification.json')!)!
-		assert receipt.format == 1 && receipt.checks.len == if i == 0 { 51 } else { 4 }
+		require(receipt.format == 1 && receipt.checks.len == if i == 0 { 51 } else { 4 }, 'invalid TLS receipt format or check count: ' + work)!
 		verify_inputs(receipt.inputs, prefix + 'inputs', root + '/tools/')!
 		inputs << receipt.inputs
 		fixture := json2.decode[tlsruntime.Fixture](os.read_file(work + if i == 0 {
@@ -283,7 +293,7 @@ fn retain() ! {
 			2
 		} else {
 			1
-		})
+		})!
 		save(work + '/qualification.json', prefix + label + '.json', mut evidence)!
 		mut summary := ''
 		for check in receipt.checks {
@@ -339,7 +349,7 @@ fn retain() ! {
 	mut unique := []Pin{}
 	for item in inputs {
 		if unique.len > 0 && unique.last().path == item.path {
-			assert unique.last() == item
+			require(unique.last() == item, 'conflicting input digest: ' + item.path)!
 			continue
 		}
 		unique << item

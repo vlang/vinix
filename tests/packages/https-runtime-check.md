@@ -77,7 +77,7 @@ the [hash ledger](results/2026-10-22/https-runtime-ledger.json). The
 serial output, requires all cases and settled reservations, and supports
 `--verify` while the pinned artifacts remain available.
 
-Later account and authenticated X11 changes advanced thirteen original tool
+Later account, authenticated X11 and ELF dependency changes advanced fifteen original tool
 source paths. Their
 [content-addressed historical copies](results/2026-10-22/https-runtime-inputs/README.md)
 preserve the exact qualified bytes without changing any original run receipt.
@@ -92,7 +92,28 @@ retainer with five admitted boundaries and 29 refusals, including missing or
 duplicate cases, unsettled/excessive reservations, retained allocations,
 malformed versions, extra requests and wrong retry offsets. Their
 [retained report](results/2026-10-22/https-runtime-evidence-check.txt) records all
-34 controls. The [failure cleanup check](https-runtime-cleanup-check.v) injects
+34 controls. Admission uses explicit errors so `-prod` cannot remove the checks.
+Both normal and `-prod` retainer builds passed all 44 evidence and historical-input
+controls; the [build-mode report](results/2026-10-22/https-runtime-retainer-modes.txt)
+records the commands, source/compiler/binary hashes and exact outputs. Build the
+assertion-based control drivers without `-prod`:
+
+```sh
+v -cc clang -nocache -path '@vlib|@vmodules|tests/packages' \
+  -o /tmp/tls-input-check tests/packages/https-runtime-input-check.v
+v -cc clang -nocache -path '@vlib|@vmodules|tests/packages' \
+  -o /tmp/tls-evidence-check tests/packages/https-runtime-evidence-check.v
+v -cc clang -nocache -path '@vlib|@vmodules|tests/packages' \
+  -o /tmp/tls-retain tests/packages/https-runtime-retain.v
+v -prod -cc clang -nocache -path '@vlib|@vmodules|tests/packages' \
+  -o /tmp/tls-retain-prod tests/packages/https-runtime-retain.v
+/tmp/tls-input-check /tmp/tls-retain
+/tmp/tls-evidence-check /tmp/tls-retain
+/tmp/tls-input-check /tmp/tls-retain-prod
+/tmp/tls-evidence-check /tmp/tls-retain-prod
+```
+
+The [failure cleanup check](https-runtime-cleanup-check.v) injects
 a failed child command into the original controller after server readiness and
 requires a stopped, reaped server and no success receipt. Its
 [report](results/2026-10-22/https-runtime-cleanup-check.txt) pins the original

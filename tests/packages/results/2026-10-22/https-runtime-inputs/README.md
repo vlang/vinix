@@ -1,7 +1,7 @@
 # Historical HTTPS tool source inputs
 
 The original HTTPS receipts and ledger keep their exact input paths and SHA-256
-digests. Thirteen account and package source files later changed independently
+digests. Fifteen account and package source files later changed independently
 of that run.
 The adjacent files preserve their original bytes, recovered with literal
 `git show 30e7b5661:PATH` arguments and checked against the recorded SHA-256
@@ -17,7 +17,9 @@ before writing. Each filename is its content digest.
 | tools/accounts/sessioncore/become.v | 025c67c4332d8f2c093d3daee9eddedf0262c0ed8de71de26b3ba4c0f05e1205 |
 | tools/accounts/sessioncore/launch.v | 134fdfa2c4a09e44b3e862ad0aef808cc2153b121921fb846428f67cebc01e40 |
 | tools/accounts/sessioncore/manager.v | 1e38c8408432d52e45318a70d69f69b3730be60a5a268ea6c2bd4310309077f5 |
+| tools/packages/pkgcore/ffmpeg_profile.v | fbfea09ae469a48545bf1d5fc722236c7c49c6804039830548159a35aaa03978 |
 | tools/packages/pkgcore/launch.v | a792edbe3ab4c10c2d89a042094f40b024d3d99bec28fca9212b95050bf0b279 |
+| tools/packages/pkgcore/sqlite_profile.v | 2c537a826f7a8dddd68d35b582658c4d838575ffd5a4e9c6855fa8d898a5e68e |
 | tools/packages/pkglaunch/client.v | 882c88ee38072a8d883f112ef31e8372c3354286ad1a647fcaf0a06e5501f4e5 |
 | tools/packages/pkglaunch/protocol.v | ab9d72cbcd5219c6a5c021ce8e84c58c8518f1976d7a54430c2d06f0cd91ea54 |
 | tools/packages/pkglaunch/request_reader.v | 573fc14e35f0bde671bd0254fbcf3d0457067b99af8eed5d18e217fd1f766330 |
