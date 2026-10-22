@@ -25,6 +25,8 @@ pub fn install(output string, resources string) ! {
  install_message_queue_probe(dir)!
  install_attachment_probe(dir)!
  install_touch_probe(dir)!
+ install_editor_probe(dir)!
+ install_window_probe(dir)!
  install_drawable_probe(dir)!
  install_path_probe(dir)!
  install_matrix_probe(dir)!
@@ -84,6 +86,8 @@ invoke-static {}, Lorg/vinix/bootstrap/MessageQueueProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/ImageFilterProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/AttachmentProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/TouchProbe;->check(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/EditorProbe;->check(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/WindowProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/DrawableProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/PathProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/MatrixProbe;->check()V

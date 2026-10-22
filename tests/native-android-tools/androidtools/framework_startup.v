@@ -29,6 +29,17 @@ fn framework_startup_apis(smali string) ! {
   '.method public setNavigationBarDividerColor(I)V\n.locals 0\niput p1, p0, Landroid/view/Window;->vinixNavigationBarDividerColor:I\nreturn-void\n.end method')!
  window_text = framework_replace_method(window_text, 'getNavigationBarDividerColor()I',
   '.method public getNavigationBarDividerColor()I\n.locals 1\niget v0, p0, Landroid/view/Window;->vinixNavigationBarDividerColor:I\nreturn v0\n.end method')!
+ // Floating is a theme property, independent of the WS window dimensions.
+ // Resolve the public windowIsFloating attribute, including theme references.
+ window_text = framework_replace_method(window_text, 'isFloating()Z',
+  '.method public isFloating()Z\n.locals 4\n' +
+  'invoke-virtual {p0}, Landroid/view/Window;->getContext()Landroid/content/Context;\nmove-result-object v0\n' +
+  'invoke-virtual {v0}, Landroid/content/Context;->getTheme()Landroid/content/res/Resources$Theme;\nmove-result-object v0\n' +
+  'new-instance v1, Landroid/util/TypedValue;\ninvoke-direct {v1}, Landroid/util/TypedValue;-><init>()V\n' +
+  'const v2, 0x1010057\nconst/4 v3, 1\n' +
+  'invoke-virtual {v0, v2, v1, v3}, Landroid/content/res/Resources$Theme;->resolveAttribute(ILandroid/util/TypedValue;Z)Z\nmove-result v0\n' +
+  'if-eqz v0, :done\niget v0, v1, Landroid/util/TypedValue;->data:I\nif-eqz v0, :done\nconst/4 v0, 1\n' +
+  ':done\nreturn v0\n.end method')!
  os.write_file(window, window_text)!
  listener := smali + '/android/hardware/SensorEventListener.smali'
  mut text := os.read_file(listener)!

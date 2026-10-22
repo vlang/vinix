@@ -93,6 +93,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_connectivity(smali)!
  framework_content_clients(smali)!
  framework_text_widgets(smali)!
+ framework_editor_actions(smali)!
  framework_image_filters(smali)!
  framework_check_widgets(smali)!
  source := os.read_file(root() + '/build-support/android/atlframework/widgets.v')!
@@ -161,7 +162,7 @@ pub fn write_framework_classes(smali string) ! {
  for class, function in {'android/view/View': 'register_view', 'android/app/ListActivity$2': 'register_list_click', 'android/widget/ScrollView': 'register_scroll'} {
   path := smali + '/' + class + '.smali'
   mut text := os.read_file(path)!
-  if class == 'android/view/View' { text += '\n.field private vinixHandler:Landroid/os/Handler;\n.field private vinixWsWatchers:Ljava/util/ArrayList;\n.field private vinixWsEditorAction:Ljava/lang/Object;\n.field private vinixRawDirection:I\n' }
+  if class == 'android/view/View' { text += '\n.field private vinixHandler:Landroid/os/Handler;\n.field private vinixWsWatchers:Ljava/util/ArrayList;\n.field protected vinixWsEditorAction:Ljava/lang/Object;\n.field private vinixRawDirection:I\n' }
   else if class == 'android/app/ListActivity$2' && !text.contains('this$0:Landroid/app/ListActivity;') { return error('unexpected ATL ListActivity click listener') }
   for block in native_declarations(views.all_after('fn ' + function + '(').all_before('\n}')).split('.method ')[1..] {
    text = framework_replace_method(text, block.all_before('\n').all_after('native '), '.method ' + block)!

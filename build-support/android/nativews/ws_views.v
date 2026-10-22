@@ -518,7 +518,7 @@ fn ws_pointer(e voidptr, event &WsEvent) {
 	}
 }
 
-fn ws_keys(e voidptr, bytes &u8, length u32) {
+fn ws_insert_text(e voidptr, bytes &u8, length u32) {
 	unsafe {
 		if ws.focused == nil || length > 4096 { return }
 		view := ws_view(e, ws.focused)
@@ -541,6 +541,31 @@ fn ws_keys(e voidptr, bytes &u8, length u32) {
 		}
 		buffer[used] = 0
 		ws_set_text(e, ws.focused, ws_string(e, buffer))
+	}
+}
+
+fn ws_keys(e voidptr, bytes &u8, length u32) {
+	unsafe {
+		if length > 4096 { return }
+		newline := [u8(10)]!
+		mut start := u32(0)
+		for i := u32(0); i < length; i++ {
+			if bytes[i] != 10 && bytes[i] != 13 { continue }
+			if bytes[i] == 10 && i > 0 && bytes[i - 1] == 13 {
+				start = i + 1
+				continue
+			}
+			if i > start { ws_insert_text(e, &bytes[start], i - start) }
+			start = i + 1
+			if ws.focused == nil || pending(e) { return }
+			view := ws_view(e, ws.focused)
+			if view.kind != 3 { return }
+			args := [Value{ i: i32(view.single_line) }]!
+			if boolean(e, ws.focused, c'android/widget/TextView', c'vinixEditorEnter', c'(Z)Z', &args[0]) == 0 && !pending(e) {
+				ws_insert_text(e, &newline[0], 1)
+			}
+		}
+		if start < length && !pending(e) { ws_insert_text(e, &bytes[start], length - start) }
 	}
 }
 

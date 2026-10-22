@@ -114,6 +114,17 @@ default route; validation and unmetered access are not advertised. Link snapshot
 include the interface name, MTU and addresses. Local ContentProviderClient handles resolve
 registered authorities, dispatch type/call operations and release their provider
 reference on close. Uninstalled service providers return null.
+ART receives the private runtime's generated JKS path, type and password before
+WolfJSSE creates its default SSLContext. Native builds also carry `cacerts` into
+the APK suite's staged runtime, including when its baseline image is older.
+`tests/native-android-ws/https-fixture.v` builds a separate network regression
+APK from an existing bootstrap fixture directory. Its arguments are `OUTPUT
+FIXTURE_DIR SMALI_TOOLS JAVA APKSIGNER`. Run it as `org.vinix.bootstrap` with at
+least 100 startup seconds and Internet access. `HTTPS-FIXTURE-PASS` requires a
+verified HTTPS response from Google and certificate failures for both
+`self-signed.badssl.com` and `wrong.host.badssl.com`; socket timeouts do not count
+as certificate rejection. The probe leaves the default trust manager and
+hostname verifier intact. TCP diagnostics separately expose unreachable routes.
 Account listeners retain their registrations and deliver an empty snapshot on
 the requested Handler (or the main Looper). Duplicate registrations fail and
 removal permits registration again. Vinix has no account authenticator.
@@ -191,6 +202,15 @@ intercepted. Passive overlays fall through to lower children. The guest
 bootstrap fixture checks capture outside bounds, interception/disallow,
 cancellation, disabled controls and click delivery. Multitouch splitting,
 transformed hit testing and long-press gestures remain incomplete.
+WS Enter dispatches TextView editor actions, preserving IME options and flags.
+Explicit actions such as Search and Done call the registered listener with a
+null KeyEvent; ordinary Enter uses IME_NULL and KEYCODE_ENTER. Unconsumed Enter
+inserts a newline only for multiline editors. The bootstrap regression covers
+EditText's native listener registration, action dispatch, no-enter-action flags,
+hardware Enter consumption and listener removal. Default Next/Done focus
+navigation and on-screen keyboard control remain incomplete.
+`Window.isFloating()` resolves `windowIsFloating` from the window context's
+theme. The guest regression checks both activity and dialog themes.
 
 The verified subset covers Arity calculation, Editor save/reopen and Open
 Sudoku touch entry/database persistence. Advanced Canvas paths/transforms,
