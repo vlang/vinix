@@ -17185,21 +17185,53 @@ resilient evolution. The inspection finds no declaration call stubs or direct
 code references. Generic and resilient conformance-table synthesis remains
 unsupported.
 
-The launch probe advances to CoreMedia's
-`_kCMFormatDescriptionColorPrimaries_P3_D65` constant. Fortnite has not reached
-application entry and is not playable.
+That launch probe stopped at CoreMedia's
+`_kCMFormatDescriptionColorPrimaries_P3_D65` constant.
+
+CoreMedia now exports the four remaining color-string globals imported by this
+executable: P3 D65, DCI P3, BT.2020 color primaries and the BT.2020 YCbCr matrix.
+Their exact values are `P3_D65`, `DCI_P3` and `ITU_R_2020`; the two BT.2020 cells
+share one CFString, matching Apple's runtime. The existing sealed arena now has
+eleven pointer cells and ten immutable strings. Existing cell indices, framework
+scoping and retirement after autorelease teardown are preserved.
+
+Native CoreMedia measurements verify read-only cells and strings, CFString type,
+exact UTF-8 text and stable identity through 256 balanced retain/release pairs
+per constant. Static inspection confirms all four imports are required in the
+same executable. Evidence is retained in
+`build/ios/fortnite/coremedia-p3-checks/native`.
+
+```sh
+v run tests/ios/native-checks.v build-media-format
+```
+
+The expanded media-format fixture passed normal and deterministic ASan/UBSan
+host runs and the ARM64 guest. It checks all eleven globals, exact UTF-8 text,
+CFString equality and ownership, shared BT.2020 identity, eight concurrent cold
+readers, read-only sealing and two drained, unmapped runtimes. P3 strings also
+survive the format description's deep extension snapshot.
+
+Evidence is retained in `build/ios/fortnite/coremedia-p3-checks`. The launch
+probe and both import audits completed, and all 19,151 listed inputs remained
+unchanged. Five binary/generated-C pairs, the host dSYM, 20 native/static
+evidence files and four guest serial/configuration pairs passed verification.
+All four temporary VMs, their scratch storage and the owned RAM disk were
+retired.
+
+The launch probe now stops at CoreFoundation's `_OBJC_CLASS_$_NSConstantArray`.
+Fortnite has not reached application entry and is not playable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,051 | 110 | 78 |
+| Fortnite executable | 2,055 | 106 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,891 | 113 | 114 |
+| All images | 2,895 | 109 | 114 |
 
-The C++/GLES/Text variant reports 2,905 resolved imports, 99 unresolved strong
+The C++/GLES/Text variant reports 2,909 resolved imports, 95 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 

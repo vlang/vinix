@@ -4,6 +4,11 @@ import os
 #include <dlfcn.h>
 fn C.dlopen(&char,i32)voidptr
 fn C.dlsym(voidptr,&char)voidptr
+$if macos {
+ #include <mach/mach.h>
+ fn C.mach_task_self() u32
+ fn C.vm_region_recurse_64(u32,&u64,&u64,&u32,&i32,&u32)i32
+}
 struct MFAPI { native bool cm u64 cf u64 }
 type MFGeneric=fn(u64,u32,u32,u64,&u64)i32
 type MFAudio=fn(u64,&AudioFormat,u64,u64,u64,u64,u64,&u64)i32
@@ -39,6 +44,7 @@ fn mf_reader(api MFAPI,format u64,media u32,subtype u32){for _ in 0..64{assert m
 fn mf_extensions(api MFAPI){
  make:=unsafe{MFGeneric(voidptr(mf_symbol(api,'_CMFormatDescriptionCreate',false)))}
  key:=mf_string(api,c'vinix-nested');inner_key:=mf_string(api,c'vinix-data');source:=mf_dict(api);inner:=mf_dict(api)
+ primaries_key:=mf_string(api,c'CVImageBufferColorPrimaries');primaries:=read64(mf_symbol(api,'_kCMFormatDescriptionColorPrimaries_P3_D65',false));mf_set(api,source,primaries_key,primaries)
  data:=unsafe{MFData(voidptr(mf_symbol(api,'_CFDataCreateMutable',true)))(0,3)};unsafe{MFLength(voidptr(mf_symbol(api,'_CFDataSetLength',true)))(data,3)}
  bytes:=mf_query(api,'_CFDataGetMutableBytePtr',data,true);unsafe{*(&u8(bytes))=0x31;*(&u8(bytes+1))=0x41;*(&u8(bytes+2))=0x59}
  mf_set(api,inner,inner_key,data);mf_set(api,source,key,inner)
@@ -50,6 +56,7 @@ fn mf_extensions(api MFAPI){
  // Native format descriptions have identity hashes even when CFEqual succeeds.
  if !api.native{assert mf_query(api,'_CFHash',first,true)==mf_query(api,'_CFHash',same,true)}
  snapshot:=mf_query(api,'_CMFormatDescriptionGetExtensions',first,false);assert snapshot!=0;assert mf_equal(api,snapshot,source,true);assert mf_query(api,'_CFRetain',snapshot,true)==snapshot
+ assert mf_equal(api,mf_get(api,snapshot,primaries_key),primaries,true)
  assert mf_query(api,'_CFArrayGetCount',mf_get(api,snapshot,array_key),true)==4
  nested:=mf_get(api,snapshot,key);copy:=mf_get(api,nested,inner_key);assert copy!=0&&mf_query(api,'_CFDataGetLength',copy,true)==3
  // A deep copy stays unchanged when nested mutable bytes are reused.
@@ -60,7 +67,8 @@ fn mf_extensions(api MFAPI){
  mf_drop(api,source);mf_drop(api,inner);mf_drop(api,data);mf_drop(api,replacement);mf_drop(api,first);mf_drop(api,same);mf_drop(api,different)
  mf_drop(api,array);mf_drop(api,number);mf_drop(api,date);mf_drop(api,array_key)
  assert unsafe{*(&u8(mf_query(api,'_CFDataGetBytePtr',copy,true)))}==0x31
- mf_drop(api,snapshot);mf_drop(api,key);mf_drop(api,inner_key)
+ assert mf_equal(api,mf_get(api,snapshot,primaries_key),primaries,true)
+ mf_drop(api,snapshot);mf_drop(api,key);mf_drop(api,inner_key);mf_drop(api,primaries_key)
 }
 fn mf_audio_equality(api MFAPI){
  create:=unsafe{MFAudio(voidptr(mf_symbol(api,'_CMAudioFormatDescriptionCreate',false)))}
@@ -99,10 +107,16 @@ fn mf_cases(api MFAPI){
  assert mf_equal(api,0,0,false)
  mf_extensions(api)
  mf_audio_equality(api)
- for pair in [['_kCMFormatDescriptionExtension_FullRangeVideo','FullRangeVideo']!,['_kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms','SampleDescriptionExtensionAtoms']!,['_kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG','ITU_R_2100_HLG']!,['_kCMFormatDescriptionTransferFunction_Linear','Linear']!,['_kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ','SMPTE_ST_2084_PQ']!,['_kCMFormatDescriptionTransferFunction_SMPTE_ST_428_1','SMPTE_ST_428_1']!,['_kCMFormatDescriptionTransferFunction_sRGB','IEC_sRGB']!]!{
-  cell:=mf_symbol(api,pair[0],false);object:=read64(cell);assert cell==mf_symbol(api,pair[0],false)
-  if api.native{mut text:=[128]u8{};assert unsafe{MFText(voidptr(mf_symbol(api,'_CFStringGetCString',true)))(object,&char(&text[0]),128,0x08000100)};assert unsafe{(&char(&text[0])).vstring()}==pair[1]}else{assert string_text(object)==pair[1]}
+ for pair in mf_constant_pairs(){
+  cell:=mf_symbol(api,pair[0],false);object:=read64(cell);assert cell!=0&&cell%8==0&&object!=0&&object!=cell&&cell==mf_symbol(api,pair[0],false)
+  assert mf_query(api,'_CFGetTypeID',object,true)==unsafe{MFType(voidptr(mf_symbol(api,'_CFStringGetTypeID',true)))()}
+  assert mf_query(api,'_CFStringGetLength',object,true)==u64(pair[1].len)
+  owned:=mf_string(api,unsafe{&char(pair[1].str)});assert mf_equal(api,object,owned,true)&&mf_query(api,'_CFHash',object,true)==mf_query(api,'_CFHash',owned,true)
+  assert mf_query(api,'_CFRetain',object,true)==object;mf_drop(api,object);mf_drop(api,owned)
+  mut text:=[128]u8{};assert unsafe{MFText(voidptr(mf_symbol(api,'_CFStringGetCString',true)))(object,&char(&text[0]),128,0x08000100)};assert text[pair[1].len]==0&&C.memcmp(&text[0],pair[1].str,usize(pair[1].len))==0
  }
+ primaries:=mf_symbol(api,'_kCMFormatDescriptionColorPrimaries_ITU_R_2020',false);matrix:=mf_symbol(api,'_kCMFormatDescriptionYCbCrMatrix_ITU_R_2020',false)
+ assert primaries!=matrix&&read64(primaries)==read64(matrix)
 }
 fn mf_private_failures(){
  value:=objc_new(ios_runtime.names['NSObject']);dict:=mf_dict(MFAPI{});key:=owned_string('invalid');mf_set(MFAPI{},dict,key,value);before:=ios_runtime.live;mut out:=u64(0xfeed)
@@ -111,11 +125,69 @@ fn mf_private_failures(){
  format:=AudioFormat{48000,0x6c70636d,12,4,1,4,2,16,0};out=0xfeed;assert cm_audio_create(0,&format,12,0,0,0,0,&out)==-12718&&out==0
  assert (runtime_symbol('/System/Library/Frameworks/CoreMedia.framework/CoreMedia','_CMBlockBufferCreateWithMemoryBlock')or{panic(err)})!=0
  for name in ['_CMVideoFormatDescriptionCreateForImageBuffer']!{if _:=runtime_symbol('/System/Library/Frameworks/CoreMedia.framework/CoreMedia',name){assert false}}
- for name in ['_CMAudioFormatDescriptionGetStreamBasicDescription','_CMFormatDescriptionGetExtensions','_kCMFormatDescriptionTransferFunction_sRGB']!{for lib in ['/System/Library/Frameworks/Foundation.framework/Foundation','/System/Library/Frameworks/CoreVideo.framework/CoreVideo','/usr/lib/libSystem.B.dylib']!{if _:=runtime_symbol(lib,name){assert false}}}
+ for name in ['_CMAudioFormatDescriptionGetStreamBasicDescription','_CMFormatDescriptionGetExtensions','_kCMFormatDescriptionTransferFunction_sRGB','_kCMFormatDescriptionColorPrimaries_P3_D65']!{for lib in ['/System/Library/Frameworks/Foundation.framework/Foundation','/System/Library/Frameworks/CoreVideo.framework/CoreVideo','/usr/lib/libSystem.B.dylib']!{if _:=runtime_symbol(lib,name){assert false}}}
 }
-fn mf_constant_reader(){for _ in 0..32{cell:=coremedia_constant_symbol('_kCMFormatDescriptionTransferFunction_sRGB')or{panic('missing CoreMedia key')};assert string_text(read64(cell))=='IEC_sRGB'}}
+fn mf_constant_pairs() [11][2]string {
+ return [['_kCMFormatDescriptionExtension_FullRangeVideo','FullRangeVideo']!,['_kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms','SampleDescriptionExtensionAtoms']!,['_kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG','ITU_R_2100_HLG']!,['_kCMFormatDescriptionTransferFunction_Linear','Linear']!,['_kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ','SMPTE_ST_2084_PQ']!,['_kCMFormatDescriptionTransferFunction_SMPTE_ST_428_1','SMPTE_ST_428_1']!,['_kCMFormatDescriptionTransferFunction_sRGB','IEC_sRGB']!,['_kCMFormatDescriptionColorPrimaries_P3_D65','P3_D65']!,['_kCMFormatDescriptionColorPrimaries_DCI_P3','DCI_P3']!,['_kCMFormatDescriptionColorPrimaries_ITU_R_2020','ITU_R_2020']!,['_kCMFormatDescriptionYCbCrMatrix_ITU_R_2020','ITU_R_2020']!]!
+}
+fn mf_constant_reader(offset int){
+ pairs:=mf_constant_pairs();mut cells:=[11]u64{}
+ for turn in 0..32{for step in 0..pairs.len{index:=(offset+step)%pairs.len;pair:=pairs[index];cell:=coremedia_constant_symbol(pair[0])or{panic('missing CoreMedia key')};assert string_text(read64(cell))==pair[1];if turn==0{cells[index]=cell}else{assert cells[index]==cell}}}
+}
+fn mf_constants_start(){
+ assert ios_runtime.coremedia_constants_arena==0
+ for name in ['kCMFormatDescriptionColorPrimaries_P3_D65','_kCMFormatDescriptionColorPrimaries_P3_D65_suffix','_kCMFormatDescriptionColorPrimaries_P3_DCI']!{if _:=coremedia_constant_symbol(name){assert false}}
+ assert ios_runtime.coremedia_constants_arena==0
+ ios_runtime.swift_concurrency_retired=true
+ if _:=coremedia_constant_symbol('_kCMFormatDescriptionColorPrimaries_P3_D65'){assert false}
+ assert ios_runtime.coremedia_constants_arena==0
+ ios_runtime.swift_concurrency_retired=false
+}
+fn mf_constants_stop_check(arena u64,objects [11]u64){
+ assert ios_runtime.coremedia_constants_arena==0&&ios_runtime.live==0&&ios_runtime.objects.len==0
+ for object in objects{assert object !in ios_runtime.constants}
+ // mprotect must fail for the retired mapping. No access to unmapped storage.
+ assert C.mprotect(unsafe{voidptr(arena)},usize(C.getpagesize()),C.PROT_READ)==-1
+}
+fn mf_maps_hex(maps string,first int)(u64,int){
+ mut cursor:=first;mut value:=u64(0)
+ for cursor<maps.len{
+  digit:=match maps[cursor]{`0`...`9`{u64(maps[cursor]-`0`)} `a`...`f`{u64(maps[cursor]-`a`+10)} else{break}}
+  assert cursor-first<16;value=value*16+digit;cursor++
+ }
+ assert cursor>first;return value,cursor
+}
+fn mf_constants_permissions(arena u64){
+ page:=u64(C.getpagesize())
+ $if macos{
+  mut start:=arena;mut size:=u64(0);mut info:=[64]i32{};mut count:=u32(C.VM_REGION_SUBMAP_INFO_COUNT_64);mut depth:=u32(999)
+  assert C.vm_region_recurse_64(C.mach_task_self(),&start,&size,&depth,unsafe{&info[0]},&count)==0
+  assert start<=arena&&arena+page<=start+size&&info[0]==C.PROT_READ
+ }$else{
+  // Own one snapshot; do not allocate line/field substrings under -gc none.
+  maps:=os.read_file('/proc/self/maps')or{panic(err)};defer{unsafe{maps.free()}}
+  mut cursor:=0
+  for cursor<maps.len{
+   start,after_start:=mf_maps_hex(maps,cursor);cursor=after_start;assert cursor<maps.len&&maps[cursor]==`-`;cursor++
+   end,after_end:=mf_maps_hex(maps,cursor);cursor=after_end;assert cursor<maps.len&&maps[cursor]==` `
+   for cursor<maps.len&&maps[cursor]==` `{cursor++};assert cursor+4<=maps.len
+   if arena>=start&&arena<end{assert page<=end-arena&&maps[cursor]==`r`&&maps[cursor+1]==`-`&&maps[cursor+2]==`-`&&maps[cursor+3]==`p`;return}
+   for cursor<maps.len&&maps[cursor]!=`\n`{cursor++};if cursor<maps.len{cursor++}
+  }
+  assert false,'CoreMedia constants mapping absent'
+ }
+}
 fn test_media_format(){
  $if macos{api:=MFAPI{true,u64(C.dlopen(c'/System/Library/Frameworks/CoreMedia.framework/CoreMedia',2)),u64(C.dlopen(c'/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation',2))};mf_cases(api);println('IOS-MEDIA-FORMAT-NATIVE: generic/audio/video construction,owned ASBD copies,signed dimensions,deep extension snapshots,CF equality/ownership,concurrent readers and exact metadata strings')}
- for _ in 0..2{objc_start();mut readers:=[]thread{};for _ in 0..8{readers<<spawn mf_constant_reader()};readers.wait();unsafe{readers.free()};mf_cases(MFAPI{});mf_private_failures();assert ios_runtime.live==ios_runtime.framework_objects.len&&ios_runtime.objects.len==ios_runtime.framework_objects.len;for object in ios_runtime.framework_objects{assert obj_header(object).refs==1};objc_stop();assert ios_runtime.coremedia_constants_arena==0&&ios_runtime.live==0&&ios_runtime.objects.len==0}
- println('IOS-MEDIA-FORMAT: owned format descriptions,deep immutable extension snapshots,ASBD pointers,signed dimensions,CF equality/ownership,sealed metadata,concurrent readers,two drained runtimes;image sample buffers and codecs remain unavailable')
+ for _ in 0..2{
+  objc_start();mf_constants_start();mut readers:=[]thread{};for offset in 0..8{readers<<spawn mf_constant_reader(offset)};readers.wait();unsafe{readers.free()}
+  mf_cases(MFAPI{});mf_private_failures();arena:=ios_runtime.coremedia_constants_arena;mf_constants_permissions(arena);mut objects:=[11]u64{}
+  for i,pair in mf_constant_pairs(){cell:=coremedia_constant_symbol(pair[0])or{panic('missing CoreMedia key')};assert cell==arena+u64(i*8);objects[i]=read64(cell);assert objects[i]==if i==10{objects[9]}else{arena+88+u64(i*32)};assert read64(objects[i]+16)>=arena+440&&read64(objects[i]+16)+u64(pair[1].len)<arena+u64(C.getpagesize());assert objects[i] in ios_runtime.constants}
+  ios_runtime.swift_concurrency_retired=true
+  assert (coremedia_constant_symbol('_kCMFormatDescriptionColorPrimaries_P3_D65')or{panic('cached global retired too early')})==arena+56
+  ios_runtime.swift_concurrency_retired=false
+  assert ios_runtime.live==ios_runtime.framework_objects.len&&ios_runtime.objects.len==ios_runtime.framework_objects.len;for object in ios_runtime.framework_objects{assert obj_header(object).refs==1}
+  objc_stop();mf_constants_stop_check(arena,objects)
+ }
+ println('IOS-MEDIA-FORMAT: owned format descriptions,deep immutable extension snapshots,ASBD pointers,signed dimensions,CF equality/ownership,eleven sealed globals with P3/2020 color strings and shared 2020 identity,eight cold readers,two drained/unmapped runtimes;image sample buffers and codecs remain unavailable')
 }
