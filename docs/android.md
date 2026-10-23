@@ -161,6 +161,13 @@ successful layout and resets on window attachment changes. The signed
 [layout regression](../tests/native-android-ws/startupfixture/layout_listeners.v)
 checks these transitions, unchanged bounds, remeasurement and exception recovery.
 
+Native WS drawing and pointer dispatch apply nested `translationX` and
+`translationY` values together with parent scrolling. Fractional offsets stay
+in floating point through hit testing and local touch coordinates. The signed
+[translation regression](../tests/native-android-ws/startupfixture/translations.v)
+checks native Canvas pixels across direct, software and hardware-fallback
+layers, negative offsets, child clicks and preserved raw touch coordinates.
+
 The native WS runner installs a streaming JCA provider for SHA-256, SHA-384
 and SHA-512 before APK loading. It uses the private runtime's OpenSSL EVP
 implementation, including independent cloned digest state and reset after

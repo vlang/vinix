@@ -197,21 +197,33 @@ if-nez v3, :next
 invoke-virtual {v1}, Landroid/view/View;->getLeft()I
 move-result v3
 int-to-float v3, v3
+invoke-virtual {v1}, Landroid/view/View;->getTranslationX()F
+move-result v4
+add-float/2addr v3, v4
 cmpg-float v3, v5, v3
 if-ltz v3, :next
 invoke-virtual {v1}, Landroid/view/View;->getTop()I
 move-result v3
 int-to-float v3, v3
+invoke-virtual {v1}, Landroid/view/View;->getTranslationY()F
+move-result v4
+add-float/2addr v3, v4
 cmpg-float v3, v6, v3
 if-ltz v3, :next
 invoke-virtual {v1}, Landroid/view/View;->getRight()I
 move-result v3
 int-to-float v3, v3
+invoke-virtual {v1}, Landroid/view/View;->getTranslationX()F
+move-result v4
+add-float/2addr v3, v4
 cmpl-float v3, v5, v3
 if-gez v3, :next
 invoke-virtual {v1}, Landroid/view/View;->getBottom()I
 move-result v3
 int-to-float v3, v3
+invoke-virtual {v1}, Landroid/view/View;->getTranslationY()F
+move-result v4
+add-float/2addr v3, v4
 cmpl-float v3, v6, v3
 if-gez v3, :next
 const/4 v3, 0
@@ -244,12 +256,18 @@ invoke-virtual {p1}, Landroid/view/View;->getLeft()I
 move-result v2
 sub-int/2addr v1, v2
 int-to-float v1, v1
+invoke-virtual {p1}, Landroid/view/View;->getTranslationX()F
+move-result v3
+sub-float/2addr v1, v3
 invoke-virtual {p0}, Landroid/view/View;->getScrollY()I
 move-result v2
 invoke-virtual {p1}, Landroid/view/View;->getTop()I
 move-result v3
 sub-int/2addr v2, v3
 int-to-float v2, v2
+invoke-virtual {p1}, Landroid/view/View;->getTranslationY()F
+move-result v3
+sub-float/2addr v2, v3
 invoke-virtual {v0, v1, v2}, Landroid/view/MotionEvent;->offsetLocation(FF)V
 invoke-virtual {p1, v0}, Landroid/view/View;->dispatchTouchEvent(Landroid/view/MotionEvent;)Z
 move-result v1

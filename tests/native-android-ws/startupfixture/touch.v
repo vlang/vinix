@@ -123,7 +123,7 @@ invoke-virtual {v1, v3, v3, v4, v4}, Landroid/view/View;->layout(IIII)V
 	check += 'sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v1, "BOOTSTRAP-TOUCH-PASS overlay capture coordinates downTime classification interception cancellation disabled context-flags"\ninvoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\nreturn-void'
 	os.write_file(dir + '/TouchProbe.smali', '.class public Lorg/vinix/bootstrap/TouchProbe;\n.super Ljava/lang/Object;\n' +
 		method('public static expect(IILjava/lang/String;)V', 'if-eq p0, p1, :done\nnew-instance v0, Ljava/lang/AssertionError;\ninvoke-direct {v0, p2}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0\n:done\nreturn-void') +
-		method('private static send(Landroid/view/View;III)Z', '
+		method('public static send(Landroid/view/View;III)Z', '
 new-instance v0, Landroid/view/MotionEvent;
 const/16 v1, 0x1002
 move v2, p1

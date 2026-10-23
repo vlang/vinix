@@ -343,7 +343,7 @@ fn ws_draw_children(e voidptr, object voidptr, canvas voidptr) {
 				width := integer(e, child, c'android/view/View', c'getWidth', c'()I', nil)
 				height := integer(e, child, c'android/view/View', c'getHeight', c'()I', nil)
 				ws_save()
-				ws_translate(f32(left), f32(top))
+				ws_translate(f32(left) + ws_view_translation(e, child, c'translationX'), f32(top) + ws_view_translation(e, child, c'translationY'))
 				ws_clip(0, 0, f32(width), f32(height))
 				draw_args := [Value{ l: canvas }]!
 				call(e, child, c'android/view/View', c'vinixDrawLayer', c'(Landroid/graphics/Canvas;)V', &draw_args[0])
@@ -444,12 +444,16 @@ fn ws_debug_tree(e voidptr, view voidptr, depth i32) {
 	}
 }
 
-fn ws_hit(e voidptr, view voidptr, x i32, y i32, depth i32) voidptr {
+fn ws_view_translation(e voidptr, view voidptr, name &char) f32 {
+	unsafe { return WsFloatField(slot(e, 102))(e, view, field(e, c'android/view/View', name, c'F')) }
+}
+
+fn ws_hit(e voidptr, view voidptr, x f32, y f32, depth i32) voidptr {
 	unsafe {
 		if depth > 64 { return nil }
 		if instance_of(e, view, c'android/view/ViewGroup') {
-			hit_x := x + get_int(e, view, c'android/view/View', c'scrollX')
-			hit_y := y + get_int(e, view, c'android/view/View', c'scrollY')
+			hit_x := x + f32(get_int(e, view, c'android/view/View', c'scrollX'))
+			hit_y := y + f32(get_int(e, view, c'android/view/View', c'scrollY'))
 			count := integer(e, view, c'android/view/ViewGroup', c'getChildCount', c'()I', nil)
 			for i := count - 1; i >= 0; i-- {
 				args := &Value(C.alloca(sizeof(Value)))
@@ -458,8 +462,9 @@ fn ws_hit(e voidptr, view voidptr, x i32, y i32, depth i32) voidptr {
 				if integer(e, child, c'android/view/View', c'getVisibility', c'()I', nil) != 0 {
 					continue
 				}
-				left, top := integer(e, child, c'android/view/View', c'getLeft', c'()I', nil), integer(e, child, c'android/view/View', c'getTop', c'()I', nil)
-				right, bottom := integer(e, child, c'android/view/View', c'getRight', c'()I', nil), integer(e, child, c'android/view/View', c'getBottom', c'()I', nil)
+				tx, ty := ws_view_translation(e, child, c'translationX'), ws_view_translation(e, child, c'translationY')
+				left, top := f32(integer(e, child, c'android/view/View', c'getLeft', c'()I', nil)) + tx, f32(integer(e, child, c'android/view/View', c'getTop', c'()I', nil)) + ty
+				right, bottom := f32(integer(e, child, c'android/view/View', c'getRight', c'()I', nil)) + tx, f32(integer(e, child, c'android/view/View', c'getBottom', c'()I', nil)) + ty
 				if hit_x >= left && hit_x < right && hit_y >= top && hit_y < bottom {
 					return ws_hit(e, child, hit_x - left, hit_y - top, depth + 1)
 				}
@@ -470,24 +475,24 @@ fn ws_hit(e voidptr, view voidptr, x i32, y i32, depth i32) voidptr {
 }
 
 struct WsPoint {
-	x i32
-	y i32
+	x f32
+	y f32
 }
 
 type WsLongCall = fn (voidptr, voidptr, voidptr, &Value) i64
 
 fn ws_local_point(e voidptr, view voidptr, x i32, y i32) WsPoint {
 	unsafe {
-		mut local_x := x - if ws.dialog == nil { i32(0) } else { ws.dialog_x }
-		mut local_y := y - if ws.dialog == nil { i32(0) } else { ws.dialog_y }
+		mut local_x := f32(x - if ws.dialog == nil { i32(0) } else { ws.dialog_x })
+		mut local_y := f32(y - if ws.dialog == nil { i32(0) } else { ws.dialog_y })
 		mut node := view
 		for depth := 0; depth < 64 && node != nil; depth++ {
-			local_x -= integer(e, node, c'android/view/View', c'getLeft', c'()I', nil)
-			local_y -= integer(e, node, c'android/view/View', c'getTop', c'()I', nil)
+			local_x -= f32(integer(e, node, c'android/view/View', c'getLeft', c'()I', nil)) + ws_view_translation(e, node, c'translationX')
+			local_y -= f32(integer(e, node, c'android/view/View', c'getTop', c'()I', nil)) + ws_view_translation(e, node, c'translationY')
 			parent := obj(e, node, c'android/view/View', c'getParent', c'()Landroid/view/ViewParent;', nil)
 			if parent == nil || !instance_of(e, parent, c'android/view/View') { break }
-			local_x += get_int(e, parent, c'android/view/View', c'scrollX')
-			local_y += get_int(e, parent, c'android/view/View', c'scrollY')
+			local_x += f32(get_int(e, parent, c'android/view/View', c'scrollX'))
+			local_y += f32(get_int(e, parent, c'android/view/View', c'scrollY'))
 			node = parent
 		}
 		return WsPoint{local_x, local_y}
@@ -533,11 +538,11 @@ fn ws_pointer(e voidptr, event &WsEvent) {
 		} else {
 			ws_dialog_decor(e, ws.dialog)
 		}
-		target := ws_hit(e, root, event.x - if ws.dialog == nil { 0 } else { ws.dialog_x }, event.y - if ws.dialog == nil {
+		target := ws_hit(e, root, f32(event.x - if ws.dialog == nil { 0 } else { ws.dialog_x }), f32(event.y - if ws.dialog == nil {
 			0
 		} else {
 			ws.dialog_y
-		}, 0)
+		}), 0)
 		if target == nil { return }
 		if event.kind == 5 { ws_wheel(e, target, event.value); return }
 		if ws.pressed != nil {
