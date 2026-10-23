@@ -125,6 +125,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if ns_predicate_dispatch(object, selector, mut frame) { return true }
 	if ns_index_set_dispatch(object, selector, mut frame) { return true }
 	if ns_character_set_dispatch(object, selector, mut frame) { return true }
+	if ns_scanner_dispatch(object, selector, mut frame) { return true }
 	if ns_url_query_item_dispatch(object, selector, mut frame) { return true }
 	if ns_timezone_dispatch(object, selector, mut frame) { return true }
 	if ns_input_stream_dispatch(object, selector, mut frame) { return true }

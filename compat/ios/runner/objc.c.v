@@ -130,6 +130,7 @@ mut:
 	predicate &FoundationPredicate = unsafe { nil }
 	index_set &FoundationIndexSet = unsafe { nil }
 	character_set &FoundationCharacterSet = unsafe { nil }
+	scanner &FoundationScanner = unsafe { nil }
 	url_query_item_owned bool
 	url_query_item_initialized bool
 	url_query_item_initializing bool
@@ -511,7 +512,7 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
+		'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSRecursiveLock', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
@@ -613,6 +614,7 @@ fn objc_start() {
 			'NSPredicate' { u32(16) }
 			'NSIndexSet', 'NSMutableIndexSet' { u32(32) }
 			'NSCharacterSet', 'NSMutableCharacterSet' { u32(8) }
+			'NSScanner' { u32(8) }
 			'NSURLQueryItem' { u32(24) }
 			'NSStream' { u32(8) }
 			'NSInputStream' { u32(136) }
@@ -733,6 +735,7 @@ fn objc_allocate(cls u64) u64 {
 	ns_predicate_require_class(cls)
 	ns_index_set_require_class(cls)
 	ns_character_set_require_class(cls)
+	ns_scanner_require_class(cls)
 	ns_url_query_item_require_class(cls)
 	allocation_class := ns_date_allocation_class(ns_uuid_allocation_class(cls))
 	objc_initialize(allocation_class)
@@ -835,6 +838,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).date_formatter != unsafe { nil } { ns_date_formatter_initialize(object); return object }
 	if obj_header(object).index_set != unsafe { nil } { return ns_index_set_initialize(object, 0, 0) }
 	if obj_header(object).character_set != unsafe { nil } { return ns_character_set_initialize(object) }
+	if obj_header(object).scanner != unsafe { nil } { return ns_scanner_default(object) }
 	if obj_header(object).url_query_item_owned { return ns_url_query_item_initialize(object, 0, 0) }
 	if obj_header(object).mutable_string_owned { mutable_string_initialize(object, ''); return object }
 	if ns_timezone_family(cls) { panic('iOS: default timezone construction is not implemented') }

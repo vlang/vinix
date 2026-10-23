@@ -18241,17 +18241,96 @@ The ARM64 character-set fixture passes, including all 38 rejection cases.
 Fortnite's launch probe resolves `NSMutableCharacterSet` and stops at
 `_OBJC_CLASS_$_NSScanner`, before application entry; the process still exits 1.
 
+V supplies bounded `NSScanner` support with Apple's measured public eight-byte
+instance layout, no public ivars and `NSObject` superclass. Five static main-image
+class-reference consumers include Firebase App ID validation, PLCrashReporter
+OS-version parsing and a stripped plist-delimiter parser. They use integer,
+hexadecimal, string, up-to-string and decimal-character-set scans, nil skip sets
+and `isAtEnd`. No selected class references were found in EOSSDK or
+MarketplaceKitWrapper. This inspection identifies dependencies; it does not
+establish that these paths execute.
+
+The profile supports `scannerWithString:`, `initWithString:`, default `init`/`new`,
+`string`, UTF-16 `scanLocation`, `caseSensitive`, copied `charactersToBeSkipped`,
+nil locale, `isAtEnd` and distinct copies preserving the properties and cursor.
+Numeric scans include signed integer/int/long-long and hexadecimal int/long-long.
+They consume overflow digits and saturate at the destination's limit; signed
+scans honor configured skips after the sign. Text scans include string,
+up-to-string, characters-from-set and up-to-characters-from-set variants.
+Failed scans preserve the original cursor and output bytes. Null outputs are
+accepted; successful string outputs are autoreleased and leave the previous
+output object alive. An empty string pattern fails for `scanString:` but consumes
+the remaining suffix for `scanUpToString:`.
+
+Construction copies validated built-in or image-constant strings of at most
+65,536 UTF-8 bytes, including embedded NUL and supplementary scalars. Cursor
+coordinates count UTF-16 units. Numeric and string-pattern scans require the
+entire source to be ASCII; string patterns must also be ASCII. Foundation
+matches canonical Unicode equivalents even with case sensitivity enabled,
+so literal Unicode matching would be incorrect. Character-set scans support
+BMP sources. Skipping uses Unicode scalar membership, including supplementary
+planes, and the default whitespace/newline bitmap matches this Mac's Foundation
+measurement. `initWithString:nil` constructs an empty string with default skips;
+default `init`/`new` instead have nil string and skip-set properties.
+Copying a default scanner normalizes its nil string to an empty string while
+preserving nil skips, matching the measured Foundation behavior.
+
+Input, copy and getter snapshots are owned before Objective-C allocation can
+invoke constructors. A successful text scan commits its cursor and owns its
+result bytes before allocating the output string; callbacks can reenter or
+release the scanner without leaving borrowed sidecar storage. String and skip
+getters return immutable value snapshots; getter identity is outside the profile.
+Skip setters copy built-in character-set bitmaps. Disposal follows allocation
+provenance after isa changes. Caller-owned eight-byte storage requires explicit
+`objc_destructInstance`; generic final release does not preserve caller storage.
+
+Raw scanners require initialization. Reinitialization, nil scan arguments,
+invalid string/set provenance, custom subclasses, nonzero copy zones,
+non-nil locales, out-of-range or surrogate-splitting locations, non-ASCII numeric
+or string-pattern scans, character-set scans of supplementary source text,
+floating-point scans, mutable copies, coding, equality, hashing and descriptions
+fail explicitly. These bounds do not claim equivalent Apple rejection behavior.
+Concurrent runtime shutdown remains outside the profile.
+
+```sh
+v run tests/ios/native-checks.v build-scanner
+```
+
+The shared Foundation fixture checks public metadata, default and nil-input
+construction, copied input and skip sets, UTF-16 cursor positions, integer
+overflow and output widths, text-result lifetimes and the sequences found in
+the static consumers. Runtime checks add image constants, guarded caller
+storage, isa-change disposal, constructors releasing or reentering receivers,
+allocation rollback and 45 explicit rejection cases. Two drained runtime cycles
+return object/live/weak counts to zero.
+
+The host fixture passes with ASan+UBSan in normal and deterministic Swift
+hashing modes, including all 45 rejection cases; leak detection is disabled.
+Two independent lifetime reviews cover the exact final generated C, with
+successful review helpers and retained full function excerpts. Evidence under
+`build/ios/fortnite/scanner-checks` pins 19,485 source, toolchain, runtime and
+review inputs and verifies 175 sealed native/static artifacts, including
+14 retained historical or unsupported nonzero statuses. The final proof verifies
+five binary/generated-C archive pairs, the host dSYM and all four ARM64 phases
+with serial/configuration hashes. Owned VMs are retired, scratch directories
+are empty and the owned RAM disk is detached. These pins do not cover the full
+host dynamic runtime closure.
+
+The ARM64 scanner fixture passes, including all 45 rejection cases. Fortnite's
+launch probe resolves `NSScanner` and stops at `_OBJC_CLASS_$_NSUserActivity`,
+before application entry; the process still exits 1.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,075 | 86 | 78 |
+| Fortnite executable | 2,076 | 85 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,915 | 89 | 114 |
+| All images | 2,916 | 88 | 114 |
 
-The C++/GLES/Text variant reports 2,929 resolved imports, 75 unresolved strong
+The C++/GLES/Text variant reports 2,930 resolved imports, 74 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -18307,7 +18386,7 @@ invocations use `invocation-checks`, invocation operations use
 `invocation-operation-checks`, date formatters use `date-formatter-checks`,
 predicates use `predicate-checks`, index sets use `index-set-checks`,
 URL query items use `url-query-item-checks`, character sets use
-`character-set-checks`,
+`character-set-checks`, scanners use `scanner-checks`,
 keyed archives use `keyed-archiver-checks`, keyed unarchives use
 `keyed-unarchiver-checks`,
 CoreFoundation dictionaries use
@@ -18323,8 +18402,8 @@ mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
 URL session, session configuration, recursive lock, invocation, invocation
-operation, date formatter, predicate, index set, URL query item, character set, keyed archive,
-keyed unarchive, sort descriptor, regular expression, mutable string,
+operation, date formatter, predicate, index set, URL query item, character set,
+scanner, keyed archive, keyed unarchive, sort descriptor, regular expression, mutable string,
 CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String

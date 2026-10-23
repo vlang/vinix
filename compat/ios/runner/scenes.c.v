@@ -56,6 +56,10 @@ fn objc_responds(object u64, selector &char) bool {
 		if ns_url_query_item_unsupported(name) { return native_method(read64(object), name) != 0 }
 		if ns_url_query_item_types('NSURLQueryItem', object in ios_runtime.classes, name) != none { return true }
 	}
+	if ns_scanner_family(formatter_cls) {
+		if ns_scanner_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if ns_scanner_types('NSScanner', object in ios_runtime.classes, name) != none { return true }
+	}
 	if formatter_cls == ios_runtime.names['NSLocale'] && ns_date_formatter_types('NSLocale', object in ios_runtime.classes, name) != none { return true }
 	if ns_timezone_family(if object in ios_runtime.classes { object } else { read64(object) }) {
 		if name in ['init', 'new', 'mutableCopy', 'mutableCopyWithZone:']! { return false }
