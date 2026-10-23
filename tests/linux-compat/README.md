@@ -2202,3 +2202,21 @@ and identical Linux probe ELFs pass; original kernels fail 89 checks each.
 The existing 175-check ABI case also passes on both candidate kernels.
 Set size remains limited to 32 semaphores. The broader IPC and application
 limits listed above remain unqualified.
+
+The `sempid` case adds 261 native ELF64 checks for per-index GETPID metadata.
+It covers SETVAL, untouched indices, zero/duplicate/net-zero vectors, queued
+grants using the original caller's PID, refusal/timeout/interruption canaries,
+thread-group PID versus TID, and the final supported index. Run
+`--cases sempid,semword,semabi` with a fresh state directory. Exact passing
+summaries and PASS markers are required.
+
+`sempid-reference.v` accepts the same Linux-reference arguments as
+`semabi-reference.v`; `--self-test` runs two positive and nine negative parser
+controls. Compile `sempid-evidence.v` without `-prod`, run `--self-test`, then
+`check` on the [retained evidence](results/2026-10-23/sempid-evidence).
+Both native kernels and identical Linux probe ELFs pass all 261 checks;
+original kernels fail 79 each. The maintained 276/175-check ABI suites also
+pass on both corrected kernels. Generated-C reviews confirm inline PID storage
+with the existing set lifetime. External toolchains and boot media have
+explicit content pins. This leaves the broader IPC/libc, installation and
+foreign/32-bit application qualifications open.

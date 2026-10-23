@@ -1708,6 +1708,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   candidate kernels. Set-size and remaining IPC limits stay explicit.
   See [the signed-argument receipts](docs/linux-posix-qualification.md#native-semaphore-signed-integer-arguments).
 
+- [x] Track semaphore operation PIDs per index, including SETVAL, successful
+  zero/net-zero vectors and queued grants by the original caller; preserve
+  metadata after refusal, timeout and interruption. Qualify 261 controls on
+  both architectures against identical Linux ELFs and repeat the maintained
+  276/175-check ABI suites. Remaining IPC and foreign paths stay explicit.
+  See [the PID receipts](docs/linux-posix-qualification.md#per-index-semaphore-operation-pids).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

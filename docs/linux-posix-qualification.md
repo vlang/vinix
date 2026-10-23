@@ -10948,5 +10948,49 @@ sessions' changes to the shared checkout.
 
 Vinix still limits sets to 32 semaphores and vectors to 32 operations. SEM_UNDO,
 permissions/namespaces, per-index GETPID, GNU libc and translated/32-bit paths
-remain unqualified. The broader libc, installation/sandbox and foreign
+were outside this argument qualification. Per-index GETPID is qualified below.
+The broader libc, installation/sandbox and foreign
 application roadmap gates remain open.
+
+## Per-index semaphore operation PIDs
+
+GETPID now records the last successful operation's thread-group PID for each
+semaphore. SETVAL updates only the selected index. Successful zero operations,
+duplicate indices and net-zero vectors record their caller, and queued grants
+retain the original caller's PID. Failed proposals, timeouts and interruptions
+leave all values and PIDs unchanged.
+
+The [retained evidence](../tests/linux-compat/results/2026-10-23/sempid-evidence/README.md)
+contains 261-check native and Linux 6.12.51 runs for each architecture using
+identical static musl ELFs. Both original Vinix kernels fail exactly 79 checks;
+both corrected kernels and Linux references pass all 261. Controls cover
+untouched indices, same-value SETVAL, zero/duplicate/net-zero operations,
+queued decrement and zero waits, NOWAIT/range/index/pointer errors, timeout,
+interruption, thread-group PID versus TID, and all 32 supported indices.
+The maintained runner repeats the 261 checks and passes the existing 276-check
+signed-argument and 175-check import suites on the same kernels.
+
+Production builds use isolated candidate
+`004aaa782d989515399ccdcd9e94b81094337dcb`, directly based on
+`955b4af34bd668722631cef7926be5a0a22cec1e`. The containing repository commit
+integrates exact semaphore source SHA-256
+`c9c74221120bc1dd4c8695eb59a4f151604a4449bef6439e796b89824ecdc186`.
+Before/after input maps match. Generated C confirms the 32-slot PID array is
+zero-initialized inside the existing set allocation, adds 248 bytes to that
+allocation, and introduces no new allocation or lifetime. Successful commits
+update vector indices; queued commits use the pending caller. Existing set and
+pending-vector ownership and teardown are unchanged.
+
+The portable V checker validates retained hashes, compilation/ELF architecture,
+isolated build identity, baseline failures, identical Linux/native probes,
+maintained regressions, generated-C reviews and controller statuses.
+It passes nine negative controls; the Linux controller separately passes two
+positive and nine negative controls. Initial unsuccessful compilations and
+their source remain separate. External toolchains and large boot media have
+explicit content pins. The completion receipt binds the final successful audit
+to the checker and manifest.
+
+The 32-semaphore/32-operation ceilings, SEM_UNDO, IPC permissions/namespaces,
+remaining semctl commands, GNU libc and translated/32-bit paths remain separate.
+The broader libc, installation/service/sandbox and foreign application gates
+remain open.

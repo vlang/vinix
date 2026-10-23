@@ -1,0 +1,68 @@
+diff --git a/kernel/sysvsem/sysvsem.v b/kernel/sysvsem/sysvsem.v
+index c80ad5c12..d9fbef916 100644
+--- a/kernel/sysvsem/sysvsem.v
++++ b/kernel/sysvsem/sysvsem.v
+@@ -44,7 +44,9 @@ mut:
+     id int
+     key i32
+     values []int
+-    last_pid int
++    // Linux's sempid belongs to each semaphore, including zero operations.
++    // Inline storage shares the set lifetime and needs no separate allocation.
++    last_pid [max_sems]int
+     removed bool
+     // Pins include completed-but-not-yet-unwound syscall frames.
+     waiters int
+@@ -91,9 +93,14 @@ fn evaluate_unlocked(set &Set, operations &SemBuf, count int, proposed &int) (in
+     }
+ }
+ 
+-fn commit_unlocked(mut set Set, proposed &int, pid int) {
++fn commit_unlocked(mut set Set, proposed &int, operations &SemBuf, count int, pid int) {
+     for number in 0 .. set.values.len { set.values[number] = unsafe { proposed[number] } }
+-    set.last_pid = pid
++    // Record every index in a successful vector, even duplicate/net-zero
++    // operations. Failed or still-blocked proposals never reach this point.
++    for i in 0 .. count {
++        number := int(unsafe { operations[i].number })
++        set.last_pid[number] = pid
++    }
+ }
+ 
+ fn link_unlocked(mut set Set, mut pending Pending) {
+@@ -144,7 +151,7 @@ fn progress_unlocked(mut set Set) {
+             pending.wait_zero = wait_zero
+             pending = next
+         } else {
+-            commit_unlocked(mut set, unsafe { &proposed[0] }, pending.pid)
++            commit_unlocked(mut set, unsafe { &proposed[0] }, pending.operations, pending.count, pending.pid)
+             complete_unlocked(mut set, mut pending, 0)
+             pending = set.pending_head
+         }
+@@ -273,7 +280,7 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64)
+             return u64(value), 0
+         }
+         getpid {
+-            pid := set.last_pid
++            pid := set.last_pid[number]
+             sets_lock.release()
+             return u64(pid), 0
+         }
+@@ -296,7 +303,7 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64)
+                 return errno.err, errno.erange
+             }
+             set.values[number] = value
+-            set.last_pid = proc.current_thread().process.pid
++            set.last_pid[number] = proc.current_thread().process.pid
+             progress_unlocked(mut set)
+             sets_lock.release()
+             return 0, 0
+@@ -362,7 +369,7 @@ fn operate(id i32, user_operations u64, count u32, timeout_address u64) (u64, u6
+         return errno.err, result
+     }
+     if blocker < 0 {
+-        commit_unlocked(mut set, unsafe { &proposed[0] }, pid)
++        commit_unlocked(mut set, unsafe { &proposed[0] }, unsafe { &operations[0] }, int(count), pid)
+         progress_unlocked(mut set)
+         sets_lock.release()
+         return 0, 0
