@@ -261,6 +261,7 @@ fn ui_event_loop(request int, response int) ! {
 			6 {}
 			else { return error('unsupported UIKit desktop command') }
 		}
+		ios_runtime.dirty = ns_notification_queues_drain() || ios_runtime.dirty
 		objc_pool_pop(pool)
 		unsafe { payload.free() }
 		if !ui_reply(response, state, encoded) { break }

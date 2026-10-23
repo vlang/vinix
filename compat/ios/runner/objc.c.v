@@ -132,6 +132,7 @@ mut:
 	character_set &FoundationCharacterSet = unsafe { nil }
 	scanner &FoundationScanner = unsafe { nil }
 	user_activity &FoundationUserActivity = unsafe { nil }
+	notification_queue &FoundationNotificationQueue = unsafe { nil }
 	url_query_item_owned bool
 	url_query_item_initialized bool
 	url_query_item_initializing bool
@@ -465,6 +466,12 @@ mut:
 	bundle_object u64
 	application u64
 	notification_center u64
+	notification_queue u64 // One main-thread default queue cache reference.
+	notification_queue_initializing bool
+	notification_queue_center_initializing bool
+	notification_queues []u64 // One scheduler reference per pending queue.
+	notification_queues_draining bool
+	notification_queues_retired bool
 	audio_session u64
 	audio_converters map[u64]&AudioConverter
 	audio_units map[u64]&AudioUnit
@@ -510,6 +517,7 @@ fn objc_start() {
 	ios_runtime.connections.flags |= .noslices
 	ios_runtime.main_thread = u64(C.pthread_self())
 	ios_runtime.observers.flags |= .noslices
+	ios_runtime.notification_queues.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
@@ -518,7 +526,7 @@ fn objc_start() {
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
-        'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet', 'NSMutableCharacterSet',
+        'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSOperation', 'NSInvocationOperation', 'NSInvocation', 'NSMethodSignature', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLQueryItem', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
@@ -617,6 +625,7 @@ fn objc_start() {
 			'NSCharacterSet', 'NSMutableCharacterSet' { u32(8) }
 			'NSScanner' { u32(8) }
 			'NSUserActivity' { u32(32) }
+			'NSNotificationQueue' { u32(32) }
 			'NSURLQueryItem' { u32(24) }
 			'NSStream' { u32(8) }
 			'NSInputStream' { u32(136) }
@@ -684,6 +693,7 @@ fn objc_start() {
 	ns_index_set_metadata()
 	ns_url_query_item_metadata()
 	ns_user_activity_metadata()
+	ns_notification_queue_metadata()
 	ns_keyed_archiver_metadata()
 	ns_keyed_unarchiver_metadata()
 	sort_descriptor_metadata()
@@ -740,6 +750,7 @@ fn objc_allocate(cls u64) u64 {
 	ns_character_set_require_class(cls)
 	ns_scanner_require_class(cls)
 	ns_user_activity_require_class(cls)
+	ns_notification_queue_require_class(cls)
 	ns_url_query_item_require_class(cls)
 	allocation_class := ns_date_allocation_class(ns_uuid_allocation_class(cls))
 	objc_initialize(allocation_class)
@@ -844,6 +855,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).character_set != unsafe { nil } { return ns_character_set_initialize(object) }
 	if obj_header(object).scanner != unsafe { nil } { return ns_scanner_default(object) }
 	if obj_header(object).user_activity != unsafe { nil } { panic('iOS: user activity requires designated construction') }
+	if obj_header(object).notification_queue != unsafe { nil } { return ns_notification_queue_initialize(object, 0, true) }
 	if obj_header(object).url_query_item_owned { return ns_url_query_item_initialize(object, 0, 0) }
 	if obj_header(object).mutable_string_owned { mutable_string_initialize(object, ''); return object }
 	if ns_timezone_family(cls) { panic('iOS: default timezone construction is not implemented') }
@@ -898,6 +910,7 @@ fn objc_stop() {
 	objc_release(ios_runtime.device)
 	objc_release(ios_runtime.bundle_object)
 	objc_release(ios_runtime.application)
+	ns_notification_queues_stop()
 	notification_stop()
 	objc_release(ios_runtime.notification_center)
 	objc_release(ios_runtime.audio_session)

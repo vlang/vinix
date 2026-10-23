@@ -18391,17 +18391,88 @@ Fortnite's launch probe resolves `NSUserActivity` and stops at
 `_OBJC_CLASS_$_NSNotificationQueue`, before application entry; the process still
 exits 1.
 
+V supplies a bounded main-thread `NSNotificationQueue` with Apple's measured
+32-byte public layout, `NSObject` superclass and three opaque object ivars at
+offsets 8, 16 and 24. The selected main-image consumer,
+`FIRMessaging setAPNSToken:type:`, creates a notification named
+`com.firebase.iid.notif.apns-token`, with a copied token as its sender and an
+`APNSTokenType` number in its userInfo. It obtains `defaultQueue` and uses the
+short enqueue overload with `NSPostASAP` (2). The selected EOSSDK and
+MarketplaceKitWrapper scans found no queue consumer. Static inspection does
+not establish that this path executes or identify a matching observer.
+
+The profile supports `defaultQueue`, `init`, `initWithNotificationCenter:`,
+both enqueue overloads and `dequeueNotificationsMatching:coalesceMask:`.
+`NSPostASAP` defers delivery until the desktop event loop finishes its current
+command. `NSPostNow` (3) posts synchronously after removing matching pending
+notifications. A nil designated center suppresses delivery, matching
+Foundation; default construction retains the existing default center.
+
+Coalescing masks 0 through 3 mean none, name, sender identity, or both. The
+short overload uses both, retaining the first matching pending notification.
+Unique notifications preserve FIFO order. Dequeue releases matching pending
+notifications; a nil filter only matches nil senders under mask 2. A queue
+remains retained by the scheduler until its next checkpoint, even after
+dequeue empties it. Delivery detaches a ready batch before invoking observers,
+so callbacks can enqueue or dequeue pending work without cancelling that
+batch. Callback-enqueued work is delivered by the checkpoint before it returns.
+
+Names must be validated immutable built-in or image-constant strings of at
+most 65,536 UTF-8 bytes. Pending entries retain their notifications and snapshot
+name bytes; notifications retain sender and userInfo identity. The scheduler,
+delivery pin and retained center protect callbacks that release the caller's
+last queue reference. Shutdown cancels pending work and releases queue caches
+before retiring notification observers and centers.
+
+Background run loops, idle posting, non-nil mode arrays, custom queue or center
+subclasses, reinitialization, opaque ivar writes, copying, coding, equality,
+hashing and descriptions fail explicitly. The profile bounds pending work to
+4,096 notifications per queue, 256 scheduled queues and 4,096 deliveries per
+checkpoint. Recursive checkpoint drainage and queue construction are rejected.
+These bounds do not claim equivalent Apple rejection behavior. Concurrent
+runtime shutdown remains outside the profile.
+
+```sh
+v run tests/ios/native-checks.v build-notification-queue
+```
+
+The shared fixture compares layout, method encodings, FIFO delivery, coalescing,
+nil filters and centers, pending ownership and callback batch behavior with
+native Foundation. Runtime checks also cover unlocked constructor and removal
+callbacks, failed construction, guarded caller storage, changed-isa disposal,
+native method precedence and 49 explicit rejection cases. Repeated runtime
+cycles drain all objects, including pending work cancelled during shutdown.
+
+The host fixture passes with ASan+UBSan in normal and deterministic Swift
+hashing modes, including all 49 rejection cases; leak detection is disabled.
+Two independent lifetime reviews cover the exact final generated C.
+The reviewed callback path uses native Objective-C method implementations.
+The existing framework-dispatch callback fallback still leaves a register frame
+allocated.
+
+Evidence under `build/ios/fortnite/notification-queue-checks` pins 20,922 source,
+toolchain, runtime and review inputs and verifies 371 sealed native artifacts,
+including 13 retained historical or unsupported nonzero statuses. These pins do
+not cover the full host dynamic runtime closure.
+
+All four ARM64 phases pass: the shared fixture, Fortnite's launch probe, the
+C++/GLES/Text import audit and the static C++ import audit. The proof retains
+five binary/generated-C archive pairs, the host dSYM and four guest serial/config
+pairs. Owned guest VMs, scratch files and the RAM disk are retired. The probe now
+resolves `NSNotificationQueue` and stops at `_OBJC_CLASS_$_NSCalendar`, attributed
+to CoreFoundation, before application entry; the process still exits 1.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,077 | 84 | 78 |
+| Fortnite executable | 2,078 | 83 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,917 | 87 | 114 |
+| All images | 2,918 | 86 | 114 |
 
-The C++/GLES/Text variant reports 2,931 resolved imports, 73 unresolved strong
+The C++/GLES/Text variant reports 2,932 resolved imports, 72 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -18458,7 +18529,7 @@ invocations use `invocation-checks`, invocation operations use
 predicates use `predicate-checks`, index sets use `index-set-checks`,
 URL query items use `url-query-item-checks`, character sets use
 `character-set-checks`, scanners use `scanner-checks`, user activities use
-`user-activity-checks`,
+`user-activity-checks`, notification queues use `notification-queue-checks`,
 keyed archives use `keyed-archiver-checks`, keyed unarchives use
 `keyed-unarchiver-checks`,
 CoreFoundation dictionaries use
@@ -18475,8 +18546,8 @@ there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
 URL session, session configuration, recursive lock, invocation, invocation
 operation, date formatter, predicate, index set, URL query item, character set,
-scanner, user activity, keyed archive, keyed unarchive, sort descriptor, regular
-expression, mutable string, CoreFoundation dictionary,
+scanner, user activity, notification queue, keyed archive, keyed unarchive,
+sort descriptor, regular expression, mutable string, CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String
 metadata/witness checks before the existing Mach-O suite and requires the

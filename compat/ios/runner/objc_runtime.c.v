@@ -109,6 +109,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := ns_character_set_types(info.name, info.meta, selector) { return types }
 	if types := ns_scanner_types(info.name, info.meta, selector) { return types }
 	if types := ns_user_activity_types(info.name, info.meta, selector) { return types }
+	if types := ns_notification_queue_types(info.name, info.meta, selector) { return types }
 	if types := ns_url_query_item_types(info.name, info.meta, selector) { return types }
 	if types := ns_timezone_types(info.name, info.meta, selector) { return types }
 	if types := ns_input_stream_types(info.name, info.meta, selector) { return types }
@@ -170,6 +171,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name in ['NSCharacterSet', 'NSMutableCharacterSet']! && ns_character_set_unsupported(name) { return 0 }
 		if info.name == 'NSScanner' && ns_scanner_unsupported(name) { return 0 }
 		if info.name == 'NSUserActivity' && ns_user_activity_unsupported(name) { return 0 }
+		if info.name == 'NSNotificationQueue' && ns_notification_queue_unsupported(name) { return 0 }
 		if info.name == 'NSURLQueryItem' && ns_url_query_item_unsupported(name) { return 0 }
 		if info.name == 'NSSortDescriptor' && sort_descriptor_unsupported(name) { return 0 }
 		if info.name == 'NSMutableString' && mutable_string_unsupported(name) { return 0 }

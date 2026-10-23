@@ -11,6 +11,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	ns_character_set_require_class(cls)
 	ns_scanner_require_class(cls)
 	ns_user_activity_require_class(cls)
+	ns_notification_queue_require_class(cls)
 	ns_url_query_item_require_class(cls)
 	ns_recursive_lock_require_class(cls)
 	dispatch_objc_allocation_checked(cls) or { panic(err) }
@@ -55,6 +56,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	ns_character_set_install(cls, mut header)
 	ns_scanner_install(cls, mut header)
 	ns_user_activity_install(cls, mut header)
+	ns_notification_queue_install(cls, mut header)
 	header.url_query_item_owned = cls == ios_runtime.names['NSURLQueryItem']
 	header.auth_owned = objc_is_kind(object, ios_runtime.names['ASWebAuthenticationSession'])
 	header.image_view_owned = objc_is_kind(object, ios_runtime.names['UIImageView'])
@@ -116,6 +118,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	ns_predicate_retire(mut header)
 	ns_url_query_item_retire(mut header)
 	ns_user_activity_retire(mut header)
+	ns_notification_queue_retire(mut header)
 	header.destroying = true
 	C.ios_objc_initialize_lock()
 	swift_unknown_weak_retire_locked(object)
@@ -163,6 +166,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	ns_character_set_dispose(mut header)
 	ns_scanner_dispose(mut header)
 	ns_user_activity_dispose(object, mut header)
+	ns_notification_queue_dispose(object, mut header)
 	ns_url_query_item_dispose(object, mut header)
 	web_auth_dispose(mut header)
 	image_view_dispose(mut header)
