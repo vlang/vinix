@@ -20,6 +20,7 @@ pub fn install(output string, resources string) ! {
  install_font_builders_probe(dir)!
  install_text_locales_probe(dir)!
  install_drawing_ids_probe(dir)!
+ install_render_node_probe(dir)!
  install_text_metrics_probe(dir)!
  install_size_span_probe(dir)!
  install_character_style_probe(dir)!
@@ -159,6 +160,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/TypefaceProbe;->check(Landroid/content/
 invoke-static {p0}, Lorg/vinix/bootstrap/FontBuildersProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/TextLocalesProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/DrawingIdsProbe;->check(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/RenderNodeProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/TextMetricsProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/FontMetricsProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/SizeSpanProbe;->check()V
