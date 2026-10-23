@@ -2,9 +2,9 @@
 @[has_globals]
 module sysvsem
 
-// System V counting semaphores used by the Linux Steam client and other
-// glibc programs. Operations on a set are atomic; waiters sleep on its event
-// and recheck the full operation after every wakeup.
+// Pending semaphore vectors are granted synchronously with value changes.
+// Every pending vector and its private event belong to the operation frame.
+// All queue state and completion decisions are protected by sets_lock.
 
 import kbudget
 import errno
@@ -46,8 +46,118 @@ mut:
     values []int
     last_pid int
     removed bool
+    // Pins include completed-but-not-yet-unwound syscall frames.
     waiters int
+    pending_head &Pending = unsafe { nil }
+    pending_tail &Pending = unsafe { nil }
+}
+
+// This record is explicitly allocated in the operation frame, never on the
+// heap. operations points into that frame's already-copied fixed array.
+struct Pending {
+mut:
+    operations &SemBuf = unsafe { nil }
+    count int
+    pid int
+    previous &Pending = unsafe { nil }
+    next &Pending = unsafe { nil }
+    blocker int = -1
+    wait_zero bool
+    linked bool
+    completed bool
+    result u64
     wake eventstruct.Event
+}
+
+// The proposal is private stack storage. Nothing is committed until the
+// entire vector succeeds. Returns first blocker, its kind, and an errno.
+fn evaluate_unlocked(set &Set, operations &SemBuf, count int, proposed &int) (int, bool, u64) {
+    unsafe {
+        for number in 0 .. set.values.len { proposed[number] = set.values[number] }
+        for i in 0 .. count {
+            op := operations[i]
+            number := int(op.number)
+            if number >= set.values.len { return -1, false, errno.efbig }
+            next := proposed[number] + int(op.operation)
+            blocked := if op.operation == 0 { proposed[number] != 0 } else { next < 0 }
+            if blocked {
+                if int(op.flags) & ipc_nowait != 0 { return -1, false, errno.eagain }
+                return number, op.operation == 0, 0
+            }
+            if next > semvmx { return -1, false, errno.erange }
+            if op.operation != 0 { proposed[number] = next }
+        }
+        return -1, false, 0
+    }
+}
+
+fn commit_unlocked(mut set Set, proposed &int, pid int) {
+    for number in 0 .. set.values.len { set.values[number] = unsafe { proposed[number] } }
+    set.last_pid = pid
+}
+
+fn link_unlocked(mut set Set, mut pending Pending) {
+    pending.previous = set.pending_tail
+    pending.next = unsafe { nil }
+    if set.pending_tail == unsafe { nil } { set.pending_head = unsafe { &pending } }
+    else { set.pending_tail.next = unsafe { &pending } }
+    set.pending_tail = unsafe { &pending }
+    pending.linked = true
+}
+
+fn unlink_unlocked(mut set Set, mut pending Pending) {
+    if !pending.linked { return }
+    if pending.previous == unsafe { nil } { set.pending_head = pending.next }
+    else { pending.previous.next = pending.next }
+    if pending.next == unsafe { nil } { set.pending_tail = pending.previous }
+    else { pending.next.previous = pending.previous }
+    pending.previous = unsafe { nil }
+    pending.next = unsafe { nil }
+    pending.linked = false
+    pending.blocker = -1
+}
+
+// Completion detaches only queue membership. Its frame retains the set pin
+// until await has removed every listener and operate is ready to return.
+fn complete_unlocked(mut set Set, mut pending Pending, result u64) {
+    unlink_unlocked(mut set, mut pending)
+    pending.result = result
+    pending.completed = true
+    event.trigger(mut pending.wake, true)
+}
+
+// SETVAL and successful semop process pending vectors under the same lock as
+// their value change. Every grant restarts the scan because a later vector
+// can enable an earlier vector. Errors detach without committing a proposal.
+fn progress_unlocked(mut set Set) {
+    mut proposed := [max_sems]int{}
+    mut pending := set.pending_head
+    for pending != unsafe { nil } {
+        next := pending.next
+        blocker, wait_zero, result := evaluate_unlocked(set, pending.operations, pending.count,
+            unsafe { &proposed[0] })
+        if result != 0 {
+            complete_unlocked(mut set, mut pending, result)
+            pending = next
+        } else if blocker >= 0 {
+            pending.blocker = blocker
+            pending.wait_zero = wait_zero
+            pending = next
+        } else {
+            commit_unlocked(mut set, unsafe { &proposed[0] }, pending.pid)
+            complete_unlocked(mut set, mut pending, 0)
+            pending = set.pending_head
+        }
+    }
+}
+
+// All paths call this only after await has detached its listeners; the stack
+// record is then unlinked before its frame disappears. Completed records can
+// still be the last owner of a removed set even though no queue entry remains.
+fn release_waiter_unlocked(mut set Set, mut pending Pending) {
+    unlink_unlocked(mut set, mut pending)
+    set.waiters--
+    if set.removed && set.waiters == 0 { destroy_unlocked(set) }
 }
 
 __global (
@@ -142,7 +252,12 @@ pub fn syscall_semctl(_ voidptr, id int, number int, command int, argument u64) 
     match command {
         ipc_rmid {
             set.removed = true
-            event.trigger(mut set.wake, true)
+            // Previously granted frames keep their saved success. Only live
+            // pending records are completed with EIDRM by removal.
+            for set.pending_head != unsafe { nil } {
+                mut pending := set.pending_head
+                complete_unlocked(mut set, mut pending, errno.eidrm)
+            }
             if set.waiters == 0 {
                 destroy_unlocked(set)
             }
@@ -160,8 +275,14 @@ pub fn syscall_semctl(_ voidptr, id int, number int, command int, argument u64) 
             return u64(pid), 0
         }
         getncnt, getzcnt {
+            mut count := u64(0)
+            mut pending := set.pending_head
+            for pending != unsafe { nil } {
+                if pending.blocker == number && pending.wait_zero == (command == getzcnt) { count++ }
+                pending = pending.next
+            }
             sets_lock.release()
-            return 0, 0
+            return count, 0
         }
         setval {
             if argument > semvmx {
@@ -170,7 +291,7 @@ pub fn syscall_semctl(_ voidptr, id int, number int, command int, argument u64) 
             }
             set.values[number] = int(argument)
             set.last_pid = proc.current_thread().process.pid
-            event.trigger(mut set.wake, true)
+            progress_unlocked(mut set)
             sets_lock.release()
             return 0, 0
         }
@@ -214,60 +335,55 @@ fn operate(id int, user_operations u64, count u64, timeout_address u64) (u64, u6
         timer = time.new_timer(duration)
     }
 
-    for {
-        sets_lock.acquire()
-        mut set := find_id_unlocked(id)
-        if set == unsafe { nil } || set.removed {
-            sets_lock.release()
-            return errno.err, errno.eidrm
-        }
-        mut proposed := set.values.clone()
-        mut blocked := false
-        mut nowait := false
-        for i in 0 .. int(count) {
-            op := operations[i]
-            number := int(op.number)
-            if number >= proposed.len {
-                unsafe { proposed.free() }
-                sets_lock.release()
-                return errno.err, errno.efbig
-            }
-            next := proposed[number] + int(op.operation)
-            if op.operation == 0 {
-                blocked = proposed[number] != 0
-            } else if next < 0 {
-                blocked = true
-            } else if next > semvmx {
-                unsafe { proposed.free() }
-                sets_lock.release()
-                return errno.err, errno.erange
-            } else {
-                proposed[number] = next
-            }
-            if blocked {
-                nowait = int(op.flags) & ipc_nowait != 0
-                break
-            }
-        }
-        if !blocked {
-            unsafe { set.values.free() }
-            set.values = proposed
-            set.last_pid = proc.current_thread().process.pid
-            event.trigger(mut set.wake, true)
-            sets_lock.release()
-            return 0, 0
-        }
-        unsafe { proposed.free() }
-        if nowait {
-            sets_lock.release()
-            return errno.err, errno.eagain
-        }
-        generation := event.generation(mut set.wake)
-        set.waiters++
-        mut wake := &set.wake
+    sets_lock.acquire()
+    mut set := find_id_unlocked(id)
+    if set == unsafe { nil } || set.removed {
         sets_lock.release()
+        return errno.err, errno.eidrm
+    }
+    // Reject an invalid semaphore anywhere in the copied vector before
+    // retaining its frame in the queue, including after a potential blocker.
+    for i in 0 .. int(count) {
+        if int(operations[i].number) >= set.values.len {
+            sets_lock.release()
+            return errno.err, errno.efbig
+        }
+    }
+    pid := proc.current_thread().process.pid
+    mut proposed := [max_sems]int{}
+    blocker, wait_zero, result := evaluate_unlocked(set, unsafe { &operations[0] }, int(count),
+        unsafe { &proposed[0] })
+    if result != 0 {
+        sets_lock.release()
+        return errno.err, result
+    }
+    if blocker < 0 {
+        commit_unlocked(mut set, unsafe { &proposed[0] }, pid)
+        progress_unlocked(mut set)
+        sets_lock.release()
+        return 0, 0
+    }
 
-        mut storage := [wake, wake]!
+    // Explicit stack storage avoids an escaping local being heap-promoted.
+    // No queue/vector allocation occurs on the blocking path. The record's
+    // private event also avoids a shared event's listener limit across waiters.
+    mut pending := unsafe { &Pending(C.vinix_stack_alloc(sizeof(Pending))) }
+    unsafe {
+        *pending = Pending{
+            operations: &operations[0]
+            count: int(count)
+            pid: pid
+            blocker: blocker
+            wait_zero: wait_zero
+        }
+    }
+    set.waiters++
+    link_unlocked(mut set, mut pending)
+
+    for {
+        generation := event.generation(mut pending.wake)
+        sets_lock.release()
+        mut storage := [unsafe { &pending.wake }, unsafe { &pending.wake }]!
         mut waiting := 1
         if timer != unsafe { nil } {
             storage[1] = &timer.event
@@ -275,23 +391,28 @@ fn operate(id int, user_operations u64, count u64, timeout_address u64) (u64, u6
         }
         mut events := unsafe { event.stack_list(&storage[0], waiting) }
         which := event.await_from_generation(mut events, true, 0, generation) or { u64(-1) }
-
         sets_lock.acquire()
-        set.waiters--
-        removed := set.removed
-        if removed && set.waiters == 0 {
-            destroy_unlocked(set)
+        // Completion wins against later RMID, timer expiry or signal delivery.
+        // Unlinking a granted frame did not release its pin or this stack event.
+        if pending.completed {
+            saved_result := pending.result
+            release_waiter_unlocked(mut set, mut pending)
+            sets_lock.release()
+            if saved_result == 0 { return 0, 0 }
+            return errno.err, saved_result
         }
-        sets_lock.release()
-        if removed {
+        if set.removed {
+            release_waiter_unlocked(mut set, mut pending)
+            sets_lock.release()
             return errno.err, errno.eidrm
         }
-        if which == u64(-1) {
-            return errno.err, errno.eintr
+        if which == u64(-1) || which == 1 {
+            release_waiter_unlocked(mut set, mut pending)
+            sets_lock.release()
+            return errno.err, if which == 1 { errno.eagain } else { errno.eintr }
         }
-        if which == 1 {
-            return errno.err, errno.eagain
-        }
+        // A spurious wake retains its original queue position and lifetime
+        // pin. Value changes are handled by the changer under sets_lock.
     }
     return 0, 0
 }

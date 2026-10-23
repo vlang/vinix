@@ -10,6 +10,7 @@ import os
 struct CaseResult {
 	name          string
 	source_sha256 string
+	source_inputs map[string]string
 	init_sha256   string
 	iso_sha256    string
 	exit_code     int
@@ -28,6 +29,34 @@ fn digest(path string) string {
 	return sha256.sum(bytes).hex()
 }
 
+fn fixture_files(name string) []string {
+	// compile_init compiles the complete frozen module directory. Install the
+	// five qualified semwait sources together so every compiled input is pinned.
+	return if name == 'semwait' {
+		['core.v', 'snapshot.v', 'storage.v', 'queued.v', 'lifetime.v']
+	} else {
+		['core.v']
+	}
+}
+
+fn freeze_fixture(source string, frozen string, names []string) !map[string]string {
+	os.mkdir_all(frozen)!
+	mut inputs := map[string]string{}
+	for name in names {
+		path := source + '/' + name
+		bytes := os.read_bytes(path)!
+		os.write_file_array(frozen + '/' + name, bytes)!
+		inputs[path] = sha256.sum(bytes).hex()
+	}
+	return inputs
+}
+
+fn fixture_timeout(name string, requested int, explicit bool) int {
+	if explicit { return requested }
+	// These probes include repeated reclamation grace periods and SMP churn.
+	return if name == 'semwait' { 7200 } else if name == 'procns' { 1200 } else { requested }
+}
+
 fn main() {
 	options := guesthost.parse(os.args[1..], [
 		hosttest.Option{ name: '--arch', value: true, choices: ['aarch64', 'x86_64'] },
@@ -35,7 +64,7 @@ fn main() {
 		hosttest.Option{ name: '--state-dir', value: true },
 		hosttest.Option{ name: '--cases', value: true },
 		hosttest.Option{ name: '--timeout', value: true },
-	], [], 'Usage: tests/linux-compat/run --arch aarch64|x86_64 --kernel-dir DIR --state-dir FRESH-DIR [--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio,iovpin,iovimport,iovrange,iovoffset,iovposition,iovflags,iovfd,iovstream,iovpacket,opathseek,scalarabi,seekerror,seekextent,truncateaccess,truncateabi,truncatepath,readlinkabi,readlinkempty,procself,execnames,statx,statabi,dupabi,duppublish,fcntlabi,fcntlpath,fcntlquery,fcntlcreated,fcntlsync,ofdlocks,lockrange,lockaccess,flocksame,fcntlsig,fcntlowner,ownerquery,proctask,procpid,accessflags,pipeabi,pipepair,pipenull,pipecmd,pipesize,schedabi,schext,rrabi,attrquery,attrimport,affabi,attrnice,rtadmit,idleexit,attrclass,niceabi,niceadmit,threadnice,randomflags,randomcopy,randomrange,randomsignal,groupabi,grouptid,grouporder,groupzombie,waitabi,waitempty,waituid,waitevent,waitusage,waitconsume,waitstatus,robustquery,robustwake,robustcreds,tidwake,tidfault,tidlast,clonesignal,clonecgroup,clonestack,cloneflags,cloneclear,cloneextend,clonetidpair,clonetidcopy,cloneparent,clonefsns,clonethreadns,clonecgshare,clonecgparent,clonecgperm,clonefuture,clonepidguard,cloneipc,procns] [--timeout SECONDS]') or {
+	], [], 'Usage: tests/linux-compat/run --arch aarch64|x86_64 --kernel-dir DIR --state-dir FRESH-DIR [--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio,iovpin,iovimport,iovrange,iovoffset,iovposition,iovflags,iovfd,iovstream,iovpacket,opathseek,scalarabi,seekerror,seekextent,truncateaccess,truncateabi,truncatepath,readlinkabi,readlinkempty,procself,execnames,statx,statabi,dupabi,duppublish,fcntlabi,fcntlpath,fcntlquery,fcntlcreated,fcntlsync,ofdlocks,lockrange,lockaccess,flocksame,fcntlsig,fcntlowner,ownerquery,proctask,procpid,accessflags,pipeabi,pipepair,pipenull,pipecmd,pipesize,schedabi,schext,rrabi,attrquery,attrimport,affabi,attrnice,rtadmit,idleexit,attrclass,niceabi,niceadmit,threadnice,randomflags,randomcopy,randomrange,randomsignal,groupabi,grouptid,grouporder,groupzombie,waitabi,waitempty,waituid,waitevent,waitusage,waitconsume,waitstatus,robustquery,robustwake,robustcreds,tidwake,tidfault,tidlast,clonesignal,clonecgroup,clonestack,cloneflags,cloneclear,cloneextend,clonetidpair,clonetidcopy,cloneparent,clonefsns,clonethreadns,clonecgshare,clonecgparent,clonecgperm,clonefuture,clonepidguard,cloneipc,procns,semwait] [--timeout SECONDS]') or {
 		eprintln(err.msg())
 		exit(2)
 	}
@@ -50,10 +79,10 @@ fn main() {
 		eprintln(err.msg())
 		exit(2)
 	}
-	cases := options.value('--cases', 'bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio,iovpin,iovimport,iovrange,iovoffset,iovposition,iovflags,iovfd,iovstream,iovpacket,opathseek,scalarabi,seekerror,seekextent,truncateaccess,truncateabi,truncatepath,readlinkabi,readlinkempty,procself,execnames,statx,statabi,dupabi,duppublish,fcntlabi,fcntlpath,fcntlquery,fcntlcreated,fcntlsync,ofdlocks,lockrange,lockaccess,flocksame,fcntlsig,fcntlowner,ownerquery,proctask,procpid,accessflags,pipeabi,pipepair,pipenull,pipecmd,pipesize,schedabi,schext,rrabi,attrquery,attrimport,affabi,attrnice,rtadmit,idleexit,attrclass,niceabi,niceadmit,threadnice,randomflags,randomcopy,randomrange,randomsignal,groupabi,grouptid,grouporder,groupzombie,waitabi,waitempty,waituid,waitevent,waitusage,waitconsume,waitstatus,robustquery,robustwake,robustcreds,tidwake,tidfault,tidlast,clonesignal,clonecgroup,clonestack,cloneflags,cloneclear,cloneextend,clonetidpair,clonetidcopy,cloneparent,clonefsns,clonethreadns,clonecgshare,clonecgparent,clonecgperm,clonefuture,clonepidguard,cloneipc,procns').split(',')
+	cases := options.value('--cases', 'bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio,iovpin,iovimport,iovrange,iovoffset,iovposition,iovflags,iovfd,iovstream,iovpacket,opathseek,scalarabi,seekerror,seekextent,truncateaccess,truncateabi,truncatepath,readlinkabi,readlinkempty,procself,execnames,statx,statabi,dupabi,duppublish,fcntlabi,fcntlpath,fcntlquery,fcntlcreated,fcntlsync,ofdlocks,lockrange,lockaccess,flocksame,fcntlsig,fcntlowner,ownerquery,proctask,procpid,accessflags,pipeabi,pipepair,pipenull,pipecmd,pipesize,schedabi,schext,rrabi,attrquery,attrimport,affabi,attrnice,rtadmit,idleexit,attrclass,niceabi,niceadmit,threadnice,randomflags,randomcopy,randomrange,randomsignal,groupabi,grouptid,grouporder,groupzombie,waitabi,waitempty,waituid,waitevent,waitusage,waitconsume,waitstatus,robustquery,robustwake,robustcreds,tidwake,tidfault,tidlast,clonesignal,clonecgroup,clonestack,cloneflags,cloneclear,cloneextend,clonetidpair,clonetidcopy,cloneparent,clonefsns,clonethreadns,clonecgshare,clonecgparent,clonecgperm,clonefuture,clonepidguard,cloneipc,procns,semwait').split(',')
 	mut seen := map[string]bool{}
 	for name in cases {
-		if name !in ['bpf', 'access', 'open', 'mmap', 'runtime', 'namespace', 'sharedmem', 'seccomp', 'futex', 'futexkeys', 'futexbits', 'futexop', 'futexerror', 'futexqueue', 'sparsefork', 'seccompquery', 'budget', 'mapstorage', 'sysrq', 'jit', 'nnp', 'nnpthread', 'keepcaps', 'securebits', 'ambient', 'capbset', 'capset', 'cappid', 'capabi', 'seccompthread', 'seccompkill', 'seccompinstall', 'seccompalloc', 'sysnr', 'pipezero', 'readerror', 'pathio', 'iovpin', 'iovimport', 'iovrange', 'iovoffset', 'iovposition', 'iovflags', 'iovfd', 'iovstream', 'iovpacket', 'opathseek', 'scalarabi', 'seekerror', 'seekextent', 'truncateaccess', 'truncateabi', 'truncatepath', 'readlinkabi', 'readlinkempty', 'procself', 'execnames', 'statx', 'statabi', 'dupabi', 'duppublish', 'fcntlabi', 'fcntlpath', 'fcntlquery', 'fcntlcreated', 'fcntlsync', 'ofdlocks', 'lockrange', 'lockaccess', 'flocksame', 'fcntlsig', 'fcntlowner', 'ownerquery', 'proctask', 'procpid', 'accessflags', 'pipeabi', 'pipepair', 'pipenull', 'pipecmd', 'pipesize', 'schedabi', 'schext', 'rrabi', 'attrquery', 'attrimport', 'affabi', 'attrnice', 'rtadmit', 'idleexit', 'attrclass', 'niceabi', 'niceadmit', 'threadnice', 'randomflags', 'randomcopy', 'randomrange', 'randomsignal', 'groupabi', 'grouptid', 'grouporder', 'groupzombie', 'waitabi', 'waitempty', 'waituid', 'waitevent', 'waitusage', 'waitconsume', 'waitstatus', 'robustquery', 'robustwake', 'robustcreds', 'tidwake', 'tidfault', 'tidlast', 'clonesignal', 'clonecgroup', 'clonestack', 'cloneflags', 'cloneclear', 'cloneextend', 'clonetidpair', 'clonetidcopy', 'cloneparent', 'clonefsns', 'clonethreadns', 'clonecgshare', 'clonecgparent', 'clonecgperm', 'clonefuture', 'clonepidguard', 'cloneipc', 'procns'] || name in seen {
+		if name !in ['bpf', 'access', 'open', 'mmap', 'runtime', 'namespace', 'sharedmem', 'seccomp', 'futex', 'futexkeys', 'futexbits', 'futexop', 'futexerror', 'futexqueue', 'sparsefork', 'seccompquery', 'budget', 'mapstorage', 'sysrq', 'jit', 'nnp', 'nnpthread', 'keepcaps', 'securebits', 'ambient', 'capbset', 'capset', 'cappid', 'capabi', 'seccompthread', 'seccompkill', 'seccompinstall', 'seccompalloc', 'sysnr', 'pipezero', 'readerror', 'pathio', 'iovpin', 'iovimport', 'iovrange', 'iovoffset', 'iovposition', 'iovflags', 'iovfd', 'iovstream', 'iovpacket', 'opathseek', 'scalarabi', 'seekerror', 'seekextent', 'truncateaccess', 'truncateabi', 'truncatepath', 'readlinkabi', 'readlinkempty', 'procself', 'execnames', 'statx', 'statabi', 'dupabi', 'duppublish', 'fcntlabi', 'fcntlpath', 'fcntlquery', 'fcntlcreated', 'fcntlsync', 'ofdlocks', 'lockrange', 'lockaccess', 'flocksame', 'fcntlsig', 'fcntlowner', 'ownerquery', 'proctask', 'procpid', 'accessflags', 'pipeabi', 'pipepair', 'pipenull', 'pipecmd', 'pipesize', 'schedabi', 'schext', 'rrabi', 'attrquery', 'attrimport', 'affabi', 'attrnice', 'rtadmit', 'idleexit', 'attrclass', 'niceabi', 'niceadmit', 'threadnice', 'randomflags', 'randomcopy', 'randomrange', 'randomsignal', 'groupabi', 'grouptid', 'grouporder', 'groupzombie', 'waitabi', 'waitempty', 'waituid', 'waitevent', 'waitusage', 'waitconsume', 'waitstatus', 'robustquery', 'robustwake', 'robustcreds', 'tidwake', 'tidfault', 'tidlast', 'clonesignal', 'clonecgroup', 'clonestack', 'cloneflags', 'cloneclear', 'cloneextend', 'clonetidpair', 'clonetidcopy', 'cloneparent', 'clonefsns', 'clonethreadns', 'clonecgshare', 'clonecgparent', 'clonecgperm', 'clonefuture', 'clonepidguard', 'cloneipc', 'procns', 'semwait'] || name in seen {
 			eprintln('unknown or repeated case: ' + name)
 			exit(2)
 		}
@@ -95,23 +124,14 @@ fn main() {
 	root := os.real_path(os.dir(@FILE) + '/../..')
 	mut results := []CaseResult{}
 	for name in cases {
-		source := root + '/tests/linux-compat/' + name + 'fixture/core.v'
-		source_text := os.read_file(source) or {
-			eprintln(err.msg())
-			exit(1)
-		}
+		source_dir := root + '/tests/linux-compat/' + name + 'fixture'
 		frozen_source := work + '/sources/' + name + 'fixture'
-		os.mkdir_all(frozen_source) or {
-			eprintln(err.msg())
-			exit(1)
-		}
-		os.write_file(frozen_source + '/core.v', source_text) or {
+		source_inputs := freeze_fixture(source_dir, frozen_source, fixture_files(name)) or {
 			eprintln(err.msg())
 			exit(1)
 		}
 		marker := 'LINUX ' + name.to_upper() + ': PASS'
-		// procns waits through several reclamation grace periods (> 247 seconds).
-		case_timeout := if name == 'procns' && !options.has('--timeout') { 1200 } else { timeout }
+		case_timeout := fixture_timeout(name, timeout, options.has('--timeout'))
 		mut detail := ''
 		code := guesthost.guest(frozen_source + '/core.v', '', work + '/' + name, work + '/kernel', arch,
 			if name == 'runtime' {
@@ -125,7 +145,15 @@ fn main() {
 			detail = err.msg()
 			1
 		}
-		results << CaseResult{name, sha256.sum(source_text.bytes()).hex(), digest(work + '/' + name + '/init'), digest(work + '/' + name + '/test.iso'), code, detail}
+		results << CaseResult{
+			name: name
+			source_sha256: source_inputs[source_dir + '/core.v']
+			source_inputs: source_inputs
+			init_sha256: digest(work + '/' + name + '/init')
+			iso_sha256: digest(work + '/' + name + '/test.iso')
+			exit_code: code
+			detail: detail
+		}
 		os.write_file(work + '/receipt.json', json2.encode(Receipt{ architecture: arch, kernel_sha256: sha256.sum(header).hex(), results: results },
 			prettify: true
 		) + '\n') or {

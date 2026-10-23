@@ -1686,6 +1686,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   failures remain visible. The existing timed reader grace and mount pins
   remain bounded assumptions. See [the procfs receipts and limits](docs/linux-posix-qualification.md#procfs-process-subtree-reclamation).
 
+- [x] Replace placeholder System V semaphore wait counts with atomic pending
+  vectors and private waiter events; preserve granted results across removal,
+  signals and timeout. Qualify native semantics against identical Linux ELFs,
+  80 queued waiters, forced exits and four flat storage cohorts on both
+  architectures, with generated-C lifetime review and desktop regressions.
+  SEM_UNDO, permissions/namespaces and foreign paths remain separate.
+  See [the semaphore receipts](docs/linux-posix-qualification.md#native-semaphore-wait-queues).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

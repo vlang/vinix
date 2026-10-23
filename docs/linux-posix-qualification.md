@@ -10784,3 +10784,76 @@ and [status](../tests/linux-compat/results/2026-10-22/procns-check.status) are r
 The first publication attempt incorrectly required x86 compiler-wrapper JSON
 from a direct GCC build. Its failure and publisher are preserved beside the
 correction; no retrospective compiler receipts were created.
+
+## Native semaphore wait queues
+
+System V semaphore sets now maintain pending operation vectors and a private
+event per blocked syscall. GETNCNT and GETZCNT report the current blocking
+semaphore and condition. Value changes evaluate and commit complete vectors
+under the set lock, including repeated indices and blocker migration. Granted
+vectors leave the pending queue immediately, while their syscall frames retain
+a lifetime pin until event listeners are detached. A saved completion survives
+later removal, signal delivery or timer expiry; removal completes remaining
+pending vectors with EIDRM. Invalid indices are checked throughout the imported
+vector before queuing.
+
+The [portable evidence](../tests/linux-compat/results/2026-10-23/semwait-evidence/README.md)
+qualifies baseline `bd9aa1bc1d04eac1ce31e02ce8914969294566ff` against isolated
+candidate `0e7556c59caac131cdfd2a319673d6e81aa41911`. The containing repository
+commit integrates the exact candidate `sysvsem.v`, SHA-256
+`6043c737cf9d66a1329cab5cfb8bbedb1426afae9b446854e1167fb54548703f`.
+These isolated receipts cover that change and its pinned baseline; they do not
+qualify unrelated changes made in the shared checkout during the runs.
+
+Each native architecture passes 11,163 checks: 1,159 semantic checks and 10,004
+storage checks, with zero failures. Identical musl probe ELFs pass the 1,159
+semantic checks on Linux 6.12.51. The original kernels fail the semantic suite
+on waiter counts; their unchanged storage cohorts also pass. This is evidence
+of corrected wait semantics and bounded lifetime handling, without establishing
+a baseline semaphore storage leak.
+
+The suite queues 80 simultaneous operations, split into 40 negative and 40
+zero waits. It exercises 32 completion-before-removal trials, 32
+completion-before-signal trials and eight completion-before-timeout trials,
+plus 16 exit_group and 16 SIGKILL cleanup trials. Four independent storage
+cohorts exercise release, timeout, interruption and removal, each with 200 warm
+and 200 measured cycles. Each cohort starts, observes sleeping and reaps 400
+children across the two phases. All 18 AArch64 and 14 x86-64 slab classes remain
+flat; big-heap pages remain 63/63 and 149/149 respectively. Unexpected errors
+and writes after free are zero.
+
+Both architectures build in production and allocation-tracking profiles.
+Independent source and generated-C reviews cover all four profiles, including
+stack-resident queue records, listener detachment, completed frame pins,
+removed-set destruction, timer cleanup and forced-exit unwinding. The static
+allocation inventory has 210 unchanged groups and no new or increased group.
+The inherited allowance check still exits 1 on both revisions, with 178 excess
+groups and 401 excess sites; its allowance is not expanded.
+
+Both architectures pass all 36 operation cohorts, with 200 measured iterations
+each, and all four 300-execution churn cohorts with zero retained bytes and no
+slab deltas. The 32 MiB cache workload retains 20 MiB on AArch64 and 7 MiB on
+x86-64, within its declared 64 MiB bound; adjacent slab samples remain within
+the 1 MiB skew bound. Five-second idle, apps and drag measurements pass on
+pinned cached desktop images. Fresh pointer-drag captures show the System
+window moving with its content intact. These are bounded functional and
+retention checks, without establishing release performance or long-term stability.
+
+Four completed AArch64 desktop attempts have raw startup markers interleaved
+with kernel debug output and fail the strict audit. Their logs and failures,
+plus a separate missing-executable-bit launch failure, remain retained. A fresh
+run emits readiness after ten seconds of startup settling and passes with the
+same kernel and unchanged strict parser. Earlier setup and checker failures
+also remain preserved. The portable
+checker rehashes copied artifacts and audits native/reference runs, builds,
+lifetime reviews, allocation comparison and raw performance results. Its
+controls reject disabled assertions, a changed critical source, one-object slab
+growth and an actual cross-architecture kernel swap with a valid hash. Large
+boot media and external toolchains remain explicit hash ledgers, rather than
+claims that the offline bundle reconstructs those inputs.
+
+This qualifies native ELF64 semaphore wait queues only. SEM_UNDO is still
+accepted without implementing undo adjustments. Permissions, namespace
+isolation, per-index GETPID, arbitrary fairness, GNU libc and translated or
+32-bit semaphore paths remain unqualified. The broad libc, installation and
+foreign-application roadmap gates remain open.

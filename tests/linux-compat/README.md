@@ -2144,3 +2144,27 @@ ELF on Linux for held-reference and exit-race semantics, without comparing
 Linux's allocation counters. Compile `procns-check.v` without `-prod` to audit
 the published receipts and its deliberately failing controls. See the
 [reclamation qualification](../../docs/linux-posix-qualification.md#procfs-process-subtree-reclamation).
+
+The `semwait` case checks System V semaphore wait counts, atomic queued vectors,
+blocker migration, repeated indices and completion before later removal, signal
+or timeout. It queues 80 simultaneous waiters and exercises exit_group/SIGKILL
+cleanup. Four storage cohorts separately measure release, timeout, interruption
+and removal after equal 200-cycle warmups. Every slab class and big-heap page
+count must stay flat; errors and writes after free must be zero.
+Run `--cases semwait` with a fresh state directory; its default deadline is
+7,200 seconds, overridden by explicit `--timeout`. The controller freezes and
+hashes all five fixture sources before compilation. Their historical draft
+header is retained to preserve the exact qualified source bytes.
+
+`semwait-reference.v` boots the same native probe on Linux using `--arch`,
+`--kernel`, `--init` and `--state-dir`; `--launcher` optionally supplies the
+separate reference init ELF. `--self-test` checks the reference result parser.
+Compile `semwait-evidence.v` without `-prod` and run `check` on the
+[published evidence directory](results/2026-10-23/semwait-evidence) to verify
+its content hashes, native/reference results, builds, independent reviews and
+performance gates. The historical `publish-partial` command also enforces all
+final gates for records marked `QUALIFIED`. Large boot media and toolchain
+dependencies have explicit hash ledgers rather than copied payloads.
+SEM_UNDO, semaphore permissions/namespaces, per-index GETPID, arbitrary fairness,
+GNU libc and foreign/32-bit semaphore paths remain unqualified. See the
+[qualification and limits](../../docs/linux-posix-qualification.md#native-semaphore-wait-queues).
