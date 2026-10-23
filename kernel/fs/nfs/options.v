@@ -57,9 +57,47 @@ pub fn parse_options(s string, out &Options) bool {
 	return true
 }
 
-// IPv4 numeric host:/absolute/export. Export is borrowed during mount only.
-pub fn parse_source(s string, address &u32, path &string) bool {
-	if s.len < 9 || s.len > 1040 { return false }
+pub const hosts_max = 16384
+pub const host_max = 253
+pub const hosts_line_max = 1024
+
+// Borrowed strings; no allocation or DNS. Numeric-looking invalid IPv4 must
+// not become a hostname that a hosts entry could accidentally authorize.
+pub fn parse_host_source(s string, host &string, path &string) bool {
+	if s.len < 4 || s.len > host_max + 1 + 1024 { return false }
+	mut at := 0
+	for at < s.len && s[at] != `:` { at++ }
+	if at == 0 || at > host_max || at + 1 >= s.len || s[at+1] != `/` || s.len-at-1 > 1024 { return false }
+	h := unsafe { tos(s.str, at) }
+	if !host_name(h) { return false }
+	for i in at+1 .. s.len { if s[i] == 0 || s[i] < 32 || s[i] == 127 { return false } }
+	unsafe { *host = h; *path = tos(s.str + at+1, s.len-at-1) }
+	return true
+}
+
+fn host_name(h string) bool {
+	if h.len == 0 || h.len > host_max { return false }
+	mut numeric := true
+	mut label := 0
+	for i, ch in h {
+		if ch == `.` {
+			if label == 0 || h[i-1] == `-` { return false }
+			label = 0
+			continue
+		}
+		if !((ch >= `a` && ch <= `z`) || (ch >= `A` && ch <= `Z`) || (ch >= `0` && ch <= `9`) || ch == `-`) { return false }
+		if ch < `0` || ch > `9` { numeric = false }
+		if label == 0 && ch == `-` { return false }
+		label++
+		if label > 63 { return false }
+	}
+	if label == 0 || h[h.len-1] == `-` { return false }
+	if numeric { mut ip := u32(0); return parse_ipv4(h, unsafe { &ip }) }
+	return true
+}
+
+pub fn parse_ipv4(s string, address &u32) bool {
+	if s.len < 7 || s.len > 15 { return false }
 	mut at := 0
 	mut ip := u32(0)
 	for part in 0 .. 4 {
@@ -68,11 +106,56 @@ pub fn parse_source(s string, address &u32, path &string) bool {
 		if at-start > 3 { return false }
 		n := decimal(unsafe { tos(s.str + start, at-start) }, 255) or { return false }
 		ip |= n << u32(part*8)
-		if at >= s.len || s[at] != if part == 3 { `:` } else { `.` } { return false }
-		at++
+		if part < 3 {
+			if at >= s.len || s[at] != `.` { return false }
+			at++
+		} else if at != s.len { return false }
 	}
-	if at >= s.len || s[at] != `/` || s.len-at > 1024 { return false }
-	for i in at .. s.len { if s[i] == 0 { return false } }
-	unsafe { *address = ip; *path = tos(s.str + at, s.len-at) }
+	unsafe { *address = ip }
+	return true
+}
+
+// Compatibility numeric-only entry point for existing wire clients.
+pub fn parse_source(s string, address &u32, path &string) bool {
+	mut host := ''; mut export := ''
+	if !parse_host_source(s, unsafe { &host }, unsafe { &export }) || !parse_ipv4(host, address) { return false }
+	unsafe { *path = export }
+	return true
+}
+
+// Exact, case-sensitive hosts aliases. Oversized lines/tokens fail closed;
+// IPv6 and malformed addresses never resolve an IPv4 endpoint. Entire input
+// is validated before returning, including text after a matching line.
+pub fn resolve_hosts(text string, host string, address &u32) bool {
+	if text.len > hosts_max || !host_name(host) { return false }
+	mut at := 0
+	mut found := false
+	mut result := u32(0)
+	for at < text.len {
+		start := at
+		for at < text.len && text[at] != `\n` { if text[at] == 0 { return false }; at++ }
+		end := at; at++
+		if end-start > hosts_line_max { return false }
+		mut pos := start
+		mut token := 0
+		mut valid_ip := false
+		mut ip := u32(0)
+		for pos < end {
+			for pos < end && (text[pos] == ` ` || text[pos] == `\t` || text[pos] == `\r`) { pos++ }
+			if pos == end || text[pos] == `#` { break }
+			ts := pos
+			for pos < end && text[pos] != ` ` && text[pos] != `\t` && text[pos] != `\r` && text[pos] != `#` { pos++ }
+			if pos-ts > host_max { return false }
+			t := unsafe { tos(text.str + ts, pos-ts) }
+			if token == 0 { valid_ip = parse_ipv4(t, unsafe { &ip }) }
+			else if valid_ip && t == host {
+				if found && result != ip { return false }
+				found = true; result = ip
+			}
+			token++
+		}
+	}
+	if !found { return false }
+	unsafe { *address = result }
 	return true
 }

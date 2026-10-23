@@ -1,0 +1,4 @@
+module memory
+fn C.free(voidptr)
+pub fn malloc_packed_fallible(n u64) voidptr { return unsafe { malloc(int(n)) } }
+pub fn free(p voidptr) { C.free(p) }

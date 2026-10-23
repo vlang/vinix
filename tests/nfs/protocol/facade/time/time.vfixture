@@ -1,0 +1,3 @@
+module time
+pub struct TimeSpec { pub mut: tv_sec i64 tv_nsec i64 }
+pub fn monotonic_ns() u64 { return 0 }

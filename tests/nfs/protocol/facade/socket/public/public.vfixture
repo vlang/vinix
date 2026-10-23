@@ -1,0 +1,11 @@
+module public
+import resource
+pub const sock_stream = 1
+pub const sol_socket = 1
+pub const so_error = 4
+pub interface Socket {
+	resource.Resource
+mut:
+	connect(voidptr, voidptr, u32) ?
+	getsockopt(voidptr, int, int) ?int
+}

@@ -1,0 +1,3 @@
+module file
+import resource
+pub struct Handle { pub mut: flags int resource &resource.Resource = unsafe { nil } }

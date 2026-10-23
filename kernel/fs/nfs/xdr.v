@@ -166,6 +166,17 @@ pub fn component(s string) bool {
 	return true
 }
 
+// Reused caller-owned cookie storage bounds scans across all pages. Equality
+// is the only ordering operation on an NFS cookie.
+pub fn remember_cookie(cookies &u64, count int, cookie u64) bool {
+	if count < 0 || count >= max_entries || cookie == 0 { return false }
+	unsafe {
+		for i in 0 .. count { if cookies[i] == cookie { return false } }
+		cookies[count] = cookie
+	}
+	return true
+}
+
 pub struct Entry {
 pub mut:
 	name string // borrowed from RPC receive buffer until the next request

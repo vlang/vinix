@@ -1,0 +1,107 @@
+module fs
+
+import fs.nfs
+import errno
+import resource
+import stat
+
+struct ContractWire {
+mut:
+	tx [nfs.capacity+4]u8
+	rx [nfs.capacity]u8
+	reply [1024]u8
+	length int
+	at int
+	procedure u32
+	sends int
+	kind u32 = 1
+}
+
+fn nfs_contract_transfer(context voidptr, p &u8, count int, sending bool) bool {
+	mut rig := unsafe { &ContractWire(context) }
+	if sending {
+		mut req := nfs.Xdr{p: unsafe { p }, n: count}
+		req.u32(); xid := req.u32()
+		req.u32(); req.u32(); req.u32(); req.u32()
+		rig.procedure = req.u32(); rig.sends++
+		mut w := nfs.Xdr{p: unsafe { &rig.reply[0] }, n: 1024}
+		w.put32(0); w.put32(xid); w.put32(1); w.put32(0); w.put32(0); w.put32(0); w.put32(0)
+		match rig.procedure {
+			1 {
+				w.put32(0)
+				w.put32(rig.kind); w.put32(0o666); w.put32(1); w.put32(0); w.put32(0)
+				w.put64(42); w.put64(512); w.put32(0); w.put32(0)
+				w.put64(7); w.put64(9)
+				for _ in 0 .. 3 { w.put32(1); w.put32(0) }
+			}
+			4 { // Linux RO export: no MODIFY/EXTEND advisory grant.
+				w.put32(0); w.put32(0); w.put32(1)
+			}
+			7 { w.put32(30); w.put32(0); w.put32(0) }
+			else { panic('unexpected contract procedure') }
+		}
+		assert !w.bad
+		mut marker := nfs.Xdr{p: unsafe { &rig.reply[0] }, n: 4}
+		marker.put32(0x80000000 | u32(w.at-4))
+		rig.length = w.at; rig.at = 0
+		return true
+	}
+	if !nfs.span(rig.length, rig.at, count) { return false }
+	nfs.copy_bytes(p, unsafe { &rig.reply[0] + rig.at }, count)
+	rig.at += count
+	return true
+}
+
+pub fn contract_tests() {
+	mut rig := &ContractWire{}
+	mut backend := &NFSFS{}
+	backend.client = nfs.Client{context: rig, transfer: nfs_contract_transfer, tx: unsafe { &rig.tx[0] }, rx: unsafe { &rig.rx[0] }}
+	mut h := nfs.FileHandle{len: 1}; h.bytes[0] = 42
+	// Demonstrate the ambiguous ACCESS response, then exercise production
+	// open(flags=O_WRONLY) and production WRITE, without copying their logic.
+	assert backend.client.access(unsafe { &h }, 13) or { u32(0) } == 1
+	mut r := &NfsResource{backend: backend, handle: h, refcount: 1}
+	r.box = &resource.Resource(r)
+	opened := r.open(resource.o_wronly) or { panic('RO server must allow write-open') }
+	// Compare interface-box identity, not recursive concrete-value equality.
+	assert voidptr(opened) == voidptr(r.box) && rig.procedure == 1
+	mut byte := u8(0)
+	r.write(unsafe { nil }, unsafe { &byte }, 0, 1) or {}
+	assert rig.procedure == 7 && backend.client.fault == 30 && !backend.client.dead
+	backend.client.ro = true
+	sends := rig.sends
+	r.open(resource.o_wronly) or {}
+	assert rig.sends == sends && errno.get() == errno.erofs
+	// Identity check must preserve a replacement that was already published.
+	mut parent := create_node(unsafe { nil }, unsafe { nil }, 'parent', true)
+	mut old := create_node(unsafe { nil }, parent, 'same', false)
+	mut replacement := create_node(unsafe { nil }, parent, 'same', false)
+	mut oldres := &NfsResource{node: old}
+	publish_child(parent, 'same', replacement)
+	nfs_retire_child(parent, mut oldres)
+	assert voidptr(lookup_child(parent, 'same')) == voidptr(replacement) && old.removed && oldres.removed
+	// VFS-owned names must be adopted exactly; enumeration makes one copy.
+	backend.client.ro = false
+	a := nfs.Attr{kind: 1, mode: 0o644}
+	owned := 'created'.clone()
+	n := backend.make_node(parent, owned, h, h, a, true) or { panic('make node') }
+	assert n.name.str == owned.str && n.mount_covered && stat.isreg(n.resource.stat.mode)
+	backend.node_count = nfs_nodes
+	backend.make_node(parent, 'overflow', h, h, a, false) or {}
+	assert errno.get() == errno.enospc
+	// Unpublished failed instances release reservations; successes never recycle.
+	mut template := NFSFS{}
+	for _ in 0 .. 6 {
+		mut iface := template.instantiate()
+		assert iface != unsafe { nil }
+		if mut iface is NFSFS { iface.destroy_failed() }
+	}
+	for _ in 0 .. nfs_sessions { assert template.instantiate() != unsafe { nil } }
+	assert template.instantiate() == unsafe { nil } && errno.get() == errno.enospc
+	// An existing file has no directory child map. Hostile type changes must
+	// poison the session without converting it to a directory.
+	rig.kind = 2
+	r.refresh_attr() or {}
+	assert backend.client.dead && errno.get() == errno.eio && stat.isreg(r.stat.mode)
+	println('NFS production facade regressions PASS: RO WRITE->EROFS, strict local ro, identity retirement, name ownership, node/session bounds, failed reservations, hostile GETATTR type change')
+}

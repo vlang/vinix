@@ -14,7 +14,7 @@ fn (mut c Client) writable() bool {
 
 pub fn (mut c Client) getattr(h &FileHandle, out &Attr) ? {
 	w := c.nfs_request(1, h)
-	mut r := c.call(unsafe { &w })?
+	mut r := c.call(w)?
 	s := r.u32()
 	if s == 0 { r.attr(out) }
 	c.finish(unsafe { &r }, s)?
@@ -52,7 +52,7 @@ pub fn (mut c Client) setattr(h &FileHandle, a &SetAttr) ? {
 	if (a.size_set && a.size > u64(0x7fffffffffffffff)) || (a.atime_set && a.atime.nsec >= 1000000000) || (a.mtime_set && a.mtime.nsec >= 1000000000) { c.fault = 22; return none }
 	mut w := c.nfs_request(2, h)
 	w.put_set(a); w.put32(0) // no ctime guard
-	mut r := c.call(unsafe { &w })?
+	mut r := c.call(w)?
 	s := r.u32()
 	mut post := Attr{}
 	r.wcc(unsafe { &post })
@@ -63,7 +63,7 @@ pub fn (mut c Client) lookup(dir &FileHandle, name string, h &FileHandle, a &Att
 	if !component(name) { c.fault = 22; return none }
 	mut w := c.nfs_request(3, dir)
 	w.text(name, 255)
-	mut r := c.call(unsafe { &w })?
+	mut r := c.call(w)?
 	s := r.u32()
 	mut has_attr := false
 	if s == 0 { r.handle(h); has_attr = r.post_attr(a) }
@@ -76,7 +76,7 @@ pub fn (mut c Client) lookup(dir &FileHandle, name string, h &FileHandle, a &Att
 pub fn (mut c Client) access(h &FileHandle, requested u32) ?u32 {
 	mut w := c.nfs_request(4, h)
 	w.put32(requested & 63)
-	mut r := c.call(unsafe { &w })?
+	mut r := c.call(w)?
 	s := r.u32()
 	mut a := Attr{}
 	r.post_attr(unsafe { &a })
@@ -90,7 +90,7 @@ pub fn (mut c Client) read(h &FileHandle, offset u64, out &u8, count int) ?int {
 	if count < 0 || count > c.rsize || count > io_max || offset > u64(0x7fffffffffffffff) - u64(count) { c.fault = 22; return none }
 	mut w := c.nfs_request(6, h)
 	w.put64(offset); w.put32(u32(count))
-	mut r := c.call(unsafe { &w })?
+	mut r := c.call(w)?
 	s := r.u32()
 	mut a := Attr{}
 	r.post_attr(unsafe { &a })
@@ -112,7 +112,7 @@ pub fn (mut c Client) write(h &FileHandle, offset u64, data &u8, count int) ?int
 	mut w := c.nfs_request(7, h)
 	w.put64(offset); w.put32(u32(count)); w.put32(2) // FILE_SYNC
 	w.put_opaque(data, count, io_max)
-	mut r := c.call(unsafe { &w })?
+	mut r := c.call(w)?
 	s := r.u32()
 	mut a := Attr{}
 	r.wcc(unsafe { &a })
@@ -135,7 +135,7 @@ pub fn (mut c Client) create(dir &FileHandle, name string, mode u32, directory b
 	if !directory { w.put32(1) } // GUARDED: never truncate an existing file
 	attributes := SetAttr{mode_set: true, mode: mode}
 	w.put_set(unsafe { &attributes })
-	mut r := c.call(unsafe { &w })?
+	mut r := c.call(w)?
 	s := r.u32()
 	mut has_handle := false
 	mut has_attr := false
@@ -155,7 +155,7 @@ pub fn (mut c Client) remove(dir &FileHandle, name string, directory bool) ? {
 	if !component(name) { c.fault = 22; return none }
 	mut w := c.nfs_request(if directory { u32(13) } else { u32(12) }, dir)
 	w.text(name, 255)
-	mut r := c.call(unsafe { &w })?
+	mut r := c.call(w)?
 	s := r.u32()
 	mut parent := Attr{}
 	r.wcc(unsafe { &parent })
@@ -167,7 +167,7 @@ pub fn (mut c Client) rename(from &FileHandle, old string, to &FileHandle, name 
 	if !component(old) || !component(name) { c.fault = 22; return none }
 	mut w := c.nfs_request(14, from)
 	w.text(old, 255); w.put_handle(to); w.text(name, 255)
-	mut r := c.call(unsafe { &w })?
+	mut r := c.call(w)?
 	s := r.u32()
 	mut parent := Attr{}
 	r.wcc(unsafe { &parent }); r.wcc(unsafe { &parent })
@@ -179,7 +179,7 @@ pub fn (mut c Client) rename(from &FileHandle, old string, to &FileHandle, name 
 pub fn (mut c Client) readdirplus(h &FileHandle, cookie u64, verifier u64, new_verifier &u64, eof &bool) ?Xdr {
 	mut w := c.nfs_request(17, h)
 	w.put64(cookie); w.put64(verifier); w.put32(8192); w.put32(32768)
-	mut r := c.call(unsafe { &w })?
+	mut r := c.call(w)?
 	s := r.u32()
 	mut a := Attr{}
 	r.post_attr(unsafe { &a })
@@ -218,7 +218,7 @@ pub mut:
 
 pub fn (mut c Client) fsstat(h &FileHandle, out &FsInfo) ? {
 	w := c.nfs_request(18, h)
-	mut r := c.call(unsafe { &w })?
+	mut r := c.call(w)?
 	s := r.u32()
 	mut a := Attr{}
 	r.post_attr(unsafe { &a })
@@ -240,7 +240,7 @@ pub mut:
 
 pub fn (mut c Client) pathconf(h &FileHandle, out &PathConf) ? {
 	w := c.nfs_request(20, h)
-	mut r := c.call(unsafe { &w })?
+	mut r := c.call(w)?
 	s := r.u32()
 	mut a := Attr{}
 	r.post_attr(unsafe { &a })

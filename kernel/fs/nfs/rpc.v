@@ -65,7 +65,9 @@ pub fn (mut c Client) record() ?int {
 	return none
 }
 
-pub fn (mut c Client) call(w &Xdr) ?Xdr {
+// Pass the small borrowed view by value. Returning a reply view must not make
+// the compiler heap-promote a caller's request cursor on every directory scan.
+pub fn (mut c Client) call(w Xdr) ?Xdr {
 	if c.dead { c.fault = 5; return none }
 	if w.bad || w.at < 40 || w.at > capacity { c.fault = 22; return none }
 	if c.begin != unsafe { nil } { c.begin(c.context) }
@@ -108,14 +110,14 @@ pub fn (mut c Client) finish(r &Xdr, status u32) ? {
 
 pub fn (mut c Client) null() ? {
 	w := c.request(100003, 3, 0)
-	r := c.call(unsafe { &w })?
+	r := c.call(w)?
 	c.finish(unsafe { &r }, 0)?
 }
 
 pub fn (mut c Client) getport(program u32, version u32) ?u16 {
 	mut w := c.request(100000, 2, 3)
 	w.put32(program); w.put32(version); w.put32(6); w.put32(0)
-	mut r := c.call(unsafe { &w })?
+	mut r := c.call(w)?
 	port := r.u32()
 	c.finish(unsafe { &r }, 0)?
 	if port == 0 || port > 65535 { c.fault = 111; return none }
@@ -125,7 +127,7 @@ pub fn (mut c Client) getport(program u32, version u32) ?u16 {
 pub fn (mut c Client) mount_export(path string, out &FileHandle) ? {
 	mut w := c.request(100005, 3, 1)
 	w.text(path, 1024)
-	mut r := c.call(unsafe { &w })?
+	mut r := c.call(w)?
 	s := r.u32()
 	if s == 0 {
 		r.handle(out)
@@ -147,7 +149,7 @@ pub fn (mut c Client) mount_export(path string, out &FileHandle) ? {
 pub fn (mut c Client) unmount_export(path string) ? {
 	mut w := c.request(100005, 3, 3)
 	w.text(path, 1024)
-	r := c.call(unsafe { &w })?
+	r := c.call(w)?
 	c.finish(unsafe { &r }, 0)?
 }
 
@@ -155,5 +157,5 @@ pub fn (mut c Client) unmount_export(path string) ? {
 // follow-up request may overwrite rx until it finishes walking this result.
 pub fn (mut c Client) exports() ?Xdr {
 	w := c.request(100005, 3, 5)
-	return c.call(unsafe { &w })
+	return c.call(w)
 }

@@ -13,6 +13,10 @@ mut:
 	sends int
 	fail bool
 	procedure u32
+	program u32
+	version u32
+	sent [nfs.capacity+4]u8
+	sent_len int
 }
 
 fn transfer(context voidptr, p &u8, n int, send bool) bool {
@@ -24,7 +28,7 @@ fn transfer(context voidptr, p &u8, n int, send bool) bool {
 		assert r.u32() == 0x80000000 | u32(n-4)
 		assert r.u32() != 0
 		assert r.u32() == 0 && r.u32() == 2
-		r.u32(); r.u32()
+		rig.program = r.u32(); rig.version = r.u32()
 		rig.procedure = r.u32()
 		assert r.u32() == 1
 		credential := r.opaque(400)
@@ -35,6 +39,8 @@ fn transfer(context voidptr, p &u8, n int, send bool) bool {
 		for _ in 0 .. int(groups) { auth.u32() }
 		assert auth.finished()
 		assert r.u32() == 0 && r.u32() == 0
+		nfs.copy_bytes(unsafe { &rig.sent[0] }, p, n)
+		rig.sent_len = n
 		return true
 	}
 	if !nfs.span(rig.n, rig.at, n) { return false }
@@ -49,18 +55,22 @@ fn client(rig &Rig) nfs.Client {
 
 fn reply(rig &Rig, status u32) nfs.Xdr {
 	unsafe { rig.at = 0; rig.n = 0 }
-	mut w := nfs.Xdr{p: unsafe { &rig.reply[0] }, n: nfs.capacity}
+	return append_reply(rig, 1, status)
+}
+
+fn append_reply(rig &Rig, xid u32, status u32) nfs.Xdr {
+	mut w := nfs.Xdr{p: unsafe { &rig.reply[rig.n] }, n: nfs.capacity-rig.n}
 	w.put32(0) // record marker filled by end_reply
-	w.put32(1); w.put32(1); w.put32(0); w.put32(0); w.put32(0); w.put32(0)
+	w.put32(xid); w.put32(1); w.put32(0); w.put32(0); w.put32(0); w.put32(0)
 	w.put32(status)
 	return w
 }
 
 fn end_reply(rig &Rig, w &nfs.Xdr) {
 	assert !w.bad
-	mut m := nfs.Xdr{p: unsafe { &rig.reply[0] }, n: 4}
+	mut m := nfs.Xdr{p: w.p, n: 4}
 	m.put32(0x80000000 | u32(w.at-4))
-	unsafe { rig.n = w.at }
+	unsafe { rig.n = int(usize(w.p)-usize(&rig.reply[0])) + w.at }
 }
 
 fn fh() nfs.FileHandle {
@@ -117,6 +127,19 @@ fn test_options() {
 	mut path := ''
 	assert nfs.parse_source('192.168.1.2:/export/a', unsafe { &address }, unsafe { &path })
 	assert path == '/export/a' && address == 0x0201a8c0
+	mut host := ''
+	assert nfs.parse_host_source('fecv3:/export/share', unsafe { &host }, unsafe { &path })
+	assert host == 'fecv3' && path == '/export/share'
+	assert nfs.resolve_hosts('# ignored\n::1 fecv3\n10.0.2.2 canonical fecv3 # alias\n', host, unsafe { &address })
+	assert address == 0x0202000a
+	for text in ['10.0.2.2 fecv30\n', '999.0.2.2 fecv3\n', '10.0.2.2 other # fecv3\n', '10.0.2.2 fecv3\n10.0.2.3 fecv3', '10.0.2.2 fecv3\x00', 'x'.repeat(1025), '10.0.2.2 ' + 'x'.repeat(254) + ' fecv3'] {
+		assert !nfs.resolve_hosts(text, 'fecv3', unsafe { &address })
+	}
+	assert !nfs.resolve_hosts(' '.repeat(nfs.hosts_max+1), 'fecv3', unsafe { &address })
+	assert nfs.resolve_hosts('10.0.2.2\tfecv3\r\n', 'fecv3', unsafe { &address })
+	for s in ['fecv3:export', 'fecv3:/x\x00', '-host:/a', 'host..name:/a', 'host-:/a', 'host:/a\n', '256.1.1.1:/a', '1.2.3:/a'] {
+		assert !nfs.parse_host_source(s, unsafe { &host }, unsafe { &path }), s
+	}
 	for s in ['256.1.1.1:/a', '1.2.3:/a', '1.2.3.4:a', 'host:/a', '1.2.3.4:/a\x00'] {
 		assert !nfs.parse_source(s, unsafe { &address }, unsafe { &path })
 	}
@@ -209,10 +232,107 @@ fn test_directory() {
 	mut w := reply(rig, 0); w.put32(0); w.put64(9); w.put32(0); w.put32(0); end_reply(rig, unsafe { &w })
 	mut verifier := u64(0); mut eof := false
 	c.readdirplus(unsafe { &h }, 0, 0, unsafe { &verifier }, unsafe { &eof }) or {}; assert c.dead
+	mut cookies := [nfs.max_entries]u64{}
+	assert nfs.remember_cookie(unsafe { &cookies[0] }, 0, 900)
+	assert nfs.remember_cookie(unsafe { &cookies[0] }, 1, 7)
+	assert nfs.remember_cookie(unsafe { &cookies[0] }, 2, 0xffffffffffffffff)
+	assert !nfs.remember_cookie(unsafe { &cookies[0] }, 3, 900)
+	assert !nfs.remember_cookie(unsafe { &cookies[0] }, 3, 0)
+	assert !nfs.remember_cookie(unsafe { &cookies[0] }, nfs.max_entries, 1)
 	println('READDIRPLUS: opaque high cookies, no-progress cookie and empty-page rejection')
 }
 
+fn test_all_procedures() {
+	mut rig := &Rig{}
+	defer { unsafe { free(rig) } }
+	h := fh()
+	mut c := client(rig)
+	mut w := reply(rig, 2049); end_reply(rig, unsafe { &w })
+	assert c.getport(100003, 3) or { u16(0) } == 2049
+	assert rig.program == 100000 && rig.version == 2 && rig.procedure == 3
+	for port in [u32(0), 65536, 0xffffffff] {
+		c = client(rig); w = reply(rig, port); end_reply(rig, unsafe { &w })
+		c.getport(100005, 3) or {}; assert c.fault == 111 && !c.dead
+	}
+	mut out := nfs.FileHandle{}
+	c = client(rig); w = reply(rig, 0); w.put_handle(unsafe { &h }); w.put32(1); w.put32(1); end_reply(rig, unsafe { &w })
+	c.mount_export('/export', unsafe { &out }) or { panic('MNT') }
+	assert out.len == 4 && rig.program == 100005 && rig.procedure == 1
+	c = client(rig); w = reply(rig, 13); end_reply(rig, unsafe { &w })
+	c.mount_export('/denied', unsafe { &out }) or {}; assert c.fault == 13 && !c.dead
+	// No AUTH_SYS flavor: successful MNT is paired with bounded UMNT cleanup.
+	c = client(rig); w = reply(rig, 0); w.put_handle(unsafe { &h }); w.put32(1); w.put32(6); end_reply(rig, unsafe { &w })
+	w = append_reply(rig, 2, 0); w.at -= 4; end_reply(rig, unsafe { &w })
+	c.mount_export('/export', unsafe { &out }) or {}; assert c.fault == 95 && rig.procedure == 3
+	c = client(rig); w = reply(rig, 0); w.at -= 4; end_reply(rig, unsafe { &w })
+	c.unmount_export('/export') or { panic('UMNT') }; assert rig.procedure == 3
+	c = client(rig); w = reply(rig, 0); end_reply(rig, unsafe { &w })
+	mut exports := c.exports() or { panic('EXPORT') }; assert !exports.boolean() && exports.finished() && rig.procedure == 5
+	mut a := nfs.Attr{}
+	c = client(rig); w = reply(rig, 0); w.put_handle(unsafe { &h }); w.put32(1); attributes(mut w); w.put32(0); end_reply(rig, unsafe { &w })
+	c.lookup(unsafe { &h }, 'file', unsafe { &out }, unsafe { &a }) or { panic('LOOKUP') }; assert rig.procedure == 3 && a.fileid == 9
+	// Missing optional LOOKUP attrs are completed with GETATTR.
+	c = client(rig); w = reply(rig, 0); w.put_handle(unsafe { &h }); w.put32(0); w.put32(0); end_reply(rig, unsafe { &w })
+	w = append_reply(rig, 2, 0); attributes(mut w); end_reply(rig, unsafe { &w })
+	c.lookup(unsafe { &h }, 'file', unsafe { &out }, unsafe { &a }) or { panic('LOOKUP fallback') }; assert rig.procedure == 1
+	c = client(rig); w = reply(rig, 0); w.put32(0); w.put32(5); end_reply(rig, unsafe { &w })
+	assert c.access(unsafe { &h }, 5) or { u32(0) } == 5 && rig.procedure == 4
+	set := nfs.SetAttr{mode_set: true, mode: 0o644, size_set: true, size: 7}
+	c = client(rig); w = reply(rig, 0); w.put32(0); w.put32(0); end_reply(rig, unsafe { &w })
+	c.setattr(unsafe { &h }, unsafe { &set }) or { panic('SETATTR') }; assert rig.procedure == 2
+	for dir in [false, true] {
+		c = client(rig); w = reply(rig, 0); w.put32(1); w.put_handle(unsafe { &h }); w.put32(1); attributes(mut w); w.put32(0); w.put32(0); end_reply(rig, unsafe { &w })
+		c.create(unsafe { &h }, 'new', 0o755, dir, unsafe { &out }, unsafe { &a }) or { panic('CREATE/MKDIR') }
+		assert rig.procedure == if dir { u32(9) } else { u32(8) }
+		c = client(rig); w = reply(rig, 0); w.put32(0); w.put32(0); end_reply(rig, unsafe { &w })
+		c.remove(unsafe { &h }, 'new', dir) or { panic('REMOVE/RMDIR') }
+		assert rig.procedure == if dir { u32(13) } else { u32(12) }
+	}
+	// CREATE with absent optional handle/attrs falls back to LOOKUP.
+	c = client(rig); w = reply(rig, 0); w.put32(0); w.put32(0); w.put32(0); w.put32(0); end_reply(rig, unsafe { &w })
+	w = append_reply(rig, 2, 0); w.put_handle(unsafe { &h }); w.put32(1); attributes(mut w); w.put32(0); end_reply(rig, unsafe { &w })
+	c.create(unsafe { &h }, 'new', 0o644, false, unsafe { &out }, unsafe { &a }) or { panic('CREATE fallback') }
+	assert rig.procedure == 3
+	c = client(rig); w = reply(rig, 0); for _ in 0 .. 4 { w.put32(0) }; end_reply(rig, unsafe { &w })
+	c.rename(unsafe { &h }, 'old', unsafe { &h }, 'new') or { panic('RENAME') }; assert rig.procedure == 14
+	mut info := nfs.FsInfo{}
+	c = client(rig); w = reply(rig, 0); w.put32(0); for i in 0 .. 6 { w.put64(u64(100+i)) }; w.put32(1); end_reply(rig, unsafe { &w })
+	c.fsstat(unsafe { &h }, unsafe { &info }) or { panic('FSSTAT') }; assert info.total == 100 && info.favailable == 105 && rig.procedure == 18
+	mut conf := nfs.PathConf{}
+	c = client(rig); w = reply(rig, 0); w.put32(0); w.put32(32000); w.put32(255); for _ in 0 .. 4 { w.put32(1) }; end_reply(rig, unsafe { &w })
+	c.pathconf(unsafe { &h }, unsafe { &conf }) or { panic('PATHCONF') }; assert conf.namemax == 255 && conf.case_preserving && rig.procedure == 20
+	println('Procedure coverage: GETPORT/MNT/UMNT/EXPORT and every requested NFS procedure; optional-arm fallbacks')
+}
+
+fn test_rpc_errors() {
+	mut rig := &Rig{}
+	defer { unsafe { free(rig) } }
+	for reason in [u32(0), 1, 2] {
+		mut c := client(rig)
+		mut w := reply(rig, 0); w.at = 12; w.put32(1); w.put32(reason)
+		if reason == 0 { w.put32(2); w.put32(2) } else if reason == 1 { w.put32(1) }
+		end_reply(rig, unsafe { &w })
+		c.null() or {}
+		assert c.dead == (reason == 2)
+		if reason < 2 { assert c.fault == if reason == 1 { 13 } else { 95 } }
+	}
+	for accepted in [u32(1), 2, 3, 4, 5, 6] {
+		mut c := client(rig)
+		mut w := reply(rig, 0); w.at = 24; w.put32(accepted)
+		if accepted == 2 { w.put32(2); w.put32(3) }
+		end_reply(rig, unsafe { &w })
+		c.null() or {}; assert c.dead == (accepted == 6)
+	}
+	for off in [4, 8, 12] {
+		mut c := client(rig)
+		mut w := reply(rig, 0); w.at -= 4; end_reply(rig, unsafe { &w })
+		mut corrupt := nfs.Xdr{p: unsafe { &rig.reply[off] }, n: 4}; corrupt.put32(99)
+		c.null() or {}; assert c.dead
+	}
+	println('RPC errors: denied auth/version, accepted error unions, invalid xid/type/reply')
+}
+
 fn main() {
-	test_xdr(); test_options(); test_rpc(); test_operations(); test_directory()
+	test_xdr(); test_options(); test_rpc(); test_operations(); test_directory(); test_all_procedures(); test_rpc_errors()
 	println('NFS protocol fixtures PASS')
 }

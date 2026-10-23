@@ -1,0 +1,9 @@
+module resource
+pub const o_nonblock = 0o4000
+pub const o_rdonly = 0
+pub const o_wronly = 1
+pub const o_accmode = 0o03 | 0o10000000
+pub struct PermissionMetadata { pub: mode u32 uid u32 gid u32 }
+pub struct FileSystemStat { pub mut: @type u64 bsize u64 blocks u64 bfree u64 bavail u64 files u64 ffree u64 namelen u64 frsize u64 flags u64 }
+pub fn create_dev_id() u64 { return 1 }
+pub fn default_ioctl(_ voidptr, _ u64, _ voidptr) ?int { return none }
