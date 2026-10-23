@@ -4,6 +4,7 @@ module androidtools
 import os
 
 fn framework_startup_apis(smali string) ! {
+ framework_accessibility_traversal(smali)!
  // No Android accessibility services are installed in the native WS backend.
  // Android exposes immutable snapshots for both installed and enabled lists.
  accessibility := smali + '/android/view/accessibility/AccessibilityManager.smali'
@@ -96,4 +97,36 @@ fn framework_startup_apis(smali string) ! {
   '.method public constructor <init>()V\n.locals 0\ninvoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void\n.end method\n' +
   '.method public static getRegistrations()Ljava/util/concurrent/CopyOnWriteArrayList;\n.locals 1\nsget-object v0, Landroid/atl/VinixBroadcast;->registrations:Ljava/util/concurrent/CopyOnWriteArrayList;\nreturn-object v0\n.end method\n' +
   '.method public native run()V\n.end method\n')!
+}
+
+// Retain traversal relationships even when no accessibility service is installed.
+// They are IDs, so unresolved targets and NO_ID must round-trip unchanged.
+fn framework_accessibility_traversal(smali string) ! {
+ path := smali + '/android/view/View.smali'
+ mut text := os.read_file(path)!
+ for kind in ['Before', 'After'] {
+  field := 'vinixAccessibilityTraversal' + kind
+  text += '\n.field private ' + field + ':I\n'
+  text = framework_replace_method(text, 'getAccessibilityTraversal' + kind + '()I',
+   '.method public getAccessibilityTraversal' + kind + '()I\n.locals 1\niget v0, p0, Landroid/view/View;->' + field + ':I\nreturn v0\n.end method')!
+  text = framework_replace_method(text, 'setAccessibilityTraversal' + kind + '(I)V',
+   '.method public setAccessibilityTraversal' + kind + '(I)V\n.locals 0\niput p1, p0, Landroid/view/View;->' + field + ':I\nreturn-void\n.end method')!
+ }
+ // All public constructors delegate here. Read the public attributes with the
+ // same theme and default styles as View, independently of the ATL styleable.
+ constructor := '<init>(Landroid/content/Context;Landroid/util/AttributeSet;II)V'
+ start := text.index(' ' + constructor + '\n') or { return error('missing View constructor') }
+ end := start + (text[start..].index('.end method') or { return error('unterminated View constructor') })
+ init := 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V'
+ assert text[start..end].count(init) == 1
+ text = text[..start] + text[start..end].replace(init, init + '\ninvoke-direct {p0, p1, p2, p3, p4}, Landroid/view/View;->vinixInitAccessibilityTraversal(Landroid/content/Context;Landroid/util/AttributeSet;II)V\n') + text[end..]
+ text += '.method private vinixInitAccessibilityTraversal(Landroid/content/Context;Landroid/util/AttributeSet;II)V\n.locals 4\n' +
+  'const/4 v0, 2\nnew-array v0, v0, [I\nfill-array-data v0, :attributes\n' +
+  'invoke-virtual {p1, p2, v0, p3, p4}, Landroid/content/Context;->obtainStyledAttributes(Landroid/util/AttributeSet;[III)Landroid/content/res/TypedArray;\nmove-result-object v0\n' +
+  ':try_start\nconst/4 v1, 0\nconst/4 v2, -1\ninvoke-virtual {v0, v1, v2}, Landroid/content/res/TypedArray;->getResourceId(II)I\nmove-result v3\niput v3, p0, Landroid/view/View;->vinixAccessibilityTraversalBefore:I\n' +
+  'const/4 v1, 1\ninvoke-virtual {v0, v1, v2}, Landroid/content/res/TypedArray;->getResourceId(II)I\nmove-result v3\niput v3, p0, Landroid/view/View;->vinixAccessibilityTraversalAfter:I\n:try_end\n' +
+  '.catchall {:try_start .. :try_end} :failed\ninvoke-virtual {v0}, Landroid/content/res/TypedArray;->recycle()V\nreturn-void\n' +
+  ':failed\nmove-exception v1\ninvoke-virtual {v0}, Landroid/content/res/TypedArray;->recycle()V\nthrow v1\n' +
+  ':attributes\n.array-data 4\n0x010104d1\n0x010104d2\n.end array-data\n.end method\n'
+ os.write_file(path, text)!
 }

@@ -9,6 +9,7 @@ fn method(signature string, body string) string {
 
 pub fn install(output string, resources string) ! {
  dir := output + '/smali/org/vinix/bootstrap'
+ install_accessibility_traversal_resource(output)!
  install_io_probe(dir)!
  install_power_probe(dir)!
  install_battery_probe(dir)!
@@ -215,6 +216,7 @@ const-string v1, "sensor availability"
 invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0') +
   method('private static accessibility(Landroid/content/Context;)V', '
+invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->accessibilityTraversal(Landroid/content/Context;)V
 const-string v0, "accessibility"
 invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
 move-result-object v0
@@ -245,6 +247,7 @@ new-instance v0, Ljava/lang/AssertionError;
 const-string v1, "absent accessibility services"
 invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0') +
+  accessibility_traversal_probe() +
   method('private static emptyServices(Ljava/util/List;)V', '
 invoke-interface {p0}, Ljava/util/List;->isEmpty()Z
 move-result v0
