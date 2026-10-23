@@ -6,6 +6,21 @@ import os
 // AutofillValue is also used as an ordinary typed value by Compose semantics,
 // independently of an installed autofill service.
 fn framework_autofill(smali string) ! {
+	// The manager has no backing autofill service or active session. Compose
+	// reports virtual-node lifecycle changes even in that state; Android ignores
+	// these notifications until autofill is enabled for an active session.
+	manager_file := smali + '/android/view/autofill/AutofillManager.smali'
+	mut manager := os.read_file(manager_file)!
+	for declaration in [
+		'notifyViewVisibilityChanged(Landroid/view/View;IZ)V',
+		'notifyValueChanged(Landroid/view/View;ILandroid/view/autofill/AutofillValue;)V',
+		'notifyViewEntered(Landroid/view/View;ILandroid/graphics/Rect;)V',
+		'notifyViewExited(Landroid/view/View;I)V',
+	] {
+		manager = framework_replace_method(manager, declaration,
+			signature_method('public ' + declaration, 'return-void'))!
+	}
+	os.write_file(manager_file, manager)!
 	owner := 'Landroid/view/autofill/AutofillValue;'
 	creator := 'Landroid/view/autofill/VinixAutofillValueCreator;'
 	mut text := '.class public final ' + owner + '\n.super Ljava/lang/Object;\n.implements Landroid/os/Parcelable;\n' +
