@@ -179,6 +179,9 @@ flags and time zones. Formatter overloads append to the caller's output and
 return that formatter. The default hour format follows DateFormat, which
 currently selects the 24-hour clock in this backend.
 
+BlurMaskFilter exposes all four Blur enum styles. Painting blurred masks remains
+unimplemented.
+
 Handle-based JNI symbol lookup searches the library and its dependencies in
 breadth-first order, including defined weak symbols. The bootstrap APK includes
 a JNI method exported only by a dependent DSO to exercise this path in ART.
