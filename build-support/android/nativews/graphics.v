@@ -32,6 +32,7 @@ mut:
 	kx     f32
 	ky     f32
 	clip_count i32
+	path_clip &WsPathClip
 	left   i32
 	top    i32
 	right  i32
@@ -93,7 +94,8 @@ fn ws_blend(x i32, y i32, color u32, coverage u32) {
 		if x < draw.transform.left || y < draw.transform.top || x >= draw.transform.right || y >= draw.transform.bottom || x < 0 || y < 0 || x >= draw.width || y >= draw.height {
 			return
 		}
-		if !ws_affine_clip(draw, f32(x) + 0.5, f32(y) + 0.5) { return }
+		if !ws_affine_clip(draw, f32(x) + 0.5, f32(y) + 0.5)
+			|| !ws_path_clip_contains(draw.transform.path_clip, f32(x) + 0.5, f32(y) + 0.5) { return }
 		alpha := (color >> 24) * coverage / 255
 		if alpha == 0 { return }
 		if draw.bitmap != 0 {
@@ -330,6 +332,7 @@ fn ws_restore() {
 	mut draw := ws_draw_state()
 	if draw.save_count > 0 {
 		draw.save_count--
+		unsafe { ws_path_clip_release(draw, draw.transforms[draw.save_count].path_clip) }
 		unsafe { draw.transform = draw.transforms[draw.save_count] }
 	}
 }

@@ -144,7 +144,8 @@ pub fn build_native_ws(smali string, runtime string, output string, compiler str
 			symbol := 'Java_' + native_ws_jni_escape(class_name) + '_' + native_ws_jni_escape(signature.all_before('(')) + '__' + native_ws_jni_escape(parameters)
 			mut native_body := body
 			if class_name == 'android/atl/GskCanvas' && method_name != 'finalize' {
-				native_body = 'previous := ws_canvas_enter(e,this,p0); defer { ws_canvas_leave(previous) }; if pending(e) { return };\n' + native_body
+				failure_return := if result == '' { 'return' } else if result == 'voidptr' { 'return nil' } else { 'return 0' }
+				native_body = 'previous := ws_canvas_enter(e,this,p0); defer { ws_canvas_leave(previous) }; if pending(e) { ${failure_return} };\n' + native_body
 			} else if class_name in ['android/view/View', 'android/view/ViewGroup'] && method_name in ['native_drawBackground', 'native_drawContent', 'native_drawChildren'] {
 				native_body = "previous := ws_canvas_enter(e,p1,get_long(e,p1,c'android/atl/GskCanvas',c'snapshot')); defer { ws_canvas_leave(previous) }; if pending(e) { return };\n" + native_body
 			}

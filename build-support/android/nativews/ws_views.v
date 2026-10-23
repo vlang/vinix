@@ -404,6 +404,7 @@ fn ws_render(e voidptr) {
 		ws_root_draw.width = ws.width
 		ws_root_draw.height = ws.height
 		ws_root_draw.pixels = &u32(usize(surface) + 48 + usize(target) * usize(surface.buffer_size))
+		ws_path_clip_release(ws_root_draw, nil)
 		ws_root_draw.transform = WsTransform{ right: ws.width, bottom: ws.height }
 		ws_root_draw.save_count = 0
 		ws.animated = false

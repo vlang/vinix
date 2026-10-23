@@ -1,0 +1,7 @@
+The baseline clipping source rejects a finite triangle spanning the canvas because its crossing arithmetic overflows `f32`. The fixed source computes crossings in `f64`; the same assertion passes.
+
+The two final host suites compile actual frozen clipping code with extracted transform/save/restore support and small state/JNI/path stubs. They cover fill rules, multiple contours and holes, implicit closure, inverse clipping, copied input points, frozen transforms, affine intersections, exact empty results, 64 saved clip levels, reset/restore lifetime, allocation failures, and 2,000 repeated clipping cycles. Both suites pass under AddressSanitizer. The counted suite records 8,177 allocations and 8,177 frees.
+
+LeakSanitizer is disabled because the unmanaged V harness has runtime allocations. The allocator counters measure only clipping allocations; AddressSanitizer checks invalid accesses, use-after-free and double-free. Guest rendering evidence is retained in the parent directory.
+
+`sources.json.gz` is a JSON map of exact baseline/final production sources and generated raw/counted/huge-case sources. `host-proof.json` records the original compiler commands and logs; `retention.json` hashes all retained artifacts and each uncompressed source. No executable binaries are retained. Run `retain.v` from the repository root to regenerate this evidence from the frozen `build/android-maps/path228` inputs.

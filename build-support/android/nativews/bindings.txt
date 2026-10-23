@@ -373,6 +373,7 @@ android/atl/GskCanvas|native_translate|ws_translate(p1,p2)
 android/atl/GskCanvas|native_concat|ws_canvas_concat(e,p1)
 android/atl/GskCanvas|native_scale|ws_scale(p1,p2)
 android/atl/GskCanvas|native_clipRect|ws_clip(p1,p2,p3,p4)
+android/atl/GskCanvas|native_clipPath|return ws_clip_path(e,p1,p2)
 android/atl/GskCanvas|native_pop|// Clipping state is restored by native_restore.
 android/atl/GskCanvas|native_drawRect|ws_canvas_rect(p1,p2,p3,p4,p5)
 android/atl/GskCanvas|native_drawRoundRect|ws_canvas_round_rect(p1,p2,p3,p4,p5,p6,p7)

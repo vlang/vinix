@@ -126,6 +126,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_gradient_colors(smali)!
  framework_paths(smali)!
  framework_render_nodes(smali)!
+ framework_render_node_outline(smali)!
  framework_layout_canvas(smali)!
  framework_pictures(smali)!
  framework_paint_color_longs(smali)!

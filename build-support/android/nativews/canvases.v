@@ -54,6 +54,7 @@ fn ws_canvas_enter(e voidptr, canvas voidptr, snapshot i64) voidptr {
 			WsPutLong(slot(e, 110))(e, canvas, f, i64(state))
 		}
 		if state.bitmap != snapshot || state.width == 0 {
+			ws_path_clip_release(state, nil)
 			ws_bitmap_unref(state.bitmap)
 			state.bitmap = ws_bitmap_ref(snapshot)
 			state.width = if snapshot == 0 { i32(0) } else { (&WsBitmap(snapshot)).width }
@@ -76,6 +77,7 @@ fn ws_canvas_free(e voidptr, canvas voidptr) {
 		if state == nil { return }
 		f := field(e, c'android/atl/GskCanvas', c'vinixDrawState', c'J')
 		WsPutLong(slot(e, 110))(e, canvas, f, 0)
+		ws_path_clip_release(state, nil)
 		ws_bitmap_unref(state.bitmap)
 		C.free(state)
 	}

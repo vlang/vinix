@@ -49,6 +49,7 @@ pub fn install(output string, resources string) ! {
  install_alpha8_probe(dir)!
  install_paint_filters_probe(dir)!
  install_canvas_z_probe(dir)!
+ install_render_node_outline_probe(dir)!
  install_traversal_probe(dir)!
  install_scroll_probe(dir)!
  install_frame_bounds_probe(dir)!
@@ -138,6 +139,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/ViewConfigurationProbe;->check(Landroid
 invoke-static {}, Lorg/vinix/bootstrap/Alpha8Probe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/PaintFiltersProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/CanvasZProbe;->check()V
+invoke-static {}, Lorg/vinix/bootstrap/RenderNodeOutlineProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/EglProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/ClockProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/TimeAnimatorProbe;->check()V
