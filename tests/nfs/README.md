@@ -177,8 +177,11 @@ skip the shutdown gate**: the rig prints a manual-stop receipt and the guest
 still demands a bounded transport failure. The parent must preserve its own
 stop evidence in that mode. With the option, the rig rejects names without the
 `m17b-` prefix, inspects the exact running container name/network namespace and
-immutable ID, and stops that ID with one `docker stop --time 1` invocation after
-the complete serial receipt. The ID prevents a reused name targeting another
+immutable ID. After the complete serial receipt it shuts down only that
+container's namespaced kernel workers with `docker exec ID rpc.nfsd 0`, then
+stops that ID with one `docker stop --timeout 1` invocation. Stopping workers
+first avoids kernel-thread/PID-namespace teardown stalls. Both commands must
+finish inside the existing quiet-window deadline. The ID prevents a reused name targeting another
 container. No Docker stop retry, container restart, host service stop, or cleanup
 stop happens. A failed/uncertain Docker command aborts with its retained log.
 
