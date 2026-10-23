@@ -423,7 +423,9 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 			if ws.animated && ws_millis() - ws.animation_last >= 80 { ws.dirty = true }
 			if C.__atomic_exchange_n(&ws_window_pending, 0, 5) != 0 { ws.dirty = true }
 			if ws.dirty { ws_render(e) }
-			ws_input(e)
+			// Rendering may leave the original Java exception pending. Input
+			// dispatch uses JNI calls that are forbidden until it is reported.
+			if !pending(e) { ws_input(e) }
 			if ws_failure(e, c'ANDROID-WS-FAIL input or render') {
 				pop_frame(e)
 				return 1
