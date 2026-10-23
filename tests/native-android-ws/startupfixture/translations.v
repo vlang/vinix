@@ -52,6 +52,7 @@ invoke-virtual {v10, v1}, Landroid/view/View;->setBackgroundColor(I)V
   check += 'const/4 v1, ${action}\nconst/16 v2, 10\nconst/16 v3, 16\ninvoke-static {v8, v1, v2, v3}, Lorg/vinix/bootstrap/TouchProbe;->send(Landroid/view/View;III)Z\nmove-result v0\nif-eqz v0, :bad\n'
  }
  check += 'invoke-static {v10}, Lorg/vinix/bootstrap/TranslationProbe;->location(Landroid/view/View;)V\n'
+ check += 'invoke-static {v10}, Lorg/vinix/bootstrap/TranslationProbe;->visible(Landroid/view/View;)V\n'
  check += '
 iget v0, v10, Lorg/vinix/bootstrap/TouchLeaf;->clicks:I
 const/4 v1, 1
@@ -128,5 +129,63 @@ new-instance v0, Ljava/lang/AssertionError;
 const-string v1, "translated screen/window location"
 invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0'
- os.write_file(dir+'/TranslationProbe.smali','.class public Lorg/vinix/bootstrap/TranslationProbe;\n.super Ljava/lang/Object;\n'+method('public static check(Landroid/content/Context;)V',check).replace('.locals 10', '.locals 11')+method('private static pixels(Landroid/view/View;)V',pixels)+method('private static location(Landroid/view/View;)V',location))!
+ // Use both overloads and local bounds: Litho uses these to mount visible
+ // content. Fractional translations round outward per ancestor, whereas the
+ // optional global offset rounds to nearest at each ancestor (not once).
+ mut visible := '
+new-instance v6, Landroid/graphics/Rect;
+invoke-direct {v6}, Landroid/graphics/Rect;-><init>()V
+new-instance v7, Landroid/graphics/Point;
+invoke-direct {v7}, Landroid/graphics/Point;-><init>()V
+'
+ for state in 0..3 {
+  if state == 1 {
+   visible += 'const/4 v0, 1\nconst/4 v1, 2\ninvoke-virtual {p0, v0, v1}, Landroid/view/View;->scrollTo(II)V\n'
+  } else if state == 2 {
+   visible += 'const/4 v0, 0\ninvoke-virtual {p0, v0, v0}, Landroid/view/View;->scrollTo(II)V\nconst v0, 0xc14c0000 # -12.75\ninvoke-virtual {p0, v0}, Landroid/view/View;->setTranslationX(F)V\nconst v0, 0xc1480000 # -12.5\ninvoke-virtual {p0, v0}, Landroid/view/View;->setTranslationY(F)V\n'
+  }
+  bounds := if state == 2 { [5, 3, 10, 9] } else { [8, 14, 18, 24] }
+  point := if state == 0 { [8, 16] } else if state == 1 { [7, 14] } else { [0, 1] }
+  for overload in ['Landroid/graphics/Rect;Landroid/graphics/Point;', 'Landroid/graphics/Rect;'] {
+   args := if overload.contains('Point;') { 'p0, v6, v7' } else { 'p0, v6' }
+   visible += 'invoke-virtual {${args}}, Landroid/view/View;->getGlobalVisibleRect(${overload})Z\nmove-result v0\nif-eqz v0, :bad\n'
+   visible += visible_rect_assert(bounds)
+  }
+  for axis, value in {'x':point[0], 'y':point[1]} {
+   visible += 'iget v0, v7, Landroid/graphics/Point;->${axis}:I\nconst/16 v1, ${value}\nif-ne v0, v1, :bad\n'
+  }
+  visible += 'invoke-virtual {p0, v6}, Landroid/view/View;->getLocalVisibleRect(Landroid/graphics/Rect;)Z\nmove-result v0\nif-eqz v0, :bad\n'
+  visible += visible_rect_assert([bounds[0]-point[0], bounds[1]-point[1], bounds[2]-point[0], bounds[3]-point[1]])
+ }
+ visible += '
+const/high16 v0, 0x42800000 # 64, outside the parent viewport
+invoke-virtual {p0, v0}, Landroid/view/View;->setTranslationX(F)V
+invoke-virtual {p0, v6, v7}, Landroid/view/View;->getGlobalVisibleRect(Landroid/graphics/Rect;Landroid/graphics/Point;)Z
+move-result v0
+if-nez v0, :bad
+invoke-virtual {p0, v6}, Landroid/view/View;->getLocalVisibleRect(Landroid/graphics/Rect;)Z
+move-result v0
+if-nez v0, :bad
+const v0, 0xc0980000 # -4.75
+invoke-virtual {p0, v0}, Landroid/view/View;->setTranslationX(F)V
+const v0, 0x40200000 # 2.5
+invoke-virtual {p0, v0}, Landroid/view/View;->setTranslationY(F)V
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-TRANSLATED-VISIBLE-PASS nested fractional negative parent-scroll self-scroll global local point round-out per-ancestor clipped hidden"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "translated visible rectangles or global offset"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+ os.write_file(dir+'/TranslationProbe.smali','.class public Lorg/vinix/bootstrap/TranslationProbe;\n.super Ljava/lang/Object;\n'+method('public static check(Landroid/content/Context;)V',check).replace('.locals 10', '.locals 11')+method('private static pixels(Landroid/view/View;)V',pixels)+method('private static location(Landroid/view/View;)V',location)+method('private static visible(Landroid/view/View;)V',visible))!
+}
+
+fn visible_rect_assert(bounds []int) string {
+ mut check := ''
+ for i, field in ['left', 'top', 'right', 'bottom'] {
+  check += 'iget v0, v6, Landroid/graphics/Rect;->${field}:I\nconst/16 v1, ${bounds[i]}\nif-ne v0, v1, :bad\n'
+ }
+ return check
 }

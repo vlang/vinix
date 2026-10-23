@@ -4,8 +4,9 @@ module androidtools
 import os
 
 // WS currently draws axis-aligned layouts, clipping at each ancestor. Query
-// those same bounds in Java: no toolkit widget or native desktop coordinates
-// are involved. Location queries must remain independent of visible clipping.
+// those same bounds in Java, including translations. Like ViewGroup's Android
+// contract, round rectangle bounds outward and the optional Point to nearest
+// at each ancestor. Location queries remain independent of visible clipping.
 fn framework_view_geometry(smali string) ! {
  path := smali + '/android/view/View.smali'
  mut text := os.read_file(path)!
@@ -13,7 +14,7 @@ fn framework_view_geometry(smali string) ! {
   '.method public getGlobalVisibleRect(Landroid/graphics/Rect;)Z\n.locals 1\nconst/4 v0, 0\n' +
   'invoke-virtual {p0, p1, v0}, Landroid/view/View;->getGlobalVisibleRect(Landroid/graphics/Rect;Landroid/graphics/Point;)Z\nmove-result v0\nreturn v0\n.end method')!
  text = framework_replace_method(text, 'getGlobalVisibleRect(Landroid/graphics/Rect;Landroid/graphics/Point;)Z',
-  '.method public getGlobalVisibleRect(Landroid/graphics/Rect;Landroid/graphics/Point;)Z\n.locals 8\n' + '
+  '.method public getGlobalVisibleRect(Landroid/graphics/Rect;Landroid/graphics/Point;)Z\n.locals 9\n' + '
 invoke-virtual {p0}, Landroid/view/View;->getWidth()I
 move-result v0
 invoke-virtual {p0}, Landroid/view/View;->getHeight()I
@@ -29,6 +30,8 @@ iget v1, p0, Landroid/view/View;->scrollY:I
 neg-int v1, v1
 invoke-virtual {p2, v0, v1}, Landroid/graphics/Point;->set(II)V
 :start
+new-instance v8, Landroid/graphics/RectF;
+invoke-direct {v8}, Landroid/graphics/RectF;-><init>()V
 move-object v0, p0
 const/16 v7, 256
 :ancestor
@@ -42,8 +45,28 @@ sub-int/2addr v2, v3
 iget v3, v0, Landroid/view/View;->top:I
 iget v4, v1, Landroid/view/View;->scrollY:I
 sub-int/2addr v3, v4
-invoke-virtual {p1, v2, v3}, Landroid/graphics/Rect;->offset(II)V
+invoke-virtual {v8, p1}, Landroid/graphics/RectF;->set(Landroid/graphics/Rect;)V
+iget v4, v0, Landroid/view/View;->translationX:F
+iget v5, v0, Landroid/view/View;->translationY:F
+invoke-virtual {v8, v4, v5}, Landroid/graphics/RectF;->offset(FF)V
+int-to-float v6, v2
+int-to-float v4, v3
+invoke-virtual {v8, v6, v4}, Landroid/graphics/RectF;->offset(FF)V
 if-eqz p2, :clip
+iget v4, p2, Landroid/graphics/Point;->x:I
+int-to-float v4, v4
+iget v5, v0, Landroid/view/View;->translationX:F
+add-float/2addr v4, v5
+invoke-static {v4}, Ljava/lang/Math;->round(F)I
+move-result v4
+iput v4, p2, Landroid/graphics/Point;->x:I
+iget v4, p2, Landroid/graphics/Point;->y:I
+int-to-float v4, v4
+iget v5, v0, Landroid/view/View;->translationY:F
+add-float/2addr v4, v5
+invoke-static {v4}, Ljava/lang/Math;->round(F)I
+move-result v4
+iput v4, p2, Landroid/graphics/Point;->y:I
 invoke-virtual {p2, v2, v3}, Landroid/graphics/Point;->offset(II)V
 :clip
 invoke-virtual {v1}, Landroid/view/View;->getWidth()I
@@ -51,8 +74,11 @@ move-result v4
 invoke-virtual {v1}, Landroid/view/View;->getHeight()I
 move-result v5
 const/4 v6, 0
-invoke-virtual {p1, v6, v6, v4, v5}, Landroid/graphics/Rect;->intersect(IIII)Z
+int-to-float v4, v4
+int-to-float v5, v5
+invoke-virtual {v8, v6, v6, v4, v5}, Landroid/graphics/RectF;->intersect(FFFF)Z
 move-result v6
+invoke-virtual {v8, p1}, Landroid/graphics/RectF;->roundOut(Landroid/graphics/Rect;)V
 if-eqz v6, :empty
 move-object v0, v1
 add-int/lit8 v7, v7, -1
