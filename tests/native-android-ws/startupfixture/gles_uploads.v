@@ -6,11 +6,11 @@ import os
 fn install_gles_upload_probe(dir string) ! {
  mut body := '
 const v0, 0x8b31
-const-string v1, "attribute vec2 pos; void main(){gl_Position=vec4(pos,0.,1.);}"
+const-string v1, "attribute vec2 pos; attribute vec4 shade; varying mediump float scale; uniform mat4 transform; void main(){scale=shade.x*shade.y*shade.z*shade.w; gl_Position=transform*vec4(pos,0.,1.);}"
 invoke-static {v0, v1}, Lorg/vinix/bootstrap/GlesShaderProbe;->shader(ILjava/lang/String;)I
 move-result v8
 const v0, 0x8b30
-const-string v1, "precision mediump float; void main(){gl_FragColor=vec4(0.,1.,0.,1.);}"
+const-string v1, "precision mediump float; varying mediump float scale; uniform mat2 tint2; uniform mat3 tint3; uniform float f1; uniform vec2 f2; uniform vec3 f3; uniform vec4 f4; uniform int i1; uniform ivec2 i2; uniform ivec3 i3; uniform ivec4 i4; void main(){gl_FragColor=vec4(tint3*vec3(tint2*vec2(0.,1.),0.),1.)*(scale*f1*f2.x*f3.y*f4.w*float(i1*i2.x*i3.y*i4.w));}"
 invoke-static {v0, v1}, Lorg/vinix/bootstrap/GlesShaderProbe;->shader(ILjava/lang/String;)I
 move-result v9
 invoke-static {}, Landroid/opengl/GLES20;->glCreateProgram()I
@@ -20,8 +20,14 @@ invoke-static {v7, v9}, Landroid/opengl/GLES20;->glAttachShader(II)V
 const/4 v0, 2
 const-string v1, "pos"
 invoke-static {v7, v0, v1}, Landroid/opengl/GLES20;->glBindAttribLocation(IILjava/lang/String;)V
+const/4 v0, 1
+const-string v1, "shade"
+invoke-static {v7, v0, v1}, Landroid/opengl/GLES20;->glBindAttribLocation(IILjava/lang/String;)V
 invoke-static {v7}, Landroid/opengl/GLES20;->glLinkProgram(I)V
 invoke-static {v7}, Landroid/opengl/GLES20;->glUseProgram(I)V
+invoke-static {v7}, Lorg/vinix/bootstrap/GlesUniformProbe;->check(I)V
+invoke-static {v7}, Lorg/vinix/bootstrap/GlesVectorProbe;->check(I)V
+invoke-static {}, Lorg/vinix/bootstrap/GlesAttributeProbe;->check()V
 const/4 v0, 2
 new-array v6, v0, [I
 const/4 v1, 0
@@ -273,6 +279,7 @@ invoke-virtual {v6, v0}, Ljava/nio/Buffer;->limit(I)Ljava/nio/Buffer;
   body += 'const/16 v0, ${at}\ninvoke-virtual {v6, v0}, Ljava/nio/ByteBuffer;->get(I)B\nmove-result v0\nconst/16 v1, ${value}\nif-ne v0, v1, :bad\n'
  }
  body += '
+invoke-static {}, Lorg/vinix/bootstrap/GlUtilsProbe;->check()V
 const/4 v0, 1
 const/4 v1, 1
 invoke-static {v0, v9, v1}, Landroid/opengl/GLES20;->glDeleteFramebuffers(I[II)V
@@ -282,7 +289,7 @@ invoke-static {}, Landroid/opengl/GLES20;->glGetError()I
 move-result v0
 if-nez v0, :bad
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "BOOTSTRAP-JAVA-GL-UPLOADS-PASS heap direct typed-buffer positions bounds VBO EBO indexed-draw green-pixel texture subimage FBO blue-texel"
+const-string v1, "BOOTSTRAP-JAVA-GL-UPLOADS-PASS heap direct typed-buffer positions bounds VBO EBO indexed-draw matrix2 matrix3 matrix4 float-vector1-4 int-vector1-4 uniforms attribute1-4 green-pixel texture subimage FBO blue-texel"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void
 :bad

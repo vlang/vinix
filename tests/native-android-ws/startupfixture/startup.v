@@ -28,6 +28,10 @@ pub fn install(output string, resources string) ! {
  install_gles_shader_probe(dir)!
  install_gles_names_probe(dir)!
  install_gles_upload_probe(dir)!
+ install_gles_uniform_probe(dir)!
+ install_gles_vector_probe(dir)!
+ install_gles_attribute_probe(dir)!
+ install_glutils_probe(dir)!
  install_image_filter_probe(dir)!
  install_clock_probe(dir)!
  install_time_animator_probe(dir)!
@@ -86,6 +90,19 @@ invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0'))!
  os.write_file(dir + '/StartupProbe.smali', '.class public Lorg/vinix/bootstrap/StartupProbe;\n.super Ljava/lang/Object;\n' +
   method('public static check(Landroid/content/Context;)V', '
+invoke-static {}, Landroid/app/ActivityManager;->isRunningInTestHarness()Z
+move-result v0
+if-nez v0, :harness_bad
+invoke-static {}, Landroid/app/ActivityManager;->isRunningInUserTestHarness()Z
+move-result v0
+if-nez v0, :harness_bad
+goto :harness_ok
+:harness_bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "ordinary Vinix session is not Android Test Harness Mode"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0
+:harness_ok
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->accessibility(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/ServiceBindingProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->appops(Landroid/content/Context;)V

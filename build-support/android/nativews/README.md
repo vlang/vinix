@@ -153,6 +153,16 @@ Java GLES20 scalar state, object and uniform calls use the same renderer. Shader
 source, compilation, linking, locations, status and compiler logs come from Mesa;
 the regression APK checks valid and invalid shaders, array offsets and object
 lifetimes through the Java APIs.
+Matrix2/3/4 and float/int vector1–4 uniform uploads accept arrays with offsets
+and heap or direct typed buffers, including read-only direct input. Constant
+vertex attribute1–4 float uploads use the same storage rules. Bounds checks
+precede driver calls and buffer cursors are preserved; read-only heap buffers
+without accessible backing storage are rejected. The signed fixture renders
+a triangle whose pixel color depends on matrix, vector and attribute values.
+`GLUtils.texImage2D` uploads the bitmap backend's RGBA_8888 pixels to Mesa.
+The regression verifies actual texture pixels, preserved GL errors and unpack
+alignment, and rejection of null or recycled bitmaps. Unsupported bitmap
+formats and unpack layouts exceeding its storage are rejected.
 Buffer and texture uploads accept heap and direct NIO storage with byte-range
 validation and preserve Java buffer cursors. Heap storage is copied and unpinned
 before calling Mesa. ReadPixels copies results back to writable buffers;

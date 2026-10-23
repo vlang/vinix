@@ -6,6 +6,10 @@ import os
 fn framework_activity_manager(smali string) ! {
  path := smali + '/android/app/ActivityManager.smali'
  mut text := os.read_file(path)!
+ // Vinix has no Android Test Harness Mode service or provisioned harness state.
+ for signature in ['isRunningInTestHarness()Z', 'isRunningInUserTestHarness()Z'] {
+  text = framework_replace_method(text, signature, '.method public static ' + signature + '\n.locals 1\nconst/4 v0, 0\nreturn v0\n.end method')!
+ }
  // Android companions share Vinix's single foreground Android user.
  text = framework_replace_method(text, 'getCurrentUser()I',
   '.method public static getCurrentUser()I\n.locals 1\ninvoke-static {}, Landroid/os/UserHandle;->myUserId()I\nmove-result v0\nreturn v0\n.end method')!
