@@ -6,6 +6,7 @@ module main
 import compress.gzip
 import crypto.sha256
 import json2
+import modulestream
 import nativeapk
 import os
 import time
@@ -223,10 +224,7 @@ fn prepare_module(settings map[string]json2.Any, app map[string]json2.Any, outpu
 	os.chmod(module_root + '/sbin/init', 0o755)!
 	companions := stage_companions(settings, app, output)!
 	os.write_file(output + '/companion-packages.json', json2.encode(companions, prettify: true))!
-	archive := output + '/module.tar'
-	checked(['tar', '--format=ustar', '-cf', archive, '-C', module_root, '.'])!
-	checked(['mcopy', '-o', '-i', settings['boot_image']!.str(), archive, '::/boot/qemu-runtime.tar'])!
-	os.rm(archive)!
+	modulestream.copy(module_root, settings['boot_image']!.str())!
 	os.rm(module_root + '/opt/android-test/application.apk')!
 	// Retain hashes and source metadata, rather than another private APK copy.
 	if os.exists(data) { os.rmdir_all(data)! }
