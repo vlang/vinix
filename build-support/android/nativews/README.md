@@ -156,6 +156,12 @@ locking are not implemented.
 Window refresh-rate preferences are retained as Java attributes; the native
 compositor does not currently select display modes from these hints.
 
+TextureView retains an independent copy of its content transform, supports
+copying it into a caller's Matrix, and resets it to identity for a null setter
+argument. The transform leaves View geometry and background drawing intact.
+TextureView still reports no available SurfaceTexture; video texture production
+and composition are not implemented.
+
 Handle-based JNI symbol lookup searches the library and its dependencies in
 breadth-first order, including defined weak symbols. The bootstrap APK includes
 a JNI method exported only by a dependent DSO to exercise this path in ART.

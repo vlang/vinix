@@ -5,6 +5,7 @@ import os
 
 fn framework_startup_apis(smali string) ! {
  framework_accessibility_traversal(smali)!
+ framework_texture_transforms(smali)!
  // No Android accessibility services are installed in the native WS backend.
  // Android exposes immutable snapshots for both installed and enabled lists.
  accessibility := smali + '/android/view/accessibility/AccessibilityManager.smali'
