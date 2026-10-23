@@ -1,4 +1,4 @@
-# Google Maps attempts218–222
+# Google Maps attempts218–223
 
 Attempt218 still shows the “Make it your map” onboarding screen after Skip. The
 interaction waits for native WS readiness, captures the initial screen, invokes
@@ -108,3 +108,19 @@ framework, native library and launcher identities. All 102 framework source
 files match the build manifest and are archived as exact V source text; the
 actual JAR's `AutofillValue` disassembly is also retained. Native221 sources
 reuse the verified attempt221 archive. Kernel/base identity remains inherited.
+
+Attempt223 adds the unavailable-autofill notification methods in framework
+`ab40d4f8…`, again with native221. After Skip, rendering fails with
+`UnsupportedOperationException: Native WS bitmap storage requires ARGB_8888`
+in `Bitmap.getSnapshot()`, called while constructing a `Canvas`. The APK exits
+with code 1. Its [initial screenshot](attempt223-google-maps-initial.png) shows
+onboarding; [Skip](attempt223-google-maps-skip.png) and final captures show the
+exited APK. The later capture again fails after QEMU closes. Input uses the
+same short-click timing as attempt222. Map display and search remain unverified.
+
+[Attempt223 results](attempt223-results.json) and
+[runtime receipt](attempt223-runtime-identities.json) retain the failure.
+The [input receipt](attempt223-input-identities.json) verifies the staged
+runtime hashes and all 102 exact framework sources. Fresh disassembly from the
+actual JAR includes both `AutofillManager` and `AutofillValue`. Native sources
+and inherited kernel/base identity limits remain as described above.

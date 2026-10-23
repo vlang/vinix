@@ -19,7 +19,7 @@ fn main() {
 			assert hash(root + receipt['input_identity_receipt']!.str())! == receipt['input_identity_receipt_sha256']!.str()
 		}
 	}
-	for attempt in ['218', '219', '220', '221', '222'] {
+	for attempt in ['218', '219', '220', '221', '222', '223'] {
 		row := json2.decode[[]json2.Any](os.read_file(root + 'attempt' + attempt + '-results.json')!)![0].as_map()
 		serial := gzip.decompress(os.read_bytes(root + row['serial_log']!.str())!)!
 		assert sha256.sum(serial).hex() == row['serial_sha256']!.str()
@@ -42,12 +42,16 @@ fn main() {
 	assert view.contains('.method public getContentCaptureSession()Landroid/view/contentcapture/ContentCaptureSession;')
 	loaded := gzip.decompress(os.read_bytes(root + 'attempt221-ATLLoadedApp.dex-smali.gz')!)!.bytestr()
 	assert loaded.contains('->init_lock:Ljava/lang/Object;') && loaded.contains('monitor-enter')
-	manifest222 := json2.decode[map[string]json2.Any](os.read_file(root + 'attempt222-framework-manifest.json')!)!
-	sources222 := json2.decode[map[string]string](gzip.decompress(os.read_bytes(root + 'attempt222-framework-sources.json.gz')!)!.bytestr())!
-	expected222 := manifest222['sources']!.as_map()
-	assert sources222.len == 102 && sources222.len == expected222.len
-	for path, source in sources222 { assert sha256.sum(source.bytes()).hex() == expected222[path]!.str() }
-	autofill := gzip.decompress(os.read_bytes(root + 'attempt222-AutofillValue.dex-smali.gz')!)!.bytestr()
-	assert autofill.contains('.method public static forToggle(Z)Landroid/view/autofill/AutofillValue;')
-	println('MAPS218-222-RETAINED PASS ${checked} artifact hashes;5 serial/result identities;2 native archives/160 sources;framework221 ${sources.len} exact sources + explicit1 missing-source limitation;framework222 ${sources222.len} exact sources;actualDEX getter+lock+AutofillValue evidence')
+	for attempt in ['222', '223'] {
+		manifest_full := json2.decode[map[string]json2.Any](os.read_file(root + 'attempt' + attempt + '-framework-manifest.json')!)!
+		sources_full := json2.decode[map[string]string](gzip.decompress(os.read_bytes(root + 'attempt' + attempt + '-framework-sources.json.gz')!)!.bytestr())!
+		expected_full := manifest_full['sources']!.as_map()
+		assert sources_full.len == 102 && sources_full.len == expected_full.len
+		for path, source in sources_full { assert sha256.sum(source.bytes()).hex() == expected_full[path]!.str() }
+		autofill := gzip.decompress(os.read_bytes(root + 'attempt' + attempt + '-AutofillValue.dex-smali.gz')!)!.bytestr()
+		assert autofill.contains('.method public static forToggle(Z)Landroid/view/autofill/AutofillValue;')
+	}
+	manager := gzip.decompress(os.read_bytes(root + 'attempt223-AutofillManager.dex-smali.gz')!)!.bytestr()
+	assert manager.contains('.method public notifyViewVisibilityChanged(Landroid/view/View;IZ)V')
+	println('MAPS218-223-RETAINED PASS ${checked} artifact hashes;6 serial/result identities;2 native archives/160 sources;framework221 ${sources.len} exact sources + explicit1 missing-source limitation;framework222+223 204 exact sources;actualDEX getter+lock+autofill evidence')
 }
