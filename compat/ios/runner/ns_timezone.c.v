@@ -24,7 +24,7 @@ fn ns_timezone_seconds(object u64) i64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	header := ios_runtime.objects[object] or { panic('iOS: timezone requires a live registered object') }
-	if header.destroyed || header.cls != ios_runtime.names['NSTimeZone'] || read64(object) != header.cls || !header.timezone_initialized {
+	if header.destroying || header.destroyed || header.cls != ios_runtime.names['NSTimeZone'] || read64(object) != header.cls || !header.timezone_initialized || header.timezone_local {
 		panic('iOS: timezone requires an initialized fixed snapshot')
 	}
 	return header.number
@@ -121,6 +121,12 @@ fn ns_timezone_dispatch(object u64, selector string, mut frame RegisterFrame) bo
 		panic('iOS: timezone defaults, named zones, coding and locale formatting are not implemented')
 	}
 	if ns_timezone_types('NSTimeZone', meta, selector) == none { return false }
+	if !meta {
+		C.ios_objc_initialize_lock()
+		local, _ := ns_timezone_snapshot(object)
+		C.ios_objc_initialize_unlock()
+		if local { return ns_calendar_local_zone_dispatch(object, selector, mut frame) }
+	}
 	if meta {
 		if selector in ['timeZoneWithAbbreviation:', 'timeZoneWithName:']! {
 			C.ios_objc_initialize_lock()

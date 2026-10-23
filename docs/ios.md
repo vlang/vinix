@@ -18458,21 +18458,97 @@ not cover the full host dynamic runtime closure.
 All four ARM64 phases pass: the shared fixture, Fortnite's launch probe, the
 C++/GLES/Text import audit and the static C++ import audit. The proof retains
 five binary/generated-C archive pairs, the host dSYM and four guest serial/config
-pairs. Owned guest VMs, scratch files and the RAM disk are retired. The probe now
-resolves `NSNotificationQueue` and stops at `_OBJC_CLASS_$_NSCalendar`, attributed
-to CoreFoundation, before application entry; the process still exits 1.
+pairs. Owned guest VMs, scratch files and the RAM disk are retired. That probe
+resolved `NSNotificationQueue` and stopped at `_OBJC_CLASS_$_NSCalendar`, attributed
+to CoreFoundation, before application entry; the process exited 1.
+
+Objective-C `NSCalendar` and `NSDateComponents` now have a bounded Foundation
+profile. Selected Fortnite disassembly contains two direct calendar consumers:
+Firebase extracts year, month, day, hour, minute and second with mask 252;
+Unreal constructs ISO 8601 dates in GMT zero and extracts their local components.
+Both pass components to `UNCalendarNotificationTrigger`. The selected EOSSDK
+and MarketplaceKitWrapper scans found no direct class reference. These scans
+establish static call sites, not execution or complete framework coverage.
+
+Both public classes expose an eight-byte instance with `NSObject` as their
+superclass and no own ivars. Sidecars hold mutable settings and fourteen signed
+component fields; undefined fields retain Foundation's `NSIntegerMax` sentinel.
+Gregorian and ISO 8601 construction, current-calendar snapshots, independent
+copying, week settings, YMDHMS extraction and full extraction in an explicit
+time zone are implemented. `NSDateComponents` copies its calendar and retains
+its immutable time zone; copying components independently copies that calendar.
+Nil time-zone assignments preserve a calendar's existing zone.
+
+Current and autoupdating calendars are fresh snapshots of the configured local
+zone and supported English locale (`en_US`, `en_US_POSIX` or `en_GB`). This does
+not implement live preference updates; locale and zone configuration must stay
+fixed during the runtime lifetime. Local conversion uses libc zone rules,
+selects the first instant in a daylight-saving overlap and moves forward through
+a gap. Local-zone objects support calendar conversion, copying, GMT-offset and
+DST-flag queries; named-zone metadata and use as fixed-zone formatter or Swift
+values fail explicitly. Explicit fixed zones must be whole-minute offsets
+within the existing time-zone bound of plus or minus eighteen hours.
+
+Date construction normalizes bounded YMDHMS values, defaults missing time fields
+to zero and accepts a component time-zone override. The input year must be
+1600 through 9998. Extraction inputs and normalized construction whole seconds
+must be in `[-12212488800, 253402236000)`. Construction then adds nanoseconds
+using `NSDate` floating-point precision; rounding can reach the excluded upper
+boundary. Extraction also requires civil years 1583 through 9999, avoiding
+Apple's 1582 Gregorian cutover. Week-based construction, non-AD eras, true leap
+months, other extraction masks, custom subclasses, reinitialization, coding,
+locale mutation, mutable copying, equality, hashing and descriptions fail
+explicitly. Component magnitudes and nanoseconds also have explicit bounds.
+These limits describe this implementation, not Apple's rejection behavior.
+
+```sh
+VINIX_IOS_CHECK_NAME=ns-calendar-checks v run tests/ios/native-checks.v build-calendar
+```
+
+The shared fixture passes against Apple Foundation in Europe/Moscow and
+America/New_York. It covers public layout and method encodings, all fourteen
+component fields, five fixed offsets, accepted boundaries, fractional seconds,
+normalization, local DST transitions and independent copies. Runtime checks
+also cover constructor callbacks and failures, guarded caller storage,
+changed-isa disposal, native method precedence and two drained lifetimes.
+The frozen host fixture passes ASan+UBSan in normal and deterministic Swift
+hashing modes, including 41 explicit rejection cases per run; leak detection
+is disabled. Two independent reviews cover the exact final generated C.
+
+Separate arithmetic comparisons match Foundation's week-of-month,
+week-of-year and year-for-week-of-year values in 537,040 cases over fifteen
+selected years and 71,540 boundary cases in years 1583 and 9999. Both audits
+use GMT zero, both identifiers and all 49 first-weekday/minimum-days settings;
+they test the copied arithmetic rather than every runtime pathway. The retained
+1582 audit reports 7,644 mismatches, motivating the final civil-year limit.
+
+Evidence under `build/ios/fortnite/ns-calendar-checks` pins 20,232 source,
+toolchain, runtime and review inputs. It retains 98 final native artifacts and
+a separate 366-artifact prior native evidence tree, including eight historical
+nonzero statuses. The pins do not cover the full host dynamic runtime closure.
+The independent arithmetic evidence records one absent historical sealer
+executable; its retained source, status and analyzer results do not establish
+verification of that missing executable.
+
+All four ARM64 phases pass: the shared calendar fixture, Fortnite's launch
+probe, the C++/GLES/Text import audit and the static C++ import audit. The proof
+retains five binary/generated-C archive pairs, the host dSYM and four guest
+serial/config pairs. Owned guest VMs, scratch files and the RAM disk are retired.
+The launch probe resolves both calendar classes and stops at
+`_OBJC_CLASS_$_UNCalendarNotificationTrigger`, attributed to UserNotifications,
+before application entry; the process exits 1.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,078 | 83 | 78 |
+| Fortnite executable | 2,080 | 81 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,918 | 86 | 114 |
+| All images | 2,920 | 84 | 114 |
 
-The C++/GLES/Text variant reports 2,932 resolved imports, 72 unresolved strong
+The C++/GLES/Text variant reports 2,934 resolved imports, 70 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -18530,6 +18606,7 @@ predicates use `predicate-checks`, index sets use `index-set-checks`,
 URL query items use `url-query-item-checks`, character sets use
 `character-set-checks`, scanners use `scanner-checks`, user activities use
 `user-activity-checks`, notification queues use `notification-queue-checks`,
+Objective-C calendars use `ns-calendar-checks`,
 keyed archives use `keyed-archiver-checks`, keyed unarchives use
 `keyed-unarchiver-checks`,
 CoreFoundation dictionaries use
@@ -18546,7 +18623,7 @@ there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
 URL session, session configuration, recursive lock, invocation, invocation
 operation, date formatter, predicate, index set, URL query item, character set,
-scanner, user activity, notification queue, keyed archive, keyed unarchive,
+scanner, user activity, notification queue, calendar, keyed archive, keyed unarchive,
 sort descriptor, regular expression, mutable string, CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String
