@@ -1,0 +1,3 @@
+Module {
+	name: 'winecalculator'
+}
