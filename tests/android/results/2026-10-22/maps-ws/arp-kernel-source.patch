@@ -1,0 +1,401 @@
+diff --git a/kernel/c/lwipopts.h b/kernel/c/lwipopts.h
+index 258c506a8..74840711a 100644
+--- a/kernel/c/lwipopts.h
++++ b/kernel/c/lwipopts.h
+@@ -18,6 +18,12 @@
+  * fragmentation header on both 64-bit targets. */
+ #define IPV6_FRAG_COPYHEADER 1
+ #define LWIP_ARP 1
++/* Preserve paired A/AAAA DNS queries while resolving a cold ARP neighbor.
++ * The default retains only the last packet. Bound both per-neighbor and
++ * aggregate storage; lwIP releases it on resolution, expiry or removal. */
++#define ARP_QUEUEING 1
++#define ARP_QUEUE_LEN 3
++#define MEMP_NUM_ARP_QUEUE 30
+ #define LWIP_ETHERNET 1
+ #define LWIP_ICMP 1
+ #define LWIP_RAW 1
+diff --git a/kernel/netcore/core.v b/kernel/netcore/core.v
+index 51e16bf7d..e868c7ad7 100644
+--- a/kernel/netcore/core.v
++++ b/kernel/netcore/core.v
+@@ -564,7 +564,9 @@ fn C.igmp_lookfor_group(ifp &C.netif, addr &C.ip4_addr) &C.igmp_group
+ fn C.igmp_start(netif &C.netif) Err_t
+ fn C.igmp_stop(netif &C.netif) Err_t
+ fn C.inet_chksum(dataptr voidptr, len U16_t) U16_t
++fn C.ip4_route(dest &C.ip4_addr) &C.netif
+ fn C.ip6_route(src &C.ip6_addr, dest &C.ip6_addr) &C.netif
++fn C.ip6_select_source_address(netif &C.netif, dest &C.ip6_addr) &C.ip_addr
+ fn C.lwip_htonl(x U32_t) U32_t
+ fn C.lwip_htons(x U16_t) U16_t
+ fn C.lwip_init()
+@@ -1783,6 +1785,31 @@ pub fn bind_ip(socket &Vinix_socket, address &C.ip_addr, port u16) i32 {
+ 	}
+ }
+ 
++// lwIP's UDP connect only records a peer. Linux also selects a local source
++// address: libc uses connect + getsockname to rank resolved destinations.
++// Keep that selection separately so wildcard UDP PCBs retain their receive
++// semantics and an explicit sendto can still select another outgoing route.
++fn udp_connect_source(socket &Vinix_socket, destination &C.ip_addr, source &C.ip_addr) i32 {
++	unsafe {
++		local := &socket.udp.local_ip
++		if destination.@type == u8(Lwip_ip_addr_type.ipaddr_type_v6) {
++			netif := C.ip6_route(&local.u_addr.ip6, &destination.u_addr.ip6)
++			if netif == nil { return 101 }
++			if local.u_addr.ip6.addr[0] | local.u_addr.ip6.addr[1]
++				| local.u_addr.ip6.addr[2] | local.u_addr.ip6.addr[3] == 0 {
++				selected := C.ip6_select_source_address(netif, &destination.u_addr.ip6)
++				if selected == nil { return 101 }
++				C.memcpy(source, selected, sizeof(C.ip_addr))
++			} else { C.memcpy(source, local, sizeof(C.ip_addr)) }
++		} else {
++			netif := C.ip4_route(&destination.u_addr.ip4)
++			if netif == nil { return 101 }
++			C.memcpy(source, if local.u_addr.ip4.addr == 0 { &netif.ip_addr } else { local }, sizeof(C.ip_addr))
++		}
++		return 0
++	}
++}
++
+ pub fn connect_ip(socket &Vinix_socket, address &C.ip_addr, port u16) i32 {
+ 	unsafe {
+ 		ip := C.ip_addr{}
+@@ -1894,6 +1921,9 @@ pub fn connect_ip(socket &Vinix_socket, address &C.ip_addr, port u16) i32 {
+ 			}
+ 			return 115
+ 		}
++		source := &C.ip_addr(C.vinix_stack_alloc(sizeof(C.ip_addr)))
++		route_error := udp_connect_source(socket, &ip, source)
++		if route_error != 0 { return route_error }
+ 		if i32(socket.udp.local_port) == 0 {
+ 			bound := bind_ephemeral(socket, &socket.udp.local_ip)
+ 			if bound {
+@@ -1903,6 +1933,7 @@ pub fn connect_ip(socket &Vinix_socket, address &C.ip_addr, port u16) i32 {
+ 		error_ = C.udp_connect(socket.udp, &ip, C.lwip_htons(port))
+ 		if i32(error_) == Err_enum_t.err_ok {
+ 			socket.connected = 1
++			C.memcpy(&socket.last_local_address, source, sizeof(C.ip_addr))
+ 		}
+ 		return linux_error(error_)
+ 	}
+@@ -3083,7 +3114,9 @@ pub fn vinix_socket_name_endpoint(socket &Vinix_socket, endpoint &C.vinix_net_en
+ 				(if peer { i32(socket.last_remote_port) } else { i32(socket.last_local_port) })
+ 			})
+ 		} else {
+-			ip = if peer { &socket.udp.remote_ip } else { &socket.udp.local_ip }
++			ip = if peer { &socket.udp.remote_ip } else if socket.connected {
++				&socket.last_local_address
++			} else { &socket.udp.local_ip }
+ 			port = C.lwip_htons(U16_t(if peer {
+ 				i32(socket.udp.remote_port)
+ 			} else {
+diff --git a/kernel/proc/proc.v b/kernel/proc/proc.v
+index 608e17cb1..e49dcd92d 100644
+--- a/kernel/proc/proc.v
++++ b/kernel/proc/proc.v
+@@ -383,8 +383,8 @@ pub mut:
+ 	children_usage UsageCounters
+ 	peak_rss_bytes u64
+ 	children_peak_rss_bytes u64
+-	// POSIX nice value. The scheduler scales this process' timeslices from
+-	// -20 (highest normal priority) through 19 (lowest).
++	// Initial nice value for fresh tasks. Individual tasks keep their own
++	// override, from -20 (highest normal priority) through 19 (lowest).
+ 	nice int
+ 	// NUMA memory policy, from set_mempolicy(2) and mbind(2). Zero is
+ 	// MPOL_DEFAULT: an anonymous page comes from the node the faulting thread
+@@ -1507,7 +1507,8 @@ pub fn process_stat_line(pid int, tid int, viewer &Namespace) string {
+ 	} else {
+ 		user_ns, system_ns = thread_cpu_times(target, 0)
+ 	}
+-	mut priority := 20 + process.nice
++	nice := if target == unsafe { nil } { process.nice } else { nice_value(target) }
++	mut priority := 20 + nice
+ 	if params.policy == sched_fifo || params.policy == sched_rr {
+ 		priority = -1 - params.priority
+ 	}
+@@ -1552,7 +1553,7 @@ pub fn process_stat_line(pid int, tid int, viewer &Namespace) string {
+ 	text.add_byte(` `)
+ 	text.add_decimal(priority)
+ 	text.add_byte(` `)
+-	text.add_decimal(process.nice)
++	text.add_decimal(nice)
+ 	text.add_byte(` `)
+ 	text.add_decimal(threads)
+ 	text.add(' 0 ')
+diff --git a/kernel/proc/proc_amd64.v b/kernel/proc/proc_amd64.v
+index 7398d2134..82b8a18ec 100644
+--- a/kernel/proc/proc_amd64.v
++++ b/kernel/proc/proc_amd64.v
+@@ -167,8 +167,8 @@ pub mut:
+ 	// and kept across exec, so `chrt -f 50 ./program` gives the program the
+ 	// priority and not just the shell that asked for it.
+ 	sched SchedParams
+-	// Kernel workers can request an ordinary nice weight without changing
+-	// the shared kernel Process or the scheduling policy of other threads.
++	// Tasks can request an ordinary nice weight without changing the weight
++	// or scheduling policy of other threads in their process.
+ 	sched_nice_override     int
+ 	sched_has_nice_override bool
+ 	// Native constructor fault injection belongs to its calling task.
+diff --git a/kernel/proc/proc_arm64.v b/kernel/proc/proc_arm64.v
+index db30fefeb..d09f7241d 100644
+--- a/kernel/proc/proc_arm64.v
++++ b/kernel/proc/proc_arm64.v
+@@ -137,7 +137,7 @@ pub mut:
+ 	// and kept across exec, so `chrt -f 50 ./program` gives the program the
+ 	// priority and not just the shell that asked for it.
+ 	sched SchedParams
+-	// Per-thread kernel-worker weight; userspace retains Process.nice.
++	// Per-task nice weight, including userspace threads and kernel workers.
+ 	sched_nice_override      int
+ 	sched_has_nice_override  bool
+ 	kernel_thread_fail_stage int
+diff --git a/kernel/sched/inherit.v b/kernel/sched/inherit.v
+index 4a7bc6c8c..3f4418197 100644
+--- a/kernel/sched/inherit.v
++++ b/kernel/sched/inherit.v
+@@ -36,6 +36,19 @@ fn inherited_sched_params(source &proc.Thread) proc.SchedParams {
+ 	return inherited
+ }
+ 
++fn inherited_nice(source &proc.Thread) int {
++	nice := proc.nice_value(source)
++	return if source.sched.reset_on_fork && nice < 0 { 0 } else { nice }
++}
++
++fn initial_user_nice(process &proc.Process) int {
++	source := proc.current_thread()
++	if source != unsafe { nil } && source.process == process {
++		return inherited_nice(source)
++	}
++	return process.nice
++}
++
+ // Publish the identity and first runnable thread together. A signal through
+ // the new pidfd may otherwise finish and free t before the creator enqueues it.
+ pub fn publish_user_thread(mut process proc.Process, t &proc.Thread) {
+@@ -124,14 +137,14 @@ pub fn new_process_with_vm(old_process &proc.Process, pagemap &memory.Pagemap, a
+ 		new_proc.sgid = old_process.sgid
+ 		new_proc.groups = old_process.groups.clone()
+ 		new_proc.umask = old_process.umask
+-		new_proc.nice = old_process.nice
++		new_proc.nice = inherited_nice(proc.current_thread())
+ 		new_proc.executable_path = old_process.executable_path.clone()
+ 		new_proc.rlimits = old_process.rlimits
+ 		proc.set_cpu_limit(mut new_proc, new_proc.rlimits[proc.rlimit_cpu])
+ 		new_proc.allow_wx = old_process.allow_wx
+ 		new_proc.dumpable = proc.dumpability(old_process)
+ 		new_proc.sigreturn_page = old_process.sigreturn_page
+-		// A NUMA memory policy is process state, like nice and the rlimits, so
++		// A NUMA memory policy is process state, like the rlimits, so
+ 		// a fork keeps the placement its parent asked for.
+ 		new_proc.mempolicy_mode = old_process.mempolicy_mode
+ 		new_proc.mempolicy_nodemask = old_process.mempolicy_nodemask
+diff --git a/kernel/sched/policy.v b/kernel/sched/policy.v
+index 08d41bd4d..7b84adb1b 100644
+--- a/kernel/sched/policy.v
++++ b/kernel/sched/policy.v
+@@ -326,10 +326,7 @@ fn effective_timeslice(t &proc.Thread) u64 {
+ 			slice = idle_policy_slice_us
+ 		}
+ 		else {
+-			mut nice := t.process.nice
+-			if katomic.load(&t.sched_has_nice_override) {
+-				nice = katomic.load(&t.sched_nice_override)
+-			}
++			nice := proc.nice_value(t)
+ 			weight := u64(20 - nice)
+ 			slice = t.timeslice * weight / 20
+ 		}
+diff --git a/kernel/sched/sched_amd64.v b/kernel/sched/sched_amd64.v
+index 6a3f1d113..22d44fcdf 100644
+--- a/kernel/sched/sched_amd64.v
++++ b/kernel/sched/sched_amd64.v
+@@ -686,6 +686,8 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
+ 		no_new_privs: proc.no_new_privs_state(proc.current_thread())
+ 		securebits: proc.securebits_state(proc.current_thread())
+ 		process:      process
++		sched_nice_override: initial_user_nice(process)
++		sched_has_nice_override: true
+ 		cr3:          process.pagemap.tagged_root()
+ 		gpr_state:    gpr_state
+ 		timeslice:    5000
+@@ -815,6 +817,8 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
+ 		masked_signals: source.masked_signals
+ 		affinity_mask:  source.affinity_mask
+ 		sched:          inherited_sched_params(source)
++		sched_nice_override: inherited_nice(source)
++		sched_has_nice_override: true
+ 		timer_slack_ns: source.timer_slack_ns
+ 		comm:           source.comm.clone()
+ 		comm_named:     source.comm_named
+diff --git a/kernel/sched/sched_arm64.v b/kernel/sched/sched_arm64.v
+index 7c2189b88..20676e85a 100644
+--- a/kernel/sched/sched_arm64.v
++++ b/kernel/sched/sched_arm64.v
+@@ -1271,6 +1271,8 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
+ 		securebits: proc.securebits_state(proc.current_thread())
+ 		process: process
+ 		ttbr0: process.pagemap.tagged_root()
++		sched_nice_override: initial_user_nice(process)
++		sched_has_nice_override: true
+ 		gpr_state: gpr_state
+ 		timeslice: 5000
+ 		running_on: u64(-1)
+@@ -1394,6 +1396,8 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
+ 		comm_named: source.comm_named
+ 		affinity_mask: source.affinity_mask
+ 		sched: inherited_sched_params(source)
++		sched_nice_override: inherited_nice(source)
++		sched_has_nice_override: true
+ 		timer_slack_ns: source.timer_slack_ns
+ 	} }
+ 	charge_transferred = true
+diff --git a/kernel/syscall/table/gaps.v b/kernel/syscall/table/gaps.v
+index 24790c11a..d3630ef8f 100644
+--- a/kernel/syscall/table/gaps.v
++++ b/kernel/syscall/table/gaps.v
+@@ -81,7 +81,7 @@ fn may_set_sched_params(target_tid int, policy int, priority int) bool {
+ 	// Leaving IDLE needs the target's current nice to fit its nice limit,
+ 	// even when the request would otherwise retain or lower priority.
+ 	if target.sched.policy == proc.sched_idle && policy != proc.sched_idle
+-		&& !proc.limit_allows(owner, proc.rlimit_nice, u64(20 - owner.nice)) {
++		&& !proc.limit_allows(owner, proc.rlimit_nice, u64(20 - proc.nice_value(target))) {
+ 		return false
+ 	}
+ 	if policy != proc.sched_fifo && policy != proc.sched_rr {
+@@ -107,7 +107,7 @@ fn sched_nice_permission(tid int, wanted int) u64 {
+ 	if !proc.mac_peer_allowed(caller, owner) { return errno.eperm }
+ 	privileged := proc.has_capability(caller, proc.cap_sys_nice)
+ 	if !privileged && caller.euid != owner.euid && caller.euid != owner.uid { return errno.eperm }
+-	if wanted < owner.nice && !privileged
++	if wanted < proc.nice_value(target) && !privileged
+ 		&& !proc.limit_allows(owner, proc.rlimit_nice, u64(20 - wanted)) { return errno.eperm }
+ 	return 0
+ }
+@@ -434,11 +434,12 @@ fn syscall_linux_sched_setattr(_ voidptr, raw_pid int, attr_ptr u64, flags u32)
+ 	// accepted requests must apply the normalized value rather than ignore it.
+ 	if policy == proc.sched_other || policy == proc.sched_batch {
+ 		proc.lock_table()
+-		target := threads_by_tid[tid]
++		mut target := threads_by_tid[tid]
+ 		if target != unsafe { nil } {
+ 			mut owner := target.process
+ 			if owner != unsafe { nil } && proc.mac_peer_allowed(proc.current_thread().process, owner) {
+-				owner.nice = int(attr.sched_nice)
++				katomic.store(mut &target.sched_nice_override, int(attr.sched_nice))
++				katomic.store(mut &target.sched_has_nice_override, true)
+ 			}
+ 		}
+ 		proc.unlock_table()
+@@ -468,7 +469,7 @@ fn syscall_linux_sched_getattr(_ voidptr, raw_pid int, attr_ptr u64, size u32, f
+ 				proc.unlock_table()
+ 				return errno.err, errno.eperm
+ 			}
+-			nice = owner.nice
++			nice = proc.nice_value(target)
+ 		}
+ 	}
+ 	proc.unlock_table()
+diff --git a/kernel/syscall/table/linux_common.v b/kernel/syscall/table/linux_common.v
+index a2bba9470..0baba180f 100644
+--- a/kernel/syscall/table/linux_common.v
++++ b/kernel/syscall/table/linux_common.v
+@@ -1094,8 +1094,7 @@ fn syscall_linux_setpriority(_ voidptr, raw_which int, raw_local_who int, raw_pr
+ 	if which != prio_process {
+ 		return errno.err, errno.einval
+ 	}
+-	mut caller := proc.current_thread().process
+-	target_pid := if who == 0 { caller.pid } else { who }
++	target_tid := if who == 0 { proc.current_thread().tid } else { who }
+ 	mut wanted := prio
+ 	if wanted < -20 {
+ 		wanted = -20
+@@ -1104,22 +1103,7 @@ fn syscall_linux_setpriority(_ voidptr, raw_which int, raw_local_who int, raw_pr
+ 		wanted = 19
+ 	}
+ 
+-	proc.lock_table()
+-	defer { proc.unlock_table() }
+-	mut target := proc.process_at(target_pid)
+-	if target == unsafe { nil } {
+-		return errno.err, errno.esrch
+-	}
+-	if !proc.mac_peer_allowed(caller, target) { return errno.err, errno.eperm }
+-	privileged := proc.has_capability(caller, proc.cap_sys_nice)
+-	if !privileged && caller.euid != target.euid && caller.euid != target.uid {
+-		return errno.err, errno.eperm
+-	}
+-	if wanted < target.nice && !privileged
+-		&& !proc.limit_allows(target, proc.rlimit_nice, u64(20 - wanted)) {
+-		return errno.err, errno.eacces
+-	}
+-	target.nice = wanted
++	if !proc.set_thread_nice(target_tid, wanted) { return errno.err, errno.get() }
+ 	return 0, 0
+ }
+ 
+@@ -1130,16 +1114,8 @@ fn syscall_linux_getpriority(_ voidptr, raw_which int, raw_local_who int) (u64,
+ 	if which != prio_process {
+ 		return errno.err, errno.einval
+ 	}
+-	target_pid := if who == 0 { proc.current_thread().process.pid } else { who }
+-	proc.lock_table()
+-	defer { proc.unlock_table() }
+-	target := proc.process_at(target_pid)
+-	if target == unsafe { nil } {
+-		return errno.err, errno.esrch
+-	}
+-	if !proc.mac_peer_allowed(proc.current_thread().process, target) {
+-		return errno.err, errno.eperm
+-	}
++	target_tid := if who == 0 { proc.current_thread().tid } else { who }
++	nice := proc.thread_nice(target_tid) or { return errno.err, errno.get() }
+ 	// The raw syscall returns 20 - nice so every successful result is positive.
+-	return u64(20 - target.nice), 0
++	return u64(20 - nice), 0
+ }
+diff --git a/kernel/userland/userland.v b/kernel/userland/userland.v
+index e35cda75a..578fd8753 100644
+--- a/kernel/userland/userland.v
++++ b/kernel/userland/userland.v
+@@ -601,6 +601,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
+ 		inherited_usage := t.usage
+ 		inherited_user_ns := t.cpu_user_ns
+ 		inherited_system_ns := t.cpu_system_ns
++		inherited_nice := proc.nice_value(t)
+ 		t.process = kernel_process
+ 
+ 		mmap.delete_pagemap(mut old_pagemap) or {
+@@ -640,6 +641,8 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
+ 		new_thread.cpu_user_ns = inherited_user_ns
+ 		new_thread.cpu_system_ns = inherited_system_ns
+ 		new_thread.cpu_time_ns = inherited_user_ns + inherited_system_ns
++		new_thread.sched_nice_override = inherited_nice
++		new_thread.sched_has_nice_override = true
+ 		proc.set_thread_sched_params_with_util(new_thread.tid, inherited_sched, true)
+ 		new_thread.timer_slack_ns = katomic.load(&t.timer_slack_ns)
+ 
+diff --git a/kernel/userland/userland_arm64.v b/kernel/userland/userland_arm64.v
+index 2fbfd234b..d6cc6ba4f 100644
+--- a/kernel/userland/userland_arm64.v
++++ b/kernel/userland/userland_arm64.v
+@@ -1366,6 +1366,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
+ 		inherited_usage := t.usage
+ 		inherited_user_ns := t.cpu_user_ns
+ 		inherited_system_ns := t.cpu_system_ns
++		inherited_nice := proc.nice_value(t)
+ 		t.process = kernel_process
+ 		gpu_exec_trace(trace_gpu, 'detached execve thread from old process')
+ 
+@@ -1423,6 +1424,8 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
+ 		new_thread.cpu_user_ns = inherited_user_ns
+ 		new_thread.cpu_system_ns = inherited_system_ns
+ 		new_thread.cpu_time_ns = inherited_user_ns + inherited_system_ns
++		new_thread.sched_nice_override = inherited_nice
++		new_thread.sched_has_nice_override = true
+ 		proc.set_thread_sched_params_with_util(new_thread.tid, inherited_sched, true)
+ 		new_thread.timer_slack_ns = katomic.load(&t.timer_slack_ns)
+ 		gpu_exec_trace(trace_gpu, 'inherited scheduler parameters')
