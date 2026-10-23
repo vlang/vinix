@@ -2256,3 +2256,21 @@ each. The maintained 457/261/276/175-check suites pass on both candidates.
 Generated C confirms only scalar validation moves before the lock, with no
 allocation or lifetime changes. The broader IPC/libc and foreign application
 limits remain unqualified.
+
+The `semperm` case adds 256,552 checks for semaphore creation modes,
+effective/supplementary credentials and capability overrides. All 512 modes
+are crossed with ten credential/capability scenarios; read/alter controls,
+vectors, removal ownership and error precedence are checked. Run
+`--cases semperm,semrange,semarray,sempid,semword,semabi` with a fresh state
+directory. `semperm-reference.v` accepts the same Linux-reference arguments
+as `semabi-reference.v`; its `--self-test` has two positive and nine negative
+parser controls.
+
+Compile `semperm-evidence.v` without `-prod`, run `--self-test`, then `check`
+on the [retained permission evidence](results/2026-10-23/semperm-evidence).
+Identical probe ELFs pass on both native candidates and Linux 6.12.51;
+original kernels fail 95,772 checks each. The maintained
+4200/457/261/276/175-check semaphore regressions also pass. The earlier
+Linux fixture's filesystem-ID expectation failure is retained. Independent
+filesystem IDs, IPC_SET/STAT, namespace isolation, SEM_UNDO and GNU/foreign/
+32-bit application paths remain outside this qualification.

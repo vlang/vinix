@@ -1729,6 +1729,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   457/261/276/175-check semaphore suites and retain evidence and limits.
   See [the SETVAL receipts](docs/linux-posix-qualification.md#native-semaphore-setval-error-order).
 
+- [x] Enforce native semaphore creation modes and credential/capability
+  permissions for existing-key lookup, controls, operation vectors and removal.
+  Qualify all 512 modes with 256,552 checks against identical Linux ELFs on
+  both architectures; originals fail 95,772 each. Repeat the maintained
+  4200/457/261/276/175-check regressions and publish failed attempts and limits.
+  See [the permission receipts](docs/linux-posix-qualification.md#native-semaphore-permissions).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
