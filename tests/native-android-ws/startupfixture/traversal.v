@@ -4,26 +4,55 @@ module startupfixture
 import os
 
 fn install_traversal_probe(dir string) ! {
- os.write_file(dir + '/TraversalProbe.smali', '.class public Lorg/vinix/bootstrap/TraversalProbe;\n.super Landroid/view/View;\n.implements Landroid/view/ViewTreeObserver$OnGlobalLayoutListener;\n.implements Landroid/view/ViewTreeObserver$OnPreDrawListener;\n.implements Landroid/view/ViewTreeObserver$OnDrawListener;\n.field private stage:I\n.field private preDraws:I\n.field private draws:I\n.field private finished:Z\n' +
+ os.write_file(dir + '/TraversalProbe.smali', '.class public Lorg/vinix/bootstrap/TraversalProbe;\n.super Landroid/view/View;\n.implements Landroid/view/ViewTreeObserver$OnGlobalLayoutListener;\n.implements Landroid/view/ViewTreeObserver$OnPreDrawListener;\n.implements Landroid/view/ViewTreeObserver$OnDrawListener;\n.field private stage:I\n.field private preDraws:I\n.field private draws:I\n.field private finished:Z\n.field private floatingObserver:Landroid/view/ViewTreeObserver;\n' +
   method('public constructor <init>(Landroid/content/Context;)V', 'invoke-direct {p0, p1}, Landroid/view/View;-><init>(Landroid/content/Context;)V\nreturn-void') +
   method('public static install(Landroid/content/Context;Landroid/view/ViewGroup;)V', '
+# Exercise merging into both an empty window observer and an existing listener list.
+invoke-static {p0, p1}, Lorg/vinix/bootstrap/TraversalProbe;->installOne(Landroid/content/Context;Landroid/view/ViewGroup;)V
+invoke-static {p0, p1}, Lorg/vinix/bootstrap/TraversalProbe;->installOne(Landroid/content/Context;Landroid/view/ViewGroup;)V
+return-void') +
+  method('private static installOne(Landroid/content/Context;Landroid/view/ViewGroup;)V', '
 new-instance v0, Lorg/vinix/bootstrap/TraversalProbe;
 invoke-direct {v0, p0}, Lorg/vinix/bootstrap/TraversalProbe;-><init>(Landroid/content/Context;)V
+invoke-virtual {v0}, Landroid/view/View;->getViewTreeObserver()Landroid/view/ViewTreeObserver;
+move-result-object v1
+iput-object v1, v0, Lorg/vinix/bootstrap/TraversalProbe;->floatingObserver:Landroid/view/ViewTreeObserver;
+invoke-virtual {v1, v0}, Landroid/view/ViewTreeObserver;->addOnGlobalLayoutListener(Landroid/view/ViewTreeObserver$OnGlobalLayoutListener;)V
+invoke-virtual {v1, v0}, Landroid/view/ViewTreeObserver;->addOnPreDrawListener(Landroid/view/ViewTreeObserver$OnPreDrawListener;)V
+invoke-virtual {v1, v0}, Landroid/view/ViewTreeObserver;->addOnDrawListener(Landroid/view/ViewTreeObserver$OnDrawListener;)V
+invoke-virtual {v0}, Landroid/view/View;->getViewTreeObserver()Landroid/view/ViewTreeObserver;
+move-result-object v2
+if-ne v1, v2, :bad
+invoke-virtual {v2}, Landroid/view/ViewTreeObserver;->isAlive()Z
+move-result v2
+if-eqz v2, :bad
 new-instance v1, Landroid/view/ViewGroup$LayoutParams;
 const/4 v2, -1
 const/16 v3, 24
 invoke-direct {v1, v2, v3}, Landroid/view/ViewGroup$LayoutParams;-><init>(II)V
 invoke-virtual {p1, v0, v1}, Landroid/view/ViewGroup;->addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V
-invoke-virtual {v0}, Landroid/view/View;->getViewTreeObserver()Landroid/view/ViewTreeObserver;
-move-result-object v1
-invoke-virtual {v1, v0}, Landroid/view/ViewTreeObserver;->addOnGlobalLayoutListener(Landroid/view/ViewTreeObserver$OnGlobalLayoutListener;)V
-invoke-virtual {v1, v0}, Landroid/view/ViewTreeObserver;->addOnPreDrawListener(Landroid/view/ViewTreeObserver$OnPreDrawListener;)V
-invoke-virtual {v1, v0}, Landroid/view/ViewTreeObserver;->addOnDrawListener(Landroid/view/ViewTreeObserver$OnDrawListener;)V
-return-void') +
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "detached view must retain its observer and listeners"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
   method('public onGlobalLayout()V', '
 invoke-virtual {p0}, Landroid/view/View;->isAttachedToWindow()Z
 move-result v0
 if-eqz v0, :bad
+iget-object v0, p0, Lorg/vinix/bootstrap/TraversalProbe;->floatingObserver:Landroid/view/ViewTreeObserver;
+invoke-virtual {v0}, Landroid/view/ViewTreeObserver;->isAlive()Z
+move-result v0
+if-nez v0, :bad
+invoke-virtual {p0}, Landroid/view/View;->getViewTreeObserver()Landroid/view/ViewTreeObserver;
+move-result-object v0
+invoke-virtual {p0}, Landroid/view/View;->getParent()Landroid/view/ViewParent;
+move-result-object v1
+check-cast v1, Landroid/view/View;
+invoke-virtual {v1}, Landroid/view/View;->getViewTreeObserver()Landroid/view/ViewTreeObserver;
+move-result-object v1
+if-ne v0, v1, :bad
 invoke-virtual {p0}, Landroid/view/View;->getWidth()I
 move-result v0
 if-lez v0, :bad
@@ -95,7 +124,7 @@ invoke-virtual {v0, p0}, Landroid/view/ViewTreeObserver;->removeOnGlobalLayoutLi
 invoke-virtual {v0, p0}, Landroid/view/ViewTreeObserver;->removeOnPreDrawListener(Landroid/view/ViewTreeObserver$OnPreDrawListener;)V
 invoke-virtual {v0, p0}, Landroid/view/ViewTreeObserver;->removeOnDrawListener(Landroid/view/ViewTreeObserver$OnDrawListener;)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "BOOTSTRAP-TRAVERSAL-PASS native-WS global-layout pre-draw-cancel draw-order draw-invalidation"
+const-string v1, "BOOTSTRAP-TRAVERSAL-PASS native-WS floating-observer-identity attachment-merge global-layout pre-draw-cancel draw-order draw-invalidation"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 :done
 return-void
