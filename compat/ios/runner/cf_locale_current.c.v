@@ -50,21 +50,42 @@ fn ns_locale_current() u64 {
 		panic('iOS: current locale outside runtime lifetime')
 	}
 	C.ios_objc_initialize_lock()
-	defer { C.ios_objc_initialize_unlock() }
-	if ios_runtime.locale == 0 {
-		identifier := ns_locale_current_identifier()
-		locale := objc_allocate(ios_runtime.names['NSLocale'])
-		store_field(locale, 0, identifier)
-		objc_release(identifier)
-		ios_runtime.locale = locale
+	if ios_runtime.locale != 0 {
+		locale := ios_runtime.locale
+		C.ios_objc_initialize_unlock()
+		return locale
 	}
-	return ios_runtime.locale
+	C.ios_objc_initialize_unlock()
+	// Both allocations may invoke application constructors. The cache lock
+	// protects publication only; no application code runs while it is held.
+	identifier := ns_locale_current_identifier()
+	if identifier == 0 { return 0 }
+	candidate := objc_allocate(ios_runtime.names['NSLocale'])
+	if candidate == 0 { objc_release(identifier); return 0 }
+	C.ios_objc_initialize_lock()
+	mut header := obj_header(candidate)
+	if header.destroying || header.destroyed || header.allocation_cls != ios_runtime.names['NSLocale']
+		|| read64(candidate) != header.allocation_cls {
+		panic('iOS: current locale requires live built-in locale storage')
+	}
+	old := header.fields[0]
+	header.fields[0] = identifier
+	published := ios_runtime.locale == 0
+	if published { ios_runtime.locale = candidate }
+	locale := ios_runtime.locale
+	C.ios_objc_initialize_unlock()
+	// Constructor-installed settings and losing candidates can run destructors.
+	// The published candidate's allocation reference belongs to the cache.
+	objc_release(old)
+	if !published { objc_release(candidate) }
+	return locale
 }
 
 // A no-argument C entry returning one owned, toll-free bridged reference.
 // The runtime keeps its separate cached reference until objc_stop().
 fn cf_locale_copy_current() u64 {
+	locale := ns_locale_current()
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
-	return objc_retain(ns_locale_current())
+	return objc_retain(locale)
 }

@@ -36,6 +36,12 @@ fn objc_responds(object u64, selector &char) bool {
 	if game_keyboard_selector(object, name) { return true }
 	if ns_uuid_selector(object, name) { return true }
 	if ns_date_selector(object, name) { return true }
+	if ns_date_formatter_family(if object in ios_runtime.classes { object } else { read64(object) }) {
+		if ns_date_formatter_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if ns_date_formatter_types('NSDateFormatter', object in ios_runtime.classes, name) != none { return true }
+	}
+	formatter_cls := if object in ios_runtime.classes { object } else { read64(object) }
+	if formatter_cls == ios_runtime.names['NSLocale'] && ns_date_formatter_types('NSLocale', object in ios_runtime.classes, name) != none { return true }
 	if ns_timezone_family(if object in ios_runtime.classes { object } else { read64(object) }) {
 		if name in ['init', 'new', 'mutableCopy', 'mutableCopyWithZone:']! { return false }
 		if ns_timezone_selector(object, name) { return true }

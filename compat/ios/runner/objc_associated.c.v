@@ -30,6 +30,10 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if zone_imp != 0 {
 		return unsafe { ObjCopyWithZone(voidptr(zone_imp))(value, &char(objc_selector(c'copyWithZone:')), 0) }
 	}
+	C.ios_objc_initialize_lock()
+	formatter := value in ios_runtime.objects && obj_header(value).date_formatter != unsafe { nil }
+	C.ios_objc_initialize_unlock()
+	if formatter { return ns_date_formatter_copy(value) }
 	if objc_is_kind(value, ios_runtime.names['NSMutableData']) {
 		return cf_data_create(0, data_pointer(value), i64(data_length(value)))
 	}
@@ -42,6 +46,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if objc_is_kind(value, ios_runtime.names['NSSortDescriptor']) { sort_descriptor_state(value); return objc_retain(value) }
 	if objc_is_kind(value, ios_runtime.names['NSRegularExpression']) { regular_expression_state(value); return objc_retain(value) }
 	if objc_is_kind(value, ios_runtime.names['NSTextCheckingResult']) { regex_result_state(value); return objc_retain(value) }
+	if ns_date_formatter_family(cls) { return ns_date_formatter_copy(value) }
 	if objc_is_kind(value, ios_runtime.names['NSTimeZone']) { ns_timezone_seconds(value); return objc_retain(value) }
 	if objc_is_kind(value, ios_runtime.names['NSSet']) { return ns_set_copy(value, false) }
 	if objc_is_kind(value, ios_runtime.names['UIAlertAction']) { return alert_copy_action(value) }

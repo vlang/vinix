@@ -33,6 +33,7 @@ fn ns_timezone_seconds(object u64) i64 {
 fn ns_timezone_fixed(seconds i64) u64 {
 	if seconds < -64800 || seconds > 64800 { return 0 }
 	object := objc_allocate(ios_runtime.names['NSTimeZone'])
+	if object == 0 { return 0 }
 	mut header := obj_header(object)
 	header.number = seconds
 	header.timezone_initialized = true
@@ -85,6 +86,7 @@ fn ns_timezone_types(name string, meta bool, selector string) ?string {
 			'alloc' { '@16@0:8' }
 			'allocWithZone:' { '@24@0:8^{_NSZone=}16' }
 			'timeZoneForSecondsFromGMT:' { '@24@0:8q16' }
+			'timeZoneWithAbbreviation:', 'timeZoneWithName:' { '@24@0:8@16' }
 			else { return none }
 		}
 	}
@@ -113,13 +115,21 @@ fn ns_timezone_dispatch(object u64, selector string, mut frame RegisterFrame) bo
 	meta := object in ios_runtime.classes
 	if !ns_timezone_family(if meta { object } else { read64(object) }) { return false }
 	if selector in ['init', 'new', 'mutableCopy', 'mutableCopyWithZone:', 'description', 'descriptionWithLocale:',
-		'initWithName:', 'initWithName:data:', 'timeZoneWithName:', 'timeZoneWithName:abbreviation:',
+		'initWithName:', 'initWithName:data:', 'timeZoneWithName:abbreviation:',
 		'defaultTimeZone', 'localTimeZone', 'systemTimeZone', 'setDefaultTimeZone:', 'resetSystemTimeZone',
 		'initWithCoder:', 'encodeWithCoder:', 'supportsSecureCoding', 'localizedName:locale:']! {
 		panic('iOS: timezone defaults, named zones, coding and locale formatting are not implemented')
 	}
 	if ns_timezone_types('NSTimeZone', meta, selector) == none { return false }
 	if meta {
+		if selector in ['timeZoneWithAbbreviation:', 'timeZoneWithName:']! {
+			C.ios_objc_initialize_lock()
+			text := ns_date_formatter_text(frame.x[2])
+			if text !in ['UTC', 'GMT']! { panic('iOS: timezone names other than UTC and GMT are not implemented') }
+			C.ios_objc_initialize_unlock()
+			frame.x[0] = objc_autorelease(ns_timezone_fixed(0))
+			return true
+		}
 		frame.x[0] = if selector == 'timeZoneForSecondsFromGMT:' { objc_autorelease(ns_timezone_fixed(i64(frame.x[2]))) } else { objc_allocate(object) }
 		return true
 	}

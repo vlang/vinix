@@ -17907,11 +17907,86 @@ the detached owned RAM disk. Native evidence retains 22 expected historical
 nonzero statuses. These hashes cover declared inputs, not the full host dynamic
 runtime closure.
 
-The launch probe now stops at `_OBJC_CLASS_$_NSDateFormatter`, before application
-entry. Fortnite remains unplayable.
+The invocation increment's launch probe stopped at
+`_OBJC_CLASS_$_NSDateFormatter`, before application entry.
 
 ```sh
 v run tests/ios/native-checks.v build-invocation
+```
+
+V supplies `NSFormatter` and a bounded `NSDateFormatter`. Their measured Apple
+instance sizes are 8 and 56 bytes; the latter inherits from `NSFormatter` and
+exposes its six measured ivar metadata records. Formatting state stays in owned
+sidecar storage. The supported patterns are the four observed at selected
+Fortnite call sites:
+`yyyy-MM-dd_HHmmssZ`, `yyyy-MM-dd HH:mm:ss`,
+`yyyy-MM-dd'T'HH:mm:ss.SSS` and `yyyy-MM-dd`.
+AppsFlyer uses the first three with `en_US_POSIX`, including a UTC formatter;
+Swift constructs the date-only formatter with POSIX locale and GMT zero.
+Firebase parses its context-manager local-time start/end strings with the second
+pattern. Resolving these imports does not establish execution of those callers
+or Swift JSONEncoder's formatted-date strategy.
+
+The profile supports `new`, `init`, independent copies, copied mutable format
+strings, nil settings, default scalar options, date/string conversion and
+`stringForObjectValue:`. Raw allocation supports default getters and `init`;
+setters before initialization fail explicitly. Repeated initialization preserves
+settings. `setDateStyle:0` and `setTimeStyle:0` clear a custom pattern. Explicit
+locale constructors accept `en_US_POSIX`, `en_US` and `en_GB`; formatting also
+validates the implicit current locale against that English-only set. Fixed
+time zones use the existing nearest-minute identity, and the new named-zone
+factories accept `UTC` and `GMT`. A nil time zone selects libc's local calendar
+rules for conversion. Returning an implicit local time-zone object remains
+unsupported.
+
+Gregorian dates run from 1582-10-15 through year 9999. Formatting rounds to the
+nearest millisecond, with exact half milliseconds rounding toward positive
+infinity, before extracting fields. Local historical offsets can include seconds.
+Parsing validates calendar fields, rejects nonexistent local times and selects
+standard time in a daylight-saving overlap. The bounded ASCII grammar accepts
+four-digit years, one/two-digit separated fields, outer spaces/tabs and one to
+nine fraction digits, truncated to milliseconds. Compact time fields require
+two digits each, and parsed zones accept `Z` or canonical `+HHmm`/`-HHmm`.
+Parsing accepts at most 128 UTF-8 bytes. Inputs require built-in
+`NSString`/`NSMutableString` objects and initialized built-in `NSDate` objects.
+Malformed or out-of-profile strings return nil. Other patterns, localized styles,
+calendars, custom subclasses, coding and non-default scalar settings fail
+explicitly; this is not a general ICU implementation.
+
+Immutable settings are published under the runtime lock and released outside it.
+Getter results remain retained until their autorelease pool drains. Active calls
+pin the formatter, and copies retain a consistent settings snapshot before any
+allocation callback. Constructors, default-locale cache construction and old
+setting destruction run without the runtime lock. Disposal retires owned state
+without freeing caller-supplied bytes, including after isa replacement.
+Concurrent runtime shutdown is outside the profile.
+
+The shared fixture passes on Apple Foundation and the compatibility runtime.
+It checks metadata, all four consumer patterns, local/fixed zones, parsing,
+fractional rounding, initializer state and independent copy lifetimes. Runtime
+checks add constructor rollback, callbacks releasing borrowed input, eight
+concurrent first-locale publishers, joined-worker copy snapshots, guarded caller
+storage, 32 isa replacements, 192 concurrent round trips and two drained runtimes.
+Forty-five child cases check explicit rejection of unsupported behavior and
+invalid storage. The host passes ASan+UBSan with ordinary and deterministic Swift
+hashing; host leak detection was disabled. Two independent reviews of the exact
+generated C found no unresolved ownership, locking or ABI issue in this profile.
+The ARM64 guest passes the same runtime fixture and all 45 rejection cases.
+
+Evidence is preserved under `build/ios/fortnite/date-formatter-checks`. The final
+proof verifies 20,705 unchanged source/toolchain/runtime inputs, 297 sealed native
+artifacts, five binary/generated-C archive pairs and the host dSYM. It verifies
+both sanitizer runs, all four ARM64 phases, guest serial/configuration hashes,
+preserved preflight and failed host/ARM build attempts, retired owned VMs, empty
+scratch directories and the detached owned RAM disk. Native evidence retains six
+expected historical nonzero statuses. These hashes cover declared inputs, not
+the full host dynamic runtime closure.
+
+The launch probe now stops at `_OBJC_CLASS_$_NSPredicate`, before application
+entry. Fortnite remains unplayable.
+
+```sh
+v run tests/ios/native-checks.v build-date-formatter
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -17919,12 +17994,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,070 | 91 | 78 |
+| Fortnite executable | 2,071 | 90 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,910 | 94 | 114 |
+| All images | 2,911 | 93 | 114 |
 
-The C++/GLES/Text variant reports 2,924 resolved imports, 80 unresolved strong
+The C++/GLES/Text variant reports 2,925 resolved imports, 79 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -17977,8 +18052,9 @@ base URL sessions use `url-session-checks`, sort descriptors use
 mutable strings use `mutable-string-checks`, session configurations use
 `session-configuration-checks`, recursive locks use `recursive-lock-checks`,
 invocations use `invocation-checks`, invocation operations use
-`invocation-operation-checks`, keyed archives use
-`keyed-archiver-checks`, keyed unarchives use `keyed-unarchiver-checks`,
+`invocation-operation-checks`, date formatters use `date-formatter-checks`,
+keyed archives use `keyed-archiver-checks`, keyed unarchives use
+`keyed-unarchiver-checks`,
 CoreFoundation dictionaries use
 `cf-dictionary-checks`, constant integers use
 `constant-integer-checks`, constant arrays use `constant-array-checks`, supplied
@@ -17992,7 +18068,7 @@ mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
 URL session, session configuration, recursive lock, invocation, invocation
-operation, keyed archive, keyed unarchive, sort
+operation, date formatter, keyed archive, keyed unarchive, sort
 descriptor, regular expression, mutable string,
 CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
