@@ -182,6 +182,10 @@ currently selects the 24-hour clock in this backend.
 BlurMaskFilter exposes all four Blur enum styles. Painting blurred masks remains
 unimplemented.
 
+Canvas's legacy float-bounds saveLayer overload delegates to its existing
+saveLayer path, as do its RectF overloads. These paths preserve the save stack;
+offscreen mask compositing and legacy save-flag validation remain incomplete.
+
 Handle-based JNI symbol lookup searches the library and its dependencies in
 breadth-first order, including defined weak symbols. The bootstrap APK includes
 a JNI method exported only by a dependent DSO to exercise this path in ART.
