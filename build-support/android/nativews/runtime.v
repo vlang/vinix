@@ -185,31 +185,35 @@ fn ws_start(e voidptr, activity voidptr) {
 				ThrowNew(slot(e, 14))(e, cls(e, c'java/lang/IllegalStateException'), c'Native activity stack is full')
 				return
 			}
-			call(e, ws.activity, c'android/app/Activity', c'onPause', c'()V', nil)
-			call(e, ws.activity, c'android/app/Activity', c'onStop', c'()V', nil)
+			call(e, ws.activity, c'android/app/Activity', c'vinixPerformPause', c'()V', nil)
+			call(e, ws.activity, c'android/app/Activity', c'vinixPerformStop', c'()V', nil)
 			ws.back_stack[ws.back_count] = ws.activity
 			ws.back_count++
 		}
 		ws.activity = WsRef(slot(e, 21))(e, activity)
 	}
 	ws.running = true
+	// ATL creates secondary activities without a host window. Native WS shares
+	// one surface across the stack; finish() still requires its nonzero token.
+	window := obj(e, activity, c'android/app/Activity', c'getWindow', c'()Landroid/view/Window;', unsafe { nil })
+	f := field(e, c'android/view/Window', c'native_window', c'J')
+	unsafe { WsPutLong(slot(e, 110))(e, window, f, 1) }
 	ws_uid_lifecycle(e, 100)
 	dispatch_create(e, activity, unsafe { nil })
 	if pending(e) { return }
 	dispatch_post_create(e, activity, unsafe { nil })
 	dispatch_start(e, activity)
-	call(e, activity, c'android/app/Activity', c'onResume', c'()V', unsafe { nil })
-	call(e, activity, c'android/app/Activity', c'onPostResume', c'()V', unsafe { nil })
+	call(e, activity, c'android/app/Activity', c'vinixPerformResume', c'()V', unsafe { nil })
 	ws.dirty = true
 }
 
 fn ws_finish(e voidptr, activity voidptr, window i64) {
 	unsafe {
 		if ws.activity == nil || Same(slot(e, 24))(e, activity, ws.activity) == 0 { return }
-		call(e, activity, c'android/app/Activity', c'onPause', c'()V', nil)
-		call(e, activity, c'android/app/Activity', c'onStop', c'()V', nil)
+		call(e, activity, c'android/app/Activity', c'vinixPerformPause', c'()V', nil)
+		call(e, activity, c'android/app/Activity', c'vinixPerformStop', c'()V', nil)
 		ws_detach_view(e, activity_decor(e, activity))
-		call(e, activity, c'android/app/Activity', c'onDestroy', c'()V', nil)
+		call(e, activity, c'android/app/Activity', c'vinixPerformDestroy', c'()V', nil)
 		Drop(slot(e, 22))(e, ws.activity)
 		ws.activity = nil
 		if ws.focused != nil {
@@ -226,9 +230,8 @@ fn ws_finish(e voidptr, activity voidptr, window i64) {
 		ws.activity = ws.back_stack[ws.back_count]
 		ws.back_stack[ws.back_count] = nil
 		call(e, ws.activity, c'android/app/Activity', c'onRestart', c'()V', nil)
-		call(e, ws.activity, c'android/app/Activity', c'onStart', c'()V', nil)
-		call(e, ws.activity, c'android/app/Activity', c'onResume', c'()V', nil)
-		call(e, ws.activity, c'android/app/Activity', c'onPostResume', c'()V', nil)
+		call(e, ws.activity, c'android/app/Activity', c'vinixPerformStart', c'()V', nil)
+		call(e, ws.activity, c'android/app/Activity', c'vinixPerformResume', c'()V', nil)
 		ws_mark()
 	}
 }
@@ -433,12 +436,12 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		// Java worker threads can still reference their JNI providers.
 		ws_uid_lifecycle(e, 300)
 		if ws.activity != nil {
-			call(e, ws.activity, c'android/app/Activity', c'onPause', c'()V', nil)
-			call(e, ws.activity, c'android/app/Activity', c'onStop', c'()V', nil)
-			call(e, ws.activity, c'android/app/Activity', c'onDestroy', c'()V', nil)
+			call(e, ws.activity, c'android/app/Activity', c'vinixPerformPause', c'()V', nil)
+			call(e, ws.activity, c'android/app/Activity', c'vinixPerformStop', c'()V', nil)
+			call(e, ws.activity, c'android/app/Activity', c'vinixPerformDestroy', c'()V', nil)
 		}
 		for i := i32(0); i < ws.back_count; i++ {
-			call(e, ws.back_stack[i], c'android/app/Activity', c'onDestroy', c'()V', nil)
+			call(e, ws.back_stack[i], c'android/app/Activity', c'vinixPerformDestroy', c'()V', nil)
 		}
 		if ws_failure(e, c'ANDROID-WS-FAIL shutdown') { return 1 }
 		return 0

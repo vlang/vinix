@@ -132,6 +132,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  smali := work + '/smali'
  if os.exists(smali) { os.rmdir_all(smali)! }
  checked([java, '-cp', tools + '/*', 'org.jf.baksmali.Main', 'disassemble', '--jobs', '2', input, '-o', smali])!
+ framework_activity_lifecycle(smali)!
  for name, hash in framework_signature_dependency(smali, work, tools, java)! { tool_hashes[name] = ah.Value(hash) }
  cursor_v := os.read_file(root() + '/build-support/android/atlframework/cursors.v')!
  bar_v := os.read_file(root() + '/build-support/android/atlframework/actionbar.v')!

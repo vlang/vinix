@@ -93,13 +93,13 @@ fn activity_restore(e voidptr, activity voidptr, _bundle voidptr) {
 fn dispatch_create(e voidptr, activity voidptr, incoming voidptr) {
     saved := get_object(e, activity, c'android/app/Activity', c'vinixSavedState', c'Landroid/os/Bundle;')
     args := [Value{l: if saved == unsafe { nil } { incoming } else { saved }}]!
-    call(e, activity, c'android/app/Activity', c'onCreate', c'(Landroid/os/Bundle;)V', unsafe { &args[0] })
+    call(e, activity, c'android/app/Activity', c'vinixPerformCreate', c'(Landroid/os/Bundle;)V', unsafe { &args[0] })
 }
 fn dispatch_post_create(e voidptr, activity voidptr, _incoming voidptr) {
     put_int(e, activity, c'android/app/Activity', c'vinixPostCreatePending', 1)
 }
 fn dispatch_start(e voidptr, activity voidptr) {
-    call(e, activity, c'android/app/Activity', c'onStart', c'()V', unsafe { nil })
+    call(e, activity, c'android/app/Activity', c'vinixPerformStart', c'()V', unsafe { nil })
     saved := get_object(e, activity, c'android/app/Activity', c'vinixSavedState', c'Landroid/os/Bundle;')
     args := [Value{l: saved}]!
     if saved != unsafe { nil } { call(e, activity, c'android/app/Activity', c'onRestoreInstanceState', c'(Landroid/os/Bundle;)V', unsafe { &args[0] }) }
@@ -114,7 +114,7 @@ fn dispatch_start(e voidptr, activity voidptr) {
 fn activity_recreate(e voidptr, activity voidptr) {
     bundle := new_object(e, c'android/os/Bundle', c'()V', unsafe { nil })
     args := [Value{l: bundle}]!
-    call(e, activity, c'android/app/Activity', c'onSaveInstanceState', c'(Landroid/os/Bundle;)V', unsafe { &args[0] })
+    call(e, activity, c'android/app/Activity', c'vinixPerformSaveInstanceState', c'(Landroid/os/Bundle;)V', unsafe { &args[0] })
     views := new_object(e, c'android/util/SparseArray', c'()V', unsafe { nil })
     view_text_state(e, activity_decor(e, activity), views, false)
     class := unsafe { GetObjectClass(slot(e, 31))(e, activity) }
