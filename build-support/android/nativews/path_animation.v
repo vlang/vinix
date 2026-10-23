@@ -10,7 +10,25 @@ fn ws_path_animation(e voidptr, pointer i64) voidptr {
    throw(e, c'java/lang/IllegalArgumentException', c'The path must not be null or empty')
    return nil
   }
-  path := &WsPath(pointer)
+  original := &WsPath(pointer)
+  for i := i32(0); i < original.count; i++ {
+   p := original.points[i]
+   if p.x != p.x || p.y != p.y || p.x > f32(3.4028234663852886e38)
+    || p.x < f32(-3.4028234663852886e38) || p.y > f32(3.4028234663852886e38)
+    || p.y < f32(-3.4028234663852886e38) {
+    throw(e, c'java/lang/IllegalArgumentException', c'The path coordinates must be finite')
+    return nil
+   }
+  }
+  // Drawing keeps its inexpensive polygon. Animation independently refines the
+  // retained original curves, then owns/releases that temporary snapshot path.
+  precise := ws_path_precise(pointer)
+  if precise == 0 {
+   throw(e, c'java/lang/OutOfMemoryError', c'Precise path animation snapshot')
+   return nil
+  }
+  defer { ws_path_unref(precise) }
+  path := &WsPath(precise)
   mut drawn := false
   for i := i32(1); i < path.count; i++ { if !path.points[i].move { drawn = true } }
   if !drawn {

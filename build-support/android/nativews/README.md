@@ -74,6 +74,19 @@ moves consume no distance. Clones own independent temporary points. The fixture
 checks endpoints, uneven segments, curves, contour jumps, zero-length paths,
 conversion, cloning, path mutation, invalid inputs and scheduled frame callbacks.
 
+`AnimationUtils.loadInterpolator` parses compiled XML for the ten standard
+interpolator tags, resolves attributes through resources or the current theme,
+and closes each resource parser on success and failure. Missing resources,
+unknown tags and malformed paths fail explicitly. Scalar interpolators use
+their Android formulas; quadratic and cubic controls evaluate the Bezier curve.
+Path and path-data interpolators refine retained cubic and quadratic spans for
+animation without changing the renderer's polygon or drawing cost. Affine
+copies preserve those spans; projective transforms keep the existing polygon
+approximation. Animation snapshots own their points and release native storage
+on allocation and JNI failures.
+The signed fixture checks the four Maps progress curves, all ten tags, numeric
+attributes, endpoints, invalid paths and parser cleanup across repeated loads.
+
 `ViewGroup.suppressLayout` defers container layout without changing its bounds,
 children or size callbacks. Releasing suppression requests one fresh traversal
 when layout was attempted; it never replays stale bounds. Explicit animation

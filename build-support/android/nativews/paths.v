@@ -17,6 +17,10 @@ mut:
 	controls &WsVertex
 	control_count i32
 	control_capacity i32
+	curves &WsPathCurve
+	curve_count i32
+	curve_capacity i32
+	curve_failed bool
 }
 
 struct WsCrossing {
@@ -40,6 +44,7 @@ fn ws_path_unref(pointer i64) {
 		if path.references == 0 {
 			C.free(path.points)
 			C.free(path.controls)
+			C.free(path.curves)
 			C.free(path)
 		}
 	}
@@ -70,14 +75,18 @@ fn ws_path_builder(pointer i64, builder i64) i64 {
 		result := if builder == 0 { ws_path_new() } else { builder }
 		if pointer != 0 {
 			path := &WsPath(pointer)
-			for i := i32(0); i < path.count; i++ {
+			count := path.count
+			control_count := path.control_count
+			offset := (&WsPath(result)).count
+			for i := i32(0); i < count; i++ {
 				p := path.points[i]
 				ws_path_point(result, p.x, p.y, p.move)
 			}
-			for i := i32(0); i < path.control_count; i++ {
+			for i := i32(0); i < control_count; i++ {
 				p := path.controls[i]
 				ws_path_control(result, p.x, p.y)
 			}
+			ws_path_copy_curves(result, pointer, 0, offset)
 			ws_path_unref(pointer)
 		}
 		return result

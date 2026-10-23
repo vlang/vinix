@@ -1,0 +1,361 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+@[translated]
+module main
+
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+fn C.alloca(usize) voidptr
+fn C.sqrtf(f32) f32
+fn C.cosf(f32) f32
+fn C.sinf(f32) f32
+
+type WsTextureNewFloats = fn (voidptr, i32) voidptr
+type WsFloatRegion = fn (voidptr, voidptr, i32, i32, &f32)
+
+struct JavaFloats {
+mut:
+	count i32
+	data &f32
+}
+
+__global (
+	allocations [4096]voidptr
+	live_allocations int
+	allocation_attempts int
+	fail_at int = -1
+	java_fail bool
+	region_fail bool
+	last_error string
+)
+
+fn allocation_fails() bool {
+	allocation_attempts++
+	return allocation_attempts == fail_at
+}
+
+fn remember(pointer voidptr) {
+	if pointer == unsafe { nil } { return }
+	assert live_allocations < allocations.len
+	allocations[live_allocations] = pointer
+	live_allocations++
+}
+
+fn forget(pointer voidptr) {
+	if pointer == unsafe { nil } { return }
+	for i := 0; i < live_allocations; i++ {
+		if allocations[i] == pointer {
+			live_allocations--
+			allocations[i] = allocations[live_allocations]
+			return
+		}
+	}
+	panic('free or realloc of unowned production allocation')
+}
+
+fn host_malloc(size usize) voidptr {
+	if allocation_fails() { return unsafe { nil } }
+	pointer := unsafe { C.malloc(size) }
+	remember(pointer)
+	return pointer
+}
+
+fn host_calloc(count usize, size usize) voidptr {
+	if allocation_fails() { return unsafe { nil } }
+	pointer := unsafe { C.calloc(count, size) }
+	remember(pointer)
+	return pointer
+}
+
+fn host_realloc(pointer voidptr, size usize) voidptr {
+	if allocation_fails() { return unsafe { nil } }
+	// Remove before realloc: ASAN correctly treats the old value as invalid after it.
+	forget(pointer)
+	result := unsafe { C.realloc(pointer, size) }
+	remember(if result == unsafe { nil } { pointer } else { result })
+	return result
+}
+
+fn host_free(pointer voidptr) {
+	forget(pointer)
+	unsafe { C.free(pointer) }
+}
+
+fn throw(_ voidptr, kind &u8, message &u8) {
+	last_error = unsafe { tos_clone(kind) + ': ' + tos_clone(message) }
+}
+
+fn slot(_ voidptr, index i32) voidptr {
+	if index == 181 { return unsafe { voidptr(new_floats) } }
+	assert index == 213
+	return unsafe { voidptr(set_floats) }
+}
+
+fn new_floats(_ voidptr, count i32) voidptr {
+	if java_fail { last_error = 'Java array allocation'; return unsafe { nil } }
+	unsafe {
+		array := &JavaFloats(C.calloc(1, sizeof(JavaFloats)))
+		array.count = count
+		array.data = &f32(C.malloc(usize(count) * sizeof(f32)))
+		return array
+	}
+}
+
+fn set_floats(_ voidptr, array voidptr, offset i32, count i32, data &f32) {
+	if region_fail { last_error = 'Java SetFloatArrayRegion'; return }
+	unsafe {
+		value := &JavaFloats(array)
+		assert offset == 0 && count == value.count
+		C.memcpy(value.data, data, usize(count) * sizeof(f32))
+	}
+}
+
+fn release_java(pointer voidptr) {
+	unsafe {
+		if pointer == nil { return }
+		array := &JavaFloats(pointer)
+		C.free(array.data)
+		C.free(array)
+	}
+}
+
+fn cubic() i64 {
+	path := ws_path_new()
+	ws_path_point(path, 0, 0, true)
+	ws_path_cubic(path, 0.2, 0, 0.8, 1, 1, 1, false)
+	return path
+}
+
+fn close_enough(a f64, b f64, tolerance f64) {
+	difference := if a > b { a - b } else { b - a }
+	assert difference <= tolerance, 'actual=${a} expected=${b} error=${difference}'
+}
+
+fn bezier(a f64, b f64, t f64) f64 {
+	u := 1 - t
+	return 3 * u * u * t * a + 3 * u * t * t * b + t * t * t
+}
+
+fn expected(x f64, x1 f64, y1 f64, x2 f64, y2 f64) f64 {
+	mut low, mut high := f64(0), f64(1)
+	for _ in 0 .. 64 {
+		middle := (low + high) / 2
+		if bezier(x1, x2, middle) < x { low = middle } else { high = middle }
+	}
+	return bezier(y1, y2, (low + high) / 2)
+}
+
+fn value_at(pointer voidptr, x f64) f64 {
+	unsafe {
+		array := &JavaFloats(pointer)
+		for i := 1; i < int(array.count / 3); i++ {
+			a, b := f64(array.data[(i - 1) * 3 + 1]), f64(array.data[i * 3 + 1])
+			if b >= x {
+				assert b > a
+				return f64(array.data[(i - 1) * 3 + 2]) + (x - a) / (b - a) *
+					(f64(array.data[i * 3 + 2]) - f64(array.data[(i - 1) * 3 + 2]))
+			}
+		}
+	}
+	return 1
+}
+
+fn numerical() {
+	path := cubic()
+	unsafe { assert (&WsPath(path)).count == 5 }
+	before := live_allocations
+	array := ws_path_animation(unsafe { nil }, path)
+	assert live_allocations == before
+	unsafe { assert (&JavaFloats(array)).count > 5 * 3 }
+	ws_path_unref(path)
+	assert live_allocations == 0
+	for i in 1 .. 100 {
+		x := f64(i) / 100
+		close_enough(value_at(array, x), expected(x, .2, 0, .8, 1), .001)
+	}
+	close_enough(value_at(array, .125), .069972543, .001)
+	release_java(array)
+	quad := ws_path_new()
+	ws_path_point(quad, 0, 0, true)
+	ws_path_quad(quad, .4, 0, 1, 1, false)
+	quadratic := ws_path_animation(unsafe { nil }, quad)
+	for i in 1 .. 100 {
+		x := f64(i) / 100
+		close_enough(value_at(quadratic, x), expected(x, f64(.8) / 3, 0, .6, f64(1) / 3), .001)
+	}
+	release_java(quadratic)
+	ws_path_unref(quad)
+	assert live_allocations == 0
+	println('PATH-PRECISION PASS normalized cubic and quadratic; drawing unchanged')
+}
+
+fn copies() {
+	identity := WsMatrix{values: [f32(1), 0, 0, 0, 1, 0, 0, 0, 1]!}
+	original := cubic()
+	clone := ws_path_builder(ws_path_ref(original), 0)
+	ws_path_unref(original)
+	unsafe {
+		assert (&WsPath(clone)).curve_count == 1
+		assert (&WsPath(clone)).references == 1
+	}
+	// Appending to a nonempty destination must offset both span endpoints.
+	destination := ws_path_new()
+	ws_path_point(destination, -1, -1, true)
+	ws_path_add(destination, clone, i64(&identity))
+	unsafe {
+		assert (&WsPath(destination)).curves[0].start == 1
+		assert (&WsPath(destination)).curves[0].end == 5
+	}
+	ws_path_unref(clone)
+	// Repeat self-add until curve storage reallocates; source values must survive.
+	for _ in 0 .. 3 { ws_path_add(destination, destination, i64(&identity)) }
+	unsafe { assert (&WsPath(destination)).curve_count == 8 }
+	precise := ws_path_precise(destination)
+	unsafe { assert (&WsPath(precise)).count > (&WsPath(destination)).count }
+	ws_path_unref(precise)
+	ws_path_unref(destination)
+	// Builder consumes its source, but owns an independent span/control allocation.
+	builder := ws_path_new()
+	ws_path_point(builder, -1, -1, true)
+	built := ws_path_builder(cubic(), builder)
+	unsafe { assert (&WsPath(built)).curves[0].start == 1 }
+	ws_path_unref(built)
+	// Path.reset/rewind releases its native reference and starts a new builder.
+	reset := cubic()
+	ws_path_unref(reset)
+	empty := ws_path_new()
+	unsafe { assert (&WsPath(empty)).curve_count == 0 && (&WsPath(empty)).curve_failed == false }
+	ws_path_unref(empty)
+	assert live_allocations == 0
+	println('PATH-PRECISION PASS copies, source release, self-add, builder and reset')
+}
+
+fn transforms() {
+	affine := WsMatrix{values: [f32(2), .5, 3, -.25, 4, -2, 0, 0, 1]!}
+	path := ws_path_transform(cubic(), i64(&affine))
+	unsafe {
+		curve := (&WsPath(path)).curves[0]
+		close_enough(curve.p0.x, 3, .000001)
+		close_enough(curve.p0.y, -2, .000001)
+		close_enough(curve.p1.x, 3.4, .000001)
+		close_enough(curve.p2.x, 5.1, .000001)
+		close_enough(curve.p3.y, 1.75, .000001)
+	}
+	snapshot := ws_path_animation(unsafe { nil }, path)
+	release_java(snapshot)
+	ws_path_unref(path)
+	perspective := WsMatrix{values: [f32(1), 0, 0, 0, 1, 0, .2, 0, 1]!}
+	projected := ws_path_transform(cubic(), i64(&perspective))
+	unsafe { assert (&WsPath(projected)).curve_count == 0 }
+	// Projective images use the inherited transformed polygon, not fake cubics.
+	shared := ws_path_precise(projected)
+	assert shared == projected
+	ws_path_unref(shared)
+	ws_path_unref(projected)
+	assert live_allocations == 0
+	println('PATH-PRECISION PASS affine controls and inherited projective polygon')
+}
+
+fn contours() {
+	path := cubic()
+	ws_path_point(path, 2, 2, true)
+	ws_path_cubic(path, 2.2, 2, 2.8, 3, 3, 3, false)
+	array := ws_path_animation(unsafe { nil }, path)
+	unsafe {
+		data := &JavaFloats(array)
+		mut moves := 0
+		for i := 1; i < data.count / 3; i++ {
+			if data.data[i * 3 + 1] == 2 && data.data[i * 3 + 2] == 2 {
+				close_enough(data.data[i * 3], data.data[(i - 1) * 3], .000001)
+				close_enough(data.data[i * 3], .5, .000001)
+				moves++
+			}
+		}
+		assert moves == 1
+		close_enough(data.data[data.count - 3], 1, .000001)
+	}
+	release_java(array)
+	ws_path_unref(path)
+	assert live_allocations == 0
+	println('PATH-PRECISION PASS contour boundaries and normalized arc length')
+}
+
+fn failures() {
+	path := cubic()
+	baseline := live_allocations
+	allocation_attempts = 0
+	array := ws_path_animation(unsafe { nil }, path)
+	count := allocation_attempts
+	release_java(array)
+	assert live_allocations == baseline
+	assert count >= 3
+	for failure in 1 .. count + 1 {
+		allocation_attempts = 0
+		fail_at = failure
+		last_error = ''
+		result := ws_path_animation(unsafe { nil }, path)
+		assert result == unsafe { nil }
+		assert last_error.starts_with('java/lang/OutOfMemoryError:')
+		assert live_allocations == baseline
+	}
+	fail_at = -1
+	for region in [false, true] {
+		java_fail = !region
+		region_fail = region
+		last_error = ''
+		result := ws_path_animation(unsafe { nil }, path)
+		assert last_error.len > 0
+		release_java(result)
+		assert live_allocations == baseline
+	}
+	java_fail = false
+	region_fail = false
+	ws_path_unref(path)
+	// Fail retained-metadata realloc after renderer points/controls already exist.
+	metadata := ws_path_new()
+	ws_path_point(metadata, 0, 0, true)
+	ws_path_control(metadata, 0, 0)
+	allocation_attempts = 0
+	fail_at = 1
+	ws_path_cubic(metadata, .2, 0, .8, 1, 1, 1, false)
+	unsafe { assert (&WsPath(metadata)).curve_failed }
+	fail_at = -1
+	failed := ws_path_animation(unsafe { nil }, metadata)
+	assert failed == unsafe { nil } && last_error.starts_with('java/lang/OutOfMemoryError:')
+	ws_path_unref(metadata)
+	// Realloc failure must preserve an already-owned metadata allocation.
+	growing := cubic()
+	unsafe {
+		curve := (&WsPath(growing)).curves[0]
+		for _ in 0 .. 3 { ws_path_curve_append(growing, curve) }
+		allocation_attempts = 0
+		fail_at = 1
+		ws_path_curve_append(growing, curve)
+		assert (&WsPath(growing)).curve_count == 4
+		assert (&WsPath(growing)).curve_failed
+	}
+	fail_at = -1
+	copy_of_failed := ws_path_builder(growing, 0)
+	unsafe { assert (&WsPath(copy_of_failed)).curve_failed }
+	ws_path_unref(copy_of_failed)
+	// Nonfinite samples must fail explicitly, rather than becoming a straight path.
+	nonfinite := cubic()
+	unsafe { (&WsPath(nonfinite)).points[1].x = C.sqrtf(-1) }
+	last_error = ''
+	invalid := ws_path_animation(unsafe { nil }, nonfinite)
+	assert invalid == unsafe { nil } && last_error.starts_with('java/lang/IllegalArgumentException:')
+	ws_path_unref(nonfinite)
+	assert live_allocations == 0
+	println('PATH-PRECISION PASS all ${count} snapshot allocation failures, metadata OOM and JNI failures')
+}
+
+fn main() {
+	numerical()
+	copies()
+	transforms()
+	contours()
+	failures()
+	assert live_allocations == 0
+	println('PATH-PRECISION-HOST PASS')
+}
