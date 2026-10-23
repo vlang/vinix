@@ -364,6 +364,16 @@ Production-mode source admission and independent malformed-output refusals are
 checked. This is local producer qualification; it does not run Wine or establish
 a hermetic compiler distribution.
 
+[Local PE receipt admission](../tests/packages/wine-pe-admission-check.md) now
+connects a produced executable to the runtime fixture's retained input pins. It
+checks exact commands/environment, complete compiler/MinGW inventories, copied
+sources and all fourteen declared outputs, including the PE header on its hashed
+bytes. Malformed and fully resealed inconsistent receipts refuse. Repeated
+host admission/refusal, ownership and descriptor checks, sanitizers and admission
+of the real producer receipt pass. This validates local artifact provenance;
+publisher authentication, redistribution authority and PE execution remain
+separate boundaries.
+
 [Wine adapter host checks](../tests/packages/wine-prefix-check.md) cover private
 per-account prefix/IPC preparation, exact pinned Wine path patches and an
 AArch64 translator patch requiring separate writable/executable mappings, without
@@ -2179,6 +2189,16 @@ apply uses the same admission before canonicalizing or fingerprinting a proposal
 This also returns a size diagnostic when a stale confirmation accompanies such
 a proposal. See [apply admission qualification](../tests/packages/policy-admission-check.md) and
 [policy service lifecycle qualification](../tests/packages/policy-lifecycle-check.md).
+
+V clients can author complete policy proposals with
+`pkgprotocol.PolicyDocument.encode()`. It preserves caller list order, borrows
+the input fields and returns owned JSON with all seven settings. Format, UTF-8
+and wire limits are checked in production; the service canonicalizes and
+validates the saved proposal during review. The
+[policy writer checks](../tests/packages/policy-writer-check.md) cover normal
+and production CLI consumers, unchanged configuration/state/input bytes after
+acceptance or refusal, measured ownership, sanitizers and both target builds.
+Target execution and policy apply remain separate checks.
 
 A format-1 deployment manifest reconciles the requested roots atomically and
 selects the latest satisfiable packages in the authenticated catalog:

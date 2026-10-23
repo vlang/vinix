@@ -1823,6 +1823,18 @@ qualify the producer boundary. A produced executable is an input to a separate
 signed runtime check, not evidence that Wine executes it. Host system libraries
 and transitive tools are not a hermetic compiler closure.
 
+`wineadapter.admit_local_pe_proof(directory, program_source, producer_source)`
+checks a producer receipt before a runtime qualification uses its executable.
+The [local admission check](../../tests/packages/wine-pe-admission-check.md)
+verifies the exact canonical receipt, literal environment/commands, complete
+compiler/MinGW inventories and all fourteen declared output files. It checks
+the PE header on the bytes it hashes and refuses altered, aliased, overlapping
+or resealed inconsistent inputs. The returned executable path and artifact map
+are independently owned; read them before calling repeatable `close()`.
+Measured host checks, sanitizers and admission of the real producer receipt
+qualify this local provenance boundary. They do not authenticate a publisher,
+freeze every concurrent filesystem mutation or execute the PE.
+
 For runtime adapter authors, `wineadapter.prepare_prefix()` admits a nonroot
 identity's private SDK data directory through captured no-follow ancestors and
 prepares private prefix/server directories and fixed builtins. The
@@ -3756,6 +3768,18 @@ remain 8 MiB, 4096 allowed IDs/pins/licenses/installed rows, five permissions an
 replaced buffers under `-gc none`; presentation instances own their fields and
 must be `.close()`d. Input policy files still use the service’s authoring contract,
 which accepts arbitrary list order and canonicalizes it for review.
+
+Use `pkgprotocol.PolicyDocument.encode() !string` to author that complete
+format-1 policy file, including every setting and both pin range endpoints.
+It borrows caller fields, preserves list order and returns owned JSON without
+a trailing newline. Format, UTF-8, field/count and escaped 8 MiB limits remain
+enabled in production. Semantic validation, sorting and approval stay in the
+service. Do not close a caller-assembled document containing borrowed fields;
+decoded documents own their fields and must be closed. The
+[policy writer check](../../tests/packages/policy-writer-check.md) covers exact
+schema/ownership, repeated zero-retention cycles, sanitizers, actual normal and
+production CLI review acceptance/refusal with unchanged state, and both target
+consumer builds. It does not qualify target execution or policy apply.
 
 Software’s **Deployment → Organization policy** workflow freezes the literal
 path and complete review, discloses all previous/proposed settings and installed

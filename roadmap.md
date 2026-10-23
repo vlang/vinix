@@ -1025,6 +1025,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     console executable, source/C, build commands and input/output inventories.
     Production-mode source binding and fourteen independent refusal controls
     qualify the local producer; Wine execution and hermetic builds are not claimed.
+  - [x] [Local Win64 receipt admission](tests/packages/wine-pe-admission-check.md)
+    binds runtime qualification inputs to exact producer commands/environment,
+    complete compiler/MinGW inventories, source copies and fourteen declared
+    output files. Header/digest agreement, resealed refusals, repeated zero V
+    retention and descriptor cleanup pass with host sanitizers and a real
+    producer receipt. Publisher authentication and PE execution remain separate.
   - [x] [Wine adapter host boundaries](tests/packages/wine-prefix-check.md)
     qualify private per-account prefix/IPC preparation and exact pinned Wine
     and AArch64 translator patches with measured ownership and sanitizers.
@@ -1061,6 +1067,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     consumers, repeated zero-retention cycles, sanitizers and both target
     consumer builds pass. Semantic authority stays in the service; target guest
     execution and broader SDK acceptance remain separate gates.
+  - [x] [Complete policy document authoring](tests/packages/policy-writer-check.md)
+    writes the existing format-1 input schema with borrowed fields, owned output
+    and production UTF-8/size limits. Arbitrary list order reaches canonical
+    service review; semantic refusals preserve configuration, state and proposal
+    bytes. Normal/production CLI consumers, measured ownership, sanitizers and
+    both target builds pass; policy apply and target execution remain separate.
 - [ ] Support offline repositories/caches and organization-managed deployment;
   keep firmware, proprietary payload licensing and runtime updates explicit.
   - [x] [Installed payload disclosure](tests/packages/software-payload-check.md)
