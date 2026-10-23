@@ -193,6 +193,13 @@ Presentation is currently centered; anchor and gravity positioning, outside-clic
 dismissal, popup styling and menu icons remain incomplete. Menu entries retain
 insertion order.
 
+ActionProvider supports virtual action-view factories, visibility and sub-UI
+listeners, and listener reset. Menu items retain their provider, reset the
+previous provider on replacement, and clear a previously assigned action view.
+PopupMenu invokes the provider's default action after unhandled item and popup
+callbacks. Provider-created action views, provider-controlled menu visibility
+and submenus, and clearing a provider through `setActionView` remain incomplete.
+
 Handle-based JNI symbol lookup searches the library and its dependencies in
 breadth-first order, including defined weak symbols. The bootstrap APK includes
 a JNI method exported only by a dependent DSO to exercise this path in ART.
