@@ -1,0 +1,1 @@
+../../../arm/reference/source/semarrayreferenceinit/core.v

@@ -10994,3 +10994,44 @@ The 32-semaphore/32-operation ceilings, SEM_UNDO, IPC permissions/namespaces,
 remaining semctl commands, GNU libc and translated/32-bit paths remain separate.
 The broader libc, installation/service/sandbox and foreign application gates
 remain open.
+
+## Native semaphore array controls
+
+GETALL snapshots exactly the set's unsigned-short values before copying to
+user memory. SETALL imports and validates the whole array before committing
+all values and per-index caller PIDs, then progresses eligible waiters. Both
+commands ignore semnum. Pointer faults return EFAULT, values above 32767
+return ERANGE, and invalid IDs return EINVAL before pointer handling.
+
+The [retained evidence](../tests/linux-compat/results/2026-10-23/semarray-evidence/README.md)
+contains 457-check runs on each native architecture and Linux 6.12.51 using
+identical static musl probe ELFs. Both original kernels fail 304 checks; both
+corrected kernels and Linux pass all 457. Controls cover sets of 1, 4 and 32,
+exact copy lengths and guards, ignored negative/extreme indices, zero and
+maximum values, invalid members at every index, fault-before-range precedence,
+protected/page-crossing buffers, same-value SETALL by another process and
+queued decrement/zero waits. Refused updates preserve all values/PIDs and
+leave waiters blocked. The maintained runner passes semarray 457, sempid 261,
+semword 276 and semabi 175 on each corrected kernel with four vCPUs.
+
+Production builds use isolated candidate
+`25a48efae23ed887ecd45559d7ec8b929e224809`, directly based on
+`004aaa782d989515399ccdcd9e94b81094337dcb`, with matching before/after input
+maps. The integrated semaphore source SHA-256 is
+`22b78bee6e8bbab1e3a84f45ab74574f81c6e5779b223ae6b02c4d3aebcd562c`.
+Generated C confirms two 64-byte stack arrays, no new allocation/lifetime,
+user copies outside the IPC lock, and no set dereference across unlocked
+usercopy. SETALL relooks up its monotonic ID before accessing the set; removal
+observed at that point returns EIDRM. All stores precede queue progress.
+
+The portable V checker validates retained hashes, compile/build identities,
+ELF architectures, exact original/native/reference summaries, identical probes,
+maintained regressions and generated-C review. Nine negative controls pass;
+the Linux parser separately passes two positive and nine negative controls.
+Unsuccessful compilation attempts remain visible. External tools/large media
+have explicit pins; the completion receipt binds the final audit and manifest.
+
+The 32-semaphore/32-operation ceilings, SEM_UNDO, IPC permissions/namespaces,
+remaining commands/timestamps, removal-during-usercopy races, GNU libc and
+translated/32-bit paths remain outside this qualification. The broader libc,
+installation/sandbox and foreign application roadmap gates remain open.

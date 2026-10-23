@@ -23,9 +23,11 @@ const sem_undo = 0x1000
 const ipc_rmid = 0
 const getpid = 11
 const getval = 12
+const getall = 13
 const getncnt = 14
 const getzcnt = 15
 const setval = 16
+const setall = 17
 const max_sems = 32
 const max_ops = 32
 const semvmx = 32767
@@ -133,7 +135,7 @@ fn complete_unlocked(mut set Set, mut pending Pending, result u64) {
     event.trigger(mut pending.wake, true)
 }
 
-// SETVAL and successful semop process pending vectors under the same lock as
+// SETVAL/SETALL and successful semop process pending vectors under the same lock as
 // their value change. Every grant restarts the scan because a later vector
 // can enable an earlier vector. Errors detach without committing a proposal.
 fn progress_unlocked(mut set Set) {
@@ -255,7 +257,8 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) 
         sets_lock.release()
         return errno.err, errno.einval
     }
-    if command != ipc_rmid && (number < 0 || number >= set.values.len) {
+    if command != ipc_rmid && command != getall && command != setall &&
+        (number < 0 || number >= set.values.len) {
         sets_lock.release()
         return errno.err, errno.einval
     }
@@ -278,6 +281,49 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) 
             value := set.values[number]
             sets_lock.release()
             return u64(value), 0
+        }
+        getall {
+            // Linux exports exactly sem_nsems unsigned shorts and ignores
+            // semnum. Snapshot under the lock before touching user memory.
+            mut values := [max_sems]u16{}
+            count := set.values.len
+            for index in 0 .. count { values[index] = u16(set.values[index]) }
+            sets_lock.release()
+            if !usercopy.copy_to_user(argument, unsafe { voidptr(&values[0]) }, u64(count) * sizeof(u16)) {
+                return errno.err, errno.efault
+            }
+            return 0, 0
+        }
+        setall {
+            // Import the entire bounded array before range validation or any
+            // mutation. User faults can sleep; keep no set pointer across the
+            // unlocked import. IDs are not reused, so a fresh lookup below
+            // either finds this same set or reports removal with EIDRM.
+            mut values := [max_sems]u16{}
+            count := set.values.len
+            sets_lock.release()
+            if !usercopy.copy_from_user(unsafe { voidptr(&values[0]) }, argument, u64(count) * sizeof(u16)) {
+                return errno.err, errno.efault
+            }
+            for index in 0 .. count {
+                if values[index] > semvmx {
+                    return errno.err, errno.erange
+                }
+            }
+            sets_lock.acquire()
+            set = find_id_unlocked(int(id))
+            if set == unsafe { nil } || set.removed {
+                sets_lock.release()
+                return errno.err, errno.eidrm
+            }
+            pid := proc.current_thread().process.pid
+            for index in 0 .. count {
+                set.values[index] = int(values[index])
+                set.last_pid[index] = pid
+            }
+            progress_unlocked(mut set)
+            sets_lock.release()
+            return 0, 0
         }
         getpid {
             pid := set.last_pid[number]

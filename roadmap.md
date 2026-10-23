@@ -1715,6 +1715,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   276/175-check ABI suites. Remaining IPC and foreign paths stay explicit.
   See [the PID receipts](docs/linux-posix-qualification.md#per-index-semaphore-operation-pids).
 
+- [x] Implement native semaphore GETALL/SETALL with exact ushort array copies,
+  whole-array validation, per-index PID updates and queued waiter progress.
+  Qualify 457 controls against identical Linux ELFs on both architectures;
+  originals fail 304 each, and the maintained 261/276/175-check suites pass.
+  Remaining IPC/libc and foreign paths stay explicit.
+  See [the array receipts](docs/linux-posix-qualification.md#native-semaphore-array-controls).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

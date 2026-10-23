@@ -2220,3 +2220,21 @@ pass on both corrected kernels. Generated-C reviews confirm inline PID storage
 with the existing set lifetime. External toolchains and boot media have
 explicit content pins. This leaves the broader IPC/libc, installation and
 foreign/32-bit application qualifications open.
+
+The `semarray` case adds 457 native ELF64 checks for GETALL/SETALL: exact
+unsigned-short copy lengths, sets of 1/4/32, ignored semnum, range and pointer
+errors with Linux precedence, protected/page-crossing buffers, atomic
+whole-array values/PID updates and queued decrement/zero waits. Run
+`--cases semarray,sempid,semword,semabi` with a fresh state directory. Exact
+passing summaries and PASS markers are required.
+
+`semarray-reference.v` accepts the same Linux-reference arguments as
+`semabi-reference.v`; `--self-test` runs two positive and nine negative parser
+controls. Compile `semarray-evidence.v` without `-prod`, run `--self-test`, then
+`check` on the [retained evidence](results/2026-10-23/semarray-evidence).
+Both native kernels and identical Linux probe ELFs pass all 457 checks;
+original kernels fail 304 each. The maintained 261/276/175-check suites also
+pass on both corrected kernels. Generated-C reviews confirm stack buffers and
+set lookup after unlocked usercopy. The existing IPC ceilings, SEM_UNDO,
+permissions/namespaces, remaining commands, GNU libc and foreign/32-bit
+application paths remain separate.
