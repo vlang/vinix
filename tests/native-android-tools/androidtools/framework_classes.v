@@ -129,6 +129,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_layout_canvas(smali)!
  framework_pictures(smali)!
  framework_paint_color_longs(smali)!
+ framework_paint_filters(smali)!
  framework_rect_parcels(smali)!
  framework_notification_channels(smali)!
  framework_network_requests(smali)!
