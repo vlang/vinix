@@ -430,7 +430,7 @@ fn boot(out string, share string, readonly string, qemu string, accel string, fi
 				stop_start := time.sys_mono_now()
 				if container != '' {
 					// Stop by immutable ID so a name replacement cannot target another service.
-					run(['docker', 'stop', '--time', '1', container_id], out +
+					run(['docker', 'stop', '--timeout', '1', container_id], out +
 						'/m17b-docker-stop.log', 6)!
 					check(time.sys_mono_now() - stop_start < u64(7 * time.second),
 						'docker stop exceeded guest quiet window')!

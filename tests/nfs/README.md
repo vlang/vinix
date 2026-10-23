@@ -21,10 +21,8 @@ file /tmp/m17b-init
 The parent must verify a **static x86-64 Linux ELF** before boot. On macOS,
 `v -os linux -arch amd64 -gc none -o /tmp/m17b-guest.c tests/nfs/guest.v`
 checks Linux C generation only; it does not establish static linking or runtime
-qualification. A local compiler discovered during this lane was
-`/Users/jefferson/.hermes/profiles/vinix-b/cache/scratch/ui2-m1-v052/v/v`
-(`V 0.5.2 7647ce1`). The suggested `vinix` profile compiler path was absent;
-the `vinix-b/.../v-ui2-qualification/v` binary could not resolve its own vlib.
+qualification. Use a compiler with a matching, complete vlib and record its
+version with the build receipts.
 
 The rig requires `tar`, `xorriso`, `qemu-system-x86_64` with slirp and virtio
 networking, a kernel ELF, and an existing bootable Limine ISO template containing
