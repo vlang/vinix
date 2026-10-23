@@ -21,6 +21,8 @@ const ipc_excl = 0o2000
 const ipc_nowait = 0o4000
 const sem_undo = 0x1000
 const ipc_rmid = 0
+const ipc_set = 1
+const ipc_stat = 2
 const getpid = 11
 const getval = 12
 const getall = 13
@@ -39,17 +41,52 @@ struct SemBuf {
     flags i16
 }
 
+// Both native ABIs have a 48-byte ipc64_perm. x86-64 inserts two
+// additional words between the timestamps; AArch64 uses the generic ABI.
+struct SemPerm {
+mut:
+    key i32
+    uid u32
+    gid u32
+    cuid u32
+    cgid u32
+    mode u32
+    seq u16
+    pad u16
+    unused1 u64
+    unused2 u64
+}
+
+struct SemIdDs {
+mut:
+    perm SemPerm
+    words [7]u64
+}
+
+fn semid_size() u64 {
+    $if amd64 { return 104 } $else { return 88 }
+}
+
+fn realtime_seconds() i64 {
+    stamp := time.clock_now(time.clock_type_realtime) or { return 0 }
+    return stamp.tv_sec
+}
+
 @[heap]
 struct Set {
 mut:
     kernel_charge kbudget.Charge
     id int
     key i32
-    // Creator and owner are identical until IPC_SET is implemented. These
-    // scalar credentials and mode live with the set; no namespace is borrowed.
+    // Creator credentials survive owner changes. All metadata lives inline
+    // with the set; no namespace or user-memory pointer is borrowed.
     uid u32
     gid u32
+    cuid u32
+    cgid u32
     mode u32
+    ctime i64
+    otime i64
     user_ns u64
     values []int
     // Linux's sempid belongs to each semaphore, including zero operations.
@@ -113,13 +150,13 @@ fn in_group(who &Identity, gid u32) bool {
 
 fn may_use(who &Identity, set &Set, requested u32) bool {
     mut mode := set.mode
-    if who.uid == set.uid { mode >>= 6 }
-    else if in_group(who, set.gid) { mode >>= 3 }
+    if who.uid == set.uid || who.uid == set.cuid { mode >>= 6 }
+    else if in_group(who, set.gid) || in_group(who, set.cgid) { mode >>= 3 }
     return requested & ~mode & 7 == 0 || capable(who, set, proc.cap_ipc_owner)
 }
 
 fn may_remove(who &Identity, set &Set) bool {
-    return who.uid == set.uid || capable(who, set, proc.cap_sys_admin)
+    return who.uid == set.uid || who.uid == set.cuid || capable(who, set, proc.cap_sys_admin)
 }
 
 // This record is explicitly allocated in the operation frame, never on the
@@ -169,6 +206,7 @@ fn commit_unlocked(mut set Set, proposed &int, operations &SemBuf, count int, pi
         number := int(unsafe { operations[i].number })
         set.last_pid[number] = pid
     }
+    set.otime = realtime_seconds()
 }
 
 fn link_unlocked(mut set Set, mut pending Pending) {
@@ -318,7 +356,10 @@ pub fn syscall_semget(_ voidptr, key i32, nsems i32, flags i32) (u64, u64) {
         key: key
         uid: who.uid
         gid: who.gid
+        cuid: who.uid
+        cgid: who.gid
         mode: u32(flags) & 0o777
+        ctime: realtime_seconds()
         user_ns: who.ipc_user_ns
         values: values
     }
@@ -334,8 +375,14 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) 
         return errno.err, errno.erange
     }
     // Unsupported commands do not acquire read/alter permission semantics.
-    if command !in [ipc_rmid, getpid, getval, getall, getncnt, getzcnt, setval, setall] {
+    if command !in [ipc_rmid, ipc_set, ipc_stat, getpid, getval, getall, getncnt, getzcnt, setval, setall] {
         return errno.err, errno.einval
+    }
+    // IPC_SET imports the full native structure before lookup/ownership
+    // checks. Faults must not change metadata or hold a set lock/pointer.
+    mut info := SemIdDs{}
+    if command == ipc_set && !usercopy.copy_from_user(unsafe { voidptr(&info) }, argument, semid_size()) {
+        return errno.err, errno.efault
     }
     who := identity()
     sets_lock.acquire()
@@ -350,17 +397,52 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) 
         sets_lock.release()
         return errno.err, errno.einval
     }
-    if command == ipc_rmid {
+    if command == ipc_rmid || command == ipc_set {
         if !may_remove(&who, set) { sets_lock.release(); return errno.err, errno.eperm }
     } else {
         requested := if command == setval || command == setall { u32(2) } else { u32(4) }
         if !may_use(&who, set, requested) { sets_lock.release(); return errno.err, errno.eacces }
-        if command != getall && command != setall && (number < 0 || number >= set.values.len) {
+        if command != ipc_stat && command != getall && command != setall && (number < 0 || number >= set.values.len) {
             sets_lock.release()
             return errno.err, errno.einval
         }
     }
     match command {
+        ipc_set {
+            // Initial-namespace UID/GID -1 has no valid mapping. Ownership
+            // authorization precedes this validation, as on Linux.
+            if info.perm.uid == u32(-1) || info.perm.gid == u32(-1) {
+                sets_lock.release()
+                return errno.err, errno.einval
+            }
+            set.uid = info.perm.uid
+            set.gid = info.perm.gid
+            set.mode = info.perm.mode & 0o777
+            set.ctime = realtime_seconds()
+            sets_lock.release()
+            return 0, 0
+        }
+        ipc_stat {
+            info.perm.key = set.key
+            info.perm.uid = set.uid
+            info.perm.gid = set.gid
+            info.perm.cuid = set.cuid
+            info.perm.cgid = set.cgid
+            info.perm.mode = set.mode
+            info.words[0] = u64(set.otime)
+            $if amd64 {
+                info.words[2] = u64(set.ctime)
+                info.words[4] = u64(set.values.len)
+            } $else {
+                info.words[1] = u64(set.ctime)
+                info.words[2] = u64(set.values.len)
+            }
+            sets_lock.release()
+            if !usercopy.copy_to_user(argument, unsafe { voidptr(&info) }, semid_size()) {
+                return errno.err, errno.efault
+            }
+            return 0, 0
+        }
         ipc_rmid {
             set.removed = true
             // Previously granted frames keep their saved success. Only live
@@ -419,6 +501,7 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) 
                 set.values[index] = int(values[index])
                 set.last_pid[index] = pid
             }
+            set.ctime = realtime_seconds()
             progress_unlocked(mut set)
             sets_lock.release()
             return 0, 0
@@ -444,6 +527,7 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) 
             value := i32(argument)
             set.values[number] = value
             set.last_pid[number] = proc.current_thread().process.pid
+            set.ctime = realtime_seconds()
             progress_unlocked(mut set)
             sets_lock.release()
             return 0, 0

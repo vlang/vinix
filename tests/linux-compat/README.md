@@ -2274,3 +2274,18 @@ original kernels fail 95,772 checks each. The maintained
 Linux fixture's filesystem-ID expectation failure is retained. Independent
 filesystem IDs, IPC_SET/STAT, namespace isolation, SEM_UNDO and GNU/foreign/
 32-bit application paths remain outside this qualification.
+
+The `semmeta` case adds 28,713 native ELF64 checks for IPC_STAT/IPC_SET,
+creator/owner permissions, timestamp transitions and full native structure
+copies/error precedence. Both architectures and identical Linux 6.12.51 probe
+ELFs pass; originals fail 19,480 checks each. Run
+`--cases semmeta,semperm,semrange,semarray,sempid,semword,semabi` with a fresh
+state directory. All seven maintained cases pass on both candidate kernels.
+
+`semmeta-reference.v` accepts the same arguments as `semabi-reference.v`;
+`--self-test` checks two positive and nine negative parser controls. Compile
+`semmeta-evidence.v` without `-prod`, run `--self-test`, then `check` on the
+[metadata evidence](results/2026-10-23/semmeta-evidence). Generated C confirms
+stack snapshots and no new object lifetime. Namespace/mapping, independent
+filesystem IDs, SEM_UNDO, inventory and GNU/foreign/32-bit qualifications
+remain open; see the retained report for failed attempts and limits.

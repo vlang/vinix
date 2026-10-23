@@ -1,0 +1,1 @@
+../../../attempts/compile-fourth-x86/fixture.c

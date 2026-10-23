@@ -1736,6 +1736,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   4200/457/261/276/175-check regressions and publish failed attempts and limits.
   See [the permission receipts](docs/linux-posix-qualification.md#native-semaphore-permissions).
 
+- [x] Implement native semaphore IPC_STAT/IPC_SET layouts, creator/owner
+  mutation rights and operation/change timestamps with Linux error precedence.
+  Qualify 28,713 checks against identical Linux ELFs on both architectures;
+  originals fail 19,480 each. Repeat all seven maintained semaphore suites,
+  retain unsuccessful attempts and publish explicit remaining IPC/libc limits.
+  See [the metadata receipts](docs/linux-posix-qualification.md#native-semaphore-metadata).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

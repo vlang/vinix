@@ -1,0 +1,1 @@
+../../../arm/maintained/semarray/fixture.c
