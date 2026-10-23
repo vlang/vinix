@@ -192,8 +192,8 @@ fn ws_measure(e voidptr, object voidptr, width_spec i32, height_spec i32) {
 }
 
 fn ws_layout(e voidptr, object voidptr, left i32, top i32, right i32, bottom i32) {
-	args := [Value{ i: right - left }, Value{ i: bottom - top }]!
-	call(e, object, c'android/view/View', c'layoutInternal', c'(II)V', unsafe { &args[0] })
+	args := [Value{ i: left }, Value{ i: top }, Value{ i: right }, Value{ i: bottom }]!
+	call(e, object, c'android/view/View', c'vinixPerformLayout', c'(IIII)V', unsafe { &args[0] })
 	// onMeasure/onSizeChanged/onLayout can throw. JNI field lookup then returns
 	// zero while the exception is pending; preserve it before reading native state.
 	if pending(e) { return }

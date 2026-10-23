@@ -153,6 +153,14 @@ converters the installed Java provider cannot construct. The normal ATL build
 generates the JNI declarations and packages the V library with source/tool
 hashes in its manifest. APK files are not patched.
 
+Native WS preserves parent-relative bounds through layout and delivers
+`OnLayoutChangeListener` callbacks after `onLayout`, with both old and new
+coordinates. Registration is deduplicated and delivery uses a snapshot, so a
+callback can add or remove listeners. `isLaidOut()` becomes true after a
+successful layout and resets on window attachment changes. The signed
+[layout regression](../tests/native-android-ws/startupfixture/layout_listeners.v)
+checks these transitions, unchanged bounds, remeasurement and exception recovery.
+
 The native WS runner installs a streaming JCA provider for SHA-256, SHA-384
 and SHA-512 before APK loading. It uses the private runtime's OpenSSL EVP
 implementation, including independent cloned digest state and reset after
