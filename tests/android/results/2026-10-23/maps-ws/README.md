@@ -146,3 +146,22 @@ archived against their manifest and checked again after decoding. The staged
 framework matches the existing attempt223 receipt and its 102-source archive.
 Additional header and generated-C hashes identify build inputs without claiming
 their text is archived. Kernel/base identities remain inherited.
+
+Attempt227 uses framework `635add65…`, with software Canvas Z methods, and
+native225. The original interaction detector accepted an all-black window as
+onboarding and clicked early at 14:21:11 local. Its `ONBOARDING-PRESENTED` marker
+is a false positive. A second helper requires both a white background and black
+sign-in button; its [presented capture](attempt227-google-maps-onboarding-presented.png)
+shows onboarding. Root reported white=124823/black=4744 pixels at 14:22:20 local
+and a real Skip at 14:22:21 local (11:22:21 UTC); that helper's stdout was observed in-session,
+not saved as a tool log. The [helper](attempt227-wait-onboarding.v) is retained.
+
+The real transition throws `UnsupportedOperationException` because RenderNode
+supports rectangular outline clipping only. The pending exception reaches JNI
+`NewLocalRef`, aborting the APK with code134. [Results](attempt227-results.json),
+[serial](attempt227-google-maps-serial.log.gz) and
+[runtime receipt](attempt227-runtime-identities.json) retain the failure.
+Map display and search remain unverified. The [input receipt](attempt227-input-identities.json)
+checks the actual staged framework/native/runtime hashes and103 exact framework
+sources; native225's exact source receipt is reused. The independent Maps VM
+was cloned without a preboot image hash, so kernel/base identities remain inherited.

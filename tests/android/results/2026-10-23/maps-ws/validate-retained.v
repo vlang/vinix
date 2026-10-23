@@ -22,7 +22,7 @@ fn main() {
 			assert hash(root + receipt['framework_input_identity_receipt']!.str())! == receipt['framework_input_identity_receipt_sha256']!.str()
 		}
 	}
-	for attempt in ['218', '219', '220', '221', '222', '223', '225'] {
+	for attempt in ['218', '219', '220', '221', '222', '223', '225', '227'] {
 		row := json2.decode[[]json2.Any](os.read_file(root + 'attempt' + attempt + '-results.json')!)![0].as_map()
 		serial := gzip.decompress(os.read_bytes(root + row['serial_log']!.str())!)!
 		assert sha256.sum(serial).hex() == row['serial_sha256']!.str()
@@ -59,5 +59,14 @@ fn main() {
 	alpha := json2.decode[map[string]string](gzip.decompress(os.read_bytes(root + 'attempt225-native-sources.json.gz')!)!.bytestr())!
 	assert alpha['bitmaps.v']!.contains('row_bytes: stride') && alpha['bitmaps.v']!.contains('format == 24')
 	assert alpha['glutils.v']!.contains('bitmap.alpha_only') && alpha['glutils.v']!.contains('i32(0x1906)')
-	println('MAPS218-225-RETAINED PASS ${checked} artifact hashes;7 serial/result identities;3 native archives/240 sources;framework221 ${sources.len} exact sources + explicit1 missing-source limitation;framework222+223 204 exact sources;actualDEX getter+lock+autofill and native ALPHA_8 evidence; no attempt224 boot claimed')
+	canvas_manifest := json2.decode[map[string]json2.Any](os.read_file(root + 'attempt227-framework-manifest.json')!)!
+	canvas_sources := json2.decode[map[string]string](gzip.decompress(os.read_bytes(root + 'attempt227-framework-sources.json.gz')!)!.bytestr())!
+	assert canvas_sources.len == 103
+	for path, source in canvas_sources { assert sha256.sum(source.bytes()).hex() == canvas_manifest['sources']!.as_map()[path]!.str(), path }
+	canvas := gzip.decompress(os.read_bytes(root + 'attempt227-Canvas.smali.gz')!)!.bytestr()
+	assert canvas.contains('.method public enableZ()V') && canvas.contains('.method public disableZ()V')
+	serial227 := gzip.decompress(os.read_bytes(root + 'attempt227-google-maps-serial.log.gz')!)!.bytestr()
+	assert serial227.contains('Native WS RenderNode supports rectangular outline clipping only')
+	assert serial227.contains('in call to NewLocalRef') && serial227.contains('APK-SUITE-EXIT id=google-maps code=134')
+	println('MAPS218-227-RETAINED PASS ${checked} artifact hashes;8 serial/result identities;3 native archives/240 sources;framework221 ${sources.len} exact sources + explicit1 missing-source limitation;framework222+223+227 307 exact sources;actualDEX getter+lock+autofill+Canvas and native ALPHA_8 evidence; no attempt224 boot claimed;227 failed outline/JNI abort134')
 }
