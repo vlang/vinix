@@ -6,6 +6,14 @@ module atlframework
 // storage to the calling thread's real GLES context, preserving GL errors and
 // pixel-store state. Other bitmap formats are rejected by the bitmap backend.
 fn ws_gl_bitmap_image(e voidptr, target i32, level i32, internal i32, object voidptr, kind i32, border i32) i32 {
+	return ws_gl_bitmap_upload(e, target, level, internal, object, kind, border, 0, 0, false)
+}
+
+fn ws_gl_bitmap_subimage(e voidptr, target i32, level i32, x i32, y i32, object voidptr, format i32, kind i32) i32 {
+	return ws_gl_bitmap_upload(e, target, level, format, object, kind, 0, x, y, true)
+}
+
+fn ws_gl_bitmap_upload(e voidptr, target i32, level i32, internal i32, object voidptr, kind i32, border i32, x i32, y i32, subdata bool) i32 {
 	unsafe {
 		if object == nil { throw(e, c'java/lang/NullPointerException', c'bitmap is null'); return -1 }
 		if Monitor(slot(e, 217))(e, object) != 0 { return -1 }
@@ -15,7 +23,7 @@ fn ws_gl_bitmap_image(e voidptr, target i32, level i32, internal i32, object voi
 		bitmap := &WsBitmap(pointer)
 		format := if internal < 0 { i32(0x1908) } else { internal }
 		pixel_type := if kind < 0 { i32(0x1401) } else { kind }
-		if format !in [0x1908, 0x8c43] || pixel_type != 0x1401 { return -1 }
+		if (format != 0x1908 && (subdata || format != 0x8c43)) || pixel_type != 0x1401 { return -1 }
 		// Validate unpack state before handing CPU memory to Mesa. In particular,
 		// a bound PBO must never interpret this host pointer as a buffer offset.
 		size := ws_gl_pixel_bytes(e, bitmap.width, bitmap.height, 0x1908, pixel_type, false)
@@ -25,8 +33,13 @@ fn ws_gl_bitmap_image(e voidptr, target i32, level i32, internal i32, object voi
 		}
 		ws_bitmap_ref(pointer)
 		defer { ws_bitmap_unref(pointer) }
-		WsGlTexImage(ws_egl_proc(c'glTexImage2D'))(u32(target), level, format, bitmap.width,
-			bitmap.height, border, 0x1908, u32(pixel_type), bitmap.rgba)
+		if subdata {
+			WsGlTexSubImage(ws_egl_proc(c'glTexSubImage2D'))(u32(target), level, x, y,
+				bitmap.width, bitmap.height, 0x1908, u32(pixel_type), bitmap.rgba)
+		} else {
+			WsGlTexImage(ws_egl_proc(c'glTexImage2D'))(u32(target), level, format, bitmap.width,
+				bitmap.height, border, 0x1908, u32(pixel_type), bitmap.rgba)
+		}
 		return 0
 	}
 }

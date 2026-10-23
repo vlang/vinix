@@ -160,9 +160,11 @@ precede driver calls and buffer cursors are preserved; read-only heap buffers
 without accessible backing storage are rejected. The signed fixture renders
 a triangle whose pixel color depends on matrix, vector and attribute values.
 `GLUtils.texImage2D` uploads the bitmap backend's RGBA_8888 pixels to Mesa.
-The regression verifies actual texture pixels, preserved GL errors and unpack
-alignment, and rejection of null or recycled bitmaps. Unsupported bitmap
-formats and unpack layouts exceeding its storage are rejected.
+Both `texSubImage2D` overloads update the existing texture at the supplied
+offset. The regression verifies actual texture pixels, unchanged neighbors,
+preserved GL errors and unpack alignment, and rejection of null or recycled
+bitmaps. Unsupported bitmap formats and unpack layouts exceeding its storage
+are rejected, following the [GLUtils contract](https://developer.android.com/reference/android/opengl/GLUtils).
 Buffer and texture uploads accept heap and direct NIO storage with byte-range
 validation and preserve Java buffer cursors. Heap storage is copied and unpinned
 before calling Mesa. ReadPixels copies results back to writable buffers;
