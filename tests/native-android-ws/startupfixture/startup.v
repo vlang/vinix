@@ -47,6 +47,7 @@ pub fn install(output string, resources string) ! {
  install_translation_probe(dir)!
  install_clipping_probe(dir)!
  install_affine_probe(dir)!
+ install_child_order_probe(dir)!
  install_editor_probe(dir)!
  install_window_probe(dir)!
  install_drawable_probe(dir)!
@@ -131,6 +132,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/TouchProbe;->check(Landroid/content/Con
 invoke-static {p0}, Lorg/vinix/bootstrap/TranslationProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/ClippingProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/AffineProbe;->check()V
+invoke-static {p0}, Lorg/vinix/bootstrap/ChildOrderProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/ScrollProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/EditorProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/WindowProbe;->check(Landroid/content/Context;)V
