@@ -168,6 +168,12 @@ argument. The transform leaves View geometry and background drawing intact.
 TextureView still reports no available SurfaceTexture; video texture production
 and composition are not implemented.
 
+WindowInsets builders retain legacy and typed inset values, visibility and
+roundness. Published values own independent maps; copies, edge replacement and
+clamped inset subtraction preserve their inputs. Consumption follows the API 35
+behavior, including stable-inset consumption being a no-op. The native backend
+supplies zero system insets and no display cutout.
+
 Handle-based JNI symbol lookup searches the library and its dependencies in
 breadth-first order, including defined weak symbols. The bootstrap APK includes
 a JNI method exported only by a dependent DSO to exercise this path in ART.
