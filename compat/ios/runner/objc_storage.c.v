@@ -2,6 +2,7 @@
 module main
 
 fn objc_install_storage(cls u64, object u64, caller_storage bool) {
+	ns_keyed_archiver_require_class(cls)
 	ns_operation_require_class(cls)
 	ns_recursive_lock_require_class(cls)
 	dispatch_objc_allocation_checked(cls) or { panic(err) }
@@ -19,6 +20,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	if header == unsafe { nil } { panic('iOS: cannot allocate object metadata') }
 	header.refs = 1
 	header.cls = cls
+	header.allocation_cls = cls
 	header.caller_storage = caller_storage
 	header.native_size = info.size
 	header.font_size = 17

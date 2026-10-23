@@ -17691,11 +17691,74 @@ and verified alongside their corrections. The input manifest covers declared
 inputs, not the full host dynamic runtime closure. VM serial/config hashes remain
 available; owned VM artifacts were retired and the RAM disk detached.
 
-The launch probe now stops at `_OBJC_CLASS_$_NSKeyedArchiver`, before application
-entry. Fortnite remains unplayable.
+That increment's launch probe stops at `_OBJC_CLASS_$_NSKeyedArchiver`, before
+application entry. Fortnite remains unplayable.
 
 ```sh
 v run tests/ios/native-checks.v build-invocation-operation
+```
+
+V now supplies the `NSKeyedArchiver` class factories
+`archivedDataWithRootObject:` and
+`archivedDataWithRootObject:requiringSecureCoding:error:`, plus the measured
+`NSCoder` superclass and 136-byte archiver instance metadata. The factories emit
+binary keyed archives with a UID object table, class descriptors and the standard
+`$archiver`, `$version`, `$objects` and `$top` envelope. Successful calls leave a
+preexisting NSError output untouched.
+
+The bounded profile accepts nil, strings, numbers, data, dates, null, arrays and
+string-keyed dictionaries, including their supported mutable variants and image
+constant containers. Shared references preserve identity. Both secure-coding
+settings accept the same closed set of built-in classes. Strings use ASCII or
+UTF-16 binary plist records; signed integers, full-width unsigned integers and
+floating values retain their numeric meaning. Single-precision numbers may be
+widened to double precision. Mutable values retain their Foundation class chains.
+
+The writer snapshots known storage while holding the runtime lock, then builds
+the NSData result outside it. A retained root protects the graph across result
+construction callbacks. Temporary node buffers, identity tables and output
+storage are explicitly freed. Allocation provenance rejects objects whose isa
+no longer matches their original storage. Cycles, custom coding, custom class
+factories, raw CF collection callbacks, non-string dictionary keys, invalid UTF-8,
+instance coders and archive file APIs fail explicitly. Concurrent mutation of
+the input graph is outside this profile. Limits are 64 levels of nesting,
+65,536 plist nodes and archive object-table entries, and 16 MiB of charged
+snapshot storage or serialized output. These rejection rules are Vinix's
+profile, not Foundation's general archive behavior.
+
+Fortnite's first preserved consumer archives an AppsFlyer dictionary for
+NSUserDefaults. Other consumers archive arrays of strings and a property-list
+dictionary. Custom Firebase/GoogleTransport coding and the paired
+NSKeyedUnarchiver paths still need implementation; resolving this class does not
+establish that those application workflows work.
+
+The shared corpus covers 33 graphs through all three factory modes and passes in
+the ARM64 Vinix guest. Both macOS ASan+UBSan runs pass with ordinary and
+deterministic Swift hashing, and Apple Foundation decodes all 99 archives produced
+by the host runtime.
+Checks cover scalar bits, embedded NUL,
+Unicode, mutable class chains, UID identity, wide references and offsets, the
+nesting boundary, independent snapshots, CFDate and result-construction callbacks.
+The fixture verifies the sole cached NSNull owner before shutdown and zero live
+objects after each of two runtime shutdowns. All 42 explicit rejection cases pass.
+Independent source and exact generated-C review found no unresolved ownership,
+locking, ABI or format issue within this profile. Host leak detection was disabled.
+
+Local evidence is recorded in
+`build/ios/fortnite/keyed-archiver-checks/proof.log`: 214 sealed native/static
+evidence files, 20,549 declared source/toolchain/runtime inputs, five archived
+binary/generated-C pairs, one host dSYM and four sequential ARM64 guest phases.
+Earlier compile, tooling and host failures are preserved with their frozen
+sources and verified alongside the corrections. The manifest covers declared
+inputs, not the full host dynamic runtime closure.
+The final proof also verifies the guest serial/configuration hashes, retired
+owned VMs, empty scratch directories and detached owned RAM disk.
+
+The launch probe now stops at `_OBJC_CLASS_$_NSKeyedUnarchiver`, before application
+entry. Fortnite remains unplayable.
+
+```sh
+v run tests/ios/native-checks.v build-keyed-archiver
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -17703,12 +17766,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,066 | 95 | 78 |
+| Fortnite executable | 2,067 | 94 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,906 | 98 | 114 |
+| All images | 2,907 | 97 | 114 |
 
-The C++/GLES/Text variant reports 2,920 resolved imports, 84 unresolved strong
+The C++/GLES/Text variant reports 2,921 resolved imports, 83 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -17760,7 +17823,8 @@ base URL sessions use `url-session-checks`, sort descriptors use
 `sort-descriptor-checks`, regular expressions use `regular-expression-checks`,
 mutable strings use `mutable-string-checks`, session configurations use
 `session-configuration-checks`, recursive locks use `recursive-lock-checks`,
-invocation operations use `invocation-operation-checks`,
+invocation operations use `invocation-operation-checks`, keyed archives use
+`keyed-archiver-checks`,
 CoreFoundation dictionaries use
 `cf-dictionary-checks`, constant integers use
 `constant-integer-checks`, constant arrays use `constant-array-checks`, supplied
@@ -17773,7 +17837,8 @@ object monitors use `objc-sync-checks`, Swift strings/buffers use
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
-URL session, session configuration, recursive lock, invocation operation, sort
+URL session, session configuration, recursive lock, invocation operation, keyed
+archive, sort
 descriptor, regular expression, mutable string,
 CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
