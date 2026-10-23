@@ -27,6 +27,36 @@ pub fn thread_nice(tid int) ?int {
 	return nice_value(t)
 }
 
+// PRIO_PGRP and PRIO_USER choose the highest priority of every matching
+// task, including nonleader threads. Keep table entries and their owners
+// under the lock and return only a scalar snapshot.
+pub fn aggregate_nice(local int, by_group bool) ?int {
+	lock_table()
+	defer { unlock_table() }
+	caller := current_thread().process
+	viewer := current_pid_namespace()
+	group := if local == 0 { pgid_in(caller, viewer) } else { local }
+	uid := if local == 0 { caller.uid } else { u32(local) }
+	mut best := 20
+	for tid := 1; tid < max_pid; tid++ {
+		t := threads_by_tid[tid]
+		if t == unsafe { nil } { continue }
+		owner := t.process
+		// Exit/exec can detach a thread before removing its TID. Such a
+		// thread no longer belongs to a published user process.
+		if owner == unsafe { nil } || voidptr(process_at(owner.pid)) != voidptr(owner)
+			|| pid_in(owner, viewer) == 0 || tid_in(t, viewer) == 0 { continue }
+		if by_group {
+			if pgid_in(owner, viewer) != group { continue }
+		} else if owner.uid != uid { continue }
+		if !mac_peer_allowed(caller, owner) { errno.set(errno.eperm); return none }
+		value := nice_value(t)
+		if value < best { best = value }
+	}
+	if best == 20 { errno.set(errno.esrch); return none }
+	return best
+}
+
 pub fn set_thread_nice(tid int, wanted int) bool {
 	if tid <= 0 || tid >= max_pid { errno.set(errno.esrch); return false }
 	lock_table()

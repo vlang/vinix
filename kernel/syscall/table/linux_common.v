@@ -1110,12 +1110,16 @@ fn syscall_linux_setpriority(_ voidptr, raw_which int, raw_local_who int, raw_pr
 fn syscall_linux_getpriority(_ voidptr, raw_which int, raw_local_who int) (u64, u64) {
 	which := int(i32(raw_which))
 	local_who := int(i32(raw_local_who))
-	who := proc.kernel_id(local_who)
-	if which != prio_process {
+	if which < prio_process || which > 2 {
 		return errno.err, errno.einval
 	}
-	target_tid := if who == 0 { proc.current_thread().tid } else { who }
-	nice := proc.thread_nice(target_tid) or { return errno.err, errno.get() }
+	nice := if which == prio_process {
+		who := proc.kernel_id(local_who)
+		target_tid := if who == 0 { proc.current_thread().tid } else { who }
+		proc.thread_nice(target_tid) or { return errno.err, errno.get() }
+	} else {
+		proc.aggregate_nice(local_who, which == 1) or { return errno.err, errno.get() }
+	}
 	// The raw syscall returns 20 - nice so every successful result is positive.
 	return u64(20 - nice), 0
 }

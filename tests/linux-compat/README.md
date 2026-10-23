@@ -2289,3 +2289,19 @@ state directory. All seven maintained cases pass on both candidate kernels.
 stack snapshots and no new object lifetime. Namespace/mapping, independent
 filesystem IDs, SEM_UNDO, inventory and GNU/foreign/32-bit qualifications
 remain open; see the retained report for failed attempts and limits.
+
+
+The `prioquery` case adds 6,199 native ELF64 checks for PRIO_PGRP/PRIO_USER
+getpriority, per-thread minima, real UID selection, signed32 argument words,
+actual musl errno and empty selections. Both native candidates and identical
+Linux 6.12.51 ELFs pass; originals fail 403 checks per architecture. Run
+`--cases prioquery,threadnice,niceabi,niceadmit,attrnice,groupabi,grouptid`
+with a fresh state directory. All seven maintained suites pass on both kernels.
+
+`prioquery-reference.v` takes the same arguments as `semabi-reference.v`;
+`--self-test` runs two positive and nine negative parser controls. Compile
+`prioquery-evidence.v` without `-prod`, run `--self-test`, then `check` on
+the [retained priority evidence](results/2026-10-23/prioquery-evidence).
+The checker validates source/build identities and all native/reference and
+maintained results. Group/user setpriority, zombies, mapped namespaces,
+restricted MAC policy and GNU/foreign/32-bit paths remain unqualified.

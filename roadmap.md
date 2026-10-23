@@ -1434,6 +1434,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   exact errors and flat repeated-call storage, with independent lifetime review.
   See [the priority-word contract](docs/linux-posix-qualification.md#native-priority-argument-words-and-missing-target-errors).
 
+- [x] Implement native PRIO_PGRP/PRIO_USER getpriority across live threads,
+  selecting by process group or real UID with zero selectors, signed32 words,
+  actual musl errno and empty-selection ESRCH. Qualify 6,199 checks against
+  identical Linux ELFs and seven maintained suites on both architectures.
+  See [the priority-query receipts and limits](docs/linux-posix-qualification.md#native-process-group-and-real-user-priority-queries).
+
 - [x] Enforce PRIO_PROCESS setpriority using effective CAP_SYS_NICE and the
   target's RLIMIT_NICE; qualify UID0/no-capability restrictions, non-root
   capability grants, owner/error ordering, genuine musl calls, retained state,
