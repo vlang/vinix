@@ -1440,6 +1440,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   identical Linux ELFs and seven maintained suites on both architectures.
   See [the priority-query receipts and limits](docs/linux-posix-qualification.md#native-process-group-and-real-user-priority-queries).
 
+- [x] Implement native PRIO_PGRP/PRIO_USER setpriority across live threads,
+  selecting by process group or real UID and preserving permitted partial
+  updates. Qualify signed32 words, clamping, actual musl permission/limit
+  errors and empty selections on both architectures and same-ELF Linux.
+  See [the priority-update receipts and limits](docs/linux-posix-qualification.md#native-process-group-and-real-user-priority-updates).
+
 - [x] Enforce PRIO_PROCESS setpriority using effective CAP_SYS_NICE and the
   target's RLIMIT_NICE; qualify UID0/no-capability restrictions, non-root
   capability grants, owner/error ordering, genuine musl calls, retained state,

@@ -1090,11 +1090,9 @@ fn syscall_linux_setpriority(_ voidptr, raw_which int, raw_local_who int, raw_pr
 	which := int(i32(raw_which))
 	local_who := int(i32(raw_local_who))
 	prio := int(i32(raw_prio))
-	who := proc.kernel_id(local_who)
-	if which != prio_process {
+	if which < prio_process || which > 2 {
 		return errno.err, errno.einval
 	}
-	target_tid := if who == 0 { proc.current_thread().tid } else { who }
 	mut wanted := prio
 	if wanted < -20 {
 		wanted = -20
@@ -1103,7 +1101,13 @@ fn syscall_linux_setpriority(_ voidptr, raw_which int, raw_local_who int, raw_pr
 		wanted = 19
 	}
 
-	if !proc.set_thread_nice(target_tid, wanted) { return errno.err, errno.get() }
+	if which == prio_process {
+		who := proc.kernel_id(local_who)
+		target_tid := if who == 0 { proc.current_thread().tid } else { who }
+		if !proc.set_thread_nice(target_tid, wanted) { return errno.err, errno.get() }
+	} else if !proc.set_aggregate_nice(local_who, which == 1, wanted) {
+		return errno.err, errno.get()
+	}
 	return 0, 0
 }
 

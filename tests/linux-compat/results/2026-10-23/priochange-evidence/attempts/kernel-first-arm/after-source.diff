@@ -1,0 +1,93 @@
+diff --git a/kernel/proc/nice.v b/kernel/proc/nice.v
+index 2672c1303..0846e5c73 100644
+--- a/kernel/proc/nice.v
++++ b/kernel/proc/nice.v
+@@ -64,17 +64,53 @@ pub fn set_thread_nice(tid int, wanted int) bool {
+ 	mut t := threads_by_tid[tid]
+ 	if t == unsafe { nil } { errno.set(errno.esrch); return false }
+ 	caller := current_thread().process
++	code := apply_nice(mut t, wanted, caller)
++	if code != 0 { errno.set(code); return false }
++	return true
++}
++
++// Called with the process table locked. A group update keeps visiting
++// matching tasks after a refusal, preserving successful partial updates.
++fn apply_nice(mut t Thread, wanted int, caller &Process) int {
+ 	owner := t.process
+-	if !mac_peer_allowed(caller, owner) { errno.set(errno.eperm); return false }
++	if !mac_peer_allowed(caller, owner) { return errno.eperm }
+ 	privileged := has_capability(caller, cap_sys_nice)
+ 	if !privileged && caller.euid != owner.euid && caller.euid != owner.uid {
+-		errno.set(errno.eperm); return false
++		return errno.eperm
+ 	}
+ 	if wanted < nice_value(t) && !privileged
+ 		&& !limit_allows(owner, rlimit_nice, u64(20 - wanted)) {
+-		errno.set(errno.eacces); return false
++		return errno.eacces
+ 	}
+ 	katomic.store(mut &t.sched_nice_override, wanted)
+ 	katomic.store(mut &t.sched_has_nice_override, true)
++	return 0
++}
++
++pub fn set_aggregate_nice(local int, by_group bool, wanted int) bool {
++	lock_table()
++	defer { unlock_table() }
++	caller := current_thread().process
++	viewer := current_pid_namespace()
++	group := if local == 0 { pgid_in(caller, viewer) } else { local }
++	uid := if local == 0 { caller.uid } else { u32(local) }
++	mut result := errno.esrch
++	for tid := 1; tid < max_pid; tid++ {
++		mut t := threads_by_tid[tid]
++		if t == unsafe { nil } { continue }
++		owner := t.process
++		if owner == unsafe { nil } || voidptr(process_at(owner.pid)) != voidptr(owner)
++			|| pid_in(owner, viewer) == 0 || tid_in(t, viewer) == 0 { continue }
++		if by_group {
++			if pgid_in(owner, viewer) != group { continue }
++		} else if owner.uid != uid { continue }
++		code := apply_nice(mut t, wanted, caller)
++		if code != 0 {
++			result = code
++		} else if result == errno.esrch {
++			result = 0
++		}
++	}
++	if result != 0 { errno.set(result); return false }
+ 	return true
+ }
+diff --git a/kernel/syscall/table/linux_common.v b/kernel/syscall/table/linux_common.v
+index 51c4ceab2..23d9dcd77 100644
+--- a/kernel/syscall/table/linux_common.v
++++ b/kernel/syscall/table/linux_common.v
+@@ -1090,11 +1090,9 @@ fn syscall_linux_setpriority(_ voidptr, raw_which int, raw_local_who int, raw_pr
+ 	which := int(i32(raw_which))
+ 	local_who := int(i32(raw_local_who))
+ 	prio := int(i32(raw_prio))
+-	who := proc.kernel_id(local_who)
+-	if which != prio_process {
++	if which < prio_process || which > 2 {
+ 		return errno.err, errno.einval
+ 	}
+-	target_tid := if who == 0 { proc.current_thread().tid } else { who }
+ 	mut wanted := prio
+ 	if wanted < -20 {
+ 		wanted = -20
+@@ -1103,7 +1101,13 @@ fn syscall_linux_setpriority(_ voidptr, raw_which int, raw_local_who int, raw_pr
+ 		wanted = 19
+ 	}
+ 
+-	if !proc.set_thread_nice(target_tid, wanted) { return errno.err, errno.get() }
++	if which == prio_process {
++		who := proc.kernel_id(local_who)
++		target_tid := if who == 0 { proc.current_thread().tid } else { who }
++		if !proc.set_thread_nice(target_tid, wanted) { return errno.err, errno.get() }
++	} else if !proc.set_aggregate_nice(local_who, which == 1, wanted) {
++		return errno.err, errno.get()
++	}
+ 	return 0, 0
+ }
+ 

@@ -1,0 +1,1 @@
+../../../source/fixture/serialcore/core.v

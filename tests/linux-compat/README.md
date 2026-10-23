@@ -2303,5 +2303,21 @@ with a fresh state directory. All seven maintained suites pass on both kernels.
 `prioquery-evidence.v` without `-prod`, run `--self-test`, then `check` on
 the [retained priority evidence](results/2026-10-23/prioquery-evidence).
 The checker validates source/build identities and all native/reference and
-maintained results. Group/user setpriority, zombies, mapped namespaces,
-restricted MAC policy and GNU/foreign/32-bit paths remain unqualified.
+maintained results. The following priochange case qualifies group/user setters.
+Zombies, mapped namespaces, restricted MAC policy and GNU/foreign/32-bit paths
+remain unqualified.
+
+The `priochange` case adds 23,508 native ELF64 checks for group/user
+setpriority, nonleader threads, real UID selection, signed32 argument words,
+nice clamping, actual musl errors and permitted partial updates. Both native
+kernels and identical Linux 6.12.51 ELFs pass; originals fail 5,077 checks
+each. Run `--cases priochange,prioquery,threadnice,niceabi,niceadmit,attrnice,groupabi,grouptid`
+with a fresh state directory. All eight maintained suites pass on both kernels.
+
+`priochange-reference.v` takes the same arguments as `semabi-reference.v`;
+`--self-test` runs two positive and nine negative parser controls. Compile
+`priochange-evidence.v` without `-prod`, run `--self-test`, then `check` on
+the [retained update evidence](results/2026-10-23/priochange-evidence).
+The audit checks source/build identities, same-ELF results, eight maintained
+suites and eleven negative controls. Namespace, race, zombie, mixed-error,
+restricted MAC and GNU/foreign/ELF32 qualifications remain open.
