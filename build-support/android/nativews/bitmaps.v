@@ -291,11 +291,15 @@ fn ws_draw_bitmap_region(pointer i64, x i32, y i32, width i32, height i32, left 
 			C.memcpy(pixels, bitmap.rgba, length)
 		}
 		defer { if copying { C.free(pixels) } }
-		for row := i32(0); row < height; row++ {
-			source_y := top + i32(i64(row) * source_height / height)
-			if source_y < 0 || source_y >= bitmap.height { continue }
-			for column := i32(0); column < width; column++ {
-				source_x := left + i32(i64(column) * source_width / width)
+		draw := ws_draw_state()
+		l, t, r, b := ws_affine_bounds(draw.transform, f32(x), f32(y), f32(x + width), f32(y + height))
+		for row := t; row < b; row++ {
+			for column := l; column < r; column++ {
+				px, py, valid := ws_affine_inverse(draw.transform, f32(column) + 0.5, f32(row) + 0.5)
+				if !valid || px < f32(x) || px >= f32(x + width) || py < f32(y) || py >= f32(y + height) { continue }
+				source_y := top + i32((py - f32(y)) * f32(source_height) / f32(height))
+				if source_y < 0 || source_y >= bitmap.height { continue }
+				source_x := left + i32((px - f32(x)) * f32(source_width) / f32(width))
 				if source_x < 0 || source_x >= bitmap.width { continue }
 				offset := (source_y * bitmap.width + source_x) * 4
 				mut color := (u32(pixels[offset + 3]) << 24) | (u32(pixels[offset]) << 16) | (u32(pixels[offset + 1]) << 8) | u32(pixels[offset + 2])
@@ -306,7 +310,7 @@ fn ws_draw_bitmap_region(pointer i64, x i32, y i32, width i32, height i32, left 
 					}
 					color = (((color >> 24) * (paint.color >> 24) / 255) << 24) | (color & 0xffffff)
 				}
-				ws_rect(f32(x + column), f32(y + row), f32(x + column + 1), f32(y + row + 1), color)
+				ws_blend(column, row, color, 255)
 			}
 		}
 	}

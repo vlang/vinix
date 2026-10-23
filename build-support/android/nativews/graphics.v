@@ -29,6 +29,9 @@ mut:
 	y      f32
 	sx     f32 = 1
 	sy     f32 = 1
+	kx     f32
+	ky     f32
+	clip_count i32
 	left   i32
 	top    i32
 	right  i32
@@ -90,6 +93,7 @@ fn ws_blend(x i32, y i32, color u32, coverage u32) {
 		if x < draw.transform.left || y < draw.transform.top || x >= draw.transform.right || y >= draw.transform.bottom || x < 0 || y < 0 || x >= draw.width || y >= draw.height {
 			return
 		}
+		if !ws_affine_clip(draw, f32(x) + 0.5, f32(y) + 0.5) { return }
 		alpha := (color >> 24) * coverage / 255
 		if alpha == 0 { return }
 		if draw.bitmap != 0 {
@@ -114,6 +118,17 @@ fn ws_blend(x i32, y i32, color u32, coverage u32) {
 
 fn ws_rect(left f32, top f32, right f32, bottom f32, color u32) {
 	mut draw := ws_draw_state()
+	if right <= left || bottom <= top { return }
+	if draw.transform.kx != 0 || draw.transform.ky != 0 || draw.transform.sx < 0 || draw.transform.sy < 0 {
+		l, t, r, b := ws_affine_bounds(draw.transform, left, top, right, bottom)
+		for y := t; y < b; y++ {
+			for x := l; x < r; x++ {
+				xx, yy, valid := ws_affine_inverse(draw.transform, f32(x) + 0.5, f32(y) + 0.5)
+				if valid && xx >= left && xx < right && yy >= top && yy < bottom { ws_blend(x, y, color, 255) }
+			}
+		}
+		return
+	}
 	x0 := i32(left * draw.transform.sx + draw.transform.x)
 	y0 := i32(top * draw.transform.sy + draw.transform.y)
 	x1 := i32(right * draw.transform.sx + draw.transform.x)
@@ -174,6 +189,10 @@ fn ws_text(text &char, x f32, baseline f32, size f32, color u32, font &WsFont) {
  info := ws_font_info(font)
 	mut draw := ws_draw_state()
 	if info == unsafe { nil } { return }
+	if draw.transform.kx != 0 || draw.transform.ky != 0 || draw.transform.sx != draw.transform.sy || draw.transform.sy <= 0 {
+		ws_affine_text(text, x, baseline, size, color, info)
+		return
+	}
 	scale := C.stbtt_ScaleForPixelHeight(info, size * draw.transform.sy)
 	mut position := usize(0)
 	length := C.strlen(text)
@@ -312,13 +331,29 @@ fn ws_restore() {
 
 fn ws_translate(x f32, y f32) {
 	mut draw := ws_draw_state()
-	draw.transform.x += x * draw.transform.sx
-	draw.transform.y += y * draw.transform.sy
+	draw.transform.x += x * draw.transform.sx + y * draw.transform.kx
+	draw.transform.y += x * draw.transform.ky + y * draw.transform.sy
 }
 
 fn ws_clip(left f32, top f32, right f32, bottom f32) {
 	mut draw := ws_draw_state()
-	l, t, r, b := i32(left * draw.transform.sx + draw.transform.x), i32(top * draw.transform.sy + draw.transform.y), i32(right * draw.transform.sx + draw.transform.x), i32(bottom * draw.transform.sy + draw.transform.y)
+	if right <= left || bottom <= top || draw.transform.sx * draw.transform.sy == draw.transform.kx * draw.transform.ky {
+		draw.transform.right = draw.transform.left
+		return
+	}
+	l, t, r, b := ws_affine_bounds(draw.transform, left, top, right, bottom)
+	if draw.transform.kx != 0 || draw.transform.ky != 0 {
+		// Clip geometry is in device space and survives subsequent matrix changes.
+		if draw.transform.clip_count >= 64 { draw.transform.right = draw.transform.left; return }
+		mut quad := WsClipQuad{}
+		for i := 0; i < 4; i++ {
+			x := if i == 0 || i == 3 { left } else { right }
+			y := if i < 2 { top } else { bottom }
+			unsafe { quad.x[i], quad.y[i] = ws_affine_point(draw.transform, x, y) }
+		}
+		unsafe { draw.clips[draw.transform.clip_count] = quad }
+		draw.transform.clip_count++
+	}
 	if l > draw.transform.left { draw.transform.left = l }
 	if t > draw.transform.top { draw.transform.top = t }
 	if r < draw.transform.right { draw.transform.right = r }
@@ -329,15 +364,17 @@ fn ws_canvas_concat(e voidptr, pointer i64) {
 	mut draw := ws_draw_state()
 	unsafe {
 		matrix := &WsMatrix(pointer)
-		if matrix.values[1] != 0 || matrix.values[3] != 0 || matrix.values[6] != 0
+		if matrix.values[6] != 0
 			|| matrix.values[7] != 0 || matrix.values[8] != 1 {
-			throw(e, c'java/lang/UnsupportedOperationException', c'Canvas concat requires translation and scaling')
+			throw(e, c'java/lang/UnsupportedOperationException', c'Canvas perspective transforms are unsupported')
 			return
 		}
-		draw.transform.x += draw.transform.sx * matrix.values[2]
-		draw.transform.y += draw.transform.sy * matrix.values[5]
-		draw.transform.sx *= matrix.values[0]
-		draw.transform.sy *= matrix.values[4]
+		before := draw.transform
+		draw.transform.x, draw.transform.y = ws_affine_point(before, matrix.values[2], matrix.values[5])
+		draw.transform.sx = before.sx * matrix.values[0] + before.kx * matrix.values[3]
+		draw.transform.kx = before.sx * matrix.values[1] + before.kx * matrix.values[4]
+		draw.transform.ky = before.ky * matrix.values[0] + before.sy * matrix.values[3]
+		draw.transform.sy = before.ky * matrix.values[1] + before.sy * matrix.values[4]
 	}
 }
 

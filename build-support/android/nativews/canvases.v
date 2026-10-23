@@ -11,6 +11,7 @@ mut:
 	transform  WsTransform
 	transforms [64]WsTransform
 	save_count i32
+	clips      [64]WsClipQuad
 }
 
 __global ws_draw_key u32
