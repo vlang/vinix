@@ -331,6 +331,20 @@ fn ws_draw_children(e voidptr, object voidptr, canvas voidptr) {
 		// ViewGroup whose content belongs to this renderer.
 		if ws_view(e, object).kind == 6 { ws_draw_content(e, object) }
 		ws_save()
+		// Padding clips the children, leaving the group's own background intact.
+		// Establish it in viewport coordinates before applying the parent scroll.
+		if boolean(e, object, c'android/view/ViewGroup', c'getClipToPadding', c'()Z', nil) {
+			left := integer(e, object, c'android/view/View', c'getPaddingLeft', c'()I', nil)
+			top := integer(e, object, c'android/view/View', c'getPaddingTop', c'()I', nil)
+			right := integer(e, object, c'android/view/View', c'getPaddingRight', c'()I', nil)
+			bottom := integer(e, object, c'android/view/View', c'getPaddingBottom', c'()I', nil)
+			if left | top | right | bottom != 0 {
+				width := integer(e, object, c'android/view/View', c'getWidth', c'()I', nil)
+				height := integer(e, object, c'android/view/View', c'getHeight', c'()I', nil)
+				ws_clip(f32(left), f32(top), f32(width - right), f32(height - bottom))
+			}
+		}
+		clip_children := boolean(e, object, c'android/view/ViewGroup', c'getClipChildren', c'()Z', nil)
 		ws_translate(-f32(get_int(e, object, c'android/view/View', c'scrollX')), -f32(get_int(e, object, c'android/view/View', c'scrollY')))
 		count := integer(e, object, c'android/view/ViewGroup', c'getChildCount', c'()I', nil)
 		for i := i32(0); i < count; i++ {
@@ -340,11 +354,13 @@ fn ws_draw_children(e voidptr, object voidptr, canvas voidptr) {
 			if child != nil && integer(e, child, c'android/view/View', c'getVisibility', c'()I', nil) == 0 {
 				left := integer(e, child, c'android/view/View', c'getLeft', c'()I', nil)
 				top := integer(e, child, c'android/view/View', c'getTop', c'()I', nil)
-				width := integer(e, child, c'android/view/View', c'getWidth', c'()I', nil)
-				height := integer(e, child, c'android/view/View', c'getHeight', c'()I', nil)
 				ws_save()
 				ws_translate(f32(left) + ws_view_translation(e, child, c'translationX'), f32(top) + ws_view_translation(e, child, c'translationY'))
-				ws_clip(0, 0, f32(width), f32(height))
+				if clip_children {
+					width := integer(e, child, c'android/view/View', c'getWidth', c'()I', nil)
+					height := integer(e, child, c'android/view/View', c'getHeight', c'()I', nil)
+					ws_clip(0, 0, f32(width), f32(height))
+				}
 				draw_args := [Value{ l: canvas }]!
 				call(e, child, c'android/view/View', c'vinixDrawLayer', c'(Landroid/graphics/Canvas;)V', &draw_args[0])
 				ws_restore()

@@ -3,18 +3,19 @@ module androidtools
 
 import os
 
-// WS currently draws axis-aligned layouts, clipping at each ancestor. Query
-// those same bounds in Java, including translations. Like ViewGroup's Android
+// WS currently draws axis-aligned layouts. Query those same bounds in Java,
+// including translations and ViewGroup clipping. Like ViewGroup's Android
 // contract, round rectangle bounds outward and the optional Point to nearest
 // at each ancestor. Location queries remain independent of visible clipping.
 fn framework_view_geometry(smali string) ! {
+ framework_viewgroup_clipping(smali)!
  path := smali + '/android/view/View.smali'
  mut text := os.read_file(path)!
  text = framework_replace_method(text, 'getGlobalVisibleRect(Landroid/graphics/Rect;)Z',
   '.method public getGlobalVisibleRect(Landroid/graphics/Rect;)Z\n.locals 1\nconst/4 v0, 0\n' +
   'invoke-virtual {p0, p1, v0}, Landroid/view/View;->getGlobalVisibleRect(Landroid/graphics/Rect;Landroid/graphics/Point;)Z\nmove-result v0\nreturn v0\n.end method')!
  text = framework_replace_method(text, 'getGlobalVisibleRect(Landroid/graphics/Rect;Landroid/graphics/Point;)Z',
-  '.method public getGlobalVisibleRect(Landroid/graphics/Rect;Landroid/graphics/Point;)Z\n.locals 9\n' + '
+  '.method public getGlobalVisibleRect(Landroid/graphics/Rect;Landroid/graphics/Point;)Z\n.locals 10\n' + '
 invoke-virtual {p0}, Landroid/view/View;->getWidth()I
 move-result v0
 invoke-virtual {p0}, Landroid/view/View;->getHeight()I
@@ -73,11 +74,50 @@ invoke-virtual {v1}, Landroid/view/View;->getWidth()I
 move-result v4
 invoke-virtual {v1}, Landroid/view/View;->getHeight()I
 move-result v5
-const/4 v6, 0
 int-to-float v4, v4
 int-to-float v5, v5
+const/4 v6, 1
+# Bounds are clipped when the parent of this ancestor clips children. The
+# root viewport always clips, even when it lets its children overflow.
+iget-object v9, v1, Landroid/view/View;->parent:Landroid/view/ViewParent;
+if-eqz v9, :bounds
+instance-of v2, v9, Landroid/view/ViewGroup;
+if-eqz v2, :padding
+check-cast v9, Landroid/view/ViewGroup;
+invoke-virtual {v9}, Landroid/view/ViewGroup;->getClipChildren()Z
+move-result v2
+if-eqz v2, :padding
+:bounds
+const/4 v6, 0
 invoke-virtual {v8, v6, v6, v4, v5}, Landroid/graphics/RectF;->intersect(FFFF)Z
 move-result v6
+if-eqz v6, :rounded
+:padding
+instance-of v2, v1, Landroid/view/ViewGroup;
+if-eqz v2, :rounded
+move-object v9, v1
+check-cast v9, Landroid/view/ViewGroup;
+invoke-virtual {v9}, Landroid/view/ViewGroup;->getClipToPadding()Z
+move-result v2
+if-eqz v2, :rounded
+iget v2, v1, Landroid/view/View;->paddingLeft:I
+iget v3, v1, Landroid/view/View;->paddingTop:I
+or-int v9, v2, v3
+iget v6, v1, Landroid/view/View;->paddingRight:I
+or-int/2addr v9, v6
+int-to-float v6, v6
+sub-float/2addr v4, v6
+iget v6, v1, Landroid/view/View;->paddingBottom:I
+or-int/2addr v9, v6
+int-to-float v6, v6
+sub-float/2addr v5, v6
+const/4 v6, 1
+if-eqz v9, :rounded
+int-to-float v2, v2
+int-to-float v3, v3
+invoke-virtual {v8, v2, v3, v4, v5}, Landroid/graphics/RectF;->intersect(FFFF)Z
+move-result v6
+:rounded
 invoke-virtual {v8, p1}, Landroid/graphics/RectF;->roundOut(Landroid/graphics/Rect;)V
 if-eqz v6, :empty
 move-object v0, v1
@@ -158,5 +198,20 @@ const-string v1, "location must have at least two elements"
 invoke-direct {v0, v1}, Ljava/lang/IllegalArgumentException;-><init>(Ljava/lang/String;)V
 throw v0
 .end method')!
+ os.write_file(path, text)!
+}
+
+fn framework_viewgroup_clipping(smali string) ! {
+ path := smali + '/android/view/ViewGroup.smali'
+ // Negative flags preserve Android's enabled defaults without depending on
+ // which constructor a subclass calls.
+ mut text := os.read_file(path)! + '\n.field private vinixDontClipChildren:Z\n.field private vinixDontClipToPadding:Z\n'
+ for property in ['Children', 'ToPadding'] {
+  field := 'Landroid/view/ViewGroup;->vinixDontClip' + property + ':Z'
+  text = framework_replace_method(text, 'getClip' + property + '()Z',
+   touch_method('public getClip' + property + '()Z', 'iget-boolean v0, p0, ' + field + '\nxor-int/lit8 v0, v0, 1\nreturn v0'))!
+  text = framework_replace_method(text, 'setClip' + property + '(Z)V',
+   touch_method('public setClip' + property + '(Z)V', 'xor-int/lit8 v0, p1, 1\niget-boolean v1, p0, ' + field + '\nif-eq v0, v1, :done\niput-boolean v0, p0, ' + field + '\ninvoke-virtual {p0}, Landroid/view/View;->invalidate()V\n:done\nreturn-void'))!
+ }
  os.write_file(path, text)!
 }
