@@ -1,4 +1,4 @@
-# Google Maps attempts218–221
+# Google Maps attempts218–222
 
 Attempt218 still shows the “Make it your map” onboarding screen after Skip. The
 interaction waits for native WS readiness, captures the initial screen, invokes
@@ -90,3 +90,21 @@ JAR, including `ATLLoadedApp` and the null content-capture getter. The retained
 Maps methods show the immediate missing call is
 `AutofillValue.forToggle(boolean)`; its wrapper also reads toggle/text values.
 Kernel/base identity remains inherited under the same limits as earlier runs.
+
+Attempt222 adds `AutofillValue` in framework `fa6bd916…`, using the same native221.
+The input now uses `--settle0.15` for each input phase, followed by an explicit
+10-second wait. The [initial](attempt222-google-maps-initial.png) and
+[Skip](attempt222-google-maps-skip.png) captures still show onboarding. The
+main thread then fails with `NoSuchMethodError` for
+`AutofillManager.notifyViewVisibilityChanged(View,int,boolean)` and the APK
+exits with code 10. The [final screenshot](attempt222-google-maps-application.png)
+shows the exited APK; QEMU closes before the later capture. Map display and
+search remain unverified.
+
+[Attempt222 results](attempt222-results.json) and
+[runtime receipt](attempt222-runtime-identities.json) preserve that failure.
+The [input receipt](attempt222-input-identities.json) verifies the staged
+framework, native library and launcher identities. All 102 framework source
+files match the build manifest and are archived as exact V source text; the
+actual JAR's `AutofillValue` disassembly is also retained. Native221 sources
+reuse the verified attempt221 archive. Kernel/base identity remains inherited.
