@@ -51,6 +51,7 @@ invoke-virtual {v10, v1}, Landroid/view/View;->setBackgroundColor(I)V
  for action in [0, 1] {
   check += 'const/4 v1, ${action}\nconst/16 v2, 10\nconst/16 v3, 16\ninvoke-static {v8, v1, v2, v3}, Lorg/vinix/bootstrap/TouchProbe;->send(Landroid/view/View;III)Z\nmove-result v0\nif-eqz v0, :bad\n'
  }
+ check += 'invoke-static {v10}, Lorg/vinix/bootstrap/TranslationProbe;->location(Landroid/view/View;)V\n'
  check += '
 iget v0, v10, Lorg/vinix/bootstrap/TouchLeaf;->clicks:I
 const/4 v1, 1
@@ -101,5 +102,31 @@ invoke-virtual/range {v0 .. v7}, Landroid/graphics/Bitmap;->getPixels([IIIIIII)V
   pixels += 'const/16 v2, ${index}\naget v2, v1, v2\nconst v3, ${color}\nif-ne v2, v3, :bad\n'
  }
  pixels += 'invoke-virtual {v0}, Landroid/graphics/Bitmap;->recycle()V\nreturn-void\n:bad\nnew-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "nested translated child pixels"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0'
- os.write_file(dir+'/TranslationProbe.smali','.class public Lorg/vinix/bootstrap/TranslationProbe;\n.super Ljava/lang/Object;\n'+method('public static check(Landroid/content/Context;)V',check).replace('.locals 10', '.locals 11')+method('private static pixels(Landroid/view/View;)V',pixels))!
+ mut location := ''
+ for query in ['getLocationOnScreen', 'getLocationInWindow'] {
+  location += 'const/4 v0, 2\nnew-array v0, v0, [I\ninvoke-virtual {p0, v0}, Landroid/view/View;->${query}([I)V\nconst/4 v1, 0\naget v2, v0, v1\nconst/16 v3, 9\nif-ne v2, v3, :bad\nconst/4 v1, 1\naget v2, v0, v1\nconst/16 v3, 15\nif-ne v2, v3, :bad\n'
+ }
+ location += '
+invoke-virtual {p0}, Landroid/view/View;->getParent()Landroid/view/ViewParent;
+move-result-object v4
+check-cast v4, Landroid/view/View;
+const v1, 0xc22c0000 # -43
+invoke-virtual {v4, v1}, Landroid/view/View;->setTranslationY(F)V
+invoke-virtual {p0, v0}, Landroid/view/View;->getLocationOnScreen([I)V
+const/4 v1, 1
+aget v2, v0, v1
+const/16 v3, -25 # Math.round(-25.5), without clipping to the window
+if-ne v2, v3, :bad
+const v1, 0xc0200000 # -2.5
+invoke-virtual {v4, v1}, Landroid/view/View;->setTranslationY(F)V
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "BOOTSTRAP-TRANSLATED-LOCATION-PASS screen window nested scroll fractional round-once negative-half unclipped"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "translated screen/window location"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0'
+ os.write_file(dir+'/TranslationProbe.smali','.class public Lorg/vinix/bootstrap/TranslationProbe;\n.super Ljava/lang/Object;\n'+method('public static check(Landroid/content/Context;)V',check).replace('.locals 10', '.locals 11')+method('private static pixels(Landroid/view/View;)V',pixels)+method('private static location(Landroid/view/View;)V',location))!
 }

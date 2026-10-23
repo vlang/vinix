@@ -94,21 +94,33 @@ move-object v2, p0
 const/16 v5, 256
 :ancestor
 iget v3, v2, Landroid/view/View;->left:I
-add-int/2addr v0, v3
+int-to-float v3, v3
+add-float/2addr v0, v3
+iget v3, v2, Landroid/view/View;->translationX:F
+add-float/2addr v0, v3
 iget v3, v2, Landroid/view/View;->top:I
-add-int/2addr v1, v3
+int-to-float v3, v3
+add-float/2addr v1, v3
+iget v3, v2, Landroid/view/View;->translationY:F
+add-float/2addr v1, v3
 iget-object v3, v2, Landroid/view/View;->parent:Landroid/view/ViewParent;
 instance-of v4, v3, Landroid/view/View;
 if-eqz v4, :done
 check-cast v3, Landroid/view/View;
 iget v4, v3, Landroid/view/View;->scrollX:I
-sub-int/2addr v0, v4
+int-to-float v4, v4
+sub-float/2addr v0, v4
 iget v4, v3, Landroid/view/View;->scrollY:I
-sub-int/2addr v1, v4
+int-to-float v4, v4
+sub-float/2addr v1, v4
 move-object v2, v3
 add-int/lit8 v5, v5, -1
 if-gtz v5, :ancestor
 :done
+invoke-static {v0}, Ljava/lang/Math;->round(F)I
+move-result v0
+invoke-static {v1}, Ljava/lang/Math;->round(F)I
+move-result v1
 const/4 v2, 0
 aput v0, p1, v2
 const/4 v2, 1

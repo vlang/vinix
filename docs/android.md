@@ -167,6 +167,9 @@ in floating point through hit testing and local touch coordinates. The signed
 [translation regression](../tests/native-android-ws/startupfixture/translations.v)
 checks native Canvas pixels across direct, software and hardware-fallback
 layers, negative offsets, child clicks and preserved raw touch coordinates.
+Screen and window location queries accumulate the same translations and parent
+scrolling, rounding once after the full ancestor chain. The regression also
+checks negative half values and locations outside the clipped window.
 
 The native WS runner installs a streaming JCA provider for SHA-256, SHA-384
 and SHA-512 before APK loading. It uses the private runtime's OpenSSL EVP
