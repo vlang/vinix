@@ -564,7 +564,9 @@ fn C.igmp_lookfor_group(ifp &C.netif, addr &C.ip4_addr) &C.igmp_group
 fn C.igmp_start(netif &C.netif) Err_t
 fn C.igmp_stop(netif &C.netif) Err_t
 fn C.inet_chksum(dataptr voidptr, len U16_t) U16_t
+fn C.ip4_route(dest &C.ip4_addr) &C.netif
 fn C.ip6_route(src &C.ip6_addr, dest &C.ip6_addr) &C.netif
+fn C.ip6_select_source_address(netif &C.netif, dest &C.ip6_addr) &C.ip_addr
 fn C.lwip_htonl(x U32_t) U32_t
 fn C.lwip_htons(x U16_t) U16_t
 fn C.lwip_init()
@@ -1783,6 +1785,31 @@ pub fn bind_ip(socket &Vinix_socket, address &C.ip_addr, port u16) i32 {
 	}
 }
 
+// lwIP's UDP connect only records a peer. Linux also selects a local source
+// address: libc uses connect + getsockname to rank resolved destinations.
+// Keep that selection separately so wildcard UDP PCBs retain their receive
+// semantics and an explicit sendto can still select another outgoing route.
+fn udp_connect_source(socket &Vinix_socket, destination &C.ip_addr, source &C.ip_addr) i32 {
+	unsafe {
+		local := &socket.udp.local_ip
+		if destination.@type == u8(Lwip_ip_addr_type.ipaddr_type_v6) {
+			netif := C.ip6_route(&local.u_addr.ip6, &destination.u_addr.ip6)
+			if netif == nil { return 101 }
+			if local.u_addr.ip6.addr[0] | local.u_addr.ip6.addr[1]
+				| local.u_addr.ip6.addr[2] | local.u_addr.ip6.addr[3] == 0 {
+				selected := C.ip6_select_source_address(netif, &destination.u_addr.ip6)
+				if selected == nil { return 101 }
+				C.memcpy(source, selected, sizeof(C.ip_addr))
+			} else { C.memcpy(source, local, sizeof(C.ip_addr)) }
+		} else {
+			netif := C.ip4_route(&destination.u_addr.ip4)
+			if netif == nil { return 101 }
+			C.memcpy(source, if local.u_addr.ip4.addr == 0 { &netif.ip_addr } else { local }, sizeof(C.ip_addr))
+		}
+		return 0
+	}
+}
+
 pub fn connect_ip(socket &Vinix_socket, address &C.ip_addr, port u16) i32 {
 	unsafe {
 		ip := C.ip_addr{}
@@ -1894,6 +1921,9 @@ pub fn connect_ip(socket &Vinix_socket, address &C.ip_addr, port u16) i32 {
 			}
 			return 115
 		}
+		source := &C.ip_addr(C.vinix_stack_alloc(sizeof(C.ip_addr)))
+		route_error := udp_connect_source(socket, &ip, source)
+		if route_error != 0 { return route_error }
 		if i32(socket.udp.local_port) == 0 {
 			bound := bind_ephemeral(socket, &socket.udp.local_ip)
 			if bound {
@@ -1903,6 +1933,7 @@ pub fn connect_ip(socket &Vinix_socket, address &C.ip_addr, port u16) i32 {
 		error_ = C.udp_connect(socket.udp, &ip, C.lwip_htons(port))
 		if i32(error_) == Err_enum_t.err_ok {
 			socket.connected = 1
+			C.memcpy(&socket.last_local_address, source, sizeof(C.ip_addr))
 		}
 		return linux_error(error_)
 	}
@@ -3083,7 +3114,9 @@ pub fn vinix_socket_name_endpoint(socket &Vinix_socket, endpoint &C.vinix_net_en
 				(if peer { i32(socket.last_remote_port) } else { i32(socket.last_local_port) })
 			})
 		} else {
-			ip = if peer { &socket.udp.remote_ip } else { &socket.udp.local_ip }
+			ip = if peer { &socket.udp.remote_ip } else if socket.connected {
+				&socket.last_local_address
+			} else { &socket.udp.local_ip }
 			port = C.lwip_htons(U16_t(if peer {
 				i32(socket.udp.remote_port)
 			} else {

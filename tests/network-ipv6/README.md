@@ -91,6 +91,30 @@ The consolidated kernel rejects mounts of a cached procfs root onto itself
 or its descendants before changing the graph; [procfs-mount](../procfs-mount/README.md)
 covers that repair, including stale PID views and legitimate aliases.
 
+## UDP source selection on connect
+
+UDP `connect` now selects the local source address before any packet is sent.
+`getsockname` reports that address and the allocated port. This is used by
+libc's destination sorting; reporting a wildcard source can incorrectly rank
+usable addresses. The lwIP PCB keeps its wildcard binding so receive and
+explicit `sendto` routing retain their existing behavior.
+
+The focused [guest fixture](udpsourcefixture/core.v) checks explicitly bound
+and unbound IPv4, IPv6 and IPv4-mapped sockets:
+
+```sh
+tests/kernel-gaps/run-native --arch=aarch64 --kernel-dir=/absolute/kernel \
+  --source=tests/network-ipv6/udpsourcefixture/core.v \
+  --expect='UDP-SOURCE PASS:' --fail='UDP-SOURCE FAIL:'
+```
+
+Repeat with `--arch=x86_64` and the corresponding kernel. The same ARM64
+fixture binary fails on the earlier kernel and passes on the repaired one;
+the x86_64 build also passes. [Receipts and compressed guest logs](../android/results/2026-10-22/maps-ws/udp-kernels.json)
+identify the exact kernels, source, generated C and fixture binaries.
+Temporary source-address storage uses the existing stack allocator and adds
+no allocation or object lifetime. This test does not qualify physical routing.
+
 ## Historical remaining networking requirements
 
 The following table records the scope left by this earlier checkpoint.
