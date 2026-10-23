@@ -374,6 +374,14 @@ of the real producer receipt pass. This validates local artifact provenance;
 publisher authentication, redistribution authority and PE execution remain
 separate boundaries.
 
+The [V Win64 calculator probe](../tests/packages/wine-calculator-check.md)
+adds a real PE with USER32 display/button controls. Host arithmetic, fixed input
+bounds and formatting pass normal/production/sanitizer checks, including 10,000
+cycles with zero retained V allocations and a production arithmetic mutation
+refusal. The real producer receipt is admitted. Generated-C callback lifetime
+review does not qualify Wine window painting, input, resource cleanup or close;
+those target execution gates remain open.
+
 [Wine adapter host checks](../tests/packages/wine-prefix-check.md) cover private
 per-account prefix/IPC preparation, exact pinned Wine path patches and an
 AArch64 translator patch requiring separate writable/executable mappings, without

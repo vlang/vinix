@@ -1031,6 +1031,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     output files. Header/digest agreement, resealed refusals, repeated zero V
     retention and descriptor cleanup pass with host sanitizers and a real
     producer receipt. Publisher authentication and PE execution remain separate.
+  - [x] [A V Win64 calculator probe](tests/packages/wine-calculator-check.md)
+    builds real USER32 controls through the pinned PE producer. Arithmetic,
+    bounded input, formatting and 10,000 zero-retained V allocation cycles pass
+    normal/production/sanitizer host checks; a production arithmetic mutation
+    refuses and the real PE receipt is admitted. Wine window painting, input
+    and close remain separate target qualification gates.
   - [x] [Wine adapter host boundaries](tests/packages/wine-prefix-check.md)
     qualify private per-account prefix/IPC preparation and exact pinned Wine
     and AArch64 translator patches with measured ownership and sanitizers.

@@ -1835,6 +1835,15 @@ Measured host checks, sanitizers and admission of the real producer receipt
 qualify this local provenance boundary. They do not authenticate a publisher,
 freeze every concurrent filesystem mutation or execute the PE.
 
+The [V Win64 calculator probe](../../tests/packages/wine-calculator-check.md)
+adds real USER32 display/button controls using fixed application storage and
+the producer's existing linker inputs. Host arithmetic, bounded input and
+formatting checks pass in normal/production/sanitizer builds, with 10,000
+zero-retained V allocation cycles and an altered-arithmetic refusal. The real
+PE build and receipt admission pass. Generated-C stack/callback lifetime review
+supplements these checks; Windows resources, Wine painting, input and window
+close still require guest execution.
+
 For runtime adapter authors, `wineadapter.prepare_prefix()` admits a nonroot
 identity's private SDK data directory through captured no-follow ancestors and
 prepares private prefix/server directories and fixed builtins. The
