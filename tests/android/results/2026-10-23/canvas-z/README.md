@@ -1,0 +1,9 @@
+# Canvas software Z API regression
+
+The identical signed fixture fails on framework226 with `NoSuchMethodError: Canvas.enableZ()V` in `CanvasZProbe.check`. Framework227 passes the new probe, all 98 prior probe markers, and `ANDROID-WS-READY`; no fixture assertion, `ANDROID-WS-FAIL`, or app exit occurs.
+
+The probe checks repeated enable/disable calls, save depth, all 16 pixels after a translated clip, inherited RecordingCanvas API availability, and recorded color playback. The two base Canvas methods are empty, matching [AOSP software Canvas](https://android.googlesource.com/platform/prebuilts/fullsdk/sources/android-29/+/refs/heads/main/android/graphics/Canvas.java). This runtime records Picture commands and replays them in order; elevation sorting and shadows supplied by [AOSP RecordingCanvas](https://android.googlesource.com/platform/frameworks/base/+/4fda9095ba9b/graphics/java/android/graphics/RecordingCanvas.java) remain unsupported.
+
+Both raw harness outcomes remain `startup_failed`: native225 includes Maps-only diagnostics that print and clear missing `Main.bB:Lnge;` reflection errors for this fixture. The validator permits only those known fixed-run failure markers and separately requires the probe contract and READY. This is a focused regression pass, not a clean harness startup pass or a Maps functional success.
+
+`receipt.json` binds both staged frameworks, native225, launcher200, signed APK, serials, screenshots, and retained artifacts. The 103 framework source hashes and 70 frozen fixture V sources are retained and validated; native source provenance refers to the measured Maps attempt225 receipt. Kernel/base provenance is inherited, and mutable shared boot images were not rehashed as source proof. Run `v_old -cc cc run tests/android/results/2026-10-23/canvas-z/validate.v` from the repository root to verify the retained evidence.

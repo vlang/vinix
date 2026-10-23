@@ -12,7 +12,12 @@ fn framework_render_nodes(smali string) ! {
  canvas := 'Landroid/graphics/Canvas;'
  picture := 'Landroid/graphics/Picture;'
  path := smali + '/android/graphics/Canvas.smali'
- os.write_file(path, os.read_file(path)! + touch_method('public drawRenderNode(${node})V', 'invoke-virtual {p1, p0}, ${node}->vinixDraw(${canvas})V\nreturn-void'))!
+ // AOSP's software Canvas leaves Z toggles empty. Our RecordingCanvas inherits
+ // these calls; display-list elevation reordering and shadows remain unsupported.
+ os.write_file(path, os.read_file(path)! +
+  touch_method('public enableZ()V', 'return-void') +
+  touch_method('public disableZ()V', 'return-void') +
+  touch_method('public drawRenderNode(${node})V', 'invoke-virtual {p1, p0}, ${node}->vinixDraw(${canvas})V\nreturn-void'))!
  os.write_file(smali + '/android/graphics/RecordingCanvas.smali',
   '.class public final Landroid/graphics/RecordingCanvas;\n.super Landroid/graphics/VinixPictureCanvas;\n' +
   touch_method('public constructor <init>(${picture}Landroid/graphics/Bitmap;)V', 'invoke-direct {p0, p1, p2}, Landroid/graphics/VinixPictureCanvas;-><init>(${picture}Landroid/graphics/Bitmap;)V\nreturn-void') +
