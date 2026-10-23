@@ -7,6 +7,7 @@ fn framework_startup_apis(smali string) ! {
  framework_accessibility_traversal(smali)!
  framework_texture_transforms(smali)!
  framework_window_insets(smali)!
+ framework_date_ranges(smali)!
  framework_lookup_trace(smali)!
  // No Android accessibility services are installed in the native WS backend.
  // Android exposes immutable snapshots for both installed and enabled lists.

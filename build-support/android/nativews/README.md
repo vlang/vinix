@@ -174,6 +174,11 @@ clamped inset subtraction preserve their inputs. Consumption follows the API 35
 behavior, including stable-inset consumption being a no-op. The native backend
 supplies zero system insets and no display cutout.
 
+DateUtils date and time ranges use ART's ICU implementation for locale, format
+flags and time zones. Formatter overloads append to the caller's output and
+return that formatter. The default hour format follows DateFormat, which
+currently selects the 24-hour clock in this backend.
+
 Handle-based JNI symbol lookup searches the library and its dependencies in
 breadth-first order, including defined weak symbols. The bootstrap APK includes
 a JNI method exported only by a dependent DSO to exercise this path in ART.
