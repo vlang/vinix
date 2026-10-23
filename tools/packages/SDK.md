@@ -914,6 +914,25 @@ command for development and existing callers. It replaces the signature and
 index separately and does not maintain publisher release history or check a
 self-contained dependency closure. Use `publish-release` for distribution.
 
+Both commands check a present workspace `catalog.json` before signing. Its
+complete package declarations must match the manifest set, including payload
+hashes, lengths, executable flags and launch metadata. Package, architecture,
+file, dependency, permission and association order and JSON formatting do not
+change the comparison. Launch argument order remains significant.
+Extra, missing or changed rows refuse before index replacement or release-sequence
+reservation. Rebuild the reviewed catalog workspace after changing declarations.
+
+The lock is captured through a nonblocking, no-follow descriptor and bounded to
+8 MiB. It must be a regular single-link file owned by the effective publisher,
+without group/other write access; final identity, size and permission checks
+refuse replacement or removal. An absent lock preserves plain `pack`/`pack-root`
+workspaces; other unsafe or unreadable entries refuse. The lock is not shipped
+in the consumer release. This detects declaration drift, without authenticating
+human review or preventing its owner from deliberately changing/removing it.
+Keep publisher inputs stable. See [host publication qualification](../../tests/packages/catalog-publication-check.md)
+for both APIs, unchanged signed bytes, explicit production refusals and measured
+reader/comparison ownership; target application execution remains separate.
+
 `pack` inventories ordinary payload files with paths, lengths, SHA-256 and
 executable bits, and copies verified content into the repository. It replaces the
 template's `files`. Symlinks/devices/sockets/path collisions are rejected. Include
@@ -1205,7 +1224,8 @@ Expose the release directory to consumers and enroll its authenticated public ke
 through the existing repository workflow. Catalog construction emits no signed
 index, generates no key and accepts no license on behalf of consumers. The
 canonical workspace lock records that import; later manual `pack`/`pack-root`
-changes require a newly reviewed lock/build for reproducible catalog assembly.
+changes must still match its declarations before either publication command can
+sign. Rebuild the reviewed lock/workspace for a changed catalog.
 This publisher workflow does not authenticate upstream archives or qualify the
 applications' executable/runtime ABI or graphical sessions.
 
@@ -1793,6 +1813,37 @@ contract. The launcher must keep generation leases valid while child processes
 use runtime files and must not depend on host-global paths or unrequested grants.
 Wine IPC, display, process lifetime, translated execution and real upstream
 applications still require target qualification. See [profile checks](../../tests/packages/wine-profile-check.md).
+
+The [local Win64 probe producer](../../tests/packages/wine-pe-check.md) compiles
+an actual Windows API program using the pinned V Windows C backend and MinGW.
+It checks the AMD64 PE32+ console header and retains source, generated C, PE,
+link map, literal build commands and before/after V-library and MinGW inventories.
+Its production-mode source binding and [refusal checks](../../tests/packages/wine-pe-refusals.md)
+qualify the producer boundary. A produced executable is an input to a separate
+signed runtime check, not evidence that Wine executes it. Host system libraries
+and transitive tools are not a hermetic compiler closure.
+
+For runtime adapter authors, `wineadapter.prepare_prefix()` admits a nonroot
+identity's private SDK data directory through captured no-follow ancestors and
+prepares private prefix/server directories and fixed builtins. The
+[host prefix/patch checks](../../tests/packages/wine-prefix-check.md) also cover
+exact pinned Wine IPC-path patches and an AArch64 QEMU patch that requires
+separate writable/executable translation mappings. Wrong, altered, duplicate or
+already-patched inputs refuse; no W+X exception is granted. Normal, tracked and
+sanitizer checks cover these helpers only, without Wine execution qualification.
+
+`pkgprotocol.decode_local_source_offer()` and
+`wineadapter.admit_local_source_offer()` support only format-1
+`local-qualification-only` evidence with `source_closure_complete: false`.
+The [bounded admission contract](../../tests/packages/local-source-evidence-check.md)
+covers strict metadata, at most 256 flat artifacts, 16 MiB per file and 64 MiB
+total, captured directory-relative opens, exact inventories and hashes, and
+required application/runtime notices. Reference URLs are recorded, not fetched.
+Callers own the decoded/admitted reply and retire it with repeatable `close()`.
+Admission does not freeze concurrent in-place writes: capture/recheck inputs
+before publication or use. It supplies no complete corresponding-source offer,
+redistribution permission or publisher enrollment. Wine/translation and graphical
+catalog acceptance remain open.
 
 ### Apple iOS ARM64 publisher profile
 
@@ -3255,6 +3306,23 @@ also validates IDs, canonical versions, digests, positive sequences, target
 architecture and uniqueness, then authenticates catalog provenance and policy.
 Decoding alone grants no trust or deployment authority. See
 [decoder qualification](../../tests/packages/deployment-decoder-check.md).
+
+Use `DeploymentDocument.encode() !string` to write the exact schema for its
+declared format. Format 1 emits only `format`, `architecture` and `packages` and
+refuses nonempty pins; format 2 also emits `locked`, including an empty array,
+with all seven pin fields and the full `u64` sequence range. A general struct
+JSON encoder would add `locked` to format 1 and produce a refused document.
+
+The method borrows every input field and returns owned UTF-8 JSON without a
+trailing newline, preserving array order. It checks supported format, UTF-8,
+the decoder's field/count limits and the fully escaped 8 MiB output limit in
+normal and production builds. It does not sort, deduplicate or establish semantic
+authority; service identity, version, closure, provenance, policy and confirmation
+checks still apply. Do not close a caller-assembled document containing borrowed
+fields. See [the wire API](DEPLOYMENT.md) for ownership examples, measured
+encode/decode/refusal cycles, sanitizer checks, real normal/production CLI
+admission without state mutation, and both target consumer builds. That host
+qualification does not boot a target guest or claim a hermetic toolchain.
 
 The metadata digest is SHA-256 of SDK-1 JSON encoding of the complete `Package`
 struct, plus a terminating LF. Fields follow the order in [`model.v`](pkgcore/model.v),

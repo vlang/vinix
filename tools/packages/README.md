@@ -11,6 +11,12 @@ configuration or package state. Select exact versions from the reported lists;
 the response does not advertise installed runtimes or publisher trust. See the
 [interface discovery contract](CAPABILITIES.md).
 
+V clients can write either deployment schema with
+`pkgprotocol.DeploymentDocument.encode()`. It preserves the selected format:
+format 1 omits `locked`, while format 2 includes it even when empty. The method
+borrows its inputs and returns owned JSON; service review still validates the
+complete deployment. See the [wire API and qualification](DEPLOYMENT.md).
+
 An ordinary caller with account groups automatically uses the fixed
 `packages-launch` account action to strip them before launch. It preserves the
 caller's identity and existing standard streams, including terminals and native
@@ -351,6 +357,14 @@ Use `publish-release REPOSITORY_DIR ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIREC
 to emit a complete signed consumer repository with atomic publication, dependency
 closure validation on each declared architecture and retained publisher sequence
 history. The legacy `publish` command remains available for workspace metadata.
+
+When the workspace contains `catalog.json`, both publication commands require
+its complete package declarations to match the manifests being signed. Changed,
+missing or extra rows refuse before index replacement or release-sequence
+reservation. Rebuild the reviewed catalog after changing it. Workspaces without
+a lock retain plain `pack`/`pack-root` behavior; an unsafe or malformed lock
+refuses. This consistency check does not authenticate human review or enroll a
+publisher. See [catalog publication checks](../../tests/packages/catalog-publication-check.md).
 
 The V reply owns its strings independently and supports idempotent
 `ReleaseInfo.close()`, preserving signed output, seed and sequence history.
@@ -717,6 +731,20 @@ It supplies no Wine runtime or consumer license grants. See the
 [profile contract](SDK.md#wine-win64-publisher-profile) and
 [publisher qualification](../../tests/packages/wine-profile-check.md); actual
 Wine/translated/graphical execution remains a separate gate.
+
+The [pinned Win64 probe producer](../../tests/packages/wine-pe-check.md) compiles
+a real Windows API program through V and MinGW, retaining its source, generated
+C, AMD64 PE32+ console executable and build/input receipts. Its local producer
+check does not execute Wine or establish runtime compatibility.
+
+Adapter [host checks](../../tests/packages/wine-prefix-check.md) cover captured,
+private per-account prefixes and IPC paths, exact-input Wine patches and a pinned
+AArch64 translator patch requiring split writable/executable mappings. They grant
+no W+X exception. [Local source-evidence admission](../../tests/packages/local-source-evidence-check.md)
+checks bounded, exact artifact inventories and hashes, but accepts only
+`local-qualification-only` records with `source_closure_complete: false`.
+These checks supply neither complete corresponding source nor redistribution
+authority. Real Wine/translation and graphical catalog qualification remain open.
 
 `apple-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY` produces a
 reproducible AArch64 iOS app/runtime lock. It checks thin ARM64 Mach-O mappings,

@@ -675,6 +675,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     checked staging identities, bounded cleanup and captured-parent publication.
     Replacement recovery, source pins, canonical retry, saved-output failures
     and signed offline consumption have explicit regression checks.
+  - [x] [Catalog declaration signing guard](tests/packages/catalog-publication-check.md)
+    makes both publication APIs compare a present catalog lock with every signed
+    manifest field before replacing indexes or reserving a release sequence.
+    Strict bounded file admission, normal/production refusals, exact retry and
+    measured ownership pass on the host; lock-free workspaces remain supported.
+    Human review, publisher enrollment and target execution remain separate gates.
   - [x] [Captured publisher profile staging](tests/packages/profile-export-check.md)
     protects native SDK, SQLite, FFmpeg, Wine and Apple inventories and locks.
     Root/child/parent replacements retain recovery data; exclusive publication
@@ -1014,6 +1020,19 @@ architectures; broader release/catalog/runtime acceptance remains open.
     PE32+ payloads and native launchers, and retains explicit licensing and
     runtime bounds. [Publisher lifecycle checks](tests/packages/wine-profile-check.md)
     cover signed offline install, registration, removal and rollback.
+  - [x] [Pinned Win64 probe production](tests/packages/wine-pe-check.md) compiles
+    a real Windows API program through V/MinGW and retains the AMD64 PE32+
+    console executable, source/C, build commands and input/output inventories.
+    Production-mode source binding and fourteen independent refusal controls
+    qualify the local producer; Wine execution and hermetic builds are not claimed.
+  - [x] [Wine adapter host boundaries](tests/packages/wine-prefix-check.md)
+    qualify private per-account prefix/IPC preparation and exact pinned Wine
+    and AArch64 translator patches with measured ownership and sanitizers.
+    Translation requires separate writable/executable mappings, with no W+X
+    exception. [Bounded local source evidence](tests/packages/local-source-evidence-check.md)
+    checks exact inventories/hashes but accepts only explicitly incomplete,
+    local-qualification records. Complete corresponding source, redistribution
+    authority and real Wine/translation execution remain open.
   - [ ] Qualified isolated Wine/translation and Apple runtime catalogs, including
     ordinary-user graphical execution and their required IPC/device services.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
@@ -1036,6 +1055,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     zero-retention checks, sanitizers, real normal/production CLI refusals and
     both target CLI builds qualify this contract. Runtime availability,
     publisher enrollment and broader SDK acceptance remain separate gates.
+  - [x] [Exact deployment document encoding](tools/packages/DEPLOYMENT.md)
+    preserves both public schemas, borrowed inputs and owned output, with
+    explicit production format/UTF-8/size refusals. Normal/production CLI
+    consumers, repeated zero-retention cycles, sanitizers and both target
+    consumer builds pass. Semantic authority stays in the service; target guest
+    execution and broader SDK acceptance remain separate gates.
 - [ ] Support offline repositories/caches and organization-managed deployment;
   keep firmware, proprietary payload licensing and runtime updates explicit.
   - [x] [Installed payload disclosure](tests/packages/software-payload-check.md)

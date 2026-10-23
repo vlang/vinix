@@ -332,6 +332,16 @@ enroll a publisher or accept proprietary/firmware terms for consumers.
 The [catalog qualification](../tests/packages/catalog-build-check.md) covers
 canonical release reproduction, refusal/cleanup and real Linux guest execution.
 
+Both `publish` and `publish-release` now compare a present workspace
+`catalog.json` with the complete manifests before signing. Changed, missing or
+extra declarations refuse before index replacement or release-sequence
+reservation; ordinary lock-free `pack`/`pack-root` workspaces keep their behavior.
+The bounded reader refuses unsafe, replaced or malformed locks. See
+[host publication checks](../tests/packages/catalog-publication-check.md) for
+normal/production refusals, exact retry and measured ownership. This enforces
+declaration consistency; it does not authenticate human review, enroll a
+publisher or qualify application execution.
+
 The [Wine Win64 publisher profile](../tools/packages/SDK.md#wine-win64-publisher-profile)
 adds explicit application/runtime recipes for both hosts, structural PE32+
 admission and matching native static launchers. It preserves publisher-declared
@@ -346,6 +356,24 @@ and 896 metadata cycles retain zero tracked allocations while preserving
 captured approvals, canonical locks and explicit licenses/runtime bounds.
 Both guests check metadata ownership and twelve selected complete-call cases;
 real Wine/translation and graphical execution remain separate.
+
+The [Win64 probe producer](../tests/packages/wine-pe-check.md) now builds a real
+Windows API program through V and MinGW, retaining its AMD64 PE32+ console
+executable, source/generated C, build commands and pinned input/output receipts.
+Production-mode source admission and independent malformed-output refusals are
+checked. This is local producer qualification; it does not run Wine or establish
+a hermetic compiler distribution.
+
+[Wine adapter host checks](../tests/packages/wine-prefix-check.md) cover private
+per-account prefix/IPC preparation, exact pinned Wine path patches and an
+AArch64 translator patch requiring separate writable/executable mappings, without
+a W+X exception. [Local source-evidence admission](../tests/packages/local-source-evidence-check.md)
+checks strict bounded metadata and exact captured artifact inventories/hashes.
+It accepts only `local-qualification-only`, incomplete source records; reference
+URLs are not fetched, and concurrent in-place writes are not frozen. These host
+checks provide no complete corresponding-source closure or redistribution
+authority. Actual Wine/translation execution and graphical catalog acceptance
+remain open.
 
 The [Apple iOS ARM64 publisher profile](../tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
 adds a bounded thin-Mach-O header/map check, matching XML/binary bundle identity,
@@ -2172,6 +2200,16 @@ refusal and limits roots and locked records to 4,096 each while parsing. Sorting
 reuses owned storage, and completed documents can be closed independently of the
 input bytes. The allocation fixture covers both formats, malformed/truncated
 input and collection growth; see [decoder qualification](../tests/packages/deployment-decoder-check.md).
+
+V developers can use `pkgprotocol.DeploymentDocument.encode()` to produce either
+exact schema: format 1 omits `locked`, while format 2 retains it even when empty.
+It borrows caller fields and returns owned JSON without a trailing newline.
+Wire/UTF-8/size checks remain enabled in production; IDs, versions, closure,
+authenticated provenance, policy and confirmation remain service decisions.
+The [wire API qualification](../tools/packages/DEPLOYMENT.md) covers both build
+modes, measured ownership, sanitizers, actual CLI acceptance/refusal without
+configuration or package-state changes, and both target consumer builds. It is
+a host API/build check, with no target-guest execution claim.
 
 Snapshot construction uses borrowed installed manifests until it builds the
 independent lock, and releases selection, encoding and hash scratch after use.
