@@ -1077,6 +1077,17 @@ architectures; broader release/catalog/runtime acceptance remains open.
     consumers, repeated zero-retention cycles, sanitizers and both target
     consumer builds pass. Semantic authority stays in the service; target guest
     execution and broader SDK acceptance remain separate gates.
+  - [x] [Shared repository URL admission](tests/packages/repository-url-check.md)
+    preserves literal identities while applying the same bounded HTTPS/file
+    syntax to SDK proposals and service configuration. Normal/production CLI
+    round trips and refusals, exact length boundaries, 1,000 repeated matrices,
+    zero retained tracked allocations and host sanitizers pass. Both target
+    CLIs compile; resolution, TLS and publisher authority remain separate gates.
+  - [x] [Early observation operand admission](tests/packages/observation-arity-check.md)
+    rejects unexpected arguments before configuration/state reads and requires
+    one ID for `info`. Actual normal/production CLIs preserve complete fixture
+    trees across missing, corrupt and valid roots; combined target builds pass.
+    These read-only checks grant no mutation or publisher authority.
   - [x] [Complete policy document authoring](tests/packages/policy-writer-check.md)
     writes the existing format-1 input schema with borrowed fields, owned output
     and production UTF-8/size limits. Arbitrary list order reaches canonical

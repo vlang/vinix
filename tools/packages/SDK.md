@@ -2725,6 +2725,16 @@ validation and explicit `close()` methods for consumers with manual memory
 management. Status has at most 4096 repository/history records and encoded
 responses are bounded to 8 MiB. Unknown formats and incomplete intents fail closed.
 
+`pkgprotocol.valid_repository_url(url)` is the shared borrowed syntax check for
+service configuration and repository proposals. HTTPS bases require a nonempty
+authority, balanced nonempty host brackets, complete `%HH` escapes and an optional
+decimal port in 0..65535. Credentials, whitespace, backslashes, queries and
+fragments refuse; host resolution and certificate verification occur during
+acquisition. HTTPS bases are bounded to 4096 bytes. Literal `file:///` paths keep
+their 1024-byte suffix limit, reject empty/dot/parent components and preserve
+spaces, percent signs and Unicode without decoding. The check never normalizes
+the accepted identity. See [URL agreement checks](../../tests/packages/repository-url-check.md).
+
 V callers of `pkgcore.repository_configuration(root)` receive independently
 owned architecture/repository fields. Call `RepositoryConfiguration.close()`
 after use; repeated close of the same owner is harmless. The reader transfers
@@ -2852,6 +2862,12 @@ state; `plan` emits `{requested,packages}`; `--json search/info/updates` emits o
 row per line. Consumers ignore additional fields and reject unknown formats.
 Success is exit 0; failures are nonzero with stderr diagnostics. Human progress
 text is not a machine protocol.
+
+`view`, `updates`, `status`, `list` and `verify` take no operands; `info` requires
+exactly one package ID. Operand-count errors are reported before configuration
+or state reads, after global option parsing. `verify` checks the complete
+installed closure. `search` continues to accept multiple literal query words.
+See [CLI operand checks](../../tests/packages/observation-arity-check.md).
 
 V clients receive independently owned snapshots from `Service.state()` and
 `Service.verify()`, including the fresh empty state. Retire each result with

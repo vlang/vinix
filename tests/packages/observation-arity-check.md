@@ -54,3 +54,10 @@ or reproducible-build qualification.
 
 The retained result is
 [cli-observation-arity.json](results/2026-10-23/cli-observation-arity.json).
+
+The combined arity and URL changes also pass normal and production cross-builds
+for AArch64 and x86_64. The [target build receipt](results/2026-10-23/combined-cli-target-builds.json)
+binds 428 source files and the retained C, static ELFs, literal commands, logs
+and linker traces in `build/package-cli-combined-target-qualified`. This adds
+build coverage only; it does not qualify guest execution or all transitive
+toolchain inputs.

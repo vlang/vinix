@@ -54,3 +54,10 @@ resolution, network/TLS behavior, publisher enrollment or authority, target
 execution, or full SDK acceptance. Project sources and V/Clang executables are
 pinned; imported vlib/thirdparty, headers, linker and transitive tools are not
 frozen. The run is not a hermetic or reproducible-build qualification.
+
+The combined URL and observation-arity implementation also passes normal and
+production CLI cross-builds for both architectures. See the
+[target build receipt](results/2026-10-23/combined-cli-target-builds.json) and
+`build/package-cli-combined-target-qualified` for the 428-file source inventory,
+generated C, static ELFs, literal commands, logs and linker traces. This is build
+coverage; guest execution and complete transitive toolchain capture remain open.
