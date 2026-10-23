@@ -41,6 +41,11 @@ fn objc_responds(object u64, selector &char) bool {
 		if ns_date_formatter_types('NSDateFormatter', object in ios_runtime.classes, name) != none { return true }
 	}
 	formatter_cls := if object in ios_runtime.classes { object } else { read64(object) }
+	if ns_predicate_family(formatter_cls) {
+		if ns_predicate_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if ns_predicate_types('NSPredicate', object in ios_runtime.classes, name) != none { return true }
+	}
+	if ns_predicate_types((ios_runtime.classes[formatter_cls] or { return false }).name, object in ios_runtime.classes, name) != none { return true }
 	if formatter_cls == ios_runtime.names['NSLocale'] && ns_date_formatter_types('NSLocale', object in ios_runtime.classes, name) != none { return true }
 	if ns_timezone_family(if object in ios_runtime.classes { object } else { read64(object) }) {
 		if name in ['init', 'new', 'mutableCopy', 'mutableCopyWithZone:']! { return false }

@@ -127,6 +127,7 @@ mut:
 	operation &FoundationOperation = unsafe { nil }
 	invocation &FoundationInvocation = unsafe { nil }
 	date_formatter &FoundationDateFormatter = unsafe { nil }
+	predicate &FoundationPredicate = unsafe { nil }
 	method_signature &FoundationMethodSignature = unsafe { nil }
 	thread &FoundationThread = unsafe { nil }
 	auth_owned bool
@@ -466,6 +467,8 @@ mut:
 	empty_dictionary u64
 	empty_array u64 // Cache-owned immutable singleton, immortal to callers.
 	empty_array_cell u64 // Read-only pointer cell, retired after pool/Swift users.
+	predicates [2]u64 // Cache-owned immutable true/false predicates.
+	predicates_retired bool
 	webkit_default_store u64
 	webkit_worlds [128]u64 // Owned interned page/client/named worlds, retired at shutdown.
 	webkit_world_count int = 2
@@ -503,7 +506,7 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
+		'NSPredicate', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSRecursiveLock', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
@@ -600,6 +603,7 @@ fn objc_start() {
 			'NSProcessInfo' { u32(48) }
 			'NSDate', 'VinixCFDate', 'NSTimeZone', 'NSLocale', 'NSFormatter' { u32(8) }
 			'NSDateFormatter' { u32(56) }
+			'NSPredicate' { u32(16) }
 			'NSStream' { u32(8) }
 			'NSInputStream' { u32(136) }
 			'NSAutoreleasePool' { u32(40) }
@@ -662,6 +666,7 @@ fn objc_start() {
 	ns_operation_metadata()
 	ns_invocation_metadata()
 	ns_date_formatter_metadata()
+	ns_predicate_metadata()
 	ns_keyed_archiver_metadata()
 	ns_keyed_unarchiver_metadata()
 	sort_descriptor_metadata()
@@ -713,6 +718,7 @@ fn objc_allocate(cls u64) u64 {
 	ns_pool_require_class(cls)
 	ns_timezone_require_class(cls)
 	ns_date_formatter_require_class(cls)
+	ns_predicate_require_class(cls)
 	allocation_class := ns_date_allocation_class(ns_uuid_allocation_class(cls))
 	objc_initialize(allocation_class)
 	info := ios_runtime.classes[allocation_class] or { panic('iOS: allocation of an unknown class') }
@@ -913,6 +919,7 @@ fn objc_stop() {
 	// Drain those owners before retiring Foundation global cells and strings.
 	swift_buffers_stop()
 	ns_empty_array_stop()
+	ns_predicate_stop()
 	ns_url_error_stop()
 	ns_url_session_constants_stop()
 	ns_foundation_keys_stop()

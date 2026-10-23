@@ -32,8 +32,10 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	}
 	C.ios_objc_initialize_lock()
 	formatter := value in ios_runtime.objects && obj_header(value).date_formatter != unsafe { nil }
+	predicate := value in ios_runtime.objects && obj_header(value).predicate != unsafe { nil }
 	C.ios_objc_initialize_unlock()
 	if formatter { return ns_date_formatter_copy(value) }
+	if predicate || ns_predicate_family(cls) { return ns_predicate_copy(value) }
 	if objc_is_kind(value, ios_runtime.names['NSMutableData']) {
 		return cf_data_create(0, data_pointer(value), i64(data_length(value)))
 	}

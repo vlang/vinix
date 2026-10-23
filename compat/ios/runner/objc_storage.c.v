@@ -6,6 +6,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	ns_operation_require_class(cls)
 	ns_invocation_require_class(cls)
 	ns_date_formatter_require_class(cls)
+	ns_predicate_require_class(cls)
 	ns_recursive_lock_require_class(cls)
 	dispatch_objc_allocation_checked(cls) or { panic(err) }
 	url_session_require_class(cls)
@@ -44,6 +45,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	ns_operation_install(cls, mut header)
 	ns_invocation_install(cls, mut header)
 	ns_date_formatter_install(cls, mut header)
+	ns_predicate_install(cls, mut header)
 	header.auth_owned = objc_is_kind(object, ios_runtime.names['ASWebAuthenticationSession'])
 	header.image_view_owned = objc_is_kind(object, ios_runtime.names['UIImageView'])
 	header.uuid_owned = objc_is_kind(object, ios_runtime.names['NSUUID'])
@@ -101,6 +103,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	ns_operation_retire(mut header)
 	ns_invocation_retire(mut header)
 	ns_date_formatter_retire(mut header)
+	ns_predicate_retire(mut header)
 	header.destroying = true
 	C.ios_objc_initialize_lock()
 	swift_unknown_weak_retire_locked(object)
@@ -143,6 +146,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	ns_operation_dispose(object, mut header)
 	ns_invocation_dispose(object, mut header)
 	ns_date_formatter_dispose(mut header)
+	ns_predicate_dispose(mut header)
 	web_auth_dispose(mut header)
 	image_view_dispose(mut header)
 	ns_input_stream_dispose(mut header)

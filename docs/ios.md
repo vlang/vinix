@@ -17982,11 +17982,70 @@ scratch directories and the detached owned RAM disk. Native evidence retains six
 expected historical nonzero statuses. These hashes cover declared inputs, not
 the full host dynamic runtime closure.
 
-The launch probe now stops at `_OBJC_CLASS_$_NSPredicate`, before application
-entry. Fortnite remains unplayable.
+The date-formatter increment's launch probe stopped at
+`_OBJC_CLASS_$_NSPredicate`, before application entry.
 
 ```sh
 v run tests/ios/native-checks.v build-date-formatter
+```
+
+V supplies a bounded `NSPredicate` with Apple's measured 16-byte public instance
+layout and ivar/type metadata. Selected Fortnite callers use `SELF == %@` to
+filter interface-orientation strings, `TRUEPREDICATE` to construct a CloudKit
+query, and block predicates for AppsFlyer null removal and captured media-type
+filtering. These observations come from static caller inspection; they do not
+establish execution of the callers or CloudKit support.
+
+The profile supports true/false factories, the exact formats `TRUEPREDICATE`,
+`FALSEPREDICATE` and `SELF == %@`, object evaluation, independent comparison/block
+copies, and ordered immutable/mutable array filtering. Darwin variadic object
+arguments come from the original stack pointer; the explicit `arguments:` and
+`argumentArray:` factories also accept the bounded forms. Equality retains its
+operand, including mutable strings, and uses the input object's `isEqual:`
+implementation. Nil and `NSNull` compare as null values. Blocks are copied on
+construction, receive the object and substitution dictionary, and return their
+low-byte Objective-C BOOL. A nil substitution dictionary is forwarded unchanged.
+Copies retain the same heap block without rerunning its copy helper. True/false
+predicates have cache-owned singleton lifetimes.
+
+Owned sidecars distinguish predicate kinds without exposing Foundation's private
+concrete subclasses. Allocation and initialization of the abstract public base
+are supported; evaluating or copying an abstract predicate fails explicitly.
+Other predicate grammar, substitution rewriting, predicate-format serialization,
+coding, custom subclasses and mutable copies remain unsupported. Built-in object
+arrays accept at most 65,536 entries. Filtering snapshots and retains inputs,
+pins the source and predicate through callbacks, and publishes mutable results
+after evaluation. Mutation during a callback fails explicitly. Application
+evaluation/equality methods, block helpers and allocation callbacks run outside
+the runtime lock. Owned storage is checked against its allocation class, and
+disposal retires sidecars even after isa replacement. Concurrent runtime shutdown
+is outside the profile.
+
+The shared V fixture passes against Apple's runtime and under host ASan/UBSan
+with ordinary and deterministic Swift hashing. It checks metadata, Darwin stack
+varargs, retained mutable operands, copied block helpers, noncanonical BOOL
+returns, ordered filtering, callback ownership and lock reentry, constructor
+rollback, guarded caller storage, isa replacement and read-only image arrays.
+Two fresh runtime cycles drain their object and weak-reference registries, and
+43 child cases require explicit rejection without sanitizer diagnostics.
+Independent review of the exact generated C covers the new allocations,
+callback lifetimes and cleanup paths. Host leak detection is disabled.
+The ARM64 guest passes the predicate fixture and all 43 rejection cases. Probe
+and both import-audit guests complete with Fortnite's expected process exit 1.
+
+Evidence under `build/ios/fortnite/predicate-checks` pins 19,947 declared
+source/toolchain/runtime inputs and 218 native/static artifacts, including 14
+expected historical nonzero statuses. It preserves preflight and superseded-host
+attempts, the independent C review, sanitizer logs, binary/generated-C archives
+and all four guests' serial/configuration hashes. The final proof verifies these
+inputs, retired VM hashes, empty owned scratch directories and the detached RAM
+disk. These pins do not cover the full host dynamic runtime closure.
+
+The launch probe now stops at `_OBJC_CLASS_$_NSMutableIndexSet`, before
+application entry. Fortnite remains unplayable.
+
+```sh
+v run tests/ios/native-checks.v build-predicate
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -17994,12 +18053,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,071 | 90 | 78 |
+| Fortnite executable | 2,072 | 89 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,911 | 93 | 114 |
+| All images | 2,912 | 92 | 114 |
 
-The C++/GLES/Text variant reports 2,925 resolved imports, 79 unresolved strong
+The C++/GLES/Text variant reports 2,926 resolved imports, 78 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -18053,6 +18112,7 @@ mutable strings use `mutable-string-checks`, session configurations use
 `session-configuration-checks`, recursive locks use `recursive-lock-checks`,
 invocations use `invocation-checks`, invocation operations use
 `invocation-operation-checks`, date formatters use `date-formatter-checks`,
+predicates use `predicate-checks`,
 keyed archives use `keyed-archiver-checks`, keyed unarchives use
 `keyed-unarchiver-checks`,
 CoreFoundation dictionaries use
@@ -18068,7 +18128,7 @@ mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
 URL session, session configuration, recursive lock, invocation, invocation
-operation, date formatter, keyed archive, keyed unarchive, sort
+operation, date formatter, predicate, keyed archive, keyed unarchive, sort
 descriptor, regular expression, mutable string,
 CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
