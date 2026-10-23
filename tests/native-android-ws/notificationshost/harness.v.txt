@@ -1,0 +1,247 @@
+@[translated]
+module main
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+
+fn C.alloca(usize) voidptr
+fn C.memset(voidptr, i32, usize) voidptr
+fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.snprintf(&char, usize, &char, ...voidptr) i32
+fn C.printf(&char, ...voidptr) i32
+fn C.strlen(&char) usize
+
+struct WsPoll {
+mut:
+	fd      i32
+	events  i16
+	revents i16
+}
+
+__global (
+	connect_error     i32
+	async_error       i32
+	last_errno        i32
+	socket_failed     bool
+	poll_failed       bool
+	getsockopt_failed bool
+	transfer_failed   bool
+	closed            int
+	poll_calls        int
+	getsockopt_calls  int
+	now               i64
+	written           []u8
+	reply             []u8
+	received          int
+	thrown            []string
+)
+
+fn reset() {
+	connect_error = 0
+	async_error = 0
+	last_errno = 0
+	socket_failed = false
+	poll_failed = false
+	getsockopt_failed = false
+	transfer_failed = false
+	closed = 0
+	poll_calls = 0
+	getsockopt_calls = 0
+	now = 0
+	written = []u8{}
+	reply = [u8(2), 0, 0, 0, `o`, `k`]
+	received = 0
+	thrown = []string{}
+}
+
+fn host_socket(domain i32, kind i32, protocol i32) i32 {
+	assert domain == 1 && kind == 1 | 0x800 | 0x80000 && protocol == 0
+	return if socket_failed { -1 } else { 23 }
+}
+
+fn host_connect(fd i32, address voidptr, length u32) i32 {
+	assert fd == 23 && length == sizeof(WsNoticeAddress)
+	unsafe {
+		endpoint := &WsNoticeAddress(address)
+		assert endpoint.family == 1
+		assert cstring_to_vstring(&char(&endpoint.path[0])) == '/run/vinix-session.123/broker'
+	}
+	last_errno = connect_error
+	return if connect_error == 0 { 0 } else { -1 }
+}
+
+fn host___errno_location() &i32 {
+	return unsafe { &last_errno }
+}
+
+fn host_getsockopt(fd i32, level i32, option i32, value voidptr, length &u32) i32 {
+	assert fd == 23 && level == 1 && option == 4
+	assert unsafe { *length } == sizeof(i32)
+	getsockopt_calls++
+	unsafe { *&i32(value) = async_error }
+	return if getsockopt_failed { -1 } else { 0 }
+}
+
+fn host_poll(descriptor voidptr, count usize, timeout i32) i32 {
+	assert count == 1 && timeout > 0
+	assert unsafe { (&WsPoll(descriptor)).fd } == 23
+	poll_calls++
+	return if poll_failed { 0 } else { 1 }
+}
+
+fn host_send(fd i32, bytes voidptr, length usize, flags i32) isize {
+	assert fd == 23 && flags == 0x4000
+	// A failed synchronous connect never creates a stream, even if SO_ERROR is zero.
+	if transfer_failed || (connect_error != 0 && connect_error != C.EINPROGRESS)
+		|| (connect_error == C.EINPROGRESS && async_error != 0) { return -1 }
+	unsafe { for i in 0 .. int(length) { written << (&u8(bytes))[i] }
+	 }
+	return isize(length)
+}
+
+fn host_recv(fd i32, bytes voidptr, length usize, flags i32) isize {
+	assert fd == 23 && flags == 0
+	if transfer_failed || received == reply.len { return 0 }
+	// Exercise partial reads through the actual production transfer loop.
+	count := if length > 1 { 1 } else { int(length) }
+	unsafe { for i in 0 .. count { (&u8(bytes))[i] = reply[received + i] }
+	 }
+	received += count
+	return count
+}
+
+fn host_close(fd i32) i32 {
+	assert fd == 23
+	closed++
+	return 0
+}
+
+fn host_getenv(_ &char) &char { return unsafe { nil } }
+
+fn host_getuid() u32 { return 123 }
+
+fn ws_millis() i64 {
+	now++
+	return now
+}
+
+fn ws_utf(_ voidptr, value voidptr) &char {
+	return unsafe { if value == nil { c'' } else { &char(value) } }
+}
+
+fn ws_release(_ voidptr, _ voidptr, _ &char) {}
+
+fn throw(_ voidptr, kind &char, message &char) {
+	thrown << unsafe { cstring_to_vstring(kind).clone() + ':' + cstring_to_vstring(message).clone() }
+}
+
+fn expect_cancel_error() {
+	ws_notification_cancel(unsafe { nil }, 42)
+	assert thrown == ['java/lang/IllegalStateException:Vinix notification service unavailable']
+	assert closed == if socket_failed { 0 } else { 1 }
+}
+
+fn main() {
+	unsafe {
+		for error in [i32(C.ENOENT), i32(C.ECONNREFUSED)] {
+			reset()
+			connect_error = error
+			ws_notification_cancel(nil, 42)
+			assert thrown.len == 0, 'cancel must tolerate an absent optional broker'
+			assert closed == 1 && poll_calls == 0 && written.len == 0
+		}
+		println('NOTIFICATION-HOST PASS synchronous-absent-cancel')
+
+		for error in [i32(C.ENOENT), i32(C.ECONNREFUSED)] {
+			reset()
+			connect_error = C.EINPROGRESS
+			async_error = error
+			ws_notification_cancel_key(nil, c'android:media')
+			assert thrown.len == 0 && closed == 1
+			assert poll_calls == 1 && getsockopt_calls == 1 && written.len == 0
+		}
+		println('NOTIFICATION-HOST PASS asynchronous-absent-cancel')
+
+		for error in [i32(C.EACCES), i32(C.EPERM), i32(C.EIO), i32(C.EAGAIN)] {
+			reset()
+			connect_error = error
+			expect_cancel_error()
+			assert poll_calls == 0
+		}
+		println('NOTIFICATION-HOST PASS synchronous-real-errors-preserved')
+
+		for error in [i32(C.EACCES), i32(C.EIO)] {
+			reset()
+			connect_error = C.EINPROGRESS
+			async_error = error
+			expect_cancel_error()
+			assert getsockopt_calls == 1
+		}
+		println('NOTIFICATION-HOST PASS asynchronous-real-errors-preserved')
+
+		for failure in 0 .. 3 {
+			reset()
+			connect_error = C.EINPROGRESS
+			if failure == 0 { poll_failed = true }
+			if failure == 1 { getsockopt_failed = true }
+			if failure == 2 { socket_failed = true }
+			expect_cancel_error()
+		}
+		println('NOTIFICATION-HOST PASS socket-timeout-and-status-errors')
+
+		for response in ['denied', 'error'] {
+			reset()
+			reply = [u8(response.len), 0, 0, 0]
+			reply << response.bytes()
+			expect_cancel_error()
+		}
+		println('NOTIFICATION-HOST PASS broker-rejection-preserved')
+
+		for response in [[u8(0), 0, 0, 0], [u8(1), 2, 0, 0], [u8(2), 0], [u8(2), 0, 0, 0, `o`]] {
+			reset()
+			reply = response.clone()
+			expect_cancel_error()
+		}
+		reset()
+		transfer_failed = true
+		expect_cancel_error()
+		println('NOTIFICATION-HOST PASS malformed-framing-and-transport-errors')
+
+		for asynchronous in [false, true] {
+			reset()
+			if asynchronous { connect_error = C.EINPROGRESS }
+			ws_notification_cancel(nil, -42)
+			assert thrown.len == 0 && closed == 1
+			payload := 'notify.cancel\t616e64726f69643a2d3432'
+			assert written[..4] == [u8(payload.len), 0, 0, 0]
+			assert written[4..].bytestr() == payload
+			assert received == 6
+		}
+		println('NOTIFICATION-HOST PASS successful-cancel-framing-and-partial-reply')
+
+		for asynchronous in [false, true] {
+			reset()
+			connect_error = if asynchronous { i32(C.EINPROGRESS) } else { i32(C.ENOENT) }
+			async_error = C.ECONNREFUSED
+			ws_notification_show(nil, 7, c'Title', c'Body', -1)
+			assert thrown == ['java/lang/IllegalStateException:Vinix notification service unavailable']
+			assert closed == 1
+		}
+		println('NOTIFICATION-HOST PASS absent-broker-post-remains-error')
+
+		reset()
+		ws_notification_show(nil, 7, c'Title', c'Body', -1)
+		assert thrown.len == 0 && closed == 1
+		assert written[4..].bytestr() == 'notify\t616e64726f69643a37\t5469746c65\t426f6479\t31\t2d31\t'
+		println('NOTIFICATION-HOST PASS successful-post-payload')
+
+		reset()
+		ws_notification_show(nil, 7, c'Title', c'Body', 0)
+		assert thrown == ['java/lang/UnsupportedOperationException:Notification PendingIntent actions are not implemented']
+		assert closed == 0 && written.len == 0
+		println('NOTIFICATION-HOST PASS unsupported-action-remains-error')
+		println('NOTIFICATION-HOST ALL PASS')
+	}
+}

@@ -477,9 +477,13 @@ translation and scaling; rotation, skew and perspective remain unsupported.
 
 Plain Android notifications post to the native Vinix session broker and cancel
 by Android ID. The broker authenticates the posting PID and permits withdrawal
-only of that process's keyed notices. The runtime requires an available broker
-and reports service failures. PendingIntent actions and media notifications
-remain unsupported. The bootstrap APK exercises real posting/cancellation as
+only of that process's keyed notices. Posting requires an available broker.
+Cancellation succeeds when the broker socket is absent or refuses the
+connection; other transport failures and broker rejections remain errors.
+The [notification host regression](../../../tests/native-android-ws/notifications-host.v)
+checks direct and asynchronous connection errors, cancellation and posting
+payloads, reply framing, and socket cleanup. PendingIntent actions and media
+notifications remain unsupported. The bootstrap APK exercises real posting/cancellation as
 well as bitmap pixels, Canvas target isolation and save/restore in a Vinix VM.
 
 The normal ATL build assembles this backend and hashes its output with the

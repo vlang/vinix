@@ -5,6 +5,13 @@
 module atlframework
 
 #include <sys/socket.h>
+#include <errno.h>
+
+enum WsNoticeResult {
+	failed
+	unavailable
+	ok
+}
 
 struct WsNoticeAddress {
 mut:
@@ -41,11 +48,11 @@ fn ws_notice_transfer(fd i32, bytes &u8, length usize, send bool) bool {
 	}
 }
 
-fn ws_notice_request(payload &u8, length usize) bool {
+fn ws_notice_request(payload &u8, length usize) WsNoticeResult {
 	unsafe {
-		if length == 0 || length > 8192 { return false }
+		if length == 0 || length > 8192 { return .failed }
 		fd := C.socket(1, 1 | 0x800 | 0x80000, 0)
-		if fd < 0 { return false }
+		if fd < 0 { return .failed }
 		defer { C.close(fd) }
 		address := &WsNoticeAddress(C.alloca(sizeof(WsNoticeAddress)))
 		C.memset(address, 0, sizeof(WsNoticeAddress))
@@ -53,31 +60,36 @@ fn ws_notice_request(payload &u8, length usize) bool {
 		mut directory := C.getenv(c'VINIX_SESSION_RUNTIME')
 		if directory == nil { directory = c'/run' }
 		count := C.snprintf(&char(&address.path[0]), 108, c'%s/vinix-session.%u/broker', directory, C.getuid())
-		if count < 0 || count >= 108 { return false }
+		if count < 0 || count >= 108 { return .failed }
 		if C.connect(fd, voidptr(address), u32(sizeof(WsNoticeAddress))) != 0 {
+			code := *C.__errno_location()
+			if code == C.ENOENT || code == C.ECONNREFUSED { return .unavailable }
+			if code != C.EINPROGRESS { return .failed }
 			mut ready := WsPoll{ fd: fd, events: 4 }
-			mut code := i32(0)
+			mut error := i32(0)
 			mut size := u32(sizeof(i32))
-			if C.poll(voidptr(&ready), 1, 1000) <= 0 || C.getsockopt(fd, 1, 4, &code, &size) != 0 || code != 0 {
-				return false
+			if C.poll(voidptr(&ready), 1, 1000) <= 0 || C.getsockopt(fd, 1, 4, &error, &size) != 0 {
+				return .failed
 			}
+			if error == C.ENOENT || error == C.ECONNREFUSED { return .unavailable }
+			if error != 0 { return .failed }
 		}
 		header := &u8(C.alloca(4))
 		for i := 0; i < 4; i++ { header[i] = u8(length >> (i * 8)) }
 		if !ws_notice_transfer(fd, header, 4, true) || !ws_notice_transfer(fd, payload, length, true)
 			|| !ws_notice_transfer(fd, header, 4, false) {
-			return false
+			return .failed
 		}
 		response_length := u32(header[0]) | (u32(header[1]) << 8) | (u32(header[2]) << 16) | (u32(header[3]) << 24)
-		if response_length == 0 || response_length > 512 { return false }
+		if response_length == 0 || response_length > 512 { return .failed }
 		response := &u8(C.alloca(513))
-		if !ws_notice_transfer(fd, response, response_length, false) { return false }
+		if !ws_notice_transfer(fd, response, response_length, false) { return .failed }
 		response[response_length] = 0
 		if C.strcmp(&char(response), c'ok') != 0 {
 			C.printf(c'ANDROID-WS-NOTIFICATION-SERVICE %s\n', response)
-			return false
+			return .failed
 		}
-		return true
+		return .ok
 	}
 }
 
@@ -108,7 +120,17 @@ fn ws_notification_cancel_key(e voidptr, key &char) {
 		C.memcpy(buffer, c'notify.cancel', 13)
 		used := &usize(C.alloca(sizeof(usize)))
 		*used = 13
-		if !ws_notice_field(buffer, used, 512, key, 128) || !ws_notice_request(buffer, *used) {
+		if !ws_notice_field(buffer, used, 512, key, 128) {
+			throw(e, c'java/lang/IllegalStateException', c'Vinix notification service unavailable')
+			return
+		}
+		result := ws_notice_request(buffer, *used)
+		// There is no peer-owned notice to remove when the optional broker is absent.
+		if result == .unavailable {
+			C.printf(c'ANDROID-WS-NOTIFICATION-CANCEL key=%s native-service=absent\n', key)
+			return
+		}
+		if result != .ok {
 			throw(e, c'java/lang/IllegalStateException', c'Vinix notification service unavailable')
 			return
 		}
@@ -151,7 +173,7 @@ fn ws_notification_show(e voidptr, id i32, title voidptr, text voidptr, intent_t
 			&& ws_notice_field(buffer, used, 4096, c'1', 1)
 			&& ws_notice_field(buffer, used, 4096, c'-1', 2)
 			&& ws_notice_field(buffer, used, 4096, c'', 0)
-		if !valid || !ws_notice_request(buffer, *used) {
+		if !valid || ws_notice_request(buffer, *used) != .ok {
 			throw(e, c'java/lang/IllegalStateException', c'Vinix notification service unavailable')
 			return
 		}
