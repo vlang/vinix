@@ -17,6 +17,11 @@ fn install_touch_probe(dir string) ! {
 		method('public constructor <init>(Landroid/content/Context;)V', 'invoke-direct {p0, p1}, Landroid/view/View;-><init>(Landroid/content/Context;)V\ninvoke-virtual {p0, p0}, Landroid/view/View;->setOnClickListener(Landroid/view/View$OnClickListener;)V\nreturn-void') +
 		method('public onClick(Landroid/view/View;)V', 'iget v0, p0, Lorg/vinix/bootstrap/TouchLeaf;->clicks:I\nadd-int/lit8 v0, v0, 1\niput v0, p0, Lorg/vinix/bootstrap/TouchLeaf;->clicks:I\nreturn-void') +
 		method('public onTouchEvent(Landroid/view/MotionEvent;)Z', '
+invoke-virtual {p1}, Landroid/view/MotionEvent;->getClassification()I
+move-result v0
+const/4 v1, 0
+const-string v2, "WS pointer stream must be unclassified"
+invoke-static {v0, v1, v2}, Lorg/vinix/bootstrap/TouchProbe;->expect(IILjava/lang/String;)V
 invoke-virtual {p1}, Landroid/view/MotionEvent;->getActionMasked()I
 move-result v0
 const/4 v1, 1
@@ -115,9 +120,9 @@ invoke-virtual {v1, v3, v3, v4, v4}, Landroid/view/View;->layout(IIII)V
 	check += touch_expect('invoke-virtual {v1}, Landroid/view/View;->isContextClickable()Z\nmove-result v7', 1, 'ordinary click flag independence')
 	check += 'invoke-virtual {v1, v3}, Landroid/view/View;->setContextClickable(Z)V\n'
 	check += touch_expect('invoke-virtual {v1}, Landroid/view/View;->isContextClickable()Z\nmove-result v7', 0, 'disabled context click state')
-	check += 'sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v1, "BOOTSTRAP-TOUCH-PASS overlay capture coordinates downTime interception cancellation disabled context-flags"\ninvoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\nreturn-void'
+	check += 'sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v1, "BOOTSTRAP-TOUCH-PASS overlay capture coordinates downTime classification interception cancellation disabled context-flags"\ninvoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\nreturn-void'
 	os.write_file(dir + '/TouchProbe.smali', '.class public Lorg/vinix/bootstrap/TouchProbe;\n.super Ljava/lang/Object;\n' +
-		method('private static expect(IILjava/lang/String;)V', 'if-eq p0, p1, :done\nnew-instance v0, Ljava/lang/AssertionError;\ninvoke-direct {v0, p2}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0\n:done\nreturn-void') +
+		method('public static expect(IILjava/lang/String;)V', 'if-eq p0, p1, :done\nnew-instance v0, Ljava/lang/AssertionError;\ninvoke-direct {v0, p2}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0\n:done\nreturn-void') +
 		method('private static send(Landroid/view/View;III)Z', '
 new-instance v0, Landroid/view/MotionEvent;
 const/16 v1, 0x1002

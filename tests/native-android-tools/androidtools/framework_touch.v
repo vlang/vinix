@@ -265,6 +265,11 @@ fn framework_motion_down_time(smali string) ! {
 	text = framework_replace_method(text, 'getDownTime()J', touch_method('public final getDownTime()J', '
 iget-wide v0, p0, Landroid/view/MotionEvent;->vinixDownTime:J
 return-wide v0'))!
+	// Native WS pointer events have no gesture classifier. Android defines
+	// CLASSIFICATION_NONE for these ordinary, unclassified event streams.
+	text = framework_replace_method(text, 'getClassification()I', touch_method('public getClassification()I', '
+const/4 v0, 0
+return v0'))!
 	// Every public obtain overload with downTime as its first argument must
 	// store it, including reused instances from the provider's event pool.
 	mut parts := text.split('.method ')
