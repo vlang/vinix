@@ -364,6 +364,8 @@ fn checked(arguments []string) !int {
 			catalog.close()
 		}
 		'view', 'search', 'info', 'updates' {
+			if command in ['view', 'updates'] && names.len != 0 { return error('${command} takes no arguments') }
+			if command == 'info' && names.len != 1 { return error('info requires one package ID') }
 			mut view := pkgcore.software_view(root, offline)!
 			defer { view.close() }
 			if command == 'view' {
@@ -373,7 +375,6 @@ fn checked(arguments []string) !int {
 				println(text)
 				return 0
 			}
-			if command == 'info' && names.len != 1 { return error('info requires one package ID') }
 			query := names.join(' ').to_lower()
 			mut found := false
 			for row in view.rows {
@@ -397,6 +398,7 @@ fn checked(arguments []string) !int {
 			if command == 'updates' && view.update_error != '' { return error(view.update_error.clone()) }
 		}
 		'status', 'list', 'verify' {
+			if names.len != 0 { return error('${command} takes no arguments') }
 			mut state := if command == 'verify' { service.verify()! } else { service.state()! }
 			defer { state.close() }
 			if as_json || command == 'status' {
