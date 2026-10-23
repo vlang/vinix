@@ -55,6 +55,7 @@ pub fn install(output string, resources string) ! {
  install_texture_transform_probe(dir)!
  install_window_insets_probe(dir)!
  install_date_ranges_probe(dir)!
+ install_blur_styles_probe(dir)!
  install_traversal_probe(dir)!
  install_scroll_probe(dir)!
  install_frame_bounds_probe(dir)!
@@ -149,6 +150,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/InterpolatorProbe;->check(Landroid/cont
 invoke-static {p0}, Lorg/vinix/bootstrap/TextureViewTransformProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/WindowInsetsProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/DateRangesProbe;->check(Landroid/content/Context;)V
+invoke-static {}, Lorg/vinix/bootstrap/BlurStylesProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/EglProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/ClockProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/TimeAnimatorProbe;->check()V
