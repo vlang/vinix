@@ -186,6 +186,13 @@ Canvas's legacy float-bounds saveLayer overload delegates to its existing
 saveLayer path, as do its RectF overloads. These paths preserve the save stack;
 offscreen mask compositing and legacy save-flag validation remain incomplete.
 
+PopupMenu uses the native menu model and an in-surface Dialog, with enabled and
+visible items, submenus, item and popup callbacks, and dismissal notifications.
+Its Context supplies resource titles and icons, including submenu resources.
+Presentation is currently centered; anchor and gravity positioning, outside-click
+dismissal, popup styling and menu icons remain incomplete. Menu entries retain
+insertion order.
+
 Handle-based JNI symbol lookup searches the library and its dependencies in
 breadth-first order, including defined weak symbols. The bootstrap APK includes
 a JNI method exported only by a dependent DSO to exercise this path in ART.

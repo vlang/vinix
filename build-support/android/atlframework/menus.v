@@ -10,6 +10,10 @@ fn array_item(e voidptr, list voidptr, index i32) voidptr {
 }
 fn menu_items(e voidptr, menu voidptr) voidptr { return get_object(e, menu, c'android/view/VinixMenu', c'items', c'Ljava/util/ArrayList;') }
 fn menu_owner(e voidptr, menu voidptr) voidptr { return get_object(e, menu, c'android/view/VinixMenu', c'owner', c'Landroid/app/Activity;') }
+fn menu_context(e voidptr, menu voidptr) voidptr {
+    context := get_object(e, menu, c'android/view/VinixMenu', c'vinixContext', c'Landroid/content/Context;')
+    return if context == unsafe { nil } { menu_owner(e, menu) } else { context }
+}
 fn item_menu(e voidptr, item voidptr) voidptr { return get_object(e, item, c'android/view/VinixMenuItem', c'menu', c'Landroid/view/VinixMenu;') }
 fn make_menu(e voidptr, owner voidptr) voidptr {
     menu := new_object(e, c'android/view/VinixMenu', c'()V', unsafe { nil })
@@ -39,7 +43,7 @@ fn menu_add_resource(e voidptr, menu voidptr, group i32, id i32, order i32, reso
     unsafe {
         mut args := &Value(C.alloca(sizeof(Value)))
         args[0] = Value{i: resource}
-        text := obj(e, menu_owner(e, menu), c'android/content/Context', c'getText', c'(I)Ljava/lang/CharSequence;', args)
+        text := obj(e, menu_context(e, menu), c'android/content/Context', c'getText', c'(I)Ljava/lang/CharSequence;', args)
         return menu_add(e, menu, group, id, order, text)
     }
 }
@@ -47,6 +51,7 @@ fn menu_add_one_resource(e voidptr, menu voidptr, resource i32) voidptr { return
 fn menu_sub(e voidptr, menu voidptr, group i32, id i32, order i32, title voidptr) voidptr {
     item := menu_add(e, menu, group, id, order, title)
     child := make_menu(e, menu_owner(e, menu))
+    put_object(e, child, c'android/view/VinixMenu', c'vinixContext', c'Landroid/content/Context;', menu_context(e, menu))
     put_object(e, child, c'android/view/VinixMenu', c'item', c'Landroid/view/VinixMenuItem;', item)
     put_object(e, item, c'android/view/VinixMenuItem', c'submenu', c'Landroid/view/VinixMenu;', child)
     return child
@@ -55,7 +60,7 @@ fn menu_sub_resource(e voidptr, menu voidptr, group i32, id i32, order i32, reso
     unsafe {
         mut args := &Value(C.alloca(sizeof(Value)))
         args[0] = Value{i: resource}
-        text := obj(e, menu_owner(e, menu), c'android/content/Context', c'getText', c'(I)Ljava/lang/CharSequence;', args)
+        text := obj(e, menu_context(e, menu), c'android/content/Context', c'getText', c'(I)Ljava/lang/CharSequence;', args)
         return menu_sub(e, menu, group, id, order, text)
     }
 }
@@ -136,7 +141,7 @@ fn item_title_resource(e voidptr, item voidptr, resource i32) voidptr {
     unsafe {
         mut args := &Value(C.alloca(sizeof(Value)))
         args[0] = Value{i: resource}
-        text := obj(e, menu_owner(e, item_menu(e, item)), c'android/content/Context', c'getText', c'(I)Ljava/lang/CharSequence;', args)
+        text := obj(e, menu_context(e, item_menu(e, item)), c'android/content/Context', c'getText', c'(I)Ljava/lang/CharSequence;', args)
         return item_set_title(e, item, text)
     }
 }
@@ -150,7 +155,7 @@ fn item_icon_resource(e voidptr, item voidptr, resource i32) voidptr {
     unsafe {
         mut args := &Value(C.alloca(sizeof(Value)))
         args[0] = Value{i: resource}
-        icon := obj(e, menu_owner(e, item_menu(e, item)), c'android/content/Context', c'getDrawable', c'(I)Landroid/graphics/drawable/Drawable;', args)
+        icon := obj(e, menu_context(e, item_menu(e, item)), c'android/content/Context', c'getDrawable', c'(I)Landroid/graphics/drawable/Drawable;', args)
         return item_set_icon(e, item, icon)
     }
 }
@@ -159,6 +164,7 @@ fn item_expand(e voidptr, item voidptr) u8 {
     action := item_action(e, item)
     if action == unsafe { nil } { return 0 }
     owner := menu_owner(e, item_menu(e, item))
+    if owner == unsafe { nil } { return 0 }
     bar := action_bar(e, owner)
     header := bar_field(e, bar, c'vinixHeader', c'Landroid/view/ViewGroup;')
     if item_expanded(e, item) == 0 { add_view(e, header, action) }
@@ -168,7 +174,9 @@ fn item_expand(e voidptr, item voidptr) u8 {
 fn item_collapse(e voidptr, item voidptr) u8 {
     action := item_action(e, item)
     if action == unsafe { nil } || item_expanded(e, item) == 0 { return 0 }
-    bar := action_bar(e, menu_owner(e, item_menu(e, item)))
+    owner := menu_owner(e, item_menu(e, item))
+    if owner == unsafe { nil } { return 0 }
+    bar := action_bar(e, owner)
     args := [Value{l: action}]!
     call(e, bar_field(e, bar, c'vinixHeader', c'Landroid/view/ViewGroup;'), c'android/view/ViewGroup', c'removeView', c'(Landroid/view/View;)V', unsafe { &args[0] })
     put_int(e, item, c'android/view/VinixMenuItem', c'expanded', 0)

@@ -176,6 +176,7 @@ pub fn write_framework_classes(smali string) ! {
   '.field public owner:Landroid/app/Activity;\n.field public item:Landroid/view/VinixMenuItem;\n' + object_constructor +
   native_declarations(menus.all_after('fn register_menu_click(').all_before('\n}'))
  os.write_file(smali + '/android/view/VinixMenuClick.smali', menu_click)!
+ framework_popup_menus(smali)!
  context := smali + '/android/app/ContextImpl.smali'
  os.write_file(context, framework_replace_method(os.read_file(context)!, 'getTheme()Landroid/content/res/Resources$Theme;', '.method public native getTheme()Landroid/content/res/Resources$Theme;\n.end method')!)!
  bitmap := smali + '/android/graphics/Bitmap.smali'
