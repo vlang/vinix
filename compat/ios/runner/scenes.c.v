@@ -101,6 +101,11 @@ fn objc_responds(object u64, selector &char) bool {
 		operation_name := if operation_class == ios_runtime.names['NSInvocationOperation'] { 'NSInvocationOperation' } else { 'NSOperation' }
 		if ns_operation_types(operation_name, object in ios_runtime.classes, name) != none { return true }
 	}
+	if ns_invocation_family(operation_class) {
+		invocation_name := if operation_class == ios_runtime.names['NSInvocation'] { 'NSInvocation' } else { 'NSMethodSignature' }
+		if ns_invocation_unsupported(invocation_name, name) { return native_method(read64(object), name) != 0 }
+		if ns_invocation_types(invocation_name, object in ios_runtime.classes, name) != none { return true }
+	}
 	if web_auth_selector(object, name) { return true }
 	if cookie_selector(object, name) { return true }
 	if request_selector(object, name) { return true }
@@ -116,9 +121,9 @@ fn objc_responds(object u64, selector &char) bool {
 	}
 	if webkit_selector(object, name) { return true }
 	if accessibility_selector(object, name) { return true }
-	if name in ['class', 'isKindOfClass:', 'respondsToSelector:', 'conformsToProtocol:', 'copy', 'init', 'dealloc'] { return true }
+	if name in ['class', 'isKindOfClass:', 'respondsToSelector:', 'conformsToProtocol:', 'methodSignatureForSelector:', 'copy', 'init', 'dealloc'] { return true }
 	if object in ios_runtime.classes {
-		if name in ['alloc', 'new'] { return true }
+		if name in ['alloc', 'new', 'instanceMethodSignatureForSelector:'] { return true }
 		info := ios_runtime.classes[object] or { return false }
 		return match info.name {
 			'NSString' { name in ['stringWithUTF8String:', 'stringWithFormat:'] }

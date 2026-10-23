@@ -125,6 +125,8 @@ mut:
 	recursive_lock_calls u64
 	recursive_lock &RecursiveLockState = unsafe { nil }
 	operation &FoundationOperation = unsafe { nil }
+	invocation &FoundationInvocation = unsafe { nil }
+	method_signature &FoundationMethodSignature = unsafe { nil }
 	thread &FoundationThread = unsafe { nil }
 	auth_owned bool
 	auth &WebAuthState = unsafe { nil }
@@ -506,7 +508,7 @@ fn objc_start() {
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
-        'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSOperation', 'NSInvocationOperation', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
+        'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSOperation', 'NSInvocationOperation', 'NSInvocation', 'NSMethodSignature', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
@@ -584,6 +586,8 @@ fn objc_start() {
 			'NSThread' { u32(64) }
 			'NSOperation' { u32(248) }
 			'NSInvocationOperation' { u32(264) }
+			'NSInvocation' { u32(64) }
+			'NSMethodSignature' { u32(32) }
 			'NSCoder' { u32(8) }
 			'NSKeyedArchiver' { u32(136) }
 			'NSKeyedUnarchiver' { u32(144) }
@@ -653,6 +657,7 @@ fn objc_start() {
 	url_session_configuration_metadata()
 	ns_recursive_lock_metadata()
 	ns_operation_metadata()
+	ns_invocation_metadata()
 	ns_keyed_archiver_metadata()
 	ns_keyed_unarchiver_metadata()
 	sort_descriptor_metadata()
@@ -812,6 +817,7 @@ fn objc_new(cls u64) u64 {
 	if ns_recursive_lock_family(read64(object)) { ns_recursive_lock_initialize(object) }
 	if obj_header(object).thread != unsafe { nil } { ns_thread_initialize(object, 0, 0, 0, 0) }
 	if obj_header(object).operation != unsafe { nil } { return ns_operation_default_initialize(object) }
+	if ns_invocation_family(cls) { objc_release(object); return 0 }
 	if objc_is_kind(object, ios_runtime.names['NSURLRequest']) { request_initialize(object, 0, 0, 60) }
 	if obj_header(object).response_owned { response_initialize(object) }
 	if obj_header(object).set_owned { ns_set_initialize(object, 0) }

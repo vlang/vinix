@@ -94,6 +94,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := ns_condition_builtin_types(info.name, info.meta, selector) { return types }
 	if types := ns_recursive_lock_types(info.name, info.meta, selector) { return types }
 	if types := ns_operation_types(info.name, info.meta, selector) { return types }
+	if types := ns_invocation_types(info.name, info.meta, selector) { return types }
 	if types := ns_thread_types(info.name, info.meta, selector) { return types }
 	if types := web_auth_types(info.name, info.meta, selector) { return types }
 	if types := image_view_types(info.name, info.meta, selector) { return types }
@@ -126,6 +127,8 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 		'dealloc', 'release' { 'v16@0:8' }
 		'isKindOfClass:' { 'B24@0:8#16' }
 		'respondsToSelector:' { 'B24@0:8:16' }
+		'methodSignatureForSelector:' { '@24@0:8:16' }
+		'instanceMethodSignatureForSelector:' { if info.meta { '@24@0:8:16' } else { return none } }
 		'conformsToProtocol:' { 'B24@0:8@16' }
 		'alloc', 'new' { if info.meta { '@16@0:8' } else { return none } }
 		else { return none }
@@ -153,6 +156,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name in ['NSCoder', 'NSKeyedArchiver']! && ns_keyed_archiver_unsupported(name) { return 0 }
 		if info.name == 'NSKeyedUnarchiver' && ns_keyed_unarchiver_unsupported(name) { return 0 }
 		if info.name in ['NSOperation', 'NSInvocationOperation']! && ns_operation_unsupported(name) { return 0 }
+		if info.name in ['NSInvocation', 'NSMethodSignature']! && ns_invocation_unsupported(info.name, name) { return 0 }
 		if info.name == 'NSSortDescriptor' && sort_descriptor_unsupported(name) { return 0 }
 		if info.name == 'NSMutableString' && mutable_string_unsupported(name) { return 0 }
 		if info.name == 'NSRegularExpression' && regular_expression_unsupported(name) { return 0 }

@@ -17831,11 +17831,87 @@ scratch directories and the detached owned RAM disk. The native evidence keeps
 11 expected historical nonzero statuses for unsupported or malformed cases.
 These hashes cover declared inputs, not the full host dynamic runtime closure.
 
-The launch probe now stops at `_OBJC_CLASS_$_NSInvocation`, before application
-entry. Fortnite remains unplayable.
+After this increment the launch probe stopped at `_OBJC_CLASS_$_NSInvocation`,
+before application entry.
 
 ```sh
 v run tests/ios/native-checks.v build-keyed-unarchiver
+```
+
+V now supplies `NSInvocation` and `NSMethodSignature`, with measured Apple
+instance sizes of 64 and 32 bytes and their nine and three ivar metadata records.
+Their factories copy signature encodings and retain the signature used by an
+invocation. Default `new` and `init` return nil; raw allocation remains releasable.
+NSObject supplies typed `methodSignatureForSelector:` and class-side
+`instanceMethodSignatureForSelector:` lookup, including inherited methods.
+
+The bounded signature parser preserves type qualifiers, quoted object names,
+block annotations and pointee encodings. Numeric frame sizes and argument offsets
+do not control dispatch. Supported value types are integers, booleans, floats,
+doubles, objects, blocks, classes, selectors, C strings and pointers. Apple treats
+the legacy `l`/`L` encoding as four bytes even on ARM64. The register profile has
+up to eight general-purpose arguments, including self and selector, and eight
+floating-point arguments. Foundation reports a 224-byte frame for supported
+signatures with arguments, and zero for a return-only signature. Encodings are
+limited to 512 bytes and 16 arguments. Aggregate values, stack arguments,
+forwarding, custom subclasses, coding, copy, signature equality/hashing and
+owned-result method families remain unsupported and fail explicitly. Variadic
+methods are outside the profile; Objective-C type encodings do not identify them.
+
+Invocation argument and return access copies exactly the declared width. Index
+zero and one alias the target and selector; index minus one aliases the return
+buffer. Initial nonvoid return storage is zero, and invoking a nil target
+preserves the stored return value. `invokeWithTarget:` replaces the stored target.
+`retainArguments` retains object values and copies blocks and C strings, including
+return values. Matching Foundation, replaced retained values stay owned until
+invocation destruction; each invocation permits at most 4,096 owned values and
+each copied C string is limited to 1 MiB. Plain pointer pointees remain borrowed.
+
+A sealed ARM64 bridge loads both argument register banks and captures scalar
+returns. Dispatch revalidates typed method metadata before calling application
+code outside the runtime lock. An active call pins the invocation and signature;
+the invoked receiver also stays retained through the call. Writers reject
+overlapping or reentrant mutation, while callbacks can read state. Construction
+failure rolls back owned storage. Disposal follows construction provenance after
+`object_setClass`, clears caller-supplied object bytes and releases retained
+values outside the runtime lock. Concurrent runtime shutdown is unsupported.
+
+The captured Fortnite consumers fit this profile: AppsFlyer passes a migration
+integer and completion block or reads a tracking-authorization integer result;
+GoogleUtilities invokes notification callbacks with two objects and an optional
+completion block. No inspected consumer passes aggregate or stack arguments.
+Import resolution does not establish that these consumers have executed.
+
+The same shared fixture passes on Apple Foundation and the compatibility runtime.
+It covers copied type buffers, 19 scalar layouts, exact-width argument and return
+buffers, index minus one, nil targets, typed method lookup, mixed integer/float
+calls and all eight general-purpose plus eight floating-point argument slots at
+once. Ownership checks exercise both orders of `retainArguments`, replaced
+target/object/return values, borrowed slots, C-string copies and block copy/dispose
+helpers. Runtime checks add joined-worker lock reentry, receiver/signature pins,
+constructor failure, guarded caller storage and repeated cleanup after isa
+replacement. Forty-two child cases check explicit rejection of unsupported
+encodings, stack arguments, spoofed storage, invalid buffers and indices,
+incompatible methods, ownership limits and active-call destruction/mutation.
+The host fixture passes ASan+UBSan with ordinary and deterministic Swift hashing;
+host leak detection was disabled. Independent review of the exact generated C
+found no unresolved ownership, locking or ABI issue within the supported profile.
+The ARM64 guest passes the same runtime fixture and all 42 rejection cases.
+
+Evidence is preserved under `build/ios/fortnite/invocation-checks`. The final proof
+verifies 19,681 unchanged source/toolchain/runtime inputs, 391 sealed native
+artifacts, five binary/generated-C archive pairs and the host dSYM. It verifies
+both sanitizer runs, all four ARM64 phases, guest serial/configuration hashes,
+preserved preflight failures, retired owned VMs, empty scratch directories and
+the detached owned RAM disk. Native evidence retains 22 expected historical
+nonzero statuses. These hashes cover declared inputs, not the full host dynamic
+runtime closure.
+
+The launch probe now stops at `_OBJC_CLASS_$_NSDateFormatter`, before application
+entry. Fortnite remains unplayable.
+
+```sh
+v run tests/ios/native-checks.v build-invocation
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -17843,12 +17919,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,068 | 93 | 78 |
+| Fortnite executable | 2,070 | 91 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,908 | 96 | 114 |
+| All images | 2,910 | 94 | 114 |
 
-The C++/GLES/Text variant reports 2,922 resolved imports, 82 unresolved strong
+The C++/GLES/Text variant reports 2,924 resolved imports, 80 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -17900,7 +17976,8 @@ base URL sessions use `url-session-checks`, sort descriptors use
 `sort-descriptor-checks`, regular expressions use `regular-expression-checks`,
 mutable strings use `mutable-string-checks`, session configurations use
 `session-configuration-checks`, recursive locks use `recursive-lock-checks`,
-invocation operations use `invocation-operation-checks`, keyed archives use
+invocations use `invocation-checks`, invocation operations use
+`invocation-operation-checks`, keyed archives use
 `keyed-archiver-checks`, keyed unarchives use `keyed-unarchiver-checks`,
 CoreFoundation dictionaries use
 `cf-dictionary-checks`, constant integers use
@@ -17914,8 +17991,8 @@ object monitors use `objc-sync-checks`, Swift strings/buffers use
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
-URL session, session configuration, recursive lock, invocation operation, keyed
-archive, keyed unarchive, sort
+URL session, session configuration, recursive lock, invocation, invocation
+operation, keyed archive, keyed unarchive, sort
 descriptor, regular expression, mutable string,
 CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,

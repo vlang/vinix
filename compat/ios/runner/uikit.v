@@ -113,6 +113,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if ns_recursive_lock_dispatch(object, selector, mut frame) { return true }
 	if ns_thread_dispatch(object, selector, mut frame) { return true }
 	if ns_operation_dispatch(object, selector, mut frame) { return true }
+	if ns_invocation_dispatch(object, selector, mut frame) { return true }
 	if web_auth_dispatch(object, selector, mut frame) { return true }
 	if image_view_dispatch(object, selector, mut frame) { return true }
 	if game_keyboard_dispatch(object, selector, mut frame) { return true }
@@ -138,6 +139,10 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if value_dispatch(object, selector, mut frame) { return true }
 	if image_dispatch(object, selector, mut frame) { return true }
 	if accessibility_dispatch(object, selector, mut frame) { return true }
+	if selector == 'methodSignatureForSelector:' || (selector == 'instanceMethodSignatureForSelector:' && object in ios_runtime.classes) {
+		frame.x[0] = ns_method_signature_lookup(object, frame.x[2], selector == 'instanceMethodSignatureForSelector:')
+		return true
+	}
 	if selector == 'self' { return true }
 	if selector == 'retain' { frame.x[0] = objc_retain(object); return true }
 	if selector == 'release' { objc_release(object); return true }
