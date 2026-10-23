@@ -18,6 +18,15 @@ paths, sixteen components per path and 1,024 output bytes per value. Description
 invoke the object's `toString`; this is intended for selected diagnostic builds.
 Production launchers leave these variables unset.
 
+`VINIX_ANDROID_TRACE_VIEW_ADDS` selects an exact Java view class name and logs
+the caller stack when a ViewGroup inserts that child. The bridge matches the
+inserted native widget against the Java children, including reordered children;
+existing siblings do not produce insertion traces. It inspects at most 4,096
+children per insertion and logs at most sixteen stacks of forty frames. JNI
+local references and strings are released, and diagnostic exceptions are
+cleared before attachment continues. This option does not change the view tree
+or invoke application lifecycle callbacks.
+
 `runtime.v` creates the real ART VM, loads the extended ATL framework DEX,
 registers the reusable V framework APIs, and runs Android lifecycle callbacks
 and the main Looper. Secondary Loopers have wakeable native queues. Resources

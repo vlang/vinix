@@ -177,7 +177,7 @@ android/view/View|native_removeClass|// CSS style classes do not apply to native
 android/view/View|native_addClasses|// CSS style classes do not apply to native widgets.
 android/view/View|native_removeClasses|// CSS style classes do not apply to native widgets.
 android/view/View|native_keep_screen_on|// Power management remains with the desktop.
-android/view/ViewGroup|native_addView|ws_attach_children(e, this); ws_mark()
+android/view/ViewGroup|native_addView|ws_trace_view_additions(e, this, p1); ws_attach_children(e, this); ws_mark()
 android/view/ViewGroup|native_removeView|ws_mark()
 android/view/ViewGroup|native_drawChildren|ws_draw_children(e,this,p1)
 android/widget/TextView|native_constructor|return ws_view_new(1)
