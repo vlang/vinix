@@ -98,7 +98,12 @@ fn ws_blend(x i32, y i32, color u32, coverage u32) {
 		if alpha == 0 { return }
 		if draw.bitmap != 0 {
 			bitmap := &WsBitmap(draw.bitmap)
-			target := &bitmap.rgba[(y * draw.width + x) * 4]
+			if bitmap.alpha_only {
+				target := &bitmap.rgba[y * bitmap.row_bytes + x]
+				*target = u8(alpha + u32(*target) * (255 - alpha) / 255)
+				return
+			}
+			target := &bitmap.rgba[y * bitmap.row_bytes + x * 4]
 			before := u32(target[3]) * (255 - alpha) / 255
 			combined := alpha + before
 			target[0] = u8((((color >> 16) & 255) * alpha + u32(target[0]) * before) / combined)

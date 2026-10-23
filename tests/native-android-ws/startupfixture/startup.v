@@ -46,6 +46,7 @@ pub fn install(output string, resources string) ! {
  install_content_capture_probe(dir)!
  install_autofill_probe(dir)!
  install_autofill_manager_probe(dir)!
+ install_alpha8_probe(dir)!
  install_traversal_probe(dir)!
  install_scroll_probe(dir)!
  install_frame_bounds_probe(dir)!
@@ -132,6 +133,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/LayoutListenerProbe;->check(Landroid/co
 invoke-static {p0}, Lorg/vinix/bootstrap/LayoutExceptionProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/ViewLayerProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/ViewConfigurationProbe;->check(Landroid/content/Context;)V
+invoke-static {}, Lorg/vinix/bootstrap/Alpha8Probe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/EglProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/ClockProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/TimeAnimatorProbe;->check()V

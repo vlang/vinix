@@ -19,7 +19,7 @@ fn ws_window_bitmap(width i32, height i32) i64 {
 		if bitmap == nil { return 0 }
 		pixels := &u8(C.calloc(usize(width) * usize(height), 4))
 		if pixels == nil { C.free(bitmap); return 0 }
-		*bitmap = WsBitmap{ width: width, height: height, references: 1, rgba: pixels }
+		*bitmap = WsBitmap{ width: width, height: height, row_bytes: width * 4, references: 1, rgba: pixels }
 		return i64(bitmap)
 	}
 }

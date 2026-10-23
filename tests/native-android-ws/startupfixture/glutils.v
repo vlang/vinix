@@ -173,6 +173,7 @@ invoke-static {v0, v1}, Landroid/opengl/GLES20;->glPixelStorei(II)V
 invoke-static {}, Landroid/opengl/GLES20;->glGetError()I
 move-result v0
 if-nez v0, :bad
+invoke-static {}, Lorg/vinix/bootstrap/Alpha8Probe;->checkGl()V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
 const-string v1, "BOOTSTRAP-GLUTILS-PASS bitmap RGBA texels subimage-auto-explicit offsets unchanged-neighbors FBO readback preserved-error unpack-alignment invalid-format null recycled"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V

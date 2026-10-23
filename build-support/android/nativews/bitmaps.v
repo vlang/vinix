@@ -16,7 +16,9 @@ struct WsBitmap {
 mut:
 	width      i32
 	height     i32
+	row_bytes  i32
 	references i32
+	alpha_only bool
 	rgba       &u8
 }
 
@@ -60,7 +62,7 @@ fn ws_bitmap_decode(bytes &u8, length i32) i64 {
 		}
 		if pixels == nil { return 0 }
 		bitmap := &WsBitmap(C.malloc(sizeof(WsBitmap)))
-		*bitmap = WsBitmap{ width: width, height: height, references: 1, rgba: pixels }
+		*bitmap = WsBitmap{ width: width, height: height, row_bytes: width * 4, references: 1, rgba: pixels }
 		return i64(bitmap)
 	}
 }
@@ -111,12 +113,15 @@ fn ws_bitmap_create(e voidptr, snapshot i64, width i32, height i32, stride i32, 
 		throw(e, c'java/lang/IllegalArgumentException', c'Invalid bitmap dimensions')
 		return 0
 	}
-	if format != 5 || stride != width * 4 {
-		throw(e, c'java/lang/UnsupportedOperationException', c'Native WS bitmap storage requires ARGB_8888')
+	alpha_only := format == 24 // GDK_MEMORY_A8 / Bitmap.Config.ALPHA_8
+	channels := if alpha_only { 1 } else { 4 }
+	expected_stride := (width * channels + 3) & ~3
+	if (format != 5 && !alpha_only) || stride != expected_stride {
+		throw(e, c'java/lang/UnsupportedOperationException', c'Native WS bitmap storage requires ARGB_8888 or ALPHA_8')
 		return 0
 	}
 	unsafe {
-		pixels := &u8(C.calloc(usize(width) * usize(height), 4))
+		pixels := &u8(C.calloc(usize(stride), usize(height)))
 		bitmap := &WsBitmap(C.malloc(sizeof(WsBitmap)))
 		if pixels == nil || bitmap == nil {
 			C.free(pixels)
@@ -124,7 +129,7 @@ fn ws_bitmap_create(e voidptr, snapshot i64, width i32, height i32, stride i32, 
 			throw(e, c'java/lang/OutOfMemoryError', c'Bitmap pixels')
 			return 0
 		}
-		*bitmap = WsBitmap{width: width, height: height, references: 1, rgba: pixels}
+		*bitmap = WsBitmap{width: width, height: height, row_bytes: stride, references: 1, alpha_only: alpha_only, rgba: pixels}
 		return i64(bitmap)
 	}
 }
@@ -160,6 +165,10 @@ fn ws_bitmap_clear(e voidptr, object voidptr, color u32) {
 		pointer := ws_bitmap_snapshot(e, object)
 		if pointer == 0 || pending(e) { return }
 		bitmap := &WsBitmap(pointer)
+		if bitmap.alpha_only {
+			C.memset(bitmap.rgba, i32(color >> 24), usize(bitmap.row_bytes) * usize(bitmap.height))
+			return
+		}
 		for i := i32(0); i < bitmap.width * bitmap.height; i++ {
 			bitmap.rgba[i * 4] = u8(color >> 16)
 			bitmap.rgba[i * 4 + 1] = u8(color >> 8)
@@ -209,7 +218,13 @@ fn ws_bitmap_pixels(e voidptr, pointer i64, array voidptr, offset i32, stride i3
 			at := offset + line * stride
 			if write { WsBitmapIntRegion(slot(e, 203))(e, array, at, width, row) }
 			for column := i32(0); column < width; column++ {
-				pixels := &bitmap.rgba[((y + line) * bitmap.width + x + column) * 4]
+				index := (y + line) * bitmap.row_bytes + x + column
+				if bitmap.alpha_only {
+					if write { bitmap.rgba[index] = u8(row[column] >> 24) }
+					else { row[column] = u32(bitmap.rgba[index]) << 24 }
+					continue
+				}
+				pixels := &bitmap.rgba[(y + line) * bitmap.row_bytes + (x + column) * 4]
 				if write {
 					color := row[column]
 					pixels[0] = u8(color >> 16); pixels[1] = u8(color >> 8)
@@ -283,9 +298,10 @@ fn ws_draw_bitmap_region(pointer i64, x i32, y i32, width i32, height i32, left 
 		if pointer == 0 || width <= 0 || height <= 0 || source_width <= 0 || source_height <= 0 { return }
 		bitmap := &WsBitmap(pointer)
 		mut pixels := bitmap.rgba
+		channels := if bitmap.alpha_only { 1 } else { 4 }
 		copying := ws_draw_state().bitmap == pointer
 		if copying {
-			length := usize(bitmap.width) * usize(bitmap.height) * 4
+			length := usize(bitmap.row_bytes) * usize(bitmap.height)
 			pixels = &u8(C.malloc(length))
 			if pixels == nil { return }
 			C.memcpy(pixels, bitmap.rgba, length)
@@ -301,10 +317,12 @@ fn ws_draw_bitmap_region(pointer i64, x i32, y i32, width i32, height i32, left 
 				if source_y < 0 || source_y >= bitmap.height { continue }
 				source_x := left + i32((px - f32(x)) * f32(source_width) / f32(width))
 				if source_x < 0 || source_x >= bitmap.width { continue }
-				offset := (source_y * bitmap.width + source_x) * 4
-				mut color := (u32(pixels[offset + 3]) << 24) | (u32(pixels[offset]) << 16) | (u32(pixels[offset + 1]) << 8) | u32(pixels[offset + 2])
+				offset := source_y * bitmap.row_bytes + source_x * channels
+				mut color := if bitmap.alpha_only { u32(pixels[offset]) << 24 }
+					else { (u32(pixels[offset + 3]) << 24) | (u32(pixels[offset]) << 16) | (u32(pixels[offset + 1]) << 8) | u32(pixels[offset + 2]) }
 				if paint_pointer != 0 {
 					paint := &WsPaint(paint_pointer)
+					if bitmap.alpha_only { color |= paint.color & 0xffffff }
 					if paint.filter_mode == 5 {
 						color = (((color >> 24) * (paint.filter_color >> 24) / 255) << 24) | (paint.filter_color & 0xffffff)
 					}
