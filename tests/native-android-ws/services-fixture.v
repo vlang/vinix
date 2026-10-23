@@ -2090,6 +2090,107 @@ invoke-virtual {v0}, Ljava/util/concurrent/CountDownLatch;->countDown()V
 return-void'))!
 }
 
+// Hold attachBaseContext open until another thread tries the cached getter.
+// The owner must be able to reenter, while the competing caller must wait
+// until attachment completes and then observe the initialized Application.
+fn application_attachment_race(dir string) ! {
+	os.write_file(dir + 'AttachmentRace.smali', '.class public Lorg/vinix/service/AttachmentRace;\n.super Ljava/lang/Object;\n.implements Ljava/lang/Runnable;\n' +
+		'.field private context:Landroid/content/Context;\n.field private static thread:Ljava/lang/Thread;\n' +
+		'.field private static volatile done:Z\n.field private static volatile failure:Ljava/lang/Throwable;\n' +
+		method('public constructor <init>(Landroid/content/Context;)V', 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\niput-object p1, p0, Lorg/vinix/service/AttachmentRace;->context:Landroid/content/Context;\nreturn-void') +
+		method('public static begin(Landroid/app/Application;Landroid/content/Context;)V', '
+invoke-virtual {p1}, Landroid/content/Context;->getApplicationContext()Landroid/content/Context;
+move-result-object v0
+if-ne v0, p0, :bad
+new-instance v0, Lorg/vinix/service/AttachmentRace;
+invoke-direct {v0, p1}, Lorg/vinix/service/AttachmentRace;-><init>(Landroid/content/Context;)V
+new-instance v1, Ljava/lang/Thread;
+invoke-direct {v1, v0}, Ljava/lang/Thread;-><init>(Ljava/lang/Runnable;)V
+sput-object v1, Lorg/vinix/service/AttachmentRace;->thread:Ljava/lang/Thread;
+invoke-virtual {v1}, Ljava/lang/Thread;->start()V
+const/16 v2, 5000
+:poll
+sget-boolean v0, Lorg/vinix/service/AttachmentRace;->done:Z
+if-nez v0, :bad
+invoke-virtual {v1}, Ljava/lang/Thread;->getState()Ljava/lang/Thread$State;
+move-result-object v0
+sget-object v3, Ljava/lang/Thread$State;->BLOCKED:Ljava/lang/Thread$State;
+if-ne v0, v3, :pause
+invoke-virtual {v1}, Ljava/lang/Thread;->getStackTrace()[Ljava/lang/StackTraceElement;
+move-result-object v0
+const/4 v3, 0
+:frame
+array-length v4, v0
+if-ge v3, v4, :pause
+aget-object v5, v0, v3
+invoke-virtual {v5}, Ljava/lang/StackTraceElement;->getMethodName()Ljava/lang/String;
+move-result-object v5
+const-string v4, "getApplicationUnsafe"
+invoke-virtual {v4, v5}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v4
+if-nez v4, :blocked
+add-int/lit8 v3, v3, 1
+goto :frame
+:pause
+const-wide/16 v3, 1
+invoke-static {v3, v4}, Ljava/lang/Thread;->sleep(J)V
+add-int/lit8 v2, v2, -1
+if-nez v2, :poll
+goto :bad
+:blocked
+return-void
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "Application getter escaped incomplete attachment or owner reentry failed"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0') +
+		method('public run()V', '
+:start
+iget-object v0, p0, Lorg/vinix/service/AttachmentRace;->context:Landroid/content/Context;
+invoke-virtual {v0}, Landroid/content/Context;->getApplicationContext()Landroid/content/Context;
+move-result-object v0
+instance-of v0, v0, Lorg/vinix/service/App;
+if-eqz v0, :bad
+sget v0, Lorg/vinix/service/App;->stage:I
+const/4 v1, 1
+if-ge v0, v1, :ok
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "competing getter saw incomplete Application attachment"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0
+:ok
+:end
+.catch Ljava/lang/Throwable; {:start .. :end} :failed
+goto :done
+:failed
+move-exception v0
+sput-object v0, Lorg/vinix/service/AttachmentRace;->failure:Ljava/lang/Throwable;
+:done
+const/4 v0, 1
+sput-boolean v0, Lorg/vinix/service/AttachmentRace;->done:Z
+return-void') +
+		method('public static finish()V', '
+sget-object v0, Lorg/vinix/service/AttachmentRace;->thread:Ljava/lang/Thread;
+const-wide/16 v1, 5000
+invoke-virtual {v0, v1, v2}, Ljava/lang/Thread;->join(J)V
+sget-object v0, Lorg/vinix/service/AttachmentRace;->failure:Ljava/lang/Throwable;
+if-eqz v0, :check
+throw v0
+:check
+sget-boolean v0, Lorg/vinix/service/AttachmentRace;->done:Z
+if-nez v0, :passed
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "Application attachment waiter did not resume"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0
+:passed
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "APPLICATION-ATTACH-PASS worker-waits owner-reentry initialized-state onCreate-worker-join"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void'))!
+}
+
 fn main() {
 	if os.args.len != 8 {
 		panic('OUTPUT FIXTURE_DIR SMALI_TOOLS JAVA APKSIGNER AAPT2 FRAMEWORK_RES')
@@ -2100,6 +2201,7 @@ fn main() {
 		os.mkdir_all(out + '/' + name + '/smali/org/vinix/service')!
 	}
 	companion := out + '/companion/smali/org/vinix/service/'
+	application_attachment_race(companion)!
 	os.write_file(companion + 'App.smali', '.class public Lorg/vinix/service/App;\n.super Landroid/app/Application;\n.field public static stage:I\n.field public static starts:I\n' +
 		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/app/Application;-><init>()V\nreturn-void') +
 		method('public static check(I)V', '
@@ -2111,8 +2213,8 @@ invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0
 :ok
 return-void') +
-		method('protected attachBaseContext(Landroid/content/Context;)V', 'invoke-super {p0, p1}, Landroid/content/ContextWrapper;->attachBaseContext(Landroid/content/Context;)V\n' + check_stage(0, 1) + 'return-void') +
-		method('public onCreate()V', check_stage(2, 3) + 'return-void'))!
+		method('protected attachBaseContext(Landroid/content/Context;)V', 'invoke-super {p0, p1}, Landroid/content/ContextWrapper;->attachBaseContext(Landroid/content/Context;)V\ninvoke-static {p0, p1}, Lorg/vinix/service/AttachmentRace;->begin(Landroid/app/Application;Landroid/content/Context;)V\n' + check_stage(0, 1) + 'return-void') +
+		method('public onCreate()V', 'invoke-static {}, Lorg/vinix/service/AttachmentRace;->finish()V\n' + check_stage(2, 3) + 'return-void'))!
 	provider := '.class public Lorg/vinix/service/Provider;\n.super Landroid/content/ContentProvider;\n' +
 		method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/content/ContentProvider;-><init>()V
 invoke-virtual {p0}, Landroid/content/ContentProvider;->getContext()Landroid/content/Context;

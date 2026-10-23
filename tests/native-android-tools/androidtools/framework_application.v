@@ -5,7 +5,36 @@ import os
 
 fn framework_application_startup(smali string) ! {
 	path := smali + '/android/atl/ATLLoadedApp.smali'
-	os.write_file(path, os.read_file(path)! + '\n.field private vinixApplicationState:I\n' +
+	mut loaded := os.read_file(path)!
+	// The original getter publishes Application before attachBaseContext returns.
+	// Serialize even its cached path with the existing initialization lock, while
+	// allowing attachment callbacks to obtain their own Application again. This
+	// lock is released before providers and Application.onCreate run.
+	getter := '.method public getApplicationUnsafe()Landroid/app/Application;'
+	if loaded.count(getter) != 1 { return error('unexpected ATL application getter') }
+	loaded = loaded.replace(getter, '.method private vinixCreateApplication()Landroid/app/Application;')
+	loaded += '
+.method public getApplicationUnsafe()Landroid/app/Application;
+.locals 2
+.annotation system Ldalvik/annotation/Throws;
+value = { Ljava/lang/ReflectiveOperationException; }
+.end annotation
+iget-object v0, p0, Landroid/atl/ATLLoadedApp;->init_lock:Ljava/lang/Object;
+monitor-enter v0
+:start
+invoke-direct {p0}, Landroid/atl/ATLLoadedApp;->vinixCreateApplication()Landroid/app/Application;
+move-result-object v1
+monitor-exit v0
+:end
+.catchall {:start .. :end} :failed
+return-object v1
+:failed
+move-exception v1
+monitor-exit v0
+throw v1
+.end method
+'
+	os.write_file(path, loaded + '\n.field private vinixApplicationState:I\n' +
 		'.method public native vinixEnsureApplicationStarted()V\n.end method\n')!
 	// A service constructor can already read globals set by Application.onCreate.
 	// Loading a package context alone does not start that package's Application.
