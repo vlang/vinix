@@ -628,8 +628,20 @@ fn ws_keys(e voidptr, bytes &u8, length u32) {
 
 fn ws_input(e voidptr) {
 	if ws.input < 0 { return }
-	mut descriptor := WsPoll{ fd: ws.input, events: 1 }
-	if C.poll(voidptr(&descriptor), 1, 0) <= 0 { return }
+	// Drain a bounded batch so queued movement cannot postpone button-up
+	// and subsequent input behind a separate rendered frame per record.
+	for _ in 0 .. 64 {
+		if !ws.running || pending(e) { return }
+		mut descriptor := WsPoll{ fd: ws.input, events: 1 }
+		if C.poll(voidptr(&descriptor), 1, 0) <= 0 { return }
+		unsafe { if FramePush(slot(e, 19))(e, 128) < 0 { return } }
+		ws_input_event(e)
+		pop_frame(e)
+	}
+}
+
+// A separate call releases each text payload stack buffer before the next event.
+fn ws_input_event(e voidptr) {
 	mut event := WsEvent{}
 	count := C.read(ws.input, &event, sizeof(WsEvent))
 	if count == 0 {

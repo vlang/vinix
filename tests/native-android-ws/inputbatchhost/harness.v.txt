@@ -1,0 +1,273 @@
+@[translated]
+module main
+
+#include <unistd.h>
+#include <poll.h>
+#include <stdlib.h>
+
+fn C.pipe(&i32) i32
+fn C.close(i32) i32
+fn C.read(i32, voidptr, usize) isize
+fn C.write(i32, voidptr, usize) isize
+fn C.poll(voidptr, usize, i32) i32
+fn C.alloca(usize) voidptr
+
+struct WsState {
+mut:
+	input   i32
+	running bool
+}
+
+type FramePush = fn (voidptr, i32) i32
+
+__global (
+	ws                WsState
+	recorded          []string
+	frame_depth       int
+	frame_pushes      int
+	frame_pops        int
+	frame_attempts    int
+	frame_fail_at     int
+	max_depth         int
+	local_refs        int
+	max_refs          int
+	pending_exception bool
+	error_at          int
+	stop_at           int
+	text_addresses    []usize
+)
+
+fn pending(_ voidptr) bool {
+	return pending_exception
+}
+
+fn slot(_ voidptr, index i32) voidptr {
+	assert index == 19
+	return unsafe { voidptr(host_push) }
+}
+
+fn host_push(_ voidptr, capacity i32) i32 {
+	assert capacity == 128
+	frame_attempts++
+	if frame_attempts == frame_fail_at {
+		pending_exception = true
+		return -1
+	}
+	assert frame_depth == 0
+	frame_pushes++
+	frame_depth++
+	max_depth = if frame_depth > max_depth { frame_depth } else { max_depth }
+	return 0
+}
+
+fn pop_frame(_ voidptr) {
+	assert frame_depth == 1
+	frame_pops++
+	frame_depth--
+	local_refs = 0
+}
+
+fn dispatch_record(value string) {
+	// Each Java dispatch needs local references; a batch must release them per record.
+	local_refs += 100
+	max_refs = if local_refs > max_refs { local_refs } else { max_refs }
+	recorded << value
+	if recorded.len == error_at { pending_exception = true }
+	if recorded.len == stop_at { ws.running = false }
+}
+
+fn ws_pointer(_ voidptr, event &WsEvent) {
+	dispatch_record('pointer:${event.kind}:${event.x}:${event.y}:${event.value}')
+}
+
+fn ws_keys(_ voidptr, bytes &u8, length u32) {
+	text_addresses << usize(bytes)
+	text := unsafe { tos(bytes, int(length)).clone() }
+	dispatch_record('text:${text}')
+}
+
+fn reset() i32 {
+	mut pipe := [i32(0), i32(0)]!
+	assert C.pipe(&pipe[0]) == 0
+	ws = WsState{ input: pipe[0], running: true }
+	recorded = []string{}
+	frame_depth = 0
+	frame_pushes = 0
+	frame_pops = 0
+	frame_attempts = 0
+	frame_fail_at = -1
+	max_depth = 0
+	local_refs = 0
+	max_refs = 0
+	pending_exception = false
+	error_at = -1
+	stop_at = -1
+	text_addresses = []usize{}
+	return pipe[1]
+}
+
+fn finish(writer i32) {
+	assert frame_depth == 0
+	assert frame_pushes == frame_pops
+	assert max_depth <= 1
+	assert max_refs <= 100
+	C.close(ws.input)
+	if writer >= 0 { C.close(writer) }
+}
+
+fn send_event(writer i32, kind u32, x i32, y i32, value i32, text string) {
+	mut event := WsEvent{ magic: 0x31494e56, kind: kind, x: x, y: y, value: value, length: u32(text.len) }
+	assert C.write(writer, &event, sizeof(WsEvent)) == isize(sizeof(WsEvent))
+	if text.len > 0 {
+		assert C.write(writer, text.str, usize(text.len)) == text.len
+	}
+}
+
+fn main() {
+	unsafe {
+		mut writer := reset()
+		send_event(writer, 2, 10, 20, 0, '')
+		send_event(writer, 1, 11, 21, 0, '')
+		send_event(writer, 1, 12, 22, 0, '')
+		send_event(writer, 3, 13, 23, 0, '')
+		send_event(writer, 4, 0, 0, 0, 'a\nβ')
+		send_event(writer, 5, 14, 24, -1, '')
+		ws_input(nil)
+		assert recorded == ['pointer:2:10:20:0', 'pointer:1:11:21:0', 'pointer:1:12:22:0',
+			'pointer:3:13:23:0', 'text:a\nβ', 'pointer:5:14:24:-1'], 'queued DOWN/MOVE/UP/text/wheel must drain in exact order'
+		assert frame_pushes == 6
+		assert ws.running
+		finish(writer)
+		println('INPUT-HOST PASS ordered-mixed-events')
+
+		writer = reset()
+		for i in 0 .. 70 { send_event(writer, 1, i, -i, 0, '') }
+		ws_input(nil)
+		assert recorded.len == 64
+		assert frame_pushes == 64
+		ws_input(nil)
+		assert recorded.len == 70
+		assert frame_pushes == 70
+		for i in 0 .. 70 {
+			assert recorded[i] == 'pointer:1:${i}:${-i}:0'
+		}
+		finish(writer)
+		println('INPUT-HOST PASS bounded64-and-resume')
+
+		writer = reset()
+		for _ in 0 .. 64 { send_event(writer, 4, 0, 0, 0, 'x') }
+		ws_input(nil)
+		assert recorded.len == 64
+		assert text_addresses.len == 64
+		mut lowest := text_addresses[0]
+		mut highest := lowest
+		for address in text_addresses {
+			lowest = if address < lowest { address } else { lowest }
+			highest = if address > highest { address } else { highest }
+		}
+		assert highest - lowest < 8192, '4096-byte text stack buffer must unwind per event'
+		finish(writer)
+		println('INPUT-HOST PASS per-record-stack-and-local-frames')
+
+		writer = reset()
+		maximum_text := 'z'.repeat(4096)
+		send_event(writer, 4, 0, 0, 0, maximum_text)
+		send_event(writer, 4, 0, 0, 0, '')
+		ws_input(nil)
+		assert recorded == ['text:' + maximum_text, 'text:']
+		finish(writer)
+		println('INPUT-HOST PASS maximum-and-empty-text')
+
+		writer = reset()
+		send_event(writer, 2, 1, 2, 0, '')
+		send_event(writer, 3, 1, 2, 0, '')
+		error_at = 1
+		ws_input(nil)
+		assert recorded.len == 1 && pending_exception
+		assert frame_pushes == 1 && frame_pops == 1
+		ws_input(nil)
+		assert recorded.len == 1
+		pending_exception = false
+		ws_input(nil)
+		assert recorded.len == 2
+		finish(writer)
+		println('INPUT-HOST PASS pending-exception-stops-with-frame-cleanup')
+
+		writer = reset()
+		send_event(writer, 2, 1, 2, 0, '')
+		send_event(writer, 3, 1, 2, 0, '')
+		frame_fail_at = 1
+		ws_input(nil)
+		assert recorded.len == 0 && pending_exception
+		assert frame_pushes == 0 && frame_pops == 0
+		frame_fail_at = -1
+		pending_exception = false
+		ws_input(nil)
+		assert recorded.len == 2
+		finish(writer)
+		println('INPUT-HOST PASS failed-push-does-not-consume-or-pop')
+
+		writer = reset()
+		for i in 0 .. 4 { send_event(writer, 1, i, 0, 0, '') }
+		frame_fail_at = 3
+		ws_input(nil)
+		assert recorded.len == 2 && pending_exception
+		assert frame_pushes == 2 && frame_pops == 2
+		pending_exception = false
+		frame_fail_at = -1
+		ws_input(nil)
+		assert recorded == ['pointer:1:0:0:0', 'pointer:1:1:0:0', 'pointer:1:2:0:0', 'pointer:1:3:0:0']
+		finish(writer)
+		println('INPUT-HOST PASS failed-push-midbatch-preserves-order')
+
+		writer = reset()
+		for i in 0 .. 3 { send_event(writer, 1, i, i, 0, '') }
+		stop_at = 1
+		ws_input(nil)
+		assert recorded.len == 1 && !ws.running
+		ws_input(nil)
+		assert recorded.len == 1
+		ws.running = true
+		ws_input(nil)
+		assert recorded.len == 3
+		finish(writer)
+		println('INPUT-HOST PASS stopped-runtime-preserves-remaining')
+
+		writer = reset()
+		ws_input(nil)
+		assert recorded.len == 0 && frame_pushes == 0 && ws.running
+		C.close(writer)
+		ws_input(nil)
+		assert !ws.running && recorded.len == 0
+		assert frame_pushes == 1 && frame_pops == 1
+		finish(-1)
+		println('INPUT-HOST PASS empty-pipe-and-eof')
+
+		for malformed in 0 .. 4 {
+			writer = reset()
+			mut event := WsEvent{ magic: 0x31494e56, kind: 4, length: 2 }
+			if malformed == 0 { event.magic = 0 }
+			if malformed == 1 { event.length = 4097 }
+			count := if malformed == 2 { usize(8) } else { sizeof(WsEvent) }
+			assert C.write(writer, &event, count) == isize(count)
+			if malformed == 3 {
+				assert C.write(writer, c'x', 1) == 1
+				C.close(writer)
+			}
+			ws_input(nil)
+			assert !ws.running && recorded.len == 0
+			assert frame_pushes == 1 && frame_pops == 1
+			finish(if malformed == 3 { -1 } else { writer })
+		}
+		println('INPUT-HOST PASS malformed-header-length-and-partial-payload')
+
+		writer = reset()
+		C.close(ws.input)
+		ws.input = -1
+		ws_input(nil)
+		assert frame_pushes == 0 && recorded.len == 0
+		C.close(writer)
+		println('INPUT-HOST PASS disabled-input')
+		println('INPUT-HOST ALL PASS')
+	}
+}
