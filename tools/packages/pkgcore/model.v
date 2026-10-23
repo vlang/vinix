@@ -2,6 +2,7 @@
 module pkgcore
 
 import tools.packages.appsdk
+import tools.packages.pkgprotocol
 
 pub const format_version = 1
 pub const max_metadata = 8 * 1024 * 1024
@@ -285,8 +286,7 @@ pub fn (p Package) validate() ! {
 
 fn valid_repository(repository Repository) bool {
 	return identifier(repository.id) && digest_valid(repository.public_key)
-		&& printable(repository.url, 4096) && !repository.url.contains('?') && !repository.url.contains('#')
-		&& (repository.url.starts_with('https://') || (repository.url.starts_with('file:///') && relative_path_from(repository.url, 8)))
+		&& pkgprotocol.valid_repository_url(repository.url)
 }
 
 pub fn (c Config) validate() ! {

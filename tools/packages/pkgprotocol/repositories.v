@@ -42,30 +42,11 @@ pub:
 	remembered_sequence u64
 }
 
-fn repository_url(url string) bool {
-	if !printable(url, 4096) || url.contains('?') || url.contains('#') { return false }
-	if url.starts_with('https://') { return true }
-	if !url.starts_with('file:///') || url.len <= 8 { return false }
-	mut start := 8
-	for i in 8 .. url.len + 1 {
-		if i < url.len && url[i] == `\\` { return false }
-		if i == url.len || url[i] == `/` {
-			length := i - start
-			if length == 0 || (length == 1 && url[start] == `.`)
-				|| (length == 2 && url[start] == `.` && url[start + 1] == `.`) {
-				return false
-			}
-			start = i + 1
-		}
-	}
-	return true
-}
-
 pub fn validate_repository(id string, url string, public_key string) ! {
 	if !identifier(id) {
 		return error('Use a lowercase repository ID with letters, digits, dots, hyphens or underscores.')
 	}
-	if !repository_url(url) {
+	if !valid_repository_url(url) {
 		return error('Enter an HTTPS URL or an absolute file:// repository path without parent traversal.')
 	}
 	if !digest(public_key) {
@@ -112,7 +93,7 @@ pub fn (review &RepositoryReview) validate() ! {
 	}
 	validate_repository(review.id, review.url, review.public_key)!
 	if (review.previous_url == '') != (review.previous_public_key == '')
-		|| (review.previous_url != '' && (!repository_url(review.previous_url) || !digest(review.previous_public_key))) {
+		|| (review.previous_url != '' && (!valid_repository_url(review.previous_url) || !digest(review.previous_public_key))) {
 		return error('invalid previous repository identity')
 	}
 	if review.operation == 'enroll' {
