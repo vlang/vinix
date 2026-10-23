@@ -112,6 +112,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_view_traversal(smali)!
  framework_view_frame_bounds(smali)!
  framework_view_touch(smali)!
+ framework_view_scroll(smali)!
  framework_view_layers(smali)!
  framework_view_shadow_colors(smali)!
  framework_child_states(smali)!

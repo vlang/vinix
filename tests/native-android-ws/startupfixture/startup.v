@@ -38,6 +38,7 @@ pub fn install(output string, resources string) ! {
  install_message_queue_probe(dir)!
  install_attachment_probe(dir)!
  install_traversal_probe(dir)!
+ install_scroll_probe(dir)!
  install_frame_bounds_probe(dir)!
  install_path_animator_probe(dir)!
  install_layout_suppression_probe(dir)!
@@ -122,6 +123,7 @@ invoke-static {}, Lorg/vinix/bootstrap/MessageQueueProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/ImageFilterProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/AttachmentProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/TouchProbe;->check(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/ScrollProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/EditorProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/WindowProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/DrawableProbe;->check()V

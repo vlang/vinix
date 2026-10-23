@@ -43,6 +43,14 @@ observers or drawing survive publication. Callback exceptions stop the frame
 before publication and retain the original Java exception. The signed fixture
 checks laid-out bounds, callback order, cancellation and drawing invalidation.
 
+Before drawing a view, WS calls its virtual `computeScroll`, including roots,
+dialogs and bitmap layers. This advances application-owned Scrollers before
+child offsets are read. `scrollTo` reports changed coordinates through
+`onScrollChanged`; unchanged coordinates do not notify or invalidate. Axis
+setters use virtual `scrollTo`, preserving subclass behavior. The signed scroll
+fixture checks callback coordinates, real Scroller-driven pixels for each layer
+type, exception identity and invalidation requesting the next WS frame.
+
 `View.setLeftTopRightBottom` applies temporary animation bounds through
 `setFrame`, without measuring or laying out children. Changed dimensions invoke
 `onSizeChanged` after all bounds are stored, and changed bounds invalidate the

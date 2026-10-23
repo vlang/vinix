@@ -59,6 +59,8 @@ return-void'
 	// children and drawing overrides all enter the same layer. Repaint each
 	// frame until WS has subtree invalidation suitable for a drawing cache.
 	text += touch_method('public final vinixDrawLayer(Landroid/graphics/Canvas;)V', '
+# Advance scroll animations before drawing either a direct or layered subtree.
+invoke-virtual {p0}, Landroid/view/View;->computeScroll()V
 iget v0, p0, Landroid/view/View;->vinixLayerType:I
 if-eqz v0, :direct
 invoke-virtual {p0}, Landroid/view/View;->getWidth()I
