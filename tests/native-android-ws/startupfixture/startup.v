@@ -53,6 +53,7 @@ pub fn install(output string, resources string) ! {
  install_render_node_outline_probe(dir)!
  install_interpolator_probe(output)!
  install_texture_transform_probe(dir)!
+ install_window_insets_probe(dir)!
  install_traversal_probe(dir)!
  install_scroll_probe(dir)!
  install_frame_bounds_probe(dir)!
@@ -145,6 +146,7 @@ invoke-static {}, Lorg/vinix/bootstrap/CanvasZProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/RenderNodeOutlineProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/InterpolatorProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/TextureViewTransformProbe;->check(Landroid/content/Context;)V
+invoke-static {}, Lorg/vinix/bootstrap/WindowInsetsProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/EglProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/ClockProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/TimeAnimatorProbe;->check()V
