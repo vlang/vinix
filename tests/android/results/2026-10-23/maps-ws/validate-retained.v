@@ -18,15 +18,18 @@ fn main() {
 		if 'input_identity_receipt_sha256' in receipt {
 			assert hash(root + receipt['input_identity_receipt']!.str())! == receipt['input_identity_receipt_sha256']!.str()
 		}
+		if 'framework_input_identity_receipt_sha256' in receipt {
+			assert hash(root + receipt['framework_input_identity_receipt']!.str())! == receipt['framework_input_identity_receipt_sha256']!.str()
+		}
 	}
-	for attempt in ['218', '219', '220', '221', '222', '223'] {
+	for attempt in ['218', '219', '220', '221', '222', '223', '225'] {
 		row := json2.decode[[]json2.Any](os.read_file(root + 'attempt' + attempt + '-results.json')!)![0].as_map()
 		serial := gzip.decompress(os.read_bytes(root + row['serial_log']!.str())!)!
 		assert sha256.sum(serial).hex() == row['serial_sha256']!.str()
 		assert row['outcome']!.str() == 'startup_failed'
 		assert !row['startup_ui_passed']!.bool() && !row['search_passed']!.bool()
 	}
-	for attempt in ['220', '221'] {
+	for attempt in ['220', '221', '225'] {
 		manifest := json2.decode[map[string]string](os.read_file(root + 'native' + attempt + '-sources.json')!)!
 		sources := json2.decode[map[string]string](gzip.decompress(os.read_bytes(root + 'attempt' + attempt + '-native-sources.json.gz')!)!.bytestr())!
 		assert sources.len == 80 && sources.len == manifest.len
@@ -53,5 +56,8 @@ fn main() {
 	}
 	manager := gzip.decompress(os.read_bytes(root + 'attempt223-AutofillManager.dex-smali.gz')!)!.bytestr()
 	assert manager.contains('.method public notifyViewVisibilityChanged(Landroid/view/View;IZ)V')
-	println('MAPS218-223-RETAINED PASS ${checked} artifact hashes;6 serial/result identities;2 native archives/160 sources;framework221 ${sources.len} exact sources + explicit1 missing-source limitation;framework222+223 204 exact sources;actualDEX getter+lock+autofill evidence')
+	alpha := json2.decode[map[string]string](gzip.decompress(os.read_bytes(root + 'attempt225-native-sources.json.gz')!)!.bytestr())!
+	assert alpha['bitmaps.v']!.contains('row_bytes: stride') && alpha['bitmaps.v']!.contains('format == 24')
+	assert alpha['glutils.v']!.contains('bitmap.alpha_only') && alpha['glutils.v']!.contains('i32(0x1906)')
+	println('MAPS218-225-RETAINED PASS ${checked} artifact hashes;7 serial/result identities;3 native archives/240 sources;framework221 ${sources.len} exact sources + explicit1 missing-source limitation;framework222+223 204 exact sources;actualDEX getter+lock+autofill and native ALPHA_8 evidence; no attempt224 boot claimed')
 }

@@ -124,3 +124,25 @@ The [input receipt](attempt223-input-identities.json) verifies the staged
 runtime hashes and all 102 exact framework sources. Fresh disassembly from the
 actual JAR includes both `AutofillManager` and `AutofillValue`. Native sources
 and inherited kernel/base identity limits remain as described above.
+
+Attempt225 uses native `592cef0d…`, adding ALPHA_8 storage, Canvas rendering
+and GL_ALPHA uploads, with the same framework223. Attempt224 was never booted;
+225 includes the reviewed correction to preserve the Java bitmap's padded row
+stride. Rendering now passes the previous bitmap configuration failure and
+throws `NoSuchMethodError` for `Canvas.enableZ()`, then the APK exits with
+code 1. The [initial capture](attempt225-google-maps-initial.png) is black;
+[Skip](attempt225-google-maps-skip.png) and
+[later](attempt225-google-maps-skip-later.png) captures show onboarding, and
+the [final capture](attempt225-google-maps-application.png) shows the exited
+APK. The same short-click input may have occurred before onboarding was
+visible; these artifacts do not establish which input triggered the failed
+transition. Map display and search remain unverified.
+
+[Attempt225 results](attempt225-results.json) and
+[runtime receipt](attempt225-runtime-identities.json) preserve that failure.
+The [input receipt](attempt225-input-identities.json) verifies actual staged
+native/framework/runtime hashes. All 80 exact native V source files were
+archived against their manifest and checked again after decoding. The staged
+framework matches the existing attempt223 receipt and its 102-source archive.
+Additional header and generated-C hashes identify build inputs without claiming
+their text is archived. Kernel/base identities remain inherited.
