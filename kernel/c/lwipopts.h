@@ -18,6 +18,12 @@
  * fragmentation header on both 64-bit targets. */
 #define IPV6_FRAG_COPYHEADER 1
 #define LWIP_ARP 1
+/* Preserve paired A/AAAA DNS queries while resolving a cold ARP neighbor.
+ * The default retains only the last packet. Bound both per-neighbor and
+ * aggregate storage; lwIP releases it on resolution, expiry or removal. */
+#define ARP_QUEUEING 1
+#define ARP_QUEUE_LEN 3
+#define MEMP_NUM_ARP_QUEUE 30
 #define LWIP_ETHERNET 1
 #define LWIP_ICMP 1
 #define LWIP_RAW 1
