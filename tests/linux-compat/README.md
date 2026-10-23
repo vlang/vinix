@@ -2238,3 +2238,21 @@ pass on both corrected kernels. Generated-C reviews confirm stack buffers and
 set lookup after unlocked usercopy. The existing IPC ceilings, SEM_UNDO,
 permissions/namespaces, remaining commands, GNU libc and foreign/32-bit
 application paths remain separate.
+
+The `semrange` case adds 4,200 checks for SETVAL's validation order. Negative
+IDs take EINVAL precedence; for nonnegative IDs, out-of-range signed low-32
+values return ERANGE before ID/index validation. The cross-product covers
+upper register bits, stale/missing IDs, signed boundaries and valid limits;
+every call also checks values/PIDs. Run
+`--cases semrange,semarray,sempid,semword,semabi` with a fresh state directory.
+
+`semrange-reference.v` accepts the same Linux-reference arguments as
+`semabi-reference.v`; `--self-test` exercises two positive and nine negative
+parser controls. Compile `semrange-evidence.v` without `-prod`, run
+`--self-test`, then `check` on the
+[retained evidence](results/2026-10-23/semrange-evidence). Identical probe ELFs
+pass on both native candidates and Linux; original kernels fail 240 checks
+each. The maintained 457/261/276/175-check suites pass on both candidates.
+Generated C confirms only scalar validation moves before the lock, with no
+allocation or lifetime changes. The broader IPC/libc and foreign application
+limits remain unqualified.

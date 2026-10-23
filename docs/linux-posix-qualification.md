@@ -11035,3 +11035,45 @@ The 32-semaphore/32-operation ceilings, SEM_UNDO, IPC permissions/namespaces,
 remaining commands/timestamps, removal-during-usercopy races, GNU libc and
 translated/32-bit paths remain outside this qualification. The broader libc,
 installation/sandbox and foreign application roadmap gates remain open.
+
+## Native semaphore SETVAL error order
+
+Native semctl rejects a negative signed ID with EINVAL first. For SETVAL and
+a nonnegative ID, it then validates the signed low-32 union value before ID
+lookup or index validation: values outside 0–32767 return ERANGE even for a
+stale/missing ID or invalid index. Valid values with those IDs/indices still
+return EINVAL. This follows `ksys_semctl` and `semctl_setval` in the retained
+[Linux v6.12 source](https://github.com/torvalds/linux/blob/v6.12/ipc/sem.c).
+
+The [retained evidence](../tests/linux-compat/results/2026-10-23/semrange-evidence/README.md)
+uses identical static musl probe ELFs on Linux 6.12.51 and native Vinix for
+both architectures. Each passes 4,200 checks; each original Vinix kernel fails
+240. The probe crosses seven ID forms, six indices, ten values and two command
+forms, including ignored upper register bits, signed boundaries, stale IDs
+and the legal 0/32767 limits. Every call also checks both values and per-index
+PIDs, so refused calls cannot silently change state. The maintained runner
+passes semrange 4,200, semarray 457, sempid 261, semword 276 and semabi 175 on
+each candidate kernel with four vCPUs.
+
+Production builds use isolated candidate
+`7eb399c6e8da852729a04fa52943a848eb1b6c92`, based directly on
+`f7db726bbba470e3b4746a90197a8b3958b62a78`. Before/after build input hashes
+match. The integrated semaphore source SHA-256 is
+`0ee9007d431ac0f225a59e391af2d379dcbb6380c6d6da813f0f2f1fa9adaab1`.
+Generated C confirms negative-ID validation before range validation before
+locking. From the first lock onward, it matches the original function except
+for removing the old range-error branch and its unlock. There is no new
+allocation, usercopy, ownership or object lifetime.
+
+The portable V evidence checker verifies hashes, compile/build identities,
+ELF architectures, exact summaries, the same probe on all three kernels,
+maintained regressions and generated-C review. Nine negative controls pass;
+the Linux parser separately passes two positive and nine negative controls.
+Unsuccessful compilation/review attempts are retained with their statuses.
+Large media and external tools have explicit pins; the completion receipt
+binds the audit to the manifest and checked source files.
+
+The existing set/vector ceilings, SEM_UNDO, IPC permissions/namespaces,
+remaining commands/timestamps, GNU libc and translated/32-bit paths remain
+outside this qualification. The broader libc, installation/sandbox and foreign
+application gates remain open.

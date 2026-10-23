@@ -1722,6 +1722,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Remaining IPC/libc and foreign paths stay explicit.
   See [the array receipts](docs/linux-posix-qualification.md#native-semaphore-array-controls).
 
+- [x] Match native semaphore SETVAL error precedence: reject negative IDs
+  first, then invalid signed low-32 values before ID lookup/index validation.
+  Qualify 4,200 state/error checks against identical Linux ELFs on both
+  architectures; originals fail 240 each. Repeat the maintained
+  457/261/276/175-check semaphore suites and retain evidence and limits.
+  See [the SETVAL receipts](docs/linux-posix-qualification.md#native-semaphore-setval-error-order).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
