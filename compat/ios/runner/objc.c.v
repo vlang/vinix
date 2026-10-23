@@ -129,6 +129,9 @@ mut:
 	date_formatter &FoundationDateFormatter = unsafe { nil }
 	predicate &FoundationPredicate = unsafe { nil }
 	index_set &FoundationIndexSet = unsafe { nil }
+	url_query_item_owned bool
+	url_query_item_initialized bool
+	url_query_item_initializing bool
 	method_signature &FoundationMethodSignature = unsafe { nil }
 	thread &FoundationThread = unsafe { nil }
 	auth_owned bool
@@ -514,7 +517,7 @@ fn objc_start() {
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSOperation', 'NSInvocationOperation', 'NSInvocation', 'NSMethodSignature', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
-        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
+        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLQueryItem', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
         'UIScreenEdgePanGestureRecognizer', 'UISelectionFeedbackGenerator', 'CADisplayLink',
@@ -607,6 +610,7 @@ fn objc_start() {
 			'NSDateFormatter' { u32(56) }
 			'NSPredicate' { u32(16) }
 			'NSIndexSet', 'NSMutableIndexSet' { u32(32) }
+			'NSURLQueryItem' { u32(24) }
 			'NSStream' { u32(8) }
 			'NSInputStream' { u32(136) }
 			'NSAutoreleasePool' { u32(40) }
@@ -671,6 +675,7 @@ fn objc_start() {
 	ns_date_formatter_metadata()
 	ns_predicate_metadata()
 	ns_index_set_metadata()
+	ns_url_query_item_metadata()
 	ns_keyed_archiver_metadata()
 	ns_keyed_unarchiver_metadata()
 	sort_descriptor_metadata()
@@ -724,6 +729,7 @@ fn objc_allocate(cls u64) u64 {
 	ns_date_formatter_require_class(cls)
 	ns_predicate_require_class(cls)
 	ns_index_set_require_class(cls)
+	ns_url_query_item_require_class(cls)
 	allocation_class := ns_date_allocation_class(ns_uuid_allocation_class(cls))
 	objc_initialize(allocation_class)
 	info := ios_runtime.classes[allocation_class] or { panic('iOS: allocation of an unknown class') }
@@ -824,6 +830,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).date_owned { ns_date_initialize(object, cf_absolute_time()); return object }
 	if obj_header(object).date_formatter != unsafe { nil } { ns_date_formatter_initialize(object); return object }
 	if obj_header(object).index_set != unsafe { nil } { return ns_index_set_initialize(object, 0, 0) }
+	if obj_header(object).url_query_item_owned { return ns_url_query_item_initialize(object, 0, 0) }
 	if obj_header(object).mutable_string_owned { mutable_string_initialize(object, ''); return object }
 	if ns_timezone_family(cls) { panic('iOS: default timezone construction is not implemented') }
 	if obj_header(object).input_stream_owned { panic('iOS: input stream requires designated construction') }

@@ -18104,24 +18104,83 @@ and their serial/configuration hashes. Owned VM payloads are retired, scratch
 directories are empty and the owned RAM disk is detached. These pins do not
 cover the full host dynamic runtime closure.
 
-The launch probe now stops at `_OBJC_CLASS_$_NSURLQueryItem`, before application
-entry. Fortnite remains unplayable.
+The index-set increment's launch probe stopped at
+`_OBJC_CLASS_$_NSURLQueryItem`, before application entry.
 
 ```sh
 v run tests/ios/native-checks.v build-index-set
 ```
+
+V supplies bounded `NSURLQueryItem` support with Apple's measured public
+24-byte instance layout and `_name`/`_value` ivar metadata. Static inspection of
+this Fortnite executable finds AppsFlyer constructing items with
+`initWithName:value:` and reading `name`/`value`; Firebase callers also use
+`queryItemWithName:value:`. These callers additionally require `NSURLComponents`
+`queryItems`/`setQueryItems:`, which remain unsupported. The inspection does not
+establish execution of those paths.
+
+The profile supports the factory, designated and default initializers, getters,
+and `copy`/`copyWithZone:nil`. Nil names become empty strings; nil values remain
+distinct from empty strings. Both strings are copied, preserving Unicode,
+embedded NUL and query punctuation without URL escaping. Copies are distinct
+owned items, matching the measured Foundation behavior. Inputs are limited to
+65,536 UTF-8 bytes each and must be built-in immutable strings, initialized
+mutable strings or validated image string constants. Raw items require
+initialization. Reinitialization, custom subclasses and string implementations,
+nonzero copy zones, mutation, coding, equality, hashing and descriptions fail
+explicitly. These limits do not claim that Apple rejects the same operations.
+
+Both input byte snapshots precede allocation callbacks. Copying also snapshots
+before destination allocation, allowing constructors to release the source.
+Initialization pins its receiver across string constructors and validates its
+allocation class and storage again before publication. Explicit destruction
+during initialization and callbacks consuming the receiver's last external
+reference are rejected. Failed constructors retire temporary strings and
+receiver ownership for allocated objects; failed designated initialization on
+caller-owned storage is rejected before consuming its receiver. Destruction
+releases the two owned strings even after an isa change and clears public ivar
+slots. Caller-owned storage requires explicit `objc_destructInstance`, which
+preserves its allocation; final `objc_release` does not support caller storage.
+Concurrent runtime shutdown is outside the profile.
+
+```sh
+v run tests/ios/native-checks.v build-url-query-item
+```
+
+The shared Foundation fixture checks public metadata, default construction,
+nil/empty values, literal UTF-8 and embedded NUL, the input byte boundary,
+mutable input snapshots, distinct copies and retained getter lifetimes. Runtime
+checks add image constants, joined-worker constructors releasing inputs or copy
+sources, failed item/string constructors, guarded caller storage, 32 isa-change
+disposal paths, two drained runtime cycles and 31 explicit rejection cases.
+The host fixture passes with ASan+UBSan in normal and deterministic Swift hashing
+modes; leak detection is disabled. Explicit object/live/weak counts return to
+zero after each runtime cycle.
+
+Two independent lifetime reviews cover the final generated C. The evidence
+under `build/ios/fortnite/query-item-checks` pins 19,387 source, toolchain,
+runtime and review inputs, and verifies 94 native/static artifacts including six
+retained historical or unsupported nonzero statuses. The final proof verifies
+both sanitizer runs, five binary/generated-C archive pairs, the host dSYM and
+all four ARM64 phases with serial/configuration hashes. Owned VM payloads are
+retired, scratch directories are empty and the owned RAM disk is detached.
+These pins do not cover the full host dynamic runtime closure.
+
+The ARM64 fixture passes. Fortnite's launch probe now resolves
+`NSURLQueryItem` and stops at `_OBJC_CLASS_$_NSMutableCharacterSet`, before
+application entry; the process still exits 1.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,073 | 88 | 78 |
+| Fortnite executable | 2,074 | 87 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,913 | 91 | 114 |
+| All images | 2,914 | 90 | 114 |
 
-The C++/GLES/Text variant reports 2,927 resolved imports, 77 unresolved strong
+The C++/GLES/Text variant reports 2,928 resolved imports, 76 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -18176,6 +18235,7 @@ mutable strings use `mutable-string-checks`, session configurations use
 invocations use `invocation-checks`, invocation operations use
 `invocation-operation-checks`, date formatters use `date-formatter-checks`,
 predicates use `predicate-checks`, index sets use `index-set-checks`,
+URL query items use `url-query-item-checks`,
 keyed archives use `keyed-archiver-checks`, keyed unarchives use
 `keyed-unarchiver-checks`,
 CoreFoundation dictionaries use
@@ -18191,8 +18251,8 @@ mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
 URL session, session configuration, recursive lock, invocation, invocation
-operation, date formatter, predicate, index set, keyed archive, keyed unarchive, sort
-descriptor, regular expression, mutable string,
+operation, date formatter, predicate, index set, URL query item, keyed archive,
+keyed unarchive, sort descriptor, regular expression, mutable string,
 CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String
