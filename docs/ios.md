@@ -17728,9 +17728,8 @@ profile, not Foundation's general archive behavior.
 
 Fortnite's first preserved consumer archives an AppsFlyer dictionary for
 NSUserDefaults. Other consumers archive arrays of strings and a property-list
-dictionary. Custom Firebase/GoogleTransport coding and the paired
-NSKeyedUnarchiver paths still need implementation; resolving this class does not
-establish that those application workflows work.
+dictionary. Custom Firebase/GoogleTransport coding still needs implementation;
+resolving this class does not establish that those application workflows work.
 
 The shared corpus covers 33 graphs through all three factory modes and passes in
 the ARM64 Vinix guest. Both macOS ASan+UBSan runs pass with ordinary and
@@ -17754,11 +17753,89 @@ inputs, not the full host dynamic runtime closure.
 The final proof also verifies the guest serial/configuration hashes, retired
 owned VMs, empty scratch directories and detached owned RAM disk.
 
-The launch probe now stops at `_OBJC_CLASS_$_NSKeyedUnarchiver`, before application
-entry. Fortnite remains unplayable.
+The writer's launch probe stopped at `_OBJC_CLASS_$_NSKeyedUnarchiver`, before
+application entry. The reader below continues from that blocker.
 
 ```sh
 v run tests/ios/native-checks.v build-keyed-archiver
+```
+
+V also supplies the `NSKeyedUnarchiver` class and its four in-memory factories:
+`unarchiveObjectWithData:`, `unarchiveTopLevelObjectWithData:error:`,
+`unarchivedObjectOfClass:fromData:error:` and
+`unarchivedObjectOfClasses:fromData:error:`. Measured Apple metadata gives the
+class an `NSCoder` superclass, 144-byte instance size and 17 ivars. Instance
+construction remains outside the supported profile.
+
+The reader accepts binary archives from the bounded writer and Apple Foundation
+for strings, numbers, data, dates, null, arrays and string-keyed dictionaries,
+including the supported mutable records. It keeps binary-plist references
+separate from archive UIDs, preserves shared object identity and validates the
+entire reachable graph before constructing Foundation objects. Class-restricted
+decoding accepts a class record when its class or a superclass appears in the
+supplied set. Primitive plist strings, numbers and data bypass that check,
+matching measured Foundation behavior. An allowed container class alone does
+not authorize other class records nested inside it. Dictionary keys copy mutable
+string records, so mutating a shared value cannot change the key.
+
+Successful decoding leaves NSError outputs untouched. An archived nil root
+returns nil, with `NSCocoaErrorDomain` code 4865 for error-bearing factories.
+Malformed binary input returns nil; the top-level legacy factory clears its
+error output, while the modern class-restricted factories report code 4864.
+Supported graph validation failures return nil, with an NSError for error-bearing
+factories. Error outputs may be null. Nil input data and nil allowed-class sets
+follow those same rules; the single-class factory requires a class.
+
+The reader retains and copies known NSData storage under the runtime lock, then
+parses, validates and constructs outside it. No archive invokes application
+coding methods or supplies a runtime class lookup. Each decoded UID has an
+owned temporary reference; containers and the returned root retain their own
+references before temporary storage is freed. Construction failure releases
+partial graphs. NSNull cache publication checks successful allocation and runs
+constructors outside the runtime lock.
+
+This remains a strict binary-only profile: XML archives, custom coding and class
+mapping, replacement objects, cycles, raw CF storage, file/stream APIs and
+instance coders are unsupported. The envelope and builtin class chains are
+validated more strictly than Foundation. Limits remain 16 MiB of input and
+charged parsed storage, 65,536 plist nodes and archive objects, and 64 nesting
+levels, including paths through shared references. Concurrent input mutation
+and concurrent runtime shutdown are outside the profile.
+
+The preserved AppsFlyer consumers request NSNull, NSString, NSNumber and
+NSDictionary and require a dictionary root. A later C++ consumer requests an
+NSArray of strings. Those builtin graph shapes fit this profile; custom
+AFSDK/Firebase coding and GoogleUtilities instance-coder fallback remain
+unsupported. Import resolution alone does not show those consumers executed.
+
+The shared checks cover 33 graphs from captured Apple archives and freshly
+written archives through all four factories: 264 graph/source/factory cases on
+both Apple Foundation and Vinix. The host ASan+UBSan runs pass with ordinary and
+deterministic Swift hashing. Checks cover scalar bits, Unicode and embedded NUL,
+mutable records, shared identity, copied dictionary keys, recursive allowlists,
+NSError output rules and retained result lifetime. Runtime-only checks add
+compact integers, 30 malformed/cycle/depth archives, constructor callbacks that
+retire the input, partial graph allocation failure and 39 explicit rejections.
+Each of two runtime cycles verifies the sole cached NSNull owner before shutdown
+and zero live objects after it. The ARM64 guest passes the same fixture. Host
+leak detection was disabled.
+
+The independent generated-C review reports no unresolved ownership, locking or
+ABI issue within this profile. Evidence is preserved under
+`build/ios/fortnite/keyed-unarchiver-checks`: the final proof verifies 21,411
+unchanged source/toolchain/runtime inputs, 629 sealed native/static evidence
+files, five binary/generated-C archive pairs and the host dSYM. It also verifies
+both preserved failed host fixture attempts, the superseded native seals,
+four ARM64 phases, guest serial/configuration hashes, retired owned VMs, empty
+scratch directories and the detached owned RAM disk. The native evidence keeps
+11 expected historical nonzero statuses for unsupported or malformed cases.
+These hashes cover declared inputs, not the full host dynamic runtime closure.
+
+The launch probe now stops at `_OBJC_CLASS_$_NSInvocation`, before application
+entry. Fortnite remains unplayable.
+
+```sh
+v run tests/ios/native-checks.v build-keyed-unarchiver
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -17766,12 +17843,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,067 | 94 | 78 |
+| Fortnite executable | 2,068 | 93 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,907 | 97 | 114 |
+| All images | 2,908 | 96 | 114 |
 
-The C++/GLES/Text variant reports 2,921 resolved imports, 83 unresolved strong
+The C++/GLES/Text variant reports 2,922 resolved imports, 82 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -17824,7 +17901,7 @@ base URL sessions use `url-session-checks`, sort descriptors use
 mutable strings use `mutable-string-checks`, session configurations use
 `session-configuration-checks`, recursive locks use `recursive-lock-checks`,
 invocation operations use `invocation-operation-checks`, keyed archives use
-`keyed-archiver-checks`,
+`keyed-archiver-checks`, keyed unarchives use `keyed-unarchiver-checks`,
 CoreFoundation dictionaries use
 `cf-dictionary-checks`, constant integers use
 `constant-integer-checks`, constant arrays use `constant-array-checks`, supplied
@@ -17838,7 +17915,7 @@ mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
 URL session, session configuration, recursive lock, invocation operation, keyed
-archive, sort
+archive, keyed unarchive, sort
 descriptor, regular expression, mutable string,
 CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,

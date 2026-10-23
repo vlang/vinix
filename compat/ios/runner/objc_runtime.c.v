@@ -90,6 +90,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := layout_builtin_types(info.name, info.meta, selector) { return types }
 	if types := json_builtin_types(info.name, info.meta, selector) { return types }
 	if types := ns_keyed_archiver_types(info.name, info.meta, selector) { return types }
+	if types := ns_keyed_unarchiver_types(info.name, info.meta, selector) { return types }
 	if types := ns_condition_builtin_types(info.name, info.meta, selector) { return types }
 	if types := ns_recursive_lock_types(info.name, info.meta, selector) { return types }
 	if types := ns_operation_types(info.name, info.meta, selector) { return types }
@@ -150,6 +151,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name == 'NSURLSessionConfiguration' && url_session_configuration_unsupported(name) { return 0 }
 		if info.name == 'NSRecursiveLock' && ns_recursive_lock_unsupported(name) { return 0 }
 		if info.name in ['NSCoder', 'NSKeyedArchiver']! && ns_keyed_archiver_unsupported(name) { return 0 }
+		if info.name == 'NSKeyedUnarchiver' && ns_keyed_unarchiver_unsupported(name) { return 0 }
 		if info.name in ['NSOperation', 'NSInvocationOperation']! && ns_operation_unsupported(name) { return 0 }
 		if info.name == 'NSSortDescriptor' && sort_descriptor_unsupported(name) { return 0 }
 		if info.name == 'NSMutableString' && mutable_string_unsupported(name) { return 0 }

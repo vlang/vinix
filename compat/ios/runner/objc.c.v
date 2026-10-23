@@ -501,7 +501,7 @@ fn objc_start() {
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
-		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSRecursiveLock', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSRecursiveLock', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
@@ -531,7 +531,7 @@ fn objc_start() {
 			'NSInputStream' { ios_runtime.names['NSStream'] }
 			'NSNumber', 'NSConcreteValue' { ios_runtime.names['NSValue'] }
 			'NSInvocationOperation' { ios_runtime.names['NSOperation'] }
-			'NSKeyedArchiver' { ios_runtime.names['NSCoder'] }
+			'NSKeyedArchiver', 'NSKeyedUnarchiver' { ios_runtime.names['NSCoder'] }
 			'NSConstantIntegerNumber' { ios_runtime.names['NSNumber'] }
 			'VinixRegularExpressionCheckingResult' { ios_runtime.names['NSTextCheckingResult'] }
 			'_NSUUIDBridge' { ios_runtime.names['NSUUID'] }
@@ -586,6 +586,7 @@ fn objc_start() {
 			'NSInvocationOperation' { u32(264) }
 			'NSCoder' { u32(8) }
 			'NSKeyedArchiver' { u32(136) }
+			'NSKeyedUnarchiver' { u32(144) }
 			'ASWebAuthenticationSession' { u32(136) }
 			'UIImageView' { u32(512) }
 			'GCKeyboard' { u32(32) }
@@ -653,6 +654,7 @@ fn objc_start() {
 	ns_recursive_lock_metadata()
 	ns_operation_metadata()
 	ns_keyed_archiver_metadata()
+	ns_keyed_unarchiver_metadata()
 	sort_descriptor_metadata()
 	regular_expression_metadata()
 	mut request_class := ios_runtime.classes[ios_runtime.names['NSURLRequest']] or { panic('iOS: missing request class') }
