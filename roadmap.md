@@ -1047,6 +1047,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     authority and real Wine/translation execution remain open.
   - [ ] Qualified isolated Wine/translation and Apple runtime catalogs, including
     ordinary-user graphical execution and their required IPC/device services.
+    The retained [translated fork regression](tests/packages/wine-translation-fork-check.md)
+    currently fails on ARM after the first fork under the ordinary UID/GID 1000
+    with split RW/RX mappings. Host arithmetic/reaping controls pass; this
+    failure keeps Wine/translation execution qualification open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.
