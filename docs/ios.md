@@ -18041,11 +18041,74 @@ and all four guests' serial/configuration hashes. The final proof verifies these
 inputs, retired VM hashes, empty owned scratch directories and the detached RAM
 disk. These pins do not cover the full host dynamic runtime closure.
 
-The launch probe now stops at `_OBJC_CLASS_$_NSMutableIndexSet`, before
-application entry. Fortnite remains unplayable.
+The predicate increment's launch probe stopped at
+`_OBJC_CLASS_$_NSMutableIndexSet`, before application entry.
 
 ```sh
 v run tests/ios/native-checks.v build-predicate
+```
+
+V supplies bounded `NSIndexSet` and `NSMutableIndexSet` implementations with
+Apple's measured 32-byte instance layouts, superclass relationship and ivar/type
+metadata. Static inspection of this Fortnite executable finds AppsFlyer's
+`+recursivelyRemoveNullsFromArray:` creating two mutable index sets, adding
+positions from a block and selecting array elements with `objectsAtIndexes:`.
+That caller also requires `NSArray enumerateObjectsUsingBlock:`, which remains
+unsupported. The inspection establishes a consumer, not execution of that path.
+
+The profile supports empty, single-index and range factories/initializers;
+sorted unique indices; count, membership, first/last and four neighbor queries;
+single-index/range insertion and removal; clearing; immutable/mutable copies;
+and ordered `objectsAtIndexes:` selections on built-in object arrays. An immutable
+copy retains its identity, while copies of mutable sets and mutable copies own
+independent snapshots. Array selection retains only the selected elements and
+returns an autoreleased immutable array in ascending index order.
+Source object arrays are limited to 65,536 elements.
+
+Sets contain at most 65,536 indices in the domain `0..0x7ffffffffffffffe`.
+`NSNotFound` is `0x7fffffffffffffff`. Empty ranges accept any location; nonempty
+ranges must stay within the supported domain. Membership of an out-of-domain
+index is false and removing that single index is a no-op. Neighbor queries at
+or above `NSNotFound` fail explicitly. This bounded profile rejects Apple's
+measured wrapping behavior at unsigned extremes. Raw allocated sets require
+initialization, and repeated initialization fails explicitly. Coding, equality,
+hashing, descriptions, bulk set operations, index shifts, block enumeration,
+filtering and custom subclasses remain unsupported.
+
+Owned sidecars hold index storage without relying on Foundation's private class
+cluster representation. Copying snapshots integers before destination allocation;
+selection snapshots retained elements. Application constructors run outside the
+runtime lock and may release the source and index set. Publication validates
+fresh destination storage, and failed constructors retire owned state. Storage
+checks use the allocation class; changing isa does not grant access to a sidecar
+or prevent its disposal. Caller-supplied object bytes remain caller-owned.
+Concurrent runtime shutdown is outside the profile.
+
+The shared V fixture passes against Apple Foundation and under host ASan+UBSan
+with ordinary and deterministic Swift hashing. It checks metadata, range ABI,
+sorted uniqueness, independent copies, ordered array selection and retained
+element lifetimes. Runtime checks add joined-worker constructors releasing both
+inputs, constructor rollback, guarded caller storage, 32 isa replacements,
+read-only image arrays and two drained runtime cycles. All 35 child cases require
+explicit rejection without sanitizer diagnostics. Host leak detection is
+disabled. Two independent reviews of the exact generated C found no lifetime
+issues. The ARM64 guest passes the same fixture and all 35 rejection cases.
+Probe and both import-audit guests complete with Fortnite's expected process
+exit 1 before application entry.
+
+Evidence under `build/ios/fortnite/index-set-checks` pins 19,544 declared
+source/toolchain/runtime inputs and 278 native/static artifacts, including 23
+preserved historical nonzero statuses. The final proof verifies both sanitizer
+runs, five binary/generated-C archive pairs, the host dSYM, all four ARM64 phases
+and their serial/configuration hashes. Owned VM payloads are retired, scratch
+directories are empty and the owned RAM disk is detached. These pins do not
+cover the full host dynamic runtime closure.
+
+The launch probe now stops at `_OBJC_CLASS_$_NSURLQueryItem`, before application
+entry. Fortnite remains unplayable.
+
+```sh
+v run tests/ios/native-checks.v build-index-set
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -18053,12 +18116,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,072 | 89 | 78 |
+| Fortnite executable | 2,073 | 88 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,912 | 92 | 114 |
+| All images | 2,913 | 91 | 114 |
 
-The C++/GLES/Text variant reports 2,926 resolved imports, 78 unresolved strong
+The C++/GLES/Text variant reports 2,927 resolved imports, 77 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -18112,7 +18175,7 @@ mutable strings use `mutable-string-checks`, session configurations use
 `session-configuration-checks`, recursive locks use `recursive-lock-checks`,
 invocations use `invocation-checks`, invocation operations use
 `invocation-operation-checks`, date formatters use `date-formatter-checks`,
-predicates use `predicate-checks`,
+predicates use `predicate-checks`, index sets use `index-set-checks`,
 keyed archives use `keyed-archiver-checks`, keyed unarchives use
 `keyed-unarchiver-checks`,
 CoreFoundation dictionaries use
@@ -18128,7 +18191,7 @@ mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
 URL session, session configuration, recursive lock, invocation, invocation
-operation, date formatter, predicate, keyed archive, keyed unarchive, sort
+operation, date formatter, predicate, index set, keyed archive, keyed unarchive, sort
 descriptor, regular expression, mutable string,
 CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,

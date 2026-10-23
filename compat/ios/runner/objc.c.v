@@ -128,6 +128,7 @@ mut:
 	invocation &FoundationInvocation = unsafe { nil }
 	date_formatter &FoundationDateFormatter = unsafe { nil }
 	predicate &FoundationPredicate = unsafe { nil }
+	index_set &FoundationIndexSet = unsafe { nil }
 	method_signature &FoundationMethodSignature = unsafe { nil }
 	thread &FoundationThread = unsafe { nil }
 	auth_owned bool
@@ -506,7 +507,7 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'NSPredicate', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
+		'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSRecursiveLock', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
@@ -554,6 +555,7 @@ fn objc_start() {
 			'UIAccessibilityElement' { ios_runtime.names['UIResponder'] }
 			'NSMutableArray', 'NSConstantArray', 'WKNSArray' { ios_runtime.names['NSArray'] }
 			'NSMutableSet' { ios_runtime.names['NSSet'] }
+			'NSMutableIndexSet' { ios_runtime.names['NSIndexSet'] }
 			'NSMutableString' { ios_runtime.names['NSString'] }
 			'NSMutableDictionary', 'NSConstantDictionary' { ios_runtime.names['NSDictionary'] }
 			'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { ios_runtime.names['NSLayoutAnchor'] }
@@ -604,6 +606,7 @@ fn objc_start() {
 			'NSDate', 'VinixCFDate', 'NSTimeZone', 'NSLocale', 'NSFormatter' { u32(8) }
 			'NSDateFormatter' { u32(56) }
 			'NSPredicate' { u32(16) }
+			'NSIndexSet', 'NSMutableIndexSet' { u32(32) }
 			'NSStream' { u32(8) }
 			'NSInputStream' { u32(136) }
 			'NSAutoreleasePool' { u32(40) }
@@ -667,6 +670,7 @@ fn objc_start() {
 	ns_invocation_metadata()
 	ns_date_formatter_metadata()
 	ns_predicate_metadata()
+	ns_index_set_metadata()
 	ns_keyed_archiver_metadata()
 	ns_keyed_unarchiver_metadata()
 	sort_descriptor_metadata()
@@ -719,6 +723,7 @@ fn objc_allocate(cls u64) u64 {
 	ns_timezone_require_class(cls)
 	ns_date_formatter_require_class(cls)
 	ns_predicate_require_class(cls)
+	ns_index_set_require_class(cls)
 	allocation_class := ns_date_allocation_class(ns_uuid_allocation_class(cls))
 	objc_initialize(allocation_class)
 	info := ios_runtime.classes[allocation_class] or { panic('iOS: allocation of an unknown class') }
@@ -818,6 +823,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).uuid_owned { ns_uuid_initialize(object, 0, true); return object }
 	if obj_header(object).date_owned { ns_date_initialize(object, cf_absolute_time()); return object }
 	if obj_header(object).date_formatter != unsafe { nil } { ns_date_formatter_initialize(object); return object }
+	if obj_header(object).index_set != unsafe { nil } { return ns_index_set_initialize(object, 0, 0) }
 	if obj_header(object).mutable_string_owned { mutable_string_initialize(object, ''); return object }
 	if ns_timezone_family(cls) { panic('iOS: default timezone construction is not implemented') }
 	if obj_header(object).input_stream_owned { panic('iOS: input stream requires designated construction') }
