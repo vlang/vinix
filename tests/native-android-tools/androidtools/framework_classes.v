@@ -111,6 +111,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_egl(smali)!
  framework_glutils(smali)!
  framework_view_attachment(smali)!
+ framework_content_capture(smali)!
  framework_view_traversal(smali)!
  framework_view_frame_bounds(smali)!
  framework_layout_listeners(smali)!

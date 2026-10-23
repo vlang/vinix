@@ -43,6 +43,7 @@ pub fn install(output string, resources string) ! {
  install_time_animator_probe(dir)!
  install_message_queue_probe(dir)!
  install_attachment_probe(dir)!
+ install_content_capture_probe(dir)!
  install_traversal_probe(dir)!
  install_scroll_probe(dir)!
  install_frame_bounds_probe(dir)!
@@ -135,6 +136,7 @@ invoke-static {}, Lorg/vinix/bootstrap/TimeAnimatorProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/MessageQueueProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/ImageFilterProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/AttachmentProbe;->check(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/ContentCaptureProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/TouchProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/TranslationProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/ClippingProbe;->check(Landroid/content/Context;)V
