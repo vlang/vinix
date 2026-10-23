@@ -194,7 +194,10 @@ fn destroy_unlocked(set &Set) {
     unsafe { free(set) }
 }
 
-pub fn syscall_semget(_ voidptr, key i32, nsems int, flags int) (u64, u64) {
+pub fn syscall_semget(_ voidptr, key i32, nsems i32, flags i32) (u64, u64) {
+    // Linux imports these registers as signed 32-bit ints and validates the
+    // count before key lookup, including queries and exclusive creation.
+    if nsems < 0 || nsems > max_sems { return errno.err, errno.einval }
     sets_lock.acquire()
     if key != ipc_private {
         existing := find_key_unlocked(key)
@@ -216,7 +219,7 @@ pub fn syscall_semget(_ voidptr, key i32, nsems int, flags int) (u64, u64) {
             return errno.err, errno.enoent
         }
     }
-    if nsems <= 0 || nsems > max_sems {
+    if nsems == 0 {
         sets_lock.release()
         return errno.err, errno.einval
     }
@@ -225,7 +228,7 @@ pub fn syscall_semget(_ voidptr, key i32, nsems int, flags int) (u64, u64) {
     id := next_id
     next_id++
     // destroy_unlocked() frees it with the set.
-    values := []int{len: nsems} @[freed]
+    values := []int{len: int(nsems)} @[freed]
     // Nothing slices the list, so growing can free the old block.
     sets.flags |= .noslices
     sets << &Set{
@@ -238,9 +241,9 @@ pub fn syscall_semget(_ voidptr, key i32, nsems int, flags int) (u64, u64) {
     return u64(id), 0
 }
 
-pub fn syscall_semctl(_ voidptr, id int, number int, command int, argument u64) (u64, u64) {
+pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) (u64, u64) {
     sets_lock.acquire()
-    mut set := find_id_unlocked(id)
+    mut set := find_id_unlocked(int(id))
     if set == unsafe { nil } || set.removed {
         sets_lock.release()
         return errno.err, errno.einval
@@ -305,7 +308,7 @@ pub fn syscall_semctl(_ voidptr, id int, number int, command int, argument u64) 
     }
 }
 
-fn operate(id int, user_operations u64, count u32, timeout_address u64) (u64, u64) {
+fn operate(id i32, user_operations u64, count u32, timeout_address u64) (u64, u64) {
     // semtimedop imports its timeout before checking the vector. Duration
     // validation follows the vector copy, matching Linux's error precedence.
     mut duration := time.TimeSpec{}
@@ -337,7 +340,7 @@ fn operate(id int, user_operations u64, count u32, timeout_address u64) (u64, u6
     }
 
     sets_lock.acquire()
-    mut set := find_id_unlocked(id)
+    mut set := find_id_unlocked(int(id))
     if set == unsafe { nil } || set.removed {
         sets_lock.release()
         return errno.err, errno.einval
@@ -418,10 +421,10 @@ fn operate(id int, user_operations u64, count u32, timeout_address u64) (u64, u6
     return 0, 0
 }
 
-pub fn syscall_semop(_ voidptr, id int, operations u64, count u32) (u64, u64) {
+pub fn syscall_semop(_ voidptr, id i32, operations u64, count u32) (u64, u64) {
     return operate(id, operations, count, 0)
 }
 
-pub fn syscall_semtimedop(_ voidptr, id int, operations u64, count u32, timeout u64) (u64, u64) {
+pub fn syscall_semtimedop(_ voidptr, id i32, operations u64, count u32, timeout u64) (u64, u64) {
     return operate(id, operations, count, timeout)
 }

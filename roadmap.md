@@ -1701,6 +1701,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   The 32-operation ceiling and remaining IPC semantics stay explicit.
   See [the ABI receipts](docs/linux-posix-qualification.md#native-semaphore-argument-abi).
 
+- [x] Match signed native semaphore IDs, semget counts/flags and semctl
+  indices/commands, including upper register bits and count validation before
+  key lookup. Qualify 276 controls against identical Linux ELFs on both
+  architectures and repeat the existing 175-check ABI regression on the same
+  candidate kernels. Set-size and remaining IPC limits stay explicit.
+  See [the signed-argument receipts](docs/linux-posix-qualification.md#native-semaphore-signed-integer-arguments).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

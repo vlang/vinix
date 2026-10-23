@@ -2187,3 +2187,18 @@ toolchains and boot media have explicit content pins.
 Vinix still limits each vector to 32 operations; larger vectors return E2BIG.
 These tests do not qualify SEM_UNDO, permissions/namespaces, per-index GETPID,
 GNU libc or foreign/32-bit application paths.
+
+The `semword` case adds 276 native ELF64 checks for signed 32-bit semaphore
+IDs, semget counts/flags and semctl indices/commands. It varies upper register
+bits independently, checks negative and excessive counts before key lookup,
+and verifies real value changes and removal. Run `--cases semword,semabi` with
+a fresh state directory. Exact passing summaries and PASS markers are required.
+
+`semword-reference.v` accepts the same Linux-reference arguments as
+`semabi-reference.v`; its `--self-test` exercises the result parser. Compile
+`semword-evidence.v` without `-prod`, run `--self-test`, then `check` on the
+[retained evidence](results/2026-10-23/semword-evidence). Both native kernels
+and identical Linux probe ELFs pass; original kernels fail 89 checks each.
+The existing 175-check ABI case also passes on both candidate kernels.
+Set size remains limited to 32 semaphores. The broader IPC and application
+limits listed above remain unqualified.

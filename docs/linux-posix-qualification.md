@@ -10909,3 +10909,44 @@ limit remains 32, below the Linux reference limit. SEM_UNDO is accepted without
 undo adjustments; IPC permission enforcement, namespace isolation, per-index
 GETPID, GNU libc and translated/32-bit paths remain unqualified. The broader
 libc, installation/sandbox and foreign-application roadmap gates remain open.
+
+## Native semaphore signed integer arguments
+
+Native semaphore IDs, semget counts/flags and semctl indices/commands now use
+signed low 32-bit words. Upper register bits are ignored. Negative or excessive
+semget counts return EINVAL before key lookup, including existing keys and
+IPC_EXCL conflicts. The error precedence is measured against Linux 6.12.51.
+
+The [retained evidence](../tests/linux-compat/results/2026-10-23/semword-evidence/README.md)
+contains 276-check native and Linux runs on each architecture with identical
+static musl probe ELFs. Both original kernels fail exactly 89 checks; both
+corrected kernels and Linux references pass all 276. Controls cover private,
+existing and absent keys, zero/negative/excessive counts, high register words,
+invalid IDs/indices/commands, real value mutations, removal and unchanged
+canaries after refusal. The maintained runner also passes the existing
+175-check argument/import regression on both candidate kernels.
+
+Production builds use isolated candidate
+`955b4af34bd668722631cef7926be5a0a22cec1e`, based directly on
+`51451adf1564de86e531b1de5a70f558d9bdb9b3`. The containing repository commit
+integrates exact semaphore source SHA-256
+`0e4a76e878aeb15a498e856dd8b8c7e32fa36fd35ff401a941f2152278270c9f`.
+Before/after input maps are identical. Generated C verifies argument widths
+and prelookup count validation on both architectures. There are no allocation
+or lifetime changes; semaphore queue ownership and teardown remain unchanged.
+
+The portable checker binds manifest hashes, probe compilation, architecture,
+build identity, baseline failures, Linux reference, native runs and maintained
+regressions. The [completion receipt](../tests/linux-compat/results/2026-10-23/semword-evidence/completion/receipt.json)
+pins the manifest, checker and successful audit command/status.
+Parser controls include six malformed serial results and a wrong
+ELF architecture; the Linux controller separately passes two positive and nine
+negative controls. Exploratory 240-check runs and unsuccessful compilations
+remain separately retained. External toolchains and large boot media have
+explicit content pins. This qualifies the isolated change rather than other
+sessions' changes to the shared checkout.
+
+Vinix still limits sets to 32 semaphores and vectors to 32 operations. SEM_UNDO,
+permissions/namespaces, per-index GETPID, GNU libc and translated/32-bit paths
+remain unqualified. The broader libc, installation/sandbox and foreign
+application roadmap gates remain open.
