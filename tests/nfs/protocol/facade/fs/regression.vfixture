@@ -66,6 +66,9 @@ pub fn contract_tests() {
 	// Compare interface-box identity, not recursive concrete-value equality.
 	assert voidptr(opened) == voidptr(r.box) && rig.procedure == 1
 	mut byte := u8(0)
+	// Keep the production read method reachable under V backends that prune
+	// unused interface methods; a zero-length read still refreshes attributes.
+	assert r.read(unsafe { nil }, unsafe { &byte }, 0, 0) or { i64(-1) } == 0
 	r.write(unsafe { nil }, unsafe { &byte }, 0, 1) or {}
 	assert rig.procedure == 7 && backend.client.fault == 30 && !backend.client.dead
 	backend.client.ro = true
