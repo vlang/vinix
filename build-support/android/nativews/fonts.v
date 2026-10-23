@@ -170,6 +170,32 @@ fn ws_typeface_resolve(e voidptr, face voidptr) i64 {
  }
 }
 
+fn ws_font_u16(data &u8, at i64) i32 {
+ unsafe { return (i32(data[at]) << 8) | i32(data[at + 1]) }
+}
+
+// Read static-face style metadata with bounds independent of stb's parser.
+// OS/2 usWeightClass and fsSelection describe the actual resource font, rather
+// than assuming every loaded face is regular. Missing tables keep defaults.
+fn ws_font_style(e voidptr, face voidptr, data &u8, length i64) {
+ unsafe {
+  if length < 12 { return }
+  count := ws_font_u16(data, 4)
+  if i64(count) > (length - 12) / 16 { return }
+  for i := i32(0); i < count; i++ {
+   at := i64(12) + i64(i) * 16
+   if data[at] != 0x4f || data[at + 1] != 0x53 || data[at + 2] != 0x2f || data[at + 3] != 0x32 { continue }
+   offset := (u32(data[at + 8]) << 24) | (u32(data[at + 9]) << 16) | (u32(data[at + 10]) << 8) | u32(data[at + 11])
+   size := (u32(data[at + 12]) << 24) | (u32(data[at + 13]) << 16) | (u32(data[at + 14]) << 8) | u32(data[at + 15])
+   if size < 64 || i64(offset) > length || i64(size) > length - i64(offset) { return }
+   weight := ws_font_u16(data, i64(offset) + 4)
+   if weight >= 1 && weight <= 1000 { put_int(e, face, c'android/graphics/Typeface', c'vinixWeight', weight) }
+   put_int(e, face, c'android/graphics/Typeface', c'vinixSlant', ws_font_u16(data, i64(offset) + 62) & 1)
+   return
+  }
+ }
+}
+
 fn ws_font_load(e voidptr, assets voidptr, path voidptr) voidptr {
  unsafe {
   asset := voidptr(ws_open_asset(e, assets, path, 3))
@@ -187,6 +213,7 @@ fn ws_font_load(e voidptr, assets voidptr, path voidptr) voidptr {
   face := new_object(e, c'android/graphics/Typeface', c'()V', nil)
   if pending(e) || face == nil { ws_font_unref(font); return nil }
   ws_put_long(e, face, c'android/graphics/Typeface', c'native_instance', i64(font))
+  ws_font_style(e, face, C.Asset_getBuffer(asset, true), i64(C.Asset_getLength(asset)))
   return face
  }
 }

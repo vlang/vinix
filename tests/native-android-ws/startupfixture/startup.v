@@ -17,6 +17,7 @@ pub fn install(output string, resources string) ! {
  install_layout_listener_probe(dir)!
  install_view_layer_probe(dir)!
  install_typeface_probe(dir)!
+ install_font_builders_probe(dir)!
  install_text_metrics_probe(dir)!
  install_size_span_probe(dir)!
  install_character_style_probe(dir)!
@@ -67,6 +68,8 @@ pub fn install(output string, resources string) ! {
  install_font_metrics_probe(dir, runtime)!
  install_child_states_probe(dir)!
  os.cp(runtime + '/usr/share/fonts/dejavu/DejaVuSansMono.ttf', output + '/res/font/fixture_font.ttf')!
+ os.cp(runtime + '/usr/share/fonts/dejavu/DejaVuSansMono-Bold.ttf', output + '/res/font/fixture_bold.ttf')!
+ os.cp(runtime + '/usr/share/fonts/dejavu/DejaVuSansMono-Oblique.ttf', output + '/res/font/fixture_italic.ttf')!
  os.write_file(output + '/res/font/fixture_family.xml', '<font-family xmlns:android="http://schemas.android.com/apk/res/android"><font android:font="@font/fixture_font" android:fontWeight="400"/></font-family>')!
  os.write_file(output + '/res/font/fixture_fallback.xml', '<font-family xmlns:android="http://schemas.android.com/apk/res/android" android:fontProviderAuthority="absent.fonts" android:fontProviderPackage="absent.fonts" android:fontProviderQuery="Absent" android:fontProviderSystemFontFamily="sans-serif"/>')!
  os.write_file(dir + '/BroadcastProbe.smali', '.class public Lorg/vinix/bootstrap/BroadcastProbe;\n.super Landroid/content/BroadcastReceiver;\n.field private static count:I\n' +
@@ -151,6 +154,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->haptics(Landroid/content
 invoke-static {p0}, Lorg/vinix/bootstrap/MediaProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->fonts(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/TypefaceProbe;->check(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/FontBuildersProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/TextMetricsProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/FontMetricsProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/SizeSpanProbe;->check()V
