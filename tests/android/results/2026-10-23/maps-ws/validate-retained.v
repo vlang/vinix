@@ -68,5 +68,27 @@ fn main() {
 	serial227 := gzip.decompress(os.read_bytes(root + 'attempt227-google-maps-serial.log.gz')!)!.bytestr()
 	assert serial227.contains('Native WS RenderNode supports rectangular outline clipping only')
 	assert serial227.contains('in call to NewLocalRef') && serial227.contains('APK-SUITE-EXIT id=google-maps code=134')
-	println('MAPS218-227-RETAINED PASS ${checked} artifact hashes;8 serial/result identities;3 native archives/240 sources;framework221 ${sources.len} exact sources + explicit1 missing-source limitation;framework222+223+227 307 exact sources;actualDEX getter+lock+autofill+Canvas and native ALPHA_8 evidence; no attempt224 boot claimed;227 failed outline/JNI abort134')
+	row228 := json2.decode[[]json2.Any](os.read_file(root + 'attempt228-results.json')!)![0].as_map()
+	serial228_bytes := gzip.decompress(os.read_bytes(root + row228['serial_log']!.str())!)!
+	assert sha256.sum(serial228_bytes).hex() == row228['serial_sha256']!.str()
+	serial228 := serial228_bytes.bytestr()
+	assert row228['outcome']!.str() == 'startup_failed' && row228['backend_ready']!.bool()
+	assert !row228['process_exited']!.bool() && row228['startup_ui_passed']!.bool()
+	assert row228['search_suggestions_passed']!.bool() && !row228['search_passed']!.bool()
+	assert row228['retained_screenshots']!.as_array().len == 10
+	assert !serial228.contains('ANDROID-WS-FAIL') && !serial228.contains('JNI DETECTED ERROR IN APPLICATION')
+	assert !serial228.contains('APK-SUITE-EXIT id=google-maps')
+	assert row228['failure_markers']!.as_array().len == 4
+	for marker in row228['failure_markers']!.as_array() {
+		assert marker.str().contains('ClassNotFoundException: io.grpc.internal.JndiResourceResolverFactory') || marker.str().contains('ClassNotFoundException: io.grpc.override.ContextStorageOverride')
+	}
+	native228_manifest := json2.decode[map[string]string](os.read_file(root + 'native228-sources.json')!)!
+	native228_sources := json2.decode[map[string]string](gzip.decompress(os.read_bytes(root + 'attempt228-native-sources.json.gz')!)!.bytestr())!
+	assert native228_sources.len == 81 && native228_sources.len == native228_manifest.len
+	for path, source in native228_sources { assert sha256.sum(source.bytes()).hex() == native228_manifest[path]!, path }
+	outline_manifest := json2.decode[map[string]json2.Any](os.read_file(root + 'attempt228-framework-manifest.json')!)!['sources']!.as_map()
+	outline_sources := json2.decode[map[string]string](gzip.decompress(os.read_bytes(root + 'attempt228-framework-sources.json.gz')!)!.bytestr())!
+	assert outline_sources.len == 104 && outline_sources.len == outline_manifest.len
+	for path, source in outline_sources { assert sha256.sum(source.bytes()).hex() == outline_manifest[path]!.str(), path }
+	println('MAPS218-228-RETAINED PASS ${checked} artifact hashes;9 serial/result identities;4 native archives/321 sources;framework221 ${sources.len} exact sources + explicit1 missing-source limitation;framework222+223+227+228 411 exact sources;actualDEX+native evidence; no attempt224 boot claimed;227 failed outline/JNI abort134;228 visible map and search suggestions with raw startup_failed classification retained')
 }

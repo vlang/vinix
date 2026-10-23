@@ -165,3 +165,34 @@ Map display and search remain unverified. The [input receipt](attempt227-input-i
 checks the actual staged framework/native/runtime hashes and103 exact framework
 sources; native225's exact source receipt is reused. The independent Maps VM
 was cloned without a preboot image hash, so kernel/base identities remain inherited.
+
+Attempt228 uses framework `26b21262…` and native `37d54bcc…`, adding rounded
+and path outline clipping. It reaches a [visible map](attempt228-google-maps-map-later.png)
+after Skip. The detector now requires both the white background and black
+sign-in button: onboarding was captured at 14:40:18 local and Skip was clicked
+at 14:40:19 with 0.15 seconds before, between and after down/up. The map capture
+was taken at 14:41:39. All times are UTC+3.
+
+Root then manually dragged the map and clicked search. Input and rendering
+lagged substantially: the first pan/zoom captures were stale, while a later
+capture shows the shifted map. The [final capture](attempt228-google-maps-application.png)
+shows the search field reading `Pars` and suggestions including
+Parsippany-Troy Hills and Parsons after the intended input `Paris`.
+Map startup and search suggestions are verified. Zoom, selecting a search
+result and directions remain unverified. Exact manual input timing and its
+in-session evidence limitation are recorded in the [review notes](attempt228-review-notes.json).
+
+The [raw result](attempt228-results.json) remains `startup_failed` because the
+harness treats caught optional gRPC/Jndi/ContextStorage class lookups as failure
+markers. The backend is ready and the APK has no recorded exit, native WS
+failure or JNI abort; QEMU was stopped by the harness timeout. The receipt
+therefore records visible startup and search suggestions separately from the
+raw harness classification and full search verification.
+
+The [input receipt](attempt228-input-identities.json) checks the actual staged
+runtime and all 81 exact native and 104 exact framework source files. The
+[runtime receipt](attempt228-runtime-identities.json) links the retained serial,
+ten screenshots, interaction and build logs. The initial native228 build was
+superseded before this run; only the final staged identity is attributed to it.
+Kernel/base identities remain inherited because the independent VM image and
+kernel were not hashed before boot.
