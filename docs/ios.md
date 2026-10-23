@@ -17631,7 +17631,7 @@ source was then revalidated. The input manifest covers declared inputs, not the
 full host dynamic runtime closure. VM serial/config hashes remain available;
 owned VM artifacts were retired and the RAM disk detached.
 
-The final launch probe resolves `NSRecursiveLock` and stops at
+That increment's launch probe resolves `NSRecursiveLock` and stops at
 `_OBJC_CLASS_$_NSInvocationOperation`, before application entry. Fortnite remains
 unplayable.
 
@@ -17639,17 +17639,76 @@ unplayable.
 v run tests/ios/native-checks.v build-recursive-lock
 ```
 
+V now supplies `NSOperation` and its `NSInvocationOperation` subclass, with
+measured 248/264-byte ARM64 instance sizes, superclass links, ivar metadata and
+typed synchronous methods. Apple Foundation confirms that default invocation
+operation initialization consumes its receiver and returns nil; base operation
+initialization returns self, clears a preinit name and preserves cancellation.
+The initialized private records remain opaque: owned sidecars hold Vinix's state.
+
+The target initializer accepts explicitly typed methods with a void or object
+return and either zero arguments or one object argument. Zero-argument methods
+ignore the supplied object. Targets and used arguments remain owned until
+operation disposal. Dispatch supports both application IMPs and framework
+builtins and rechecks method encodings before delivery. Direct `main` calls can
+repeat, including after cancellation, without finishing the operation. `start`
+executes synchronously, exposes executing state during its callback, then marks
+the operation finished; cancellation before start skips the callback. Starting
+an already finished operation does nothing. `result` returns nil before finish
+and borrows the retained object result afterward. Names copy NSString inputs.
+
+Receiver pins cover target calls, name copying and releases. Cleanup follows
+allocation provenance after isa changes or supplied-storage construction;
+dispatch rejects class changes incompatible with that provenance, and explicit
+destruction rejects active calls. Missing targets, selectors or target methods
+clear a preset name, return nil and consume the initializer's receiver.
+Unsupported method signatures, retained-result method families, overlapping
+execution, reinitialization, custom operation subclass construction and
+unavailable exception paths fail explicitly. General NSInvocation objects,
+invocation inspection, dependencies, completion blocks, waiting, queue scheduling,
+priorities, coding and copying remain outside this profile.
+
+The preserved Fortnite consumer creates an invocation operation for
+`AFSDKBuffer.didFinishOperations` (`v16@0:8`), adds dependencies and enqueues it.
+Its `AFSDKOperation` work items also subclass NSOperation. Those dependency,
+subclass and scheduler paths still need implementation; direct execution checks
+do not establish that this application workflow works.
+
+The shared fixture passes against Apple Foundation and in the ARM64 Vinix
+guest. Both macOS ASan+UBSan runs pass with ordinary and deterministic Swift
+hashing. Checks cover callback receiver pins, target/argument/result ownership,
+copied names, failed construction, guarded supplied storage, 64 isa replacements,
+two drained runtimes and 39 explicit rejection cases. Independent source and
+exact generated-C lifetime/ABI review found no unresolved issue within this
+profile. Host leak detection was disabled.
+
+Local evidence is recorded in
+`build/ios/fortnite/invocation-operation-checks/proof.log`: 183 sealed
+native/static evidence files, 19,881 unchanged declared source/toolchain/runtime
+inputs, five archived binary/generated-C pairs, one host dSYM and four sequential
+ARM64 guest phases. Earlier compile, helper and fixture failures are preserved
+and verified alongside their corrections. The input manifest covers declared
+inputs, not the full host dynamic runtime closure. VM serial/config hashes remain
+available; owned VM artifacts were retired and the RAM disk detached.
+
+The launch probe now stops at `_OBJC_CLASS_$_NSKeyedArchiver`, before application
+entry. Fortnite remains unplayable.
+
+```sh
+v run tests/ios/native-checks.v build-invocation-operation
+```
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,063 | 98 | 78 |
+| Fortnite executable | 2,066 | 95 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,903 | 101 | 114 |
+| All images | 2,906 | 98 | 114 |
 
-The C++/GLES/Text variant reports 2,917 resolved imports, 87 unresolved strong
+The C++/GLES/Text variant reports 2,920 resolved imports, 84 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -17701,6 +17760,7 @@ base URL sessions use `url-session-checks`, sort descriptors use
 `sort-descriptor-checks`, regular expressions use `regular-expression-checks`,
 mutable strings use `mutable-string-checks`, session configurations use
 `session-configuration-checks`, recursive locks use `recursive-lock-checks`,
+invocation operations use `invocation-operation-checks`,
 CoreFoundation dictionaries use
 `cf-dictionary-checks`, constant integers use
 `constant-integer-checks`, constant arrays use `constant-array-checks`, supplied
@@ -17713,7 +17773,8 @@ object monitors use `objc-sync-checks`, Swift strings/buffers use
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
-URL session, session configuration, recursive lock, sort descriptor, regular expression, mutable string,
+URL session, session configuration, recursive lock, invocation operation, sort
+descriptor, regular expression, mutable string,
 CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String

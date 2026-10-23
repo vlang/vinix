@@ -2,6 +2,7 @@
 module main
 
 fn objc_install_storage(cls u64, object u64, caller_storage bool) {
+	ns_operation_require_class(cls)
 	ns_recursive_lock_require_class(cls)
 	dispatch_objc_allocation_checked(cls) or { panic(err) }
 	url_session_require_class(cls)
@@ -36,6 +37,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	header.condition_owned = objc_is_kind(object, ios_runtime.names['NSCondition'])
 	header.recursive_lock_owned = ns_recursive_lock_family(cls)
 	ns_thread_install(object, mut header)
+	ns_operation_install(cls, mut header)
 	header.auth_owned = objc_is_kind(object, ios_runtime.names['ASWebAuthenticationSession'])
 	header.image_view_owned = objc_is_kind(object, ios_runtime.names['UIImageView'])
 	header.uuid_owned = objc_is_kind(object, ios_runtime.names['NSUUID'])
@@ -90,6 +92,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	connection_dispose(header)
 	ns_pool_require_inactive(header)
 	ns_recursive_lock_retire(mut header)
+	ns_operation_retire(mut header)
 	header.destroying = true
 	C.ios_objc_initialize_lock()
 	swift_unknown_weak_retire_locked(object)
@@ -129,6 +132,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	ns_condition_dispose(object, mut header)
 	ns_recursive_lock_dispose(object, mut header)
 	ns_thread_dispose(mut header)
+	ns_operation_dispose(object, mut header)
 	web_auth_dispose(mut header)
 	image_view_dispose(mut header)
 	ns_input_stream_dispose(mut header)

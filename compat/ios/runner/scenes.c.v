@@ -90,6 +90,12 @@ fn objc_responds(object u64, selector &char) bool {
 		if ns_recursive_lock_types('NSRecursiveLock', object in ios_runtime.classes, name) != none { return true }
 	}
 	if ns_thread_selector(object, name) { return true }
+	operation_class := if object in ios_runtime.classes { object } else { read64(object) }
+	if ns_operation_family(operation_class) {
+		if ns_operation_unsupported(name) { return native_method(read64(object), name) != 0 }
+		operation_name := if operation_class == ios_runtime.names['NSInvocationOperation'] { 'NSInvocationOperation' } else { 'NSOperation' }
+		if ns_operation_types(operation_name, object in ios_runtime.classes, name) != none { return true }
+	}
 	if web_auth_selector(object, name) { return true }
 	if cookie_selector(object, name) { return true }
 	if request_selector(object, name) { return true }

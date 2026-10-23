@@ -123,6 +123,7 @@ mut:
 	recursive_lock_retiring bool
 	recursive_lock_calls u64
 	recursive_lock &RecursiveLockState = unsafe { nil }
+	operation &FoundationOperation = unsafe { nil }
 	thread &FoundationThread = unsafe { nil }
 	auth_owned bool
 	auth &WebAuthState = unsafe { nil }
@@ -504,7 +505,7 @@ fn objc_start() {
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
-        'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
+        'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSOperation', 'NSInvocationOperation', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
@@ -528,6 +529,7 @@ fn objc_start() {
 			'VinixMetalTextureDescriptor' { ios_runtime.names['MTLTextureDescriptor'] }
 			'NSInputStream' { ios_runtime.names['NSStream'] }
 			'NSNumber', 'NSConcreteValue' { ios_runtime.names['NSValue'] }
+			'NSInvocationOperation' { ios_runtime.names['NSOperation'] }
 			'NSConstantIntegerNumber' { ios_runtime.names['NSNumber'] }
 			'VinixRegularExpressionCheckingResult' { ios_runtime.names['NSTextCheckingResult'] }
 			'_NSUUIDBridge' { ios_runtime.names['NSUUID'] }
@@ -578,6 +580,8 @@ fn objc_start() {
 			'NSCondition' { u32(sizeof(AbiNSCondition)) }
 			'NSRecursiveLock' { u32(sizeof(AbiNSRecursiveLock)) }
 			'NSThread' { u32(64) }
+			'NSOperation' { u32(248) }
+			'NSInvocationOperation' { u32(264) }
 			'ASWebAuthenticationSession' { u32(136) }
 			'UIImageView' { u32(512) }
 			'GCKeyboard' { u32(32) }
@@ -643,6 +647,7 @@ fn objc_start() {
 	url_session_metadata()
 	url_session_configuration_metadata()
 	ns_recursive_lock_metadata()
+	ns_operation_metadata()
 	sort_descriptor_metadata()
 	regular_expression_metadata()
 	mut request_class := ios_runtime.classes[ios_runtime.names['NSURLRequest']] or { panic('iOS: missing request class') }
@@ -678,6 +683,7 @@ fn obj_header(object u64) &ObjHeader {
 }
 
 fn objc_allocate(cls u64) u64 {
+	ns_operation_require_class(cls)
 	ns_recursive_lock_require_class(cls)
 	dispatch_objc_allocation_checked(cls) or { panic(err) }
 	if connection_family(cls) && cls != ios_runtime.names['NSURLConnection'] { panic('iOS: custom connection subclass construction is not implemented') }
@@ -797,6 +803,7 @@ fn objc_new(cls u64) u64 {
 	if objc_is_kind(object, ios_runtime.names['NSCondition']) { ns_condition_initialize(object) }
 	if ns_recursive_lock_family(read64(object)) { ns_recursive_lock_initialize(object) }
 	if obj_header(object).thread != unsafe { nil } { ns_thread_initialize(object, 0, 0, 0, 0) }
+	if obj_header(object).operation != unsafe { nil } { return ns_operation_default_initialize(object) }
 	if objc_is_kind(object, ios_runtime.names['NSURLRequest']) { request_initialize(object, 0, 0, 60) }
 	if obj_header(object).response_owned { response_initialize(object) }
 	if obj_header(object).set_owned { ns_set_initialize(object, 0) }
