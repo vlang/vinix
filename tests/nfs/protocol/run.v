@@ -9,6 +9,7 @@ fn checked(args []string) ! {
 	p.run(); p.wait()
 	code := p.code
 	p.close()
+	println('NFS-COMMAND exit=${code} argv=${args}')
 	if code != 0 { return error('command failed (${code}): ${args}') }
 }
 
@@ -25,6 +26,7 @@ fn main() {
 	os.cp(root + '/tests/nfs/protocol/cases.vfixture', work + '/main.v')!
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('VEXE', v, true)
+	checked([v, 'version'])!
 	flags := ['-nocache', '-cc', 'clang', '-gc', 'none', '-manualfree']
 	mut args := [v]
 	args << flags

@@ -1,4 +1,15 @@
 module klock
-pub struct Lock {}
-pub fn (mut l Lock) acquire() {}
-pub fn (mut l Lock) release() {}
+pub struct Lock {
+pub mut:
+	held bool
+	after_release fn (voidptr) = unsafe { nil }
+	context voidptr
+}
+pub fn (mut l Lock) acquire() { assert !l.held; l.held = true }
+pub fn (mut l Lock) release() {
+	assert l.held
+	l.held = false
+	callback := l.after_release
+	l.after_release = unsafe { nil }
+	if callback != unsafe { nil } { callback(l.context) }
+}

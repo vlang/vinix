@@ -15,15 +15,27 @@ mut:
 	procedure u32
 	sends int
 	kind u32 = 1
+	fsstat_status u32
+	fail_transport bool
+	renamed bool
+	list_parent u8 = 1
 }
 
 fn nfs_contract_transfer(context voidptr, p &u8, count int, sending bool) bool {
 	mut rig := unsafe { &ContractWire(context) }
+	assert !children_lock.held
+	if rig.fail_transport { return false }
 	if sending {
 		mut req := nfs.Xdr{p: unsafe { p }, n: count}
 		req.u32(); xid := req.u32()
 		req.u32(); req.u32(); req.u32(); req.u32()
 		rig.procedure = req.u32(); rig.sends++
+		// Skip the request's AUTH_SYS credentials and verifier, then inspect
+		// the directory handle for deterministic remote rename/listing state.
+		req.u32(); credential_size := int(req.u32()); req.take(credential_size)
+		req.u32(); verifier_size := int(req.u32()); req.take(verifier_size)
+		mut requested := nfs.FileHandle{}
+		if rig.procedure in [u32(12), 13, 14, 17] { req.handle(unsafe { &requested }) }
 		mut w := nfs.Xdr{p: unsafe { &rig.reply[0] }, n: 1024}
 		w.put32(0); w.put32(xid); w.put32(1); w.put32(0); w.put32(0); w.put32(0); w.put32(0)
 		match rig.procedure {
@@ -38,6 +50,38 @@ fn nfs_contract_transfer(context voidptr, p &u8, count int, sending bool) bool {
 				w.put32(0); w.put32(0); w.put32(1)
 			}
 			7 { w.put32(30); w.put32(0); w.put32(0) }
+			12, 13 {
+				assert requested.bytes[0] == rig.list_parent
+				assert req.opaque(255) == 'after'
+				w.put32(0); w.put32(0); w.put32(0)
+			}
+			14 {
+				assert req.opaque(255) == 'before'
+				mut target := nfs.FileHandle{}; req.handle(unsafe { &target })
+				assert req.opaque(255) == 'after'
+				rig.renamed = true; rig.list_parent = target.bytes[0]
+				w.put32(0)
+				for _ in 0 .. 4 { w.put32(0) }
+			}
+			17 {
+				w.put32(0); w.put32(0); w.put64(1)
+				parent := if rig.renamed { rig.list_parent } else { u8(1) }
+				if requested.bytes[0] == parent {
+					w.put32(1); w.put64(9)
+					w.text(if rig.renamed { 'after' } else { 'before' }, 255)
+					w.put64(1); w.put32(1)
+					contract_attr(mut w, rig.kind, 9)
+					w.put32(1); w.put32(1); w.put32(u32(42) << 24)
+				}
+				w.put32(0); w.put32(1)
+			}
+			18 {
+				w.put32(rig.fsstat_status); w.put32(0)
+				if rig.fsstat_status == 0 {
+					for value in [u64(409600), 204800, 102400, 100, 50, 25]! { w.put64(value) }
+					w.put32(0)
+				}
+			}
 			else { panic('unexpected contract procedure') }
 		}
 		assert !w.bad
@@ -53,6 +97,9 @@ fn nfs_contract_transfer(context voidptr, p &u8, count int, sending bool) bool {
 }
 
 pub fn contract_tests() {
+	cleanup_regression()
+	rename_regressions()
+	statfs_regressions()
 	mut rig := &ContractWire{}
 	mut backend := &NFSFS{}
 	backend.client = nfs.Client{context: rig, transfer: nfs_contract_transfer, tx: unsafe { &rig.tx[0] }, rx: unsafe { &rig.rx[0] }}

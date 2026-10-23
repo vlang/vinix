@@ -1,6 +1,9 @@
 module errno
 __global ( saved_errno u64 )
 pub const einval = u64(22)
+pub const err = ~u64(0)
+pub const efault = u64(14)
+pub const enotsup = u64(95)
 pub const eio = u64(5)
 pub const enomem = u64(12)
 pub const enotdir = u64(20)

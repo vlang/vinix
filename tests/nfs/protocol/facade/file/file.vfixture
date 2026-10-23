@@ -1,3 +1,10 @@
 module file
 import resource
-pub struct Handle { pub mut: flags int resource &resource.Resource = unsafe { nil } }
+import lib
+pub struct Handle { pub mut: flags int resource &resource.Resource = unsafe { nil } node voidptr mount lib.MountContext }
+pub fn (mut h Handle) mac_check(_ int) ? {}
+pub struct FD { pub mut: handle &Handle = unsafe { nil } }
+__global ( test_fd &FD )
+pub fn set_test_fd(fd &FD) { unsafe { test_fd = fd } }
+pub fn fd_from_fdnum(_ voidptr, _ int) ?&FD { return test_fd }
+pub fn (mut fd FD) unref() {}

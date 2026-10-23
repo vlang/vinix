@@ -14,6 +14,10 @@ pub mut:
 	name string
 	parent &VFSNode = unsafe { nil }
 	children &map[string]&VFSNode = unsafe { nil }
+	redir &VFSNode = unsafe { nil }
+	parent_held u32
+	parent_refs int
+	overlay &OverlayEntry = unsafe { nil }
 	read_only bool
 	removed bool
 	mount_covered bool
@@ -23,7 +27,6 @@ pub fn create_node(f &FileSystem, p &VFSNode, name string, dir bool) &VFSNode {
 	if dir { n.children = &map[string]&VFSNode{} }
 	return n
 }
-pub fn (mut n VFSNode) create_dotentries(_ &VFSNode) {}
 pub fn publish_child(p &VFSNode, name string, n &VFSNode) { unsafe { p.children[name] = n } }
 pub fn free_after_grace(_ voidptr) {}
 fn lookup_child(n &VFSNode, name string) &VFSNode {
@@ -31,3 +34,5 @@ fn lookup_child(n &VFSNode, name string) &VFSNode {
  return unsafe { n.children[name] }
 }
 pub fn get_node(_ &VFSNode, _ string, _ bool) ?&VFSNode { return none }
+struct OverlayEntry { mut: upper &VFSNode = unsafe { nil } }
+fn free_string_after_grace(s string) { unsafe { s.free() } }

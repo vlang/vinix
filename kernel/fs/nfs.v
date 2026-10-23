@@ -148,7 +148,11 @@ fn (mut b NFSFS) destroy_failed() {
 		mut node := r.node
 		if node != unsafe { nil } {
 			if node.children != unsafe { nil } {
-				for key, child in node.children { if key == '.' || key == '..' { unsafe { free(child) } } }
+				// Only dots are private map-owned nodes. Looking them up directly
+				// avoids V's heap-cloned string keys in a map iteration. map.free
+				// below still owns and frees the stored keys exactly once.
+				memory.free(lookup_child(node, '.'))
+				memory.free(lookup_child(node, '..'))
 				unsafe { node.children.free(); free(node.children) }
 			}
 			if voidptr(node) != voidptr(b.root) { unsafe { node.name.free() } }
@@ -383,6 +387,31 @@ fn (mut b NFSFS) link(_ &VFSNode, _ string, mut _ VFSNode) ?&VFSNode { errno.set
 
 fn (mut b NFSFS) rename(oldparent &VFSNode, old string, newparent &VFSNode, name string, flags int) ? {
 	b.lock.acquire(); defer { b.lock.release() }
+	b.rename_locked(oldparent, old, newparent, name, flags)?
+}
+
+fn (mut b NFSFS) rename_begin(oldparent &VFSNode, old string, source &VFSNode,
+	newparent &VFSNode, name string, destination &VFSNode, flags int) ? {
+	b.lock.acquire()
+	mut success := false
+	defer { if !success { b.lock.release() } }
+	// Permission/path walks can refresh directories before reaching this hook.
+	// Bind the validated identities again under the lock that excludes refresh.
+	r := nfs_res(source)
+	if r == unsafe { nil } || r.removed || voidptr(r.backend) != voidptr(b)
+		|| voidptr(lookup_child(oldparent, old)) != voidptr(source) {
+		errno.set(errno.enoent); return none
+	}
+	if voidptr(lookup_child(newparent, name)) != voidptr(destination) {
+		errno.set(errno.eagain); return none
+	}
+	b.rename_locked(oldparent, old, newparent, name, flags)?
+	success = true
+}
+
+fn (mut b NFSFS) rename_end() { b.lock.release() }
+
+fn (mut b NFSFS) rename_locked(oldparent &VFSNode, old string, newparent &VFSNode, name string, flags int) ? {
 	if !b.usable() { return none }
 	if flags != 0 { errno.set(errno.eopnotsupp); return none }
 	p := nfs_res(oldparent); q := nfs_res(newparent)
@@ -510,11 +539,11 @@ fn (mut r NfsResource) chmod_mode(mode u32) ? {
 	r.refresh_attr()?
 }
 
-fn (mut r NfsResource) filesystem_stat() resource.FileSystemStat {
+fn (mut r NfsResource) try_filesystem_stat() ?resource.FileSystemStat {
 	r.backend.lock.acquire(); defer { r.backend.lock.release() }
 	mut info := nfs.FsInfo{}
-	if !r.backend.usable() { return resource.FileSystemStat{} }
-	r.backend.client.fsstat(unsafe { &r.handle }, unsafe { &info }) or { r.backend.failure(); return resource.FileSystemStat{} }
+	if !r.backend.usable() { return none }
+	r.backend.client.fsstat(unsafe { &r.handle }, unsafe { &info }) or { r.backend.failure(); return none }
 	return resource.FileSystemStat{@type: 0x6969, bsize: 4096, frsize: 4096, blocks: info.total/4096, bfree: info.free/4096, bavail: info.available/4096, files: info.files, ffree: info.ffree, namelen: r.backend.name_max, flags: u64(r.backend.client.ro)}
 }
 
