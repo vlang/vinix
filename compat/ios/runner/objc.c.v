@@ -129,6 +129,7 @@ mut:
 	date_formatter &FoundationDateFormatter = unsafe { nil }
 	predicate &FoundationPredicate = unsafe { nil }
 	index_set &FoundationIndexSet = unsafe { nil }
+	character_set &FoundationCharacterSet = unsafe { nil }
 	url_query_item_owned bool
 	url_query_item_initialized bool
 	url_query_item_initializing bool
@@ -515,7 +516,7 @@ fn objc_start() {
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
-        'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
+        'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet', 'NSMutableCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSOperation', 'NSInvocationOperation', 'NSInvocation', 'NSMethodSignature', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLQueryItem', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
@@ -559,6 +560,7 @@ fn objc_start() {
 			'NSMutableArray', 'NSConstantArray', 'WKNSArray' { ios_runtime.names['NSArray'] }
 			'NSMutableSet' { ios_runtime.names['NSSet'] }
 			'NSMutableIndexSet' { ios_runtime.names['NSIndexSet'] }
+			'NSMutableCharacterSet' { ios_runtime.names['NSCharacterSet'] }
 			'NSMutableString' { ios_runtime.names['NSString'] }
 			'NSMutableDictionary', 'NSConstantDictionary' { ios_runtime.names['NSDictionary'] }
 			'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { ios_runtime.names['NSLayoutAnchor'] }
@@ -610,6 +612,7 @@ fn objc_start() {
 			'NSDateFormatter' { u32(56) }
 			'NSPredicate' { u32(16) }
 			'NSIndexSet', 'NSMutableIndexSet' { u32(32) }
+			'NSCharacterSet', 'NSMutableCharacterSet' { u32(8) }
 			'NSURLQueryItem' { u32(24) }
 			'NSStream' { u32(8) }
 			'NSInputStream' { u32(136) }
@@ -729,6 +732,7 @@ fn objc_allocate(cls u64) u64 {
 	ns_date_formatter_require_class(cls)
 	ns_predicate_require_class(cls)
 	ns_index_set_require_class(cls)
+	ns_character_set_require_class(cls)
 	ns_url_query_item_require_class(cls)
 	allocation_class := ns_date_allocation_class(ns_uuid_allocation_class(cls))
 	objc_initialize(allocation_class)
@@ -830,6 +834,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).date_owned { ns_date_initialize(object, cf_absolute_time()); return object }
 	if obj_header(object).date_formatter != unsafe { nil } { ns_date_formatter_initialize(object); return object }
 	if obj_header(object).index_set != unsafe { nil } { return ns_index_set_initialize(object, 0, 0) }
+	if obj_header(object).character_set != unsafe { nil } { return ns_character_set_initialize(object) }
 	if obj_header(object).url_query_item_owned { return ns_url_query_item_initialize(object, 0, 0) }
 	if obj_header(object).mutable_string_owned { mutable_string_initialize(object, ''); return object }
 	if ns_timezone_family(cls) { panic('iOS: default timezone construction is not implemented') }

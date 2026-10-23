@@ -18166,21 +18166,92 @@ all four ARM64 phases with serial/configuration hashes. Owned VM payloads are
 retired, scratch directories are empty and the owned RAM disk is detached.
 These pins do not cover the full host dynamic runtime closure.
 
-The ARM64 fixture passes. Fortnite's launch probe now resolves
+The query-item increment's ARM64 fixture passes. Its Fortnite launch probe resolves
 `NSURLQueryItem` and stops at `_OBJC_CLASS_$_NSMutableCharacterSet`, before
 application entry; the process still exits 1.
+
+V supplies bounded `NSCharacterSet` and `NSMutableCharacterSet` support with
+Apple's measured public eight-byte instance layouts and superclass relationship.
+Static callers build Firebase library-name/API-key validation sets by adding
+`-_` or `-_.` to alphanumeric sets, then copying, inverting, taking unions or
+checking supersets. Another caller removes URL punctuation from a mutable copy of
+the query-allowed set. This inspection identifies dependencies; it does not
+establish that those paths execute. NSString splitting, trimming and percent
+encoding remain separate APIs.
+
+The profile supports empty construction, string factories, `characterIsMember:`,
+`longCharacterIsMember:`, `isSupersetOfSet:`, copies, mutable copies, inverted
+sets, and mutable string addition/removal and union. The eight predefined sets
+are alphanumeric, decimal digits, whitespace, illegal, control, and URL query,
+host and path allowed characters. Their tables were measured over all
+1,114,112 code points on macOS 26.5 (25F71), arm64, and follow that Foundation
+version. `tests/ios/character-set-data.v` regenerates the tables, checks
+immutable/mutable factory membership equality, and records bitmap hashes.
+The URL factories return immutable sets even when called on the mutable class;
+the other supported mutable-class factories return mutable sets.
+
+Each set owns a bitmap covering all 17 Unicode planes. String inputs must be
+validated built-in strings or image constants, contain only BMP characters and
+occupy at most 65,536 UTF-8 bytes; embedded NUL is preserved. Native direct-CF
+and Objective-C measurements found mixed BMP/supplementary strings truncating
+supplementary values on this Foundation build. Supplementary string inputs
+therefore fail explicitly, including before any mutation. Predefined sets,
+membership, inversion, copying and union retain supplementary-plane bits.
+Long membership outside U+000000..U+10FFFF fails explicitly.
+
+Factories and copies snapshot their bitmap before allocation callbacks, so a
+constructor can release the input string or source set without leaving a
+borrowed reference. Immutable copies retain identity; copies of mutable sets
+produce immutable snapshots, and mutable copies own independent mutable
+bitmaps. Sidecar disposal follows allocation provenance after isa changes.
+Caller-owned eight-byte storage requires explicit `objc_destructInstance`;
+generic final release does not preserve caller storage. Raw sets require
+initialization. Reinitialization, invalid or nil arguments, custom subclasses,
+nonzero copy zones, immutable mutation, range/bitmap construction, intersection,
+in-place inversion, unlisted predefined sets, coding, equality, hashing and
+descriptions fail explicitly. These bounds do not claim equivalent Apple
+rejection behavior. Concurrent runtime shutdown remains outside the profile.
+
+```sh
+v run tests/ios/native-checks.v build-character-set
+```
+
+The shared Foundation fixture checks both public classes' metadata, empty
+construction, BMP/NUL strings, the input byte boundary, predefined membership,
+copy/inversion/union isolation and retained lifetimes. Runtime checks compare
+every predefined bitmap bit against the native hashes, then exercise image
+constants, joined-worker constructors releasing inputs or sources, constructor
+rollback with weak-reference clearing, guarded caller storage, 32 isa-change
+disposal paths, two drained runtime cycles and 38 explicit rejection cases.
+The host fixture passes with ASan+UBSan in normal and deterministic Swift hashing
+modes; leak detection is disabled. Object/live/weak counts return to zero after
+each runtime cycle.
+
+Two independent lifetime reviews cover the final generated C. The evidence
+under `build/ios/fortnite/character-set-checks` pins 19,458 source, toolchain,
+runtime and review inputs, and verifies 153 native/static artifacts including
+21 retained historical or unsupported nonzero statuses. Initial reviewer-tool
+compile failures are also retained; both final review helpers pass. The final
+proof verifies both sanitizer runs, five binary/generated-C archive pairs,
+the host dSYM and all four ARM64 phases with serial/configuration hashes.
+Owned VMs are retired, scratch directories are empty and the owned RAM disk
+is detached. These pins do not cover the full host dynamic runtime closure.
+
+The ARM64 character-set fixture passes, including all 38 rejection cases.
+Fortnite's launch probe resolves `NSMutableCharacterSet` and stops at
+`_OBJC_CLASS_$_NSScanner`, before application entry; the process still exits 1.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,074 | 87 | 78 |
+| Fortnite executable | 2,075 | 86 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,914 | 90 | 114 |
+| All images | 2,915 | 89 | 114 |
 
-The C++/GLES/Text variant reports 2,928 resolved imports, 76 unresolved strong
+The C++/GLES/Text variant reports 2,929 resolved imports, 75 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -18235,7 +18306,8 @@ mutable strings use `mutable-string-checks`, session configurations use
 invocations use `invocation-checks`, invocation operations use
 `invocation-operation-checks`, date formatters use `date-formatter-checks`,
 predicates use `predicate-checks`, index sets use `index-set-checks`,
-URL query items use `url-query-item-checks`,
+URL query items use `url-query-item-checks`, character sets use
+`character-set-checks`,
 keyed archives use `keyed-archiver-checks`, keyed unarchives use
 `keyed-unarchiver-checks`,
 CoreFoundation dictionaries use
@@ -18251,7 +18323,7 @@ mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
 URL session, session configuration, recursive lock, invocation, invocation
-operation, date formatter, predicate, index set, URL query item, keyed archive,
+operation, date formatter, predicate, index set, URL query item, character set, keyed archive,
 keyed unarchive, sort descriptor, regular expression, mutable string,
 CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
