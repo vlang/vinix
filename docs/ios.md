@@ -18320,17 +18320,88 @@ The ARM64 scanner fixture passes, including all 45 rejection cases. Fortnite's
 launch probe resolves `NSScanner` and stops at `_OBJC_CLASS_$_NSUserActivity`,
 before application entry; the process still exits 1.
 
+V supplies bounded `NSUserActivity` continuation payloads with Apple's measured
+32-byte public layout, `NSObject` superclass and three opaque object ivars at
+offsets 8, 16 and 24. One selected main-image class-reference consumer,
+`FIRMessaging handleIncomingLinkIfNeededFromMessage:`, constructs a browsing
+activity, sets its webpage URL and passes it to the application's continuation
+handler. AppsFlyer and the iOS delegate also read the type and URLs of incoming
+activities. No selected class references were found in EOSSDK or
+MarketplaceKitWrapper. This static inspection identifies dependencies without
+establishing that those paths execute.
+
+The profile supports `initWithActivityType:`, `activityType`, `webpageURL`,
+`setWebpageURL:` and the initially nil `referrerURL`. Construction snapshots a
+nonempty explicit type from validated built-in or image-constant strings of at
+most 65,536 UTF-8 bytes, including embedded NUL and supplementary scalars.
+Mutable strings are copied before application string constructors can run.
+Nil and empty types select bundle-dependent default construction on this Mac's
+Foundation; that path is outside this profile.
+
+The webpage URL starts nil and accepts nil to clear it. Non-nil values must be
+live initialized built-in `NSURL` objects with an HTTP or HTTPS scheme, compared
+without case sensitivity. Copying these immutable URLs retains their identity,
+matching Foundation. URL construction keeps its existing absolute HTTP URL
+bounds. No network load starts. Type and URL getters retain and autorelease the
+result so it survives release of its owning activity until pool drainage.
+
+The initializer pins its receiver across string constructors, commits owned
+property references only after revalidation, and rolls back failed string
+construction. Replacing a URL releases its old value outside the runtime lock,
+allowing deallocation callbacks to reenter. Disposal follows allocation
+provenance after isa changes. Caller-owned 32-byte storage requires explicit
+`objc_destructInstance`. The three opaque Foundation ivars remain reserved.
+
+Raw activities require initialization. Default construction, reinitialization,
+invalid type or URL provenance, non-HTTP(S) webpage URLs, custom subclasses,
+opaque ivar writes, copying, coding, equality, hashing, descriptions and all
+publication, Handoff, saved-activity and continuation-stream operations fail
+explicitly. Setting a referrer URL, delegates or other activity properties is
+also outside this selected profile. These bounds do not claim equivalent Apple
+rejection behavior. Concurrent runtime shutdown remains outside the profile.
+
+```sh
+v run tests/ios/native-checks.v build-user-activity
+```
+
+The shared fixture compares layout, method encodings, copied type bytes, nil
+defaults, HTTP(S) URL replacement and getter ownership with native Foundation.
+Native payload survival after pool drainage depends on timing, so immediate
+payload destruction is asserted only for Vinix. Both implementations must keep
+getter results alive across the activity's last release while the getter pool
+remains active. Runtime checks also cover joined-worker constructor input
+release, initializer rollback, URL destructor reentry, guarded caller storage,
+changed-isa disposal and 48 explicit rejection cases. Two fully drained runtime
+cycles return object/live/weak counts to zero.
+
+The host fixture passes with ASan+UBSan in normal and deterministic Swift
+hashing modes, including all 48 rejection cases; leak detection is disabled.
+Two independent lifetime reviews cover the exact final generated C. Evidence
+under `build/ios/fortnite/user-activity-checks` pins 19,738 source, toolchain,
+runtime and review inputs and verifies 343 sealed native artifacts,
+including 37 retained historical or unsupported nonzero statuses. These pins do
+not cover the full host dynamic runtime closure.
+
+The final proof verifies five binary/generated-C archive pairs, the host dSYM
+and all four ARM64 phases with serial/configuration hashes. Owned VMs are
+retired, scratch directories are empty and the owned RAM disk is detached.
+
+The ARM64 user activity fixture passes, including all 48 rejection cases.
+Fortnite's launch probe resolves `NSUserActivity` and stops at
+`_OBJC_CLASS_$_NSNotificationQueue`, before application entry; the process still
+exits 1.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,076 | 85 | 78 |
+| Fortnite executable | 2,077 | 84 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,916 | 88 | 114 |
+| All images | 2,917 | 87 | 114 |
 
-The C++/GLES/Text variant reports 2,930 resolved imports, 74 unresolved strong
+The C++/GLES/Text variant reports 2,931 resolved imports, 73 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -18386,7 +18457,8 @@ invocations use `invocation-checks`, invocation operations use
 `invocation-operation-checks`, date formatters use `date-formatter-checks`,
 predicates use `predicate-checks`, index sets use `index-set-checks`,
 URL query items use `url-query-item-checks`, character sets use
-`character-set-checks`, scanners use `scanner-checks`,
+`character-set-checks`, scanners use `scanner-checks`, user activities use
+`user-activity-checks`,
 keyed archives use `keyed-archiver-checks`, keyed unarchives use
 `keyed-unarchiver-checks`,
 CoreFoundation dictionaries use
@@ -18403,8 +18475,8 @@ there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
 URL session, session configuration, recursive lock, invocation, invocation
 operation, date formatter, predicate, index set, URL query item, character set,
-scanner, keyed archive, keyed unarchive, sort descriptor, regular expression, mutable string,
-CoreFoundation dictionary,
+scanner, user activity, keyed archive, keyed unarchive, sort descriptor, regular
+expression, mutable string, CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String
 metadata/witness checks before the existing Mach-O suite and requires the
