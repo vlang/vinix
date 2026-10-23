@@ -18,6 +18,12 @@ paths, sixteen components per path and 1,024 output bytes per value. Description
 invoke the object's `toString`; this is intended for selected diagnostic builds.
 Production launchers leave these variables unset.
 
+`VINIX_ANDROID_TRACE_VIEW_LOOKUP=1` enables ATL's verbose recursive
+`ViewGroup.findViewById` messages. The framework reads this setting once on the
+first lookup. By default it skips diagnostic string formatting and resource-name
+lookups, preserving the existing search order and results. Other log messages,
+including warnings and errors, are unchanged.
+
 `VINIX_ANDROID_TRACE_VIEW_ADDS` selects an exact Java view class name and logs
 the caller stack when a ViewGroup inserts that child. The bridge matches the
 inserted native widget against the Java children, including reordered children;
