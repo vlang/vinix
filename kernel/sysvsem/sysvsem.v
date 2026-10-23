@@ -285,11 +285,14 @@ pub fn syscall_semctl(_ voidptr, id int, number int, command int, argument u64) 
             return count, 0
         }
         setval {
-            if argument > semvmx {
+            // Linux's SETVAL union member is a signed native int, even when
+            // the syscall register contains nonzero upper bits.
+            value := i32(argument)
+            if value < 0 || value > semvmx {
                 sets_lock.release()
                 return errno.err, errno.erange
             }
-            set.values[number] = int(argument)
+            set.values[number] = value
             set.last_pid = proc.current_thread().process.pid
             progress_unlocked(mut set)
             sets_lock.release()
@@ -302,20 +305,22 @@ pub fn syscall_semctl(_ voidptr, id int, number int, command int, argument u64) 
     }
 }
 
-fn operate(id int, user_operations u64, count u64, timeout_address u64) (u64, u64) {
-    if user_operations == 0 || count == 0 || count > max_ops {
-        return errno.err, errno.einval
-    }
-    mut operations := [max_ops]SemBuf{}
-    if !usercopy.copy_from_user(unsafe { voidptr(&operations[0]) }, user_operations, count * sizeof(SemBuf)) {
+fn operate(id int, user_operations u64, count u32, timeout_address u64) (u64, u64) {
+    // semtimedop imports its timeout before checking the vector. Duration
+    // validation follows the vector copy, matching Linux's error precedence.
+    mut duration := time.TimeSpec{}
+    if timeout_address != 0 && !usercopy.copy_from_user(unsafe { voidptr(&duration) }, timeout_address, sizeof(time.TimeSpec)) {
         return errno.err, errno.efault
     }
-    for i in 0 .. int(count) {
-        op := operations[i]
-        if int(op.flags) & ~(ipc_nowait | sem_undo) != 0 {
-            return errno.err, errno.einval
-        }
+    if count == 0 {
+        return errno.err, errno.einval
     }
+    if count > max_ops { return errno.err, errno.e2big }
+    mut operations := [max_ops]SemBuf{}
+    if !usercopy.copy_from_user(unsafe { voidptr(&operations[0]) }, user_operations, u64(count) * sizeof(SemBuf)) {
+        return errno.err, errno.efault
+    }
+    // Unknown sem_flg bits are ignored by Linux.
 
     mut timer := &time.Timer(unsafe { nil })
     defer {
@@ -325,10 +330,6 @@ fn operate(id int, user_operations u64, count u64, timeout_address u64) (u64, u6
         }
     }
     if timeout_address != 0 {
-        mut duration := time.TimeSpec{}
-        if !usercopy.copy_from_user(voidptr(&duration), timeout_address, sizeof(time.TimeSpec)) {
-            return errno.err, errno.efault
-        }
         if duration.tv_sec < 0 || duration.tv_nsec < 0 || duration.tv_nsec >= 1000000000 {
             return errno.err, errno.einval
         }
@@ -339,7 +340,7 @@ fn operate(id int, user_operations u64, count u64, timeout_address u64) (u64, u6
     mut set := find_id_unlocked(id)
     if set == unsafe { nil } || set.removed {
         sets_lock.release()
-        return errno.err, errno.eidrm
+        return errno.err, errno.einval
     }
     // Reject an invalid semaphore anywhere in the copied vector before
     // retaining its frame in the queue, including after a potential blocker.
@@ -417,10 +418,10 @@ fn operate(id int, user_operations u64, count u64, timeout_address u64) (u64, u6
     return 0, 0
 }
 
-pub fn syscall_semop(_ voidptr, id int, operations u64, count u64) (u64, u64) {
+pub fn syscall_semop(_ voidptr, id int, operations u64, count u32) (u64, u64) {
     return operate(id, operations, count, 0)
 }
 
-pub fn syscall_semtimedop(_ voidptr, id int, operations u64, count u64, timeout u64) (u64, u64) {
+pub fn syscall_semtimedop(_ voidptr, id int, operations u64, count u32, timeout u64) (u64, u64) {
     return operate(id, operations, count, timeout)
 }

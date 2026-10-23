@@ -10857,3 +10857,55 @@ accepted without implementing undo adjustments. Permissions, namespace
 isolation, per-index GETPID, arbitrary fairness, GNU libc and translated or
 32-bit semaphore paths remain unqualified. The broad libc, installation and
 foreign-application roadmap gates remain open.
+
+## Native semaphore argument ABI
+
+Native semop and semtimedop now interpret the operation count as an unsigned
+32-bit word, while semctl SETVAL interprets its union member as a signed
+32-bit word. Upper register bits are ignored. Empty vectors return EINVAL,
+counts beyond Vinix's 32-operation ceiling return E2BIG, and unreadable vectors
+return EFAULT before set lookup or value mutation. Unknown sem_flg bits are
+ignored. An ID absent at syscall entry returns EINVAL; removal of an already
+queued vector still returns EIDRM.
+
+The timeout is copied before count/vector validation, while duration validation
+follows the vector copy. These ordering rules are measured against Linux
+6.12.51, including calls with multiple invalid arguments. They are bounded
+reference behavior rather than a claim about every Linux release.
+
+The [retained evidence](../tests/linux-compat/results/2026-10-23/semabi-evidence/README.md)
+contains 175-check native and Linux runs for each architecture, using identical
+static musl probe ELFs. Both original native kernels fail 90 checks; both
+candidate kernels and Linux references pass all 175. Controls include high
+register words, negative SETVAL values, null and invalid pointers, removed IDs,
+guard-page-crossing vectors and no mutation after refusal. The same candidate
+kernels pass the existing 11,163-check wait/storage suite, including its four
+warmed storage cohorts.
+
+Production builds use isolated candidate
+`51451adf1564de86e531b1de5a70f558d9bdb9b3`, directly based on
+`033b04639076b7e8982504322c64443f167afd20`. The containing repository commit
+integrates its exact semaphore source, SHA-256
+`a2236eea20c6a0bf53aee5dc41db4f06d03b582459c3eaf892d0bd937f32c9da`.
+Before/after input maps are identical. Generated C on both architectures shows
+the explicit i32 conversion, u32 count, stack timeout and stack operation vector.
+Queue ownership and teardown are unchanged from the separately qualified wait
+implementation. An earlier wider-cast draft was stopped during compilation;
+its incomplete build records remain separate from passing results.
+
+The portable checker rehashes retained artifacts and binds matching-architecture
+ELFs, probe compilation, kernel builds, expected baseline failures, Linux
+reference results and native ABI/wait runs, plus the maintained runner on both
+architectures. The [completion receipt](../tests/linux-compat/results/2026-10-23/semabi-evidence/completion/receipt.json)
+pins the published manifest and retains the final audit command and status.
+Parser controls reject missing or repeated results, mismatches, panic text and
+a wrong ELF architecture. External
+toolchains and large boot media have explicit content pins. The evidence is
+for the isolated change and pinned integration base, without qualifying other
+sessions' changes to the shared checkout.
+
+This qualifies native ELF64 argument and import behavior only. Vinix's vector
+limit remains 32, below the Linux reference limit. SEM_UNDO is accepted without
+undo adjustments; IPC permission enforcement, namespace isolation, per-index
+GETPID, GNU libc and translated/32-bit paths remain unqualified. The broader
+libc, installation/sandbox and foreign-application roadmap gates remain open.

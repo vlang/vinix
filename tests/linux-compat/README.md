@@ -2168,3 +2168,22 @@ dependencies have explicit hash ledgers rather than copied payloads.
 SEM_UNDO, semaphore permissions/namespaces, per-index GETPID, arbitrary fairness,
 GNU libc and foreign/32-bit semaphore paths remain unqualified. See the
 [qualification and limits](../../docs/linux-posix-qualification.md#native-semaphore-wait-queues).
+
+The `semabi` case checks the native ELF64 semaphore argument ABI with 175
+checks: unsigned 32-bit operation counts, signed 32-bit SETVAL values, ignored
+upper register bits and unknown operation flags, invalid or removed IDs,
+guard-page vector import, atomic refusal and timeout error precedence.
+Run `--cases semabi` with a fresh state directory. Both the exact passing
+summary and PASS marker are required.
+
+`semabi-reference.v` runs the unchanged probe ELF on Linux with `--arch`,
+`--kernel`, `--init`, `--state-dir` and optional `--launcher` arguments.
+Its `--self-test` exercises positive and negative parser controls.
+Compile `semabi-evidence.v` and run `--self-test`, then `check` on the
+[published evidence](results/2026-10-23/semabi-evidence) to verify retained
+hashes, build identity, baseline failures, Linux reference and native runs,
+plus the existing wait regression on the same candidate kernels. Omitted
+toolchains and boot media have explicit content pins.
+Vinix still limits each vector to 32 operations; larger vectors return E2BIG.
+These tests do not qualify SEM_UNDO, permissions/namespaces, per-index GETPID,
+GNU libc or foreign/32-bit application paths.

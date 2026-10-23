@@ -1694,6 +1694,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   SEM_UNDO, permissions/namespaces and foreign paths remain separate.
   See [the semaphore receipts](docs/linux-posix-qualification.md#native-semaphore-wait-queues).
 
+- [x] Match native semaphore operation-count and SETVAL word widths, vector
+  fault/count errors, ignored operation flags and timeout error precedence.
+  Qualify 175 controls against identical Linux probe ELFs on both architectures
+  and repeat the wait/storage regression on the same candidate kernels.
+  The 32-operation ceiling and remaining IPC semantics stay explicit.
+  See [the ABI receipts](docs/linux-posix-qualification.md#native-semaphore-argument-abi).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
