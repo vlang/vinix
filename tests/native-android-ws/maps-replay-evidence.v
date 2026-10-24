@@ -1,0 +1,409 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Retain one fresh Maps replay. Historical complete bundles stay independent.
+module main
+
+import compress.gzip
+import crypto.sha256
+import json2
+import os
+import time
+
+const base = 'build/android-maps/'
+const frozen_pin = '7b602e16397db66cb23df41e421238656d0e1d493f29e2fb71683d7c33e1fb64'
+const classifier_pin = '47f1d9a78bfb2991f9802ebebc95436505160f7e551e1e77d4d95a171c63946b'
+const jar = 'opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/api-impl.jar'
+const native = 'opt/vinix-android-aarch64/usr/lib/art/libvinix-android-native.so'
+
+struct Frame {
+	path string
+	width int
+	height int
+	sha256 string
+}
+
+fn hash(path string) !string {
+	mut file := os.open(path)!
+	defer { file.close() }
+	mut digest := sha256.new()
+	mut buffer := []u8{len: 1024 * 1024}
+	for {
+		n := file.read(mut buffer) or { if err is os.Eof { break }; return err }
+		if n == 0 { break }
+		digest.write(buffer[..n])!
+	}
+	return digest.sum([]u8{}).hex()
+}
+
+fn write_json[T](path string, value T) ! { os.write_file(path, json2.encode(value, prettify: true) + '\n')! }
+fn read_map(path string) !map[string]string { return json2.decode[map[string]string](os.read_file(path)!)! }
+fn object(path string) !map[string]json2.Any { return json2.decode[map[string]json2.Any](os.read_file(path)!)! }
+fn checked(argv []string) !string {
+	r := os.exec(argv)
+	if r.exit_code != 0 { return error(argv.str() + ': ' + r.output) }
+	return r.output
+}
+fn clone(from string, to string) ! {
+	if os.exists(to) || os.is_link(to) { return error('fresh destination required: ' + to) }
+	os.mkdir_all(os.dir(to))!
+	checked(['cp', '-c', '-R', '-P', from, to])!
+}
+
+// lstat preserves links and empty directories without following either. Only
+// the stopped raw run's QMP socket has no archival contents.
+fn walk(root string, relative string, copy_to string, raw bool, mut entries map[string]string, mut omitted []string) ! {
+	for name in os.ls(root + '/' + relative)! {
+		key := if relative == '' { name } else { relative + '/' + name }
+		if !raw && relative == '' && name == 'sha256.json' { continue }
+		path := root + '/' + key
+		match os.lstat(path)!.get_filetype() {
+			.regular { entries[key] = hash(path)!; if copy_to != '' { clone(path, copy_to + '/' + key)! } }
+			.symbolic_link { entries[key] = 'symlink:' + os.readlink(path)!; if copy_to != '' { clone(path, copy_to + '/' + key)! } }
+			.directory {
+				entries[key] = 'directory'
+				if copy_to != '' { os.mkdir_all(copy_to + '/' + key)! }
+				walk(root, key, copy_to, raw, mut entries, mut omitted)!
+			}
+			.socket {
+				if !raw || key != 'google-maps/qmp.sock' { return error('unexpected socket: ' + path) }
+				omitted << key
+			}
+			else { return error('unexpected special file: ' + path) }
+		}
+	}
+}
+fn inventory(root string) !map[string]string {
+	mut entries := map[string]string{}
+	mut omitted := []string{}
+	walk(root, '', '', false, mut entries, mut omitted)!
+	return entries
+}
+fn equal_maps(actual map[string]string, expected map[string]string) ! {
+	if actual.len != expected.len { return error('inventory lengths differ') }
+	for path, value in expected { if actual[path] or { '' } != value { return error('inventory differs: ' + path) } }
+}
+fn subtree(entries map[string]string, prefix string) map[string]string {
+	mut result := map[string]string{}
+	for path, digest in entries { if path.starts_with(prefix + '/') { result[path.all_after(prefix + '/')] = digest } }
+	return result
+}
+fn regular_files(entries map[string]string, paths []string) ! {
+	for path in paths {
+		value := entries[path] or { '' }
+		if value.len != 64 || value.bytes().any((it < `0` || it > `9`) && (it < `a` || it > `f`)) { return error('regular retained file required: ' + path) }
+	}
+}
+fn ids(run string, build string) ! {
+	if run.len != 3 || build.len != 3 || run.bytes().any(it < `0` || it > `9`) || build.bytes().any(it < `0` || it > `9`)
+		|| run.int() <= 271 || run.int() != build.int() + 1 { return error('fresh consecutive replay/build IDs required') }
+}
+fn external_path(root string) ! {
+	if !os.is_abs_path(root) || os.is_link(root) || os.exists(root) || !os.is_dir(os.dir(root)) { return error('fresh absolute external destination with existing parent required') }
+	resolved := os.real_path(os.dir(root)) + '/' + os.file_name(root)
+	repo := os.real_path(os.getwd())
+	if resolved == repo || resolved.starts_with(repo + '/') { return error('state directory must be outside checkout') }
+}
+fn supplemental_logs(run string, to string) !map[string]string {
+	mut entries := map[string]string{}
+	for name in os.ls(base)! {
+		if name.starts_with('attempt' + run + '-') && name.ends_with('.log') {
+			assert os.lstat(base + name)!.get_filetype() == .regular
+			key := if name == 'attempt' + run + '-harness.log' { 'harness.log' } else { name }
+			entries[key] = hash(base + name)!
+			if to != '' { clone(base + name, to + '/' + key)! }
+		}
+	}
+	return entries
+}
+fn observation(source string) string { return source.all_after('fn observation(').all_before('// Real companion packages') }
+fn classifier_equal(original string, suite string) ! {
+	if observation(original).len <= 1000 || observation(original) != observation(suite)
+		|| sha256.sum(observation(original).bytes()).hex() != classifier_pin { return error('original observation classifier differs') }
+}
+fn logical(path string, repo string) string { return if path.starts_with(repo + '/') { path.all_after(repo + '/') } else { path } }
+fn verify_start(start map[string]string, pins map[string]string, expected []string) ! {
+	if start.len != expected.len { return error('start receipt input count differs') }
+	for path in expected { if start[path] or { '' } != pins[path]! { return error('start receipt input differs: ' + path) } }
+}
+fn png_frame(path string, relative string, digest string) !Frame {
+	mut file := os.open(path)!
+	defer { file.close() }
+	mut header := []u8{len: 24}
+	if file.read(mut header)! != 24 || header[..8] != [u8(137), 80, 78, 71, 13, 10, 26, 10]
+		|| header[8..16] != [u8(0), 0, 0, 13, 73, 72, 68, 82] { return error('invalid PNG header: ' + relative) }
+	width := int(u32(header[16]) << 24 | u32(header[17]) << 16 | u32(header[18]) << 8 | u32(header[19]))
+	height := int(u32(header[20]) << 24 | u32(header[21]) << 16 | u32(header[22]) << 8 | u32(header[23]))
+	if width <= 0 || height <= 0 || width > 16384 || height > 16384 { return error('invalid PNG dimensions: ' + relative) }
+	return Frame{relative, width, height, digest}
+}
+fn qemu_arguments(config map[string]json2.Any, repo string) []string {
+	state := repo + '/' + config['output']!.str() + '/google-maps'
+	return [config['qemu']!.str(), '-qmp', 'unix:' + state + '/qmp.sock,server=on,wait=off', '-machine', 'virt,gic-version=3',
+		'-accel', 'hvf', '-cpu', 'host', '-m', '12288', '-smp', '4', '-object', 'rng-random,filename=/dev/urandom,id=vinix-rng',
+		'-device', 'virtio-rng-device', '-drive', 'if=pflash,format=raw,readonly=on,file=' + config['firmware']!.str(),
+		'-drive', 'if=pflash,format=raw,file=' + config['efivars']!.str(), '-drive', 'format=raw,file=' + config['boot_image']!.str(),
+		'-device', 'virtio-keyboard-device', '-device', 'virtio-tablet-device', '-device', 'ramfb', '-netdev', 'user,id=net0',
+		'-device', 'virtio-net-device,netdev=net0', '-object', 'filter-dump,id=capture,netdev=net0,file=' + state + '/network.pcap',
+		'-display', 'none', '-monitor', 'none', '-serial', 'file:' + state + '/serial.log']
+}
+
+// Checks fresh source/artifact/launch relations; no historical archive replay.
+fn validate(root string, entries map[string]string) !map[string]json2.Any {
+	regular_files(entries, ['collection.json', 'prelaunch/prelaunch-sha256.json', 'run/results.json', 'run/google-maps/start-receipt.json',
+		'run/google-maps/observation-before-capture.json', 'run/google-maps/serial.log', 'run/google-maps/serial.log.gz',
+		'run/google-maps/application.png', 'run/google-maps/network.pcap', 'media/boot-after-run.img', 'media/efivars-after-run.fd',
+		'supplemental/harness.log', 'visual-notes.txt', 'audit/omitted-sockets.json'])!
+	receipt := object(root + '/collection.json')!
+	run := receipt['run']!.str()
+	build := receipt['build']!.str()
+	ids(run, build)!
+	repo := receipt['repo_root']!.str()
+	prepared := base + 'maps' + run
+	paired := base + 'compound' + build
+	replica := 'prelaunch/prelaunch/replica/'
+	prep := replica + prepared
+	regular_files(entries, [prep + '/prelaunch-sha256.json', prep + '/preparation-receipt.json', 'prelaunch/prelaunch/generation.generation.json'])!
+	assert entries['prelaunch/prelaunch-sha256.json']! == receipt['prelaunch_pin']!.str()
+	equal_maps(subtree(entries, 'prelaunch/prelaunch'), read_map(root + '/prelaunch/prelaunch-sha256.json')!)!
+	pins := read_map(root + '/' + prep + '/prelaunch-sha256.json')!
+	for path, digest in pins { assert entries[replica + path.trim_left('/')]! == digest, path }
+	regular_files(entries, [prep + '/build-receipt.json'])!
+	suite_build := object(root + '/' + prep + '/build-receipt.json')!
+	assert suite_build['exit_code']!.int() == 0 && suite_build['completed_utc']!.str() != ''
+	assert suite_build['source_sha256']!.str() == entries[prep + '/suite' + run + '.v']!
+	assert suite_build['binary_sha256']!.str() == entries[prep + '/suite' + run]!
+	assert suite_build['nativeapk_source_sha256']!.str() == entries[prep + '/sources/nativeapk/install.v']!
+	assert suite_build['compiler_sha256']!.str() == pins['/Users/alex/code/v/v_old']!
+	assert suite_build['cc_sha256']!.str() == pins[suite_build['cc_path']!.str()]!
+	assert entries['prelaunch/prelaunch/frozen-inputs.json']! == frozen_pin
+	frozen := read_map(root + '/prelaunch/prelaunch/frozen-inputs.json')!
+	for path, digest in frozen {
+		if 'prelaunch/prelaunch/frozen-consumed/' + path in entries { assert entries['prelaunch/prelaunch/frozen-consumed/' + path]! == digest, path }
+	}
+	original := os.read_file(root + '/prelaunch/prelaunch/frozen-consumed/' + base + 'suite256-resume.v')!
+	suite := os.read_file(root + '/' + prep + '/suite' + run + '.v')!
+	classifier_equal(original, suite)!
+	assert pins[base + 'run-android-identity256']! == 'd6479d8a49f5d65c3190dfbca6e84f306d9becb4923ca89e93a678b2fe9fa5da'
+	for path in [base + 'GoogleMaps.apk', base + 'GooglePlayServices.apk', base + 'GooglePlayStore.apk'] { assert pins[path]! == frozen[path]! }
+	before := read_map(root + '/' + prep + '/runtime-before.json')!
+	after := read_map(root + '/' + prep + '/runtime-after.json')!
+	equal_maps(before, read_map(root + '/prelaunch/prelaunch/frozen-consumed/' + base + 'maps256/runtime-after.json')!)!
+	assert before.len == 109 && after.len == 109
+	mut changes := []string{}
+	for path, digest in before { if after[path]! != digest { changes << path } }
+	changes.sort()
+	mut overlays := [jar, native]
+	overlays.sort()
+	assert changes == overlays
+	assert after[jar]! == entries[replica + paired + '/framework/api-impl.jar']!
+	assert after[native]! == entries[replica + paired + '/native/libvinix-android-native.so']!
+	generation := object(root + '/prelaunch/prelaunch/generation.generation.json')!
+	assert generation['generated_source_sha256']!.str() == entries[replica + receipt['generated_helper']!.str().trim_left('/')]!
+	assert generation['source_manifest_sha256']!.as_map().len == 2
+	for suffix, key in {'.selector.v': 'selector_source_sha256', '.selector-bin': 'selector_binary_sha256', '.template.v': 'template_sha256'} {
+		assert entries['prelaunch/prelaunch/generation' + suffix]! == generation[key]!.str()
+	}
+	for kind, pin in generation['source_manifest_sha256']!.as_map() {
+		assert kind in ['framework', 'native']
+		prefix := replica + paired + '/' + kind + '/'
+		assert entries[prefix + 'sources.json']! == pin.str()
+		sources := read_map(root + '/' + prefix + 'sources.json')!
+		assert sources.len > 0
+		directory := if kind == 'framework' { 'sources/' } else { 'atlframework/' }
+		for path, digest in sources { assert entries[prefix + directory + path]! == digest, path }
+	}
+	for label in ['build-framework-compiler', 'build-framework', 'generate-native', 'build-native', 'fixture-compiler', 'fixture'] {
+		regular_files(entries, [replica + paired + '/' + label + '-receipt.json', replica + paired + '/' + label + '-before.json'])!
+		built := object(root + '/' + replica + paired + '/' + label + '-receipt.json')!
+		assert built['exit_code']!.int() == 0 && built['completed_utc']!.str() != ''
+		assert replica + paired + '/' + label + '-before.json' in entries
+		if label == 'build-framework' { assert built['output_sha256']!.str() == after[jar]! }
+		if label == 'build-native' { assert built['output_sha256']!.str() == after[native]! }
+	}
+	config := object(root + '/' + replica + base + 'attempt' + run + '.json')!
+	assert config['output']!.str() == base + 'attempt' + run
+	assert config['boot_image']!.str() == prepared + '/vm/boot.img' && config['efivars']!.str() == prepared + '/vm/efivars.fd'
+	assert config['applications']!.as_array().len == 1 && config['applications']!.as_array()[0].as_map()['startup_seconds']!.int() == 420
+	state := root + '/run/google-maps'
+	start := object(state + '/start-receipt.json')!
+	assert start['qemu_argv']!.as_array().map(it.str()) == qemu_arguments(config, repo)
+	mut start_pins := map[string]string{}
+	for path, digest in start['sha256']!.as_map() { start_pins[logical(path, repo)] = digest.str() }
+	expected := [prepared + '/suite' + run, base + 'attempt' + run + '.json', prepared + '/vm/boot.img', prepared + '/vm/efivars.fd',
+		config['qemu']!.str(), config['firmware']!.str(), prepared + '/runtime-after.json', base + 'maps-interact-unique258']
+	verify_start(start_pins, pins, expected)!
+	preparation := object(root + '/' + prep + '/preparation-receipt.json')!
+	assert start['recorded_before_qemu_run_utc']!.str() >= preparation['completed_before_launch_utc']!.str()
+	apps := json2.decode[[]json2.Any](os.read_file(root + '/run/results.json')!)!
+	assert apps.len == 1
+	app := apps[0].as_map()
+	assert app['id']!.str() == 'google-maps' && app['package']!.str() == 'com.google.android.apps.maps'
+	assert app['startup_timeout_seconds']!.int() == 420 && app['observation_elapsed_seconds']!.int() >= 420
+	assert app['qemu_alive_before_capture']!.bool() && !app['process_exited']!.bool()
+	for key, value in object(state + '/observation-before-capture.json')! { assert json2.encode(value) == json2.encode(app[key]!), key }
+	assert gzip.decompress(os.read_bytes(state + '/serial.log.gz')!)! == os.read_bytes(state + '/serial.log')!
+	assert entries['run/google-maps/serial.log']! == app['serial_sha256']!.str()
+	assert entries['run/google-maps/application.png']! == app['screenshot_sha256']!.str() && 'screenshot_error' !in app
+	assert os.file_size(state + '/network.pcap') > 24
+	harness := os.read_file(root + '/supplemental/harness.log')!
+	assert harness.contains('MAPS' + run + ' observation retained before final capture')
+	assert harness.contains('APK-SUITE result google-maps ' + app['outcome']!.str()) && !harness.contains('V panic')
+	for name, source in {'boot-after-run.img': 'boot.img', 'efivars-after-run.fd': 'efivars.fd'} {
+		assert os.file_size(root + '/media/' + name) == os.file_size(root + '/' + prep + '/vm/' + source)
+	}
+	assert entries['audit/collector.v']! == receipt['collector_source_sha256']!.str()
+	assert entries['audit/collector']! == receipt['collector_binary_sha256']!.str()
+	assert os.lstat(root + '/visual-notes.txt')!.get_filetype() == .regular && os.file_size(root + '/visual-notes.txt') > 0
+	omitted := json2.decode[[]string](os.read_file(root + '/audit/omitted-sockets.json')!)!
+	assert omitted.len <= 1 && omitted.all(it == 'google-maps/qmp.sock')
+	mut frames := []Frame{}
+	mut paths := entries.keys().filter(it.starts_with('run/') && it.ends_with('.png'))
+	paths.sort()
+	for path in paths { regular_files(entries, [path])!; frames << png_frame(root + '/' + path, path, entries[path]!)! }
+	assert frames.len > 0
+	return {'run': json2.Any(run), 'build': json2.Any(build), 'original_outcome': app['outcome']!, 'original_functional_passed': app['functional_passed']!,
+		'frames': json2.decode[json2.Any](json2.encode(frames))!, 'visual_conclusions': json2.Any('Root-authored visual-notes.txt is separate from the unchanged application classifier.')}
+}
+
+fn collect(run string, build string, prelaunch string, pin string, root string, notes string) ! {
+	ids(run, build)!
+	external_path(root)!
+	if os.lstat(notes)!.get_filetype() != .regular || os.file_size(notes) == 0 { return error('nonempty regular visual notes required') }
+	if hash(prelaunch + '/prelaunch-sha256.json')! != pin { return error('wrong prelaunch pin') }
+	repo := os.real_path(os.getwd())
+	needle := '-qmp unix:' + repo + '/' + base + 'attempt' + run + '/google-maps/qmp.sock'
+	if checked(['ps', '-A', '-o', 'command='])!.split_into_lines().any(it.contains(needle)) { return error('fresh replay QEMU is still active') }
+	source := os.read_file(@FILE)!
+	binary := os.read_bytes(os.executable())!
+	os.mkdir_all(root + '/audit')!
+	os.write_file(root + '/audit/collector.v', source)!
+	os.write_file_array(root + '/audit/collector', binary)!
+	clone(prelaunch, root + '/prelaunch')!
+	mut raw := map[string]string{}
+	mut omitted := []string{}
+	walk(base + 'attempt' + run, '', root + '/run', true, mut raw, mut omitted)!
+	write_json(root + '/audit/raw-sha256.json', raw)!
+	write_json(root + '/audit/omitted-sockets.json', omitted)!
+	supplemental := supplemental_logs(run, root + '/supplemental')!
+	write_json(root + '/audit/supplemental-sha256.json', supplemental)!
+	clone(base + 'maps' + run + '/vm/boot.img', root + '/media/boot-after-run.img')!
+	clone(base + 'maps' + run + '/vm/efivars.fd', root + '/media/efivars-after-run.fd')!
+	clone(notes, root + '/visual-notes.txt')!
+	mut after_raw := map[string]string{}
+	mut after_omitted := []string{}
+	walk(base + 'attempt' + run, '', '', true, mut after_raw, mut after_omitted)!
+	equal_maps(after_raw, raw)!
+	assert omitted == after_omitted
+	equal_maps(supplemental_logs(run, '')!, supplemental)!
+	// The generated source is one of the launch-pinned inputs. Locate it without
+	// consulting the now mutable helper source or historical checker paths.
+	pins := read_map(root + '/prelaunch/prelaunch/replica/' + base + 'maps' + run + '/prelaunch-sha256.json')!
+	mut helper := ''
+	for path, _ in pins { if path.ends_with('.v') && os.is_file(root + '/prelaunch/prelaunch/replica/' + path.trim_left('/'))
+		&& os.read_file(root + '/prelaunch/prelaunch/replica/' + path.trim_left('/'))!.contains("const target = base + 'maps" + run + "'") { helper = path } }
+	if helper == '' { return error('missing generated helper pin') }
+	write_json(root + '/collection.json', {'run': json2.Any(run), 'build': json2.Any(build), 'repo_root': json2.Any(repo), 'prelaunch_pin': json2.Any(pin),
+		'generated_helper': json2.Any(helper), 'collected_utc': json2.Any(time.utc().str()), 'source_revision': json2.Any(checked(['git', 'rev-parse', 'HEAD'])!.trim_space()),
+		'collector_source_sha256': json2.Any(sha256.sum(source.bytes()).hex()), 'collector_binary_sha256': json2.Any(sha256.sum(binary).hex()),
+		'omitted_special_file': json2.Any('Actual omitted stopped QMP socket paths are recorded in audit/omitted-sockets.json.')})!
+	println('MAPS REPLAY COLLECTED ' + root)
+}
+fn seal(root string) ! {
+	if os.exists(root + '/sha256.json') { return error('fresh seal required') }
+	entries := inventory(root)!
+	equal_maps(subtree(entries, 'run'), read_map(root + '/audit/raw-sha256.json')!)!
+	equal_maps(subtree(entries, 'supplemental'), read_map(root + '/audit/supplemental-sha256.json')!)!
+	write_json(root + '/validation.json', validate(root, entries)!)!
+	write_json(root + '/sha256.json', inventory(root)!)!
+	println('MAPS REPLAY SEALED pin=' + hash(root + '/sha256.json')!)
+}
+fn check(root string, pin string) ! {
+	if pin.len != 64 || hash(root + '/sha256.json')! != pin { return error('wrong complete bundle pin') }
+	entries := inventory(root)!
+	equal_maps(entries, read_map(root + '/sha256.json')!)!
+	equal_maps(subtree(entries, 'run'), read_map(root + '/audit/raw-sha256.json')!)!
+	equal_maps(subtree(entries, 'supplemental'), read_map(root + '/audit/supplemental-sha256.json')!)!
+	actual := validate(root, entries)!
+	recorded := object(root + '/validation.json')!
+	assert actual.len == recorded.len
+	for key, value in actual { assert json2.encode(value) == json2.encode(recorded[key]!), key }
+	println('MAPS REPLAY COMPLETE CHECK PASS entries=' + entries.len.str())
+}
+
+fn self_test(original_path string) ! {
+	root := os.temp_dir() + '/maps-replay-evidence-' + time.now().unix_micro().str()
+	os.mkdir_all(root + '/empty')!
+	os.write_file(root + '/item', 'original\x00bytes')!
+	os.symlink('item', root + '/link')!
+	os.symlink(os.getwd(), root + '/checkout-link')!
+	mut rejected := false
+	external_path(root + '/checkout-link/results') or { rejected = true }
+	assert rejected
+	os.rm(root + '/checkout-link')!
+	expected := inventory(root)!
+	assert expected['empty']! == 'directory' && expected['link']! == 'symlink:item'
+	equal_maps(inventory(root)!, expected)!
+	regular_files(expected, ['item'])!
+	rejected = false
+	regular_files(expected, ['link']) or { rejected = true }
+	assert rejected
+	rejected = false
+	regular_files({'link': 'symlink:' + 'a'.repeat(56)}, ['link']) or { rejected = true }
+	assert rejected
+	os.write_file(root + '/item', 'changed bytes')!
+	rejected = false
+	equal_maps(inventory(root)!, expected) or { rejected = true }
+	assert rejected
+	os.rm(root + '/item')!
+	rejected = false
+	equal_maps(inventory(root)!, expected) or { rejected = true }
+	assert rejected
+	// Header parsing tests dimensions without pretending to decode image pixels.
+	mut header := [u8(137), 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 4, 0, 0, 0, 3, 0]
+	os.write_file_array(root + '/frame.png', header)!
+	frame := png_frame(root + '/frame.png', 'frame.png', '')!
+	assert frame.width == 1024 && frame.height == 768
+	header[20] = 255
+	os.write_file_array(root + '/frame.png', header)!
+	rejected = false
+	png_frame(root + '/frame.png', 'frame.png', '') or { rejected = true }
+	assert rejected
+	os.write_file(root + '/frame.png', 'truncated')!
+	rejected = false
+	png_frame(root + '/frame.png', 'frame.png', '') or { rejected = true }
+	assert rejected
+	original := os.read_file(original_path)!
+	classifier_equal(original, original)!
+	rejected = false
+	classifier_equal(original, original.replace('fn observation(', 'fn changed_observation(')) or { rejected = true }
+	assert rejected
+	pins := {'suite': '0'.repeat(64), 'media': '1'.repeat(64)}
+	verify_start(pins, pins, pins.keys())!
+	rejected = false
+	verify_start({'suite': pins['suite']!, 'media': '2'.repeat(64)}, pins, pins.keys()) or { rejected = true }
+	assert rejected
+	rejected = false
+	verify_start({'suite': pins['suite']!}, pins, pins.keys()) or { rejected = true }
+	assert rejected
+	write_json(root + '/sha256.json', expected)!
+	rejected = false
+	check(root, 'f'.repeat(64)) or { rejected = true }
+	assert rejected
+	ids('275', '274')!
+	rejected = false
+	ids('275', '272') or { rejected = true }
+	assert rejected
+	probe := os.exec([os.executable(), '--assertion-probe'])
+	assert probe.exit_code != 0 && probe.output.contains('assert false')
+	println('MAPS REPLAY EVIDENCE SELF-TEST PASS changed/missing bytes, links/directories, malformed PNG, classifier mutation, missing/changed launch pins, wrong bundle pin, invalid IDs and live assertions; fixture=' + root)
+}
+
+fn main() {
+	$if prod { eprintln('replay evidence checker requires assertions; compile without -prod'); exit(2) }
+	if os.args.len == 2 && os.args[1] == '--assertion-probe' { assert false; return }
+	if os.args.len == 3 && os.args[1] == '--self-test' { self_test(os.args[2]) or { eprintln(err); exit(1) }; return }
+	if os.args.len == 8 && os.args[1] == 'collect' { collect(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7]) or { eprintln(err); exit(1) }; return }
+	if os.args.len == 3 && os.args[1] == 'seal' { seal(os.args[2]) or { eprintln(err); exit(1) }; return }
+	if os.args.len == 4 && os.args[1] == 'check' { check(os.args[2], os.args[3]) or { eprintln(err); exit(1) }; return }
+	eprintln('usage: maps-replay-evidence collect MAPS_ID BUILD_ID PRELAUNCH PIN DEST VISUAL_NOTES; seal ROOT; check ROOT PIN')
+	exit(2)
+}
