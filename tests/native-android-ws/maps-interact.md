@@ -21,6 +21,10 @@ files, and kill/wait cleanup. `interaction.log` records command boundaries, outp
 paths, exit status and timeout state. Deadline, command failure or capped residual
 output draining fails the action.
 
+Command filenames include the driver PID, wall-clock nanoseconds and monotonic
+time, and existing output paths are rejected. Darwin's process-relative monotonic
+time alone can repeat across driver invocations and overwrite earlier streams.
+
 The controlled V fixture runs without a guest or QMP server:
 
 ```sh
@@ -45,3 +49,20 @@ The original script and `build/android-maps/maps-interact` binary used by
 Maps250 remain preserved under the sibling `maps250-251-2026-10-24/inputs/`.
 These fixture results qualify subprocess handling;
 they do not qualify the screenshot probes or a complete Maps workflow.
+
+Source revision `1114bb985ba4d3897e44b500e8e68bff5cbf8e19` fixes filename
+collisions. The extended fixture passed 32 separate driver invocations into one
+run directory, preserving
+all 64 unique stdout/stderr streams and their tokens. Exact binary flood
+preservation, exit-7 propagation and hung-command termination/reaping also passed
+(85 / 26 / 30024 ms). Complete tested sources, binaries, compiler, raw logs and
+commands recorded after execution are retained at
+`/Users/alex/.local/state/vinix/android/maps-interact-unique258-2026-10-24`.
+The 99-entry `sha256.json` SHA256 is
+`ccf1c4eeff9011d560bef1bfc1e63929f78f7169d2ac697e98459a8975fb5d95`.
+
+A read-only audit found no repeated command stream paths among Maps256's
+22 commands. Maps257 reused `command-37333` for its `search-ready` and
+`paris-query` captures: the earlier capture's stdout/stderr files were overwritten.
+Its original interaction timeline and separate screenshots remain available.
+Both historical runs retain their original frozen driver and artifacts.
