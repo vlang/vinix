@@ -125,6 +125,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_child_states(smali)!
  framework_child_order(smali)!
  framework_gradient_colors(smali)!
+ framework_vector_fill_rules(smali)!
  framework_paths(smali)!
  framework_render_nodes(smali)!
  framework_render_node_outline(smali)!

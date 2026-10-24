@@ -119,3 +119,27 @@ return v4
  text = text.replace(marker, '    :cond_4e\ninvoke-virtual {p0}, Landroid/graphics/drawable/GradientDrawable;->getState()[I\nmove-result-object v0\ninvoke-virtual {p0, v0}, Landroid/graphics/drawable/GradientDrawable;->onStateChange([I)Z\n    return-void')
  os.write_file(path, text)!
 }
+
+// XML fillType belongs to each vector path, including when the renderer reuses
+// its temporary Path for paths with different rules. Path.addPath preserves the
+// destination fill rule, so apply the parsed rule to that destination explicitly.
+fn framework_vector_fill_rules(smali string) ! {
+ path := smali + '/android/graphics/drawable/VectorDrawable$VFullPath.smali'
+ mut text := os.read_file(path)!
+ start := text.index('.method private updateStateFromTypedArray(Landroid/content/res/TypedArray;)V\n') or { return error('missing vector path parser') }
+ end := start + (text[start..].index('.end method') or { return error('unterminated vector path parser') })
+ parser := text[start..end]
+ marker := '    iput v0, p0, Landroid/graphics/drawable/VectorDrawable$VFullPath;->mTrimPathStart:F'
+ if parser.count(marker) != 1 { return error('unexpected vector path fill-rule parser entry') }
+ text = text[..start] + parser.replace(marker, marker + '\n\n    const/16 v0, 0xd\n    iget v1, p0, Landroid/graphics/drawable/VectorDrawable$VFullPath;->mFillRule:I\n    invoke-virtual {p1, v0, v1}, Landroid/content/res/TypedArray;->getInt(II)I\n    move-result v0\n    iput v0, p0, Landroid/graphics/drawable/VectorDrawable$VFullPath;->mFillRule:I') + text[end..]
+ os.write_file(path, text)!
+ renderer := smali + '/android/graphics/drawable/VectorDrawable$VPathRenderer.smali'
+ mut drawing := os.read_file(renderer)!
+ reset := '    invoke-virtual {v3}, Landroid/graphics/Path;->reset()V'
+ if drawing.count(reset) != 1 { return error('unexpected vector render-path reset') }
+ drawing = drawing.replace(reset, reset + '\n    sget-object v4, Landroid/graphics/Path$FillType;->WINDING:Landroid/graphics/Path$FillType;\n    invoke-virtual {v3, v4}, Landroid/graphics/Path;->setFillType(Landroid/graphics/Path$FillType;)V')
+ fill := '    iget v1, p2, Landroid/graphics/drawable/VectorDrawable$VFullPath;->mFillColor:I'
+ if drawing.count(fill) != 1 { return error('unexpected vector path fill-rule draw entry') }
+ drawing = drawing.replace(fill, '    iget v1, p2, Landroid/graphics/drawable/VectorDrawable$VFullPath;->mFillRule:I\n    if-nez v1, :vinix_even_odd\n    sget-object v1, Landroid/graphics/Path$FillType;->WINDING:Landroid/graphics/Path$FillType;\n    goto :vinix_fill_rule\n    :vinix_even_odd\n    sget-object v1, Landroid/graphics/Path$FillType;->EVEN_ODD:Landroid/graphics/Path$FillType;\n    :vinix_fill_rule\n    invoke-virtual {v3, v1}, Landroid/graphics/Path;->setFillType(Landroid/graphics/Path$FillType;)V\n\n' + fill)
+ os.write_file(renderer, drawing)!
+}
