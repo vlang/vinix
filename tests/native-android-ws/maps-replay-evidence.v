@@ -127,21 +127,22 @@ fn classifier_equal(original string, suite string) ! {
 		|| sha256.sum(observation(original).bytes()).hex() != classifier_pin { return error('original observation classifier differs') }
 }
 
-// Maps277 exited before its configured window. Retain that exact failed run,
+// Maps277/279 exited before their configured windows. Retain those exact failures,
 // without changing the application classifier or other replays' live window.
 fn observation_window(run string, build string, app map[string]json2.Any, serial string) ! {
 	if app['startup_timeout_seconds']!.int() != 420 { return error('configured observation window differs') }
-	if run == '277' && build == '276' {
-		if app['observation_elapsed_seconds']!.int() != 262 || !app['process_exited']!.bool()
+	if (run == '277' && build == '276') || (run == '279' && build == '278') {
+		elapsed := if run == '277' { 262 } else { 280 }
+		if app['observation_elapsed_seconds']!.int() != elapsed || !app['process_exited']!.bool()
 			|| !app['qemu_alive_before_capture']!.bool() || !app['backend_ready']!.bool()
 			|| !app['native_maps_observed']!.bool() || app['outcome']!.str() != 'startup_failed'
 			|| app['functional_passed']! !is json2.Null {
-			return error('Maps277 failed-run observation differs')
+			return error('Maps' + run + ' failed-run observation differs')
 		}
 		markers := app['failure_markers']!.as_array().map(it.str())
 		for marker in ['ANDROID-WS-FAIL main looper', tooltip277, exit277] {
 			if marker !in markers || marker !in serial.split_into_lines() {
-				return error('Maps277 missing exact failure marker: ' + marker)
+				return error('Maps' + run + ' missing exact failure marker: ' + marker)
 			}
 		}
 		return
@@ -504,31 +505,37 @@ fn self_test(original_path string) ! {
 	}
 	failed_serial := 'ANDROID-WS-FAIL main looper\n' + tooltip277 + '\n' + exit277 + '\n'
 	observation_window('277', '276', failed277, failed_serial)!
-	for key, value in {
-		'startup_timeout_seconds': json2.Any(419)
-		'observation_elapsed_seconds': json2.Any(263)
-		'process_exited': json2.Any(false)
-		'qemu_alive_before_capture': json2.Any(false)
-		'backend_ready': json2.Any(false)
-		'native_maps_observed': json2.Any(false)
-		'outcome': json2.Any('passed')
-		'functional_passed': json2.Any(true)
-	} {
-		mut changed := json2.decode[map[string]json2.Any](json2.encode(failed277))!
-		changed[key] = value
-		rejected = false
-		observation_window('277', '276', changed, failed_serial) or { rejected = true }
-		assert rejected, key
-	}
-	for marker in ['ANDROID-WS-FAIL main looper', tooltip277, exit277] {
-		mut changed := json2.decode[map[string]json2.Any](json2.encode(failed277))!
-		changed['failure_markers'] = json2.Any(failed277['failure_markers']!.as_array().filter(it.str() != marker))
-		rejected = false
-		observation_window('277', '276', changed, failed_serial) or { rejected = true }
-		assert rejected, marker
-		rejected = false
-		observation_window('277', '276', failed277, failed_serial.replace(marker, '')) or { rejected = true }
-		assert rejected, marker
+	for run, elapsed in {'277': 262, '279': 280} {
+		build := (run.int() - 1).str()
+		mut failed := json2.decode[map[string]json2.Any](json2.encode(failed277))!
+		failed['observation_elapsed_seconds'] = json2.Any(elapsed)
+		observation_window(run, build, failed, failed_serial)!
+		for key, value in {
+			'startup_timeout_seconds': json2.Any(419)
+			'observation_elapsed_seconds': json2.Any(elapsed + 1)
+			'process_exited': json2.Any(false)
+			'qemu_alive_before_capture': json2.Any(false)
+			'backend_ready': json2.Any(false)
+			'native_maps_observed': json2.Any(false)
+			'outcome': json2.Any('passed')
+			'functional_passed': json2.Any(true)
+		} {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(failed))!
+			changed[key] = value
+			rejected = false
+			observation_window(run, build, changed, failed_serial) or { rejected = true }
+			assert rejected, key
+		}
+		for marker in ['ANDROID-WS-FAIL main looper', tooltip277, exit277] {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(failed))!
+			changed['failure_markers'] = json2.Any(failed['failure_markers']!.as_array().filter(it.str() != marker))
+			rejected = false
+			observation_window(run, build, changed, failed_serial) or { rejected = true }
+			assert rejected, marker
+			rejected = false
+			observation_window(run, build, failed, failed_serial.replace(marker, '')) or { rejected = true }
+			assert rejected, marker
+		}
 	}
 	rejected = false
 	observation_window('279', '278', failed277, failed_serial) or { rejected = true }
@@ -537,9 +544,12 @@ fn self_test(original_path string) ! {
 	live['observation_elapsed_seconds'] = json2.Any(420)
 	live['process_exited'] = json2.Any(false)
 	observation_window('275', '274', live, '')!
-	observation_window('279', '278', live, '')!
+	observation_window('281', '280', live, '')!
 	rejected = false
 	observation_window('277', '276', live, failed_serial) or { rejected = true }
+	assert rejected
+	rejected = false
+	observation_window('279', '278', live, failed_serial) or { rejected = true }
 	assert rejected
 	assert build_labels('276') == ['generate-native', 'build-native']
 	assert build_labels('278') == ['build-framework-compiler', 'build-framework', 'fixture-compiler', 'fixture']
@@ -559,7 +569,7 @@ fn self_test(original_path string) ! {
 	assert rejected
 	probe := os.exec([os.executable(), '--assertion-probe'])
 	assert probe.exit_code != 0 && probe.output.contains('assert false')
-	println('MAPS REPLAY EVIDENCE SELF-TEST PASS changed/missing bytes, links/directories, malformed PNG, classifier mutation, missing/changed launch pins, wrong bundle pin, exact failed277 and negative failure markers/window, unchanged live windows, invalid IDs and live assertions; fixture=' + root)
+	println('MAPS REPLAY EVIDENCE SELF-TEST PASS changed/missing bytes, links/directories, malformed PNG, classifier mutation, missing/changed launch pins, wrong bundle pin, exact failed277/279 and negative failure markers/window, unchanged live windows, invalid IDs and live assertions; fixture=' + root)
 }
 
 fn main() {
