@@ -18782,10 +18782,27 @@ The shared map-table fixture passes against Apple Foundation and the V runtime
 under ASan+UBSan, normally and with deterministic Swift hashing. All fourteen
 ARM64 fixtures and runners build, and the focused guest passes all eleven
 map-table, credential, telephony, cache, calendar and notification fixtures,
-including 27 map-table rejection cases. The fresh Fortnite probe resolves
-`NSMapTable` and stops at `_OBJC_CLASS_$_NSLock` during linking, before application
+including 27 map-table rejection cases. That milestone's Fortnite probe resolved
+`NSMapTable` and stopped at `_OBJC_CLASS_$_NSLock` during linking, before application
 entry. The [map-table report](../tests/ios/map-table-report.md) records the source
-revision, complete external archive, checksums and verification. Full native
+revision, complete external archive, checksums and verification.
+
+The lock milestone adds nonrecursive `NSLock` with Apple's measured 88-byte
+layout and seven method encodings, copied names, blocking acquisition,
+`tryLock`, deadline waits and owner-checked unlock. Waits and property-copy
+callbacks run outside the runtime lock, with pinned receivers. Custom
+subclasses, copying, coding, uninitialized use and destruction of active locks
+fail explicitly.
+
+The shared lock fixture passes against Apple Foundation and the V runtime
+under ASan+UBSan, normally and with deterministic Swift hashing. The recursive
+lock host regression also passes in both modes. All sixteen ARM64 fixtures and
+runners build, and the focused guest passes all thirteen lock, map-table,
+credential, telephony, cache, calendar and notification fixtures, including
+28 lock and 23 recursive-lock rejection cases. The fresh Fortnite probe resolves
+`NSLock` and stops at `_OBJC_CLASS_$_NSNumberFormatter` during linking, before
+application entry. The [lock report](../tests/ios/lock-report.md) records the
+source revision, complete external archive, checksums and verification. Full native
 regression, Swift support, Fortnite initialization, rendering, login and gameplay
 remain unverified. The audits below include this implementation and do not
 execute app code.
@@ -18795,12 +18812,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,090 | 71 | 78 |
+| Fortnite executable | 2,091 | 70 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,930 | 74 | 114 |
+| All images | 2,931 | 73 | 114 |
 
-The C++/GLES/Text variant reports 2,944 resolved imports, 60 unresolved strong
+The C++/GLES/Text variant reports 2,945 resolved imports, 59 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
