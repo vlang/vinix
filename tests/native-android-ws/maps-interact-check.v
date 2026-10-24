@@ -18,6 +18,11 @@ fn fixture() ! {
 	run := os.dir(os.args[at + 1])
 	os.write_file(run + '/command.pid', os.getpid().str())!
 	match mode {
+		'stamp' {
+			assert os.args.len > 3
+			println('stdout token=' + os.args[3])
+			eprintln('stderr token=' + os.args[3])
+		}
 		'flood' {
 			mut output := os.stdout()
 			mut errors := os.stderr()
@@ -97,6 +102,40 @@ fn check(driver string, state string, mode string) ! {
 	println('MAPS-INTERACT-CHECK PASS ' + mode + ' elapsed_ms=' + (elapsed / u64(time.millisecond)).str())
 }
 
+fn check_separate_invocations(driver string, state string) ! {
+	run := state + '/separate-invocations'
+	os.mkdir(run)!
+	mut streams := map[string]string{}
+	for index in 0 .. 32 {
+		token := index.str()
+		mut process := os.new_process(driver)
+		process.set_args([run, 'input', 'stamp', token])
+		process.set_work_folder(state)
+		process.set_redirect_stdio_merged()
+		process.set_stdin_path('/dev/null')
+		process.run()
+		process.wait()
+		output := process.stdout_read()
+		code := process.code
+		process.close()
+		assert code == 0, output
+		for path, expected in streams { assert os.read_file(path)! == expected, path + ' overwritten' }
+		for path in os.ls(run)! {
+			if !path.ends_with('.stdout.log') && !path.ends_with('.stderr.log') { continue }
+			full := run + '/' + path
+			if full in streams { continue }
+			stream := if path.ends_with('.stdout.log') { 'stdout' } else { 'stderr' }
+			assert os.read_file(full)! == stream + ' token=' + token + '\n', full
+			streams[full] = os.read_file(full)!
+		}
+		assert streams.len == (index + 1) * 2, 'stream path reused by another driver process'
+	}
+	timeline := os.read_file(run + '/interaction.log')!
+	assert timeline.split_into_lines().filter(it.contains(' BEGIN ')).len == 32
+	assert timeline.split_into_lines().filter(it.contains(' END exit=0 ')).len == 32
+	println('MAPS-INTERACT-CHECK PASS separate invocations=32 preserved streams=64')
+}
+
 fn execute_checks() ! {
 	if os.base(os.executable()) == 'android-run' {
 		fixture()!
@@ -109,6 +148,7 @@ fn execute_checks() ! {
 	os.mkdir_all(state + '/build')!
 	os.cp(os.executable(), state + '/build/android-run')!
 	os.chmod(state + '/build/android-run', 0o755)!
+	check_separate_invocations(driver, state)!
 	for mode in ['flood', 'fail', 'hang'] { check(driver, state, mode)! }
 	println('MAPS-INTERACT-CHECK PASS output preservation, exit failure, 30-second timeout and command reap; evidence=' + state)
 }

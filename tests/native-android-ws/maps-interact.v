@@ -31,9 +31,14 @@ fn drain(mut process os.Process, mut stdout os.File, mut stderr os.File) !bool {
 }
 
 fn command(run string, arguments []string) ! {
-	name := 'command-' + time.sys_mono_now().str()
+	// Darwin's monotonic clock is relative to each process. Separate invocations
+	// can therefore report the same value; include their PID and wall time.
+	name := 'command-' + os.getpid().str() + '-' + time.utc().unix_nano().str() + '-' + time.sys_mono_now().str()
 	out_path := run + '/' + name + '.stdout.log'
 	err_path := run + '/' + name + '.stderr.log'
+	if os.exists(out_path) || os.is_link(out_path) || os.exists(err_path) || os.is_link(err_path) {
+		return error('command output path already exists: ' + name)
+	}
 	mut stdout := os.create(out_path)!
 	defer { stdout.close() }
 	mut stderr := os.create(err_path)!
