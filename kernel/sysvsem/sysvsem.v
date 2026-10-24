@@ -23,6 +23,7 @@ const sem_undo = 0x1000
 const ipc_rmid = 0
 const ipc_set = 1
 const ipc_stat = 2
+const ipc_info = 3
 const getpid = 11
 const getval = 12
 const getall = 13
@@ -30,6 +31,10 @@ const getncnt = 14
 const getzcnt = 15
 const setval = 16
 const setall = 17
+const sem_stat = 18
+const sem_info = 19
+const sem_stat_any = 20
+const max_sets = 4096
 const max_sems = 32
 const max_ops = 32
 const semvmx = 32767
@@ -63,6 +68,21 @@ mut:
     words [7]u64
 }
 
+// Linux's native seminfo consists of ten signed 32-bit integers on both ABIs.
+struct SemInfo {
+mut:
+    semmap i32
+    semmni i32
+    semmns i32
+    semmnu i32
+    semmsl i32
+    semopm i32
+    semume i32
+    semusz i32
+    semvmx i32
+    semaem i32
+}
+
 fn semid_size() u64 {
     $if amd64 { return 104 } $else { return 88 }
 }
@@ -77,6 +97,9 @@ struct Set {
 mut:
     kernel_charge kbudget.Charge
     id int
+    // Enumeration indices survive unrelated array deletions. A removed set
+    // may remain pinned by waiters, but stops occupying its public slot.
+    index int
     key i32
     // Creator credentials survive owner changes. All metadata lives inline
     // with the set; no namespace or user-memory pointer is borrowed.
@@ -297,6 +320,58 @@ fn find_key_unlocked(key i32) &Set {
     return unsafe { nil }
 }
 
+fn find_index_unlocked(index int) &Set {
+    for set in sets {
+        if !set.removed && set.index == index { return set }
+    }
+    return unsafe { nil }
+}
+
+fn vacant_index_unlocked() int {
+    // Fixed stack storage; no allocation on creation or inspection paths.
+    mut occupied := [64]u64{}
+    for set in sets {
+        if !set.removed { occupied[set.index / 64] |= u64(1) << (set.index % 64) }
+    }
+    for index in 0 .. max_sets {
+        if occupied[index / 64] & (u64(1) << (index % 64)) == 0 { return index }
+    }
+    return -1
+}
+
+fn inspect_limits(command i32, argument u64) (u64, u64) {
+    mut info := unsafe { &SemInfo(C.vinix_stack_alloc(sizeof(SemInfo))) }
+    unsafe {
+        *info = SemInfo{
+            // These three unused fields and SEMUSZ retain Linux's legacy
+            // constants. They do not advertise implemented SEM_UNDO support.
+            semmap: 1024000000
+            semmnu: 1024000000
+            semume: 500
+            semmni: max_sets
+            semmns: max_sets * max_sems
+            semmsl: max_sems
+            semopm: max_ops
+            semusz: if command == sem_info { 0 } else { 20 }
+            semvmx: semvmx
+            semaem: if command == sem_info { 0 } else { semvmx }
+        }
+    }
+    mut highest := 0
+    sets_lock.acquire()
+    for set in sets {
+        if set.removed { continue }
+        if set.index > highest { highest = set.index }
+        if command == sem_info {
+            info.semusz++
+            info.semaem += i32(set.values.len)
+        }
+    }
+    sets_lock.release()
+    if !usercopy.copy_to_user(argument, info, sizeof(SemInfo)) { return errno.err, errno.efault }
+    return u64(highest), 0
+}
+
 fn destroy_unlocked(set &Set) {
     index := sets.index(set)
     if index >= 0 {
@@ -342,7 +417,8 @@ pub fn syscall_semget(_ voidptr, key i32, nsems i32, flags i32) (u64, u64) {
         sets_lock.release()
         return errno.err, errno.einval
     }
-    if sets.len >= 4096 { sets_lock.release(); return errno.err, errno.enospc }
+    index := vacant_index_unlocked()
+    if index < 0 { sets_lock.release(); return errno.err, errno.enospc }
     charge := proc.reserve_kernel(.ipc, 4096) or { sets_lock.release(); return errno.err, errno.get() }
     id := next_id
     next_id++
@@ -353,6 +429,7 @@ pub fn syscall_semget(_ voidptr, key i32, nsems i32, flags i32) (u64, u64) {
     sets << &Set{
         kernel_charge: charge
         id: id
+        index: index
         key: key
         uid: who.uid
         gid: who.gid
@@ -371,22 +448,26 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) 
     // Linux rejects a negative ID first, then validates SETVAL's signed
     // union member before looking up a nonnegative ID or checking semnum.
     if id < 0 { return errno.err, errno.einval }
+    if command == ipc_info || command == sem_info { return inspect_limits(command, argument) }
     if command == setval && (i32(argument) < 0 || i32(argument) > semvmx) {
         return errno.err, errno.erange
     }
     // Unsupported commands do not acquire read/alter permission semantics.
-    if command !in [ipc_rmid, ipc_set, ipc_stat, getpid, getval, getall, getncnt, getzcnt, setval, setall] {
+    if command !in [ipc_rmid, ipc_set, ipc_stat, sem_stat, sem_stat_any, getpid, getval, getall, getncnt, getzcnt, setval, setall] {
         return errno.err, errno.einval
     }
     // IPC_SET imports the full native structure before lookup/ownership
     // checks. Faults must not change metadata or hold a set lock/pointer.
-    mut info := SemIdDs{}
-    if command == ipc_set && !usercopy.copy_from_user(unsafe { voidptr(&info) }, argument, semid_size()) {
+    mut info := unsafe { &SemIdDs(C.vinix_stack_alloc(sizeof(SemIdDs))) }
+    unsafe { *info = SemIdDs{} }
+    if command == ipc_set && !usercopy.copy_from_user(info, argument, semid_size()) {
         return errno.err, errno.efault
     }
     who := identity()
     sets_lock.acquire()
-    mut set := find_id_unlocked(int(id))
+    mut set := if command == sem_stat || command == sem_stat_any {
+        find_index_unlocked(int(id))
+    } else { find_id_unlocked(int(id)) }
     if set == unsafe { nil } || set.removed {
         sets_lock.release()
         return errno.err, errno.einval
@@ -401,8 +482,8 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) 
         if !may_remove(&who, set) { sets_lock.release(); return errno.err, errno.eperm }
     } else {
         requested := if command == setval || command == setall { u32(2) } else { u32(4) }
-        if !may_use(&who, set, requested) { sets_lock.release(); return errno.err, errno.eacces }
-        if command != ipc_stat && command != getall && command != setall && (number < 0 || number >= set.values.len) {
+        if command != sem_stat_any && !may_use(&who, set, requested) { sets_lock.release(); return errno.err, errno.eacces }
+        if command !in [ipc_stat, sem_stat, sem_stat_any, getall, setall] && (number < 0 || number >= set.values.len) {
             sets_lock.release()
             return errno.err, errno.einval
         }
@@ -422,7 +503,7 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) 
             sets_lock.release()
             return 0, 0
         }
-        ipc_stat {
+        ipc_stat, sem_stat, sem_stat_any {
             info.perm.key = set.key
             info.perm.uid = set.uid
             info.perm.gid = set.gid
@@ -437,11 +518,12 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) 
                 info.words[1] = u64(set.ctime)
                 info.words[2] = u64(set.values.len)
             }
+            result := if command == ipc_stat { 0 } else { set.id }
             sets_lock.release()
-            if !usercopy.copy_to_user(argument, unsafe { voidptr(&info) }, semid_size()) {
+            if !usercopy.copy_to_user(argument, info, semid_size()) {
                 return errno.err, errno.efault
             }
-            return 0, 0
+            return u64(result), 0
         }
         ipc_rmid {
             set.removed = true
