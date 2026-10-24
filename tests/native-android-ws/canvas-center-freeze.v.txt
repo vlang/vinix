@@ -1,0 +1,112 @@
+const archive274 = '/Users/alex/.local/state/vinix/android/compound274-2026-10-24'
+const jar274 = '1a026975748c693f11c09c7fc080f8b72c20c0638c01996f226698cc740f92f6'
+const native274 = '27f1ec2604f93f55d8b3557fb7e34dc754daedde854a6041939503cb72cf12a7'
+const apk274 = '214421dcae1874873e58023080e7746e7e385034f71e0af9a5e56247b1b2f3ed'
+
+fn check_native() ! {
+	mut actual := map[string]string{}
+	for path in os.walk_ext(base + '/native/atlframework', '.v') { actual[path.all_after(base + '/native/atlframework/')] = hash(path)! }
+	assert actual == json2.decode[map[string]string](os.read_file(base + '/native/sources.json')!)!
+}
+
+fn freeze() ! {
+	assert !os.exists(base + '/framework') && !os.exists(base + '/native')
+	assert hash(previous + '/framework/api-impl.jar')! == jar274
+	assert hash(previous + '/native/libvinix-android-native.so')! == native274
+	assert hash(previous + '/apk/probe.apk')! == apk274
+	write_json(base + '/attempt.json', {'attempt': attempt, 'base': base, 'audit': audit, 'baseline_attempt': baseline_attempt, 'reused_baseline': archive274 + '/run-fixed', 'fixture_source': fixture_source, 'fixture_frozen': fixture_frozen})!
+	framework := snapshot('framework', 126)!
+	native := snapshot('native', 83)!
+	old := native['graphics.v']!
+	live := os.read_file('build-support/android/nativews/graphics.v')!
+	assert sha256.sum(live.bytes()).hex() == 'cb05db13887d7a019cee731b0994ce1b54b2f0619f67c2eae0fa09aeabec9739'
+	start := 'fn ws_rect('
+	end := '\nfn ws_codepoint('
+	assert old.count(start) == 1 && live.count(start) == 1
+	helper := 'fn ws_rect_bound(' + live.all_after('fn ws_rect_bound(').all_before(start)
+	assert helper.count('\nfn ') == 0 && helper.contains('C.ceilf(edge - 0.5)')
+	assert old.all_before(start) + helper == live.all_before(start)
+	assert old.all_after(end) == live.all_after(end)
+	assert section(live, start, end).contains('if !(l < r && t < b) { return }')
+	for edge in ['l, draw.transform.left, draw.transform.right', 't, draw.transform.top, draw.transform.bottom', 'r, draw.transform.left, draw.transform.right', 'b, draw.transform.top, draw.transform.bottom'] { assert section(live, start, end).contains('ws_rect_bound(' + edge + ')') }
+	os.write_file(base + '/native/atlframework/graphics.v', live)!
+	for kind in ['framework', 'native'] {
+		directory := if kind == 'framework' { '/sources/' } else { '/atlframework/' }
+		mut exact := map[string]string{}
+		mut pins := map[string]string{}
+		mut changed := []string{}
+		prior := if kind == 'framework' { framework } else { native }
+		for path in os.walk_ext(base + '/' + kind + directory, '.v') {
+			name := path.all_after(base + '/' + kind + directory)
+			exact[name] = os.read_file(path)!
+			pins[name] = hash(path)!
+			if prior[name]! != exact[name]! { changed << name }
+		}
+		assert changed == if kind == 'native' { ['graphics.v'] } else { []string{} }
+		write_json(base + '/' + kind + '/sources.json', pins)!
+		write_json(base + '/' + kind + '/source-delta.json', changed)!
+		os.write_file_array(base + '/' + kind + '/exact-sources.json.gz', gzip.compress(json2.encode(exact).bytes())!)!
+	}
+	for name in ['androidfw_c_api.h', 'sqlite3.h', 'stb_image.h', 'stb_truetype.h', 'bindings.txt'] { clone_file(previous + '/native/' + name, base + '/native/' + name)! }
+	for name in ['api-impl.jar', 'framework-manifest.json'] { clone_file(previous + '/framework/' + name, base + '/framework/' + name)! }
+	clone_file(previous + '/apk/probe.apk', base + '/apk/probe.apk')!
+	clone_file(previous + '/source/paint-xfermode-fixture.v', fixture_frozen)!
+	mut inputs := map[string]string{}
+	for path in ['tests/native-android-ws/canvas-center-run.v', 'tests/native-android-ws/canvas-center-freeze.v.txt', 'build-support/android/nativews/graphics.v', previous + '/framework/api-impl.jar', previous + '/native/libvinix-android-native.so', previous + '/apk/probe.apk', compiler] { inputs[path] = hash(path)!; clone_file(path, base + '/inputs/' + path.trim_left('/'))! }
+	old_inputs := json2.decode[map[string]string](os.read_file(previous + '/frozen-inputs.json')!)!
+	for path, pin in old_inputs {
+		if path == '/opt/homebrew/bin/aarch64-linux-musl-gcc' || path.contains('/calculator/overlay/') {
+			assert hash(path)! == pin, path
+			inputs[path] = pin
+			clone_file(path, base + '/inputs/' + path.trim_left('/'))!
+		}
+	}
+	for name in ['androidfw_c_api.h', 'sqlite3.h', 'stb_image.h', 'stb_truetype.h', 'bindings.txt'] { inputs[base + '/native/' + name] = hash(base + '/native/' + name)! }
+	write_json(base + '/frozen-inputs.json', inputs)!
+	freeze_closure('native-generator', [compiler, '-print-v-files', 'tests/linuxkpi/generate_module.v'])!
+	println('COMPOUND276 FROZEN native graphics-only; same274 JAR/APK; red baseline retained274 fixed-side run')
+}
+
+fn prepare_reused_baseline() ! {
+	mut equality := map[string]string{}
+	old := json2.decode[map[string]string](os.read_file(archive274 + '/prelaunch/paired-initial-equality.json')!)!
+	for name in ['boot.img', 'efivars.fd'] {
+		equality['vm/' + name] = hash(base + '/vm-fixed/' + name)!
+		assert equality['vm/' + name]! == old['vm/' + name]!, name
+	}
+	mut files := []string{}
+	for path in os.walk_ext(base + '/native-fixed', '') {
+		if !os.is_file(path) { continue }
+		name := path.all_after(base + '/native-fixed/')
+		files << name
+		if name == 'libvinix-android-native.so' { continue }
+		equality['native/' + name] = hash(path)!
+		assert equality['native/' + name]! == hash(archive274 + '/prelaunch/native-fixed/' + name)!, name
+	}
+	mut prior := os.walk_ext(archive274 + '/prelaunch/native-fixed', '').filter(os.is_file(it)).map(it.all_after(archive274 + '/prelaunch/native-fixed/'))
+	files.sort()
+	prior.sort()
+	assert files == prior
+	equality['same_apk'] = hash(base + '/apk/probe.apk')!
+	assert equality['same_apk']! == apk274
+	write_json(base + '/paired-initial-equality.json', equality)!
+	mut reference := map[string]string{}
+	for path in ['failed-attempt-sha256.json', 'run-fixed-before.json', 'run-fixed-receipt.json', 'run-fixed.log', 'run-fixed/results.json', 'run-fixed/bootstrap-fixture/serial.log', 'run-fixed/bootstrap-fixture/serial.log.gz', 'run-fixed/bootstrap-fixture/application.png', 'prelaunch/framework/api-impl.jar', 'prelaunch/native/libvinix-android-native.so', 'prelaunch/apk/probe.apk'] { reference[archive274 + '/' + path] = hash(archive274 + '/' + path)! }
+	write_json(base + '/reused-baseline.json', reference)!
+}
+
+// NATIVE_BUILD
+fn build() ! {
+	for path, pin in json2.decode[map[string]string](os.read_file(base + '/frozen-inputs.json')!)! { assert hash(path)! == pin, path }
+	check_native()!
+	os.setenv('VINIX_V_COMPILER', compiler, true)
+	verify_closure('native-generator')!
+	compile_step('generate-native', [compiler, '-nocache', '-cc', 'cc', 'run', 'tests/linuxkpi/generate_module.v', base + '/native/atlframework', base + '/native/android-native.c', '--arch', 'arm64'], base + '/native/android-native.c')!
+	verify_closure('native-generator')!
+	runtime := 'build/android-framework/calculator/overlay/opt/vinix-android-aarch64'
+	compile_step('build-native', ['/opt/homebrew/bin/aarch64-linux-musl-gcc', '-D_GNU_SOURCE', '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-unused-function', '-Wno-unused-label', '-Wno-unused-parameter', '-fvisibility=hidden', '-shared', '-fPIC', '-I' + base + '/native', '-Wl,-z,max-page-size=65536', '-Wl,--allow-shlib-undefined', base + '/native/android-native.c', runtime + '/usr/lib/art/libandroidfw.so', '-Wl,--no-as-needed', runtime + '/usr/lib/libpng16.so.16', runtime + '/usr/lib/libsqlite3.so.0', '-ldl', '-lm', '-o', base + '/native/libvinix-android-native.so'], base + '/native/libvinix-android-native.so')!
+	check_native()!
+	for path, pin in json2.decode[map[string]string](os.read_file(base + '/frozen-inputs.json')!)! { assert hash(path)! == pin, path }
+	assert hash(base + '/framework/api-impl.jar')! == jar274 && hash(base + '/apk/probe.apk')! == apk274
+	println('COMPOUND276 BUILT native=' + hash(base + '/native/libvinix-android-native.so')! + ' same274 JAR/APK')
+}
