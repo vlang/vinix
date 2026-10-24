@@ -2370,3 +2370,20 @@ Its `--self-test` has two positive and nine negative controls. Compile
 `shmflags-evidence.v` without `-prod`, run `self-test` (five positive and 23
 negative controls), then `check` on the complete external bundle documented
 in the [flag qualification](../../docs/linux-shared-memory-flags.md).
+
+The `shmabi` case checks native 32-bit shared-memory IDs, commands, keys and
+flags with decorated upper register words as root and UID 1000/GID 2000.
+It checks metadata, contents, attachment counts, updates/removal and real
+argument/access errors, including retained 64-bit buffer and size handling.
+Identical musl ELFs pass 243 checks on both production kernels and Linux
+6.12.51; original kernels fail 104 checks each. Run
+`--cases shmabi,shmflags,shmremap,sharedmem,runtime,mmap,namespace,jit`
+with a fresh state directory.
+
+`shmabi-reference.v` accepts the same arguments as `shmflags-reference.v`.
+Its `--self-test` has two positive and nine negative controls. Compile
+`shmabi-evidence.v` without `-prod`, run `self-test` (five positive and 23
+negative controls), then `check` on the complete external bundle documented
+in the [ABI qualification](../../docs/linux-shared-memory-abi.md). This
+qualifies native ELF64 argument widths; full IPC, namespace isolation and
+GNU/foreign/32-bit paths remain separate qualifications.

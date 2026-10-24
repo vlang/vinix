@@ -11527,3 +11527,14 @@ address validation and permission errors. Identical native musl ELFs pass
 kernels fail 1,085 each. Both production builds and all seven maintained
 suites pass. The report records source/kernel identities, complete external
 evidence, actual page sizes and remaining IPC/runtime limitations.
+
+## Native shared-memory integer ABI
+
+The 2026-10-24 [ABI qualification](linux-shared-memory-abi.md) verifies
+Linux 32-bit IDs, commands and flags while preserving 64-bit sizes and
+addresses. Identical musl ELF64 probes pass 243 checks on both production
+architectures and Linux 6.12.51; original kernels fail 104 each. Both
+production builds and all eight maintained suites pass. Generated C confirms
+the parameter widths and byte-identical function bodies. The report records
+exact source/kernel identities, complete external evidence, actual page
+sizes and remaining IPC/runtime limitations.

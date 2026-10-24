@@ -203,7 +203,7 @@ fn in_group(process &proc.Process, gid u32) bool {
 	return false
 }
 
-pub fn syscall_shmget(_ voidptr, key i32, size u64, flags int) (u64, u64) {
+pub fn syscall_shmget(_ voidptr, key i32, size u64, flags i32) (u64, u64) {
 	segments_lock.acquire()
 
 	if key != ipc_private {
@@ -271,7 +271,7 @@ pub fn syscall_shmget(_ voidptr, key i32, size u64, flags int) (u64, u64) {
 	return u64(id), 0
 }
 
-pub fn syscall_shmat(_ voidptr, shmid int, requested_address u64, flags int) (u64, u64) {
+pub fn syscall_shmat(_ voidptr, shmid i32, requested_address u64, flags i32) (u64, u64) {
 	// Linux ignores unused flag bits; only the attachment flags below affect
 	// access and address selection.
 	mut address := requested_address
@@ -381,7 +381,7 @@ pub fn syscall_shmdt(_ voidptr, address u64) (u64, u64) {
 	return 0, 0
 }
 
-pub fn syscall_shmctl(_ voidptr, shmid int, command int, buffer u64) (u64, u64) {
+pub fn syscall_shmctl(_ voidptr, shmid i32, command i32, buffer u64) (u64, u64) {
 	segments_lock.acquire()
 	mut segment := find_id_unlocked(shmid)
 	if segment == unsafe { nil } {

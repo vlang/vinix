@@ -1796,6 +1796,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   1,085 each. All seven maintained suites pass per architecture. See
   [the flag qualification](docs/linux-shared-memory-flags.md).
 
+- [x] Use Linux 32-bit native shared-memory IDs, commands and flags while
+  preserving 64-bit sizes and addresses. Identical musl ELFs pass 243 checks
+  on both production architectures and Linux; original kernels fail 104 each.
+  All eight maintained suites pass per architecture. See
+  [the ABI qualification](docs/linux-shared-memory-abi.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
