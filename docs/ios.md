@@ -18578,17 +18578,58 @@ status 1. Both import audits complete without executing app code and report
 the counts below. The evidence manifest hashes selected source and artifact
 inputs; it does not seal the full toolchain or host dynamic runtime closure.
 
+V now provides bounded `UNNotificationRequest` construction and inspection.
+Native Apple measurements establish its 40-byte layout, with `_content` at
+offset 8, `_trigger` at 16, `_destinations` at 24 and `_identifier` at 32.
+The factory accepts a non-nil built-in UTF8 string identifier of at most
+65,536 bytes, nil content and an optional initialized built-in
+`UNCalendarNotificationTrigger`. It snapshots identifier bytes independently
+and retains the trigger with its original identity. Empty, non-ASCII and
+embedded-NUL identifiers are supported. Getters borrow the stored objects;
+`copy` and `copyWithZone:nil` retain the request itself. Default construction,
+custom subclasses, invalid or uninitialized inputs, changed-isa access,
+non-nil content, other trigger types, non-nil copy zones, coding, equality,
+hashing, descriptions and private destination APIs fail explicitly. Native
+method implementations retain dispatch precedence.
+
+```sh
+VINIX_IOS_CHECK_NAME=un-request-checks v run tests/ios/native-checks.v build-notification-request
+```
+
+The shared fixture passes against Apple Foundation and UserNotifications on
+the Mac host with ASan+UBSan, in normal and deterministic Swift hashing modes;
+leak detection is disabled. It checks layout, encodings, identifier snapshots,
+trigger identity, copying and weak ownership. Runtime checks cover reentrant
+success and failure at both string and request constructors, guarded caller
+storage, changed-isa cleanup, native method precedence, 28 explicit rejection
+cases and two drained lifetimes. A source and generated-C lifetime self-review
+records snapshot ownership, retained-trigger cleanup and constructor-failure
+paths; it is not an independent review.
+
+Evidence under `build/ios/fortnite/un-request-checks` retains generated C,
+binaries, logs and four guest serial/configuration pairs. The focused ARM64
+guest passes the calendar, calendar-trigger and notification-request fixtures;
+this does not establish full Swift or regression success. Fortnite's new
+launch probe resolves the request class and stops at
+`_OBJC_CLASS_$_UNUserNotificationCenter`, attributed to UserNotifications,
+before application entry, with process exit status 1. Inspected Fortnite
+request factories supply non-nil content, which remains unsupported; resolving
+the class does not establish those calls work. Both import audits complete
+without executing app code and report the counts below. The evidence manifest
+hashes selected source and artifact inputs; it does not seal the full toolchain
+or host dynamic runtime closure.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,081 | 80 | 78 |
+| Fortnite executable | 2,082 | 79 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,921 | 83 | 114 |
+| All images | 2,922 | 82 | 114 |
 
-The C++/GLES/Text variant reports 2,935 resolved imports, 69 unresolved strong
+The C++/GLES/Text variant reports 2,936 resolved imports, 68 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -18647,7 +18688,7 @@ URL query items use `url-query-item-checks`, character sets use
 `character-set-checks`, scanners use `scanner-checks`, user activities use
 `user-activity-checks`, notification queues use `notification-queue-checks`,
 Objective-C calendars use `ns-calendar-checks`, calendar notification triggers
-use `un-calendar-checks`,
+use `un-calendar-checks`, notification requests use `un-request-checks`,
 keyed archives use `keyed-archiver-checks`, keyed unarchives use
 `keyed-unarchiver-checks`,
 CoreFoundation dictionaries use
@@ -18665,7 +18706,7 @@ terminal, thread-policy, file timestamp, UUID, audio-session constant,
 URL session, session configuration, recursive lock, invocation, invocation
 operation, date formatter, predicate, index set, URL query item, character set,
 scanner, user activity, notification queue, calendar, calendar notification trigger,
-keyed archive, keyed unarchive,
+notification request, keyed archive, keyed unarchive,
 sort descriptor, regular expression, mutable string, CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String

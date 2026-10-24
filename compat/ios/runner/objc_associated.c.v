@@ -40,6 +40,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	user_activity := value in ios_runtime.objects && obj_header(value).user_activity != unsafe { nil }
 	notification_queue := value in ios_runtime.objects && obj_header(value).notification_queue != unsafe { nil }
 	un_trigger := value in ios_runtime.objects && obj_header(value).un_trigger_owned
+	un_request := value in ios_runtime.objects && obj_header(value).un_request_owned
 	query_item := value in ios_runtime.objects && obj_header(value).url_query_item_owned
 	C.ios_objc_initialize_unlock()
 	if formatter { return ns_date_formatter_copy(value) }
@@ -51,6 +52,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if user_activity || ns_user_activity_family(cls) { panic('iOS: user activity copying is not implemented') }
 	if notification_queue || ns_notification_queue_family(cls) { panic('iOS: notification queue copying is not implemented') }
 	if un_trigger || un_trigger_family(cls) { return un_trigger_copy(value) }
+	if un_request || un_request_family(cls) { return un_request_copy(value) }
 	if query_item || ns_url_query_item_family(cls) { return ns_url_query_item_copy(value) }
 	if objc_is_kind(value, ios_runtime.names['NSMutableData']) {
 		return cf_data_create(0, data_pointer(value), i64(data_length(value)))
