@@ -5,7 +5,7 @@ It keeps the root compositor's inherited input and fresh `/tmp` surface while
 launching Android with real Unix UID/GID 10000. It does not establish a general
 application sandbox or delegate the root session's notification broker.
 
-The experiments isolate three requirements:
+The experiments isolate successive startup requirements:
 
 - 251 drops real/effective/saved UID/GID and verifies root cannot be regained.
   The unapproved private ART loader fails with `EPERM` under the kernel's W^X
@@ -27,6 +27,9 @@ The experiments isolate three requirements:
 - 255 uses the production launcher with ART cache preparation and disables the
   root spectator. Its configured 900-second observation window leaves time for
   search and route interaction; the configured limit is not endurance evidence.
+- 256 retains cache preparation and adds production scheduling admission for
+  Android application thread priorities. The root spectator stays disabled;
+  the 900-second configured limit is not an observed endurance result.
 
 Build the preparation and checking tools without `-prod`. This V compiler
 removes assertions in production builds. Use `-cflags -O2` for optimization:

@@ -278,7 +278,7 @@ fn run() ! {
 		return error('fixture requires the unchanged test APK path')
 	}
 	experiment := (os.read_file('/opt/android-test/credential-run') or { '251' }).trim_space()
-	if experiment !in ['251', '252', '253', '254', '255'] { return error('unsupported credential experiment') }
+	if experiment !in ['251', '252', '253', '254', '255', '256'] { return error('unsupported credential experiment') }
 	fixture_data := '/tmp/maps' + experiment + '-data'
 	fixture_home := '/tmp/maps' + experiment + '-home'
 	if experiment != '251' { approve_runtime(experiment)! }
@@ -291,7 +291,7 @@ fn run() ! {
 	// inherited path and stdin; no descriptor or application bytes are replaced.
 	os.chmod('/tmp', 0o1777)!
 	os.mkdir_all(fixture_home)!
-	if experiment in ['253', '254', '255'] { provision_account(fixture_data, fixture_home, experiment)! }
+	if experiment in ['253', '254', '255', '256'] { provision_account(fixture_data, fixture_home, experiment)! }
 	own_fixture(fixture_data)!
 	own_fixture(fixture_home)!
 	for key, value in {
@@ -304,7 +304,7 @@ fn run() ! {
 	} {
 		os.setenv(key, value, true)
 	}
-	if experiment in ['253', '254', '255'] {
+	if experiment in ['253', '254', '255', '256'] {
 		for key, value in {
 			'VINIX_ANDROID_UID':  '10000'
 			'VINIX_ANDROID_GID':  '10000'
@@ -315,7 +315,7 @@ fn run() ! {
 		}
 		println('MAPS${experiment}-PRODUCTION-LAUNCH root=${C.getuid()},${C.geteuid()} uid=10000 gid=10000 data=${fixture_data} home=${fixture_home} surface=${surface}')
 		if experiment == '254' { os.setenv('VINIX_MAPS_ROOT_WATCH', '1', true) }
-		if experiment != '255' { start_root_spectator(experiment)! }
+		if experiment !in ['255', '256'] { start_root_spectator(experiment)! }
 		os.execvp('/usr/bin/run-android-identity', os.args[1..])!
 		return
 	}

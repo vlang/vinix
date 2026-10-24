@@ -14,8 +14,9 @@ const base = 'build/android-maps/'
 fn digest(path string) !string { return sha256.sum(os.read_bytes(path)!).hex() }
 
 fn production_source(path string, experiment string) string {
-	if experiment == '255' && path.starts_with('build-support/android/') {
-		return base + 'native-cache255/source/' + path.all_after('build-support/android/')
+	if experiment in ['255', '256'] && path.starts_with('build-support/android/') {
+		snapshot := if experiment == '256' { 'native-priority256' } else { 'native-cache255' }
+		return base + snapshot + '/source/' + path.all_after('build-support/android/')
 	}
 	if experiment == '254' && path in ['build-support/android/native-run.v',
 		'build-support/android/nativeidentity/identity.v', 'build-support/android/nativeapk/install.v'] {
@@ -25,7 +26,7 @@ fn production_source(path string, experiment string) string {
 }
 
 fn production_launcher(experiment string) string {
-	return base + 'run-android-identity' + if experiment == '255' { '255' } else { '253' }
+	return base + 'run-android-identity' + if experiment in ['255', '256'] { experiment } else { '253' }
 }
 
 fn checked(args []string) {
@@ -47,9 +48,9 @@ fn main() {
 	$if prod {
 		panic('build maps-credential-image without -prod; integrity assertions must execute')
 	}
-	assert os.args.len == 2, 'usage: maps-credential-image 251|252|253|254|255'
+	assert os.args.len == 2, 'usage: maps-credential-image 251|252|253|254|255|256'
 	experiment := os.args[1]
-	assert experiment in ['251', '252', '253', '254', '255']
+	assert experiment in ['251', '252', '253', '254', '255', '256']
 	target := base + 'maps' + experiment
 	helper := base + 'credential-launcher' + experiment
 	os.setenv('COPYFILE_DISABLE', '1', true)
@@ -111,7 +112,7 @@ fn main() {
 	if experiment != '251' {
 		os.write_file(target + '/module/opt/android-test/credential-run', experiment + '\n')!
 	}
-	if experiment in ['253', '254', '255'] {
+	if experiment in ['253', '254', '255', '256'] {
 		production := production_launcher(experiment)
 		receipt := json2.decode[map[string]string](os.read_file(production + '.receipt.json')!)!
 		for path, hash in receipt {
@@ -125,7 +126,7 @@ fn main() {
 		os.cp(production_source('build-support/android/native-run.v', experiment), target + '/sources/native-run.v')!
 		os.cp(production_source('build-support/android/nativeidentity/identity.v', experiment), target + '/sources/nativeidentity.v')!
 		os.cp(production_source('build-support/android/nativeapk/install.v', experiment), target + '/sources/nativeapk-install.v')!
-		if experiment == '255' {
+		if experiment in ['255', '256'] {
 			for path, _ in receipt {
 				if path.starts_with('build-support/') {
 					destination := target + '/sources/production/' + path
@@ -136,7 +137,7 @@ fn main() {
 		}
 	}
 	after := inventory(target + '/module')!
-	assert after.len == before.len + if experiment in ['253', '254', '255'] {
+	assert after.len == before.len + if experiment in ['253', '254', '255', '256'] {
 		3
 	} else if experiment == '252' {
 		2
@@ -157,7 +158,7 @@ fn main() {
 	if experiment != '251' {
 		assert os.read_file(target + '/module/opt/android-test/credential-run')! == experiment + '\n'
 	}
-	if experiment in ['253', '254', '255'] {
+	if experiment in ['253', '254', '255', '256'] {
 		assert after['usr/bin/run-android-identity']! == digest(production_launcher(experiment))!
 	}
 	os.write_file(target + '/runtime-before.json', json2.encode(before, prettify: true) + '\n')!
@@ -188,10 +189,10 @@ fn main() {
 	config['boot_image'] = target + '/vm/boot.img'
 	config['efivars'] = target + '/vm/efivars.fd'
 	config['output'] = base + 'attempt' + experiment
-	if experiment in ['253', '254', '255'] {
+	if experiment in ['253', '254', '255', '256'] {
 		mut applications := config['applications']!.as_array().clone()
 		mut application := applications[0].as_map().clone()
-		application['startup_seconds'] = if experiment == '255' { 900 } else { 300 }
+		application['startup_seconds'] = if experiment in ['255', '256'] { 900 } else { 300 }
 		applications[0] = application
 		config['applications'] = applications
 	}
@@ -207,15 +208,15 @@ fn main() {
 		' os.cp("build/android-maps/attempt244/companion-packages.json", output + "/companion-packages.json")!\n' +
 		' println("MAPS' + experiment + ' PREFLIGHT PASS original APK, frozen247 runtime, isolated real UID10000 fixture; original classifier retained")\n}\n'
 	os.write_file(base + 'suite' + experiment + '-resume.v', suite.all_before(marker).replace('validate_resume248', 'validate_resume' + experiment) + validation)!
-	mount_scope := if experiment in ['253', '254', '255'] {
+	mount_scope := if experiment in ['253', '254', '255', '256'] {
 		' Administrator self-binds the dedicated runtime and remounts it read-only,nosuid,nodev,strictatime,wxallowed before production identity activation; advertised mount policy is verified as root and executable paths are checked to stay inside this attachment.'
 	} else if experiment == '252' {
 		' Administrator self-binds the dedicated runtime and remounts it read-only,nosuid,nodev,strictatime,wxallowed before dropping UID; advertised mount policy is verified before and after drop.'
 	} else {
 		''
 	}
-	identity_scope := if experiment in ['253', '254', '255'] {
-		' Administrator wrapper prepares owned data/home and real passwd/group account, retaining exact original database bytes in serial provenance. It executes the production ' + os.base(production_launcher(experiment)) + ' launcher as root with explicit identity settings; production launcher drops and verifies real/effective/saved Unix UID/GID10000, capabilities, groups and no_new_privs and requires the real account before and after drop. Wrapper does not drop credentials. Configured observation is ' + if experiment == '255' { '900sec.' } else { '300sec.' }
+	identity_scope := if experiment in ['253', '254', '255', '256'] {
+		' Administrator wrapper prepares owned data/home and real passwd/group account, retaining exact original database bytes in serial provenance. It executes the production ' + os.base(production_launcher(experiment)) + ' launcher as root with explicit identity settings; production launcher drops and verifies real/effective/saved Unix UID/GID10000, capabilities, groups and no_new_privs and requires the real account before and after drop. Wrapper does not drop credentials. Configured observation is ' + if experiment in ['255', '256'] { '900sec.' } else { '300sec.' }
 	} else {
 		' UID fixture genuinely drops real/effective/saved Unix UID/GID10000.'
 	}
@@ -223,6 +224,8 @@ fn main() {
 		' Root spectator enabled for at most15sec, publishing bounded ART mappings/status snapshots. Production253 launcher and its frozen source retained unchanged. This run diagnoses the existing crash; no ART cache preparation is added.'
 	} else if experiment == '255' {
 		' Root spectator disabled. Production launcher prepares the app-owned ART cache; configured duration is not an observed endurance result.'
+	} else if experiment == '256' {
+		' Root spectator disabled. Production launcher prepares the app-owned ART cache and admits Android application thread priorities before dropping credentials; configured duration is not an observed endurance result.'
 	} else { '' }
 	os.write_file(target + '/scope.txt', time.utc().str() + ' UTC\nPrivate clone of original Maps244/248 boot image. Frozen247 jar/native inherited from fully inventoried Maps250 staging. Launcher wrapper added, original launcher renamed, companion data moved to /tmp/maps' + experiment + '-data; all original regular-file bytes retained, including unchanged Google APK.' + identity_scope + mount_scope + diagnostic_scope + ' This is not a production app isolation or notification implementation. Actual FAT archive read back with hidden files inventoried and AppleDouble rejected.\n')!
 	mut identities := map[string]string{}
@@ -231,7 +234,7 @@ fn main() {
 		target + '/sources/maps-credential-image.v', helper, base + 'attempt' + experiment + '.json'] {
 		identities[path] = digest(path)!
 	}
-	if experiment in ['253', '254', '255'] {
+	if experiment in ['253', '254', '255', '256'] {
 		for path in [production_launcher(experiment), target + '/production-launcher-receipt.json',
 			target + '/sources/native-run.v', target + '/sources/nativeidentity.v',
 			target + '/sources/nativeapk-install.v'] {

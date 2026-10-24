@@ -9,8 +9,9 @@ import json2
 import time
 
 fn production_source(path string, experiment string) string {
-	if experiment == '255' && path.starts_with('build-support/android/') {
-		return 'build/android-maps/native-cache255/source/' + path.all_after('build-support/android/')
+	if experiment in ['255', '256'] && path.starts_with('build-support/android/') {
+		snapshot := if experiment == '256' { 'native-priority256' } else { 'native-cache255' }
+		return 'build/android-maps/' + snapshot + '/source/' + path.all_after('build-support/android/')
 	}
 	if experiment == '254' && path in ['build-support/android/native-run.v',
 		'build-support/android/nativeidentity/identity.v', 'build-support/android/nativeapk/install.v'] {
@@ -20,7 +21,7 @@ fn production_source(path string, experiment string) string {
 }
 
 fn production_launcher(experiment string) string {
-	return 'build/android-maps/run-android-identity' + if experiment == '255' { '255' } else { '253' }
+	return 'build/android-maps/run-android-identity' + if experiment in ['255', '256'] { experiment } else { '253' }
 }
 
 fn digest(path string) !string {
@@ -117,7 +118,7 @@ fn verify(experiment string) ! {
 		return error('frozen fixture source differs from built source')
 	}
 	config := json2.decode[map[string]json2.Any](os.read_file(b + 'attempt' + experiment + '.json')!)!
-	seconds := if experiment == '255' { 900 } else { 300 }
+	seconds := if experiment in ['255', '256'] { 900 } else { 300 }
 	if config['applications']!.as_array()[0].as_map()['startup_seconds']!.int() != seconds
 		|| config['boot_image']!.str() != target + '/vm/boot.img' {
 		return error('wrong observation duration or private boot media')
@@ -163,8 +164,9 @@ fn freeze(experiment string, root string) ! {
 		if path.starts_with('/') || path.starts_with('build') { paths << path }
 	}
 	paths << production_launcher(experiment) + '.receipt.json'
-	if experiment == '255' {
-		for path in os.walk_ext(b + 'native-cache255/source', '.v', hidden: true) {
+	if experiment in ['255', '256'] {
+		snapshot := if experiment == '256' { 'native-priority256' } else { 'native-cache255' }
+		for path in os.walk_ext(b + snapshot + '/source', '.v', hidden: true) {
 			paths << path
 		}
 	}
@@ -211,8 +213,8 @@ fn main() {
 		assert false, 'credential assertion probe must fail'
 		return
 	}
-	if os.args.len != 3 || os.args[1] !in ['253', '254', '255'] {
-		panic('usage: maps-credential-inputs 253|254|255 EXTERNAL-DIR')
+	if os.args.len != 3 || os.args[1] !in ['253', '254', '255', '256'] {
+		panic('usage: maps-credential-inputs 253|254|255|256 EXTERNAL-DIR')
 	}
 	freeze(os.args[1], os.args[2]) or {
 		eprintln('MAPS-CREDENTIAL-INPUTS-FAIL: ${err}')

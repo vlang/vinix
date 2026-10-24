@@ -27,13 +27,13 @@ fn main() {
 	$if prod {
 		panic('build media verifier without -prod')
 	}
-	if os.args.len < 2 { panic('usage: maps-credential-media hash [253|254|255] | publish EXTERNAL-DIR [253|254|255]') }
+	if os.args.len < 2 { panic('usage: maps-credential-media hash [253|254|255|256] | publish EXTERNAL-DIR [253|254|255|256]') }
 	experiment := if os.args[1] == 'hash' && os.args.len == 3 {
 		os.args[2]
 	} else if os.args[1] == 'publish' && os.args.len == 4 {
 		os.args[3]
 	} else { '253' }
-	if experiment !in ['253', '254', '255'] { panic('unsupported media experiment') }
+	if experiment !in ['253', '254', '255', '256'] { panic('unsupported media experiment') }
 	base := 'build/android-maps/maps' + experiment
 	if os.args[1] == 'hash' && os.args.len in [2, 3] {
 		mut hashes := map[string]string{}
@@ -54,7 +54,7 @@ fn main() {
 		return
 	}
 	if os.args.len !in [3, 4] || os.args[1] != 'publish' {
-		panic('usage: maps-credential-media hash [253|254|255] | publish EXTERNAL-DIR [253|254|255]')
+		panic('usage: maps-credential-media hash [253|254|255|256] | publish EXTERNAL-DIR [253|254|255|256]')
 	}
 	root := os.args[2]
 	mut hashes := json2.decode[map[string]string](os.read_file(root + '/frozen-inputs.json')!)!
