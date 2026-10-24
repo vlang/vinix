@@ -41,6 +41,10 @@ fn objc_responds(object u64, selector &char) bool {
 		if ns_date_formatter_types('NSDateFormatter', object in ios_runtime.classes, name) != none { return true }
 	}
 	formatter_cls := if object in ios_runtime.classes { object } else { read64(object) }
+	if un_sound_family(formatter_cls) {
+		if un_sound_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if un_sound_types('UNNotificationSound', object in ios_runtime.classes, name) != none { return true }
+	}
 	if un_content_family(formatter_cls) {
 		if un_content_unsupported(name) { return native_method(read64(object), name) != 0 }
 		if un_content_types((ios_runtime.classes[formatter_cls] or { return false }).name, object in ios_runtime.classes, name) != none { return true }

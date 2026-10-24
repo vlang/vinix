@@ -4,7 +4,7 @@ module main
 import math
 import math.bits
 
-// Public value storage only. Delivery, nonempty attachments, sounds, badges,
+// Public value storage only. Delivery, nonempty attachments, critical sounds, badges,
 // arbitrary userInfo payloads, coding and private presentation options are absent.
 struct UNContent {
 mut:
@@ -131,7 +131,8 @@ fn un_content_initialize(object u64) u64 {
 
 fn un_content_validate_value(index int, value u64) {
 	if value == 0 { return }
-	if index in [1, 5]! { panic('iOS: notification badge and sound values are not implemented') }
+	if index == 1 { panic('iOS: notification badge values are not implemented') }
+	if index == 5 { un_sound_storage(value, true); return }
 	if index in [0, 11]! {
 		header := obj_header(value)
 		names := if index == 0 { ['NSArray', 'NSMutableArray']! } else { ['NSDictionary', 'NSMutableDictionary']! }
@@ -150,7 +151,7 @@ fn un_content_set(object u64, index int, value u64) {
 	if obj_header(object).allocation_cls != ios_runtime.names['UNMutableNotificationContent'] { panic('iOS: notification content is immutable') }
 	un_content_validate_value(index, value)
 	// Native launchImageName/subtitle retain their inputs; their getters copy.
-	if index in [4, 6]! && (value != 0 || index == 6) {
+	if index == 5 || (index in [4, 6]! && (value != 0 || index == 6)) {
 		mut state := un_content_storage(object, true)
 		old := state.values[index]
 		state.values[index] = objc_retain(value)

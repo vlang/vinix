@@ -139,6 +139,8 @@ mut:
 	un_trigger_initialized bool
 	un_request_owned bool
 	un_request_initialized bool
+	un_sound_owned bool
+	un_sound_initialized bool
 	un_center_owned bool
 	un_center_initialized bool
 	un_content &UNContent = unsafe { nil }
@@ -539,7 +541,7 @@ fn objc_start() {
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'UNNotificationTrigger', 'UNCalendarNotificationTrigger', 'UNNotificationRequest', 'UNUserNotificationCenter', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
-        'UNNotificationContent', 'UNMutableNotificationContent',
+        'UNNotificationContent', 'UNMutableNotificationContent', 'UNNotificationSound',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSOperation', 'NSInvocationOperation', 'NSInvocation', 'NSMethodSignature', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLQueryItem', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
@@ -611,6 +613,7 @@ fn objc_start() {
 			'UNNotificationTrigger' { u32(16) }
 			'UNCalendarNotificationTrigger' { u32(24) }
 			'UNNotificationRequest' { u32(40) }
+			'UNNotificationSound' { u32(104) }
 			'UNUserNotificationCenter' { u32(40) }
 			'UNNotificationContent', 'UNMutableNotificationContent' { u32(296) }
 			'NSMutableString' { u32(8) }
@@ -715,6 +718,7 @@ fn objc_start() {
 	un_request_metadata()
 	un_center_metadata()
 	un_content_metadata()
+	un_sound_metadata()
 	ns_url_query_item_metadata()
 	ns_user_activity_metadata()
 	ns_notification_queue_metadata()
@@ -773,6 +777,7 @@ fn objc_allocate(cls u64) u64 {
 	un_request_require_class(cls)
 	un_center_require_class(cls)
 	un_content_require_class(cls)
+	un_sound_require_class(cls)
 	ns_calendar_require_class(cls)
 	ns_predicate_require_class(cls)
 	ns_index_set_require_class(cls)
@@ -888,6 +893,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).notification_queue != unsafe { nil } { return ns_notification_queue_initialize(object, 0, true) }
 	if obj_header(object).un_trigger_owned { panic('iOS: notification trigger requires designated construction') }
 	if obj_header(object).un_request_owned { panic('iOS: notification request requires designated construction') }
+	if obj_header(object).un_sound_owned { panic('iOS: notification sound requires designated construction') }
 	if obj_header(object).un_center_owned { panic('iOS: user notification center requires currentNotificationCenter') }
 	if obj_header(object).un_content != unsafe { nil } { return un_content_initialize(object) }
 	if obj_header(object).url_query_item_owned { return ns_url_query_item_initialize(object, 0, 0) }

@@ -14,7 +14,7 @@ fn run(out string, label string, args []string, deterministic bool) {
 	p.set_environment(env); p.run(); output := p.stdout_slurp(); p.wait(); code := p.code; p.close()
 	os.write_file(out + '/' + label + '.log', 'COMMAND: ' + args.map(os.quoted_path(it)).join(' ') + '\n' + output) or { panic(err) }
 	os.write_file(out + '/' + label + '.status.txt', code.str() + '\n') or { panic(err) }
-	assert code == 0 && !output.contains('runtime error:') && !output.contains('ERROR: AddressSanitizer') && !output.contains('V panic:'), output
+	assert code == 0 && !output.contains('runtime error:') && !output.contains('ERROR: AddressSanitizer') && !output.contains('V panic:') && !output.contains('> assert '), output
 	println(label + ': PASS')
 }
 fn main() {
@@ -26,9 +26,13 @@ fn main() {
 		run(out, 'inspect', [out + '/inspect-user-notifications', '--bundle', out], false)
 	} else if os.args[1] == 'content-inspect' {
 		run(out, 'inspect', [out + '/inspect-notification-content'], false)
-	} else if os.args[1] in ['host', 'content-host']! {
+	} else if os.args[1] == 'sound-inspect' {
+		run(out, 'inspect', [out + '/inspect-notification-sound'], false)
+	} else if os.args[1] == 'sound-metadata-inspect' {
+		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'UNNotificationSound'], false)
+	} else if os.args[1] in ['host', 'content-host', 'sound-host']! {
 		content := os.args[1] == 'content-host'
-		fixture := if content { 'un_notification_content_test.v' } else { 'un_notification_center_test.v' }
+		fixture := if content { 'un_notification_content_test.v' } else if os.args[1] == 'sound-host' { 'un_notification_sound_test.v' } else { 'un_notification_center_test.v' }
 		cfile := out + '/payload/center-host.c'; bundle := out + "/NotificationChecks.app/Contents"
 		os.mkdir_all(bundle + "/MacOS")!
 		os.write_file(bundle + "/Info.plist", "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>org.vinix.notification-checks</string><key>CFBundleExecutable</key><string>center-host</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>")!
