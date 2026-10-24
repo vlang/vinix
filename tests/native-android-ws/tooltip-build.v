@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Compile with280's frozen framework closure first in the V module path.
+// Compile with the selected280/282 frozen framework closure first in the V module path.
 module main
 
 import androidtools
@@ -13,7 +13,10 @@ fn main() {
 	$if prod {
 		panic('requires assertions; compile without -prod')
 	}
-	base := 'build/android-maps/compound280'
+	selected := os.getenv('VINIX_COMPOUND_ATTEMPT')
+	attempt := if selected == '' { '280' } else { selected }
+	assert attempt in ['280', '282']
+	base := 'build/android-maps/compound' + attempt
 	input := '/Users/alex/code/vinix-android-native/build-aarch64-android/aarch64/staging/opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/api-impl.jar'
 	assert hash(input)! == '4acb4a9356b7c0ed53498923e46fbe55acfabfe362f899a0a0a45bfd58f12357'
 	pins := json2.decode[map[string]string](os.read_file(base + '/frozen-inputs.json')!)!
@@ -42,5 +45,5 @@ fn main() {
 	manifest['sources'] = json2.Any(sources)
 	manifest['source_scope'] = 'Completed278 framework build/prelaunch provenance; only framework_classes tooltip registration and new framework_view_tooltips generator changed. Runtime qualification is separate. Native library reused byte-for-byte from sealed qualified276; no native build claimed.'
 	os.write_file(out + '/framework-manifest.json', json2.encode(manifest, prettify: true) + '\n')!
-	println('COMPOUND280 FRAMEWORK ' + hash(out + '/api-impl.jar')!)
+	println('COMPOUND' + attempt + ' FRAMEWORK ' + hash(out + '/api-impl.jar')!)
 }

@@ -30,7 +30,7 @@ fn inventory_self_test() ! {
 	actual.sort()
 	assert actual == ['.hidden/nested/input', 'plain']
 	assert all_files(root + '/')! == all_files(root)!
-	println('TOOLTIP280 HIDDEN INVENTORY SELF-TEST PASS')
+	println('TOOLTIP' + attempt + ' HIDDEN INVENTORY SELF-TEST PASS')
 }
 
 fn check_sources(kind string) ! {
@@ -44,6 +44,11 @@ fn check_sources(kind string) ! {
 
 fn freeze() ! {
 	assert !os.exists(base + '/framework') && !os.exists(base + '/native')
+	if attempt == '282' {
+		assert hash(fixture_source)! == '6e0c042e40e68d0594ecfc2a6c6edf5d9868323e3d4eb79722283568c1b4a4dd'
+		assert hash('tests/native-android-tools/androidtools/framework_classes.v')! == '78947a909887728eefbc1d99c5b62c3615061d50a0e17471a972f0736839fa6c'
+		assert hash('tests/native-android-tools/androidtools/framework_view_tooltips.v')! == 'd8785bbdbecfd936847d26e391a9a5c8e067aff825cf3987fc087d298298b8f1'
+	}
 	assert hash(prepared278 + '/prelaunch-sha256.json')! == manifest278
 	prepared := json2.decode[map[string]string](os.read_file(prepared278 + '/prelaunch-sha256.json')!)!
 	mut reused := map[string]string{}
@@ -129,7 +134,7 @@ fn freeze() ! {
 	write_json(base + '/frozen-inputs.json', inputs)!
 	freeze_closure('framework', [compiler, '-print-v-files', '-enable-globals', '-path', framework_paths(), base + '/build-framework.v'])!
 	freeze_closure('fixture', [compiler, '-print-v-files', fixture_frozen])!
-	println('COMPOUND280 FROZEN tooltip-only framework; completed278 build provenance; native exactly sealed276; new paired fixture')
+	println('COMPOUND' + attempt + ' FROZEN tooltip-only framework; completed278 build provenance; native exactly sealed276; new paired fixture')
 }
 
 // FRAMEWORK_BUILD
@@ -151,5 +156,5 @@ fn build() ! {
 	check_sources('native')!
 	assert hash(base + '/native/libvinix-android-native.so')! == native276
 	for path, pin in json2.decode[map[string]string](os.read_file(base + '/frozen-inputs.json')!)! { assert hash(path)! == pin, path }
-	println('COMPOUND280 BUILT framework=' + hash(base + '/framework/api-impl.jar')! + ' native=' + native276 + ' apk=' + hash(base + '/apk/probe.apk')!)
+	println('COMPOUND' + attempt + ' BUILT framework=' + hash(base + '/framework/api-impl.jar')! + ' native=' + native276 + ' apk=' + hash(base + '/apk/probe.apk')!)
 }

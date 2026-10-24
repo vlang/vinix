@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Framework-only280; pair one new tooltip fixture with unchanged276 native.
+// Framework-only280/282; pair one new tooltip fixture with unchanged276 native.
+// Set VINIX_TOOLTIP_ATTEMPT=282 for the API26 fixture; default280 is preserved.
 module main
 
 import crypto.sha256
 import os
 import time
 
-const base = 'build/android-maps/compound280'
 const template = '/Users/alex/.local/state/vinix/android/compound278-2026-10-25/prelaunch/driver.v'
 const compiler = '/Users/alex/code/v/v_old'
 const fragment_path = 'tests/native-android-ws/tooltip-freeze.v.txt'
@@ -16,10 +16,11 @@ fn once(source string, before string, after string) string {
 	return source.replace(before, after)
 }
 
-fn driver(original string, fragment string) string {
+fn driver(original string, fragment string, attempt string) string {
+	assert attempt in ['280', '282']
 	assert sha256.sum(original.bytes()).hex() == '116338f773fc27264f11b4010825ac42f5550f1d34cc5cb389aaa16e7ab3154f'
 	mut prefix := original.all_before('const archive276')
-	prefix = once(prefix, "const attempt = '278'", "const attempt = '280'")
+	prefix = once(prefix, "const attempt = '278'", "const attempt = '" + attempt + "'")
 	prefix = once(prefix, "const baseline_attempt = '276'", "const baseline_attempt = '278'")
 	prefix = once(prefix, "const fixture_name = 'vector-fill-fixture.v'", "const fixture_name = 'tooltip-fixture.v'")
 	mut tail := 'fn compile_step(' + original.all_after('fn compile_step(')
@@ -34,6 +35,7 @@ fn driver(original string, fragment string) string {
 		tail = tail.replace(old, 'all_files(' + expression + ')!')
 	}
 	tail = once(tail, "os.write_file(base + '/suite-self-test.log', checked([base + '/suite', '--self-test'])!)!", "compile_step('suite-self-test', [base + '/suite', '--self-test'], '')!")
+	tail = once(tail, '\tassert os.args.len == 2\n\tmatch', "\tassert os.args.len == 2\n\tos.setenv('VINIX_COMPOUND_ATTEMPT', attempt, true)\n\tmatch")
 	tail = once(tail, "'prepare-runs' { prepare_runs()! } else", "'prepare-runs' { prepare_runs()! } '--inventory-self-test' { inventory_self_test()! } '--assertion-probe' { assert false } else")
 	return prefix + fragment.all_before('// FRAMEWORK_BUILD\n') + '\n' + tail
 }
@@ -49,10 +51,15 @@ fn main() {
 		panic('requires assertions; compile without -prod')
 	}
 	assert os.args.len == 2 && os.args[1] in ['--self-test', 'freeze', 'build', 'prepare-runs']
+	selected := os.getenv('VINIX_TOOLTIP_ATTEMPT')
+	attempt := if selected == '' { '280' } else { selected }
+	assert attempt in ['280', '282']
+	base := 'build/android-maps/compound' + attempt
 	if os.args[1] in ['--self-test', 'freeze'] {
-		generated := driver(os.read_file(template)!, os.read_file(fragment_path)!)
-		assert generated.contains("const attempt = '280'")
+		generated := driver(os.read_file(template)!, os.read_file(fragment_path)!, attempt)
+		assert generated.contains("const attempt = '" + attempt + "'")
 		assert generated.contains("const baseline_attempt = '278'")
+		assert generated.contains("os.setenv('VINIX_COMPOUND_ATTEMPT', attempt, true)")
 		assert generated.contains('snapshot(\'framework\', 126)')
 		assert generated.contains('pins.len == if kind == \'framework\' { 127 } else { 83 }')
 		assert !generated.contains('os.walk_ext(')
@@ -72,7 +79,7 @@ fn main() {
 			checked([scratch + '/driver', '--inventory-self-test'])!
 			probe := os.exec([scratch + '/driver', '--assertion-probe'])
 			assert probe.exit_code != 0 && probe.output.contains('assert false')
-			println('TOOLTIP280 SELECTOR SELF-TEST PASS generated driver compiled; hidden-directory inventory and live assertions verified')
+			println('TOOLTIP' + attempt + ' SELECTOR SELF-TEST PASS generated driver compiled; hidden-directory inventory and live assertions verified')
 			return
 		}
 		assert !os.exists(base + '/driver.v')
@@ -84,6 +91,6 @@ fn main() {
 		checked([compiler, '-nocache', '-cc', 'cc', '-cflags', '-O2', '-o', base + '/driver',
 			base + '/driver.v'])!
 	}
-	os.setenv('VINIX_COMPOUND_ATTEMPT', '280', true)
+	os.setenv('VINIX_COMPOUND_ATTEMPT', attempt, true)
 	checked([base + '/driver', os.args[1]])!
 }
