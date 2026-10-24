@@ -42,7 +42,13 @@ fn require_child(path string) {
 
 fn main() {
 	mode := os.read_file('/opt/ios/check-mode') or { panic(err) }
-	if mode == 'regression' {
+	if mode == 'notifications' {
+		for name in ['calendar', 'calendar-trigger', 'notification-request', 'notification-center']! {
+			require_child('/opt/ios/' + name + '-checks')
+		}
+		println('VINIX iOS NOTIFICATIONS: PASS')
+		C.fflush(unsafe { nil })
+	} else if mode == 'regression' {
 		require_child('/opt/ios/select-checks')
 		require_child('/opt/ios/semaphore-checks')
 		require_child('/opt/ios/signal-checks')
@@ -89,6 +95,7 @@ fn main() {
 		require_child('/opt/ios/calendar-checks')
 		require_child('/opt/ios/calendar-trigger-checks')
 		require_child('/opt/ios/notification-request-checks')
+		require_child('/opt/ios/notification-center-checks')
 		require_child('/opt/ios/index-set-checks')
 		require_child('/opt/ios/predicate-checks')
 		require_child('/opt/ios/date-formatter-checks')
