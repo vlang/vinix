@@ -38,6 +38,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	character_set := value in ios_runtime.objects && obj_header(value).character_set != unsafe { nil }
 	scanner := value in ios_runtime.objects && obj_header(value).scanner != unsafe { nil }
 	user_activity := value in ios_runtime.objects && obj_header(value).user_activity != unsafe { nil }
+	cache := value in ios_runtime.objects && obj_header(value).cache != unsafe { nil }
 	notification_queue := value in ios_runtime.objects && obj_header(value).notification_queue != unsafe { nil }
 	un_trigger := value in ios_runtime.objects && obj_header(value).un_trigger_owned
 	un_request := value in ios_runtime.objects && obj_header(value).un_request_owned
@@ -54,6 +55,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if character_set || ns_character_set_family(cls) { return ns_character_set_copy(value, false, false) }
 	if scanner || ns_scanner_family(cls) { return ns_scanner_copy(value) }
 	if user_activity || ns_user_activity_family(cls) { panic('iOS: user activity copying is not implemented') }
+	if cache || ns_cache_family(cls) { panic('iOS: cache copying is not implemented') }
 	if notification_queue || ns_notification_queue_family(cls) { panic('iOS: notification queue copying is not implemented') }
 	if un_trigger || un_trigger_family(cls) { return un_trigger_copy(value) }
 	if un_request || un_request_family(cls) { return un_request_copy(value) }

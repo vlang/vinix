@@ -43,7 +43,7 @@ fn require_child(path string) {
 fn main() {
 	mode := os.read_file('/opt/ios/check-mode') or { panic(err) }
 	if mode == 'notifications' {
-		for name in ['calendar', 'calendar-trigger', 'notification-request', 'notification-center', 'notification-content', 'notification-sound', 'notification-attachment']! {
+		for name in ['cache', 'calendar', 'calendar-trigger', 'notification-request', 'notification-center', 'notification-content', 'notification-sound', 'notification-attachment']! {
 			require_child('/opt/ios/' + name + '-checks')
 		}
 		println('VINIX iOS NOTIFICATIONS: PASS')
@@ -99,6 +99,7 @@ fn main() {
 		require_child('/opt/ios/notification-content-checks')
 		require_child('/opt/ios/notification-sound-checks')
 		require_child('/opt/ios/notification-attachment-checks')
+		require_child('/opt/ios/cache-checks')
 		require_child('/opt/ios/index-set-checks')
 		require_child('/opt/ios/predicate-checks')
 		require_child('/opt/ios/date-formatter-checks')
