@@ -11507,3 +11507,13 @@ also unqualified. The broad libc, installation/sandbox and foreign-app
 acceptance gates remain open.
 
 [Retained zombie-priority evidence](../tests/linux-compat/results/2026-10-24/priozombie-evidence).
+
+## Native shared-memory remap validation
+
+The 2026-10-24 [remap qualification](linux-shared-memory-remap.md) verifies
+EINVAL for null and SHM_RND-rounded-null SHM_REMAP requests before lookup and
+access checks. Identical native musl ELFs pass 1,101 checks on AArch64, x86-64
+and their Linux 6.12.51 references; original kernels fail 876 each. Production
+builds and all six maintained suites pass on both architectures. The report
+records actual 16 KiB native AArch64 pages, positive RW/RO/RX controls,
+complete external evidence and the remaining IPC/runtime limitations.

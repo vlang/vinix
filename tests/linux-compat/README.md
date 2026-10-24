@@ -2342,3 +2342,18 @@ Its `--self-test` has two positive and nine negative controls. Compile
 negative controls), then `check` on the external bundle documented in the
 [refusal qualification](../../docs/linux-semaphore-undo.md). Full SEM_UNDO
 remains unsupported; the explicit refusal does not qualify Linux undo semantics.
+
+The `shmremap` case checks EINVAL for null and SHM_RND-rounded-null SHM_REMAP
+requests, earlier address validation, unchanged metadata and existing contents,
+and ordinary automatic/fixed RW/RO/RX attachments as root and UID 1000. The
+probe uses the actual page size (16 KiB on native AArch64). Identical musl
+ELFs pass 1,101 checks on both production kernels and Linux 6.12.51; original
+kernels fail 876 checks each. Run
+`--cases shmremap,sharedmem,runtime,mmap,namespace,jit` with a fresh state directory.
+
+`shmremap-reference.v` accepts the same arguments as `semundo-reference.v`.
+Its `--self-test` has two positive and nine negative controls. Compile
+`shmremap-evidence.v` without `-prod`, run `self-test` (five positive and 23
+negative controls), then `check` on the external bundle documented in the
+[remap qualification](../../docs/linux-shared-memory-remap.md). Full IPC,
+namespace isolation and GNU/foreign/32-bit paths remain separate qualifications.

@@ -284,6 +284,11 @@ pub fn syscall_shmat(_ voidptr, shmid int, requested_address u64, flags int) (u6
 			return errno.err, errno.einval
 		}
 	}
+	// SHM_REMAP replaces a fixed mapping. A null address, including one
+	// rounded down by SHM_RND, is invalid before lookup or access checks.
+	if address == 0 && flags & shm_remap != 0 {
+		return errno.err, errno.einval
+	}
 
 	segments_lock.acquire()
 	mut segment := find_id_unlocked(shmid)

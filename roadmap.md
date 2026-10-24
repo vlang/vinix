@@ -1783,6 +1783,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and original kernels fail 12 each. Full undo semantics remain unsupported.
   See [the refusal qualification](docs/linux-semaphore-undo.md).
 
+- [x] Reject null and SHM_RND-rounded-null native SHM_REMAP addresses with
+  EINVAL before segment lookup/access checks. Preserve metadata, ordinary
+  automatic attachments and fixed RW/RO/RX replacements. Identical musl ELFs
+  pass 1,101 checks on both production architectures and Linux; original
+  kernels fail 876 each. All six maintained suites pass per architecture.
+  See [the remap qualification](docs/linux-shared-memory-remap.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
