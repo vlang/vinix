@@ -135,6 +135,7 @@ mut:
 	scanner &FoundationScanner = unsafe { nil }
 	user_activity &FoundationUserActivity = unsafe { nil }
 	cache &FoundationCache = unsafe { nil }
+	map_table &FoundationMapTable = unsafe { nil }
 	telephony_owned bool
 	telephony_initialized bool
 	telephony_active int
@@ -546,7 +547,7 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'CTTelephonyNetworkInfo', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
+		'NSMapTable', 'CTTelephonyNetworkInfo', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
@@ -799,6 +800,7 @@ fn objc_allocate(cls u64) u64 {
 	un_sound_require_class(cls)
 	un_attachment_require_class(cls)
 	ns_cache_require_class(cls)
+	ns_map_table_require_class(cls)
 	telephony_require_class(cls)
 	ns_credential_require_class(cls)
 	ns_calendar_require_class(cls)
@@ -913,6 +915,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).character_set != unsafe { nil } { return ns_character_set_initialize(object) }
 	if obj_header(object).scanner != unsafe { nil } { return ns_scanner_default(object) }
 	if obj_header(object).cache != unsafe { nil } { return ns_cache_initialize(object) }
+	if obj_header(object).map_table != unsafe { nil } { return ns_map_table_initialize(object, 0, 0, 0) }
 	if obj_header(object).telephony_owned { return telephony_initialize(object) }
 	if obj_header(object).credential_owned { panic('iOS: credential requires a designated initializer') }
 	if obj_header(object).user_activity != unsafe { nil } { panic('iOS: user activity requires designated construction') }

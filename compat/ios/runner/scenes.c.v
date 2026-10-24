@@ -45,6 +45,10 @@ fn objc_responds(object u64, selector &char) bool {
 		if un_sound_unsupported(name) { return native_method(read64(object), name) != 0 }
 		if un_sound_types('UNNotificationSound', object in ios_runtime.classes, name) != none { return true }
 	}
+	if ns_map_table_family(formatter_cls) {
+		if ns_map_table_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if ns_map_table_types('NSMapTable', object in ios_runtime.classes, name) != none { return true }
+	}
 	if ns_cache_family(formatter_cls) {
 		if ns_cache_unsupported(name) { return native_method(read64(object), name) != 0 }
 		if ns_cache_types('NSCache', object in ios_runtime.classes, name) != none { return true }

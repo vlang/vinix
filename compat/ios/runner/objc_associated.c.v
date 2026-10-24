@@ -39,6 +39,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	scanner := value in ios_runtime.objects && obj_header(value).scanner != unsafe { nil }
 	user_activity := value in ios_runtime.objects && obj_header(value).user_activity != unsafe { nil }
 	cache := value in ios_runtime.objects && obj_header(value).cache != unsafe { nil }
+	map_table := value in ios_runtime.objects && obj_header(value).map_table != unsafe { nil }
 	telephony := value in ios_runtime.objects && obj_header(value).telephony_owned
 	credential := value in ios_runtime.objects && obj_header(value).credential_owned
 	notification_queue := value in ios_runtime.objects && obj_header(value).notification_queue != unsafe { nil }
@@ -58,6 +59,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if scanner || ns_scanner_family(cls) { return ns_scanner_copy(value) }
 	if user_activity || ns_user_activity_family(cls) { panic('iOS: user activity copying is not implemented') }
 	if cache || ns_cache_family(cls) { panic('iOS: cache copying is not implemented') }
+	if map_table || ns_map_table_family(cls) { panic('iOS: map table copying is not implemented') }
 	if telephony || telephony_family(cls) { panic('iOS: telephony copying is not implemented') }
 	if credential || ns_credential_family(cls) { return ns_credential_copy(value) }
 	if notification_queue || ns_notification_queue_family(cls) { panic('iOS: notification queue copying is not implemented') }

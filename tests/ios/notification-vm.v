@@ -70,6 +70,7 @@ fn compile_c(root string, generated string, output string, gles bool) {
 
 fn native_fixture_source(item string) string {
 	return match item {
+		'map-table-checks' { 'ns_map_table_test.v' }
 		'credential-checks' { 'ns_url_credential_test.v' }
 		'telephony-checks' { 'coretelephony_test.v' }
 		'cache-checks' { 'ns_cache_test.v' }
@@ -85,8 +86,8 @@ fn native_fixture_source(item string) string {
 }
 
 fn build(root string, out string, only string) {
-	if only !in ['credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! { panic('unknown notification build target') }
-	for item in ['credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
+	if only !in ['map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! { panic('unknown notification build target') }
+	for item in ['map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -149,6 +150,7 @@ fn vm(root string, out string, mode string) {
 		copy_file(out + '/notification-content-checks', fs + '/opt/ios/notification-content-checks')
 		copy_file(out + '/notification-sound-checks', fs + '/opt/ios/notification-sound-checks')
 		copy_file(out + '/cache-checks', fs + '/opt/ios/cache-checks')
+		copy_file(out + '/map-table-checks', fs + '/opt/ios/map-table-checks')
 		copy_file(out + '/credential-checks', fs + '/opt/ios/credential-checks')
 		copy_file(out + '/telephony-checks', fs + '/opt/ios/telephony-checks')
 		copy_file(out + '/notification-attachment-checks', fs + '/opt/ios/notification-attachment-checks')
@@ -237,6 +239,6 @@ fn main() {
 	mode := os.args[1]
 	if mode !in ['build', 'notifications', 'probe', 'audit', 'static-audit']! { panic('invalid notification mode') }
 	if mode == 'build' {
-		for item in ['credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks', 'native-init', 'run-ios', 'run-ios-gles']! { build(root, out, item) }
+		for item in ['map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks', 'native-init', 'run-ios', 'run-ios-gles']! { build(root, out, item) }
 	} else { vm(root, out, mode) }
 }

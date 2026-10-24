@@ -13,6 +13,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	un_sound_require_class(cls)
 	un_attachment_require_class(cls)
 	ns_cache_require_class(cls)
+	ns_map_table_require_class(cls)
 	telephony_require_class(cls)
 	ns_credential_require_class(cls)
 	ns_calendar_require_class(cls)
@@ -68,6 +69,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	ns_scanner_install(cls, mut header)
 	ns_user_activity_install(cls, mut header)
 	ns_cache_install(cls, mut header)
+	ns_map_table_install(cls, mut header)
 	header.telephony_owned = cls == ios_runtime.names['CTTelephonyNetworkInfo']
 	header.credential_owned = cls == ios_runtime.names['NSURLCredential']
 	ns_notification_queue_install(cls, mut header)
@@ -144,6 +146,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	ns_url_query_item_retire(mut header)
 	un_attachment_retire(header)
 	ns_cache_retire(header)
+	ns_map_table_retire(header)
 	telephony_retire(header)
 	ns_credential_retire(mut header)
 	ns_user_activity_retire(mut header)
@@ -203,6 +206,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	un_sound_dispose(object, mut header)
 	un_attachment_dispose(object, mut header)
 	ns_cache_dispose(object, mut header)
+	ns_map_table_dispose(mut header)
 	telephony_dispose(object, mut header)
 	ns_credential_dispose(object, mut header)
 	un_center_dispose(object, mut header)

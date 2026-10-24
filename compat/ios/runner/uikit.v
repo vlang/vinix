@@ -129,6 +129,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if un_sound_dispatch(object, selector, mut frame) { return true }
 	if un_attachment_dispatch(object, selector, mut frame) { return true }
 	if ns_cache_dispatch(object, selector, mut frame) { return true }
+	if ns_map_table_dispatch(object, selector, mut frame) { return true }
 	if telephony_dispatch(object, selector, mut frame) { return true }
 	if ns_credential_dispatch(object, selector, mut frame) { return true }
 	if ns_calendar_dispatch(object, selector, mut frame) { return true }
