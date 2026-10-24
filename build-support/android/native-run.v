@@ -10,6 +10,7 @@ import nativecache
 
 #include <sys/resource.h>
 struct C.rlimit {
+pub:
 	rlim_cur u64
 	rlim_max u64
 }

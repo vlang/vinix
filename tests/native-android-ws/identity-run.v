@@ -85,6 +85,7 @@ fn execution_receipt(output string, compiler string, qemu string, firmware strin
 }
 
 fn run() ! {
+	$if prod { return error('identity runner requires assertions; compile without -prod') }
 	compiler := os.getenv_opt('VINIX_V_COMPILER') or { 'v' }
 	qemu_path := os.getenv_opt('VINIX_IDENTITY_QEMU') or { 'build/qemu-horizontal/bin/qemu-system-aarch64' }
 	firmware := os.getenv_opt('VINIX_IDENTITY_FIRMWARE') or { '/opt/homebrew/share/qemu/edk2-aarch64-code.fd' }
@@ -145,11 +146,15 @@ fn run() ! {
 	deadline := time.now().unix() + 120
 	for time.now().unix() < deadline {
 		serial := os.read_file(output + '/serial.log') or { '' }
-		if serial.contains('ANDROID-IDENTITY-SUITE PASS cases=17') {
+		if serial.contains('ANDROID-IDENTITY-SUITE PASS cases=18') {
+			assert serial.count('ANDROID-IDENTITY-DISABLED PASS ') == 1
+			assert serial.count('ANDROID-IDENTITY-SCHED PASS ') == 3
+			assert serial.count('ANDROID-IDENTITY-EXEC PASS ') == 3
+			assert serial.count('ANDROID-IDENTITY-REJECT ') == 15
 			if qemu.is_alive() { qemu.signal_term() }
 			qemu.wait()
-			os.write_file(output + '/result.txt', 'PASS cases=17\nserial_sha256=' + digest(output + '/serial.log')! + '\n')!
-			println('ANDROID-IDENTITY-VM PASS cases=17 evidence=' + output)
+			os.write_file(output + '/result.txt', 'PASS cases=18\nserial_sha256=' + digest(output + '/serial.log')! + '\n')!
+			println('ANDROID-IDENTITY-VM PASS cases=18 evidence=' + output)
 			return
 		}
 		if serial.contains('ANDROID-IDENTITY-SUITE FAIL') || !qemu.is_alive() {

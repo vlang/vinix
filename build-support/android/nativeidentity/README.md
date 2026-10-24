@@ -56,6 +56,16 @@ The drop clears supplementary groups and capability sets, changes all real,
 effective and saved IDs, sets and reads back `no_new_privs`, verifies the
 result and rejects a process that can regain root. Errors terminate the launcher.
 
+After validating the administrator's identity and owned data/home inputs, the
+launcher sets `RLIMIT_NICE` to soft/hard `40/40` before dropping capabilities
+and IDs. This admits normal thread nice values from `-20` to `19`, following
+[Android 15 init.rc, line 41](https://android.googlesource.com/platform/system/core/+/android-15.0.0_r1/rootdir/init.rc#41).
+The kernel still requires matching Unix ownership for another thread's
+priority; no `CAP_SYS_NICE` remains. The launcher also sets `RLIMIT_RTPRIO`
+to `0/0` so inherited real-time admission is removed, and reads back both
+limits after the drop. Apps cannot raise the hard limits. Launches without
+explicit identity options keep their inherited scheduling limits.
+
 Run the host configuration tests with `v test build-support/android/nativeidentity`.
 The Linux/Vinix fixture in `tests/native-android-ws/identity-fixture.v` exercises
 actual credential changes in child processes, including a fresh exec and
@@ -67,7 +77,7 @@ On the ARM64 macOS build host, boot the fixture in a private clone of an existin
 Vinix boot image and firmware variables file:
 
 ```sh
-v -prod run tests/native-android-ws/identity-run.v \
+v -cflags -O2 run tests/native-android-ws/identity-run.v \
   /absolute/path/boot.img /absolute/path/efivars.fd \
   /absolute/path/new-identity-results
 ```
@@ -79,10 +89,17 @@ the host account database untouched.
 the compiler, QEMU binary and read-only firmware. The runner preserves its
 private image, fixture overlay, source/binary hashes and serial log. It writes
 compiler, QEMU and firmware identities plus exact argument arrays to
-`execution.json` before compiling the frozen fixture. `-prod` optimizes only
-the host runner; the guest fixture compile command omits it so assertions run.
-A passing run records `ANDROID-IDENTITY-SUITE PASS cases=17` after two successful
-drop-and-exec cases and fifteen rejected configurations. This verifies the
+`execution.json` before compiling the frozen fixture.
+Both runner and guest fixture reject `-prod`; assertions must remain enabled.
+A passing run records `ANDROID-IDENTITY-SUITE PASS cases=18` after three successful
+drop-and-exec cases and fifteen rejected configurations. The successful cases
+check all normal nice values, zero-limit refusal, denied hard-limit increases,
+another UID's unchanged priority, zero real-time admission, and enforcement after
+lowering the hard limit. One starts with inherited real-time admission to
+verify the launcher clears it. The parent also verifies that disabled identity
+activation preserves both scheduling limits. FIFO must fail with `EPERM` when
+implemented; an older kernel's `ENOSYS` is recorded as `fifo=unsupported-ENOSYS`
+and does not establish FIFO permission enforcement. This verifies the
 credential module; a real APK launch still requires the approved runtime
 mount and compositor transport described above.
 

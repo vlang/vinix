@@ -10,6 +10,16 @@ import os
 #include <grp.h>
 #include <pwd.h>
 #include <errno.h>
+#include <sys/resource.h>
+
+struct C.rlimit {
+pub:
+	rlim_cur u64
+	rlim_max u64
+}
+
+fn C.getrlimit(int, &C.rlimit) int
+fn C.setrlimit(int, &C.rlimit) int
 
 $if linux {
 	#include <sys/prctl.h>
@@ -120,6 +130,12 @@ fn (config Config) surface(path string) ! {
 
 fn (config Config) verify() ! {
 	$if linux {
+		mut nice := C.rlimit{}
+		mut realtime := C.rlimit{}
+		if C.getrlimit(C.RLIMIT_NICE, &nice) != 0 || nice.rlim_cur != 40 || nice.rlim_max != 40
+			|| C.getrlimit(C.RLIMIT_RTPRIO, &realtime) != 0 || realtime.rlim_cur != 0 || realtime.rlim_max != 0 {
+			return error('credential launch did not retain bounded Android scheduling limits')
+		}
 		mut real := u32(0)
 		mut effective := u32(0)
 		mut saved := u32(0)
@@ -163,6 +179,14 @@ pub fn (config Config) activate(apk string, runtime string, surface string) ! {
 		config.account()!
 		config.owned_directory(config.data)!
 		config.owned_directory(config.home)!
+		// Android init admits fair nice values -20..19 through RLIMIT_NICE.
+		// Resource admission remains independent of the kernel's UID checks and
+		// grants no real-time scheduling privilege or capability to the app.
+		nice := C.rlimit{rlim_cur: 40, rlim_max: 40}
+		realtime := C.rlimit{}
+		if C.setrlimit(C.RLIMIT_NICE, &nice) != 0 || C.setrlimit(C.RLIMIT_RTPRIO, &realtime) != 0 {
+			return error('cannot establish bounded Android scheduling limits')
+		}
 		for capability in 0 .. 64 {
 			if C.prctl(23, u64(capability), 0, 0, 0) == 1 && C.prctl(24, u64(capability), 0, 0, 0) != 0 {
 				return error('cannot drop credential launch capability bounding set')

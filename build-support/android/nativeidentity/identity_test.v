@@ -29,6 +29,18 @@ fn test_absent_options_preserve_the_launching_identity() {
 	os.unsetenv('VINIX_ANDROID_GID')
 	config := from_environment()!
 	assert !config.enabled
+	$if linux {
+		mut before := C.rlimit{}
+		assert C.getrlimit(C.RLIMIT_NICE, &before) == 0
+		config.activate('', '', '')!
+		mut after := C.rlimit{}
+		assert C.getrlimit(C.RLIMIT_NICE, &after) == 0
+		assert before.rlim_cur == after.rlim_cur && before.rlim_max == after.rlim_max
+		assert C.getrlimit(C.RLIMIT_RTPRIO, &before) == 0
+		config.activate('', '', '')!
+		assert C.getrlimit(C.RLIMIT_RTPRIO, &after) == 0
+		assert before.rlim_cur == after.rlim_cur && before.rlim_max == after.rlim_max
+	}
 	config.activate('', '', '')!
 	os.setenv('VINIX_ANDROID_UID', '', true)
 	mut rejected := false
