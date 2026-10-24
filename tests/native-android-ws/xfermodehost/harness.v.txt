@@ -1,0 +1,174 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+@[translated]
+module main
+
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+fn C.ceilf(f32) f32
+fn C.floorf(f32) f32
+
+struct WsFont {}
+
+__global draw_state WsDrawState
+
+fn ws_draw_state() &WsDrawState { return unsafe { &draw_state } }
+fn ws_font_ref(_ &WsFont) {}
+
+fn canvas(mut bitmap WsBitmap) {
+	draw_state = WsDrawState{width: bitmap.width, height: bitmap.height, bitmap: i64(unsafe { &bitmap }), transform: WsTransform{right: bitmap.width, bottom: bitmap.height}}
+}
+
+fn argb(bitmap &WsBitmap, x int, y int) u32 {
+	unsafe {
+		at := y * bitmap.row_bytes + x * 4
+		return (u32(bitmap.rgba[at + 3]) << 24) | (u32(bitmap.rgba[at]) << 16) | (u32(bitmap.rgba[at + 1]) << 8) | u32(bitmap.rgba[at + 2])
+	}
+}
+
+fn fill(mut bitmap WsBitmap, color u32) {
+	unsafe {
+		for y in 0 .. bitmap.height {
+			for x in 0 .. bitmap.width {
+				at := y * bitmap.row_bytes + x * 4
+				bitmap.rgba[at] = u8(color >> 16); bitmap.rgba[at + 1] = u8(color >> 8)
+				bitmap.rgba[at + 2] = u8(color); bitmap.rgba[at + 3] = u8(color >> 24)
+			}
+		}
+	}
+}
+
+fn apply(source &WsBitmap, p &WsPaint, x i32, y i32, width i32, height i32) {
+	ws_draw_bitmap_paint(i64(source), x, y, width, height, i64(p))
+}
+
+fn alpha_masks() {
+	mut bytes := [u8(0), 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 127, 0, 0, 0, 128, 0, 0, 0, 255]!
+	source := WsBitmap{width: 5, height: 1, row_bytes: 20, rgba: unsafe { &bytes[0] }}
+	mut output := [20]u8{}
+	mut target := WsBitmap{width: 5, height: 1, row_bytes: 20, rgba: unsafe { &output[0] }}
+	canvas(mut target)
+	for destination_alpha in [u32(0), 1, 127, 128, 255] {
+		for paint_alpha in [u32(0), 1, 127, 128, 255] {
+			fill(mut target, (destination_alpha << 24) | 0x123456)
+			p := WsPaint{color: (paint_alpha << 24) | 0xffffff, xfer_mode: 6}
+			apply(&source, &p, 0, 0, 5, 1)
+			for x, source_alpha in [u32(0), 1, 127, 128, 255] {
+				alpha := destination_alpha * (source_alpha * paint_alpha / 255) / 255
+				expected := if alpha == 0 { u32(0) } else { (alpha << 24) | 0x123456 }
+				assert argb(&target, x, 0) == expected, 'ARGB alpha=${destination_alpha}/${source_alpha}/${paint_alpha}'
+			}
+		}
+	}
+	println('PAINT-XFERMODE-HOST PASS argb-alpha-grid')
+}
+
+fn alpha_only_masks() {
+	mut bytes := [u8(0), 1, 127, 128, 255]!
+	source := WsBitmap{width: 5, height: 1, row_bytes: 5, alpha_only: true, rgba: unsafe { &bytes[0] }}
+	mut output := [5]u8{}
+	mut target := WsBitmap{width: 5, height: 1, row_bytes: 5, alpha_only: true, rgba: unsafe { &output[0] }}
+	canvas(mut target)
+	for paint_alpha in [u32(0), 1, 127, 128, 255] {
+		for i in 0 .. output.len { output[i] = 128 }
+		p := WsPaint{color: (paint_alpha << 24) | 0xabcdef, xfer_mode: 6}
+		apply(&source, &p, 0, 0, 5, 1)
+		for x, alpha in [u32(0), 1, 127, 128, 255] { assert output[x] == u8(128 * (alpha * paint_alpha / 255) / 255) }
+	}
+	mut rgba := [20]u8{}
+	mut rgba_target := WsBitmap{width: 5, height: 1, row_bytes: 20, rgba: unsafe { &rgba[0] }}
+	fill(mut rgba_target, 0xffabcdef)
+	canvas(mut rgba_target)
+	p := WsPaint{xfer_mode: 6}
+	apply(&source, &p, 0, 0, 5, 1)
+	assert argb(&rgba_target, 0, 0) == 0
+	assert argb(&rgba_target, 3, 0) == 0x80abcdef
+	// ARGB source uses its alpha alone when the destination is ALPHA_8.
+	mut source_rgba := [u8(21), 42, 84, 0, 21, 42, 84, 1, 21, 42, 84, 127, 21, 42, 84, 128, 21, 42, 84, 255]!
+	rgba_source := WsBitmap{width: 5, height: 1, row_bytes: 20, rgba: unsafe { &source_rgba[0] }}
+	for i in 0 .. output.len { output[i] = 128 }
+	canvas(mut target)
+	apply(&rgba_source, &p, 0, 0, 5, 1)
+	assert output == [u8(0), 0, 63, 64, 128]!
+	println('PAINT-XFERMODE-HOST PASS alpha-only-source-target')
+}
+
+fn opaque_surface() {
+	mut bytes := [u8(0), 128, 255]!
+	source := WsBitmap{width: 3, height: 1, row_bytes: 3, alpha_only: true, rgba: unsafe { &bytes[0] }}
+	mut pixels := [u32(0xff204060), 0xff204060, 0xff204060]!
+	draw_state = WsDrawState{width: 3, height: 1, pixels: unsafe { &pixels[0] }, transform: WsTransform{right: 3, bottom: 1}}
+	p := WsPaint{xfer_mode: 6}
+	apply(&source, &p, 0, 0, 3, 1)
+	assert pixels == [u32(0xff000000), 0xff102030, 0xff204060]!
+	println('PAINT-XFERMODE-HOST PASS opaque-surface')
+}
+
+fn transformed_clipped_mask() {
+	mut bytes := [u8(0), 255, 128, 255]!
+	source := WsBitmap{width: 2, height: 2, row_bytes: 2, alpha_only: true, rgba: unsafe { &bytes[0] }}
+	mut output := [256]u8{}
+	mut target := WsBitmap{width: 8, height: 8, row_bytes: 32, rgba: unsafe { &output[0] }}
+	fill(mut target, 0xff123456)
+	canvas(mut target)
+	draw_state.transform = WsTransform{x: 6, y: 1, sx: 0, sy: 0, kx: -2, ky: 2, left: 1, top: 1, right: 7, bottom: 6}
+	// Intersect a device-space path clip with an affine quadrilateral clip.
+	mut points := [WsVertex{2, 1, true}, WsVertex{5, 1, false}, WsVertex{5, 5, false}, WsVertex{2, 5, false}]!
+	mut clip := WsPathClip{points: unsafe { &points[0] }, count: 4}
+	draw_state.transform.path_clip = unsafe { &clip }
+	draw_state.transform.clip_count = 1
+	draw_state.clips[0] = WsClipQuad{x: [f32(1), 7, 7, 1]!, y: [f32(2), 2, 6, 6]!}
+	p := WsPaint{xfer_mode: 6}
+	apply(&source, &p, 0, 0, 2, 2)
+	for y in 0 .. 8 {
+		for x in 0 .. 8 {
+			mut expected := u32(0xff123456)
+			if x >= 2 && x < 5 && y >= 2 && y < 5 {
+				if x >= 4 && y < 3 { expected = 0 }
+				else if x < 4 && y < 3 { expected = 0x80123456 }
+			}
+			assert argb(&target, x, y) == expected, 'transformed clip pixel (${x},${y})'
+		}
+	}
+	println('PAINT-XFERMODE-HOST PASS affine-path-quad-clip')
+}
+
+fn source_over_and_copy() {
+	mut bytes := [u8(250), 90, 50, 128]!
+	source := WsBitmap{width: 1, height: 1, row_bytes: 4, rgba: unsafe { &bytes[0] }}
+	mut output := [16]u8{}
+	mut target := WsBitmap{width: 2, height: 2, row_bytes: 8, rgba: unsafe { &output[0] }}
+	fill(mut target, 0xff204060)
+	canvas(mut target)
+	default_paint := WsPaint{}
+	assert default_paint.xfer_mode == 3
+	apply(&source, &default_paint, 1, 1, 1, 1)
+	assert argb(&target, 1, 1) == 0xff8d4d48
+	assert argb(&target, 0, 0) == 0xff204060
+	// Overlapping source and target must read a snapshot while masking.
+	fill(mut target, 0x80123456)
+	output[3] = 0
+	p := WsPaint{xfer_mode: 6}
+	ws_draw_bitmap_region(i64(unsafe { &target }), 1, 0, 1, 2, 0, 0, 1, 2, i64(unsafe { &p }))
+	assert argb(&target, 0, 0) == 0x00123456
+	assert argb(&target, 1, 0) == 0
+	assert argb(&target, 1, 1) == 0x40123456
+	new_paint := ws_paint_new()
+	unsafe { (&WsPaint(new_paint)).xfer_mode = 6 }
+	clone := ws_paint_clone(new_paint)
+	unsafe {
+		assert (&WsPaint(clone)).xfer_mode == 6
+		C.free(voidptr(new_paint)); C.free(voidptr(clone))
+	}
+	println('PAINT-XFERMODE-HOST PASS source-over-alias-clone')
+}
+
+fn main() {
+	alpha_masks()
+	alpha_only_masks()
+	opaque_surface()
+	transformed_clipped_mask()
+	source_over_and_copy()
+	println('PAINT-XFERMODE-HOST PASS all')
+}

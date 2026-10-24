@@ -51,6 +51,7 @@ mut:
 	join_        i32
 	filter_mode  i32
 	filter_color u32
+	xfer_mode    i32 = 3 // PorterDuff.Mode.SRC_OVER
 }
 
 __global ws_font voidptr

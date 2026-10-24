@@ -293,6 +293,41 @@ fn ws_draw_bitmap_paint(pointer i64, x i32, y i32, width i32, height i32, paint 
 	}
 }
 
+// DST_IN uses the bitmap's alpha as a mask for pixels already on the target.
+// A transparent source still writes: it clears the corresponding destination.
+fn ws_bitmap_dst_in(x i32, y i32, alpha u32) {
+	draw := ws_draw_state()
+	unsafe {
+		if x < draw.transform.left || y < draw.transform.top || x >= draw.transform.right || y >= draw.transform.bottom
+			|| x < 0 || y < 0 || x >= draw.width || y >= draw.height { return }
+		if !ws_affine_clip(draw, f32(x) + 0.5, f32(y) + 0.5)
+			|| !ws_path_clip_contains(draw.transform.path_clip, f32(x) + 0.5, f32(y) + 0.5) { return }
+		if draw.bitmap != 0 {
+			bitmap := &WsBitmap(draw.bitmap)
+			if bitmap.alpha_only {
+				target := &bitmap.rgba[y * bitmap.row_bytes + x]
+				*target = u8(u32(*target) * alpha / 255)
+				return
+			}
+			target := &bitmap.rgba[y * bitmap.row_bytes + x * 4]
+			combined := u32(target[3]) * alpha / 255
+			if combined == 0 {
+				target[0] = 0; target[1] = 0; target[2] = 0
+			}
+			target[3] = u8(combined)
+			return
+		}
+		// The desktop surface is opaque, so store the premultiplied result in
+		// its RGB channels instead of retaining an alpha it cannot represent.
+		target := &draw.pixels[y * draw.width + x]
+		before := *target
+		r := ((before >> 16) & 255) * alpha / 255
+		g := ((before >> 8) & 255) * alpha / 255
+		b := (before & 255) * alpha / 255
+		*target = 0xff000000 | (r << 16) | (g << 8) | b
+	}
+}
+
 fn ws_draw_bitmap_region(pointer i64, x i32, y i32, width i32, height i32, left i32, top i32, source_width i32, source_height i32, paint_pointer i64) {
 	unsafe {
 		if pointer == 0 || width <= 0 || height <= 0 || source_width <= 0 || source_height <= 0 { return }
@@ -308,6 +343,7 @@ fn ws_draw_bitmap_region(pointer i64, x i32, y i32, width i32, height i32, left 
 		}
 		defer { if copying { C.free(pixels) } }
 		draw := ws_draw_state()
+		xfer_mode := if paint_pointer == 0 { i32(3) } else { (&WsPaint(paint_pointer)).xfer_mode }
 		l, t, r, b := ws_affine_bounds(draw.transform, f32(x), f32(y), f32(x + width), f32(y + height))
 		for row := t; row < b; row++ {
 			for column := l; column < r; column++ {
@@ -328,7 +364,8 @@ fn ws_draw_bitmap_region(pointer i64, x i32, y i32, width i32, height i32, left 
 					}
 					color = (((color >> 24) * (paint.color >> 24) / 255) << 24) | (color & 0xffffff)
 				}
-				ws_blend(column, row, color, 255)
+				if xfer_mode == 6 { ws_bitmap_dst_in(column, row, color >> 24) }
+				else { ws_blend(column, row, color, 255) }
 			}
 		}
 	}
