@@ -188,6 +188,10 @@ fn freeze() ! {
 	if attempt == '268' {
 		live := os.read_file('build-support/android/nativews/ws_views.v')!
 		os.write_file(base + '/native/atlframework/ws_views.v', replace_section(native['ws_views.v']!, live, 'fn ws_draw_content(', '\nfn ws_draw_children('))!
+		binding_hash := json2.decode[map[string]string](os.read_file(previous + '/frozen-inputs.json')!)!['build-support/android/nativews/bindings.txt']!
+		assert hash(previous + '/native/bindings.txt')! == binding_hash
+		assert hash('build-support/android/nativews/bindings.txt')! == binding_hash
+		clone_file(previous + '/native/bindings.txt', base + '/native/bindings.txt')!
 	} else if attempt in ['264', '266'] { freeze_geometry_native(native)! } else {
 	old_native := native['check_widgets.v']!
 	live_native := os.read_file('build-support/android/nativews/check_widgets.v')!
@@ -248,7 +252,9 @@ fn freeze() ! {
 	if attempt in ['264', '266'] {
 		for path in ['tests/native-android-tools/androidtools/framework_geometry.v', 'tests/native-android-tools/androidtools/framework_view_canvas.v', 'build-support/android/nativews/ws_views.v', 'build-support/android/nativews/bindings.txt'] { inputs[path] = hash(path)! }
 	}
-	if attempt == '268' { inputs['build-support/android/nativews/ws_views.v'] = hash('build-support/android/nativews/ws_views.v')! }
+	if attempt == '268' {
+		for path in ['build-support/android/nativews/ws_views.v', 'build-support/android/nativews/bindings.txt', previous + '/native/bindings.txt'] { inputs[path] = hash(path)! }
+	}
 	for name in ['usr/lib/art/libandroidfw.so', 'usr/lib/libpng16.so.16', 'usr/lib/libsqlite3.so.0'] {
 		path := 'build/android-framework/calculator/overlay/opt/vinix-android-aarch64/' + name
 		inputs[path] = hash(path)!
@@ -327,6 +333,7 @@ fn prepare_runs() ! {
 		}
 	}
 	clone_file(previous + '/framework/framework-manifest.json', base + '/baseline-framework/framework-manifest.json')!
+	if attempt == '268' { clone_file(previous + '/native/bindings.txt', base + '/baseline-native/bindings.txt')! }
 	clone_file('build/android-maps/suite239-stream.v', base + '/source/suite239-stream-original.v')!
 	mut suite := os.read_file('build/android-maps/suite239-stream.v')!
 	original_observation := suite.all_after('fn observation(').all_before('// Real companion packages')
