@@ -146,6 +146,10 @@ fn validate_styled261(settings map[string]json2.Any, output string) ! {
 	old_capture := '\tcapture := os.exec([settings[\'input_tool\']!.str(), \'screenshot\', \'--socket\', socket, \'--destination\',\n\t\tframe])'
 	new_capture := '\tresult[\'observation_elapsed_seconds\'] = json2.Any(time.now().unix() - begin_at)\n\tresult[\'qemu_alive_before_capture\'] = json2.Any(qemu.is_alive())\n\tos.write_file(state + \'/observation-before-capture.json\', json2.encode(result, prettify: true) + \'\\n\')!\n\tprintln(\'MAPS261 observation retained before final capture\')\n\tcapture := os.exec([\'build/android-maps/maps-interact-unique258\', state, \'capture\', \'application\'])'
 	source = replace_once(source, old_capture, new_capture)!
+	// Finish the guest before snapshotting serial bytes so deferred shutdown
+	// cannot append output after the published hash and gzip are recorded.
+	source = replace_once(source, '\tserial := os.read_bytes(serial_path)!',
+		'\tif qemu.is_alive() { qemu.signal_term() }\n\tqemu.wait()\n\tserial := os.read_bytes(serial_path)!')!
 	source = replace_once(source, '\tqemu.run()', '\tmut start_pins := map[string]string{}\n\tfor path in [os.executable(), os.args[1], settings[\'boot_image\']!.str(), settings[\'efivars\']!.str(), settings[\'qemu\']!.str(), settings[\'firmware\']!.str(), \'build/android-maps/maps261/runtime-after.json\', \'build/android-maps/maps-interact-unique258\'] { start_pins[path] = styled_hash(path)! }\n\tos.write_file(state + \'/start-receipt.json\', json2.encode({\'recorded_before_qemu_run_utc\': json2.Any(time.utc().str()), \'qemu_argv\': json2.Any([qemu.filename, ...qemu.args]), \'sha256\': json2.decode[json2.Any](json2.encode(start_pins))!}, prettify: true) + \'\\n\')!\n\tqemu.run()')!
 	if observation(source) != observation(original) || observation(original).len < 1000 {
 		return error('original observation classifier changed or missing')
@@ -332,6 +336,8 @@ fn self_test(original string) ! {
 	preliminary := generated.index('observation-before-capture.json') or { return error('missing preliminary observation') }
 	capture := generated.index("capture := os.exec(['build/android-maps/maps-interact-unique258'") or { return error('missing bounded final capture') }
 	assert preliminary < capture
+	stop := generated.index('\tif qemu.is_alive() { qemu.signal_term() }\n\tqemu.wait()\n\tserial :=') or { return error('missing stopped serial snapshot') }
+	assert capture < stop
 	mut before := map[string]string{}
 	for i in 0 .. 107 { before['fixture-' + i.str()] = 'same' }
 	before[jar] = 'old'
