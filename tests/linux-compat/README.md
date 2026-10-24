@@ -2436,3 +2436,19 @@ negative controls), then `check` on the complete external bundle documented
 in the [removal qualification](../../docs/linux-shared-memory-removal.md).
 Inherited/split mappings, races, IPC namespaces and GNU/foreign/32-bit paths
 remain separate qualifications.
+
+The `shmimport` case checks complete native IPC_SET input import before ID
+lookup and ownership checks, including unreadable ignored tails, negative
+arguments, nonowners, preserved metadata and exact read-only record bounds.
+Identical musl ELFs pass 218 checks on both production kernels and Linux
+6.12.51; original kernels fail 33 checks each. Run
+`--cases shmimport,shmremove,shmtime,shmset,shmabi,shmflags,shmremap,sharedmem,runtime,mmap,namespace,jit`
+with a fresh state directory. All twelve suites pass per architecture.
+
+`shmimport-reference.v` accepts the same arguments as `shmremove-reference.v`.
+Its `--self-test` has two positive and nine negative controls. Compile
+`shmimport-evidence.v` without `-prod`, run `self-test` (five positive and 23
+negative controls), then `check` on the complete external bundle documented
+in the [input-import qualification](../../docs/linux-shared-memory-import.md).
+Inherited/split mappings, races, IPC namespaces and GNU/foreign/32-bit paths
+remain separate qualifications.

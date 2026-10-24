@@ -402,6 +402,16 @@ pub fn syscall_shmdt(_ voidptr, address u64) (u64, u64) {
 }
 
 pub fn syscall_shmctl(_ voidptr, shmid i32, command i32, buffer u64) (u64, u64) {
+	if shmid < 0 || command < 0 {
+		return errno.err, errno.einval
+	}
+	// Linux imports IPC_SET metadata before looking up a nonnegative ID or
+	// checking ownership. Keep user page-table walks outside segments_lock;
+	// no segment pointer needs to survive the copy.
+	mut input := Shmid64Ds{}
+	if command == ipc_set && !usercopy.copy_from_user(voidptr(&input), buffer, sizeof(Shmid64Ds)) {
+		return errno.err, errno.efault
+	}
 	segments_lock.acquire()
 	mut segment := find_id_unlocked(shmid)
 	if segment == unsafe { nil } {
@@ -467,31 +477,14 @@ pub fn syscall_shmctl(_ voidptr, shmid i32, command i32, buffer u64) (u64, u64) 
 			return 0, 0
 		}
 		ipc_set {
-			if buffer == 0 {
-				segments_lock.release()
-				return errno.err, errno.efault
-			}
-			mut info := Shmid64Ds{}
-			// Do not hold the global spinlock while walking user page tables.
-			segment.operations++
-			segments_lock.release()
-			if !usercopy.copy_from_user(voidptr(&info), buffer, sizeof(Shmid64Ds)) {
-				segments_lock.acquire()
-				finish_operation_unlocked(segment)
-				segments_lock.release()
-				return errno.err, errno.efault
-			}
-			segments_lock.acquire()
-			if info.perm.uid == u32(-1) || info.perm.gid == u32(-1) {
-				finish_operation_unlocked(segment)
+			if input.perm.uid == u32(-1) || input.perm.gid == u32(-1) {
 				segments_lock.release()
 				return errno.err, errno.einval
 			}
-			segment.uid = info.perm.uid
-			segment.gid = info.perm.gid
-			segment.mode = (segment.mode & ~u32(0o777)) | (info.perm.mode & 0o777)
+			segment.uid = input.perm.uid
+			segment.gid = input.perm.gid
+			segment.mode = (segment.mode & ~u32(0o777)) | (input.perm.mode & 0o777)
 			segment.ctime = realtime_seconds()
-			finish_operation_unlocked(segment)
 			segments_lock.release()
 			return 0, 0
 		}

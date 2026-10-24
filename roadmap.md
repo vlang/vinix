@@ -1823,6 +1823,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   All eleven maintained suites pass per architecture. See
   [the removal qualification](docs/linux-shared-memory-removal.md).
 
+- [x] Import native shared-memory IPC_SET metadata before ID lookup and
+  authorization, returning EFAULT for unreadable input while preserving the
+  negative-argument EINVAL guard and metadata on failure. Identical musl ELFs
+  pass 218 checks on both production architectures and Linux; originals fail
+  33 each. All twelve maintained suites pass per architecture. See
+  [the input-import qualification](docs/linux-shared-memory-import.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
