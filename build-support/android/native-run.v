@@ -6,6 +6,7 @@ module main
 import os
 import nativeapk
 import nativeidentity
+import nativecache
 
 #include <sys/resource.h>
 struct C.rlimit {
@@ -68,6 +69,7 @@ fn run() ! {
 	data := os.getenv_opt('ANDROID_APP_DATA_DIR') or { data_root + '/vinix/android/' + os.base(apk) + '_' }
 	identity := nativeidentity.from_environment()!
 	identity.activate(apk, root, os.getenv('VINIX_SURFACE_PATH'))!
+	nativecache.prepare()!
 	os.mkdir_all(data)!
 	native := nativeapk.install(apk, data, 'arm64-v8a')!
 	os.setenv('VINIX_ANDROID_NATIVE_DIR', native, true)

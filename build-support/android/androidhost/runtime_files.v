@@ -146,7 +146,7 @@ fn native_producer_digest(support string, inputs []string, directories []string)
 	root := path_parent(path_parent(support))
 	mut paths := inputs.clone()
 	if 'build-support/android/atlframework' in directories {
-		for directory in ['build-support/android/nativews','build-support/android/wsloader','build-support/android/nativeapk','build-support/android/nativeidentity'] { producer_sources(root,directory,mut paths)! }
+		for directory in ['build-support/android/nativews','build-support/android/wsloader','build-support/android/nativeapk','build-support/android/nativeidentity','build-support/android/nativecache'] { producer_sources(root,directory,mut paths)! }
 		paths << ['build-support/android/nativews/bindings.txt','build-support/android/native-entry.v','build-support/android/native-run.v']
 	}
 	for directory in directories { producer_sources(root, directory, mut paths)! }
