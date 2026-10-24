@@ -455,6 +455,11 @@ pub fn syscall_shmctl(_ voidptr, shmid i32, command i32, buffer u64) (u64, u64) 
 				return errno.err, errno.efault
 			}
 			segments_lock.acquire()
+			if info.perm.uid == u32(-1) || info.perm.gid == u32(-1) {
+				finish_operation_unlocked(segment)
+				segments_lock.release()
+				return errno.err, errno.einval
+			}
 			segment.uid = info.perm.uid
 			segment.gid = info.perm.gid
 			segment.mode = (segment.mode & ~u32(0o777)) | (info.perm.mode & 0o777)

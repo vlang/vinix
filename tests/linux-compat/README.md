@@ -2387,3 +2387,18 @@ negative controls), then `check` on the complete external bundle documented
 in the [ABI qualification](../../docs/linux-shared-memory-abi.md). This
 qualifies native ELF64 argument widths; full IPC, namespace isolation and
 GNU/foreign/32-bit paths remain separate qualifications.
+
+The `shmset` case checks native IPC_SET invalid owner IDs, unchanged metadata,
+contents/counts, valid large IDs and retained EFAULT/EINVAL/EPERM errors as root
+and UID 1000/GID 2000. Identical musl ELFs pass 398 checks on both production
+kernels and Linux 6.12.51; original kernels fail 180 checks each. Run
+`--cases shmset,shmabi,shmflags,shmremap,sharedmem,runtime,mmap,namespace,jit`
+with a fresh state directory. All nine maintained suites pass per architecture.
+
+`shmset-reference.v` accepts the same arguments as `shmabi-reference.v`.
+Its `--self-test` has two positive and nine negative controls. Compile
+`shmset-evidence.v` without `-prod`, run `self-test` (five positive and 23
+negative controls), then `check` on the complete external bundle documented
+in the [ownership qualification](../../docs/linux-shared-memory-ownership.md).
+Mapped namespaces, concurrent changes, successful timestamps and full IPC or
+GNU/foreign/32-bit paths remain separate qualifications.

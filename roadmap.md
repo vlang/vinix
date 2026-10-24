@@ -1802,6 +1802,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   All eight maintained suites pass per architecture. See
   [the ABI qualification](docs/linux-shared-memory-abi.md).
 
+- [x] Reject all-ones native shared-memory IPC_SET owner IDs with EINVAL before
+  changing metadata. Qualify valid large IDs, immutable fields, preserved
+  contents/counts and retained EFAULT/EINVAL/EPERM errors. Identical musl ELFs
+  pass 398 checks on both production architectures and Linux; originals fail
+  180 each. All nine maintained suites pass per architecture. See
+  [the ownership qualification](docs/linux-shared-memory-ownership.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

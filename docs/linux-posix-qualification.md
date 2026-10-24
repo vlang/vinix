@@ -11538,3 +11538,14 @@ production builds and all eight maintained suites pass. Generated C confirms
 the parameter widths and byte-identical function bodies. The report records
 exact source/kernel identities, complete external evidence, actual page
 sizes and remaining IPC/runtime limitations.
+
+## Native shared-memory owner validation
+
+The 2026-10-24 [ownership qualification](linux-shared-memory-ownership.md)
+verifies EINVAL for all-ones IPC_SET UID/GID before metadata changes, with
+valid large-ID and permission controls. Identical musl ELF64 probes pass 398
+checks on both production architectures and Linux 6.12.51; originals fail 180
+each. Both production builds and all nine maintained suites pass. Generated
+C confirms the existing locked operation-pin cleanup and immediate return,
+with no new allocation or lifetime. The report records source/kernel hashes,
+complete evidence, actual page sizes and remaining IPC/runtime limitations.
