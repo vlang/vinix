@@ -70,6 +70,7 @@ fn compile_c(root string, generated string, output string, gles bool) {
 
 fn native_fixture_source(item string) string {
 	return match item {
+		'notification-content-checks' { 'un_notification_content_test.v' }
 		'notification-center-checks' { 'un_notification_center_test.v' }
 		'notification-request-checks' { 'un_notification_request_test.v' }
 		'calendar-trigger-checks' { 'un_calendar_trigger_test.v' }
@@ -79,8 +80,8 @@ fn native_fixture_source(item string) string {
 }
 
 fn build(root string, out string, only string) {
-	assert only in ['notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']!
-	for item in ['notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
+	assert only in ['notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']!
+	for item in ['notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -139,6 +140,7 @@ fn vm(root string, out string, mode string) {
 		copy_file(out + '/calendar-trigger-checks', fs + '/opt/ios/calendar-trigger-checks')
 		copy_file(out + '/notification-request-checks', fs + '/opt/ios/notification-request-checks')
 		copy_file(out + '/notification-center-checks', fs + '/opt/ios/notification-center-checks')
+		copy_file(out + '/notification-content-checks', fs + '/opt/ios/notification-content-checks')
 		tree(root+'/build/ios/fortnite/staging/usr/lib/vinix/ios-gles',fs+'/usr/lib/vinix/ios-gles')
 	} else {
 		os.mkdir_all(fs + '/opt/ios') or { panic(err) }
@@ -224,6 +226,6 @@ fn main() {
 	mode := os.args[1]
 	assert mode in ['build', 'notifications', 'probe', 'audit', 'static-audit']!
 	if mode == 'build' {
-		for item in ['notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks', 'native-init', 'run-ios', 'run-ios-gles']! { build(root, out, item) }
+		for item in ['notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks', 'native-init', 'run-ios', 'run-ios-gles']! { build(root, out, item) }
 	} else { vm(root, out, mode) }
 }

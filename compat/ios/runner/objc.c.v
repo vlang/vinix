@@ -141,6 +141,7 @@ mut:
 	un_request_initialized bool
 	un_center_owned bool
 	un_center_initialized bool
+	un_content &UNContent = unsafe { nil }
 	url_query_item_owned bool
 	url_query_item_initialized bool
 	url_query_item_initializing bool
@@ -538,6 +539,7 @@ fn objc_start() {
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'UNNotificationTrigger', 'UNCalendarNotificationTrigger', 'UNNotificationRequest', 'UNUserNotificationCenter', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
+        'UNNotificationContent', 'UNMutableNotificationContent',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSOperation', 'NSInvocationOperation', 'NSInvocation', 'NSMethodSignature', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLQueryItem', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
@@ -559,6 +561,7 @@ fn objc_start() {
 			'OS_dispatch_queue_serial' { ios_runtime.names['OS_dispatch_queue_serial_executor'] }
 			'OS_dispatch_queue_main' { ios_runtime.names['OS_dispatch_queue_serial'] }
 			'UNCalendarNotificationTrigger' { ios_runtime.names['UNNotificationTrigger'] }
+			'UNMutableNotificationContent' { ios_runtime.names['UNNotificationContent'] }
 			'VinixCFDate' { ios_runtime.names['NSDate'] }
 			'VinixMetalTextureDescriptor' { ios_runtime.names['MTLTextureDescriptor'] }
 			'NSInputStream' { ios_runtime.names['NSStream'] }
@@ -609,6 +612,7 @@ fn objc_start() {
 			'UNCalendarNotificationTrigger' { u32(24) }
 			'UNNotificationRequest' { u32(40) }
 			'UNUserNotificationCenter' { u32(40) }
+			'UNNotificationContent', 'UNMutableNotificationContent' { u32(296) }
 			'NSMutableString' { u32(8) }
 			'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global' { u32(8) }
 			'_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty' { u32(8) }
@@ -710,6 +714,7 @@ fn objc_start() {
 	un_trigger_metadata()
 	un_request_metadata()
 	un_center_metadata()
+	un_content_metadata()
 	ns_url_query_item_metadata()
 	ns_user_activity_metadata()
 	ns_notification_queue_metadata()
@@ -767,6 +772,7 @@ fn objc_allocate(cls u64) u64 {
 	un_trigger_require_class(cls)
 	un_request_require_class(cls)
 	un_center_require_class(cls)
+	un_content_require_class(cls)
 	ns_calendar_require_class(cls)
 	ns_predicate_require_class(cls)
 	ns_index_set_require_class(cls)
@@ -883,6 +889,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).un_trigger_owned { panic('iOS: notification trigger requires designated construction') }
 	if obj_header(object).un_request_owned { panic('iOS: notification request requires designated construction') }
 	if obj_header(object).un_center_owned { panic('iOS: user notification center requires currentNotificationCenter') }
+	if obj_header(object).un_content != unsafe { nil } { return un_content_initialize(object) }
 	if obj_header(object).url_query_item_owned { return ns_url_query_item_initialize(object, 0, 0) }
 	if obj_header(object).mutable_string_owned { mutable_string_initialize(object, ''); return object }
 	if ns_timezone_family(cls) { panic('iOS: default timezone construction is not implemented') }

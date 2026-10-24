@@ -107,6 +107,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := un_trigger_types(info.name, info.meta, selector) { return types }
 	if types := un_request_types(info.name, info.meta, selector) { return types }
 	if types := un_center_types(info.name, info.meta, selector) { return types }
+	if types := un_content_types(info.name, info.meta, selector) { return types }
 	if types := ns_calendar_types(info.name, info.meta, selector) { return types }
 	if types := ns_predicate_types(info.name, info.meta, selector) { return types }
 	if types := ns_index_set_types(info.name, info.meta, selector) { return types }
@@ -173,6 +174,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name in ['UNNotificationTrigger', 'UNCalendarNotificationTrigger']! && un_trigger_unsupported(name) { return 0 }
 		if info.name == 'UNNotificationRequest' && un_request_unsupported(name) { return 0 }
 		if info.name == 'UNUserNotificationCenter' && un_center_unsupported(name) { return 0 }
+		if info.name in ['UNNotificationContent', 'UNMutableNotificationContent']! && un_content_unsupported(name) { return 0 }
 		if info.name in ['NSCalendar', 'NSDateComponents']! && ns_calendar_unsupported(name) { return 0 }
 		if info.name == 'NSPredicate' && ns_predicate_unsupported(name) { return 0 }
 		if info.name in ['NSIndexSet', 'NSMutableIndexSet']! && ns_index_set_unsupported(name) { return 0 }

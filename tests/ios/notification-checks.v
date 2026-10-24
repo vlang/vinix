@@ -24,12 +24,16 @@ fn main() {
 	os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
 	if os.args[1] == 'inspect' {
 		run(out, 'inspect', [out + '/inspect-user-notifications', '--bundle', out], false)
-	} else if os.args[1] == 'host' {
+	} else if os.args[1] == 'content-inspect' {
+		run(out, 'inspect', [out + '/inspect-notification-content'], false)
+	} else if os.args[1] in ['host', 'content-host']! {
+		content := os.args[1] == 'content-host'
+		fixture := if content { 'un_notification_content_test.v' } else { 'un_notification_center_test.v' }
 		cfile := out + '/payload/center-host.c'; bundle := out + "/NotificationChecks.app/Contents"
 		os.mkdir_all(bundle + "/MacOS")!
 		os.write_file(bundle + "/Info.plist", "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>org.vinix.notification-checks</string><key>CFBundleExecutable</key><string>center-host</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>")!
 		binary := bundle + "/MacOS/center-host"
-		run(out, 'host-generate', [old + '/v', '-enable-globals', '-nocache', '-gc', 'none', '-cc', 'clang', '-d', 'ios_video', '-d', 'ios_cxx', '-d', 'ios_sqlite', '-os', 'macos', '-arch', 'arm64', '-path', '@vlib|' + root + '/compat/ios|@vmodules', '-o', cfile, root + '/compat/ios/runner/un_notification_center_test.v'], false)
+		run(out, 'host-generate', [old + '/v', '-enable-globals', '-nocache', '-gc', 'none', '-cc', 'clang', '-d', 'ios_video', '-d', 'ios_cxx', '-d', 'ios_sqlite', '-os', 'macos', '-arch', 'arm64', '-path', '@vlib|' + root + '/compat/ios|@vmodules', '-o', cfile, root + '/compat/ios/runner/' + fixture], false)
 		mut objects := []string{}
 		for i, source in [cfile, old + '/vlib/os/execute_capture_nix.c', old + '/vlib/builtin/segfault_handler_nix.c', root + '/compat/ios/runner/abi/dispatch.S']! {
 			object := out + '/payload/host-' + i.str() + '.o'; objects << object

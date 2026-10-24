@@ -9,6 +9,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	un_trigger_require_class(cls)
 	un_request_require_class(cls)
 	un_center_require_class(cls)
+	un_content_require_class(cls)
 	ns_calendar_require_class(cls)
 	ns_predicate_require_class(cls)
 	ns_index_set_require_class(cls)
@@ -65,6 +66,11 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	header.un_trigger_owned = cls in [ios_runtime.names['UNNotificationTrigger'], ios_runtime.names['UNCalendarNotificationTrigger']]!
 	header.un_request_owned = cls == ios_runtime.names['UNNotificationRequest']
 	header.un_center_owned = cls == ios_runtime.names['UNUserNotificationCenter']
+	if cls in [ios_runtime.names['UNNotificationContent'], ios_runtime.names['UNMutableNotificationContent']]! {
+		header.un_content = unsafe { &UNContent(C.calloc(1, sizeof(UNContent))) }
+		if header.un_content == unsafe { nil } { panic('iOS: cannot allocate notification content state') }
+		header.un_content.interruption = 1
+	}
 	header.url_query_item_owned = cls == ios_runtime.names['NSURLQueryItem']
 	header.auth_owned = objc_is_kind(object, ios_runtime.names['ASWebAuthenticationSession'])
 	header.image_view_owned = objc_is_kind(object, ios_runtime.names['UIImageView'])
@@ -181,6 +187,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	un_trigger_dispose(object, mut header)
 	un_request_dispose(object, mut header)
 	un_center_dispose(object, mut header)
+	un_content_dispose(object, mut header)
 	ns_url_query_item_dispose(object, mut header)
 	web_auth_dispose(mut header)
 	image_view_dispose(mut header)
