@@ -2419,3 +2419,20 @@ negative controls), then `check` on the complete external bundle documented
 in the [timestamp qualification](../../docs/linux-shared-memory-timestamps.md).
 Inherited/split mappings, mremap metadata, races, IPC namespaces and
 GNU/foreign/32-bit paths remain separate qualifications.
+
+The `shmremove` case checks native IPC_RMID key clearing and SHM_DEST, exact
+metadata preservation, continued contents/ID access, key reuse with independent
+storage, repeated removal, IPC_SET preservation, read-only reattachment and
+final-detach stale-ID errors as root and UID 1000/GID 2000. Identical musl ELFs
+pass 301 checks on both production kernels and Linux 6.12.51; original kernels
+fail 60 checks each. Run
+`--cases shmremove,shmtime,shmset,shmabi,shmflags,shmremap,sharedmem,runtime,mmap,namespace,jit`
+with a fresh state directory. All eleven suites pass per architecture.
+
+`shmremove-reference.v` accepts the same arguments as `shmtime-reference.v`.
+Its `--self-test` has two positive and nine negative controls. Compile
+`shmremove-evidence.v` without `-prod`, run `self-test` (five positive and 23
+negative controls), then `check` on the complete external bundle documented
+in the [removal qualification](../../docs/linux-shared-memory-removal.md).
+Inherited/split mappings, races, IPC namespaces and GNU/foreign/32-bit paths
+remain separate qualifications.

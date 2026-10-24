@@ -11561,3 +11561,15 @@ longer change this metadata, and exit cleanup retains the exiting process PID.
 The report records the generated C lifetime review, complete selected evidence,
 source/kernel hashes and actual page sizes. Inherited/split VMAs, mremap,
 races, IPC namespaces and GNU/foreign/32-bit paths remain unqualified.
+
+## Native shared-memory pending removal
+
+The 2026-10-24 [removal qualification](linux-shared-memory-removal.md) verifies
+that IPC_RMID clears the key and exposes SHM_DEST while preserving attached
+contents and ID access until final detach. Key reuse, repeated removal and
+IPC_SET preservation pass. Identical musl ELF64 probes pass 301 checks on both
+production architectures and Linux 6.12.51; originals fail 60 each. Both
+production builds and all eleven maintained suites pass. The report records
+the two-write generated C scope review, complete selected evidence,
+source/kernel hashes and actual page sizes. Inherited/split mappings, races,
+IPC namespaces and GNU/foreign/32-bit paths remain unqualified.

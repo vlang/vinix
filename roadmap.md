@@ -1816,6 +1816,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   maintained suites pass per architecture. Inherited/split mappings remain
   unqualified. See [the timestamp qualification](docs/linux-shared-memory-timestamps.md).
 
+- [x] Expose SHM_DEST and clear the key after native shared-memory IPC_RMID,
+  preserving attached contents/ID access until final detach. Qualify key reuse,
+  repeated removal and IPC_SET preservation. Identical musl ELFs pass 301
+  checks on both production architectures and Linux; originals fail 60 each.
+  All eleven maintained suites pass per architecture. See
+  [the removal qualification](docs/linux-shared-memory-removal.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

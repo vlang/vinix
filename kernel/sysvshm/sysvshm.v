@@ -25,6 +25,7 @@ const ipc_rmid = 0
 const ipc_set = 1
 const ipc_stat = 2
 
+const shm_dest = u32(0o1000)
 const shm_rdonly = 0o10000
 const shm_rnd = 0o20000
 const shm_remap = 0o40000
@@ -427,6 +428,10 @@ pub fn syscall_shmctl(_ voidptr, shmid i32, command i32, buffer u64) (u64, u64) 
 	match command {
 		ipc_rmid {
 			segment.removed = true
+			// Linux keeps attached segments addressable by ID, with a private
+			// key and SHM_DEST in IPC_STAT until their final attachment leaves.
+			segment.key = ipc_private
+			segment.mode |= shm_dest
 			if segment.attachments == 0 && segment.operations == 0 {
 				destroy_unlocked(segment)
 			}
