@@ -18732,24 +18732,41 @@ failures.
 The shared cache fixture passes against Apple Foundation and the V runtime
 under ASan+UBSan, normally and with deterministic Swift hashing. All eleven
 ARM64 fixtures and runners build, and the focused guest passes all eight cache,
-calendar and notification fixtures, including 31 cache rejection cases. The
-fresh Fortnite probe resolves `NSCache` and stops at
+calendar and notification fixtures, including 31 cache rejection cases. That
+milestone's Fortnite probe resolved `NSCache` and stopped at
 `_OBJC_CLASS_$_CTTelephonyNetworkInfo` in CoreTelephony during linking, before
 application entry. The [cache report](../tests/ios/cache-report.md) records the
-source revision, complete external archive, checksums and verification. The
-audits below use this cache implementation and do not execute app code.
+source revision, complete external archive, checksums and verification.
+
+The telephony milestone adds `CTTelephonyNetworkInfo` with Apple's measured
+40-byte layout, a zeroing weak delegate and copied notifier blocks. It reports
+no cellular service: carrier and radio values are nil, and service maps are
+empty immutable dictionaries. It emits no service-change events. Coding,
+copying, custom subclasses and unsupported private APIs fail explicitly.
+
+The shared telephony fixture passes against Apple CoreTelephony and the V
+runtime under ASan+UBSan, normally and with deterministic Swift hashing. All
+twelve ARM64 fixtures and runners build, and the focused guest passes all nine
+telephony, cache, calendar and notification fixtures, including 19 telephony
+rejection cases. The fresh Fortnite probe resolves the telephony class and
+stops at `_OBJC_CLASS_$_NSURLCredential` during linking, before application
+entry. The [telephony report](../tests/ios/telephony-report.md) records the source
+revision, complete external archive, checksums and verification. Full native
+regression, Swift support, Fortnite initialization, rendering, login and
+gameplay remain unverified. The audits below include this implementation and
+do not execute app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,087 | 74 | 78 |
+| Fortnite executable | 2,088 | 73 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,927 | 77 | 114 |
+| All images | 2,928 | 76 | 114 |
 
-The C++/GLES/Text variant reports 2,941 resolved imports, 63 unresolved strong
+The C++/GLES/Text variant reports 2,942 resolved imports, 62 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
