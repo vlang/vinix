@@ -1,0 +1,112 @@
+const archive276 = '/Users/alex/.local/state/vinix/android/compound276-2026-10-24'
+const manifest276 = '37bfa8ec3449adf8a294e0b1f3ff3cabfa49123c228f308d9919cab7531d5fa4'
+const jar276 = '1a026975748c693f11c09c7fc080f8b72c20c0638c01996f226698cc740f92f6'
+const native276 = '5fe27a87c179b97121c368f417936ceebb75752c4a4204b937312ee28da531ca'
+
+fn check_sources(kind string) ! {
+	directory := if kind == 'framework' { '/sources/' } else { '/atlframework/' }
+	mut actual := map[string]string{}
+	for path in os.walk_ext(base + '/' + kind + directory, '.v') {
+		actual[path.all_after(base + '/' + kind + directory)] = hash(path)!
+	}
+	assert actual == json2.decode[map[string]string](os.read_file(base + '/' + kind + '/sources.json')!)!, kind
+}
+
+fn freeze() ! {
+	assert !os.exists(base + '/framework') && !os.exists(base + '/native')
+	assert hash(archive276 + '/sha256.json')! == manifest276
+	sealed := json2.decode[map[string]string](os.read_file(archive276 + '/sha256.json')!)!
+	mut reused := map[string]string{}
+	// Verify every reused source byte and artifact against the complete sealed
+	// qualification. The original evidence stays at archive276, unchanged.
+	for kind in ['framework', 'native'] {
+		for name in ['sources.json', 'exact-sources.json.gz'] {
+			path := kind + '/' + name
+			reused[path] = hash(previous + '/' + path)!
+			assert reused[path]! == sealed['prelaunch/' + path]!, path
+		}
+	}
+	for path in ['framework/api-impl.jar', 'framework/framework-manifest.json', 'native/libvinix-android-native.so', 'native/bindings.txt', 'native/androidfw_c_api.h', 'native/sqlite3.h', 'native/stb_image.h', 'native/stb_truetype.h'] {
+		reused[path] = hash(previous + '/' + path)!
+		assert reused[path]! == sealed['prelaunch/' + path]!, path
+	}
+	assert reused['framework/api-impl.jar']! == jar276
+	assert reused['native/libvinix-android-native.so']! == native276
+	write_json(base + '/attempt.json', {'attempt': attempt, 'base': base, 'audit': audit, 'baseline_attempt': baseline_attempt, 'fixture_source': fixture_source, 'fixture_frozen': fixture_frozen})!
+	framework := snapshot('framework', 126)!
+	native := snapshot('native', 83)!
+	for path in ['androidtools/framework_classes.v', 'androidtools/framework_drawables.v'] {
+		live := os.read_file('tests/native-android-tools/' + path)!
+		old := framework[path]!
+		if path.ends_with('framework_classes.v') {
+			registration := ' framework_vector_fill_rules(smali)!\n'
+			assert live.count(registration) == 1 && old.count(registration) == 0
+			assert live.replace(registration, '') == old
+		} else {
+			assert live.starts_with(old)
+			assert live.all_after(old).count('fn framework_vector_fill_rules(') == 1
+		}
+		os.write_file(base + '/framework/sources/' + path, live)!
+	}
+	for kind in ['framework', 'native'] {
+		directory := if kind == 'framework' { '/sources/' } else { '/atlframework/' }
+		prior := if kind == 'framework' { framework } else { native }
+		mut pins := map[string]string{}
+		mut exact := map[string]string{}
+		mut delta := []string{}
+		for path in os.walk_ext(base + '/' + kind + directory, '.v') {
+			name := path.all_after(base + '/' + kind + directory)
+			pins[name] = hash(path)!
+			exact[name] = os.read_file(path)!
+			if prior[name]! != exact[name]! { delta << name }
+		}
+		delta.sort()
+		assert delta == if kind == 'framework' { ['androidtools/framework_classes.v', 'androidtools/framework_drawables.v'] } else { []string{} }
+		write_json(base + '/' + kind + '/sources.json', pins)!
+		write_json(base + '/' + kind + '/source-delta.json', delta)!
+		os.write_file_array(base + '/' + kind + '/exact-sources.json.gz', gzip.compress(json2.encode(exact).bytes())!)!
+	}
+	for name in ['bindings.txt', 'androidfw_c_api.h', 'sqlite3.h', 'stb_image.h', 'stb_truetype.h', 'libvinix-android-native.so'] {
+		clone_file(previous + '/native/' + name, base + '/native/' + name)!
+	}
+	clone_file(archive276 + '/sha256.json', base + '/qualified276-sha256.json')!
+	write_json(base + '/qualified276-reference.json', {'root': json2.Any(archive276), 'manifest_sha256': json2.Any(manifest276), 'checked_utc': json2.Any(time.utc().str()), 'consumed': json2.decode[json2.Any](json2.encode(reused))!})!
+	clone_file(fixture_source, fixture_frozen)!
+	clone_file('tests/native-android-ws/vector-fill-build.v', base + '/build-framework.v')!
+	mut inputs := map[string]string{}
+	old_inputs := json2.decode[map[string]string](os.read_file('build/android-maps/compound274/frozen-inputs.json')!)!
+	for path, pin in old_inputs {
+		if path.starts_with('/') || path.starts_with('build/android-framework/tools/') || path.starts_with('build-support/android/atlframework/') || path in ['build/android-native-ws/aapt2', 'build/android-native-ws/android-15/lib/apksigner.jar'] {
+			assert hash(path)! == pin, path
+			inputs[path] = pin
+		}
+	}
+	for path in [fixture_source, 'tests/native-android-ws/vector-fill-run.v', 'tests/native-android-ws/vector-fill-freeze.v.txt', 'tests/native-android-ws/vector-fill-build.v', 'tests/native-android-tools/androidtools/framework_classes.v', 'tests/native-android-tools/androidtools/framework_drawables.v', previous + '/framework/api-impl.jar', previous + '/native/libvinix-android-native.so', archive276 + '/sha256.json'] { inputs[path] = hash(path)! }
+	for path in inputs.keys() { clone_file(path, base + '/inputs/' + path.trim_left('/'))! }
+	write_json(base + '/frozen-inputs.json', inputs)!
+	freeze_closure('framework', [compiler, '-print-v-files', '-enable-globals', '-path', framework_paths(), base + '/build-framework.v'])!
+	freeze_closure('fixture', [compiler, '-print-v-files', fixture_frozen])!
+	println('COMPOUND278 FROZEN framework fill rules only; native exactly sealed276; new paired fixture')
+}
+
+// FRAMEWORK_BUILD
+fn build() ! {
+	for path, pin in json2.decode[map[string]string](os.read_file(base + '/frozen-inputs.json')!)! { assert hash(path)! == pin, path }
+	check_sources('framework')!
+	check_sources('native')!
+	assert hash(base + '/native/libvinix-android-native.so')! == native276
+	verify_closure('framework')!
+	compile_step('build-framework-compiler', [compiler, '-nocache', '-cc', 'cc', '-enable-globals', '-cflags', '-O2', '-path', framework_paths(), '-o', base + '/build-framework', base + '/build-framework.v'], base + '/build-framework')!
+	verify_closure('framework')!
+	compile_step('build-framework', [base + '/build-framework'], base + '/framework/api-impl.jar')!
+	verify_closure('framework')!
+	verify_closure('fixture')!
+	compile_step('fixture-compiler', [compiler, '-nocache', '-cc', 'cc', '-cflags', '-O2', '-o', base + '/fixture-generator', fixture_frozen], base + '/fixture-generator')!
+	verify_closure('fixture')!
+	compile_step('fixture', [base + '/fixture-generator', base + '/apk'], base + '/apk/probe.apk')!
+	check_sources('framework')!
+	check_sources('native')!
+	assert hash(base + '/native/libvinix-android-native.so')! == native276
+	for path, pin in json2.decode[map[string]string](os.read_file(base + '/frozen-inputs.json')!)! { assert hash(path)! == pin, path }
+	println('COMPOUND278 BUILT framework=' + hash(base + '/framework/api-impl.jar')! + ' native=' + native276 + ' apk=' + hash(base + '/apk/probe.apk')!)
+}
