@@ -18613,9 +18613,9 @@ this does not establish full Swift or regression success. Fortnite's new
 launch probe resolves the request class and stops at
 `_OBJC_CLASS_$_UNUserNotificationCenter`, attributed to UserNotifications,
 before application entry, with process exit status 1. Inspected Fortnite
-request factories supply non-nil content, which remains unsupported; resolving
-the class does not establish those calls work. Both import audits complete
-without executing app code. The evidence manifest
+request factories supply non-nil content, which was unsupported at that
+milestone; resolving the class did not establish those calls worked. Both
+import audits completed without executing app code. The evidence manifest
 hashes selected source and artifact inputs; it does not seal the full toolchain
 or host dynamic runtime closure.
 
@@ -18643,9 +18643,9 @@ cases and two drained lifetimes. The focused ARM64 guest passes calendar,
 calendar-trigger, notification-request and notification-center fixtures.
 This does not establish full regression or Swift success.
 
-Fresh Fortnite probing resolves the center class and stops at
+The center-only Fortnite probe resolves the center class and stops at
 `_OBJC_CLASS_$_UNMutableNotificationContent`, attributed to UserNotifications,
-before application entry, with process exit status 1. The audits below do not
+before application entry, with process exit status 1. Those audits did not
 execute app code. Complete guest media, firmware state, source snapshots,
 generated C, binaries and logs are retained in a sealed bundle outside Git at
 `/Users/alex/Library/Caches/vinix-ios/un-center-20261024`.
@@ -18655,17 +18655,47 @@ evidence checker controls. Compressed archive creation failed on a full disk;
 the complete bundle remains intact. Selected build inputs are hashed; the full
 compiler header and host dynamic-library closures are not independently sealed.
 
+V now provides bounded `UNNotificationContent` and
+`UNMutableNotificationContent`, including immutable content snapshots in
+`UNNotificationRequest`. Apple measurements establish their 296-byte layout,
+method encodings, defaults and nil normalization. Nine string properties,
+empty attachments and user-info collections, summary counts, interruption
+levels and relevance scores are supported. String behavior follows the native
+measurements: `launchImageName` and `subtitle` retain mutable inputs, their
+getters return immutable snapshots, and content copies freeze those values.
+Other string setters take immutable snapshots. Non-nil badge and sound objects,
+nonempty collections, custom subclasses, coding, providers and private service
+operations remain explicit failures. Notification delivery remains absent.
+
+The shared content fixture passes against Apple UserNotifications and the V
+runtime with ASan+UBSan, normally and with deterministic Swift hashing; leak
+detection is disabled. It checks native layout, encodings, copy classes, UTF-8,
+nil normalization, scalar bounds and request ownership. Runtime checks cover
+reentrant constructors and failures, caller storage, changed-isa cleanup,
+associated copies, native overrides, 28 rejection cases and two drained
+lifetimes. The focused ARM64 guest passes all five calendar and notification
+fixtures, including their 41/21/28/31/28 rejection cases. This does not establish
+full regression or Swift success.
+
+The new Fortnite probe resolves mutable notification content and stops at
+`_OBJC_CLASS_$_UNNotificationSound` in UserNotifications, before application
+entry, with process exit status 1. The
+[notification-content report](../tests/ios/notification-content-report.md)
+records the committed source revision, complete external evidence bundle,
+archive and checksums. The audits below use this content implementation and
+do not execute application code.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,083 | 78 | 78 |
+| Fortnite executable | 2,084 | 77 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,923 | 81 | 114 |
+| All images | 2,924 | 80 | 114 |
 
-The C++/GLES/Text variant reports 2,937 resolved imports, 67 unresolved strong
+The C++/GLES/Text variant reports 2,938 resolved imports, 66 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
