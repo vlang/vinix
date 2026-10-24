@@ -18765,25 +18765,42 @@ The shared credential fixture passes against Apple Foundation and the V
 runtime under ASan+UBSan, normally and with deterministic Swift hashing. All
 thirteen ARM64 fixtures and runners build, and the focused guest passes all ten
 credential, telephony, cache, calendar and notification fixtures, including 35
-credential rejection cases. The fresh Fortnite probe resolves the credential
-class and stops at `_OBJC_CLASS_$_NSMapTable` during linking, before application
+credential rejection cases. That milestone's Fortnite probe resolved the credential
+class and stopped at `_OBJC_CLASS_$_NSMapTable` during linking, before application
 entry. The [credential report](../tests/ios/credential-report.md) records the
-source revision, complete external archive, checksums and verification. Full
-native regression, Swift support, Fortnite initialization, rendering, login and
-gameplay remain unverified. The audits below include this implementation and do
-not execute app code.
+source revision, complete external archive, checksums and verification.
+
+The map-table milestone adds `NSMapTable` with Apple's measured 8-byte layout,
+strong and zeroing weak keys and values, object equality or pointer identity,
+and original-key retention on equal replacement. Nil keys and values are
+ignored. Storage is bounded to 4,096 entries; callbacks execute outside the
+runtime lock, with pinned receivers and retained snapshots. Custom subclasses,
+copy-in and other pointer functions, coding, copying, enumeration and unsupported
+private APIs fail explicitly.
+
+The shared map-table fixture passes against Apple Foundation and the V runtime
+under ASan+UBSan, normally and with deterministic Swift hashing. All fourteen
+ARM64 fixtures and runners build, and the focused guest passes all eleven
+map-table, credential, telephony, cache, calendar and notification fixtures,
+including 27 map-table rejection cases. The fresh Fortnite probe resolves
+`NSMapTable` and stops at `_OBJC_CLASS_$_NSLock` during linking, before application
+entry. The [map-table report](../tests/ios/map-table-report.md) records the source
+revision, complete external archive, checksums and verification. Full native
+regression, Swift support, Fortnite initialization, rendering, login and gameplay
+remain unverified. The audits below include this implementation and do not
+execute app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,089 | 72 | 78 |
+| Fortnite executable | 2,090 | 71 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,929 | 75 | 114 |
+| All images | 2,930 | 74 | 114 |
 
-The C++/GLES/Text variant reports 2,943 resolved imports, 61 unresolved strong
+The C++/GLES/Text variant reports 2,944 resolved imports, 60 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
