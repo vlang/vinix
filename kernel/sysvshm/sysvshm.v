@@ -272,10 +272,8 @@ pub fn syscall_shmget(_ voidptr, key i32, size u64, flags int) (u64, u64) {
 }
 
 pub fn syscall_shmat(_ voidptr, shmid int, requested_address u64, flags int) (u64, u64) {
-	if flags & ~(shm_rdonly | shm_rnd | shm_remap | shm_exec) != 0 {
-		return errno.err, errno.einval
-	}
-
+	// Linux ignores unused flag bits; only the attachment flags below affect
+	// access and address selection.
 	mut address := requested_address
 	if address != 0 {
 		if flags & shm_rnd != 0 {

@@ -1790,6 +1790,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   kernels fail 876 each. All six maintained suites pass per architecture.
   See [the remap qualification](docs/linux-shared-memory-remap.md).
 
+- [x] Ignore unused native shmat flag bits while retaining active protections,
+  address validation and permission errors. Identical musl ELFs pass 1,763
+  checks on both production architectures and Linux; original kernels fail
+  1,085 each. All seven maintained suites pass per architecture. See
+  [the flag qualification](docs/linux-shared-memory-flags.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

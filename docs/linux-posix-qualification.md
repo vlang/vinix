@@ -11517,3 +11517,13 @@ and their Linux 6.12.51 references; original kernels fail 876 each. Production
 builds and all six maintained suites pass on both architectures. The report
 records actual 16 KiB native AArch64 pages, positive RW/RO/RX controls,
 complete external evidence and the remaining IPC/runtime limitations.
+
+## Native shared-memory attachment flags
+
+The 2026-10-24 [flag qualification](linux-shared-memory-flags.md) verifies
+that shmat ignores unused flag bits while preserving active protection flags,
+address validation and permission errors. Identical native musl ELFs pass
+1,763 checks on AArch64, x86-64 and their Linux 6.12.51 references; original
+kernels fail 1,085 each. Both production builds and all seven maintained
+suites pass. The report records source/kernel identities, complete external
+evidence, actual page sizes and remaining IPC/runtime limitations.

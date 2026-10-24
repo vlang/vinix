@@ -2357,3 +2357,16 @@ Its `--self-test` has two positive and nine negative controls. Compile
 negative controls), then `check` on the external bundle documented in the
 [remap qualification](../../docs/linux-shared-memory-remap.md). Full IPC,
 namespace isolation and GNU/foreign/32-bit paths remain separate qualifications.
+
+The `shmflags` case checks ignored shmat flag bits, retained protection flags,
+shared contents/counts and address/access errors as root and UID 1000/GID 2000.
+Identical musl ELFs pass 1,763 checks on both production kernels and Linux
+6.12.51; original kernels fail 1,085 checks each. Run
+`--cases shmflags,shmremap,sharedmem,runtime,mmap,namespace,jit` with a fresh
+state directory.
+
+`shmflags-reference.v` accepts the same arguments as `shmremap-reference.v`.
+Its `--self-test` has two positive and nine negative controls. Compile
+`shmflags-evidence.v` without `-prod`, run `self-test` (five positive and 23
+negative controls), then `check` on the complete external bundle documented
+in the [flag qualification](../../docs/linux-shared-memory-flags.md).
