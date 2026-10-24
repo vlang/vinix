@@ -168,6 +168,10 @@ fn objc_responds(object u64, selector &char) bool {
 		if object == ios_runtime.names['NSKeyedUnarchiver'] && ns_keyed_unarchiver_types('NSKeyedUnarchiver', true, name) != none { return true }
 	}
 	if ns_condition_selector(object, name) { return true }
+	if ns_lock_family(if object in ios_runtime.classes { object } else { read64(object) }) {
+		if ns_lock_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if ns_lock_types('NSLock', object in ios_runtime.classes, name) != none { return true }
+	}
 	if ns_recursive_lock_family(if object in ios_runtime.classes { object } else { read64(object) }) {
 		if ns_recursive_lock_unsupported(name) { return native_method(read64(object), name) != 0 }
 		if ns_recursive_lock_types('NSRecursiveLock', object in ios_runtime.classes, name) != none { return true }

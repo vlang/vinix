@@ -110,6 +110,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if ns_keyed_unarchiver_dispatch(object, selector, mut frame) { return true }
 	if ns_keyed_archiver_dispatch(object, selector, mut frame) { return true }
 	if ns_condition_dispatch(object, selector, mut frame) { return true }
+	if ns_lock_dispatch(object, selector, mut frame) { return true }
 	if ns_recursive_lock_dispatch(object, selector, mut frame) { return true }
 	if ns_thread_dispatch(object, selector, mut frame) { return true }
 	if ns_operation_dispatch(object, selector, mut frame) { return true }

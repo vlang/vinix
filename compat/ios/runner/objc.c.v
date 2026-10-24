@@ -120,6 +120,10 @@ mut:
 	set_mutating bool
 	condition_owned bool
 	condition_initialized bool
+	foundation_lock_owned bool
+	foundation_lock_retiring bool
+	foundation_lock_calls u64
+	foundation_lock &FoundationLockState = unsafe { nil }
 	recursive_lock_owned bool
 	recursive_lock_retiring bool
 	recursive_lock_calls u64
@@ -548,7 +552,7 @@ fn objc_start() {
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'NSMapTable', 'CTTelephonyNetworkInfo', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
-		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
@@ -640,6 +644,7 @@ fn objc_start() {
 			'NSConcreteValue' { u32(24) }
 			'NSError' { u32(sizeof(AbiNSError)) }
 			'NSCondition' { u32(sizeof(AbiNSCondition)) }
+			'NSLock' { u32(sizeof(AbiNSLock)) }
 			'NSRecursiveLock' { u32(sizeof(AbiNSRecursiveLock)) }
 			'NSCache' { 48 }
 			'CTTelephonyNetworkInfo' { 40 }
@@ -724,6 +729,7 @@ fn objc_start() {
 	webkit_metadata()
 	url_session_metadata()
 	url_session_configuration_metadata()
+	ns_lock_metadata()
 	ns_recursive_lock_metadata()
 	ns_operation_metadata()
 	ns_invocation_metadata()
@@ -781,6 +787,7 @@ fn obj_header(object u64) &ObjHeader {
 fn objc_allocate(cls u64) u64 {
 	ns_keyed_archiver_require_class(cls)
 	ns_operation_require_class(cls)
+	ns_lock_require_class(cls)
 	ns_recursive_lock_require_class(cls)
 	dispatch_objc_allocation_checked(cls) or { panic(err) }
 	if connection_family(cls) && cls != ios_runtime.names['NSURLConnection'] { panic('iOS: custom connection subclass construction is not implemented') }
@@ -935,6 +942,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).auth_owned { panic('iOS: authentication session requires designated construction') }
 	if obj_header(object).image_view_owned { image_view_initialize(object, 0, 0, ObjRect{}, false) }
 	if objc_is_kind(object, ios_runtime.names['NSCondition']) { ns_condition_initialize(object) }
+	if ns_lock_family(read64(object)) { ns_lock_initialize(object) }
 	if ns_recursive_lock_family(read64(object)) { ns_recursive_lock_initialize(object) }
 	if obj_header(object).thread != unsafe { nil } { ns_thread_initialize(object, 0, 0, 0, 0) }
 	if obj_header(object).operation != unsafe { nil } { return ns_operation_default_initialize(object) }

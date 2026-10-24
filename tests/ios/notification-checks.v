@@ -25,7 +25,9 @@ fn main() {
 	root := os.real_path(os.getwd()); out := os.abs_path(os.args[2]); old := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
-	if os.args[1] == 'inspect' {
+	if os.args[1] == 'driver-build' {
+		run(out, 'driver-build', [old + '/v', '-nocache', '-prod', '-gc', 'none', '-cc', 'clang', '-o', out + '/native-checks', root + '/tests/ios/native-checks.v'], false)
+	} else if os.args[1] == 'inspect' {
 		run(out, 'inspect', [out + '/inspect-user-notifications', '--bundle', out], false)
 	} else if os.args[1] == 'content-inspect' {
 		run(out, 'inspect', [out + '/inspect-notification-content'], false)
@@ -37,6 +39,8 @@ fn main() {
 		run(out, 'inspect', [out + '/inspect-cache'], false)
 	} else if os.args[1] == 'cache-metadata-inspect' {
 		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'NSCache'], false)
+	} else if os.args[1] == 'lock-metadata-inspect' {
+		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'NSLock'], false)
 	} else if os.args[1] == 'map-table-metadata-inspect' {
 		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'NSMapTable'], false)
 	} else if os.args[1] == 'map-table-inspect' {
@@ -51,9 +55,9 @@ fn main() {
 		run(out, 'inspect', [out + '/inspect-notification-attachment'], false)
 	} else if os.args[1] == 'attachment-metadata-inspect' {
 		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'UNNotificationAttachment'], false)
-	} else if os.args[1] in ['host', 'content-host', 'sound-host', 'attachment-host', 'cache-host', 'telephony-host', 'credential-host', 'map-table-host']! {
+	} else if os.args[1] in ['host', 'content-host', 'sound-host', 'attachment-host', 'cache-host', 'telephony-host', 'credential-host', 'map-table-host', 'lock-host', 'recursive-lock-host']! {
 		content := os.args[1] == 'content-host'
-		fixture := if os.args[1] == 'map-table-host' { 'ns_map_table_test.v' } else if os.args[1] == 'credential-host' { 'ns_url_credential_test.v' } else if os.args[1] == 'telephony-host' { 'coretelephony_test.v' } else if os.args[1] == 'cache-host' { 'ns_cache_test.v' } else if content { 'un_notification_content_test.v' } else if os.args[1] == 'sound-host' { 'un_notification_sound_test.v' } else if os.args[1] == 'attachment-host' { 'un_notification_attachment_test.v' } else { 'un_notification_center_test.v' }
+		fixture := if os.args[1] == 'lock-host' { 'ns_lock_test.v' } else if os.args[1] == 'recursive-lock-host' { 'ns_recursive_lock_test.v' } else if os.args[1] == 'map-table-host' { 'ns_map_table_test.v' } else if os.args[1] == 'credential-host' { 'ns_url_credential_test.v' } else if os.args[1] == 'telephony-host' { 'coretelephony_test.v' } else if os.args[1] == 'cache-host' { 'ns_cache_test.v' } else if content { 'un_notification_content_test.v' } else if os.args[1] == 'sound-host' { 'un_notification_sound_test.v' } else if os.args[1] == 'attachment-host' { 'un_notification_attachment_test.v' } else { 'un_notification_center_test.v' }
 		cfile := out + '/payload/center-host.c'; bundle := out + "/NotificationChecks.app/Contents"
 		os.mkdir_all(bundle + "/MacOS")!
 		os.write_file(bundle + "/Info.plist", "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>org.vinix.notification-checks</string><key>CFBundleExecutable</key><string>center-host</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>")!

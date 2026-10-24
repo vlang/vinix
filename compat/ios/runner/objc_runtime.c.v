@@ -92,6 +92,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := ns_keyed_archiver_types(info.name, info.meta, selector) { return types }
 	if types := ns_keyed_unarchiver_types(info.name, info.meta, selector) { return types }
 	if types := ns_condition_builtin_types(info.name, info.meta, selector) { return types }
+	if types := ns_lock_types(info.name, info.meta, selector) { return types }
 	if types := ns_recursive_lock_types(info.name, info.meta, selector) { return types }
 	if types := ns_operation_types(info.name, info.meta, selector) { return types }
 	if types := ns_invocation_types(info.name, info.meta, selector) { return types }
@@ -171,6 +172,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if !info.meta && info.name == 'NSURLConnection' && name in ['init', 'copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
 		if info.name == 'NSURLSession' && url_session_unsupported(name) { return 0 }
 		if info.name == 'NSURLSessionConfiguration' && url_session_configuration_unsupported(name) { return 0 }
+		if info.name == 'NSLock' && ns_lock_unsupported(name) { return 0 }
 		if info.name == 'NSRecursiveLock' && ns_recursive_lock_unsupported(name) { return 0 }
 		if info.name in ['NSCoder', 'NSKeyedArchiver']! && ns_keyed_archiver_unsupported(name) { return 0 }
 		if info.name == 'NSKeyedUnarchiver' && ns_keyed_unarchiver_unsupported(name) { return 0 }

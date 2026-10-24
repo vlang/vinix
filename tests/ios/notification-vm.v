@@ -27,6 +27,18 @@ fn tree(source string, destination string) {
 	checked(['/bin/cp', '-a', source + '/.', destination])
 }
 
+fn require_arm64_elf(path string) {
+	mut file := os.open(path) or { panic(err) }
+	defer { file.close() }
+	mut header := []u8{len: 64}
+	count := file.read(mut header) or { panic(err) }
+	if count != 64 || header[..7] != [u8(0x7f), `E`, `L`, `F`, 2, 1, 1]
+		|| header[16] !in [u8(2), 3] || header[17] != 0
+		|| header[18] != 183 || header[19] != 0 {
+		panic('invalid ARM64 ELF executable: ' + path)
+	}
+}
+
 fn compile_c(root string, generated string, output string, gles bool) {
 	sysroot := root + '/build/ios/fortnite/date-encoding-checks/sdk'
 	gcc := root + '/build/useralloc-pipe/static-desktop-v5/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0'
@@ -66,10 +78,13 @@ fn compile_c(root string, generated string, output string, gles bool) {
 	args << ['-lgcc_eh', '-lc', '-lgcc', '-lm', gcc + '/crtend.o', sysroot + '/usr/lib/crtn.o',
 		'-fuse-ld=lld', '-B/opt/homebrew/opt/llvm/bin', '-o', output]
 	checked(args)
+	require_arm64_elf(output)
 }
 
 fn native_fixture_source(item string) string {
 	return match item {
+		'lock-checks' { 'ns_lock_test.v' }
+		'recursive-lock-checks' { 'ns_recursive_lock_test.v' }
 		'map-table-checks' { 'ns_map_table_test.v' }
 		'credential-checks' { 'ns_url_credential_test.v' }
 		'telephony-checks' { 'coretelephony_test.v' }
@@ -86,8 +101,8 @@ fn native_fixture_source(item string) string {
 }
 
 fn build(root string, out string, only string) {
-	if only !in ['map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! { panic('unknown notification build target') }
-	for item in ['map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
+	if only !in ['lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! { panic('unknown notification build target') }
+	for item in ['lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -132,6 +147,14 @@ fn vm(root string, out string, mode string) {
 	if mode !in ['notifications', 'probe', 'audit', 'static-audit'] {
 		panic('invalid check mode: ' + mode)
 	}
+	require_arm64_elf(out + '/native-init')
+	if mode == 'notifications' {
+		for item in ['lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks'] {
+			require_arm64_elf(out + '/' + item)
+		}
+	} else {
+		require_arm64_elf(out + if mode == 'static-audit' { '/run-ios' } else { '/run-ios-gles' })
+	}
 	state := out + '/' + mode + '-' + time.sys_mono_now().str()
 	if os.exists(state) { panic('VM state already exists') }
 	os.write_file(out + '/' + mode + '-state.txt', state) or { panic(err) }
@@ -150,6 +173,8 @@ fn vm(root string, out string, mode string) {
 		copy_file(out + '/notification-content-checks', fs + '/opt/ios/notification-content-checks')
 		copy_file(out + '/notification-sound-checks', fs + '/opt/ios/notification-sound-checks')
 		copy_file(out + '/cache-checks', fs + '/opt/ios/cache-checks')
+		copy_file(out + '/lock-checks', fs + '/opt/ios/lock-checks')
+		copy_file(out + '/recursive-lock-checks', fs + '/opt/ios/recursive-lock-checks')
 		copy_file(out + '/map-table-checks', fs + '/opt/ios/map-table-checks')
 		copy_file(out + '/credential-checks', fs + '/opt/ios/credential-checks')
 		copy_file(out + '/telephony-checks', fs + '/opt/ios/telephony-checks')
@@ -237,8 +262,10 @@ fn main() {
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out) or { panic(err) }
 	mode := os.args[1]
-	if mode !in ['build', 'notifications', 'probe', 'audit', 'static-audit']! { panic('invalid notification mode') }
+	if mode !in ['build', 'build-run-ios-gles', 'notifications', 'probe', 'audit', 'static-audit']! { panic('invalid notification mode') }
 	if mode == 'build' {
-		for item in ['map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks', 'native-init', 'run-ios', 'run-ios-gles']! { build(root, out, item) }
+		for item in ['lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks', 'native-init', 'run-ios', 'run-ios-gles']! { build(root, out, item) }
+	} else if mode == 'build-run-ios-gles' {
+		build(root, out, 'run-ios-gles')
 	} else { vm(root, out, mode) }
 }
