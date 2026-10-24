@@ -1,0 +1,262 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+@[translated]
+module main
+
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+fn C.ceilf(f32) f32
+fn C.floorf(f32) f32
+
+struct WsFont {}
+struct WsPathCurve {}
+
+__global (
+ draw_state WsDrawState
+ pixels [4096]u32
+ allocations [128]voidptr
+ live_allocations int
+ allocation_attempts int
+ fail_at int = -1
+ last_error string
+)
+
+fn remember(p voidptr) {
+ if p == unsafe { nil } { return }
+ assert live_allocations < allocations.len
+ allocations[live_allocations] = p
+ live_allocations++
+}
+fn forget(p voidptr) {
+ if p == unsafe { nil } { return }
+ for i in 0 .. live_allocations {
+  if allocations[i] == p {
+   live_allocations--
+   allocations[i] = allocations[live_allocations]
+   return
+  }
+ }
+ panic('free of unowned production allocation')
+}
+fn allocation_fails() bool {
+ allocation_attempts++
+ return allocation_attempts == fail_at
+}
+fn host_malloc(size usize) voidptr {
+ if allocation_fails() { return unsafe { nil } }
+ p := unsafe { C.malloc(size) }
+ remember(p)
+ return p
+}
+fn host_calloc(count usize, size usize) voidptr {
+ if allocation_fails() { return unsafe { nil } }
+ p := unsafe { C.calloc(count, size) }
+ remember(p)
+ return p
+}
+fn host_realloc(p voidptr, size usize) voidptr {
+ if allocation_fails() { return unsafe { nil } }
+ forget(p)
+ result := unsafe { C.realloc(p, size) }
+ remember(if result == unsafe { nil } { p } else { result })
+ return result
+}
+fn host_free(p voidptr) {
+ forget(p)
+ unsafe { C.free(p) }
+}
+fn throw(_ voidptr, kind &u8, message &u8) {
+ last_error = unsafe { tos_clone(kind) + ': ' + tos_clone(message) }
+}
+fn ws_draw_state() &WsDrawState { return unsafe { &draw_state } }
+fn reset() {
+ assert live_allocations == 0
+ last_error = ''
+ pixels = [4096]u32{}
+ draw_state = WsDrawState{width: 64, height: 64, pixels: unsafe { &pixels[0] }, transform: WsTransform{right: 64, bottom: 64}}
+}
+fn test_paint() WsPaint { return WsPaint{color: 0xffff3300} }
+fn render_path(path i64, fill i32) {
+ p := test_paint()
+ before := live_allocations
+ ws_draw_path(unsafe { nil }, path, i64(unsafe { &p }), fill)
+ assert live_allocations == before, 'fill leaked temporary memory'
+ assert last_error == '', last_error
+}
+fn pixel(x int, y int, expected bool) {
+ actual := pixels[y * 64 + x] != 0
+ assert actual == expected, 'pixel(${x},${y}) actual=${actual} expected=${expected}'
+}
+fn reverse_rect(path i64, left f32, top f32, right f32, bottom f32) {
+ ws_path_point(path, left, top, true)
+ ws_path_point(path, left, bottom, false)
+ ws_path_point(path, right, bottom, false)
+ ws_path_point(path, right, top, false)
+ // Leave open: both directions must receive the same implicit closure.
+}
+fn nested() {
+ for reverse in [false, true] {
+  for fill in 0 .. 4 {
+   reset()
+   path := ws_path_new()
+   ws_path_rect(path, 4, 4, 28, 28)
+   if reverse { reverse_rect(path, 10, 10, 22, 22) }
+   else { ws_path_rect(path, 10, 10, 22, 22) }
+   render_path(path, fill)
+   for y in 0 .. 64 {
+    for x in 0 .. 64 {
+     outer := x >= 4 && x < 28 && y >= 4 && y < 28
+     inner := x >= 10 && x < 22 && y >= 10 && y < 22
+     solid := outer && !(inner && (reverse || fill & 1 != 0))
+     pixel(x, y, solid != (fill >= 2))
+    }
+   }
+   ws_path_unref(path)
+  }
+ }
+ // Coincident edges: parity cancels same-direction contours, winding does not.
+ for reverse in [false, true] {
+  for fill in 0 .. 4 {
+   reset()
+   path := ws_path_new()
+   ws_path_rect(path, 6, 6, 26, 26)
+   if reverse { reverse_rect(path, 6, 6, 26, 26) }
+   else { ws_path_rect(path, 6, 6, 26, 26) }
+   render_path(path, fill)
+   for y in 0 .. 64 {
+    for x in 0 .. 64 {
+     solid := x >= 6 && x < 26 && y >= 6 && y < 26 && !reverse && fill & 1 == 0
+     pixel(x, y, solid != (fill >= 2))
+    }
+   }
+   ws_path_unref(path)
+  }
+ }
+ println('PATH-FILL-RULES-PASS winding/parity/inverse/opposite/tied crossings')
+}
+fn open_contours() {
+ reset()
+ path := ws_path_new()
+ ws_path_point(path, 4, 4, true)
+ ws_path_point(path, 28, 4, false)
+ ws_path_point(path, 16, 28, false)
+ reverse_rect(path, 34, 8, 56, 24)
+ render_path(path, 0)
+ for y in 0 .. 64 {
+  for x in 0 .. 64 {
+   px, py := f32(x) + .5, f32(y) + .5
+   triangle := py >= 4 && py < 28 && px >= 4 + (py - 4) / 2 && px < 28 - (py - 4) / 2
+   rectangle := x >= 34 && x < 56 && y >= 8 && y < 24
+   pixel(x, y, triangle || rectangle)
+  }
+ }
+ ws_path_unref(path)
+ // Filling must never append closing vertices or make later strokes close.
+ reset()
+ stroke := ws_path_new()
+ ws_path_point(stroke, 4, 4, true)
+ ws_path_point(stroke, 28, 4, false)
+ ws_path_point(stroke, 28, 28, false)
+ render_path(stroke, 0)
+ unsafe { assert (&WsPath(stroke)).count == 3 }
+ pixels = [4096]u32{}
+ p := WsPaint{color: 0xff00ff00, style: 1}
+ ws_draw_path(unsafe { nil }, stroke, i64(unsafe { &p }), 1)
+ pixel(12, 12, false) // Would lie on an accidentally closed diagonal.
+ pixel(12, 4, true)
+ pixel(28, 12, true)
+ ws_path_unref(stroke)
+ println('PATH-FILL-CONTOURS-PASS implicit closure/multiple contours/open stroke')
+}
+fn transforms() {
+ for mode in 0 .. 3 {
+  reset()
+  draw_state.transform = match mode {
+   0 { WsTransform{x: 3, y: 5, sx: 2, right: 64, bottom: 64} }
+   1 { WsTransform{x: 2, y: 3, kx: 1, right: 64, bottom: 64} }
+   else { WsTransform{x: 32, sx: 0, sy: 0, kx: -1, ky: 1, right: 64, bottom: 64} }
+  }
+  path := ws_path_new()
+  ws_path_rect(path, 4, 4, 20, 20)
+  ws_path_rect(path, 8, 8, 16, 16)
+  render_path(path, 1)
+  for y in 0 .. 64 {
+   for x in 0 .. 64 {
+    px, py := f32(x) + .5, f32(y) + .5
+    // Independent inverse of each chosen transform, no rasterizer helper.
+    xx := if mode == 0 { (px - 3) / 2 } else if mode == 1 { px - py + 1 } else { py }
+    yy := if mode == 0 { py - 5 } else if mode == 1 { py - 3 } else { 32 - px }
+    outer := xx >= 4 && xx < 20 && yy >= 4 && yy < 20
+    inner := xx >= 8 && xx < 16 && yy >= 8 && yy < 16
+    pixel(x, y, outer && !inner)
+   }
+  }
+  ws_path_unref(path)
+ }
+ println('PATH-FILL-TRANSFORMS-PASS scale/translate/shear/rotation')
+}
+fn clips_and_empty() {
+ for fill in 0 .. 4 {
+  reset()
+  empty := ws_path_new()
+  ws_save()
+  ws_clip(7, 9, 41, 43)
+  // Use an actual path clip as well as rectangular Canvas bounds.
+  clip := ws_path_new()
+  ws_path_rect(clip, 11, 13, 37, 39)
+  assert ws_clip_path(unsafe { nil }, clip, 0) == 1
+  ws_path_unref(clip)
+  render_path(empty, fill)
+  for y in 0 .. 64 {
+   for x in 0 .. 64 { pixel(x, y, fill >= 2 && x >= 11 && x < 37 && y >= 13 && y < 39) }
+  }
+  ws_restore()
+  assert draw_state.transform.left == 0 && draw_state.transform.right == 64
+  assert draw_state.save_count == 0
+  unsafe { assert draw_state.transform.path_clip == nil }
+  ws_path_unref(empty)
+ }
+ println('PATH-FILL-CLIP-PASS empty/inverse/saved rectangular and path clip')
+}
+fn boundaries() {
+ reset()
+ path := ws_path_new()
+ ws_path_point(path, -1e30, -1e30, true)
+ ws_path_point(path, 1e30, -1e30, false)
+ // Slanted huge edges overflow f32 products even though intersections are finite.
+ ws_path_point(path, 2e30, 1e30, false)
+ ws_path_point(path, -2e30, 1e30, false)
+ render_path(path, 0)
+ for y in 0 .. 64 { for x in 0 .. 64 { pixel(x, y, true) } }
+ pixels = [4096]u32{}
+ p := test_paint()
+ for fill in [-1, 4] {
+  ws_draw_path(unsafe { nil }, path, i64(unsafe { &p }), fill)
+  assert last_error == 'java/lang/IllegalArgumentException: Invalid path fill type'
+  for y in 0 .. 64 { for x in 0 .. 64 { pixel(x, y, false) } }
+ }
+ // Both temporary allocation failure points must release the other buffer.
+ before := live_allocations
+ for offset in 1 .. 3 {
+  last_error = ''
+  fail_at = allocation_attempts + offset
+  ws_draw_path(unsafe { nil }, path, i64(unsafe { &p }), 0)
+  fail_at = -1
+  assert last_error == 'java/lang/OutOfMemoryError: Canvas path fill'
+  assert live_allocations == before
+  for y in 0 .. 64 { for x in 0 .. 64 { pixel(x, y, false) } }
+ }
+ ws_path_unref(path)
+ assert live_allocations == 0
+ println('PATH-FILL-BOUNDARIES-PASS huge vertices/invalid type/OOM lifetimes')
+}
+fn main() {
+ nested()
+ open_contours()
+ transforms()
+ clips_and_empty()
+ boundaries()
+ assert live_allocations == 0
+ println('PATH-FILL-HOST-PASS')
+}

@@ -152,9 +152,13 @@ fn ws_path_round_rect(e voidptr, pointer i64, left f32, top f32, right f32, bott
 	}
 }
 
-fn ws_draw_path(pointer i64, paint_pointer i64) {
+fn ws_draw_path(e voidptr, pointer i64, paint_pointer i64, fill_type i32) {
 	mut draw := ws_draw_state()
 	unsafe {
+		if fill_type < 0 || fill_type > 3 {
+			throw(e, c'java/lang/IllegalArgumentException', c'Invalid path fill type')
+			return
+		}
 		if pointer == 0 { return }
 		path := &WsPath(pointer)
 		paint := &WsPaint(paint_pointer)
@@ -165,24 +169,37 @@ fn ws_draw_path(pointer i64, paint_pointer i64) {
 			}
 			return
 		}
-		// Scanline nonzero winding fill, clipped by the current Canvas state.
+		// Java owns the fill rule independently of the shared native geometry.
 		points := &WsVertex(C.malloc(usize(path.count) * sizeof(WsVertex)))
 		defer { C.free(points) }
+		crossings := &WsCrossing(C.malloc(usize(path.count + 1) * sizeof(WsCrossing)))
+		defer { C.free(crossings) }
+		if (path.count > 0 && points == nil) || crossings == nil {
+			throw(e, c'java/lang/OutOfMemoryError', c'Canvas path fill')
+			return
+		}
 		for i := i32(0); i < path.count; i++ {
 			x, y := ws_affine_point(draw.transform, path.points[i].x, path.points[i].y)
 			points[i] = WsVertex{x, y, path.points[i].move}
 		}
-		crossings := &WsCrossing(C.malloc(usize(path.count + 1) * sizeof(WsCrossing)))
-		defer { C.free(crossings) }
 		for y := draw.transform.top; y < draw.transform.bottom; y++ {
 			local_y := f32(y) + 0.5
 			mut count := i32(0)
-			for i := i32(1); i < path.count; i++ {
-				a, b := points[i - 1], points[i]
-				if b.move || !((a.y <= local_y && b.y > local_y) || (b.y <= local_y && a.y > local_y)) {
+			mut start := i32(0)
+			for i := i32(0); i < path.count; i++ {
+				a := points[i]
+				mut next := i + 1
+				// Filled paths close each contour, including an unclosed last one.
+				if next == path.count || points[next].move {
+					next = start
+					start = i + 1
+				}
+				b := points[next]
+				if !((a.y <= local_y && b.y > local_y) || (b.y <= local_y && a.y > local_y)) {
 					continue
 				}
-				x := a.x + (local_y - a.y) * (b.x - a.x) / (b.y - a.y)
+				// Finite f32 coordinates can overflow intermediate products.
+				x := f32(f64(a.x) + (f64(local_y) - f64(a.y)) * (f64(b.x) - f64(a.x)) / (f64(b.y) - f64(a.y)))
 				crossings[count] = WsCrossing{x, if b.y > a.y { 1 } else { -1 }}
 				count++
 			}
@@ -196,13 +213,22 @@ fn ws_draw_path(pointer i64, paint_pointer i64) {
 				crossings[j] = value
 			}
 			mut winding := i32(0)
+			mut left := draw.transform.left
 			for i := i32(0); i < count; i++ {
-				if i > 0 && winding != 0 {
-					left := if crossings[i - 1].x < f32(draw.transform.left) { draw.transform.left } else { i32(C.ceilf(crossings[i - 1].x - 0.5)) }
-					right := if crossings[i].x > f32(draw.transform.right) { draw.transform.right } else { i32(C.ceilf(crossings[i].x - 0.5)) }
+				// Clamp both sides before converting potentially huge coordinates.
+				right := if crossings[i].x <= f32(draw.transform.left) { draw.transform.left }
+					else if crossings[i].x >= f32(draw.transform.right) { draw.transform.right }
+					else { i32(C.ceilf(crossings[i].x - 0.5)) }
+				inside := if fill_type & 1 != 0 { winding & 1 != 0 } else { winding != 0 }
+				if inside != (fill_type >= 2) {
 					for x := left; x < right; x++ { ws_blend(x, y, paint.color, 255) }
 				}
 				winding += crossings[i].direction
+				left = right
+			}
+			inside := if fill_type & 1 != 0 { winding & 1 != 0 } else { winding != 0 }
+			if inside != (fill_type >= 2) {
+				for x := left; x < draw.transform.right; x++ { ws_blend(x, y, paint.color, 255) }
 			}
 		}
 	}
