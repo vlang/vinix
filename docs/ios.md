@@ -18748,25 +18748,42 @@ The shared telephony fixture passes against Apple CoreTelephony and the V
 runtime under ASan+UBSan, normally and with deterministic Swift hashing. All
 twelve ARM64 fixtures and runners build, and the focused guest passes all nine
 telephony, cache, calendar and notification fixtures, including 19 telephony
-rejection cases. The fresh Fortnite probe resolves the telephony class and
-stops at `_OBJC_CLASS_$_NSURLCredential` during linking, before application
+rejection cases. That milestone's Fortnite probe resolved the telephony class
+and stopped at `_OBJC_CLASS_$_NSURLCredential` during linking, before application
 entry. The [telephony report](../tests/ios/telephony-report.md) records the source
-revision, complete external archive, checksums and verification. Full native
-regression, Swift support, Fortnite initialization, rendering, login and
-gameplay remain unverified. The audits below include this implementation and
-do not execute app code.
+revision, complete external archive, checksums and verification.
+
+The credential milestone adds password `NSURLCredential` values with Apple's
+measured 16-byte layout, immutable username/password snapshots, persistence and
+retained self copies. Nil and empty passwords remain distinct; UTF-8, embedded
+NUL bytes and persistence values outside the documented enum are preserved.
+Each string is bounded to 65,536 bytes. Identity and certificates return nil.
+Custom subclasses, plain initialization, coding, trust/identity credentials and
+unsupported private APIs fail explicitly.
+
+The shared credential fixture passes against Apple Foundation and the V
+runtime under ASan+UBSan, normally and with deterministic Swift hashing. All
+thirteen ARM64 fixtures and runners build, and the focused guest passes all ten
+credential, telephony, cache, calendar and notification fixtures, including 35
+credential rejection cases. The fresh Fortnite probe resolves the credential
+class and stops at `_OBJC_CLASS_$_NSMapTable` during linking, before application
+entry. The [credential report](../tests/ios/credential-report.md) records the
+source revision, complete external archive, checksums and verification. Full
+native regression, Swift support, Fortnite initialization, rendering, login and
+gameplay remain unverified. The audits below include this implementation and do
+not execute app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,088 | 73 | 78 |
+| Fortnite executable | 2,089 | 72 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,928 | 76 | 114 |
+| All images | 2,929 | 75 | 114 |
 
-The C++/GLES/Text variant reports 2,942 resolved imports, 62 unresolved strong
+The C++/GLES/Text variant reports 2,943 resolved imports, 61 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
