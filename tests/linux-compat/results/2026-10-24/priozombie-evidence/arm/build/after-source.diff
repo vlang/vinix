@@ -1,0 +1,193 @@
+diff --git a/kernel/proc/nice.v b/kernel/proc/nice.v
+index f5421e11a..7c651d618 100644
+--- a/kernel/proc/nice.v
++++ b/kernel/proc/nice.v
+@@ -15,12 +15,38 @@ pub fn nice_value(t &Thread) int {
+ 	return int(i32(katomic.load(&t.process.nice)))
+ }
+ 
++// Called under the process table lock before a leader loses its thread
++// slot or owner. A second retirement must not overwrite a priority update
++// made against the retained leader in between those two events.
++fn retire_leader_nice_locked(t &Thread) {
++	mut owner := t.process
++	if owner == unsafe { nil } || t.tid != owner.pid
++		|| voidptr(process_at(owner.pid)) != voidptr(owner) || owner.leader_nice_retired { return }
++	owner.retired_leader_nice = nice_value(t)
++	owner.leader_nice_retired = true
++}
++
++// Exit detaches the last thread before releasing its slot. Serialize that
++// transition with priority lookup/update so no caller updates a task whose
++// retained value has already been captured. The exit path pins its owner.
++pub fn detach_exiting_thread(mut t Thread, replacement &Process) {
++	lock_table()
++	retire_leader_nice_locked(t)
++	t.process = unsafe { replacement }
++	unlock_table()
++}
++
+ pub fn thread_nice(tid int) ?int {
+ 	if tid <= 0 || tid >= max_pid { errno.set(errno.esrch); return none }
+ 	lock_table()
+ 	defer { unlock_table() }
+ 	t := threads_by_tid[tid]
+-	if t == unsafe { nil } { errno.set(errno.esrch); return none }
++	owner := process_at(tid)
++	if t == unsafe { nil } || (owner != unsafe { nil } && voidptr(t.process) != voidptr(owner)) {
++		if owner == unsafe { nil } || !owner.leader_nice_retired { errno.set(errno.esrch); return none }
++		if !mac_peer_allowed(current_thread().process, owner) { errno.set(errno.eperm); return none }
++		return owner.retired_leader_nice
++	}
+ 	if !mac_peer_allowed(current_thread().process, t.process) {
+ 		errno.set(errno.eperm); return none
+ 	}
+@@ -53,6 +79,15 @@ pub fn aggregate_nice(local int, by_group bool) ?int {
+ 		value := nice_value(t)
+ 		if value < best { best = value }
+ 	}
++	for pid := 1; pid < max_pid; pid++ {
++		owner := process_at(pid)
++		if owner == unsafe { nil } || !owner.leader_nice_retired || pid_in(owner, viewer) == 0 { continue }
++		if by_group {
++			if pgid_in(owner, viewer) != group { continue }
++		} else if owner.uid != uid { continue }
++		if !mac_peer_allowed(caller, owner) { errno.set(errno.eperm); return none }
++		if owner.retired_leader_nice < best { best = owner.retired_leader_nice }
++	}
+ 	if best == 20 { errno.set(errno.esrch); return none }
+ 	return best
+ }
+@@ -62,8 +97,15 @@ pub fn set_thread_nice(tid int, wanted int) bool {
+ 	lock_table()
+ 	defer { unlock_table() }
+ 	mut t := threads_by_tid[tid]
+-	if t == unsafe { nil } { errno.set(errno.esrch); return false }
+ 	caller := current_thread().process
++	mut owner := process_at(tid)
++	if t == unsafe { nil } || (owner != unsafe { nil } && voidptr(t.process) != voidptr(owner)) {
++		if owner == unsafe { nil } || !owner.leader_nice_retired { errno.set(errno.esrch); return false }
++		code := nice_permission(owner, wanted, owner.retired_leader_nice, caller)
++		if code != 0 { errno.set(code); return false }
++		owner.retired_leader_nice = wanted
++		return true
++	}
+ 	code := apply_nice(mut t, wanted, caller)
+ 	if code != 0 { errno.set(code); return false }
+ 	return true
+@@ -72,18 +114,23 @@ pub fn set_thread_nice(tid int, wanted int) bool {
+ // Called with the process table locked. A group update keeps visiting
+ // matching tasks after a refusal, preserving successful partial updates.
+ fn apply_nice(mut t Thread, wanted int, caller &Process) u64 {
+-	owner := t.process
++	code := nice_permission(t.process, wanted, nice_value(t), caller)
++	if code != 0 { return code }
++	katomic.store(mut &t.sched_nice_override, wanted)
++	katomic.store(mut &t.sched_has_nice_override, true)
++	return 0
++}
++
++fn nice_permission(owner &Process, wanted int, current int, caller &Process) u64 {
+ 	if !mac_peer_allowed(caller, owner) { return errno.eperm }
+ 	privileged := has_capability(caller, cap_sys_nice)
+ 	if !privileged && caller.euid != owner.euid && caller.euid != owner.uid {
+ 		return errno.eperm
+ 	}
+-	if wanted < nice_value(t) && !privileged
++	if wanted < current && !privileged
+ 		&& !limit_allows(owner, rlimit_nice, u64(20 - wanted)) {
+ 		return errno.eacces
+ 	}
+-	katomic.store(mut &t.sched_nice_override, wanted)
+-	katomic.store(mut &t.sched_has_nice_override, true)
+ 	return 0
+ }
+ 
+@@ -111,6 +158,20 @@ pub fn set_aggregate_nice(local int, by_group bool, wanted int) bool {
+ 			result = 0
+ 		}
+ 	}
++	for pid := 1; pid < max_pid; pid++ {
++		mut owner := process_at(pid)
++		if owner == unsafe { nil } || !owner.leader_nice_retired || pid_in(owner, viewer) == 0 { continue }
++		if by_group {
++			if pgid_in(owner, viewer) != group { continue }
++		} else if owner.uid != uid { continue }
++		code := nice_permission(owner, wanted, owner.retired_leader_nice, caller)
++		if code != 0 {
++			result = code
++		} else {
++			owner.retired_leader_nice = wanted
++			if result == errno.esrch { result = 0 }
++		}
++	}
+ 	if result != 0 { errno.set(result); return false }
+ 	return true
+ }
+diff --git a/kernel/proc/proc.v b/kernel/proc/proc.v
+index e49dcd92d..84b5f4f95 100644
+--- a/kernel/proc/proc.v
++++ b/kernel/proc/proc.v
+@@ -386,6 +386,11 @@ pub mut:
+ 	// Initial nice value for fresh tasks. Individual tasks keep their own
+ 	// override, from -20 (highest normal priority) through 19 (lowest).
+ 	nice int
++	// Linux retains the leader as a zombie until wait reaps the process.
++	// Our thread slot is released earlier; priority operations retain only
++	// these scalars, protected by the process table lock.
++	retired_leader_nice int
++	leader_nice_retired bool
+ 	// NUMA memory policy, from set_mempolicy(2) and mbind(2). Zero is
+ 	// MPOL_DEFAULT: an anonymous page comes from the node the faulting thread
+ 	// is running on. Inherited across fork and preserved by exec, as on Linux.
+@@ -814,6 +819,7 @@ fn free_process_memory(p &Process) {
+ fn release_thread_slot(tid int) {
+ 	t := threads_by_tid[tid]
+ 	if t != unsafe { nil } {
++		retire_leader_nice_locked(t)
+ 		adjust_policy_count(t.sched.is_special(), false)
+ 		release_thread_number(t)
+ 		mut released := unsafe { t }
+@@ -962,6 +968,11 @@ fn bind_tid_locked(tid int, thrd &Thread) bool {
+ 		}
+ 	}
+ 	if !reserve_cgroup_task(mut charged, replacing) { return false }
++	if thrd.process != unsafe { nil } && tid == thrd.process.pid {
++		// Exec replaces the old leader with a live task at the same PID.
++		mut owner := thrd.process
++		owner.leader_nice_retired = false
++	}
+ 	threads_by_tid[tid] = unsafe { thrd }
+ 	adjust_policy_count(false, thrd.sched.is_special())
+ 	return true
+diff --git a/kernel/userland/exit.v b/kernel/userland/exit.v
+index 4c2b2e138..0c767c8e5 100644
+--- a/kernel/userland/exit.v
++++ b/kernel/userland/exit.v
+@@ -77,7 +77,7 @@ fn thread_exit_status(outcome int, group bool) {
+ 		proc.free_tid(current_thread.tid)
+ 		event.trigger(mut &current_thread.exited, false)
+ 		proc.charge_cpu_time(mut current_thread, proc.cpu_time_now_ns())
+-		current_thread.process = kernel_process
++		proc.detach_exiting_thread(mut current_thread, kernel_process)
+ 		proc.begin_cpu_time(mut current_thread, proc.cpu_time_now_ns())
+ 		proc.cpu_enter_kernel()
+ 		proc.unpin_process(current_process)
+@@ -182,7 +182,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
+ 		leave_process(mut current_process, current_thread)
+ 		proc.free_tid(current_thread.tid)
+ 		proc.charge_cpu_time(mut current_thread, proc.cpu_time_now_ns())
+-		current_thread.process = kernel_process
++		proc.detach_exiting_thread(mut current_thread, kernel_process)
+ 		proc.begin_cpu_time(mut current_thread, proc.cpu_time_now_ns())
+ 		proc.cpu_enter_kernel()
+ 		proc.unpin_process(current_process)
+@@ -214,7 +214,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
+ 	// carrying kernel_process; the final dequeue must not bill it there.
+ 	proc.charge_cpu_time(mut current_thread, proc.cpu_time_now_ns())
+ 	kernel_pagemap.switch_to()
+-	current_thread.process = kernel_process
++	proc.detach_exiting_thread(mut current_thread, kernel_process)
+ 	proc.begin_cpu_time(mut current_thread, proc.cpu_time_now_ns())
+ 	proc.cpu_enter_kernel()
+ 	// Detached under the process table lock, which cgroup memory accounting

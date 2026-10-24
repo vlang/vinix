@@ -386,6 +386,11 @@ pub mut:
 	// Initial nice value for fresh tasks. Individual tasks keep their own
 	// override, from -20 (highest normal priority) through 19 (lowest).
 	nice int
+	// Linux retains the leader as a zombie until wait reaps the process.
+	// Our thread slot is released earlier; priority operations retain only
+	// these scalars, protected by the process table lock.
+	retired_leader_nice int
+	leader_nice_retired bool
 	// NUMA memory policy, from set_mempolicy(2) and mbind(2). Zero is
 	// MPOL_DEFAULT: an anonymous page comes from the node the faulting thread
 	// is running on. Inherited across fork and preserved by exec, as on Linux.
@@ -814,6 +819,7 @@ fn free_process_memory(p &Process) {
 fn release_thread_slot(tid int) {
 	t := threads_by_tid[tid]
 	if t != unsafe { nil } {
+		retire_leader_nice_locked(t)
 		adjust_policy_count(t.sched.is_special(), false)
 		release_thread_number(t)
 		mut released := unsafe { t }
@@ -962,6 +968,11 @@ fn bind_tid_locked(tid int, thrd &Thread) bool {
 		}
 	}
 	if !reserve_cgroup_task(mut charged, replacing) { return false }
+	if thrd.process != unsafe { nil } && tid == thrd.process.pid {
+		// Exec replaces the old leader with a live task at the same PID.
+		mut owner := thrd.process
+		owner.leader_nice_retired = false
+	}
 	threads_by_tid[tid] = unsafe { thrd }
 	adjust_policy_count(false, thrd.sched.is_special())
 	return true

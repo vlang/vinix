@@ -1446,6 +1446,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   errors and empty selections on both architectures and same-ELF Linux.
   See [the priority-update receipts and limits](docs/linux-posix-qualification.md#native-process-group-and-real-user-priority-updates).
 
+- [x] Retain native leader nice after thread retirement until process reaping,
+  including process/group/real-user queries and updates. Qualify three exit
+  paths, signed32 words, clamping, actual musl permission errors and post-reap
+  ESRCH with 1,728 checks and eight maintained suites per architecture.
+  See [the zombie-priority receipts and limits](docs/linux-posix-qualification.md#native-zombie-priority-retention).
+
 - [x] Enforce PRIO_PROCESS setpriority using effective CAP_SYS_NICE and the
   target's RLIMIT_NICE; qualify UID0/no-capability restrictions, non-root
   capability grants, owner/error ordering, genuine musl calls, retained state,

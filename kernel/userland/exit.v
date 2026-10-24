@@ -77,7 +77,7 @@ fn thread_exit_status(outcome int, group bool) {
 		proc.free_tid(current_thread.tid)
 		event.trigger(mut &current_thread.exited, false)
 		proc.charge_cpu_time(mut current_thread, proc.cpu_time_now_ns())
-		current_thread.process = kernel_process
+		proc.detach_exiting_thread(mut current_thread, kernel_process)
 		proc.begin_cpu_time(mut current_thread, proc.cpu_time_now_ns())
 		proc.cpu_enter_kernel()
 		proc.unpin_process(current_process)
@@ -182,7 +182,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 		leave_process(mut current_process, current_thread)
 		proc.free_tid(current_thread.tid)
 		proc.charge_cpu_time(mut current_thread, proc.cpu_time_now_ns())
-		current_thread.process = kernel_process
+		proc.detach_exiting_thread(mut current_thread, kernel_process)
 		proc.begin_cpu_time(mut current_thread, proc.cpu_time_now_ns())
 		proc.cpu_enter_kernel()
 		proc.unpin_process(current_process)
@@ -214,7 +214,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	// carrying kernel_process; the final dequeue must not bill it there.
 	proc.charge_cpu_time(mut current_thread, proc.cpu_time_now_ns())
 	kernel_pagemap.switch_to()
-	current_thread.process = kernel_process
+	proc.detach_exiting_thread(mut current_thread, kernel_process)
 	proc.begin_cpu_time(mut current_thread, proc.cpu_time_now_ns())
 	proc.cpu_enter_kernel()
 	// Detached under the process table lock, which cgroup memory accounting
