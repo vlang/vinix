@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Frozen baseline247/fixed-attempt paired regression preparation (264/266 use262). Select the
+// Frozen paired regression preparation (264/266 use262; 268 uses266). Select the
 // attempt with VINIX_COMPOUND_ATTEMPT (default258). Run each action
 // once from the repository root; run the two resulting suite/config pairs only
 // after preparation. Baseline APK and native runtime are preserved unchanged.
@@ -13,9 +13,9 @@ import time
 
 const attempt = os.getenv_opt('VINIX_COMPOUND_ATTEMPT') or { '258' }
 const base = 'build/android-maps/compound' + attempt
-const baseline_attempt = if attempt in ['264', '266'] { '262' } else { '247' }
+const baseline_attempt = if attempt == '268' { '266' } else if attempt in ['264', '266'] { '262' } else { '247' }
 const previous = 'build/android-maps/compound' + baseline_attempt
-const fixture_name = if attempt in ['264', '266'] { 'widget-geometry-fixture.v' } else { 'compound-button-fixture.v' }
+const fixture_name = if attempt == '268' { 'compound-text-fixture.v' } else if attempt in ['264', '266'] { 'widget-geometry-fixture.v' } else { 'compound-button-fixture.v' }
 const fixture_source = 'tests/native-android-ws/' + fixture_name
 const fixture_frozen = base + '/source/' + fixture_name
 const compiler = '/Users/alex/code/v/v_old'
@@ -163,10 +163,14 @@ fn freeze_geometry_native(native map[string]string) ! {
 fn freeze() ! {
 	assert !os.exists(base + '/framework') && !os.exists(base + '/native')
 	write_json(base + '/attempt.json', {'attempt': attempt, 'VINIX_COMPOUND_ATTEMPT': os.getenv('VINIX_COMPOUND_ATTEMPT'), 'base': base, 'audit': audit, 'baseline_attempt': baseline_attempt, 'fixture_source': fixture_source, 'fixture_frozen': fixture_frozen})!
-	assert hash(previous + '/framework/api-impl.jar')! == if attempt in ['264', '266'] { 'a37ffeceffd29e7bd5db825e079949f5a6e3f71dd04edba8c61239bd1971b71c' } else { '73a10513135f9e264df9afdc7139c5370d67016d864be82fe0d6b2adba1f459b' }
-	assert hash(previous + '/native/libvinix-android-native.so')! == if attempt in ['264', '266'] { '3bbc2d9439961be351f18e391f305ded393d7a10b67f1cf2e80adad2a6569b80' } else { '78893e6767c9398a7d6cb513f0f34b8536604afaa065e383f46cb98e9d003f37' }
+	assert hash(previous + '/framework/api-impl.jar')! == if attempt == '268' { '69f560aef5965acd2e4c1eba35a545dae5c8e48708695b0c747a1267d75643c3' } else if attempt in ['264', '266'] { 'a37ffeceffd29e7bd5db825e079949f5a6e3f71dd04edba8c61239bd1971b71c' } else { '73a10513135f9e264df9afdc7139c5370d67016d864be82fe0d6b2adba1f459b' }
+	assert hash(previous + '/native/libvinix-android-native.so')! == if attempt == '268' { '0a9928b59585bc7e1d6518c22a9a388f5bb99e4f43f3c0838d6c1c47588fb680' } else if attempt in ['264', '266'] { '3bbc2d9439961be351f18e391f305ded393d7a10b67f1cf2e80adad2a6569b80' } else { '78893e6767c9398a7d6cb513f0f34b8536604afaa065e383f46cb98e9d003f37' }
 	framework := snapshot('framework', 125)!
-	if attempt in ['264', '266'] {
+	if attempt == '268' {
+		file := 'androidtools/framework_classes.v'
+		live := os.read_file('tests/native-android-tools/' + file)!
+		os.write_file(base + '/framework/sources/' + file, replace_section(framework[file]!, live, 'fn framework_text_widgets(', '\nfn framework_check_widgets('))!
+	} else if attempt in ['264', '266'] {
 		for spec in [['androidtools/framework_geometry.v', 'fn framework_view_geometry(', '\nfn framework_viewgroup_clipping('], ['androidtools/framework_view_canvas.v', 'fn framework_view_canvas(', ''], ['androidtools/framework_classes.v', 'fn framework_text_widgets(', '\nfn framework_check_widgets(']] {
 			live := os.read_file('tests/native-android-tools/' + spec[0])!
 			os.write_file(base + '/framework/sources/' + spec[0], replace_section(framework[spec[0]]!, live, spec[1], spec[2]))!
@@ -181,7 +185,10 @@ fn freeze() ! {
 	os.write_file(base + '/framework/sources/' + file, old.all_before(marker) + marker + live.all_after(marker))!
 	}
 	native := snapshot('native', 83)!
-	if attempt in ['264', '266'] { freeze_geometry_native(native)! } else {
+	if attempt == '268' {
+		live := os.read_file('build-support/android/nativews/ws_views.v')!
+		os.write_file(base + '/native/atlframework/ws_views.v', replace_section(native['ws_views.v']!, live, 'fn ws_draw_content(', '\nfn ws_draw_children('))!
+	} else if attempt in ['264', '266'] { freeze_geometry_native(native)! } else {
 	old_native := native['check_widgets.v']!
 	live_native := os.read_file('build-support/android/nativews/check_widgets.v')!
 	native_marker := 'fn ws_checked('
@@ -204,7 +211,9 @@ fn freeze() ! {
 		}
 		assert sources.len == count
 		delta.sort()
-		expected := if attempt in ['264', '266'] {
+		expected := if attempt == '268' {
+			if kind == 'framework' { ['androidtools/framework_classes.v'] } else { ['ws_views.v'] }
+		} else if attempt in ['264', '266'] {
 			if kind == 'framework' { ['androidtools/framework_classes.v', 'androidtools/framework_geometry.v', 'androidtools/framework_view_canvas.v'] } else { ['ws_generated.v', 'ws_views.v'] }
 		} else { if kind == 'framework' { ['androidtools/framework_classes.v'] } else { ['check_widgets.v'] } }
 		assert delta == expected, delta.str()
@@ -239,6 +248,7 @@ fn freeze() ! {
 	if attempt in ['264', '266'] {
 		for path in ['tests/native-android-tools/androidtools/framework_geometry.v', 'tests/native-android-tools/androidtools/framework_view_canvas.v', 'build-support/android/nativews/ws_views.v', 'build-support/android/nativews/bindings.txt'] { inputs[path] = hash(path)! }
 	}
+	if attempt == '268' { inputs['build-support/android/nativews/ws_views.v'] = hash('build-support/android/nativews/ws_views.v')! }
 	for name in ['usr/lib/art/libandroidfw.so', 'usr/lib/libpng16.so.16', 'usr/lib/libsqlite3.so.0'] {
 		path := 'build/android-framework/calculator/overlay/opt/vinix-android-aarch64/' + name
 		inputs[path] = hash(path)!
