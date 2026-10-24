@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Prepare Maps269 without starting QEMU. The frozen256 classifier and identity
-// remain unchanged; only the paired268 framework/native artifacts are overlaid.
+// Prepare Maps271 without starting QEMU. The frozen256 classifier and identity
+// remain unchanged; only the paired270 framework/native artifacts are overlaid.
 module main
 
 import crypto.sha256
@@ -9,8 +9,8 @@ import os
 import time
 
 const base = 'build/android-maps/'
-const target = base + 'maps269'
-const compound = base + 'compound268'
+const target = base + 'maps271'
+const compound = base + 'compound270'
 const driver = base + 'maps-interact-unique258'
 const compiler = '/Users/alex/code/v/v_old'
 const frozen_pin = '7b602e16397db66cb23df41e421238656d0e1d493f29e2fb71683d7c33e1fb64'
@@ -116,41 +116,41 @@ fn observation(source string) string {
 
 fn suite_source(original string, runtime_pin string, boot_pin string, firmware_pin string) !string {
 	mut source := replace_once(original, 'fn main() {', 'fn main() {\n\t$if prod { eprintln("styled replay requires assertions; compile without -prod"); exit(2) }')!
-	source = replace_once(source, 'validate_resume256(settings, output)!', 'validate_styled269(settings, output)!')!
+	source = replace_once(source, 'validate_resume256(settings, output)!', 'validate_styled271(settings, output)!')!
 	start := source.index('fn validate_resume256(') or { return error('missing original preflight') }
 	source = source[..start] + '
-fn validate_styled269(settings map[string]json2.Any, output string) ! {
+fn validate_styled271(settings map[string]json2.Any, output string) ! {
  $if prod { return error("styled replay requires assertions; compile without -prod") }
- assert settings["boot_image"]!.str() == "build/android-maps/maps269/vm/boot.img"
- assert settings["efivars"]!.str() == "build/android-maps/maps269/vm/efivars.fd"
+ assert settings["boot_image"]!.str() == "build/android-maps/maps271/vm/boot.img"
+ assert settings["efivars"]!.str() == "build/android-maps/maps271/vm/efivars.fd"
  assert settings["applications"]!.as_array()[0].as_map()["startup_seconds"]!.int() == 420
- assert styled_hash("build/android-maps/maps269/runtime-after.json")! == "RUNTIME_PIN"
- expected := json2.decode[map[string]string](os.read_file("build/android-maps/maps269/runtime-after.json")!)!
+ assert styled_hash("build/android-maps/maps271/runtime-after.json")! == "RUNTIME_PIN"
+ expected := json2.decode[map[string]string](os.read_file("build/android-maps/maps271/runtime-after.json")!)!
  assert expected.len == 109
  mut count := 0
- for path in os.walk_ext("build/android-maps/maps269/module", "", hidden: true) {
+ for path in os.walk_ext("build/android-maps/maps271/module", "", hidden: true) {
   if os.is_file(path) && !os.is_link(path) {
    count++
-   assert styled_hash(path)! == expected[path.all_after("build/android-maps/maps269/module/")]!, path
+   assert styled_hash(path)! == expected[path.all_after("build/android-maps/maps271/module/")]!, path
   }
  }
  assert count == 109
- assert styled_hash("build/android-maps/maps269/vm/boot.img")! == "BOOT_PIN"
- assert styled_hash("build/android-maps/maps269/vm/efivars.fd")! == "FIRMWARE_PIN"
+ assert styled_hash("build/android-maps/maps271/vm/boot.img")! == "BOOT_PIN"
+ assert styled_hash("build/android-maps/maps271/vm/efivars.fd")! == "FIRMWARE_PIN"
  assert styled_hash("build/android-maps/maps-interact-unique258")! == "DRIVER_PIN"
  os.cp("build/android-maps/attempt244/companion-packages.json", output + "/companion-packages.json")!
- println("MAPS269 PREFLIGHT PASS109 files; only paired268 overlays; original classifier and identity256 retained")
+ println("MAPS271 PREFLIGHT PASS109 files; only paired270 overlays; original classifier and identity256 retained")
 }
 '.replace('RUNTIME_PIN', runtime_pin).replace('BOOT_PIN', boot_pin).replace('FIRMWARE_PIN', firmware_pin).replace('DRIVER_PIN', driver_pin)
 	source += os.read_file(@FILE)!.all_after('// HASH-BEGIN\n').all_before('// HASH-END')
 	old_capture := '\tcapture := os.exec([settings[\'input_tool\']!.str(), \'screenshot\', \'--socket\', socket, \'--destination\',\n\t\tframe])'
-	new_capture := '\tresult[\'observation_elapsed_seconds\'] = json2.Any(time.now().unix() - begin_at)\n\tresult[\'qemu_alive_before_capture\'] = json2.Any(qemu.is_alive())\n\tos.write_file(state + \'/observation-before-capture.json\', json2.encode(result, prettify: true) + \'\\n\')!\n\tprintln(\'MAPS269 observation retained before final capture\')\n\tcapture := os.exec([\'build/android-maps/maps-interact-unique258\', state, \'capture\', \'application\'])'
+	new_capture := '\tresult[\'observation_elapsed_seconds\'] = json2.Any(time.now().unix() - begin_at)\n\tresult[\'qemu_alive_before_capture\'] = json2.Any(qemu.is_alive())\n\tos.write_file(state + \'/observation-before-capture.json\', json2.encode(result, prettify: true) + \'\\n\')!\n\tprintln(\'MAPS271 observation retained before final capture\')\n\tcapture := os.exec([\'build/android-maps/maps-interact-unique258\', state, \'capture\', \'application\'])'
 	source = replace_once(source, old_capture, new_capture)!
 	// Finish the guest before snapshotting serial bytes so deferred shutdown
 	// cannot append output after the published hash and gzip are recorded.
 	source = replace_once(source, '\tserial := os.read_bytes(serial_path)!',
 		'\tif qemu.is_alive() { qemu.signal_term() }\n\tqemu.wait()\n\tserial := os.read_bytes(serial_path)!')!
-	source = replace_once(source, '\tqemu.run()', '\tmut start_pins := map[string]string{}\n\tfor path in [os.executable(), os.args[1], settings[\'boot_image\']!.str(), settings[\'efivars\']!.str(), settings[\'qemu\']!.str(), settings[\'firmware\']!.str(), \'build/android-maps/maps269/runtime-after.json\', \'build/android-maps/maps-interact-unique258\'] { start_pins[path] = styled_hash(path)! }\n\tos.write_file(state + \'/start-receipt.json\', json2.encode({\'recorded_before_qemu_run_utc\': json2.Any(time.utc().str()), \'qemu_argv\': json2.Any([qemu.filename, ...qemu.args]), \'sha256\': json2.decode[json2.Any](json2.encode(start_pins))!}, prettify: true) + \'\\n\')!\n\tqemu.run()')!
+	source = replace_once(source, '\tqemu.run()', '\tmut start_pins := map[string]string{}\n\tfor path in [os.executable(), os.args[1], settings[\'boot_image\']!.str(), settings[\'efivars\']!.str(), settings[\'qemu\']!.str(), settings[\'firmware\']!.str(), \'build/android-maps/maps271/runtime-after.json\', \'build/android-maps/maps-interact-unique258\'] { start_pins[path] = styled_hash(path)! }\n\tos.write_file(state + \'/start-receipt.json\', json2.encode({\'recorded_before_qemu_run_utc\': json2.Any(time.utc().str()), \'qemu_argv\': json2.Any([qemu.filename, ...qemu.args]), \'sha256\': json2.decode[json2.Any](json2.encode(start_pins))!}, prettify: true) + \'\\n\')!\n\tqemu.run()')!
 	if observation(source) != observation(original) || observation(original).len < 1000 {
 		return error('original observation classifier changed or missing')
 	}
@@ -192,13 +192,13 @@ fn check_external(root string, pin string) ! {
 	mut actual := map[string]string{}
 	inventory(root + '/prelaunch', '', mut actual, false)!
 	equal_maps(actual, read_map(root + '/prelaunch-sha256.json')!)!
-	println('MAPS269 PRELAUNCH CHECK PASS entries=' + actual.len.str())
+	println('MAPS271 PRELAUNCH CHECK PASS entries=' + actual.len.str())
 }
 
 fn prepare(frozen string, media string, external string) ! {
 	external_path(external)!
-	if os.exists(target) || os.exists(base + 'attempt269') || os.exists(external) || os.exists(base + 'attempt269.json') {
-		return error('fresh Maps269 and external destinations required; partial evidence is preserved')
+	if os.exists(target) || os.exists(base + 'attempt271') || os.exists(external) || os.exists(base + 'attempt271.json') {
+		return error('fresh Maps271 and external destinations required; partial evidence is preserved')
 	}
 	if styled_hash(frozen + '/frozen-inputs.json')! != frozen_pin { return error('wrong Maps256 input pin') }
 	inputs := read_map(frozen + '/frozen-inputs.json')!
@@ -213,16 +213,16 @@ fn prepare(frozen string, media string, external string) ! {
 	if styled_hash(driver)! != driver_pin || styled_hash('tests/native-android-ws/maps-interact.v')! != driver_source_pin { return error('wrong unique258 capture driver') }
 	for label in ['build-framework-compiler', 'build-framework', 'generate-native', 'build-native', 'fixture-compiler', 'fixture'] {
 		receipt := json2.decode[map[string]json2.Any](os.read_file(compound + '/' + label + '-receipt.json')!)!
-		if receipt['exit_code']!.int() != 0 || receipt['completed_utc']!.str() == '' || !os.is_file(compound + '/' + label + '-before.json') { return error('incomplete paired268 build: ' + label) }
+		if receipt['exit_code']!.int() != 0 || receipt['completed_utc']!.str() == '' || !os.is_file(compound + '/' + label + '-before.json') { return error('incomplete paired270 build: ' + label) }
 		artifact := if label == 'build-framework' { compound + '/framework/api-impl.jar' }
 			else if label == 'build-native' { compound + '/native/libvinix-android-native.so' } else { '' }
-		if artifact != '' && styled_hash(artifact)! != receipt['output_sha256']!.str() { return error('268 artifact differs from completed build receipt: ' + label) }
+		if artifact != '' && styled_hash(artifact)! != receipt['output_sha256']!.str() { return error('270 artifact differs from completed build receipt: ' + label) }
 	}
 	for kind, count in {'framework': 125, 'native': 83} {
 		sources := read_map(compound + '/' + kind + '/sources.json')!
-		if sources.len != count { return error('incomplete frozen268 sources') }
+		if sources.len != count { return error('incomplete frozen270 sources') }
 		directory := if kind == 'framework' { '/sources/' } else { '/atlframework/' }
-		for path, digest in sources { if styled_hash(compound + '/' + kind + directory + path)! != digest { return error('268 source differs: ' + path) } }
+		for path, digest in sources { if styled_hash(compound + '/' + kind + directory + path)! != digest { return error('270 source differs: ' + path) } }
 	}
 	before := read_map(frozen + '/inputs/' + base + 'maps256/runtime-after.json')!
 	equal_maps(files(base + 'maps256/module')!, before)!
@@ -256,34 +256,34 @@ fn prepare(frozen string, media string, external string) ! {
 	firmware_pin := styled_hash(target + '/vm/efivars.fd')!
 	if firmware_pin != media_before['efivars.fd']! { return error('firmware clone differs') }
 	original := os.read_file(frozen + '/inputs/' + base + 'suite256-resume.v')!
-	os.write_file(target + '/suite269.v', suite_source(original, styled_hash(target + '/runtime-after.json')!, boot_pin, firmware_pin)!)!
+	os.write_file(target + '/suite271.v', suite_source(original, styled_hash(target + '/runtime-after.json')!, boot_pin, firmware_pin)!)!
 	mut config := json2.decode[map[string]json2.Any](os.read_file(frozen + '/inputs/' + base + 'attempt256.json')!)!
 	config['boot_image'] = target + '/vm/boot.img'
 	config['efivars'] = target + '/vm/efivars.fd'
-	config['output'] = base + 'attempt269'
+	config['output'] = base + 'attempt271'
 	mut apps := config['applications']!.as_array()
 	mut app := apps[0].as_map().clone()
 	app['startup_seconds'] = json2.Any(420)
 	apps[0] = json2.Any(app)
 	config['applications'] = json2.Any(apps)
-	write_json(base + 'attempt269.json', config)!
+	write_json(base + 'attempt271.json', config)!
 	os.mkdir_all(target + '/sources/nativeapk')!
 	clone(frozen + '/inputs/build-support/android/nativeapk/install.v', target + '/sources/nativeapk/install.v')!
-	argv := [compiler, '-nocache', '-cc', 'cc', '-cflags', '-O2', '-path', target + '/sources|@vlib|@vmodules', '-o', target + '/suite269', target + '/suite269.v']
+	argv := [compiler, '-nocache', '-cc', 'cc', '-cflags', '-O2', '-path', target + '/sources|@vlib|@vmodules', '-o', target + '/suite271', target + '/suite271.v']
 	cc := os.find_abs_path_of_executable('cc')!
-	mut receipt := {'argv': json2.Any(argv), 'started_utc': json2.Any(time.utc().str()), 'compiler_sha256': json2.Any(styled_hash(compiler)!), 'source_sha256': json2.Any(styled_hash(target + '/suite269.v')!), 'nativeapk_source_sha256': json2.Any(styled_hash(target + '/sources/nativeapk/install.v')!), 'cc_path': json2.Any(cc), 'cc_sha256': json2.Any(styled_hash(cc)!)}
+	mut receipt := {'argv': json2.Any(argv), 'started_utc': json2.Any(time.utc().str()), 'compiler_sha256': json2.Any(styled_hash(compiler)!), 'source_sha256': json2.Any(styled_hash(target + '/suite271.v')!), 'nativeapk_source_sha256': json2.Any(styled_hash(target + '/sources/nativeapk/install.v')!), 'cc_path': json2.Any(cc), 'cc_sha256': json2.Any(styled_hash(cc)!)}
 	write_json(target + '/build-before.json', receipt)!
 	build := os.exec(argv)
 	os.write_file(target + '/build.log', build.output)!
 	receipt['completed_utc'] = time.utc().str()
 	receipt['exit_code'] = json2.Any(build.exit_code)
-	if build.exit_code == 0 { receipt['binary_sha256'] = styled_hash(target + '/suite269')! }
+	if build.exit_code == 0 { receipt['binary_sha256'] = styled_hash(target + '/suite271')! }
 	write_json(target + '/build-receipt.json', receipt)!
 	if build.exit_code != 0 { return error('suite build failed: ' + build.output) }
-	os.write_file(target + '/self-test.log', checked([target + '/suite269', '--self-test'])!)!
-	os.write_file(target + '/scope.txt', 'Prepared, not launched. Private stopped-media clone.109 original regular runtime files, exactly two paired268 overlay differences, actual FAT archive read back before/after. Original signed APKs and production identity256 remain fixed. Configured420 seconds is an observation limit. Original classifier is byte-identical. Preliminary observation precedes bounded unique258 final capture. Chip checkbox overlays are the visual target; suggestion circles remain separate. Start receipt is written immediately before QEMU starts. Driver build receipt was recorded after compilation, not before.\n')!
+	os.write_file(target + '/self-test.log', checked([target + '/suite271', '--self-test'])!)!
+	os.write_file(target + '/scope.txt', 'Prepared, not launched. Private stopped-media clone.109 original regular runtime files, exactly two paired270 overlay differences, actual FAT archive read back before/after. Original signed APKs and production identity256 remain fixed. Configured420 seconds is an observation limit. Original classifier is byte-identical. Preliminary observation precedes bounded unique258 final capture. Chip checkbox overlays are the visual target; suggestion circles remain separate. Start receipt is written immediately before QEMU starts. Driver build receipt was recorded after compilation, not before.\n')!
 	mut pins := map[string]string{}
-	for path in [target + '/vm/boot.img', target + '/vm/efivars.fd', target + '/suite269.v', target + '/suite269', target + '/runtime-before.json', target + '/runtime-after.json', base + 'attempt269.json', compiler, cc, os.executable(), @FILE, driver, 'tests/native-android-ws/maps-interact.v', 'build/android-run', 'build/qemu-horizontal/bin/qemu-system-aarch64', config['aapt2']!.str(), config['apksigner']!.str(), config['java']!.str(), config['firmware']!.str()] { pins[path] = styled_hash(path)! }
+	for path in [target + '/vm/boot.img', target + '/vm/efivars.fd', target + '/suite271.v', target + '/suite271', target + '/runtime-before.json', target + '/runtime-after.json', base + 'attempt271.json', compiler, cc, os.executable(), @FILE, driver, 'tests/native-android-ws/maps-interact.v', 'build/android-run', 'build/qemu-horizontal/bin/qemu-system-aarch64', config['aapt2']!.str(), config['apksigner']!.str(), config['java']!.str(), config['firmware']!.str()] { pins[path] = styled_hash(path)! }
 	for path in [base + 'GoogleMaps.apk', base + 'GooglePlayServices.apk', base + 'GooglePlayStore.apk', base + 'run-android-identity256', base + 'attempt244/companion-packages.json'] { pins[path] = styled_hash(path)! }
 	write_json(target + '/prelaunch-sha256.json', pins)!
 	mut resolved_inputs := map[string]string{}
@@ -319,14 +319,14 @@ fn prepare(frozen string, media string, external string) ! {
 	for path, digest in pins { if retained['replica/' + path.trim_left('/')]! != digest { return error('retained launch pin differs: ' + path) } }
 	for path, digest in inputs { if retained['frozen256/inputs/' + path.trim_left('/')]! != digest { return error('retained original input differs: ' + path) } }
 	if retained['replica/' + compound + '/framework/api-impl.jar']! != after[jar]!
-		|| retained['replica/' + compound + '/native/libvinix-android-native.so']! != after[native]! { return error('retained268 artifacts differ from runtime') }
+		|| retained['replica/' + compound + '/native/libvinix-android-native.so']! != after[native]! { return error('retained270 artifacts differ from runtime') }
 	mut retained_unique := map[string]string{}
 	for path, digest in retained {
 		if path.starts_with('unique258-evidence/') && path != 'unique258-evidence/sha256.json' { retained_unique[path.all_after('unique258-evidence/')] = digest }
 	}
 	equal_maps(retained_unique, read_map(unique_evidence + '/sha256.json')!)!
 	write_json(external + '/prelaunch-sha256.json', retained)!
-	println('MAPS269 PREPARED external=' + external + ' prelaunch_pin=' + styled_hash(external + '/prelaunch-sha256.json')!)
+	println('MAPS271 PREPARED external=' + external + ' prelaunch_pin=' + styled_hash(external + '/prelaunch-sha256.json')!)
 }
 
 fn self_test(original string) ! {
@@ -354,7 +354,7 @@ fn self_test(original string) ! {
 	mut rejected := false
 	overlay_delta(before, after) or { rejected = true }
 	assert rejected
-	fixture := os.temp_dir() + '/maps269-inventory-selftest-' + time.now().unix_micro().str()
+	fixture := os.temp_dir() + '/maps271-inventory-selftest-' + time.now().unix_micro().str()
 	os.mkdir_all(fixture + '/prelaunch/empty')!
 	os.write_file(fixture + '/prelaunch/fixture.txt', 'retained evidence\n')!
 	os.symlink('fixture.txt', fixture + '/prelaunch/link')!
@@ -378,17 +378,17 @@ fn self_test(original string) ! {
 	mut changed_rejected := false
 	check_external(fixture, fixture_pin) or { changed_rejected = true }
 	assert changed_rejected
-	scratch := base + 'maps269-helper-selftest-' + time.now().unix_micro().str()
+	scratch := base + 'maps271-helper-selftest-' + time.now().unix_micro().str()
 	os.mkdir_all(scratch)!
-	os.write_file(scratch + '/suite269.v', generated)!
+	os.write_file(scratch + '/suite271.v', generated)!
 	build := os.exec([compiler, '-nocache', '-cc', 'cc', '-cflags', '-O2', '-path',
-		'build-support/android|@vlib|@vmodules', '-o', scratch + '/suite269', scratch + '/suite269.v'])
+		'build-support/android|@vlib|@vmodules', '-o', scratch + '/suite271', scratch + '/suite271.v'])
 	os.write_file(scratch + '/build.log', build.output)!
 	if build.exit_code != 0 { return error('generated suite build failed: ' + build.output) }
-	os.write_file(scratch + '/suite-self-test.log', checked([scratch + '/suite269', '--self-test'])!)!
-	println('MAPS269 HELPER SELF-TEST PASS observation=420 seconds; original classifier byte-identical; exact2 delta enforced')
-	println('MAPS269 HELPER NEGATIVE PASS wrong pin, incomplete inventory and changed bytes; fixture=' + fixture)
-	println('MAPS269 HELPER GENERATED-SUITE SELF-TEST PASS ' + scratch)
+	os.write_file(scratch + '/suite-self-test.log', checked([scratch + '/suite271', '--self-test'])!)!
+	println('MAPS271 HELPER SELF-TEST PASS observation=420 seconds; original classifier byte-identical; exact2 delta enforced')
+	println('MAPS271 HELPER NEGATIVE PASS wrong pin, incomplete inventory and changed bytes; fixture=' + fixture)
+	println('MAPS271 HELPER GENERATED-SUITE SELF-TEST PASS ' + scratch)
 }
 
 fn main() {
@@ -397,5 +397,5 @@ fn main() {
 	if os.args.len == 2 && os.args[1] == '--assertion-probe' { assert false, 'assertion probe must fail'; return }
 	if os.args.len == 4 && os.args[1] == 'check' { check_external(os.args[2], os.args[3]) or { eprintln(err); exit(1) }; return }
 	if os.args.len != 5 || os.args[1] != 'prepare' { eprintln('usage: maps-styled-replay prepare FROZEN256 STOPPED_MEDIA EXTERNAL; check EXTERNAL PIN; --self-test ORIGINAL_SUITE'); exit(2) }
-	prepare(os.args[2], os.args[3], os.args[4]) or { eprintln('MAPS269 PREPARE FAIL ' + err.msg()); exit(1) }
+	prepare(os.args[2], os.args[3], os.args[4]) or { eprintln('MAPS271 PREPARE FAIL ' + err.msg()); exit(1) }
 }
