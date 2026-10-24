@@ -18615,21 +18615,57 @@ launch probe resolves the request class and stops at
 before application entry, with process exit status 1. Inspected Fortnite
 request factories supply non-nil content, which remains unsupported; resolving
 the class does not establish those calls work. Both import audits complete
-without executing app code and report the counts below. The evidence manifest
+without executing app code. The evidence manifest
 hashes selected source and artifact inputs; it does not seal the full toolchain
 or host dynamic runtime closure.
+
+V now provides bounded `UNUserNotificationCenter` inspection. Native Apple
+measurements establish its 40-byte NSObject layout and four ivars: a zeroing
+weak delegate at offset 8, bundle identifier at 16, queue at 24 and private
+delegate at 32. `currentNotificationCenter` caches one owned instance;
+`delegate` protects the returned object until the caller's autorelease pool
+drains, and `setDelegate:` registers weak storage. Constructors run outside
+the runtime lock; failed construction can be retried, while overlapping first
+construction fails explicitly. Cached access works from other threads.
+`supportsContentExtensions` returns false on both class and instance, reflecting
+the bounded implementation. Default construction, custom subclasses, copying,
+coding, permission requests, categories, settings, scheduling, delivery,
+badges, topics and private services fail explicitly. No notification service
+callbacks are simulated. Native method implementations retain precedence.
+
+The shared fixture passes against Apple UserNotifications and the V runtime
+with ASan+UBSan, in normal and deterministic Swift hashing modes; leak
+detection is disabled. It checks layout, encodings, singleton lifetime, weak
+delegate replacement and getter lifetime. Runtime checks cover constructor
+lock handoff and failure/retry, cached access from worker threads, guarded
+caller storage, changed-isa cleanup, native overrides, 31 explicit rejection
+cases and two drained lifetimes. The focused ARM64 guest passes calendar,
+calendar-trigger, notification-request and notification-center fixtures.
+This does not establish full regression or Swift success.
+
+Fresh Fortnite probing resolves the center class and stops at
+`_OBJC_CLASS_$_UNMutableNotificationContent`, attributed to UserNotifications,
+before application entry, with process exit status 1. The audits below do not
+execute app code. Complete guest media, firmware state, source snapshots,
+generated C, binaries and logs are retained in a sealed bundle outside Git at
+`/Users/alex/Library/Caches/vinix-ios/un-center-20261024`.
+The tracked [notification-center report](../tests/ios/notification-center-report.md)
+records the source revision, manifest checksum, reproduction commands and
+evidence checker controls. Compressed archive creation failed on a full disk;
+the complete bundle remains intact. Selected build inputs are hashed; the full
+compiler header and host dynamic-library closures are not independently sealed.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,082 | 79 | 78 |
+| Fortnite executable | 2,083 | 78 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,922 | 82 | 114 |
+| All images | 2,923 | 81 | 114 |
 
-The C++/GLES/Text variant reports 2,936 resolved imports, 68 unresolved strong
+The C++/GLES/Text variant reports 2,937 resolved imports, 67 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -18689,6 +18725,7 @@ URL query items use `url-query-item-checks`, character sets use
 `user-activity-checks`, notification queues use `notification-queue-checks`,
 Objective-C calendars use `ns-calendar-checks`, calendar notification triggers
 use `un-calendar-checks`, notification requests use `un-request-checks`,
+notification centers use `notification-center-checks`,
 keyed archives use `keyed-archiver-checks`, keyed unarchives use
 `keyed-unarchiver-checks`,
 CoreFoundation dictionaries use
@@ -18706,7 +18743,7 @@ terminal, thread-policy, file timestamp, UUID, audio-session constant,
 URL session, session configuration, recursive lock, invocation, invocation
 operation, date formatter, predicate, index set, URL query item, character set,
 scanner, user activity, notification queue, calendar, calendar notification trigger,
-notification request, keyed archive, keyed unarchive,
+notification request, notification center, keyed archive, keyed unarchive,
 sort descriptor, regular expression, mutable string, CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String
