@@ -80,3 +80,8 @@ kernel/tmp.v
 
 /build-aarch64-android/
 /build-aarch64-roblox/
+
+# Test execution output is archived outside Git. Existing source snapshots and
+# short Markdown reports can remain tracked; new reports belong in docs/.
+/tests/**/results/
+/artifacts/

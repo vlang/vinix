@@ -1,5 +1,10 @@
 # Linux compatibility qualification
 
+Test source stays in Git; raw execution bundles are archived outside it. See
+[test artifact storage](../../docs/test-artifacts.md). Historical evidence links
+below require restoring the original bundle before running its checker. Pass
+an external fresh directory to `--state-dir` for new runs.
+
 The maintained V controller snapshots a matching, already built ELF64 kernel
 and each V fixture before compiling or booting. Both architectures use the
 existing native guest supervisor and disposable images. Every requested marker

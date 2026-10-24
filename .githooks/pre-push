@@ -1,0 +1,13 @@
+#!/usr/bin/env -S v run
+// SPDX-License-Identifier: GPL-2.0-or-later
+import os
+
+fn main() {
+	result := os.exec(['git', 'rev-parse', '--show-toplevel'])
+	if result.exit_code != 0 { eprintln(result.output); exit(1) }
+	compiler := os.getenv_opt('V') or { 'v' }
+	mut command := [compiler, 'run', result.output.trim_space() + '/tools/git-source-policy.v',
+		'pre-push']
+	command << os.args[1..]
+	exit(os.system_args(command))
+}

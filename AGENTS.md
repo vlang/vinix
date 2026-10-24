@@ -19,6 +19,20 @@
   running QEMU guest (see `desktop/README.md`). Name the app in the subject
   (`Files:`, `Activity Monitor:`, `Settings:`) so the hook picks it up.
 
+## Test artifacts
+
+- Keep test programs, fixtures, runners and checkers in Git. Write generated
+  results to an external state directory or an ignored `tests/**/results/`
+  directory; never force-add raw evidence, binaries, generated C, images,
+  packet captures, firmware state or build inventories.
+- Preserve audit bundles outside Git with their checksums. Commit concise
+  reports with the source revision and artifact location. Historical checkers
+  still require the original complete bundle; do not weaken them to accept
+  missing evidence. See `docs/test-artifacts.md`.
+- Enable repository hooks with `git config core.hooksPath .githooks`.
+  The V pre-push check scans every outgoing commit, including files later
+  deleted, and rejects generated result output and files larger than 5 MiB.
+
 ## Finding memory leaks in the kernel
 
 The kernel is V built with `-gc none -manualfree`: nothing is freed unless the
