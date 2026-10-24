@@ -98,6 +98,13 @@ must preserve the packaged libc's exports and use 16 KiB-compatible ELF
 segments. `usr/share/vinix/musl-build.json` records its source, patch and payload
 hashes; Android, Roblox and desktop staging verify that receipt.
 
+APKs normally retain the launching Unix identity. Administrators can explicitly
+select real application UID/GID credentials before ART starts using the
+[native launcher credential option](../build-support/android/nativeidentity/README.md).
+It requires prepared application-owned data and home directories and preserves
+the native surface/input transport. Ordinary desktop launches keep their
+existing identity.
+
 Android's 80-byte ARM64 `mallinfo` reports actual live payload bytes, reusable
 slot capacity, anonymous allocation-group mappings and peak mapped bytes.
 Allocator metadata arenas are excluded. This private allocator leaves unused

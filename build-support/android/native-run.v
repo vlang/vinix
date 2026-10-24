@@ -5,6 +5,7 @@ module main
 
 import os
 import nativeapk
+import nativeidentity
 
 #include <sys/resource.h>
 struct C.rlimit {
@@ -24,7 +25,7 @@ fn main() {
 fn run() ! {
 	root := os.getenv_opt('VINIX_ANDROID_ROOT') or { '/opt/vinix-android-aarch64' }
 	if os.args.len == 2 && os.args[1] == '--help' {
-		println('usage: run-android APK [-l ACTIVITY] [-w WIDTH -h HEIGHT]\nRequires an inherited Vinix WS surface and input pipe.')
+		println('usage: run-android APK [-l ACTIVITY] [-w WIDTH -h HEIGHT]\nRequires an inherited Vinix WS surface and input pipe.\nOptional root-only Unix identity: VINIX_ANDROID_UID/GID=10000..19999,\nANDROID_APP_DATA_DIR and VINIX_ANDROID_HOME must name prepared target-owned directories.')
 		return
 	}
 	if os.args.len < 2 { return error('usage: run-android APK [-l ACTIVITY]') }
@@ -65,6 +66,8 @@ fn run() ! {
 	if C.setrlimit(3, &stack) != 0 { return error('cannot set ART stack limit') }
 	data_root := os.getenv_opt('XDG_DATA_HOME') or { (os.getenv_opt('HOME') or { '/root' }) + '/.local/share' }
 	data := os.getenv_opt('ANDROID_APP_DATA_DIR') or { data_root + '/vinix/android/' + os.base(apk) + '_' }
+	identity := nativeidentity.from_environment()!
+	identity.activate(apk, root, os.getenv('VINIX_SURFACE_PATH'))!
 	os.mkdir_all(data)!
 	native := nativeapk.install(apk, data, 'arm64-v8a')!
 	os.setenv('VINIX_ANDROID_NATIVE_DIR', native, true)
