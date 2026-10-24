@@ -276,6 +276,20 @@ fn framework_check_widgets(smali string) ! {
   mut text := os.read_file(path)!
   if class == 'CompoundButton' {
    text += '\n.field private vinixWsCheckedListener:Landroid/widget/CompoundButton$OnCheckedChangeListener;\n'
+   // The provider starts with a null drawable even for its default checkbox.
+   // Retain whether the app explicitly replaced/removed that indicator.
+   text += '\n.field public vinixWsButtonDrawableSet:I\n'
+   text = framework_replace_method(text, 'setButtonDrawable(Landroid/graphics/drawable/Drawable;)V',
+    '.method public setButtonDrawable(Landroid/graphics/drawable/Drawable;)V\n.locals 1\n' +
+    'iput-object p1, p0, Landroid/widget/CompoundButton;->button_drawable:Landroid/graphics/drawable/Drawable;\n' +
+    'iput-object p1, p0, Landroid/widget/CompoundButton;->mButtonDrawable:Landroid/graphics/drawable/Drawable;\n' +
+    'const/4 v0, 1\niput v0, p0, Landroid/widget/CompoundButton;->vinixWsButtonDrawableSet:I\n' +
+    'invoke-virtual {p0}, Landroid/view/View;->requestLayout()V\n' +
+    'invoke-virtual {p0}, Landroid/view/View;->invalidate()V\nreturn-void\n.end method')!
+   text += '\n.method public setButtonDrawable(I)V\n.locals 1\nconst/4 v0, 0\n' +
+    'if-eqz p1, :set\ninvoke-virtual {p0}, Landroid/view/View;->getContext()Landroid/content/Context;\nmove-result-object v0\n' +
+    'invoke-virtual {v0, p1}, Landroid/content/Context;->getDrawable(I)Landroid/graphics/drawable/Drawable;\nmove-result-object v0\n' +
+    ':set\ninvoke-virtual {p0, v0}, Landroid/widget/CompoundButton;->setButtonDrawable(Landroid/graphics/drawable/Drawable;)V\nreturn-void\n.end method\n'
    text = framework_replace_method(text, 'getText()Ljava/lang/CharSequence;',
     '.method public native getText()Ljava/lang/CharSequence;\n.end method')!
    text += '\n.method public performClick()Z\n.locals 1\n' +

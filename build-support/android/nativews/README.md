@@ -200,6 +200,14 @@ PopupMenu invokes the provider's default action after unhandled item and popup
 callbacks. Provider-created action views, provider-controlled menu visibility
 and submenus, and clearing a provider through `setActionView` remain incomplete.
 
+CompoundButton preserves its built-in checkbox or radio indicator until the app
+calls `setButtonDrawable`. Passing null removes both the indicator and its
+reserved width, including in subclasses such as Maps filter chips. Static custom
+drawables use their intrinsic dimensions and draw into the current Canvas.
+Drawable state changes and animation callbacks remain incomplete. The
+[CompoundButton fixture](../../../tests/native-android-ws/compound-button-fixture.v)
+checks measurement and bitmap pixels on baseline and fixed runtimes.
+
 Handle-based JNI symbol lookup searches the library and its dependencies in
 breadth-first order, including defined weak symbols. The bootstrap APK includes
 a JNI method exported only by a dependent DSO to exercise this path in ART.

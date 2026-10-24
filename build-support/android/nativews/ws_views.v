@@ -41,6 +41,29 @@ fn ws_view_new(kind i32) i64 {
 	}
 }
 
+struct WsButtonIndicator {
+	drawable voidptr
+	custom bool
+	width i32 = 18
+	height i32 = 18
+	advance i32 = 30
+}
+
+fn ws_button_indicator(e voidptr, object voidptr) WsButtonIndicator {
+	if get_int(e, object, c'android/widget/CompoundButton', c'vinixWsButtonDrawableSet') == 0 {
+		return WsButtonIndicator{}
+	}
+	drawable := obj(e, object, c'android/widget/CompoundButton', c'getButtonDrawable', c'()Landroid/graphics/drawable/Drawable;', unsafe { nil })
+	if drawable == unsafe { nil } {
+		return WsButtonIndicator{ custom: true, width: 0, height: 0, advance: 0 }
+	}
+	w := integer(e, drawable, c'android/graphics/drawable/Drawable', c'getIntrinsicWidth', c'()I', unsafe { nil })
+	h := integer(e, drawable, c'android/graphics/drawable/Drawable', c'getIntrinsicHeight', c'()I', unsafe { nil })
+	width := if w > 0 { w } else { i32(0) }
+	height := if h > 0 { h } else { i32(0) }
+	return WsButtonIndicator{ drawable: drawable, custom: true, width: width, height: height, advance: if width > 0 { width + 12 } else { i32(0) } }
+}
+
 fn ws_view_free(pointer i64) {
 	unsafe {
 		if pointer == 0 { return }
@@ -149,8 +172,11 @@ fn ws_measure(e voidptr, object voidptr, width_spec i32, height_spec i32) {
 			height += 12
 		}
 		if view.kind == 7 || view.kind == 8 {
-			width += 30
-			if height < 32 { height = 32 }
+			indicator := ws_button_indicator(e, object)
+			width += indicator.advance
+			indicator_height := indicator.height + view.padding_top + view.padding_bottom
+			if height < indicator_height { height = indicator_height }
+			if !indicator.custom && height < 32 { height = 32 }
 		}
 		if view.kind == 9 {
 			width = if view.indeterminate { i32(32) } else { i32(120) }
@@ -255,7 +281,7 @@ fn ws_draw_background(e voidptr, object voidptr, canvas voidptr) {
 	}
 }
 
-fn ws_draw_content(e voidptr, object voidptr) {
+fn ws_draw_content(e voidptr, object voidptr, canvas voidptr) {
 	unsafe {
 		view := ws_view(e, object)
 		if view.kind == 10 { ws_surface_draw(e, object); return }
@@ -299,15 +325,28 @@ fn ws_draw_content(e voidptr, object voidptr) {
 			return
 		}
 		text_width := ws_text_width(view.text, view.size, view.font)
+		mut indicator_advance := i32(0)
 		if view.kind == 7 || view.kind == 8 {
+			indicator := ws_button_indicator(e, object)
+			indicator_advance = indicator.advance
 			left := f32(view.padding_left + 3)
-			top := (f32(height) - 18) / 2
-			ws_rect(left, top, left + 18, top + 18, 0xff66736c)
-			ws_rect(left + 2, top + 2, left + 16, top + 16, if view.checked { u32(0xff00a884) } else { u32(0xffffffff) })
-			if view.checked { ws_rect(left + 6, top + 6, left + 12, top + 12, 0xffffffff) }
+			top := f32(view.padding_top) + (f32(height - view.padding_top - view.padding_bottom) - f32(indicator.height)) / 2
+			if !indicator.custom {
+				ws_rect(left, top, left + 18, top + 18, 0xff66736c)
+				ws_rect(left + 2, top + 2, left + 16, top + 16, if view.checked { u32(0xff00a884) } else { u32(0xffffffff) })
+				if view.checked { ws_rect(left + 6, top + 6, left + 12, top + 12, 0xffffffff) }
+			} else if indicator.drawable != nil && indicator.width > 0 && indicator.height > 0 {
+				ws_save()
+				ws_translate(left, top)
+				bounds := [Value{ i: 0 }, Value{ i: 0 }, Value{ i: indicator.width }, Value{ i: indicator.height }]!
+				call(e, indicator.drawable, c'android/graphics/drawable/Drawable', c'setBounds', c'(IIII)V', &bounds[0])
+				args := [Value{ l: canvas }]!
+				call(e, indicator.drawable, c'android/graphics/drawable/Drawable', c'draw', c'(Landroid/graphics/Canvas;)V', &args[0])
+				ws_restore()
+			}
 		}
 		left := if view.kind == 7 || view.kind == 8 {
-			f32(view.padding_left + 30)
+			f32(view.padding_left + indicator_advance)
 		} else if view.kind == 2 {
 			(f32(width) - text_width) / 2
 		} else {
@@ -329,7 +368,7 @@ fn ws_draw_children(e voidptr, object voidptr, canvas voidptr) {
 	unsafe {
 		// ViewGroup's Java native_drawContent is empty; WebView is a leaf
 		// ViewGroup whose content belongs to this renderer.
-		if ws_view(e, object).kind == 6 { ws_draw_content(e, object) }
+		if ws_view(e, object).kind == 6 { ws_draw_content(e, object, canvas) }
 		ws_save()
 		// Padding clips the children, leaving the group's own background intact.
 		// Establish it in viewport coordinates before applying the parent scroll.

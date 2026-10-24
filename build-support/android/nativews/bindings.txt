@@ -160,7 +160,7 @@ android/view/View|native_setBackgroundColor|(&WsView(p0)).background = u32(p1); 
 android/view/View|native_setBackgroundDrawable|ws_mark()
 android/view/View|native_setVisibility|view := &WsView(p0); view.visible = p1 == 0; view.sensitive = p3 != 0; ws_mark()
 android/view/View|native_drawBackground|ws_draw_background(e,this,p1)
-android/view/View|native_drawContent|ws_draw_content(e,this)
+android/view/View|native_drawContent|ws_draw_content(e,this,p1)
 android/view/View|nativeInvalidate|ws_mark()
 android/view/View|nativeSetOnClickListener|// View retains the listener in its Java field.
 android/view/View|nativeSetOnTouchListener|// View retains the listener in its Java field.
