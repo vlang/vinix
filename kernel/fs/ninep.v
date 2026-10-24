@@ -2,7 +2,7 @@
 // Mission16-A: bounded, synchronous 9P2000.L VFS facade.
 // Data/attributes are fetched remotely; namespace conflicts fail closed.
 // Namespace nodes follow the VFS's permanent mount-cache lifetime. One bounded
-// superblock/session is pinned for this boot, including across ordinary detach:
+// superblock/session per transport tag is pinned for this boot, including across ordinary detach:
 // copied namespaces and nsfs descriptions can retain routes invisible here.
 // Remount makes a fresh root view without resetting another view's live FIDs.
 @[has_globals]
@@ -22,8 +22,17 @@ import time
 
 pub struct NinePFS {
 mut:
-	box             &FileSystem        = unsafe { nil }
+	session &NinePSession = unsafe { nil }
+	session_value NinePSession
+	box &FileSystem = unsafe { nil }
 	filesystem_value FileSystem
+	published bool
+}
+
+// Mount adapters have distinct stable addresses. Only mounts of the same tag
+// share the serialized wire session/FID budget; another tag cannot mutate it.
+struct NinePSession {
+mut:
 	channel         &virtio_9p.Channel = unsafe { nil }
 	client          ninep.Client
 	lock            klock.Lock
@@ -38,7 +47,7 @@ mut:
 }
 
 __global (
-	ninep_cached_backend &NinePFS = unsafe { nil }
+	ninep_backends [32]&NinePFS
 	ninep_cache_lock     klock.Lock
 )
 
@@ -53,6 +62,7 @@ pub mut:
 mut:
 	filesystem       &NinePFS           = unsafe { nil }
 	box              &resource.Resource = unsafe { nil }
+	resource_value resource.Resource
 	node             &VFSNode           = unsafe { nil }
 	fid              u32                = ninep.nofid
 	slot             int
@@ -65,10 +75,9 @@ mut:
 }
 
 fn (mut backend NinePFS) as_filesystem() &FileSystem {
-	// The interface value is interior storage owned by the backend, and the
-	// registry borrows its address. Boxing a second copy here allocated an
-	// object that the success path never freed: the cached backend keeps it
-	// for the boot, so the marker only hid the allocation from the gate.
+	if backend.session == unsafe { nil } {
+		backend.session = unsafe { &backend.session_value }
+	}
 	if backend.box == unsafe { nil } {
 		backend.filesystem_value = FileSystem(unsafe { &backend })
 		backend.box = unsafe { &backend.filesystem_value }
@@ -77,9 +86,6 @@ fn (mut backend NinePFS) as_filesystem() &FileSystem {
 }
 
 fn (mut template NinePFS) instantiate() &FileSystem {
-	ninep_cache_lock.acquire()
-	defer { ninep_cache_lock.release() }
-	if ninep_cached_backend != unsafe { nil } { return ninep_cached_backend.box }
 	mut instance := unsafe { &NinePFS(memory.malloc_packed_fallible(sizeof(NinePFS))) }
 	if instance == unsafe { nil } {
 		errno.set(errno.enomem)
@@ -95,71 +101,91 @@ fn (mut backend NinePFS) mount(_ &VFSNode, _ string, _ &VFSNode) ?&VFSNode {
 }
 
 fn (mut backend NinePFS) error() {
-	errno.set(if backend.client.fault > 0 && backend.client.fault <= 4095 {
-		u64(backend.client.fault)
+	errno.set(if backend.session.client.fault > 0 && backend.session.client.fault <= 4095 {
+		u64(backend.session.client.fault)
 	} else {
 		errno.eio
 	})
 }
 
 fn (mut backend NinePFS) live() ? {
-	if backend.closed || backend.channel == unsafe { nil } || backend.client.dead {
+	if backend.session.closed || backend.session.channel == unsafe { nil } || backend.session.client.dead {
 		errno.set(errno.eio)
 		return none
 	}
 }
 
 fn (mut backend NinePFS) mount_specifier(parent &VFSNode, name string, source string, flags u64, options string) ?&VFSNode {
+	// Serialize discovery/publication, including same-tag simultaneous mounts.
+	// No template state is changed and every mount keeps its own adapter.
+	ninep_cache_lock.acquire()
+	defer { ninep_cache_lock.release() }
+	backend.as_filesystem()
+	mut free_slot := -1
+	for i, cached in ninep_backends {
+		if cached == unsafe { nil } {
+			if free_slot < 0 { free_slot = i }
+		} else if !backend.published && cached.session.tag == source {
+			backend.session = cached.session
+			break
+		}
+	}
 	mut opts := ninep.Options{}
 	// A published superblock is never destroyed by a subsequent mount failure.
 	// Each attachment owns a new, bounded namespace view; all share the serialized
 	// connection. This avoids both stale remount trees and unsafe alias teardown.
-	if backend.root != unsafe { nil } {
-		backend.lock.acquire()
-		defer { backend.lock.release() }
+	if backend.session.root != unsafe { nil } {
+		mut attached := false
+		defer {
+			if !attached && !backend.published { memory.free(backend) }
+		}
+		backend.session.lock.acquire()
+		defer { backend.session.lock.release() }
 		if !ninep.parse_options(options, unsafe { &opts }) {
 			errno.set(errno.einval)
 			return none
 		}
-		if source != backend.tag {
+		if source != backend.session.tag {
 			errno.set(errno.enodev)
 			return none
 		}
-		if opts.msize != backend.requested_msize || proc.current_thread().process.euid != backend.attach_uid {
+		if opts.msize != backend.session.requested_msize || proc.current_thread().process.euid != backend.session.attach_uid {
 			errno.set(errno.ebusy)
 			return none
 		}
 		backend.live()?
-		root_resource := ninep_resource(backend.root)
-		fid := backend.client.walk(root_resource.fid, '') or {
+		root_resource := ninep_resource(backend.session.root)
+		fid := backend.session.client.walk(root_resource.fid, '') or {
 			backend.error()
 			return none
 		}
 		mut attr := unsafe { &ninep.Attr(C.vinix_stack_alloc(sizeof(ninep.Attr))) }
 		unsafe { *attr = ninep.Attr{} }
-		backend.client.getattr(fid, attr) or {
-			backend.client.release(fid)
+		backend.session.client.getattr(fid, attr) or {
+			backend.session.client.release(fid)
 			backend.error()
 			return none
 		}
 		if !stat.isdir(attr.mode) {
-			backend.client.release(fid)
+			backend.session.client.release(fid)
 			errno.set(errno.enotdir)
 			return none
 		}
 		mut root := backend.make_node(parent, name, fid, attr) or {
-			backend.client.release(fid)
+			backend.session.client.release(fid)
 			return none
 		}
 		root.create_dotentries(parent)
+		backend.published = true
+		attached = true
 		return root
 	}
 	mut success := false
 	defer {
 		if !success {
-			if backend.channel != unsafe { nil } { backend.channel.close() }
+			if backend.session.channel != unsafe { nil } { backend.session.channel.close() }
 			// Failed construction is private; no node/name ownership escaped.
-			for ptr in backend.resources {
+			for ptr in backend.session.resources {
 				mut res := unsafe { ptr }
 				if res == unsafe { nil } { continue }
 				mut node := res.node
@@ -171,10 +197,9 @@ fn (mut backend NinePFS) mount_specifier(parent &VFSNode, name string, source st
 						}
 					}
 					// The root's name is borrowed until mount succeeds.
-					if voidptr(node) != voidptr(backend.root) { unsafe { node.name.free() } }
+					if voidptr(node) != voidptr(backend.session.root) { unsafe { node.name.free() } }
 					memory.free(node)
 				}
-				memory.free(res.box)
 				memory.free(res)
 			}
 			memory.free(backend)
@@ -184,30 +209,34 @@ fn (mut backend NinePFS) mount_specifier(parent &VFSNode, name string, source st
 		errno.set(errno.einval)
 		return none
 	}
-	backend.channel = virtio_9p.connect(source) or {
+	if free_slot < 0 {
 		errno.set(errno.enodev)
 		return none
 	}
-	backend.client = ninep.Client{
-		context:  voidptr(backend.channel)
+	backend.session.channel = virtio_9p.connect(source) or {
+		errno.set(errno.enodev)
+		return none
+	}
+	backend.session.client = ninep.Client{
+		context:  voidptr(backend.session.channel)
 		exchange: virtio_9p.exchange
-		tx:       backend.channel.tx
-		rx:       backend.channel.rx
+		tx:       backend.session.channel.tx
+		rx:       backend.session.channel.rx
 		msize:    opts.msize
 	}
-	backend.dev = resource.create_dev_id()
-	backend.client.negotiate() or {
+	backend.session.dev = resource.create_dev_id()
+	backend.session.client.negotiate() or {
 		backend.error()
 		return none
 	}
 	attach_uid := proc.current_thread().process.euid
-	fid := backend.client.attach(attach_uid) or {
+	fid := backend.session.client.attach(attach_uid) or {
 		backend.error()
 		return none
 	}
 	mut attr := unsafe { &ninep.Attr(C.vinix_stack_alloc(sizeof(ninep.Attr))) }
 	unsafe { *attr = ninep.Attr{} }
-	backend.client.getattr(fid, attr) or {
+	backend.session.client.getattr(fid, attr) or {
 		backend.error()
 		return none
 	}
@@ -216,18 +245,17 @@ fn (mut backend NinePFS) mount_specifier(parent &VFSNode, name string, source st
 		return none
 	}
 	mut root := backend.make_node(parent, name, fid, attr) or { return none }
-	backend.root = root
+	backend.session.root = root
 	// Root publication is all-or-nothing. Population is lazy through the
 	// existing permission/open capabilities, rather than a whole-share crawl.
 	root.create_dotentries(parent)
 	// Retained once per boot, not per operation. The node/FID budgets cap all
 	// later mount views; incompatible remount credentials/options are refused.
-	backend.tag = source.clone()
-	backend.requested_msize = opts.msize
-	backend.attach_uid = attach_uid
-	ninep_cache_lock.acquire()
-	ninep_cached_backend = backend
-	ninep_cache_lock.release()
+	backend.session.tag = source.clone()
+	backend.session.requested_msize = opts.msize
+	backend.session.attach_uid = attach_uid
+	ninep_backends[free_slot] = backend
+	backend.published = true
 	success = true
 	_ = flags // VFS attachment enforces readonly/noexec/etc on every use.
 	return root
@@ -236,7 +264,7 @@ fn (mut backend NinePFS) mount_specifier(parent &VFSNode, name string, source st
 fn (mut backend NinePFS) make_node(parent &VFSNode, name string, fid u32, attr &ninep.Attr) ?&VFSNode {
 	mut slot := -1
 	for i in 0 .. ninep.max_nodes {
-		if backend.resources[i] == unsafe { nil } {
+		if backend.session.resources[i] == unsafe { nil } {
 			slot = i
 			break
 		}
@@ -255,15 +283,17 @@ fn (mut backend NinePFS) make_node(parent &VFSNode, name string, fid u32, attr &
 	mut node := create_node(backend.as_filesystem(), parent, name, stat.isdir(attr.mode))
 	res.node = node
 	res.remember_name(parent, name)
-	res.box = &resource.Resource(res) @[freed]
+	// refcount is already initialized in the stable owner before conversion.
+	res.resource_value = resource.Resource(res)
+	res.box = unsafe { &res.resource_value }
 	node.resource = res.box
-	backend.resources[slot] = res
+	backend.session.resources[slot] = res
 	return node
 }
 
 fn (mut res NinePResource) set_stat(attr &ninep.Attr) {
 	res.host = *attr
-	res.stat.dev = res.filesystem.dev
+	res.stat.dev = res.filesystem.session.dev
 	res.stat.ino = attr.qid.path
 	res.stat.mode = attr.mode
 	res.stat.uid = attr.uid
@@ -297,7 +327,7 @@ fn (mut res NinePResource) refresh_locked() ? {
 		return none
 	}
 	mut attr := ninep.Attr{}
-	backend.client.getattr(res.fid, unsafe { &attr }) or {
+	backend.session.client.getattr(res.fid, unsafe { &attr }) or {
 		backend.error()
 		return none
 	}
@@ -315,8 +345,8 @@ fn (mut res NinePResource) refresh_locked() ? {
 // Other resource kinds are a no-op. This API does not consume a reference.
 pub fn ninep_refresh_stat(mut res resource.Resource) ? {
 	if mut res is NinePResource {
-		res.filesystem.lock.acquire()
-		defer { res.filesystem.lock.release() }
+		res.filesystem.session.lock.acquire()
+		defer { res.filesystem.session.lock.release() }
 		res.refresh_locked()?
 	}
 }
@@ -340,7 +370,7 @@ fn (mut res NinePResource) remember_name(parent &VFSNode, name string) {
 // safe: reconciliation only refreshes attributes or adds unrelated names.
 fn (mut backend NinePFS) publication_ready_locked() bool {
 	mut ready := true
-	for ptr in backend.resources {
+	for ptr in backend.session.resources {
 		mut res := unsafe { ptr }
 		if res == unsafe { nil } || res.publication == 0 { continue }
 		name := unsafe { tos(&res.namespace_name[0], res.namespace_length) }
@@ -366,12 +396,12 @@ fn (mut backend NinePFS) populate_locked(mut directory NinePResource) ? {
 		errno.set(errno.enoent)
 		return none
 	}
-	fid := backend.client.walk(directory.fid, '') or {
+	fid := backend.session.client.walk(directory.fid, '') or {
 		backend.error()
 		return none
 	}
-	defer { backend.client.release(fid) }
-	unit := backend.client.lopen(fid, 0x10000) or {
+	defer { backend.session.client.release(fid) }
+	unit := backend.session.client.lopen(fid, 0x10000) or {
 		backend.error()
 		return none
 	}
@@ -379,9 +409,9 @@ fn (mut backend NinePFS) populate_locked(mut directory NinePResource) ? {
 		errno.set(errno.eio)
 		return none
 	}
-	backend.serial++
-	if backend.serial == 0 { backend.serial++ }
-	epoch := backend.serial
+	backend.session.serial++
+	if backend.session.serial == 0 { backend.session.serial++ }
+	epoch := backend.session.serial
 	mut cookie := u64(0)
 	mut entry := unsafe { &ninep.DirEntry(C.vinix_stack_alloc(sizeof(ninep.DirEntry))) }
 	unsafe { *entry = ninep.DirEntry{} }
@@ -389,7 +419,7 @@ fn (mut backend NinePFS) populate_locked(mut directory NinePResource) ? {
 	// Bounds malicious cookie cycles and dot-only streams independently of
 	// the number of allocated nodes; no count controls a dynamic allocation.
 	for _ in 0 .. ninep.max_nodes * 4 {
-		has_entry := backend.client.readdir_one(fid, cookie, unit, entry) or {
+		has_entry := backend.session.client.readdir_one(fid, cookie, unit, entry) or {
 			backend.error()
 			return none
 		}
@@ -415,23 +445,23 @@ fn (mut backend NinePFS) populate_locked(mut directory NinePResource) ? {
 			errno.set(errno.ebusy)
 			return none
 		}
-		fresh := backend.client.walk(directory.fid, name) or {
+		fresh := backend.session.client.walk(directory.fid, name) or {
 			backend.error()
 			return none
 		}
 		mut attr := ninep.Attr{}
-		backend.client.getattr(fresh, unsafe { &attr }) or {
-			backend.client.release(fresh)
+		backend.session.client.getattr(fresh, unsafe { &attr }) or {
+			backend.session.client.release(fresh)
 			backend.error()
 			return none
 		}
 		if !stat.isreg(attr.mode) && !stat.isdir(attr.mode) {
-			backend.client.release(fresh)
+			backend.session.client.release(fresh)
 			continue
 		}
 		owned_name := name.clone() @[freed]
 		mut node := backend.make_node(directory.node, owned_name, fresh, unsafe { &attr }) or {
-			backend.client.release(fresh)
+			backend.session.client.release(fresh)
 			unsafe { owned_name.free() }
 			return none
 		}
@@ -446,7 +476,7 @@ fn (mut backend NinePFS) populate_locked(mut directory NinePResource) ? {
 	}
 	// Removal/replacement requires a VFS transaction API unavailable here.
 	// Retain the complete cached subtree and refuse conflicting lookups.
-	for ptr in backend.resources {
+	for ptr in backend.session.resources {
 		mut child := unsafe { ptr }
 		if child == unsafe { nil } || child.node == unsafe { nil } || voidptr(child.namespace_parent) != voidptr(directory.node)
 			|| child.node.orphan || child.node.removed || child.seen == epoch {
@@ -460,14 +490,14 @@ fn (mut backend NinePFS) populate_locked(mut directory NinePResource) ? {
 fn (mut backend NinePFS) populate(node &VFSNode) {
 	mut res := ninep_resource(node)
 	if res == unsafe { nil } { return }
-	backend.lock.acquire()
-	defer { backend.lock.release() }
+	backend.session.lock.acquire()
+	defer { backend.session.lock.release() }
 	backend.populate_locked(mut res) or {}
 }
 
 fn (mut res NinePResource) snapshot_permissions(mut acl []u8) ?resource.PermissionMetadata {
-	res.filesystem.lock.acquire()
-	defer { res.filesystem.lock.release() }
+	res.filesystem.session.lock.acquire()
+	defer { res.filesystem.session.lock.release() }
 	res.refresh_locked()?
 	if stat.isdir(res.stat.mode) { res.filesystem.populate_locked(mut res)? }
 	_ = acl // No remote ACL/xattr support in this subset.
@@ -475,18 +505,18 @@ fn (mut res NinePResource) snapshot_permissions(mut acl []u8) ?resource.Permissi
 }
 
 fn (mut res NinePResource) open(flags int) ?&resource.Resource {
-	res.filesystem.lock.acquire()
-	defer { res.filesystem.lock.release() }
+	res.filesystem.session.lock.acquire()
+	defer { res.filesystem.session.lock.release() }
 	res.refresh_locked()?
 	if stat.isdir(res.stat.mode) { res.filesystem.populate_locked(mut res)? }
 	if flags & resource.o_path == 0 {
-		fid := res.filesystem.client.walk(res.fid, '') or {
+		fid := res.filesystem.session.client.walk(res.fid, '') or {
 			res.filesystem.error()
 			return none
 		}
-		defer { res.filesystem.client.release(fid) }
+		defer { res.filesystem.session.client.release(fid) }
 		mode := if stat.isdir(res.stat.mode) { u32(0x10000) } else { u32(flags & 3) }
-		res.filesystem.client.lopen(fid, mode) or {
+		res.filesystem.session.client.lopen(fid, mode) or {
 			res.filesystem.error()
 			return none
 		}
@@ -495,8 +525,8 @@ fn (mut res NinePResource) open(flags int) ?&resource.Resource {
 }
 
 fn (mut backend NinePFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
-	backend.lock.acquire()
-	defer { backend.lock.release() }
+	backend.session.lock.acquire()
+	defer { backend.session.lock.release() }
 	backend.live() or { return unsafe { nil } }
 	mut dir := ninep_resource(parent)
 	if dir == unsafe { nil } || !ninep.valid_name(name) {
@@ -517,7 +547,7 @@ fn (mut backend NinePFS) create(parent &VFSNode, name string, mode u32) &VFSNode
 	}
 	// Reserve a resource slot before mutating the host namespace.
 	mut available := false
-	for res in backend.resources {
+	for res in backend.session.resources {
 		if res == unsafe { nil } {
 			available = true
 			break
@@ -529,35 +559,35 @@ fn (mut backend NinePFS) create(parent &VFSNode, name string, mode u32) &VFSNode
 	}
 	gid := proc.current_thread().process.egid
 	if stat.isdir(mode) {
-		backend.client.mkdir(dir.fid, name, mode, gid) or {
+		backend.session.client.mkdir(dir.fid, name, mode, gid) or {
 			backend.error()
 			return unsafe { nil }
 		}
 	} else {
-		fid := backend.client.walk(dir.fid, '') or {
+		fid := backend.session.client.walk(dir.fid, '') or {
 			backend.error()
 			return unsafe { nil }
 		}
-		defer { backend.client.release(fid) }
-		backend.client.lcreate(fid, name, mode, gid) or {
+		defer { backend.session.client.release(fid) }
+		backend.session.client.lcreate(fid, name, mode, gid) or {
 			backend.error()
 			return unsafe { nil }
 		}
 	}
-	fresh := backend.client.walk(dir.fid, name) or {
+	fresh := backend.session.client.walk(dir.fid, name) or {
 		backend.error()
 		return unsafe { nil }
 	}
 	mut attr := unsafe { &ninep.Attr(C.vinix_stack_alloc(sizeof(ninep.Attr))) }
 	unsafe { *attr = ninep.Attr{} }
-	backend.client.getattr(fresh, attr) or {
-		backend.client.release(fresh)
+	backend.session.client.getattr(fresh, attr) or {
+		backend.session.client.release(fresh)
 		backend.error()
 		return unsafe { nil }
 	}
 	mut node := backend.make_node(parent, name, fresh, attr) or {
-		backend.client.release(fresh)
-		backend.client.unlinkat(dir.fid, name, stat.isdir(mode)) or {}
+		backend.session.client.release(fresh)
+		backend.session.client.unlinkat(dir.fid, name, stat.isdir(mode)) or {}
 		return unsafe { nil }
 	}
 	mut created := ninep_resource(node)
@@ -580,8 +610,8 @@ fn (mut backend NinePFS) rename(old_parent &VFSNode, old_name string, new_parent
 		errno.set(errno.enotsup)
 		return none
 	}
-	backend.lock.acquire()
-	defer { backend.lock.release() }
+	backend.session.lock.acquire()
+	defer { backend.session.lock.release() }
 	backend.live()?
 	old := ninep_resource(old_parent)
 	new := ninep_resource(new_parent)
@@ -604,7 +634,7 @@ fn (mut backend NinePFS) rename(old_parent &VFSNode, old_name string, new_parent
 		errno.set(errno.ebusy)
 		return none
 	}
-	backend.client.renameat(old.fid, old_name, new.fid, new_name) or {
+	backend.session.client.renameat(old.fid, old_name, new.fid, new_name) or {
 		backend.error()
 		return none
 	}
@@ -613,8 +643,12 @@ fn (mut backend NinePFS) rename(old_parent &VFSNode, old_name string, new_parent
 }
 
 fn (mut res NinePResource) read(_ voidptr, buf voidptr, offset u64, count u64) ?i64 {
-	res.filesystem.lock.acquire()
-	defer { res.filesystem.lock.release() }
+	res.filesystem.session.lock.acquire()
+	defer { res.filesystem.session.lock.release() }
+	return res.read_locked(buf, offset, count, false)
+}
+
+fn (mut res NinePResource) read_locked(buf voidptr, offset u64, count u64, strict bool) ?i64 {
 	res.refresh_locked()?
 	if !stat.isreg(res.stat.mode) {
 		errno.set(errno.eisdir)
@@ -630,19 +664,19 @@ fn (mut res NinePResource) read(_ voidptr, buf voidptr, offset u64, count u64) ?
 		return none
 	}
 	mut backend := res.filesystem
-	fid := backend.client.walk(res.fid, '') or {
+	fid := backend.session.client.walk(res.fid, '') or {
 		backend.error()
 		return none
 	}
-	defer { backend.client.release(fid) }
-	unit := backend.client.lopen(fid, 0) or {
+	defer { backend.session.client.release(fid) }
+	unit := backend.session.client.lopen(fid, 0) or {
 		backend.error()
 		return none
 	}
 	mut done := u64(0)
 	for done < count {
 		chunk := u32(if count - done < unit { count - done } else { unit })
-		n := backend.client.read(fid, offset + done, unsafe { &u8(u64(buf) + done) }, chunk) or {
+		n := backend.session.client.read(fid, offset + done, unsafe { &u8(u64(buf) + done) }, chunk) or {
 			backend.error()
 			if done != 0 { return i64(done) }
 			return none
@@ -669,19 +703,19 @@ fn (mut res NinePResource) write_locked(buf voidptr, offset u64, count u64) ?i64
 		errno.set(errno.efault)
 		return none
 	}
-	fid := backend.client.walk(res.fid, '') or {
+	fid := backend.session.client.walk(res.fid, '') or {
 		backend.error()
 		return none
 	}
-	defer { backend.client.release(fid) }
-	unit := backend.client.lopen(fid, 1) or {
+	defer { backend.session.client.release(fid) }
+	unit := backend.session.client.lopen(fid, 1) or {
 		backend.error()
 		return none
 	}
 	mut done := u64(0)
 	for done < count {
 		chunk := u32(if count - done < unit { count - done } else { unit })
-		n := backend.client.write(fid, offset + done, unsafe { &u8(u64(buf) + done) }, chunk) or {
+		n := backend.session.client.write(fid, offset + done, unsafe { &u8(u64(buf) + done) }, chunk) or {
 			backend.error()
 			if done != 0 { break }
 			return none
@@ -699,15 +733,15 @@ fn (mut res NinePResource) write_locked(buf voidptr, offset u64, count u64) ?i64
 }
 
 fn (mut res NinePResource) write(_ voidptr, buf voidptr, offset u64, count u64) ?i64 {
-	res.filesystem.lock.acquire()
-	defer { res.filesystem.lock.release() }
+	res.filesystem.session.lock.acquire()
+	defer { res.filesystem.session.lock.release() }
 	res.refresh_locked()?
 	return res.write_locked(buf, offset, count)
 }
 
 fn (mut res NinePResource) append_data(_ voidptr, buf voidptr, count u64, limit u64, end &u64) ?i64 {
-	res.filesystem.lock.acquire()
-	defer { res.filesystem.lock.release() }
+	res.filesystem.session.lock.acquire()
+	defer { res.filesystem.session.lock.release() }
 	res.refresh_locked()?
 	location := u64(res.stat.size)
 	if count != 0 && location >= limit {
@@ -721,15 +755,15 @@ fn (mut res NinePResource) append_data(_ voidptr, buf voidptr, count u64, limit 
 }
 
 fn (mut res NinePResource) grow(_ voidptr, size u64) ? {
-	res.filesystem.lock.acquire()
-	defer { res.filesystem.lock.release() }
+	res.filesystem.session.lock.acquire()
+	defer { res.filesystem.session.lock.release() }
 	res.filesystem.live()?
 	if !stat.isreg(res.stat.mode) || size > 0x7fffffffffffffff {
 		errno.set(errno.einval)
 		return none
 	}
 	attr := ninep.Attr{ size: size }
-	res.filesystem.client.setattr(res.fid, 8, &attr) or {
+	res.filesystem.session.client.setattr(res.fid, 8, &attr) or {
 		res.filesystem.error()
 		return none
 	}
@@ -738,8 +772,8 @@ fn (mut res NinePResource) grow(_ voidptr, size u64) ? {
 }
 
 fn (mut res NinePResource) persist_metadata() ? {
-	res.filesystem.lock.acquire()
-	defer { res.filesystem.lock.release() }
+	res.filesystem.session.lock.acquire()
+	defer { res.filesystem.session.lock.release() }
 	res.filesystem.live()?
 	if res.stat.atim.tv_sec < 0 || res.stat.mtim.tv_sec < 0
 		|| res.stat.atim.tv_nsec < 0 || res.stat.mtim.tv_nsec < 0 {
@@ -768,7 +802,7 @@ fn (mut res NinePResource) persist_metadata() ? {
 	}
 	if mask == 0 { return }
 	mut fresh := ninep.Attr{}
-	res.filesystem.client.getattr(res.fid, unsafe { &fresh }) or {
+	res.filesystem.session.client.getattr(res.fid, unsafe { &fresh }) or {
 		res.filesystem.error()
 		return none
 	}
@@ -788,7 +822,7 @@ fn (mut res NinePResource) persist_metadata() ? {
 		errno.set(errno.ebusy)
 		return none
 	}
-	res.filesystem.client.setattr(res.fid, mask, &attr) or {
+	res.filesystem.session.client.setattr(res.fid, mask, &attr) or {
 		res.filesystem.error()
 		return none
 	}
@@ -807,11 +841,11 @@ fn (mut res NinePResource) persist_metadata() ? {
 }
 
 fn (mut res NinePResource) chmod_mode(mode u32) ? {
-	res.filesystem.lock.acquire()
-	defer { res.filesystem.lock.release() }
+	res.filesystem.session.lock.acquire()
+	defer { res.filesystem.session.lock.release() }
 	res.refresh_locked()?
 	attr := ninep.Attr{ mode: (res.stat.mode & stat.ifmt) | (mode & 0o7777) }
-	res.filesystem.client.setattr(res.fid, 1, &attr) or {
+	res.filesystem.session.client.setattr(res.fid, 1, &attr) or {
 		res.filesystem.error()
 		return none
 	}
@@ -825,15 +859,15 @@ fn (mut res NinePResource) unlink(handle voidptr) ? {
 		errno.set(errno.einval)
 		return none
 	}
-	res.filesystem.lock.acquire()
-	defer { res.filesystem.lock.release() }
+	res.filesystem.session.lock.acquire()
+	defer { res.filesystem.session.lock.release() }
 	res.filesystem.live()?
 	dir := ninep_resource(node.parent)
 	if dir == unsafe { nil } {
 		errno.set(errno.einval)
 		return none
 	}
-	res.filesystem.client.unlinkat(dir.fid, node.name, stat.isdir(res.stat.mode)) or {
+	res.filesystem.session.client.unlinkat(dir.fid, node.name, stat.isdir(res.stat.mode)) or {
 		res.filesystem.error()
 		return none
 	}
@@ -853,19 +887,19 @@ fn (mut res NinePResource) ioctl(handle voidptr, request u64, arg voidptr) ?int 
 fn (mut res NinePResource) mmap(_ voidptr, _ u64, _ int) voidptr { return unsafe { nil } }
 
 fn (mut res NinePResource) sync(_ voidptr) ? {
-	res.filesystem.lock.acquire()
-	defer { res.filesystem.lock.release() }
+	res.filesystem.session.lock.acquire()
+	defer { res.filesystem.session.lock.release() }
 	res.filesystem.live()?
-	fid := res.filesystem.client.walk(res.fid, '') or {
+	fid := res.filesystem.session.client.walk(res.fid, '') or {
 		res.filesystem.error()
 		return none
 	}
-	defer { res.filesystem.client.release(fid) }
-	res.filesystem.client.lopen(fid, if stat.isdir(res.stat.mode) { u32(0x10000) } else { u32(0) }) or {
+	defer { res.filesystem.session.client.release(fid) }
+	res.filesystem.session.client.lopen(fid, if stat.isdir(res.stat.mode) { u32(0x10000) } else { u32(0) }) or {
 		res.filesystem.error()
 		return none
 	}
-	res.filesystem.client.fsync(fid) or {
+	res.filesystem.session.client.fsync(fid) or {
 		res.filesystem.error()
 		return none
 	}
@@ -874,11 +908,10 @@ fn (mut res NinePResource) sync(_ voidptr) ? {
 fn (mut res NinePResource) unref(_ voidptr) ? {
 	if katomic.dec(mut &res.refcount) { return }
 	mut backend := res.filesystem
-	backend.lock.acquire()
-	if !backend.closed && res.fid != ninep.nofid { backend.client.release(res.fid) }
-	backend.resources[res.slot] = unsafe { nil }
-	backend.lock.release()
-	memory.free(res.box)
+	backend.session.lock.acquire()
+	if !backend.session.closed && res.fid != ninep.nofid { backend.session.client.release(res.fid) }
+	backend.session.resources[res.slot] = unsafe { nil }
+	backend.session.lock.release()
 	memory.free(res)
 }
 

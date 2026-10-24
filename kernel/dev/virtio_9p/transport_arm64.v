@@ -71,6 +71,7 @@ fn (mut ch Channel) locate(tag string) bool {
 	for slot in 0 .. 32 {
 		base := memory.map_mmio(0x0a000000 + u64(slot) * 0x200, 0x200)
 		if base == 0 { continue }
+		if transport_claimed(0, base) { continue }
 		ch.base = base
 		if ch.rd(0) != 0x74726976 || ch.rd(4) != 1 || ch.rd(8) != 9 {
 			ch.base = 0

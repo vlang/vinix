@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // One synchronous mount session, one outstanding descriptor chain, polling.
 // No request memory is released until device reset is acknowledged. If reset
-// fails, the global Channel and all its DMA mappings remain quarantined for
+// fails, that Channel and all its DMA mappings remain quarantined for
 // the rest of this boot, and reconnect is refused. Disabling bus mastering is
 // only containment, never used as proof that in-flight DMA has stopped.
 @[has_globals]
@@ -30,11 +30,12 @@ mut:
 	ready        bool
 	quarantined  bool
 	installed    bool
+	claimed      bool
 	lock         klock.Lock
 }
 
 __global (
-	ninep_session    Channel
+	ninep_sessions   [32]Channel
 	ninep_claim_lock klock.Lock
 	ninep_claimed    bool
 )
@@ -44,18 +45,41 @@ pub fn connect(tag string) ?&Channel {
 	for c in tag { if c == 0 || c == `/` { return none } }
 	ninep_claim_lock.acquire()
 	defer { ninep_claim_lock.release() }
-	if ninep_claimed || ninep_session.quarantined { return none }
-	ninep_claimed = true
-	if !ninep_session.locate(tag) {
-		ninep_claimed = false
-		return none
+	for i in 0 .. ninep_sessions.len {
+		mut ch := unsafe { &ninep_sessions[i] }
+		if ch.claimed || ch.quarantined { continue }
+		unsafe { *ch = Channel{} }
+		if !ch.locate(tag) {
+			if ch.quarantined { ch.claimed = true; ninep_claimed = true }
+			return none
+		}
+		ch.claimed = true
+		ninep_claimed = true
+		if !ch.start() {
+			ch.stop_locked()
+			if !ch.quarantined { ch.claimed = false }
+			refresh_claimed()
+			return none
+		}
+		return ch
 	}
-	if !ninep_session.start() {
-		ninep_session.stop_locked()
-		if !ninep_session.quarantined { ninep_claimed = false }
-		return none
+	return none
+}
+
+// Called under the claim lock, before discovery touches a device's registers.
+fn transport_claimed(io u16, base u64) bool {
+	for ch in ninep_sessions {
+		if (ch.claimed || ch.quarantined)
+			&& ((io != 0 && ch.io == io) || (base != 0 && ch.base == base)) { return true }
 	}
-	return unsafe { &ninep_session }
+	return false
+}
+
+fn refresh_claimed() {
+	ninep_claimed = false
+	for ch in ninep_sessions {
+		if ch.claimed || ch.quarantined { ninep_claimed = true; return }
+	}
 }
 
 fn (mut ch Channel) start() bool {
@@ -170,5 +194,6 @@ pub fn (mut ch Channel) close() {
 	ch.lock.acquire()
 	defer { ch.lock.release() }
 	ch.stop_locked()
-	if !ch.quarantined { ninep_claimed = false }
+	if !ch.quarantined { ch.claimed = false }
+	refresh_claimed()
 }

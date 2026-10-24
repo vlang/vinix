@@ -83,6 +83,7 @@ fn (mut ch Channel) locate(tag string) bool {
 			|| bar.size > 65536 - bar.base {
 			continue
 		}
+		if transport_claimed(u16(bar.base), 0) { continue }
 		bdf := (u32(card.bus) << 8) | (u32(card.slot) << 3) | card.function
 		caps, status := pci.capabilities_read(bdf, card.header_type, pci.native_topology_read)
 		if status != pci.topology_ok { continue }
