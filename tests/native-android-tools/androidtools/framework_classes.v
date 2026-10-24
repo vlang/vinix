@@ -276,14 +276,94 @@ fn framework_check_widgets(smali string) ! {
   mut text := os.read_file(path)!
   if class == 'CompoundButton' {
    text += '\n.field private vinixWsCheckedListener:Landroid/widget/CompoundButton$OnCheckedChangeListener;\n'
-   // The provider starts with a null drawable even for its default checkbox.
-   // Retain whether the app explicitly replaced/removed that indicator.
+   // Zero selects the WS default indicator; one selects the styled/app drawable,
+   // including null. A custom CompoundButton style need not have an indicator.
+   // The provider cannot inflate some framework animated defaults. Use the WS
+   // fallback only when the app has not overridden the framework default style.
    text += '\n.field public vinixWsButtonDrawableSet:I\n'
+   text = framework_replace_method(text, '<init>(Landroid/content/Context;Landroid/util/AttributeSet;II)V', r'.method public constructor <init>(Landroid/content/Context;Landroid/util/AttributeSet;II)V
+.locals 4
+invoke-direct {p0, p1, p2, p3, p4}, Landroid/widget/Button;-><init>(Landroid/content/Context;Landroid/util/AttributeSet;II)V
+const/4 v0, 1
+iput v0, p0, Landroid/widget/CompoundButton;->vinixWsButtonDrawableSet:I
+sget-object v0, Lcom/android/internal/R$styleable;->CompoundButton:[I
+invoke-virtual {p1, p2, v0, p3, p4}, Landroid/content/Context;->obtainStyledAttributes(Landroid/util/AttributeSet;[III)Landroid/content/res/TypedArray;
+move-result-object v0
+const/4 v1, 1
+invoke-virtual {v0, v1}, Landroid/content/res/TypedArray;->hasValueOrEmpty(I)Z
+move-result v2
+if-eqz v2, :absent_button
+invoke-virtual {v0, v1}, Landroid/content/res/TypedArray;->getDrawable(I)Landroid/graphics/drawable/Drawable;
+move-result-object v1
+iput-object v1, p0, Landroid/widget/CompoundButton;->button_drawable:Landroid/graphics/drawable/Drawable;
+iput-object v1, p0, Landroid/widget/CompoundButton;->mButtonDrawable:Landroid/graphics/drawable/Drawable;
+if-nez v1, :checked
+const/4 v1, 1
+const/4 v2, 0
+invoke-virtual {v0, v1, v2}, Landroid/content/res/TypedArray;->getResourceId(II)I
+move-result v2
+ushr-int/lit8 v2, v2, 24
+const/4 v3, 1
+if-ne v2, v3, :checked
+:absent_button
+if-nez p4, :checked
+const/4 v2, 0
+invoke-virtual {v0, v1, v2}, Landroid/content/res/TypedArray;->getSourceStyleResourceId(II)I
+move-result v2
+if-eqz v2, :button_source_default
+ushr-int/lit8 v2, v2, 24
+const/4 v3, 1
+if-ne v2, v3, :checked
+:button_source_default
+if-eqz p2, :default_style
+invoke-interface {p2}, Landroid/util/AttributeSet;->getStyleAttribute()I
+move-result v2
+if-nez v2, :checked
+const-string v2, "http://schemas.android.com/apk/res/android"
+const-string v3, "button"
+invoke-interface {p2, v2, v3}, Landroid/util/AttributeSet;->getAttributeValue(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+move-result-object v2
+if-nez v2, :checked
+:default_style
+const v1, 0x101006c
+if-eq p3, v1, :default_theme
+const v1, 0x101007e
+if-ne p3, v1, :checked
+:default_theme
+invoke-virtual {p1}, Landroid/content/Context;->getTheme()Landroid/content/res/Resources$Theme;
+move-result-object v2
+new-instance v3, Landroid/util/TypedValue;
+invoke-direct {v3}, Landroid/util/TypedValue;-><init>()V
+const/4 v1, 1
+invoke-virtual {v2, p3, v3, v1}, Landroid/content/res/Resources$Theme;->resolveAttribute(ILandroid/util/TypedValue;Z)Z
+move-result v1
+if-eqz v1, :default_button
+iget v1, v3, Landroid/util/TypedValue;->resourceId:I
+ushr-int/lit8 v1, v1, 24
+const/4 v2, 1
+if-ne v1, v2, :checked
+:default_button
+const/4 v1, 0
+iput v1, p0, Landroid/widget/CompoundButton;->vinixWsButtonDrawableSet:I
+:checked
+const/4 v1, 0
+invoke-virtual {v0, v1}, Landroid/content/res/TypedArray;->hasValue(I)Z
+move-result v2
+if-eqz v2, :done
+invoke-virtual {v0, v1, v1}, Landroid/content/res/TypedArray;->getBoolean(IZ)Z
+move-result v1
+invoke-virtual {p0, v1}, Landroid/widget/CompoundButton;->setChecked(Z)V
+:done
+invoke-virtual {v0}, Landroid/content/res/TypedArray;->recycle()V
+invoke-virtual {p0}, Landroid/view/View;->refreshDrawableState()V
+return-void
+.end method')!
    text = framework_replace_method(text, 'setButtonDrawable(Landroid/graphics/drawable/Drawable;)V',
     '.method public setButtonDrawable(Landroid/graphics/drawable/Drawable;)V\n.locals 1\n' +
     'iput-object p1, p0, Landroid/widget/CompoundButton;->button_drawable:Landroid/graphics/drawable/Drawable;\n' +
     'iput-object p1, p0, Landroid/widget/CompoundButton;->mButtonDrawable:Landroid/graphics/drawable/Drawable;\n' +
     'const/4 v0, 1\niput v0, p0, Landroid/widget/CompoundButton;->vinixWsButtonDrawableSet:I\n' +
+    'invoke-virtual {p0}, Landroid/view/View;->refreshDrawableState()V\n' +
     'invoke-virtual {p0}, Landroid/view/View;->requestLayout()V\n' +
     'invoke-virtual {p0}, Landroid/view/View;->invalidate()V\nreturn-void\n.end method')!
    text += '\n.method public setButtonDrawable(I)V\n.locals 1\nconst/4 v0, 0\n' +
@@ -295,6 +375,53 @@ fn framework_check_widgets(smali string) ! {
    text += '\n.method public performClick()Z\n.locals 1\n' +
     'invoke-virtual {p0}, Landroid/widget/CompoundButton;->toggle()V\n' +
     'invoke-super {p0}, Landroid/widget/Button;->performClick()Z\nconst/4 v0, 1\nreturn v0\n.end method\n'
+   text = framework_replace_method(text, 'onCreateDrawableState(I)[I', r'.method protected onCreateDrawableState(I)[I
+.locals 3
+add-int/lit8 v0, p1, 1
+invoke-super {p0, v0}, Landroid/widget/Button;->onCreateDrawableState(I)[I
+move-result-object v0
+invoke-virtual {p0}, Landroid/widget/CompoundButton;->isChecked()Z
+move-result v1
+if-eqz v1, :done
+const v1, 0x10100a0
+filled-new-array {v1}, [I
+move-result-object v1
+invoke-static {v0, v1}, Landroid/view/View;->mergeDrawableStates([I[I)[I
+move-result-object v0
+:done
+return-object v0
+.end method')!
+   text = framework_replace_method(text, 'drawableStateChanged()V', r'.method protected drawableStateChanged()V
+.locals 2
+invoke-super {p0}, Landroid/widget/Button;->drawableStateChanged()V
+iget-object v0, p0, Landroid/widget/CompoundButton;->button_drawable:Landroid/graphics/drawable/Drawable;
+if-eqz v0, :done
+invoke-virtual {v0}, Landroid/graphics/drawable/Drawable;->isStateful()Z
+move-result v1
+if-eqz v1, :done
+invoke-virtual {p0}, Landroid/view/View;->getDrawableState()[I
+move-result-object v1
+invoke-virtual {v0, v1}, Landroid/graphics/drawable/Drawable;->setState([I)Z
+move-result v1
+if-eqz v1, :done
+invoke-virtual {p0}, Landroid/view/View;->invalidate()V
+:done
+return-void
+.end method')!
+  } else {
+   // Forward the platform default style only from the short constructors.
+   // Subclasses such as chips pass their own style through the longer forms.
+   owner := 'Landroid/widget/' + class + ';'
+   default_style := if class == 'CheckBox' { '0x101006c' } else { '0x101007e' }
+   for signature, body in {
+    'Landroid/content/Context;': 'const/4 v0, 0\ninvoke-direct {p0, p1, v0}, ' + owner + '-><init>(Landroid/content/Context;Landroid/util/AttributeSet;)V\n'
+    'Landroid/content/Context;Landroid/util/AttributeSet;': 'const v0, ' + default_style + '\ninvoke-direct {p0, p1, p2, v0}, ' + owner + '-><init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V\n'
+    'Landroid/content/Context;Landroid/util/AttributeSet;I': 'const/4 v0, 0\ninvoke-direct {p0, p1, p2, p3, v0}, ' + owner + '-><init>(Landroid/content/Context;Landroid/util/AttributeSet;II)V\n'
+    'Landroid/content/Context;Landroid/util/AttributeSet;II': 'invoke-direct {p0, p1, p2, p3, p4}, Landroid/widget/CompoundButton;-><init>(Landroid/content/Context;Landroid/util/AttributeSet;II)V\n'
+   } {
+    text = framework_replace_method(text, '<init>(' + signature + ')V',
+     '.method public constructor <init>(' + signature + ')V\n.locals 1\n' + body + 'return-void\n.end method')!
+   }
   }
   for signature in ['setTextColor(I)V', 'setTextSize(F)V'] {
    text = framework_replace_method(text, signature, '.method public native ' + signature + '\n.end method')!

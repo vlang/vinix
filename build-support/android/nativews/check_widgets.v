@@ -7,6 +7,8 @@ fn ws_checked(e voidptr, object voidptr, checked bool) {
 	if view.checked == checked { return }
 	view.checked = checked
 	ws_mark()
+	call(e, object, c'android/view/View', c'refreshDrawableState', c'()V', unsafe { nil })
+	if pending(e) { return }
 	if view.broadcasting { return }
 	listener := get_object(e, object, c'android/widget/CompoundButton', c'vinixWsCheckedListener', c'Landroid/widget/CompoundButton$OnCheckedChangeListener;')
 	if listener == unsafe { nil } { return }
