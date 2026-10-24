@@ -1,0 +1,111 @@
+fn freeze_inputs() ! {
+	manifest := json2.decode[map[string]json2.Any](os.read_file(previous + '/framework/framework-manifest.json')!)!
+	mut inputs := map[string]string{}
+	for path, digest in manifest['sources']!.as_map() {
+		if path.starts_with('build-support/android/atlframework/') {
+			assert hash(path)! == digest.str(), path
+			inputs[path] = digest.str()
+			clone_file(path, base + '/source/' + path)!
+		}
+	}
+	previous_inputs := json2.decode[map[string]string](os.read_file(previous + '/frozen-inputs.json')!)!
+	for path, digest in previous_inputs {
+		if path.starts_with('/') || path.starts_with('build/android-framework/') || path.starts_with('tests/linuxkpi/') || path.starts_with('tests/host-policy/') || path in ['build/android-native-ws/aapt2', 'build/android-native-ws/android-15/lib/apksigner.jar'] {
+			assert hash(path)! == digest, path
+			inputs[path] = digest
+		}
+	}
+	for path in [fixture_source, 'tests/native-android-ws/compound-button-run.v', 'tests/native-android-ws/paint-xfermode-run.v', 'tests/native-android-ws/paint-xfermode-freeze.v.txt', 'tests/native-android-ws/paint-xfermode-build.v', 'tests/native-android-tools/androidtools/framework_classes.v', 'tests/native-android-tools/androidtools/framework_paint_xfermodes.v', 'build-support/android/nativews/graphics.v', 'build-support/android/nativews/bitmaps.v', 'build-support/android/nativews/bindings.txt', previous + '/native/bindings.txt'] { inputs[path] = hash(path)! }
+	for path in inputs.keys() {
+		target := base + '/inputs/' + path.trim_left('/')
+		if !os.exists(target) { clone_file(path, target)! }
+	}
+	write_json(base + '/frozen-inputs.json', inputs)!
+}
+
+fn freeze_metadata(framework map[string]string, native map[string]string) ! {
+	for kind, count in {'framework': 126, 'native': 83} {
+		directory := if kind == 'framework' { '/sources/' } else { '/atlframework/' }
+		mut sources := map[string]string{}
+		mut exact := map[string]string{}
+		mut delta := []string{}
+		baseline := if kind == 'framework' { framework } else { native }
+		for path in os.walk_ext(base + '/' + kind + directory, '.v') {
+			name := path.all_after(base + '/' + kind + directory)
+			sources[name] = hash(path)!
+			exact[name] = os.read_file(path)!
+			if name !in baseline || exact[name] != baseline[name]! { delta << name }
+		}
+		assert sources.len == count
+		delta.sort()
+		expected := if kind == 'framework' { ['androidtools/framework_classes.v', 'androidtools/framework_paint_xfermodes.v'] } else { ['bitmaps.v', 'graphics.v', 'ws_generated.v'] }
+		assert delta == expected, delta.str()
+		write_json(base + '/' + kind + '/sources.json', sources)!
+		write_json(base + '/' + kind + '/source-delta.json', json2.Any(delta))!
+		os.write_file_array(base + '/' + kind + '/exact-sources.json.gz', gzip.compress(json2.encode(exact).bytes())!)!
+	}
+	for name in ['androidfw_c_api.h', 'sqlite3.h', 'stb_image.h', 'stb_truetype.h'] { clone_file(previous + '/native/' + name, base + '/native/' + name)! }
+	os.cp(fixture_source, fixture_frozen)!
+	os.cp('tests/native-android-ws/paint-xfermode-build.v', base + '/build-framework.v')!
+	freeze_inputs()!
+	freeze_closure('framework', [compiler, '-print-v-files', '-enable-globals', '-path', framework_paths(), base + '/build-framework.v'])!
+	freeze_closure('native-generator', [compiler, '-print-v-files', 'tests/linuxkpi/generate_module.v'])!
+	freeze_closure('fixture', [compiler, '-print-v-files', fixture_frozen])!
+	println('COMPOUND274 FROZEN baseline272 framework=126 native=83 bounded xfermode deltas fixture=' + hash(fixture_frozen)!)
+}
+
+fn freeze_native(native map[string]string) ! {
+	old_graphics := native['graphics.v']!
+	paint_end := '\tfilter_color u32\n'
+	assert old_graphics.count(paint_end) == 1
+	new_graphics := old_graphics.replace(paint_end, paint_end + '\txfer_mode    i32 = 3 // PorterDuff.Mode.SRC_OVER\n')
+	assert os.read_file('build-support/android/nativews/graphics.v')! == new_graphics
+	os.write_file(base + '/native/atlframework/graphics.v', new_graphics)!
+	old_bitmaps := native['bitmaps.v']!
+	live_bitmaps := os.read_file('build-support/android/nativews/bitmaps.v')!
+	marker := 'fn ws_draw_bitmap_region('
+	comment := '// DST_IN uses the bitmap\'s alpha as a mask for pixels already on the target.\n'
+	assert live_bitmaps.count('fn ws_bitmap_dst_in(') == 1 && live_bitmaps.count(comment) == 1
+	assert old_bitmaps.all_before(marker) == live_bitmaps.all_before(comment)
+	assert old_bitmaps.count(marker) == 1 && live_bitmaps.count(marker) == 1
+	draw := '\t\tdraw := ws_draw_state()\n'
+	blend := '\t\t\t\tws_blend(column, row, color, 255)\n'
+	old_region := marker + old_bitmaps.all_after(marker)
+	assert old_region.count(draw) == 1 && old_region.count(blend) == 1
+	new_region := old_region.replace(draw, draw + '\t\txfer_mode := if paint_pointer == 0 { i32(3) } else { (&WsPaint(paint_pointer)).xfer_mode }\n').replace(blend, '\t\t\t\tif xfer_mode == 6 { ws_bitmap_dst_in(column, row, color >> 24) }\n\t\t\t\telse { ws_blend(column, row, color, 255) }\n')
+	assert section(live_bitmaps, marker, '') == new_region
+	os.write_file(base + '/native/atlframework/bitmaps.v', live_bitmaps)!
+	bindings := os.read_file('build-support/android/nativews/bindings.txt')!
+	old_bindings := os.read_file(previous + '/native/bindings.txt')!
+	row := 'android/graphics/Paint|native_set_xfermode|(&WsPaint(p0)).xfer_mode = p1'
+	assert old_bindings.count(row) == 0 && bindings.count(row) == 1
+	assert bindings.replace(row + '\n', '') == old_bindings
+	generated := native['ws_generated.v']!
+	symbol := 'Java_android_graphics_Paint_native_1set_1xfermode__JI'
+	assert !generated.contains(symbol)
+	setter := "\n@[export: '${symbol}']\nfn ws_xfermode_native_set(e voidptr, this voidptr, p0 i64, p1 i32) {\n    unsafe {\n (&WsPaint(p0)).xfer_mode = p1\n }\n}\n"
+	os.write_file(base + '/native/atlframework/ws_generated.v', generated + setter)!
+	clone_file('build-support/android/nativews/bindings.txt', base + '/native/bindings.txt')!
+	write_json(base + '/native/binding-rows.json', {'native_set_xfermode': row})!
+}
+
+fn freeze() ! {
+	assert !os.exists(base + '/framework') && !os.exists(base + '/native')
+	write_json(base + '/attempt.json', {'attempt': attempt, 'VINIX_COMPOUND_ATTEMPT': os.getenv('VINIX_COMPOUND_ATTEMPT'), 'base': base, 'audit': audit, 'baseline_attempt': baseline_attempt, 'fixture_source': fixture_source, 'fixture_frozen': fixture_frozen})!
+	assert hash(previous + '/framework/api-impl.jar')! == '305f04316f617fa26ca84d74d8a1693f90a0a3ffdada0936f9bb18d3cc5a5f75'
+	assert hash(previous + '/native/libvinix-android-native.so')! == '6e92d8d95ae6b0cddf082f34ed33209bf6d49e04463b3af8354b12bb1bf80989'
+	framework := snapshot('framework', 125)!
+	classes := 'androidtools/framework_classes.v'
+	call := ' framework_paint_filters(smali)!\n'
+	old_classes := framework[classes]!
+	assert old_classes.count(call) == 1 && !old_classes.contains('framework_paint_xfermodes')
+	new_classes := old_classes.replace(call, call + ' framework_paint_xfermodes(smali)!\n')
+	assert os.read_file('tests/native-android-tools/' + classes)! == new_classes
+	os.write_file(base + '/framework/sources/' + classes, new_classes)!
+	helper := 'androidtools/framework_paint_xfermodes.v'
+	assert helper !in framework
+	os.cp('tests/native-android-tools/' + helper, base + '/framework/sources/' + helper)!
+	native := snapshot('native', 83)!
+	freeze_native(native)!
+	freeze_metadata(framework, native)!
+}
