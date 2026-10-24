@@ -82,9 +82,9 @@ fn (mut this Slab) add_partial(mut hdr SlabHeader) {
 	hdr.next = this.partial
 	if this.partial != 0 {
 		mut next := unsafe { &SlabHeader(this.partial) }
-		next.prev = u64(hdr)
+		next.prev = u64(voidptr(hdr))
 	}
-	this.partial = u64(hdr)
+	this.partial = u64(voidptr(hdr))
 }
 
 fn (mut this Slab) remove_partial(mut hdr SlabHeader) {
