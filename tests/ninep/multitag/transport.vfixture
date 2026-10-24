@@ -1,0 +1,37 @@
+// Two independent copies of the existing wire service, selected by tag.
+// The production facade and client are compiled without modification.
+module virtio_9p
+
+import dev.service_a
+import dev.service_b
+
+pub struct Channel {
+pub mut:
+	tx &u8 = unsafe { nil }
+	rx &u8 = unsafe { nil }
+mut:
+	a &service_a.Channel = unsafe { nil }
+	b &service_b.Channel = unsafe { nil }
+}
+
+pub fn connect(tag string) ?&Channel {
+	if tag == 'tag-a' {
+		a := service_a.connect('share')?
+		return &Channel{tx: a.tx, rx: a.rx, a: a}
+	}
+	if tag == 'tag-b' {
+		b := service_b.connect('share')?
+		return &Channel{tx: b.tx, rx: b.rx, b: b}
+	}
+	return none
+}
+
+pub fn exchange(context voidptr, request &u8, length u32, response &u8, capacity u32) int {
+	ch := unsafe { &Channel(context) }
+	if ch.a != unsafe { nil } { return service_a.exchange(voidptr(ch.a), request, length, response, capacity) }
+	return service_b.exchange(voidptr(ch.b), request, length, response, capacity)
+}
+
+pub fn (mut ch Channel) close() {
+	if ch.a != unsafe { nil } { ch.a.close() } else { ch.b.close() }
+}
