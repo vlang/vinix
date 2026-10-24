@@ -32,9 +32,12 @@ Validation completed:
 - The maintained JNI fixture assembled and signed. It covers Java identity,
   copied/self-set/reset Paint, explicit SRC_OVER restoration, bitmap formats,
   affine clipping, and the Maps child/layer/oval-mask flow with repeated draws.
-  Its paired baseline/fixed guest execution is still pending: preparation was
-  delayed by shared disk pressure and inherited media hashing. No synthetic
-  JNI fixture runtime PASS is claimed here.
+  The subsequent paired execution confirmed the 272 baseline's expected direct
+  pixel failure. Fixed 274 passed the direct bitmap checks, then failed the
+  layered oval at pixel 5: `0xffeecc88` instead of `0xff336699`. This exposed a
+  separate rectangle edge rounding bug; see [the 276 follow-up](paint-xfermode276.md).
+  The failed 274 evidence is retained without alteration. No complete synthetic
+  JNI fixture runtime PASS is claimed for 274.
 - Actual Maps attempt 275 used the built 274 runtime. Manual observations
   showed nine outline suggestion pins in place of the black disks, followed
   by Skip, Paris search, Eiffel Tower origin selection, route overview,

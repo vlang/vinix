@@ -124,6 +124,13 @@ fn ws_blend(x i32, y i32, color u32, coverage u32) {
 	}
 }
 
+fn ws_rect_bound(edge f32, lower i32, upper i32) i32 {
+	// Clamp before converting large coordinates to integers, as in affine bounds.
+	if edge <= f32(lower) { return lower }
+	if edge >= f32(upper) { return upper }
+	return i32(C.ceilf(edge - 0.5))
+}
+
 fn ws_rect(left f32, top f32, right f32, bottom f32, color u32) {
 	mut draw := ws_draw_state()
 	if right <= left || bottom <= top { return }
@@ -137,10 +144,15 @@ fn ws_rect(left f32, top f32, right f32, bottom f32, color u32) {
 		}
 		return
 	}
-	x0 := i32(left * draw.transform.sx + draw.transform.x)
-	y0 := i32(top * draw.transform.sy + draw.transform.y)
-	x1 := i32(right * draw.transform.sx + draw.transform.x)
-	y1 := i32(bottom * draw.transform.sy + draw.transform.y)
+	// Match the inverse-affine path: a pixel belongs to the rectangle when
+	// its center lies within the transformed half-open edges.
+	l, t := left * draw.transform.sx + draw.transform.x, top * draw.transform.sy + draw.transform.y
+	r, b := right * draw.transform.sx + draw.transform.x, bottom * draw.transform.sy + draw.transform.y
+	if !(l < r && t < b) { return }
+	x0 := ws_rect_bound(l, draw.transform.left, draw.transform.right)
+	y0 := ws_rect_bound(t, draw.transform.top, draw.transform.bottom)
+	x1 := ws_rect_bound(r, draw.transform.left, draw.transform.right)
+	y1 := ws_rect_bound(b, draw.transform.top, draw.transform.bottom)
 	for y := if y0 < draw.transform.top { draw.transform.top } else { y0 }; y < y1 && y < draw.transform.bottom; y++ {
 		for x := if x0 < draw.transform.left { draw.transform.left } else { x0 }; x < x1 && x < draw.transform.right; x++ {
 			ws_blend(x, y, color, 255)

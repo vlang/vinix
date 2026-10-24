@@ -8,6 +8,7 @@ module main
 
 fn C.ceilf(f32) f32
 fn C.floorf(f32) f32
+fn C.sqrtf(f32) f32
 
 struct WsFont {}
 
@@ -164,11 +165,116 @@ fn source_over_and_copy() {
 	println('PAINT-XFERMODE-HOST PASS source-over-alias-clone')
 }
 
+struct RectCase {
+	name string
+	left f32
+	top f32
+	right f32
+	bottom f32
+	transform WsTransform
+	x0 int
+	y0 int
+	x1 int
+	y1 int
+}
+
+fn fractional_rectangles() {
+	// Expected device spans are specified independently of ws_rect's rounding.
+	cases := [
+		RectCase{name: 'inward', left: 0.6, top: 1.6, right: 4.4, bottom: 5.4, x0: 1, y0: 2, x1: 4, y1: 5},
+		RectCase{name: 'outward', left: 0.4, top: 1.4, right: 4.6, bottom: 5.6, x0: 0, y0: 1, x1: 5, y1: 6},
+		RectCase{name: 'half-pixel', left: 0.5, top: 1.5, right: 4.5, bottom: 5.5, x0: 0, y0: 1, x1: 4, y1: 5},
+		RectCase{name: 'negative-edges', left: -1.6, top: -1.4, right: 3.4, bottom: 3.6, x0: 0, y0: 0, x1: 3, y1: 4},
+		RectCase{name: 'translation-scale', left: 0.4, top: 0.2, right: 2.4, bottom: 1.8, transform: WsTransform{x: 0.3, y: 0.2, sx: 2, sy: 3}, x0: 1, y0: 1, x1: 5, y1: 6},
+		RectCase{name: 'fractional-scale', left: 0.4, top: 0.2, right: 2.4, bottom: 1.8, transform: WsTransform{x: -0.35, y: 0.25, sx: 1.5, sy: 2}, x0: 0, y0: 1, x1: 3, y1: 4},
+		// Clamp huge finite edges before any conversion to a pixel integer.
+		RectCase{name: 'huge-cover', left: -1e30, top: -1e30, right: 1e30, bottom: 1e30, x0: 0, y0: 0, x1: 8, y1: 8},
+		RectCase{name: 'huge-clipped', left: -1e30, top: -1e30, right: 1e30, bottom: 1e30, transform: WsTransform{left: 1, top: 2, right: 7, bottom: 6}, x0: 1, y0: 2, x1: 7, y1: 6},
+		RectCase{name: 'finite-transform-overflow', left: -1e30, top: -1e30, right: 1e30, bottom: 1e30, transform: WsTransform{sx: 1e30, sy: 1e30, left: 1, top: 2, right: 7, bottom: 6}, x0: 1, y0: 2, x1: 7, y1: 6},
+		RectCase{name: 'huge-before', left: -1e30, top: -1e30, right: -1e20, bottom: -1e20},
+		RectCase{name: 'huge-after', left: 1e20, top: 1e20, right: 1e30, bottom: 1e30},
+		RectCase{name: 'zero-scale', left: 0.4, top: 0.2, right: 2.4, bottom: 1.8, transform: WsTransform{sx: 0, sy: 0}},
+		RectCase{name: 'collapsed-transformed', left: 0.4, top: 0.2, right: 2.4, bottom: 1.8, transform: WsTransform{x: 1e30, y: 1e30}},
+		RectCase{name: 'nan-translation', left: 0.4, top: 0.2, right: 2.4, bottom: 1.8, transform: WsTransform{x: C.sqrtf(-1)}},
+		RectCase{name: 'nan-edge', left: C.sqrtf(-1), top: 0.2, right: 2.4, bottom: 1.8},
+		// Negative scale takes the existing inverse-affine branch.
+		RectCase{name: 'negative-scale', left: 0.6, top: 1.6, right: 4.4, bottom: 5.4, transform: WsTransform{x: 7, sx: -1}, x0: 3, y0: 2, x1: 6, y1: 5},
+	]
+	mut bytes := [256]u8{}
+	mut target := WsBitmap{width: 8, height: 8, row_bytes: 32, rgba: unsafe { &bytes[0] }}
+	for item in cases {
+		fill(mut target, 0xffeecc88)
+		canvas(mut target)
+		draw_state.transform = item.transform
+		if draw_state.transform.right == 0 { draw_state.transform.right = 8 }
+		if draw_state.transform.bottom == 0 { draw_state.transform.bottom = 8 }
+		ws_rect(item.left, item.top, item.right, item.bottom, 0xff336699)
+		for y in 0 .. 8 {
+			for x in 0 .. 8 {
+				expected := if x >= item.x0 && x < item.x1 && y >= item.y0 && y < item.y1 { u32(0xff336699) } else { u32(0xffeecc88) }
+				assert argb(&target, x, y) == expected, '${item.name} pixel (${x},${y})'
+			}
+		}
+	}
+	// Shearing also retains the inverse-affine branch. Device centers map to
+	// local (x-y, y-0.5), giving these three exact two-pixel rows.
+	fill(mut target, 0xffeecc88)
+	canvas(mut target)
+	draw_state.transform = WsTransform{x: 1, y: 1, kx: 1, right: 8, bottom: 8}
+	ws_rect(0.2, 0.2, 2.8, 2.8, 0xff336699)
+	for y in 0 .. 8 {
+		for x in 0 .. 8 {
+			expected := if y >= 1 && y <= 3 && (x == y + 1 || x == y + 2) { u32(0xff336699) } else { u32(0xffeecc88) }
+			assert argb(&target, x, y) == expected, 'shear pixel (${x},${y})'
+		}
+	}
+	println('PAINT-XFERMODE-HOST PASS fractional-rect-center-samples')
+}
+
+fn maps_oval_layer() {
+	mut mask_bytes := [256]u8{}
+	mut mask := WsBitmap{width: 8, height: 8, row_bytes: 32, rgba: unsafe { &mask_bytes[0] }}
+	canvas(mut mask)
+	black := WsPaint{}
+	// Canvas.drawOval(RectF, Paint) delegates to this production primitive.
+	ws_canvas_round_rect(0, 0, 8, 8, 4, 4, i64(unsafe { &black }))
+	mut layer_bytes := [256]u8{}
+	mut layer := WsBitmap{width: 8, height: 8, row_bytes: 32, rgba: unsafe { &layer_bytes[0] }}
+	mut output := [256]u8{}
+	mut target := WsBitmap{width: 8, height: 8, row_bytes: 32, rgba: unsafe { &output[0] }}
+	mask_paint := WsPaint{xfer_mode: 6}
+	composite_paint := WsPaint{}
+	// Match the JNI fixture: draw a colored child into an isolated layer,
+	// apply the cached black oval with DST_IN, then composite onto opaque pixels.
+	for frame in 0 .. 2 {
+		fill(mut layer, 0xff336699)
+		canvas(mut layer)
+		apply(&mask, &mask_paint, 0, 0, 8, 8)
+		fill(mut target, 0xffeecc88)
+		canvas(mut target)
+		apply(&layer, &composite_paint, 0, 0, 8, 8)
+		for y in 0 .. 8 {
+			for x in 0 .. 8 {
+				xx := f32(x) + 0.5 - 4
+				yy := f32(y) + 0.5 - 4
+				inside := xx * xx + yy * yy <= 16
+				assert argb(&mask, x, y) == if inside { u32(0xff000000) } else { u32(0) }, 'oval mask (${x},${y})'
+				assert argb(&layer, x, y) == if inside { u32(0xff336699) } else { u32(0) }, 'oval layer (${x},${y})'
+				expected := if inside { u32(0xff336699) } else { u32(0xffeecc88) }
+				assert argb(&target, x, y) == expected, 'oval composite frame=${frame} pixel (${x},${y})'
+			}
+		}
+	}
+	println('PAINT-XFERMODE-HOST PASS maps-oval-layer-grid')
+}
+
 fn main() {
 	alpha_masks()
 	alpha_only_masks()
 	opaque_surface()
 	transformed_clipped_mask()
 	source_over_and_copy()
+	fractional_rectangles()
+	maps_oval_layer()
 	println('PAINT-XFERMODE-HOST PASS all')
 }

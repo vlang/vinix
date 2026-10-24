@@ -46,7 +46,11 @@ fn main() {
 		match name {
 			'graphics.v' {
 				actual += structure(body, 'WsTransform') + structure(body, 'WsPaint')
-				for symbol in ['ws_blend', 'ws_paint_new', 'ws_paint_clone'] { actual += function(body, symbol) }
+				// Older captured graphics inputs predate the clipped bound helper.
+				if body.contains('fn ws_rect_bound(') { actual += function(body, 'ws_rect_bound') }
+				for symbol in ['ws_blend', 'ws_rect', 'ws_round_inset', 'ws_canvas_round_rect', 'ws_paint_new', 'ws_paint_clone'] {
+					actual += function(body, symbol)
+				}
 			}
 			'bitmaps.v' {
 				actual += structure(body, 'WsBitmap')
