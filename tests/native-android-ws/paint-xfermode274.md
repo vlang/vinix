@@ -14,8 +14,8 @@ device, path and quadrilateral clips apply, and pixels outside the bitmap's
 destination rectangle remain unchanged. Paint's Java and native transfer mode
 state stays synchronized through copy, set, reset and null/default setters.
 
-Source baseline: `e4999db88` (path fill-rule fix 272). This report accompanies
-the subsequent DST_IN source commit. Frozen build inputs and retained evidence
+Source baseline: `e4999db88` (path fill-rule fix 272); DST_IN source commit:
+`b50aab72d`. Frozen build inputs and retained evidence
 are under `/Users/alex/.local/state/vinix/android/compound274-2026-10-24`.
 
 Validation completed:
@@ -49,15 +49,20 @@ Maps 275's raw classifier nevertheless reports `startup_failed`, with
 markers for `JndiResourceResolverFactory` and `ContextStorageOverride` and their
 causes. Manual UI observations do not override that classification. The
 lower-right location/control rendering remains incomplete; GPS, sign-in,
-voice and long-duration use were not validated. Raw local observation and
-visual notes are `build/android-maps/attempt275/results.json` and
-`build/android-maps/maps275-root-visual-notes.md`; the Maps evidence collection
-and seal are tracked separately from this source qualification.
+voice and long-duration use were not validated. The retained Maps evidence,
+seals and manual observations are recorded in [the Maps 275 report](maps275.md).
 
-Retained SHA-256 pins (the complete 274 bundle seal is pending):
+The complete failed 274 archive is sealed by `failed-attempt-sha256.json`.
+Its integrity check passed with status `UNQUALIFIED`; the original positive
+qualification checker still rejects the layered assertion failure, retained
+in `qualification-rejected.log`. The later 276 fixture success does not change
+274's failed result.
+
+Retained SHA-256 pins:
 
 | Artifact | SHA-256 |
 | --- | --- |
+| `failed-attempt-sha256.json` | `78d8d38f8e855e42cceed3054944641a622d5ceecda1cb5e826953d6bf5b9e22` |
 | Framework JAR | `1a026975748c693f11c09c7fc080f8b72c20c0638c01996f226698cc740f92f6` |
 | Native library | `27f1ec2604f93f55d8b3557fb7e34dc754daedde854a6041939503cb72cf12a7` |
 | Paired fixture APK | `214421dcae1874873e58023080e7746e7e385034f71e0af9a5e56247b1b2f3ed` |
