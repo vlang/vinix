@@ -32,7 +32,7 @@ fn main() {
 		if file.starts_with('framework') && file.ends_with('.v') { sources['tests/native-android-tools/androidtools/' + file] = hash(out + '/sources/androidtools/' + file)! }
 	}
 	manifest['sources'] = json2.Any(sources)
-	manifest['source_scope'] = if attempt in ['268', '270'] { 'Frozen compound266 generators; only framework_text_widgets changed. Live ATL registration sources match266 baseline before and after build.' } else if attempt in ['264', '266'] { 'Frozen compound262 generators; only framework_view_geometry, framework_view_canvas and framework_text_widgets changed. Live ATL registration sources match262 baseline before and after build.' } else { 'Frozen compound247 generators; only framework_check_widgets changed. Live ATL registration sources match247 baseline before and after build.' }
+	manifest['source_scope'] = if attempt == '270' { 'Frozen compound266 generators; only framework_text_widgets and framework_check_widgets changed. Live ATL registration sources match266 baseline before and after build.' } else if attempt == '268' { 'Frozen compound266 generators; only framework_text_widgets changed. Live ATL registration sources match266 baseline before and after build.' } else if attempt in ['264', '266'] { 'Frozen compound262 generators; only framework_view_geometry, framework_view_canvas and framework_text_widgets changed. Live ATL registration sources match262 baseline before and after build.' } else { 'Frozen compound247 generators; only framework_check_widgets changed. Live ATL registration sources match247 baseline before and after build.' }
 	os.write_file(out + '/framework-manifest.json', json2.encode(manifest, prettify: true) + '\n')!
 	println('COMPOUND' + attempt + ' FRAMEWORK ' + hash(out + '/api-impl.jar')!)
 }

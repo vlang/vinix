@@ -169,7 +169,9 @@ fn freeze() ! {
 	if attempt in ['268', '270'] {
 		file := 'androidtools/framework_classes.v'
 		live := os.read_file('tests/native-android-tools/' + file)!
-		os.write_file(base + '/framework/sources/' + file, replace_section(framework[file]!, live, 'fn framework_text_widgets(', '\nfn framework_check_widgets('))!
+		mut updated := replace_section(framework[file]!, live, 'fn framework_text_widgets(', '\nfn framework_check_widgets(')
+		if attempt == '270' { updated = replace_section(updated, live, 'fn framework_check_widgets(', '') }
+		os.write_file(base + '/framework/sources/' + file, updated)!
 	} else if attempt in ['264', '266'] {
 		for spec in [['androidtools/framework_geometry.v', 'fn framework_view_geometry(', '\nfn framework_viewgroup_clipping('], ['androidtools/framework_view_canvas.v', 'fn framework_view_canvas(', ''], ['androidtools/framework_classes.v', 'fn framework_text_widgets(', '\nfn framework_check_widgets(']] {
 			live := os.read_file('tests/native-android-tools/' + spec[0])!
