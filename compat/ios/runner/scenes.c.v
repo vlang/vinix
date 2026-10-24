@@ -45,6 +45,10 @@ fn objc_responds(object u64, selector &char) bool {
 		if un_sound_unsupported(name) { return native_method(read64(object), name) != 0 }
 		if un_sound_types('UNNotificationSound', object in ios_runtime.classes, name) != none { return true }
 	}
+	if un_attachment_family(formatter_cls) {
+		if un_attachment_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if un_attachment_types('UNNotificationAttachment', object in ios_runtime.classes, name) != none { return true }
+	}
 	if un_content_family(formatter_cls) {
 		if un_content_unsupported(name) { return native_method(read64(object), name) != 0 }
 		if un_content_types((ios_runtime.classes[formatter_cls] or { return false }).name, object in ios_runtime.classes, name) != none { return true }

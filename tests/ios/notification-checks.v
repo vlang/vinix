@@ -14,13 +14,16 @@ fn run(out string, label string, args []string, deterministic bool) {
 	p.set_environment(env); p.run(); output := p.stdout_slurp(); p.wait(); code := p.code; p.close()
 	os.write_file(out + '/' + label + '.log', 'COMMAND: ' + args.map(os.quoted_path(it)).join(' ') + '\n' + output) or { panic(err) }
 	os.write_file(out + '/' + label + '.status.txt', code.str() + '\n') or { panic(err) }
-	assert code == 0 && !output.contains('runtime error:') && !output.contains('ERROR: AddressSanitizer') && !output.contains('V panic:') && !output.contains('> assert '), output
+	if code != 0 || output.contains('runtime error:') || output.contains('ERROR: AddressSanitizer') || output.contains('V panic:') || output.contains('> assert ') {
+		eprintln(output)
+		exit(1)
+	}
 	println(label + ': PASS')
 }
 fn main() {
-	assert os.args.len == 3
+	if os.args.len != 3 { panic('usage: notification-checks MODE EXTERNAL_BUNDLE') }
 	root := os.real_path(os.getwd()); out := os.abs_path(os.args[2]); old := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
-	assert out != root && !out.starts_with(root + "/")
+	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
 	if os.args[1] == 'inspect' {
 		run(out, 'inspect', [out + '/inspect-user-notifications', '--bundle', out], false)
@@ -30,9 +33,13 @@ fn main() {
 		run(out, 'inspect', [out + '/inspect-notification-sound'], false)
 	} else if os.args[1] == 'sound-metadata-inspect' {
 		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'UNNotificationSound'], false)
-	} else if os.args[1] in ['host', 'content-host', 'sound-host']! {
+	} else if os.args[1] == 'attachment-inspect' {
+		run(out, 'inspect', [out + '/inspect-notification-attachment'], false)
+	} else if os.args[1] == 'attachment-metadata-inspect' {
+		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'UNNotificationAttachment'], false)
+	} else if os.args[1] in ['host', 'content-host', 'sound-host', 'attachment-host']! {
 		content := os.args[1] == 'content-host'
-		fixture := if content { 'un_notification_content_test.v' } else if os.args[1] == 'sound-host' { 'un_notification_sound_test.v' } else { 'un_notification_center_test.v' }
+		fixture := if content { 'un_notification_content_test.v' } else if os.args[1] == 'sound-host' { 'un_notification_sound_test.v' } else if os.args[1] == 'attachment-host' { 'un_notification_attachment_test.v' } else { 'un_notification_center_test.v' }
 		cfile := out + '/payload/center-host.c'; bundle := out + "/NotificationChecks.app/Contents"
 		os.mkdir_all(bundle + "/MacOS")!
 		os.write_file(bundle + "/Info.plist", "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>org.vinix.notification-checks</string><key>CFBundleExecutable</key><string>center-host</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>")!

@@ -70,6 +70,7 @@ fn compile_c(root string, generated string, output string, gles bool) {
 
 fn native_fixture_source(item string) string {
 	return match item {
+		'notification-attachment-checks' { 'un_notification_attachment_test.v' }
 		'notification-sound-checks' { 'un_notification_sound_test.v' }
 		'notification-content-checks' { 'un_notification_content_test.v' }
 		'notification-center-checks' { 'un_notification_center_test.v' }
@@ -81,8 +82,8 @@ fn native_fixture_source(item string) string {
 }
 
 fn build(root string, out string, only string) {
-	assert only in ['notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']!
-	for item in ['notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
+	if only !in ['notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! { panic('unknown notification build target') }
+	for item in ['notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -144,6 +145,7 @@ fn vm(root string, out string, mode string) {
 		copy_file(out + '/notification-center-checks', fs + '/opt/ios/notification-center-checks')
 		copy_file(out + '/notification-content-checks', fs + '/opt/ios/notification-content-checks')
 		copy_file(out + '/notification-sound-checks', fs + '/opt/ios/notification-sound-checks')
+		copy_file(out + '/notification-attachment-checks', fs + '/opt/ios/notification-attachment-checks')
 		tree(root+'/build/ios/fortnite/staging/usr/lib/vinix/ios-gles',fs+'/usr/lib/vinix/ios-gles')
 	} else {
 		os.mkdir_all(fs + '/opt/ios') or { panic(err) }
@@ -220,15 +222,15 @@ fn vm(root string, out string, mode string) {
 
 
 fn main() {
-	assert os.args.len == 3
+	if os.args.len != 3 { panic('usage: notification-vm MODE EXTERNAL_BUNDLE') }
 	root := os.real_path(os.getwd())
-	assert os.getenv('VINIX_IOS_CHECK_NAME') == 'notification-center-checks'
+	if os.getenv('VINIX_IOS_CHECK_NAME') != 'notification-center-checks' { panic('run through notification-checks') }
 	out := os.abs_path(os.args[2])
-	assert out != root && !out.starts_with(root + "/")
+	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out) or { panic(err) }
 	mode := os.args[1]
-	assert mode in ['build', 'notifications', 'probe', 'audit', 'static-audit']!
+	if mode !in ['build', 'notifications', 'probe', 'audit', 'static-audit']! { panic('invalid notification mode') }
 	if mode == 'build' {
-		for item in ['notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks', 'native-init', 'run-ios', 'run-ios-gles']! { build(root, out, item) }
+		for item in ['notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks', 'native-init', 'run-ios', 'run-ios-gles']! { build(root, out, item) }
 	} else { vm(root, out, mode) }
 }

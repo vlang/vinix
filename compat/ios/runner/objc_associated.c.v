@@ -42,6 +42,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	un_trigger := value in ios_runtime.objects && obj_header(value).un_trigger_owned
 	un_request := value in ios_runtime.objects && obj_header(value).un_request_owned
 	un_sound := value in ios_runtime.objects && obj_header(value).un_sound_owned
+	un_attachment := value in ios_runtime.objects && obj_header(value).un_attachment_owned
 	un_center := value in ios_runtime.objects && obj_header(value).un_center_owned
 	un_content := value in ios_runtime.objects && obj_header(value).un_content != unsafe { nil }
 	query_item := value in ios_runtime.objects && obj_header(value).url_query_item_owned
@@ -57,6 +58,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if un_trigger || un_trigger_family(cls) { return un_trigger_copy(value) }
 	if un_request || un_request_family(cls) { return un_request_copy(value) }
 	if un_sound || un_sound_family(cls) { return un_sound_copy(value) }
+	if un_attachment || un_attachment_family(cls) { return un_attachment_copy(value) }
 	if un_center || un_center_family(cls) { panic('iOS: user notification center copying is not implemented') }
 	if un_content || un_content_family(cls) { return un_content_copy(value, false) }
 	if query_item || ns_url_query_item_family(cls) { return ns_url_query_item_copy(value) }
