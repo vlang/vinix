@@ -18,6 +18,8 @@ const qualified276_pin = '37bfa8ec3449adf8a294e0b1f3ff3cabfa49123c228f308d9919ca
 const prepared278_root = '/Users/alex/.local/state/vinix/android/compound278-2026-10-25'
 const prepared278_pin = 'aa10e659faf39ab1a9b4bf01d2dde791f4ab1fbb9eff007d71e8226fce370995'
 const prepared278_jar = 'a1b839c77a575a40ddab8d6e264e92c9abcc9de54ae6c3dcefcc0e725c938eba'
+const tooltip277 = "java.lang.NoSuchMethodError: No virtual method getTooltipText()Ljava/lang/CharSequence; in class Lcom/google/android/material/floatingactionbutton/ExtendedFloatingActionButton; or its super classes (declaration of 'com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton' appears in /opt/android-test/application.apk!classes8.dex)"
+const exit277 = 'APK-SUITE-EXIT id=google-maps code=1 native_observed=true gtk_x11_absent=true'
 
 struct Frame {
 	path string
@@ -123,6 +125,29 @@ fn observation(source string) string { return source.all_after('fn observation('
 fn classifier_equal(original string, suite string) ! {
 	if observation(original).len <= 1000 || observation(original) != observation(suite)
 		|| sha256.sum(observation(original).bytes()).hex() != classifier_pin { return error('original observation classifier differs') }
+}
+
+// Maps277 exited before its configured window. Retain that exact failed run,
+// without changing the application classifier or other replays' live window.
+fn observation_window(run string, build string, app map[string]json2.Any, serial string) ! {
+	if app['startup_timeout_seconds']!.int() != 420 { return error('configured observation window differs') }
+	if run == '277' && build == '276' {
+		if app['observation_elapsed_seconds']!.int() != 262 || !app['process_exited']!.bool()
+			|| !app['qemu_alive_before_capture']!.bool() || !app['backend_ready']!.bool()
+			|| !app['native_maps_observed']!.bool() || app['outcome']!.str() != 'startup_failed'
+			|| app['functional_passed']! !is json2.Null {
+			return error('Maps277 failed-run observation differs')
+		}
+		markers := app['failure_markers']!.as_array().map(it.str())
+		for marker in ['ANDROID-WS-FAIL main looper', tooltip277, exit277] {
+			if marker !in markers || marker !in serial.split_into_lines() {
+				return error('Maps277 missing exact failure marker: ' + marker)
+			}
+		}
+		return
+	}
+	if app['observation_elapsed_seconds']!.int() < 420 || !app['qemu_alive_before_capture']!.bool()
+		|| app['process_exited']!.bool() { return error('complete live observation window required') }
 }
 fn logical(path string, repo string) string { return if path.starts_with(repo + '/') { path.all_after(repo + '/') } else { path } }
 fn verify_start(start map[string]string, pins map[string]string, expected []string) ! {
@@ -313,8 +338,7 @@ fn validate(root string, entries map[string]string) !map[string]json2.Any {
 	assert apps.len == 1
 	app := apps[0].as_map()
 	assert app['id']!.str() == 'google-maps' && app['package']!.str() == 'com.google.android.apps.maps'
-	assert app['startup_timeout_seconds']!.int() == 420 && app['observation_elapsed_seconds']!.int() >= 420
-	assert app['qemu_alive_before_capture']!.bool() && !app['process_exited']!.bool()
+	observation_window(run, build, app, os.read_file(state + '/serial.log')!)!
 	for key, value in object(state + '/observation-before-capture.json')! { assert json2.encode(value) == json2.encode(app[key]!), key }
 	assert gzip.decompress(os.read_bytes(state + '/serial.log.gz')!)! == os.read_bytes(state + '/serial.log')!
 	assert entries['run/google-maps/serial.log']! == app['serial_sha256']!.str()
@@ -467,6 +491,56 @@ fn self_test(original_path string) ! {
 	ids('275', '274')!
 	ids('277', '276')!
 	ids('279', '278')!
+	failed277 := {
+		'startup_timeout_seconds': json2.Any(420)
+		'observation_elapsed_seconds': json2.Any(262)
+		'process_exited': json2.Any(true)
+		'qemu_alive_before_capture': json2.Any(true)
+		'backend_ready': json2.Any(true)
+		'native_maps_observed': json2.Any(true)
+		'outcome': json2.Any('startup_failed')
+		'functional_passed': json2.Any(json2.Null{})
+		'failure_markers': json2.Any([json2.Any('ANDROID-WS-FAIL main looper'), json2.Any(tooltip277), json2.Any(exit277)])
+	}
+	failed_serial := 'ANDROID-WS-FAIL main looper\n' + tooltip277 + '\n' + exit277 + '\n'
+	observation_window('277', '276', failed277, failed_serial)!
+	for key, value in {
+		'startup_timeout_seconds': json2.Any(419)
+		'observation_elapsed_seconds': json2.Any(263)
+		'process_exited': json2.Any(false)
+		'qemu_alive_before_capture': json2.Any(false)
+		'backend_ready': json2.Any(false)
+		'native_maps_observed': json2.Any(false)
+		'outcome': json2.Any('passed')
+		'functional_passed': json2.Any(true)
+	} {
+		mut changed := json2.decode[map[string]json2.Any](json2.encode(failed277))!
+		changed[key] = value
+		rejected = false
+		observation_window('277', '276', changed, failed_serial) or { rejected = true }
+		assert rejected, key
+	}
+	for marker in ['ANDROID-WS-FAIL main looper', tooltip277, exit277] {
+		mut changed := json2.decode[map[string]json2.Any](json2.encode(failed277))!
+		changed['failure_markers'] = json2.Any(failed277['failure_markers']!.as_array().filter(it.str() != marker))
+		rejected = false
+		observation_window('277', '276', changed, failed_serial) or { rejected = true }
+		assert rejected, marker
+		rejected = false
+		observation_window('277', '276', failed277, failed_serial.replace(marker, '')) or { rejected = true }
+		assert rejected, marker
+	}
+	rejected = false
+	observation_window('279', '278', failed277, failed_serial) or { rejected = true }
+	assert rejected
+	mut live := json2.decode[map[string]json2.Any](json2.encode(failed277))!
+	live['observation_elapsed_seconds'] = json2.Any(420)
+	live['process_exited'] = json2.Any(false)
+	observation_window('275', '274', live, '')!
+	observation_window('279', '278', live, '')!
+	rejected = false
+	observation_window('277', '276', live, failed_serial) or { rejected = true }
+	assert rejected
 	assert build_labels('276') == ['generate-native', 'build-native']
 	assert build_labels('278') == ['build-framework-compiler', 'build-framework', 'fixture-compiler', 'fixture']
 	assert build_labels('274').len == 6
@@ -485,7 +559,7 @@ fn self_test(original_path string) ! {
 	assert rejected
 	probe := os.exec([os.executable(), '--assertion-probe'])
 	assert probe.exit_code != 0 && probe.output.contains('assert false')
-	println('MAPS REPLAY EVIDENCE SELF-TEST PASS changed/missing bytes, links/directories, malformed PNG, classifier mutation, missing/changed launch pins, wrong bundle pin, invalid IDs and live assertions; fixture=' + root)
+	println('MAPS REPLAY EVIDENCE SELF-TEST PASS changed/missing bytes, links/directories, malformed PNG, classifier mutation, missing/changed launch pins, wrong bundle pin, exact failed277 and negative failure markers/window, unchanged live windows, invalid IDs and live assertions; fixture=' + root)
 }
 
 fn main() {
