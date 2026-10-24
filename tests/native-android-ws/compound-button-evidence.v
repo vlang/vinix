@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Audit a complete external CompoundButton regression bundle, never a partial
 // export. Pin sha256.json with the digest published in the committed report.
+// Build without -prod: these assertions are the audit checks.
 module main
 
 import compress.gzip
@@ -149,6 +150,10 @@ fn verify_runs(root string) ! {
 }
 
 fn main() {
+	$if prod {
+		eprintln('compound-button-evidence requires assertions; build without -prod')
+		exit(2)
+	}
 	if os.args.len != 4 || os.args[1] != 'check' {
 		panic('usage: compound-button-evidence check BUNDLE SHA256_OF_sha256.json')
 	}
