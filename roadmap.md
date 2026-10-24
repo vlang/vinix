@@ -1837,6 +1837,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   suites pass per architecture. See
   [the output-prefix qualification](docs/linux-pending-signal-output.md).
 
+- [x] Consume the selected native rt_sigtimedwait signal on output EFAULT and
+  acknowledge consumed POSIX timer notifications, allowing later periodic
+  delivery without rearming. Qualify blocked bystanders, mask preservation,
+  empty waits and successful output controls. Identical musl ELFs pass 1,488
+  checks on both production architectures and Linux; originals fail 244 each.
+  All nine maintained suites pass per architecture. See
+  [the signal-copy qualification](docs/linux-signal-wait-copy.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

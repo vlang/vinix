@@ -2469,3 +2469,19 @@ negative controls), then `check` on the complete external bundle documented
 in the [output-prefix qualification](../../docs/linux-pending-signal-output.md).
 Signal delivery races, queued payloads, timed waits and GNU/foreign/32-bit
 paths remain separate qualifications.
+
+The `sigwaitcopy` case checks native rt_sigtimedwait output EFAULT consumption,
+blocked bystanders and masks, empty-wait pointer bypass, successful output
+controls and periodic POSIX timer acknowledgement without rearming. Root and
+UID 1000/GID 2000 cohorts use identical musl ELFs on both production kernels
+and Linux 6.12.51: 1,488 checks pass; original kernels fail 244 checks each. Run
+`--cases sigwaitcopy,sigpending,randomsignal,clonesignal,cloneclear,seccomp,runtime,futex,jit`
+with a fresh state directory. All nine suites pass per architecture.
+
+`sigwaitcopy-reference.v` accepts the same arguments as `sigpending-reference.v`.
+Its `--self-test` has two positive and nine negative controls. Compile
+`sigwaitcopy-evidence.v` without `-prod`, run `self-test` (five positive and 23
+negative controls), then `check` on the complete external bundle documented
+in the [signal-copy qualification](../../docs/linux-signal-wait-copy.md).
+Selection priority, concurrent delivery/copy races, queued payloads and
+GNU/foreign/32-bit paths remain separate qualifications.

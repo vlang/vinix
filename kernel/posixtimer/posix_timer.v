@@ -419,8 +419,8 @@ pub fn syscall_timer_delete(_ voidptr, timer_id int) (u64, u64) {
 }
 
 // Signal delivery asks for this after it atomically claims the pending bit.
-// Leaving the metadata in place until acknowledge_signal() also means an
-// EFAULT while writing siginfo_t can put the signal back without losing it.
+// Keep metadata until acknowledge_signal() so siginfo_t can be constructed
+// before consumption is acknowledged, including when its output copy faults.
 pub fn signal_info(thrd &proc.Thread, signum int) SignalInfo {
 	if signum <= 0 || signum > 64 {
 		return SignalInfo{}

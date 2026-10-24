@@ -310,13 +310,11 @@ pub fn syscall_rt_sigtimedwait(_ voidptr, set_ptr u64, info_ptr u64, timeout_ptr
 	for {
 		which, shared := take_wait_signal(mut current_thread, wanted)
 		if which != -1 {
-			if info_ptr != 0 && !write_signal_info(info_ptr, current_thread, which, shared) {
-				// Hand the signal back rather than losing it.
-				if shared { requeue_shared_signal(mut current_thread.process, which) }
-				else { katomic.bts(mut &current_thread.pending_signals, u8(which - 1)) }
-				return errno.err, errno.efault
-			}
+			// Linux consumes the selected signal even when copying siginfo_t
+			// faults. Read timer metadata before acknowledging that consumption.
+			copied := info_ptr == 0 || write_signal_info(info_ptr, current_thread, which, shared)
 			if !shared { posixtimer.acknowledge_signal(mut current_thread, which) }
+			if !copied { return errno.err, errno.efault }
 			return u64(which), 0
 		}
 
