@@ -703,16 +703,28 @@ fn operate(id i32, user_operations u64, count u32, timeout_address u64) (u64, u6
     // Reject an invalid semaphore anywhere in the copied vector before
     // retaining its frame in the queue, including after a potential blocker.
     mut alter := false
+    mut needs_undo := false
     for i in 0 .. int(count) {
         if int(operations[i].number) >= set.values.len {
             sets_lock.release()
             return errno.err, errno.efbig
         }
-        if operations[i].operation != 0 { alter = true }
+        if operations[i].operation != 0 {
+            alter = true
+            if int(operations[i].flags) & sem_undo != 0 { needs_undo = true }
+        }
     }
     if !may_use(&who, set, if alter { u32(2) } else { u32(4) }) {
         sets_lock.release()
         return errno.err, errno.eacces
+    }
+    // Exit-time adjustments and CLONE_SYSVSEM sharing are not implemented.
+    // Refuse the entire vector before evaluating, committing or queuing it:
+    // silently ignoring SEM_UNDO lets applications lose their recovery lock.
+    // A zero operation has no adjustment to undo and remains a normal wait.
+    if needs_undo {
+        sets_lock.release()
+        return errno.err, errno.eopnotsupp
     }
     pid := proc.current_thread().process.pid
     mut proposed := [max_sems]int{}

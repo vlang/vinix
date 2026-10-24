@@ -2326,3 +2326,19 @@ the [retained update evidence](results/2026-10-23/priochange-evidence).
 The audit checks source/build identities, same-ELF results, eight maintained
 suites and eleven negative controls. Namespace, race, zombie, mixed-error,
 restricted MAC and GNU/foreign/ELF32 qualifications remain open.
+
+The `semundo` case checks explicit EOPNOTSUPP for value-changing SEM_UNDO
+vectors, earlier validation errors, unchanged metadata/wait counts and ordinary
+zero waits. Both production architectures pass 1,643 checks. The same probe
+ELFs run with `--reference` on Linux 6.12.51 and pass 71 checks including real
+exit-time restoration; original Vinix kernels fail 12 checks each. Run
+`--cases semundo,semns,cloneipc,procns,semwait,seminfo,semmeta,semperm,semrange,semarray,sempid,semword,semabi`
+with a fresh state directory.
+
+`semundo-reference.v` accepts the same Linux-reference arguments as
+`semabi-reference.v`, with optional `--launcher` for a prebuilt reference init.
+Its `--self-test` has two positive and nine negative controls. Compile
+`semundo-evidence.v` without `-prod`, run `self-test` (five positive and 23
+negative controls), then `check` on the external bundle documented in the
+[refusal qualification](../../docs/linux-semaphore-undo.md). Full SEM_UNDO
+remains unsupported; the explicit refusal does not qualify Linux undo semantics.

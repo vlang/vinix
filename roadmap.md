@@ -1776,6 +1776,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   storage after warmed teardown of 200 arrays. Preserve failures and limits in
   [the namespace qualification](docs/linux-semaphore-namespaces.md).
 
+- [x] Refuse value-changing native SEM_UNDO vectors with EOPNOTSUPP instead of
+  silently accepting operations without exit-time restoration. Preserve earlier
+  index/access errors, unchanged state and ordinary zero waits. Both production
+  architectures pass 1,643 controls; identical Linux ELFs pass 71 reference checks
+  and original kernels fail 12 each. Full undo semantics remain unsupported.
+  See [the refusal qualification](docs/linux-semaphore-undo.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
