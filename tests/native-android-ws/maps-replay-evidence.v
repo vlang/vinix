@@ -13,6 +13,8 @@ const frozen_pin = '7b602e16397db66cb23df41e421238656d0e1d493f29e2fb71683d7c33e1
 const classifier_pin = '47f1d9a78bfb2991f9802ebebc95436505160f7e551e1e77d4d95a171c63946b'
 const jar = 'opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/api-impl.jar'
 const native = 'opt/vinix-android-aarch64/usr/lib/art/libvinix-android-native.so'
+const qualified276_root = '/Users/alex/.local/state/vinix/android/compound276-2026-10-24'
+const qualified276_pin = '37bfa8ec3449adf8a294e0b1f3ff3cabfa49123c228f308d9919cab7531d5fa4'
 
 struct Frame {
 	path string
@@ -146,6 +148,34 @@ fn qemu_arguments(config map[string]json2.Any, repo string) []string {
 		'-display', 'none', '-monitor', 'none', '-serial', 'file:' + state + '/serial.log']
 }
 
+fn build_labels(build string) []string {
+	return if build == '276' { ['generate-native', 'build-native'] }
+		else { ['build-framework-compiler', 'build-framework', 'generate-native', 'build-native', 'fixture-compiler', 'fixture'] }
+}
+
+// Complete276 qualification stays independently sealed. Verify the exact
+// source/artifact/receipt subset consumed by this fresh Maps replay.
+fn qualified276(root string, entries map[string]string, paired string) ! {
+	prefix := 'prelaunch/prelaunch/'
+	regular_files(entries, [prefix + 'qualified-build-sha256.json', prefix + 'qualified-build-reference.json'])!
+	if entries[prefix + 'qualified-build-sha256.json']! != qualified276_pin { return error('wrong qualified276 manifest pin') }
+	archived := read_map(root + '/' + prefix + 'qualified-build-sha256.json')!
+	reference := object(root + '/' + prefix + 'qualified-build-reference.json')!
+	assert reference['root']!.str() == qualified276_root && reference['manifest_sha256']!.str() == qualified276_pin
+	copy_prefix := prefix + 'replica/' + paired + '/'
+	for name in ['framework', 'native'] {
+		equal_maps(subtree(entries, copy_prefix + name), subtree(archived, 'prelaunch/' + name))!
+	}
+	for label in build_labels('276') {
+		for suffix in ['-before.json', '-receipt.json', '.log'] {
+			path := label + suffix
+			assert entries[copy_prefix + path]! == archived['prelaunch/' + path]!, path
+		}
+	}
+	assert entries[copy_prefix + 'framework/api-impl.jar']! == '1a026975748c693f11c09c7fc080f8b72c20c0638c01996f226698cc740f92f6'
+	assert entries[copy_prefix + 'native/libvinix-android-native.so']! == '5fe27a87c179b97121c368f417936ceebb75752c4a4204b937312ee28da531ca'
+}
+
 // Checks fresh source/artifact/launch relations; no historical archive replay.
 fn validate(root string, entries map[string]string) !map[string]json2.Any {
 	regular_files(entries, ['collection.json', 'prelaunch/prelaunch-sha256.json', 'run/results.json', 'run/google-maps/start-receipt.json',
@@ -211,7 +241,8 @@ fn validate(root string, entries map[string]string) !map[string]json2.Any {
 		directory := if kind == 'framework' { 'sources/' } else { 'atlframework/' }
 		for path, digest in sources { assert entries[prefix + directory + path]! == digest, path }
 	}
-	for label in ['build-framework-compiler', 'build-framework', 'generate-native', 'build-native', 'fixture-compiler', 'fixture'] {
+	if build == '276' { qualified276(root, entries, paired)! }
+	for label in build_labels(build) {
 		regular_files(entries, [replica + paired + '/' + label + '-receipt.json', replica + paired + '/' + label + '-before.json'])!
 		built := object(root + '/' + replica + paired + '/' + label + '-receipt.json')!
 		assert built['exit_code']!.int() == 0 && built['completed_utc']!.str() != ''
@@ -389,6 +420,13 @@ fn self_test(original_path string) ! {
 	check(root, 'f'.repeat(64)) or { rejected = true }
 	assert rejected
 	ids('275', '274')!
+	ids('277', '276')!
+	assert build_labels('276') == ['generate-native', 'build-native']
+	assert build_labels('274').len == 6
+	rejected = false
+	qualified276(root, {'prelaunch/prelaunch/qualified-build-sha256.json': 'f'.repeat(64),
+		'prelaunch/prelaunch/qualified-build-reference.json': '0'.repeat(64)}, base + 'compound276') or { rejected = true }
+	assert rejected
 	rejected = false
 	ids('275', '272') or { rejected = true }
 	assert rejected

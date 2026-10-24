@@ -42,7 +42,48 @@ fn selected(template string, run string, paired string, source_pins map[string]s
 	source = once(source, 'Chip checkbox overlays are the visual target; suggestion circles remain separate.', 'Visual behavior requires inspection of this fresh run.')!
 	source = once(source, '\tif os.args.len == 3 && os.args[1] == \'--self-test\'', "\tif os.args.len == 2 && os.args[1] == '--hash-stdin' { println(stream_hash() or { eprintln(err); exit(1) }); return }\n\tif os.args.len == 3 && os.args[1] == '--self-test'")!
 	source = once(source, "\tprintln('MAPS" + run + " HELPER SELF-TEST PASS", "\tarchive_stream_fixture()!\n\tprintln('MAPS" + run + " HELPER SELF-TEST PASS")!
+	if paired == '276' { source = qualified276(source)! }
 	return source + stream_helpers()
+}
+
+// Native-only276 has a complete sealed qualification. Reuse its exact inputs
+// without inventing the earlier full-build framework and fixture receipts.
+fn qualified276(source string) !string {
+	full_labels := "['build-framework-compiler', 'build-framework', 'generate-native', 'build-native', 'fixture-compiler', 'fixture']"
+	mut result := once(source, 'for label in ' + full_labels, "qualified_manifest := qualified276_inputs(compound)!\n\tfor label in ['generate-native', 'build-native']")!
+	full_names := '["framework", "native", "baseline-framework", "baseline-native", "inputs", "source", "closure-inputs", "build-framework", "build-framework.v", "frozen-inputs.json", "framework-v-files.json", "framework-v-files.txt", "native-generator-v-files.json", "native-generator-v-files.txt", "fixture-v-files.json", "fixture-v-files.txt"]'
+	result = once(result, 'for name in ' + full_names, 'for name in ["framework", "native"]')!
+	result = once(result, 'for label in ' + full_labels.replace("'", '"'), 'for label in ["generate-native", "build-native"]')!
+	result = once(result, '\tmut retained := map[string]string{}', '\tclone(qualified276_root + "/sha256.json", external + "/prelaunch/qualified-build-sha256.json")!\n\twrite_json(external + "/prelaunch/qualified-build-reference.json", {"root": qualified276_root, "manifest_sha256": qualified276_pin, "scope": "qualified native-only276; unchanged274 JAR; complete historical evidence remains at root"})!\n\tmut retained := map[string]string{}')!
+	result = once(result, '\twrite_json(external + "/prelaunch-sha256.json", retained)!', '\tfor path, digest in retained {\n\t\tprefix := "replica/" + compound + "/"\n\t\tif path.starts_with(prefix) && qualified_manifest["prelaunch/" + path.all_after(prefix)]! != digest { return error("retained qualified276 input differs: " + path) }\n\t}\n\tif retained["qualified-build-sha256.json"]! != qualified276_pin { return error("retained qualified276 manifest differs") }\n\twrite_json(external + "/prelaunch-sha256.json", retained)!')!
+	return result + qualified276_helpers()
+}
+
+fn qualified276_helpers() string {
+	return '
+const qualified276_root = "/Users/alex/.local/state/vinix/android/compound276-2026-10-24"
+const qualified276_pin = "37bfa8ec3449adf8a294e0b1f3ff3cabfa49123c228f308d9919cab7531d5fa4"
+
+fn qualified276_inputs(root string) !map[string]string {
+	if styled_hash(qualified276_root + "/sha256.json")! != qualified276_pin { return error("wrong qualified276 manifest pin") }
+	archived := read_map(qualified276_root + "/sha256.json")!
+	for name in ["framework", "native"] {
+		mut expected := map[string]string{}
+		prefix := "prelaunch/" + name + "/"
+		for path, digest in archived { if path.starts_with(prefix) && digest.len == 64 { expected[path.all_after(prefix)] = digest } }
+		equal_maps(files(root + "/" + name)!, expected)!
+	}
+	for label in ["generate-native", "build-native"] {
+		for suffix in ["-before.json", "-receipt.json", ".log"] {
+			path := label + suffix
+			if styled_hash(root + "/" + path)! != archived["prelaunch/" + path]! { return error("qualified276 receipt differs: " + path) }
+		}
+	}
+	if styled_hash(root + "/framework/api-impl.jar")! != "1a026975748c693f11c09c7fc080f8b72c20c0638c01996f226698cc740f92f6"
+		|| styled_hash(root + "/native/libvinix-android-native.so")! != "5fe27a87c179b97121c368f417936ceebb75752c4a4204b937312ee28da531ca" { return error("qualified276 overlay identity differs") }
+	return archived
+}
+'
 }
 
 fn compact_retention() string {
@@ -136,7 +177,7 @@ fn archive_stream_fixture() ! {
 
 fn self_test(template string) ! {
 	pins := {'framework': '0'.repeat(64), 'native': '1'.repeat(64)}
-	for run, paired in {'273': '272', '275': '274'} {
+	for run, paired in {'273': '272', '275': '274', '277': '276'} {
 		source := selected(template, run, paired, pins)!
 		assert source.contains("const target = base + 'maps" + run + "'")
 		assert source.contains("const compound = base + 'compound" + paired + "'")
@@ -145,7 +186,10 @@ fn self_test(template string) ! {
 		assert !source.contains("archive_readback('before'") && !source.contains("archive_readback('after'")
 		assert !source.contains('clone(frozen + \'/inputs\',')
 		assert source.contains('retained launch input differs: ')
-		assert source.contains('baseline-framework') && source.contains('baseline-native')
+		if paired == '276' {
+			assert source.contains('qualified276_inputs(compound)!') && source.contains('qualified-build-sha256.json')
+			assert !source.contains('for label in [\'build-framework-compiler\'')
+		} else { assert source.contains('baseline-framework') && source.contains('baseline-native') }
 		assert source.contains('1'.repeat(64)) && !source.contains("'native': 83")
 		for prefix in ['Maps', 'MAPS', 'maps', 'suite', 'attempt', 'styled'] { assert !source.contains(prefix + '271') }
 		for pin in ['7b602e16397db66cb23df41e421238656d0e1d493f29e2fb71683d7c33e1fb64', 'abd2dfbb01fddc83ffffae481b5d1fcab35b9ebd279f3f47abae237b00134208'] { assert source.contains(pin) }
@@ -161,7 +205,7 @@ fn self_test(template string) ! {
 	scratch := 'build/android-maps/maps-selector-selftest-' + os.getpid().str()
 	if os.exists(scratch) { return error('fresh selector self-test directory required') }
 	os.mkdir_all(scratch)!
-	write_selection(template, selected(template, '273', '272', pins)!, scratch + '/replay.v', pins)!
+	write_selection(template, selected(template, '277', '276', pins)!, scratch + '/replay.v', pins)!
 	build := os.exec(['/Users/alex/code/v/v_old', '-nocache', '-cc', 'cc', '-cflags', '-O2', '-o', scratch + '/replay', scratch + '/replay.v'])
 	os.write_file(scratch + '/build.log', build.output)!
 	if build.exit_code != 0 { return error('selected helper compilation failed: ' + build.output) }
