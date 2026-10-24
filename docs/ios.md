@@ -18717,23 +18717,39 @@ The shared attachment fixture passes against Apple UserNotifications and the V
 runtime under ASan+UBSan, normally and with deterministic Swift hashing. All ten
 ARM64 fixtures and runners build, and the focused guest passes all seven
 calendar and notification fixtures, including 39 attachment rejection cases.
-The fresh Fortnite probe resolves the attachment class and stops at
+That milestone's Fortnite probe resolved the attachment class and stopped at
 `_OBJC_CLASS_$_NSCache` in CoreFoundation during linking, before application
 entry. The [notification-attachment report](../tests/ios/notification-attachment-report.md)
 records the source revision, complete external archive, checksums and verification.
-The audits below use this attachment implementation and do not execute app code.
+
+The cache milestone adds bounded `NSCache` storage with Apple's measured 48-byte
+layout, copied names, retained keys and values, equality lookup, removal and
+thread-safe count/cost eviction. Limits are enforced strictly in FIFO order,
+with a hard ceiling of 4096 entries; Apple's limits are advisory. Nonzero
+delegates, discardable contents, coding and custom subclasses remain explicit
+failures.
+
+The shared cache fixture passes against Apple Foundation and the V runtime
+under ASan+UBSan, normally and with deterministic Swift hashing. All eleven
+ARM64 fixtures and runners build, and the focused guest passes all eight cache,
+calendar and notification fixtures, including 31 cache rejection cases. The
+fresh Fortnite probe resolves `NSCache` and stops at
+`_OBJC_CLASS_$_CTTelephonyNetworkInfo` in CoreTelephony during linking, before
+application entry. The [cache report](../tests/ios/cache-report.md) records the
+source revision, complete external archive, checksums and verification. The
+audits below use this cache implementation and do not execute app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,086 | 75 | 78 |
+| Fortnite executable | 2,087 | 74 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,926 | 78 | 114 |
+| All images | 2,927 | 77 | 114 |
 
-The C++/GLES/Text variant reports 2,940 resolved imports, 64 unresolved strong
+The C++/GLES/Text variant reports 2,941 resolved imports, 63 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -18811,7 +18827,8 @@ terminal, thread-policy, file timestamp, UUID, audio-session constant,
 URL session, session configuration, recursive lock, invocation, invocation
 operation, date formatter, predicate, index set, URL query item, character set,
 scanner, user activity, notification queue, calendar, calendar notification trigger,
-notification request, notification center, keyed archive, keyed unarchive,
+notification request, notification center, notification content, notification
+sound, notification attachment, cache, keyed archive, keyed unarchive,
 sort descriptor, regular expression, mutable string, CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String
