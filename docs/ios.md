@@ -18663,7 +18663,7 @@ empty attachments and user-info collections, summary counts, interruption
 levels and relevance scores are supported. String behavior follows the native
 measurements: `launchImageName` and `subtitle` retain mutable inputs, their
 getters return immutable snapshots, and content copies freeze those values.
-Other string setters take immutable snapshots. Non-nil badge and sound objects,
+Other string setters take immutable snapshots. Non-nil badges, critical sounds,
 nonempty collections, custom subclasses, coding, providers and private service
 operations remain explicit failures. Notification delivery remains absent.
 
@@ -18677,25 +18677,47 @@ lifetimes. The focused ARM64 guest passes all five calendar and notification
 fixtures, including their 41/21/28/31/28 rejection cases. This does not establish
 full regression or Swift success.
 
-The new Fortnite probe resolves mutable notification content and stops at
+The content-only Fortnite probe resolves mutable notification content and stops at
 `_OBJC_CLASS_$_UNNotificationSound` in UserNotifications, before application
 entry, with process exit status 1. The
 [notification-content report](../tests/ios/notification-content-report.md)
 records the committed source revision, complete external evidence bundle,
-archive and checksums. The audits below use this content implementation and
-do not execute application code.
+archive and checksums.
+
+V now provides bounded ordinary `UNNotificationSound` values. Native Apple
+measurements establish the 104-byte NSObject layout, 15 ivars and method
+encodings. `defaultSound` and `soundNamed:` produce immutable values; named
+sounds snapshot UTF-8 input, and copies retain the same sound. Notification
+content and request snapshots retain these values. Nil names are supported.
+Critical alerts, ringtones, playback, coding and custom subclasses remain
+explicit failures; notification delivery is absent.
+
+The shared sound fixture passes against Apple UserNotifications and the V
+runtime under ASan+UBSan, normally and with deterministic Swift hashing; leak
+detection is disabled. Runtime checks include constructor lock handoff and
+failure, caller storage, changed-isa cleanup, associated copies, native
+overrides, 33 rejection cases and two drained lifetimes. All nine ARM64 fixtures
+and runners build, and the focused guest passes all six calendar and
+notification fixtures. This does not establish full regression or Swift success.
+
+The fresh Fortnite probe resolves the sound class and stops at
+`_OBJC_CLASS_$_UNNotificationAttachment` in UserNotifications, before application
+entry, with process exit status 1. The
+[notification-sound report](../tests/ios/notification-sound-report.md) records
+the source revision, complete external archive, checksums and verification.
+The audits below use this sound implementation and do not execute app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,084 | 77 | 78 |
+| Fortnite executable | 2,085 | 76 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,924 | 80 | 114 |
+| All images | 2,925 | 79 | 114 |
 
-The C++/GLES/Text variant reports 2,938 resolved imports, 66 unresolved strong
+The C++/GLES/Text variant reports 2,939 resolved imports, 65 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
