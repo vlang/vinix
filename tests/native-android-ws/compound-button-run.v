@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Frozen paired regression preparation (264/266 use262; 268/270 use266). Select the
+// Frozen paired regression preparation (264/266 use262; 268/270 use266; 272 use270). Select the
 // attempt with VINIX_COMPOUND_ATTEMPT (default258). Run each action
 // once from the repository root; run the two resulting suite/config pairs only
 // after preparation. Baseline APK and native runtime are preserved unchanged.
@@ -13,9 +13,9 @@ import time
 
 const attempt = os.getenv_opt('VINIX_COMPOUND_ATTEMPT') or { '258' }
 const base = 'build/android-maps/compound' + attempt
-const baseline_attempt = if attempt in ['268', '270'] { '266' } else if attempt in ['264', '266'] { '262' } else { '247' }
+const baseline_attempt = if attempt == '272' { '270' } else if attempt in ['268', '270'] { '266' } else if attempt in ['264', '266'] { '262' } else { '247' }
 const previous = 'build/android-maps/compound' + baseline_attempt
-const fixture_name = if attempt in ['268', '270'] { 'compound-text-fixture.v' } else if attempt in ['264', '266'] { 'widget-geometry-fixture.v' } else { 'compound-button-fixture.v' }
+const fixture_name = if attempt == '272' { 'path-fill-fixture.v' } else if attempt in ['268', '270'] { 'compound-text-fixture.v' } else if attempt in ['264', '266'] { 'widget-geometry-fixture.v' } else { 'compound-button-fixture.v' }
 const fixture_source = 'tests/native-android-ws/' + fixture_name
 const fixture_frozen = base + '/source/' + fixture_name
 const compiler = '/Users/alex/code/v/v_old'
@@ -160,13 +160,43 @@ fn freeze_geometry_native(native map[string]string) ! {
 	clone_file('build-support/android/nativews/bindings.txt', base + '/native/bindings.txt')!
 }
 
+fn freeze_path_native(native map[string]string) ! {
+	old := native['paths.v']!
+	live := os.read_file('build-support/android/nativews/paths.v')!
+	old_marker := 'fn ws_draw_path(pointer i64, paint_pointer i64) {'
+	new_marker := 'fn ws_draw_path(e voidptr, pointer i64, paint_pointer i64, fill_type i32) {'
+	section(old, old_marker, '')
+	new_body := section(live, new_marker, '')
+	os.write_file(base + '/native/atlframework/paths.v', old.all_before(old_marker) + new_body)!
+	previous_bindings := os.read_file(previous + '/native/bindings.txt')!
+	bindings := os.read_file('build-support/android/nativews/bindings.txt')!
+	old_row := 'android/atl/GskCanvas|native_drawPath|ws_draw_path(p1,p2)'
+	new_row := 'android/atl/GskCanvas|native_drawPath|ws_draw_path(e,p1,p2,p3)'
+	assert previous_bindings.count(old_row) == 1 && bindings.count(new_row) == 1
+	assert previous_bindings.replace(old_row, new_row) == bindings
+	generated := native['ws_generated.v']!
+	old_export := "@[export: 'Java_android_atl_GskCanvas_native_1drawPath__JJJ']\n"
+	next_export := "\n@[export: 'Java_android_atl_GskCanvas_finalize__']"
+	old_wrapper := section(generated, old_export, next_export)
+	old_signature := 'fn ws_binding_367(e voidptr, this voidptr, p0 i64, p1 i64, p2 i64)  {'
+	assert old_wrapper.count(old_signature) == 1 && old_wrapper.count('ws_draw_path(p1,p2)') == 1
+	new_wrapper := old_wrapper.replace(old_export, "@[export: 'Java_android_atl_GskCanvas_native_1drawPath__JJJI']\n").replace(old_signature, 'fn ws_binding_367(e voidptr, this voidptr, p0 i64, p1 i64, p2 i64, p3 i32)  {').replace('ws_draw_path(p1,p2)', new_row.all_after_last('|'))
+	os.write_file(base + '/native/atlframework/ws_generated.v', generated.replace(old_wrapper, new_wrapper))!
+	write_json(base + '/native/binding-rows.json', {'native_drawPath': new_row})!
+	clone_file('build-support/android/nativews/bindings.txt', base + '/native/bindings.txt')!
+}
+
 fn freeze() ! {
 	assert !os.exists(base + '/framework') && !os.exists(base + '/native')
 	write_json(base + '/attempt.json', {'attempt': attempt, 'VINIX_COMPOUND_ATTEMPT': os.getenv('VINIX_COMPOUND_ATTEMPT'), 'base': base, 'audit': audit, 'baseline_attempt': baseline_attempt, 'fixture_source': fixture_source, 'fixture_frozen': fixture_frozen})!
-	assert hash(previous + '/framework/api-impl.jar')! == if attempt in ['268', '270'] { '69f560aef5965acd2e4c1eba35a545dae5c8e48708695b0c747a1267d75643c3' } else if attempt in ['264', '266'] { 'a37ffeceffd29e7bd5db825e079949f5a6e3f71dd04edba8c61239bd1971b71c' } else { '73a10513135f9e264df9afdc7139c5370d67016d864be82fe0d6b2adba1f459b' }
-	assert hash(previous + '/native/libvinix-android-native.so')! == if attempt in ['268', '270'] { '0a9928b59585bc7e1d6518c22a9a388f5bb99e4f43f3c0838d6c1c47588fb680' } else if attempt in ['264', '266'] { '3bbc2d9439961be351f18e391f305ded393d7a10b67f1cf2e80adad2a6569b80' } else { '78893e6767c9398a7d6cb513f0f34b8536604afaa065e383f46cb98e9d003f37' }
+	assert hash(previous + '/framework/api-impl.jar')! == if attempt == '272' { 'b1364aa6d21f3293bef534a939cafa93bb4194e13deb9c0864bec7e9b18f9413' } else if attempt in ['268', '270'] { '69f560aef5965acd2e4c1eba35a545dae5c8e48708695b0c747a1267d75643c3' } else if attempt in ['264', '266'] { 'a37ffeceffd29e7bd5db825e079949f5a6e3f71dd04edba8c61239bd1971b71c' } else { '73a10513135f9e264df9afdc7139c5370d67016d864be82fe0d6b2adba1f459b' }
+	assert hash(previous + '/native/libvinix-android-native.so')! == if attempt == '272' { 'ce78582105a8e2e29e29d0fa843769549d5fa4deba02067b41749643bb4b0c32' } else if attempt in ['268', '270'] { '0a9928b59585bc7e1d6518c22a9a388f5bb99e4f43f3c0838d6c1c47588fb680' } else if attempt in ['264', '266'] { '3bbc2d9439961be351f18e391f305ded393d7a10b67f1cf2e80adad2a6569b80' } else { '78893e6767c9398a7d6cb513f0f34b8536604afaa065e383f46cb98e9d003f37' }
 	framework := snapshot('framework', 125)!
-	if attempt in ['268', '270'] {
+	if attempt == '272' {
+		file := 'androidtools/framework_paths.v'
+		live := os.read_file('tests/native-android-tools/' + file)!
+		os.write_file(base + '/framework/sources/' + file, replace_section(framework[file]!, live, 'fn framework_paths(', ''))!
+	} else if attempt in ['268', '270'] {
 		file := 'androidtools/framework_classes.v'
 		live := os.read_file('tests/native-android-tools/' + file)!
 		mut updated := replace_section(framework[file]!, live, 'fn framework_text_widgets(', '\nfn framework_check_widgets(')
@@ -187,7 +217,7 @@ fn freeze() ! {
 	os.write_file(base + '/framework/sources/' + file, old.all_before(marker) + marker + live.all_after(marker))!
 	}
 	native := snapshot('native', 83)!
-	if attempt in ['268', '270'] {
+	if attempt == '272' { freeze_path_native(native)! } else if attempt in ['268', '270'] {
 		live := os.read_file('build-support/android/nativews/ws_views.v')!
 		os.write_file(base + '/native/atlframework/ws_views.v', replace_section(native['ws_views.v']!, live, 'fn ws_draw_content(', '\nfn ws_draw_children('))!
 		binding_hash := json2.decode[map[string]string](os.read_file(previous + '/frozen-inputs.json')!)!['build-support/android/nativews/bindings.txt']!
@@ -217,7 +247,9 @@ fn freeze() ! {
 		}
 		assert sources.len == count
 		delta.sort()
-		expected := if attempt in ['268', '270'] {
+		expected := if attempt == '272' {
+			if kind == 'framework' { ['androidtools/framework_paths.v'] } else { ['paths.v', 'ws_generated.v'] }
+		} else if attempt in ['268', '270'] {
 			if kind == 'framework' { ['androidtools/framework_classes.v'] } else { ['ws_views.v'] }
 		} else if attempt in ['264', '266'] {
 			if kind == 'framework' { ['androidtools/framework_classes.v', 'androidtools/framework_geometry.v', 'androidtools/framework_view_canvas.v'] } else { ['ws_generated.v', 'ws_views.v'] }
@@ -256,6 +288,9 @@ fn freeze() ! {
 	}
 	if attempt in ['268', '270'] {
 		for path in ['build-support/android/nativews/ws_views.v', 'build-support/android/nativews/bindings.txt', previous + '/native/bindings.txt'] { inputs[path] = hash(path)! }
+	}
+	if attempt == '272' {
+		for path in ['tests/native-android-tools/androidtools/framework_paths.v', 'build-support/android/nativews/paths.v', 'build-support/android/nativews/bindings.txt', previous + '/native/bindings.txt'] { inputs[path] = hash(path)! }
 	}
 	for name in ['usr/lib/art/libandroidfw.so', 'usr/lib/libpng16.so.16', 'usr/lib/libsqlite3.so.0'] {
 		path := 'build/android-framework/calculator/overlay/opt/vinix-android-aarch64/' + name
@@ -324,6 +359,35 @@ fn clone_tree(from string, to string) ! {
 	}
 }
 
+// Share immutable runtime bytes on APFS; preserve the suite's observation logic.
+fn apfs_suite_staging(suite string) string {
+	start := 'fn prepare_module('
+	end := '\nfn run_app('
+	old := section(suite, start, end)
+	assert old.count('os.cp(') == 8 && old.count('os.cp_all(') == 1
+	provider := "os.cp_all(native + '/' + provider, runtime + '/usr/lib/art/native-ws', false)!"
+	assert old.count(provider) == 1
+	updated := old.replace('os.cp(', 'suite_clone(').replace(provider, "suite_clone_tree(native + '/' + provider, runtime + '/usr/lib/art/native-ws')!")
+	helpers := '
+fn suite_clone(from string, to string) ! {
+	if !os.is_file(from) { return error("missing clone source: " + from) }
+	os.mkdir_all(os.dir(to))!
+	if os.exists(to) || os.is_link(to) { os.rm(to)! }
+	checked(["cp", "-c", os.real_path(from), to])!
+}
+
+fn suite_clone_tree(from string, to string) ! {
+	os.mkdir_all(to)!
+	for name in os.ls(from)! {
+		source := os.real_path(from + "/" + name)
+		if os.is_dir(source) { suite_clone_tree(source, to + "/" + name)! }
+		else { suite_clone(source, to + "/" + name)! }
+	}
+}
+'
+	return suite.replace(old, helpers + updated)
+}
+
 fn prepare_runs() ! {
 	assert os.is_file(base + '/framework/api-impl.jar') && os.is_file(base + '/native/libvinix-android-native.so')
 	assert os.is_file(base + '/apk/probe.apk') && !os.exists(base + '/baseline.json')
@@ -335,7 +399,7 @@ fn prepare_runs() ! {
 		}
 	}
 	clone_file(previous + '/framework/framework-manifest.json', base + '/baseline-framework/framework-manifest.json')!
-	if attempt in ['268', '270'] { clone_file(previous + '/native/bindings.txt', base + '/baseline-native/bindings.txt')! }
+	if attempt in ['268', '270', '272'] { clone_file(previous + '/native/bindings.txt', base + '/baseline-native/bindings.txt')! }
 	clone_file('build/android-maps/suite239-stream.v', base + '/source/suite239-stream-original.v')!
 	mut suite := os.read_file('build/android-maps/suite239-stream.v')!
 	original_observation := suite.all_after('fn observation(').all_before('// Real companion packages')
@@ -343,6 +407,7 @@ fn prepare_runs() ! {
 	new_capture := '\tresult[\'observation_elapsed_seconds\'] = json2.Any(time.now().unix() - begin_at)\n\tresult[\'qemu_alive_before_capture\'] = json2.Any(qemu.is_alive())\n\tos.write_file(state + \'/observation-before-capture.json\', json2.encode(result, prettify: true) + \'\\n\')!\n\tcapture := os.exec([\'build/android-maps/maps-interact-unique258\', state, \'capture\', \'application\'])'
 	assert suite.count(old_capture) == 1 && suite.count('fn main() {') == 1
 	suite = suite.replace(old_capture, new_capture).replace('fn main() {', 'fn main() {\n\t$if prod { eprintln("requires assertions; compile without -prod"); exit(2) }')
+	if attempt == '272' { suite = apfs_suite_staging(suite) }
 	assert suite.all_after('fn observation(').all_before('// Real companion packages') == original_observation
 	os.write_file(base + '/source/suite.v', suite)!
 	os.mkdir_all(base + '/suite-support/nativeapk')!
