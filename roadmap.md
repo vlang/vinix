@@ -1809,6 +1809,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   180 each. All nine maintained suites pass per architecture. See
   [the ownership qualification](docs/linux-shared-memory-ownership.md).
 
+- [x] Report native shared-memory creation/control, attachment and final mapping
+  detach/exit timestamps with the responsible PID; keep temporary fault and
+  inspection pins from changing them. Identical musl ELFs pass 175 checks on
+  both production architectures and Linux; originals fail 46 each. All ten
+  maintained suites pass per architecture. Inherited/split mappings remain
+  unqualified. See [the timestamp qualification](docs/linux-shared-memory-timestamps.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

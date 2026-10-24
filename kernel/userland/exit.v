@@ -299,7 +299,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	proc.save_pidfd_exit_identity(mut current_process)
 	fs.release_process_namespaces(mut current_process)
 
-	mmap.delete_pagemap(mut old_pagemap) or {}
+	mmap.delete_pagemap_for_exit(mut old_pagemap, current_process.pid) or {}
 	complete_vfork(mut current_process)
 	oom_victim_gone(current_process)
 

@@ -2402,3 +2402,20 @@ negative controls), then `check` on the complete external bundle documented
 in the [ownership qualification](../../docs/linux-shared-memory-ownership.md).
 Mapped namespaces, concurrent changes, successful timestamps and full IPC or
 GNU/foreign/32-bit paths remain separate qualifications.
+
+The `shmtime` case checks native creation/control, attachment and detach/exit
+timestamps and caller PIDs as root and UID 1000/GID 2000. It checks no-op
+IPC_SET, immutable fields, failed-update preservation, IPC_RMID preservation,
+read/write and read-only attachments and child cleanup after fork-before-attach.
+Identical musl ELFs pass 175 checks on both production kernels and Linux
+6.12.51; original kernels fail 46 checks each. Run
+`--cases shmtime,shmset,shmabi,shmflags,shmremap,sharedmem,runtime,mmap,namespace,jit`
+with a fresh state directory. All ten maintained suites pass per architecture.
+
+`shmtime-reference.v` accepts the same arguments as `shmset-reference.v`.
+Its `--self-test` has two positive and nine negative controls. Compile
+`shmtime-evidence.v` without `-prod`, run `self-test` (five positive and 23
+negative controls), then `check` on the complete external bundle documented
+in the [timestamp qualification](../../docs/linux-shared-memory-timestamps.md).
+Inherited/split mappings, mremap metadata, races, IPC namespaces and
+GNU/foreign/32-bit paths remain separate qualifications.

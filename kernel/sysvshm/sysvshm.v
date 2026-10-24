@@ -14,6 +14,7 @@ import klock
 import memory.mmap
 import proc
 import resource
+import time
 import usercopy
 
 const ipc_private = i32(0)
@@ -77,6 +78,9 @@ mut:
 	cuid        u32
 	cgid        u32
 	size        u64
+	atime       i64
+	dtime       i64
+	ctime       i64
 	creator_pid int
 	last_pid    int
 	attachments u64
@@ -90,6 +94,11 @@ __global (
 	segments_lock klock.Lock
 	next_id       = int(1)
 )
+
+fn realtime_seconds() i64 {
+	stamp := time.clock_now(time.clock_type_realtime) or { return 0 }
+	return stamp.tv_sec
+}
 
 fn find_id_unlocked(id int) &Segment {
 	for segment in segments {
@@ -146,7 +155,6 @@ fn retain_mapping(handle voidptr) {
 	mut segment := unsafe { &Segment(handle) }
 	segments_lock.acquire()
 	segment.attachments++
-	segment.last_pid = proc.current_thread().process.pid
 	segments_lock.release()
 }
 
@@ -159,10 +167,19 @@ fn release_mapping(handle voidptr) {
 	if segment.attachments != 0 {
 		segment.attachments--
 	}
-	segment.last_pid = proc.current_thread().process.pid
 	if segment.removed && segment.attachments == 0 && segment.operations == 0 {
 		destroy_unlocked(segment)
 	}
+	segments_lock.release()
+}
+
+// Faults and /proc readers also pin the handle. Only retiring the actual
+// mapping changes the detach stamp, before its final pin is freed.
+fn mapping_unmapped(handle voidptr, pid int) {
+	mut segment := unsafe { &Segment(handle) }
+	segments_lock.acquire()
+	segment.dtime = realtime_seconds()
+	segment.last_pid = pid
 	segments_lock.release()
 }
 
@@ -260,8 +277,8 @@ pub fn syscall_shmget(_ voidptr, key i32, size u64, flags i32) (u64, u64) {
 		cuid: process.euid
 		cgid: process.egid
 		size: size
+		ctime: realtime_seconds()
 		creator_pid: process.pid
-		last_pid: process.pid
 		backing: backing
 	}
 	segments.flags |= .noslices
@@ -331,7 +348,7 @@ pub fn syscall_shmat(_ voidptr, shmid i32, requested_address u64, flags i32) (u6
 		}
 	}
 
-	result := mmap.mmap(process.pagemap, voidptr(address), segment.size, prot, map_flags, segment.backing, 0, voidptr(segment), retain_mapping, release_mapping) or {
+	result := mmap.mmap_notify_unmap(process.pagemap, voidptr(address), segment.size, prot, map_flags, segment.backing, 0, voidptr(segment), retain_mapping, release_mapping, mapping_unmapped) or {
 		segments_lock.acquire()
 		finish_operation_unlocked(segment)
 		segments_lock.release()
@@ -339,6 +356,8 @@ pub fn syscall_shmat(_ voidptr, shmid i32, requested_address u64, flags i32) (u6
 	}
 
 	segments_lock.acquire()
+	segment.atime = realtime_seconds()
+	segment.last_pid = process.pid
 	finish_operation_unlocked(segment)
 	segments_lock.release()
 	return u64(result), 0
@@ -429,6 +448,9 @@ pub fn syscall_shmctl(_ voidptr, shmid i32, command i32, buffer u64) (u64, u64) 
 					mode: segment.mode
 				}
 				segsz: segment.size
+				atime: segment.atime
+				dtime: segment.dtime
+				ctime: segment.ctime
 				cpid: i32(segment.creator_pid)
 				lpid: i32(segment.last_pid)
 				nattch: segment.attachments
@@ -463,6 +485,7 @@ pub fn syscall_shmctl(_ voidptr, shmid i32, command i32, buffer u64) (u64, u64) 
 			segment.uid = info.perm.uid
 			segment.gid = info.perm.gid
 			segment.mode = (segment.mode & ~u32(0o777)) | (info.perm.mode & 0o777)
+			segment.ctime = realtime_seconds()
 			finish_operation_unlocked(segment)
 			segments_lock.release()
 			return 0, 0

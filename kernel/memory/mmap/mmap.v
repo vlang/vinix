@@ -150,6 +150,8 @@ pub mut:
 	handle            voidptr
 	handle_ref        fn (voidptr) = unsafe { nil }
 	handle_unref      fn (voidptr) = unsafe { nil }
+	// Distinct from temporary fault/inspection pins; the handle is still held.
+	on_unmap          fn (voidptr, int) = unsafe { nil }
 	base              u64
 	length            u64
 	offset            i64
@@ -170,6 +172,7 @@ pub mut:
 
 struct MmapOptions {
 mut:
+	on_unmap         fn (voidptr, int) = unsafe { nil }
 	lazy_file        bool
 	segmented_file   bool
 	file_data_start  u64
@@ -529,11 +532,16 @@ fn find_free_base_unlocked(pagemap &memory.Pagemap, start u64, length u64) ?u64 
 }
 
 pub fn delete_pagemap(mut pagemap memory.Pagemap) ? {
-	delete_pagemap_impl(mut pagemap, false)?
+	delete_pagemap_impl(mut pagemap, false, proc.current_thread().process.pid)?
 }
 
 pub fn delete_pagemap_traced(mut pagemap memory.Pagemap) ? {
-	delete_pagemap_impl(mut pagemap, true)?
+	delete_pagemap_impl(mut pagemap, true, proc.current_thread().process.pid)?
+}
+
+// Exit switches its Thread to the kernel process before retiring this map.
+pub fn delete_pagemap_for_exit(mut pagemap memory.Pagemap, pid int) ? {
+	delete_pagemap_impl(mut pagemap, false, pid)?
 }
 
 // The caller already owns a process reference. Called before publishing the
@@ -572,7 +580,7 @@ fn end_brk(mut pagemap memory.Pagemap) {
 	pagemap.l.release()
 }
 
-fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
+fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool, pid int) ? {
 	pagemap.l.acquire()
 	katomic.dec(mut &pagemap.owners)
 	last := pagemap.owners == 0
@@ -616,7 +624,7 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
 				u64(range_index), u64(local_range.base), u64(local_range.length), i64(old_len))
 		}
 		munmap_unlocked_impl(mut pagemap, voidptr(local_range.base), local_range.length,
-			false) or {
+			false, pid) or {
 			if trace {
 				C.kprintf(c'exec[gpu]/vm: ERROR unmapping old range %llu\n', u64(range_index))
 			}
@@ -1265,6 +1273,13 @@ pub fn mmap(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int, flags
 	return mmap_with_credit(_pagemap, addr, _length, prot, flags, _resource, offset, handle, handle_ref, handle_unref, 0, MmapOptions{})
 }
 
+pub fn mmap_notify_unmap(pagemap &memory.Pagemap, addr voidptr, length u64, prot int,
+	flags int, res &resource.Resource, offset i64, handle voidptr, retain fn (voidptr),
+	release fn (voidptr), on_unmap fn (voidptr, int)) ?voidptr {
+	return mmap_with_credit(pagemap, addr, length, prot, flags, res, offset, handle,
+		retain, release, 0, MmapOptions{ on_unmap: on_unmap })
+}
+
 // Install an ELF PT_LOAD range without populating it. file_data_start is the
 // in-page displacement of the segment, and bytes outside its exact file image
 // are supplied as zero-filled memory when each page first faults.
@@ -1440,6 +1455,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		handle: range_handle
 		handle_ref: handle_ref
 		handle_unref: handle_unref
+		on_unmap: options.on_unmap
 		offset: offset
 		pte_extra: extra_pte
 		owns_mapping_ref: mapping_retained
@@ -2057,7 +2073,7 @@ pub fn munmap(mut pagemap memory.Pagemap, addr voidptr, len u64) ? {
 }
 
 pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? {
-	munmap_unlocked_impl(mut pagemap, addr, _length, true)?
+	munmap_unlocked_impl(mut pagemap, addr, _length, true, proc.current_thread().process.pid)?
 }
 
 // A split or a fork can keep a global range alive after one local stops
@@ -2111,7 +2127,7 @@ fn reclaim_uncovered_shadow_pages_locked(mut global_range MmapRangeGlobal, begin
 }
 
 fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
-	enforce_immutable bool) ? {
+	enforce_immutable bool, pid int) ? {
 	if _length == 0 {
 		C.printf(c'munmap: length is 0\n')
 		errno.set(errno.einval)
@@ -2215,6 +2231,9 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 				}
 				if global_range.handle != unsafe { nil }
 					&& global_range.handle_unref != unsafe { nil } {
+					if global_range.on_unmap != unsafe { nil } {
+						global_range.on_unmap(global_range.handle, pid)
+					}
 					global_range.handle_unref(global_range.handle)
 				} else if global_range.owns_resource_ref {
 					mut retained := global_range.resource

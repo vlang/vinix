@@ -11549,3 +11549,15 @@ each. Both production builds and all nine maintained suites pass. Generated
 C confirms the existing locked operation-pin cleanup and immediate return,
 with no new allocation or lifetime. The report records source/kernel hashes,
 complete evidence, actual page sizes and remaining IPC/runtime limitations.
+
+## Native shared-memory timestamps
+
+The 2026-10-24 [timestamp qualification](linux-shared-memory-timestamps.md)
+verifies creation/control, attachment and detach/exit times and last-operation
+PIDs. Identical musl ELF64 probes pass 175 checks on both production
+architectures and Linux 6.12.51; original kernels fail 46 each. Both production
+builds and all ten maintained suites pass. Temporary fault/inspection pins no
+longer change this metadata, and exit cleanup retains the exiting process PID.
+The report records the generated C lifetime review, complete selected evidence,
+source/kernel hashes and actual page sizes. Inherited/split VMAs, mremap,
+races, IPC namespaces and GNU/foreign/32-bit paths remain unqualified.
