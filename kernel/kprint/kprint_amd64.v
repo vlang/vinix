@@ -7,11 +7,9 @@ pub fn kwrite(message charptr, msglen u64) {
 	kprint_lock.acquire()
 	bootlog.append(message, msglen)
 
-	$if !prod {
-		unsafe {
-			for i := 0; i < msglen; i++ {
-				serial.out(u8(message[i]))
-			}
+	unsafe {
+		for i := 0; i < msglen; i++ {
+			serial.out(u8(message[i]))
 		}
 	}
 
