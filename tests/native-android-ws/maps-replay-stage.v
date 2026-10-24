@@ -9,6 +9,8 @@ import os
 import time
 
 const template_path = 'tests/native-android-ws/maps-styled-replay.v'
+const prepared278_pin = 'aa10e659faf39ab1a9b4bf01d2dde791f4ab1fbb9eff007d71e8226fce370995'
+const prepared278_jar = 'a1b839c77a575a40ddab8d6e264e92c9abcc9de54ae6c3dcefcc0e725c938eba'
 
 fn once(source string, before string, after string) !string {
 	if source.count(before) != 1 { return error('unexpected replay template block: ' + before) }
@@ -43,7 +45,42 @@ fn selected(template string, run string, paired string, source_pins map[string]s
 	source = once(source, '\tif os.args.len == 3 && os.args[1] == \'--self-test\'', "\tif os.args.len == 2 && os.args[1] == '--hash-stdin' { println(stream_hash() or { eprintln(err); exit(1) }); return }\n\tif os.args.len == 3 && os.args[1] == '--self-test'")!
 	source = once(source, "\tprintln('MAPS" + run + " HELPER SELF-TEST PASS", "\tarchive_stream_fixture()!\n\tprintln('MAPS" + run + " HELPER SELF-TEST PASS")!
 	if paired == '276' { source = qualified276(source)! }
+	if paired == '278' { source = prepared278(source)! }
 	return source + stream_helpers()
+}
+
+// Four real framework/fixture receipts bind this completed build. Runtime
+// qualification is separate; the native inputs still refer to sealed276.
+fn prepared278(source string) !string {
+	mut result := qualified276(source)!
+	result = result.replace('qualified276', 'prepared278').replace('qualified-build-', 'prepared-build-')
+	result = once(result, 'compound276-2026-10-24', 'compound278-2026-10-25')!
+	result = once(result, '37bfa8ec3449adf8a294e0b1f3ff3cabfa49123c228f308d9919cab7531d5fa4', prepared278_pin)!
+	result = once(result, '1a026975748c693f11c09c7fc080f8b72c20c0638c01996f226698cc740f92f6', prepared278_jar)!
+	result = once(result, 'qualified native-only276; unchanged274 JAR; complete historical evidence remains at root', 'completed framework-only278 build/prelaunch provenance; qualified276 native unchanged; runtime qualification is separate')!
+	labels := "['build-framework-compiler', 'build-framework', 'fixture-compiler', 'fixture']"
+	result = once(result, "['generate-native', 'build-native']", labels)!
+	if result.count('["generate-native", "build-native"]') != 2 { return error('unexpected native-only receipt loops') }
+	result = result.replace('["generate-native", "build-native"]', labels.replace("'", '"'))
+	if result.count('prepared278_root + "/sha256.json"') != 3 { return error('unexpected build manifest reads') }
+	result = result.replace('prepared278_root + "/sha256.json"', 'prepared278_root + "/prelaunch-sha256.json"')
+	result = once(result, 'if path.starts_with(prefix) && qualified_manifest[', 'if path.starts_with(prefix) && digest != "directory" && qualified_manifest[')!
+	result = once(result, '\treturn archived\n}', '\tprepared278_native(root, archived)!\n\treturn archived\n}')!
+	result = once(result, '\tmut retained := map[string]string{}', '\tfor name in ["qualified276-reference.json", "qualified276-sha256.json"] { clone(prepared278_root + "/prelaunch/" + name, external + "/prelaunch/" + name)! }\n\tmut retained := map[string]string{}')!
+	return result + '
+fn prepared278_native(root string, archived map[string]string) ! {
+	pin := "37bfa8ec3449adf8a294e0b1f3ff3cabfa49123c228f308d9919cab7531d5fa4"
+	pre := prepared278_root + "/prelaunch/"
+	if styled_hash(pre + "qualified276-sha256.json")! != pin { return error("wrong qualified276 native reference") }
+	for name in ["qualified276-reference.json", "qualified276-sha256.json"] {
+		if styled_hash(pre + name)! != archived["prelaunch/" + name]! { return error("278 native reference differs: " + name) }
+	}
+	sealed := read_map(pre + "qualified276-sha256.json")!
+	for name in ["sources.json", "bindings.txt", "libvinix-android-native.so", "androidfw_c_api.h", "sqlite3.h", "stb_image.h", "stb_truetype.h"] {
+		if styled_hash(root + "/native/" + name)! != sealed["prelaunch/native/" + name]! { return error("qualified276 native input differs: " + name) }
+	}
+}
+'
 }
 
 // Native-only276 has a complete sealed qualification. Reuse its exact inputs
@@ -177,7 +214,7 @@ fn archive_stream_fixture() ! {
 
 fn self_test(template string) ! {
 	pins := {'framework': '0'.repeat(64), 'native': '1'.repeat(64)}
-	for run, paired in {'273': '272', '275': '274', '277': '276'} {
+	for run, paired in {'273': '272', '275': '274', '277': '276', '279': '278'} {
 		source := selected(template, run, paired, pins)!
 		assert source.contains("const target = base + 'maps" + run + "'")
 		assert source.contains("const compound = base + 'compound" + paired + "'")
@@ -186,7 +223,11 @@ fn self_test(template string) ! {
 		assert !source.contains("archive_readback('before'") && !source.contains("archive_readback('after'")
 		assert !source.contains('clone(frozen + \'/inputs\',')
 		assert source.contains('retained launch input differs: ')
-		if paired == '276' {
+		if paired == '278' {
+			assert source.contains('prepared278_inputs(compound)!') && source.contains('runtime qualification is separate')
+			assert source.contains("for label in ['build-framework-compiler', 'build-framework', 'fixture-compiler', 'fixture']")
+			assert !source.contains("for label in ['generate-native'")
+		} else if paired == '276' {
 			assert source.contains('qualified276_inputs(compound)!') && source.contains('qualified-build-sha256.json')
 			assert !source.contains('for label in [\'build-framework-compiler\'')
 		} else { assert source.contains('baseline-framework') && source.contains('baseline-native') }
@@ -205,7 +246,7 @@ fn self_test(template string) ! {
 	scratch := 'build/android-maps/maps-selector-selftest-' + os.getpid().str()
 	if os.exists(scratch) { return error('fresh selector self-test directory required') }
 	os.mkdir_all(scratch)!
-	write_selection(template, selected(template, '277', '276', pins)!, scratch + '/replay.v', pins)!
+	write_selection(template, selected(template, '279', '278', pins)!, scratch + '/replay.v', pins)!
 	build := os.exec(['/Users/alex/code/v/v_old', '-nocache', '-cc', 'cc', '-cflags', '-O2', '-o', scratch + '/replay', scratch + '/replay.v'])
 	os.write_file(scratch + '/build.log', build.output)!
 	if build.exit_code != 0 { return error('selected helper compilation failed: ' + build.output) }

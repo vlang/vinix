@@ -15,6 +15,9 @@ const jar = 'opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_laye
 const native = 'opt/vinix-android-aarch64/usr/lib/art/libvinix-android-native.so'
 const qualified276_root = '/Users/alex/.local/state/vinix/android/compound276-2026-10-24'
 const qualified276_pin = '37bfa8ec3449adf8a294e0b1f3ff3cabfa49123c228f308d9919cab7531d5fa4'
+const prepared278_root = '/Users/alex/.local/state/vinix/android/compound278-2026-10-25'
+const prepared278_pin = 'aa10e659faf39ab1a9b4bf01d2dde791f4ab1fbb9eff007d71e8226fce370995'
+const prepared278_jar = 'a1b839c77a575a40ddab8d6e264e92c9abcc9de54ae6c3dcefcc0e725c938eba'
 
 struct Frame {
 	path string
@@ -150,7 +153,48 @@ fn qemu_arguments(config map[string]json2.Any, repo string) []string {
 
 fn build_labels(build string) []string {
 	return if build == '276' { ['generate-native', 'build-native'] }
+		else if build == '278' { ['build-framework-compiler', 'build-framework', 'fixture-compiler', 'fixture'] }
 		else { ['build-framework-compiler', 'build-framework', 'generate-native', 'build-native', 'fixture-compiler', 'fixture'] }
+}
+
+fn nondirectories(entries map[string]string) map[string]string {
+	mut result := map[string]string{}
+	for path, digest in entries { if digest != 'directory' { result[path] = digest } }
+	return result
+}
+
+// This reference binds a completed build, not the separate278 guest outcome.
+fn prepared278(root string, entries map[string]string, paired string) ! {
+	prefix := 'prelaunch/prelaunch/'
+	regular_files(entries, [prefix + 'prepared-build-sha256.json', prefix + 'prepared-build-reference.json',
+		prefix + 'qualified276-sha256.json', prefix + 'qualified276-reference.json'])!
+	if entries[prefix + 'prepared-build-sha256.json']! != prepared278_pin { return error('wrong prepared278 manifest pin') }
+	archived := read_map(root + '/' + prefix + 'prepared-build-sha256.json')!
+	reference := object(root + '/' + prefix + 'prepared-build-reference.json')!
+	assert reference['root']!.str() == prepared278_root && reference['manifest_sha256']!.str() == prepared278_pin
+	assert reference['scope']!.str().contains('runtime qualification is separate')
+	copy_prefix := prefix + 'replica/' + paired + '/'
+	for name in ['framework', 'native'] {
+		equal_maps(nondirectories(subtree(entries, copy_prefix + name)), subtree(archived, 'prelaunch/' + name))!
+	}
+	for label in build_labels('278') {
+		for suffix in ['-before.json', '-receipt.json', '.log'] {
+			path := label + suffix
+			assert entries[copy_prefix + path]! == archived['prelaunch/' + path]!, path
+		}
+	}
+	for name in ['qualified276-reference.json', 'qualified276-sha256.json'] {
+		assert entries[prefix + name]! == archived['prelaunch/' + name]!, name
+	}
+	assert entries[prefix + 'qualified276-sha256.json']! == qualified276_pin
+	native_reference := object(root + '/' + prefix + 'qualified276-reference.json')!
+	assert native_reference['root']!.str() == qualified276_root && native_reference['manifest_sha256']!.str() == qualified276_pin
+	sealed := read_map(root + '/' + prefix + 'qualified276-sha256.json')!
+	for name in ['sources.json', 'bindings.txt', 'libvinix-android-native.so', 'androidfw_c_api.h', 'sqlite3.h', 'stb_image.h', 'stb_truetype.h'] {
+		assert entries[copy_prefix + 'native/' + name]! == sealed['prelaunch/native/' + name]!, name
+	}
+	assert entries[copy_prefix + 'framework/api-impl.jar']! == prepared278_jar
+	assert entries[copy_prefix + 'native/libvinix-android-native.so']! == '5fe27a87c179b97121c368f417936ceebb75752c4a4204b937312ee28da531ca'
 }
 
 // Complete276 qualification stays independently sealed. Verify the exact
@@ -242,6 +286,7 @@ fn validate(root string, entries map[string]string) !map[string]json2.Any {
 		for path, digest in sources { assert entries[prefix + directory + path]! == digest, path }
 	}
 	if build == '276' { qualified276(root, entries, paired)! }
+	if build == '278' { prepared278(root, entries, paired)! }
 	for label in build_labels(build) {
 		regular_files(entries, [replica + paired + '/' + label + '-receipt.json', replica + paired + '/' + label + '-before.json'])!
 		built := object(root + '/' + replica + paired + '/' + label + '-receipt.json')!
@@ -421,11 +466,19 @@ fn self_test(original_path string) ! {
 	assert rejected
 	ids('275', '274')!
 	ids('277', '276')!
+	ids('279', '278')!
 	assert build_labels('276') == ['generate-native', 'build-native']
+	assert build_labels('278') == ['build-framework-compiler', 'build-framework', 'fixture-compiler', 'fixture']
 	assert build_labels('274').len == 6
 	rejected = false
 	qualified276(root, {'prelaunch/prelaunch/qualified-build-sha256.json': 'f'.repeat(64),
 		'prelaunch/prelaunch/qualified-build-reference.json': '0'.repeat(64)}, base + 'compound276') or { rejected = true }
+	assert rejected
+	rejected = false
+	prepared278(root, {'prelaunch/prelaunch/prepared-build-sha256.json': 'f'.repeat(64),
+		'prelaunch/prelaunch/prepared-build-reference.json': '0'.repeat(64),
+		'prelaunch/prelaunch/qualified276-sha256.json': '0'.repeat(64),
+		'prelaunch/prelaunch/qualified276-reference.json': '0'.repeat(64)}, base + 'compound278') or { rejected = true }
 	assert rejected
 	rejected = false
 	ids('275', '272') or { rejected = true }
