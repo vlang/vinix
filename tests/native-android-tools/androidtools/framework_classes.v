@@ -265,6 +265,21 @@ fn framework_text_widgets(smali string) ! {
  text += '\n.method public setGravity(I)V\n.locals 0\niput p1, p0, Landroid/widget/TextView;->gravity:I\n' +
   'invoke-virtual {p0}, Landroid/view/View;->requestLayout()V\nreturn-void\n.end method\n'
  os.write_file(path, text)!
+ // Preserve TextView overload dispatch for subclasses such as styled chips.
+ for class in ['Button', 'CompoundButton', 'CheckBox', 'RadioButton'] {
+  widget := smali + '/android/widget/' + class + '.smali'
+  mut source := os.read_file(widget)!
+  source = framework_replace_method(source, 'setText(Ljava/lang/CharSequence;)V',
+   '.method public setText(Ljava/lang/CharSequence;)V\n.locals 1\n' +
+   'sget-object v0, Landroid/widget/TextView$BufferType;->NORMAL:Landroid/widget/TextView$BufferType;\n' +
+   'invoke-virtual {p0, p1, v0}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;Landroid/widget/TextView$BufferType;)V\nreturn-void\n.end method')!
+  if class == 'Button' {
+   source = framework_replace_method(source, 'getText()Ljava/lang/CharSequence;',
+    '.method public getText()Ljava/lang/CharSequence;\n.locals 1\n' +
+    'invoke-super {p0}, Landroid/widget/TextView;->getText()Ljava/lang/CharSequence;\nmove-result-object v0\nreturn-object v0\n.end method')!
+  }
+  os.write_file(widget, source)!
+ }
  html := smali + '/android/text/Html.smali'
  os.write_file(html, framework_replace_method(os.read_file(html)!, 'fromHtml(Ljava/lang/String;I)Landroid/text/Spanned;',
   '.method public static native fromHtml(Ljava/lang/String;I)Landroid/text/Spanned;\n.end method')!)!
@@ -371,7 +386,8 @@ return-void
     'invoke-virtual {v0, p1}, Landroid/content/Context;->getDrawable(I)Landroid/graphics/drawable/Drawable;\nmove-result-object v0\n' +
     ':set\ninvoke-virtual {p0, v0}, Landroid/widget/CompoundButton;->setButtonDrawable(Landroid/graphics/drawable/Drawable;)V\nreturn-void\n.end method\n'
    text = framework_replace_method(text, 'getText()Ljava/lang/CharSequence;',
-    '.method public native getText()Ljava/lang/CharSequence;\n.end method')!
+    '.method public getText()Ljava/lang/CharSequence;\n.locals 1\n' +
+    'invoke-super {p0}, Landroid/widget/Button;->getText()Ljava/lang/CharSequence;\nmove-result-object v0\nreturn-object v0\n.end method')!
    text += '\n.method public performClick()Z\n.locals 1\n' +
     'invoke-virtual {p0}, Landroid/widget/CompoundButton;->toggle()V\n' +
     'invoke-super {p0}, Landroid/widget/Button;->performClick()Z\nconst/4 v0, 1\nreturn v0\n.end method\n'

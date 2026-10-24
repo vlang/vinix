@@ -305,31 +305,6 @@ fn ws_draw_content(e voidptr, object voidptr, canvas voidptr) {
 		if (view.kind < 1 || view.kind > 3) && view.kind != 7 && view.kind != 8 { return }
 		width := integer(e, object, c'android/view/View', c'getWidth', c'()I', nil)
 		height := integer(e, object, c'android/view/View', c'getHeight', c'()I', nil)
-		if view.kind == 1 {
-			content_width := width - view.padding_left - view.padding_right - 6
-			layout := ws_text_layout(view.text, view.size, if view.single_line { 0 } else if content_width > 0 { content_width } else { 1 }, view.font)
-			gravity := integer(e, object, c'android/widget/TextView', c'getGravity', c'()I', nil)
-			alignment := integer(e, object, c'android/view/View', c'getTextAlignment', c'()I', nil)
-			mut lines := (&WsTextLayout(layout)).count
-			if view.max_lines > 0 && lines > view.max_lines { lines = view.max_lines }
-			block_height := view.size * (1.5 + f32(lines - 1) * 1.25)
-			available := height - view.padding_top - view.padding_bottom
-			extra := if f32(available) > block_height { f32(available) - block_height } else { f32(0) }
-			y := f32(view.padding_top) + view.size + if gravity & 0x70 == 0x50 { extra } else if gravity & 0x70 == 0x10 { extra / 2 } else { f32(0) }
-			for line := i32(0); line < lines; line++ {
-				entry := (&WsTextLayout(layout)).lines[line]
-				horizontal := if alignment == 4 { i32(1) } else if alignment == 3 || alignment == 6 { i32(5) } else if alignment == 2 || alignment == 5 { i32(3) } else { gravity & 7 }
-				x := f32(view.padding_left + 3) + if horizontal == 1 { (f32(content_width) - entry.width) / 2 } else if horizontal == 5 { f32(content_width) - entry.width } else { f32(0) }
-				text := (&WsTextLayout(layout)).text
-				end := text[entry.end]
-				text[entry.end] = 0
-				ws_text(&text[entry.start], x, y + f32(line) * view.size * 1.25, view.size, view.color, view.font)
-				text[entry.end] = end
-			}
-			ws_layout_free(layout)
-			return
-		}
-		text_width := ws_text_width(view.text, view.size, view.font)
 		mut indicator_advance := i32(0)
 		if view.kind == 7 || view.kind == 8 {
 			indicator := ws_button_indicator(e, object)
@@ -350,9 +325,33 @@ fn ws_draw_content(e voidptr, object voidptr, canvas voidptr) {
 				ws_restore()
 			}
 		}
-		left := if view.kind == 7 || view.kind == 8 {
-			f32(view.padding_left + indicator_advance)
-		} else if view.kind == 2 {
+		if view.kind == 1 || view.kind == 7 || view.kind == 8 {
+			text_inset := if view.kind == 1 { i32(3) } else { indicator_advance }
+			content_width := width - view.padding_left - view.padding_right - 6 - indicator_advance
+			layout := ws_text_layout(view.text, view.size, if view.kind != 1 || view.single_line { 0 } else if content_width > 0 { content_width } else { 1 }, view.font)
+			gravity := integer(e, object, c'android/widget/TextView', c'getGravity', c'()I', nil)
+			alignment := integer(e, object, c'android/view/View', c'getTextAlignment', c'()I', nil)
+			mut lines := (&WsTextLayout(layout)).count
+			if view.max_lines > 0 && lines > view.max_lines { lines = view.max_lines }
+			block_height := view.size * (1.5 + f32(lines - 1) * 1.25)
+			available := height - view.padding_top - view.padding_bottom
+			extra := if f32(available) > block_height { f32(available) - block_height } else { f32(0) }
+			y := f32(view.padding_top) + view.size + if gravity & 0x70 == 0x50 { extra } else if gravity & 0x70 == 0x10 { extra / 2 } else { f32(0) }
+			for line := i32(0); line < lines; line++ {
+				entry := (&WsTextLayout(layout)).lines[line]
+				horizontal := if alignment == 4 { i32(1) } else if alignment == 3 || alignment == 6 { i32(5) } else if alignment == 2 || alignment == 5 { i32(3) } else { gravity & 7 }
+				x := f32(view.padding_left + text_inset) + if horizontal == 1 { (f32(content_width) - entry.width) / 2 } else if horizontal == 5 { f32(content_width) - entry.width } else { f32(0) }
+				text := (&WsTextLayout(layout)).text
+				end := text[entry.end]
+				text[entry.end] = 0
+				ws_text(&text[entry.start], x, y + f32(line) * view.size * 1.25, view.size, view.color, view.font)
+				text[entry.end] = end
+			}
+			ws_layout_free(layout)
+			return
+		}
+		text_width := ws_text_width(view.text, view.size, view.font)
+		left := if view.kind == 2 {
 			(f32(width) - text_width) / 2
 		} else {
 			f32(view.padding_left + 3)
