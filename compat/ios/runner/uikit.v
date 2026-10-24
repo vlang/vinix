@@ -123,6 +123,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if ns_process_info_dispatch(object, selector, mut frame) { return true }
 	if ns_date_dispatch(object, selector, mut frame) { return true }
 	if ns_date_formatter_dispatch(object, selector, mut frame) { return true }
+	if ns_number_formatter_dispatch(object, selector, mut frame) { return true }
 	if un_trigger_dispatch(object, selector, mut frame) { return true }
 	if un_request_dispatch(object, selector, mut frame) { return true }
 	if un_center_dispatch(object, selector, mut frame) { return true }

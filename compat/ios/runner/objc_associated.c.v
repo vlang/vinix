@@ -32,6 +32,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	}
 	C.ios_objc_initialize_lock()
 	formatter := value in ios_runtime.objects && obj_header(value).date_formatter != unsafe { nil }
+	number_formatter := value in ios_runtime.objects && obj_header(value).number_formatter != unsafe { nil }
 	calendar := value in ios_runtime.objects && obj_header(value).calendar != unsafe { nil }
 	predicate := value in ios_runtime.objects && obj_header(value).predicate != unsafe { nil }
 	index_set := value in ios_runtime.objects && obj_header(value).index_set != unsafe { nil }
@@ -53,6 +54,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	query_item := value in ios_runtime.objects && obj_header(value).url_query_item_owned
 	C.ios_objc_initialize_unlock()
 	if formatter { return ns_date_formatter_copy(value) }
+	if number_formatter { return ns_number_formatter_copy(value) }
 	if calendar || ns_calendar_name(cls) != '' { return ns_calendar_copy(value) }
 	if predicate || ns_predicate_family(cls) { return ns_predicate_copy(value) }
 	if index_set || ns_index_set_family(cls) { return ns_index_set_copy(value, false) }
@@ -85,6 +87,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if objc_is_kind(value, ios_runtime.names['NSRegularExpression']) { regular_expression_state(value); return objc_retain(value) }
 	if objc_is_kind(value, ios_runtime.names['NSTextCheckingResult']) { regex_result_state(value); return objc_retain(value) }
 	if ns_date_formatter_family(cls) { return ns_date_formatter_copy(value) }
+	if ns_number_formatter_family(cls) { return ns_number_formatter_copy(value) }
 	if objc_is_kind(value, ios_runtime.names['NSTimeZone']) {
 		C.ios_objc_initialize_lock()
 		ns_timezone_snapshot(value)

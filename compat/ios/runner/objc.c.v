@@ -131,6 +131,7 @@ mut:
 	operation &FoundationOperation = unsafe { nil }
 	invocation &FoundationInvocation = unsafe { nil }
 	date_formatter &FoundationDateFormatter = unsafe { nil }
+	number_formatter &FoundationNumberFormatter = unsafe { nil }
 	calendar &FoundationCalendar = unsafe { nil }
 	timezone_local bool
 	predicate &FoundationPredicate = unsafe { nil }
@@ -550,7 +551,7 @@ fn objc_start() {
 	ios_runtime.notification_queues.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
-	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
+	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSNumberFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'NSMapTable', 'CTTelephonyNetworkInfo', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
@@ -597,7 +598,7 @@ fn objc_start() {
             'CAMetalLayer', 'AVCaptureVideoPreviewLayer' { ios_runtime.names['CALayer'] }
             'UIScreenEdgePanGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
 			'UIWindowScene' { ios_runtime.names['UIScene'] }
-			'NSDateFormatter' { ios_runtime.names['NSFormatter'] }
+			'NSDateFormatter', 'NSNumberFormatter' { ios_runtime.names['NSFormatter'] }
 			'UIButton' { ios_runtime.names['UIControl'] }
 			'UIAccessibilityElement' { ios_runtime.names['UIResponder'] }
 			'NSMutableArray', 'NSConstantArray', 'WKNSArray' { ios_runtime.names['NSArray'] }
@@ -663,6 +664,7 @@ fn objc_start() {
 			'NSProcessInfo' { u32(48) }
 			'NSDate', 'VinixCFDate', 'NSTimeZone', 'NSLocale', 'NSFormatter' { u32(8) }
 			'NSDateFormatter' { u32(56) }
+			'NSNumberFormatter' { u32(64) }
 			'NSPredicate' { u32(16) }
 			'NSIndexSet', 'NSMutableIndexSet' { u32(32) }
 			'NSCharacterSet', 'NSMutableCharacterSet' { u32(8) }
@@ -734,6 +736,7 @@ fn objc_start() {
 	ns_operation_metadata()
 	ns_invocation_metadata()
 	ns_date_formatter_metadata()
+	ns_number_formatter_metadata()
 	ns_predicate_metadata()
 	ns_index_set_metadata()
 	un_trigger_metadata()
@@ -800,6 +803,7 @@ fn objc_allocate(cls u64) u64 {
 	ns_pool_require_class(cls)
 	ns_timezone_require_class(cls)
 	ns_date_formatter_require_class(cls)
+	ns_number_formatter_require_class(cls)
 	un_trigger_require_class(cls)
 	un_request_require_class(cls)
 	un_center_require_class(cls)
@@ -917,6 +921,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).uuid_owned { ns_uuid_initialize(object, 0, true); return object }
 	if obj_header(object).date_owned { ns_date_initialize(object, cf_absolute_time()); return object }
 	if obj_header(object).date_formatter != unsafe { nil } { ns_date_formatter_initialize(object); return object }
+	if obj_header(object).number_formatter != unsafe { nil } { ns_number_formatter_initialize(object); return object }
 	if obj_header(object).calendar != unsafe { nil } { return ns_calendar_initialize(object, 0, false) }
 	if obj_header(object).index_set != unsafe { nil } { return ns_index_set_initialize(object, 0, 0) }
 	if obj_header(object).character_set != unsafe { nil } { return ns_character_set_initialize(object) }

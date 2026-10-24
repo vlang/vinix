@@ -83,6 +83,8 @@ fn compile_c(root string, generated string, output string, gles bool) {
 
 fn native_fixture_source(item string) string {
 	return match item {
+		'number-formatter-checks' { 'ns_number_formatter_test.v' }
+		'date-formatter-checks' { 'date_formatter_test.v' }
 		'lock-checks' { 'ns_lock_test.v' }
 		'recursive-lock-checks' { 'ns_recursive_lock_test.v' }
 		'map-table-checks' { 'ns_map_table_test.v' }
@@ -101,8 +103,8 @@ fn native_fixture_source(item string) string {
 }
 
 fn build(root string, out string, only string) {
-	if only !in ['lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! { panic('unknown notification build target') }
-	for item in ['lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
+	if only !in ['number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! { panic('unknown notification build target') }
+	for item in ['number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -149,7 +151,7 @@ fn vm(root string, out string, mode string) {
 	}
 	require_arm64_elf(out + '/native-init')
 	if mode == 'notifications' {
-		for item in ['lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks'] {
+		for item in ['number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks'] {
 			require_arm64_elf(out + '/' + item)
 		}
 	} else {
@@ -167,6 +169,8 @@ fn vm(root string, out string, mode string) {
 			os.mkdir_all(fs + '/' + directory) or { panic(err) }
 		}
 		copy_file(out + '/calendar-checks', fs + '/opt/ios/calendar-checks')
+		copy_file(out + '/number-formatter-checks', fs + '/opt/ios/number-formatter-checks')
+		copy_file(out + '/date-formatter-checks', fs + '/opt/ios/date-formatter-checks')
 		copy_file(out + '/calendar-trigger-checks', fs + '/opt/ios/calendar-trigger-checks')
 		copy_file(out + '/notification-request-checks', fs + '/opt/ios/notification-request-checks')
 		copy_file(out + '/notification-center-checks', fs + '/opt/ios/notification-center-checks')
@@ -264,7 +268,7 @@ fn main() {
 	mode := os.args[1]
 	if mode !in ['build', 'build-run-ios-gles', 'notifications', 'probe', 'audit', 'static-audit']! { panic('invalid notification mode') }
 	if mode == 'build' {
-		for item in ['lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks', 'native-init', 'run-ios', 'run-ios-gles']! { build(root, out, item) }
+		for item in ['number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks', 'native-init', 'run-ios', 'run-ios-gles']! { build(root, out, item) }
 	} else if mode == 'build-run-ios-gles' {
 		build(root, out, 'run-ios-gles')
 	} else { vm(root, out, mode) }
