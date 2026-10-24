@@ -40,6 +40,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	user_activity := value in ios_runtime.objects && obj_header(value).user_activity != unsafe { nil }
 	cache := value in ios_runtime.objects && obj_header(value).cache != unsafe { nil }
 	telephony := value in ios_runtime.objects && obj_header(value).telephony_owned
+	credential := value in ios_runtime.objects && obj_header(value).credential_owned
 	notification_queue := value in ios_runtime.objects && obj_header(value).notification_queue != unsafe { nil }
 	un_trigger := value in ios_runtime.objects && obj_header(value).un_trigger_owned
 	un_request := value in ios_runtime.objects && obj_header(value).un_request_owned
@@ -58,6 +59,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if user_activity || ns_user_activity_family(cls) { panic('iOS: user activity copying is not implemented') }
 	if cache || ns_cache_family(cls) { panic('iOS: cache copying is not implemented') }
 	if telephony || telephony_family(cls) { panic('iOS: telephony copying is not implemented') }
+	if credential || ns_credential_family(cls) { return ns_credential_copy(value) }
 	if notification_queue || ns_notification_queue_family(cls) { panic('iOS: notification queue copying is not implemented') }
 	if un_trigger || un_trigger_family(cls) { return un_trigger_copy(value) }
 	if un_request || un_request_family(cls) { return un_request_copy(value) }

@@ -138,6 +138,10 @@ mut:
 	telephony_owned bool
 	telephony_initialized bool
 	telephony_active int
+	credential_owned bool
+	credential_initialized bool
+	credential_initializing bool
+	credential_persistence u64
 	notification_queue &FoundationNotificationQueue = unsafe { nil }
 	un_trigger_owned bool
 	un_trigger_initialized bool
@@ -550,7 +554,7 @@ fn objc_start() {
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'UNNotificationTrigger', 'UNCalendarNotificationTrigger', 'UNNotificationRequest', 'UNUserNotificationCenter', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
         'UNNotificationContent', 'UNMutableNotificationContent', 'UNNotificationSound', 'UNNotificationAttachment',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSOperation', 'NSInvocationOperation', 'NSInvocation', 'NSMethodSignature', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
-        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLQueryItem', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
+        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLQueryItem', 'NSURLCredential', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
         'UIScreenEdgePanGestureRecognizer', 'UISelectionFeedbackGenerator', 'CADisplayLink',
@@ -660,6 +664,7 @@ fn objc_start() {
 			'NSUserActivity' { u32(32) }
 			'NSNotificationQueue' { u32(32) }
 			'NSURLQueryItem' { u32(24) }
+			'NSURLCredential' { u32(16) }
 			'NSStream' { u32(8) }
 			'NSInputStream' { u32(136) }
 			'NSAutoreleasePool' { u32(40) }
@@ -732,6 +737,7 @@ fn objc_start() {
 	un_attachment_metadata()
 	ns_cache_metadata()
 	telephony_metadata()
+	ns_credential_metadata()
 	ns_url_query_item_metadata()
 	ns_user_activity_metadata()
 	ns_notification_queue_metadata()
@@ -794,6 +800,7 @@ fn objc_allocate(cls u64) u64 {
 	un_attachment_require_class(cls)
 	ns_cache_require_class(cls)
 	telephony_require_class(cls)
+	ns_credential_require_class(cls)
 	ns_calendar_require_class(cls)
 	ns_predicate_require_class(cls)
 	ns_index_set_require_class(cls)
@@ -907,6 +914,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).scanner != unsafe { nil } { return ns_scanner_default(object) }
 	if obj_header(object).cache != unsafe { nil } { return ns_cache_initialize(object) }
 	if obj_header(object).telephony_owned { return telephony_initialize(object) }
+	if obj_header(object).credential_owned { panic('iOS: credential requires a designated initializer') }
 	if obj_header(object).user_activity != unsafe { nil } { panic('iOS: user activity requires designated construction') }
 	if obj_header(object).notification_queue != unsafe { nil } { return ns_notification_queue_initialize(object, 0, true) }
 	if obj_header(object).un_trigger_owned { panic('iOS: notification trigger requires designated construction') }
@@ -1075,6 +1083,10 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if symbol in ['_OBJC_CLASS_$_NSURLCredential', '_OBJC_METACLASS_$_NSURLCredential']!
+		&& library != '/System/Library/Frameworks/Foundation.framework/Foundation' {
+		return error('iOS: credential import requires Foundation.framework')
+	}
 	if symbol in ['_OBJC_CLASS_$_CTTelephonyNetworkInfo', '_OBJC_METACLASS_$_CTTelephonyNetworkInfo']!
 		&& library != '/System/Library/Frameworks/CoreTelephony.framework/CoreTelephony' {
 		return error('iOS: telephony import requires CoreTelephony.framework')

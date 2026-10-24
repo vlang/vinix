@@ -37,15 +37,19 @@ fn main() {
 		run(out, 'inspect', [out + '/inspect-cache'], false)
 	} else if os.args[1] == 'cache-metadata-inspect' {
 		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'NSCache'], false)
+	} else if os.args[1] == 'credential-metadata-inspect' {
+		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'NSURLCredential'], false)
+	} else if os.args[1] == 'credential-inspect' {
+		for mode in ['password', 'empty', 'nil-user', 'nil-password', 'invalid-persistence']! { run(out, 'inspect-' + mode, [out + '/inspect-credential', mode], false) }
 	} else if os.args[1] == 'telephony-metadata-inspect' {
 		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'CTTelephonyNetworkInfo'], false)
 	} else if os.args[1] == 'attachment-inspect' {
 		run(out, 'inspect', [out + '/inspect-notification-attachment'], false)
 	} else if os.args[1] == 'attachment-metadata-inspect' {
 		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'UNNotificationAttachment'], false)
-	} else if os.args[1] in ['host', 'content-host', 'sound-host', 'attachment-host', 'cache-host', 'telephony-host']! {
+	} else if os.args[1] in ['host', 'content-host', 'sound-host', 'attachment-host', 'cache-host', 'telephony-host', 'credential-host']! {
 		content := os.args[1] == 'content-host'
-		fixture := if os.args[1] == 'telephony-host' { 'coretelephony_test.v' } else if os.args[1] == 'cache-host' { 'ns_cache_test.v' } else if content { 'un_notification_content_test.v' } else if os.args[1] == 'sound-host' { 'un_notification_sound_test.v' } else if os.args[1] == 'attachment-host' { 'un_notification_attachment_test.v' } else { 'un_notification_center_test.v' }
+		fixture := if os.args[1] == 'credential-host' { 'ns_url_credential_test.v' } else if os.args[1] == 'telephony-host' { 'coretelephony_test.v' } else if os.args[1] == 'cache-host' { 'ns_cache_test.v' } else if content { 'un_notification_content_test.v' } else if os.args[1] == 'sound-host' { 'un_notification_sound_test.v' } else if os.args[1] == 'attachment-host' { 'un_notification_attachment_test.v' } else { 'un_notification_center_test.v' }
 		cfile := out + '/payload/center-host.c'; bundle := out + "/NotificationChecks.app/Contents"
 		os.mkdir_all(bundle + "/MacOS")!
 		os.write_file(bundle + "/Info.plist", "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>org.vinix.notification-checks</string><key>CFBundleExecutable</key><string>center-host</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>")!

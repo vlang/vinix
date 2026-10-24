@@ -110,6 +110,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := un_attachment_types(info.name, info.meta, selector) { return types }
 	if types := ns_cache_types(info.name, info.meta, selector) { return types }
 	if types := telephony_types(info.name, info.meta, selector) { return types }
+	if types := ns_credential_types(info.name, info.meta, selector) { return types }
 	if types := un_center_types(info.name, info.meta, selector) { return types }
 	if types := un_content_types(info.name, info.meta, selector) { return types }
 	if types := ns_calendar_types(info.name, info.meta, selector) { return types }
@@ -181,6 +182,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name == 'UNNotificationAttachment' && un_attachment_unsupported(name) { return 0 }
 		if info.name == 'NSCache' && ns_cache_unsupported(name) { return 0 }
 		if info.name == 'CTTelephonyNetworkInfo' && telephony_unsupported(name) { return 0 }
+		if info.name == 'NSURLCredential' && ns_credential_unsupported(name) { return 0 }
 		if info.name == 'UNUserNotificationCenter' && un_center_unsupported(name) { return 0 }
 		if info.name in ['UNNotificationContent', 'UNMutableNotificationContent']! && un_content_unsupported(name) { return 0 }
 		if info.name in ['NSCalendar', 'NSDateComponents']! && ns_calendar_unsupported(name) { return 0 }
