@@ -18534,21 +18534,61 @@ All four ARM64 phases pass: the shared calendar fixture, Fortnite's launch
 probe, the C++/GLES/Text import audit and the static C++ import audit. The proof
 retains five binary/generated-C archive pairs, the host dSYM and four guest
 serial/config pairs. Owned guest VMs, scratch files and the RAM disk are retired.
-The launch probe resolves both calendar classes and stops at
+That calendar launch probe resolves both calendar classes and stops at
 `_OBJC_CLASS_$_UNCalendarNotificationTrigger`, attributed to UserNotifications,
 before application entry; the process exits 1.
+
+V now provides bounded `UNCalendarNotificationTrigger` construction and
+inspection, with `UNNotificationTrigger` as its superclass. Native Apple
+measurements establish 24-byte and 16-byte public instances, respectively,
+with `_dateComponents` at offset 16 and `_repeats` at offset 8.
+
+`triggerWithDateMatchingComponents:repeats:` independently copies initialized
+built-in `NSDateComponents`, including its calendar, before invoking native
+trigger constructors. Empty and partial date patterns are accepted. The
+`dateComponents` getter returns the same borrowed, mutable stored object on
+each call; subsequent input mutations do not affect it. `repeats` uses the
+ARM64 BOOL low bit. `copy` and `copyWithZone:nil` retain the trigger itself.
+Default construction, custom subclasses, invalid or uninitialized inputs,
+changed-isa access, non-nil copy zones, coding, mutable copying, equality,
+hashing and descriptions fail explicitly. Scheduling and `nextTriggerDate`
+remain unsupported. Native method implementations retain dispatch precedence.
+
+```sh
+VINIX_IOS_CHECK_NAME=un-calendar-checks v run tests/ios/native-checks.v build-calendar-trigger
+```
+
+The shared fixture passes against Apple Foundation and UserNotifications on
+the Mac host with ASan+UBSan, in normal and deterministic Swift hashing modes;
+leak detection is disabled. It checks layout, encodings, BOOL behavior,
+snapshots, getter identity, copying and weak ownership. Runtime checks cover
+reentrant constructor success and failure, failed component copying, guarded
+caller storage, changed-isa cleanup, native method precedence, 21 explicit
+rejection cases and two drained lifetimes. A source and generated-C lifetime
+self-review records balanced input pins, copied-component ownership and
+constructor-failure cleanup; it is not an independent review.
+
+Evidence under `build/ios/fortnite/un-calendar-checks` retains the generated C,
+binaries, logs and four guest serial/configuration pairs. The focused ARM64
+guest passes both the existing calendar fixture and the new trigger fixture;
+this does not establish full regression success. Fortnite's new launch probe
+resolves the trigger and stops at `_OBJC_CLASS_$_UNNotificationRequest`,
+attributed to UserNotifications, before application entry, with process exit
+status 1. Both import audits complete without executing app code and report
+the counts below. The evidence manifest hashes selected source and artifact
+inputs; it does not seal the full toolchain or host dynamic runtime closure.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,080 | 81 | 78 |
+| Fortnite executable | 2,081 | 80 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,920 | 84 | 114 |
+| All images | 2,921 | 83 | 114 |
 
-The C++/GLES/Text variant reports 2,934 resolved imports, 70 unresolved strong
+The C++/GLES/Text variant reports 2,935 resolved imports, 69 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
@@ -18606,7 +18646,8 @@ predicates use `predicate-checks`, index sets use `index-set-checks`,
 URL query items use `url-query-item-checks`, character sets use
 `character-set-checks`, scanners use `scanner-checks`, user activities use
 `user-activity-checks`, notification queues use `notification-queue-checks`,
-Objective-C calendars use `ns-calendar-checks`,
+Objective-C calendars use `ns-calendar-checks`, calendar notification triggers
+use `un-calendar-checks`,
 keyed archives use `keyed-archiver-checks`, keyed unarchives use
 `keyed-unarchiver-checks`,
 CoreFoundation dictionaries use
@@ -18623,7 +18664,8 @@ there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant,
 URL session, session configuration, recursive lock, invocation, invocation
 operation, date formatter, predicate, index set, URL query item, character set,
-scanner, user activity, notification queue, calendar, keyed archive, keyed unarchive,
+scanner, user activity, notification queue, calendar, calendar notification trigger,
+keyed archive, keyed unarchive,
 sort descriptor, regular expression, mutable string, CoreFoundation dictionary,
 constant array and constant integer, supplied Objective-C storage,
 associated-object, property, object-monitor, Swift string/buffer and String

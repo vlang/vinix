@@ -6,6 +6,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	ns_operation_require_class(cls)
 	ns_invocation_require_class(cls)
 	ns_date_formatter_require_class(cls)
+	un_trigger_require_class(cls)
 	ns_calendar_require_class(cls)
 	ns_predicate_require_class(cls)
 	ns_index_set_require_class(cls)
@@ -59,6 +60,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	ns_scanner_install(cls, mut header)
 	ns_user_activity_install(cls, mut header)
 	ns_notification_queue_install(cls, mut header)
+	header.un_trigger_owned = cls in [ios_runtime.names['UNNotificationTrigger'], ios_runtime.names['UNCalendarNotificationTrigger']]!
 	header.url_query_item_owned = cls == ios_runtime.names['NSURLQueryItem']
 	header.auth_owned = objc_is_kind(object, ios_runtime.names['ASWebAuthenticationSession'])
 	header.image_view_owned = objc_is_kind(object, ios_runtime.names['UIImageView'])
@@ -171,6 +173,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	ns_scanner_dispose(mut header)
 	ns_user_activity_dispose(object, mut header)
 	ns_notification_queue_dispose(object, mut header)
+	un_trigger_dispose(object, mut header)
 	ns_url_query_item_dispose(object, mut header)
 	web_auth_dispose(mut header)
 	image_view_dispose(mut header)

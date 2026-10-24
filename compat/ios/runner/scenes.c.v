@@ -41,6 +41,10 @@ fn objc_responds(object u64, selector &char) bool {
 		if ns_date_formatter_types('NSDateFormatter', object in ios_runtime.classes, name) != none { return true }
 	}
 	formatter_cls := if object in ios_runtime.classes { object } else { read64(object) }
+	if un_trigger_family(formatter_cls) {
+		if un_trigger_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if un_trigger_types((ios_runtime.classes[formatter_cls] or { return false }).name, object in ios_runtime.classes, name) != none { return true }
+	}
 	calendar_name := ns_calendar_name(formatter_cls)
 	if calendar_name != '' {
 		if ns_calendar_unsupported(name) { return native_method(read64(object), name) != 0 }

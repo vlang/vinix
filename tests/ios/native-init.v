@@ -87,6 +87,7 @@ fn main() {
 		require_child('/opt/ios/user-activity-checks')
 		require_child('/opt/ios/notification-queue-checks')
 		require_child('/opt/ios/calendar-checks')
+		require_child('/opt/ios/calendar-trigger-checks')
 		require_child('/opt/ios/index-set-checks')
 		require_child('/opt/ios/predicate-checks')
 		require_child('/opt/ios/date-formatter-checks')

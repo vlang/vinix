@@ -135,6 +135,8 @@ mut:
 	scanner &FoundationScanner = unsafe { nil }
 	user_activity &FoundationUserActivity = unsafe { nil }
 	notification_queue &FoundationNotificationQueue = unsafe { nil }
+	un_trigger_owned bool
+	un_trigger_initialized bool
 	url_query_item_owned bool
 	url_query_item_initialized bool
 	url_query_item_initializing bool
@@ -528,7 +530,7 @@ fn objc_start() {
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
-        'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
+        'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'UNNotificationTrigger', 'UNCalendarNotificationTrigger', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSOperation', 'NSInvocationOperation', 'NSInvocation', 'NSMethodSignature', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLQueryItem', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
@@ -549,6 +551,7 @@ fn objc_start() {
 			'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_global' { ios_runtime.names['OS_dispatch_queue'] }
 			'OS_dispatch_queue_serial' { ios_runtime.names['OS_dispatch_queue_serial_executor'] }
 			'OS_dispatch_queue_main' { ios_runtime.names['OS_dispatch_queue_serial'] }
+			'UNCalendarNotificationTrigger' { ios_runtime.names['UNNotificationTrigger'] }
 			'VinixCFDate' { ios_runtime.names['NSDate'] }
 			'VinixMetalTextureDescriptor' { ios_runtime.names['MTLTextureDescriptor'] }
 			'NSInputStream' { ios_runtime.names['NSStream'] }
@@ -595,6 +598,8 @@ fn objc_start() {
 		metaclass.isa = if parent == 0 { meta } else { read64(parent) }
 		metaclass.parent = if parent == 0 { u64(cls) } else { read64(parent) }
 		size := match name {
+			'UNNotificationTrigger' { u32(16) }
+			'UNCalendarNotificationTrigger' { u32(24) }
 			'NSMutableString' { u32(8) }
 			'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global' { u32(8) }
 			'_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty' { u32(8) }
@@ -693,6 +698,7 @@ fn objc_start() {
 	ns_date_formatter_metadata()
 	ns_predicate_metadata()
 	ns_index_set_metadata()
+	un_trigger_metadata()
 	ns_url_query_item_metadata()
 	ns_user_activity_metadata()
 	ns_notification_queue_metadata()
@@ -747,6 +753,7 @@ fn objc_allocate(cls u64) u64 {
 	ns_pool_require_class(cls)
 	ns_timezone_require_class(cls)
 	ns_date_formatter_require_class(cls)
+	un_trigger_require_class(cls)
 	ns_calendar_require_class(cls)
 	ns_predicate_require_class(cls)
 	ns_index_set_require_class(cls)
@@ -860,6 +867,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).scanner != unsafe { nil } { return ns_scanner_default(object) }
 	if obj_header(object).user_activity != unsafe { nil } { panic('iOS: user activity requires designated construction') }
 	if obj_header(object).notification_queue != unsafe { nil } { return ns_notification_queue_initialize(object, 0, true) }
+	if obj_header(object).un_trigger_owned { panic('iOS: notification trigger requires designated construction') }
 	if obj_header(object).url_query_item_owned { return ns_url_query_item_initialize(object, 0, 0) }
 	if obj_header(object).mutable_string_owned { mutable_string_initialize(object, ''); return object }
 	if ns_timezone_family(cls) { panic('iOS: default timezone construction is not implemented') }
