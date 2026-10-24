@@ -135,6 +135,9 @@ mut:
 	scanner &FoundationScanner = unsafe { nil }
 	user_activity &FoundationUserActivity = unsafe { nil }
 	cache &FoundationCache = unsafe { nil }
+	telephony_owned bool
+	telephony_initialized bool
+	telephony_active int
 	notification_queue &FoundationNotificationQueue = unsafe { nil }
 	un_trigger_owned bool
 	un_trigger_initialized bool
@@ -539,7 +542,7 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
+		'CTTelephonyNetworkInfo', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
@@ -634,6 +637,7 @@ fn objc_start() {
 			'NSCondition' { u32(sizeof(AbiNSCondition)) }
 			'NSRecursiveLock' { u32(sizeof(AbiNSRecursiveLock)) }
 			'NSCache' { 48 }
+			'CTTelephonyNetworkInfo' { 40 }
 			'NSThread' { u32(64) }
 			'NSOperation' { u32(248) }
 			'NSInvocationOperation' { u32(264) }
@@ -727,6 +731,7 @@ fn objc_start() {
 	un_sound_metadata()
 	un_attachment_metadata()
 	ns_cache_metadata()
+	telephony_metadata()
 	ns_url_query_item_metadata()
 	ns_user_activity_metadata()
 	ns_notification_queue_metadata()
@@ -788,6 +793,7 @@ fn objc_allocate(cls u64) u64 {
 	un_sound_require_class(cls)
 	un_attachment_require_class(cls)
 	ns_cache_require_class(cls)
+	telephony_require_class(cls)
 	ns_calendar_require_class(cls)
 	ns_predicate_require_class(cls)
 	ns_index_set_require_class(cls)
@@ -900,6 +906,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).character_set != unsafe { nil } { return ns_character_set_initialize(object) }
 	if obj_header(object).scanner != unsafe { nil } { return ns_scanner_default(object) }
 	if obj_header(object).cache != unsafe { nil } { return ns_cache_initialize(object) }
+	if obj_header(object).telephony_owned { return telephony_initialize(object) }
 	if obj_header(object).user_activity != unsafe { nil } { panic('iOS: user activity requires designated construction') }
 	if obj_header(object).notification_queue != unsafe { nil } { return ns_notification_queue_initialize(object, 0, true) }
 	if obj_header(object).un_trigger_owned { panic('iOS: notification trigger requires designated construction') }
@@ -1068,6 +1075,10 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if symbol in ['_OBJC_CLASS_$_CTTelephonyNetworkInfo', '_OBJC_METACLASS_$_CTTelephonyNetworkInfo']!
+		&& library != '/System/Library/Frameworks/CoreTelephony.framework/CoreTelephony' {
+		return error('iOS: telephony import requires CoreTelephony.framework')
+	}
 	if symbol in ['_OBJC_CLASS_$_MTLTextureDescriptor', '_OBJC_METACLASS_$_MTLTextureDescriptor']!
 		&& library != '/System/Library/Frameworks/Metal.framework/Metal' {
 		return error('iOS: Metal texture descriptor import requires Metal.framework')

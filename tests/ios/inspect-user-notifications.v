@@ -12,6 +12,7 @@ fn C.objc_getClass(&char) voidptr
 fn C.object_getClass(voidptr) voidptr
 fn C.sel_registerName(&char) voidptr
 fn C.dlsym(voidptr, &char) voidptr
+fn C.dlopen(&char, int) voidptr
 fn C.class_getInstanceSize(voidptr) usize
 fn C.class_getSuperclass(voidptr) voidptr
 fn C.class_getName(voidptr) &char
@@ -42,6 +43,9 @@ fn main() {
   exit(code)
  }
  name := if os.args.len > 1 { os.args[1] } else { 'UNUserNotificationCenter' }
+ if name == 'CTTelephonyNetworkInfo' {
+  assert C.dlopen(c'/System/Library/Frameworks/CoreTelephony.framework/CoreTelephony', 2) != unsafe { nil }
+ }
  cls := C.objc_getClass(name.str)
  assert cls != unsafe { nil }
  println('${name} SIZE ${C.class_getInstanceSize(cls)} PARENT ${unsafe { C.class_getName(C.class_getSuperclass(cls)).vstring() }}')
@@ -59,6 +63,16 @@ fn main() {
    println('METHOD ${if meta { "+" } else { "-" }} ${unsafe { C.sel_getName(C.method_getName(method)).vstring() }} ${unsafe { C.method_getTypeEncoding(method).vstring() }}')
   }
   unsafe { C.free(methods) }
+ }
+ if name == 'CTTelephonyNetworkInfo' {
+  pool := msg(u64(C.objc_getClass(c'NSAutoreleasePool')), c'new', 0)
+  object := msg(u64(cls), c'new', 0)
+  for selector in [c'delegate', c'dataServiceIdentifier', c'subscriberCellularProvider', c'serviceSubscriberCellularProviders', c'serviceCurrentRadioAccessTechnology', c'currentRadioAccessTechnology', c'serviceSubscriberCellularProvidersDidUpdateNotifier', c'subscriberCellularProviderDidUpdateNotifier']! {
+   value := msg(object, selector, 0)
+   kind := if value == 0 { 'nil' } else { unsafe { C.class_getName(C.object_getClass(voidptr(value))).vstring() } }
+   println('DEFAULT ${unsafe { selector.vstring() }} ${kind}${if value == 0 { '' } else { ' count=' + msg(value, c'count', 0).str() }}')
+  }
+  msg(object, c'release', 0); msg(pool, c'drain', 0)
  }
  if os.args.len > 2 && os.args[2] == 'center' {
   assert name == 'UNUserNotificationCenter'

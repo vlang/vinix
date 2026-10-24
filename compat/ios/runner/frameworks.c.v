@@ -250,6 +250,11 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		return u64(unsafe { voidptr(cf_uuid_get_uuid_bytes) })
 	}
 	if address := core_foundation_symbol(symbol) { return address }
+	if symbol in ['_OBJC_CLASS_$_CTTelephonyNetworkInfo', '_OBJC_METACLASS_$_CTTelephonyNetworkInfo']! {
+		if library != '/System/Library/Frameworks/CoreTelephony.framework/CoreTelephony' { return none }
+		cls := ios_runtime.names['CTTelephonyNetworkInfo']
+		return if symbol == '_OBJC_CLASS_$_CTTelephonyNetworkInfo' { cls } else { read64(cls) }
+	}
 	for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_'] {
 		if symbol.starts_with(prefix) {
 			if _ := dispatch_objc_import_name(symbol) { return none }
