@@ -205,10 +205,21 @@ remain historical evidence for that separate implementation.
 
 The subsequent [popular-app startup matrix](../tests/android/results/2026-10-21/popular-ws/README.md)
 probed eleven widely installed Google Play app identities. None reached a
-usable UI on the native WS runtime. The report distinguishes standalone APKs
+usable UI in that run. The report distinguishes standalone APKs
 from limited base-APK probes, records exact versions and signatures, and
 retains the first framework/JNI failure for each app. The Arity control still
 calculated `579` through the same runner.
+
+The [23 October Maps continuation](../tests/android/results/2026-10-23/maps-action-provider/README.md)
+displays live map tiles, Paris search and place photos, manually entered
+Versailles-to-Paris route estimates, and Route Preview. Preview's next and previous
+controls change the instruction and map; its overflow menu now opens with All
+traffic, Satellite and Terrain choices after adding `ActionProvider` support.
+The retained screenshots establish those interactions; the 15-minute observation
+was interrupted after these checks. GPS navigation and map layer changes remain
+unverified. The earlier
+[overflow failure](../tests/android/results/2026-10-23/maps-popup-menus/README.md)
+is retained separately with its raw `startup_failed` result.
 
 The desktop launches APKs with a WS surface and input pipe. Inside such a
 native client connection, the public launcher accepts:
