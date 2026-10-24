@@ -111,6 +111,7 @@ mut:
     ctime i64
     otime i64
     user_ns u64
+    ipc_ns u64
     values []int
     // Linux's sempid belongs to each semaphore, including zero operations.
     // Inline storage shares the set lifetime and needs no separate allocation.
@@ -130,22 +131,31 @@ mut:
     group_count int
     user_ns u64
     ipc_user_ns u64
+    ipc_ns u64
+    ipc_namespace &proc.Namespace = unsafe { nil }
     initial_user bool
     caps u64
 }
 
-// Copy credentials before taking sets_lock. Retain only scalar namespace IDs,
-// never a process/group slice or a namespace pointer across either lock.
-fn identity() Identity {
+// Snapshot credentials and pin the IPC namespace before taking sets_lock.
+// The pin survives unlocked user copies and pending operations, including a
+// concurrent namespace change by another thread in the same process.
+fn identity() ?Identity {
     process := proc.current_thread().process
     proc.lock_table()
     user_namespace := process.ns.user
-    ipc_namespace := process.ns.ipc
+    mut ipc_namespace := process.ns.ipc
+    if ipc_namespace != unsafe { nil } && !proc.try_get_namespace(mut ipc_namespace) {
+        proc.unlock_table()
+        return none
+    }
     mut who := Identity{
         uid: process.euid
         gid: process.egid
         user_ns: if user_namespace == unsafe { nil } { u64(4026531837) } else { user_namespace.id }
         ipc_user_ns: if ipc_namespace == unsafe { nil } { u64(4026531837) } else { ipc_namespace.ipc_user_ns }
+        ipc_ns: if ipc_namespace == unsafe { nil } { u64(4026531839) } else { ipc_namespace.id }
+        ipc_namespace: ipc_namespace
         initial_user: proc.is_initial_namespace(user_namespace)
         caps: process.caps.effective
     }
@@ -156,6 +166,13 @@ fn identity() Identity {
     }
     proc.unlock_table()
     return who
+}
+
+fn release_identity(who Identity) {
+    mut ns := who.ipc_namespace
+    // The registered IPC release hook removes all objects on the final put.
+    // Call only after sets_lock is released, since that hook takes it again.
+    if ns != unsafe { nil } { proc.put_namespace(mut ns) }
 }
 
 fn capable(who &Identity, set &Set, cap int) bool {
@@ -302,36 +319,36 @@ __global (
     next_id = int(1)
 )
 
-fn find_id_unlocked(id int) &Set {
+fn find_id_unlocked(id int, ns u64) &Set {
     for set in sets {
-        if set.id == id {
+        if set.id == id && set.ipc_ns == ns {
             return set
         }
     }
     return unsafe { nil }
 }
 
-fn find_key_unlocked(key i32) &Set {
+fn find_key_unlocked(key i32, ns u64) &Set {
     for set in sets {
-        if !set.removed && set.key == key {
+        if !set.removed && set.key == key && set.ipc_ns == ns {
             return set
         }
     }
     return unsafe { nil }
 }
 
-fn find_index_unlocked(index int) &Set {
+fn find_index_unlocked(index int, ns u64) &Set {
     for set in sets {
-        if !set.removed && set.index == index { return set }
+        if !set.removed && set.index == index && set.ipc_ns == ns { return set }
     }
     return unsafe { nil }
 }
 
-fn vacant_index_unlocked() int {
+fn vacant_index_unlocked(ns u64) int {
     // Fixed stack storage; no allocation on creation or inspection paths.
     mut occupied := [64]u64{}
     for set in sets {
-        if !set.removed { occupied[set.index / 64] |= u64(1) << (set.index % 64) }
+        if !set.removed && set.ipc_ns == ns { occupied[set.index / 64] |= u64(1) << (set.index % 64) }
     }
     for index in 0 .. max_sets {
         if occupied[index / 64] & (u64(1) << (index % 64)) == 0 { return index }
@@ -339,7 +356,7 @@ fn vacant_index_unlocked() int {
     return -1
 }
 
-fn inspect_limits(command i32, argument u64) (u64, u64) {
+fn inspect_limits(command i32, argument u64, ns u64) (u64, u64) {
     mut info := unsafe { &SemInfo(C.vinix_stack_alloc(sizeof(SemInfo))) }
     unsafe {
         *info = SemInfo{
@@ -360,7 +377,7 @@ fn inspect_limits(command i32, argument u64) (u64, u64) {
     mut highest := 0
     sets_lock.acquire()
     for set in sets {
-        if set.removed { continue }
+        if set.removed || set.ipc_ns != ns { continue }
         if set.index > highest { highest = set.index }
         if command == sem_info {
             info.semusz++
@@ -382,14 +399,40 @@ fn destroy_unlocked(set &Set) {
     unsafe { free(set) }
 }
 
+fn remove_unlocked(mut set Set) {
+    set.removed = true
+    // Previously granted frames keep their saved success. Only live pending
+    // records are completed with EIDRM. Waiter pins still own removed sets.
+    for set.pending_head != unsafe { nil } {
+        mut pending := set.pending_head
+        complete_unlocked(mut set, mut pending, errno.eidrm)
+    }
+    if set.waiters == 0 { destroy_unlocked(set) }
+}
+
+// Namespace references held by syscall frames prevent final teardown while
+// a frame can still use one of its sets. Retain the normal waiter rule here
+// as well; removal never frees an event or queue record owned by a frame.
+pub fn destroy_namespace(ns u64) {
+    sets_lock.acquire()
+    mut index := sets.len
+    for index > 0 {
+        index--
+        mut set := sets[index]
+        if !set.removed && set.ipc_ns == ns { remove_unlocked(mut set) }
+    }
+    sets_lock.release()
+}
+
 pub fn syscall_semget(_ voidptr, key i32, nsems i32, flags i32) (u64, u64) {
     // Linux imports these registers as signed 32-bit ints and validates the
     // count before key lookup, including queries and exclusive creation.
     if nsems < 0 || nsems > max_sems { return errno.err, errno.einval }
-    who := identity()
+    who := identity() or { return errno.err, errno.eidrm }
+    defer { release_identity(who) }
     sets_lock.acquire()
     if key != ipc_private {
-        existing := find_key_unlocked(key)
+        existing := find_key_unlocked(key, who.ipc_ns)
         if existing != unsafe { nil } {
             if flags & ipc_creat != 0 && flags & ipc_excl != 0 {
                 sets_lock.release()
@@ -417,7 +460,7 @@ pub fn syscall_semget(_ voidptr, key i32, nsems i32, flags i32) (u64, u64) {
         sets_lock.release()
         return errno.err, errno.einval
     }
-    index := vacant_index_unlocked()
+    index := vacant_index_unlocked(who.ipc_ns)
     if index < 0 { sets_lock.release(); return errno.err, errno.enospc }
     charge := proc.reserve_kernel(.ipc, 4096) or { sets_lock.release(); return errno.err, errno.get() }
     id := next_id
@@ -438,6 +481,7 @@ pub fn syscall_semget(_ voidptr, key i32, nsems i32, flags i32) (u64, u64) {
         mode: u32(flags) & 0o777
         ctime: realtime_seconds()
         user_ns: who.ipc_user_ns
+        ipc_ns: who.ipc_ns
         values: values
     }
     sets_lock.release()
@@ -448,7 +492,11 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) 
     // Linux rejects a negative ID first, then validates SETVAL's signed
     // union member before looking up a nonnegative ID or checking semnum.
     if id < 0 { return errno.err, errno.einval }
-    if command == ipc_info || command == sem_info { return inspect_limits(command, argument) }
+    if command == ipc_info || command == sem_info {
+        who := identity() or { return errno.err, errno.eidrm }
+        defer { release_identity(who) }
+        return inspect_limits(command, argument, who.ipc_ns)
+    }
     if command == setval && (i32(argument) < 0 || i32(argument) > semvmx) {
         return errno.err, errno.erange
     }
@@ -463,11 +511,12 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) 
     if command == ipc_set && !usercopy.copy_from_user(info, argument, semid_size()) {
         return errno.err, errno.efault
     }
-    who := identity()
+    who := identity() or { return errno.err, errno.eidrm }
+    defer { release_identity(who) }
     sets_lock.acquire()
     mut set := if command == sem_stat || command == sem_stat_any {
-        find_index_unlocked(int(id))
-    } else { find_id_unlocked(int(id)) }
+        find_index_unlocked(int(id), who.ipc_ns)
+    } else { find_id_unlocked(int(id), who.ipc_ns) }
     if set == unsafe { nil } || set.removed {
         sets_lock.release()
         return errno.err, errno.einval
@@ -526,16 +575,7 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) 
             return u64(result), 0
         }
         ipc_rmid {
-            set.removed = true
-            // Previously granted frames keep their saved success. Only live
-            // pending records are completed with EIDRM by removal.
-            for set.pending_head != unsafe { nil } {
-                mut pending := set.pending_head
-                complete_unlocked(mut set, mut pending, errno.eidrm)
-            }
-            if set.waiters == 0 {
-                destroy_unlocked(set)
-            }
+            remove_unlocked(mut set)
             sets_lock.release()
             return 0, 0
         }
@@ -573,7 +613,7 @@ pub fn syscall_semctl(_ voidptr, id i32, number i32, command i32, argument u64) 
                 }
             }
             sets_lock.acquire()
-            set = find_id_unlocked(int(id))
+            set = find_id_unlocked(int(id), who.ipc_ns)
             if set == unsafe { nil } || set.removed {
                 sets_lock.release()
                 return errno.err, errno.eidrm
@@ -652,9 +692,10 @@ fn operate(id i32, user_operations u64, count u32, timeout_address u64) (u64, u6
         timer = time.new_timer(duration)
     }
 
-    who := identity()
+    who := identity() or { return errno.err, errno.eidrm }
+    defer { release_identity(who) }
     sets_lock.acquire()
-    mut set := find_id_unlocked(int(id))
+    mut set := find_id_unlocked(int(id), who.ipc_ns)
     if set == unsafe { nil } || set.removed {
         sets_lock.release()
         return errno.err, errno.einval

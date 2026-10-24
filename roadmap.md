@@ -1768,6 +1768,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   semaphore suites and retain external build/reference/regression evidence.
   See [the inspection receipts and limits](docs/linux-semaphore-inspection.md).
 
+- [x] Scope native semaphore keys, IDs, enumeration and usage to IPC namespaces,
+  and destroy sets when their last namespace reference closes. Qualify fork,
+  unshare, setns and descriptor-held lifetimes against identical Linux ELFs on
+  both architectures, with 445 Linux / 446 native checks and 36 original failures
+  each. Repeat all 12 maintained namespace/semaphore suites and measure flat
+  storage after warmed teardown of 200 arrays. Preserve failures and limits in
+  [the namespace qualification](docs/linux-semaphore-namespaces.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

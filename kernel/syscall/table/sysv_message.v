@@ -3,9 +3,15 @@ module table
 
 import proc
 import sysvmsg
+import sysvsem
+
+fn destroy_ipc_namespace(ns u64) {
+	sysvmsg.destroy_namespace(ns)
+	sysvsem.destroy_namespace(ns)
+}
 
 fn init_sysv_message_syscalls() {
-	proc.register_ipc_namespace_release_hook(voidptr(sysvmsg.destroy_namespace))
+	proc.register_ipc_namespace_release_hook(voidptr(destroy_ipc_namespace))
 	$if amd64 {
 		syscall_table[68] = voidptr(sysvmsg.syscall_msgget)
 		syscall_table[69] = voidptr(sysvmsg.syscall_msgsnd)
