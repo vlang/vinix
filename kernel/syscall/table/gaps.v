@@ -601,17 +601,16 @@ fn syscall_linux_sched_setaffinity(_ voidptr, raw_pid int, size u32, mask u64) (
 // rt_sigpending(set, sigsetsize): the signals raised for this thread that its
 // mask is holding back.
 fn syscall_linux_rt_sigpending(_ voidptr, set u64, sigsetsize u64) (u64, u64) {
-	if sigsetsize != sizeof(u64) {
+	if sigsetsize > sizeof(u64) {
 		return errno.err, errno.einval
-	}
-	if set == 0 {
-		return errno.err, errno.efault
 	}
 
 	current_thread := proc.current_thread()
 	pending := proc.sigset_to_user(proc.pending_signals(current_thread) & current_thread.masked_signals)
 
-	if !usercopy.copy_to_user(set, voidptr(&pending), sizeof(u64)) {
+	// Linux accepts the requested prefix, including an empty copy whose
+	// pointer is ignored. Other signal syscalls still require a full sigset.
+	if !usercopy.copy_to_user(set, voidptr(&pending), sigsetsize) {
 		return errno.err, errno.efault
 	}
 

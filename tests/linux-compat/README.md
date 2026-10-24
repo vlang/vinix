@@ -2452,3 +2452,20 @@ negative controls), then `check` on the complete external bundle documented
 in the [input-import qualification](../../docs/linux-shared-memory-import.md).
 Inherited/split mappings, races, IPC namespaces and GNU/foreign/32-bit paths
 remain separate qualifications.
+
+The `sigpending` case checks native rt_sigpending output prefixes, zero-length
+pointer bypass, high-bit lengths, exact page bounds, guard faults, surrounding
+byte preservation, blocked thread/process pending sets and libc sigpending as
+root and UID 1000/GID 2000. Other signal syscall size requirements stay intact.
+Identical musl ELFs pass 428 checks on both production kernels and Linux
+6.12.51; original kernels fail 256 checks each. Run
+`--cases sigpending,randomsignal,clonesignal,cloneclear,seccomp,runtime,futex,jit`
+with a fresh state directory. All eight suites pass per architecture.
+
+`sigpending-reference.v` accepts the same arguments as `shmimport-reference.v`.
+Its `--self-test` has two positive and nine negative controls. Compile
+`sigpending-evidence.v` without `-prod`, run `self-test` (five positive and 23
+negative controls), then `check` on the complete external bundle documented
+in the [output-prefix qualification](../../docs/linux-pending-signal-output.md).
+Signal delivery races, queued payloads, timed waits and GNU/foreign/32-bit
+paths remain separate qualifications.

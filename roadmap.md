@@ -1830,6 +1830,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   33 each. All twelve maintained suites pass per architecture. See
   [the input-import qualification](docs/linux-shared-memory-import.md).
 
+- [x] Accept native rt_sigpending output prefixes of zero through eight bytes,
+  ignore zero-length pointers and preserve EINVAL/EFAULT precedence and the
+  pending set. Identical musl ELFs pass 428 checks on both production
+  architectures and Linux; originals fail 256 each. All eight maintained
+  suites pass per architecture. See
+  [the output-prefix qualification](docs/linux-pending-signal-output.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
