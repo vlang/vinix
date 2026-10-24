@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Frozen baseline247/fixed-attempt paired regression preparation. Select the
+// Frozen baseline247/fixed-attempt paired regression preparation (264/266 use262). Select the
 // attempt with VINIX_COMPOUND_ATTEMPT (default258). Run each action
 // once from the repository root; run the two resulting suite/config pairs only
 // after preparation. Baseline APK and native runtime are preserved unchanged.
@@ -13,7 +13,11 @@ import time
 
 const attempt = os.getenv_opt('VINIX_COMPOUND_ATTEMPT') or { '258' }
 const base = 'build/android-maps/compound' + attempt
-const previous = 'build/android-maps/compound247'
+const baseline_attempt = if attempt in ['264', '266'] { '262' } else { '247' }
+const previous = 'build/android-maps/compound' + baseline_attempt
+const fixture_name = if attempt in ['264', '266'] { 'widget-geometry-fixture.v' } else { 'compound-button-fixture.v' }
+const fixture_source = 'tests/native-android-ws/' + fixture_name
+const fixture_frozen = base + '/source/' + fixture_name
 const compiler = '/Users/alex/code/v/v_old'
 const audit = '/Users/alex/.local/state/vinix/android/compound' + attempt + '-2026-10-24'
 
@@ -83,12 +87,91 @@ fn verify_closure(label string) ! {
 	}
 }
 
+fn section(source string, marker string, next string) string {
+	assert source.count(marker) == 1, marker
+	tail := source.all_after(marker)
+	if next == '' {
+		assert !tail.contains('\nfn ') && !tail.contains('\npub fn '), marker
+		return marker + tail
+	}
+	assert source.count(next) == 1 && tail.contains(next), next
+	return marker + tail.all_before(next)
+}
+
+fn replace_section(original string, live string, marker string, next string) string {
+	old := section(original, marker, next)
+	replacement := section(live, marker, next)
+	assert old.all_before('\n') == replacement.all_before('\n'), marker
+	prefix := original.all_before(marker)
+	return prefix + replacement + original[prefix.len + old.len..]
+}
+
+fn replace_binding_body(original string, symbol string, body string) string {
+	marker := "@[export: '${symbol}']\n"
+	assert original.count(marker) == 1
+	tail := original.all_after(marker)
+	assert tail.contains('\n@[export: ')
+	old := tail.all_before('\n@[export: ')
+	assert old.count('    unsafe {\n') == 1 && old.count('\n }\n}\n') == 1
+	replacement := old.all_before('    unsafe {\n') + '    unsafe {\n ' + body + '\n }\n}\n'
+	return original.all_before(marker) + marker + replacement + '\n@[export: ' + tail.all_after('\n@[export: ')
+}
+
+fn freeze_geometry_native(native map[string]string) ! {
+	old := native['ws_views.v']!
+	live := os.read_file('build-support/android/nativews/ws_views.v')!
+	marker := 'struct WsView {\n'
+	next := '\nfn ws_view('
+	old_struct := section(old, marker, next)
+	live_struct := section(live, marker, next)
+	mut kept := []string{}
+	mut added := map[string]string{}
+	for line in live_struct.split_into_lines() {
+		parts := line.fields()
+		if parts.len > 0 && parts[0] in ['min_height', 'min_height_pixels'] {
+			assert parts.len == 2 && parts[1] == if parts[0] == 'min_height' { 'i32' } else { 'bool' }
+			assert parts[0] !in added
+			added[parts[0]] = parts[1]
+		} else { kept << line }
+	}
+	assert added.len == 2 && kept.join('\n') == old_struct.trim_right('\n')
+	mut updated := replace_section(old, live, marker, next)
+	updated = replace_section(updated, live, 'fn ws_measure(', '\nfn ws_layout(')
+	os.write_file(base + '/native/atlframework/ws_views.v', updated)!
+	mut rows := map[string]string{}
+	for line in os.read_file('build-support/android/nativews/bindings.txt')!.split_into_lines() {
+		parts := line.split('|')
+		if parts.len == 3 && parts[0] == 'android/widget/TextView' && parts[1] in ['setMinLines', 'getMinLines', 'setMinHeight', 'getMinHeight'] {
+			assert parts[1] !in rows
+			rows[parts[1]] = line
+		}
+	}
+	assert rows.len == 4
+	mut generated := native['ws_generated.v']!
+	for pair in [['setMinLines', 'Java_android_widget_TextView_setMinLines__I'], ['getMinLines', 'Java_android_widget_TextView_getMinLines__']] {
+		generated = replace_binding_body(generated, pair[1], rows[pair[0]]!.all_after_last('|'))
+	}
+	for spec in [['setMinHeight', 'Java_android_widget_TextView_setMinHeight__I', 'ws_geometry_set_min_height', 'e voidptr, this voidptr, p0 i32', ''], ['getMinHeight', 'Java_android_widget_TextView_getMinHeight__', 'ws_geometry_get_min_height', 'e voidptr, this voidptr', 'i32']] {
+		assert !generated.contains("@[export: '${spec[1]}']") && !generated.contains('fn ' + spec[2] + '(')
+		generated += "\n@[export: '${spec[1]}']\nfn ${spec[2]}(${spec[3]}) ${spec[4]} {\n    unsafe {\n ${rows[spec[0]]!.all_after_last('|')}\n }\n}\n"
+	}
+	os.write_file(base + '/native/atlframework/ws_generated.v', generated)!
+	write_json(base + '/native/binding-rows.json', rows)!
+	clone_file('build-support/android/nativews/bindings.txt', base + '/native/bindings.txt')!
+}
+
 fn freeze() ! {
 	assert !os.exists(base + '/framework') && !os.exists(base + '/native')
-	write_json(base + '/attempt.json', {'attempt': attempt, 'VINIX_COMPOUND_ATTEMPT': os.getenv('VINIX_COMPOUND_ATTEMPT'), 'base': base, 'audit': audit})!
-	assert hash(previous + '/framework/api-impl.jar')! == '73a10513135f9e264df9afdc7139c5370d67016d864be82fe0d6b2adba1f459b'
-	assert hash(previous + '/native/libvinix-android-native.so')! == '78893e6767c9398a7d6cb513f0f34b8536604afaa065e383f46cb98e9d003f37'
+	write_json(base + '/attempt.json', {'attempt': attempt, 'VINIX_COMPOUND_ATTEMPT': os.getenv('VINIX_COMPOUND_ATTEMPT'), 'base': base, 'audit': audit, 'baseline_attempt': baseline_attempt, 'fixture_source': fixture_source, 'fixture_frozen': fixture_frozen})!
+	assert hash(previous + '/framework/api-impl.jar')! == if attempt in ['264', '266'] { 'a37ffeceffd29e7bd5db825e079949f5a6e3f71dd04edba8c61239bd1971b71c' } else { '73a10513135f9e264df9afdc7139c5370d67016d864be82fe0d6b2adba1f459b' }
+	assert hash(previous + '/native/libvinix-android-native.so')! == if attempt in ['264', '266'] { '3bbc2d9439961be351f18e391f305ded393d7a10b67f1cf2e80adad2a6569b80' } else { '78893e6767c9398a7d6cb513f0f34b8536604afaa065e383f46cb98e9d003f37' }
 	framework := snapshot('framework', 125)!
+	if attempt in ['264', '266'] {
+		for spec in [['androidtools/framework_geometry.v', 'fn framework_view_geometry(', '\nfn framework_viewgroup_clipping('], ['androidtools/framework_view_canvas.v', 'fn framework_view_canvas(', ''], ['androidtools/framework_classes.v', 'fn framework_text_widgets(', '\nfn framework_check_widgets(']] {
+			live := os.read_file('tests/native-android-tools/' + spec[0])!
+			os.write_file(base + '/framework/sources/' + spec[0], replace_section(framework[spec[0]]!, live, spec[1], spec[2]))!
+		}
+	} else {
 	file := 'androidtools/framework_classes.v'
 	marker := 'fn framework_check_widgets(smali string) ! {'
 	live := os.read_file('tests/native-android-tools/' + file)!
@@ -96,7 +179,9 @@ fn freeze() ! {
 	assert old.count(marker) == 1 && live.count(marker) == 1
 	assert !old.all_after(marker).contains('\nfn ') && !live.all_after(marker).contains('\nfn ')
 	os.write_file(base + '/framework/sources/' + file, old.all_before(marker) + marker + live.all_after(marker))!
+	}
 	native := snapshot('native', 83)!
+	if attempt in ['264', '266'] { freeze_geometry_native(native)! } else {
 	old_native := native['check_widgets.v']!
 	live_native := os.read_file('build-support/android/nativews/check_widgets.v')!
 	native_marker := 'fn ws_checked('
@@ -104,6 +189,7 @@ fn freeze() ! {
 	assert old_native.count(native_marker) == 1 && live_native.count(native_marker) == 1
 	assert old_native.all_after(next) == live_native.all_after(next)
 	os.write_file(base + '/native/atlframework/check_widgets.v', old_native.all_before(native_marker) + native_marker + live_native.all_after(native_marker).all_before(next) + next + old_native.all_after(next))!
+	}
 	for kind, count in {'framework': 125, 'native': 83} {
 		directory := if kind == 'framework' { '/sources/' } else { '/atlframework/' }
 		mut sources := map[string]string{}
@@ -118,14 +204,17 @@ fn freeze() ! {
 		}
 		assert sources.len == count
 		delta.sort()
-		assert delta == if kind == 'framework' { ['androidtools/framework_classes.v'] } else { ['check_widgets.v'] }, delta.str()
+		expected := if attempt in ['264', '266'] {
+			if kind == 'framework' { ['androidtools/framework_classes.v', 'androidtools/framework_geometry.v', 'androidtools/framework_view_canvas.v'] } else { ['ws_generated.v', 'ws_views.v'] }
+		} else { if kind == 'framework' { ['androidtools/framework_classes.v'] } else { ['check_widgets.v'] } }
+		assert delta == expected, delta.str()
 		write_json(base + '/' + kind + '/sources.json', sources)!
 		write_json(base + '/' + kind + '/source-delta.json', json2.Any(delta))!
 		os.write_file_array(base + '/' + kind + '/exact-sources.json.gz', gzip.compress(json2.encode(exact).bytes())!)!
 	}
 	for name in ['androidfw_c_api.h', 'sqlite3.h', 'stb_image.h', 'stb_truetype.h'] { clone_file(previous + '/native/' + name, base + '/native/' + name)! }
 	os.mkdir_all(base + '/source')!
-	os.cp('tests/native-android-ws/compound-button-fixture.v', base + '/source/compound-button-fixture.v')!
+	os.cp(fixture_source, fixture_frozen)!
 	os.cp('tests/native-android-ws/compound-button-build.v', base + '/build-framework.v')!
 	os.cp(@FILE, base + '/source/compound-button-run.v')!
 	manifest := json2.decode[map[string]json2.Any](os.read_file(previous + '/framework/framework-manifest.json')!)!
@@ -141,11 +230,14 @@ fn freeze() ! {
 		'/usr/bin/cc', '/usr/bin/clang', '/usr/bin/zip', '/opt/homebrew/opt/openjdk@25/bin/keytool',
 		'build/android-native-ws/aapt2', 'build/android-native-ws/android-15/lib/apksigner.jar',
 		'tests/linuxkpi/generate_module.v', 'tests/native-android-tools/androidtools/framework_classes.v',
-		'build-support/android/nativews/check_widgets.v', 'tests/native-android-ws/compound-button-fixture.v',
+		'build-support/android/nativews/check_widgets.v', fixture_source,
 		'tests/native-android-ws/compound-button-run.v', 'tests/native-android-ws/compound-button-build.v',
 		'/Users/alex/code/vinix-android-native/build-aarch64-android/aarch64/staging/opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/api-impl.jar',
 		'/Users/alex/code/vinix-android-native/build-aarch64-android/aarch64/staging/opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/framework-res.apk'] {
 		inputs[path] = hash(path)!
+	}
+	if attempt in ['264', '266'] {
+		for path in ['tests/native-android-tools/androidtools/framework_geometry.v', 'tests/native-android-tools/androidtools/framework_view_canvas.v', 'build-support/android/nativews/ws_views.v', 'build-support/android/nativews/bindings.txt'] { inputs[path] = hash(path)! }
 	}
 	for name in ['usr/lib/art/libandroidfw.so', 'usr/lib/libpng16.so.16', 'usr/lib/libsqlite3.so.0'] {
 		path := 'build/android-framework/calculator/overlay/opt/vinix-android-aarch64/' + name
@@ -161,8 +253,8 @@ fn freeze() ! {
 	write_json(base + '/frozen-inputs.json', inputs)!
 	freeze_closure('framework', [compiler, '-print-v-files', '-enable-globals', '-path', framework_paths(), base + '/build-framework.v'])!
 	freeze_closure('native-generator', [compiler, '-print-v-files', 'tests/linuxkpi/generate_module.v'])!
-	freeze_closure('fixture', [compiler, '-print-v-files', base + '/source/compound-button-fixture.v'])!
-	println('COMPOUND' + attempt + ' FROZEN framework=125 delta=framework_check_widgets native=83 delta=ws_checked fixture=' + hash(base + '/source/compound-button-fixture.v')!)
+	freeze_closure('fixture', [compiler, '-print-v-files', fixture_frozen])!
+	println('COMPOUND' + attempt + ' FROZEN baseline=' + baseline_attempt + ' framework=125 native=83 bounded deltas fixture=' + hash(fixture_frozen)!)
 }
 
 fn compile_step(label string, argv []string, output string) ! {
@@ -199,7 +291,7 @@ fn build() ! {
 	runtime := 'build/android-framework/calculator/overlay/opt/vinix-android-aarch64'
 	compile_step('build-native', ['/opt/homebrew/bin/aarch64-linux-musl-gcc', '-D_GNU_SOURCE', '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-unused-function', '-Wno-unused-label', '-Wno-unused-parameter', '-fvisibility=hidden', '-shared', '-fPIC', '-I' + base + '/native', '-Wl,-z,max-page-size=65536', '-Wl,--allow-shlib-undefined', base + '/native/android-native.c', runtime + '/usr/lib/art/libandroidfw.so', '-Wl,--no-as-needed', runtime + '/usr/lib/libpng16.so.16', runtime + '/usr/lib/libsqlite3.so.0', '-ldl', '-lm', '-o', base + '/native/libvinix-android-native.so'], base + '/native/libvinix-android-native.so')!
 	verify_closure('fixture')!
-	compile_step('fixture-compiler', [compiler, '-nocache', '-cc', 'cc', '-cflags', '-O2', '-o', base + '/fixture-generator', base + '/source/compound-button-fixture.v'], base + '/fixture-generator')!
+	compile_step('fixture-compiler', [compiler, '-nocache', '-cc', 'cc', '-cflags', '-O2', '-o', base + '/fixture-generator', fixture_frozen], base + '/fixture-generator')!
 	verify_closure('fixture')!
 	compile_step('fixture', [base + '/fixture-generator', base + '/apk'], base + '/apk/probe.apk')!
 	println('COMPOUND' + attempt + ' BUILT framework=' + hash(base + '/framework/api-impl.jar')! + ' native=' + hash(base + '/native/libvinix-android-native.so')! + ' apk=' + hash(base + '/apk/probe.apk')!)
@@ -259,7 +351,7 @@ fn prepare_runs() ! {
 		mut apps := config['applications']!.as_array()
 		mut app := apps[0].as_map().clone()
 		app['apk'] = os.abs_path(base + '/apk/probe.apk')
-		app['source'] = os.abs_path(base + '/source/compound-button-fixture.v')
+		app['source'] = os.abs_path(fixture_frozen)
 		app['startup_seconds'] = json2.Any(30)
 		apps[0] = json2.Any(app)
 		config['applications'] = json2.Any(apps)
@@ -306,7 +398,7 @@ fn prepare_runs() ! {
 		if os.is_file(path) { independent[path.all_after(audit + '/')] = hash(path)! }
 	}
 	write_json(audit + '/prelaunch-sha256.json', independent)!
-	println('COMPOUND' + attempt + ' RUNS PREPARED same signed APK; private baseline247/fixed' + attempt + ' media; original classifier; bounded finalcapture; prelaunch=' + hash(base + '/prelaunch-sha256.json')!)
+	println('COMPOUND' + attempt + ' RUNS PREPARED same signed APK; private baseline' + baseline_attempt + '/fixed' + attempt + ' media; original classifier; bounded finalcapture; prelaunch=' + hash(base + '/prelaunch-sha256.json')!)
 }
 
 fn main() {
