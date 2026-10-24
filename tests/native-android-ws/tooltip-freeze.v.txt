@@ -11,7 +11,7 @@ fn all_files(root string) ![]string {
 	mut names := os.ls(root)!
 	names.sort()
 	for name in names {
-		path := root + '/' + name
+		path := root.trim_right('/') + '/' + name
 		assert !os.is_link(path), path
 		if os.is_dir(path) { result << all_files(path)! }
 		else { assert os.is_file(path), path; result << path }
@@ -29,6 +29,7 @@ fn inventory_self_test() ! {
 	mut actual := all_files(root)!.map(it.all_after(root + '/'))
 	actual.sort()
 	assert actual == ['.hidden/nested/input', 'plain']
+	assert all_files(root + '/')! == all_files(root)!
 	println('TOOLTIP280 HIDDEN INVENTORY SELF-TEST PASS')
 }
 
