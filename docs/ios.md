@@ -18799,9 +18799,27 @@ under ASan+UBSan, normally and with deterministic Swift hashing. The recursive
 lock host regression also passes in both modes. All sixteen ARM64 fixtures and
 runners build, and the focused guest passes all thirteen lock, map-table,
 credential, telephony, cache, calendar and notification fixtures, including
-28 lock and 23 recursive-lock rejection cases. The fresh Fortnite probe resolves
-`NSLock` and stops at `_OBJC_CLASS_$_NSNumberFormatter` during linking, before
-application entry. The [lock report](../tests/ios/lock-report.md) records the
+28 lock and 23 recursive-lock rejection cases. That milestone's Fortnite probe
+resolved `NSLock` and stopped at `_OBJC_CLASS_$_NSNumberFormatter` during linking,
+before application entry. The [lock report](../tests/ios/lock-report.md) records
+the source revision, complete external archive, checksums and verification.
+
+The number-formatter milestone adds `NSNumberFormatter` with Apple's measured
+64-byte layout and seven ivars. Its bounded English profile supports no-style
+and decimal formatting, half-even rounding, grouping, padding, exact 64-bit
+integers, strict parsing, copied locales and independent copies. Reinitializing
+resets settings and the explicit locale. Currency, percent, arbitrary locales,
+custom symbols, coding and custom subclasses fail explicitly.
+
+The shared number-formatter fixture passes against Apple Foundation and the V
+runtime under ASan+UBSan, normally and with deterministic Swift hashing. The
+date-formatter host regression passes in both modes. All eighteen ARM64 fixtures
+and runners build, and the focused guest passes all fifteen number/date
+formatter, lock, map-table, credential, telephony, cache, calendar and notification
+fixtures, including 33 number-formatter rejection cases. The fresh Fortnite probe
+resolves `NSNumberFormatter` and stops at `_OBJC_CLASS_$_NSBundleResourceRequest`
+during linking, before application entry.
+The [number-formatter report](../tests/ios/number-formatter-report.md) records the
 source revision, complete external archive, checksums and verification. Full native
 regression, Swift support, Fortnite initialization, rendering, login and gameplay
 remain unverified. The audits below include this implementation and do not
@@ -18812,12 +18830,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,091 | 70 | 78 |
+| Fortnite executable | 2,092 | 69 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,931 | 73 | 114 |
+| All images | 2,932 | 72 | 114 |
 
-The C++/GLES/Text variant reports 2,945 resolved imports, 59 unresolved strong
+The C++/GLES/Text variant reports 2,946 resolved imports, 58 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
