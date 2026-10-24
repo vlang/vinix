@@ -23,6 +23,7 @@ import time
 pub struct NinePFS {
 mut:
 	box             &FileSystem        = unsafe { nil }
+	filesystem_value FileSystem
 	channel         &virtio_9p.Channel = unsafe { nil }
 	client          ninep.Client
 	lock            klock.Lock
@@ -64,7 +65,14 @@ mut:
 }
 
 fn (mut backend NinePFS) as_filesystem() &FileSystem {
-	if backend.box == unsafe { nil } { backend.box = &FileSystem(backend) @[freed] }
+	// The interface value is interior storage owned by the backend, and the
+	// registry borrows its address. Boxing a second copy here allocated an
+	// object that the success path never freed: the cached backend keeps it
+	// for the boot, so the marker only hid the allocation from the gate.
+	if backend.box == unsafe { nil } {
+		backend.filesystem_value = FileSystem(unsafe { &backend })
+		backend.box = unsafe { &backend.filesystem_value }
+	}
 	return backend.box
 }
 
@@ -169,7 +177,6 @@ fn (mut backend NinePFS) mount_specifier(parent &VFSNode, name string, source st
 				memory.free(res.box)
 				memory.free(res)
 			}
-			memory.free(backend.box)
 			memory.free(backend)
 		}
 	}
