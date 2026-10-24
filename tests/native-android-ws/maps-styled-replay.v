@@ -293,7 +293,7 @@ fn prepare(frozen string, media string, external string) ! {
 	clone(target, external + '/prelaunch/replica/' + target)!
 	// Paired fixture VMs have separate retention. Select their immutable build
 	// provenance here so no running guest media or QMP socket is copied.
-	for name in ['framework', 'native', 'inputs', 'source', 'closure-inputs', 'failed-path-compile',
+	for name in ['framework', 'native', 'baseline-framework', 'baseline-native', 'inputs', 'source', 'closure-inputs', 'failed-path-compile',
 		'build-framework', 'build-framework.v', 'frozen-inputs.json', 'path-repair-receipt.json',
 		'framework-v-files.json', 'framework-v-files.txt', 'native-generator-v-files.json',
 		'native-generator-v-files.txt', 'fixture-v-files.json', 'fixture-v-files.txt'] {
