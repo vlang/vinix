@@ -18700,24 +18700,40 @@ overrides, 33 rejection cases and two drained lifetimes. All nine ARM64 fixtures
 and runners build, and the focused guest passes all six calendar and
 notification fixtures. This does not establish full regression or Swift success.
 
-The fresh Fortnite probe resolves the sound class and stops at
+The sound milestone's Fortnite probe resolved the sound class and stopped at
 `_OBJC_CLASS_$_UNNotificationAttachment` in UserNotifications, before application
 entry, with process exit status 1. The
 [notification-sound report](../tests/ios/notification-sound-report.md) records
 the source revision, complete external archive, checksums and verification.
-The audits below use this sound implementation and do not execute app code.
+
+The attachment milestone adds bounded `UNNotificationAttachment` values with
+Apple's measured 64-byte layout. The designated initializer snapshots identifier
+and type strings, retains a live built-in file or HTTP URL and accepts nil
+options. Immutable copies retain the same attachment. Public factories, file
+import, options, security scopes, coding and custom subclasses remain explicit
+failures; notification delivery is absent.
+
+The shared attachment fixture passes against Apple UserNotifications and the V
+runtime under ASan+UBSan, normally and with deterministic Swift hashing. All ten
+ARM64 fixtures and runners build, and the focused guest passes all seven
+calendar and notification fixtures, including 39 attachment rejection cases.
+The fresh Fortnite probe resolves the attachment class and stops at
+`_OBJC_CLASS_$_NSCache` in CoreFoundation during linking, before application
+entry. The [notification-attachment report](../tests/ios/notification-attachment-report.md)
+records the source revision, complete external archive, checksums and verification.
+The audits below use this attachment implementation and do not execute app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,085 | 76 | 78 |
+| Fortnite executable | 2,086 | 75 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,925 | 79 | 114 |
+| All images | 2,926 | 78 | 114 |
 
-The C++/GLES/Text variant reports 2,939 resolved imports, 65 unresolved strong
+The C++/GLES/Text variant reports 2,940 resolved imports, 64 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
