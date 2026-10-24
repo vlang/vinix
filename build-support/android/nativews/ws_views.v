@@ -20,6 +20,8 @@ mut:
 	focused        bool
 	max_lines      i32
 	min_lines      i32
+	min_height     i32
+	min_height_pixels bool
 	single_line    bool
 	checked        bool
 	broadcasting   bool
@@ -204,6 +206,9 @@ fn ws_measure(e voidptr, object voidptr, width_spec i32, height_spec i32) {
 			if height > ws.height / 2 { height = ws.height / 2 }
 			ws_layout_free(layout)
 		}
+		// TextView pixel and line minima replace one another. The pixel floor
+		// includes padding and remains independent of View.setMinimumHeight.
+		if view.min_height_pixels && height < view.min_height { height = view.min_height }
 		minimum_width := integer(e, object, c'android/view/View', c'getSuggestedMinimumWidth', c'()I', nil)
 		minimum_height := integer(e, object, c'android/view/View', c'getSuggestedMinimumHeight', c'()I', nil)
 		if width < minimum_width { width = minimum_width }

@@ -258,7 +258,7 @@ fn framework_application_uid(smali string) ! {
 fn framework_text_widgets(smali string) ! {
  path := smali + '/android/widget/TextView.smali'
  mut text := os.read_file(path)!
- for signature in ['setMaxLines(I)V', 'getMaxLines()I', 'setMinLines(I)V', 'getMinLines()I',
+ for signature in ['setMaxLines(I)V', 'getMaxLines()I', 'setMinLines(I)V', 'getMinLines()I', 'setMinHeight(I)V', 'getMinHeight()I',
   'setSingleLine()V', 'setSingleLine(Z)V', 'setHorizontallyScrolling(Z)V', 'getHorizontallyScrolling()Z'] {
   text = framework_replace_method(text, signature, '.method public native ' + signature + '\n.end method')!
  }

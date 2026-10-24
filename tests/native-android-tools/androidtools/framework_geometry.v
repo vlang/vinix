@@ -11,6 +11,96 @@ fn framework_view_geometry(smali string) ! {
  framework_viewgroup_clipping(smali)!
  path := smali + '/android/view/View.smali'
  mut text := os.read_file(path)!
+ // Retain logical padding and resolve it on demand, like layout direction.
+ text += '\n.field private vinixRelativePadding:Z\n.field private vinixPaddingStart:I\n.field private vinixPaddingEnd:I\n'
+ text = framework_replace_method(text, 'setPadding(IIII)V', '.method public setPadding(IIII)V\n.locals 1\nconst/4 v0, 0\niput-boolean v0, p0, Landroid/view/View;->vinixRelativePadding:Z\ninvoke-direct {p0, p1, p2, p3, p4}, Landroid/view/View;->vinixSetPadding(IIII)V\nreturn-void\n.end method')!
+ text = framework_replace_method(text, 'setPaddingRelative(IIII)V', r'.method public setPaddingRelative(IIII)V
+.locals 3
+const/4 v0, 1
+iput-boolean v0, p0, Landroid/view/View;->vinixRelativePadding:Z
+iput p1, p0, Landroid/view/View;->vinixPaddingStart:I
+iput p3, p0, Landroid/view/View;->vinixPaddingEnd:I
+invoke-virtual {p0}, Landroid/view/View;->getLayoutDirection()I
+move-result v0
+const/4 v1, 1
+move v2, p3
+if-ne v0, v1, :apply
+move v2, p1
+move p1, p3
+:apply
+invoke-direct {p0, p1, p2, v2, p4}, Landroid/view/View;->vinixSetPadding(IIII)V
+return-void
+.end method')!
+ text = framework_replace_method(text, 'isPaddingRelative()Z', '.method public isPaddingRelative()Z\n.locals 1\niget-boolean v0, p0, Landroid/view/View;->vinixRelativePadding:Z\nreturn v0\n.end method')!
+ for side in ['Left', 'Right', 'Start', 'End'] {
+  mut body := 'invoke-direct {p0}, Landroid/view/View;->vinixResolvePadding()V\n'
+  if side == 'Start' || side == 'End' {
+   primary := if side == 'Start' { 'Left' } else { 'Right' }
+   other := if side == 'Start' { 'Right' } else { 'Left' }
+   body += 'invoke-virtual {p0}, Landroid/view/View;->getLayoutDirection()I\nmove-result v0\nconst/4 v1, 1\nif-eq v0, v1, :rtl\niget v0, p0, Landroid/view/View;->padding' + primary + ':I\nreturn v0\n:rtl\niget v0, p0, Landroid/view/View;->padding' + other + ':I\nreturn v0\n'
+  } else {
+   body += 'iget v0, p0, Landroid/view/View;->padding' + side + ':I\nreturn v0\n'
+  }
+  text = framework_replace_method(text, 'getPadding' + side + '()I', '.method public getPadding' + side + '()I\n.locals 2\n' + body + '.end method')!
+ }
+ text += r'
+.method private vinixResolvePadding()V
+.locals 4
+iget-boolean v0, p0, Landroid/view/View;->vinixRelativePadding:Z
+if-eqz v0, :done
+iget v0, p0, Landroid/view/View;->vinixPaddingStart:I
+iget v1, p0, Landroid/view/View;->vinixPaddingEnd:I
+invoke-virtual {p0}, Landroid/view/View;->getLayoutDirection()I
+move-result v2
+const/4 v3, 1
+if-ne v2, v3, :apply
+move v2, v0
+move v0, v1
+move v1, v2
+:apply
+iget v2, p0, Landroid/view/View;->paddingTop:I
+iget v3, p0, Landroid/view/View;->paddingBottom:I
+invoke-direct {p0, v0, v2, v1, v3}, Landroid/view/View;->vinixSetPadding(IIII)V
+:done
+return-void
+.end method
+
+.method private vinixSetPadding(IIII)V
+.locals 7
+iget v0, p0, Landroid/view/View;->paddingLeft:I
+if-ne v0, p1, :apply
+iget v0, p0, Landroid/view/View;->paddingTop:I
+if-ne v0, p2, :apply
+iget v0, p0, Landroid/view/View;->paddingRight:I
+if-ne v0, p3, :apply
+iget v0, p0, Landroid/view/View;->paddingBottom:I
+if-eq v0, p4, :done
+:apply
+iput p1, p0, Landroid/view/View;->paddingLeft:I
+iput p2, p0, Landroid/view/View;->paddingTop:I
+iput p3, p0, Landroid/view/View;->paddingRight:I
+iput p4, p0, Landroid/view/View;->paddingBottom:I
+move-object v0, p0
+iget-wide v1, p0, Landroid/view/View;->widget:J
+move v3, p1
+move v4, p2
+move v5, p3
+move v6, p4
+invoke-virtual/range {v0 .. v6}, Landroid/view/View;->native_setPadding(JIIII)V
+invoke-virtual {p0}, Landroid/view/View;->requestLayout()V
+invoke-virtual {p0}, Landroid/view/View;->invalidate()V
+:done
+return-void
+.end method
+'
+ measure_start := text.index('.method public final measure(II)V\n') or { return error('missing View measure method') }
+ measure_end := measure_start + (text[measure_start..].index('.end method') or { return error('unterminated View measure method') }) + '.end method'.len
+ measure_method := text[measure_start..measure_end]
+ measure := '    iget-boolean v0, p0, Landroid/view/View;->layoutRequested:Z'
+ if measure_method.count(measure) != 1 { return error('unexpected View measurement padding entry') }
+ // Resolve before the measure cache check; other methods also read this flag.
+ patched_measure := measure_method.replace(measure, '    invoke-direct {p0}, Landroid/view/View;->vinixResolvePadding()V\n\n' + measure)
+ text = text[..measure_start] + patched_measure + text[measure_end..]
  text = framework_replace_method(text, 'getGlobalVisibleRect(Landroid/graphics/Rect;)Z',
   '.method public getGlobalVisibleRect(Landroid/graphics/Rect;)Z\n.locals 1\nconst/4 v0, 0\n' +
   'invoke-virtual {p0, p1, v0}, Landroid/view/View;->getGlobalVisibleRect(Landroid/graphics/Rect;Landroid/graphics/Point;)Z\nmove-result v0\nreturn v0\n.end method')!
@@ -93,6 +183,7 @@ invoke-virtual {v8, v6, v6, v4, v5}, Landroid/graphics/RectF;->intersect(FFFF)Z
 move-result v6
 if-eqz v6, :rounded
 :padding
+invoke-direct {v1}, Landroid/view/View;->vinixResolvePadding()V
 instance-of v2, v1, Landroid/view/ViewGroup;
 if-eqz v2, :rounded
 move-object v9, v1

@@ -29,7 +29,9 @@ return-object v0
 		if class == 'View' {
 			for method, native in {'draw': 'native_drawBackground', 'onDraw': 'native_drawContent', 'dispatchDraw': 'native_drawChildren'} {
 				mut body := '.method ' + if method == 'dispatchDraw' { 'protected ' } else { 'public ' }
-				body += method + '(Landroid/graphics/Canvas;)V\n.locals 3\n' +
+				body += method + '(Landroid/graphics/Canvas;)V\n.locals 3\n'
+				if method == 'draw' { body += 'invoke-direct {p0}, Landroid/view/View;->vinixResolvePadding()V\n' }
+				body +=
 					'invoke-virtual {p1}, Landroid/graphics/Canvas;->vinixNativeCanvas()Landroid/atl/GskCanvas;\nmove-result-object v0\n' +
 					'iget-wide v1, p0, Landroid/view/View;->widget:J\n' +
 					'invoke-virtual {p0, v1, v2, v0}, Landroid/view/View;->' + native + '(JLandroid/atl/GskCanvas;)V\n'

@@ -183,8 +183,10 @@ android/view/ViewGroup|native_drawChildren|ws_draw_children(e,this,p1)
 android/widget/TextView|native_constructor|return ws_view_new(1)
 android/widget/TextView|setMaxLines|ws_view(e,this).max_lines = p0; call(e,this,c'android/view/View',c'requestLayout',c'()V',nil); ws_mark()
 android/widget/TextView|getMaxLines|return if ws_view(e,this).max_lines > 0 { ws_view(e,this).max_lines } else { i32(2147483647) }
-android/widget/TextView|setMinLines|ws_view(e,this).min_lines = p0; call(e,this,c'android/view/View',c'requestLayout',c'()V',nil); ws_mark()
-android/widget/TextView|getMinLines|return ws_view(e,this).min_lines
+android/widget/TextView|setMinLines|view := ws_view(e,this); view.min_lines = p0; view.min_height_pixels = false; call(e,this,c'android/view/View',c'requestLayout',c'()V',nil); ws_mark()
+android/widget/TextView|getMinLines|view := ws_view(e,this); return if view.min_height_pixels { i32(-1) } else { view.min_lines }
+android/widget/TextView|setMinHeight|view := ws_view(e,this); view.min_height = p0; view.min_height_pixels = true; view.min_lines = 0; call(e,this,c'android/view/View',c'requestLayout',c'()V',nil); ws_mark()
+android/widget/TextView|getMinHeight|view := ws_view(e,this); return if view.min_height_pixels { view.min_height } else { i32(-1) }
 android/widget/TextView|setSingleLine()V|ws_view(e,this).single_line = true; ws_view(e,this).max_lines = 1; call(e,this,c'android/view/View',c'requestLayout',c'()V',nil); ws_mark()
 android/widget/TextView|setSingleLine(Z)V|ws_view(e,this).single_line = p0 != 0; ws_view(e,this).max_lines = if p0 != 0 { i32(1) } else { i32(0) }; call(e,this,c'android/view/View',c'requestLayout',c'()V',nil); ws_mark()
 android/widget/TextView|setHorizontallyScrolling|ws_view(e,this).single_line = p0 != 0; call(e,this,c'android/view/View',c'requestLayout',c'()V',nil); ws_mark()
