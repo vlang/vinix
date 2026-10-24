@@ -184,6 +184,10 @@ fn verify_run(root string) ! {
 }
 
 fn main() {
+	$if prod {
+		eprintln('Maps248 evidence requires assertions; compile without -prod')
+		exit(2)
+	}
 	if os.args.len == 3 && os.args[1] == 'collect' { collect(os.args[2])!; return }
 	if os.args.len != 4 || os.args[1] != 'check' {
 		panic('usage: maps248-evidence collect EXTERNAL_BUNDLE | check BUNDLE SHA256_OF_sha256.json')

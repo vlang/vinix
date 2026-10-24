@@ -19,7 +19,7 @@ native236. The implementation checkpoint was
 `58d3877930fe516f7fbe841495e060d039171bb6` (ActionProvider callbacks); exact
 113-file framework and 83-file native source snapshots are retained alongside
 their build inventories. Later CompoundButton changes are not part of this run.
-The report/auditor was prepared from checkout
+The original report/auditor was prepared from checkout
 `5577de6f3667423d27fd7bb01b9bc688494aef05`.
 
 | Input | SHA-256 |
@@ -47,16 +47,26 @@ Bundle `sha256.json` SHA-256:
 `465c52b1559a2b6d24df67d6285eae5bf7406b1b253cd5cc6323f6e29b3721e9`.
 Retention `sha256-inventory.json` SHA-256:
 `f445467e3baa2d5eacd29fe90f5720931d4b796688220c5111b88c4fbd8cf9a6`.
+The original audit logs in that inventory were produced with `-prod`, which
+omits V assertions. They remain historical records and do not establish that
+the integrity comparisons passed.
 
 Audit the complete directory with:
 
 ```sh
-v -prod -o /tmp/maps248-evidence tests/native-android-ws/maps248-evidence.v
+v -cc clang -cflags '-O2' -o /tmp/maps248-evidence tests/native-android-ws/maps248-evidence.v
 /tmp/maps248-evidence check /Users/alex/.local/state/vinix/android/maps248-2026-10-24/bundle 465c52b1559a2b6d24df67d6285eae5bf7406b1b253cd5cc6323f6e29b3721e9
 ```
 
-Validation: complete-bundle audit passed; a manifest-only partial bundle was
-rejected for missing evidence. The audit and negative-check logs are retained
-beside the bundle with `sha256-inventory.json`. The auditor preserved the
-original failure markers and results. No APK modifications or
-exception-classifier changes were made for this run.
+An assertion-enabled re-audit on 2026-10-24 passed against the complete pinned
+bundle. The same executable rejected a wrong manifest pin (assertion sentinel)
+and an authentic pinned manifest-only bundle. A `-prod` build refused to audit
+with exit code 2. Frozen checker source, compiler identity, binaries and logs are
+retained in `assertions-enabled-reaudit-clang/`; its `sha256.json` SHA-256 is:
+`81af8711db70d4daed32cba862da0159bd2d55fad6b579d3ddb9cd32be39a0ca`.
+The independently frozen checker differs from the original bundled source only
+by the production-build refusal guard. The original bundle and prior inventories
+are unchanged.
+
+The auditor preserved the original failure markers and results. No APK
+modifications or exception-classifier changes were made for this run.
