@@ -6,6 +6,12 @@ DT_FLAGS/DF_TEXTREL without the legacy tag, ordinary tables, early DT_NULL,
 malformed/oversized tables, bounds, writable segment overlap, holes and full
 range containment. Resource I/O and the range index/lock are test fixtures;
 the scanner and freeze functions are extracted unchanged from kernel source.
+It also extracts the production PIE base picker and supplies deterministic
+entropy. Every slot for 1 MiB and 28 MiB images remains aligned and below the
+interpreter range. The entropy slot that placed musl over Maps' fixed
+`0x400000` executable passes with the 256 MiB floor; a separate old-floor
+control must fail with the recorded collision. RNG failure and oversized
+image fallbacks retain their existing behavior.
 
 `tests/elf-text/run --arch x86_64 --kernel-dir /path/to/kernel` boots the
 actual loader. Its static V guest writes three real ELF files with synthetic
@@ -13,6 +19,12 @@ PT_DYNAMIC records and executes them. Ordinary text rejects mprotect even
 when the requested protection is unchanged; both textrel encodings allow it.
 A real dynamically linked musl PIE verifies that both its own executable
 text and the kernel-loaded interpreter's executable text are immutable.
+The maintained V fixture also explicitly executes musl with a dynamically
+linked ET_EXEC fixed at `0x400000`, checks that its low-address target runs,
+and requires `ELF TEXT PASS: direct musl ET_EXEC at 0x400000`. This mirrors
+Maps' launcher path. Its text is mapped by musl, so this mode does not assert
+kernel text immutability. Historical `--source` C controls keep their original
+two verdicts and do not build the new executable.
 
 Run the same command with `--arch aarch64` for ARM. Use
 `VINIX_VM_RUNNER_ROOT` for the checkout containing installed VM dependencies,

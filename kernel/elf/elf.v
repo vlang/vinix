@@ -44,7 +44,9 @@ const dt_flags = i64(30)
 const df_textrel = u64(4)
 const dynamic_scan_limit = u64(64 * 1024)
 
-const pie_base = u64(0x00200000)
+// An explicitly executed runtime linker is itself a PIE. Keep it above the
+// usual low ET_EXEC addresses so it can subsequently map its fixed executable.
+const pie_base = u64(0x10000000)
 const interpreter_base = u64(0x40000000)
 const image_aslr_span = u64(0x40000000)
 const image_alignment = u64(0x200000)
@@ -212,6 +214,10 @@ fn pie_span(extent u64) u64 {
 	return room - extent
 }
 
+fn pie_load_base(extent u64) u64 {
+	return pie_base + random_offset(pie_span(extent), image_alignment)
+}
+
 fn read_exact(mut res resource.Resource, buf voidptr, offset u64, length u64) ! {
 	read := res.read(unsafe { nil }, buf, offset, length) or {
 		return error('elf: read failure')
@@ -304,7 +310,7 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 	if base == 0 && header.@type == u16(et_dyn) {
 		exec_trace(trace, image, 'choosing PIE load base')
 		extent := load_extent(mut res, *header)!
-		base = pie_base + random_offset(pie_span(extent), image_alignment)
+		base = pie_load_base(extent)
 	}
 	if trace {
 		C.kprintf(c'exec[gpu]/elf %.*s: effective load base=0x%llx\n', i32(image.len), image.str,

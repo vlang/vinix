@@ -9,6 +9,7 @@ module textfixture
 struct C.FILE {}
 @[typedef]
 struct C.Elf64_Ehdr {
+	e_type      u16
 	e_phoff     u64
 	e_phentsize u16
 	e_phnum     u16
@@ -96,6 +97,27 @@ fn run_child(path &char, mode &char) i32 {
 	}
 }
 
+fn run_direct_loader() i32 {
+	unsafe {
+		child := C.fork()
+		if !check(child >= 0, 120) { return 1 }
+		if child == 0 {
+			$if arm64 {
+				C.execl(c'/lib/ld-musl-aarch64.so.1', c'/lib/ld-musl-aarch64.so.1',
+					c'--library-path', c'/lib', c'/elf-exec', c'direct-loader', &char(nil))
+			} $else {
+				C.execl(c'/lib/ld-musl-x86_64.so.1', c'/lib/ld-musl-x86_64.so.1',
+					c'--library-path', c'/lib', c'/elf-exec', c'direct-loader', &char(nil))
+			}
+			C._exit(100)
+		}
+		mut status := i32(0)
+		if !check(C.waitpid(child, &status, 0) == child, 121) { return 1 }
+		if !check(C.WIFEXITED(status) && C.WEXITSTATUS(status) == 0, 122) { return 1 }
+		return 0
+	}
+}
+
 fn check_interpreter() i32 {
 	unsafe {
 		base := C.getauxval(C.AT_BASE)
@@ -164,6 +186,14 @@ fn make_fixture(path &char, tag u64, value u64) i32 {
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
 		if argc > 1 {
+			if C.strcmp(argv[1], c'direct-loader') == 0 {
+				// Explicit musl maps this ET_EXEC itself, so kernel text-freeze
+				// and interpreter AT_BASE checks do not apply to this mode.
+				header := &C.Elf64_Ehdr(usize(0x400000))
+				address := usize(C.velf_text_target)
+				if !check(header.e_type == 2 && address >= 0x400000 && address < 0x10000000, 123) { return 1 }
+				return if check(C.velf_text_target() == 73, 124) { 0 } else { 1 }
+			}
 			if !check(check_text(C.strcmp(argv[1], c'mutable') == 0) == 0, 100) { return 1 }
 			return if C.strcmp(argv[1], c'interpreter') == 0 { check_interpreter() } else { 0 }
 		}
@@ -175,8 +205,10 @@ pub fn run(argc i32, argv &&char) i32 {
 		if !check(run_child(c'/tmp/elf-legacy', c'mutable') == 0, 108) { return 1 }
 		if !check(run_child(c'/tmp/elf-flags', c'mutable') == 0, 109) { return 1 }
 		if !check(run_child(c'/elf-pie', c'interpreter') == 0, 111) { return 1 }
+		if !check(run_direct_loader() == 0, 125) { return 1 }
 		C.puts(c'ELF TEXT PASS: ordinary and both textrel encodings')
 		C.puts(c'ELF TEXT PASS: PIE and interpreter boot')
+		C.puts(c'ELF TEXT PASS: direct musl ET_EXEC at 0x400000')
 		C.fflush(C.stdout)
 		for { C.pause() }
 	}
