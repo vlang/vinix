@@ -101,7 +101,7 @@ fn (installer &Installer) put_with(source string, relative string, mode u32, opt
 	installer.check()!
 	names := relative.split('/')
 	defer { unsafe { names.free() } }
-	if names.len < 2 || names.len > 32 || mode !in [u32(0o644), u32(0o755)] {
+	if names.len < 2 || names.len > 32 || mode !in [u32(0o600), u32(0o644), u32(0o755)] {
 		return error('invalid relative account tool destination')
 	}
 	for name in names {

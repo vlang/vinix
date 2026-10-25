@@ -84,6 +84,13 @@ fn stage() ! {
 	}
 	mut installer := stagecore.open(staging)!
 	defer { installer.close() }
+	// Alpine ships shadow as 0640, while our account store requires every
+	// password record to be private to its owner. Preserve the imported records
+	// through the same checked atomic publication used for account executables.
+	shadow := staging + '/etc/shadow'
+	if os.exists(shadow) || os.is_link(shadow) {
+		installer.put(shadow, 'etc/shadow', 0o600)!
+	}
 	if cc.len == 0 { cc = [architecture + '-linux-musl-gcc', '-w', '-Wno-error=incompatible-pointer-types'] }
 	compiler := os.find_abs_path_of_executable(cc[0])!
 	configured_v := os.getenv('V')
