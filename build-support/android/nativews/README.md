@@ -398,9 +398,14 @@ and are exercised by the signed guest fixture. `Intent.FilterComparison` wraps
 the original Intent, compares its filter fields and caches its initial filter
 hash, so service-binding keys work in hash maps.
 LocationManager enabled queries report false and best-provider discovery returns
-null because the native WS backend has no location provider. PendingIntent's
-OnFinished callback interface is present for class loading; callback send
-overloads are not implemented.
+null because the native WS backend has no location provider. Requests for an
+absent provider fail before retaining a listener or calling native location
+code. Legacy GNSS registration returns false and emits no satellite callbacks;
+extra commands retain Android 10's true return value without creating a
+provider. The signed [no-provider regression](../../../tests/native-android-ws/location323-fixture.v)
+checks these contracts, listener removal and delayed callback absence.
+PendingIntent's OnFinished callback interface is present for class loading;
+callback send overloads are not implemented.
 ApplicationInfo and PackageManager share the actual APK, data and native library
 paths. Elapsed realtime uses the boot clock in the API's requested units.
 Current-thread CPU clocks use the kernel's thread clock in milliseconds or
