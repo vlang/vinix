@@ -85,6 +85,8 @@ fn execute_with_options(image macho.Image, arguments []string, options Execution
 	// globals are advertised until they have a compatible implementation.
 	mut empty := [unsafe { &char(nil) }]!
 	image_runtime.started = true
+	if ios_runtime.trace { eprintln('iOS startup: Swift image metadata') }
+	objc_complete_swift_images()!
 	if ios_runtime.trace { eprintln('iOS startup: Objective-C +load') }
 	objc_load_image()
 	for index in module_runtime.order {

@@ -29,7 +29,8 @@ fn swift_singleton_metadata_descriptor(descriptor u64) !SwiftSingletonMetadata {
 }
 
 // Called with the registry lock held. Only already registered SwiftObject
-// roots are admitted; image registration and resilient relocation stay guarded.
+// roots are admitted; image registration separately preflights their storage.
+// Resilient relocation stays guarded.
 // The completer must finish the instance layout through the checked initializer.
 fn swift_singleton_class_layout_locked(value SwiftSingletonMetadata, descriptor u64, witness u64, completed bool) ! {
 	m := value.metadata

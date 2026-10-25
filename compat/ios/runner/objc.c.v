@@ -47,6 +47,9 @@ mut:
 	protocols []u64 // Owned array of canonical adopted protocol identities.
 	swift_ivar_list u64 // Owned copy; image class/descriptor/offset cells stay borrowed.
 	swift_layout_complete bool
+	swift_initializer u64 // Borrowed executable image callback, deferred until sealing.
+	swift_descriptor u64
+	swift_image_phase u8 // 0 cold, 1 running, 2 complete, 3 failed.
 }
 
 // Metadata is private to Vinix and stored separately from object bytes. The
@@ -1610,7 +1613,7 @@ fn (m ObjMetadata) register(cls u64, depth int) ! {
 	ro := read64(cls + 32) & ~u64(7)
 	m.range(ro, 72, false)!
 	flags := read32(ro)
-	if flags & 0x40 != 0 { return error('iOS: Swift class metadata is not implemented') }
+	swift := if flags & 0x40 != 0 { m.swift_class(cls, ro)! } else { ObjSwiftImageClass{} }
 	parent := read64(cls + 8)
 	if parent != 0 { m.register(parent, depth + 1)! }
 	name := m.string_at(read64(ro + 24))!
@@ -1650,6 +1653,8 @@ fn (m ObjMetadata) register(cls u64, depth int) ! {
 		size:    size
 		meta:    meta
 		load_imp: if meta { methods['load'].imp } else { u64(0) }
+		swift_initializer: swift.initializer
+		swift_descriptor: swift.descriptor
 	}
 	for selector, method in methods {
 		objc_record_method(cls, unsafe { &char(selector.str) }, method.imp, unsafe { &char(method.types.str) }, false)

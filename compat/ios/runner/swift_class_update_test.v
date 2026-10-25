@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import macho
+
 #include <dlfcn.h>
 $if macos {
 	#include <objc/runtime.h>
@@ -29,6 +31,9 @@ fn cu_metadata_initialize(cls u64, _argument u64) u64 {
 fn cu_write(address u64, value u64) { unsafe { *(&u64(address)) = value } }
 
 fn cu_input(fields []CuField, native bool, start u32, matching_sizes bool) CuInput {
+	return cu_input_kind(fields, native, start, matching_sizes, true)
+}
+fn cu_input_kind(fields []CuField, native bool, start u32, matching_sizes bool, registered bool) CuInput {
 	page := u64(C.getpagesize())
 	base := u64(C.mmap(unsafe { nil }, usize(page * 6), C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
 	assert base != ~u64(0)
@@ -68,6 +73,8 @@ fn cu_input(fields []CuField, native bool, start u32, matching_sizes bool) CuInp
 		cu_write(parent, parent_meta)
 		ios_runtime.classes[parent] = &ObjClass{name: '_TtCs12_SwiftObject', size: 16}
 		ios_runtime.classes[parent_meta] = &ObjClass{name: '_TtCs12_SwiftObject', meta: true}
+	}
+	if !native && registered {
 		ios_runtime.classes[meta] = &ObjClass{name: 'ClassUpdateFixture', parent: parent_meta, meta: true}
 		ios_runtime.classes[m] = &ObjClass{name: 'ClassUpdateFixture', parent: parent, size: start}
 		objc_record_method(meta, c'initialize', u64(unsafe { voidptr(cu_initialize) }), c'v16@0:8', false)
@@ -82,7 +89,7 @@ fn cu_input(fields []CuField, native bool, start u32, matching_sizes bool) CuInp
 		C.memcpy(voidptr(b + 8448 + u64(i * 32)), field_name.str, usize(field_name.len + 1))
 		cu_write(entry, cells + u64(i * 8)); cu_write(entry + 8, b + 8448 + u64(i * 32)); cu_write(entry + 16, b + 11200)
 		write32(entry + 24, 3); write32(entry + 28, if matching_sizes { u32(f.size) } else { u32(99) })
-		if !native { ios_runtime.classes[m].ivars[field_name] = &ObjIvar{name: field_name.clone(), types: '@'.clone(), offset: 1, size: if matching_sizes { f.size } else { u64(99) }} }
+		if !native && registered { ios_runtime.classes[m].ivars[field_name] = &ObjIvar{name: field_name.clone(), types: '@'.clone(), offset: 1, size: if matching_sizes { f.size } else { u64(99) }} }
 		unsafe { field_name.free() }
 	}
 	return CuInput{base, page, m, ro, d, types, list, cells, fields.len}
@@ -370,7 +377,10 @@ fn cs_complete(m u64, context u64, pattern u64) SwiftAssociatedMetadata {
 	return SwiftAssociatedMetadata{read64(t + 72), ~u64(0)}
 }
 fn cs_input(native bool, get u64, initialize u64, code u64) CuInput {
-	input := cu_input([CuField{8, 8, 0x10007, 0}, CuField{8, 8, 7, 0}], native, 16, false)
+	return cs_input_kind(native, get, initialize, code, true)
+}
+fn cs_input_kind(native bool, get u64, initialize u64, code u64, registered bool) CuInput {
+	input := cu_input_kind([CuField{8, 8, 0x10007, 0}, CuField{8, 8, 7, 0}], native, 16, false, registered)
 	m := input.metadata; d := input.descriptor; t := cs_trace(input)
 	write32(d, 0x80010050); write32(d + 24, 3); write32(d + 28, 13)
 	write32(m + 56, 128); write32(m + 60, 24); write32(input.ro, 0xc0)
@@ -444,6 +454,116 @@ fn cs_matrix(native bool, get u64, initialize u64, code u64, probe CuProbe) []Cu
 	}
 	return fixtures
 }
+// Image registration has a separate lifecycle: borrowed metadata is checked
+// while non-executable, then callbacks run after binding and selector repair.
+fn cx_initialize(cls u64, argument u64) u64 {
+	d := read64(cls + 64); t := u64(i64(d + 16) + i64(i32(read32(d + 16))))
+	assert argument == 0 && C.ios_ref_change(unsafe { &i64(t + 88) }, 1) == 0
+	assert ios_runtime.classes[cls].swift_image_phase == 1
+	assert ios_runtime.classes[read64(cls)].meta
+	assert read64(t + 192) == objc_selector(c'initialize')
+	// A different thread must acquire the registry lock during this callback.
+	worker := spawn objc_get_class(unsafe { &char(read64((read64(cls + 32) & ~u64(7)) + 24)) })
+	assert worker.wait() == cls
+	if _ := objc_complete_swift_class(cls) { assert false, 'recursive image initializer accepted' }
+	if read64(t + 96) != 1 {
+		result := unsafe { CsGet(voidptr(read64(t + 48)))(0, d) }
+		assert result.metadata == cls && result.state == 0
+	}
+	return if read64(t + 96) == 2 { cls + 8 } else { cls }
+}
+fn cx_load(cls u64, _selector &char) {
+	d := read64(cls + 64); t := u64(i64(d + 16) + i64(i32(read32(d + 16))))
+	assert ios_runtime.classes[cls].swift_image_phase == 2 && read64(t + 88) == 1
+	assert read64(read64(t + 32)) == cls && read64(t) == 1
+	assert C.ios_ref_change(unsafe { &i64(t + 112) }, 1) == 0
+}
+fn cx_input(get u64, initialize u64, code u64) CuInput {
+	input := cs_input_kind(false, get, initialize, code, false)
+	b := input.base + input.page; m := input.metadata; d := input.descriptor; t := cs_trace(input)
+	cu_write(m + 8, b + 12288); write32(m + 48, 32); write32(input.ro + 8, 32)
+	cu_write(input.ro + 72, code + 512)
+	for i in 0 .. 2 {
+		cu_write(m + 80 + u64(i * 8), u64(16 + i * 8)); cu_write(input.cells + u64(i * 8), u64(16 + i * 8))
+		write32(input.list + 8 + u64(i * 32) + 28, 8)
+	}
+	write32(d + 60, 1); write32(d + 64, 1); write32(d + 68, 0)
+	cu_write(m + 96, u64(unsafe { voidptr(swift_deleted_method_failure) }))
+	methods := b + 11520; write32(methods + 4, 2); cu_write(methods + 24, code + 768)
+	C.memcpy(voidptr(b + 11400), c'load', 5)
+	cu_write(methods + 32, b + 11400); cu_write(methods + 40, b + 11360); cu_write(methods + 48, code + 1024)
+	// Keep image tables beyond the host's pthread mutex at trace + 128..192.
+	cu_write(b + 12032, m); cu_write(b + 12040, m); cu_write(t + 192, b + 11328)
+	return input
+}
+fn cx_image(input CuInput, code u64, data_flags u32, file_size u64) ObjMetadata {
+	b := input.base + input.page
+	return ObjMetadata{
+		image: macho.Image{segments: [
+			macho.Segment{name: '__TEXT', address: code, size: input.page, filesize: input.page, prot: 5},
+			macho.Segment{name: '__DATA', address: b, size: input.page * 4, filesize: file_size, prot: 3, flags: data_flags, sections: [
+				macho.Section{name: '__objc_classlist', address: b + 12032, size: 8},
+				macho.Section{name: '__objc_nlclslist', address: b + 12040, size: 8},
+				macho.Section{name: '__objc_selrefs', address: cs_trace(input) + 192, size: 8},
+			]},
+		]}
+		layout: macho.Layout{size: input.page * 5}
+	}
+}
+fn cx_reject(input CuInput, image ObjMetadata) {
+	copy := C.malloc(usize(input.page * 4)); assert copy != unsafe { nil }
+	C.memcpy(copy, voidptr(input.base + input.page), usize(input.page * 4))
+	if _ := image.register(input.metadata, 0) { assert false, 'malformed Swift image accepted' }
+	assert input.metadata !in ios_runtime.classes && read64(cs_trace(input)) == 0 && read64(cs_trace(input) + 88) == 0
+	assert C.memcmp(copy, voidptr(input.base + input.page), usize(input.page * 4)) == 0; C.free(copy)
+}
+fn cx_matrix(get u64, initialize u64, code u64, guard u64) []CuInput {
+	mut fixtures := []CuInput{}
+	bad := cx_input(get, initialize, code); fixtures << bad
+	image := cx_image(bad, code, 0, bad.page * 4)
+	for pair in [[bad.metadata + 64, guard]!, [bad.metadata, guard]!, [bad.ro + 72, guard]!,
+		[bad.metadata + 32, guard | 1]!, [bad.cells, u64(33)]!, [bad.list + 8, guard]!,
+		[bad.list + 16, guard]!, [bad.list + 24, guard]!, [bad.metadata + 96, code]!]! {
+		old := read64(pair[0]); cu_write(pair[0], pair[1]); cx_reject(bad, image); cu_write(pair[0], old)
+	}
+	for pair in [[bad.descriptor, u32(0x800100d0)]!, [bad.descriptor + 20, u32(1)]!,
+		[bad.descriptor + 36, u32(65)]!, [bad.descriptor + 40, u32(9)]!, [bad.descriptor + 60, u32(2)]!,
+		[bad.descriptor + 64, u32(2)]!, [bad.descriptor + 68, u32(1)]!, [bad.ro, u32(0x1c0)]!,
+		[bad.metadata + 44, u32(1)]!, [bad.list + 8 + 24, u32(9)]!]! {
+		old := read32(u64(pair[0])); write32(u64(pair[0]), u32(pair[1])); cx_reject(bad, image); write32(u64(pair[0]), old)
+	}
+	for offset in [u64(44), 48, 52]! {
+		old := read32(bad.descriptor + offset); write32(bad.descriptor + offset, 0); cx_reject(bad, image); write32(bad.descriptor + offset, old)
+	}
+	cu_write(cs_cache(bad) + 8, 1); cx_reject(bad, image); cu_write(cs_cache(bad) + 8, 0)
+	old_cell := read64(bad.list + 40); cu_write(bad.list + 40, bad.cells); cx_reject(bad, image); cu_write(bad.list + 40, old_cell)
+	cx_reject(bad, cx_image(bad, code, 0x10, bad.page * 4)) // Final SG_READ_ONLY removes write permission.
+	cx_reject(bad, cx_image(bad, code, 0, 4096)) // Reservation without file-backed ivars.
+	for local_method in [false, true]! {
+		input := cx_input(get, initialize, code); fixtures << input
+		if local_method { swift_protocol_relative(input.descriptor + 68, code + 768); cu_write(input.metadata + 96, code + 768) }
+		m := cx_image(input, code, 0, input.page * 4)
+		objc_register_image(m.image, m.layout, m.base) or { panic(err) }
+		assert read64(cs_trace(input)) == 0 && read64(cs_trace(input) + 88) == 0 && read64(cs_trace(input) + 112) == 0
+		assert ios_runtime.classes[input.metadata].swift_image_phase == 0 && !ios_runtime.classes[input.metadata].initialized
+		objc_complete_swift_images() or { panic(err) }; objc_complete_swift_images() or { panic(err) }
+		assert read64(cs_trace(input)) == 1 && read64(cs_trace(input) + 88) == 1
+		assert ios_runtime.classes[input.metadata].swift_image_phase == 2 && ios_runtime.classes[input.metadata].swift_layout_complete
+		assert read64(input.ro + 48) == input.list && read64(input.cells) == 16 && read64(input.cells + 8) == 24
+	}
+	objc_load_image()
+	for input in fixtures[1..] { assert read64(cs_trace(input) + 112) == 1 && !ios_runtime.classes[input.metadata].initialized }
+	assert cu_initializations == 0 && cu_metadata_initializations == 0
+	for mode in [u64(1), 2]! {
+		input := cx_input(get, initialize, code); fixtures << input
+		m := cx_image(input, code, 0, input.page * 4); cu_write(cs_trace(input) + 96, mode)
+		objc_register_image(m.image, m.layout, m.base) or { panic(err) }
+		for _ in 0 .. 2 { if _ := objc_complete_swift_class(input.metadata) { assert false, 'incomplete or relocated Swift image accepted' } }
+		assert ios_runtime.classes[input.metadata].swift_image_phase == 3 && read64(cs_trace(input) + 88) == 1
+		assert read64(cs_trace(input) + 112) == 0
+	}
+	return fixtures
+}
 fn test_swift_class_update() {
 	page := usize(C.getpagesize())
 	code := u64(C.mmap(unsafe { nil }, page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
@@ -453,7 +573,10 @@ fn test_swift_class_update() {
 	// x0..x4 arguments; x0/x1 dependency result; preserved Swift context x20/x21.
 	for i, op in [u32(0xa9bc7bfd), 0xa90153f3, 0xa9025bf5, 0xaa0603f3, 0xaa0503f0, u32(0xd2800000 | (0x5020 << 5) | 20), u32(0xd2800000 | (0x5021 << 5) | 21), 0xd63f0200, 0xa9000660, 0xa9015674, 0xa9425bf5, 0xa94153f3, 0xa8c47bfd, 0xd65f03c0]! { write32(code + u64(i * 4), op) }
 	write32(code + 256, 0x58000050); write32(code + 260, 0xd61f0200); cu_write(code + 264, u64(unsafe { voidptr(cs_complete) }))
-	C.__builtin___clear_cache(voidptr(code), voidptr(code + 272)); assert C.mprotect(voidptr(code), page, C.PROT_READ | C.PROT_EXEC) == 0
+	for pair in [[u64(512), u64(unsafe { voidptr(cx_initialize) })]!, [u64(768), u64(unsafe { voidptr(cu_initialize) })]!, [u64(1024), u64(unsafe { voidptr(cx_load) })]!]! {
+		write32(code + pair[0], 0x58000050); write32(code + pair[0] + 4, 0xd61f0200); cu_write(code + pair[0] + 8, pair[1])
+	}
+	C.__builtin___clear_cache(voidptr(code), voidptr(code + 1040)); assert C.mprotect(voidptr(code), page, C.PROT_READ | C.PROT_EXEC) == 0
 	probe := unsafe { CuProbe(voidptr(code)) }
 	$if macos {
 		core := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', 2); entry := u64(C.dlsym(core, c'swift_updateClassMetadata2')); assert entry != 0
@@ -479,6 +602,7 @@ fn test_swift_class_update() {
 		fixtures << ci_matrix(initialize, probe, false)
 		fixtures << ci_invalid(guard); fixtures << cu_repeat(initialize, probe, true)
 		singletons := cs_matrix(false, cs_lookup(), initialize, code, probe); fixtures << singletons
+		images := cx_matrix(cs_lookup(), initialize, code, guard); fixtures << images
 		if _ := runtime_symbol('/usr/lib/swift/libswiftFoundation.dylib', '_swift_initClassMetadata2') { assert false }
 		if _ := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '__swift_initClassMetadata2') { assert false }
 		if _ := runtime_symbol('/usr/lib/swift/libswiftFoundation.dylib', '_swift_updateClassMetadata2') { assert false }
@@ -488,12 +612,15 @@ fn test_swift_class_update() {
 			assert C.mprotect(voidptr(input.base + input.page), usize(input.page * 4), C.PROT_READ | C.PROT_WRITE) == 0
 			assert C.pthread_mutex_destroy(voidptr(cs_trace(input) + 128)) == 0
 		}; unsafe { singletons.free() }
+		for input in images { assert C.pthread_mutex_destroy(voidptr(cs_trace(input) + 128)) == 0 }; unsafe { images.free() }
 		for input in fixtures { assert C.mprotect(voidptr(input.base + input.page), usize(input.page * 4), C.PROT_NONE) == 0 }
 		objc_stop(); cu_reject(guard, 0x100, 0, guard, guard); ci_reject(guard, 0x100, 0, guard, guard)
 		if _ := swift_singleton_metadata_checked(0, guard) { assert false }
+		if _ := objc_complete_swift_class(guard) { assert false }
 		for input in fixtures { cu_free(input) }; unsafe { fixtures.free() }
 	}
 	println('IOS-CLASS-UPDATE: bounded registered nongeneric Swift root layout, UInt64 offsets, ivar encoding/alignment and registry publication; 16 header variants, unchanged negative words, no metadata initializer or +initialize; fail-before-write validation, live-layout rejection, readonly unchanged storage, 512 concurrent repeats, owned-copy drain with inaccessible image pages and two runtime lifetimes')
 	println('IOS-CLASS-INIT: bounded registered static-vtable Swift root initialization, implicit superclass and normalized Swift bit; FileStorage-shaped headers, field layout and nil dependency ABI; no metadata callback or +initialize; fail-before-write rejection, readonly 512 concurrent repeats, inaccessible-image teardown and two lifetimes')
 	println('IOS-CLASS-SINGLETON: bounded registered root completion, reference witness setup, release publication and complete-state recognition; eight cold/warm requests, LayoutComplete busy responses, eight concurrent readers, unlocked nested completion and recursive rejection; preflight validation, cache alias rejection, malformed/dependency poisoning and inaccessible-image teardown across two lifetimes')
+	println('IOS-CLASS-IMAGE: bounded file-backed Swift root registration, final segment protections, deleted/local vtable entries and fail-before-write malformed metadata rejection; deferred C-ABI initializer after metaclass and selector registration, unlocked registry reentry, recursive rejection, exact-once completion across duplicate lists before +load without +initialize; incomplete/relocated result poisoning and inaccessible-image teardown across two lifetimes')
 }
