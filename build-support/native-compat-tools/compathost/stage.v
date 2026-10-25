@@ -122,13 +122,13 @@ fn stage_command(args []string, security bool) !int {
 		// bootstrap before init can launch its ordinary graphical manager.
 		// Match tools/accounts/build.v: V's library emits an i64 wait status
 		// for C's int pointer, which current GCC otherwise treats as an error.
-		account_cc := [...cc, '-w', '-Wno-error=incompatible-pointer-types']
+		userland_cc := [...cc, '-w', '-Wno-error=incompatible-pointer-types']
 		run(['sh', root() + '/build-support/run-v-tool.sh', root() + '/tools/accounts/stage.v',
-			'--arch', arch, '--staging', staging, '--cc-argv', json2.encode(account_cc)])!
+			'--arch', arch, '--staging', staging, '--cc-argv', json2.encode(userland_cc)])!
 		// Both desktop builders already stage these utilities. Keep package
 		// distribution in the same native V build path on both architectures.
 		run(['sh', root() + '/build-support/run-v-tool.sh', root() + '/tools/packages/stage.v',
-			'--arch', arch, '--staging', staging, '--cc-argv', json2.encode(cc)])!
+			'--arch', arch, '--staging', staging, '--cc-argv', json2.encode(userland_cc)])!
 		install(root() + '/build-support/security-audit/run-collector', staging + '/usr/libexec/vinix-security-audit-supervise', 0o755, '.security-tool-')!
 		log := staging + '/var/log/vinix-audit'
 		if os.is_link(log) { return error('Audit log staging directory cannot be a symlink') }
