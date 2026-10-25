@@ -47,6 +47,9 @@ fn main() {
 	} else if os.args[1] == 'gc-color-inspect' {
 		run(out, 'GCColor-metadata', [out + '/inspect-user-notifications', 'GCColor'], false)
 		run(out, 'gc-color-inspect', [out + '/inspect-gc-color'], false)
+	} else if os.args[1] == 'gc-mouse-inspect' {
+		run(out, 'GCMouse-metadata', [out + '/inspect-user-notifications', 'GCMouse'], false)
+		run(out, 'gc-mouse-inspect', [out + '/inspect-gc-mouse'], false)
 	} else if os.args[1] == 'session-task-inspect' {
 		for name in ['NSURLSessionTask', 'NSURLSessionDownloadTask', 'NSURLSessionDataTask', 'NSURLSessionUploadTask']! {
 			run(out, name + '-metadata', [out + '/inspect-user-notifications', name], false)

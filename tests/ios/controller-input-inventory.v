@@ -37,7 +37,7 @@ fn main() {
 		'compat/ios/runner/game_controller_test.v', 'compat/ios/runner/gc_color.c.v', 'compat/ios/runner/objc.c.v',
 		'compat/ios/runner/objc_runtime.c.v', 'compat/ios/runner/objc_storage.c.v',
 		'compat/ios/runner/scenes.c.v', 'compat/ios/runner/uikit.v',
-		'tests/ios/inspect-game-controller.v', 'tests/ios/inspect-gc-color.v', 'tests/ios/inspect-user-notifications.v',
+		'tests/ios/inspect-game-controller.v', 'tests/ios/inspect-gc-color.v', 'tests/ios/inspect-gc-mouse.v', 'tests/ios/inspect-user-notifications.v',
 		'tests/ios/native-checks.v', 'tests/ios/native-init.v',
 		'tests/ios/notification-checks.v', 'tests/ios/notification-vm.v'] {
 		result := os.exec(['git', 'show', revision + ':' + path])

@@ -386,3 +386,135 @@ fn test_gc_color_rejections() {
 	objc_stop(); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
 	println('IOS-GC-COLOR-REJECT: eight mutable copying, coding, preset and incompatible storage cases fail explicitly')
 }
+
+fn mouse_discovery(api ControllerApi) {
+	for _ in 0 .. 3 {
+		array := api.msg(api.cls, c'mice', 0)
+		assert array != 0 && api.msg(array, c'count', 0) == 0
+		assert api.msg(api.cls, c'current', 0) == 0
+		assert api.msg(array, c'retain', 0) == array
+		api.msg(array, c'release', 0)
+	}
+	for name in ['GCMouseDidConnectNotification', 'GCMouseDidDisconnectNotification',
+		'GCMouseDidBecomeCurrentNotification', 'GCMouseDidStopBeingCurrentNotification']! {
+		mut address := u64(0)
+		$if macos { if api.native { address = u64(C.dlsym(unsafe { voidptr(-2) }, name.str)) } }
+		if !api.native { address = runtime_symbol('/System/Library/Frameworks/GameController.framework/GameController', '_' + name) or { panic(err) } }
+		assert address != 0
+		object := read64(address)
+		assert object != 0 && ctext(api.msg(object, c'UTF8String', 0)) == name
+		assert api.msg(object, c'retain', 0) == object
+		api.msg(object, c'release', 0)
+		assert read64(address) == object
+	}
+}
+fn mouse_worker(api ControllerApi, expected u64, cell u64) {
+	pool := objc_pool_push()
+	for _ in 0 .. 128 {
+		assert api.msg(api.cls, c'mice', 0) == expected
+		assert api.msg(expected, c'count', 0) == 0 && api.msg(api.cls, c'current', 0) == 0
+		assert runtime_symbol('/System/Library/Frameworks/GameController.framework/GameController', '_GCMouseDidConnectNotification') or { panic(err) } == cell
+		mouse_discovery(api)
+	}
+	objc_pool_pop(pool)
+}
+fn test_gc_mouse_native() {
+	$if macos {
+		assert C.dlopen(c'/System/Library/Frameworks/GameController.framework/GameController', 2) != unsafe { nil }
+		cls := u64(C.objc_getClass(c'GCMouse'))
+		assert cls != 0 && C.class_getInstanceSize(unsafe { voidptr(cls) }) == 40
+		assert C.class_getSuperclass(unsafe { voidptr(cls) }) == C.objc_getClass(c'NSObject')
+		api := ControllerApi{native: true, send: u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend')), cls: cls}
+		pool := api.msg(u64(C.objc_getClass(c'NSAutoreleasePool')), c'new', 0)
+		mouse_discovery(api); api.msg(pool, c'drain', 0)
+		println('IOS-GC-MOUSE-NATIVE: 40-byte NSObject, empty discovery, nil current and four notification values')
+	}
+}
+fn test_gc_mouse_runtime() {
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push()
+		cls := ios_runtime.names['GCMouse']; api := controller_api(cls)
+		library := '/System/Library/Frameworks/GameController.framework/GameController'
+		assert game_mouse_family(cls) && !game_controller_family(cls) && !gamepad_family(cls)
+		assert objc_class_size(cls) == 40 && objc_class_parent(cls) == ios_runtime.names['NSObject']
+		for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_']! {
+			assert runtime_symbol(library, prefix + 'GCMouse')! == if prefix == '_OBJC_CLASS_$_' { cls } else { read64(cls) }
+			for wrong in ['Foundation', 'UIKit']! {
+				if _ := runtime_symbol('/System/Library/Frameworks/' + wrong + '.framework/' + wrong, prefix + 'GCMouse') { assert false }
+			}
+		}
+		for name in ['GCMouseDidConnectNotification', 'GCMouseDidDisconnectNotification',
+			'GCMouseDidBecomeCurrentNotification', 'GCMouseDidStopBeingCurrentNotification']! {
+			for wrong in ['Foundation', 'UIKit']! {
+				if _ := runtime_symbol('/System/Library/Frameworks/' + wrong + '.framework/' + wrong, '_' + name) { assert false }
+			}
+		}
+		for i, name in ['_creationSequence', '_vendorName', '_handlerQueue', '_mouseInput']! {
+			ivar := objc_find_ivar(cls, name.str)
+			assert ivar != 0 && objc_ivar_offset(ivar) == 8 + 8 * i
+			assert ctext(u64(objc_ivar_types(ivar))) == ['I', '@"NSString"', '@"NSObject<OS_dispatch_queue>"', '@"GCMouseInput"']![i]
+		}
+		for selector in [c'mice', c'current']! {
+			method := objc_class_method(cls, u64(selector))
+			assert method != 0 && ctext(u64(objc_method_types(method))) == '@16@0:8'
+			assert objc_responds(cls, selector) && objc_instance_method(cls, u64(selector)) == 0
+			signature := api.msg(cls, c'methodSignatureForSelector:', u64(selector))
+			assert signature != 0 && api.msg(signature, c'numberOfArguments', 0) == 2
+			assert ctext(api.msg(signature, c'methodReturnType', 0)) == '@'
+			assert api.msg(signature, c'methodReturnLength', 0) == 8
+		}
+		for selector in [c'alloc', c'allocWithZone:', c'new', c'init', c'copy', c'copyWithZone:', c'mutableCopy', c'mutableCopyWithZone:', c'initWithCoder:', c'encodeWithCoder:', c'supportsSecureCoding', c'initWithName:additionalButtons:', c'mouseInput', c'physicalInputProfile', c'controllers']! {
+			assert !objc_responds(cls, selector)
+			assert objc_class_method(cls, u64(selector)) == 0 && objc_instance_method(cls, u64(selector)) == 0
+		}
+		mouse_discovery(api); controller_constants(controller_api(ios_runtime.names['GCController']))
+		array := api.msg(cls, c'mice', 0)
+		assert array == api.msg(ios_runtime.names['GCController'], c'controllers', 0)
+		assert api.msg(array, c'copy', 0) == array; api.msg(array, c'release', 0)
+		assert !objc_responds(array, c'addObject:')
+		cell := runtime_symbol(library, '_GCMouseDidConnectNotification')!
+		baseline := ios_runtime.live
+		mut workers := []thread{}
+		for _ in 0 .. 4 { workers << spawn mouse_worker(api, array, cell) }
+		workers.wait(); unsafe { workers.free() }
+		assert ios_runtime.live == baseline && ios_runtime.block_refs.len == 0
+		sub := objc_allocate_class(cls, c'VinixDiscoveryMouse', 0); objc_register_class(sub)
+		assert game_mouse_family(sub) && objc_class_size(sub) == 40
+		assert api.msg(sub, c'mice', 0) == array && api.msg(sub, c'current', 0) == 0
+		saved := objc_method_imp(objc_class_method(cls, u64(c'current')))
+		assert objc_add_method(read64(sub), u64(c'current'), u64(unsafe { voidptr(controller_override) }), c'@16@0:8')
+		assert api.msg(sub, c'current', 0) == sub
+		assert unsafe { ControllerSend(voidptr(saved))(sub, u64(c'current'), 0) } == 0
+		assert objc_add_method(read64(sub), u64(c'copy'), u64(unsafe { voidptr(controller_override) }), c'@16@0:8')
+		assert objc_responds(sub, c'copy') && api.msg(sub, c'copy', 0) == sub
+		objc_pool_pop(pool); objc_stop()
+		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0 && ios_runtime.block_refs.len == 0
+		assert ios_runtime.controller_constants_arena == 0
+	}
+	println('IOS-GC-MOUSE: scoped imports, typed class methods and ivars, immutable empty discovery, four constants, concurrent readers, subclass overrides, saved IMP and two drained runtimes')
+}
+fn test_gc_mouse_rejections() {
+	objc_start(); api := controller_api(ios_runtime.names['GCMouse'])
+	for mode in ['alloc', 'new', 'allocate', 'caller', 'subclass', 'copy', 'initWithCoder:', 'supportsSecureCoding', 'mouseInput']! {
+		mut fds := [2]i32{}; assert C.pipe(unsafe { &fds[0] }) == 0
+		pid := C.fork(); assert pid >= 0
+		if pid == 0 {
+			C.close(fds[0]); assert C.dup2(fds[1], 2) == 2; C.close(fds[1])
+			match mode {
+				'allocate' { objc_allocate(api.cls) }
+				'caller' { mut storage := [5]u64{}; objc_construct_instance(api.cls, u64(unsafe { &storage[0] })) }
+				'subclass' { sub := objc_allocate_class(api.cls, c'VinixPhysicalMouse', 0); objc_register_class(sub); objc_allocate(sub) }
+				else { api.msg(api.cls, mode.str, 0) }
+			}
+			C._exit(0)
+		}
+		C.close(fds[1]); mut bytes := [16384]u8{}; mut length := 0
+		for { assert length < bytes.len; count := C.read(fds[0], unsafe { &bytes[length] }, usize(bytes.len - length)); if count == 0 { break }; if count < 0 && unsafe { *C.ios_errno_address() } == C.EINTR { continue }; assert count > 0; length += int(count) }
+		C.close(fds[0]); mut status := i32(0); assert C.ios_waitpid(pid, &status, 0) == pid && status == 256
+		output := unsafe { tos(&bytes[0], length) }
+		reason := if mode == 'mouseInput' { 'unimplemented Objective-C method' } else { 'GCMouse construction requires an implemented physical input profile' }
+		assert output.contains(reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output
+	}
+	objc_stop(); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
+	println('IOS-GC-MOUSE-REJECT: nine construction, caller storage, subclass, copying, coding and input cases fail explicitly')
+}

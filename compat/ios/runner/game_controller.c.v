@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
-// No physical controller transport exists in the desktop input protocol.
-// Discovery is accurate for that environment; creating profiles is unsupported.
+// No GameController device transport exists in the desktop input protocol.
+// Discovery is empty until a bridge exists; creating devices is unsupported.
+const game_controller_notification_names = ['GCControllerDidBecomeCurrentNotification',
+	'GCControllerDidConnectNotification', 'GCControllerDidDisconnectNotification',
+	'GCMouseDidConnectNotification', 'GCMouseDidDisconnectNotification',
+	'GCMouseDidBecomeCurrentNotification', 'GCMouseDidStopBeingCurrentNotification']!
+
 fn game_controller_class_name(symbol string) ?string {
 	name := if symbol.starts_with('_OBJC_CLASS_$_') { symbol.all_after('_OBJC_CLASS_$_') }
 		else if symbol.starts_with('_OBJC_METACLASS_$_') { symbol.all_after('_OBJC_METACLASS_$_') }
 		else { return none }
-	if name in ['GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor']! { return name }
+	if name in ['GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor', 'GCMouse']! { return name }
 	return none
 }
 
@@ -33,12 +38,34 @@ fn game_controller_family(cls u64) bool {
 	panic('iOS: cyclic controller superclass chain')
 }
 
+fn game_mouse_family(cls u64) bool {
+	mut current := cls
+	for _ in 0 .. 128 {
+		info := ios_runtime.classes[current] or { return false }
+		if info.name == 'GCMouse' { return true }
+		current = info.parent
+		if current == 0 { return false }
+	}
+	panic('iOS: cyclic mouse superclass chain')
+}
+
+fn game_controller_metadata() {
+	mut cls := ios_runtime.classes[ios_runtime.names['GCMouse']] or { panic('iOS: missing mouse class') }
+	for i, name in ['_creationSequence', '_vendorName', '_handlerQueue', '_mouseInput']! {
+		types := ['I', '@"NSString"', '@"NSObject<OS_dispatch_queue>"', '@"GCMouseInput"']![i]
+		cls.ivars[name] = &ObjIvar{name: name.clone(), types: types.clone(), offset: 8 + i64(i * 8), size: if i == 0 { u64(4) } else { u64(8) }}
+	}
+}
+
 fn game_controller_unsupported(selector string) bool {
 	return selector in ['alloc', 'allocWithZone:', 'new', 'init', 'copy', 'copyWithZone:',
 		'mutableCopy', 'mutableCopyWithZone:', 'initWithCoder:', 'encodeWithCoder:', 'supportsSecureCoding']!
 }
 
 fn game_controller_require_discovery(cls u64) {
+	if game_mouse_family(cls) {
+		panic('iOS: GCMouse construction requires an implemented physical input profile')
+	}
 	if gamepad_family(cls) {
 		panic('iOS: gamepad construction requires an implemented physical input profile')
 	}
@@ -48,6 +75,7 @@ fn game_controller_require_discovery(cls u64) {
 }
 
 fn game_controller_types(name string, meta bool, selector string) ?string {
+	if name == 'GCMouse' && meta && selector in ['mice', 'current']! { return '@16@0:8' }
 	if name != 'GCController' || !meta { return none }
 	return match selector {
 		'controllers', 'current' { '@16@0:8' }
@@ -60,6 +88,16 @@ fn game_controller_types(name string, meta bool, selector string) ?string {
 fn game_controller_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	meta := object in ios_runtime.classes
 	cls := if meta { object } else { read64(object) }
+	if game_mouse_family(cls) {
+		if game_controller_unsupported(selector) { game_controller_require_discovery(cls) }
+		if !meta { return false }
+		match selector {
+			'mice' { frame.x[0] = ns_empty_array_symbol('___NSArray0__struct') or { panic('iOS: mouse discovery after shutdown') } }
+			'current' { frame.x[0] = 0 }
+			else { return false }
+		}
+		return true
+	}
 	if gamepad_family(cls) {
 		if game_controller_unsupported(selector) { game_controller_require_discovery(cls) }
 		return false
@@ -95,6 +133,10 @@ fn game_controller_constant_index(symbol string) ?int {
 		'_GCControllerDidBecomeCurrentNotification' { 0 }
 		'_GCControllerDidConnectNotification' { 1 }
 		'_GCControllerDidDisconnectNotification' { 2 }
+		'_GCMouseDidConnectNotification' { 3 }
+		'_GCMouseDidDisconnectNotification' { 4 }
+		'_GCMouseDidBecomeCurrentNotification' { 5 }
+		'_GCMouseDidStopBeingCurrentNotification' { 6 }
 		else { none }
 	}
 }
@@ -113,10 +155,9 @@ fn game_controller_symbol(symbol string) ?u64 {
 		arena := C.mmap(unsafe { nil }, page, C.PROT_READ | C.PROT_WRITE,
 			C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
 		if arena == voidptr(-1) { panic('iOS: cannot allocate controller globals') }
-		mut cursor := u64(120)
-		for i, text in ['GCControllerDidBecomeCurrentNotification',
-			'GCControllerDidConnectNotification', 'GCControllerDidDisconnectNotification']! {
-			object := u64(arena) + 24 + u64(i * 32)
+		mut cursor := u64(game_controller_notification_names.len * 40)
+		for i, text in game_controller_notification_names {
+			object := u64(arena) + u64(game_controller_notification_names.len * 8 + i * 32)
 			if cursor + u64(text.len) + 1 > u64(page) { panic('iOS: controller globals exceed their page') }
 			unsafe {
 				*(&u64(u64(arena) + u64(i * 8))) = object
@@ -139,7 +180,7 @@ fn game_controller_symbol(symbol string) ?u64 {
 fn game_controller_stop() {
 	arena := ios_runtime.controller_constants_arena
 	if arena == 0 { return }
-	for i in 0 .. 3 { ios_runtime.constants.delete(read64(arena + u64(i * 8))) }
+	for i in 0 .. game_controller_notification_names.len { ios_runtime.constants.delete(read64(arena + u64(i * 8))) }
 	if C.munmap(unsafe { voidptr(arena) }, usize(C.getpagesize())) != 0 {
 		panic('iOS: cannot retire controller globals')
 	}

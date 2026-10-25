@@ -180,7 +180,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name == 'NSURLSession' && url_session_unsupported(name) { return 0 }
 		if info.name == 'NSURLSessionConfiguration' && url_session_configuration_unsupported(name) { return 0 }
 		if url_session_task_name(info.name) && url_session_task_unsupported(name) { return 0 }
-		if info.name in ['GCController', 'GCPhysicalInputProfile']! && game_controller_unsupported(name) { return 0 }
+		if info.name in ['GCController', 'GCPhysicalInputProfile', 'GCMouse']! && game_controller_unsupported(name) { return 0 }
 		if info.name == 'GCColor' && gc_color_unsupported(name) { return 0 }
 		if info.name == 'NSLock' && ns_lock_unsupported(name) { return 0 }
 		if info.name == 'NSRecursiveLock' && ns_recursive_lock_unsupported(name) { return 0 }
