@@ -145,6 +145,10 @@ fn objc_responds(object u64, selector &char) bool {
 		if url_session_unsupported(name) { return native_method(read64(object), name) != 0 }
 		if url_session_selector(object, name) { return true }
 	}
+	if url_session_task_family(if object in ios_runtime.classes { object } else { read64(object) }) {
+		if url_session_task_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if url_session_task_types('NSURLSessionTask', object in ios_runtime.classes, name) != none { return true }
+	}
 	if url_session_configuration_family(if object in ios_runtime.classes { object } else { read64(object) }) {
 		if url_session_configuration_unsupported(name) { return native_method(read64(object), name) != 0 }
 		if url_session_configuration_types('NSURLSessionConfiguration', object in ios_runtime.classes, name) != none { return true }

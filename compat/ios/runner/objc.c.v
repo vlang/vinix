@@ -198,6 +198,7 @@ mut:
 	connection_cancelled bool
 	url_session_owned bool
 	url_session_configuration_owned bool
+	url_session_task_owned bool
 	sort_descriptor_owned bool
 	sort_descriptor_initialized bool
 	sort_descriptor_initializing bool
@@ -568,7 +569,7 @@ fn objc_start() {
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'UNNotificationTrigger', 'UNCalendarNotificationTrigger', 'UNNotificationRequest', 'UNUserNotificationCenter', 'NSBundle', 'NSBundleResourceRequest', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
         'UNNotificationContent', 'UNMutableNotificationContent', 'UNNotificationSound', 'UNNotificationAttachment',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSOperation', 'NSInvocationOperation', 'NSInvocation', 'NSMethodSignature', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
-        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLQueryItem', 'NSURLCredential', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
+        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLQueryItem', 'NSURLCredential', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSURLSessionTask', 'NSURLSessionDownloadTask', 'NSURLSessionDataTask', 'NSURLSessionUploadTask', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
         'UIScreenEdgePanGestureRecognizer', 'UIFeedbackGenerator', 'UINotificationFeedbackGenerator', 'UISelectionFeedbackGenerator', 'UIImpactFeedbackGenerator', 'CADisplayLink',
@@ -579,6 +580,8 @@ fn objc_start() {
 		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGFont', 'VinixReachability', 'VinixNWPath', 'VinixNWInterface', 'VinixNWPathMonitor', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider', 'VinixSecCertificate', 'VinixSecKey', 'VinixSecPolicy', 'VinixSecTrust', 'VinixCFDate', 'VinixCFError', 'VinixCFUUID'] {
 		parent := match name {
 			'NSObject' { u64(0) }
+			'NSURLSessionDownloadTask', 'NSURLSessionDataTask' { ios_runtime.names['NSURLSessionTask'] }
+			'NSURLSessionUploadTask' { ios_runtime.names['NSURLSessionDataTask'] }
 			'OS_dispatch_object' { ios_runtime.names['OS_object'] }
 			'OS_dispatch_group' { ios_runtime.names['OS_dispatch_object'] }
 			'OS_dispatch_source' { ios_runtime.names['OS_dispatch_object'] }
@@ -698,6 +701,7 @@ fn objc_start() {
 			'NSURLConnection' { u32(16) }
 			'NSURLSession' { u32(160) }
 			'NSURLSessionConfiguration' { u32(560) }
+			'NSURLSessionTask', 'NSURLSessionDownloadTask', 'NSURLSessionDataTask', 'NSURLSessionUploadTask' { u32(720) }
 			'NSSortDescriptor' { u32(40) }
 			'NSRegularExpression' { u32(40) }
 			'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult' { u32(8) }
@@ -743,6 +747,7 @@ fn objc_start() {
 	webkit_metadata()
 	url_session_metadata()
 	url_session_configuration_metadata()
+	url_session_task_metadata()
 	ns_lock_metadata()
 	ns_recursive_lock_metadata()
 	ns_operation_metadata()
@@ -809,6 +814,7 @@ fn objc_allocate(cls u64) u64 {
 	if connection_family(cls) && cls != ios_runtime.names['NSURLConnection'] { panic('iOS: custom connection subclass construction is not implemented') }
 	url_session_require_class(cls)
 	url_session_configuration_require_class(cls)
+	url_session_task_require_class(cls)
 	sort_descriptor_require_class(cls)
 	regular_expression_require_class(cls)
 	mutable_string_require_class(cls)
@@ -1117,6 +1123,11 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if ((symbol.starts_with('_OBJC_CLASS_$_') && url_session_task_name(symbol.all_after('_OBJC_CLASS_$_')))
+		|| (symbol.starts_with('_OBJC_METACLASS_$_') && url_session_task_name(symbol.all_after('_OBJC_METACLASS_$_'))))
+		&& library != '/System/Library/Frameworks/Foundation.framework/Foundation' {
+		return error('iOS: URL session task import requires Foundation.framework')
+	}
 	if symbol in ['_OBJC_CLASS_$_UIFeedbackGenerator', '_OBJC_METACLASS_$_UIFeedbackGenerator',
 		'_OBJC_CLASS_$_UINotificationFeedbackGenerator', '_OBJC_METACLASS_$_UINotificationFeedbackGenerator',
 		'_OBJC_CLASS_$_UISelectionFeedbackGenerator', '_OBJC_METACLASS_$_UISelectionFeedbackGenerator',

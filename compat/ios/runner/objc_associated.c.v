@@ -84,6 +84,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if objc_is_kind(value, ios_runtime.names['NSURLRequest']) { return request_copy(value, false) }
 	if objc_is_kind(value, ios_runtime.names['NSURLSession']) { url_session_state(value); return objc_retain(value) }
 	if objc_is_kind(value, ios_runtime.names['NSURLSessionConfiguration']) { return url_session_configuration_copy(value) }
+	if url_session_task_family(cls) { url_session_task_state(value); return objc_retain(value) }
 	if header := ios_runtime.objects[value] {
 		if header.mutable_string_owned { return mutable_string_snapshot(value, false) }
 	}

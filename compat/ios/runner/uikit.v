@@ -150,6 +150,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if connection_dispatch(object, selector, mut frame) { return true }
 	if url_session_dispatch(object, selector, mut frame) { return true }
 	if url_session_configuration_dispatch(object, selector, mut frame) { return true }
+	if url_session_task_dispatch(object, selector, mut frame) { return true }
 	if sort_descriptor_dispatch(object, selector, mut frame) { return true }
 	if regular_expression_dispatch(object, selector, mut frame) { return true }
 	if mutable_string_dispatch(object, selector, mut frame) { return true }
