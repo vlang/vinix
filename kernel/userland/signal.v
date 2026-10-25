@@ -36,6 +36,10 @@ const sa_mask_offset = u64(24)
 
 const k_sigaction_size = u64(32)
 
+// Native Linux UAPI flags. Unknown bits and SA_UNSUPPORTED are never retained;
+// applications use that property to probe newly introduced signal flags.
+const linux_uapi_sa_flags = u64(0xdc000807)
+
 // stack_t: void *ss_sp; int ss_flags; size_t ss_size.
 const stack_t_size = u64(24)
 
@@ -78,7 +82,7 @@ pub fn syscall_rt_sigaction(_ voidptr, signum int, act_ptr u64, oldact_ptr u64, 
 		}
 		incoming = proc.SigAction{
 			sa_sigaction: voidptr(raw[0])
-			sa_flags:     int(raw[1])
+			sa_flags:     int(raw[1] & linux_uapi_sa_flags)
 			sa_restorer:  voidptr(raw[2])
 			sa_mask:      raw[3] & ~unblockable_mask()
 		}
@@ -95,7 +99,7 @@ pub fn syscall_rt_sigaction(_ voidptr, signum int, act_ptr u64, oldact_ptr u64, 
 	if oldact_ptr != 0 {
 		previous := current_thread.sigactions[signum]
 		raw[0] = u64(previous.sa_sigaction)
-		raw[1] = u64(u32(previous.sa_flags))
+		raw[1] = u64(u32(previous.sa_flags)) & linux_uapi_sa_flags
 		// The restorer has to survive a save/restore round trip: it is the only
 		// way back out of a Linux-style handler, so dropping it here would
 		// wedge the next signal the caller re-installs this action for.

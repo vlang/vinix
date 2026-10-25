@@ -2691,3 +2691,17 @@ remain unqualified.
 `autodisarm-evidence.v` without `-prod`, run `self-test` (ten positive and
 51 negative controls), then `check` on the complete bundle in
 [the qualification](../../docs/linux-alternate-stack-autodisarm.md).
+
+The `sigactionflags` case tests all 64 individual action-flag bits and eight
+combined values for three signals as root and UID 1000/GID 2000. Guarded
+queries, aliasing and copy faults check Linux UAPI flag normalization,
+including clearing SA_UNSUPPORTED, internal flags and unknown bits.
+Identical musl ELFs pass 6,480 checks on both production architectures and
+Linux references; original kernels fail 870 each. This qualifies flag
+storage and probing; individual flag delivery needs separate tests.
+
+`sigactionflags-reference.v` accepts the same arguments as
+`sigwaitcopy-reference.v`; `--self-test` has two positive and 17 negative
+controls. Compile `sigactionflags-evidence.v` without `-prod`, run `self-test`
+(eleven positive and 190 negative controls), then `check` on the complete
+bundle in [the qualification](../../docs/linux-signal-action-flags.md).

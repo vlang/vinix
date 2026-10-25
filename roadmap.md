@@ -1968,6 +1968,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   integration remain separate. See
   [the autodisarm qualification](docs/linux-alternate-stack-autodisarm.md).
 
+- [x] Normalize native rt_sigaction flags to Linux UAPI bits, clearing
+  SA_UNSUPPORTED, internal and unknown flags. Guarded queries, aliases and
+  copy faults pass 6,480 checks on both production architectures and Linux;
+  originals fail 870 each. All 23 selected maintained cases pass per
+  architecture. Individual flag delivery requires separate tests.
+  See [the flag-probing qualification](docs/linux-signal-action-flags.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
