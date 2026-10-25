@@ -9,10 +9,11 @@ literal argv behavior and 4096-byte bound. Escape leaves a focused field and
 clears its selection before a second Escape returns to Deployment. Pasting
 while unfocused or viewing an accepted receipt does nothing.
 
-Compact windows show the current status, Back when idle, and retained failure
-access. A pending writer shows a wait message. Draft text, focus and receipt
-detail page survive resizing. Filename and follow-up actions remain available
-in the full view.
+Compact windows provide the filename field and Save action at 320×240, with
+Back when idle, status text and retained failure access. A pending writer shows
+a wait message. Draft text, focus and receipt detail page survive resizing.
+Receipt follow-up actions remain available in the full view; compact accepted
+receipts retain the report reader.
 
 Saving still protects its independently captured destination. The maintained
 [fixture](software_snapshot_fixture.v) uses real child processes held behind

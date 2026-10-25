@@ -153,8 +153,38 @@ fn (mut a SoftwareApp) snapshot_paste_input(input string) {
 }
 
 fn (a &SoftwareApp) build_snapshot_compact(width int, height int) ui2.Element {
-	mut children := frame_elements(6)
-	children << software_label(if a.snapshot_ready { 'Installed deployment saved' } else { 'Save installed · enlarge for details' }, 14, 8, width - 28, 28, false)
+	mut children := frame_elements(7)
+	if width < 320 || height < 240 {
+		children << software_label(if a.snapshot_ready { 'Installed deployment saved · enlarge for details' } else { 'Save installed · enlarge for details' }, 14, 8, width - 28, 28, false)
+		if a.worker == unsafe { nil } {
+			failure := a.failure_pages.len > 0
+			button_width := if failure { (width - 40) / 2 } else { if width > 202 { 174 } else { width - 28 } }
+			children << software_button('software.snapshot.back', 'Back', 14, 46, button_width)
+			if failure { children << software_button('software.failure', 'Failure', 26 + button_width, 46, button_width) }
+		} else {
+			children << software_label('Wait for saving to finish.', 14, 46, width - 28, 28, false)
+		}
+		children << software_label(a.status, 14, 78, width - 28, if height > 86 { height - 86 } else { 1 }, false)
+		return ui2.screen(app_surface, children)
+	}
+	if !a.snapshot_ready {
+		idle := a.worker == unsafe { nil }
+		children << software_label('Save installed', 14, 8, if idle { width - 98 } else { width - 28 }, 28, false)
+		if idle { children << software_button('software.snapshot.back', 'Back', width - 70, 8, 56) }
+		children << software_label('New deployment file (absolute path)', 14, 42, width - 28, 18, false)
+		children << console_field('software.deployment.path', editor_bytes_text(a.deployment_path), 14, 64, width - 28, a.focus)
+		if idle {
+			failure := a.failure_pages.len > 0
+			button_width := if failure { (width - 40) / 2 } else { if width > 202 { 174 } else { width - 28 } }
+			children << software_button('software.snapshot.save', 'Save installed', 14, 104, button_width)
+			if failure { children << software_button('software.failure', 'Failure details', 26 + button_width, 104, button_width) }
+		} else {
+			children << software_label('Wait for saving to finish.', 14, 104, width - 28, 28, false)
+		}
+		children << software_label(a.status, 14, 142, width - 28, if height > 150 { height - 150 } else { 1 }, false)
+		return ui2.screen(app_surface, children)
+	}
+	children << software_label('Installed deployment saved', 14, 8, width - 28, 28, false)
 	button_width := if width > 202 { 174 } else { width - 28 }
 	available := a.failure_pages.len > 0 && a.worker == unsafe { nil }
 	if a.worker == unsafe { nil } {

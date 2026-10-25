@@ -63,7 +63,8 @@ fn check_software_snapshot_navigation() ! {
 	for size in [ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 640, 610)]! {
 		tree := app.build(size)!
 		assert tree.children.any(it.id == 'software.snapshot.back') && tree.children.any(it.text == app.status)
-		assert tree.children.any(it.id == 'software.deployment.path') == (size.width >= 640)
+		assert tree.children.any(it.id == 'software.deployment.path')
+		assert tree.children.any(it.id == 'software.snapshot.save')
 		assert editor_bytes_text(app.deployment_path) == software_snapshot_fixture_path && !app.focus
 		free_window_tree(tree)
 	}

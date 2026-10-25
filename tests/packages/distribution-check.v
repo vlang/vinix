@@ -389,6 +389,7 @@ fn check() ! {
 	os.cp(repository + '/tests/packages/software_mirror_navigation_fixture.v', work + '/software/mirror_navigation_fixture.v')!
 	os.cp(repository + '/desktop/software_mirror.v', work + '/software/software_mirror.v')!
 	os.cp(repository + '/desktop/software_terminal.v', work + '/software/software_terminal.v')!
+	os.cp(repository + '/desktop/software_hosted.v', work + '/software/software_hosted.v')!
 	os.cp(repository + '/desktop/software_launch.v', work + '/software/software_launch.v')!
 	os.cp(repository + '/desktop/software_launch_navigation.v', work + '/software/software_launch_navigation.v')!
 	os.cp(repository + '/tests/packages/software_launch_navigation_fixture.v', work + '/software/launch_navigation_fixture.v')!
@@ -405,6 +406,7 @@ fn check() ! {
 	os.cp(repository + '/tests/packages/software_metadata_fixture.v', work + '/software/metadata_fixture.v')!
 	os.cp(repository + '/tests/packages/software_data_fixture.v', work + '/software/data_fixture.v')!
 	os.cp(repository + '/tests/packages/software_terminal_fixture.v', work + '/software/terminal_fixture.v')!
+	os.cp(repository + '/tests/packages/software_hosted_fixture.v', work + '/software/hosted_fixture.v')!
 	os.cp(repository + '/tests/packages/software_fixture.v', work + '/software/main.v')!
 	modules := os.getenv_opt('VINIX_PACKAGE_TEST_UI2') or { repository + '/build/vmodules' }
 	if !os.is_file(modules + '/ui2/v.mod') {

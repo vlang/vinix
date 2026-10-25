@@ -170,6 +170,7 @@ fn stage_software_image(host hwhost.Host, root string, work string) !NativeArtif
 	}
 	os.cp(host.root + '/tests/packages/software_image_fixture.v', source + '/main.v')!
 	os.cp(host.root + '/tests/packages/software_terminal_fixture.v', source + '/terminal_fixture.v')!
+	os.cp(host.root + '/tests/packages/software_hosted_fixture.v', source + '/hosted_fixture.v')!
 	lookup := '@vlib|' + host.root + '|' + host.root + '/tools/accounts|' + modules + '|@vmodules'
 	binary := hwhost.build_program_with_flags(host, source, work + '/software-build', 'software-image', [],
 		['-manualfree', '-enable-globals', '-d', 'ui2_headless', '-path', lookup, '-cflags', '-I' + host.root + '/desktop'])!
