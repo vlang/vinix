@@ -32,10 +32,11 @@ All evidence paths below are relative to
 Capture names retain their original chronology. In particular,
 `my-location-settings-prompt.png` shows another denial explanation, not
 location settings, and the two `directions-editor-*` captures show Attractions,
-not directions. The denial UI is concrete application behavior; the Maps
-permission callback itself was not directly logged. No permission grant,
-location provider, injected coordinates, blue current-location dot or account
-was established.
+not directions. Serial lines 7694–7698 directly show Maps'
+`neg.onRequestPermissionsResult` called through `VinixPermissionResult.run`,
+`Handler` and `Looper`. This confirms callback delivery alongside the denial
+UI. No permission grant, location provider, injected coordinates, blue
+current-location dot or account was established.
 
 The complete serial log contains no `ANDROID-WS-FAIL`, `APK-SUITE-EXIT`,
 `NoSuchMethodError`, missing `getChildDrawingOrder(II)I`, or former
@@ -43,10 +44,19 @@ The complete serial log contains no `ANDROID-WS-FAIL`, `APK-SUITE-EXIT`,
 route-layout path, which was not reached. A Play Services finalizer reports
 `IllegalStateException: Lock wasn't released correctly` at lines 4154–4160;
 line 10091 records unknown settings key `location_mode`. Maps continues
-after both. Native loop counters advance through the final observation, so
-the unresolved sheet is not evidence of a permanently blocked main loop.
-Thread, view-tree and transition snapshots were not enabled; its cause remains
-undetermined.
+after both. Lines 7670–7702 also contain a caught APK-signature verification
+`NullPointerException` while `ATLLoadedApp.getSystemApplication` creates the
+denial dialog. The retained Framework325 disassembly shows that this
+resource-only system package has a null archive path, passed to the verifier's
+`String.concat`. System application creation and the denial dialog continue;
+this stack does not establish the cause of the later Attractions stall.
+Native loop counters advance through the final observation, and additional
+RecyclerView inflations appear at lines 11980, 12366 and 13060, so the
+unresolved sheet is not evidence of a permanently blocked main loop. Thread,
+view-tree and transition snapshots were not enabled; its cause remains
+undetermined. A fresh route replay should select Paris once, wait for the
+settled place card before pressing Directions, and test a manual origin
+before exercising My Location.
 
 The requested real PNG is retained at
 `/Users/alex/.local/state/vinix/android/maps327-2026-10-25/results/attempt327/google-maps/map-after-skip.png`,
