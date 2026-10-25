@@ -158,10 +158,6 @@ struct Receipt {
 
 fn digest(path string) !string { return sha256.sum(os.read_bytes(path)!).hex() }
 
-fn build_source(path string) bool {
-	return (path.ends_with('.v') && !path.ends_with('_test.v')) || path.ends_with('.h') || path.ends_with('/v.mod')
-}
-
 struct PackageProof {
 	signature string
 	object_sha256 string
@@ -495,8 +491,7 @@ fn run() !int {
 			userland := root + '/home/developer/native-source'
 			os.mkdir(userland)!
 			source_revision = sourcecore.revision(guesthost.root())!
-			sourcecore.export(guesthost.root(), source_revision, ['util-vinix', 'init',
-				'tools/packages/main.v', 'tools/packages/pkgcore', 'tools/packages/pkgprotocol', 'tools/packages/signing'], userland, build_source)!
+			sourcecore.export_native_userland(guesthost.root(), source_revision, userland)!
 			os.write_file(userland + '/SOURCE_REVISION', source_revision + '\n')!
 			os.write_file(userland + '/assert-failure.v', 'fn main() {\n    assert 1 == 2\n}\n')!
 			mut steps := []BuildStep{}
@@ -539,7 +534,7 @@ fn run() !int {
 				name: 'compile-package'
 				argv: [project_v, '-new-compiler', '-nocache', '-showcc', '-no-retry-compilation', '-no-parallel', '-no-memory-limit',
 					'-os', 'linux', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-musl', '-gc', 'none',
-					'-cc', '{cc}', '-path', '@vlib|{work}', '-o', '{work}/package-bin', '{work}/tools/packages/main.v']
+					'-cc', '{cc}', '-path', sourcecore.native_package_module_path('{work}'), '-o', '{work}/package-bin', '{work}/tools/packages/main.v']
 				artifacts: ['package-bin']
 			}
 			steps << BuildStep{ name: 'help-package', argv: ['{work}/package-bin', '--help'], artifacts: []string{} }
