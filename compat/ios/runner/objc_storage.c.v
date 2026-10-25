@@ -2,6 +2,8 @@
 module main
 
 fn objc_install_storage(cls u64, object u64, caller_storage bool) {
+	snapshot_configuration_require_class(cls)
+	if caller_storage && snapshot_configuration_family(cls) { panic('iOS: WKSnapshotConfiguration caller storage is not implemented') }
 	if caller_storage && text_field_family(cls) { panic('iOS: UITextField caller storage is not implemented') }
 	haptic_dynamic_parameter_require_class(cls)
 	haptic_parameter_require_class(cls)

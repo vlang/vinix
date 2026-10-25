@@ -218,6 +218,7 @@ mut:
 	pool_token u64
 	uuid_bytes [16]u8
 	cookie_owned bool
+	snapshot_configuration_initialized bool
 	webkit &WebKitState = unsafe { nil }
 	webkit_array bool // Read-only script list; its contents change through its controller.
 	webview &WebViewState = unsafe { nil }
@@ -568,7 +569,7 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSNumberFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'NSMapTable', 'CTTelephonyNetworkInfo', 'ASIdentifierManager', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
+		'NSMapTable', 'CTTelephonyNetworkInfo', 'ASIdentifierManager', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKSnapshotConfiguration', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor', 'CHHapticDynamicParameter', 'CHHapticEventParameter', 'CHHapticEvent', 'CHHapticPattern', 'GCMouse', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UITextField', 'UIWindow', 'UIViewController', 'UINavigationController', 'GKGameCenterViewController', 'UIStoryboard', 'UITextPosition', 'UITextRange',
@@ -689,6 +690,7 @@ fn objc_start() {
 			'GCKeyboard' { u32(32) }
 			'GCMouse' { u32(40) }
 			'GCColor', 'CHHapticEventParameter', 'AVAudioApplication' { u32(24) }
+			'WKSnapshotConfiguration' { u32(56) }
 			'CHHapticDynamicParameter' { u32(32) }
 			'CHHapticEvent' { u32(48) }
 			'CHHapticPattern' { u32(72) }
@@ -786,6 +788,7 @@ fn objc_start() {
 	un_attachment_metadata()
 	ns_cache_metadata()
 	gc_color_metadata()
+	snapshot_configuration_metadata()
 	haptic_dynamic_parameter_metadata()
 	haptic_parameter_metadata()
 	haptic_pattern_metadata()
@@ -834,6 +837,7 @@ fn obj_header(object u64) &ObjHeader {
 }
 
 fn objc_allocate(cls u64) u64 {
+	snapshot_configuration_require_class(cls)
 	haptic_dynamic_parameter_require_class(cls)
 	haptic_parameter_require_class(cls)
 	haptic_pattern_require_class(cls)
@@ -978,6 +982,7 @@ fn objc_new(cls u64) u64 {
 	if object == 0 { return 0 }
 	imp := native_method(cls, 'init')
 	if imp != 0 { return unsafe { ObjInit(voidptr(imp))(object, c'init') } }
+	if snapshot_configuration_family(cls) { return snapshot_configuration_initialize(object) }
 	game_keyboard_require_discovery(cls)
 	if obj_header(object).pool_owned { ns_pool_initialize(object); return object }
 	if obj_header(object).uuid_owned { ns_uuid_initialize(object, 0, true); return object }
@@ -1167,6 +1172,11 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if symbol in ['_OBJC_CLASS_$_WKSnapshotConfiguration', '_OBJC_METACLASS_$_WKSnapshotConfiguration']! {
+		if library != '/System/Library/Frameworks/WebKit.framework/WebKit' { return error('iOS: WKSnapshotConfiguration class import requires WebKit.framework') }
+		cls := ios_runtime.names['WKSnapshotConfiguration']
+		return if symbol.starts_with('_OBJC_METACLASS_') { read64(cls) } else { cls }
+	}
 	if symbol in ['_OBJC_CLASS_$_CHHapticPattern', '_OBJC_METACLASS_$_CHHapticPattern']! {
 		if library != '/System/Library/Frameworks/CoreHaptics.framework/CoreHaptics' {
 			return error('iOS: CHHapticPattern class import requires CoreHaptics.framework')
