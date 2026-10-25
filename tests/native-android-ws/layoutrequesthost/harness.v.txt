@@ -1,0 +1,197 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module main
+
+import os
+
+#include <pthread.h>
+#include <stdlib.h>
+fn C.pthread_key_create(&u64, voidptr) i32
+fn C.pthread_getspecific(u64) voidptr
+fn C.pthread_setspecific(u64, voidptr) i32
+fn C.__atomic_load_n(&u32, i32) u32
+fn C.__atomic_store_n(&u32, u32, i32)
+
+union Value { i i32 l voidptr }
+struct WsTransform { right i32 bottom i32 }
+struct WsDrawState {
+mut:
+	width i32
+	height i32
+	pixels &u32 = unsafe { nil }
+	transform WsTransform
+	save_count i32
+}
+
+__global (
+	ws &WsState
+	ws_draw_key u64
+	ws_root_draw &WsDrawState
+	inject string
+	injected bool
+	fault string
+	pending_error string
+	cancel_point string
+	marked string
+	visited []string
+	leaves int
+)
+
+fn ready() { assert pending_error == '', 'JNI call after pending exception: ' + pending_error }
+fn phase(name string) {
+	ready()
+	visited << name
+	if inject == name && !injected { injected = true; native_request_layout() }
+	if marked == name { ws_mark() }
+	if fault == name { pending_error = name + '-identity' }
+}
+fn prefix(target voidptr) string {
+	return if target in [unsafe { voidptr(1) }, unsafe { voidptr(11) }, unsafe { voidptr(21) }] { 'root' } else { 'dialog' }
+}
+fn pending(_ voidptr) bool { return pending_error != '' }
+fn activity_decor(_ voidptr, _ voidptr) voidptr { ready(); return unsafe { voidptr(1) } }
+fn ws_dialog_decor(_ voidptr, _ voidptr) voidptr { ready(); return unsafe { voidptr(2) } }
+fn obj(_ voidptr, target voidptr, _ &char, name &char, _ &char, _ voidptr) voidptr {
+	ready()
+	assert unsafe { cstring_to_vstring(name) } == 'getWindow'
+	return if target == unsafe { voidptr(100) } { unsafe { voidptr(11) } } else { unsafe { voidptr(12) } }
+}
+fn get_object(_ voidptr, window voidptr, _ &char, _ &char, _ &char) voidptr {
+	ready()
+	return if window == unsafe { voidptr(11) } { unsafe { voidptr(21) } } else { unsafe { voidptr(22) } }
+}
+fn ws_attach_window(_ voidptr, window voidptr, _ voidptr) { phase(prefix(window) + '-attach') }
+fn call(_ voidptr, target voidptr, _ &char, name &char, _ &char, _ voidptr) {
+	ready()
+	method := unsafe { cstring_to_vstring(name) }
+	part := match method {
+		'measure' { 'measure' }
+		'layout' { 'layout' }
+		'vinixDrawLayer' { 'draw' }
+		'dispatchOnGlobalLayout' { 'global' }
+		'dispatchOnDraw' { 'observer-draw' }
+		else { panic('unexpected method: ' + method) }
+	}
+	// Production ws_layout marks even an ordinary unchanged layout dirty.
+	if part == 'layout' { ws_mark() }
+	phase(prefix(target) + '-' + part)
+}
+fn integer(_ voidptr, _ voidptr, _ &char, name &char, _ &char, _ voidptr) i32 {
+	ready()
+	assert unsafe { cstring_to_vstring(name) } in ['getMeasuredWidth', 'getMeasuredHeight']
+	return 2
+}
+fn boolean(_ voidptr, observer voidptr, _ &char, name &char, _ &char, _ voidptr) u8 {
+	assert unsafe { cstring_to_vstring(name) } == 'dispatchOnPreDraw'
+	name_ := prefix(observer) + '-pre'
+	phase(name_)
+	return u8(cancel_point == name_)
+}
+fn ws_path_clip_release(_ &WsDrawState, _ voidptr) {}
+fn ws_canvas_leave(previous voidptr) { leaves++; C.pthread_setspecific(ws_draw_key, previous) }
+fn ws_trace_tree(_ voidptr, _ voidptr) { ready() }
+fn ws_millis() i64 { return 123 }
+fn ws_rect(_ f32, _ f32, _ f32, _ f32, _ u32) { ready() }
+fn ws_save() { ready() }
+fn ws_restore() {}
+fn ws_translate(_ f32, _ f32) { ready() }
+fn ws_clip(_ f32, _ f32, _ f32, _ f32) { ready() }
+
+fn reset(dialog bool) {
+	unsafe {
+		if ws != nil { C.free(ws.surface) }
+		ws = &WsState{
+			root: nil
+			apk: nil
+			data: nil
+			width: 4
+			height: 4
+			activity: voidptr(100)
+			dialog: if dialog { voidptr(200) } else { nil }
+			dirty: true
+			surface: &WsSurface(C.calloc(1, 48 + 2 * 64))
+		}
+		ws.surface.buffer_size = 64
+		ws.surface.reader = 2
+	}
+	inject = ''
+	injected = false
+	fault = ''
+	pending_error = ''
+	cancel_point = ''
+	marked = ''
+	visited = []string{}
+	leaves = 0
+}
+
+fn checked_render(sequence u32) {
+	ws_render(unsafe { nil })
+	assert ws.surface.sequence == sequence
+	assert leaves == int(sequence)
+	assert C.pthread_getspecific(ws_draw_key) == unsafe { nil }
+}
+
+fn request_case(point string) {
+	reset(point.starts_with('dialog'))
+	inject = point
+	checked_render(1)
+	assert injected, point
+	assert ws.dirty, 'requestLayout was lost during ' + point
+	// The pending request schedules exactly one fresh traversal when callbacks
+	// stop requesting. Ordinary layout bookkeeping must not keep it active.
+	checked_render(2)
+	assert !ws.dirty, 'unchanged layout never becomes idle after ' + point
+	assert pending_error == ''
+	println('LAYOUT-REQUEST-PASS ' + point)
+}
+
+fn main() {
+	$if prod { panic('assertions required') }
+	unsafe {
+		assert C.pthread_key_create(&ws_draw_key, nil) == 0
+		ws_root_draw = &WsDrawState{}
+		assert sizeof(WsSurface) == 48
+		assert ws == nil
+		native_request_layout()
+		assert ws == nil
+	}
+	wanted := if os.args.len > 1 { os.args[1] } else { 'all' }
+	points := ['root-attach', 'root-measure', 'root-layout', 'dialog-attach', 'dialog-measure', 'dialog-layout']
+	if wanted != 'all' { assert wanted in points; request_case(wanted); return }
+	for point in points { request_case(point) }
+	reset(true)
+	checked_render(1)
+	assert !ws.dirty && !injected
+	println('LAYOUT-REQUEST-IDLE-PASS')
+	for point in ['root-global', 'root-pre', 'root-observer-draw', 'root-draw', 'dialog-global', 'dialog-pre', 'dialog-observer-draw', 'dialog-draw'] {
+		reset(true)
+		marked = point
+		checked_render(1)
+		assert ws.dirty, 'invalidation was lost at ' + point
+	}
+	println('LAYOUT-REQUEST-INVALIDATION-PASS')
+	for point in ['root-pre', 'dialog-pre'] {
+		reset(true)
+		cancel_point = point
+		ws_render(unsafe { nil })
+		assert ws.surface.sequence == 0 && ws.dirty && leaves == 1
+		assert C.pthread_getspecific(ws_draw_key) == unsafe { nil }
+		assert !visited.contains(point.all_before('-') + '-draw')
+	}
+	println('LAYOUT-REQUEST-CANCELLATION-PASS')
+	for point in ['root-attach', 'root-measure', 'root-layout', 'root-global', 'root-pre', 'root-observer-draw', 'root-draw', 'dialog-attach', 'dialog-measure', 'dialog-layout', 'dialog-global', 'dialog-pre', 'dialog-observer-draw', 'dialog-draw'] {
+		reset(true)
+		fault = point
+		ws_render(unsafe { nil })
+		assert pending_error == point + '-identity'
+		assert visited.last() == point, 'callback entered after exception'
+		assert ws.surface.sequence == 0 && leaves == 1
+		assert C.pthread_getspecific(ws_draw_key) == unsafe { nil }
+	}
+	println('LAYOUT-REQUEST-EXCEPTIONS-PASS')
+	reset(false)
+	ws.surface.reader = 1
+	ws_render(unsafe { nil })
+	assert visited.len == 0 && leaves == 0 && ws.dirty && ws.surface.sequence == 0
+	println('LAYOUT-REQUEST-READER-BUSY-PASS')
+	println('LAYOUT-REQUEST-HOST-PASS')
+}

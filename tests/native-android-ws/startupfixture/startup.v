@@ -16,6 +16,7 @@ pub fn install(output string, resources string) ! {
  install_geometry_probe(dir)!
  install_layout_exception_probe(dir)!
  install_layout_listener_probe(dir)!
+ install_layout_request_probe(dir)!
  install_view_layer_probe(dir)!
  install_typeface_probe(dir)!
  install_font_builders_probe(dir)!
@@ -140,6 +141,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/PowerProbe;->check(Landroid/content/Con
 invoke-static {p0}, Lorg/vinix/bootstrap/BatteryProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/GeometryProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/LayoutListenerProbe;->check(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/LayoutRequestProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/LayoutExceptionProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/ViewLayerProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/ViewConfigurationProbe;->check(Landroid/content/Context;)V

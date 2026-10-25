@@ -116,7 +116,7 @@ return-void
   reset := 'const/4 v0, 0\niput-boolean v0, p0, Landroid/view/View;->vinixLaidOut:Z\n'
   text = text.replace(point, if point.starts_with('iput-object') { reset + point } else { point + '\n' + reset })
  }
- os.write_file(path, text)!
+ os.write_file(path, framework_layout_requests(text)!)!
  listener := smali + '/android/view/View$OnLayoutChangeListener.smali'
  definition := os.read_file(listener)!
  if definition.contains('onLayoutChange(') { return error('unexpected existing layout listener definition') }

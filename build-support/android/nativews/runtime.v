@@ -108,6 +108,7 @@ mut:
 	height        i32
 	input         i32
 	dirty         bool
+	layout_requests u64
 	running       bool
 	animated      bool
 	animation_last i64

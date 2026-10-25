@@ -87,6 +87,7 @@ fn ws_dialog_close(e voidptr, dialog voidptr) {
 fn ws_render_dialog(e voidptr) bool {
 	unsafe {
 		needs_redraw := ws.dirty
+		layout_requests := ws.layout_requests
 		decor := ws_dialog_decor(e, ws.dialog)
 		window := obj(e, ws.dialog, c'android/app/Dialog', c'getWindow', c'()Landroid/view/Window;', nil)
 		ws_attach_window(e, window, decor)
@@ -104,7 +105,7 @@ fn ws_render_dialog(e voidptr) bool {
 		layout := [Value{ i: 0 }, Value{ i: 0 }, Value{ i: width }, Value{ i: height }]!
 		call(e, decor, c'android/view/View', c'layout', c'(IIII)V', &layout[0])
 		if pending(e) { return false }
-		ws.dirty = needs_redraw
+		ws.dirty = needs_redraw || ws.layout_requests != layout_requests
 		if !ws_dispatch_traversal(e, window) { return false }
 		ws_rect(0, 0, f32(ws.width), f32(ws.height), 0x66000000)
 		ws_save()

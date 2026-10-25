@@ -80,6 +80,13 @@ fn ws_view_free(pointer i64) {
 
 fn ws_mark() { if ws != unsafe { nil } { ws.dirty = true } }
 
+fn ws_request_layout() {
+	if ws != unsafe { nil } {
+		ws.layout_requests++
+		ws_mark()
+	}
+}
+
 fn ws_set_text(e voidptr, object voidptr, text voidptr) {
 	unsafe {
 		view := ws_view(e, object)
@@ -482,6 +489,7 @@ fn ws_render(e voidptr) {
 		for i := i32(0); i < ws.width * ws.height; i++ { ws_root_draw.pixels[i] = 0xfffafafa }
 		decor := activity_decor(e, ws.activity)
 		window := obj(e, ws.activity, c'android/app/Activity', c'getWindow', c'()Landroid/view/Window;', nil)
+		layout_requests := ws.layout_requests
 		ws_attach_window(e, window, decor)
 		if pending(e) { return }
 		measure := [Value{ i: ws.width | 0x40000000 }, Value{ i: ws.height | 0x40000000 }]!
@@ -490,9 +498,9 @@ fn ws_render(e voidptr) {
 		layout := [Value{ i: 0 }, Value{ i: 0 }, Value{ i: ws.width }, Value{ i: ws.height }]!
 		call(e, decor, c'android/view/View', c'layout', c'(IIII)V', &layout[0])
 		if pending(e) { return }
-		// Layout itself marks the window dirty. Preserve subsequent invalidations
-		// from observers and drawing so they request another traversal.
-		ws.dirty = false
+		// Consume layout's own dirty mark, but retain requests made by attachment,
+		// measurement or layout callbacks. Observers and drawing may dirty it again.
+		ws.dirty = ws.layout_requests != layout_requests
 		if !ws_dispatch_traversal(e, window) { return }
 		ws_trace_tree(e, decor)
 		args := [Value{ l: ws.canvas }]!
