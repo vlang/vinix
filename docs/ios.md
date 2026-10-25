@@ -18909,6 +18909,19 @@ records the source revision and complete external evidence. Native iOS layout
 parity, Fortnite initialization, rendering, login and gameplay remain
 unverified. Advertising work remains skipped.
 
+The DualSense checkpoint adds scoped class and metaclass imports for
+`GCDualSenseGamepad`, directly under `GCExtendedGamepad`, with its
+macOS-measured 896-byte instance size. Native inspection, both sanitizer host
+runs and the focused ARM64 guest fixture pass across all four gamepad classes,
+including 36 explicit rejection cases for unsupported operations. A fresh
+Fortnite probe passes the DualSense import and stops at
+`_OBJC_CLASS_$_GCColor` during linking, before application entry. The
+[DualSense checkpoint](../tests/ios/dualsense-gamepad-checkpoint-20261025.md)
+records the source revision and complete external evidence. Physical input
+remains unsupported. Native iOS layout parity, Fortnite initialization,
+rendering, login and gameplay remain unverified. Advertising work remains
+skipped.
+
 The import audit measurements below belong to the bundle-resource milestone;
 they were not rerun for the startup, feedback, task, controller or gamepad
 checkpoints and do not execute app code.
