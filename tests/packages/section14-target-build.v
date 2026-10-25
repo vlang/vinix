@@ -20,9 +20,9 @@ fn module_capture(argv []string, _ string, _ int, env map[string]string) !hostte
 	return hosttest.capture(argv, os.getenv('VINIX_TARGET_MODULE_LOG'), 1800, env)
 }
 
-fn inventory(root string) !map[string]string {
+fn inventory(root string, hidden bool) !map[string]string {
 	mut result := map[string]string{}
-	for path in os.walk_ext(root, '') {
+	for path in os.walk_ext(root, '', hidden: hidden) {
 		if os.is_file(path) { result[path[root.len + 1..]] = sha(path)! }
 	}
 	return result
@@ -39,40 +39,122 @@ fn write_json(path string, value map[string]string) ! {
 	os.write_file(path, json2.encode(value) + '\n')!
 }
 
+fn no_links(root string) ! {
+	for name in os.ls(root)! {
+		path := root + '/' + name
+		if os.is_link(path) { return error('unexpected bundle symlink: ' + path) }
+		if os.is_dir(path) { no_links(path)! }
+	}
+}
+
+fn runtime_inputs(roots []string) !(map[string]string, map[string]string) {
+	mut files := map[string]string{}
+	mut links := map[string]string{}
+	for root in roots {
+		for path in os.walk_ext(root, '', hidden: true) {
+			if os.is_link(path) { links[path] = os.readlink(path)! }
+			if os.is_file(path) { files[path] = sha(path)! }
+		}
+	}
+	return files, links
+}
+
+// Retain the same project/generation/link recipe as the maintained
+// tests/software-hosted-x11/check.v build_bridge, with frozen source modules.
+fn bridge_build(compiler string, clang string, lld string, llvm string, dependencies string,
+	source string, arch string, version string, gcc string, work string) ! {
+	bridge := work + '/bridge'
+	project := bridge + '/project'
+	os.mkdir_all(project)!
+	os.cp_all(source + '/build-support/xorg-server/winehost', project + '/winehost', true)!
+	os.cp_all(source + '/tools/packages/x11auth', project + '/x11auth', true)!
+	os.write_file(project + '/v.mod', "Module { name: 'x11_bridge' }\n")!
+	os.write_file(project + '/entry.v', 'module main\nimport winehost as _\n')!
+	sysroot := dependencies + '/build-' + if arch == 'aarch64' { 'aarch64' } else { 'amd64' } + '-x11/sysroot'
+	files, links := runtime_inputs([sysroot + '/lib', sysroot + '/usr/lib', gcc])!
+	write_json(work + '/bridge-runtime-before.json', files)!
+	write_json(work + '/bridge-runtime-links-before.json', links)!
+	cfile := bridge + '/bridge.c'
+	capture([compiler, '-shared', '-no-builtin', '-no-closures', '-os', 'vinix', '-arch', version,
+		'-target-libc-headers', '-gc', 'none', '-manualfree', '-o', cfile, '-d', 'x11_host_libc', project],
+		work + '/bridge-generate-command.log')!
+	os.write_file(cfile, '#define VINIX_XINPUT_V_RUNTIME 1\n#pragma GCC diagnostic ignored "-Wunused-function"\n#pragma GCC diagnostic ignored "-Wunused-label"\n#pragma GCC diagnostic ignored "-Wunused-parameter"\n' + os.read_file(cfile)!)!
+	generated := {'bridge.c': sha(cfile)!}
+	write_json(work + '/bridge-generated-before.json', generated)!
+	capture([clang, '--target=' + arch + '-linux-musl', '--sysroot=' + sysroot, '--gcc-install-dir=' + gcc,
+		'-static-libgcc', '-O2', '-Wall', '-Wextra', '-Werror', '-D__vinix__', '-I' + sysroot + '/usr/include',
+		cfile, '-I' + source + '/build-support/xorg-server', '-fuse-ld=lld', '--ld-path=' + lld, '-B' + llvm,
+		'-L' + sysroot + '/usr/lib', '-L' + sysroot + '/lib', '-Wl,-rpath-link,' + sysroot + '/usr/lib',
+		'-Wl,-rpath-link,' + sysroot + '/lib', '-Wl,-t', '-Wl,-Map=' + bridge + '/link.map',
+		'-lXtst', '-lXdamage', '-lX11', '-lXext', '-lxcb', '-o', bridge + '/bridge'],
+		work + '/bridge-clang-command.log')!
+	write_json(work + '/bridge-generated-after.json', {'bridge.c': sha(cfile)!})!
+	if generated['bridge.c'] != sha(cfile)! { return error('hosted bridge generated C changed') }
+	after_files, after_links := runtime_inputs([sysroot + '/lib', sysroot + '/usr/lib', gcc])!
+	write_json(work + '/bridge-runtime-after.json', after_files)!
+	write_json(work + '/bridge-runtime-links-after.json', after_links)!
+	unchanged(files, after_files)!
+	unchanged(links, after_links)!
+	elf(bridge + '/bridge', if arch == 'aarch64' { u16(183) } else { u16(62) }, '/lib/ld-musl-' + arch + '.so.1')!
+	println('SECTION14 TARGET hosted X11 bridge cross-linked ' + arch)
+}
+
 fn production_names(scope string) ![]string {
-	mut names := ['software_snapshot.v', 'software_policy_navigation.v', 'packagecore/release.c.v', 'app_selection_migration.v', 'session_hub.v']
-	if scope == 'release-save-policy-repository' {
-		names << 'software_repository_navigation.v'
+	mut names := ['desktop/software_snapshot.v', 'desktop/software_policy_navigation.v', 'desktop/packagecore/release.c.v', 'desktop/app_selection_migration.v', 'desktop/session_hub.v']
+	if scope in ['release-save-policy-repository', 'release-save-policy-repository-hosted-launch-options'] {
+		names << 'desktop/software_repository_navigation.v'
 	} else if scope != 'release-save-policy' {
 		return error('unknown production source scope')
+	}
+	if scope == 'release-save-policy-repository-hosted-launch-options' {
+		names << ['desktop/software_app.v', 'desktop/software_launch.v', 'desktop/software_hosted.v',
+			'build-support/xorg-server/winehost/core.v', 'build-support/xorg-server/winehost/package.v']
 	}
 	return names
 }
 
-fn elf(path string, machine u16) ! {
+fn word64(data []u8, start int) u64 {
+	mut value := u64(0)
+	for index in 0 .. 8 { value |= u64(data[start + index]) << (8 * index) }
+	return value
+}
+
+fn elf(path string, machine u16, interpreter string) ! {
 	data := os.read_bytes(path)!
 	if data.len < 64 || data[..4] != [u8(0x7f), `E`, `L`, `F`] || data[4] != 2 || data[5] != 1
-		|| data[16] != 2 || data[17] != 0
+		|| data[16] != if interpreter == '' { u8(2) } else { u8(3) } || data[17] != 0
 		|| (u16(data[18]) | (u16(data[19]) << 8)) != machine { return error('unexpected ELF64 executable architecture: ' + path) }
-	mut offset := u64(0)
-	for index in 0 .. 8 { offset |= u64(data[32 + index]) << (8 * index) }
+	offset := word64(data, 32)
 	size := int(data[54]) | (int(data[55]) << 8)
 	count := int(data[56]) | (int(data[57]) << 8)
 	if count == 0 || size < 56 || offset > u64(data.len) || u64(count) * u64(size) > u64(data.len) - offset {
 		return error('invalid ELF program headers')
 	}
 	mut load := false
+	mut interpreters := 0
 	for index in 0 .. count {
 		start := int(offset) + index * size
 		kind := u32(data[start]) | (u32(data[start + 1]) << 8) | (u32(data[start + 2]) << 16) | (u32(data[start + 3]) << 24)
-		if kind == 3 { return error('unexpected ELF interpreter') }
-		if kind == 1 { load = true }
+		if kind in [u32(1), 3] {
+			file_offset := word64(data, start + 8)
+			file_size := word64(data, start + 32)
+			if file_offset > u64(data.len) || file_size > u64(data.len) - file_offset { return error('ELF segment exceeds file') }
+			if kind == 1 {
+				if file_size > word64(data, start + 40) { return error('ELF load exceeds memory size') }
+				load = true
+			} else {
+				interpreters++
+				if interpreter == '' || file_size != u64(interpreter.len + 1)
+					|| data[int(file_offset)..int(file_offset + file_size)] != (interpreter + '\x00').bytes() { return error('unexpected ELF interpreter') }
+			}
+		}
 	}
 	if !load { return error('missing ELF load segment') }
+	if interpreter != '' && interpreters != 1 { return error('missing or duplicate ELF interpreter') }
 }
 
-fn seal(work string) !string {
-	mut paths := os.walk_ext(work, '')
+fn seal(work string, hidden bool) !string {
+	mut paths := os.walk_ext(work, '', hidden: hidden)
 	paths.sort()
 	mut lines := []string{}
 	for path in paths {
@@ -90,12 +172,21 @@ fn check(work string) ! {
 			|| fields[1] in expected { return error('invalid manifest') }
 		expected[fields[1]] = fields[0]
 	}
-	mut actual := inventory(work)!
+	// Keep historical inventory semantics; the new scope seals hidden entries too.
+	scope := if os.is_file(work + '/production-scope.txt') { os.read_file(work + '/production-scope.txt')!.trim_space() } else { 'release-save-policy' }
+	hosted := scope == 'release-save-policy-repository-hosted-launch-options'
+	if hosted { no_links(work)! }
+	mut actual := inventory(work, hosted)!
 	actual.delete('bundle.sha256')
 	unchanged(expected, actual)!
 	// The first five-source bundle predates the explicit scope receipt.
-	scope := if 'production-scope.txt' in actual { os.read_file(work + '/production-scope.txt')!.trim_space() } else { 'release-save-policy' }
 	names := production_names(scope)!
+	if hosted {
+		for name in ['source/build-support/xorg-server/wine-host-v-abi.h', 'source/tests/packages/software_image_fixture.v',
+			'source/tests/packages/software_terminal_fixture.v', 'source/tests/packages/software_hosted_fixture.v'] {
+			if name !in actual { return error('missing hosted scope source: ' + name) }
+		}
+	}
 	for name in ['runner', 'runner.v', 'repository-head.log', 'production.patch.log', 'v-version.log',
 		'clang-version.log', 'lld-version.log', 'source-before.json', 'source-after.json', 'tools-before.json', 'tools-after.json',
 		'production-before.json', 'production-after.json', 'tool-executables/v', 'tool-executables/clang', 'tool-executables/ld.lld'] {
@@ -106,7 +197,7 @@ fn check(work string) ! {
 		after := json2.decode[map[string]string](os.read_file(work + '/' + prefix + '-after.json')!)!
 		if before.len == 0 { return error('empty input receipt') }
 		unchanged(before, after)!
-		if prefix == 'source' { unchanged(before, inventory(work + '/source')!)! }
+		if prefix == 'source' { unchanged(before, inventory(work + '/source', hosted)!)! }
 		if prefix == 'tools' {
 			for name in ['v', 'clang', 'ld.lld'] {
 				if sha(work + '/tool-executables/' + name)! !in before.values() { return error('tool executable copy mismatch') }
@@ -117,9 +208,9 @@ fn check(work string) ! {
 			for name in names {
 				mut matches := 0
 				for path, expected_hash in before {
-					if path.ends_with('/desktop/' + name) {
+					if path.ends_with('/' + name) {
 						matches++
-						if sha(work + '/source/desktop/' + name)! != expected_hash { return error('production source mismatch') }
+						if sha(work + '/source/' + name)! != expected_hash { return error('production source mismatch') }
 					}
 				}
 				if matches != 1 { return error('missing or duplicate production source: ' + name) }
@@ -143,14 +234,33 @@ fn check(work string) ! {
 			}
 			image := json2.decode[map[string]string](os.read_file(work + '/' + arch + '/image-generated.json')!)!
 			if image['software-image.c'] != sha(work + '/' + arch + '/image-app/software-image.c')! { return error('image generated C mismatch') }
-			elf(work + '/' + arch + '/software-image', if arch == 'aarch64' { u16(183) } else { u16(62) })!
+			elf(work + '/' + arch + '/software-image', if arch == 'aarch64' { u16(183) } else { u16(62) }, '')!
+		}
+		if scope == 'release-save-policy-repository-hosted-launch-options' {
+			for name in ['bridge/bridge.c', 'bridge/bridge', 'bridge/link.map', 'bridge-generate-command.log', 'bridge-clang-command.log',
+				'bridge-generated-before.json', 'bridge-generated-after.json', 'bridge-runtime-before.json', 'bridge-runtime-after.json',
+				'bridge-runtime-links-before.json', 'bridge-runtime-links-after.json'] {
+				if arch + '/' + name !in actual { return error('missing hosted bridge artifact: ' + name) }
+			}
+			for prefix in ['bridge-generated', 'bridge-runtime', 'bridge-runtime-links'] {
+				bridge_before := json2.decode[map[string]string](os.read_file(work + '/' + arch + '/' + prefix + '-before.json')!)!
+				bridge_after := json2.decode[map[string]string](os.read_file(work + '/' + arch + '/' + prefix + '-after.json')!)!
+				if bridge_before.len == 0 { return error('empty hosted bridge receipt') }
+				unchanged(bridge_before, bridge_after)!
+				if prefix == 'bridge-generated' && (bridge_before.len != 1 || bridge_before['bridge.c'] != sha(work + '/' + arch + '/bridge/bridge.c')!) { return error('hosted bridge generated C mismatch') }
+			}
+			for name in ['winehost', 'x11auth'] {
+				path := if name == 'winehost' { '/build-support/xorg-server/winehost' } else { '/tools/packages/x11auth' }
+				unchanged(inventory(work + '/source' + path, true)!, inventory(work + '/' + arch + '/bridge/project/' + name, true)!)!
+			}
+			elf(work + '/' + arch + '/bridge/bridge', if arch == 'aarch64' { u16(183) } else { u16(62) }, '/lib/ld-musl-' + arch + '.so.1')!
 		}
 	}
 	for name in names {
-		if 'source/desktop/' + name !in actual { return error('missing combined production source') }
+		if 'source/' + name !in actual { return error('missing combined production source') }
 	}
-	elf(work + '/aarch64/vinix-desktop', 183)!
-	elf(work + '/x86_64/vinix-desktop', 62)!
+	elf(work + '/aarch64/vinix-desktop', 183, '')!
+	elf(work + '/x86_64/vinix-desktop', 62, '')!
 	println('SECTION14 TARGET bundle verified ' + sha(work + '/bundle.sha256')!)
 }
 
@@ -166,7 +276,9 @@ fn build(options map[string]string) ! {
 	// Keep argv[0]: ld.lld is a symlink to the generic multi-call lld driver.
 	lld := os.find_abs_path_of_executable('ld.lld')!
 	scope := options['--scope'] or { 'release-save-policy' }
+	hosted := scope == 'release-save-policy-repository-hosted-launch-options'
 	names := production_names(scope)!
+	if scope == 'release-save-policy-repository-hosted-launch-options' && '--fixtures' !in options { return error('hosted scope requires --fixtures') }
 	os.mkdir_all(work)!
 	os.write_file(work + '/production-scope.txt', scope + '\n')!
 	os.cp(@FILE, work + '/runner.v')!
@@ -180,7 +292,7 @@ fn build(options map[string]string) ! {
 	}
 	mut production := map[string]string{}
 	for name in names {
-		production[root + '/desktop/' + name] = sha(root + '/desktop/' + name)!
+		production[root + '/' + name] = sha(root + '/' + name)!
 	}
 	write_json(work + '/production-before.json', production)!
 	write_json(work + '/tools-before.json', pins)!
@@ -188,12 +300,17 @@ fn build(options map[string]string) ! {
 	capture([clang, '--version'], work + '/clang-version.log')!
 	capture([lld, '--version'], work + '/lld-version.log')!
 	capture(['git', '-C', root, 'rev-parse', 'HEAD'], work + '/repository-head.log')!
-	capture(['git', '-C', root, 'diff', '--', 'desktop'], work + '/production.patch.log')!
+	capture(['git', '-C', root, 'diff', '--', 'desktop', 'build-support/xorg-server/winehost'], work + '/production.patch.log')!
 	source := work + '/source'
 	os.mkdir_all(source + '/tools')!
 	for name in ['desktop', 'tools/packages', 'tools/accounts', 'compat', 'build-support/aarch64-cc-shim'] {
 		os.mkdir_all(os.dir(source + '/' + name))!
 		os.cp_all(root + '/' + name, source + '/' + name, true)!
+	}
+	if scope == 'release-save-policy-repository-hosted-launch-options' {
+		os.mkdir_all(source + '/build-support/xorg-server')!
+		os.cp_all(root + '/build-support/xorg-server/winehost', source + '/build-support/xorg-server/winehost', true)!
+		os.cp(root + '/build-support/xorg-server/wine-host-v-abi.h', source + '/build-support/xorg-server/wine-host-v-abi.h')!
 	}
 	for name in ['ui', 'linux', 'uikit', 'windows', 'assets', 'examples/calculator'] {
 		os.mkdir_all(os.dir(source + '/ui2/' + name))!
@@ -206,7 +323,7 @@ fn build(options map[string]string) ! {
 			os.cp(fixtures + '/' + name, source + '/tests/packages/' + name)!
 		}
 	}
-	before := inventory(source)!
+	before := inventory(source, hosted)!
 	write_json(work + '/source-before.json', before)!
 	for arch in ['aarch64', 'x86_64'] {
 		version := if arch == 'aarch64' { 'arm64' } else { 'amd64' }
@@ -243,7 +360,7 @@ fn build(options map[string]string) ! {
 			'-L' + gcc, '-lgcc_eh', '-lc', '-lgcc', '-lm', gcc + '/crtend.o', sysroot + '/usr/lib/crtn.o',
 			'-fuse-ld=lld', '--ld-path=' + lld, '-B' + llvm, '-o', arch_work + '/vinix-desktop']
 		capture(link_args, arch_work + '/clang-command.log')!
-		elf(arch_work + '/vinix-desktop', if arch == 'aarch64' { u16(183) } else { u16(62) })!
+		elf(arch_work + '/vinix-desktop', if arch == 'aarch64' { u16(183) } else { u16(62) }, '')!
 		mut after_generated := map[string]string{}
 		for name, _ in generated { after_generated[name] = sha(app + '/' + name)! }
 		write_json(arch_work + '/generated-after.json', after_generated)!
@@ -270,12 +387,15 @@ fn build(options map[string]string) ! {
 			capture(image_link, arch_work + '/image-clang-command.log')!
 			if image_before != sha(image + '/software-image.c')! { return error('image generated C changed') }
 			write_json(arch_work + '/image-generated.json', {'software-image.c': image_before})!
-			elf(arch_work + '/software-image', if arch == 'aarch64' { u16(183) } else { u16(62) })!
+			elf(arch_work + '/software-image', if arch == 'aarch64' { u16(183) } else { u16(62) }, '')!
 			println('SECTION14 TARGET supplementary Software image cross-linked ' + arch)
+		}
+		if scope == 'release-save-policy-repository-hosted-launch-options' {
+			bridge_build(compiler, clang, lld, llvm, dependencies, source, arch, version, gcc, arch_work)!
 		}
 		println('SECTION14 TARGET cross-linked ' + arch)
 	}
-	after := inventory(source)!
+	after := inventory(source, hosted)!
 	write_json(work + '/source-after.json', after)!
 	unchanged(before, after)!
 	mut after_tools := map[string]string{}
@@ -286,7 +406,7 @@ fn build(options map[string]string) ! {
 	for path, _ in production { after_production[path] = sha(path)! }
 	write_json(work + '/production-after.json', after_production)!
 	unchanged(production, after_production)!
-	println('SECTION14 TARGET manifest ' + seal(work)!)
+	println('SECTION14 TARGET manifest ' + seal(work, hosted)!)
 	check(work)!
 }
 

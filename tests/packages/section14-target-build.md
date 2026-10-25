@@ -98,3 +98,87 @@ To validate the retained bundle using the maintained checker:
 v -backend c -path '@vlib|.|desktop/tools|@vmodules' run tests/packages/section14-target-build.v --check=/Users/alex/Library/Caches/vinix-codex/section14/package-section14-combined-target-20261026/full-compositor
 v -backend c -path '@vlib|.|desktop/tools|@vmodules' run tests/packages/section14-target-build.v --check=/Users/alex/Library/Caches/vinix-codex/section14/package-section14-combined-target-20261026/full-compositor-plus-repository
 ```
+
+## Hosted Launch options target builds
+
+The separate 2026-10-26 hosted-options qualification uses source base
+`3770607e67052a3e179d8c27a19b1668993a440e`, the same six production hashes
+above, and these five additional frozen production paths:
+
+| Source | SHA-256 |
+| --- | --- |
+| `desktop/software_app.v` | `fbe37cc132d224b00d44c183ff76958ca0fb8100ce7cb63f8b12bd50162b4695` |
+| `desktop/software_launch.v` | `11db058fe944789a19df91f2c8a3cb0b31a84d6bd5955913922a524d064e5719` |
+| `desktop/software_hosted.v` | `8e366c7f1a1706e736b3982e8bb842d5cde02edec77f49959f9ffbf0ace6938d` |
+| `build-support/xorg-server/winehost/core.v` | `bc31ff0dcb2746bf81e54c9e44e900cb0e33dbaa7037392b72277fa44d3ccedf` |
+| `build-support/xorg-server/winehost/package.v` | `7ce47e4cacad1fc1acbcd7a91dc2bd25b5fd127407307785f5996a923bdcccb3` |
+
+Its explicit scope is
+`release-save-policy-repository-hosted-launch-options`: eleven named original
+production paths must match their frozen source copies before and after building.
+This scope requires the Software image fixtures and actual authenticated X11
+bridge in addition to the complete compositor on both architectures. The bridge
+freezes `winehost` and `x11auth`, generates C with the maintained raw-module recipe,
+and links against the architecture's X11 musl sysroot. Its generated C contains
+the new `package_command_allowed` call and parser. The compositor and image use
+the static recipe described above; the bridge uses `-static-libgcc` and dynamic
+musl linking with `-O2 -Wall -Wextra -Werror`.
+
+The new scope inventories hidden entries, rejects bundle symlinks, and retains
+bridge generated-C before/after receipts, a linker trace and map, plus hashes and
+alias targets before and after for the X11 sysroot `lib`, `usr/lib`, and selected
+GCC runtime directory. The checker requires static ET_EXEC compositor/image
+outputs and ET_DYN bridge outputs with exactly the architecture's
+`/lib/ld-musl-ARCH.so.1` interpreter, bounded segments, and PT_LOAD. Historical
+five- and six-source bundle admission keeps its original inventory semantics;
+both original seals passed again with the extended checker.
+
+The complete external hosted-options bundle is at
+`/Users/alex/Library/Caches/vinix-codex/section14/package-section14-hosted-options-target-20261026/full-compositor-hosted-options-v2`.
+All six cross-links and the complete bundle checker passed. Its `bundle.sha256`
+SHA-256 is
+`c5b72beb336e451695c58094d8f77ed850014ee180fe609bf5d05582b267834d`.
+
+| Eleven-source target output | SHA-256 |
+| --- | --- |
+| AArch64 compositor | `cb23ee2f37ecdde3703dfb6c0d4a2e02526499d0942685bacc0cf4c256d75d68` |
+| AArch64 Software image | `81b551a3161fd5e11fa9efaa6e2f619beb3f2f76747434bb7632ed52c830b15b` |
+| AArch64 X11 bridge | `7f3f29c0b40ff3a7d841386f7833a94f7d4cdfec4a5b98f1c7e5dd9e50fcc019` |
+| x86-64 compositor | `60a2a6619403dd551f969445f3548d6fadd6f785303315377fb2043ca0d2b4a0` |
+| x86-64 Software image | `1753a7906cb342c6bf2fb2ea1edede8562dc1ace1c7308696ce73b11d321606c` |
+| x86-64 X11 bridge | `5d63f0d9fdc31b74b92f2658e5244320e46090c4ee344dcc9d2b183215e87c7e` |
+
+The V, Clang and LLD executable hashes are the same as above. The bundle preserves
+their executable copies, literal commands, diagnostics, frozen project/UI/ABI and
+bridge sources, generated C, and ELFs. Runtime receipts hash the enumerated files;
+they do not freeze the entire sysroot, headers, V library tree or transitive host
+toolchain inputs. This qualification covers compilation and linking only; it does
+not execute the fixture assertions, hosted application, or guest workflow.
+
+```sh
+v -backend c -path '@vlib|.|desktop/tools|@vmodules' run tests/packages/section14-target-build.v --check=/Users/alex/Library/Caches/vinix-codex/section14/package-section14-hosted-options-target-20261026/full-compositor-hosted-options-v2
+```
+
+The maintained `section14-target-build-controls.v` exercised seven resealed
+negative controls on a complete disposable copy. It restored the original bytes
+and manifest and passed a full check after every control. The original bundle
+also passed before and after, retaining the same seal. All controls exited 1:
+
+| Mutation | Refusal |
+| --- | --- |
+| AArch64 bridge ET_EXEC | `unexpected ELF64 executable architecture` |
+| AArch64 wrong PT_INTERP bytes | `unexpected ELF interpreter` |
+| AArch64 duplicate PT_INTERP | `missing or duplicate ELF interpreter` |
+| Hidden source addition | `input count changed` |
+| Hidden source removal | `input count changed` |
+| Bundle file symlink | `unexpected bundle symlink` |
+| Missing x86-64 bridge | `missing hosted bridge artifact: bridge/bridge` |
+
+The external control directory is `negative-controls` beside the hosted-options
+bundle. It retains the complete restored copy, helper source/executable, literal
+checker commands, diagnostics, mutated manifests and ELF samples. Its exact
+refusal receipt is `controls.json`, SHA-256
+`77e87e02401bcd658ab06eba9477137d3207973751b6b23cc0532bb4a2f450a8`.
+The receipt also binds the checker executable, helper source and mutated
+manifest hashes. These controls leave the original five- and six-source bundles
+and their admission unchanged.
