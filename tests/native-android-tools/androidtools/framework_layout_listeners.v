@@ -117,6 +117,7 @@ return-void
   text = text.replace(point, if point.starts_with('iput-object') { reset + point } else { point + '\n' + reset })
  }
  os.write_file(path, framework_layout_requests(text)!)!
+ framework_layout_request_parents(smali)!
  listener := smali + '/android/view/View$OnLayoutChangeListener.smali'
  definition := os.read_file(listener)!
  if definition.contains('onLayoutChange(') { return error('unexpected existing layout listener definition') }
