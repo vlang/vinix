@@ -85,5 +85,62 @@ stopped-guest bundle is
 `/Users/alex/.local/state/vinix/android/paint-text-widths313-fixture-2026-10-25`,
 manifest SHA256
 `ea40e7026cfb606156aca1c0af2ce23b1b9e7af6a92170858921d76ef67bda2a`.
-This qualifies the Paint API behavior; a Maps replay is still needed to assess
-whether it changes map labels.
+This qualifies the Paint API behavior; Maps314 below assesses its visible
+effect in the application.
+
+Maps314 replayed the exact312 artifacts with source committed as `a5dd635fd`.
+The unchanged Maps/GMS APKs, clean283 launcher and 600-second classifier were
+retained. The complete bundle is
+`/Users/alex/.local/state/vinix/android/maps314-2026-10-25`, typed manifest
+SHA256 `36f69cfdcf35e81eb853e6a16ad31e31998e70c69a04d9b69d88ad5cdc2d73b7`.
+Both the replay runner and independent root readback verified all 23,090
+entries. The raw outcome is `window_observed`, with 600 seconds observed,
+backend/native maps ready, no process exit, QEMU alive before capture and no
+failure markers. Independent screenshot authentication also passed.
+
+Skip advances to a labelled continent map. Country/state names and Hudson Bay
+are visible; these geographic labels were absent in311. Google Maps attribution
+is also visible. Paris search then loads a place card, photos and
+city/street/neighbourhood labels.
+Directions accepts a manual Eiffel Tower origin and loads driving and walking
+routes to Paris, including the selected blue path, alternatives and travel
+times. The first fast origin entry lost characters; clearing it and entering
+with pauses produced the verified complete suggestion. Current-location
+selection still supplies no usable GPS position, so this run does not qualify
+navigation from the guest's current position.
+
+Trip options now show circular switch thumbs, absent in308. Each avoid row
+moves its thumb from x540 to x566 when enabled; a second ferries click moves it
+back. The toll-price toggle moves in the opposite direction when disabled.
+Walking wheelchair/ferries toggles also move from left to right. Tracks and
+checked-state tint remain too faint to qualify visually. Returning to the
+driving screen shows the selected route and Avoid tolls/Avoid highways chips.
+
+Driving preview Next changes the instruction and, after 10.5 seconds without
+intervening input, moves the camera from the Eiffel area to Pont de l'Alma.
+Previous restores the first instruction and Eiffel-area camera. Walking
+preview opens with a dotted route; its initially beige base map finishes
+loading park/road geometry and labels before the final application capture.
+The timed guest then stops. A subsequent walking Next attempt fails because
+the QMP socket is gone; walking Next/Previous are not qualified by314.
+
+Serial SHA256:
+`eafc82ad9ab84c97a25efc6669146ca36d141ad02cbdf8a37b6f9aacade798f0`.
+Interaction SHA256:
+`50101bce883594811699e4fd5fb283ff57b649a7089c6e1eafb2e6dd6ba8b8dd`.
+Final application PNG SHA256:
+`cee4e7dfa320a9bf4bb3b42d95c06e734c80283d95c3eda4f44e1892376d8f29`.
+
+The two failed commands attempted after shutdown, their complete output
+streams, and the extended interaction log are preserved separately by
+`maps-post-stop-preserve.v`. The original sealed interaction is authenticated
+and must be an exact prefix. The qualified supplement is
+`/Users/alex/.local/state/vinix/android/maps314-post-stop-supplement-v2-2026-10-25`,
+manifest SHA256
+`f0c4575e3b5e7a009686bd16e8b162bdb56c93b5db0f91622714c386da2eb0ab`.
+Independent read-only verification passed all 20 typed entries. Its sibling
+receipt SHA256 is
+`e009db6fac28c1ee6e1a5f92a68d7f66cbe08daf2c5dc1687006867dca038b05`.
+The earlier supplement without `-v2` remains unchanged and unqualified: it
+wrote a readback receipt after its inventory inside the bundle. The corrected
+helper keeps receipts outside the sealed root and verifies the exact inventory.

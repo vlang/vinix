@@ -94,3 +94,10 @@ Interaction SHA256:
 `07116674e5f60e03cb5f6b0a4dba50c39abe3a3ed7e60a149b0586ad0cd6e346`.
 Final application PNG SHA256:
 `31466ffaa274cdd2fb7b4e7344d05e52239bf26b9bf4990eaa8f15dce1c856e1`.
+
+Maps314 subsequently reaches real Trip options with these dimensions retained
+in the312 framework/native pair. Its circular thumbs are visible and change
+position for all three driving avoid options, toll prices, and the walking
+wheelchair/ferries options. Track tint remains too faint to qualify. The
+[Paint313 report](paint-text-widths313.md) records the complete authenticated
+replay, including geographic labels and delayed driving-preview camera motion.
