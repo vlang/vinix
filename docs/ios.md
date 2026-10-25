@@ -18856,8 +18856,23 @@ and focused guest fixture suite were not rerun for this checkpoint. Swift
 support, Fortnite initialization, rendering, login and gameplay remain
 unverified.
 
+The following feedback checkpoint adds `UIFeedbackGenerator`,
+`UINotificationFeedbackGenerator`, `UISelectionFeedbackGenerator` and
+`UIImpactFeedbackGenerator`. Requests succeed without hardware haptics. The
+assertion-enabled host fixture passes ASan+UBSan in both hashing modes, and the
+focused ARM64 guest fixture passes, including all five impact styles,
+floating-point intensity calls, reflection and subclass overrides. A fresh
+Fortnite probe passes these class imports and stops at
+`_OBJC_CLASS_$_NSURLSessionDownloadTask` during linking, before application
+entry. The [feedback checkpoint](../tests/ios/feedback-checkpoint-20261025.md)
+records both startup probes, runtime revisions and complete external evidence.
+Native UIKit layout parity, the broader native regression suite, Swift support,
+Fortnite initialization, rendering, login and gameplay remain unverified at
+this checkpoint.
+
 The import audit measurements below belong to the bundle-resource milestone;
-they were not rerun for the startup checkpoint and do not execute app code.
+they were not rerun for the startup or feedback checkpoints and do not execute
+app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
