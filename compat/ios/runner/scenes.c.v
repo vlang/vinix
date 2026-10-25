@@ -25,6 +25,7 @@ fn objc_responds(object u64, selector &char) bool {
 		|| match_request_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| achievement_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| achievement_description_family(if object in ios_runtime.classes { object } else { read64(object) })
+		|| gk_player_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| audio_application_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| gc_event_controller_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| text_field_family(if object in ios_runtime.classes { object } else { read64(object) })

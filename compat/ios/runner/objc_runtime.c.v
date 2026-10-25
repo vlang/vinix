@@ -87,6 +87,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := match_request_types(info.name, info.meta, selector) { return types }
 	if types := achievement_types(info.name, info.meta, selector) { return types }
 	if types := achievement_description_types(info.name, info.meta, selector) { return types }
+	if types := gk_player_types(info.name, info.meta, selector) { return types }
 	if types := gc_event_controller_types(info.name, info.meta, selector) { return types }
 	if types := text_input_types(info.name, info.meta, selector) { return types }
 	if types := text_field_types(info.name, info.meta, selector) { return types }
@@ -193,6 +194,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name == 'GKMatchRequest' && match_request_unsupported(name) { return 0 }
 		if info.name == 'GKAchievement' && achievement_unsupported(name) { return 0 }
 		if info.name == 'GKAchievementDescription' && achievement_description_unsupported(name) { return 0 }
+		if info.name in ['GKBasePlayer', 'GKPlayer']! && gk_player_unsupported(name) { return 0 }
 		if info.name == 'GCEventViewController' && gc_event_controller_unsupported(name) { return 0 }
 		if info.name == 'UITextField' && text_field_unsupported(name) { return 0 }
 		if !info.meta && dispatch_objc_name(info.name) && dispatch_objc_types(info.name,false,name) == none { return 0 }
@@ -377,6 +379,9 @@ fn objc_set_class(object u64, cls u64) u64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if object in ios_runtime.classes || object in ios_runtime.constants { panic('iOS: changing a class or constant string isa is not implemented') }
+	if gk_player_family(cls) || gk_player_family(obj_header(object).allocation_cls) {
+		panic('iOS: changing GKPlayer storage isa is not implemented')
+	}
 	if achievement_description_family(cls) || achievement_description_family(obj_header(object).allocation_cls) {
 		panic('iOS: changing GKAchievementDescription storage isa is not implemented')
 	}
