@@ -18816,26 +18816,48 @@ runtime under ASan+UBSan, normally and with deterministic Swift hashing. The
 date-formatter host regression passes in both modes. All eighteen ARM64 fixtures
 and runners build, and the focused guest passes all fifteen number/date
 formatter, lock, map-table, credential, telephony, cache, calendar and notification
-fixtures, including 33 number-formatter rejection cases. The fresh Fortnite probe
-resolves `NSNumberFormatter` and stops at `_OBJC_CLASS_$_NSBundleResourceRequest`
+fixtures, including 33 number-formatter rejection cases. That milestone's Fortnite probe
+resolved `NSNumberFormatter` and stopped at `_OBJC_CLASS_$_NSBundleResourceRequest`
 during linking, before application entry.
 The [number-formatter report](../tests/ios/number-formatter-report.md) records the
-source revision, complete external archive, checksums and verification. Full native
-regression, Swift support, Fortnite initialization, rendering, login and gameplay
-remain unverified. The audits below include this implementation and do not
-execute app code.
+source revision, complete external archive, checksums and verification.
+
+The bundle-resource milestone adds `NSBundleResourceRequest` with Apple's
+measured 48-byte layout, five ivars and six constructor/property encodings. Its
+bounded profile supports shallow tag-set copies, retained string members and
+the main bundle, explicit nil bundles, and a loading priority that starts at 0.5
+and clamps finite values to 0–1. Nil and empty tags remain distinct. Construction
+pins inputs before reentry and validates destination storage again before
+publishing state. Resource downloading, access/completion, progress, copying,
+coding and custom subclasses remain unsupported.
+
+The shared resource-request fixture passes against Apple Foundation and the V
+runtime under ASan+UBSan, normally and with deterministic Swift hashing. Runtime
+checks cover constructor rollback and worker reentry, shallow snapshots,
+400 concurrent priority roundtrips, guarded caller storage, 32 isa replacements,
+37 rejection cases and two balanced runtime lifetimes. All nineteen ARM64
+targets build, and all sixteen focused regression fixtures pass in the Vinix
+QEMU guest. Fortnite's probe resolves `NSBundleResourceRequest` and stops at
+`_OBJC_CLASS_$_ASIdentifierManager` in AdSupport during linking, before application
+entry.
+
+The [bundle-resource report](../tests/ios/bundle-resource-report.md) records the
+source revision, complete external archive, checksums and verification. Full
+native regression, Swift support, Fortnite initialization, rendering, login and
+gameplay remain unverified. The audits below include this implementation and do
+not execute app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 2,092 | 69 | 78 |
+| Fortnite executable | 2,093 | 68 | 78 |
 | EOSSDK | 661 | 3 | 16 |
 | MarketplaceKitWrapper | 179 | 0 | 20 |
-| All images | 2,932 | 72 | 114 |
+| All images | 2,933 | 71 | 114 |
 
-The C++/GLES/Text variant reports 2,946 resolved imports, 58 unresolved strong
+The C++/GLES/Text variant reports 2,947 resolved imports, 57 unresolved strong
 imports and 114 unresolved weak imports, including its native zlib/text backends.
 Both measurements include the optional SQLite backend.
 
