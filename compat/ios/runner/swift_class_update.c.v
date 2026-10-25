@@ -44,15 +44,18 @@ fn swift_class_update_checked(metadata u64, algorithm u64, count u64, types u64,
 	descriptor := read64(metadata + 64)
 	if ro == 0 || ro > ~u64(0) - 72 || descriptor == 0 || descriptor & 3 != 0
 		|| descriptor > ~u64(0) - 44 { return swift_class_update_failure() }
-	// Permit an existing static vtable, but no generic, resilient, actor,
-	// override-table or negative-immediate-member descriptor variants.
-	if read32(descriptor) & ~u32(0x80000000) != 0x10010 || read32(descriptor + 20) != 0
+	// Unique descriptors and an existing static vtable do not change field
+	// layout. Older class templates reserve a third negative metadata word.
+	// The singleton initializer must already have normalized their Swift bit;
+	// this updater neither initializes singletons nor realizes image classes.
+	address_point := u64(read32(metadata + 60))
+	if read32(descriptor) & ~u32(0x80000040) != 0x10010 || read32(descriptor + 20) != 0
 		|| read32(descriptor + 36) != count || (count != 0 && read32(descriptor + 40) != 10)
-		|| read32(metadata + 60) != 16 || read32(descriptor + 24) != 2
-		|| read32(metadata + 56) < 96 + count * 8 || read32(metadata + 56) > 1048576
-		|| u64(read32(descriptor + 28)) * 8 + 16 != read32(metadata + 56)
+		|| address_point !in [u64(16), 24]! || u64(read32(descriptor + 24)) * 8 != address_point
+		|| read32(metadata + 56) < address_point + 80 + count * 8 || read32(metadata + 56) > 1048576
+		|| u64(read32(descriptor + 28)) * 8 + address_point != read32(metadata + 56)
 		|| read32(descriptor + 32) < count || read32(descriptor + 32) > read32(descriptor + 28)
-		|| read32(ro) != 0x80 || read32(ro + 4) < 16 || read32(ro + 4) > 1048576 {
+		|| read32(ro) & ~u32(0x40) != 0x80 || read32(ro + 4) < 16 || read32(ro + 4) > 1048576 {
 		return swift_class_update_failure()
 	}
 	list := read64(ro + 48)
