@@ -570,7 +570,7 @@ fn objc_start() {
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor', 'GCMouse', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController', 'UINavigationController', 'GKGameCenterViewController', 'UIStoryboard', 'UITextPosition', 'UITextRange',
-		'UIScreen', 'UIGestureRecognizer', 'UIPanGestureRecognizer', 'UIPinchGestureRecognizer', 'UITapGestureRecognizer', 'UIRotationGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
+		'UIScreen', 'UIGestureRecognizer', 'UIPanGestureRecognizer', 'UIPinchGestureRecognizer', 'UILongPressGestureRecognizer', 'UITapGestureRecognizer', 'UIRotationGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'UNNotificationTrigger', 'UNCalendarNotificationTrigger', 'UNNotificationRequest', 'UNUserNotificationCenter', 'NSBundle', 'NSBundleResourceRequest', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
         'UNNotificationContent', 'UNMutableNotificationContent', 'UNNotificationSound', 'UNNotificationAttachment',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSOperation', 'NSInvocationOperation', 'NSInvocation', 'NSMethodSignature', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
@@ -635,7 +635,7 @@ fn objc_start() {
 			'_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData' { ios_runtime.names['NSData'] }
 			'NSMutableURLRequest' { ios_runtime.names['NSURLRequest'] }
 			'NSHTTPURLResponse' { ios_runtime.names['NSURLResponse'] }
-			'UIPanGestureRecognizer', 'UIPinchGestureRecognizer', 'UITapGestureRecognizer', 'UIRotationGestureRecognizer', 'UISwipeGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
+			'UIPanGestureRecognizer', 'UIPinchGestureRecognizer', 'UILongPressGestureRecognizer', 'UITapGestureRecognizer', 'UIRotationGestureRecognizer', 'UISwipeGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
 			else { ios_runtime.names['NSObject'] }
 		}
 		cls := unsafe { &AbiClass(C.calloc(2, sizeof(AbiClass))) }
@@ -824,6 +824,7 @@ fn obj_header(object u64) &ObjHeader {
 }
 
 fn objc_allocate(cls u64) u64 {
+	long_press_descriptor_require_recognition(cls)
 	tap_descriptor_require_recognition(cls)
 	rotation_descriptor_require_recognition(cls)
 	pinch_descriptor_require_recognition(cls)
@@ -1151,6 +1152,10 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if symbol in ['_OBJC_CLASS_$_UILongPressGestureRecognizer', '_OBJC_METACLASS_$_UILongPressGestureRecognizer']!
+		&& library != '/System/Library/Frameworks/UIKit.framework/UIKit' {
+		return error('iOS: long press gesture class import requires UIKit.framework')
+	}
 	if symbol in ['_OBJC_CLASS_$_UITapGestureRecognizer', '_OBJC_METACLASS_$_UITapGestureRecognizer']!
 		&& library != '/System/Library/Frameworks/UIKit.framework/UIKit' {
 		return error('iOS: tap gesture class import requires UIKit.framework')

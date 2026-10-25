@@ -102,6 +102,9 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 }
 
 fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if long_press_descriptor_unsupported(selector) {
+		long_press_descriptor_require_recognition(if object in ios_runtime.classes { object } else { read64(object) })
+	}
 	if tap_descriptor_unsupported(selector) {
 		tap_descriptor_require_recognition(if object in ios_runtime.classes { object } else { read64(object) })
 	}
