@@ -14,7 +14,7 @@ fn C.close(int) int
 fn C.symlinkat(&char, int, &char) int
 fn C.readlinkat(int, &char, &char, usize) isize
 fn C.write(int, voidptr, usize) isize
-fn C.geteuid() u32
+fn C.geteuid() i32
 
 pub struct Prefix {
 pub:
@@ -115,7 +115,7 @@ fn disable_update(parent int, uid u32) ! {
 // All mutation uses captured descriptors. Links to signed builtins are created
 // only within the private prefix; a pre-existing different target is refused.
 pub fn prepare_prefix(data string, builtins string) !Prefix {
-	uid := C.geteuid()
+	uid := u32(C.geteuid())
 	if uid == 0 || os.getegid() == 0 { return error('packaged Wine requires an ordinary account') }
 	data_fd := absolute_directory(data)!
 	mut prefix := Prefix{path: data + '/wine', data: data_fd}
@@ -175,12 +175,12 @@ pub fn prepare_prefix(data string, builtins string) !Prefix {
 pub fn (prefix &Prefix) recheck(data string) ! {
 	fd := absolute_directory(data)!
 	defer { C.close(fd) }
-	original := directory(prefix.data, C.geteuid(), true)!
-	current := directory(fd, C.geteuid(), true)!
+	original := directory(prefix.data, u32(C.geteuid()), true)!
+	current := directory(fd, u32(C.geteuid()), true)!
 	if original.st_dev != current.st_dev || original.st_ino != current.st_ino { return error('Wine data directory was replaced') }
 	check := C.openat(fd, c'wine', C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
 	if check < 0 { return error('Wine prefix was replaced') }
 	defer { C.close(check) }
-	info := directory(check, C.geteuid(), true)!
+	info := directory(check, u32(C.geteuid()), true)!
 	if u64(info.st_dev) != prefix.device || u64(info.st_ino) != prefix.inode { return error('Wine prefix identity changed') }
 }
