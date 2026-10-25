@@ -2,6 +2,7 @@
 module main
 
 fn objc_install_storage(cls u64, object u64, caller_storage bool) {
+	tap_descriptor_require_recognition(cls)
 	rotation_descriptor_require_recognition(cls)
 	pinch_descriptor_require_recognition(cls)
 	pan_descriptor_require_recognition(cls)

@@ -83,6 +83,7 @@ fn compile_c(root string, generated string, output string, gles bool) {
 
 fn native_fixture_source(item string) string {
 	return match item {
+		'tap-gesture-checks' { 'ui_tap_gesture_test.v' }
 		'rotation-gesture-checks' { 'ui_rotation_gesture_test.v' }
 		'pinch-gesture-checks' { 'ui_pinch_gesture_test.v' }
 		'pan-gesture-checks' { 'ui_pan_gesture_test.v' }
@@ -115,8 +116,8 @@ fn native_fixture_source(item string) string {
 }
 
 fn build(root string, out string, only string) {
-	if only !in ['rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! { panic('unknown notification build target') }
-	for item in ['rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
+	if only !in ['tap-gesture-checks', 'rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! { panic('unknown notification build target') }
+	for item in ['tap-gesture-checks', 'rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -147,7 +148,7 @@ fn await_checks(mut p os.Process, log string, marker string) ! {
 			|| text.contains('> assert ')
 			|| text.contains('KERNEL PANIC') || text.contains('FATAL EXCEPTION')
 			|| (text.contains('EXCEPTION') && text.contains('pc=0xffffffff'))
-			|| (marker in ['VINIX iOS ROTATIONGESTURE: PASS', 'VINIX iOS PINCHGESTURE: PASS', 'VINIX iOS PANGESTURE: PASS', 'VINIX iOS TEXTINPUT: PASS', 'VINIX iOS GAMECENTER: PASS', 'VINIX iOS STORYBOARD: PASS', 'VINIX iOS AUDIOAPPLICATION: PASS', 'VINIX iOS NOTIFICATIONS: PASS', 'VINIX iOS FEEDBACK: PASS', 'VINIX iOS SESSIONTASK: PASS', 'VINIX iOS GAMECONTROLLER: PASS'] && text.contains('V panic:')) {
+			|| (marker in ['VINIX iOS TAPGESTURE: PASS', 'VINIX iOS ROTATIONGESTURE: PASS', 'VINIX iOS PINCHGESTURE: PASS', 'VINIX iOS PANGESTURE: PASS', 'VINIX iOS TEXTINPUT: PASS', 'VINIX iOS GAMECENTER: PASS', 'VINIX iOS STORYBOARD: PASS', 'VINIX iOS AUDIOAPPLICATION: PASS', 'VINIX iOS NOTIFICATIONS: PASS', 'VINIX iOS FEEDBACK: PASS', 'VINIX iOS SESSIONTASK: PASS', 'VINIX iOS GAMECONTROLLER: PASS'] && text.contains('V panic:')) {
 			return error(text)
 		}
 		if text.contains(marker) { return }
@@ -158,11 +159,13 @@ fn await_checks(mut p os.Process, log string, marker string) ! {
 }
 
 fn vm(root string, out string, mode string) {
-	if mode !in ['rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications', 'probe', 'audit', 'static-audit'] {
+	if mode !in ['tap-gesture', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications', 'probe', 'audit', 'static-audit'] {
 		panic('invalid check mode: ' + mode)
 	}
 	require_arm64_elf(out + '/native-init')
-	if mode == 'rotation-gesture' {
+	if mode == 'tap-gesture' {
+		require_arm64_elf(out + '/tap-gesture-checks')
+	} else if mode == 'rotation-gesture' {
 		require_arm64_elf(out + '/rotation-gesture-checks')
 	} else if mode == 'pinch-gesture' {
 		require_arm64_elf(out + '/pinch-gesture-checks')
@@ -183,7 +186,7 @@ fn vm(root string, out string, mode string) {
 	} else if mode == 'feedback' {
 		require_arm64_elf(out + '/feedback-checks')
 	} else if mode == 'notifications' {
-		for item in ['rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks'] {
+		for item in ['tap-gesture-checks', 'rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks'] {
 			require_arm64_elf(out + '/' + item)
 		}
 	} else {
@@ -196,7 +199,9 @@ fn vm(root string, out string, mode string) {
 	payload := state
 	os.mkdir_all(payload + '/rootfs') or { panic(err) }
 	fs := payload + '/rootfs'
-	if mode == 'rotation-gesture' {
+	if mode == 'tap-gesture' {
+		copy_file(out + '/tap-gesture-checks', fs + '/opt/ios/tap-gesture-checks')
+	} else if mode == 'rotation-gesture' {
 		copy_file(out + '/rotation-gesture-checks', fs + '/opt/ios/rotation-gesture-checks')
 	} else if mode == 'pinch-gesture' {
 		copy_file(out + '/pinch-gesture-checks', fs + '/opt/ios/pinch-gesture-checks')
@@ -217,6 +222,7 @@ fn vm(root string, out string, mode string) {
 	} else if mode == 'feedback' {
 		copy_file(out + '/feedback-checks', fs + '/opt/ios/feedback-checks')
 	} else if mode == 'notifications' {
+		copy_file(out + '/tap-gesture-checks', fs + '/opt/ios/tap-gesture-checks')
 		copy_file(out + '/rotation-gesture-checks', fs + '/opt/ios/rotation-gesture-checks')
 		copy_file(out + '/pinch-gesture-checks', fs + '/opt/ios/pinch-gesture-checks')
 		copy_file(out + '/pan-gesture-checks', fs + '/opt/ios/pan-gesture-checks')
@@ -298,7 +304,7 @@ fn vm(root string, out string, mode string) {
 		'virtio-keyboard-device', '-device', 'virtio-tablet-device'])
 	p.set_redirect_stdio()
 	p.run()
-	marker := if mode == 'rotation-gesture' { 'VINIX iOS ROTATIONGESTURE: PASS' } else if mode == 'pinch-gesture' { 'VINIX iOS PINCHGESTURE: PASS' } else if mode == 'pan-gesture' { 'VINIX iOS PANGESTURE: PASS' } else if mode == 'text-input' { 'VINIX iOS TEXTINPUT: PASS' } else if mode == 'game-center' { 'VINIX iOS GAMECENTER: PASS' } else if mode == 'storyboard' { 'VINIX iOS STORYBOARD: PASS' } else if mode == 'audio-application' { 'VINIX iOS AUDIOAPPLICATION: PASS' } else if mode == 'game-controller' { 'VINIX iOS GAMECONTROLLER: PASS' } else if mode == 'session-task' { 'VINIX iOS SESSIONTASK: PASS' } else if mode == 'feedback' { 'VINIX iOS FEEDBACK: PASS' } else if mode == 'notifications' { 'VINIX iOS NOTIFICATIONS: PASS' } else { 'FORTNITE PROBE COMPLETE' }
+	marker := if mode == 'tap-gesture' { 'VINIX iOS TAPGESTURE: PASS' } else if mode == 'rotation-gesture' { 'VINIX iOS ROTATIONGESTURE: PASS' } else if mode == 'pinch-gesture' { 'VINIX iOS PINCHGESTURE: PASS' } else if mode == 'pan-gesture' { 'VINIX iOS PANGESTURE: PASS' } else if mode == 'text-input' { 'VINIX iOS TEXTINPUT: PASS' } else if mode == 'game-center' { 'VINIX iOS GAMECENTER: PASS' } else if mode == 'storyboard' { 'VINIX iOS STORYBOARD: PASS' } else if mode == 'audio-application' { 'VINIX iOS AUDIOAPPLICATION: PASS' } else if mode == 'game-controller' { 'VINIX iOS GAMECONTROLLER: PASS' } else if mode == 'session-task' { 'VINIX iOS SESSIONTASK: PASS' } else if mode == 'feedback' { 'VINIX iOS FEEDBACK: PASS' } else if mode == 'notifications' { 'VINIX iOS NOTIFICATIONS: PASS' } else { 'FORTNITE PROBE COMPLETE' }
 	mut failure := ''
 	await_checks(mut p, log, marker) or { failure = err.msg() }
 	// V panics do not unwind defers. Close our VM before reporting failure.
@@ -314,7 +320,7 @@ fn vm(root string, out string, mode string) {
 	}
 	p.close()
 	if failure != '' { panic(failure) }
-	println('${mode}: ${if mode in ['rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications'] {
+	println('${mode}: ${if mode in ['tap-gesture', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications'] {
 		'PASS'
 	} else {
 		'COMPLETE (see guest process status)'
@@ -330,16 +336,18 @@ fn main() {
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out) or { panic(err) }
 	mode := os.args[1]
-	if mode !in ['build', 'build-init', 'build-feedback', 'build-rotation-gesture', 'build-pinch-gesture', 'build-pan-gesture', 'build-text-input', 'build-game-center', 'build-storyboard', 'build-audio-application', 'build-game-controller', 'build-session-task', 'build-run-ios-gles', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications', 'probe', 'audit', 'static-audit']! { panic('invalid notification mode') }
+	if mode !in ['build', 'build-init', 'build-feedback', 'build-tap-gesture', 'build-rotation-gesture', 'build-pinch-gesture', 'build-pan-gesture', 'build-text-input', 'build-game-center', 'build-storyboard', 'build-audio-application', 'build-game-controller', 'build-session-task', 'build-run-ios-gles', 'tap-gesture', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications', 'probe', 'audit', 'static-audit']! { panic('invalid notification mode') }
 	if mode == 'build' {
 		mut jobs := []thread{}
-		for item in ['rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks', 'native-init', 'run-ios', 'run-ios-gles']! {
+		for item in ['tap-gesture-checks', 'rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks', 'native-init', 'run-ios', 'run-ios-gles']! {
 			jobs << spawn build(root, out, item)
 			if jobs.len == 4 { jobs.wait(); jobs.clear() }
 		}
 		jobs.wait()
 	} else if mode == 'build-init' {
 		build(root, out, 'native-init')
+	} else if mode == 'build-tap-gesture' {
+		build(root, out, 'tap-gesture-checks')
 	} else if mode == 'build-rotation-gesture' {
 		build(root, out, 'rotation-gesture-checks')
 	} else if mode == 'build-pinch-gesture' {

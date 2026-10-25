@@ -24,6 +24,7 @@ fn objc_responds(object u64, selector &char) bool {
 		|| navigation_descriptor_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| pan_descriptor_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| pinch_descriptor_family(if object in ios_runtime.classes { object } else { read64(object) })
+		|| tap_descriptor_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| rotation_descriptor_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| storyboard_family(if object in ios_runtime.classes { object } else { read64(object) }) {
 		return objc_instance_method(read64(object), u64(selector)) != 0
