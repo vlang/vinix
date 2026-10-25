@@ -102,6 +102,9 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 }
 
 fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if pan_descriptor_unsupported(selector) {
+		pan_descriptor_require_recognition(if object in ios_runtime.classes { object } else { read64(object) })
+	}
 	if text_input_dispatch(object, selector, mut frame) { return true }
 	if navigation_descriptor_unsupported(selector) {
 		navigation_descriptor_require_ui(if object in ios_runtime.classes { object } else { read64(object) })

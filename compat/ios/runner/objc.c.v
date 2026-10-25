@@ -570,7 +570,7 @@ fn objc_start() {
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor', 'GCMouse', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController', 'UINavigationController', 'GKGameCenterViewController', 'UIStoryboard', 'UITextPosition', 'UITextRange',
-		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
+		'UIScreen', 'UIGestureRecognizer', 'UIPanGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'UNNotificationTrigger', 'UNCalendarNotificationTrigger', 'UNNotificationRequest', 'UNUserNotificationCenter', 'NSBundle', 'NSBundleResourceRequest', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
         'UNNotificationContent', 'UNMutableNotificationContent', 'UNNotificationSound', 'UNNotificationAttachment',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSOperation', 'NSInvocationOperation', 'NSInvocation', 'NSMethodSignature', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
@@ -615,7 +615,7 @@ fn objc_start() {
 			'WKWebView' { ios_runtime.names['UIView'] }
 			'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController', 'UIAlertController' { ios_runtime.names['UIViewController'] }
             'CAMetalLayer', 'AVCaptureVideoPreviewLayer' { ios_runtime.names['CALayer'] }
-            'UIScreenEdgePanGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
+            'UIScreenEdgePanGestureRecognizer' { ios_runtime.names['UIPanGestureRecognizer'] }
 			'UIWindowScene' { ios_runtime.names['UIScene'] }
 			'NSDateFormatter', 'NSNumberFormatter' { ios_runtime.names['NSFormatter'] }
 			'GCExtendedGamepad' { ios_runtime.names['GCPhysicalInputProfile'] }
@@ -635,7 +635,7 @@ fn objc_start() {
 			'_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData' { ios_runtime.names['NSData'] }
 			'NSMutableURLRequest' { ios_runtime.names['NSURLRequest'] }
 			'NSHTTPURLResponse' { ios_runtime.names['NSURLResponse'] }
-			'UISwipeGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
+			'UIPanGestureRecognizer', 'UISwipeGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
 			else { ios_runtime.names['NSObject'] }
 		}
 		cls := unsafe { &AbiClass(C.calloc(2, sizeof(AbiClass))) }
@@ -824,6 +824,7 @@ fn obj_header(object u64) &ObjHeader {
 }
 
 fn objc_allocate(cls u64) u64 {
+	pan_descriptor_require_recognition(cls)
 	navigation_descriptor_require_ui(cls)
 	ns_keyed_archiver_require_class(cls)
 	ns_operation_require_class(cls)
@@ -1147,6 +1148,11 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if symbol in ['_OBJC_CLASS_$_UIPanGestureRecognizer', '_OBJC_METACLASS_$_UIPanGestureRecognizer',
+		'_OBJC_CLASS_$_UIScreenEdgePanGestureRecognizer', '_OBJC_METACLASS_$_UIScreenEdgePanGestureRecognizer']!
+		&& library != '/System/Library/Frameworks/UIKit.framework/UIKit' {
+		return error('iOS: pan gesture class import requires UIKit.framework')
+	}
 	if symbol in ['_OBJC_CLASS_$_UITextRange', '_OBJC_METACLASS_$_UITextRange',
 		'_OBJC_CLASS_$_UITextPosition', '_OBJC_METACLASS_$_UITextPosition']!
 		&& library != '/System/Library/Frameworks/UIKit.framework/UIKit' {

@@ -22,6 +22,7 @@ fn objc_responds(object u64, selector &char) bool {
 	if audio_application_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| text_input_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| navigation_descriptor_family(if object in ios_runtime.classes { object } else { read64(object) })
+		|| pan_descriptor_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| storyboard_family(if object in ios_runtime.classes { object } else { read64(object) }) {
 		return objc_instance_method(read64(object), u64(selector)) != 0
 	}
