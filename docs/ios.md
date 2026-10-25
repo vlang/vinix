@@ -298,13 +298,14 @@ SHA-256:    6aae5109d316864fb67bea6a92046c347edbb04dc2a104c6666713da989cd373
 Imports:    2,239 (chained fixups)
 ```
 
-The 2026-10-25 diagnostic launch with `--probe-no-ads` passes the remaining
-SKAdNetwork import and reaches the main executable's Objective-C metadata
-registration. It stops at `iOS: Swift class metadata is not implemented`, with
-guest exit status 1, before Objective-C `+load`, initializers or application
-entry. Rendering, login and gameplay remain unverified. The ordinary launch
+The 2026-10-26 diagnostic launch with `--probe-no-ads` passes the remaining
+SKAdNetwork import, initializer-table collection and Swift image metadata
+registration. It reaches Objective-C `+load`, then stops at
+`V panic: iOS: object has no live runtime metadata`, with guest exit status 1,
+before application initializers or entry. Rendering, login and gameplay remain
+unverified. The ordinary launch
 still requires SKAdNetwork; advertising work is skipped. See the
-[diagnostic checkpoint](../tests/ios/no-ads-probe-checkpoint-20261025.md).
+[diagnostic checkpoint](../tests/ios/image-initializers-checkpoint-20261026.md).
 
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
