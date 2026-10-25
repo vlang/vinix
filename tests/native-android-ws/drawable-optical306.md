@@ -64,3 +64,37 @@ original consumed cleanup source and binary are preserved in
 verified all 24 entries. The final cleanup source additionally rejects
 assertion-disabled production builds; that build was verified to fail before
 argument handling. No cleanup was rerun after preservation.
+
+Maps308 replay validates the fix committed as `455246d9b`, with Framework306
+and Native302. Complete bundle: `maps308-2026-10-25`, typed manifest SHA256
+`1aa702d073a83eb9523eac3c4e001ad9c008429dea370b79f15e98c4b32f58ae`;
+complete readback passed 22,960 typed entries. Recorded runner source SHA256
+`0094138d1d6ab2343d1c9a1cd5768c0417becd69f285bba342b539fa0d621aec`,
+binary SHA256
+`0cd4fe627aeb9ab0c79e449cda2a41a39969a62d837e43e509a817d18f0178e3`.
+Prelaunch manifest SHA256
+`4ebbc7183f0b33c7996136916a6cb599c404a919174b960297ce76a0c1606393`.
+
+The unchanged suite observed 600 seconds with `outcome=window_observed`,
+`backend_ready=true`, `native_maps_observed=true`, `process_exited=false`,
+`qemu_alive_before_capture=true` and no failure markers. Serial SHA256
+`ee11a49c539c42794ac7a917f91af3382f3425c8fc5c499c76dfad25a10a82d2`;
+interaction SHA256
+`90df4c0cb69446b2469857e277a78587e403d6ec048cfadb18d25a9eca5687f9`.
+
+Observed flows: Skip reaches the map with the search hint; current-location
+click survives; Paris search and place card load; a manual Eiffel Tower origin
+produces driving and walking routes. Both modes open Route Options and support
+Preview, Next and Previous. Driving advances from “Head toward Pont d'Iéna” to
+“750 m Turn left onto Pont de l'Alma”; walking advances from “Head northwest”
+to “50 m Slight right toward Rue de l'Université”. Previous restores each
+initial instruction. Route preference row clicks produce corresponding chips.
+Screenshots are in `results/attempt308/google-maps/`, including
+`route-options-open.png`, `route-return.png`, `preview-driving-next.png`,
+`preview-walking-next.png`, and final `application.png`.
+
+Remaining observed limits: switch graphics and street labels are absent.
+The screenshots establish preference chips, not visible switch checked states.
+Preview camera movement is asynchronous; immediate Next captures do not prove
+the final camera location. GPS providers are unavailable, so this replay uses
+a manual origin and does not establish current-position navigation.
