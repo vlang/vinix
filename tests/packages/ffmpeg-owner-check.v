@@ -63,7 +63,7 @@ fn qualify() ! {
 	}
 	mut paths := [compiler, @FILE, archive, repository + '/tools/packages/main.v', repository + '/desktop/tools/tests/heap_tracker.h']
 	for name in ['hello', 'counter', 'memo']! { for arch in ['aarch64', 'x86_64']! { paths << repository + '/examples/package-' + name + '/manifest-' + arch + '.json' } }
-	for directory in ['tools/packages/pkgcore', 'tools/packages/pkgprotocol', 'tools/packages/signing', 'tools/packages/appsdk', 'tools/packages/pkglaunch', 'tools/packages/pkgadmin', 'tests/packages/elffixture', 'tests/packages/applefixture', 'compat/ios/plist', 'tools/accounts']! {
+	for directory in ['tools/packages/pkgcore', 'tools/packages/pkgprotocol', 'tools/packages/signing', 'tools/packages/appsdk', 'tools/packages/audiopcm', 'tools/packages/pkglaunch', 'tools/packages/pkgadmin', 'tests/packages/elffixture', 'tests/packages/applefixture', 'compat/ios/plist', 'tools/accounts']! {
 		for name in os.walk_ext(repository + '/' + directory, '.v') { if !name.ends_with('_test.v') { paths << name } }
 	}
 	for job in jobs { paths << job.source }
