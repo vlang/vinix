@@ -571,7 +571,7 @@ fn objc_start() {
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLQueryItem', 'NSURLCredential', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
-        'UIScreenEdgePanGestureRecognizer', 'UISelectionFeedbackGenerator', 'CADisplayLink',
+        'UIScreenEdgePanGestureRecognizer', 'UIFeedbackGenerator', 'UINotificationFeedbackGenerator', 'UISelectionFeedbackGenerator', 'CADisplayLink',
 		'UIAccessibilityElement',
         'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',
         'AVAudioSession', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession',
@@ -588,6 +588,7 @@ fn objc_start() {
 			'OS_dispatch_queue_serial' { ios_runtime.names['OS_dispatch_queue_serial_executor'] }
 			'OS_dispatch_queue_main' { ios_runtime.names['OS_dispatch_queue_serial'] }
 			'UNCalendarNotificationTrigger' { ios_runtime.names['UNNotificationTrigger'] }
+			'UINotificationFeedbackGenerator', 'UISelectionFeedbackGenerator' { ios_runtime.names['UIFeedbackGenerator'] }
 			'UNMutableNotificationContent' { ios_runtime.names['UNNotificationContent'] }
 			'VinixCFDate' { ios_runtime.names['NSDate'] }
 			'VinixMetalTextureDescriptor' { ios_runtime.names['MTLTextureDescriptor'] }
@@ -658,6 +659,7 @@ fn objc_start() {
 			'NSCache' { 48 }
 			'CTTelephonyNetworkInfo' { 40 }
 			'ASIdentifierManager' { 8 }
+			'UIFeedbackGenerator', 'UINotificationFeedbackGenerator', 'UISelectionFeedbackGenerator' { 8 }
 			'NSThread' { u32(64) }
 			'NSOperation' { u32(248) }
 			'NSInvocationOperation' { u32(264) }
@@ -1115,6 +1117,12 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if symbol in ['_OBJC_CLASS_$_UIFeedbackGenerator', '_OBJC_METACLASS_$_UIFeedbackGenerator',
+		'_OBJC_CLASS_$_UINotificationFeedbackGenerator', '_OBJC_METACLASS_$_UINotificationFeedbackGenerator',
+		'_OBJC_CLASS_$_UISelectionFeedbackGenerator', '_OBJC_METACLASS_$_UISelectionFeedbackGenerator']!
+		&& library != '/System/Library/Frameworks/UIKit.framework/UIKit' {
+		return error('iOS: feedback generator import requires UIKit.framework')
+	}
 	if symbol in ['_OBJC_CLASS_$_ASIdentifierManager', '_OBJC_METACLASS_$_ASIdentifierManager']!
 		&& library != '/System/Library/Frameworks/AdSupport.framework/AdSupport' {
 		return error('iOS: advertising manager import requires AdSupport.framework')

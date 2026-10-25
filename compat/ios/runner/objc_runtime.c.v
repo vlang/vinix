@@ -99,6 +99,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := ns_thread_types(info.name, info.meta, selector) { return types }
 	if types := web_auth_types(info.name, info.meta, selector) { return types }
 	if types := image_view_types(info.name, info.meta, selector) { return types }
+	if types := ui_feedback_types(info.name, info.meta, selector) { return types }
 	if types := game_keyboard_types(info.name, info.meta, selector) { return types }
 	if types := ns_uuid_types(info.name, info.meta, selector) { return types }
 	if types := ns_file_manager_types(info.name, info.meta, selector) { return types }
@@ -192,6 +193,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name == 'NSMapTable' && ns_map_table_unsupported(name) { return 0 }
 		if info.name == 'CTTelephonyNetworkInfo' && telephony_unsupported(name) { return 0 }
 		if info.name == 'ASIdentifierManager' && adsupport_unsupported(name) { return 0 }
+		if ui_feedback_name(info.name) && ui_feedback_unsupported(name) { return 0 }
 		if info.name == 'NSURLCredential' && ns_credential_unsupported(name) { return 0 }
 		if info.name == 'UNUserNotificationCenter' && un_center_unsupported(name) { return 0 }
 		if info.name in ['UNNotificationContent', 'UNMutableNotificationContent']! && un_content_unsupported(name) { return 0 }
