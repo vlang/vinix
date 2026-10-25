@@ -39,6 +39,8 @@ fn verify_sources() ! {
 	for path, contents in {
 		@FILE: $embed_file('wine-build.v').to_string()
 		os.dir(@FILE) + '/wine-runner.v': $embed_file('wine-runner.v').to_string()
+		os.dir(@FILE) + '/wineadapter/layout.v': $embed_file('wineadapter/layout.v').to_string()
+		os.dir(@FILE) + '/wineadapter/patch.v': $embed_file('wineadapter/patch.v').to_string()
 	} {
 		if digest(path)! != sha256.hexhash(contents) { return error('compiled Wine producer source differs: ' + path) }
 	}
@@ -130,9 +132,13 @@ fn build() ! {
 	}) + '\n')!
 	mut seeds := []string{}
 	for relative in ['/usr/bin/wine', '/usr/bin/wineserver', '/lib/ld-musl-x86_64.so.1']! {
-		copy_input(root + relative, runtime + '/root' + relative, mut inputs)!
+		destination := if relative.starts_with('/usr/bin/') { '/usr/libexec/vinix-wine/' + os.base(relative) } else { relative }
+		copy_input(root + relative, runtime + '/root' + destination, mut inputs)!
 		seeds << root + relative
 	}
+	// An ordinary loader copy keeps /proc/self/exe in usr/bin, where Wine
+	// discovers its native child bridges and ../share/wine resources.
+	copy_input(root + '/lib/ld-musl-x86_64.so.1', runtime + '/root/usr/bin/vinix-wine-musl', mut inputs)!
 	for directory in ['/usr/lib/wine/x86_64-windows', '/usr/lib/wine/x86_64-unix', '/usr/share/wine', '/etc/fonts']! {
 		for path in os.walk_ext(root + directory, '') {
 			if os.is_dir(path) { continue }
@@ -155,7 +161,8 @@ fn build() ! {
 	for part in ['/usr/bin/wineserver', '/usr/lib/wine/x86_64-unix/ntdll.so']! {
 		text := os.read_file(root + part)!
 		patched := wineadapter.private_server_patch(text, part.ends_with('ntdll.so'))!
-		os.write_file(runtime + '/root' + part, patched)!
+		destination := if part == '/usr/bin/wineserver' { '/usr/libexec/vinix-wine/wineserver' } else { part }
+		os.write_file(runtime + '/root' + destination, patched)!
 		unsafe { text.free(); patched.free() }
 	}
 	if arch == 'aarch64' {
@@ -206,6 +213,8 @@ fn build() ! {
 		'--gcc-install-dir=' + gcc, '-fuse-ld=lld', '-O2', '-w', '-fno-stack-protector', '-static', '-D_GNU_SOURCE',
 		'-Wno-error=incompatible-pointer-types', generated, runtime_c, '-lm', '-lpthread', '-o', runtime + '/bin/wine-runner'], output + '/logs/cc.log')!
 	for name in ['wine64', 'wineserver']! { os.cp(runtime + '/bin/wine-runner', runtime + '/bin/' + name)! }
+	for name in ['wine', 'wine64', 'wineserver']! { os.cp(runtime + '/bin/wine-runner', runtime + '/root/usr/bin/' + name)! }
+	wineadapter.admit_private_layout(runtime, inputs)!
 	for role in ['application', 'runtime']! {
 		payload := prepared + '/' + role
 		mut entries := []Entry{}

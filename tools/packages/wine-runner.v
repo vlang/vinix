@@ -29,21 +29,22 @@ fn run_wine() ! {
 	defer { prefix.close() }
 	name := os.base(os.args[0])
 	defer { unsafe { name.free() } }
-	if name !in ['wine-runner', 'wine64', 'wineserver'] { return error('unknown Wine adapter mode') }
+	if name !in ['wine-runner', 'wine', 'wine64', 'wineserver'] { return error('unknown Wine adapter mode') }
 	if name == 'wine-runner' {
 		program := context.app_directory + '/bin/program.exe'
 		defer { unsafe { program.free() } }
 		if os.args.len < 2 || os.args[1] != program { return error('Wine entrypoint must name its signed application') }
 	}
-	program := root + if name == 'wineserver' { '/usr/bin/wineserver' } else { '/usr/bin/wine' }
-	loader := root + '/lib/ld-musl-x86_64.so.1'
+	program := root + if name == 'wineserver' { '/usr/libexec/vinix-wine/wineserver' } else { '/usr/libexec/vinix-wine/wine' }
+	identity := root + if name == 'wineserver' { '/usr/bin/wineserver' } else { '/usr/bin/wine' }
+	loader := root + '/usr/bin/vinix-wine-musl'
 	libraries := root + '/lib:' + root + '/usr/lib:' + root + '/usr/lib/wine/x86_64-unix:' + root + '/usr/lib/pulseaudio'
 	dlls := root + '/usr/lib/wine/x86_64-unix:' + builtins
-	wine_loader := context.runtime_directory + '/bin/wine64'
-	wine_server := context.runtime_directory + '/bin/wineserver'
+	wine_loader := root + '/usr/bin/wine'
+	wine_server := root + '/usr/bin/wineserver'
 	fonts := root + '/etc/fonts'
 	font_file := fonts + '/fonts.conf'
-	defer { unsafe { program.free(); loader.free(); libraries.free(); dlls.free(); wine_loader.free(); wine_server.free(); fonts.free(); font_file.free() } }
+	defer { unsafe { program.free(); identity.free(); loader.free(); libraries.free(); dlls.free(); wine_loader.free(); wine_server.free(); fonts.free(); font_file.free() } }
 	for key in ['LD_LIBRARY_PATH', 'LD_PRELOAD', 'QEMU_LD_PREFIX', 'QEMU_SET_ENV', 'QEMU_UNSET_ENV', 'VINIX_ALLOW_WX', 'WINEDLLOVERRIDES', 'WINEDEBUG']! { os.unsetenv(key) }
 	for variable in [WineVariable{'WINEARCH', 'win64'}, WineVariable{'WINEPREFIX', prefix.path}, WineVariable{'WINEDLLPATH', dlls},
 		WineVariable{'WINELOADERNOEXEC', '1'}, WineVariable{'WINELOADER', wine_loader}, WineVariable{'WINESERVER', wine_server},
@@ -63,7 +64,7 @@ fn run_wine() ! {
 		// Its Linux-user CLI does not implement a -split-wx switch.
 		for argument in [translated, '-B', '0x100000000', '-L', root]! { command << argument }
 	}
-	for argument in [loader, '--library-path', libraries, '--argv0', program, '--', program]! { command << argument }
+	for argument in [loader, '--library-path', libraries, '--argv0', identity, '--', program]! { command << argument }
 	for index in 1 .. os.args.len { command << os.args[index] }
 	mut pointers := []&char{cap: command.len + 1}
 	defer { unsafe { pointers.free() } }

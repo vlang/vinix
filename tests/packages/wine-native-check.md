@@ -1,17 +1,12 @@
 # Signed Wine Win64 native qualification
 
 Current status: **runtime qualification is incomplete**. The retained
-[checkpoint](wine-native-checkpoint.md) records the real
-failed guests, not a passing Wine result. In x86-9, the ordinary private-loader
-version check prints `wine-9.17`, but the signed PE exits 1 before READY. Under
-the same sandbox, the server bridge's `--version` succeeds, the client bridge
-exits 1 without output, and direct execution of the private raw server is
-refused because its ELF interpreter is absent at the global path. The client
-adapter sets `WINELOADERNOEXEC`, which makes Wine skip command-line handling,
-including `--version`; that diagnostic enters Wine initialization rather than
-repeating the loader-only version check. Nested Wine loader/server execution
-still needs adapter integration; these diagnostics do not establish the sole
-cause of the signed launch failure.
+[checkpoint](wine-native-checkpoint.md) records the previous failed guests.
+The [nested bridge qualification](wine-nested-bridge-check.md) adds private
+native child bridges and an adjacent ordinary musl copy so Wine can discover
+its loader, server and data through its own executable-directory rules. Both
+prepared architectures pass independent layout and source-binding controls;
+these host checks do not establish a passing signed Wine launch.
 
 The current production retainer verifies the x86-9 input/output provenance and
 then refuses its failed outcome, leaving no retained success directory. The
@@ -57,6 +52,12 @@ absence of the forbidden host file, natural CLI exit, both observed process
 entries gone after reaping, and successful exclusive lease acquisition after
 retirement. The host harness stops the guest after its final PASS; this fixture
 does not prove guest poweroff or normal-init startup.
+
+The lease checks cover READY and retirement after both observed processes
+exit. They do not establish that the package generation remains leased after
+the client exits while a detached wineserver remains alive. Plain
+`wineserver -w` also requires separate lock-error, prefix-replacement and
+startup-race qualification before it could close that gap.
 
 On AArch64 the same guest first runs real x86 BusyBox `true` as UID/GID 1000
 with the original and patched translators. The original must fail and the

@@ -119,6 +119,7 @@ fn retain() ! {
 		'tools/packages/wine-runner.v':            $embed_file('../../tools/packages/wine-runner.v').to_string()
 		'tools/packages/wineadapter/prefix.c.v':   $embed_file('../../tools/packages/wineadapter/prefix.c.v').to_string()
 		'tools/packages/wineadapter/patch.v':      $embed_file('../../tools/packages/wineadapter/patch.v').to_string()
+		'tools/packages/wineadapter/layout.v':     $embed_file('../../tools/packages/wineadapter/layout.v').to_string()
 		'tools/packages/wineadapter/pe_proof.c.v': $embed_file('../../tools/packages/wineadapter/pe_proof.c.v').to_string()
 		'tools/packages/wineadapter/pe_reader.v':  $embed_file('../../tools/packages/wineadapter/pe_reader.v').to_string()
 		'tests/hardware-platform/plainiso/iso.v':  plainiso.source()
@@ -222,7 +223,13 @@ fn retain() ! {
 		'build-producer.json', 'pe-producer.json', 'publisher-notices/source-offer.json',
 		'prepared/' + arch + '/runtime/bin/wine-runner', 'prepared/' + arch + '/runtime/bin/wine64',
 		'prepared/' + arch + '/runtime/bin/wineserver',
+		'prepared/' + arch + '/runtime/root/usr/bin/wine',
+		'prepared/' + arch + '/runtime/root/usr/bin/wine64',
 		'prepared/' + arch + '/runtime/root/usr/bin/wineserver',
+		'prepared/' + arch + '/runtime/root/usr/bin/vinix-wine-musl',
+		'prepared/' + arch + '/runtime/root/lib/ld-musl-x86_64.so.1',
+		'prepared/' + arch + '/runtime/root/usr/libexec/vinix-wine/wine',
+		'prepared/' + arch + '/runtime/root/usr/libexec/vinix-wine/wineserver',
 		'prepared/' + arch + '/runtime/root/usr/lib/wine/x86_64-unix/ntdll.so',
 		'prepared/' + arch + '/application/bin/program.exe',
 		'prepared/' + arch + '/runtime/root/usr/share/wine/nls/locale.nls',
@@ -252,29 +259,7 @@ fn retain() ! {
 			return error('Wine data resource differs from its distribution input: ' + name)
 		}
 	}
-	for part in ['/usr/bin/wineserver', '/usr/lib/wine/x86_64-unix/ntdll.so']! {
-		suffix := '/usr/libexec/vinix-x86_64/root' + part
-		mut original := ''
-		mut matches := 0
-		for path, _ in producer_inputs {
-			if path.ends_with(suffix) {
-				original = path
-				matches++
-			}
-		}
-		if matches != 1 {
-			return error('Wine private-server original input is missing or ambiguous')
-		}
-		text := os.read_file(original)!
-		defer { unsafe { text.free() } }
-		patched := wineadapter.private_server_patch(text, part.ends_with('ntdll.so'))!
-		defer { unsafe { patched.free() } }
-		consumed := os.read_file(prepared + '/prepared/' + arch + '/runtime/root' + part)!
-		defer { unsafe { consumed.free() } }
-		if patched != consumed {
-			return error('Wine binary differs from the exact private-server patch: ' + part)
-		}
-	}
+	wineadapter.admit_private_layout(prepared + '/prepared/' + arch + '/runtime', producer_inputs)!
 	mut offer := wineadapter.admit_local_source_offer(prepared + '/publisher-notices', 'org.vinix.wine-runtime', '9.17-r1', arch)!
 	offer.close()
 	if arch == 'aarch64' {

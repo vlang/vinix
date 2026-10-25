@@ -32,15 +32,26 @@ fn replace(path string, text string) ! {
 	os.write_file(path, text)!
 }
 
+fn private_executable(path string) bool {
+	for suffix in ['/runtime/bin/wine-runner', '/runtime/bin/wine64', '/runtime/bin/wineserver',
+		'/runtime/root/usr/bin/wine', '/runtime/root/usr/bin/wine64', '/runtime/root/usr/bin/wineserver',
+		'/runtime/root/usr/bin/vinix-wine-musl', '/runtime/root/lib/ld-musl-x86_64.so.1',
+		'/runtime/root/usr/libexec/vinix-wine/wine', '/runtime/root/usr/libexec/vinix-wine/wineserver',
+		'/runtime/root/usr/lib/wine/x86_64-unix/ntdll.so']! {
+		if path.ends_with(suffix) { return true }
+	}
+	return false
+}
+
 fn clone_tree(source string, destination string) ! {
 	os.mkdir_all(destination)!
 	for path in os.walk_ext(source, '') {
 		if !os.is_file(path) { continue }
 		target := destination + path[source.len..]
 		os.mkdir_all(os.dir(target))!
-		// Source-offer admission deliberately rejects links. Preserve that
-		// independent check; all other large immutable files can be shared.
-		if path.contains('/publisher-notices/') {
+		// Source-offer and private executable admission deliberately reject
+		// links. Preserve those checks in an unchanged copied baseline.
+		if path.contains('/publisher-notices/') || private_executable(path) {
 			os.cp(path, target)!
 		} else {
 			os.symlink(path, target)!
@@ -189,7 +200,7 @@ fn checks() ! {
 			replace(directory + '/declaration.json', json2.encode(declaration))!
 		} else if name in ['wine-server-resealed-patch', 'wine-client-resealed-patch'] {
 			part := if name == 'wine-server-resealed-patch' {
-				'/usr/bin/wineserver'
+				'/usr/libexec/vinix-wine/wineserver'
 			} else {
 				'/usr/lib/wine/x86_64-unix/ntdll.so'
 			}

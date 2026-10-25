@@ -38,13 +38,13 @@ fn smoke_child() {
 }
 
 fn native_loader_child() {
-	if os.args.len != 6 { exit(125) }
+	if os.args.len != 7 { exit(125) }
 	os.unsetenv('VINIX_ALLOW_WX')
-	os.setenv('WINEDLLPATH', os.args[5], true)
+	os.setenv('WINEDLLPATH', os.args[6], true)
 	if C.setgroups(0, unsafe { nil }) != 0 || C.setresgid(1000, 1000, 1000) != 0 || C.setresuid(1000, 1000, 1000) != 0 {
 		exit(124)
 	}
-	args := [os.args[2], '--library-path', os.args[3], '--argv0', os.args[4], '--', os.args[4],
+	args := [os.args[2], '--library-path', os.args[3], '--argv0', os.args[4], '--', os.args[5],
 		'--version']!
 	mut pointers := unsafe { [10]&char{} }
 	for index, argument in args { pointers[index] = &char(argument.str) }
@@ -54,9 +54,10 @@ fn native_loader_child() {
 
 fn native_loader_smoke(generation string) ! {
 	root := generation + '/apps/org.vinix.wine-runtime/root'
-	loader := root + '/lib/ld-musl-x86_64.so.1'
+	loader := root + '/usr/bin/vinix-wine-musl'
 	libraries := root + '/lib:' + root + '/usr/lib:' + root + '/usr/lib/wine/x86_64-unix:' + root + '/usr/lib/pulseaudio'
-	wine := root + '/usr/bin/wine'
+	wine := root + '/usr/libexec/vinix-wine/wine'
+	identity := root + '/usr/bin/wine'
 	dlls := root + '/usr/lib/wine/x86_64-unix:' + root + '/usr/lib/wine/x86_64-windows'
 	defer {
 		unsafe {
@@ -64,6 +65,7 @@ fn native_loader_smoke(generation string) ! {
 			loader.free()
 			libraries.free()
 			wine.free()
+			identity.free()
 			dlls.free()
 		}
 	}
@@ -75,7 +77,7 @@ fn native_loader_smoke(generation string) ! {
 		}
 		child.close()
 	}
-	child.set_args(['--native-loader-smoke', loader, libraries, wine, dlls])
+	child.set_args(['--native-loader-smoke', loader, libraries, identity, wine, dlls])
 	child.set_redirect_stdio_merged()
 	child.run()
 	C.close(child.stdio_fd[0])
@@ -226,10 +228,10 @@ fn observe(generation string) ![]string {
 		if name == '' || name[0] < `0` || name[0] > `9` { continue }
 		text := os.read_file('/proc/' + name + '/cmdline') or { continue }
 		defer { unsafe { text.free() } }
-		if text.contains(generation + '/apps/org.vinix.wine-runtime/root/usr/bin/wine') {
+		if text.contains(generation + '/apps/org.vinix.wine-runtime/root/usr/libexec/vinix-wine/wine') {
 			ordinary_status(name)!
-			client = client || text.contains('/usr/bin/wine\x00')
-			server = server || text.contains('/usr/bin/wineserver\x00')
+			client = client || text.contains('/usr/libexec/vinix-wine/wine\x00')
+			server = server || text.contains('/usr/libexec/vinix-wine/wineserver\x00')
 			found << name.clone()
 		}
 	}
@@ -338,7 +340,8 @@ fn failure_diagnostics(state pkgcore.State, generation string) ! {
 	if separator < 0 { return error('diagnostic launch plan has no command separator') }
 	runtime := generation + '/apps/org.vinix.wine-runtime'
 	defer { unsafe { runtime.free() } }
-	for suffix in ['/bin/wine64', '/bin/wineserver', '/root/usr/bin/wineserver']! {
+	for suffix in ['/bin/wine64', '/bin/wineserver', '/root/usr/bin/wineserver',
+		'/root/usr/libexec/vinix-wine/wineserver']! {
 		program := runtime + suffix
 		defer { unsafe { program.free() } }
 		mut arguments := []string{cap: separator + 3}
