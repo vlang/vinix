@@ -18896,9 +18896,22 @@ records the source revision and complete external evidence. Advertising work
 remains skipped; Fortnite initialization, rendering, login and gameplay remain
 unverified.
 
+The DualShock gamepad checkpoint adds scoped class and metaclass imports for
+`GCPhysicalInputProfile`, `GCExtendedGamepad` and `GCDualShockGamepad`, with
+their superclass links and macOS-measured instance sizes. Native inspection,
+both sanitizer host runs and the focused ARM64 guest fixture pass, including
+27 explicit rejection cases for unsupported construction, copying, coding and
+touchpad access. Physical input transport and hardware events remain
+unsupported. A fresh Fortnite probe passes the DualShock import and stops at
+`_OBJC_CLASS_$_GCDualSenseGamepad` during linking, before application entry. The
+[gamepad checkpoint](../tests/ios/dualshock-gamepad-checkpoint-20261025.md)
+records the source revision and complete external evidence. Native iOS layout
+parity, Fortnite initialization, rendering, login and gameplay remain
+unverified. Advertising work remains skipped.
+
 The import audit measurements below belong to the bundle-resource milestone;
-they were not rerun for the startup, feedback, task or controller checkpoints
-and do not execute app code.
+they were not rerun for the startup, feedback, task, controller or gamepad
+checkpoints and do not execute app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
