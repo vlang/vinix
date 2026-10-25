@@ -178,6 +178,8 @@ mut:
 	image_view_owned bool
 	image_view &ImageViewState = unsafe { nil }
 	image_view_array bool
+	text_field_owned bool
+	text_field &TextFieldState = unsafe { nil }
 	process_arguments_array bool
 	date_owned bool
 	date_initialized bool
@@ -569,7 +571,7 @@ fn objc_start() {
 		'NSMapTable', 'CTTelephonyNetworkInfo', 'ASIdentifierManager', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor', 'CHHapticDynamicParameter', 'CHHapticEventParameter', 'CHHapticEvent', 'CHHapticPattern', 'GCMouse', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
-		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController', 'UINavigationController', 'GKGameCenterViewController', 'UIStoryboard', 'UITextPosition', 'UITextRange',
+		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UITextField', 'UIWindow', 'UIViewController', 'UINavigationController', 'GKGameCenterViewController', 'UIStoryboard', 'UITextPosition', 'UITextRange',
 		'UIScreen', 'UIGestureRecognizer', 'UIPanGestureRecognizer', 'UIPinchGestureRecognizer', 'UILongPressGestureRecognizer', 'UITapGestureRecognizer', 'UIRotationGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'UNNotificationTrigger', 'UNCalendarNotificationTrigger', 'UNNotificationRequest', 'UNUserNotificationCenter', 'NSBundle', 'NSBundleResourceRequest', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
         'UNNotificationContent', 'UNMutableNotificationContent', 'UNNotificationSound', 'UNNotificationAttachment',
@@ -620,7 +622,7 @@ fn objc_start() {
 			'NSDateFormatter', 'NSNumberFormatter' { ios_runtime.names['NSFormatter'] }
 			'GCExtendedGamepad' { ios_runtime.names['GCPhysicalInputProfile'] }
 			'GCDualShockGamepad', 'GCDualSenseGamepad' { ios_runtime.names['GCExtendedGamepad'] }
-			'UIButton' { ios_runtime.names['UIControl'] }
+			'UIButton', 'UITextField' { ios_runtime.names['UIControl'] }
 			'UIAccessibilityElement' { ios_runtime.names['UIResponder'] }
 			'NSMutableArray', 'NSConstantArray', 'WKNSArray' { ios_runtime.names['NSArray'] }
 			'NSMutableSet' { ios_runtime.names['NSSet'] }
@@ -649,6 +651,7 @@ fn objc_start() {
 		metaclass.parent = if parent == 0 { u64(cls) } else { read64(parent) }
 		size := match name {
 			'UITextPosition', 'UITextRange' { u32(8) }
+			'UITextField' { u32(1064) } // Opaque Catalyst-sized reserve; state is private to the shim.
 			'UNNotificationTrigger' { u32(16) }
 			'UNCalendarNotificationTrigger' { u32(24) }
 			'UNNotificationRequest' { u32(40) }
@@ -1007,6 +1010,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).value_owned { objc_release(object); return 0 }
 	if obj_header(object).auth_owned { panic('iOS: authentication session requires designated construction') }
 	if obj_header(object).image_view_owned { image_view_initialize(object, 0, 0, ObjRect{}, false) }
+	if obj_header(object).text_field_owned { text_field_initialize(object, ObjRect{}) }
 	if objc_is_kind(object, ios_runtime.names['NSCondition']) { ns_condition_initialize(object) }
 	if ns_lock_family(read64(object)) { ns_lock_initialize(object) }
 	if ns_recursive_lock_family(read64(object)) { ns_recursive_lock_initialize(object) }
@@ -1214,7 +1218,8 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		return error('iOS: pan gesture class import requires UIKit.framework')
 	}
 	if symbol in ['_OBJC_CLASS_$_UITextRange', '_OBJC_METACLASS_$_UITextRange',
-		'_OBJC_CLASS_$_UITextPosition', '_OBJC_METACLASS_$_UITextPosition']!
+		'_OBJC_CLASS_$_UITextPosition', '_OBJC_METACLASS_$_UITextPosition',
+		'_OBJC_CLASS_$_UITextField', '_OBJC_METACLASS_$_UITextField']!
 		&& library != '/System/Library/Frameworks/UIKit.framework/UIKit' {
 		return error('iOS: text input class import requires UIKit.framework')
 	}

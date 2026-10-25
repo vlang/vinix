@@ -2,6 +2,7 @@
 module main
 
 fn objc_install_storage(cls u64, object u64, caller_storage bool) {
+	if caller_storage && text_field_family(cls) { panic('iOS: UITextField caller storage is not implemented') }
 	haptic_dynamic_parameter_require_class(cls)
 	haptic_parameter_require_class(cls)
 	haptic_pattern_require_class(cls)
@@ -114,6 +115,11 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	header.url_query_item_owned = cls == ios_runtime.names['NSURLQueryItem']
 	header.auth_owned = objc_is_kind(object, ios_runtime.names['ASWebAuthenticationSession'])
 	header.image_view_owned = objc_is_kind(object, ios_runtime.names['UIImageView'])
+	header.text_field_owned = text_field_family(cls)
+	if header.text_field_owned {
+		header.text_field = unsafe { &TextFieldState(C.calloc(1, sizeof(TextFieldState))) }
+		if header.text_field == unsafe { nil } { panic('iOS: UITextField state allocation failed') }
+	}
 	header.uuid_owned = objc_is_kind(object, ios_runtime.names['NSUUID'])
 	header.date_owned = ns_date_family(cls)
 	header.input_stream_owned = ns_input_stream_family(cls)
@@ -255,6 +261,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	ns_url_query_item_dispose(object, mut header)
 	web_auth_dispose(mut header)
 	image_view_dispose(mut header)
+	text_field_dispose(mut header)
 	ns_input_stream_dispose(mut header)
 	url_session_dispose(object, header)
 	url_session_configuration_dispose(object, header)
