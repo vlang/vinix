@@ -2,6 +2,8 @@
 module main
 
 fn objc_install_storage(cls u64, object u64, caller_storage bool) {
+	haptic_parameter_require_class(cls)
+	if caller_storage && haptic_parameter_family(cls) { panic('iOS: CHHapticEventParameter caller storage is not implemented') }
 	long_press_descriptor_require_recognition(cls)
 	tap_descriptor_require_recognition(cls)
 	rotation_descriptor_require_recognition(cls)
