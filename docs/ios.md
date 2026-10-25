@@ -18837,15 +18837,27 @@ checks cover constructor rollback and worker reentry, shallow snapshots,
 400 concurrent priority roundtrips, guarded caller storage, 32 isa replacements,
 37 rejection cases and two balanced runtime lifetimes. All nineteen ARM64
 targets build, and all sixteen focused regression fixtures pass in the Vinix
-QEMU guest. Fortnite's probe resolves `NSBundleResourceRequest` and stops at
-`_OBJC_CLASS_$_ASIdentifierManager` in AdSupport during linking, before application
-entry.
+QEMU guest. That milestone's Fortnite probe resolved `NSBundleResourceRequest`
+and stopped at `_OBJC_CLASS_$_ASIdentifierManager` in AdSupport during linking,
+before application entry.
 
 The [bundle-resource report](../tests/ios/bundle-resource-report.md) records the
-source revision, complete external archive, checksums and verification. Full
-native regression, Swift support, Fortnite initialization, rendering, login and
-gameplay remain unverified. The audits below include this implementation and do
-not execute app code.
+source revision, complete external archive, checksums and verification.
+
+The next startup checkpoint satisfies Fortnite's mandatory AdSupport class
+import with tracking disabled and an all-zero advertising identifier. Advertising
+functionality is skipped. The host checks pass under ASan+UBSan in both hashing
+modes, and the ARM64 GLES runner and guest initializer build. A fresh Fortnite
+probe passes that import and stops at
+`_OBJC_CLASS_$_UINotificationFeedbackGenerator` during linking, before application
+entry. The [startup checkpoint](../tests/ios/startup-checkpoint-20261025.md)
+records the source revision and preserved evidence. The full native regression
+and focused guest fixture suite were not rerun for this checkpoint. Swift
+support, Fortnite initialization, rendering, login and gameplay remain
+unverified.
+
+The import audit measurements below belong to the bundle-resource milestone;
+they were not rerun for the startup checkpoint and do not execute app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
