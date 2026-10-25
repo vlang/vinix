@@ -1845,6 +1845,15 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   All nine maintained suites pass per architecture. See
   [the signal-copy qualification](docs/linux-signal-wait-copy.md).
 
+- [x] Select native rt_sigtimedwait thread-directed signals before shared
+  process signals, then synchronous signal numbers before numeric fallback.
+  Qualify filtered wanted sets, independent same-number pending signals,
+  bystanders and preserved masks/output. Identical musl ELFs pass 27,968 checks
+  on both production architectures and Linux; originals fail 4,160 each.
+  All ten maintained suites pass per architecture; the first x86-64 timeout
+  and complete passing retry are retained. See
+  [the selection qualification](docs/linux-signal-wait-order.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

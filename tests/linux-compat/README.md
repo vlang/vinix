@@ -2485,3 +2485,23 @@ negative controls), then `check` on the complete external bundle documented
 in the [signal-copy qualification](../../docs/linux-signal-wait-copy.md).
 Selection priority, concurrent delivery/copy races, queued payloads and
 GNU/foreign/32-bit paths remain separate qualifications.
+
+The `sigwaitorder` case checks native rt_sigtimedwait thread-before-shared
+pending selection, synchronous-number priority within each pool and numeric
+fallback. Root and UID 1000/GID 2000 cohorts cover 240 ordered pairs from 16
+signals in four pool combinations, filtered wanted sets, independently pending
+same-number signals, bystanders, preserved masks and unaligned/null siginfo
+output. Identical musl ELFs pass 27,968 checks on both production kernels and
+Linux 6.12.51; original kernels fail 4,160 checks each. Run
+`--cases sigwaitorder,sigwaitcopy,sigpending,randomsignal,clonesignal,cloneclear,seccomp,runtime,futex,jit`
+with a fresh state directory. All ten suites pass per architecture. The first
+x86-64 cloneclear timeout and complete passing retry are both retained.
+
+`sigwaitorder-reference.v` accepts the same arguments as `sigwaitcopy-reference.v`.
+Its `--self-test` has two positive and nine negative controls. Compile
+`sigwaitorder-evidence.v` without `-prod`, run `self-test` (five positive and 23
+negative controls), then `check` on the complete external bundle documented
+in the [selection qualification](../../docs/linux-signal-wait-order.md).
+Synthetic kill/tgkill signals do not qualify real fault delivery. Concurrent
+delivery/dequeue races, queued payload provenance and GNU/foreign/32-bit paths
+remain separate qualifications.

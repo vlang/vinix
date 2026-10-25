@@ -349,20 +349,32 @@ pub fn syscall_rt_sigtimedwait(_ voidptr, set_ptr u64, info_ptr u64, timeout_ptr
 	return errno.err, errno.eagain
 }
 
-// Claim the lowest-numbered pending signal that is in `wanted`.
+// Linux checks thread-directed signals before process-wide signals. Within
+// each pending set, synchronous signal numbers precede other signal numbers.
 fn take_wait_signal(mut t proc.Thread, wanted u64) (int, bool) {
-	for signum := 1; signum <= max_signal; signum++ {
-		if wanted & signal_bit(signum) == 0 {
-			continue
+	which := take_pending_wait_signal(&t.pending_signals, wanted)
+	if which != -1 { return which, false }
+	return take_pending_wait_signal(&t.process.shared_pending_signals, wanted), true
+}
+
+fn take_pending_wait_signal(pending &u64, wanted u64) int {
+	synchronous := signal_bit(4) | signal_bit(5) | signal_bit(7) | signal_bit(8) |
+		signal_bit(11) | signal_bit(31)
+	for {
+		available := katomic.load(pending) & wanted
+		if available == 0 { return -1 }
+		priority := available & synchronous
+		candidates := if priority != 0 { priority } else { available }
+		for signum := 1; signum <= max_signal; signum++ {
+			if candidates & signal_bit(signum) != 0 &&
+				katomic.btr(mut unsafe { pending }, u8(signum - 1)) {
+				return signum
+			}
 		}
-		if katomic.btr(mut &t.pending_signals, u8(signum - 1)) == true {
-			return signum, false
-		}
-		if katomic.btr(mut &t.process.shared_pending_signals, u8(signum - 1)) {
-			return signum, true
-		}
+		// Another waiter may have consumed the shared candidates. Recheck
+		// the pending set before selecting from the remaining signal class.
 	}
-	return -1, false
+	return -1
 }
 
 // The 128-byte siginfo_t for a synchronously accepted signal. Ordinary signals
