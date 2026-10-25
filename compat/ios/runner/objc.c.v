@@ -148,6 +148,10 @@ mut:
 	credential_initialized bool
 	credential_initializing bool
 	credential_persistence u64
+	bundle_resource_owned bool
+	bundle_resource_initialized bool
+	bundle_resource_initializing bool
+	bundle_resource_priority f64
 	notification_queue &FoundationNotificationQueue = unsafe { nil }
 	un_trigger_owned bool
 	un_trigger_initialized bool
@@ -557,7 +561,7 @@ fn objc_start() {
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
-        'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'UNNotificationTrigger', 'UNCalendarNotificationTrigger', 'UNNotificationRequest', 'UNUserNotificationCenter', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
+        'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'UNNotificationTrigger', 'UNCalendarNotificationTrigger', 'UNNotificationRequest', 'UNUserNotificationCenter', 'NSBundle', 'NSBundleResourceRequest', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
         'UNNotificationContent', 'UNMutableNotificationContent', 'UNNotificationSound', 'UNNotificationAttachment',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue', 'NSOperation', 'NSInvocationOperation', 'NSInvocation', 'NSMethodSignature', 'NSSortDescriptor', 'NSRegularExpression', 'NSTextCheckingResult', 'VinixRegularExpressionCheckingResult',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLQueryItem', 'NSURLCredential', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSURLSession', 'NSURLSessionConfiguration', 'NSUserDefaults',
@@ -673,6 +677,7 @@ fn objc_start() {
 			'NSNotificationQueue' { u32(32) }
 			'NSURLQueryItem' { u32(24) }
 			'NSURLCredential' { u32(16) }
+			'NSBundleResourceRequest' { u32(48) }
 			'NSStream' { u32(8) }
 			'NSInputStream' { u32(136) }
 			'NSAutoreleasePool' { u32(40) }
@@ -748,6 +753,7 @@ fn objc_start() {
 	ns_cache_metadata()
 	telephony_metadata()
 	ns_credential_metadata()
+	ns_bundle_resource_metadata()
 	ns_url_query_item_metadata()
 	ns_user_activity_metadata()
 	ns_notification_queue_metadata()
@@ -814,6 +820,7 @@ fn objc_allocate(cls u64) u64 {
 	ns_map_table_require_class(cls)
 	telephony_require_class(cls)
 	ns_credential_require_class(cls)
+	ns_bundle_resource_require_class(cls)
 	ns_calendar_require_class(cls)
 	ns_predicate_require_class(cls)
 	ns_index_set_require_class(cls)
@@ -930,6 +937,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).map_table != unsafe { nil } { return ns_map_table_initialize(object, 0, 0, 0) }
 	if obj_header(object).telephony_owned { return telephony_initialize(object) }
 	if obj_header(object).credential_owned { panic('iOS: credential requires a designated initializer') }
+	if obj_header(object).bundle_resource_owned { panic('iOS: resource request requires a designated initializer') }
 	if obj_header(object).user_activity != unsafe { nil } { panic('iOS: user activity requires designated construction') }
 	if obj_header(object).notification_queue != unsafe { nil } { return ns_notification_queue_initialize(object, 0, true) }
 	if obj_header(object).un_trigger_owned { panic('iOS: notification trigger requires designated construction') }
@@ -1099,6 +1107,10 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if symbol in ['_OBJC_CLASS_$_NSBundleResourceRequest', '_OBJC_METACLASS_$_NSBundleResourceRequest']!
+		&& library != '/System/Library/Frameworks/Foundation.framework/Foundation' {
+		return error('iOS: resource request import requires Foundation.framework')
+	}
 	if symbol in ['_OBJC_CLASS_$_NSURLCredential', '_OBJC_METACLASS_$_NSURLCredential']!
 		&& library != '/System/Library/Frameworks/Foundation.framework/Foundation' {
 		return error('iOS: credential import requires Foundation.framework')

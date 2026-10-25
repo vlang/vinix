@@ -60,8 +60,7 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 			}
 			'NSBundle' {
 				if selector != 'mainBundle' { return false }
-				if ios_runtime.bundle_object == 0 { ios_runtime.bundle_object = objc_allocate(cls) }
-				frame.x[0] = ios_runtime.bundle_object
+				frame.x[0] = ns_main_bundle()
 			}
 			'AVAudioSession' {
 				if selector != 'sharedInstance' { return false }

@@ -106,6 +106,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := ns_date_types(info.name, info.meta, selector) { return types }
 	if types := ns_date_formatter_types(info.name, info.meta, selector) { return types }
 	if types := ns_number_formatter_types(info.name, info.meta, selector) { return types }
+	if types := ns_bundle_resource_types(info.name, info.meta, selector) { return types }
 	if types := un_trigger_types(info.name, info.meta, selector) { return types }
 	if types := un_request_types(info.name, info.meta, selector) { return types }
 	if types := un_sound_types(info.name, info.meta, selector) { return types }
@@ -181,6 +182,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name in ['NSInvocation', 'NSMethodSignature']! && ns_invocation_unsupported(info.name, name) { return 0 }
 		if info.name == 'NSDateFormatter' && ns_date_formatter_unsupported(name) { return 0 }
 		if info.name == 'NSNumberFormatter' && ns_number_formatter_unsupported(name) { return 0 }
+		if info.name == 'NSBundleResourceRequest' && ns_bundle_resource_unsupported(name) { return 0 }
 		if info.name in ['UNNotificationTrigger', 'UNCalendarNotificationTrigger']! && un_trigger_unsupported(name) { return 0 }
 		if info.name == 'UNNotificationRequest' && un_request_unsupported(name) { return 0 }
 		if info.name == 'UNNotificationSound' && un_sound_unsupported(name) { return 0 }

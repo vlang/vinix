@@ -45,6 +45,10 @@ fn objc_responds(object u64, selector &char) bool {
 		if ns_number_formatter_types('NSNumberFormatter', object in ios_runtime.classes, name) != none { return true }
 	}
 	formatter_cls := if object in ios_runtime.classes { object } else { read64(object) }
+	if ns_bundle_resource_family(formatter_cls) {
+		if ns_bundle_resource_unsupported(name) { return native_method(read64(object), name) != 0 }
+		if ns_bundle_resource_types('NSBundleResourceRequest', object in ios_runtime.classes, name) != none { return true }
+	}
 	if un_sound_family(formatter_cls) {
 		if un_sound_unsupported(name) { return native_method(read64(object), name) != 0 }
 		if un_sound_types('UNNotificationSound', object in ios_runtime.classes, name) != none { return true }

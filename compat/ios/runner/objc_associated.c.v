@@ -44,6 +44,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	foundation_lock := value in ios_runtime.objects && obj_header(value).foundation_lock_owned
 	telephony := value in ios_runtime.objects && obj_header(value).telephony_owned
 	credential := value in ios_runtime.objects && obj_header(value).credential_owned
+	bundle_resource := value in ios_runtime.objects && obj_header(value).bundle_resource_owned
 	notification_queue := value in ios_runtime.objects && obj_header(value).notification_queue != unsafe { nil }
 	un_trigger := value in ios_runtime.objects && obj_header(value).un_trigger_owned
 	un_request := value in ios_runtime.objects && obj_header(value).un_request_owned
@@ -66,6 +67,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if foundation_lock || ns_lock_family(cls) { panic('iOS: NSLock copying, coding and this selector are not implemented') }
 	if telephony || telephony_family(cls) { panic('iOS: telephony copying is not implemented') }
 	if credential || ns_credential_family(cls) { return ns_credential_copy(value) }
+	if bundle_resource || ns_bundle_resource_family(cls) { panic('iOS: resource request copying is not implemented') }
 	if notification_queue || ns_notification_queue_family(cls) { panic('iOS: notification queue copying is not implemented') }
 	if un_trigger || un_trigger_family(cls) { return un_trigger_copy(value) }
 	if un_request || un_request_family(cls) { return un_request_copy(value) }
