@@ -1076,6 +1076,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     checks exact inventories/hashes but accepts only explicitly incomplete,
     local-qualification records. Complete corresponding source, redistribution
     authority and real Wine/translation execution remain open.
+    [Native startup diagnostics](tests/packages/wine-startup-check.md) also pass
+    the x86_64 ownership control for Windows-only metadata permission: private
+    socket mode changes succeed; protected root-owned payload descriptors
+    refuse chmod, explicit timestamps and access ACL changes. Signed execution
+    and detached-server lease qualification remain open.
   - [ ] Qualified isolated Wine/translation and Apple runtime catalogs, including
     ordinary-user graphical execution and their required IPC/device services.
     The retained [translated fork regression](tests/packages/wine-translation-fork-check.md)
