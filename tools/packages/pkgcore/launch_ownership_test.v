@@ -103,7 +103,9 @@ fn test_launch_plan_matrix_retires_success_storage_and_keeps_inputs_literal() {
 					mut plan := application_launch_plan(config, '/var/lib/vinix-packages', selected, 'app', '/home/user/data', 1000, 1000, input)!
 					assert plan.program == '/usr/bin/vinix-sandbox'
 					assert plan.directory == if input.data_cwd { '/home/user/data' } else { '/var/lib/vinix-packages/generations/42/apps/app' }
-					assert plan.arguments[5] == if input.window { 'stdio rpath wpath cpath flock exec prot_exec inet dns proc unix' }
+					assert plan.arguments[5] == if kind == 'windows' && input.terminal { 'stdio rpath wpath cpath flock exec prot_exec fattr tty inet dns proc unix' }
+						else if kind == 'windows' { 'stdio rpath wpath cpath flock exec prot_exec fattr inet dns proc unix' }
+						else if input.window { 'stdio rpath wpath cpath flock exec prot_exec inet dns proc unix' }
 						else if input.terminal { 'stdio rpath wpath cpath flock exec prot_exec tty inet dns proc unix' }
 						else { 'stdio rpath wpath cpath flock exec prot_exec inet dns proc unix' }
 					assert ('TERM=linux' in plan.arguments) == input.terminal
@@ -140,6 +142,8 @@ fn test_process_grant_allows_local_ipc_without_additional_paths_or_display_conte
 					assert ('proc' in promises) == process
 					assert ('unix' in promises) == process
 					assert promises.filter(it == 'unix').len <= 1
+					assert ('fattr' in promises) == (kind == 'windows')
+					assert promises.filter(it == 'fattr').len <= 1
 					assert 'inet' !in promises && 'dns' !in promises
 					assert ('tty' in promises) == (mode == 1)
 					assert !plan.arguments.any(it.starts_with('DISPLAY=') || it.starts_with('XAUTHORITY='))
