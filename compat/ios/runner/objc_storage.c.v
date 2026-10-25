@@ -16,6 +16,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	ns_cache_require_class(cls)
 	ns_map_table_require_class(cls)
 	telephony_require_class(cls)
+	adsupport_require_class(cls)
 	ns_credential_require_class(cls)
 	ns_bundle_resource_require_class(cls)
 	ns_calendar_require_class(cls)
@@ -76,6 +77,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	ns_cache_install(cls, mut header)
 	ns_map_table_install(cls, mut header)
 	header.telephony_owned = cls == ios_runtime.names['CTTelephonyNetworkInfo']
+	header.adsupport_owned = cls == ios_runtime.names['ASIdentifierManager']
 	header.credential_owned = cls == ios_runtime.names['NSURLCredential']
 	header.bundle_resource_owned = cls == ios_runtime.names['NSBundleResourceRequest']
 	ns_notification_queue_install(cls, mut header)
@@ -156,6 +158,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	ns_cache_retire(header)
 	ns_map_table_retire(header)
 	telephony_retire(header)
+	adsupport_retire(object, header)
 	ns_credential_retire(mut header)
 	ns_bundle_resource_retire(mut header)
 	ns_user_activity_retire(mut header)

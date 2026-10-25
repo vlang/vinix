@@ -43,6 +43,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	map_table := value in ios_runtime.objects && obj_header(value).map_table != unsafe { nil }
 	foundation_lock := value in ios_runtime.objects && obj_header(value).foundation_lock_owned
 	telephony := value in ios_runtime.objects && obj_header(value).telephony_owned
+	adsupport := value in ios_runtime.objects && obj_header(value).adsupport_owned
 	credential := value in ios_runtime.objects && obj_header(value).credential_owned
 	bundle_resource := value in ios_runtime.objects && obj_header(value).bundle_resource_owned
 	notification_queue := value in ios_runtime.objects && obj_header(value).notification_queue != unsafe { nil }
@@ -66,6 +67,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if map_table || ns_map_table_family(cls) { panic('iOS: map table copying is not implemented') }
 	if foundation_lock || ns_lock_family(cls) { panic('iOS: NSLock copying, coding and this selector are not implemented') }
 	if telephony || telephony_family(cls) { panic('iOS: telephony copying is not implemented') }
+	if adsupport || adsupport_family(cls) { panic('iOS: advertising manager copying is not implemented') }
 	if credential || ns_credential_family(cls) { return ns_credential_copy(value) }
 	if bundle_resource || ns_bundle_resource_family(cls) { panic('iOS: resource request copying is not implemented') }
 	if notification_queue || ns_notification_queue_family(cls) { panic('iOS: notification queue copying is not implemented') }

@@ -144,6 +144,8 @@ mut:
 	telephony_owned bool
 	telephony_initialized bool
 	telephony_active int
+	adsupport_owned bool
+	adsupport_active int
 	credential_owned bool
 	credential_initialized bool
 	credential_initializing bool
@@ -478,6 +480,8 @@ mut:
 	process_info u64 // One owned NSProcessInfo singleton reference.
 	process_arguments u64 // Owned app arguments, configured before image initialization.
 	distant_dates [2]u64 // Owned immutable date cache references, retired at shutdown.
+	adsupport_manager u64 // Cache-owned advertising manager, retired before pool teardown.
+	adsupport_retired bool
 	connections []u64 // Main-thread pending connections, one owning reference each.
 	connection_callbacks int
 	weak         map[u64]u64 // Location -> object; weak loads retain before returning.
@@ -556,7 +560,7 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSNumberFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'NSMapTable', 'CTTelephonyNetworkInfo', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
+		'NSMapTable', 'CTTelephonyNetworkInfo', 'ASIdentifierManager', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
@@ -653,6 +657,7 @@ fn objc_start() {
 			'NSRecursiveLock' { u32(sizeof(AbiNSRecursiveLock)) }
 			'NSCache' { 48 }
 			'CTTelephonyNetworkInfo' { 40 }
+			'ASIdentifierManager' { 8 }
 			'NSThread' { u32(64) }
 			'NSOperation' { u32(248) }
 			'NSInvocationOperation' { u32(264) }
@@ -819,6 +824,7 @@ fn objc_allocate(cls u64) u64 {
 	ns_cache_require_class(cls)
 	ns_map_table_require_class(cls)
 	telephony_require_class(cls)
+	adsupport_require_class(cls)
 	ns_credential_require_class(cls)
 	ns_bundle_resource_require_class(cls)
 	ns_calendar_require_class(cls)
@@ -936,6 +942,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).cache != unsafe { nil } { return ns_cache_initialize(object) }
 	if obj_header(object).map_table != unsafe { nil } { return ns_map_table_initialize(object, 0, 0, 0) }
 	if obj_header(object).telephony_owned { return telephony_initialize(object) }
+	if obj_header(object).adsupport_owned { return adsupport_initialize(object) }
 	if obj_header(object).credential_owned { panic('iOS: credential requires a designated initializer') }
 	if obj_header(object).bundle_resource_owned { panic('iOS: resource request requires a designated initializer') }
 	if obj_header(object).user_activity != unsafe { nil } { panic('iOS: user activity requires designated construction') }
@@ -1003,6 +1010,7 @@ fn objc_stop() {
 	objc_release(ios_runtime.application)
 	ns_notification_queues_stop()
 	un_center_stop()
+	adsupport_stop()
 	notification_stop()
 	objc_release(ios_runtime.notification_center)
 	objc_release(ios_runtime.audio_session)
@@ -1107,6 +1115,16 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if symbol in ['_OBJC_CLASS_$_ASIdentifierManager', '_OBJC_METACLASS_$_ASIdentifierManager']!
+		&& library != '/System/Library/Frameworks/AdSupport.framework/AdSupport' {
+		return error('iOS: advertising manager import requires AdSupport.framework')
+	}
+	if library == '/System/Library/Frameworks/AdSupport.framework/AdSupport' {
+		cls := ios_runtime.names['ASIdentifierManager']
+		if symbol == '_OBJC_CLASS_$_ASIdentifierManager' { return cls }
+		if symbol == '_OBJC_METACLASS_$_ASIdentifierManager' { return read64(cls) }
+		return error('iOS: AdSupport symbol is not implemented: ${symbol}')
+	}
 	if symbol in ['_OBJC_CLASS_$_NSBundleResourceRequest', '_OBJC_METACLASS_$_NSBundleResourceRequest']!
 		&& library != '/System/Library/Frameworks/Foundation.framework/Foundation' {
 		return error('iOS: resource request import requires Foundation.framework')

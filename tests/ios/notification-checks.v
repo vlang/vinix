@@ -39,6 +39,8 @@ fn main() {
 		run(out, 'inspect', [out + '/inspect-cache'], false)
 	} else if os.args[1] == 'cache-metadata-inspect' {
 		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'NSCache'], false)
+	} else if os.args[1] == 'adsupport-metadata-inspect' {
+		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'ASIdentifierManager'], false)
 	} else if os.args[1] == 'bundle-resource-metadata-inspect' {
 		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'NSBundleResourceRequest'], false)
 	} else if os.args[1] == 'bundle-resource-inspect' {
@@ -61,9 +63,9 @@ fn main() {
 		run(out, 'inspect', [out + '/inspect-notification-attachment'], false)
 	} else if os.args[1] == 'attachment-metadata-inspect' {
 		run(out, 'inspect-metadata', [out + '/inspect-user-notifications', 'UNNotificationAttachment'], false)
-	} else if os.args[1] in ['host', 'content-host', 'sound-host', 'attachment-host', 'cache-host', 'telephony-host', 'credential-host', 'map-table-host', 'lock-host', 'recursive-lock-host', 'number-formatter-host', 'date-formatter-host', 'bundle-resource-host']! {
+	} else if os.args[1] in ['host', 'content-host', 'sound-host', 'attachment-host', 'cache-host', 'telephony-host', 'credential-host', 'map-table-host', 'lock-host', 'recursive-lock-host', 'number-formatter-host', 'date-formatter-host', 'bundle-resource-host', 'adsupport-host']! {
 		content := os.args[1] == 'content-host'
-		fixture := if os.args[1] == 'bundle-resource-host' { 'ns_bundle_resource_test.v' } else if os.args[1] == 'number-formatter-host' { 'ns_number_formatter_test.v' } else if os.args[1] == 'date-formatter-host' { 'date_formatter_test.v' } else if os.args[1] == 'lock-host' { 'ns_lock_test.v' } else if os.args[1] == 'recursive-lock-host' { 'ns_recursive_lock_test.v' } else if os.args[1] == 'map-table-host' { 'ns_map_table_test.v' } else if os.args[1] == 'credential-host' { 'ns_url_credential_test.v' } else if os.args[1] == 'telephony-host' { 'coretelephony_test.v' } else if os.args[1] == 'cache-host' { 'ns_cache_test.v' } else if content { 'un_notification_content_test.v' } else if os.args[1] == 'sound-host' { 'un_notification_sound_test.v' } else if os.args[1] == 'attachment-host' { 'un_notification_attachment_test.v' } else { 'un_notification_center_test.v' }
+		fixture := if os.args[1] == 'adsupport-host' { 'adsupport_test.v' } else if os.args[1] == 'bundle-resource-host' { 'ns_bundle_resource_test.v' } else if os.args[1] == 'number-formatter-host' { 'ns_number_formatter_test.v' } else if os.args[1] == 'date-formatter-host' { 'date_formatter_test.v' } else if os.args[1] == 'lock-host' { 'ns_lock_test.v' } else if os.args[1] == 'recursive-lock-host' { 'ns_recursive_lock_test.v' } else if os.args[1] == 'map-table-host' { 'ns_map_table_test.v' } else if os.args[1] == 'credential-host' { 'ns_url_credential_test.v' } else if os.args[1] == 'telephony-host' { 'coretelephony_test.v' } else if os.args[1] == 'cache-host' { 'ns_cache_test.v' } else if content { 'un_notification_content_test.v' } else if os.args[1] == 'sound-host' { 'un_notification_sound_test.v' } else if os.args[1] == 'attachment-host' { 'un_notification_attachment_test.v' } else { 'un_notification_center_test.v' }
 		cfile := out + '/payload/center-host.c'; bundle := out + "/NotificationChecks.app/Contents"
 		os.mkdir_all(bundle + "/MacOS")!
 		os.write_file(bundle + "/Info.plist", "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>org.vinix.notification-checks</string><key>CFBundleExecutable</key><string>center-host</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>")!

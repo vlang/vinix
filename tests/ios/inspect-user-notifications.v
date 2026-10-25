@@ -46,6 +46,9 @@ fn main() {
  if name == 'CTTelephonyNetworkInfo' {
   assert C.dlopen(c'/System/Library/Frameworks/CoreTelephony.framework/CoreTelephony', 2) != unsafe { nil }
  }
+ if name == 'ASIdentifierManager' {
+  assert C.dlopen(c'/System/Library/Frameworks/AdSupport.framework/AdSupport', 2) != unsafe { nil }
+ }
  cls := C.objc_getClass(name.str)
  assert cls != unsafe { nil }
  println('${name} SIZE ${C.class_getInstanceSize(cls)} PARENT ${unsafe { C.class_getName(C.class_getSuperclass(cls)).vstring() }}')
@@ -73,6 +76,18 @@ fn main() {
    println('DEFAULT ${unsafe { selector.vstring() }} ${kind}${if value == 0 { '' } else { ' count=' + msg(value, c'count', 0).str() }}')
   }
   msg(object, c'release', 0); msg(pool, c'drain', 0)
+ }
+ if name == 'ASIdentifierManager' {
+  pool := msg(u64(C.objc_getClass(c'NSAutoreleasePool')), c'new', 0)
+  object := msg(u64(cls), c'sharedManager', 0)
+  println('ADSUPPORT: sharedManager nil=' + (object == 0).str())
+  println('ADSUPPORT: repeated sharedManager same=' + (object == msg(u64(cls), c'sharedManager', 0)).str())
+  identifier := msg(object, c'advertisingIdentifier', 0)
+  println('ADSUPPORT: tracking=' + msg(object, c'isAdvertisingTrackingEnabled', 0).str())
+  if identifier != 0 { println('ADSUPPORT: identifier=' + unsafe { (&char(msg(msg(identifier, c'UUIDString', 0), c'UTF8String', 0))).vstring() }) }
+  allocated := msg(u64(cls), c'new', 0)
+  println('ADSUPPORT: new same=' + (allocated == object).str() + ' tracking=' + msg(allocated, c'isAdvertisingTrackingEnabled', 0).str())
+  msg(allocated, c'release', 0); msg(pool, c'drain', 0)
  }
  if os.args.len > 2 && os.args[2] == 'center' {
   assert name == 'UNUserNotificationCenter'
