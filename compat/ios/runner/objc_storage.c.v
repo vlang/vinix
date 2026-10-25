@@ -27,6 +27,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	pinch_descriptor_require_recognition(cls)
 	pan_descriptor_require_recognition(cls)
 	navigation_descriptor_require_ui(cls)
+	av_player_require_playback(cls)
 	ns_keyed_archiver_require_class(cls)
 	ns_operation_require_class(cls)
 	ns_invocation_require_class(cls)

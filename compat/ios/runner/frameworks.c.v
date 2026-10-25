@@ -191,6 +191,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		if address := iosurface_symbol(symbol) { return address }
 	}
 	if library == '/System/Library/Frameworks/AVFoundation.framework/AVFoundation' {
+		if address := av_player_symbol(symbol) { return address }
 		if address := capture_discovery_symbol(symbol) { return address }
 		if address := capture_audio_symbol(symbol) { return address }
 		if address := avfoundation_constant_symbol(symbol) { return address }

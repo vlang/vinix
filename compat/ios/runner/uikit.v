@@ -135,6 +135,13 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if navigation_descriptor_unsupported(selector) {
 		navigation_descriptor_require_ui(if object in ios_runtime.classes { object } else { read64(object) })
 	}
+	if selector == 'superclass' && object in ios_runtime.classes && av_player_family(object) {
+		frame.x[0] = objc_class_parent(object)
+		return true
+	}
+	if av_player_unsupported(selector) {
+		av_player_require_playback(if object in ios_runtime.classes { object } else { read64(object) })
+	}
 	if constant_integer_dispatch(object, selector, mut frame) { return true }
 	if dispatch_objc_dispatch(object,selector,mut frame) { return true }
 	if ns_pool_dispatch(object, selector, mut frame) { return true }

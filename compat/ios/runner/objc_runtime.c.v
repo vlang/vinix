@@ -168,6 +168,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := ns_set_types(info.name, info.meta, selector) { return types }
 	if types := value_types(info.name, info.meta, selector) { return types }
 	if info.name == 'NSMutableDictionary' && !info.meta && selector == 'setObject:forKey:' { return 'v32@0:8@16@24' }
+	if av_player_name(info.name) && selector == 'superclass' { return '#16@0:8' }
 	if info.name != 'NSObject' { return none }
 	return match selector {
 		'init', 'copy', 'retain', 'autorelease', 'self' { '@16@0:8' }
@@ -193,6 +194,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if current == 0 { return 0 }
 		info := ios_runtime.classes[current] or { return 0 }
 		if method := info.method_info[name] { return u64(method) }
+		if av_player_name(info.name) && av_player_unsupported(name) { return 0 }
 		if info.name in ['UITextPosition', 'UITextRange']! && text_input_unsupported(name) { return 0 }
 		if info.name == 'WKSnapshotConfiguration' && snapshot_configuration_unsupported(name) { return 0 }
 		if info.name == 'GKMatchRequest' && match_request_unsupported(name) { return 0 }
@@ -444,6 +446,9 @@ fn objc_set_class(object u64, cls u64) u64 {
 	}
 	if pan_descriptor_family(cls) || pan_descriptor_family(obj_header(object).allocation_cls) {
 		panic('iOS: changing pan gesture storage isa is not implemented')
+	}
+	if av_player_family(cls) || av_player_family(obj_header(object).allocation_cls) {
+		panic('iOS: changing AVFoundation playback storage isa is not implemented')
 	}
 	if navigation_descriptor_family(cls) || navigation_descriptor_family(obj_header(object).allocation_cls) {
 		panic('iOS: changing navigation controller storage isa is not implemented')

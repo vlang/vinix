@@ -603,11 +603,14 @@ fn objc_start() {
         'UIScreenEdgePanGestureRecognizer', 'UIFeedbackGenerator', 'UINotificationFeedbackGenerator', 'UISelectionFeedbackGenerator', 'UIImpactFeedbackGenerator', 'CADisplayLink',
 		'UIAccessibilityElement',
         'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',
+        'AVAsset', 'AVURLAsset', 'AVPlayer', 'AVPlayerItem', 'AVPlayerItemOutput', 'AVPlayerItemLegibleOutput', 'AVPlayerItemVideoOutput',
         'AVAudioSession', 'AVAudioApplication', 'DCAppAttestService', 'AVCaptureDeviceDiscoverySession', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession', 'AVCaptureOutput', 'AVCaptureAudioDataOutput',
         'AVCaptureVideoDataOutput', 'AVCaptureVideoPreviewLayer', 'PHPhotoLibrary',
 		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGFont', 'VinixReachability', 'VinixNWPath', 'VinixNWInterface', 'VinixNWPathMonitor', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider', 'VinixSecCertificate', 'VinixSecKey', 'VinixSecPolicy', 'VinixSecTrust', 'VinixCFDate', 'VinixCFError', 'VinixCFUUID'] {
 		parent := match name {
 			'NSObject' { u64(0) }
+			'AVURLAsset' { ios_runtime.names['AVAsset'] }
+			'AVPlayerItemLegibleOutput', 'AVPlayerItemVideoOutput' { ios_runtime.names['AVPlayerItemOutput'] }
 			'NSURLSessionDownloadTask', 'NSURLSessionDataTask' { ios_runtime.names['NSURLSessionTask'] }
 			'NSURLSessionUploadTask' { ios_runtime.names['NSURLSessionDataTask'] }
 			'OS_dispatch_object' { ios_runtime.names['OS_object'] }
@@ -892,6 +895,7 @@ fn objc_allocate(cls u64) u64 {
 	pinch_descriptor_require_recognition(cls)
 	pan_descriptor_require_recognition(cls)
 	navigation_descriptor_require_ui(cls)
+	av_player_require_playback(cls)
 	ns_keyed_archiver_require_class(cls)
 	ns_operation_require_class(cls)
 	ns_lock_require_class(cls)
@@ -1229,6 +1233,12 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if address := av_player_symbol(symbol) {
+		if library != '/System/Library/Frameworks/AVFoundation.framework/AVFoundation' {
+			return error('iOS: AVFoundation playback class import requires AVFoundation.framework')
+		}
+		return address
+	}
 	if symbol in ['_OBJC_CLASS_$_WKSnapshotConfiguration', '_OBJC_METACLASS_$_WKSnapshotConfiguration']! {
 		if library != '/System/Library/Frameworks/WebKit.framework/WebKit' { return error('iOS: WKSnapshotConfiguration class import requires WebKit.framework') }
 		cls := ios_runtime.names['WKSnapshotConfiguration']
