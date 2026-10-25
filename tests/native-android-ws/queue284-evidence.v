@@ -20,6 +20,7 @@ fn C.CC_SHA256_Update(voidptr, voidptr, u32) i32
 fn C.CC_SHA256_Final(&u8, voidptr) i32
 
 const compound = 'build/android-maps/compound284'
+const prepared_root = '/Users/alex/.local/state/vinix/android/compound284-2026-10-25'
 const same_jar = '92b069b1dbb31b08960d00d4f33f84b068a3adf53af9339f2ef3c1a6478f0618'
 const baseline_native = '5fe27a87c179b97121c368f417936ceebb75752c4a4204b937312ee28da531ca'
 const archive276 = '/Users/alex/.local/state/vinix/android/compound276-2026-10-24'
@@ -32,7 +33,7 @@ const queue_source = 'ff4bb8c0657a240d47bf6164879a02e6db994aa74ad5d160c53b046d20
 const runtime_source = '4a55617a8e2f2013c6ac51c29e8c3919a53bc269b34d4b46dffdfdc5ab17ed94'
 const compiler_path = 'build/android-maps/queue284-tools/v_old276'
 const compiler_pin = '109a0bad877cf42cd19382a87d3e3d62e9c153e3d74a566b2b3e650a1aec318e'
-const tool_root = '/Users/alex/.local/state/vinix/android/queue284-evidence-tool-fast4-2026-10-25'
+const tool_root = '/Users/alex/.local/state/vinix/android/queue284-evidence-tool-fast5-2026-10-25'
 const pass_markers = ['BOOTSTRAP-QUEUE-PUMP-PASS', 'BOOTSTRAP-QUEUE-PUMP-COMPLETE-PASS', 'BOOTSTRAP-READY']
 const jar_path = 'opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/api-impl.jar'
 const native_path = 'opt/vinix-android-aarch64/usr/lib/art/libvinix-android-native.so'
@@ -476,18 +477,10 @@ fn verify_runs(root string) ! {
 
 fn verify(root string) ! { verify_inputs(root)!; verify_references(root)!; verify_sources(root + '/prelaunch')!; verify_runs(root)! }
 
-fn run_pair(base string, mode string) ! {
+// Exercise the same real launch metadata without creating a run or guest.
+fn run_metadata(base string, mode string) !map[string]json2.Any {
 	assert base == compound && mode in ['baseline', 'fixed']
 	assert !os.exists(base + '/run-' + mode + '/results.json')
-	tool := base + '/run-tool'
-	if !os.exists(tool) {
-		os.mkdir_all(tool)!
-		os.cp(@FILE, tool + '/queue284-evidence.v')!
-		os.cp(os.executable(), tool + '/queue284-evidence')!
-	}
-	assert hash(@FILE)! == hash(tool + '/queue284-evidence.v')!
-	assert hash(os.executable())! == hash(tool + '/queue284-evidence')!
-	root := object(base + '/attempt.json')!['audit']!.str()
 	argv := [base + '/suite', base + '/' + mode + '.json']
 	config := object(argv[1])!
 	frozen := pins(base + '/frozen-inputs.json')!
@@ -497,8 +490,23 @@ fn run_pair(base string, mode string) ! {
 		assert hash(path)! == frozen[path]!, 'same retained284 APK inspection tool: ' + field
 		inspection_tools[path] = frozen[path]!
 	}
-	mut receipt := {'argv': json2.Any(argv), 'started_utc': json2.Any(time.utc().str()), 'suite_sha256': json2.Any(hash(argv[0])!), 'config_sha256': json2.Any(hash(argv[1])!), 'external_prelaunch_inventory_sha256': json2.Any(hash(root + '/prelaunch-sha256.json')!), 'runner_sha256': json2.Any(hash(os.executable())!), 'runner_source_sha256': json2.Any(hash(@FILE)!)}
+	mut receipt := {'argv': json2.Any(argv), 'started_utc': json2.Any(time.utc().str()), 'suite_sha256': json2.Any(hash(argv[0])!), 'config_sha256': json2.Any(hash(argv[1])!), 'external_prelaunch_inventory_sha256': json2.Any(hash(prepared_root + '/prelaunch-sha256.json')!), 'runner_sha256': json2.Any(hash(os.executable())!), 'runner_source_sha256': json2.Any(hash(@FILE)!)}
 	receipt['inspection_tool_sha256'] = inspection_tools
+	return receipt
+}
+
+fn run_pair(base string, mode string) ! {
+	mut receipt := run_metadata(base, mode)!
+	argv := receipt['argv']!.as_array().map(it.str())
+	inspection_tools := receipt['inspection_tool_sha256']!.as_map()
+	tool := base + '/run-tool'
+	if !os.exists(tool) {
+		os.mkdir_all(tool)!
+		os.cp(@FILE, tool + '/queue284-evidence.v')!
+		os.cp(os.executable(), tool + '/queue284-evidence')!
+	}
+	assert hash(@FILE)! == hash(tool + '/queue284-evidence.v')!
+	assert hash(os.executable())! == hash(tool + '/queue284-evidence')!
 	prefix := base + '/run-' + mode
 	os.write_file(prefix + '-before.json', json2.encode(receipt, prettify: true) + '\n')!
 	r := os.exec(argv)
@@ -506,7 +514,7 @@ fn run_pair(base string, mode string) ! {
 	receipt['completed_utc'] = time.utc().str()
 	receipt['exit_code'] = json2.Any(r.exit_code)
 	receipt['stdout_sha256'] = hash(prefix + '.log')!
-	for key, path in {'suite_sha256': argv[0], 'config_sha256': argv[1], 'external_prelaunch_inventory_sha256': root + '/prelaunch-sha256.json', 'runner_sha256': tool + '/queue284-evidence', 'runner_source_sha256': tool + '/queue284-evidence.v'} { assert receipt[key]!.str() == hash(path)!, key }
+	for key, path in {'suite_sha256': argv[0], 'config_sha256': argv[1], 'external_prelaunch_inventory_sha256': prepared_root + '/prelaunch-sha256.json', 'runner_sha256': tool + '/queue284-evidence', 'runner_source_sha256': tool + '/queue284-evidence.v'} { assert receipt[key]!.str() == hash(path)!, key }
 	for path, digest in inspection_tools { assert hash(path)! == digest.str(), 'APK inspection tool unchanged through run: ' + path }
 	if r.exit_code == 0 {
 		receipt['results_sha256'] = hash(prefix + '/results.json')!
@@ -714,6 +722,7 @@ fn main() {
 	$if prod { panic('requires assertions; compile without -prod') }
 	assert os.args.len >= 2
 	if os.args[1] == '--self-test' { assert os.args.len == 2; self_test()!; return }
+	if os.args[1] == '--run-metadata' { assert os.args.len == 4; println(json2.encode(run_metadata(os.args[2], os.args[3])!, prettify: true)); return }
 	if os.args[1] == '--hash-self-test' { assert os.args.len == 3; hash_self_test(os.args[2])!; return }
 	if os.args[1] == '--hash-pin' { assert os.args.len == 4 && hash(os.args[2])! == os.args[3]; println('QUEUE284 HASH PIN PASS ' + os.args[3]); return }
 	if os.args[1] == 'compile' { assert os.args.len == 2; compile_checker()!; return }
