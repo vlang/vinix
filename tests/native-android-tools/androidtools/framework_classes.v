@@ -64,6 +64,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_async_trace(smali)!
  framework_main_executor(smali)!
  framework_permission_listeners(smali)!
+ framework_permission_info(smali)!
  framework_activity_permissions(smali)!
  framework_application_uid(smali)!
  framework_appops(smali)!
