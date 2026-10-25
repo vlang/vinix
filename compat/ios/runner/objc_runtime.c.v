@@ -107,6 +107,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := game_keyboard_types(info.name, info.meta, selector) { return types }
 	if types := game_controller_types(info.name, info.meta, selector) { return types }
 	if types := app_attest_types(info.name, info.meta, selector) { return types }
+	if types := capture_discovery_types(info.name, info.meta, selector) { return types }
 	if types := audio_application_types(info.name, info.meta, selector) { return types }
 	if types := storyboard_types(info.name, info.meta, selector) { return types }
 	if types := haptic_dynamic_parameter_types(info.name, info.meta, selector) { return types }
@@ -202,6 +203,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name == 'CHHapticEvent' && haptic_event_unsupported(name) { return 0 }
 		if info.name == 'GCColor' && gc_color_unsupported(name) { return 0 }
 		if info.name == 'DCAppAttestService' && app_attest_unsupported(name) { return 0 }
+		if info.name == 'AVCaptureDeviceDiscoverySession' && capture_discovery_unsupported(name) { return 0 }
 		if info.name == 'AVAudioApplication' && audio_application_unsupported(name) { return 0 }
 		if info.name == 'UIStoryboard' && storyboard_unsupported(name) { return 0 }
 		if info.name == 'UINavigationController' && navigation_descriptor_unsupported(name) { return 0 }
@@ -412,6 +414,9 @@ fn objc_set_class(object u64, cls u64) u64 {
 	}
 	if app_attest_family(cls) || app_attest_family(obj_header(object).allocation_cls) {
 		panic('iOS: changing App Attest storage isa is not implemented')
+	}
+	if capture_discovery_family(cls) || capture_discovery_family(obj_header(object).allocation_cls) {
+		panic('iOS: changing capture discovery storage isa is not implemented')
 	}
 	if audio_application_family(cls) || audio_application_family(obj_header(object).allocation_cls) {
 		panic('iOS: changing audio application storage isa is not implemented')

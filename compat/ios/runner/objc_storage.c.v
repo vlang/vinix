@@ -53,6 +53,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	url_session_task_require_class(cls)
 	game_controller_require_discovery(cls)
 	app_attest_install(cls, caller_storage)
+	capture_discovery_install(cls, caller_storage)
 	audio_application_install(cls, caller_storage)
 	if storyboard_family(cls) && (caller_storage || cls != ios_runtime.names['UIStoryboard']) {
 		panic('iOS: UIStoryboard requires storyboardWithName:bundle:')

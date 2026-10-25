@@ -587,7 +587,7 @@ fn objc_start() {
         'UIScreenEdgePanGestureRecognizer', 'UIFeedbackGenerator', 'UINotificationFeedbackGenerator', 'UISelectionFeedbackGenerator', 'UIImpactFeedbackGenerator', 'CADisplayLink',
 		'UIAccessibilityElement',
         'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',
-        'AVAudioSession', 'AVAudioApplication', 'DCAppAttestService', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession',
+        'AVAudioSession', 'AVAudioApplication', 'DCAppAttestService', 'AVCaptureDeviceDiscoverySession', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession',
         'AVCaptureVideoDataOutput', 'AVCaptureVideoPreviewLayer', 'PHPhotoLibrary',
 		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGFont', 'VinixReachability', 'VinixNWPath', 'VinixNWInterface', 'VinixNWPathMonitor', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider', 'VinixSecCertificate', 'VinixSecKey', 'VinixSecPolicy', 'VinixSecTrust', 'VinixCFDate', 'VinixCFError', 'VinixCFUUID'] {
 		parent := match name {
@@ -696,6 +696,7 @@ fn objc_start() {
 			'GCMouse' { u32(40) }
 			'GCColor', 'CHHapticEventParameter', 'AVAudioApplication' { u32(24) }
 			'DCAppAttestService' { u32(16) } // Catalyst size; opaque shim storage.
+			'AVCaptureDeviceDiscoverySession' { u32(48) } // Catalyst size; opaque shim storage.
 			'WKSnapshotConfiguration' { u32(56) }
 			'CHHapticDynamicParameter' { u32(32) }
 			'CHHapticEvent' { u32(48) }
@@ -865,6 +866,7 @@ fn objc_allocate(cls u64) u64 {
 	url_session_task_require_class(cls)
 	game_controller_require_discovery(cls)
 	app_attest_require_factory(cls)
+	capture_discovery_require_factory(cls)
 	audio_application_require_factory(cls)
 	storyboard_require_factory(cls)
 	sort_descriptor_require_class(cls)
@@ -1253,6 +1255,10 @@ fn runtime_symbol(library string, symbol string) !u64 {
 	if symbol in ['_OBJC_CLASS_$_UIStoryboard', '_OBJC_METACLASS_$_UIStoryboard']!
 		&& library != '/System/Library/Frameworks/UIKit.framework/UIKit' {
 		return error('iOS: storyboard import requires UIKit.framework')
+	}
+	if symbol in ['_OBJC_CLASS_$_AVCaptureDeviceDiscoverySession', '_OBJC_METACLASS_$_AVCaptureDeviceDiscoverySession']!
+		&& library != '/System/Library/Frameworks/AVFoundation.framework/AVFoundation' {
+		return error('iOS: capture discovery import requires AVFoundation.framework')
 	}
 	if symbol in ['_OBJC_CLASS_$_DCAppAttestService', '_OBJC_METACLASS_$_DCAppAttestService']!
 		&& library != '/System/Library/Frameworks/DeviceCheck.framework/DeviceCheck' {
