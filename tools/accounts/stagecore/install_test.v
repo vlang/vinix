@@ -2,6 +2,7 @@
 module stagecore
 
 import os
+import accountcore
 
 fn fixture() !string {
 	base := os.join_path(os.temp_dir(), 'vinix-account-stage-${os.getpid()}')
@@ -148,4 +149,29 @@ fn test_account_staging_preserves_imported_shadow_with_private_permissions() {
 	assert os.read_file(shadow)! == 'root:*:19000:0:99999:7:::\n'
 	assert os.lstat(shadow)!.mode & 0o777 == 0o600
 	assert os.ls(base + '/image/etc')! == ['shadow']
+}
+
+fn test_compact_account_defaults_bootstrap_and_preserve_existing_records() {
+	base := fixture()!
+	defer { os.rmdir_all(base) or {}; unsafe { base.free() } }
+	mut installer := open(base + '/image')!
+	defer { installer.close() }
+	defaults := os.dir(os.dir(@FILE)) + '/defaults'
+	installer.prepare_accounts(defaults)!
+	store := accountcore.Store{ etc: base + '/image/etc', owned: false }
+	mut db := store.load()!
+	defer { db.close() }
+	db.ensure_system_accounts()!
+	assert (db.user_by_uid(0) or { panic('missing root account') }).name == 'root'
+	assert os.stat(store.shadow_path())!.mode & 0o777 == 0o600
+	passwd := os.read_file(store.passwd_path())! + 'daemon:x:1:1:daemon:/sbin:/sbin/nologin\n'
+	group := os.read_file(store.group_path())! + 'daemon:x:1:\n'
+	os.write_file(store.passwd_path(), passwd)!
+	os.write_file(store.group_path(), group)!
+	os.chmod(store.shadow_path(), 0o640)!
+	installer.prepare_accounts(defaults)!
+	assert os.read_file(store.passwd_path())! == passwd
+	assert os.read_file(store.group_path())! == group
+	assert os.read_file(store.shadow_path())! == os.read_file(defaults + '/shadow')!
+	assert os.stat(store.shadow_path())!.mode & 0o777 == 0o600
 }

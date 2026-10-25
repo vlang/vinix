@@ -28,6 +28,9 @@ fn build_input_paths(repository string, v string, compiler string) !map[string]s
 	for name in os.ls(repository + '/tools/accounts/actions')! {
 		paths['action/' + name] = repository + '/tools/accounts/actions/' + name
 	}
+	for name in ['passwd', 'group', 'shadow'] {
+		paths['default/' + name] = repository + '/tools/accounts/defaults/' + name
+	}
 	return paths
 }
 
@@ -84,18 +87,12 @@ fn stage() ! {
 	}
 	mut installer := stagecore.open(staging)!
 	defer { installer.close() }
-	// Alpine ships shadow as 0640, while our account store requires every
-	// password record to be private to its owner. Preserve the imported records
-	// through the same checked atomic publication used for account executables.
-	shadow := staging + '/etc/shadow'
-	if os.exists(shadow) || os.is_link(shadow) {
-		installer.put(shadow, 'etc/shadow', 0o600)!
-	}
+	repository := os.dir(os.dir(os.dir(@FILE)))
+	installer.prepare_accounts(repository + '/tools/accounts/defaults')!
 	if cc.len == 0 { cc = [architecture + '-linux-musl-gcc', '-w', '-Wno-error=incompatible-pointer-types'] }
 	compiler := os.find_abs_path_of_executable(cc[0])!
 	configured_v := os.getenv('V')
 	v := os.find_abs_path_of_executable(if configured_v == '' { 'v' } else { configured_v })!
-	repository := os.dir(os.dir(os.dir(@FILE)))
 	work := os.join_path(os.temp_dir(), 'vinix-accounts-${os.getpid()}')
 	os.mkdir(work, mode: 0o700)!
 	defer { os.rmdir_all(work) or {} }
