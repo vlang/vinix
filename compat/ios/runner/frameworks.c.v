@@ -56,6 +56,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		if address := swiftui_text_localized_symbol(symbol) { return address }
 	}
 	if library == '/System/Library/Frameworks/StoreKit.framework/StoreKit' {
+		if address := storekit_purchase_symbol(symbol) { return address }
 		if address := storekit_constant_symbol(symbol) { return address }
 		if address := storefront_symbol(symbol) { return address }
 		if address := refund_symbol(symbol) { return address }

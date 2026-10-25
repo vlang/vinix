@@ -28,6 +28,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	pan_descriptor_require_recognition(cls)
 	navigation_descriptor_require_ui(cls)
 	av_player_require_playback(cls)
+	storekit_purchase_require_storage(cls)
 	ns_proxy_require_forwarding(cls)
 	ns_keyed_archiver_require_class(cls)
 	ns_operation_require_class(cls)

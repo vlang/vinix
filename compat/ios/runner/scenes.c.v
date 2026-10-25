@@ -39,6 +39,7 @@ fn objc_responds(object u64, selector &char) bool {
 		|| text_input_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| navigation_descriptor_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| av_player_family(if object in ios_runtime.classes { object } else { read64(object) })
+		|| storekit_purchase_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| ns_proxy_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| pan_descriptor_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| pinch_descriptor_family(if object in ios_runtime.classes { object } else { read64(object) })

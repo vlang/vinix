@@ -604,11 +604,14 @@ fn objc_start() {
 		'UIAccessibilityElement',
         'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',
         'AVAsset', 'AVURLAsset', 'AVPlayer', 'AVPlayerItem', 'AVPlayerItemOutput', 'AVPlayerItemLegibleOutput', 'AVPlayerItemVideoOutput',
+        'SKPaymentQueue', 'SKPayment', 'SKMutablePayment', 'SKRequest', 'SKReceiptRefreshRequest', 'SKProductsRequest',
         'AVAudioSession', 'AVAudioApplication', 'DCAppAttestService', 'AVCaptureDeviceDiscoverySession', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession', 'AVCaptureOutput', 'AVCaptureAudioDataOutput',
         'AVCaptureVideoDataOutput', 'AVCaptureVideoPreviewLayer', 'PHPhotoLibrary',
 		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGFont', 'VinixReachability', 'VinixNWPath', 'VinixNWInterface', 'VinixNWPathMonitor', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider', 'VinixSecCertificate', 'VinixSecKey', 'VinixSecPolicy', 'VinixSecTrust', 'VinixCFDate', 'VinixCFError', 'VinixCFUUID'] {
 		parent := match name {
 			'NSObject', 'NSProxy' { u64(0) }
+			'SKMutablePayment' { ios_runtime.names['SKPayment'] }
+			'SKReceiptRefreshRequest', 'SKProductsRequest' { ios_runtime.names['SKRequest'] }
 			'AVURLAsset' { ios_runtime.names['AVAsset'] }
 			'AVPlayerItemLegibleOutput', 'AVPlayerItemVideoOutput' { ios_runtime.names['AVPlayerItemOutput'] }
 			'NSURLSessionDownloadTask', 'NSURLSessionDataTask' { ios_runtime.names['NSURLSessionTask'] }
@@ -898,6 +901,7 @@ fn objc_allocate(cls u64) u64 {
 	pan_descriptor_require_recognition(cls)
 	navigation_descriptor_require_ui(cls)
 	av_player_require_playback(cls)
+	storekit_purchase_require_storage(cls)
 	ns_proxy_require_forwarding(cls)
 	ns_keyed_archiver_require_class(cls)
 	ns_operation_require_class(cls)
@@ -1246,6 +1250,12 @@ fn runtime_symbol(library string, symbol string) !u64 {
 	if address := av_player_symbol(symbol) {
 		if library != '/System/Library/Frameworks/AVFoundation.framework/AVFoundation' {
 			return error('iOS: AVFoundation playback class import requires AVFoundation.framework')
+		}
+		return address
+	}
+	if address := storekit_purchase_symbol(symbol) {
+		if library != '/System/Library/Frameworks/StoreKit.framework/StoreKit' {
+			return error('iOS: StoreKit payment and request class import requires StoreKit.framework')
 		}
 		return address
 	}
