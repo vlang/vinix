@@ -1910,6 +1910,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Seventeen maintained suites pass on each architecture; earlier intermittent
   failures remain unresolved. See [the live-pointer qualification](docs/linux-alternate-stack-pointer.md).
 
+- [x] Save configured alternate-stack base, flags and size in native signal
+  frame uc_stack records. Outer/nested handler probes pass 272 checks on both
+  production architectures and Linux; originals fail 48 on AArch64 and four
+  on x86-64. Maintained suites pass 18/18 on AArch64 and 17/18 on x86-64;
+  its randomsignal failure and passing identical replay remain unresolved.
+  Repeated nesting and handler-modified stack restoration remain open. See [the signal-frame qualification](docs/linux-alternate-stack-frame.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

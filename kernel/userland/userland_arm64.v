@@ -588,6 +588,10 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 			// its 128 bytes are followed by eight bytes of alignment before
 			// mcontext at 176. The reserved extension records are 16-byte
 			// aligned after pstate.
+			// uc_stack saves the configured stack, not the live SS_ONSTACK flag.
+			*&u64(uc_base + 16) = t.sigaltstack_sp
+			*&u32(uc_base + 24) = if t.sigaltstack_size == 0 { u32(ss_disable) } else { u32(0) }
+			*&u64(uc_base + 32) = t.sigaltstack_size
 			*&u64(uc_base + 40) = previous_mask
 			*&u64(uc_base + 176) = fault_address
 			C.memcpy(voidptr(uc_base + 184), context, 31 * sizeof(u64))

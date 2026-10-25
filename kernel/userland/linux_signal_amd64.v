@@ -142,7 +142,7 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	// uc_flags and uc_link stay 0. uc_stack describes the alternate stack as
 	// it was when the signal arrived.
 	put_u64(mut buf, frame_ucontext + 16, t.sigaltstack_sp)
-	put_u32(mut buf, frame_ucontext + 24, altstack_flags(t, context.rsp))
+	put_u32(mut buf, frame_ucontext + 24, altstack_flags(t))
 	put_u64(mut buf, frame_ucontext + 32, t.sigaltstack_size)
 	mc := frame_mcontext
 	registers := [context.r8, context.r9, context.r10, context.r11, context.r12, context.r13,
@@ -310,11 +310,9 @@ fn on_sigaltstack(t &proc.Thread, sp u64) bool {
 	return sp > t.sigaltstack_sp && sp - t.sigaltstack_sp <= t.sigaltstack_size
 }
 
-fn altstack_flags(t &proc.Thread, sp u64) u32 {
-	if t.sigaltstack_size == 0 {
-		return u32(ss_disable)
-	}
-	return if on_sigaltstack(t, sp) { u32(ss_onstack) } else { u32(0) }
+// Signal frames save the configured flags, even when interrupted on this stack.
+fn altstack_flags(t &proc.Thread) u32 {
+	return if t.sigaltstack_size == 0 { u32(ss_disable) } else { u32(0) }
 }
 
 // Whether the thread is running on its alternate signal stack now, for

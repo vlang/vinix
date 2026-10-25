@@ -2616,3 +2616,19 @@ suites pass on each architecture; earlier intermittent failures remain open.
 `altstacksp-evidence.v` without `-prod`, run `self-test` (eight positive and
 33 negative controls), then `check` on the complete bundle in
 [the qualification](../../docs/linux-alternate-stack-pointer.md).
+
+The `altstackframe` case inspects uc_stack in outer and nested SA_SIGINFO
+handlers across enabled/disabled stacks and both SA_ONSTACK flags. Root and
+UID 1000/GID 2000 cohorts check configured base/flags/size, stack placement,
+live queries, post-return state and guards. Identical musl ELFs pass 272 checks
+on both production architectures and Linux references; originals fail 48 on
+AArch64 and four on x86-64. Maintained suites pass 18/18 on AArch64 and 17/18
+on x86-64; randomsignal fails there, then passes with the same ELF and kernel.
+Both results are retained. Repeated nesting, handler-modified uc_stack
+restoration and intermittent failures remain open.
+
+`altstackframe-reference.v` accepts the same arguments as `sigwaitcopy-reference.v`;
+`--self-test` has two positive and nine negative controls. Compile
+`altstackframe-evidence.v` without `-prod`, run `self-test` (11 positive and
+46 negative controls), then `check` on the complete bundle in
+[the qualification](../../docs/linux-alternate-stack-frame.md).
