@@ -18947,9 +18947,22 @@ source revision and complete external evidence. Native iOS layout parity,
 Fortnite initialization, rendering, login and gameplay remain unverified.
 Advertising work remains skipped.
 
+The AVAudioApplication checkpoint adds scoped AVFAudio class and metaclass
+imports, a 24-byte singleton, denied record-permission queries, synchronous
+false permission completions and an unmuted input query. Native macOS inspection,
+both sanitizer host runs and the focused ARM64 guest fixture pass, including
+concurrent readers, callback reentry, two drained runtime cycles and 19 explicit
+rejection cases. Microphone capture, permission UI, injection and mute setters
+remain unsupported. A fresh Fortnite probe passes AVAudioApplication and stops
+at `_OBJC_CLASS_$_UIStoryboard` during linking, before application entry. The
+[AVAudioApplication checkpoint](../tests/ios/audio-application-checkpoint-20261025.md)
+records the source revision and complete external evidence. Native iOS layout
+parity, Fortnite initialization, rendering, login and gameplay remain unverified.
+Advertising work remains skipped.
+
 The import audit measurements below belong to the bundle-resource milestone;
-they were not rerun for the startup, feedback, task, controller, gamepad, color
-or mouse checkpoints and do not execute app code.
+they were not rerun for the startup, feedback, task, controller, gamepad, color,
+mouse or audio application checkpoints and do not execute app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
