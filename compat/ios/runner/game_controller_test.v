@@ -9,6 +9,7 @@ $if macos {
 fn C.dlopen(&char, int) voidptr
 fn C.dlsym(voidptr, &char) voidptr
 fn C.objc_getClass(&char) voidptr
+fn C.objc_getMetaClass(&char) voidptr
 fn C.sel_registerName(&char) voidptr
 fn C.class_getInstanceSize(voidptr) usize
 fn C.class_getSuperclass(voidptr) voidptr
@@ -152,4 +153,90 @@ fn test_game_controller_rejections() {
 	}
 	objc_stop(); assert ios_runtime.live == 0
 	println('IOS-GAME-CONTROLLER-REJECT: ten construction, caller storage, subclass, copying, coding, factory and wireless discovery cases fail explicitly')
+}
+
+fn test_gamepad_native_hierarchy() {
+	$if macos {
+		assert C.dlopen(c'/System/Library/Frameworks/GameController.framework/GameController', 2) != unsafe { nil }
+		for i, name in ['GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad']! {
+			cls := C.objc_getClass(name.str)
+			assert cls != unsafe { nil } && C.class_getInstanceSize(cls) == [usize(680), 872, 896]![i]
+			parent := ['NSObject', 'GCPhysicalInputProfile', 'GCExtendedGamepad']![i]
+			assert C.class_getSuperclass(cls) == C.objc_getClass(parent.str)
+			assert C.dlsym(unsafe { voidptr(-2) }, ('OBJC_CLASS_$_' + name).str) == cls
+			assert C.dlsym(unsafe { voidptr(-2) }, ('OBJC_METACLASS_$_' + name).str) == C.objc_getMetaClass(name.str)
+		}
+		println('IOS-GAMEPAD-NATIVE: physical, extended and DualShock class imports, superclass links and 680/872/896-byte layouts')
+	}
+}
+
+fn test_gamepad_runtime_hierarchy() {
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push()
+		library := '/System/Library/Frameworks/GameController.framework/GameController'
+		for i, name in ['GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad']! {
+			cls := ios_runtime.names[name]; api := controller_api(cls)
+			parent := ios_runtime.names[['NSObject', 'GCPhysicalInputProfile', 'GCExtendedGamepad']![i]]
+			assert gamepad_family(cls) && !game_controller_family(cls)
+			assert objc_class_size(cls) == [u32(680), 872, 896]![i]
+			assert objc_class_parent(cls) == parent && objc_class_parent(read64(cls)) == read64(parent)
+			assert ctext(u64(objc_class_name(cls))) == name
+			for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_']! {
+				symbol := prefix + name
+				assert runtime_symbol(library, symbol)! == if prefix == '_OBJC_CLASS_$_' { cls } else { read64(cls) }
+				for wrong in ['/System/Library/Frameworks/Foundation.framework/Foundation', '/System/Library/Frameworks/UIKit.framework/UIKit', '/usr/lib/libobjc.A.dylib']! {
+					if _ := runtime_symbol(wrong, symbol) { assert false }
+				}
+			}
+			assert api.msg(cls, c'class', 0) == cls
+			assert api.msg(cls, c'respondsToSelector:', u64(c'class')) == 1
+			signature := api.msg(cls, c'methodSignatureForSelector:', u64(c'class'))
+			assert signature != 0 && ctext(api.msg(signature, c'methodReturnType', 0)) == '#'
+			for selector in [c'alloc', c'allocWithZone:', c'new', c'init', c'copy', c'copyWithZone:', c'mutableCopy', c'mutableCopyWithZone:', c'initWithCoder:', c'encodeWithCoder:', c'supportsSecureCoding', c'buttonA', c'touchpadButton', c'physicalInputProfile', c'controllers']! {
+				assert !objc_responds(cls, selector)
+				assert objc_class_method(cls, u64(selector)) == 0 && objc_instance_method(cls, u64(selector)) == 0
+				assert api.msg(cls, c'methodSignatureForSelector:', u64(selector)) == 0
+				assert api.msg(cls, c'instanceMethodSignatureForSelector:', u64(selector)) == 0
+			}
+			sub := objc_allocate_class(cls, ('Vinix' + name).str, 0); objc_register_class(sub)
+			assert gamepad_family(sub) && objc_class_size(sub) == objc_class_size(cls)
+			assert !objc_responds(sub, c'copy')
+			assert objc_add_method(read64(sub), u64(c'copy'), u64(unsafe { voidptr(controller_override) }), c'@16@0:8')
+			assert objc_responds(sub, c'copy') && api.msg(sub, c'copy', 0) == sub
+		}
+		if _ := game_controller_symbol('_OBJC_CLASS_$_GCUnknownGamepad') { assert false }
+		if _ := game_controller_symbol('_OBJC_METACLASS_$_GCUnknownGamepad') { assert false }
+		objc_pool_pop(pool); objc_stop()
+		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0 && ios_runtime.block_refs.len == 0
+	}
+	println('IOS-GAMEPAD: three scoped class/metaclass imports, inherited metadata, honest method lookup, subclass overrides and two drained runtimes')
+}
+
+fn test_gamepad_rejections() {
+	objc_start()
+	for name in ['GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad']! {
+		api := controller_api(ios_runtime.names[name])
+		for mode in ['alloc', 'new', 'allocate', 'caller', 'subclass', 'copy', 'initWithCoder:', 'supportsSecureCoding', 'touchpadButton']! {
+			mut fds := [2]i32{}; assert C.pipe(unsafe { &fds[0] }) == 0
+			pid := C.fork(); assert pid >= 0
+			if pid == 0 {
+				C.close(fds[0]); assert C.dup2(fds[1], 2) == 2; C.close(fds[1])
+				match mode {
+					'allocate' { objc_allocate(api.cls) }
+					'caller' { mut storage := [112]u64{}; objc_construct_instance(api.cls, u64(unsafe { &storage[0] })) }
+					'subclass' { sub := objc_allocate_class(api.cls, c'VinixUnimplementedGamepad', 0); objc_register_class(sub); objc_allocate(sub) }
+					else { api.msg(api.cls, mode.str, 0) }
+				}
+				C._exit(0)
+			}
+			C.close(fds[1]); mut bytes := [16384]u8{}; mut length := 0
+			for { assert length < bytes.len; count := C.read(fds[0], unsafe { &bytes[length] }, usize(bytes.len - length)); if count == 0 { break }; if count < 0 && unsafe { *C.ios_errno_address() } == C.EINTR { continue }; assert count > 0; length += int(count) }
+			C.close(fds[0]); mut status := i32(0); assert C.ios_waitpid(pid, &status, 0) == pid && status == 256
+			output := unsafe { tos(&bytes[0], length) }
+			reason := if mode == 'touchpadButton' { 'unimplemented Objective-C method' } else { 'gamepad construction requires an implemented physical input profile' }
+			assert output.contains(reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output
+		}
+	}
+	objc_stop(); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
+	println('IOS-GAMEPAD-REJECT: 27 construction, caller storage, subclass, copying, coding and touchpad cases fail explicitly')
 }

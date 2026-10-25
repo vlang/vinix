@@ -45,7 +45,7 @@ fn objc_responds(object u64, selector &char) bool {
 		if ns_number_formatter_types('NSNumberFormatter', object in ios_runtime.classes, name) != none { return true }
 	}
 	formatter_cls := if object in ios_runtime.classes { object } else { read64(object) }
-	if game_controller_family(formatter_cls) {
+	if game_controller_family(formatter_cls) || gamepad_family(formatter_cls) {
 		return objc_instance_method(read64(object), u64(selector)) != 0
 	}
 	if ui_feedback_family(formatter_cls) {

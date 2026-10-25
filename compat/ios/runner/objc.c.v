@@ -564,7 +564,7 @@ fn objc_start() {
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSNumberFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'NSMapTable', 'CTTelephonyNetworkInfo', 'ASIdentifierManager', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
-		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
@@ -613,6 +613,8 @@ fn objc_start() {
             'UIScreenEdgePanGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
 			'UIWindowScene' { ios_runtime.names['UIScene'] }
 			'NSDateFormatter', 'NSNumberFormatter' { ios_runtime.names['NSFormatter'] }
+			'GCExtendedGamepad' { ios_runtime.names['GCPhysicalInputProfile'] }
+			'GCDualShockGamepad' { ios_runtime.names['GCExtendedGamepad'] }
 			'UIButton' { ios_runtime.names['UIControl'] }
 			'UIAccessibilityElement' { ios_runtime.names['UIResponder'] }
 			'NSMutableArray', 'NSConstantArray', 'WKNSArray' { ios_runtime.names['NSArray'] }
@@ -676,7 +678,10 @@ fn objc_start() {
 			'ASWebAuthenticationSession' { u32(136) }
 			'UIImageView' { u32(512) }
 			'GCKeyboard' { u32(32) }
-		'GCController' { u32(232) } // Measured host layout; physical profile construction is unavailable.
+			'GCController' { u32(232) } // Measured host layouts; physical profile construction is unavailable.
+			'GCPhysicalInputProfile' { u32(680) }
+			'GCExtendedGamepad' { u32(872) }
+			'GCDualShockGamepad' { u32(896) }
 			'NSFileManager' { u32(32) }
 			'NSProcessInfo' { u32(48) }
 			'NSDate', 'VinixCFDate', 'NSTimeZone', 'NSLocale', 'NSFormatter' { u32(8) }
@@ -1128,7 +1133,7 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
-	if (symbol in ['_OBJC_CLASS_$_GCController', '_OBJC_METACLASS_$_GCController']!
+	if (game_controller_class_name(symbol) != none
 		|| game_controller_constant_index(symbol) != none)
 		&& library != '/System/Library/Frameworks/GameController.framework/GameController' {
 		return error('iOS: controller import requires GameController.framework')

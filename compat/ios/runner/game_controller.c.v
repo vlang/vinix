@@ -3,6 +3,25 @@ module main
 
 // No physical controller transport exists in the desktop input protocol.
 // Discovery is accurate for that environment; creating profiles is unsupported.
+fn game_controller_class_name(symbol string) ?string {
+	name := if symbol.starts_with('_OBJC_CLASS_$_') { symbol.all_after('_OBJC_CLASS_$_') }
+		else if symbol.starts_with('_OBJC_METACLASS_$_') { symbol.all_after('_OBJC_METACLASS_$_') }
+		else { return none }
+	if name in ['GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad']! { return name }
+	return none
+}
+
+fn gamepad_family(cls u64) bool {
+	mut current := cls
+	for _ in 0 .. 128 {
+		info := ios_runtime.classes[current] or { return false }
+		if info.name == 'GCPhysicalInputProfile' { return true }
+		current = info.parent
+		if current == 0 { return false }
+	}
+	panic('iOS: cyclic gamepad superclass chain')
+}
+
 fn game_controller_family(cls u64) bool {
 	mut current := cls
 	for _ in 0 .. 128 {
@@ -20,6 +39,9 @@ fn game_controller_unsupported(selector string) bool {
 }
 
 fn game_controller_require_discovery(cls u64) {
+	if gamepad_family(cls) {
+		panic('iOS: gamepad construction requires an implemented physical input profile')
+	}
 	if game_controller_family(cls) {
 		panic('iOS: GCController construction requires an implemented physical input profile')
 	}
@@ -37,7 +59,12 @@ fn game_controller_types(name string, meta bool, selector string) ?string {
 
 fn game_controller_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	meta := object in ios_runtime.classes
-	if !game_controller_family(if meta { object } else { read64(object) }) { return false }
+	cls := if meta { object } else { read64(object) }
+	if gamepad_family(cls) {
+		if game_controller_unsupported(selector) { game_controller_require_discovery(cls) }
+		return false
+	}
+	if !game_controller_family(cls) { return false }
 	if game_controller_unsupported(selector) {
 		panic('iOS: GCController construction requires an implemented physical input profile')
 	}
@@ -73,9 +100,10 @@ fn game_controller_constant_index(symbol string) ?int {
 }
 
 fn game_controller_symbol(symbol string) ?u64 {
-	cls := ios_runtime.names['GCController']
-	if symbol == '_OBJC_CLASS_$_GCController' { return cls }
-	if symbol == '_OBJC_METACLASS_$_GCController' { return read64(cls) }
+	if name := game_controller_class_name(symbol) {
+		cls := ios_runtime.names[name]
+		return if symbol.starts_with('_OBJC_METACLASS_$_') { read64(cls) } else { cls }
+	}
 	index := game_controller_constant_index(symbol) or { return none }
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
