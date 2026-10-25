@@ -20,6 +20,7 @@ fn objc_association_copy(value u64) u64 {
 fn objc_copy_value(value u64, with_zone bool) u64 {
 	if is_block(value) { return block_copy(value) }
 	cls := read64(value)
+	if haptic_pattern_family(cls) { panic('iOS: unsupported CHHapticPattern method: copy') }
 	if !with_zone {
 		copy_imp := native_method(cls, 'copy')
 		if copy_imp != 0 {
