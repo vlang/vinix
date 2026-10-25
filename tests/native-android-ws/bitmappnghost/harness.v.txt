@@ -1,0 +1,227 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+@[translated]
+module main
+
+import compress.zlib
+import hash.adler32
+import hash.crc32
+
+#include <stdlib.h>
+
+type WsNewByteArray = fn (voidptr, i32) voidptr
+type WsByteRegion = fn (voidptr, voidptr, i32, i32, voidptr)
+
+__global (
+	allocation voidptr
+	allocation_attempts int
+	allocation_fails bool
+	new_fails bool
+	new_pending bool
+	copy_fails bool
+	new_calls int
+	copy_calls int
+	last_error string
+	java_bytes []u8
+)
+
+fn host_malloc(size usize) voidptr {
+	allocation_attempts++
+	if allocation_fails { return unsafe { nil } }
+	assert allocation == unsafe { nil }
+	allocation = unsafe { C.malloc(size) }
+	return allocation
+}
+
+fn host_free(p voidptr) {
+	assert allocation == p && p != unsafe { nil }
+	allocation = unsafe { nil }
+	unsafe { C.free(p) }
+}
+
+fn throw(_ voidptr, kind &u8, _ &u8) { last_error = unsafe { tos_clone(kind) } }
+fn pending(_ voidptr) bool { return last_error != '' }
+
+fn host_new(_ voidptr, size i32) voidptr {
+	assert last_error == ''
+	new_calls++
+	if new_fails || new_pending {
+		last_error = 'java/lang/OutOfMemoryError'
+		if new_fails { return unsafe { nil } }
+	}
+	java_bytes = []u8{len: int(size)}
+	return voidptr(usize(1))
+}
+
+fn host_copy(_ voidptr, array voidptr, start i32, length i32, bytes voidptr) {
+	assert last_error == ''
+	assert array == voidptr(usize(1)) && start == 0 && length == java_bytes.len
+	copy_calls++
+	if copy_fails { last_error = 'java/lang/ArrayIndexOutOfBoundsException'; return }
+	unsafe { C.memcpy(java_bytes.data, bytes, usize(length)) }
+}
+
+fn slot(_ voidptr, index int) voidptr {
+	return match index {
+		176 { voidptr(host_new) }
+		208 { voidptr(host_copy) }
+		else { panic('unexpected JNI slot ' + index.str()) }
+	}
+}
+
+fn reset() {
+	assert allocation == unsafe { nil }, 'production PNG allocation leaked'
+	allocation_attempts = 0
+	allocation_fails = false
+	new_fails = false
+	new_pending = false
+	copy_fails = false
+	new_calls = 0
+	copy_calls = 0
+	last_error = ''
+	java_bytes = []u8{}
+}
+
+fn be32(bytes []u8, index int) u32 {
+	assert index >= 0 && index <= bytes.len - 4
+	return u32(bytes[index]) << 24 | u32(bytes[index + 1]) << 16 | u32(bytes[index + 2]) << 8 | bytes[index + 3]
+}
+
+// This checker uses the standard library's CRC and DEFLATE implementations,
+// independently of the production encoder's table and stored-block writer.
+fn decode(bytes []u8, width int, height int) ![]u8 {
+	if bytes.len < 57 || bytes[..8] != [u8(0x89), `P`, `N`, `G`, `\r`, `\n`, 0x1a, `\n`] { return error('signature') }
+	mut offset := 8
+	mut idat := []u8{}
+	mut saw_header := false
+	mut saw_end := false
+	for offset <= bytes.len - 12 {
+		length := be32(bytes, offset)
+		if length > u32(bytes.len - offset - 12) { return error('chunk length') }
+		end := offset + 8 + int(length)
+		if crc32.sum(bytes[offset + 4..end]) != be32(bytes, end) { return error('chunk CRC') }
+		kind := bytes[offset + 4..offset + 8].bytestr()
+		match kind {
+			'IHDR' {
+				if saw_header || offset != 8 || length != 13 || be32(bytes, offset + 8) != u32(width)
+					|| be32(bytes, offset + 12) != u32(height) || bytes[offset + 16..end] != [u8(8), 6, 0, 0, 0] { return error('IHDR') }
+				saw_header = true
+			}
+			'IDAT' { if !saw_header || saw_end { return error('chunk order') }; idat << bytes[offset + 8..end] }
+			'IEND' { if !saw_header || length != 0 || end + 4 != bytes.len { return error('IEND') }; saw_end = true }
+			else { return error('unexpected chunk') }
+		}
+		offset = end + 4
+	}
+	if !saw_end || offset != bytes.len { return error('missing IEND') }
+	raw := zlib.decompress(idat)!
+	if idat.len < 6 || adler32.sum(raw) != be32(idat, idat.len - 4) { return error('zlib Adler-32') }
+	if raw.len != (width * 4 + 1) * height { return error('decoded length') }
+	mut pixels := []u8{cap: width * height * 4}
+	for y in 0 .. height {
+		row := y * (width * 4 + 1)
+		if raw[row] != 0 { return error('filter') }
+		pixels << raw[row + 1..row + width * 4 + 1]
+	}
+	return pixels
+}
+
+fn roundtrip(width int, height int, padding int, alpha bool) {
+	reset()
+	channels := if alpha { 1 } else { 4 }
+	stride := width * channels + padding
+	mut source := []u8{len: stride * height, init: 0xed}
+	mut expected := []u8{cap: width * height * 4}
+	for y in 0 .. height {
+		for x in 0 .. width {
+			alpha_value := u8((x * 37 + y * 19) & 255)
+			if alpha {
+				source[y * stride + x] = alpha_value
+				expected << [u8(0), 0, 0, alpha_value]
+			} else {
+				color := [u8((x * 43 + y * 7 + 13) & 255), u8((x + y * 113 + 37) & 255), u8((x * 17 + y * 29 + 231) & 255), alpha_value]
+				for channel in 0 .. 4 { source[y * stride + x * 4 + channel] = color[channel] }
+				expected << color
+			}
+		}
+	}
+	before := source.clone()
+	bitmap := WsBitmap{width: i32(width), height: i32(height), row_bytes: i32(stride), references: 7, alpha_only: alpha, rgba: source.data}
+	result := ws_bitmap_png(unsafe { nil }, i64(unsafe { &bitmap }))
+	assert result != unsafe { nil } && last_error == ''
+	assert allocation == unsafe { nil } && allocation_attempts == 1 && new_calls == 1 && copy_calls == 1
+	assert source == before && bitmap.references == 7
+	pixels := decode(java_bytes, width, height) or { panic(err) }
+	assert pixels == expected, 'decoded pixels differ'
+	mut corrupt := java_bytes.clone()
+	corrupt[29] ^= 1
+	mut rejected := false
+	decode(corrupt, width, height) or { rejected = true; []u8{} }
+	assert rejected, 'checker accepted a corrupt CRC'
+	// Repair the outer PNG CRC after damaging zlib's checksum, so this negative
+	// control requires the independent Adler check rather than a chunk rejection.
+	corrupt = java_bytes.clone()
+	idat_end := 41 + int(be32(corrupt, 33))
+	corrupt[idat_end - 1] ^= 1
+	crc := crc32.sum(corrupt[37..idat_end])
+	for shift in 0 .. 4 { corrupt[idat_end + shift] = u8(crc >> (24 - shift * 8)) }
+	rejected = false
+	decode(corrupt, width, height) or { rejected = true; []u8{} }
+	assert rejected, 'checker accepted a corrupt Adler-32'
+	println('PASS roundtrip width=${width} height=${height} padding=${padding} alpha=${alpha} png=${java_bytes.len}')
+}
+
+fn invalid(bitmap &WsBitmap, expected string) {
+	reset()
+	assert ws_bitmap_png(unsafe { nil }, i64(bitmap)) == unsafe { nil }
+	assert last_error == expected && allocation_attempts == 0 && new_calls == 0 && copy_calls == 0
+	assert allocation == unsafe { nil }
+}
+
+fn main() {
+	roundtrip(1, 1, 0, false)
+	roundtrip(2, 2, 4, false)
+	roundtrip(3, 2, 1, true)
+	roundtrip(31, 45, 0, false) // crosses Adler-32's 5552-byte reduction boundary
+	roundtrip(64, 255, 0, false) // one exact 65535-byte DEFLATE block
+	roundtrip(64, 256, 0, false) // second block crosses a scanline
+	roundtrip(16384, 1, 0, false) // second block crosses a pixel
+	roundtrip(1, 16384, 3, true)
+	reset()
+	assert ws_bitmap_png(unsafe { nil }, 0) == unsafe { nil }
+	assert last_error == 'java/lang/IllegalStateException' && allocation_attempts == 0
+	mut byte := u8(255)
+	mut bitmap := WsBitmap{width: 1, height: 1, row_bytes: 4, references: 1, rgba: &byte}
+	for width in [0, -1, 16385] { bitmap.width = width; invalid(&bitmap, 'java/lang/IllegalArgumentException') }
+	bitmap.width = 1
+	for height in [0, -1, 16385] { bitmap.height = height; invalid(&bitmap, 'java/lang/IllegalArgumentException') }
+	bitmap.height = 1
+	for stride in [0, -1, 3] { bitmap.row_bytes = stride; invalid(&bitmap, 'java/lang/IllegalArgumentException') }
+	bitmap = WsBitmap{width: 8193, height: 8192, row_bytes: 8193 * 4, references: 1, rgba: &byte}
+	invalid(&bitmap, 'java/lang/IllegalArgumentException')
+	bitmap = WsBitmap{width: 1, height: 2, row_bytes: 2147483647, references: 1, rgba: &byte}
+	invalid(&bitmap, 'java/lang/IllegalArgumentException')
+	bitmap = WsBitmap{width: 1, height: 1, row_bytes: 4, references: 1, rgba: unsafe { nil }}
+	invalid(&bitmap, 'java/lang/IllegalStateException')
+	bitmap = WsBitmap{width: 8192, height: 8192, row_bytes: 8192 * 4, references: 1, rgba: &byte}
+	reset()
+	allocation_fails = true
+	assert ws_bitmap_png(unsafe { nil }, i64(unsafe { &bitmap })) == unsafe { nil }
+	assert last_error == 'java/lang/OutOfMemoryError' && allocation_attempts == 1 && new_calls == 0
+	mut rgba := [u8(13), 37, 231, 0]!
+	bitmap = WsBitmap{width: 1, height: 1, row_bytes: 4, references: 1, rgba: unsafe { &rgba[0] }}
+	for failure in ['new-null', 'new-pending', 'copy-pending', 'entry-pending'] {
+		reset()
+		match failure {
+			'new-null' { new_fails = true }
+			'new-pending' { new_pending = true }
+			'copy-pending' { copy_fails = true }
+			else { last_error = 'original exception' }
+		}
+		assert ws_bitmap_png(unsafe { nil }, i64(unsafe { &bitmap })) == unsafe { nil }
+		assert allocation == unsafe { nil } && last_error != ''
+		if failure == 'entry-pending' { assert allocation_attempts == 0 && new_calls == 0 && copy_calls == 0 && last_error == 'original exception' }
+		else { assert allocation_attempts == 1 && new_calls == 1 && copy_calls == if failure == 'copy-pending' { 1 } else { 0 } }
+		println('PASS fault=' + failure)
+	}
+	println('PASS bitmap PNG validation, independent decode/CRC, allocation and JNI failures')
+}
