@@ -2165,8 +2165,9 @@ access and write/create private-data access, including advisory file locking.
 creation (`proc`) and local Unix IPC (`unix`), including socket pairs and local
 RPC used by multiprocess applications. It adds no filesystem paths, network
 promises, display authority or devices. Pathname sockets remain subject to
-unveil; abstract Unix sockets have no filesystem path. `network`, `display` and
-`audio` request their corresponding sandbox promises/device or IPC paths.
+unveil; abstract Unix sockets have no filesystem path. `network` and `display`
+request their corresponding sandbox promises or IPC paths. `audio` selects the
+admitted PCM portal described below; it grants no raw sound-device path.
 Organization policy can refuse requests.
 See [actual enforcement limits](../sandbox/README.md).
 
@@ -2289,6 +2290,48 @@ retained. See [launch-data qualification](../../tests/packages/launch-data-check
 The built-in `NativeApp` V interface and VAPP version 11 remain internal desktop
 contracts. Third-party ui2 clients need compositor adapter qualification. Importing
 `desktop/app_process.v` is not a supported standalone UI SDK protocol.
+
+### PCM audio interface
+
+Signed applications requesting `audio` can use `tools.packages.audiopcm` for
+output-only S16LE stereo PCM at 48 kHz. Organization policy must also allow the
+permission. Each nonempty write contains complete four-byte stereo frames and
+at most 4096 bytes. The client waits for the worker's acknowledgement before
+returning; `drain()` sends a zero-length frame and waits for hardware drain.
+
+```v
+import tools.packages.audiopcm
+
+fn play(chunk []u8) ! {
+    mut output := audiopcm.connect()!
+    defer { output.close() }
+    output.write(chunk)!
+    output.drain()!
+}
+```
+
+The normal ordinary-account launch creates a fresh private socket while holding
+the selected signed generation lease. The account service checks the active
+seat, immutable cached kernel login labels, and the exact worker/socket identity,
+then passes a one-use authenticated bootstrap to the isolated launcher. Package
+ID, generation and canonical manifest digest bind the stream. Applications use
+`connect()` rather than constructing environment authority or opening `/dev/dsp`.
+An unsupported `SO_PEERLOGIN` kernel, missing permission, direct already-isolated
+launch or manually supplied ambient endpoint refuses admission.
+
+`Client.close()` is idempotent. Invalid local chunks return an error; transport
+or refusal errors close that client. The portal serves one client stream at a
+time and retires its worker and recorded endpoint before releasing the launch
+lease. It supplies no mixing, recording, ALSA/Pulse compatibility or Wine audio
+translation. Socket waits and nonblocking DSP retries have five-second deadlines
+and observe the caller lease; hardware drain and final close retain the driver's
+interruption semantics. Stalled hardware is not qualified. A forced startup kill
+before endpoint identity capture can leave a private nonce socket.
+
+The [52 host checks](../../tests/packages/audio-portal-host-check.md) cover
+authority, framing, refusal, allocation ownership and production C generation
+for both targets. Actual device playback, seat switching and launch cleanup
+remain separate native qualification gates.
 
 ### Personal data cleanup
 
