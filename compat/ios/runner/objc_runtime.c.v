@@ -190,6 +190,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name == 'UIStoryboard' && storyboard_unsupported(name) { return 0 }
 		if info.name == 'UINavigationController' && navigation_descriptor_unsupported(name) { return 0 }
 		if info.name == 'UIPanGestureRecognizer' && pan_descriptor_unsupported(name) { return 0 }
+		if info.name == 'UIPinchGestureRecognizer' && pinch_descriptor_unsupported(name) { return 0 }
 		if info.name == 'NSLock' && ns_lock_unsupported(name) { return 0 }
 		if info.name == 'NSRecursiveLock' && ns_recursive_lock_unsupported(name) { return 0 }
 		if info.name in ['NSCoder', 'NSKeyedArchiver']! && ns_keyed_archiver_unsupported(name) { return 0 }
@@ -347,6 +348,9 @@ fn objc_set_class(object u64, cls u64) u64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if object in ios_runtime.classes || object in ios_runtime.constants { panic('iOS: changing a class or constant string isa is not implemented') }
+	if pinch_descriptor_family(cls) || pinch_descriptor_family(obj_header(object).allocation_cls) {
+		panic('iOS: changing pinch gesture storage isa is not implemented')
+	}
 	if pan_descriptor_family(cls) || pan_descriptor_family(obj_header(object).allocation_cls) {
 		panic('iOS: changing pan gesture storage isa is not implemented')
 	}
