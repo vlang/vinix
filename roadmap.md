@@ -1895,6 +1895,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   maintained suites pass per architecture. See
   [the alternate-stack ABI qualification](docs/linux-alternate-stack-abi.md).
 
+- [x] Import native sigaltstack input before active-handler EPERM; qualify
+  unreadable-input EFAULT, readable-input EPERM, null-input queries, state,
+  output and guards inside a real alternate-stack handler. Identical musl ELFs
+  pass 19,444 checks on both production architectures and Linux; originals fail
+  2,160 each. Sixteen maintained suites pass on AArch64, fifteen on x86-64;
+  randomsignal and its identical replay fail and remain unresolved. See
+  [the handler fault-precedence qualification](docs/linux-alternate-stack-handler.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -408,16 +408,17 @@ pub fn syscall_sigaltstack(_ voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u64) {
 	mut incoming_size := u64(0)
 	mut disabling := false
 	if ss_ptr != 0 {
+		mut raw := [3]u64{}
+		if !usercopy.copy_from_user(voidptr(&raw[0]), ss_ptr, stack_t_size) {
+			return errno.err, errno.efault
+		}
+		// Linux imports ss before checking whether the handler is on this stack.
 		// Changing the alternate stack while running on it would pull the rug
 		// out from under the handler.
 		if thread_on_sigaltstack(current_thread) {
 			return errno.err, errno.eperm
 		}
 
-		mut raw := [3]u64{}
-		if !usercopy.copy_from_user(voidptr(&raw[0]), ss_ptr, stack_t_size) {
-			return errno.err, errno.efault
-		}
 		flags := int(u32(raw[1]))
 		// Linux accepts SS_ONSTACK as an input mode even off the stack.
 		if flags != 0 && flags != ss_onstack && flags != ss_disable {

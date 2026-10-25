@@ -2585,3 +2585,20 @@ architecture. Handler delivery and other limits remain open.
 `altstackabi-evidence.v` without `-prod`, run `self-test` (six positive and
 25 negative controls), then `check` on the complete bundle in
 [the qualification](../../docs/linux-alternate-stack-abi.md).
+
+The `altstackhandler` case delivers SIGUSR1 on a guarded alternate stack
+and checks native sigaltstack input-copy precedence. Root and UID 1000/GID
+2000 cohorts cover eight flag words, three sizes, nine input and nine output
+placements. Unreadable input returns EFAULT before the active-handler EPERM
+check; readable input returns EPERM before mode/size/output validation. Null
+input queries still report SS_ONSTACK. Return values, errno, state, complete
+output and guards are checked. Identical musl ELFs pass 19,444 checks on both
+production architectures and Linux references; originals fail 2,160 each.
+Sixteen maintained suites pass on AArch64, fifteen on x86-64. The x86-64
+randomsignal case and identical replay fail and remain unresolved.
+
+`altstackhandler-reference.v` accepts the same arguments as `sigwaitcopy-reference.v`;
+`--self-test` has two positive and nine negative controls. Compile
+`altstackhandler-evidence.v` without `-prod`, run `self-test` (seven positive and
+28 negative controls), then `check` on the complete bundle in
+[the qualification](../../docs/linux-alternate-stack-handler.md).
