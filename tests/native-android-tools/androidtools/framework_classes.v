@@ -117,6 +117,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_view_traversal(smali)!
  framework_view_frame_bounds(smali)!
  framework_frame_metrics(smali)!
+ framework_inflater_trace(smali)!
  framework_layout_listeners(smali)!
  framework_view_touch(smali)!
  framework_view_tooltips(smali)!
