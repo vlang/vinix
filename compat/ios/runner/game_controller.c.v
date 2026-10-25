@@ -12,7 +12,7 @@ fn game_controller_class_name(symbol string) ?string {
 	name := if symbol.starts_with('_OBJC_CLASS_$_') { symbol.all_after('_OBJC_CLASS_$_') }
 		else if symbol.starts_with('_OBJC_METACLASS_$_') { symbol.all_after('_OBJC_METACLASS_$_') }
 		else { return none }
-	if name in ['GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor', 'GCMouse']! { return name }
+	if name in ['GCController', 'GCEventViewController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor', 'GCMouse']! { return name }
 	return none
 }
 

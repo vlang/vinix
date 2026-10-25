@@ -219,6 +219,8 @@ mut:
 	uuid_bytes [16]u8
 	cookie_owned bool
 	snapshot_configuration_initialized bool
+	gc_event_controller_initialized bool
+	gc_event_controller_interaction bool
 	webkit &WebKitState = unsafe { nil }
 	webkit_array bool // Read-only script list; its contents change through its controller.
 	webview &WebViewState = unsafe { nil }
@@ -572,7 +574,7 @@ fn objc_start() {
 		'NSMapTable', 'CTTelephonyNetworkInfo', 'ASIdentifierManager', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKSnapshotConfiguration', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor', 'CHHapticDynamicParameter', 'CHHapticEventParameter', 'CHHapticEvent', 'CHHapticPattern', 'GCMouse', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
-		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UITextField', 'UIWindow', 'UIViewController', 'UINavigationController', 'GKGameCenterViewController', 'UIStoryboard', 'UITextPosition', 'UITextRange',
+		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UITextField', 'UIWindow', 'UIViewController', 'GCEventViewController', 'UINavigationController', 'GKGameCenterViewController', 'UIStoryboard', 'UITextPosition', 'UITextRange',
 		'UIScreen', 'UIGestureRecognizer', 'UIPanGestureRecognizer', 'UIPinchGestureRecognizer', 'UILongPressGestureRecognizer', 'UITapGestureRecognizer', 'UIRotationGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'UNNotificationTrigger', 'UNCalendarNotificationTrigger', 'UNNotificationRequest', 'UNUserNotificationCenter', 'NSBundle', 'NSBundleResourceRequest', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
         'UNNotificationContent', 'UNMutableNotificationContent', 'UNNotificationSound', 'UNNotificationAttachment',
@@ -612,7 +614,7 @@ fn objc_start() {
 			'_NSUUIDBridge' { ios_runtime.names['NSUUID'] }
 			'__NSConcreteUUID' { ios_runtime.names['_NSUUIDBridge'] }
 			'UIView', 'UIViewController', 'UIApplication' { ios_runtime.names['UIResponder'] }
-			'UINavigationController' { ios_runtime.names['UIViewController'] }
+			'UINavigationController', 'GCEventViewController' { ios_runtime.names['UIViewController'] }
 			'GKGameCenterViewController' { ios_runtime.names['UINavigationController'] }
 			'UIImageView', 'UILabel', 'UIControl', 'UIWindow', 'UIAlertView', 'GLKView' { ios_runtime.names['UIView'] }
 			'WKWebView' { ios_runtime.names['UIView'] }
@@ -653,6 +655,7 @@ fn objc_start() {
 		size := match name {
 			'UITextPosition', 'UITextRange' { u32(8) }
 			'UITextField' { u32(1064) } // Opaque Catalyst-sized reserve; state is private to the shim.
+			'GCEventViewController' { u32(1112) } // Opaque reserve; public iOS hierarchy, private shim state.
 			'UNNotificationTrigger' { u32(16) }
 			'UNCalendarNotificationTrigger' { u32(24) }
 			'UNNotificationRequest' { u32(40) }
@@ -983,6 +986,7 @@ fn objc_new(cls u64) u64 {
 	imp := native_method(cls, 'init')
 	if imp != 0 { return unsafe { ObjInit(voidptr(imp))(object, c'init') } }
 	if snapshot_configuration_family(cls) { return snapshot_configuration_initialize(object) }
+	if gc_event_controller_family(cls) { return gc_event_controller_initialize(object) }
 	game_keyboard_require_discovery(cls)
 	if obj_header(object).pool_owned { ns_pool_initialize(object); return object }
 	if obj_header(object).uuid_owned { ns_uuid_initialize(object, 0, true); return object }

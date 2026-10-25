@@ -21,6 +21,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if is_block(value) { return block_copy(value) }
 	cls := read64(value)
 	if snapshot_configuration_family(cls) { return snapshot_configuration_copy(value) }
+	if gc_event_controller_family(cls) { panic('iOS: unsupported GCEventViewController method: copy') }
 	if text_field_family(cls) { panic('iOS: unsupported UITextField method: copy') }
 	if haptic_dynamic_parameter_family(cls) { panic('iOS: unsupported CHHapticDynamicParameter method: copy') }
 	if haptic_pattern_family(cls) { panic('iOS: unsupported CHHapticPattern method: copy') }
