@@ -8,7 +8,8 @@ package build searches both the exported root and its `tools/accounts` directory
 The existing source filter still excludes tests, Python and nonregular blobs.
 
 `check-development-source.v` passed six explicit checks on 2026-10-26 against
-committed package sources at `0bf315dc8`. AArch64 and x86-64 each generated the
+committed package sources at `a1552c7bb5d28e5b4af6aeba64e63e87b9266a6b`.
+AArch64 and x86-64 each generated the
 actual `tools/packages/main.v` production C from the export. Each architecture
 also rejected a withheld `audiopcm` module and a missing account-module search
 path, with the expected import diagnostic. The compiler ran from an external
