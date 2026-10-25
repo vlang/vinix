@@ -163,6 +163,35 @@ fn ws_failure(e voidptr, stage &char) bool {
 	return true
 }
 
+fn ws_input_layout_ready(e voidptr, decor voidptr, width i32, height i32) bool {
+	unsafe {
+		if pending(e) || decor == nil { return false }
+		if boolean(e, decor, c'android/view/View', c'isAttachedToWindow', c'()Z', nil) == 0
+			|| pending(e) { return false }
+		if boolean(e, decor, c'android/view/View', c'isLayoutRequested', c'()Z', nil) != 0
+			|| pending(e) { return false }
+		if integer(e, decor, c'android/view/View', c'getWidth', c'()I', nil) != width
+			|| pending(e) { return false }
+		return integer(e, decor, c'android/view/View', c'getHeight', c'()I', nil) == height
+			&& !pending(e)
+	}
+}
+
+// A laid-out window can apply queued input to this frame instead of waiting
+// behind its draw. New or replaced trees still need layout before hit testing.
+fn ws_input_before_render(e voidptr) bool {
+	unsafe {
+		if ws.surface.sequence == 0 || ws.activity == nil || pending(e) { return false }
+		decor := activity_decor(e, ws.activity)
+		if !ws_input_layout_ready(e, decor, ws.width, ws.height) { return false }
+		if ws.dialog != nil {
+			dialog := ws_dialog_decor(e, ws.dialog)
+			if !ws_input_layout_ready(e, dialog, ws.dialog_width, ws.dialog_height) { return false }
+		}
+		return true
+	}
+}
+
 fn ws_static_int(e voidptr, name &char, member &char, value i32) {
 	c := cls(e, name)
 	unsafe {
@@ -424,13 +453,27 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 				pop_frame(e)
 				return 1
 			}
+			if !ws.running {
+				pop_frame(e)
+				break
+			}
+			input_dispatched := ws_input_before_render(e)
+			if input_dispatched { ws_input(e) }
+			if ws_failure(e, c'ANDROID-WS-FAIL input') {
+				pop_frame(e)
+				return 1
+			}
+			if !ws.running {
+				pop_frame(e)
+				break
+			}
 			ws_frames_dispatch()
 			if ws.animated && ws_millis() - ws.animation_last >= 80 { ws.dirty = true }
 			if C.__atomic_exchange_n(&ws_window_pending, 0, 5) != 0 { ws.dirty = true }
 			if ws.dirty { ws_render(e) }
 			// Rendering may leave the original Java exception pending. Input
 			// dispatch uses JNI calls that are forbidden until it is reported.
-			if !pending(e) { ws_input(e) }
+			if !input_dispatched && !pending(e) { ws_input(e) }
 			if ws_failure(e, c'ANDROID-WS-FAIL input or render') {
 				pop_frame(e)
 				return 1
