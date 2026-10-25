@@ -6,6 +6,7 @@ import authproto
 import crypto.rand
 import os
 import tools.packages.pkgadmin
+import tools.packages.audiopcm
 
 pub fn run(arguments []string) !int {
 	return run_with_socket(arguments, authclient.default_socket)
@@ -17,10 +18,13 @@ fn run_with_socket(arguments []string, socket_path string) !int {
 	if uid == 0 { return error('isolated launch transport requires an ordinary caller') }
 	display := os.getenv('DISPLAY')
 	authority := os.getenv('XAUTHORITY')
+	mut audio := audiopcm.environment()!
+	defer { audio.close() }
 	defer { unsafe { display.free(); authority.free() } }
 	// Refuse an ambient or incomplete display before contacting the service.
-	shape := Request{ format: if display == '' && authority == '' { 1 } else { 2 }, arguments: arguments, display: display, authority: authority }
+	shape := Request{ format: if audio.path != '' { 3 } else if display == '' && authority == '' { 1 } else { 2 }, arguments: arguments, display: display, authority: authority, audio: audio }
 	shape.validate_display(uid)!
+	shape.validate_audio(uid)!
 	mut describe_request := authproto.Frame{ code: authproto.op_describe, fields: [action.bytes()] }
 	defer { describe_request.close() }
 	mut description := authclient.ask_root(socket_path, describe_request.code, ...describe_request.fields)!
@@ -35,7 +39,7 @@ fn run_with_socket(arguments []string, socket_path string) !int {
 	rand.read(mut random)!
 	nonce := random.hex()
 	defer { unsafe { nonce.free() } }
-	request := Request{ format: shape.format, nonce: nonce, arguments: arguments, display: display, authority: authority }
+	request := Request{ format: shape.format, nonce: nonce, arguments: arguments, display: display, authority: authority, audio: audio }
 	mut listener := pkgadmin.listen_private(directory, uid, nonce)!
 	defer { listener.close() }
 	mut run_request := authproto.Frame{ code: authproto.op_run, fields: [action.bytes(), []u8{}, nonce.bytes()] }

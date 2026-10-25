@@ -8,6 +8,7 @@ import tools.packages.pkgadmin
 import tools.packages.pkglaunch
 import tools.packages.pkgcore
 import tools.packages.pkgprotocol
+import tools.packages.audiopcm
 
 const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progress] COMMAND [ARGS]\n' +
 	'  capabilities (read-only JSON supported interface versions)\n' +
@@ -99,13 +100,36 @@ fn checked(arguments []string) !int {
 		return error('--progress supports update, install/remove/upgrade/repair, apply, deploy/deployment-apply, rollback, verify, health and mirror/mirror-apply/mirror-deployment-apply; only health also supports --json')
 	}
 	names := args[1..].clone()
+	mut audio_portal := audiopcm.Portal{}
+	mut audio_admission := pkgcore.AudioAdmission{}
+	defer { audio_portal.close(); audio_admission.close() }
 	if command in ['run', 'run-terminal', 'run-window', 'run-args', 'run-terminal-args'] && os.geteuid() != 0 {
 		if root != '' { return error('application launch does not support an alternate installation root') }
 		if offline || as_json || progress { return error('application launches use the real root without administration/output options') }
 		if command in ['run-terminal', 'run-terminal-args'] && (C.isatty(0) != 1 || C.isatty(1) != 1) {
 			return error('terminal launch requires terminal standard input and output')
 		}
-		if pkglaunch.needs_isolation()! { return pkglaunch.run(args) }
+		pkglaunch.validate_arguments(args)!
+		isolate := pkglaunch.needs_isolation()!
+		// The outer launcher never adopts an ambient audio endpoint. Only the
+		// explicit checked account transport passes one to a group-free child.
+		if isolate { audiopcm.clear_environment() }
+		audio_admission = (pkgcore.Service{}).audio_admission(args[1])!
+		if audio_admission.allowed {
+			mut incoming := audiopcm.environment()!
+			defer { incoming.close() }
+			if isolate {
+				audio_portal = audiopcm.start(args[1], audio_admission.generation, audio_admission.manifest)!
+				audio_portal.capability.export_environment()
+			} else {
+				if incoming.path == '' || incoming.generation != audio_admission.generation || incoming.manifest != audio_admission.manifest { return error('audio launch requires the exact admitted account-service handoff') }
+				audiopcm.consume_bootstrap(incoming, args[1])!
+			}
+		} else {
+			if !isolate { audiopcm.discard_bootstrap() }
+			audiopcm.clear_environment()
+		}
+		if isolate { return pkglaunch.run(args) }
 	}
 	if command in ['admin', 'admin-authorize'] {
 		if root != '' || offline || as_json || progress { return error('administrator transport options follow admin, and cannot select another root') }

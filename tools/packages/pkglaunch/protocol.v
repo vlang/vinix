@@ -4,6 +4,7 @@ module pkglaunch
 import crypto.sha256
 import json2
 import tools.packages.pkgprotocol
+import tools.packages.audiopcm
 
 pub const action = 'packages-launch'
 pub const request_limit = 512 * 1024 // JSON escaping preserves the 64 KiB literal command contract
@@ -16,6 +17,7 @@ pub:
 	arguments []string
 	display string
 	authority string
+	audio audiopcm.Capability
 }
 
 // Version one remains byte-for-byte compatible for non-X11 launches. Version
@@ -24,6 +26,14 @@ struct LiteralRequest {
 	format int = 1
 	nonce string
 	arguments []string
+}
+
+struct DisplayRequest {
+	format int = 2
+	nonce string
+	arguments []string
+	display string
+	authority string
 }
 
 pub fn valid_nonce(value string) bool {
@@ -71,11 +81,14 @@ pub fn (request &Request) encode() !string {
 	if !valid_nonce(request.nonce) { return error('invalid isolated package request identity') }
 	validate_arguments(request.arguments)!
 	request.validate_display_shape()!
+	request.validate_audio_shape()!
 	mut bytes := []u8{cap: request_limit}
 	unsafe { bytes.flags |= .noslices }
 	defer { unsafe { bytes.free() } }
 	if request.format == 1 {
 		json2.encode_append(LiteralRequest{ nonce: request.nonce, arguments: request.arguments }, mut bytes)
+	} else if request.format == 2 {
+		json2.encode_append(DisplayRequest{ nonce: request.nonce, arguments: request.arguments, display: request.display, authority: request.authority }, mut bytes)
 	} else { json2.encode_append(request, mut bytes) }
 	text := bytes.bytestr()
 	if text.len > request_limit { unsafe { text.free() }; return error('isolated package request is too large') }
@@ -119,6 +132,6 @@ pub fn (request &Request) result(text string) !int {
 }
 
 pub fn (mut request Request) close() {
-	unsafe { request.nonce.free(); request.display.free(); request.authority.free(); for value in request.arguments { value.free() }; (&array(&request.arguments)).free() }
+	unsafe { request.nonce.free(); request.display.free(); request.authority.free(); request.audio.path.free(); request.audio.manifest.free(); for value in request.arguments { value.free() }; (&array(&request.arguments)).free() }
 	request = Request{}
 }

@@ -294,11 +294,15 @@ fn package_launch_worker(fd int, nonce string, db accountcore.Database, user acc
 	defer { for stream in streams { if stream >= 0 { C.close(stream) } } }
 	for index, stream in streams { if C.dup2(stream, index) != index { return error('cannot attach application streams') } }
 	for index in 0 .. streams.len { C.close(streams[index]); streams[index] = -1 }
-	// No inherited auth-service descriptor is passed to the session child;
-	// exec_as closes everything except the caller's three existing streams.
+	// The session child receives the caller's three streams and, only for
+	// admitted audio, a one-use root bootstrap which its launcher consumes.
 	for descriptor in 3 .. 1024 { if descriptor != fd { C.close(descriptor) } }
 	request.forward_display(user.uid)!
-	started := sessioncore.start_isolated(db, user, ['/usr/bin/vinix-package', ...request.arguments])!
+	audio_control := request.forward_audio(user.uid, fd)!
+	defer { if audio_control >= 0 { C.close(audio_control) } }
+	started := if audio_control >= 0 {
+		sessioncore.start_isolated_control(db, user, ['/usr/bin/vinix-package', ...request.arguments], audio_control)!
+	} else { sessioncore.start_isolated(db, user, ['/usr/bin/vinix-package', ...request.arguments])! }
 	// The supervisor also sheds root and account memberships before waiting.
 	// Its cached socket peer credentials still prove who made the connection.
 	sessioncore.become_isolated(user)!

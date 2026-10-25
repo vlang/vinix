@@ -175,6 +175,13 @@ pub fn start_isolated(db accountcore.Database, user accountcore.User, argv []str
 	return start_profile(db, user, argv, []string{}, false, -1, Unlock{}, true)
 }
 
+// A single account-service bootstrap, consumed before the package sandbox.
+// This does not take the seat or retain supplementary account memberships.
+pub fn start_isolated_control(db accountcore.Database, user accountcore.User, argv []string, control int) !Started {
+	if control < 3 { return error('isolated bootstrap requires a private descriptor') }
+	return start_profile(db, user, argv, []string{}, false, control, Unlock{}, true)
+}
+
 fn start_profile(db accountcore.Database, user accountcore.User, argv []string, fallback []string, at_seat bool, control int, unlock Unlock, isolated bool) !Started {
 	if !accountcore.is_person(user) && user.name != 'greeter' {
 		return error('${user.name} is not an account sessions are for')
@@ -217,8 +224,9 @@ fn start_profile(db accountcore.Database, user accountcore.User, argv []string, 
 		C.write(report[1], number.str, usize(number.len))
 		C.close(report[1])
 		if control >= 0 && control != 3 {
-			C.dup2(control, 3)
+			if C.dup2(control, 3) != 3 { C._exit(126) }
 		}
+		if control >= 0 && C.fcntl(3, C.F_SETFD, 0) != 0 { C._exit(126) }
 		if isolated {
 			become_isolated(user) or {
 				eprintln('vinix-session: ${err.msg()}')

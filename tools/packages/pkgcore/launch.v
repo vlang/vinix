@@ -146,7 +146,7 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	if 'process' in p.permissions { promises << 'proc' }
 	// Child processes use socketpair and local RPC as well as fork/exec. This
 	// grants no extra paths; pathname sockets remain subject to unveil.
-	if 'process' in p.permissions || ('display' in p.permissions && !input.window) { promises << 'unix' }
+	if 'process' in p.permissions || 'audio' in p.permissions || ('display' in p.permissions && !input.window) { promises << 'unix' }
 	args << '--promises'; args << promises.join(' ')
 	launch_unveil(mut args, app, 'rx')
 	launch_unveil(mut args, data, 'rwc')
@@ -195,7 +195,7 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	if 'display' in p.permissions && !input.window {
 		launch_x11(mut args, uid, '/', 0)!
 	}
-	if 'audio' in p.permissions { launch_unveil(mut args, '/dev/snd', 'rw') }
+	if 'audio' in p.permissions { launch_audio(mut args, id, uid, state.generation, p)! }
 	for document in input.documents {
 		validate_launch_document(document)!
 		if 'files' !in p.permissions { return error('${id}: file permission is not declared') }
@@ -270,8 +270,17 @@ fn run_leased_mode(config Config, directory string, state State, id string, inpu
 	defer { unsafe { data.free(); home_prefix.free() } }
 	mut launch := application_launch_plan(config, directory, state, id, data, uid, gid, input)!
 	defer { launch.close() }
+	verify_launch_payloads(config, directory, state, id)!
+	prepare_launch_data(home, id, u32(uid))!
+	return run_launch_process(launch)
+}
+
+// Shared by actual execution and the pre-isolation audio admission. Holding
+// the caller's generation lease keeps this exact verified closure available.
+fn verify_launch_payloads(config Config, directory string, state State, id string) ! {
 	closure := application_closure(state, id)
 	defer { unsafe { (&array(&closure)).free() } }
+	require_publisher_keys(closure)!
 	number := state.generation.str()
 	generation := directory + '/generations/' + number
 	defer { unsafe { number.free(); generation.free() } }
@@ -293,6 +302,4 @@ fn run_leased_mode(config Config, directory string, state State, id string, inpu
 			return error('${installed.package.id}: installed application registration verification failed; use Repair installed or vinix-package repair')
 		}
 	}
-	prepare_launch_data(home, id, u32(uid))!
-	return run_launch_process(launch)
 }

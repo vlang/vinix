@@ -10,8 +10,8 @@ fn C.unsetenv(&char) int
 // hosted surface. Filesystem admission below binds this syntax to the intended
 // UID, private authority inode and exact owned X socket before any handoff.
 fn (request &Request) validate_display_shape() ! {
-	if request.format == 1 && request.display == '' && request.authority == '' { return }
-	if request.format != 2 || request.arguments.len < 2 || request.arguments[0] !in ['run', 'run-args']
+	if request.format in [1, 3] && request.display == '' && request.authority == '' { return }
+	if request.format !in [2, 3] || request.arguments.len < 2 || request.arguments[0] !in ['run', 'run-args']
 		|| request.display.len < 2 || request.display.len > 6 || request.display.contains('\x00')
 		|| x11auth.display_number(&char(request.display.str)) < 0
 		|| !request.authority.starts_with('/run/user/') || !request.authority.ends_with('/Xauthority')
@@ -40,7 +40,7 @@ fn (request &Request) validate_display_shape() ! {
 
 pub fn (request &Request) validate_display(uid u32) ! {
 	request.validate_display_shape()!
-	if request.format == 1 { return }
+	if request.display == '' && request.authority == '' { return }
 	if uid == 0 || !x11auth.admit(c'/', &char(request.authority.str), &char(request.display.str), uid, 0) {
 		return error('isolated launch requires the account private X11 authority and socket')
 	}
@@ -50,7 +50,7 @@ pub fn (request &Request) validate_display(uid u32) ! {
 // isolated package CLI validates the same paths again after shedding groups.
 pub fn (request &Request) forward_display(uid u32) ! {
 	request.validate_display(uid)!
-	if request.format == 1 {
+	if request.display == '' && request.authority == '' {
 		if C.unsetenv(c'DISPLAY') != 0 || C.unsetenv(c'XAUTHORITY') != 0 { return error('cannot clear isolated display') }
 	} else {
 		if C.setenv(c'DISPLAY', &char(request.display.str), 1) != 0 || C.setenv(c'XAUTHORITY', &char(request.authority.str), 1) != 0 {

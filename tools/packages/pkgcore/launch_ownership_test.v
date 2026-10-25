@@ -34,7 +34,7 @@ fn launch_owned_fixture(architecture string, kind string, width int) (Config, St
 	packages << Installed{ repository: 'publisher', public_key: key, sequence: 7,
 		package: Package{ id: 'app', version: '1.2.3', architecture: architecture, name: 'App', license: 'MIT', kind: kind,
 			runtime: if kind == 'native' { '' } else { 'runtime' }, entrypoint: 'bin/runner', dependencies: dependencies,
-			window_protocol: 0, permissions: ['files', 'audio', 'network', 'process'],
+			window_protocol: 0, permissions: ['files', 'network', 'process'],
 			arguments: ['@APP@/a', '@DATA@/b', '@RUNTIME@/c', '@APP@:@DATA@:@RUNTIME@', '', '$(literal)'],
 			files: [Payload{ path: 'bin/runner', sha256: key, bytes: 1, executable: true }] } }
 	return Config{ architecture: architecture, launch_user: 'alex', repositories: [Repository{ id: 'publisher', url: 'https://example.invalid', public_key: key }] },

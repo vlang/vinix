@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkglaunch
 
+import tools.packages.audiopcm
+
 // The wire contract already requires byte-exact encode() output. Parse only
 // that fixed, nonrecursive envelope, owning every accepted field and retiring
 // partial arrays/strings on refusal. Argument bytes keep their existing Unix
@@ -9,6 +11,20 @@ struct RequestReader {
 	text string
 mut:
 	at int
+}
+
+fn (mut reader RequestReader) unsigned() !u64 {
+	start := reader.at
+	mut result := u64(0)
+	for reader.at < reader.text.len {
+		byte := reader.text[reader.at]
+		if byte < `0` || byte > `9` { break }
+		if reader.at - start == 20 || result > (u64(-1) - u64(byte - `0`)) / 10 { return error('isolated audio identity overflow') }
+		result = result * 10 + u64(byte - `0`)
+		reader.at++
+	}
+	if reader.at == start || (reader.at > start + 1 && reader.text[start] == `0`) { return error('invalid isolated audio identity') }
+	return result
 }
 
 fn (mut reader RequestReader) expect(value string) ! {
@@ -62,17 +78,20 @@ fn (mut reader RequestReader) quoted(limit int) !string {
 fn decode_request(text string) !Request {
 	mut reader := &RequestReader{ text: text }
 	defer { unsafe { free(reader) } }
-	format := if text.starts_with('{"format":2,') { 2 } else { 1 }
-	if format == 2 { reader.expect('{"format":2,"nonce":')! }
+	format := if text.starts_with('{"format":3,') { 3 } else if text.starts_with('{"format":2,') { 2 } else { 1 }
+	if format == 3 { reader.expect('{"format":3,"nonce":')! }
+	else if format == 2 { reader.expect('{"format":2,"nonce":')! }
 	else { reader.expect('{"format":1,"nonce":')! }
 	nonce := reader.quoted(32)!
 	mut display := ''
 	mut authority := ''
+	mut audio := audiopcm.Capability{}
 	mut values := []string{cap: 16}
 	unsafe { values.flags |= .noslices }
 	mut accepted := false
 	defer {
 		if !accepted {
+			audio.close()
 			unsafe { nonce.free(); display.free(); authority.free(); for value in values { value.free() }; (&array(&values)).free() }
 		}
 	}
@@ -84,15 +103,36 @@ fn decode_request(text string) !Request {
 		values << reader.quoted(4096)!
 	}
 	reader.expect(']')!
-	if format == 2 {
+	if format in [2, 3] {
 		reader.expect(',"display":')!
 		display = reader.quoted(6)!
 		reader.expect(',"authority":')!
 		authority = reader.quoted(192)!
 	}
+	if format == 3 {
+		reader.expect(',"audio":{"path":')!
+		path := reader.quoted(99)!
+		mut manifest := ''
+		mut fields_owned := false
+		defer { if !fields_owned { unsafe { path.free(); manifest.free() } } }
+		reader.expect(',"device":')!
+		device := reader.unsigned()!
+		reader.expect(',"inode":')!
+		inode := reader.unsigned()!
+		reader.expect(',"worker":')!
+		worker := reader.unsigned()!
+		if worker > 0x7fff_ffff { return error('invalid isolated audio worker') }
+		reader.expect(',"generation":')!
+		generation := reader.unsigned()!
+		reader.expect(',"manifest":')!
+		manifest = reader.quoted(64)!
+		reader.expect('}')!
+		audio = audiopcm.Capability{ path: path, device: device, inode: inode, worker: int(worker), generation: generation, manifest: manifest }
+		fields_owned = true
+	}
 	reader.expect('}')!
 	if reader.at != text.len { return error('isolated package request is not canonical') }
-	request := Request{ format: format, nonce: nonce, arguments: values, display: display, authority: authority }
+	request := Request{ format: format, nonce: nonce, arguments: values, display: display, authority: authority, audio: audio }
 	canonical := request.encode()!
 	defer { unsafe { canonical.free() } }
 	if text != canonical { return error('isolated package request is not canonical') }
