@@ -136,9 +136,19 @@ fn constant_integer_format(header &ObjHeader, buffer &char, capacity usize) {
 	}
 }
 
+fn constant_integer_receiver(object u64) ?&ObjHeader {
+	// Every framework message probes this registry, including messages sent
+	// while other threads allocate or dispose ordinary Objective-C objects.
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	header := ios_runtime.objects[object] or { return none }
+	if !header.image_integer { return none }
+	// Image integer metadata remains alive until quiescent runtime shutdown.
+	return header
+}
+
 fn constant_integer_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
-	if object !in ios_runtime.objects || !obj_header(object).image_integer { return false }
-	header := obj_header(object)
+	header := constant_integer_receiver(object) or { return false }
 	match selector {
 		'init' { panic('iOS: cannot initialize image integer storage') }
 		'setObject:forKeyedSubscript:', 'setObject:forKey:', 'removeObjectForKey:',

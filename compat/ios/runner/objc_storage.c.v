@@ -54,6 +54,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	game_controller_require_discovery(cls)
 	app_attest_install(cls, caller_storage)
 	capture_discovery_install(cls, caller_storage)
+	capture_audio_install(cls, caller_storage)
 	audio_application_install(cls, caller_storage)
 	if storyboard_family(cls) && (caller_storage || cls != ios_runtime.names['UIStoryboard']) {
 		panic('iOS: UIStoryboard requires storyboardWithName:bundle:')
@@ -281,6 +282,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	response_dispose(mut header)
 	alert_dispose(mut header)
 	objc_destroy_weak(unsafe { &header.presenter })
+	capture_audio_dispose(mut header)
 	for field in header.fields { objc_release(field) }
 	for i in 0 .. header.child_count {
 		mut child := obj_header(header.children[i])

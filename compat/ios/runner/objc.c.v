@@ -234,6 +234,8 @@ mut:
 	alert_owned bool
 	alert_button bool
 	presenter u64 // Weak: a presenter owns its presented controller in fields[8].
+	capture_audio_delegate u64 // Zeroing weak; the output owns only its callback queue.
+	capture_audio_queue u64
 	value_owned bool
 	value_initialized bool
 	web_history bool
@@ -587,7 +589,7 @@ fn objc_start() {
         'UIScreenEdgePanGestureRecognizer', 'UIFeedbackGenerator', 'UINotificationFeedbackGenerator', 'UISelectionFeedbackGenerator', 'UIImpactFeedbackGenerator', 'CADisplayLink',
 		'UIAccessibilityElement',
         'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',
-        'AVAudioSession', 'AVAudioApplication', 'DCAppAttestService', 'AVCaptureDeviceDiscoverySession', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession',
+        'AVAudioSession', 'AVAudioApplication', 'DCAppAttestService', 'AVCaptureDeviceDiscoverySession', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession', 'AVCaptureOutput', 'AVCaptureAudioDataOutput',
         'AVCaptureVideoDataOutput', 'AVCaptureVideoPreviewLayer', 'PHPhotoLibrary',
 		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGFont', 'VinixReachability', 'VinixNWPath', 'VinixNWInterface', 'VinixNWPathMonitor', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider', 'VinixSecCertificate', 'VinixSecKey', 'VinixSecPolicy', 'VinixSecTrust', 'VinixCFDate', 'VinixCFError', 'VinixCFUUID'] {
 		parent := match name {
@@ -598,6 +600,7 @@ fn objc_start() {
 			'OS_dispatch_group' { ios_runtime.names['OS_dispatch_object'] }
 			'OS_dispatch_source' { ios_runtime.names['OS_dispatch_object'] }
 			'OS_dispatch_semaphore' { ios_runtime.names['OS_dispatch_object'] }
+			'AVCaptureAudioDataOutput' { ios_runtime.names['AVCaptureOutput'] }
 			'OS_dispatch_queue' { ios_runtime.names['OS_dispatch_object'] }
 			'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_global' { ios_runtime.names['OS_dispatch_queue'] }
 			'OS_dispatch_queue_serial' { ios_runtime.names['OS_dispatch_queue_serial_executor'] }
@@ -697,6 +700,8 @@ fn objc_start() {
 			'GCColor', 'CHHapticEventParameter', 'AVAudioApplication' { u32(24) }
 			'DCAppAttestService' { u32(16) } // Catalyst size; opaque shim storage.
 			'AVCaptureDeviceDiscoverySession' { u32(48) } // Catalyst size; opaque shim storage.
+			'AVCaptureOutput' { u32(16) }
+			'AVCaptureAudioDataOutput' { u32(24) } // Catalyst sizes; opaque shim storage.
 			'WKSnapshotConfiguration' { u32(56) }
 			'CHHapticDynamicParameter' { u32(32) }
 			'CHHapticEvent' { u32(48) }
@@ -1259,6 +1264,11 @@ fn runtime_symbol(library string, symbol string) !u64 {
 	if symbol in ['_OBJC_CLASS_$_AVCaptureDeviceDiscoverySession', '_OBJC_METACLASS_$_AVCaptureDeviceDiscoverySession']!
 		&& library != '/System/Library/Frameworks/AVFoundation.framework/AVFoundation' {
 		return error('iOS: capture discovery import requires AVFoundation.framework')
+	}
+	if symbol in ['_OBJC_CLASS_$_AVCaptureOutput', '_OBJC_METACLASS_$_AVCaptureOutput',
+		'_OBJC_CLASS_$_AVCaptureAudioDataOutput', '_OBJC_METACLASS_$_AVCaptureAudioDataOutput']!
+		&& library != '/System/Library/Frameworks/AVFoundation.framework/AVFoundation' {
+		return error('iOS: capture output import requires AVFoundation.framework')
 	}
 	if symbol in ['_OBJC_CLASS_$_DCAppAttestService', '_OBJC_METACLASS_$_DCAppAttestService']!
 		&& library != '/System/Library/Frameworks/DeviceCheck.framework/DeviceCheck' {
