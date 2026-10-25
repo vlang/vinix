@@ -515,6 +515,8 @@ mut:
 	notification_queues_draining bool
 	notification_queues_retired bool
 	audio_session u64
+	audio_application u64 // One factory-owned reference.
+	audio_application_retired bool
 	audio_converters map[u64]&AudioConverter
 	audio_units map[u64]&AudioUnit
 	audio_graphs map[u64]&AudioGraph
@@ -577,7 +579,7 @@ fn objc_start() {
         'UIScreenEdgePanGestureRecognizer', 'UIFeedbackGenerator', 'UINotificationFeedbackGenerator', 'UISelectionFeedbackGenerator', 'UIImpactFeedbackGenerator', 'CADisplayLink',
 		'UIAccessibilityElement',
         'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',
-        'AVAudioSession', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession',
+        'AVAudioSession', 'AVAudioApplication', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession',
         'AVCaptureVideoDataOutput', 'AVCaptureVideoPreviewLayer', 'PHPhotoLibrary',
 		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGFont', 'VinixReachability', 'VinixNWPath', 'VinixNWInterface', 'VinixNWPathMonitor', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider', 'VinixSecCertificate', 'VinixSecKey', 'VinixSecPolicy', 'VinixSecTrust', 'VinixCFDate', 'VinixCFError', 'VinixCFUUID'] {
 		parent := match name {
@@ -679,7 +681,7 @@ fn objc_start() {
 			'UIImageView' { u32(512) }
 			'GCKeyboard' { u32(32) }
 			'GCMouse' { u32(40) }
-			'GCColor' { u32(24) }
+			'GCColor', 'AVAudioApplication' { u32(24) }
 			'GCController' { u32(232) } // Measured host layouts; physical profile construction is unavailable.
 			'GCPhysicalInputProfile' { u32(680) }
 			'GCExtendedGamepad' { u32(872) }
@@ -828,6 +830,7 @@ fn objc_allocate(cls u64) u64 {
 	url_session_configuration_require_class(cls)
 	url_session_task_require_class(cls)
 	game_controller_require_discovery(cls)
+	audio_application_require_factory(cls)
 	sort_descriptor_require_class(cls)
 	regular_expression_require_class(cls)
 	mutable_string_require_class(cls)
@@ -1035,6 +1038,7 @@ fn objc_stop() {
 	notification_stop()
 	objc_release(ios_runtime.notification_center)
 	objc_release(ios_runtime.audio_session)
+	audio_application_stop()
 	objc_release(ios_runtime.defaults)
 	objc_release(ios_runtime.file_manager)
 	ios_runtime.file_manager = 0
@@ -1137,6 +1141,10 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if symbol in ['_OBJC_CLASS_$_AVAudioApplication', '_OBJC_METACLASS_$_AVAudioApplication']!
+		&& library != '/System/Library/Frameworks/AVFAudio.framework/AVFAudio' {
+		return error('iOS: audio application import requires AVFAudio.framework')
+	}
 	if (game_controller_class_name(symbol) != none
 		|| game_controller_constant_index(symbol) != none)
 		&& library != '/System/Library/Frameworks/GameController.framework/GameController' {

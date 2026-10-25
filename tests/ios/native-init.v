@@ -42,7 +42,11 @@ fn require_child(path string) {
 
 fn main() {
 	mode := os.read_file('/opt/ios/check-mode') or { panic(err) }
-	if mode == 'game-controller' {
+	if mode == 'audio-application' {
+		require_child('/opt/ios/audio-application-checks')
+		println('VINIX iOS AUDIOAPPLICATION: PASS')
+		C.fflush(unsafe { nil })
+	} else if mode == 'game-controller' {
 		require_child('/opt/ios/game-controller-checks')
 		println('VINIX iOS GAMECONTROLLER: PASS')
 		C.fflush(unsafe { nil })
@@ -55,7 +59,7 @@ fn main() {
 		println('VINIX iOS FEEDBACK: PASS')
 		C.fflush(unsafe { nil })
 	} else if mode == 'notifications' {
-		for name in ['game-controller', 'session-task', 'feedback', 'adsupport', 'bundle-resource', 'number-formatter', 'date-formatter', 'lock', 'recursive-lock', 'map-table', 'credential', 'telephony', 'cache', 'calendar', 'calendar-trigger', 'notification-request', 'notification-center', 'notification-content', 'notification-sound', 'notification-attachment']! {
+		for name in ['audio-application', 'game-controller', 'session-task', 'feedback', 'adsupport', 'bundle-resource', 'number-formatter', 'date-formatter', 'lock', 'recursive-lock', 'map-table', 'credential', 'telephony', 'cache', 'calendar', 'calendar-trigger', 'notification-request', 'notification-center', 'notification-content', 'notification-sound', 'notification-attachment']! {
 			require_child('/opt/ios/' + name + '-checks')
 		}
 		println('VINIX iOS NOTIFICATIONS: PASS')
@@ -132,6 +136,7 @@ fn main() {
 		require_child('/opt/ios/url-session-checks')
 		require_child('/opt/ios/game-controller-checks')
 		require_child('/opt/ios/session-task-checks')
+		require_child('/opt/ios/audio-application-checks')
 		require_child('/opt/ios/session-constants-checks')
 		require_child('/opt/ios/foundation-keys-checks')
 		require_child('/opt/ios/audio-services-checks')

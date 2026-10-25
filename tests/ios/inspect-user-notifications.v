@@ -43,6 +43,9 @@ fn main() {
   exit(code)
  }
  name := if os.args.len > 1 { os.args[1] } else { 'UNUserNotificationCenter' }
+ if name == 'AVAudioApplication' {
+  assert C.dlopen(c'/System/Library/Frameworks/AVFAudio.framework/AVFAudio', 2) != unsafe { nil }
+ }
  if name == 'CTTelephonyNetworkInfo' {
   assert C.dlopen(c'/System/Library/Frameworks/CoreTelephony.framework/CoreTelephony', 2) != unsafe { nil }
  }

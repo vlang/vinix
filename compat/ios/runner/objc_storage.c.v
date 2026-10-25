@@ -34,6 +34,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	url_session_configuration_require_class(cls)
 	url_session_task_require_class(cls)
 	game_controller_require_discovery(cls)
+	audio_application_install(cls, caller_storage)
 	sort_descriptor_require_class(cls)
 	regular_expression_require_class(cls)
 	mutable_string_require_class(cls)
@@ -146,6 +147,7 @@ fn objc_destruct_instance(object u64) u64 {
 
 fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	if header.destroyed || header.destroying { return }
+	audio_application_retire(object)
 	connection_dispose(header)
 	ns_pool_require_inactive(header)
 	ns_lock_retire(mut header)

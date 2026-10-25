@@ -102,6 +102,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := ui_feedback_types(info.name, info.meta, selector) { return types }
 	if types := game_keyboard_types(info.name, info.meta, selector) { return types }
 	if types := game_controller_types(info.name, info.meta, selector) { return types }
+	if types := audio_application_types(info.name, info.meta, selector) { return types }
 	if types := gc_color_types(info.name, info.meta, selector) { return types }
 	if types := ns_uuid_types(info.name, info.meta, selector) { return types }
 	if types := ns_file_manager_types(info.name, info.meta, selector) { return types }
@@ -182,6 +183,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if url_session_task_name(info.name) && url_session_task_unsupported(name) { return 0 }
 		if info.name in ['GCController', 'GCPhysicalInputProfile', 'GCMouse']! && game_controller_unsupported(name) { return 0 }
 		if info.name == 'GCColor' && gc_color_unsupported(name) { return 0 }
+		if info.name == 'AVAudioApplication' && audio_application_unsupported(name) { return 0 }
 		if info.name == 'NSLock' && ns_lock_unsupported(name) { return 0 }
 		if info.name == 'NSRecursiveLock' && ns_recursive_lock_unsupported(name) { return 0 }
 		if info.name in ['NSCoder', 'NSKeyedArchiver']! && ns_keyed_archiver_unsupported(name) { return 0 }
@@ -339,6 +341,9 @@ fn objc_set_class(object u64, cls u64) u64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if object in ios_runtime.classes || object in ios_runtime.constants { panic('iOS: changing a class or constant string isa is not implemented') }
+	if audio_application_family(cls) || audio_application_family(obj_header(object).allocation_cls) {
+		panic('iOS: changing audio application storage isa is not implemented')
+	}
 	info := ios_runtime.classes[cls] or { panic('iOS: object_setClass needs a known class') }
 	if info.meta || info.size > obj_header(object).native_size { panic('iOS: replacement class does not fit the object allocation') }
 	previous := read64(object)
