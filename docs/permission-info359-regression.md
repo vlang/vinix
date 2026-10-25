@@ -96,9 +96,9 @@ receipt is `permission-info359-framework-builder-peer-readback-2026-10-26.json`.
 ## ART and Maps status
 
 The same-APK ART harness is committed as `bea726cc3` and has compiled successfully.
-No old/new ART run or Maps360 replay has started. Their unchanged preparation
-gates require 1,024 MiB and 1,536 MiB free respectively; the last reported
-availability was 615,692 KiB. The complete framework build establishes the
-targeted bytecode change, while runtime outcomes remain pending. This evidence
-does not establish resolution of Maps' permission failure or later service
-teardown in a guest.
+ART preparation and old/new guest runs have not started; Maps360 generation and
+replay have not started. Their unchanged preparation gates require 1,024 MiB and
+1,536 MiB free respectively; the latest root checkpoint recorded 469,812 KiB
+available. The complete framework build establishes the targeted bytecode change;
+runtime outcomes remain pending. This evidence does not establish resolution of
+Maps' permission failure or later service teardown in a guest.
