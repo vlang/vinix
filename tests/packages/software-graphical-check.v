@@ -299,7 +299,7 @@ fn wait_label(mut child os.Process, mut monitor qmpclient.Monitor, log string,
 }
 
 fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work string, ordinary bool,
-	installed bool, first_run bool, boot int, previous screenshotcore.Image) !screenshotcore.Image {
+	installed bool, first_run bool, release_routing bool, boot int, previous screenshotcore.Image) !screenshotcore.Image {
 	log := work + if boot == 1 { '/serial.log' } else { '/serial-2.log' }
 	mut child := os.new_process(qemu)
 	defer {
@@ -328,13 +328,69 @@ fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work
 			if release_card(shot(mut monitor, work, 'first-run-01-card')!) { break }
 			time.sleep(200 * time.millisecond)
 		}
-		click(mut monitor, 512, 439)!
+		click(mut monitor, 512, if release_routing { 491 } else { 439 })!
 	}
 	wait_marker(mut child, log, deadline, 'vinix-desktop: ready')!
 	if ordinary { wait_marker(mut child, log, deadline, 'SOFTWARE GRAPHICAL ordinary-compositor')! }
 	time.sleep(2 * time.second)
+	if release_routing && boot == 1 {
+		// A minimal root has no Files binary, so the normal initial window is
+		// the fallback System panel. Close it through real input before freezing
+		// the desktop: its live frame counter would invalidate exact controls.
+		click(mut monitor, 936, 70)!
+		point(mut monitor, 800, 700)!
+		before := shot(mut monitor, work, 'release-routing-01-desktop')!
+		if healthy(mut child, log, deadline)!.contains('SOFTWARE RELEASE ROUTING malformed') {
+			return error('routing controls began before the desktop baseline was captured')
+		}
+		for control in ['extra-token', 'action'] {
+			wait_marker(mut child, log, deadline,
+				'SOFTWARE RELEASE ROUTING malformed ' + control + ' enqueued PASS')!
+			// A queued dialog follows the malformed action. Its real cancellation
+			// is a FIFO barrier: only the compositor may complete dialog.result.
+			for {
+				healthy(mut child, log, deadline)!
+				barrier := shot(mut monitor, work, if control == 'extra-token' {
+					'release-routing-02-extra-barrier'
+				} else { 'release-routing-03-action-barrier' })!
+				if region_changes(before, barrier, 140, 90, 650, 450) > 100 { break }
+				time.sleep(100 * time.millisecond)
+			}
+			key(mut monitor, 'esc')!
+			wait_marker(mut child, log, deadline,
+				'SOFTWARE RELEASE ROUTING malformed ' + control + ' drained PASS')!
+			time.sleep(time.second)
+			after := shot(mut monitor, work, if control == 'extra-token' {
+				'release-routing-02-extra-refused'
+			} else { 'release-routing-03-action-refused' })!
+			later := if control == 'extra-token' { 'SOFTWARE RELEASE ROUTING malformed action' }
+				else { 'SOFTWARE RELEASE ROUTING exact software.release-review' }
+			if healthy(mut child, log, deadline)!.contains(later) ||
+				region_changes(before, after, 0, 70, 1024, 620) != 0 {
+				return error('malformed release route changed the desktop or exceeded its observation window')
+			}
+		}
+		os.write_file(work + '/release-routing-controls.json', json2.encode({
+			'format': json2.Any(1),
+			'malformed_extra_token': json2.Any('no Software window'),
+			'malformed_action': json2.Any('no Software window'),
+			'unchanged_region': json2.Any([json2.Any(0), json2.Any(70), json2.Any(1024), json2.Any(620)]),
+		}) + '\n')!
+		wait_marker(mut child, log, deadline,
+			'SOFTWARE FIRST RUN review handed to Software without activation or approval PASS')!
+		// The signed proposal oracle runs independently of the compositor. Wait
+		// for its queued action to render before targeting the title-bar control.
+		for {
+			healthy(mut child, log, deadline)!
+			proposal := shot(mut monitor, work, 'first-run-02-proposal')!
+			if region_changes(before, proposal, 0, 70, 1024, 620) > 100 { break }
+			time.sleep(100 * time.millisecond)
+		}
+	}
 	if first_run && boot == 2 {
-		wait_marker(mut child, log, deadline, 'SOFTWARE FIRST RUN BOOT 2 retained review decision no repeated prompt PASS')!
+		choice := if release_routing { 'skip' } else { 'review' }
+		wait_marker(mut child, log, deadline, 'SOFTWARE FIRST RUN BOOT 2 retained ' +
+			choice + ' decision no repeated prompt PASS')!
 		shot(mut monitor, work, 'first-run-03-reboot-desktop')!
 		// Explicitly open Software through the normal Start search, after ready.
 		click(mut monitor, 24, 744)!
@@ -474,12 +530,16 @@ fn check() ! {
 	ordinary := options['--ordinary'] or { 'false' }
 	installed := options['--installed'] or { 'false' }
 	first_run := options['--first-run'] or { 'false' }
+	release_routing := options['--release-routing'] or { 'false' }
 	if ordinary !in ['true', 'false'] { return error('--ordinary must be true or false') }
 	if installed !in ['true', 'false'] || (installed == 'true' && ordinary != 'true') {
 		return error('--installed=true requires --ordinary=true')
 	}
 	if first_run !in ['true', 'false'] || (first_run == 'true' && installed != 'true') {
 		return error('--first-run=true requires --installed=true')
+	}
+	if release_routing !in ['true', 'false'] || (release_routing == 'true' && first_run != 'true') {
+		return error('--release-routing=true requires --first-run=true')
 	}
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported architecture') }
 	root := hwhost.find_root(@FILE)!
@@ -542,7 +602,6 @@ fn check() ! {
 			'architecture': json2.Any(arch), 'packages': json2.Any([json2.Any('org.vinix.counter')])}) + '\n')!
 		os.chmod(declaration, 0o644)!
 		os.write_file(work + '/rootfs/etc/software-graphical-first-run', '1\n')!
-		pin(mut artifacts, mut artifact_paths, 'release-declaration', declaration)!
 	}
 	os.write_file(work + '/rootfs/etc/software-graphical-mode', if ordinary == 'true' {
 		'ordinary\n'
@@ -559,9 +618,45 @@ fn check() ! {
 			work + '/publisher-workspace'])!
 		pkgcore.publish_release(work + '/publisher-workspace', 'native', os.real_path(publisher) + '/seed', u64(time.now().unix()), time.now().unix() + 3600, repository)!
 	}
+	if release_routing == 'true' {
+		// Resolve the complete lock from an authenticated disposable copy. The
+		// installed fixture itself stays fresh until its own initial refresh.
+		invoke('cp', ['-Rp', work + '/rootfs', work + '/lock-root'])!
+		// The guest's file URL is absolute inside its root. Only the disposable
+		// host-side resolver uses the copied repository's host path.
+		lock_config := work + '/lock-root/etc/vinix-packages/config.json'
+		mut configuration_document := json2.decode[json2.Any](os.read_file(lock_config)!)!.as_map()
+		mut repositories := configuration_document['repositories']!.as_array()
+		for index, entry in repositories {
+			mut repository := entry.as_map().clone()
+			if repository['id']!.str() == 'native' {
+				repository['url'] = json2.Any('file://' + work + '/lock-root/usr/share/vinix-packages/repositories/native')
+				repositories[index] = json2.Any(repository)
+			}
+		}
+		configuration_document['repositories'] = json2.Any(repositories)
+		os.write_file(lock_config, json2.encode(configuration_document) + '\n')!
+		service := pkgcore.Service{root: work + '/lock-root', offline: true}
+		mut catalog := service.refresh()!
+		defer { catalog.close() }
+		mut document := service.lock_deployment(['org.vinix.counter'])!
+		defer { document.close() }
+		if document.format != 2 || document.packages != ['org.vinix.counter'] ||
+			document.locked.len != 1 || document.locked[0].id != 'org.vinix.counter' ||
+			document.locked[0].version != '1.0.0' {
+			return error('release routing requires the exact complete signed Counter lock')
+		}
+		os.write_file(work + '/rootfs/usr/share/vinix-packages/applications.json', json2.encode(document) + '\n')!
+		os.write_file(work + '/rootfs/etc/software-graphical-release-routing', '1\n')!
+	}
+	if first_run == 'true' {
+		pin(mut artifacts, mut artifact_paths, 'release-declaration',
+			work + '/rootfs/usr/share/vinix-packages/applications.json')!
+	}
 	os.cp(desktop, work + '/rootfs/usr/bin/vinix-desktop')!
 	os.chmod(work + '/rootfs/usr/bin/vinix-desktop', 0o755)!
-	guest := hwhost.build_program(host, work + '/source/guest', work + '/guest-build', 'init', ['.'])!
+	guest := hwhost.build_program_with_flags(host, work + '/source/guest', work + '/guest-build',
+		'init', ['.'], ['-enable-globals'])!
 	os.mkdir_all(work + '/rootfs/sbin')!
 	os.cp(guest, work + '/rootfs/sbin/init')!
 	os.chmod(work + '/rootfs/sbin/init', 0o755)!
@@ -612,9 +707,9 @@ fn check() ! {
 		} else { ['-drive', 'if=ide,format=raw,cache=writeback,file=' + work + '/system.vjfs'] }
 	}
 	checkpoint := graphical_boot(arch, host.qemu, arguments, qmp, work, ordinary == 'true',
-		installed == 'true', first_run == 'true', 1, screenshotcore.Image{})!
+		installed == 'true', first_run == 'true', release_routing == 'true', 1, screenshotcore.Image{})!
 	if installed == 'true' {
-		graphical_boot(arch, host.qemu, arguments, qmp, work, true, true, first_run == 'true', 2, checkpoint)!
+		graphical_boot(arch, host.qemu, arguments, qmp, work, true, true, first_run == 'true', release_routing == 'true', 2, checkpoint)!
 		pin(mut artifacts, mut artifact_paths, 'system-disk', work + '/system.vjfs')!
 		pin(mut artifacts, mut artifact_paths, 'serial-2', work + '/serial-2.log')!
 		pin(mut artifacts, mut artifact_paths, 'shutdown-2', work + '/shutdown-2.jsonl')!
@@ -626,6 +721,9 @@ fn check() ! {
 			'boot-configuration': work + '/iso/iso-root/boot/limine.conf'
 			'boot-image-commands': work + '/image-commands.json'
 		} { pin(mut artifacts, mut artifact_paths, name, path)! }
+	}
+	if release_routing == 'true' {
+		pin(mut artifacts, mut artifact_paths, 'release-routing-controls', work + '/release-routing-controls.json')!
 	}
 	build_receipt := os.dir(desktop) + '/desktop-build.json'
 	if os.is_file(build_receipt) {
@@ -660,7 +758,9 @@ fn check() ! {
 	}
 	os.write_file(work + '/qualification.json', json2.encode(GraphicalReceipt{
 		architecture: arch
-		platform:     if first_run == 'true' {
+		platform:     if release_routing == 'true' {
+			'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'
+		} else if first_run == 'true' {
 			'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
 		} else if installed == 'true' {
 			'qemu-framebuffer-ordinary-seat-installed-root-two-boots'

@@ -14,7 +14,9 @@ fn check_first_run_inputs(fresh bool) ! {
 	}
 	document := json2.decode[json2.Any](os.read_file(release_declaration)!)!.as_map()
 	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
-	if document.len != 3 || document['format']! != json2.Any(f64(1)) ||
+	if release_routing_enabled() {
+		check_release_routing_declaration(document, architecture)!
+	} else if document.len != 3 || document['format']! != json2.Any(f64(1)) ||
 		document['architecture']!.str() != architecture ||
 		document['packages']!.as_array().map(it.str()) != ['org.vinix.counter'] {
 		return error('first-run declaration is not the complete architecture-matched Counter set')
@@ -32,8 +34,9 @@ fn check_first_run_inputs(fresh bool) ! {
 
 fn check_first_run_decision() ! {
 	info := os.lstat(release_decision)!
+	choice := if release_routing_enabled() { 'skip' } else { 'review' }
 	if info.uid != 1000 || info.mode & 0o170000 != 0o100000 || info.mode & 0o777 != 0o600 ||
-		os.read_file(release_decision)! != 'review\n' {
+		os.read_file(release_decision)! != choice + '\n' {
 		return error('first-run Review decision is not exact, private and owned by alex')
 	}
 }
@@ -76,5 +79,6 @@ fn first_run_proposal() ! {
 	}
 	require_uninstalled()!
 	println('SOFTWARE FIRST RUN PROPOSAL ' + json2.encode(review))
-	println('SOFTWARE FIRST RUN private decision owner=1000 mode=0600 value=review PASS')
+	choice := if release_routing_enabled() { 'skip' } else { 'review' }
+	println('SOFTWARE FIRST RUN private decision owner=1000 mode=0600 value=' + choice + ' PASS')
 }

@@ -240,8 +240,9 @@ fn run() ! {
 			if first_run {
 				check_first_run_decision()!
 				if !fresh {
-					println('SOFTWARE FIRST RUN private decision owner=1000 mode=0600 value=review PASS')
-					println('SOFTWARE FIRST RUN BOOT 2 retained review decision no repeated prompt PASS')
+					choice := if release_routing_enabled() { 'skip' } else { 'review' }
+					println('SOFTWARE FIRST RUN private decision owner=1000 mode=0600 value=' + choice + ' PASS')
+					println('SOFTWARE FIRST RUN BOOT 2 retained ' + choice + ' decision no repeated prompt PASS')
 				}
 			}
 			if previous_marker.is_opened { previous_marker.close() }
@@ -249,7 +250,9 @@ fn run() ! {
 			ready = true
 			ready_at = time.sys_mono_now()
 		}
-		if ready && !reviewed && time.sys_mono_now() - ready_at >= 3 * time.second {
+		if ready && !reviewed && time.sys_mono_now() - ready_at >=
+			if release_routing_enabled() { 8 * time.second } else { 3 * time.second } {
+			if release_routing_enabled() { release_routing_request()! }
 			first_run_proposal()!
 			println('SOFTWARE FIRST RUN review handed to Software without activation or approval PASS')
 			reviewed = true
@@ -297,6 +300,11 @@ fn run() ! {
 }
 
 fn main() {
+	// An isolated client keeps the diagnostic pipes supplied by PID 1.
+	if os.args.len == 2 && os.args[1] == '--release-routing-client' {
+		release_routing_client() or { eprintln('SOFTWARE GRAPHICAL FAIL: ' + err.msg()); exit(1) }
+		return
+	}
 	// x86 console output is graphical. Keep fd 0 as the inherited seat-console
 	// capability while routing fixture and child diagnostics to the serial log.
 	console := $if arm64 { '/dev/console' } $else { '/dev/com1' }
