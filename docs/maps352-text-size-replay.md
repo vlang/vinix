@@ -78,6 +78,7 @@ two replacements, exact overlay, unchanged base boot members, APK inputs and
 | `maps352-check-receipt-2026-10-25/sha256.json` | `32d4f39aab1af46378db40da0ecd3c64b4f79bafab03cae1a49c5e24dcf10b8f` |
 | `maps352-run-receipt-2026-10-25/sha256.json` | `cb947930d5d1fd2dab4c9dbfd3bf453c4308c0cbf6089a96ac10ba990147220c` |
 | `maps352-2026-10-25/sha256.json` | `e39f99459a6ee90b8a0d8f9602b3a9719e70f68cdc3589b46dd183053e7f6fda` |
+| `maps352-postrun-interactions-r3-2026-10-25/sha256.json` | `85f2e98414e8961335d0409c790c2904a0bfff9992d86caf62aa1b92513282e8` |
 
 ## Outcome
 
@@ -119,6 +120,14 @@ readback passes all 69,490 entries, including file hashes, directory/link entrie
 and modes. Verification output and the launch readback receipt remain adjacent
 to the sealed bundles as `maps352-report-canonical-readback-2026-10-25.log` and
 `maps352-report-run-readback-2026-10-25.json`.
+
+A screenshot command completed after automatic collection at 19:35:13 UTC,
+exiting 1 with `No such file or directory`; it produced no `attraction-details.png`.
+The separate post-run supplement retains the complete working attempt, exact
+canonical interaction prefix, two appended interaction lines and both late
+command logs. Its complete typed readback passes all 804 entries, with no socket
+omissions. It includes the recorded preserver build and provenance; the canonical
+bundle remains unchanged and this failed capture qualifies no additional behavior.
 
 The retained runner repeats complete canonical verification:
 
