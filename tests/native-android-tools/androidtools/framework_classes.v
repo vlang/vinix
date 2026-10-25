@@ -128,6 +128,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_child_states(smali)!
  framework_child_order(smali)!
  framework_drawable_optical_insets(smali)!
+ framework_nine_patch_dimensions(smali)!
  framework_gradient_colors(smali)!
  framework_ripple_radius(smali)!
  framework_vector_fill_rules(smali)!
