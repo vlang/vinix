@@ -32,7 +32,7 @@ const queue_source = 'ff4bb8c0657a240d47bf6164879a02e6db994aa74ad5d160c53b046d20
 const runtime_source = '4a55617a8e2f2013c6ac51c29e8c3919a53bc269b34d4b46dffdfdc5ab17ed94'
 const compiler_path = 'build/android-maps/queue284-tools/v_old276'
 const compiler_pin = '109a0bad877cf42cd19382a87d3e3d62e9c153e3d74a566b2b3e650a1aec318e'
-const tool_root = '/Users/alex/.local/state/vinix/android/queue284-evidence-tool-fast2-2026-10-25'
+const tool_root = '/Users/alex/.local/state/vinix/android/queue284-evidence-tool-fast3-2026-10-25'
 const pass_markers = ['BOOTSTRAP-QUEUE-PUMP-PASS', 'BOOTSTRAP-QUEUE-PUMP-COMPLETE-PASS', 'BOOTSTRAP-READY']
 const jar_path = 'opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/api-impl.jar'
 const native_path = 'opt/vinix-android-aarch64/usr/lib/art/libvinix-android-native.so'
@@ -307,7 +307,9 @@ fn verify_inputs(root string) ! {
 	expected_config['base_module'] = os.abs_path(compound + '/base-runtime.tar')
 	for field in ['boot_image', 'efivars', 'native_dir', 'output'] { expected_config.delete(field) }
 	sealed282 := pins(pre + '/qualified282-sha256.json')!
-	for field in ['qemu', 'firmware', 'input_tool', 'java', 'aapt2', 'apksigner'] {
+	// Guest execution inputs retain historical equality. The same newly built
+	// APK is inspected with the retained284 host tools in both runs.
+	for field in ['qemu', 'firmware', 'input_tool'] {
 		path := expected_config[field]!.str()
 		digest := hash(retained(root, path)!)!
 		mut historical := ''
@@ -418,6 +420,11 @@ fn verify_runs(root string) ! {
 		done := object(base + '-receipt.json')!
 		for key, value in before { assert done[key]! == value, mode + ':' + key }
 		assert before['argv']!.as_array().map(it.str()) == [compound + '/suite', compound + '/' + mode + '.json']
+		config := object(pre + '/' + mode + '.json')!
+		frozen := pins(pre + '/frozen-inputs.json')!
+		mut expected_inspection := map[string]json2.Any{}
+		for field in ['java', 'aapt2', 'apksigner'] { path := config[field]!.str(); expected_inspection[path] = frozen[path]! }
+		assert before['inspection_tool_sha256']!.as_map() == expected_inspection, 'same retained284 host APK inspection tools'
 		for key, path in {'suite_sha256': pre + '/suite', 'config_sha256': pre + '/' + mode + '.json', 'external_prelaunch_inventory_sha256': root + '/prelaunch-sha256.json', 'runner_sha256': root + '/run-tool/queue284-evidence', 'runner_source_sha256': root + '/run-tool/queue284-evidence.v', 'stdout_sha256': base + '.log', 'results_sha256': base + '/results.json'} { assert done[key]!.str() == hash(path)!, mode + ':' + key }
 		assert done['exit_code']!.int() == 0 && done['started_utc']!.str() != '' && done['completed_utc']!.str() != ''
 		rows := json2.decode[[]json2.Any](os.read_file(base + '/results.json')!)!
@@ -476,7 +483,16 @@ fn run_pair(base string, mode string) ! {
 	assert hash(os.executable())! == hash(tool + '/queue284-evidence')!
 	root := object(base + '/attempt.json')!['audit']!.str()
 	argv := [base + '/suite', base + '/' + mode + '.json']
+	config := object(argv[1])!
+	frozen := pins(base + '/frozen-inputs.json')!
+	mut inspection_tools := map[string]json2.Any{}
+	for field in ['java', 'aapt2', 'apksigner'] {
+		path := config[field]!.str()
+		assert hash(path)! == frozen[path]!, 'same retained284 APK inspection tool: ' + field
+		inspection_tools[path] = frozen[path]!
+	}
 	mut receipt := {'argv': json2.Any(argv), 'started_utc': json2.Any(time.utc().str()), 'suite_sha256': json2.Any(hash(argv[0])!), 'config_sha256': json2.Any(hash(argv[1])!), 'external_prelaunch_inventory_sha256': json2.Any(hash(root + '/prelaunch-sha256.json')!), 'runner_sha256': json2.Any(hash(os.executable())!), 'runner_source_sha256': json2.Any(hash(@FILE)!)}
+	receipt['inspection_tool_sha256'] = inspection_tools
 	prefix := base + '/run-' + mode
 	os.write_file(prefix + '-before.json', json2.encode(receipt, prettify: true) + '\n')!
 	r := os.exec(argv)
@@ -485,6 +501,7 @@ fn run_pair(base string, mode string) ! {
 	receipt['exit_code'] = json2.Any(r.exit_code)
 	receipt['stdout_sha256'] = hash(prefix + '.log')!
 	for key, path in {'suite_sha256': argv[0], 'config_sha256': argv[1], 'external_prelaunch_inventory_sha256': root + '/prelaunch-sha256.json', 'runner_sha256': tool + '/queue284-evidence', 'runner_source_sha256': tool + '/queue284-evidence.v'} { assert receipt[key]!.str() == hash(path)!, key }
+	for path, digest in inspection_tools { assert hash(path)! == digest.str(), 'APK inspection tool unchanged through run: ' + path }
 	if r.exit_code == 0 {
 		receipt['results_sha256'] = hash(prefix + '/results.json')!
 		stage := staged_files(prefix)!
