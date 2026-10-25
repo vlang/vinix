@@ -102,6 +102,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := ui_feedback_types(info.name, info.meta, selector) { return types }
 	if types := game_keyboard_types(info.name, info.meta, selector) { return types }
 	if types := game_controller_types(info.name, info.meta, selector) { return types }
+	if types := gc_color_types(info.name, info.meta, selector) { return types }
 	if types := ns_uuid_types(info.name, info.meta, selector) { return types }
 	if types := ns_file_manager_types(info.name, info.meta, selector) { return types }
 	if types := ns_process_info_types(info.name, info.meta, selector) { return types }
@@ -180,6 +181,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name == 'NSURLSessionConfiguration' && url_session_configuration_unsupported(name) { return 0 }
 		if url_session_task_name(info.name) && url_session_task_unsupported(name) { return 0 }
 		if info.name in ['GCController', 'GCPhysicalInputProfile']! && game_controller_unsupported(name) { return 0 }
+		if info.name == 'GCColor' && gc_color_unsupported(name) { return 0 }
 		if info.name == 'NSLock' && ns_lock_unsupported(name) { return 0 }
 		if info.name == 'NSRecursiveLock' && ns_recursive_lock_unsupported(name) { return 0 }
 		if info.name in ['NSCoder', 'NSKeyedArchiver']! && ns_keyed_archiver_unsupported(name) { return 0 }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import math.bits
+
 $if macos {
 	#flag -framework Foundation
 	#include <objc/runtime.h>
@@ -239,4 +241,148 @@ fn test_gamepad_rejections() {
 	}
 	objc_stop(); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
 	println('IOS-GAMEPAD-REJECT: 36 construction, caller storage, subclass, copying, coding and touchpad cases fail explicitly')
+}
+
+type ColorInitSend = fn (u64, u64, f32, f32, f32) u64
+type ColorGetSend = fn (u64, u64) f32
+fn (api ControllerApi) sel(selector &char) u64 {
+	$if macos { if api.native { return u64(C.sel_registerName(selector)) } }
+	return u64(selector)
+}
+fn (api ControllerApi) color_init(object u64, values [3]u32) u64 {
+	return unsafe { ColorInitSend(voidptr(api.send))(object, api.sel(c'initWithRed:green:blue:'), bits.f32_from_bits(values[0]), bits.f32_from_bits(values[1]), bits.f32_from_bits(values[2])) }
+}
+fn (api ControllerApi) color_bits(object u64, selector &char) u32 {
+	return bits.f32_bits(unsafe { ColorGetSend(voidptr(api.send))(object, api.sel(selector)) })
+}
+fn color_values(api ControllerApi) {
+	object := api.msg(api.cls, c'new', 0)
+	for selector in [c'red', c'green', c'blue']! { assert api.color_bits(object, selector) == 0 }
+	api.msg(object, c'release', 0)
+	for values in [[u32(0x3e800000), 0x3f000000, 0x3f400000]!,
+		[u32(0xbf800000), 0x40000000, 0x3f800000]!,
+		[u32(0x7fc01234), 0x7f800000, 0xff800000]!,
+		[u32(0x80000000), 0, 0x3f800000]!,
+		[u32(1), 0x7f7fffff, 0xff7fffff]!] {
+		for copier in [c'copy', c'copyWithZone:']! {
+			source := api.color_init(api.msg(api.cls, c'alloc', 0), values)
+			for i, selector in [c'red', c'green', c'blue']! { assert api.color_bits(source, selector) == values[i] }
+			duplicate := api.msg(source, copier, 0)
+			assert duplicate != 0 && duplicate != source && api.msg(duplicate, c'class', 0) == api.cls
+			api.msg(source, c'release', 0)
+			for i, selector in [c'red', c'green', c'blue']! { assert api.color_bits(duplicate, selector) == values[i] }
+			api.msg(duplicate, c'release', 0)
+		}
+	}
+	color := api.color_init(api.msg(api.cls, c'alloc', 0), [u32(0x3e800000), 0x3f000000, 0x3f400000]!)
+	assert ctext(api.msg(api.msg(color, c'description', 0), c'UTF8String', 0)) == '<GCColor r=0.250000 g=0.500000 b=0.750000>'
+	api.msg(color, c'release', 0)
+}
+fn color_red_override(object u64, selector &char) f32 { return f32(0.875) }
+fn color_init_unexpected(object u64, selector &char, red f32, green f32, blue f32) u64 {
+	panic('GCColor copy must not call the subclass initializer')
+}
+fn test_gc_color_native() {
+	$if macos {
+		assert C.dlopen(c'/System/Library/Frameworks/GameController.framework/GameController', 2) != unsafe { nil }
+		cls := u64(C.objc_getClass(c'GCColor'))
+		assert cls != 0 && C.class_getInstanceSize(unsafe { voidptr(cls) }) == 24
+		assert C.class_getSuperclass(unsafe { voidptr(cls) }) == C.objc_getClass(c'NSObject')
+		api := ControllerApi{native: true, send: u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend')), cls: cls}
+		pool := api.msg(u64(C.objc_getClass(c'NSAutoreleasePool')), c'new', 0)
+		color_values(api); api.msg(pool, c'drain', 0)
+		println('IOS-GC-COLOR-NATIVE: 24-byte NSObject, zero default, exact RGB float bits, independent copies and description')
+	}
+}
+fn test_gc_color_runtime() {
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push()
+		cls := ios_runtime.names['GCColor']; api := controller_api(cls)
+		library := '/System/Library/Frameworks/GameController.framework/GameController'
+		for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_']! {
+			assert runtime_symbol(library, prefix + 'GCColor')! == if prefix == '_OBJC_CLASS_$_' { cls } else { read64(cls) }
+			for wrong in ['Foundation', 'UIKit']! {
+				if _ := runtime_symbol('/System/Library/Frameworks/' + wrong + '.framework/' + wrong, prefix + 'GCColor') { assert false }
+			}
+		}
+		assert objc_class_size(cls) == 24 && objc_class_parent(cls) == ios_runtime.names['NSObject']
+		for i, name in ['_red', '_green', '_blue']! {
+			ivar := objc_find_ivar(cls, name.str)
+			assert ivar != 0 && objc_ivar_offset(ivar) == 8 + 4 * i
+			assert ctext(u64(objc_ivar_types(ivar))) == 'f' && ctext(u64(objc_ivar_name(ivar))) == name
+		}
+		for selector, types in {'initWithRed:green:blue:': '@28@0:8f16f20f24', 'red': 'f16@0:8', 'green': 'f16@0:8', 'blue': 'f16@0:8', 'copyWithZone:': '@24@0:8^{_NSZone=}16', 'description': '@16@0:8'} {
+			method := objc_instance_method(cls, u64(selector.str))
+			assert method != 0 && ctext(u64(objc_method_types(method))) == types
+			signature := api.msg(cls, c'instanceMethodSignatureForSelector:', u64(selector.str))
+			assert signature != 0
+			assert api.msg(signature, c'methodReturnLength', 0) == if types.starts_with('f') { u64(4) } else { u64(8) }
+			if selector == 'initWithRed:green:blue:' {
+				assert api.msg(signature, c'numberOfArguments', 0) == 5
+				for index in 2 .. 5 { assert ctext(api.msg(signature, c'getArgumentTypeAtIndex:', u64(index))) == 'f' }
+			}
+		}
+		for selector in ['mutableCopy', 'mutableCopyWithZone:', 'initWithCoder:', 'encodeWithCoder:', 'supportsSecureCoding', 'initWithColorPreset:']! {
+			assert objc_instance_method(cls, u64(selector.str)) == 0 && objc_class_method(cls, u64(selector.str)) == 0
+		}
+		color_values(api)
+		color := api.color_init(api.msg(cls, c'alloc', 0), [u32(0x3e800000), 0x3f000000, 0x3f400000]!)
+		mut weak := u64(0); objc_store_weak(&weak, color)
+		duplicate := api.msg(color, c'copy', 0); assert obj_header(duplicate).refs == 1
+		api.msg(color, c'release', 0); assert weak == 0
+		assert api.color_bits(duplicate, c'green') == 0x3f000000
+		api.msg(duplicate, c'release', 0); objc_store_weak(&weak, 0)
+		mut storage := [5]u64{}; storage[0] = 0x12345678; storage[4] = 0x87654321
+		caller := u64(unsafe { &storage[1] })
+		assert objc_construct_instance(cls, caller) == caller && api.msg(caller, c'init', 0) == caller
+		assert api.color_bits(caller, c'red') == 0
+		assert api.color_init(caller, [u32(0x80000000), 0x7fc01234, 0x40000000]!) == caller
+		assert api.color_bits(caller, c'green') == 0x7fc01234
+		objc_destruct_instance(caller)
+		assert storage[0] == 0x12345678 && storage[4] == 0x87654321
+		sub := objc_allocate_class(cls, c'VinixRGBColor', 0)
+		assert objc_add_ivar(sub, c'_extra', 8, 3, c'Q'); objc_register_class(sub)
+		child := api.color_init(api.msg(sub, c'alloc', 0), [u32(0x3e800000), 0x3f000000, 0x3f400000]!)
+		unsafe { *(&u64(child + 24)) = 0x123456789abcdef0 }
+		saved := objc_method_imp(objc_instance_method(cls, u64(c'red')))
+		assert objc_add_method(sub, u64(c'red'), u64(unsafe { voidptr(color_red_override) }), c'f16@0:8')
+		assert api.color_bits(child, c'red') == 0x3f600000
+		assert bits.f32_bits(unsafe { ColorGetSend(voidptr(saved))(child, u64(c'red')) }) == 0x3e800000
+		assert objc_add_method(sub, u64(c'initWithRed:green:blue:'), u64(unsafe { voidptr(color_init_unexpected) }), c'@28@0:8f16f20f24')
+		child_copy := api.msg(child, c'copy', 0)
+		assert read64(child_copy) == sub && api.color_bits(child_copy, c'blue') == 0x3f400000
+		assert bits.f32_bits(unsafe { ColorGetSend(voidptr(saved))(child_copy, u64(c'red')) }) == 0x3e800000
+		assert read64(child_copy + 24) == 0
+		api.msg(child, c'release', 0); api.msg(child_copy, c'release', 0)
+		objc_pool_pop(pool); objc_stop()
+		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0 && ios_runtime.block_refs.len == 0
+	}
+	println('IOS-GC-COLOR: scoped imports, float ABI and ivars, exact bits, copy ownership, caller storage, subclass overrides, saved IMP and two drained runtimes')
+}
+fn test_gc_color_rejections() {
+	objc_start(); api := controller_api(ios_runtime.names['GCColor'])
+	for mode in ['mutableCopy', 'mutableCopyWithZone:', 'initWithCoder:', 'encodeWithCoder:', 'supportsSecureCoding', 'initWithColorPreset:', 'changed-isa', 'foreign-storage']! {
+		mut fds := [2]i32{}; assert C.pipe(unsafe { &fds[0] }) == 0
+		pid := C.fork(); assert pid >= 0
+		if pid == 0 {
+			C.close(fds[0]); assert C.dup2(fds[1], 2) == 2; C.close(fds[1])
+			if mode in ['changed-isa', 'foreign-storage']! {
+				sub := objc_allocate_class(if mode == 'changed-isa' { api.cls } else { ios_runtime.names['NSObject'] }, c'VinixChangedColor', 0)
+				if mode == 'foreign-storage' { assert objc_add_ivar(sub, c'_padding', 16, 3, c'[16C]') }
+				objc_register_class(sub)
+				object := objc_allocate(if mode == 'changed-isa' { api.cls } else { sub })
+				objc_set_class(object, if mode == 'changed-isa' { sub } else { api.cls })
+				api.msg(object, c'red', 0)
+			} else { api.msg(if mode == 'supportsSecureCoding' { api.cls } else { objc_allocate(api.cls) }, mode.str, 0) }
+			C._exit(0)
+		}
+		C.close(fds[1]); mut bytes := [16384]u8{}; mut length := 0
+		for { assert length < bytes.len; count := C.read(fds[0], unsafe { &bytes[length] }, usize(bytes.len - length)); if count == 0 { break }; if count < 0 && unsafe { *C.ios_errno_address() } == C.EINTR { continue }; assert count > 0; length += int(count) }
+		C.close(fds[0]); mut status := i32(0); assert C.ios_waitpid(pid, &status, 0) == pid && status == 256
+		output := unsafe { tos(&bytes[0], length) }
+		reason := if mode in ['changed-isa', 'foreign-storage']! { 'GCColor requires live owned color storage' } else { 'unsupported GCColor method: ' + mode }
+		assert output.contains(reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output
+	}
+	objc_stop(); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
+	println('IOS-GC-COLOR-REJECT: eight mutable copying, coding, preset and incompatible storage cases fail explicitly')
 }

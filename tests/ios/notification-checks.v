@@ -44,6 +44,9 @@ fn main() {
 		for name in ['GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad']! {
 			run(out, name + '-metadata', [out + '/inspect-user-notifications', name], false)
 		}
+	} else if os.args[1] == 'gc-color-inspect' {
+		run(out, 'GCColor-metadata', [out + '/inspect-user-notifications', 'GCColor'], false)
+		run(out, 'gc-color-inspect', [out + '/inspect-gc-color'], false)
 	} else if os.args[1] == 'session-task-inspect' {
 		for name in ['NSURLSessionTask', 'NSURLSessionDownloadTask', 'NSURLSessionDataTask', 'NSURLSessionUploadTask']! {
 			run(out, name + '-metadata', [out + '/inspect-user-notifications', name], false)

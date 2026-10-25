@@ -46,7 +46,7 @@ fn main() {
  if name == 'CTTelephonyNetworkInfo' {
   assert C.dlopen(c'/System/Library/Frameworks/CoreTelephony.framework/CoreTelephony', 2) != unsafe { nil }
  }
- if name in ['GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad']! {
+ if name in ['GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor']! {
   assert C.dlopen(c'/System/Library/Frameworks/GameController.framework/GameController', 2) != unsafe { nil }
  }
  if name == 'ASIdentifierManager' {
