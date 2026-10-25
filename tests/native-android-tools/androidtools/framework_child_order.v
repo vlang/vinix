@@ -17,6 +17,10 @@ return-void'))!)!
 	root := smali + '/android/view/WindowManagerImpl$WindowViewParent.smali'
 	os.write_file(root, os.read_file(root)! + touch_method('public bringChildToFront(Landroid/view/View;)V', 'return-void'))!
 	group := smali + '/android/view/ViewGroup.smali'
+	// The protected callback is also called directly by subclasses during
+	// layout. Its default implementation is independent of the drawing-order
+	// flag; custom traversal by the renderer is a separate contract.
+	os.write_file(group, framework_replace_method(os.read_file(group)!, 'getChildDrawingOrder(II)I', '.method protected getChildDrawingOrder(II)I\n.locals 0\nreturn p2\n.end method\n')!)!
 	// Reorder in place: removeView/addView would detach the child, replace its
 	// layout parameters and dispatch hierarchy callbacks. Drawing and touch
 	// dispatch both read this same list in their respective traversal orders.
