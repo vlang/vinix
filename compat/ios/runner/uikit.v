@@ -102,6 +102,9 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 }
 
 fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if rotation_descriptor_unsupported(selector) {
+		rotation_descriptor_require_recognition(if object in ios_runtime.classes { object } else { read64(object) })
+	}
 	if pinch_descriptor_unsupported(selector) {
 		pinch_descriptor_require_recognition(if object in ios_runtime.classes { object } else { read64(object) })
 	}
