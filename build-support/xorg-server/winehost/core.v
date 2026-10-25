@@ -792,7 +792,7 @@ pub fn host_main(argc i32, argv &&char) i32 {
 		signed_application := argc >= 6 && C.strcmp(argv[4], c'--package') == 0
 		literal_arguments := argc >= 6 && (C.strcmp(argv[4], c'--') == 0 || signed_application)
 		if !literal_arguments && argc != 5 && argc != 6 {
-			C.fprintf(C.stderr, c'usage: %s DISPLAY FBDIR GEOMETRY COMMAND [--fill|--game-input|--obs], or DISPLAY FBDIR GEOMETRY -- COMMAND [ARG...], or DISPLAY FBDIR GEOMETRY --package /usr/bin/vinix-package run ID [DOCUMENT]\n', argv[0])
+			C.fprintf(C.stderr, c'usage: %s DISPLAY FBDIR GEOMETRY COMMAND [--fill|--game-input|--obs], or DISPLAY FBDIR GEOMETRY -- COMMAND [ARG...], or DISPLAY FBDIR GEOMETRY --package /usr/bin/vinix-package run ID [DOCUMENT] | run-args ID [--data-cwd] [--file DOCUMENT]... -- [ARG...]\n', argv[0])
 			return 2
 		}
 		if !literal_arguments && argc == 6 {
@@ -805,8 +805,8 @@ pub fn host_main(argc i32, argv &&char) i32 {
 		directory := argv[2]
 		geometry := argv[3]
 		command := if literal_arguments { argv[5] } else { argv[4] }
-		if signed_application && (C.strcmp(command, c'/usr/bin/vinix-package') != 0 || argc < 8 || argc > 9 || C.strcmp(argv[6], c'run') != 0) {
-			C.fprintf(C.stderr, c'vinix-wine-host: --package requires /usr/bin/vinix-package run ID [DOCUMENT]\n')
+		if signed_application && !package_command_allowed(argc - 5, argv + 5) {
+			C.fprintf(C.stderr, c'vinix-wine-host: --package requires a valid /usr/bin/vinix-package run or run-args launch\n')
 			return 2
 		}
 		if signed_application { fill_surface = true }

@@ -205,6 +205,7 @@ mut:
 	launch_file_scroll int
 	launch_data_cwd bool = true
 	launch_files_allowed bool
+	launch_hosted_display bool
 	window_mode bool
 	window_protocol int = 1
 	window_frame appsdk.WindowFrame

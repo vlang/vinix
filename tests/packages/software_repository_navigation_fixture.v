@@ -49,7 +49,7 @@ fn check_repository_report_content(app &SoftwareApp) {
 }
 
 fn check_repository_reader_boundaries() ! {
-	prefix := 'file:///offline/部署 é🚀/'
+	prefix := 'https://repo.example/offline/部署-é🚀/'
 	url := prefix + 'a'.repeat(4096 - prefix.len)
 	old_url := prefix + 'b'.repeat(4096 - prefix.len)
 	defer { unsafe { url.free(); old_url.free() } }

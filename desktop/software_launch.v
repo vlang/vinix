@@ -22,7 +22,7 @@ fn (mut a SoftwareApp) clear_launch_options() {
 	a.launch_mode = false; a.launch_focus = 0
 	a.launch_file_selected = -1; a.launch_file_scroll = 0
 	a.launch_read_file = -1
-	a.launch_data_cwd = true; a.launch_files_allowed = false
+	a.launch_data_cwd = true; a.launch_files_allowed = false; a.launch_hosted_display = false
 }
 
 fn (mut a SoftwareApp) prepare_launch_details() {
@@ -64,7 +64,7 @@ fn (mut a SoftwareApp) prepare_launch_details() {
 fn (mut a SoftwareApp) open_launch_options() {
 	if a.selected < 0 || a.selected >= a.rows.len { return }
 	row := a.rows[a.selected]
-	if row.installed_version == '' || software_launch_kind(row) in ['runtime', 'data'] { return }
+	if row.installed_version == '' || row.installed_window_protocol != 0 || software_launch_kind(row) in ['runtime', 'data'] { return }
 	a.clear_launch_options()
 	a.clear_review(); a.clear_repository_review()
 	a.repository_mode = false; a.deployment_mode = false; a.focus = false; a.select_all = false
@@ -73,6 +73,9 @@ fn (mut a SoftwareApp) open_launch_options() {
 	// Update presentation describes the planned candidate. Launch presentation
 	// uses the installed manifest, including an explicitly empty permission set.
 	a.launch_files_allowed = if row.installed_kind != '' { 'files' in row.installed_permissions } else { 'files' in row.permissions }
+	// Freeze the installed display grant with this draft. Candidate permissions
+	// never choose the private X11 session used to launch installed code.
+	a.launch_hosted_display = 'display' in row.installed_permissions
 	a.launch_arguments = []u8{cap: software_launch_text_limit}
 	a.launch_file = []u8{cap: software_launch_text_limit}
 	a.launch_documents = []string{cap: 16}
@@ -106,6 +109,11 @@ fn (mut a SoftwareApp) launch_with_options(terminal bool) {
 	}
 	mut vector := pkgprotocol.command_vector(a.launch_id, words, a.launch_documents, a.launch_data_cwd, false) or { a.set_status(err.msg()); unsafe { err.free() }; return }
 	defer { pkgprotocol.free_command_values(mut vector) }
+	if a.launch_hosted_display {
+		a.open_hosted_package_command(vector) or { a.set_status(err.msg()); unsafe { err.free() }; return }
+		a.clear_launch_options()
+		return
+	}
 	a.start(vector, false)
 	if a.worker != unsafe { nil } {
 		a.worker_run = true; a.launch_focus = 0; a.select_all = false

@@ -4,17 +4,26 @@ module main
 import desktop.packagecore
 import desktop.sessioncore
 import ui2
+import tools.packages.pkgprotocol
 
 fn (mut a SoftwareApp) open_hosted_package(request packagecore.Request) ! {
 	request.validate()!
+	mut arguments := []string{cap: 3}
+	unsafe { arguments.flags |= .noslices }
+	arguments << 'run'.clone(); arguments << request.id.clone()
+	if request.document != '' { arguments << request.document.clone() }
+	defer { pkgprotocol.free_command_values(mut arguments) }
+	a.open_hosted_package_command(arguments)!
+}
+
+// Borrow the validated service vector until the synchronous fork boundary.
+// The child owns its forked address space before the caller releases strings.
+fn (mut a SoftwareApp) open_hosted_package_command(arguments []string) ! {
 	if C.geteuid() == 0 { return error('Open graphical packages from an ordinary account session.') }
 	if a.service_path != '/usr/bin/vinix-package' { return error('Graphical packages require the signed package launcher.') }
 	if a.worker != unsafe { nil } || a.hosted_app != unsafe { nil } || a.terminal_app != unsafe { nil } || a.window_mode {
 		return error('a software operation is already running')
 	}
-	mut arguments := ['run', request.id.clone()]
-	if request.document != '' { arguments << request.document.clone() }
-	defer { unsafe { arguments.free() } }
 	// The actual signed launcher verifies publisher, payload, runtime, policy
 	// and data ownership, then retains its generation lease around the child.
 	a.hosted_app = open_hosted_x11_command('package', a.service_path, arguments, true, 1024, 768,
