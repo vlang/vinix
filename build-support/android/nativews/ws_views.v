@@ -124,6 +124,21 @@ fn ws_set_text(e voidptr, object voidptr, text voidptr) {
 	}
 }
 
+fn ws_set_hint(e voidptr, object voidptr, text voidptr) {
+	unsafe {
+		view := ws_view(e, object)
+		chars := ws_utf(e, text)
+		replacement := C.strdup(chars)
+		ws_release(e, text, chars)
+		C.free(view.hint)
+		view.hint = replacement
+		if C.getenv(c'VINIX_ANDROID_TRACE_TEXT') != nil {
+			C.printf(c'ANDROID-WS-HINT kind=%d value=%.512s\n', view.kind, replacement)
+		}
+		ws_mark()
+	}
+}
+
 fn ws_watcher(e voidptr, object voidptr, watcher voidptr, remove bool) {
 	unsafe {
 		list := get_object(e, object, c'android/view/View', c'vinixWsWatchers', c'Ljava/util/ArrayList;')
@@ -152,18 +167,24 @@ fn ws_focus(e voidptr, object voidptr) {
 fn ws_measure(e voidptr, object voidptr, width_spec i32, height_spec i32) {
 	unsafe {
 		view := ws_view(e, object)
-		text_width := i32(ws_text_width(view.text, view.size, view.font) + 0.999)
-		mut width := text_width + view.padding_left + view.padding_right + 6
+		text_width := ws_text_width(view.text, view.size, view.font)
+		hint_width := ws_text_width(view.hint, view.size, view.font)
+		// Hints contribute to the desired size even while actual text is shown.
+		mut width := i32((if hint_width > text_width { hint_width } else { text_width }) + 0.999) + view.padding_left + view.padding_right + 6
 		mut height := i32(view.size * 1.5) + view.padding_top + view.padding_bottom
 		if view.kind == 1 && !view.single_line {
 			limit := if u32(width_spec) >> 30 == 0 { width } else { width_spec & 0x3fffffff }
 			content_width := limit - view.padding_left - view.padding_right - 6
 			layout := ws_text_layout(view.text, view.size, if content_width > 0 { content_width } else { 1 }, view.font)
 			mut lines := (&WsTextLayout(layout)).count
+			hint_layout := ws_text_layout(view.hint, view.size, if content_width > 0 { content_width } else { 1 }, view.font)
+			hint_lines := (&WsTextLayout(hint_layout)).count
+			if lines < hint_lines { lines = hint_lines }
 			if lines < view.min_lines { lines = view.min_lines }
 			if view.max_lines > 0 && lines > view.max_lines { lines = view.max_lines }
 			height = i32(view.size * (1.5 + f32(lines - 1) * 1.25)) + view.padding_top + view.padding_bottom
 			ws_layout_free(layout)
+			ws_layout_free(hint_layout)
 		}
 		if view.kind == 2 {
 			width += 24
@@ -303,6 +324,12 @@ fn ws_draw_content(e voidptr, object voidptr, canvas voidptr) {
 			return
 		}
 		if (view.kind < 1 || view.kind > 3) && view.kind != 7 && view.kind != 8 { return }
+		show_hint := view.text[0] == 0 && view.hint[0] != 0
+		display_text := if show_hint { view.hint } else { view.text }
+		display_color := if show_hint {
+			u32(integer(e, object, c'android/widget/TextView', c'getCurrentHintTextColor', c'()I', nil))
+		} else { view.color }
+		if pending(e) { return }
 		width := integer(e, object, c'android/view/View', c'getWidth', c'()I', nil)
 		height := integer(e, object, c'android/view/View', c'getHeight', c'()I', nil)
 		mut indicator_advance := i32(0)
@@ -328,7 +355,7 @@ fn ws_draw_content(e voidptr, object voidptr, canvas voidptr) {
 		if view.kind == 1 || view.kind == 7 || view.kind == 8 {
 			text_inset := if view.kind == 1 { i32(3) } else { indicator_advance }
 			content_width := width - view.padding_left - view.padding_right - 6 - indicator_advance
-			layout := ws_text_layout(view.text, view.size, if view.kind != 1 || view.single_line { 0 } else if content_width > 0 { content_width } else { 1 }, view.font)
+			layout := ws_text_layout(display_text, view.size, if view.kind != 1 || view.single_line { 0 } else if content_width > 0 { content_width } else { 1 }, view.font)
 			gravity := integer(e, object, c'android/widget/TextView', c'getGravity', c'()I', nil)
 			alignment := integer(e, object, c'android/view/View', c'getTextAlignment', c'()I', nil)
 			mut lines := (&WsTextLayout(layout)).count
@@ -344,13 +371,13 @@ fn ws_draw_content(e voidptr, object voidptr, canvas voidptr) {
 				text := (&WsTextLayout(layout)).text
 				end := text[entry.end]
 				text[entry.end] = 0
-				ws_text(&text[entry.start], x, y + f32(line) * view.size * 1.25, view.size, view.color, view.font)
+				ws_text(&text[entry.start], x, y + f32(line) * view.size * 1.25, view.size, display_color, view.font)
 				text[entry.end] = end
 			}
 			ws_layout_free(layout)
 			return
 		}
-		text_width := ws_text_width(view.text, view.size, view.font)
+		text_width := ws_text_width(display_text, view.size, view.font)
 		left := if view.kind == 2 {
 			(f32(width) - text_width) / 2
 		} else {
@@ -361,9 +388,10 @@ fn ws_draw_content(e voidptr, object voidptr, canvas voidptr) {
 		} else {
 			f32(view.padding_top) + view.size
 		}
-		ws_text(view.text, left, top, view.size, view.color, view.font)
+		ws_text(display_text, left, top, view.size, display_color, view.font)
 		if view.kind == 3 && view.focused {
-			ws_rect(left + text_width + 1, top - view.size * 0.8, left + text_width + 2, top + 2, view.color)
+			cursor_width := ws_text_width(view.text, view.size, view.font)
+			ws_rect(left + cursor_width + 1, top - view.size * 0.8, left + cursor_width + 2, top + 2, view.color)
 		}
 	}
 }

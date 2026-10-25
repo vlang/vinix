@@ -128,6 +128,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_child_states(smali)!
  framework_child_order(smali)!
  framework_gradient_colors(smali)!
+ framework_ripple_radius(smali)!
  framework_vector_fill_rules(smali)!
  framework_paths(smali)!
  framework_render_nodes(smali)!
@@ -143,6 +144,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_connectivity(smali)!
  framework_content_clients(smali)!
  framework_text_widgets(smali)!
+ framework_text_hints(smali)!
  framework_editor_actions(smali)!
  framework_image_filters(smali)!
  framework_check_widgets(smali)!
