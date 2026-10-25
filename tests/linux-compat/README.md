@@ -2505,3 +2505,20 @@ in the [selection qualification](../../docs/linux-signal-wait-order.md).
 Synthetic kill/tgkill signals do not qualify real fault delivery. Concurrent
 delivery/dequeue races, queued payload provenance and GNU/foreign/32-bit paths
 remain separate qualifications.
+
+The `altstackcopy` case checks native sigaltstack output-copy ordering. A valid
+update remains installed after output EFAULT; input faults and validation
+errors preserve state and old-output bytes. Root and UID 1000/GID 2000 cohorts
+cover enabled/disabled transitions, six bad output pointer classes, unaligned
+and aliased records, exact page boundaries, guard bytes and null output.
+Identical musl ELFs pass 560 checks on both production kernels and Linux
+6.12.51; originals fail 36 each. All eleven maintained suites pass on each
+architecture. The first x86-64 randomsignal failure and unchanged passing
+retry remain in the external bundle.
+
+`altstackcopy-reference.v` accepts the same arguments as `sigwaitcopy-reference.v`.
+Its `--self-test` has two positive and nine negative controls. Compile
+`altstackcopy-evidence.v` without `-prod`, run `self-test` (five positive and 23
+negative controls), then `check` on the complete external bundle documented
+in [the qualification](../../docs/linux-signal-stack-copy.md). Remaining asynchronous,
+GNU/foreign/32-bit and installation limits are recorded there.

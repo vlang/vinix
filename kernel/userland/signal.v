@@ -431,21 +431,17 @@ pub fn syscall_sigaltstack(_ voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u64) {
 		}
 	}
 
-	if old_ss_ptr != 0 {
-		mut raw := [3]u64{}
-		raw[0] = current_thread.sigaltstack_sp
-		raw[1] = if thread_on_sigaltstack(current_thread) {
-			u64(ss_onstack)
-		} else if current_thread.sigaltstack_size == 0 {
-			u64(ss_disable)
-		} else {
-			u64(0)
-		}
-		raw[2] = current_thread.sigaltstack_size
-		if !usercopy.copy_to_user(old_ss_ptr, voidptr(&raw[0]), stack_t_size) {
-			return errno.err, errno.efault
-		}
+	// Snapshot before committing: ss and old_ss may refer to the same record.
+	mut old := [3]u64{}
+	old[0] = current_thread.sigaltstack_sp
+	old[1] = if thread_on_sigaltstack(current_thread) {
+		u64(ss_onstack)
+	} else if current_thread.sigaltstack_size == 0 {
+		u64(ss_disable)
+	} else {
+		u64(0)
 	}
+	old[2] = current_thread.sigaltstack_size
 
 	if ss_ptr != 0 {
 		if disabling {
@@ -455,6 +451,11 @@ pub fn syscall_sigaltstack(_ voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u64) {
 			current_thread.sigaltstack_sp = incoming_sp
 			current_thread.sigaltstack_size = incoming_size
 		}
+	}
+
+	// Linux retains a valid update even when copying the old record faults.
+	if old_ss_ptr != 0 && !usercopy.copy_to_user(old_ss_ptr, voidptr(&old[0]), stack_t_size) {
+		return errno.err, errno.efault
 	}
 
 	return 0, 0

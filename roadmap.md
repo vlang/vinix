@@ -1854,6 +1854,15 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and complete passing retry are retained. See
   [the selection qualification](docs/linux-signal-wait-order.md).
 
+- [x] Commit valid native sigaltstack updates before old-record output,
+  retaining the change on EFAULT and preserving state/output on input errors.
+  Qualify enabled/disabled transitions, bad output pointers, unaligned/aliased
+  records, page boundaries and guards. Identical musl ELFs pass 560 checks on
+  both production architectures and Linux; originals fail 36 each. All eleven
+  maintained suites pass per architecture; the first x86-64 randomsignal
+  failure and unchanged passing retry are retained. See
+  [the alternate-stack qualification](docs/linux-signal-stack-copy.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
