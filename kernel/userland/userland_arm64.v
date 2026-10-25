@@ -471,7 +471,7 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 	// SA_ONSTACK runs the handler on the stack sigaltstack(2) registered, which
 	// is the only way a SIGSEGV handler can run after a stack overflow.
 	mut stack_top := context.sp
-	if wants_altstack(t, sigaction) {
+	if wants_altstack(t, sigaction, context) {
 		stack_top = lib.align_down(t.sigaltstack_sp + t.sigaltstack_size, 16)
 		t.on_sigaltstack = true
 	}
@@ -679,14 +679,16 @@ fn thread_on_sigaltstack(t &proc.Thread, context voidptr) bool {
 	return frame.sp > t.sigaltstack_sp && frame.sp - t.sigaltstack_sp <= t.sigaltstack_size
 }
 
-fn wants_altstack(t &proc.Thread, sigaction proc.SigAction) bool {
+fn wants_altstack(t &proc.Thread, sigaction proc.SigAction, context &cpulocal.GPRState) bool {
 	// SA_ONSTACK is 1 << 1 for Vinix and 1 << 27 for Linux.
 	if sigaction.sa_flags & sa_onstack == 0 && sigaction.sa_flags & int(0x08000000) == 0 {
 		return false
 	}
 	// Nesting onto an alternate stack already in use would overwrite the frame
 	// the outer handler is standing on.
-	return t.sigaltstack_sp != 0 && t.sigaltstack_size != 0 && !t.on_sigaltstack
+	// A nested sigreturn clears the bookkeeping flag while the outer handler
+	// is still active. Use the interrupted user SP to preserve its frame.
+	return t.sigaltstack_sp != 0 && t.sigaltstack_size != 0 && !thread_on_sigaltstack(t, context)
 }
 
 // Enter the handler by rewriting the exception frame that the syscall exit path

@@ -2632,3 +2632,17 @@ restoration and intermittent failures remain open.
 `altstackframe-evidence.v` without `-prod`, run `self-test` (11 positive and
 46 negative controls), then `check` on the complete bundle in
 [the qualification](../../docs/linux-alternate-stack-frame.md).
+
+The `altstacknest` case raises three sequential nested signals in each outer
+handler across enabled/disabled alternate stacks and both SA_ONSTACK flags.
+Root and UID 1000/GID 2000 cohorts check saved uc_stack, actual placement,
+guarded live queries, a 512-byte outer-stack canary and return state. Identical
+musl ELFs pass 592 checks on both production architectures and Linux references.
+Original x86-64 also passes; original AArch64 reports 520 checks and two failures
+when both outer+inner SA_ONSTACK children die before reporting their checks.
+
+`altstacknest-reference.v` accepts the same arguments as `sigwaitcopy-reference.v`;
+`--self-test` has two positive and nine negative controls. Compile
+`altstacknest-evidence.v` without `-prod`, run `self-test` (eight positive and
+40 negative controls), then `check` on the complete bundle in
+[the qualification](../../docs/linux-alternate-stack-nesting.md).

@@ -1915,7 +1915,17 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   production architectures and Linux; originals fail 48 on AArch64 and four
   on x86-64. Maintained suites pass 18/18 on AArch64 and 17/18 on x86-64;
   its randomsignal failure and passing identical replay remain unresolved.
-  Repeated nesting and handler-modified stack restoration remain open. See [the signal-frame qualification](docs/linux-alternate-stack-frame.md).
+  See [the signal-frame qualification](docs/linux-alternate-stack-frame.md)
+  and the repeated-nesting follow-up below. Handler-modified stack restoration
+  remains open.
+
+- [x] Preserve the outer native alternate-stack frame across three sequential
+  nested signals by using the interrupted AArch64 user SP. Enabled/disabled
+  stacks and both SA_ONSTACK flags pass 592 checks on both production
+  architectures and Linux; original AArch64 loses two children and reports
+  520 checks/two failures, while original x86-64 passes. All nineteen maintained
+  cases pass per architecture; earlier intermittent failures remain unresolved.
+  See [the repeated-nesting qualification](docs/linux-alternate-stack-nesting.md).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
