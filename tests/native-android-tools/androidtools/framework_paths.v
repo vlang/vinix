@@ -69,6 +69,7 @@ invoke-virtual {p1}, Ljava/lang/Enum;->ordinal()I
 iput-object p1, p0, Landroid/graphics/Path;->fillType:Landroid/graphics/Path$FillType;
 return-void
 .end method')!
+ text = framework_path_ops(text)!
  os.write_file(path, text)!
  // Match clipPath: geometry may be shared while each Java Path has its own rule.
  canvas_path := smali + '/android/atl/GskCanvas.smali'

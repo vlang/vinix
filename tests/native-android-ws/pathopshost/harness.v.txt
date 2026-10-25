@@ -1,0 +1,548 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+@[translated]
+module main
+
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+fn C.alloca(usize) voidptr
+fn C.sqrt(f64) f64
+fn C.nan(&u8) f64
+
+__global (
+	allocations [4096]voidptr
+	live_allocations int
+	allocation_attempts int
+	fail_at int = -1
+)
+
+fn allocation_fails() bool {
+	allocation_attempts++
+	return allocation_attempts == fail_at
+}
+
+fn remember(pointer voidptr) {
+	if pointer == unsafe { nil } { return }
+	assert live_allocations < allocations.len
+	allocations[live_allocations] = pointer
+	live_allocations++
+}
+
+fn forget(pointer voidptr) {
+	if pointer == unsafe { nil } { return }
+	for i := 0; i < live_allocations; i++ {
+		if allocations[i] == pointer {
+			live_allocations--
+			allocations[i] = allocations[live_allocations]
+			return
+		}
+	}
+	panic('free or realloc of unowned production allocation')
+}
+
+fn host_malloc(size usize) voidptr {
+	if allocation_fails() { return unsafe { nil } }
+	pointer := unsafe { C.malloc(size) }
+	remember(pointer)
+	return pointer
+}
+
+fn host_calloc(count usize, size usize) voidptr {
+	if allocation_fails() { return unsafe { nil } }
+	pointer := unsafe { C.calloc(count, size) }
+	remember(pointer)
+	return pointer
+}
+
+fn host_realloc(pointer voidptr, size usize) voidptr {
+	if allocation_fails() { return unsafe { nil } }
+	forget(pointer)
+	result := unsafe { C.realloc(pointer, size) }
+	remember(if result == unsafe { nil } { pointer } else { result })
+	return result
+}
+
+fn host_free(pointer voidptr) {
+	forget(pointer)
+	unsafe { C.free(pointer) }
+}
+
+struct SampleEdge {
+	x0 f64
+	y0 f64
+	x1 f64
+	y1 f64
+}
+
+struct Snapshot {
+	header WsPath
+	points []WsVertex
+	controls []WsVertex
+	curves []WsPathCurve
+}
+
+fn snapshot(pointer i64) Snapshot {
+	unsafe {
+		path := &WsPath(pointer)
+		mut points := []WsVertex{}
+		mut controls := []WsVertex{}
+		mut curves := []WsPathCurve{}
+		for i := i32(0); i < path.count; i++ { points << path.points[i] }
+		for i := i32(0); i < path.control_count; i++ { controls << path.controls[i] }
+		for i := i32(0); i < path.curve_count; i++ { curves << path.curves[i] }
+		return Snapshot{*path, points, controls, curves}
+	}
+}
+
+fn unchanged(pointer i64, before Snapshot) {
+	after := snapshot(pointer)
+	assert after.header == before.header, 'operation changed the input header or references'
+	assert after.points == before.points && after.controls == before.controls && after.curves == before.curves,
+		'operation changed borrowed input geometry'
+}
+
+fn edges(pointer i64) []SampleEdge {
+	mut result := []SampleEdge{}
+	unsafe {
+		path := &WsPath(pointer)
+		mut start := i32(0)
+		for i := i32(0); i < path.count; i++ {
+			mut next := i + 1
+			if next == path.count || path.points[next].move { next = start; start = i + 1 }
+			a, b := path.points[i], path.points[next]
+			if a.x != b.x || a.y != b.y {
+				result << SampleEdge{a.x, a.y, b.x, b.y}
+			}
+		}
+	}
+	return result
+}
+
+// Independent point winding: signed cross products count crossings of an
+// upward ray. The production operation instead sweeps horizontal slabs.
+fn contains(segments []SampleEdge, fill int, x f64, y f64) bool {
+	mut winding := 0
+	for edge in segments {
+		cross := (edge.x1 - edge.x0) * (y - edge.y0) - (x - edge.x0) * (edge.y1 - edge.y0)
+		if edge.y0 <= y {
+			if edge.y1 > y && cross > 0 { winding++ }
+		} else if edge.y1 <= y && cross < 0 { winding-- }
+	}
+	inside := if fill & 1 != 0 { winding & 1 != 0 } else { winding != 0 }
+	return inside != (fill >= 2)
+}
+
+fn on_boundary(segments []SampleEdge, x f64, y f64, epsilon f64) bool {
+	for edge in segments {
+		dx, dy := edge.x1 - edge.x0, edge.y1 - edge.y0
+		cross := dx * (y - edge.y0) - dy * (x - edge.x0)
+		length := C.sqrt(dx * dx + dy * dy)
+		if cross < -epsilon * length || cross > epsilon * length { continue }
+		dot := (x - edge.x0) * dx + (y - edge.y0) * dy
+		if dot >= -epsilon * length && dot <= length * length + epsilon * length { return true }
+	}
+	return false
+}
+
+fn truth(a bool, b bool, op int) bool {
+	return match op {
+		0 { a && !b }
+		1 { a && b }
+		2 { a || b }
+		3 { a != b }
+		4 { b && !a }
+		else { panic('bad test operation') }
+	}
+}
+
+fn normalized_fill(a int, b int, op int) int {
+	return if truth(a >= 2, b >= 2, op) { 3 } else { 1 }
+}
+
+fn edge_separates(a_edges []SampleEdge, afill int, b_edges []SampleEdge, bfill int, op int,
+	edge SampleEdge, epsilon f64) bool {
+	dx, dy := edge.x1 - edge.x0, edge.y1 - edge.y0
+	length := C.sqrt(dx * dx + dy * dy)
+	if length == 0 { return true }
+	mid_x, mid_y := (edge.x0 + edge.x1) / 2, (edge.y0 + edge.y1) / 2
+	left_x, left_y := mid_x - dy / length * epsilon, mid_y + dx / length * epsilon
+	right_x, right_y := mid_x + dy / length * epsilon, mid_y - dx / length * epsilon
+	left := truth(contains(a_edges, afill, left_x, left_y), contains(b_edges, bfill, left_x, left_y), op)
+	right := truth(contains(a_edges, afill, right_x, right_y), contains(b_edges, bfill, right_x, right_y), op)
+	return left != right
+}
+
+fn validate(a i64, afill int, b i64, bfill int, op int, result i64, scale f64, offset f64) {
+	assert result != 0, 'valid operation unexpectedly failed: op=${op} afill=${afill} bfill=${bfill}'
+	unsafe { assert (&WsPath(result)).references == 1 }
+	a_edges, b_edges, result_edges := edges(a), edges(b), edges(result)
+	fill := normalized_fill(afill, bfill, op)
+	assert ws_path_op_fill(i32(afill), i32(bfill), i32(op)) == fill
+	for y in -4 .. 37 {
+		for x in -4 .. 37 {
+			px := (f64(x) / 2 + .137) * scale + offset
+			py := (f64(y) / 2 + .293) * scale + offset
+			if on_boundary(a_edges, px, py, scale * 1e-7) || on_boundary(b_edges, px, py, scale * 1e-7) { continue }
+			expected := truth(contains(a_edges, afill, px, py), contains(b_edges, bfill, px, py), op)
+			actual := contains(result_edges, fill, px, py)
+			assert actual == expected, 'membership op=${op} fills=${afill}/${bfill} p=${px}/${py} actual=${actual} expected=${expected}'
+		}
+	}
+	// Every emitted edge must separate the result's interior and exterior.
+	// This rejects unmerged slab trapezoids whose internal seams would stroke.
+	for edge in result_edges {
+		dx, dy := edge.x1 - edge.x0, edge.y1 - edge.y0
+		length := C.sqrt(dx * dx + dy * dy)
+		if length <= scale * 1e-7 { continue }
+		assert edge_separates(a_edges, afill, b_edges, bfill, op, edge, scale * 1e-5),
+			'output includes an internal or extraneous boundary: op=${op} fills=${afill}/${bfill} edge=${edge}'
+	}
+}
+
+fn add_polygon(path i64, coordinates []f32, reverse bool) {
+	assert coordinates.len % 2 == 0
+	count := coordinates.len / 2
+	for i in 0 .. count {
+		index := if reverse { count - 1 - i } else { i }
+		ws_path_point(path, coordinates[index * 2], coordinates[index * 2 + 1], i == 0)
+	}
+}
+
+fn rectangle(left f32, top f32, right f32, bottom f32) i64 {
+	path := ws_path_new()
+	ws_path_rect(path, left, top, right, bottom)
+	return path
+}
+
+fn polygon(coordinates []f32) i64 {
+	path := ws_path_new()
+	add_polygon(path, coordinates, false)
+	return path
+}
+
+fn exercise(name string, a i64, b i64, scale f64, offset f64) {
+	assert fail_at == -1
+	// Shared inputs exercise reference preservation as well as geometry.
+	ws_path_ref(a)
+	ws_path_ref(b)
+	before_a, before_b := snapshot(a), snapshot(b)
+	baseline := live_allocations
+	for afill in 0 .. 4 {
+		for bfill in 0 .. 4 {
+			for op in 0 .. 5 {
+				result := ws_path_op(a, i32(afill), b, i32(bfill), i32(op))
+				validate(a, afill, b, bfill, op, result, scale, offset)
+				unchanged(a, before_a)
+				unchanged(b, before_b)
+				ws_path_unref(result)
+				assert live_allocations == baseline, 'operation leaked native working storage'
+			}
+		}
+	}
+	ws_path_unref(a)
+	ws_path_unref(b)
+	ws_path_unref(a)
+	ws_path_unref(b)
+	assert live_allocations == 0
+	println('PATH-OPS-HOST PASS ' + name + ' operations=80')
+}
+
+fn geometry() {
+	exercise('overlapping rectangles', rectangle(1, 1, 9, 8), rectangle(5, 4, 13, 12), 1, 0)
+	exercise('disjoint rectangles', rectangle(1, 1, 5, 5), rectangle(9, 8, 14, 13), 1, 0)
+	exercise('nested rectangles', rectangle(1, 1, 15, 15), rectangle(5, 5, 11, 11), 1, 0)
+	exercise('identical contours', rectangle(2, 3, 13, 12), rectangle(2, 3, 13, 12), 1, 0)
+	exercise('touching shared edge', rectangle(1, 1, 8, 9), rectangle(8, 1, 15, 9), 1, 0)
+	exercise('partially shared edge', rectangle(1, 1, 8, 9), rectangle(8, 4, 15, 13), 1, 0)
+	exercise('T junction', rectangle(1, 1, 15, 5), rectangle(6, 5, 10, 15), 1, 0)
+	exercise('touching one vertex', rectangle(1, 1, 8, 8), rectangle(8, 8, 14, 14), 1, 0)
+	exercise('crossing diagonals', polygon([f32(1), 2, 14, 4, 5, 14]), polygon([f32(2), 12, 13, 1, 15, 15]), 1, 0)
+	exercise('open concave contours', polygon([f32(1), 1, 14, 1, 14, 5, 5, 5, 5, 14, 1, 14]),
+		polygon([f32(3), 3, 12, 3, 12, 12, 3, 12]), 1, 0)
+	exercise('self intersecting bow tie', polygon([f32(1), 1, 14, 14, 1, 14, 14, 1]), rectangle(4, 3, 11, 13), 1, 0)
+	for reverse in [false, true] {
+		a := rectangle(1, 1, 15, 15)
+		add_polygon(a, [f32(4), 4, 11, 4, 11, 11, 4, 11], reverse)
+		exercise('multiple nested contours reverse=' + reverse.str(), a, rectangle(7, 2, 17, 13), 1, 0)
+		a2 := rectangle(2, 2, 13, 13)
+		add_polygon(a2, [f32(2), 2, 13, 2, 13, 13, 2, 13], reverse)
+		exercise('coincident contours reverse=' + reverse.str(), a2, rectangle(5, 1, 15, 10), 1, 0)
+	}
+	exercise('empty left', ws_path_new(), rectangle(2, 3, 13, 14), 1, 0)
+	exercise('empty right', rectangle(2, 3, 13, 14), ws_path_new(), 1, 0)
+	exercise('two empty paths', ws_path_new(), ws_path_new(), 1, 0)
+	exercise('zero area and duplicate points', polygon([f32(2), 2, 2, 2, 6, 6, 12, 12, 6, 6]), rectangle(3, 3, 10, 11), 1, 0)
+	a := ws_path_new()
+	ws_path_point(a, 1, 8, true)
+	ws_path_cubic(a, 1, 0, 14, 0, 14, 8, false)
+	ws_path_quad(a, 8, 16, 1, 8, false)
+	exercise('production flattened cubic and quadratic', a, rectangle(5, 3, 11, 13), 1, 0)
+	exercise('small finite coordinates', rectangle(.0001, .0001, .0009, .0008), rectangle(.0005, .0004, .0013, .0012), .0001, 0)
+	exercise('large translated coordinates', rectangle(1.001e6, 1.001e6, 1.009e6, 1.008e6),
+		rectangle(1.005e6, 1.004e6, 1.013e6, 1.012e6), 1000, 1e6)
+}
+
+fn checker_negative_controls() {
+	a, b := rectangle(1, 1, 9, 9), ws_path_new()
+	seamed := rectangle(1, 1, 9, 5)
+	ws_path_rect(seamed, 1, 5, 9, 9)
+	a_edges, b_edges, bad_edges := edges(a), edges(b), edges(seamed)
+	// The bad path fills exactly the right rectangle while carrying an internal
+	// horizontal stroke seam. The geometry oracle must reject that seam.
+	assert contains(bad_edges, 1, 4, 4) && contains(bad_edges, 1, 4, 6)
+	mut rejected := 0
+	for edge in bad_edges {
+		if !edge_separates(a_edges, 0, b_edges, 0, 2, edge, .00001) { rejected++ }
+	}
+	assert rejected == 2, 'boundary oracle accepted duplicated interior edges'
+	assert contains(a_edges, 0, 4, 4) != contains(b_edges, 0, 4, 4),
+		'membership oracle failed its empty-result negative control'
+	ws_path_unref(a)
+	ws_path_unref(b)
+	ws_path_unref(seamed)
+	assert live_allocations == 0
+	println('PATH-OPS-HOST PASS oracle negative controls for missing fill and interior stroke seam')
+}
+
+fn thin_sliver(name string, origin_x f32, origin_y f32, width f32) {
+	// Width spans two f32 ULPs at origin_x. Midpoint probes remain well within
+	// each sliver, unlike the broader probes used for the regular shape grid.
+	a := rectangle(origin_x, origin_y, origin_x + width * 2, origin_y + 10)
+	b := rectangle(origin_x + width, origin_y, origin_x + width * 3, origin_y + 10)
+	a_edges, b_edges := edges(a), edges(b)
+	before_a, before_b := snapshot(a), snapshot(b)
+	baseline := live_allocations
+	for afill in 0 .. 4 {
+		for bfill in 0 .. 4 {
+			for op in 0 .. 5 {
+				result := ws_path_op(a, i32(afill), b, i32(bfill), i32(op))
+				assert result != 0, 'exact f32 sliver operation failed'
+				result_edges := edges(result)
+				for i in -1 .. 5 {
+					x, y := f64(origin_x) + (f64(i) + .5) * f64(width), f64(origin_y) + 5
+					expected := truth(contains(a_edges, afill, x, y), contains(b_edges, bfill, x, y), op)
+					assert contains(result_edges, normalized_fill(afill, bfill, op), x, y) == expected,
+						'thin sliver membership failed'
+				}
+				for edge in result_edges {
+					assert edge_separates(a_edges, afill, b_edges, bfill, op, edge, f64(width) / 8),
+						'thin sliver output has an interior/extraneous edge'
+				}
+				unchanged(a, before_a)
+				unchanged(b, before_b)
+				ws_path_unref(result)
+				assert live_allocations == baseline
+			}
+		}
+	}
+	ws_path_unref(a)
+	ws_path_unref(b)
+	assert live_allocations == 0
+	println('PATH-OPS-HOST PASS ${name} operations=80')
+}
+
+fn numeric_precision() {
+	// All three vertices are exact f32 values. The long diagonal exceeds the
+	// short horizontal edge by 2^59, while the triangle still has area 2^18.
+	// Floating cancellation must not turn that filled triangle into success
+	// with an empty result. Safe rejection is permitted by the native contract.
+	width, far := f32(.00000095367431640625), f32(549755813888)
+	a := polygon([f32(0), 0, width, 0, far, far])
+	b := ws_path_new()
+	before_a, before_b := snapshot(a), snapshot(b)
+	baseline := live_allocations
+	x, y := f64(width) / 2, f64(width) / 4
+	assert contains(edges(a), 0, x, y), 'numeric regression oracle lost the known triangle interior'
+	result := ws_path_op(a, 0, b, 0, 2)
+	if result != 0 {
+		assert contains(edges(result), 1, x, y), 'exponent-spread triangle silently became empty'
+		ws_path_unref(result)
+	}
+	unchanged(a, before_a)
+	unchanged(b, before_b)
+	assert live_allocations == baseline
+	ws_path_unref(a)
+	ws_path_unref(b)
+	assert live_allocations == 0
+	println('PATH-OPS-HOST PASS exponent-spread triangle preserves fill or rejects safely')
+}
+
+fn emptiness() {
+	assert ws_path_is_empty(0) == 1
+	empty, moved, filled := ws_path_new(), ws_path_new(), rectangle(1, 1, 8, 8)
+	ws_path_point(moved, 4, 4, true)
+	assert ws_path_is_empty(empty) == 1
+	assert ws_path_is_empty(moved) == 0, 'move-only path still contains a verb'
+	assert ws_path_is_empty(filled) == 0
+	ws_path_close(filled)
+	for fill in 0 .. 4 {
+		// Filling the inverse of empty geometry does not add native verbs.
+		all_empty := ws_path_op(empty, i32(fill), empty, i32(fill), 2)
+		assert all_empty != 0 && ws_path_is_empty(all_empty) == 1
+		assert ws_path_op_fill(i32(fill), i32(fill), 2) == normalized_fill(fill, fill, 2)
+		ws_path_unref(all_empty)
+		intersection := ws_path_op(filled, 0, empty, 0, 1)
+		assert intersection != 0 && ws_path_is_empty(intersection) == 1
+		ws_path_unref(intersection)
+		united := ws_path_op(filled, 0, empty, 0, 2)
+		assert united != 0 && ws_path_is_empty(united) == 0
+		ws_path_unref(united)
+	}
+	ws_path_unref(empty)
+	ws_path_unref(moved)
+	ws_path_unref(filled)
+	assert live_allocations == 0
+	println('PATH-OPS-HOST PASS native empty geometry, move-only verbs and operation results')
+}
+
+fn resource_limits() {
+	b := rectangle(1, 1, 8, 8)
+	for count in [258, 4097] {
+		a := ws_path_new()
+		for i in 0 .. count { ws_path_point(a, f32(i) / 100, f32(i % 2), i == 0) }
+		before_a, before_b := snapshot(a), snapshot(b)
+		baseline := live_allocations
+		assert ws_path_op(a, 0, b, 0, 1) == 0, 'complexity limit unexpectedly accepted geometry'
+		unchanged(a, before_a)
+		unchanged(b, before_b)
+		assert live_allocations == baseline
+		ws_path_unref(a)
+	}
+	a, c := ws_path_new(), ws_path_new()
+	for i in 0 .. 2050 {
+		ws_path_point(a, f32(i), 1, true)
+		ws_path_point(c, f32(i), 2, true)
+	}
+	before_a, before_c := snapshot(a), snapshot(c)
+	baseline := live_allocations
+	assert ws_path_op(a, 0, c, 0, 1) == 0, 'combined source-point cap was not enforced'
+	unchanged(a, before_a)
+	unchanged(c, before_c)
+	assert live_allocations == baseline
+	ws_path_unref(a)
+	ws_path_unref(b)
+	ws_path_unref(c)
+	assert live_allocations == 0
+	println('PATH-OPS-HOST PASS source-point/nonhorizontal-edge/combined-point caps fail without mutation or leaks')
+}
+
+fn aliases_and_chaining() {
+	a := rectangle(1, 1, 14, 13)
+	before := snapshot(a)
+	baseline := live_allocations
+	for afill in 0 .. 4 {
+		for bfill in 0 .. 4 {
+			for op in 0 .. 5 {
+				result := ws_path_op(a, i32(afill), a, i32(bfill), i32(op))
+				validate(a, afill, a, bfill, op, result, 1, 0)
+				unchanged(a, before)
+				ws_path_unref(result)
+				assert live_allocations == baseline
+			}
+		}
+	}
+	ws_path_unref(a)
+	b := rectangle(4, 3, 11, 10)
+	mut accumulated := rectangle(1, 1, 14, 13)
+	for i in 0 .. 30 {
+		result := ws_path_op(accumulated, 1, b, 0, 2)
+		validate(accumulated, 1, b, 0, 2, result, 1, 0)
+		unsafe { assert (&WsPath(result)).count <= 16, 'repeated union grew redundant geometry at iteration ' + i.str() }
+		ws_path_unref(accumulated)
+		accumulated = result
+	}
+	ws_path_unref(b)
+	// Result lifetime and storage must be independent of the released operands.
+	assert contains(edges(accumulated), 1, 8, 8)
+	ws_path_point(accumulated, 17, 17, true)
+	ws_path_point(accumulated, 18, 17, false)
+	ws_path_point(accumulated, 18, 18, false)
+	assert contains(edges(accumulated), 1, 8, 8)
+	ws_path_unref(accumulated)
+	assert live_allocations == 0
+	println('PATH-OPS-HOST PASS native pointer aliasing, chaining, bounded geometry and independent result lifetime')
+}
+
+fn allocation_failures() {
+	a := polygon([f32(1), 2, 14, 4, 5, 14])
+	b := rectangle(5, 3, 12, 13)
+	before_a, before_b := snapshot(a), snapshot(b)
+	baseline := live_allocations
+	for op in 0 .. 5 {
+		allocation_attempts = 0
+		result := ws_path_op(a, 0, b, 1, i32(op))
+		assert result != 0
+		attempts := allocation_attempts
+		assert attempts > 0 && attempts < 1000
+		ws_path_unref(result)
+		assert live_allocations == baseline
+		for failure in 1 .. attempts + 1 {
+			allocation_attempts = 0
+			fail_at = failure
+			failed := ws_path_op(a, 0, b, 1, i32(op))
+			fail_at = -1
+			assert failed == 0, 'faulted operation must fail transactionally: op=${op} allocation=${failure}'
+			assert live_allocations == baseline, 'failed operation leaked native storage: op=${op} allocation=${failure}'
+			unchanged(a, before_a)
+			unchanged(b, before_b)
+		}
+		println('PATH-OPS-HOST PASS allocation failures op=${op} allocation_sites=${attempts}')
+	}
+	ws_path_unref(a)
+	ws_path_unref(b)
+	assert live_allocations == 0
+}
+
+fn invalid_inputs() {
+	a, b := rectangle(1, 1, 10, 10), rectangle(3, 3, 14, 14)
+	before_a, before_b := snapshot(a), snapshot(b)
+	baseline := live_allocations
+	for fill in [-1, 4, 2147483647] {
+		assert ws_path_op(a, i32(fill), b, 0, 1) == 0
+		assert ws_path_op(a, 0, b, i32(fill), 1) == 0
+	}
+	for op in [-1, 5, 2147483647] { assert ws_path_op(a, 0, b, 0, i32(op)) == 0 }
+	assert ws_path_op(0, 0, b, 0, 1) == 0
+	assert ws_path_op(a, 0, 0, 0, 1) == 0
+	assert live_allocations == baseline
+	unchanged(a, before_a)
+	unchanged(b, before_b)
+	unsafe {
+		path := &WsPath(a)
+		original := path.points[0]
+		for invalid in [f32(C.nan(c'')), f32(1e13), f32(-1e13)] {
+			path.points[0] = WsVertex{invalid, 1, true}
+			assert ws_path_op(a, 0, b, 0, 1) == 0
+			assert live_allocations == baseline
+		}
+		path.points[0] = original
+		count := path.count
+		path.count = -1
+		assert ws_path_op(a, 0, b, 0, 1) == 0
+		path.count = 2147483647
+		assert ws_path_op(a, 0, b, 0, 1) == 0
+		path.count = count
+	}
+	unchanged(a, before_a)
+	unchanged(b, before_b)
+	ws_path_unref(a)
+	ws_path_unref(b)
+	assert live_allocations == 0
+	println('PATH-OPS-HOST PASS invalid fill/op/pointers/counts/nonfinite/out-of-range geometry without mutation or leaks')
+}
+
+fn main() {
+	checker_negative_controls()
+	geometry()
+	thin_sliver('exact binary f32-resolvable slivers', 1, 2, .0000002384185791015625)
+	thin_sliver('large translated subunit slivers', 1e6, 1e6, .125)
+	numeric_precision()
+	emptiness()
+	aliases_and_chaining()
+	allocation_failures()
+	invalid_inputs()
+	resource_limits()
+	assert live_allocations == 0
+	println('PATH-OPS-HOST-PASS independent truth tables, contour boundaries and allocation balance')
+}

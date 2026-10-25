@@ -596,3 +596,5 @@ android/opengl/GLES20|glVertexAttrib4fv(I[FI)V|ws_gl_attribute_values(e,c'glVert
 android/opengl/GLES20|glVertexAttrib4fv(ILjava/nio/FloatBuffer;)V|ws_gl_attribute_values(e,c'glVertexAttrib4fv',4,p0,p1,0,true)
 android/graphics/Paint|native_set_xfermode|(&WsPaint(p0)).xfer_mode = p1
 android/graphics/Bitmap|native_save_to_png|return ws_bitmap_png(e,p0)
+android/graphics/Path|native_op|return ws_path_op(p2,p3,p4,p5,p6)
+android/graphics/Path|native_is_empty|return u8(ws_path_is_empty(p1))
