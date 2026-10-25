@@ -20,7 +20,7 @@ const base = 'build/android-maps/'
 const target = base + 'maps285'
 const prelaunch = '/Users/alex/.local/state/vinix/android/maps285-2026-10-25-prelaunch'
 const completed = '/Users/alex/.local/state/vinix/android/maps285-2026-10-25'
-const build_root = '/Users/alex/.local/state/vinix/android/maps285-run-build-final4-2026-10-25'
+const build_root = '/Users/alex/.local/state/vinix/android/maps285-run-build-final5-2026-10-25'
 const prepare_build = '/Users/alex/.local/state/vinix/android/maps285-workflow-final4-2026-10-25'
 const suite = target + '/suite285'
 const config = base + 'attempt285.json'
@@ -109,8 +109,8 @@ fn verify_prepare_build() ! {
 	if build['exit_code']!.int() != 0 || build['completed_utc']!.str() == '' { return error('preparer build incomplete') }
 	require_pin(prepare_build + '/maps285-prepare.v', build['source_sha256']!.str())!
 	require_pin(prepare_build + '/maps285-prepare', build['output_sha256']!.str())!
-	require_pin(retained_path('tests/native-android-ws/maps285-prepare.v'), build['source_sha256']!.str())!
-	require_pin(retained_path(base + 'maps285-prepare-final4'), build['output_sha256']!.str())!
+	require_pin(retained_path(os.abs_path('tests/native-android-ws/maps285-prepare.v')), build['source_sha256']!.str())!
+	require_pin(retained_path(os.abs_path(base + 'maps285-prepare-final4')), build['output_sha256']!.str())!
 	for label, expected in {'helper-self-test': 0, 'prod-guard': 2, 'prepare': 0} {
 		receipt := object(prepare_build + '/' + label + '-receipt.json')!
 		for key, value in object(prepare_build + '/' + label + '-before.json')! {
