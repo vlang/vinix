@@ -120,8 +120,11 @@ fn stage_command(args []string, security bool) !int {
 	if security {
 		// The default image must contain the privileged service and first-account
 		// bootstrap before init can launch its ordinary graphical manager.
+		// Match tools/accounts/build.v: V's library emits an i64 wait status
+		// for C's int pointer, which current GCC otherwise treats as an error.
+		account_cc := [...cc, '-w', '-Wno-error=incompatible-pointer-types']
 		run(['sh', root() + '/build-support/run-v-tool.sh', root() + '/tools/accounts/stage.v',
-			'--arch', arch, '--staging', staging, '--cc-argv', json2.encode(cc)])!
+			'--arch', arch, '--staging', staging, '--cc-argv', json2.encode(account_cc)])!
 		// Both desktop builders already stage these utilities. Keep package
 		// distribution in the same native V build path on both architectures.
 		run(['sh', root() + '/build-support/run-v-tool.sh', root() + '/tools/packages/stage.v',
