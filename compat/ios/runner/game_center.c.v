@@ -28,7 +28,7 @@ fn navigation_descriptor_require_ui(cls u64) {
 }
 
 fn game_center_symbol(symbol string) ?u64 {
-	for name in ['GKGameCenterViewController', 'GKMatchRequest', 'GKAchievement', 'GKAchievementDescription', 'GKBasePlayer', 'GKPlayer', 'GKTurnBasedParticipant']! {
+	for name in ['GKGameCenterViewController', 'GKMatchRequest', 'GKAchievement', 'GKAchievementDescription', 'GKBasePlayer', 'GKPlayer', 'GKTurnBasedParticipant', 'GKTurnBasedMatch']! {
 		cls := ios_runtime.names[name] or { continue }
 		if symbol == '_OBJC_CLASS_$_' + name { return cls }
 		if symbol == '_OBJC_METACLASS_$_' + name { return read64(cls) }

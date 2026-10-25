@@ -89,6 +89,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := achievement_description_types(info.name, info.meta, selector) { return types }
 	if types := gk_player_types(info.name, info.meta, selector) { return types }
 	if types := turn_participant_types(info.name, info.meta, selector) { return types }
+	if types := turn_match_types(info.name, info.meta, selector) { return types }
 	if types := gc_event_controller_types(info.name, info.meta, selector) { return types }
 	if types := text_input_types(info.name, info.meta, selector) { return types }
 	if types := text_field_types(info.name, info.meta, selector) { return types }
@@ -197,6 +198,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name == 'GKAchievementDescription' && achievement_description_unsupported(name) { return 0 }
 		if info.name in ['GKBasePlayer', 'GKPlayer']! && gk_player_unsupported(name) { return 0 }
 		if info.name == 'GKTurnBasedParticipant' && turn_participant_unsupported(name) { return 0 }
+		if info.name == 'GKTurnBasedMatch' && turn_match_unsupported(name) { return 0 }
 		if info.name == 'GCEventViewController' && gc_event_controller_unsupported(name) { return 0 }
 		if info.name == 'UITextField' && text_field_unsupported(name) { return 0 }
 		if !info.meta && dispatch_objc_name(info.name) && dispatch_objc_types(info.name,false,name) == none { return 0 }
@@ -381,6 +383,9 @@ fn objc_set_class(object u64, cls u64) u64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if object in ios_runtime.classes || object in ios_runtime.constants { panic('iOS: changing a class or constant string isa is not implemented') }
+	if turn_match_family(cls) || turn_match_family(obj_header(object).allocation_cls) {
+		panic('iOS: changing GKTurnBasedMatch storage isa is not implemented')
+	}
 	if turn_participant_family(cls) || turn_participant_family(obj_header(object).allocation_cls) {
 		panic('iOS: changing GKTurnBasedParticipant storage isa is not implemented')
 	}

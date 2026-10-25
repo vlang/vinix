@@ -108,6 +108,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if achievement_description_dispatch(object, selector, mut frame) { return true }
 	if gk_player_dispatch(object, selector, mut frame) { return true }
 	if turn_participant_dispatch(object, selector, mut frame) { return true }
+	if turn_match_dispatch(object, selector, mut frame) { return true }
 	if text_field_dispatch(object, selector, mut frame) { return true }
 	if haptic_pattern_dispatch(object, selector, mut frame) { return true }
 	if haptic_event_dispatch(object, selector, mut frame) { return true }
