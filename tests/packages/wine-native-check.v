@@ -8,12 +8,11 @@ import json2
 import os
 import plainiso
 import time
+import tests.packages.winesource
 import tools.packages.pkgcore
 
 fn digest(path string) !string {
-	contents := os.read_file(path)!
-	defer { unsafe { contents.free() } }
-	return sha256.hexhash(contents)
+	return winesource.file_digest(path)
 }
 
 fn invoke(arguments []string, log string) ! {
@@ -32,15 +31,30 @@ fn invoke(arguments []string, log string) ! {
 	if child.code != 0 { return error('Wine qualification producer failed: ' + log) }
 }
 
-fn build_program(v string, sysroot string, gcc string, source string, arch string, work string, name string) !string {
-	directory := work + '/build-' + name
-	os.mkdir_all(directory)!
+fn v_program(v string, source string, arch string, cfile string) ![]string {
 	root := hwhost.find_root(@FILE)!
-	cfile := directory + '/' + name + '.c'
-	invoke([v, '-backend', 'c', '-prod', '-os', 'linux', '-arch',
+	return [v, '-backend', 'c', '-prod', '-os', 'linux', '-arch',
 		if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-gc', 'none', '-manualfree',
 		'-enable-globals', '-d', 'no_backtrace', '-d', 'no_segfault_handler', '-path',
-		'@vlib|' + root + '|' + root + '/tools/accounts|@vmodules', '-o', cfile, source], directory + '/v.log')!
+		'@vlib|' + root + '|' + root + '/tools/accounts|@vmodules', '-o', cfile, source]
+}
+
+fn discover_program(v string, source string, arch string, work string, name string, mut inputs map[string]string) ! {
+	directory := work + '/build-' + name
+	os.mkdir_all(directory)!
+	mut command := v_program(v, source, arch, directory + '/' + name + '.c')!
+	command.insert(1, ['-print-watched-files', '-dump-files', directory + '/sources-before.txt'])
+	invoke(command, directory + '/discover.log')!
+	winesource.capture(directory + '/sources-before.txt', mut inputs)!
+}
+
+fn build_program(v string, sysroot string, gcc string, source string, arch string, work string, name string, inputs map[string]string) !string {
+	directory := work + '/build-' + name
+	cfile := directory + '/' + name + '.c'
+	mut command := v_program(v, source, arch, cfile)!
+	command.insert(1, ['-dump-files', directory + '/sources-built.txt'])
+	invoke(command, directory + '/v.log')!
+	winesource.admit(directory + '/sources-before.txt', directory + '/sources-built.txt', inputs)!
 	vlib := os.dir(v) + '/vlib'
 	os.write_file(directory + '/runtime.c', '#include <unistd.h>\n#include <fcntl.h>\n#include <sys/wait.h>\n#define V_OS_EXECUTE_SCOPE\n#include "' +
 		vlib + '/os/execute_capture_nix.h"\n#define V_SYNC_THREAD_SCOPE\n#include "' + vlib + '/sync/thread_helper.h"\n')!
@@ -64,6 +78,9 @@ fn check() ! {
 	}
 	if digest(@FILE)! != sha256.hexhash($embed_file('wine-native-check.v').to_string()) {
 		return error('compiled Wine native controller source differs')
+	}
+	if digest(os.dir(@FILE) + '/winesource/closure.v')! != sha256.hexhash($embed_file('winesource/closure.v').to_string()) {
+		return error('compiled Wine source closure admission differs')
 	}
 	if os.args.len != 9 {
 		return error('usage: wine-native-check ARCH OUTPUT PREPARED_BUILD KERNEL ASSEMBLED_STAGE SYSROOT GCC_RUNTIME SANDBOX')
@@ -110,7 +127,7 @@ fn check() ! {
 		inputs[translator_busybox] = digest(translator_busybox)!
 	}
 	for path in [os.executable(), host.v, kernel, host.qemu, host.firmware, @FILE,
-		root + '/tests/packages/wine-native/main.v', '/opt/homebrew/opt/llvm/bin/clang',
+		root + '/tests/packages/wine-native/main.v', root + '/tests/packages/winesource/closure.v', '/opt/homebrew/opt/llvm/bin/clang',
 		'/opt/homebrew/bin/ld.lld', sandbox] {
 		inputs[path] = digest(path)!
 	}
@@ -126,11 +143,13 @@ fn check() ! {
 	for name in ['usr/sbin/vinix-account', 'usr/sbin/vinix-session'] {
 		inputs[stage + '/' + name] = digest(stage + '/' + name)!
 	}
+	discover_program(host.v, root + '/tests/packages/wine-native/main.v', arch, work, 'guest', mut inputs)!
+	discover_program(host.v, root + '/tools/packages/main.v', arch, work, 'package', mut inputs)!
 	os.write_file(work + '/inputs-before-build.json', json2.encode(inputs))!
-	guest := build_program(host.v, sysroot, gcc, root + '/tests/packages/wine-native/main.v', arch, work, 'guest')!
+	guest := build_program(host.v, sysroot, gcc, root + '/tests/packages/wine-native/main.v', arch, work, 'guest', inputs)!
 	// Rebuild the package CLI from the captured tree. The archived account tools
 	// are separate inputs; their stage's package CLI may predate runtime policy.
-	package_cli := build_program(host.v, sysroot, gcc, root + '/tools/packages/main.v', arch, work, 'package')!
+	package_cli := build_program(host.v, sysroot, gcc, root + '/tools/packages/main.v', arch, work, 'package', inputs)!
 	// An owned local test key signs the real runtime. It is never copied into
 	// the guest image or printed. This does not enroll a production publisher.
 	publisher := work + '/publisher'
@@ -175,7 +194,7 @@ fn check() ! {
 	mut generated := map[string]string{}
 	for program in ['guest', 'package']! {
 		for name in [program, program + '.c', 'runtime.c', 'v.log', 'v.log.argv.json', 'cc.log',
-			'cc.log.argv.json'] {
+			'cc.log.argv.json', 'discover.log', 'discover.log.argv.json', 'sources-before.txt', 'sources-built.txt'] {
 			path := 'build-' + program + '/' + name
 			generated[path] = digest(work + '/' + path)!
 		}
@@ -207,6 +226,7 @@ fn check() ! {
 		'gcc_runtime':         gcc
 		'sandbox':             sandbox
 		'controller':          os.executable()
+		'source_scope':        'parsed-v1'
 		'iso_xorriso':         image_inputs['iso-xorriso']
 		'iso_bootx64':         image_inputs['iso-BOOTX64.EFI']
 		'iso_limine_cd':       image_inputs['iso-limine-uefi-cd.bin']

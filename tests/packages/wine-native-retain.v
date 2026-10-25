@@ -7,6 +7,7 @@ import hwhost
 import json2
 import os
 import plainiso
+import tests.packages.winesource
 import tools.packages.wineadapter
 
 struct WineOutcome {
@@ -26,9 +27,7 @@ struct WineReceipt {
 }
 
 fn digest(path string) !string {
-	text := os.read_file(path)!
-	defer { unsafe { text.free() } }
-	return sha256.hexhash(text)
+	return winesource.file_digest(path)
 }
 
 fn hashes(path string) !map[string]string {
@@ -84,6 +83,14 @@ fn producer_argv(vargv string, ccargv string, compiler string, architecture stri
 		expected_v << ['-path', '@vlib|' + root + '|' + root + '/tools/accounts|@vmodules']
 	}
 	expected_v << ['-o', cfile, source]
+	if native {
+		expected_v.insert(1, ['-dump-files', os.dir(cfile) + '/sources-built.txt'])
+		mut expected_discovery := [compiler, '-print-watched-files', '-dump-files', os.dir(cfile) + '/sources-before.txt']
+		for argument in expected_v[3..] { expected_discovery << argument }
+		if argv(os.dir(vargv) + '/discover.log.argv.json')! != expected_discovery {
+			return error('V source discovery argv differs')
+		}
+	}
 	if v != expected_v {
 		return error('V producer argv differs')
 	}
@@ -115,6 +122,7 @@ fn retain() ! {
 		'tests/packages/wine-native-retain.v':     $embed_file('wine-native-retain.v').to_string()
 		'tests/packages/wine-native-check.v':      $embed_file('wine-native-check.v').to_string()
 		'tests/packages/wine-native/main.v':       $embed_file('wine-native/main.v').to_string()
+		'tests/packages/winesource/closure.v':     $embed_file('winesource/closure.v').to_string()
 		'tools/packages/wine-build.v':             $embed_file('../../tools/packages/wine-build.v').to_string()
 		'tools/packages/wine-runner.v':            $embed_file('../../tools/packages/wine-runner.v').to_string()
 		'tools/packages/wineadapter/prefix.c.v':   $embed_file('../../tools/packages/wineadapter/prefix.c.v').to_string()
@@ -130,7 +138,8 @@ fn retain() ! {
 		}
 	}
 	declaration := json2.decode[map[string]string](os.read_file(run + '/declaration.json')!)!
-	if declaration['architecture'] != arch || declaration['source_root'] != root || declaration['prepared'] != prepared {
+	if declaration['architecture'] != arch || declaration['source_root'] != root || declaration['prepared'] != prepared
+		|| declaration['source_scope'] != 'parsed-v1' {
 		return error('Wine declaration binding differs')
 	}
 	// A disposable evidence copy retains the build's absolute argv namespace.
@@ -165,7 +174,7 @@ fn retain() ! {
 			require_input(inputs, declaration[name])!
 		}
 	}
-	for name in ['tests/packages/wine-native-check.v', 'tests/packages/wine-native/main.v']! {
+	for name in ['tests/packages/wine-native-check.v', 'tests/packages/wine-native/main.v', 'tests/packages/winesource/closure.v']! {
 		require_input(inputs, root + '/' + name)!
 	}
 	for directory in [root + '/tools/packages', root + '/tools/accounts',
@@ -304,9 +313,11 @@ fn retain() ! {
 	mut required := []string{}
 	for program in ['guest', 'package']! {
 		for name in [program, program + '.c', 'runtime.c', 'v.log', 'v.log.argv.json', 'cc.log',
-			'cc.log.argv.json'] {
+			'cc.log.argv.json', 'discover.log', 'discover.log.argv.json', 'sources-before.txt', 'sources-built.txt'] {
 			required << 'build-' + program + '/' + name
 		}
+		winesource.admit(run + '/build-' + program + '/sources-before.txt',
+			run + '/build-' + program + '/sources-built.txt', inputs)!
 	}
 	for name in ['usr/bin/vinix-package', 'usr/sbin/vinix-account', 'usr/sbin/vinix-session',
 		'usr/bin/vinix-sandbox', 'etc/vinix/auth.conf', 'etc/vinix-packages/config.json']! {

@@ -49,9 +49,10 @@ fn clone_tree(source string, destination string) ! {
 		if !os.is_file(path) { continue }
 		target := destination + path[source.len..]
 		os.mkdir_all(os.dir(target))!
-		// Source-offer and private executable admission deliberately reject
+		// Source-offer, executable and compiler-closure admission reject
 		// links. Preserve those checks in an unchanged copied baseline.
-		if path.contains('/publisher-notices/') || private_executable(path) {
+		if path.contains('/publisher-notices/') || private_executable(path)
+			|| path.ends_with('/sources-before.txt') || path.ends_with('/sources-built.txt') {
 			os.cp(path, target)!
 		} else {
 			os.symlink(path, target)!
