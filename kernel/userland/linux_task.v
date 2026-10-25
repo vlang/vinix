@@ -167,6 +167,20 @@ fn import_clone3_tid_vector(args &CloneArgs, size u64) u64 {
 	return 0
 }
 
+// A private address space inherits the caller's alternate signal stack.
+// CLONE_VM clears it unless CLONE_VFORK also suspends the parent.
+fn inherit_clone_altstack(mut child proc.Thread, source &proc.Thread, flags u64) {
+	if flags & (clone_vm | clone_vfork) == clone_vm {
+		child.sigaltstack_sp = 0
+		child.sigaltstack_size = 0
+		child.sigaltstack_flags = 2
+	} else {
+		child.sigaltstack_sp = source.sigaltstack_sp
+		child.sigaltstack_size = source.sigaltstack_size
+		child.sigaltstack_flags = source.sigaltstack_flags
+	}
+}
+
 // CLONE_CLEAR_SIGHAND resets the child's private copy before it can run.
 // Linux preserves SIG_IGN but clears every action's flags, restorer and mask.
 fn reset_clone_sighand(mut child proc.Thread, flags u64) {

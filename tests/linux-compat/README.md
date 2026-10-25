@@ -2661,3 +2661,18 @@ on AArch64 and 100 on x86-64. All twenty maintained cases pass per architecture.
 `altstackrestore-evidence.v` without `-prod`, run `self-test` (ten positive and
 51 negative controls), then `check` on the complete bundle in
 [the qualification](../../docs/linux-alternate-stack-restoration.md).
+
+The `altstackclone` case checks native alternate-stack inheritance through
+fork, five clone/pthread variants and two clone3 variants. Three initial
+configurations run as root and UID 1000/GID 2000. Guarded stacks check child
+configuration, real SA_ONSTACK placement, saved uc_stack, live queries,
+replacement/disabling and unchanged parent behavior. CLONE_VM clears the
+child's stack unless CLONE_VFORK is also set. Identical musl ELFs pass 1,440
+checks on both production architectures and Linux references; originals fail
+120 each. Active-handler creation and other limits remain unqualified.
+
+`altstackclone-reference.v` accepts the same arguments as `sigwaitcopy-reference.v`;
+`--self-test` has two positive and nine negative controls. Compile
+`altstackclone-evidence.v` without `-prod`, run `self-test` (eleven positive and
+57 negative controls), then `check` on the complete bundle in
+[the qualification](../../docs/linux-alternate-stack-inheritance.md).

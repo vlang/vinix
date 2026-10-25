@@ -1953,6 +1953,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   earlier intermittent failures remain unresolved. See
   [the restoration qualification](docs/linux-alternate-stack-restoration.md).
 
+- [x] Inherit the caller's native alternate signal stack through fork/clone,
+  clearing it for CLONE_VM unless CLONE_VFORK is also set. Guarded child and
+  parent probes pass 1,440 checks on both production architectures and Linux;
+  originals fail 120 each. Maintained cases pass 25/25 on AArch64 and 24/25 on
+  x86-64, with the complete randomsignal failure retained. See
+  [the inheritance qualification](docs/linux-alternate-stack-inheritance.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

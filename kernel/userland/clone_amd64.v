@@ -170,6 +170,7 @@ fn clone_thread_of_current(state &cpulocal.GPRState, flags u64, child_stack u64,
 
 	mut new_thread := sched.new_cloned_thread(process, current_thread, state, child_stack, tls,
 		flags & clone_settls != 0) or { return errno.err, errno.eagain }
+	inherit_clone_altstack(mut new_thread, current_thread, flags)
 
 	if flags & clone_child_cleartid != 0 {
 		new_thread.clear_child_tid = child_tid
@@ -266,6 +267,7 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 		abandon_new_process(mut new_process)
 		return errno.err, errno.eagain
 	}
+	inherit_clone_altstack(mut new_thread, old_thread, flags)
 	reset_clone_sighand(mut new_thread, flags)
 
 	if flags & clone_child_cleartid != 0 {
