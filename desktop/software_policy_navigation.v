@@ -157,9 +157,16 @@ fn (mut a SoftwareApp) build_policy_compact(width int, height int) ui2.Element {
 	if a.worker == unsafe { nil } && a.policy_ready && height >= 220 {
 		children << software_button('software.policy.read', 'Read policy', 14, next_y, button_width)
 		next_y += 38
+	} else if a.worker == unsafe { nil } && !a.policy_ready && !a.policy_review_ready
+		&& next_y + 46 <= height {
+		children << software_button('software.policy.reload', 'Reload policy', 14, next_y, button_width)
+		next_y += 38
 	}
-	if available { children << software_button('software.failure', 'Failure details', 14, next_y, button_width); next_y += 38 }
-	progress := a.progress_seen && height >= 240
+	if available && next_y + 46 <= height {
+		children << software_button('software.failure', 'Failure details', 14, next_y, button_width)
+		next_y += 38
+	}
+	progress := a.progress_seen && height >= 240 && next_y <= height - 110
 	if progress { children << a.progress_bar(width, height) }
 	preferred_y := if height > 230 { height - if progress { 88 } else { 98 } } else { next_y }
 	y := if preferred_y > next_y { preferred_y } else { next_y }
