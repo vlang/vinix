@@ -2,6 +2,7 @@
 module memory
 
 import lib
+import errno
 
 // Boot-time tests of the actual allocator, enabled with -d heap_selftest.
 // Run before SMP startup; free-page snapshots assume no concurrent clients.
@@ -139,5 +140,29 @@ fn heap_selftest() {
 	heap_test_require(memory.malloc(u64(-1)) == unsafe { nil })
 	heap_trim()
 	heap_test_require(free_bytes() == baseline)
+
+	big_pages := heap_big_pages()
+	for alignment in [u64(8), 16, 32, page_size, 2 * page_size, 4 * page_size]! {
+		for size in [u64(0), 1, 17, page_size + 1]! {
+			mut aligned := unsafe { nil }
+			heap_test_require(posix_memalign(unsafe { &aligned }, alignment, size) == 0)
+			heap_test_require(aligned != unsafe { nil } && u64(aligned) % alignment == 0)
+			unsafe { C.memset(aligned, 0x7c, size) }
+			heap_test_bytes(aligned, size, 0x7c)
+			free(aligned)
+			heap_trim()
+			heap_test_require(free_bytes() == baseline && heap_big_pages() == big_pages)
+		}
+	}
+	mut untouched := voidptr(0x10)
+	for alignment in [u64(0), 1, 4, 24]! {
+		heap_test_require(posix_memalign(unsafe { &untouched }, alignment, 1) == errno.einval)
+		heap_test_require(untouched == voidptr(0x10))
+	}
+	for alignment in [u64(16), page_size, 2 * page_size]! {
+		heap_test_require(posix_memalign(unsafe { &untouched }, alignment, u64(-1)) == errno.enomem)
+		heap_test_require(untouched == voidptr(0x10))
+	}
+	heap_test_require(free_bytes() == baseline && heap_big_pages() == big_pages)
 	C.printf(c'heap: self-test passed\n')
 }
