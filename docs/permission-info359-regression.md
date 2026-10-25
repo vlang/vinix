@@ -61,23 +61,44 @@ passed every file hash and the exact file set, both exiting 0. Their adjacent
 receipts are `permission-info359-source-check-own-readback-2026-10-26.json` and
 `permission-info359-source-check-root-readback-2026-10-26.json`.
 
-| Source or baseline | SHA-256 |
+| Source or artifact | SHA-256 |
 | --- | --- |
 | `framework_permission_info.v` | `c1899b8db95d3fca1f79e361828879c5da6a77b7a3c0d2c537483ca2fe2b67f5` |
 | `startupfixture/permission_info.v` | `c9dfd9d8008f46bc8e6b98e67932595d637ca25b0c345b4919a069790295b614` |
 | Qualified353 complete bundle manifest | `22bc4e713113d41a7ab56a1809293fb9f3ccb11fd8cc8c8c589fc20afd19171f` |
 | Qualified353 framework JAR | `1e5467f57ac9a3a51a9f29f7c73bf4896b47dc1ea055f59d07db1e1d281cfa83` |
+| Executed framework359 builder source | `e2cbbd637be4a52e758eb9f66705ee7e7a50d8c4f2709aca8e226146435c30e1` |
+| Framework359 complete bundle manifest | `7a2ae7763e71f702ccc1a50b3b63cf444a0e37d8b6a800e77c80866d3ba9dccc` |
+| Fixed359 framework JAR | `88fdf06964bfbd3815d824ab5ff5517887e58de3eb3eb47986d99806fbe6c2fc` |
+| Independent complete build-readback receipt | `e7db2798e440011f1ef7bd632276b91fe2f19daf3a7280d95c1fff0bb4b733b1` |
 
-## Build, ART and Maps status
+## Complete framework build
 
-The standalone builder is committed as `d7d8dcb60`, with frozen compiler-root
-correction `ae652e427`. The same-APK ART harness is committed as `bea726cc3` and
-has compiled successfully. Compilation does not establish guest behavior.
+The standalone builder, originally `d7d8dcb60` and corrected in
+`ae652e42769dce32cdbf62f3c610bf56fa8376ec`, completed attempt4 successfully.
+The sealed 14,862-file bundle is
+`/Users/alex/.local/state/vinix/android/permission-info359-framework-build-attempt4-2026-10-26`.
+It retains the complete qualified353 baseline. Original, clone and post-build
+baseline readbacks passed. Frozen provider/helper inputs and both builder and
+driver V source closures passed their before/after checks. SDK/JDK libraries
+remain environmental inputs.
 
-No final framework359 JAR exists yet. Build attempts stopped before framework
-work at the unchanged 768 MiB free-space gate; the last reported availability
-was 631,088 KiB. The complete framework build, same-APK old/new native ART runs
-and separate Maps replay remain pending. Final artifact pins, actual outcomes
-and complete readback results must be recorded after execution. The completed
-source/host evidence does not establish resolution of Maps' permission failure
-or later service teardown in a guest.
+Complete DEX comparison retains all 2,073 classes, changes only PackageManager,
+and adds or removes no classes. Only `classes.dex` changes among the three
+extracted regular JAR members; ancillary members match the baseline. Duplicate
+provider application again fails without mutation. The builder's complete final
+readback exited 0 with every file hash and exact set matching; its adjacent
+receipt is `permission-info359-framework-build-attempt4-2026-10-26-own-readback.json`.
+Independent final readback also exited 0 and matched all 14,862 file hashes and
+the exact set, with checker identity verified before and after. Its adjacent
+receipt is `permission-info359-framework-builder-peer-readback-2026-10-26.json`.
+
+## ART and Maps status
+
+The same-APK ART harness is committed as `bea726cc3` and has compiled successfully.
+No old/new ART run or Maps360 replay has started. Their unchanged preparation
+gates require 1,024 MiB and 1,536 MiB free respectively; the last reported
+availability was 615,692 KiB. The complete framework build establishes the
+targeted bytecode change, while runtime outcomes remain pending. This evidence
+does not establish resolution of Maps' permission failure or later service
+teardown in a guest.
