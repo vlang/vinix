@@ -5,6 +5,7 @@ module main
 import crypto.sha256
 import json2
 import os
+import strconv
 import time
 
 const base = 'build/android-maps/'
@@ -87,6 +88,13 @@ fn files(root string) !map[string]string {
 	mut entries := map[string]string{}
 	inventory(root, '', mut entries, true)!
 	return entries
+}
+
+fn module_tree(root string) !map[string]string {
+	mut tree := map[string]string{}
+	inventory(root, '', mut tree, false)!
+	for path in tree.keys() { tree['@mode:' + path] = (os.lstat(root + '/' + path)!.mode & 0o7777).str() }
+	return tree
 }
 
 fn equal_maps(actual map[string]string, expected map[string]string) ! {
@@ -179,6 +187,68 @@ fn stdin_hash() !string {
 		digest.write(buffer[..n])!
 	}
 	return digest.sum([]u8{}).hex()
+}
+
+fn read_exact(mut input os.File, mut buffer []u8) ! {
+	mut offset := 0
+	for offset < buffer.len {
+		n := input.read(mut buffer[offset..])!
+		if n == 0 { return error('truncated tar stream') }
+		offset += n
+	}
+}
+
+// Read only the authoritative runtime tar stream, without extracting historical trees.
+fn stdin_tar_tree() !map[string]string {
+	mut input := os.stdin()
+	mut entries := map[string]string{}
+	mut header := []u8{len: 512}
+	mut payload := []u8{len: 1024 * 1024}
+	mut saw_root := false
+	for {
+		read_exact(mut input, mut header)!
+		if header.all(it == 0) {
+			read_exact(mut input, mut header)!
+			if !header.all(it == 0) { return error('invalid tar terminator') }
+			return entries
+		}
+		mut checksum := u64(0)
+		for i, byte in header { checksum += if i >= 148 && i < 156 { u64(32) } else { u64(byte) } }
+		if checksum != strconv.parse_uint(header[148..156].bytestr().trim(' \x00'), 8, 64)! {
+			return error('invalid tar header checksum')
+		}
+		prefix := header[345..500].bytestr().all_before('\x00')
+		mut path := header[..100].bytestr().all_before('\x00')
+		if prefix != '' { path = prefix + '/' + path }
+		size := strconv.parse_uint(header[124..136].bytestr().trim(' \x00'), 8, 64)!
+		kind := header[156]
+		mode := strconv.parse_uint(header[100..108].bytestr().trim(' \x00'), 8, 64)!
+		if path == './' {
+			if saw_root || kind != `5` || size != 0 { return error('invalid or duplicate tar root') }
+			saw_root = true
+			continue
+		}
+		path = path.trim_string_left('./').trim_right('/')
+		if path == '' || path.starts_with('/') || path.starts_with('@mode:') || '..' in path.split('/') || path in entries {
+			return error('unsafe or duplicate tar path: ' + path)
+		}
+		entries['@mode:' + path] = (mode & 0o7777).str()
+		if kind == `5` && size == 0 { entries[path] = 'directory'; continue }
+		if kind == `2` && size == 0 { entries[path] = 'symlink:' + header[157..257].bytestr().all_before('\x00'); continue }
+		if kind != `0` && kind != 0 { return error('unsupported runtime tar member: ' + path) }
+		mut digest := sha256.new()
+		mut remaining := size
+		for remaining > 0 {
+			n := int(if remaining > u64(payload.len) { u64(payload.len) } else { remaining })
+			read_exact(mut input, mut payload[..n])!
+			digest.write(payload[..n])!
+			remaining -= u64(n)
+		}
+		entries[path] = digest.sum([]u8{}).hex()
+		padding := int((512 - size % 512) % 512)
+		if padding > 0 { read_exact(mut input, mut header[..padding])! }
+	}
+	return entries
 }
 
 fn archive_stage(root string) ! {
@@ -286,7 +356,7 @@ fn prepare(native_root string, native_manifest_pin string) ! {
 	os.mkdir_all(target + '/vm')!
 	clone_file(compiler_source, compiler)!
 	mut staging_tools := map[string]string{}
-	for name in ['cp', 'tar', 'mcopy', 'mtype', 'zsh'] {
+	for name in ['cp', 'tar', 'mcopy', 'mtype', 'zsh', 'unzip'] {
 		path := os.find_abs_path_of_executable(name)!
 		staging_tools[path] = hash(path)!
 	}
@@ -307,6 +377,18 @@ fn prepare(native_root string, native_manifest_pin string) ! {
 		if media[name]! != manifest[original + 'vm/' + name]! { return error('initial media clone differs') }
 	}
 	write_json(target + '/initial-media-clones.json', media)!
+	// Bind every directory and symlink target as well as regular file bytes to sealed283.
+	tree_argv := ['/bin/zsh', '-c', 'set -o pipefail; ' + shell_quote(os.find_abs_path_of_executable('mtype')!) + ' -i ' + shell_quote(target + '/vm/boot.img') + ' ::/boot/qemu-runtime.tar | ' + shell_quote(os.executable()) + ' --tar-tree-stdin']
+	write_json(target + '/original-module-tree-before.json', {'argv': json2.Any(tree_argv), 'started_utc': json2.Any(time.utc().str()), 'sealed283_boot_sha256': json2.Any(media['boot.img']!)})!
+	old_tree := json2.decode[map[string]string](checked(tree_argv)!)!
+	mut expected_tree := old_tree.clone()
+	if expected_tree[native]! != before[native]! { return error('sealed283 archive native differs') }
+	expected_tree[native] = native_pin
+	actual_tree := module_tree(target + '/module')!
+	equal_maps(actual_tree, expected_tree)!
+	write_json(target + '/module-before-typed.json', old_tree)!
+	write_json(target + '/module-after-typed.json', actual_tree)!
+	write_json(target + '/original-module-tree-receipt.json', {'argv': json2.Any(tree_argv), 'completed_utc': json2.Any(time.utc().str()), 'exit_code': json2.Any(0), 'original_typed_sha256': json2.Any(hash(target + '/module-before-typed.json')!), 'overlaid_typed_sha256': json2.Any(hash(target + '/module-after-typed.json')!), 'changed_paths': json2.Any([native])})!
 	archive_stage(target)!
 	boot_pin := hash(target + '/vm/boot.img')!
 	efivars_pin := hash(target + '/vm/efivars.fd')!
@@ -427,6 +509,7 @@ fn self_test() ! {
 fn main() {
 	$if prod { eprintln('Maps285 preparation requires assertions'); exit(2) }
 	if os.args.len == 2 && os.args[1] == '--hash-stdin' { println(stdin_hash() or { eprintln(err); exit(1) }); return }
+	if os.args.len == 2 && os.args[1] == '--tar-tree-stdin' { println(json2.encode(stdin_tar_tree() or { eprintln(err); exit(1) })); return }
 	if os.args.len == 2 && os.args[1] == '--self-test' { self_test() or { eprintln(err); exit(1) }; return }
 	if os.args.len == 4 && os.args[1] == 'prepare' { prepare(os.args[2], os.args[3]) or { eprintln(err); exit(1) }; return }
 	eprintln('usage: maps285-prepare --self-test | prepare QUEUE284_BUNDLE PRELAUNCH_SHA256')
