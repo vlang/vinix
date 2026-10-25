@@ -18922,9 +18922,21 @@ remains unsupported. Native iOS layout parity, Fortnite initialization,
 rendering, login and gameplay remain unverified. Advertising work remains
 skipped.
 
+The GCColor checkpoint adds scoped GameController class and metaclass imports,
+RGB float values, independent copies, descriptions and macOS-measured metadata.
+Native inspection, both sanitizer host runs and the focused ARM64 guest fixture
+pass, including float ABI, caller-provided storage, subclass behavior and eight
+explicit rejection cases. Coding and private preset initialization remain
+unsupported. A fresh Fortnite probe passes GCColor and stops at
+`_OBJC_CLASS_$_GCMouse` during linking, before application entry. The
+[GCColor checkpoint](../tests/ios/gc-color-checkpoint-20261025.md) records the
+source revision and complete external evidence. Native iOS layout parity,
+Fortnite initialization, rendering, login and gameplay remain unverified.
+Advertising work remains skipped.
+
 The import audit measurements below belong to the bundle-resource milestone;
-they were not rerun for the startup, feedback, task, controller or gamepad
-checkpoints and do not execute app code.
+they were not rerun for the startup, feedback, task, controller, gamepad or
+color checkpoints and do not execute app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
