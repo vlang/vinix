@@ -3,6 +3,7 @@ module main
 
 fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	match_request_install(cls, caller_storage)
+	achievement_install(cls, caller_storage)
 	snapshot_configuration_require_class(cls)
 	if caller_storage && snapshot_configuration_family(cls) { panic('iOS: WKSnapshotConfiguration caller storage is not implemented') }
 	if caller_storage && gc_event_controller_family(cls) { panic('iOS: GCEventViewController caller storage is not implemented') }
@@ -177,6 +178,7 @@ fn objc_destruct_instance(object u64) u64 {
 
 fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	if header.destroyed || header.destroying { return }
+	achievement_retire(header)
 	app_attest_retire(object)
 	audio_application_retire(object)
 	connection_dispose(header)
