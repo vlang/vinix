@@ -68,3 +68,29 @@ Old serial/results SHA256:
 New serial/results SHA256:
 `89bada48e09f54b2f3db2a79f0de0fe3956b2b7472f084b758bd0c3a0be900f9` /
 `20cdcd1bbfb75e04735722ccf8efe9d52538382eebcef9d83013ca89df952c5c`.
+
+Maps311 pairs these exact framework/native309 artifacts with the unchanged
+Maps/GMS APKs, clean283 launcher and 600-second observation/classifier.
+Bundle: `maps311-2026-10-25`, typed manifest SHA256
+`e8d8ef1bc3666eefd4a83b5ee474dc79b8a60bb1ed7d5c809e4e01c4fd182ddc`.
+Complete independent typed readback passed all 22,878 entries. The raw result
+is `window_observed`, with `backend_ready` and `native_maps_observed` true,
+`process_exited` false, `qemu_alive_before_capture` true and no failure markers.
+
+Skip advances to the map, the search hint and Paris suggestions render, and
+Paris map geometry loads. Delayed search transitions caused retries to hit
+the Restaurants chip after Paris loaded. This search then persisted through
+the final capture: its close button and search field did not advance the UI;
+a map drag collapsed the blank bottom sheet but left the map cyan. No fatal
+or linkage failure accompanied the stall. Geographic labels remain absent.
+Route Options, checked switch graphics and preview controls were not reached,
+so this replay does not qualify those real-app behaviors. Guest310 supplies
+the positive generic nine-patch rendering proof; a later replay must still
+verify actual Maps switches and preview camera behavior.
+
+Serial SHA256:
+`701d1e068e77aa6df7cda90e09921f7d54b393f0c9e70d1538f7281cf6eb2a7a`.
+Interaction SHA256:
+`07116674e5f60e03cb5f6b0a4dba50c39abe3a3ed7e60a149b0586ad0cd6e346`.
+Final application PNG SHA256:
+`31466ffaa274cdd2fb7b4e7344d05e52239bf26b9bf4990eaa8f15dce1c856e1`.
