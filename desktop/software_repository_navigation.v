@@ -42,11 +42,19 @@ fn (a &SoftwareApp) build_repositories_compact(width int, height int) ui2.Elemen
 		children << software_label('Wait for repository changes to finish.', 14, 46, width - 28, 28, false)
 	}
 	mut next_y := 84
+	if a.worker == unsafe { nil } && a.repository_operation == '' && !a.repository_review_ready
+		&& height >= next_y + 46 {
+		children << software_button('software.repository.reload', 'Reload list', 14, next_y, button_width)
+		next_y += 38
+	}
 	if a.worker == unsafe { nil } && a.repository_review_ready && a.details_pages.len > 0 && height >= 220 {
 		children << software_button('software.report.read', 'Read review', 14, next_y, button_width)
 		next_y += 38
 	}
-	if available { children << software_button('software.failure', 'Failure details', 14, next_y, button_width); next_y += 38 }
+	if available && height >= next_y + 46 {
+		children << software_button('software.failure', 'Failure details', 14, next_y, button_width)
+		next_y += 38
+	}
 	progress := a.progress_seen && height >= 240 && next_y <= height - 110
 	if progress { children << a.progress_bar(width, height) }
 	preferred_y := if height > 230 { height - if progress { 88 } else { 98 } } else { next_y }
