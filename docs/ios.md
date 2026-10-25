@@ -18870,9 +18870,22 @@ Native UIKit layout parity, the broader native regression suite, Swift support,
 Fortnite initialization, rendering, login and gameplay remain unverified at
 this checkpoint.
 
+The URL session task checkpoint adds Foundation imports for `NSURLSessionTask`,
+`NSURLSessionDownloadTask`, `NSURLSessionDataTask` and `NSURLSessionUploadTask`,
+with measured hierarchy, base properties, copied descriptions, signed client
+byte expectations and float priority. Native macOS inspections, the sanitizer
+host fixture and the focused ARM64 guest fixture pass. Transfers and task
+lifecycle operations remain unsupported. A fresh Fortnite probe passes these
+class imports and stops at GameController's `_OBJC_CLASS_$_GCController` during
+linking, before application entry. The
+[task checkpoint](../tests/ios/session-task-checkpoint-20261025.md) records the
+source revision, coverage, limitations and complete external evidence.
+Advertising work remains skipped; Fortnite initialization, rendering, login
+and gameplay remain unverified.
+
 The import audit measurements below belong to the bundle-resource milestone;
-they were not rerun for the startup or feedback checkpoints and do not execute
-app code.
+they were not rerun for the startup, feedback or task checkpoints and do not
+execute app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
