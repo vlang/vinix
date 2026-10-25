@@ -521,6 +521,8 @@ mut:
 	notification_queues_draining bool
 	notification_queues_retired bool
 	audio_session u64
+	app_attest u64 // One factory-owned reference.
+	app_attest_retired bool
 	audio_application u64 // One factory-owned reference.
 	audio_application_retired bool
 	audio_converters map[u64]&AudioConverter
@@ -585,7 +587,7 @@ fn objc_start() {
         'UIScreenEdgePanGestureRecognizer', 'UIFeedbackGenerator', 'UINotificationFeedbackGenerator', 'UISelectionFeedbackGenerator', 'UIImpactFeedbackGenerator', 'CADisplayLink',
 		'UIAccessibilityElement',
         'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',
-        'AVAudioSession', 'AVAudioApplication', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession',
+        'AVAudioSession', 'AVAudioApplication', 'DCAppAttestService', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession',
         'AVCaptureVideoDataOutput', 'AVCaptureVideoPreviewLayer', 'PHPhotoLibrary',
 		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGFont', 'VinixReachability', 'VinixNWPath', 'VinixNWInterface', 'VinixNWPathMonitor', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider', 'VinixSecCertificate', 'VinixSecKey', 'VinixSecPolicy', 'VinixSecTrust', 'VinixCFDate', 'VinixCFError', 'VinixCFUUID'] {
 		parent := match name {
@@ -693,6 +695,7 @@ fn objc_start() {
 			'GCKeyboard' { u32(32) }
 			'GCMouse' { u32(40) }
 			'GCColor', 'CHHapticEventParameter', 'AVAudioApplication' { u32(24) }
+			'DCAppAttestService' { u32(16) } // Catalyst size; opaque shim storage.
 			'WKSnapshotConfiguration' { u32(56) }
 			'CHHapticDynamicParameter' { u32(32) }
 			'CHHapticEvent' { u32(48) }
@@ -861,6 +864,7 @@ fn objc_allocate(cls u64) u64 {
 	url_session_configuration_require_class(cls)
 	url_session_task_require_class(cls)
 	game_controller_require_discovery(cls)
+	app_attest_require_factory(cls)
 	audio_application_require_factory(cls)
 	storyboard_require_factory(cls)
 	sort_descriptor_require_class(cls)
@@ -1073,6 +1077,7 @@ fn objc_stop() {
 	notification_stop()
 	objc_release(ios_runtime.notification_center)
 	objc_release(ios_runtime.audio_session)
+	app_attest_stop()
 	audio_application_stop()
 	objc_release(ios_runtime.defaults)
 	objc_release(ios_runtime.file_manager)
@@ -1248,6 +1253,10 @@ fn runtime_symbol(library string, symbol string) !u64 {
 	if symbol in ['_OBJC_CLASS_$_UIStoryboard', '_OBJC_METACLASS_$_UIStoryboard']!
 		&& library != '/System/Library/Frameworks/UIKit.framework/UIKit' {
 		return error('iOS: storyboard import requires UIKit.framework')
+	}
+	if symbol in ['_OBJC_CLASS_$_DCAppAttestService', '_OBJC_METACLASS_$_DCAppAttestService']!
+		&& library != '/System/Library/Frameworks/DeviceCheck.framework/DeviceCheck' {
+		return error('iOS: App Attest import requires DeviceCheck.framework')
 	}
 	if symbol in ['_OBJC_CLASS_$_AVAudioApplication', '_OBJC_METACLASS_$_AVAudioApplication']!
 		&& library != '/System/Library/Frameworks/AVFAudio.framework/AVFAudio' {

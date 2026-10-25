@@ -145,6 +145,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if game_keyboard_dispatch(object, selector, mut frame) { return true }
 	if gc_event_controller_dispatch(object, selector, mut frame) { return true }
 	if game_controller_dispatch(object, selector, mut frame) { return true }
+	if app_attest_dispatch(object, selector, mut frame) { return true }
 	if audio_application_dispatch(object, selector, mut frame) { return true }
 	if storyboard_dispatch(object, selector, mut frame) { return true }
 	if gc_color_dispatch(object, selector, mut frame) { return true }

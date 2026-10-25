@@ -3,6 +3,9 @@ module main
 
 // The export is an NSString pointer cell, not the string object itself.
 fn devicecheck_symbol(symbol string) ?u64 {
+	if ios_runtime != unsafe { nil } {
+		if value := app_attest_symbol(symbol) { return value }
+	}
 	if symbol!='_DCErrorDomain' || ios_runtime==unsafe{nil} { return none }
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }

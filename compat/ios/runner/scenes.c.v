@@ -19,7 +19,8 @@ fn objc_is_kind(object u64, cls u64) bool {
 fn objc_responds(object u64, selector &char) bool {
 	if object == 0 || selector == unsafe { nil } { return false }
 	name := ctext(u64(selector))
-	if audio_application_family(if object in ios_runtime.classes { object } else { read64(object) })
+	if app_attest_family(if object in ios_runtime.classes { object } else { read64(object) })
+		|| audio_application_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| gc_event_controller_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| text_field_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| haptic_dynamic_parameter_family(if object in ios_runtime.classes { object } else { read64(object) })
