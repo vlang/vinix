@@ -2569,3 +2569,19 @@ Handler delivery and other limits remain open.
 `sigactionabi-evidence.v` without `-prod`, run `self-test` (five positive and
 23 negative controls), then `check` on the complete bundle in
 [the qualification](../../docs/linux-signal-action-abi.md).
+
+The `altstackabi` case checks native sigaltstack modes and architecture ABI
+minimum sizes. Root and UID 1000/GID 2000 cohorts cover disabled/enabled state,
+eight flag words, nine sizes and three input/nine output placements, checking
+return values, errno, state, complete writable output and guards. SS_ONSTACK
+input is accepted off-stack; combined/unknown modes return EINVAL. The enabled
+minimum is 5120 bytes on AArch64 and 2048 on x86-64. Identical musl ELFs pass
+38,880 checks per production architecture and Linux reference; originals fail
+2,628 on AArch64 and 2,268 on x86-64. All fifteen maintained suites pass per
+architecture. Handler delivery and other limits remain open.
+
+`altstackabi-reference.v` accepts the same arguments as `sigwaitcopy-reference.v`;
+`--self-test` has two positive and nine negative controls. Compile
+`altstackabi-evidence.v` without `-prod`, run `self-test` (six positive and
+25 negative controls), then `check` on the complete bundle in
+[the qualification](../../docs/linux-alternate-stack-abi.md).

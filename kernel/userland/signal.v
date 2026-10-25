@@ -43,10 +43,6 @@ const ss_onstack = 1
 
 const ss_disable = 2
 
-// Small enough to accept whatever a libc hands us, large enough that a handler
-// has somewhere to stand.
-const min_sigstack_size = u64(2048)
-
 // Signals that can never be blocked, caught or ignored.
 fn unblockable_mask() u64 {
 	return signal_bit(sigkill) | signal_bit(sigstop)
@@ -423,13 +419,16 @@ pub fn syscall_sigaltstack(_ voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u64) {
 			return errno.err, errno.efault
 		}
 		flags := int(u32(raw[1]))
-		if flags & ~ss_disable != 0 {
+		// Linux accepts SS_ONSTACK as an input mode even off the stack.
+		if flags != 0 && flags != ss_onstack && flags != ss_disable {
 			return errno.err, errno.einval
 		}
 
-		disabling = flags & ss_disable != 0
+		disabling = flags == ss_disable
 		if !disabling {
-			if raw[2] < min_sigstack_size {
+			// Linux UAPI minima differ independently of the native page size.
+			minimum := $if arm64 { u64(5120) } $else { u64(2048) }
+			if raw[2] < minimum {
 				return errno.err, errno.enomem
 			}
 			incoming_sp = raw[0]

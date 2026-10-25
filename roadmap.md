@@ -1887,6 +1887,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   All fourteen maintained suites pass per architecture. See
   [the action ABI qualification](docs/linux-signal-action-abi.md).
 
+- [x] Match native sigaltstack mode validation and architecture minimum sizes,
+  accepting SS_ONSTACK input off-stack and retaining valid updates after output
+  EFAULT. Qualify flags, size boundaries, pointers, aliases, state and guards.
+  Identical musl ELFs pass 38,880 checks on both production architectures and
+  Linux; originals fail 2,628 on AArch64 and 2,268 on x86-64. All fifteen
+  maintained suites pass per architecture. See
+  [the alternate-stack ABI qualification](docs/linux-alternate-stack-abi.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
