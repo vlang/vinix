@@ -102,10 +102,14 @@ fn same_except(old map[string]string, new map[string]string, changed string) ! {
 	}
 }
 
+fn driver(root string) string {
+	return root + '/frozen/vroot/source/permission359-driver'
+}
+
 fn freeze_provider(root string, revision string, pin string) ! {
 	committed := record(root, 'provider-committed-source', ['git', 'show', revision + ':' + provider])!
 	assert committed == os.read_file(provider)! && hash(provider)! == pin
-	clone(root, 'retain-provider', provider, root + '/driver/androidtools/framework_permission_info.v')!
+	clone(root, 'retain-provider', provider, driver(root) + '/androidtools/framework_permission_info.v')!
 	// Preserve the production method helper verbatim without importing the whole
 	// generator module. Its authenticated353 definition must still equal live.
 	frozen := root + '/baseline353/frozen/vroot/source/androidtools/framework.v'
@@ -114,7 +118,7 @@ fn freeze_provider(root string, revision string, pin string) ! {
 	live := os.read_file('tests/native-android-tools/androidtools/framework.v')!.all_after(marker).all_before('\n// Missing packages')
 	assert qualified == live && qualified.starts_with('source string, name string, declaration string) !string {')
 	if os.read_file(provider)!.contains('framework_replace_method(') {
-		os.write_file(root + '/driver/androidtools/framework_method.v', 'module androidtools\n\n' + marker + qualified + '\n')!
+		os.write_file(driver(root) + '/androidtools/framework_method.v', 'module androidtools\n\n' + marker + qualified + '\n')!
 	}
 	write_json(root + '/source/provider-inputs.json', {
 		'provider_commit': revision, 'provider_sha256': pin,
@@ -139,12 +143,15 @@ fn run() ! {
 	clone(root, 'retain-checker', checker, root + '/tools/build-bundle-check290')!
 	checked := root + '/tools/build-bundle-check290'
 	clone(root, 'retain-bootstrap', os.executable(), root + '/tools/bootstrap')!
-	clone(root, 'retain-builder-source', source_name, root + '/source/permission-info-framework-build.v')!
 	record(root, 'verify-baseline-original', [checked, baseline, baseline_pin, root + '/qualification/baseline-original.json'])!
 	clone(root, 'clone-complete353', baseline, root + '/baseline353')!
 	record(root, 'verify-baseline-clone', [checked, root + '/baseline353', baseline_pin, root + '/qualification/baseline-clone.json'])!
 	assert hash(root + '/baseline353/framework/api-impl.jar')! == old_jar
 	assert hash(root + '/baseline353/frozen/vroot/v')! == compiler_pin
+	// V selects builtin/C-support roots relative to the input source, regardless
+	// of explicit module search paths. Keep all inputs beneath a private V root.
+	clone(root, 'clone-qualified-vroot', root + '/baseline353/frozen/vroot', root + '/frozen/vroot')!
+	clone(root, 'retain-builder-source', source_name, root + '/frozen/vroot/source/permission-info-framework-build.v')!
 	freeze_provider(root, revision, provider_pin)!
 	mut host_tools := map[string]string{}
 	for name in ['clang', 'ld'] {
@@ -158,20 +165,20 @@ fn run() ! {
 		'checkout': record(root, 'checkout-revision', ['git', 'rev-parse', 'HEAD'])!.trim_space(),
 		'provider_commit': revision, 'provider_sha256': provider_pin, 'baseline_manifest': baseline_pin
 	})!
-	os.write_file(root + '/driver/main.v', "module main\nimport androidtools\nimport os\nfn main() {\n if os.args.len == 3 {\n  androidtools.framework_permission_info(os.args[1]) or { println('PERMISSION359-DUPLICATE-GUARD-PASS'); return }\n  eprintln('provider accepted duplicate application'); exit(1)\n }\n androidtools.framework_permission_info(os.args[1]) or { eprintln(err); exit(1) }\n}\n")!
-	vroot := root + '/baseline353/frozen/vroot'
+	os.write_file(driver(root) + '/main.v', "module main\nimport androidtools\nimport os\nfn main() {\n if os.args.len == 3 {\n  androidtools.framework_permission_info(os.args[1]) or { println('PERMISSION359-DUPLICATE-GUARD-PASS'); return }\n  eprintln('provider accepted duplicate application'); exit(1)\n }\n androidtools.framework_permission_info(os.args[1]) or { eprintln(err); exit(1) }\n}\n")!
+	vroot := root + '/frozen/vroot'
 	compiler := vroot + '/v'
-	paths := root + '/driver|' + vroot + '/vlib'
+	paths := driver(root) + '|' + vroot + '/vlib'
 	os.mkdir_all(root + '/generated-c')!
 	os.mkdir_all(root + '/vmodules')!
 	os.setenv('VROOT', vroot, true)
 	os.setenv('VEXE', compiler, true)
 	os.setenv('VMODULES', root + '/vmodules', true)
 	os.setenv('VTMP', root + '/generated-c', true)
-	before_closure := closure(root, 'driver-before', compiler, paths, root + '/driver')!
-	builder_closure := closure(root, 'builder-before', compiler, vroot + '/vlib', root + '/source/permission-info-framework-build.v')!
+	before_closure := closure(root, 'driver-before', compiler, paths, driver(root))!
+	builder_closure := closure(root, 'builder-before', compiler, vroot + '/vlib', vroot + '/source/permission-info-framework-build.v')!
 	record(root, 'compile-driver', [compiler, '-path', paths, '-nocache', '-keepc', '-showcc', '-cc', '/usr/bin/cc',
-		'-o', root + '/tools/permission-info-provider', root + '/driver'])!
+		'-o', root + '/tools/permission-info-provider', driver(root)])!
 	assert !os.read_file(root + '/commands/compile-driver.log')!.contains('/Users/alex/code/'), 'mutable checkout in C compiler command'
 	clone(root, 'clone-smali', root + '/baseline353/framework/smali', root + '/framework/smali')!
 	mut before := map[string]string{}
@@ -187,14 +194,14 @@ fn run() ! {
 	assert after == duplicate, 'duplicate application mutated input'
 	write_json(root + '/framework/smali-delta.json', {'before': json2.decode[json2.Any](json2.encode(before))!, 'after': json2.decode[json2.Any](json2.encode(after))!, 'changed': json2.Any([changed_class]), 'duplicate_guard_unchanged': json2.Any(true)})!
 	build_dex(root)!
-	assert before_closure == closure(root, 'driver-after', compiler, paths, root + '/driver')!
-	assert builder_closure == closure(root, 'builder-after', compiler, vroot + '/vlib', root + '/source/permission-info-framework-build.v')!
+	assert before_closure == closure(root, 'driver-after', compiler, paths, driver(root))!
+	assert builder_closure == closure(root, 'builder-after', compiler, vroot + '/vlib', vroot + '/source/permission-info-framework-build.v')!
 	assert hash(provider)! == provider_pin && hash(java)! == java_pin && hash('/usr/bin/cc')! == cc_pin
 	for path, pin in host_tools { assert hash(path)! == pin, path }
 	record(root, 'verify-baseline-after', [checked, root + '/baseline353', baseline_pin, root + '/qualification/baseline-after.json'])!
 	write_json(root + '/validation.json', {'scope': 'Framework-only production provider build; complete qualified353 baseline retained unchanged; no native rebuild or guest execution.',
 		'baseline_manifest_sha256': baseline_pin, 'old_framework_sha256': old_jar, 'new_framework_sha256': hash(root + '/framework/api-impl.jar')!,
-		'changed_class': changed_class, 'class_count': '2073', 'provider_sha256': provider_pin, 'builder_sha256': hash(root + '/source/permission-info-framework-build.v')!})!
+		'changed_class': changed_class, 'class_count': '2073', 'provider_sha256': provider_pin, 'builder_sha256': hash(vroot + '/source/permission-info-framework-build.v')!})!
 	mut pins := map[string]string{}
 	inventory(root, '', mut pins)!
 	write_json(root + '/sha256.json', pins)!
