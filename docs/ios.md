@@ -18934,9 +18934,22 @@ source revision and complete external evidence. Native iOS layout parity,
 Fortnite initialization, rendering, login and gameplay remain unverified.
 Advertising work remains skipped.
 
+The GCMouse checkpoint adds scoped GameController class and metaclass imports,
+immutable empty mouse discovery, a nil current mouse, four notification values
+and macOS-measured metadata. Native inspection, both sanitizer host runs and
+the focused ARM64 guest fixture pass, including concurrent readers, subclass
+overrides, saved IMP calls and nine explicit rejection cases. Physical mouse
+transport, device construction and input events remain unsupported. A fresh
+Fortnite probe passes GCMouse and stops at `_OBJC_CLASS_$_AVAudioApplication`
+in AVFAudio during linking, before application entry. The
+[GCMouse checkpoint](../tests/ios/gc-mouse-checkpoint-20261025.md) records the
+source revision and complete external evidence. Native iOS layout parity,
+Fortnite initialization, rendering, login and gameplay remain unverified.
+Advertising work remains skipped.
+
 The import audit measurements below belong to the bundle-resource milestone;
-they were not rerun for the startup, feedback, task, controller, gamepad or
-color checkpoints and do not execute app code.
+they were not rerun for the startup, feedback, task, controller, gamepad, color
+or mouse checkpoints and do not execute app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
