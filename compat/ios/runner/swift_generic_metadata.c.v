@@ -16,14 +16,14 @@ mut:
 	metadata u64
 	owner u64
 	phase u64 // 1 instantiating, 2 complete, 3 rejected result.
-	singleton_cache u64 // Nonzero for borrowed in-place singleton value metadata.
+	singleton_cache u64 // Nonzero for borrowed in-place singleton metadata.
 	singleton_state u64 // Abstract/LayoutComplete while its completer runs.
 	mutex [8]u64
 }
 struct SwiftGenericMetadataCache { mut: entries [64]SwiftGenericMetadataEntry }
 struct SwiftGenericMetadataKey { count u64 kind u64 mut: arguments [64]u64 }
 
-// Both generic instantiations and in-place singleton values share this bounded
+// Both generic instantiations and in-place singleton metadata share this bounded
 // runtime-owned arena, user accounting and quiescent mutex/arena retirement.
 fn swift_generic_metadata_cache_locked() !&SwiftGenericMetadataCache {
 	if ios_runtime.swift_generic_metadata_arena == 0 {

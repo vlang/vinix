@@ -99,7 +99,7 @@ fn sm_invalid(api SmApi)[]SmInput{
 	mut inputs:=[]SmInput{};input:=sm_input(api,0x200,true,true);inputs<<input
 	for request in [u64(2),0x40,0x200,~u64(0)]!{sm_bad(request,api.guard)};for descriptor in [u64(0),1,~u64(3)]!{sm_bad(0,descriptor)}
 	assert C.mprotect(voidptr(input.base+input.page),usize(input.page),C.PROT_READ|C.PROT_WRITE)==0
-	for flags in [u32(0x51),0x10050,0x100d1,0x10151,0x50051,0x90051,0x40010051]!{write32(input.descriptor,flags);sm_bad(0,input.descriptor)}
+	for flags in [u32(0x51),0x10070,0x100d1,0x10151,0x50051,0x90051,0x40010051]!{write32(input.descriptor,flags);sm_bad(0,input.descriptor)}
 	write32(input.descriptor,0x10051);write32(input.descriptor+20,65);sm_bad(0,input.descriptor);write32(input.descriptor+20,4)
 	for offset in [u32(0),1,129]!{write32(input.descriptor+24,offset);sm_bad(0,input.descriptor)};write32(input.descriptor+24,2)
 	for field in [u64(28),32,36]!{saved:=read32(input.descriptor+field);write32(input.descriptor+field,0);sm_bad(0,input.descriptor);write32(input.descriptor+field,saved)}

@@ -15,6 +15,7 @@ fn C.sel_registerName(&char) voidptr
 type CuEntry = fn (u64, u64, u64, u64, u64) SwiftAssociatedMetadata
 type CuProbe = fn (u64, u64, u64, u64, u64, u64, &u64)
 type CuRealize = fn (u64, u64) u64
+type CsGet = fn (u64, u64) SwiftAssociatedMetadata
 struct CuField { size u64 stride u64 flags u32 extra u32 }
 struct CuInput { base u64 page u64 metadata u64 ro u64 descriptor u64 types u64 list u64 cells u64 count int }
 __global cu_sequence = u64(0)
@@ -332,6 +333,117 @@ fn ci_matrix(entry u64, probe CuProbe, native bool) []CuInput {
 	fixtures << cu_headers(entry, probe, native, true)
 	return fixtures
 }
+// Singleton records follow the 44-byte class descriptor, before its vtable.
+// These fixtures share the observed FileStorage header and two pointer fields.
+fn cs_trace(input CuInput) u64 { return input.base + input.page + 11776 }
+fn cs_cache(input CuInput) u64 { return input.base + input.page + 1792 }
+fn cs_lookup() u64 { return runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_swift_getSingletonMetadata') or { panic(err) } }
+fn cs_complete(m u64, context u64, pattern u64) SwiftAssociatedMetadata {
+	assert pattern == 0
+	for i in 0 .. 4 { assert read64(context + u64(i * 8)) == 0; cu_write(context + u64(i * 8), u64(0x3100 + i)) }
+	d := read64(m + 64) & 0x0000ffffffffffff
+	t := u64(i64(d + 16) + i64(i32(read32(d + 16))))
+	assert C.ios_ref_change(unsafe { &i64(t) }, 1) == 0
+	assert read64(m + 32) & 7 == 2 && read64(m - 8) == read64(t + 8)
+	assert C.ios_load_pointer(unsafe { &u64(read64(t + 32)) }) == 0
+	if read64(t + 64) != 0 { C.pthread_mutex_lock(voidptr(t + 128)); C.pthread_mutex_unlock(voidptr(t + 128)) }
+	if read64(t + 40) == 0 {
+		// Completion runs without the registry lock, can resolve runtime symbols,
+		// inspect partial metadata and initialize a different singleton.
+		worker := spawn cs_lookup(); assert worker.wait() == read64(t + 48)
+		partial := unsafe { CsGet(voidptr(read64(t + 48)))(0x1ff, d) }
+		assert partial.metadata == m && partial.state == 0x3f
+		if _ := swift_singleton_metadata_checked(0, d) { assert false }
+		if read64(t + 80) != 0 {
+			nested := unsafe { CsGet(voidptr(read64(t + 48)))(0, read64(t + 80)) }; assert nested.metadata != 0 && nested.state == 0
+		}
+	}
+	if read64(t + 56) != 1 {
+		result := unsafe { CuEntry(voidptr(read64(t + 16)))(m, 0x100, 2, read64(t + 24), m + 80) }; assert result.metadata == 0
+	}
+	match read64(t + 56) {
+		2 { cu_write(m - 8, 0) }
+		3 { cu_write(m + 80, 999) }
+		4 { write32(m + 48, 999) }
+		else {}
+	}
+	return SwiftAssociatedMetadata{read64(t + 72), ~u64(0)}
+}
+fn cs_input(native bool, get u64, initialize u64, code u64) CuInput {
+	input := cu_input([CuField{8, 8, 0x10007, 0}, CuField{8, 8, 7, 0}], native, 16, false)
+	m := input.metadata; d := input.descriptor; t := cs_trace(input)
+	write32(d, 0x80010050); write32(d + 24, 3); write32(d + 28, 13)
+	write32(m + 56, 128); write32(m + 60, 24); write32(input.ro, 0xc0)
+	cu_write(input.ro + 72, u64(unsafe { voidptr(cu_metadata_initialize) }))
+	cu_write(m + 32, input.ro | 1); cu_write(m + 8, 0)
+	for i in 1 .. 4 { cu_write(m - u64(i * 8), 0x12340000 + u64(i)) }
+	swift_protocol_relative(d + 16, t)
+	swift_protocol_relative(d + 44, cs_cache(input)); swift_protocol_relative(d + 48, m); swift_protocol_relative(d + 52, code + 256)
+	write32(d + 56, 12); write32(d + 60, 0) // Empty trailing vtable.
+	mut witness := u64(0)
+	$if macos { if native { core := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', 2); witness = u64(C.dlsym(core, c'$sBoWV')) } }
+	if !native { witness = swift_native_value_witnesses() }
+	assert witness != 0
+	cu_write(t + 8, witness); cu_write(t + 16, initialize); cu_write(t + 24, input.types); cu_write(t + 32, cs_cache(input)); cu_write(t + 40, u64(native)); cu_write(t + 48, get)
+	assert C.ios_mutex_create(voidptr(t + 128), 0) == 0
+	return input
+}
+fn cs_call(input CuInput, get u64, probe CuProbe, request u64) {
+	mut words := [u64(0xcafe), 0, 0, 0, 0, 0xbeef]!
+	probe(request, input.descriptor, 0, 0, 0, get, unsafe { &words[1] })
+	assert words[0] == 0xcafe && words[5] == 0xbeef && words[1] == input.metadata && words[2] == 0 && words[3] == 0x5020 && words[4] == 0x5021
+	assert C.ios_load_pointer(unsafe { &u64(cs_cache(input)) }) == input.metadata && read64(cs_trace(input)) == 1
+}
+fn cs_worker(input CuInput, get u64) u64 {
+	result := unsafe { CsGet(voidptr(get))(0, input.descriptor) }; assert result.metadata == input.metadata && result.state == 0; return result.metadata
+}
+fn cs_bad(input CuInput) { if _ := swift_singleton_metadata_checked(0, input.descriptor) { assert false, 'unsupported class singleton accepted' } }
+fn cs_matrix(native bool, get u64, initialize u64, code u64, probe CuProbe) []CuInput {
+	mut fixtures := []CuInput{}
+	for request in [u64(0), 1, 0x3f, 0xff, 0x100, 0x101, 0x13f, 0x1ff]! {
+		input := cs_input(native, get, initialize, code); fixtures << input
+		cs_call(input, get, probe, request)
+		cu_check(input, [u64(16), 24], 32, 7, [CuField{8, 8, 0x10007, 0}, CuField{8, 8, 7, 0}], native, false, true)
+		for i in 2 .. 4 { assert read64(input.metadata - u64(i * 8)) == 0x12340000 + u64(i) }
+		assert C.mprotect(voidptr(input.base + input.page), usize(input.page * 4), C.PROT_READ) == 0
+		for next in [u64(0), 1, 0x3f, 0xff, 0x100, 0x101, 0x13f, 0x1ff]! { cs_call(input, get, probe, next) }
+		if !native { checked := swift_metadata_state_checked(0, input.metadata) or { panic(err) }; assert checked.metadata == input.metadata && checked.state == 0 }
+	}
+	busy := cs_input(native, get, initialize, code); fixtures << busy
+	t := cs_trace(busy); cu_write(t + 64, 1); C.pthread_mutex_lock(voidptr(t + 128))
+	worker := spawn cs_worker(busy, get)
+	for C.ios_load_pointer(unsafe { &u64(t) }) == 0 { C.usleep(1000) }
+	for request in [u64(0x100), 0x101, 0x13f, 0x1ff, 0x3f, 0xff]! {
+		partial := unsafe { CsGet(voidptr(get))(request, busy.descriptor) }; assert partial.metadata == busy.metadata && partial.state == 0x3f
+	}
+	assert read64(cs_cache(busy)) == 0
+	C.pthread_mutex_unlock(voidptr(t + 128)); assert worker.wait() == busy.metadata; cs_call(busy, get, probe, 0)
+	concurrent := cs_input(native, get, initialize, code); fixtures << concurrent
+	if !native { nested := cs_input(false, get, initialize, code); fixtures << nested; cu_write(cs_trace(concurrent) + 80, nested.descriptor) }
+	mut workers := []thread u64{}
+	for _ in 0 .. 8 { workers << spawn cs_worker(concurrent, get) }; results := workers.wait()
+	for result in results { assert result == concurrent.metadata }; assert read64(cs_trace(concurrent)) == 1
+	unsafe { workers.free(); results.free() }
+	if !native {
+		invalid := cs_input(false, get, initialize, code); fixtures << invalid
+		// Preflight failures leave both borrowed headers and cache untouched.
+		for pair in [[invalid.descriptor + 20, u64(4)]!, [invalid.descriptor + 36, u64(65)]!, [invalid.metadata + 44, u64(1)]!, [invalid.ro, u64(0x180)]!]! {
+			old := read32(pair[0]); write32(pair[0], u32(pair[1])); copy := C.malloc(usize(invalid.page * 4)); assert copy != unsafe { nil }; C.memcpy(copy, voidptr(invalid.base + invalid.page), usize(invalid.page * 4))
+			cs_bad(invalid); assert C.memcmp(copy, voidptr(invalid.base + invalid.page), usize(invalid.page * 4)) == 0; C.free(copy); write32(pair[0], old)
+		}
+		for offset in [u64(44), 48, 52]! { old := read32(invalid.descriptor + offset); write32(invalid.descriptor + offset, 0); cs_bad(invalid); write32(invalid.descriptor + offset, old) }
+		cu_write(cs_cache(invalid) + 8, 1); cs_bad(invalid); cu_write(cs_cache(invalid) + 8, 0)
+		// A cache cannot be shared by different descriptors.
+		swift_protocol_relative(invalid.descriptor + 44, cs_cache(concurrent)); cs_bad(invalid); swift_protocol_relative(invalid.descriptor + 44, cs_cache(invalid))
+		assert read64(cs_trace(invalid)) == 0
+		for mode in [u64(1), 2, 3, 4, 5]! {
+			bad := cs_input(false, get, initialize, code); fixtures << bad; cu_write(cs_trace(bad) + 56, mode)
+			if mode == 5 { cu_write(cs_trace(bad) + 72, code) }
+			cs_bad(bad); cs_bad(bad); assert read64(cs_trace(bad)) == 1 && read64(cs_cache(bad)) == 0
+		}
+	}
+	return fixtures
+}
 fn test_swift_class_update() {
 	page := usize(C.getpagesize())
 	code := u64(C.mmap(unsafe { nil }, page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
@@ -340,7 +452,8 @@ fn test_swift_class_update() {
 	defer { assert C.munmap(voidptr(code), page) == 0 && C.munmap(voidptr(guard), page) == 0 }
 	// x0..x4 arguments; x0/x1 dependency result; preserved Swift context x20/x21.
 	for i, op in [u32(0xa9bc7bfd), 0xa90153f3, 0xa9025bf5, 0xaa0603f3, 0xaa0503f0, u32(0xd2800000 | (0x5020 << 5) | 20), u32(0xd2800000 | (0x5021 << 5) | 21), 0xd63f0200, 0xa9000660, 0xa9015674, 0xa9425bf5, 0xa94153f3, 0xa8c47bfd, 0xd65f03c0]! { write32(code + u64(i * 4), op) }
-	C.__builtin___clear_cache(voidptr(code), voidptr(code + 56)); assert C.mprotect(voidptr(code), page, C.PROT_READ | C.PROT_EXEC) == 0
+	write32(code + 256, 0x58000050); write32(code + 260, 0xd61f0200); cu_write(code + 264, u64(unsafe { voidptr(cs_complete) }))
+	C.__builtin___clear_cache(voidptr(code), voidptr(code + 272)); assert C.mprotect(voidptr(code), page, C.PROT_READ | C.PROT_EXEC) == 0
 	probe := unsafe { CuProbe(voidptr(code)) }
 	$if macos {
 		core := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', 2); entry := u64(C.dlsym(core, c'swift_updateClassMetadata2')); assert entry != 0
@@ -351,6 +464,9 @@ fn test_swift_class_update() {
 		initialize := u64(C.dlsym(core, c'swift_initClassMetadata2')); assert initialize != 0
 		mut initialized := ci_matrix(initialize, probe, true); unsafe { initialized.free() }
 		println('IOS-CLASS-INIT-NATIVE: static-vtable root initialization, implicit SwiftObject superclass, normalized Swift bit, FileStorage-shaped headers, field layout and nil dependency ABI; no metadata callback or +initialize')
+		get := u64(C.dlsym(core, c'swift_getSingletonMetadata')); assert get != 0
+		mut singletons := cs_matrix(true, get, initialize, code, probe); unsafe { singletons.free() }
+		println('IOS-CLASS-SINGLETON-NATIVE: FileStorage-shaped root completion, native object witnesses before callback, four-word context and null pattern, eight cold/warm requests, LayoutComplete busy responses, one completion across eight readers and preserved x20/x21')
 	}
 	cu_reject(guard, 0x100, 0, guard, guard); ci_reject(guard, 0x100, 0, guard, guard)
 	for _ in 0 .. 2 {
@@ -362,15 +478,22 @@ fn test_swift_class_update() {
 		initialize := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_swift_initClassMetadata2') or { panic(err) }
 		fixtures << ci_matrix(initialize, probe, false)
 		fixtures << ci_invalid(guard); fixtures << cu_repeat(initialize, probe, true)
+		singletons := cs_matrix(false, cs_lookup(), initialize, code, probe); fixtures << singletons
 		if _ := runtime_symbol('/usr/lib/swift/libswiftFoundation.dylib', '_swift_initClassMetadata2') { assert false }
 		if _ := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '__swift_initClassMetadata2') { assert false }
 		if _ := runtime_symbol('/usr/lib/swift/libswiftFoundation.dylib', '_swift_updateClassMetadata2') { assert false }
 		if _ := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '__swift_updateClassMetadata2') { assert false }
 		assert ios_runtime.swift_heap.len == 0 && ios_runtime.live == 0
+		for input in singletons {
+			assert C.mprotect(voidptr(input.base + input.page), usize(input.page * 4), C.PROT_READ | C.PROT_WRITE) == 0
+			assert C.pthread_mutex_destroy(voidptr(cs_trace(input) + 128)) == 0
+		}; unsafe { singletons.free() }
 		for input in fixtures { assert C.mprotect(voidptr(input.base + input.page), usize(input.page * 4), C.PROT_NONE) == 0 }
 		objc_stop(); cu_reject(guard, 0x100, 0, guard, guard); ci_reject(guard, 0x100, 0, guard, guard)
+		if _ := swift_singleton_metadata_checked(0, guard) { assert false }
 		for input in fixtures { cu_free(input) }; unsafe { fixtures.free() }
 	}
 	println('IOS-CLASS-UPDATE: bounded registered nongeneric Swift root layout, UInt64 offsets, ivar encoding/alignment and registry publication; 16 header variants, unchanged negative words, no metadata initializer or +initialize; fail-before-write validation, live-layout rejection, readonly unchanged storage, 512 concurrent repeats, owned-copy drain with inaccessible image pages and two runtime lifetimes')
 	println('IOS-CLASS-INIT: bounded registered static-vtable Swift root initialization, implicit superclass and normalized Swift bit; FileStorage-shaped headers, field layout and nil dependency ABI; no metadata callback or +initialize; fail-before-write rejection, readonly 512 concurrent repeats, inaccessible-image teardown and two lifetimes')
+	println('IOS-CLASS-SINGLETON: bounded registered root completion, reference witness setup, release publication and complete-state recognition; eight cold/warm requests, LayoutComplete busy responses, eight concurrent readers, unlocked nested completion and recursive rejection; preflight validation, cache alias rejection, malformed/dependency poisoning and inaccessible-image teardown across two lifetimes')
 }
