@@ -108,9 +108,10 @@ with changed arrows and map camera. `route-previous.png` at 04:04:14 restores
 “Head toward Pont d'Iéna” and the original camera and position arrow.
 The full observed UI flow passes: onboarding → map → live Paris search → details
 → Directions → Eiffel Tower origin → route → Preview → Next → Previous.
-The frame-metrics linkage failure is resolved for this path. Visible updates
-still needed roughly 20–50 seconds of waiting; this run establishes no latency
-gain. The observed UI result is separate from the suite's raw classifier.
+The frame-metrics linkage failure is resolved for this path. Captures were taken
+roughly 20–50 seconds after inputs; those observation intervals do not measure
+response time or establish a latency gain. The observed UI result is separate
+from the suite's raw classifier.
 The 600-second replay completes naturally with launch and runner exit 0
 (03:54:16–04:05:53 UTC). Raw results report `window_observed`, backend ready and
 native execution observed, with `process_exited=false` and QEMU alive before

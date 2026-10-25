@@ -13,6 +13,7 @@ const overlap_note = 'Phase totals overlap: loop_total includes the other phases
 const limits_note = 'These samples do not establish overall latency percentiles, interaction latency, frame rate, or time spent in unlogged phases.'
 const input_note = 'input_done is summarized separately without a duration threshold. No samples does not establish that no input occurred; the retained Maps283 source defines this helper without a callsite. Its duration starts at native input read, not pointer-to-presentation.'
 const comparison_note = 'This is a descriptive comparison of diagnostic samples from nonidentical interaction workloads. It does not isolate a causal effect or establish an overall performance change.'
+const scan_note = 'Scan mode accepts a complete, strictly valid record after exactly one WS-TIMING231 marker on a line, discarding only its preceding console prefix. It rejects malformed, truncated, suffixed or multiple-marker lines without repairing them. Statistics exclude rejected lines; scan counts are not a completeness guarantee.'
 
 struct SampleStats {
 	name             string
@@ -45,6 +46,26 @@ struct Analysis {
 	empty_definition  string = 'has_samples=false and zero numeric fields mean no logged samples, not measured zero duration.'
 	comparison        string
 	runs              []RunSummary
+}
+
+struct RejectedRecord {
+	line   int
+	reason string
+}
+
+struct ScanSummary {
+	marker_line_count      int
+	accepted_record_count  int
+	recovered_prefix_count int
+	rejected_record_count  int
+	rejected_records       []RejectedRecord
+}
+
+struct ScannedAnalysis {
+	schema   string = 'vinix.maps-timing231.scan.v1'
+	scope    string = scan_note
+	scan     ScanSummary
+	analysis Analysis
 }
 
 fn natural(value string, key string) !u64 {
@@ -168,6 +189,48 @@ fn parse_log(path string, raw string) !RunSummary {
 	}
 }
 
+// Keep the historical parser strict. Recovery is an explicit, separately
+// reported operation, and only whole validated records reach its statistics.
+fn scan_log(path string, raw string) !(RunSummary, ScanSummary) {
+	mut records := []string{}
+	mut rejected := []RejectedRecord{}
+	mut marker_lines := 0
+	mut prefixed := 0
+	lines := raw.split_into_lines()
+	for index, line in lines {
+		count := line.count('WS-TIMING231')
+		if count == 0 { continue }
+		marker_lines++
+		if count != 1 {
+			rejected << RejectedRecord{index + 1, 'multiple timing markers on one line'}
+			continue
+		}
+		start := line.index('WS-TIMING231') or { return error('timing marker count/index disagree') }
+		record := line[start..].trim_space()
+		parse_log('record', record) or {
+			rejected << RejectedRecord{index + 1, err.msg().all_after('record:1: ')}
+			continue
+		}
+		records << record
+		if line[..start].trim_space() != '' { prefixed++ }
+	}
+	parsed := parse_log(path, records.join('\n'))!
+	return RunSummary{
+		source_path:        path
+		source_sha256:      sha256.hexhash(raw)
+		line_count:         lines.len
+		phase_sample_count: parsed.phase_sample_count
+		phases:             parsed.phases
+		input_done:         parsed.input_done
+	}, ScanSummary{
+		marker_line_count:      marker_lines
+		accepted_record_count:  records.len
+		recovered_prefix_count: prefixed
+		rejected_record_count:  rejected.len
+		rejected_records:       rejected
+	}
+}
+
 fn stat_line(sample SampleStats) string {
 	if !sample.has_samples { return '${sample.name}: count=0 (no logged samples)' }
 	return '${sample.name}: count=${sample.count} sampled_total_ms=${sample.sampled_total_ms} min_ms=${sample.min_ms} median_ms=${sample.median_ms} p95_ms=${sample.p95_ms} max_ms=${sample.max_ms}'
@@ -187,6 +250,15 @@ fn render(analysis Analysis) string {
 		lines << stat_line(run.input_done)
 	}
 	return lines.join('\n') + '\n'
+}
+
+fn render_scan(scan ScanSummary, analysis Analysis) string {
+	mut lines := [scan_note,
+		'Marker lines: ${scan.marker_line_count}; accepted records: ${scan.accepted_record_count}; recovered prefixes: ${scan.recovered_prefix_count}; rejected records: ${scan.rejected_record_count}']
+	for rejected in scan.rejected_records {
+		lines << 'Rejected line ${rejected.line}: ${rejected.reason}'
+	}
+	return lines.join('\n') + '\n\n' + render(analysis)
 }
 
 fn guard_outputs(prefix string, inputs []string) ! {
@@ -238,6 +310,25 @@ fn selftest() ! {
 	assert output.contains('no logged samples')
 	assert !encoded.contains('overall_p95') && !encoded.contains('fps')
 	assert encoded.contains('sampled_total_ms') && encoded.contains('has_samples')
+	complete := 'WS-TIMING231 phase loop=3 name=render_total duration_ms=123 now_ms=700'
+	interleaved := 'ordinary output\nANDROID-WS-MAPS absent' + complete + '\n' +
+		complete + '\n' + complete + 'WS-TIMING231 phase\n' +
+		'WS-TIMING231 phase loop=4 name=looper duration_ms=\n' +
+		complete + ' trailing-console-output\n'
+	scanned, scan := scan_log('interleaved', interleaved)!
+	assert scanned.source_sha256 == sha256.hexhash(interleaved)
+	assert scanned.line_count == interleaved.split_into_lines().len
+	assert scanned.phase_sample_count == 2 && scanned.phases[2].sampled_total_ms == 246
+	assert scan.marker_line_count == 5 && scan.accepted_record_count == 2
+	assert scan.recovered_prefix_count == 1 && scan.rejected_record_count == 3
+	assert scan.rejected_records.map(it.line) == [4, 5, 6]
+	assert scan.rejected_records[0].reason == 'multiple timing markers on one line'
+	assert scan.rejected_records[1].reason.contains('missing fields')
+	assert scan.rejected_records[2].reason.contains('unexpected or duplicate field')
+	if _ := parse_log('strict', interleaved) { return error('strict parser accepted console prefix') }
+	empty_run, empty_scan := scan_log('none', 'ordinary output\n')!
+	assert empty_run.phase_sample_count == 0 && empty_scan.marker_line_count == 0
+	assert render_scan(scan, Analysis{runs: [scanned]}).contains('Rejected line 4:')
 	temporary := os.join_path(os.temp_dir(), 'vinix-maps-timing-${os.getpid()}')
 	os.mkdir_all(temporary)!
 	defer { os.rmdir_all(temporary) or {} }
@@ -248,7 +339,7 @@ fn selftest() ! {
 	}
 	assert os.read_file(input)! == raw
 	guard_outputs(os.join_path(temporary, 'separate'), [os.real_path(input)])!
-	println('MAPS-TIMING SELFTEST PASS: thresholded samples, ranks, empty/input records, strict parsing and claim limits')
+	println('MAPS-TIMING SELFTEST PASS: thresholded samples, ranks, empty/input records, strict parsing, explicit scan recovery/rejection and claim limits')
 }
 
 fn main() {
@@ -260,20 +351,31 @@ fn main() {
 		return
 	}
 	compare := os.args.len == 5 && os.args[1] == 'compare'
-	if !compare && !(os.args.len == 4 && os.args[1] == 'analyze') {
-		eprintln('usage: maps-timing selftest | analyze SERIAL OUTPUT_PREFIX | compare OLD_SERIAL NEW_SERIAL OUTPUT_PREFIX')
+	scan_mode := os.args.len == 4 && os.args[1] == 'scan'
+	if !compare && !scan_mode && !(os.args.len == 4 && os.args[1] == 'analyze') {
+		eprintln('usage: maps-timing selftest | analyze SERIAL OUTPUT_PREFIX | scan SERIAL OUTPUT_PREFIX | compare OLD_SERIAL NEW_SERIAL OUTPUT_PREFIX')
 		exit(1)
 	}
 	mut runs := []RunSummary{}
+	mut scan := ScanSummary{}
 	for path in os.args[2..os.args.len - 1] {
 		absolute := os.real_path(path)
 		raw := os.read_file(absolute) or {
 			eprintln(err)
 			exit(1)
 		}
-		runs << parse_log(absolute, raw) or {
-			eprintln(err)
-			exit(1)
+		if scan_mode {
+			run, scanned := scan_log(absolute, raw) or {
+				eprintln(err)
+				exit(1)
+			}
+			runs << run
+			scan = scanned
+		} else {
+			runs << parse_log(absolute, raw) or {
+				eprintln(err)
+				exit(1)
+			}
 		}
 	}
 	analysis := Analysis{ comparison: if compare { comparison_note } else { '' }, runs: runs }
@@ -286,13 +388,15 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	output := render(analysis)
-	os.write_file(prefix + '.json', json2.encode(analysis,
-		prettify:       true
-		legacy_layout:  true
-		escape_unicode: true
-		time_as_unix:   true
-	)) or {
+	output := if scan_mode { render_scan(scan, analysis) } else { render(analysis) }
+	encoded := if scan_mode {
+		json2.encode(ScannedAnalysis{scan: scan, analysis: analysis},
+			prettify: true, legacy_layout: true, escape_unicode: true, time_as_unix: true)
+	} else {
+		json2.encode(analysis,
+			prettify: true, legacy_layout: true, escape_unicode: true, time_as_unix: true)
+	}
+	os.write_file(prefix + '.json', encoded) or {
 		eprintln(err)
 		exit(1)
 	}
