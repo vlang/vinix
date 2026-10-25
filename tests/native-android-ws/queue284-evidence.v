@@ -32,7 +32,7 @@ const queue_source = 'ff4bb8c0657a240d47bf6164879a02e6db994aa74ad5d160c53b046d20
 const runtime_source = '4a55617a8e2f2013c6ac51c29e8c3919a53bc269b34d4b46dffdfdc5ab17ed94'
 const compiler_path = 'build/android-maps/queue284-tools/v_old276'
 const compiler_pin = '109a0bad877cf42cd19382a87d3e3d62e9c153e3d74a566b2b3e650a1aec318e'
-const tool_root = '/Users/alex/.local/state/vinix/android/queue284-evidence-tool-fast3-2026-10-25'
+const tool_root = '/Users/alex/.local/state/vinix/android/queue284-evidence-tool-fast4-2026-10-25'
 const pass_markers = ['BOOTSTRAP-QUEUE-PUMP-PASS', 'BOOTSTRAP-QUEUE-PUMP-COMPLETE-PASS', 'BOOTSTRAP-READY']
 const jar_path = 'opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/api-impl.jar'
 const native_path = 'opt/vinix-android-aarch64/usr/lib/art/libvinix-android-native.so'
@@ -84,6 +84,12 @@ fn portable_hash(path string) !string {
 
 fn object(path string) !map[string]json2.Any { return json2.decode[map[string]json2.Any](os.read_file(path)!)! }
 fn pins(path string) !map[string]string { return json2.decode[map[string]string](os.read_file(path)!)! }
+
+// Constructed integers and decoded JSON numbers can use different Any variants.
+// Round-trip the complete expected object before exact decoded-map comparison.
+fn canonical_object(value map[string]json2.Any) !map[string]json2.Any {
+	return json2.decode[map[string]json2.Any](json2.encode(value))!
+}
 
 // Include hidden paths; preserve links in inventories instead of following them.
 fn catalog(root string, relative string, mut out map[string]string) ! {
@@ -346,7 +352,7 @@ fn verify_inputs(root string) ! {
 	for path, digest in common['baseline'] { equality['native/' + path] = digest }
 	assert equality == pins(pre + '/paired-initial-equality.json')!
 	assert configs['baseline'] == configs['fixed'], 'same observation, fixture, runner and all common configuration'
-	assert configs['fixed'] == expected_config, 'exact historical common configuration and declared fixture/window changes'
+	assert configs['fixed'] == canonical_object(expected_config)!, 'exact historical common configuration and declared fixture/window changes'
 }
 
 fn staged_files(base string) !map[string]string {
@@ -513,6 +519,15 @@ fn run_pair(base string, mode string) ! {
 }
 
 fn self_test() ! {
+	decoded := json2.decode[map[string]json2.Any]('{"applications":[{"startup_seconds":90,"enabled":true}],"label":"same"}')!
+	expected_app := {'startup_seconds': json2.Any(90), 'enabled': json2.Any(true)}
+	expected := {'applications': json2.Any([json2.Any(expected_app)]), 'label': json2.Any('same')}
+	assert expected != decoded, 'regression reproduces constructed-versus-decoded numeric variants'
+	normalized := canonical_object(expected)!
+	assert normalized == decoded, 'canonical exact comparison preserves numeric JSON value'
+	assert normalized != json2.decode[map[string]json2.Any]('{"applications":[{"startup_seconds":91,"enabled":true}],"label":"same"}')!, 'changed nested number rejected'
+	assert normalized != json2.decode[map[string]json2.Any]('{"applications":[{"startup_seconds":90,"enabled":true,"extra":true}],"label":"same"}')!, 'extra nested field rejected'
+	assert normalized != json2.decode[map[string]json2.Any]('{"applications":[{"startup_seconds":90}],"label":"same"}')!, 'missing nested field rejected'
 	prefix := 'APK-SUITE-BEGIN id=bootstrap-fixture package=test\nANDROID-WS-READY backend=vinix-native\n'
 	assert raw_observation(prefix)['outcome']!.str() == 'window_observed'
 	assert raw_observation(prefix + 'java.lang.ClassNotFoundException: nge\n')['outcome']!.str() == 'startup_failed'
@@ -524,7 +539,7 @@ fn self_test() ! {
 	defer { os.rmdir_all(scratch) or {} }
 	os.write_file(scratch + '/.hidden/proof', 'closure')!
 	assert files(scratch)! == {'.hidden/proof': sha256.sum('closure'.bytes()).hex()}
-	println('QUEUE284 EVIDENCE SELF-TEST PASS hidden closure and honest failure classification')
+	println('QUEUE284 EVIDENCE SELF-TEST PASS exact canonical JSON, hidden closure and honest failure classification')
 }
 
 fn hash_self_test(root string) ! {
