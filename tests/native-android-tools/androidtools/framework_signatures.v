@@ -231,9 +231,30 @@ return v0
 	framework_verified_loaders(smali)!
 }
 
+// The system application is parsed from Resources.getSystem(), with no APK
+// archive path. Leave its signing metadata unset; external APK loaders still
+// require authenticated certificates through collectCertificates below.
+pub fn framework_system_application(source string) !string {
+	header := '.method public static getSystemApplication()Landroid/atl/ATLLoadedApp;'
+	if source.count(header) != 1 { return error('unexpected system application factory') }
+	start := source.index(header) or { return error('missing system application factory') }
+	end := start + (source[start..].index('.end method') or { return error('unterminated system application factory') })
+	method := source[start..end]
+	null_parser := '    const/4 v1, 0x0\n\n    invoke-direct {v0, v1}, Landroid/content/pm/PackageParser;-><init>(Ljava/lang/String;)V'
+	resources := '    invoke-static {}, Landroid/content/res/Resources;->getSystem()Landroid/content/res/Resources;'
+	collect := '    invoke-virtual {v0, v2, v6}, Landroid/content/pm/PackageParser;->collectCertificates(Landroid/content/pm/PackageParser$Package;I)Z\n'
+	if method.count(null_parser) != 1 || method.count(resources) != 1 {
+		return error('expected resource-only system application')
+	}
+	if method.count(collect) != 1 || method.count('->collectCertificates(') != 1 {
+		return error('unexpected system application certificate collection')
+	}
+	return source[..start] + method.replace(collect, '') + source[end..]
+}
+
 fn framework_verified_loaders(smali string) ! {
 	loaded_path := smali + '/android/atl/ATLLoadedApp.smali'
-	mut loaded := os.read_file(loaded_path)!
+	mut loaded := framework_system_application(os.read_file(loaded_path)!)!
 	factory := loaded.index('.method public static loadFromPath(') or { return error('missing APK loader') }
 	start := factory + (loaded[factory..].index('    sget-object v2, Landroid/atl/ATLLoadedApp;->play_services:Ljava/util/HashSet;') or { return error('missing signature substitution') })
 	end := start + (loaded[start..].index('    :cond_58') or { return error('missing signature substitution exit') })
