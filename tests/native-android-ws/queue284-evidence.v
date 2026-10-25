@@ -8,6 +8,17 @@ import json2
 import os
 import time
 
+$if macos {
+	#include <CommonCrypto/CommonDigest.h>
+}
+
+@[typedef]
+struct C.CC_SHA256_CTX {}
+
+fn C.CC_SHA256_Init(voidptr) i32
+fn C.CC_SHA256_Update(voidptr, voidptr, u32) i32
+fn C.CC_SHA256_Final(&u8, voidptr) i32
+
 const compound = 'build/android-maps/compound284'
 const same_jar = '92b069b1dbb31b08960d00d4f33f84b068a3adf53af9339f2ef3c1a6478f0618'
 const baseline_native = '5fe27a87c179b97121c368f417936ceebb75752c4a4204b937312ee28da531ca'
@@ -21,12 +32,44 @@ const queue_source = 'ff4bb8c0657a240d47bf6164879a02e6db994aa74ad5d160c53b046d20
 const runtime_source = '4a55617a8e2f2013c6ac51c29e8c3919a53bc269b34d4b46dffdfdc5ab17ed94'
 const compiler_path = 'build/android-maps/queue284-tools/v_old276'
 const compiler_pin = '109a0bad877cf42cd19382a87d3e3d62e9c153e3d74a566b2b3e650a1aec318e'
-const tool_root = '/Users/alex/.local/state/vinix/android/queue284-evidence-tool-2026-10-25'
+const tool_root = '/Users/alex/.local/state/vinix/android/queue284-evidence-tool-fast2-2026-10-25'
 const pass_markers = ['BOOTSTRAP-QUEUE-PUMP-PASS', 'BOOTSTRAP-QUEUE-PUMP-COMPLETE-PASS', 'BOOTSTRAP-READY']
 const jar_path = 'opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/api-impl.jar'
 const native_path = 'opt/vinix-android-aarch64/usr/lib/art/libvinix-android-native.so'
 
 fn hash(path string) !string {
+	mut input := os.open(path)!
+	defer { input.close() }
+	mut buffer := []u8{len: 1024 * 1024}
+	defer { unsafe { buffer.free() } }
+	$if macos {
+		mut state := C.CC_SHA256_CTX{}
+		if C.CC_SHA256_Init(unsafe { &state }) != 1 { return error('CC_SHA256_Init failed') }
+		for {
+			n := input.read(mut buffer) or { if err is os.Eof { break }; return err }
+			if n == 0 { break }
+			if C.CC_SHA256_Update(unsafe { &state }, buffer.data, u32(n)) != 1 { return error('CC_SHA256_Update failed') }
+		}
+		mut result := [32]u8{}
+		if C.CC_SHA256_Final(unsafe { &result[0] }, unsafe { &state }) != 1 { return error('CC_SHA256_Final failed') }
+		return result[..].hex()
+	} $else {
+		mut state := sha256.new()
+		defer { unsafe { state.free() } }
+		for {
+			n := input.read(mut buffer) or { if err is os.Eof { break }; return err }
+			if n == 0 { break }
+			if state.write(buffer[..n])! != n { return error('SHA256 short write') }
+		}
+		mut result := []u8{len: 32}
+		defer { unsafe { result.free() } }
+		state.checksum_into(mut result)
+		return result.hex()
+	}
+}
+
+// Preserve the original portable backend for independent byte-equivalence tests.
+fn portable_hash(path string) !string {
 	mut file := os.open(path)!
 	defer { file.close() }
 	mut digest := sha256.new()
@@ -349,13 +392,15 @@ fn raw_observation(serial string) map[string]json2.Any {
 
 fn verify_runs(root string) ! {
 	pre := root + '/prelaunch'
+	verify_backend(root + '/checker')!
 	assert hash(root + '/checker/compiler')! == compiler_pin
 	for suffix in ['', '.v'] { assert hash(root + '/run-tool/queue284-evidence' + suffix)! == hash(root + '/checker/queue284-evidence' + suffix)! }
 	assert hash(root + '/checker/queue284-evidence')! == hash(os.executable())!, 'use the frozen retained checker'
 	before_compile := object(root + '/checker/compile-before.json')!
 	done_compile := object(root + '/checker/compile-receipt.json')!
 	for key, value in before_compile { assert done_compile[key]! == value }
-	assert done_compile['argv']!.as_array().map(it.str()) == [compiler_path, '-nocache', '-cc', 'cc', '-cflags', '-O2', '-o', tool_root + '/queue284-evidence', tool_root + '/queue284-evidence.v']
+	backend := pins(root + '/checker/backend/backend.json')!
+	assert done_compile['argv']!.as_array().map(it.str()) == [compiler_path, '-nocache', '-cc', backend['cc']!, '-cflags', '-O2', '-o', tool_root + '/queue284-evidence', tool_root + '/queue284-evidence.v']
 	assert done_compile['VROOT']!.str() == '/Users/alex/code/v' && done_compile['compiler_sha256']!.str() == compiler_pin
 	assert done_compile['source_sha256']!.str() == hash(root + '/checker/queue284-evidence.v')!
 	assert done_compile['bootstrap_sha256']!.str() == hash(root + '/checker/bootstrap')!
@@ -465,6 +510,131 @@ fn self_test() ! {
 	println('QUEUE284 EVIDENCE SELF-TEST PASS hidden closure and honest failure classification')
 }
 
+fn hash_self_test(root string) ! {
+	assert !os.exists(root)
+	os.mkdir_all(root)!
+	mut receipt := {'argv': json2.Any(os.args), 'started_utc': json2.Any(time.utc().str()), 'backend': json2.Any('darwin-commoncrypto'), 'chunk_bytes': json2.Any(1024 * 1024), 'source_sha256': json2.Any(hash(@FILE)!), 'binary_sha256': json2.Any(hash(os.executable())!)}
+	os.write_file(root + '/before.json', json2.encode(receipt, prettify: true) + '\n')!
+	mut expected := {
+		'empty': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+		'abc': 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
+		'nist-long': '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1'
+		'million-a': 'cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0'
+		'binary-64m': 'f49c27347e38012ce129d8be15b11f11248e4006fd33cdd64b4e7eaa9d0bc07c'
+	}
+	os.write_file(root + '/empty', '')!
+	os.write_file(root + '/abc', 'abc')!
+	os.write_file(root + '/nist-long', 'abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq')!
+	os.write_file_array(root + '/million-a', []u8{len: 1000000, init: `a`})!
+	block := []u8{len: 1024 * 1024, init: u8((index * 37 + index / 251) & 255)}
+	mut large := os.create(root + '/binary-64m')!
+	for _ in 0 .. 64 { assert large.write(block)! == block.len }
+	large.close()
+	for size in [1, 55, 56, 63, 64, 65, 1024 * 1024 - 1, 1024 * 1024, 1024 * 1024 + 1] {
+		data := []u8{len: size, init: u8((index * 37 + index / 251) & 255)}
+		name := 'binary-' + size.str()
+		os.write_file_array(root + '/' + name, data)!
+		expected[name] = sha256.sum(data).hex()
+	}
+	for name, digest in expected {
+		assert hash(root + '/' + name)! == digest, 'CommonCrypto known vector: ' + name
+		assert portable_hash(root + '/' + name)! == digest, 'portable known vector: ' + name
+	}
+	mut missing_rejected := false
+	_ := hash(root + '/absent') or { missing_rejected = true; '' }
+	assert missing_rejected
+	os.write_file(root + '/vectors.json', json2.encode(expected, prettify: true) + '\n')!
+	receipt['completed_utc'] = time.utc().str()
+	receipt['exit_code'] = json2.Any(0)
+	receipt['vectors_sha256'] = hash(root + '/vectors.json')!
+	os.write_file(root + '/receipt.json', json2.encode(receipt, prettify: true) + '\n')!
+	println('QUEUE284 HASH PASS known vectors, binary block boundaries, missing input and 64MiB cross-backend equality')
+}
+
+fn retain_backend() ! {
+	$if !macos { return error('this retained backend qualification requires macOS') }
+	mut metadata := {'backend': 'darwin-commoncrypto', 'chunk_bytes': '1048576', 'context': 'SDK-owned CC_SHA256_CTX', 'CC_LONG': 'uint32_t', 'runtime_scope': 'CommonCrypto from libSystem/dyld shared cache; SDK headers and link stub retained, OS build recorded; no runtime shared-cache byte audit claimed'}
+	cc := os.find_abs_path_of_executable('cc')!
+	metadata['cc'] = cc
+	metadata['cc_sha256'] = hash(cc)!
+	for name, argv in {'sdk-path': ['xcrun', '--show-sdk-path'], 'sdk-version': ['xcrun', '--show-sdk-version'], 'cc-version': [cc, '--version'], 'os-build': ['sw_vers']} {
+		r := os.exec(argv)
+		assert r.exit_code == 0, r.output
+		os.mkdir_all(tool_root + '/backend')!
+		os.write_file(tool_root + '/backend/' + name + '.log', r.output)!
+		metadata[name] = r.output.trim_space()
+		metadata[name + '_sha256'] = hash(tool_root + '/backend/' + name + '.log')!
+	}
+	mut excluded := map[string]string{}
+	clone_tree(metadata['sdk-path']! + '/usr/include/CommonCrypto', tool_root + '/backend/headers', mut excluded)!
+	clone_tree(metadata['sdk-path']! + '/usr/lib/system/libcommonCrypto.tbd', tool_root + '/backend/libcommonCrypto.tbd', mut excluded)!
+	assert excluded.len == 0
+	os.write_file(tool_root + '/backend/headers.json', json2.encode(files(tool_root + '/backend/headers')!, prettify: true) + '\n')!
+	metadata['link_stub_sha256'] = hash(tool_root + '/backend/libcommonCrypto.tbd')!
+	probe := tool_root + '/backend/CommonCrypto-probe.c'
+	os.write_file(probe, '#include <CommonCrypto/CommonDigest.h>\nint main(void) { return sizeof(CC_SHA256_CTX) == 0; }\n')!
+	argv := [cc, '-M', probe]
+	mut receipt := {'argv': json2.Any(argv), 'started_utc': json2.Any(time.utc().str()), 'cc_sha256': json2.Any(hash(cc)!), 'probe_sha256': json2.Any(hash(probe)!)}
+	os.write_file(tool_root + '/backend/dependencies-before.json', json2.encode(receipt, prettify: true) + '\n')!
+	r := os.exec(argv)
+	os.write_file(tool_root + '/backend/dependencies.log', r.output)!
+	receipt['completed_utc'] = time.utc().str()
+	receipt['exit_code'] = r.exit_code
+	receipt['stdout_sha256'] = hash(tool_root + '/backend/dependencies.log')!
+	os.write_file(tool_root + '/backend/dependencies-receipt.json', json2.encode(receipt, prettify: true) + '\n')!
+	assert r.exit_code == 0, r.output
+	mut paths := r.output.replace('\\\n', ' ').fields()[1..].clone()
+	paths << [cc, metadata['sdk-path']! + '/SDKSettings.json', metadata['sdk-path']! + '/usr/lib/libSystem.tbd', metadata['sdk-path']! + '/usr/lib/system/libcommonCrypto.tbd']
+	mut inputs := map[string]string{}
+	for path in paths {
+		if path in inputs { continue }
+		inputs[path] = hash(path)!
+		destination := tool_root + '/backend/inputs/' + path.trim_left('/')
+		os.mkdir_all(os.dir(destination))!
+		os.cp(os.real_path(path), destination)!
+		assert hash(destination)! == inputs[path]!
+	}
+	os.write_file(tool_root + '/backend/inputs-before.json', json2.encode(inputs, prettify: true) + '\n')!
+	os.write_file(tool_root + '/backend/backend.json', json2.encode(metadata, prettify: true) + '\n')!
+}
+
+fn verify_backend(root string) ! {
+	metadata := pins(root + '/backend/backend.json')!
+	assert metadata['backend']! == 'darwin-commoncrypto' && metadata['chunk_bytes']! == '1048576'
+	assert files(root + '/backend/headers')! == pins(root + '/backend/headers.json')!
+	assert os.is_file(root + '/backend/headers/CommonDigest.h')
+	assert hash(root + '/backend/libcommonCrypto.tbd')! == metadata['link_stub_sha256']!
+	for name in ['sdk-path', 'sdk-version', 'cc-version', 'os-build'] { assert hash(root + '/backend/' + name + '.log')! == metadata[name + '_sha256']! }
+	dep_before := object(root + '/backend/dependencies-before.json')!
+	dep_done := object(root + '/backend/dependencies-receipt.json')!
+	for key, value in dep_before { assert dep_done[key]! == value }
+	assert dep_done['argv']!.as_array().map(it.str()) == [metadata['cc']!, '-M', tool_root + '/backend/CommonCrypto-probe.c']
+	assert dep_done['cc_sha256']!.str() == metadata['cc_sha256']!
+	assert dep_done['probe_sha256']!.str() == hash(root + '/backend/CommonCrypto-probe.c')!
+	assert dep_done['stdout_sha256']!.str() == hash(root + '/backend/dependencies.log')!
+	assert dep_done['exit_code']!.int() == 0 && dep_done['started_utc']!.str() != '' && dep_done['completed_utc']!.str() != ''
+	inputs := pins(root + '/backend/inputs-before.json')!
+	assert inputs == pins(root + '/backend/inputs-after.json')!, 'backend inputs unchanged during actual compilation'
+	mut paths := os.read_file(root + '/backend/dependencies.log')!.replace('\\\n', ' ').fields()[1..].clone()
+	paths << [metadata['cc']!, metadata['sdk-path']! + '/SDKSettings.json', metadata['sdk-path']! + '/usr/lib/libSystem.tbd', metadata['sdk-path']! + '/usr/lib/system/libcommonCrypto.tbd']
+	mut expected := map[string]string{}
+	for path in paths { expected[path] = hash(root + '/backend/inputs/' + path.trim_left('/'))! }
+	assert inputs == expected && inputs[metadata['cc']!]! == metadata['cc_sha256']!
+	assert inputs[metadata['sdk-path']! + '/usr/include/CommonCrypto/CommonDigest.h']! != ''
+	before := object(root + '/hash-vectors/before.json')!
+	done := object(root + '/hash-vectors/receipt.json')!
+	for key, value in before { assert done[key]! == value }
+	assert done['source_sha256']!.str() == hash(root + '/queue284-evidence.v')!
+	assert done['binary_sha256']!.str() == hash(root + '/queue284-evidence')!
+	assert done['argv']!.as_array().map(it.str()) == [tool_root + '/queue284-evidence', '--hash-self-test', tool_root + '/hash-vectors']
+	assert done['backend']!.str() == 'darwin-commoncrypto' && done['chunk_bytes']!.int() == 1024 * 1024
+	assert done['exit_code']!.int() == 0 && done['started_utc']!.str() != '' && done['completed_utc']!.str() != ''
+	assert done['vectors_sha256']!.str() == hash(root + '/hash-vectors/vectors.json')!
+	vectors := pins(root + '/hash-vectors/vectors.json')!
+	assert vectors.len == 14 && vectors['binary-64m']! == 'f49c27347e38012ce129d8be15b11f11248e4006fd33cdd64b4e7eaa9d0bc07c'
+	for name, digest in vectors { assert hash(root + '/hash-vectors/' + name)! == digest }
+}
+
 // Preserve the actual assertion-enabled compiler invocation before first VM.
 fn compile_checker() ! {
 	assert !os.exists(tool_root) && hash(compiler_path)! == compiler_pin
@@ -472,6 +642,7 @@ fn compile_checker() ! {
 	os.cp(@FILE, tool_root + '/queue284-evidence.v')!
 	os.cp(os.executable(), tool_root + '/bootstrap')!
 	os.cp(compiler_path, tool_root + '/compiler')!
+	retain_backend()!
 	os.setenv('VROOT', '/Users/alex/code/v', true)
 	os.setenv('V', os.abs_path(compiler_path), true)
 	os.setenv('VINIX_V_COMPILER', os.abs_path(compiler_path), true)
@@ -485,7 +656,8 @@ fn compile_checker() ! {
 		clone_tree(path, tool_root + '/closure-inputs/' + path.trim_left('/'), mut excluded)!
 	}
 	os.write_file(tool_root + '/v-files.json', json2.encode(closure, prettify: true) + '\n')!
-	argv := [compiler_path, '-nocache', '-cc', 'cc', '-cflags', '-O2', '-o', tool_root + '/queue284-evidence', tool_root + '/queue284-evidence.v']
+	backend := pins(tool_root + '/backend/backend.json')!
+	argv := [compiler_path, '-nocache', '-cc', backend['cc']!, '-cflags', '-O2', '-o', tool_root + '/queue284-evidence', tool_root + '/queue284-evidence.v']
 	mut receipt := {'argv': json2.Any(argv), 'started_utc': json2.Any(time.utc().str()), 'VROOT': json2.Any(os.getenv('VROOT')), 'compiler_sha256': json2.Any(hash(compiler_path)!), 'source_sha256': json2.Any(hash(argv.last())!), 'bootstrap_sha256': json2.Any(hash(os.executable())!)}
 	os.write_file(tool_root + '/compile-before.json', json2.encode(receipt, prettify: true) + '\n')!
 	r := os.exec(argv)
@@ -496,6 +668,11 @@ fn compile_checker() ! {
 	if r.exit_code == 0 { receipt['output_sha256'] = hash(tool_root + '/queue284-evidence')! }
 	os.write_file(tool_root + '/compile-receipt.json', json2.encode(receipt, prettify: true) + '\n')!
 	assert r.exit_code == 0, r.output
+	for path, digest in pins(tool_root + '/backend/headers.json')! { assert hash(backend['sdk-path']! + '/usr/include/CommonCrypto/' + path)! == digest, 'SDK headers unchanged during checker compilation: ' + path }
+	assert hash(backend['sdk-path']! + '/usr/lib/system/libcommonCrypto.tbd')! == backend['link_stub_sha256']!
+	mut after := map[string]string{}
+	for path, digest in pins(tool_root + '/backend/inputs-before.json')! { after[path] = hash(path)!; assert after[path]! == digest, 'consumed backend input unchanged: ' + path }
+	os.write_file(tool_root + '/backend/inputs-after.json', json2.encode(after, prettify: true) + '\n')!
 	for path, digest in closure { assert hash(path)! == digest }
 	assert hash(compiler_path)! == compiler_pin && hash(argv.last())! == receipt['source_sha256']!.str()
 	println('QUEUE284 CHECKER COMPILED ' + receipt['output_sha256']!.str())
@@ -505,6 +682,8 @@ fn main() {
 	$if prod { panic('requires assertions; compile without -prod') }
 	assert os.args.len >= 2
 	if os.args[1] == '--self-test' { assert os.args.len == 2; self_test()!; return }
+	if os.args[1] == '--hash-self-test' { assert os.args.len == 3; hash_self_test(os.args[2])!; return }
+	if os.args[1] == '--hash-pin' { assert os.args.len == 4 && hash(os.args[2])! == os.args[3]; println('QUEUE284 HASH PIN PASS ' + os.args[3]); return }
 	if os.args[1] == 'compile' { assert os.args.len == 2; compile_checker()!; return }
 	if os.args[1] == '--assertion-probe' { assert false, 'assertions enabled'; return }
 	assert os.args.len in [3, 4], 'run BASE MODE | retain BASE BUNDLE | preflight BUNDLE | seal BUNDLE | check BUNDLE MANIFEST_SHA256'
@@ -533,6 +712,7 @@ fn main() {
 		assert compile_receipt['output_sha256']!.str() == hash(os.executable())!
 		assert compile_receipt['source_sha256']!.str() == hash(@FILE)!
 		assert compile_receipt['exit_code']!.int() == 0 && compile_receipt['compiler_sha256']!.str() == compiler_pin
+		verify_backend(tool_root)!
 		verify_inputs(root)!
 		verify_references(root)!
 		verify_sources(root + '/prelaunch')!
