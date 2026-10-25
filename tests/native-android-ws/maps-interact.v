@@ -178,7 +178,8 @@ fn run_action(run string, action string, args []string) ! {
 		'onboarding' {
 			if args.len != 0 { return error('onboarding takes no extra arguments') }
 			wait_screen(run, action)!
-			input(run, ['click', '556', '134'])!
+			// Click the label centre; 556 falls to its right in this layout.
+			input(run, ['click', '524', '134'])!
 			record(run, 'SKIP-CLICK')!
 		}
 		'map' {
