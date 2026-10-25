@@ -97,6 +97,22 @@ pub fn (installer &Installer) put(source string, relative string, mode u32) ! {
 	installer.put_with(source, relative, mode, InstallOptions{})!
 }
 
+// Compact images omit Alpine's account files. Supply only missing records;
+// imported databases keep their contents, with shadow private to its owner.
+pub fn (installer &Installer) prepare_accounts(defaults string) ! {
+	for name in ['passwd', 'group', 'shadow'] {
+		relative := 'etc/' + name
+		path := installer.path + '/' + relative
+		present := os.exists(path) || os.is_link(path)
+		mode := if name == 'shadow' { u32(0o600) } else { u32(0o644) }
+		if !present {
+			installer.put(defaults + '/' + name, relative, mode)!
+		} else if name == 'shadow' {
+			installer.put(path, relative, mode)!
+		}
+	}
+}
+
 fn (installer &Installer) put_with(source string, relative string, mode u32, options InstallOptions) ! {
 	installer.check()!
 	names := relative.split('/')
