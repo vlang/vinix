@@ -2527,11 +2527,19 @@ paged and removed, and an unfinished file entry must be added or cleared before
 launch. **Working folder: private app data** is the default in this form; its
 relative outputs are saved under the ordinary account's
 `~/.local/share/vinix-apps/ID`. Choose **installed app** for apps needing their
-packaged assets as the working folder. **Run** shows captured diagnostics;
-**Run in Terminal** transfers the exact vector to Software's PTY. Input, grants
+packaged assets as the working folder. **Run** opens installed display apps
+through the private authenticated X11 session and captures diagnostics for
+other apps. The display route is frozen from the installed permissions when
+the form opens; update candidates cannot select it. **Run in Terminal**
+transfers the exact vector to Software's PTY. Input, grants
 and working-folder choice cannot change while a worker is active. Returning to
 the catalog or closing clears the draft; failed batch execution retains it for
 correction. The service performs the actual file/access/trust/policy checks.
+The [hosted Launch options checks](../../tests/packages/software-hosted-options-check.md)
+cover literal forwarding and refusal in production, sanitizer and allocation
+builds; [both target builds](../../tests/packages/section14-target-build.md)
+also cross-link the compositor and actual bridge. Native guest interaction is
+qualified separately.
 
 Compact Software views retain Back, status and failure access. Editor and
 launch controls appear in the full form; resize preserves arguments, explicit
