@@ -105,6 +105,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := game_controller_types(info.name, info.meta, selector) { return types }
 	if types := audio_application_types(info.name, info.meta, selector) { return types }
 	if types := storyboard_types(info.name, info.meta, selector) { return types }
+	if types := haptic_dynamic_parameter_types(info.name, info.meta, selector) { return types }
 	if types := haptic_parameter_types(info.name, info.meta, selector) { return types }
 	if types := haptic_pattern_types(info.name, info.meta, selector) { return types }
 	if types := haptic_event_types(info.name, info.meta, selector) { return types }
@@ -188,6 +189,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name == 'NSURLSessionConfiguration' && url_session_configuration_unsupported(name) { return 0 }
 		if url_session_task_name(info.name) && url_session_task_unsupported(name) { return 0 }
 		if info.name in ['GCController', 'GCPhysicalInputProfile', 'GCMouse']! && game_controller_unsupported(name) { return 0 }
+		if info.name == 'CHHapticDynamicParameter' && haptic_dynamic_parameter_unsupported(name) { return 0 }
 		if info.name == 'CHHapticEventParameter' && haptic_parameter_unsupported(name) { return 0 }
 		if info.name == 'CHHapticPattern' && haptic_pattern_unsupported(name) { return 0 }
 		if info.name == 'CHHapticEvent' && haptic_event_unsupported(name) { return 0 }
@@ -363,6 +365,10 @@ fn objc_set_class(object u64, cls u64) u64 {
 	if haptic_event_family(cls) || haptic_event_family(obj_header(object).allocation_cls) {
 		panic('iOS: changing CHHapticEvent storage isa is not implemented')
 	}
+	if haptic_dynamic_parameter_family(cls) || haptic_dynamic_parameter_family(obj_header(object).allocation_cls) {
+		panic('iOS: changing CHHapticDynamicParameter storage isa is not implemented')
+	}
+
 	if haptic_parameter_family(cls) || haptic_parameter_family(obj_header(object).allocation_cls) {
 		panic('iOS: changing CHHapticEventParameter storage isa is not implemented')
 	}

@@ -83,6 +83,7 @@ fn compile_c(root string, generated string, output string, gles bool) {
 
 fn native_fixture_source(item string) string {
 	return match item {
+		'haptic-dynamic-parameter-checks' { 'ch_haptic_dynamic_parameter_test.v' }
 		'haptic-pattern-checks' { 'ch_haptic_pattern_test.v' }
 		'haptic-event-checks' { 'ch_haptic_event_test.v' }
 		'haptic-event-parameter-checks' { 'ch_haptic_event_parameter_test.v' }
@@ -120,8 +121,8 @@ fn native_fixture_source(item string) string {
 }
 
 fn build(root string, out string, only string) {
-	if only !in ['haptic-pattern-checks', 'haptic-event-checks', 'haptic-event-parameter-checks', 'long-press-gesture-checks', 'tap-gesture-checks', 'rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! { panic('unknown notification build target') }
-	for item in ['haptic-pattern-checks', 'haptic-event-checks', 'haptic-event-parameter-checks', 'long-press-gesture-checks', 'tap-gesture-checks', 'rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
+	if only !in ['haptic-dynamic-parameter-checks', 'haptic-pattern-checks', 'haptic-event-checks', 'haptic-event-parameter-checks', 'long-press-gesture-checks', 'tap-gesture-checks', 'rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! { panic('unknown notification build target') }
+	for item in ['haptic-dynamic-parameter-checks', 'haptic-pattern-checks', 'haptic-event-checks', 'haptic-event-parameter-checks', 'long-press-gesture-checks', 'tap-gesture-checks', 'rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -163,11 +164,13 @@ fn await_checks(mut p os.Process, log string, marker string) ! {
 }
 
 fn vm(root string, out string, mode string) {
-	if mode !in ['haptic-pattern', 'haptic-event', 'haptic-event-parameter', 'long-press-gesture', 'tap-gesture', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications', 'probe', 'audit', 'static-audit'] {
+	if mode !in ['haptic-dynamic-parameter', 'haptic-pattern', 'haptic-event', 'haptic-event-parameter', 'long-press-gesture', 'tap-gesture', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications', 'probe', 'audit', 'static-audit'] {
 		panic('invalid check mode: ' + mode)
 	}
 	require_arm64_elf(out + '/native-init')
-	if mode == 'haptic-pattern' {
+	if mode == 'haptic-dynamic-parameter' {
+		require_arm64_elf(out + '/haptic-dynamic-parameter-checks')
+	} else if mode == 'haptic-pattern' {
 		require_arm64_elf(out + '/haptic-pattern-checks')
 	} else if mode == 'haptic-event' {
 		require_arm64_elf(out + '/haptic-event-checks')
@@ -198,7 +201,7 @@ fn vm(root string, out string, mode string) {
 	} else if mode == 'feedback' {
 		require_arm64_elf(out + '/feedback-checks')
 	} else if mode == 'notifications' {
-		for item in ['haptic-pattern-checks', 'haptic-event-checks', 'haptic-event-parameter-checks', 'long-press-gesture-checks', 'tap-gesture-checks', 'rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks'] {
+		for item in ['haptic-dynamic-parameter-checks', 'haptic-pattern-checks', 'haptic-event-checks', 'haptic-event-parameter-checks', 'long-press-gesture-checks', 'tap-gesture-checks', 'rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks'] {
 			require_arm64_elf(out + '/' + item)
 		}
 	} else {
@@ -211,7 +214,9 @@ fn vm(root string, out string, mode string) {
 	payload := state
 	os.mkdir_all(payload + '/rootfs') or { panic(err) }
 	fs := payload + '/rootfs'
-	if mode == 'haptic-pattern' {
+	if mode == 'haptic-dynamic-parameter' {
+		copy_file(out + '/haptic-dynamic-parameter-checks', fs + '/opt/ios/haptic-dynamic-parameter-checks')
+	} else if mode == 'haptic-pattern' {
 		copy_file(out + '/haptic-pattern-checks', fs + '/opt/ios/haptic-pattern-checks')
 	} else if mode == 'haptic-event' {
 		copy_file(out + '/haptic-event-checks', fs + '/opt/ios/haptic-event-checks')
@@ -242,6 +247,7 @@ fn vm(root string, out string, mode string) {
 	} else if mode == 'feedback' {
 		copy_file(out + '/feedback-checks', fs + '/opt/ios/feedback-checks')
 	} else if mode == 'notifications' {
+		copy_file(out + '/haptic-dynamic-parameter-checks', fs + '/opt/ios/haptic-dynamic-parameter-checks')
 		copy_file(out + '/haptic-pattern-checks', fs + '/opt/ios/haptic-pattern-checks')
 		copy_file(out + '/haptic-event-checks', fs + '/opt/ios/haptic-event-checks')
 		copy_file(out + '/haptic-event-parameter-checks', fs + '/opt/ios/haptic-event-parameter-checks')
@@ -328,7 +334,7 @@ fn vm(root string, out string, mode string) {
 		'virtio-keyboard-device', '-device', 'virtio-tablet-device'])
 	p.set_redirect_stdio()
 	p.run()
-	marker := if mode == 'haptic-pattern' { 'VINIX iOS HAPTICPATTERN: PASS' } else if mode == 'haptic-event' { 'VINIX iOS HAPTICEVENT: PASS' } else if mode == 'haptic-event-parameter' { 'VINIX iOS HAPTICEVENTPARAMETER: PASS' } else if mode == 'long-press-gesture' { 'VINIX iOS LONGPRESSGESTURE: PASS' } else if mode == 'tap-gesture' { 'VINIX iOS TAPGESTURE: PASS' } else if mode == 'rotation-gesture' { 'VINIX iOS ROTATIONGESTURE: PASS' } else if mode == 'pinch-gesture' { 'VINIX iOS PINCHGESTURE: PASS' } else if mode == 'pan-gesture' { 'VINIX iOS PANGESTURE: PASS' } else if mode == 'text-input' { 'VINIX iOS TEXTINPUT: PASS' } else if mode == 'game-center' { 'VINIX iOS GAMECENTER: PASS' } else if mode == 'storyboard' { 'VINIX iOS STORYBOARD: PASS' } else if mode == 'audio-application' { 'VINIX iOS AUDIOAPPLICATION: PASS' } else if mode == 'game-controller' { 'VINIX iOS GAMECONTROLLER: PASS' } else if mode == 'session-task' { 'VINIX iOS SESSIONTASK: PASS' } else if mode == 'feedback' { 'VINIX iOS FEEDBACK: PASS' } else if mode == 'notifications' { 'VINIX iOS NOTIFICATIONS: PASS' } else { 'FORTNITE PROBE COMPLETE' }
+	marker := if mode == 'haptic-dynamic-parameter' { 'VINIX iOS HAPTICDYNAMICPARAMETER: PASS' } else if mode == 'haptic-pattern' { 'VINIX iOS HAPTICPATTERN: PASS' } else if mode == 'haptic-event' { 'VINIX iOS HAPTICEVENT: PASS' } else if mode == 'haptic-event-parameter' { 'VINIX iOS HAPTICEVENTPARAMETER: PASS' } else if mode == 'long-press-gesture' { 'VINIX iOS LONGPRESSGESTURE: PASS' } else if mode == 'tap-gesture' { 'VINIX iOS TAPGESTURE: PASS' } else if mode == 'rotation-gesture' { 'VINIX iOS ROTATIONGESTURE: PASS' } else if mode == 'pinch-gesture' { 'VINIX iOS PINCHGESTURE: PASS' } else if mode == 'pan-gesture' { 'VINIX iOS PANGESTURE: PASS' } else if mode == 'text-input' { 'VINIX iOS TEXTINPUT: PASS' } else if mode == 'game-center' { 'VINIX iOS GAMECENTER: PASS' } else if mode == 'storyboard' { 'VINIX iOS STORYBOARD: PASS' } else if mode == 'audio-application' { 'VINIX iOS AUDIOAPPLICATION: PASS' } else if mode == 'game-controller' { 'VINIX iOS GAMECONTROLLER: PASS' } else if mode == 'session-task' { 'VINIX iOS SESSIONTASK: PASS' } else if mode == 'feedback' { 'VINIX iOS FEEDBACK: PASS' } else if mode == 'notifications' { 'VINIX iOS NOTIFICATIONS: PASS' } else { 'FORTNITE PROBE COMPLETE' }
 	mut failure := ''
 	await_checks(mut p, log, marker) or { failure = err.msg() }
 	// V panics do not unwind defers. Close our VM before reporting failure.
@@ -344,7 +350,7 @@ fn vm(root string, out string, mode string) {
 	}
 	p.close()
 	if failure != '' { panic(failure) }
-	println('${mode}: ${if mode in ['haptic-pattern', 'haptic-event', 'haptic-event-parameter', 'long-press-gesture', 'tap-gesture', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications'] {
+	println('${mode}: ${if mode in ['haptic-dynamic-parameter', 'haptic-pattern', 'haptic-event', 'haptic-event-parameter', 'long-press-gesture', 'tap-gesture', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications'] {
 		'PASS'
 	} else {
 		'COMPLETE (see guest process status)'
@@ -360,16 +366,18 @@ fn main() {
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out) or { panic(err) }
 	mode := os.args[1]
-	if mode !in ['build', 'build-init', 'build-feedback', 'build-haptic-pattern', 'build-haptic-event', 'build-haptic-event-parameter', 'build-long-press-gesture', 'build-tap-gesture', 'build-rotation-gesture', 'build-pinch-gesture', 'build-pan-gesture', 'build-text-input', 'build-game-center', 'build-storyboard', 'build-audio-application', 'build-game-controller', 'build-session-task', 'build-run-ios-gles', 'haptic-pattern', 'haptic-event', 'haptic-event-parameter', 'long-press-gesture', 'tap-gesture', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications', 'probe', 'audit', 'static-audit']! { panic('invalid notification mode') }
+	if mode !in ['build', 'build-init', 'build-feedback', 'build-haptic-dynamic-parameter', 'build-haptic-pattern', 'build-haptic-event', 'build-haptic-event-parameter', 'build-long-press-gesture', 'build-tap-gesture', 'build-rotation-gesture', 'build-pinch-gesture', 'build-pan-gesture', 'build-text-input', 'build-game-center', 'build-storyboard', 'build-audio-application', 'build-game-controller', 'build-session-task', 'build-run-ios-gles', 'haptic-dynamic-parameter', 'haptic-pattern', 'haptic-event', 'haptic-event-parameter', 'long-press-gesture', 'tap-gesture', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications', 'probe', 'audit', 'static-audit']! { panic('invalid notification mode') }
 	if mode == 'build' {
 		mut jobs := []thread{}
-		for item in ['haptic-pattern-checks', 'haptic-event-checks', 'haptic-event-parameter-checks', 'long-press-gesture-checks', 'tap-gesture-checks', 'rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks', 'native-init', 'run-ios', 'run-ios-gles']! {
+		for item in ['haptic-dynamic-parameter-checks', 'haptic-pattern-checks', 'haptic-event-checks', 'haptic-event-parameter-checks', 'long-press-gesture-checks', 'tap-gesture-checks', 'rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks', 'native-init', 'run-ios', 'run-ios-gles']! {
 			jobs << spawn build(root, out, item)
 			if jobs.len == 4 { jobs.wait(); jobs.clear() }
 		}
 		jobs.wait()
 	} else if mode == 'build-init' {
 		build(root, out, 'native-init')
+	} else if mode == 'build-haptic-dynamic-parameter' {
+		build(root, out, 'haptic-dynamic-parameter-checks')
 	} else if mode == 'build-haptic-pattern' {
 		build(root, out, 'haptic-pattern-checks')
 	} else if mode == 'build-haptic-event' {

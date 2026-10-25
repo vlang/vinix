@@ -104,6 +104,7 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	if haptic_pattern_dispatch(object, selector, mut frame) { return true }
 	if haptic_event_dispatch(object, selector, mut frame) { return true }
+	if haptic_dynamic_parameter_dispatch(object, selector, mut frame) { return true }
 	if haptic_parameter_dispatch(object, selector, mut frame) { return true }
 	if long_press_descriptor_unsupported(selector) {
 		long_press_descriptor_require_recognition(if object in ios_runtime.classes { object } else { read64(object) })

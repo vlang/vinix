@@ -20,6 +20,7 @@ fn objc_responds(object u64, selector &char) bool {
 	if object == 0 || selector == unsafe { nil } { return false }
 	name := ctext(u64(selector))
 	if audio_application_family(if object in ios_runtime.classes { object } else { read64(object) })
+		|| haptic_dynamic_parameter_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| haptic_parameter_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| haptic_pattern_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| haptic_event_family(if object in ios_runtime.classes { object } else { read64(object) })
