@@ -263,11 +263,17 @@ pub fn syscall_linux_rt_sigreturn(gpr_state voidptr) (u64, u64) {
 	fpstate := get_u64(buf, mc + mc_fpstate)
 	mask := get_u64(buf, frame_sigmask)
 	selectors := get_u64(buf, mc + mc_cs)
+	stack_sp := get_u64(buf, frame_ucontext + 16)
+	stack_flags := u32(get_u64(buf, frame_ucontext + 24))
+	stack_size := get_u64(buf, frame_ucontext + 32)
 	unsafe { buf.free() }
 	if !valid_sigreturn_context(&context) {
 		exit_with_fatal_signal(u8(sigsegv))
 	}
 	sanitize_sigreturn_context(mut context, u16(selectors), u16(selectors >> 48), syscall_frame)
+	// Linux x86 restores uc_stack before the interrupted SP, so an active
+	// handler's current alternate stack still prevents a configuration change.
+	restore_sigaltstack(syscall_frame, stack_sp, stack_flags, stack_size)
 
 	if fpstate != 0 {
 		mut t := unsafe { proc.current_thread() }
@@ -312,7 +318,7 @@ fn on_sigaltstack(t &proc.Thread, sp u64) bool {
 
 // Signal frames save the configured flags, even when interrupted on this stack.
 fn altstack_flags(t &proc.Thread) u32 {
-	return if t.sigaltstack_size == 0 { u32(ss_disable) } else { u32(0) }
+	return if t.sigaltstack_size == 0 { u32(ss_disable) } else { t.sigaltstack_flags }
 }
 
 // Whether the thread is running on its alternate signal stack now, for

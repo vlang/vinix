@@ -2624,8 +2624,8 @@ live queries, post-return state and guards. Identical musl ELFs pass 272 checks
 on both production architectures and Linux references; originals fail 48 on
 AArch64 and four on x86-64. Maintained suites pass 18/18 on AArch64 and 17/18
 on x86-64; randomsignal fails there, then passes with the same ELF and kernel.
-Both results are retained. Repeated nesting, handler-modified uc_stack
-restoration and intermittent failures remain open.
+Both results are retained. Repeated nesting and handler-modified uc_stack
+restoration have follow-up qualifications below; intermittent failures remain open.
 
 `altstackframe-reference.v` accepts the same arguments as `sigwaitcopy-reference.v`;
 `--self-test` has two positive and nine negative controls. Compile
@@ -2646,3 +2646,18 @@ when both outer+inner SA_ONSTACK children die before reporting their checks.
 `altstacknest-evidence.v` without `-prod`, run `self-test` (eight positive and
 40 negative controls), then `check` on the complete bundle in
 [the qualification](../../docs/linux-alternate-stack-nesting.md).
+
+The `altstackrestore` case mutates uc_stack in a native SA_SIGINFO handler,
+then observes the configuration, saved flags and stack placement after
+sigreturn. Root and UID 1000/GID 2000 each run 28 configurations with two
+guarded 64 KiB stacks. The seven variants keep, replace, disable, set invalid
+flags, use an undersized stack, use SS_ONSTACK, or change the live stack
+before returning the original record. Identical musl ELFs pass 952 checks
+on each production architecture and Linux reference; originals fail 130
+on AArch64 and 100 on x86-64. All twenty maintained cases pass per architecture.
+
+`altstackrestore-reference.v` accepts the same arguments as `sigwaitcopy-reference.v`;
+`--self-test` has two positive and nine negative controls. Compile
+`altstackrestore-evidence.v` without `-prod`, run `self-test` (ten positive and
+51 negative controls), then `check` on the complete bundle in
+[the qualification](../../docs/linux-alternate-stack-restoration.md).

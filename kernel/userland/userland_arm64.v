@@ -113,6 +113,8 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 	mut frame := unsafe { &cpulocal.GPRState(gpr_state_ptr) }
 	mut restored := cpulocal.GPRState{}
 	mut restored_mask := u64(0)
+	mut restored_stack := [3]u64{}
+	mut restore_stack := false
 
 	if t.sigentry != 0 {
 		// Vinix/mlibc mode: context and mask passed as args (user x0, x1)
@@ -165,6 +167,10 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 			if public_context != user_sp + linux_frame_ucontext_offset() {
 				exit_with_fatal_signal(u8(sigsegv))
 			}
+			if !usercopy.copy_from_user(unsafe { voidptr(&restored_stack[0]) }, public_context + 16, stack_t_size) {
+				return errno.err, errno.efault
+			}
+			restore_stack = true
 			if !usercopy.copy_from_user(voidptr(&restored.x0), public_context + 184, 31 * sizeof(u64)) {
 				return errno.err, errno.efault
 			}
@@ -185,6 +191,12 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 		return errno.err, errno.einval
 	}
 	sanitize_sigreturn_context(mut restored)
+	if restore_stack {
+		// Linux AArch64 has already restored the interrupted SP when applying
+		// uc_stack. In particular, a return to the main stack can replace it.
+		restore_sigaltstack(unsafe { voidptr(&restored) }, restored_stack[0], u32(restored_stack[1]),
+			restored_stack[2])
+	}
 
 	t.gpr_state = restored
 	t.masked_signals = restored_mask & ~unblockable_mask()
@@ -590,7 +602,7 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 			// aligned after pstate.
 			// uc_stack saves the configured stack, not the live SS_ONSTACK flag.
 			*&u64(uc_base + 16) = t.sigaltstack_sp
-			*&u32(uc_base + 24) = if t.sigaltstack_size == 0 { u32(ss_disable) } else { u32(0) }
+			*&u32(uc_base + 24) = if t.sigaltstack_size == 0 { u32(ss_disable) } else { t.sigaltstack_flags }
 			*&u64(uc_base + 32) = t.sigaltstack_size
 			*&u64(uc_base + 40) = previous_mask
 			*&u64(uc_base + 176) = fault_address

@@ -100,6 +100,7 @@ pub mut:
 	// sigaltstack(2): where SA_ONSTACK handlers run.
 	sigaltstack_sp   u64
 	sigaltstack_size u64
+	sigaltstack_flags u32
 	on_sigaltstack   bool
 	// A mask sigsuspend(2) installed temporarily. The next handler frame has to
 	// carry the mask from before the call, not the one that let it through, so

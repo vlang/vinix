@@ -229,6 +229,7 @@ pub mut:
 	// sigaltstack(2): where SA_ONSTACK handlers run.
 	sigaltstack_sp   u64
 	sigaltstack_size u64
+	sigaltstack_flags u32
 	// What the syscall a seccomp filter turned away returns: an errno, or 0.
 	seccomp_errno u64
 	seccomp_return u64

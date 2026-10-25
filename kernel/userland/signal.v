@@ -399,6 +399,30 @@ fn write_signal_info(info_ptr u64, thrd &proc.Thread, signum int, shared bool) b
 
 // ── alternate signal stack ───────────────────────────────────────────────────
 
+// Linux sigreturn imports uc_stack but ignores invalid modes, undersized stacks
+// and changes made while the selected user SP is on the current alternate stack.
+// The architectures select that SP at different stages of register restoration.
+fn restore_sigaltstack(context voidptr, sp u64, flags u32, size u64) {
+	mut t := proc.current_thread()
+	if thread_on_sigaltstack(t, context)
+		|| (flags != 0 && flags != u32(ss_onstack) && flags != u32(ss_disable)) {
+		return
+	}
+	if flags == u32(ss_disable) {
+		t.sigaltstack_sp = 0
+		t.sigaltstack_size = 0
+		t.sigaltstack_flags = flags
+		return
+	}
+	minimum := $if arm64 { u64(5120) } $else { u64(2048) }
+	if size < minimum {
+		return
+	}
+	t.sigaltstack_sp = sp
+	t.sigaltstack_size = size
+	t.sigaltstack_flags = flags
+}
+
 // sigaltstack(ss, old_ss).
 pub fn syscall_sigaltstack(context voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u64) {
 	mut current_thread := proc.current_thread()
@@ -406,6 +430,7 @@ pub fn syscall_sigaltstack(context voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u6
 	// Read the new stack first: a faulting `ss` must leave the old one in place.
 	mut incoming_sp := u64(0)
 	mut incoming_size := u64(0)
+	mut incoming_flags := u32(0)
 	mut disabling := false
 	if ss_ptr != 0 {
 		mut raw := [3]u64{}
@@ -420,6 +445,7 @@ pub fn syscall_sigaltstack(context voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u6
 		}
 
 		flags := int(u32(raw[1]))
+		incoming_flags = u32(flags)
 		// Linux accepts SS_ONSTACK as an input mode even off the stack.
 		if flags != 0 && flags != ss_onstack && flags != ss_disable {
 			return errno.err, errno.einval
@@ -450,6 +476,7 @@ pub fn syscall_sigaltstack(context voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u6
 	old[2] = current_thread.sigaltstack_size
 
 	if ss_ptr != 0 {
+		current_thread.sigaltstack_flags = incoming_flags
 		if disabling {
 			current_thread.sigaltstack_sp = 0
 			current_thread.sigaltstack_size = 0
