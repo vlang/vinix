@@ -63,6 +63,9 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if library == '/System/Library/Frameworks/CoreHaptics.framework/CoreHaptics' {
 		if address := corehaptics_constant_symbol(symbol) { return address }
 	}
+	if library == '/System/Library/Frameworks/GameController.framework/GameController' {
+		if address := game_controller_symbol(symbol) { return address }
+	}
 	if library == '/System/Library/Frameworks/Network.framework/Network' {
 		if address := nw_symbol(symbol) { return address }
 	}
@@ -456,9 +459,6 @@ fn framework_constant(symbol string) ?u64 {
 		'_kCTForegroundColorFromContextAttributeName' { 'CTForegroundColorFromContext' }
 		'_NSDefaultRunLoopMode' { 'kCFRunLoopDefaultMode' }
 		'_NSLocaleIdentifier' { 'kCFLocaleIdentifierKey' }
-		'_GCControllerDidConnectNotification' { 'GCControllerDidConnectNotification' }
-		'_GCControllerDidDisconnectNotification' { 'GCControllerDidDisconnectNotification' }
-		'_GCControllerDidBecomeCurrentNotification' { 'GCControllerDidBecomeCurrentNotification' }
 		'_GCKeyboardDidConnectNotification' { 'GCKeyboardDidConnectNotification' }
 		'_GCKeyboardDidDisconnectNotification' { 'GCKeyboardDidDisconnectNotification' }
 		'_GCMouseDidConnectNotification' { 'GCMouseDidConnectNotification' }

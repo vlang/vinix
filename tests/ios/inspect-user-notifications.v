@@ -46,6 +46,9 @@ fn main() {
  if name == 'CTTelephonyNetworkInfo' {
   assert C.dlopen(c'/System/Library/Frameworks/CoreTelephony.framework/CoreTelephony', 2) != unsafe { nil }
  }
+ if name == 'GCController' {
+  assert C.dlopen(c'/System/Library/Frameworks/GameController.framework/GameController', 2) != unsafe { nil }
+ }
  if name == 'ASIdentifierManager' {
   assert C.dlopen(c'/System/Library/Frameworks/AdSupport.framework/AdSupport', 2) != unsafe { nil }
  }

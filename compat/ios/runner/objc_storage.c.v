@@ -33,6 +33,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	url_session_require_class(cls)
 	url_session_configuration_require_class(cls)
 	url_session_task_require_class(cls)
+	game_controller_require_discovery(cls)
 	sort_descriptor_require_class(cls)
 	regular_expression_require_class(cls)
 	mutable_string_require_class(cls)

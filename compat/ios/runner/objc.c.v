@@ -476,6 +476,8 @@ mut:
 	ns_locale_country_arena u64 // Sealed NS/CF country, currency-code and currency-symbol key cells/CFSTRs.
 	devicecheck_arena u64 // Sealed DeviceCheck error-domain cell, CFSTR record and bytes.
 	corehaptics_constants_arena u64 // Sealed CoreHaptics NSString cells, records and bytes.
+	controller_constants_arena u64 // Sealed GameController NSString notification cells and records.
+	controller_background_events bool // Shared across GCController and its subclasses.
 	storekit_constants_arena u64 // Sealed StoreKit conversion NSString cells, records and bytes.
 	file_manager u64 // One owned NSFileManager cache reference, retired at shutdown.
 	process_info u64 // One owned NSProcessInfo singleton reference.
@@ -562,7 +564,7 @@ fn objc_start() {
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSNumberFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'NSMapTable', 'CTTelephonyNetworkInfo', 'ASIdentifierManager', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
-		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
@@ -674,6 +676,7 @@ fn objc_start() {
 			'ASWebAuthenticationSession' { u32(136) }
 			'UIImageView' { u32(512) }
 			'GCKeyboard' { u32(32) }
+		'GCController' { u32(232) } // Measured host layout; physical profile construction is unavailable.
 			'NSFileManager' { u32(32) }
 			'NSProcessInfo' { u32(48) }
 			'NSDate', 'VinixCFDate', 'NSTimeZone', 'NSLocale', 'NSFormatter' { u32(8) }
@@ -815,6 +818,7 @@ fn objc_allocate(cls u64) u64 {
 	url_session_require_class(cls)
 	url_session_configuration_require_class(cls)
 	url_session_task_require_class(cls)
+	game_controller_require_discovery(cls)
 	sort_descriptor_require_class(cls)
 	regular_expression_require_class(cls)
 	mutable_string_require_class(cls)
@@ -1077,6 +1081,7 @@ fn objc_stop() {
 	ns_locale_country_stop()
 	devicecheck_stop()
 	corehaptics_constants_stop()
+	game_controller_stop()
 	storekit_constants_stop()
 	avfoundation_constants_stop()
 	corevideo_constants_stop()
@@ -1123,6 +1128,11 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if (symbol in ['_OBJC_CLASS_$_GCController', '_OBJC_METACLASS_$_GCController']!
+		|| game_controller_constant_index(symbol) != none)
+		&& library != '/System/Library/Frameworks/GameController.framework/GameController' {
+		return error('iOS: controller import requires GameController.framework')
+	}
 	if ((symbol.starts_with('_OBJC_CLASS_$_') && url_session_task_name(symbol.all_after('_OBJC_CLASS_$_')))
 		|| (symbol.starts_with('_OBJC_METACLASS_$_') && url_session_task_name(symbol.all_after('_OBJC_METACLASS_$_'))))
 		&& library != '/System/Library/Frameworks/Foundation.framework/Foundation' {
