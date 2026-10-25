@@ -103,6 +103,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_font_builders(smali)!
  framework_text_locales(smali)!
  framework_font_metrics(smali)!
+ framework_paint_text_widths(smali)!
  framework_character_styles(smali)!
  framework_absolute_size_span(smali)!
  framework_static_layout_fallback(smali)!

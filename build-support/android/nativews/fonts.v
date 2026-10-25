@@ -61,6 +61,57 @@ fn ws_measure_text(e voidptr, paint voidptr, text voidptr, start i32, limit i32,
  }
 }
 
+// Return raw advances per UTF-16 code unit. Paired low surrogates have zero
+// advance; the font and decoder match measureText and Canvas's rasterizer.
+fn ws_text_widths(e voidptr, paint voidptr, text voidptr, start i32, limit i32, widths voidptr, array bool) i32 {
+ unsafe {
+  if text == nil { throw(e, c'java/lang/IllegalArgumentException', c'text cannot be null'); return 0 }
+  length := WsLength(slot(e, if array { 171 } else { 164 }))(e, text)
+  count := if array { i64(limit) } else { i64(limit) - i64(start) }
+  if start < 0 || count < 0 || i64(start) + count > i64(length) {
+   kind := if array { &char(c'java/lang/ArrayIndexOutOfBoundsException') } else { &char(c'java/lang/IndexOutOfBoundsException') }
+   throw(e, kind, c'invalid text range'); return 0
+  }
+  if widths == nil { throw(e, c'java/lang/NullPointerException', c'widths cannot be null'); return 0 }
+  if count > i64(WsLength(slot(e, 171))(e, widths)) {
+   throw(e, c'java/lang/ArrayIndexOutOfBoundsException', c'widths array too short'); return 0
+  }
+  if count == 0 { return 0 }
+  native := &WsPaint(get_long(e, paint, c'android/graphics/Paint', c'paint'))
+  if pending(e) { return 0 }
+  info := ws_font_info(native.font)
+  if info == nil { return 0 }
+  chars := WsChars(slot(e, if array { 185 } else { 165 }))(e, text, nil)
+  if chars == nil { return 0 }
+  defer {
+   if array { WsCharRelease(slot(e, 193))(e, text, chars, 2) }
+   else { WsCharsRelease(slot(e, 166))(e, text, chars) }
+  }
+  // Stage all advances before touching Java output, including on OOM.
+  data := &f32(C.calloc(usize(count), sizeof(f32)))
+  if data == nil { throw(e, c'java/lang/OutOfMemoryError', c'text widths allocation'); return 0 }
+  defer { C.free(data) }
+  scale := C.stbtt_ScaleForPixelHeight(info, native.size)
+  mut pos := i64(start)
+  end := pos + count
+  for pos < end {
+   index := pos - i64(start)
+   mut code := i32(chars[pos])
+   pos++
+   if code >= 0xd800 && code <= 0xdbff && pos < end && chars[pos] >= 0xdc00 && chars[pos] <= 0xdfff {
+    code = 0x10000 + ((code - 0xd800) << 10) + i32(chars[pos]) - 0xdc00
+    pos++
+   } else if code >= 0xd800 && code <= 0xdfff { code = 0xfffd }
+   mut advance := i32(0)
+   mut bearing := i32(0)
+   C.stbtt_GetCodepointHMetrics(info, code, &advance, &bearing)
+   data[index] = f32(advance) * scale
+  }
+  WsFloatRegion(slot(e, 213))(e, widths, 0, i32(count), data)
+  return if pending(e) { 0 } else { i32(count) }
+ }
+}
+
 fn ws_font_ref(font &WsFont) {
  if font != unsafe { nil } { C.__atomic_add_fetch(&font.references, 1, 5) }
 }
