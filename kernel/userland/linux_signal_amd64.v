@@ -191,6 +191,13 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 		exit_with_fatal_signal(u8(sigsegv))
 	}
 
+	// The saved context retains the configuration; handler entry disarms it.
+	if t.sigaltstack_flags & ss_autodisarm != 0 {
+		t.sigaltstack_sp = 0
+		t.sigaltstack_size = 0
+		t.sigaltstack_flags = u32(ss_disable)
+	}
+
 	t.masked_signals = previous_mask | sigaction.sa_mask
 	if sigaction.sa_flags & linux_sa_nodefer == 0 {
 		t.masked_signals |= signal_bit(which)
@@ -313,12 +320,16 @@ pub fn syscall_linux_rt_sigreturn(gpr_state voidptr) (u64, u64) {
 // Whether `sp` is on `t`'s alternate signal stack, which is how Linux tells a
 // handler already running there.
 fn on_sigaltstack(t &proc.Thread, sp u64) bool {
+	// Linux treats an automatically disarmed stack as available for changes.
+	if t.sigaltstack_flags & ss_autodisarm != 0 {
+		return false
+	}
 	return sp > t.sigaltstack_sp && sp - t.sigaltstack_sp <= t.sigaltstack_size
 }
 
 // Signal frames save the configured flags, even when interrupted on this stack.
 fn altstack_flags(t &proc.Thread) u32 {
-	return if t.sigaltstack_size == 0 { u32(ss_disable) } else { t.sigaltstack_flags }
+	return if t.sigaltstack_size == 0 { u32(ss_disable) | (t.sigaltstack_flags & ss_autodisarm) } else { t.sigaltstack_flags }
 }
 
 // Whether the thread is running on its alternate signal stack now, for

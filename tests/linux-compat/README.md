@@ -2676,3 +2676,18 @@ checks on both production architectures and Linux references; originals fail
 `altstackclone-evidence.v` without `-prod`, run `self-test` (eleven positive and
 57 negative controls), then `check` on the complete bundle in
 [the qualification](../../docs/linux-alternate-stack-inheritance.md).
+
+The `autodisarm` case qualifies native SS_AUTODISARM registration, queries,
+handler-entry disarming and sigreturn restoration, including nested delivery,
+replacement stacks and handler-modified uc_stack. Three initial modes, both
+SA_ONSTACK choices and five handler operations run as root and UID 1000/GID
+2000. Identical musl ELFs pass 1,560 checks on both production architectures
+and Linux references; originals fail 640 each. All 22 selected maintained
+cases pass per architecture. Context-switch integration and other limits
+remain unqualified.
+
+`autodisarm-reference.v` accepts the same arguments as `sigwaitcopy-reference.v`;
+`--self-test` has two positive and nine negative controls. Compile
+`autodisarm-evidence.v` without `-prod`, run `self-test` (ten positive and
+51 negative controls), then `check` on the complete bundle in
+[the qualification](../../docs/linux-alternate-stack-autodisarm.md).

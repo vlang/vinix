@@ -43,6 +43,8 @@ const ss_onstack = 1
 
 const ss_disable = 2
 
+const ss_autodisarm = u32(0x80000000)
+
 // Signals that can never be blocked, caught or ignored.
 fn unblockable_mask() u64 {
 	return signal_bit(sigkill) | signal_bit(sigstop)
@@ -404,11 +406,12 @@ fn write_signal_info(info_ptr u64, thrd &proc.Thread, signum int, shared bool) b
 // The architectures select that SP at different stages of register restoration.
 fn restore_sigaltstack(context voidptr, sp u64, flags u32, size u64) {
 	mut t := proc.current_thread()
+	mode := flags & ~ss_autodisarm
 	if thread_on_sigaltstack(t, context)
-		|| (flags != 0 && flags != u32(ss_onstack) && flags != u32(ss_disable)) {
+		|| (mode != 0 && mode != u32(ss_onstack) && mode != u32(ss_disable)) {
 		return
 	}
-	if flags == u32(ss_disable) {
+	if mode == u32(ss_disable) {
 		t.sigaltstack_sp = 0
 		t.sigaltstack_size = 0
 		t.sigaltstack_flags = flags
@@ -444,14 +447,14 @@ pub fn syscall_sigaltstack(context voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u6
 			return errno.err, errno.eperm
 		}
 
-		flags := int(u32(raw[1]))
-		incoming_flags = u32(flags)
+		incoming_flags = u32(raw[1])
+		mode := incoming_flags & ~ss_autodisarm
 		// Linux accepts SS_ONSTACK as an input mode even off the stack.
-		if flags != 0 && flags != ss_onstack && flags != ss_disable {
+		if mode != 0 && mode != u32(ss_onstack) && mode != u32(ss_disable) {
 			return errno.err, errno.einval
 		}
 
-		disabling = flags == ss_disable
+		disabling = mode == u32(ss_disable)
 		if !disabling {
 			// Linux UAPI minima differ independently of the native page size.
 			minimum := $if arm64 { u64(5120) } $else { u64(2048) }
@@ -473,6 +476,7 @@ pub fn syscall_sigaltstack(context voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u6
 	} else {
 		u64(0)
 	}
+	old[1] |= u64(current_thread.sigaltstack_flags & ss_autodisarm)
 	old[2] = current_thread.sigaltstack_size
 
 	if ss_ptr != 0 {

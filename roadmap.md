@@ -1960,6 +1960,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   x86-64, with the complete randomsignal failure retained. See
   [the inheritance qualification](docs/linux-alternate-stack-inheritance.md).
 
+- [x] Implement native SS_AUTODISARM registration/query flags, handler-entry
+  disarming and sigreturn restoration, including nested handlers, replacement
+  stacks and changed uc_stack. Guarded probes pass 1,560 checks on both
+  production architectures and Linux; originals fail 640 each. All 22 selected
+  maintained cases pass per architecture. Context switching and broader
+  integration remain separate. See
+  [the autodisarm qualification](docs/linux-alternate-stack-autodisarm.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

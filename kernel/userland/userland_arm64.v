@@ -602,7 +602,7 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 			// aligned after pstate.
 			// uc_stack saves the configured stack, not the live SS_ONSTACK flag.
 			*&u64(uc_base + 16) = t.sigaltstack_sp
-			*&u32(uc_base + 24) = if t.sigaltstack_size == 0 { u32(ss_disable) } else { t.sigaltstack_flags }
+			*&u32(uc_base + 24) = if t.sigaltstack_size == 0 { u32(ss_disable) | (t.sigaltstack_flags & ss_autodisarm) } else { t.sigaltstack_flags }
 			*&u64(uc_base + 32) = t.sigaltstack_size
 			*&u64(uc_base + 40) = previous_mask
 			*&u64(uc_base + 176) = fault_address
@@ -631,6 +631,13 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 		unsafe { frame.free() }
 		if !pushed {
 			exit_with_fatal_signal(u8(sigsegv))
+		}
+
+		// The saved context retains the configuration; handler entry disarms it.
+		if t.sigaltstack_flags & ss_autodisarm != 0 {
+			t.sigaltstack_sp = 0
+			t.sigaltstack_size = 0
+			t.sigaltstack_flags = u32(ss_disable)
 		}
 
 		// Set up handler invocation
@@ -687,6 +694,9 @@ pub fn dispatch_sync_fault(context &cpulocal.GPRState, fault_address u64, fault_
 // Whether the thread is running on its alternate signal stack now, for
 // sigaltstack(2) in signal.v.
 fn thread_on_sigaltstack(t &proc.Thread, context voidptr) bool {
+	if t.sigaltstack_flags & ss_autodisarm != 0 {
+		return false
+	}
 	frame := unsafe { &cpulocal.GPRState(context) }
 	return frame.sp > t.sigaltstack_sp && frame.sp - t.sigaltstack_sp <= t.sigaltstack_size
 }
