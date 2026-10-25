@@ -21,6 +21,18 @@ fn C.execv(&char, &&char) int
 const application = 'org.vinix.wine-win64-probe'
 const data = '/home/alex/.local/share/vinix-apps/' + application
 
+fn nonblocking(fd int) ! {
+	flags := C.fcntl(fd, C.F_GETFL)
+	if flags < 0 { return error('cannot read child pipe flags') }
+	if C.fcntl(fd, C.F_SETFL, flags | C.O_NONBLOCK) < 0 {
+		return error('cannot make child pipe nonblocking')
+	}
+	current := C.fcntl(fd, C.F_GETFL)
+	if current < 0 || current & C.O_NONBLOCK == 0 {
+		return error('child pipe did not retain nonblocking mode')
+	}
+}
+
 fn smoke_child() {
 	if os.args.len != 5 { exit(125) }
 	os.unsetenv('VINIX_ALLOW_WX')
@@ -83,7 +95,7 @@ fn native_loader_smoke(generation string) ! {
 	C.close(child.stdio_fd[0])
 	child.stdio_fd[0] = -1
 	fd := child.stdio_fd[1]
-	C.fcntl(fd, C.F_SETFL, C.fcntl(fd, C.F_GETFL) | C.O_NONBLOCK)
+	nonblocking(fd)!
 	deadline := time.sys_mono_now() + 15 * time.second
 	mut output := []u8{cap: 65536}
 	defer { unsafe { output.free() } }
@@ -134,7 +146,7 @@ fn smoke_status(qemu string, root string) !int {
 	C.close(child.stdio_fd[0])
 	child.stdio_fd[0] = -1
 	fd := child.stdio_fd[1]
-	C.fcntl(fd, C.F_SETFL, C.fcntl(fd, C.F_GETFL) | C.O_NONBLOCK)
+	nonblocking(fd)!
 	deadline := time.sys_mono_now() + 15 * time.second
 	mut total := 0
 	mut buffer := [4096]u8{}
@@ -271,11 +283,12 @@ fn socket_check() ! {
 
 // These probes run only after the real signed launch has already failed. They
 // preserve its SDK context, identity, unveil paths and promises, and substitute
-// an explicit version command for diagnosis. They cannot satisfy a PASS gate.
+// an explicit diagnostic command. They cannot satisfy a PASS gate.
 fn diagnostic_command(plan pkgcore.Launch, arguments []string, label string) ! {
 	mut child := os.new_process(plan.program)
+	mut reaped := false
 	defer {
-		if child.is_alive() {
+		if !reaped && child.pid > 0 && child.is_alive() {
 			child.signal_kill()
 			child.wait()
 		}
@@ -284,36 +297,94 @@ fn diagnostic_command(plan pkgcore.Launch, arguments []string, label string) ! {
 	child.set_work_folder(plan.directory)
 	child.set_args(arguments)
 	child.set_redirect_stdio_merged()
+	println('HWTEST DIAGNOSTIC Wine begin ' + label)
 	child.run()
+	if child.pid <= 0 { return error('diagnostic process did not start: ' + label) }
+	println('HWTEST DIAGNOSTIC Wine spawned ' + label)
 	C.close(child.stdio_fd[0])
 	child.stdio_fd[0] = -1
 	fd := child.stdio_fd[1]
-	C.fcntl(fd, C.F_SETFL, C.fcntl(fd, C.F_GETFL) | C.O_NONBLOCK)
+	nonblocking(fd)!
+	println('HWTEST DIAGNOSTIC Wine nonblocking ' + label)
 	deadline := time.sys_mono_now() + 15 * time.second
 	mut bytes := []u8{cap: 65536}
 	defer { unsafe { bytes.free() } }
 	mut buffer := [4096]u8{}
+	mut raw_status := i32(0)
+	mut timed_out := false
 	for {
 		count := C.read(fd, &buffer[0], usize(buffer.len))
 		if count > 0 {
 			if bytes.len + count > 65536 { return error('diagnostic output exceeded bound') }
 			for index in 0 .. int(count) { bytes << buffer[index] }
 		}
-		if !child.is_alive() { break }
-		if time.sys_mono_now() > deadline { return error('diagnostic timed out: ' + label) }
+		waited := C.waitpid(child.pid, &raw_status, C.WNOHANG)
+		if waited == child.pid {
+			reaped = true
+			break
+		}
+		if waited < 0 && C.errno != C.EINTR { return error('diagnostic waitpid failed: ' + label) }
+		if time.sys_mono_now() > deadline {
+			timed_out = true
+			println('HWTEST DIAGNOSTIC Wine timeout ' + label)
+			child.signal_kill()
+			println('HWTEST DIAGNOSTIC Wine killed ' + label)
+			for {
+				result := C.waitpid(child.pid, &raw_status, 0)
+				if result == child.pid { reaped = true; break }
+				if result < 0 && C.errno == C.EINTR { continue }
+				return error('diagnostic reap failed: ' + label)
+			}
+			break
+		}
 		time.sleep(10 * time.millisecond)
 	}
-	child.wait()
+	// This fixture collected the raw status itself; keep os.Process cleanup
+	// from waiting for the same child again. Record signal and exit separately.
+	child.status = .exited
 	for {
 		count := C.read(fd, &buffer[0], usize(buffer.len))
 		if count <= 0 { break }
 		if bytes.len + count > 65536 { return error('diagnostic output exceeded bound') }
 		for index in 0 .. int(count) { bytes << buffer[index] }
 	}
-	status := child.code.str()
-	defer { unsafe { status.free() } }
-	println('HWTEST DIAGNOSTIC Wine ' + label + ' status=' + status)
+	raw := raw_status.str()
+	signal := (raw_status & 0x7f).str()
+	status := ((raw_status >> 8) & 0xff).str()
+	timeout := timed_out.str()
+	defer { unsafe { raw.free(); signal.free(); status.free(); timeout.free() } }
+	println('HWTEST DIAGNOSTIC Wine ' + label + ' exit=' + status + ' signal=' + signal +
+		' raw_wait=' + raw + ' timed_out=' + timeout)
 	println(unsafe { tos(bytes.data, bytes.len) })
+}
+
+fn diagnostic_server_directory(label string) ! {
+	base := data + '/wine/.wine-1000'
+	defer { unsafe { base.free() } }
+	names := os.ls(base)!
+	defer { for name in names { unsafe { name.free() } }; unsafe { (&array(&names)).free() } }
+	if names.len > 64 { return error('diagnostic server inventory exceeded bound') }
+	for name in names {
+		if !name.starts_with('server-') { continue }
+		directory := base + '/' + name
+		defer { unsafe { directory.free() } }
+		entries := os.ls(directory)!
+		defer { for entry in entries { unsafe { entry.free() } }; unsafe { (&array(&entries)).free() } }
+		if entries.len > 64 { return error('diagnostic server entries exceeded bound') }
+		for entry in entries {
+			path := directory + '/' + entry
+			defer { unsafe { path.free() } }
+			st := os.lstat(path)!
+			kind := st.get_filetype().str()
+			uid := st.uid.str()
+			gid := st.gid.str()
+			mode := (st.mode & 0o7777).str()
+			defer { unsafe { kind.free(); uid.free(); gid.free(); mode.free() } }
+			println('HWTEST DIAGNOSTIC Wine ' + label + ' server-entry=' + name + '/' + entry +
+				' kind=' + kind + ' uid=' + uid + ' gid=' + gid + ' mode_decimal=' + mode)
+		}
+		if entries.len == 0 { println('HWTEST DIAGNOSTIC Wine ' + label + ' server-empty=' + name) }
+	}
 }
 
 fn failure_diagnostics(state pkgcore.State, generation string) ! {
@@ -345,7 +416,7 @@ fn failure_diagnostics(state pkgcore.State, generation string) ! {
 		program := runtime + suffix
 		defer { unsafe { program.free() } }
 		mut arguments := []string{cap: separator + 3}
-		defer { unsafe { arguments.free() } }
+		defer { unsafe { (&array(&arguments)).free() } }
 		for index in 0 .. separator + 1 { arguments << plan.arguments[index] }
 		arguments << program
 		arguments << '--version'
@@ -365,6 +436,31 @@ fn failure_diagnostics(state pkgcore.State, generation string) ! {
 		defer { unsafe { names.free() } }
 		if names.len > 64 { return error('diagnostic prefix inventory exceeded bound') }
 		for name in names { println('HWTEST DIAGNOSTIC Wine prefix ' + suffix + '/' + name) }
+	}
+	diagnostic_server_directory('before-init') or {
+		eprintln('HWTEST DIAGNOSTIC Wine server inventory error: ' + err.msg())
+		unsafe { err.free() }
+	}
+	// Foreground avoids Wine's daemon fork/status translation. Each run stays
+	// inside the failed launch's exact sandbox and has a bounded parent wait.
+	for foreground in [true, false]! {
+		program := runtime + '/bin/wineserver'
+		label := if foreground { 'wineserver-foreground-debug' } else { 'wineserver-background-debug' }
+		defer { unsafe { program.free() } }
+		mut arguments := []string{cap: separator + 4}
+		defer { unsafe { (&array(&arguments)).free() } }
+		for index in 0 .. separator + 1 { arguments << plan.arguments[index] }
+		arguments << program
+		if foreground { arguments << '--foreground' }
+		arguments << '--debug'
+		diagnostic_command(plan, arguments, label) or {
+			eprintln('HWTEST DIAGNOSTIC Wine error: ' + err.msg())
+			unsafe { err.free() }
+		}
+		diagnostic_server_directory(label) or {
+			eprintln('HWTEST DIAGNOSTIC Wine server inventory error: ' + err.msg())
+			unsafe { err.free() }
+		}
 	}
 }
 
@@ -410,7 +506,7 @@ fn run() ! {
 	C.close(child.stdio_fd[0])
 	child.stdio_fd[0] = -1
 	fd := child.stdio_fd[1]
-	C.fcntl(fd, C.F_SETFL, C.fcntl(fd, C.F_GETFL) | C.O_NONBLOCK)
+	nonblocking(fd)!
 	mut bytes := []u8{cap: 32768}
 	unsafe { bytes.flags |= .noslices }
 	defer { unsafe { bytes.free() } }
@@ -470,7 +566,7 @@ fn run() ! {
 		for os.exists('/proc/' + pid) {
 			// Wine's detached server may be adopted by this fixture PID1. The
 			// package CLI already waited for its own child before this reap.
-			mut status := 0
+			mut status := i32(0)
 			for C.waitpid(-1, &status, C.WNOHANG) > 0 {
 			}
 			if time.sys_mono_now() > retire {
