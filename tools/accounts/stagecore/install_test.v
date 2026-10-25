@@ -134,3 +134,18 @@ fn test_account_staging_atomic_output_short_writes_and_failures() {
 		installer.close()
 	}
 }
+
+fn test_account_staging_preserves_imported_shadow_with_private_permissions() {
+	base := fixture()!
+	defer { os.rmdir_all(base) or {}; unsafe { base.free() } }
+	os.mkdir(base + '/image/etc')!
+	shadow := base + '/image/etc/shadow'
+	os.write_file(shadow, 'root:*:19000:0:99999:7:::\n')!
+	os.chmod(shadow, 0o640)!
+	mut installer := open(base + '/image')!
+	defer { installer.close() }
+	installer.put(shadow, 'etc/shadow', 0o600)!
+	assert os.read_file(shadow)! == 'root:*:19000:0:99999:7:::\n'
+	assert os.lstat(shadow)!.mode & 0o777 == 0o600
+	assert os.ls(base + '/image/etc')! == ['shadow']
+}
