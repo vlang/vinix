@@ -11,6 +11,8 @@ import time
 const template_path = 'tests/native-android-ws/maps-styled-replay.v'
 const prepared278_pin = 'aa10e659faf39ab1a9b4bf01d2dde791f4ab1fbb9eff007d71e8226fce370995'
 const prepared278_jar = 'a1b839c77a575a40ddab8d6e264e92c9abcc9de54ae6c3dcefcc0e725c938eba'
+const prepared282_pin = '2d9a307a57f3ffd5f07170a61cb6fb42361cc65ab260e78c158be2c9b05edefc'
+const prepared282_jar = '92b069b1dbb31b08960d00d4f33f84b068a3adf53af9339f2ef3c1a6478f0618'
 
 fn once(source string, before string, after string) !string {
 	if source.count(before) != 1 { return error('unexpected replay template block: ' + before) }
@@ -46,11 +48,79 @@ fn selected(template string, run string, paired string, source_pins map[string]s
 	source = once(source, "\tprintln('MAPS" + run + " HELPER SELF-TEST PASS", "\tarchive_stream_fixture()!\n\tprintln('MAPS" + run + " HELPER SELF-TEST PASS")!
 	if paired == '276' { source = qualified276(source)! }
 	if paired == '278' { source = prepared278(source)! }
+	if paired == '282' { source = clean283(prepared282(source, prepared282_pin, prepared282_jar)!)! }
 	return source + stream_helpers()
 }
 
 // Four real framework/fixture receipts bind this completed build. Runtime
 // qualification is separate; the native inputs still refer to sealed276.
+fn prepared282(source string, pin string, jar_pin string) !string {
+	mut result := prepared278(source)!
+	result = result.replace('prepared278', 'prepared282')
+	result = once(result, 'compound278-2026-10-25', 'compound282-2026-10-25')!
+	result = once(result, prepared278_pin, pin)!
+	result = once(result, prepared278_jar, jar_pin)!
+	result = once(result, 'framework-only278', 'framework-only282')!
+	return once(result, '"278 native reference differs:', '"282 native reference differs:')!
+}
+
+// Maps283 explicitly changes the framework, native artifact and sample launcher.
+// The native bytes remain qualified276; credential/identity launchers stay fixed.
+fn clean283(source string) !string {
+	mut result := once(source, 'mut expected := [jar, native]', 'mut expected := [jar, native, clean_launcher]')!
+	result = once(result, "if changed != expected { return error('only framework JAR/native overlay may differ: ' + changed.str()) }", "if changed != expected { return error('only framework/native/clean launcher overlays may differ: ' + changed.str()) }\n\tclean_launcher_identity(before, after)!")!
+	result = once(result, "\tos.cp(compound + '/native/libvinix-android-native.so', target + '/module/' + native)!", "\tos.cp(compound + '/native/libvinix-android-native.so', target + '/module/' + native)!\n\tvalidate_clean_launcher()!\n\tos.cp(clean_launcher_root + '/run-android-calculator', target + '/module/' + clean_launcher)!\n\twrite_json(target + '/launcher-environment.json', clean_environment(target + '/module')!)!")!
+	result = once(result, '\tmut retained := map[string]string{}', '\tclone(clean_launcher_root, external + "/prelaunch/clean-launcher")!\n\tclone(target + "/launcher-environment.json", external + "/prelaunch/launcher-environment.json")!\n\tfor name, _ in clean_environment(target + "/module")! { clone(target + "/module/" + name, external + "/prelaunch/launcher-environment-files/" + name)! }\n\tmut retained := map[string]string{}')!
+	result = result.replace('exactly two paired282 overlay differences', 'exactly three explicit framework/native/launcher overlay differences; native is unchanged qualified276')
+	result = result.replace('only paired282 overlays', 'framework/native/clean launcher overlays')
+	result = once(result, 'exact2 delta enforced', 'exact3 delta enforced')!
+	result = once(result, 'for i in 0 .. 107', 'for i in 0 .. 106')!
+	result = once(result, "\tbefore[native] = 'old'", "\tbefore[native] = 'old'\n\tbefore[clean_launcher] = historical_launcher_pin")!
+	result = once(result, "\tafter[native] = 'new'", "\tafter[native] = 'new'\n\tafter[clean_launcher] = clean_launcher_pin")!
+	result = once(result, "\tafter['fixture-0'] = 'wrong'", "\tmut wrong_launcher := after.clone()\n\twrong_launcher[clean_launcher] = 'wrong'\n\tmut launcher_rejected := false\n\toverlay_delta(before, wrong_launcher) or { launcher_rejected = true }\n\tassert launcher_rejected\n\tclean_environment_fixture()!\n\tafter['fixture-0'] = 'wrong'")!
+	return result + clean283_helpers()
+}
+
+fn clean283_helpers() string {
+	return '
+const clean_launcher = "usr/bin/run-android-calculator"
+const clean_launcher_root = "build/android-maps/maps283-clean-launcher"
+const clean_launcher_manifest_pin = "9e8256b31be97aa97c7bf8b4b353624514ea9cd7d9acfb7f7315d24c26670f10"
+const clean_launcher_pin = "406b187bb0ef8f42c57cc26532abae6599b837b5b0226da7afd23fcda8ca67a0"
+const historical_launcher_pin = "052bcaf5f663d3743d7712964e38e75c6c2500350ad3d431874e68123113d264"
+
+fn clean_launcher_identity(before map[string]string, after map[string]string) ! {
+	if before[clean_launcher]! != historical_launcher_pin || after[clean_launcher]! != clean_launcher_pin { return error("clean launcher overlay identity differs") }
+}
+fn validate_clean_launcher() ! {
+	if styled_hash(clean_launcher_root + "/sha256.json")! != clean_launcher_manifest_pin { return error("wrong fresh launcher build manifest") }
+	checked([clean_launcher_root + "/builder", "check", clean_launcher_root])!
+	if styled_hash(clean_launcher_root + "/run-android-calculator")! != clean_launcher_pin { return error("fresh launcher output differs") }
+}
+fn clean_environment(root string) !map[string]string {
+	mut pins := map[string]string{}
+	for name in ["usr/bin/vinix-session", "usr/bin/vinix-desktop", "usr/bin/run-android", "usr/bin/run-android-identity", "usr/bin/run-android-original", clean_launcher] {
+		if os.read_file(root + "/" + name)!.contains("VINIX_ANDROID_TRACE_") { return error("inherited launcher trace export/string present: " + name) }
+		pins[name] = styled_hash(root + "/" + name)!
+	}
+	return pins
+}
+fn clean_environment_fixture() ! {
+	root := os.temp_dir() + "/maps283-clean-env-" + time.now().unix_micro().str()
+	for name in ["usr/bin/vinix-session", "usr/bin/vinix-desktop", "usr/bin/run-android", "usr/bin/run-android-identity", "usr/bin/run-android-original", clean_launcher] {
+		os.mkdir_all(os.dir(root + "/" + name))!
+		os.write_file(root + "/" + name, "clean launcher")!
+	}
+	assert clean_environment(root)!.len == 6
+	os.write_file(root + "/usr/bin/vinix-session", "export VINIX_ANDROID_TRACE_VISIBILITY=android.widget.LinearLayout")!
+	mut rejected := false
+	clean_environment(root) or { rejected = true }
+	assert rejected
+	println("MAPS283 CLEAN LAUNCHER NEGATIVE PASS wrong overlay and inherited trace export")
+}
+'
+}
+
 fn prepared278(source string) !string {
 	mut result := qualified276(source)!
 	result = result.replace('qualified276', 'prepared278').replace('qualified-build-', 'prepared-build-')
@@ -214,7 +284,7 @@ fn archive_stream_fixture() ! {
 
 fn self_test(template string) ! {
 	pins := {'framework': '0'.repeat(64), 'native': '1'.repeat(64)}
-	for run, paired in {'273': '272', '275': '274', '277': '276', '279': '278'} {
+	for run, paired in {'273': '272', '275': '274', '277': '276', '279': '278', '283': '282'} {
 		source := selected(template, run, paired, pins)!
 		assert source.contains("const target = base + 'maps" + run + "'")
 		assert source.contains("const compound = base + 'compound" + paired + "'")
@@ -223,10 +293,11 @@ fn self_test(template string) ! {
 		assert !source.contains("archive_readback('before'") && !source.contains("archive_readback('after'")
 		assert !source.contains('clone(frozen + \'/inputs\',')
 		assert source.contains('retained launch input differs: ')
-		if paired == '278' {
-			assert source.contains('prepared278_inputs(compound)!') && source.contains('runtime qualification is separate')
+		if paired in ['278', '282'] {
+			assert source.contains('prepared' + paired + '_inputs(compound)!') && source.contains('runtime qualification is separate')
 			assert source.contains("for label in ['build-framework-compiler', 'build-framework', 'fixture-compiler', 'fixture']")
 			assert !source.contains("for label in ['generate-native'")
+			if paired == '282' { assert source.contains('mut expected := [jar, native, clean_launcher]') && source.contains('clean_environment_fixture()!') }
 		} else if paired == '276' {
 			assert source.contains('qualified276_inputs(compound)!') && source.contains('qualified-build-sha256.json')
 			assert !source.contains('for label in [\'build-framework-compiler\'')
@@ -246,7 +317,7 @@ fn self_test(template string) ! {
 	scratch := 'build/android-maps/maps-selector-selftest-' + os.getpid().str()
 	if os.exists(scratch) { return error('fresh selector self-test directory required') }
 	os.mkdir_all(scratch)!
-	write_selection(template, selected(template, '279', '278', pins)!, scratch + '/replay.v', pins)!
+	write_selection(template, selected(template, '283', '282', pins)!, scratch + '/replay.v', pins)!
 	build := os.exec(['/Users/alex/code/v/v_old', '-nocache', '-cc', 'cc', '-cflags', '-O2', '-o', scratch + '/replay', scratch + '/replay.v'])
 	os.write_file(scratch + '/build.log', build.output)!
 	if build.exit_code != 0 { return error('selected helper compilation failed: ' + build.output) }

@@ -18,6 +18,13 @@ const qualified276_pin = '37bfa8ec3449adf8a294e0b1f3ff3cabfa49123c228f308d9919ca
 const prepared278_root = '/Users/alex/.local/state/vinix/android/compound278-2026-10-25'
 const prepared278_pin = 'aa10e659faf39ab1a9b4bf01d2dde791f4ab1fbb9eff007d71e8226fce370995'
 const prepared278_jar = 'a1b839c77a575a40ddab8d6e264e92c9abcc9de54ae6c3dcefcc0e725c938eba'
+const prepared282_root = '/Users/alex/.local/state/vinix/android/compound282-2026-10-25'
+const prepared282_pin = '2d9a307a57f3ffd5f07170a61cb6fb42361cc65ab260e78c158be2c9b05edefc'
+const prepared282_jar = '92b069b1dbb31b08960d00d4f33f84b068a3adf53af9339f2ef3c1a6478f0618'
+const clean_launcher = 'usr/bin/run-android-calculator'
+const clean_launcher_manifest_pin = '9e8256b31be97aa97c7bf8b4b353624514ea9cd7d9acfb7f7315d24c26670f10'
+const clean_launcher_pin = '406b187bb0ef8f42c57cc26532abae6599b837b5b0226da7afd23fcda8ca67a0'
+const historical_launcher_pin = '052bcaf5f663d3743d7712964e38e75c6c2500350ad3d431874e68123113d264'
 const tooltip277 = "java.lang.NoSuchMethodError: No virtual method getTooltipText()Ljava/lang/CharSequence; in class Lcom/google/android/material/floatingactionbutton/ExtendedFloatingActionButton; or its super classes (declaration of 'com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton' appears in /opt/android-test/application.apk!classes8.dex)"
 const exit277 = 'APK-SUITE-EXIT id=google-maps code=1 native_observed=true gtk_x11_absent=true'
 
@@ -179,7 +186,7 @@ fn qemu_arguments(config map[string]json2.Any, repo string) []string {
 
 fn build_labels(build string) []string {
 	return if build == '276' { ['generate-native', 'build-native'] }
-		else if build == '278' { ['build-framework-compiler', 'build-framework', 'fixture-compiler', 'fixture'] }
+		else if build in ['278', '282'] { ['build-framework-compiler', 'build-framework', 'fixture-compiler', 'fixture'] }
 		else { ['build-framework-compiler', 'build-framework', 'generate-native', 'build-native', 'fixture-compiler', 'fixture'] }
 }
 
@@ -191,13 +198,19 @@ fn nondirectories(entries map[string]string) map[string]string {
 
 // This reference binds a completed build, not the separate278 guest outcome.
 fn prepared278(root string, entries map[string]string, paired string) ! {
+	prepared_framework(root, entries, paired, prepared278_root, prepared278_pin, prepared278_jar)!
+}
+fn prepared282(root string, entries map[string]string, paired string) ! {
+	prepared_framework(root, entries, paired, prepared282_root, prepared282_pin, prepared282_jar)!
+}
+fn prepared_framework(root string, entries map[string]string, paired string, prepared_root string, prepared_pin string, jar_pin string) ! {
 	prefix := 'prelaunch/prelaunch/'
 	regular_files(entries, [prefix + 'prepared-build-sha256.json', prefix + 'prepared-build-reference.json',
 		prefix + 'qualified276-sha256.json', prefix + 'qualified276-reference.json'])!
-	if entries[prefix + 'prepared-build-sha256.json']! != prepared278_pin { return error('wrong prepared278 manifest pin') }
+	if entries[prefix + 'prepared-build-sha256.json']! != prepared_pin { return error('wrong prepared framework manifest pin') }
 	archived := read_map(root + '/' + prefix + 'prepared-build-sha256.json')!
 	reference := object(root + '/' + prefix + 'prepared-build-reference.json')!
-	assert reference['root']!.str() == prepared278_root && reference['manifest_sha256']!.str() == prepared278_pin
+	assert reference['root']!.str() == prepared_root && reference['manifest_sha256']!.str() == prepared_pin
 	assert reference['scope']!.str().contains('runtime qualification is separate')
 	copy_prefix := prefix + 'replica/' + paired + '/'
 	for name in ['framework', 'native'] {
@@ -219,8 +232,43 @@ fn prepared278(root string, entries map[string]string, paired string) ! {
 	for name in ['sources.json', 'bindings.txt', 'libvinix-android-native.so', 'androidfw_c_api.h', 'sqlite3.h', 'stb_image.h', 'stb_truetype.h'] {
 		assert entries[copy_prefix + 'native/' + name]! == sealed['prelaunch/native/' + name]!, name
 	}
-	assert entries[copy_prefix + 'framework/api-impl.jar']! == prepared278_jar
+	assert entries[copy_prefix + 'framework/api-impl.jar']! == jar_pin
 	assert entries[copy_prefix + 'native/libvinix-android-native.so']! == '5fe27a87c179b97121c368f417936ceebb75752c4a4204b937312ee28da531ca'
+}
+
+fn runtime_delta(build string, before map[string]string, after map[string]string) ! {
+	if before.len != after.len { return error('runtime inventory lengths differ') }
+	mut changes := []string{}
+	for path, digest in before { if after[path]! != digest { changes << path } }
+	changes.sort()
+	mut overlays := [jar, native]
+	if build == '282' {
+		overlays << clean_launcher
+		if before[clean_launcher]! != historical_launcher_pin || after[clean_launcher]! != clean_launcher_pin {
+			return error('clean launcher overlay identity differs')
+		}
+	}
+	overlays.sort()
+	if changes != overlays { return error('unexpected runtime overlay differences: ' + changes.str()) }
+}
+fn clean_environment(root string, expected map[string]string) ! {
+	if expected.len != 6 { return error('exact launcher environment chain required') }
+	for name in ['usr/bin/vinix-session', 'usr/bin/vinix-desktop', 'usr/bin/run-android', 'usr/bin/run-android-identity', 'usr/bin/run-android-original', clean_launcher] {
+		if hash(root + '/' + name)! != expected[name]! { return error('launcher environment file differs: ' + name) }
+		if os.read_file(root + '/' + name)!.contains('VINIX_ANDROID_TRACE_') { return error('inherited launcher trace export/string present: ' + name) }
+	}
+}
+fn clean_build(root string, entries map[string]string, after map[string]string) ! {
+	prefix := 'prelaunch/prelaunch/'
+	launcher := root + '/' + prefix + 'clean-launcher'
+	regular_files(entries, [prefix + 'clean-launcher/sha256.json', prefix + 'clean-launcher/builder', prefix + 'launcher-environment.json'])!
+	if entries[prefix + 'clean-launcher/sha256.json']! != clean_launcher_manifest_pin { return error('wrong fresh launcher build pin') }
+	checked([launcher + '/builder', 'check', launcher])!
+	if entries[prefix + 'clean-launcher/run-android-calculator']! != clean_launcher_pin { return error('wrong clean launcher output') }
+	environment := read_map(root + '/' + prefix + 'launcher-environment.json')!
+	equal_maps(nondirectories(subtree(entries, prefix + 'launcher-environment-files')), environment)!
+	for name, pin in environment { if after[name]! != pin { return error('launcher environment runtime identity differs: ' + name) } }
+	clean_environment(root + '/' + prefix + 'launcher-environment-files', environment)!
 }
 
 // Complete276 qualification stays independently sealed. Verify the exact
@@ -288,12 +336,8 @@ fn validate(root string, entries map[string]string) !map[string]json2.Any {
 	after := read_map(root + '/' + prep + '/runtime-after.json')!
 	equal_maps(before, read_map(root + '/prelaunch/prelaunch/frozen-consumed/' + base + 'maps256/runtime-after.json')!)!
 	assert before.len == 109 && after.len == 109
-	mut changes := []string{}
-	for path, digest in before { if after[path]! != digest { changes << path } }
-	changes.sort()
-	mut overlays := [jar, native]
-	overlays.sort()
-	assert changes == overlays
+	runtime_delta(build, before, after)!
+	if build == '282' { clean_build(root, entries, after)! }
 	assert after[jar]! == entries[replica + paired + '/framework/api-impl.jar']!
 	assert after[native]! == entries[replica + paired + '/native/libvinix-android-native.so']!
 	generation := object(root + '/prelaunch/prelaunch/generation.generation.json')!
@@ -313,6 +357,7 @@ fn validate(root string, entries map[string]string) !map[string]json2.Any {
 	}
 	if build == '276' { qualified276(root, entries, paired)! }
 	if build == '278' { prepared278(root, entries, paired)! }
+	if build == '282' { prepared282(root, entries, paired)! }
 	for label in build_labels(build) {
 		regular_files(entries, [replica + paired + '/' + label + '-receipt.json', replica + paired + '/' + label + '-before.json'])!
 		built := object(root + '/' + replica + paired + '/' + label + '-receipt.json')!
@@ -492,6 +537,7 @@ fn self_test(original_path string) ! {
 	ids('275', '274')!
 	ids('277', '276')!
 	ids('279', '278')!
+	ids('283', '282')!
 	failed277 := {
 		'startup_timeout_seconds': json2.Any(420)
 		'observation_elapsed_seconds': json2.Any(262)
@@ -544,7 +590,7 @@ fn self_test(original_path string) ! {
 	live['observation_elapsed_seconds'] = json2.Any(420)
 	live['process_exited'] = json2.Any(false)
 	observation_window('275', '274', live, '')!
-	observation_window('281', '280', live, '')!
+	observation_window('283', '282', live, '')!
 	rejected = false
 	observation_window('277', '276', live, failed_serial) or { rejected = true }
 	assert rejected
@@ -553,7 +599,38 @@ fn self_test(original_path string) ! {
 	assert rejected
 	assert build_labels('276') == ['generate-native', 'build-native']
 	assert build_labels('278') == ['build-framework-compiler', 'build-framework', 'fixture-compiler', 'fixture']
+	assert build_labels('282') == build_labels('278')
 	assert build_labels('274').len == 6
+	before_runtime := {jar: 'old-jar', native: 'old-native', clean_launcher: historical_launcher_pin}
+	after_runtime := {jar: 'new-jar', native: 'new-native', clean_launcher: clean_launcher_pin}
+	runtime_delta('282', before_runtime, after_runtime)!
+	mut wrong_launcher := after_runtime.clone()
+	wrong_launcher[clean_launcher] = 'wrong'
+	rejected = false
+	runtime_delta('282', before_runtime, wrong_launcher) or { rejected = true }
+	assert rejected
+	mut extra_runtime := after_runtime.clone()
+	extra_runtime['usr/bin/run-android'] = 'wrong'
+	rejected = false
+	runtime_delta('282', before_runtime, extra_runtime) or { rejected = true }
+	assert rejected
+	mut environment := map[string]string{}
+	for name in ['usr/bin/vinix-session', 'usr/bin/vinix-desktop', 'usr/bin/run-android', 'usr/bin/run-android-identity', 'usr/bin/run-android-original', clean_launcher] {
+		os.mkdir_all(os.dir(root + '/environment/' + name))!
+		os.write_file(root + '/environment/' + name, 'clean')!
+		environment[name] = hash(root + '/environment/' + name)!
+	}
+	clean_environment(root + '/environment', environment)!
+	os.write_file(root + '/environment/usr/bin/vinix-session', 'export VINIX_ANDROID_TRACE_VISIBILITY=android.widget.LinearLayout')!
+	environment['usr/bin/vinix-session'] = hash(root + '/environment/usr/bin/vinix-session')!
+	rejected = false
+	clean_environment(root + '/environment', environment) or { rejected = true }
+	assert rejected
+	rejected = false
+	clean_build(root, {'prelaunch/prelaunch/clean-launcher/sha256.json': 'f'.repeat(64),
+		'prelaunch/prelaunch/clean-launcher/builder': '0'.repeat(64),
+		'prelaunch/prelaunch/launcher-environment.json': '0'.repeat(64)}, after_runtime) or { rejected = true }
+	assert rejected
 	rejected = false
 	qualified276(root, {'prelaunch/prelaunch/qualified-build-sha256.json': 'f'.repeat(64),
 		'prelaunch/prelaunch/qualified-build-reference.json': '0'.repeat(64)}, base + 'compound276') or { rejected = true }
@@ -569,7 +646,7 @@ fn self_test(original_path string) ! {
 	assert rejected
 	probe := os.exec([os.executable(), '--assertion-probe'])
 	assert probe.exit_code != 0 && probe.output.contains('assert false')
-	println('MAPS REPLAY EVIDENCE SELF-TEST PASS changed/missing bytes, links/directories, malformed PNG, classifier mutation, missing/changed launch pins, wrong bundle pin, exact failed277/279 and negative failure markers/window, unchanged live windows, invalid IDs and live assertions; fixture=' + root)
+	println('MAPS REPLAY EVIDENCE SELF-TEST PASS changed/missing bytes, links/directories, malformed PNG, classifier mutation, missing/changed launch pins, wrong bundle pin, exact failed277/279 and negative failure markers/window, unchanged live windows, clean launcher pin/extra overlay/inherited trace rejection, invalid IDs and live assertions; fixture=' + root)
 }
 
 fn main() {
