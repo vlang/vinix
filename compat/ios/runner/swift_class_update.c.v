@@ -15,10 +15,11 @@ fn swift_class_assign32(address u64, value u32) {
 }
 
 // Swift 5's static-vtable layout algorithm, for already registered, nongeneric
-// formal root classes using SwiftObject. Superclass resolution, resilient and
-// generic metadata, and image class realization need separate implementations.
+// formal root classes using SwiftObject. Initializing a root template can fill
+// its implicit superclass and normalize the Swift class bit. Superclass type
+// resolution, resilient/generic metadata and image registration remain separate.
 // Both offset vectors and exported Objective-C offset cells are pointer-sized.
-fn swift_class_update_checked(metadata u64, algorithm u64, count u64, types u64, offsets u64) !SwiftAssociatedMetadata {
+fn swift_class_layout_checked(metadata u64, algorithm u64, count u64, types u64, offsets u64, initialize bool) !SwiftAssociatedMetadata {
 	if algorithm != 0x100 || count > 64 || metadata == 0 || metadata & 7 != 0
 		|| metadata > ~u64(0) - 1048576 || (count != 0 && (types == 0 || types & 7 != 0
 		|| types > ~u64(0) - count * 8 || offsets != metadata + 80)) {
@@ -36,9 +37,12 @@ fn swift_class_update_checked(metadata u64, algorithm u64, count u64, types u64,
 		&& (info.initialized || info.instances != 0)) { return swift_class_update_failure() }
 	meta := ios_runtime.classes[read64(metadata)] or { return swift_class_update_failure() }
 	parent := ios_runtime.classes[info.parent] or { return swift_class_update_failure() }
+	superclass := read64(metadata + 8)
+	bits := read64(metadata + 32) & 7
 	if !meta.meta || parent.meta || parent.parent != 0 || parent.size != 16
-		|| parent.name != '_TtCs12_SwiftObject' || read64(metadata + 8) != info.parent
-		|| read64(metadata + 32) & 7 != 2 || read32(metadata + 40) != 2
+		|| parent.name != '_TtCs12_SwiftObject'
+		|| (superclass != info.parent && !(initialize && !info.swift_layout_complete && superclass == 0))
+		|| (bits != 2 && !(initialize && !info.swift_layout_complete && bits == 1)) || read32(metadata + 40) != 2
 		|| read32(metadata + 44) != 0 { return swift_class_update_failure() }
 	ro := read64(metadata + 32) & ~u64(7)
 	descriptor := read64(metadata + 64)
@@ -46,8 +50,8 @@ fn swift_class_update_checked(metadata u64, algorithm u64, count u64, types u64,
 		|| descriptor > ~u64(0) - 44 { return swift_class_update_failure() }
 	// Unique descriptors and an existing static vtable do not change field
 	// layout. Older class templates reserve a third negative metadata word.
-	// The singleton initializer must already have normalized their Swift bit;
-	// this updater neither initializes singletons nor realizes image classes.
+	// The updater requires a normalized class. Neither entry point invokes a
+	// singleton completion callback or registers an unrecognized image class.
 	address_point := u64(read32(metadata + 60))
 	if read32(descriptor) & ~u32(0x80000040) != 0x10010 || read32(descriptor + 20) != 0
 		|| read32(descriptor + 36) != count || (count != 0 && read32(descriptor + 40) != 10)
@@ -121,6 +125,10 @@ fn swift_class_update_checked(metadata u64, algorithm u64, count u64, types u64,
 		if result_list == 0 { return swift_class_update_failure() }
 		C.memcpy(voidptr(result_list), voidptr(list), usize(8 + count * 32))
 	}
+	if initialize {
+		swift_class_assign64(metadata + 8, info.parent)
+		swift_class_assign64(metadata + 32, ro | 2)
+	}
 	for i in u64(0) .. count {
 		entry := result_list + 8 + i * 32
 		cell := read64(entry)
@@ -151,6 +159,18 @@ fn swift_class_update_checked(metadata u64, algorithm u64, count u64, types u64,
 	return SwiftAssociatedMetadata{}
 }
 
+fn swift_class_update_checked(metadata u64, algorithm u64, count u64, types u64, offsets u64) !SwiftAssociatedMetadata {
+	return swift_class_layout_checked(metadata, algorithm, count, types, offsets, false)
+}
+
 fn swift_class_update(metadata u64, algorithm u64, count u64, types u64, offsets u64) SwiftAssociatedMetadata {
 	return swift_class_update_checked(metadata, algorithm, count, types, offsets) or { panic(err) }
+}
+
+fn swift_class_initialize_checked(metadata u64, algorithm u64, count u64, types u64, offsets u64) !SwiftAssociatedMetadata {
+	return swift_class_layout_checked(metadata, algorithm, count, types, offsets, true)
+}
+
+fn swift_class_initialize(metadata u64, algorithm u64, count u64, types u64, offsets u64) SwiftAssociatedMetadata {
+	return swift_class_initialize_checked(metadata, algorithm, count, types, offsets) or { panic(err) }
 }

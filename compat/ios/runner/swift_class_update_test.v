@@ -14,6 +14,7 @@ fn C.sel_registerName(&char) voidptr
 
 type CuEntry = fn (u64, u64, u64, u64, u64) SwiftAssociatedMetadata
 type CuProbe = fn (u64, u64, u64, u64, u64, u64, &u64)
+type CuRealize = fn (u64, u64) u64
 struct CuField { size u64 stride u64 flags u32 extra u32 }
 struct CuInput { base u64 page u64 metadata u64 ro u64 descriptor u64 types u64 list u64 cells u64 count int }
 __global cu_sequence = u64(0)
@@ -92,7 +93,7 @@ fn cu_call(input CuInput, entry u64, probe CuProbe) {
 	assert output[0] == 0xcafe && output[5] == 0xbeef && output[1] == 0 && output[3] == 0x5020 && output[4] == 0x5021
 	// Native leaves the state register unspecified when dependency metadata is nil.
 }
-fn cu_check(input CuInput, positions []u64, size u32, mask u32, fields []CuField, native bool, matching_sizes bool) {
+fn cu_check(input CuInput, positions []u64, size u32, mask u32, fields []CuField, native bool, matching_sizes bool, initialize bool) {
 	m := input.metadata; list := read64(input.ro + 48)
 	assert read32(m + 44) == 0 && read32(m + 48) == size && read32(m + 52) == mask
 	assert read32(input.ro + 8) == size && read32(m + 56) == read32(m + 60) + read32(input.descriptor + 28) * 8 && read64(m + 64) == input.descriptor
@@ -119,11 +120,23 @@ fn cu_check(input CuInput, positions []u64, size u32, mask u32, fields []CuField
 	}
 	// Objective-C reports pointer-rounded allocation size; Swift retains the
 	// unrounded field layout size in the class header and read-only data.
-	$if macos { if native { assert C.class_getInstanceSize(voidptr(m)) == usize((size + 7) & ~u32(7)) } }
+	$if macos { if native {
+		if initialize {
+			// swift_initClassMetadata2 uses objc_readClassPair. These synthetic
+			// classes have no registered Mach-O image, so explicitly realize them
+			// only after checking the initializer's layout and normalized bit.
+			// This step is fixture setup, not evidence of image registration.
+			assert read64(m + 32) & 7 == 2
+			objc := C.dlopen(c'/usr/lib/libobjc.A.dylib', 2)
+			realize := u64(C.dlsym(objc, c'_objc_realizeClassFromSwift')); assert realize != 0
+			assert unsafe { CuRealize(voidptr(realize))(m, m) } == m
+		}
+		assert C.class_getInstanceSize(voidptr(m)) == usize((size + 7) & ~u32(7))
+	} }
 	if !native { assert ios_runtime.classes[m].size == size && ios_runtime.classes[m].swift_layout_complete && !ios_runtime.classes[m].initialized }
 	assert cu_initializations == 0 && cu_metadata_initializations == 0
 }
-fn cu_headers(entry u64, probe CuProbe, native bool) []CuInput {
+fn cu_headers(entry u64, probe CuProbe, native bool, initialize bool) []CuInput {
 	mut fixtures := []CuInput{}
 	fields := [CuField{8, 8, 0x10007, 0}, CuField{8, 8, 7, 0}]
 	for address_point in [u32(16), 24]! {
@@ -139,7 +152,7 @@ fn cu_headers(entry u64, probe CuProbe, native bool) []CuInput {
 					cu_write(input.ro + 72, u64(unsafe { voidptr(cu_metadata_initialize) }))
 					for i in 1 .. 4 { cu_write(m - u64(i * 8), 0x12340000 + u64(i)) }
 					cu_call(input, entry, probe)
-					cu_check(input, [u64(16), 24], 32, 7, fields, native, false)
+					cu_check(input, [u64(16), 24], 32, 7, fields, native, false, initialize)
 					assert read32(m + 56) == address_point + positive * 8 && read32(m + 60) == address_point
 					assert read32(d) == 0x10010 | unique | vtable && read32(d + 24) == address_point / 8 && read32(d + 28) == positive
 					assert read64(input.ro + 72) == u64(unsafe { voidptr(cu_metadata_initialize) })
@@ -151,27 +164,27 @@ fn cu_headers(entry u64, probe CuProbe, native bool) []CuInput {
 	}
 	return fixtures
 }
-fn cu_case(entry u64, probe CuProbe, native bool, fields []CuField, positions []u64, size u32, mask u32, start u32, matching bool) CuInput {
+fn cu_case(entry u64, probe CuProbe, native bool, fields []CuField, positions []u64, size u32, mask u32, start u32, matching bool, initialize bool) CuInput {
 	input := cu_input(fields, native, start, matching)
 	cu_call(input, entry, probe)
-	cu_check(input, positions, size, mask, fields, native, matching)
+	cu_check(input, positions, size, mask, fields, native, matching, initialize)
 	return input
 }
-fn cu_matrix(entry u64, probe CuProbe, native bool) []CuInput {
+fn cu_matrix(entry u64, probe CuProbe, native bool, initialize bool) []CuInput {
 	mut fixtures := []CuInput{}
-	fixtures << cu_case(entry, probe, native, []CuField{}, []u64{}, 16, 7, 16, true)
+	fixtures << cu_case(entry, probe, native, []CuField{}, []u64{}, 16, 7, 16, true, initialize)
 	for matching in [false, true]! {
 		// Same two-field pointer-layout shape as the observed URL/NativeObject call.
-		fixtures << cu_case(entry, probe, native, [CuField{8, 8, 0x10007, 0}, CuField{8, 8, 7, 0}], [u64(16), 24], 32, 7, 16, matching)
+		fixtures << cu_case(entry, probe, native, [CuField{8, 8, 0x10007, 0}, CuField{8, 8, 7, 0}], [u64(16), 24], 32, 7, 16, matching, initialize)
 	}
-	fixtures << cu_case(entry, probe, native, [CuField{1, 1, 0, 0}, CuField{8, 8, 7, 0}, CuField{2, 2, 1, 0}], [u64(16), 24, 32], 34, 7, 16, false)
-	fixtures << cu_case(entry, probe, native, [CuField{3, 4, 3, 0}, CuField{1, 1, 0, 0}], [u64(16), 19], 20, 7, 16, false)
-	fixtures << cu_case(entry, probe, native, [CuField{8, 32, 31, 0}], [u64(32)], 40, 31, 16, false)
-	fixtures << cu_case(entry, probe, native, [CuField{0, 256, 255, 0}, CuField{8, 8, 7, 0}], [u64(0), 16], 24, 7, 16, false)
-	fixtures << cu_case(entry, probe, native, [CuField{1, 1, 0, 0}, CuField{8, 8, 0x110007, 0x7fffffff}], [u64(48), 56], 64, 7, 48, false)
+	fixtures << cu_case(entry, probe, native, [CuField{1, 1, 0, 0}, CuField{8, 8, 7, 0}, CuField{2, 2, 1, 0}], [u64(16), 24, 32], 34, 7, 16, false, initialize)
+	fixtures << cu_case(entry, probe, native, [CuField{3, 4, 3, 0}, CuField{1, 1, 0, 0}], [u64(16), 19], 20, 7, 16, false, initialize)
+	fixtures << cu_case(entry, probe, native, [CuField{8, 32, 31, 0}], [u64(32)], 40, 31, 16, false, initialize)
+	fixtures << cu_case(entry, probe, native, [CuField{0, 256, 255, 0}, CuField{8, 8, 7, 0}], [u64(0), 16], 24, 7, 16, false, initialize)
+	fixtures << cu_case(entry, probe, native, [CuField{1, 1, 0, 0}, CuField{8, 8, 0x110007, 0x7fffffff}], [u64(48), 56], 64, 7, 48, false, initialize)
 	mut many := []CuField{}; mut positions := []u64{}
 	for i in 0 .. 64 { many << CuField{1, 1, 0, 0}; positions << u64(16 + i) }
-	fixtures << cu_case(entry, probe, native, many, positions, 80, 7, 16, false)
+	fixtures << cu_case(entry, probe, native, many, positions, 80, 7, 16, false, initialize)
 	// A copied table preserves the encoding and alignment of unchanged entries.
 	mixed := cu_input([CuField{8, 8, 7, 0}, CuField{1, 1, 0, 0}], native, 16, false)
 	write32(mixed.list + 8 + 28, 8)
@@ -191,12 +204,49 @@ fn cu_matrix(entry u64, probe CuProbe, native bool) []CuInput {
 fn cu_reject(metadata u64, flags u64, count u64, types u64, offsets u64) {
 	if _ := swift_class_update_checked(metadata, flags, count, types, offsets) { assert false, 'unsupported class update accepted' }
 }
-fn cu_bad(input CuInput) {
+fn ci_reject(metadata u64, flags u64, count u64, types u64, offsets u64) {
+	if _ := swift_class_initialize_checked(metadata, flags, count, types, offsets) { assert false, 'unsupported class initialization accepted' }
+}
+fn cu_bad_kind(input CuInput, initialize bool) {
 	copy := C.malloc(usize(input.page * 4)); assert copy != unsafe { nil }
 	C.memcpy(copy, voidptr(input.base + input.page), usize(input.page * 4))
-	cu_reject(input.metadata, 0x100, u64(input.count), input.types, input.metadata + 80)
+	if initialize { ci_reject(input.metadata, 0x100, u64(input.count), input.types, input.metadata + 80) }
+	else { cu_reject(input.metadata, 0x100, u64(input.count), input.types, input.metadata + 80) }
 	assert C.memcmp(copy, voidptr(input.base + input.page), usize(input.page * 4)) == 0
 	C.free(copy)
+}
+fn cu_bad(input CuInput) { cu_bad_kind(input, false) }
+fn ci_invalid(guard u64) CuInput {
+	for flags in [u64(0), 1, 0x101, 0x200, ~u64(0)]! { ci_reject(guard, flags, 1, guard, guard) }
+	ci_reject(guard, 0x100, 65, guard, guard)
+	for pointer in [u64(0), 1, ~u64(7), guard]! { ci_reject(pointer, 0x100, 0, guard, guard) }
+	input := cu_input([CuField{8, 8, 7, 0}], false, 16, false)
+	m := input.metadata; d := input.descriptor; layout := read64(input.types)
+	parent := read64(m + 8)
+	cu_write(m + 8, 0); cu_write(m + 32, input.ro | 1)
+	// A late invalid field must not partially normalize either class header.
+	for field in [CuField{8, 0, 7, 0}, CuField{8, 8, 2, 0}, CuField{8, 8, 0x400007, 0}, CuField{8, 8, 7, 0x80000000}]! {
+		cu_write(layout + 8, field.stride); write32(layout + 16, field.flags); write32(layout + 20, field.extra); cu_bad_kind(input, true)
+	}
+	cu_write(layout + 8, 8); write32(layout + 16, 7); write32(layout + 20, 0)
+	for pair in [[d, u64(0x10090)]!, [d, u64(0x20010010)]!, [d + 20, u64(4)]!, [d + 24, u64(3)]!, [d + 28, u64(12)]!, [d + 36, u64(2)]!, [d + 40, u64(11)]!, [input.ro, u64(0x180)]!, [input.list, u64(24)]!, [input.list + 4, u64(2)]!]! {
+		old := read32(pair[0]); write32(pair[0], u32(pair[1])); cu_bad_kind(input, true); write32(pair[0], old)
+	}
+	for bits in [u64(0), 3, 6]! { cu_write(m + 32, input.ro | bits); cu_bad_kind(input, true) }; cu_write(m + 32, input.ro | 1)
+	cu_write(m + 8, guard); cu_bad_kind(input, true); cu_write(m + 8, 0)
+	mut info := ios_runtime.classes[m]
+	info.initialized = true; cu_bad_kind(input, true); info.initialized = false
+	info.instances = 1; cu_bad_kind(input, true); info.instances = 0
+	info.initializing = true; cu_bad_kind(input, true); info.initializing = false
+	info.dynamic = true; cu_bad_kind(input, true); info.dynamic = false
+	info.meta = true; cu_bad_kind(input, true); info.meta = false
+	info.parent = guard; cu_bad_kind(input, true); info.parent = parent
+	ios_runtime.swift_concurrency_retired = true; ci_reject(guard, 0x100, 0, guard, guard); ios_runtime.swift_concurrency_retired = false
+	ios_runtime.swift_generic_metadata_retired = true; ci_reject(guard, 0x100, 0, guard, guard); ios_runtime.swift_generic_metadata_retired = false
+	ios_runtime.swift_generic_value_retired = true; ci_reject(guard, 0x100, 0, guard, guard); ios_runtime.swift_generic_value_retired = false
+	assert info.swift_ivar_list == 0 && !info.swift_layout_complete && info.size == 16
+	assert info.ivars['field0'].offset == 1 && info.ivars['field0'].size == 99 && info.ivars['field0'].types == '@'
+	return input
 }
 fn cu_invalid(guard u64) CuInput {
 	input := cu_input([CuField{8, 8, 7, 0}], false, 16, false)
@@ -238,18 +288,49 @@ fn cu_invalid(guard u64) CuInput {
 fn cu_worker(input CuInput, entry u64) {
 	for _ in 0 .. 64 { result := unsafe { CuEntry(voidptr(entry))(input.metadata, 0x100, u64(input.count), input.types, input.metadata + 80) }; assert result.metadata == 0 && result.state == 0 }
 }
-fn cu_repeat(entry u64, probe CuProbe) CuInput {
+fn cu_repeat(entry u64, probe CuProbe, initialize bool) CuInput {
 	input := cu_input([CuField{8, 8, 7, 0}], false, 16, false)
+	if initialize { cu_write(input.metadata + 8, 0); cu_write(input.metadata + 32, input.ro | 1) }
 	cu_call(input, entry, probe)
 	list := read64(input.ro + 48)
 	// Changing an already-published layout must fail without writing or replacing
 	// its owned ivar table. Identical calls need no allocations or image writes.
-	layout := read64(input.types); cu_write(layout, 16); cu_write(layout + 8, 16); cu_bad(input); cu_write(layout, 8); cu_write(layout + 8, 8)
+	layout := read64(input.types); cu_write(layout, 16); cu_write(layout + 8, 16); cu_bad_kind(input, initialize); cu_write(layout, 8); cu_write(layout + 8, 8)
 	assert C.mprotect(voidptr(input.base + input.page), usize(input.page * 4), C.PROT_READ) == 0
 	mut workers := []thread{}
 	for _ in 0 .. 8 { workers << spawn cu_worker(input, entry) }; workers.wait(); unsafe { workers.free() }
 	assert read64(input.ro + 48) == list && ios_runtime.classes[input.metadata].swift_ivar_list == list
 	return input
+}
+fn ci_matrix(entry u64, probe CuProbe, native bool) []CuInput {
+	mut fixtures := []CuInput{}
+	fields := [CuField{8, 8, 0x10007, 0}, CuField{8, 8, 7, 0}]
+	for bits in [u64(1), 2]! {
+		for implicit_superclass in [false, true]! {
+			input := cu_input(fields, native, 16, false)
+			m := input.metadata; d := input.descriptor
+			// FileStorage's unique descriptor, extra negative word and static
+			// vtable coexist with an Objective-C metadata initializer callback.
+			write32(d, 0x80010050); write32(d + 24, 3); write32(d + 28, 13)
+			write32(m + 56, 128); write32(m + 60, 24); write32(input.ro, 0xc0)
+			cu_write(input.ro + 72, u64(unsafe { voidptr(cu_metadata_initialize) }))
+			parent := read64(m + 8)
+			if implicit_superclass { cu_write(m + 8, 0) }
+			cu_write(m + 32, input.ro | bits)
+			for i in 1 .. 4 { cu_write(m - u64(i * 8), 0x12340000 + u64(i)) }
+			cu_call(input, entry, probe)
+			assert read64(m + 8) == parent && read64(m + 32) & 7 == 2
+			cu_check(input, [u64(16), 24], 32, 7, fields, native, false, true)
+			assert read64(m + 8) == parent && read64(m + 32) & 7 == 2
+			assert read32(d) == 0x80010050 && read32(m + 60) == 24
+			assert read64(input.ro + 72) == u64(unsafe { voidptr(cu_metadata_initialize) })
+			for i in 1 .. 4 { assert read64(m - u64(i * 8)) == 0x12340000 + u64(i) }
+			fixtures << input
+		}
+	}
+	fixtures << cu_matrix(entry, probe, native, true)
+	fixtures << cu_headers(entry, probe, native, true)
+	return fixtures
 }
 fn test_swift_class_update() {
 	page := usize(C.getpagesize())
@@ -265,22 +346,31 @@ fn test_swift_class_update() {
 		core := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', 2); entry := u64(C.dlsym(core, c'swift_updateClassMetadata2')); assert entry != 0
 		// Native Objective-C realizes these class identities permanently; their
 		// synthetic image storage remains mapped until this process exits.
-		mut fixtures := cu_matrix(entry, probe, true); fixtures << cu_headers(entry, probe, true); unsafe { fixtures.free() }
+		mut fixtures := cu_matrix(entry, probe, true, false); fixtures << cu_headers(entry, probe, true, false); unsafe { fixtures.free() }
 		println('IOS-CLASS-UPDATE-NATIVE: five-argument C ABI, nil dependency in x0/x1, preserved x20/x21; root header, field size/tail padding/alignment, UInt64 vectors and exported cells, copy-on-size-change ivars, unchanged encodings, zero/64 fields, existing instance start; 16 header variants, unchanged negative words, no metadata initializer or +initialize')
+		initialize := u64(C.dlsym(core, c'swift_initClassMetadata2')); assert initialize != 0
+		mut initialized := ci_matrix(initialize, probe, true); unsafe { initialized.free() }
+		println('IOS-CLASS-INIT-NATIVE: static-vtable root initialization, implicit SwiftObject superclass, normalized Swift bit, FileStorage-shaped headers, field layout and nil dependency ABI; no metadata callback or +initialize')
 	}
-	cu_reject(guard, 0x100, 0, guard, guard)
+	cu_reject(guard, 0x100, 0, guard, guard); ci_reject(guard, 0x100, 0, guard, guard)
 	for _ in 0 .. 2 {
 		objc_start()
 		entry := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_swift_updateClassMetadata2') or { panic(err) }
-		mut fixtures := cu_matrix(entry, probe, false)
-		fixtures << cu_headers(entry, probe, false)
-		fixtures << cu_invalid(guard); fixtures << cu_repeat(entry, probe)
+		mut fixtures := cu_matrix(entry, probe, false, false)
+		fixtures << cu_headers(entry, probe, false, false)
+		fixtures << cu_invalid(guard); fixtures << cu_repeat(entry, probe, false)
+		initialize := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_swift_initClassMetadata2') or { panic(err) }
+		fixtures << ci_matrix(initialize, probe, false)
+		fixtures << ci_invalid(guard); fixtures << cu_repeat(initialize, probe, true)
+		if _ := runtime_symbol('/usr/lib/swift/libswiftFoundation.dylib', '_swift_initClassMetadata2') { assert false }
+		if _ := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '__swift_initClassMetadata2') { assert false }
 		if _ := runtime_symbol('/usr/lib/swift/libswiftFoundation.dylib', '_swift_updateClassMetadata2') { assert false }
 		if _ := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '__swift_updateClassMetadata2') { assert false }
 		assert ios_runtime.swift_heap.len == 0 && ios_runtime.live == 0
 		for input in fixtures { assert C.mprotect(voidptr(input.base + input.page), usize(input.page * 4), C.PROT_NONE) == 0 }
-		objc_stop(); cu_reject(guard, 0x100, 0, guard, guard)
+		objc_stop(); cu_reject(guard, 0x100, 0, guard, guard); ci_reject(guard, 0x100, 0, guard, guard)
 		for input in fixtures { cu_free(input) }; unsafe { fixtures.free() }
 	}
 	println('IOS-CLASS-UPDATE: bounded registered nongeneric Swift root layout, UInt64 offsets, ivar encoding/alignment and registry publication; 16 header variants, unchanged negative words, no metadata initializer or +initialize; fail-before-write validation, live-layout rejection, readonly unchanged storage, 512 concurrent repeats, owned-copy drain with inaccessible image pages and two runtime lifetimes')
+	println('IOS-CLASS-INIT: bounded registered static-vtable Swift root initialization, implicit superclass and normalized Swift bit; FileStorage-shaped headers, field layout and nil dependency ABI; no metadata callback or +initialize; fail-before-write rejection, readonly 512 concurrent repeats, inaccessible-image teardown and two lifetimes')
 }
