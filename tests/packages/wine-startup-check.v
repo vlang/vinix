@@ -58,14 +58,14 @@ fn check() ! {
 	if winesource.file_digest(os.dir(@FILE) + '/winesource/closure.v')! != sha256.hexhash($embed_file('winesource/closure.v').to_string()) {
 		return error('compiled startup source closure admission differs')
 	}
-	if os.args.len != 7 || os.args[1] !in ['process', 'server'] {
-		return error('usage: wine-startup-check process|server OUTPUT KERNEL EXTRAS_OR_DASH SYSROOT GCC_RUNTIME')
+	if os.args.len != 7 || os.args[1] !in ['process', 'metadata', 'server'] {
+		return error('usage: wine-startup-check process|metadata|server OUTPUT KERNEL EXTRAS_OR_DASH SYSROOT GCC_RUNTIME')
 	}
 	root := hwhost.find_root(@FILE)!
 	mode := os.args[1]
 	work := os.abs_path(os.args[2])
 	kernel := os.real_path(os.args[3])
-	extras := if mode == 'server' { os.real_path(os.args[4]) } else { '' }
+	extras := if mode in ['metadata', 'server'] { os.real_path(os.args[4]) } else { '' }
 	sysroot := os.real_path(os.args[5])
 	gcc := os.real_path(os.args[6])
 	if os.exists(work) { return error('startup output already exists') }
@@ -80,7 +80,11 @@ fn check() ! {
 	inventory(root + '/tests/hardware-platform/hwhost', mut inputs)!
 	inventory(root + '/tests/hardware-platform/plainiso', mut inputs)!
 	if extras != '' { inventory(extras, mut inputs)! }
-	source := root + '/tests/packages/' + if mode == 'process' { 'wine-process-probe/main.v' } else { 'wine-native/main.v' }
+	source := root + '/tests/packages/' + match mode {
+		'process' { 'wine-process-probe/main.v' }
+		'metadata' { 'wine-metadata-probe/main.v' }
+		else { 'wine-native/main.v' }
+	}
 	directory := work + '/build'
 	os.mkdir_all(directory)!
 	cfile := directory + '/guest.c'
@@ -124,12 +128,16 @@ fn check() ! {
 		name: 'Wine-startup-' + mode
 		arches: ['x86_64']
 		qemu_x86_64: ['-cpu', 'max']
-		required: [if mode == 'process' { 'HWTEST PASS Wine-process-primitives' } else { 'HWTEST PASS packaged-Wine' }]
+		required: [match mode {
+			'process' { 'HWTEST PASS Wine-process-primitives' }
+			'metadata' { 'HWTEST PASS Wine-metadata-ownership' }
+			else { 'HWTEST PASS packaged-Wine' }
+		}]
 		forbidden: ['HWTEST FAIL', 'Kernel panic', 'KERNEL PANIC', 'FATAL EXCEPTION']
 		ending: .running
 	}
 	outcome := hwhost.run_scenario(hwhost.Host{ ...host, root: plainiso.prepare(root, work)! },
-		scenario, hwhost.Run{kernel: kernel, guest: directory + '/guest', state: work + '/boot', timeout: if mode == 'process' { 45 } else { 240 }, keep: true})
+		scenario, hwhost.Run{kernel: kernel, guest: directory + '/guest', state: work + '/boot', timeout: if mode == 'server' { 240 } else { 45 }, keep: true})
 	os.write_file(work + '/result.json', json2.encode(outcome))!
 	verify(inputs)!
 	verify(built)!

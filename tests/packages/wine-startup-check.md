@@ -112,8 +112,7 @@ Host assertions cover all package kinds on both architectures, optional
 process permission present/absent, and exact unchanged unveil paths. The
 36-case ownership matrix passes 1,000 warmed plan/close cycles per case with
 zero retained tracked bytes. ASan/UBSan also pass. These checks qualify host
-plan construction and ownership only; fresh native metadata controls and signed
-Wine execution remain required.
+plan construction and ownership only; signed Wine execution remains required.
 
 The selected source/compiler/output capture is
 `wine-fattr-host-20261026`, `SHA256SUMS` SHA-256
@@ -122,3 +121,24 @@ It retains both passing binaries/logs and their selected inputs; its scope
 explicitly excludes a complete imported-source/C/toolchain closure. The pinned
 debugger producer also refuses a different kernel and a different ISO before
 creating output or starting QEMU.
+
+The dedicated `wine-metadata-probe` now passes on the original x86_64 kernel
+in 13.077 seconds. With `fattr` granted, sandboxed UID/GID 1000 changes its
+private file and Unix socket to mode `0600`. Descriptor chmod, explicit
+timestamps and access ACL changes to a root-owned `0644` payload each return
+`EPERM`; its metadata and bytes remain unchanged. The generated C confirms
+32-bit descriptors, native `stat`/`timespec` layouts and a stack socket address.
+Independent review covered the process cleanup and ownership boundary.
+
+This is an ownership analogue using a byte-bound production sandbox binary,
+not a signed package launch. The `metadata` controller mode admits its parsed
+V closure and compares selected inputs before and after the run; complete
+sysroot/GCC/header/linker admission remains outside its scope. Source baseline
+is `5045cd10595759b384c5b51457045b0ef6244065` plus the three maintained source
+snapshots in `wine-meta4-20261026/capture-report.json`. That bundle also retains
+the three preboot failures, including an accidentally selected host compiler
+and a corrected C name collision. Its `SHA256SUMS` SHA-256 is
+`37500739f5a0002b77f3d161473d2740ec999830d292522b3727616f413949cf`;
+the bundle retains 200 selected inputs. A separate verify pass re-read all
+261 ordinary files and the inventory of two special objects. Signed Wine execution
+and detached-server lease coverage remain unqualified.
