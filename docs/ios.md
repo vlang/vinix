@@ -18883,9 +18883,22 @@ source revision, coverage, limitations and complete external evidence.
 Advertising work remains skipped; Fortnite initialization, rendering, login
 and gameplay remain unverified.
 
+The controller discovery checkpoint adds GameController's `GCController` import,
+empty controller discovery, a nil current controller, the background-event
+monitoring flag and three immutable notification constants. Native macOS
+inspection, both sanitizer host runs and the focused ARM64 guest fixture pass.
+Physical controller profiles, construction, coding, factories and wireless
+discovery remain unsupported. A fresh Fortnite probe passes this class import
+and stops at `_OBJC_CLASS_$_GCDualShockGamepad` during linking, before application
+entry. The
+[controller checkpoint](../tests/ios/game-controller-checkpoint-20261025.md)
+records the source revision and complete external evidence. Advertising work
+remains skipped; Fortnite initialization, rendering, login and gameplay remain
+unverified.
+
 The import audit measurements below belong to the bundle-resource milestone;
-they were not rerun for the startup, feedback or task checkpoints and do not
-execute app code.
+they were not rerun for the startup, feedback, task or controller checkpoints
+and do not execute app code.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
