@@ -588,7 +588,7 @@ fn objc_start() {
 	ios_runtime.notification_queues.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
-	for name in ['NSObject', 'NSProxy', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSNumberFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
+	for name in ['NSObject', 'NSProxy', '_TtCs12_SwiftObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSNumberFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'NSMapTable', 'CTTelephonyNetworkInfo', 'ASIdentifierManager', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKSnapshotConfiguration', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor', 'CHHapticDynamicParameter', 'CHHapticEventParameter', 'CHHapticEvent', 'CHHapticPattern', 'GCMouse', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
@@ -609,7 +609,7 @@ fn objc_start() {
         'AVCaptureVideoDataOutput', 'AVCaptureVideoPreviewLayer', 'PHPhotoLibrary',
 		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGFont', 'VinixReachability', 'VinixNWPath', 'VinixNWInterface', 'VinixNWPathMonitor', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider', 'VinixSecCertificate', 'VinixSecKey', 'VinixSecPolicy', 'VinixSecTrust', 'VinixCFDate', 'VinixCFError', 'VinixCFUUID'] {
 		parent := match name {
-			'NSObject', 'NSProxy' { u64(0) }
+			'NSObject', 'NSProxy', '_TtCs12_SwiftObject' { u64(0) }
 			'SKMutablePayment' { ios_runtime.names['SKPayment'] }
 			'SKReceiptRefreshRequest', 'SKProductsRequest' { ios_runtime.names['SKRequest'] }
 			'AVURLAsset' { ios_runtime.names['AVAsset'] }
@@ -681,6 +681,7 @@ fn objc_start() {
 		metaclass.parent = if parent == 0 { u64(cls) } else { read64(parent) }
 		size := match name {
 			'NSProxy' { u32(8) }
+			'_TtCs12_SwiftObject' { u32(16) }
 			'UITextPosition', 'UITextRange' { u32(8) }
 			'UITextField' { u32(1064) } // Opaque Catalyst-sized reserve; state is private to the shim.
 			'GCEventViewController' { u32(1112) } // Opaque reserve; public iOS hierarchy, private shim state.
@@ -785,6 +786,7 @@ fn objc_start() {
 	}
 	objc_protocols_start()
 	ns_proxy_publish()
+	swift_object_publish()
 	dispatch_objc_publish_classes()
 	mut root := ios_runtime.classes[ios_runtime.names['NSObject']] or { panic('iOS: missing NSObject') }
 	root.ivars['isa'] = &ObjIvar{name: 'isa'.clone(), types: '#'.clone(), offset: 0, size: 8}
@@ -903,6 +905,7 @@ fn objc_allocate(cls u64) u64 {
 	av_player_require_playback(cls)
 	storekit_purchase_require_storage(cls)
 	ns_proxy_require_forwarding(cls)
+	swift_object_require_storage(cls)
 	ns_keyed_archiver_require_class(cls)
 	ns_operation_require_class(cls)
 	ns_lock_require_class(cls)
@@ -1240,6 +1243,13 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if symbol in ['_OBJC_CLASS_$__TtCs12_SwiftObject', '_OBJC_METACLASS_$__TtCs12_SwiftObject']! {
+		if library != '/usr/lib/swift/libswiftCore.dylib' {
+			return error('iOS: SwiftObject class import requires libswiftCore.dylib')
+		}
+		cls := ios_runtime.names['_TtCs12_SwiftObject']
+		return if symbol.starts_with('_OBJC_METACLASS_') { read64(cls) } else { cls }
+	}
 	if symbol in ['_OBJC_CLASS_$_NSProxy', '_OBJC_METACLASS_$_NSProxy']! {
 		if library != '/System/Library/Frameworks/Foundation.framework/Foundation' {
 			return error('iOS: NSProxy class import requires Foundation.framework')

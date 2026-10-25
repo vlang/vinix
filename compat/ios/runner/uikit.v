@@ -156,6 +156,13 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if ns_proxy_unsupported(selector) {
 		ns_proxy_require_forwarding(if object in ios_runtime.classes { object } else { read64(object) })
 	}
+	if selector == 'superclass' && object in ios_runtime.classes && swift_object_family(object) {
+		frame.x[0] = objc_class_parent(object)
+		return true
+	}
+	if swift_object_unsupported(selector) {
+		swift_object_require_storage(if object in ios_runtime.classes { object } else { read64(object) })
+	}
 	if constant_integer_dispatch(object, selector, mut frame) { return true }
 	if dispatch_objc_dispatch(object,selector,mut frame) { return true }
 	if ns_pool_dispatch(object, selector, mut frame) { return true }

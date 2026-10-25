@@ -30,6 +30,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	av_player_require_playback(cls)
 	storekit_purchase_require_storage(cls)
 	ns_proxy_require_forwarding(cls)
+	swift_object_require_storage(cls)
 	ns_keyed_archiver_require_class(cls)
 	ns_operation_require_class(cls)
 	ns_invocation_require_class(cls)
