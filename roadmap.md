@@ -903,8 +903,20 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Generic release routing](tests/packages/signed-legacy-routing-check.md)
     admits any nonempty protected root set with complete exact locks through
     the compositor's fixed review action. Production and sanitizer host checks
-    and [both compositor builds](tests/packages/section14-target-build.md) pass;
-    a new native routing UI check remains open.
+    and [both compositor builds](tests/packages/section14-target-build.md) pass.
+    The [native generic routing check](tests/packages/software-release-routing-native-check.md)
+    also passes on both targets: real Skip, refused ordinary broker actions,
+    rendered signed Counter proposals, separate confirmation/administrator
+    approval and persisted application data across two cold boots. Each target
+    rejects all 106 evidence corruptions. This qualifies the retained six-source
+    compositor; the later combined Launch options compositor remains separate.
+  - [x] [Admitted PCM launch portal host checks](tests/packages/audio-portal-host-check.md)
+    bind output-only 48 kHz stereo streams to the signed generation lease,
+    package identity, exact private endpoint and immutable active-seat login
+    labels before account isolation. Applications receive no raw sound-device
+    path. All 52 host checks pass, including allocation ownership, refusal and
+    production C generation for both targets. Actual VirtIO/HDA playback, seat
+    switching, cleanup and stalled-driver acceptance remain open.
   - [x] [Ordinary-account graphical sessions](tests/packages/software-session-check.md)
     use the effective account's home and child environment, inherited console
     descriptors, private readiness and shared numeric broker/framebuffer paths.
