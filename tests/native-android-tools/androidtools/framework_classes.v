@@ -118,6 +118,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_view_frame_bounds(smali)!
  framework_layout_listeners(smali)!
  framework_view_touch(smali)!
+ framework_view_tooltips(smali)!
  framework_view_scroll(smali)!
  framework_drawing_ids(smali)!
  framework_view_layers(smali)!
