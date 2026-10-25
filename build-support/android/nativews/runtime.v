@@ -85,6 +85,9 @@ mut:
 	e             voidptr
 	vm            voidptr
 	main_thread   usize
+	queue_pump_active bool
+	queue_pump_polls i32
+	queue_pump_deadline i64
 	activity      voidptr
 	back_stack    [64]voidptr
 	back_count    i32
@@ -414,7 +417,9 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		C.puts(c'ANDROID-WS-READY backend=vinix-native gtk=absent x11=absent')
 		for ws.running {
 			push_frame(e)
+			ws_queue_begin_pump()
 			static_void(e, c'android/os/Looper', c'loop', c'()V', nil)
+			ws_queue_end_pump()
 			if ws_failure(e, c'ANDROID-WS-FAIL main looper') {
 				pop_frame(e)
 				return 1
