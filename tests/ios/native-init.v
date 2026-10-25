@@ -146,6 +146,10 @@ fn main() {
 		require_child('/opt/ios/av-player-checks')
 		println('VINIX iOS AVPLAYER: PASS')
 		C.fflush(unsafe { nil })
+	} else if mode == 'ns-proxy' {
+		require_child('/opt/ios/ns-proxy-checks')
+		println('VINIX iOS NSPROXY: PASS')
+		C.fflush(unsafe { nil })
 	} else if mode == 'storyboard' {
 		require_child('/opt/ios/storyboard-checks')
 		println('VINIX iOS STORYBOARD: PASS')
@@ -167,7 +171,7 @@ fn main() {
 		println('VINIX iOS FEEDBACK: PASS')
 		C.fflush(unsafe { nil })
 	} else if mode == 'notifications' {
-		for name in ['native-value', 'capture-audio-output', 'gk-match-request', 'gk-achievement', 'gk-achievement-description', 'gk-player', 'gk-turn-based-participant', 'gk-turn-based-match', 'gk-local-player', 'gk-leaderboard', 'capture-discovery', 'app-attest', 'gc-event-view-controller', 'snapshot-configuration', 'text-field', 'haptic-dynamic-parameter', 'haptic-pattern', 'haptic-event', 'haptic-event-parameter', 'long-press-gesture', 'tap-gesture', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'av-player', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'adsupport', 'bundle-resource', 'number-formatter', 'date-formatter', 'lock', 'recursive-lock', 'map-table', 'credential', 'telephony', 'cache', 'calendar', 'calendar-trigger', 'notification-request', 'notification-center', 'notification-content', 'notification-sound', 'notification-attachment']! {
+		for name in ['native-value', 'capture-audio-output', 'gk-match-request', 'gk-achievement', 'gk-achievement-description', 'gk-player', 'gk-turn-based-participant', 'gk-turn-based-match', 'gk-local-player', 'gk-leaderboard', 'capture-discovery', 'app-attest', 'gc-event-view-controller', 'snapshot-configuration', 'text-field', 'haptic-dynamic-parameter', 'haptic-pattern', 'haptic-event', 'haptic-event-parameter', 'long-press-gesture', 'tap-gesture', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'av-player', 'ns-proxy', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'adsupport', 'bundle-resource', 'number-formatter', 'date-formatter', 'lock', 'recursive-lock', 'map-table', 'credential', 'telephony', 'cache', 'calendar', 'calendar-trigger', 'notification-request', 'notification-center', 'notification-content', 'notification-sound', 'notification-attachment']! {
 			require_child('/opt/ios/' + name + '-checks')
 		}
 		println('VINIX iOS NOTIFICATIONS: PASS')
