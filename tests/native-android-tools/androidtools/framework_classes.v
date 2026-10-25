@@ -159,6 +159,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_editor_actions(smali)!
  framework_image_filters(smali)!
  framework_check_widgets(smali)!
+ framework_text_size(smali)!
  source := os.read_file(root() + '/build-support/android/atlframework/widgets.v')!
  for name, text in framework_extra_classes(source) { os.write_file(smali + '/' + name + '.smali', text)! }
  dialogs := os.read_file(root() + '/build-support/android/atlframework/dialogs.v')!
