@@ -564,7 +564,7 @@ fn objc_start() {
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSNumberFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'NSMapTable', 'CTTelephonyNetworkInfo', 'ASIdentifierManager', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
-		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
@@ -614,7 +614,7 @@ fn objc_start() {
 			'UIWindowScene' { ios_runtime.names['UIScene'] }
 			'NSDateFormatter', 'NSNumberFormatter' { ios_runtime.names['NSFormatter'] }
 			'GCExtendedGamepad' { ios_runtime.names['GCPhysicalInputProfile'] }
-			'GCDualShockGamepad' { ios_runtime.names['GCExtendedGamepad'] }
+			'GCDualShockGamepad', 'GCDualSenseGamepad' { ios_runtime.names['GCExtendedGamepad'] }
 			'UIButton' { ios_runtime.names['UIControl'] }
 			'UIAccessibilityElement' { ios_runtime.names['UIResponder'] }
 			'NSMutableArray', 'NSConstantArray', 'WKNSArray' { ios_runtime.names['NSArray'] }
@@ -681,7 +681,7 @@ fn objc_start() {
 			'GCController' { u32(232) } // Measured host layouts; physical profile construction is unavailable.
 			'GCPhysicalInputProfile' { u32(680) }
 			'GCExtendedGamepad' { u32(872) }
-			'GCDualShockGamepad' { u32(896) }
+			'GCDualShockGamepad', 'GCDualSenseGamepad' { u32(896) }
 			'NSFileManager' { u32(32) }
 			'NSProcessInfo' { u32(48) }
 			'NSDate', 'VinixCFDate', 'NSTimeZone', 'NSLocale', 'NSFormatter' { u32(8) }

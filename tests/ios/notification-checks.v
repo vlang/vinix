@@ -41,7 +41,7 @@ fn main() {
 		run(out, 'GCController-metadata', [out + '/inspect-user-notifications', 'GCController'], false)
 		run(out, 'inspect', [out + '/inspect-game-controller'], false)
 	} else if os.args[1] == 'gamepad-inspect' {
-		for name in ['GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad']! {
+		for name in ['GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad']! {
 			run(out, name + '-metadata', [out + '/inspect-user-notifications', name], false)
 		}
 	} else if os.args[1] == 'session-task-inspect' {

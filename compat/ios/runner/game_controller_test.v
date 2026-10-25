@@ -158,15 +158,15 @@ fn test_game_controller_rejections() {
 fn test_gamepad_native_hierarchy() {
 	$if macos {
 		assert C.dlopen(c'/System/Library/Frameworks/GameController.framework/GameController', 2) != unsafe { nil }
-		for i, name in ['GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad']! {
+		for i, name in ['GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad']! {
 			cls := C.objc_getClass(name.str)
-			assert cls != unsafe { nil } && C.class_getInstanceSize(cls) == [usize(680), 872, 896]![i]
-			parent := ['NSObject', 'GCPhysicalInputProfile', 'GCExtendedGamepad']![i]
+			assert cls != unsafe { nil } && C.class_getInstanceSize(cls) == [usize(680), 872, 896, 896]![i]
+			parent := ['NSObject', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCExtendedGamepad']![i]
 			assert C.class_getSuperclass(cls) == C.objc_getClass(parent.str)
 			assert C.dlsym(unsafe { voidptr(-2) }, ('OBJC_CLASS_$_' + name).str) == cls
 			assert C.dlsym(unsafe { voidptr(-2) }, ('OBJC_METACLASS_$_' + name).str) == C.objc_getMetaClass(name.str)
 		}
-		println('IOS-GAMEPAD-NATIVE: physical, extended and DualShock class imports, superclass links and 680/872/896-byte layouts')
+		println('IOS-GAMEPAD-NATIVE: physical, extended, DualShock and DualSense class imports, superclass links and 680/872/896/896-byte layouts')
 	}
 }
 
@@ -174,11 +174,11 @@ fn test_gamepad_runtime_hierarchy() {
 	for _ in 0 .. 2 {
 		objc_start(); pool := objc_pool_push()
 		library := '/System/Library/Frameworks/GameController.framework/GameController'
-		for i, name in ['GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad']! {
+		for i, name in ['GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad']! {
 			cls := ios_runtime.names[name]; api := controller_api(cls)
-			parent := ios_runtime.names[['NSObject', 'GCPhysicalInputProfile', 'GCExtendedGamepad']![i]]
+			parent := ios_runtime.names[['NSObject', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCExtendedGamepad']![i]]
 			assert gamepad_family(cls) && !game_controller_family(cls)
-			assert objc_class_size(cls) == [u32(680), 872, 896]![i]
+			assert objc_class_size(cls) == [u32(680), 872, 896, 896]![i]
 			assert objc_class_parent(cls) == parent && objc_class_parent(read64(cls)) == read64(parent)
 			assert ctext(u64(objc_class_name(cls))) == name
 			for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_']! {
@@ -192,7 +192,7 @@ fn test_gamepad_runtime_hierarchy() {
 			assert api.msg(cls, c'respondsToSelector:', u64(c'class')) == 1
 			signature := api.msg(cls, c'methodSignatureForSelector:', u64(c'class'))
 			assert signature != 0 && ctext(api.msg(signature, c'methodReturnType', 0)) == '#'
-			for selector in [c'alloc', c'allocWithZone:', c'new', c'init', c'copy', c'copyWithZone:', c'mutableCopy', c'mutableCopyWithZone:', c'initWithCoder:', c'encodeWithCoder:', c'supportsSecureCoding', c'buttonA', c'touchpadButton', c'physicalInputProfile', c'controllers']! {
+			for selector in [c'alloc', c'allocWithZone:', c'new', c'init', c'copy', c'copyWithZone:', c'mutableCopy', c'mutableCopyWithZone:', c'initWithCoder:', c'encodeWithCoder:', c'supportsSecureCoding', c'buttonA', c'touchpadButton', c'touchpadPrimary', c'touchpadSecondary', c'initWithController:', c'initWithIdentifier:', c'physicalInputProfile', c'controllers']! {
 				assert !objc_responds(cls, selector)
 				assert objc_class_method(cls, u64(selector)) == 0 && objc_instance_method(cls, u64(selector)) == 0
 				assert api.msg(cls, c'methodSignatureForSelector:', u64(selector)) == 0
@@ -209,12 +209,12 @@ fn test_gamepad_runtime_hierarchy() {
 		objc_pool_pop(pool); objc_stop()
 		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0 && ios_runtime.block_refs.len == 0
 	}
-	println('IOS-GAMEPAD: three scoped class/metaclass imports, inherited metadata, honest method lookup, subclass overrides and two drained runtimes')
+	println('IOS-GAMEPAD: four scoped class/metaclass imports, inherited metadata, honest method lookup, subclass overrides and two drained runtimes')
 }
 
 fn test_gamepad_rejections() {
 	objc_start()
-	for name in ['GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad']! {
+	for name in ['GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad']! {
 		api := controller_api(ios_runtime.names[name])
 		for mode in ['alloc', 'new', 'allocate', 'caller', 'subclass', 'copy', 'initWithCoder:', 'supportsSecureCoding', 'touchpadButton']! {
 			mut fds := [2]i32{}; assert C.pipe(unsafe { &fds[0] }) == 0
@@ -238,5 +238,5 @@ fn test_gamepad_rejections() {
 		}
 	}
 	objc_stop(); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
-	println('IOS-GAMEPAD-REJECT: 27 construction, caller storage, subclass, copying, coding and touchpad cases fail explicitly')
+	println('IOS-GAMEPAD-REJECT: 36 construction, caller storage, subclass, copying, coding and touchpad cases fail explicitly')
 }
