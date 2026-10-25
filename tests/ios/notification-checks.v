@@ -37,6 +37,8 @@ fn main() {
 		run(out, 'inspect-build', [old + '/v', '-nocache', '-gc', 'none', '-cc', 'clang', '-cflags', '-target arm64-apple-ios14.0-macabi', '-ldflags', '-target arm64-apple-ios14.0-macabi', '-o', out + '/inspect-gk-turn-based-match', root + '/tests/ios/inspect-gk-turn-based-match.v'], false)
 	} else if os.args[1] == 'gk-local-player-inspector-build' {
 		run(out, 'inspect-build', [old + '/v', '-nocache', '-gc', 'none', '-cc', 'clang', '-cflags', '-target arm64-apple-ios14.0-macabi', '-ldflags', '-target arm64-apple-ios14.0-macabi', '-o', out + '/inspect-gk-local-player', root + '/tests/ios/inspect-gk-local-player.v'], false)
+	} else if os.args[1] == 'gk-turn-based-matchmaker-inspector-build' {
+		run(out, 'inspect-build', [old + '/v', '-nocache', '-gc', 'none', '-cc', 'clang', '-cflags', '-target arm64-apple-ios14.0-macabi', '-ldflags', '-target arm64-apple-ios14.0-macabi', '-o', out + '/inspect-gk-turn-based-matchmaker', root + '/tests/ios/inspect-gk-turn-based-matchmaker.v'], false)
 	} else if os.args[1] == 'gk-leaderboard-inspector-build' {
 		run(out, 'inspect-build', [old + '/v', '-nocache', '-gc', 'none', '-cc', 'clang', '-cflags', '-target arm64-apple-ios14.0-macabi', '-ldflags', '-target arm64-apple-ios14.0-macabi', '-o', out + '/inspect-gk-leaderboard', root + '/tests/ios/inspect-gk-leaderboard.v'], false)
 	} else if os.args[1] == 'gk-turn-based-participant-inspector-build' {
@@ -71,6 +73,8 @@ fn main() {
 		run(out, 'inspect', [out + '/inspect-gk-turn-based-match'], false)
 	} else if os.args[1] == 'gk-local-player-inspect' {
 		run(out, 'inspect', [out + '/inspect-gk-local-player'], false)
+	} else if os.args[1] == 'gk-turn-based-matchmaker-inspect' {
+		run(out, 'inspect', [out + '/inspect-gk-turn-based-matchmaker'], false)
 	} else if os.args[1] == 'gk-leaderboard-inspect' {
 		run(out, 'inspect', [out + '/inspect-gk-leaderboard'], false)
 	} else if os.args[1] == 'gk-turn-based-participant-inspect' {

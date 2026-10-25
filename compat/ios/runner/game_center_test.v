@@ -13,11 +13,14 @@ fn test_game_center_descriptors() {
 		pool := objc_pool_push()
 		nav := ios_runtime.names['UINavigationController']
 		game := ios_runtime.names['GKGameCenterViewController']
+		matchmaker := ios_runtime.names['GKTurnBasedMatchmakerViewController']
 		assert objc_class_parent(game) == nav
+		assert objc_class_parent(matchmaker) == nav
 		assert objc_class_parent(nav) == ios_runtime.names['UIViewController']
 		assert objc_class_parent(read64(game)) == read64(nav)
+		assert objc_class_parent(read64(matchmaker)) == read64(nav)
 		assert objc_class_parent(read64(nav)) == read64(ios_runtime.names['UIViewController'])
-		for name in ['UINavigationController', 'GKGameCenterViewController']! {
+		for name in ['UINavigationController', 'GKGameCenterViewController', 'GKTurnBasedMatchmakerViewController']! {
 			cls := ios_runtime.names[name]
 			assert ctext(u64(objc_class_name(cls))) == name
 			assert !objc_class_meta(cls) && objc_class_meta(read64(cls))
@@ -42,10 +45,12 @@ fn test_game_center_descriptors() {
 			assert objc_class_parent(sub) == cls && navigation_descriptor_family(sub)
 			for target in [cls, sub]! {
 				for selector in [c'alloc', c'allocWithZone:', c'new', c'init', c'initWithCoder:',
-					c'initWithState:', c'initWithRootViewController:', c'initWithNibName:bundle:',
+					c'initWithState:', c'initWithMatchRequest:', c'initWithRootViewController:', c'initWithNibName:bundle:',
 					c'copy', c'copyWithZone:', c'mutableCopy', c'mutableCopyWithZone:',
 					c'encodeWithCoder:', c'supportsSecureCoding', c'classForCoder',
 					c'gameCenterDelegate', c'setGameCenterDelegate:', c'viewState', c'setViewState:',
+					c'turnBasedMatchmakerDelegate', c'setTurnBasedMatchmakerDelegate:',
+					c'showExistingMatches', c'setShowExistingMatches:', c'matchmakingMode', c'setMatchmakingMode:',
 					c'viewControllers', c'pushViewController:animated:', c'popViewControllerAnimated:']! {
 					assert objc_instance_method(target, u64(selector)) == 0, ctext(u64(selector))
 					assert objc_class_method(target, u64(selector)) == 0, ctext(u64(selector))
@@ -64,12 +69,12 @@ fn test_game_center_descriptors() {
 
 fn test_game_center_construction_rejected() {
 	objc_start()
-	for name in ['UINavigationController', 'GKGameCenterViewController']! {
+	for name in ['UINavigationController', 'GKGameCenterViewController', 'GKTurnBasedMatchmakerViewController']! {
 		cls := ios_runtime.names[name]
 		sub_name := 'Blocked' + name
 		sub := objc_allocate_class(cls, sub_name.str, 0)
 		objc_register_class(sub)
-		for mode in ['alloc', 'allocWithZone:', 'new', 'init', 'initWithState:', 'copy',
+		for mode in ['alloc', 'allocWithZone:', 'new', 'init', 'initWithState:', 'initWithMatchRequest:', 'copy',
 			'allocate', 'caller', 'install', 'subclass', 'super-alloc', 'super-new', 'isa-in', 'isa-subclass', 'isa-out']! {
 			mut fds := [2]i32{}
 			assert C.pipe(unsafe { &fds[0] }) == 0
@@ -120,5 +125,5 @@ fn test_game_center_construction_rejected() {
 	}
 	objc_stop()
 	assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
-	println('IOS-GAMECENTER-REJECT: 30 dispatch, direct/caller allocation, subclass, saved NSObject IMP and isa cases fail explicitly')
+	println('IOS-GAMECENTER-REJECT: 48 dispatch, direct/caller allocation, subclass, saved NSObject IMP and isa cases fail explicitly')
 }
