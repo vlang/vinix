@@ -567,7 +567,7 @@ fn objc_start() {
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'VinixCVPixelBuffer', 'VinixIOSurface', 'VinixCVMetalTextureCache', 'VinixCVMetalTexture', 'MTLTextureDescriptor', 'VinixMetalTextureDescriptor', 'Protocol', 'OS_object', 'OS_dispatch_object', 'OS_dispatch_group', 'OS_dispatch_source', 'OS_dispatch_semaphore', 'OS_dispatch_queue', 'OS_dispatch_queue_serial_executor', 'OS_dispatch_queue_serial', 'OS_dispatch_queue_main', 'OS_dispatch_queue_global', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSFormatter', 'NSDateFormatter', 'NSNumberFormatter', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'NSMapTable', 'CTTelephonyNetworkInfo', 'ASIdentifierManager', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
-		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor', 'CHHapticEventParameter', 'GCMouse', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor', 'CHHapticEventParameter', 'CHHapticEvent', 'GCMouse', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController', 'UINavigationController', 'GKGameCenterViewController', 'UIStoryboard', 'UITextPosition', 'UITextRange',
 		'UIScreen', 'UIGestureRecognizer', 'UIPanGestureRecognizer', 'UIPinchGestureRecognizer', 'UILongPressGestureRecognizer', 'UITapGestureRecognizer', 'UIRotationGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
@@ -686,6 +686,7 @@ fn objc_start() {
 			'GCKeyboard' { u32(32) }
 			'GCMouse' { u32(40) }
 			'GCColor', 'CHHapticEventParameter', 'AVAudioApplication' { u32(24) }
+			'CHHapticEvent' { u32(48) }
 			'GCController' { u32(232) } // Measured host layouts; physical profile construction is unavailable.
 			'GCPhysicalInputProfile' { u32(680) }
 			'GCExtendedGamepad' { u32(872) }
@@ -781,6 +782,7 @@ fn objc_start() {
 	ns_cache_metadata()
 	gc_color_metadata()
 	haptic_parameter_metadata()
+	haptic_event_metadata()
 	game_controller_metadata()
 	telephony_metadata()
 	ns_credential_metadata()
@@ -826,6 +828,7 @@ fn obj_header(object u64) &ObjHeader {
 
 fn objc_allocate(cls u64) u64 {
 	haptic_parameter_require_class(cls)
+	haptic_event_require_class(cls)
 	long_press_descriptor_require_recognition(cls)
 	tap_descriptor_require_recognition(cls)
 	rotation_descriptor_require_recognition(cls)
@@ -1154,6 +1157,13 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if symbol in ['_OBJC_CLASS_$_CHHapticEvent', '_OBJC_METACLASS_$_CHHapticEvent']! {
+		if library != '/System/Library/Frameworks/CoreHaptics.framework/CoreHaptics' {
+			return error('iOS: CHHapticEvent class import requires CoreHaptics.framework')
+		}
+		cls := ios_runtime.names['CHHapticEvent']
+		return if symbol.starts_with('_OBJC_METACLASS_') { read64(cls) } else { cls }
+	}
 	if symbol in ['_OBJC_CLASS_$_CHHapticEventParameter', '_OBJC_METACLASS_$_CHHapticEventParameter']! {
 		if library != '/System/Library/Frameworks/CoreHaptics.framework/CoreHaptics' {
 			return error('iOS: CHHapticEventParameter class import requires CoreHaptics.framework')
