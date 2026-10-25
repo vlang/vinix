@@ -89,9 +89,10 @@ pub fn syscall_rt_sigaction(_ voidptr, signum int, act_ptr u64, oldact_ptr u64, 
 		}
 	}
 
+	// Snapshot before updating: act and oldact may alias.
+	mut raw := [4]u64{}
 	if oldact_ptr != 0 {
 		previous := current_thread.sigactions[signum]
-		mut raw := [4]u64{}
 		raw[0] = u64(previous.sa_sigaction)
 		raw[1] = u64(u32(previous.sa_flags))
 		// The restorer has to survive a save/restore round trip: it is the only
@@ -99,9 +100,6 @@ pub fn syscall_rt_sigaction(_ voidptr, signum int, act_ptr u64, oldact_ptr u64, 
 		// wedge the next signal the caller re-installs this action for.
 		raw[2] = u64(previous.sa_restorer)
 		raw[3] = previous.sa_mask
-		if !usercopy.copy_to_user(oldact_ptr, voidptr(&raw[0]), k_sigaction_size) {
-			return errno.err, errno.efault
-		}
 	}
 
 	if act_ptr != 0 {
@@ -114,6 +112,11 @@ pub fn syscall_rt_sigaction(_ voidptr, signum int, act_ptr u64, oldact_ptr u64, 
 			target_thread.sigactions[signum] = incoming
 		}
 		process.threads_lock.release()
+	}
+
+	// Linux retains a valid disposition update if old-action output faults.
+	if oldact_ptr != 0 && !usercopy.copy_to_user(oldact_ptr, voidptr(&raw[0]), k_sigaction_size) {
+		return errno.err, errno.efault
 	}
 
 	return 0, 0

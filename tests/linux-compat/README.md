@@ -2539,3 +2539,18 @@ Its `--self-test` has two positive and nine negative controls. Compile
 negative controls), then `check` on the complete external bundle documented
 in [the qualification](../../docs/linux-signal-mask-copy.md). Remaining asynchronous,
 GNU/foreign/32-bit and installation limits are recorded there.
+
+The `sigactioncopy` case checks native rt_sigaction output-copy ordering. A
+valid process-wide update survives output EFAULT; input faults and invalid
+sizes preserve state/output. Root and UID 1000/GID 2000 cohorts exercise
+three signals, four starting/incoming records, six bad output pointer classes,
+aligned/unaligned/aliased/null records, page boundaries, guards and stripping
+SIGKILL/SIGSTOP. Identical musl ELFs pass 4,440 checks on each production
+architecture and Linux 6.12.51; originals fail 432 each. All thirteen maintained
+suites pass per architecture. Handler delivery and other limits remain open.
+
+`sigactioncopy-reference.v` accepts the same arguments as `sigwaitcopy-reference.v`;
+`--self-test` has two positive and nine negative controls. Compile
+`sigactioncopy-evidence.v` without `-prod`, run `self-test` (five positive and
+23 negative controls), then `check` on the complete bundle in
+[the qualification](../../docs/linux-signal-action-copy.md).

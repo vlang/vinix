@@ -1871,6 +1871,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Linux; originals fail 324 each. All twelve maintained suites pass per
   architecture. See [the mask qualification](docs/linux-signal-mask-copy.md).
 
+- [x] Commit valid native rt_sigaction disposition updates before old-record
+  output, retaining the change on EFAULT while input faults and invalid sizes
+  preserve state/output. Qualify action combinations, bad pointers,
+  unaligned/aliased records, page boundaries and guards. Identical musl ELFs
+  pass 4,440 checks on both production architectures and Linux; originals fail
+  432 each. All thirteen maintained suites pass per architecture. See
+  [the action qualification](docs/linux-signal-action-copy.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
