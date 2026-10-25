@@ -1879,6 +1879,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   432 each. All thirteen maintained suites pass per architecture. See
   [the action qualification](docs/linux-signal-action-copy.md).
 
+- [x] Permit native rt_sigaction queries for SIGKILL/SIGSTOP and validate
+  sigset size, new-action import, signal/update validity and old-action output
+  in Linux order. Qualify signal/size/pointer combinations, return values,
+  errno, state, page boundaries and guards. Identical musl ELFs pass 56,000
+  checks on both production architectures and Linux; originals fail 908 each.
+  All fourteen maintained suites pass per architecture. See
+  [the action ABI qualification](docs/linux-signal-action-abi.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

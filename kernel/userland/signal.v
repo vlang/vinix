@@ -64,9 +64,6 @@ fn valid_signal(signum int) bool {
 
 // rt_sigaction(signum, act, oldact, sigsetsize).
 pub fn syscall_rt_sigaction(_ voidptr, signum int, act_ptr u64, oldact_ptr u64, sigsetsize u64) (u64, u64) {
-	if !valid_signal(signum) || signum == sigkill || signum == sigstop {
-		return errno.err, errno.einval
-	}
 	if sigsetsize != sigset_size {
 		return errno.err, errno.einval
 	}
@@ -87,6 +84,12 @@ pub fn syscall_rt_sigaction(_ voidptr, signum int, act_ptr u64, oldact_ptr u64, 
 			sa_restorer:  voidptr(raw[2])
 			sa_mask:      raw[3] & ~unblockable_mask()
 		}
+	}
+
+	// Linux imports the new record before validating the signal number.
+	// SIGKILL and SIGSTOP permit queries, but never disposition changes.
+	if !valid_signal(signum) || (act_ptr != 0 && (signum == sigkill || signum == sigstop)) {
+		return errno.err, errno.einval
 	}
 
 	// Snapshot before updating: act and oldact may alias.

@@ -2554,3 +2554,18 @@ suites pass per architecture. Handler delivery and other limits remain open.
 `sigactioncopy-evidence.v` without `-prod`, run `self-test` (five positive and
 23 negative controls), then `check` on the complete bundle in
 [the qualification](../../docs/linux-signal-action-copy.md).
+
+The `sigactionabi` case checks native rt_sigaction SIGKILL/SIGSTOP queries
+and validation precedence: size, new-action import, signal/update validity,
+then old-action output. Root and UID 1000/GID 2000 cohorts exercise ten signal
+numbers, seven sizes, eight input classes and ten output classes, checking
+return values, errno, disposition state, output and guards. Identical musl
+ELFs pass 56,000 checks on each production architecture and Linux 6.12.51;
+originals fail 908 each. All fourteen maintained suites pass per architecture.
+Handler delivery and other limits remain open.
+
+`sigactionabi-reference.v` accepts the same arguments as `sigwaitcopy-reference.v`;
+`--self-test` has two positive and nine negative controls. Compile
+`sigactionabi-evidence.v` without `-prod`, run `self-test` (five positive and
+23 negative controls), then `check` on the complete bundle in
+[the qualification](../../docs/linux-signal-action-abi.md).
