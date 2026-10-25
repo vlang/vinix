@@ -102,13 +102,15 @@ fn main() {
 		return
 	}
 	if os.args.len < 2 || os.args[1] in ['--help', '-h'] {
-		println('usage: run-ios [--inspect|--imports|--audit] <ARM64 Mach-O executable> [arguments...]')
+		println('usage: run-ios [--inspect|--imports|--audit|--probe-no-ads] <ARM64 Mach-O executable> [arguments...]')
+		println('  --probe-no-ads: diagnostic execution with the SKAdNetwork class import bound to nil')
 		if os.args.len < 2 { exit(2) }
 		return
 	}
 	inspection := os.args[1] in ['--inspect', '--imports']
 	audit := os.args[1] == '--audit'
-	index := if inspection || audit { 2 } else { 1 }
+	probe_no_ads := os.args[1] == '--probe-no-ads'
+	index := if inspection || audit || probe_no_ads { 2 } else { 1 }
 	if os.args.len <= index {
 		eprintln('iOS: executable path is missing')
 		exit(2)
@@ -132,7 +134,7 @@ fn main() {
 		status := audit_imports(image, os.args[index]) or { eprintln(err); exit(1) }
 		exit(status)
 	}
-	status := execute(image, os.args[index..]) or {
+	status := execute_with_options(image, os.args[index..], ExecutionOptions{probe_no_ads: probe_no_ads}) or {
 		eprintln(err)
 		exit(1)
 	}

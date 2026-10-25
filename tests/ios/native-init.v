@@ -464,9 +464,12 @@ fn main() {
 	} else {
 		args := if mode == 'audit' {
 			['--audit', '/opt/ios/FortniteClient-IOS-Shipping']
+		} else if mode == 'probe-no-ads' {
+			['--probe-no-ads', '/opt/ios/FortniteClient-IOS-Shipping']
 		} else {
 			['/opt/ios/FortniteClient-IOS-Shipping']
 		}
+		if mode == 'probe-no-ads' { os.setenv('VINIX_IOS_TRACE', '1', true) }
 		status := run_child('/opt/ios/run-ios', args)
 		println('FORTNITE PROBE: process exit status ${if status & 127 == 0 {
 			status >> 8

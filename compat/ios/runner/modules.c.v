@@ -26,6 +26,7 @@ mut:
 	binding  int
 	bytes    u64
 	auditing bool
+	probe_no_ads bool
 	dyld_add []u64
 	dyld_remove []u64
 	dyld_retiring bool
@@ -198,6 +199,14 @@ fn module_symbol(owner_index int, library string, symbol string) !u64 {
 }
 
 fn module_bind_symbol(library string, symbol string) !u64 {
+	// Diagnostic execution only: retain strict import audits and dynamic lookup.
+	// Do not manufacture an ad class or silently ignore other missing imports.
+	if module_runtime.probe_no_ads && !module_runtime.auditing
+		&& library == '/System/Library/Frameworks/StoreKit.framework/StoreKit'
+		&& symbol == '_OBJC_CLASS_$_SKAdNetwork' {
+		eprintln('iOS DIAGNOSTIC PROBE: binding ${library} ${symbol} to nil')
+		return 0
+	}
 	return module_symbol(module_runtime.binding, library, symbol)
 }
 
@@ -205,6 +214,7 @@ fn module_bind_all() ! {
 	for index in module_runtime.order {
 		module_runtime.binding = index
 		loaded := module_runtime.modules[index]
+		if ios_runtime.trace { eprintln('iOS startup: binding ${loaded.path}') }
 		fixups := loaded.image.plan_fixups_with_lazy(loaded.layout, loaded.base, module_bind_symbol, lazy_symbol) or {
 			return error('iOS: linking ${loaded.path}: ${err}')
 		}
@@ -218,6 +228,7 @@ fn module_bind_all() ! {
 			value := fixup.value
 			unsafe { C.memcpy(voidptr(loaded.base + fixup.offset), &value, 8) }
 		}
+		if ios_runtime.trace { eprintln('iOS startup: registering Objective-C metadata for ${loaded.path}') }
 		objc_register_image(loaded.image, loaded.layout, loaded.base)!
 		module_runtime.modules[index].initializers = image_initializers(loaded)!
 		image_tls_prepare(loaded)!

@@ -15,7 +15,15 @@ fn C.__builtin___clear_cache(voidptr, voidptr)
 
 type AppMain = fn (int, &&char, &&char, &&char) int
 
+struct ExecutionOptions {
+	probe_no_ads bool
+}
+
 fn execute(image macho.Image, arguments []string) !int {
+	return execute_with_options(image, arguments, ExecutionOptions{})
+}
+
+fn execute_with_options(image macho.Image, arguments []string, options ExecutionOptions) !int {
 	$if !arm64 {
 		return error('iOS: native execution requires an ARM64 host; --inspect works on any host')
 	}
@@ -37,6 +45,10 @@ fn execute(image macho.Image, arguments []string) !int {
 	path := os.real_path(arguments[0])
 	defer { unsafe { path.free() } }
 	modules_start(image, layout, base, path, false)
+	module_runtime.probe_no_ads = options.probe_no_ads
+	if options.probe_no_ads {
+		eprintln('iOS DIAGNOSTIC PROBE: SKAdNetwork class import will bind to nil; application behavior is modified')
+	}
 	defer {
 		dispatch_stop()
 		ns_threads_join()
@@ -73,13 +85,16 @@ fn execute(image macho.Image, arguments []string) !int {
 	// globals are advertised until they have a compatible implementation.
 	mut empty := [unsafe { &char(nil) }]!
 	image_runtime.started = true
+	if ios_runtime.trace { eprintln('iOS startup: Objective-C +load') }
 	objc_load_image()
 	for index in module_runtime.order {
+		if ios_runtime.trace { eprintln('iOS startup: initializers for ${module_runtime.modules[index].path}') }
 		for address in module_runtime.modules[index].initializers {
 			initializer := unsafe { ImageInitializer(voidptr(address)) }
 			unsafe { initializer(arguments.len, &&char(argv.data), &empty[0], &empty[0]) }
 		}
 	}
 	entry := unsafe { AppMain(voidptr(base + layout.entry)) }
+	if ios_runtime.trace { eprintln('iOS startup: application entry') }
 	return unsafe { entry(arguments.len, &&char(argv.data), &empty[0], &empty[0]) }
 }

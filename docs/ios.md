@@ -57,7 +57,12 @@ map or execute application code, and does not establish runnable support. The C
 Mach-O probe still works with `run-ios /opt/ios/calculator 7 + 5` after staging it.
 UIKit apps require the desktop's `VINIX_REQUEST_FD`/`VINIX_RESPONSE_FD` pipe pair;
 executing a GUI app directly from a shell does not create a window. Set
-`VINIX_IOS_TRACE=1` for UILabel update diagnostics.
+`VINIX_IOS_TRACE=1` for startup stages and UILabel update diagnostics.
+
+`run-ios --probe-no-ads BINARY` is diagnostic execution that binds only the
+StoreKit `_OBJC_CLASS_$_SKAdNetwork` import to `nil`. It prints a warning because
+this changes application behavior. Ordinary launches, import audits and dynamic
+symbol lookup remain strict. This flag does not implement advertising APIs.
 
 ## Supported ABI
 
@@ -292,6 +297,14 @@ Executable: Payload/FortniteClient-IOS-Shipping.app/FortniteClient-IOS-Shipping
 SHA-256:    6aae5109d316864fb67bea6a92046c347edbb04dc2a104c6666713da989cd373
 Imports:    2,239 (chained fixups)
 ```
+
+The 2026-10-25 diagnostic launch with `--probe-no-ads` passes the remaining
+SKAdNetwork import and reaches the main executable's Objective-C metadata
+registration. It stops at `iOS: Swift class metadata is not implemented`, with
+guest exit status 1, before Objective-C `+load`, initializers or application
+entry. Rendering, login and gameplay remain unverified. The ordinary launch
+still requires SKAdNetwork; advertising work is skipped. See the
+[diagnostic checkpoint](../tests/ios/no-ads-probe-checkpoint-20261025.md).
 
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
