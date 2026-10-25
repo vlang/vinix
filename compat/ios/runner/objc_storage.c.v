@@ -35,6 +35,9 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	url_session_task_require_class(cls)
 	game_controller_require_discovery(cls)
 	audio_application_install(cls, caller_storage)
+	if storyboard_family(cls) && (caller_storage || cls != ios_runtime.names['UIStoryboard']) {
+		panic('iOS: UIStoryboard requires storyboardWithName:bundle:')
+	}
 	sort_descriptor_require_class(cls)
 	regular_expression_require_class(cls)
 	mutable_string_require_class(cls)
@@ -191,6 +194,10 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	}
 	C.ios_objc_initialize_unlock()
 	$if ios_gles ? { gles_dispose(object) }
+	if header.storyboard_root != unsafe { nil } {
+		storyboard_node_free(header.storyboard_root)
+		header.storyboard_root = unsafe { nil }
+	}
 	$if ios_text ? { text_dispose(object) }
 	accessibility_dispose(object)
 	cv_pixel_dispose(mut header)

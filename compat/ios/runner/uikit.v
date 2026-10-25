@@ -120,6 +120,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if game_keyboard_dispatch(object, selector, mut frame) { return true }
 	if game_controller_dispatch(object, selector, mut frame) { return true }
 	if audio_application_dispatch(object, selector, mut frame) { return true }
+	if storyboard_dispatch(object, selector, mut frame) { return true }
 	if gc_color_dispatch(object, selector, mut frame) { return true }
 	if ns_uuid_dispatch(object, selector, mut frame) { return true }
 	if ns_file_manager_dispatch(object, selector, mut frame) { return true }

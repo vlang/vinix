@@ -96,6 +96,7 @@ mut:
 	repeat      bool
 	loaded      bool
 	data []u8
+	storyboard_root &StoryboardNode = unsafe { nil } // Owns nodes borrowing data.
 	file voidptr
 	external_data u64
 	external_size u64
@@ -568,7 +569,7 @@ fn objc_start() {
 		'NSMapTable', 'CTTelephonyNetworkInfo', 'ASIdentifierManager', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor', 'GCMouse', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
-		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
+		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController', 'UIStoryboard',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'UNNotificationTrigger', 'UNCalendarNotificationTrigger', 'UNNotificationRequest', 'UNUserNotificationCenter', 'NSBundle', 'NSBundleResourceRequest', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
         'UNNotificationContent', 'UNMutableNotificationContent', 'UNNotificationSound', 'UNNotificationAttachment',
@@ -668,7 +669,7 @@ fn objc_start() {
 			'NSCache' { 48 }
 			'CTTelephonyNetworkInfo' { 40 }
 			'ASIdentifierManager' { 8 }
-			'UIFeedbackGenerator', 'UINotificationFeedbackGenerator', 'UISelectionFeedbackGenerator', 'UIImpactFeedbackGenerator' { 8 }
+			'UIStoryboard', 'UIFeedbackGenerator', 'UINotificationFeedbackGenerator', 'UISelectionFeedbackGenerator', 'UIImpactFeedbackGenerator' { 8 }
 			'NSThread' { u32(64) }
 			'NSOperation' { u32(248) }
 			'NSInvocationOperation' { u32(264) }
@@ -831,6 +832,7 @@ fn objc_allocate(cls u64) u64 {
 	url_session_task_require_class(cls)
 	game_controller_require_discovery(cls)
 	audio_application_require_factory(cls)
+	storyboard_require_factory(cls)
 	sort_descriptor_require_class(cls)
 	regular_expression_require_class(cls)
 	mutable_string_require_class(cls)
@@ -1141,6 +1143,10 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if symbol in ['_OBJC_CLASS_$_UIStoryboard', '_OBJC_METACLASS_$_UIStoryboard']!
+		&& library != '/System/Library/Frameworks/UIKit.framework/UIKit' {
+		return error('iOS: storyboard import requires UIKit.framework')
+	}
 	if symbol in ['_OBJC_CLASS_$_AVAudioApplication', '_OBJC_METACLASS_$_AVAudioApplication']!
 		&& library != '/System/Library/Frameworks/AVFAudio.framework/AVFAudio' {
 		return error('iOS: audio application import requires AVFAudio.framework')
