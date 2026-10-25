@@ -3,6 +3,7 @@
 module main
 
 import os
+import json2
 import workflowbuild
 
 fn main() {
@@ -19,8 +20,9 @@ fn main() {
 	work := os.join_path(os.temp_dir(), 'vinix-app-selection-${os.getpid()}')
 	defer { if os.getenv('VINIX_SETUP_KEEP') != '1' { os.rmdir_all(work) or {} } }
 	os.mkdir_all('${work}/source')!
-	workflowbuild.run('git', ['archive', 'HEAD', 'desktop', '-o', '${work}/source.tar'])!
-	workflowbuild.run('tar', ['-xf', '${work}/source.tar', '-C', '${work}/source'])!
+	os.setenv('VINIX_SETUP_COMMAND_LOG', work + '/commands.jsonl', true)
+	setup_run('git', ['archive', 'HEAD', 'desktop', '-o', '${work}/source.tar'])!
+	setup_run('tar', ['-xf', '${work}/source.tar', '-C', '${work}/source'])!
 	for name in ['main.v', 'app_selection.v', 'app_selection_release.v', 'app_selection_migration.v', 'app_selection_catalogue.v', 'app_selection_runtime.v', 'app_selection_download.v', 'session_hub.v',
 		'software_app.v', 'software_release.v',
 		'app_icon.v', 'font_data.v', 'app.v', 'wine_app.v', 'zed_app.v', 'session_paste.v'] {
@@ -55,9 +57,9 @@ fn main() {
 	}
 	if 'app_selection_migration' in tests || 'app_selection_release_routing' in tests {
 		os.mkdir_all(work + '/bin')!
-		workflowbuild.run(v, ['-backend', 'c', '-o', work + '/bin/pkg', root + '/desktop/tools/tests/fixtures/setup-pkg/main.v'])!
+		setup_run(v, ['-backend', 'c', '-cc', 'clang', '-o', work + '/bin/pkg', root + '/desktop/tools/tests/fixtures/setup-pkg/main.v'])!
 		// Use and retain the same C backend as the target broker.
-		workflowbuild.run(v, ['-backend', 'c', '-keepc', '-no-skip-unused', '-gc', 'none', '-manualfree', '-enable-globals', '-path', '@vlib|' + root + '|@vmodules',
+		setup_run(v, ['-backend', 'c', '-cc', 'clang', '-keepc', '-no-skip-unused', '-gc', 'none', '-manualfree', '-enable-globals', '-path', '@vlib|' + root + '|@vmodules',
 			'-o', work + '/session-broker', root + '/desktop/services/session/main.v'])!
 		os.setenv('PATH', work + '/bin:' + os.getenv('PATH'), true)
 		os.setenv('VINIX_SETUP_TOOL_LOG', work + '/tool.log', true)
@@ -79,7 +81,7 @@ fn main() {
 fn setup_test(v string, args []string, work string, name string) ! {
 	mut generate := args.clone()
 	generate.insert(generate.len - 1, ['-o', '${work}/test.c'])
-	workflowbuild.run(v, generate)!
+	setup_run(v, generate)!
 	mut source := os.read_file('${work}/test.c')!
 	source = source.replace('\t#endif#define V_MANUAL_STDLIB_HEADERS 1', '\t#endif\n};\n#endif\n#undef V_CRT_STDIO_LINKAGE\n#undef V_CRT_LINKAGE\n#undef V_CRT_CALL\n#define V_MANUAL_STDLIB_HEADERS 1')
 	$if macos {
@@ -100,13 +102,23 @@ fn setup_test(v string, args []string, work string, name string) ! {
 	}
 	flags << ['${work}/presenter.o', '${os.dir(compiler)}/vlib/os/execute_capture_nix.c', '-lpthread',
 		'-lm', '-o', '${work}/test']
-	workflowbuild.run('clang', flags)!
+	setup_run('clang', flags)!
 	println('Running ${name}')
-	workflowbuild.run('${work}/test', [])!
+	setup_run('${work}/test', [])!
 	if name in ['app_selection_migration', 'app_selection_release_routing'] && os.getenv('VINIX_SETUP_KEEP') == '1' {
 		stem := if name == 'app_selection_migration' { 'migration' } else { 'release-routing' }
 		os.cp('${work}/test.c', '${work}/${stem}.c')!
 		os.cp('${work}/test', '${work}/${stem}')!
 	}
 	println('PASS ${name}')
+}
+
+fn setup_run(program string, args []string) ! {
+	mut command := []string{cap: args.len + 1}
+	command << program
+	command << args
+	mut log := os.open_append(os.getenv('VINIX_SETUP_COMMAND_LOG'))!
+	log.writeln(json2.encode(command))!
+	log.close()
+	workflowbuild.run(program, args)!
 }
