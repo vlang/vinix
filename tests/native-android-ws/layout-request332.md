@@ -201,8 +201,10 @@ three variants. The attached probe emitter is unchanged.
 
 ## Qualification limits
 
-Maps332 has not run. These scoped host, build and ART checks do not
-prove that this defect causes Maps' Attractions loading sheet. The latest
-qualified application run is [Maps331](maps331.md): map display, Paris search,
-driving and walking routes, route preview and a Trip options toggle were
-observed with Native315 and Framework329, before this layout fix.
+These scoped host, build and ART checks do not prove that this defect causes
+Maps' Attractions loading sheet. [Maps332](maps332.md) subsequently completed a
+600-second application replay with both full updated payloads: map display,
+Paris search, driving and walking routes, preview advancement and a Trip options
+toggle were observed. The prior baseline [Maps331](maps331.md) used Native315
+and Framework329, before this layout fix. The application replay does not
+establish causality for the preview change or qualify live GPS navigation.
