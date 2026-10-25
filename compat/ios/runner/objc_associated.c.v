@@ -23,6 +23,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if snapshot_configuration_family(cls) { return snapshot_configuration_copy(value) }
 	if match_request_family(cls) { panic('iOS: unsupported GKMatchRequest method: copy') }
 	if achievement_family(cls) { panic('iOS: unsupported GKAchievement method: copy') }
+	if achievement_description_family(cls) { panic('iOS: unsupported GKAchievementDescription method: copy') }
 	app_attest_require_factory(cls)
 	capture_discovery_require_factory(cls)
 	if capture_audio_family(cls) { panic('iOS: unsupported capture audio output method: copy') }

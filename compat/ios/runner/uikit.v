@@ -105,6 +105,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if snapshot_configuration_dispatch(object, selector, mut frame) { return true }
 	if match_request_dispatch(object, selector, mut frame) { return true }
 	if achievement_dispatch(object, selector, mut frame) { return true }
+	if achievement_description_dispatch(object, selector, mut frame) { return true }
 	if text_field_dispatch(object, selector, mut frame) { return true }
 	if haptic_pattern_dispatch(object, selector, mut frame) { return true }
 	if haptic_event_dispatch(object, selector, mut frame) { return true }
