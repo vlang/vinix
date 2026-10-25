@@ -21,6 +21,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if is_block(value) { return block_copy(value) }
 	cls := read64(value)
 	if gk_player_family(cls) { return gk_player_copy(value) }
+	if turn_participant_family(cls) { return turn_participant_copy(value) }
 	if snapshot_configuration_family(cls) { return snapshot_configuration_copy(value) }
 	if match_request_family(cls) { panic('iOS: unsupported GKMatchRequest method: copy') }
 	if achievement_family(cls) { panic('iOS: unsupported GKAchievement method: copy') }
