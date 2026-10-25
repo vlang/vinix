@@ -125,6 +125,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_inflater_trace(smali)!
  framework_layout_listeners(smali)!
  framework_view_touch(smali)!
+ framework_touch_delegate(smali)!
  framework_view_tooltips(smali)!
  framework_view_scroll(smali)!
  framework_drawing_ids(smali)!
