@@ -403,7 +403,7 @@ mut:
 	swift_tuple_metadata_pages [64]u64 // Canonical, sealed inline tuple records, under the registry lock.
 	swift_tuple_metadata_count u64
 	swift_tuple_metadata_retired bool
-	swift_unknown_value_arena u64 // Sealed Builtin.UnknownObject value witnesses.
+	swift_unknown_value_arena u64 // Sealed Swift reference value witness tables.
 	swift_error_arena u64 // Sealed ObjC value witnesses and the concrete CFError: Error conformance.
 	swift_error_allocation_arena u64 // Private heap destructor and immutable error box metadata.
 	swift_error_allocation_retired bool

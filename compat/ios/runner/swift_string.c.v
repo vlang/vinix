@@ -316,6 +316,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 		'_$sS2SycfC' { u64(unsafe { voidptr(swift_string_empty) }) }
 		'_$sBOWV' { swift_unknown_value_witnesses() }
 		'_$sBbWV' { swift_bridge_value_witnesses() }
+		'_$sBoWV' { swift_native_value_witnesses() }
 		'_$sSDMa' { swift_dictionary_metadata_arena() }
 		// Error entries use ordinary C calls. Dispatch generic boxes to their
 		// native heap lifetime and toll-free NSError/CFError owners to Cocoa ARC.

@@ -235,7 +235,8 @@ fn test_swift_unknown_value() {
 		mut publishers := []thread u64{}; for _ in 0 .. 8 { publishers << spawn unknown_resolve() }; tables := publishers.wait()
 		api := unknown_api(false); for table in tables { assert table == api.table }
 		unknown_suite(api)
-		assert swift_core_symbol('_$sBoWV') == none && swift_core_symbol('_$sBON') == none
+		assert (swift_core_symbol('_$sBoWV') or { panic('missing NativeObject witnesses') }) == swift_native_value_witnesses()
+		assert swift_core_symbol('_$sBON') == none
 		assert ios_runtime.live == 0 && ios_runtime.swift_arrays.len == 0 && ios_runtime.swift_buffers.len == 0
 		arena := api.table; objc_stop()
 		assert ios_runtime.swift_unknown_value_arena == 0 && ios_runtime.live == 0

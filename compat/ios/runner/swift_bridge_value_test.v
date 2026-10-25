@@ -387,7 +387,8 @@ fn test_swift_bridge_value() {
 			assert table == api.table
 		}
 		bridge_value_suite(api)
-		assert swift_core_symbol('_$sBoWV') == none && swift_core_symbol('_$sBON') == none
+		assert (swift_core_symbol('_$sBoWV') or { panic('missing NativeObject witnesses') }) == swift_native_value_witnesses()
+		assert swift_core_symbol('_$sBON') == none
 		assert ios_runtime.live == 0 && ios_runtime.swift_arrays.len == 0 && ios_runtime.swift_buffers.len == 0
 		assert api.table == swift_unknown_value_witnesses() + 128
 		arena := api.table - 128
