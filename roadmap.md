@@ -1863,6 +1863,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   failure and unchanged passing retry are retained. See
   [the alternate-stack qualification](docs/linux-signal-stack-copy.md).
 
+- [x] Commit valid native rt_sigprocmask updates before old-mask output,
+  retaining the change on EFAULT while input errors, invalid operations and
+  invalid sizes preserve state/output. Qualify mask/operation combinations,
+  bad pointers, unaligned/aliased records, page boundaries and guards.
+  Identical musl ELFs pass 3,984 checks on both production architectures and
+  Linux; originals fail 324 each. All twelve maintained suites pass per
+  architecture. See [the mask qualification](docs/linux-signal-mask-copy.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

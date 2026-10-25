@@ -126,6 +126,8 @@ pub fn syscall_rt_sigprocmask(_ voidptr, how int, set_ptr u64, oldset_ptr u64, s
 	}
 
 	mut current_thread := proc.current_thread()
+	// Snapshot before updating: set and oldset may alias.
+	previous := current_thread.masked_signals
 
 	mut incoming := u64(0)
 	if set_ptr != 0 {
@@ -134,13 +136,6 @@ pub fn syscall_rt_sigprocmask(_ voidptr, how int, set_ptr u64, oldset_ptr u64, s
 		}
 		if how != sig_block && how != sig_unblock && how != sig_setmask {
 			return errno.err, errno.einval
-		}
-	}
-
-	if oldset_ptr != 0 {
-		previous := current_thread.masked_signals
-		if !usercopy.copy_to_user(oldset_ptr, voidptr(&previous), sigset_size) {
-			return errno.err, errno.efault
 		}
 	}
 
@@ -153,6 +148,11 @@ pub fn syscall_rt_sigprocmask(_ voidptr, how int, set_ptr u64, oldset_ptr u64, s
 		}
 		// SIGKILL and SIGSTOP are never blockable, whatever was asked for.
 		current_thread.masked_signals = mask & ~unblockable_mask()
+	}
+
+	// Linux retains a valid mask update even if copying the old mask faults.
+	if oldset_ptr != 0 && !usercopy.copy_to_user(oldset_ptr, voidptr(&previous), sigset_size) {
+		return errno.err, errno.efault
 	}
 
 	return 0, 0

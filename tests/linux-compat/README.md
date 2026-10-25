@@ -2522,3 +2522,20 @@ Its `--self-test` has two positive and nine negative controls. Compile
 negative controls), then `check` on the complete external bundle documented
 in [the qualification](../../docs/linux-signal-stack-copy.md). Remaining asynchronous,
 GNU/foreign/32-bit and installation limits are recorded there.
+
+The `sigmaskcopy` case checks native rt_sigprocmask output-copy ordering. A
+valid update remains installed after output EFAULT; input errors, invalid
+operations and invalid sizes preserve state and output. Root and UID
+1000/GID 2000 cohorts cover four starting/incoming masks, three operations,
+six bad output pointer classes, unaligned/aliased/null records, exact page
+boundaries, guard bytes, query-only ignored operations and SIGKILL/SIGSTOP
+stripping. Identical musl ELFs pass 3,984 checks on both production kernels
+and Linux 6.12.51; originals fail 324 each. All twelve maintained suites pass
+per architecture.
+
+`sigmaskcopy-reference.v` accepts the same arguments as `sigwaitcopy-reference.v`.
+Its `--self-test` has two positive and nine negative controls. Compile
+`sigmaskcopy-evidence.v` without `-prod`, run `self-test` (five positive and 23
+negative controls), then `check` on the complete external bundle documented
+in [the qualification](../../docs/linux-signal-mask-copy.md). Remaining asynchronous,
+GNU/foreign/32-bit and installation limits are recorded there.
