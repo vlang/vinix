@@ -1695,6 +1695,12 @@ administrator approval. See [routing qualification](../../tests/packages/signed-
 for host behavior, sanitizer coverage and both target builds; this does not
 enroll a publisher or qualify a new native routing UI workflow.
 
+The compositor admits that review action for any nonempty protected release
+set whose advertised roots all have exact locks, including native applications
+without a legacy picker mapping. It checks the complete captured declaration
+and rejects additional action fields before opening it. This read-only route
+does not extend the legacy `neovim` mapping or grant install approval.
+
 ### Wine Win64 publisher profile
 
 `wine-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY` inventories a
@@ -2719,6 +2725,12 @@ they expose no confirmation and preserve URL paging/review state across resize.
 An idle Escape blurs the editor first, then returns to Software. See
 [navigation checks](../../tests/packages/software-repository-navigation-check.md).
 
+Idle compact repository forms from 180×130 also offer **Reload list**, including
+after stopped, failed or invalid reads. Reload preserves the entered ID, URL,
+key and previous valid list. Optional diagnostics require a complete row and
+status space; smaller windows keep their state until enlarged. See
+[compact recovery checks](../../tests/packages/software-repository-recovery-check.md).
+
 The lightweight [`pkgprotocol` repository module](pkgprotocol/repositories.v)
 provides bounded `decode_repositories`, `decode_repository_review`, input/response
 validation and explicit `close()` methods for consumers with manual memory
@@ -3472,6 +3484,13 @@ or receipt as authorization. Diagnostics retain postpublication failures; no
 automatic retry or overwrite is attempted. See
 [Software save qualification](../../tests/packages/software-deployment-save-check.md).
 
+The compact Save form retains the literal filename field and Save action from
+320×240 upward, along with status and idle failure access. While the writer is
+active, input, navigation and closing remain guarded until the child exits.
+Smaller windows show status and idle Back/failure controls and ask to enlarge
+for details; they preserve the draft and accepted receipt. See the
+[compact Save checks](../../tests/packages/software-snapshot-compact-check.md).
+
 For a nonempty receipt, Software's **Export offline…** action transfers owned
 copies of the captured filename and saved bytes' SHA-256 into an exact locked
 export intent, retires the receipt, and clears the destination field. It invokes
@@ -3837,6 +3856,12 @@ before submission. The subsequent read-only reload can be stopped without
 discarding the saved result. Existing progress frames are displayed when
 emitted; command arguments and administrator transport are unchanged. See
 [navigation checks](../../tests/packages/software-policy-navigation-check.md).
+
+When a compact policy read is stopped, fails or returns invalid output, an idle
+window from 180×130 offers **Reload policy** and preserves the literal filename.
+Smaller windows preserve the draft until enlarged. Reload, diagnostics and
+progress require enough room to avoid overlapping status or controls. See
+[compact recovery checks](../../tests/packages/software-policy-recovery-check.md).
 
 `mirror-review NEW_DIRECTORY ID...` emits a format-1
 [`pkgprotocol.MirrorReview`](pkgprotocol/mirror.v) envelope. Every envelope field

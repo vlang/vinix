@@ -900,6 +900,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     saved Review choice across two installed-root boots; host checks also cover
     saved Skip and failed choice publication. Production publisher selection
     and migration of the legacy catalog remain open.
+    [Generic release routing](tests/packages/signed-legacy-routing-check.md)
+    admits any nonempty protected root set with complete exact locks through
+    the compositor's fixed review action. Production and sanitizer host checks
+    and [both compositor builds](tests/packages/section14-target-build.md) pass;
+    a new native routing UI check remains open.
   - [x] [Ordinary-account graphical sessions](tests/packages/software-session-check.md)
     use the effective account's home and child environment, inherited console
     descriptors, private readiness and shared numeric broker/framebuffer paths.
@@ -981,6 +986,20 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Compact Deployment forms](tests/packages/software-deployment-form-check.md)
     retain literal editing and paged file/release/management actions at 320×240,
     complete help and diagnostics, with approval on the full reviewed plan.
+    [Compact Save installed](tests/packages/software-snapshot-compact-check.md)
+    also retains filename editing and saving at 320×240, protects active writers
+    through real child exit and keeps drafts/receipts across smaller windows.
+    Host production, sanitizer and render-allocation checks qualify this UI;
+    native graphical acceptance remains separate.
+    [Compact policy recovery](tests/packages/software-policy-recovery-check.md)
+    exposes Reload after stopped, failed or invalid reads without losing the
+    literal filename. Real-child production and sanitizer checks cover recovery;
+    repeated compact rendering retains no tracked V allocations.
+    [Compact repository recovery](tests/packages/software-repository-recovery-check.md)
+    offers Reload list after stopped, failed or invalid reads, preserving literal
+    repository drafts and the previous valid list. Recovery controls stay bounded
+    at small sizes, and protected enrollment/revocation/refresh writers retain
+    their navigation and close guards.
 - [ ] Package native, Linux, Windows and Apple-compatible apps with isolated
   runtimes, launcher/association registration and clean uninstall behavior.
   - [x] [Signed Neovim terminal packages](tests/packages/neovim-check.md)
