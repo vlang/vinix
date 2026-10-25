@@ -83,6 +83,7 @@ fn objc_record_method(cls u64, name &char, imp u64, types &char, builtin bool) &
 fn C.ios_objc_builtin()
 fn objc_builtin_types(cls u64, selector string) ?string {
 	info := ios_runtime.classes[cls] or { return none }
+	if types := text_input_types(info.name, info.meta, selector) { return types }
 	if types := constant_integer_types(info.name, info.meta, selector) { return types }
 	if types := swift_data_bridge_types(info.name, info.meta, selector) { return types }
 	if types := dispatch_objc_types(info.name,info.meta,selector) { return types }
@@ -174,6 +175,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if current == 0 { return 0 }
 		info := ios_runtime.classes[current] or { return 0 }
 		if method := info.method_info[name] { return u64(method) }
+		if info.name in ['UITextPosition', 'UITextRange']! && text_input_unsupported(name) { return 0 }
 		if !info.meta && dispatch_objc_name(info.name) && dispatch_objc_types(info.name,false,name) == none { return 0 }
 		if !info.meta && info.name == 'NSAutoreleasePool' && name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
 		if !info.meta && info.name == 'NSFileManager' && name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
