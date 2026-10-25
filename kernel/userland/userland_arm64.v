@@ -670,8 +670,9 @@ pub fn dispatch_sync_fault(context &cpulocal.GPRState, fault_address u64, fault_
 
 // Whether the thread is running on its alternate signal stack now, for
 // sigaltstack(2) in signal.v.
-fn thread_on_sigaltstack(t &proc.Thread) bool {
-	return t.on_sigaltstack
+fn thread_on_sigaltstack(t &proc.Thread, context voidptr) bool {
+	frame := unsafe { &cpulocal.GPRState(context) }
+	return frame.sp > t.sigaltstack_sp && frame.sp - t.sigaltstack_sp <= t.sigaltstack_size
 }
 
 fn wants_altstack(t &proc.Thread, sigaction proc.SigAction) bool {

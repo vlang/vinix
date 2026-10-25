@@ -1903,6 +1903,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   randomsignal and its identical replay fail and remain unresolved. See
   [the handler fault-precedence qualification](docs/linux-alternate-stack-handler.md).
 
+- [x] Use the live syscall-entry user stack pointer for native sigaltstack
+  queries and updates, with Linux base-exclusive/end-inclusive bounds. Ordinary
+  execution and real alternate-stack handlers pass 388 checks on both production
+  architectures and Linux; originals fail 60 on AArch64 and 40 on x86-64.
+  Seventeen maintained suites pass on each architecture; earlier intermittent
+  failures remain unresolved. See [the live-pointer qualification](docs/linux-alternate-stack-pointer.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

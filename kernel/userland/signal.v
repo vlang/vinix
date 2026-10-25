@@ -400,7 +400,7 @@ fn write_signal_info(info_ptr u64, thrd &proc.Thread, signum int, shared bool) b
 // ── alternate signal stack ───────────────────────────────────────────────────
 
 // sigaltstack(ss, old_ss).
-pub fn syscall_sigaltstack(_ voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u64) {
+pub fn syscall_sigaltstack(context voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u64) {
 	mut current_thread := proc.current_thread()
 
 	// Read the new stack first: a faulting `ss` must leave the old one in place.
@@ -415,7 +415,7 @@ pub fn syscall_sigaltstack(_ voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u64) {
 		// Linux imports ss before checking whether the handler is on this stack.
 		// Changing the alternate stack while running on it would pull the rug
 		// out from under the handler.
-		if thread_on_sigaltstack(current_thread) {
+		if thread_on_sigaltstack(current_thread, context) {
 			return errno.err, errno.eperm
 		}
 
@@ -440,7 +440,7 @@ pub fn syscall_sigaltstack(_ voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u64) {
 	// Snapshot before committing: ss and old_ss may refer to the same record.
 	mut old := [3]u64{}
 	old[0] = current_thread.sigaltstack_sp
-	old[1] = if thread_on_sigaltstack(current_thread) {
+	old[1] = if thread_on_sigaltstack(current_thread, context) {
 		u64(ss_onstack)
 	} else if current_thread.sigaltstack_size == 0 {
 		u64(ss_disable)

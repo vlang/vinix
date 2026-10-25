@@ -2602,3 +2602,17 @@ randomsignal case and identical replay fail and remain unresolved.
 `altstackhandler-evidence.v` without `-prod`, run `self-test` (seven positive and
 28 negative controls), then `check` on the complete bundle in
 [the qualification](../../docs/linux-alternate-stack-handler.md).
+
+The `altstacksp` case uses assembly wrappers to pivot the live user SP around
+a guarded alternate stack, in ordinary execution and a real SA_ONSTACK handler.
+Root and UID 1000/GID 2000 cohorts check Linux base-exclusive/end-inclusive
+bounds, query flags, EPERM, mode/size errors, updates, old records and guards.
+Identical musl ELFs pass 388 checks on both production architectures and Linux
+references; originals fail 60 on AArch64 and 40 on x86-64. Seventeen maintained
+suites pass on each architecture; earlier intermittent failures remain open.
+
+`altstacksp-reference.v` accepts the same arguments as `sigwaitcopy-reference.v`;
+`--self-test` has two positive and nine negative controls. Compile
+`altstacksp-evidence.v` without `-prod`, run `self-test` (eight positive and
+33 negative controls), then `check` on the complete bundle in
+[the qualification](../../docs/linux-alternate-stack-pointer.md).

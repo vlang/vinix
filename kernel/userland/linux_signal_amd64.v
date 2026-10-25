@@ -307,7 +307,7 @@ pub fn syscall_linux_rt_sigreturn(gpr_state voidptr) (u64, u64) {
 // Whether `sp` is on `t`'s alternate signal stack, which is how Linux tells a
 // handler already running there.
 fn on_sigaltstack(t &proc.Thread, sp u64) bool {
-	return t.sigaltstack_size != 0 && sp - t.sigaltstack_sp < t.sigaltstack_size
+	return sp > t.sigaltstack_sp && sp - t.sigaltstack_sp <= t.sigaltstack_size
 }
 
 fn altstack_flags(t &proc.Thread, sp u64) u32 {
@@ -320,8 +320,9 @@ fn altstack_flags(t &proc.Thread, sp u64) u32 {
 // Whether the thread is running on its alternate signal stack now, for
 // sigaltstack(2) in signal.v: whether the stack pointer it made the syscall
 // with is on it.
-fn thread_on_sigaltstack(t &proc.Thread) bool {
-	return on_sigaltstack(t, t.user_stack)
+fn thread_on_sigaltstack(t &proc.Thread, context voidptr) bool {
+	frame := unsafe { &cpulocal.GPRState(context) }
+	return on_sigaltstack(t, frame.rsp)
 }
 
 // Signals Linux ignores by default.
