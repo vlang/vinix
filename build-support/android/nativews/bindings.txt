@@ -305,6 +305,7 @@ android/graphics/drawable/NinePatchDrawable|nativeCreate([BJ)J|return ws_bitmap_
 android/graphics/drawable/NinePatchDrawable|nativeCreate(Ljava/lang/String;)J|return ws_bitmap_file(e,p0)
 android/graphics/drawable/NinePatchDrawable|nativeGetIntrinsicWidth|return if p0 == 0 { -1 } else { (&WsBitmap(p0)).width }
 android/graphics/drawable/NinePatchDrawable|nativeGetIntrinsicHeight|return if p0 == 0 { -1 } else { (&WsBitmap(p0)).height }
+android/graphics/drawable/NinePatchDrawable|nativeDraw(JLandroid/graphics/Canvas;IIIIJ)V|previous := ws_canvas_enter(e,p1,get_long(e,p1,c'android/atl/GskCanvas',c'snapshot')); defer { ws_canvas_leave(previous) }; if pending(e) { return }; ws_draw_bitmap_paint(p0,p2,p3,p4,p5,p6)
 android/graphics/drawable/Drawable|native_paintable_from_path|return ws_bitmap_file(e,p0)
 android/atl/GskCanvas|native_drawBitmap(JJIIIIJ)V|ws_draw_bitmap_paint(p1,p2,p3,p4,p5,p6)
 android/atl/GskCanvas|native_drawBitmap(JJIIIIIIIIJ)V|ws_draw_bitmap_region(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10)
