@@ -15,16 +15,16 @@ fn gk_player_family(cls u64) bool {
 }
 
 fn gk_player_install(cls u64, caller_storage bool) {
-	if gk_player_family(cls) && (caller_storage || cls !in [ios_runtime.names['GKBasePlayer'], ios_runtime.names['GKPlayer']]!) {
+	if gk_player_family(cls) && (caller_storage || cls !in [ios_runtime.names['GKBasePlayer'], ios_runtime.names['GKPlayer'], ios_runtime.names['GKLocalPlayer']]!) {
 		panic('iOS: GKPlayer requires built-in allocation')
 	}
 }
 
 fn gk_player_types(name string, meta bool, selector string) ?string {
-	if name !in ['GKBasePlayer', 'GKPlayer']! || meta { return none }
+	if name !in ['GKBasePlayer', 'GKPlayer', 'GKLocalPlayer']! || meta { return none }
 	if selector in ['init', 'playerID', 'displayName', 'copy']! { return '@16@0:8' }
 	if selector == 'copyWithZone:' { return '@24@0:8^{_NSZone=}16' }
-	if name == 'GKPlayer' {
+	if name != 'GKBasePlayer' {
 		if selector in ['alias', 'guestIdentifier']! { return '@16@0:8' }
 		if selector in ['isFriend', 'isInvitable', 'scopedIDsArePersistent']! { return 'B16@0:8' }
 	}
@@ -46,8 +46,9 @@ fn gk_player_storage(object u64, initialized bool) &ObjHeader {
 	header := obj_header(object)
 	base := ios_runtime.names['GKBasePlayer']
 	player := ios_runtime.names['GKPlayer']
-	if header.allocation_cls !in [base, player]! || header.caller_storage
-		|| header.native_size != (if header.allocation_cls == base { u32(8) } else { u32(32) })
+	local := ios_runtime.names['GKLocalPlayer']
+	if header.allocation_cls !in [base, player, local]! || header.caller_storage
+		|| header.native_size != (if header.allocation_cls == base { u32(8) } else if header.allocation_cls == player { u32(32) } else { u32(120) })
 		|| header.cls != header.allocation_cls || read64(object) != header.cls
 		|| header.releasing || header.destroying || header.destroyed
 		|| C.ios_ref_change(unsafe { &header.refs }, 0) <= 0 {
@@ -64,7 +65,7 @@ fn gk_player_initialize(object u64) u64 {
 	if !header.gk_player_initialized {
 		// Transfer the string's +1 into the generic owned-field array. Object
 		// destruction releases it; repeated init must not replace or leak it.
-		if header.cls == ios_runtime.names['GKPlayer'] { header.fields[0] = owned_string('Unknown') }
+		if header.cls != ios_runtime.names['GKBasePlayer'] { header.fields[0] = owned_string('Unknown') }
 		header.gk_player_initialized = true
 	}
 	return object

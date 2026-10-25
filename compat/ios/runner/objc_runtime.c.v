@@ -87,6 +87,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := match_request_types(info.name, info.meta, selector) { return types }
 	if types := achievement_types(info.name, info.meta, selector) { return types }
 	if types := achievement_description_types(info.name, info.meta, selector) { return types }
+	if types := local_player_types(info.name, info.meta, selector) { return types }
 	if types := gk_player_types(info.name, info.meta, selector) { return types }
 	if types := turn_participant_types(info.name, info.meta, selector) { return types }
 	if types := turn_match_types(info.name, info.meta, selector) { return types }
@@ -197,7 +198,8 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name == 'GKMatchRequest' && match_request_unsupported(name) { return 0 }
 		if info.name == 'GKAchievement' && achievement_unsupported(name) { return 0 }
 		if info.name == 'GKAchievementDescription' && achievement_description_unsupported(name) { return 0 }
-		if info.name in ['GKBasePlayer', 'GKPlayer']! && gk_player_unsupported(name) { return 0 }
+		if info.name == 'GKLocalPlayer' && local_player_unsupported(name) { return 0 }
+		if info.name in ['GKBasePlayer', 'GKPlayer', 'GKLocalPlayer']! && gk_player_unsupported(name) { return 0 }
 		if info.name == 'GKTurnBasedParticipant' && turn_participant_unsupported(name) { return 0 }
 		if info.name == 'GKTurnBasedMatch' && turn_match_unsupported(name) { return 0 }
 		if info.name == 'GKLeaderboard' && leaderboard_unsupported(name) { return 0 }

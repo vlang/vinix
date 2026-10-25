@@ -501,6 +501,7 @@ mut:
 	controller_background_events bool // Shared across GCController and its subclasses.
 	storekit_constants_arena u64 // Sealed StoreKit conversion NSString cells, records and bytes.
 	file_manager u64 // One owned NSFileManager cache reference, retired at shutdown.
+	gk_local_player u64 // One owned unauthenticated GameKit singleton reference.
 	process_info u64 // One owned NSProcessInfo singleton reference.
 	process_arguments u64 // Owned app arguments, configured before image initialization.
 	distant_dates [2]u64 // Owned immutable date cache references, retired at shutdown.
@@ -591,7 +592,7 @@ fn objc_start() {
 		'NSMapTable', 'CTTelephonyNetworkInfo', 'ASIdentifierManager', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKSnapshotConfiguration', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor', 'CHHapticDynamicParameter', 'CHHapticEventParameter', 'CHHapticEvent', 'CHHapticPattern', 'GCMouse', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
-		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UITextField', 'UIWindow', 'UIViewController', 'GCEventViewController', 'UINavigationController', 'GKGameCenterViewController', 'GKMatchRequest', 'GKAchievement', 'GKAchievementDescription', 'GKBasePlayer', 'GKPlayer', 'GKTurnBasedParticipant', 'GKTurnBasedMatch', 'GKLeaderboard', 'UIStoryboard', 'UITextPosition', 'UITextRange',
+		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UITextField', 'UIWindow', 'UIViewController', 'GCEventViewController', 'UINavigationController', 'GKGameCenterViewController', 'GKMatchRequest', 'GKAchievement', 'GKAchievementDescription', 'GKBasePlayer', 'GKPlayer', 'GKLocalPlayer', 'GKTurnBasedParticipant', 'GKTurnBasedMatch', 'GKLeaderboard', 'UIStoryboard', 'UITextPosition', 'UITextRange',
 		'UIScreen', 'UIGestureRecognizer', 'UIPanGestureRecognizer', 'UIPinchGestureRecognizer', 'UILongPressGestureRecognizer', 'UITapGestureRecognizer', 'UIRotationGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'UNNotificationTrigger', 'UNCalendarNotificationTrigger', 'UNNotificationRequest', 'UNUserNotificationCenter', 'NSBundle', 'NSBundleResourceRequest', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
         'UNNotificationContent', 'UNMutableNotificationContent', 'UNNotificationSound', 'UNNotificationAttachment',
@@ -635,6 +636,7 @@ fn objc_start() {
 			'UINavigationController', 'GCEventViewController' { ios_runtime.names['UIViewController'] }
 			'GKGameCenterViewController' { ios_runtime.names['UINavigationController'] }
 			'GKPlayer' { ios_runtime.names['GKBasePlayer'] }
+			'GKLocalPlayer' { ios_runtime.names['GKPlayer'] }
 			'UIImageView', 'UILabel', 'UIControl', 'UIWindow', 'UIAlertView', 'GLKView' { ios_runtime.names['UIView'] }
 			'WKWebView' { ios_runtime.names['UIView'] }
 			'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController', 'UIAlertController' { ios_runtime.names['UIViewController'] }
@@ -718,6 +720,7 @@ fn objc_start() {
 			'AVCaptureAudioDataOutput' { u32(24) } // Catalyst sizes; opaque shim storage.
 			'GKBasePlayer' { u32(8) }
 			'GKPlayer' { u32(32) }
+			'GKLocalPlayer' { u32(120) }
 			'GKTurnBasedParticipant' { u32(16) }
 			'GKTurnBasedMatch' { u32(40) }
 			'GKLeaderboard' { u32(88) }
@@ -1127,6 +1130,8 @@ fn objc_stop() {
 	ios_runtime.file_manager = 0
 	objc_release(ios_runtime.process_info)
 	ios_runtime.process_info = 0
+	objc_release(ios_runtime.gk_local_player)
+	ios_runtime.gk_local_player = 0
 	objc_release(ios_runtime.process_arguments)
 	ios_runtime.process_arguments = 0
 	objc_release(ios_runtime.locale)
@@ -1285,7 +1290,7 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		&& library != '/System/Library/Frameworks/UIKit.framework/UIKit' {
 		return error('iOS: text input class import requires UIKit.framework')
 	}
-	if symbol in ['_OBJC_CLASS_$_GKGameCenterViewController', '_OBJC_METACLASS_$_GKGameCenterViewController', '_OBJC_CLASS_$_GKMatchRequest', '_OBJC_METACLASS_$_GKMatchRequest', '_OBJC_CLASS_$_GKAchievement', '_OBJC_METACLASS_$_GKAchievement', '_OBJC_CLASS_$_GKAchievementDescription', '_OBJC_METACLASS_$_GKAchievementDescription', '_OBJC_CLASS_$_GKBasePlayer', '_OBJC_METACLASS_$_GKBasePlayer', '_OBJC_CLASS_$_GKPlayer', '_OBJC_METACLASS_$_GKPlayer', '_OBJC_CLASS_$_GKTurnBasedParticipant', '_OBJC_METACLASS_$_GKTurnBasedParticipant', '_OBJC_CLASS_$_GKTurnBasedMatch', '_OBJC_METACLASS_$_GKTurnBasedMatch', '_OBJC_CLASS_$_GKLeaderboard', '_OBJC_METACLASS_$_GKLeaderboard']!
+	if symbol in ['_OBJC_CLASS_$_GKGameCenterViewController', '_OBJC_METACLASS_$_GKGameCenterViewController', '_OBJC_CLASS_$_GKMatchRequest', '_OBJC_METACLASS_$_GKMatchRequest', '_OBJC_CLASS_$_GKAchievement', '_OBJC_METACLASS_$_GKAchievement', '_OBJC_CLASS_$_GKAchievementDescription', '_OBJC_METACLASS_$_GKAchievementDescription', '_OBJC_CLASS_$_GKBasePlayer', '_OBJC_METACLASS_$_GKBasePlayer', '_OBJC_CLASS_$_GKPlayer', '_OBJC_METACLASS_$_GKPlayer', '_OBJC_CLASS_$_GKLocalPlayer', '_OBJC_METACLASS_$_GKLocalPlayer', '_OBJC_CLASS_$_GKTurnBasedParticipant', '_OBJC_METACLASS_$_GKTurnBasedParticipant', '_OBJC_CLASS_$_GKTurnBasedMatch', '_OBJC_METACLASS_$_GKTurnBasedMatch', '_OBJC_CLASS_$_GKLeaderboard', '_OBJC_METACLASS_$_GKLeaderboard']!
 		&& library != '/System/Library/Frameworks/GameKit.framework/GameKit' {
 		return error('iOS: Game Center controller import requires GameKit.framework')
 	}

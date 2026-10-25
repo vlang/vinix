@@ -106,6 +106,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if match_request_dispatch(object, selector, mut frame) { return true }
 	if achievement_dispatch(object, selector, mut frame) { return true }
 	if achievement_description_dispatch(object, selector, mut frame) { return true }
+	if local_player_dispatch(object, selector, mut frame) { return true }
 	if gk_player_dispatch(object, selector, mut frame) { return true }
 	if turn_participant_dispatch(object, selector, mut frame) { return true }
 	if turn_match_dispatch(object, selector, mut frame) { return true }

@@ -53,7 +53,7 @@ fn test_game_center_descriptors() {
 				}
 			}
 		}
-		if _ := runtime_symbol('/System/Library/Frameworks/GameKit.framework/GameKit', '_OBJC_CLASS_$_GKLocalPlayer') { assert false }
+		if _ := runtime_symbol('/System/Library/Frameworks/GameKit.framework/GameKit', '_OBJC_CLASS_$_GKVoiceChat') { assert false }
 		assert !navigation_descriptor_family(ios_runtime.names['UIViewController'])
 		objc_pool_pop(pool)
 		objc_stop()
