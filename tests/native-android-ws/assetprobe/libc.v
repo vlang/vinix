@@ -9,6 +9,8 @@ fn C.write(i32, voidptr, usize) isize
 fn C.lseek(i32, i64, i32) i64
 fn C.__pread_chk(i32, voidptr, usize, i64, usize) isize
 fn C.__pread64_chk(i32, voidptr, usize, i64, usize) isize
+fn C.__pwrite_chk(i32, voidptr, usize, i64, usize) isize
+fn C.__pwrite64_chk(i32, voidptr, usize, i64, usize) isize
 fn C.android_get_device_api_level() i32
 fn C.__system_property_get(&char, &char) i32
 fn C.mallopt(i32, i32) i32
@@ -61,6 +63,16 @@ pub fn libc_check(e voidptr, class voidptr) u8 {
 			|| C.__pread64_chk(fd, &bytes[0], 8, 4, 8) != 2
 			|| C.__pread_chk(fd, &bytes[0], 0, 0, 0) != 0
 			|| C.__pread_chk(-1, &bytes[0], 1, 0, 8) != -1 { return 0 }
+		if C.__pwrite_chk(fd, c'XY', 2, 1, 2) != 2
+			|| C.__pwrite64_chk(fd, c'Z', 1, 5, 1) != 1
+			|| C.lseek(fd, 0, 1) != 6
+			|| C.__pread_chk(fd, &bytes[0], 6, 0, 8) != 6
+			|| bytes[0] != `a` || bytes[1] != `X` || bytes[2] != `Y`
+			|| bytes[3] != `d` || bytes[4] != `e` || bytes[5] != `Z`
+			|| C.__pwrite_chk(fd, nil, 0, 0, 0) != 0
+			|| C.__pwrite64_chk(fd, nil, 0, 0, 0) != 0
+			|| C.__pwrite_chk(-1, c'x', 1, 0, 1) != -1
+			|| C.__pwrite64_chk(-1, c'x', 1, 0, 1) != -1 { return 0 }
 		mut property := [92]char{}
 		if C.__system_property_get(c'ro.build.version.sdk', &property[0]) <= 0 { return 0 }
 		mut level := i32(0)

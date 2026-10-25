@@ -10,6 +10,7 @@ fn C.strnlen(&char, usize) usize
 fn C.memcpy(voidptr, voidptr, usize) voidptr
 fn C.strlen(&char) usize
 fn C.write(i32, voidptr, usize) isize
+fn C.pwrite(i32, voidptr, usize, i64) isize
 fn C.abort()
 fn C.dprintf(i32, &char, ...voidptr) i32
 
@@ -50,4 +51,21 @@ pub fn checked_pread(fd i32, buffer voidptr, count usize, offset i64, capacity u
 @[export: 'bionic___pread64_chk']
 pub fn checked_pread64(fd i32, buffer voidptr, count usize, offset i64, capacity usize) isize {
 	return checked_pread(fd, buffer, count, offset, capacity)
+}
+
+// Fortified positional writes validate the source buffer before entering libc.
+// Android's LP64 pwrite64 uses the same signed 64-bit offset ABI as pwrite.
+@[export: 'bionic___pwrite_chk']
+pub fn checked_pwrite(fd i32, buffer voidptr, count usize, offset i64, capacity usize) isize {
+	if count > usize(0x7fffffffffffffff) || count > capacity {
+		C.dprintf(2, c'FORTIFY: pwrite: count %zu exceeds buffer %zu or SSIZE_MAX\n', count, capacity)
+		C.abort()
+		return -1
+	}
+	return C.pwrite(fd, buffer, count, offset)
+}
+
+@[export: 'bionic___pwrite64_chk']
+pub fn checked_pwrite64(fd i32, buffer voidptr, count usize, offset i64, capacity usize) isize {
+	return checked_pwrite(fd, buffer, count, offset, capacity)
 }
