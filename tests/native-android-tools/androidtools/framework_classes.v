@@ -129,6 +129,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_view_touch(smali)!
  framework_touch_delegate(smali)!
  framework_view_tooltips(smali)!
+ framework_screen_reader_focusable(smali)!
  framework_view_scroll(smali)!
  framework_drawing_ids(smali)!
  framework_view_layers(smali)!
