@@ -186,6 +186,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name == 'GCColor' && gc_color_unsupported(name) { return 0 }
 		if info.name == 'AVAudioApplication' && audio_application_unsupported(name) { return 0 }
 		if info.name == 'UIStoryboard' && storyboard_unsupported(name) { return 0 }
+		if info.name == 'UINavigationController' && navigation_descriptor_unsupported(name) { return 0 }
 		if info.name == 'NSLock' && ns_lock_unsupported(name) { return 0 }
 		if info.name == 'NSRecursiveLock' && ns_recursive_lock_unsupported(name) { return 0 }
 		if info.name in ['NSCoder', 'NSKeyedArchiver']! && ns_keyed_archiver_unsupported(name) { return 0 }
@@ -343,6 +344,9 @@ fn objc_set_class(object u64, cls u64) u64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if object in ios_runtime.classes || object in ios_runtime.constants { panic('iOS: changing a class or constant string isa is not implemented') }
+	if navigation_descriptor_family(cls) || navigation_descriptor_family(obj_header(object).allocation_cls) {
+		panic('iOS: changing navigation controller storage isa is not implemented')
+	}
 	if storyboard_family(cls) || storyboard_family(obj_header(object).allocation_cls) {
 		panic('iOS: changing storyboard storage isa is not implemented')
 	}

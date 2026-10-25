@@ -42,7 +42,11 @@ fn require_child(path string) {
 
 fn main() {
 	mode := os.read_file('/opt/ios/check-mode') or { panic(err) }
-	if mode == 'storyboard' {
+	if mode == 'game-center' {
+		require_child('/opt/ios/game-center-checks')
+		println('VINIX iOS GAMECENTER: PASS')
+		C.fflush(unsafe { nil })
+	} else if mode == 'storyboard' {
 		require_child('/opt/ios/storyboard-checks')
 		println('VINIX iOS STORYBOARD: PASS')
 		C.fflush(unsafe { nil })
@@ -63,7 +67,7 @@ fn main() {
 		println('VINIX iOS FEEDBACK: PASS')
 		C.fflush(unsafe { nil })
 	} else if mode == 'notifications' {
-		for name in ['storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'adsupport', 'bundle-resource', 'number-formatter', 'date-formatter', 'lock', 'recursive-lock', 'map-table', 'credential', 'telephony', 'cache', 'calendar', 'calendar-trigger', 'notification-request', 'notification-center', 'notification-content', 'notification-sound', 'notification-attachment']! {
+		for name in ['game-center', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'adsupport', 'bundle-resource', 'number-formatter', 'date-formatter', 'lock', 'recursive-lock', 'map-table', 'credential', 'telephony', 'cache', 'calendar', 'calendar-trigger', 'notification-request', 'notification-center', 'notification-content', 'notification-sound', 'notification-attachment']! {
 			require_child('/opt/ios/' + name + '-checks')
 		}
 		println('VINIX iOS NOTIFICATIONS: PASS')

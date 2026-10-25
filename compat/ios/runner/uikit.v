@@ -102,6 +102,9 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 }
 
 fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if navigation_descriptor_unsupported(selector) {
+		navigation_descriptor_require_ui(if object in ios_runtime.classes { object } else { read64(object) })
+	}
 	if constant_integer_dispatch(object, selector, mut frame) { return true }
 	if dispatch_objc_dispatch(object,selector,mut frame) { return true }
 	if ns_pool_dispatch(object, selector, mut frame) { return true }

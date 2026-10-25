@@ -2,6 +2,7 @@
 module main
 
 fn objc_install_storage(cls u64, object u64, caller_storage bool) {
+	navigation_descriptor_require_ui(cls)
 	ns_keyed_archiver_require_class(cls)
 	ns_operation_require_class(cls)
 	ns_invocation_require_class(cls)

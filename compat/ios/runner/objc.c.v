@@ -569,7 +569,7 @@ fn objc_start() {
 		'NSMapTable', 'CTTelephonyNetworkInfo', 'ASIdentifierManager', 'NSPredicate', 'NSIndexSet', 'NSMutableIndexSet', 'NSScanner', 'NSUserActivity', 'NSConstantIntegerNumber', 'NSConstantArray', 'VinixCMFormatDescription', 'VinixCMBlockBuffer', 'VinixCMSampleBuffer', 'VinixVTDecompressionSession', 'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSMutableString', 'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSCoder', 'NSKeyedArchiver', 'NSKeyedUnarchiver', 'NSNull', 'NSError', 'NSException', 'NSCondition', 'NSLock', 'NSRecursiveLock', 'NSCache', 'NSThread', 'ASWebAuthenticationSession', 'GCController', 'GCPhysicalInputProfile', 'GCExtendedGamepad', 'GCDualShockGamepad', 'GCDualSenseGamepad', 'GCColor', 'GCMouse', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
-		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController', 'UIStoryboard',
+		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController', 'UINavigationController', 'GKGameCenterViewController', 'UIStoryboard',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', '_NSDispatchData', 'OS_dispatch_data', 'OS_dispatch_data_empty', 'NSMutableData', '_NSZeroData', '_NSInlineData', 'Foundation.__NSSwiftData', 'NSLocale', 'NSTimeZone', 'NSCalendar', 'NSDateComponents', 'UNNotificationTrigger', 'UNCalendarNotificationTrigger', 'UNNotificationRequest', 'UNUserNotificationCenter', 'NSBundle', 'NSBundleResourceRequest', 'NSNotification', 'NSNotificationCenter', 'NSNotificationQueue', 'NSCharacterSet', 'NSMutableCharacterSet',
         'UNNotificationContent', 'UNMutableNotificationContent', 'UNNotificationSound', 'UNNotificationAttachment',
@@ -609,6 +609,8 @@ fn objc_start() {
 			'_NSUUIDBridge' { ios_runtime.names['NSUUID'] }
 			'__NSConcreteUUID' { ios_runtime.names['_NSUUIDBridge'] }
 			'UIView', 'UIViewController', 'UIApplication' { ios_runtime.names['UIResponder'] }
+			'UINavigationController' { ios_runtime.names['UIViewController'] }
+			'GKGameCenterViewController' { ios_runtime.names['UINavigationController'] }
 			'UIImageView', 'UILabel', 'UIControl', 'UIWindow', 'UIAlertView', 'GLKView' { ios_runtime.names['UIView'] }
 			'WKWebView' { ios_runtime.names['UIView'] }
 			'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController', 'UIAlertController' { ios_runtime.names['UIViewController'] }
@@ -821,6 +823,7 @@ fn obj_header(object u64) &ObjHeader {
 }
 
 fn objc_allocate(cls u64) u64 {
+	navigation_descriptor_require_ui(cls)
 	ns_keyed_archiver_require_class(cls)
 	ns_operation_require_class(cls)
 	ns_lock_require_class(cls)
@@ -1143,6 +1146,14 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		if address := zlib_bound_symbol(symbol) { return address }
 	}
 	// Check before generic class fallbacks in libobjc and Foundation/UIKit.
+	if symbol in ['_OBJC_CLASS_$_GKGameCenterViewController', '_OBJC_METACLASS_$_GKGameCenterViewController']!
+		&& library != '/System/Library/Frameworks/GameKit.framework/GameKit' {
+		return error('iOS: Game Center controller import requires GameKit.framework')
+	}
+	if symbol in ['_OBJC_CLASS_$_UINavigationController', '_OBJC_METACLASS_$_UINavigationController']!
+		&& library != '/System/Library/Frameworks/UIKit.framework/UIKit' {
+		return error('iOS: navigation controller import requires UIKit.framework')
+	}
 	if symbol in ['_OBJC_CLASS_$_UIStoryboard', '_OBJC_METACLASS_$_UIStoryboard']!
 		&& library != '/System/Library/Frameworks/UIKit.framework/UIKit' {
 		return error('iOS: storyboard import requires UIKit.framework')

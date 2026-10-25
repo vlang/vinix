@@ -6,6 +6,9 @@ import os
 // Framework class descriptors provide inheritance and native subclass layout.
 // Their API methods are implemented individually; absent methods still fail.
 fn framework_symbol(library string, symbol string) ?u64 {
+	if library == '/System/Library/Frameworks/GameKit.framework/GameKit' {
+		if address := game_center_symbol(symbol) { return address }
+	}
 	if library == '/System/Library/Frameworks/AVFAudio.framework/AVFAudio' {
 		if address := audio_application_symbol(symbol) { return address }
 	}
