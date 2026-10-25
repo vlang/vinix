@@ -28,10 +28,10 @@ fn navigation_descriptor_require_ui(cls u64) {
 }
 
 fn game_center_symbol(symbol string) ?u64 {
-	cls := ios_runtime.names['GKGameCenterViewController'] or { return none }
-	return match symbol {
-		'_OBJC_CLASS_$_GKGameCenterViewController' { cls }
-		'_OBJC_METACLASS_$_GKGameCenterViewController' { read64(cls) }
-		else { none }
+	for name in ['GKGameCenterViewController', 'GKMatchRequest']! {
+		cls := ios_runtime.names[name] or { continue }
+		if symbol == '_OBJC_CLASS_$_' + name { return cls }
+		if symbol == '_OBJC_METACLASS_$_' + name { return read64(cls) }
 	}
+	return none
 }
