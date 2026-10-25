@@ -26,6 +26,8 @@ fn main() {
 		'app_icon.v', 'font_data.v', 'app.v', 'wine_app.v', 'zed_app.v', 'session_paste.v'] {
 		os.cp('${root}/desktop/${name}', '${work}/source/desktop/${name}')!
 	}
+	os.cp(root + '/desktop/packagecore/release.c.v', work + '/source/desktop/packagecore/release.c.v')!
+	os.cp(root + '/desktop/tools/test-app-selection.v', work + '/source/desktop/tools/test-app-selection.v')!
 	for directory in ['assets', 'translations'] {
 		os.cp_all('${root}/desktop/${directory}', '${work}/source/desktop/${directory}', true)!
 	}
@@ -46,9 +48,12 @@ fn main() {
 	os.rm('${app}/main.v')!
 	mut tests := os.args[1..].clone()
 	if tests.len == 0 {
-		tests = ['app_selection', 'app_selection_release', 'app_selection_migration', 'app_icon', 'app_selection_i18n', 'i18n_apps', 'registration']
+		tests = ['app_selection', 'app_selection_release', 'app_selection_migration', 'app_selection_release_routing', 'app_icon', 'app_selection_i18n', 'i18n_apps', 'registration']
 	}
-	if 'app_selection_migration' in tests {
+	if os.getenv('VINIX_SETUP_PRODUCTION') == '1' && (tests.len != 1 || tests[0] != 'app_selection_release_routing') {
+		panic('production checks require the explicit app_selection_release_routing suite; historical suites use assertions')
+	}
+	if 'app_selection_migration' in tests || 'app_selection_release_routing' in tests {
 		os.mkdir_all(work + '/bin')!
 		workflowbuild.run(v, ['-backend', 'c', '-o', work + '/bin/pkg', root + '/desktop/tools/tests/fixtures/setup-pkg/main.v'])!
 		// Use and retain the same C backend as the target broker.
@@ -59,10 +64,12 @@ fn main() {
 		os.setenv('VINIX_SETUP_BROKER', work + '/session-broker', true)
 	}
 	for name in tests {
+		os.cp('${root}/desktop/tools/tests/${name}_test.v', '${work}/source/desktop/tools/tests/${name}_test.v')!
 		os.cp('${root}/desktop/tools/tests/${name}_test.v', '${app}/${name}_test.v')!
-		args := ['-new-compiler', '-nocache', '-cc', 'clang', '-gc', 'none', '-manualfree',
+		mut args := ['-new-compiler', '-nocache', '-cc', 'clang', '-gc', 'none', '-manualfree',
 			'-enable-globals', '-d', 'ui2_headless', '-d', 'no_segfault_handler', '-path',
-			'@vlib|${app}/modules|@vmodules|${root}|${root}/tools/accounts|${root}/third_party', '${app}/${name}_test.v']
+			'@vlib|${app}/modules|@vmodules|${work}/source|${root}|${root}/tools/accounts|${root}/third_party', '${app}/${name}_test.v']
+		if os.getenv('VINIX_SETUP_PRODUCTION') == '1' { args.insert(0, '-prod') }
 		setup_test(v, args, app, name)!
 		os.rm('${app}/${name}_test.v')!
 	}
@@ -81,6 +88,9 @@ fn setup_test(v string, args []string, work string, name string) ! {
 	os.write_file('${work}/test.c', source)!
 	compiler := os.real_path(os.find_abs_path_of_executable(v)!)
 	mut flags := ['-w', '-O0', '-I', work]
+	if os.getenv('VINIX_SETUP_SANITIZE') == '1' {
+		flags << ['-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']
+	}
 	$if macos {
 		flags << ['-x', 'objective-c', '-framework', 'Cocoa', '-framework', 'QuartzCore']
 	}
@@ -93,9 +103,10 @@ fn setup_test(v string, args []string, work string, name string) ! {
 	workflowbuild.run('clang', flags)!
 	println('Running ${name}')
 	workflowbuild.run('${work}/test', [])!
-	if name == 'app_selection_migration' && os.getenv('VINIX_SETUP_KEEP') == '1' {
-		os.cp('${work}/test.c', '${work}/migration.c')!
-		os.cp('${work}/test', '${work}/migration')!
+	if name in ['app_selection_migration', 'app_selection_release_routing'] && os.getenv('VINIX_SETUP_KEEP') == '1' {
+		stem := if name == 'app_selection_migration' { 'migration' } else { 'release-routing' }
+		os.cp('${work}/test.c', '${work}/${stem}.c')!
+		os.cp('${work}/test', '${work}/${stem}')!
 	}
 	println('PASS ${name}')
 }

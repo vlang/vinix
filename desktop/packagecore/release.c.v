@@ -29,7 +29,19 @@ fn release_trusted(fd int, owner u32, directory bool) !C.stat {
 // deliberately checks routing structure only; malformed signed semantics are
 // refused by the existing service review, never retried as a legacy install.
 pub fn release_requirement_at(root string, owner u32, architecture string, id string) !bool {
-	if architecture !in ['aarch64', 'x86_64'] || !identifier(id) { return error('invalid release route') }
+	if !identifier(id) { return error('invalid release route') }
+	return release_route_at(root, owner, architecture, id)
+}
+
+// Review routing concerns the complete advertised set, independent of legacy
+// picker mappings. Empty deployments remain available through Software's normal
+// deployment form; they do not advertise applications for this acquisition route.
+pub fn release_review_at(root string, owner u32, architecture string) !bool {
+	return release_route_at(root, owner, architecture, '')
+}
+
+fn release_route_at(root string, owner u32, architecture string, id string) !bool {
+	if architecture !in ['aarch64', 'x86_64'] { return error('invalid release route') }
 	mut directory := C.open(&char(root.str), C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC, 0)
 	if directory < 0 { return error('release root unavailable') }
 	defer { C.close(directory) }
@@ -84,9 +96,14 @@ fn release_requirement(text string, architecture string, id string) !bool {
 		if !identifier(root) { return error('invalid release roots') }
 		for j in 0 .. i { if document.packages[j] == root { return error('duplicate release root') } }
 	}
-	if id !in document.packages { return false }
-	for pin in document.locked {
-		if pin.id == id { return true }
+	if id != '' && id !in document.packages { return false }
+	for root in document.packages {
+		if id != '' && root != id { continue }
+		mut locked := false
+		for pin in document.locked {
+			if pin.id == root { locked = true; break }
+		}
+		if !locked { return error('release root has no exact locked package') }
 	}
-	return error('release root has no exact locked package')
+	return document.packages.len > 0
 }

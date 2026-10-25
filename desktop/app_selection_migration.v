@@ -18,6 +18,12 @@ fn first_run_enqueue_release_review() ! {
 	if reply != 'ok' { return error('Software release review is unavailable') }
 }
 
+fn first_run_release_review_requested(message SessionMessage, route FirstRunReleaseRoute) !bool {
+	if message.count != 1 || message.fields[0].str() != first_run_release_review_action { return false }
+	architecture := if route.architecture != '' { route.architecture } else { $if arm64 { 'aarch64' } $else { 'x86_64' } }
+	return packagecore.release_review_at(route.root, route.owner, architecture)
+}
+
 fn first_run_signed_release_required(name string, route FirstRunReleaseRoute) !bool {
 	architecture := if route.architecture != '' { route.architecture } else { $if arm64 { 'aarch64' } $else { 'x86_64' } }
 	for app in first_run_apps {

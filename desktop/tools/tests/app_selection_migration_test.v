@@ -39,6 +39,17 @@ fn migration_install_refused(route FirstRunReleaseRoute) bool {
 	return false
 }
 
+fn migration_review_message() SessionMessage {
+	mut message := SessionMessage{count: 1}
+	message.fields[0] = sessioncore.text(first_run_release_review_action) or { panic(err) }
+	return message
+}
+
+fn migration_review_refused(route FirstRunReleaseRoute) bool {
+	admitted := first_run_release_review_requested(migration_review_message(), route) or { return true }
+	return !admitted
+}
+
 fn test_signed_neovim_declaration_replaces_actual_legacy_acquisition_installed_or_not() {
 	root := migration_root('acquire')
 	defer { os.rmdir_all(root) or {} }
@@ -89,14 +100,17 @@ fn test_release_routing_refuses_aliases_unsafe_metadata_and_replacement() {
 	for target in [path, root + '/usr/share/vinix-packages', root + '/usr/share', root + '/usr', root] {
 		os.chmod(target, 0o777)!
 		assert migration_install_refused(route)
+		assert migration_review_refused(route)
 		os.chmod(target, if target == path { 0o644 } else { 0o755 })!
 	}
 	os.rename(path, path + '.real')!; os.symlink(path + '.real', path)!
 	assert migration_install_refused(route)
+	assert migration_review_refused(route)
 	os.rm(path)!; os.rename(path + '.real', path)!
 	os.rename(root + '/usr/share/vinix-packages', root + '/usr/share/real')!
 	os.symlink('real', root + '/usr/share/vinix-packages')!
 	assert migration_install_refused(route)
+	assert migration_review_refused(route)
 	os.rm(root + '/usr/share/vinix-packages')!; os.rename(root + '/usr/share/real', root + '/usr/share/vinix-packages')!
 	// A request captured before publication cannot bypass the execution guard.
 	os.rm(path)!

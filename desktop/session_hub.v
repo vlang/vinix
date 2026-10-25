@@ -271,7 +271,7 @@ fn (mut d Desktop) perform_session_action(m SessionMessage) {
 		first_run_release_review_action {
 			// The broker admits only this account. Recheck the fixed declaration;
 			// callers cannot supply another path, package, approval or apply action.
-			if m.count == 1 && first_run_signed_release_required('neovim', FirstRunReleaseRoute{}) or { unsafe { err.free() }; false } {
+			if first_run_release_review_requested(m, FirstRunReleaseRoute{}) or { unsafe { err.free() }; false } {
 				d.open_first_run_release_review()
 			}
 		}
