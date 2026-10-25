@@ -106,6 +106,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_paint_text_widths(smali)!
  framework_character_styles(smali)!
  framework_absolute_size_span(smali)!
+ framework_tts_span(smali)!
  framework_static_layout_fallback(smali)!
  framework_asset_streams(smali)!
  framework_view_geometry(smali)!
