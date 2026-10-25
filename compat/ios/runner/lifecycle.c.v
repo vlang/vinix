@@ -82,8 +82,31 @@ fn (loaded LoadedModule) section_address(section macho.Section) u64 {
 	return loaded.base + section.address - loaded.layout.base
 }
 
+// Fortnite's __init_offsets has 176,816 entries. Bound the whole image,
+// including routines and terminators, while admitting that table.
+const image_initializer_limit = u64(262144)
+
 fn image_initializers(loaded &LoadedModule) ![]u64 {
-	mut functions := []u64{}
+	mut count := u64(loaded.image.routines.len)
+	if count > image_initializer_limit { return error('iOS: invalid initializer section') }
+	for segment in loaded.image.segments {
+		for section in segment.sections {
+			kind := section.flags & 0xff
+			if kind !in [u32(9), 10, 0x16] { continue }
+			stride := if kind == 0x16 { u64(4) } else { u64(8) }
+			if section.size % stride != 0 || section.size / stride > image_initializer_limit - count
+				|| section.address < segment.address
+				|| section.address - segment.address > segment.filesize
+				|| section.size > segment.filesize - (section.address - segment.address) {
+				return error('iOS: invalid initializer section')
+			}
+			count += section.size / stride
+		}
+	}
+	// Reserve once: this loader is built with -gc none.
+	mut functions := []u64{cap: int(count)}
+	mut complete := false
+	defer { if !complete { unsafe { functions.free() } } }
 	for address in loaded.image.routines {
 		functions << loaded.base + address - loaded.layout.base
 	}
@@ -92,11 +115,6 @@ fn image_initializers(loaded &LoadedModule) ![]u64 {
 			kind := section.flags & 0xff
 			if kind !in [u32(9), 10, 0x16] { continue }
 			stride := if kind == 0x16 { u64(4) } else { u64(8) }
-			if section.size % stride != 0 || section.size / stride > 65536
-				|| section.address - segment.address > segment.filesize
-				|| section.size > segment.filesize - (section.address - segment.address) {
-				return error('iOS: invalid initializer section')
-			}
 			for offset := u64(0); offset < section.size; offset += stride {
 				address := if kind == 0x16 {
 					loaded.base + read32(loaded.section_address(section) + offset)
@@ -111,6 +129,7 @@ fn image_initializers(loaded &LoadedModule) ![]u64 {
 	for address in functions {
 		if !loaded.code_address(address) { return error('iOS: initializer is not executable') }
 	}
+	complete = true
 	return functions
 }
 
