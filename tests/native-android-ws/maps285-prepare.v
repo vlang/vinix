@@ -8,6 +8,15 @@ import os
 import strconv
 import time
 
+$if macos {
+	#include <CommonCrypto/CommonDigest.h>
+}
+@[typedef]
+struct C.CC_SHA256_CTX {}
+fn C.CC_SHA256_Init(voidptr) i32
+fn C.CC_SHA256_Update(voidptr, voidptr, u32) i32
+fn C.CC_SHA256_Final(&u8, voidptr) i32
+
 const base = 'build/android-maps/'
 const target = base + 'maps285'
 const external = '/Users/alex/.local/state/vinix/android/maps285-2026-10-25-prelaunch'
@@ -27,14 +36,32 @@ const driver_pin = 'abd2dfbb01fddc83ffffae481b5d1fcab35b9ebd279f3f47abae237b0013
 fn hash(path string) !string {
 	mut file := os.open(path)!
 	defer { file.close() }
-	mut digest := sha256.new()
 	mut buffer := []u8{len: 1024 * 1024}
-	for {
-		n := file.read(mut buffer) or { if err is os.Eof { break }; return err }
-		if n == 0 { break }
-		digest.write(buffer[..n])!
+	defer { unsafe { buffer.free() } }
+	$if macos {
+		mut state := C.CC_SHA256_CTX{}
+		if C.CC_SHA256_Init(unsafe { &state }) != 1 { return error('CC_SHA256_Init failed') }
+		for {
+			n := file.read(mut buffer) or { if err is os.Eof { break }; return err }
+			if n == 0 { break }
+			if C.CC_SHA256_Update(unsafe { &state }, buffer.data, u32(n)) != 1 { return error('CC_SHA256_Update failed') }
+		}
+		mut result := [32]u8{}
+		if C.CC_SHA256_Final(unsafe { &result[0] }, unsafe { &state }) != 1 { return error('CC_SHA256_Final failed') }
+		return result[..].hex()
+	} $else {
+		mut digest := sha256.new()
+		defer { unsafe { digest.free() } }
+		for {
+			n := file.read(mut buffer) or { if err is os.Eof { break }; return err }
+			if n == 0 { break }
+			if digest.write(buffer[..n])! != n { return error('SHA256 short write') }
+		}
+		mut result := []u8{len: 32}
+		defer { unsafe { result.free() } }
+		digest.checksum_into(mut result)
+		return result.hex()
 	}
-	return digest.sum([]u8{}).hex()
 }
 
 fn checked(argv []string) !string {

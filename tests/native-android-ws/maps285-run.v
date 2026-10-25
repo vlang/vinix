@@ -7,12 +7,21 @@ import json2
 import os
 import time
 
+$if macos {
+	#include <CommonCrypto/CommonDigest.h>
+}
+@[typedef]
+struct C.CC_SHA256_CTX {}
+fn C.CC_SHA256_Init(voidptr) i32
+fn C.CC_SHA256_Update(voidptr, voidptr, u32) i32
+fn C.CC_SHA256_Final(&u8, voidptr) i32
+
 const base = 'build/android-maps/'
 const target = base + 'maps285'
 const prelaunch = '/Users/alex/.local/state/vinix/android/maps285-2026-10-25-prelaunch'
 const completed = '/Users/alex/.local/state/vinix/android/maps285-2026-10-25'
-const build_root = '/Users/alex/.local/state/vinix/android/maps285-run-build-2026-10-25'
-const prepare_build = '/Users/alex/.local/state/vinix/android/maps285-workflow-final3-2026-10-25'
+const build_root = '/Users/alex/.local/state/vinix/android/maps285-run-build-final4-2026-10-25'
+const prepare_build = '/Users/alex/.local/state/vinix/android/maps285-workflow-final4-2026-10-25'
 const suite = target + '/suite285'
 const config = base + 'attempt285.json'
 const output = base + 'attempt285'
@@ -21,14 +30,32 @@ const source = 'tests/native-android-ws/maps285-run.v'
 fn hash(path string) !string {
 	mut file := os.open(path)!
 	defer { file.close() }
-	mut digest := sha256.new()
 	mut buffer := []u8{len: 1024 * 1024}
-	for {
-		n := file.read(mut buffer) or { if err is os.Eof { break }; return err }
-		if n == 0 { break }
-		digest.write(buffer[..n])!
+	defer { unsafe { buffer.free() } }
+	$if macos {
+		mut state := C.CC_SHA256_CTX{}
+		if C.CC_SHA256_Init(unsafe { &state }) != 1 { return error('CC_SHA256_Init failed') }
+		for {
+			n := file.read(mut buffer) or { if err is os.Eof { break }; return err }
+			if n == 0 { break }
+			if C.CC_SHA256_Update(unsafe { &state }, buffer.data, u32(n)) != 1 { return error('CC_SHA256_Update failed') }
+		}
+		mut result := [32]u8{}
+		if C.CC_SHA256_Final(unsafe { &result[0] }, unsafe { &state }) != 1 { return error('CC_SHA256_Final failed') }
+		return result[..].hex()
+	} $else {
+		mut digest := sha256.new()
+		defer { unsafe { digest.free() } }
+		for {
+			n := file.read(mut buffer) or { if err is os.Eof { break }; return err }
+			if n == 0 { break }
+			if digest.write(buffer[..n])! != n { return error('SHA256 short write') }
+		}
+		mut result := []u8{len: 32}
+		defer { unsafe { result.free() } }
+		digest.checksum_into(mut result)
+		return result.hex()
 	}
-	return digest.sum([]u8{}).hex()
 }
 
 fn read_map(path string) !map[string]string { return json2.decode[map[string]string](os.read_file(path)!)! }
@@ -83,7 +110,7 @@ fn verify_prepare_build() ! {
 	require_pin(prepare_build + '/maps285-prepare.v', build['source_sha256']!.str())!
 	require_pin(prepare_build + '/maps285-prepare', build['output_sha256']!.str())!
 	require_pin(retained_path('tests/native-android-ws/maps285-prepare.v'), build['source_sha256']!.str())!
-	require_pin(retained_path(base + 'maps285-prepare-final3'), build['output_sha256']!.str())!
+	require_pin(retained_path(base + 'maps285-prepare-final4'), build['output_sha256']!.str())!
 	for label, expected in {'helper-self-test': 0, 'prod-guard': 2, 'prepare': 0} {
 		receipt := object(prepare_build + '/' + label + '-receipt.json')!
 		for key, value in object(prepare_build + '/' + label + '-before.json')! {
@@ -94,7 +121,7 @@ fn verify_prepare_build() ! {
 	}
 	prepared := object(prepare_build + '/prepare-receipt.json')!
 	references := object(target + '/references.json')!
-	expected_argv := [base + 'maps285-prepare-final3', 'prepare', references['queue284_root']!.str(), references['queue284_prelaunch_sha256']!.str()]
+	expected_argv := [base + 'maps285-prepare-final4', 'prepare', references['queue284_root']!.str(), references['queue284_prelaunch_sha256']!.str()]
 	if prepared['argv']!.as_array().map(it.str()) != expected_argv { return error('wrong recorded preparation argv') }
 	for path, pin in read_map(prepare_build + '/helper-v-files.json')! { require_pin(prepare_build + '/source-closure/' + path.trim_left('/'), pin)! }
 	for path, pin in read_map(prepare_build + '/build-tools.json')! { require_pin(prepare_build + '/tools/' + path.trim_left('/'), pin)! }

@@ -7,7 +7,7 @@ import json2
 import os
 import time
 
-const root = '/Users/alex/.local/state/vinix/android/maps285-input-tests-2026-10-25'
+const root = '/Users/alex/.local/state/vinix/android/maps285-input-tests-final4-2026-10-25'
 
 fn hash(path string) !string { return sha256.sum(os.read_bytes(path)!).hex() }
 fn quote(value string) string { return "'" + value.replace("'", r"'\''") + "'" }
