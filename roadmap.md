@@ -1126,6 +1126,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     Apple framework/application and graphical coverage remain open.
 - [ ] Establish a supported application SDK/protocol, stable public interfaces,
   package format, signing/publishing process and developer documentation.
+  - [x] [Native SDK contract execution](tests/packages/sdk-contract-check.md)
+    passes in both AArch64 and x86_64 guests: interface discovery, deployment
+    encoding, repository URL admission and policy authoring retain twelve exact
+    markers and six matching native executables per target. Complete archived
+    evidence, unchanged selected inputs and child cleanup pass independent
+    checks. Publisher enrollment, policy apply and broader SDK acceptance
+    remain separate gates.
   - [x] [Read-only package-tool interface discovery](tools/packages/CAPABILITIES.md)
     reports exact supported package, SDK, native window and deployment versions
     without configuration or state access. A strict owned decoder, repeated

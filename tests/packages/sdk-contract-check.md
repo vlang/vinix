@@ -112,4 +112,100 @@ Selected ARM artifact SHA-256 values (the full receipt is `04/s/qualification.js
 | Package CLI | `f5e55305364b8a84aa417795c34fcc11dc6200f03527bc105035ed6e49798a72` |
 | Serial log | `88d6f11aeadf7d412cd4c91292209d94c452a3dcd234b5b9ab70c4884739578e` |
 
-Native x86_64 execution remains pending. The broader SDK release gate stays open.
+### Retained x86 attempts, 2026-10-26
+
+At source base `7594b84b387b46bed02df0b84cc35e813b82aecd`, with retained
+`qualified-source`, the x86 `01` guest and controller passed the same native
+contract scenario in 124.3 seconds. The supervisor then exited 1: its full-state
+C scan treated two staged upstream Limine C source files as V-generated output.
+Its input maps matched, all seven emitted V C files identified the qualified
+vlib, and the controller group exited 0 and was reaped/empty (-1/ECHILD, no kill).
+This is a retained supervisor refusal, not a passing complete qualification.
+The complete `vinix-sdk-x86-20261026-01` bundle remains outside Git under
+`/Users/alex/.cache/`; its adjacent `-seal/inventory.json` SHA-256 is
+`8f163b47854ebbe165fe9cfccfe2b42e1104392a17c9ccf0ba40ce6100fdc3cb`.
+The broader SDK release gate stays open.
+
+The second x86 attempt was interrupted before program generation completed.
+On continuation no supervisor/controller/QEMU process remained, and the bundle
+had no serial guest log, qualification, final cleanup, after-map or budget receipt.
+The terminating signal and exit status are unknown; this provides no passing
+execution or cleanup result. Its complete interrupted namespace is retained at
+`/Users/alex/.cache/vinix-sdk-x86-20261026-02`, with adjacent complete inventory
+SHA-256 `c00c094000bbb597df6ef0b1c5ffd422f7ffb7e42baa45117811275bc1bef39f`.
+An independent full-state check passed without altering that namespace.
+
+### Native x86 execution, 2026-10-26
+
+The shared supervisor now has a fixed `--x86` profile for
+`/Users/alex/.cache/vinix-sdk-x86-20261026-03`, reusing the sealed ARM `03` production
+controller. The retained ARM source and all sealed bundles remain unchanged.
+Its kernel is the existing audio baseline kernel (SHA-256
+`348b1204b78afe70f847b1cb5ebb1dd06dfac17add8dab672bb781baf5b6f78e`).
+The selected C toolchain is `/opt/homebrew/Cellar/musl-cross/0.9.11`, including
+its baked x86 musl sysroot, and the boot profile selects the existing x86 QEMU,
+firmware, xorriso and complete cached Limine 12.9.3 tree. Fixed executable,
+libc and cache hashes join complete selected before/after input maps. Host
+shared libraries and system frameworks remain outside this observation.
+The toolchain's three fixed target-loader links are recorded with their exact
+`/lib/libc.so` literal target and required absence on the host; inventory does
+not follow them into the host root. Other missing inputs remain refusals.
+
+This profile requires the qualified V root's exact five top-level entries and
+its complete overlay map and records both full input maps. It inventories the
+V output directories `bootstrap-tmp` and `s/run/guest`, requiring one retained
+supervisor C file and precisely the six expected target C files, each identifying
+the selected vlib root. Cached bootloader C sources are outside these V output
+directories.
+The 768 MiB sampled charge includes ARM attempts `01`–`04` and their seals,
+the SDK evidence directory/worktree, retained x86 `01`/`02` and seals, and fresh
+`03`/seal. It keeps the 4 MiB receipt reserve, actual 2 GiB/1 GiB disk
+admission/floor and 1,000 second controller guard.
+
+At source base `7594b84b387b46bed02df0b84cc35e813b82aecd`, with retained
+qualified supervisor source SHA-256
+`7d7f86b887273747d25aae4b604b0c7db4e6809f3e977ebe4c8f3ff0de2038e5`
+and supervisor executable SHA-256
+`e3661b0ca135375a9a59e9b6ed7113b1947ee72f8124b2870829f3f01ce9fea5`,
+the third attempt passed the native x86 scenario in 246.0 seconds. The controller
+and supervisor both exited 0. All twelve exact serial markers occur once, six
+built/staged native ELFs match, and the guest powered off cleanly. The retained
+boot medium's extracted kernel matches the input.
+
+Both complete input maps have SHA-256
+`502cef3ea6a735feda2dad03a55a2fd9f90976d6d1a4f44b0347ed06d9d019dc`;
+the after receipt reports no changed input. All seven emitted V C files identify
+the qualified vlib. The inherited controller group was observed, reaped and
+empty; final wait returned -1/ECHILD, with actual child exit 0 and no kill needed.
+The final sample before its budget receipt was 542,724,096 bytes under the
+805,306,368-byte cap, with 41,620,389,888 bytes actually available. Bootstrap ran
+separately, outside the native guard. The sampled guard has the same escaped
+daemon and filesystem quota limits described for ARM.
+
+The complete quiescent `vinix-sdk-x86-20261026-03` bundle remains outside Git.
+Its complete inventory is
+`/Users/alex/.cache/vinix-sdk-x86-20261026-03-seal-02/inventory.json`, SHA-256
+`ef08167c01d87ed06796b0a897cd7109ccaf57ddd56898d2b1a917ac4263adff`.
+The first seal hit its 120-second bound during its final comparison; that
+incomplete `-03-seal` directory remains intact. Its inventory passed a separate
+complete check, and a fresh seal completed with the unchanged checker under a
+240-second bound. Both inventories are identical. An independent complete check
+of the final seal passed with the original unchanged checker (actual exit 0).
+Post-seal `du` charged all
+extant historical roots and both seal directories at 530,900 KiB before writing
+its receipt, still below 768 MiB including the 4 MiB receipt reserve. That receipt
+is retained at
+`/Users/alex/Library/Caches/vinix-codex/section14/sdk-contract-20261026/host/x86-03-postseal-du.txt`.
+
+Selected x86 artifact SHA-256 values (the full receipt is
+`/Users/alex/.cache/vinix-sdk-x86-20261026-03/s/qualification.json`):
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Qualification receipt | `70fe579048b4b90d9f77a93e4fb04af034d642bf355129465a57501f2b1f5d6f` |
+| V executable | `ff75a30180b1de305e3c62acc1ebd85341ff83ae5d852c819d11f27d5260c4c5` |
+| Production controller | `b28d7ca7199a22e7bddf0a20d4a157ec45410c00a75db90fa90150a662dde902` |
+| Input/extracted kernel | `348b1204b78afe70f847b1cb5ebb1dd06dfac17add8dab672bb781baf5b6f78e` |
+| Boot medium | `c710b23b3a4a6b1028bc03a73373a6d0a3ac6f341bbab090dfdb15f2732c9516` |
+| Package CLI | `dc15d93f94367189eed6b172eafa3322f3c7f024bdc52c8b6c4bf7f67edbec5e` |
+| Serial log | `50389bd6ac21b83b37e05ba73a79ff1595e8e172f5559aefed05d04f78cc3c69` |
