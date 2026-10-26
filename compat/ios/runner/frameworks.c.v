@@ -403,6 +403,8 @@ fn framework_constant(symbol string) ?u64 {
 		'_UIApplicationWillResignActiveNotification' { 'UIApplicationWillResignActiveNotification' }
 		'_UISceneDidActivateNotification' { 'UISceneDidActivateNotification' }
 		'_UISceneWillDeactivateNotification' { 'UISceneWillDeactivateNotification' }
+		'_UISceneWillEnterForegroundNotification' { 'UISceneWillEnterForegroundNotification' }
+		'_UISceneDidEnterBackgroundNotification' { 'UISceneDidEnterBackgroundNotification' }
 		'_UIWindowSceneSessionRoleApplication' { 'UIWindowSceneSessionRoleApplication' }
 		'_NSCocoaErrorDomain' { 'NSCocoaErrorDomain' }
 		'_NSMachErrorDomain' { 'NSMachErrorDomain' }

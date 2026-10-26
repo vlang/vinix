@@ -33,7 +33,7 @@ fn main() {
 	revision := os.args[3]
 	if revision.len != 40 || revision.bytes().any(!it.is_hex_digit()) { panic('invalid revision') }
 	os.chdir(root) or { panic(err) }
-	listing := os.exec(['git', 'ls-tree', '-r', '--name-only', revision, '--', 'compat/ios', 'tests/ios/native-checks.v', 'tests/ios/native-init.v', 'tests/ios/notification-checks.v', 'tests/ios/notification-vm.v', 'tests/ios/image-initializers-evidence.v', 'tests/ios/image-initializers-input-inventory.v', 'tests/ios/string-character-search-evidence.v', 'tests/ios/startup-host.v', 'tests/ios/inspect-string-character-search.v'])
+	listing := os.exec(['git', 'ls-tree', '-r', '--name-only', revision, '--', 'compat/ios', 'tests/ios/native-checks.v', 'tests/ios/native-init.v', 'tests/ios/notification-checks.v', 'tests/ios/notification-vm.v', 'tests/ios/image-initializers-evidence.v', 'tests/ios/image-initializers-input-inventory.v', 'tests/ios/string-character-search-evidence.v', 'tests/ios/scene-notifications-evidence.v', 'tests/ios/startup-host.v', 'tests/ios/inspect-string-character-search.v', 'tests/ios/inspect-scene-notifications.v'])
 	if listing.exit_code != 0 { panic(listing.output) }
 	paths_in_revision := listing.output.trim_space().split_into_lines()
 	os.write_file(out + '/source-files.txt', paths_in_revision.join('\n') + '\n') or { panic(err) }
@@ -76,6 +76,8 @@ fn main() {
 	for path in ['/opt/homebrew/opt/llvm/bin/clang', '/usr/bin/clang',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSObject.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/objc/runtime.h',
+		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/iOSSupport/System/Library/Frameworks/UIKit.framework/Versions/A/Headers/UIScene.h',
+		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/iOSSupport/System/Library/Frameworks/UIKit.framework/Versions/A/UIKit.tbd',
 		'/opt/homebrew/bin/qemu-system-aarch64', '/opt/homebrew/share/qemu/edk2-aarch64-code.fd'] {
 		lines << (digest(path) or { panic(err) }) + '  ' + path
 	}
