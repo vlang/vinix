@@ -3,7 +3,7 @@ module modulestream
 
 import os
 
-#include <spawn.h>
+#include "@VMODROOT/spawn_abi.h"
 #include <sys/wait.h>
 #include <errno.h>
 #include <signal.h>
