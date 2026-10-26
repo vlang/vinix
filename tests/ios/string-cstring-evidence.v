@@ -163,7 +163,6 @@ fn native_observations(out string) ! {
 
 fn cstring_observations(out string) ! {
 	lines := require_text(out, 'inspect.log', [])!.split_into_lines().filter(it.starts_with('CSTRING-NATIVE:'))
-	if lines.len != 1060 { return error('incomplete native CString matrix') }
 	mut expected := map[string]bool{}
 	for name in ['NSString', 'NSMutableString'] {
 		prefix := 'CSTRING-NATIVE: class=' + name
@@ -187,6 +186,7 @@ fn cstring_observations(out string) ! {
 			expected[prefix + ' encoding=4 input=' + input + ' output=' + outputs[i]] = true
 		}
 	}
+	if lines.len != expected.len { return error('incomplete native CString matrix') }
 	mut seen := map[string]bool{}
 	for line in lines {
 		if line !in expected || line in seen { return error('changed or repeated native CString case: ' + line) }
