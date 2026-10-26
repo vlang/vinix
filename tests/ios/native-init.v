@@ -5,6 +5,7 @@ module main
 import os
 import probebudget
 import probefault
+import probedesktop
 
 #include <unistd.h>
 #include <sys/wait.h>
@@ -505,16 +506,39 @@ fn main() {
 		}
 		budget := os.read_file('/opt/ios/probe-memory-max') or { '' }
 		if budget != '' && mode != 'probe-no-ads' { panic('budget requires probe-no-ads') }
+		desktop := os.read_file('/opt/ios/probe-desktop') or { '' }
+		if desktop !in ['', '1'] || (desktop == '1' && mode != 'probe-no-ads') {
+			panic('desktop peer requires probe-no-ads')
+		}
+		if desktop == '1' {
+			fixture := probedesktop.run('/opt/ios/window-checks', [], probebudget.enter, '',
+				probedesktop.Config{reply_ms: 5000, session_ms: 200}) or { panic(err) }
+			if !fixture.handshake || fixture.builds < 1 || fixture.polls < 1
+				|| !fixture.closed || fixture.forced || fixture.wait_status != 0 {
+				println('IOS-NATIVE: FAIL desktop window fixture')
+				panic('desktop window fixture')
+			}
+			println('IOS-PROBE-DESKTOP: UIKit window fixture PASS')
+		}
 		group := probebudget.prepare(budget) or {
 			eprintln('IOS-NATIVE: FAIL budget setup: ' + err.msg())
 			panic(err)
 		}
-		status := run_child_in_group('/opt/ios/run-ios', args, group)
+		mut status := i32(0)
+		mut forced := false
+		if desktop == '1' {
+			observation := probedesktop.run('/opt/ios/run-ios', args, probebudget.enter, group,
+				probedesktop.Config{}) or { panic(err) }
+			status = i32(observation.wait_status)
+			forced = observation.forced
+		} else {
+			status = run_child_in_group('/opt/ios/run-ios', args, group)
+		}
 		probebudget.finish(group) or {
 			eprintln('IOS-NATIVE: FAIL budget finish: ' + err.msg())
 			panic(err)
 		}
-		println('FORTNITE PROBE: process exit status ${if status & 127 == 0 {
+		println('FORTNITE PROBE: ${if forced { 'supervisor termination status' } else { 'process exit status' }} ${if status & 127 == 0 {
 			status >> 8
 		} else {
 			128 + (status & 127)

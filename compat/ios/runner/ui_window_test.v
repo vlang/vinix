@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import os
+
 type WindowTestSend = fn (u64, u64, u64, u64) u64
 
 fn window_test_msg(object u64, selector &char, argument u64) u64 {
@@ -90,4 +92,19 @@ fn test_ui_window() {
 		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
 	}
 	println('IOS-WINDOW: controllerless visibility/layout/touches, direct subviews, late root assignment, replacement/removal, callbacks, strong ownership and two drained runtimes')
+	// The standalone probe also launches this fixture through real VAPP pipes.
+	// Ordinary host/native runs retain their original entry/exit behavior.
+	if os.getenv('VINIX_REQUEST_FD') != '' {
+		objc_start()
+		window := objc_allocate(ios_runtime.names['UIWindow'])
+		obj_header(window).frame = ObjRect{0, 0, 390, 680}
+		window_test_msg(window, c'makeKeyAndVisible', 0)
+		objc_release(window)
+		ui_event_loop(os.getenv('VINIX_REQUEST_FD').int(), os.getenv('VINIX_RESPONSE_FD').int()) or {
+			panic(err)
+		}
+		objc_stop()
+		assert ios_runtime.live == 0
+		println('IOS-WINDOW: desktop protocol closed PASS')
+	}
 }

@@ -207,6 +207,10 @@ fn await_checks(mut p os.Process, log string, marker string) ! {
 }
 
 fn vm(root string, out string, mode string) {
+	desktop := os.getenv('VINIX_IOS_PROBE_DESKTOP')
+	if desktop !in ['', '1'] || (desktop == '1' && mode != 'probe-no-ads') {
+		panic('VINIX_IOS_PROBE_DESKTOP=1 requires probe-no-ads')
+	}
 	mut budget := ''
 	if configured := os.getenv_opt('VINIX_IOS_PROBE_MEMORY_MAX') {
 		if mode != 'probe-no-ads' { panic('VINIX_IOS_PROBE_MEMORY_MAX requires probe-no-ads') }
@@ -473,6 +477,7 @@ fn vm(root string, out string, mode string) {
 	// Explicitly overlay an empty value for unmanaged runs, even if the base
 	// archive was made from a previous budgeted probe.
 	os.write_file(fs + '/opt/ios/probe-memory-max', budget) or { panic(err) }
+	os.write_file(fs + '/opt/ios/probe-desktop', desktop) or { panic(err) }
 	println('VM probe memory.max: ' + if budget == '' { 'unmanaged' } else { budget })
 	archive := state + '/initramfs.tar.gz'
 	// Higher compression lets full-IPA audits preserve complete guest media
