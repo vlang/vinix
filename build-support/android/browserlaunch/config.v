@@ -20,10 +20,20 @@ fn C.geteuid() u32
 const manifest_header = 'vinix-android-browser-launch-v1'
 const manifest_limit = 4 * 1024 * 1024
 const file_limit = u64(2) * 1024 * 1024 * 1024
+const injected_bundle = 'usr/lib/webkitgtk-6.0/injected-bundle/libwebkitgtkinjectedbundle.so'
 const external_helpers = ['/lib/ld-musl-aarch64.so.1', '/usr/bin/xkbcomp', '/usr/bin/bwrap',
 	'/usr/libexec/webkitgtk-6.0/WebKitWebProcess',
 	'/usr/libexec/webkitgtk-6.0/WebKitNetworkProcess',
 	'/usr/libexec/webkitgtk-6.0/WebKitGPUProcess']
+// GIO's GnuTLS backend loads system trust from this compiled-in path. Protect
+// and pin it independently of executable helpers; caller CA overrides stay out.
+const external_data = ['/etc/ssl/certs/ca-certificates.crt']
+
+fn external_dependencies() []string {
+	mut paths := external_helpers.clone()
+	paths << external_data
+	return paths
+}
 
 // Retained dirfds detect replacement across the identity change and lazy wait.
 // The administrator must keep the deployment immutable through execution.
@@ -85,7 +95,7 @@ fn parse_manifest(text string) !Config {
 				if fields[2] in config.files { return error('duplicate browser file pin') }
 				config.files[fields[2]] = fields[1]
 			} else {
-				if fields[2] !in external_helpers || fields[2] in config.externals {
+				if (fields[2] !in external_helpers && fields[2] !in external_data) || fields[2] in config.externals {
 					return error('invalid or duplicate browser external helper')
 				}
 				config.externals[fields[2]] = fields[1]
@@ -128,10 +138,10 @@ fn parse_manifest(text string) !Config {
 	for key in ['exclusive-principal', 'root', 'loader', 'engine', 'xvfb', 'libraries', 'xkb', 'fonts', 'fontconfig'] {
 		if key !in seen { return error('missing browser configuration key: ' + key) }
 	}
-	for file in [config.loader, config.engine, config.xvfb, config.fontconfig] {
+	for file in [config.loader, config.engine, config.xvfb, config.fontconfig, injected_bundle] {
 		if file !in config.files { return error('browser executable/configuration lacks a file pin') }
 	}
-	for helper in external_helpers {
+	for helper in external_dependencies() {
 		if helper !in config.externals { return error('browser fixed-path helper lacks a file pin: ' + helper) }
 	}
 	return config
@@ -256,7 +266,9 @@ fn (config Config) verify_closure() ! {
 		info := protected_stat(fd, false) or { C.close(fd); return err }
 		actual := digest_fd(fd, file_limit) or { C.close(fd); return err }
 		C.close(fd)
-		if actual != expected || info.st_mode & 0o111 == 0 { return error('browser fixed helper pin/mode mismatch: ' + path) }
+		executable := info.st_mode & 0o111 != 0
+		if actual != expected || (path in external_helpers && !executable)
+			|| (path in external_data && executable) { return error('browser fixed dependency pin/mode mismatch: ' + path) }
 	}
 }
 

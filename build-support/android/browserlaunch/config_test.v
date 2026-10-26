@@ -9,10 +9,10 @@ fn complete_manifest() string {
 	mut lines := [manifest_header, 'exclusive-principal\t10042\t10043\t/var/lib/vinix/apps/10042',
 		'root\t/opt/vinix/browser', 'loader\tlib/ld.so', 'engine\tbin/engine', 'xvfb\tbin/Xvfb',
 		'libraries\tlib:lib64', 'xkb\tshare/xkb', 'fonts\tshare/fonts', 'fontconfig\tetc/fonts.conf']
-	for path in ['lib/ld.so', 'bin/engine', 'bin/Xvfb', 'etc/fonts.conf'] {
+	for path in ['lib/ld.so', 'bin/engine', 'bin/Xvfb', 'etc/fonts.conf', injected_bundle] {
 		lines << 'file\t${test_pin}\t${path}'
 	}
-	for path in external_helpers {
+	for path in external_dependencies() {
 		lines << 'external\t${test_pin}\t${path}'
 	}
 	return lines.join('\n') + '\n'
@@ -33,9 +33,9 @@ fn test_manifest_admits_only_complete_pinned_configuration() {
 	assert config.libraries == ['lib', 'lib64']
 	assert config.xkb == 'share/xkb' && config.fonts == 'share/fonts'
 	assert config.fontconfig == 'etc/fonts.conf'
-	assert config.files.len == 4 && config.externals.len == external_helpers.len
+	assert config.files.len == 5 && config.externals.len == external_helpers.len + external_data.len
 	assert config.files['bin/engine'] == test_pin
-	for path in external_helpers {
+	for path in external_dependencies() {
 		assert config.externals[path] == test_pin
 	}
 	config.close()
