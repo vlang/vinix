@@ -283,6 +283,14 @@ fn cleanup(mut owned map[int]Identity) !int {
 	return error('unreachable cleanup')
 }
 
+fn reap_broker(mut child os.Process) {
+	deadline := time.sys_mono_now() + 2 * time.second
+	for child.is_alive() {
+		if time.sys_mono_now() >= deadline { return }
+		time.sleep(20 * time.millisecond)
+	}
+}
+
 fn number(text string) !u32 {
 	if text == '' || text.len > 10 || (text.len > 1 && text[0] == `0`)
 		|| !text.bytes().all(it >= `0` && it <= `9`) || text.u64() > 0xffffffff {
@@ -946,7 +954,7 @@ fn broker_session(mut receipt Receipt) ! {
 	defer { child.close() }
 	receipt.broker = identity(child.pid) or {
 		child.signal_pgkill()
-		child.wait()
+		reap_broker(mut child)
 		return error('broker identity unavailable after spawn: ' + err.msg())
 	}
 	mut owned := {
@@ -958,7 +966,7 @@ fn broker_session(mut receipt Receipt) ! {
 		discover(mut owned) or {}
 		for item in selected_processes() or { []Identity{} } { owned[item.pid] = item }
 		kill_owned(owned)
-		child.wait()
+		reap_broker(mut child)
 		receipt.broker_exit = child.code
 		receipt.cleanup_survivors = cleanup(mut owned) or { -1 }
 		os.rm(broker_root + '/session.json') or {}
