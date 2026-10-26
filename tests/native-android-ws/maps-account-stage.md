@@ -32,6 +32,8 @@ maps-account-stage REQUEST_JSON REQUEST_SHA256 FRESH_OUTPUT
 maps-account-stage --audit-base BASE JAVA APKSIGNER_JAR FRESH_OUTPUT
 maps-account-stage --replay-ui ORIGINAL_UI_STAGE BASE FRESH_OUTPUT
 maps-account-stage --verify-inventory BUNDLE MANIFEST_SHA256
+maps-account-stage --audit-account-build BUNDLE MANIFEST_SHA256
+maps-account-stage --audit-ui-controller-build UI_BUNDLE UI_SHA256 FRAMEWORK FRAMEWORK_SHA256 NATIVE NATIVE_SHA256
 maps-account-stage --self-test
 clone-maps-account-stage SOURCE MANIFEST_SHA256 FRESH_OUTPUT
 ```
@@ -41,6 +43,14 @@ regular-file clones with matching file and directory modes, and rechecks both
 complete inventories and metadata trees. Its tool, source and provenance stay
 beside the output so the copied original manifest remains exact. Apply kernel
 patches and boot only the copy; retain the original sealed stage unchanged.
+
+Framework profiles require their exact class count: `cache-2102` has 2,102 and
+`descriptions-2104` has 2,104. Selected framework manifest, JAR and DEX pins
+remain exact. Builds that retain the ZIP authenticator consumer also require
+the complete original static zlib producer, exact retained archive and headers,
+actual dependency-file inputs and exact compile/link commands. A missing
+archive or dynamic zlib fallback fails the audit. The standalone UI controller
+has its own one-output profile; the launcher still requires all four outputs.
 
 Evidence under `/Users/alex/.local/state/vinix/android/`:
 
@@ -63,6 +73,15 @@ Evidence under `/Users/alex/.local/state/vinix/android/`:
   rejection checks, including ordered original-mode inheritance. Retained tool
   binaries and build logs use the `maps-account-stage-tool-r*` names; exact
   sources are embedded in each tool.
+- `maps-account-hostsha-module-tests-2026-10-26-r1.log` records all five module
+  test files passing after native host SHA was added (`a30b0c7a0`). It covers
+  native and portable digest vectors, binary/block boundaries, closed-state
+  rejection, framework profile/count mismatches and static zlib pin mutations.
+  `maps-account-r6-stager-audit.log` records the optimized stager's successful
+  complete inventory and static zlib audit of `current-account-build-2026-10-26-r6`
+  (producer source `bd119e164`, manifest
+  `0cfc569921b7afee59e538064e91683868200fe2b62f34da887636cde58fc0a4`).
+  The frozen r1/r2 tools remain unchanged.
 - `maps-account-r1` passed final staging with tool source `af6402672` and
   controller fix `27d5bfe47`. Its complete pre-kernel-patch manifest SHA-256 is
   `2982ad3dd8ac1e8de3c7169382788397be9551f58a19059e58311282a8380070`;

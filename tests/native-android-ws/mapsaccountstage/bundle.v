@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module mapsaccountstage
 
-import crypto.sha256
 import json2
 import os
 
 pub const baseline_seal = 'd99195272b8af813679cf54fed9f1e0341e6f1115804ac09c1cd2d5a8f942e3e'
 pub const compiler_seal = '0cc6c1d34c1811a818e4ae89853116861a4b067d4251af257851a7714f0d11fe'
 pub const sqlite_seal = '5a228127ca3ffa0c88bcae0aa5f7ab10e15b383dfb46822c573013105628bbaa'
+const zlib_root = '/Users/alex/.local/state/vinix/android/account-zlib-static-build-2026-10-26-r1'
+const zlib_seal = 'f2652acfdf8963998d51d767990ac72daae4c54a9ee6e956327cdf2ee462272f'
+const zlib_source = 'd9e270d46252734aa49770fbc544125391617956266f220bd63216c834f3a522'
 
 pub struct Bundle {
 pub:
@@ -27,7 +29,8 @@ pub:
 pub fn digest(path string) !string {
 	mut input := os.open(path)!
 	defer { input.close() }
-	mut state := sha256.new()
+	mut state := new_host_sha256()!
+	defer { state.close() }
 	mut buffer := []u8{len: 1024 * 1024}
 	for {
 		n := input.read(mut buffer) or {
@@ -35,9 +38,9 @@ pub fn digest(path string) !string {
 			return err
 		}
 		if n == 0 { break }
-		state.write(buffer[..n])!
+		state.update(buffer[..n])!
 	}
-	return state.sum([]u8{}).hex()
+	return state.finish()!
 }
 
 pub fn valid_pin(value string) bool {
@@ -99,6 +102,7 @@ pub fn recheck(bundle Bundle) ! {
 	if load_bundle(bundle.root, bundle.seal)!.files != bundle.files {
 		return error('sealed input changed during staging')
 	}
+	verify_zlib_dependency(bundle)!
 }
 
 pub fn text_field(value map[string]json2.Any, name string) !string {
@@ -172,8 +176,14 @@ pub fn verify_framework(bundle Bundle, seal string, jar string, dex string) !Fra
 		|| bundle.files['classes.dex']! != dex { return error('audited framework profile differs') }
 	exact_text(bundle.receipt, 'api_impl_sha256', jar)!
 	exact_text(bundle.receipt, 'classes_dex_sha256', dex)!
-	if !exact_integer(bundle.receipt['class_count']!, 2102) { return error('expected 2102-class framework') }
-	return Framework{jar, dex, text_field(bundle.receipt, 'profile')!}
+	profile := text_field(bundle.receipt, 'profile')!
+	count := match profile {
+		'cache-2102' { 2102 }
+		'descriptions-2104' { 2104 }
+		else { return error('unrecognized audited framework profile') }
+	}
+	if !exact_integer(bundle.receipt['class_count']!, count) { return error('framework profile class count differs') }
+	return Framework{jar, dex, profile}
 }
 
 fn coupled_framework(bundle Bundle, framework Bundle) ! {
@@ -240,6 +250,80 @@ fn includes(bundle Bundle, label string) []string {
 	return result
 }
 
+fn uses_zlib(bundle Bundle, label string) bool {
+	return bundle.files.keys().any(it.starts_with('closure/' + label + '/')
+		&& it.ends_with('/accountmanifest/authenticator_zip.v'))
+}
+
+fn verify_zlib_dependency(bundle Bundle) ! {
+	uses := bundle.files.keys().any(it.starts_with('closure/')
+		&& it.ends_with('/accountmanifest/authenticator_zip.v'))
+	if !uses {
+		if 'zlib-dependency.json' in bundle.files { return error('unexpected zlib dependency without retained consumer') }
+		return
+	}
+	dependency := receipt_file(bundle, 'zlib-dependency.json')!
+	if dependency != {
+		'bundle': json2.Any(zlib_root)
+		'sha256': json2.Any(zlib_seal)
+		'source_archive_sha256': json2.Any(zlib_source)
+	} { return error('static zlib dependency selection differs') }
+	// The complete original producer remains required, even though consumers
+	// retain only the archive and headers that their build actually read.
+	producer := load_bundle(zlib_root, zlib_seal)!
+	verify_retained_zlib(bundle, producer)!
+}
+
+fn verify_retained_zlib(bundle Bundle, producer Bundle) ! {
+	retained_manifest(bundle, 'zlib-producer-sha256.json', zlib_seal)!
+	retained_manifest(bundle, 'zlib-producer-build.json', producer.files['build.json']!)!
+	exact_text(producer.receipt, 'kind', 'vinix-account-zlib-static-v1')!
+	exact_text(producer.receipt, 'source_archive_sha256', zlib_source)!
+	exact_text(producer.receipt, 'architecture', 'aarch64')!
+	if producer.receipt['pic'] or { json2.Any(false) } != json2.Any(true) { return error('PIC static zlib required') }
+	mut expected := map[string]string{}
+	for path in ['lib/libz.a', 'native/zlib.h', 'native/zconf.h'] {
+		pin := producer.files[path] or { return error('zlib producer output absent: ' + path) }
+		retained_manifest(bundle, 'zlib/' + path, pin)!
+		expected[bundle.root + '/zlib/' + path] = pin
+	}
+	consumed := json2.decode[map[string]string](json2.encode(receipt_file(bundle, 'zlib-native-inputs.json')!))!
+	if consumed != expected { return error('exact static zlib consumed inputs differ') }
+}
+
+fn build_includes(bundle Bundle, label string) []string {
+	mut result := if uses_zlib(bundle, label) { ['-I' + bundle.root + '/zlib/native'] } else { []string{} }
+	result << includes(bundle, label)
+	return result
+}
+
+fn verify_zlib_consumption(bundle Bundle, label string) ! {
+	if !uses_zlib(bundle, label) { return }
+	headers := json2.decode[map[string]string](json2.encode(receipt_file(bundle, 'generated/' + label + '-headers.json')!))!
+	for name in ['zlib.h', 'zconf.h'] {
+		path := 'zlib/native/' + name
+		if headers[bundle.root + '/' + path] or { '' } != bundle.files[path]! {
+			return error('retained zlib header was not consumed: ' + label + '/' + name)
+		}
+	}
+	archive := bundle.root + '/zlib/lib/libz.a'
+	inputs := json2.decode[map[string]string](json2.encode(receipt_file(bundle, 'generated/' + label + '-link-inputs.json')!))!
+	if inputs[archive] or { '' } != bundle.files['zlib/lib/libz.a']! { return error('retained zlib archive was not consumed') }
+	log := 'commands/build-' + label + '.log'
+	if log !in bundle.files { return error('sealed zlib link trace absent') }
+	verify_zlib_trace(os.read_file(bundle.root + '/' + log)!, archive)!
+}
+
+fn verify_zlib_trace(trace string, archive string) ! {
+	mut found := false
+	for line in trace.split_into_lines() {
+		path := line.trim_space()
+		if path == archive { found = true }
+		if os.file_name(path).starts_with('libz.so') { return error('dynamic zlib link fallback') }
+	}
+	if !found { return error('static zlib archive absent from link trace') }
+}
+
 fn closure_source(bundle Bundle, label string, suffix string) !string {
 	names := bundle.files.keys().filter(it.starts_with('closure/' + label + '/') && it.ends_with(suffix))
 	if names.len != 1 { return error('source closure is absent or ambiguous: ' + label + suffix) }
@@ -292,6 +376,7 @@ pub fn verify_launch(bundle Bundle, framework Bundle, native Bundle) ! {
 	common_receipt(bundle, 'vinix-current-launch-v1')!
 	coupled_framework(bundle, framework)!
 	retained_manifest(bundle, 'baseline-sha256.json', baseline_seal)!
+	verify_zlib_dependency(bundle)!
 	if !exact_integer(bundle.receipt['service_main_argc']!, 7) { return error('seven-argument service ABI required') }
 	output_map(bundle, 'outputs_sha256', launch_items().map('bin/' + it[1]))!
 	if bundle.files['abi/headless.v']! != native.files['native/atlframework/headless.v']! {
@@ -310,19 +395,23 @@ pub fn verify_launch(bundle Bundle, framework Bundle, native Bundle) ! {
 		if elf.runpath != '' || elf.interpreter != if label == 'native-entry' { '/lib/ld-musl-aarch64.so.1' } else { '' }
 			|| (label != 'native-entry' && elf.needed.len != 0) { return error('launch static/dynamic contract differs: ' + label) }
 		verify_generated(bundle, label, closure_source(bundle, label, item[2])!, [])!
-		header_flags := includes(bundle, label)
+		header_flags := build_includes(bundle, label)
 		verify_compile(bundle, label, bundle.root + '/generated/' + label + '.c', header_flags, false, false)!
 		verify_compile(bundle, label, closure_source(bundle, label, '/vlib/builtin/segfault_handler_nix.c')!, header_flags, false, true)!
 		mut expected := [cross, '-v', '-no-pie', '-pthread', '-Wl,-t']
 		if label != 'native-entry' { expected << '-static' }
-		expected << [bundle.root + '/generated/' + label + '.o', bundle.root + '/generated/' + label + '-runtime.o', '-ldl', '-lm', '-o', bundle.root + '/' + output]
+		expected << [bundle.root + '/generated/' + label + '.o', bundle.root + '/generated/' + label + '-runtime.o']
+		if uses_zlib(bundle, label) { expected << bundle.root + '/zlib/lib/libz.a' }
+		expected << ['-ldl', '-lm', '-o', bundle.root + '/' + output]
 		if command_args(bundle, 'build-' + label)! != expected { return error('launch link receipt differs: ' + label) }
+		verify_zlib_consumption(bundle, label)!
 	}
 }
 
 pub fn verify_account(bundle Bundle) !map[string]string {
 	common_receipt(bundle, 'vinix-current-account-v1')!
 	retained_manifest(bundle, 'baseline-sha256.json', baseline_seal)!
+	verify_zlib_dependency(bundle)!
 	output_map(bundle, 'outputs_sha256', ['lib/libvinix-android-account.so'])!
 	dependencies := json2.decode[map[string]string](json2.encode(bundle.receipt['runtime_dependencies_sha256']!))!
 	if dependencies != {'lib/libsqlite3.so.0': sqlite_seal} { return error('store account transport requires the sealed SQLite runtime') }
@@ -331,7 +420,8 @@ pub fn verify_account(bundle Bundle) !map[string]string {
 	bytes := os.read_bytes(output)!
 	if bytes.len < 18 || u16_at(bytes, 16) != 3 { return error('account output must be a shared object') }
 	elf := inspect_elf(bytes)!
-	if elf.interpreter != '' || elf.runpath != '' || 'libsqlite3.so.0' !in elf.needed {
+	if elf.interpreter != '' || elf.runpath != '' || 'libsqlite3.so.0' !in elf.needed
+		|| elf.needed.any(it.starts_with('libz.so')) {
 		return error('store transport ELF dependency or search path differs')
 	}
 	sqlite := inspect_elf(os.read_bytes(bundle.root + '/lib/libsqlite3.so.0')!)!
@@ -349,12 +439,43 @@ pub fn verify_account(bundle Bundle) !map[string]string {
 	}
 	source := bundle.root + '/closure/account/Users/alex/code/vinix/build-support/android/accountclient'
 	verify_generated(bundle, 'account', source, ['-enable-globals', '-manualfree', '-shared', '-d', 'no_backtrace', '-d', 'no_segfault_handler'])!
-	mut header_flags := includes(bundle, 'account')
+	mut header_flags := build_includes(bundle, 'account')
 	header_flags << '-I' + bundle.root + '/native'
 	verify_compile(bundle, 'account', bundle.root + '/generated/account.c', header_flags, true, false)!
 	verify_compile(bundle, 'account', closure_source(bundle, 'account', '/vlib/builtin/segfault_handler_nix.c')!, header_flags, true, true)!
-	expected := [cross, '-v', '-shared', '-pthread', '-Wl,-z,defs', '-Wl,-z,max-page-size=65536', '-Wl,-t',
-		bundle.root + '/generated/account.o', bundle.root + '/generated/account-runtime.o', bundle.root + '/lib/libsqlite3.so.0', '-ldl', '-lm', '-o', output]
+	mut expected := [cross, '-v', '-shared', '-pthread', '-Wl,-z,defs', '-Wl,-z,max-page-size=65536', '-Wl,-t',
+		bundle.root + '/generated/account.o', bundle.root + '/generated/account-runtime.o', bundle.root + '/lib/libsqlite3.so.0']
+	if uses_zlib(bundle, 'account') { expected << bundle.root + '/zlib/lib/libz.a' }
+	expected << ['-ldl', '-lm', '-o', output]
 	if command_args(bundle, 'build-account')! != expected { return error('account strict shared-link receipt differs') }
+	verify_zlib_consumption(bundle, 'account')!
 	return dependencies
+}
+
+// A standalone UI build has one exact output; it must never weaken the four
+// outputs required by verify_launch for the production runtime.
+pub fn verify_ui_controller(bundle Bundle, framework Bundle, native Bundle) ! {
+	common_receipt(bundle, 'vinix-account-ui-controller-build-v1')!
+	exact_text(bundle.receipt, 'profile', 'ui-controller')!
+	coupled_framework(bundle, framework)!
+	retained_manifest(bundle, 'baseline-sha256.json', baseline_seal)!
+	verify_zlib_dependency(bundle)!
+	if !exact_integer(bundle.receipt['service_main_argc']!, 7)
+		|| bundle.files['abi/headless.v']! != native.files['native/atlframework/headless.v']! {
+		return error('standalone UI service ABI differs')
+	}
+	label := 'account-ui-controller'
+	output_map(bundle, 'outputs_sha256', ['bin/' + label])!
+	elf := inspect_elf(os.read_bytes(bundle.root + '/bin/' + label)!)!
+	if elf.needed.len != 0 || elf.interpreter != '' || elf.runpath != '' { return error('standalone UI controller must be static') }
+	verify_generated(bundle, label, closure_source(bundle, label, '/tests/native-android-ws/account-ui-controller.v')!, [])!
+	header_flags := build_includes(bundle, label)
+	verify_compile(bundle, label, bundle.root + '/generated/' + label + '.c', header_flags, false, false)!
+	verify_compile(bundle, label, closure_source(bundle, label, '/vlib/builtin/segfault_handler_nix.c')!, header_flags, false, true)!
+	mut expected := [cross, '-v', '-no-pie', '-pthread', '-Wl,-t', '-static',
+		bundle.root + '/generated/' + label + '.o', bundle.root + '/generated/' + label + '-runtime.o']
+	if uses_zlib(bundle, label) { expected << bundle.root + '/zlib/lib/libz.a' }
+	expected << ['-ldl', '-lm', '-o', bundle.root + '/bin/' + label]
+	if command_args(bundle, 'build-' + label)! != expected { return error('standalone UI link receipt differs') }
+	verify_zlib_consumption(bundle, label)!
 }

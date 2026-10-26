@@ -27,6 +27,7 @@ const signer_pin = '00ef9948f843fe395d2440ae3ef41405b8040a6d5d46493bd1902ac0ee6d
 const retained = {
 	'tests/native-android-ws/maps-account-stage.v': carry($embed_file(@FILE))
 	'tests/native-android-ws/mapsaccountstage/bundle.v': carry($embed_file("mapsaccountstage/bundle.v"))
+	'tests/native-android-ws/mapsaccountstage/hostsha.v': carry($embed_file("mapsaccountstage/hostsha.v"))
 	'tests/native-android-ws/mapsaccountstage/elf.v': carry($embed_file("mapsaccountstage/elf.v"))
 	'tests/native-android-ws/mapsaccountstage/media.v': carry($embed_file("mapsaccountstage/media.v"))
 	'tests/native-android-ws/mapsaccountstage/headless.v': carry($embed_file("mapsaccountstage/headless.v"))
@@ -561,6 +562,23 @@ fn self_test() ! {
 
 fn main() {
 	if os.args.len == 2 && os.args[1] == '--self-test' { self_test() or { eprintln(err); exit(1) }; return }
+	if os.args.len == 8 && os.args[1] == '--audit-ui-controller-build' {
+		bundle := stage.load_bundle(os.args[2], os.args[3]) or { eprintln(err); exit(1) }
+		framework := stage.load_bundle(os.args[4], os.args[5]) or { eprintln(err); exit(1) }
+		native := stage.load_bundle(os.args[6], os.args[7]) or { eprintln(err); exit(1) }
+		stage.verify_native(native, framework) or { eprintln(err); exit(1) }
+		stage.verify_ui_controller(bundle, framework, native) or { eprintln(err); exit(1) }
+		for input in [bundle, framework, native] { stage.recheck(input) or { eprintln(err); exit(1) } }
+		println('MAPS-ACCOUNT-UI-BUILD PASS complete inventories exact standalone profile and retained compile/link receipts')
+		return
+	}
+	if os.args.len == 4 && os.args[1] == '--audit-account-build' {
+		bundle := stage.load_bundle(os.args[2], os.args[3]) or { eprintln(err); exit(1) }
+		stage.verify_account(bundle) or { eprintln(err); exit(1) }
+		stage.recheck(bundle) or { eprintln(err); exit(1) }
+		println('MAPS-ACCOUNT-BUILD PASS complete inventory static zlib producer and exact shared-link receipts')
+		return
+	}
 	if os.args.len == 4 && os.args[1] == '--verify-inventory' {
 		files := stage.load_inventory(os.args[2], os.args[3]) or { eprintln(err); exit(1) }
 		println('MAPS-INVENTORY PASS files=' + files.len.str())
