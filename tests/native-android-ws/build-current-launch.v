@@ -583,6 +583,19 @@ fn build(root string, framework string) ! {
 	println('CURRENT-LAUNCH-BUILD-PASS bundle=' + root + ' seal=' + hash(root + '/sha256.json')!)
 }
 
+fn account_sqlite(root string, base_pins map[string]string) !map[string]string {
+	reused := json2.decode[map[string]string](os.read_file(root + '/reused-inputs.json')!)!
+	source := state + 'account-contract-companion-build-2026-10-26/inputs/build/android-framework/calculator/overlay/opt/vinix-android-aarch64/usr/lib/libsqlite3.so.0'
+	pin := reused[source] or { return error('SQLite runtime absent from sealed r5 dependencies') }
+	header := root + '/native/sqlite3.h'
+	library := root + '/lib/libsqlite3.so.0'
+	sealed_copy(base, base_pins, 'native/sqlite3.h', header)!
+	copy_pin(source, library, pin)!
+	pins := {header: hash(header)!, library: pin}
+	write_json(root + '/account-native-inputs.json', pins)!
+	return pins
+}
+
 fn build_account(root string) ! {
 	if hash(base + '/sha256.json')! != base_seal { return error('sealed r5 baseline differs') }
 	base_pins := json2.decode[map[string]string](os.read_file(base + '/sha256.json')!)!
@@ -606,7 +619,13 @@ fn build_account(root string) ! {
 	originals := freeze_closure(root, 'account', command(root, 'account-closure', discover)!)!
 	write_json(root + '/current-inputs.json', originals)!
 	unchanged(originals)!
-	cross_pins := cross_inputs(root, base_pins)!
+	mut cross_pins := cross_inputs(root, base_pins)!
+	uses_sqlite := originals.keys().any(it.contains('/accountstore/'))
+	mut runtime_dependencies := map[string]string{}
+	if uses_sqlite {
+		for path, pin in account_sqlite(root, base_pins)! { cross_pins[path] = pin }
+		runtime_dependencies['lib/libsqlite3.so.0'] = hash(root + '/lib/libsqlite3.so.0')!
+	}
 	closure := frozen_pins(root, 'account')!
 	v := os.dir(closure_vlib(closure)!) + '/v'
 	copy_pin(root + '/tools/v', v, compiler_pin)!
@@ -624,7 +643,8 @@ fn build_account(root string) ! {
 	generate << ['-o', generated, source]
 	command_at(root, 'generate-account', os.dir(v), generate)!
 	unchanged(closure)!
-	includes := native_includes(closure)
+	mut includes := native_includes(closure)
+	if uses_sqlite { includes << '-I' + root + '/native' }
 	check_headers_flags(root, 'account', generated, cross_pins, closure, includes, ['-fPIC'])!
 	object := root + '/generated/account.o'
 	mut compile := [cross, '-v', '-D_GNU_SOURCE', '-O2', '-fwrapv', '-pthread', '-fPIC',
@@ -642,8 +662,10 @@ fn build_account(root string) ! {
 	runtime_compile << ['-c', runtime_source, '-o', runtime_object]
 	command(root, 'compile-account-runtime', runtime_compile)!
 	output := root + '/lib/libvinix-android-account.so'
-	link := [cross, '-v', '-shared', '-pthread', '-Wl,-z,defs', '-Wl,-z,max-page-size=65536',
-		'-Wl,-t', object, runtime_object, '-ldl', '-lm', '-o', output]
+	mut link := [cross, '-v', '-shared', '-pthread', '-Wl,-z,defs', '-Wl,-z,max-page-size=65536',
+		'-Wl,-t', object, runtime_object]
+	if uses_sqlite { link << root + '/lib/libsqlite3.so.0' }
+	link << ['-ldl', '-lm', '-o', output]
 	check_link(root, 'account', command(root, 'build-account', link)!, [object, runtime_object], cross_pins)!
 	account_elf(os.read_bytes(output)!)!
 	nm := command(root, 'cross-tool-nm', [cross, '-print-prog-name=nm'])!.trim_space()
@@ -657,6 +679,8 @@ fn build_account(root string) ! {
 	unchanged(cross_pins)!
 	unchanged(builder_pins)!
 	if hash(base + '/sha256.json')! != base_seal { return error('sealed baseline changed') }
+	mut dependency_fields := map[string]json2.Any{}
+	for path, pin in runtime_dependencies { dependency_fields[path] = pin }
 	write_json(root + '/build.json', {
 		'kind': json2.Any('vinix-current-account-v1')
 		'scope': json2.Any('Current account transport ABI; retained V/C sources and cross inputs; no guest or account login claim.')
@@ -666,6 +690,7 @@ fn build_account(root string) ! {
 		'compiler_sha256': json2.Any(compiler_pin)
 		'exports': json2.Any(exports)
 		'outputs_sha256': json2.Any({'lib/libvinix-android-account.so': json2.Any(hash(output)!)})
+		'runtime_dependencies_sha256': json2.Any(dependency_fields)
 		'completed_utc': json2.Any(time.utc().str())
 	})!
 	write_json(root + '/frozen-execution.json', {
