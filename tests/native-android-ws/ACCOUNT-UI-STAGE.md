@@ -125,3 +125,16 @@ all six original modules passed unchanged hash checks and overlay readback.
 The staged firmware SHA-256 remains
 `d3b3f7afddb44de7020b8544270a67791fca44a48864dcd550cefee633463cbf`.
 No guest was launched by this replay, which proves no ART or Google sign-in.
+
+Independent read-only artifact review is retained in
+`check-account-ui-argv-stage.v` at `4dd935b86`. Its assertions-enabled build and
+rerun passed all 774 stage output files, 699 recorded stage inputs, retained
+compiled controller sources, and the six streamed module preservation receipts.
+The external evidence prefix is
+`/Users/alex/.local/state/vinix/android/check-account-ui-argv-stage-host-2026-10-26-r1`;
+the `.v` source SHA-256 is
+`1abbea12ff3e6e5a302ed6bf26865a74bd59db7cf4b5e2af94044565eb41dce8`,
+executable SHA-256 is
+`a8d70ac590c75270bfeec41b25f49b4d1fef12eb824c00d8c10b0bc586981eb0`,
+and `.log` SHA-256 is
+`792bc0359cb5eab0d4424f1ff1cb6b5cfdb4f76d875423e198af4b289b8004f4`.
