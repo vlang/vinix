@@ -31,7 +31,8 @@ fn software_view_service_fixture(args []string) bool {
 	defer { unsafe { text.free() } }
 	if mode == 'held' {
 		print(text); flush_stdout()
-		mut release := u8(0); assert C.read(0, &release, 1) == 1 && release == `!`
+		mut release := u8(0)
+		if C.read(0, &release, 1) != 1 || release != `!` { panic('catalog fixture release barrier failed') }
 		return true
 	}
 	println(match mode {
@@ -64,6 +65,7 @@ fn check_software_view_reader() ! {
 	check_software_installed_name_search()!
 	check_software_search_paste()
 	check_software_catalog_browser()!
+	check_software_compact_launch_entry()!
 	mut app := SoftwareApp{ service_path: os.executable(), administration_required: true, query: []u8{cap: 256}, output: []u8{cap: 8192} }
 	defer { os.unsetenv('VINIX_SOFTWARE_VIEW_FIXTURE'); app.close_app() }
 	text := json2.encode(software_view_fixture())
@@ -235,8 +237,8 @@ fn catalog_browser_cycle(mut app SoftwareApp) ! {
 	free_window_tree(app.build(ui2.rect(0, 0, 180, 220))!)
 	app.key_input('\x1b'); assert !app.details_mode && app.catalog_browser_mode && app.details_pages.len == 0
 	for action in ['software.install', 'software.remove', 'software.upgrade', 'software.reload', 'software.refresh',
-		'software.confirm', 'software.run', 'software.repositories', 'software.deployment']! { app.handle(action)! }
-	assert app.worker == unsafe { nil } && !app.admin_prompt && app.review == '' && app.launch_request == ''
+		'software.confirm', 'software.run', 'software.run-options', 'software.repositories', 'software.deployment']! { app.handle(action)! }
+	assert app.worker == unsafe { nil } && !app.admin_prompt && !app.launch_mode && app.review == '' && app.launch_request == ''
 	free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!)
 	app.key_input('\x1b'); assert !app.catalog_browser_mode && app.selected == 31 && app.filter == 0
 }
@@ -334,6 +336,110 @@ fn check_software_catalog_browser() ! {
 	invalid := app.build(ui2.rect(0, 0, 180, 220))!; assert invalid.children.any(it.text == app.status); free_window_tree(invalid)
 	app.key_input('\x1b')
 	println('Software compact catalog: both architectures, all six kinds, 4096 packages, search/filter/empty states, complete Details, native controls, resize selection, read-only actions and Back passed')
+}
+
+fn check_software_compact_launch_entry() ! {
+	// The button and existing dispatch must agree on installed eligibility,
+	// including when candidate kind and permissions describe a future update.
+	for architecture in ['aarch64', 'x86_64']! {
+		for kind in ['native', 'linux', 'windows', 'apple', 'runtime', 'data']! {
+			for protocol in [0, 1, 2]! {
+				for installed in [false, true]! {
+					mut app := SoftwareApp{ selected: 0, rows: [SoftwareRow{
+						id: 'selected-app', name: 'Candidate', kind: 'runtime', architecture: architecture,
+						installed_name: 'Installed application', installed_kind: kind,
+						installed_version: if installed { '1.0.0' } else { '' },
+						installed_window_protocol: protocol, installed_permissions: ['files'] }] }
+					defer { app.close_app() }
+					eligible := installed && protocol == 0 && kind !in ['runtime', 'data']
+					tree := app.build(ui2.rect(0, 0, 320, 240))!
+					compact_launch_require(tree.children.any(it.id == 'software.run-options') == eligible,
+						'compact entry disagrees with installed eligibility')
+					free_window_tree(tree)
+					app.handle('software.run-options')!
+					compact_launch_require(app.launch_mode == eligible && app.worker == unsafe { nil }
+						&& app.selected == 0, 'compact entry dispatch changed eligibility or selection')
+					if eligible {
+						compact_launch_require(app.launch_id == 'selected-app' && app.launch_name == 'Installed application'
+							&& app.launch_files_allowed, 'entry used candidate launch metadata')
+						app.handle('software.launch.back')!
+					}
+				}
+			}
+		}
+	}
+	mut app := launch_navigation_app()
+	defer { os.unsetenv('VINIX_SOFTWARE_VIEW_FIXTURE'); app.close_app() }
+	for selected in [-1, app.rows.len]! {
+		app.selected = selected
+		tree := app.build(ui2.rect(0, 0, 320, 240))!
+		compact_launch_require(!tree.children.any(it.id == 'software.run-options'), 'invalid selection exposed entry')
+		free_window_tree(tree)
+		app.handle('software.run-options')!
+		compact_launch_require(!app.launch_mode, 'invalid selection opened a draft')
+	}
+	app.selected = 0
+	// Legacy installed metadata uses the same candidate fallback as full layout.
+	app.rows[0] = SoftwareRow{ ...app.rows[0], installed_kind: '', kind: 'linux' }
+	compact_launch_tree(mut app, 320, 240, 'software.run-options')!
+	app.handle('software.run-options')!
+	compact_launch_require(app.launch_mode, 'legacy eligible selection lost entry')
+	app.handle('software.launch.back')!
+	app.rows[0] = SoftwareRow{ ...app.rows[0], installed_kind: 'linux' }
+	app.review = 'install'.clone()
+	review := app.build(ui2.rect(0, 0, 320, 240))!
+	compact_launch_require(!review.children.any(it.id == 'software.run-options'), 'pending review exposed entry')
+	free_window_tree(review); app.clear_review()
+	app.set_status('Choose an installed application, then open Launch options.')
+	arguments := ['run-args']
+	defer { unsafe { (&array(&arguments)).free() } }
+	app.capture_failure(arguments, 17); app.progress_seen = true
+	for size in [ui2.rect(0, 0, 180, 220), ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 639, 609)]! {
+		compact_launch_tree(mut app, int(size.width), int(size.height), 'software.run-options')!
+		compact_launch_tree(mut app, int(size.width), int(size.height), 'software.failure')!
+	}
+	app.handle('software.catalog.browse')!
+	app.handle('software.catalog.previous')!
+	compact_launch_require(app.catalog_browser_mode && app.selected == 1, 'browser did not select the other installed app')
+	app.handle('software.run-options')!
+	compact_launch_require(app.catalog_browser_mode && !app.launch_mode && app.worker == unsafe { nil },
+		'browser started Launch options instead of staying read-only')
+	app.handle('software.catalog.back')!
+	for size in [ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 320, 240)]! {
+		free_window_tree(app.build(size)!)
+		compact_launch_require(app.selected == 1 && app.query.bytestr() == 'kept query' && app.filter == 2
+			&& app.matching == [1, 0] && app.scroll == 0, 'entry resize lost catalog state')
+	}
+	compact_launch_tree(mut app, 320, 240, 'software.run-options')!
+	app.handle('software.run-options')!
+	compact_launch_require(app.launch_mode && app.launch_id == 'no-files' && !app.launch_files_allowed,
+		'entry did not open the current installed selection')
+	compact_launch_tree(mut app, 320, 240, 'software.launch.arguments')!
+	app.handle('software.launch.arguments')!; app.paste_input('--literal "kept value"')
+	app.handle('software.launch.back')!
+	compact_launch_require(!app.launch_mode && app.launch_arguments.len == 0 && app.selected == 1
+		&& app.query.bytestr() == 'kept query' && app.filter == 2 && app.matching == [1, 0]
+		&& app.scroll == 0 && app.worker == unsafe { nil }, 'Back did not discard only the launch draft')
+	// Hold a real catalog worker: hidden and injected entry actions both refuse.
+	os.setenv('VINIX_SOFTWARE_VIEW_FIXTURE', 'held', true)
+	app.start(['view'], true)
+	compact_launch_require(app.worker != unsafe { nil }, 'held catalog worker did not start')
+	pid := app.worker.pid
+	wait_for_package_navigation_output(mut app, false)
+	compact_launch_require(app.worker != unsafe { nil } && app.worker.pid == pid && app.output.len > 0,
+		'held catalog worker did not reach its barrier')
+	busy := app.build(ui2.rect(0, 0, 320, 240))!
+	compact_launch_require(!busy.children.any(it.id == 'software.run-options'), 'busy catalog exposed entry')
+	free_window_tree(busy)
+	app.handle('software.run-options')!
+	compact_launch_require(!app.launch_mode && app.worker.pid == pid && C.kill(pid, 0) == 0
+		&& app.selected == 1 && app.query.bytestr() == 'kept query' && app.filter == 2,
+		'injected compact entry bypassed the running-worker guard')
+	release := u8(`!`)
+	compact_launch_require(C.write(app.worker.stdio_fd[0], &release, 1) == 1, 'held catalog release failed')
+	wait_for_software(mut app)
+	compact_launch_require(app.worker == unsafe { nil } && !app.launch_mode, 'catalog worker did not retire')
+	println('Software compact launch entry: PASS')
 }
 
 fn software_search_fixture_text(a &SoftwareApp) string {

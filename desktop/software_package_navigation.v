@@ -171,10 +171,11 @@ fn (mut a SoftwareApp) stop_package_review() {
 }
 
 fn (a &SoftwareApp) build_packages_compact(width int, height int) ui2.Element {
-	mut children := frame_elements(9)
+	mut children := frame_elements(10)
 	available := a.failure_pages.len > 0 && a.worker == unsafe { nil } && !a.details_mode
 	readable := a.package_review_readable() && !a.details_mode
 	browsable := a.catalog_browsable() && !a.details_mode
+	launchable := browsable && a.launch_options_available() && width >= 180 && height >= 220
 	children << software_label('Software', 14, 8, if a.status_readable() && width >= 180 { 60 } else { width - 28 }, 28, false)
 	if a.status_readable() && width >= 180 { children << software_button('software.status', 'Read status', width - 104, 8, 90) }
 	button_width := if width > 202 { 174 } else { width - 28 }
@@ -190,14 +191,32 @@ fn (a &SoftwareApp) build_packages_compact(width int, height int) ui2.Element {
 	} else {
 		children << software_label(if a.worker_view { 'Reading the software catalog…' } else { 'Wait for the operation to finish.' }, 14, 46, width - 28, 28, false)
 	}
-	if readable { children << software_button('software.report.read', 'Read plan', 14, 84, button_width) }
-	if browsable { children << software_button('software.catalog.browse', 'Browse catalog', 14, 84, button_width) }
-	if available { children << software_button('software.failure', 'Failure details', 14, if readable || browsable { 122 } else { 84 }, button_width) }
-	progress := a.progress_seen && height >= 240
+	mut next_y := 84
+	if readable {
+		children << software_button('software.report.read', 'Read plan', 14, next_y, button_width)
+		next_y += 38
+	}
+	if browsable {
+		paired := launchable && width >= 320
+		browse_width := if paired { (width - 40) / 2 } else { button_width }
+		children << software_button('software.catalog.browse', 'Browse catalog', 14, next_y, browse_width)
+		if paired {
+			children << software_button('software.run-options', 'Launch options', width - 14 - browse_width, next_y, browse_width)
+		}
+		next_y += 38
+		if launchable && !paired {
+			children << software_button('software.run-options', 'Launch options', 14, next_y, button_width)
+			next_y += 38
+		}
+	}
+	if available {
+		children << software_button('software.failure', 'Failure details', 14, next_y, button_width)
+		next_y += 38
+	}
+	progress := a.progress_seen && height >= 240 && next_y <= height - 110
 	if progress { children << a.progress_bar(width, height) }
-	minimum := if (readable || browsable) && available { 160 } else if readable || browsable || available { 122 } else { 84 }
 	footer := height - if progress { 88 } else { 98 }
-	y := if footer > minimum { footer } else { minimum }
+	y := if footer > next_y { footer } else { next_y }
 	children << software_label(a.status, 14, y, width - 28, if height > y + 8 { height - y - 8 } else { 1 }, false)
 	return ui2.screen(app_surface, children)
 }

@@ -15,24 +15,88 @@ import tools.sourcecommand
 
 const driver_path = 'tests/packages/software-compact-launch-check.v'
 const focused_marker = 'Software compact launch: PASS'
+const entry_marker = 'Software compact launch entry: PASS'
+const state_limit = u64(512 * 1024 * 1024)
+const log_limit = u64(16 * 1024 * 1024)
 
 fn require(ok bool, message string) ! { if !ok { return error(message) } }
 fn digest(path string) !string { return sha256.sum(os.read_bytes(path)!).hex() }
 
+struct Budget {
+mut:
+	bytes u64
+	entries int
+}
+
+// Charge every observed object without following links. Compiler scratch files
+// can disappear during an inventory; all other filesystem errors refuse it.
+fn charge(path string, depth int, deadline u64, mut budget Budget) ! {
+	require(depth <= 128 && budget.entries < 250000 && time.sys_mono_now() < deadline,
+		'state inventory bound exceeded')!
+	info := os.lstat(path) or { if err.code() == C.ENOENT { return }; return err }
+	budget.entries++
+	require(info.size <= state_limit - budget.bytes, 'inclusive state exceeded 512 MiB')!
+	budget.bytes += info.size
+	match info.get_filetype() {
+		.regular {
+			if path.ends_with('.log') { require(info.size <= log_limit, 'log exceeded 16 MiB: ' + path)! }
+		}
+		.symbolic_link {}
+		.directory {
+			names := os.ls(path) or { if err.code() == C.ENOENT { return }; return err }
+			for name in names { charge(path + '/' + name, depth + 1, deadline, mut budget)! }
+		}
+		else { return error('unsupported state object: ' + path) }
+	}
+}
+
 struct Phase {
-	log string
+	roots []string
 	limit int
 mut:
 	pid int
+	peak u64
+	samples int
+	group_observation string
+}
+
+fn sample(mut phase Phase) ! {
+	mut budget := Budget{}
+	deadline := time.sys_mono_now() + 2 * u64(time.second)
+	for root in phase.roots { charge(root, 0, deadline, mut budget)! }
+	if budget.bytes > phase.peak { phase.peak = budget.bytes }
+	phase.samples++
 }
 
 fn observe_phase(pid int, context voidptr) ! {
 	mut phase := unsafe { &Phase(context) }
 	phase.pid = pid
+	require(pid > 1 && pid != C.getpgid(0), 'invalid child group identity')!
 	started := time.sys_mono_now()
+	mut next_sample := u64(0)
 	for {
-		require(os.file_size(phase.log) <= 16 * 1024 * 1024, 'phase log exceeded 16 MiB')!
-		if sourcecommand.child_exited(pid)! { return }
+		now := time.sys_mono_now()
+		if now >= next_sample { sample(mut phase)!; next_sample = now + 250 * u64(time.millisecond) }
+		if phase.group_observation == '' {
+			group := C.getpgid(pid)
+			group_error := C.errno
+			if group == pid {
+				phase.group_observation = 'private process group observed'
+			} else {
+				// Spawn configured the private group atomically. Darwin can remove
+				// it just before publishing a fast leader's WNOWAIT exit record.
+				require(group < 0 && group_error == C.ESRCH, 'child group not private')!
+				if sourcecommand.child_exited(pid)! {
+					phase.group_observation = 'leader exit observed with WNOWAIT after getpgid ESRCH'
+					sample(mut phase)!
+					return
+				}
+				require(time.sys_mono_now() - started < 5 * u64(time.second), 'child group exit observation timed out')!
+				time.sleep(time.millisecond)
+				continue
+			}
+		}
+		if sourcecommand.child_exited(pid)! { sample(mut phase)!; return }
 		require(time.sys_mono_now() - started < u64(phase.limit) * u64(time.second), 'phase deadline exceeded')!
 		time.sleep(10 * time.millisecond)
 	}
@@ -51,21 +115,25 @@ fn phase_retired(pid int) ! {
 	require(result == -1 && C.errno == C.ECHILD, 'waitable phase child remained')!
 }
 
-fn invoke(argv []string, log string) !(int, string) {
+fn invoke(argv []string, log string, roots []string) !(int, string) {
 	os.write_file(log + '.argv.json', json2.encode(argv) + '\n')!
-	mut phase := Phase{log: log, limit: if log.ends_with('.build.log') { 240 } else { 120 }}
+	mut phase := Phase{roots: roots, limit: if log.ends_with('.build.log') { 600 } else { 120 }}
+	sample(mut phase)!
 	mut refusal := ''
 	output := sourcecommand.run_logged_owned(argv, os.environ(), unsafe { nil }, log, false, '', observe_phase, &phase, 0) or {
 		refusal = err.msg(); sourcecommand.Output{}
 	}
 	mut receipt := {'exit_code': if refusal == '' { output.status.str() } else { 'unavailable after observer refusal' },
-		'pid': phase.pid.str(), 'limit_seconds': phase.limit.str(), 'refusal': refusal, 'cleanup': 'pending'}
+		'pid': phase.pid.str(), 'limit_seconds': phase.limit.str(), 'refusal': refusal,
+		'group_observation': phase.group_observation,
+		'sampled_peak_bytes': phase.peak.str(), 'samples': phase.samples.str(), 'cleanup': 'pending'}
 	os.write_file(log + '.exit.json', json2.encode(receipt) + '\n')!
 	if phase.pid > 1 { phase_retired(phase.pid)! }
-	receipt['cleanup'] = 'private process group absent; sole reap complete; ECHILD'
+	receipt['cleanup'] = if phase.pid > 1 { 'private process group absent; sole reap complete; ECHILD' } else { 'no child group started' }
 	os.write_file(log + '.exit.json', json2.encode(receipt) + '\n')!
 	require(refusal == '', refusal + '; see ' + log)!
-	require(os.file_size(log) <= 16 * 1024 * 1024, 'phase log exceeded 16 MiB')!
+	sample(mut phase)!
+	require(os.file_size(log) <= log_limit, 'phase log exceeded 16 MiB')!
 	text := os.read_file(log)!
 	for forbidden in ['V panic:', 'ERROR: AddressSanitizer', 'SUMMARY: AddressSanitizer',
 		'UndefinedBehaviorSanitizer', 'runtime error:'] {
@@ -125,7 +193,7 @@ fn one_marker(text string, marker string) ! {
 	require(text.split_into_lines().filter(it == marker).len == 1, 'PASS marker missing or duplicated: ' + marker)!
 }
 
-fn qualify(root string, output string, mut receipt map[string]string) ! {
+fn qualify(root string, output string, bootstrap string, mut receipt map[string]string) ! {
 	$if prod {} $else { return error('compile software-compact-launch-check with -prod') }
 	embedded := sha256.sum($embed_file('software-compact-launch-check.v').to_bytes()).hex()
 	require(digest(@FILE)! == embedded, 'driver source differs from executable')!
@@ -138,12 +206,26 @@ fn qualify(root string, output string, mut receipt map[string]string) ! {
 	os.setenv('V_MACOS_V3_CALLER_NO_FALLBACK', '1', true)
 	os.setenv('V_MACOS_V3_CALLER_NO_FALLBACK_PRESENT', '1', true)
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
+	os.setenv('V_SKIP_VVMRC', '1', true)
+	os.setenv('LLVM_BIN', os.dir(cc), true)
+	os.setenv('PATH', '/opt/homebrew/bin:/opt/homebrew/opt/llvm/bin:/usr/bin:/bin:/usr/sbin:/sbin', true)
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0:abort_on_error=1', true)
 	os.setenv('UBSAN_OPTIONS', 'halt_on_error=1', true)
 	for name in ['empty-vmodules', 'vtmp', 'tmp']! { os.mkdir(output + '/' + name)! }
 	os.setenv('VMODULES', os.real_path(output + '/empty-vmodules'), true)
 	os.setenv('VTMP', os.real_path(output + '/vtmp'), true)
 	os.setenv('TMPDIR', os.real_path(output + '/tmp'), true)
+	mut environment := map[string]string{}
+	for key in ['V', 'VEXE', 'V_MACOS_V3_CALLER_VEXE', 'V_MACOS_V3_CALLER_VEXE_PRESENT',
+		'V_MACOS_V3_CALLER_VCHILD_PRESENT', 'V_MACOS_V3_NO_FALLBACK', 'V_MACOS_V3_CALLER_NO_FALLBACK',
+		'V_MACOS_V3_CALLER_NO_FALLBACK_PRESENT', 'V_C_ERROR_BUG_REPORT_DISABLED', 'V_SKIP_VVMRC',
+		'LLVM_BIN', 'PATH', 'VMODULES', 'VTMP', 'TMPDIR', 'ASAN_OPTIONS', 'UBSAN_OPTIONS'] {
+		environment[key] = os.getenv(key)
+	}
+	os.write_file(output + '/environment.json', json2.encode(environment) + '\n')!
+	roots := [output, bootstrap]
+	mut initial := Phase{roots: roots}
+	sample(mut initial)!
 	paths := project_sources(root)!; ui_paths := ui_sources(modules)
 	hashes := inventory(root, paths)!; ui_hashes := inventory(modules, ui_paths)!
 	require(hashes[driver_path] == embedded, 'captured driver differs from executable')!
@@ -159,8 +241,14 @@ fn qualify(root string, output string, mut receipt map[string]string) ! {
 	os.write_file(output + '/executables.json', json2.encode(compiler_pins) + '\n')!
 	os.write_file(output + '/sources.json', json2.encode(hashes) + '\n')!
 	os.write_file(output + '/ui-sources.json', json2.encode(ui_hashes) + '\n')!
-	revision_code, revision := invoke(['/usr/bin/git', '-C', root, 'rev-parse', 'HEAD'], output + '/revision.log')!
+	revision_code, revision := invoke(['/usr/bin/git', '-C', root, 'rev-parse', 'HEAD'], output + '/revision.log', roots)!
 	require(revision_code == 0 && revision.trim_space().len == 40, 'cannot capture source revision')!
+	// Exercise real fast success and failure through the same owned observer.
+	// The explicit missing Git directory cannot inherit the caller's repository.
+	refusal_code, refusal_text := invoke(['/usr/bin/git', '--git-dir=' + output + '/missing-git-dir',
+		'rev-parse', '--verify', 'HEAD'], output + '/expected-git-refusal.log', roots)!
+	require(refusal_code == 128 && refusal_text != '', 'expected missing-repository Git refusal')!
+	receipt['observer_controls'] = 'Git revision exit 0 and explicit missing-repository Git exit 128'
 	receipt['project_revision'] = revision.trim_space()
 	receipt['driver_source_sha256'] = embedded
 	receipt['v_executable'] = v; receipt['clang_executable'] = cc
@@ -199,17 +287,19 @@ fn qualify(root string, output string, mut receipt map[string]string) ! {
 		if mode == 'prod' { argv << '-prod' }
 		if mode == 'sanitized' { argv << ['-d', 'no_segfault_handler', '-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags', '-fsanitize=address,undefined'] }
 		argv << ['-o', output + '/' + mode, app]
-		code, _ := invoke(argv, output + '/' + mode + '.build.log')!
+		code, _ := invoke(argv, output + '/' + mode + '.build.log', roots)!
 		require(code == 0, 'build failed; see ' + output + '/' + mode + '.build.log')!
-		run_code, text := invoke([output + '/' + mode, 'launch-compact'], output + '/' + mode + '.run.log')!
+		run_code, text := invoke([output + '/' + mode, 'launch-compact'], output + '/' + mode + '.run.log', roots)!
 		require(run_code == 0, 'focused check failed; see ' + output + '/' + mode + '.run.log')!
 		one_marker(text, focused_marker)!
+		one_marker(text, entry_marker)!
 		println('COMPACT LAUNCH ' + mode + ' build/check PASS')
 	}
 	// The historical fixture has assertion side effects and runs only normally.
-	legacy_code, legacy := invoke([output + '/normal'], output + '/normal.historical.log')!
+	legacy_code, legacy := invoke([output + '/normal'], output + '/normal.historical.log', roots)!
 	require(legacy_code == 0, 'historical normal Software fixture failed')!
 	one_marker(legacy, 'Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed')!
+	one_marker(legacy, entry_marker)!
 	require(project_sources(root)! == paths && ui_sources(modules) == ui_paths, 'source inventory changed')!
 	verify(root, paths, hashes)!; verify(source, paths, hashes)!
 	verify(modules, ui_paths, ui_hashes)!; verify(pristine_ui, ui_paths, ui_hashes)!; verify(ui, ui_paths, staged_ui)!
@@ -222,6 +312,8 @@ fn qualify(root string, output string, mut receipt map[string]string) ! {
 	for name in ['sources.json', 'ui-sources.json', 'staged-ui-sources.json', 'staged-sources.json', 'executables.json']! {
 		receipt[name + '_sha256'] = digest(output + '/' + name)!
 	}
+	mut final := Phase{roots: roots}
+	sample(mut final)!
 }
 
 fn write_result(output string, mut receipt map[string]string) ! {
@@ -236,29 +328,54 @@ fn write_result(output string, mut receipt map[string]string) ! {
 	os.write_file(output + '/result.json', json2.encode(receipt) + '\n')!
 }
 
+// A refused tree can exceed the inventory bounds. Preserve it without walking
+// or reading it again; the original complete sealer owns its later audit.
+fn write_failure(output string, mut receipt map[string]string) ! {
+	receipt.delete('artifact_inventory_sha256')
+	receipt['artifact_inventory_status'] = 'not claimed after refusal; preserved state requires original full sealer'
+	os.write_file(output + '/result.json', json2.encode(receipt) + '\n')!
+}
+
 fn main() {
-	if os.args.len != 5 { eprintln('usage: software-compact-launch-check V_EXECUTABLE CLANG_EXECUTABLE UI_MODULE_DIRECTORY NEW_OUTPUT_DIRECTORY'); exit(1) }
+	if os.args.len != 6 { eprintln('usage: software-compact-launch-check V_EXECUTABLE CLANG_EXECUTABLE UI_MODULE_DIRECTORY NEW_OUTPUT_DIRECTORY BOOTSTRAP_DIRECTORY'); exit(1) }
 	root := os.real_path(os.join_path(os.dir(@FILE), '../..'))
+	bootstrap := os.args[5]
+	if bootstrap != os.real_path(bootstrap) || !os.is_dir(bootstrap)
+		|| bootstrap != os.real_path(os.dir(os.executable())) || bootstrap == root || bootstrap.starts_with(root + '/') {
+		eprintln('provide the canonical external directory containing this owner'); exit(1)
+	}
 	requested := os.abs_path(os.args[4])
 	if !os.is_dir(os.dir(requested)) { eprintln('output parent directory must exist'); exit(1) }
 	output := os.join_path(os.real_path(os.dir(requested)), os.file_name(requested))
 	if os.exists(output) || os.is_link(output) || output == root || output.starts_with(root + '/') {
 		eprintln('provide a fresh external output directory'); exit(1)
 	}
+	if output == bootstrap || output.starts_with(bootstrap + '/') || bootstrap.starts_with(output + '/') {
+		eprintln('output and bootstrap charge roots must be disjoint'); exit(1)
+	}
 	os.mkdir(output, mode: 0o700) or { eprintln(err); exit(1) }
 	mut receipt := {
 		'format': '1'
 		'outcome': 'PASS'
 		'output_directory': output
+		'bootstrap_directory': bootstrap
+		'state_limit_bytes': state_limit.str()
+		'log_limit_bytes': log_limit.str()
 		'source_binding': 'source inventories bind captured bytes including uncommitted edits; revision is provenance only'
 		'scope': 'host headless compact Software launch controls; no guest rendering or wider section 14 qualification'
 		'toolchain_limit': 'project/UI inputs and executable pins only; imported vlib/thirdparty, headers, linker and transitive tools are not frozen; not hermetic'
 	}
-	qualify(root, output, mut receipt) or {
+	qualify(root, output, bootstrap, mut receipt) or {
 		receipt['outcome'] = 'FAIL'; receipt['error'] = err.msg()
-		write_result(output, mut receipt) or { eprintln('cannot finish failure receipt: ' + err.msg()) }
+		write_failure(output, mut receipt) or { eprintln('cannot finish failure receipt: ' + err.msg()) }
 		eprintln('COMPACT LAUNCH FAIL: ' + output + ': ' + err.msg()); exit(1)
 	}
 	write_result(output, mut receipt) or { eprintln(err); exit(1) }
+	mut final := Phase{roots: [output, bootstrap]}
+	sample(mut final) or {
+		receipt['outcome'] = 'FAIL'; receipt['error'] = err.msg()
+		write_failure(output, mut receipt) or { eprintln('cannot finish failure receipt: ' + err.msg()) }
+		eprintln('COMPACT LAUNCH FAIL: ' + output + ': ' + err.msg()); exit(1)
+	}
 	println('COMPACT LAUNCH three focused host variants and historical normal PASS: ' + output)
 }

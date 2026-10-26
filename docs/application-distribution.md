@@ -999,9 +999,13 @@ when the catalog presents a pending update with different metadata. The service
 continues to enforce the current installed state, trust and organization policy.
 See [qualification](../tests/packages/launch-options-check.md).
 
-Small windows retain **Back to catalog**, status and failure access; enlarge the
-window to edit arguments/grants or launch. Resizing preserves the entire draft
-and file-page selection. Escape leaves a focused field, then returns an idle
+In an idle compact Software window, **Browse catalog** selects an application.
+Return with **Back**, then use **Launch options** for the selected eligible
+installed application. Browsing itself remains read-only. Compact launch forms
+provide pages for arguments, adding and removing allowed files, working folder,
+**Run** and **Run in Terminal**, with **Back to catalog**, status and failure
+access. Resizing preserves the entire draft and file-page selection.
+Escape leaves a focused field, then returns an idle
 form to the catalog and discards its draft. Pasted Escape, Enter and other
 control bytes are rejected without editing or navigation. Running applications
 retain their close guard: Back, Escape and other form actions cannot interrupt
@@ -1017,7 +1021,7 @@ browse the grants without changing the form's selection or file page. Only the
 current grant's pages are cached, so all 256 grants can be inspected without
 preparing every path at once. Back/Escape returns to the exact draft, including
 field focus and selection. Reading neither validates nor starts a command;
-return to the full form to edit or run. Active applications cannot enter the
+return to Launch options to edit or run. Active applications cannot enter the
 reader. See [launch draft reader checks](../tests/packages/software-launch-reader-check.md).
 
 Search covers names, IDs and descriptions. Info shows publisher, repository,

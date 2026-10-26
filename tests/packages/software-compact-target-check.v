@@ -14,7 +14,7 @@ import tools.sourcecommand
 #include <errno.h>
 
 const compact_sources = ['desktop/software_app.v', 'desktop/software_launch.v',
-	'desktop/software_launch_navigation.v']!
+	'desktop/software_launch_navigation.v', 'desktop/software_package_navigation.v']!
 const state_limit = u64(768 * 1024 * 1024)
 const log_limit = u64(16 * 1024 * 1024)
 
@@ -57,6 +57,7 @@ mut:
 	pid int
 	peak u64
 	samples int
+	group_observation string
 }
 
 fn sample(mut phase Phase) ! {
@@ -70,12 +71,31 @@ fn sample(mut phase Phase) ! {
 fn observe(pid int, context voidptr) ! {
 	mut phase := unsafe { &Phase(context) }
 	phase.pid = pid
-	require(pid > 1 && C.getpgid(pid) == pid && pid != C.getpgid(0), 'child group not private')!
+	require(pid > 1 && pid != C.getpgid(0), 'invalid child group identity')!
 	started := time.sys_mono_now()
 	mut next_sample := u64(0)
 	for {
 		now := time.sys_mono_now()
 		if now >= next_sample { sample(mut phase)!; next_sample = now + 250 * u64(time.millisecond) }
+		if phase.group_observation == '' {
+			group := C.getpgid(pid)
+			group_error := C.errno
+			if group == pid {
+				phase.group_observation = 'private process group observed'
+			} else {
+				// Spawn configured the private group atomically. Darwin can remove
+				// it just before publishing a fast leader's WNOWAIT exit record.
+				require(group < 0 && group_error == C.ESRCH, 'child group not private')!
+				if sourcecommand.child_exited(pid)! {
+					phase.group_observation = 'leader exit observed with WNOWAIT after getpgid ESRCH'
+					sample(mut phase)!
+					return
+				}
+				require(time.sys_mono_now() - started < 5 * u64(time.second), 'child group exit observation timed out')!
+				time.sleep(time.millisecond)
+				continue
+			}
+		}
 		if sourcecommand.child_exited(pid)! { sample(mut phase)!; return }
 		require(now - started < u64(phase.limit) * u64(time.second), 'owned phase deadline exceeded')!
 		time.sleep(10 * time.millisecond)
@@ -103,6 +123,7 @@ fn invoke(argv []string, log string, limit int, roots []string) ! {
 		observe, &phase, 0) or { refusal = err.msg(); sourcecommand.Output{} }
 	mut receipt := {'exit': if refusal == '' { output.status.str() } else { 'unavailable' },
 		'pid': phase.pid.str(), 'refusal': refusal, 'limit_seconds': limit.str(),
+		'group_observation': phase.group_observation,
 		'sampled_peak_bytes': phase.peak.str(), 'samples': phase.samples.str(), 'cleanup': 'pending'}
 	write_json(log + '.exit.json', receipt)!
 	if phase.pid > 1 { retired(phase.pid)! }
@@ -202,7 +223,7 @@ fn run() ! {
 	write_json(out + '/owner-tools-after.json', after_tools)!
 	require(tools == after_tools, 'compiler inputs changed')!
 	write_json(out + '/result.json', {'outcome': 'PASS', 'scope': 'both full compositor static cross-links; no guest rendering',
-		'inner_scope': 'unchanged release-save-policy named five-source scope; complete copied source and explicit compact-three byte equality',
+		'inner_scope': 'unchanged release-save-policy named five-source scope; complete copied source and explicit compact-four byte equality',
 		'compact_source_binding': 'owner-inputs-before/after and bundle source-before/after plus both staged apps',
 		'state_limit_bytes': state_limit.str(), 'log_limit_bytes': log_limit.str(),
 		'ownership': 'private group retained with WNOWAIT through retirement; sole reap; absent group and ECHILD',

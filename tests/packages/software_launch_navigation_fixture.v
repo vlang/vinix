@@ -340,6 +340,7 @@ fn compact_launch_tree(mut app SoftwareApp, width int, height int, required stri
 }
 
 fn check_software_launch_compact() ! {
+	check_software_compact_launch_entry()!
 	mut app := launch_navigation_app()
 	defer { app.close_app() }
 	app.handle('software.run-options')!

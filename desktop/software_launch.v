@@ -62,10 +62,16 @@ fn (mut a SoftwareApp) prepare_launch_details() {
 	a.prepare_report_reader()
 }
 
-fn (mut a SoftwareApp) open_launch_options() {
-	if a.selected < 0 || a.selected >= a.rows.len { return }
+fn (a &SoftwareApp) launch_options_available() bool {
+	if a.selected < 0 || a.selected >= a.rows.len { return false }
 	row := a.rows[a.selected]
-	if row.installed_version == '' || row.installed_window_protocol != 0 || software_launch_kind(row) in ['runtime', 'data'] { return }
+	return row.installed_version != '' && row.installed_window_protocol == 0
+		&& software_launch_kind(row) !in ['runtime', 'data']
+}
+
+fn (mut a SoftwareApp) open_launch_options() {
+	if !a.launch_options_available() { return }
+	row := a.rows[a.selected]
 	a.clear_launch_options()
 	a.clear_review(); a.clear_repository_review()
 	a.repository_mode = false; a.deployment_mode = false; a.focus = false; a.select_all = false

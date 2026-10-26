@@ -1026,6 +1026,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     across renamed updates. Normal, production, sanitizer and tracked rendering
     checks pass; each tracked audit render mode retains zero V bytes and records
     across 18,000 trees. Guest graphical acceptance remains open.
+  - [x] [Compact Launch entry](tests/packages/software-launch-navigation-check.md#compact-entry-follow-up-2026-10-26)
+    opens Launch options for the selected eligible installed application at
+    320×240 and 180×220, preserving catalog selection and worker guards.
+    Normal, production and sanitizer host checks and both static desktop target
+    builds pass; native graphical and broader runtime acceptance remain open.
 - [ ] Package native, Linux, Windows and Apple-compatible apps with isolated
   runtimes, launcher/association registration and clean uninstall behavior.
   - [x] [Bare MIME association admission](tests/packages/mime-association-check.md)
