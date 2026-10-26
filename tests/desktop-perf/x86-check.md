@@ -174,3 +174,54 @@ bootloader bytes are regular archived files. Guest-root links retain their
 complete runtime payload. Directory metadata is outside the historical
 manifest's authentication scope. Corrected native execution remains pending
 storage coordination; the shared validator and workloads are unchanged.
+
+## Optional APFS staging
+
+On macOS, `VINIX_PERF_X86_APFS_CLONE=1` selects exclusive `clonefile`
+staging for runtime files, the selected desktop and ISO inputs. Each ordinary
+file has its own inode; writes in either direction remain private. Guest links
+are copied literally and permission modes are preserved. An existing target,
+unsupported entry, unsupported filesystem or failed system call refuses
+preparation without a copy fallback. Other hosts and the default mode retain
+the existing copy behavior. The prepared receipt records the selected mode;
+the full source, runtime, staged-file and execution input checks are unchanged.
+
+The separate `run-x86 clonecheck FRESH_STATE` command checks independent
+inodes, private writes in both directions, complete inventory equality,
+literal absolute/relative/dangling/intermediate guest links, exclusive targets
+and failure propagation. Source containment is checked before creating output,
+including destination parents reached through a host symlink and missing
+intermediate directories. Native qualification remains pending; the first
+interrupted attempt is preserved above.
+
+On source base `7d684ac914b7e3f76ce9c7218dc65daa7e632876`, the normal host
+build, original 24 checks (15 refusals), and all 18 clone controls passed.
+Independent source review found the parent-alias containment issue; the final
+controls require its exact refusal and unchanged source inventory/output.
+Generated controller C, executable, source, literal command/exit receipts,
+compiler versions and logs are retained in `package-perf-x86-20261026/apfs-host-02/`.
+Before each build/control invocation, actual available storage exceeded
+500 MiB. Both host attempts, archives and sidecars use less than 10 MiB.
+
+Complete archive `package-perf-x86-20261026/apfs-host-02-final.tar.gz` has
+SHA-256 `a6dad6d45f25b1f2d6de274f414fde8fbbda41454fcd77a83541d5c05c10448c`.
+Its original complete inventory has SHA-256
+`467e6ef5edd32bf7c3e000613a49ff514c08682288478eca8b80561aa509b8a1`.
+The original sealer checks passed; the independent strict reader checked
+41 sealed entries (24 regular payloads, 17 literal links) and gzip integrity.
+The earlier host01 source/controls, host02 fixture syntax refusal and archives
+refused for macOS metadata headers are preserved. The final archive uses
+`COPYFILE_DISABLE=1`; the original inventory remained byte-identical. This
+host qualification observes the installed compiler versions and generated
+output, without claiming toolchain reproducibility or a native scenario pass.
+
+The first attempt's uncompressed initramfs and ISO occupy 211,771,392 and
+247,715,840 bytes. Together they require about 438.2 MiB of new storage even
+with cloning. The runtime and ISO staging copies can share extents while
+remaining complete ordinary files. The ext2 disk has a 256 MiB logical upper
+bound; the unchanged cache workload writes 32 MiB. A conservative proposed
+retry allowance is 736 MiB, including the full ext2 bound and about 42 MiB for
+generated source, executables, logs and filesystem metadata. This is a planning
+allowance, not measured clone-mode usage. Shared storage admission uses actual
+`df -k` readings and the coordinator's reserve; `os.disk_usage` is unsuitable
+on this host. No original input is hardlinked or modified.
