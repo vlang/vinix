@@ -330,6 +330,9 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	mut sys_kernel := add_procfs_directory(mut sys, 'kernel')
 	add_procfs_file(mut sys_kernel, 'ostype', .ostype)
 	add_procfs_file(mut sys_kernel, 'osrelease', .osrelease)
+	// Fixed fallback identity policy. These informational files are read-only.
+	add_procfs_text(mut sys_kernel, 'overflowuid', '65534\n')
+	add_procfs_text(mut sys_kernel, 'overflowgid', '65534\n')
 	add_procfs_text(mut sys_kernel, 'pid_max', decimal_line(proc.max_pid))
 	add_procfs_text(mut sys_kernel, 'threads-max', decimal_line(proc.max_pid))
 	// Writable, so root can raise it; see security.set_securelevel.
