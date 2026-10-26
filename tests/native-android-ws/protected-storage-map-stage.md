@@ -36,8 +36,8 @@ Build and run from the repository with one compiler at a time:
 /absolute/external/protected-storage-map-stage --prepare /absolute/external/fresh-output
 ```
 
-The complete input roots and seals are pinned in the source. This diagnostic
-uses base seal
+The complete input roots and seals are pinned in the source. The original
+protected-storage diagnostic used base seal
 `9a8bf61bd526d7ec020d45920367d45e90a2ef4692c6d8fa8b87de801a14c5ca`,
 protected framework seal
 `67e1cb450fa87305c99480133084b7f9cb684feeeaa2e0c3efa3007ab43ee938`,
@@ -91,5 +91,99 @@ Measured logs remain beside the bundle under
 The earlier `maps-storage-r1` is an incomplete, unsealed failed attempt. It
 stopped before media cloning because a generated receipt parent was absent;
 the committed directory fix above is included in r2. Use only the sealed r2
-bundle for subsequent guest diagnostics. Guest execution and account login
+bundle for that original native profile. Guest execution and account login
 remain separate validation.
+
+## Binding deadline diagnostic
+
+Source revision `7ed2682b7ce9cf9c08ccbfe9f594ff5aaa341d6a` selects
+`current-native-build-2026-10-27-binding-r2`, manifest SHA-256
+`bd0e3902130f74877abaf269301377c7b5d2cbfe9e7732508838d84ec863d19d`,
+and JNI SHA-256
+`8508d4acb9a96c15eddd3a4afd075855270e2dae48006a9675a86ead0b2f6f19`.
+The r5 base, protected framework and complete original role bundles remain
+unchanged. Prior producers and stages remain immutable.
+
+This exact native profile changes the sealed service source to add the opt-in
+numeric binding deadline record and portable printf casts. The stager retains
+source equality acceptance and additionally accepts only this ordered pair:
+
+| Sealed source | SHA-256 |
+| --- | --- |
+| Retained launcher `abi/headless.v` | `c453f9a0a4ab8b5f8ad4ea17d0c932304d61aafb6126d55b9bcc55efe0aa9b57` |
+| Binding JNI `native/atlframework/headless.v` | `e0f72ab74ccf89d91dd66c23ae35823079e9ead4552e965ab198b3b91057c489` |
+
+The unequal pair also requires the exact native manifest and library above.
+Independent review compared the complete sealed source diff and verified the
+unchanged exported `vinix_android_native_service_main` entry and seven-argument
+signature. The retained native-entry source and new implementation bytes are
+rehashed against their complete manifests before the existing launch builder's
+declaration and call checks run. Native export command/source receipts and
+the original launch receipt remain fully checked. Positive and rejection
+self-tests cover equality, the audited pair, reversed/unknown source pairs,
+unrelated native profiles and changed declarations, calls or signatures.
+Production deployment checks remain unchanged.
+
+The initial constants-only attempt correctly failed the source equality gate
+before creating an output directory or cloning media. Its retained log is
+`protected-storage-map-stage-prepare-binding-r1.log`, SHA-256
+`6fafbb0f4ae678560ef20e2d20b1be17a47e8314a33a13b9c9314676d33ad3c1`;
+exit 1, 19.96 seconds, maximum RSS 48,037,888 bytes, zero swaps.
+
+The revised stager source SHA-256 is
+`5eb327b195a11294706c07cb89ee7b54ab4cc3e5f34c13df7002e95963822c28`.
+The retained `protected-storage-map-stage-r5` executable SHA-256 is
+`13a0255bc8e8a085cc1c5a17757afc7f4ec7826c6ce0b7c7962a3d235ea0ea33`.
+The same pinned V compiler and Boehm build command above were used.
+
+| Check | Exit | Wall seconds | Maximum RSS bytes |
+| --- | ---: | ---: | ---: |
+| Boehm host compile | 0 | 10.36 | 428261376 |
+| Expanded positive and rejection self-tests | 0 | 1.94 | 7372800 |
+| Complete prepare and media readbacks | 0 | 94.43 | 62373888 |
+
+All recorded zero swaps. Adjacent logs are
+`protected-storage-map-stage-compile-r5.log` (SHA-256
+`9826f51481f76976d04b36b6b7768d58064ac8e04adfbf896de1687b59923411`)
+and `protected-storage-map-stage-selftest-r5.log` (SHA-256
+`63b80c47e6803fa3edb5da2d32a7d3f69ee73536a297e3da42bbfd9e726816d1`).
+The successful prepare log is
+`protected-storage-map-stage-prepare-binding-r2.log`, SHA-256
+`4fa3b36a5ec8169fe4d3a02dbf3c4f08c7e1acfa57699d98ac3554ecc97e409b`.
+
+The new immutable bundle is
+`/Users/alex/.local/state/vinix/android/maps-binding-r1`, with complete
+`sha256.json` SHA-256
+`ae6ba098eaddb61f5edf895fd831075c0c1a23bbf37ad0ebca3c1d81dcec91fc`.
+Its recorded checkout revision is
+`aa8c5debcc534751af17c6d7601bd97f61970abb`, which includes the implementation
+commit above; the embedded source hashes also match the checkout. The exactly
+nine-file overlay is 6,604,800 bytes, SHA-256
+`f7f2ff6cda52025b339437938f4df7decee4cb480790c6d5c631ba66c69d6ef0`.
+The staged boot image SHA-256 is
+`9a3206317893de5de54a18886d60e4671cbce62387a9780f8b46905de45a0e65`.
+The unchanged firmware SHA-256 is
+`d3b3f7afddb44de7020b8544270a67791fca44a48864dcd550cefee633463cbf`;
+Limine SHA-256 is
+`3f4e6f9056ac36958a236ef0ed53211f5c3ecc65cbd44d9e98cb0ffbbe075194`.
+All seven original modules and complete input bundles passed rechecks.
+
+Only the 4 GiB logical boot image and 64 MiB firmware file were APFS-cloned;
+no SDK or runtime copy was made. `du -sk` reports 4,208,576 KiB including shared
+media extents. Filesystem free space was 70,605,204 KiB before and 69,334,620 KiB
+after; other sessions were active, so this is not a unique allocation measure.
+
+The JNI producer's strict AArch64 build passed in 222.41 seconds with maximum
+RSS 582,860,800 bytes. Its independent complete 1,197-file check passed in
+9.28 seconds with maximum RSS 1,291,485,184 bytes; both recorded zero swaps.
+Their adjacent evidence remains in the external state directory:
+
+| Evidence | SHA-256 |
+| --- | --- |
+| `current-native-build-2026-10-27-binding-r2.log` | `9bf5b7c6b5c10f829641f9b8bc2784b01e071ee3d8334e51cc5f06f081dc8ed9` |
+| `current-native-build-2026-10-27-binding-r2-independent-check.log` | `31dde10ec70c7a9e54975973b78f884d64389345dc6411a2d43491bd3d77ba3b` |
+| `current-native-build-2026-10-27-binding-r2-independent-check.json` | `5cf10529807d2bf155920d12b04457f4d52e4a20aa7fbd84546079de079bedd3` |
+
+No guest execution or Google login is established by preparation. The subsequent
+root-run diagnostic must record its explicit
+`VINIX_ANDROID_TRACE_SERVICE_BINDING=1` environment prefix.
