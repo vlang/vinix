@@ -120,6 +120,10 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 		}
 		'NSBundle' {
 			match selector {
+				'appStoreReceiptURL' {
+					// App Store receipt support is unavailable in this runtime.
+					frame.x[0] = 0
+				}
 				'URLForResource:withExtension:subdirectory:', 'URLForResource:withExtension:' {
 					name := string_text(frame.x[2])
 					extension := string_text(frame.x[3])

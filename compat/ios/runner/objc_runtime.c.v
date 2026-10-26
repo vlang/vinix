@@ -83,6 +83,7 @@ fn objc_record_method(cls u64, name &char, imp u64, types &char, builtin bool) &
 fn C.ios_objc_builtin()
 fn objc_builtin_types(cls u64, selector string) ?string {
 	info := ios_runtime.classes[cls] or { return none }
+	if info.name == 'NSBundle' && !info.meta && selector == 'appStoreReceiptURL' { return '@16@0:8' }
 	if types := snapshot_configuration_types(info.name, info.meta, selector) { return types }
 	if types := match_request_types(info.name, info.meta, selector) { return types }
 	if types := achievement_types(info.name, info.meta, selector) { return types }

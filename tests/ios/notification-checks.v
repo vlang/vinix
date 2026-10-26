@@ -52,8 +52,9 @@ fn main() {
 	root := os.real_path(os.getwd()); out := os.abs_path(os.args[2]); old := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
-	if os.args[1] in ['cf-string-output-host', 'search-path-host', 'home-directory-host', 'inline-pthread-self-host', 'dictionary-snapshot-host', 'block-byref-host', 'block-imp-host', 'vm-probe-host', 'proc-memory-host', 'processinfo-host', 'data-url-host', 'data-http-host', 'connection-host'] {
+	if os.args[1] in ['bundle-receipt-host', 'cf-string-output-host', 'search-path-host', 'home-directory-host', 'inline-pthread-self-host', 'dictionary-snapshot-host', 'block-byref-host', 'block-imp-host', 'vm-probe-host', 'proc-memory-host', 'processinfo-host', 'data-url-host', 'data-http-host', 'connection-host'] {
 		fixture := match os.args[1] {
+			'bundle-receipt-host' { 'ns_bundle_receipt_test.v' }
 			'cf-string-output-host' { 'cf_string_output_test.v' }
 			'search-path-host' { 'ns_search_paths_test.v' }
 			'home-directory-host' { 'ns_home_directory_test.v' }
@@ -69,6 +70,10 @@ fn main() {
 			else { 'ns_url_connection_test.v' }
 		}
 		run_host_fixture(root, old, out, fixture)!
+	} else if os.args[1] == 'bundle-receipt-inspector-build' {
+		run(out, 'inspect-build', [old + '/v', '-nocache', '-gc', 'none', '-cc', 'clang', '-o', out + '/inspect-bundle-receipt', root + '/tests/ios/inspect-bundle-receipt.v'], false)
+	} else if os.args[1] == 'bundle-receipt-inspect' {
+		run(out, 'inspect', [out + '/inspect-bundle-receipt'], false)
 	} else if os.args[1] == 'driver-build' {
 		run(out, 'driver-build', [old + '/v', '-nocache', '-prod', '-gc', 'none', '-cc', 'clang', '-o', out + '/native-checks', root + '/tests/ios/native-checks.v'], false)
 	} else if os.args[1] == 'scene-notifications-inspector-build' {
