@@ -71,6 +71,22 @@ fn verify_dependency_inventory(roots []string, expected map[string]string) ! {
 	if actual != expected { return error('shared dependency path, type or contents changed') }
 }
 
+fn tracked_pin(path string) !string {
+	return match os.lstat(path)!.get_filetype() {
+		.regular { hash(path)! }
+		.symbolic_link { 'symlink:' + os.readlink(path)! }
+		else { return error('tracked build input must be a file or symlink: ' + path) }
+	}
+}
+
+fn verify_tracked_inputs(root string, expected map[string]string) ! {
+	for relative, pin in expected {
+		if tracked_pin(root + '/' + relative)! != pin {
+			return error('tracked source changed: ' + relative)
+		}
+	}
+}
+
 fn self_test(root string) ! {
 	if os.exists(root) || os.is_link(root) { return error('fresh self-test root required') }
 	os.mkdir_all(root + '/dependency')!
@@ -102,6 +118,27 @@ fn self_test(root string) ! {
 	verify_dependency_inventory(roots, expected) or { rejected = true }
 	if !rejected { return error('symbolic dependency accepted') }
 	println('UNIX-RECVMSG-KERNEL-INVENTORY-PASS unchanged=1 rejected=5')
+	// The host generator imports tracked module symlinks. Preserve their
+	// targets as inputs instead of hashing the directories they resolve to.
+	os.mkdir(root + '/tracked')!
+	os.write_file(root + '/tracked/file.v', 'module fixture')!
+	os.symlink('file.v', root + '/tracked/module')!
+	tracked := {
+		'file.v': tracked_pin(root + '/tracked/file.v')!
+		'module': tracked_pin(root + '/tracked/module')!
+	}
+	verify_tracked_inputs(root + '/tracked', tracked)!
+	os.rm(root + '/tracked/module')!
+	os.symlink('other.v', root + '/tracked/module')!
+	rejected = false
+	verify_tracked_inputs(root + '/tracked', tracked) or { rejected = true }
+	if !rejected { return error('changed tracked symlink accepted') }
+	os.rm(root + '/tracked/module')!
+	os.write_file(root + '/tracked/module', 'file.v')!
+	rejected = false
+	verify_tracked_inputs(root + '/tracked', tracked) or { rejected = true }
+	if !rejected { return error('tracked symlink replaced with file accepted') }
+	println('UNIX-RECVMSG-KERNEL-TRACKED-PASS unchanged=1 rejected=2')
 }
 
 fn freeze_library(source string, target string, mut pins map[string]string) ! {
@@ -149,8 +186,17 @@ fn run() ! {
 	worktree := root + '/source'
 	command(root, 'worktree-add', ['git', 'worktree', 'add', '--detach', '--no-checkout', worktree,
 		resolved])!
-	command(root, 'sparse', ['git', '-C', worktree, 'sparse-checkout', 'set', 'kernel',
-		'tests/unix-recvmsg-flags'])!
+	mut sparse_paths := ['kernel', 'tests/unix-recvmsg-flags']
+	generator_paths := ['tests/native-generators', 'tests/linuxkpi/hosttest',
+		'build-support/cachecli', 'build-support/cachekey', 'tools/sourcecommand',
+		'build-support/run-v-tool.sh', 'build-support/find-v.sh']
+	if arch == 'x86_64' {
+		// Cone mode includes immediate parent files (the two shell entry points).
+		sparse_paths << generator_paths[..5]
+	}
+	mut sparse_command := ['git', '-C', worktree, 'sparse-checkout', 'set']
+	sparse_command << sparse_paths
+	command(root, 'sparse', sparse_command)!
 	command(root, 'checkout', ['git', '-C', worktree, 'checkout', '--detach', resolved])!
 	mut pins := map[string]string{}
 	copy_pin(os.real_path(@FILE), root + '/builder.v', mut pins)!
@@ -175,6 +221,11 @@ fn run() ! {
 	if os.is_dir(vroot + '/thirdparty') {
 		freeze_library(vroot + '/thirdparty', root + '/compiler/thirdparty', mut pins)!
 	}
+	if arch == 'x86_64' {
+		// The maintained host-generator wrapper uses V's default Boehm GC.
+		copy_pin(vroot + '/thirdparty/tcc/lib/libgc.a',
+			root + '/compiler/thirdparty/tcc/lib/libgc.a', mut pins)!
+	}
 	if os.is_file(vroot + '/v.mod') {
 		copy_pin(vroot + '/v.mod', root + '/compiler/v.mod', mut pins)!
 	}
@@ -186,14 +237,27 @@ fn run() ! {
 		if relative == '' { continue }
 		kernel_pins[relative] = hash(worktree + '/' + relative)!
 	}
+	mut generator_pins := map[string]string{}
+	if arch == 'x86_64' {
+		mut args := ['git', '-C', worktree, 'ls-files', '-z']
+		args << generator_paths
+		for relative in command(root, 'generator-files', args)!.split('\x00') {
+			if relative != '' { generator_pins[relative] = tracked_pin(worktree + '/' + relative)! }
+		}
+	}
 	mut tools := map[string]string{}
 	for tool in ['/usr/bin/clang', '/opt/homebrew/bin/ld.lld', '/opt/homebrew/opt/llvm/bin/llvm-ar',
 		'/usr/bin/make'] {
 		tools[tool] = hash(tool)!
 	}
+	if arch == 'x86_64' {
+		host_cc := os.find_abs_path_of_executable('cc')!
+		tools[host_cc] = hash(host_cc)!
+	}
 	os.write_file(root + '/input-pins.json', json2.encode({
 		'compiler_and_dependencies': object(pins)
 		'kernel':                    object(kernel_pins)
+		'host_generator':            object(generator_pins)
 		'tools':                     object(tools)
 		'shared_dependency_links':   object(shared)
 		'shared_dependency_entries': object(dependency_entries)
@@ -205,9 +269,8 @@ fn run() ! {
 		'AR=/opt/homebrew/opt/llvm/bin/llvm-ar', 'KERNEL_LINK_SEED=20261026'])!
 	verify_dependency_inventory(dependency_roots, dependency_entries)!
 	for path, pin in pins { if hash(path)! != pin { return error('shared build input changed') } }
-	for relative, pin in kernel_pins {
-		if hash(worktree + '/' + relative)! != pin { return error('kernel source changed') }
-	}
+	verify_tracked_inputs(worktree, kernel_pins)!
+	verify_tracked_inputs(worktree, generator_pins)!
 	for path, pin in tools { if hash(path)! != pin { return error('build tool changed') } }
 	for target, source in shared {
 		if os.readlink(target)! != source { return error('dependency link changed') }

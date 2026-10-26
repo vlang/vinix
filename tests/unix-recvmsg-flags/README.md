@@ -49,7 +49,12 @@ its available library sources into the bundle and pins the C compiler, linker,
 archiver and Make.
 The kernel, generated C, commands, logs, source pins and file/link inventory remain
 in that external root. The fixed link seed is recorded. Host SDK and dynamic
-libraries remain environmental inputs. `x86_64` is also supported. A successful
+libraries remain environmental inputs. For `x86_64`, the sparse closure also
+includes the native host generator, its imported modules and the maintained
+shell entry points. Their tracked file hashes and symlink targets are checked
+after compilation. The frozen compiler includes its Boehm archive for that
+host tool; the host C compiler is pinned. The host's libarchive and SDK remain
+environmental inputs. A successful
 build records `guest_executed: false`; boot validation is separate.
 
 The inventory regression checks unchanged input plus added, removed, modified,
