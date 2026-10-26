@@ -110,8 +110,11 @@ ARM64e/PAC, encrypted images, non-PIE binaries, custom stack sizes, threaded dyl
 binding opcodes, TLS pointer/initializer sections and multiple chain starts
 per page are rejected. Objective-C exceptions and general Swift metadata are
 unsupported; the String metadata and value witnesses described below are available.
-Blocks support object/block captures, but not
-`__block` by-reference captures. ARC and weak tables are synchronized; UIKit
+Blocks support object/block captures and `__block` by-reference forwarding,
+shared ownership, compiler copy/dispose helpers and extended layouts. Native
+reference checks cover stack/heap cleanup orders, ARC strong/weak moves and
+concurrent retain/release of an already promoted capture; concurrent first
+promotion is unverified. ARC and weak tables are synchronized; UIKit
 view operations run on the main thread. Mach IPC services,
 direct Darwin syscalls, Swift/SwiftUI, general
 Foundation/UIKit APIs, multiple scenes, compiled nibs/storyboards and Auto Layout are not
@@ -341,6 +344,14 @@ status 1 and no cgroup OOM event. Reserving the range does not commit 24 GiB of
 physical memory. Initializer completion, application entry, rendering, login and
 gameplay remain unverified. See the
 [VM reservation checkpoint](../tests/ios/probe-vm-checkpoint-20261026.md).
+
+Blocks by-reference captures now pass native sanitizer and ARM64 guest
+regressions. The next no-ads launch passes the former capture-disposal panic
+and stops at `NSMutableDictionary allKeys`, with no cgroup OOM event.
+Image binding and all nine `+load` calls pass: 2 of 8 observable launch gates,
+or 25% of the checklist, without estimating remaining effort. Initializer
+completion, application entry, rendering and gameplay remain unverified.
+See the [Blocks capture checkpoint](../tests/ios/block-byref-checkpoint-20261026.md).
 
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
