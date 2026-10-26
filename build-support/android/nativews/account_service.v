@@ -98,47 +98,113 @@ fn ws_account_service_init() bool {
 			fd = fd * 10 + i32(*p - `0`)
 		}
 		C.unsetenv(c'VINIX_ANDROID_AUTHENTICATOR_FD')
-		if !valid || fd < 3 || C.pthread_mutex_init(&ws_auth_mutex,nil) != 0 { return false }
+		if !valid || fd < 3 { return ws_auth_init_failure(1,22,0,nil) }
+		mutex_code := C.pthread_mutex_init(&ws_auth_mutex,nil)
+		if mutex_code != 0 { return ws_auth_init_failure(2,mutex_code,0,nil) }
 		ws_auth_ready = true
 		mut peer := WsServicePeer{}
 		mut peer_size := u32(sizeof(WsServicePeer))
-		if C.getsockopt(fd,1,17,&peer,&peer_size) != 0 || peer_size != sizeof(WsServicePeer) || peer.uid != 0 || peer.pid <= 0 {
-			C.close(fd); return false
+		if C.getsockopt(fd,1,17,&peer,&peer_size) != 0 {
+			code := *C.__errno_location()
+			C.close(fd); return ws_auth_init_failure(3,code,0,nil)
+		}
+		if peer_size != sizeof(WsServicePeer) || peer.uid != 0 || peer.pid <= 0 {
+			detail := if peer_size != sizeof(WsServicePeer) { 1 } else if peer.uid != 0 { 2 } else { 3 }
+			C.close(fd); return ws_auth_init_failure(4,1,detail,nil)
 		}
 		ws_auth_broker_pid = peer.pid
+		C.dlerror()
+		*C.__errno_location() = 0
 		ws_auth_library = C.dlopen(c'libvinix-android-account.so',2)
-		if ws_auth_library == nil { C.close(fd); return false }
-		ws_auth_open = WsAuthOpen(C.dlsym(ws_auth_library,c'vinix_android_authenticator_open'))
-		ws_auth_read = WsAuthRead(C.dlsym(ws_auth_library,c'vinix_android_authenticator_read'))
-		ws_auth_operation = WsAuthOperation(C.dlsym(ws_auth_library,c'vinix_android_authenticator_operation'))
-		ws_auth_close = WsAuthFree(C.dlsym(ws_auth_library,c'vinix_android_authenticator_close'))
-		ws_auth_type = WsAuthString(C.dlsym(ws_auth_library,c'vinix_android_authenticator_account_type'))
-		ws_auth_name = WsAuthString(C.dlsym(ws_auth_library,c'vinix_android_authenticator_account_name'))
-		ws_auth_token = WsAuthString(C.dlsym(ws_auth_library,c'vinix_android_authenticator_auth_token_type'))
-		ws_auth_token_authorized = WsAuthTokenAuthorized(C.dlsym(ws_auth_library,c'vinix_android_account_store_token_authorized'))
-		ws_auth_features = WsAuthCount(C.dlsym(ws_auth_library,c'vinix_android_authenticator_feature_count'))
-		ws_auth_feature = WsAuthText(C.dlsym(ws_auth_library,c'vinix_android_authenticator_feature'))
-		ws_auth_count = WsAuthCount(C.dlsym(ws_auth_library,c'vinix_android_authenticator_count'))
-		ws_auth_key = WsAuthText(C.dlsym(ws_auth_library,c'vinix_android_authenticator_key'))
-		ws_auth_tag = WsAuthTag(C.dlsym(ws_auth_library,c'vinix_android_authenticator_tag'))
-		ws_auth_text = WsAuthText(C.dlsym(ws_auth_library,c'vinix_android_authenticator_text'))
-		ws_auth_number = WsAuthNumber(C.dlsym(ws_auth_library,c'vinix_android_authenticator_number'))
-		ws_auth_response = WsAuthResponse(C.dlsym(ws_auth_library,c'vinix_android_authenticator_response'))
-		ws_auth_option = WsAuthOption(C.dlsym(ws_auth_library,c'vinix_android_authenticator_response_option'))
-		ws_auth_send = WsAuthSend(C.dlsym(ws_auth_library,c'vinix_android_authenticator_response_send'))
-		ws_auth_free = WsAuthFree(C.dlsym(ws_auth_library,c'vinix_android_authenticator_response_free'))
-		ws_auth_interaction = WsAuthInteraction(C.dlsym(ws_auth_library,c'vinix_android_authenticator_response_interaction'))
-		ws_auth_ui_authority = WsAuthUiAuthority(C.dlsym(ws_auth_library,c'vinix_android_authenticator_ui_authority'))
-		ws_auth_launch_target = WsAuthLaunchTarget(C.dlsym(ws_auth_library,c'vinix_android_authenticator_launch_target'))
+		if ws_auth_library == nil {
+			code := *C.__errno_location()
+			loader := C.dlerror()
+			C.close(fd); return ws_auth_init_failure(5,code,0,loader)
+		}
+		ws_auth_open = WsAuthOpen(ws_auth_init_symbol(c'vinix_android_authenticator_open',1))
+		ws_auth_read = WsAuthRead(ws_auth_init_symbol(c'vinix_android_authenticator_read',2))
+		ws_auth_operation = WsAuthOperation(ws_auth_init_symbol(c'vinix_android_authenticator_operation',3))
+		ws_auth_close = WsAuthFree(ws_auth_init_symbol(c'vinix_android_authenticator_close',4))
+		ws_auth_type = WsAuthString(ws_auth_init_symbol(c'vinix_android_authenticator_account_type',5))
+		ws_auth_name = WsAuthString(ws_auth_init_symbol(c'vinix_android_authenticator_account_name',6))
+		ws_auth_token = WsAuthString(ws_auth_init_symbol(c'vinix_android_authenticator_auth_token_type',7))
+		ws_auth_token_authorized = WsAuthTokenAuthorized(ws_auth_init_symbol(c'vinix_android_account_store_token_authorized',8))
+		ws_auth_features = WsAuthCount(ws_auth_init_symbol(c'vinix_android_authenticator_feature_count',9))
+		ws_auth_feature = WsAuthText(ws_auth_init_symbol(c'vinix_android_authenticator_feature',10))
+		ws_auth_count = WsAuthCount(ws_auth_init_symbol(c'vinix_android_authenticator_count',11))
+		ws_auth_key = WsAuthText(ws_auth_init_symbol(c'vinix_android_authenticator_key',12))
+		ws_auth_tag = WsAuthTag(ws_auth_init_symbol(c'vinix_android_authenticator_tag',13))
+		ws_auth_text = WsAuthText(ws_auth_init_symbol(c'vinix_android_authenticator_text',14))
+		ws_auth_number = WsAuthNumber(ws_auth_init_symbol(c'vinix_android_authenticator_number',15))
+		ws_auth_response = WsAuthResponse(ws_auth_init_symbol(c'vinix_android_authenticator_response',16))
+		ws_auth_option = WsAuthOption(ws_auth_init_symbol(c'vinix_android_authenticator_response_option',17))
+		ws_auth_send = WsAuthSend(ws_auth_init_symbol(c'vinix_android_authenticator_response_send',18))
+		ws_auth_free = WsAuthFree(ws_auth_init_symbol(c'vinix_android_authenticator_response_free',19))
+		ws_auth_interaction = WsAuthInteraction(ws_auth_init_symbol(c'vinix_android_authenticator_response_interaction',20))
+		ws_auth_ui_authority = WsAuthUiAuthority(ws_auth_init_symbol(c'vinix_android_authenticator_ui_authority',21))
+		ws_auth_launch_target = WsAuthLaunchTarget(ws_auth_init_symbol(c'vinix_android_authenticator_launch_target',22))
 		if voidptr(ws_auth_open) == nil || voidptr(ws_auth_read) == nil || voidptr(ws_auth_operation) == nil || voidptr(ws_auth_close) == nil
 			|| voidptr(ws_auth_type) == nil || voidptr(ws_auth_name) == nil || voidptr(ws_auth_token) == nil || voidptr(ws_auth_token_authorized) == nil || voidptr(ws_auth_features) == nil || voidptr(ws_auth_feature) == nil
 			|| voidptr(ws_auth_count) == nil || voidptr(ws_auth_key) == nil || voidptr(ws_auth_tag) == nil || voidptr(ws_auth_text) == nil || voidptr(ws_auth_number) == nil
 			|| voidptr(ws_auth_response) == nil || voidptr(ws_auth_option) == nil || voidptr(ws_auth_send) == nil || voidptr(ws_auth_free) == nil || voidptr(ws_auth_interaction) == nil || voidptr(ws_auth_ui_authority) == nil || voidptr(ws_auth_launch_target) == nil {
 			C.close(fd); return false
 		}
+		*C.__errno_location() = 0
 		ws_auth_handle = ws_auth_open(fd)
-		if ws_auth_handle == nil { C.close(fd); return false }
-		return ws_store_init(account_type)
+		if ws_auth_handle == nil {
+			code := *C.__errno_location()
+			C.close(fd); return ws_auth_init_failure(7,code,0,nil)
+		}
+		*C.__errno_location() = 0
+		if !ws_store_init(account_type) { return ws_auth_init_failure(8,*C.__errno_location(),0,nil) }
+		return true
+	}
+}
+
+fn C.strstr(&char, &char) &char
+
+// Classify only the first 512 loader bytes. Never print paths, symbol names or
+// other loader-controlled text. Codes: 0 none, 1 other, 2 missing file,
+// 3 missing symbol, 4 invalid ELF, 5 permission.
+fn ws_auth_init_loader(loader &char) i32 {
+	unsafe {
+		if loader == nil { return 0 }
+		text := &char(C.alloca(513))
+		mut length := 0
+		for length < 512 && loader[length] != 0 { text[length] = loader[length]; length++ }
+		text[length] = 0
+		if C.strstr(text,c'No such file') != nil || C.strstr(text,c'cannot open shared object') != nil { return 2 }
+		if C.strstr(text,c'undefined symbol') != nil || C.strstr(text,c'symbol not found') != nil { return 3 }
+		if C.strstr(text,c'ELF') != nil || C.strstr(text,c'Exec format') != nil { return 4 }
+		if C.strstr(text,c'Permission denied') != nil { return 5 }
+		return 1
+	}
+}
+
+// One bounded line per failing stage (at most 22 missing-symbol lines). Stage:
+// 1 descriptor, 2 mutex, 3 peer syscall, 4 peer identity, 5 library, 6 symbol,
+// 7 authenticator open, 8 account store. Code is errno or the mutex return code;
+// detail is the identity field (size/uid/pid) or stable 1-based symbol index.
+fn ws_auth_init_failure(stage i32, code i32, detail i32, loader &char) bool {
+	unsafe {
+		buffer := &char(C.alloca(128))
+		length := C.snprintf(buffer,128,c'ANDROID-AUTH-INIT-FAIL stage=%d code=%d detail=%d loader=%d\n',stage,code,detail,ws_auth_init_loader(loader))
+		if length > 0 && length < 128 { C.write(2,buffer,usize(length)) }
+		return false
+	}
+}
+
+fn ws_auth_init_symbol(name &char, detail i32) voidptr {
+	unsafe {
+		C.dlerror()
+		*C.__errno_location() = 0
+		value := C.dlsym(ws_auth_library,name)
+		if value == nil {
+			code := *C.__errno_location()
+			loader := C.dlerror()
+			ws_auth_init_failure(6,code,detail,loader)
+		}
+		return value
 	}
 }
 
