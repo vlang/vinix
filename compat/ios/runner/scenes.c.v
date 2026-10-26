@@ -262,7 +262,7 @@ fn objc_responds(object u64, selector &char) bool {
 		if name in ['alloc', 'new', 'instanceMethodSignatureForSelector:'] { return true }
 		info := ios_runtime.classes[object] or { return false }
 		return match info.name {
-			'NSString' { name in ['stringWithUTF8String:', 'stringWithFormat:'] }
+			'NSString' { name in ['stringWithUTF8String:', 'stringWithCString:encoding:', 'stringWithFormat:'] }
 			'NSNumber' { name == 'numberWithInteger:' }
 			'NSArray', 'NSMutableArray' { name in ['array', 'arrayWithArray:', 'arrayWithCapacity:', 'arrayWithObjects:count:'] }
 			'NSDictionary', 'NSMutableDictionary' { name in ['dictionary', 'dictionaryWithObjects:forKeys:count:'] }

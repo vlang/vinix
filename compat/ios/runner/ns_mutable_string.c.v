@@ -33,6 +33,9 @@ fn mutable_string_state(object u64) &ObjHeader {
 }
 
 fn mutable_string_types(name string, meta bool, selector string) ?string {
+	if meta && name in ['NSString', 'NSMutableString']! && selector == 'stringWithCString:encoding:' {
+		return '@32@0:8r*16Q24'
+	}
 	if name == 'NSString' && !meta {
 		return match selector {
 			'description' { '@16@0:8' }
@@ -79,8 +82,7 @@ fn mutable_string_unsupported(selector string) bool {
 	return selector.contains('Format') || selector.contains('NoCopy') || selector.contains('ContentsOf')
 		|| selector in ['initWithCoder:', 'encodeWithCoder:', 'supportsSecureCoding',
 		'replaceOccurrencesOfString:withString:options:range:', 'applyTransform:reverse:range:updatedRange:',
-		'initWithCharacters:length:', 'initWithCString:encoding:', 'stringWithCharacters:length:',
-		'stringWithCString:encoding:']!
+		'initWithCharacters:length:', 'initWithCString:encoding:', 'stringWithCharacters:length:']!
 }
 
 // All text borrows in this module stay under the recursive runtime lock and
@@ -200,9 +202,80 @@ fn mutable_string_byte_length(object u64, encoding u64) u64 {
 	return u64(text.len)
 }
 
+fn mutable_string_encoded_cstring(cls u64, address u64, encoding u64) u64 {
+	mutable_string_require_class(cls)
+	if address == 0 { panic('iOS: string CString input must not be nil') }
+	if encoding !in [u64(1), 4]! { panic('iOS: string CString encoding is not implemented') }
+	C.ios_objc_initialize_lock()
+	length := u64(C.strnlen(unsafe { &char(address) }, usize(mutable_string_limit + 1)))
+	if length > mutable_string_limit { panic('iOS: string exceeds the supported size') }
+	input := unsafe { tos(&u8(voidptr(address)), int(length)) }
+	mut text := ''
+	if encoding == 4 {
+		// Foundation consumes one leading UTF8 byte order mark.
+		start := if input.len >= 3 && input[0] == 0xef && input[1] == 0xbb && input[2] == 0xbf { 3 } else { 0 }
+		if utf8.validate_str(input) {
+			text = unsafe { tos(input.str + start, input.len - start) }.clone()
+		} else {
+			// Native Foundation replaces stray A9 bytes with U+FFFD, but
+			// rejects other malformed sequences. Preserve valid multibyte runs.
+			mut bytes := []u8{cap: input.len}
+			bytes.flags |= .noslices
+			mut offset := start
+			mut valid := true
+			for offset < input.len {
+				first := input[offset]
+				width := if first == 0xa9 { 1 } else if first < 0x80 { 1 } else if first < 0xe0 { 2 } else if first < 0xf0 { 3 } else { 4 }
+				if offset + width > input.len || (first != 0xa9 && !utf8.validate(unsafe { input.str + offset }, width)) {
+					valid = false
+					break
+				}
+				size := if first == 0xa9 { 3 } else { width }
+				if u64(bytes.len + size) > mutable_string_limit { panic('iOS: string exceeds the supported size') }
+				if first == 0xa9 { bytes << u8(0xef); bytes << u8(0xbf); bytes << u8(0xbd) } else {
+					for i in 0 .. width { bytes << input[offset + i] }
+				}
+				offset += width
+			}
+			if valid { text = bytes.bytestr() }
+			unsafe { bytes.free() }
+			if !valid {
+				C.ios_objc_initialize_unlock()
+				return 0
+			}
+		}
+	} else {
+		// This Foundation factory accepts high ASCII bytes as Latin1 codepoints.
+		mut size := input.len
+		for byte in input { if byte >= 0x80 { size++ } }
+		if u64(size) > mutable_string_limit { panic('iOS: string exceeds the supported size') }
+		mut bytes := []u8{cap: size}
+		for byte in input {
+			if byte < 0x80 { bytes << byte } else {
+				bytes << u8(0xc0 | (byte >> 6))
+				bytes << u8(0x80 | (byte & 0x3f))
+			}
+		}
+		text = bytes.bytestr()
+		unsafe { bytes.free() }
+	}
+	// Snapshot before allocation, which may invoke application callbacks.
+	C.ios_objc_initialize_unlock()
+	defer { unsafe { text.free() } }
+	if cls == ios_runtime.names['NSString'] { return objc_autorelease(owned_string(text)) }
+	result := objc_allocate(cls)
+	if result == 0 { return 0 }
+	mutable_string_initialize(result, text)
+	return objc_autorelease(result)
+}
+
 fn mutable_string_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	meta := object in ios_runtime.classes
 	family := mutable_string_family(if meta { object } else { read64(object) })
+	if meta && (family || object == ios_runtime.names['NSString']) && selector == 'stringWithCString:encoding:' {
+		frame.x[0] = mutable_string_encoded_cstring(object, frame.x[2], frame.x[3])
+		return true
+	}
 	if !family {
 		if meta && object == ios_runtime.names['NSString'] && selector == 'stringWithUTF8String:' {
 			frame.x[0] = mutable_string_cstring_snapshot(frame.x[2])
