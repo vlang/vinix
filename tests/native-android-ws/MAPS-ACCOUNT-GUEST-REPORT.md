@@ -5,28 +5,42 @@ starts the real GMS authenticator broker, and launches the real Maps APK through
 the desktop compositor. Broker readiness establishes a service transport only;
 this build report does not establish successful Google authentication.
 
-Controller and builder sources were committed in `9fa5e4ad9` and `7a6e71dd3`.
+Controller and builder sources were committed in `9fa5e4ad9`, `7a6e71dd3` and
+`27d5bfe47`.
 The retained build records the complete source revision and hashes of the exact
 builder, controller, compiler, imported V sources, native includes, cross tools,
 startup files and static link inputs. Host self-tests check canonical paths,
 process credentials, registry/APK/service bindings, identity collisions and stale
-stop requests; builder self-tests check dependency/source membership, native
-helper objects and static ELF validation.
+stop requests. SQLite tests reject changed paths, ownership, modes, link counts,
+inodes, sizes and digests, then exercise exclusive file creation, bounded copying
+and atomic replacement of a real host hardlink while preserving its alias.
+Builder self-tests check dependency/source membership, native helper objects and
+static ELF validation.
 
-Final build: `2026-10-26 15:47:12 UTC`, source revision
-`db22f699e3aa075d34e239f633b3b3e05a55b4a0`. Both retained host self-tests and
+Final build: `2026-10-26 16:05:28 UTC`, source revision
+`d72f0ddcff3288bbec3aeb4191ddc1c63a9ba6f7`. Both retained host self-tests and
 the strict AArch64 compile/static link passed. The builder validated complete
 source/header/link membership and rechecked original and frozen input hashes
 after linking. No QEMU boot was performed for this build.
 
 Complete retained bundle:
-`/Users/alex/.local/state/vinix/android/maps-account-guest-build-2026-10-26-r2`.
+`/Users/alex/.local/state/vinix/android/maps-account-guest-build-2026-10-26-r3`.
 Its `sha256.json` digest is
-`a42463cc9a9e98c378e3a313ded8fe7eed092f35e7693472591343f8a9734a86`;
+`74b972255e2a151a14eb05302f28081de2a091280109f2c0ffded2962e6ad622`;
 `bin/maps-account-guest` is
-`32558ceb85bf316bc896469eedbc6300999da33d276457be1f294417fd55467f`.
+`31e76e6100a83f6d476e892f7571868fc01cc0d7992c6f618b3aba8a32a8ff8b`.
 Retain the entire bundle to audit its compiler and dependency closure. The
-earlier r1 bundle predates stop/cleanup fixes and must not be staged.
+earlier r1 and r2 bundles are superseded and must not be staged.
+
+The baseline SQLite library has one audited versioned hardlink. Before immutable
+input admission, the controller requires exactly the two fixed root-owned
+`0755` paths, their shared inode and link count two, and the known SQLite digest.
+It copies the canonical library to an exclusively created fresh inode, rechecks
+the original group, and atomically replaces the canonical path. Both resulting
+files must have link count one, unchanged bytes, and the preserved versioned
+alias must retain its original inode and metadata. The private
+`sqlite-dealias.json` receipt records the before/after identities. All other
+inputs retain strict single-link admission.
 
 The deployment receipt must pin the controller, identical desktop launch slot,
 real APKs, identity registry, runtime account/JNI/framework outputs, and both
