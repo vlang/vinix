@@ -134,7 +134,8 @@ It installed the same 18 provider/translator files (117,846,960 bytes) in
 both cases, verified all 22 deployed payload hashes per case, and matched
 the Linux target source inventories. The rebuilt checker also rejected the
 actual failed `r2` serial log with exit 1 and no successful result JSON.
-The `r3` guest results remain pending.
+Both `r3` guest cases subsequently passed the strict checker, as detailed
+below.
 
 The `r3` preparation recorded source base
 `d32325678505b726b2e89a572e58baafac569af4` and runner source SHA-256
@@ -147,3 +148,57 @@ The original runtime module SHA-256, checked before and after extraction,
 is `1c6988d1f3d3844425f0e8cbb49a878b3a16f2a270b4eb3852c71dfaa8fe200e`;
 the complete original inventory SHA-256 is
 `d3c2fcc3ede63edc181729940123929c60acb07fdf2d76972f0bd41e3a6f5423`.
+
+## Paired guest result
+
+The reviewed runner/provider change is commit `15fd6d2eb`. The old and new
+guests ran sequentially with the recorded 2 GiB/two CPU arguments. The old
+case produced the direct `ApplicationInfo.credentialProtectedDataDir`
+`NoSuchFieldError` at fixture `Main.onCreate`, then child exit 1 and the
+expected controller DONE marker. The new case produced its exact PASS at
+serial line 302, READY at 313, stdin close at 314, activity destruction,
+child exit 0 at 322 and DONE at 323. Both serial logs include the captured
+app stderr and drained output tail. Repeating both strict checks produced
+byte-identical result receipts; an independent read-only review agreed.
+The ART AOT warnings preceded app execution; this run does not qualify AOT
+compilation.
+
+The host stopped each owned QEMU after its guest DONE marker.
+Recorded identities bind old PID 21290 and new PID 22961 to their respective
+images and serial paths; a subsequent PID query confirmed both absent.
+QEMU stderr records SIGINT cleanup, rather than guest-initiated VM shutdown.
+The old process ran for 42.10 seconds with maximum RSS 1,825,505,280 bytes;
+the new ran for 35.10 seconds with maximum RSS 1,834,090,496 bytes. Both
+recorded zero swaps. Repeated host checks peaked at 5,292,032 and 6,258,688
+bytes respectively. These are host process measurements, not guest heap
+measurements.
+
+Old serial SHA-256:
+`9709da1f6fef4ae3d27462c62ee6428a5c27da66de680356dd4f2e9cf2df9092`;
+new serial SHA-256:
+`cd55fad1c2c4e7b134982e37931069074dc4294c0eaa26b4ee888666cc4f56a1`.
+Their result receipts are respectively
+`33308d4873a34ff9892397ec7cbe92cd38758c70b1d07c7e80c36f25aef101de`
+and `bc0afb3e07926fbbcdda723508a584cce5e105678f4873fb82aff20246d82ad2`.
+The preparation receipt remains unchanged; the post-run results are
+separate files. This confirms the paired framework/JNI protected-storage
+fixture only. Map rendering and Google account authentication remain
+outside its scope.
+
+The complete closed evidence is bound in place by the stream seal at
+`/Users/alex/.local/state/vinix/android/protected-storage-guest-closed-2026-10-27-r3`,
+manifest SHA-256
+`ee7ab9acf6d06cf352205fbc1b3cf49e1be6bc414c6328da1898859210c036ab`.
+Its 20 roots include both complete guest preparations, the preserved failed
+`r2`, build/test logs, the full direct fixture/framework/JNI/runtime/suite
+producer directories, audit receipts, selected tool binaries and the sealer
+build plan. The exact root list and repeated-check receipts are retained at
+`/Users/alex/.local/state/vinix/android/protected-storage-guest-audit-2026-10-27-r3`.
+Retain every listed root and all original producer bundles; this integrity
+inventory does not replace their historical checkers or qualify deletion.
+No files were added to the guest preparations after sealing.
+The seal and its built-in complete recheck passed over 39,806 entries in
+301.23 seconds with maximum RSS 24,772,608 bytes and zero swaps. The timing
+and PASS transcript is retained outside the sealed roots at
+`/Users/alex/.local/state/vinix/android/protected-storage-guest-seal-2026-10-27-r3.log`,
+SHA-256 `45a960ceba10e020c14ff6121b3ba64d14080106385d6775f629b9047e3f190b`.
