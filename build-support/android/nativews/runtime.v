@@ -356,6 +356,7 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 			static_void(e, c'android/os/Looper', c'loop', c'()V', nil)
 			ws_queue_end_pump()
 			ws_web_pump(e)
+			ws_account_client_pump(e)
 			if ws_failure(e, c'ANDROID-WS-FAIL main looper') {
 				pop_frame(e)
 				return 1
@@ -400,6 +401,7 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		for i := i32(0); i < ws.back_count; i++ {
 			call(e, ws.back_stack[i], c'android/app/Activity', c'vinixPerformDestroy', c'()V', nil)
 		}
+		ws_account_client_shutdown(e)
 		ws_web_shutdown(e)
 		if ws_failure(e, c'ANDROID-WS-FAIL shutdown') { return 1 }
 		return 0

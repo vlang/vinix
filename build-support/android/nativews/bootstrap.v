@@ -8,6 +8,7 @@ fn ws_bootstrap(root &char, apk &char, display bool) voidptr {
 	unsafe {
 		// Claim the launcher-owned endpoint before any APK code can exec.
 		if !ws_web_init() { C.puts(c'ANDROID-WS-FAIL browser transport'); return nil }
+		if !ws_account_client_init() { C.puts(c'ANDROID-WS-FAIL account transport'); return nil }
 		// The framework enumerates ICU converters through the stable native
 		// provider API. ART loads javacore locally, so expose that provider
 		// explicitly instead of relying on another toolkit's dependency scope.
