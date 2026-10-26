@@ -226,6 +226,32 @@ fn stopped(root string) !bool {
 	return process_gone(recorded_owner(root)!)
 }
 
+// Observe an already absent guest without attributing an exit status or signal.
+// A requested stop has its separate reconciliation path and receipt chain.
+fn observe_gone(root string) ! {
+	for name in ['stop.json', 'gone.json'] {
+		if os.exists(root + '/' + name) || os.is_link(root + '/' + name) {
+			return error('read-only disappearance observation requires no ' + name)
+		}
+	}
+	ownership_sha := hash(root + '/ownership.json')!
+	owner := recorded_owner(root)!
+	if !process_gone(owner)! { return error('owned guest remains live; no signal sent') }
+	if hash(root + '/ownership.json')! != ownership_sha {
+		return error('guest ownership changed during disappearance observation')
+	}
+	write_json(root + '/gone.json', json2.decode[json2.Any](json2.encode({
+		'pid':              json2.Any(owner.pid)
+		'checked_utc':      json2.Any(time.utc().str())
+		'check':            json2.Any('one ps snapshot returned exit1 with empty stdout and stderr for recorded owned PID')
+		'ownership_sha256': json2.Any(ownership_sha)
+		'stop_requested':   json2.Any(false)
+		'exit_status':      json2.Any('unknown')
+		'cause':            json2.Any('unobserved; this command sent no signal')
+	}))!)!
+	println('BROWSER-RUN OBSERVED-GONE pid=' + owner.pid.str() + ' exit=unknown cause=unobserved')
+}
+
 fn reconcile_stop(root string) ! {
 	owner := recorded_owner(root)!
 	stop_receipt := json2.decode[StopReceipt](os.read_file(root + '/stop.json')!)!
@@ -289,6 +315,8 @@ fn self_test() ! {
 	os.write_file(root + '/qemu.pid', os.getpid().str())!
 	write_json(root + '/ownership.json', json2.decode[json2.Any](json2.encode(identity(os.getpid())!))!)!
 	if _ := owned(root) { return error('non-QEMU process accepted as owned guest') }
+	if _ := observe_gone(root) { return error('non-QEMU ownership accepted for disappearance') }
+	assert !os.exists(root + '/gone.json')
 	mut child := os.new_process(os.executable())
 	child.set_args(['--self-test-child'])
 	child.run()
@@ -317,15 +345,24 @@ fn self_test() ! {
 	write_json(root + '/ownership.json', json2.decode[json2.Any](json2.encode(fake))!)!
 	assert stopped(root)!
 	if _ := reconcile_stop(root) { return error('missing stop receipt accepted') }
+	observe_gone(root)!
+	observed := json2.decode[json2.Any](os.read_file(root + '/gone.json')!)!
+	assert observed.as_map()['stop_requested']!.bool() == false
+	assert observed.as_map()['exit_status']!.str() == 'unknown'
+	assert !os.exists(root + '/stop.json')
+	if _ := observe_gone(root) { return error('existing disappearance observation accepted') }
+	os.rm(root + '/gone.json')!
 	write_json(root + '/stop.json', json2.decode[json2.Any](json2.encode(StopReceipt{
 		pid:           child.pid
 		signal:        'SIGTERM'
 		requested_utc: time.utc().str()
 	}))!)!
+	if _ := observe_gone(root) { return error('stop request accepted for read-only disappearance') }
+	assert !os.exists(root + '/gone.json')
 	reconcile_stop(root)!
 	assert os.is_file(root + '/gone.json')
 	if _ := reconcile_stop(root) { return error('existing disappearance receipt accepted') }
-	println('BROWSER-RUN SELF-TEST PASS qmp-length external-directory unsafe-pid bounded-command complete-output foreign-owner nonzero-exit live-without-pidfile reaped-child absent-ps reconcile-stop')
+	println('BROWSER-RUN SELF-TEST PASS qmp-length external-directory unsafe-pid bounded-command complete-output foreign-owner nonzero-exit live-without-pidfile reaped-child absent-ps reconcile-stop observe-gone no-invented-signal')
 }
 
 fn main() {
@@ -346,8 +383,8 @@ fn main() {
 		}
 		return
 	}
-	if os.args.len != 3 || os.args[1] !in ['start', 'status', 'stop', 'reconcile-stop'] {
-		eprintln('usage: run start|status|stop|reconcile-stop STAGED_EXTERNAL_DIRECTORY')
+	if os.args.len != 3 || os.args[1] !in ['start', 'status', 'stop', 'reconcile-stop', 'observe-gone'] {
+		eprintln('usage: run start|status|stop|reconcile-stop|observe-gone STAGED_EXTERNAL_DIRECTORY')
 		exit(2)
 	}
 	root := canonical_root(os.args[2]) or {
@@ -369,6 +406,12 @@ fn main() {
 		}
 		'reconcile-stop' {
 			reconcile_stop(root) or {
+				eprintln(err.msg())
+				exit(1)
+			}
+		}
+		'observe-gone' {
+			observe_gone(root) or {
 				eprintln(err.msg())
 				exit(1)
 			}
