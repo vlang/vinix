@@ -69,6 +69,17 @@ inventoried fixture under `/opt/vinix-account-authority-fixture`. Its execution
 is independent of the browser test. The guest runner pins the selected fixture
 binary; pass its complete frozen build directory, including `module/`.
 
+`patch-kernel.v FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256` can replace
+the kernel before the first launch. It accepts only the pinned Maps372 browser
+baseline. Its `--maps-account` profile accepts the separate pinned headless r4
+baseline, the six original modules in their audited order, and one appended
+`maps-account.tar`. It verifies the complete frozen kernel inventory, checks
+every FAT module before and after replacement, preserves configuration and
+firmware, and records the selected profile. A previously launched or patched
+stage is rejected. `--self-test` exercises both overlay names on real FAT images
+and rejects changed Maps module ordering, missing or substituted overlays, and
+an unaudited baseline module list. This operation supplies no login evidence.
+
 The macOS host lifecycle tool starts the staged image once, records the exact
 QEMU command and executable hashes, and checks PID, command, and process start
 time before stopping its guest:

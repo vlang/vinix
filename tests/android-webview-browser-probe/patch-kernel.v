@@ -13,7 +13,26 @@ import time
 fn C.kill(int, int) int
 
 const baseline_sha = '176094564fba09181b1a2f334f240dc49f0e5f25032696a84db12c2316d0445c'
+const maps_baseline_sha = '08b0a9c6d0eaf109a5027eac802cb5add897e7612aac85528a08fdba794b3f5e'
 const source = $embed_file(@FILE).to_string()
+
+struct Profile {
+	name         string
+	baseline_sha string
+	overlay      string
+	modules      []string
+}
+
+fn browser_profile() Profile {
+	return Profile{'browser-probe', baseline_sha, 'browser-probe.tar', []string{}}
+}
+
+fn maps_profile() Profile {
+	return Profile{'maps-account', maps_baseline_sha, 'maps-account.tar', [
+		'initramfs.tar', 'qemu-runtime.tar', 'maps335-diagnostics.tar',
+		'maps350-diagnostics.tar', 'maps372-diagnostics.tar', 'headless-service.tar',
+	]}
+}
 
 struct Stage {
 	format                   int
@@ -182,7 +201,7 @@ fn unlaunched(root string) ! {
 	for name in ['launch.json', 'launch-result.json', 'ownership.json', 'qemu.pid', 'qmp.sock',
 		'serial.log', 'network.pcap', 'stop.json', 'gone.json', 'run-source.v', 'runner'] {
 		if os.exists(root + '/' + name) || os.is_link(root + '/' + name) {
-			return error('fresh unlaunched browser stage required: ' + name)
+			return error('fresh unlaunched diagnostic stage required: ' + name)
 		}
 	}
 }
@@ -257,7 +276,17 @@ fn validate_build(root string, receipt_sha string) !Build {
 	return build
 }
 
-fn patch(root string, build_root string, receipt_sha string, baseline_pin string) ! {
+fn verify_modules(profile Profile, before Config, after Config) ! {
+	mut expected := before.modules.clone()
+	expected << profile.overlay
+	if (profile.modules.len > 0 && before.modules != profile.modules)
+		|| after.kernel != before.kernel || after.modules != expected {
+		return error('stage modules differ from audited ' + profile.name + ' profile')
+	}
+}
+
+fn patch(root string, build_root string, receipt_sha string, profile Profile) ! {
+	baseline_pin := profile.baseline_sha
 	unlaunched(root)!
 	for name in ['kernel-patch.json', 'kernel-patch-request.json', 'kernel-patch-commands',
 		'kernel-patch-build', 'stage-before-kernel.json', 'kernel-patch-source.v', 'kernel-patch-tool'] {
@@ -295,10 +324,8 @@ fn patch(root string, build_root string, receipt_sha string, baseline_pin string
 	after_text := os.read_file(root + '/limine-after.conf')!
 	before := configure(before_text)!
 	after := configure(after_text)!
-	mut expected_modules := before.modules.clone()
-	expected_modules << 'browser-probe.tar'
-	if after.kernel != before.kernel || after.modules != expected_modules
-		|| stage.original_modules_sha256.len != before.modules.len
+	verify_modules(profile, before, after)!
+	if stage.original_modules_sha256.len != before.modules.len
 		|| stage.original_modules_sha256 != stage.preserved_modules_sha256
 		|| !digest_valid(stage.overlay_sha256) {
 		return error('stage baseline/module manifest differs')
@@ -337,10 +364,10 @@ fn patch(root string, build_root string, receipt_sha string, baseline_pin string
 		}
 		preserved[name] = expected
 	}
-	if fat_hash(root, 'before-browser-probe.tar', root + '/boot.img', 'browser-probe.tar')! != stage.overlay_sha256 {
-		return error('browser payload differs before patch')
+	if fat_hash(root, 'before-' + profile.overlay, root + '/boot.img', profile.overlay)! != stage.overlay_sha256 {
+		return error('diagnostic payload differs before patch')
 	}
-	preserved['browser-probe.tar'] = stage.overlay_sha256
+	preserved[profile.overlay] = stage.overlay_sha256
 	os.mkdir(root + '/kernel-patch-build')!
 	mut build_receipts := map[string]string{}
 	for name in ['build.json', 'input-pins.json', 'sha256.json'] {
@@ -351,6 +378,7 @@ fn patch(root string, build_root string, receipt_sha string, baseline_pin string
 	os.write_file(root + '/kernel-patch-source.v', source)!
 	os.cp(os.executable(), root + '/kernel-patch-tool')!
 	os.write_file(root + '/kernel-patch-request.json', json2.encode({
+		'profile':                     json2.Any(profile.name)
 		'created_utc':                 json2.Any(time.utc().str())
 		'original_stage_sha256':       json2.Any(sha256.sum(stage_text.bytes()).hex())
 		'baseline_boot_sha256':        json2.Any(baseline_pin)
@@ -386,7 +414,8 @@ fn patch(root string, build_root string, receipt_sha string, baseline_pin string
 	unlaunched(root)!
 	provenance := json2.decode[json2.Any](json2.encode({
 		'format':                       json2.Any(1)
-		'scope':                        json2.Any('Fresh diagnostic stage only; prepared browser payload preserved byte-for-byte; no guest execution or Google login evidence.')
+		'scope':                        json2.Any('Fresh diagnostic stage only; prepared payload preserved byte-for-byte; no guest execution or Google login evidence.')
+		'profile':                      json2.Any(profile.name)
 		'created_utc':                  json2.Any(time.utc().str())
 		'baseline_boot_path':           json2.Any(baseline)
 		'baseline_boot_sha256':         json2.Any(baseline_pin)
@@ -427,14 +456,15 @@ fn external(path string) !string {
 	return root
 }
 
-fn fat_self_test(root string) ! {
+fn fat_self_test(root string, overlay string) ! {
+	os.mkdir(root)!
 	os.mkdir(root + '/kernel-patch-commands')!
 	os.mkdir(root + '/baseline')!
 	os.mkdir(root + '/stage')!
 	os.mkdir_all(root + '/build/kernel/socket/unix')!
 	baseline := root + '/baseline/boot.img'
 	config := '/Vinix\n kernel_path: boot():/boot/vinix\n module_path: boot():/boot/runtime.tar\n'
-	updated := config + ' module_path: boot():/boot/browser-probe.tar\n'
+	updated := config + ' module_path: boot():/boot/' + overlay + '\n'
 	os.write_file(root + '/config', config)!
 	os.write_file(root + '/old-kernel', 'old baseline kernel')!
 	os.write_file(root + '/runtime', 'original module\x00exact bytes')!
@@ -452,7 +482,7 @@ fn fat_self_test(root string) ! {
 	execute(root, 'fixture-update-limine', [mcopy, '-o', '-i', root + '/stage/boot.img',
 		root + '/config-after', '::/boot/limine.conf'])!
 	execute(root, 'fixture-install-overlay', [mcopy, '-i', root + '/stage/boot.img', root + '/overlay',
-		'::/boot/browser-probe.tar'])!
+		'::/boot/' + overlay])!
 	os.write_file(root + '/stage/efivars.fd', 'unchanged firmware state')!
 	os.write_file(root + '/stage/limine-before.conf', config)!
 	os.write_file(root + '/stage/limine-after.conf', updated)!
@@ -505,12 +535,13 @@ fn fat_self_test(root string) ! {
 		}
 	}))!
 	receipt_sha := hash(root + '/build/build.json')!
-	if _ := patch(root + '/stage', root + '/build', '0'.repeat(64), hash(baseline)!) {
+	profile := Profile{'fixture', hash(baseline)!, overlay, ['runtime.tar']}
+	if _ := patch(root + '/stage', root + '/build', '0'.repeat(64), profile) {
 		return error('wrong build receipt pin accepted')
 	}
 	assert os.read_file(root + '/stage/stage.json')! == stage_text
 	assert hash(root + '/stage/boot.img')! == stage.staged_boot_sha256
-	patch(root + '/stage', root + '/build', receipt_sha, hash(baseline)!)!
+	patch(root + '/stage', root + '/build', receipt_sha, profile)!
 	updated_stage := json2.decode[Stage](os.read_file(root + '/stage/stage.json')!)!
 	assert updated_stage.staged_boot_sha256 != stage.staged_boot_sha256
 	assert updated_stage.inputs_sha256 == stage.inputs_sha256
@@ -520,13 +551,32 @@ fn fat_self_test(root string) ! {
 	assert updated_stage.staged_efivars_sha256 == stage.staged_efivars_sha256
 	assert os.read_file(root + '/stage/stage-before-kernel.json')! == stage_text
 	assert os.is_file(root + '/stage/kernel-patch.json')
-	if _ := patch(root + '/stage', root + '/build', receipt_sha, hash(baseline)!) {
+	if _ := patch(root + '/stage', root + '/build', receipt_sha, profile) {
 		return error('second patch of same stage accepted')
 	}
 	println('BROWSER-KERNEL-PATCH FAT-SELF-TEST PASS pinned build rejection exact kernel readback baseline modules overlay firmware receipts once-only')
 }
 
 fn self_test() ! {
+	maps := maps_profile()
+	before := Config{'vinix', maps.modules}
+	mut modules := maps.modules.clone()
+	modules << maps.overlay
+	verify_modules(maps, before, Config{'vinix', modules})!
+	mut wrong_overlay := maps.modules.clone()
+	wrong_overlay << 'browser-probe.tar'
+	for bad in [Config{'vinix', maps.modules},
+		Config{'vinix', modules.reverse()},
+		Config{'vinix', wrong_overlay},
+		Config{'other', modules}] {
+		if _ := verify_modules(maps, before, bad) {
+			return error('altered Maps module profile accepted')
+		}
+	}
+	if _ := verify_modules(maps, Config{'vinix', ['runtime.tar']},
+		Config{'vinix', ['runtime.tar', maps.overlay]}) {
+		return error('unaudited Maps baseline modules accepted')
+	}
 	config := '/Vinix\n kernel_path: boot():/boot/vinix\n module_path: boot():/boot/runtime.tar\n'
 	assert configure(config)!.modules == ['runtime.tar']
 	for bad in [config + '/Other\n', config + ' kernel_path: boot():/boot/vinix\n',
@@ -559,7 +609,8 @@ fn self_test() ! {
 	unlaunched(root)!
 	os.write_file(root + '/launch.json', '{}')!
 	if _ := unlaunched(root) { return error('historical launched stage accepted') }
-	fat_self_test(root)!
+	fat_self_test(root + '/browser', 'browser-probe.tar')!
+	fat_self_test(root + '/maps', 'maps-account.tar')!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -571,19 +622,21 @@ fn main() {
 		}
 		return
 	}
-	if os.args.len != 4 {
-		eprintln('usage: patch-kernel FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+	is_maps := os.args.len == 5 && os.args[1] == '--maps-account'
+	if os.args.len != 4 && !is_maps {
+		eprintln('usage: patch-kernel [--maps-account] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	root := external(os.args[1]) or {
+	offset := if is_maps { 1 } else { 0 }
+	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
 	}
-	build_root := external(os.args[2]) or {
+	build_root := external(os.args[2 + offset]) or {
 		eprintln(err)
 		exit(1)
 	}
-	patch(root, build_root, os.args[3], baseline_sha) or {
+	patch(root, build_root, os.args[3 + offset], if is_maps { maps_profile() } else { browser_profile() }) or {
 		eprintln(err)
 		exit(1)
 	}
