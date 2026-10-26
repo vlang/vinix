@@ -36,6 +36,7 @@ maps-account-stage --audit-account-build BUNDLE MANIFEST_SHA256
 maps-account-stage --audit-ui-controller-build UI_BUNDLE UI_SHA256 FRAMEWORK FRAMEWORK_SHA256 NATIVE NATIVE_SHA256
 maps-account-stage --self-test
 clone-maps-account-stage SOURCE MANIFEST_SHA256 FRESH_OUTPUT
+refresh-coupled-maps-account-request ORIGINAL ORIGINAL_SHA256 SELECTION SELECTION_SHA256 FRESH_OUTPUT_DIR
 ```
 
 The separate clone helper verifies the entire original bundle, makes fresh
@@ -51,6 +52,14 @@ the complete original static zlib producer, exact retained archive and headers,
 actual dependency-file inputs and exact compile/link commands. A missing
 archive or dynamic zlib fallback fails the audit. The standalone UI controller
 has its own one-output profile; the launcher still requires all four outputs.
+
+The coupled request refresher (`9d5323f68`) selects exactly framework, JNI,
+account library, launcher, token fixture, token controller and standalone UI
+references from pinned manifests. It derives framework JAR/DEX and token APK
+pins, preserves every other decoded request field, and retains the original,
+selection, resulting request, source, tool and receipt in a fresh sealed bundle.
+This selection step leaves complete build, signature and media audits to the
+stager. Its positive and rejection fixtures remain in the retained source.
 
 Evidence under `/Users/alex/.local/state/vinix/android/`:
 
@@ -82,6 +91,15 @@ Evidence under `/Users/alex/.local/state/vinix/android/`:
   (producer source `bd119e164`, manifest
   `0cfc569921b7afee59e538064e91683868200fe2b62f34da887636cde58fc0a4`).
   The frozen r1/r2 tools remain unchanged.
+- `account-ui-stage-2026-10-26-r3` is the new standalone UI profile selected by
+  current source. Complete manifest SHA-256:
+  `bcb7656ee29c66d2d54fad120aff2d09f078e3a7684ce59c3ac1dd88aa16d394`;
+  stage receipt SHA-256:
+  `ade6f5f89f73632ee6ef1cc36b95d17b8a3b70e25dbeb3660ba5c3401e894b20`.
+  `maps-account-ui-controller-r1-stager-audit.log` records the complete producer
+  and exact compile/link audit against the descriptions framework and JNI r16.
+  Original unbooted firmware and all six modules remain unchanged. Frozen r1/r2
+  stages retain their original standalone UI profile.
 - `maps-account-r1` passed final staging with tool source `af6402672` and
   controller fix `27d5bfe47`. Its complete pre-kernel-patch manifest SHA-256 is
   `2982ad3dd8ac1e8de3c7169382788397be9551f58a19059e58311282a8380070`;
