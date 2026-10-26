@@ -13,12 +13,13 @@ v -prod -path '@vlib|tests/android-browser-deployment|tests/native-android-ws|bu
 
 Run with the repository, base runtime, its `runtime-manifest.json` SHA256, base
 APK cache, addon build, its `build.json` SHA256, addon APK cache, engine build,
-its `build-sha256.json` SHA256, and a fresh output directory outside the repo:
+its `build-sha256.json` SHA256, the compiler sysroot's `libc.so` and its SHA256,
+and a fresh output directory outside the repo:
 
 ```sh
 /external/state/browser-deployment-builder REPO BASE_RUNTIME BASE_MANIFEST_SHA \
   BASE_APK_CACHE ADDON_BUILD ADDON_BUILD_SHA ADDON_APK_CACHE \
-  ENGINE_BUILD ENGINE_INVENTORY_SHA FRESH_OUTPUT
+  ENGINE_BUILD ENGINE_INVENTORY_SHA TOOLCHAIN_LIBC TOOLCHAIN_LIBC_SHA FRESH_OUTPUT
 ```
 
 The builder verifies the inputs before and after extraction. Offline APK
@@ -33,6 +34,14 @@ in seven aliases of SQLite, LLVM and libproxy. The launcher supplies a protected
 `LD_LIBRARY_PATH` first, and every ELF dependency must exist there. Legacy
 `DT_RPATH` is rejected for every file. The protected library search list includes
 `usr/lib/libproxy` so its backend resolves inside the pinned closure.
+
+The engine's musl cross compiler requests `libc.so`; Alpine uses
+`libc.musl-aarch64.so.1`. The builder requires identical pinned runtime loader
+and libc bytes, then checks the engine's unversioned dynamic imports against
+both the retained, pinned compiler libc and deployed musl. Required symbols,
+types and data sizes must agree, including executable COPY data symbols.
+Only then does it create an independent
+`lib/libc.so` copy and retain the comparison in `musl-abi.json`.
 
 The output contains:
 

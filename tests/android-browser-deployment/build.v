@@ -7,6 +7,7 @@ import crypto.sha256
 import json2
 import fontindex
 import mapsaccountstage
+import muslabi
 import os
 
 const guest_root = '/opt/vinix-google-browser'
@@ -193,6 +194,35 @@ fn check_elf(root string, files map[string]string) ! {
 	}
 }
 
+fn musl_alias(root string, toolchain string, mut files map[string]string) ![]string {
+	loader := 'lib/ld-musl-aarch64.so.1'
+	libc := 'lib/libc.musl-aarch64.so.1'
+	alias := 'lib/libc.so'
+	if loader !in files || libc !in files || files[loader] != files[libc]
+		|| alias in files || os.exists(root + '/' + alias) || os.is_link(root + '/' + alias) {
+		return error('independent musl alias requires identical pinned loader and libc')
+	}
+	engine_bytes := os.read_bytes(root + '/bin/webview-engine')!
+	runtime_bytes := os.read_bytes(root + '/' + libc)!
+	toolchain_bytes := os.read_bytes(toolchain)!
+	engine := mapsaccountstage.inspect_elf(engine_bytes)!
+	runtime := mapsaccountstage.inspect_elf(runtime_bytes)!
+	compiler := mapsaccountstage.inspect_elf(toolchain_bytes)!
+	if engine.needed != ['libc.so'] || engine.interpreter != '/lib/ld-musl-aarch64.so.1'
+		|| runtime.soname != 'libc.musl-aarch64.so.1' || runtime.needed.len != 0
+		|| runtime.interpreter != '' || runtime.runpath != '' || compiler.needed.len != 0
+		|| compiler.interpreter != '' || compiler.runpath != '' || compiler.soname != '' {
+		return error('unexpected musl engine or libc dynamic contract')
+	}
+	verified := muslabi.verify(muslabi.inspect(engine_bytes)!, muslabi.inspect(toolchain_bytes)!,
+		muslabi.inspect(runtime_bytes)!)!
+	os.cp(root + '/' + libc, root + '/' + alias)!
+	os.chmod(root + '/' + alias, 0o555)!
+	pin(root + '/' + alias, files[libc])!
+	files[alias] = files[libc]
+	return verified
+}
+
 fn allowed_runpath(name string, checksum string, runpath string) bool {
 	if runpath == '' { return true }
 	// These pinned releases carry fallback paths. The launcher's private
@@ -220,14 +250,15 @@ fn allowed_runpath(name string, checksum string, runpath string) bool {
 }
 
 fn run() ! {
-	if os.args.len != 11 {
-		return error('usage: build REPO BASE_RUNTIME BASE_MANIFEST_SHA BASE_APK_CACHE ADDON_BUILD ADDON_BUILD_SHA ADDON_APK_CACHE ENGINE_BUILD ENGINE_INVENTORY_SHA FRESH_OUTPUT')
+	if os.args.len != 13 {
+		return error('usage: build REPO BASE_RUNTIME BASE_MANIFEST_SHA BASE_APK_CACHE ADDON_BUILD ADDON_BUILD_SHA ADDON_APK_CACHE ENGINE_BUILD ENGINE_INVENTORY_SHA TOOLCHAIN_LIBC TOOLCHAIN_LIBC_SHA FRESH_OUTPUT')
 	}
 	repo := os.real_path(os.args[1])
 	base, base_seal, base_cache := os.real_path(os.args[2]), os.args[3], os.real_path(os.args[4])
 	addon, addon_seal, addon_cache := os.real_path(os.args[5]), os.args[6], os.real_path(os.args[7])
 	engine, engine_seal := os.real_path(os.args[8]), os.args[9]
-	output := os.abs_path(os.args[10])
+	toolchain, toolchain_seal := os.real_path(os.args[10]), os.args[11]
+	output := os.abs_path(os.args[12])
 	if os.exists(output) || os.is_link(output) || output == repo || output.starts_with(repo + '/') {
 		return error('fresh external deployment output required')
 	}
@@ -240,6 +271,8 @@ fn run() ! {
 	addon_lock := addon + '/sources/packages.lock.json'
 	pin(addon_lock, addon_build.addon_lock_sha256)!
 	engine_build := sealed_engine(engine, engine_seal)!
+	if os.lstat(toolchain)!.get_filetype() != .regular { return error('regular toolchain libc required') }
+	pin(toolchain, toolchain_seal)!
 	os.mkdir_all(output)!
 	if os.real_path(output) != output { return error('canonical external output required') }
 	mut source_pins := map[string]string{}
@@ -254,6 +287,7 @@ fn run() ! {
 		'addon-packages.json':   addon_lock
 		'engine-build.json':     engine + '/build.json'
 		'engine-inventory.json': engine + '/build-sha256.json'
+		'toolchain-libc.so':     toolchain
 	} {
 		os.cp(path, output + '/inputs/' + name)!
 	}
@@ -285,6 +319,7 @@ fn run() ! {
 	os.chmod(closure_root + '/bin/webview-engine', 0o555)!
 	pin(closure_root + '/bin/webview-engine', engine_build.engine_sha256)!
 	files['bin/webview-engine'] = engine_build.engine_sha256
+	verified_symbols := musl_alias(closure_root, output + '/inputs/toolchain-libc.so', mut files)!
 	os.mkdir_all(closure_root + '/etc/fonts')!
 	fontconfig := '<?xml version="1.0"?>\n<fontconfig><dir>' + guest_root + '/usr/share/fonts</dir><cachedir prefix="xdg">fontconfig</cachedir></fontconfig>\n'
 	os.write_file(closure_root + '/etc/fonts/browser.conf', fontconfig)!
@@ -329,6 +364,8 @@ fn run() ! {
 	pin(addon + '/build.json', addon_seal)!
 	pin(addon_lock, addon_build.addon_lock_sha256)!
 	sealed_engine(engine, engine_seal)!
+	pin(toolchain, toolchain_seal)!
+	pin(output + '/inputs/toolchain-libc.so', toolchain_seal)!
 	for source_path, source_pin in source_pins {
 		pin(repo + '/' + source_path, source_pin)!
 		pin(output + '/sources/' + source_path, source_pin)!
@@ -339,6 +376,15 @@ fn run() ! {
 	os.write_file(output + '/selected-packages.json', json2.encode(selected, prettify: true) + '\n')!
 	os.write_file(output + '/source-inputs.json', json2.encode(source_pins, prettify: true) + '\n')!
 	os.write_file(output + '/payload-files.json', json2.encode(entries, prettify: true) + '\n')!
+	os.write_file(output + '/musl-abi.json', json2.encode({
+		'toolchain_libc_sha256': json2.Any(toolchain_seal)
+		'runtime_libc_sha256': json2.Any(files['lib/libc.so'])
+		'engine_sha256': json2.Any(engine_build.engine_sha256)
+		'alias': json2.Any('lib/libc.so')
+		'source': json2.Any('lib/libc.musl-aarch64.so.1')
+		'version_requirements': json2.Any(false)
+		'verified_symbols': json2.Any(verified_symbols)
+	}, prettify: true) + '\n')!
 	os.write_file(output + '/build.json', json2.encode({
 		'format':                  json2.Any(1)
 		'source_revision':         json2.Any(os.exec(['git', '-C', repo, 'rev-parse', 'HEAD']).output.trim_space())
@@ -346,6 +392,7 @@ fn run() ! {
 		'addon_build_sha256':      json2.Any(addon_seal)
 		'engine_inventory_sha256': json2.Any(engine_seal)
 		'engine_sha256':           json2.Any(engine_build.engine_sha256)
+		'toolchain_libc_sha256':   json2.Any(toolchain_seal)
 		'builder_sha256':          json2.Any(digest(output + '/builder')!)
 		'argv':                    json2.Any(os.args)
 		'closure_root':            json2.Any(guest_root)
