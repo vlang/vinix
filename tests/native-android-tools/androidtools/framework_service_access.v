@@ -7,6 +7,32 @@ pub fn framework_service_access_class_names() []string {
 	return ['android/app/ContextImpl']
 }
 
+// Assembly/disassembly renames labels. Validate the resolved-target branch and
+// its false-return destination rather than depending on a source label name.
+fn service_access_validate_binding(bind string, lookup string) ! {
+	lines := bind.split_into_lines().map(it.trim_space()).filter(it != '' && !it.starts_with('#'))
+	registration := 'invoke-static {p0, p2}, Landroid/atl/VinixServiceBinding;->register(Landroid/content/Context;Landroid/content/ServiceConnection;)Landroid/atl/VinixServiceBinding;'
+	if lines.filter(it == lookup).len != 1 || lines.filter(it == registration).len != 1 {
+		return error('unexpected service binding routing')
+	}
+	i := lines.index(lookup)
+	if i < 0 || i + 3 >= lines.len || lines[i + 1] != 'move-result-object v0'
+		|| !lines[i + 2].starts_with('if-eqz v0, :') || lines[i + 3] != registration {
+		return error('unexpected service binding target guard')
+	}
+	label := lines[i + 2].all_after('if-eqz v0, ')
+	if label.len < 2 || label[1..].bytes().any(!it.is_alnum() && it != `_`)
+		|| lines.filter(it == label).len != 1 {
+		return error('unexpected service binding missing label')
+	}
+	j := lines.index(label)
+	if j <= i + 3 || j + 3 != lines.len - 1
+		|| lines[j + 1] !in ['const/4 v0, 0', 'const/4 v0, 0x0']
+		|| lines[j + 2] != 'return v0' || lines[j + 3] != '.end method' {
+		return error('unexpected service binding missing return')
+	}
+}
+
 // Ordinary explicit Context calls use the ContextImpl's loaded-app owner. That
 // owner is the runtime's compatibility model, not an unforgeable APK identity.
 // Reuse the Activity package resolver: it checks that owner before cache lookup.
@@ -27,10 +53,7 @@ pub fn framework_service_access_sources(context string) !string {
 	bind := companion_activity_original(context, bind_signature)!
 	start := companion_activity_original(context, start_signature)!
 	companion_activity_original(context, 'atl_get_intent_target(Landroid/content/Intent;)Landroid/atl/ATLLoadedApp;')!
-	if bind.count(lookup) != 1 || !bind.contains('Landroid/atl/VinixServiceBinding;->register(')
-		|| !bind.contains('if-eqz v0, :missing') {
-		return error('unexpected service binding routing')
-	}
+	service_access_validate_binding(bind, lookup)!
 	if start.count('    .registers 6\n') != 1 || start.count(lookup) != 1
 		|| start.count('->nativeStartExternalService(') != 1 {
 		return error('unexpected service start routing')

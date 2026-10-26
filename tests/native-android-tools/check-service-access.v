@@ -62,8 +62,15 @@ fn main() {
 	assert helper.contains('new-instance v0, Ljava/lang/SecurityException;')
 	bind := after[bind_signature]
 	assert position(bind, '->vinixGetServiceTarget(') < position(bind, '->register(')
-	assert position(bind, 'if-eqz v0, :missing') < position(bind, '->register(')
-	assert position(bind, 'if-nez p2, :lookup') < position(bind, '->vinixGetServiceTarget(')
+	bind_lines := bind.split_into_lines().map(it.trim_space()).filter(it != '' && !it.starts_with('#'))
+	target_guard := bind_lines.filter(it.starts_with('if-eqz v0, :'))[0]
+	missing_label := target_guard.all_after('if-eqz v0, ')
+	assert position(bind, target_guard) < position(bind, '->register(')
+	assert position(bind, 'if-nez p2, :') < position(bind, '->vinixGetServiceTarget(')
+	assert bind_lines[bind_lines.index(missing_label) + 2] == 'return v0'
+	// Label names are not semantic; the same routing must survive renaming.
+	renamed := source.replace(before[bind_signature], before[bind_signature].replace(missing_label, ':renamed_service_miss'))
+	androidtools.framework_service_access_sources(renamed)!
 	start := after[start_signature]
 	legacy := position(start, '    :vinix_explicit_service_legacy\n')
 	assert position(start, '->vinixGetServiceTarget(') < legacy
@@ -73,10 +80,13 @@ fn main() {
 	// All original implicit behavior survives byte-for-byte after the guard.
 	assert start[legacy + '    :vinix_explicit_service_legacy\n'.len..] == before[start_signature].all_after('    .registers 6\n')
 	// The shared package resolver itself gates cached apps by the actual owner.
-	_, manager, _ := androidtools.framework_companion_activity_sources(
-		os.read_file(os.args[1] + '/android/app/Activity.smali')!,
-		os.read_file(os.args[1] + '/android/atl/ATLLoadedAppManager.smali')!,
-		os.read_file(os.args[1] + '/android/app/Activity$2.smali')!)!
+	mut manager := os.read_file(os.args[1] + '/android/atl/ATLLoadedAppManager.smali')!
+	if !manager.contains('vinixGetActivityApplication(') {
+		_, patched_manager, _ := androidtools.framework_companion_activity_sources(
+			os.read_file(os.args[1] + '/android/app/Activity.smali')!, manager,
+			os.read_file(os.args[1] + '/android/app/Activity$2.smali')!)!
+		manager = patched_manager
+	}
 	lookup := methods(manager)['vinixGetActivityApplication(Landroid/atl/ATLLoadedApp;Ljava/lang/String;)Landroid/atl/ATLLoadedApp;']
 	assert position(lookup, '->vinixActivityPackageVisible(') < position(lookup, '->peekAppFromPackageName(')
 
@@ -93,6 +103,15 @@ fn main() {
 	rejected(source + '\n.method public unfinished()V\n', 'unbalanced method')
 	rejected(source + '\n.method public vinixGetServiceTarget()V\n.locals 0\nreturn-void\n.end method\n', 'helper overload')
 	rejected(source.replace('Landroid/atl/VinixServiceBinding;->register(', 'Landroid/atl/VinixServiceBinding;->missing('), 'binding registration drift')
+	rejected(source.replace(before[bind_signature], before[bind_signature].replace(target_guard,
+		target_guard.replace('if-eqz', 'if-nez'))), 'inverted missing target branch')
+	missing_destination := before[bind_signature].split_into_lines().map(if it.trim_space() == missing_label { ':missing_replaced' } else { it }).join('\n')
+	assert missing_destination != before[bind_signature]
+	rejected(source.replace(before[bind_signature], missing_destination), 'absent missing target label')
+	true_destination := before[bind_signature].split_into_lines().map(if it.trim_space() in ['const/4 v0, 0', 'const/4 v0, 0x0'] { 'const/4 v0, 1' } else { it }).join('\n')
+	assert true_destination != before[bind_signature]
+	rejected(source.replace(before[bind_signature], true_destination), 'missing target returns true')
+	rejected(source.replace(before[bind_signature], before[bind_signature].replace('return v0', 'return p3')), 'changed missing target return')
 	rejected(source.replace('->nativeStartExternalService(', '->missingExternalService('), 'external fallback drift')
 	rejected(source.replace(before[start_signature], before[start_signature].replace('    .registers 6\n', '    .registers 7\n')), 'start registers drift')
 	rejected(patched, 'reapplied patch')
