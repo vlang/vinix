@@ -23,11 +23,15 @@ const diagnostic_prefix = 'opt/vinix-account-ui'
 const compiler = '/Users/alex/code/v-tccbin-bootstrap-20261026/v'
 const cross = '/opt/homebrew/bin/aarch64-linux-musl-gcc'
 const compiler_pin = '0cc6c1d34c1811a818e4ae89853116861a4b067d4251af257851a7714f0d11fe'
-const controller = '/Users/alex/.local/state/vinix/android/account-ui-controller-aarch64-2026-10-26'
-const controller_pin = '3dcfb85051079e8205d4a71334e432241a72e9950b25551ea8e69ece70c909d4'
+const controller_root = '/Users/alex/.local/state/vinix/android/current-ui-controller-build-2026-10-26-r1'
+const controller_seal = '503f4e03edf225311038cc0ecce556b804f6b07a337793ff7a466881fbe0112a'
+const controller = controller_root + '/bin/account-ui-controller'
+const controller_pin = '5c5d6415f3e97cb2369187a7aa373aca019ae1e085298daf4551789739851f18'
+const controller_argv_source_pin = '7655f8175951075501cc3cc395bdf38355bbaaf8d50ede416c208758f77a3282'
+const controller_source_pin = '3dcc2e60d5082cf7736c2f363a165f4cba33fabd9b0563599d6662dbbd21f5b2'
 const helper_root = '/Users/alex/.local/state/vinix/android/account-ui-2026-10-26/arm64-committed'
 const helper_pin = 'eff0ee8da211772f2549a5b39fdb2739cbb746db44e859bc25bd56b854fbd989'
-const controller_revision = 'b5ce00d64'
+const controller_revision = 'c5fc9065af1e624002eaff6e2f927ce79858a06e'
 const helper_revision = '4887c0f13'
 const compiled_source = carried($embed_file(@FILE))
 const compiled_guest = carried($embed_file("account-ui-guest.v"))
@@ -89,6 +93,13 @@ struct Entry {
 struct Config {
 	modules []string
 	updated string
+}
+
+struct ControllerBuild {
+	kind            string
+	profile         string
+	source_revision string
+	outputs_sha256  map[string]string
 }
 
 fn hash(path string) !string {
@@ -389,6 +400,79 @@ fn files(root string, prefix string, mut pins map[string]string) ! {
 	}
 }
 
+fn sealed(root string, expected_pin string) !map[string]string {
+	if os.real_path(root) != root || os.is_link(root) || !os.is_dir(root)
+		|| !pin(expected_pin) || hash(root + '/sha256.json')! != expected_pin {
+		return error('sealed controller inventory pin or canonical root differs')
+	}
+	if os.file_size(root + '/sha256.json') > 2 * 1024 * 1024 {
+		return error('oversized controller inventory')
+	}
+	expected := json2.decode[map[string]string](os.read_file(root + '/sha256.json')!)!
+	if expected.len == 0 || expected.len > 4096 || 'sha256.json' in expected {
+		return error('invalid controller inventory shape')
+	}
+	for name, digest in expected {
+		if !relative(name) || !pin(digest) { return error('unsafe controller inventory key/hash') }
+	}
+	mut actual := map[string]string{}
+	files(root, '', mut actual)!
+	actual.delete('sha256.json')
+	if actual != expected { return error('complete controller inventory differs') }
+	return expected
+}
+
+fn verify_controller() !map[string]string {
+	manifest := sealed(controller_root, controller_seal)!
+	build := json2.decode[ControllerBuild](os.read_file(controller_root + '/build.json')!)!
+	controller_contract(build, manifest)!
+	closure := json2.decode[map[string]string](os.read_file(controller_root + '/account-ui-controller-compiled-closure.json')!)!
+	prefix := controller_root + '/closure/account-ui-controller/'
+	if closure.len == 0 || closure.len > 4096 { return error('controller compiled closure absent or oversized') }
+	for path, digest in closure {
+		if !path.starts_with(prefix) || !relative(path[controller_root.len + 1..]) || !pin(digest)
+			|| manifest[path[controller_root.len + 1..]] != digest {
+			return error('controller compiled closure pin differs')
+		}
+	}
+	for name, digest in {
+		'build-support/android/accountuifd/control.c.v': controller_argv_source_pin
+		'tests/native-android-ws/account-ui-controller.v': controller_source_pin
+	} {
+		path := prefix + 'Users/alex/code/vinix/' + name
+		if closure[path] != digest { return error('controller source or argv lifetime fix differs') }
+	}
+	return manifest
+}
+
+fn controller_contract(build ControllerBuild, manifest map[string]string) ! {
+	if build.kind != 'vinix-account-ui-controller-build-v1' || build.profile != 'ui-controller'
+		|| build.source_revision != controller_revision
+		|| build.outputs_sha256 != {'bin/account-ui-controller': controller_pin}
+		|| manifest['bin/account-ui-controller'] != controller_pin {
+		return error('controller build kind, revision or output differs')
+	}
+}
+
+fn retain_controller(root string, manifest map[string]string, mut inputs map[string]string) ! {
+	for name, digest in manifest {
+		if !name.starts_with('closure/account-ui-controller/') && name !in ['build.json',
+			'account-ui-controller-closure.json', 'account-ui-controller-compiled-closure.json',
+			'account-ui-controller-linux-compatibility.json'] { continue }
+		path := controller_root + '/' + name
+		retained := root + '/controller-build/' + name
+		os.mkdir_all(os.dir(retained))!
+		os.cp(path, retained)!
+		if hash(retained)! != digest { return error('retained controller build source differs') }
+		inputs[path] = digest
+	}
+	os.cp(controller_root + '/sha256.json', root + '/controller-build/producer-sha256.json')!
+	if hash(root + '/controller-build/producer-sha256.json')! != controller_seal {
+		return error('retained controller build inventory differs')
+	}
+	inputs[controller_root + '/sha256.json'] = controller_seal
+}
+
 fn static_elf(path string) ! {
 	bytes := os.read_bytes(path)!
 	if bytes.len < 64 || bytes[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1]
@@ -541,6 +625,10 @@ fn retain_sources(root string) ! {
 		os.mkdir_all(os.dir(root + '/sources/' + name))!
 		os.write_file(root + '/sources/' + name, data)!
 	}
+	if hash(root + '/sources/build-support/android/accountuifd/control.c.v')! != controller_argv_source_pin
+		|| hash(root + '/sources/tests/native-android-ws/account-ui-controller.v')! != controller_source_pin {
+		return error('documentary controller revision differs from compiled source pins')
+	}
 }
 
 fn build_guest(root string, mut inputs map[string]string) ! {
@@ -614,6 +702,7 @@ fn stage() ! {
 		return error('headless stage receipt pin differs')
 	}
 	receipt := json2.decode[map[string]json2.Any](os.read_file(base + '/stage.json')!)!
+	controller_manifest := verify_controller()!
 	boot, efivars := base + '/boot.img', base + '/efivars.fd'
 	if hash(boot)! != receipt['staged_boot_sha256']!.str()
 		|| hash(efivars)! != receipt['staged_efivars_sha256']!.str()
@@ -637,12 +726,17 @@ fn stage() ! {
 		os.mkdir(root + '/' + dir, mode: 0o755)!
 	}
 	retain_sources(root)!
+	retain_controller(root, controller_manifest, mut inputs)!
 	os.cp(os.executable(), root + '/stage')!
 	os.cp(base + '/stage.json', root + '/base-stage.json')!
 	os.cp(helper_root + '/build.json', root + '/helper-build.json')!
 	os.cp(helper_root + '/inputs.json', root + '/helper-inputs.json')!
 	os.cp(controller, root + '/payload/bin/account-ui-controller')!
 	os.cp(helper_root + '/vinix-android-account-ui', root + '/payload/bin/vinix-android-account-ui')!
+	if hash(root + '/payload/bin/account-ui-controller')! != controller_pin
+		|| hash(root + '/payload/bin/vinix-android-account-ui')! != helper_pin {
+		return error('copied controller or helper differs from selected executable')
+	}
 	build_guest(root, mut inputs)!
 	for name in ['account-ui-guest', 'account-ui-controller', 'vinix-android-account-ui'] {
 		os.chmod(root + '/payload/bin/' + name, 0o755)!
@@ -718,6 +812,7 @@ fn stage() ! {
 	mut final_entries := []Entry{}
 	inventory(root + '/payload', '', diagnostic_prefix, mut final_entries)!
 	if final_entries != entries { return error('diagnostic payload changed during staging') }
+	if verify_controller()! != controller_manifest { return error('controller build changed during staging') }
 	for path, expected_sha in inputs {
 		if hash(path)! != expected_sha { return error('input changed during staging: ' + path) }
 	}
@@ -729,6 +824,8 @@ fn stage() ! {
 		'compiled_guest_source_sha256':     json2.Any(sha256.sum(compiled_guest.bytes()).hex())
 		'compiled_collector_source_sha256': json2.Any(sha256.sum(compiled_collector.bytes()).hex())
 		'controller_source_revision':       json2.Any(controller_revision)
+		'controller_build':                 json2.Any(controller_root)
+		'controller_build_sha256':          json2.Any(controller_seal)
 		'helper_source_revision':           json2.Any(helper_revision)
 		'inputs_sha256':                    json2.decode[json2.Any](json2.encode(inputs))!
 		'original_modules_sha256':          json2.decode[json2.Any](json2.encode(before))!
@@ -750,6 +847,22 @@ fn stage() ! {
 }
 
 fn self_test() ! {
+	build := ControllerBuild{
+		kind: 'vinix-account-ui-controller-build-v1'
+		profile: 'ui-controller'
+		source_revision: controller_revision
+		outputs_sha256: {'bin/account-ui-controller': controller_pin}
+	}
+	outputs := {'bin/account-ui-controller': controller_pin}
+	controller_contract(build, outputs)!
+	for bad in [ControllerBuild{...build, kind: 'other'}, ControllerBuild{...build, profile: 'launch'},
+		ControllerBuild{...build, source_revision: helper_revision},
+		ControllerBuild{...build, outputs_sha256: {'bin/account-ui-controller': helper_pin}}] {
+		if _ := controller_contract(bad, outputs) { return error('inexact controller build metadata accepted') }
+	}
+	if _ := controller_contract(build, {'bin/account-ui-controller': helper_pin}) {
+		return error('controller output absent from inventory accepted')
+	}
 	valid := '/Vinix\n    module_path: boot():/boot/base.tar\n'
 	assert configure(valid)!.modules == ['base.tar']
 	for bad in ['', valid + '/Other\n', valid + '    module_path: boot():/boot/base.tar\n',
@@ -788,7 +901,7 @@ fn self_test() ! {
 	mut wrong_mode := entries.clone()
 	wrong_mode[2] = Entry{ ...wrong_mode[2], mode: 0o777 }
 	if _ := verify_plan(wrong_mode) { return error('writable executable accepted') }
-	println('ACCOUNT-UI-STAGE SELFTEST PASS config collision exact-allowlist mode')
+	println('ACCOUNT-UI-STAGE SELFTEST PASS config collision exact-allowlist mode controller-build')
 	println('ACCOUNT-UI-STAGE COMPILED-SOURCES ' + sha256.sum(compiled_source.bytes()).hex() + ' ' +
 		sha256.sum(compiled_guest.bytes()).hex() + ' ' + sha256.sum(compiled_collector.bytes()).hex())
 }
@@ -812,6 +925,20 @@ fn host_check(path string) ! {
 	}
 	retain_sources(root)!
 	mut inputs := map[string]string{}
+	controller_manifest := verify_controller()!
+	retain_controller(root, controller_manifest, mut inputs)!
+	fixture := root + '/sealed-check'
+	os.mkdir(fixture)!
+	os.write_file(fixture + '/input', 'original')!
+	write_json(fixture + '/sha256.json', {'input': hash(fixture + '/input')!})!
+	fixture_seal := hash(fixture + '/sha256.json')!
+	sealed(fixture, fixture_seal)!
+	if _ := sealed(fixture, '0'.repeat(64)) { return error('wrong controller seal accepted') }
+	os.write_file(fixture + '/extra', 'extra')!
+	if _ := sealed(fixture, fixture_seal) { return error('extra controller inventory file accepted') }
+	os.rm(fixture + '/extra')!
+	os.write_file(fixture + '/input', 'changed')!
+	if _ := sealed(fixture, fixture_seal) { return error('changed controller inventory file accepted') }
 	build_guest(root, mut inputs)!
 	self_test()!
 	deadline_check(root)!
@@ -847,15 +974,21 @@ fn host_check(path string) ! {
 	if _ := verify_overlay(root + '/test.tar', changed) {
 		return error('archive digest mismatch accepted')
 	}
+	if verify_controller()! != controller_manifest { return error('controller build changed during host checks') }
 	for input, digest in inputs {
 		if hash(input)! != digest { return error('host check source changed') }
 	}
 	write_json(root + '/checks.json', {
 		'kind':         json2.Any('vinix-account-ui-stage-host-check-v1')
 		'checks':       json2.Any(['static-AArch64-guest', 'embedded-sources', 'source-revisions',
+			'complete-controller-producer', 'compiled-controller-source-pins', 'controller-metadata-rejection',
+			'controller-inventory-pin-extra-file-and-mutation-rejection',
 			'configuration', 'collision', 'exact-overlay-allowlist', 'archive-readback',
 			'digest-rejection', 'fresh-output', 'QMP-path-limit', 'incomplete-baseline-receipt',
 			'bounded-command-deadline-receipt'].map(json2.Any(it)))
+		'controller_build': json2.Any(controller_root)
+		'controller_build_sha256': json2.Any(controller_seal)
+		'inputs_sha256': json2.decode[json2.Any](json2.encode(inputs))!
 		'guest_sha256': json2.Any(hash(root + '/payload/bin/account-ui-guest')!)
 	})!
 	println('ACCOUNT-UI-STAGE HOST-CHECK PASS ' + root + '/checks.json')

@@ -79,3 +79,49 @@ a separate 900-second bound and retains timeout receipts. Its targeted
 deadline rejection check passed at `account-ui-deadline-check-2026-10-26-r1`,
 receipt SHA-256
 `c08df6271bb4300425b7c25753517fcb234e45d2c712c3b8d7daea53efed79db`.
+
+## Controller argv lifetime fix replay
+
+Fresh staging at
+`/Users/alex/.local/state/vinix/android/account-ui-stage-2026-10-26-r3`
+uses the argv lifetime fix from `75154c870`. The controller producer is
+`current-ui-controller-build-2026-10-26-r1`, source revision
+`c5fc9065af1e624002eaff6e2f927ce79858a06e`, complete inventory SHA-256
+`503f4e03edf225311038cc0ecce556b804f6b07a337793ff7a466881fbe0112a`.
+The stager checks that complete producer, exact build profile and output, and
+the actual compiled controller and argv source pins before and after staging.
+It retains the compiled source closure and original producer inventory outside
+the guest payload. Historical bundles above remain unchanged.
+
+The new controller SHA-256 is
+`5c5d6415f3e97cb2369187a7aa373aca019ae1e085298daf4551789739851f18`;
+the guest SHA-256 is
+`c6aa4affee1b2ac822cc422aca755bb5867f23bd7b471007e0f04a93020d3f3f`.
+The helper remains `4887c0f13` and
+`eff0ee8da211772f2549a5b39fdb2739cbb746db44e859bc25bd56b854fbd989`.
+Stage source SHA-256 is
+`aa112b59fda67bf53ce0ed2a45f313ce917c54e02d05992a3166f1b4b4c79bb2`;
+guest source SHA-256 is
+`c8642b186fa4255ce63e29958b4cfa101497ff73af0250b15c1a63c10aecf464`.
+
+Production/debug and source-mutation checks passed at
+`/Users/alex/.local/state/vinix/android/account-ui-check-argv-2026-10-26-r1`.
+The `checks.json` SHA-256 is
+`ac359f73b0283c6b298274d0dd4d4e73c97b9ce3628c87326ed9131dc8df6c73`;
+`host/checks.json` SHA-256 is
+`967c39156b01f9a6c2fbeb3ae12e3b013f3a26bc563239ddac1d7472a24fde1c`.
+These also cover complete producer inventory and metadata rejection, static
+AArch64 compilation, archive readback, and the existing deadline checks.
+The retained `stage-prod` binary SHA-256 is
+`ff8d69b191094b63df9f50c8545b4548392b9ed48afaaf0732b9099af829154a`.
+
+The fresh media stage completed with exit zero. Its `stage.json` SHA-256 is
+`ade6f5f89f73632ee6ef1cc36b95d17b8a3b70e25dbeb3660ba5c3401e894b20`;
+the complete `sha256.json` inventory SHA-256 is
+`bcb7656ee29c66d2d54fad120aff2d09f078e3a7684ce59c3ac1dd88aa16d394`.
+It uses the same unbooted baseline receipt
+`7448a177792eaba0a5555dd35ada0efefd790afd4b863def3647362c23c65559`;
+all six original modules passed unchanged hash checks and overlay readback.
+The staged firmware SHA-256 remains
+`d3b3f7afddb44de7020b8544270a67791fca44a48864dcd550cefee633463cbf`.
+No guest was launched by this replay, which proves no ART or Google sign-in.
