@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Native APK launcher. ART uses a private libc and libraries; WS supplies the
-// inherited surface/input connection. No display toolkit or X server starts.
+// inherited surface/input connection. Browser startup requires an explicit,
+// administrator-pinned deployment and remains lazy until the first request.
 module main
 
 import os
@@ -8,6 +9,7 @@ import nativeapk
 import nativeidentity
 import nativecache
 import nativeaccountauth
+import browserlaunch
 
 #include <sys/resource.h>
 struct C.rlimit {
@@ -28,6 +30,7 @@ fn main() {
 fn run() ! {
 	root := os.getenv_opt('VINIX_ANDROID_ROOT') or { '/opt/vinix-android-aarch64' }
 	if os.args.len == 2 && os.args[1] == '--help' {
+		println('Service mode optionally accepts --authenticator-socket ABS after --service-fd N; the dedicated root-peer channel connects after the app identity drop.')
 		println('usage: run-android APK [-l ACTIVITY] [-w WIDTH -h HEIGHT]\nRequires an inherited Vinix WS surface and input pipe.\nHeadless service host: run-android APK --service-fd N; requires a live root Unix peer,\nroot-provisioned account registry and explicit Unix credentials.\nOptional root-only Unix identity: VINIX_ANDROID_UID/GID=10000..19999,\nANDROID_APP_DATA_DIR and VINIX_ANDROID_HOME must name prepared target-owned directories.')
 		return
 	}
@@ -37,14 +40,23 @@ fn run() ! {
 	mut activity := ''
 	mut at := 2
 	mut service_fd := -1
+	mut authenticator_socket := ''
 	if os.args.len >= 3 && os.args[2] == '--service-fd' {
-		if os.args.len != 4 { return error('service host requires exactly APK --service-fd N') }
+		if os.args.len != 4 && os.args.len != 6 {
+			return error('service host requires APK --service-fd N [--authenticator-socket ABS]')
+		}
 		value := os.args[3]
 		if value.len == 0 || value.len > 10 || !value.bytes().all(it >= `0` && it <= `9`)
 			|| value.u64() < 3 || value.u64() > 0x7fffffff {
 			return error('invalid service control descriptor')
 		}
 		service_fd = value.int()
+		if os.args.len == 6 {
+			if os.args[4] != '--authenticator-socket' || os.args[5] == '' {
+				return error('unsupported service command channel option')
+			}
+			authenticator_socket = os.args[5]
+		}
 		at = os.args.len
 	}
 	for at < os.args.len {
@@ -82,6 +94,9 @@ fn run() ! {
 	data := os.getenv_opt('ANDROID_APP_DATA_DIR') or { data_root + '/vinix/android/' + os.base(apk) + '_' }
 	identity := nativeidentity.from_environment()!
 	nativeaccountauth.verify_environment_launch(apk, identity.uid, identity.gid, identity.enabled)!
+	mut browser := browserlaunch.from_environment(identity.uid, identity.gid, data, identity.enabled,
+		os.getenv_opt('VINIX_ANDROID_ACCOUNT_REGISTRY') != none)!
+	defer { browser.close() }
 	if service_fd >= 0 {
 		if !identity.enabled || os.getenv_opt('VINIX_ANDROID_ACCOUNT_REGISTRY') == none {
 			return error('service host requires a protected registry and explicit Unix credentials')
@@ -91,9 +106,20 @@ fn run() ! {
 	} else {
 		identity.activate(apk, root, os.getenv('VINIX_SURFACE_PATH'))!
 	}
+	// The broker authenticates the permanently dropped service principal and
+	// this PID. CLOEXEC remains set until the final native-entry handoff.
+	authenticator_fd := if authenticator_socket != '' {
+		nativeaccountauth.connect_authenticator(authenticator_socket)!
+	} else { -1 }
+	defer { if authenticator_fd >= 3 { C.close(i32(authenticator_fd)) } }
 	nativecache.prepare()!
 	os.mkdir_all(data)!
 	native := nativeapk.install(apk, data, 'arm64-v8a')!
+	// Admission happened as root; the socketpair must be created only after
+	// nativeidentity has irreversibly dropped all credentials/capabilities.
+	browser_fd := browser.launch()!
+	defer { if browser_fd >= 3 { C.close(i32(browser_fd)) } }
+	if browser_fd >= 3 { os.setenv('VINIX_ANDROID_WEBVIEW_FD', browser_fd.str(), true) }
 	os.setenv('VINIX_ANDROID_NATIVE_DIR', native, true)
 	os.setenv('BIONIC_LD_LIBRARY_PATH', native + ':' + data + '/*', true)
 	os.setenv('XDG_DATA_DIRS', root + '/usr/share/vinix-android-ws', true)
@@ -116,5 +142,9 @@ fn run() ! {
 	mut arguments := ['--library-path', paths, root + '/usr/bin/vinix-android-native', apk]
 	if service_fd >= 0 { arguments << ['--service-fd', service_fd.str()] }
 	else { arguments << activity }
+	if authenticator_fd >= 3 {
+		nativeaccountauth.inherit_root_channel(authenticator_fd)!
+		arguments << ['--authenticator-fd', authenticator_fd.str()]
+	}
 	os.execvp(root + '/lib/ld-musl-aarch64.so.1', arguments)!
 }
