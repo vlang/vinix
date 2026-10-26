@@ -10,10 +10,10 @@ import time
 
 const repo = '/Users/alex/code/vinix'
 const state = '/Users/alex/.local/state/vinix/android/'
-const framework_base = state + 'account-contract-response-build-2026-10-26'
-const framework_manifest = '4bfb24a711625e1e627a25c1ad5cea0c1b68090d6b0633179844636f7fce8c21'
-const framework_class_count = 2089
-const jar_pin = 'f89db07bc2897ca11c1645a39300e84b9f981050c940bd04c4b1dceb19225477'
+const framework_base = state + 'account-contract-intent-parcel-build-2026-10-26-r2'
+const framework_manifest = 'f0d7109fbf50ed690de7a8bff0d81c642a70801b8f0318b2bc8904d989f0ab62'
+const framework_class_count = 2090
+const jar_pin = '5672bcde9890eb2c86f4a1dab5b2e6ffdd0695f27f86039d787a7ee4810cb5ea'
 const native_base = state + 'text-size351-native-build-2026-10-25'
 const native_manifest = 'eb0dfe0dd87ea7f5972bddd06ae4c0c45ba8b9e5ad56a39c074142847f4bccd9'
 const native_pin = 'd3da7eefd58c8f1faf7a88dd0b6fa0839cebdba145d236bd5fe1ecc185e257a1'
@@ -474,6 +474,7 @@ fn native_only(root string) ! {
 		'native351_manifest_sha256': native_manifest
 		'environmental_inputs':      'System SDK and dynamic libraries remain environmental dependencies; copied frozen351 V, crosscompiler and runtime inputs guarded before and after generation.'
 	})!
+	os.cp(root + '/native-stage.json', root + '/build.json')!
 	println('COMPANION-ACTIVITY-NATIVE-STAGE-PASS native=' + root + '/native/libvinix-android-native.so')
 }
 
