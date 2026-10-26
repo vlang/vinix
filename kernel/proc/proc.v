@@ -707,7 +707,8 @@ __global (
 	reaped_waiters &Process = unsafe { nil }
 )
 
-// Acquired under children_lock, or from an existing reference.
+// Acquired under children_lock or the process-table lock, or from an existing
+// reference. A table lookup must pin before dropping the table lock.
 pub fn pin_process(p &Process) {
 	mut process := unsafe { p }
 	katomic.inc(mut &process.wait_pins)

@@ -10,10 +10,12 @@ module userland
 import errno
 import event
 import event.eventstruct
+import file
 import futex
 import katomic
 import memory.mmap
 import proc
+import resource
 import usercopy
 
 // clone(2) flags. Only the ones that change what we build are listed.
@@ -56,6 +58,8 @@ const p_all = 0
 const p_pid = 1
 
 const p_pgid = 2
+
+const p_pidfd = 3
 
 // siginfo si_code values for SIGCHLD.
 const cld_exited = 1
@@ -453,8 +457,13 @@ fn abandon_robust_futex(tid int, address u64, pi bool, pending bool) {
 
 // Selector semantics shared by wait4() and waitid(): >0 one pid, 0 the caller's
 // process group, -1 any child, < -1 the process group -pid.
-// `pid` is as the caller's pid namespace numbers processes and groups.
-fn child_matches(current_process &proc.Process, child &proc.Process, pid int) bool {
+// `pid` is as the caller's pid namespace numbers processes and groups. A
+// non-null target is pinned by a P_PIDFD waiter and selects that exact object,
+// even if a sibling reaps it and its numeric pid is reused while we sleep.
+fn child_matches(current_process &proc.Process, child &proc.Process, pid int, target &proc.Process) bool {
+	if target != unsafe { nil } {
+		return child == target
+	}
 	if pid == -1 {
 		return true
 	}
@@ -499,13 +508,13 @@ fn wake_child_waiters(mut parent proc.Process) {
 	parent.children_lock.release()
 }
 
-fn scan_child_change(mut parent proc.Process, pid int, options int) ChildChange {
+fn scan_child_change(mut parent proc.Process, pid int, target &proc.Process, options int) ChildChange {
 	// The parent list owns a child until its exclusive wait claim is committed.
 	// Unlike a raw process-table snapshot, a claimed child cannot be reaped and
 	// freed while a copy-out faults or another sibling is waiting.
 	mut matches := false
 	for mut child in parent.children {
-		if !child_matches(parent, child, pid) { continue }
+		if !child_matches(parent, child, pid, target) { continue }
 		child.job_lock.acquire()
 		if child.wait_reaped {
 			child.job_lock.release()
@@ -542,7 +551,7 @@ fn scan_child_change(mut parent proc.Process, pid int, options int) ChildChange 
 	return ChildChange{ err: if matches { u64(0) } else { errno.echild } }
 }
 
-fn take_child_change(mut parent proc.Process, pid int, options int) ChildChange {
+fn take_child_change(mut parent proc.Process, pid int, target &proc.Process, options int) ChildChange {
 	// alloca stays in this frame until listeners detach and the intrusive link
 	// is removed. Taking &ChildWaiter{} or a promoted fixed array would leak.
 	mut waiter := unsafe { &ChildWaiter(C.__builtin_alloca(sizeof(ChildWaiter))) }
@@ -550,7 +559,7 @@ fn take_child_change(mut parent proc.Process, pid int, options int) ChildChange 
 	mut interrupted := false
 	for {
 		parent.children_lock.acquire()
-		result := scan_child_change(mut parent, pid, options)
+		result := scan_child_change(mut parent, pid, target, options)
 		if result.child != unsafe { nil } || result.err != 0 || options & wnohang != 0 || interrupted {
 			parent.children_lock.release()
 			if interrupted && result.child == unsafe { nil } && result.err == 0 {
@@ -646,7 +655,7 @@ pub fn syscall_wait4(_ voidptr, pid_word u64, status_ptr u64, options_word u64, 
 	// Its negation is undefined in Linux's signed pid_t. Invalid options take
 	// precedence, then this selector returns ESRCH instead of scanning children.
 	if pid == -2147483648 { return errno.err, errno.esrch }
-	change := take_child_change(mut current_process, pid, options | wexited)
+	change := take_child_change(mut current_process, pid, unsafe { nil }, options | wexited)
 	if change.child == unsafe { nil } {
 		if change.err != 0 { return errno.err, change.err }
 		return 0, 0
@@ -727,6 +736,15 @@ pub fn syscall_waitid(_ voidptr, idtype_word u64, id_word u64, infop u64, option
 	}
 
 	mut pid := 0
+	mut target := &proc.Process(unsafe { nil })
+	mut descriptor := &file.FD(unsafe { nil })
+	mut nonblocking := false
+	defer {
+		// Both final releases can acquire the process-table lock. No child,
+		// descriptor or process-table lock remains held on any return path.
+		if target != unsafe { nil } { proc.unpin_process(target) }
+		if descriptor != unsafe { nil } { descriptor.unref() }
+	}
 	match idtype {
 		p_all {
 			pid = -1
@@ -743,14 +761,46 @@ pub fn syscall_waitid(_ voidptr, idtype_word u64, id_word u64, infop u64, option
 			}
 			pid = if id == 0 { 0 } else { -int(id) }
 		}
+		p_pidfd {
+			if id > u64(0x7fffffff) {
+				return empty_waitid_result(infop, errno.einval)
+			}
+			descriptor = file.fd_from_fdnum(unsafe { nil }, int(id)) or {
+				return empty_waitid_result(infop, errno.ebadf)
+			}
+			mut res := descriptor.handle.resource
+			if mut res is proc.PidFile {
+				descriptor.handle.l.acquire()
+				nonblocking = descriptor.handle.flags & resource.o_nonblock != 0
+				descriptor.handle.l.release()
+				proc.lock_table()
+				target = proc.pidfd_target_locked(res)
+				// The descriptor reference keeps the identity record alive;
+				// this separate pin keeps the exact Process alive through a
+				// concurrent reap, the blocking wait and every copyout path.
+				if target != unsafe { nil } { proc.pin_process(target) }
+				proc.unlock_table()
+				if target == unsafe { nil } {
+					return empty_waitid_result(infop, errno.echild)
+				}
+			} else {
+				return empty_waitid_result(infop, errno.ebadf)
+			}
+		}
 		else {
 			return empty_waitid_result(infop, errno.einval)
 		}
 	}
 
-	change := take_child_change(mut current_process, pid, options)
+	// O_NONBLOCK forces a scan without sleeping. An explicit WNOHANG still
+	// returns an empty successful result; only an implicit scan returns EAGAIN.
+	wait_options := if nonblocking { options | wnohang } else { options }
+	change := take_child_change(mut current_process, pid, target, wait_options)
 	if change.child == unsafe { nil } {
-		return empty_waitid_result(infop, change.err)
+		error := if change.err == 0 && nonblocking && options & wnohang == 0 {
+			u64(errno.eagain)
+		} else { change.err }
+		return empty_waitid_result(infop, error)
 	}
 
 	child := change.child
