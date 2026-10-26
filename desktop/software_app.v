@@ -291,12 +291,12 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	a.worker.set_args(owned)
 	if a.worker_health { a.worker.set_redirect_stdio() } else { a.worker.set_redirect_stdio_merged() }
 	a.worker.run()
-	if authorized { a.begin_admin_prompt() }
 	a.set_status(if view {
 		'Reading the software catalog…'
 	} else {
 		'Package operation started…'
 	})
+	if authorized { a.begin_admin_prompt() }
 }
 
 fn software_free_row(row SoftwareRow) {

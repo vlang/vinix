@@ -10,11 +10,15 @@ import desktop.packagecore
 import tools.packages.pkgprotocol
 import tools.packages.appsdk
 
+#include <errno.h>
+#include <sys/wait.h>
+
 $if track_heap ? {
 	#include "tools/tests/heap_tracker.h"
 }
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
+fn C.vinix_heap_count() u32
 
 struct Desktop {
 	tz_offset_seconds i64
@@ -378,6 +382,7 @@ fn check_software_window_text() ! {
 
 fn main() {
 	unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+	if os.args.len == 2 && os.args[1] == 'admin-status' { check_software_admin_status() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'dependencies' { check_software_dependencies() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'release-memory' { check_software_release_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'deployment-form-memory' { check_software_deployment_form_memory() or { panic(err) }; return }
@@ -671,6 +676,8 @@ fn admin_tree_has_secret(tree ui2.Element) bool {
 fn check_software_admin() ! {
 	mut app := SoftwareApp{ administration_required: true, service_path: os.executable(), output: []u8{cap: 8192}, query: []u8{cap: 256} }
 	app.start(['apply', 'c'.repeat(64), 'install', 'editor'], false)
+	software_admin_status_require(app.status == 'Enter your own administrator password to approve this package change.',
+		'administrator guidance was overwritten after worker startup')
 	assert app.admin_prompt && app.worker.args == ['admin', '--progress', 'apply', 'c'.repeat(64), 'install', 'editor']
 	check_admin_empty_paste(mut app)
 	app.key_input('fixture secret é')
@@ -703,7 +710,48 @@ fn check_software_admin() ! {
 	refresh.cancel_admin()
 	assert refresh.repository_result.contains('trust was saved') && !refresh.admin_prompt
 	refresh.close_app()
+	check_software_admin_input_refusal()!
 	println('Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed')
+}
+
+fn software_admin_status_require(condition bool, reason string) {
+	if !condition { panic(reason) }
+}
+
+fn check_software_admin_status() ! {
+	mut app := SoftwareApp{ administration_required: true, service_path: os.executable(), output: []u8{cap: 8192} }
+	defer { app.close_app() }
+	app.start(['apply', 'c'.repeat(64), 'install', 'editor'], false)
+	software_admin_status_require(app.admin_prompt && app.worker != unsafe { nil }, 'administrator prompt did not start')
+	software_admin_status_require(app.status == 'Enter your own administrator password to approve this package change.',
+		'administrator guidance was overwritten after worker startup')
+	app.cancel_admin()
+	software_admin_status_require(app.worker == unsafe { nil } && !app.admin_prompt, 'administrator cancellation retained a worker or prompt')
+	check_software_admin_input_refusal()!
+	println('Software administrator status: startup guidance and nonblocking input refusal survive; refused worker reaped and credentials wiped PASS')
+}
+
+fn check_software_admin_input_refusal() ! {
+	mut app := SoftwareApp{ worker: os.new_process(os.executable()) }
+	defer { app.close_app() }
+	app.worker.set_args(['lease-hold'.clone()])
+	app.worker.set_redirect_stdio_merged()
+	app.worker.run()
+	pid := app.worker.pid
+	software_admin_status_require(pid > 0, 'input refusal fixture child did not start')
+	// Retire the actual owned write descriptor, then exercise the production
+	// refusal path without changing descriptor ownership or injecting a hook.
+	software_admin_status_require(C.close(app.worker.stdio_fd[0]) == 0, 'cannot close fixture administrator stdin')
+	app.worker.stdio_fd[0] = -1
+	app.admin_password[0] = `x`; app.admin_password_len = 1
+	app.begin_admin_prompt()
+	software_admin_status_require(app.status == 'Cannot protect nonblocking administrator password input.', 'administrator input refusal diagnostic was lost')
+	software_admin_status_require(app.worker == unsafe { nil } && !app.admin_prompt && !app.admin_focus
+		&& app.admin_password_len == 0 && app.admin_password.all(it == 0) && app.admin_mask.len == 0,
+		'administrator input refusal retained a worker, prompt or credential')
+	mut status := 0
+	software_admin_status_require(C.waitpid(pid, &status, C.WNOHANG) == -1 && C.errno == C.ECHILD,
+		'administrator input refusal did not reap its worker')
 }
 
 fn check_admin_empty_paste(mut app SoftwareApp) {
