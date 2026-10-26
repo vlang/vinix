@@ -6,7 +6,8 @@ ordinary active-seat playback, refusal controls, process cleanup and seat
 changes. Every guest check remains active in production builds.
 **Real guest audio acceptance is pending.**
 
-Production base: `df766e9e446ffe0cbe6f5fa446c1c0278a789da9`.
+Production base: `df766e9e446ffe0cbe6f5fa446c1c0278a789da9`;
+strict socket-address C boundary fix: `f50041955`.
 Wave oracle: `7c15b7aa3e196f9fdf85fa75c212af63a9ab63bd`.
 Initial evidence tools: `32a97777573dcfa49992d642362c1ea2cc1a01b0`.
 Initial guest fixtures: `20b2bdd26`.
@@ -15,11 +16,14 @@ Frozen-sysroot controller: the commit containing this update.
 
 | Preparation check | Result |
 | --- | --- |
-| Controller host `-prod`, explicit C backend / LLVM clang | PASS |
-| Current guest and payload `-prod` Linux C generation, both architectures | PASS, four translations; no target links or boots |
-| Rooted sysroot capture `-prod` controls | PASS, 16 controls |
-| Evidence tools `-prod`, synthetic controls | PASS, 26 per architecture |
-| Native admission of synthetic receipts | Refused on both architectures |
+| Current input checker and retainer/evidence tools, host `-prod` | PASS |
+| Current controller host rebuild | PASS, explicit C backend / LLVM clang |
+| Historical guest and payload `-prod` Linux C generation | PASS, both architectures; four translations |
+| Rooted capture, selected-input refusal and adapter controls | PASS, 36 controls |
+| Current V probe and tone, actual AArch64 static target links | PASS, 2 further controls; selected-input traces admitted |
+| Current evidence matrix, synthetic AArch64 | PASS, 34 controls |
+| Current evidence matrix, synthetic x86_64 | PASS, 34 controls |
+| Native admission of current synthetic receipts | Refused, both architectures |
 | Stereo waveform oracle | PASS, 19 controls |
 | Real playback, refusal, cleanup and seat scenarios | Pending |
 
@@ -28,7 +32,7 @@ External evidence is retained at
 Historical `validation-final-01.txt` contains the initial evidence-tool commands,
 hashes and complete result paths; SHA-256
 `d2ce8f2e5a01797b71a3fa6cec398d4cced0903783fa38c86dec086ceee757ae`.
-Current commands and hashes are in `validation-sysroot-02.txt`, SHA-256
+Earlier commands and hashes are in `validation-sysroot-02.txt`, SHA-256
 `9e3b3c5be9739d3e8ac150a4127fa0e047356455e20d5ad4d5da908f4857e570`.
 The two `retainer-sysroot-{arm,x86}-02/proof/evidence-controls.json`
 SHA-256 values are respectively
@@ -39,12 +43,12 @@ SHA-256 values are respectively
 `wave-final-01/result.json` SHA-256:
 `1774a8eedf0cc685e3421245eba624a81b41a08f34c7198417b79763cd0915f5`.
 
-Controller logs and generated translations are under `controller-build/`:
+Historical controller logs and generated translations are under `controller-build/`:
 `compile-frozen-04.log`, `cross-cc-compile.log` and
 `{guest,tone}-final-{arm64,amd64}.log` all passed.
-Controller source SHA-256:
+Historical controller source SHA-256:
 `85ec1d2ae8e62de1ed2c8009014912b19867beb2e62f41ea3f0cdac35832b538`.
-Compiled `audio-portal-runtime-check-frozen-vprobe` SHA-256:
+Historical compiled `audio-portal-runtime-check-frozen-vprobe` SHA-256:
 `2ed99169cb3b7f8701cbbd7990063182224f8dd5b73ed6e72b98afd902c3e5b6`.
 The guest supervisor's timeout path kills and EINTR-safely reaps its direct child.
 
@@ -96,4 +100,60 @@ musl loader link before any target link or boot; the rooted capturer and
 16 controls address that refusal. Both diagnostics remain outside Git.
 The controller retains C-backend stdatomic inputs and original compiler
 snapshot metadata, refusing additional uncaptured quoted thirdparty includes.
+The preserved `a2` attempt reached the real AArch64 GCC14 compiler and
+linked the V probe, then stopped at an incompatible SDK `connect` argument
+before boot. Inspection also showed that `--sysroot` alone left original
+headers and startup libraries ahead of the captured copies. The production
+fix covers both `bind` and `connect`. The adapter now forces captured include
+and library directories and saves each generated object; independent admission
+requires all eight target traces to select their exact retained object and
+captured startup/runtime inputs. Selected optional `libm.a` and `libpthread.a`
+must also be regular captured files. Original/relative/foreign selected inputs,
+missing captures and forged header origins are refused. Exact generated-source
+warning/note locations are admitted; errors and malformed locations are refused.
+Detached positive controls rebase only recorded paths and exercise the exact
+generated-source warning case without changing original evidence.
+The preserved `input-trace-02`, `03` and `04` diagnostics refused missing
+origin metadata, a symlink command path and GCC's LTO-plugin lookup before
+target linking. `input-trace-05/actual-links/` then linked the current V probe
+and tone into AArch64 ELF executables. The probe's selected-input trace passed;
+the tone trace refused generated-source diagnostic text before a final result
+was published. Its raw GCC warnings remain retained, including V runtime macro
+redefinition, const-discard and inlined scalar-push `memcpy` diagnostics. No
+audio guest was booted.
+
+The completed `input-trace-06/result.json` records all 38 controls passing,
+including two actual links; SHA-256:
+`a52b9ece0568a809d1f9a32c8d4d7ae506271d5736cc8d022a724b16feaa7748`.
+The current AArch64 34-control evidence receipt at
+`retainer-trace-arm-06/proof/evidence-controls.json` has SHA-256
+`c199ed1eec595b59973bb14f0d74bc85810ca1e2f4f21e99f9871abf5f3ff28f`.
+The matching x86_64 receipt at
+`retainer-trace-x86-06/proof/evidence-controls.json` has SHA-256
+`0910cb08c8110b7176b35c2290b6c9bb78042e954b7abef27bc9aa502e741d9a`.
+These results supersede the earlier 16/26-control receipts for the changed
+input and trace admission; the historical waveform oracle is unchanged.
+Current commands, source/tool hashes and complete receipt paths are in
+`validation-selected-inputs-06.txt`, SHA-256
+`d218bebe4c362b1d8f6453cef3324eae55c44f67d2764d88a3ecb6f8e9867f9f`.
+Current controller source SHA-256:
+`5923add3e34ff0da48ed4ec8ac5a67fab8604f077863aa09e17fa8aa1dbebb7e`.
+The successfully rebuilt `controller-build/audio-runtime-trace06` SHA-256 is
+`39ed1ad8922d7ecd55e374d36efb784f750959077679144c3321078ae8bd1ea5`.
+`input-trace-06/actual-links/commands.json` preserves literal generation/link
+arguments. V flags match the native producer: Linux AArch64, `-prod -gc none`,
+without `-manualfree`. The bounded diagnostic uses static `-O1` links with
+warnings enabled and does not build all eight native programs. Its source
+inventory includes the PCM module, SDK, tone and producer helpers. Captured
+target bytes are hardlinked read-only from `vinix-audio14/a2`. Original V
+library and stdatomic inputs must match those captured bytes before generation.
+All selected source, tool and input hashes are equal before and after both
+links; both inventory files have SHA-256
+`950e182a17dc4805c8e07e4ece03d349bc3ab200faae4c92481d750d4a12caa3`.
+`actual-links/outputs.json` pins C, preprocessed `.i`, assembly `.s`, objects,
+ELFs, literal arguments and raw logs; SHA-256:
+`f61354ff47d261fec132ff13043d2bf343f5ed20780b87d8c45714e56be8c223`.
+No target pointer-error suppression is applied. Retained original V header
+paths bind exact captured keys and hashes without requiring live originals
+during an archival audit. Full native execution remains pending.
 This report makes no roadmap completion claim.

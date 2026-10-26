@@ -151,7 +151,7 @@ fn sandbox_build(root string, host hwhost.Host, out string, compiler string) !st
 		args << ['--target=aarch64-linux-musl', '--sysroot=' + sysroot, '-L' + sysroot + '/lib', '-fuse-ld=lld']
 	}
 	args << ['-static', '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', '-D_GNU_SOURCE',
-		'-DVINIX_V_RUNTIME', '-I', root + '/tools/sandbox', source, '-o', directory + '/vinix-sandbox']
+		'-DVINIX_V_RUNTIME', '-I', out + '/inputs/source/tools/sandbox', source, '-o', directory + '/vinix-sandbox']
 	invoke(args, directory + '/build.log')!
 	return directory + '/vinix-sandbox'
 }
@@ -177,15 +177,20 @@ fn cross_inputs(host hwhost.Host, out string, mut paths map[string]string,
 		paths['cross-sysroot-' + name] = path
 	}
 	retain_tree(os.dir(libgcc), 'cross-gcc', out, [], mut paths, mut originals)!
-	for tool in ['cc1', 'collect2', 'as', 'ld'] {
+	for tool in ['cc1', 'collect2', 'as', 'ld', 'lto-wrapper'] {
 		candidate := invoke([backend, '-print-prog-name=' + tool], out + '/cross-' + tool + '.log')!.trim_space()
 		path := if candidate.contains('/') { os.real_path(candidate) } else { os.find_abs_path_of_executable(candidate)! }
 		paths['cross-' + tool] = retained(path, out, 'cross-' + tool)!
 		originals['cross-' + tool] = path
 	}
+	plugin := invoke([backend, '-print-prog-name=liblto_plugin.so'], out + '/cross-lto-plugin.log')!.trim_space()
+	if !os.is_abs_path(plugin) { return error('GCC LTO plugin must have an absolute path') }
+	paths['cross-lto-plugin'] = retained(plugin, out, 'cross-lto-plugin')!
+	originals['cross-lto-plugin'] = os.real_path(plugin)
 	frozen := out + '/inputs/cross-sysroot'
 	os.setenv('VINIX_AUDIO_BACKEND_CC', backend, true)
 	os.setenv('VINIX_AUDIO_FROZEN_SYSROOT', frozen, true)
+	os.setenv('VINIX_AUDIO_FROZEN_GCC', out + '/inputs/cross-gcc', true)
 	os.setenv('VINIX_AARCH64_SYSROOT', frozen, true)
 	host_cc := os.real_path('/opt/homebrew/opt/llvm/bin/clang')
 	paths['adapter-host-cc'] = retained(host_cc, out, 'adapter-host-cc')!
@@ -318,6 +323,12 @@ fn prepare_check(options hwhost.Options, root string, out string, before map[str
 	paths['sandbox-c'] = out + '/sandbox-build/sandbox.c'
 	for index, name in ['package-cli', 'account-cli', 'session-cli', 'authd'] {
 		paths[name] = out + '/tools/program-${index}/' + os.file_name(suite.programs[index].path)
+	}
+	allowed_headers := audioinputs.header_allowlist(out + '/inputs/source', before, originals)
+	for name in audioinputs.trace_files() {
+		audioinputs.verify_trace(os.read_file(out + '/' + name)!, out, name, allowed_headers)!
+		paths['trace/' + name] = out + '/' + name
+		paths['trace-object/' + name] = audioinputs.trace_object(out, name)!
 	}
 	// Fail closed if a generated translation unit introduces another compiler
 	// thirdparty dependency outside the explicitly retained C-backend headers.

@@ -6,6 +6,7 @@ import crypto.sha256
 import json2
 import math
 import os
+import tests.packages.audioinputs
 import tests.packages.audiotest
 
 struct Receipt {
@@ -146,11 +147,18 @@ fn clone(original string, work string, receipt Receipt) !Receipt {
 	}
 	// Rebase the explicitly observed frozen-root argument only in this detached
 	// positive-control copy; the original compiler diagnostic remains untouched.
-	trace := os.read_file(paths['cross-search.log'])!
-	updated = seal_artifact(work, updated, 'cross-search.log', trace.replace(original + '/inputs/cross-sysroot', work + '/inputs/cross-sysroot').bytes())!
+	for name in audioinputs.trace_files() {
+		key := 'trace/' + name
+		trace := os.read_file(paths[key])!
+		object := audioinputs.trace_object(original, name)!
+		source := if name == 'sandbox-build/build.log' { original + '/sandbox-build/sandbox.c' } else { object[..object.len - 2] + '.c' }
+		updated = seal_artifact(work, updated, key, trace.replace(original + '/inputs/cross-sysroot', work + '/inputs/cross-sysroot').replace(original + '/inputs/cross-gcc', work + '/inputs/cross-gcc').replace(original + '/inputs/source', work + '/inputs/source').replace(object, audioinputs.trace_object(work, name)!).replace(source + ':', work + source[original.len..] + ':').bytes())!
+	}
 	for key in ['input-before', 'input-after'] {
 		mut inventory := json2.decode[map[string]string](os.read_file(paths[key])!)!
-		inventory['cross-search.log'] = updated.artifacts['cross-search.log']
+		for name, _ in paths {
+			if name == 'cross-search.log' || name.starts_with('trace/') { inventory[name] = updated.artifacts[name] }
+		}
 		updated = seal_artifact(work, updated, key, json2.encode(inventory).bytes())!
 	}
 	return updated
@@ -177,6 +185,53 @@ fn encode(samples []i16) []u8 {
 
 fn mutate(work string, receipt Receipt, name string) !string {
 	serial := receipt.artifact_paths['basic-serial']
+	if name == 'forged-header-origin' {
+		mut origins := json2.decode[map[string]string](os.read_file(receipt.artifact_paths['input-origins'])!)!
+		origins['v-thirdparty/forged.h'] = '/original/foreign.h'
+		updated := seal_artifact(work, receipt, 'input-origins', json2.encode(origins).bytes())!
+		key := 'trace/tone-build/build.log'
+		text := os.read_file(receipt.artifact_paths[key])!
+		seal_artifact(work, updated, key, (text + '. /original/foreign.h\n').bytes())!
+		return 'uncaptured original V header input'
+	}
+	if name in ['relative-selected-object', 'foreign-cc-object'] {
+		key := 'trace/tone-build/build.log'
+		text := os.read_file(receipt.artifact_paths[key])!
+		seal_artifact(work, receipt, key, (text + if name == 'relative-selected-object' { 'uncaptured.o\n' } else { '/original/ccforeign.o\n' }).bytes())!
+		return if name == 'relative-selected-object' { 'relative selected target link input' } else { 'uncaptured selected target link input' }
+	}
+	if name == 'missing-target-object' {
+		mut paths := receipt.artifact_paths.clone()
+		mut sums := receipt.artifacts.clone()
+		paths.delete('trace-object/tone-build/build.log')
+		sums.delete('trace-object/tone-build/build.log')
+		save(work, Receipt{ ...receipt, artifact_paths: paths, artifacts: sums })!
+		return 'missing exact generated target object'
+	}
+	if name in ['original-selected-header', 'original-selected-startup', 'missing-selected-libc'] {
+		key := 'trace/tone-build/build.log'
+		text := os.read_file(receipt.artifact_paths[key])!
+		changed := match name {
+			'original-selected-header' { text.replace('. ' + work + '/inputs/cross-sysroot/include/stdint.h', '. /original/include/stdint.h') }
+			'original-selected-startup' { text.replace(work + '/inputs/cross-sysroot/lib/crt1.o', '/original/lib/crt1.o') }
+			else { text.replace(work + '/inputs/cross-sysroot/lib/libc.a\n', '') }
+		}
+		if changed == text { return error('selected target mutation did not change trace') }
+		seal_artifact(work, receipt, key, changed.bytes())!
+		return match name {
+			'original-selected-header' { 'uncaptured selected header' }
+			'original-selected-startup' { 'uncaptured selected target link input' }
+			else { 'missing captured selected target input' }
+		}
+	}
+	if name == 'missing-target-trace' {
+		mut paths := receipt.artifact_paths.clone()
+		mut sums := receipt.artifacts.clone()
+		paths.delete('trace/guest-build/build.log')
+		sums.delete('trace/guest-build/build.log')
+		save(work, Receipt{ ...receipt, artifact_paths: paths, artifacts: sums })!
+		return 'missing exact target compiler trace'
+	}
 	if name == 'wrong-cross-trace' {
 		text := os.read_file(receipt.artifact_paths['cross-search.log'])!
 		seal_artifact(work, receipt, 'cross-search.log', text.replace('--sysroot=' + work + '/inputs/cross-sysroot', '--sysroot=' + work + '/inputs/cross-sysroot-foreign').bytes())!
@@ -351,6 +406,9 @@ fn run(program string, original string, proof string, arch string, synthetic boo
 	for name in ['wrong-waveform', 'silent-channel', 'extra-tone', 'unfinalized-wave', 'short-quiet-gap', 'short-leading-quiet',
 		'missing-marker', 'duplicate-marker', 'reordered-marker', 'resealed-source',
 		'resealed-input-source', 'wrong-cross-trace', 'wrong-cross-probe', 'incomplete-cross-sysroot',
+		'original-selected-header', 'original-selected-startup', 'missing-selected-libc', 'missing-target-trace',
+		'relative-selected-object', 'foreign-cc-object', 'missing-target-object',
+		'forged-header-origin',
 		'resealed-artifact', 'changed-kernel-source', 'wrong-kernel-identity', 'incomplete-inputs', 'incomplete-retained-input', 'generated-mismatch', 'failed-outcome',
 		'wrong-shutdown', 'duplicate-shutdown', 'missing-artifact'] {
 		work := proof + '/' + name
@@ -466,12 +524,13 @@ fn synthetic_kernel(raw string, mut paths map[string]string, mut sums map[string
 fn synthetic_cross(raw string, mut paths map[string]string, mut sums map[string]string,
 	mut input_sums map[string]string) ! {
 	root := '/synthetic/original-sysroot'
-	files := {'lib/libc.so': root + '/lib/libc.so', 'lib/loader': root + '/lib/libc.so'}
+	mut files := {'lib/libc.so': root + '/lib/libc.so', 'lib/loader': root + '/lib/libc.so'}
+	for name in ['lib/crt1.o', 'lib/crti.o', 'lib/crtn.o', 'lib/libc.a', 'include/stdint.h'] { files[name] = root + '/' + name }
 	for name, bytes in {
 		'cross-adapter-build': 'SYNTHETIC ADAPTER BUILD\n'
 		'cross-probe-generate.log': 'SYNTHETIC PROBE V GENERATION\n'
 		'cross-probe.c': '/* SYNTHETIC PROBE */\n'
-		'cross-search.log': 'SYNTHETIC TRACE --sysroot=' + raw + '/inputs/cross-sysroot\n'
+		'input-origins': '{}'
 		'cross-sysroot-files': json2.encode(files)
 		'cross-sysroot-links': json2.encode({'lib/loader': 'libc.so'})
 		'cross-sysroot-root': json2.encode({'root': root})
@@ -479,6 +538,7 @@ fn synthetic_cross(raw string, mut paths map[string]string, mut sums map[string]
 		filename := match name {
 			'cross-probe.c', 'cross-probe-generate.log', 'cross-search.log' { name }
 			'cross-adapter-build' { 'cross-adapter-build.log' }
+			'input-origins' { 'original-input-paths.json' }
 			else { name + '.json' }
 		}
 		path := raw + '/' + filename
@@ -496,6 +556,34 @@ fn synthetic_cross(raw string, mut paths map[string]string, mut sums map[string]
 			sums[alias] = digest(path)!
 			input_sums[alias] = sums[alias]
 		}
+	}
+	for name in ['crtbeginT.o', 'crtend.o', 'libgcc.a', 'libgcc_eh.a'] {
+		key := 'cross-gcc/' + name
+		path := raw + '/inputs/' + key
+		replace(path, 'SYNTHETIC GCC INPUT\n'.bytes())!
+		paths['input/' + key] = path
+		sums['input/' + key] = digest(path)!
+		input_sums['input/' + key] = sums['input/' + key]
+	}
+	mut trace := 'SYNTHETIC TRACE --sysroot=' + raw + '/inputs/cross-sysroot\n#include <...> search starts here:\n'
+	for directory in ['/cross-gcc/include', '/cross-gcc/include-fixed', '/cross-sysroot/include'] { trace += ' ' + raw + '/inputs' + directory + '\n' }
+	trace += 'End of search list.\n. ' + raw + '/inputs/cross-sysroot/include/stdint.h\n'
+	for name in ['crt1.o', 'crti.o', 'crtn.o', 'libc.a'] { trace += raw + '/inputs/cross-sysroot/lib/' + name + '\n' }
+	for name in ['crtbeginT.o', 'crtend.o', 'libgcc.a', 'libgcc_eh.a'] { trace += raw + '/inputs/cross-gcc/' + name + '\n' }
+	for name in audioinputs.trace_files() {
+		path := raw + '/' + name
+		object := audioinputs.trace_object(raw, name)!
+		replace(object, 'SYNTHETIC GENERATED OBJECT\n'.bytes())!
+		paths['trace-object/' + name] = object
+		sums['trace-object/' + name] = digest(object)!
+		input_sums['trace-object/' + name] = sums['trace-object/' + name]
+		advice := if name == 'cross-search.log' { raw + '/cross-probe.c:12:3: warning: synthetic exact-source diagnostic\n' } else { '' }
+		replace(path, (trace + object + '\n' + advice).bytes())!
+		key := 'trace/' + name
+		paths[key] = path
+		sums[key] = digest(path)!
+		input_sums[key] = sums[key]
+		if name == 'cross-search.log' { paths[name] = path; sums[name] = sums[key]; input_sums[name] = sums[key] }
 	}
 }
 
@@ -527,7 +615,7 @@ fn self_test(program string, out string, arch string) ! {
 	mut sums := map[string]string{}
 	mut input_sums := map[string]string{}
 	for name in ['guest', 'tone', 'package-cli', 'account-cli', 'session-cli', 'authd', 'kernel', 'v', 'clang', 'qemu', 'firmware', 'sandbox', 'sandbox-c',
-		'adapter-host-cc', 'cross-backend', 'cross-cc1', 'cross-collect2', 'cross-as', 'cross-ld', 'cross-adapter', 'cross-probe'] {
+		'adapter-host-cc', 'cross-backend', 'cross-cc1', 'cross-collect2', 'cross-as', 'cross-ld', 'cross-lto-wrapper', 'cross-lto-plugin', 'cross-adapter', 'cross-probe'] {
 		mut bytes := []u8{len: 64}
 		for i, byte in [u8(127), `E`, `L`, `F`, 2, 1, 1] { bytes[i] = byte }
 		bytes[18] = if arch == 'aarch64' { 183 } else { 62 }

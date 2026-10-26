@@ -7,6 +7,7 @@ import json2
 import math
 import os
 import tests.packages.audiotest
+import tests.packages.audioinputs
 
 const trees = ['tools/packages', 'tools/accounts', 'tools/security-events', 'tools/keyring',
 	'build-support/native-compat-tools/compathost', 'tools/sandbox', 'tests/qemu-core/fixturehost',
@@ -21,9 +22,9 @@ const files = ['tests/packages/audio-portal-runtime-check.v', 'tests/packages/au
 	'tests/packages/audio-input-check.v', 'tests/packages/audio-cross-probe.v']
 const inputs = ['guest', 'tone', 'package-cli', 'account-cli', 'session-cli', 'authd', 'kernel',
 	'v', 'clang', 'qemu', 'firmware', 'sandbox', 'sandbox-c', 'adapter-host-cc',
-	'cross-backend', 'cross-cc1', 'cross-collect2', 'cross-as', 'cross-ld', 'cross-adapter',
+	'cross-backend', 'cross-cc1', 'cross-collect2', 'cross-as', 'cross-ld', 'cross-lto-wrapper', 'cross-lto-plugin', 'cross-adapter',
 	'cross-adapter-build', 'cross-probe.c', 'cross-probe', 'cross-probe-generate.log', 'cross-search.log',
-	'cross-sysroot-files', 'cross-sysroot-links', 'cross-sysroot-root']
+	'cross-sysroot-files', 'cross-sysroot-links', 'cross-sysroot-root', 'input-origins']
 const metadata = ['source-before', 'source-after', 'generated-before', 'generated-after', 'input-before', 'input-after']
 const generated = ['guest-build/init.c', 'tone-build/tone.c', 'tools/program-0/vinix-package.c',
 	'tools/program-1/vinix-account.c', 'tools/program-2/vinix-session.c', 'tools/program-3/vinix-authd.c']
@@ -222,6 +223,22 @@ fn admit_cross(run string, receipt Receipt, arch string) ! {
 	target_elf(receipt.artifact_paths['cross-probe'], arch)!
 	if !observed_argument(bounded(receipt.artifact_paths['cross-search.log'])!, '--sysroot=' + run + '/inputs/cross-sysroot') {
 		return error('cross compiler trace lacks retained frozen sysroot')
+	}
+	if receipt.artifact_paths['input-origins'] != run + '/original-input-paths.json' {
+		return error('misplaced original compiler input inventory')
+	}
+	origins := json2.decode[map[string]string](bounded(receipt.artifact_paths['input-origins'])!)!
+	for name, path in origins {
+		if (!name.starts_with('vlib/') && !name.starts_with('v-thirdparty/')) || !name.ends_with('.h') { continue }
+		if !relative(name) || !os.is_abs_path(path) || receipt.artifact_paths[name] != run + '/inputs/' + name
+			|| !hex(receipt.artifacts[name], 64) { return error('uncaptured original V header input: ' + name) }
+	}
+	allowed := audioinputs.header_allowlist(receipt.source_root, receipt.sources, origins)
+	for name in audioinputs.trace_files() {
+		key := 'trace/' + name
+		if receipt.artifact_paths[key] != run + '/' + name { return error('missing exact target compiler trace: ' + name) }
+		if receipt.artifact_paths['trace-object/' + name] != audioinputs.trace_object(run, name)! { return error('missing exact generated target object: ' + name) }
+		audioinputs.verify_trace(bounded(receipt.artifact_paths[key])!, run, name, allowed)!
 	}
 }
 
