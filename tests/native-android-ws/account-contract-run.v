@@ -29,12 +29,20 @@ const modules = ['initramfs.tar', 'qemu-runtime.tar', 'maps335-diagnostics.tar',
 const fixture_pass = 'ACCOUNT-ASYNC-PASS credential-insertion-rejected null-type no-callback no-accounts main-queued worker-to-main explicit-handler callback-once same-future done cancel-false result-authenticator-exception repeat timed null-unit'
 const response_pass = 'AUTHENTICATOR-RESPONSE-PASS local proxy oneway descriptor null-bundle intent error parcelable remote-exception runtime-exception parcel-cleanup'
 const activity_pass = 'COMPANION-ACTIVITY-PASS package classloader resources theme application-once caller intent-copy cached-result result-overwrite finish-once default-canceled recreate-pending primary-recreate missing disabled unexported permission cached-invisible'
+const intent_pass = 'INTENT-PARCEL-PASS values categories selector component source-bounds response-binder bundle cursor typed-array null-clear atomic-read unsupported malformed clip-rejected'
+const request_pass = 'AUTHENTICATOR-REQUEST-PASS account-parcel fourteen-local fourteen-proxy typed-values typed-nulls response-binder oneway descriptor unknown trailing-data remote-exception runtime-exception parcel-cleanup'
+const fixture_kinds = ['fixture', 'response-fixture', 'companion-activity-fixture', 'intent-parcel-fixture', 'authenticator-request-fixture']
+const compiled_runner_source = $embed_file(@FILE).to_string()
+const compiled_stream_source = $embed_file('../../build-support/android/modulestream/stream.v').to_string()
+const compiled_stream_header = $embed_file('../../build-support/android/modulestream/spawn_abi.h').to_string()
 
 fn fixture_source(kind string) !string {
 	return match kind {
 		'fixture' { repo + '/tests/native-android-ws/account-addition-fixture.v' }
 		'response-fixture' { repo + '/tests/native-android-ws/authenticator-response-fixture.v' }
 		'companion-activity-fixture' { repo + '/tests/native-android-ws/companion-activity-fixture.v' }
+		'intent-parcel-fixture' { repo + '/tests/native-android-ws/intent-parcel-fixture.v' }
+		'authenticator-request-fixture' { repo + '/tests/native-android-ws/authenticator-request-fixture.v' }
 		else { return error('unknown account fixture kind') }
 	}
 }
@@ -44,6 +52,8 @@ fn fixture_marker(kind string) !string {
 		'fixture' { fixture_pass }
 		'response-fixture' { response_pass }
 		'companion-activity-fixture' { activity_pass }
+		'intent-parcel-fixture' { intent_pass }
+		'authenticator-request-fixture' { request_pass }
 		else { return error('unknown account fixture kind') }
 	}
 }
@@ -53,6 +63,8 @@ fn fixture_scope(kind string) !string {
 		'fixture' { 'unsupported account future/callback contract in guest ART' }
 		'response-fixture' { 'authenticator response Binder/Parcelable contract in guest ART; no Google authentication' }
 		'companion-activity-fixture' { 'explicit companion Activity ownership, recreation and result lifetime in guest ART; no Google authentication' }
+		'intent-parcel-fixture' { 'modeled Intent Parcelable codec in guest ART; no native Android byte interoperability or Google authentication' }
+		'authenticator-request-fixture' { 'Account Parcelable and authenticator request Binder ABI in guest ART; no account broker, account storage or Google authentication' }
 		else { return error('unknown account fixture kind') }
 	}
 }
@@ -228,6 +240,70 @@ fn activity_apks(root string, apks []string, mut inputs map[string]string) !stri
 	return receipt_path
 }
 
+fn single_fixture_apk(root string, apk string, kind string, mut inputs map[string]string) !string {
+	fixture_root := os.dir(apk)
+	receipt_path := fixture_root + '/build.json'
+	receipt := json2.decode[map[string]json2.Any](os.read_file(receipt_path)!)!
+	if os.is_link(apk) || apk != fixture_root + '/probe.apk'
+		|| receipt['apk_sha256']!.str() != digest(apk)!
+		|| receipt['pass_marker']!.str() != fixture_marker(kind)! { return error('fixture APK or contract differs from receipt') }
+	args := receipt['argv']!.as_array().map(it.str())
+	if args.len != 6 || args[1] != fixture_root { return error('fixture build arguments differ') }
+	pins := receipt['inputs_sha256']!.as_map()
+	source := fixture_source(kind)!
+	if pins[source]!.str() != digest(source)! { return error('fixture source differs from receipt') }
+	java := os.real_path(if args[4].starts_with('/') { args[4] } else { repo + '/' + args[4] })
+	signer := os.real_path(if args[5].starts_with('/') { args[5] } else { repo + '/' + args[5] })
+	if java !in pins || signer !in pins { return error('fixture signing tools are not pinned') }
+	for path, expected in pins {
+		if digest(path)! != expected.str() { return error('fixture input changed: ' + path) }
+		inputs[path] = expected.str()
+	}
+	command(root, kind + '-signature', [java, '-jar', signer, 'verify', '--verbose', apk])!
+	inputs[receipt_path] = digest(receipt_path)!
+	return receipt_path
+}
+
+fn native_artifact(build string, receipt map[string]json2.Any, mut inputs map[string]string) !string {
+	native := build + '/native/libvinix-android-native.so'
+	if digest(native)! != receipt['native_sha256']!.str()
+		|| receipt['native_base_sha256']!.str() != baseline_native { return error('native library differs from build receipt or frozen351 base') }
+	inputs[native] = digest(native)!
+	return native
+}
+
+fn request_native(receipt map[string]json2.Any, mut inputs map[string]string) !string {
+	base := receipt['baseline_path']!.str()
+	pins := receipt['input_sha256']!.as_map()
+	for name in ['api-impl.jar', 'build.json', 'sha256.json'] {
+		path := base + '/' + name
+		if digest(path)! != pins[path]!.str() { return error('request native baseline input changed: ' + path) }
+		inputs[path] = pins[path]!.str()
+	}
+	base_receipt := json2.decode[map[string]json2.Any](os.read_file(base + '/build.json')!)!
+	if inputs[base + '/api-impl.jar']! != receipt['baseline_api_impl_sha256']!.str()
+		|| inputs[base + '/api-impl.jar']! != base_receipt['api_impl_sha256']!.str()
+		|| inputs[base + '/sha256.json']! != receipt['baseline_manifest_sha256']!.str() {
+		return error('request native baseline receipt differs')
+	}
+	return native_artifact(base, base_receipt, mut inputs)
+}
+
+fn retain_compiled_sources(root string, mut inputs map[string]string) ! {
+	$if !prod { return error('compile this source-capturing runner with -prod; development embeds reload checkout files') }
+	for name, source in {
+		'runner-source.v': compiled_runner_source,
+		'stream-source/stream.v': compiled_stream_source,
+		'stream-source/spawn_abi.h': compiled_stream_header
+	} {
+		path := root + '/' + name
+		os.mkdir_all(os.dir(path))!
+		os.write_file(path, source)!
+		inputs[path] = sha256.sum(source.bytes()).hex()
+		if digest(path)! != inputs[path]! { return error('retained compiled source differs: ' + name) }
+	}
+}
+
 fn prepare(root string, build string, apk string, kind string, companions []string) ! {
 	if (apk == '') != (kind == 'maps') { return error('fixture APK and kind differ') }
 	if (kind == 'companion-activity-fixture' && companions.len != 2)
@@ -243,22 +319,20 @@ fn prepare(root string, build string, apk string, kind string, companions []stri
 	if digest(baseline + '/boot.img')! != baseline_boot { return error('qualified Maps372 boot differs') }
 	mut inputs := map[string]string{}
 	for path in [baseline + '/boot.img', baseline + '/efivars.fd', jar, build + '/build.json',
-		repo + '/tests/native-android-ws/account-contract-run.v',
-		repo + '/build-support/android/modulestream/stream.v',
-		repo + '/build-support/android/modulestream/spawn_abi.h',
 		os.executable(), qemu, firmware] { inputs[path] = digest(path)! }
+	retain_compiled_sources(root, mut inputs)!
 	if apk != '' {
 		inputs[apk] = digest(apk)!
 		inputs[fixture_source(kind)!] = digest(fixture_source(kind)!)!
 	}
-	mut activity_receipt := ''
+	mut fixture_receipt := ''
 	mut native := ''
 	if kind == 'companion-activity-fixture' {
-		activity_receipt = activity_apks(root, [apk, companions[0], companions[1]], mut inputs)!
-		native = build + '/native/libvinix-android-native.so'
-		if digest(native)! != receipt['native_sha256']!.str()
-			|| receipt['native_base_sha256']!.str() != baseline_native { return error('native library differs from build receipt or frozen351 base') }
-		inputs[native] = digest(native)!
+		fixture_receipt = activity_apks(root, [apk, companions[0], companions[1]], mut inputs)!
+		native = native_artifact(build, receipt, mut inputs)!
+	} else if kind in ['intent-parcel-fixture', 'authenticator-request-fixture'] {
+		fixture_receipt = single_fixture_apk(root, apk, kind, mut inputs)!
+		if kind == 'authenticator-request-fixture' { native = request_native(receipt, mut inputs)! }
 	}
 	for name in ['boot.img', 'efivars.fd'] {
 		from := baseline + '/' + name
@@ -300,11 +374,13 @@ fn prepare(root string, build string, apk string, kind string, companions []stri
 		replacements['opt/android-test/popular-id'] = sha256.sum('account-contract'.bytes()).hex()
 		replacements['usr/share/vinix/android-app-label'] = sha256.sum('Account contract'.bytes()).hex()
 	}
-	if kind == 'companion-activity-fixture' {
+	if native != '' {
 		if before[native_member] != baseline_native { return error('composed runtime native library is not frozen351') }
 		os.cp(native, root + '/scratch/' + native_member)!
 		replacements[native_member] = inputs[native]!
 		changed << native_member
+	}
+	if kind == 'companion-activity-fixture' {
 		for i, companion in companions {
 			member := installed_apks + activity_packages[i + 1] + '.apk'
 			if member in before { return error('Activity companion already exists in baseline: ' + member) }
@@ -344,17 +420,12 @@ fn prepare(root string, build string, apk string, kind string, companions []stri
 	os.rmdir_all(root + '/read-back-overlay')!
 	os.rmdir_all(root + '/scratch')!
 	for path, pin in inputs { if digest(path)! != pin { return error('input changed while preparing: ' + path) } }
-	os.cp(repo + '/tests/native-android-ws/account-contract-run.v', root + '/runner-source.v')!
-	os.mkdir_all(root + '/stream-source')!
-	for name in ['stream.v', 'spawn_abi.h'] {
-		os.cp(repo + '/build-support/android/modulestream/' + name, root + '/stream-source/' + name)!
-	}
 	if apk != '' {
 		os.cp(apk, root + '/fixture.apk')!
 		os.cp(fixture_source(kind)!, root + '/fixture-source.v')!
 	}
+	if fixture_receipt != '' { os.cp(fixture_receipt, root + '/fixture-build.json')! }
 	if kind == 'companion-activity-fixture' {
-		os.cp(activity_receipt, root + '/fixture-build.json')!
 		for i, companion in companions { os.cp(companion, root + '/fixture-' + activity_packages[i + 1] + '.apk')! }
 	}
 	os.cp(os.executable(), root + '/runner')!
@@ -362,6 +433,9 @@ fn prepare(root string, build string, apk string, kind string, companions []stri
 		'scope': json2.Any(if apk == '' { 'Maps precredential Add account retest; no authenticator or account store' } else { fixture_scope(kind)! }),
 		'kind': json2.Any(kind),
 		'source_revision': json2.Any(checked(['/usr/bin/git', '-C', repo, 'rev-parse', 'HEAD'])!),
+		'source_revision_scope': json2.Any('checkout revision at preparation; embedded runner source is identified separately'),
+		'runner_source_sha256': json2.Any(inputs[root + '/runner-source.v']!),
+		'runner_source_origin': json2.Any('embedded at runner compilation with $embed_file(@FILE)'),
 		'input_sha256': json2.decode[json2.Any](json2.encode(inputs))!,
 		'preserved_original_module_sha256': json2.decode[json2.Any](json2.encode(module_pins))!,
 		'account_overlay_sha256': json2.Any(overlay_pin),
@@ -414,12 +488,12 @@ fn stop(root string) ! {
 
 fn fixture_log(log string, kind string) !bool {
 	expected := fixture_marker(kind)!
-	for marker in ['APK-SUITE-EXIT id=', 'ANDROID-WS-FAIL', 'java.lang.AssertionError', 'java.lang.VerifyError', 'NoClassDefFoundError', 'UnsatisfiedLinkError', 'Exception in thread', 'ACCOUNT-ASYNC-FAIL', 'AUTHENTICATOR-RESPONSE-FAIL', 'COMPANION-ACTIVITY-FAIL', 'VINIX-ACCOUNT-PASSWORD-SENTINEL-2026', 'VINIX-ACCOUNT-USERDATA-SENTINEL-2026'] {
+	for marker in ['APK-SUITE-EXIT id=', 'ANDROID-WS-FAIL', 'java.lang.AssertionError', 'java.lang.VerifyError', 'NoClassDefFoundError', 'UnsatisfiedLinkError', 'Exception in thread', 'ACCOUNT-ASYNC-FAIL', 'AUTHENTICATOR-RESPONSE-FAIL', 'COMPANION-ACTIVITY-FAIL', 'INTENT-PARCEL-FAIL', 'AUTHENTICATOR-REQUEST-FAIL', 'VINIX-ACCOUNT-PASSWORD-SENTINEL-2026', 'VINIX-ACCOUNT-USERDATA-SENTINEL-2026'] {
 		if log.contains(marker) { return error('ART fixture failure marker: ' + marker) }
 	}
 	mut passes := 0
 	for line in log.split_into_lines() {
-		if line.contains('ACCOUNT-ASYNC-PASS') || line.contains('AUTHENTICATOR-RESPONSE-PASS') || line.contains('COMPANION-ACTIVITY-PASS') {
+		if line.contains('ACCOUNT-ASYNC-PASS') || line.contains('AUTHENTICATOR-RESPONSE-PASS') || line.contains('COMPANION-ACTIVITY-PASS') || line.contains('INTENT-PARCEL-PASS') || line.contains('AUTHENTICATOR-REQUEST-PASS') {
 			if line.trim_space() != expected { return error('unexpected fixture pass marker') }
 			passes++
 		}
@@ -517,33 +591,51 @@ fn runtime_delta_test() ! {
 	return error('preexisting addition accepted')
 }
 
+fn compiled_sources_test() ! {
+	root := '/Users/alex/.local/state/vinix/android/account-contract-source-test-' + os.getpid().str()
+	if os.exists(root) { return error('fresh source test directory required') }
+	defer { os.rmdir_all(root) or {} }
+	mut inputs := map[string]string{}
+	retain_compiled_sources(root, mut inputs)!
+	if inputs.len != 3 || os.read_file(root + '/runner-source.v')! != compiled_runner_source
+		|| os.read_file(root + '/stream-source/stream.v')! != compiled_stream_source
+		|| os.read_file(root + '/stream-source/spawn_abi.h')! != compiled_stream_header {
+		return error('compiled source snapshot differs')
+	}
+	println('ACCOUNT-CONTRACT-COMPILED-SOURCE-PASS sha256=' + inputs[root + '/runner-source.v']!)
+}
+
 fn main() {
 	if os.args.len == 2 && os.args[1] == '--self-test' {
-		for kind in ['fixture', 'response-fixture', 'companion-activity-fixture'] {
+		for kind in fixture_kinds {
 			marker := fixture_marker(kind)!
-			assert !fixture_log('no begin', kind)!
-			assert !fixture_log(marker, kind)!
-			assert fixture_log('APK-SUITE-BEGIN id=account-contract backend=vinix-ws\n' + marker + '\r\n', kind)!
-			for suffix in [' extra', '\njava.lang.AssertionError late', '\n' + marker, '\nAPK-SUITE-EXIT id=account-contract code=1', '\nVINIX-ACCOUNT-PASSWORD-SENTINEL-2026', '\nVINIX-ACCOUNT-USERDATA-SENTINEL-2026', '\nAUTHENTICATOR-RESPONSE-FAIL', '\nACCOUNT-ASYNC-FAIL', '\nCOMPANION-ACTIVITY-FAIL'] {
+			if fixture_log('no begin', kind)! || fixture_log(marker, kind)!
+				|| !fixture_log('APK-SUITE-BEGIN id=account-contract backend=vinix-ws\n' + marker + '\r\n', kind)! {
+				panic('fixture begin or exact marker classification differs')
+			}
+			for suffix in [' extra', '\njava.lang.AssertionError late', '\n' + marker, '\nAPK-SUITE-EXIT id=account-contract code=1', '\nVINIX-ACCOUNT-PASSWORD-SENTINEL-2026', '\nVINIX-ACCOUNT-USERDATA-SENTINEL-2026', '\nAUTHENTICATOR-RESPONSE-FAIL', '\nACCOUNT-ASYNC-FAIL', '\nCOMPANION-ACTIVITY-FAIL', '\nINTENT-PARCEL-FAIL', '\nAUTHENTICATOR-REQUEST-FAIL'] {
 				fixture_log('APK-SUITE-BEGIN id=account-contract backend=vinix-ws\n' + marker + suffix, kind) or { continue }
 				panic('late or malformed fixture failure accepted')
 			}
-			for other_kind in ['fixture', 'response-fixture', 'companion-activity-fixture'].filter(it != kind) {
+			for other_kind in fixture_kinds.filter(it != kind) {
 				other := fixture_marker(other_kind)!
 				fixture_log('APK-SUITE-BEGIN id=account-contract backend=vinix-ws\n' + other, kind) or { continue }
 				panic('wrong fixture contract accepted')
 			}
 		}
 		runtime_delta_test()!
+		compiled_sources_test()!
 		ownership_test()!
 		println('ACCOUNT-CONTRACT-RUN-SELF-TEST-PASS exact replacements/additions checked; late errors, sentinels and duplicate markers rejected; unrelated process protected')
 		return
 	}
-	if os.args.len < 3 { eprintln('usage: account-contract-run prepare ROOT BUILD [FIXTURE_APK] | prepare-response ROOT BUILD FIXTURE_APK | prepare-activity ROOT BUILD CLIENT_APK COMPANION_APK DISABLED_APK | start|stop|status|observe ROOT'); exit(2) }
+	if os.args.len < 3 { eprintln('usage: account-contract-run prepare ROOT BUILD [FIXTURE_APK] | prepare-response|prepare-intent|prepare-request ROOT BUILD FIXTURE_APK | prepare-activity ROOT BUILD CLIENT_APK COMPANION_APK DISABLED_APK | start|stop|status|observe ROOT'); exit(2) }
 	root := os.abs_path(os.args[2])
 	match os.args[1] {
 		'prepare' { if os.args.len !in [4, 5] { exit(2) }; prepare(root, os.abs_path(os.args[3]), if os.args.len == 5 { os.abs_path(os.args[4]) } else { '' }, if os.args.len == 5 { 'fixture' } else { 'maps' }, []string{}) or { eprintln(err); exit(1) } }
 		'prepare-response' { if os.args.len != 5 { exit(2) }; prepare(root, os.abs_path(os.args[3]), os.abs_path(os.args[4]), 'response-fixture', []string{}) or { eprintln(err); exit(1) } }
+		'prepare-intent' { if os.args.len != 5 { exit(2) }; prepare(root, os.abs_path(os.args[3]), os.abs_path(os.args[4]), 'intent-parcel-fixture', []string{}) or { eprintln(err); exit(1) } }
+		'prepare-request' { if os.args.len != 5 { exit(2) }; prepare(root, os.abs_path(os.args[3]), os.abs_path(os.args[4]), 'authenticator-request-fixture', []string{}) or { eprintln(err); exit(1) } }
 		'prepare-activity' { if os.args.len != 7 { exit(2) }; prepare(root, os.abs_path(os.args[3]), os.abs_path(os.args[4]), 'companion-activity-fixture', [os.abs_path(os.args[5]), os.abs_path(os.args[6])]) or { eprintln(err); exit(1) } }
 		'start' { start(root) or { eprintln(err); exit(1) } }
 		'stop' { stop(root) or { eprintln(err); exit(1) } }
