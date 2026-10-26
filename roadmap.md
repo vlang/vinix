@@ -1028,6 +1028,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     across 18,000 trees. Guest graphical acceptance remains open.
 - [ ] Package native, Linux, Windows and Apple-compatible apps with isolated
   runtimes, launcher/association registration and clean uninstall behavior.
+  - [x] [Lossless XDG launcher labels](tests/packages/desktop-entry-check.md)
+    preserve signed names and comments containing literal backslashes or boundary
+    spaces. Exact encoding, signed install/repair/update/remove/rollback,
+    installed-health refusals, sanitizers and repeated zero-retention checks
+    pass on the host. Guest graphical interoperability remains separate.
   - [x] [Signed Neovim terminal packages](tests/packages/neovim-check.md)
     retain the real 0.12.5 static editor, complete upstream runtime, pinned
     sources and redistribution notices for both architectures. Ordinary-user
