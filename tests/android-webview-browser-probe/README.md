@@ -171,6 +171,16 @@ extension from loading a separate DRI driver. The launcher also sends an
 authenticated X11 `QueryExtension` request and requires GLX to be absent before
 starting the browser; `session.json` records the policy and the checked result.
 This diagnostic setting does not qualify accelerated rendering or account use.
+The loader searches `usr/lib/libproxy` under both pinned runtime roots, with
+the base runtime first, so libproxy's backend resolves inside the relocated
+runtime. The preparation receipt pins `usr/lib/libproxy/libpxbackend-1.0.so`;
+the session rejects an unpinned, missing or changed backend and records its
+path/hash and the full library search path in `session.json`. This addresses
+the separate missing-backend message from the r8 diagnostic; it does not
+establish that the surfaceless EGL failure is resolved.
+Each added search directory and its parents within the runtime must be owned
+by root without group/world writes. The session and helper trampoline reject
+linked or unpinned backend entries and recheck their hashes before launch.
 The launcher also selects WebKit's Skia CPU image buffers with
 `WEBKIT_SKIA_ENABLE_CPU_RENDERING=1` and disables compositing before WebKit
 initializes with `WEBKIT_DISABLE_COMPOSITING_MODE=1`. GTK's separate

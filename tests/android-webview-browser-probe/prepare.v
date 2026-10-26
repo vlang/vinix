@@ -411,6 +411,7 @@ fn prepare() ! {
 		'usr/lib/libjavascriptcoregtk-6.0.so.1', 'usr/lib/libgtk-4.so.1',
 		'usr/libexec/webkitgtk-6.0/WebKitWebProcess', 'usr/libexec/webkitgtk-6.0/WebKitNetworkProcess',
 		'usr/libexec/webkitgtk-6.0/WebKitGPUProcess',
+		'usr/lib/libproxy/libpxbackend-1.0.so',
 		'usr/lib/webkitgtk-6.0/injected-bundle/libwebkitgtkinjectedbundle.so'] {
 		runtime_pins[name] = hash(runtime + '/' + name)!
 	}

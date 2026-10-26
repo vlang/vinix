@@ -17,6 +17,7 @@ import time
 
 const webkit_helpers = ['WebKitWebProcess', 'WebKitNetworkProcess', 'WebKitGPUProcess']
 const injected_bundle = 'usr/lib/webkitgtk-6.0/injected-bundle/libwebkitgtkinjectedbundle.so'
+const libproxy_backend = 'usr/lib/libproxy/libpxbackend-1.0.so'
 
 struct BuildPins {
 	runtime_references map[string]string
@@ -52,7 +53,9 @@ fn equal_hash(path string, expected string) ! {
 }
 
 fn library_path(base string, addon string) string {
-	return '${base}/lib:${base}/usr/lib:${addon}/lib:${addon}/usr/lib'
+	// libproxy's packaged RUNPATH is /usr/lib/libproxy. Resolve the relocated
+	// backend in the pinned roots before any ambient guest library directory.
+	return '${base}/lib:${base}/usr/lib:${base}/usr/lib/libproxy:${addon}/lib:${addon}/usr/lib:${addon}/usr/lib/libproxy'
 }
 
 fn safe_root(path string) !string {
@@ -65,6 +68,33 @@ fn safe_root(path string) !string {
 fn safe_relative(path string) bool {
 	return path != '' && !path.starts_with('/') && !path.contains_any('\x00\n\r\\')
 		&& !path.split('/').any(it in ['', '.', '..'])
+}
+
+fn protected_library_stat(info os.Stat, directory bool) bool {
+	return info.uid == 0 && info.mode & 0o022 == 0
+		&& if directory { info.get_filetype() == .directory }
+			else { info.get_filetype() == .regular && info.nlink == 1 }
+}
+
+// Newly searched backend directories must be root protected, including their
+// parents. Every backend entry must be a pinned regular file, never an alias.
+fn validate_libproxy_directory(root string, references map[string]string) ! {
+	for relative in ['', 'usr', 'usr/lib', 'usr/lib/libproxy'] {
+		path := if relative == '' { root } else { root + '/' + relative }
+		if relative == 'usr/lib/libproxy' && !os.exists(path) && !os.is_link(path) { return }
+		if !protected_library_stat(os.lstat(path)!, true) {
+			return error('libproxy search directory is not root protected: ' + path)
+		}
+	}
+	for name in os.ls(root + '/usr/lib/libproxy')! {
+		relative := 'usr/lib/libproxy/' + name
+		path := root + '/' + relative
+		if !safe_relative(name) || relative !in references
+			|| !protected_library_stat(os.lstat(path)!, false) {
+			return error('libproxy backend is not a pinned root-protected regular file: ' + path)
+		}
+		equal_hash(path, references[relative])!
+	}
 }
 
 fn little16(bytes []u8, offset int) u16 {
@@ -111,7 +141,7 @@ fn validate_runtime(base string, references map[string]string) ! {
 	}
 	for name in ['lib/ld-musl-aarch64.so.1', 'usr/libexec/webkitgtk-6.0/WebKitWebProcess',
 		'usr/libexec/webkitgtk-6.0/WebKitNetworkProcess', 'usr/libexec/webkitgtk-6.0/WebKitGPUProcess',
-		'usr/bin/mkfontscale', injected_bundle] {
+		'usr/bin/mkfontscale', injected_bundle, libproxy_backend] {
 		if name !in references {
 			return error('runtime receipt does not pin ' + name)
 		}
@@ -125,6 +155,8 @@ fn validate(base string, addon string, executable string) !(string, string) {
 	build := json2.decode[BuildPins](os.read_file(build_path)!)!
 	files := json2.decode[map[string]string](os.read_file(addon_path)!)!
 	validate_runtime(base, build.runtime_references)!
+	validate_libproxy_directory(base, build.runtime_references)!
+	validate_libproxy_directory(addon, files)!
 	for name in ['usr/bin/Xvfb', 'usr/bin/xkbcomp'] {
 		if name !in files { return error('addon receipt does not pin ' + name) }
 		equal_hash(addon + '/' + name, files[name])!
@@ -157,11 +189,13 @@ fn trampoline(name string) ! {
 	equal_hash(build_path, os.getenv('VINIX_BROWSER_BUILD_SHA256'))!
 	equal_hash(addon_path, os.getenv('VINIX_BROWSER_ADDON_SHA256'))!
 	build := json2.decode[BuildPins](os.read_file(build_path)!)!
+	files := json2.decode[map[string]string](os.read_file(addon_path)!)!
+	validate_libproxy_directory(base, build.runtime_references)!
+	validate_libproxy_directory(addon, files)!
 	equal_hash('/proc/self/exe', build.session_sha256)!
 	equal_hash(base + '/lib/ld-musl-aarch64.so.1', build.runtime_references['lib/ld-musl-aarch64.so.1'])!
 	mut target := ''
 	if name == 'xkbcomp' {
-		files := json2.decode[map[string]string](os.read_file(addon_path)!)!
 		target = addon + '/usr/bin/xkbcomp'
 		equal_hash(target, files['usr/bin/xkbcomp'])!
 	} else if name in webkit_helpers {
@@ -630,6 +664,9 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 	}
 	loader := base + '/lib/ld-musl-aarch64.so.1'
 	libraries := library_path(base, addon)
+	receipt['library_path'] = libraries
+	receipt['libproxy_backend_path'] = base + '/' + libproxy_backend
+	receipt['libproxy_backend_sha256'] = build.runtime_references[libproxy_backend]
 	mut environment := cpu_webkit_environment(base, os.environ())
 	for key in ['WAYLAND_DISPLAY', 'DBUS_SESSION_BUS_ADDRESS', 'DBUS_STARTER_ADDRESS', 'GTK_MODULES',
 		'GTK_PATH', 'LD_PRELOAD'] {
@@ -742,6 +779,16 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 }
 
 fn self_test() ! {
+	assert library_path('/base', '/addon') == '/base/lib:/base/usr/lib:/base/usr/lib/libproxy:/addon/lib:/addon/usr/lib:/addon/usr/lib/libproxy'
+	assert protected_library_stat(os.Stat{ mode: u32(C.S_IFDIR) | 0o755, uid: 0 }, true)
+	assert protected_library_stat(os.Stat{ mode: u32(C.S_IFREG) | 0o644, uid: 0, nlink: 1 }, false)
+	for mode in [u32(0o775), u32(0o777)] {
+		assert !protected_library_stat(os.Stat{ mode: u32(C.S_IFDIR) | mode, uid: 0 }, true)
+	}
+	assert !protected_library_stat(os.Stat{ mode: u32(C.S_IFDIR) | 0o755, uid: 1000 }, true)
+	assert !protected_library_stat(os.Stat{ mode: u32(C.S_IFLNK) | 0o755, uid: 0 }, true)
+	assert !protected_library_stat(os.Stat{ mode: u32(C.S_IFREG) | 0o644, uid: 0, nlink: 2 }, false)
+	assert !protected_library_stat(os.Stat{ mode: u32(C.S_IFREG) | 0o666, uid: 0, nlink: 1 }, false)
 	assert glx_query() == [u8(98), 0, 3, 0, 3, 0, 0, 0, `G`, `L`, `X`, 0]
 	mut absent := []u8{len: 32}
 	absent[0] = 1
@@ -780,11 +827,20 @@ fn self_test() ! {
 	mut runtime_pins := map[string]string{}
 	for name in ['lib/ld-musl-aarch64.so.1', 'usr/libexec/webkitgtk-6.0/WebKitWebProcess',
 		'usr/libexec/webkitgtk-6.0/WebKitNetworkProcess', 'usr/libexec/webkitgtk-6.0/WebKitGPUProcess',
-		'usr/bin/mkfontscale', injected_bundle] {
+		'usr/bin/mkfontscale', injected_bundle, libproxy_backend] {
 		os.mkdir_all(os.dir(root + '/' + name))!
 		os.write_file(root + '/' + name, 'fixture-' + name)!
 		runtime_pins[name] = hash(root + '/' + name)!
 	}
+	validate_runtime(root, runtime_pins)!
+	mut missing_backend := runtime_pins.clone()
+	missing_backend.delete(libproxy_backend)
+	if _ := validate_runtime(root, missing_backend) { return error('unpinned libproxy backend accepted') }
+	os.write_file(root + '/' + libproxy_backend, 'changed-backend')!
+	if _ := validate_runtime(root, runtime_pins) { return error('changed libproxy backend accepted') }
+	os.rm(root + '/' + libproxy_backend)!
+	if _ := validate_runtime(root, runtime_pins) { return error('missing libproxy backend accepted') }
+	os.write_file(root + '/' + libproxy_backend, 'fixture-' + libproxy_backend)!
 	validate_runtime(root, runtime_pins)!
 	mut missing_bundle := runtime_pins.clone()
 	missing_bundle.delete(injected_bundle)
@@ -870,7 +926,7 @@ fn self_test() ! {
 		context.replace('X11-MAPS-END\n', '')] {
 		if _ := known_fault_evidence(bad) { return error('incomplete or inconsistent fault evidence accepted') }
 	}
-	println('BROWSER-SESSION SELF-TEST PASS glx-arguments glx-wire-query glx-absence-negative authority-record x11-setup receipt-paths bundle-pins bundle-tamper bundle-missing cpu-renderer-environment dmabuf-renderer-environment pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins complete-context buffered-context negative-context')
+	println('BROWSER-SESSION SELF-TEST PASS library-path libproxy-protection libproxy-pins libproxy-tamper libproxy-missing glx-arguments glx-wire-query glx-absence-negative authority-record x11-setup receipt-paths bundle-pins bundle-tamper bundle-missing cpu-renderer-environment dmabuf-renderer-environment pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins complete-context buffered-context negative-context')
 }
 
 fn main() {
