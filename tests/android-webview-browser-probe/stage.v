@@ -18,6 +18,17 @@ fn C.kill(int, int) int
 const overlay_name = 'browser-probe.tar'
 const browser_prefix = 'opt/vinix-browser-probe'
 const fixture_prefix = 'opt/vinix-account-authority-fixture'
+const regression_prefix = 'opt/vinix-unix-recvmsg-flags'
+const regression_build_sha = 'e15f100836821c82b947e56ff0821668ce56e86880cfe45f748be91c7c286e83'
+const regression_guest_sha = '48b9b323b6a2cead60c4a157802327985df6773b143c4d4ef2707b6b10ae1dc9'
+const regression_kernel_sha = '287c78126cda7407f91494297494e029fef35aa93ada1dedd216cf9305d1013c'
+
+struct Regression {
+	format               int
+	guest_executed       bool
+	guest_sha256         string
+	kernel_source_sha256 string
+}
 
 struct Entry {
 	name     string
@@ -314,9 +325,44 @@ fn external(path string) !string {
 	return absolute
 }
 
+fn valid_sha(value string) bool {
+	return value.len == 64 && value.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`))
+}
+
+// The optional executable is an independently frozen syscall regression. Pin
+// its build receipt and the exact kernel source it is intended to exercise.
+fn validate_regression(root string, receipt_pin string, guest_pin string, kernel_pin string) ! {
+	for name in ['build.json', 'sha256.json', 'guest'] {
+		if os.lstat(root + '/' + name)!.get_filetype() != .regular {
+			return error('regular regression fixture input required: ' + name)
+		}
+	}
+	if hash(root + '/build.json')! != receipt_pin { return error('regression build receipt pin differs') }
+	text := os.read_file(root + '/build.json')!
+	fields := json2.decode[map[string]json2.Any](text)!
+	build := json2.decode[Regression](text)!
+	if 'guest_executed' !in fields || build.format != 1 || build.guest_executed
+		|| !valid_sha(guest_pin) || !valid_sha(kernel_pin)
+		|| build.guest_sha256 != guest_pin || build.kernel_source_sha256 != kernel_pin
+		|| hash(root + '/guest')! != guest_pin {
+		return error('regression fixture format, execution state, guest or kernel source pin differs')
+	}
+	if os.lstat(root + '/guest')!.mode & 0o111 == 0 { return error('regression guest is not executable') }
+	manifest := json2.decode[map[string]string](os.read_file(root + '/sha256.json')!)!
+	if manifest['guest'] or { '' } != guest_pin || manifest['build.json'] or { '' } != receipt_pin {
+		return error('regression manifest omits pinned guest or build receipt')
+	}
+	for name, expected in manifest {
+		if normalize(name)! != name || name == '' || !valid_sha(expected)
+			|| os.lstat(root + '/' + name)!.get_filetype() != .regular
+			|| !os.real_path(root + '/' + name).starts_with(os.real_path(root) + '/')
+			|| hash(root + '/' + name)! != expected { return error('regression inventory differs: ' + name) }
+	}
+}
+
 fn stage() ! {
-	if os.args.len !in [5, 6] {
-		return error('usage: stage BASE_BOOT BASE_EFIVARS PREPARED_BUNDLE FRESH_OUTPUT [AUTHORITY_FIXTURE_DIR]')
+	if os.args.len !in [5, 6, 7] {
+		return error('usage: stage BASE_BOOT BASE_EFIVARS PREPARED_BUNDLE FRESH_OUTPUT [AUTHORITY_FIXTURE_DIR [REGRESSION_BUILD_ROOT]]')
 	}
 	$if !macos { return error('staging requires macOS APFS clonefile') }
 	boot := os.real_path(os.args[1])
@@ -328,10 +374,15 @@ fn stage() ! {
 		return error('expected base media and a prepared browser bundle')
 	}
 	mut roots := {browser_prefix: bundle}
-	if os.args.len == 6 {
+	if os.args.len >= 6 {
 		fixture := os.real_path(os.args[5])
 		if !os.is_dir(fixture) { return error('authority fixture directory required') }
 		roots[fixture_prefix] = fixture
+	}
+	if os.args.len == 7 {
+		regression := os.real_path(os.args[6])
+		validate_regression(regression, regression_build_sha, regression_guest_sha, regression_kernel_sha)!
+		roots[regression_prefix] = regression
 	}
 	mut entries := []Entry{}
 	mut prefixes := roots.keys()
@@ -443,7 +494,49 @@ fn self_test() ! {
 	write_overlay(root + '/overlay.tar', {browser_prefix: root + '/bundle'}, entries)!
 	verify_overlay(root + '/overlay.tar', entries)!
 	assert entries.len == 3
+	os.mkdir(root + '/regression')!
+	os.write_file(root + '/regression/guest', 'independent syscall regression executable')!
+	os.chmod(root + '/regression/guest', 0o751)!
+	guest_pin := hash(root + '/regression/guest')!
+	kernel_pin := 'a'.repeat(64)
+	os.write_file(root + '/regression/build.json', json2.encode(Regression{
+		format: 1
+		guest_sha256: guest_pin
+		kernel_source_sha256: kernel_pin
+	}))!
+	receipt_pin := hash(root + '/regression/build.json')!
+	os.write_file(root + '/regression/sha256.json', json2.encode({
+		'guest': guest_pin
+		'build.json': receipt_pin
+	}))!
+	validate_regression(root + '/regression', receipt_pin, guest_pin, kernel_pin)!
+	for bad in [[receipt_pin, 'b'.repeat(64), kernel_pin], [receipt_pin, guest_pin, 'b'.repeat(64)],
+		['b'.repeat(64), guest_pin, kernel_pin]] {
+		if _ := validate_regression(root + '/regression', bad[0], bad[1], bad[2]) {
+			return error('regression fixture pin mismatch accepted')
+		}
+	}
+	good_receipt := os.read_file(root + '/regression/build.json')!
+	for bad in [Regression{format: 2, guest_sha256: guest_pin, kernel_source_sha256: kernel_pin},
+		Regression{format: 1, guest_executed: true, guest_sha256: guest_pin, kernel_source_sha256: kernel_pin}] {
+		os.write_file(root + '/regression/build.json', json2.encode(bad))!
+		bad_pin := hash(root + '/regression/build.json')!
+		os.write_file(root + '/regression/sha256.json', json2.encode({'guest': guest_pin, 'build.json': bad_pin}))!
+		if _ := validate_regression(root + '/regression', bad_pin, guest_pin, kernel_pin) {
+			return error('unsupported regression format or executed fixture accepted')
+		}
+	}
+	os.write_file(root + '/regression/build.json', good_receipt)!
+	os.write_file(root + '/regression/sha256.json', json2.encode({'guest': guest_pin, 'build.json': receipt_pin}))!
+	os.write_file(root + '/regression/guest', 'mutated executable')!
+	if _ := validate_regression(root + '/regression', receipt_pin, guest_pin, kernel_pin) {
+		return error('mutated regression guest accepted')
+	}
+	if _ := collision(tarcore.Member{name: regression_prefix + '/guest'}, [regression_prefix]) {
+		return error('regression destination collision accepted')
+	}
 	println('BROWSER-STAGE SELF-TEST PASS config collision streamed-archive regular-mode symlink')
+	println('BROWSER-STAGE REGRESSION-SELF-TEST PASS fixture receipt guest kernel-source inventory mutation collision')
 }
 
 fn main() {

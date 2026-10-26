@@ -37,3 +37,13 @@ Run a syscall regression separately before the unchanged browser guest command
 when collecting evidence. This tool does not launch QEMU or change the browser
 payload. Its results establish installation and byte preservation, not syscall
 behavior, a functioning browser or Google account login.
+
+The stager accepts an optional final `REGRESSION_BUILD_ROOT` after the authority
+fixture argument. Its existing calls with four or five arguments still work.
+The additional complete frozen fixture is inventoried under
+`/opt/vinix-unix-recvmsg-flags`, using the same collision and overlay readback
+checks as the browser and authority fixtures. Its reviewed build receipt,
+executable hash, kernel source hash and complete manifest are checked before
+staging. Run `/opt/vinix-unix-recvmsg-flags/guest > /dev/console 2>&1` before
+`/opt/vinix-browser-probe/bin/browser-guest` and preserve both outputs. Staging the
+regression does not establish that it passed in the guest.
