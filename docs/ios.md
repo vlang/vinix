@@ -304,12 +304,15 @@ registration. Both host and Vinix guest probes pass all nine Objective-C
 `+load` methods and reach image initialization. Resolving the scene foreground
 notification export cleared the preceding null read at preferred PC
 `0x10009b674` in `GDTCORApplication +load`. The runner now supports
-`NSProcessInfo physicalMemory` and file-backed `NSData dataWithContentsOfURL:`.
-Both probes now stop at explicit unsupported HTTP/HTTPS data loading during
-image initialization, with process exit status 1. Initializer completion,
-application entry, rendering, login and gameplay remain unverified. The ordinary
-launch still requires SKAdNetwork; advertising work is skipped. See the
-[diagnostic checkpoint](../tests/ios/foundation-file-memory-checkpoint-20261026.md).
+`NSProcessInfo physicalMemory` and bounded file, HTTP and HTTPS loading through
+`NSData dataWithContentsOfURL:`. The HTTP/HTTPS fixtures pass certificate,
+framing, redirect and ownership checks. Both startup probes now print
+`Using MallocBinned3 allocator.` during image initialization, then crash: the
+host reports an ASan write fault at address 3 (status 134), and the guest reports
+a segmentation fault (status 139). Initializer completion, application entry,
+rendering, login and gameplay remain unverified. The ordinary launch still
+requires SKAdNetwork; advertising work is skipped. See the
+[diagnostic checkpoint](../tests/ios/foundation-http-checkpoint-20261026.md).
 
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
