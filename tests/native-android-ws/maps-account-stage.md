@@ -15,6 +15,9 @@ runtime pins. UID/GID 10014 is reserved for the synthetic token cache fixture;
 the Maps controller provisions its separately audited IDs 10012 and 10013.
 Existing regular-file modes are preserved in the tar and recorded; the guest
 controller verifies all protected inputs before removing file write bits.
+The initial passwd/group contents are retained in the overlay inventory. They
+are excluded from immutable controller pins because provisioning appends the
+validated Maps/GMS identities and records both database versions.
 
 Build with the pinned V compiler's new backend, `-prod -gc none`, and import
 roots `build-support`, `build-support/android`, and `tests/native-android-ws`.

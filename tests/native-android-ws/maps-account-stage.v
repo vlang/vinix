@@ -443,7 +443,11 @@ fn finish(root string, request Request, bundles []stage.Bundle, original_entries
 	}
 	mut deployment_pins := map[string]string{}
 	mut entries := payload_inventory(root + '/payload')!
-	for entry in entries.filter(it.kind == 'regular') { deployment_pins['/' + entry.name] = entry.sha256 }
+	// The broker appends the separately audited app identities before launch.
+	// Preserve their initial hashes in the overlay inventory, not immutable pins.
+	for entry in entries.filter(it.kind == 'regular' && it.name !in ['etc/passwd', 'etc/group']) {
+		deployment_pins['/' + entry.name] = entry.sha256
+	}
 	deployment_pins['/opt/vinix-headless-service/bin/headless-service-guest'] = stage.headless_guest_sha256
 	deployment_pins['/opt/vinix-headless-service/fixture.apk'] = stage.headless_fixture_sha256
 	write_json(root + '/payload/' + prefix + '/build.json', {
