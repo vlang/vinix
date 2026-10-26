@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Capture the guest build and launch commands for the UIApplication badge clearing checkpoint.
+// Capture the guest regression builds and Fortnite startup probe commands.
 module main
 
 import os
@@ -59,7 +59,7 @@ fn main() {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
 	os.setenv('VINIX_IOS_CHECK_NAME', 'notification-center-checks', true)
 	if os.args[1] == 'build' {
-		modes := ['build-init', 'build-application-badge', 'build-window', 'build-string-float', 'build-string-cstring', 'build-bundle-receipt', 'build-cf-string-output', 'build-search-path', 'build-home-directory', 'build-inline-pthread-self', 'build-dictionary-snapshot', 'build-block-byref', 'build-vm-probe', 'build-run-ios-gles']
+		modes := ['build-init', 'build-application-badge', 'build-window', 'build-string-float', 'build-string-cstring', 'build-bundle-receipt', 'build-cf-string-output', 'build-search-path', 'build-home-directory', 'build-inline-pthread-self', 'build-dictionary-snapshot', 'build-block-byref', 'build-processinfo', 'build-vm-probe', 'build-run-ios-gles']
 		// Outputs are independent and tlsbuild locks the shared archive.
 		for start := 0; start < modes.len; start += 4 {
 			end := if start + 4 < modes.len { start + 4 } else { modes.len }

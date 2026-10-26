@@ -81,6 +81,7 @@ fn ns_process_info_types(name string, meta bool, selector string) ?string {
 		'init', 'arguments' { '@16@0:8' }
 		'operatingSystemVersion' { '{?=qqq}16@0:8' }
 		'physicalMemory' { 'Q16@0:8' }
+		'thermalState' { 'q16@0:8' }
 		'isOperatingSystemAtLeastVersion:' { 'B40@0:8{?=qqq}16' }
 		'isiOSAppOnMac', 'isMacCatalystApp' { 'B16@0:8' }
 		else { return none }
@@ -105,6 +106,9 @@ fn ns_process_info_dispatch(object u64, selector string, mut frame RegisterFrame
 		'init' {}
 		'arguments' { frame.x[0] = ns_process_info_arguments(object) }
 		'physicalMemory' { frame.x[0] = ns_process_info_physical_memory() }
+		// Foundation specifies nominal when thermal awareness is unavailable.
+		// This runtime has no Darwin thermal-awareness provider.
+		'thermalState' { frame.x[0] = 0 }
 		'operatingSystemVersion' {
 			if frame.x[8] == 0 { panic('iOS: process info version requires an indirect result buffer') }
 			// Darwin ARM64 returns this 24-byte aggregate through x8.

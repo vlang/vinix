@@ -492,6 +492,7 @@ fn main() {
 			require_child('/opt/ios/cf-string-output-checks')
 			require_child('/opt/ios/search-path-checks')
 			require_child('/opt/ios/home-directory-checks')
+			require_child('/opt/ios/processinfo-checks')
 			require_child('/opt/ios/vm-probe-checks')
 			require_child('/opt/ios/block-byref-checks')
 			require_child('/opt/ios/dictionary-snapshot-checks')
