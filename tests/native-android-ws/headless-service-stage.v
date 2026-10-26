@@ -37,7 +37,7 @@ const interaction_framework_jar_sha = '86278c9cbe1f25904b760250f34f859206d719cbb
 const full_native_seal = 'd99195272b8af813679cf54fed9f1e0341e6f1115804ac09c1cd2d5a8f942e3e'
 const compiler_pin = '0cc6c1d34c1811a818e4ae89853116861a4b067d4251af257851a7714f0d11fe'
 const fixture_apk_sha = '4df9e3cd757b463259c73dc038eb84d149d7ec1461a1889bc8f2d531f6980634'
-const compiler = '/Users/alex/code/v/v'
+const compiler = '/Users/alex/code/v-tccbin-bootstrap-20261026/v'
 const cross = '/opt/homebrew/bin/aarch64-linux-musl-gcc'
 const compiled_source = carried($embed_file(@FILE))
 const compiled_guest = carried($embed_file('headless-service-guest.v'))
@@ -779,7 +779,12 @@ fn retain_sources(root string) ! {
 	}
 }
 
+fn verify_guest_compiler(path string) ! {
+	if hash(path)! != compiler_pin { return error('guest compiler pin differs') }
+}
+
 fn build_guest(root string, mut inputs map[string]string) ! {
+	verify_guest_compiler(compiler)!
 	source := root + '/sources/headless-service-guest.v'
 	flags := [compiler, '-new-compiler', '-prod', '-os', 'linux', '-arch', 'arm64', '-cc', cross,
 		'-gc', 'none', '-skip-running', '-cflags', '-static']
@@ -800,6 +805,7 @@ fn build_guest(root string, mut inputs map[string]string) ! {
 	mut build_args := flags.clone()
 	build_args << ['-o', root + '/payload/bin/headless-service-guest', source]
 	command(root, 'build-guest', build_args)!
+	verify_guest_compiler(compiler)!
 	static_elf(root + '/payload/bin/headless-service-guest')!
 }
 
@@ -885,7 +891,7 @@ fn stage() ! {
 	}
 	profile := framework_profile(hash(framework + '/sha256.json')!)!
 	verify_mode(profile, current_native, current_executables)!
-	if hash(boot)! != baseline_boot_sha
+	if hash(compiler)! != compiler_pin || hash(boot)! != baseline_boot_sha
 		|| hash(fixture + '/probe.apk')! != fixture_apk_sha {
 		return error('fixed baseline/fixture pin differs')
 	}
@@ -1098,6 +1104,8 @@ fn stage() ! {
 }
 
 fn self_test() ! {
+	verify_guest_compiler(compiler)!
+	if _ := verify_guest_compiler(os.executable()) { return error('untrusted guest compiler accepted') }
 	for seal in [framework_seal, combined_framework_seal, interaction_framework_seal] {
 		profile := framework_profile(seal)!
 		assert profile.seal == seal

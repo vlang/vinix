@@ -6,7 +6,7 @@ import crypto.sha256
 import json2
 import os
 
-const compiler = '/Users/alex/code/v/v'
+const compiler = '/Users/alex/code/v-tccbin-bootstrap-20261026/v'
 
 struct Check {
 	argv      []string
