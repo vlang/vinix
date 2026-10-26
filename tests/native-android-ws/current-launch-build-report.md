@@ -89,3 +89,28 @@ and its complete closure, strict static ARM link and ELF checks.
 These receipts qualify executable builds and ABI coupling. They were handed
 off for guest execution. Maps login, account persistence and the requested
 running screenshot require separate guest evidence.
+
+## UI controller with corrected argument ownership
+
+The standalone `--ui-controller` profile from builder `a3e6718c3` passed its
+retained-source AArch64 cross-build and strict static link. It captures the
+helper argument ownership fix (`75154c870`): the controller clones borrowed
+configuration strings before freeing the temporary argument array. This is
+build evidence; the real-helper guest regression remains a separate check.
+
+- Complete retained bundle: `/Users/alex/.local/state/vinix/android/current-ui-controller-build-2026-10-26-r1`.
+- Bundle `sha256.json`: `503f4e03edf225311038cc0ecce556b804f6b07a337793ff7a466881fbe0112a`.
+- `bin/account-ui-controller`: `5c5d6415f3e97cb2369187a7aa373aca019ae1e085298daf4551789739851f18`.
+- Source revision: `c5fc9065af1e624002eaff6e2f927ce79858a06e`.
+- Controller source: `3dcc2e60d5082cf7736c2f363a165f4cba33fabd9b0563599d6662dbbd21f5b2`.
+- Retained `accountuifd/control.c.v`: `7655f8175951075501cc3cc395bdf38355bbaaf8d50ede416c208758f77a3282`.
+- Compiled closure receipt: `61580cfa752889d08e6b9c178b128491bc69324a748d2af9ed2de5196b1b40ba`.
+- Descriptions framework `sha256.json`: `d898fdcca66df0c32b9863dca99c7185d10f8e3b3fb5ab7708999b3619803021`.
+
+The build receipt kind is `vinix-account-ui-controller-build-v1`; target
+profile is `ui-controller`. The pinned compiler, sealed r5 dependency input,
+Linux wait-status correction, strict declaration/conversion checks, consumed
+headers, native signal object, static ELF program headers, source closure and
+before/after input checks match the executable policy above. Builder self-tests
+passed. Guest execution must use the retained controller with its paired
+helper and actual desktop UID, GID and socket.
