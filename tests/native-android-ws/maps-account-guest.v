@@ -36,6 +36,9 @@ const controller_path = bundle_root + '/bin/maps-account-guest'
 const helper_path = runtime_root + '/usr/bin/vinix-android-account-ui'
 const broker_path = runtime_root + '/usr/bin/native-account-broker'
 const launcher_path = runtime_root + '/usr/bin/run-android'
+const sqlite_path = runtime_root + '/usr/lib/libsqlite3.so.0'
+const sqlite_alias = runtime_root + '/usr/lib/libsqlite3.so.3.53.4'
+const sqlite_pin = '5a228127ca3ffa0c88bcae0aa5f7ab10e15b383dfb46822c573013105628bbaa'
 const registry_path = bundle_root + '/identity.registry'
 const maps_apk = bundle_root + '/apks/maps.apk'
 const gms_apk = bundle_root + '/apks/gms.apk'
@@ -504,6 +507,151 @@ struct InputHardening {
 	after  PathIdentity
 }
 
+struct SqliteObject {
+	identity PathIdentity
+	nlink    u64
+	size     u64
+	sha256   string
+}
+
+struct SqliteDealias {
+	kind   string = 'vinix-maps-account-sqlite-dealias-v1'
+	before []SqliteObject
+	after  []SqliteObject
+}
+
+fn sqlite_shape(objects []SqliteObject) ! {
+	if objects.len != 2 { return error('SQLite alias group must contain exactly two selected paths') }
+	for index, path in [sqlite_path, sqlite_alias] {
+		item := objects[index]
+		if item.identity.path != path || item.identity.kind != 'regular'
+			|| item.identity.uid != 0 || item.identity.gid != 0
+			|| item.identity.mode & 0o7777 != 0o755 || item.size == 0 || item.size > 32 * 1024 * 1024 {
+			return error('SQLite alias group metadata differs: ' + path)
+		}
+	}
+	if objects[0].size != objects[1].size { return error('SQLite alias group sizes differ') }
+}
+
+fn sqlite_before(objects []SqliteObject) ! {
+	sqlite_shape(objects)!
+	for item in objects {
+		if item.nlink != 2 || item.sha256 != sqlite_pin {
+			return error('SQLite original alias count or digest differs')
+		}
+	}
+	if objects[0].identity.dev != objects[1].identity.dev
+		|| objects[0].identity.inode != objects[1].identity.inode {
+		return error('SQLite selected aliases do not share the original inode')
+	}
+}
+
+fn sqlite_after(before []SqliteObject, after []SqliteObject) ! {
+	sqlite_before(before)!
+	sqlite_shape(after)!
+	for item in after {
+		if item.nlink != 1 || item.sha256 != sqlite_pin {
+			return error('SQLite replacement or preserved alias differs')
+		}
+	}
+	if after[0].identity.dev != before[0].identity.dev
+		|| after[0].identity.inode == before[0].identity.inode
+		|| after[1].identity != before[1].identity || after[0].size != before[0].size {
+		return error('SQLite replacement did not preserve the original alias')
+	}
+}
+
+fn sqlite_snapshot() ![]SqliteObject {
+	protected('/', 0, false, .directory)!
+	mut parent := ''
+	for part in os.dir(sqlite_path)[1..].split('/') {
+		parent += '/' + part
+		protected(parent, 0, false, .directory)!
+	}
+	mut objects := []SqliteObject{}
+	for path in [sqlite_path, sqlite_alias] {
+		selected := protected(path, 0, false, .regular)!
+		st := os.lstat(path)!
+		objects << SqliteObject{ identity: selected, nlink: st.nlink, size: st.size }
+	}
+	// Bound and validate both objects before reading either selected inode.
+	sqlite_shape(objects)!
+	for index, item in objects {
+		objects[index] = SqliteObject{ ...item, sha256: hash(item.identity.path)! }
+		if protected(item.identity.path, 0, false, .regular)! != item.identity
+			|| os.lstat(item.identity.path)!.nlink != item.nlink
+			|| os.lstat(item.identity.path)!.size != item.size {
+			return error('SQLite alias group changed during hashing')
+		}
+	}
+	return objects
+}
+
+fn exclusive_regular(path string, mode int) !int {
+	fd := unsafe { C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NOFOLLOW | C.O_CLOEXEC, mode) }
+	if fd < 0 { return error('cannot exclusively create regular file: ' + path) }
+	return fd
+}
+
+fn copy_stream(source int, target int) ! {
+	mut bytes := []u8{len: 65536}
+	mut total := 0
+	for {
+		n := C.read(source, bytes.data, uint(bytes.len))
+		if n < 0 && C.errno == C.EINTR { continue }
+		if n < 0 { return error('cannot read SQLite copy source') }
+		if n == 0 { break }
+		total += int(n)
+		if total > 32 * 1024 * 1024 { return error('SQLite copy exceeds size bound') }
+		mut offset := 0
+		for offset < n {
+			written := unsafe { C.write(target, &bytes[offset], uint(n - offset)) }
+			if written < 0 && C.errno == C.EINTR { continue }
+			if written <= 0 { return error('incomplete SQLite copy') }
+			offset += int(written)
+		}
+	}
+}
+
+fn dealias_sqlite() ! {
+	// This is the one audited baseline hardlink group. Do not admit arbitrary
+	// aliases or weaken the single-link invariant used for immutable inputs.
+	before := sqlite_snapshot()!
+	sqlite_before(before)!
+	temporary := sqlite_path + '.maps-account-fresh'
+	if os.exists(temporary) || os.is_link(temporary) {
+		return error('SQLite replacement temporary already exists')
+	}
+	source := unsafe { C.open(&char(sqlite_path.str), C.O_RDONLY | C.O_NOFOLLOW | C.O_CLOEXEC) }
+	if source < 0 { return error('cannot open selected SQLite source') }
+	defer { C.close(source) }
+	mut selected := C.stat{}
+	if C.fstat(source, &selected) != 0 || u64(selected.st_dev) != before[0].identity.dev
+		|| u64(selected.st_ino) != before[0].identity.inode || selected.st_nlink != 2 {
+		return error('SQLite source changed before copy')
+	}
+	target := exclusive_regular(temporary, 0o755)!
+	mut published := false
+	defer {
+		C.close(target)
+		if !published { os.rm(temporary) or {} }
+	}
+	copy_stream(source, target)!
+	os.chmod(temporary, 0o755)!
+	deployment_input(temporary)!
+	if os.lstat(temporary)!.gid != 0 || hash(temporary)! != sqlite_pin
+		|| os.lstat(temporary)!.size != before[0].size {
+		return error('SQLite fresh replacement differs')
+	}
+	if sqlite_snapshot()! != before { return error('SQLite original group changed before replacement') }
+	os.rename(temporary, sqlite_path)!
+	published = true
+	after := sqlite_snapshot()!
+	sqlite_after(before, after)!
+	os.write_file(result_root + '/sqlite-dealias.json', json2.encode(SqliteDealias{ before: before, after: after }) + '\n')!
+	os.chmod(result_root + '/sqlite-dealias.json', 0o600)!
+}
+
 fn canonical_absolute(path string) bool {
 	return path.starts_with('/') && safe_relative(path[1..])
 }
@@ -924,6 +1072,7 @@ fn track_maps_launch(mut owned map[int]Identity, desktop Identity) ! {
 }
 
 fn broker_session(mut receipt Receipt) ! {
+	dealias_sqlite()!
 	build := build_inputs(true)!
 	receipt.build_sha256 = hash(bundle_root + '/build.json')!
 	os.cp(bundle_root + '/build.json', result_root + '/build.json')!
@@ -1056,7 +1205,75 @@ fn launch_maps() ! {
 	os.execvp(launcher_path, [maps_apk])!
 }
 
+fn sqlite_self_test() ! {
+	before := [
+		SqliteObject{ identity: PathIdentity{path: sqlite_path, dev: 1, inode: 2, mode: 0o100755, kind: 'regular'}, nlink: 2, size: 1234, sha256: sqlite_pin },
+		SqliteObject{ identity: PathIdentity{path: sqlite_alias, dev: 1, inode: 2, mode: 0o100755, kind: 'regular'}, nlink: 2, size: 1234, sha256: sqlite_pin },
+	]
+	sqlite_before(before)!
+	if _ := sqlite_before(before[..1]) { return error('incomplete SQLite group accepted') }
+	for case in 0 .. 11 {
+		mut invalid := before.clone()
+		match case {
+			0 { invalid[0] = SqliteObject{ ...invalid[0], nlink: 1 } }
+			1 { invalid[1] = SqliteObject{ ...invalid[1], nlink: 3 } }
+			2 { invalid[0] = SqliteObject{ ...invalid[0], sha256: 'a'.repeat(64) } }
+			3 { invalid[1] = SqliteObject{ ...invalid[1], size: 0 } }
+			4 { invalid[0] = SqliteObject{ ...invalid[0], size: 32 * 1024 * 1024 + 1 } }
+			5 { invalid[0] = SqliteObject{ ...invalid[0], identity: PathIdentity{ ...invalid[0].identity, path: sqlite_alias } } }
+			6 { invalid[0] = SqliteObject{ ...invalid[0], identity: PathIdentity{ ...invalid[0].identity, uid: 10012 } } }
+			7 { invalid[1] = SqliteObject{ ...invalid[1], identity: PathIdentity{ ...invalid[1].identity, gid: 10013 } } }
+			8 { invalid[0] = SqliteObject{ ...invalid[0], identity: PathIdentity{ ...invalid[0].identity, mode: 0o100775 } } }
+			9 { invalid[1] = SqliteObject{ ...invalid[1], identity: PathIdentity{ ...invalid[1].identity, inode: 9 } } }
+			else { invalid[1] = SqliteObject{ ...invalid[1], identity: PathIdentity{ ...invalid[1].identity, kind: 'symbolic_link' } } }
+		}
+		if _ := sqlite_before(invalid) { return error('changed SQLite group accepted: ' + case.str()) }
+	}
+	after := [
+		SqliteObject{ ...before[0], nlink: 1, identity: PathIdentity{ ...before[0].identity, inode: 3 } },
+		SqliteObject{ ...before[1], nlink: 1 },
+	]
+	sqlite_after(before, after)!
+	for case in 0 .. 4 {
+		mut invalid := after.clone()
+		match case {
+			0 { invalid[0] = SqliteObject{ ...invalid[0], nlink: 2 } }
+			1 { invalid[0] = SqliteObject{ ...invalid[0], identity: before[0].identity } }
+			2 { invalid[1] = SqliteObject{ ...invalid[1], identity: PathIdentity{ ...invalid[1].identity, inode: 4 } } }
+			else { invalid[0] = SqliteObject{ ...invalid[0], sha256: 'b'.repeat(64) } }
+		}
+		if _ := sqlite_after(before, invalid) { return error('changed SQLite replacement accepted') }
+	}
+	directory := os.join_path(os.temp_dir(), 'vinix-maps-sqlite-selftest-' + os.getpid().str() + '-' + time.sys_mono_now().str())
+	os.mkdir(directory, mode: 0o700)!
+	defer { os.rmdir_all(directory) or {} }
+	original := directory + '/original'
+	alias := directory + '/alias'
+	temporary := directory + '/fresh'
+	content := 'copy-stream-boundary-test\n'.repeat(4097)
+	os.write_file(original, content)!
+	os.link(original, alias)!
+	original_inode := os.lstat(original)!.inode
+	source := unsafe { C.open(&char(original.str), C.O_RDONLY | C.O_NOFOLLOW | C.O_CLOEXEC) }
+	if source < 0 { return error('self-test source open failed') }
+	defer { C.close(source) }
+	target := exclusive_regular(temporary, 0o600)!
+	copy_stream(source, target) or { C.close(target); return err }
+	C.close(target)
+	if _ := exclusive_regular(temporary, 0o600) { return error('exclusive SQLite create replaced an existing file') }
+	os.symlink(alias, temporary + '-link')!
+	if _ := exclusive_regular(temporary + '-link', 0o600) { return error('exclusive SQLite create followed a symlink') }
+	if os.read_file(temporary)! != content { return error('bounded fd stream copy differs') }
+	os.rename(temporary, original)!
+	if os.lstat(original)!.nlink != 1 || os.lstat(alias)!.nlink != 1
+		|| os.lstat(alias)!.inode != original_inode || os.lstat(original)!.inode == original_inode
+		|| os.read_file(original)! != content || os.read_file(alias)! != content {
+		return error('atomic replacement did not preserve hardlink alias')
+	}
+}
+
 fn self_test() ! {
+	sqlite_self_test()!
 	if !canonical_absolute('/opt/maps/app.apk') || canonical_absolute('/opt/../maps/app.apk')
 		|| canonical_absolute('/opt//maps.apk') || canonical_absolute('maps.apk')
 		|| valid_pin('A'.repeat(64)) || !valid_pin('a'.repeat(64)) {
@@ -1112,7 +1329,7 @@ fn self_test() ! {
 			return error('stale stop request accepted')
 		}
 	}
-	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding')
+	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation')
 }
 
 fn main() {
