@@ -176,6 +176,30 @@ Evidence under `/Users/alex/.local/state/vinix/android/`:
   `a5d8df629c41919a941bc10f0e1708ca7b446f395fb98cf31aeaa36bcf9da9bf`.
   See `maps-account-clone-run-r3.log` (exit 0). The original r3 stays sealed;
   subsequent kernel and guest changes belong only in its VM copy.
+- `maps-account-coupled-request-r4` changes only account r6 to r7, selecting
+  the canonical SQLite path fix `c318d84f2`. Independent comparison confirms
+  that all 15 other decoded request fields remain equal to r3. The retained
+  account build audit passed complete inventory, static zlib provenance and
+  exact shared-link checks (`maps-account-r7-build-audit.log`). Request SHA-256 is
+  `ec700798f9cfd1969ec0d1fbccb979db47c19dcd55269f26aac37a76b44fc59e`;
+  its complete six-artifact manifest is
+  `ec13bc9e33845119f8c68925170fdd86db95ab4d54adaec831a517584e3e364a`.
+  See `maps-account-coupled-request-r4.log` and adjacent `-inventory.log`.
+- `maps-account-r4` passed full staging with the unchanged r3 stager. Complete
+  producer inventories, runtime coupling, both signatures, overlay readback
+  and all six original modules passed. Its complete manifest is
+  `d8b601b131af4f5f1212d4e093bc2d028231a49846636549dff88b236d2bfcf0`;
+  stage receipt SHA-256 is
+  `38a54001ab3565ae4b2fae716a47dd6c87430646d039f9a5070f11cffa6207b1`.
+  `maps-account-stage-run-r4.log` records exit 0.
+- `maps-account-vm-r4` passed the same exact clone helper: all 1,911 regular
+  files and complete metadata matched before patching or boot; both trees
+  passed the full r4 manifest. The exact 13-file helper source closure remains
+  retained beside the clone. Adjacent provenance
+  `maps-account-vm-r4-clone.json` SHA-256 is
+  `f58891b8b1fcffa0880b632d962c47a028f6bd49aa2732aa00d415d9b4f6d44b`.
+  See `maps-account-clone-run-r4.log` (exit 0). The original r4 stays sealed;
+  subsequent kernel and guest changes belong only in its VM copy.
 
 The final runtime bundles and actual guest results are separate evidence.
 Staging and synthetic fixture success must not be reported as Google account
