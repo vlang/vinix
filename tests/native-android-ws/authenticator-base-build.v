@@ -14,10 +14,12 @@ const compiler = '/Users/alex/code/v/v'
 const java = '/opt/homebrew/opt/openjdk@25/bin/java'
 const tools = repo + '/build/android-framework/tools'
 const source_file = repo + '/tests/native-android-ws/authenticator-base-build.v'
-const providers = ['framework_authenticator_request.v', 'framework_authenticator_base.v']
+const providers = ['framework_authenticator_request.v', 'framework_authenticator_base.v',
+ 'framework_accounts.v']
 const additions = ['android/accounts/AbstractAccountAuthenticator.smali',
  'android/accounts/AbstractAccountAuthenticator$Transport.smali',
- 'android/accounts/AbstractAccountAuthenticator$DefaultResponse.smali']
+ 'android/accounts/AbstractAccountAuthenticator$DefaultResponse.smali',
+ 'android/accounts/NetworkErrorException.smali']
 const native_reference = state + 'account-contract-companion-build-2026-10-26'
 const native_manifest_pin = '0ee86be7fd8168eb5dd14d8e6672fb9d54424a7da449dd91945140b75ca736ae'
 const native_pin = 'aa460c06686e2d1f60ea6dd27ab8f158a3b9794440499c6cdc5e7840cafda0cb'
@@ -114,6 +116,13 @@ fn self_test() ! {
   class_delta(before, bad) or { continue }
   return error('invalid class delta accepted: ' + case.str())
  }
+ for name in additions {
+  mut bad := good.clone()
+  bad.delete(name)
+  bad['surprise.smali'] = 'new'
+  class_delta(old, bad) or { continue }
+  return error('missing required addition accepted: ' + name)
+ }
  jar_old := {'classes.dex': 'old', 'manifest': 'same', 'resources': 'same'}
  jar_good := {'classes.dex': 'new', 'manifest': 'same', 'resources': 'same'}
  jar_delta(jar_old, jar_good)!
@@ -128,7 +137,7 @@ fn self_test() ! {
   jar_delta(jar_old, bad) or { continue }
   return error('invalid JAR delta accepted: ' + case.str())
  }
- println('AUTHENTICATOR-BASE-BUILD-SELF-TEST-PASS eight invalid class deltas and four invalid JAR deltas rejected')
+ println('AUTHENTICATOR-BASE-BUILD-SELF-TEST-PASS eight invalid class deltas, four missing additions and four invalid JAR deltas rejected')
 }
 
 fn freeze_closure(root string, listing string, destination string) !map[string]string {
@@ -147,6 +156,15 @@ fn freeze_closure(root string, listing string, destination string) !map[string]s
 
 fn valid_pin(pin string) bool {
  return pin.len == 64 && pin.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`))
+}
+
+fn helper_function(source string, signature string) !string {
+ marker := '\n' + signature
+ if source.count(marker) != 1 { return error('unique helper required: ' + signature) }
+ start := (source.index(marker) or { return error('missing helper: ' + signature) }) + 1
+ tail := source[start..]
+ end := tail.index('\n}') or { return error('unterminated helper: ' + signature) }
+ return tail[..end + 2] + '\n'
 }
 
 fn build(baseline string, manifest_pin string, jar_pin string, root string) ! {
@@ -198,8 +216,25 @@ fn build(baseline string, manifest_pin string, jar_pin string, root string) ! {
   inputs[path] = digest(path)!
   os.cp(path, root + '/provider-source/androidtools/' + name)!
  }
+ // The account provider shares these two self-contained helpers with the full
+ // framework generator. Retain their complete originals and compile exact
+ // function bytes without importing the unrelated framework generators.
+ mut helpers := 'module androidtools\n'
+ os.mkdir_all(root + '/provider-helper-inputs')!
+ for name, signature in {'framework.v': 'pub fn framework_replace_method(',
+  'framework_classes.v': 'fn interface_class('} {
+  path := repo + '/tests/native-android-tools/androidtools/' + name
+  inputs[path] = digest(path)!
+  target := root + '/provider-helper-inputs/' + name
+  os.cp(path, target)!
+  if digest(target)! != inputs[path]! { return error('helper copy differs') }
+  helpers += '\n' + helper_function(os.read_file(target)!, signature)!
+ }
+ os.write_file(root + '/provider-source/androidtools/framework_account_helpers.v', helpers)!
  os.write_file(root + '/provider-source/main.v', 'module main\nimport androidtools\nimport os\nfn main() {\nr := os.args[1]\n' +
-  'classes := androidtools.framework_authenticator_base_classes()\n' +
+  'mut classes := androidtools.framework_authenticator_base_classes()\n' +
+  'account_classes := androidtools.framework_account_async_classes()\n' +
+  'classes["android/accounts/NetworkErrorException"] = account_classes["android/accounts/NetworkErrorException"] or { panic("missing NetworkErrorException") }\n' +
   'for name,_ in classes { if os.exists(r + "/" + name + ".smali") { panic("base class already exists") } }\n' +
   'for name,source in classes { os.write_file(r + "/" + name + ".smali",source)! }\n}\n')!
  os.setenv('VROOT', '/Users/alex/code/v', true)
