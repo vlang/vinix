@@ -42,6 +42,12 @@ owned state rather than returning to the discarded image.
 An exiting or unreaped zombie target still passes an authorized signal probe;
 ordinary delivery to it is ignored.
 
+`waitid(P_PIDFD)` selects the retained child identity, including through
+duplicate descriptors. Nonblocking status is stored on the open description:
+an unavailable event returns `EAGAIN` unless the caller explicitly supplies
+`WNOHANG`. The focused V regression and Linux reference runner are described in
+[pidfd-wait.md](pidfd-wait.md).
+
 ## Lifetime and bounds
 
 The first open allocates one of 1024 static identity slots and an immutable,
@@ -78,11 +84,10 @@ metadata needs a real signal queue before it can be accepted.
 
 `CLONE_PIDFD` is rejected with `EINVAL` by both `clone` and `clone3`; no child is
 created and the supplied descriptor word stays unchanged. This checkpoint does
-not add `waitid(P_PIDFD)`, `CLONE_PIDFD` descriptor creation, `pidfd_getfd`,
+not add `CLONE_PIDFD` descriptor creation, `pidfd_getfd`,
 pidfd namespace ioctls, pidfs fdinfo or PIDFD_SELF pseudo-descriptors. In
-particular, callers obtain a descriptor with `pidfd_open`. Nonblocking
-status is stored on the open description; nonblocking `P_PIDFD` waits are
-outside this checkpoint. PID/user namespaces still use Vinix's existing flat
+particular, callers obtain a descriptor with `pidfd_open`.
+PID/user namespaces still use Vinix's existing flat
 model, without Linux's full namespace hierarchy or UID-map semantics.
 
 ## Verification
