@@ -32,6 +32,7 @@ pub fn digest(path string) !string {
 	mut state := new_host_sha256()!
 	defer { state.close() }
 	mut buffer := []u8{len: 1024 * 1024}
+	defer { unsafe { buffer.free() } }
 	for {
 		n := input.read(mut buffer) or {
 			if err is os.Eof { break }

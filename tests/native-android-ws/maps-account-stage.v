@@ -566,6 +566,8 @@ fn main() {
 		bundle := stage.load_bundle(os.args[2], os.args[3]) or { eprintln(err); exit(1) }
 		framework := stage.load_bundle(os.args[4], os.args[5]) or { eprintln(err); exit(1) }
 		native := stage.load_bundle(os.args[6], os.args[7]) or { eprintln(err); exit(1) }
+		stage.verify_framework(framework, os.args[5], framework.files['api-impl.jar'] or { '' },
+			framework.files['classes.dex'] or { '' }) or { eprintln(err); exit(1) }
 		stage.verify_native(native, framework) or { eprintln(err); exit(1) }
 		stage.verify_ui_controller(bundle, framework, native) or { eprintln(err); exit(1) }
 		for input in [bundle, framework, native] { stage.recheck(input) or { eprintln(err); exit(1) } }
