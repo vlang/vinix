@@ -43,9 +43,11 @@ listeners. It has no authenticator broker, account storage, token issuance or
 refresh path. The installed Play Services APK declares a `com.google`
 authenticator service. The response Binder API passes its ART regression. The
 request Binder API and Account Parcelable are implemented and pass host assembly
-checks; their ART validation is pending. The authenticator base class and trusted
-dispatch path remain incomplete. Explicit companion activity routing and
-finish-time result delivery have a maintained three-APK regression fixture.
+checks; their ART validation is pending. `AbstractAccountAuthenticator` now
+implements its API and transport defaults and passes host assembly checks;
+its ART validation is pending. Trusted account dispatch remains incomplete.
+Explicit companion activity routing and finish-time result delivery pass their
+maintained three-APK ART regression.
 
 The installed Play Services APK's `BrowserSignInChimeraActivity` constructs a
 `CustomWebView`, installs WebView clients, enables JavaScript and loads its login
@@ -59,8 +61,9 @@ identity. Failed futures and empty account stores must not be reported as login
 success.
 
 The installed GMS authenticator is enabled but not exported. Its Chimera
-implementation extends `AbstractAccountAuthenticator`, which is absent from the
-current framework. All companion APKs currently receive the process UID;
+implementation extends `AbstractAccountAuthenticator`. The new base API does
+not grant its required `ACCOUNT_MANAGER` permission. All companion APKs currently
+receive the process UID;
 `getPackageUid` and signature checks do not yet establish package authority.
 Forwarding caller-supplied package/UID options to this private service would not
 provide a trusted broker. These gaps must be repaired before forwarding real
@@ -209,6 +212,26 @@ Full read-back verified 168 files; `sha256.json` digest:
 `c011a9bb0b6d0ce5d14c679e12007c9e992aa542c8e1ad32306eed3312939692`.
 It contains the three original signed APKs, build receipts, complete serial log,
 genuine failed-screen PNG and historical runner source from `94c1b9d2b`.
+
+Commit `e24ddd967` corrects the companion APK catalog path. The unchanged
+three-APK fixture then passes `COMPANION-ACTIVITY-PASS` and ten further seconds
+without a fixture failure or APK exit. It checks package resources, classloader,
+theme, one Application startup, caller identity, copied launch Intent, result
+replacement and finish-time delivery, default cancellation, pending recreation,
+primary recreation and missing/disabled/private/protected/invisible targets.
+The genuine `companion-activity-pass.png` shows the passing screen. This verifies
+the shared-VM activity contract, not separate-process package authority.
+
+The passing stopped guest is retained at
+`/Users/alex/.local/state/vinix/android/account-contract-companion-art-2026-10-26-r2`.
+Full read-back verified 165 files; `sha256.json` digest:
+`4c88cf4652925cd817f33b18bc374ce11182fc05d12785f7e252d47c3a566608`.
+The framework JAR digest is
+`f6a6fd3d2cbf89478d95f184616d365ae18bc449029b5481aeca23a28d011712`;
+the native library digest is
+`aa460c06686e2d1f60ea6dd27ab8f158a3b9794440499c6cdc5e7840cafda0cb`.
+The bundle retains all three signed APKs, their complete build tree, receipts,
+serial/capture logs and the historical runner source from `e24ddd967`.
 
 The stopped diagnostic is outside Git at
 `/Users/alex/.local/state/vinix/android/maps-signin-probe-2026-10-26`.
