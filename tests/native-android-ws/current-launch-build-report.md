@@ -145,3 +145,24 @@ headers, native signal object, static ELF program headers, source closure and
 before/after input checks match the executable policy above. Builder self-tests
 passed. Guest execution must use the retained controller with its paired
 helper and actual desktop UID, GID and socket.
+
+## Updated authenticator and token-cache controller
+
+The r2 single-target token controller passed the complete retained-source
+build against the descriptions framework. It captures `d7a057b97`, including
+the signed r7 fixture, the `android.accounts.AccountAuthenticator` action and
+both authenticator-discovery and token-cache client success markers.
+
+- Complete bundle: `/Users/alex/.local/state/vinix/android/current-token-cache-controller-build-2026-10-26-r2`.
+- Bundle `sha256.json`: `5ea4efd5327ba354cd16207ee1602d085d0576d4641d119f1a1f0b5a2a52f52c`.
+- `bin/account-token-cache-controller`: `31268f67c0226c9fa27a130d2c77b80ae097d5c850e0e46928c75fceb4ce4632`.
+- Source revision: `53cc741fa88491e49d4ca4c3ddf2d875a9a4df13`.
+- Controller source: `c290ef342ffe47e11557aa1035ba978842035563c9f211008402d98cfa1a26b3`.
+- Compiled closure receipt: `b7b366468e0a1060d70a025ce9387648a7ccc747dd08ce37a20d0d9b52cca45c`.
+- Required signed fixture r7 APK: `e4766dbe14ec5cd4fb64c23d66ecc44becd017f175c4104d27804fb1a0fc12ab`.
+
+The receipt kind is `vinix-account-token-cache-controller-v1`, profile
+`token-cache-controller`. Its pinned compiler, r5 dependency, source and
+header audits, strict static link, ELF checks and before/after rechecks match
+the policy above. This is build evidence. Guest authenticator-discovery,
+cache execution and Google account login require separate runtime evidence.
