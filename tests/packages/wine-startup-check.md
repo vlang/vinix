@@ -142,3 +142,53 @@ and a corrected C name collision. Its `SHA256SUMS` SHA-256 is
 the bundle retains 200 selected inputs. A separate verify pass re-read all
 261 ordinary files and the inventory of two special objects. Signed Wine execution
 and detached-server lease coverage remain unqualified.
+
+## Explicit current-CLI diagnostic admission
+
+The server diagnostic accepts an optional absolute CLI path and expected
+lowercase SHA-256 after its original arguments:
+
+```text
+wine-startup-check server OUTPUT KERNEL EXTRAS SYSROOT GCC_RUNTIME CURRENT_CLI EXPECTED_SHA256
+```
+
+All three original seven-argument modes retain their behavior. Only `server`
+accepts the additional pair. Admission occurs before output creation and
+requires a bounded ordinary executable with one link, no special mode bits,
+an x86_64 ELF64 executable header, and the exact supplied digest. This is a
+header filter, not full ELF or current-source qualification. Source identity,
+metadata and bytes are checked again during staging and after the run.
+
+After cloning the frozen extras, the controller replaces only
+`usr/bin/vinix-package`. Ordinary directory ancestry, an ordinary single-link
+target and a distinct source inode are required. The receipt records the old
+target digest, selected digest and resulting metadata; the exact staged bytes
+and permissions are checked before boot and afterward. Frozen extras retain
+their original input comparison. The full `HWTEST PASS packaged-Wine` marker
+and all failure markers remain unchanged. These path rechecks assume trusted,
+stopped host writers and do not exclude hostile concurrent rename races.
+
+The maintained `wine-current-cli-host.v` builds both the controller and
+`wine-current-cli-check.v` with `-prod -gc none -manualfree`. Its final run
+passes 13 control groups covering original arguments, server-only selection,
+digest/header/mode/link refusals, exact staged bytes, preserved frozen bytes,
+changed input/target and replacement-inode refusals. The actual controller
+also refuses a wrong digest with exit 1 before creating output. Discovery and
+build agree on 270 control and 322 controller source paths. Those inputs are
+retained by digest and rechecked after the controls, together with both built
+binaries. Independent source review covered the admission, staging ownership,
+argument compatibility and receipt runner.
+
+The complete host bundle is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-current-cli-host-20261026`;
+its `bundle.sha256` SHA-256 is
+`230dba1f6702bcd2b0a49cef2c7e90c5e42eb60af45b3d052f5e0a9c41fd57de`.
+The adjacent `.tar.gz` SHA-256 is
+`efa2286a74da6b49c3b856e9052e6cd612a0652f7c4cc6b881527c916635c765`.
+Source baseline is `25b7aaff2` plus the final maintained source snapshots in
+`run-03`; earlier compiler failures and the preceding passing control run are
+preserved as diagnostic records. The host producer bootstrap and selected
+compiler inputs are recorded, but their complete library/header/linker
+closure is outside scope. No image or guest was produced by these controls.
+Successful signed Wine execution with the selected CLI and the detached-server
+lease interval still require native qualification.

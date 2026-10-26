@@ -7,6 +7,7 @@ import hwhost
 import json2
 import os
 import plainiso
+import tests.packages.winecurrent
 import tests.packages.winesource
 
 fn invoke(arguments []string, log string) ! {
@@ -58,10 +59,16 @@ fn check() ! {
 	if winesource.file_digest(os.dir(@FILE) + '/winesource/closure.v')! != sha256.hexhash($embed_file('winesource/closure.v').to_string()) {
 		return error('compiled startup source closure admission differs')
 	}
-	if os.args.len != 7 || os.args[1] !in ['process', 'metadata', 'server'] {
-		return error('usage: wine-startup-check process|metadata|server OUTPUT KERNEL EXTRAS_OR_DASH SYSROOT GCC_RUNTIME')
+	if winesource.file_digest(os.dir(@FILE) + '/winecurrent/admission.v')! != sha256.hexhash($embed_file('winecurrent/admission.v').to_string()) {
+		return error('compiled startup current CLI admission differs')
 	}
+	current_cli := winecurrent.requested(os.args)!
+	mut selection := winecurrent.Selection{}
+	if current_cli { selection = winecurrent.admit(os.args[7], os.args[8])! }
+	defer { if current_cli { winecurrent.close_selection(selection) } }
 	root := hwhost.find_root(@FILE)!
+	mut inputs := map[string]string{}
+	inventory(root + '/tests/packages/winecurrent', mut inputs)!
 	mode := os.args[1]
 	work := os.abs_path(os.args[2])
 	kernel := os.real_path(os.args[3])
@@ -70,12 +77,14 @@ fn check() ! {
 	gcc := os.real_path(os.args[6])
 	if os.exists(work) { return error('startup output already exists') }
 	os.mkdir_all(work)!
+	if current_cli { os.write_file(work + '/current-cli-selected.json', json2.encode(selection))! }
 	host := hwhost.find_host(root, 'x86_64', '')!
-	mut inputs := map[string]string{}
 	for path in [@FILE, os.executable(), host.v, host.qemu, host.firmware, kernel,
-		os.dir(@FILE) + '/winesource/closure.v', '/opt/homebrew/opt/llvm/bin/clang'] {
+		os.dir(@FILE) + '/winesource/closure.v', os.dir(@FILE) + '/winecurrent/admission.v',
+		'/opt/homebrew/opt/llvm/bin/clang'] {
 		inputs[path] = winesource.file_digest(path)!
 	}
+	if current_cli { inputs[selection.path] = selection.digest.clone() }
 	for _, path in plainiso.inputs(root)! { inputs[path] = winesource.file_digest(path)! }
 	inventory(root + '/tests/hardware-platform/hwhost', mut inputs)!
 	inventory(root + '/tests/hardware-platform/plainiso', mut inputs)!
@@ -112,6 +121,7 @@ fn check() ! {
 	os.write_file(work + '/built-before.json', json2.encode(built))!
 	os.write_file(work + '/declaration.json', json2.encode({
 		'mode': mode, 'source_root': root, 'kernel': kernel, 'extras': extras,
+		'current_cli': selection.path, 'current_cli_sha256': selection.digest,
 		'source_scope': 'parsed-v1', 'purpose': 'diagnostic-only; reused extras cannot qualify Wine',
 		'input_scope': 'selected paths; sysroot, GCC runtime, headers and linker closure are not admitted',
 		'VEXE': os.getenv('VEXE'), 'V_MACOS_V3_CALLER_VEXE': os.getenv('V_MACOS_V3_CALLER_VEXE'),
@@ -123,6 +133,13 @@ fn check() ! {
 		// APFS clone saves space; never mutate the frozen producer or its ISO.
 		os.mkdir_all(work + '/boot/rootfs')!
 		invoke(['/bin/cp', '-cRp', extras + '/.', work + '/boot/rootfs'], work + '/clone.log')!
+	}
+	mut staged := winecurrent.Staged{}
+	defer { if current_cli && staged.path != '' { winecurrent.close_staged(staged) } }
+	if current_cli {
+		staged = winecurrent.stage(selection, work + '/boot/rootfs')!
+		os.write_file(work + '/current-cli-staged.json', json2.encode(staged))!
+		verify(inputs)!
 	}
 	scenario := hwhost.Scenario{
 		name: 'Wine-startup-' + mode
@@ -141,6 +158,10 @@ fn check() ! {
 	os.write_file(work + '/result.json', json2.encode(outcome))!
 	verify(inputs)!
 	verify(built)!
+	if current_cli {
+		winecurrent.verify_staged(selection, staged, work + '/boot/rootfs')!
+		os.write_file(work + '/current-cli-verified.json', json2.encode(staged))!
+	}
 	os.write_file(work + '/inputs-verified.json', json2.encode(inputs))!
 	os.write_file(work + '/built-verified.json', json2.encode(built))!
 	if !outcome.passed || outcome.interrupted || outcome.reason != '' { return error('Wine startup diagnostic failed: ' + outcome.reason) }
