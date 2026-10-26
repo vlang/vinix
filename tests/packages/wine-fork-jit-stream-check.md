@@ -742,3 +742,39 @@ process source. Their complete kernel source diff changes only `elf/elf.v`,
 one-shot handler, Linux action-flag and automatic alternate-stack disarming
 changes on main are absent from that matched baseline. A retest using it
 must preserve this distinction when interpreting the result.
+
+## Matched kernel receipt adapter
+
+The maintained production-only `wine-fork-jit-stream-kernel-bind.v` adapts
+the actual matched build-05 ARM status and its original complete audit to
+the standalone controller's receipt format. It pins the checker, manifest,
+build status, qualification, baseline, production patch and kernel; verifies
+the original complete audit; and retains equal full selected per-path input
+maps before and after. It preserves the actual successful 207,711 ms build
+and its `leader reaped; group absent` cleanup. It does not build a kernel.
+
+From source base `a0cca255efd1246f85d7ea1b8c1c652a2172f0b2`, the external
+bootstrap completed with actual status `0` in 37,700 ms, and the adapter
+completed with actual status `0` in 76,430 ms. The checker was a leaf in
+the adapter's inherited process group with a 300-second bound; subsequent
+inventory found the adapter, checker and observed group absent. Adapter
+source SHA-256 is
+`e94d8580ab678a406e5560324919cca6bf44232c8b536a479c29f9d1592ce77d`;
+the generated `kernel-binding.json` SHA-256 is
+`cdee03dabbcd5af40f5e1b7dc0eed94994042fac48c37f23bd630b8edcdd80dd`.
+
+Under the external section14 cache, both original complete seal checks
+passed: `wine-jit-stream-native-kernel-bind-seal-01/bootstrap/complete/inventory.json`
+SHA-256 `cc297e31f82899d4c40611921da69a29dadcd6987a85d089db11513e94b22801`,
+and `wine-jit-stream-native-kernel-bind-seal-01/receipt/complete/inventory.json`
+SHA-256 `438766088e9d82534dcd9b8e2943083f4f35477cdb24690f4f46aaf589dfe2ca`.
+They preserve `wine-jit-stream-native-kernel-bind-host-01` and
+`wine-jit-stream-native-kernel-bind-01`; the original complete matched
+kernel audit remains mandatory. New retained state, including both seals,
+is 464,048 bytes within the reviewed 8 MiB reserve. The Wine evidence
+profile, prior retained states and 2 MiB reserve total 93,363,327 bytes
+within 128 MiB. Final actual free space was 32,546,264 KiB. Bootstrap and
+whole-adapter stop policies were externally observed; host SDK and
+transitive dynamic dependencies remain unfrozen. No target program or VM
+ran. The receipt names the unchanged-signal matched baseline, rather than
+qualifying later main signal changes or any Wine workload.
