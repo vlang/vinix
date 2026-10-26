@@ -4,6 +4,8 @@
 module main
 
 import accountbroker
+import accountinteraction
+import accountmanifest
 import nativeaccountauth
 import os
 import time
@@ -109,8 +111,8 @@ fn stop_child(pid i32) {
 }
 
 fn run() ! {
-	if os.args.len != 12 || C.getuid() != 0 || C.geteuid() != 0 {
-		return error('usage (root): native-account-broker REGISTRY RUNTIME_ROOT APK UID GID SERVICE ACTION DIRECTORY DATA_DIRECTORY HOME_DIRECTORY PACKAGE')
+	if os.args.len !in [12, 13] || C.getuid() != 0 || C.geteuid() != 0 {
+		return error('usage (root): native-account-broker REGISTRY RUNTIME_ROOT APK UID GID SERVICE ACTION DIRECTORY DATA_DIRECTORY HOME_DIRECTORY PACKAGE [INTERACTION_ACTIVITY]')
 	}
 	registry_path, runtime, apk := os.args[1], os.args[2], os.args[3]
 	uid_text, gid_text := os.args[4], os.args[5]
@@ -121,6 +123,9 @@ fn run() ! {
 	uid, gid := uid_text.u32(), gid_text.u32()
 	registry := nativeaccountauth.load(registry_path)!
 	entry := registry.verify_service(apk, uid, gid, os.args[6], os.args[7])!
+	if os.args.len == 13 {
+		accountmanifest.verify_activity(apk, entry.package_name, os.args[12])!
+	}
 	directory := os.args[8]
 	protected_directory(directory)!
 	client_path, service_path := directory + '/accounts.sock', directory + '/authenticator.sock'
@@ -192,6 +197,9 @@ fn run() ! {
 	mut broker := accountbroker.create(registry, entry, int(pid), int(pair[0]))!
 	root_lifetime_owned = false
 	defer { broker.close() }
+	if os.args.len == 13 {
+		broker.allow_interactions([accountinteraction.Target{entry.package_name, os.args[12]}])!
+	}
 	println('ANDROID-ACCOUNT-BROKER-LISTENING pid=${pid} clients=${client_path} service=${service_path}')
 	C.fflush(unsafe { nil })
 	mut attached := false
