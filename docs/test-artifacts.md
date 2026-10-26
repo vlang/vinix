@@ -31,6 +31,11 @@ and archive size do not establish how much removing an expanded tree would free.
 Retain a checksum-verified archive, restore the complete bundle, compare its full
 typed inventory and run the unchanged auditor before removing expanded evidence.
 
+`tests/native-android-ws/apfs-extent-sample.v` records read-only physical extent
+samples for supplied files. `zero-range-scan.v` hashes a file and reports aligned
+zero ranges without changing it. Their receipts do not qualify deletion or hole
+punching: zero bytes can already be sparse or shared with retained APFS clones.
+
 `tests/**/results/` and `/artifacts/` are ignored. Historical source snapshots
 and Markdown reports up to 64 KiB remain tracked where useful. Their links to
 raw results refer to archived evidence, which must be restored before auditing.
