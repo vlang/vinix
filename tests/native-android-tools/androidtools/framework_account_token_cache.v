@@ -15,5 +15,7 @@ pub fn framework_account_token_cache(source string) !string {
 	] {
 		text = framework_replace_method(text, signature, '.method public native ' + signature + '\n.end method')!
 	}
+	text = framework_replace_method(text, 'clearPassword(Landroid/accounts/Account;)V',
+		'.method public clearPassword(Landroid/accounts/Account;)V\n.locals 1\nconst/4 v0, 0x0\ninvoke-virtual {p0, p1, v0}, Landroid/accounts/AccountManager;->setPassword(Landroid/accounts/Account;Ljava/lang/String;)V\nreturn-void\n.end method')!
 	return text
 }

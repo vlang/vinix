@@ -14,7 +14,8 @@ fn main() {
 	] {
 		assert patched.count('.method public native ' + signature + '\n.end method') == 1
 	}
-	assert patched.count('.method ') == source.count('.method ') + 3
+	assert patched.contains('.method public clearPassword(Landroid/accounts/Account;)V\n.locals 1\nconst/4 v0, 0x0\ninvoke-virtual {p0, p1, v0}, Landroid/accounts/AccountManager;->setPassword(Landroid/accounts/Account;Ljava/lang/String;)V\nreturn-void\n.end method')
+	assert patched.count('.method ') == source.count('.method ') + 4
 	assert patched.contains(source.all_after('.super Ljava/lang/Object;\n'))
 	assert androidtools.framework_account_token_cache(patched)! == patched
 	mut rejected := false
