@@ -173,16 +173,31 @@ fn (mut a SoftwareApp) handle_deployment_audit(event_id string) {
 }
 
 fn (mut a SoftwareApp) build_deployment_audit_compact(width int, height int) ui2.Element {
-	mut children := frame_elements(5)
+	mut children := frame_elements(9)
+	idle := a.worker == unsafe { nil }
+	failed := idle && a.failure_pages.len > 0
+	if width < 320 || height < 240 {
+		children << software_label('Deployment check · enlarge for details', 14, 8, width - 28, 28, false)
+		button_width := if failed { (width - 42) / 2 } else { if width > 202 { 174 } else { width - 28 } }
+		children << software_button(if idle { 'software.audit.back' } else { 'software.audit.stop' },
+			if idle { 'Back' } else { 'Stop check' }, 14, 46, button_width)
+		if failed { children << software_button('software.failure', 'Failure', (width + 14) / 2, 46, button_width) }
+		if height > 112 { children << software_label(a.status, 14, 84, width - 28, height - 92, false) }
+		return ui2.screen(app_surface, children)
+	}
+	children << software_label('Installed deployment check', 14, 8, width - 28, 28, false)
 	children << software_button(if a.worker == unsafe { nil } { 'software.audit.back' } else { 'software.audit.stop' },
-		if a.worker == unsafe { nil } { 'Back to deployment' } else { 'Stop check' }, 14, 8, if width > 188 { 174 } else { width - 28 })
-	children << software_label('Installed deployment check', 14, 46, width - 28, 28, false)
-	if a.audit_ready { children << software_label(a.audit_results, 14, 80, width - 28, 28, false) }
-	reading := a.worker == unsafe { nil } && a.audit_ready && a.details_pages.len > 0 && height >= 220
-	if reading { children << software_button('software.report.read', 'Read report', 14, 114, if width > 188 { 174 } else { width - 28 }) }
-	y := if reading { 152 } else if a.audit_ready { 114 } else { 80 }
-	children << software_label(if reading { 'Enlarge to search or filter packages.' } else { 'Enlarge this window to search packages, filter differences and inspect deployment details.' },
-		14, y, width - 28, if reading { height - y - 8 } else if height > 180 { 60 } else { 28 }, false)
+		if idle { 'Back to deployment' } else { 'Stop check' }, 14, 46, 140)
+	if idle { children << software_button('software.audit.reload', 'Reload check', width - 154, 46, 140) }
+	children << software_label(a.status, 14, 84, width - 28, 28, false)
+	children << software_label(if a.audit_ready { a.audit_results } else if idle { 'Reload to compare installed metadata.' }
+		else { 'Wait for the report or stop this check.' }, 14, 118, width - 28, 28, false)
+	reading := idle && a.audit_ready && a.details_pages.len > 0
+	button_width := if failed && reading { (width - 52) / 3 } else { 140 }
+	if a.status_readable() { children << software_button('software.status', 'Read status', 14, 156, button_width) }
+	if reading { children << software_button('software.report.read', 'Read report', if failed { 26 + button_width } else { width - 154 }, 156, button_width) }
+	if failed { children << software_button('software.failure', if reading { 'Failure' } else { 'Failure details' }, width - 14 - button_width, 156, button_width) }
+	children << software_label('Enlarge to search or filter packages.', 14, 194, width - 28, height - 202, false)
 	return ui2.screen(app_surface, children)
 }
 
