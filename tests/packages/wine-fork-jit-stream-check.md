@@ -351,3 +351,100 @@ and launch-refusal state totals 7,638,328 bytes. Completed free-space checks
 exceeded 550 MiB before every build/run; final available space was
 37,768,404 KiB. No target build, staging, image or VM ran in this followup.
 The canonical probe and translated ARM fork result are unchanged.
+
+## Retained static C inputs and host qualification
+
+The maintained static-input composer follows source revision
+`a9f0dba16a317590e145fe05ed07d8f18feef75f`. It copies only ordinary C headers,
+six fixed musl startup/library files and five fixed GCC runtime files from
+`/opt/homebrew/Cellar/musl-cross/0.9.11/libexec` into the standard relative
+layout at `section14/wine-jit-stream-native-inputs-01`. The root C++ header
+branch is excluded. Missing files, links, special files, destination collisions,
+source changes and unselected destination entries are refused. Sources are
+inventoried before copying and checked again after complete destination
+readback and after both driver queries. The shared source installation and
+its dangling links remain unchanged. These checks assume stopped trusted
+inputs; they do not provide a hostile ancestor-rename sandbox.
+
+The final four source SHA-256 values are:
+
+- `tools/packages/winejitstream/static_inputs.v`:
+  `a9d2d2275e98ca8c8fad244681866bccd90a252a194a5db858fdab97f0ae95e0`.
+- `tools/packages/winejitstream/static_inputs_test.v`:
+  `8abc7dc56d7b2b83707de9490d12960a3248a3a666dfcde1567a786eec2ca1e4`.
+- `tests/packages/wine-fork-jit-stream-inputs.v`:
+  `0a6ce4ea204f4cc840fe0830b6a6ae530b1823b8cf7571d3fbf63affbfe5e9eb`.
+- `tests/packages/wine-fork-jit-stream-inputs-host.v`:
+  `a943d758a96279a5c9a60a77ef955e55e55328535444b0ea4937798e02507ee8`.
+
+Evidence is retained outside Git under
+`/Users/alex/Library/Caches/vinix-codex/section14/`, in
+`wine-jit-stream-static-inputs-host-01` through `host-05`. Final qualification
+is in `wine-jit-stream-static-inputs-host-05`; `host-receipt.json` has SHA-256
+`d413d0281bb44205e70b636acf27643415b515f759b7e48d8151d70dec7953f2`.
+It binds the selected private V binary `ff75a301...` described above, its full
+selected adjacent compiler library trees and the maintained source paths.
+The 3,741-entry sorted binding digest was unchanged before/after:
+`c555e8339260d5babac7079afe6b4fe2160702cd26176e388256b5a2109a0471`.
+Explicit caller-selection/no-fallback markers, cleared caller overrides,
+compiler argv and private scratch paths are recorded. The first small host
+observer build was an observed bootstrap outside its own guard; the final
+bootstrap exited 0 in 23.42 seconds. Subsequent three builds used hard
+60-second process-group guards and all exited 0 with confirmed cleanup.
+The final composer executable SHA-256 is
+`e85d063d9653786ee608b008e75cc71bd1409985f1b688e787e8303bbcf55b6e`.
+
+All eight unit functions passed in both normal and production builds, in
+1,759 and 2,376 ms. Checks use explicit `if`/`panic`, with filesystem side
+effects evaluated separately. The same executables' intentional-failure
+sentinels each retained raw wait status 256 and the exact expected diagnostic,
+in 85 and 106 ms. Coverage includes ordinary copy/readback, link/special and
+missing-input refusal, changed sources/outputs, collision/overlap, budget and
+receipt bounds, and split/joined compiler search-path escape refusal. Every
+guarded build/run confirmed process-group cleanup.
+
+The admitted 32 MiB inclusive limit covers all selected prior retained failure,
+receipt and compiler-scratch state, plus a 2 MiB reserve. Projection includes
+both plan/compose-before envelopes, complete source/readback inventories,
+the exact environment and bounded final receipt before admission; actual
+encoded lengths and cumulative state are rechecked before copying, before
+driver queries and after the final receipt. Host-05 planned 28,601,132 bytes
+including reserve. The final copy retained 1,113 files totaling 9,915,649
+bytes. Whole composition exited 0 in 5.36 seconds. Final inclusive logical
+state was 26,509,811 bytes; with the reserve it was 28,606,963 bytes, below
+33,554,432. Completed free-space checks exceeded 2 GiB before builds/runs;
+the enforced floor was 1 GiB. Final available space was 8,415,928 KiB.
+
+Both guarded Clang queries, `-###` and `-print-search-dirs`, exited 0 with
+confirmed cleanup in 64 and 38 ms. Their recorded argv uses the retained
+sysroot and GCC-relative layout, explicit resource/linker paths and
+`--no-default-config`; ambient search/configuration variables are cleared and
+recorded. The recipe selected retained C headers, library directories and
+all five startup objects. Its selected external include directory was the
+pinned Clang resource include tree. Original cross-installation paths and
+existing search paths outside these roots are refused. The selected Clang,
+linker and resource tree are bound before/after. This observes dry-run path
+selection; it does not compile or link, freeze the host SDK/transitive host
+libraries, or establish exact private-compiler source provenance.
+
+Final host-05 evidence SHA-256 values are:
+
+- `composition.json`:
+  `f9ede94dcfa974b992d5768ce93e9c1b16d2e607d363dac3cd7d524929665450`.
+- `drivers.json`:
+  `2c187985a65cdafb11a73c194b7d19183cf49527714c59946619c5ad3eea4372`.
+- `output-readback.json` and `source-after.json`:
+  `9a28c8bd5edd84abda9c71443e2800a2beb9685f68db6274c1232b9dbcb9929a`.
+
+Earlier failed controls and refusals are preserved. Host-01/02 unit attempts
+are unqualified: filesystem cleanup failed, including an `assert` side effect
+omitted by production compilation. Host-03 passed the then-seven explicit
+normal/production controls and refused the original 20 MiB budget. Host-04
+passed those controls but refused before destination creation when its
+compose-before receipt exceeded the 24 MiB cumulative limit by 32,490 bytes;
+this led to the final advance receipt projection. Its initial bootstrap's
+mistyped posthoc elapsed field is preserved separately as
+`bootstrap.log.incorrect-elapsed.json`; the corrected receipt records 10.06
+seconds from unchanged raw timing output. No earlier evidence was removed.
+This followup ran no target build, staging, image or VM. The canonical probe
+and translated ARM fork result remain unchanged.
