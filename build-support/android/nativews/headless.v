@@ -132,16 +132,43 @@ fn ws_service_pump(e voidptr) bool {
 	return !ws_failure(e, c'ANDROID-SERVICE-FAIL main looper')
 }
 
+// One bounded numeric record, with no account/app content. Reason 1 is the
+// existing deadline; reason 2 is control closure/input. Unknown active is -1.
+fn ws_service_binding_timeout(e voidptr, binding voidptr, started_ms i64, pumps u64, record bool, reason i32, control i32) {
+	unsafe {
+		selected := C.getenv(c'VINIX_ANDROID_TRACE_SERVICE_BINDING')
+		if selected == nil || selected[0] != char(49) || selected[1] != 0 { return }
+		mut active := i32(-1)
+		// Never replace an existing exception or leave a diagnostic exception.
+		if binding != nil && !pending(e) {
+			member := field(e, c'android/atl/VinixServiceBinding', c'active', c'Z')
+			if member != nil && !pending(e) {
+				active = i32(WsBoolField(slot(e, 96))(e, binding, member))
+			}
+			if pending(e) {
+				WsApplicationClear(slot(e, 17))(e)
+				active = -1
+			}
+		}
+		buffer := &char(C.alloca(256))
+		count := C.snprintf(buffer, 256, c'ANDROID-SERVICE-BINDING-WAIT elapsed_ms=%lld pumps=%llu active=%d record=%d reason=%d control=%d\n', ws_millis() - started_ms, pumps, active, i32(record), reason, control)
+		if count > 0 && count < 256 { C.write(2, buffer, usize(count)) }
+	}
+}
+
 // Every exit after registration goes through ws_service_shutdown, including
 // controller loss while Application/onBind callbacks are being dispatched.
 fn ws_service_run(e voidptr, binding voidptr, control_fd i32, package_name &char, service &char) i32 {
 	unsafe {
-		deadline := ws_millis() + 5000
+		started_ms := ws_millis()
+		deadline := started_ms + 5000
+		mut pumps := u64(0)
 		mut bound := false
 		for !bound {
 			if ws_service_control(control_fd, 0) != 1 { return 1 }
 			push_frame(e)
 			ok := ws_service_pump(e)
+			pumps++
 			record := if ok {
 				get_object(e, binding, c'android/atl/VinixServiceBinding', c'record', c'Landroid/atl/VinixServiceBindingRecord;')
 			} else {
@@ -157,9 +184,14 @@ fn ws_service_run(e voidptr, binding voidptr, control_fd i32, package_name &char
 			pop_frame(e)
 			if !ok || failed || invalid_binder { return 1 }
 			if ws_service_control(control_fd, 0) != 1 { return 1 }
-			if !bound && (ws_millis() >= deadline || ws_service_control(control_fd, 16) != 1) {
-				C.puts(c'ANDROID-SERVICE-FAIL service binding incomplete')
-				return 1
+			if !bound {
+				expired := ws_millis() >= deadline
+				control := if expired { i32(1) } else { ws_service_control(control_fd, 16) }
+				if expired || control != 1 {
+					ws_service_binding_timeout(e, binding, started_ms, pumps, record != nil, if expired { i32(1) } else { i32(2) }, control)
+					C.puts(c'ANDROID-SERVICE-FAIL service binding incomplete')
+					return 1
+				}
 			}
 		}
 		if ws_service_control(control_fd, 0) != 1 { return 1 }

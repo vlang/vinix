@@ -82,6 +82,8 @@ struct Value { l voidptr }
 type WsApplicationClear = fn (voidptr)
 type ServiceRun = fn (voidptr, voidptr, i32, &char, &char) i32
 type ServiceShutdown = fn (voidptr, voidptr, voidptr, voidptr, voidptr, voidptr, i32) i32
+// The separate binding-timeout checker executes the production diagnostic.
+fn ws_service_binding_timeout(e voidptr, binding voidptr, started_ms i64, pumps u64, record bool, reason i32, control i32) {}
 struct Probe {
 mut:
  controls []i32
