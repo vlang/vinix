@@ -354,7 +354,7 @@ fn cross_inputs(root string, base_pins map[string]string) !map[string]string {
 		return error('cross compiler specs differ')
 	}
 	mut additional := map[string]string{}
-	for name in ['crt1.o', 'Scrt1.o', 'crti.o', 'crtbegin.o', 'crtbeginS.o', 'crtend.o', 'crtendS.o',
+	for name in ['crt1.o', 'Scrt1.o', 'crti.o', 'crtbegin.o', 'crtbeginS.o', 'crtbeginT.o', 'crtend.o', 'crtendS.o',
 		'crtn.o', 'libgcc.a', 'libgcc_eh.a', 'libgcc_s.so', 'libgcc_s.so.1', 'libc.so', 'libc.a',
 		'libm.a', 'libpthread.a', 'libdl.a'] {
 		path := command(root, 'cross-file-' + name, [cross, '-print-file-name=' + name])!.trim_space()
