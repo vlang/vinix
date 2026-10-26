@@ -63,6 +63,43 @@ found that the shared baseline lacks `android.accounts.NetworkErrorException`;
 the service overlay must be rebuilt over the repaired baseline before its ART
 fixture can qualify the behavior.
 
+## Repaired 2,098-class framework overlay
+
+The rebuilt overlay is retained, without changing the historical candidate, at
+`/Users/alex/.local/state/vinix/android/account-contract-service-access-build-2026-10-26-candidate-2098`.
+It uses the repaired authenticator baseline with manifest SHA-256
+`36a472320e71eb459896c1d52a8f211f475362fb2c6dada682870bf43b6a2b7b`
+and input JAR SHA-256
+`9e643451d4d82fc3839c91415947f04d3726aa81967a784d4d26db63e2c88cb1`.
+The output pins are:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Complete 6,792-file manifest | `4cb40ad627633304a1cab1b236032c148dd1095f6a92575029a9a01c5e94e94f` |
+| `api-impl.jar` | `645731503cb26d422a95bf8e2cf5ca66d7d490d0c9c3031f3d6cbad45b333f74` |
+| `classes.dex` | `aab3251c6c7263fcd28731731bc493b9cb44098680c291225b88a50daaf48d98` |
+
+The retained builder source is byte-identical to
+`tests/native-android-ws/service-access-build.v` at commit
+`e55d8f0614b7d74b791cae52f1a3c87351952ee8`. The bundle was built immediately
+before that source was committed, so its original receipt records parent
+`ae81933fb51667b9594d2eccc98fb6e876a0c8db`. The receipt and sealed bundle are
+preserved unchanged. Direct byte comparisons also confirmed the retained
+service provider and complete helper source files match the checkout.
+
+The builder disassembles the pinned JAR, retains both canonical DEX trees and
+checks the complete class sets before and after assembly. All 2,098 classes
+remain present; only ContextImpl changes. Only `classes.dex` changes in the JAR.
+Eight invalid class inventories and four invalid JAR inventories are rejected
+by the builder self-test. Provider guards and reapplication rejection pass,
+and the baseline and native-reference integrity checks pass before and after
+the build. The native reference remains `aa460c06686e2d1f60ea6dd27ab8f158a3b9794440499c6cdc5e7840cafda0cb`.
+An independent full integrity recheck is retained in
+`/Users/alex/.local/state/vinix/android/service-access-final-source-readback-2026-10-26.log`.
+
+This qualifies the rebuilt host artifact for an isolated ART run. Runtime
+service-access behavior and Google account sign-in remain unverified here.
+
 ## Signed runtime fixture: host build only
 
 `tests/native-android-ws/service-access-fixture.v` builds four signed APKs. The
@@ -106,6 +143,6 @@ SHA-256 `2f68c43aed0395a4836a8f9922eb95106d19d26d6a52c70438d16234ff336729`.
 | `blocked/probe.apk` | `ff0e1edab41f4f847938e24f42f1abec7a5b5181dd4174e803c23de6a1e41994` |
 | `disabled/probe.apk` | `9c59d18e48208977675d36eb2fd8673305cdac9b7b31588a7d31394b39419434` |
 
-This establishes fixture construction and transformer validation. An isolated
-framework overlay and ART execution remain required; no runtime pass or Google
+This establishes fixture construction and transformer validation. ART execution
+of the repaired isolated framework overlay remains required; no runtime pass or Google
 account sign-in success is claimed here.
