@@ -387,8 +387,12 @@ fn ws_auth_copy(id u64) &WsAuthCommand {
 		command.id = id
 		command.operation = ws_auth_operation(ws_auth_handle)
 		name := ws_auth_type(ws_auth_handle)
-		if command.operation != 1 && command.operation != 2 && command.operation != 4 { ws_auth_command_free(command); return nil }
+		if command.operation != 1 && command.operation != 2 && command.operation != 4 && command.operation != 5 { ws_auth_command_free(command); return nil }
 		if name != nil { command.account_type = C.strdup(name) }
+		if command.operation == 5 {
+			if name == nil || name[0] == 0 || command.account_type == nil { ws_auth_command_free(command); return nil }
+			return command
+		}
 		account := ws_auth_name(ws_auth_handle)
 		if account != nil { command.account_name = C.strdup(account) }
 		token := ws_auth_token(ws_auth_handle)
@@ -470,6 +474,7 @@ fn ws_auth_token_check(id u64) i32 {
 fn ws_auth_dispatch(e voidptr, binder voidptr, command &WsAuthCommand) bool {
 	unsafe {
 		if command.operation == 1 { return ws_store_dispatch(command.id) }
+		if command.operation == 5 { return ws_store_invalidate_dispatch(command.id) }
 		if command.operation == 4 {
 			status := ws_auth_token_check(command.id)
 			if status != 1 { return status == 0 }

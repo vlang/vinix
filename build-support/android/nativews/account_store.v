@@ -15,6 +15,8 @@ type WsStoreData = fn (voidptr,&char,&char,&char) voidptr
 type WsStoreWrite = fn (voidptr,&char,&char,&char) i32
 type WsStoreWriteData = fn (voidptr,&char,&char,&char,&char) i32
 type WsStoreWriteVisibility = fn (voidptr,&char,&char,&char,i32) i32
+type WsStoreToken = fn (voidptr,&char,&char) i32
+type WsAccountInvalidateBuild = fn (u64,&char,&char) voidptr
 
 struct WsStoreIdentity {
 mut:
@@ -42,6 +44,10 @@ __global ws_store_cell_free WsAuthFree
 __global ws_store_password_put WsStoreWrite
 __global ws_store_data_put WsStoreWriteData
 __global ws_store_visibility_put WsStoreWriteVisibility
+__global ws_store_token_read WsStoreData
+__global ws_store_token_put WsStoreWriteData
+__global ws_store_token_invalidate WsStoreToken
+__global ws_store_invalidate WsStoreQuery
 
 // Consume before APK execution, even when no service channel is present.
 fn ws_store_take_type() &char {
@@ -78,13 +84,19 @@ fn ws_store_init(account_type &char) bool {
 		ws_store_password_put = WsStoreWrite(C.dlsym(ws_auth_library,c'vinix_android_account_store_set_password'))
 		ws_store_data_put = WsStoreWriteData(C.dlsym(ws_auth_library,c'vinix_android_account_store_set_data'))
 		ws_store_visibility_put = WsStoreWriteVisibility(C.dlsym(ws_auth_library,c'vinix_android_account_store_set_visibility'))
+		ws_store_token_read = WsStoreData(C.dlsym(ws_auth_library,c'vinix_android_account_store_peek_token'))
+		ws_store_token_put = WsStoreWriteData(C.dlsym(ws_auth_library,c'vinix_android_account_store_set_token'))
+		ws_store_token_invalidate = WsStoreToken(C.dlsym(ws_auth_library,c'vinix_android_account_store_invalidate_token'))
+		ws_store_invalidate = WsStoreQuery(C.dlsym(ws_auth_library,c'vinix_android_account_store_invalidate'))
 		if voidptr(ws_store_open) == nil || voidptr(ws_store_close) == nil || voidptr(ws_store_insertion) == nil
 			|| voidptr(ws_store_userdata) == nil || voidptr(ws_store_map_visibility) == nil || voidptr(ws_store_commit) == nil
 			|| voidptr(ws_store_insertion_free) == nil || voidptr(ws_store_snapshot) == nil || voidptr(ws_store_snapshot_count) == nil
 			|| voidptr(ws_store_snapshot_name) == nil || voidptr(ws_store_snapshot_type) == nil || voidptr(ws_store_snapshot_free) == nil
 			|| voidptr(ws_store_query) == nil || voidptr(ws_store_password) == nil || voidptr(ws_store_data) == nil
 			|| voidptr(ws_store_cell_text) == nil || voidptr(ws_store_cell_free) == nil || voidptr(ws_store_password_put) == nil
-			|| voidptr(ws_store_data_put) == nil || voidptr(ws_store_visibility_put) == nil { return false }
+			|| voidptr(ws_store_data_put) == nil || voidptr(ws_store_visibility_put) == nil
+			|| voidptr(ws_store_token_read) == nil || voidptr(ws_store_token_put) == nil
+			|| voidptr(ws_store_token_invalidate) == nil || voidptr(ws_store_invalidate) == nil { return false }
 		ws_store_handle = ws_store_open(ws_auth_handle,ws.data,account_type,ws_auth_origin)
 		return ws_store_handle != nil
 	}
@@ -321,6 +333,38 @@ fn ws_store_get_data(e voidptr, manager voidptr, account voidptr, key voidptr) v
 	return ws_store_read(e,account,key,false)
 }
 
+fn ws_store_peek_token(e voidptr, manager voidptr, account voidptr, token_type voidptr) voidptr {
+	unsafe {
+		if !ws_store_owner(e) { return nil }
+		identity := &WsStoreIdentity(C.calloc(1,sizeof(WsStoreIdentity)))
+		if identity == nil { throw(e,c'java/lang/OutOfMemoryError',c'account identity'); return nil }
+		defer { C.free(identity.name); C.free(identity.kind); C.free(identity) }
+		if !ws_store_identity(e,account,identity) { return nil }
+		key := ws_account_utf8(e,token_type)
+		defer { C.free(key) }
+		if pending(e) { return nil }
+		if key == nil || key[0] == 0 { throw(e,c'java/lang/IllegalArgumentException',c'invalid token type'); return nil }
+		C.pthread_mutex_lock(&ws_auth_mutex)
+		mut cell := voidptr(nil)
+		mut text := &char(nil)
+		mut copied := true
+		if ws_store_live() {
+			cell = ws_store_token_read(ws_store_handle,identity.name,identity.kind,key)
+			if cell != nil {
+				value := ws_store_cell_text(cell)
+				if value != nil { text = C.strdup(value); copied = text != nil }
+			}
+		}
+		C.pthread_mutex_unlock(&ws_auth_mutex)
+		defer { C.free(text); if cell != nil { ws_store_cell_free(cell) } }
+		if cell == nil || !copied { throw(e,c'java/lang/UnsupportedOperationException',c'account token read failed'); return nil }
+		if text == nil { return nil }
+		result := ws_account_java_text(e,text)
+		if result == nil && !pending(e) { throw(e,c'java/lang/UnsupportedOperationException',c'invalid account token text') }
+		return result
+	}
+}
+
 fn ws_store_write(e voidptr, account voidptr, key voidptr, value voidptr, mode i32, visibility i32) i32 {
 	unsafe {
 		if !ws_store_owner(e) { return -1 }
@@ -341,6 +385,7 @@ fn ws_store_write(e voidptr, account voidptr, key voidptr, value voidptr, mode i
 			if mode == 0 { result = ws_store_password_put(ws_store_handle,identity.name,identity.kind,value_text) }
 			else if mode == 1 { result = ws_store_data_put(ws_store_handle,identity.name,identity.kind,key_text,value_text) }
 			else if mode == 2 { result = ws_store_visibility_put(ws_store_handle,identity.name,identity.kind,key_text,visibility) }
+			else if mode == 3 { result = ws_store_token_put(ws_store_handle,identity.name,identity.kind,key_text,value_text) }
 		}
 		C.pthread_mutex_unlock(&ws_auth_mutex)
 		if result < 0 { throw(e,c'java/lang/UnsupportedOperationException',c'account update failed') }
@@ -356,6 +401,67 @@ fn ws_store_set_data(e voidptr, manager voidptr, account voidptr, key voidptr, v
 	ws_store_write(e,account,key,value,1,0)
 }
 
+fn ws_store_set_token(e voidptr, manager voidptr, account voidptr, token_type voidptr, value voidptr) {
+	ws_store_write(e,account,token_type,value,3,0)
+}
+
+// Return only after durable invalidation is acknowledged. A following token
+// request must not race an outstanding asynchronous cache deletion.
+fn ws_store_invalidate_token(e voidptr, manager voidptr, account_type voidptr, token voidptr) {
+	unsafe {
+		kind := ws_account_utf8(e,account_type)
+		defer { C.free(kind) }
+		if pending(e) { return }
+		if kind == nil || kind[0] == 0 { throw(e,c'java/lang/IllegalArgumentException',c'invalid account type'); return }
+		if token == nil { return }
+		value := ws_account_utf8(e,token)
+		defer { C.free(value) }
+		if pending(e) { return }
+		if value == nil { throw(e,c'java/lang/IllegalArgumentException',c'invalid account token'); return }
+		if ws.service {
+			if !ws_store_owner(e) { return }
+			C.pthread_mutex_lock(&ws_auth_mutex)
+			status := if ws_store_live() { ws_store_token_invalidate(ws_store_handle,kind,value) } else { i32(-1) }
+			C.pthread_mutex_unlock(&ws_auth_mutex)
+			if status < 0 { throw(e,c'java/lang/UnsupportedOperationException',c'account token invalidation failed') }
+			return
+		}
+		if !ws_account_initialized || ws_account_library == nil {
+			throw(e,c'java/lang/UnsupportedOperationException',c'account broker is unavailable'); return
+		}
+		build := WsAccountInvalidateBuild(C.dlsym(ws_account_library,c'vinix_android_account_invalidate_request'))
+		if voidptr(build) == nil { throw(e,c'java/lang/UnsupportedOperationException',c'account invalidation API is unavailable'); return }
+		C.pthread_mutex_lock(&ws_account_mutex)
+		if ws_account_closing || ws_account_sequence == ~u64(0) {
+			C.pthread_mutex_unlock(&ws_account_mutex)
+			throw(e,c'java/lang/UnsupportedOperationException',c'account client is closing'); return
+		}
+		ws_account_sequence++
+		id := ws_account_sequence
+		C.pthread_mutex_unlock(&ws_account_mutex)
+		builder := build(id,kind,value)
+		if builder == nil { throw(e,c'java/lang/IllegalArgumentException',c'invalid account invalidation request'); return }
+		mut endpoint := C.getenv(c'VINIX_ANDROID_ACCOUNT_SOCKET')
+		if endpoint == nil { endpoint = c'/run/vinix/android/accounts.sock' }
+		client := ws_account_submit(builder,endpoint)
+		ws_account_free(builder)
+		if client == nil { throw(e,c'java/lang/UnsupportedOperationException',c'account broker connection failed'); return }
+		defer { ws_account_close(client) }
+		deadline := ws_millis() + 5000
+		for ws_millis() < deadline {
+			mut response_kind := u16(0)
+			mut response_id := u64(0)
+			status := ws_account_read(client,&response_kind,&response_id,100)
+			if status == 0 { continue }
+			if status != 1 || response_id != id { break }
+			if response_kind == 5 { continue }
+			if response_kind == 1 { return }
+			break
+		}
+		throw(e,c'java/lang/UnsupportedOperationException',c'account invalidation failed or timed out')
+	}
+}
+
 fn ws_store_visibility(e voidptr, manager voidptr, account voidptr, package_name voidptr, visibility i32) u8 {
 	return u8(ws_store_write(e,account,package_name,unsafe { nil },2,visibility) == 1)
 }
@@ -367,6 +473,24 @@ fn ws_store_dispatch(id u64) bool {
 		C.pthread_mutex_lock(&ws_auth_mutex)
 		if ws_store_live() {
 			result := ws_store_query(ws_store_handle,ws_auth_handle,id)
+			C.pthread_mutex_unlock(&ws_auth_mutex)
+			return result == 0
+		}
+		builder := if ws_auth_handle != nil { ws_auth_response(ws_auth_handle,id,2) } else { voidptr(nil) }
+		C.pthread_mutex_unlock(&ws_auth_mutex)
+		if builder == nil { return false }
+		defer { ws_auth_free(builder) }
+		return ws_auth_error_fields(builder,6,c'account store is unavailable') && ws_auth_send(builder) == 0
+	}
+}
+
+// The native backend reads the token from the authenticated session. It is
+// never copied into a Java command or dispatched to the APK authenticator.
+fn ws_store_invalidate_dispatch(id u64) bool {
+	unsafe {
+		C.pthread_mutex_lock(&ws_auth_mutex)
+		if ws_store_live() {
+			result := ws_store_invalidate(ws_store_handle,ws_auth_handle,id)
 			C.pthread_mutex_unlock(&ws_auth_mutex)
 			return result == 0
 		}
