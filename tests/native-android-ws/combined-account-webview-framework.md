@@ -126,3 +126,25 @@ location; r3 supersedes it by adding the missing password-clear wrapper.
 The compiler and retained-input policy match the auth profile. These are host
 construction checks; execution of the paired JNI implementation and Google
 account sign-in require separate guest evidence.
+
+The descriptions profile adds the real `AccountManager.getAuthenticatorTypes`
+native API and the `AuthenticatorDescription` Parcelable with its creator over
+the sealed r3 cache framework. The builder self-test, assembly, canonical
+disassembly, exact delta checks, and complete retained-bundle verification
+passed. Exactly one method is added to `AccountManager`, with no existing
+method changed, and exactly two classes are added: 2102 classes become 2104.
+All other classes and non-DEX JAR members retain their content. Both the
+baseline and output complete file sets are checked.
+
+- Builder implementation commit: `b97039546`; provider commit: `0a52b1112`.
+- Build source revision: `a3e6718c3cc5e203e5ec3ecbdb197bd097c8d68a`.
+- Retained builder source SHA256: `f5cee2f726d04edbe4280e671ba29ff4377c60ed23a17fbd8f00406452d78faf`.
+- Retained descriptions provider SHA256: `0e960fc476dcd165a2e0b5152cfb1be5089f7e8a55968aec8f5607b2efc0ba91`.
+- Complete retained bundle: `/Users/alex/.local/state/vinix/android/combined-account-webview-descriptions-framework-2026-10-26-r1`.
+- Bundle manifest SHA256: `d898fdcca66df0c32b9863dca99c7185d10f8e3b3fb5ab7708999b3619803021`.
+- Output `api-impl.jar` SHA256: `71d05c6e6288978de66a5c71279e8cb27d92c9166950813ddbf0c33ff86e1d0d`.
+- Output DEX SHA256: `447731834498597a51d47ff08bfe18837fa6587d841b247d5feb626d5d907d28`.
+
+The profile retains the same pinned compiler and input policy as the cache
+profile. These host construction checks require paired JNI and account-broker
+guest validation before establishing authenticator discovery or Google login.
