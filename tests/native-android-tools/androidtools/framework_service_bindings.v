@@ -270,6 +270,7 @@ return v0
 	os.write_file(wrapper, os.read_file(wrapper)! + service_binding_method('public unbindService(Landroid/content/ServiceConnection;)V', 'iget-object v0, p0, Landroid/content/ContextWrapper;->baseContext:Landroid/content/Context;\ninvoke-virtual {v0, p1}, Landroid/content/Context;->unbindService(Landroid/content/ServiceConnection;)V\nreturn-void'))!
 	executor := smali + '/android/content/VinixServiceConnection.smali'
 	os.write_file(executor, os.read_file(executor)! + service_binding_method('public vinixConnection()Landroid/content/ServiceConnection;', 'iget-object v0, p0, Landroid/content/VinixServiceConnection;->connection:Landroid/content/ServiceConnection;\nreturn-object v0'))!
+	framework_service_access(smali)!
 }
 
 fn service_binding_method(signature string, body string) string {
