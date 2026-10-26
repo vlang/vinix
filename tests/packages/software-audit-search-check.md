@@ -69,3 +69,49 @@ claimed.
 - [desktop architecture checks](results/2026-10-15/software-audit-search-desktop.txt)
 - [initial allocation attempt](results/2026-10-15/software-audit-search-attempts.txt)
 - [compiler/source/artifact ledger](results/2026-10-15/software-audit-search-toolchain.json)
+
+## Compact recovery, 2026-10-26
+
+At 320×240 and 400×300, idle audit views expose Reload, status and readers for
+the full status, report and retained failure. Running views retain Stop. Smaller
+windows keep safe Back/Stop and a failure reader; enlarging is required for the
+complete controls. Reload keeps the captured source path and query/filter
+choices. These changes are in `d6d2129b835f976e4e162531b5a7941806ae0a5d`
+(base `fb621102b656d4820e78df3b34bf978563e92e78`).
+
+The audit recovery fixture passed normal, production, tracked normal, tracked
+production and ASan/UBSan builds, plus the complete historical Software fixture
+in normal mode only. Real children exercised malformed and mismatched replies,
+diagnostic failure, a held partial report, literal frozen-path reload and
+Stop/Back/close reaping. Geometry covered 320×240, 400×300, 180×96, 319×239,
+319×240 and 320×239. Each tracked mode retained zero V bytes and records across
+3,000 steady render cycles (18,000 trees).
+
+The complete bundle is outside Git at
+`/Users/alex/Library/Caches/vinix-codex/section14/deployment-audit-compact-20261026/run01`.
+Its `result.json` SHA-256 is
+`67d784dfde56075fd17e78d7e59b6f74f2e84eaac2255114702d1d078013e4fc`.
+It retains pristine and staged project/UI manifests, literal command vectors,
+binaries and logs; the source manifests bind the then-uncommitted compact edits.
+V and Clang executables were pinned before and after execution. Imported V
+libraries, headers, linker and other transitive tools were not frozen. This is
+host headless evidence; no guest, pixel rendering or wider section 14 acceptance
+is claimed.
+
+The maintained [runner](software-audit-compact-check.v) locates the repository
+from its own source path, preserves the private production-safe focused entry
+adapter, and additionally invokes installed-name search in each of the five
+modes. It requires both exact PASS markers, the tracked allocation marker and
+the supplementary historical normal fixture. Compile and run it with explicit
+compiler/module inputs and a fresh external output directory:
+
+```sh
+V_EXECUTABLE -prod -cc CLANG_EXECUTABLE -o /external/audit-check tests/packages/software-audit-compact-check.v
+/external/audit-check V_EXECUTABLE CLANG_EXECUTABLE UI_MODULE_DIRECTORY /external/fresh-audit-run
+```
+
+The maintained runner passed production typechecking and executable compilation;
+the receipt is `maintained-runner-01/result.json` beside the prior bundle,
+SHA-256 `86c258602b29cee1c0e9cfa396e96a1f2dbd4580a09c3b237a45cd52295e3570`.
+The prior bundle qualifies audit recovery only; combined execution with
+installed-name search remains pending integration.
