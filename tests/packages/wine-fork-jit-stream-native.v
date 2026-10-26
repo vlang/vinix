@@ -8,6 +8,8 @@ import json2
 import os
 import tools.packages.winejitstream
 
+fn C.getpgrp() i32
+
 const native_clang = '/opt/homebrew/opt/llvm/bin/clang'
 const native_linker = '/opt/homebrew/bin/ld.lld'
 const native_resource = '/opt/homebrew/opt/llvm/lib/clang/23'
@@ -52,12 +54,25 @@ fn native_invoke(arguments []string, work string, name string, timeout_ms int) !
 	}
 	winejitstream.native_require_empty_modules(work + '/modules')!
 	os.write_file(work + '/' + name + '.argv.json', json2.encode(arguments))!
-	result := winejitstream.native_guard(arguments, work, name + '.log', winejitstream.native_capture_limits(timeout_ms))!
+	group := native_owner_group(false)!
+	result := winejitstream.native_guard_inherited(arguments, work, name + '.log',
+		winejitstream.native_capture_limits(timeout_ms), group)!
 	os.write_file(work + '/' + name + '.guard.json', json2.encode(result))!
 	winejitstream.native_require_empty_modules(work + '/modules')!
-	if !result.stopped || result.wait_status != 0 || result.timed_out || result.size_limited || result.reason != '' {
+	if !result.stopped || result.owner_group != group || result.cleanup_scope != 'direct-leader; outer-group-owned'
+		|| result.wait_status != 0 || result.timed_out || result.size_limited || result.reason != '' {
 		return error('native operation failed or exceeded bounds: ' + name)
 	}
+}
+
+fn native_owner_group(leader bool) !int {
+	text := os.getenv('VINIX_WINE_NATIVE_OWNER_PGID')
+	group := text.int()
+	if group <= 1 || group > 2147483647 || group.str() != text || int(C.getpgrp()) != group
+		|| (leader && os.getpid() != group) {
+		return error('native controller requires its reserved enclosing process-group owner')
+	}
+	return group
 }
 
 fn little16(bytes []u8, offset int) u16 {
@@ -95,6 +110,7 @@ fn native_static_elf(path string, machine u16) ! {
 }
 
 fn native_boot(root string, work string, kernel string) ! {
+	native_owner_group(false)!
 	native_sources(root)!
 	if os.getenv('VMODULES') != work + '/modules' {
 		return error('boot worker private module search selection changed')
@@ -131,6 +147,7 @@ fn native_run() ! {
 	if os.args.len != 11 {
 		return error('usage: native-stream ROOT PATCHED_TRANSLATOR KERNEL KERNEL_RECEIPT V ARM_SYSROOT ARM_GCC AMD_SYSROOT AMD_GCC NEW_OUTPUT')
 	}
+	native_owner_group(true)!
 	root := os.real_path(os.args[1])
 	translator := os.real_path(os.args[2])
 	kernel := os.real_path(os.args[3])
@@ -191,11 +208,11 @@ fn native_run() ! {
 	for directory in [os.dir(v) + '/vlib', os.dir(v) + '/thirdparty', arm_sysroot, arm_gcc,
 		amd_sysroot, amd_gcc, native_resource, root + '/tests/hardware-platform/hwhost',
 		root + '/tools/packages/winejitstream', root + '/tests/packages/wine-fork-jit-stream-probe',
-		root + '/tests/packages/wine-fork-jit-stream-guest'] {
+		root + '/tests/packages/wine-fork-jit-stream-guest', root + '/tools/sourcecommand'] {
 		winejitstream.native_input_tree(directory, mut inputs)!
 	}
 	for relative in ['tests/packages/wine-fork-jit-stream-native.v',
-		'tests/packages/wine-fork-jit-stream-check.v'] {
+		'tests/packages/wine-fork-jit-stream-check.v', 'tests/packages/wine-fork-jit-stream-native-owner.v'] {
 		winejitstream.native_input_add(root + '/' + relative, mut inputs)!
 	}
 	// Reserve for private boot media, retained state and monitored-threshold overshoot.
@@ -219,7 +236,8 @@ fn native_run() ! {
 		'V_MACOS_V3_CALLER_VEXE_PRESENT', 'V_MACOS_V3_CALLER_VCHILD', 'V_MACOS_V3_CALLER_VCHILD_PRESENT',
 		'V_MACOS_V3_CALLER_NO_FALLBACK', 'V_MACOS_V3_CALLER_NO_FALLBACK_PRESENT',
 		'V_MACOS_V3_NO_FALLBACK', 'VCHILD', 'V_C_ERROR_BUG_REPORT_DISABLED', 'LANG', 'LC_ALL',
-		'PATH', 'TMPDIR', 'VTMP', 'VMODULES', 'VINIX_LIMINE_BOOTAA64', 'VINIX_HWTEST_TCG'] {
+		'PATH', 'TMPDIR', 'VTMP', 'VMODULES', 'VINIX_LIMINE_BOOTAA64', 'VINIX_HWTEST_TCG',
+		'VINIX_WINE_NATIVE_OWNER_PGID'] {
 		environment[name] = os.getenv(name)
 	}
 	os.write_file(work + '/environment.json', json2.encode(environment))!
@@ -265,6 +283,7 @@ fn native_run() ! {
 		'kernel_candidate_commit': binding.candidate_commit
 		'observed_state_bytes':    winejitstream.native_state_bytes(work)!.str()
 		'limits':                  'VM worker90s plus cleanup2s; innerVM60s; build steps60s each; file hard128MiB; monitored state256MiB/log256KiB/serial6MiB every10ms, thresholds may overshoot; checked statvfs >=2GiB initially/pre-VM and >=1GiB before each child and once per second during it.'
+		'ownership':               'Every child inherits the reserved enclosing owner group. Inner guards retire/reap direct leaders only; the outer owner retires the whole group on every outcome and covers both input inventories and staging within its deadline and live state cap.'
 		'toolchain_limit':         'Captured paths for selected sources, compiler, resources, target dependencies and host tools are pinned and rechecked. Newly added directory entries, host SDK, transitive dynamic libraries and external tool behavior are not hermetically frozen.'
 	}))!
 	println('STANDALONE JIT STREAM CAPTURE COMPLETE (not workload qualification): ' + work)

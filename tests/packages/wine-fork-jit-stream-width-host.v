@@ -238,7 +238,7 @@ fn c_anchors(path string, shared bool) ! {
 			|| !text.contains('struct winejitstream__WaitSlot {\n\tu32 before;\n\ti32 status;\n\tu32 after;') {
 			return error('shared raw i32 C anchors missing')
 		}
-		for name in ['capture', 'native_guard'] {
+		for name in ['capture', 'native_guard_run'] {
 			body := c_body(text, 'winejitstream__' + name,
 				if name == 'capture' { '__v_result_winejitstream__Run' }
 				else { '__v_result_winejitstream__NativeRun' })!

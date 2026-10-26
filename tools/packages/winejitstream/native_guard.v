@@ -14,6 +14,7 @@ struct C.statvfs {
 }
 
 fn C.statvfs(&char, &C.statvfs) int
+fn C.getpgrp() i32
 
 __global native_interrupted = i32(0)
 
@@ -49,6 +50,8 @@ pub:
 	stopped        bool
 	reason         string
 	observed_bytes u64
+	cleanup_scope  string
+	owner_group    int
 }
 
 // f_frsize is the allocation fragment size. V's macOS disk_usage incorrectly
@@ -126,11 +129,45 @@ pub fn native_state_bytes(directory string) !u64 {
 	return tree.bytes
 }
 
+pub fn native_require_state(directory string, limits NativeLimits) !u64 {
+	if os.real_path(directory) != directory || os.lstat(directory)!.get_filetype() != .directory {
+		return error('state scan root must be a canonical ordinary directory')
+	}
+	mut tree := NativeTree{}
+	native_scan(directory, '', limits, mut tree)!
+	if tree.limited { return error('capture state threshold exceeded') }
+	return tree.bytes
+}
+
+pub fn native_apply_file_limits(bytes u64) ! {
+	if bytes < 1 || bytes > 128 * 1024 * 1024 { return error('invalid inherited file limit') }
+	files := C.rlimit{rlim_cur: bytes, rlim_max: bytes}
+	cores := C.rlimit{}
+	if C.setrlimit(C.RLIMIT_FSIZE, &files) != 0 || C.setrlimit(C.RLIMIT_CORE, &cores) != 0 {
+		return error('cannot apply inherited owner file/core limits')
+	}
+}
+
 // A finite trusted tool group is monitored every 10 ms. Per-log and aggregate
 // thresholds can overshoot between polls: the inherited hard per-file limit is
 // the final ceiling, including a serial writer. It must accommodate FAT/UEFI
 // media; it is deliberately distinct from the smaller admission thresholds.
 pub fn native_guard(command []string, directory string, log_name string, limits NativeLimits) !NativeRun {
+	return native_guard_run(command, directory, log_name, limits, 0)
+}
+
+// The enclosing owner retires the shared group; this guard reaps only its
+// direct leader. Trusted tools must keep the inherited group throughout.
+pub fn native_guard_inherited(command []string, directory string, log_name string,
+	limits NativeLimits, owner_group int) !NativeRun {
+	if owner_group <= 1 || owner_group > 2147483647 || int(C.getpgrp()) != owner_group {
+		return error('inherited native guard requires its reserved owner process group')
+	}
+	return native_guard_run(command, directory, log_name, limits, owner_group)
+}
+
+fn native_guard_run(command []string, directory string, log_name string, limits NativeLimits,
+	owner_group int) !NativeRun {
 	if command.len == 0 || !command[0].starts_with('/') || limits.timeout_ms < 1
 		|| limits.timeout_ms > 300000 || limits.file_bytes < 1 || limits.file_bytes > 128 * 1024 * 1024
 		|| limits.total_bytes < limits.file_bytes || limits.total_bytes > 256 * 1024 * 1024
@@ -155,7 +192,9 @@ pub fn native_guard(command []string, directory string, log_name string, limits 
 	pid := C.fork()
 	if pid < 0 { return error('native guard fork failed') }
 	if pid == 0 {
-		if C.setpgid(0, 0) != 0 { C._exit(120) }
+		if owner_group == 0 {
+			if C.setpgid(0, 0) != 0 { C._exit(120) }
+		} else if int(C.getpgrp()) != owner_group { C._exit(120) }
 		file_limit := C.rlimit{ rlim_cur: limits.file_bytes, rlim_max: limits.file_bytes }
 		core_limit := C.rlimit{}
 		if C.setrlimit(C.RLIMIT_FSIZE, &file_limit) != 0
@@ -168,10 +207,11 @@ pub fn native_guard(command []string, directory string, log_name string, limits 
 		C.execv(command[0].str, &exec_arguments[0])
 		C._exit(125)
 	}
-	// The child also sets its group before exec; this best-effort parent call
-	// narrows immediate-cancellation races (exec may already have happened).
-	C.setpgid(pid, pid)
+	// Standalone children set their group before exec; the parent call narrows
+	// immediate-cancellation races. Inherited children never change groups.
+	if owner_group == 0 { C.setpgid(pid, pid) }
 	mut reaped := false
+	mut identity_reserved := true
 	mut status := i32(-1)
 	mut timed_out := false
 	mut limited := false
@@ -196,32 +236,47 @@ pub fn native_guard(command []string, directory string, log_name string, limits 
 		}
 		if waited < 0 && C.errno != C.EINTR {
 			reason = 'native leader wait failed'
+			identity_reserved = false
 			break
 		}
 		if (time.sys_mono_now() - started) / 1000000 >= u64(limits.timeout_ms) { timed_out = true }
 		if timed_out || limited || reason != '' { break }
 		time.sleep(10 * time.millisecond)
 	}
-	// Even a successful/failed leader may have left a tool or VM descendant.
-	C.kill(-pid, C.SIGKILL)
-	if !reaped { C.kill(pid, C.SIGKILL) }
 	mut stopped := false
-	for _ in 0 .. 200 {
-		// A cancellation can precede the child's setpgid. Retry group kill
-		// while it settles, and keep the leader stopped until it is reaped.
+	if owner_group > 0 {
+		// Never signal the shared group or a released numeric identity.
+		for _ in 0 .. 200 {
+			if reaped { stopped = true; break }
+			if !identity_reserved { break }
+			C.kill(pid, C.SIGKILL)
+			waited := raw_waitpid(pid, &status, C.WNOHANG)
+			if waited == pid { reaped = true }
+			if waited < 0 && C.errno != C.EINTR { identity_reserved = false }
+			time.sleep(10 * time.millisecond)
+		}
+		stopped = reaped
+	} else {
+		// Even a successful/failed leader may have left a tool or VM descendant.
 		C.kill(-pid, C.SIGKILL)
 		if !reaped { C.kill(pid, C.SIGKILL) }
-		if !reaped && raw_waitpid(pid, &status, C.WNOHANG) == pid { reaped = true }
-		if reaped {
-			mut descendant_status := i32(0)
-			for raw_waitpid(-pid, &descendant_status, C.WNOHANG) > 0 {
+		for _ in 0 .. 200 {
+			// A cancellation can precede the child's setpgid. Retry group kill
+			// while it settles, and keep the leader stopped until it is reaped.
+			C.kill(-pid, C.SIGKILL)
+			if !reaped { C.kill(pid, C.SIGKILL) }
+			if !reaped && raw_waitpid(pid, &status, C.WNOHANG) == pid { reaped = true }
+			if reaped {
+				mut descendant_status := i32(0)
+				for raw_waitpid(-pid, &descendant_status, C.WNOHANG) > 0 {
+				}
 			}
+			if reaped && C.kill(-pid, 0) < 0 && C.errno == C.ESRCH {
+				stopped = true
+				break
+			}
+			time.sleep(10 * time.millisecond)
 		}
-		if reaped && C.kill(-pid, 0) < 0 && C.errno == C.ESRCH {
-			stopped = true
-			break
-		}
-		time.sleep(10 * time.millisecond)
 	}
 	mut after := NativeTree{}
 	native_scan(directory, '', limits, mut after) or { reason = err.msg() }
@@ -236,5 +291,7 @@ pub fn native_guard(command []string, directory string, log_name string, limits 
 		stopped:        stopped
 		reason:         reason
 		observed_bytes: observed
+		cleanup_scope:  if owner_group > 0 { 'direct-leader; outer-group-owned' } else { 'leader-and-private-group' }
+		owner_group:    owner_group
 	}
 }

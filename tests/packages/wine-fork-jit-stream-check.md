@@ -778,3 +778,70 @@ whole-adapter stop policies were externally observed; host SDK and
 transitive dynamic dependencies remain unfrozen. No target program or VM
 ran. The receipt names the unchanged-signal matched baseline, rather than
 qualifying later main signal changes or any Wine workload.
+
+## Whole native command owner
+
+The fixed production-only `wine-fork-jit-stream-native-owner.v` keeps the
+controller's input inventories, staging, compilers and guest worker inside
+one existing `sourcecommand` private process group. The owner reserves its
+leader until group retirement and the sole reap. Inherited native guards
+verify the group, do not call `setpgid`, and retire only their reserved
+direct child; the outer owner retires remaining descendants. Standalone
+native guards retain their private-group behavior. The native policy is
+300 seconds with sampled aggregate, file, log and serial limits. It has not
+been executed. Host qualification uses a 180-second whole-command bound,
+a 120-second compiler bound and a sampled 16 MiB state limit, with actual
+free-space admission and monitoring. Sampling is admission evidence, not a
+filesystem quota. Post-retirement absence probes retain raw status and
+errno and never signal a released identity.
+
+From source base `689e7a94372d177756d8b03f58e1b6ffd622c45d`, bootstrap-01
+failed compilation with actual status `1`. Bootstrap-02 completed with
+actual status `0` in 19.16 seconds, but controls-01 stopped at state-cap:
+the threshold correctly canceled the command, while its final receipt
+recorded `leader_absent=true` and `group_absent=false`. Later process
+absence does not replace that failed qualification or establish its cause.
+The revised probes retry paired leader/group observations for up to two
+seconds and preserve the final raw observations.
+
+Bootstrap-03 completed with actual status `0` in 5.82 seconds. All eight
+fresh controls-02 passed: successful leader with live descendant, abrupt
+controller exit, outer timeout, state cap, log cap, inner timeout, wrong
+group refusal and cooperative owner interruption. Each fresh receipt
+records leader and group absence; observer cancellations explicitly mark
+the exit status unobserved. The fresh host-01 owner completed with actual
+status `0` in 9,814 ms, including a successful 6,918 ms production controller
+build, before/after inventories and group retirement. Its sampled peak
+was 5,855,938 bytes. Full selected input maps were persisted before and
+after; both have SHA-256
+`bf2eba4ceb9872007a6c08ef0a50383b7b32d5faa63ad5773579621a0ec6abf6`.
+Owner source SHA-256 is
+`3026e72b6fdfedf7ee97aa2594f5d7eab9ca1a1513913695180d840805269ae1`;
+the fresh controller SHA-256 is
+`7f81110c4e26740b58eb77ed6486db98019d0ffa4aa24fe28b1884c873eb406f`.
+
+All original complete seal checks passed under the external section14
+cache. The roots `wine-jit-stream-native-owner-bootstrap-01`,
+`-bootstrap-02`, `-bootstrap-03`, `-controls-01`, `-controls-02` and
+`-host-01` are retained. Their manifests are under
+`wine-jit-stream-native-owner-seal-01/<name>/complete/inventory.json`:
+
+| Name | Manifest SHA-256 |
+| --- | --- |
+| bootstrap-01 | `5080edb20a4f92477f574eafaf2de1eb8a449b9c473fcb11f99f47044d81e057` |
+| bootstrap-02 | `f7bd0fb8a5ae0fc629c8ae296009795ad94493a305aabc5f164dd6b9f162f0ba` |
+| controls-01 | `bb8599fea6ea5cb2500987761a3f872f63ca4c0cf5f397548c0db770f8c2e30a` |
+| bootstrap-03 | `ac7e284440211d6e08d653aaf55c343dea00c5c89dc911ce6179284fce88f8ec` |
+| controls-02 | `5d605dc1a73c1ad3f1e4e4cdf760929a00b38e7cab90b5d78ba7ed86050c6d18` |
+| host-01 | `6fe422adfe1229cd66fefbc4e9f24f6bfcd04e1862b575cc55647f24b89261b4` |
+
+All owner attempts, controls, host state and seals retain 4,922,873 bytes.
+Combined with the prior Wine evidence profile and its existing reserve,
+the inclusive charge is 98,286,200 bytes within 128 MiB; adding the named
+619,584,463-byte static inputs gives 717,870,663 bytes within 768 MiB.
+Final actual free space after the host run was 23,242,360 KiB. Bootstrap
+uses an external 300-second `gtimeout`, without claiming independent
+bootstrap group cleanup. Host SDK and transitive dynamic dependencies
+remain unfrozen. The controller was built but never executed: no target
+program or VM ran, and unchanged-signal matched-kernel diagnostic work
+remains unqualified.
