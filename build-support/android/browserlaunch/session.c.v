@@ -29,7 +29,10 @@ fn C.getresgid(&u32, &u32, &u32) i32
 fn C.getgroups(i32, voidptr) i32
 fn C.dup2(i32, i32) i32
 fn C.dup(i32) i32
-fn C.waitpid(i32, &i32, i32) i32
+// Keep the typed status binding separate from builtin's platform-int binding,
+// which os.Process uses with the compiler's C-int copyback conversion.
+@[c: 'waitpid']
+fn C.browser_waitpid(i32, &i32, i32) i32
 
 $if linux {
 	#include <sys/prctl.h>
@@ -339,8 +342,8 @@ pub fn (mut config Config) launch() !int {
 	}
 	C.close(pair[1])
 	mut status := i32(0)
-	mut waited := C.waitpid(pid, &status, 0)
-	for waited < 0 && C.errno == C.EINTR { waited = C.waitpid(pid, &status, 0) }
+	mut waited := C.browser_waitpid(pid, &status, 0)
+	for waited < 0 && C.errno == C.EINTR { waited = C.browser_waitpid(pid, &status, 0) }
 	if waited != pid || status != 0 { C.close(pair[0]); return error('cannot detach browser supervisor') }
 	cloexec(pair[0], false) or { C.close(pair[0]); return err }
 	return int(pair[0])
