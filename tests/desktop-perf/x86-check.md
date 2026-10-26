@@ -4,7 +4,8 @@
 guest. It reuses the unchanged `perfrunner.parse`/`drive`, `measure.c`,
 `perf-init.sh`, result validator and QMP pointer driver. Its small V init
 routes stdout/stderr to `/dev/com1`, mounts `/dev/sd0` as ext2 at `/root`
-and executes the existing script. The
+and executes the existing script. The boot arguments include
+`vinix.disk=auto quiet` to initialize ATA/AHCI on production kernels. The
 isolated UEFI ISO uses plain USTAR and 2048×1536 graphics, matching the
 shared pointer coordinates; QEMU uses q35, TCG and USB input.
 
@@ -225,3 +226,52 @@ generated source, executables, logs and filesystem metadata. This is a planning
 allowance, not measured clone-mode usage. Shared storage admission uses actual
 `df -k` readings and the coordinator's reserve; `os.disk_usage` is unsuitable
 on this host. No original input is hardlinked or modified.
+
+## Production disk initialization correction, 2026-10-26
+
+The complete clone-mode `attempt02` is preserved under
+`/Users/alex/Library/Caches/vinix-codex/section14/package-perf-x86-20261026/`.
+Preparation passed with receipt SHA-256
+`b26a27953d5175f80a73f73222e90806eb64d35d5005663175a12ca3e08f6c1c`.
+The guest unpacked 3,263 entries and reached the serial init, then refused the
+ext2 `/root` mount before any workload ran: all 44 measurements were missing.
+Its serial log has SHA-256
+`43d0048d1f4967fa2c484150a9fbb9eb1f36b9b9ccb024817236f2aaeb9d6cbc`.
+This attempt provides no performance qualification.
+
+The selected production kernel initializes ATA/AHCI only when its boot
+arguments request a disk. The adapter previously emitted `quiet` alone,
+skipping that initialization and explaining the mount refusal. The old init
+did not log errno or device presence; absence of `/dev/sd0` is inferred from
+the source. The q35 SATA device, native mount call and clean
+256 MiB ext2 filesystem were correct. The harness now emits the exact
+`vinix.disk=auto quiet` arguments, checks them in its host selfcheck and
+saves errno before checking device presence on a future mount refusal.
+No kernel or workload source changed.
+
+The retained kernel `initramfs.image_id` and `sysdisk.mount_or_install`
+sources show that this plain USTAR archive without `/.vinix-image-id` returns
+to its memory root before the installer disk scan or writes. The earlier
+hibernate image scan may read disks. Neither complete input inventory nor
+the actual archive listing contains that entry. The formatted test disk is
+also below the separate 4 GiB blank-disk installation threshold. Read-only
+filesystem inspection and the failed attempt's before/after receipt confirm
+the disk remained byte-identical, SHA-256
+`e33658b1a0a161f0b10ccc1296e8caae5b65bddd12e6236e6a010b1d598a86d8`.
+Corrected native execution remains pending.
+
+On source base `2c94ee65e20fb2db82c2b021193e31a7b85822d3` plus these three
+maintained paths, the host controller build, 25 selfchecks (15 refusals),
+all 18 APFS controls and the updated static x86 init link passed. Generated
+C confirms an immediate native-width errno snapshot before device lookup;
+ELF inspection confirms x86-64 with no interpreter or dynamic dependencies.
+The complete host outputs and exact source copies are retained in
+`package-perf-x86-20261026/disk-boot-host-01/`; `commands.json` has SHA-256
+`fb17d1b160ae89bedc9b12e57d2f7ebeef922dc78c8e6ad8a5018cfaccb7a4a4`.
+Its two-code-path source patch has SHA-256
+`e038beec3f68ae1546e879636638512358a70a59a1ae3d9019cae15005544203`.
+The 24-file `evidence.sha256` index binds the recorded commands, code copies,
+executables, generated C, outputs and disk-safety source proof; its SHA-256 is
+`6a1b48edf99211276089d01dc656ee04484a6c6b73b03ee30d9cdd6ac5675037`.
+These checks validate the harness correction and preserve the failed guest;
+they provide no corrected native, allocation or performance result.

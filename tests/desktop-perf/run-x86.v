@@ -259,7 +259,10 @@ fn verify(p Prepared, state string) ! {
 }
 
 fn iso_configuration() string {
-	return plainiso.configuration().replace('1024x768x32', '2048x1536x32')
+	// Production kernels initialize ATA/AHCI only when a disk is requested.
+	// Without an installer image id, the fixture's root stays in memory.
+	return plainiso.configuration().replace('1024x768x32', '2048x1536x32') +
+		'    cmdline: vinix.disk=auto quiet\n'
 }
 
 fn image_builder() ! {
@@ -277,7 +280,7 @@ fn image_builder() ! {
 		[loader + '/limine-uefi-cd.bin', '/boot/limine-uefi-cd.bin']] {
 		stage_file(pair[0], stage + pair[1], clone)!
 	}
-	os.write_file(stage + '/boot/limine.conf', iso_configuration() + '    cmdline: quiet\n')!
+	os.write_file(stage + '/boot/limine.conf', iso_configuration())!
 	args := [os.getenv('VINIX_PERF_X86_XORRISO'), '-as', 'mkisofs', '-iso-level', '3', '-R', '-r',
 		'-J', '--efi-boot', 'boot/limine-uefi-cd.bin', '-efi-boot-part', '--efi-boot-image',
 		'--protective-msdos-label', stage, '-o', output]
@@ -522,6 +525,10 @@ fn selfcheck(state string) ! {
 	if iso_configuration().contains('1024x768') || !iso_configuration().contains('2048x1536x32') {
 		return error('pointer geometry changed')
 	}
+	if !iso_configuration().ends_with('    cmdline: vinix.disk=auto quiet\n')
+		|| iso_configuration().count('    cmdline:') != 1 {
+		return error('production disk boot arguments changed')
+	}
 	for options in [['--scenarios=ops', '--timeout=1799'], ['--scenarios=idle', '--mem=-1'],
 		['--scenarios=pointer'], ['--scenarios=idle', "--desktop-args='bad'"]] {
 		mut args := [state, state + '/base', state + '/empty', state + '/never',
@@ -543,8 +550,8 @@ fn selfcheck(state string) ! {
 	os.rm(state + '/host-tool')!
 	os.symlink('tool-a', state + '/host-tool')!
 	verify(tool, state)!
-	os.write_file(state + '/result', 'PASS 24 checks including 15 refusals: final/intermediate absolute and relative guest links, escape/cycle/referral/link/staged mutations, streaming digest, restore, geometry, timeout/memory/scenario/quote controls, host-tool symlink retarget\n')!
-	println('PERF X86 SELFCHECK PASS 24 checks including 15 refusals')
+	os.write_file(state + '/result', 'PASS 25 checks including 15 refusals: final/intermediate absolute and relative guest links, escape/cycle/referral/link/staged mutations, streaming digest, restore, geometry, production disk boot arguments, timeout/memory/scenario/quote controls, host-tool symlink retarget\n')!
+	println('PERF X86 SELFCHECK PASS 25 checks including 15 refusals')
 }
 
 fn clonecheck(state string) ! {
