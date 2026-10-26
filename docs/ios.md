@@ -353,6 +353,14 @@ or 25% of the checklist, without estimating remaining effort. Initializer
 completion, application entry, rendering and gameplay remain unverified.
 See the [Blocks capture checkpoint](../tests/ios/block-byref-checkpoint-20261026.md).
 
+Dictionary key/value snapshots now pass native sanitizer and ARM64 guest
+ownership checks, including mutation, owner release and pool-drain lifetimes.
+The next no-ads launch passes `NSMutableDictionary allKeys` and faults at a
+direct `TPIDRRO_EL0` thread-data read with a zero masked pointer. The application
+exits 139 with no cgroup OOM event. Progress remains 2 of 8 observable launch
+gates; initializer completion and application entry remain unverified.
+See the [dictionary snapshot checkpoint](../tests/ios/dictionary-snapshot-checkpoint-20261026.md).
+
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
 runner previously rejected as reserved bits. The decoder now preserves pointer
