@@ -13,16 +13,19 @@ import sync
 #include <sys/stat.h>
 #include <unistd.h>
 
+struct C.sqlite3 {}
+struct C.sqlite3_stmt {}
+
 fn C.open(&char, int, ...voidptr) int
 fn C.openat(int, &char, int, ...voidptr) int
 fn C.close(int) int
 fn C.mkdirat(int, &char, u32) int
 fn C.fstat(int, &C.stat) int
 fn C.fsync(int) int
-fn C.sqlite3_open_v2(&char, &voidptr, int, &char) int
+fn C.sqlite3_open_v2(&char, &&C.sqlite3, int, &char) int
 fn C.sqlite3_close(voidptr) int
 fn C.sqlite3_busy_timeout(voidptr, int) int
-fn C.sqlite3_prepare_v2(voidptr, &char, int, &voidptr, voidptr) int
+fn C.sqlite3_prepare_v2(voidptr, &char, int, &&C.sqlite3_stmt, voidptr) int
 fn C.sqlite3_finalize(voidptr) int
 fn C.sqlite3_bind_text(voidptr, int, &char, int, voidptr) int
 fn C.sqlite3_bind_null(voidptr, int) int
@@ -153,7 +156,7 @@ fn check_file(directory int, name string, uid u32, create bool) ! {
 }
 
 fn prepare(db voidptr, query string) !voidptr {
-	mut statement := unsafe { nil }
+	mut statement := &C.sqlite3_stmt(unsafe { nil })
 	if unsafe { C.sqlite3_prepare_v2(db, query.str, query.len, &statement, nil) } != C.SQLITE_OK {
 		if statement != unsafe { nil } { C.sqlite3_finalize(statement) }
 		return error('cannot prepare account store operation')
@@ -243,7 +246,7 @@ pub fn open(data_directory string, expected_uid u32, owner_package string, allow
 	}
 	path := database_path(directory, data_directory)
 	defer { unsafe { path.free() } }
-	mut db := unsafe { nil }
+	mut db := &C.sqlite3(unsafe { nil })
 	status := unsafe { C.sqlite3_open_v2(path.str, &db, C.SQLITE_OPEN_READWRITE | C.SQLITE_OPEN_FULLMUTEX | C.SQLITE_OPEN_NOFOLLOW, nil) }
 	if status != C.SQLITE_OK {
 		if db != unsafe { nil } { C.sqlite3_close(db) }
