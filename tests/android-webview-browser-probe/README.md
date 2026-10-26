@@ -53,8 +53,24 @@ The stager does not launch QEMU. Its receipt records the original module hashes,
 the exact overlay additions, readback checks, and the resulting boot image hash.
 An optional final `AUTHORITY_FIXTURE_DIR` argument adds that complete, separately
 inventoried fixture under `/opt/vinix-account-authority-fixture`. Its execution
-is independent of the browser test. After booting the cloned media, launch from
-the guest terminal:
+is independent of the browser test. The guest runner pins the selected fixture
+binary; pass its complete frozen build directory, including `module/`.
+
+The macOS host lifecycle tool starts the staged image once, records the exact
+QEMU command and executable hashes, and checks PID, command, and process start
+time before stopping its guest:
+
+```sh
+v -o /tmp/vinix-browser-run tests/android-webview-browser-probe/run.v
+/tmp/vinix-browser-run --self-test
+/tmp/vinix-browser-run start FRESH_VM_OUTPUT
+/tmp/vinix-browser-run status FRESH_VM_OUTPUT
+```
+
+It requires this checkout's QEMU build and Homebrew firmware at the paths in
+`run.v`, refuses another running aarch64 guest, and writes `serial.log`,
+`network.pcap`, and a QMP socket within the staged directory. Use the existing
+QMP tooling to open the guest terminal and enter:
 
 ```sh
 /opt/vinix-browser-probe/bin/browser-guest
@@ -72,6 +88,10 @@ export on the host with the maintained collector:
 v -o /tmp/vinix-browser-collect tests/android-webview-browser-probe/collect.v
 /tmp/vinix-browser-collect SERIAL_LOG FRESH_EXTERNAL_RESULTS
 ```
+
+After the export's `END` frame has arrived, stop the owned guest with
+`/tmp/vinix-browser-run stop FRESH_VM_OUTPUT`. Retain its launch, ownership,
+stop, and disappearance receipts with the evidence.
 
 The collector requires a complete, contiguous export and checks the archive's
 size and SHA-256, strict paths, inode types, and every regular file's content
