@@ -138,3 +138,34 @@ executable SHA-256 is
 `a8d70ac590c75270bfeec41b25f49b4d1fef12eb824c00d8c10b0bc586981eb0`,
 and `.log` SHA-256 is
 `792bc0359cb5eab0d4424f1ff1cb6b5cfdb4f76d875423e198af4b289b8004f4`.
+
+## Actual desktop replay of the argv fix
+
+The root-owned `account-ui-vm-r3` guest passed at 2026-10-26
+19:08:05–19:08:07 UTC using the original r3 stage and controller revision
+`c5fc9065af1e624002eaff6e2f927ce79858a06e`. The controller exited zero,
+did not time out, reported one descendant and left zero cleanup survivors.
+All nine checks passed: real helper window, session capability, two received
+file descriptors, CLOEXEC, sealed frame size, read-only input FIFO, diagnostic
+frame, helper-lifetime EOF/input close, and single-use attachment.
+
+The stopped clone, original stage, full controller producer and original
+17-entry collection remain at their complete external paths. The collection
+is `account-ui-collected-2026-10-26-r3`, archive SHA-256
+`a78b2697680c094b8967d816332996734bc5893456da3f4b489c657516bad1fe`.
+`seal-account-ui-run-r3.v` checks their complete membership and hashes, binds
+launch/stop receipts to the owned process and media, and replays the retained
+historical strict collector with its self-test. The replay archive and every
+result file match the original collection exactly.
+
+The sealed evidence is
+`/Users/alex/.local/state/vinix/android/account-ui-run-evidence-2026-10-26-r3-r2`,
+with complete inventory SHA-256
+`7a064dfb75de1c583c74b7b7a3ce3f1bae164155c91f29cc2386b992369bc6bb`
+and receipt SHA-256
+`2453c19380517a8fe52b4994491b21341b3d4a8db77b46eadfa69bb66a0ea96b`.
+It retains the sealer's compiled source and executable, collector commands and
+receipts, and 2,450 external file pins; all evidence trees are rechecked before
+sealing. Its build argv is documented rather than a retained command receipt.
+This proves the standalone desktop helper/controller behavior. Android account
+authentication and Google sign-in remain separate checks.
