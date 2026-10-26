@@ -3,8 +3,49 @@ module accountstore
 
 import os
 
+#include <fcntl.h>
+#include <sys/wait.h>
+
 fn C.link(&char, &char) int
 fn C.mkfifo(&char, u32) int
+
+struct C.flock {
+mut:
+	l_type i16
+	l_whence i16
+	l_start i64
+	l_len i64
+	l_pid i32
+}
+
+@[c: 'waitpid']
+fn C.vinix_accountstore_waitpid(i32, &i32, i32) i32
+
+fn has_parent_lock(fd int) bool {
+	mut pipe := [2]i32{}
+	assert C.pipe(&pipe[0]) == 0
+	pid := C.fork()
+	assert pid >= 0
+	if pid == 0 {
+		C.close(pipe[0])
+		mut query := C.flock{ l_type: i16(C.F_WRLCK), l_whence: i16(C.SEEK_SET), l_len: 1 }
+		mut answer := u8(0)
+		if unsafe { C.fcntl(i32(fd), C.F_GETLK, &query) } == 0 && query.l_type != i16(C.F_UNLCK) {
+			answer = 1
+		}
+		unsafe { C.write(pipe[1], &answer, 1) }
+		C._exit(0)
+		return false
+	}
+	C.close(pipe[1])
+	mut answer := u8(0)
+	count := unsafe { C.read(pipe[0], &answer, 1) }
+	C.close(pipe[0])
+	mut status := i32(-1)
+	assert unsafe { C.vinix_accountstore_waitpid(pid, &status, 0) } == pid
+	assert count == 1 && status == 0
+	return answer == 1
+}
 
 const owner = 'com.google.android.gms'
 const maps = 'com.google.android.apps.maps'
@@ -310,4 +351,28 @@ fn test_unsafe_journal_and_corrupt_database_fail_instead_of_returning_empty_snap
 	mut corrupt := false
 	open(path, u32(os.geteuid()), owner, kind) or { corrupt = true }
 	assert corrupt
+}
+
+fn test_metadata_validation_does_not_drop_an_existing_sqlite_kernel_lock() {
+	path := fixture('kernel-lock')
+	defer { os.rmdir_all(path) or {} }
+	mut store := open(path, u32(os.geteuid()), owner, kind)!
+	defer { dispose(mut store) or { panic(err) } }
+	file := os.join_path(path, 'accounts', 'accounts.sqlite')
+	fd := unsafe { C.open(file.str, C.O_RDWR | C.O_CLOEXEC | C.O_NOFOLLOW) }
+	assert fd >= 0
+	defer { C.close(fd) }
+	execute(store.db, 'BEGIN IMMEDIATE')!
+	// Pin an ordinary POSIX lock on byte zero: some host SQLite builds use
+	// a different lock style. Closing any same-inode descriptor must preserve
+	// this lock too. SQLite's own lock bytes are above the first GiB.
+	mut guard := C.flock{ l_type: i16(C.F_WRLCK), l_whence: i16(C.SEEK_SET), l_len: 1 }
+	assert unsafe { C.fcntl(i32(fd), C.F_SETLK, &guard) } == 0
+	assert has_parent_lock(fd)
+	check_file(store.directory, 'accounts.sqlite', u32(os.geteuid()), true)!
+	assert has_parent_lock(fd)
+	execute(store.db, 'ROLLBACK')!
+	guard.l_type = i16(C.F_UNLCK)
+	assert unsafe { C.fcntl(i32(fd), C.F_SETLK, &guard) } == 0
+	assert !has_parent_lock(fd)
 }

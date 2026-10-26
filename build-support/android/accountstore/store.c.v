@@ -22,6 +22,8 @@ fn C.close(int) int
 fn C.mkdirat(int, &char, u32) int
 fn C.fstat(int, &C.stat) int
 fn C.fsync(int) int
+@[c: 'fstatat']
+fn C.vinix_accountstore_fstatat(int, &char, &C.stat, int) int
 fn C.sqlite3_open_v2(&char, &&C.sqlite3, int, &char) int
 fn C.sqlite3_close(voidptr) int
 fn C.sqlite3_busy_timeout(voidptr, int) int
@@ -137,19 +139,19 @@ fn database_path(directory int, data_directory string) string {
 }
 
 fn check_file(directory int, name string, uid u32, create bool) ! {
-	flags := C.O_RDWR | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK | if create {
-		C.O_CREAT
-	} else {
-		0
-	}
-	fd := unsafe { C.openat(directory, name.str, flags, u32(0o600)) }
-	if fd < 0 {
-		if !create && C.errno == C.ENOENT { return }
-		return error('cannot open private account store file')
-	}
-	defer { C.close(fd) }
 	mut info := C.stat{}
-	if C.fstat(fd, unsafe { &info }) != 0 || u32(info.st_mode) & u32(C.S_IFMT) != u32(C.S_IFREG)
+	// Opening and closing an existing inode can release another SQLite
+	// connection's process-owned POSIX locks. Inspect without opening it.
+	if unsafe { C.vinix_accountstore_fstatat(directory, name.str, &info, C.AT_SYMLINK_NOFOLLOW) } != 0 {
+		if C.errno != C.ENOENT { return error('cannot inspect private account store file') }
+		if !create { return }
+		fd := unsafe { C.openat(directory, name.str, C.O_RDWR | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK | C.O_CREAT | C.O_EXCL, u32(0o600)) }
+		if fd < 0 { return error('cannot create private account store file') }
+		status := C.fstat(fd, unsafe { &info })
+		C.close(fd)
+		if status != 0 { return error('cannot inspect new account store file') }
+	}
+	if u32(info.st_mode) & u32(C.S_IFMT) != u32(C.S_IFREG)
 		|| info.st_uid != uid || u32(info.st_mode) & 0o777 != 0o600 || info.st_nlink != 1 {
 		return error('account store file ownership, mode or link count is unsafe')
 	}
