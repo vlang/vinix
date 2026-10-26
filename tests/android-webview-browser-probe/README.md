@@ -24,6 +24,18 @@ its verified helper name, PID and parent PID so warnings can be assigned to a
 process; arguments, URLs, raw titles and engine error messages are omitted.
 These diagnostics preserve the existing DOM, cookie and PNG pass requirements.
 
+The UI process also uses a pinned V `waitid` interposer, through musl's explicit
+`--preload` argument. It forwards each original wait exactly once, preserves
+arguments, results and errno, and emits at most 32 populated successful child
+statuses as numeric `BROWSER-WAITID` records in `probe.log`. The helper
+trampoline, Xvfb and production account processes do not load this interposer.
+Preparation uses `-no-builtin` for this module so loading it does not initialize
+V's standard I/O or signal handling runtime.
+No additional wait or child watcher consumes an exit status. This separates
+WebKit's termination classification from libc's actual child status. Run its
+host regressions with `v -cc /usr/bin/cc -gc none test
+tests/android-webview-browser-probe/waitshim`.
+
 From the repository root, build the V host preparation tool:
 
 ```sh

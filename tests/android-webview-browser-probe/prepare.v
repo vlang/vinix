@@ -378,11 +378,13 @@ fn prepare() ! {
 		extract(cache + '/' + package.filename, root + '/runtime', mut files)!
 	}
 	os.write_file(root + '/addon-files.json', json2.encode(files, prettify: true) + '\n')!
-	for name in ['probe.v', 'session.v', 'guest.v', 'collect.v', 'prepare.v', 'packages.lock.json', 'guest-helpers.lock.json', 'inspect-helper.v'] {
+	source_names := ['probe.v', 'session.v', 'guest.v', 'collect.v', 'prepare.v', 'packages.lock.json', 'guest-helpers.lock.json', 'inspect-helper.v', 'waitshim/core.v', 'waitshim/core_test.v']
+	os.mkdir(root + '/sources/waitshim')!
+	for name in source_names {
 		os.cp(sources + '/' + name, root + '/sources/' + name)!
 	}
 	mut source_pins := map[string]string{}
-	for name in ['probe.v', 'session.v', 'guest.v', 'collect.v', 'prepare.v', 'packages.lock.json', 'guest-helpers.lock.json', 'inspect-helper.v'] {
+	for name in source_names {
 		source_pins[name] = hash(root + '/sources/' + name)!
 	}
 	revision := os.exec(['git', '-C', repo, 'rev-parse', 'HEAD'])
@@ -403,6 +405,9 @@ fn prepare() ! {
 			root + '/sources/' + name + '.v']
 		command(root, 'build-' + name, argv)!
 	}
+	command(root, 'build-waitid-shim', [compiler, '-os', 'linux', '-arch', 'arm64', '-cc',
+		cross_compiler, '-gc', 'none', '-prod', '-no-builtin', '-shared', '-d', 'wait_probe_preload',
+		'-o', root + '/bin/libbrowser-waitid.so', root + '/sources/waitshim'])!
 	if hash(compiler)! != compiler_pin || hash(cross_compiler)! != cross_compiler_pin {
 		return error('compiler changed during build')
 	}
@@ -432,6 +437,7 @@ fn prepare() ! {
 		'probe_sha256':            json2.Any(hash(root + '/bin/browser-probe')!)
 		'session_sha256':          json2.Any(hash(root + '/bin/browser-session')!)
 		'guest_sha256':            json2.Any(hash(root + '/bin/browser-guest')!)
+		'waitid_probe_sha256':     json2.Any(hash(root + '/bin/libbrowser-waitid.so')!)
 		'fault_probe_build_sha256': json2.Any(fault_build_hash)
 		'fault_probe_shim_sha256': json2.Any(fault_shim_hash)
 		'fault_probe_fixture_sha256': json2.Any(fault_fixture_hash)

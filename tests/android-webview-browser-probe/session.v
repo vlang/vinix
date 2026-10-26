@@ -24,6 +24,7 @@ struct BuildPins {
 	guest_helper_references map[string]string
 	probe_sha256       string
 	session_sha256     string
+	waitid_probe_sha256 string
 	fault_probe_build_sha256 string
 	fault_probe_shim_sha256 string
 	fault_probe_fixture_sha256 string
@@ -163,7 +164,19 @@ fn validate(base string, addon string, executable string) !(string, string) {
 	}
 	equal_hash(executable, build.session_sha256)!
 	equal_hash(os.dir(executable) + '/browser-probe', build.probe_sha256)!
+	waitid_loader_arguments(os.dir(executable), build)!
 	return hash(build_path)!, hash(addon_path)!
+}
+
+// Explicit loader arguments apply only to the UI process. In particular they
+// never become LD_PRELOAD or part of the helper trampoline's argument list.
+fn waitid_loader_arguments(bin string, build BuildPins) ![]string {
+	path := bin + '/libbrowser-waitid.so'
+	if !protected_library_stat(os.lstat(path)!, false) {
+		return error('waitid diagnostic must be a root-protected regular file')
+	}
+	equal_hash(path, build.waitid_probe_sha256)!
+	return ['--preload', path]
 }
 
 // GTK's Cairo renderer does not select WebKit's Skia image-buffer backend.
@@ -593,6 +606,8 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 		'x11_glx_policy':        'disabled-for-cpu-rendered-local-diagnostic'
 		'x11_glx_absent':        'false'
 		'probe_result':          'incomplete'
+		'waitid_probe_sha256':   build.waitid_probe_sha256
+		'waitid_probe_scope':    'UI process only; at most 32 populated successful waits; native wait result, arguments, errno preserved'
 		'scope':                 'Separate real-engine diagnostic; no Android integration or Google authentication proof.'
 	}
 	defer {
@@ -751,8 +766,9 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 	events.write_string('X11-GLX-ABSENT PASS authenticated QueryExtension GLX\n')!
 	mut plog := os.open_file(output + '/probe.log', 'w', 0o600)!
 	defer { plog.close() }
-	mut probe := child(loader, ['--library-path', libraries, os.dir(executable) + '/browser-probe',
-		output + '/results'], environment)
+	mut probe_arguments := waitid_loader_arguments(os.dir(executable), build)!
+	probe_arguments << ['--library-path', libraries, os.dir(executable) + '/browser-probe', output + '/results']
+	mut probe := child(loader, probe_arguments, environment)
 	defer { stop(mut probe, mut plog) }
 	probe_deadline := time.sys_mono_now() + u64(120 * time.second)
 	for probe.is_alive() {
@@ -831,6 +847,21 @@ fn self_test() ! {
 	if os.exists(root) || os.is_link(root) { return error('selftest directory already exists') }
 	os.mkdir(root)!
 	defer { os.rmdir_all(root) or {} }
+	os.write_file(root + '/libbrowser-waitid.so', 'waitid-shim-fixture')!
+	os.chmod(root + '/libbrowser-waitid.so', 0o644)!
+	wait_pin := hash(root + '/libbrowser-waitid.so')!
+	// Host self-tests may run without root; validate the hash independently
+	// and exercise the root-only loader gate when the fixture is root-owned.
+	equal_hash(root + '/libbrowser-waitid.so', wait_pin)!
+	if os.getuid() == 0 {
+		assert waitid_loader_arguments(root, BuildPins{waitid_probe_sha256: wait_pin})! == ['--preload', root + '/libbrowser-waitid.so']
+		if _ := waitid_loader_arguments(root, BuildPins{}) { return error('missing waitid pin accepted') }
+		os.chmod(root + '/libbrowser-waitid.so', 0o666)!
+		if _ := waitid_loader_arguments(root, BuildPins{waitid_probe_sha256: wait_pin}) { return error('writable waitid shim accepted') }
+		os.chmod(root + '/libbrowser-waitid.so', 0o644)!
+	}
+	os.write_file(root + '/libbrowser-waitid.so', 'changed-waitid-shim')!
+	if _ := equal_hash(root + '/libbrowser-waitid.so', wait_pin) { return error('changed waitid shim accepted') }
 	mut runtime_pins := map[string]string{}
 	for name in ['lib/ld-musl-aarch64.so.1', 'usr/libexec/webkitgtk-6.0/WebKitWebProcess',
 		'usr/libexec/webkitgtk-6.0/WebKitNetworkProcess', 'usr/libexec/webkitgtk-6.0/WebKitGPUProcess',
