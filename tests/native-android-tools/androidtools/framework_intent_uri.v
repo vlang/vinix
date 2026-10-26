@@ -28,7 +28,7 @@ pub fn framework_intent_uri(smali string) ! {
 	}
 	for method in ['<init>()V', '<init>(Ljava/lang/String;)V',
 		'<init>(Ljava/lang/String;Landroid/net/Uri;)V',
-		'addCategory(Ljava/lang/String;)Landroid/content/Intent;',
+		'addCategory(Ljava/lang/String;)Landroid/content/Intent;', 'getDataString()Ljava/lang/String;',
 		'setSelector(Landroid/content/Intent;)V', 'getSourceBounds()Landroid/graphics/Rect;',
 		'setSourceBounds(Landroid/graphics/Rect;)V', '<init>(Landroid/content/Intent;Z)V'] {
 		if text.split_into_lines().filter(it.starts_with('.method ') && it.ends_with(' ' + method)).len != 1 {
@@ -58,6 +58,17 @@ pub fn framework_intent_uri(smali string) ! {
 		'.field public static final URI_ANDROID_APP_SCHEME:I = 0x2\n' +
 		'.field public static final URI_ALLOW_UNSAFE:I = 0x4\n' +
 		'.field private vinixSourceBounds:Landroid/graphics/Rect;\n'
+	text = framework_replace_method(text, 'getDataString()Ljava/lang/String;', r'.method public getDataString()Ljava/lang/String;
+.locals 1
+iget-object v0, p0, Landroid/content/Intent;->data:Landroid/net/Uri;
+if-nez v0, :has_data
+const/4 v0, 0
+return-object v0
+:has_data
+invoke-virtual {v0}, Landroid/net/Uri;->toString()Ljava/lang/String;
+move-result-object v0
+return-object v0
+.end method')!
 	text = framework_replace_method(text, 'getSourceBounds()Landroid/graphics/Rect;', r'.method public getSourceBounds()Landroid/graphics/Rect;
 .locals 1
 iget-object v0, p0, Landroid/content/Intent;->vinixSourceBounds:Landroid/graphics/Rect;
