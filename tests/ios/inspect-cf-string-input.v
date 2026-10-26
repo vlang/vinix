@@ -47,6 +47,11 @@ fn main() {
 		mut used := i64(-1)
 		converted := call(u64(object), InputRange{0, length}, 0x14000100, 0, false, u64(unsafe { &buffer[0] }), buffer.len, &used)
 		lines << 'CF-INPUT: encoding=0x${encoding.hex()} external=${external} bytes=${bytes.hex()} null=false length=${length} converted=${converted} utf16le=${buffer[..int(used)].hex()}'
+		for loss in [u8(0), 63] {
+			used = -1
+			count := call(u64(object), InputRange{0, length}, 0x08000100, loss, false, u64(unsafe { &buffer[0] }), buffer.len, &used)
+			lines << 'CF-INPUT-UTF8: encoding=0x${encoding.hex()} external=${external} bytes=${bytes.hex()} loss=${loss} converted=${count} utf8=${buffer[..int(used)].hex()}'
+		}
 		C.CFRelease(object)
 	} } }
 	os.write_file(out + '/native-input.txt', lines.join('\n') + '\n')!

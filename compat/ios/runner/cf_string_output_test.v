@@ -7,11 +7,13 @@ fn C.dlsym(voidptr, &char) voidptr
 type OutputCall = fn (u64, CFRange, u32, u8, bool, u64, i64, &i64) i64
 type OutputCreate = fn (u64, u64, i64, u32, bool) u64
 type OutputDrop = fn (u64)
+type OutputLength = fn (u64) i64
 struct OutputApi {
 	native bool
 	call OutputCall
 	create OutputCreate
 	drop OutputDrop
+	length OutputLength
 }
 fn output_api(native bool) OutputApi {
 	$if macos { if native {
@@ -19,10 +21,114 @@ fn output_api(native bool) OutputApi {
 		return OutputApi{native: true,
 			call: unsafe { OutputCall(C.dlsym(lib, c'CFStringGetBytes')) },
 			create: unsafe { OutputCreate(C.dlsym(lib, c'CFStringCreateWithBytes')) },
-			drop: unsafe { OutputDrop(C.dlsym(lib, c'CFRelease')) }}
+			drop: unsafe { OutputDrop(C.dlsym(lib, c'CFRelease')) },
+			length: unsafe { OutputLength(C.dlsym(lib, c'CFStringGetLength')) }}
 	} }
 	entry := runtime_symbol('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation', '_CFStringGetBytes') or { panic(err) }
-	return OutputApi{call: unsafe { OutputCall(voidptr(entry)) }, create: cf_string_bytes, drop: objc_release}
+	create := runtime_symbol('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation', '_CFStringCreateWithBytes') or { panic(err) }
+	length := runtime_symbol('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation', '_CFStringGetLength') or { panic(err) }
+	return OutputApi{call: unsafe { OutputCall(voidptr(entry)) }, create: unsafe { OutputCreate(voidptr(create)) },
+		length: unsafe { OutputLength(voidptr(length)) }, drop: objc_release}
+}
+
+fn input_case(api OutputApi, bytes []u8, units []u16, encoding u32, external bool) {
+	// A mutable, deliberately unaligned source verifies that Create copies it.
+	mut source := []u8{len: bytes.len + 2, init: 0xa5}
+	for index, byte in bytes { source[index + 1] = byte }
+	object := api.create(0, u64(unsafe { &source[1] }), bytes.len, encoding, external)
+	for index in 0 .. source.len { source[index] = 0x5a }
+	unsafe { source.free() }
+	if bytes.len == 1 && (encoding != 0x100 || external) { assert object == 0; return }
+	assert object != 0 && api.length(object) == units.len
+	for start in 0 .. units.len + 1 {
+	for length in 0 .. units.len - start + 1 {
+	for capacity in [i64(0), 1, 3, 16] {
+		output_case(api, object, units, CFRange{start, length}, 0x14000100, false, capacity, false)
+	} } }
+	api.drop(object)
+}
+
+fn input_matrix(api OutputApi) {
+	for units in [ []u16{}, [u16(0x41), 0, 0x3c0, 0xd83c, 0xdfae, 0x5a],
+		[u16(0xd83c)], [u16(0xdfae)], [u16(0x41), 0xd83c, 0x5a],
+		[u16(0xd83c), 0xd83c, 0xdfae, 0xdfae], [u16(0xfffe), 0xfeff, 0x41] ] {
+	for encoding in [u32(0x100), 0x14000100, 0x10000100] {
+	for external in [false, true] {
+	for bom in [false, true] {
+		big_endian := encoding == 0x10000100 || (encoding == 0x100 && external)
+		mut bytes := []u8{cap: units.len * 2 + 3}
+		mut expected := []u16{cap: units.len + 1}
+		if bom {
+			bytes << if big_endian { u8(0xfe) } else { u8(0xff) }
+			bytes << if big_endian { u8(0xff) } else { u8(0xfe) }
+			if encoding != 0x100 || !external { expected << u16(0xfeff) }
+		}
+		for unit in units {
+			bytes << if big_endian { u8(unit >> 8) } else { u8(unit) }
+			bytes << if big_endian { u8(unit) } else { u8(unit >> 8) }
+		}
+		expected << units
+		// An initial reverse mark on external native input selects LE order.
+		if !bom && encoding == 0x100 && external && units.len > 0 && units[0] == 0xfffe {
+			expected.clear()
+			for unit in units[1..] { expected << (unit >> 8) | (unit << 8) }
+		}
+		input_case(api, bytes, expected, encoding, external)
+		bytes << u8(0xa5) // Native CF ignores an odd trailing byte after complete units.
+		input_case(api, bytes, expected, encoding, external)
+		unsafe { bytes.free(); expected.free() }
+	} } }
+	unsafe { units.free() }
+	}
+	// External native UTF-16 consumes either byte-order mark.
+	for bytes in [[u8(0xff), 0xfe, 0x41, 0], [u8(0xfe), 0xff, 0, 0x41]] {
+		input_case(api, bytes, [u16(0x41)], 0x100, true)
+		unsafe { bytes.free() }
+	}
+	// UTF-8 output must stop before an isolated surrogate, even with lossByte.
+	for middle in [u8(0xd8), 0xdc] {
+		bytes := [u8(0x41), 0, 0, middle, 0x5a, 0]
+		object := api.create(0, u64(bytes.data), bytes.len, 0x14000100, false)
+		for loss in [u8(0), 63] {
+		for query in [false, true] {
+			mut buffer := [16]u8{init: 0xa5}
+			mut used := i64(-1)
+			assert api.call(object, CFRange{0, 3}, 0x08000100, loss, false,
+				if query { 0 } else { u64(unsafe { &buffer[1] }) }, 8, &used) == 1
+			assert used == 1 && buffer[0] == 0xa5 && buffer[2] == 0xa5
+			assert buffer[1] == if query { u8(0xa5) } else { u8(0x41) }
+		} }
+		api.drop(object)
+		unsafe { bytes.free() }
+	}
+}
+
+fn input_guard(api OutputApi) {
+	page := usize(C.getpagesize())
+	mapping := C.mmap(unsafe { nil }, page * 2, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
+	assert mapping != voidptr(-1)
+	assert C.mprotect(voidptr(u64(mapping) + u64(page)), page, C.PROT_NONE) == 0
+	for length in 0 .. 18 {
+		pointer := u64(mapping) + u64(page) - u64(length)
+		unsafe { C.memset(voidptr(pointer), 0x41, usize(length)) }
+		for encoding in [u32(0x100), 0x14000100, 0x10000100] {
+		for external in [false, true] {
+			object := api.create(0, pointer, length, encoding, external)
+			if length == 1 && (encoding != 0x100 || external) { assert object == 0; continue }
+			assert object != 0 && api.length(object) == length / 2
+			mut buffer := [32]u8{init: 0xa5}
+			mut used := i64(-1)
+			assert api.call(object, CFRange{0, length / 2}, 0x14000100, 0, false,
+				u64(unsafe { &buffer[1] }), 30, &used) == length / 2
+			assert used == (length / 2) * 2 && buffer[0] == 0xa5 && buffer[int(used) + 1] == 0xa5
+			for index in 0 .. int(used) { assert buffer[index + 1] == 0x41 }
+			api.drop(object)
+		} }
+	}
+	for external in [false, true] {
+		object := api.create(0, 0, 0, 0x100, external); assert object != 0; api.drop(object)
+	}
+	assert C.munmap(mapping, page * 2) == 0
 }
 fn output_case(api OutputApi, object u64, units []u16, range CFRange, encoding u32, external bool, capacity i64, query bool) {
 	mut buffer := [32]u8{init: 0xa5}
@@ -113,14 +219,16 @@ fn output_threads(api OutputApi) {
 }
 fn test_cf_string_output() {
 	$if macos {
-		api := output_api(true); output_matrix(api); output_guard(api); output_threads(api)
+		api := output_api(true); input_matrix(api); input_guard(api); output_matrix(api); output_guard(api); output_threads(api)
+		println('IOS-CF-STRING-INPUT-NATIVE: endian/BOM, odd input, surrogate preservation, owned copy, C ABI and guard pages PASS')
 		println('IOS-CF-STRING-OUTPUT-NATIVE: UTF-16 ranges, endian/BOM, sizing, partial buffers, C ABI, guard pages and concurrent readers PASS')
 	}
 	for _ in 0 .. 2 {
 		objc_start(); api := output_api(false)
-		output_matrix(api); output_guard(api); output_threads(api)
+		input_matrix(api); input_guard(api); output_matrix(api); output_guard(api); output_threads(api)
 		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
 		objc_stop()
 	}
+	println('IOS-CF-STRING-INPUT: endian/BOM, odd input, surrogate preservation, owned copy, C ABI and guard pages PASS')
 	println('IOS-CF-STRING-OUTPUT: UTF-16 ranges including surrogate halves, endian/BOM, null sizing, zero/odd capacities, unaligned canaries, guard pages, null used pointer, game call sequence, UTF-8/ASCII capacity regression, concurrent readers and two drained runtimes PASS')
 }

@@ -57,9 +57,11 @@ fn cf_string_create(allocator u64, text &char, encoding u32) u64 {
 }
 
 fn cf_string_bytes(allocator u64, bytes u64, length i64, encoding u32, external bool) u64 {
-	_ = external
 	cf_allocator_check(allocator)
 	if length < 0 || length > 16777216 || (bytes == 0 && length != 0) { panic('iOS: invalid CFString byte buffer') }
+	if encoding in [u32(0x100), 0x14000100, 0x10000100] {
+		return cf_string_utf16(bytes, length, encoding, external)
+	}
 	if encoding !in [u32(0x08000100), 0x0600] {
 		cf_string_input_probe(bytes, length, encoding, external)
 		panic('iOS: CFString encoding is not implemented')
@@ -80,6 +82,50 @@ fn cf_string_bytes(allocator u64, bytes u64, length i64, encoding u32, external 
 		return owned_string(if converted.len == 0 { '' } else { unsafe { tos(converted.data, converted.len) } })
 	}
 	return owned_string(text)
+}
+
+// Native UTF-16 defaults to host order internally and big endian externally.
+// Only external native UTF-16 consumes a BOM; explicit endian encodings retain it.
+fn cf_string_utf16(bytes u64, length i64, encoding u32, external bool) u64 {
+	if length == 1 && (encoding != 0x100 || external) { return 0 }
+	mut big_endian := encoding == 0x10000100 || (encoding == 0x100 && external)
+	mut offset := i64(0)
+	if encoding == 0x100 && external && length >= 2 {
+		first := unsafe { *(&u8(bytes)) }
+		second := unsafe { *(&u8(bytes + 1)) }
+		if first == 0xff && second == 0xfe { big_endian = false; offset = 2 }
+		else if first == 0xfe && second == 0xff { offset = 2 }
+	}
+	mut converted := []u8{cap: int(length / 2) * 3}
+	defer { unsafe { converted.free() } }
+	for offset + 1 < length {
+		mut scalar := u32(cf_string_utf16_unit(bytes + u64(offset), big_endian))
+		offset += 2
+		if scalar >= 0xd800 && scalar <= 0xdbff && offset + 1 < length {
+			low := u32(cf_string_utf16_unit(bytes + u64(offset), big_endian))
+			if low >= 0xdc00 && low <= 0xdfff {
+				scalar = 0x10000 + ((scalar - 0xd800) << 10) + low - 0xdc00
+				offset += 2
+			}
+		}
+		// Preserve isolated code units as WTF-8 for lossless CF UTF-16 output.
+		// They are rejected by CF UTF-8 output, just as on native CF.
+		if scalar < 0x80 { converted << u8(scalar) }
+		else if scalar < 0x800 { converted << u8(0xc0 | (scalar >> 6)); converted << u8(0x80 | (scalar & 0x3f)) }
+		else if scalar < 0x10000 {
+			converted << u8(0xe0 | (scalar >> 12)); converted << u8(0x80 | ((scalar >> 6) & 0x3f)); converted << u8(0x80 | (scalar & 0x3f))
+		} else {
+			converted << u8(0xf0 | (scalar >> 18)); converted << u8(0x80 | ((scalar >> 12) & 0x3f))
+			converted << u8(0x80 | ((scalar >> 6) & 0x3f)); converted << u8(0x80 | (scalar & 0x3f))
+		}
+	}
+	return owned_string(if converted.len == 0 { '' } else { unsafe { tos(converted.data, converted.len) } })
+}
+
+fn cf_string_utf16_unit(bytes u64, big_endian bool) u16 {
+	first := u16(unsafe { *(&u8(bytes)) })
+	second := u16(unsafe { *(&u8(bytes + 1)) })
+	return if big_endian { (first << 8) | second } else { first | (second << 8) }
 }
 
 // Unsupported input diagnostics belong only to the explicit no-ad startup probe.
@@ -172,6 +218,7 @@ fn cf_string_get_bytes(object u64, range CFRange, encoding u32, loss u8, externa
 				converted++
 			}
 		} else if encoding == 0x08000100 {
+			if width == 3 && first == 0xed && text[start + 1] >= 0xa0 { break }
 			if selected != units || (!query && i64(width) > max_length - written) { break }
 			if !query { unsafe { C.memcpy(voidptr(buffer + u64(written)), text.str + start, usize(width)) } }
 			written += width

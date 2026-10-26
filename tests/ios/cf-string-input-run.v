@@ -28,8 +28,8 @@ fn capture(out string, label string, args []string) ! {
 }
 
 fn main() {
-	if os.args.len < 3 || os.args[1] !in ['prepare', 'build', 'probe', 'host'] {
-		panic('usage: cf-string-input-run prepare OUT PRIOR | build|probe|host OUT')
+	if os.args.len < 3 || os.args[1] !in ['prepare', 'fixture', 'build', 'probe', 'host'] {
+		panic('usage: cf-string-input-run prepare OUT PRIOR | fixture|build|probe|host OUT')
 	}
 	root := os.real_path(os.getwd())
 	out := os.abs_path(os.args[2])
@@ -69,6 +69,10 @@ fn main() {
 				'@vlib|' + root + '/compat/ios|' + root + '/tests/ios|@vmodules', '-o', out + '/' + name,
 				root + '/tests/ios/' + tool + '.v'])!
 		}
+	} else if os.args[1] == 'fixture' {
+		capture(out, 'build-cf-string-output', [out + '/notification-vm', 'build-cf-string-output', out])!
+		reused := os.read_lines(out + '/reused-files.txt')!.filter(it !in ['cf-string-output-checks', 'cf-string-output-checks.c'])
+		os.write_file(out + '/reused-files.txt', reused.join('\n') + '\n')!
 	} else if os.args[1] == 'build' {
 		capture(out, 'build-run-ios-gles', [out + '/notification-vm', 'build-run-ios-gles', out])!
 	} else if os.args[1] == 'host' {
