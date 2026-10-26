@@ -28,17 +28,38 @@ The complete external archive is:
 - Embedded `SHA256SUMS`: `3032a6c088527a4d34d7e454fbf6564f3d5385ad561fe459afd363334d164aa2`
 - `capture.json`: `0f45b14fd23e34a54001b2fa982dec7de46dc96e9f6795d315b6dde1d286e087`
 
-The adjacent directory is the sealed archive view. Its `raw` tree retains
-`/Users/alex/.cache/vinix-arm-fork-20261026`; `tools` retains
+The [V sealer](wine-fork-jit-retain.v) initially made an adjacent archive
+view: `raw` represented `/Users/alex/.cache/vinix-arm-fork-20261026`, and
+`tools` represented
 `/Users/alex/Library/Caches/vinix-codex/section14/wine-arm-translated-fork-20261026`.
-Both original roots remain in place. The [V sealer](wine-fork-jit-retain.v)
-streamed ordinary files with no-follow descriptor checks, hardlinked them into
-the new view, recreated literal symlinks, and recorded every object type in
+It streamed ordinary files with no-follow descriptor checks, hardlinked them
+into the view, recreated literal symlinks, and recorded every object type in
 `raw-objects.json` and `tools-objects.json`. The single stale
 `raw/jit01/boot/qmp.sock` is recorded as a socket with its mode and size; no
 socket content is claimed and the socket itself is omitted from the archive.
 Complete raw/view inventories and source, sealer, tar and receipt bytes were
-checked again after archiving. The original roots' file bytes were not changed.
+checked again after archiving; original file bytes were not changed.
+
+On 2026-10-26, the reviewed [fixed-scope V tool](wine-fork-jit-reclaim.v)
+removed only that adjacent view and those two original roots. The complete
+archive remains unchanged. The [original-check adapter](wine-fork-jit-recheck.v)
+changes only the report destinations: all 150 typed-object and 120 file checks
+passed before and after a fresh strict streaming check of all 121 regular
+payloads, 53 directories and one complete gzip member (381,785,088 decoded
+bytes). The required historical baseline's inventory and root identity stayed
+unchanged. Historical checkers still require their complete original layout;
+restore the archive and recorded special-node metadata before rerunning them.
+
+The reclamation receipt bundle, including sources, binary/build bindings,
+original manifests, control receipts and three selected triage files, is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-arm-fork-reclamation-01`
+(under 8 MiB observed; no hard quota claim). `eligible.json` has SHA256
+`0cd8db57ddfa0af95c949fb5df5928ff579242b7679c9629c865437adfa5f351`;
+`completed.json` has SHA256
+`09b5d707389ad039ea7f4a180cf262ef43dffe17d5491f96590cb5e5b775ad6c`.
+The helper capture used source base `a13b0ab7a` with its new source bytes bound
+in the retained build receipt. This preserves failed diagnostics and does not
+qualify the translated workload or re-admit its external input closure.
 
 Independent verification passed the maintained production streaming archive
 checker: gzip CRC/trailer validation and all 121 sealed regular-file payloads
