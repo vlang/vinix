@@ -12,13 +12,21 @@ import time
 
 #include <sys/clonefile.h>
 #include <signal.h>
+#include <CommonCrypto/CommonDigest.h>
 fn C.clonefile(&char, &char, int) int
 fn C.kill(int, int) int
+@[typedef]
+struct C.CC_SHA256_CTX {}
+fn C.CC_SHA256_Init(voidptr) i32
+fn C.CC_SHA256_Update(voidptr, voidptr, u32) i32
+fn C.CC_SHA256_Final(&u8, voidptr) i32
 
 const overlay_name = 'browser-probe.tar'
 const browser_prefix = 'opt/vinix-browser-probe'
 const fixture_prefix = 'opt/vinix-account-authority-fixture'
 const regression_prefix = 'opt/vinix-unix-recvmsg-flags'
+const boot_prefix = 'opt/vinix-browser-boot'
+const native_init = '#!/bin/sh\nexec /opt/android-test/native-guest\n'
 const regression_build_sha = 'e15f100836821c82b947e56ff0821668ce56e86880cfe45f748be91c7c286e83'
 const regression_guest_sha = '48b9b323b6a2cead60c4a157802327985df6773b143c4d4ef2707b6b10ae1dc9'
 const regression_kernel_sha = '287c78126cda7407f91494297494e029fef35aa93ada1dedd216cf9305d1013c'
@@ -28,6 +36,19 @@ struct Regression {
 	guest_executed       bool
 	guest_sha256         string
 	kernel_source_sha256 string
+}
+
+struct QuietBoot {
+	format            int
+	guest_executed    bool
+	executable_sha256 string
+	source_sha256     string
+	desktop_argv      []string
+}
+
+struct InitDefinition {
+	module_name string
+	sha256      string
 }
 
 struct Entry {
@@ -47,7 +68,8 @@ struct Config {
 fn hash(path string) !string {
 	mut file := os.open(path)!
 	defer { file.close() }
-	mut digest := sha256.new()
+	mut digest := C.CC_SHA256_CTX{}
+	if C.CC_SHA256_Init(unsafe { &digest }) != 1 { return error('SHA256 initialization') }
 	mut buffer := []u8{len: 1024 * 1024}
 	for {
 		n := file.read(mut buffer) or {
@@ -55,9 +77,15 @@ fn hash(path string) !string {
 			return err
 		}
 		if n == 0 { break }
-		digest.write(buffer[..n])!
+		if C.CC_SHA256_Update(unsafe { &digest }, buffer.data, u32(n)) != 1 {
+			return error('SHA256 update')
+		}
 	}
-	return digest.sum([]u8{}).hex()
+	mut result := [32]u8{}
+	if C.CC_SHA256_Final(unsafe { &result[0] }, unsafe { &digest }) != 1 {
+		return error('SHA256 finalization')
+	}
+	return result[..].hex()
 }
 
 fn safe_name(name string) bool {
@@ -123,6 +151,19 @@ fn collision(member tarcore.Member, prefixes []string) ! {
 	}
 }
 
+fn quiet_init_member(member tarcore.Member) !bool {
+	path := normalize(member.name)!
+	if path == 'sbin' && member.kind != `5` {
+		return error('quiet boot requires a directory sbin ancestor')
+	}
+	if path.starts_with('sbin/init/') {
+		return error('quiet boot init is an ancestor of an original member')
+	}
+	if path != 'sbin/init' { return false }
+	if !member.regular() { return error('quiet boot may replace only a regular init') }
+	return true
+}
+
 fn command(root string, label string, argv []string) !string {
 	return command_expected(root, label, argv, 0)
 }
@@ -174,7 +215,7 @@ fn command_expected(root string, label string, argv []string, expected int) !str
 }
 
 // Parse tar directly from mcopy's pipe. Do not extract or retain original modules.
-fn check_module(mcopy string, image string, name string, prefixes []string) ! {
+fn check_module(mcopy string, image string, name string, prefixes []string, quiet bool) ![]InitDefinition {
 	mut child := os.new_process(mcopy)
 	child.use_pgroup = true
 	child.set_args(['-i', image, '::/boot/' + name, '-'])
@@ -191,12 +232,16 @@ fn check_module(mcopy string, image string, name string, prefixes []string) ! {
 	}
 	mut archive := tarstream.from_descriptor(i32(child.stdio_fd[1]))!
 	defer { archive.close() }
+	mut inits := []InitDefinition{}
 	for {
 		member := archive.next() or {
 			if err is tarstream.End { break }
 			return err
 		}
 		collision(member, prefixes)!
+		if quiet && quiet_init_member(member)! {
+			inits << InitDefinition{name, archive.digest()!}
+		}
 	}
 	// Tar stops at the first zero block; consume the producer's remaining padding.
 	mut stderr := ''
@@ -217,6 +262,13 @@ fn check_module(mcopy string, image string, name string, prefixes []string) ! {
 	child.wait()
 	finished = true
 	if child.code != 0 { return error('collision scan mcopy failed: ' + stderr) }
+	return inits
+}
+
+fn validate_init(inits []InitDefinition) ! {
+	if inits.len == 0 || inits.last().sha256 != sha256.sum(native_init.bytes()).hex() {
+		return error('quiet boot requires the effective original native-WS test init')
+	}
 }
 
 fn inventory(root string, relative string, prefix string, mut result []Entry) ! {
@@ -263,6 +315,7 @@ fn write_overlay(path string, roots map[string]string, entries []Entry) ! {
 		if entry.kind == 'regular' {
 			mut source := ''
 			for prefix, root in roots {
+				if entry.name == prefix { source = root }
 				if entry.name.starts_with(prefix + '/') { source = root + entry.name[prefix.len..] }
 			}
 			if source == '' { return error('overlay entry has no source') }
@@ -329,6 +382,39 @@ fn valid_sha(value string) bool {
 	return value.len == 64 && value.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`))
 }
 
+fn validate_boot(root string) ! {
+	for name in ['build.json', 'sha256.json', 'boot', 'sources/boot.v'] {
+		if os.lstat(root + '/' + name)!.get_filetype() != .regular {
+			return error('regular quiet boot input required: ' + name)
+		}
+	}
+	text := os.read_file(root + '/build.json')!
+	fields := json2.decode[map[string]json2.Any](text)!
+	build := json2.decode[QuietBoot](text)!
+	if 'guest_executed' !in fields || build.format != 1 || build.guest_executed
+		|| build.desktop_argv != ['/usr/bin/vinix-desktop', '--open=Terminal']
+		|| !valid_sha(build.executable_sha256) || !valid_sha(build.source_sha256)
+		|| hash(root + '/boot')! != build.executable_sha256
+		|| hash(root + '/sources/boot.v')! != build.source_sha256
+		|| os.lstat(root + '/boot')!.mode & 0o111 == 0 {
+		return error('quiet boot format, execution state, desktop command, source or executable differs')
+	}
+	manifest := json2.decode[map[string]string](os.read_file(root + '/sha256.json')!)!
+	if manifest['boot'] or { '' } != build.executable_sha256
+		|| manifest['sources/boot.v'] or { '' } != build.source_sha256
+		|| manifest['build.json'] or { '' } != hash(root + '/build.json')! {
+		return error('quiet boot manifest omits its executable, source or receipt')
+	}
+	for name, expected in manifest {
+		if normalize(name)! != name || name == '' || !valid_sha(expected)
+			|| os.lstat(root + '/' + name)!.get_filetype() != .regular
+			|| !os.real_path(root + '/' + name).starts_with(os.real_path(root) + '/')
+			|| hash(root + '/' + name)! != expected {
+			return error('quiet boot inventory differs: ' + name)
+		}
+	}
+}
+
 // The optional executable is an independently frozen syscall regression. Pin
 // its build receipt and the exact kernel source it is intended to exercise.
 fn validate_regression(root string, receipt_pin string, guest_pin string, kernel_pin string) ! {
@@ -361,26 +447,37 @@ fn validate_regression(root string, receipt_pin string, guest_pin string, kernel
 }
 
 fn stage() ! {
-	if os.args.len !in [5, 6, 7] {
-		return error('usage: stage BASE_BOOT BASE_EFIVARS PREPARED_BUNDLE FRESH_OUTPUT [AUTHORITY_FIXTURE_DIR [REGRESSION_BUILD_ROOT]]')
+	mut args := os.args[1..].clone()
+	mut boot_bundle := ''
+	if args.len >= 2 && args[0] == '--quiet-boot' {
+		boot_bundle = os.real_path(args[1])
+		validate_boot(boot_bundle)!
+		args = args[2..]
+	}
+	if args.len !in [4, 5, 6] {
+		return error('usage: stage [--quiet-boot QUIET_BOOT_BUILD] BASE_BOOT BASE_EFIVARS PREPARED_BUNDLE FRESH_OUTPUT [AUTHORITY_FIXTURE_DIR [REGRESSION_BUILD_ROOT]]')
 	}
 	$if !macos { return error('staging requires macOS APFS clonefile') }
-	boot := os.real_path(os.args[1])
-	efivars := os.real_path(os.args[2])
-	bundle := os.real_path(os.args[3])
-	root := external(os.args[4])!
+	boot := os.real_path(args[0])
+	efivars := os.real_path(args[1])
+	bundle := os.real_path(args[2])
+	root := external(args[3])!
 	if !os.is_file(boot) || !os.is_file(efivars) || !os.is_dir(bundle)
 		|| !os.is_file(bundle + '/build.json') || !os.is_file(bundle + '/addon-files.json') {
 		return error('expected base media and a prepared browser bundle')
 	}
 	mut roots := {browser_prefix: bundle}
-	if os.args.len >= 6 {
-		fixture := os.real_path(os.args[5])
+	if boot_bundle != '' {
+		roots[boot_prefix] = boot_bundle
+		roots['sbin/init'] = boot_bundle + '/boot'
+	}
+	if args.len >= 5 {
+		fixture := os.real_path(args[4])
 		if !os.is_dir(fixture) { return error('authority fixture directory required') }
 		roots[fixture_prefix] = fixture
 	}
-	if os.args.len == 7 {
-		regression := os.real_path(os.args[6])
+	if args.len == 6 {
+		regression := os.real_path(args[5])
 		validate_regression(regression, regression_build_sha, regression_guest_sha, regression_kernel_sha)!
 		roots[regression_prefix] = regression
 	}
@@ -413,10 +510,13 @@ fn stage() ! {
 	os.write_file(root + '/limine-before.conf', original)!
 	os.write_file(root + '/limine-after.conf', config.updated)!
 	mut before := map[string]string{}
+	mut init_definitions := []InitDefinition{}
+	collision_prefixes := prefixes.filter(it != 'sbin/init')
 	for name in config.modules {
 		before[name] = module_hash(root, 'original-' + name, boot, name)!
-		check_module(mcopy, boot, name, prefixes)!
+		init_definitions << check_module(mcopy, boot, name, collision_prefixes, boot_bundle != '')!
 	}
+	if boot_bundle != '' { validate_init(init_definitions)! }
 	for pair in [[boot, root + '/boot.img'], [efivars, root + '/efivars.fd']] {
 		if C.clonefile(pair[0].str, pair[1].str, 0) != 0 { return error('APFS clonefile failed: ' + pair[0]) }
 		if hash(pair[1])! != inputs[pair[0]]! { return error('media clone differs') }
@@ -460,6 +560,8 @@ fn stage() ! {
 		'staged_boot_sha256': json2.Any(hash(root + '/boot.img')!)
 		'staged_efivars_sha256': json2.Any(hash(root + '/efivars.fd')!)
 		'bundle_roots': json2.decode[json2.Any](json2.encode(roots))!
+		'quiet_boot': json2.Any(boot_bundle != '')
+		'original_init_definitions': json2.decode[json2.Any](json2.encode(init_definitions))!
 	}, prettify: true))!
 	println('BROWSER-STAGE PASS ' + root + '/stage.json')
 }
@@ -486,6 +588,10 @@ fn self_test() ! {
 	os.mkdir(root)!
 	defer { os.rmdir_all(root) or {} }
 	os.mkdir(root + '/bundle')!
+	for data in ['', 'abc', 'chunk-boundary'.repeat(100000)] {
+		os.write_file(root + '/hash-input', data)!
+		assert hash(root + '/hash-input')! == sha256.sum(data.bytes()).hex()
+	}
 	os.write_file(root + '/bundle/payload', 'real-streamed-fixture')!
 	os.chmod(root + '/bundle/payload', 0o751)!
 	os.symlink('payload', root + '/bundle/link')!
@@ -494,6 +600,52 @@ fn self_test() ! {
 	write_overlay(root + '/overlay.tar', {browser_prefix: root + '/bundle'}, entries)!
 	verify_overlay(root + '/overlay.tar', entries)!
 	assert entries.len == 3
+	// A quiet overlay replaces exactly the effective native test init while
+	// retaining the complete boot build under its own diagnostic prefix.
+	mut quiet_entries := []Entry{}
+	inventory(root + '/bundle/payload', '', 'sbin/init', mut quiet_entries)!
+	write_overlay(root + '/quiet.tar', {'sbin/init': root + '/bundle/payload'}, quiet_entries)!
+	verify_overlay(root + '/quiet.tar', quiet_entries)!
+	validate_init([InitDefinition{'fixture.tar', sha256.sum(native_init.bytes()).hex()}])!
+	assert !quiet_init_member(tarcore.Member{name: './sbin/', kind: `5`})!
+	assert quiet_init_member(tarcore.Member{name: './sbin/init', kind: `0`})!
+	for bad in [tarcore.Member{name: 'sbin', kind: `2`},
+		tarcore.Member{name: 'sbin/init', kind: `2`},
+		tarcore.Member{name: 'sbin/init', kind: `5`},
+		tarcore.Member{name: 'sbin/init/child', kind: `0`}] {
+		if _ := quiet_init_member(bad) { return error('quiet boot accepted nonregular or ambiguous init') }
+	}
+	for bad in [ []InitDefinition{}, [InitDefinition{'fixture.tar', 'a'.repeat(64)}],
+		[InitDefinition{'good.tar', sha256.sum(native_init.bytes()).hex()},
+		 InitDefinition{'late.tar', 'a'.repeat(64)}]] {
+		if _ := validate_init(bad) { return error('quiet boot accepted missing or different effective init') }
+	}
+	os.mkdir_all(root + '/boot/sources')!
+	os.write_file(root + '/boot/boot', 'independent quiet diagnostic init executable')!
+	os.chmod(root + '/boot/boot', 0o755)!
+	os.write_file(root + '/boot/sources/boot.v', 'retained quiet diagnostic source')!
+	quiet_build := QuietBoot{
+		format: 1
+		executable_sha256: hash(root + '/boot/boot')!
+		source_sha256: hash(root + '/boot/sources/boot.v')!
+		desktop_argv: ['/usr/bin/vinix-desktop', '--open=Terminal']
+	}
+	os.write_file(root + '/boot/build.json', json2.encode(quiet_build))!
+	os.write_file(root + '/boot/sha256.json', json2.encode({
+		'boot': quiet_build.executable_sha256
+		'sources/boot.v': quiet_build.source_sha256
+		'build.json': hash(root + '/boot/build.json')!
+	}))!
+	validate_boot(root + '/boot')!
+	for bad in [QuietBoot{...quiet_build, guest_executed: true},
+		QuietBoot{...quiet_build, desktop_argv: ['/usr/bin/vinix-desktop', '--open=Android Calculator']},
+		QuietBoot{...quiet_build, source_sha256: 'a'.repeat(64)}] {
+		os.write_file(root + '/boot/build.json', json2.encode(bad))!
+		if _ := validate_boot(root + '/boot') { return error('quiet boot accepted changed receipt') }
+	}
+	os.write_file(root + '/boot/build.json', json2.encode(quiet_build))!
+	os.write_file(root + '/boot/boot', 'mutated executable')!
+	if _ := validate_boot(root + '/boot') { return error('quiet boot accepted mutated executable') }
 	os.mkdir(root + '/regression')!
 	os.write_file(root + '/regression/guest', 'independent syscall regression executable')!
 	os.chmod(root + '/regression/guest', 0o751)!
@@ -537,6 +689,7 @@ fn self_test() ! {
 	}
 	println('BROWSER-STAGE SELF-TEST PASS config collision streamed-archive regular-mode symlink')
 	println('BROWSER-STAGE REGRESSION-SELF-TEST PASS fixture receipt guest kernel-source inventory mutation collision')
+	println('BROWSER-STAGE QUIET-SELF-TEST PASS exact-file overlay effective-init receipt command source executable')
 }
 
 fn main() {

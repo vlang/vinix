@@ -87,6 +87,25 @@ inventoried fixture under `/opt/vinix-account-authority-fixture`. Its execution
 is independent of the browser test. The guest runner pins the selected fixture
 binary; pass its complete frozen build directory, including `module/`.
 
+The native Maps test image normally starts Maps and its background GMS logs.
+Those kernel print calls can interleave bytes with a `/dev/console` archive
+frame, so a browser-only replay can use the separate quiet diagnostic boot:
+
+```sh
+v -o /tmp/vinix-browser-boot-build tests/android-webview-browser-probe/boot-build.v
+/tmp/vinix-browser-boot-build FRESH_EXTERNAL_BOOT_BUILD /absolute/path/to/v
+/tmp/vinix-browser-stage --quiet-boot FRESH_EXTERNAL_BOOT_BUILD BASE_BOOT_IMG BASE_EFIVARS_FD OUTPUT FRESH_VM_OUTPUT
+```
+
+This mode appends the audited static V PID1 as `sbin/init` in the diagnostic
+overlay. It starts the same test desktop user with Terminal open. The legacy
+native-WS test supervisor and its automatic Maps launch do not run. The stager
+requires the effective original init to be the exact native-WS test script,
+rejects nonregular or ambiguous init paths, verifies the boot build receipt and
+complete overlay readback, and preserves every original FAT module unchanged.
+The complete boot build is also retained under `/opt/vinix-browser-boot`.
+This is a browser diagnostic image; it does not exercise the Maps account UI.
+
 `patch-kernel.v FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256` can replace
 the kernel before the first launch. It accepts only the pinned Maps372 browser
 baseline. Its `--maps-account` profile accepts the separate pinned headless r4
@@ -128,8 +147,9 @@ browser session. It exports the complete result tree, including failure logs
 and the real PNG, in numbered, checksummed frames through `/dev/console`. The
 aarch64 console mirrors these writes to the UART, so QEMU's existing
 `-serial file:...` log captures the export even when the command is entered in a
-GUI terminal. No boot startup file or existing module is changed. Restore that
-export on the host with the maintained collector:
+GUI terminal. The default mode changes no boot startup file; quiet mode replaces
+only `sbin/init` through its appended overlay. Existing modules remain unchanged.
+Restore that export on the host with the maintained collector:
 
 ```sh
 v -o /tmp/vinix-browser-collect tests/android-webview-browser-probe/collect.v
