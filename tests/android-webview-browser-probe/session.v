@@ -18,6 +18,7 @@ const webkit_helpers = ['WebKitWebProcess', 'WebKitNetworkProcess', 'WebKitGPUPr
 
 struct BuildPins {
 	runtime_references map[string]string
+	guest_helper_references map[string]string
 	probe_sha256       string
 	session_sha256     string
 }
@@ -281,6 +282,34 @@ fn remove_aliases(paths []string, directories []string, executable string, mut e
 	if failures.len > 0 { return error('helper cleanup failed: ' + failures.join('; ')) }
 }
 
+// Only a specifically pinned original helper may be reused. It stays in place
+// throughout the session and never enters the list of aliases we remove.
+fn helper(path string, executable string, expected string, mut events os.File) !bool {
+	if os.exists(path) || os.is_link(path) {
+		stat := os.lstat(path)!
+		if stat.mode & 0o170000 != 0o100000 || stat.mode & 0o111 == 0
+			|| expected.len != 64 || hash(path)! != expected {
+			return error('refusing unqualified existing guest helper ' + path)
+		}
+		events.write_string('helper-reused ' + path + ' sha256=' + expected + '\n')!
+		return false
+	}
+	if C.symlink(executable.str, path.str) != 0 {
+		return error('refusing to replace existing guest helper ' + path)
+	}
+	events.write_string('helper-created ' + path + ' -> ' + executable + ' argv=explicit-musl-loader,pinned-original,inherited-arguments\n')!
+	return true
+}
+
+fn preserved_helpers(paths map[string]string, mut events os.File) ! {
+	for path, expected in paths {
+		stat := os.lstat(path)!
+		if stat.mode & 0o170000 != 0o100000 { return error('reused guest helper type changed') }
+		equal_hash(path, expected)!
+		events.write_string('helper-preserved ' + path + ' sha256=' + expected + '\n')!
+	}
+}
+
 fn xml_text(value string) string {
 	return value.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&apos;')
 }
@@ -327,6 +356,7 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 		return error('session trampoline must be static ELF64/AArch64')
 	}
 	build_hash, addon_hash := validate(base, addon, executable)!
+	build := json2.decode[BuildPins](os.read_file(os.dir(addon) + '/build.json')!)!
 	if !output_arg.starts_with('/') || output_arg.contains_any('\x00\n\r') {
 		return error('output must be an absolute fresh directory')
 	}
@@ -347,6 +377,7 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 		'started_utc':           time.utc().str()
 		'helper_created':        'false'
 		'helper_removed':        'false'
+		'helper_preserved':      'false'
 		'authenticated_x11':     'false'
 		'wrong_cookie_rejected': 'false'
 		'probe_result':          'incomplete'
@@ -366,6 +397,7 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 	}
 	mut owned_aliases := []string{}
 	mut owned_directories := []string{}
+	mut reused_helpers := map[string]string{}
 	defer {
 		mut removed := true
 		remove_aliases(owned_aliases, owned_directories, executable, mut events) or {
@@ -373,6 +405,12 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 			eprintln(err.msg())
 		}
 		receipt['helper_removed'] = removed.str()
+		mut preserved := true
+		preserved_helpers(reused_helpers, mut events) or {
+			preserved = false
+			eprintln(err.msg())
+		}
+		receipt['helper_preserved'] = preserved.str()
 	}
 	if !os.exists('/usr/libexec') && !os.is_link('/usr/libexec') {
 		if unsafe { C.mkdir(c'/usr/libexec', 0o755) } != 0 {
@@ -390,15 +428,23 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 	mut aliases := ['/usr/bin/xkbcomp']
 	for name in webkit_helpers { aliases << '/usr/libexec/webkitgtk-6.0/' + name }
 	for path in aliases {
-		// Atomic creation refuses any existing file, including dangling links.
-		if C.symlink(executable.str, path.str) != 0 {
-			return error('refusing to replace existing guest helper ' + path)
+		mut expected := ''
+		if path == '/usr/bin/xkbcomp' && (os.exists(path) || os.is_link(path)) {
+			// This original helper is dynamically linked through the original
+			// guest musl interpreter. Pin that interpreter before executing it.
+			preserved_helpers({'/lib/ld-musl-aarch64.so.1': build.guest_helper_references['/lib/ld-musl-aarch64.so.1']}, mut events)!
+			expected = build.guest_helper_references[path]
+			reused_helpers['/lib/ld-musl-aarch64.so.1'] = build.guest_helper_references['/lib/ld-musl-aarch64.so.1']
 		}
-		owned_aliases << path
-		events.write_string('helper-created ' + path + ' -> ' + executable + ' argv=explicit-musl-loader,pinned-original,inherited-arguments\n')!
+		if helper(path, executable, expected, mut events)! {
+			owned_aliases << path
+		} else {
+			reused_helpers[path] = expected
+		}
 	}
 	receipt['helper_created'] = 'true'
 	receipt['helper_aliases'] = owned_aliases.join(',')
+	receipt['helper_reused'] = reused_helpers.keys().join(',')
 	display := choose_display()!
 	receipt['display'] = ':' + display
 	mut cookie := rand.bytes(16)!
@@ -498,6 +544,8 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 	remove_aliases(owned_aliases, owned_directories, executable, mut events)!
 	owned_aliases.clear()
 	owned_directories.clear()
+	preserved_helpers(reused_helpers, mut events)!
+	receipt['helper_preserved'] = 'true'
 	receipt['helper_removed'] = 'true'
 	receipt['probe_result'] = 'pass'
 	println('BROWSER-SESSION PASS output=' + output)
@@ -520,7 +568,36 @@ fn self_test() ! {
 		if safe_relative(bad) { return error('unsafe receipt path admitted') }
 	}
 	if !safe_relative('usr/bin/xkbcomp') { return error('safe receipt path rejected') }
-	println('BROWSER-SESSION SELF-TEST PASS authority-record x11-setup receipt-paths')
+	root := os.join_path(os.temp_dir(), 'vinix-browser-helper-selftest-' + os.getpid().str())
+	if os.exists(root) || os.is_link(root) { return error('selftest directory already exists') }
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {} }
+	mut events := os.open_file(root + '/events', 'w', 0o600)!
+	defer { events.close() }
+	original := root + '/original'
+	os.write_file(original, 'pinned-existing-helper')!
+	os.chmod(original, 0o755)!
+	pin := hash(original)!
+	if helper(original, '/never-replace-original', pin, mut events)! {
+		return error('existing helper was marked for removal')
+	}
+	assert os.read_file(original)! == 'pinned-existing-helper' && !os.is_link(original)
+	preserved_helpers({original: pin}, mut events)!
+	for expected in ['', '0'.repeat(64)] {
+		if _ := helper(original, '/never-replace-original', expected, mut events) {
+			return error('unqualified original helper accepted')
+		}
+	}
+	alias := root + '/alias'
+	if !helper(alias, original, '', mut events)! { return error('new alias not owned') }
+	remove_aliases([alias], [], original, mut events)!
+	assert !os.exists(alias) && !os.is_link(alias) && os.read_file(original)! == 'pinned-existing-helper'
+	os.symlink(root + '/missing', alias)!
+	if _ := helper(alias, original, pin, mut events) { return error('dangling helper link replaced') }
+	assert os.readlink(alias)! == root + '/missing'
+	os.write_file(original, 'changed')!
+	if _ := preserved_helpers({original: pin}, mut events) { return error('changed original helper passed preservation') }
+	println('BROWSER-SESSION SELF-TEST PASS authority-record x11-setup receipt-paths pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper')
 }
 
 fn main() {

@@ -1,0 +1,10 @@
+{
+    "format": 1,
+    "architecture": "aarch64",
+    "source_module": "initramfs.tar",
+    "source_module_sha256": "863944c8ff791dbf94841cb48bbfa0ad8adbab427589bf76a2d20276f5040efb",
+    "files": {
+        "/usr/bin/xkbcomp": "533bf051946f34845ee37512b6222468868be38aaad3235b4b9a26c139ad9abc",
+        "/lib/ld-musl-aarch64.so.1": "44770ff3960d040e6023ff77b809def2e4123db85e064c311f4cfa45a05959f4"
+    }
+}

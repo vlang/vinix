@@ -36,6 +36,14 @@ struct BaseLock {
 	packages []BasePackage
 }
 
+struct GuestHelpers {
+	format               int
+	architecture         string
+	source_module        string
+	source_module_sha256 string
+	files                map[string]string
+}
+
 struct Metadata {
 	name         string
 	version      string
@@ -238,6 +246,13 @@ fn prepare() ! {
 	lock_path := sources + '/packages.lock.json'
 	base_lock := repo + '/build-support/android/packages.lock.json'
 	pins := json2.decode[Lock](os.read_file(lock_path)!)!
+	helpers := json2.decode[GuestHelpers](os.read_file(sources + '/guest-helpers.lock.json')!)!
+	if helpers.format != 1 || helpers.architecture != 'aarch64'
+		|| helpers.source_module != 'initramfs.tar' || helpers.source_module_sha256.len != 64
+		|| helpers.files.len != 2 || helpers.files['/usr/bin/xkbcomp'].len != 64
+		|| helpers.files['/lib/ld-musl-aarch64.so.1'].len != 64 {
+		return error('unexpected existing guest helper lock')
+	}
 	if pins.format != 1 || pins.architecture != 'aarch64' || pins.packages.len != 15 || hash(base_lock)! != pins.base_lock_sha256 {
 		return error('unexpected package lock/base lock')
 	}
@@ -298,11 +313,11 @@ fn prepare() ! {
 		extract(cache + '/' + package.filename, root + '/runtime', mut files)!
 	}
 	os.write_file(root + '/addon-files.json', json2.encode(files, prettify: true) + '\n')!
-	for name in ['probe.v', 'session.v', 'guest.v', 'collect.v', 'prepare.v', 'packages.lock.json'] {
+	for name in ['probe.v', 'session.v', 'guest.v', 'collect.v', 'prepare.v', 'packages.lock.json', 'guest-helpers.lock.json', 'inspect-helper.v'] {
 		os.cp(sources + '/' + name, root + '/sources/' + name)!
 	}
 	mut source_pins := map[string]string{}
-	for name in ['probe.v', 'session.v', 'guest.v', 'collect.v', 'prepare.v', 'packages.lock.json'] {
+	for name in ['probe.v', 'session.v', 'guest.v', 'collect.v', 'prepare.v', 'packages.lock.json', 'guest-helpers.lock.json', 'inspect-helper.v'] {
 		source_pins[name] = hash(root + '/sources/' + name)!
 	}
 	revision := os.exec(['git', '-C', repo, 'rev-parse', 'HEAD'])
@@ -344,6 +359,7 @@ fn prepare() ! {
 		'archive_bytes':           json2.Any(archive_bytes)
 		'archive_references':      json2.decode[json2.Any](json2.encode(refs))!
 		'runtime_references':      json2.decode[json2.Any](json2.encode(runtime_pins))!
+		'guest_helper_references': json2.decode[json2.Any](json2.encode(helpers.files))!
 		'compiler_sha256':         json2.Any(compiler_pin)
 		'cross_compiler_sha256':   json2.Any(cross_compiler_pin)
 		'probe_sha256':            json2.Any(hash(root + '/bin/browser-probe')!)

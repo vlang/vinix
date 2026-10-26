@@ -67,6 +67,11 @@ v -o /tmp/vinix-browser-run tests/android-webview-browser-probe/run.v
 /tmp/vinix-browser-run status FRESH_VM_OUTPUT
 ```
 
+If an already recorded stop was interrupted, `reconcile-stop FRESH_VM_OUTPUT`
+checks the matching ownership and stop receipts, confirms process disappearance,
+and writes the missing receipt without sending another signal. Shutdown polling
+tolerates QEMU removing its PID file while the same owned process is exiting.
+
 It requires this checkout's QEMU build and Homebrew firmware at the paths in
 `run.v`, refuses another running aarch64 guest, and writes `serial.log`,
 `network.pcap`, and a QMP socket within the staged directory. Use the existing
@@ -114,13 +119,21 @@ This credential-free, fixed local-document diagnostic explicitly disables the
 installed release's namespace sandbox and records the setting. It must not be
 used for an account session.
 
-Xvfb and release WebKit have compiled-in helper paths. The launcher uses
-exclusive, temporary guest-only aliases to its verified static trampoline at
+Xvfb and release WebKit have compiled-in helper paths. When those paths are absent,
+the launcher creates exclusive, temporary guest-only aliases to its verified static trampoline at
 `/usr/bin/xkbcomp` and `/usr/libexec/webkitgtk-6.0/WebKit{Web,Network,GPU}Process`.
-It refuses an existing helper, invokes the pinned helper through the explicit
-base musl loader, records alias creation/removal, and removes only its exact
-aliases during cleanup. Run this only in an isolated diagnostic guest. It never
-installs these aliases on the host.
+It refuses existing WebKit helpers. The original Maps372 image already contains
+`xkbcomp`; `guest-helpers.lock.json` pins its exact bytes and original musl
+interpreter. The session verifies and reuses those files in place, checks their
+hashes again after the probe, and records preservation separately from alias
+cleanup. Any other existing file or symlink fails closed. Absent helpers use the
+trampoline and explicit base musl loader. Cleanup removes only aliases created
+by this session. Run this only in an isolated diagnostic guest.
+
+`inspect-helper.v BOOT_IMG MODULE.tar...` streams the original boot modules and
+reports the fixed helper and interpreter hashes and ELF properties without
+extracting a whole module. Pass all modules in their boot order when auditing
+the committed existing-helper pins.
 
 Preserve the complete external result bundle with checksums under the
 repository's [test artifact policy](../../docs/test-artifacts.md). Keep generated
