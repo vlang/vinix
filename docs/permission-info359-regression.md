@@ -95,10 +95,54 @@ receipt is `permission-info359-framework-builder-peer-readback-2026-10-26.json`.
 
 ## ART and Maps status
 
-The same-APK ART harness is committed as `bea726cc3` and has compiled successfully.
-ART preparation and old/new guest runs have not started; Maps360 generation and
-replay have not started. Their unchanged preparation gates require 1,024 MiB and
-1,536 MiB free respectively; the latest root checkpoint recorded 469,812 KiB
-available. The complete framework build establishes the targeted bytecode change;
-runtime outcomes remain pending. This evidence does not establish resolution of
-Maps' permission failure or later service teardown in a guest.
+The same-APK ART harness is committed as `bea726cc3`. Preparation completed with
+exit 0 after its unchanged 1,024 MiB gate passed. Runner and fixture-driver V
+source closures matched before and after compilation; all APK packaging and
+signature checks passed. Both variants use the same signed APK and Native351
+runtime; only the framework JAR differs.
+
+The actual old-framework ART action completed with outer exit 0 and
+`PERMISSION-INFO-OLD-EXPECTED-RESULT-PASS`. Its raw guest result was
+`startup_failed`: the app exited 1 after the exact READ_CONTACTS
+`PermissionInfo.protectionLevel` null-field NPE at `PermissionInfoEntry.check`.
+Serial contains one BEGIN and no positive fixture markers, reproducing the
+baseline failure.
+
+The new-framework action also completed with outer exit 0. All six positive
+fixture markers appeared once in order, followed by `ANDROID-WS-READY`.
+The final raw result was `window_observed` for the full 35 seconds, with
+`backend_ready=true`, `process_exited=false`, QEMU alive before capture and no
+failure markers. `functional_passed` remains null in that generic raw result;
+the separate semantic receipt reports `expected-result-pass`. Old and new
+runtime input inventories each matched before and after execution.
+
+| ART input or result | SHA-256 |
+| --- | --- |
+| Signed fixture APK | `334020c1b46570f266cd3d3ef89320431f33b4284970f05a2cdbbe0d0cb685f1` |
+| Checked runner | `bf0d2656c5cd5b7e7e0f463a72fbc63334fdeefe91a1b6c7e9b871e5efcae91a` |
+| `old-semantic-check.json` | `c33971ef1b05dc7adf6acbb206579d970a940b5b5a7b513cc90de880bf60a074` |
+| `new-semantic-check.json` | `20c0c4a7dd96f9bda618e49ba82be2423a90dd67b7521cf6d162f762baf808fe` |
+| Old serial | `f39f96a42f4c552d6a52cba05632125b77557bda2501f08ac22aa8a99987cf70` |
+| New serial | `9489cfbf46cf0443560682149aa70c6ad1c484687481fc73ead4937c9ada84b8` |
+| Complete ART bundle manifest | `01aa44a3e5ca9281379329c185e38aa43ca148c00cb5e0edd2382946d1a43661` |
+| Root ART readback receipt | `3a568c938f3b370a80be31cf4bb22b6a1470ebc49f84ec789cb3bf297b6d28c1` |
+| Independent ART readback receipt | `9160b32049e5df0697b2b5cce2239bf5e72af8be72377b801635129f36fdfd3f` |
+
+The sealed 16,081-file regression bundle is retained under
+`/Users/alex/.local/state/vinix/android/permission-info359-fixture-2026-10-26`.
+Sealing exited 0 after revalidating both variants; the qualification copies of
+their semantic receipts retain the exact hashes above. Root and independent
+complete readbacks each exited 0, matching all 16,081 file hashes and the exact
+file set with the unchanged complete-bundle checker. Their adjacent receipts are
+`permission-info359-fixture-root-readback-2026-10-26.json` and
+`permission-info359-fixture-peer-readback-2026-10-26.json`.
+Adjacent preparation and action logs are
+`permission-info359-fixture-prepare-2026-10-26.log`,
+`permission-info359-fixture-old-2026-10-26.log` and
+`permission-info359-fixture-new-2026-10-26.log`.
+
+Maps360 generation and replay have not started; their unchanged capacity gate
+requires 1,536 MiB free, while the latest root checkpoint recorded 963,360 KiB
+available. The ART fixture establishes the permission metadata behavior above.
+Resolution of Maps' permission failure and later service teardown still requires
+a separate Maps replay.
