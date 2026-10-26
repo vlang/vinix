@@ -845,3 +845,16 @@ bootstrap group cleanup. Host SDK and transitive dynamic dependencies
 remain unfrozen. The controller was built but never executed: no target
 program or VM ran, and unchanged-signal matched-kernel diagnostic work
 remains unqualified.
+
+After owner source commit `74b4d57397c7c162b0fbd2adcdd3c43f5f8736cc`,
+the unchanged original checker was rerun against the historical matched
+audit and manifest `1be74ac8...`. It refused with actual status `1` after
+12.32 seconds: `state inventory mismatch`. The old binding cannot admit a
+new native diagnostic while that refusal remains. No historical input or
+seal was repaired, and no target or VM ran. The exact invocation, refusal
+and status are retained at
+`wine-jit-stream-native-historical-audit-check-01`; its complete seal is
+`wine-jit-stream-native-historical-audit-check-seal-01/complete/inventory.json`,
+SHA-256 `5f61f1462d0434dd9b34aaf0ce6dc56f1ac5e5bb7e261bb62aef4274668c24e7`.
+The additional refusal state and seal charge 2,266 bytes. Earlier recorded
+successful historical checks and host-only qualification remain unchanged.
