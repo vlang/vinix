@@ -44,6 +44,56 @@ struct GuestHelpers {
 	files                map[string]string
 }
 
+struct FaultBuild {
+	format             int
+	shim_sha256        string
+	known_fault_sha256 string
+	guest_executed     bool
+}
+
+// Retain the complete small diagnostic bundle, rejecting links and special
+// files so a later guest launch never follows an unrecorded host dependency.
+fn copy_fault_tree(source string, target string, relative string, mut pins map[string]string, mut total []u64) ! {
+	mut names := os.ls(source)!
+	names.sort()
+	for name in names {
+		path_parts(name)!
+		from := source + '/' + name
+		to := target + '/' + name
+		key := if relative == '' { name } else { relative + '/' + name }
+		st := os.lstat(from)!
+		match st.get_filetype() {
+			.directory {
+				os.mkdir(to)!
+				copy_fault_tree(from, to, key, mut pins, mut total)!
+			}
+			.regular {
+				if pins.len >= 128 || st.size > 16 * 1024 * 1024 || total[0] + st.size > 32 * 1024 * 1024 {
+					return error('fault diagnostic bundle exceeds fixed limits')
+				}
+				before := hash(from)!
+				os.cp(from, to)!
+				os.chmod(to, int(st.mode & 0o777))!
+				if hash(from)! != before || hash(to)! != before { return error('fault diagnostic changed during copy') }
+				pins[key] = before
+				total[0] += st.size
+			}
+			else { return error('fault diagnostic must contain only real directories and regular files') }
+		}
+	}
+}
+
+fn fault_build(root string) !FaultBuild {
+	build := json2.decode[FaultBuild](os.read_file(root + '/build.json')!)!
+	if build.format != 1 || build.guest_executed || build.shim_sha256.len != 64
+		|| build.known_fault_sha256.len != 64
+		|| hash(root + '/libx11-fault-probe.so')! != build.shim_sha256
+		|| hash(root + '/known-fault')! != build.known_fault_sha256 {
+		return error('unqualified fault diagnostic build')
+	}
+	return build
+}
+
 struct Metadata {
 	name         string
 	version      string
@@ -236,8 +286,8 @@ fn command(root string, label string, argv []string) ! {
 }
 
 fn prepare() ! {
-	if os.args.len != 6 {
-		return error('usage: prepare OUTPUT BASE_RUNTIME BASE_APK_CACHE ADDON_APK_CACHE COMPILER')
+	if os.args.len !in [6, 7] {
+		return error('usage: prepare OUTPUT BASE_RUNTIME BASE_APK_CACHE ADDON_APK_CACHE COMPILER [FAULT_BUILD_DIR]')
 	}
 	root, runtime, base_cache, cache, compiler := os.args[1], os.args[2], os.args[3], os.args[4], os.args[5]
 	if os.exists(root) || os.is_link(root) { return error('fresh output directory required') }
@@ -308,6 +358,21 @@ fn prepare() ! {
 	os.mkdir_all(root + '/runtime')!
 	os.mkdir_all(root + '/bin')!
 	os.mkdir_all(root + '/sources')!
+	mut fault_pins := map[string]string{}
+	mut fault_build_hash := ''
+	mut fault_shim_hash := ''
+	mut fault_fixture_hash := ''
+	if os.args.len == 7 {
+		fault_root := os.real_path(os.args[6])
+		fault := fault_build(fault_root)!
+		os.mkdir(root + '/fault-probe')!
+		mut total := [u64(0)]
+		copy_fault_tree(fault_root, root + '/fault-probe', '', mut fault_pins, mut total)!
+		fault_build(root + '/fault-probe')!
+		fault_build_hash = fault_pins['build.json']
+		fault_shim_hash = fault.shim_sha256
+		fault_fixture_hash = fault.known_fault_sha256
+	}
 	mut files := map[string]string{}
 	for package in pins.packages {
 		extract(cache + '/' + package.filename, root + '/runtime', mut files)!
@@ -365,6 +430,10 @@ fn prepare() ! {
 		'probe_sha256':            json2.Any(hash(root + '/bin/browser-probe')!)
 		'session_sha256':          json2.Any(hash(root + '/bin/browser-session')!)
 		'guest_sha256':            json2.Any(hash(root + '/bin/browser-guest')!)
+		'fault_probe_build_sha256': json2.Any(fault_build_hash)
+		'fault_probe_shim_sha256': json2.Any(fault_shim_hash)
+		'fault_probe_fixture_sha256': json2.Any(fault_fixture_hash)
+		'fault_probe_files_sha256': json2.decode[json2.Any](json2.encode(fault_pins))!
 		'scope':                   json2.Any('Pinned APK hashes and declared name/SONAME/exact-version dependency closure checked; original APK signatures not cryptographically verified. Separate real-engine diagnostic only, no Android integration or Google authentication proof.')
 	}, prettify: true) + '\n')!
 	println('BROWSER-PREPARE PASS packages=' + added.len.str() + ' archive-bytes=' + archive_bytes.str() + ' payload-files=' + files.len.str())
@@ -397,7 +466,35 @@ fn self_test() ! {
 		dependencies([p, bad], [bad]) or { rejected = true }
 		if !rejected { return error('accepted unresolved dependency: ' + value) }
 	}
-	println('BROWSER-PREPARE-CHECK PASS paths symlink providers soname exact-version unsupported-constraint')
+	root := os.join_path(os.temp_dir(), 'vinix-browser-fault-copy-' + os.getpid().str())
+	if os.exists(root) || os.is_link(root) { return error('selftest root already exists') }
+	os.mkdir_all(root + '/source/sources')!
+	defer { os.rmdir_all(root) or {} }
+	os.mkdir(root + '/target')!
+	os.write_file(root + '/source/libx11-fault-probe.so', 'fixture-shim')!
+	os.write_file(root + '/source/known-fault', 'fixture-executable')!
+	os.write_file(root + '/source/sources/source.v', 'fixture-source')!
+	os.chmod(root + '/source/known-fault', 0o751)!
+	os.write_file(root + '/source/build.json', json2.encode(FaultBuild{
+		format: 1
+		shim_sha256: hash(root + '/source/libx11-fault-probe.so')!
+		known_fault_sha256: hash(root + '/source/known-fault')!
+	}))!
+	fault_build(root + '/source')!
+	mut copied := map[string]string{}
+	mut total := [u64(0)]
+	copy_fault_tree(root + '/source', root + '/target', '', mut copied, mut total)!
+	assert copied.len == 4 && copied['sources/source.v'] == hash(root + '/target/sources/source.v')!
+	assert os.lstat(root + '/target/known-fault')!.mode & 0o777 == 0o751
+	fault_build(root + '/target')!
+	os.write_file(root + '/target/known-fault', 'changed')!
+	if _ := fault_build(root + '/target') { return error('changed fault executable accepted') }
+	os.symlink('../known-fault', root + '/source/sources/link')!
+	os.mkdir(root + '/rejected')!
+	if _ := copy_fault_tree(root + '/source', root + '/rejected', '', mut copied, mut total) {
+		return error('linked fault diagnostic source accepted')
+	}
+	println('BROWSER-PREPARE-CHECK PASS paths symlink providers soname exact-version unsupported-constraint fault-copy pins modes tamper symlink')
 }
 
 fn main() {

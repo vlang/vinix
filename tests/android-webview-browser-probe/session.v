@@ -21,6 +21,10 @@ struct BuildPins {
 	guest_helper_references map[string]string
 	probe_sha256       string
 	session_sha256     string
+	fault_probe_build_sha256 string
+	fault_probe_shim_sha256 string
+	fault_probe_fixture_sha256 string
+	fault_probe_files_sha256 map[string]string
 }
 
 fn hash(path string) !string {
@@ -261,6 +265,71 @@ fn stop(mut process os.Process, mut log os.File) {
 	process.close()
 }
 
+fn fault_environment(root string, build BuildPins, environment map[string]string) !map[string]string {
+	mut result := environment.clone()
+	if build.fault_probe_build_sha256 == '' {
+		if build.fault_probe_shim_sha256 != '' || build.fault_probe_fixture_sha256 != ''
+			|| build.fault_probe_files_sha256.len != 0 {
+			return error('incomplete fault diagnostic pins')
+		}
+		return result
+	}
+	if os.lstat(root)!.get_filetype() != .directory {
+		return error('fault diagnostic root must be a real directory')
+	}
+	for path, expected in build.fault_probe_files_sha256 {
+		if !safe_relative(path) { return error('unsafe fault diagnostic receipt path') }
+		mut parent := os.dir(path)
+		for parent != '.' {
+			if os.lstat(root + '/' + parent)!.get_filetype() != .directory {
+				return error('fault diagnostic parent must be a real directory')
+			}
+			parent = os.dir(parent)
+		}
+		st := os.lstat(root + '/' + path)!
+		if st.get_filetype() != .regular { return error('fault diagnostic file must be regular') }
+		equal_hash(root + '/' + path, expected)!
+	}
+	for path, expected in {
+		'build.json': build.fault_probe_build_sha256
+		'libx11-fault-probe.so': build.fault_probe_shim_sha256
+		'known-fault': build.fault_probe_fixture_sha256
+	} {
+		if build.fault_probe_files_sha256[path] != expected || expected.len != 64 {
+			return error('missing fault diagnostic file pin: ' + path)
+		}
+	}
+	return result
+}
+
+fn fault_loader_arguments(root string, build BuildPins) []string {
+	return if build.fault_probe_build_sha256 == '' { []string{} } else {
+		['--preload', root + '/libx11-fault-probe.so']
+	}
+}
+
+fn fault_preflight(loader string, libraries string, root string, output string, environment map[string]string) ! {
+	mut log := os.open_file(output + '/x11-known-fault.log', 'w', 0o600)!
+	defer { log.close() }
+	fixture_arguments := ['--library-path', libraries, '--preload', root + '/libx11-fault-probe.so', root + '/known-fault']
+	mut fixture := child(loader, fixture_arguments, environment)
+	defer { stop(mut fixture, mut log) }
+	deadline := time.sys_mono_now() + u64(10 * time.second)
+	for fixture.is_alive() {
+		drain(mut fixture, mut log)!
+		if time.sys_mono_now() >= deadline { return error('fault diagnostic preflight exceeded watchdog') }
+		time.sleep(10 * time.millisecond)
+	}
+	stop(mut fixture, mut log)
+	if fixture.code != 0 { return error('fault diagnostic preflight failed; see x11-known-fault.log') }
+	text := os.read_file(output + '/x11-known-fault.log')!
+	if !text.split_into_lines().contains('X11-KNOWN-FAULT-PASS query=preserved restoration=preserved chain=preserved')
+		|| !text.contains('X11-FAULT ') || !text.contains('X11-REGS ')
+		|| !text.contains('X11-MAPS-BEGIN') || !text.contains('X11-MAPS-END') {
+		return error('fault diagnostic preflight lacks complete success evidence')
+	}
+}
+
 fn remove_aliases(paths []string, directories []string, executable string, mut events os.File) ! {
 	mut failures := []string{}
 	for path in paths.reverse() {
@@ -494,11 +563,25 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 		'</dir><cachedir>' + xml_text(output + '/cache/fontconfig') + '</cachedir></fontconfig>\n')!
 	environment['FONTCONFIG_FILE'] = output + '/fonts.conf'
 	environment['FONTCONFIG_PATH'] = output
+	fault_root := os.dir(addon) + '/fault-probe'
+	x_environment := fault_environment(fault_root, build, environment)!
+	if build.fault_probe_build_sha256 != '' {
+		receipt['x11_fault_build_sha256'] = build.fault_probe_build_sha256
+		receipt['x11_fault_shim_sha256'] = build.fault_probe_shim_sha256
+		receipt['x11_fault_fixture_sha256'] = build.fault_probe_fixture_sha256
+		receipt['x11_fault_preload_scope'] = 'musl-loader-argument-only:known-fault,xvfb'
+		receipt['x11_fault_preflight'] = 'incomplete'
+		fault_preflight(loader, libraries, fault_root, output, x_environment)!
+		receipt['x11_fault_preflight'] = 'pass'
+	}
 	mut xlog := os.open_file(output + '/xvfb.log', 'w', 0o600)!
 	defer { xlog.close() }
-	mut server := child(loader, ['--library-path', libraries, addon + '/usr/bin/Xvfb', ':' + display,
+	mut x_arguments := ['--library-path', libraries]
+	x_arguments << fault_loader_arguments(fault_root, build)
+	x_arguments << [addon + '/usr/bin/Xvfb', ':' + display,
 		'-screen', '0', '800x600x24', '-auth', output + '/Xauthority', '-nolisten', 'tcp', '-noreset',
-		'-xkbdir', base + '/usr/share/X11/xkb', '-fp', output + '/fonts'], environment)
+		'-xkbdir', base + '/usr/share/X11/xkb', '-fp', output + '/fonts']
+	mut server := child(loader, x_arguments, x_environment)
 	defer { stop(mut server, mut xlog) }
 	deadline := time.sys_mono_now() + u64(30 * time.second)
 	mut ready := false
@@ -597,7 +680,33 @@ fn self_test() ! {
 	assert os.readlink(alias)! == root + '/missing'
 	os.write_file(original, 'changed')!
 	if _ := preserved_helpers({original: pin}, mut events) { return error('changed original helper passed preservation') }
-	println('BROWSER-SESSION SELF-TEST PASS authority-record x11-setup receipt-paths pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper')
+	clean_environment := {'DISPLAY': ':120'}
+	assert fault_environment(root, BuildPins{}, clean_environment)! == clean_environment
+	mut fault_files := map[string]string{}
+	for name in ['build.json', 'libx11-fault-probe.so', 'known-fault'] {
+		os.write_file(root + '/' + name, 'fixture-' + name)!
+		fault_files[name] = hash(root + '/' + name)!
+	}
+	fault_pins := BuildPins{
+		fault_probe_build_sha256: fault_files['build.json']
+		fault_probe_shim_sha256: fault_files['libx11-fault-probe.so']
+		fault_probe_fixture_sha256: fault_files['known-fault']
+		fault_probe_files_sha256: fault_files
+	}
+	fault_env := fault_environment(root, fault_pins, clean_environment)!
+	assert fault_env == clean_environment
+	assert fault_loader_arguments(root, fault_pins) == ['--preload', root + '/libx11-fault-probe.so']
+	assert fault_loader_arguments(root, BuildPins{}).len == 0
+	assert 'LD_PRELOAD' !in clean_environment
+	os.write_file(root + '/known-fault', 'tampered')!
+	if _ := fault_environment(root, fault_pins, clean_environment) { return error('changed fault fixture accepted') }
+	os.rm(root + '/known-fault')!
+	os.symlink(original, root + '/known-fault')!
+	if _ := fault_environment(root, fault_pins, clean_environment) { return error('linked fault fixture accepted') }
+	if _ := fault_environment(root, BuildPins{fault_probe_shim_sha256: pin}, clean_environment) {
+		return error('partial fault diagnostic pins accepted')
+	}
+	println('BROWSER-SESSION SELF-TEST PASS authority-record x11-setup receipt-paths pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins')
 }
 
 fn main() {

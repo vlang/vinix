@@ -37,6 +37,19 @@ dynamic `bin/browser-probe` and static `bin/browser-session` and
 collector), and records commands, hashes, compiler pins, and selected base
 runtime references in `build.json` and `addon-files.json`.
 
+For an Xvfb startup fault investigation, preparation accepts an optional final
+`FAULT_BUILD_DIR` from the maintained
+[`android-x11-fault-probe`](../android-x11-fault-probe) builder. It copies the
+complete small bundle under `OUTPUT/fault-probe` and pins every file. The guest
+first runs its controlled known-fault executable with the pinned interposer,
+requires its successful handler query/restoration/chaining checks and fault
+register/mapping evidence, and retains `x11-known-fault.log`. Only this fixture
+and Xvfb use musl's explicit `--preload` loader argument. No `LD_PRELOAD`
+environment variable reaches the browser or inherited helper processes.
+The original Xvfb binary is unchanged. An incomplete or changed diagnostic
+bundle fails before Xvfb starts. Fault instrumentation is separate diagnostic
+evidence and does not establish browser success or account authentication.
+
 Stage the complete prepared bundle into an isolated aarch64 Vinix guest, while
 preserving executable modes and symlinks. Keep the base runtime under
 `/opt/vinix-android-aarch64`. The maintained host stager clones existing APFS
