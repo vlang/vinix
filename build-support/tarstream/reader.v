@@ -221,9 +221,11 @@ pub fn (mut reader Reader) read(mut buffer []u8) !int {
 fn (mut reader Reader) skip() ! {
 	if reader.remaining > 0 {
 		mut buffer := []u8{len: 1024 * 1024}
+		defer { unsafe { buffer.free() } }
 		for reader.remaining > 0 { reader.read(mut buffer)! }
 	}
 	mut padding := []u8{len: reader.padding}
+	defer { unsafe { padding.free() } }
 	reader.exact(mut padding, false)!
 	reader.padding = 0
 }

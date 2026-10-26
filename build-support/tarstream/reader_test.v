@@ -87,6 +87,40 @@ fn test_streaming_digest_and_skip_around_chunk_boundaries() {
 	assert reader.digest()! == 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
 }
 
+fn test_descriptor_skips_unread_and_partly_read_members_with_padding() {
+	work := temporary_directory()!
+	defer { os.rmdir_all(work) or { panic(err) } }
+	path := work + '/skips.tar'
+	sizes := [1, 511, 512, 513, 1024 * 1024 - 1, 1024 * 1024, 1024 * 1024 + 1]
+	data := []u8{len: 1024 * 1024 + 1, init: u8(index * 67)}
+	mut writer := tarcore.create_stream(path)!
+	for index, size in sizes {
+		writer.add(tarcore.Member{ name: 'member-${index}', size: size }, data[..size])!
+	}
+	writer.add(tarcore.Member{ name: 'after', size: 5 }, 'after'.bytes())!
+	writer.finish()!
+	writer.close_checked()!
+	mut file := os.open(path)!
+	defer { file.close() }
+	mut reader := from_descriptor(file.fd)!
+	defer { reader.close() }
+	mut prefix := []u8{len: 17}
+	for index, size in sizes {
+		member := reader.next()!
+		assert member.name == 'member-${index}' && member.size == size
+		if index % 2 == 1 {
+			assert reader.read(mut prefix)! == prefix.len
+			assert prefix == data[..prefix.len]
+		}
+	}
+	assert reader.next()!.name == 'after'
+	mut tail := []u8{len: 5}
+	assert reader.read(mut tail)! == tail.len && tail == 'after'.bytes()
+	mut ended := false
+	reader.next() or { assert err is End; ended = true }
+	assert ended
+}
+
 fn test_concatenated_tar_streams_continue_beyond_end_markers() {
 	work := temporary_directory()!
 	defer { os.rmdir_all(work) or { panic(err) } }
