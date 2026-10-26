@@ -4,6 +4,11 @@
 @[translated]
 module atlframework
 
+#include <stdint.h>
+
+type C.intmax_t = i64
+type C.uintmax_t = u64
+
 fn C.getsockname(i32, &C.sockaddr, &u32) i32
 fn C.getpeername(i32, &C.sockaddr, &u32) i32
 fn C.fflush(voidptr) i32
@@ -151,7 +156,7 @@ fn ws_service_binding_timeout(e voidptr, binding voidptr, started_ms i64, pumps 
 			}
 		}
 		buffer := &char(C.alloca(256))
-		count := C.snprintf(buffer, 256, c'ANDROID-SERVICE-BINDING-WAIT elapsed_ms=%lld pumps=%llu active=%d record=%d reason=%d control=%d\n', ws_millis() - started_ms, pumps, active, i32(record), reason, control)
+		count := C.snprintf(buffer, 256, c'ANDROID-SERVICE-BINDING-WAIT elapsed_ms=%jd pumps=%ju active=%d record=%d reason=%d control=%d\n', C.intmax_t(ws_millis() - started_ms), C.uintmax_t(pumps), active, i32(record), reason, control)
 		if count > 0 && count < 256 { C.write(2, buffer, usize(count)) }
 	}
 }

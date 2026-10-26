@@ -11,6 +11,26 @@ fn binding_block(source string, name string) !string {
 	return source[start..start + end + 2]
 }
 
+fn binding_format_abis(compiler string, work string) ! {
+	generated := os.exec([compiler, '-w', '-n', '-gc', 'none', '-enable-globals', '-o', work + '/probe.c', work + '/main.v'])
+	assert generated.exit_code == 0, generated.output
+	code := os.read_file(work + '/probe.c')!
+	lines := code.split_into_lines().filter(it.contains('ANDROID-SERVICE-BINDING-WAIT') && it.contains('snprintf('))
+	assert lines.len == 1, 'missing generated diagnostic call'
+	call := lines[0].replace('main__ws_millis()', '((i64)123)')
+		.replace('ws_millis()', '((i64)123)')
+	// int64_t is long on AArch64 Linux, long long on macOS. Check the actual
+	// generated call under both typedefs so a native macOS pass cannot hide the
+	// target mismatch. Standard intmax_t casts must preserve every 64-bit value.
+	cc := os.find_abs_path_of_executable('cc')!
+	for i, spelling in ['long', 'long long'] {
+		path := work + '/format-' + i.str() + '.c'
+		os.write_file(path, '#include <stdio.h>\n#include <stdint.h>\n#include <stdbool.h>\ntypedef ${spelling} i64;\ntypedef unsigned ${spelling} u64;\ntypedef int32_t i32;\nvoid check(char *buffer, i64 started_ms, u64 pumps, i32 active, bool record, i32 reason, i32 control) {\n${call}\n}\n')!
+		checked := os.exec([cc, '-std=gnu11', '-fsyntax-only', '-Wformat=2', '-Werror=format', path])
+		assert checked.exit_code == 0, '${spelling}: ${checked.output}'
+	}
+}
+
 fn main() {
 	assert os.args.len in [1, 2], 'usage: check-headless-binding-timeout [REPO]'
 	repo := if os.args.len == 2 { os.real_path(os.args[1]) } else { os.getwd() }
@@ -26,18 +46,22 @@ fn main() {
 	defer { os.rmdir_all(work) or {} }
 	os.write_file(work + '/main.v', binding_probe + diagnostic + '\n' + run + binding_cases)!
 	compiler := os.getenv_opt('VINIX_V_COMPILER') or { 'v' }
-	built := os.exec([compiler, '-w', '-n', '-gc', 'none', '-enable-globals', '-cc', 'cc', '-o', work + '/probe', work + '/main.v'])
+	built := os.exec([compiler, '-w', '-n', '-gc', 'none', '-enable-globals', '-cc', 'cc', '-cflags', '-Wformat=2 -Werror=format', '-o', work + '/probe', work + '/main.v'])
 	if built.exit_code != 0 { panic(built.output) }
 	result := os.exec([work + '/probe'])
 	if result.exit_code != 0 { panic(result.output) }
 	assert result.output.trim_space() == 'HEADLESS-BINDING-TIMEOUT-PASS cases=15'
-	println(result.output.trim_space())
+	binding_format_abis(compiler, work)!
+	println(result.output.trim_space() + ' format-abis=2')
 }
 
 const binding_probe = '
 module main
 #include <stdio.h>
+#include <stdint.h>
 #include <alloca.h>
+type C.intmax_t = i64
+type C.uintmax_t = u64
 fn C.alloca(usize) voidptr
 fn C.snprintf(&char, usize, &char, ...) i32
 type WsBoolField = fn (voidptr, voidptr, voidptr) u8
