@@ -33,6 +33,7 @@ fn mutable_string_state(object u64) &ObjHeader {
 }
 
 fn mutable_string_types(name string, meta bool, selector string) ?string {
+	if !meta && name in ['NSString', 'NSMutableString']! && selector == 'precomposedStringWithCanonicalMapping' { return '@16@0:8' }
 	if !meta && name in ['NSString', 'NSMutableString']! && selector == 'floatValue' { return 'f16@0:8' }
 	if meta && name in ['NSString', 'NSMutableString']! && selector == 'stringWithCString:encoding:' {
 		return '@32@0:8r*16Q24'
@@ -272,6 +273,10 @@ fn mutable_string_encoded_cstring(cls u64, address u64, encoding u64) u64 {
 
 fn mutable_string_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	meta := object in ios_runtime.classes
+	if !meta && selector == 'precomposedStringWithCanonicalMapping' && objc_is_kind(object, ios_runtime.names['NSString']) {
+		frame.x[0] = ns_string_precomposed(object)
+		return true
+	}
 	if !meta && selector == 'floatValue' && objc_is_kind(object, ios_runtime.names['NSString']) {
 		ns_string_float_return(object, mut frame)
 		return true

@@ -485,6 +485,9 @@ fn main() {
 			['/opt/ios/FortniteClient-IOS-Shipping']
 		}
 		if mode == 'probe-no-ads' {
+			if os.exists('/opt/ios/string-normalization-checks') {
+				require_child('/opt/ios/string-normalization-checks')
+			}
 			require_child('/opt/ios/responder-checks')
 			require_child('/opt/ios/view-tag-checks')
 			require_child('/opt/ios/main-selector-checks')
