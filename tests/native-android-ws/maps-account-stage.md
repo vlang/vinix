@@ -33,7 +33,14 @@ maps-account-stage --audit-base BASE JAVA APKSIGNER_JAR FRESH_OUTPUT
 maps-account-stage --replay-ui ORIGINAL_UI_STAGE BASE FRESH_OUTPUT
 maps-account-stage --verify-inventory BUNDLE MANIFEST_SHA256
 maps-account-stage --self-test
+clone-maps-account-stage SOURCE MANIFEST_SHA256 FRESH_OUTPUT
 ```
+
+The separate clone helper verifies the entire original bundle, makes fresh
+regular-file clones with matching file and directory modes, and rechecks both
+complete inventories and metadata trees. Its tool, source and provenance stay
+beside the output so the copied original manifest remains exact. Apply kernel
+patches and boot only the copy; retain the original sealed stage unchanged.
 
 Evidence under `/Users/alex/.local/state/vinix/android/`:
 
@@ -71,6 +78,13 @@ Evidence under `/Users/alex/.local/state/vinix/android/`:
   and 1,926 planned entries. See `maps-account-stage-run-r1.log` and the bundle's
   retained inventories. This image still requires the separately audited
   recvmsg kernel patch before guest execution.
+- `maps-account-vm-r1` passed exact cloning with helper source `9f2d74d4c`.
+  All 1,910 regular files and the complete metadata tree matched before any
+  kernel patch or boot; source and copy both passed the complete original
+  manifest above. The original `maps-account-r1` remains unchanged. Adjacent
+  provenance `maps-account-vm-r1-clone.json` has SHA-256
+  `11eefc5fd71734d0502c95625aef0859faecb0c468d992ac9b78b4b42968a9e6`.
+  See `maps-account-clone-run-r1.log`. Guest mutation belongs only in the copy.
 
 The final runtime bundles and actual guest results are separate evidence.
 Staging and synthetic fixture success must not be reported as Google account
