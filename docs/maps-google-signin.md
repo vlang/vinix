@@ -38,36 +38,38 @@ These are working firmware variables, not the historical prelaunch image.
 
 ## Authentication dependencies
 
-The native account backend supplies empty account snapshots and update
-listeners. It has no authenticator broker, account storage, token issuance or
-refresh path. The installed Play Services APK declares a `com.google`
-authenticator service. The response Binder API passes its ART regression. The
-request Binder API and Account Parcelable pass their maintained ART regression.
-`AbstractAccountAuthenticator` now implements its API and transport defaults
-and passes its maintained ART regression. Trusted account dispatch remains
-incomplete.
-Explicit companion activity routing and finish-time result delivery pass their
-maintained three-APK ART regression.
+The installed Play Services APK declares an enabled, non-exported `com.google`
+authenticator service. Its Chimera implementation extends
+`AbstractAccountAuthenticator`. The response Binder API, request Binder API,
+Account Parcelable and authenticator base API pass their maintained ART
+regressions. Explicit companion activity routing and finish-time result delivery
+also pass their maintained three-APK ART regression. Those contract tests do not
+establish Google authentication.
 
-The installed Play Services APK's `BrowserSignInChimeraActivity` constructs a
-`CustomWebView`, installs WebView clients, enables JavaScript and loads its login
-URL. Native `WebView.loadUrl` throws, and native HTML rendering does not execute
-JavaScript. Standalone Firefox has no Android account handoff; browser login
-alone would not prove stock Maps received an account or token.
+The account client added in `ced2182cb` connects pending futures to the optional
+broker transport. Its host checks cover terminal delivery, cancellation,
+reentry, timeout, response identity, bounds, continuation and shutdown. Its
+Unicode boundary checks and focused AArch64 compilation also pass. The request
+ownership repair in `8031c2fc6` bounds and releases decoded request data. Full
+framework, broker and authenticator integration is still being tested; the
+working Maps screenshot below predates these changes.
 
-Real login requires those activity, WebView and authenticator paths, plus an
-explicit caller/permission model: APKs currently share an ART VM and Unix
-identity. Failed futures and empty account stores must not be reported as login
-success.
+The browser engine added in `6acfdbc60` uses a separate WebKitGTK process. The
+WebView bridge added in `d772c00a7` supplies loading, clients, JavaScript settings,
+cookies, rendering and input transport. The protected launcher in `8651d57f8`
+checks pinned package authority and drops to the selected package identity.
+The [retained browser diagnostic](../tests/android-webview-browser-probe/evidence-2026-10-26.md)
+passed authority rejection checks, then failed during Xvfb startup before
+browser readiness. It provides no rendering, cookie, JavaScript or Google login
+result. Production browser sandbox support remains an integration requirement.
 
-The installed GMS authenticator is enabled but not exported. Its Chimera
-implementation extends `AbstractAccountAuthenticator`. The new base API does
-not grant its required `ACCOUNT_MANAGER` permission. All companion APKs currently
-receive the process UID;
-`getPackageUid` and signature checks do not yet establish package authority.
-Forwarding caller-supplied package/UID options to this private service would not
-provide a trusted broker. These gaps must be repaired before forwarding real
-account requests.
+The working native backend still returns empty account snapshots and rejects
+credential insertion. Persistent account storage, token issuance and refresh
+are incomplete. The authenticator's activity handoff must retain its original
+response Binder under the service identity and return its result to the
+requesting Maps future. A browser page alone would not prove that Maps received
+an account or token. Failed futures and empty stores must not be reported as
+login success.
 
 ## Credential logging repair
 
