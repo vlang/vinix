@@ -38,8 +38,11 @@ The maintained test sources are `nativeaccountauth/token_test.v`,
 `accountbroker/token_test.v`, `accountbroker/interaction_test.v`,
 `accountclient/token_test.v` and `check-account-client.v`.
 
-This route performs no token caching or synthetic token generation. Failure
-notifications, token invalidation/storage APIs and Maps' separate GMS
-GetToken/TokenData service path remain separate work. Host fixture success
-does not establish a Google login. Real guest interaction and an actual GMS
-response still need to be observed without recording credentials or tokens.
+Authenticator responses on this route are not automatically cached, and no
+synthetic tokens are generated. Explicit token storage, exact invalidation
+and password token clearing are documented in
+[account-token-cache.md](account-token-cache.md). Failure notifications and
+Maps' separate GMS GetToken/TokenData service path still need runtime work.
+Host fixture success does not establish a Google login. Real guest interaction
+and an actual GMS response still need to be observed without recording
+credentials or tokens.
