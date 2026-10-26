@@ -113,6 +113,7 @@ pub fn framework_webview_sources(view_source string, settings_source string,
 				'if-eqz v0, :done\nnew-instance v2, Landroid/webkit/VinixCookieCallback;\n' +
 				'invoke-direct {v2, p3, v1}, Landroid/webkit/VinixCookieCallback;-><init>(Landroid/webkit/ValueCallback;Z)V\n' +
 				'invoke-virtual {v0, v2}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z\n:done\nreturn-void'))!
+	cookies = framework_webview_cookie_clear(cookies)!
 	return {
 		'WebView':       view
 		'WebSettings':   settings
