@@ -43,9 +43,9 @@ listeners. It has no authenticator broker, account storage, token issuance or
 refresh path. The installed Play Services APK declares a `com.google`
 authenticator service. The response Binder API passes its ART regression. The
 request Binder API and Account Parcelable pass their maintained ART regression.
-`AbstractAccountAuthenticator` now
-implements its API and transport defaults and passes host assembly checks;
-its ART validation is pending. Trusted account dispatch remains incomplete.
+`AbstractAccountAuthenticator` now implements its API and transport defaults
+and passes its maintained ART regression. Trusted account dispatch remains
+incomplete.
 Explicit companion activity routing and finish-time result delivery pass their
 maintained three-APK ART regression.
 
@@ -228,6 +228,33 @@ Both guests passed ten further seconds without a fixture failure or APK exit;
 their genuine passing-screen PNGs were visually reviewed. Both bundles retain
 the runner's compiled source from `44da73f1b`, signed APK/build inputs and full
 logs. Neither test creates an account or issues a Google token.
+
+The first authenticator-base ART run failed during error mapping because the
+framework omitted `android.accounts.NetworkErrorException`. Its complete failed
+guest is preserved at
+`/Users/alex/.local/state/vinix/android/account-contract-authenticator-base-art-2026-10-26`;
+the 107-file manifest digest is
+`c1d708fea1f44c16748f9c7d311383839b284c2f71382050b0cf94a31bdce8b2`.
+Commits `d4794eb61` and `5281ac761` add the exception and include it in the
+maintained build. The repaired 2,098-class JAR digest is
+`9e643451d4d82fc3839c91415947f04d3726aa81967a784d4d26db63e2c88cb1`;
+the complete build manifest digest is
+`36a472320e71eb459896c1d52a8f211f475362fb2c6dada682870bf43b6a2b7b`.
+
+The unchanged signed APK then passed `AUTHENTICATOR-BASE-PASS` and ten further
+seconds without a fixture failure or APK exit. It verifies fourteen dispatches,
+permission denial before dispatch, response/error mapping, asynchronous null
+replies and the base class's removal, cloning, session and credential-update
+defaults. Its permission context is synthetic; it grants no runtime account
+authority. The genuine `authenticator-base-pass.png` was visually reviewed.
+The stopped guest and complete inputs are retained at
+`/Users/alex/.local/state/vinix/android/account-contract-base-r2-2026-10-26`.
+Full read-back verified 108 files; manifest digest:
+`1becfde044b6bf602ed1623660b362385ece1b6eee4f2fbb857f966e2cf19318`.
+The APK digest is
+`7a1734a391b8f5f6171c0aa975245887cb088083c359eeee27293b255445a385`;
+the retained runner source is from `f3d3c4f9331ad7a15fcbcf414bfac073b127fa63`.
+No account was registered or Google token issued.
 
 The first companion activity ART run failed before a companion APK loaded:
 the runner installed APKs under the default home directory, while this guest
