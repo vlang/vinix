@@ -69,6 +69,25 @@ also be reported separately. Fresh prepared receipts, exact kernel pins,
 reviewed profiles and guest measurements remain required. This report was
 updated after the unchanged maps and quiescent seals were complete.
 
+The qualified production adapter subsequently passed its read-only input
+check against matched build05 x86 kernel SHA256
+`b70d1e316d29cbc22368695667b41311ec88dd6aa75362e014f64d973033e6e4`
+and retained desktop SHA256
+`259613b8f95ddde359a70f338baeca27bd96f0ae2b56391f6d6c3cc35de67a83`.
+The proposed flags were `--scenarios=ops,churn,cache,idle,apps,drag`,
+`--settle=3 --seconds=5 --rounds=1 --mem=3072 --timeout=2400`.
+The maintained checker admitted the guest ELF dependency closure and pinned
+the compiler, source, firmware, QEMU and staging tools. Actual exit status
+was zero; the proposed output state remains absent. The log is
+`foreground-preflight09/matched-check.log`, SHA256
+`e5db949c6ca070d8e25a46dd4296172770b642bb050e0f39b90b2a516618e1ab`;
+the original metadata inventory is
+`foreground-preflight09-seal01/inventory.json`, SHA256
+`0e30f76aa4b649233cb9c38cce8cb87761d88495f8c9ddd66c9fe0c9a4ac355c`.
+Its explicit invocation was recorded after execution, not intercepted.
+Independent artifact checks passed. The two new roots occupy 32 KiB within
+the growth reserve above; no prepare or VM execution is implied.
+
 ## Earlier foreground supervisor qualification
 
 PASS: normal and production builds each passed six real process controls and
