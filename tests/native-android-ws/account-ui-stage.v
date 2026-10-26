@@ -41,30 +41,32 @@ const retained_modules = {
 	'build-support/tarstream/filter_abi.h':           carried($embed_file("../../build-support/tarstream/filter_abi.h"))
 	'build-support/tarstream/sparse.v':               carried($embed_file("../../build-support/tarstream/sparse.v"))
 }
-const fixture_sources = {
-	'build-support/android/accountui/bridge.v':                   carried($embed_file("../../build-support/android/accountui/bridge.v"))
-	'build-support/android/accountui/connect.c.v':                carried($embed_file("../../build-support/android/accountui/connect.c.v"))
-	'build-support/android/accountui/control.c.v':                carried($embed_file("../../build-support/android/accountui/control.c.v"))
-	'build-support/android/accountui/input.c.v':                  carried($embed_file("../../build-support/android/accountui/input.c.v"))
-	'build-support/android/accountui/main.v':                     carried($embed_file("../../build-support/android/accountui/main.v"))
-	'build-support/android/accountui/surface.c.v':                carried($embed_file("../../build-support/android/accountui/surface.c.v"))
-	'build-support/android/accountuifd/control.c.v':              carried($embed_file("../../build-support/android/accountuifd/control.c.v"))
-	'build-support/android/nativeaccountauth/connect.c.v':        carried($embed_file("../../build-support/android/nativeaccountauth/connect.c.v"))
-	'build-support/android/nativeaccountauth/dispose.v':          carried($embed_file("../../build-support/android/nativeaccountauth/dispose.v"))
-	'build-support/android/nativeaccountauth/launcher_options.v': carried($embed_file("../../build-support/android/nativeaccountauth/launcher_options.v"))
-	'build-support/android/nativeaccountauth/peer.c.v':           carried($embed_file("../../build-support/android/nativeaccountauth/peer.c.v"))
-	'build-support/android/nativeaccountauth/redemption.v':       carried($embed_file("../../build-support/android/nativeaccountauth/redemption.v"))
-	'build-support/android/nativeaccountauth/registry.v':         carried($embed_file("../../build-support/android/nativeaccountauth/registry.v"))
-	'build-support/android/nativeaccountauth/request.c.v':        carried($embed_file("../../build-support/android/nativeaccountauth/request.c.v"))
-	'build-support/android/nativeaccountauth/service.c.v':        carried($embed_file("../../build-support/android/nativeaccountauth/service.c.v"))
-	'build-support/android/nativeaccountauth/service_ui.c.v':     carried($embed_file("../../build-support/android/nativeaccountauth/service_ui.c.v"))
-	'desktop/sessionruntime/runtime.c.v':                         carried($embed_file("../../desktop/sessionruntime/runtime.c.v"))
-	'desktop/windowfb/client.v':                                  carried($embed_file("../../desktop/windowfb/client.v"))
-	'desktop/windowfb/protocol.v':                                carried($embed_file("../../desktop/windowfb/protocol.v"))
-	'desktop/windowfb/surface.c.v':                               carried($embed_file("../../desktop/windowfb/surface.c.v"))
-	'desktop/windowfb/transport.c.v':                             carried($embed_file("../../desktop/windowfb/transport.c.v"))
-	'tests/native-android-ws/account-ui-controller.v':            carried($embed_file("../../tests/native-android-ws/account-ui-controller.v"))
-}
+// Supplied binaries are not rebuilt here. Their documentary source is
+// retrieved from fixed revisions independently of live checkout edits.
+const fixture_source_paths = [
+	'build-support/android/accountui/bridge.v',
+	'build-support/android/accountui/connect.c.v',
+	'build-support/android/accountui/control.c.v',
+	'build-support/android/accountui/input.c.v',
+	'build-support/android/accountui/main.v',
+	'build-support/android/accountui/surface.c.v',
+	'build-support/android/accountuifd/control.c.v',
+	'build-support/android/nativeaccountauth/connect.c.v',
+	'build-support/android/nativeaccountauth/dispose.v',
+	'build-support/android/nativeaccountauth/launcher_options.v',
+	'build-support/android/nativeaccountauth/peer.c.v',
+	'build-support/android/nativeaccountauth/redemption.v',
+	'build-support/android/nativeaccountauth/registry.v',
+	'build-support/android/nativeaccountauth/request.c.v',
+	'build-support/android/nativeaccountauth/service.c.v',
+	'build-support/android/nativeaccountauth/service_ui.c.v',
+	'desktop/sessionruntime/runtime.c.v',
+	'desktop/windowfb/client.v',
+	'desktop/windowfb/protocol.v',
+	'desktop/windowfb/surface.c.v',
+	'desktop/windowfb/transport.c.v',
+	'tests/native-android-ws/account-ui-controller.v',
+]
 
 fn carried(data embed_file.EmbedFileData) string {
 	// Check before to_string(), which would load today's checkout in a debug
@@ -163,6 +165,10 @@ fn command(root string, label string, argv []string) !string {
 }
 
 fn command_expected(root string, label string, argv []string, expected int) !string {
+	return command_limit(root, label, argv, expected, 120 * time.second)
+}
+
+fn command_limit(root string, label string, argv []string, expected int, timeout time.Duration) !string {
 	mut child := os.new_process(argv[0])
 	child.use_pgroup = true
 	child.set_args(argv[1..])
@@ -179,7 +185,7 @@ fn command_expected(root string, label string, argv []string, expected int) !str
 	}
 	mut stdout := ''
 	mut stderr := ''
-	deadline := time.sys_mono_now() + 120 * time.second
+	deadline := time.sys_mono_now() + timeout
 	for {
 		stdout += child.stdout_read()
 		stderr += child.stderr_read()
@@ -187,7 +193,22 @@ fn command_expected(root string, label string, argv []string, expected int) !str
 			return error('oversized command output: ' + label)
 		}
 		if !child.is_alive() { break }
-		if time.sys_mono_now() >= deadline { return error('command deadline: ' + label) }
+		if time.sys_mono_now() >= deadline {
+			// Preserve the observed command failure before returning. Killing the
+			// owned process group also reaps any compiler child at the deadline.
+			if child.pid > 0 { C.kill(-child.pid, 9) }
+			child.wait()
+			finished = true
+			write_json(root + '/commands/' + label + '.json', {
+				'argv':       json2.decode[json2.Any](json2.encode(argv))!
+				'exit_code':  json2.Any(child.code)
+				'stdout':     json2.Any(stdout)
+				'stderr':     json2.Any(stderr)
+				'timed_out':  json2.Any(true)
+				'timeout_ns': json2.Any(i64(timeout))
+			})!
+			return error('command deadline: ' + label)
+		}
 		time.sleep(10 * time.millisecond)
 	}
 	for {
@@ -503,24 +524,22 @@ fn retain_sources(root string) ! {
 		os.mkdir_all(os.dir(root + '/sources/' + name))!
 		os.write_file(root + '/sources/' + name, data)!
 	}
-	for collection in [retained_modules, fixture_sources] {
-		for name, data in collection {
-			os.mkdir_all(os.dir(root + '/sources/' + name))!
-			os.write_file(root + '/sources/' + name, data)!
-		}
+	for name, data in retained_modules {
+		os.mkdir_all(os.dir(root + '/sources/' + name))!
+		os.write_file(root + '/sources/' + name, data)!
 	}
 	// These files document the source identities supplied with the pinned
 	// binaries; this is not a claim that those binaries were rebuilt here.
-	for name, data in fixture_sources {
+	for name in fixture_source_paths {
 		revision := if name.starts_with('desktop/') || name.starts_with('build-support/android/accountui/') {
 			helper_revision
 		} else {
 			controller_revision
 		}
-		if command(root, 'source-' + name.replace('/', '_'), ['/usr/bin/git', '-C',
-			'/Users/alex/code/vinix', 'show', revision + ':' + name])! != data {
-			return error('embedded diagnostic source differs from its supplied revision: ' + name)
-		}
+		data := command(root, 'source-' + name.replace('/', '_'), ['/usr/bin/git', '-C',
+			'/Users/alex/code/vinix', 'show', revision + ':' + name])!
+		os.mkdir_all(os.dir(root + '/sources/' + name))!
+		os.write_file(root + '/sources/' + name, data)!
 	}
 }
 
@@ -549,7 +568,9 @@ fn build_guest(root string, mut inputs map[string]string) ! {
 	write_json(root + '/guest-source-closure.json', closure)!
 	mut args := flags.clone()
 	args << ['-o', root + '/payload/bin/account-ui-guest', source]
-	command(root, 'build-guest', args)!
+	// Production AArch64 C optimization can exceed the short metadata-command
+	// limit on a shared host; retain a separate bounded compilation budget.
+	command_limit(root, 'build-guest', args, 0, 900 * time.second)!
 	if hash(compiler)! != compiler_pin {
 		return error('guest compiler pin differs after compilation')
 	}
@@ -772,6 +793,17 @@ fn self_test() ! {
 		sha256.sum(compiled_guest.bytes()).hex() + ' ' + sha256.sum(compiled_collector.bytes()).hex())
 }
 
+fn deadline_check(root string) ! {
+	if _ := command_limit(root, 'deadline-negative', ['/bin/sleep', '1'], 0, 20 * time.millisecond) {
+		return error('overdue command accepted')
+	}
+	deadline_receipt := json2.decode[map[string]json2.Any](os.read_file(root + '/commands/deadline-negative.json')!)!
+	if !deadline_receipt['timed_out']!.bool() || deadline_receipt['exit_code']!.int() == 0
+		|| deadline_receipt['argv']!.as_array().map(it.str()) != ['/bin/sleep', '1'] {
+		return error('deadline command failure receipt differs')
+	}
+}
+
 fn host_check(path string) ! {
 	root := external(path)!
 	os.mkdir(root, mode: 0o700)!
@@ -782,6 +814,7 @@ fn host_check(path string) ! {
 	mut inputs := map[string]string{}
 	build_guest(root, mut inputs)!
 	self_test()!
+	deadline_check(root)!
 	if _ := external(root) { return error('existing output accepted') }
 	if _ := external(os.dir(root) + '/' + 'x'.repeat(104)) {
 		return error('overlong QMP path accepted')
@@ -821,13 +854,22 @@ fn host_check(path string) ! {
 		'kind':         json2.Any('vinix-account-ui-stage-host-check-v1')
 		'checks':       json2.Any(['static-AArch64-guest', 'embedded-sources', 'source-revisions',
 			'configuration', 'collision', 'exact-overlay-allowlist', 'archive-readback',
-			'digest-rejection', 'fresh-output', 'QMP-path-limit', 'incomplete-baseline-receipt'].map(json2.Any(it)))
+			'digest-rejection', 'fresh-output', 'QMP-path-limit', 'incomplete-baseline-receipt',
+			'bounded-command-deadline-receipt'].map(json2.Any(it)))
 		'guest_sha256': json2.Any(hash(root + '/payload/bin/account-ui-guest')!)
 	})!
 	println('ACCOUNT-UI-STAGE HOST-CHECK PASS ' + root + '/checks.json')
 }
 
 fn main() {
+	if os.args.len == 3 && os.args[1] == '--command-check' {
+		root := external(os.args[2]) or { eprintln(err) exit(1) }
+		os.mkdir(root, mode: 0o700) or { eprintln(err) exit(1) }
+		os.mkdir(root + '/commands', mode: 0o755) or { eprintln(err) exit(1) }
+		deadline_check(root) or { eprintln(err) exit(1) }
+		println('ACCOUNT-UI-STAGE COMMAND-CHECK PASS deadline rejected owned-child reaped receipt retained')
+		return
+	}
 	if os.args.len == 3 && os.args[1] == '--host-check' {
 		host_check(os.args[2]) or {
 			eprintln(err)
