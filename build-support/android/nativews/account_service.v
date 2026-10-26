@@ -196,7 +196,10 @@ fn ws_auth_continued(e voidptr, response voidptr) {
 fn ws_auth_extract(e voidptr, bundle voidptr, response voidptr) voidptr {
 	unsafe {
 		if bundle == nil || ws_auth_origin == nil { return nil }
-		args := [Value{l:bundle},Value{l:response},Value{l:ws_account_java_text(e,ws_auth_origin)}]!
+		args := &Value(C.alloca(3 * sizeof(Value)))
+		args[0] = Value{l:bundle}
+		args[1] = Value{l:response}
+		args[2] = Value{l:ws_account_java_text(e,ws_auth_origin)}
 		if args[2].l == nil || pending(e) { return nil }
 		return static_obj(e,c'android/atl/VinixAccountInteraction',c'extract',c'(Landroid/os/Bundle;Landroid/accounts/IAccountAuthenticatorResponse;Ljava/lang/String;)Landroid/content/Intent;',&args[0])
 	}

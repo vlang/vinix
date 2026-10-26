@@ -34,6 +34,7 @@ module main
 #include <stdlib.h>
 #include <string.h>
 fn C.calloc(u64,u64) voidptr
+fn C.alloca(u64) voidptr
 fn C.free(voidptr)
 fn C.strdup(&char) &char
 fn C.strcmp(&char,&char) int
