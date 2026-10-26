@@ -129,3 +129,27 @@ fn test_policy_id_cannot_complete_cookie_request() {
 	assert callback.header.op == .policy_request && callback.payload == policy
 	unsafe { callback.payload.free() }
 }
+
+fn test_public_abi_roundtrip_and_descriptor_ownership() {
+	sockets := pair()
+	handle := abi_open(sockets[0])
+	assert handle != unsafe { nil }
+	defer { C.close(sockets[1]) }
+	get := [u8(1), 0, 0, 0, `x`]
+	request := abi_submit(handle, u16(browseripc.Op.cookie_get), 0, 0, 0, get.data, u32(get.len))
+	assert request == 1
+	expected := 'session=opaque'.bytes()
+	send_bytes(sockets[1], wire(.cookie_result, request, 0, 0, 0, expected))
+	mut header := []u8{len: browseripc.header_size}
+	mut payload := unsafe { &u8(nil) }
+	mut length := u32(0)
+	assert abi_read(handle, request, header.data, &payload, &length, 500) == 1
+	decoded := browseripc.decode_header(header, .engine_to_client) or { panic(err) }
+	assert decoded.op == .cookie_result && decoded.request == request
+	assert length == expected.len
+	assert unsafe { payload.vbytes(int(length)) } == expected
+	assert abi_read(handle, 0, header.data, &payload, &length, 0) == 0
+	abi_close(handle)
+	assert C.fcntl(sockets[0], C.F_GETFD) == -1
+	abi_close(unsafe { nil })
+}

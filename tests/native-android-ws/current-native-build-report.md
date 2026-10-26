@@ -1,5 +1,27 @@
 # Complete current JNI provider
 
+The r17 provider adds numeric browser transport startup diagnostics from
+`16f020ef0` to the descriptions framework build. The strict AArch64 compile,
+shared link, exact source export comparison and consumed-header checks pass.
+The source and compiler dependency policy remains unchanged.
+
+- Complete retained bundle: `/Users/alex/.local/state/vinix/android/current-native-build-2026-10-26-r17`.
+- Bundle `sha256.json`: `77503d184cc53fe3527f1949f7b88648b5a6bacd1e6b74bd82acb82fec222419`.
+- `native/libvinix-android-native.so`: `70b8db58c59d769f4f4ae4e6775fb7c3a2c4c9af42cfd3f14076092ec14818c0`.
+- Source revision: `13783410eccce99c8903c38cd2defee2b7353d75`.
+- Retained `native/atlframework/webview.v`: `a41bacd6b18a0332daca5e0ccd2beb324d1f6ac5f2acccd81feba695607f7859`.
+- Retained builder source: `1f68bc792e31031f9312ea2d9b26fb2dedf060c58c59f6357eb57476cdaf1015`.
+- Descriptions framework `sha256.json`: `d898fdcca66df0c32b9863dca99c7185d10f8e3b3fb5ab7708999b3619803021`.
+
+The independent `build-bundle-check.v` check verifies all 1,196 retained files
+against the exact manifest. Receipt:
+`/Users/alex/.local/state/vinix/android/current-native-build-r17-audit.json`,
+SHA-256 `70349433df94dba32db2f5c6d3c83de8f39b982feb7b5783101fd8dc9b676793`.
+The maintained builder self-test passed before this build. These results do
+not establish guest browser startup or successful Google account sign-in.
+
+## Previous r16 evidence
+
 The r16 complete `atlframework` and `nativews` provider passed the strict
 AArch64 shared build against the 2,104-class descriptions framework. It adds
 the real `getAuthenticatorTypes` adapter from `56cdb03c0`, converting bounded

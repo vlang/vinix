@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Build current launch executables or account transport from retained sources.
+// Build current launch executables or account/browser transports from retained sources.
 // No runtime composition, guest execution or Google sign-in occurs.
 module main
 
@@ -406,6 +406,48 @@ fn account_exports(closure map[string]string, listing string) ![]string {
 	}
 	expected.sort()
 	return expected
+}
+
+fn transport_module(profile string) !string {
+	return match profile {
+		'account' { 'accountclient' }
+		'browser' { 'browserclient' }
+		else { return error('unknown shared transport profile') }
+	}
+}
+
+fn browser_exports(expected []string, listing string) ![]string {
+	mut required := ['vinix_android_browser_open', 'vinix_android_browser_submit',
+		'vinix_android_browser_read', 'vinix_android_browser_close']
+	required.sort()
+	mut source := expected.clone()
+	source.sort()
+	mut actual := []string{}
+	for line in listing.split_into_lines() {
+		fields := line.fields()
+		if fields.len >= 3 && fields.last().starts_with('vinix_android_browser_') {
+			if fields[fields.len - 2] != 'T' { return error('browser ABI export is not code') }
+			actual << fields.last()
+		}
+	}
+	actual.sort()
+	if source != required || actual != required { return error('exact browser transport ABI differs') }
+	return required
+}
+
+fn transport_exports(closure map[string]string, listing string, profile string) ![]string {
+	if profile == 'account' { return account_exports(closure, listing) }
+	module_name := transport_module(profile)!
+	mut expected := []string{}
+	for path in closure.keys().filter(it.ends_with('.v') && it.contains('/' + module_name + '/')) {
+		for line in os.read_file(path)!.split_into_lines() {
+			trimmed := line.trim_space()
+			if trimmed.starts_with("@[export: '") && trimmed.ends_with("']") {
+				expected << trimmed.all_after("@[export: '").all_before("']")
+			}
+		}
+	}
+	return browser_exports(expected, listing)
 }
 
 fn set_compiler(path string) {
@@ -816,7 +858,9 @@ fn account_sqlite(root string, base_pins map[string]string) !map[string]string {
 	return pins
 }
 
-fn build_account(root string) ! {
+fn build_transport(root string, profile string) ! {
+	module_name := transport_module(profile)!
+	output_relative := 'lib/libvinix-android-' + profile + '.so'
 	if hash(base + '/sha256.json')! != base_seal { return error('sealed r5 baseline differs') }
 	base_pins := json2.decode[map[string]string](os.read_file(base + '/sha256.json')!)!
 	copy_pin(base + '/sha256.json', root + '/baseline-sha256.json', base_seal)!
@@ -835,8 +879,8 @@ fn build_account(root string) ! {
 	set_compiler(root + '/tools/v')
 	mut discover := flags(root + '/tools/v', repo + '/build-support/android|@vlib')
 	discover << ['-enable-globals', '-manualfree', '-shared', '-d', 'no_backtrace', '-d', 'no_segfault_handler']
-	discover << ['-print-v-files', repo + '/build-support/android/accountclient']
-	originals := freeze_closure(root, 'account', command(root, 'account-closure', discover)!)!
+	discover << ['-print-v-files', repo + '/build-support/android/' + module_name]
+	originals := freeze_closure(root, profile, command(root, profile + '-closure', discover)!)!
 	write_json(root + '/current-inputs.json', originals)!
 	unchanged(originals)!
 	mut cross_pins := cross_inputs(root, base_pins)!
@@ -850,51 +894,51 @@ fn build_account(root string) ! {
 		for path, pin in account_sqlite(root, base_pins)! { cross_pins[path] = pin }
 		runtime_dependencies['lib/libsqlite3.so.0'] = hash(root + '/lib/libsqlite3.so.0')!
 	}
-	closure := frozen_pins(root, 'account')!
+	closure := frozen_pins(root, profile)!
 	v := os.dir(closure_vlib(closure)!) + '/v'
 	copy_pin(root + '/tools/v', v, compiler_pin)!
 	os.chmod(v, 0o755)!
 	set_compiler(v)
 	imports := closure_imports(closure)!
-	source := root + '/closure/account/' + (repo + '/build-support/android/accountclient').trim_left('/')
+	source := root + '/closure/' + profile + '/' + (repo + '/build-support/android/' + module_name).trim_left('/')
 	mut account_flags := flags(v, imports)
 	account_flags << ['-enable-globals', '-manualfree', '-shared', '-d', 'no_backtrace', '-d', 'no_segfault_handler']
 	mut listing := account_flags.clone()
 	listing << ['-print-v-files', source]
-	check_frozen_listing(closure, command_at(root, 'frozen-account-closure', os.dir(v), listing)!)!
-	generated := root + '/generated/account.c'
+	check_frozen_listing(closure, command_at(root, 'frozen-' + profile + '-closure', os.dir(v), listing)!)!
+	generated := root + '/generated/' + profile + '.c'
 	mut generate := account_flags.clone()
 	generate << ['-o', generated, source]
-	command_at(root, 'generate-account', os.dir(v), generate)!
+	command_at(root, 'generate-' + profile, os.dir(v), generate)!
 	unchanged(closure)!
 	mut includes := if uses_zlib { ['-I' + root + '/zlib/native'] } else { []string{} }
 	includes << native_includes(closure)
 	if uses_sqlite { includes << '-I' + root + '/native' }
-	check_headers_flags(root, 'account', generated, cross_pins, closure, includes, ['-fPIC'])!
-	if uses_zlib { check_zlib_headers(root, 'account')! }
-	object := root + '/generated/account.o'
+	check_headers_flags(root, profile, generated, cross_pins, closure, includes, ['-fPIC'])!
+	if uses_zlib { check_zlib_headers(root, profile)! }
+	object := root + '/generated/' + profile + '.o'
 	mut compile := [cross, '-v', '-D_GNU_SOURCE', '-O2', '-fwrapv', '-pthread', '-fPIC',
 		'-Werror=implicit-function-declaration', '-Werror=int-conversion']
 	compile << includes
 	compile << ['-c', generated, '-o', object]
-	command(root, 'compile-account', compile)!
+	command(root, 'compile-' + profile, compile)!
 	runtime_source := closure_vlib(closure)! + '/builtin/segfault_handler_nix.c'
 	if runtime_source !in closure { return error('missing retained Unix signal runtime') }
-	runtime_object := root + '/generated/account-runtime.o'
-	check_headers_flags(root, 'account-runtime', runtime_source, cross_pins, closure, includes, ['-fPIC'])!
+	runtime_object := root + '/generated/' + profile + '-runtime.o'
+	check_headers_flags(root, profile + '-runtime', runtime_source, cross_pins, closure, includes, ['-fPIC'])!
 	mut runtime_compile := [cross, '-v', '-D_GNU_SOURCE', '-O2', '-fwrapv', '-pthread', '-fPIC',
 		'-Werror=implicit-function-declaration', '-Werror=int-conversion']
 	runtime_compile << includes
 	runtime_compile << ['-c', runtime_source, '-o', runtime_object]
-	command(root, 'compile-account-runtime', runtime_compile)!
-	output := root + '/lib/libvinix-android-account.so'
+	command(root, 'compile-' + profile + '-runtime', runtime_compile)!
+	output := root + '/' + output_relative
 	mut link := [cross, '-v', '-shared', '-pthread', '-Wl,-z,defs', '-Wl,-z,max-page-size=65536',
 		'-Wl,-t', object, runtime_object]
 	if uses_sqlite { link << root + '/lib/libsqlite3.so.0' }
 	if uses_zlib { link << root + '/zlib/lib/libz.a' }
 	link << ['-ldl', '-lm', '-o', output]
-	trace := command(root, 'build-account', link)!
-	check_link(root, 'account', trace, [object, runtime_object], cross_pins)!
+	trace := command(root, 'build-' + profile, link)!
+	check_link(root, profile, trace, [object, runtime_object], cross_pins)!
 	if uses_zlib { zlib_link_trace(trace, root + '/zlib/lib/libz.a')! }
 	account_elf(os.read_bytes(output)!)!
 	nm := command(root, 'cross-tool-nm', [cross, '-print-prog-name=nm'])!.trim_space()
@@ -902,7 +946,7 @@ fn build_account(root string) ! {
 	nm_pin := hash(nm_path)!
 	copy_pin(nm_path, root + '/additional-cross/' + nm_path.trim_left('/'), nm_pin)!
 	write_json(root + '/nm-input.json', {nm_path: nm_pin})!
-	exports := account_exports(closure, command(root, 'account-exports', [nm_path, '-D', '--defined-only', output])!)!
+	exports := transport_exports(closure, command(root, profile + '-exports', [nm_path, '-D', '--defined-only', output])!, profile)!
 	if hash(nm_path)! != nm_pin { return error('export tool changed') }
 	unchanged(closure)!
 	unchanged(cross_pins)!
@@ -912,14 +956,14 @@ fn build_account(root string) ! {
 	mut dependency_fields := map[string]json2.Any{}
 	for path, pin in runtime_dependencies { dependency_fields[path] = pin }
 	write_json(root + '/build.json', {
-		'kind': json2.Any('vinix-current-account-v1')
-		'scope': json2.Any('Current account transport ABI; retained V/C sources and cross inputs; no guest or account login claim.')
+		'kind': json2.Any('vinix-current-' + profile + '-v1')
+		'scope': json2.Any('Current ' + profile + ' transport ABI; retained V/C sources and cross inputs; no guest or account login claim.')
 		'source_revision': json2.Any(revision)
 		'native_base': json2.Any(base)
 		'native_base_sha256': json2.Any(base_seal)
 		'compiler_sha256': json2.Any(compiler_pin)
 		'exports': json2.Any(exports)
-		'outputs_sha256': json2.Any({'lib/libvinix-android-account.so': json2.Any(hash(output)!)})
+		'outputs_sha256': json2.Any({output_relative: json2.Any(hash(output)!)})
 		'runtime_dependencies_sha256': json2.Any(dependency_fields)
 		'completed_utc': json2.Any(time.utc().str())
 	})!
@@ -931,7 +975,7 @@ fn build_account(root string) ! {
 	mut bundle := map[string]string{}
 	inventory(root, '', mut bundle)!
 	write_json(root + '/sha256.json', bundle)!
-	println('CURRENT-ACCOUNT-BUILD-PASS bundle=' + root + ' seal=' + hash(root + '/sha256.json')!)
+	println('CURRENT-' + profile.to_upper() + '-BUILD-PASS bundle=' + root + ' seal=' + hash(root + '/sha256.json')!)
 }
 
 fn bootstrap(root string, framework string, profile string) ! {
@@ -975,8 +1019,8 @@ fn bootstrap(root string, framework string, profile string) ! {
 	compile_host(root, os.dir(v), [v, '-new-compiler', '-gc', 'none', '-nocache', '-cc', 'cc',
 		'-showcc', '-path', imports, '-o', root + '/tools/frozen-builder', frozen_source], closure)!
 	unchanged(closure)!
-	argv := if framework == '--account' {
-		[root + '/tools/frozen-builder', '--frozen-account', root]
+	argv := if framework in ['--account', '--browser'] {
+		[root + '/tools/frozen-builder', '--frozen-' + framework.trim_left('-'), root]
 	} else if profile == 'token-cache-controller' {
 		[root + '/tools/frozen-builder', '--frozen-token-cache-controller', framework, root]
 	} else if profile == 'ui-controller' {
@@ -995,6 +1039,28 @@ fn bootstrap(root string, framework string, profile string) ! {
 }
 
 fn self_test() ! {
+	if transport_module('account')! != 'accountclient' || transport_module('browser')! != 'browserclient' {
+		return error('transport source module differs')
+	}
+	mut invalid_transport_rejected := false
+	transport_module('other') or { invalid_transport_rejected = true }
+	if !invalid_transport_rejected { return error('accepted unknown transport') }
+	public := ['vinix_android_browser_open', 'vinix_android_browser_submit',
+		'vinix_android_browser_read', 'vinix_android_browser_close']
+	listing := public.map('0000000000000001 T ' + it).join('\n')
+	browser_exports(public, listing)!
+	for invalid in [public[..3].map('1 T ' + it).join('\n'),
+		listing + '\n1 T vinix_android_browser_extra', listing + '\n1 T ' + public[0],
+		listing.replace('T ' + public[0], 'D ' + public[0])] {
+		browser_exports(public, invalid) or { continue }
+		return error('accepted changed browser linked ABI')
+	}
+	mut duplicate_source := public.clone()
+	duplicate_source << public[0]
+	for invalid in [public[..3].clone(), duplicate_source] {
+		browser_exports(invalid, listing) or { continue }
+		return error('accepted changed browser source ABI')
+	}
 	valid_zlib := {
 		'build.json': 'a'.repeat(64)
 		'lib/libz.a': 'b'.repeat(64)
@@ -1139,7 +1205,7 @@ fn self_test() ! {
 	rejected = false
 	account_elf(bytes) or { rejected = true }
 	if !rejected { return error('accepted shared library interpreter') }
-	println('CURRENT-LAUNCH-BUILDER-SELF-TEST-PASS dependencies, source closure, seven-argument ABI, executable/shared ELF program headers, exact Linux waitpid correction, executable profiles')
+	println('CURRENT-LAUNCH-BUILDER-SELF-TEST-PASS dependencies, source closure, seven-argument ABI, executable/shared ELF program headers, exact Linux waitpid correction, executable profiles, exact browser transport ABI')
 }
 
 fn main() {
@@ -1162,14 +1228,15 @@ fn main() {
 		}
 		return
 	}
-	if os.args.len == 3 && os.args[1] == '--frozen-account' {
+	if os.args.len == 3 && os.args[1] in ['--frozen-account', '--frozen-browser'] {
 		root := os.abs_path(os.args[2])
-		if os.executable() != root + '/tools/frozen-builder' || !root.starts_with(state + 'current-account-build-') {
-			eprintln('internal account build requires its retained executable')
+		profile := os.args[1].all_after('--frozen-')
+		if os.executable() != root + '/tools/frozen-builder' || !root.starts_with(state + 'current-' + profile + '-build-') {
+			eprintln('internal transport build requires its retained executable')
 			exit(2)
 		}
 		os.chdir(repo)!
-		build_account(root) or {
+		build_transport(root, profile) or {
 			eprintln(err)
 			exit(1)
 		}
@@ -1197,18 +1264,18 @@ fn main() {
 	}
 	controller := os.args.len == 4 && os.args[1] in ['--token-cache-controller', '--ui-controller']
 	if os.args.len != 3 && !controller {
-		eprintln('usage: build-current-launch [--token-cache-controller|--ui-controller] SEALED_FRAMEWORK_BUNDLE|--account FRESH_EXTERNAL_OUTPUT')
+		eprintln('usage: build-current-launch [--token-cache-controller|--ui-controller] SEALED_FRAMEWORK_BUNDLE FRESH_EXTERNAL_OUTPUT; or build-current-launch --account|--browser FRESH_EXTERNAL_OUTPUT')
 		exit(2)
 	}
-	account := !controller && os.args[1] == '--account'
-	profile := if controller { os.args[1].trim_left('-') } else { 'launch' }
-	framework := if account { '--account' } else { os.abs_path(os.args[if controller { 2 } else { 1 }]) }
+	transport := !controller && os.args[1] in ['--account', '--browser']
+	profile := if controller || transport { os.args[1].trim_left('-') } else { 'launch' }
+	framework := if transport { os.args[1] } else { os.abs_path(os.args[if controller { 2 } else { 1 }]) }
 	root := os.abs_path(os.args[if controller { 3 } else { 2 }])
-	prefix := if account { 'current-account-build-' } else { profile_prefix(profile)! }
-	if (!account && (!framework.starts_with(state) || os.real_path(framework) != framework))
+	prefix := if transport { 'current-' + profile + '-build-' } else { profile_prefix(profile)! }
+	if (!transport && (!framework.starts_with(state) || os.real_path(framework) != framework))
 		|| !root.starts_with(state + prefix) || os.exists(root)
 		|| os.is_link(root) || os.real_path(os.dir(root)) != os.dir(root) {
-		eprintln('canonical sealed framework and fresh external current-launch-build or current-account-build output required')
+		eprintln('canonical sealed framework and fresh external current profile build output required')
 		exit(2)
 	}
 	os.chdir(repo)!
