@@ -56,6 +56,21 @@ Evidence under `/Users/alex/.local/state/vinix/android/`:
   rejection checks, including ordered original-mode inheritance. Retained tool
   binaries and build logs use the `maps-account-stage-tool-r*` names; exact
   sources are embedded in each tool.
+- `maps-account-r1` passed final staging with tool source `af6402672` and
+  controller fix `27d5bfe47`. Its complete pre-kernel-patch manifest SHA-256 is
+  `2982ad3dd8ac1e8de3c7169382788397be9551f58a19059e58311282a8380070`;
+  stage receipt SHA-256 is
+  `88fb4254f5baec7b4fc70a56314ea103c35bb051e1963bdc895739f67af04552`.
+  `maps-account-stage-request-r1.json` freezes framework r3, JNI r15, account r5,
+  launcher r12, Maps controller r3, browser deployment r7, token APK r5 and
+  token controller r1. Its SHA-256 is
+  `929a6938e07daef5b32f42dee91857734da75ff08cdf206c04e7c1d60ea714fb`.
+  Complete frozen input rechecks, both SDK 29 signatures, overlay readback and
+  all six unchanged module checks passed. Independent comparison found zero
+  kind/mode mismatches across 36 destination collisions in 6,295 base headers
+  and 1,926 planned entries. See `maps-account-stage-run-r1.log` and the bundle's
+  retained inventories. This image still requires the separately audited
+  recvmsg kernel patch before guest execution.
 
 The final runtime bundles and actual guest results are separate evidence.
 Staging and synthetic fixture success must not be reported as Google account
