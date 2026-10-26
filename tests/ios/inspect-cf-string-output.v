@@ -27,8 +27,12 @@ fn main() {
 		length := if text == '' { 0 } else if text == 'AZ' { 2 } else { 6 }
 		for encoding in [u32(0x100), 0x14000100, 0x10000100, 0x08000100, 0x600] {
 		for external in [false, true] {
+		mut seen_ranges := map[string]bool{}
 		for range in [OutputRange{0, length}, OutputRange{3, 1}, OutputRange{4, 1}, OutputRange{3, 2}, OutputRange{0, 0}] {
 			if range.location + range.length > length { continue }
+			key := '${range.location},${range.length}'
+			if key in seen_ranges { continue }
+			seen_ranges[key] = true
 		for capacity in [i64(0), 1, 2, 3, 4, 5, 7, 16] {
 		for query in [false, true] {
 			mut buffer := [u8(0xa5)].repeat(32)

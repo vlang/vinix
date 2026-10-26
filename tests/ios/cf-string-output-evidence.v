@@ -132,7 +132,7 @@ fn native_case(lines []string, key string, converted int, used int, bytes string
 
 fn native_observations(out string) ! {
 	lines := require_text(out, 'native-output.txt', [])!.split_into_lines()
-	if lines.len != 1440 { return error('incomplete native output matrix') }
+	if lines.len != 1280 { return error('incomplete native output matrix') }
 	mut seen := map[string]bool{}
 	for line in lines {
 		key := line.all_before(' converted=')
