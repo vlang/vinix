@@ -41,6 +41,7 @@ fn mutable_string_types(name string, meta bool, selector string) ?string {
 			'lengthOfBytesUsingEncoding:' { 'Q24@0:8Q16' }
 			'isEqualToString:' { 'B24@0:8@16' }
 			'stringByAppendingString:' { '@24@0:8@16' }
+			'rangeOfCharacterFromSet:' { '{_NSRange=QQ}24@0:8@16' }
 			else { return none }
 		}
 	}

@@ -38,7 +38,10 @@ fn objc_load_class(cls u64, mut visited map[u64]bool) {
 	info := ios_runtime.classes[cls] or { panic('iOS: unknown load class') }
 	objc_load_class(info.parent, mut visited)
 	meta := ios_runtime.classes[read64(cls)] or { panic('iOS: unknown load metaclass') }
-	if meta.load_imp != 0 { unsafe { ObjVoid(voidptr(meta.load_imp))(cls, c'load') } }
+	if meta.load_imp != 0 {
+		if ios_runtime.trace { eprintln('iOS +load: ${info.name} at 0x${meta.load_imp.hex()}') }
+		unsafe { ObjVoid(voidptr(meta.load_imp))(cls, c'load') }
+	}
 }
 
 fn objc_load_image() {
@@ -50,6 +53,7 @@ fn objc_load_image() {
 	// Categories keep their own +load IMP even when another category overrides
 	// the dispatch-table entry. +load is never inherited or sent as a message.
 	for item in ios_runtime.load_categories {
+		if ios_runtime.trace { eprintln('iOS category +load: ${ctext(u64(objc_class_name(item.cls)))} at 0x${item.imp.hex()}') }
 		unsafe { ObjVoid(voidptr(item.imp))(item.cls, c'load') }
 	}
 }

@@ -222,6 +222,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if url_session_task_dispatch(object, selector, mut frame) { return true }
 	if sort_descriptor_dispatch(object, selector, mut frame) { return true }
 	if regular_expression_dispatch(object, selector, mut frame) { return true }
+	if ns_string_character_search_dispatch(object, selector, mut frame) { return true }
 	if mutable_string_dispatch(object, selector, mut frame) { return true }
 	if cookie_dispatch(object, selector, mut frame) { return true }
 	if webkit_dispatch(object, selector, mut frame) { return true }

@@ -33,7 +33,7 @@ fn main() {
 	revision := os.args[3]
 	if revision.len != 40 || revision.bytes().any(!it.is_hex_digit()) { panic('invalid revision') }
 	os.chdir(root) or { panic(err) }
-	listing := os.exec(['git', 'ls-tree', '-r', '--name-only', revision, '--', 'compat/ios', 'tests/ios/native-checks.v', 'tests/ios/native-init.v', 'tests/ios/notification-checks.v', 'tests/ios/notification-vm.v', 'tests/ios/image-initializers-evidence.v', 'tests/ios/image-initializers-input-inventory.v'])
+	listing := os.exec(['git', 'ls-tree', '-r', '--name-only', revision, '--', 'compat/ios', 'tests/ios/native-checks.v', 'tests/ios/native-init.v', 'tests/ios/notification-checks.v', 'tests/ios/notification-vm.v', 'tests/ios/image-initializers-evidence.v', 'tests/ios/image-initializers-input-inventory.v', 'tests/ios/string-character-search-evidence.v', 'tests/ios/startup-host.v', 'tests/ios/inspect-string-character-search.v'])
 	if listing.exit_code != 0 { panic(listing.output) }
 	paths_in_revision := listing.output.trim_space().split_into_lines()
 	os.write_file(out + '/source-files.txt', paths_in_revision.join('\n') + '\n') or { panic(err) }

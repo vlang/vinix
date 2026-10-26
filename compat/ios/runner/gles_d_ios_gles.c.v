@@ -74,9 +74,17 @@ __global gles_runtime = unsafe { &GlesRuntime(nil) }
 
 fn gles_start() ! {
 	gles_runtime = &GlesRuntime{}
-	gles_runtime.functions = C.dlopen(c'libGLESv2.so.2', C.RTLD_NOW | C.RTLD_LOCAL)
+	$if macos {
+		gles_runtime.functions = C.dlopen(c'libGLESv2.dylib', C.RTLD_NOW | C.RTLD_LOCAL)
+	} $else {
+		gles_runtime.functions = C.dlopen(c'libGLESv2.so.2', C.RTLD_NOW | C.RTLD_LOCAL)
+	}
 	if gles_runtime.functions == unsafe { nil } { return error('iOS: cannot load Mesa GLES library') }
-	gles_runtime.compression = C.dlopen(c'libz.so.1', C.RTLD_NOW | C.RTLD_LOCAL)
+	$if macos {
+		gles_runtime.compression = C.dlopen(c'/usr/lib/libz.1.dylib', C.RTLD_NOW | C.RTLD_LOCAL)
+	} $else {
+		gles_runtime.compression = C.dlopen(c'libz.so.1', C.RTLD_NOW | C.RTLD_LOCAL)
+	}
 	if gles_runtime.compression == unsafe { nil } { C.dlclose(gles_runtime.functions); return error('iOS: cannot load native zlib') }
 	if C.ios_key_create(unsafe { &gles_runtime.current_key }, unsafe { voidptr(gles_current_destructor) }) != 0 {
 		C.dlclose(gles_runtime.functions)
