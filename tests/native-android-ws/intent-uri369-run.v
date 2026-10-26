@@ -614,6 +614,8 @@ fn semantic_at(kind string, raw map[string]json2.Any, log string, apk string, st
   require(frames.len == prefixes.len, 'isolated old application frames')!
   for i, prefix in prefixes { require(frames[i].starts_with(prefix), 'ordered old application frame')! }
   require(lines.index(frames[0]) > failure, 'old frames follow direct failure')!
+  require(lines.index(frames.last()) < lines.index('APK-SUITE-EXIT id=bootstrap-fixture code=1 native_observed=true gtk_x11_absent=true'),
+   'old application frames precede guest exit1')!
   require(lines.filter(it == "ANDROID-WS-FAIL start activity").len == 1 && log.count("ANDROID-WS-FAIL") == 1, "start activity failure")!
   require(lines.filter(it == "APK-SUITE-EXIT id=bootstrap-fixture code=1 native_observed=true gtk_x11_absent=true").len == 1, "guest exit1")!
   require(raw["outcome"]!.str() == "startup_failed" && raw["process_exited"]!.bool(), "old raw failure")!
@@ -721,6 +723,8 @@ fn self_test() ! {
  }
  rejected('old', old_raw, old_log.replace(frames[3] + '\n', '').replace('INTENT-URI-BEGIN\n',
   frames[3] + '\nINTENT-URI-BEGIN\n'), apk)!
+ exit_line := frames.last() + '\n'
+ rejected('old', old_raw, exit_line + old_log.replace(exit_line, ''), apk)!
  mut missing_rejection := synthetic_raw('old', apk)
  missing_rejection['failure_markers'] = ['ANDROID-WS-FAIL start activity',
   'APK-SUITE-EXIT id=bootstrap-fixture code=1 native_observed=true gtk_x11_absent=true']

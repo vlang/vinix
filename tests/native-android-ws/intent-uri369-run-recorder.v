@@ -11,9 +11,12 @@ fn C.CC_SHA256_Update(voidptr, voidptr, u32) i32
 fn C.CC_SHA256_Final(&u8, voidptr) i32
 
 const state = '/Users/alex/.local/state/vinix/android'
-const root = state + '/intent-uri369-run-bootstrap-build-2026-10-26'
-const baseline = state + '/timing-logger367-framework-build-2026-10-26'
-const baseline_pin = '933baf6da303aebaf262e280e41769c89b61c2f050b481dd4075900a533ad23b'
+const root = state + '/intent-uri369-run-bootstrap-build-b-2026-10-26'
+// The sealed first bootstrap retains the complete qualified367 readback and
+// frozen compiler. Reuse that audited input after the ordering correction.
+const baseline = state + '/intent-uri369-run-bootstrap-build-2026-10-26'
+const baseline_pin = 'f3aeac7aa1ff66543a1afd520c1cd2363982fe9250c6dfb475e5c3e1e1c8873a'
+const framework_baseline_pin = '933baf6da303aebaf262e280e41769c89b61c2f050b481dd4075900a533ad23b'
 const checkout_source = '/Users/alex/code/vinix/tests/native-android-ws/intent-uri369-run.v'
 const compiler_pin = '109a0bad877cf42cd19382a87d3e3d62e9c153e3d74a566b2b3e650a1aec318e'
 const checker = '/Users/alex/code/vinix/build/android-maps/build-bundle-check290'
@@ -95,10 +98,17 @@ fn run() ! {
  recorder_committed := record('committed-recorder', ['/usr/bin/git', 'show', revision + ':tests/native-android-ws/intent-uri369-run-recorder.v'])!
  assert recorder_committed == os.read_file(@FILE)!
 	record('verify-baseline', [checker, baseline, baseline_pin, root + '/baseline-receipt.json'])!
+	framework_receipt := json2.decode[map[string]json2.Any](os.read_file(baseline + '/baseline-receipt.json')!)!
+	assert framework_receipt['exit_code']!.int() == 0 && framework_receipt['files_checked']!.int() == 41884
+	assert framework_receipt['every_file_hash_matches']!.bool() && framework_receipt['exact_file_set']!.bool()
+	assert framework_receipt['manifest_sha256']!.str() == framework_baseline_pin
+	assert framework_receipt['checker_sha256']!.str() == checker_pin
+	assert framework_receipt['root']!.str() == state + '/timing-logger367-framework-build-2026-10-26'
+	record('retain-framework-receipt', ['/bin/cp', '-c', baseline + '/baseline-receipt.json', root + '/framework367-receipt.json'])!
 	vroot := root + '/frozen/vroot'
 	os.mkdir_all(root + '/frozen')!
-	record('clone-vroot', ['/bin/cp', '-c', '-R', baseline + '/baseline365/baseline361/baseline359/baseline353/frozen/vroot', vroot])!
-	source := vroot + '/source/intent-uri369-run.v'
+	record('clone-vroot', ['/bin/cp', '-c', '-R', baseline + '/frozen/vroot', vroot])!
+	source := vroot + '/source/intent-uri369-run-corrected.v'
 	assert !os.exists(source)
 	record('retain-source', ['/bin/cp', '-c', checkout_source, source])!
 	assert hash(source)! == source_pin
@@ -131,7 +141,8 @@ fn run() ! {
 	write_json(root + '/build.json', {'source_commit': json2.Any(revision), 'source_sha256': json2.Any(hash(source)!),
 		'binary_sha256': json2.Any(hash(output)!), 'compiler_sha256': json2.Any(compiler_pin),
 		'host_tools': json2.decode[json2.Any](json2.encode(host_tools))!,
-		'v_input_count': json2.Any(before.len), 'baseline_manifest_sha256': json2.Any(baseline_pin)})!
+		'v_input_count': json2.Any(before.len), 'baseline_manifest_sha256': json2.Any(baseline_pin),
+		'framework_baseline_manifest_sha256': json2.Any(framework_baseline_pin)})!
 	mut pins := map[string]string{}
 	inventory(root, '', mut pins)!
 	write_json(root + '/sha256.json', pins)!
