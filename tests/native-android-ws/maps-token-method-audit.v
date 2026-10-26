@@ -12,9 +12,7 @@ const apk_pin = '6218d72f48b184eb71f68879bce48cb9ebb2b510be7f7cff88217ea3fd592bb
 
 fn selected_descriptor(descriptor string) bool {
 	return (descriptor.starts_with('Landroid/accounts/AccountManager;->')
-		&& (descriptor.contains('->getAuthToken(')
-			|| descriptor.contains('->blockingGetAuthToken(')
-			|| descriptor.contains('->invalidateAuthToken(')))
+		&& descriptor.all_after('->').all_before('(').contains('AuthToken'))
 		|| descriptor.starts_with('Lcom/google/android/gms/auth/GoogleAuthUtil;->')
 		|| descriptor.contains('Lcom/google/android/gms/auth/TokenData;')
 		|| descriptor.contains('->getToken(')
