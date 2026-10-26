@@ -183,6 +183,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 		'init', 'copy', 'retain', 'autorelease', 'self' { '@16@0:8' }
 		'class' { '#16@0:8' }
 		'dealloc', 'release' { 'v16@0:8' }
+		'performSelectorOnMainThread:withObject:waitUntilDone:' { 'v36@0:8:16@24B32' }
 		'isKindOfClass:' { 'B24@0:8#16' }
 		'respondsToSelector:' { 'B24@0:8:16' }
 		'methodSignatureForSelector:' { '@24@0:8:16' }

@@ -37,6 +37,7 @@ fn main() {
 	if listing.exit_code != 0 { panic(listing.output) }
 	mut paths_in_revision := listing.output.trim_space().split_into_lines()
 	for checker in ['tests/ios/cf-string-input-run.v', 'tests/ios/cf-string-input-evidence.v', 'tests/ios/inspect-cf-string-input.v', 'tests/ios/probedesktop/peer.c.v', 'tests/ios/desktop-peer-checks.v', 'tests/ios/desktop-probe-run.v', 'tests/ios/desktop-probe-evidence.v', 'tests/ios/thermal-state-prepare.v', 'tests/ios/thermal-state-evidence.v', 'tests/ios/compiled-storyboard-input-inventory.v', 'tests/ios/compiled-storyboard-evidence.v', 'tests/ios/compiled-storyboard-prepare.v', 'tests/ios/nib-archive-checks.v', 'tests/ios/nibfixture/nibfixture.v', 'tests/ios/application-badge-clear-prepare.v', 'tests/ios/application-badge-clear-evidence.v',
+		'tests/ios/main-selector-run.v', 'tests/ios/main-selector-evidence.v',
 		'tests/ios/application-badge-run.v', 'tests/ios/application-badge-evidence.v', 'tests/ios/inspect-application-badge.v', 'tests/ios/window-run.v', 'tests/ios/window-evidence.v', 'tests/ios/string-float-run.v', 'tests/ios/string-float-evidence.v', 'tests/ios/inspect-string-float.v',
 		'tests/ios/string-cstring-run.v', 'tests/ios/string-cstring-evidence.v', 'tests/ios/inspect-string-cstring.v', 'tests/ios/bundle-receipt-run.v', 'tests/ios/bundle-receipt-evidence.v', 'tests/ios/inspect-bundle-receipt.v', 'tests/ios/cf-string-output-run.v', 'tests/ios/cf-string-output-evidence.v', 'tests/ios/inspect-cf-string-output.v', 'tests/ios/search-path-run.v', 'tests/ios/search-path-evidence.v', 'tests/ios/inspect-search-path-calls.v', 'tests/ios/probe-vm-evidence.v', 'tests/ios/probe-vm-tags-evidence.v', 'tests/ios/block-byref-evidence.v', 'tests/ios/dictionary-snapshot-evidence.v', 'tests/ios/inspect-dictionary-snapshot-fault.v', 'tests/ios/inline-pthread-self-run.v', 'tests/ios/inline-pthread-self-evidence.v'] {
 		listing_checker := os.exec(['git', 'ls-tree', '-r', '--name-only', revision, '--', checker])
@@ -92,6 +93,7 @@ fn main() {
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSString.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSPathUtilities.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/CoreFoundation.framework/Versions/A/Headers/CFString.h',
+		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/CoreFoundation.framework/Versions/A/Headers/CFRunLoop.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/objc/runtime.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/iOSSupport/System/Library/Frameworks/UIKit.framework/Versions/A/Headers/UIScene.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/iOSSupport/System/Library/Frameworks/UIKit.framework/Versions/A/UIKit.tbd',

@@ -125,6 +125,11 @@ fn collection_remove(mut header ObjHeader, index int) {
 
 fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	if ns_empty_array_dispatch(object, selector, mut frame) { return true }
+	if selector == 'performSelectorOnMainThread:withObject:waitUntilDone:' {
+		ns_main_selector(object, frame.x[2], frame.x[3], u8(frame.x[4]) != 0)
+		frame.x[0] = 0
+		return true
+	}
 	if selector == 'isKindOfClass:' {
 		frame.x[0] = u64(objc_is_kind(object, frame.x[2]))
 		return true
