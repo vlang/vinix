@@ -1012,6 +1012,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     repository drafts and the previous valid list. Recovery controls stay bounded
     at small sizes, and protected enrollment/revocation/refresh writers retain
     their navigation and close guards.
+    [Compact audit recovery](tests/packages/software-audit-search-check.md#compact-recovery-2026-10-26)
+    retains Reload, complete diagnostics and report readers at 320×240, with
+    Stop while running and frozen-path retries. Combined host checks also cover
+    [installed-name search](tests/packages/software-view-owner-check.md#installed-name-search-2026-10-26)
+    across renamed updates. Normal, production, sanitizer and tracked rendering
+    checks pass; each tracked audit render mode retains zero V bytes and records
+    across 18,000 trees. Guest graphical acceptance remains open.
 - [ ] Package native, Linux, Windows and Apple-compatible apps with isolated
   runtimes, launcher/association registration and clean uninstall behavior.
   - [x] [Signed Neovim terminal packages](tests/packages/neovim-check.md)
