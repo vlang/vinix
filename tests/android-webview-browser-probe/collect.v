@@ -230,10 +230,14 @@ fn self_test() ! {
 	log := frames(payload)
 	exported := parse_export('kernel chatter\n' + log + 'done\n')!
 	assert exported.payload == payload && validate(exported.payload)!.entries == fixture.entries
+	changed := payload.replace('/pinned/font', '/pinned/foNt')
+	changed_sha := sha256.sum(changed.bytes()).hex()
 	for bad in [log.all_before(prefix + 'END'), log + log,
 		log.replace('CHUNK ' + exported.sha256 + ' 0 ', 'CHUNK ' + exported.sha256 + ' 1 '),
 		log.replace('BEGIN ' + exported.sha256, 'BEGIN ' + '0'.repeat(64)),
-		log.replace('CHUNK ', 'OTHER '), log.replace(' 0 ', ' 00 ')] {
+		log.replace('CHUNK ', 'OTHER '), log.replace(' 0 ', ' 00 '),
+		frames(changed).replace(changed_sha, exported.sha256),
+		frames('test').replace('dGVzdA==', 'dGVzdA')] {
 		if _ := parse_export(bad) { return error('malformed export accepted') }
 	}
 	for bad in [
