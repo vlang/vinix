@@ -6,6 +6,7 @@ import crypto.sha256
 import hwhost
 import json2
 import os
+import time
 import tests.packages.audioinputs
 
 #include <sys/stat.h>
@@ -136,6 +137,51 @@ fn checksums(paths map[string]string) !map[string]string {
 	return sums
 }
 
+fn command_refused(argv []string, log string, expected int, diagnostic string) ! {
+	mut child := hwhost.start_child(argv, {}, log)!
+	deadline := hwhost.now_ms() + 300_000
+	for !child.poll() {
+		if hwhost.interrupted() || hwhost.now_ms() >= deadline {
+			child.stop()
+			return error('refusal control interrupted or timed out')
+		}
+		time.sleep(10 * time.millisecond)
+	}
+	os.write_file(log + '.status.json', json2.encode({'exit_code': child.exit_code(), 'expected': expected}) + '\n')!
+	if child.exit_code() != expected || !os.read_file(log)!.contains(diagnostic) {
+		return error('unexpected compiler refusal: ' + log)
+	}
+}
+
+fn strict_pointer_controls(work string, adapter string, mut commands map[string][]string) ! {
+	good := work + '/tone-build/tone.c'
+	bad := work + '/tone-build/incompatible.c'
+	text := os.read_file(good)!
+	original := '#define vinix_pcm_connect(fd, address, length) connect((fd), (const struct sockaddr *)(address), (length))'
+	if !text.contains(original) { return error('generated tone does not contain the reviewed pointer boundary') }
+	os.write_file(bad, text.replace(original, original.replace('(const struct sockaddr *)', '')))!
+	mut args := [adapter, '-static', '-O1', '-w', '-Wno-error=incompatible-pointer-types', '-D_GNU_SOURCE',
+		'-fno-stack-protector', bad, '-o', work + '/tone-build/incompatible', '-lm', '-lpthread']
+	commands['pointer-invalid/link'] = args.clone()
+	os.write_file(work + '/commands.json', json2.encode(commands) + '\n')!
+	command_refused(args, work + '/pointer-invalid.log', 1, 'incompatible-pointer-types')!
+	if os.exists(work + '/tone-build/incompatible') { return error('invalid pointer control produced an executable') }
+	args = [adapter, '-static', '-fpermissive', good, '-o', work + '/tone-build/permissive']
+	commands['permissive/link'] = args.clone()
+	os.write_file(work + '/commands.json', json2.encode(commands) + '\n')!
+	command_refused(args, work + '/permissive.log', 2, 'ARM pointer diagnostics require strict compilation')!
+	args = [adapter, '-static', '-###', '-w', '-Wall', '-Wextra', '-Werror=incompatible-pointer-types',
+		good, '-o', work + '/tone-build/argv-only', '-lm', '-lpthread']
+	commands['driver-argv/inspect'] = args.clone()
+	os.write_file(work + '/commands.json', json2.encode(commands) + '\n')!
+	hwhost.run_tool(args, {}, work + '/driver-argv.log', 300)!
+	trace := os.read_file(work + '/driver-argv.log')!
+	if trace.contains("'-w'") || trace.contains(' -w ') || !trace.contains('-Wall')
+		|| !trace.contains('-Wextra') || !trace.contains('-Werror=incompatible-pointer-types') {
+		return error('ARM driver suppressed or lost reviewed pointer diagnostics')
+	}
+}
+
 // The diagnostic copies only directory entries: target bytes are hardlinked
 // from a prior preserved capture. Its C is generated from current V sources.
 fn actual_links(out string, captured string, adapter_path string, backend_path string, compiler_path string) !map[string]string {
@@ -205,7 +251,7 @@ fn actual_links(out string, captured string, adapter_path string, backend_path s
 		os.write_file(work + '/commands.json', json2.encode(commands) + '\n')!
 		hwhost.run_tool(generate, {}, work + '/' + name + '-generate.log', 300)!
 		trace := if name == 'cross-probe' { 'cross-search.log' } else { 'tone-build/build.log' }
-		compile := [adapter, '-static', '-O1', '-D_GNU_SOURCE', '-fno-stack-protector', generated, '-o', work + '/' + name, '-lm', '-lpthread']
+		compile := [adapter, '-static', '-O1', '-w', '-D_GNU_SOURCE', '-fno-stack-protector', generated, '-o', work + '/' + name, '-lm', '-lpthread']
 		commands[name + '/link'] = compile
 		os.write_file(work + '/commands.json', json2.encode(commands) + '\n')!
 		hwhost.run_tool(compile, {}, work + '/' + trace, 300)!
@@ -214,6 +260,7 @@ fn actual_links(out string, captured string, adapter_path string, backend_path s
 			|| binary[4] != 2 || binary[5] != 1 || binary[16] != 2 || binary[17] != 0 || binary[18] != 183 || binary[19] != 0 { return error('actual link is not an AArch64 ELF executable: ' + name) }
 		audioinputs.verify_trace(os.read_file(work + '/' + trace)!, work, trace, audioinputs.header_allowlist(root, {}, origins))!
 	}
+	strict_pointer_controls(work, adapter, mut commands)!
 	after := checksums(paths)!
 	os.write_file(work + '/input-after.json', json2.encode(after) + '\n')!
 	if before != after { return error('actual-link inputs changed') }
@@ -308,7 +355,13 @@ fn run(out string, adapter string, backend string, captured string, compiler str
 	adapter_inputs := adapter_control(out, adapter, backend)!
 	if adapter_inputs.len != 0 { controls << 'missing-captured-libc-refused-with-original-present' }
 	links := actual_links(out, captured, adapter, backend, compiler)!
-	if links.len != 0 { controls << 'actual-frozen-probe-link'; controls << 'actual-frozen-current-tone-link' }
+	if links.len != 0 {
+		controls << 'actual-frozen-probe-link'
+		controls << 'actual-frozen-current-tone-link-with-inherited-w'
+		controls << 'real-generated-incompatible-pointer-refused'
+		controls << 'arm-fpermissive-refused'
+		controls << 'arm-driver-w-removed-warning-flags-preserved'
+	}
 	os.write_file(out + '/result.json', json2.encode(Report{
 		checker: sha256.sum(os.read_bytes(@FILE)!).hex()
 		helper: sha256.sum($embed_file('audioinputs/tree.v').to_string().bytes()).hex()
