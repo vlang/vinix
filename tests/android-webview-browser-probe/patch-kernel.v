@@ -386,7 +386,7 @@ fn patch(root string, build_root string, receipt_sha string, baseline_pin string
 	unlaunched(root)!
 	provenance := json2.decode[json2.Any](json2.encode({
 		'format':                       json2.Any(1)
-		'scope':                        json2.Any('Fresh diagnostic stage only; unchanged r8 browser payload; no guest execution or Google login evidence.')
+		'scope':                        json2.Any('Fresh diagnostic stage only; prepared browser payload preserved byte-for-byte; no guest execution or Google login evidence.')
 		'created_utc':                  json2.Any(time.utc().str())
 		'baseline_boot_path':           json2.Any(baseline)
 		'baseline_boot_sha256':         json2.Any(baseline_pin)
