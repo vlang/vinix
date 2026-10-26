@@ -58,38 +58,73 @@ fn ws_web_put32(bytes &u8, value u32) {
 fn ws_web_init() bool {
 	unsafe {
 		if ws_browser_initialized { return true }
-		if C.pthread_mutex_init(&ws_browser_mutex, nil) != 0 { return false }
+		mutex_code := C.pthread_mutex_init(&ws_browser_mutex, nil)
+		if mutex_code != 0 { return ws_web_init_failure(1,mutex_code,0,nil) }
 		ws_browser_initialized = true
 		text := C.getenv(c'VINIX_ANDROID_WEBVIEW_FD')
 		if text == nil { return true }
 		// Claim the launcher endpoint before APK code can exec another process.
 		fd := C.atoi(text)
-		if fd < 3 { return false }
+		if fd < 3 { return ws_web_init_failure(2,22,0,nil) }
 		flags := C.fcntl(fd, C.F_GETFD)
-		if flags < 0 || C.fcntl(fd, C.F_SETFD, flags | C.FD_CLOEXEC) != 0 {
-			C.close(fd)
-			return false
+		if flags < 0 {
+			code := *C.__errno_location()
+			C.close(fd); return ws_web_init_failure(3,code,0,nil)
 		}
+		if C.fcntl(fd, C.F_SETFD, flags | C.FD_CLOEXEC) != 0 {
+			code := *C.__errno_location()
+			C.close(fd); return ws_web_init_failure(4,code,0,nil)
+		}
+		C.dlerror()
+		*C.__errno_location() = 0
 		ws_browser_library = C.dlopen(c'libvinix-android-browser.so', 2)
 		if ws_browser_library == nil {
-			C.close(fd)
-			return false
+			code := *C.__errno_location()
+			loader := C.dlerror()
+			C.close(fd); return ws_web_init_failure(5,code,0,loader)
 		}
-		open := WsBrowserOpen(C.dlsym(ws_browser_library, c'vinix_android_browser_open'))
-		ws_browser_submit = WsBrowserSubmit(C.dlsym(ws_browser_library, c'vinix_android_browser_submit'))
-		ws_browser_read = WsBrowserRead(C.dlsym(ws_browser_library, c'vinix_android_browser_read'))
-		ws_browser_close = WsBrowserClose(C.dlsym(ws_browser_library, c'vinix_android_browser_close'))
+		open := WsBrowserOpen(ws_web_init_symbol(c'vinix_android_browser_open',1))
+		ws_browser_submit = WsBrowserSubmit(ws_web_init_symbol(c'vinix_android_browser_submit',2))
+		ws_browser_read = WsBrowserRead(ws_web_init_symbol(c'vinix_android_browser_read',3))
+		ws_browser_close = WsBrowserClose(ws_web_init_symbol(c'vinix_android_browser_close',4))
 		if voidptr(open) == nil || voidptr(ws_browser_submit) == nil || voidptr(ws_browser_read) == nil
 			|| voidptr(ws_browser_close) == nil {
 			C.close(fd)
 			return false
 		}
+		*C.__errno_location() = 0
 		ws_browser_handle = open(fd)
 		if ws_browser_handle == nil {
-			C.close(fd)
-			return false
+			code := *C.__errno_location()
+			C.close(fd); return ws_web_init_failure(7,code,0,nil)
 		}
 		return true
+	}
+}
+
+// Numeric stages only: mutex, descriptor, descriptor flags, claim descriptor,
+// library, symbol (stable 1-based detail), client open. The shared bounded
+// loader classifier never exposes loader paths, names or other private text.
+fn ws_web_init_failure(stage i32, code i32, detail i32, loader &char) bool {
+	unsafe {
+		buffer := &char(C.alloca(128))
+		length := C.snprintf(buffer,128,c'ANDROID-BROWSER-INIT-FAIL stage=%d code=%d detail=%d loader=%d\n',stage,code,detail,ws_auth_init_loader(loader))
+		if length > 0 && length < 128 { C.write(2,buffer,usize(length)) }
+		return false
+	}
+}
+
+fn ws_web_init_symbol(name &char, detail i32) voidptr {
+	unsafe {
+		C.dlerror()
+		*C.__errno_location() = 0
+		value := C.dlsym(ws_browser_library,name)
+		if value == nil {
+			code := *C.__errno_location()
+			loader := C.dlerror()
+			ws_web_init_failure(6,code,detail,loader)
+		}
+		return value
 	}
 }
 
