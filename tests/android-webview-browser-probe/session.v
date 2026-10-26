@@ -142,6 +142,7 @@ fn cpu_webkit_environment(base string, inherited map[string]string) map[string]s
 	environment.delete('WEBKIT_FORCE_COMPOSITING_MODE')
 	environment['WEBKIT_SKIA_ENABLE_CPU_RENDERING'] = '1'
 	environment['WEBKIT_DISABLE_COMPOSITING_MODE'] = '1'
+	environment['WEBKIT_DISABLE_DMABUF_RENDERER'] = '1'
 	environment['WEBKIT_INJECTED_BUNDLE_PATH'] = os.dir(base + '/' + injected_bundle)
 	return environment
 }
@@ -649,13 +650,13 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 	environment['GSETTINGS_BACKEND'] = 'memory'
 	environment['LIBGL_ALWAYS_SOFTWARE'] = '1'
 	environment['GALLIUM_DRIVER'] = 'softpipe'
-	environment['WEBKIT_DISABLE_DMABUF_RENDERER'] = '1'
 	// This fixture loads only its credential-free local document; Vinix lacks
 	// bubblewrap's Linux namespace sandbox. Never use this mode for accounts.
 	environment['WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS'] = '1'
 	receipt['webkit_sandbox'] = 'disabled-for-credential-free-local-diagnostic'
 	receipt['webkit_skia_renderer'] = 'cpu'
 	receipt['webkit_compositing_policy'] = 'disabled-for-cpu-rendered-local-diagnostic'
+	receipt['webkit_dmabuf_renderer_policy'] = 'disabled-for-cpu-rendered-local-diagnostic'
 	receipt['webkit_injected_bundle_path'] = environment['WEBKIT_INJECTED_BUNDLE_PATH']
 	receipt['webkit_injected_bundle_sha256'] = build.runtime_references[injected_bundle]
 	environment['VINIX_BROWSER_BASE'] = base
@@ -794,10 +795,13 @@ fn self_test() ! {
 	if _ := validate_runtime(root, runtime_pins) { return error('missing injected bundle accepted') }
 	inherited := {'WEBKIT_SKIA_ENABLE_CPU_RENDERING': '0',
 		'WEBKIT_DISABLE_COMPOSITING_MODE': '0', 'WEBKIT_FORCE_COMPOSITING_MODE': '1',
+		'WEBKIT_DISABLE_DMABUF_RENDERER': '0',
 		'WEBKIT_INJECTED_BUNDLE_PATH': '/foreign/bundle', 'DISPLAY': ':120'}
 	webkit_env := cpu_webkit_environment(root, inherited)
 	assert webkit_env['WEBKIT_SKIA_ENABLE_CPU_RENDERING'] == '1'
 	assert webkit_env['WEBKIT_DISABLE_COMPOSITING_MODE'] == '1'
+	assert webkit_env['WEBKIT_DISABLE_DMABUF_RENDERER'] == '1'
+	assert inherited['WEBKIT_DISABLE_DMABUF_RENDERER'] == '0'
 	assert 'WEBKIT_FORCE_COMPOSITING_MODE' !in webkit_env
 	assert webkit_env['WEBKIT_INJECTED_BUNDLE_PATH'] == os.dir(root + '/' + injected_bundle)
 	assert webkit_env['DISPLAY'] == ':120' && inherited['WEBKIT_SKIA_ENABLE_CPU_RENDERING'] == '0'
@@ -866,7 +870,7 @@ fn self_test() ! {
 		context.replace('X11-MAPS-END\n', '')] {
 		if _ := known_fault_evidence(bad) { return error('incomplete or inconsistent fault evidence accepted') }
 	}
-	println('BROWSER-SESSION SELF-TEST PASS glx-arguments glx-wire-query glx-absence-negative authority-record x11-setup receipt-paths bundle-pins bundle-tamper bundle-missing cpu-renderer-environment pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins complete-context buffered-context negative-context')
+	println('BROWSER-SESSION SELF-TEST PASS glx-arguments glx-wire-query glx-absence-negative authority-record x11-setup receipt-paths bundle-pins bundle-tamper bundle-missing cpu-renderer-environment dmabuf-renderer-environment pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins complete-context buffered-context negative-context')
 }
 
 fn main() {

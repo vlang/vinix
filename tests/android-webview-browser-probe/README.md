@@ -159,13 +159,19 @@ initializes with `WEBKIT_DISABLE_COMPOSITING_MODE=1`. GTK's separate
 are implemented by the exact installed release's
 [WebProcess initialization](https://github.com/WebKit/WebKit/blob/webkitgtk-2.48.1/Source/WebKit/WebProcess/glib/WebProcessGLib.cpp)
 and [hardware acceleration manager](https://github.com/WebKit/WebKit/blob/webkitgtk-2.48.1/Source/WebKit/UIProcess/gtk/HardwareAccelerationManager.cpp).
+It separately disables DMA-BUF transport with `WEBKIT_DISABLE_DMABUF_RENDERER=1`,
+which the release's
+[DMA-BUF backing store](https://github.com/WebKit/WebKit/blob/webkitgtk-2.48.1/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.cpp)
+checks before probing EGL transport capabilities. This setting was already
+present in the r8 launcher; recording and testing it does not resolve that
+run's surfaceless EGL initialization failure.
 The inherited force-compositing override is removed. The launcher sets
 `WEBKIT_INJECTED_BUNDLE_PATH` to the relocated runtime's pinned
 `usr/lib/webkitgtk-6.0/injected-bundle` directory, as supported by
 [WebKitWebContext](https://github.com/WebKit/WebKit/blob/webkitgtk-2.48.1/Source/WebKit/UIProcess/API/glib/WebKitWebContext.cpp).
 Preparation records the bundle's SHA-256; the session rejects an absent,
 unpinned, or changed bundle. `session.json` records the selected renderer,
-compositing policy, bundle directory, and checked bundle hash. These settings
+compositing and DMA-BUF policies, bundle directory, and checked bundle hash. These settings
 exercise the local document's CPU path; they do not establish WebGL support.
 Results and the real snapshot are written beneath the output directory. A
 successful browser phase prints `BROWSER-PROBE PASS`; the launcher separately
