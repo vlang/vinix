@@ -1,5 +1,32 @@
 # Complete current JNI provider
 
+The r16 complete `atlframework` and `nativews` provider passed the strict
+AArch64 shared build against the 2,104-class descriptions framework. It adds
+the real `getAuthenticatorTypes` adapter from `56cdb03c0`, converting bounded
+broker metadata into `AuthenticatorDescription` objects and preserving the
+existing account cache and authenticator dispatch.
+
+- Complete retained bundle: `/Users/alex/.local/state/vinix/android/current-native-build-2026-10-26-r16`.
+- Bundle `sha256.json`: `1859b2df1af3e5140284ec6d19a2d4378d6193c29c872f280b129713a5d5982f`.
+- `native/libvinix-android-native.so`: `b2f88fd605c03eaa1cc37c7d29bdb3657110d9f7eebef43f155a6c0351555bac`.
+- Source revision: `f324182c30ce9997d06323582fc9f86566a2f85c`.
+- Descriptions framework `sha256.json`: `d898fdcca66df0c32b9863dca99c7185d10f8e3b3fb5ab7708999b3619803021`.
+- Retained binding spec: `60b590a07c627bd3ff8d57f1edaf5c0bd2e06c44124c7f808c6f5701f5bb3bbe`.
+- Regenerated JNI bindings: `3961844aee7e624ec9d746b4a6c16d83e691bef4188d6e42e070c8ae5e36af00`.
+- Retained descriptions adapter: `05afd8a239fa8536af965f755e4aa437b9960f769114cf92eacdb1e2b5a1426c`.
+
+The builder self-test passed, followed by the actual strict compile/link,
+ELF, consumed-header, source membership and before/after input checks. All
+715 source exports plus `_init` and `_fini` match exactly; 628 binding entries
+produce 629 generated exports. The seven-argument `headless.v` ABI remains
+`c453f9a0a4ab8b5f8ad4ea17d0c932304d61aafb6126d55b9bcc55efe0aa9b57`.
+The compiler and r5 dependency policy below is unchanged. Pair this JNI output
+with the descriptions framework, r6 account library and rebuilt broker and
+launcher. These host checks do not establish guest authenticator discovery or
+successful Google account sign-in.
+
+## Previous r15 evidence
+
 The full current `atlframework` and `nativews` provider passes the strict
 AArch64 shared build against the 2,102-class cache framework. It includes
 `peekAuthToken`, `setAuthToken`, broker-acknowledged `invalidateAuthToken`,
