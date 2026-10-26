@@ -21,7 +21,7 @@ fn main() {
  androidtools.framework_account_async_addition(source.all_before('.end method')) or { rejected = true }
  assert rejected
  classes := androidtools.framework_account_async_classes()
- assert classes.len == 8
+ assert classes.len == 9
  future := classes['android/atl/VinixAccountFuture']
  assert future.contains('.super Ljava/util/concurrent/FutureTask;')
  assert future.contains('->run()V') && future.contains('Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z')

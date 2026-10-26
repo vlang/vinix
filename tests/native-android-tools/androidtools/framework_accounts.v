@@ -103,13 +103,13 @@ pub fn framework_account_async_classes() map[string]string {
 }
 
 fn framework_account_listeners(smali string) ! {
- for name, source in framework_account_async_classes() {
+ for name, source in framework_account_client_classes() {
   os.write_file(smali + '/' + name + '.smali', source)!
  }
  os.write_file(smali + '/android/accounts/OnAccountsUpdateListener.smali',
   interface_class('android/accounts/OnAccountsUpdateListener', ['onAccountsUpdated([Landroid/accounts/Account;)V']))!
  path := smali + '/android/accounts/AccountManager.smali'
- mut text := framework_account_async_addition(framework_account_addition(os.read_file(path)!)!)! + '\n.field private static vinixInstance:Landroid/accounts/AccountManager;\n' +
+ mut text := framework_account_client_addition(framework_account_addition(os.read_file(path)!)!)! + '\n.field private static vinixInstance:Landroid/accounts/AccountManager;\n' +
   '.field private vinixListeners:Ljava/util/HashMap;\n'
  text = framework_replace_method(text, '<init>()V',
   '.method public constructor <init>()V\n.locals 1\ninvoke-direct {p0}, Ljava/lang/Object;-><init>()V\n' +
