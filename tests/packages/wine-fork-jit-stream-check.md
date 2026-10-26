@@ -272,3 +272,82 @@ cleanup. Combined
 including failure and compiler scratch. Recorded build/run free-space checks
 exceeded 550 MiB. This followup contains no target build, image or VM result;
 the translated ARM fork failure remains open.
+
+## Standalone input-inventory refusal with private compiler
+
+A second authorized launch used the unchanged `host-03` controller from source
+commit `682f6fbe796bd8e82f567b059b07498429d1dcd1`. The shared V executable had
+changed, so this launch selected the existing copied compiler at
+`build/package-https-runtime-work/toolchain/v`, SHA-256
+`ff75a30180b1de305e3c62acc1ebd85341ff83ae5d852c819d11f27d5260c4c5`,
+beside its `vlib` and `thirdparty` trees. This is a selected binary binding,
+not a compiler rebuild or exact binary/source provenance claim. `VFLAGS` and
+`VINIX_HWTEST_TCG` were explicitly unset. The other selected controller,
+translator, kernel and kernel-receipt hashes matched the earlier bindings;
+completed `df -k` reported 47,009,988 KiB available before launch.
+
+The controller exited 1 during input inventory with the exact output
+`No such file or directory; code: 2`. The proposed `wine-jit-stream-native-arm-01`
+output directory remained absent. No input inventory, target build, image,
+child process group, VM, serial capture or offline comparison was produced.
+The missing entry is not identified by this bare error. Subsequent read-only
+inspection found dangling `usr/lib/libRusticlOpenCL.so` links in both selected
+X11 sysroots, each naming absent `libRusticlOpenCL.so.1`; this does not prove
+which entry first stopped inventory. Dangling-input refusal remains enforced.
+
+The preserved external posthoc tool-trace transcription is
+`section14/wine-jit-stream-native-arm-01.launch-02.json`, SHA-256
+`c1002c7e5cf45cc904b689587192b6d719e025520e6ba94ff676a40631f9b525`.
+It records exact argv, explicit environment changes, observed output/exit,
+selected pins and before/after free-space readings. It explicitly does not
+reconstruct the full inherited environment or claim a completed input binding.
+The 3,481-byte receipt is the only new retained state from this attempt. The
+translated ARM fork failure remains open.
+
+## Contextual input refusal and host controls
+
+The followup to `682f6fbe796bd8e82f567b059b07498429d1dcd1` adds operation,
+literal path and underlying error to failed input open/read/lstat/readlink/stat
+and directory-list operations. Admission rules are unchanged. Missing paths,
+dangling links, special entries, uncovered directory links and changed captured
+inputs still fail closed. The focused negative control checks the missing
+add/root/open paths, deleted captured input and dangling target diagnostics;
+it also checks that refused inputs are not admitted and retained ordinary
+content is unchanged. Qualified source SHA-256 values are:
+
+- `native_inputs.v`:
+  `005bb652e8a893afe77caec23a5012286e287d51ddfab314da8f9ad2889a30ad`.
+- `native_guard_test.v`:
+  `857c768eb883ba4c9efb42c2a57f431327cbf97d8b94356e569a3ee6002baad5`.
+
+Host-only evidence is retained in `section14/wine-jit-stream-native-host-05`
+under the same external cache root. Its `receipt.json` SHA-256 is
+`f76b3abc22ec0f4725fbd12245b967016a25a63f9771146c26e3e70d321bc16f`.
+The unchanged maintained observer and selected private compiler are bound in
+the receipt. It records explicit V caller-selection/no-fallback environment
+fields; launch additionally unset `VFLAGS`. All three host builds completed
+with raw status 0 and confirmed cleanup, in 48,795, 25,031 and 15,376 ms.
+All nine unit functions passed in 542 ms. The controller executable SHA-256 is
+`11afa70a12a21c34e58f30203319202e9cef13f2da88e96bb40a7c40f2d50f0a`.
+Selected before/after inventories are identical. This selected-input host
+observation does not freeze the host SDK or transitive libraries.
+
+All ten normal guard-control entries passed, including sixteen pre-cancelled
+process groups. Normal controls took 962 ms. Wrapper SIGTERM forwarding took
+71 ms and retained raw status 256; its interrupted fixture took 34 ms with raw
+status 9 and confirmed cleanup. The cancellation checker confirmed no later
+case and no surviving nested leader, process group or descendant.
+
+The preceding `wine-jit-stream-native-host-04` failure is preserved. Its raw
+build status was 256 after 11,706 ms, with confirmed cleanup and no controller
+output. Clang could not create an embedded-object temporary file because the
+observer-selected private `TMPDIR` did not exist. The successful fresh
+`host-05` invocation precreated that directory. The failed `steps.json` SHA-256
+is `83aeed9c788ccd9869ca1337f1b630b8e8aa1a0681544a7a8f4c8d26cfed4bc5`;
+its build-log SHA-256 is
+`c27047a1908cc1222be87fcd9689d53f1c65b619ffaa7087b76b8f5730e9452f`.
+Both states, their scratch and receipt add 1,374,667 bytes; all retained host
+and launch-refusal state totals 7,638,328 bytes. Completed free-space checks
+exceeded 550 MiB before every build/run; final available space was
+37,768,404 KiB. No target build, staging, image or VM ran in this followup.
+The canonical probe and translated ARM fork result are unchanged.

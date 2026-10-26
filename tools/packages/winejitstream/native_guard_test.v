@@ -193,14 +193,59 @@ fn test_native_inputs_refuse_dangling_links_and_special_entries() {
 	os.symlink('absent', directory + '/dangling')!
 	mut pins := map[string]NativePin{}
 	mut refused := false
-	native_input_tree(directory, mut pins) or { refused = true }
+	native_input_tree(directory, mut pins) or {
+		assert err.msg().starts_with('input stat failed: ' + directory + '/dangling: ')
+		refused = true
+	}
 	assert refused
+	assert directory + '/dangling' !in pins
 	os.rm(directory + '/dangling')!
 	assert C.mkfifo((directory + '/fifo').str, 0o600) == 0
 	refused = false
 	native_input_tree(directory, mut pins) or {
 		assert err.msg().contains('unsupported input entry')
 		refused = true
+	}
+	assert refused
+}
+
+fn test_native_inputs_name_missing_paths_without_admitting_or_mutating_them() {
+	directory := native_test_directory('input-missing')!
+	defer { os.rmdir_all(directory) or {} }
+	payload := directory + '/payload'
+	missing := directory + '/absent'
+	os.write_file(payload, 'retain')!
+	mut pins := map[string]NativePin{}
+	mut refused := false
+	native_input_add(missing, mut pins) or {
+		assert err.msg().starts_with('input lstat failed: ' + missing + ': ')
+		refused = true
+	}
+	assert refused
+	assert pins.len == 0
+	refused = false
+	native_input_tree(missing, mut pins) or {
+		assert err.msg().starts_with('input lstat failed: ' + missing + ': ')
+		refused = true
+	}
+	assert refused
+	assert pins.len == 0
+	assert !os.exists(missing)
+	assert os.read_file(payload)! == 'retain'
+	native_input_add(payload, mut pins)!
+	os.rm(payload)!
+	refused = false
+	native_input_verify(pins) or {
+		assert err.msg().starts_with('input lstat failed: ' + payload + ': ')
+		refused = true
+	}
+	assert refused
+	assert !os.exists(payload)
+	refused = false
+	native_input_digest(missing) or {
+		assert err.msg().starts_with('input open failed: ' + missing + ': ')
+		refused = true
+		''
 	}
 	assert refused
 }

@@ -13,7 +13,7 @@ pub:
 }
 
 pub fn native_input_digest(path string) !string {
-	mut file := os.open(path)!
+	mut file := os.open(path) or { return error('input open failed: ' + path + ': ' + err.msg()) }
 	defer { file.close() }
 	mut hash := sha256.new()
 	mut buffer := []u8{len: 65536}
@@ -32,7 +32,7 @@ pub fn native_input_digest(path string) !string {
 				unsafe { err.free() }
 				break
 			}
-			return error('cannot hash ' + path)
+			return error('input read failed: ' + path + ': ' + err.msg())
 		}
 		if count == 0 { break }
 		hash.write(buffer[..count])!
@@ -42,17 +42,22 @@ pub fn native_input_digest(path string) !string {
 }
 
 fn native_input_pin(path string) !NativePin {
-	info := os.lstat(path)!
+	info := os.lstat(path) or { return error('input lstat failed: ' + path + ': ' + err.msg()) }
 	kind := info.get_filetype()
 	if kind !in [.regular, .symbolic_link] {
 		return error('missing ordinary input: ' + path)
 	}
-	link := if kind == .symbolic_link { os.readlink(path)! } else { '' }
+	link := if kind == .symbolic_link {
+		os.readlink(path) or { return error('input readlink failed: ' + path + ': ' + err.msg()) }
+	} else {
+		''
+	}
 	canonical := os.real_path(path)
 	if kind == .symbolic_link && os.is_dir(path) {
 		return NativePin{kind: 'directory-link', link: link, canonical: canonical}
 	}
-	if (os.stat(path)!).get_filetype() != .regular {
+	info_target := os.stat(path) or { return error('input stat failed: ' + path + ': ' + err.msg()) }
+	if info_target.get_filetype() != .regular {
 		return error('missing ordinary input: ' + path)
 	}
 	return NativePin{
@@ -75,9 +80,11 @@ pub fn native_input_add(path string, mut pins map[string]NativePin) ! {
 }
 
 fn native_input_walk(path string, root string, mut pins map[string]NativePin) ! {
-	for name in os.ls(path)! {
+	names := os.ls(path) or { return error('input ls failed: ' + path + ': ' + err.msg()) }
+	for name in names {
 		entry := path + '/' + name
-		kind := (os.lstat(entry)!).get_filetype()
+		info := os.lstat(entry) or { return error('input lstat failed: ' + entry + ': ' + err.msg()) }
+		kind := info.get_filetype()
 		if kind == .directory {
 			native_input_walk(entry, root, mut pins)!
 		} else if kind == .symbolic_link && os.is_dir(entry) {
@@ -98,7 +105,8 @@ fn native_input_walk(path string, root string, mut pins map[string]NativePin) ! 
 }
 
 pub fn native_input_tree(path string, mut pins map[string]NativePin) ! {
-	if (os.lstat(path)!).get_filetype() != .directory {
+	info := os.lstat(path) or { return error('input lstat failed: ' + path + ': ' + err.msg()) }
+	if info.get_filetype() != .directory {
 		return error('input tree root must be an ordinary directory: ' + path)
 	}
 	native_input_walk(path, os.real_path(path), mut pins)!
