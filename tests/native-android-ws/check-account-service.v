@@ -75,6 +75,7 @@ fn option(builder voidptr,key &char,tag u16,text &char,number i64) i32 {
 fn send(builder voidptr) i32 { assert !held && builder == voidptr(90); sent++; return 0 }
 fn free_response(builder voidptr) { assert !held && builder == voidptr(90); freed++ }
 fn close_service(handle voidptr) { assert held && handle == voidptr(3); closed++ }
+fn ws_store_shutdown() { assert held }
 fn ws_account_utf8(e voidptr,text voidptr) &char { assert !held; return unsafe { if text == nil { &char(nil) } else { C.strdup(&char(text)) } } }
 fn ws_service_string(e voidptr,value voidptr,text &char) bool {
  assert !held

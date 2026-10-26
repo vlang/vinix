@@ -9,6 +9,7 @@ type WsAuthArray = fn (voidptr,i32,voidptr,voidptr) voidptr
 
 type WsAuthOpen = fn (i32) voidptr
 type WsAuthRead = fn (voidptr, &u64, i32) i32
+type WsAuthOperation = fn (voidptr) u16
 type WsAuthFree = fn (voidptr)
 type WsAuthCount = fn (voidptr) u32
 type WsAuthString = fn (voidptr) &char
@@ -43,6 +44,7 @@ struct WsAuthCommand {
 mut:
 	id u64
 	account_type &char
+	operation u16
 	token_type &char
 	feature_count u32
 	features [32]&char
@@ -59,6 +61,7 @@ __global ws_auth_scope bool
 __global ws_auth_broker_pid i32
 __global ws_auth_open WsAuthOpen
 __global ws_auth_read WsAuthRead
+__global ws_auth_operation WsAuthOperation
 __global ws_auth_close WsAuthFree
 __global ws_auth_type WsAuthString
 __global ws_auth_token WsAuthString
@@ -80,6 +83,8 @@ __global ws_auth_launch_target WsAuthLaunchTarget
 
 fn ws_account_service_init() bool {
 	unsafe {
+		account_type := ws_store_take_type()
+		defer { C.free(account_type) }
 		value := C.getenv(c'VINIX_ANDROID_AUTHENTICATOR_FD')
 		if value == nil { return true }
 		mut fd := i32(0)
@@ -101,6 +106,7 @@ fn ws_account_service_init() bool {
 		if ws_auth_library == nil { C.close(fd); return false }
 		ws_auth_open = WsAuthOpen(C.dlsym(ws_auth_library,c'vinix_android_authenticator_open'))
 		ws_auth_read = WsAuthRead(C.dlsym(ws_auth_library,c'vinix_android_authenticator_read'))
+		ws_auth_operation = WsAuthOperation(C.dlsym(ws_auth_library,c'vinix_android_authenticator_operation'))
 		ws_auth_close = WsAuthFree(C.dlsym(ws_auth_library,c'vinix_android_authenticator_close'))
 		ws_auth_type = WsAuthString(C.dlsym(ws_auth_library,c'vinix_android_authenticator_account_type'))
 		ws_auth_token = WsAuthString(C.dlsym(ws_auth_library,c'vinix_android_authenticator_auth_token_type'))
@@ -118,7 +124,7 @@ fn ws_account_service_init() bool {
 		ws_auth_interaction = WsAuthInteraction(C.dlsym(ws_auth_library,c'vinix_android_authenticator_response_interaction'))
 		ws_auth_ui_authority = WsAuthUiAuthority(C.dlsym(ws_auth_library,c'vinix_android_authenticator_ui_authority'))
 		ws_auth_launch_target = WsAuthLaunchTarget(C.dlsym(ws_auth_library,c'vinix_android_authenticator_launch_target'))
-		if voidptr(ws_auth_open) == nil || voidptr(ws_auth_read) == nil || voidptr(ws_auth_close) == nil
+		if voidptr(ws_auth_open) == nil || voidptr(ws_auth_read) == nil || voidptr(ws_auth_operation) == nil || voidptr(ws_auth_close) == nil
 			|| voidptr(ws_auth_type) == nil || voidptr(ws_auth_token) == nil || voidptr(ws_auth_features) == nil || voidptr(ws_auth_feature) == nil
 			|| voidptr(ws_auth_count) == nil || voidptr(ws_auth_key) == nil || voidptr(ws_auth_tag) == nil || voidptr(ws_auth_text) == nil || voidptr(ws_auth_number) == nil
 			|| voidptr(ws_auth_response) == nil || voidptr(ws_auth_option) == nil || voidptr(ws_auth_send) == nil || voidptr(ws_auth_free) == nil || voidptr(ws_auth_interaction) == nil || voidptr(ws_auth_ui_authority) == nil || voidptr(ws_auth_launch_target) == nil {
@@ -126,7 +132,7 @@ fn ws_account_service_init() bool {
 		}
 		ws_auth_handle = ws_auth_open(fd)
 		if ws_auth_handle == nil { C.close(fd); return false }
-		return true
+		return ws_store_init(account_type)
 	}
 }
 
@@ -373,9 +379,10 @@ fn ws_auth_copy(id u64) &WsAuthCommand {
 		command := &WsAuthCommand(C.calloc(1,sizeof(WsAuthCommand)))
 		if command == nil { return nil }
 		command.id = id
+		command.operation = ws_auth_operation(ws_auth_handle)
 		name := ws_auth_type(ws_auth_handle)
-		if name == nil { ws_auth_command_free(command); return nil }
-		command.account_type = C.strdup(name)
+		if command.operation != 1 && command.operation != 2 { ws_auth_command_free(command); return nil }
+		if name != nil { command.account_type = C.strdup(name) }
 		token := ws_auth_token(ws_auth_handle)
 		if token != nil { command.token_type = C.strdup(token) }
 		command.feature_count = ws_auth_features(ws_auth_handle)
@@ -384,7 +391,7 @@ fn ws_auth_copy(id u64) &WsAuthCommand {
 			command.feature_count = 0; command.count = 0
 			ws_auth_command_free(command); return nil
 		}
-		mut valid := command.account_type != nil && (token == nil || command.token_type != nil)
+		mut valid := (name == nil || command.account_type != nil) && (command.operation != 2 || name != nil) && (token == nil || command.token_type != nil)
 		for i := u32(0); i < command.feature_count; i++ {
 			value := ws_auth_feature(ws_auth_handle,i)
 			if value == nil { valid = false; continue }
@@ -435,6 +442,7 @@ fn ws_auth_bundle(e voidptr, command &WsAuthCommand) voidptr {
 
 fn ws_auth_dispatch(e voidptr, binder voidptr, command &WsAuthCommand) bool {
 	unsafe {
+		if command.operation == 1 { return ws_store_dispatch(command.id) }
 		arg := &Value(C.alloca(sizeof(Value)))
 		arg.l = binder
 		authenticator := static_obj(e,c'android/accounts/IAccountAuthenticator$Stub',c'asInterface',c'(Landroid/os/IBinder;)Landroid/accounts/IAccountAuthenticator;',arg)
@@ -514,6 +522,7 @@ fn ws_account_service_shutdown(e voidptr) {
 		C.pthread_mutex_lock(&ws_auth_mutex)
 		mut nodes := ws_auth_slots
 		ws_auth_slots = nil
+		ws_store_shutdown()
 		handle := ws_auth_handle
 		ws_auth_handle = nil
 		// Response builders hold a transport reference, so callbacks already

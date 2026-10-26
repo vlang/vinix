@@ -168,10 +168,10 @@ fn (mut b Broker) admit(incoming Incoming) ! {
 		b.redeem(id, incoming.authorized)!
 		return
 	}
-	// Only addAccount is implemented. Queries require a real authoritative
-	// account store; returning an invented empty account list would mask failure.
-	if incoming.authorized.request.operation != .add_account {
-		b.fail(id, 6, 'Account storage is not available')!
+	// The selected service owns its private account database. Its query sees
+	// the same authenticated caller as addAccount, never an option claim.
+	if incoming.authorized.request.operation !in [.add_account, .get_accounts] {
+		b.fail(id, 6, 'Account operation is not available')!
 		return
 	}
 	command := accountipc.Command{id, capability, incoming.authorized.caller, incoming.authorized.request}
@@ -271,6 +271,7 @@ fn (mut b Broker) callback(packet accountipc.Packet) ! {
 		return error('authenticator response capability is invalid or consumed')
 	}
 	if event.kind == .interaction {
+		if session.operation != .add_account { return error('account query cannot start an interaction') }
 		if b.interactions == unsafe { nil } {
 			b.cancel_service(event.id)
 			b.fail(event.id, 6, 'Account interaction is unavailable')!
@@ -294,7 +295,9 @@ fn (mut b Broker) callback(packet accountipc.Packet) ! {
 		})!
 		return
 	}
-	if event.kind !in [.result, .failure, .continued] {
+	if event.kind !in [.result, .failure, .continued, .accounts]
+		|| (event.kind == .accounts && session.operation != .get_accounts)
+		|| (event.kind == .result && session.operation == .get_accounts) {
 		return error('unsupported authenticator callback')
 	}
 	b.finish(event.id, event)!

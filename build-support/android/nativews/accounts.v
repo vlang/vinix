@@ -2,8 +2,7 @@
 @[translated]
 module atlframework
 
-// Vinix has no account authenticator installed. Keep listener registrations
-// and dispatch the real (empty) account snapshot on the requested Handler.
+// Keep registrations and deliver the actual filtered snapshot on the Handler.
 fn ws_accounts_add(e voidptr, manager voidptr, listener voidptr, handler voidptr, immediately u8) {
 	unsafe {
 		if listener == nil {
@@ -47,8 +46,11 @@ fn ws_accounts_remove(e voidptr, manager voidptr, listener voidptr) {
 fn ws_accounts_notify(e voidptr, task voidptr) {
 	unsafe {
 		listener := get_object(e, task, c'android/atl/VinixAccountUpdate', c'listener', c'Landroid/accounts/OnAccountsUpdateListener;')
-		accounts := ObjectArrayNew(slot(e, 172))(e, 0, cls(e, c'android/accounts/Account'), nil)
+		defer { if listener != nil { Drop(slot(e,23))(e,listener) } }
+		accounts := ws_store_accounts(e, nil, nil, nil)
+		if accounts == nil || pending(e) { return }
 		args := [Value{ l: accounts }]!
 		call(e, listener, c'android/accounts/OnAccountsUpdateListener', c'onAccountsUpdated', c'([Landroid/accounts/Account;)V', &args[0])
+		Drop(slot(e,23))(e,accounts)
 	}
 }

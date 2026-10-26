@@ -38,6 +38,7 @@ struct AuthResponse {
 	kind accountipc.Kind
 mut:
 	options []nativeaccountauth.Option
+	accounts []accountipc.Account
 	interaction accountipc.Interaction
 }
 
@@ -106,7 +107,8 @@ pub fn auth_read(handle voidptr, session &u64, timeout i32) i32 {
 	if packet.header.kind == .dispatch {
 		command := accountipc.decode_command(packet.header, packet.body) or { a.disconnect(); return -1 }
 		if a.sessions.len >= accountipc.max_sessions || command.session in a.sessions
-			|| command.request.operation != .add_account || command.request.account_type == none {
+			|| command.request.operation !in [.add_account, .get_accounts]
+			|| (command.request.operation == .add_account && command.request.account_type == none) {
 			accountipc.dispose_command(command)
 			a.disconnect(); return -1
 		}
@@ -238,6 +240,12 @@ pub fn auth_account_type(handle voidptr) &char {
 	return unsafe { nil }
 }
 
+@[export: 'vinix_android_authenticator_operation']
+pub fn auth_operation(handle voidptr) u16 {
+	s := auth_current(handle)
+	return if s == unsafe { nil } { 0 } else { u16(s.command.request.operation) }
+}
+
 @[export: 'vinix_android_authenticator_auth_token_type']
 pub fn auth_token_type(handle voidptr) &char {
 	s := auth_current(handle)
@@ -307,12 +315,14 @@ pub fn auth_number(handle voidptr, index u32) i64 {
 
 @[export: 'vinix_android_authenticator_response']
 pub fn auth_response(handle voidptr, session u64, kind u16) voidptr {
-	if handle == unsafe { nil } || kind !in [u16(1),u16(2),u16(4),u16(5)] { return unsafe { nil } }
+	if handle == unsafe { nil } || kind !in [u16(1),u16(2),u16(3),u16(4),u16(5)] { return unsafe { nil } }
 	mut a := unsafe { &Authenticator(handle) }
 	a.mutex.lock()
 	defer { a.mutex.unlock() }
 	if a.closed { return unsafe { nil } }
 	s := a.sessions[session] or { return unsafe { nil } }
+	if (kind == 3 && s.command.request.operation != .get_accounts)
+		|| (kind in [u16(1),u16(4)] && s.command.request.operation == .get_accounts) { return unsafe { nil } }
 	a.refs++
 	return &AuthResponse{owner: a, session: session, capability: s.command.capability.clone(), kind: unsafe { accountipc.Kind(kind) }, options: []nativeaccountauth.Option{cap:32}}
 }
@@ -333,7 +343,7 @@ fn auth_cstring(value &char) !string {
 pub fn auth_response_option(handle voidptr, key &char, tag u16, text &char, number i64) i32 {
 	if handle == unsafe { nil } || tag > 4 { return -1 }
 	mut b := unsafe { &AuthResponse(handle) }
-	if b.kind in [.continued,.interaction] || b.options.len >= 32 { return -1 }
+	if b.kind in [.continued,.interaction,.accounts] || b.options.len >= 32 { return -1 }
 	name := auth_cstring(key) or { return -1 }
 	if name.len == 0 || b.options.any(it.key == name) { unsafe { name.free() }; return -1 }
 	value := match tag {
@@ -350,6 +360,21 @@ pub fn auth_response_option(handle voidptr, key &char, tag u16, text &char, numb
 		else { nativeaccountauth.Scalar{kind: .int64, number: number} }
 	}
 	b.options << nativeaccountauth.Option{name,value}
+	return 0
+}
+
+@[export: 'vinix_android_authenticator_response_account']
+pub fn auth_response_account(handle voidptr, name &char, account_type &char) i32 {
+	if handle == unsafe { nil } { return -1 }
+	mut b := unsafe { &AuthResponse(handle) }
+	if b.kind != .accounts || b.accounts.len >= 64 { return -1 }
+	account_name := auth_cstring(name) or { return -1 }
+	type_name := auth_cstring(account_type) or { unsafe { account_name.free() }; return -1 }
+	if account_name.len == 0 || type_name.len == 0
+		|| b.accounts.any(it.name == account_name && it.account_type == type_name) {
+		unsafe { account_name.free(); type_name.free() }; return -1
+	}
+	b.accounts << accountipc.Account{account_name,type_name}
 	return 0
 }
 
@@ -379,7 +404,7 @@ pub fn auth_response_send(handle voidptr) i32 {
 	mut s := a.sessions[b.session] or { return -1 }
 	if !same_capability(b.capability,s.command.capability) { return -1 }
 	if b.kind == .interaction && s.interaction.handle.len != 0 { return -1 }
-	wire := accountipc.encode_event(accountipc.Event{kind:b.kind,id:b.session,capability:b.capability,options:b.options,interaction:b.interaction},true) or { return -1 }
+	wire := accountipc.encode_event(accountipc.Event{kind:b.kind,id:b.session,capability:b.capability,options:b.options,accounts:b.accounts,interaction:b.interaction},true) or { return -1 }
 	defer { unsafe { wire.free() } }
 	a.stream.enqueue(wire) or { a.disconnect(); return -1 }
 	if b.kind == .interaction {
@@ -401,6 +426,7 @@ pub fn auth_response_free(handle voidptr) {
 	unsafe { b.capability.free() }
 	accountipc.dispose_interaction(b.interaction)
 	for item in b.options { unsafe { item.key.free(); item.value.text.free() } }
-	unsafe { b.options.free(); free(b) }
+	for item in b.accounts { unsafe { item.name.free(); item.account_type.free() } }
+	unsafe { b.options.free(); b.accounts.free(); free(b) }
 	if dispose { auth_free(mut a) }
 }
