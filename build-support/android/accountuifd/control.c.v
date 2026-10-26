@@ -72,7 +72,7 @@ fn C.prctl(int, u64, u64, u64, u64) int
 fn C.sysconf(int) i64
 fn C.syscall(i64, ...voidptr) i64
 fn C.chdir(&u8) int
-fn C.execve(&u8, &&u8, &&u8) int
+fn C.execve(&char, &&char, &&char) int
 fn C._exit(int)
 fn C.kill(int, int) int
 fn C.waitpid(i32, &i32, i32) i32
@@ -336,7 +336,7 @@ pub fn (mut c Controller) begin(session u64, capability []u8) ! {
 fn (c &Controller) start_helper(surface int, input int, lifetime int) !int {
 	args := [c.config.helper, '--surface-fd', surface.str(), '--input-fd', input.str(), '--lifetime-fd',
 		lifetime.str(), '--window-socket', c.config.window_socket]
-	mut argv := []&u8{cap: args.len + 1}
+	mut argv := []&char{cap: args.len + 1}
 	defer {
 		unsafe {
 			argv.free()
@@ -346,9 +346,9 @@ fn (c &Controller) start_helper(surface int, input int, lifetime int) !int {
 			args.free()
 		}
 	}
-	for arg in args { argv << arg.str }
-	argv << unsafe { &u8(nil) }
-	environment := [c'PATH=/usr/bin:/bin', c'HOME=/', c'LANG=C', unsafe { &u8(nil) }]!
+	for arg in args { argv << &char(arg.str) }
+	argv << unsafe { &char(nil) }
+	environment := [c'PATH=/usr/bin:/bin', c'HOME=/', c'LANG=C', unsafe { &char(nil) }]!
 	limit := C.sysconf(C._SC_OPEN_MAX)
 	if limit < 0 || limit > 1048576 { return error('cannot bound UI helper descriptor cleanup') }
 	pid := C.fork()
@@ -380,7 +380,7 @@ fn (c &Controller) start_helper(surface int, input int, lifetime int) !int {
 		} $else {
 			C._exit(125)
 		}
-		C.execve(c.config.helper.str, argv.data, &environment[0])
+		C.execve(&char(c.config.helper.str), argv.data, &environment[0])
 		C._exit(126)
 	}
 	return pid

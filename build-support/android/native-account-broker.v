@@ -255,7 +255,7 @@ fn run() ! {
 		}
 		mut ready := [BrokerPoll{ fd: i32(clients), events: i16(C.POLLIN) },
 			BrokerPoll{ fd: i32(services), events: i16(C.POLLIN) }]!
-		polled := C.poll(&ready[0], 2, 10)
+		polled := C.poll(voidptr(&ready[0]), 2, 10)
 		if polled < 0 && C.errno != C.EINTR { return error('broker listener poll failed') }
 		for index in 0 .. 2 {
 			if ready[index].revents & C.POLLIN == 0 { continue }
