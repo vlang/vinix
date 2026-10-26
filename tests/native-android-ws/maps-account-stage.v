@@ -63,6 +63,7 @@ struct Request {
 	token Ref
 	token_apk string
 	token_controller Ref
+	browser_client Ref
 	java string
 	signer string
 }
@@ -296,7 +297,7 @@ fn run(request_path string, pin string, output string) ! {
 	request := json2.decode[Request](os.read_file(request_path)!)!
 	if request.kind != 'vinix-maps-account-stage-request-v1' { return error('unsupported stage request') }
 	root := stage.external(output)!
-	refs := [request.framework, request.native, request.account, request.launch, request.guest, request.browser, request.token, request.token_controller]
+	refs := [request.framework, request.native, request.account, request.launch, request.guest, request.browser, request.token, request.token_controller, request.browser_client]
 	mut roots := [request_path, request.base, request.ui, request.java, request.signer]
 	for ref in refs { roots << ref.root }
 	stage.disjoint(root, roots)!
@@ -311,7 +312,9 @@ fn run(request_path string, pin string, output string) ! {
 	native := stage.load_bundle(request.native.root, request.native.seal)!
 	stage.verify_native(native, framework)!
 	account := stage.load_bundle(request.account.root, request.account.seal)!
-	stage.verify_account(account)!
+	account_dependencies := stage.verify_account(account)!
+	browser_client := stage.load_bundle(request.browser_client.root, request.browser_client.seal)!
+	stage.verify_browser_client(browser_client, account_dependencies)!
 	launch := stage.load_bundle(request.launch.root, request.launch.seal)!
 	stage.verify_launch(launch, framework, native)!
 	guest := stage.load_bundle(request.guest.root, request.guest.seal)!
@@ -342,7 +345,7 @@ fn run(request_path string, pin string, output string) ! {
 		request.ui + '/stage.json', request.ui + '/sha256.json', request.java, request.signer, mcopy, mtype, mdir, os.executable()] {
 		inputs[path] = stage.hash(path)!
 	}
-	for index, bundle in [framework, native, account, launch, guest, browser, token, token_controller] {
+	for index, bundle in [framework, native, account, launch, guest, browser, token, token_controller, browser_client] {
 		copy_file(bundle.root + '/sha256.json', root + '/inputs/' + index.str() + '-sha256.json', 0o644)!
 		copy_file(bundle.root + '/build.json', root + '/inputs/' + index.str() + '-build.json', 0o644)!
 		inputs[bundle.root + '/sha256.json'] = bundle.seal
@@ -398,6 +401,7 @@ fn run(request_path string, pin string, output string) ! {
 	copies[runtime + '/usr/lib/java/dex/android_translation_layer/classes.dex'] = framework.root + '/classes.dex'
 	copies[runtime + '/usr/lib/art/libvinix-android-native.so'] = native.root + '/native/libvinix-android-native.so'
 	for name in ['libvinix-android-account.so', 'libsqlite3.so.0'] { copies[runtime + '/usr/lib/' + name] = account.root + '/lib/' + name }
+	copies[runtime + '/usr/lib/libvinix-android-browser.so'] = browser_client.root + '/lib/libvinix-android-browser.so'
 	for name in ['run-android', 'vinix-android-native', 'native-account-broker'] { copies[runtime + '/usr/bin/' + name] = launch.root + '/bin/' + name }
 	copies['usr/bin/run-android'] = launch.root + '/bin/run-android'
 	copies['usr/bin/run-android-calculator'] = guest.root + '/bin/maps-account-guest'
@@ -410,7 +414,7 @@ fn run(request_path string, pin string, output string) ! {
 	}
 	copy_file(request.ui + '/payload/guest-inputs.json', root + '/payload/opt/vinix-account-ui/guest-inputs.json', 0o644)!
 	copy_file(token.root + '/probe.apk', root + '/payload/' + prefix + '/account-token-fixture.apk', 0o644)!
-	finish(root, request, [framework, native, account, launch, guest, browser, token, token_controller], all, before, inputs, config.updated, original, ui_files, maps_signer, gms_signer, pin)!
+	finish(root, request, [framework, native, account, launch, guest, browser, token, token_controller, browser_client], all, before, inputs, config.updated, original, ui_files, maps_signer, gms_signer, pin)!
 }
 
 fn finish(root string, request Request, bundles []stage.Bundle, original_entries []stage.Entry,
@@ -468,6 +472,7 @@ fn finish(root string, request Request, bundles []stage.Bundle, original_entries
 		'account_manifest_sha256': json2.Any(bundles[2].seal), 'launch_manifest_sha256': json2.Any(launch.seal),
 		'browser_manifest_sha256': json2.Any(browser.seal), 'maps_signer_sdk29_sha256': json2.Any(maps_signer),
 		'token_controller_manifest_sha256': json2.Any(bundles[7].seal),
+		'browser_client_manifest_sha256': json2.Any(bundles[8].seal),
 		'gms_signer_sdk29_sha256': json2.Any(gms_signer),
 	})!
 	entries = payload_inventory(root + '/payload')!
@@ -579,6 +584,15 @@ fn main() {
 		stage.verify_account(bundle) or { eprintln(err); exit(1) }
 		stage.recheck(bundle) or { eprintln(err); exit(1) }
 		println('MAPS-ACCOUNT-BUILD PASS complete inventory static zlib producer and exact shared-link receipts')
+		return
+	}
+	if os.args.len == 6 && os.args[1] == '--audit-browser-build' {
+		bundle := stage.load_bundle(os.args[2], os.args[3]) or { eprintln(err); exit(1) }
+		account := stage.load_bundle(os.args[4], os.args[5]) or { eprintln(err); exit(1) }
+		dependencies := stage.verify_account(account) or { eprintln(err); exit(1) }
+		stage.verify_browser_client(bundle, dependencies) or { eprintln(err); exit(1) }
+		for input in [bundle, account] { stage.recheck(input) or { eprintln(err); exit(1) } }
+		println('MAPS-BROWSER-BUILD PASS complete inventory exact browser ABI retained shared-link receipts and selected runtime dependencies')
 		return
 	}
 	if os.args.len == 4 && os.args[1] == '--verify-inventory' {

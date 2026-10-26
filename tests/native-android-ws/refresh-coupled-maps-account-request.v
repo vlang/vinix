@@ -8,7 +8,7 @@ import os
 import v.embed_file
 
 const source_text = source($embed_file(@FILE))
-const roles = ['framework', 'native', 'account', 'launch', 'token', 'token_controller', 'ui']
+const roles = ['framework', 'native', 'account', 'launch', 'token', 'token_controller', 'ui', 'browser_client']
 const artifacts = ['request.json', 'original-request.json', 'selection.json', 'source.v', 'refresh', 'refresh.json']
 
 struct Refreshed {
@@ -270,6 +270,8 @@ fn self_test(output string) ! {
 	assert after['framework_jar']! == json2.Any(sha256.hexhash('selected-jar'))
 	assert after['framework_dex']! == json2.Any(sha256.hexhash('selected-dex'))
 	assert after['token_apk']! == json2.Any(sha256.hexhash('selected-apk'))
+	assert after['browser_client']! == chosen['browser_client']!
+	assert after['browser']! == fields['browser']!
 	create_refresh(root + '/original.json', original_pin, root + '/chosen.json', selection_pin, root + '/result')!
 	assert read_bounded(root + '/result/source.v', 1024 * 1024)! == source_text
 	assert read_bounded(root + '/result/refresh', 64 * 1024 * 1024)! == read_bounded(os.executable(), 64 * 1024 * 1024)!
@@ -302,7 +304,7 @@ fn self_test(output string) ! {
 		'{"build.json":null}', '{"build.json":17}'] {
 		reject_manifest(original, selection, 'native', bad)!
 	}
-	for role, member in {'framework': 'api-impl.jar', 'token': 'probe.apk', 'ui': 'stage.json'} {
+	for role, member in {'framework': 'api-impl.jar', 'token': 'probe.apk', 'ui': 'stage.json', 'browser_client': 'build.json'} {
 		manifest_path := root + '/' + role + '/sha256.json'
 		mut pins := json2.decode[map[string]string](read_bounded(manifest_path, 32768)!)!
 		pins.delete(member)

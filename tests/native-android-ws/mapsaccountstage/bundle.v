@@ -453,6 +453,169 @@ pub fn verify_account(bundle Bundle) !map[string]string {
 	return dependencies
 }
 
+fn browser_abi() []string {
+	return ['vinix_android_browser_close', 'vinix_android_browser_open',
+		'vinix_android_browser_read', 'vinix_android_browser_submit']
+}
+
+fn verify_browser_exports(bundle Bundle, output string) ! {
+	mut source_exports := []string{}
+	for path in bundle.files.keys().filter(it.starts_with('closure/browser/')
+		&& it.contains('/browserclient/') && it.ends_with('.v')) {
+		for line in os.read_file(bundle.root + '/' + path)!.split_into_lines() {
+			trimmed := line.trim_space()
+			if trimmed.starts_with("@[export: '") && trimmed.ends_with("']") {
+				source_exports << trimmed.all_after("@[export: '").all_before("'")
+			}
+		}
+	}
+	source_exports.sort()
+	exports := json2.decode[[]string](json2.encode(bundle.receipt['exports']!))!
+	if source_exports != browser_abi() || exports != browser_abi() {
+		return error('exact browser source and receipt ABI differ')
+	}
+	nm_inputs := json2.decode[map[string]string](json2.encode(receipt_file(bundle, 'nm-input.json')!))!
+	if nm_inputs.len != 1 { return error('exact browser export tool receipt required') }
+	nm := nm_inputs.keys()[0]
+	if !nm.starts_with('/') || !valid_pin(nm_inputs[nm]!)
+		|| bundle.files['additional-cross/' + nm.trim_left('/')] or { '' } != nm_inputs[nm]!
+		|| command_args(bundle, 'browser-exports')! != [nm, '-D', '--defined-only', output] {
+		return error('browser export command differs')
+	}
+	log := 'commands/browser-exports.log'
+	if log !in bundle.files { return error('sealed browser symbol listing absent') }
+	mut linked := []string{}
+	for line in os.read_file(bundle.root + '/' + log)!.split_into_lines() {
+		fields := line.fields()
+		if fields.len >= 3 && fields.last().starts_with('vinix_android_browser_') {
+			if fields[fields.len - 2] != 'T' { return error('browser ABI export is not code') }
+			linked << fields.last()
+		}
+	}
+	linked.sort()
+	if linked != browser_abi() { return error('linked browser ABI differs') }
+}
+
+// Generated compiler outputs, dependency inventories and link traces must all
+// refer to the selected bundle or its retained cross input map.
+fn verify_browser_consumed(bundle Bundle, name string, required []string, trace string) ! {
+	consumed := json2.decode[map[string]string](json2.encode(receipt_file(bundle, name)!))!
+	cross_inputs := json2.decode[map[string]string](json2.encode(receipt_file(bundle, 'cross-inputs.json')!))!
+	mut traced := map[string]bool{}
+	if trace != '' {
+		for line in trace.split_into_lines() {
+			path := line.trim_space()
+			// GCC's verbose command lines contain arguments; linker input
+			// trace rows contain one absolute file name, possibly with ../.
+			if !path.starts_with('/') || path.contains_any(' \t') { continue }
+			canonical := os.real_path(path)
+			if canonical !in consumed { return error('browser link trace input absent from inventory: ' + path) }
+			traced[canonical] = true
+		}
+		if consumed.len < 5 { return error('incomplete browser link input trace') }
+	}
+	for path, pin in consumed {
+		if !path.starts_with('/') || !valid_pin(pin) { return error('unsafe browser consumed input') }
+		if path.starts_with(bundle.root + '/') {
+			if bundle.files[path[bundle.root.len + 1..]] or { '' } != pin {
+				return error('browser consumed bundle input differs: ' + path)
+			}
+		} else if cross_inputs[path] or { '' } != pin {
+			return error('browser input outside retained cross closure: ' + path)
+		}
+		if trace != '' && path !in traced {
+			return error('browser consumed input absent from link trace: ' + path)
+		}
+	}
+	for path in required {
+		if path !in consumed { return error('browser required consumed input absent: ' + path) }
+	}
+}
+
+fn verify_browser_headers(bundle Bundle, label string) ! {
+	log := 'commands/' + label + '-headers.log'
+	if log !in bundle.files { return error('sealed browser dependency listing absent') }
+	text := os.read_file(bundle.root + '/' + log)!
+	colon := text.index(':') or { return error('missing browser dependency target') }
+	if text[..colon] != label { return error('browser dependency target differs') }
+	mut paths := map[string]bool{}
+	mut token := ''
+	mut escaped := false
+	for ch in text[colon + 1..].bytes() {
+		if escaped {
+			if ch != `\n` { token += ch.ascii_str() }
+			escaped = false
+		} else if ch == `\\` { escaped = true }
+		else if ch.is_space() {
+			if token != '' { paths[os.real_path(token)] = true; token = '' }
+		} else { token += ch.ascii_str() }
+	}
+	if escaped { return error('unterminated browser dependency escape') }
+	if token != '' { paths[os.real_path(token)] = true }
+	consumed := json2.decode[map[string]string](json2.encode(receipt_file(bundle, 'generated/' + label + '-headers.json')!))!
+	if paths.len == 0 || paths.len != consumed.len || paths.keys().any(it !in consumed) {
+		return error('browser dependency listing and inventory differ')
+	}
+}
+
+pub fn verify_browser_client(bundle Bundle, available_dependencies map[string]string) ! {
+	common_receipt(bundle, 'vinix-current-browser-v1')!
+	retained_manifest(bundle, 'baseline-sha256.json', baseline_seal)!
+	verify_zlib_dependency(bundle)!
+	name := 'lib/libvinix-android-browser.so'
+	output_map(bundle, 'outputs_sha256', [name])!
+	dependencies := json2.decode[map[string]string](json2.encode(bundle.receipt['runtime_dependencies_sha256']!))!
+	uses_sqlite := bundle.files.keys().any(it.starts_with('closure/browser/') && it.contains('/accountstore/'))
+	expected_dependencies := if uses_sqlite { {'lib/libsqlite3.so.0': sqlite_seal} } else { map[string]string{} }
+	if dependencies != expected_dependencies { return error('browser retained SQLite consumer and runtime dependencies differ') }
+	for path, pin in dependencies {
+		if available_dependencies[path] or { '' } != pin || bundle.files[path] or { '' } != pin {
+			return error('browser runtime dependency differs from selected account runtime')
+		}
+	}
+	output := bundle.root + '/' + name
+	bytes := os.read_bytes(output)!
+	if bytes.len < 18 || u16_at(bytes, 16) != 3 { return error('browser output must be a shared object') }
+	elf := inspect_elf(bytes)!
+	if elf.interpreter != '' || elf.runpath != '' || elf.needed.any(it.starts_with('libz.so'))
+		|| ('libsqlite3.so.0' in elf.needed) != uses_sqlite {
+		return error('browser ELF dependency or search path differs')
+	}
+	verify_browser_exports(bundle, output)!
+	source := bundle.root + '/closure/browser/Users/alex/code/vinix/build-support/android/browserclient'
+	verify_generated(bundle, 'browser', source, ['-enable-globals', '-manualfree', '-shared', '-d', 'no_backtrace', '-d', 'no_segfault_handler'])!
+	mut header_flags := build_includes(bundle, 'browser')
+	if uses_sqlite { header_flags << '-I' + bundle.root + '/native' }
+	generated := bundle.root + '/generated/browser.c'
+	runtime_source := closure_source(bundle, 'browser', '/vlib/builtin/segfault_handler_nix.c')!
+	for pair in [['browser', generated], ['browser-runtime', runtime_source]] {
+		if pair[1][bundle.root.len + 1..] !in bundle.files { return error('browser retained C source absent') }
+		verify_compile(bundle, 'browser', pair[1], header_flags, true, pair[0] == 'browser-runtime')!
+		mut expected := [cross, '-D_GNU_SOURCE', '-O2', '-fwrapv', '-pthread', '-M', '-MT', pair[0], '-fPIC']
+		expected << header_flags
+		expected << pair[1]
+		if command_args(bundle, pair[0] + '-headers')! != expected { return error('browser header scan receipt differs') }
+		verify_browser_consumed(bundle, 'generated/' + pair[0] + '-headers.json', [pair[1]], '')!
+		verify_browser_headers(bundle, pair[0])!
+	}
+	objects := [bundle.root + '/generated/browser.o', bundle.root + '/generated/browser-runtime.o']
+	mut expected := [cross, '-v', '-shared', '-pthread', '-Wl,-z,defs', '-Wl,-z,max-page-size=65536', '-Wl,-t']
+	expected << objects
+	if uses_sqlite { expected << bundle.root + '/lib/libsqlite3.so.0' }
+	if uses_zlib(bundle, 'browser') { expected << bundle.root + '/zlib/lib/libz.a' }
+	expected << ['-ldl', '-lm', '-o', output]
+	if command_args(bundle, 'build-browser')! != expected { return error('browser strict shared-link receipt differs') }
+	log := 'commands/build-browser.log'
+	if log !in bundle.files { return error('sealed browser link trace absent') }
+	trace := os.read_file(bundle.root + '/' + log)!
+	if trace.trim_space() == '' { return error('sealed browser link trace empty') }
+	mut required := objects.clone()
+	if uses_sqlite { required << bundle.root + '/lib/libsqlite3.so.0' }
+	if uses_zlib(bundle, 'browser') { required << bundle.root + '/zlib/lib/libz.a' }
+	verify_browser_consumed(bundle, 'generated/browser-link-inputs.json', required, trace)!
+	verify_zlib_consumption(bundle, 'browser')!
+}
+
 // A standalone UI build has one exact output; it must never weaken the four
 // outputs required by verify_launch for the production runtime.
 pub fn verify_ui_controller(bundle Bundle, framework Bundle, native Bundle) ! {
