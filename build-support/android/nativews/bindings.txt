@@ -98,6 +98,7 @@ android/accounts/AccountManager|addOnAccountsUpdatedListener|ws_accounts_add(e,t
 android/accounts/AccountManager|removeOnAccountsUpdatedListener|ws_accounts_remove(e,this,p0)
 android/atl/VinixAccountUpdate|run|ws_accounts_notify(e,this)
 android/accounts/AccountManager|vinixStartAddition|return ws_account_start(e,this,p0,p1,p2,p3,p4,p5)
+android/accounts/AccountManager|vinixStartToken|return ws_account_token(e,this,p0,p1,p2,p3,p4)
 android/accounts/AccountManager|vinixAddExplicitly|return ws_store_add(e,this,p0,p1,p2,p3)
 android/accounts/AccountManager|vinixAccounts|return ws_store_accounts(e,this,p0,p1)
 android/accounts/AccountManager|getUserData|return ws_store_get_data(e,this,p0,p1)
