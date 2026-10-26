@@ -10,7 +10,7 @@ not boot an image or establish Google login success.
 
 The request selects separate sealed framework, JNI, account library, launcher,
 Maps controller, browser, token APK and token controller bundles. The overlay
-includes the unchanged UI fixture and headless fixture, updating the latter's
+includes the selected UI fixture and the headless fixture, updating the latter's
 runtime pins. UID/GID 10014 is reserved for the synthetic token cache fixture;
 the Maps controller provisions its separately audited IDs 10012 and 10013.
 The first original creation establishes each existing inode's mode. Later tar
@@ -142,6 +142,40 @@ Evidence under `/Users/alex/.local/state/vinix/android/`:
   `4bce7d50ae09deb938e984d6ffa5d3c890ebc9e5ae8ad9d05ce0cd05eccb46f2`.
   See `maps-account-clone-run-r2.log` (exit 0). The original r2 stays sealed;
   kernel and guest mutations belong only in its VM copy.
+- `maps-account-coupled-request-r3` retains the exact seven-role refresh from
+  the r2 request after selecting Maps controller r5. Its complete six-artifact
+  manifest is
+  `e832bae55ca7291ea6c96ee6a1cc0f6b6543ab349801c5577a6a35fc7a5cedb8`;
+  resulting `request.json` SHA-256 is
+  `8f60a3b7b56465f55e2fc0ade4e78fe7c24d97dea7f556ebafb24b70538ed356`.
+  The refreshed roles are descriptions framework r1 (2,104 classes), JNI r16,
+  account r6, launcher r13, signed token fixture r7, token controller r2 and
+  standalone UI stage r3. Framework JAR/DEX and token APK pins derive from
+  selected sealed manifests. Independent decoded-field comparison confirms
+  that base, browser r7, Java, signer and request kind remain unchanged.
+  See `maps-account-coupled-request-r3.log` and
+  `maps-account-coupled-request-r3-inventory.log` (exit 0).
+- `maps-account-r3` passed full staging with source `15b67a3ee`; retained stager
+  source SHA-256 is
+  `c93432973680d4de5932c950fff9ece29c377b604fca8e31383820c9fe8f8ab1`.
+  Complete build inventories, coupled runtime receipts, static zlib provenance,
+  both APK signatures, overlay readback and all six original modules passed.
+  Its complete manifest is
+  `cb252f3d616a705f6c779346ff94b91d9922c61fc9c81804af99aaecc0791741`;
+  stage receipt SHA-256 is
+  `4de83be0b0407a2ab9d3efc61e654b7e6a14362689db745a6143c6decfa02173`.
+  `maps-account-stage-run-r3.log` records exit 0. Independent bounded receipt
+  and payload review confirms the exact request, all selected role seals,
+  guest r5/UI r3 bytes and headless runtime pin replacements.
+- `maps-account-vm-r3` passed exact cloning of all 1,911 regular files and the
+  full metadata tree before kernel patching or boot. Both copies passed the
+  complete r3 manifest above. The optimized helper retains its exact 13-file
+  source closure beside the VM copy; its source is `5b588a078` with the bounded
+  digest buffer fix `949c187e4`. Adjacent provenance
+  `maps-account-vm-r3-clone.json` SHA-256 is
+  `a5d8df629c41919a941bc10f0e1708ca7b446f395fb98cf31aeaa36bcf9da9bf`.
+  See `maps-account-clone-run-r3.log` (exit 0). The original r3 stays sealed;
+  subsequent kernel and guest changes belong only in its VM copy.
 
 The final runtime bundles and actual guest results are separate evidence.
 Staging and synthetic fixture success must not be reported as Google account
