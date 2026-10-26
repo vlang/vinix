@@ -173,20 +173,21 @@ fn header(payload string, kind string) string {
 }
 
 fn serial_write(fd int, line string) ! {
-	if line.len > 1024 { return error('serial frame limit') }
-	mut used := 0
-	for used < line.len {
-		n := unsafe { C.write(fd, &u8(line.str) + used, uint(line.len - used)) }
-		if n <= 0 { return error('serial write failed') }
-		used += int(n)
+	if line.len >= 1024 || !line.starts_with(prefix) || !line.ends_with('\n')
+		|| line[..line.len - 1].contains_any('\r\n') {
+		return error('invalid bounded serial frame')
 	}
+	// Close an unfinished console message and emit the complete frame in the
+	// same write. A partial write is damaged evidence, never a retryable suffix.
+	framed := '\n' + line
+	n := unsafe { C.write(fd, framed.str, uint(framed.len)) }
+	if n != framed.len { return error('single serial-frame write was incomplete') }
 }
 
 fn export_serial(payload string) ! {
 	fd := C.open(c'/dev/console', C.O_WRONLY | C.O_NOCTTY | C.O_CLOEXEC)
 	if fd < 0 { return error('cannot open serial-mirroring /dev/console') }
 	defer { C.close(fd) }
-	serial_write(fd, '\n')!
 	serial_write(fd, header(payload, 'BEGIN'))!
 	digest := sha256.sum(payload.bytes()).hex()
 	for offset := 0; offset < payload.len; offset += chunk_bytes {
@@ -505,6 +506,27 @@ fn self_test() ! {
 	assert base64.decode(decoded.entries[1].data) == 'exact\x00bytes\n'.bytes()
 	assert decoded.entries[2].link == '/pinned/runtime/font.pcf.gz'
 	assert archive(root)! == payload && header(payload, 'BEGIN').starts_with(prefix + 'BEGIN ')
+	serial_path := root + '/framing.log'
+	mut serial := os.open_file(serial_path, 'wx', 0o600)!
+	begin := header(payload, 'BEGIN')
+	chunk := prefix + 'CHUNK ' + sha256.sum(payload.bytes()).hex() + ' 0 ' +
+		base64.encode(payload[..if payload.len < chunk_bytes { payload.len } else { chunk_bytes }].bytes()) + '\n'
+	end := header(payload, 'END')
+	chatter := 'Maps onUnbind without a terminating newline'
+	mut expected_serial := ''
+	for frame in [begin, chunk, end] {
+		serial.write_string(chatter)!
+		serial_write(serial.fd, frame)!
+		expected_serial += chatter + '\n' + frame
+	}
+	for bad in ['', prefix + 'no newline', prefix + 'two\nlines\n',
+		prefix + 'carriage\rreturn\n', 'foreign frame\n', prefix + 'x'.repeat(1024) + '\n'] {
+		if _ := serial_write(serial.fd, bad) { return error('invalid serial frame accepted') }
+	}
+	serial.close()
+	assert os.read_file(serial_path)! == expected_serial
+	assert expected_serial.split_into_lines().filter(it.starts_with(prefix)).len == 3
+	if _ := serial_write(-1, begin) { return error('failed serial write accepted') }
 	assert !safe_relative('../escape') && !safe_relative('a//b') && safe_relative('a/b')
 	before := 'root:x:0:0:root:/root:/bin/sh'
 	after := database_after(before, fixture_name, fixture_name + ':x:10010:')!
@@ -527,7 +549,7 @@ fn self_test() ! {
 			return error('duplicate/unapproved runtime mount accepted')
 		}
 	}
-	println('HEADLESS-GUEST SELF-TEST PASS deterministic-tree modes binary-content symlink framing account-prefix collisions existing-approved-mount duplicate-mount-rejection')
+	println('HEADLESS-GUEST SELF-TEST PASS deterministic-tree modes binary-content symlink framing chatter-boundary single-write-failure account-prefix collisions existing-approved-mount duplicate-mount-rejection')
 }
 
 fn main() {
