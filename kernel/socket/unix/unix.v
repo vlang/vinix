@@ -25,6 +25,7 @@ const msg_ctrunc = 0x08
 const msg_peek = 0x02
 const msg_trunc = 0x20
 const msg_dontwait = 0x40
+const msg_nosignal = 0x4000
 const msg_waitall = 0x100
 const cmsg_header_size = u64(16)
 const cmsg_align = u64(8)
@@ -1520,7 +1521,9 @@ fn (mut this UnixSocket) listen(_handle voidptr, backlog int) ? {
 }
 
 fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags int) ?u64 {
-	if flags & ~msg_cmsg_cloexec != 0 {
+	// Linux accepts MSG_NOSIGNAL on receive as an inert flag. WebKit uses it
+	// for its Unix IPC reads; receiving cannot generate a SIGPIPE in any case.
+	if flags & ~(msg_cmsg_cloexec | msg_nosignal) != 0 {
 		errno.set(errno.eopnotsupp)
 		return none
 	}
