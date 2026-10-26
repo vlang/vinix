@@ -125,7 +125,7 @@ fn ws_ui_receive(frame &u8, fds &i32) bool {
 			remaining := deadline - ws_millis()
 			if remaining <= 0 { return false }
 			ready.returned = 0
-			status := C.poll(&ready, 1, i32(remaining))
+			status := C.poll(voidptr(&ready), 1, i32(remaining))
 			if status < 0 && *C.__errno_location() == C.EINTR { continue }
 			if status <= 0 { return false }
 			C.memset(control, 0, 4096)
@@ -391,8 +391,9 @@ fn ws_service_activity(e voidptr, intent voidptr, id u64) bool {
 		// From this point a Java object can escape to a worker. Never unmap its
 		// backing pixels even if construction or Activity.onCreate later fails.
 		ws_ui_retained = true
-		canvas_arg := Value{ j: 1 }
-		canvas := new_object(e, c'android/atl/GskCanvas', c'(J)V', &canvas_arg)
+		canvas_arg := &Value(C.alloca(sizeof(Value)))
+		canvas_arg[0] = Value{ j: 1 }
+		canvas := new_object(e, c'android/atl/GskCanvas', c'(J)V', canvas_arg)
 		if canvas == nil || pending(e) { return false }
 		ws.canvas = WsRef(slot(e, 21))(e, canvas)
 		if ws.canvas == nil || pending(e) { return false }
@@ -416,8 +417,10 @@ fn ws_service_activity(e voidptr, intent voidptr, id u64) bool {
 		matches := ws_auth_handle != nil && ws_auth_launch_target(ws_auth_handle, id, package_text, class_text) == 0
 		C.pthread_mutex_unlock(&ws_auth_mutex)
 		if !matches { return false }
-		args := [Value{ l: name }, Value{ l: intent }]!
-		activity := obj(e, loaded, c'android/atl/ATLLoadedApp', c'createActivity', c'(Ljava/lang/String;Landroid/content/Intent;)Landroid/app/Activity;', &args[0])
+		args := &Value(C.alloca(sizeof(Value) * 2))
+		args[0] = Value{ l: name }
+		args[1] = Value{ l: intent }
+		activity := obj(e, loaded, c'android/atl/ATLLoadedApp', c'createActivity', c'(Ljava/lang/String;Landroid/content/Intent;)Landroid/app/Activity;', args)
 		if activity == nil || pending(e) { return false }
 		ws_ui_live = true
 		ws_start(e, activity)
@@ -432,7 +435,7 @@ fn ws_service_ui_pump(e voidptr) bool {
 		if !ws_ui_live { return !pending(e) }
 		if pending(e) { return false }
 		mut ready := WsPoll{ fd: ws.input, events: 1 }
-		status := C.poll(&ready, 1, 0)
+		status := C.poll(voidptr(&ready), 1, 0)
 		if ws.activity == nil || ws.input < 3 || (status > 0 && ready.returned & 0x38 != 0)
 			|| (status < 0 && *C.__errno_location() != C.EINTR) {
 			ws_service_ui_shutdown(e)
