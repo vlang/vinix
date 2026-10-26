@@ -364,14 +364,16 @@ See the [dictionary snapshot checkpoint](../tests/ios/dictionary-snapshot-checkp
 The latest diagnostic checkpoint reaches application entry after all nine
 `+load` calls and three initializer groups return. Compiled launch-storyboard
 construction and the nominal `NSProcessInfo.thermalState` fallback now pass.
-All 13 guest regression fixtures and both sanitized host runs pass. Fortnite
-then reaches the check for the desktop's `VINIX_REQUEST_FD` and
-`VINIX_RESPONSE_FD` pipes, which this probe does not supply, and the VM harness
-times out without observing a natural application exit. Progress is 4 of 8
-observable gates (50% of that checklist, without estimating remaining work).
+All 13 guest regression fixtures and both sanitized host runs pass. A bounded
+VAPP v10 diagnostic peer now supplies the desktop pipes. Fortnite completes
+the handshake and returns two empty view trees, then exits 1 at unsupported
+CFString input encoding. No supervisor kill or application cgroup OOM occurs.
+The peer has no compositor; these trees do not establish a rendered game frame.
+Progress is 4 of 8 observable gates (50% of that checklist, without estimating
+remaining work).
 A rendered frame, interactive menu, login and playable match remain
 unverified. Advertising remains skipped. See the
-[thermal-state checkpoint](../tests/ios/thermal-state-checkpoint-20261026.md).
+[desktop probe checkpoint](../tests/ios/desktop-probe-checkpoint-20261026.md).
 
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
