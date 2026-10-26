@@ -172,6 +172,10 @@ fn validate(base string, addon string, executable string) !(string, string) {
 fn cpu_webkit_environment(base string, inherited map[string]string) map[string]string {
 	mut environment := inherited.clone()
 	environment.delete('WEBKIT_FORCE_COMPOSITING_MODE')
+	// The pinned Mesa package builds llvmpipe, not softpipe. Mesa fails rather
+	// than falling back when GALLIUM_DRIVER requests an unavailable driver.
+	environment['LIBGL_ALWAYS_SOFTWARE'] = '1'
+	environment['GALLIUM_DRIVER'] = 'llvmpipe'
 	environment['WEBKIT_SKIA_ENABLE_CPU_RENDERING'] = '1'
 	environment['WEBKIT_DISABLE_COMPOSITING_MODE'] = '1'
 	environment['WEBKIT_DISABLE_DMABUF_RENDERER'] = '1'
@@ -685,12 +689,12 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 	environment['GDK_BACKEND'] = 'x11'
 	environment['GSK_RENDERER'] = 'cairo'
 	environment['GSETTINGS_BACKEND'] = 'memory'
-	environment['LIBGL_ALWAYS_SOFTWARE'] = '1'
-	environment['GALLIUM_DRIVER'] = 'softpipe'
 	// This fixture loads only its credential-free local document; Vinix lacks
 	// bubblewrap's Linux namespace sandbox. Never use this mode for accounts.
 	environment['WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS'] = '1'
 	receipt['webkit_sandbox'] = 'disabled-for-credential-free-local-diagnostic'
+	receipt['libgl_always_software'] = environment['LIBGL_ALWAYS_SOFTWARE']
+	receipt['gallium_driver'] = environment['GALLIUM_DRIVER']
 	receipt['webkit_skia_renderer'] = 'cpu'
 	receipt['webkit_compositing_policy'] = 'disabled-for-cpu-rendered-local-diagnostic'
 	receipt['webkit_dmabuf_renderer_policy'] = 'disabled-for-cpu-rendered-local-diagnostic'
@@ -852,8 +856,12 @@ fn self_test() ! {
 	inherited := {'WEBKIT_SKIA_ENABLE_CPU_RENDERING': '0',
 		'WEBKIT_DISABLE_COMPOSITING_MODE': '0', 'WEBKIT_FORCE_COMPOSITING_MODE': '1',
 		'WEBKIT_DISABLE_DMABUF_RENDERER': '0',
+		'LIBGL_ALWAYS_SOFTWARE': '0', 'GALLIUM_DRIVER': 'softpipe',
 		'WEBKIT_INJECTED_BUNDLE_PATH': '/foreign/bundle', 'DISPLAY': ':120'}
 	webkit_env := cpu_webkit_environment(root, inherited)
+	assert webkit_env['LIBGL_ALWAYS_SOFTWARE'] == '1'
+	assert webkit_env['GALLIUM_DRIVER'] == 'llvmpipe'
+	assert inherited['LIBGL_ALWAYS_SOFTWARE'] == '0' && inherited['GALLIUM_DRIVER'] == 'softpipe'
 	assert webkit_env['WEBKIT_SKIA_ENABLE_CPU_RENDERING'] == '1'
 	assert webkit_env['WEBKIT_DISABLE_COMPOSITING_MODE'] == '1'
 	assert webkit_env['WEBKIT_DISABLE_DMABUF_RENDERER'] == '1'
@@ -926,7 +934,7 @@ fn self_test() ! {
 		context.replace('X11-MAPS-END\n', '')] {
 		if _ := known_fault_evidence(bad) { return error('incomplete or inconsistent fault evidence accepted') }
 	}
-	println('BROWSER-SESSION SELF-TEST PASS library-path libproxy-protection libproxy-pins libproxy-tamper libproxy-missing glx-arguments glx-wire-query glx-absence-negative authority-record x11-setup receipt-paths bundle-pins bundle-tamper bundle-missing cpu-renderer-environment dmabuf-renderer-environment pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins complete-context buffered-context negative-context')
+	println('BROWSER-SESSION SELF-TEST PASS library-path libproxy-protection libproxy-pins libproxy-tamper libproxy-missing glx-arguments glx-wire-query glx-absence-negative authority-record x11-setup receipt-paths bundle-pins bundle-tamper bundle-missing cpu-renderer-environment mesa-packaged-driver-environment dmabuf-renderer-environment pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins complete-context buffered-context negative-context')
 }
 
 fn main() {

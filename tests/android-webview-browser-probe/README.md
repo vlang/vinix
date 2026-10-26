@@ -181,6 +181,19 @@ extension from loading a separate DRI driver. The launcher also sends an
 authenticated X11 `QueryExtension` request and requires GLX to be absent before
 starting the browser; `session.json` records the policy and the checked result.
 This diagnostic setting does not qualify accelerated rendering or account use.
+The browser selects `LIBGL_ALWAYS_SOFTWARE=1` and `GALLIUM_DRIVER=llvmpipe`.
+The pinned Mesa 26.2.3-r1 package's exact
+[Alpine build recipe](https://github.com/alpinelinux/aports/blob/5be9d1d4593ed639fe9e1905cee3a791de36bff3/main/mesa/APKBUILD)
+enables llvmpipe on aarch64 and omits softpipe. Mesa's
+[software driver selector](https://gitlab.freedesktop.org/mesa/mesa/-/blob/mesa-26.2.3/src/gallium/auxiliary/target-helpers/sw_helper.h)
+returns null when a nonempty `GALLIUM_DRIVER` requests an unavailable driver;
+it does not try another driver. The r9 launcher incorrectly forced softpipe,
+and its browser aborted with `EGL_NOT_INITIALIZED`. Selecting the packaged
+driver fixes that mismatch; a real guest pass is still required. `session.json`
+records both environment values, and the host self-test rejects regression to
+an inherited softpipe setting. CPU rendering and disabled compositing do not
+guarantee that WebKit avoids EGL, as tracked in upstream
+[WebKit bug 285154](https://bugs.webkit.org/show_bug.cgi?id=285154).
 The loader searches `usr/lib/libproxy` under both pinned runtime roots, with
 the base runtime first, so libproxy's backend resolves inside the relocated
 runtime. The preparation receipt pins `usr/lib/libproxy/libpxbackend-1.0.so`;
