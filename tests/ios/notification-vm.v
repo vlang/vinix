@@ -156,6 +156,7 @@ fn build(root string, out string, only string) {
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
 			checked([root + '/build/ios/fortnite/ns-calendar-checks/toolchain/v', '-enable-globals','-nocache', '-cc', 'clang', '-os', 'linux', '-arch', 'arm64', '-gc', 'none', '-prod', '-d', 'no_backtrace',
+				'-path', '@vlib|' + root + '/compat/ios|' + root + '/tests/ios|@vmodules',
 				'-o', generated, root + '/tests/ios/native-init.v'])
 		} else {
 			mut args := [root + '/build/ios/fortnite/ns-calendar-checks/toolchain/v', '-enable-globals','-nocache', '-cc', 'clang', '-os', 'linux', '-arch', 'arm64', '-enable-globals', '-gc', 'none',

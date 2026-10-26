@@ -3,6 +3,7 @@ module main
 
 import macho
 import os
+import faultprobe
 
 #include <sys/mman.h>
 #include <unistd.h>
@@ -31,6 +32,8 @@ fn execute_with_options(image macho.Image, arguments []string, options Execution
 	if issues.len != 0 { return error('iOS: cannot execute:\n  ' + issues.join('\n  ')) }
 	page := u64(C.getpagesize())
 	layout := image.layout(page)!
+	mut probe := faultprobe.install(options.probe_no_ads)!
+	defer { faultprobe.restore(mut probe) or { eprintln(err) } }
 	flags := C.MAP_PRIVATE | C.MAP_ANONYMOUS
 	mapping := C.mmap(unsafe { nil }, usize(layout.size), C.PROT_READ | C.PROT_WRITE, flags, -1, 0)
 	if mapping == unsafe { voidptr(-1) } { return error('iOS: cannot allocate image mapping') }
@@ -78,6 +81,11 @@ fn execute_with_options(image macho.Image, arguments []string, options Execution
 	module_dependencies(0, 0)!
 	lazy_start()!
 	module_bind_all()!
+	if options.probe_no_ads {
+		for module in module_runtime.modules {
+			eprintln('iOS probe image: base=0x${module.base.hex()} size=0x${module.layout.size.hex()} vmaddr=0x${module.layout.base.hex()} path=${module.path}')
+		}
+	}
 	mut argv := []&char{cap: arguments.len + 1}
 	for argument in arguments { argv << unsafe { &char(argument.str) } }
 	argv << unsafe { &char(nil) }

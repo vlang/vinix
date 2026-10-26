@@ -4,6 +4,7 @@ module main
 
 import os
 import probebudget
+import probefault
 
 #include <unistd.h>
 #include <sys/wait.h>
@@ -482,7 +483,13 @@ fn main() {
 		} else {
 			['/opt/ios/FortniteClient-IOS-Shipping']
 		}
-		if mode == 'probe-no-ads' { os.setenv('VINIX_IOS_TRACE', '1', true) }
+		if mode == 'probe-no-ads' {
+			probefault.verify() or {
+				eprintln('IOS-NATIVE: FAIL fault context: ' + err.msg())
+				panic(err)
+			}
+			os.setenv('VINIX_IOS_TRACE', '1', true)
+		}
 		budget := os.read_file('/opt/ios/probe-memory-max') or { '' }
 		if budget != '' && mode != 'probe-no-ads' { panic('budget requires probe-no-ads') }
 		group := probebudget.prepare(budget) or {
