@@ -49,7 +49,10 @@ fn carry(data embed_file.EmbedFileData) string {
 	return data.to_string()
 }
 fn as_json[T](value T) !json2.Any { return json2.decode[json2.Any](json2.encode(value)) }
-fn write_json(path string, value json2.Any) ! { os.write_file(path, json2.encode(value, prettify: true) + '\n')! }
+fn write_json(path string, value json2.Any) ! {
+	os.mkdir_all(os.dir(path), mode: 0o755)!
+	os.write_file(path, json2.encode(value, prettify: true) + '\n')!
+}
 fn read_json(path string) !map[string]json2.Any {
 	if os.lstat(path)!.size > 8 * 1024 * 1024 { return error('receipt exceeds bound') }
 	return json2.decode[map[string]json2.Any](os.read_file(path)!)!
