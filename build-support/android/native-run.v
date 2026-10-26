@@ -28,7 +28,7 @@ fn main() {
 fn run() ! {
 	root := os.getenv_opt('VINIX_ANDROID_ROOT') or { '/opt/vinix-android-aarch64' }
 	if os.args.len == 2 && os.args[1] == '--help' {
-		println('usage: run-android APK [-l ACTIVITY] [-w WIDTH -h HEIGHT]\nRequires an inherited Vinix WS surface and input pipe.\nOptional root-only Unix identity: VINIX_ANDROID_UID/GID=10000..19999,\nANDROID_APP_DATA_DIR and VINIX_ANDROID_HOME must name prepared target-owned directories.')
+		println('usage: run-android APK [-l ACTIVITY] [-w WIDTH -h HEIGHT]\nRequires an inherited Vinix WS surface and input pipe.\nHeadless service host: run-android APK --service-fd N; requires a live root Unix peer,\nroot-provisioned account registry and explicit Unix credentials.\nOptional root-only Unix identity: VINIX_ANDROID_UID/GID=10000..19999,\nANDROID_APP_DATA_DIR and VINIX_ANDROID_HOME must name prepared target-owned directories.')
 		return
 	}
 	if os.args.len < 2 { return error('usage: run-android APK [-l ACTIVITY]') }
@@ -36,6 +36,17 @@ fn run() ! {
 	if !os.is_file(apk) { return error('cannot read APK: ' + apk) }
 	mut activity := ''
 	mut at := 2
+	mut service_fd := -1
+	if os.args.len >= 3 && os.args[2] == '--service-fd' {
+		if os.args.len != 4 { return error('service host requires exactly APK --service-fd N') }
+		value := os.args[3]
+		if value.len == 0 || value.len > 10 || !value.bytes().all(it >= `0` && it <= `9`)
+			|| value.u64() < 3 || value.u64() > 0x7fffffff {
+			return error('invalid service control descriptor')
+		}
+		service_fd = value.int()
+		at = os.args.len
+	}
 	for at < os.args.len {
 		option := os.args[at]
 		if option == '' {
@@ -71,7 +82,15 @@ fn run() ! {
 	data := os.getenv_opt('ANDROID_APP_DATA_DIR') or { data_root + '/vinix/android/' + os.base(apk) + '_' }
 	identity := nativeidentity.from_environment()!
 	nativeaccountauth.verify_environment_launch(apk, identity.uid, identity.gid, identity.enabled)!
-	identity.activate(apk, root, os.getenv('VINIX_SURFACE_PATH'))!
+	if service_fd >= 0 {
+		if !identity.enabled || os.getenv_opt('VINIX_ANDROID_ACCOUNT_REGISTRY') == none {
+			return error('service host requires a protected registry and explicit Unix credentials')
+		}
+		nativeaccountauth.inherit_root_channel(service_fd)!
+		identity.activate_headless(apk, root)!
+	} else {
+		identity.activate(apk, root, os.getenv('VINIX_SURFACE_PATH'))!
+	}
 	nativecache.prepare()!
 	os.mkdir_all(data)!
 	native := nativeapk.install(apk, data, 'arm64-v8a')!
@@ -94,6 +113,8 @@ fn run() ! {
 			os.setenv('ICU_DATA', root + '/usr/share/icu/' + entry, true)
 		}
 	}
-	os.execvp(root + '/lib/ld-musl-aarch64.so.1', ['--library-path', paths,
-		root + '/usr/bin/vinix-android-native', apk, activity])!
+	mut arguments := ['--library-path', paths, root + '/usr/bin/vinix-android-native', apk]
+	if service_fd >= 0 { arguments << ['--service-fd', service_fd.str()] }
+	else { arguments << activity }
+	os.execvp(root + '/lib/ld-musl-aarch64.so.1', arguments)!
 }

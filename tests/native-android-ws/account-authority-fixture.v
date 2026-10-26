@@ -23,12 +23,6 @@ $if linux {
 	#flag -D_GNU_SOURCE
 }
 
-struct C.pollfd {
-	fd i32
-	events i16
-	revents i16
-}
-
 fn C.getuid() u32
 fn C.geteuid() u32
 fn C.getpid() i32

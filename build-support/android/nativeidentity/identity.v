@@ -168,6 +168,18 @@ fn (config Config) verify() ! {
 // Returns only with the selected credentials and accessible launch inputs.
 // On error the caller must exit: the credential change is intentionally one way.
 pub fn (config Config) activate(apk string, runtime string, surface string) ! {
+	config.activate_mode(apk, runtime, surface, false)!
+}
+
+// A headless service host still requires the complete explicit credential drop;
+// only the display surface check is omitted. Caller authority is checked by the
+// root control channel and registry before starting this host.
+pub fn (config Config) activate_headless(apk string, runtime string) ! {
+	if !config.enabled { return error('headless service launch requires explicit Unix credentials') }
+	config.activate_mode(apk, runtime, '', true)!
+}
+
+fn (config Config) activate_mode(apk string, runtime string, surface string, headless bool) ! {
 	if !config.enabled { return }
 	$if linux {
 		if C.getuid() != 0 || C.geteuid() != 0 {
@@ -215,7 +227,7 @@ pub fn (config Config) activate(apk string, runtime string, surface string) ! {
 		for path in [runtime + '/lib/ld-musl-aarch64.so.1', runtime + '/usr/bin/vinix-android-native'] {
 			accessible(path, 5)!
 		}
-		config.surface(surface)!
+		if !headless { config.surface(surface)! }
 		os.chdir(config.data)!
 		os.setenv('HOME', config.home, true)
 		for name, suffix in {

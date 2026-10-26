@@ -29,6 +29,9 @@ fn test_absent_options_preserve_the_launching_identity() {
 	os.unsetenv('VINIX_ANDROID_GID')
 	config := from_environment()!
 	assert !config.enabled
+	mut headless_rejected := false
+	config.activate_headless('', '') or { headless_rejected = true }
+	assert headless_rejected
 	$if linux {
 		mut before := C.rlimit{}
 		assert C.getrlimit(C.RLIMIT_NICE, &before) == 0

@@ -16,15 +16,6 @@ fn C.fork() i32
 fn C._exit(i32)
 fn C.kill(i32, i32) i32
 fn C.waitpid(i32, &i32, i32) i32
-fn C.poll(&C.pollfd, usize, i32) i32
-
-struct C.pollfd {
-mut:
-	fd i32
-	events i16
-	revents i16
-}
-
 fn rejected_peer(fd int) bool {
 	peer_credentials(fd) or { return true }
 	return false

@@ -61,6 +61,25 @@ separate administrator-provisioned process/channel. Exporting this socket helper
 does not itself make a private service accessible. APKs which still run as Unix
 root or share a UID are deliberately ineligible for this registry.
 
+The headless host form is `run-android APK --service-fd N`, with exactly those
+arguments, the protected registry, explicit target UID/GID and prepared data/home
+directories. The inherited connected Unix stream must have a kernel-authenticated
+root peer. The launcher preserves it across exec and performs the same complete
+credential/capability drop as a graphical launch, omitting only the surface check.
+The receiver must call `verify_service_frame` before any APK code and set
+`FD_CLOEXEC` before starting the service runtime.
+
+The root peer sends exactly one ASCII, tab-separated frame followed by newline:
+`vinix-android-service-host-v1`, package, fully qualified service class, action,
+and APK SHA-256. Parsing has a 4096-byte limit and one monotonic five-second
+deadline. The package, APK digest and exact service/action pair must match the
+registry, and real/effective UID/GID must match the selected registered IDs.
+There are no UID, permission, credential or account fields in this protocol.
+Queued extra bytes, multiple frames and a closed controller fail. The receiver
+keeps the descriptor for the host lifetime; subsequent bytes are a protocol
+failure and EOF requests orderly teardown. This is a bounded service lifecycle
+control channel, not an authenticator RPC or account-creation channel.
+
 Run host tests with `v test build-support/android/nativeaccountauth`. These test
 registry parsing, authority decisions, launch failure behavior, file metadata
 policy and real host socket credentials. They do not establish separate-process
