@@ -4,7 +4,9 @@ module faultprobe
 import os
 
 #include <signal.h>
-#include <ucontext.h>
+$if linux {
+	#include <ucontext.h>
+}
 #include <unistd.h>
 #include <string.h>
 

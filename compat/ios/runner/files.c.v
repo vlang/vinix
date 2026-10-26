@@ -94,6 +94,12 @@ fn darwin_shm_open(path &char, flags i32, mode u32) i32 {
 }
 
 fn darwin_mmap(address voidptr, size usize, protection i32, flags i32, file i32, offset i64) voidptr {
+	result := darwin_mmap_impl(address, size, protection, flags, file, offset)
+	vm_probe_record(c'mmap', u64(address), u64(size), [u64(u32(protection)), u64(u32(flags)), u64(u32(file)), u64(offset), 0, 0, 0, 0, 0, 0]!, i64(result))
+	return result
+}
+
+fn darwin_mmap_impl(address voidptr, size usize, protection i32, flags i32, file i32, offset i64) voidptr {
 	$if linux {
 		if flags & ~i32(1 | 2 | 0x10 | 0x40 | 0x1000) != 0 || protection & ~i32(7) != 0 {
 			darwin_set_errno(45)
@@ -116,12 +122,24 @@ fn darwin_mmap_fixed(address voidptr, size usize, protection i32, flags i32, fil
 }
 
 fn darwin_munmap(address voidptr, size usize) i32 {
+	result := darwin_munmap_impl(address, size)
+	vm_probe_record(c'munmap', u64(address), u64(size), [10]u64{}, result)
+	return result
+}
+
+fn darwin_munmap_impl(address voidptr, size usize) i32 {
 	C.ios_mach_threads_lock(); defer { C.ios_mach_threads_unlock() }
 	if mach_mapping_overlaps(u64(address), u64(size)) { darwin_set_errno(45); return -1 }
 	return i32(C.munmap(address, size))
 }
 
 fn darwin_mprotect(address voidptr, size usize, protection i32) i32 {
+	result := darwin_mprotect_impl(address, size, protection)
+	vm_probe_record(c'mprotect', u64(address), u64(size), [u64(u32(protection)), 0, 0, 0, 0, 0, 0, 0, 0, 0]!, result)
+	return result
+}
+
+fn darwin_mprotect_impl(address voidptr, size usize, protection i32) i32 {
 	C.ios_mach_threads_lock(); defer { C.ios_mach_threads_unlock() }
 	if mach_mapping_overlaps(u64(address), u64(size)) { darwin_set_errno(45); return -1 }
 	return i32(C.mprotect(address, size, protection))

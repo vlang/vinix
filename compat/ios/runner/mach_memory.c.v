@@ -68,7 +68,7 @@ fn mach_allocate(rounded u64, requested u64, anywhere bool) ?u64 {
 	return mapped
 }
 
-fn darwin_vm_allocate(task u32, address &u64, size u64, flags i32) i32 {
+fn darwin_vm_allocate_impl(task u32, address &u64, size u64, flags i32) i32 {
 	previous := unsafe { *C.ios_errno_address() }
 	defer { darwin_set_errno(previous) }
 	if task != system_data.task_self || address == unsafe { nil } || flags !in [i32(0), 1] { return 4 }
@@ -112,7 +112,7 @@ fn darwin_vm_remap(task u32, address &u64, size u64, mask u64, flags i32,
 	return 1
 }
 
-fn darwin_vm_deallocate(task u32, address u64, size u64) i32 {
+fn darwin_vm_deallocate_impl(task u32, address u64, size u64) i32 {
 	previous := unsafe { *C.ios_errno_address() }
 	defer { darwin_set_errno(previous) }
 	if task != system_data.task_self || address & (mach_page_size() - 1) != 0 { return 4 }

@@ -216,7 +216,7 @@ fn mach_mapping_remove(address u64, size u64, split_fd i32) {
 	}
 }
 
-fn darwin_vm_map(task u32, address &u64, size u64, mask u64, flags i32, object u32, offset u64, copy i32, current i32, maximum i32, inheritance i32) i32 {
+fn darwin_vm_map_impl(task u32, address &u64, size u64, mask u64, flags i32, object u32, offset u64, copy i32, current i32, maximum i32, inheritance i32) i32 {
 	previous := unsafe { *C.ios_errno_address() }
 	defer { darwin_set_errno(previous) }
 	if system_data == unsafe { nil } || task != system_data.task_self || address == unsafe { nil } { return 4 }
