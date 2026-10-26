@@ -75,7 +75,7 @@ boot media, preserves the original modules and configuration, and appends the
 bundle under `/opt/vinix-browser-probe`:
 
 ```sh
-v -path '@vlib|build-support|build-support/android' -o /tmp/vinix-browser-stage tests/android-webview-browser-probe/stage.v
+v -prod -cc clang -path '@vlib|build-support|build-support/android' -o /tmp/vinix-browser-stage tests/android-webview-browser-probe/stage.v
 /tmp/vinix-browser-stage --self-test
 /tmp/vinix-browser-stage BASE_BOOT_IMG BASE_EFIVARS_FD OUTPUT FRESH_VM_OUTPUT
 ```
