@@ -487,6 +487,7 @@ fn main() {
 			require_child('/opt/ios/vm-probe-checks')
 			require_child('/opt/ios/block-byref-checks')
 			require_child('/opt/ios/dictionary-snapshot-checks')
+			require_child('/opt/ios/inline-pthread-self-checks')
 			probefault.verify() or {
 				eprintln('IOS-NATIVE: FAIL fault context: ' + err.msg())
 				panic(err)

@@ -15,6 +15,8 @@ mut:
 	initializers []u64
 	visiting     bool
 	dyld_published bool
+	thread_self_thunks []InlineThreadSelf
+	thread_self_prefix usize
 }
 
 struct ModuleRuntime {
@@ -153,15 +155,12 @@ fn module_dependencies(index int, depth int) ! {
 				return error('iOS: loaded library span exceeds limit')
 			}
 			mapping := if module_runtime.auditing {
-				unsafe { voidptr(1) }
+				InlineSelfMapping{base: 1}
 			} else {
-				C.mmap(unsafe { nil }, usize(layout.size), C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
-			}
-			if mapping == unsafe { voidptr(-1) } {
-				return error('iOS: cannot allocate library mapping')
+				inline_self_map(image, layout)!
 			}
 			target = module_runtime.modules.len
-			module_runtime.modules << &LoadedModule{ image: image, layout: layout, base: u64(mapping), path: path.clone() }
+			module_runtime.modules << &LoadedModule{ image: image, layout: layout, base: mapping.base, thread_self_prefix: mapping.prefix, path: path.clone() }
 			module_runtime.lookup_order << ModuleProvider{index: target}
 			module_runtime.paths[path] = target
 			module_runtime.bytes += layout.size
@@ -232,6 +231,7 @@ fn module_bind_all() ! {
 		objc_register_image(loaded.image, loaded.layout, loaded.base)!
 		module_runtime.modules[index].initializers = image_initializers(loaded)!
 		image_tls_prepare(loaded)!
+		inline_self_prepare(mut module_runtime.modules[index])!
 	}
 	module_runtime.binding = 0
 	lazy_seal()!
@@ -258,9 +258,10 @@ fn modules_stop() {
 	defer { dyld_callbacks_unlock() }
 	dyld_images_retire()
 	for index, loaded in module_runtime.modules {
+		inline_self_stop(mut module_runtime.modules[index])
 		if index != 0 {
 			if !module_runtime.auditing {
-				C.munmap(unsafe { voidptr(loaded.base) }, usize(loaded.layout.size))
+				C.munmap(unsafe { voidptr(loaded.base - u64(loaded.thread_self_prefix)) }, usize(loaded.layout.size) + loaded.thread_self_prefix)
 			}
 			module_image_free(loaded.image)
 		}

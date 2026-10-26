@@ -34,11 +34,9 @@ fn execute_with_options(image macho.Image, arguments []string, options Execution
 	layout := image.layout(page)!
 	mut probe := faultprobe.install(options.probe_no_ads)!
 	defer { faultprobe.restore(mut probe) or { eprintln(err) } }
-	flags := C.MAP_PRIVATE | C.MAP_ANONYMOUS
-	mapping := C.mmap(unsafe { nil }, usize(layout.size), C.PROT_READ | C.PROT_WRITE, flags, -1, 0)
-	if mapping == unsafe { voidptr(-1) } { return error('iOS: cannot allocate image mapping') }
-	defer { C.munmap(mapping, usize(layout.size)) }
-	base := u64(mapping)
+	mapping := inline_self_map(image, layout)!
+	defer { C.munmap(unsafe { voidptr(mapping.base - u64(mapping.prefix)) }, usize(layout.size) + mapping.prefix) }
+	base := mapping.base
 	objc_start()
 	ns_process_info_start(arguments)
 	$if ios_text ? { text_start()! }
@@ -48,6 +46,7 @@ fn execute_with_options(image macho.Image, arguments []string, options Execution
 	path := os.real_path(arguments[0])
 	defer { unsafe { path.free() } }
 	modules_start(image, layout, base, path, false)
+	module_runtime.modules[0].thread_self_prefix = mapping.prefix
 	module_runtime.probe_no_ads = options.probe_no_ads
 	if options.probe_no_ads {
 		eprintln('iOS DIAGNOSTIC PROBE: SKAdNetwork class import will bind to nil; application behavior is modified')
