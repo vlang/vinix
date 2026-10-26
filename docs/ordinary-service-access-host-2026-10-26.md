@@ -64,6 +64,15 @@ file set and both APK hash maps. All 29 command receipts exited zero; all four
 smali assemblies had empty output and all four signature checks verified v3.
 The adjacent readback is `service-access-fixture-2026-10-26-r3-verify.log`.
 
+The reusable checker is `tests/native-android-ws/check-service-access-fixture.v`.
+It reads the complete historical bundle, including preserved generator source,
+binary and signing key. Its `--self-test BUNDLE FRESH_OUTPUT` mode rejects ten
+copied bundles with missing, extra, nonregular or changed artifacts, incomplete
+maps, failed commands, noisy assembly or failed v3 verification. All ten probes
+passed without changing the original bundle; evidence is
+`/Users/alex/.local/state/vinix/android/service-access-checker-selftest-2026-10-26.log`,
+SHA-256 `2f68c43aed0395a4836a8f9922eb95106d19d26d6a52c70438d16234ff336729`.
+
 | APK under the bundle | SHA-256 |
 | --- | --- |
 | `client/probe.apk` | `1450307d74ee2581cffb516107e4b7bbbf7308d49f32cd9da828daf25926b891` |
