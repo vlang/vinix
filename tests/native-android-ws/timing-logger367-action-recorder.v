@@ -30,7 +30,7 @@ fn hash(path string) !string {
 fn main() {
 	assert os.args.len >= 5
 	label := os.args[1]
-	assert label in ['prepare', 'old', 'new', 'qualify', 'seal']
+	assert label in ['prepare', 'old', 'new', 'qualify', 'seal', 'observed-qualify', 'observed-seal']
 	pin := os.args[2]
 	assert pin.len == 64 && pin.bytes().all(it in '0123456789abcdef'.bytes())
 	argv := os.args[3..]

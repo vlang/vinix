@@ -542,6 +542,18 @@ fn expected_timing_output() []string {
  return lines
 }
 
+fn expected_old_output() []string {
+ return ['TIMING-LOGGER-BEGIN', 'ANDROID-WS-FAIL start activity', rejection,
+  'at java.lang.Class.classForName(Native Method)',
+  'at java.lang.Class.forName(Class.java:453)',
+  'at java.lang.Class.forName(Class.java:378)',
+  'at org.vinix.bootstrap.TimingLoggerProbe.check(Unknown Source:2)',
+  'at org.vinix.bootstrap.Main.onCreate(Unknown Source:10)',
+  'at android.app.Activity.vinixPerformCreate(Unknown Source:5)',
+  'Caused by: ' + rejection, '... 6 more',
+  'APK-SUITE-EXIT id=bootstrap-fixture code=1 native_observed=true gtk_x11_absent=true']
+}
+
 fn semantic_at(kind string, raw map[string]json2.Any, log string, apk string, staged_apk string) ! {
  require(kind in ["old", "new"], "variant")!
  lines := log.split_into_lines().map(it.trim_space())
@@ -553,18 +565,20 @@ fn semantic_at(kind string, raw map[string]json2.Any, log string, apk string, st
  require(lines.filter(it == "TIMING-LOGGER-BEGIN").len == 1, "single probe start")!
  if kind == "old" {
   for marker in markers { require(!log.contains(marker), "old emitted " + marker)! }
-  require(lines.filter(it == rejection).len == 1 && log.count("ClassNotFoundException") == 1, "exact TimingLogger CNFE")!
-  begin := log.index("TIMING-LOGGER-BEGIN") or { return error("missing old start") }
-  failure := log.index(rejection) or { return error("missing old failure") }
-  require(begin < failure && log.contains("at java.lang.Class.forName("), "old started before reflective lookup failure")!
-  frames := lines.filter(it.starts_with("at org.vinix.bootstrap."))
-  prefixes := ["at org.vinix.bootstrap.TimingLoggerProbe.check(", "at org.vinix.bootstrap.Main.onCreate("]
-  require(frames.len == prefixes.len, "isolated TimingLogger fixture stack")!
-  for i, prefix in prefixes { require(frames[i].starts_with(prefix), "ordered old frame: " + prefix)! }
+  expected := expected_old_output()
+  begin := lines.index('TIMING-LOGGER-BEGIN')
+  require(begin >= 0 && begin + expected.len <= lines.len, 'complete old exception block')!
+  require(lines[begin..begin + expected.len] == expected, 'exact observed nested CNFE block')!
+  require(lines.filter(it == rejection).len == 1 && log.count('ClassNotFoundException') == 2,
+   'exact outer and nested TimingLogger CNFE')!
+  require(lines.filter(it.starts_with('Caused by:')) == ['Caused by: ' + rejection]
+   && !log.contains('Suppressed:'), 'single exact old cause')!
+  require(lines.filter(it.starts_with('at ')) == expected[3..9], 'exact ordered six old frames')!
   require(lines.filter(it == "ANDROID-WS-FAIL start activity").len == 1 && log.count("ANDROID-WS-FAIL") == 1, "start activity failure")!
   require(lines.filter(it == "APK-SUITE-EXIT id=bootstrap-fixture code=1 native_observed=true gtk_x11_absent=true").len == 1, "guest exit1")!
   require(raw["outcome"]!.str() == "startup_failed" && raw["process_exited"]!.bool(), "old raw failure")!
   require(raw["failure_markers"]!.as_array().map(it.str()) == ["ANDROID-WS-FAIL start activity", rejection,
+   'Caused by: ' + rejection,
    "APK-SUITE-EXIT id=bootstrap-fixture code=1 native_observed=true gtk_x11_absent=true"], "old raw markers")!
  } else {
   mut position := log.index("TIMING-LOGGER-BEGIN") or { return error("missing start") }
@@ -618,6 +632,91 @@ fn check(kind string, receipt string) ! {
  println('TIMING-LOGGER-' + kind.to_upper() + '-EXPECTED-RESULT-PASS')
 }
 
+// Preserve the original failed old validator invocation and successful new
+// invocation. Requalification changes only the old exception-shape validator;
+// the prepared runner, APK, runtime closure and actual guest output stay pinned.
+fn observed_invocations() !map[string]string {
+ original_runner := 'a33a93cb8c8d21b244e92eca86a5d3dac8e23dd0142364db441b338ddcdd03a4'
+ recorder_source := '36cd71cdec17ccf3cd4fb964786deb177e161cb49c76cd8d437a80b4dd2d187d'
+ recorder_binary := 'dc823bd2632ede0ff06e7cfa1987fe1dff9dd4417e3314b9a0b145c2db6f71bb'
+ assert hash(state + '/tools/checked-runner')! == original_runner
+ assert !os.exists(state + '/old-semantic-check.json')
+ mut pins := map[string]string{}
+ for kind in ['old', 'new'] {
+  prefix := os.dir(state) + '/timing-logger367-fixture-' + kind + '-2026-10-26'
+  before := object(prefix + '-before.json')!
+  actual := object(prefix + '-command.json')!
+  assert before.keys().sorted() == ['argv', 'cwd', 'executable_sha256_before',
+   'recorder_binary_sha256', 'recorder_source_sha256', 'started_utc']
+  assert actual.keys().sorted() == ['argv', 'completed_utc', 'cwd', 'executable_sha256_after',
+   'executable_sha256_before', 'exit_code', 'output_sha256', 'recorder_binary_sha256',
+   'recorder_source_sha256', 'started_utc']
+  for key, value in before { assert json2.encode(value) == json2.encode(actual[key]!) }
+  assert actual['argv']!.as_array().map(it.str()) == [state + '/tools/checked-runner', kind]
+  assert actual['cwd']!.str() == '/Users/alex/code/vinix'
+  assert actual['started_utc']!.str() < actual['completed_utc']!.str()
+  assert actual['executable_sha256_before']!.str() == original_runner
+   && actual['executable_sha256_after']!.str() == original_runner
+  assert actual['recorder_source_sha256']!.str() == recorder_source
+   && actual['recorder_binary_sha256']!.str() == recorder_binary
+  assert actual['exit_code']!.int() == if kind == 'old' { 1 } else { 0 }
+  output_pin := if kind == 'old' { '6e3f6f2a3f4f1d09eeb4295a029adb624cd4806237bdb2beb25ed4e637d96f46' }
+   else { '9cbbf87c03c32e04a06c5b1db095a0b9a0f57b621aa83916f3f331164513d045' }
+  assert actual['output_sha256']!.str() == output_pin && hash(prefix + '.log')! == output_pin
+  if kind == 'old' { assert os.read_file(prefix + '.log')!.contains('V panic: exact TimingLogger CNFE') }
+  else { assert os.read_file(prefix + '.log')!.trim_space() == 'TIMING-LOGGER-NEW-EXPECTED-RESULT-PASS' }
+  suite := object(state + '/commands/suite-' + kind + '.json')!
+  assert suite['exit_code']!.int() == 0
+  for suffix in ['-before.json', '-command.json', '.log'] { pins[prefix + suffix] = hash(prefix + suffix)! }
+ }
+ for item in ['timing-logger367-action-recorder.v', 'timing-logger367-action-recorder'] {
+  path := os.dir(state) + '/' + item
+  assert hash(path)! == if item.ends_with('.v') { recorder_source } else { recorder_binary }
+  pins[path] = hash(path)!
+ }
+ original_new := read_map(state + '/new-semantic-check.json')!
+ assert original_new['checker_binary_sha256']! == original_runner
+ assert original_new['status']! == 'expected-result-pass' && original_new['variant']! == 'new'
+ assert original_new['serial_sha256']! == hash(state + '/run-new/bootstrap-fixture/serial.log')!
+ assert original_new['raw_results_sha256']! == hash(state + '/run-new/results.json')!
+ pins[state + '/new-semantic-check.json'] = hash(state + '/new-semantic-check.json')!
+ return pins
+}
+
+fn observed_qualify() ! {
+ assert !os.exists(state + '/qualification/observed-invocations.json')
+ pins := observed_invocations()!
+ for path, pin in pins {
+  target := state + '/qualification/original-invocations/' + os.base(path)
+  assert !os.exists(target)
+  clone(path, target)!
+  assert hash(target)! == pin
+ }
+ write_json(state + '/qualification/observed-invocations.json', pins)!
+ for kind in ['old', 'new'] { check(kind, state + '/qualification/observed-' + kind + '-semantic-check.json')! }
+ assert observed_invocations()! == pins
+ println('TIMING-LOGGER-OBSERVED-QUALIFICATION-PASS')
+}
+
+fn observed_seal() ! {
+ assert !os.exists(state + '/sha256.json')
+ pins := read_map(state + '/qualification/observed-invocations.json')!
+ assert observed_invocations()! == pins
+ for path, pin in pins { assert hash(state + '/qualification/original-invocations/' + os.base(path))! == pin }
+ for kind in ['old', 'new'] {
+  prior := read_map(state + '/qualification/observed-' + kind + '-semantic-check.json')!
+  receipt := state + '/qualification/observed-' + kind + '-seal-semantic-check.json'
+  check(kind, receipt)!
+  assert read_map(receipt)! == prior, 'observed semantic result changed before sealing'
+ }
+ assert stable()! == read_map(state + '/shared-inputs.json')!
+ assert observed_invocations()! == pins
+ r := os.exec([state + '/tools/inflater-trace-seal', 'seal', state])
+ os.write_file(state + '-seal.log', r.output)!
+ assert r.exit_code == 0, r.output
+ print(r.output)
+}
+
 fn synthetic_raw(kind string, apk string) map[string]json2.Any {
  return {'id': json2.Any('bootstrap-fixture'), 'package': json2.Any('org.vinix.bootstrap'),
   'container_sha256': json2.Any(apk), 'metadata': json2.Any({'apk_sha256': json2.Any(apk)}),
@@ -627,6 +726,7 @@ fn synthetic_raw(kind string, apk string) map[string]json2.Any {
   'qemu_alive_before_capture': json2.Any(true), 'process_exited': json2.Any(kind == 'old'),
   'outcome': json2.Any(if kind == 'old' { 'startup_failed' } else { 'window_observed' }),
   'failure_markers': json2.Any(if kind == 'old' { ['ANDROID-WS-FAIL start activity', rejection,
+   'Caused by: ' + rejection,
    'APK-SUITE-EXIT id=bootstrap-fixture code=1 native_observed=true gtk_x11_absent=true'] } else { []string{} })}
 }
 
@@ -639,12 +739,7 @@ fn self_test() ! {
  apk := "0".repeat(64)
  old_raw := synthetic_raw("old", apk)
  new_raw := synthetic_raw("new", apk)
- old_log := "TIMING-LOGGER-BEGIN\nANDROID-WS-FAIL start activity\n" + rejection + "\n" +
-  " at java.lang.Class.classForName(Native Method)\n" +
-  " at java.lang.Class.forName(Class.java:454)\n" +
-  " at org.vinix.bootstrap.TimingLoggerProbe.check(Unknown Source:0)\n" +
-  " at org.vinix.bootstrap.Main.onCreate(Unknown Source:0)\n" +
-  "APK-SUITE-EXIT id=bootstrap-fixture code=1 native_observed=true gtk_x11_absent=true\n"
+ old_log := expected_old_output().join('\n') + '\n'
  new_log := expected_timing_output().join('\n') + '\n'
  semantic("old", old_raw, old_log, apk)!
  semantic("new", new_raw, new_log, apk)!
@@ -659,7 +754,27 @@ fn self_test() ! {
  rejected("old", old_raw, old_log.replace(rejection, "java.lang.ClassNotFoundException: unrelated"), apk)!
  rejected("old", old_raw, old_log.replace(rejection, "java.lang.ClassNotFoundException: android.util.Other"), apk)!
  rejected("old", old_raw, old_log + " at org.vinix.bootstrap.TimingLoggerProbe.check(Unknown Source:0)\n", apk)!
- rejected("old", old_raw, old_log.replace("TimingLoggerProbe.check(Unknown Source:0)\n at org.vinix.bootstrap.Main.onCreate", "Main.onCreate(Unknown Source:0)\n at org.vinix.bootstrap.TimingLoggerProbe.check"), apk)!
+ for line in expected_old_output()[2..] {
+  rejected('old', old_raw, old_log.replace(line + '\n', ''), apk)!
+ }
+ for changed in ['Caused by: java.lang.ClassNotFoundException: android.util.Other',
+  'Caused by: java.lang.NoClassDefFoundError: android.util.TimingLogger'] {
+  rejected('old', old_raw, old_log.replace('Caused by: ' + rejection, changed), apk)!
+ }
+ rejected('old', old_raw, old_log.replace('... 6 more', '... 5 more'), apk)!
+ rejected('old', old_raw, old_log.replace('... 6 more', 'at unrelated.Frame.call(Unknown Source:0)\n... 6 more'), apk)!
+ rejected('old', old_raw, old_log.replace('... 6 more', 'unrelated\n... 6 more'), apk)!
+ rejected('old', old_raw, old_log.replace('Class.java:453', 'Class.java:454'), apk)!
+ rejected('old', old_raw, old_log.replace('Unknown Source:2', 'Unknown Source:0'), apk)!
+ rejected('old', old_raw, old_log.replace('Activity.vinixPerformCreate', 'Activity.onCreate'), apk)!
+ rejected('old', old_raw, old_log + 'Caused by: ' + rejection + '\n', apk)!
+ rejected('old', old_raw, old_log + 'Suppressed: unrelated\n', apk)!
+ rejected('old', old_raw, old_log + old_log, apk)!
+ for i in 3 .. 8 {
+  frames := expected_old_output()
+  pair := frames[i] + '\n' + frames[i + 1]
+  rejected('old', old_raw, old_log.replace(pair, frames[i + 1] + '\n' + frames[i]), apk)!
+ }
  mut missing_cnfe := synthetic_raw("old", apk)
  missing_cnfe["failure_markers"] = ["ANDROID-WS-FAIL start activity",
   "APK-SUITE-EXIT id=bootstrap-fixture code=1 native_observed=true gtk_x11_absent=true"]
@@ -725,10 +840,12 @@ fn main() {
   prepare(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6])!
   return
  }
- assert os.args.len == 2, 'prepare FRAMEWORK_ROOT MANIFEST_SHA JAR_SHA FIXTURE_COMMIT FIXTURE_SHA | old | new | qualify | seal | self-test'
+ assert os.args.len == 2, 'prepare FRAMEWORK_ROOT MANIFEST_SHA JAR_SHA FIXTURE_COMMIT FIXTURE_SHA | old | new | qualify | seal | observed-qualify | observed-seal | self-test'
  match os.args[1] {
   'self-test' { self_test()! }
   'old', 'new' { run(os.args[1])! }
+  'observed-qualify' { observed_qualify()! }
+  'observed-seal' { observed_seal()! }
   'qualify' { for kind in ['old', 'new'] { check(kind, state + '/qualification/' + kind + '-semantic-check.json')! } }
   'seal' {
    assert !os.exists(state + '/sha256.json')
