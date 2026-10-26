@@ -1,5 +1,32 @@
 # Current account transport and store library, 2026-10-26
 
+The r7 retained-source AArch64 build passed with the validated canonical SQLite
+store path (`c318d84f2`). This removes the deliberate `/proc/self/fd` symlink
+from SQLite's `NOFOLLOW` path while preserving ancestor, ownership, mode and
+database/journal file checks. The account ABI remains complete at 75 exports.
+
+- Complete retained bundle: `/Users/alex/.local/state/vinix/android/current-account-build-2026-10-26-r7`.
+- Bundle `sha256.json`: `1c761aa0e437bab4f1f2219837c11c78697b31444f0f11b5eea671f09932ce4a`.
+- `lib/libvinix-android-account.so`: `b59677fa3c1c77606632790db4e958e4644dffa090c7787b8f6de48b120c41e7`.
+- Source revision: `c318d84f240d6bea25c2b9d3343745b11a540b37`.
+- Retained `accountstore/store.c.v`: `b174fd25e52bcd5f8f29c068a426979a76de3ff6eef05e8550b136530756d6d3`.
+- Retained builder source: `a00628725834222fb801cf214094a60eb737c8187e8f7eddf6088aaf6a6ccc0a`
+  (`81fd09e0d`); compiler, SQLite, native r5 baseline and static zlib pins are
+  unchanged from the r6/r5 evidence below.
+
+The builder self-test and complete zlib producer check passed before capture.
+The retained compile, strict shared link, consumed headers, exact link inputs,
+ELF, ABI and complete inventory checks passed. The independent retained Maps
+stager's `--audit-account-build` passed; its log is
+`/Users/alex/.local/state/vinix/android/maps-account-r7-build-audit.log`.
+The two host SQLite store/token test files passed with log
+`/Users/alex/.local/state/vinix/android/accountstore-canonical-path-host-2026-10-26-r1.log`.
+This account-only refresh needs no JNI or launcher rebuild: their retained
+closures do not contain the account store implementation. Linux guest behavior
+and Google account login require separate evidence.
+
+## Previous r6 evidence
+
 The r6 retained-source AArch64 account library build passed with trusted APK
 authenticator metadata discovery and the operation-6 description query. It
 captures the metadata parser (`638e9984c`) and broker/client query (`1507fec33`)
