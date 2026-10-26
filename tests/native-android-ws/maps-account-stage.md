@@ -8,8 +8,9 @@ overlay destinations and all six preserved modules. It retains its sources,
 request, tools, command receipts and readback inventories outside Git. It does
 not boot an image or establish Google login success.
 
-The request selects separate sealed framework, JNI, account library, launcher,
-Maps controller, browser, token APK and token controller bundles. The overlay
+The request selects separate sealed framework, JNI, account library, browser
+client library, launcher, Maps controller, production browser, token APK and
+token controller bundles. The overlay
 includes the selected UI fixture and the headless fixture, updating the latter's
 runtime pins. UID/GID 10014 is reserved for the synthetic token cache fixture;
 the Maps controller provisions its separately audited IDs 10012 and 10013.
@@ -53,13 +54,22 @@ actual dependency-file inputs and exact compile/link commands. A missing
 archive or dynamic zlib fallback fails the audit. The standalone UI controller
 has its own one-output profile; the launcher still requires all four outputs.
 
-The coupled request refresher (`9d5323f68`) selects exactly framework, JNI,
-account library, launcher, token fixture, token controller and standalone UI
-references from pinned manifests. It derives framework JAR/DEX and token APK
+The coupled request refresher (`3b0b2befa`) selects exactly framework, JNI,
+account library, browser client library, launcher, token fixture, token
+controller and standalone UI references from pinned manifests. It derives
+framework JAR/DEX and token APK
 pins, preserves every other decoded request field, and retains the original,
 selection, resulting request, source, tool and receipt in a fresh sealed bundle.
 This selection step leaves complete build, signature and media audits to the
 stager. Its positive and rejection fixtures remain in the retained source.
+
+The browser client has its own `vinix-current-browser-v1` producer. Its complete
+inventory, exact public ABI source, command, dependency headers, link trace/map
+and ELF dependency closure must pass before deployment. The stager installs
+`libvinix-android-browser.so` under the Android runtime's `usr/lib` and pins it
+in the Maps and headless controller inputs. It remains a separate role from
+the production WebKit browser deployment. Older frozen stages retain their
+original inventories and historical seven-role requests.
 
 Evidence under `/Users/alex/.local/state/vinix/android/`:
 
@@ -199,6 +209,30 @@ Evidence under `/Users/alex/.local/state/vinix/android/`:
   `maps-account-vm-r4-clone.json` SHA-256 is
   `f58891b8b1fcffa0880b632d962c47a028f6bd49aa2732aa00d415d9b4f6d44b`.
   See `maps-account-clone-run-r4.log` (exit 0). The original r4 stays sealed;
+  subsequent kernel and guest changes belong only in its VM copy.
+- `maps-account-coupled-request-r5` adds browser client r2 and selects JNI r17
+  and Maps controller r6. Framework, account r7, launcher, token, standalone UI
+  and production browser selections remain unchanged. The resulting request
+  SHA-256 is
+  `c3e19c79269b5e0f7c72d4c81f1dad0fed80c245e2aa43ffb1d5c4009864aa03`;
+  its complete refresh manifest is
+  `ee425c9ae2e46d8697f2181f7fcec610ac55e8603aaf62d83a6d6727a1d54592`.
+- `maps-account-r5` passed full staging with source `3b0b2befa`, including
+  the new browser client producer audit, runtime closure, both signatures,
+  overlay readback and all six original modules. Its complete manifest is
+  `9a8bf61bd526d7ec020d45920367d45e90a2ef4692c6d8fa8b87de801a14c5ca`;
+  stage receipt SHA-256 is
+  `eea06012bcbaaf5b492bfa400e3e1bc96b5dd11d5836d5f1f09c06671710bbf7`.
+  See `maps-account-stage-run-r5.log` (exit 0). Browser client build and strict
+  audit evidence are described in `current-browser-build-report.md`; native
+  initialization diagnostics and controller checks are described in
+  `browser-init-check-report.md`.
+- `maps-account-vm-r5` passed the same exact clone helper: all 1,914 regular
+  files and complete metadata matched, and both full inventories passed before
+  kernel patching or boot. Adjacent provenance
+  `maps-account-vm-r5-clone.json` SHA-256 is
+  `c18c5c282bed59842d275222d7454892346f5db08850cf791a621ba6b7bd6057`.
+  See `maps-account-clone-run-r5.log` (exit 0). The original stage stays sealed;
   subsequent kernel and guest changes belong only in its VM copy.
 
 The final runtime bundles and actual guest results are separate evidence.
