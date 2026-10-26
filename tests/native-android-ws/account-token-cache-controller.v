@@ -45,15 +45,16 @@ fn C.accept(i32, voidptr, voidptr) i32
 fn C.fcntl(i32, i32, ...i32) i32
 fn C.poll(voidptr, uint, i32) i32
 
-const fixture_sha256 = 'bd79181ffa9fca598189a0382a8de5c40d83fc675318a609be3e2a7ad3ec0042'
+const fixture_sha256 = 'e4766dbe14ec5cd4fb64c23d66ecc44becd017f175c4104d27804fb1a0fc12ab'
 const fixture_cert_sha256 = '12520d3c4783e80927f029e8d0108b9808e3c17fbb9d69647f10527ffe1308f7'
 const fixture_package = 'org.vinix.bootstrap'
 const fixture_service = fixture_package + '.TokenCacheService'
-const fixture_action = fixture_package + '.TOKEN_CACHE'
+const fixture_action = 'android.accounts.AccountAuthenticator'
 const fixture_type = 'org.vinix.fixture.account'
 const fixture_client = fixture_package + '.TokenCacheClient'
 const ready_marker = 'ACCOUNT-TOKEN-CACHE-READY owner null-empty exact-invalidation password-clear'
 const client_marker = 'ACCOUNT-TOKEN-CACHE-CLIENT-PASS owner-denied null-type null-token synchronous-broker-ack'
+const authenticators_marker = 'ACCOUNT-AUTHENTICATORS-PASS'
 const pass_marker = 'ACCOUNT-TOKEN-CACHE-PASS broker-invalidation exact-multiaccount preserved-other-value'
 const persist_marker = 'ACCOUNT-TOKEN-CACHE-PERSIST-PASS cleared-token preserved-other-value'
 const closed_marker = 'ANDROID-SERVICE-CLOSED unbind destroy'
@@ -208,6 +209,10 @@ fn healthy(text string) bool {
 
 fn exact_marker(text string, marker string) bool {
 	return text.split_into_lines().filter(it == marker).len == 1 && text.count(marker) == 1
+}
+
+fn client_complete(text string) bool {
+	return exact_marker(text, authenticators_marker) && exact_marker(text, client_marker)
 }
 
 fn listener(path string) !i32 {
@@ -412,7 +417,7 @@ fn run_case(config Configuration, restart bool) !CaseReceipt {
 			client_text := log_text(client_log)!
 			require(healthy(client_text), 'ordinary client failure')!
 			complete = exact_marker(service_text, ready_marker) && exact_marker(service_text, pass_marker)
-				&& exact_marker(client_text, client_marker) && broker.active() == 0
+				&& client_complete(client_text) && broker.active() == 0
 		}
 		if complete { break }
 		mut status := i32(-1)
@@ -433,7 +438,7 @@ fn run_case(config Configuration, restart bool) !CaseReceipt {
 		client_status = wait_clean(client, 15)!
 		client_reaped = true
 		client_text := log_text(client_log)!
-		require(client_status == 0 && healthy(client_text) && exact_marker(client_text, client_marker), 'client clean exit and exact PASS')!
+		require(client_status == 0 && healthy(client_text) && client_complete(client_text), 'client clean exit and exact metadata/cache PASS')!
 	}
 	// Signal EOF while the authenticator connection remains alive. Closing its
 	// stream first could race the normal service unbind/destroy path.
@@ -459,7 +464,7 @@ fn run_case(config Configuration, restart bool) !CaseReceipt {
 		client_wait_status: client_status
 		log_sha256: logs
 		checks: if restart { ['same-store-restart', 'token-deletion-durable', 'other-value-preserved', 'clean-EOF-exit'] }
-			else { ['owner-null-empty-exact-cache', 'password-clear-purge', 'ordinary-client-owner-denied',
+			else { ['trusted-authenticator-descriptions', 'owner-null-empty-exact-cache', 'password-clear-purge', 'ordinary-client-owner-denied',
 				'kernel-authenticated-broker-invalidation', 'multiaccount-exact-delete', 'clean-client-and-service-exit'] }
 	}
 }
@@ -472,6 +477,13 @@ fn self_test() ! {
 	require(exact_marker(client_marker + '\n', client_marker), 'single marker')!
 	for text in [client_marker + '\n' + client_marker + '\n', 'prefix ' + client_marker + '\n'] {
 		require(!exact_marker(text, client_marker), 'duplicate or forged marker')!
+	}
+	client_pass := authenticators_marker + '\n' + client_marker + '\n'
+	require(client_complete(client_pass), 'complete metadata and cache result')!
+	for text in [client_marker + '\n', authenticators_marker + '\n',
+		client_pass + authenticators_marker + '\n', client_pass + client_marker + '\n',
+		'prefix ' + authenticators_marker + '\n' + client_marker + '\n'] {
+		require(!client_complete(text), 'missing, duplicate or forged client phase')!
 	}
 	for text in ['ANDROID-WS-FAIL start', 'JNI DETECTED ERROR', 'FATAL EXCEPTION', 'VerifyError'] {
 		require(!healthy(text), 'failure rejection')!

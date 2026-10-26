@@ -85,3 +85,31 @@ stopping QEMU. APKs and app databases stay in the guest. The required final mark
 Actual ART execution remains pending; host compilation/self-tests and APK
 assembly do not establish this marker. See `account-token-cache.md` for the
 production cache scope and host validation evidence.
+
+The metadata fixture at source commit `a05d244b3` retains those cache checks
+and adds `AccountManager.getAuthenticatorTypes()` construction, Parcel and
+registry checks. Its service now declares the actual
+`android.accounts.AccountAuthenticator` action and compiled authenticator XML;
+the existing token-cache action remains available. The new signed bundle is
+`/Users/alex/.local/state/vinix/android/account-token-fixture-2026-10-26-r7`.
+Its complete `sha256.json` SHA-256 is
+`3a1cad685bc9c16316e1de97fbd8db8bd75e8b3b5d6380fc985197a44c6e9f58`;
+`probe.apk` SHA-256 is
+`e4766dbe14ec5cd4fb64c23d66ecc44becd017f175c4104d27804fb1a0fc12ab`.
+The generator source SHA-256 is
+`92e86a872d6e899ac4bdfa208a5e788551a16fee410fe2e08e04c54408d4035d`.
+The interrupted r6 directory remains preserved without a completed inventory.
+The retained checker at commit `8df0f81cf` independently accepted the complete
+r7 inventory, successful command receipts, v3 signature and single fixture
+signer, and rejected a wrong inventory pin. Its evidence bundle is
+`/Users/alex/.local/state/vinix/android/account-token-apk-check-2026-10-26-r2`,
+with `sha256.json` SHA-256
+`2cf8c5369f438ae3f7a92dd05c759f72d451ae1fbdd7a50202d14467cbc2750d`.
+
+The controller selects the actual authenticator action and requires both
+`ACCOUNT-AUTHENTICATORS-PASS` and the original ordinary-client cache marker,
+each exactly once. Missing, prefixed and duplicate phase markers fail its host
+self-test. The successful host build and test log are retained at
+`/Users/alex/.local/state/vinix/android/account-token-cache-controller-host-r7`
+and the adjacent `-build.log` and `-self-test.log` paths. This r7 fixture has
+not yet run on ART, and this evidence does not establish Google login.
