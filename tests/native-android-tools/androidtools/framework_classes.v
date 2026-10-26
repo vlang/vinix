@@ -97,6 +97,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_account_listeners(smali)!
  framework_account_parcel(smali)!
  framework_account_authenticator_response(smali)!
+ framework_account_interaction(smali)!
  framework_account_authenticator_request(smali)!
  framework_account_authenticator_base(smali)!
  framework_account_broker_context(smali)!

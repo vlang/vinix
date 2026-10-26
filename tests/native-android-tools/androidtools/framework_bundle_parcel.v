@@ -190,6 +190,7 @@ invoke-direct {v0}, Landroid/os/BadParcelableException;-><init>()V
 throw v0')!
 	// No files change until every source and destination guard has passed.
 	os.write_file(base_path, base)!
+	bundle += framework_account_interaction_bundle_accessor()
 	os.write_file(bundle_path, bundle)!
 	os.write_file(parcel_path, parcel)!
 	loader_interface += '\n.method public abstract createFromParcel(Landroid/os/Parcel;Ljava/lang/ClassLoader;)Ljava/lang/Object;\n.end method\n'

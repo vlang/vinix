@@ -40,6 +40,7 @@ fn framework_pending_intent(smali string) ! {
   'invoke-direct {v0, v1}, Ljava/lang/UnsupportedOperationException;-><init>(Ljava/lang/String;)V\nthrow v0')
  text = framework_replace_method(text, 'cancel()V', signature_method('public cancel()V',
   'const/4 v0, 1\niput-boolean v0, p0, ' + owner + '->vinixCanceled:Z\nreturn-void'))!
+ text += framework_account_interaction_pending_accessor()
  // Preserve real Activity/Service/Broadcast dispatch, with a shared cancellation
  // flag because deserializing a local token resolves the original operation.
  start := '.method public send()V\n    .registers 4\n'

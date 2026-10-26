@@ -92,6 +92,7 @@ pub fn framework_authenticator_response_classes() map[string]string {
  text += authenticator_response_method('public writeToParcel(Landroid/os/Parcel;I)V', 1,
   'iget-object v0, p0, ${response}->response:${iface}\ninvoke-interface {v0}, ${iface}->asBinder()Landroid/os/IBinder;\nmove-result-object v0\n' +
   'invoke-virtual {p1, v0}, Landroid/os/Parcel;->writeStrongBinder(Landroid/os/IBinder;)V\nreturn-void')
+ text += framework_account_interaction_response_accessor()
  for i, signature in ['onResult(Landroid/os/Bundle;)V', 'onRequestContinued()V', 'onError(ILjava/lang/String;)V'] {
   registers := if i == 0 { 'v0, p1' } else if i == 1 { 'v0' } else { 'v0, p1, p2' }
   text += authenticator_response_method('public ' + signature, 1,
