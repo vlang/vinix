@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Account client, broker response/context and real WebView delta over the sealed
+// Account client, broker response/context/interaction and real WebView delta over the sealed
 // 2098-class framework. The pinned JAR is the only canonical class input.
 module main
 
@@ -15,12 +15,20 @@ const java = '/opt/homebrew/opt/openjdk@25/bin/java'
 const tools = repo + '/build/android-framework/tools'
 const source_file = repo + '/tests/native-android-ws/combined-account-webview-build.v'
 const providers = ['framework_accounts.v', 'framework_account_client.v',
- 'framework_account_broker_context.v', 'framework_account_native_response.v', 'framework_webview.v']
+ 'framework_account_broker_context.v', 'framework_account_native_response.v', 'framework_webview.v',
+ 'framework_account_interaction.v']
 const changes = ['android/accounts/AccountManager.smali', 'android/atl/VinixAccountFuture.smali',
  'android/os/Binder.smali', 'android/content/Context.smali', 'android/webkit/WebView.smali',
- 'android/webkit/WebSettings.smali', 'android/webkit/WebViewClient.smali', 'android/webkit/CookieManager.smali']
+ 'android/webkit/WebSettings.smali', 'android/webkit/WebViewClient.smali', 'android/webkit/CookieManager.smali',
+ 'android/app/PendingIntent.smali', 'android/accounts/AccountAuthenticatorResponse.smali', 'android/os/Bundle.smali']
 const additions = ['android/atl/VinixAccountBrokerContext.smali',
- 'android/atl/VinixAuthenticatorResponse.smali', 'android/webkit/VinixCookieCallback.smali']
+ 'android/atl/VinixAuthenticatorResponse.smali', 'android/webkit/VinixCookieCallback.smali',
+ 'android/atl/VinixAccountInteraction.smali']
+const accessors = {
+ 'android/app/PendingIntent.smali': 'public final vinixAccountActivityIntent()Landroid/content/Intent;'
+ 'android/accounts/AccountAuthenticatorResponse.smali': 'public final vinixMatchesResponse(Landroid/accounts/IAccountAuthenticatorResponse;)Z'
+ 'android/os/Bundle.smali': 'public final declared-synchronized vinixAccountInteractionValue(Ljava/lang/String;)Ljava/lang/Object;'
+}
 
 fn digest(path string) !string {
  if os.lstat(path)!.get_filetype() != .regular { return error('regular input required: ' + path) }
@@ -97,6 +105,23 @@ fn jar_delta(old map[string]string, new map[string]string) ! {
  }
 }
 
+fn accessor_delta(old string, new string, declaration string) ! {
+ marker := '.method ' + declaration + '\n'
+ if old.contains(marker) || new.count(marker) != 1 {
+  return error('missing, duplicate or preexisting interaction accessor: ' + declaration)
+ }
+ start := new.index(marker) or { return error('missing accessor') }
+ tail := new[start..]
+ end := tail.index('.end method') or { return error('unterminated interaction accessor') }
+ block := tail[..end + '.end method'.len]
+ if block.count('.method ') != 1 { return error('nested interaction accessor') }
+ stripped := new[..start] + new[start + block.len..]
+ if old.split_into_lines().filter(it.trim_space() != '').join('\n') !=
+  stripped.split_into_lines().filter(it.trim_space() != '').join('\n') {
+  return error('interaction accessor changed existing class code: ' + declaration)
+ }
+}
+
 fn self_test() ! {
  mut old := map[string]string{}
  for name in changes { old[name] = 'old' }
@@ -144,6 +169,25 @@ fn self_test() ! {
   class_delta(before, bad) or { continue }
   return error('substituted baseline change accepted: ' + name)
  }
+ accessor_old := '.class public LExample;\n.super Ljava/lang/Object;\n.method public existing()V\n.locals 0\nreturn-void\n.end method\n'
+ accessor := '.method public added()V\n.locals 0\nreturn-void\n.end method\n'
+ accessor_delta(accessor_old, accessor_old + '\n' + accessor, 'public added()V')!
+ for bad in [accessor_old, accessor_old + accessor + accessor,
+  (accessor_old + accessor).replace('public existing()V', 'public changed()V'),
+  (accessor_old + accessor).replace('.super Ljava/lang/Object;', '.super LOther;'),
+  accessor_old + accessor.all_before('.end method'),
+  accessor_old + accessor.replace('return-void', '.method private injected()V\nreturn-void')] {
+  accessor_delta(accessor_old, bad, 'public added()V') or { continue }
+  return error('invalid accessor-only class delta accepted')
+ }
+ accessor_delta(accessor_old + accessor, accessor_old + accessor, 'public added()V') or {
+  jar_self_test()!
+  return
+ }
+ return error('preexisting accessor accepted')
+}
+
+fn jar_self_test() ! {
  jar_old := {'classes.dex': 'old', 'manifest': 'same', 'resources': 'same'}
  jar_good := {'classes.dex': 'new', 'manifest': 'same', 'resources': 'same'}
  jar_delta(jar_old, jar_good)!
@@ -162,7 +206,7 @@ fn self_test() ! {
  if helper_function(helper, 'fn exact(')! != helper.trim_left('\n') { return error('helper extraction differs') }
  helper_function(helper + helper, 'fn exact(') or {
   helper_function('\nfn exact() string {\n', 'fn exact(') or {
-   println('COMBINED-FRAMEWORK-SELF-TEST-PASS strict class/JAR mutations, missing required deltas, substituted baseline classes and malformed/duplicate helpers rejected')
+   println('COMBINED-FRAMEWORK-SELF-TEST-PASS strict class/JAR mutations, accessor-only deltas, missing required deltas, substituted baseline classes and malformed/duplicate helpers rejected')
    return
   }
   return error('unterminated helper accepted')
@@ -225,7 +269,18 @@ fn provider_main() string {
   'os.read_file(web + "CookieManager.smali")!)!\n' +
   'for name,source in patched { os.write_file(web + name + ".smali",source)! }\n' +
   'if os.exists(web + "VinixCookieCallback.smali") { panic("cookie callback already exists") }\n' +
-  'os.write_file(web + "VinixCookieCallback.smali",androidtools.framework_webview_callback())!\n}\n'
+  'os.write_file(web + "VinixCookieCallback.smali",androidtools.framework_webview_callback())!\n' +
+  'for name,accessor in {\n' +
+  '"android/app/PendingIntent": androidtools.framework_account_interaction_pending_accessor()\n' +
+  '"android/accounts/AccountAuthenticatorResponse": androidtools.framework_account_interaction_response_accessor()\n' +
+  '"android/os/Bundle": androidtools.framework_account_interaction_bundle_accessor()\n} {\n' +
+  'path := r + "/" + name + ".smali"\nsource := os.read_file(path)!\n' +
+  'declaration := accessor.all_before("\\n")\n' +
+  'if !declaration.starts_with(".method ") || source.contains(declaration + "\\n") { panic("preexisting or invalid accessor " + name) }\n' +
+  'os.write_file(path,source + "\\n" + accessor)!\n}\n' +
+  'for name,source in androidtools.framework_account_interaction_classes() {\n' +
+  'path := r + "/" + name + ".smali"\nif os.exists(path) { panic("interaction helper already exists") }\n' +
+  'os.write_file(path,source)!\n}\n}\n'
 }
 
 fn build(baseline string, manifest_pin string, jar_pin string, root string) ! {
@@ -276,13 +331,20 @@ fn build(baseline string, manifest_pin string, jar_pin string, root string) ! {
  // function bytes without importing the unrelated framework generators.
  mut helpers := 'module androidtools\n'
  os.mkdir_all(root + '/provider-helper-inputs')!
- for name, signature in {'framework.v': 'pub fn framework_replace_method(',
-  'framework_classes.v': 'fn interface_class('} {
+ for pair in [['framework.v', 'pub fn framework_replace_method('],
+  ['framework_classes.v', 'fn interface_class('],
+  ['framework_signatures.v', 'fn signature_method('],
+  ['framework_bundle_parcel.v', 'fn bundle_parcel_method('],
+  ['framework_bundle_parcel.v', 'fn bundle_parcel_lock(']] {
+  name := pair[0]
+  signature := pair[1]
   path := repo + '/tests/native-android-tools/androidtools/' + name
-  inputs[path] = digest(path)!
   target := root + '/provider-helper-inputs/' + name
-  os.cp(path, target)!
-  if digest(target)! != inputs[path]! { return error('helper copy differs') }
+  if path !in inputs {
+   inputs[path] = digest(path)!
+   os.cp(path, target)!
+  }
+  if digest(path)! != inputs[path]! || digest(target)! != inputs[path]! { return error('helper copy differs') }
   helpers += '\n' + helper_function(os.read_file(target)!, signature)!
  }
  os.write_file(root + '/provider-source/androidtools/framework_account_helpers.v', helpers)!
@@ -306,7 +368,7 @@ fn build(baseline string, manifest_pin string, jar_pin string, root string) ! {
  inventory(root + '/smali', '', mut applied)!
  // Raw generated formatting can differ from baksmali. The canonical delta is
  // checked after assembly/disassembly; no non-smali input is accepted here.
- if applied.len != 2101 || applied.keys().any(!it.ends_with('.smali')) {
+ if applied.len != 2098 + additions.len || applied.keys().any(!it.ends_with('.smali')) {
   return error('unexpected provider class set')
  }
  command(root, 'assemble', [java, '-cp', classpath.join(':'), 'org.jf.smali.Main', 'assemble', '--jobs', '2', root + '/smali', '-o', root + '/classes.dex'])!
@@ -316,6 +378,10 @@ fn build(baseline string, manifest_pin string, jar_pin string, root string) ! {
  mut new := map[string]string{}
  inventory(root + '/new-dex', '', mut new)!
  class_delta(old, new)!
+ for name, declaration in accessors {
+  accessor_delta(os.read_file(root + '/old-dex/' + name)!,
+   os.read_file(root + '/new-dex/' + name)!, declaration)!
+ }
  write_json(root + '/framework-dex-before.json', old)!
  write_json(root + '/framework-dex-after.json', new)!
  for pair in [[baseline + '/api-impl.jar', 'old'], [root + '/api-impl.jar', 'new']] {
@@ -330,13 +396,14 @@ fn build(baseline string, manifest_pin string, jar_pin string, root string) ! {
  for path, pin in driver_closure { if digest(path)! != pin { return error('builder source changed: ' + path) } }
  for path, pin in inputs { if digest(path)! != pin { return error('input changed: ' + path) } }
  write_json(root + '/build.json', {
-  'scope': json2.Any('Combined account client, broker context/response and WebView framework; source and assembly validation only, no Google login success claim'),
+  'scope': json2.Any('Combined account client, broker context/response/interaction and WebView framework; source and assembly validation only, no Google login success claim'),
   'source_revision': json2.Any(command(root, 'revision', ['/usr/bin/git', '-C', repo, 'rev-parse', 'HEAD'])!.trim_space()),
   'input_sha256': json2.decode[json2.Any](json2.encode(inputs))!,
   'baseline_path': json2.Any(baseline), 'baseline_manifest_sha256': json2.Any(manifest_pin),
   'baseline_api_impl_sha256': json2.Any(jar_pin), 'api_impl_sha256': json2.Any(digest(root + '/api-impl.jar')!),
   'classes_dex_sha256': json2.Any(digest(root + '/classes.dex')!),
   'changed_classes': json2.Any(changes), 'added_classes': json2.Any(additions), 'class_count': json2.Any(new.len),
+  'accessor_only_classes': json2.decode[json2.Any](json2.encode(accessors))!,
   'environmental_inputs': json2.Any('Host SDK and dynamic libraries are environmental dependencies; V source closures and smali tool JARs retained and checked')
  })!
  mut pins := map[string]string{}
