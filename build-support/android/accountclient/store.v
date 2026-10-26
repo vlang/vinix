@@ -329,6 +329,56 @@ pub fn store_token_authorized(handle voidptr, auth voidptr, session u64) i32 {
 	return -1
 }
 
+// Invalidation exposes no stored token or account data. Any authenticated
+// caller may remove an exact value for the selected authenticator's type.
+@[export: 'vinix_android_account_store_invalidate']
+pub fn store_invalidate(handle voidptr, auth voidptr, session u64) i32 {
+	if handle == unsafe { nil } || auth == unsafe { nil } { return -1 }
+	mut s := unsafe { &AccountStoreHandle(handle) }
+	mut a := s.auth
+	if voidptr(a) != auth { return -1 }
+	a.mutex.lock()
+	if !store_live(s) { a.mutex.unlock(); return -1 }
+	command := a.sessions[session] or { a.mutex.unlock(); return -1 }
+	request := command.command.request
+	if request.operation != .invalidate_auth_token
+		|| time.sys_mono_now() - command.started >= 5 * time.minute { a.mutex.unlock(); return -1 }
+	kind := request.account_type or { a.mutex.unlock(); return -1 }
+	token := request.token_value or { a.mutex.unlock(); return -1 }
+	if kind != s.allowed_type { a.mutex.unlock(); return -1 }
+	s.db.invalidate_auth_token(kind, token) or { a.mutex.unlock(); return -1 }
+	capability := command.command.capability.clone()
+	s.refs++
+	a.mutex.unlock()
+	defer {
+		unsafe { capability.free() }
+		store_release(mut s)
+	}
+	response := auth_response(auth, session, 1)
+	if response == unsafe { nil } { return -1 }
+	defer { auth_response_free(response) }
+	b := unsafe { &AuthResponse(response) }
+	if !same_capability(capability, b.capability) { return -1 }
+	return auth_response_send(response)
+}
+
+// Authenticator service calls already hold the owner capability and avoid a
+// synchronous round trip through the channel they are themselves serving.
+@[export: 'vinix_android_account_store_invalidate_token']
+pub fn store_invalidate_token(handle voidptr, account_type &char, token_value &char) i32 {
+	if handle == unsafe { nil } { return -1 }
+	kind := store_text(account_type, 255) or { return -1 }
+	defer { unsafe { kind.free() } }
+	token := store_text(token_value, 4096) or { return -1 }
+	defer { unsafe { token.free() } }
+	mut s := unsafe { &AccountStoreHandle(handle) }
+	s.auth.mutex.lock()
+	defer { s.auth.mutex.unlock() }
+	if !store_live(s) { return -1 }
+	s.db.invalidate_auth_token(kind, token) or { return -1 }
+	return 0
+}
+
 fn store_get(handle voidptr, name &char, account_type &char, key &char, password bool) voidptr {
 	if handle == unsafe { nil } { return unsafe { nil } }
 	account := store_account(name, account_type) or { return unsafe { nil } }
@@ -357,6 +407,42 @@ pub fn store_password(handle voidptr, name &char, account_type &char) voidptr {
 @[export: 'vinix_android_account_store_get_data']
 pub fn store_get_data(handle voidptr, name &char, account_type &char, key &char) voidptr {
 	return store_get(handle, name, account_type, key, false)
+}
+
+// Explicit authenticator token storage is separate from caller token requests.
+// The service-only native entry points hold this owner capability; callers can
+// invalidate exact token values through their authenticated broker session.
+@[export: 'vinix_android_account_store_peek_token']
+pub fn store_peek_token(handle voidptr, name &char, account_type &char, token_type &char) voidptr {
+	if handle == unsafe { nil } { return unsafe { nil } }
+	account := store_account(name, account_type) or { return unsafe { nil } }
+	defer { store_account_free(account) }
+	kind := store_text(token_type, 4096) or { return unsafe { nil } }
+	defer { unsafe { kind.free() } }
+	mut s := unsafe { &AccountStoreHandle(handle) }
+	s.auth.mutex.lock()
+	defer { s.auth.mutex.unlock() }
+	if !store_live(s) { return unsafe { nil } }
+	value := s.db.auth_token(account, kind) or { return unsafe { nil } }
+	s.refs++
+	return &AccountCell{store: s, value: value}
+}
+
+@[export: 'vinix_android_account_store_set_token']
+pub fn store_set_token(handle voidptr, name &char, account_type &char, token_type &char, value &char) i32 {
+	if handle == unsafe { nil } { return -1 }
+	account := store_account(name, account_type) or { return -1 }
+	defer { store_account_free(account) }
+	kind := store_text(token_type, 4096) or { return -1 }
+	defer { unsafe { kind.free() } }
+	token := store_optional(value, 4096) or { return -1 }
+	defer { accountstore.dispose_nullable(token) }
+	mut s := unsafe { &AccountStoreHandle(handle) }
+	s.auth.mutex.lock()
+	defer { s.auth.mutex.unlock() }
+	if !store_live(s) { return -1 }
+	s.db.set_auth_token(account, kind, token.value) or { return -1 }
+	return 0
 }
 
 @[export: 'vinix_android_account_store_cell_text']
