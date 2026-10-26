@@ -365,7 +365,12 @@ fn flags(v string, imports string) []string {
 		imports]
 }
 
-fn launch_items() [][]string {
+fn launch_items(profile string) ![][]string {
+	if profile == 'token-cache-controller' {
+		return [['token-cache-controller', repo + '/tests/native-android-ws/account-token-cache-controller.v',
+			'account-token-cache-controller']]
+	}
+	if profile != 'launch' { return error('unknown executable profile') }
 	return [
 		['native-entry', repo + '/build-support/android/native-entry.v', 'vinix-android-native'],
 		['launcher', repo + '/build-support/android/native-run.v', 'run-android'],
@@ -373,6 +378,38 @@ fn launch_items() [][]string {
 			'headless-service-controller'],
 		['broker', repo + '/build-support/android/native-account-broker.v', 'native-account-broker'],
 	]
+}
+
+// The pinned V compiler represents inferred int as 64 bits. POSIX waitpid
+// writes a C int, so its output storage must be explicitly 32 bits. Preserve
+// both the original library source and this exact correction in the bundle.
+fn linux_process_source(source string) !string {
+	before := '\tmut cstatus := 0\n'
+	if source.count(before) != 1 || !source.contains('C.waitpid(p.pid, &cstatus, waitpid_options)') {
+		return error('pinned Process waitpid source differs')
+	}
+	return source.replace(before, '\tmut cstatus := i32(0)\n')
+}
+
+fn linux_closure(root string, label string) !map[string]string {
+	mut pins := frozen_pins(root, label)!
+	mut corrections := map[string]json2.Any{}
+	for path, pin in pins.clone() {
+		if !path.ends_with('/vlib/os/process_nix.c.v') { continue }
+		original := root + '/compatibility/' + label + '/process_nix.original.c.v'
+		copy_pin(path, original, pin)!
+		os.write_file(path, linux_process_source(os.read_file(path)!)!)!
+		pins[path] = hash(path)!
+		corrections[path] = json2.Any({
+			'original_source': json2.Any(original)
+			'original_sha256': json2.Any(pin)
+			'corrected_sha256': json2.Any(pins[path])
+			'reason': json2.Any('waitpid output requires C int (i32), not inferred V int')
+		})
+	}
+	write_json(root + '/' + label + '-linux-compatibility.json', corrections)!
+	write_json(root + '/' + label + '-compiled-closure.json', pins)!
+	return pins
 }
 
 // r5 seals cross headers and compiler tools. Preserve any additional static
@@ -476,7 +513,7 @@ fn check_link(root string, label string, output string, objects []string, pins m
 	write_json(root + '/generated/' + label + '-link-inputs.json', consumed)!
 }
 
-fn build(root string, framework string) ! {
+fn build(root string, framework string, profile string) ! {
 	if hash(base + '/sha256.json')! != base_seal { return error('sealed r5 baseline differs') }
 	base_pins := json2.decode[map[string]string](os.read_file(base + '/sha256.json')!)!
 	framework_seal := hash(framework + '/sha256.json')!
@@ -496,7 +533,8 @@ fn build(root string, framework string) ! {
 	sealed_copy(base, base_pins, 'commands/build-native-entry.json', root + '/baseline-entry-command.json')!
 	set_compiler(root + '/tools/v')
 	mut originals := map[string]string{}
-	for item in launch_items() {
+	items := launch_items(profile)!
+	for item in items {
 		mut argv := flags(root + '/tools/v', repo + '/build-support/android|@vlib')
 		argv << ['-print-v-files', item[1]]
 		closure := freeze_closure(root, item[0], command(root, item[0] + '-closure', argv)!)!
@@ -510,8 +548,8 @@ fn build(root string, framework string) ! {
 	unchanged(originals)!
 	cross_pins := cross_inputs(root, base_pins)!
 	mut outputs := map[string]string{}
-	for item in launch_items() {
-		closure := frozen_pins(root, item[0])!
+	for item in items {
+		closure := linux_closure(root, item[0])!
 		v := os.dir(closure_vlib(closure)!) + '/v'
 		copy_pin(root + '/tools/v', v, compiler_pin)!
 		os.chmod(v, 0o755)!
@@ -561,8 +599,9 @@ fn build(root string, framework string) ! {
 	mut output_fields := map[string]json2.Any{}
 	for path, pin in outputs { output_fields[path] = pin }
 	write_json(root + '/build.json', {
-		'kind':               json2.Any('vinix-current-launch-v1')
-		'scope':              json2.Any('Current launch executables; retained V/C sources and cross inputs; no guest or account login claim.')
+		'kind':               json2.Any(if profile == 'launch' { 'vinix-current-launch-v1' } else { 'vinix-account-token-cache-controller-v1' })
+		'profile':            json2.Any(profile)
+		'scope':              json2.Any('Retained executable sources, typed Linux library correction and cross inputs; no guest or account login claim.')
 		'source_revision':    json2.Any(revision)
 		'native_base':        json2.Any(base)
 		'native_base_sha256': json2.Any(base_seal)
@@ -705,7 +744,7 @@ fn build_account(root string) ! {
 	println('CURRENT-ACCOUNT-BUILD-PASS bundle=' + root + ' seal=' + hash(root + '/sha256.json')!)
 }
 
-fn bootstrap(root string, framework string) ! {
+fn bootstrap(root string, framework string, profile string) ! {
 	for directory in ['commands', 'tools', 'generated', 'bin', 'lib'] {
 		os.mkdir_all(root + '/' + directory)!
 	}
@@ -748,6 +787,8 @@ fn bootstrap(root string, framework string) ! {
 	unchanged(closure)!
 	argv := if framework == '--account' {
 		[root + '/tools/frozen-builder', '--frozen-account', root]
+	} else if profile == 'token-cache-controller' {
+		[root + '/tools/frozen-builder', '--frozen-token-cache-controller', framework, root]
 	} else {
 		[root + '/tools/frozen-builder', '--frozen-build', framework, root]
 	}
@@ -762,6 +803,20 @@ fn bootstrap(root string, framework string) ! {
 }
 
 fn self_test() ! {
+	if launch_items('launch')!.len != 4 || launch_items('token-cache-controller')!.len != 1 {
+		return error('executable profile membership differs')
+	}
+	mut profile_rejected := false
+	launch_items('unknown') or { profile_rejected = true }
+	if !profile_rejected { return error('accepted unknown executable profile') }
+	process_source := '\tmut cstatus := 0\nret = C.waitpid(p.pid, &cstatus, waitpid_options)\n'
+	if !linux_process_source(process_source)!.contains('mut cstatus := i32(0)') {
+		return error('missing typed waitpid storage')
+	}
+	for invalid in ['', process_source + process_source, process_source.replace('&cstatus', '&other')] {
+		linux_process_source(invalid) or { continue }
+		return error('accepted drifted waitpid source')
+	}
 	if helper_objects('  > cc src.c /tmp/helper.o /tmp/second.o -lm\n')! != [
 		'/tmp/helper.o',
 		'/tmp/second.o',
@@ -839,7 +894,7 @@ fn self_test() ! {
 	rejected = false
 	account_elf(bytes) or { rejected = true }
 	if !rejected { return error('accepted shared library interpreter') }
-	println('CURRENT-LAUNCH-BUILDER-SELF-TEST-PASS dependencies, source closure, seven-argument ABI, executable/shared ELF program headers')
+	println('CURRENT-LAUNCH-BUILDER-SELF-TEST-PASS dependencies, source closure, seven-argument ABI, executable/shared ELF program headers, exact Linux waitpid correction, executable profiles')
 }
 
 fn main() {
@@ -863,28 +918,32 @@ fn main() {
 		}
 		return
 	}
-	if os.args.len == 4 && os.args[1] == '--frozen-build' {
+	if os.args.len == 4 && os.args[1] in ['--frozen-build', '--frozen-token-cache-controller'] {
 		framework := os.abs_path(os.args[2])
 		root := os.abs_path(os.args[3])
-		if os.executable() != root + '/tools/frozen-builder' || !root.starts_with(state + 'current-launch-build-') {
+		profile := if os.args[1] == '--frozen-build' { 'launch' } else { 'token-cache-controller' }
+		prefix := if profile == 'launch' { 'current-launch-build-' } else { 'current-token-cache-controller-build-' }
+		if os.executable() != root + '/tools/frozen-builder' || !root.starts_with(state + prefix) {
 			eprintln('internal frozen build requires its retained executable')
 			exit(2)
 		}
 		os.chdir(repo)!
-		build(root, framework) or {
+		build(root, framework, profile) or {
 			eprintln(err)
 			exit(1)
 		}
 		return
 	}
-	if os.args.len != 3 {
-		eprintln('usage: build-current-launch SEALED_FRAMEWORK_BUNDLE|--account FRESH_EXTERNAL_OUTPUT')
+	controller := os.args.len == 4 && os.args[1] == '--token-cache-controller'
+	if os.args.len != 3 && !controller {
+		eprintln('usage: build-current-launch [--token-cache-controller] SEALED_FRAMEWORK_BUNDLE|--account FRESH_EXTERNAL_OUTPUT')
 		exit(2)
 	}
-	account := os.args[1] == '--account'
-	framework := if account { '--account' } else { os.abs_path(os.args[1]) }
-	root := os.abs_path(os.args[2])
-	prefix := if account { 'current-account-build-' } else { 'current-launch-build-' }
+	account := !controller && os.args[1] == '--account'
+	profile := if controller { 'token-cache-controller' } else { 'launch' }
+	framework := if account { '--account' } else { os.abs_path(os.args[if controller { 2 } else { 1 }]) }
+	root := os.abs_path(os.args[if controller { 3 } else { 2 }])
+	prefix := if account { 'current-account-build-' } else if controller { 'current-token-cache-controller-build-' } else { 'current-launch-build-' }
 	if (!account && (!framework.starts_with(state) || os.real_path(framework) != framework))
 		|| !root.starts_with(state + prefix) || os.exists(root)
 		|| os.is_link(root) || os.real_path(os.dir(root)) != os.dir(root) {
@@ -892,7 +951,7 @@ fn main() {
 		exit(2)
 	}
 	os.chdir(repo)!
-	bootstrap(root, framework) or {
+	bootstrap(root, framework, profile) or {
 		eprintln(err)
 		exit(1)
 	}
