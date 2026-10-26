@@ -47,3 +47,34 @@ auditor. These quiescent roots are bound in place by
 `tests/linux-compat/pidfdwait-seal.v` created and rechecked this seal; its format
 name establishes no guest execution claim. This build evidence does not prove
 successful Google account login; the fresh staged guest must exercise that flow.
+
+The packaging change is committed in
+`3b0b2befacff7ae74c495bbbe4baa77364051eb7`. The Maps stager and coupled request
+refresher now require a separate `browser_client` reference, retain its receipts
+at appended input index 8, and copy the selected library into runtime `/usr/lib`.
+The existing `browser` reference continues to select the WebKit helper. The
+checker verifies the exact ABI, selected account runtime dependencies, frozen
+compiler commands, canonical link trace and consumed input agreement, and
+complete header listings. Existing role indices and sealed r4 evidence remain
+unchanged. The final packaging diff received independent review.
+
+All five staging module test files, both tool self-tests, and the actual browser
+r2 plus account r7 audit passed. Negative controls cover missing or mismatched
+references, ABI and outputs, commands and receipts, dependency selection, ELF
+contracts, and removed or injected link/header inputs. The ready host tools are
+`maps-account-stage-browser-2026-10-27-r1` (SHA256
+`041fc5d8673654eef86d8f518d3223f894a3ab6d0a4a48bd4a72feb662d0b6a0`)
+and `refresh-coupled-browser-2026-10-27-r1` (SHA256
+`52ab628560dcc471ec98f0ef47b350a8dd5c23f42a98c2276d2a8536b91efab1`)
+under the same external state directory.
+
+The complete packaging validation seal is
+`browser-client-stage-validation-complete-2026-10-27-r1/manifest.json`, SHA256
+`04662a8385756b0a2e0f1d731fd62542ce27480ab2aa70455eb478747ceaeeea`
+(19 roots, 2,747 typed entries). It binds the complete original browser r2,
+account r7 and static-zlib producer bundles, source snapshots, all retained
+successful and failed compile/test logs, binaries and refresher fixtures. Its
+validation record also records the initial console-only mutable-vlib compiler
+mismatch. The final module test log is
+`browser-client-stage-module-tests-2026-10-27-r3.log`, SHA256
+`98f99c182611b34a5444693ff7bae9615d435a782c4c84430ffaf9223842bf54`.
