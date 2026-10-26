@@ -1,4 +1,75 @@
-# Foreground supervisor host qualification — 2026-10-26
+# Foreground supervisor and adapter host qualification — 2026-10-26
+
+Latest PASS: `foreground-host08` rebuilt the foreground supervisor in normal
+and production modes, passing sixteen controls each. Its newly built
+production supervisor then rebuilt the maintained x86 adapter in both modes;
+each passed 26 selfchecks and 18 clone controls. Four budget-limit admission
+controls passed. No staging operation, QEMU or guest measurement was run.
+
+The source base is `513a49b20`, plus the qualified foreground source and the
+existing main-branch prerequisite `8f7d7ccca` for the hwhost i32 wait status.
+That prerequisite was copied exactly into the isolated worktree before the
+successful attempt; it is not a new change in this report's commit.
+
+| Input | SHA256 |
+| --- | --- |
+| `tests/desktop-perf/foreground-supervise.v` | `37c8062538841fb7f638998b1e9f6463cdf2ede2aab26fb7569aeb27a6cfba54` |
+| `tests/hardware-platform/hwhost/process.v` | `1cefdf1ce196bbe4f05813969107144dd2c123662c56815124da56c92dc5e5d5` |
+| `tools/sourcecommand/core.v` | `5b5ba4be07027e508ff881602a9a9f100491f0c65164607b39ee58e987117212` |
+| supervisor before/after input map | `dc0bf03da766a9c755442eab19e818229da425ba98f2bcbf0341183faf77e837` |
+| adapter before/after input map | `7a8502a87819ac15e0fbd143669a10603c99510e142339a832f993ab03406772` |
+
+The complete selected compiler and bounded compiler environment remain those
+described below. The adapter maps include `plainiso` and `linuxkpi/hosttest`
+along with the other imported maintained source roots. The five source roots
+are retained with literal links, file bytes and modes. Before/after maps were
+equal. This binds the selected compiler and recorded host compiler/SDK
+metadata; it does not claim a hermetic installed loader or SDK closure.
+Independent review checked all 145 retained source entries against the map,
+the exact prerequisite, all process/adapter receipts and all four new original
+metadata inventories. The checks passed; successful and nonzero children
+preserve actual status, and refusals record it as unavailable.
+
+All paths below use the state prefix documented below.
+
+| Receipt | SHA256 |
+| --- | --- |
+| `foreground-host08/supervisor01/qualification.json` | `f6221d13c73158c9a66efc60a37eeb1029952c44be44c53684f3c32502df9ed1` |
+| `foreground-host08/adapter01/qualification.json` | `ec60aba48c65ab5cdb9c2353c345bc7a31b156270aa3cbcea2c430e007d06bf4` |
+| `foreground-host08/limit01/result.json` | `3d70710f71b4678c6814aa2c52671d6c795911198c2fae499072fb79b76fa259` |
+| `foreground-host08-seal01/inventory.json` | `95d8586ece219b097b674ada0dfbfa45638b1e0794024c86d572226cfec4b1ca` |
+
+| Qualified executable | Normal SHA256 | Production SHA256 |
+| --- | --- | --- |
+| foreground supervisor | `f51bc0cf2923f01907644a662f3d8dfb26f0739484f08b7ac2821a00819fd5ca` | `77c80951ad2cdb6667be4326217332ba159ab32cef3c20a18b2d8e708c532178` |
+| x86 adapter | `012aeaadd487f1e56fa7890172a6002049d50a629c43d9553c91224727440328` | `18da221cdbd413f14064f72ce1efc662ccc6ded7bedc10f8a22dee6312ae4c45` |
+
+The four limit controls admit 524288 and 2097152 KiB at the actual low usage
+of their test state, and refuse 524287 and 2097153. They check the accepted
+range and actual df/du admission; they do not allocate up to either limit.
+The default remains 512 MiB; a reviewed named phase may select at most 2 GiB.
+
+The incomplete intervening attempts are retained with complete metadata
+inventories, without supplying successful adapter qualification:
+
+| State | Outcome | Separate inventory SHA256 |
+| --- | --- | --- |
+| `foreground-host05` | bootstrap only; no qualification | `81b342025ebc49fd5f6444b614363f1ab82580e9a86987d55e52ed8bbb7ff6e2` |
+| `foreground-host06` | limit controls passed; adapter build interrupted without final receipt | `33820937b78e6685c35b63f37fe7152212df7c0dbd121414589191a22dcda2a5` |
+| `foreground-host07` | intentionally cancelled after finding the stale hwhost prerequisite; child status unavailable | `d2a17431b3b52af716b59fe7c119bb151abd96c5ef00473a329b8d61f1826bdb` |
+
+After qualification, df reported 42,942,284 KiB free. The isolated worktree,
+all eight foreground attempt roots and seals, and retained `guard-baseline01`
+occupied 630,844 KiB. Reserving 512 MiB each for fresh baseline and matched
+prepared/supervisor trees, plus 128 MiB growth, projects 1,810,492 KiB under
+the named 2 GiB phase limit. The entire historical state prefix occupied
+3,389,724 KiB, so it is not claimed to fit that named phase. Retained kernel,
+compiler and desktop audit inputs outside the declared foreground roots must
+also be reported separately. Fresh prepared receipts, exact kernel pins,
+reviewed profiles and guest measurements remain required. This report was
+updated after the unchanged maps and quiescent seals were complete.
+
+## Earlier foreground supervisor qualification
 
 PASS: normal and production builds each passed six real process controls and
 ten prepared-profile/completion-receipt controls. No QEMU, target kernel

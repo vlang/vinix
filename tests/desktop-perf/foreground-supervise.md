@@ -22,8 +22,12 @@ The outer deadline must exceed the adapter deadline by 60 seconds and is
 limited to two hours. Actual df and du observations run every five seconds,
 with three-second bounded probes: admission needs 2 GiB free, continued
 execution needs 1 GiB, and declared nonoverlapping roots plus supervisor
-state may occupy at most 512 MiB. The prepared runtime must be covered by
-a charged root. These are sampled bounds, not a filesystem quota.
+state default to at most 512 MiB. An explicitly reviewed `charged_limit_kib`
+may select a limit from 524288 to 2097152 KiB. The prepared runtime must be
+covered by a charged root. These are sampled bounds, not a filesystem quota.
+The named foreground baseline/matched phase uses the approved 2 GiB limit;
+historical states outside its declared roots remain outside that phase's
+inclusive total and must be reported separately.
 
 Build with a complete selected V installation and private temporary/module
 directories; preserve coherent V, VEXE and caller compiler environment
@@ -45,6 +49,7 @@ The profile is an explicit reviewed document:
   "directory": "/absolute/source-checkout",
   "timeout_seconds": 3660,
   "log_limit_bytes": 33554432,
+  "charged_limit_kib": 524288,
   "charged_roots": ["/external/attempt", "/absolute/source-worktree"],
   "input_roots": ["/absolute/source-checkout/tests/desktop-perf", "/absolute/source-checkout/tools", "/external/complete-v-root"]
 }
@@ -75,6 +80,13 @@ qualification state throughout. It retains source copies, generated C,
 binaries, argv, environments, logs, budgets and receipts. Its complete V
 root and recorded host compiler/SDK metadata maps must stay unchanged.
 The installed loader and SDK dependency closure are not claimed hermetic.
+
+`qualify-adapter NEW-STATE COMPLETE-V` uses the same bounded compiler and
+input-inventory policy to build maintained `run-x86.v` in normal and
+production modes. Each build must pass its existing 26 selfcheck cases and
+18 clone controls; their receipts and executable hashes are retained. This
+mode does not stage a guest or run QEMU. `limitcheck NEW-STATE` checks actual
+budget admission at both accepted limits and refusal just outside them.
 
 Host qualification results and checksums are recorded in
 `foreground-supervise-report.md`. No guest performance measurement is

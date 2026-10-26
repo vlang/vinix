@@ -26,6 +26,7 @@ struct Profile {
 	directory string
 	timeout_seconds int
 	log_limit_bytes int
+	charged_limit_kib int = 524288
 	charged_roots []string
 	input_roots []string
 }
@@ -83,6 +84,7 @@ fn number(text string) !i64 {
 }
 
 fn budget(profile Profile, state string, admission bool) !string {
+	require(profile.charged_limit_kib >= 524288 && profile.charged_limit_kib <= 2097152, 'charged limit must be 512 MiB..2 GiB')!
 	df := command(['/bin/df', '-k', os.dir(state)])!
 	rows := df.trim_space().split_into_lines()
 	if rows.len != 2 || rows[1].fields().len < 4 { return error('unexpected df output') }
@@ -100,7 +102,7 @@ fn budget(profile Profile, state string, admission bool) !string {
 			total += number(fields[0])!
 		}
 	}
-	if total > 524288 { return error('512 MiB charged-root budget exceeded') }
+	if total > i64(profile.charged_limit_kib) { return error('declared charged-root budget exceeded') }
 	return df + '\n' + usage
 }
 
@@ -133,6 +135,23 @@ fn inputs(paths []string) !map[string]string {
 	deadline := time.sys_mono_now() + 120 * u64(time.second)
 	for path in paths { inventory(path, [], deadline, mut context, mut result)! }
 	return result
+}
+
+fn preserve_source(source string, destination string, depth int, deadline u64, mut context Inventory) ! {
+	context.count++
+	require(depth <= 128 && context.count <= 250000 && time.sys_mono_now() <= deadline, 'source copy nesting/entry/deadline limit')!
+	info := os.lstat(source)!
+	match info.get_filetype() {
+		.symbolic_link { os.symlink(os.readlink(source)!, destination)! }
+		.regular { os.cp(source, destination)!; os.chmod(destination, int(info.mode & 0o7777))! }
+		.directory {
+			os.mkdir(destination)!
+			mut names := os.ls(source)!; names.sort()
+			for name in names { preserve_source(source + '/' + name, destination + '/' + name, depth + 1, deadline, mut context)! }
+			os.chmod(destination, int(info.mode & 0o7777))!
+		}
+		else { return error('special source copy input') }
+	}
 }
 
 fn group_absent(pid int) ! {
@@ -238,6 +257,7 @@ fn validated(profile Profile, state string) !PreparedView {
 	require(profile.directory == os.real_path(profile.directory) && os.is_dir(profile.directory), 'canonical working directory required')!
 	require(profile.timeout_seconds >= 1800 && profile.timeout_seconds <= 7200, 'outer deadline must be 1800..7200 seconds')!
 	require(profile.log_limit_bytes > 0 && profile.log_limit_bytes <= 32 * 1024 * 1024, 'log limit must be 1..32 MiB')!
+	require(profile.charged_limit_kib >= 524288 && profile.charged_limit_kib <= 2097152, 'charged limit must be 512 MiB..2 GiB')!
 	require(profile.input_roots.len > 0 && profile.charged_roots.len > 0, 'declared input and charged roots required')!
 	for index, root in profile.charged_roots {
 		require(root == os.real_path(root) && os.is_dir(root), 'canonical charged root required')!
@@ -425,7 +445,28 @@ fn selfcheck(state string, compiler string) ! {
 	println('PERF FOREGROUND HOST PASS ' + hash(state + '/qualification.json')!)
 }
 
-fn qualify(state string, compiler string) ! {
+fn limitcheck(state string) ! {
+	fresh(state)!
+	os.mkdir(state)!
+	mut checks := map[string]string{}
+	for limit in [524288, 2097152] {
+		profile := Profile{charged_limit_kib: limit, charged_roots: [state]}
+		checks[limit.str()] = budget(profile, state, true)!
+	}
+	for limit in [524287, 2097153] {
+		profile := Profile{charged_limit_kib: limit, charged_roots: [state]}
+		budget(profile, state, true) or {
+			require(err.msg() == 'charged limit must be 512 MiB..2 GiB', 'different limit refusal')!
+			checks[limit.str()] = err.msg()
+			continue
+		}
+		return error('out-of-range charged limit accepted')
+	}
+	os.write_file(state + '/result.json', json2.encode(checks) + '\n')!
+	println('PERF FOREGROUND LIMIT PASS four admission boundaries')
+}
+
+fn qualify(state string, compiler string, adapter bool) ! {
 	fresh(state)!
 	require(compiler == os.real_path(compiler) && os.is_file(compiler), 'canonical complete V executable required')!
 	root := os.real_path(@DIR + '/../..')
@@ -459,26 +500,47 @@ fn qualify(state string, compiler string) ! {
 	resource := command([clang, '-print-resource-dir'])!.trim_space()
 	sdk := command(['/usr/bin/xcrun', '--show-sdk-path'])!.trim_space()
 	os.setenv('SDKROOT', sdk, true)
-	paths := [os.dir(compiler), root + '/tools', root + '/tests/desktop-perf', root + '/tests/hardware-platform/hwhost',
+	mut paths := [os.dir(compiler), root + '/tools', root + '/tests/desktop-perf', root + '/tests/hardware-platform/hwhost',
 		os.executable(), clang, '/Library/Developer/CommandLineTools/usr/bin/ld', resource + '/include',
 		sdk + '/SDKSettings.json', sdk + '/SDKSettings.plist', '/usr/bin/xcrun', '/bin/df', '/usr/bin/du']
+	if adapter { paths << [root + '/tests/hardware-platform/plainiso', root + '/tests/linuxkpi/hosttest'] }
 	before := inputs(paths)!
 	os.write_file(state + '/inputs-before.json', json2.encode(before) + '\n')!
+	if adapter {
+		mut copies := Inventory{}
+		deadline := time.sys_mono_now() + 120 * u64(time.second)
+		for directory in ['tools', 'tests/desktop-perf', 'tests/hardware-platform/hwhost', 'tests/hardware-platform/plainiso', 'tests/linuxkpi/hosttest'] {
+			os.mkdir_all(os.dir(state + '/source/' + directory))!
+			preserve_source(root + '/' + directory, state + '/source/' + directory, 0, deadline, mut copies)!
+		}
+	}
 	mut results := map[string]string{}
+	target := if adapter { 'run-x86' } else { 'foreground-supervise' }
 	for kind in ['normal', 'production'] {
 		work := state + '/' + kind; os.mkdir(work)!
 		build := work + '/build'; os.mkdir(build)!
 		mut argv := [compiler, '-enable-globals', '-nocache', '-keepc', '-cc', clang, '-path',
 			'@vlib|@vmodules|' + root + '/tools|' + root + '/tests/desktop-perf|' + root + '/tests/hardware-platform|' + root + '/tests/linuxkpi',
-			'-o', work + '/foreground-supervise']
+			'-o', work + '/' + target]
 		if kind == 'production' { argv << '-prod' }
-		argv << root + '/tests/desktop-perf/foreground-supervise.v'
+		argv << root + '/tests/desktop-perf/' + target + '.v'
 		require(supervise(profile, build, argv)! == 0, kind + ' compile failed')!
 		control := work + '/driver'; os.mkdir(control)!
-		control_argv := [work + '/foreground-supervise', 'selfcheck', work + '/controls', compiler]
+		mut control_argv := [work + '/' + target, 'selfcheck', work + '/controls']
+		if !adapter { control_argv << compiler }
 		require(supervise(profile, control, control_argv)! == 0, kind + ' controls failed')!
-		results[kind + ':binary_sha256'] = hash(work + '/foreground-supervise')!
-		results[kind + ':qualification_sha256'] = hash(work + '/controls/qualification.json')!
+		results[kind + ':binary_sha256'] = hash(work + '/' + target)!
+		if adapter {
+			require(os.read_file(work + '/controls/result')!.starts_with('PASS 26 checks including 15 refusals:'), 'adapter control receipt differs')!
+			results[kind + ':selfcheck_sha256'] = hash(work + '/controls/result')!
+			clone_driver := work + '/clone-driver'; os.mkdir(clone_driver)!
+			require(supervise(profile, clone_driver, [work + '/' + target, 'clonecheck', work + '/clone-controls'])! == 0, kind + ' clone controls failed')!
+			clone_checks := json2.decode[[]string](os.read_file(work + '/clone-controls/result.json')!)!
+			require(clone_checks.len == 18, 'adapter clone receipt count differs')!
+			results[kind + ':clonecheck_sha256'] = hash(work + '/clone-controls/result.json')!
+		} else {
+			results[kind + ':qualification_sha256'] = hash(work + '/controls/qualification.json')!
+		}
 		os.write_file(state + '/progress.json', json2.encode(results) + '\n')!
 	}
 	after := inputs(paths)!
@@ -486,7 +548,7 @@ fn qualify(state string, compiler string) ! {
 	require(before == after, 'build/control input identity changed')!
 	os.write_file(state + '/budget-after.log', budget(profile, state, false)!)!
 	results['inputs_sha256'] = hash(state + '/inputs-before.json')!
-	results['verdict'] = 'PASS normal and production; sixteen controls each; no guest execution'
+	results['verdict'] = if adapter { 'PASS normal and production; 26 selfcheck and 18 clone controls each; no guest execution' } else { 'PASS normal and production; sixteen controls each; no guest execution' }
 	results['scope'] = 'selected complete compiler, maintained sources and recorded host compiler/SDK metadata; installed loader and SDK dependency closure is not hermetic'
 	os.write_file(state + '/qualification.json', json2.encode(results) + '\n')!
 	println('PERF FOREGROUND QUALIFIED ' + hash(state + '/qualification.json')!)
@@ -497,8 +559,11 @@ fn main() {
 	if os.args.len == 4 && os.args[1] == 'selfcheck' {
 		selfcheck(os.args[2], os.args[3]) or { eprintln(err); exit(1) }; return
 	}
-	if os.args.len == 4 && os.args[1] == 'qualify' {
-		qualify(os.args[2], os.args[3]) or { eprintln(err); exit(1) }; return
+	if os.args.len == 3 && os.args[1] == 'limitcheck' {
+		limitcheck(os.args[2]) or { eprintln(err); exit(1) }; return
+	}
+	if os.args.len == 4 && os.args[1] in ['qualify', 'qualify-adapter'] {
+		qualify(os.args[2], os.args[3], os.args[1] == 'qualify-adapter') or { eprintln(err); exit(1) }; return
 	}
 	if os.args.len == 4 && os.args[1] == 'run' {
 		status := run(os.args[2], os.args[3]) or {
@@ -506,6 +571,6 @@ fn main() {
 			eprintln(err); exit(1)
 		}; exit(status)
 	}
-	eprintln('usage: foreground-supervise run NEW-STATE PROFILE.json\n       foreground-supervise selfcheck|qualify NEW-STATE COMPLETE-V')
+	eprintln('usage: foreground-supervise run NEW-STATE PROFILE.json\n       foreground-supervise selfcheck|qualify|qualify-adapter NEW-STATE COMPLETE-V\n       foreground-supervise limitcheck NEW-STATE')
 	exit(2)
 }
