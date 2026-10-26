@@ -5,6 +5,7 @@ module main
 import accountstore
 import os
 
+#include <errno.h>
 #include <fcntl.h>
 #include <sqlite3.h>
 #include <sys/mount.h>
@@ -100,15 +101,36 @@ fn unsafe_links(root string) ! {
 	}
 }
 
+fn proc_self_fd_ready() !bool {
+	descriptor := unsafe { C.open(c'/', C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC) }
+	if descriptor < 0 {
+		code := C.errno
+		return error('cannot open fixture root errno=${code}')
+	}
+	defer { C.close(descriptor) }
+	// Verify that procfs resolves this process's actual open descriptor;
+	// an existing mountpoint directory alone is insufficient.
+	target := os.readlink('/proc/self/fd/${descriptor}') or { return false }
+	return target == '/'
+}
+
 fn fixture_path() !string {
 	$if linux {
 		if os.getpid() == 1 && os.args.len == 1 {
 			// The minimal guest runner starts /sbin/init without arguments.
 			// Only PID 1 may mount procfs or select this fixed synthetic path.
-			if unsafe { C.mount(c'proc', c'/proc', c'proc', 0, nil) } != 0 {
-				return error('cannot mount fixture procfs')
+			if proc_self_fd_ready()! {
+				println('ACCOUNTSTORE-INIT proc-existing')
+			} else {
+				if unsafe { C.mount(c'proc', c'/proc', c'proc', 0, nil) } != 0 {
+					code := C.errno
+					return error('cannot mount fixture procfs errno=${code}')
+				}
+				if !proc_self_fd_ready()! {
+					return error('mounted procfs does not resolve fixture descriptor')
+				}
+				println('ACCOUNTSTORE-INIT proc-mounted')
 			}
-			println('ACCOUNTSTORE-INIT proc-mounted')
 			return '/accountstore-linux-regression'
 		}
 	}
