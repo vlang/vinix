@@ -22,6 +22,15 @@ checksum. The existing `.github/workflows/m1-wifi-build.yml` demonstrates
 artifact uploads. Do not remove checks from an auditor to make a partial bundle
 pass.
 
+For a large cold-storage candidate, `tests/native-android-ws/cold-archive-estimate.v`
+can count a complete gzip archive stream without storing the archive. Pass the
+bundle directory, its pinned `sha256.json` checksum and a fresh external JSON
+receipt path. The receipt records the byte count, command, source and tool hashes.
+This estimates archive size only: APFS clones may share physical extents, so `du`
+and archive size do not establish how much removing an expanded tree would free.
+Retain a checksum-verified archive, restore the complete bundle, compare its full
+typed inventory and run the unchanged auditor before removing expanded evidence.
+
 `tests/**/results/` and `/artifacts/` are ignored. Historical source snapshots
 and Markdown reports up to 64 KiB remain tracked where useful. Their links to
 raw results refer to archived evidence, which must be restored before auditing.
