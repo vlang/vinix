@@ -22,6 +22,17 @@ struct Provider {
 	version string
 }
 
+fn absolute_command(name string) bool {
+	for prefix in ['/bin/', '/sbin/', '/usr/bin/', '/usr/sbin/'] {
+		if !name.starts_with(prefix) { continue }
+		base := name[prefix.len..]
+		return base !in ['', '.', '..'] && base.bytes().all((it >= `a` && it <= `z`)
+			|| (it >= `A` && it <= `Z`) || (it >= `0` && it <= `9`)
+			|| it in [u8(`_`), `+`, `-`, `.`])
+	}
+	return false
+}
+
 fn dependency(value string) !Dependency {
 	if value == '' || value.len > 4096 || !value.bytes().all(it > 32 && it < 127) {
 		return error('invalid APK dependency')
@@ -31,8 +42,9 @@ fn dependency(value string) !Dependency {
 	mut at := 0
 	for at < text.len && text[at] !in [u8(`<`), `>`, `=`, `~`, `!`] { at++ }
 	name := text[..at]
-	if name == '' || !name.bytes().all((it >= `a` && it <= `z`) || (it >= `A` && it <= `Z`)
-		|| (it >= `0` && it <= `9`) || it in [u8(`_`), `+`, `-`, `.`, `:`]) {
+	if name == '' || (!absolute_command(name) && !name.bytes().all((it >= `a` && it <= `z`)
+		|| (it >= `A` && it <= `Z`) || (it >= `0` && it <= `9`)
+		|| it in [u8(`_`), `+`, `-`, `.`, `:`])) {
 		return error('invalid APK dependency name: ' + value)
 	}
 	start := at
@@ -82,7 +94,7 @@ fn package_metadata(path string) !PackageMetadata {
 		return error('APK metadata requires unique aarch64/noarch identity: ' + path)
 	}
 	identity := dependency(fields['pkgname'][0] + '=' + fields['pkgver'][0])!
-	if identity.conflict || identity.name.contains(':') { return error('invalid APK package identity') }
+	if identity.conflict || identity.name.contains_any(':/') { return error('invalid APK package identity') }
 	return PackageMetadata{identity.name, identity.version, fields['depend'], fields['provides']}
 }
 

@@ -107,3 +107,22 @@ fn test_select_packages_rejects_different_selected_providers_for_one_virtual_nam
 	select_packages(archives, ['browser']) or { rejected = true }
 	assert rejected
 }
+
+fn test_absolute_commands_require_exact_declared_pinned_provider() {
+	work := workspace()!
+	defer { remove_tree(work) }
+	mut archives := {
+		'browser': metadata_archive(work, 'browser', '1-r0', 'depend = /bin/sh\n')!
+		'shell': metadata_archive(work, 'shell', '0.37.0-r0', 'provides = /bin/sh\n')!
+	}
+	assert select_packages(archives, ['browser'])! == ['browser', 'shell']
+	archives.delete('shell')
+	mut rejected := false
+	select_packages(archives, ['browser']) or { rejected = true }
+	assert rejected // The host's /bin/sh never supplies an implicit provider.
+	for value in ['/bin/../sh', '/bin//sh', '/bin/', '/etc/passwd', '/usr/bin/sub/sh'] {
+		mut failed := false
+		dependency(value) or { failed = true }
+		assert failed
+	}
+}
