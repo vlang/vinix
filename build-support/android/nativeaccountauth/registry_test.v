@@ -10,9 +10,9 @@ fn test_exact_service_and_action_allowlist() {
 	selector := 'com.example.auth.Outer$Service@com.example.AUTH'
 	text := fixture_registry().replace('\t-\n', '\t' + selector + '\n')
 	registry := parse_registry(text)!
-	assert registry.entries[0].services == [Service{'com.example.auth.Outer$Service', 'com.example.AUTH'}]
+	assert registry.entries[0].services == [Service{class_name: 'com.example.auth.Outer$Service', action: 'com.example.AUTH'}]
 	for value in ['', 'com.example.Service', 'com.example.Service@', '@com.example.AUTH',
-		'com.example.Service@com.example.AUTH@extra', 'com.example.Service@bad action',
+		'com.example.Service@com.example.AUTH@', 'com.example.Service@com.example.AUTH@type@extra', 'com.example.Service@bad action',
 		'com.example.Service@com.example.$AUTH', selector + ',' + selector, selector + ',',
 		(selector + ',').repeat(16) + selector] {
 		mut rejected := false

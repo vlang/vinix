@@ -18,10 +18,23 @@ fn entry_handoff(source string) bool {
 	parse := entry_main.index('selected, fd, selected_ui := service_launch()') or { return false }
 	load := entry_main.index('C.dlopen(') or { return false }
 	clear := entry_main.index("os.unsetenv('VINIX_ANDROID_AUTHENTICATOR_FD')") or { return false }
-	return clear < parse && parse < load
+	clear_type := entry_main.index("os.unsetenv('VINIX_ANDROID_AUTHENTICATOR_TYPE')") or { return false }
+	return clear < parse && clear_type < parse && parse < load
 		&& source.contains('type NativeServiceMain = fn (&char, &char, &char, &char, &char, i32, i32) i32')
 		&& entry_main.contains('control_fd = fd') && entry_main.contains('ui_fd = selected_ui')
 		&& entry_main.contains('exit(int(entry(root.str, os.args[1].str, launch.package_name.str, launch.service.str, launch.action.str, i32(control_fd), i32(ui_fd))))')
+}
+
+fn entry_attestation(source string) bool {
+	launch := entry_block(source, 'service_launch') or { return false }
+	frame := launch.index('nativeaccountauth.verify_service_frame(') or { return false }
+	root_peer := launch.index('nativeaccountauth.verify_root_channel(auth_fd)!') or { return false }
+	selected := launch.index('registry.verify_authenticator_type(os.args[1], C.getuid(), u32(C.getgid()), launch)!') or { return false }
+	publish := launch.index("os.setenv('VINIX_ANDROID_AUTHENTICATOR_TYPE', account_type, true)") or { return false }
+	return frame < root_peer && root_peer < selected && selected < publish
+		&& launch.contains("if account_type != '' {")
+		&& !source.contains("getenv('VINIX_ANDROID_AUTHENTICATOR_TYPE')")
+		&& !source.contains("getenv_opt('VINIX_ANDROID_AUTHENTICATOR_TYPE')")
 }
 
 fn entry_implementation_abi(source string) bool {
@@ -55,6 +68,7 @@ fn main() {
 	source := os.read_file(repo + '/build-support/android/native-entry.v')!
 	implementation := os.read_file(repo + '/build-support/android/nativews/headless.v')!
 	assert entry_handoff(source), 'service channels must be verified before library loading and passed directly through the typed ABI'
+	assert entry_attestation(source), 'account authority must come from the pinned registry after verified root service channels'
 	assert entry_implementation_abi(implementation), 'native service export must match entry NativeServiceMain, including final ui_fd i32'
 	for mutation in [implementation.replace(', ui_fd i32) i32', ') i32'),
 		implementation.replace(', ui_fd i32) i32', ', ui_fd i64) i32')] {
@@ -65,10 +79,19 @@ fn main() {
 		source.replace('ui_fd = selected_ui', 'ui_fd = control_fd'),
 		source.replace('i32(control_fd), i32(ui_fd)', 'i32(control_fd), i32(control_fd)'),
 		source.replace("os.unsetenv('VINIX_ANDROID_AUTHENTICATOR_FD')", ''),
+		source.replace("os.unsetenv('VINIX_ANDROID_AUTHENTICATOR_TYPE')", ''),
 		source.replace('selected, fd, selected_ui := service_launch()',
 			'unsafe { C.dlopen(nil, 0) }\n\t\tselected, fd, selected_ui := service_launch()'),
 	] {
 		assert mutation != source && !entry_handoff(mutation), 'handoff checker accepted a negative mutation'
+	}
+	for mutation in [
+		source.replace('nativeaccountauth.verify_root_channel(auth_fd)!', ''),
+		source.replace('nativeaccountauth.verify_service_frame(', 'nativeaccountauth.unverified_service_frame('),
+		source.replace('registry.verify_authenticator_type(os.args[1], C.getuid(), u32(C.getgid()), launch)!', "'forged'"),
+		source.replace("if account_type != '' {", 'if true {'),
+	] {
+		assert mutation != source && !entry_attestation(mutation), 'attestation checker accepted a negative mutation'
 	}
 	mut parser := entry_block(source, 'service_launch')!
 	for name in ['load', 'verify_service_frame', 'verify_root_channel'] {
@@ -95,7 +118,9 @@ fn main() {
 	os.write_file(work + '/input-native-entry.v', source)!
 	os.write_file(work + '/input-nativews-headless.v', implementation)!
 	model := entry_model.replace('@ENTRY_SERVICE_SIGNATURE@', implementation_line[0].replace('fn ws_service_main(', 'fn abi_spy('))
-	os.write_file(work + '/main.v', model + '\n' + type_line[0] + '\n' + parser + invoke + entry_cases)!
+	clear_body := entry_block(source, 'main')!.all_after('fn main() {').all_before('\troot :=')
+	clear := '\nfn clear_entry_environment() {' + clear_body.replace('os.unsetenv', 'probe_unsetenv') + '\n}\n'
+	os.write_file(work + '/main.v', model + '\n' + type_line[0] + '\n' + parser + invoke + clear + entry_cases)!
 	compiler := os.real_path(os.getenv_opt('VINIX_V_COMPILER') or { os.find_abs_path_of_executable('v')! })
 	compile_argv := [compiler, '-w', '-enable-globals', '-cc', 'cc', '-o', work + '/probe',
 		work + '/main.v']
@@ -120,7 +145,7 @@ fn main() {
 		run:                   EntryReceipt{run_argv, ran.exit_code, ran.output}
 	}, prettify: true))!
 	println(ran.output.trim_space())
-	println('NATIVE-ENTRY-UI-HANDOFF-PASS negative-mutations=7 production-service-signature')
+	println('NATIVE-ENTRY-UI-HANDOFF-PASS negative-mutations=12 production-service-signature pinned-type')
 }
 
 const entry_model = '
@@ -141,6 +166,9 @@ mut:
  flags map[int]i32
  trace []string
  auth_env string
+ type_env string
+ registered_type string = "com.example.account"
+ type_error bool
  uid u32 = 10001
  gid i32 = 10002
 }
@@ -170,6 +198,14 @@ fn probe_verify_root_channel(fd int) !ProbePeer {
  if fd == ep.peer_error || fd !in ep.peer_uid || ep.peer_uid[fd] != 0 { return error("not root Unix peer") }
  return ProbePeer{ep.peer_uid[fd]}
 }
+fn (registry ProbeRegistry) verify_authenticator_type(apk string, uid u32, gid u32, launch ProbeServiceLaunch) !string {
+ assert apk == "/registered.apk" && uid == ep.uid && gid == u32(ep.gid)
+ assert launch.package_name == "com.example.origin" && launch.service == "com.example.origin.Authenticator"
+ assert launch.action == "android.accounts.AccountAuthenticator"
+ ep.trace << "registered-type"
+ if ep.type_error { return error("pinned authenticator identity changed") }
+ return ep.registered_type
+}
 fn probe_fcntl(fd i32, operation i32, flags ...i32) i32 {
  ep.trace << (if operation == 1 { "get:" } else { "set:" }) + fd.str()
  if operation == 1 {
@@ -183,11 +219,22 @@ fn probe_fcntl(fd i32, operation i32, flags ...i32) i32 {
  return 0
 }
 fn probe_setenv(name string, value string, overwrite bool) {
- assert name == "VINIX_ANDROID_AUTHENTICATOR_FD" && overwrite
- ep.trace << "auth-env:" + value; ep.auth_env = value
+ assert overwrite
+ if name == "VINIX_ANDROID_AUTHENTICATOR_FD" {
+  ep.trace << "auth-env:" + value; ep.auth_env = value
+ } else {
+  assert name == "VINIX_ANDROID_AUTHENTICATOR_TYPE"
+  ep.trace << "type-env:" + value; ep.type_env = value
+ }
+}
+fn probe_unsetenv(name string) {
+ if name == "VINIX_ANDROID_AUTHENTICATOR_FD" { ep.auth_env = "" }
+ else { assert name == "VINIX_ANDROID_AUTHENTICATOR_TYPE"; ep.type_env = "" }
 }
 fn reset_entry(arguments []string) {
- ep = EntryProbe{peer_uid:{4:u32(0),5:u32(0)},flags:{3:i32(8),4:i32(16),5:i32(32)}}
+ ep = EntryProbe{peer_uid:{4:u32(0),5:u32(0)},flags:{3:i32(8),4:i32(16),5:i32(32)},auth_env:"inherited-forged",type_env:"inherited-forged"}
+ clear_entry_environment()
+ assert ep.auth_env == "" && ep.type_env == ""
  probe_arguments = ["native-entry","/registered.apk"]
  probe_arguments << arguments
 }
@@ -220,17 +267,22 @@ fn main() {
  reset_entry(base)
  launch, lifetime, ui := service_launch()!
  assert lifetime == 3 && ui == -1 && launch.package_name == "com.example.origin"
- assert ep.auth_env == "" && ep.flags[3] == 9
+ assert ep.auth_env == "" && ep.type_env == "" && ep.flags[3] == 9
  assert ep.trace == ["registry-env","registry-load","service:3","get:3","set:3"]
  reset_entry(auth)
  _, auth_lifetime, absent_ui := service_launch()!
  assert auth_lifetime == 3 && absent_ui == -1 && ep.auth_env == "4" && ep.flags[4] == 17
- assert ep.trace == ["registry-env","registry-load","service:3","get:3","set:3","peer:4","get:4","set:4","auth-env:4"]
+ assert ep.type_env == "com.example.account"
+ assert ep.trace == ["registry-env","registry-load","service:3","get:3","set:3","peer:4","get:4","set:4","auth-env:4","registered-type","type-env:com.example.account"]
  reset_entry(full)
  selected, control, selected_ui := service_launch()!
  assert control == 3 && selected_ui == 5 && ep.flags[3] == 9 && ep.flags[4] == 17 && ep.flags[5] == 33
- assert ep.trace == ["registry-env","registry-load","service:3","get:3","set:3","peer:4","get:4","set:4","auth-env:4","peer:5","get:5","set:5"]
+ assert ep.trace == ["registry-env","registry-load","service:3","get:3","set:3","peer:4","get:4","set:4","auth-env:4","peer:5","get:5","set:5","registered-type","type-env:com.example.account"]
  assert invoke_entry(abi_spy,"/runtime","/registered.apk",selected,control,selected_ui) == 73
+ reset_entry(full); ep.registered_type = ""; service_launch()!; assert ep.type_env == ""
+ assert ep.trace.last() == "registered-type"
+ reset_entry(full); ep.type_error = true; reject_current(); assert ep.type_env == ""
+ assert ep.trace.last() == "registered-type"
  for arguments in [
   []string{}, ["--service-fd"], ["--ui-fd","5"], ["--service-fd","3","--ui-fd","5"],
   ["--service-fd","3","--authenticator-fd","4","--ui-fd"],

@@ -59,6 +59,10 @@ fn service_launch() !(nativeaccountauth.ServiceLaunch, int, int) {
 				return error('cannot protect authenticator UI descriptor')
 			}
 		}
+		account_type := registry.verify_authenticator_type(os.args[1], C.getuid(), u32(C.getgid()), launch)!
+		if account_type != '' {
+			os.setenv('VINIX_ANDROID_AUTHENTICATOR_TYPE', account_type, true)
+		}
 	}
 	return launch, fd, ui_fd
 }
@@ -66,6 +70,7 @@ fn service_launch() !(nativeaccountauth.ServiceLaunch, int, int) {
 fn main() {
 	// Only the verified service argv may introduce a command channel.
 	os.unsetenv('VINIX_ANDROID_AUTHENTICATOR_FD')
+	os.unsetenv('VINIX_ANDROID_AUTHENTICATOR_TYPE')
 	root := os.getenv_opt('VINIX_ANDROID_ROOT') or { '/opt/vinix-android-aarch64' }
 	if os.args.len < 2 {
 		eprintln('usage: vinix-android-native APK [ACTIVITY] | APK --service-fd FD [--authenticator-fd FD [--ui-fd FD]]')

@@ -36,6 +36,7 @@ pub struct Service {
 pub:
 	class_name string
 	action     string
+	account_type string // optional administrator attestation for this pinned APK
 }
 
 // The loaded snapshot is immutable to callers. A registry never reloads itself
@@ -93,6 +94,13 @@ fn service_identifier(value string, class_name bool) bool {
 	return true
 }
 
+fn account_type_valid(value string) bool {
+	// Registry delimiters and whitespace have no escaping. Account types are
+	// opaque identifiers; they need not be Java package or class names.
+	return value.len > 0 && value.len <= 255
+		&& value.bytes().all(it > 32 && it < 127 && it != `@` && it != `,`)
+}
+
 fn parse_services(value string) ![]Service {
 	if value == '-' { return []Service{} }
 	parts := value.split(',')
@@ -101,10 +109,14 @@ fn parse_services(value string) ![]Service {
 	mut seen := map[string]bool{}
 	for part in parts {
 		pair := part.split('@')
-		if pair.len != 2 || !service_identifier(pair[0], true) || !service_identifier(pair[1], false)
-			|| part in seen { return error('invalid account authority service selector') }
-		seen[part] = true
-		services << Service{pair[0], pair[1]}
+		if pair.len !in [2, 3] || !service_identifier(pair[0], true) || !service_identifier(pair[1], false)
+			|| (pair.len == 3 && !account_type_valid(pair[2])) {
+			return error('invalid account authority service selector')
+		}
+		selector := pair[0] + '@' + pair[1]
+		if selector in seen { return error('duplicate account authority service selector') }
+		seen[selector] = true
+		services << Service{class_name: pair[0], action: pair[1], account_type: if pair.len == 3 { pair[2] } else { '' }}
 	}
 	return services
 }
@@ -265,6 +277,26 @@ pub fn (registry Registry) verify_service(apk string, uid u32, gid u32, class_na
 		if service.class_name == class_name && service.action == action { return entry }
 	}
 	return error('service and action are not registered for account authority')
+}
+
+fn selected_authenticator_type(entry Entry, launch ServiceLaunch) !string {
+	if entry.package_name != launch.package_name || entry.apk_sha256 != launch.apk_sha256 {
+		return error('authenticator attestation does not match service package or APK pin')
+	}
+	for service in entry.services {
+		if service.class_name == launch.service && service.action == launch.action {
+			// Legacy two-part selectors authorize launch only, never account writes.
+			return service.account_type
+		}
+	}
+	return error('authenticator attestation does not match registered service selector')
+}
+
+// The administrator attests the selected service's account type for these exact
+// APK bytes. Recheck the protected APK digest before publishing that authority.
+pub fn (registry Registry) verify_authenticator_type(apk string, uid u32, gid u32, launch ServiceLaunch) !string {
+	entry := registry.verify_service(apk, uid, gid, launch.service, launch.action)!
+	return selected_authenticator_type(entry, launch)
 }
 
 fn (registry Registry) authenticate_peer(peer Peer, claims Claims) !Caller {
