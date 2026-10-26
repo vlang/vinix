@@ -138,3 +138,15 @@ the committed existing-helper pins.
 Preserve the complete external result bundle with checksums under the
 repository's [test artifact policy](../../docs/test-artifacts.md). Keep generated
 PNG files, binaries, caches, inventories, and raw logs out of Git.
+
+`seal.v` binds complete external roots in place without copying disk images.
+Build it on macOS with `v -prod -o /tmp/vinix-browser-seal tests/android-webview-browser-probe/seal.v` and run its
+`--self-test`. After stopping the guest and collecting the export, run
+`/tmp/vinix-browser-seal seal FRESH_SEAL_DIR STOPPED_VM_DIR BUILD_DIR RESULTS_DIR`
+with any additional complete fixture/tool roots. It requires matching ownership,
+stop, and disappearance receipts and an absent guest PID. It freezes its own
+source and binary and prints the manifest hash. Later use
+`/tmp/vinix-browser-seal check SEAL_DIR MANIFEST_SHA256` to detect added, missing,
+or changed entries across every retained root. Symlinks are recorded without
+following them; sockets and other special entries fail closed. Keep the roots
+at their recorded paths and preserve the full trees.
