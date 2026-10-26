@@ -261,11 +261,11 @@ fn verify_executable_command(root string, label string, action string, receipt m
 	args := json2.decode[[]string](json2.encode(receipt['argv']!))!
 	if receipt['exit_code']!.int() != 0 { return error('current executable command failed') }
 	if action == 'generate' {
-		if receipt['executable_sha256']!.str() != compiler_pin || args.len != 17
-			|| args[1..13] != ['-new-compiler', '-os', 'linux', '-arch', 'arm64', '-cc', cross,
-				'-gc', 'none', '-nocache', '-skip-running', '-path']
-			|| !args[13].split('|').all(it.starts_with(root + '/closure/' + label + '/') && relative(it[root.len + 1..]))
-			|| args[14..16] != ['-o', root + '/generated/' + label + '.c']
+		if receipt['executable_sha256']!.str() != compiler_pin || args.len != 19
+			|| args[1..15] != ['-new-compiler', '-os', 'linux', '-arch', 'arm64', '-cc', cross,
+				'-gc', 'none', '-nocache', '-skip-running', '-exclude', '@vlib/crypto/rand/internal/rand.wasm.v', '-path']
+			|| !args[15].split('|').all(it.starts_with(root + '/closure/' + label + '/') && relative(it[root.len + 1..]))
+			|| args[16..18] != ['-o', root + '/generated/' + label + '.c']
 			|| args.last() != source {
 			return error('current executable frozen generation command differs')
 		}
@@ -1233,7 +1233,7 @@ fn self_test() ! {
 		}
 		generation := {
 			'argv': json2.Any(['/current/closure/' + item[0] + '/v', '-new-compiler', '-os', 'linux', '-arch', 'arm64', '-cc', cross,
-				'-gc', 'none', '-nocache', '-skip-running', '-path', '/current/closure/' + item[0] + '/vlib',
+				'-gc', 'none', '-nocache', '-skip-running', '-exclude', '@vlib/crypto/rand/internal/rand.wasm.v', '-path', '/current/closure/' + item[0] + '/vlib',
 				'-o', '/current/generated/' + item[0] + '.c', '/current/closure/' + item[0] + '/source.v'])
 			'exit_code': json2.Any(0)
 			'executable_sha256': json2.Any(compiler_pin)
