@@ -3,6 +3,7 @@
 module main
 
 import os
+import probebudget
 import time
 import tlsbuild
 
@@ -192,6 +193,12 @@ fn await_checks(mut p os.Process, log string, marker string) ! {
 }
 
 fn vm(root string, out string, mode string) {
+	mut budget := ''
+	if configured := os.getenv_opt('VINIX_IOS_PROBE_MEMORY_MAX') {
+		if mode != 'probe-no-ads' { panic('VINIX_IOS_PROBE_MEMORY_MAX requires probe-no-ads') }
+		bytes := probebudget.parse(configured) or { panic(err) }
+		budget = bytes.str()
+	}
 	if mode !in ['class-update', 'native-value', 'capture-audio-output', 'gk-match-request', 'gk-achievement', 'gk-achievement-description', 'gk-player', 'gk-turn-based-participant', 'gk-turn-based-match', 'gk-local-player', 'gk-leaderboard', 'capture-discovery', 'app-attest', 'gc-event-view-controller', 'snapshot-configuration', 'text-field', 'haptic-dynamic-parameter', 'haptic-pattern', 'haptic-event', 'haptic-event-parameter', 'long-press-gesture', 'tap-gesture', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'av-player', 'ns-proxy', 'swift-object', 'storekit-purchase', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications', 'probe', 'probe-no-ads', 'audit', 'static-audit'] {
 		panic('invalid check mode: ' + mode)
 	}
@@ -425,6 +432,10 @@ fn vm(root string, out string, mode string) {
 		os.write_file(fs + '/etc/resolv.conf', 'nameserver 127.0.0.1\noptions timeout:1 attempts:1\n') or { panic(err) }
 	}
 	os.write_file(fs + '/opt/ios/check-mode', if mode.contains('audit') { 'audit' } else { mode }) or { panic(err) }
+	// Explicitly overlay an empty value for unmanaged runs, even if the base
+	// archive was made from a previous budgeted probe.
+	os.write_file(fs + '/opt/ios/probe-memory-max', budget) or { panic(err) }
+	println('VM probe memory.max: ' + if budget == '' { 'unmanaged' } else { budget })
 	archive := state + '/initramfs.tar.gz'
 	// Higher compression lets full-IPA audits preserve complete guest media
 	// on hosts with little free space. Keep the level in the captured log.

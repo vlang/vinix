@@ -3,6 +3,7 @@
 module main
 
 import os
+import probebudget
 
 #include <unistd.h>
 #include <sys/wait.h>
@@ -15,6 +16,10 @@ fn C.pause() i32
 fn C.fflush(voidptr) i32
 
 fn run_child(path string, args []string) i32 {
+	return run_child_in_group(path, args, '')
+}
+
+fn run_child_in_group(path string, args []string, group string) i32 {
 	mut pointers := []&char{}
 	pointers << path.str
 	for arg in args { pointers << arg.str }
@@ -22,6 +27,10 @@ fn run_child(path string, args []string) i32 {
 	child := C.fork()
 	if child < 0 { panic('fork') }
 	if child == 0 {
+		probebudget.enter(group) or {
+			eprintln('IOS-NATIVE: FAIL budget child: ' + err.msg())
+			exit(125)
+		}
 		C.execv(path.str, pointers.data)
 		exit(127)
 	}
@@ -474,7 +483,17 @@ fn main() {
 			['/opt/ios/FortniteClient-IOS-Shipping']
 		}
 		if mode == 'probe-no-ads' { os.setenv('VINIX_IOS_TRACE', '1', true) }
-		status := run_child('/opt/ios/run-ios', args)
+		budget := os.read_file('/opt/ios/probe-memory-max') or { '' }
+		if budget != '' && mode != 'probe-no-ads' { panic('budget requires probe-no-ads') }
+		group := probebudget.prepare(budget) or {
+			eprintln('IOS-NATIVE: FAIL budget setup: ' + err.msg())
+			panic(err)
+		}
+		status := run_child_in_group('/opt/ios/run-ios', args, group)
+		probebudget.finish(group) or {
+			eprintln('IOS-NATIVE: FAIL budget finish: ' + err.msg())
+			panic(err)
+		}
 		println('FORTNITE PROBE: process exit status ${if status & 127 == 0 {
 			status >> 8
 		} else {

@@ -4,6 +4,23 @@ module main
 import macho
 import os
 
+fn test_proc_memory_trace_preserves_errno() {
+	previous := ios_runtime
+	ios_runtime = unsafe { nil }
+	darwin_set_errno(37)
+	darwin_os_proc_available_memory()
+	assert unsafe { *C.ios_errno_address() } == 37
+	objc_start()
+	defer { objc_stop(); ios_runtime = previous }
+	for trace in [false, true] {
+		ios_runtime.trace = trace
+		darwin_set_errno(37)
+		darwin_os_proc_available_memory()
+		assert unsafe { *C.ios_errno_address() } == 37
+	}
+	println('IOS-PROC-MEMORY-TRACE: errno preserved before runtime initialization and with tracing off/on')
+}
+
 fn test_proc_memory_hierarchy_discovery() {
 	mut output := [4096]u8{}
 	for invalid in ['', '1:memory:/child\n', '1:cpu:/other\n0::/child\n', '0::/child\n1:memory:/other\n', '0::/a\ninjected\n', '0::relative\n', '0::/../child\n', '0::/a//b\n', '0::/a/.\n', '0::/a/\n', '0::/a\x00b\n'] {
@@ -28,6 +45,7 @@ fn test_proc_memory_hierarchy_discovery() {
 		assert (proc_memory_amount(valid.str, valid.len) or { panic('invalid amount') }) == valid.u64()
 	}
 	assert (proc_memory_amount(c'max\n', 4) or { panic('invalid max') }) == ~u64(0)
+	println('IOS-PROC-MEMORY-PARSER: canonical membership, full-root mounts, escapes, bounds and overflow')
 }
 
 fn test_proc_memory_macho() {

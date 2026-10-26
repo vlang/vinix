@@ -214,6 +214,15 @@ fn proc_memory_native_budget() usize {
 fn darwin_os_proc_available_memory() usize {
 	previous := unsafe { *C.ios_errno_address() }
 	defer { darwin_set_errno(previous) }
-	$if macos { return C.ios_native_proc_available_memory() }
-	$else { return proc_memory_native_budget() }
+	mut available := usize(0)
+	$if macos { available = C.ios_native_proc_available_memory() }
+	$else { available = proc_memory_native_budget() }
+	if ios_runtime != unsafe { nil } && ios_runtime.trace {
+		// A memory query must not allocate, including when tracing startup.
+		mut line := [128]u8{}
+		length := C.snprintf(unsafe { &char(&line[0]) }, usize(line.len),
+			c'iOS memory: os_proc_available_memory=%llu\n', u64(available))
+		if length > 0 && length < line.len { C.write(2, unsafe { &line[0] }, usize(length)) }
+	}
+	return available
 }
