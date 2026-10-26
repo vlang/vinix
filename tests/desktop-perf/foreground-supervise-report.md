@@ -1,6 +1,68 @@
 # Foreground supervisor and adapter host qualification — 2026-10-26
 
-Latest PASS: `foreground-host08` rebuilt the foreground supervisor in normal
+Latest PASS: `foreground-host10` qualifies the fixed, supervised prepare path
+on source base `249c50cea` plus the exact existing prerequisite `8f7d7ccca`.
+Normal and production supervisors each passed 24 controls: the existing six
+process and ten run-profile/completion controls, plus eight prepare admission
+controls including six refusals. Normal and production adapters each passed
+32 selfchecks, including 19 refusals, and 18 clone controls. Four live-budget
+boundary controls passed. No real base staging or QEMU execution occurred.
+
+The new prepare owner fixes the six-scenario argv, binds the selected tools,
+source, kernel, desktop, root mode and approved literal base manifest, and
+charges the complete preparation through the existing process owner and live
+watcher. The first full base inventory is checked before the prepared state
+is created and reused as `base-before.tsv`. Read-only `admit-prepare` emits
+the selected map for review; actual prepare requires its approved SHA256.
+
+| Qualified source | SHA256 |
+| --- | --- |
+| `tests/desktop-perf/foreground-supervise.v` | `17b44764ba9b339c592f85552217d694ee938f8381d5d766488984887732cc7f` |
+| `tests/desktop-perf/run-x86.v` | `4eb48699b23b3c784ac9dff1419a76c3d5f4f92a1a697dfc82eceecebcc24509` |
+| existing `tests/hardware-platform/hwhost/process.v` prerequisite | `1cefdf1ce196bbe4f05813969107144dd2c123662c56815124da56c92dc5e5d5` |
+
+The retained host08 production bootstrap built and ran the new supervisor.
+Its raw outer verdict retains the older wording “sixteen controls”; the
+new normal and production nested receipts both record the actual 24 controls.
+The newly qualified production supervisor then qualified the adapter. Both
+qualifications preserve equal complete before/after maps, source copies,
+environments, argv, generated C, binaries, process receipts and budgets.
+The exact imported hwhost prerequisite is excluded from this change.
+
+| Receipt, relative to the state prefix below | SHA256 |
+| --- | --- |
+| `foreground-host10/supervisor01/qualification.json` | `88203e5d18462c45f3206304cdbc11e8e3622f2a7ee1e6acaca91ef49cdb3c01` |
+| supervisor before/after map | `b06297a4618c8cf5b9d37810abf7947b4fdb1bf2192af97ebdbd7f4ba029f8df` |
+| `foreground-host10/adapter02/qualification.json` | `e213a2904450b54c60d56dbccdf529ba78d8a3b81d5e7bd4e923d043b5676ec3` |
+| adapter before/after map | `14689d4346b23c0b481b9de106b2540b8498401c6bca7068d0139be69a68e515` |
+| `foreground-host10/limits02/result.json` | `6c6b9dbb86893cbf9f30cebc6606463749eb5e8dab61b01ec138da78decb6dfc` |
+| `foreground-host10-seal01/inventory.json` | `257cda6491161628a132f47cd1363d26a0cd348a782f435c1e8e5302547f3164` |
+
+| Qualified executable | Normal SHA256 | Production SHA256 |
+| --- | --- | --- |
+| foreground supervisor | `1ae43bce918d782dbab13dd73373d47b1946effd4364a1f18a966a30b3741b4c` | `2d79ddcecc408af8602dc06e4accfcbbb9c4fd4121f1d9e00cae940934d34144` |
+| x86 adapter | `36785be552a57bf687fa72accac7bf9ba98e8f28f088331c7df50f7a18f1c807` | `0087dbc6986bf94ed0816c4d21044c72e40bcd3dbe191d86c65dc15527c201b1` |
+
+Interrupted `adapter01` remains unchanged without a completed build receipt;
+`adapter02` is the successful fresh attempt. An existing `limits01` PASS is
+also preserved; `limits02` is the fresh observed four-boundary run. The full
+quiescent host10 bundle is sealed with the original complete metadata checker.
+Two independent invocations of that original checker also passed with actual
+exit status zero against the complete retained bundle.
+
+After qualification, df reported 42,200,664 KiB free. The worktree, all retained
+foreground01–08/10 roots and seals, preflight09 and its seal, and retained
+`guard-baseline01` occupy 672,392 KiB. Adding 512 MiB each for fresh baseline
+and matched prepared/supervisor trees and 128 MiB growth projects 1,852,040 KiB,
+leaving 245,112 KiB under the named 2 GiB phase limit. The whole historical
+state prefix occupies 3,431,252 KiB, outside that named phase; retained base,
+kernel, compiler and desktop input audits are separate. Exact fresh profiles,
+the selected admission maps and original baseline audit pins still require
+review before staging. Guest results remain pending.
+
+## Earlier adapter host qualification
+
+PASS: `foreground-host08` rebuilt the foreground supervisor in normal
 and production modes, passing sixteen controls each. Its newly built
 production supervisor then rebuilt the maintained x86 adapter in both modes;
 each passed 26 selfchecks and 18 clone controls. Four budget-limit admission

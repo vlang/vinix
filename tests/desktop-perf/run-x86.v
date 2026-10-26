@@ -161,6 +161,30 @@ fn inventory(root string, relative string) !string {
 	return rows.filter(it != '').join('\n')
 }
 
+fn prepare_options(options []string) !(string, []string) {
+	mut expected := ''
+	mut arguments := []string{}
+	for option in options {
+		if option.starts_with('--base-manifest-sha256=') {
+			if expected != '' { return error('duplicate base manifest pin') }
+			expected = option.all_after('=')
+			if expected.len != 64 || !expected.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`)) {
+				return error('invalid base manifest pin')
+			}
+		} else { arguments << option }
+	}
+	return expected, arguments
+}
+
+fn admitted_base(base string, state string, expected string) !string {
+	if os.exists(state) || os.is_link(state) { return error('state must be fresh') }
+	manifest := inventory(base, '')! + '\n'
+	if expected != '' && sha256.sum(manifest.bytes()).hex() != expected {
+		return error('base manifest pin differs before staging')
+	}
+	return manifest
+}
+
 fn guest_path(root string, relative string) !string {
 	// Resolve every component before using host file APIs: an intermediate
 	// guest-absolute link must never become a host-absolute pathname.
@@ -305,7 +329,8 @@ fn prepare(args []string, stage bool) ! {
 	if os.exists(state) || os.is_link(state) { return error('state must be fresh') }
 	admit_destination(base, state)!
 	clone := clone_mode()!
-	plan := perfrunner.parse(args[4..], root, root + '/tests/desktop-perf', '')!
+	expected_base, arguments := prepare_options(args[4..])!
+	plan := perfrunner.parse(arguments, root, root + '/tests/desktop-perf', '')!
 	if plan.mem < 512 || plan.mem > 65536 || plan.desktop_args.contains_any("'\r\n") || plan.assets.len != 0 {
 		return error('unsupported memory, quoted desktop arguments or dictionary assets')
 	}
@@ -352,12 +377,13 @@ fn prepare(args []string, stage bool) ! {
 		println('PERF X86 INPUT CHECK PASS; no staging or VM execution')
 		return
 	}
+	base_manifest := admitted_base(base, state, expected_base)!
 	os.mkdir_all(state)!
 	os.write_file(state + '/prepare-arguments.json', json2.encode(os.args,
 		escape_unicode: true
 		time_as_unix:   true
 	) + '\n')!
-	os.write_file(state + '/base-before.tsv', inventory(base, '')! + '\n')!
+	os.write_file(state + '/base-before.tsv', base_manifest)!
 	if clone {
 		clone_tree(base, state + '/rootfs')!
 	} else {
@@ -424,7 +450,7 @@ fn prepare(args []string, stage bool) ! {
 		pins[destination] = digest(destination)!
 	}
 	os.write_file(state + '/staged-before.tsv', inventory(state + '/rootfs', '')! + '\n')!
-	p := Prepared{root, base, args[4..], command, socket, pins, digest(state + '/base-before.tsv')!, digest(state + '/staged-before.tsv')!, if clone { 'apfs-clone' } else { 'copy' }}
+	p := Prepared{root, base, arguments, command, socket, pins, digest(state + '/base-before.tsv')!, digest(state + '/staged-before.tsv')!, if clone { 'apfs-clone' } else { 'copy' }}
 	verify(p, state)!
 	os.write_file(state + '/prepared.json', json2.encode(p,
 		escape_unicode: true
@@ -560,8 +586,22 @@ fn selfcheck(state string) ! {
 	os.rm(state + '/host-tool')!
 	os.symlink('tool-a', state + '/host-tool')!
 	verify(tool, state)!
-	os.write_file(state + '/result', 'PASS 26 checks including 15 refusals: final/intermediate absolute and relative guest links, escape/cycle/referral/link/staged mutations, streaming digest, restore, geometry, production disk boot arguments, foreground serial monitor escape, timeout/memory/scenario/quote controls, host-tool symlink retarget\n')!
-	println('PERF X86 SELFCHECK PASS 26 checks including 15 refusals')
+	empty_pin, unchanged := prepare_options(['--scenarios=idle'])!
+	if empty_pin != '' || unchanged != ['--scenarios=idle'] { return error('optional base pin changed arguments') }
+	base_pin := sha256.sum(base.bytes()).hex()
+	expected, stripped := prepare_options(['--base-manifest-sha256=' + base_pin, '--scenarios=idle'])!
+	if stripped != ['--scenarios=idle'] || admitted_base(state + '/base', state + '/never', expected)! != base {
+		return error('matching base manifest pin refused')
+	}
+	if _ := admitted_base(state + '/base', state + '/never', '0'.repeat(64)) { return error('changed base pin accepted') }
+	for options in [['--base-manifest-sha256=short'], ['--base-manifest-sha256=' + 'g'.repeat(64)],
+		['--base-manifest-sha256=' + base_pin, '--base-manifest-sha256=' + base_pin]] {
+		prepare_options(options) or { continue }
+		return error('invalid base pin option accepted')
+	}
+	if os.exists(state + '/never') || os.is_link(state + '/never') { return error('base admission created staging') }
+	os.write_file(state + '/result', 'PASS 32 checks including 19 refusals: final/intermediate absolute and relative guest links, escape/cycle/referral/link/staged mutations, streaming digest, restore, geometry, production disk boot arguments, foreground serial monitor escape, timeout/memory/scenario/quote controls, host-tool symlink retarget, optional/matching/mismatched/malformed/duplicate base manifest pin before staging\n')!
+	println('PERF X86 SELFCHECK PASS 32 checks including 19 refusals')
 }
 
 fn clonecheck(state string) ! {

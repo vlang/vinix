@@ -5,6 +5,43 @@ adapter. It requires a fresh prepared runtime with all six scenarios
 (`ops,churn,cache,idle,apps,drag`), the foreground `mon:stdio` QEMU mux,
 and an adapter executable matching the prepared input digest.
 
+It also owns a fixed `run-x86 prepare` operation. Preparation profiles name
+canonical `adapter`, `directory`, `base`, `kernel`, `desktop`, and fresh
+`prepared_state` paths, with `adapter_sha256`, `kernel_sha256`,
+`desktop_sha256`, `base_mode` (the complete lstat mode), and
+`base_manifest_sha256` pins. They select absolute canonical `compiler`,
+`qemu`, `firmware`, `cc`, `readelf`, `mkfs`, `xorriso`, `limine`, and `sdk`
+paths, and the same `charged_roots`, `input_roots`, `charged_limit_kib`,
+`timeout_seconds`, and `log_limit_bytes` fields. The preparation timeout is
+120..1800 seconds. Both fresh output states must be covered by charged roots
+and separate from each other and from every selected input tree.
+
+`admit-prepare NEW-STATE PROFILE.json` records a read-only selected input
+map for review, without scanning the base, staging a runtime or running a VM.
+Copy its `admission.json` `inputs_sha256` value into the reviewed profile.
+`prepare NEW-STATE PROFILE.json` requires that exact selected input map and
+runs the adapter under the foreground process owner and live budget watcher.
+The selected map excludes the profile file itself to avoid a digest fixed
+point; the complete before/after map separately binds the profile bytes and
+mode. Both operations record the fixed argv. Tool selection is typed, with
+fixed environment variable names and private compiler caches, rather than
+an arbitrary command or environment map.
+
+The fixed workload is `new=DESKTOP --scenarios=ops,churn,cache,idle,apps,drag
+--settle=3 --seconds=5 --rounds=1 --mem=3072 --timeout=2400`. Preparation
+requires APFS clones. The adapter inventories the complete base before
+creating the prepared destination, refuses a different approved manifest
+digest, and reuses those bytes as `base-before.tsv`. This literal manifest
+binds entry contents, modes, directories and link targets; it does not bind
+inode numbers, ownership or timestamps. The base root mode is pinned
+separately. Guest absolute links are never followed by the supervisor's
+host input inventory. Existing adapter verification still inventories the
+base and staged runtime after preparation. The owner checks the prepared
+receipt's exact roots, ordered arguments, storage mode, input pins,
+manifest digests and QEMU command before retaining `preparation.json`.
+Preparation does not execute QEMU. Its reviewed prepared receipt can then
+be used with the existing `run` profile below.
+
 The sourcecommand owner reserves the child leader with WNOWAIT, uses a
 private process group, and performs the sole raw i32 waitpid reap. One
 combined pipe preserves stdout/stderr ordering and enforces the output
@@ -71,9 +108,12 @@ completion-receipt cases without executing an adapter or QEMU. Each process
 case checks the log bound and retirement; the nonzero case checks exact
 stderr retention. The descendant case must time out because its inherited
 pipe prevents EOF after the leader exits.
+Eight additional preparation admission controls check the fixed argv and
+fresh charged outputs, with six refusals; these use fixture documents and
+paths and never execute an adapter.
 
 `qualify NEW-STATE COMPLETE-V` rebuilds normal and production binaries and
-runs all sixteen controls on each. It clears inherited tool selection,
+runs all twenty-four controls on each. It clears inherited tool selection,
 uses private temp/module/cache directories and `-nocache`, selects the
 inventoried absolute clang with an explicit SDKROOT, and charges the whole
 qualification state throughout. It retains source copies, generated C,
@@ -83,7 +123,7 @@ The installed loader and SDK dependency closure are not claimed hermetic.
 
 `qualify-adapter NEW-STATE COMPLETE-V` uses the same bounded compiler and
 input-inventory policy to build maintained `run-x86.v` in normal and
-production modes. Each build must pass its existing 26 selfcheck cases and
+production modes. Each build must pass its 32 selfcheck cases and
 18 clone controls; their receipts and executable hashes are retained. This
 mode does not stage a guest or run QEMU. `limitcheck NEW-STATE` checks actual
 budget admission at both accepted limits and refusal just outside them.
