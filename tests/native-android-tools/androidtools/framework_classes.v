@@ -99,6 +99,11 @@ pub fn write_framework_classes(smali string) ! {
  framework_account_authenticator_response(smali)!
  framework_account_authenticator_request(smali)!
  framework_account_authenticator_base(smali)!
+ framework_account_broker_context(smali)!
+ for name, text in framework_account_native_response_classes() {
+  os.mkdir_all(os.dir(smali + '/' + name + '.smali'))!
+  os.write_file(smali + '/' + name + '.smali', text)!
+ }
  framework_storage_queries(smali)!
  framework_startup_apis(smali)!
  framework_absent_hardware(smali)!
