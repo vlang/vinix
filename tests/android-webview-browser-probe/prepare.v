@@ -298,11 +298,11 @@ fn prepare() ! {
 		extract(cache + '/' + package.filename, root + '/runtime', mut files)!
 	}
 	os.write_file(root + '/addon-files.json', json2.encode(files, prettify: true) + '\n')!
-	for name in ['probe.v', 'session.v', 'prepare.v', 'packages.lock.json'] {
+	for name in ['probe.v', 'session.v', 'guest.v', 'collect.v', 'prepare.v', 'packages.lock.json'] {
 		os.cp(sources + '/' + name, root + '/sources/' + name)!
 	}
 	mut source_pins := map[string]string{}
-	for name in ['probe.v', 'session.v', 'prepare.v', 'packages.lock.json'] {
+	for name in ['probe.v', 'session.v', 'guest.v', 'collect.v', 'prepare.v', 'packages.lock.json'] {
 		source_pins[name] = hash(root + '/sources/' + name)!
 	}
 	revision := os.exec(['git', '-C', repo, 'rev-parse', 'HEAD'])
@@ -310,17 +310,16 @@ fn prepare() ! {
 	compiler_pin := hash(compiler)!
 	cross_compiler := '/opt/homebrew/bin/aarch64-linux-musl-gcc'
 	cross_compiler_pin := hash(cross_compiler)!
-	for name in ['probe', 'session'] {
+	for name in ['probe', 'session', 'guest'] {
 		mut argv := [compiler, '-os', 'linux', '-arch', 'arm64', '-cc',
 			cross_compiler, '-gc', 'none', '-prod']
 		// Xvfb invokes its compiled-in xkbcomp path without our musl loader.
-		// The session's scoped trampoline must therefore be a static executable.
-		if name == 'session' {
+		// The session trampoline and directly launched guest runner are static.
+		if name in ['session', 'guest'] {
 			argv << '-cflags'
 			argv << '-static'
 		}
-		argv << ['-o',
-			root + '/bin/' + if name == 'probe' { 'browser-probe' } else { 'browser-session' },
+		argv << ['-o', root + '/bin/browser-' + name,
 			root + '/sources/' + name + '.v']
 		command(root, 'build-' + name, argv)!
 	}
@@ -349,6 +348,7 @@ fn prepare() ! {
 		'cross_compiler_sha256':   json2.Any(cross_compiler_pin)
 		'probe_sha256':            json2.Any(hash(root + '/bin/browser-probe')!)
 		'session_sha256':          json2.Any(hash(root + '/bin/browser-session')!)
+		'guest_sha256':            json2.Any(hash(root + '/bin/browser-guest')!)
 		'scope':                   json2.Any('Pinned APK hashes and declared name/SONAME/exact-version dependency closure checked; original APK signatures not cryptographically verified. Separate real-engine diagnostic only, no Android integration or Google authentication proof.')
 	}, prettify: true) + '\n')!
 	println('BROWSER-PREPARE PASS packages=' + added.len.str() + ' archive-bytes=' + archive_bytes.str() + ' payload-files=' + files.len.str())
