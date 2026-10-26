@@ -106,6 +106,26 @@ pub fn (mut s Stream) flush() ! {
 
 pub fn (s &Stream) pending_output() bool { return s.queue.len > 0 }
 
+// A request intentionally half-closes its write side after one frame.
+// POLLIN/EOF is therefore not cancellation; a full peer hangup is.
+pub fn (s &Stream) peer_gone() bool {
+	if s.closed { return true }
+	mut ready := Poll{ fd: i32(s.fd) }
+	status := C.poll(voidptr(&ready), 1, 0)
+	if (status < 0 && C.errno != C.EINTR)
+		|| ready.revents & (C.POLLHUP | C.POLLERR | C.POLLNVAL) != 0 {
+		return true
+	}
+	// Darwin does not consistently report POLLHUP after the peer first used
+	// SHUT_WR. This probes its read half without adding wire bytes.
+	mut flags := i32(C.MSG_DONTWAIT)
+	$if linux {
+		flags |= C.MSG_NOSIGNAL
+	}
+	n := C.send(i32(s.fd), unsafe { nil }, 0, flags)
+	return n < 0 && C.errno !in [C.EINTR, C.EAGAIN, C.EWOULDBLOCK]
+}
+
 fn (mut s Stream) pump_read() !Packet {
 	for _ in 0 .. 16 {
 		if s.started != 0 && time.sys_mono_now() - s.started > 10 * time.second {

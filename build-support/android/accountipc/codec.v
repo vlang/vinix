@@ -18,6 +18,7 @@ pub enum Kind {
 	continued   = 5
 	dispatch    = 6
 	cancel      = 7
+	launch      = 8
 }
 
 pub struct Header {
@@ -35,11 +36,12 @@ pub:
 
 pub struct Event {
 pub:
-	kind       Kind
-	id         u64
-	capability []u8
-	options    []nativeaccountauth.Option
-	accounts   []Account
+	kind        Kind
+	id          u64
+	capability  []u8
+	options     []nativeaccountauth.Option
+	accounts    []Account
+	interaction Interaction
 }
 
 pub struct Command {
@@ -179,7 +181,8 @@ fn (mut r Reader) scalar() !nativeaccountauth.Scalar {
 }
 
 pub fn encode_header(header Header) ![]u8 {
-	if header.kind !in [.result, .failure, .accounts, .interaction, .continued, .dispatch, .cancel]
+	if header.kind !in [.result, .failure, .accounts, .interaction, .continued, .dispatch, .cancel,
+		.launch]
 		|| header.session == 0 || header.length < 0 || header.length > max_payload {
 		return error('invalid account IPC header')
 	}
@@ -202,7 +205,7 @@ pub fn decode_header(bytes []u8) !Header {
 	mut r := Reader{ bytes: bytes, index: 4 }
 	if r.number(2)! != 1 { return error('unsupported account IPC version') }
 	kind := r.number(2)!
-	if kind < 1 || kind > 7 { return error('unknown account IPC event kind') }
+	if kind < 1 || kind > 8 { return error('unknown account IPC event kind') }
 	session := r.number(8)!
 	length := r.number(4)!
 	if session == 0 || length > max_payload { return error('invalid account IPC bound') }
@@ -223,6 +226,9 @@ pub fn terminal(kind Kind) bool { return kind in [.result, .failure, .accounts] 
 pub fn encode_event(event Event, service bool) ![]u8 {
 	if event.kind !in [.result, .failure, .accounts, .interaction, .continued, .cancel] {
 		return error('not an account result event')
+	}
+	if event.kind != .interaction && !empty_interaction(event.interaction) {
+		return error('unexpected account interaction fields')
 	}
 	mut body := []u8{cap: max_payload}
 	defer { unsafe { body.free() } }
@@ -258,7 +264,12 @@ pub fn encode_event(event Event, service bool) ![]u8 {
 				string_bytes(mut body, account.account_type)!
 			}
 		}
-		.interaction { return error('account interaction object transport is not implemented') }
+		.interaction {
+			if event.options.len != 0 || event.accounts.len != 0 {
+				return error('unexpected account interaction result fields')
+			}
+			interaction_bytes(mut body, event.interaction, service)!
+		}
 		.continued, .cancel {
 			if event.options.len != 0 || event.accounts.len != 0 {
 				return error('unexpected account event fields')
@@ -270,17 +281,19 @@ pub fn encode_event(event Event, service bool) ![]u8 {
 }
 
 pub fn decode_event(header Header, bytes []u8, service bool) !Event {
-	if bytes.len != header.length || bytes.len > max_payload || header.kind == .dispatch {
+	if bytes.len != header.length || bytes.len > max_payload || header.session == 0
+		|| header.kind !in [.result, .failure, .accounts, .interaction, .continued, .cancel] {
 		return error('invalid account event body')
 	}
 	mut r := Reader{ bytes: bytes }
 	capability := if service { r.take(32)! } else { []u8{} }
 	mut options := []nativeaccountauth.Option{}
 	mut accounts := []Account{cap: 256}
+	mut interaction := Interaction{}
 	mut complete := false
 	defer {
 		if !complete {
-			dispose_event(Event{ capability: capability, options: options, accounts: accounts })
+			dispose_event(Event{ capability: capability, options: options, accounts: accounts, interaction: interaction })
 		}
 	}
 	match header.kind {
@@ -324,13 +337,13 @@ pub fn decode_event(header Header, bytes []u8, service bool) !Event {
 				accounts << Account{name, account_type}
 			}
 		}
-		.interaction { return error('account interaction object transport is not implemented') }
+		.interaction { interaction = r.interaction(service)! }
 		.continued, .cancel {}
 		else { return error('invalid account event kind') }
 	}
 	if r.index != bytes.len { return error('trailing account event fields') }
 	complete = true
-	return Event{header.kind, header.session, capability, options, accounts}
+	return Event{ kind: header.kind, id: header.session, capability: capability, options: options, accounts: accounts, interaction: interaction }
 }
 
 fn valid_caller(caller nativeaccountauth.Caller) ! {
@@ -424,6 +437,7 @@ pub fn dispose_event(event Event) {
 		}
 	}
 	unsafe { event.accounts.free() }
+	dispose_interaction(event.interaction)
 }
 
 pub fn dispose_command(command Command) {
