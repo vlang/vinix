@@ -867,6 +867,21 @@ fn registry_matches(text string, pins map[string]string) ! {
 	if seen.len != 2 { return error('registry package set differs') }
 }
 
+fn required_deployment_inputs(pins map[string]string) ! {
+	for path in [controller_path, '/usr/bin/run-android-calculator', maps_apk, gms_apk, registry_path,
+		launcher_path, broker_path, helper_path,
+		runtime_root + '/usr/lib/art/libvinix-android-native.so',
+		runtime_root + '/usr/lib/libvinix-android-account.so',
+		runtime_root + '/usr/lib/libvinix-android-browser.so',
+		runtime_root + '/usr/lib/libsqlite3.so.0',
+		runtime_root + '/usr/lib/java/dex/android_translation_layer/api-impl.jar',
+		runtime_root + '/usr/lib/java/dex/android_translation_layer/classes.dex'] {
+		if path !in pins {
+			return error('required deployment input absent: ' + path)
+		}
+	}
+}
+
 fn build_inputs(harden bool) !Build {
 	build_path := bundle_root + '/build.json'
 	deployment_input(build_path)!
@@ -877,20 +892,10 @@ fn build_inputs(harden bool) !Build {
 	build := json2.decode[Build](os.read_file(build_path)!)!
 	if build.kind != 'vinix-maps-account-deployment-v1' || build.format != 1
 		|| build.runtime_root != runtime_root || build.maps_uid != 10012 || build.gms_uid != 10013
-		|| build.inputs_sha256.len < 13 || build.inputs_sha256.len > 20032 {
+		|| build.inputs_sha256.len < 14 || build.inputs_sha256.len > 20032 {
 		return error('deployment receipt identity differs')
 	}
-	for path in [controller_path, '/usr/bin/run-android-calculator', maps_apk, gms_apk, registry_path,
-		launcher_path, broker_path, helper_path,
-		runtime_root + '/usr/lib/art/libvinix-android-native.so',
-		runtime_root + '/usr/lib/libvinix-android-account.so',
-		runtime_root + '/usr/lib/libsqlite3.so.0',
-		runtime_root + '/usr/lib/java/dex/android_translation_layer/api-impl.jar',
-		runtime_root + '/usr/lib/java/dex/android_translation_layer/classes.dex'] {
-		if path !in build.inputs_sha256 {
-			return error('required deployment input absent: ' + path)
-		}
-	}
+	required_deployment_inputs(build.inputs_sha256)!
 	for path, pin in build.inputs_sha256 {
 		if !valid_pin(pin) { return error('invalid deployment digest') }
 		deployment_input(path)!
@@ -1575,9 +1580,39 @@ fn browser_init_self_test() ! {
 	}
 }
 
+fn required_deployment_inputs_self_test() ! {
+	mut complete := map[string]string{}
+	for path in [controller_path, '/usr/bin/run-android-calculator', maps_apk, gms_apk,
+		registry_path, launcher_path, broker_path, helper_path,
+		runtime_root + '/usr/lib/art/libvinix-android-native.so',
+		runtime_root + '/usr/lib/libvinix-android-account.so', sqlite_path,
+		runtime_root + '/usr/lib/java/dex/android_translation_layer/api-impl.jar',
+		runtime_root + '/usr/lib/java/dex/android_translation_layer/classes.dex',
+		runtime_root + '/usr/lib/libvinix-android-browser.so'] {
+		complete[path] = 'a'.repeat(64)
+	}
+	required_deployment_inputs(complete)!
+	browser := runtime_root + '/usr/lib/libvinix-android-browser.so'
+	mut missing := complete.clone()
+	missing.delete(browser)
+	for replacement in ['', '/usr/lib/libvinix-android-browser.so',
+		runtime_root + '/usr/lib/art/libvinix-android-browser.so'] {
+		mut invalid := missing.clone()
+		if replacement != '' { invalid[replacement] = 'a'.repeat(64) }
+		if _ := required_deployment_inputs(invalid) {
+			return error('deployment accepted a missing/substituted browser client')
+		} else {
+			if err.msg() != 'required deployment input absent: ' + browser {
+				return error('deployment did not identify the missing browser client')
+			}
+		}
+	}
+}
+
 fn self_test() ! {
 	auth_init_self_test()!
 	browser_init_self_test()!
+	required_deployment_inputs_self_test()!
 	protected_directory_self_test()!
 	sqlite_self_test()!
 	if !canonical_absolute('/opt/maps/app.apk') || canonical_absolute('/opt/../maps/app.apk')
@@ -1635,7 +1670,7 @@ fn self_test() ! {
 			return error('stale stop request accepted')
 		}
 	}
-	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths protected-directory-symlink-and-mode-rejection process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation bounded-numeric-auth-diagnostics bounded-numeric-browser-diagnostics')
+	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths protected-directory-symlink-and-mode-rejection process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation bounded-numeric-auth-diagnostics bounded-numeric-browser-diagnostics mandatory-browser-client')
 }
 
 fn main() {
