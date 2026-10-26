@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// ART behavior probe for token overloads. Synthetic result data is confined to
-// a subclass; run with VINIX_ANDROID_ACCOUNT_SOCKET naming a nonexistent socket
-// so the production AccountManager exercises immediate no-backend failure.
+// ART behavior probes. Main uses a synthetic subclass and a nonexistent broker.
+// Optional cache Service/Client use the selected authenticator's real SQLite
+// cache and broker with fixture values. Neither probe uses Google credentials.
 module main
 
 import crypto.sha256
@@ -13,6 +13,13 @@ const probe = 'Lorg/vinix/bootstrap/TokenManagerProbe;'
 const manager = 'Landroid/accounts/AccountManager;'
 const future = 'Landroid/accounts/AccountManagerFuture;'
 const pending = 'Landroid/atl/VinixAccountFuture;'
+const cache_service = 'Lorg/vinix/bootstrap/TokenCacheService;'
+const cache_client = 'Lorg/vinix/bootstrap/TokenCacheClient;'
+const cache_type = 'org.vinix.fixture.account'
+const cache_ready = 'ACCOUNT-TOKEN-CACHE-READY owner null-empty exact-invalidation password-clear'
+const cache_pass = 'ACCOUNT-TOKEN-CACHE-PASS broker-invalidation exact-multiaccount preserved-other-value'
+const cache_persist = 'ACCOUNT-TOKEN-CACHE-PERSIST-PASS cleared-token preserved-other-value'
+const cache_client_pass = 'ACCOUNT-TOKEN-CACHE-CLIENT-PASS owner-denied null-type null-token synchronous-broker-ack'
 const activity = 'getAuthToken(Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;Landroid/app/Activity;Landroid/accounts/AccountManagerCallback;Landroid/os/Handler;)${future}'
 const boolean = 'getAuthToken(Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;ZLandroid/accounts/AccountManagerCallback;Landroid/os/Handler;)${future}'
 const deprecated = 'getAuthToken(Landroid/accounts/Account;Ljava/lang/String;ZLandroid/accounts/AccountManagerCallback;Landroid/os/Handler;)${future}'
@@ -96,6 +103,82 @@ if-eqz v0, :bad
 :done
 return-void
 ' + failure('unavailable or notification error'), 2)
+}
+
+fn marker(value string) string {
+	return 'sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v1, "${value}"\ninvoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\ninvoke-virtual {v0}, Ljava/io/PrintStream;->flush()V\n'
+}
+
+fn cache_accounts() string {
+	return 'new-instance v1, Landroid/accounts/Account;\nconst-string v3, "cache-first"\nconst-string v4, "${cache_type}"\ninvoke-direct {v1, v3, v4}, Landroid/accounts/Account;-><init>(Ljava/lang/String;Ljava/lang/String;)V\nnew-instance v2, Landroid/accounts/Account;\nconst-string v3, "cache-second"\ninvoke-direct {v2, v3, v4}, Landroid/accounts/Account;-><init>(Ljava/lang/String;Ljava/lang/String;)V\n'
+}
+
+fn cache_set(account string, key string, value ?string) string {
+	return 'const-string v3, "${key}"\n' + if text := value { 'const-string v4, "${text}"\n' } else { 'const/4 v4, 0\n' } +
+		'invoke-virtual {v0, ${account}, v3, v4}, ${manager}->setAuthToken(Landroid/accounts/Account;Ljava/lang/String;Ljava/lang/String;)V\n'
+}
+
+fn cache_expect(account string, key string, value ?string) string {
+	mut body := 'const-string v3, "${key}"\ninvoke-virtual {v0, ${account}, v3}, ${manager}->peekAuthToken(Landroid/accounts/Account;Ljava/lang/String;)Ljava/lang/String;\nmove-result-object v5\n'
+	if text := value {
+		body += 'const-string v4, "${text}"\ninvoke-virtual {v4, v5}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\nmove-result v5\nif-eqz v5, :bad\n'
+	} else { body += 'if-nez v5, :bad\n' }
+	return body
+}
+
+fn cache_service_class() string {
+	mut source := '.class public final ${cache_service}\n.super Landroid/app/Service;\n.implements Ljava/lang/Runnable;\n.field private handler:Landroid/os/Handler;\n.field private attempts:I\n'
+	source += method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/app/Service;-><init>()V\nreturn-void', 0)
+	mut create := 'invoke-super {p0}, Landroid/app/Service;->onCreate()V\ninvoke-static {p0}, ${manager}->get(Landroid/content/Context;)${manager}\nmove-result-object v0\n' + cache_accounts()
+	create += 'const/4 v3, 0\ninvoke-virtual {v0, v1, v3, v3}, ${manager}->addAccountExplicitly(Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;)Z\nmove-result v5\nif-nez v5, :fresh\nconst-string v3, "cache-phase"\ninvoke-virtual {v0, v1, v3}, ${manager}->getUserData(Landroid/accounts/Account;Ljava/lang/String;)Ljava/lang/String;\nmove-result-object v5\nconst-string v4, "complete"\ninvoke-virtual {v4, v5}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\nmove-result v5\nif-eqz v5, :bad\n' + cache_expect('v1', 'broker', none) + cache_expect('v2', 'broker', none) + cache_expect('v2', 'keep', 'different-fixture-value') + marker(cache_persist) + 'return-void\n:fresh\n'
+	create += 'const/4 v3, 0\ninvoke-virtual {v0, v2, v3, v3}, ${manager}->addAccountExplicitly(Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;)Z\nmove-result v5\nif-eqz v5, :bad\n'
+	// Null account and token type must fail before any database mutation.
+	for index in 0 .. 4 {
+		create += 'const-string v3, "null-check"\nconst/4 v4, 0\n:null_cache_${index}_start\n'
+		create += match index {
+			0 { 'invoke-virtual {v0, v4, v3}, ${manager}->peekAuthToken(Landroid/accounts/Account;Ljava/lang/String;)Ljava/lang/String;\n' }
+			1 { 'invoke-virtual {v0, v1, v4}, ${manager}->peekAuthToken(Landroid/accounts/Account;Ljava/lang/String;)Ljava/lang/String;\n' }
+			2 { 'invoke-virtual {v0, v4, v3, v4}, ${manager}->setAuthToken(Landroid/accounts/Account;Ljava/lang/String;Ljava/lang/String;)V\n' }
+			else { 'invoke-virtual {v0, v1, v4, v3}, ${manager}->setAuthToken(Landroid/accounts/Account;Ljava/lang/String;Ljava/lang/String;)V\n' }
+		}
+		create += ':null_cache_${index}_end\ngoto :bad\n.catch Ljava/lang/IllegalArgumentException; {:null_cache_${index}_start .. :null_cache_${index}_end} :null_cache_${index}_caught\n:null_cache_${index}_caught\nmove-exception v5\n'
+	}
+	create += cache_set('v1', 'nullable', 'fixture-value') + cache_expect('v1', 'nullable', 'fixture-value') + cache_set('v1', 'nullable', none) + cache_expect('v1', 'nullable', none)
+	create += cache_set('v1', 'empty', '') + cache_set('v2', 'empty', '') + cache_set('v2', 'keep', 'different-fixture-value')
+	create += 'const-string v3, "${cache_type}"\nconst/4 v4, 0\ninvoke-virtual {v0, v3, v4}, ${manager}->invalidateAuthToken(Ljava/lang/String;Ljava/lang/String;)V\n' + cache_expect('v1', 'empty', '')
+	create += 'const-string v3, "${cache_type}"\nconst-string v4, ""\ninvoke-virtual {v0, v3, v4}, ${manager}->invalidateAuthToken(Ljava/lang/String;Ljava/lang/String;)V\n' + cache_expect('v1', 'empty', none) + cache_expect('v2', 'empty', none) + cache_expect('v2', 'keep', 'different-fixture-value')
+	for operation in ['setPassword', 'clearPassword'] {
+		create += cache_set('v1', 'password-cleared', 'fixture-value')
+		create += if operation == 'setPassword' { 'const-string v3, "fixture-password"\ninvoke-virtual {v0, v1, v3}, ${manager}->setPassword(Landroid/accounts/Account;Ljava/lang/String;)V\n' } else { 'invoke-virtual {v0, v1}, ${manager}->clearPassword(Landroid/accounts/Account;)V\n' }
+		create += 'invoke-virtual {v0, v1}, ${manager}->getPassword(Landroid/accounts/Account;)Ljava/lang/String;\nmove-result-object v5\n'
+		create += if operation == 'setPassword' { 'const-string v4, "fixture-password"\ninvoke-virtual {v4, v5}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\nmove-result v5\nif-eqz v5, :bad\n' } else { 'if-nez v5, :bad\n' }
+		create += cache_expect('v1', 'password-cleared', none) + cache_expect('v2', 'keep', 'different-fixture-value')
+	}
+	create += cache_set('v1', 'broker', 'broker-fixture-value') + cache_set('v2', 'broker', 'broker-fixture-value')
+	create += 'new-instance v6, Landroid/os/Handler;\ninvoke-direct {v6}, Landroid/os/Handler;-><init>()V\niput-object v6, p0, ${cache_service}->handler:Landroid/os/Handler;\n' + marker(cache_ready)
+	create += 'iget-object v6, p0, ${cache_service}->handler:Landroid/os/Handler;\nconst-wide/16 v3, 100\ninvoke-virtual {v6, p0, v3, v4}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z\nreturn-void\n' + failure('cache owner/null/empty/password')
+	source += method('public onCreate()V', create, 7)
+	source += method('public onBind(Landroid/content/Intent;)Landroid/os/IBinder;', 'new-instance v0, Landroid/os/Binder;\ninvoke-direct {v0}, Landroid/os/Binder;-><init>()V\nconst/4 v1, 0\nconst-string v2, "org.vinix.bootstrap.TokenCacheService"\ninvoke-virtual {v0, v1, v2}, Landroid/os/Binder;->attachInterface(Landroid/os/IInterface;Ljava/lang/String;)V\nreturn-object v0', 3)
+	mut run := 'invoke-static {p0}, ${manager}->get(Landroid/content/Context;)${manager}\nmove-result-object v0\n' + cache_accounts()
+	run += 'const-string v3, "broker"\ninvoke-virtual {v0, v1, v3}, ${manager}->peekAuthToken(Landroid/accounts/Account;Ljava/lang/String;)Ljava/lang/String;\nmove-result-object v5\nif-nez v5, :waiting\n' + cache_expect('v2', 'broker', none) + cache_expect('v2', 'keep', 'different-fixture-value')
+	run += 'const-string v3, "cache-phase"\nconst-string v4, "complete"\ninvoke-virtual {v0, v1, v3, v4}, ${manager}->setUserData(Landroid/accounts/Account;Ljava/lang/String;Ljava/lang/String;)V\n' + marker(cache_pass) + 'return-void\n:waiting\niget v5, p0, ${cache_service}->attempts:I\nadd-int/lit8 v5, v5, 1\niput v5, p0, ${cache_service}->attempts:I\nconst/16 v6, 600\nif-ge v5, v6, :bad\niget-object v6, p0, ${cache_service}->handler:Landroid/os/Handler;\nconst-wide/16 v3, 100\ninvoke-virtual {v6, p0, v3, v4}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z\nreturn-void\n' + failure('cache broker completion deadline')
+	source += method('public run()V', run, 7)
+	return source
+}
+
+fn cache_client_class() string {
+	mut source := '.class public final ${cache_client}\n.super Landroid/app/Activity;\n.implements Ljava/lang/Runnable;\n'
+	source += method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/app/Activity;-><init>()V\nreturn-void', 0)
+	source += method('public onCreate(Landroid/os/Bundle;)V', 'invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V\nnew-instance v0, Ljava/lang/Thread;\ninvoke-direct {v0, p0}, Ljava/lang/Thread;-><init>(Ljava/lang/Runnable;)V\ninvoke-virtual {v0}, Ljava/lang/Thread;->start()V\nreturn-void', 1)
+	mut run := 'invoke-static {p0}, ${manager}->get(Landroid/content/Context;)${manager}\nmove-result-object v0\n' + cache_accounts()
+	for index in 0 .. 2 {
+		run += 'const-string v3, "broker"\nconst-string v4, "forbidden-write"\n:owner_${index}_start\n'
+		run += if index == 0 { 'invoke-virtual {v0, v1, v3}, ${manager}->peekAuthToken(Landroid/accounts/Account;Ljava/lang/String;)Ljava/lang/String;\n' } else { 'invoke-virtual {v0, v1, v3, v4}, ${manager}->setAuthToken(Landroid/accounts/Account;Ljava/lang/String;Ljava/lang/String;)V\n' }
+		run += ':owner_${index}_end\ngoto :bad\n.catch Ljava/lang/SecurityException; {:owner_${index}_start .. :owner_${index}_end} :owner_${index}_caught\n:owner_${index}_caught\nmove-exception v5\n'
+	}
+	run += 'const/4 v3, 0\nconst/4 v4, 0\n:null_kind_start\ninvoke-virtual {v0, v3, v4}, ${manager}->invalidateAuthToken(Ljava/lang/String;Ljava/lang/String;)V\n:null_kind_end\ngoto :bad\n.catch Ljava/lang/IllegalArgumentException; {:null_kind_start .. :null_kind_end} :null_kind_caught\n:null_kind_caught\nmove-exception v5\nconst-string v3, "${cache_type}"\ninvoke-virtual {v0, v3, v4}, ${manager}->invalidateAuthToken(Ljava/lang/String;Ljava/lang/String;)V\nconst-string v4, "broker-fixture-value"\ninvoke-virtual {v0, v3, v4}, ${manager}->invalidateAuthToken(Ljava/lang/String;Ljava/lang/String;)V\n' + marker(cache_client_pass) + 'return-void\n' + failure('cache client owner/null/broker')
+	source += method('public run()V', run, 6)
+	return source
 }
 
 fn worker() string {
@@ -227,9 +310,15 @@ return-void
 	return source
 }
 
-fn checked(args []string) {
+fn recorded(out string, name string, args []string) string {
 	r := os.exec(args)
+	os.write_file(out + '/commands/' + name + '.json', json2.encode({
+		'argv': json2.Any(args)
+		'exit_code': json2.Any(r.exit_code)
+		'output': json2.Any(r.output)
+	}, prettify: true) + '\n') or { panic(err) }
 	if r.exit_code != 0 { panic(r.output) }
+	return r.output
 }
 
 fn inventory(root string, relative string, mut pins map[string]string) ! {
@@ -247,27 +336,52 @@ fn inventory(root string, relative string, mut pins map[string]string) ! {
 }
 
 fn main() {
-	if os.args.len != 6 { panic('OUTPUT FIXTURE_DIR SMALI_TOOLS JAVA APKSIGNER') }
+	if os.args.len !in [6, 8] { panic('OUTPUT FIXTURE_DIR SMALI_TOOLS JAVA APKSIGNER [AAPT2 FRAMEWORK_RES]') }
 	out, fixture := os.abs_path(os.args[1]), os.abs_path(os.args[2])
 	tools, java, signer := os.real_path(os.args[3]), os.real_path(os.args[4]), os.real_path(os.args[5])
 	repo := os.real_path(os.dir(@FILE) + '/../..')
 	if os.exists(out) || out == repo || out.starts_with(repo + '/') { panic('fresh external output required') }
 	root := out + '/smali/org/vinix/bootstrap'
 	os.mkdir_all(root)!
+	os.mkdir_all(out + '/commands')!
 	os.write_file(root + '/Main.smali', main_class())!
 	os.write_file(root + '/TokenManagerProbe.smali', probe_class())!
+	os.write_file(root + '/TokenCacheService.smali', cache_service_class())!
+	os.write_file(root + '/TokenCacheClient.smali', cache_client_class())!
 	for name in ['App', 'High', 'Low'] {
 		os.cp(fixture + '/smali/org/vinix/bootstrap/' + name + '.smali', root + '/' + name + '.smali')!
 	}
 	dex := out + '/classes.dex'
-	checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', '--jobs', '2', out + '/smali', '-o', dex])
+	assembly := recorded(out, 'assemble', [java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', '--jobs', '2', out + '/smali', '-o', dex])
+	if assembly.trim_space() != '' { panic('unexpected assembler diagnostics: ' + assembly) }
 	assert os.is_file(dex)
-	os.cp(fixture + '/unsigned.apk', out + '/unsigned.apk')!
-	checked(['zip', '-q', '-j', out + '/unsigned.apk', dex])
-	checked([java, '-jar', signer, 'sign', '--ks', fixture + '/fixture.p12', '--ks-key-alias', 'fixture', '--ks-pass', 'pass:android', '--key-pass', 'pass:android', '--out', out + '/probe.apk', out + '/unsigned.apk'])
+	if os.args.len == 8 {
+		aapt, resources := os.real_path(os.args[6]), os.real_path(os.args[7])
+		original := os.read_file(fixture + '/AndroidManifest.xml')!
+		if original.count('</application>') != 1 { panic('fixture application manifest anchor') }
+		components := '<service android:name="org.vinix.bootstrap.TokenCacheService" android:enabled="true" android:exported="true"><intent-filter><action android:name="org.vinix.bootstrap.TOKEN_CACHE"/></intent-filter></service><activity android:name="org.vinix.bootstrap.TokenCacheClient" android:exported="true"/>'
+		os.write_file(out + '/AndroidManifest.xml', original.replace('</application>', components + '</application>'))!
+		os.mkdir_all(out + '/res/values')!
+		os.write_file(out + '/res/values/values.xml', '<resources><string name="fixture_name">Account token fixture</string></resources>')!
+		recorded(out, 'compile-resources', [aapt, 'compile', '--dir', out + '/res', '-o', out + '/resources.zip'])
+		recorded(out, 'link-resources', [aapt, 'link', '-I', resources, out + '/resources.zip', '--manifest', out + '/AndroidManifest.xml', '-o', out + '/unsigned.apk'])
+	} else { os.cp(fixture + '/unsigned.apk', out + '/unsigned.apk')! }
+	recorded(out, 'zip', ['zip', '-q', '-j', out + '/unsigned.apk', dex])
+	recorded(out, 'sign', [java, '-jar', signer, 'sign', '--ks', fixture + '/fixture.p12', '--ks-key-alias', 'fixture', '--ks-pass', 'pass:android', '--key-pass', 'pass:android', '--out', out + '/probe.apk', out + '/unsigned.apk'])
+	verification := recorded(out, 'verify', [java, '-jar', signer, 'verify', '--verbose', out + '/probe.apk'])
+	if !verification.contains('Verified using v3 scheme (APK Signature Scheme v3): true') { panic('APK v3 signature verification missing') }
 	mut inputs := map[string]json2.Any{}
 	for path in [@FILE, os.executable(), fixture + '/unsigned.apk', fixture + '/fixture.p12', java, signer] {
 		inputs[os.real_path(path)] = json2.Any(sha256.sum(os.read_bytes(path)!).hex())
+	}
+	if os.args.len == 8 {
+		for path in [fixture + '/AndroidManifest.xml', os.args[6], os.args[7]] {
+			inputs[os.real_path(path)] = json2.Any(sha256.sum(os.read_bytes(path)!).hex())
+		}
+		manifest_dump := recorded(out, 'manifest', [os.real_path(os.args[6]), 'dump', 'xmltree', out + '/probe.apk', '--file', 'AndroidManifest.xml'])
+		for component in ['org.vinix.bootstrap.TokenCacheService', 'org.vinix.bootstrap.TokenCacheClient', 'org.vinix.bootstrap.TOKEN_CACHE'] {
+			if !manifest_dump.contains(component) { panic('compiled manifest missing ' + component) }
+		}
 	}
 	for directory in [tools, root] {
 		for name in os.ls(directory)! {
@@ -286,7 +400,13 @@ fn main() {
 		'inputs_sha256': json2.Any(inputs)
 		'apk_sha256': json2.Any(sha256.sum(os.read_bytes(out + '/probe.apk')!).hex())
 		'pass_marker': json2.Any(pass_marker)
-		'scope': json2.Any('synthetic subclass tests public overload delegation; production instance tests no-backend failure; run with VINIX_ANDROID_ACCOUNT_SOCKET set to a nonexistent socket; no credentials/network; APK assembly is not ART execution')
+		'cache_service': json2.Any('org.vinix.bootstrap.TokenCacheService')
+		'cache_client': json2.Any('org.vinix.bootstrap.TokenCacheClient')
+		'cache_action': json2.Any('org.vinix.bootstrap.TOKEN_CACHE')
+		'cache_account_type': json2.Any(cache_type)
+		'cache_markers': json2.Any([cache_ready, cache_client_pass, cache_pass, cache_persist])
+		'cache_manifest': json2.Any(os.args.len == 8)
+		'scope': json2.Any('Main: synthetic subclass overloads and production no-backend errors, nonexistent socket required. Optional TokenCacheService: selected authenticator with authenticated root channel and fresh data directory; real JNI/SQLite fixture cache values only. TokenCacheClient: normal app using real broker socket after service READY. Restart service with same data directory for persistence marker. No Google credentials/network; APK assembly is not ART execution.')
 	}, prettify: true) + '\n')!
 	os.cp(@FILE, out + '/builder.v')!
 	os.cp(os.executable(), out + '/builder')!
