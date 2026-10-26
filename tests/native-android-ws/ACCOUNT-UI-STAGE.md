@@ -55,3 +55,27 @@ run `/opt/vinix-account-ui/bin/account-ui-guest` as root. Collect the strict
 The checked collector SHA-256 is
 `357edf19436ac0f905b2fab4ceb000937e821447fbc48cba7ddcb16660771578`.
 Frame ordering, transfer digests and archive inventory remain mandatory.
+
+Fresh staging completed with exit zero from source `ca13b0838` at
+`/Users/alex/.local/state/vinix/android/account-ui-stage-2026-10-26-r2`.
+Its `stage.json` SHA-256 is
+`a7c8a08157f32595491863bf6bb2a86c370a79bb644d6bc681194547f60b0ecb`;
+the complete `sha256.json` inventory is
+`f5def88d6933a888f81b8a816788dbd28c38ca89523cc8417d074bfd1d1a624b`.
+The baseline was the unbooted `headless-stage-r4-2026-10-26`, receipt
+`7448a177792eaba0a5555dd35ada0efefd790afd4b863def3647362c23c65559`.
+All six original modules passed unchanged hash checks and overlay readback.
+Guest execution remains a separate root-owned check.
+
+This run used `build/android-maps/account-ui-stage-r4`, SHA-256
+`f5b9cda90a51c60394414a03b760ca1890a3a6bc026d9d0976fb7213a6e5a6f2`.
+It retains compiled stage source
+`1c6b73a6d60e9d3d8bd904c4200de0ac95942fdcc5128c3e4af813c75b73acfb`
+and guest binary
+`253c6daefdd308c9dc8c7f597c5615b659e5323aeccd2e15f51aa98e9e6f0056`.
+The earlier `account-ui-stage-2026-10-26-r1` remains preserved after its
+120-second compiler deadline. The revised runner gives guest compilation
+a separate 900-second bound and retains timeout receipts. Its targeted
+deadline rejection check passed at `account-ui-deadline-check-2026-10-26-r1`,
+receipt SHA-256
+`c08df6271bb4300425b7c25753517fcb234e45d2c712c3b8d7daea53efed79db`.
