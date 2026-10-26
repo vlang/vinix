@@ -292,7 +292,7 @@ fn objc_responds(object u64, selector &char) bool {
 	if objc_is_kind(object, ios_runtime.names['NSBundle']) && name == 'appStoreReceiptURL' { return true }
 	if objc_is_kind(object, ios_runtime.names['NSOperationQueue']) { return name in ['name', 'setName:', 'maxConcurrentOperationCount', 'setMaxConcurrentOperationCount:'] }
 	if objc_is_kind(object, ios_runtime.names['CLLocationManager']) { return name in ['delegate', 'setDelegate:'] }
-	if objc_is_kind(object, ios_runtime.names['UIApplication']) { return name in ['delegate', 'setDelegate:', 'applicationState', 'isIdleTimerDisabled', 'setIdleTimerDisabled:'] }
+	if objc_is_kind(object, ios_runtime.names['UIApplication']) { return name in ['delegate', 'setDelegate:', 'applicationState', 'isIdleTimerDisabled', 'setIdleTimerDisabled:', 'applicationIconBadgeNumber', 'setApplicationIconBadgeNumber:'] }
 	if objc_is_kind(object, ios_runtime.names['UIViewController']) {
 		return name in ['preferredScreenEdgesDeferringSystemGestures', 'prefersHomeIndicatorAutoHidden',
 			'setNeedsUpdateOfScreenEdgesDeferringSystemGestures', 'setNeedsUpdateOfHomeIndicatorAutoHidden',
@@ -316,6 +316,12 @@ fn scene_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 			'delegate' { frame.x[0] = obj_header(object).fields[0] }
 			'setDelegate:' { store_field(object, 0, frame.x[2]) }
 			'applicationState' { frame.x[0] = 0 } // This runner owns one active foreground window.
+			'applicationIconBadgeNumber' { frame.x[0] = 0 }
+			'setApplicationIconBadgeNumber:' {
+				// There is no launcher badge backend. Clearing an absent badge is
+				// supported; never claim to display a requested nonzero count.
+				if frame.x[2] != 0 { panic('iOS: application icon badge count ${i64(frame.x[2])} requires a badge backend') }
+			}
 			'isIdleTimerDisabled' { frame.x[0] = u64(obj_header(object).idle_timer_disabled) }
 			'setIdleTimerDisabled:' { obj_header(object).idle_timer_disabled = frame.x[2] != 0 }
 			else { return false }

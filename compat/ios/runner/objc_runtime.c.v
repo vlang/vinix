@@ -84,6 +84,10 @@ fn C.ios_objc_builtin()
 fn objc_builtin_types(cls u64, selector string) ?string {
 	info := ios_runtime.classes[cls] or { return none }
 	if info.name == 'NSBundle' && !info.meta && selector == 'appStoreReceiptURL' { return '@16@0:8' }
+	if info.name == 'UIApplication' && !info.meta {
+		if selector == 'applicationIconBadgeNumber' { return 'q16@0:8' }
+		if selector == 'setApplicationIconBadgeNumber:' { return 'v24@0:8q16' }
+	}
 	if types := snapshot_configuration_types(info.name, info.meta, selector) { return types }
 	if types := match_request_types(info.name, info.meta, selector) { return types }
 	if types := achievement_types(info.name, info.meta, selector) { return types }

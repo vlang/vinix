@@ -27,8 +27,8 @@ fn run_host_fixture(root string, old string, out string, fixture string) ! {
 	os.write_file(bundle + "/Info.plist", "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>org.vinix.notification-checks</string><key>CFBundleExecutable</key><string>center-host</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>")!
 	binary := bundle + "/MacOS/center-host"
 	run(out, 'host-generate', [old + '/v', '-enable-globals', '-nocache', '-gc', 'none', '-cc', 'clang', '-d', 'ios_video', '-d', 'ios_cxx', '-d', 'ios_sqlite', '-os', 'macos', '-arch', 'arm64', '-path', '@vlib|' + root + '/compat/ios|@vmodules', '-o', cfile, root + '/compat/ios/runner/' + fixture], false)
-	// The shared alert fixture also loads native UIKit, which requires Catalyst.
-	target := if fixture == 'ui_alert_test.v' { ['-target', 'arm64-apple-ios14.0-macabi'] } else { []string{} }
+	// Shared UIKit fixtures require Catalyst for native comparisons.
+	target := if fixture in ['ui_alert_test.v', 'ui_application_badge_test.v'] { ['-target', 'arm64-apple-ios14.0-macabi'] } else { []string{} }
 	mut tls_cc := ['/usr/bin/clang', '-fsanitize=address,undefined', '-fno-omit-frame-pointer']
 	tls_cc << target
 	tls := tlsbuild.build(root, old, out + '/payload', tls_cc)
@@ -58,8 +58,9 @@ fn main() {
 	root := os.real_path(os.getwd()); out := os.abs_path(os.args[2]); old := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
-	if os.args[1] in ['window-host', 'alert-host', 'string-float-host', 'string-cstring-host', 'bundle-receipt-host', 'cf-string-output-host', 'search-path-host', 'home-directory-host', 'inline-pthread-self-host', 'dictionary-snapshot-host', 'block-byref-host', 'block-imp-host', 'vm-probe-host', 'proc-memory-host', 'processinfo-host', 'data-url-host', 'data-http-host', 'connection-host'] {
+	if os.args[1] in ['application-badge-host', 'window-host', 'alert-host', 'string-float-host', 'string-cstring-host', 'bundle-receipt-host', 'cf-string-output-host', 'search-path-host', 'home-directory-host', 'inline-pthread-self-host', 'dictionary-snapshot-host', 'block-byref-host', 'block-imp-host', 'vm-probe-host', 'proc-memory-host', 'processinfo-host', 'data-url-host', 'data-http-host', 'connection-host'] {
 		fixture := match os.args[1] {
+			'application-badge-host' { 'ui_application_badge_test.v' }
 			'window-host' { 'ui_window_test.v' }
 			'alert-host' { 'ui_alert_test.v' }
 			'string-float-host' { 'ns_string_float_test.v' }
@@ -80,6 +81,10 @@ fn main() {
 			else { 'ns_url_connection_test.v' }
 		}
 		run_host_fixture(root, old, out, fixture)!
+	} else if os.args[1] == 'application-badge-inspector-build' {
+		run(out, 'inspect-build', [old + '/v', '-nocache', '-gc', 'none', '-cc', 'clang', '-cflags', '-target arm64-apple-ios14.0-macabi', '-ldflags', '-target arm64-apple-ios14.0-macabi', '-o', out + '/inspect-application-badge', root + '/tests/ios/inspect-application-badge.v'], false)
+	} else if os.args[1] == 'application-badge-inspect' {
+		run(out, 'inspect', [out + '/inspect-application-badge', '--bundle', out], false)
 	} else if os.args[1] == 'string-float-inspector-build' {
 		run(out, 'inspect-build', [old + '/v', '-nocache', '-gc', 'none', '-cc', 'clang', '-path', '@vlib|' + root + '/compat/ios|@vmodules', '-o', out + '/inspect-string-float', root + '/tests/ios/inspect-string-float.v'], false)
 	} else if os.args[1] == 'string-float-inspect' {
