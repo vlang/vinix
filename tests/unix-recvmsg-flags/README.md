@@ -32,3 +32,30 @@ It exercises real stream, sequence-packet and datagram Unix socketpairs:
 Success ends with `UNIX-RECVMSG-FLAGS-PASS all=3`. The fixture deliberately
 checks Vinix's unsupported-flag contract and is not a generic host-Linux test.
 Building it alone does not constitute a guest pass or browser qualification.
+
+Build a kernel from a committed revision without reading dirty kernel sources:
+
+```sh
+/path/to/v run tests/unix-recvmsg-flags/kernel-build.v \
+  /path/to/vinix /compatible/frozen/v /fresh/external/kernel-root \
+  COMMITTED_REVISION aarch64
+```
+
+The builder creates a detached sparse worktree. It links the checkout's existing
+dependency directories, retains separate copies, and checks their complete path,
+type and hash inventories before and after the build. Added or removed inputs
+and symbolic dependencies are rejected. It copies the compiler executable and
+its available library sources into the bundle and pins the C compiler, linker,
+archiver and Make.
+The kernel, generated C, commands, logs, source pins and file/link inventory remain
+in that external root. The fixed link seed is recorded. Host SDK and dynamic
+libraries remain environmental inputs. `x86_64` is also supported. A successful
+build records `guest_executed: false`; boot validation is separate.
+
+The inventory regression checks unchanged input plus added, removed, modified,
+type-changed and symbolic inputs:
+
+```sh
+/path/to/v run tests/unix-recvmsg-flags/kernel-build.v \
+  --self-test /fresh/external/inventory-test-root
+```
