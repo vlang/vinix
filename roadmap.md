@@ -1003,6 +1003,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     through real child exit and keeps drafts/receipts across smaller windows.
     Host production, sanitizer and render-allocation checks qualify this UI;
     native graphical acceptance remains separate.
+    [Compact offline export](tests/packages/software-mirror-compact-check.md)
+    supports destination editing, selected/installed/deployment scopes and
+    source navigation at 320×240. Saved sources retain their fixed digest;
+    live reviews offer Stop and publication keeps its full approval gates.
+    Five host modes, both target C-generation checks and the historical
+    Software fixture pass. Each tracked mode retains zero V bytes and records
+    across 12,000 draft/navigation trees; native graphical acceptance remains open.
     [Compact policy recovery](tests/packages/software-policy-recovery-check.md)
     exposes Reload after stopped, failed or invalid reads without losing the
     literal filename. Real-child production and sanitizer checks cover recovery;
