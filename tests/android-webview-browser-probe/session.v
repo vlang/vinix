@@ -217,6 +217,57 @@ fn authenticated(display string, cookie []u8) !bool {
 	return true
 }
 
+fn x11_read_exact(mut connection unix.StreamConn, length int) ![]u8 {
+	if length < 0 || length > 256 * 1024 { return error('X11 response exceeds fixed bound') }
+	mut bytes := []u8{len: length}
+	mut used := 0
+	for used < bytes.len {
+		mut remaining := unsafe { bytes[used..] }
+		n := connection.read(mut remaining)!
+		if n == 0 { return error('X11 response ended early') }
+		used += n
+	}
+	return bytes
+}
+
+fn glx_query() []u8 {
+	// QueryExtension, sequence 1, with the padded three-byte extension name.
+	return [u8(98), 0, 3, 0, 3, 0, 0, 0, `G`, `L`, `X`, 0]
+}
+
+fn glx_absent_reply(reply []u8) ! {
+	if reply.len != 32 || reply[0] != 1 || little16(reply, 2) != 1
+		|| little32(reply, 4) != 0 || reply[8] != 0 {
+		return error('X11 GLX extension is present or its absence was not established')
+	}
+}
+
+fn require_glx_absent(display string, cookie []u8) ! {
+	mut connection := unix.connect_stream('/tmp/.X11-unix/X' + display)!
+	defer { connection.close() or {} }
+	net.set_blocking(connection.sock.handle, false)!
+	connection.set_read_timeout(250 * time.millisecond)
+	connection.set_write_timeout(250 * time.millisecond)
+	setup := setup_packet(cookie)
+	if connection.write(setup)! != setup.len { return error('partial X11 setup request') }
+	header := x11_read_exact(mut connection, 8)!
+	if header[0] != 1 || little16(header, 2) != 11 {
+		return error('GLX query requires authenticated X11 setup')
+	}
+	x11_read_exact(mut connection, int(little16(header, 6)) * 4)!
+	query := glx_query()
+	if connection.write(query)! != query.len { return error('partial X11 GLX query') }
+	glx_absent_reply(x11_read_exact(mut connection, 32)!)!
+}
+
+fn xvfb_arguments(addon string, display string, output string, base string) []string {
+	// This CPU-rendered local fixture must not dlopen the guest's older Mesa
+	// DRI stack into its separately pinned Mesa/LLVM runtime.
+	return [addon + '/usr/bin/Xvfb', ':' + display,
+		'-screen', '0', '800x600x24', '-auth', output + '/Xauthority', '-nolisten', 'tcp', '-noreset',
+		'-extension', 'GLX', '-xkbdir', base + '/usr/share/X11/xkb', '-fp', output + '/fonts']
+}
+
 fn choose_display() !string {
 	for number in 120 .. 240 {
 		value := number.str()
@@ -473,6 +524,8 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 		'helper_preserved':      'false'
 		'authenticated_x11':     'false'
 		'wrong_cookie_rejected': 'false'
+		'x11_glx_policy':        'disabled-for-cpu-rendered-local-diagnostic'
+		'x11_glx_absent':        'false'
 		'probe_result':          'incomplete'
 		'scope':                 'Separate real-engine diagnostic; no Android integration or Google authentication proof.'
 	}
@@ -602,9 +655,7 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 	defer { xlog.close() }
 	mut x_arguments := ['--library-path', libraries]
 	x_arguments << fault_loader_arguments(fault_root, build)
-	x_arguments << [addon + '/usr/bin/Xvfb', ':' + display,
-		'-screen', '0', '800x600x24', '-auth', output + '/Xauthority', '-nolisten', 'tcp', '-noreset',
-		'-xkbdir', base + '/usr/share/X11/xkb', '-fp', output + '/fonts']
+	x_arguments << xvfb_arguments(addon, display, output, base)
 	mut server := child(loader, x_arguments, x_environment)
 	defer { stop(mut server, mut xlog) }
 	deadline := time.sys_mono_now() + u64(30 * time.second)
@@ -622,6 +673,9 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 	wrong[0] ^= 255
 	if authenticated(display, wrong)! { return error('Xvfb admitted an invalid cookie') }
 	receipt['wrong_cookie_rejected'] = 'true'
+	require_glx_absent(display, cookie)!
+	receipt['x11_glx_absent'] = 'true'
+	events.write_string('X11-GLX-ABSENT PASS authenticated QueryExtension GLX\n')!
 	mut plog := os.open_file(output + '/probe.log', 'w', 0o600)!
 	defer { plog.close() }
 	mut probe := child(loader, ['--library-path', libraries, os.dir(executable) + '/browser-probe',
@@ -659,6 +713,21 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 }
 
 fn self_test() ! {
+	assert glx_query() == [u8(98), 0, 3, 0, 3, 0, 0, 0, `G`, `L`, `X`, 0]
+	mut absent := []u8{len: 32}
+	absent[0] = 1
+	absent[2] = 1
+	glx_absent_reply(absent)!
+	for offset in [0, 2, 4, 8] {
+		mut bad := absent.clone()
+		bad[offset] = if offset in [0, 2] { u8(0) } else { u8(1) }
+		if _ := glx_absent_reply(bad) { return error('unqualified GLX absence accepted') }
+	}
+	if _ := glx_absent_reply(absent[..31]) { return error('short GLX response accepted') }
+	xargs := xvfb_arguments('/addon', '120', '/out', '/base')
+	assert xargs == ['/addon/usr/bin/Xvfb', ':120', '-screen', '0', '800x600x24',
+		'-auth', '/out/Xauthority', '-nolisten', 'tcp', '-noreset', '-extension', 'GLX',
+		'-xkbdir', '/base/usr/share/X11/xkb', '-fp', '/out/fonts']
 	cookie := []u8{len: 16, init: u8(index)}
 	record := authority_record('120', cookie)
 	if record.len != 47 || record[..9] != [u8(255), 255, 0, 0, 0, 3, `1`, `2`, `0`]
@@ -740,7 +809,7 @@ fn self_test() ! {
 		context.replace('X11-MAPS-END\n', '')] {
 		if _ := known_fault_evidence(bad) { return error('incomplete or inconsistent fault evidence accepted') }
 	}
-	println('BROWSER-SESSION SELF-TEST PASS authority-record x11-setup receipt-paths pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins complete-context negative-context')
+	println('BROWSER-SESSION SELF-TEST PASS glx-arguments glx-wire-query glx-absence-negative authority-record x11-setup receipt-paths pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins complete-context negative-context')
 }
 
 fn main() {

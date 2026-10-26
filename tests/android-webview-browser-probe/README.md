@@ -124,6 +124,13 @@ also available when a guest filesystem transport is already present:
 The output directory must be fresh. The launcher creates a private authenticated
 Xvfb display with TCP disabled, verifies both accepted and rejected X11 cookies,
 uses software rendering, and bounds the browser process with an outer watchdog.
+For this CPU-rendered local fixture only, Xvfb starts with `-extension GLX`.
+The retained startup fault evidence showed the base Mesa/LLVM runtime loading
+the original guest's older DRI/LLVM stack. Disabling GLX prevents that server
+extension from loading a separate DRI driver. The launcher also sends an
+authenticated X11 `QueryExtension` request and requires GLX to be absent before
+starting the browser; `session.json` records the policy and the checked result.
+This diagnostic setting does not qualify accelerated rendering or account use.
 Results and the real snapshot are written beneath the output directory. A
 successful browser phase prints `BROWSER-PROBE PASS`; the launcher separately
 reports whether setup, execution, and cleanup succeeded.
