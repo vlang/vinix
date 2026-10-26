@@ -30,6 +30,7 @@ pub fn framework_bundle_parcel(smali string) ! {
 		|| bundle_parcel_method(bundle, '.method public readFromParcel(Landroid/os/Parcel;)V\n')!.count('->readMap(') != 1 {
 		return error('unexpected original Bundle parcel contract')
 	}
+	parcel = bundle_parcel_binder_values(parcel)!
 	copy_signature := '.method public constructor <init>(Landroid/os/Bundle;)V\n'
 	copy_constructor := bundle_parcel_method(bundle, copy_signature)!
 	copy_map := '    new-instance v0, Landroid/util/ArrayMap;\n\n    iget-object v1, p1, Landroid/os/Bundle;->mMap:Landroid/util/ArrayMap;\n\n    invoke-direct {v0, v1}, Landroid/util/ArrayMap;-><init>(Landroid/util/ArrayMap;)V\n\n    iput-object v0, p0, Landroid/os/Bundle;->mMap:Landroid/util/ArrayMap;'
@@ -206,6 +207,42 @@ fn bundle_parcel_method(text string, signature string) !string {
 fn bundle_parcel_replace(text string, signature string, body string) !string {
 	original := bundle_parcel_method(text, signature)!
 	return text.replace(original, signature + body + '\n.end method')
+}
+
+// Value containers must use the same reference table as direct Binder writes.
+// The original tag emitted no reference and its reader invented a new Binder.
+fn bundle_parcel_binder_values(text string) !string {
+	read := bundle_parcel_method(text, '.method public readValue(Ljava/lang/ClassLoader;)Ljava/lang/Object;\n')!
+	write := bundle_parcel_method(text, '.method public writeValue(Ljava/lang/Object;)V\n')!
+	old_read := '    new-instance v0, Landroid/os/Binder;\n\n    invoke-direct {v0}, Landroid/os/Binder;-><init>()V'
+	old_write := '    instance-of v0, p1, Landroid/os/Binder;
+
+    if-eqz v0, :cond_16e
+
+    const/16 v0, 0x15
+
+    invoke-virtual {p0, v0}, Landroid/os/Parcel;->writeInt(I)V
+
+    goto/16 :goto_6'
+	if read.count(old_read) != 1 || write.count(old_write) != 1 {
+		return error('unexpected original Parcel Binder value branch')
+	}
+	new_read := '    invoke-virtual {p0}, Landroid/os/Parcel;->readStrongBinder()Landroid/os/IBinder;\n\n    move-result-object v0'
+	new_write := '    instance-of v0, p1, Landroid/os/IBinder;
+
+    if-eqz v0, :cond_16e
+
+    const/16 v0, 0x15
+
+    invoke-virtual {p0, v0}, Landroid/os/Parcel;->writeInt(I)V
+
+    check-cast p1, Landroid/os/IBinder;
+
+    invoke-virtual {p0, p1}, Landroid/os/Parcel;->writeStrongBinder(Landroid/os/IBinder;)V
+
+    goto/16 :goto_6'
+	return text.replace(read, read.replace(old_read, new_read)).replace(write,
+		write.replace(old_write, new_write))
 }
 
 // ACC_DECLARED_SYNCHRONIZED is reflection metadata in DEX. Non-native methods
