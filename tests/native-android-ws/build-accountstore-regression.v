@@ -23,7 +23,7 @@ const compiler_pin = '0cc6c1d34c1811a818e4ae89853116861a4b067d4251af257851a7714f
 const store_pin = 'b174fd25e52bcd5f8f29c068a426979a76de3ff6eef05e8550b136530756d6d3'
 const cross = '/opt/homebrew/bin/aarch64-linux-musl-gcc'
 const fixture = repo + '/tests/native-android-ws/accountstore-linux-regression.v'
-const fixture_pin = 'a8bec782b4d47eef7d974640c0dc35ae0a40e6285837caf5007dc2aeb7a90f67'
+const fixture_pin = '78eacda7efd09e070b37ba45eb753920eabdab523af4519b07c962d0ad7ae086'
 const self_source = repo + '/tests/native-android-ws/build-accountstore-regression.v'
 const sqlite_directory = repo + '/build/package-sqlite-work/inputs/source'
 

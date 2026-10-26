@@ -7,10 +7,12 @@ import os
 
 #include <fcntl.h>
 #include <sqlite3.h>
+#include <sys/mount.h>
 #include <unistd.h>
 
 fn C.sqlite3_extended_errcode(voidptr) int
 fn C.link(&char, &char) int
+fn C.mount(&char, &char, &char, u64, voidptr) int
 
 const owner = 'com.google.android.gms'
 const kind = 'com.google'
@@ -98,12 +100,26 @@ fn unsafe_links(root string) ! {
 	}
 }
 
-fn main() {
-	if os.args.len != 2 {
-		eprintln('usage: accountstore-linux-regression FRESH_PRIVATE_DIRECTORY')
-		exit(2)
+fn fixture_path() !string {
+	$if linux {
+		if os.getpid() == 1 && os.args.len == 1 {
+			// The minimal guest runner starts /sbin/init without arguments.
+			// Only PID 1 may mount procfs or select this fixed synthetic path.
+			if unsafe { C.mount(c'proc', c'/proc', c'proc', 0, nil) } != 0 {
+				return error('cannot mount fixture procfs')
+			}
+			println('ACCOUNTSTORE-INIT proc-mounted')
+			return '/accountstore-linux-regression'
+		}
 	}
-	path := os.args[1]
+	if os.args.len != 2 {
+		return error('usage: accountstore-linux-regression FRESH_PRIVATE_DIRECTORY')
+	}
+	return os.args[1]
+}
+
+fn main() {
+	path := fixture_path() or { eprintln('ACCOUNTSTORE-FAIL ' + err.msg()); exit(2) }
 	// A newly-created leaf prevents accidental access to a real account store.
 	if path.len < 2 || !os.is_abs_path(path) || os.exists(path) || os.is_link(path) {
 		eprintln('fixture requires a fresh absolute directory beneath trusted ancestors')
