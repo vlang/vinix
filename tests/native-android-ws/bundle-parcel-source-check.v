@@ -118,7 +118,7 @@ fn main() {
 	}
 	// Every malformed case is a fresh complete input tree. Rejection must leave
 	// the entire tree, including occupied destinations, byte-for-byte unchanged.
-	for n in 0 .. 5 {
+	for n in 0 .. 7 {
 		dir := root + '/rejected-' + n.str()
 		write_inputs(dir, originals)!
 		if n == 3 {
@@ -129,6 +129,19 @@ fn main() {
 		if n == 4 {
 			os.write_file(dir + '/android/os/Parcelable$ClassLoaderCreator.smali',
 				originals['Parcelable$ClassLoaderCreator.smali'] + '\n.method public abstract createFromParcel(Landroid/os/Parcel;Ljava/lang/ClassLoader;)Ljava/lang/Object;\n.end method\n')!
+			rejected_unchanged(dir)!
+			continue
+		}
+		if n >= 5 {
+			old := originals['Parcel.smali']
+			anchor := if n == 5 {
+				'    :cond_163\n    instance-of v0, p1, Landroid/os/Binder;'
+			} else {
+				'    :pswitch_a2\n    new-instance v0, Landroid/os/Binder;'
+			}
+			assert old.count(anchor) == 1
+			os.write_file(dir + '/android/os/Parcel.smali', old.replace(anchor,
+				anchor.replace('Landroid/os/Binder;', 'Landroid/os/IInterface;')))!
 			rejected_unchanged(dir)!
 			continue
 		}
@@ -190,6 +203,20 @@ fn main() {
 		'.method public readParcelable(Ljava/lang/ClassLoader;)Landroid/os/Parcelable;\n'] {
 		unrelated = unrelated.replace(extract(parcel, signature)!, extract(originals['Parcel.smali'], signature)!)
 	}
+	// Only the two legacy tag21 branches may change within readValue/writeValue.
+	// Reversing those exact branches leaves every other Parcel byte unchanged.
+	old_binder_read := '    :pswitch_a2\n    new-instance v0, Landroid/os/Binder;\n\n    invoke-direct {v0}, Landroid/os/Binder;-><init>()V\n\n    goto/16 :goto_21\n'
+	new_binder_read := '    :pswitch_a2\n    invoke-virtual {p0}, Landroid/os/Parcel;->readStrongBinder()Landroid/os/IBinder;\n\n    move-result-object v0\n\n    goto/16 :goto_21\n'
+	old_binder_write := '    :cond_163\n    instance-of v0, p1, Landroid/os/Binder;\n\n    if-eqz v0, :cond_16e\n\n    const/16 v0, 0x15\n\n    invoke-virtual {p0, v0}, Landroid/os/Parcel;->writeInt(I)V\n\n    goto/16 :goto_6\n'
+	new_binder_write := '    :cond_163\n    instance-of v0, p1, Landroid/os/IBinder;\n\n    if-eqz v0, :cond_16e\n\n    const/16 v0, 0x15\n\n    invoke-virtual {p0, v0}, Landroid/os/Parcel;->writeInt(I)V\n\n    check-cast p1, Landroid/os/IBinder;\n\n    invoke-virtual {p0, p1}, Landroid/os/Parcel;->writeStrongBinder(Landroid/os/IBinder;)V\n\n    goto/16 :goto_6\n'
+	for old, replacement in {
+		old_binder_read:  new_binder_read
+		old_binder_write: new_binder_write
+	} {
+		assert originals['Parcel.smali'].count(old) == 1, 'unexpected original Binder value branch'
+		assert unrelated.count(replacement) == 1, 'Binder value must use strong Binder identity and IBinder interface'
+		unrelated = unrelated.replace(replacement, old)
+	}
 	assert unrelated == originals['Parcel.smali'], 'unrelated Parcel encoding or Binder behavior changed'
 	assert extract(parcel, '.method public readParcelable(Ljava/lang/ClassLoader;)Landroid/os/Parcelable;\n')!.contains('Landroid/os/Parcelable$ClassLoaderCreator;->createFromParcel(Landroid/os/Parcel;Ljava/lang/ClassLoader;)Ljava/lang/Object;'), 'Parcel does not dispatch to the loader-aware creator overload'
 	for signature in ['.method public readBundle()Landroid/os/Bundle;\n',
@@ -233,12 +260,12 @@ fn main() {
 	}
 	os.write_file(root + '/inputs.json', json2.encode(inputs, prettify: true) + '\n')!
 	os.write_file(root + '/validation.json', json2.encode({
-		'scope':               'Host source generation, malformed/destination/interface and duplicate rejection without mutation, deferred Bundle reads and 78 map accesses, explicit monitor cleanup, Binder-preserving snapshots, unchanged unrelated Parcel and PersistableBundle encoding, twelve-class API28 assemble/disassemble; separate ART evidence is required.'
-		'malformed_cases':     '5'
+		'scope':               'Host source generation, malformed/destination/interface/Binder and duplicate rejection without mutation, deferred Bundle reads and 78 map accesses, explicit monitor cleanup, Binder-preserving snapshots and strong Binder value identity, unchanged unrelated Parcel and PersistableBundle encoding, twelve-class API28 assemble/disassemble; separate ART evidence is required.'
+		'malformed_cases':     '7'
 		'duplicate_unchanged': 'true'
 		'guarded_map_reads':   '78'
 		'assembled_classes':   classes.len.str()
 		'dex_sha256':          hash(root + '/classes.dex')!
 	}, prettify: true) + '\n')!
-	println('BUNDLE-PARCEL-SOURCE-CHECK-PASS guards=6 classes=' + classes.len.str() + ' dex=' + hash(root + '/classes.dex')!)
+	println('BUNDLE-PARCEL-SOURCE-CHECK-PASS guards=8 classes=' + classes.len.str() + ' dex=' + hash(root + '/classes.dex')!)
 }
