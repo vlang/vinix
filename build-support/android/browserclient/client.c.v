@@ -75,18 +75,18 @@ pub fn open(fd int) !&Client {
 }
 
 fn ready(fd int, events i16, timeout int) !bool {
-	mut poll := C.pollfd{ fd: fd, events: events }
+	mut watched := C.pollfd{ fd: fd, events: events }
 	deadline := time.sys_mono_now() / 1000000 + timeout
 	for {
 		remaining := deadline - time.sys_mono_now() / 1000000
-		result := C.poll(&poll, 1, if remaining > 0 { int(remaining) } else { 0 })
+		result := C.poll(&watched, 1, if remaining > 0 { int(remaining) } else { 0 })
 		if result < 0 {
 			if C.errno == C.EINTR { continue }
 			return error('browser descriptor poll failed')
 		}
 		if result == 0 { return false }
 		// A readable EOF is consumed by recv, including POLLIN|POLLHUP.
-		if poll.revents & events != 0 { return true }
+		if watched.revents & events != 0 { return true }
 		return error('browser channel disconnected')
 	}
 	return false
