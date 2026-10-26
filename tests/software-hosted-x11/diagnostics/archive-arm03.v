@@ -1,0 +1,192 @@
+module main
+
+import os
+import json2
+import crypto.sha256
+import strconv
+import recoveryguard
+
+const state = '/Users/alex/.cache/vinix-package-hosted-launch-options-guest-20261026-a'
+const name = 'native-aarch64-03'
+const root = state + '/' + name
+const archive = state + '/failed-diagnostics/' + name + '.tar.gz'
+const out = state + '/failed-diagnostics/' + name + '-stream-reclaim-01'
+const sealer = '/Users/alex/.cache/vinix-package-hosted-launch-options-guest-20261026-a/evidence-archive-verifier-qualification-01/tools/software-release-routing-bundle'
+const seal_source = '/Users/alex/code/vinix/build/package-release-routing-native-worktree/tests/packages/software-release-routing-bundle.v'
+const reader = state + '/archive-controls-build-03/evidence-archive-check-prod'
+const reader_source = '/Users/alex/code/vinix/build/package-hosted-launch-options-guest-worktree/tests/packages/evidence-archive-check.v'
+
+struct ChildExit {
+	exit_code int
+}
+
+fn budget_gate() ! {
+	if os.getenv('VINIX_FAILED_RECOVERY_SUPERVISION') != 'actual-df-k-256MiB-v1' {
+		return error('requires reviewed actual-df supervisor')
+	}
+	mut p := os.new_process('/bin/df')
+	defer { p.close() }
+	p.set_args(['-k', state]); p.set_redirect_stdio_merged(); p.run()
+	C.close(p.stdio_fd[0]); p.stdio_fd[0] = -1
+	text := p.stdout_slurp(); p.wait()
+	lines := text.trim_space().split_into_lines()
+	if p.code != 0 || lines.len != 2 || !lines[0].contains('1024-blocks') {
+		return error('actual df format differs')
+	}
+	fields := lines[1].fields()
+	if fields.len != 9 || fields[0] != '/dev/disk3s5' || fields[8] != '/System/Volumes/Data' ||
+		strconv.parse_uint(fields[3], 10, 64)! < u64(256) * 1024 {
+		return error('actual df below256MiB or volume differs; original retained')
+	}
+	if os.exists(archive) && u64(os.lstat(archive)!.size) > (u64(210) << 20) {
+		return error('archive above210MiB; original retained')
+	}
+}
+
+fn sha(path string) !string {
+	mut f := os.open(path)!
+	defer { f.close() }
+	mut sum := sha256.new()
+	defer { unsafe { sum.free() } }
+	mut buffer := []u8{len: 1024 * 1024}
+	defer { unsafe { buffer.free() } }
+	for {
+		n := f.read(mut buffer) or { if err is os.Eof { break } else { return err } }
+		if n == 0 { break }
+		sum.write(buffer[..n])!
+	}
+	return sum.sum([]u8{}).hex()
+}
+
+fn invoke(args []string, log string) ! {
+	recoveryguard.invoke(args, log)!
+}
+
+fn check_types(path string) ! {
+	if os.is_link(path) { return }
+	info := os.lstat(path)!
+	mode := info.mode & 0o170000
+	if mode == 0o040000 {
+		for entry in os.ls(path)! { check_types(path + '/' + entry)! }
+	} else if mode != 0o100000 {
+		return error('unexpected special entry; original untouched: ' + path)
+	}
+}
+
+fn run() ! {
+	if os.args.len != 2 || os.args[1] != '--reclaim-reviewed-arm03' {
+		return error('expected exact reviewed arm03 scope')
+	}
+	first_root := state + '/native-x86_64-02'
+	first_receipt := state + '/failed-diagnostics/native-x86_64-02-stream-reclaim-01.json'
+	first := json2.decode[map[string]string](os.read_file(first_receipt)!)!
+	verified := json2.decode[map[string]string](first['verified_before_removal'])!
+	if os.exists(first_root) || os.is_link(first_root) || first['expanded_original_removed'] != 'true' ||
+		verified['original_directory'] != first_root ||
+		verified['archive'] != state + '/failed-diagnostics/native-x86_64-02.tar.gz' ||
+		verified['manifest'] != state + '/failed-diagnostics/native-x86_64-02.bundle.sha256' ||
+		sha(verified['archive'])! != verified['archive_sha256'] ||
+		sha(verified['manifest'])! != verified['manifest_sha256'] ||
+		u64(os.lstat(verified['archive'])!.size) > (u64(210) << 20) {
+		return error('first fixed diagnostic must remain completely verified and reclaimed')
+	}
+	if os.is_link(root) || !os.is_dir(root) || os.exists(root + '/qualification.json') ||
+		os.exists(root + '/bundle.sha256') ||
+		os.exists(root + '/archive-preparation.json') || os.exists(archive) || os.is_link(archive) ||
+		os.exists(archive + '.sha256') || os.exists(out + '.json') || os.exists(out + '-eligible.json') {
+		return error('requires exact failed original and new outputs')
+	}
+	identity := os.lstat(root)!
+	if identity.mode & 0o170000 != 0o040000 { return error('original must be a real directory') }
+	check_types(root)!
+	if os.lstat(root + '/system.vjfs')!.mode & 0o170000 != 0o100000 ||
+		json2.decode[ChildExit](os.read_file(root + '.controller-exit.json')!)!.exit_code != 1 ||
+		!os.read_file(root + '/serial.log')!.contains('SOFTWARE X11 FAIL: timed out waiting for exact contents: /home/alex/.local/share/vinix-apps/org.fixture.x11/ready') {
+		return error('exact failed arm03 observation differs')
+	}
+	expected := {
+		sealer: '0bf024564aba9cedfac1fd8f92b3f117e5735511cafb1dfb409f449ca00ca94b'
+		seal_source: '766633f318d98e104923f2e29d7c6873a72e8ae6b6727358a21c097bf6f9e26b'
+		reader: '8808f2000e0ed1f9977a2ed9bd42ef0eaf0a4143be3440222a38be3237d1757a'
+		reader_source: '59e10b89aa8416207bfaad35446b8dd389d64425c61585dca7328ce15c88ebfa'
+		state + '/archive-controls-normal-03/results.json': '639601d07f784c5db470913d7f434c034e784e987c290aef022601aefa35064b'
+		state + '/archive-controls-prod-04/results.json': '65973b6751cef1ef256eab25d7e0b7c2cfc759f079afb9e02da682d27c515de3'
+		root + '/system.vjfs': '0a25e0b56c7cb2e561d653af67f5014f3281cce60065ba459c683acbdd8853eb'
+	}
+	mut pins := map[string]string{}
+	for path in [first_receipt, verified['archive'], verified['manifest'], verified['archive'] + '.sha256'] {
+		pins[path] = sha(path)!
+	}
+	for path, wanted in expected {
+		pins[path] = sha(path)!
+		if pins[path] != wanted { return error('reviewed tool/control changed: ' + path) }
+	}
+	for path in [@FILE, os.executable(), '/Users/alex/code/vinix/build/package-hosted-launch-options-guest-worktree/tests/software-hosted-x11/diagnostics/recoveryguard/recoveryguard.v', state + '/host-build-06/pins.json',
+		state + '/host-build-normal-06/pins.json', state + '/run-native06.v', state + '/run-native06'] {
+		pins[path] = sha(path)!
+	}
+	budget_gate()!
+	// Every original controller sibling remains outside the reclaimed tree too.
+	mut siblings := map[string]string{}
+	meta := root + '/_controller-metadata'
+	if os.is_link(meta) || (os.exists(meta) && !os.is_dir(meta)) { return error('metadata must be a real directory') }
+	if os.exists(meta) {
+		mut actual := os.ls(meta)!
+		mut wanted := []string{}
+		for suffix in ['.argv.json', '.environment.json', '.runner.json', '.controller.log', '.controller-exit.json'] { wanted << name + suffix }
+		actual.sort(); wanted.sort()
+		if actual != wanted { return error('existing metadata has unexpected entries') }
+	} else { os.mkdir(meta)! }
+	for suffix in ['.argv.json', '.environment.json', '.runner.json', '.controller.log', '.controller-exit.json'] {
+		path := root + suffix
+		info := os.lstat(path)!
+		if info.mode & 0o170000 != 0o100000 { return error('controller sibling is not regular') }
+		siblings[path] = sha(path)!
+		copy := root + '/_controller-metadata/' + name + suffix
+		if !os.exists(copy) && !os.is_link(copy) { os.cp(path, copy, fail_if_exists: true)! }
+		if os.lstat(copy)!.mode & 0o170000 != 0o100000 { return error('metadata copy must be a regular file') }
+		if sha(copy)! != siblings[path] { return error('controller copy differs') }
+	}
+	os.write_file(root + '/archive-preparation.json', json2.encode({
+		'original_directory': root, 'original_controller_siblings': json2.encode(siblings),
+		'preparation_tool_pins': json2.encode(pins),
+		'scope': 'Failed ARM03 only. Exact child-ready timeout retained. File bytes and literal link targets sealed; directory existence and metadata unsealed. Controller siblings, separate diagnostic03 copy and all external input/link referents remain outside fixed removal target. No native acceptance.'
+	}))!
+	os.setenv('COPYFILE_DISABLE', '1', true)
+	invoke([sealer, 'seal', root, archive], out + '-seal.log')!
+	manifest := state + '/failed-diagnostics/' + name + '.bundle.sha256'
+	if os.exists(manifest) || os.is_link(manifest) { return error('standalone manifest already exists') }
+	os.cp(root + '/bundle.sha256', manifest, fail_if_exists: true)!
+	manifest_hash := sha(manifest)!
+	archive_hash := sha(archive)!
+	if os.read_file(archive + '.sha256')! != archive_hash + '  ' + os.base(archive) + '\n' ||
+		sha(root + '/bundle.sha256')! != manifest_hash { return error('sidecar/manifest differs') }
+	invoke([sealer, 'check', root], out + '-original-before.log')!
+	invoke([reader, 'check', archive, name, manifest, archive_hash], out + '-archive.log')!
+	invoke([sealer, 'check', root], out + '-original-after.log')!
+	if sha(archive)! != archive_hash || sha(manifest)! != manifest_hash ||
+		sha(root + '/bundle.sha256')! != manifest_hash { return error('archive or manifest changed') }
+	for path, wanted in pins { if sha(path)! != wanted { return error('tool/source/control changed') } }
+	for path, wanted in siblings { if sha(path)! != wanted { return error('controller sibling changed') } }
+	receipt := {
+		'original_directory': root, 'original_device': identity.dev.str(), 'original_inode': identity.inode.str(),
+		'archive': archive, 'archive_sha256': archive_hash,
+		'manifest': manifest, 'manifest_sha256': manifest_hash,
+		'qualified_tool_pins': json2.encode(pins), 'controller_siblings': json2.encode(siblings),
+		'scope': 'Exact failed ARM03 expanded tree only; independent strict gzip/all-member/content verification and complete original inventories before/after. External inputs, link referents, diagnostic03 copy and controller siblings retained. No acceptance.'
+	}
+	os.write_file(out + '-eligible.json', json2.encode(receipt))!
+	budget_gate()!
+	// Reviewed V rmdir_all does not follow symlinks; root is hardcoded above.
+	final_identity := os.lstat(root)!
+	if final_identity.dev != identity.dev || final_identity.inode != identity.inode || final_identity.mode & 0o170000 != 0o040000 {
+		return error('original directory identity changed; removal refused')
+	}
+	os.rmdir_all(root)!
+	if os.exists(root) || os.is_link(root) { return error('original remains') }
+	os.write_file(out + '.json', json2.encode({'verified_before_removal': json2.encode(receipt),
+		'expanded_original_removed': 'true'}))!
+	println('PASS exact failed ARM03 archive verified and expanded tree reclaimed')
+}
+
+fn main() { run() or { eprintln(recoveryguard.bounded_message(err.msg())); exit(1) } }
