@@ -33,7 +33,7 @@ fn digest(path string) !string {
 	return sha256.sum256(os.read_bytes(path)!).hex()
 }
 
-fn capture(root string, compiler string) ! {
+fn capture(root string, compiler string, native_sha bool) ! {
 	if os.real_path(root) != root || !os.is_dir(root) || os.is_link(root)
 		|| root.starts_with(os.getwd() + '/') || os.exists(root + '/build.json') {
 		return error('fresh external canonical build directory required')
@@ -43,13 +43,20 @@ fn capture(root string, compiler string) ! {
 	if git.exit_code != 0 || git.output.trim_space().len != 40 { return error('source revision') }
 	mut tools := []Tool{}
 	mut objects := map[string]string{}
-	os.mkdir(root + '/source')!
-	os.mkdir(root + '/link-objects')!
-	for name, expected in {
+	mut pins := {
 		'patch-kernel': '1cc14f493bef51f955d85252c543ab3722c3d3fc7fe9851ad73a938741968a0d'
 		'run': '7953d7540600aa37daa3b721eaa974c3d08d1fb9b687fe362d521f986bbbcfd9'
 		'seal': '9b990d6c2bc849f7732a8e18662f84564dc8adb833f148888004e628c28cec6a'
-	} {
+	}
+	if native_sha {
+		pins = {
+			'patch-kernel': '2186c55bfc784169d923cd4e83e0e2911850b9f81a32a807d8acc82a2cd9d3a1'
+			'run': 'f8e15d06651efaafee55c0ee92093b577d9f7dfd800c17dee01ebd1fe7b64741'
+		}
+	}
+	os.mkdir(root + '/source')!
+	os.mkdir(root + '/link-objects')!
+	for name, expected in pins {
 		path := 'tests/android-webview-browser-probe/' + name + '.v'
 		source := os.read_file(path)!
 		if digest(path)! != expected || !os.read_file(root + '/' + name)!.contains(source) {
@@ -60,6 +67,9 @@ fn capture(root string, compiler string) ! {
 		test_log := os.read_file(root + '/' + name + '-self-test.log')!
 		if !test_log.contains('SELF-TEST PASS ') || !test_log.contains('real ') {
 			return error('self-test receipt missing: ' + name)
+		}
+		if native_sha && test_log.split_into_lines().filter(it == 'HOST-SHA256 SELF-TEST PASS known-vectors block-padding streaming-boundaries V-reference').len != 1 {
+			return error('native SHA256 regression receipt missing: ' + name)
 		}
 		os.write_file(root + '/source/' + name + '.v', source)!
 		for word in log.split_any(' \n\t') {
@@ -81,21 +91,29 @@ fn capture(root string, compiler string) ! {
 		}
 	}
 	os.write_file(root + '/build.json', json2.encode(Receipt{
+		kind: if native_sha { 'vinix-native-sha-browser-host-tools-v1' } else { 'vinix-optimized-browser-host-tools-v1' }
 		source_revision: git.output.trim_space()
 		compiler: compiler
 		compiler_sha256: pinned_compiler_sha
 		tools: tools
 		retained_link_objects: objects
+		qualification: if native_sha {
+			'Darwin CommonCrypto streaming SHA256 entry sources, V reference digest regressions and existing validation self-tests; no guest or Google login result. The original complete compiler dependency bundle remains required; this receipt is not a complete compiler source closure.'
+		} else {
+			'Unchanged entry sources and existing self-tests; no guest or Google login result. The original complete compiler dependency bundle remains required; this receipt is not a complete compiler source closure.'
+		}
 	}) + '\n')!
 	println('BROWSER-HOST-TOOLS RECEIPT PASS ' + digest(root + '/build.json')!)
 }
 
 fn main() {
-	if os.args.len != 3 {
-		eprintln('usage: host-tool-receipt EXTERNAL_BUILD_DIRECTORY PINNED_OLD_V')
+	native_sha := os.args.len == 4 && os.args[1] == '--native-sha'
+	if os.args.len != 3 && !native_sha {
+		eprintln('usage: host-tool-receipt [--native-sha] EXTERNAL_BUILD_DIRECTORY PINNED_OLD_V')
 		exit(2)
 	}
-	capture(os.args[1], os.args[2]) or {
+	offset := if native_sha { 1 } else { 0 }
+	capture(os.args[1 + offset], os.args[2 + offset], native_sha) or {
 		eprintln(err)
 		exit(1)
 	}

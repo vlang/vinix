@@ -12,8 +12,14 @@ import time
 
 #include <signal.h>
 #include <errno.h>
+#include <CommonCrypto/CommonDigest.h>
 
 fn C.kill(int, int) int
+@[typedef]
+struct C.CC_SHA256_CTX {}
+fn C.CC_SHA256_Init(voidptr) i32
+fn C.CC_SHA256_Update(voidptr, voidptr, u32) i32
+fn C.CC_SHA256_Final(&u8, voidptr) i32
 
 const repo = '/Users/alex/code/vinix'
 const qemu = repo + '/build/qemu-horizontal/bin/qemu-system-aarch64'
@@ -48,17 +54,43 @@ struct StopReceipt {
 fn hash(path string) !string {
 	mut file := os.open(path)!
 	defer { file.close() }
-	mut digest := sha256.new()
+	mut digest := C.CC_SHA256_CTX{}
 	mut bytes := []u8{len: 1024 * 1024}
+	if C.CC_SHA256_Init(unsafe { &digest }) != 1 { return error('SHA256 initialization') }
 	for {
 		n := file.read(mut bytes) or {
 			if err is os.Eof { break }
 			return err
 		}
 		if n == 0 { break }
-		digest.write(bytes[..n])!
+		if C.CC_SHA256_Update(unsafe { &digest }, bytes.data, u32(n)) != 1 {
+			return error('SHA256 update')
+		}
 	}
-	return digest.sum([]u8{}).hex()
+	mut result := [32]u8{}
+	if C.CC_SHA256_Final(unsafe { &result[0] }, unsafe { &digest }) != 1 {
+		return error('SHA256 finalization')
+	}
+	return result[..].hex()
+}
+
+fn hash_self_test(root string) ! {
+	path := root + '/sha256-input'
+	defer { os.rm(path) or {} }
+	for input, expected in {
+		'': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+		'abc': 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
+	} {
+		os.write_file(path, input)!
+		assert hash(path)! == expected
+	}
+	mut bytes := []u8{len: 2 * 1024 * 1024 + 65}
+	for i in 0 .. bytes.len { bytes[i] = u8((i * 29 + 11) % 251) }
+	for size in [55, 56, 63, 64, 65, 1024 * 1024 - 1, 1024 * 1024, 1024 * 1024 + 1, bytes.len] {
+		os.write_file_array(path, bytes[..size])!
+		assert hash(path)! == sha256.sum(bytes[..size]).hex()
+	}
+	println('HOST-SHA256 SELF-TEST PASS known-vectors block-padding streaming-boundaries V-reference')
 }
 
 fn execute(argv []string) !Execution {
@@ -529,6 +561,7 @@ fn self_test() ! {
 	if os.exists(root) || os.is_link(root) { return error('selftest output exists') }
 	os.mkdir(root)!
 	defer { os.rmdir_all(root) or {} }
+	hash_self_test(root)!
 	os.write_file(root + '/qemu.pid', os.getpid().str())!
 	write_json(root + '/ownership.json', json2.decode[json2.Any](json2.encode(identity(os.getpid())!))!)!
 	if _ := owned(root) { return error('non-QEMU process accepted as owned guest') }
