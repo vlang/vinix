@@ -148,3 +148,38 @@ baseline and output complete file sets are checked.
 The profile retains the same pinned compiler and input policy as the cache
 profile. These host construction checks require paired JNI and account-broker
 guest validation before establishing authenticator discovery or Google login.
+
+The protected-storage profile (`--protected-storage`) extends exactly the sealed
+2104-class descriptions baseline above. Its self-tests, provider compilation,
+assembly, canonical disassembly, exact member/class comparisons and complete
+bundle integrity checks passed. No classes are added or removed. Only these
+four classes change:
+
+| Class | Existing methods changed | Methods added | Fields added |
+| --- | ---: | ---: | ---: |
+| `ApplicationInfo` | 1 (copy constructor) | 1 (`vinixSetDataDirectory`) | 2 public String fields |
+| `Context` | 2 (`<clinit>`, `getDataDirFile`) | 0 | 0 |
+| `ATLLoadedAppManager` | 2 (application metadata loaders) | 0 | 0 |
+| `ContextImpl` | 1 (`createConfigurationContext`) | 0 | 0 |
+
+The two fields are `credentialProtectedDataDir` and `deviceProtectedDataDir`.
+Every unrelated method, class/field declaration, other class and non-DEX JAR
+member retains its content. Mutation tests reject missing/duplicate/preexisting
+fields, changed field access, class substitutions and missing required
+class/method changes. Historical 2102-class profile checks remain strict.
+
+- Provider implementation commit: `2045b466e2a032586a699d67379be3daec61dc15`.
+- Build source revision: `8fa48d6081fbc1fa95e3e335b0c1e04bf288bc97`.
+- Retained builder source SHA256: `1ee342ad30e1f18c0e115faf5e597810d6ad4c3f3eba8e5e176abc94cc81d373`.
+- Retained provider SHA256: `860607d9f13a74dff4a1ef93bfb47614fdab096f9fd7bee450b374b22fec4772`.
+- Complete retained bundle: `/Users/alex/.local/state/vinix/android/combined-account-webview-protected-storage-framework-2026-10-27-r2`.
+- Bundle manifest SHA256: `67e1cb450fa87305c99480133084b7f9cb684feeeaa2e0c3efa3007ab43ee938`.
+- Output `api-impl.jar` SHA256: `a8ba34eb79be2473f89042c8ee940ab1994dbc902c3d45143877f8891d3b428b`.
+- Output DEX SHA256: `2739569a157276b76da82ed51ce41ef805457f95c01fe23ec524b5666bd486c6`.
+
+This narrow host build retains the pinned compiler/source closure policy above,
+uses APFS clones of canonical baseline smali, and caps each smali JVM at 512 MiB
+with two workers. Device-protected storage is a distinct private child directory
+within Vinix's app root; there is no separate Android encryption/unlock lifecycle.
+These checks establish framework construction. Paired native execution, the
+storage fixture in ART and actual Google account sign-in need guest validation.

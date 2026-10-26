@@ -21,6 +21,8 @@ const auth_manifest = '1299ddd064ebe89bae35cafd4c509794894c7466fda0bfaee2dfb85cf
 const auth_jar = 'c677808eb55f58845b4ce3dd5c72be481d4ca585fd4980cec18266271d4740bf'
 const cache_manifest = 'f37e13b84b5dfb2c71ad852e2bae5b03fed04e8ee319f44e77fc7605f3b1994a'
 const cache_jar = '3a590476c53e3f05533c327c5935e395c55694eacb7895b02940feaf888c56d0'
+const descriptions_manifest = 'd898fdcca66df0c32b9863dca99c7185d10f8e3b3fb5ab7708999b3619803021'
+const descriptions_jar = '71d05c6e6288978de66a5c71279e8cb27d92c9166950813ddbf0c33ff86e1d0d'
 const java = '/opt/homebrew/opt/openjdk@25/bin/java'
 const tools = repo + '/build/android-framework/tools'
 const source_file = repo + '/tests/native-android-ws/combined-account-webview-build.v'
@@ -83,6 +85,9 @@ struct NarrowProfile {
  added map[string]int
  class_provider string
  extra_classes []string
+ baseline_classes int = 2102
+ directory_provider string
+ fields map[string][]string
 }
 
 fn storage_profile() NarrowProfile {
@@ -145,6 +150,30 @@ fn descriptions_profile() NarrowProfile {
  }
 }
 
+fn protected_storage_profile() NarrowProfile {
+ return NarrowProfile{
+  name: 'protected-storage'
+  baseline_name: 'combined-account-webview-descriptions-framework-2026-10-26-r1'
+  manifest_pin: descriptions_manifest
+  jar_pin: descriptions_jar
+  baseline_classes: 2104
+  providers: ['framework_protected_storage.v']
+  directory_provider: 'framework_protected_storage'
+  methods: {
+   'android/content/pm/ApplicationInfo.smali': ['<init>(Landroid/content/pm/ApplicationInfo;)V', 'vinixSetDataDirectory(Ljava/lang/String;)V']
+   'android/content/Context.smali': ['getDataDirFile()Ljava/io/File;', '<clinit>()V']
+   'android/atl/ATLLoadedAppManager.smali': ['loadApplication(Ljava/lang/String;)Landroid/atl/ATLLoadedApp;', 'vinixLoadActivityApplication(Ljava/lang/String;)Landroid/atl/ATLLoadedApp;']
+   'android/app/ContextImpl.smali': ['createConfigurationContext(Landroid/content/res/Configuration;)Landroid/content/Context;']
+  }
+  changed: {'android/content/pm/ApplicationInfo.smali': 1, 'android/content/Context.smali': 2,
+   'android/atl/ATLLoadedAppManager.smali': 2, 'android/app/ContextImpl.smali': 1}
+  added: {'android/content/pm/ApplicationInfo.smali': 1, 'android/content/Context.smali': 0,
+   'android/atl/ATLLoadedAppManager.smali': 0, 'android/app/ContextImpl.smali': 0}
+  fields: {'android/content/pm/ApplicationInfo.smali': ['.field public credentialProtectedDataDir:Ljava/lang/String;',
+   '.field public deviceProtectedDataDir:Ljava/lang/String;']}
+ }
+}
+
 fn store_parts(source string) !StoreClassParts {
  mut methods := map[string]string{}
  mut metadata := []string{}
@@ -174,9 +203,23 @@ fn store_parts(source string) !StoreClassParts {
 }
 
 fn narrow_method_delta(old string, new string, allowed []string, expected_changed int, expected_added int) ! {
+ narrow_member_delta(old, new, allowed, expected_changed, expected_added, []string{})!
+}
+
+fn narrow_member_delta(old string, new string, allowed []string, expected_changed int, expected_added int, fields []string) ! {
  before := store_parts(old)!
  after := store_parts(new)!
- if before.metadata != after.metadata { return error('provider changed class/field metadata') }
+ mut metadata := after.metadata.split_into_lines()
+ mut seen := map[string]bool{}
+ for field in fields {
+  if !field.starts_with('.field ') || field in seen || field in before.metadata.split_into_lines()
+   || metadata.filter(it == field).len != 1 {
+   return error('missing, duplicate or preexisting required field: ' + field)
+  }
+  seen[field] = true
+  metadata = metadata.filter(it != field)
+ }
+ if before.metadata != metadata.join('\n') { return error('provider changed class/field metadata') }
  mut changed := 0
  mut added := 0
  for name, method in before.methods {
@@ -315,8 +358,12 @@ fn narrow_class_delta(old map[string]string, new map[string]string, targets []st
 }
 
 fn narrow_added_class_delta(old map[string]string, new map[string]string, targets []string, extras []string) ! {
- if old.len != 2102 || new.len != old.len + extras.len || targets.len == 0 {
-  return error('narrow profile requires exactly 2102 baseline classes and explicit targets/additions')
+ narrow_profile_class_delta(old, new, targets, extras, 2102)!
+}
+
+fn narrow_profile_class_delta(old map[string]string, new map[string]string, targets []string, extras []string, baseline_classes int) ! {
+ if old.len != baseline_classes || new.len != old.len + extras.len || targets.len == 0 {
+  return error('narrow profile requires exactly ' + baseline_classes.str() + ' baseline classes and explicit targets/additions')
  }
  mut seen := map[string]bool{}
  for name in extras {
@@ -331,6 +378,48 @@ fn narrow_added_class_delta(old map[string]string, new map[string]string, target
   }
  }
  for name in targets { if name !in old { return error('missing narrow baseline class: ' + name) } }
+}
+
+fn protected_storage_self_test() ! {
+ profile := protected_storage_profile()
+ targets := profile.methods.keys()
+ for target in targets { narrow_method_self_test(profile.methods[target]!, profile.changed[target]!, profile.added[target]!)! }
+ mut old := map[string]string{}
+ for target in targets { old[target] = 'old' }
+ for i in 0 .. profile.baseline_classes - targets.len { old['other/' + i.str() + '.smali'] = 'same' }
+ mut good := old.clone()
+ for target in targets { good[target] = 'new' }
+ narrow_profile_class_delta(old, good, targets, []string{}, profile.baseline_classes)!
+ for case in 0 .. targets.len + 4 {
+  mut before := old.clone()
+  mut bad := good.clone()
+  match case {
+   targets.len { bad['other/0.smali'] = 'changed' }
+   targets.len + 1 { bad.delete('other/0.smali'); bad['extra.smali'] = 'new' }
+   targets.len + 2 { before.delete('other/0.smali'); bad.delete('other/0.smali') }
+   targets.len + 3 { bad['extra.smali'] = 'new' }
+   else { bad[targets[case]] = 'old' }
+  }
+  narrow_profile_class_delta(before, bad, targets, []string{}, profile.baseline_classes) or { continue }
+  return error('invalid protected storage class delta accepted: ' + case.str())
+ }
+ metadata := '.class public LExample;\n.super Ljava/lang/Object;\n.field public dataDir:Ljava/lang/String;\n'
+ method := '.method public existing()V\n.locals 0\nreturn-void\n.end method\n'
+ fields := profile.fields['android/content/pm/ApplicationInfo.smali']!
+ before := metadata + method
+ after := metadata + fields.join('\n') + '\n' + method
+ narrow_member_delta(before, after, []string{}, 0, 0, fields)!
+ for bad in [before, after + fields[0] + '\n', after.replace('public deviceProtectedDataDir:', 'private deviceProtectedDataDir:'),
+  after + '.field public unexpected:I\n', after.replace('public dataDir:', 'private dataDir:'),
+  after.replace('Ljava/lang/Object;', 'LOther;')] {
+  narrow_member_delta(before, bad, []string{}, 0, 0, fields) or { continue }
+  return error('invalid protected storage field delta accepted')
+ }
+ narrow_member_delta(after, after, []string{}, 0, 0, fields) or {
+  narrow_member_delta(before, after, []string{}, 0, 0, [fields[0], fields[0]]) or { return }
+  return error('duplicate required storage field accepted')
+ }
+ return error('preexisting required storage fields accepted')
 }
 
 fn store_delta_self_test() ! {
@@ -407,6 +496,7 @@ fn accessor_delta(old string, new string, declaration string) ! {
 fn self_test() ! {
  store_delta_self_test()!
  store_method_self_test()!
+ protected_storage_self_test()!
  mut old := map[string]string{}
  for name in changes { old[name] = 'old' }
  for i in 0 .. 2098 - changes.len { old['other/' + i.str() + '.smali'] = 'old' }
@@ -530,12 +620,18 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  os.write_file(root + '/provider-source/androidtools/framework_account_helpers.v',
   'module androidtools\n' + helper_function(os.read_file(root + '/provider-helper-inputs/framework.v')!, 'pub fn framework_replace_method(')!)!
  mut application := 'module main\nimport androidtools\nimport os\nfn main() {\n'
- mut targets := profile.calls.keys()
+ mut targets := profile.methods.keys()
  targets.sort()
- for i, target in targets {
-  name := 'path' + i.str()
-  application += name + ' := os.args[1] + "/' + target + '"\n' +
-   'os.write_file(' + name + ',androidtools.' + profile.calls[target]! + '(os.read_file(' + name + ')!)!)!\n'
+ if profile.directory_provider != '' {
+  if profile.calls.len != 0 { return error('directory provider cannot also have per-class calls') }
+  application += 'androidtools.' + profile.directory_provider + '(os.args[1])!\n'
+ } else {
+  if profile.calls.len != targets.len { return error('narrow calls differ from explicit method targets') }
+  for i, target in targets {
+   name := 'path' + i.str()
+   application += name + ' := os.args[1] + "/' + target + '"\n' +
+    'os.write_file(' + name + ',androidtools.' + profile.calls[target]! + '(os.read_file(' + name + ')!)!)!\n'
+  }
  }
  if profile.class_provider != '' {
   application += 'classes := androidtools.' + profile.class_provider + '()\n' +
@@ -553,7 +649,8 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  command(root, 'java-version', [java, '--version'])!
  command(root, 'v-version', [store_compiler, 'version'])!
  driver_closure := freeze_closure(root, command(root, 'builder-closure', [store_compiler, '-print-v-files', source_file])!, 'builder-closure-inputs')!
- command(root, 'old-disassemble', [java, '-cp', classpath.join(':'), 'org.jf.baksmali.Main', 'disassemble', '--jobs', '2', baseline + '/api-impl.jar', '-o', root + '/old-dex'])!
+ // Smali has a small worker pool and fixed heap even on hosts with large RAM.
+ command(root, 'old-disassemble', [java, '-Xmx512m', '-XX:ActiveProcessorCount=2', '-cp', classpath.join(':'), 'org.jf.baksmali.Main', 'disassemble', '--jobs', '2', baseline + '/api-impl.jar', '-o', root + '/old-dex'])!
  command(root, 'clone-canonical-smali', ['/bin/cp', '-c', '-R', root + '/old-dex', root + '/smali'])!
  os.cp(baseline + '/api-impl.jar', root + '/api-impl.jar')!
  mut old := map[string]string{}
@@ -564,21 +661,21 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  command(root, 'apply-provider', [root + '/provider', root + '/smali'])!
  mut applied := map[string]string{}
  inventory(root + '/smali', '', mut applied)!
- narrow_added_class_delta(old, applied, targets, profile.extra_classes)!
+ narrow_profile_class_delta(old, applied, targets, profile.extra_classes, profile.baseline_classes)!
  for target in targets {
-  narrow_method_delta(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!,
-   profile.methods[target]!, profile.changed[target]!, profile.added[target]!)!
+  narrow_member_delta(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!,
+   profile.methods[target]!, profile.changed[target]!, profile.added[target]!, profile.fields[target] or { []string{} })!
  }
- command(root, 'assemble', [java, '-cp', classpath.join(':'), 'org.jf.smali.Main', 'assemble', '--jobs', '2', root + '/smali', '-o', root + '/classes.dex'])!
+ command(root, 'assemble', [java, '-Xmx512m', '-XX:ActiveProcessorCount=2', '-cp', classpath.join(':'), 'org.jf.smali.Main', 'assemble', '--jobs', '2', root + '/smali', '-o', root + '/classes.dex'])!
  if !os.is_file(root + '/classes.dex') || os.file_size(root + '/classes.dex') < 112 { return error('store assembly produced no fresh DEX') }
  command(root, 'replace-dex', ['/usr/bin/zip', '-q', '-j', root + '/api-impl.jar', root + '/classes.dex'])!
- command(root, 'new-disassemble', [java, '-cp', classpath.join(':'), 'org.jf.baksmali.Main', 'disassemble', '--jobs', '2', root + '/api-impl.jar', '-o', root + '/new-dex'])!
+ command(root, 'new-disassemble', [java, '-Xmx512m', '-XX:ActiveProcessorCount=2', '-cp', classpath.join(':'), 'org.jf.baksmali.Main', 'disassemble', '--jobs', '2', root + '/api-impl.jar', '-o', root + '/new-dex'])!
  mut new := map[string]string{}
  inventory(root + '/new-dex', '', mut new)!
- narrow_added_class_delta(old, new, targets, profile.extra_classes)!
+ narrow_profile_class_delta(old, new, targets, profile.extra_classes, profile.baseline_classes)!
  for target in targets {
-  narrow_method_delta(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!,
-   profile.methods[target]!, profile.changed[target]!, profile.added[target]!)!
+  narrow_member_delta(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!,
+   profile.methods[target]!, profile.changed[target]!, profile.added[target]!, profile.fields[target] or { []string{} })!
  }
  write_json(root + '/framework-dex-before.json', old)!
  write_json(root + '/framework-dex-after.json', new)!
@@ -605,6 +702,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   'class_count': json2.Any(new.len), 'compiler_sha256': json2.Any(store_compiler_pin),
   'changed_method_counts': json2.decode[json2.Any](json2.encode(profile.changed))!,
   'added_method_counts': json2.decode[json2.Any](json2.encode(profile.added))!,
+  'added_fields': json2.decode[json2.Any](json2.encode(profile.fields))!,
   'environmental_inputs': json2.Any('Host SDK and dynamic libraries are environmental dependencies; exact V source closures, compiler and smali tool JARs retained and checked')
  })!
  mut pins := map[string]string{}
@@ -849,11 +947,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions'] {
-  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } else { descriptions_profile() } }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage'] {
+  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } else { protected_storage_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
