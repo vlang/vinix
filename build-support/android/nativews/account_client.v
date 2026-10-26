@@ -341,13 +341,14 @@ fn ws_account_interact(node &WsAccountRequest) bool {
 			node.error_code = 7
 			return false
 		}
-		mut ticket := [32]u8{}
-		if ws_account_interaction(node.handle, &ticket[0], 32) != 0 { return false }
+		ticket := &u8(C.calloc(1, 32))
+		if ticket == nil { return false }
+		defer { C.memset(ticket, 0, 32); C.free(ticket) }
+		if ws_account_interaction(node.handle, ticket, 32) != 0 { return false }
 		ws_account_sequence++
 		node.redemption_id = ws_account_sequence
 		node.interacted = true
-		node.redemption = ws_account_redeem(node.redemption_id, node.id, &ticket[0], 32, node.endpoint)
-		C.memset(&ticket[0], 0, 32)
+		node.redemption = ws_account_redeem(node.redemption_id, node.id, ticket, 32, node.endpoint)
 		return node.redemption != nil
 	}
 }
