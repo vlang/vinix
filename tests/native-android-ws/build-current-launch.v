@@ -16,6 +16,9 @@ const compiler_pin = '0cc6c1d34c1811a818e4ae89853116861a4b067d4251af257851a7714f
 const compiler = '/Users/alex/code/v/v'
 const cross = '/opt/homebrew/bin/aarch64-linux-musl-gcc'
 const self_source = repo + '/tests/native-android-ws/build-current-launch.v'
+const zlib_bundle = state + 'account-zlib-static-build-2026-10-26-r1'
+const zlib_seal = 'f2652acfdf8963998d51d767990ac72daae4c54a9ee6e956327cdf2ee462272f'
+const zlib_source_pin = 'd9e270d46252734aa49770fbc544125391617956266f220bd63216c834f3a522'
 
 fn pinned_compiler() !string {
 	candidate := os.getenv_opt('VINIX_CURRENT_LAUNCH_COMPILER') or { compiler }
@@ -370,6 +373,10 @@ fn launch_items(profile string) ![][]string {
 		return [['token-cache-controller', repo + '/tests/native-android-ws/account-token-cache-controller.v',
 			'account-token-cache-controller']]
 	}
+	if profile == 'ui-controller' {
+		return [['account-ui-controller', repo + '/tests/native-android-ws/account-ui-controller.v',
+			'account-ui-controller']]
+	}
 	if profile != 'launch' { return error('unknown executable profile') }
 	return [
 		['native-entry', repo + '/build-support/android/native-entry.v', 'vinix-android-native'],
@@ -378,6 +385,24 @@ fn launch_items(profile string) ![][]string {
 			'headless-service-controller'],
 		['broker', repo + '/build-support/android/native-account-broker.v', 'native-account-broker'],
 	]
+}
+
+fn profile_prefix(profile string) !string {
+	return match profile {
+		'launch' { 'current-launch-build-' }
+		'token-cache-controller' { 'current-token-cache-controller-build-' }
+		'ui-controller' { 'current-ui-controller-build-' }
+		else { return error('unknown executable profile') }
+	}
+}
+
+fn profile_kind(profile string) !string {
+	return match profile {
+		'launch' { 'vinix-current-launch-v1' }
+		'token-cache-controller' { 'vinix-account-token-cache-controller-v1' }
+		'ui-controller' { 'vinix-account-ui-controller-build-v1' }
+		else { return error('unknown executable profile') }
+	}
 }
 
 // The pinned V compiler represents inferred int as 64 bits. POSIX waitpid
@@ -513,6 +538,92 @@ fn check_link(root string, label string, output string, objects []string, pins m
 	write_json(root + '/generated/' + label + '-link-inputs.json', consumed)!
 }
 
+fn needs_zlib(closure map[string]string) bool {
+	return closure.keys().any(it.ends_with('/accountmanifest/authenticator_zip.v'))
+}
+
+fn zlib_manifest_paths(pins map[string]string) ![]string {
+	for required in ['build.json', 'lib/libz.a', 'native/zlib.h', 'native/zconf.h'] {
+		if required !in pins { return error('missing pinned zlib output: ' + required) }
+	}
+	mut paths := pins.keys()
+	paths.sort()
+	for path in paths {
+		if path == '' || os.is_abs_path(path) || path.contains('\\')
+			|| path.split('/').any(it in ['', '.', '..']) || path == 'sha256.json'
+			|| pins[path]!.len != 64 || !pins[path]!.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`)) {
+			return error('invalid zlib inventory member: ' + path)
+		}
+	}
+	return paths
+}
+
+// Reuse a separately sealed, PIC static zlib build. Its complete producer
+// bundle remains required evidence; the exact consumed archive and headers are
+// copied here and admitted to the ordinary header/link closure checks.
+fn validate_zlib_producer() !map[string]string {
+	if hash(zlib_bundle + '/sha256.json')! != zlib_seal { return error('sealed zlib build differs') }
+	pins := json2.decode[map[string]string](os.read_file(zlib_bundle + '/sha256.json')!)!
+	paths := zlib_manifest_paths(pins)!
+	mut actual := map[string]string{}
+	inventory(zlib_bundle, '', mut actual)!
+	actual.delete('sha256.json')
+	if actual.len != pins.len { return error('zlib producer file membership differs') }
+	for path in paths {
+		full := zlib_bundle + '/' + path
+		if os.real_path(full) != full || os.lstat(full)!.get_filetype() != .regular
+			|| actual[path] != pins[path]! { return error('zlib producer input differs: ' + path) }
+	}
+	receipt := json2.decode[map[string]json2.Any](os.read_file(zlib_bundle + '/build.json')!)!
+	if receipt['kind']!.str() != 'vinix-account-zlib-static-v1'
+		|| receipt['source_archive_sha256']!.str() != zlib_source_pin
+		|| receipt['architecture']!.str() != 'aarch64' || !receipt['pic']!.bool() {
+		return error('zlib producer contract differs')
+	}
+	if hash(zlib_bundle + '/sha256.json')! != zlib_seal { return error('zlib producer seal changed') }
+	return pins
+}
+
+fn retained_zlib(root string) !map[string]string {
+	pins := validate_zlib_producer()!
+	copy_pin(zlib_bundle + '/sha256.json', root + '/zlib-producer-sha256.json', zlib_seal)!
+	copy_pin(zlib_bundle + '/build.json', root + '/zlib-producer-build.json', pins['build.json']!)!
+	mut consumed := map[string]string{}
+	for path in ['lib/libz.a', 'native/zlib.h', 'native/zconf.h'] {
+		target := root + '/zlib/' + path
+		copy_pin(zlib_bundle + '/' + path, target, pins[path]!)!
+		consumed[target] = pins[path]!
+	}
+	write_json(root + '/zlib-native-inputs.json', consumed)!
+	write_json(root + '/zlib-dependency.json', {
+		'bundle': json2.Any(zlib_bundle)
+		'sha256': json2.Any(zlib_seal)
+		'source_archive_sha256': json2.Any(zlib_source_pin)
+	})!
+	if hash(zlib_bundle + '/sha256.json')! != zlib_seal { return error('zlib producer seal changed') }
+	return consumed
+}
+
+fn check_zlib_headers(root string, label string) ! {
+	consumed := json2.decode[map[string]string](os.read_file(root + '/generated/' + label + '-headers.json')!)!
+	for name in ['zlib.h', 'zconf.h'] {
+		path := root + '/zlib/native/' + name
+		if consumed[path] != hash(path)! { return error('retained zlib header was not consumed: ' + name) }
+	}
+}
+
+fn zlib_link_trace(output string, archive string) ! {
+	mut found := false
+	for line in output.split_into_lines() {
+		path := line.trim_space()
+		if path == archive { found = true }
+		if os.file_name(path).starts_with('libz.so') {
+			return error('dynamic zlib outside static dependency contract')
+		}
+	}
+	if !found { return error('missing retained zlib archive in link trace') }
+}
+
 fn build(root string, framework string, profile string) ! {
 	if hash(base + '/sha256.json')! != base_seal { return error('sealed r5 baseline differs') }
 	base_pins := json2.decode[map[string]string](os.read_file(base + '/sha256.json')!)!
@@ -549,7 +660,10 @@ fn build(root string, framework string, profile string) ! {
 	service_abi(os.read_file(root + '/abi/native-entry.v')!, os.read_file(root + '/abi/headless.v')!)!
 	write_json(root + '/current-inputs.json', originals)!
 	unchanged(originals)!
-	cross_pins := cross_inputs(root, base_pins)!
+	mut cross_pins := cross_inputs(root, base_pins)!
+	if needs_zlib(originals) {
+		for path, pin in retained_zlib(root)! { cross_pins[path] = pin }
+	}
 	mut outputs := map[string]string{}
 	for item in items {
 		closure := linux_closure(root, item[0])!
@@ -567,8 +681,11 @@ fn build(root string, framework string, profile string) ! {
 		generate << ['-o', generated, source]
 		command_at(root, 'generate-' + item[0], os.dir(v), generate)!
 		unchanged(closure)!
-		includes := native_includes(closure)
+		uses_zlib := needs_zlib(closure)
+		mut includes := if uses_zlib { ['-I' + root + '/zlib/native'] } else { []string{} }
+		includes << native_includes(closure)
 		check_headers(root, item[0], generated, cross_pins, closure, includes)!
+		if uses_zlib { check_zlib_headers(root, item[0])! }
 		object := root + '/generated/' + item[0] + '.o'
 		mut compile := [cross, '-v', '-D_GNU_SOURCE', '-O2', '-fwrapv', '-pthread',
 			'-Werror=implicit-function-declaration', '-Werror=int-conversion']
@@ -588,21 +705,26 @@ fn build(root string, framework string, profile string) ! {
 		command(root, 'compile-' + item[0] + '-runtime', runtime_compile)!
 		mut link := [cross, '-v', '-no-pie', '-pthread', '-Wl,-t']
 		if item[0] != 'native-entry' { link << '-static' }
-		link << [object, runtime_object, '-ldl', '-lm', '-o', root + '/bin/' + item[2]]
-		check_link(root, item[0], command(root, 'build-' + item[0], link)!, [object, runtime_object], cross_pins)!
+		link << [object, runtime_object]
+		if uses_zlib { link << root + '/zlib/lib/libz.a' }
+		link << ['-ldl', '-lm', '-o', root + '/bin/' + item[2]]
+		trace := command(root, 'build-' + item[0], link)!
+		check_link(root, item[0], trace, [object, runtime_object], cross_pins)!
+		if uses_zlib { zlib_link_trace(trace, root + '/zlib/lib/libz.a')! }
 		executable_elf(os.read_bytes(root + '/bin/' + item[2])!, item[0] != 'native-entry')!
 		outputs['bin/' + item[2]] = hash(root + '/bin/' + item[2])!
 		unchanged(closure)!
 	}
 	unchanged(cross_pins)!
 	unchanged(builder_pins)!
+	if needs_zlib(originals) { validate_zlib_producer()! }
 	if hash(base + '/sha256.json')! != base_seal || hash(framework + '/sha256.json')! != framework_seal {
 		return error('sealed manifest changed')
 	}
 	mut output_fields := map[string]json2.Any{}
 	for path, pin in outputs { output_fields[path] = pin }
 	write_json(root + '/build.json', {
-		'kind':               json2.Any(if profile == 'launch' { 'vinix-current-launch-v1' } else { 'vinix-account-token-cache-controller-v1' })
+		'kind':               json2.Any(profile_kind(profile)!)
 		'profile':            json2.Any(profile)
 		'scope':              json2.Any('Retained executable sources, typed Linux library correction and cross inputs; no guest or account login claim.')
 		'source_revision':    json2.Any(revision)
@@ -664,6 +786,10 @@ fn build_account(root string) ! {
 	unchanged(originals)!
 	mut cross_pins := cross_inputs(root, base_pins)!
 	uses_sqlite := originals.keys().any(it.contains('/accountstore/'))
+	uses_zlib := needs_zlib(originals)
+	if uses_zlib {
+		for path, pin in retained_zlib(root)! { cross_pins[path] = pin }
+	}
 	mut runtime_dependencies := map[string]string{}
 	if uses_sqlite {
 		for path, pin in account_sqlite(root, base_pins)! { cross_pins[path] = pin }
@@ -686,9 +812,11 @@ fn build_account(root string) ! {
 	generate << ['-o', generated, source]
 	command_at(root, 'generate-account', os.dir(v), generate)!
 	unchanged(closure)!
-	mut includes := native_includes(closure)
+	mut includes := if uses_zlib { ['-I' + root + '/zlib/native'] } else { []string{} }
+	includes << native_includes(closure)
 	if uses_sqlite { includes << '-I' + root + '/native' }
 	check_headers_flags(root, 'account', generated, cross_pins, closure, includes, ['-fPIC'])!
+	if uses_zlib { check_zlib_headers(root, 'account')! }
 	object := root + '/generated/account.o'
 	mut compile := [cross, '-v', '-D_GNU_SOURCE', '-O2', '-fwrapv', '-pthread', '-fPIC',
 		'-Werror=implicit-function-declaration', '-Werror=int-conversion']
@@ -708,8 +836,11 @@ fn build_account(root string) ! {
 	mut link := [cross, '-v', '-shared', '-pthread', '-Wl,-z,defs', '-Wl,-z,max-page-size=65536',
 		'-Wl,-t', object, runtime_object]
 	if uses_sqlite { link << root + '/lib/libsqlite3.so.0' }
+	if uses_zlib { link << root + '/zlib/lib/libz.a' }
 	link << ['-ldl', '-lm', '-o', output]
-	check_link(root, 'account', command(root, 'build-account', link)!, [object, runtime_object], cross_pins)!
+	trace := command(root, 'build-account', link)!
+	check_link(root, 'account', trace, [object, runtime_object], cross_pins)!
+	if uses_zlib { zlib_link_trace(trace, root + '/zlib/lib/libz.a')! }
 	account_elf(os.read_bytes(output)!)!
 	nm := command(root, 'cross-tool-nm', [cross, '-print-prog-name=nm'])!.trim_space()
 	nm_path := if os.is_abs_path(nm) { os.real_path(nm) } else { os.find_abs_path_of_executable(nm)! }
@@ -721,6 +852,7 @@ fn build_account(root string) ! {
 	unchanged(closure)!
 	unchanged(cross_pins)!
 	unchanged(builder_pins)!
+	if uses_zlib { validate_zlib_producer()! }
 	if hash(base + '/sha256.json')! != base_seal { return error('sealed baseline changed') }
 	mut dependency_fields := map[string]json2.Any{}
 	for path, pin in runtime_dependencies { dependency_fields[path] = pin }
@@ -792,6 +924,8 @@ fn bootstrap(root string, framework string, profile string) ! {
 		[root + '/tools/frozen-builder', '--frozen-account', root]
 	} else if profile == 'token-cache-controller' {
 		[root + '/tools/frozen-builder', '--frozen-token-cache-controller', framework, root]
+	} else if profile == 'ui-controller' {
+		[root + '/tools/frozen-builder', '--frozen-ui-controller', framework, root]
 	} else {
 		[root + '/tools/frozen-builder', '--frozen-build', framework, root]
 	}
@@ -806,9 +940,62 @@ fn bootstrap(root string, framework string, profile string) ! {
 }
 
 fn self_test() ! {
-	if launch_items('launch')!.len != 4 || launch_items('token-cache-controller')!.len != 1 {
+	valid_zlib := {
+		'build.json': 'a'.repeat(64)
+		'lib/libz.a': 'b'.repeat(64)
+		'native/zlib.h': 'c'.repeat(64)
+		'native/zconf.h': 'd'.repeat(64)
+	}
+	if zlib_manifest_paths(valid_zlib)!.len != 4 { return error('zlib producer membership differs') }
+	for pin in ['0'.repeat(64), '9'.repeat(64), 'a'.repeat(64), 'f'.repeat(64)] {
+		mut boundary := valid_zlib.clone()
+		boundary['lib/libz.a'] = pin
+		zlib_manifest_paths(boundary)!
+	}
+	for invalid_path in ['', '/outside', '../outside', 'native/../outside', 'native//zlib.h',
+		'native\\zlib.h', 'sha256.json'] {
+		mut invalid := valid_zlib.clone()
+		invalid[invalid_path] = 'a'.repeat(64)
+		zlib_manifest_paths(invalid) or { continue }
+		return error('accepted invalid zlib inventory path')
+	}
+	for omitted in valid_zlib.keys() {
+		mut invalid := valid_zlib.clone()
+		invalid.delete(omitted)
+		zlib_manifest_paths(invalid) or { continue }
+		return error('accepted missing zlib producer output')
+	}
+	for pin in ['short', 'g'.repeat(64)] {
+		mut invalid := valid_zlib.clone()
+		invalid['lib/libz.a'] = pin
+		zlib_manifest_paths(invalid) or { continue }
+		return error('accepted invalid zlib digest')
+	}
+	zlib_link_trace('/retained/lib/libz.a\n', '/retained/lib/libz.a')!
+	for invalid in ['/other/libz.a\n', '/retained/lib/libz.a\n/system/libz.so.1\n', ''] {
+		zlib_link_trace(invalid, '/retained/lib/libz.a') or { continue }
+		return error('accepted missing archive or dynamic zlib fallback')
+	}
+	if !needs_zlib({'/frozen/accountmanifest/authenticator_zip.v': 'pin'})
+		|| needs_zlib({'/frozen/unrelated.v': 'pin'}) { return error('zlib source selection differs') }
+	if launch_items('launch')!.len != 4 || launch_items('token-cache-controller')!.len != 1
+		|| launch_items('ui-controller')! != [['account-ui-controller', repo + '/tests/native-android-ws/account-ui-controller.v', 'account-ui-controller']] {
 		return error('executable profile membership differs')
 	}
+	if profile_prefix('ui-controller')! != 'current-ui-controller-build-'
+		|| profile_kind('ui-controller')! != 'vinix-account-ui-controller-build-v1'
+		|| profile_prefix('launch')! != 'current-launch-build-'
+		|| profile_kind('launch')! != 'vinix-current-launch-v1'
+		|| profile_prefix('token-cache-controller')! != 'current-token-cache-controller-build-'
+		|| profile_kind('token-cache-controller')! != 'vinix-account-token-cache-controller-v1' {
+		return error('executable profile receipt differs')
+	}
+	mut rejected_profile := false
+	profile_prefix('unknown') or { rejected_profile = true }
+	if !rejected_profile { return error('accepted unknown profile prefix') }
+	rejected_profile = false
+	profile_kind('unknown') or { rejected_profile = true }
+	if !rejected_profile { return error('accepted unknown profile kind') }
 	mut profile_rejected := false
 	launch_items('unknown') or { profile_rejected = true }
 	if !profile_rejected { return error('accepted unknown executable profile') }
@@ -901,6 +1088,14 @@ fn self_test() ! {
 }
 
 fn main() {
+	if os.args.len == 2 && os.args[1] == '--check-zlib' {
+		validate_zlib_producer() or {
+			eprintln(err)
+			exit(1)
+		}
+		println('CURRENT-LAUNCH-ZLIB-PRODUCER-PASS seal=' + zlib_seal)
+		return
+	}
 	if os.args.len == 2 && os.args[1] == '--self-test' {
 		self_test() or {
 			eprintln(err)
@@ -921,11 +1116,15 @@ fn main() {
 		}
 		return
 	}
-	if os.args.len == 4 && os.args[1] in ['--frozen-build', '--frozen-token-cache-controller'] {
+	if os.args.len == 4 && os.args[1] in ['--frozen-build', '--frozen-token-cache-controller', '--frozen-ui-controller'] {
 		framework := os.abs_path(os.args[2])
 		root := os.abs_path(os.args[3])
-		profile := if os.args[1] == '--frozen-build' { 'launch' } else { 'token-cache-controller' }
-		prefix := if profile == 'launch' { 'current-launch-build-' } else { 'current-token-cache-controller-build-' }
+		profile := match os.args[1] {
+			'--frozen-build' { 'launch' }
+			'--frozen-token-cache-controller' { 'token-cache-controller' }
+			else { 'ui-controller' }
+		}
+		prefix := profile_prefix(profile)!
 		if os.executable() != root + '/tools/frozen-builder' || !root.starts_with(state + prefix) {
 			eprintln('internal frozen build requires its retained executable')
 			exit(2)
@@ -937,16 +1136,16 @@ fn main() {
 		}
 		return
 	}
-	controller := os.args.len == 4 && os.args[1] == '--token-cache-controller'
+	controller := os.args.len == 4 && os.args[1] in ['--token-cache-controller', '--ui-controller']
 	if os.args.len != 3 && !controller {
-		eprintln('usage: build-current-launch [--token-cache-controller] SEALED_FRAMEWORK_BUNDLE|--account FRESH_EXTERNAL_OUTPUT')
+		eprintln('usage: build-current-launch [--token-cache-controller|--ui-controller] SEALED_FRAMEWORK_BUNDLE|--account FRESH_EXTERNAL_OUTPUT')
 		exit(2)
 	}
 	account := !controller && os.args[1] == '--account'
-	profile := if controller { 'token-cache-controller' } else { 'launch' }
+	profile := if controller { os.args[1].trim_left('-') } else { 'launch' }
 	framework := if account { '--account' } else { os.abs_path(os.args[if controller { 2 } else { 1 }]) }
 	root := os.abs_path(os.args[if controller { 3 } else { 2 }])
-	prefix := if account { 'current-account-build-' } else if controller { 'current-token-cache-controller-build-' } else { 'current-launch-build-' }
+	prefix := if account { 'current-account-build-' } else { profile_prefix(profile)! }
 	if (!account && (!framework.starts_with(state) || os.real_path(framework) != framework))
 		|| !root.starts_with(state + prefix) || os.exists(root)
 		|| os.is_link(root) || os.real_path(os.dir(root)) != os.dir(root) {
