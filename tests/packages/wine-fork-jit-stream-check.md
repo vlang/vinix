@@ -858,3 +858,49 @@ and status are retained at
 SHA-256 `5f61f1462d0434dd9b34aaf0ce6dc56f1ac5e5bb7e261bb62aef4274668c24e7`.
 The additional refusal state and seal charge 2,266 bytes. Earlier recorded
 successful historical checks and host-only qualification remain unchanged.
+
+The separate `wine-fork-jit-stream-kernel-bind-atomic.v` adapter preserves
+that historical route and binds the fresh atomic build-02 instead. From
+source base `989c31ef60396f27f0dcee993f163677ef7e6cf0`, production bootstrap
+completed with actual status `0` in 3.97 seconds; adaptation completed with
+actual status `0` in 11.34 seconds. The unchanged original complete checker
+passed against `matched-peer-frame-atomic-20261026` and its manifest
+`d7764b47d4c617550ed67af5eee5167392f818ea51e884d1a6abaf3469acf118`.
+The original ARM build status is `0` in 95,824 ms, with its leader reaped
+and group absent. This is base `9acefa77...` with seven reviewed production
+sources: six tracked patch diffs plus the retained new `frame_page.v`.
+Signal, clone and process sources remain the earlier baseline.
+
+The binding selects the retained
+`matched-peer-frame-atomic-kernel-20261026/kernel-aarch64/bin/vinix`,
+SHA-256 `1111f8d6451a0ab94361c3ebf006e9ceed62baea9dd395ac0a5c3caa7fb3a254`,
+whose bytes equal the original qualified ELF. Retained format-2 receipt
+`2d93f496c9f17a029eff5691070fb6093cad741380b28a87736f12ebfa35e5cb`
+and selected-copy manifest `3a36d8ec...` are pinned references; the adapter
+does not repeat the full selected-copy audit. Full selected input maps
+before and after are persisted, both SHA-256
+`be4e5bfde9fc76109044bad90ed5bf112706f3cba71a9493fa98c3387cc0fb82`.
+The new binding at `wine-jit-stream-native-kernel-bind-atomic-01/kernel-binding.json`
+has SHA-256 `27113003335b4185a59f0671994a7fd99c4fddc895c841cd13df0ec2f382bc8f`.
+Adapter source SHA-256 is `276a6c97f295b0f2fa42ee8fc992c3a10e5c552fa34ea12efb07d4febacf5f77`;
+its executable SHA-256 is `485b6d5dfcec25f3315860a5ece6a62f27fe65df1a6b425e3f259f674e3c1bfe`.
+
+Exact environment, invocations and actual observations are retained under
+`wine-jit-stream-native-kernel-bind-atomic-host-01`. External bootstrap and
+adapter bounds were 300 and 360 seconds, with a 300-second original audit
+leaf. No independent bootstrap group-cleanup claim is made. Original
+complete seals passed at `wine-jit-stream-native-kernel-bind-atomic-seal-01`:
+
+| Manifest | SHA-256 |
+| --- | --- |
+| `bootstrap/complete/inventory.json` | `12ba09fa59a9ed2f80f4100c6cdcead8ef4fb3d616b94d6fa45f9a54137e8a86` |
+| `receipt/complete/inventory.json` | `55fba9b818b5c8d128e58f58fcc3d27d8da7e700ddc08e9721c947223836a11d` |
+
+New adapter state and seals retain 486,096 bytes, within the 8 MiB reserve.
+Together with all earlier Wine state and reserves, the charge is
+98,774,562 bytes within 128 MiB. Including all historical named static
+inputs and the fresh atomic raw bundle, selected copy, retainer and seals
+gives 1,061,236,888 bytes within 1 GiB. These are inclusive storage charges,
+not filesystem quotas. Actual free space after adaptation was 7,958,472 KiB.
+No controller, target program or VM executed; this binding supplies an
+unchanged-signal diagnostic input, without guest qualification.
