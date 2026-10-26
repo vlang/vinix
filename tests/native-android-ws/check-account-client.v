@@ -20,6 +20,12 @@ fn main() {
 		code += '\n' + block(source, name)
 	}
 	code = code.replace('C.pthread_mutex_t', 'int').replace('C.pthread_mutex_lock', 'lock').replace('C.pthread_mutex_unlock', 'unlock')
+	// Instrument the production ticket allocation only; all other allocations
+	// remain real. Release checks bytes before free; this proves cleanup branches,
+	// not that production memset survives an optimizing C compiler.
+	assert code.count('ticket := &u8(C.calloc(1, 32))') == 1
+	code = code.replace('ticket := &u8(C.calloc(1, 32))', 'ticket := ticket_allocate()')
+	code = code.replace('C.memset(', 'cleanse(').replace('C.free(', 'release(')
 	os.write_file(work + '/main.v', model + code + cases)!
 	compiler := os.getenv_opt('VINIX_V_COMPILER') or { 'v' }
 	r := os.exec([compiler, '-w', '-n', '-enable-globals', '-cc', 'cc', 'run', work + '/main.v'])
@@ -68,6 +74,37 @@ __global submit_bad bool
 __global ref_bad voidptr
 __global seen_error i32
 __global token_built int
+__global ticket_pointer voidptr
+__global ticket_allocation_bad bool
+__global ticket_attempts int
+__global ticket_allocated int
+__global ticket_cleansed int
+__global ticket_freed int
+__global ticket_calls int
+fn ticket_allocate() &u8 {
+ assert held && ticket_pointer == unsafe { nil }
+ ticket_attempts++
+ if ticket_allocation_bad { return unsafe { nil } }
+ value := C.calloc(1, 32)
+ assert value != unsafe { nil }
+ ticket_pointer = value; ticket_allocated++
+ return unsafe { &u8(value) }
+}
+fn cleanse(value voidptr, byte int, size u64) voidptr {
+ if value == ticket_pointer && value != unsafe { nil } {
+  assert held && byte == 0 && size == 32 && ticket_cleansed == ticket_freed
+  ticket_cleansed++
+ }
+ return C.memset(value, byte, size)
+}
+fn release(value voidptr) {
+ if value == ticket_pointer && value != unsafe { nil } {
+  assert held && ticket_cleansed == ticket_allocated && ticket_freed + 1 == ticket_allocated
+  unsafe { bytes := &u8(value); for i in 0 .. 32 { assert bytes[i] == 0 } }
+  ticket_freed++; ticket_pointer = unsafe { nil }
+ }
+ C.free(value)
+}
 fn lock(mutex &int) { assert !held; held = true }
 fn unlock(mutex &int) { assert held; held = false }
 fn pending(e voidptr) bool { return false }
@@ -99,6 +136,10 @@ fn item_tag(handle voidptr, i u32) u16 { return if handle == voidptr(6) { u16(3)
 fn item_number(handle voidptr, i u32) i64 { return 7 }
 fn ticket(handle voidptr, output &u8, size u32) i32 {
  assert held && handle == voidptr(3) && size == 32
+ assert voidptr(output) == ticket_pointer
+ ticket_calls++
+ // A failed transport can still have written a secret prefix.
+ unsafe { for i in 0 .. 9 { output[i] = u8(i + 1) } }
  if ticket_bad { return -1 }
  unsafe { for i in 0 .. 32 { output[i] = u8(i + 1) } }
  return 0
@@ -142,11 +183,14 @@ fn ws_account_complete(e voidptr, node &WsAccountRequest) {
 const cases = '
 fn reset() {
  unsafe {
+  assert ticket_pointer == nil && ticket_allocated == ticket_freed
   assert ws_account_requests == nil
   closed = 0; dropped = 0; completed = 0; depth = 0; now = 0
   seen_kind = 0; event_kind = 1; event_id = 7; event_status = 1; event_count = 1
   ack_kind = 1; ack_id = 8; ack_status = 0; ack_count = 0
   redeemed = 0; ticket_bad = false; submit_bad = false; ref_bad = nil; seen_error = 0
+  ticket_allocation_bad = false; ticket_attempts = 0; ticket_allocated = 0
+  ticket_cleansed = 0; ticket_freed = 0; ticket_calls = 0
   ws_account_initialized = true; ws_account_library = voidptr(1); ws_account_closing = false
   ws_account_sequence = 7
   ws_account_close = close_request; ws_account_read = read_request
@@ -172,6 +216,8 @@ fn offered() {
  event_kind = 4
  ws_account_client_pump(voidptr(1))
  assert redeemed == 1 && completed == 0 && closed == 0 && ws_account_active == 1
+ assert ticket_attempts == 1 && ticket_allocated == 1 && ticket_calls == 1
+ assert ticket_cleansed == 1 && ticket_freed == 1 && ticket_pointer == unsafe { nil }
 }
 fn interaction_terminal(kind u16) {
  assert completed == 1 && seen_kind == kind
@@ -224,11 +270,21 @@ fn main() {
  offered(); now = 300001; ws_account_client_pump(e); interaction_terminal(2)
  offered(); ws_account_client_shutdown(e); ws_account_client_shutdown(e)
  assert closed == 2 && dropped == 2 && ws_account_active == 0
- for variant in 0 .. 4 {
+ for variant in 0 .. 5 {
   reset(); unsafe { ws_account_requests.activity = voidptr(4) }; event_kind = 4
-  match variant { 0 { ticket_bad = true } 1 { submit_bad = true } 2 { unsafe { ws_account_redeem = nil } } else { ws_account_sequence = ~u64(0) } }
+  match variant { 0 { ticket_bad = true } 1 { submit_bad = true } 2 { unsafe { ws_account_redeem = nil } } 3 { ws_account_sequence = ~u64(0) } else { ticket_allocation_bad = true } }
   ws_account_client_pump(e)
   assert completed == 1 && seen_kind == 2 && closed == 1 && dropped == 2 && ws_account_active == 0
+  assert ticket_pointer == unsafe { nil }
+  if variant in [0, 1] {
+   assert ticket_attempts == 1 && ticket_allocated == 1 && ticket_calls == 1
+   assert ticket_cleansed == 1 && ticket_freed == 1
+   assert redeemed == if variant == 0 { 0 } else { 1 }
+  } else {
+   assert ticket_attempts == if variant == 4 { 1 } else { 0 }
+   assert ticket_allocated == 0 && ticket_calls == 0 && redeemed == 0
+   assert ticket_cleansed == 0 && ticket_freed == 0
+  }
  }
  // Execute the production JNI starter: retain both references and close on OOM.
  for bad in [voidptr(0), voidptr(2), voidptr(4)] {
@@ -250,6 +306,6 @@ fn main() {
  reset(); ws_account_finished(e,voidptr(2)); closed = 0; dropped = 0
  assert ws_account_token(e,voidptr(1),unsafe { nil },voidptr(12),unsafe { nil },unsafe { nil },voidptr(2)) == 0
  assert token_built == 0 && ws_account_active == 0
- println("ACCOUNT-CLIENT-PASS terminal cancellation reentry timeout identity bounds continuation shutdown activity opaque-redemption acknowledgement replay cleanup token-identity")
+ println("ACCOUNT-CLIENT-PASS terminal cancellation reentry timeout identity bounds continuation shutdown activity opaque-redemption acknowledgement replay cleanup token-identity ticket-allocation-failure ticket-cleansing")
 }
 '
