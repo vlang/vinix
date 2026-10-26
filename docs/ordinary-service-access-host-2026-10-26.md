@@ -37,6 +37,32 @@ Both TRANSFORM-PASS and ASSEMBLY-PASS are retained in
 `/Users/alex/.local/state/vinix/android/service-access-check-2026-10-26.log`,
 SHA-256 `fedbb90a9956de27f45f350f4cd02ddea46b29091381c05c02580c59c5ba0837`.
 
+Follow-up `dcb2d755f` validates the lookup, result register, conditional branch,
+registration and final false return structurally. Smali label names may change
+after assembly/disassembly. Both the original source and canonical disassembly
+pass transformation and assembly; inverted branches, missing destinations,
+success-returning miss paths and changed return registers are rejected.
+
+## Canonical framework overlay: historical host check
+
+The complete 2,097-class candidate is retained at
+`/Users/alex/.local/state/vinix/android/account-contract-service-access-build-2026-10-26-candidate-r2`.
+Its sealed manifest SHA-256 is
+`57703467f75b8425135ed31ed6b419b75ddba8c6a2ff637b76d36cc43460f0df`;
+the JAR SHA-256 is
+`7e01a5052c15ee4c5222eaa84cb633dd96d372ecfbbfeb49f1f212c0bba1a921`.
+The build preserves the complete input/output trees and command receipts. Source
+and DEX readback confirm ContextImpl is the only changed class, and classes.dex
+is the only changed JAR member. Provider guards, malformed/reapplication probes,
+class/JAR inventory self-tests and pre/post baseline/native integrity checks
+passed. The retained native library reference remains
+`aa460c06686e2d1f60ea6dd27ab8f158a3b9794440499c6cdc5e7840cafda0cb`.
+
+This historical candidate is not the final runtime baseline. Separate ART tests
+found that the shared baseline lacks `android.accounts.NetworkErrorException`;
+the service overlay must be rebuilt over the repaired baseline before its ART
+fixture can qualify the behavior.
+
 ## Signed runtime fixture: host build only
 
 `tests/native-android-ws/service-access-fixture.v` builds four signed APKs. The
