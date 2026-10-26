@@ -1,0 +1,176 @@
+{
+    "format": 1,
+    "architecture": "aarch64",
+    "base_lock_sha256": "c39129f6bd641d315f6d582d6457fb5f7adb15dafbc5fcfc7da4260411e6b3bd",
+    "indexes": {
+        "https://dl-cdn.alpinelinux.org/alpine/edge/community/aarch64/APKINDEX.tar.gz": "cbcc689de370cde500ada54f6638a82c879b624541779955737008b620d57973",
+        "https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/APKINDEX.tar.gz": "42b04e924a9b55087d5ac2b5395ed5728d21f76437fe058833a91437e098aea5"
+    },
+    "packages": [
+        {
+            "name": "font-alias",
+            "version": "1.0.6-r0",
+            "filename": "font-alias-1.0.6-r0.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/font-alias-1.0.6-r0.apk",
+            "sha256": "4358279fc11afc496ed43320c82ae945fefc38bd405779ae4b213119345d6c87",
+            "archive_bytes": 3945,
+            "installed_bytes": 15663,
+            "dependencies": "",
+            "apk_index_checksum": "Q1Ikkxhz3sn9NA2d/3lqBUqgWYX/A="
+        },
+        {
+            "name": "font-cursor-misc",
+            "version": "1.0.4-r1",
+            "filename": "font-cursor-misc-1.0.4-r1.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/font-cursor-misc-1.0.4-r1.apk",
+            "sha256": "f6d8139fb31a42d7d12be83a1850199b81c83195cfe8ed46df196445613f6146",
+            "archive_bytes": 7013,
+            "installed_bytes": 28672,
+            "dependencies": "encodings font-alias mkfontscale fontconfig util-macros",
+            "apk_index_checksum": "Q1CLyknApF068MJaAIaivc033Tr38="
+        },
+        {
+            "name": "font-misc-misc",
+            "version": "1.1.3-r1",
+            "filename": "font-misc-misc-1.1.3-r1.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/font-misc-misc-1.1.3-r1.apk",
+            "sha256": "163b53f7633091408e222b0eed5287a16b24307dba40b767e75cfeff756f6bcb",
+            "archive_bytes": 3696486,
+            "installed_bytes": 5296128,
+            "dependencies": "encodings font-alias mkfontscale fontconfig util-macros",
+            "apk_index_checksum": "Q1smnlBdU61gVLaCHlKy0wZWq62uA="
+        },
+        {
+            "name": "libncursesw",
+            "version": "6.6_p20261017-r0",
+            "filename": "libncursesw-6.6_p20261017-r0.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/libncursesw-6.6_p20261017-r0.apk",
+            "sha256": "bd4f81dc1cef1399f7ca8c994ba5860136ca6d10f949d9609975310d8f3a6138",
+            "archive_bytes": 163404,
+            "installed_bytes": 396160,
+            "dependencies": "ncurses-terminfo-base=6.6_p20261017-r0 so:libc.musl-aarch64.so.1",
+            "apk_index_checksum": "Q1fJJA5m4AKjsC0fM4RLBkHNvqYrY="
+        },
+        {
+            "name": "libxfont2",
+            "version": "2.0.8-r0",
+            "filename": "libxfont2-2.0.8-r0.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/community/aarch64/libxfont2-2.0.8-r0.apk",
+            "sha256": "66dcaeabea44f3762374c3727a9981b21a56848933c237ccaddf477daa7ccfb8",
+            "archive_bytes": 102319,
+            "installed_bytes": 201720,
+            "dependencies": "so:libc.musl-aarch64.so.1 so:libfontenc.so.1 so:libfreetype.so.6 so:libz.so.1",
+            "apk_index_checksum": "Q1spO1HJZ4cj3pWvxkPqabl4WV7H4="
+        },
+        {
+            "name": "libxkbfile",
+            "version": "1.2.0-r0",
+            "filename": "libxkbfile-1.2.0-r0.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/libxkbfile-1.2.0-r0.apk",
+            "sha256": "224fa593a373cda44c6098d1cb7ec2a24ed83f9426d63b695c96ba5e5ecef33e",
+            "archive_bytes": 60235,
+            "installed_bytes": 133912,
+            "dependencies": "so:libX11.so.6 so:libc.musl-aarch64.so.1",
+            "apk_index_checksum": "Q1XFpsXy7MHSIkgehotBfOV3/L3+Q="
+        },
+        {
+            "name": "libxtst",
+            "version": "1.2.6-r0",
+            "filename": "libxtst-1.2.6-r0.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/libxtst-1.2.6-r0.apk",
+            "sha256": "f465e68b9d85e3cb24381fa87037814033eb43916b68adabaff51567682d7cb5",
+            "archive_bytes": 10578,
+            "installed_bytes": 67432,
+            "dependencies": "so:libX11.so.6 so:libXext.so.6 so:libc.musl-aarch64.so.1",
+            "apk_index_checksum": "Q11aPWI9U2togtQ87pkJlhqMaQyIo="
+        },
+        {
+            "name": "ncurses-terminfo-base",
+            "version": "6.6_p20261017-r0",
+            "filename": "ncurses-terminfo-base-6.6_p20261017-r0.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/ncurses-terminfo-base-6.6_p20261017-r0.apk",
+            "sha256": "16fd5e1d7d93f98a3eeeccf0629bc49613a0a159b64c67a06f2d6a627a64347a",
+            "archive_bytes": 22183,
+            "installed_bytes": 103132,
+            "dependencies": "",
+            "apk_index_checksum": "Q1eWl9hwhk1BiH5j6ujcL64Spf3oQ="
+        },
+        {
+            "name": "oils-for-unix",
+            "version": "0.37.0-r0",
+            "filename": "oils-for-unix-0.37.0-r0.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/community/aarch64/oils-for-unix-0.37.0-r0.apk",
+            "sha256": "205669db3bffaf0afdcbbb9e10a42d3d24c7eb901c68868b9172214b19ac6487",
+            "archive_bytes": 546802,
+            "installed_bytes": 1489200,
+            "dependencies": "so:libc.musl-aarch64.so.1 so:libgcc_s.so.1 so:libreadline.so.8 so:libstdc++.so.6",
+            "apk_index_checksum": "Q110AkR7Azm3CQX8SBU70+7t9RO+U="
+        },
+        {
+            "name": "oils-for-unix-binsh",
+            "version": "0.37.0-r0",
+            "filename": "oils-for-unix-binsh-0.37.0-r0.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/community/aarch64/oils-for-unix-binsh-0.37.0-r0.apk",
+            "sha256": "0259236a99b88afc30167002c0bdc8a1ff65a58cf3b095f435a9179bfe507fcb",
+            "archive_bytes": 1554,
+            "installed_bytes": 1,
+            "dependencies": "oils-for-unix=0.37.0-r0",
+            "apk_index_checksum": "Q1LkNL4m21c78Tuzjx6Lbny+CNjoc="
+        },
+        {
+            "name": "readline",
+            "version": "8.3.3-r1",
+            "filename": "readline-8.3.3-r1.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/readline-8.3.3-r1.apk",
+            "sha256": "ef3339d5a240b3501b57b21b48da192b429780af9e8a1ba3def629a72810dfbf",
+            "archive_bytes": 129718,
+            "installed_bytes": 352692,
+            "dependencies": "so:libc.musl-aarch64.so.1 so:libncursesw.so.6",
+            "apk_index_checksum": "Q1QCfXo0vQv4/OwHnLmOG2hyxew5Y="
+        },
+        {
+            "name": "util-macros",
+            "version": "1.20.2-r0",
+            "filename": "util-macros-1.20.2-r0.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/util-macros-1.20.2-r0.apk",
+            "sha256": "12d1c59f78a7c0f6585a5043e5511f783b338390761fd1ad1ef62d9716df06ef",
+            "archive_bytes": 24899,
+            "installed_bytes": 87974,
+            "dependencies": "pkgconfig",
+            "apk_index_checksum": "Q1m3SJMYKSMYUI1a/stmVzoz/Z6bc="
+        },
+        {
+            "name": "xkbcomp",
+            "version": "1.5.0-r0",
+            "filename": "xkbcomp-1.5.0-r0.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/xkbcomp-1.5.0-r0.apk",
+            "sha256": "947774ada07195f274984cd2d7c02c963b41b6272657716563a79c161c00d117",
+            "archive_bytes": 80432,
+            "installed_bytes": 204144,
+            "dependencies": "so:libX11.so.6 so:libc.musl-aarch64.so.1 so:libxkbfile.so.1",
+            "apk_index_checksum": "Q15Jfot5//afVHCd3UVPYDXM16BMI="
+        },
+        {
+            "name": "xorg-server-common",
+            "version": "21.1.25-r0",
+            "filename": "xorg-server-common-21.1.25-r0.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/community/aarch64/xorg-server-common-21.1.25-r0.apk",
+            "sha256": "ed3c5829922ba09e06641c0dc8c6904086257433fd2f3a271f2cac056769999b",
+            "archive_bytes": 8487,
+            "installed_bytes": 25699,
+            "dependencies": "",
+            "apk_index_checksum": "Q1CbFMgisplqYERcgoKlBU659WGj0="
+        },
+        {
+            "name": "xvfb",
+            "version": "21.1.25-r0",
+            "filename": "xvfb-21.1.25-r0.apk",
+            "url": "https://dl-cdn.alpinelinux.org/alpine/edge/community/aarch64/xvfb-21.1.25-r0.apk",
+            "sha256": "12b4e40337c4cc0e4038147a5595ad99948ebaab50a4a65fc331c3504026d54f",
+            "archive_bytes": 710279,
+            "installed_bytes": 1542760,
+            "dependencies": "font-cursor-misc font-misc-misc mesa-egl xkbcomp xkeyboard-config xorg-server-common so:libGL.so.1 so:libXau.so.6 so:libXdmcp.so.6 so:libXfont2.so.2 so:libc.musl-aarch64.so.1 so:libnettle.so.8 so:libpixman-1.so.0",
+            "apk_index_checksum": "Q10HkIwR/Immmx/3AeQrikgMyKvF0="
+        }
+    ]
+}
