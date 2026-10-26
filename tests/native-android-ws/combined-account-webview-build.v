@@ -58,7 +58,8 @@ const token_methods = ['getAuthToken(Landroid/accounts/Account;Ljava/lang/String
  'vinixStartToken(Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;Landroid/app/Activity;Landroid/atl/VinixAccountFuture;)Z']
 const cache_methods = ['peekAuthToken(Landroid/accounts/Account;Ljava/lang/String;)Ljava/lang/String;',
  'setAuthToken(Landroid/accounts/Account;Ljava/lang/String;Ljava/lang/String;)V',
- 'invalidateAuthToken(Ljava/lang/String;Ljava/lang/String;)V']
+ 'invalidateAuthToken(Ljava/lang/String;Ljava/lang/String;)V',
+ 'clearPassword(Landroid/accounts/Account;)V']
 
 struct StoreClassParts {
  methods map[string]string
@@ -117,7 +118,7 @@ fn cache_profile() NarrowProfile {
   calls: {'android/accounts/AccountManager.smali': 'framework_account_token_cache'}
   methods: {'android/accounts/AccountManager.smali': cache_methods}
   changed: {'android/accounts/AccountManager.smali': 0}
-  added: {'android/accounts/AccountManager.smali': 3}
+  added: {'android/accounts/AccountManager.smali': 4}
  }
 }
 
@@ -178,7 +179,7 @@ fn store_method_self_test() ! {
  narrow_method_self_test(store_methods, 4, 8)!
  narrow_method_self_test(clear_methods, 4, 1)!
  narrow_method_self_test(token_methods, 0, 5)!
- narrow_method_self_test(cache_methods, 0, 3)!
+ narrow_method_self_test(cache_methods, 0, 4)!
 }
 
 fn narrow_method_self_test(allowed []string, changed int, added int) ! {
