@@ -22,7 +22,10 @@ mut:
 	revents i16
 }
 
-fn C.poll(&C.pollfd, usize, i32) i32
+// Use private V names so importing another archive/poll caller cannot change
+// these bindings. Archive sizes retain the 64-bit size_t/ssize_t ABI.
+@[c: 'poll']
+fn C.vinix_tar_poll(&C.pollfd, u64, i32) i32
 
 struct C.archive {}
 
@@ -32,9 +35,11 @@ fn C.archive_read_new() &C.archive
 fn C.archive_read_support_filter_all(&C.archive) int
 fn C.archive_read_support_filter_none(&C.archive) int
 fn C.archive_read_support_format_raw(&C.archive) int
-fn C.archive_read_open_filename(&C.archive, &char, usize) int
+@[c: 'archive_read_open_filename']
+fn C.vinix_tar_archive_read_open_filename(&C.archive, &char, u64) int
 fn C.archive_read_next_header(&C.archive, &&C.archive_entry) int
-fn C.archive_read_data(&C.archive, voidptr, usize) isize
+@[c: 'archive_read_data']
+fn C.vinix_tar_archive_read_data(&C.archive, voidptr, u64) i64
 fn C.archive_error_string(&C.archive) &char
 fn C.archive_read_free(&C.archive) int
 
@@ -143,7 +148,7 @@ fn open_filtered(path string, compressed bool) !Reader {
 			C.archive_read_support_filter_none(stream)
 		}
 		if filter < 0 || C.archive_read_support_format_raw(stream) != 0
-			|| C.archive_read_open_filename(stream, path.str, 10240) != 0 {
+			|| C.vinix_tar_archive_read_open_filename(stream, path.str, 10240) != 0 {
 			return filter_error(stream)
 		}
 		mut entry := &C.archive_entry(unsafe { nil })
@@ -172,14 +177,14 @@ fn (mut reader Reader) exact(mut buffer []u8, allow_eof bool) !bool {
 		if reader.cancel != unsafe { nil } && reader.cancel() {
 			return error('archive input interrupted')
 		}
-		mut count := isize(0)
+		mut count := i64(0)
 		if reader.descriptor >= 0 {
-			count = unsafe { C.read(reader.descriptor, &buffer[position], usize(buffer.len - position)) }
+			count = unsafe { C.read(reader.descriptor, &buffer[position], u64(buffer.len - position)) }
 			if count < 0 {
 				if C.errno == C.EINTR { continue }
 				if C.errno in [C.EAGAIN, C.EWOULDBLOCK] {
 					mut descriptor := C.pollfd{ fd: reader.descriptor, events: i16(C.POLLIN) }
-					if C.poll(&descriptor, 1, 50) < 0 && C.errno != C.EINTR {
+					if C.vinix_tar_poll(&descriptor, 1, 50) < 0 && C.errno != C.EINTR {
 						return os.error_posix()
 					}
 					continue
@@ -190,7 +195,7 @@ fn (mut reader Reader) exact(mut buffer []u8, allow_eof bool) !bool {
 			$if tarstream_fd_only ? {
 				return error('archive stream is closed')
 			} $else {
-				count = unsafe { C.archive_read_data(reader.stream, &buffer[position], usize(buffer.len - position)) }
+				count = unsafe { C.vinix_tar_archive_read_data(reader.stream, &buffer[position], u64(buffer.len - position)) }
 				if count < 0 { return filter_error(reader.stream) }
 			}
 		}

@@ -131,7 +131,7 @@ pub fn (mut writer Writer) write(data []u8) ! {
 			int(unsafe { C.gzwrite(writer.gzip_stream, &data[offset], u32(int_min(data.len - offset, 1024 * 1024))) })
 			}
 		} else if writer.streaming {
-			int(unsafe { C.write(writer.stream_fd, &data[offset], usize(data.len - offset)) })
+			int(unsafe { C.write(writer.stream_fd, &data[offset], u64(data.len - offset)) })
 		} else {
 			writer.file.write(data[offset..])!
 		}
