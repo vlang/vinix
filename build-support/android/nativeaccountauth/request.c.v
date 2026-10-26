@@ -14,6 +14,7 @@ const max_request_string = 4096
 pub enum Operation {
 	get_accounts = 1
 	add_account  = 2
+	redeem_interaction = 3
 }
 
 pub enum ScalarKind {
@@ -46,6 +47,7 @@ pub:
 	auth_token_type ?string
 	features        []string
 	options         []Option
+	redemption      ?Redemption
 }
 
 // Caller is derived independently from the accepted socket's kernel peer.
@@ -76,7 +78,7 @@ fn append_string(mut bytes []u8, value ?string) ! {
 	if text := value {
 		request_text(text, true)!
 		append_uint(mut bytes, u64(text.len), 4)
-		bytes << text.bytes()
+		bytes << unsafe { text.str.vbytes(text.len) }
 	} else {
 		append_uint(mut bytes, 0xffffffff, 4)
 	}
@@ -84,9 +86,19 @@ fn append_string(mut bytes []u8, value ?string) ! {
 
 fn validate_request(request Request) ! {
 	if request.id == 0 { return error('account request ID must be nonzero') }
-	if request.operation !in [.get_accounts, .add_account] {
+	if request.operation !in [.get_accounts, .add_account, .redeem_interaction] {
 		return error('unknown account operation')
 	}
+	if request.operation == .redeem_interaction {
+		value := request.redemption or { return error('missing account interaction ticket') }
+		validate_redemption(value)!
+		if request.account_type != none || request.auth_token_type != none
+			|| request.features.len != 0 || request.options.len != 0 {
+			return error('account interaction redemption has unrelated fields')
+		}
+		return
+	}
+	if request.redemption != none { return error('unexpected account interaction ticket') }
 	if value := request.account_type { request_text(value, false)! }
 	if value := request.auth_token_type { request_text(value, true)! }
 	if request.operation == .get_accounts {
@@ -100,12 +112,14 @@ fn validate_request(request Request) ! {
 		return error('too many account request fields')
 	}
 	mut features := map[string]bool{}
+	defer { unsafe { features.free() } }
 	for feature in request.features {
 		request_text(feature, false)!
 		if feature in features { return error('duplicate account feature') }
 		features[feature] = true
 	}
 	mut keys := map[string]bool{}
+	defer { unsafe { keys.free() } }
 	for option in request.options {
 		request_text(option.key, false)!
 		if reserved_option(option.key) || option.key in keys {
@@ -130,8 +144,13 @@ fn validate_request(request Request) ! {
 // allows a receiver to reject trailing data, including delayed second frames.
 pub fn encode_request(request Request) ![]u8 {
 	validate_request(request)!
-	mut body := []u8{}
-	append_string(mut body, request.account_type)!
+	mut body := []u8{cap: max_request_body}
+	defer { unsafe { body.free() } }
+	if request.operation == .redeem_interaction {
+		append_redemption(mut body, request.redemption or { return error('missing account interaction ticket') })!
+	} else {
+		append_string(mut body, request.account_type)!
+	}
 	if request.operation == .add_account {
 		append_string(mut body, request.auth_token_type)!
 		body << u8(request.features.len)
@@ -150,7 +169,11 @@ pub fn encode_request(request Request) ![]u8 {
 		}
 	}
 	if body.len > max_request_body { return error('account request body exceeds size limit') }
-	mut frame := request_magic.bytes()
+	mut frame := []u8{cap: request_header_size + body.len}
+	frame << u8(`V`)
+	frame << u8(`X`)
+	frame << u8(`A`)
+	frame << u8(`1`)
 	append_uint(mut frame, 1, 2)
 	append_uint(mut frame, u64(request.operation), 2)
 	append_uint(mut frame, request.id, 8)
@@ -164,6 +187,7 @@ pub fn encode_request(request Request) ![]u8 {
 pub fn send_request(fd int, request Request) ! {
 	verify_root_channel(fd)!
 	frame := encode_request(request)!
+	defer { unsafe { frame.free() } }
 	flags := C.fcntl(i32(fd), C.F_GETFD)
 	if flags < 0 || C.fcntl(i32(fd), C.F_SETFD, flags | C.FD_CLOEXEC) != 0 {
 		return error('cannot protect account client descriptor')
@@ -229,7 +253,10 @@ fn (mut reader RequestReader) string_value() !NullableString {
 	}
 	value := reader.bytes[reader.position..reader.position + int(length)].bytestr()
 	reader.position += int(length)
-	request_text(value, true)!
+	request_text(value, true) or {
+		unsafe { value.free() }
+		return err
+	}
 	return NullableString{ value: value }
 }
 
@@ -238,14 +265,35 @@ fn (mut reader RequestReader) required_string() !string {
 	return result.value or { return error('null account request string') }
 }
 
+fn (mut reader RequestReader) option() !Option {
+	key := reader.required_string()!
+	mut complete := false
+	defer { if !complete { unsafe { key.free() } } }
+	tag := reader.uint_value(1)!
+	value := match tag {
+		0 { Scalar{ kind: .null_value } }
+		1 { Scalar{ kind: .text, text: reader.required_string()! } }
+		2 {
+			flag := reader.uint_value(1)!
+			if flag > 1 { return error('invalid account boolean') }
+			Scalar{ kind: .boolean, boolean: flag == 1 }
+		}
+		3 { Scalar{ kind: .int32, number: i64(i32(reader.uint_value(4)!)) } }
+		4 { Scalar{ kind: .int64, number: i64(reader.uint_value(8)!) } }
+		else { return error('unsupported account option tag') }
+	}
+	complete = true
+	return Option{key, value}
+}
+
 fn request_header(bytes []u8) !(Operation, u64, int) {
-	if bytes.len != request_header_size || bytes[..4].bytestr() != request_magic {
+	if bytes.len != request_header_size || bytes[0] != `V` || bytes[1] != `X` || bytes[2] != `A` || bytes[3] != `1` {
 		return error('invalid account request header')
 	}
 	mut reader := RequestReader{ bytes: bytes, position: 4 }
 	if reader.uint_value(2)! != 1 { return error('unsupported account request version') }
 	op := reader.uint_value(2)!
-	if op !in [u64(1), 2] { return error('unknown account request operation') }
+	if op !in [u64(1), 2, 3] { return error('unknown account request operation') }
 	id := reader.uint_value(8)!
 	length := reader.uint_value(4)!
 	if id == 0 || length > max_request_body { return error('invalid account request bound') }
@@ -256,10 +304,23 @@ fn decode_request(header []u8, body []u8) !Request {
 	op, id, length := request_header(header)!
 	if body.len != length { return error('account request body length mismatch') }
 	mut reader := RequestReader{ bytes: body }
-	account_type := reader.string_value()!.value
+	mut account_type := ?string(none)
 	mut auth_type := ?string(none)
-	mut features := []string{}
-	mut options := []Option{}
+	mut features := []string{cap: 32}
+	mut options := []Option{cap: 32}
+	mut redemption := ?Redemption(none)
+	mut complete := false
+	defer {
+		if !complete {
+			dispose_request(Request{id: id, operation: op, account_type: account_type,
+				auth_token_type: auth_type, features: features, options: options, redemption: redemption})
+		}
+	}
+	if op == .redeem_interaction {
+		redemption = reader.redemption()!
+	} else {
+		account_type = reader.string_value()!.value
+	}
 	if op == .add_account {
 		auth_type = reader.string_value()!.value
 		feature_count := reader.uint_value(1)!
@@ -268,27 +329,25 @@ fn decode_request(header []u8, body []u8) !Request {
 		option_count := reader.uint_value(1)!
 		if option_count > 32 { return error('too many account options') }
 		for _ in 0 .. int(option_count) {
-			key := reader.required_string()!
-			tag := reader.uint_value(1)!
-			value := match tag {
-				0 { Scalar{ kind: .null_value } }
-				1 { Scalar{ kind: .text, text: reader.required_string()! } }
-				2 {
-					flag := reader.uint_value(1)!
-					if flag > 1 { return error('invalid account boolean') }
-					Scalar{ kind: .boolean, boolean: flag == 1 }
-				}
-				3 { Scalar{ kind: .int32, number: i64(i32(reader.uint_value(4)!)) } }
-				4 { Scalar{ kind: .int64, number: i64(reader.uint_value(8)!) } }
-				else { return error('unsupported account option tag') }
-			}
-			options << Option{key, value}
+			options << reader.option()!
 		}
 	}
 	if reader.position != body.len { return error('trailing account request fields') }
-	request := Request{id, op, account_type, auth_type, features, options}
+	request := Request{id: id, operation: op, account_type: account_type,
+		auth_token_type: auth_type, features: features, options: options, redemption: redemption}
 	validate_request(request)!
+	complete = true
 	return request
+}
+
+// Decode an already bounded complete frame on the trusted broker/service leg.
+// Public application sockets must still use Registry.receive_request so kernel
+// authentication and the one-request write-half-close rule cannot be skipped.
+pub fn decode_request_bytes(bytes []u8) !Request {
+	if bytes.len < request_header_size || bytes.len > request_header_size + max_request_body {
+		return error('invalid complete account request size')
+	}
+	return decode_request(bytes[..request_header_size], bytes[request_header_size..])
 }
 
 fn request_read_exact(fd int, mut bytes []u8, deadline i64) ! {
@@ -311,13 +370,16 @@ fn request_read_exact(fd int, mut bytes []u8, deadline i64) ! {
 
 fn receive_request_frame(fd int, deadline i64) !Request {
 	mut header := []u8{len: request_header_size}
+	defer { unsafe { header.free() } }
 	request_read_exact(fd, mut header, deadline)!
 	_, _, length := request_header(header)!
 	mut body := []u8{len: length}
+	defer { unsafe { body.free() } }
 	request_read_exact(fd, mut body, deadline)!
 	// An actual EOF is mandatory. Merely peeking at currently queued bytes would
 	// accept a delayed second frame and leave ambiguous connection ownership.
 	mut extra := []u8{len: 1}
+	defer { unsafe { extra.free() } }
 	for {
 		remaining := (deadline - time.sys_mono_now()) / time.millisecond
 		if remaining <= 0 { return error('account request write-half close deadline expired') }
