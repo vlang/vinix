@@ -394,28 +394,57 @@ fn provision() ! {
 	}
 }
 
+// The baseline desktop launcher may already have approved this shared runtime.
+// A second self-bind would leave two advertised attachments at the same path.
+// Validate that existing approval instead of adding another mount over it.
+fn approved_runtime_mount(table string) !string {
+	mut found := ''
+	for line in table.split_into_lines() {
+		fields := line.fields()
+		if fields.len < 2 || fields[1] != runtime_root { continue }
+		if found != '' { return error('duplicate runtime mount entry') }
+		if fields.len != 6 || fields[0] != runtime_root {
+			return error('runtime mount is not a dedicated self-bind')
+		}
+		options := fields[3].split(',')
+		for option in ['ro', 'nosuid', 'nodev', 'wxallowed'] {
+			if option !in options { return error('runtime mount lacks ' + option) }
+		}
+		if 'noexec' in options || 'rw' in options {
+			return error('runtime attachment is not read-only and executable')
+		}
+		found = line
+	}
+	return found
+}
+
+fn runtime_mount_snapshot(label string) !string {
+	table := os.read_file('/proc/self/mounts')!
+	os.write_file(result_root + '/runtime-mounts' + label + '.txt', table)!
+	os.write_file(result_root + '/runtime-mountinfo' + label + '.txt',
+		os.read_file('/proc/self/mountinfo')!)!
+	return table
+}
+
 fn approve_runtime() !string {
 	$if linux {
+		before := runtime_mount_snapshot('-before')!
+		existing := approved_runtime_mount(before)!
+		if existing != '' {
+			// Recheck the unique attachment immediately before launching the child.
+			current := approved_runtime_mount(runtime_mount_snapshot('')!)!
+			if current != existing { return error('runtime mount changed during approval') }
+			return current
+		}
 		if unsafe { C.mount(runtime_root.str, runtime_root.str, nil, u64(C.MS_BIND), nil) } != 0 {
 			return error('cannot attach dedicated runtime bind mount')
 		}
+		runtime_mount_snapshot('-bound')!
 		flags := u64(C.MS_BIND | C.MS_REMOUNT | C.MS_RDONLY | C.MS_NOSUID | C.MS_NODEV | C.MS_STRICTATIME)
 		if unsafe { C.mount(c'none', runtime_root.str, nil, flags, c'wxallowed') } != 0 {
 			return error('cannot authorize dedicated runtime WX attachment')
 		}
-		mut found := ''
-		for line in os.read_file('/proc/self/mounts')!.split_into_lines() {
-			fields := line.fields()
-			if fields.len < 4 || fields[1] != runtime_root { continue }
-			if found != '' { return error('duplicate runtime mount entry') }
-			for option in ['ro', 'nosuid', 'nodev', 'wxallowed'] {
-				if option !in fields[3].split(',') { return error('runtime mount lacks ' + option) }
-			}
-			if 'noexec' in fields[3].split(',') {
-				return error('runtime attachment is not executable')
-			}
-			found = line
-		}
+		found := approved_runtime_mount(runtime_mount_snapshot('')!)!
 		if found == '' { return error('runtime mount record absent') }
 		return found
 	} $else {
@@ -453,7 +482,6 @@ fn diagnostics(mut receipt Receipt) ! {
 	}
 	provision()!
 	receipt.runtime_mount = approve_runtime()!
-	os.write_file(result_root + '/runtime-mounts.txt', os.read_file('/proc/self/mounts')!)!
 	receipt.controller = bounded([bundle_root + '/bin/headless-service-controller', runtime_root,
 		bundle_root + '/fixture.apk', fixture_id, fixture_id, result_root + '/controller'],
 		result_root + '/controller.log', 180)!
@@ -487,7 +515,19 @@ fn self_test() ! {
 			return error('account collision/malformed database accepted')
 		}
 	}
-	println('HEADLESS-GUEST SELF-TEST PASS deterministic-tree modes binary-content symlink framing account-prefix collisions')
+	approved := runtime_root + ' ' + runtime_root + ' tmpfs ro,nosuid,nodev,wxallowed,relatime 0 0'
+	assert approved_runtime_mount('tmpfs / tmpfs rw 0 0\n')! == ''
+	assert approved_runtime_mount('tmpfs / tmpfs rw 0 0\n' + approved + '\n')! == approved
+	for bad in [approved + '\n' + approved, approved.replace('ro,', 'rw,'),
+		approved.replace('nodev,', ''), approved.replace('wxallowed,', ''),
+		approved.replace('relatime', 'relatime,noexec'), approved.replace('ro,', 'ro,rw,'),
+		approved.replace(runtime_root + ' ' + runtime_root, '/other ' + runtime_root),
+		approved + ' extra', runtime_root + ' ' + runtime_root] {
+		if _ := approved_runtime_mount(bad) {
+			return error('duplicate/unapproved runtime mount accepted')
+		}
+	}
+	println('HEADLESS-GUEST SELF-TEST PASS deterministic-tree modes binary-content symlink framing account-prefix collisions existing-approved-mount duplicate-mount-rejection')
 }
 
 fn main() {
