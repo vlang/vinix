@@ -19,6 +19,8 @@ const store_manifest = '7cc408299a3a7d37578735e79b31c5c2ff96dbd1de00a2d7dd0d1e14
 const store_jar = '9e89db595defb905b0322183f176613f2b42f951ec1b51d4ceb91431876c3c8e'
 const auth_manifest = '1299ddd064ebe89bae35cafd4c509794894c7466fda0bfaee2dfb85cf404d309'
 const auth_jar = 'c677808eb55f58845b4ce3dd5c72be481d4ca585fd4980cec18266271d4740bf'
+const cache_manifest = 'f37e13b84b5dfb2c71ad852e2bae5b03fed04e8ee319f44e77fc7605f3b1994a'
+const cache_jar = '3a590476c53e3f05533c327c5935e395c55694eacb7895b02940feaf888c56d0'
 const java = '/opt/homebrew/opt/openjdk@25/bin/java'
 const tools = repo + '/build/android-framework/tools'
 const source_file = repo + '/tests/native-android-ws/combined-account-webview-build.v'
@@ -60,6 +62,9 @@ const cache_methods = ['peekAuthToken(Landroid/accounts/Account;Ljava/lang/Strin
  'setAuthToken(Landroid/accounts/Account;Ljava/lang/String;Ljava/lang/String;)V',
  'invalidateAuthToken(Ljava/lang/String;Ljava/lang/String;)V',
  'clearPassword(Landroid/accounts/Account;)V']
+const description_methods = ['getAuthenticatorTypes()[Landroid/accounts/AuthenticatorDescription;']
+const description_classes = ['android/accounts/AuthenticatorDescription.smali',
+ 'android/accounts/AuthenticatorDescription$Creator.smali']
 
 struct StoreClassParts {
  methods map[string]string
@@ -76,6 +81,8 @@ struct NarrowProfile {
  methods map[string][]string
  changed map[string]int
  added map[string]int
+ class_provider string
+ extra_classes []string
 }
 
 fn storage_profile() NarrowProfile {
@@ -119,6 +126,22 @@ fn cache_profile() NarrowProfile {
   methods: {'android/accounts/AccountManager.smali': cache_methods}
   changed: {'android/accounts/AccountManager.smali': 0}
   added: {'android/accounts/AccountManager.smali': 4}
+ }
+}
+
+fn descriptions_profile() NarrowProfile {
+ return NarrowProfile{
+  name: 'descriptions'
+  baseline_name: 'combined-account-webview-cache-framework-2026-10-26-r3'
+  manifest_pin: cache_manifest
+  jar_pin: cache_jar
+  providers: ['framework_authenticator_descriptions.v']
+  calls: {'android/accounts/AccountManager.smali': 'framework_authenticator_descriptions'}
+  methods: {'android/accounts/AccountManager.smali': description_methods}
+  changed: {'android/accounts/AccountManager.smali': 0}
+  added: {'android/accounts/AccountManager.smali': 1}
+  class_provider: 'framework_authenticator_description_classes'
+  extra_classes: description_classes
  }
 }
 
@@ -180,6 +203,7 @@ fn store_method_self_test() ! {
  narrow_method_self_test(clear_methods, 4, 1)!
  narrow_method_self_test(token_methods, 0, 5)!
  narrow_method_self_test(cache_methods, 0, 4)!
+ narrow_method_self_test(description_methods, 0, 1)!
 }
 
 fn narrow_method_self_test(allowed []string, changed int, added int) ! {
@@ -287,7 +311,20 @@ fn store_class_delta(old map[string]string, new map[string]string) ! {
 }
 
 fn narrow_class_delta(old map[string]string, new map[string]string, targets []string) ! {
- if old.len != 2102 || new.len != old.len || targets.len == 0 { return error('narrow profile requires exactly 2102 classes and explicit targets') }
+ narrow_added_class_delta(old, new, targets, []string{})!
+}
+
+fn narrow_added_class_delta(old map[string]string, new map[string]string, targets []string, extras []string) ! {
+ if old.len != 2102 || new.len != old.len + extras.len || targets.len == 0 {
+  return error('narrow profile requires exactly 2102 baseline classes and explicit targets/additions')
+ }
+ mut seen := map[string]bool{}
+ for name in extras {
+  if name in seen || name in old || name !in new || !name.ends_with('.smali') {
+   return error('missing, duplicate or preexisting narrow addition: ' + name)
+  }
+  seen[name] = true
+ }
  for name, pin in old {
   if name !in new || ((name in targets) == (pin == new[name]!)) {
    return error('unexpected narrow profile class delta: ' + name)
@@ -327,6 +364,26 @@ fn store_delta_self_test() ! {
  for bad in [good, old] {
   narrow_class_delta(old, bad, targets) or { continue }
   return error('missing one of multiple required class deltas accepted')
+ }
+ mut extended := good.clone()
+ for name in description_classes { extended[name] = 'new class' }
+ narrow_added_class_delta(old, extended, ['android/accounts/AccountManager.smali'], description_classes)!
+ for case in 0 .. 5 {
+  mut bad := extended.clone()
+  match case {
+   0 { bad.delete(description_classes[0]) }
+   1 { bad.delete(description_classes[0]); bad['extra.smali'] = 'new class' }
+   2 { bad['other/0.smali'] = 'changed' }
+   3 { bad['android/accounts/AccountManager.smali'] = 'old' }
+   else { bad.delete('other/0.smali'); bad['extra.smali'] = 'new class' }
+  }
+  narrow_added_class_delta(old, bad, ['android/accounts/AccountManager.smali'], description_classes) or { continue }
+  return error('invalid descriptions class delta accepted')
+ }
+ for invalid in [[description_classes[0], description_classes[0]],
+  ['android/accounts/AccountManager.smali', description_classes[0]]] {
+  narrow_added_class_delta(old, extended, ['android/accounts/AccountManager.smali'], invalid) or { continue }
+  return error('duplicate or preexisting descriptions class addition accepted')
  }
 }
 
@@ -480,6 +537,15 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   application += name + ' := os.args[1] + "/' + target + '"\n' +
    'os.write_file(' + name + ',androidtools.' + profile.calls[target]! + '(os.read_file(' + name + ')!)!)!\n'
  }
+ if profile.class_provider != '' {
+  application += 'classes := androidtools.' + profile.class_provider + '()\n' +
+   'expected := ' + json2.encode(profile.extra_classes.map(it.all_before_last('.smali'))) + '\n' +
+   'if classes.len != expected.len { panic("unexpected added class count") }\n' +
+   'for name, source in classes {\nif name !in expected { panic("unexpected added class") }\n' +
+   'path := os.args[1] + "/" + name + ".smali"\n' +
+   'if os.exists(path) { panic("added class already exists") }\n' +
+   'os.mkdir_all(os.dir(path))!\nos.write_file(path, source)!\n}\n'
+ } else if profile.extra_classes.len != 0 { return error('class additions require an explicit provider') }
  os.write_file(root + '/provider-source/main.v', application + '}\n')!
  os.setenv('VROOT', os.dir(store_compiler), true)
  os.setenv('V', store_compiler, true)
@@ -498,7 +564,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  command(root, 'apply-provider', [root + '/provider', root + '/smali'])!
  mut applied := map[string]string{}
  inventory(root + '/smali', '', mut applied)!
- narrow_class_delta(old, applied, targets)!
+ narrow_added_class_delta(old, applied, targets, profile.extra_classes)!
  for target in targets {
   narrow_method_delta(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!,
    profile.methods[target]!, profile.changed[target]!, profile.added[target]!)!
@@ -509,7 +575,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  command(root, 'new-disassemble', [java, '-cp', classpath.join(':'), 'org.jf.baksmali.Main', 'disassemble', '--jobs', '2', root + '/api-impl.jar', '-o', root + '/new-dex'])!
  mut new := map[string]string{}
  inventory(root + '/new-dex', '', mut new)!
- narrow_class_delta(old, new, targets)!
+ narrow_added_class_delta(old, new, targets, profile.extra_classes)!
  for target in targets {
   narrow_method_delta(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!,
    profile.methods[target]!, profile.changed[target]!, profile.added[target]!)!
@@ -529,13 +595,13 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  for path, pin in inputs { if digest(path)! != pin { return error('store input changed: ' + path) } }
  write_json(root + '/build.json', {
   'scope': json2.Any('Narrow ' + profile.name + ' provider delta over exact sealed framework; host assembly only, no guest or Google login proof'),
-  'profile': json2.Any(profile.name + '-2102'),
+  'profile': json2.Any(profile.name + '-' + new.len.str()),
   'source_revision': json2.Any(command(root, 'revision', ['/usr/bin/git', '-C', repo, 'rev-parse', 'HEAD'])!.trim_space()),
   'input_sha256': json2.decode[json2.Any](json2.encode(inputs))!,
   'baseline_path': json2.Any(baseline), 'baseline_manifest_sha256': json2.Any(manifest_pin),
   'baseline_api_impl_sha256': json2.Any(jar_pin), 'api_impl_sha256': json2.Any(digest(root + '/api-impl.jar')!),
   'classes_dex_sha256': json2.Any(digest(root + '/classes.dex')!),
-  'changed_classes': json2.Any(targets), 'added_classes': json2.Any([]string{}),
+  'changed_classes': json2.Any(targets), 'added_classes': json2.Any(profile.extra_classes),
   'class_count': json2.Any(new.len), 'compiler_sha256': json2.Any(store_compiler_pin),
   'changed_method_counts': json2.decode[json2.Any](json2.encode(profile.changed))!,
   'added_method_counts': json2.decode[json2.Any](json2.encode(profile.added))!,
@@ -783,11 +849,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache'] {
-  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } else { cache_profile() } }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions'] {
+  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } else { descriptions_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
