@@ -419,13 +419,14 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 			}
 			frame.x[0] = header.fields[index]
 		}
-		'setText:', 'setBackgroundColor:', 'setTextColor:', 'setFont:', 'setRootViewController:' {
+		'setRootViewController:' { ui_set_root_controller(object, frame.x[2]) }
+		'setText:', 'setBackgroundColor:', 'setTextColor:', 'setFont:' {
 			index := match selector {
 				'setText:' { 0 }
 				'setFont:' { 1 }
 				'setBackgroundColor:' { 2 }
 				'setTextColor:' { 3 }
-				else { 7 }
+				else { 3 }
 			}
 			store_field(object, index, frame.x[2])
 			if ios_runtime.trace && selector == 'setText:' {
@@ -459,10 +460,9 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 			header.action = frame.x[3]
 		}
 		'makeKeyAndVisible' {
-			objc_release(ios_runtime.window)
-			ios_runtime.window = objc_retain(object)
+			objc_store_strong(unsafe { &ios_runtime.window }, object)
 			controller := header.fields[7]
-			ui_load_controller(controller)
+			if controller != 0 { ui_load_controller(controller) }
 		}
 		else { return false }
 	}
@@ -522,15 +522,22 @@ fn ui_application_main(argc int, argv &&char, principal u64, delegate_name u64) 
 
 fn ui_root_view() u64 {
 	controller := ui_current_controller()
+	// Apps may attach views directly and assign a root controller later.
+	if controller == 0 { return ios_runtime.window }
 	return obj_header(controller).fields[6]
 }
 
 fn ui_layout(width int, height int) {
-	if ios_runtime.window != 0 { mut window := obj_header(ios_runtime.window); window.frame.width = f64(width); window.frame.height = f64(height) }
+	if ios_runtime.window == 0 { return }
+	mut window := obj_header(ios_runtime.window)
+	window.frame.width = f64(width); window.frame.height = f64(height)
 	mut view := obj_header(ui_root_view())
 	view.frame = ObjRect{0, 0, f64(width), f64(height)}
-	invoke_void(ui_current_controller(), c'viewDidLayoutSubviews')
-	alert_layout(ui_current_controller())
+	controller := ui_current_controller()
+	if controller != 0 {
+		invoke_void(controller, c'viewDidLayoutSubviews')
+		alert_layout(controller)
+	}
 }
 
 fn ui_action(button u64) ! {

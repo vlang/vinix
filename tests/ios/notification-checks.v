@@ -27,15 +27,21 @@ fn run_host_fixture(root string, old string, out string, fixture string) ! {
 	os.write_file(bundle + "/Info.plist", "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>org.vinix.notification-checks</string><key>CFBundleExecutable</key><string>center-host</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>")!
 	binary := bundle + "/MacOS/center-host"
 	run(out, 'host-generate', [old + '/v', '-enable-globals', '-nocache', '-gc', 'none', '-cc', 'clang', '-d', 'ios_video', '-d', 'ios_cxx', '-d', 'ios_sqlite', '-os', 'macos', '-arch', 'arm64', '-path', '@vlib|' + root + '/compat/ios|@vmodules', '-o', cfile, root + '/compat/ios/runner/' + fixture], false)
-	tls := tlsbuild.build(root, old, out + '/payload', ['/usr/bin/clang', '-fsanitize=address,undefined', '-fno-omit-frame-pointer'])
+	// The shared alert fixture also loads native UIKit, which requires Catalyst.
+	target := if fixture == 'ui_alert_test.v' { ['-target', 'arm64-apple-ios14.0-macabi'] } else { []string{} }
+	mut tls_cc := ['/usr/bin/clang', '-fsanitize=address,undefined', '-fno-omit-frame-pointer']
+	tls_cc << target
+	tls := tlsbuild.build(root, old, out + '/payload', tls_cc)
 	mut objects := []string{}
 	for i, source in [cfile, old + '/vlib/os/execute_capture_nix.c', old + '/vlib/builtin/segfault_handler_nix.c', root + '/compat/ios/runner/abi/dispatch.S']! {
 		object := out + '/payload/host-' + i.str() + '.o'; objects << object
 		mut compile := ['/usr/bin/clang', '-I/opt/homebrew/include', '-I/opt/homebrew/opt/freetype/include/freetype2', '-O0', '-g', '-w', '-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-c', source, '-o', object]
+		compile << target
 		compile << tlsbuild.includes(old)
 		run(out, 'host-object-' + i.str(), compile, false)
 	}
 	mut link := ['/usr/bin/clang', '-g', '-fsanitize=address,undefined']; link << objects
+	link << target
 	link << tls
 	link << ['-L/opt/homebrew/lib', '-lavcodec', '-lswscale', '-lavutil', '-framework', 'AppKit', '-lc++', '-lsqlite3', '-lresolv', '-framework', 'Foundation', '-framework', 'UserNotifications', '-framework', 'CoreFoundation', '-pthread', '-lproc', '-lm', '-o', binary]
 	run(out, 'host-link', link, false)
@@ -52,8 +58,10 @@ fn main() {
 	root := os.real_path(os.getwd()); out := os.abs_path(os.args[2]); old := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
-	if os.args[1] in ['string-float-host', 'string-cstring-host', 'bundle-receipt-host', 'cf-string-output-host', 'search-path-host', 'home-directory-host', 'inline-pthread-self-host', 'dictionary-snapshot-host', 'block-byref-host', 'block-imp-host', 'vm-probe-host', 'proc-memory-host', 'processinfo-host', 'data-url-host', 'data-http-host', 'connection-host'] {
+	if os.args[1] in ['window-host', 'alert-host', 'string-float-host', 'string-cstring-host', 'bundle-receipt-host', 'cf-string-output-host', 'search-path-host', 'home-directory-host', 'inline-pthread-self-host', 'dictionary-snapshot-host', 'block-byref-host', 'block-imp-host', 'vm-probe-host', 'proc-memory-host', 'processinfo-host', 'data-url-host', 'data-http-host', 'connection-host'] {
 		fixture := match os.args[1] {
+			'window-host' { 'ui_window_test.v' }
+			'alert-host' { 'ui_alert_test.v' }
 			'string-float-host' { 'ns_string_float_test.v' }
 			'string-cstring-host' { 'ns_string_cstring_test.v' }
 			'bundle-receipt-host' { 'ns_bundle_receipt_test.v' }

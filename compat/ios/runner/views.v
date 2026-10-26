@@ -19,13 +19,29 @@ fn invoke_action(target u64, selector u64, sender u64) {
 }
 
 fn ui_current_controller() u64 {
+	if ios_runtime.window == 0 { return 0 }
 	mut controller := obj_header(ios_runtime.window).fields[7]
+	if controller == 0 { return 0 }
 	for _ in 0 .. 32 {
 		presented := obj_header(controller).fields[8]
 		if presented == 0 { return controller }
 		controller = presented
 	}
 	panic('iOS: presentation hierarchy exceeds limit')
+}
+
+fn ui_set_root_controller(window u64, controller u64) {
+	old := obj_header(window).fields[7]
+	if old == controller { return }
+	// Retain the replacement before removing the previous view hierarchy.
+	objc_retain(controller)
+	if old != 0 {
+		view := obj_header(old).fields[6]
+		if view != 0 && obj_header(view).parent_view == window { ui_remove_child(view) }
+	}
+	store_field(window, 7, controller)
+	objc_release(controller)
+	if window == ios_runtime.window && controller != 0 { ui_load_controller(controller) }
 }
 
 fn ui_load_controller(controller u64) {

@@ -15,10 +15,11 @@ fn ui_native_pointer(phase u32, button u32, x int, y int) bool {
 		else { c'touchesMoved:withEvent:' }
 	}
 	mut responder := ui_root_view()
+	if responder == 0 { return false }
 	mut imp := native_method(read64(responder), ctext(u64(selector)))
 	if imp == 0 {
 		responder = ui_current_controller()
-		imp = native_method(read64(responder), ctext(u64(selector)))
+		if responder != 0 { imp = native_method(read64(responder), ctext(u64(selector))) }
 	}
 	if imp == 0 || (phase != 1 && ios_runtime.native_touch == 0) { return false }
 	if phase == 1 {
