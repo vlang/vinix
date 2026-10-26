@@ -189,12 +189,13 @@ fn protected_stat(fd int, directory bool, limit u64) !C.stat {
 // hashing never reopens the pathname. Root is the trusted administrator.
 fn open_protected(path string, limit u64) !int {
 	if !absolute_clean_path(path) { return error('account authority input path must be absolute and canonical') }
-	parts := path.split('/')[1..]
+	parts := path.split('/')
+	defer { unsafe { parts.free() } }
 	mut directory := unsafe { C.open(c'/', C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW) }
 	if directory < 0 { return error('cannot open account authority filesystem root') }
 	defer { C.close(directory) }
 	protected_stat(directory, true, 0)!
-	for part in parts[..parts.len - 1] {
+	for part in parts[1..parts.len - 1] {
 		next := unsafe { C.openat(directory, &char(part.str), C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW) }
 		if next < 0 { return error('cannot open protected account authority directory') }
 		protected_stat(next, true, 0) or {
@@ -218,6 +219,7 @@ fn protected_registry(path string) !string {
 	fd := open_protected(path, max_registry_bytes)!
 	defer { C.close(fd) }
 	mut bytes := []u8{len: max_registry_bytes + 1}
+	defer { unsafe { bytes.free() } }
 	mut count := 0
 	for count < bytes.len {
 		n := unsafe { C.read(fd, &bytes[count], usize(bytes.len - count)) }
@@ -233,6 +235,7 @@ fn protected_apk_digest(path string) !string {
 	defer { C.close(fd) }
 	mut hash := sha256.new()
 	mut buffer := []u8{len: 1024 * 1024}
+	defer { unsafe { buffer.free(); hash.free(); free(hash) } }
 	mut size := u64(0)
 	for {
 		n := unsafe { C.read(fd, buffer.data, usize(buffer.len)) }
@@ -243,15 +246,23 @@ fn protected_apk_digest(path string) !string {
 		hash.write(buffer[..int(n)])!
 	}
 	protected_stat(fd, false, u64(2) * 1024 * 1024 * 1024)!
-	return hash.sum([]u8{}).hex()
+	mut digest := []u8{len: sha256.size}
+	defer { unsafe { digest.free() } }
+	hash.checksum_into(mut digest)
+	return digest.hex()
 }
 
 // Load and verify a fixed root-provisioned registry and every pinned APK. The
 // signer digest is an administrator attestation, not a signature verifier.
 pub fn load(path string) !Registry {
-	registry := parse_registry(protected_registry(path)!)!
+	text := protected_registry(path)!
+	defer { unsafe { text.free() } }
+	registry := parse_registry(text)!
 	for entry in registry.entries {
-		if protected_apk_digest(entry.apk)! != entry.apk_sha256 {
+		digest := protected_apk_digest(entry.apk)!
+		matches := digest == entry.apk_sha256
+		unsafe { digest.free() }
+		if !matches {
 			return error('account authority APK digest mismatch')
 		}
 	}
@@ -262,7 +273,10 @@ pub fn (registry Registry) verify_launch(apk string, uid u32, gid u32) !Entry {
 	for entry in registry.entries {
 		if entry.apk == apk && entry.uid == uid && entry.gid == gid {
 			// Recheck the launch inode: the registry may have been loaded earlier.
-			if protected_apk_digest(apk)! != entry.apk_sha256 {
+			digest := protected_apk_digest(apk)!
+			matches := digest == entry.apk_sha256
+			unsafe { digest.free() }
+			if !matches {
 				return error('account authority launch APK digest mismatch')
 			}
 			return entry

@@ -18,7 +18,7 @@ fn le32(data []u8, at int) u32 {
 }
 
 fn pool_length(data []u8, at int, utf8_pool bool) !(int, int) {
-	if at >= data.len { return error('truncated manifest string length') }
+	if at < 0 || at >= data.len { return error('truncated manifest string length') }
 	if utf8_pool {
 		if data[at] & 0x80 == 0 { return int(data[at]), at + 1 }
 		if at + 2 > data.len { return error('truncated manifest string length') }
@@ -36,70 +36,84 @@ fn string_pool(data []u8, header int) ![]string {
 	count, styles := int(le32(data, 8)), int(le32(data, 12))
 	flags := le32(data, 16)
 	start, style_start := int(le32(data, 20)), int(le32(data, 24))
-	if count > 65536 || styles != 0 || style_start != 0 || flags & ~u32(0x101) != 0
+	if count < 0 || count > 65536 || styles != 0 || style_start != 0 || flags & ~u32(0x101) != 0
 		|| start < header + count * 4 || start > data.len {
 		return error('invalid manifest string pool bounds or styles')
 	}
 	utf8_pool := flags & 0x100 != 0
 	mut result := []string{cap: count}
+	mut accepted := false
+	defer { if !accepted { unsafe { result.free() } } }
 	mut decoded_bytes := 0
 	for i in 0 .. count {
 		offset := int(le32(data, header + i * 4))
-		if offset >= data.len - start { return error('manifest string offset out of bounds') }
-		units, next := pool_length(data, start + offset, utf8_pool)!
-		mut at := next
-		mut value := ''
-		if utf8_pool {
-			bytes, content := pool_length(data, at, true)!
-			at = content
-			if bytes >= data.len - at || data[at + bytes] != 0 {
-				return error('unterminated manifest UTF-8 string')
-			}
-			if bytes > manifest_limit * 4 - decoded_bytes {
-				return error('manifest decoded strings exceed limit')
-			}
-			decoded_bytes += bytes
-			value = data[at..at + bytes].bytestr()
-			if !utf8.validate_str(value) || value.contains('\x00') {
-				return error('invalid manifest UTF-8')
-			}
-			mut actual_units := 0
-			for point in value.runes() { actual_units += if point > 0xffff { 2 } else { 1 } }
-			if actual_units != units { return error('manifest UTF-8 length mismatch') }
-		} else {
-			if units > (data.len - at - 2) / 2 || at + 2 > data.len
-				|| le16(data, at + units * 2) != 0 {
-				return error('unterminated manifest UTF-16 string')
-			}
-			if units > (manifest_limit * 4 - decoded_bytes) / 3 {
-				return error('manifest decoded strings exceed limit')
-			}
-			decoded_bytes += units * 3
-			mut points := []rune{cap: units}
-			end := at + units * 2
-			for at < end {
-				first := u32(le16(data, at))
-				at += 2
-				if first == 0 { return error('embedded null in manifest string') }
-				if first >= 0xd800 && first <= 0xdbff {
-					if at >= end { return error('unpaired manifest UTF-16 surrogate') }
-					second := u32(le16(data, at))
-					at += 2
-					if second < 0xdc00 || second > 0xdfff {
-						return error('invalid manifest UTF-16 surrogate')
-					}
-					points << rune(0x10000 + ((first - 0xd800) << 10) + second - 0xdc00)
-				} else if first >= 0xdc00 && first <= 0xdfff {
-					return error('unpaired manifest UTF-16 surrogate')
-				} else {
-					points << rune(first)
-				}
-			}
-			value = points.string()
-		}
+		if offset < 0 || offset >= data.len - start { return error('manifest string offset out of bounds') }
+		value, weight := manifest_pool_string(data, start + offset, utf8_pool, manifest_limit * 4 - decoded_bytes)!
+		decoded_bytes += weight
+		// Appending to []string clones the string; release the decoder's copy.
 		result << value
+		unsafe { value.free() }
 	}
+	accepted = true
 	return result
+}
+
+fn manifest_pool_string(data []u8, offset int, utf8_pool bool, remaining int) !(string, int) {
+	units, next := pool_length(data, offset, utf8_pool)!
+	mut at := next
+	if utf8_pool {
+		bytes, content := pool_length(data, at, true)!
+		at = content
+		if bytes >= data.len - at || data[at + bytes] != 0 {
+			return error('unterminated manifest UTF-8 string')
+		}
+		if bytes > remaining {
+			return error('manifest decoded strings exceed limit')
+		}
+		value := data[at..at + bytes].bytestr()
+		mut accepted := false
+		defer { if !accepted { unsafe { value.free() } } }
+		if !utf8.validate_str(value) || value.contains('\x00') {
+			return error('invalid manifest UTF-8')
+		}
+		mut actual_units := 0
+		for i in 0 .. value.len {
+			if value[i] & 0xc0 != 0x80 { actual_units += if value[i] & 0xf8 == 0xf0 { 2 } else { 1 } }
+		}
+		if actual_units != units { return error('manifest UTF-8 length mismatch') }
+		accepted = true
+		return value, bytes
+	} else {
+		if units > (data.len - at - 2) / 2 || at + 2 > data.len
+			|| le16(data, at + units * 2) != 0 {
+			return error('unterminated manifest UTF-16 string')
+		}
+		if units > remaining / 3 {
+			return error('manifest decoded strings exceed limit')
+		}
+		mut points := []rune{cap: units}
+		defer { unsafe { points.free() } }
+		end := at + units * 2
+		for at < end {
+			first := u32(le16(data, at))
+			at += 2
+			if first == 0 { return error('embedded null in manifest string') }
+			if first >= 0xd800 && first <= 0xdbff {
+				if at >= end { return error('unpaired manifest UTF-16 surrogate') }
+				second := u32(le16(data, at))
+				at += 2
+				if second < 0xdc00 || second > 0xdfff {
+					return error('invalid manifest UTF-16 surrogate')
+				}
+				points << rune(0x10000 + ((first - 0xd800) << 10) + second - 0xdc00)
+			} else if first >= 0xdc00 && first <= 0xdfff {
+				return error('unpaired manifest UTF-16 surrogate')
+			} else {
+				points << rune(first)
+			}
+		}
+		return points.string(), units * 3
+	}
 }
 
 fn pool_value(pool []string, index u32, optional bool) !string {
