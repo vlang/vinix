@@ -168,7 +168,7 @@ fn check() ! {
 		'valid_reviews':                        '3'
 		'semantic_refusals':                    '8'
 		'package_tree_and_proposals_unchanged': 'true'
-		'scope':                                'host SDK authoring/real CLI read-only compatibility; no apply, trust or target execution'
+		'scope':                                'SDK authoring/real CLI read-only compatibility; no apply, trust or application-runtime qualification'
 	}) + '\n')!
 	println('POLICY WRITER real CLI accepts complete/empty/arbitrary-order policies, canonical fingerprint agrees, refuses 8 semantic cases, preserves state PASS')
 }

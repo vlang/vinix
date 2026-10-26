@@ -88,7 +88,7 @@ fn check() ! {
 	for path, hash in inputs { require(digest(path)! == hash, 'CLI changed encoded input')! }
 	os.write_file(work + '/evidence.json', json2.encode({ 'cli_sha256': digest(cli)!,
 		'accepted_empty_versions': '1,2', 'service_semantic_or_catalog_refusals': '5',
-		'package_tree_unchanged': 'true', 'scope': 'host wire/CLI review compatibility; no install, trust or target-runtime qualification' }) + '\n')!
+		'package_tree_unchanged': 'true', 'scope': 'wire/CLI review compatibility; no install, trust or application-runtime qualification' }) + '\n')!
 	println('DEPLOYMENT WRITER real CLI accepts formats 1/2, refuses five semantic/catalog cases, preserves package tree PASS')
 }
 

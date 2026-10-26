@@ -13,7 +13,7 @@ struct Reply {
 
 struct Evidence {
 	format int = 1
-	scope string = 'host CLI interface discovery, no runtime/ABI/publisher qualification'
+	scope string = 'CLI interface discovery, no runtime/ABI/publisher qualification'
 	cli_sha256 string
 	response string
 	refusals int
