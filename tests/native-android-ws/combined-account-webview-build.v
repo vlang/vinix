@@ -15,12 +15,15 @@ const store_compiler = '/Users/alex/code/v-tccbin-bootstrap-20261026/v'
 const store_compiler_pin = '0cc6c1d34c1811a818e4ae89853116861a4b067d4251af257851a7714f0d11fe'
 const interaction_manifest = 'dc5c0470c4cdc7a075ded61680e4ac89cef056dbcb515ce55a32f74bf82aef87'
 const interaction_jar = '86278c9cbe1f25904b760250f34f859206d719cbb23cf5ff5411a75c480ac36f'
+const store_manifest = '7cc408299a3a7d37578735e79b31c5c2ff96dbd1de00a2d7dd0d1e149b156690'
+const store_jar = '9e89db595defb905b0322183f176613f2b42f951ec1b51d4ceb91431876c3c8e'
 const java = '/opt/homebrew/opt/openjdk@25/bin/java'
 const tools = repo + '/build/android-framework/tools'
 const source_file = repo + '/tests/native-android-ws/combined-account-webview-build.v'
 const providers = ['framework_accounts.v', 'framework_account_client.v',
  'framework_account_broker_context.v', 'framework_account_native_response.v', 'framework_webview.v',
- 'framework_account_interaction.v']
+ 'framework_account_interaction.v', 'framework_account_store.v', 'framework_cookie_clear.v',
+ 'framework_account_token.v']
 const changes = ['android/accounts/AccountManager.smali', 'android/atl/VinixAccountFuture.smali',
  'android/os/Binder.smali', 'android/content/Context.smali', 'android/webkit/WebView.smali',
  'android/webkit/WebSettings.smali', 'android/webkit/WebViewClient.smali', 'android/webkit/CookieManager.smali',
@@ -44,10 +47,59 @@ const store_methods = ['addAccountExplicitly(Landroid/accounts/Account;Ljava/lan
  'setAccountVisibility(Landroid/accounts/Account;Ljava/lang/String;I)Z',
  'getPassword(Landroid/accounts/Account;)Ljava/lang/String;',
  'setPassword(Landroid/accounts/Account;Ljava/lang/String;)V']
+const clear_methods = ['removeAllCookie()V', 'removeAllCookies(Landroid/webkit/ValueCallback;)V',
+ 'removeSessionCookie()V', 'removeSessionCookies(Landroid/webkit/ValueCallback;)V', 'nativeClear(Z)Z']
+const token_methods = ['getAuthToken(Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;Landroid/app/Activity;Landroid/accounts/AccountManagerCallback;Landroid/os/Handler;)Landroid/accounts/AccountManagerFuture;',
+ 'getAuthToken(Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;ZLandroid/accounts/AccountManagerCallback;Landroid/os/Handler;)Landroid/accounts/AccountManagerFuture;',
+ 'getAuthToken(Landroid/accounts/Account;Ljava/lang/String;ZLandroid/accounts/AccountManagerCallback;Landroid/os/Handler;)Landroid/accounts/AccountManagerFuture;',
+ 'blockingGetAuthToken(Landroid/accounts/Account;Ljava/lang/String;Z)Ljava/lang/String;',
+ 'vinixStartToken(Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;Landroid/app/Activity;Landroid/atl/VinixAccountFuture;)Z']
 
 struct StoreClassParts {
  methods map[string]string
  metadata string
+}
+
+struct NarrowProfile {
+ name string
+ baseline_name string
+ manifest_pin string
+ jar_pin string
+ providers []string
+ calls map[string]string
+ methods map[string][]string
+ changed map[string]int
+ added map[string]int
+}
+
+fn storage_profile() NarrowProfile {
+ return NarrowProfile{
+  name: 'store'
+  baseline_name: 'combined-account-webview-interaction-framework-2026-10-26'
+  manifest_pin: interaction_manifest
+  jar_pin: interaction_jar
+  providers: ['framework_account_store.v']
+  calls: {'android/accounts/AccountManager.smali': 'framework_account_store'}
+  methods: {'android/accounts/AccountManager.smali': store_methods}
+  changed: {'android/accounts/AccountManager.smali': 4}
+  added: {'android/accounts/AccountManager.smali': 8}
+ }
+}
+
+fn auth_profile() NarrowProfile {
+ return NarrowProfile{
+  name: 'auth'
+  baseline_name: 'combined-account-webview-store-framework-2026-10-26'
+  manifest_pin: store_manifest
+  jar_pin: store_jar
+  providers: ['framework_cookie_clear.v', 'framework_account_token.v']
+  calls: {'android/accounts/AccountManager.smali': 'framework_account_token',
+   'android/webkit/CookieManager.smali': 'framework_webview_cookie_clear'}
+  methods: {'android/accounts/AccountManager.smali': token_methods,
+   'android/webkit/CookieManager.smali': clear_methods}
+  changed: {'android/accounts/AccountManager.smali': 0, 'android/webkit/CookieManager.smali': 4}
+  added: {'android/accounts/AccountManager.smali': 5, 'android/webkit/CookieManager.smali': 1}
+ }
 }
 
 fn store_parts(source string) !StoreClassParts {
@@ -78,49 +130,58 @@ fn store_parts(source string) !StoreClassParts {
  return StoreClassParts{methods, metadata.join('\n')}
 }
 
-fn store_method_delta(old string, new string) ! {
+fn narrow_method_delta(old string, new string, allowed []string, expected_changed int, expected_added int) ! {
  before := store_parts(old)!
  after := store_parts(new)!
- if before.metadata != after.metadata { return error('store provider changed class/field metadata') }
+ if before.metadata != after.metadata { return error('provider changed class/field metadata') }
  mut changed := 0
  mut added := 0
  for name, method in before.methods {
-  if name !in after.methods { return error('store provider removed method: ' + name) }
+  if name !in after.methods { return error('provider removed method: ' + name) }
   if method != after.methods[name]! {
-   if name !in store_methods { return error('store provider changed unrelated method: ' + name) }
+   if name !in allowed { return error('provider changed unrelated method: ' + name) }
    changed++
   }
  }
  for name in after.methods.keys() {
   if name !in before.methods {
-   if name !in store_methods { return error('store provider added unrelated method: ' + name) }
+   if name !in allowed { return error('provider added unrelated method: ' + name) }
    added++
   }
  }
- for name in store_methods {
-  if name !in after.methods { return error('missing store method: ' + name) }
+ for name in allowed {
+  if name !in after.methods { return error('missing required method: ' + name) }
  }
- if changed != 4 || added != 8 { return error('store provider requires exactly four changed and eight added methods') }
+ if changed != expected_changed || added != expected_added { return error('unexpected provider changed/added method count') }
 }
 
 fn store_method_self_test() ! {
+ narrow_method_self_test(store_methods, 4, 8)!
+ narrow_method_self_test(clear_methods, 4, 1)!
+ narrow_method_self_test(token_methods, 0, 5)!
+}
+
+fn narrow_method_self_test(allowed []string, changed int, added int) ! {
  metadata := '.class public Landroid/accounts/AccountManager;\n.super Ljava/lang/Object;\n'
  unrelated := '.method public unrelated()V\n.locals 0\nreturn-void\n.end method\n'
  mut before := metadata + unrelated
  mut after := metadata + unrelated
- for i, name in store_methods {
+ for i, name in allowed {
   method := '.method public ' + name + '\n.locals 1\nreturn-void\n.end method\n'
-  if i < 4 { before += method }
+  if i < changed { before += method }
   after += method.replace('.locals 1', '.locals 2')
  }
- store_method_delta(before, after)!
+ narrow_method_delta(before, after, allowed, changed, added)!
+ mut count_rejected := false
+ narrow_method_delta(before, after, allowed, changed, added + 1) or { count_rejected = true }
+ if !count_rejected { return error('incorrect expected method count accepted') }
  for bad in [after.replace('.super Ljava/lang/Object;', '.super LOther;'),
   after.replace('public unrelated()V', 'public renamed()V'),
   after.replace('.locals 0', '.locals 3'), after + unrelated,
-  after.replace('public ' + store_methods[11], 'public extra()V'),
+  after.replace('public ' + allowed.last(), 'public extra()V'),
   after + '.method public broken()V\n',
-  after.replace('public ' + store_methods[0] + '\n.locals 2', 'public ' + store_methods[0] + '\n.locals 1')] {
-  store_method_delta(before, bad) or { continue }
+  after.replace('public ' + allowed[0], 'public renamed_target()V')] {
+  narrow_method_delta(before, bad, allowed, changed, added) or { continue }
   return error('invalid store method delta accepted')
  }
 }
@@ -201,13 +262,17 @@ fn jar_delta(old map[string]string, new map[string]string) ! {
 }
 
 fn store_class_delta(old map[string]string, new map[string]string) ! {
- if old.len != 2102 || new.len != old.len { return error('store profile requires exactly 2102 classes') }
+ narrow_class_delta(old, new, ['android/accounts/AccountManager.smali'])!
+}
+
+fn narrow_class_delta(old map[string]string, new map[string]string, targets []string) ! {
+ if old.len != 2102 || new.len != old.len || targets.len == 0 { return error('narrow profile requires exactly 2102 classes and explicit targets') }
  for name, pin in old {
-  if name !in new || ((name == 'android/accounts/AccountManager.smali') == (pin == new[name]!)) {
-   return error('unexpected store profile class delta: ' + name)
+  if name !in new || ((name in targets) == (pin == new[name]!)) {
+   return error('unexpected narrow profile class delta: ' + name)
   }
  }
- if 'android/accounts/AccountManager.smali' !in old { return error('missing AccountManager baseline') }
+ for name in targets { if name !in old { return error('missing narrow baseline class: ' + name) } }
 }
 
 fn store_delta_self_test() ! {
@@ -233,6 +298,14 @@ fn store_delta_self_test() ! {
   }
   store_class_delta(before, bad) or { continue }
   return error('invalid store profile class delta accepted: ' + case.str())
+ }
+ targets := ['android/accounts/AccountManager.smali', 'other/0.smali']
+ mut two := good.clone()
+ two[targets[1]] = 'new'
+ narrow_class_delta(old, two, targets)!
+ for bad in [good, old] {
+  narrow_class_delta(old, bad, targets) or { continue }
+  return error('missing one of multiple required class deltas accepted')
  }
 }
 
@@ -320,21 +393,22 @@ fn self_test() ! {
  return error('preexisting accessor accepted')
 }
 
-// Apply only the committed storage provider to the sealed interaction profile.
-// The original combined build remains available with its historical input ABI.
-fn build_store(baseline string, manifest_pin string, jar_pin string, root string) ! {
- if baseline != state + 'combined-account-webview-interaction-framework-2026-10-26'
-  || manifest_pin != interaction_manifest || jar_pin != interaction_jar
-  || os.real_path(baseline) != baseline || !root.starts_with(state + 'combined-account-webview-store-')
+// Narrow follow-ups retain the complete pinned class set and allow only their
+// named method deltas. The original combined build keeps its historical ABI.
+fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar_pin string, root string) ! {
+ if baseline != state + profile.baseline_name
+  || manifest_pin != profile.manifest_pin || jar_pin != profile.jar_pin
+  || os.real_path(baseline) != baseline || !root.starts_with(state + 'combined-account-webview-' + profile.name + '-')
   || os.real_path(os.dir(root)) != os.dir(root) || os.exists(root) || os.is_link(root)
   || root.contains_any(' \n\t') {
-  return error('exact sealed interaction baseline and fresh external store output required')
+  return error('exact sealed baseline and fresh external narrow output required')
  }
  if digest(store_compiler)! != store_compiler_pin || digest(baseline + '/api-impl.jar')! != jar_pin {
   return error('store compiler or interaction JAR pin differs')
  }
  sealed_baseline(baseline, manifest_pin)!
  os.mkdir_all(root + '/commands')!
+ command(root, 'builder-self-test', [os.executable(), '--self-test'])!
  os.mkdir_all(root + '/provider-source/androidtools')!
  os.mkdir_all(root + '/smali-tools')!
  os.mkdir_all(root + '/tools')!
@@ -361,21 +435,31 @@ fn build_store(baseline string, manifest_pin string, jar_pin string, root string
   if digest(target)! != inputs[path]! { return error('smali tool copy differs') }
   classpath << target
  }
- provider := repo + '/tests/native-android-tools/androidtools/framework_account_store.v'
  helper := repo + '/tests/native-android-tools/androidtools/framework.v'
- for path in [provider, helper] { inputs[path] = digest(path)! }
- os.cp(provider, root + '/provider-source/androidtools/framework_account_store.v')!
+ inputs[helper] = digest(helper)!
+ for name in profile.providers {
+  provider := repo + '/tests/native-android-tools/androidtools/' + name
+  inputs[provider] = digest(provider)!
+  os.cp(provider, root + '/provider-source/androidtools/' + name)!
+  if digest(root + '/provider-source/androidtools/' + name)! != inputs[provider]! {
+   return error('provider copy differs: ' + name)
+  }
+ }
  os.cp(helper, root + '/provider-helper-inputs/framework.v')!
- if digest(root + '/provider-source/androidtools/framework_account_store.v')! != inputs[provider]!
-  || digest(root + '/provider-helper-inputs/framework.v')! != inputs[helper]! {
-  return error('store provider/helper copy differs')
+ if digest(root + '/provider-helper-inputs/framework.v')! != inputs[helper]! {
+  return error('provider helper copy differs')
  }
  os.write_file(root + '/provider-source/androidtools/framework_account_helpers.v',
   'module androidtools\n' + helper_function(os.read_file(root + '/provider-helper-inputs/framework.v')!, 'pub fn framework_replace_method(')!)!
- os.write_file(root + '/provider-source/main.v',
-  'module main\nimport androidtools\nimport os\nfn main() {\n' +
-  'path := os.args[1] + "/android/accounts/AccountManager.smali"\n' +
-  'os.write_file(path,androidtools.framework_account_store(os.read_file(path)!)!)!\n}\n')!
+ mut application := 'module main\nimport androidtools\nimport os\nfn main() {\n'
+ mut targets := profile.calls.keys()
+ targets.sort()
+ for i, target in targets {
+  name := 'path' + i.str()
+  application += name + ' := os.args[1] + "/' + target + '"\n' +
+   'os.write_file(' + name + ',androidtools.' + profile.calls[target]! + '(os.read_file(' + name + ')!)!)!\n'
+ }
+ os.write_file(root + '/provider-source/main.v', application + '}\n')!
  os.setenv('VROOT', os.dir(store_compiler), true)
  os.setenv('V', store_compiler, true)
  os.setenv('VINIX_V_COMPILER', store_compiler, true)
@@ -393,18 +477,22 @@ fn build_store(baseline string, manifest_pin string, jar_pin string, root string
  command(root, 'apply-provider', [root + '/provider', root + '/smali'])!
  mut applied := map[string]string{}
  inventory(root + '/smali', '', mut applied)!
- store_class_delta(old, applied)!
- store_method_delta(os.read_file(root + '/old-dex/android/accounts/AccountManager.smali')!,
-  os.read_file(root + '/smali/android/accounts/AccountManager.smali')!)!
+ narrow_class_delta(old, applied, targets)!
+ for target in targets {
+  narrow_method_delta(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!,
+   profile.methods[target]!, profile.changed[target]!, profile.added[target]!)!
+ }
  command(root, 'assemble', [java, '-cp', classpath.join(':'), 'org.jf.smali.Main', 'assemble', '--jobs', '2', root + '/smali', '-o', root + '/classes.dex'])!
  if !os.is_file(root + '/classes.dex') || os.file_size(root + '/classes.dex') < 112 { return error('store assembly produced no fresh DEX') }
  command(root, 'replace-dex', ['/usr/bin/zip', '-q', '-j', root + '/api-impl.jar', root + '/classes.dex'])!
  command(root, 'new-disassemble', [java, '-cp', classpath.join(':'), 'org.jf.baksmali.Main', 'disassemble', '--jobs', '2', root + '/api-impl.jar', '-o', root + '/new-dex'])!
  mut new := map[string]string{}
  inventory(root + '/new-dex', '', mut new)!
- store_class_delta(old, new)!
- store_method_delta(os.read_file(root + '/old-dex/android/accounts/AccountManager.smali')!,
-  os.read_file(root + '/new-dex/android/accounts/AccountManager.smali')!)!
+ narrow_class_delta(old, new, targets)!
+ for target in targets {
+  narrow_method_delta(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!,
+   profile.methods[target]!, profile.changed[target]!, profile.added[target]!)!
+ }
  write_json(root + '/framework-dex-before.json', old)!
  write_json(root + '/framework-dex-after.json', new)!
  for pair in [[baseline + '/api-impl.jar', 'old'], [root + '/api-impl.jar', 'new']] {
@@ -419,24 +507,25 @@ fn build_store(baseline string, manifest_pin string, jar_pin string, root string
  for path, pin in driver_closure { if digest(path)! != pin { return error('store builder source changed: ' + path) } }
  for path, pin in inputs { if digest(path)! != pin { return error('store input changed: ' + path) } }
  write_json(root + '/build.json', {
-  'scope': json2.Any('AccountManager storage provider over exact sealed interaction framework; host assembly only, no guest or Google login proof'),
-  'profile': json2.Any('account-store-interaction-2102'),
+  'scope': json2.Any('Narrow ' + profile.name + ' provider delta over exact sealed framework; host assembly only, no guest or Google login proof'),
+  'profile': json2.Any(profile.name + '-2102'),
   'source_revision': json2.Any(command(root, 'revision', ['/usr/bin/git', '-C', repo, 'rev-parse', 'HEAD'])!.trim_space()),
   'input_sha256': json2.decode[json2.Any](json2.encode(inputs))!,
   'baseline_path': json2.Any(baseline), 'baseline_manifest_sha256': json2.Any(manifest_pin),
   'baseline_api_impl_sha256': json2.Any(jar_pin), 'api_impl_sha256': json2.Any(digest(root + '/api-impl.jar')!),
   'classes_dex_sha256': json2.Any(digest(root + '/classes.dex')!),
-  'changed_classes': json2.Any(['android/accounts/AccountManager.smali']), 'added_classes': json2.Any([]string{}),
+  'changed_classes': json2.Any(targets), 'added_classes': json2.Any([]string{}),
   'class_count': json2.Any(new.len), 'compiler_sha256': json2.Any(store_compiler_pin),
-  'account_manager_changed_method_count': json2.Any(4), 'account_manager_added_method_count': json2.Any(8),
+  'changed_method_counts': json2.decode[json2.Any](json2.encode(profile.changed))!,
+  'added_method_counts': json2.decode[json2.Any](json2.encode(profile.added))!,
   'environmental_inputs': json2.Any('Host SDK and dynamic libraries are environmental dependencies; exact V source closures, compiler and smali tool JARs retained and checked')
  })!
  mut pins := map[string]string{}
  inventory(root, '', mut pins)!
  write_json(root + '/sha256.json', pins)!
  sealed_baseline(root, digest(root + '/sha256.json')!)!
- println('STORE-FRAMEWORK-BUILD-PASS classes=' + new.len.str() + ' jar=' + root + '/api-impl.jar')
- println('STORE-FRAMEWORK-BUILD-MANIFEST-SHA256 ' + digest(root + '/sha256.json')!)
+ println('NARROW-FRAMEWORK-BUILD-PASS profile=' + profile.name + ' classes=' + new.len.str() + ' jar=' + root + '/api-impl.jar')
+ println('NARROW-FRAMEWORK-BUILD-MANIFEST-SHA256 ' + digest(root + '/sha256.json')!)
 }
 
 fn jar_self_test() ! {
@@ -673,10 +762,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] == '--store' {
-  build_store(os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth'] {
+  profile := if os.args[1] == '--store' { storage_profile() } else { auth_profile() }
+  build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
