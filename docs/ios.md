@@ -314,6 +314,15 @@ rendering, login and gameplay remain unverified. The ordinary launch still
 requires SKAdNetwork; advertising work is skipped. See the
 [diagnostic checkpoint](../tests/ios/foundation-http-checkpoint-20261026.md).
 
+A subsequent Vinix probe applies an enforced 2 GiB cgroup memory limit to the
+application, with the supervisor outside that group. Allocation and OOM checks
+verify enforcement before launch. All four traced `os_proc_available_memory`
+calls return 663,462,822 bytes, but the application still exits with signal 11
+after `Using MallocBinned3 allocator.`, without a cgroup OOM event. The crash
+persists with positive headroom; its location and cause remain undetermined.
+See the
+[enforced memory-budget checkpoint](../tests/ios/probe-memory-checkpoint-20261026.md).
+
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
 runner previously rejected as reserved bits. The decoder now preserves pointer
@@ -838,6 +847,16 @@ live child/parent limit changes and unlimited budgets. ASAN covers bounded
 hierarchy parsing and two Mach-O image loads/unloads with eight concurrent
 callers. The full ARM64 C++/GLES/PPSSPP regression passes. This resolves two more
 strong imports across Fortnite and EOSSDK.
+
+The notification VM harness accepts `VINIX_IOS_PROBE_MEMORY_MAX` only with
+`probe-no-ads`. Supply positive decimal bytes aligned to 4,096, for example
+`2147483648` for 2 GiB. Before launch, a separate 64 MiB group must charge and
+release an 8 MiB touch, kill a child touching 128 MiB, and leave its supervisor
+outside the group. The application then enters its own finite group before
+exec; its final memory events are recorded. Leaving the variable unset clears
+any inherited probe configuration and keeps the launch unmanaged.
+Calls preserve errno even before runtime initialization. Once initialized,
+runtime tracing logs each `os_proc_available_memory` result.
 
 The installed `libsystem_pthread.dylib` reference accepts null fork handlers
 and preserves errno across eight-thread registration. A real fork verifies
