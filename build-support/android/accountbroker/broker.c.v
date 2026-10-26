@@ -4,6 +4,7 @@
 module accountbroker
 
 import accountipc
+import accountinteraction
 import crypto.rand
 import nativeaccountauth
 import time
@@ -32,6 +33,7 @@ struct Session {
 	capability []u8
 	deadline   i64
 	output     &accountipc.Stream = unsafe { nil }
+	caller     nativeaccountauth.Caller
 mut:
 	terminal  bool
 	cancelled bool
@@ -45,13 +47,28 @@ pub struct Broker {
 	lifetime int
 	incoming chan Incoming
 mut:
-	service     &accountipc.Stream = unsafe { nil }
-	sessions    map[u64]Session
-	next        u64 = 1
-	pending     int
-	workers     []Worker
-	next_worker u64 = 1
-	closed      bool
+	service      &accountipc.Stream        = unsafe { nil }
+	interactions &accountinteraction.Table = unsafe { nil }
+	sessions     map[u64]Session
+	next         u64 = 1
+	pending      int
+	workers      []Worker
+	next_worker  u64 = 1
+	closed       bool
+}
+
+fn (b &Broker) origin() nativeaccountauth.Caller {
+	return nativeaccountauth.Caller{b.selected.package_name, b.selected.uid, b.selected.gid, b.pid, b.selected.apk_sha256, b.selected.certificate_sha256}
+}
+
+// Only administrator-selected components declared by the pinned APK may be
+// supplied here. Configure before accepting any application or service peer.
+pub fn (mut b Broker) allow_interactions(targets []accountinteraction.Target) ! {
+	if b.closed || b.service != unsafe { nil } || b.active() != 0
+		|| b.interactions != unsafe { nil } {
+		return error('account interaction policy is already fixed')
+	}
+	b.interactions = accountinteraction.create(b.origin(), targets)!
 }
 
 pub fn create(registry nativeaccountauth.Registry, selected nativeaccountauth.Entry, pid int, lifetime int) !&Broker {
@@ -110,12 +127,14 @@ fn (mut b Broker) admit(incoming Incoming) ! {
 	}
 	if b.next == 0 {
 		output.close()
+		unsafe { free(output) }
 		return error('account session sequence exhausted')
 	}
 	id := b.next
 	b.next++
 	capability := rand.bytes(32) or {
 		output.close()
+		unsafe { free(output) }
 		return err
 	}
 	b.sessions[id] = Session{
@@ -124,21 +143,69 @@ fn (mut b Broker) admit(incoming Incoming) ! {
 		capability: capability
 		deadline:   time.sys_mono_now() + 5 * time.minute
 		output:     output
+		caller:     incoming.authorized.caller
 	}
 	if b.service == unsafe { nil } {
-		b.finish(id, accountipc.failure(id, 1, 'Account authenticator is unavailable'))!
+		b.fail(id, 1, 'Account authenticator is unavailable')!
+		return
+	}
+	if incoming.authorized.request.operation == .redeem_interaction {
+		b.redeem(id, incoming.authorized)!
 		return
 	}
 	// Only addAccount is implemented. Queries require a real authoritative
 	// account store; returning an invented empty account list would mask failure.
 	if incoming.authorized.request.operation != .add_account {
-		b.finish(id, accountipc.failure(id, 6, 'Account storage is not available'))!
+		b.fail(id, 6, 'Account storage is not available')!
 		return
 	}
 	command := accountipc.Command{id, capability, incoming.authorized.caller, incoming.authorized.request}
 	bytes := accountipc.encode_command(command)!
 	defer { unsafe { bytes.free() } }
 	b.service.enqueue(bytes)!
+}
+
+fn (mut b Broker) fail(id u64, code int, message string) ! {
+	event := accountipc.failure(id, code, message)
+	defer { unsafe { event.options.free() } } // keys and message are borrowed
+	b.finish(id, event)!
+}
+
+fn (mut b Broker) redeem(id u64, authorized nativeaccountauth.AuthorizedRequest) ! {
+	if b.interactions == unsafe { nil } {
+		b.fail(id, 6, 'Account interaction is unavailable')!
+		return
+	}
+	redemption := authorized.request.redemption or {
+		b.fail(id, 7, 'Account interaction ticket is invalid')!
+		return
+	}
+	mut launch := b.interactions.redeem(authorized.caller, redemption.request,
+		redemption.capability) or {
+		b.fail(id, 7, 'Account interaction ticket is invalid or expired')!
+		return
+	}
+	defer { launch.dispose() }
+	session := b.sessions[launch.session] or {
+		b.fail(id, 7, 'Account request has ended')!
+		return
+	}
+	if session.terminal || session.output.peer_gone() || time.sys_mono_now() >= session.deadline
+		|| !same_capability(session.capability, launch.response_capability) {
+		b.revoke(launch.session)
+		b.fail(id, 7, 'Account request has ended')!
+		return
+	}
+	bytes := accountipc.encode_launch(accountipc.Launch{
+		session:     launch.session
+		capability:  launch.response_capability
+		interaction: accountipc.Interaction{launch.local_handle, launch.target.package_name, launch.target.class_name}
+	})!
+	defer { unsafe { bytes.free() } }
+	b.service.enqueue(bytes)!
+	// This acknowledges delivery of a launch command only. The original
+	// addAccount request still waits for an actual authenticator result.
+	b.finish(id, accountipc.Event{ kind: .result, id: id })!
 }
 
 fn same_capability(a []u8, b []u8) bool {
@@ -151,11 +218,18 @@ fn same_capability(a []u8, b []u8) bool {
 fn (mut b Broker) finish(id u64, event accountipc.Event) ! {
 	mut session := b.sessions[id] or { return error('unknown account session') }
 	if session.terminal { return error('account session already completed') }
-	client_event := accountipc.Event{ kind: event.kind, id: session.request, options: event.options, accounts: event.accounts }
+	client_event := accountipc.Event{
+		kind:        event.kind
+		id:          session.request
+		options:     event.options
+		accounts:    event.accounts
+		interaction: event.interaction
+	}
 	bytes := accountipc.encode_event(client_event, false)!
 	defer { unsafe { bytes.free() } }
 	session.output.enqueue(bytes)!
 	if accountipc.terminal(event.kind) {
+		if b.interactions != unsafe { nil } { b.interactions.revoke(id) }
 		session.terminal = true
 		b.sessions[id] = session
 	}
@@ -167,6 +241,30 @@ fn (mut b Broker) callback(packet accountipc.Packet) ! {
 	session := b.sessions[event.id] or { return error('authenticator returned an unknown session') }
 	if session.terminal || !same_capability(session.capability, event.capability) {
 		return error('authenticator response capability is invalid or consumed')
+	}
+	if event.kind == .interaction {
+		if b.interactions == unsafe { nil } {
+			b.cancel_service(event.id)
+			b.fail(event.id, 6, 'Account interaction is unavailable')!
+			return
+		}
+		ticket := b.interactions.offer(accountinteraction.Offer{
+			origin:              b.origin()
+			caller:              session.caller
+			session:             event.id
+			request:             session.request
+			response_capability: session.capability
+			local_handle:        event.interaction.handle
+			target:              accountinteraction.Target{event.interaction.target_package, event.interaction.target_class}
+			deadline:            session.deadline
+		})!
+		defer { unsafe { ticket.free() } }
+		b.finish(event.id, accountipc.Event{
+			kind:        .interaction
+			id:          event.id
+			interaction: accountipc.Interaction{ handle: ticket }
+		})!
+		return
 	}
 	if event.kind !in [.result, .failure, .continued] {
 		return error('unsupported authenticator callback')
@@ -191,6 +289,7 @@ fn (mut b Broker) cancel_service(id u64) {
 }
 
 fn (mut b Broker) revoke(id u64) {
+	if b.interactions != unsafe { nil } { b.interactions.revoke(id) }
 	b.cancel_service(id)
 	session := b.sessions[id] or { return }
 	session.output.close()
@@ -239,9 +338,13 @@ pub fn (mut b Broker) pump(timeout int) ! {
 	}
 	now := time.sys_mono_now()
 	for id, session in b.sessions {
+		if session.output.peer_gone() {
+			b.revoke(id)
+			continue
+		}
 		if now > session.deadline && !session.terminal {
 			b.cancel_service(id)
-			b.finish(id, accountipc.failure(id, 4, 'Account request timed out')) or {
+			b.fail(id, 4, 'Account request timed out') or {
 				b.revoke(id)
 				continue
 			}
@@ -272,6 +375,11 @@ pub fn (mut b Broker) close() {
 	unsafe { b.workers.free() }
 	for id, _ in b.sessions { b.revoke(id) }
 	unsafe { b.sessions.free() }
+	if b.interactions != unsafe { nil } {
+		b.interactions.close()
+		unsafe { free(b.interactions) }
+		b.interactions = unsafe { nil }
+	}
 	if b.service != unsafe { nil } {
 		b.service.close()
 		unsafe { free(b.service) }
