@@ -72,3 +72,25 @@ and source/compiler/artifact hashes. Native
 [x86_64](results/2026-10-18/software-view-owner-x86_64.txt) reports accompany the
 raw serial logs. The [retainer](software-view-owner-retain.v) verifies local
 inputs and evidence with `--verify` while those files remain available.
+
+## Installed-name search, 2026-10-26
+
+Search now includes the retained installed name alongside the candidate name,
+ID and description. A renamed update remains discoverable using its installed
+name in All, Installed and Updates. The fixture also checks Unicode folding,
+available-name lookalikes, omitted legacy installed metadata, repeated filtering
+and compact/full browser resizing without starting package work.
+
+Source revision `ec8638f10c62e67892749ec51208613f3af6f89a` passed focused normal,
+production and ASan/UBSan host runs, the historical full normal Software fixture,
+and a production control that correctly refuses the original implementation.
+The complete evidence directory is
+`/Users/alex/Library/Caches/vinix-codex/section14/software-installed-name-20261026-03`.
+Its `result.json` SHA-256 is
+`66e9c52db6705018376c467786c14155d32c78e63e82745a37d0b41de8f23127`;
+the artifact inventory SHA-256 is
+`670021ba5e8d8559074482dbc4179e667f5be3c06ad02ffeafc8cc582b653a2c`.
+Earlier failed fixture attempts remain separately retained. These are host
+UI-tree checks without measured allocation or guest-presentation claims.
+Project/UI sources and V/Clang executables are pinned; imported compiler-library,
+header, linker and transitive tool inputs are not fully frozen.

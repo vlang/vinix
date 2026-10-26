@@ -383,7 +383,7 @@ fn (mut a SoftwareApp) filter_rows() {
 	for i, row in a.rows {
 		if a.filter == 1 && row.installed_version == '' { continue }
 		if a.filter == 2 && !row.updatable { continue }
-		combined := '${row.id} ${row.name} ${row.description}'
+		combined := '${row.id} ${row.name} ${row.installed_name} ${row.description}'
 		text := software_search_lower(combined)
 		if query.len == 0 || text.contains(query) { a.matching << i }
 		unsafe {

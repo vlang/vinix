@@ -61,6 +61,7 @@ fn software_view_legacy(text string) string {
 }
 
 fn check_software_view_reader() ! {
+	check_software_installed_name_search()!
 	check_software_search_paste()
 	check_software_catalog_browser()!
 	mut app := SoftwareApp{ service_path: os.executable(), administration_required: true, query: []u8{cap: 256}, output: []u8{cap: 8192} }
@@ -113,6 +114,67 @@ fn check_software_view_reader() ! {
 	assert 'Installed license, payload and runtime: Unavailable from this service' in details_fixture_values(&app, 4)
 	app.clear_details()
 	println('Software catalog reader: complete typed flags, installed-versus-planned launch fields, asynchronous malformed-response refusal, prior-valid-view preservation and explicit legacy details passed')
+}
+
+fn check_software_installed_name_search() ! {
+	mut view := SoftwareView{ format: 1, generation: 7, architecture: 'aarch64', rows: [
+		SoftwareRow{ id: 'renamed-update', name: 'Future α', description: 'Description uniquedetail',
+			version: '2.0.0', installed_version: '1.0.0', installed_name: 'Retained ÉKİ🚀', installed_kind: 'native',
+			updatable: true, update_action: 'update' },
+		SoftwareRow{ id: 'renamed-stable', name: 'Other candidate', version: '1.0.0', installed_version: '1.0.0',
+			installed_name: 'Retained ÉKİ🚀', installed_kind: 'native' },
+		SoftwareRow{ id: 'available', name: 'Retained ÉKİ🚀', version: '1.0.0' },
+	].map(SoftwareRow{ ...it, architecture: 'aarch64', kind: 'native', repository: 'publisher',
+		public_key: 'a'.repeat(64), license: 'MIT' }) }
+	defer { view.close() }
+	view.validate()!
+	text := json2.encode(view)
+	without_names := text.replace('"installed_name":"Retained ÉKİ🚀",', '')
+	without_empty_names := without_names.replace('"installed_name":"",', '')
+	without_named_kinds := without_empty_names.replace('"installed_kind":"native",', '')
+	without_kinds := without_named_kinds.replace('"installed_kind":"",', '')
+	without_permissions := without_kinds.replace('"installed_permissions":[],', '')
+	legacy := without_permissions.replace('"installed_window_protocol":0,', '')
+	defer { unsafe { text.free(); without_names.free(); without_empty_names.free(); without_named_kinds.free(); without_kinds.free(); without_permissions.free(); legacy.free() } }
+	for old_service in [false, true]! {
+		mut app := SoftwareApp{ query: []u8{cap: 256}, output: []u8{cap: 8192} }
+		defer { app.close_app() }
+		metadata_fixture_output(mut app, if old_service { legacy } else { text }); app.load_view()
+		if app.rows.len != 3 || (app.rows[0].installed_name == '') != old_service {
+			return error('installed-name search fixture was not admitted: ${old_service}: ${app.status}')
+		}
+		for filter, action in ['software.catalog', 'software.installed', 'software.updates']! {
+			app.handle(action)!
+			for query in ['retained éki🚀', 'FUTURE Α', 'UNIQUEDETAIL', 'RENAMED-UPDATE', 'no matching name']! {
+				app.focus = true; app.key_input('\x01'); app.paste_input(query)
+				expected := if query == 'retained éki🚀' {
+					if old_service { if filter == 0 { [2] } else { []int{} } }
+					else if filter == 0 { [0, 1, 2] } else if filter == 1 { [0, 1] } else { [0] }
+				} else if query == 'no matching name' { []int{} } else { [0] }
+				defer { unsafe { expected.free() } }
+				for _ in 0 .. 3 {
+					app.filter_rows()
+					if app.filter != filter || app.matching != expected || editor_bytes_text(app.query) != query {
+						return error('candidate/installed search changed its query or filter projection')
+					}
+				}
+				selected := if expected.len > 0 { expected[0] } else { -1 }
+				app.selected = -1; app.handle('software.catalog.browse')!
+				for size in [ui2.rect(0, 0, 180, 220), ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 320, 240)]! {
+					free_window_tree(app.build(size)!)
+					if !app.catalog_browser_mode || app.selected != selected || app.filter != filter
+						|| app.matching != expected || editor_bytes_text(app.query) != query {
+						return error('installed-name search changed across compact/full browser resize')
+					}
+				}
+				app.handle('software.catalog.back')!
+				if app.catalog_browser_mode || app.worker != unsafe { nil } || app.review != '' || app.admin_prompt {
+					return error('installed-name search started work or failed to leave its browser')
+				}
+			}
+		}
+	}
+	println('Software installed-name search: retained and candidate Unicode names, IDs/descriptions, all filters, legacy omission, repeated filtering and compact/full resize passed')
 }
 
 fn check_software_view_memory() ! {
