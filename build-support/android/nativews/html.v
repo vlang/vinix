@@ -279,6 +279,7 @@ fn ws_web_new(e voidptr, view voidptr) i64 {
 		pointer := ws_view_new(6)
 		(&WsView(pointer)).background = 0xffffffff
 		(&WsView(pointer)).size = 16
+		ws_web_attach(e, view, pointer)
 		return pointer
 	}
 }

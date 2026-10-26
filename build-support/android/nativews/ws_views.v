@@ -66,10 +66,11 @@ fn ws_button_indicator(e voidptr, object voidptr) WsButtonIndicator {
 	return WsButtonIndicator{ drawable: drawable, custom: true, width: width, height: height, advance: if width > 0 { width + 12 } else { i32(0) } }
 }
 
-fn ws_view_free(pointer i64) {
+fn ws_view_free(e voidptr, pointer i64) {
 	unsafe {
 		if pointer == 0 { return }
 		view := &WsView(pointer)
+		ws_web_forget(e, view)
 		ws_window_release(view.window)
 		ws_font_unref(view.font)
  C.free(view.text)
@@ -324,6 +325,7 @@ fn ws_draw_content(e voidptr, object voidptr, canvas voidptr) {
 			return
 		}
 		if view.kind == 6 {
+			if ws_web_draw(e, object) { return }
 			width := integer(e, object, c'android/view/View', c'getWidth', c'()I', nil)
 			layout := ws_text_layout(view.text, view.size, width - 6, view.font)
 			ws_layout_draw(layout, view.color, 3, view.size)
@@ -656,6 +658,7 @@ fn ws_pointer(e voidptr, event &WsEvent) {
 
 fn ws_insert_text(e voidptr, bytes &u8, length u32) {
 	unsafe {
+		if ws_web_text(e, bytes, length) { return }
 		if ws.focused == nil || length > 4096 { return }
 		view := ws_view(e, ws.focused)
 		if view.kind != 3 { return }
@@ -682,6 +685,7 @@ fn ws_insert_text(e voidptr, bytes &u8, length u32) {
 
 fn ws_keys(e voidptr, bytes &u8, length u32) {
 	unsafe {
+		if ws_web_text(e, bytes, length) { return }
 		if length > 4096 { return }
 		newline := [u8(10)]!
 		mut start := u32(0)

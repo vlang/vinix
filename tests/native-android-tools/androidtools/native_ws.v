@@ -82,44 +82,11 @@ pub fn native_ws_cli(argv []string) !int {
 	return 0
 }
 
-pub fn build_native_ws(smali string, runtime string, output string, compiler string, arch string) ! {
-	os.mkdir_all(output + '/atlframework')!
-	build_native_timezones(runtime, output)!
-	// Carry the runtime's generated Java trust store when updating older
-	// guest images, which may predate JKS staging.
-	os.cp(runtime + '/etc/ssl/certs/java/cacerts', output + '/cacerts')!
-	vcompiler := os.real_path(os.find_abs_path_of_executable('v')!)
-	os.cp(os.dir(vcompiler) + '/thirdparty/fontstash/stb_truetype.h', output + '/stb_truetype.h')!
-	os.cp(os.dir(vcompiler) + '/thirdparty/stb_image/stb_image.h', output + '/stb_image.h')!
-	sqlite_header := if os.is_file(runtime + '/usr/include/sqlite3.h') {
-		runtime + '/usr/include/sqlite3.h'
-	} else if os.is_file('/usr/include/sqlite3.h') {
-		'/usr/include/sqlite3.h'
-	} else {
-		'/opt/homebrew/opt/sqlite/include/sqlite3.h'
-	}
-	os.cp(sqlite_header, output + '/sqlite3.h')!
-	for dir in ['atlframework', 'nativews'] {
-		for name in os.ls(root() + '/build-support/android/' + dir)! {
-			if name.ends_with('.v') {
-				os.cp(root() + '/build-support/android/' + dir + '/' + name, output + '/atlframework/' + name)!
-			}
-		}
-	}
-	// This upstream header describes the existing, GTK-independent resource ABI.
-	header := output + '/androidfw_c_api.h'
-	if !os.exists(header) {
-		checked(['curl', '-fLsS',
-			'https://gitlab.com/android_translation_layer/art_standalone/-/raw/e78bf68917bcaaf58fef3960cd88793b3b7f39cc/libandroidfw/include/androidfw/androidfw_c_api.h',
-			'-o', header])!
-	}
-	if sha256.sum(os.read_bytes(header)!).hex() != 'e233a055133776838b8044ca43eb9e8dfac387a0580918786d60207276d37af4' {
-		return error('libandroidfw header checksum mismatch')
-	}
-	// Bindings are explicit: a new native API is never silently stubbed.
+// Generate bindings separately so native delta fixtures can validate the exact
+// framework declarations without rebuilding every runtime dependency.
+pub fn native_ws_bindings(spec string, smali string) !string {
 	mut generated := '@[translated]\nmodule atlframework\n'
 	mut count := 0
-	spec := os.read_file(root() + '/build-support/android/nativews/bindings.txt')!
 	for line in spec.split_into_lines() {
 		if line.trim_space() == '' || line.starts_with('#') { continue }
 		parts := line.split('|')
@@ -157,6 +124,47 @@ pub fn build_native_ws(smali string, runtime string, output string, compiler str
 			return error('binding does not match native declaration: ' + class_name + '.' + method_name)
 		}
 	}
+	return generated
+}
+
+pub fn build_native_ws(smali string, runtime string, output string, compiler string, arch string) ! {
+	os.mkdir_all(output + '/atlframework')!
+	build_native_timezones(runtime, output)!
+	// Carry the runtime's generated Java trust store when updating older
+	// guest images, which may predate JKS staging.
+	os.cp(runtime + '/etc/ssl/certs/java/cacerts', output + '/cacerts')!
+	vcompiler := os.real_path(os.find_abs_path_of_executable('v')!)
+	os.cp(os.dir(vcompiler) + '/thirdparty/fontstash/stb_truetype.h', output + '/stb_truetype.h')!
+	os.cp(os.dir(vcompiler) + '/thirdparty/stb_image/stb_image.h', output + '/stb_image.h')!
+	sqlite_header := if os.is_file(runtime + '/usr/include/sqlite3.h') {
+		runtime + '/usr/include/sqlite3.h'
+	} else if os.is_file('/usr/include/sqlite3.h') {
+		'/usr/include/sqlite3.h'
+	} else {
+		'/opt/homebrew/opt/sqlite/include/sqlite3.h'
+	}
+	os.cp(sqlite_header, output + '/sqlite3.h')!
+	for dir in ['atlframework', 'nativews'] {
+		for name in os.ls(root() + '/build-support/android/' + dir)! {
+			if name.ends_with('.v') {
+				os.cp(root() + '/build-support/android/' + dir + '/' + name, output + '/atlframework/' + name)!
+			}
+		}
+	}
+	// This upstream header describes the existing, GTK-independent resource ABI.
+	header := output + '/androidfw_c_api.h'
+	if !os.exists(header) {
+		checked(['curl', '-fLsS',
+			'https://gitlab.com/android_translation_layer/art_standalone/-/raw/e78bf68917bcaaf58fef3960cd88793b3b7f39cc/libandroidfw/include/androidfw/androidfw_c_api.h',
+			'-o', header])!
+	}
+	if sha256.sum(os.read_bytes(header)!).hex() != 'e233a055133776838b8044ca43eb9e8dfac387a0580918786d60207276d37af4' {
+		return error('libandroidfw header checksum mismatch')
+	}
+	// Bindings are explicit: a new native API is never silently stubbed.
+	spec := os.read_file(root() + '/build-support/android/nativews/bindings.txt')!
+	generated := native_ws_bindings(spec, smali)!
+	count := generated.count('\nfn ws_binding_')
 	os.write_file(output + '/atlframework/ws_generated.v', generated)!
 	generators.generate_module(output + '/atlframework', output + '/android-native.c', arch, []string{})!
 	generators.generate_module(root() + '/build-support/android/wsloader', output + '/android-loader.c', arch, []string{})!
