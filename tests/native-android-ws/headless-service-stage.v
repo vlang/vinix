@@ -32,7 +32,10 @@ const framework_seal = '36a472320e71eb459896c1d52a8f211f475362fb2c6dada682870bf4
 const framework_jar_sha = '9e643451d4d82fc3839c91415947f04d3726aa81967a784d4d26db63e2c88cb1'
 const combined_framework_seal = '798b574b811203313b185480ddfd9349bfc5b7e1863d96e99d9c1afca3be4dd2'
 const combined_framework_jar_sha = '296cb0bd9d16801322a18d40bca0facfb0593e50be47d424f199d02ceeb7e15f'
+const interaction_framework_seal = 'dc5c0470c4cdc7a075ded61680e4ac89cef056dbcb515ce55a32f74bf82aef87'
+const interaction_framework_jar_sha = '86278c9cbe1f25904b760250f34f859206d719cbb23cf5ff5411a75c480ac36f'
 const full_native_seal = 'd99195272b8af813679cf54fed9f1e0341e6f1115804ac09c1cd2d5a8f942e3e'
+const compiler_pin = '0cc6c1d34c1811a818e4ae89853116861a4b067d4251af257851a7714f0d11fe'
 const fixture_apk_sha = '4df9e3cd757b463259c73dc038eb84d149d7ec1461a1889bc8f2d531f6980634'
 const compiler = '/Users/alex/code/v/v'
 const cross = '/opt/homebrew/bin/aarch64-linux-musl-gcc'
@@ -87,7 +90,17 @@ fn framework_profile(seal string) !FrameworkProfile {
 		combined_framework_seal {
 			FrameworkProfile{'combined-account-webview-2101', combined_framework_seal, combined_framework_jar_sha, 2101}
 		}
+		interaction_framework_seal {
+			FrameworkProfile{'combined-account-webview-interaction-2102', interaction_framework_seal, interaction_framework_jar_sha, 2102}
+		}
 		else { return error('framework manifest is outside the audited profiles') }
+	}
+}
+
+fn verify_mode(profile FrameworkProfile, current_native bool, current_executables bool) ! {
+	if (profile.seal == interaction_framework_seal && (!current_native || !current_executables))
+		|| (current_executables && (profile.seal != interaction_framework_seal || !current_native)) {
+		return error('interaction framework requires current native and seven-argument executable bundles together')
 	}
 }
 
@@ -118,7 +131,7 @@ fn current_native_destinations() []string {
 
 fn verify_current_identity(profile FrameworkProfile, framework string, native_seal string,
 	baseline string, dso_sha string, receipt map[string]json2.Any) ! {
-	if profile.seal != combined_framework_seal || native_seal != full_native_seal
+	if profile.seal !in [combined_framework_seal, interaction_framework_seal] || native_seal != full_native_seal
 		|| receipt['framework']!.str() != framework
 		|| receipt['framework_sha256']!.str() != profile.seal
 		|| receipt['baseline_sha256']!.str() != full_native_seal
@@ -174,6 +187,186 @@ fn verify_current_native(current string, framework string, profile FrameworkProf
 		}
 	}
 	return exports
+}
+
+fn executable_items() [][]string {
+	return [['native-entry', 'vinix-android-native'], ['launcher', 'run-android'],
+		['controller', 'headless-service-controller']]
+}
+
+fn executable_receipts() []string {
+	mut names := ['build.json', 'sha256.json']
+	for item in executable_items() {
+		for action in ['generate', 'compile', 'build'] { names << 'commands/' + action + '-' + item[0] + '.json' }
+		names << 'commands/compile-' + item[0] + '-runtime.json'
+	}
+	return names
+}
+
+fn executable_destinations() []string {
+	return executable_receipts().map('current-launch-' + it.replace('commands/', '').replace('/', '-'))
+}
+
+fn executable_outputs(pins map[string]string) !map[string]string {
+	mut expected := map[string]string{}
+	for item in executable_items() { expected['bin/' + item[1]] = pins['bin/' + item[1]]! }
+	return expected
+}
+
+fn verify_executable_identity(profile FrameworkProfile, framework string, baseline string,
+	pins map[string]string, receipt map[string]json2.Any) ! {
+	expected := executable_outputs(pins)!
+	if profile.seal != interaction_framework_seal
+		|| receipt['kind']!.str() != 'vinix-current-launch-v1'
+		|| receipt['framework']!.str() != framework || receipt['framework_sha256']!.str() != profile.seal
+		|| receipt['native_base']!.str() != baseline || receipt['native_base_sha256']!.str() != full_native_seal
+		|| receipt['service_main_argc']! != json2.Any(7) || receipt['compiler_sha256']!.str() != compiler_pin
+		|| receipt['source_revision']!.str() == '' || receipt['completed_utc']!.str() == ''
+		|| json2.decode[map[string]string](json2.encode(receipt['outputs_sha256']!))! != expected {
+		return error('current executable receipt does not couple the exact seven-argument outputs and framework')
+	}
+}
+
+fn executable_includes(root string, label string, pins map[string]string) []string {
+	mut flags := []string{}
+	for name in pins.keys().filter(it.starts_with('closure/' + label + '/') && it.ends_with('.h')) {
+		flag := '-I' + os.dir(root + '/' + name)
+		if flag !in flags { flags << flag }
+	}
+	flags.sort()
+	return flags
+}
+
+fn executable_source(root string, label string, pins map[string]string) !string {
+	suffix := match label {
+		'native-entry' { '/build-support/android/native-entry.v' }
+		'launcher' { '/build-support/android/native-run.v' }
+		'controller' { '/tests/native-android-ws/headless-service-controller.v' }
+		else { return error('unknown current executable source') }
+	}
+	sources := pins.keys().filter(it.starts_with('closure/' + label + '/') && it.ends_with(suffix))
+	if sources.len != 1 { return error('current executable source closure is ambiguous: ' + label) }
+	return root + '/' + sources[0]
+}
+
+fn executable_runtime_source(root string, label string, pins map[string]string) !string {
+	sources := pins.keys().filter(it.starts_with('closure/' + label + '/')
+		&& it.ends_with('/vlib/builtin/segfault_handler_nix.c'))
+	if sources.len != 1 { return error('current executable signal runtime closure is ambiguous: ' + label) }
+	return root + '/' + sources[0]
+}
+
+fn verify_executable_command(root string, label string, action string, receipt map[string]json2.Any,
+	includes []string, source string) ! {
+	args := json2.decode[[]string](json2.encode(receipt['argv']!))!
+	if receipt['exit_code']!.int() != 0 { return error('current executable command failed') }
+	if action == 'generate' {
+		if receipt['executable_sha256']!.str() != compiler_pin || args.len != 17
+			|| args[1..13] != ['-new-compiler', '-os', 'linux', '-arch', 'arm64', '-cc', cross,
+				'-gc', 'none', '-nocache', '-skip-running', '-path']
+			|| !args[13].split('|').all(it.starts_with(root + '/closure/' + label + '/') && relative(it[root.len + 1..]))
+			|| args[14..16] != ['-o', root + '/generated/' + label + '.c']
+			|| args.last() != source {
+			return error('current executable frozen generation command differs')
+		}
+		return
+	}
+	mut expected := [cross, '-v']
+	if action in ['compile', 'runtime'] {
+		expected << ['-D_GNU_SOURCE', '-O2', '-fwrapv', '-pthread', '-Werror=implicit-function-declaration', '-Werror=int-conversion']
+		expected << includes
+		expected << if action == 'runtime' {
+			['-c', source, '-o', root + '/generated/' + label + '-runtime.o']
+		} else {
+			['-c', root + '/generated/' + label + '.c', '-o', root + '/generated/' + label + '.o']
+		}
+	} else if action == 'build' {
+		expected << ['-no-pie', '-pthread', '-Wl,-t']
+		if label != 'native-entry' { expected << '-static' }
+		items := executable_items().filter(it[0] == label)
+		if items.len != 1 { return error('unknown current executable label') }
+		expected << [root + '/generated/' + label + '.o', root + '/generated/' + label + '-runtime.o',
+			'-ldl', '-lm', '-o', root + '/bin/' + items[0][1]]
+	} else { return error('unknown current executable command action') }
+	if args != expected { return error('current executable cross command differs: ' + label + '/' + action) }
+}
+
+fn executable_elf(path string, dynamic bool) ! {
+	bytes := os.read_bytes(path)!
+	if bytes.len < 64 || bytes[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1]
+		|| bytes[16..20] != [u8(2), 0, 183, 0] { return error('current executable is not AArch64 ELF64 ET_EXEC') }
+	mut offset := u64(0)
+	for i in 0 .. 8 { offset |= u64(bytes[32 + i]) << (8 * i) }
+	stride := int(bytes[54]) | int(bytes[55]) << 8
+	count := int(bytes[56]) | int(bytes[57]) << 8
+	if count == 0 || stride < 56 || offset < 64 || offset > u64(bytes.len)
+		|| u64(stride * count) > u64(bytes.len) - offset { return error('invalid executable program headers') }
+	mut loads := 0
+	mut interpreters := 0
+	for i in 0 .. count {
+		at := int(offset) + i * stride
+		if bytes[at..at + 4] == [u8(1), 0, 0, 0] { loads++ }
+		if bytes[at..at + 4] == [u8(3), 0, 0, 0] {
+			interpreters++
+			mut start := u64(0)
+			mut size := u64(0)
+			for j in 0 .. 8 { start |= u64(bytes[at + 8 + j]) << (8 * j); size |= u64(bytes[at + 32 + j]) << (8 * j) }
+			if start > u64(bytes.len) || size > u64(bytes.len) - start
+				|| bytes[int(start)..int(start + size)] != '/lib/ld-musl-aarch64.so.1\x00'.bytes() {
+				return error('current executable interpreter differs')
+			}
+		}
+	}
+	if loads == 0 || interpreters != if dynamic { 1 } else { 0 } {
+		return error('current executable static/dynamic contract differs')
+	}
+}
+
+fn verify_service_abi(entry string, implementation string, entry_implementation_sha string,
+	native_implementation_sha string) ! {
+	if entry_implementation_sha != native_implementation_sha
+		|| !entry.contains('type NativeServiceMain = fn (&char, &char, &char, &char, &char, i32, i32) i32')
+		|| !entry.contains('launch.action.str, i32(control_fd), i32(ui_fd))')
+		|| !implementation.contains('fn ws_service_main(root &char, apk &char, package_name &char, service &char, action &char, control_fd i32, ui_fd i32) i32 {') {
+		return error('current native and executable service implementation snapshots differ')
+	}
+}
+
+fn verify_current_executables(root string, framework string, profile FrameworkProfile,
+	baseline string, pins map[string]string, native_pins map[string]string) ! {
+	receipt := json2.decode[map[string]json2.Any](os.read_file(root + '/build.json')!)!
+	verify_executable_identity(profile, framework, baseline, pins, receipt)!
+	if hash(root + '/framework-sha256.json')! != profile.seal
+		|| hash(root + '/baseline-sha256.json')! != full_native_seal {
+		return error('current executable retained input manifests differ')
+	}
+	// The same implementation snapshot must underlie both sides of the ABI.
+	verify_service_abi(os.read_file(executable_source(root, 'native-entry', pins)!)!, os.read_file(root + '/abi/headless.v')!,
+		pins['abi/headless.v']!, native_pins['native/atlframework/headless.v']!)!
+	for item in executable_items() {
+		executable_elf(root + '/bin/' + item[1], item[0] == 'native-entry')!
+		for generated in ['generated/' + item[0] + '.c', 'generated/' + item[0] + '.o',
+			'generated/' + item[0] + '-runtime.o', 'generated/' + item[0] + '-runtime-headers.json'] {
+			if generated !in pins { return error('current executable generated artifact missing: ' + generated) }
+		}
+		includes := executable_includes(root, item[0], pins)
+		source := executable_source(root, item[0], pins)!
+		for action in ['generate', 'compile', 'build'] {
+			command_receipt := json2.decode[map[string]json2.Any](os.read_file(root + '/commands/' + action + '-' + item[0] + '.json')!)!
+			verify_executable_command(root, item[0], action, command_receipt, includes, source)!
+			if action == 'generate' {
+				args := json2.decode[[]string](json2.encode(command_receipt['argv']!))!
+				if !args[0].starts_with(root + '/closure/' + item[0] + '/')
+					|| pins[args[0][root.len + 1..]]! != compiler_pin
+					|| args.last()[root.len + 1..] !in pins {
+					return error('current executable generator compiler is outside its pinned closure')
+				}
+			}
+		}
+		runtime_receipt := json2.decode[map[string]json2.Any](os.read_file(root + '/commands/compile-' + item[0] + '-runtime.json')!)!
+		verify_executable_command(root, item[0], 'runtime', runtime_receipt, includes,
+			executable_runtime_source(root, item[0], pins)!)!
+	}
 }
 
 fn hash(path string) !string {
@@ -638,7 +831,7 @@ fn replacement_entry(name string, source string, mode u32) !Entry {
 	return Entry{ name: name, kind: 'regular', mode: mode, size: os.lstat(source)!.size, sha256: hash(source)! }
 }
 
-fn verify_plan(entries []Entry, current_native bool) ! {
+fn verify_plan(entries []Entry, current_native bool, current_executables bool) ! {
 	mut names := map[string]bool{}
 	mut expected := {
 		diagnostic_prefix:          'directory'
@@ -653,6 +846,9 @@ fn verify_plan(entries []Entry, current_native bool) ! {
 	if current_native {
 		for name in current_native_destinations() { expected[diagnostic_prefix + '/' + name] = 'regular' }
 	}
+	if current_executables {
+		for name in executable_destinations() { expected[diagnostic_prefix + '/' + name] = 'regular' }
+	}
 	for entry in entries {
 		if !relative(entry.name) || entry.name in names || entry.mode > 0o777 {
 			return error('unsafe or duplicate overlay entry/mode')
@@ -666,25 +862,29 @@ fn verify_plan(entries []Entry, current_native bool) ! {
 }
 
 fn stage() ! {
-	if os.args.len !in [8, 10] {
-		return error('usage: headless-service-stage BASE_BOOT BASE_EFIVARS FRAMEWORK_BUILD NATIVE_BUILD NATIVE_SEAL FIXTURE_DIR FRESH_OUTPUT [CURRENT_DSO_BUILD CURRENT_DSO_SEAL]')
+	if os.args.len !in [8, 10, 12] {
+		return error('usage: headless-service-stage BASE_BOOT BASE_EFIVARS FRAMEWORK_BUILD NATIVE_BUILD NATIVE_SEAL FIXTURE_DIR FRESH_OUTPUT [CURRENT_DSO_BUILD CURRENT_DSO_SEAL [CURRENT_EXECUTABLES_BUILD CURRENT_EXECUTABLES_SEAL]]')
 	}
 	$if !macos {
 		return error('staging requires macOS APFS clonefile')
 	}
 	boot, efivars := os.real_path(os.args[1]), os.real_path(os.args[2])
 	framework, native, fixture := os.real_path(os.args[3]), os.real_path(os.args[4]), os.real_path(os.args[6])
-	current_native := os.args.len == 10
+	current_native := os.args.len >= 10
 	current := if current_native { os.real_path(os.args[8]) } else { '' }
+	current_executables := os.args.len == 12
+	executables := if current_executables { os.real_path(os.args[10]) } else { '' }
 	root := external(os.args[7])!
 	mut input_roots := [boot, efivars, framework, native, fixture]
 	if current_native { input_roots << current }
+	if current_executables { input_roots << executables }
 	for input in input_roots {
 		if root == input || input.starts_with(root + '/') || root.starts_with(input + '/') {
 			return error('output overlaps an input')
 		}
 	}
 	profile := framework_profile(hash(framework + '/sha256.json')!)!
+	verify_mode(profile, current_native, current_executables)!
 	if hash(boot)! != baseline_boot_sha
 		|| hash(fixture + '/probe.apk')! != fixture_apk_sha {
 		return error('fixed baseline/fixture pin differs')
@@ -706,11 +906,16 @@ fn stage() ! {
 		return error('native build receipt identity differs')
 	}
 	mut current_pins := map[string]string{}
+	mut executable_pins := map[string]string{}
 	mut current_exports := []string{}
 	if current_native {
 		current_pins = sealed_bundle(current, os.args[9], mut inputs)!
 		current_exports = verify_current_native(current, framework, profile, native, os.args[5], current_pins)!
 		inputs['/opt/homebrew/bin/aarch64-linux-musl-nm'] = hash('/opt/homebrew/bin/aarch64-linux-musl-nm')!
+	}
+	if current_executables {
+		executable_pins = sealed_bundle(executables, os.args[11], mut inputs)!
+		verify_current_executables(executables, framework, profile, native, executable_pins, current_pins)!
 	}
 	fixture_receipt := json2.decode[map[string]json2.Any](os.read_file(fixture + '/build.json')!)!
 	if fixture_receipt['apk_sha256']!.str() != fixture_apk_sha
@@ -738,8 +943,13 @@ fn stage() ! {
 			os.cp(current + '/' + name, root + '/payload/' + current_native_destinations()[i])!
 		}
 	}
+	if current_executables {
+		for i, name in executable_receipts() {
+			os.cp(executables + '/' + name, root + '/payload/' + executable_destinations()[i])!
+		}
+	}
 	for pair in [
-		[native + '/bin/headless-service-controller',
+		[(if current_executables { executables } else { native }) + '/bin/headless-service-controller',
 			root + '/payload/bin/headless-service-controller'],
 		[fixture + '/probe.apk', root + '/payload/fixture.apk'],
 		[fixture + '/build.json', root + '/payload/fixture-build.json'],
@@ -760,6 +970,10 @@ fn stage() ! {
 		launcher_member: native + '/bin/run-android'
 	}
 	if current_native { sources[native_member] = current + '/native/libvinix-android-native.so' }
+	if current_executables {
+		sources[entry_member] = executables + '/bin/vinix-android-native'
+		sources[launcher_member] = executables + '/bin/run-android'
+	}
 	mut entries := []Entry{}
 	for name in replacements() {
 		entry := replacement_entry(name, sources[name]!, if name in [entry_member, launcher_member] {
@@ -782,7 +996,7 @@ fn stage() ! {
 			sources[entry.name] = root + '/payload' + entry.name[diagnostic_prefix.len..]
 		}
 	}
-	verify_plan(entries, current_native)!
+	verify_plan(entries, current_native, current_executables)!
 	write_json(root + '/overlay-plan.json', entries)!
 	original := command(root, 'read-limine', [mtype, '-i', boot, '::/boot/limine.conf'])!
 	config := configure(original)!
@@ -843,6 +1057,9 @@ fn stage() ! {
 	if current_native && sealed_bundle(current, os.args[9], mut inputs)! != current_pins {
 		return error('current native bundle changed during staging')
 	}
+	if current_executables && sealed_bundle(executables, os.args[11], mut inputs)! != executable_pins {
+		return error('current executable bundle changed during staging')
+	}
 	revision := command(root, 'source-revision', ['/usr/bin/git', 'rev-parse', 'HEAD'])!.trim_space()
 	write_json(root + '/stage.json', {
 		'format':                           json2.Any(1)
@@ -858,6 +1075,9 @@ fn stage() ! {
 		'native_base_manifest_sha256':      json2.Any(os.args[5])
 		'current_native_manifest_sha256':   json2.Any(if current_native { os.args[9] } else { '' })
 		'current_native_sha256':            json2.Any(if current_native { current_pins['native/libvinix-android-native.so']! } else { '' })
+		'current_executables_manifest_sha256': json2.Any(if current_executables { os.args[11] } else { '' })
+		'current_executables_sha256':       json2.decode[json2.Any](json2.encode(if current_executables { executable_outputs(executable_pins)! } else { map[string]string{} }))!
+		'service_main_argc':               json2.Any(if current_executables { 7 } else { 6 })
 		'inputs_sha256':                    json2.decode[json2.Any](json2.encode(inputs))!
 		'original_modules_sha256':          json2.decode[json2.Any](json2.encode(before))!
 		'preserved_modules_sha256':         json2.decode[json2.Any](json2.encode(after))!
@@ -878,10 +1098,12 @@ fn stage() ! {
 }
 
 fn self_test() ! {
-	for seal in [framework_seal, combined_framework_seal] {
+	for seal in [framework_seal, combined_framework_seal, interaction_framework_seal] {
 		profile := framework_profile(seal)!
 		assert profile.seal == seal
-		assert profile.class_count == if seal == framework_seal { 2098 } else { 2101 }
+		if profile.class_count != match seal { framework_seal { 2098 } combined_framework_seal { 2101 } else { 2102 } } {
+			return error('audited framework class count differs')
+		}
 		receipt := {
 			'api_impl_sha256': json2.Any(profile.jar_sha256)
 			'class_count': json2.Any(profile.class_count)
@@ -928,6 +1150,111 @@ fn self_test() ! {
 		'/native-base', 'a'.repeat(64), current_receipt) { return error('current DSO paired with old framework') }
 	if _ := verify_current_identity(combined, '/framework', '0'.repeat(64), '/native-base',
 		'a'.repeat(64), current_receipt) { return error('current DSO paired with unknown full native base') }
+	interaction := framework_profile(interaction_framework_seal)!
+	verify_mode(framework_profile(framework_seal)!, false, false)!
+	verify_mode(combined, true, false)!
+	verify_mode(interaction, true, true)!
+	for mode in [[false, false], [true, false], [false, true]] {
+		if _ := verify_mode(interaction, mode[0], mode[1]) { return error('interaction framework accepted without matching native/entry pair') }
+	}
+	for old in [framework_profile(framework_seal)!, combined] {
+		if _ := verify_mode(old, true, true) { return error('seven-argument executable bundle accepted with historical framework') }
+	}
+	mut executable_pins := map[string]string{}
+	for item in executable_items() { executable_pins['bin/' + item[1]] = 'b'.repeat(64) }
+	executable_receipt := {
+		'kind': json2.Any('vinix-current-launch-v1')
+		'framework': json2.Any('/framework')
+		'framework_sha256': json2.Any(interaction_framework_seal)
+		'native_base': json2.Any('/native-base')
+		'native_base_sha256': json2.Any(full_native_seal)
+		'service_main_argc': json2.Any(7)
+		'compiler_sha256': json2.Any(compiler_pin)
+		'outputs_sha256': json2.decode[json2.Any](json2.encode(executable_pins))!
+		'source_revision': json2.Any('reviewed-source')
+		'completed_utc': json2.Any('2026-10-26 00:00:00')
+	}
+	verify_executable_identity(interaction, '/framework', '/native-base', executable_pins, executable_receipt)!
+	for field in executable_receipt.keys() {
+		mut bad := json2.decode[map[string]json2.Any](json2.encode(executable_receipt))!
+		bad[field] = if field == 'service_main_argc' { json2.Any(6) } else { json2.Any('') }
+		if _ := verify_executable_identity(interaction, '/framework', '/native-base', executable_pins, bad) {
+			return error('mismatched or incomplete current executable identity accepted: ' + field)
+		}
+	}
+	mut extra_outputs := executable_pins.clone()
+	extra_outputs['bin/unlisted'] = 'b'.repeat(64)
+	mut extra_receipt := json2.decode[map[string]json2.Any](json2.encode(executable_receipt))!
+	extra_receipt['outputs_sha256'] = json2.decode[json2.Any](json2.encode(extra_outputs))!
+	if _ := verify_executable_identity(interaction, '/framework', '/native-base', executable_pins, extra_receipt) {
+		return error('unlisted current executable accepted')
+	}
+	for item in executable_items() {
+		mut link := [cross, '-v', '-no-pie', '-pthread', '-Wl,-t']
+		if item[0] != 'native-entry' { link << '-static' }
+		link << ['/current/generated/' + item[0] + '.o', '/current/generated/' + item[0] + '-runtime.o',
+			'-ldl', '-lm', '-o', '/current/bin/' + item[1]]
+		receipt := {'argv': json2.Any(link), 'exit_code': json2.Any(0)}
+		verify_executable_command('/current', item[0], 'build', receipt, [], '')!
+		mut bad := json2.decode[map[string]json2.Any](json2.encode(receipt))!
+		bad['argv'] = json2.Any(link.filter(it != '-no-pie'))
+		if _ := verify_executable_command('/current', item[0], 'build', bad, [], '') { return error('altered executable link command accepted') }
+		header_pins := {
+			'closure/' + item[0] + '/vlib/builtin/a.h': 'a'.repeat(64)
+			'closure/' + item[0] + '/vlib/builtin/b.h': 'b'.repeat(64)
+			'closure/' + item[0] + '/vlib/x/c.h': 'c'.repeat(64)
+			'closure/unrelated/vlib/foreign.h': 'd'.repeat(64)
+		}
+		includes := executable_includes('/current', item[0], header_pins)
+		if includes != ['-I/current/closure/' + item[0] + '/vlib/builtin', '-I/current/closure/' + item[0] + '/vlib/x'] {
+			return error('current executable include directories differ from exact sorted closure')
+		}
+		mut compile_args := [cross, '-v', '-D_GNU_SOURCE', '-O2', '-fwrapv', '-pthread', '-Werror=implicit-function-declaration', '-Werror=int-conversion']
+		compile_args << includes
+		compile_args << ['-c', '/current/generated/' + item[0] + '.c', '-o', '/current/generated/' + item[0] + '.o']
+		compile_receipt := {'argv': json2.Any(compile_args), 'exit_code': json2.Any(0)}
+		verify_executable_command('/current', item[0], 'compile', compile_receipt, includes, '')!
+		mut bad_compile := json2.decode[map[string]json2.Any](json2.encode(compile_receipt))!
+		bad_compile['argv'] = json2.Any(compile_args.filter(it != '-Werror=int-conversion'))
+		if _ := verify_executable_command('/current', item[0], 'compile', bad_compile, includes, '') { return error('altered executable compile command accepted') }
+		if _ := verify_executable_command('/current', item[0], 'compile', compile_receipt, [], '') { return error('unsealed executable header include accepted') }
+		runtime_source := '/current/closure/' + item[0] + '/vlib/builtin/segfault_handler_nix.c'
+		mut runtime_args := compile_args[..compile_args.len - 4].clone()
+		runtime_args << ['-c', runtime_source, '-o', '/current/generated/' + item[0] + '-runtime.o']
+		runtime_receipt := {'argv': json2.Any(runtime_args), 'exit_code': json2.Any(0)}
+		verify_executable_command('/current', item[0], 'runtime', runtime_receipt, includes, runtime_source)!
+		if _ := verify_executable_command('/current', item[0], 'runtime', runtime_receipt, includes, runtime_source + '.unsealed') {
+			return error('unsealed executable signal runtime source accepted')
+		}
+		mut missing_runtime := json2.decode[map[string]json2.Any](json2.encode(receipt))!
+		missing_runtime['argv'] = json2.Any(link.filter(!it.ends_with('-runtime.o')))
+		if _ := verify_executable_command('/current', item[0], 'build', missing_runtime, [], '') {
+			return error('missing executable signal runtime object accepted')
+		}
+		generation := {
+			'argv': json2.Any(['/current/closure/' + item[0] + '/v', '-new-compiler', '-os', 'linux', '-arch', 'arm64', '-cc', cross,
+				'-gc', 'none', '-nocache', '-skip-running', '-path', '/current/closure/' + item[0] + '/vlib',
+				'-o', '/current/generated/' + item[0] + '.c', '/current/closure/' + item[0] + '/source.v'])
+			'exit_code': json2.Any(0)
+			'executable_sha256': json2.Any(compiler_pin)
+		}
+		verify_executable_command('/current', item[0], 'generate', generation, [], '/current/closure/' + item[0] + '/source.v')!
+		if _ := verify_executable_command('/current', item[0], 'generate', generation, [], '/current/closure/' + item[0] + '/other.v') {
+			return error('unrelated generation source accepted under matching ABI closure')
+		}
+		mut bad_generation := json2.decode[map[string]json2.Any](json2.encode(generation))!
+		bad_generation['executable_sha256'] = json2.Any('0'.repeat(64))
+		if _ := verify_executable_command('/current', item[0], 'generate', bad_generation, [], '/current/closure/' + item[0] + '/source.v') { return error('untrusted executable generator compiler accepted') }
+	}
+	entry_abi := 'type NativeServiceMain = fn (&char, &char, &char, &char, &char, i32, i32) i32\nlaunch.action.str, i32(control_fd), i32(ui_fd))'
+	implementation_abi := 'fn ws_service_main(root &char, apk &char, package_name &char, service &char, action &char, control_fd i32, ui_fd i32) i32 {'
+	verify_service_abi(entry_abi, implementation_abi, 'same-sha', 'same-sha')!
+	for bad in [[entry_abi, implementation_abi, 'different-sha', 'same-sha'],
+		[entry_abi.replace(', i32, i32)', ', i32)'), implementation_abi, 'same-sha', 'same-sha'],
+		[entry_abi.replace(', i32(ui_fd)', ''), implementation_abi, 'same-sha', 'same-sha'],
+		[entry_abi, implementation_abi.replace(', ui_fd i32', ''), 'same-sha', 'same-sha']] {
+		if _ := verify_service_abi(bad[0], bad[1], bad[2], bad[3]) { return error('incompatible or mixed seven-argument service ABI accepted') }
+	}
 	config := '/Vinix\n    protocol: limine\n    module_path: boot():/boot/initramfs.tar\n    module_path: boot():/boot/runtime.tar\n'
 	parsed := configure(config)!
 	assert parsed.modules == ['initramfs.tar', 'runtime.tar']
@@ -993,7 +1320,7 @@ fn self_test() ! {
 		sources[name] = root + '/bundle/fixture.apk'
 	}
 	inventory(root + '/bundle', '', diagnostic_prefix, mut entries)!
-	verify_plan(entries, false)!
+	verify_plan(entries, false, false)!
 	assert entries.len == 15
 	for entry in entries {
 		if entry.kind == 'regular' && entry.name.starts_with(diagnostic_prefix + '/') {
@@ -1012,21 +1339,33 @@ fn self_test() ! {
 	alias[0] = Entry{ name: jar_member, kind: 'symlink', linkname: 'elsewhere' }
 	for bad in [missing, duplicate, extra, alias] {
 		mut rejected := false
-		verify_plan(bad, false) or { rejected = true }
+		verify_plan(bad, false, false) or { rejected = true }
 		assert rejected
 	}
 	mut current_entries := entries.clone()
 	for name in current_native_destinations() {
 		current_entries << Entry{ name: diagnostic_prefix + '/' + name, kind: 'regular', mode: 0o644 }
 	}
-	verify_plan(current_entries, true)!
+	verify_plan(current_entries, true, false)!
 	assert current_entries.len == 20
-	if _ := verify_plan(current_entries, false) { return error('current native receipts leaked into old exact allowlist') }
-	if _ := verify_plan(entries, true) { return error('missing current native receipts accepted') }
+	if _ := verify_plan(current_entries, false, false) { return error('current native receipts leaked into old exact allowlist') }
+	if _ := verify_plan(entries, true, false) { return error('missing current native receipts accepted') }
 	for i in entries.len .. current_entries.len {
 		mut missing_receipt := current_entries.clone()
 		missing_receipt.delete(i)
-		if _ := verify_plan(missing_receipt, true) { return error('incomplete current native receipt set accepted') }
+		if _ := verify_plan(missing_receipt, true, false) { return error('incomplete current native receipt set accepted') }
+	}
+	mut executable_entries := current_entries.clone()
+	for name in executable_destinations() {
+		executable_entries << Entry{ name: diagnostic_prefix + '/' + name, kind: 'regular', mode: 0o644 }
+	}
+	verify_plan(executable_entries, true, true)!
+	if executable_entries.len != 34 { return error('current executable receipt count differs') }
+	if _ := verify_plan(executable_entries, true, false) { return error('executable receipts leaked into historical native-only allowlist') }
+	for i in current_entries.len .. executable_entries.len {
+		mut missing_receipt := executable_entries.clone()
+		missing_receipt.delete(i)
+		if _ := verify_plan(missing_receipt, true, true) { return error('incomplete current executable receipt set accepted') }
 	}
 	assert external(root + '/fresh')! == root + '/fresh'
 	for bad in [root, root + '/./alias', root + '/' + 'x'.repeat(110)] {
@@ -1070,6 +1409,32 @@ fn self_test() ! {
 	os.write_file_array(root + '/static', elf)!
 	static_elf(root + '/static')!
 	shared_elf(root + '/static')!
+	mut launch_elf := []u8{len: 240}
+	for i, value in [u8(0x7f), `E`, `L`, `F`, 2, 1] { launch_elf[i] = value }
+	launch_elf[16] = 2
+	launch_elf[18] = 183
+	launch_elf[32] = 64
+	launch_elf[54] = 56
+	launch_elf[56] = 1
+	launch_elf[64] = 1
+	os.write_file_array(root + '/launch-static', launch_elf)!
+	executable_elf(root + '/launch-static', false)!
+	if _ := executable_elf(root + '/launch-static', true) { return error('static current native entry accepted') }
+	launch_elf[56] = 2
+	launch_elf[120] = 3
+	launch_elf[128] = 176
+	interpreter := '/lib/ld-musl-aarch64.so.1\x00'.bytes()
+	launch_elf[152] = u8(interpreter.len)
+	for i, value in interpreter { launch_elf[176 + i] = value }
+	os.write_file_array(root + '/launch-dynamic', launch_elf)!
+	executable_elf(root + '/launch-dynamic', true)!
+	if _ := executable_elf(root + '/launch-dynamic', false) { return error('dynamic current launcher/controller accepted') }
+	for at in [16, 18, 56, 64, 120, 128, 152, 176] {
+		mut invalid := launch_elf.clone()
+		invalid[at] = 0
+		os.write_file_array(root + '/launch-invalid', invalid)!
+		if _ := executable_elf(root + '/launch-invalid', true) { return error('invalid current executable accepted: ' + at.str()) }
+	}
 	for bad in [16, 18] {
 		mut invalid := elf.clone()
 		invalid[bad] = 0
@@ -1081,7 +1446,7 @@ fn self_test() ! {
 	mut rejected_dynamic := false
 	static_elf(root + '/dynamic') or { rejected_dynamic = true }
 	assert rejected_dynamic
-	println('HEADLESS-STAGE SELF-TEST PASS audited-framework-profiles mixed-framework-rejection current-native-coupling current-native-exact-receipts config-prefix baseline-existing added-launcher collision caches exact-allowlist streamed-archive modes fresh-output QMP-limit full-seal static-ELF shared-ELF')
+	println('HEADLESS-STAGE SELF-TEST PASS audited-framework-profiles mixed-framework-rejection current-native-coupling current-native-exact-receipts seven-argument-pairing executable-exact-receipts compile-link-receipts matching-service-source executable-interpreter config-prefix baseline-existing added-launcher collision caches exact-allowlist streamed-archive modes fresh-output QMP-limit full-seal static-ELF shared-ELF')
 	println('HEADLESS-STAGE COMPILED-SOURCES ' + sha256.sum(compiled_source.bytes()).hex() +
 		' ' + sha256.sum(compiled_guest.bytes()).hex() + ' ' + sha256.sum(compiled_collector.bytes()).hex())
 }
