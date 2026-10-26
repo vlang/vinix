@@ -130,12 +130,13 @@ fn open_data_directory(path string, uid u32) !int {
 	return fd
 }
 
-fn database_path(directory int, data_directory string) string {
-	$if linux {
-		return '/proc/self/fd/${directory}/accounts.sqlite'
-	} $else {
-		return data_directory + '/accounts/accounts.sqlite'
-	}
+fn database_path(data_directory string) string {
+	// SQLite's NOFOLLOW rejects symlinks in every pathname component, including
+	// the intentional /proc/self/fd directory links. Keep its complete-path
+	// protection by using the canonical path whose ancestors were opened without
+	// following links and checked for trusted ownership and no group/world write.
+	// Only trusted root or this selected authenticator's UID can rename them.
+	return data_directory + '/accounts/accounts.sqlite'
 }
 
 fn check_file(directory int, name string, uid u32, create bool) ! {
@@ -246,7 +247,7 @@ pub fn open(data_directory string, expected_uid u32, owner_package string, allow
 	for name in ['accounts.sqlite-journal', 'accounts.sqlite-wal', 'accounts.sqlite-shm']! {
 		check_file(directory, name, expected_uid, false)!
 	}
-	path := database_path(directory, data_directory)
+	path := database_path(data_directory)
 	defer { unsafe { path.free() } }
 	mut db := &C.sqlite3(unsafe { nil })
 	status := unsafe { C.sqlite3_open_v2(path.str, &db, C.SQLITE_OPEN_READWRITE | C.SQLITE_OPEN_FULLMUTEX | C.SQLITE_OPEN_NOFOLLOW, nil) }
