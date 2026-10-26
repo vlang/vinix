@@ -4,6 +4,7 @@ module main
 
 import crypto.sha256
 import json2
+import modulestream
 import os
 import strconv
 import time
@@ -22,6 +23,31 @@ const firmware = '/opt/homebrew/share/qemu/edk2-aarch64-code.fd'
 const jar_member = 'opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/api-impl.jar'
 const modules = ['initramfs.tar', 'qemu-runtime.tar', 'maps335-diagnostics.tar', 'maps350-diagnostics.tar', 'maps372-diagnostics.tar']
 const fixture_pass = 'ACCOUNT-ASYNC-PASS credential-insertion-rejected null-type no-callback no-accounts main-queued worker-to-main explicit-handler callback-once same-future done cancel-false result-authenticator-exception repeat timed null-unit'
+const response_pass = 'AUTHENTICATOR-RESPONSE-PASS local proxy oneway descriptor null-bundle intent error parcelable remote-exception runtime-exception parcel-cleanup'
+
+fn fixture_source(kind string) !string {
+	return match kind {
+		'fixture' { repo + '/tests/native-android-ws/account-addition-fixture.v' }
+		'response-fixture' { repo + '/tests/native-android-ws/authenticator-response-fixture.v' }
+		else { return error('unknown account fixture kind') }
+	}
+}
+
+fn fixture_marker(kind string) !string {
+	return match kind {
+		'fixture' { fixture_pass }
+		'response-fixture' { response_pass }
+		else { return error('unknown account fixture kind') }
+	}
+}
+
+fn fixture_scope(kind string) !string {
+	return match kind {
+		'fixture' { 'unsupported account future/callback contract in guest ART' }
+		'response-fixture' { 'authenticator response Binder/Parcelable contract in guest ART; no Google authentication' }
+		else { return error('unknown account fixture kind') }
+	}
+}
 
 struct Ownership {
 	pid     int
@@ -68,6 +94,39 @@ fn command(root string, label string, argv []string) !string {
 	return r.output
 }
 
+fn stream_module(root string, label string, image string, member string, destination string) !string {
+	mut executables := map[string]string{}
+	for name in ['mcopy', '/usr/bin/tar', '/usr/bin/shasum'] {
+		path := if name.contains('/') { name } else { os.find_abs_path_of_executable(name)! }
+		executables[path] = digest(path)!
+	}
+	started := time.utc().str()
+	mut pin := ''
+	mut producer := 0
+	mut consumer := 0
+	if destination == '' {
+		result := modulestream.hash_member(image, member, root + '/commands/' + label + '.log')!
+		pin = result.sha256
+		producer = result.statuses.producer
+		consumer = result.statuses.consumer
+	} else {
+		result := modulestream.extract_member(image, member, destination)!
+		producer = result.producer
+		consumer = result.consumer
+	}
+	write_json(root + '/commands/' + label + '.json', {
+		'image': json2.Any(image), 'member': json2.Any(member), 'destination': json2.Any(destination),
+		'started_utc': json2.Any(started), 'completed_utc': json2.Any(time.utc().str()),
+		'producer_exit_code': json2.Any(producer), 'consumer_exit_code': json2.Any(consumer),
+		'sha256': json2.Any(pin), 'executable_sha256': json2.decode[json2.Any](json2.encode(executables))!
+	})!
+	for path, expected in executables { if digest(path)! != expected { return error('stream executable changed: ' + path) } }
+	if producer != 0 || consumer != 0 || (destination == '' && pin.len != 64) {
+		return error('module stream failed: ' + label)
+	}
+	return pin
+}
+
 fn inventory(root string, prefix string, mut pins map[string]string) ! {
 	for name in os.ls(root + '/' + prefix)! {
 		key := if prefix == '' { name } else { prefix + '/' + name }
@@ -91,7 +150,9 @@ fn root_check(root string) ! {
 		|| os.real_path(root) != root || os.is_link(root) { return error('canonical external state path required') }
 }
 
-fn prepare(root string, build string, apk string) ! {
+fn prepare(root string, build string, apk string, kind string) ! {
+	if (apk == '') != (kind == 'maps') { return error('fixture APK and kind differ') }
+	if apk != '' { fixture_source(kind)! }
 	if os.exists(root) || os.is_link(root) { return error('fresh external state required') }
 	os.mkdir_all(root + '/commands')!
 	root_check(root)!
@@ -102,10 +163,13 @@ fn prepare(root string, build string, apk string) ! {
 	if digest(baseline + '/boot.img')! != baseline_boot { return error('qualified Maps372 boot differs') }
 	mut inputs := map[string]string{}
 	for path in [baseline + '/boot.img', baseline + '/efivars.fd', jar, build + '/build.json',
-		repo + '/tests/native-android-ws/account-contract-run.v', os.executable(), qemu, firmware] { inputs[path] = digest(path)! }
+		repo + '/tests/native-android-ws/account-contract-run.v',
+		repo + '/build-support/android/modulestream/stream.v',
+		repo + '/build-support/android/modulestream/spawn_abi.h',
+		os.executable(), qemu, firmware] { inputs[path] = digest(path)! }
 	if apk != '' {
 		inputs[apk] = digest(apk)!
-		inputs[repo + '/tests/native-android-ws/account-addition-fixture.v'] = digest(repo + '/tests/native-android-ws/account-addition-fixture.v')!
+		inputs[fixture_source(kind)!] = digest(fixture_source(kind)!)!
 	}
 	for name in ['boot.img', 'efivars.fd'] {
 		from := baseline + '/' + name
@@ -120,15 +184,16 @@ fn prepare(root string, build string, apk string) ! {
 	mut module_pins := map[string]string{}
 	os.mkdir_all(root + '/scratch')!
 	for name in modules {
-		archive := root + '/' + name
-		command(root, 'extract-' + name, ['mcopy', '-i', baseline + '/boot.img', '::/boot/' + name, archive])!
-		module_pins[name] = digest(archive)!
+		module_pins[name] = stream_module(root, 'hash-' + name, baseline + '/boot.img', name, '')!
 		// initramfs supplies the OS; the Android runtime and ordered overlays
 		// form the application tree whose exact file delta is checked below.
 		if name != 'initramfs.tar' {
-			command(root, 'compose-' + name, ['/usr/bin/tar', '-xf', archive, '-C', root + '/scratch'])!
+			stream_module(root, 'compose-' + name, baseline + '/boot.img', name, root + '/scratch')!
 		}
-		if name in ['initramfs.tar', 'qemu-runtime.tar'] { os.rm(archive)! }
+		if name !in ['initramfs.tar', 'qemu-runtime.tar'] {
+			command(root, 'extract-' + name, ['mcopy', '-i', baseline + '/boot.img', '::/boot/' + name, root + '/' + name])!
+			if digest(root + '/' + name)! != module_pins[name]! { return error('retained original module differs: ' + name) }
+		}
 	}
 	if digest(root + '/scratch/' + jar_member)! != baseline_jar { return error('composed runtime framework is not Framework371') }
 	mut before := map[string]string{}
@@ -168,23 +233,25 @@ fn prepare(root string, build string, apk string) ! {
 	if overlay_files.len != changed.len { return error('account overlay file set differs') }
 	for name in changed { if overlay_files[name] != after[name] { return error('account overlay file differs: ' + name) } }
 	for name, pin in module_pins {
-		command(root, 'preserved-' + name, ['mcopy', '-i', root + '/boot.img', '::/boot/' + name, root + '/preserved.tar'])!
-		if digest(root + '/preserved.tar')! != pin { return error('original module changed: ' + name) }
-		os.rm(root + '/preserved.tar')!
+		if stream_module(root, 'preserved-' + name, root + '/boot.img', name, '')! != pin { return error('original module changed: ' + name) }
 	}
 	os.rmdir_all(root + '/overlay')!
 	os.rmdir_all(root + '/read-back-overlay')!
 	os.rmdir_all(root + '/scratch')!
 	for path, pin in inputs { if digest(path)! != pin { return error('input changed while preparing: ' + path) } }
 	os.cp(repo + '/tests/native-android-ws/account-contract-run.v', root + '/runner-source.v')!
+	os.mkdir_all(root + '/stream-source')!
+	for name in ['stream.v', 'spawn_abi.h'] {
+		os.cp(repo + '/build-support/android/modulestream/' + name, root + '/stream-source/' + name)!
+	}
 	if apk != '' {
 		os.cp(apk, root + '/fixture.apk')!
-		os.cp(repo + '/tests/native-android-ws/account-addition-fixture.v', root + '/fixture-source.v')!
+		os.cp(fixture_source(kind)!, root + '/fixture-source.v')!
 	}
 	os.cp(os.executable(), root + '/runner')!
 	write_json(root + '/prepare.json', {
-		'scope': json2.Any(if apk == '' { 'Maps precredential Add account retest; no authenticator or account store' } else { 'Actual ART unsupported-account future/callback regression' }),
-		'kind': json2.Any(if apk == '' { 'maps' } else { 'fixture' }),
+		'scope': json2.Any(if apk == '' { 'Maps precredential Add account retest; no authenticator or account store' } else { fixture_scope(kind)! }),
+		'kind': json2.Any(kind),
 		'source_revision': json2.Any(checked(['/usr/bin/git', '-C', repo, 'rev-parse', 'HEAD'])!),
 		'input_sha256': json2.decode[json2.Any](json2.encode(inputs))!,
 		'preserved_original_module_sha256': json2.decode[json2.Any](json2.encode(module_pins))!,
@@ -235,26 +302,35 @@ fn stop(root string) ! {
 	println('ACCOUNT-CONTRACT-STOP-SENT pid=' + owner.pid.str())
 }
 
-fn fixture_log(log string) !bool {
-	for marker in ['APK-SUITE-EXIT id=', 'ANDROID-WS-FAIL', 'java.lang.AssertionError', 'java.lang.VerifyError', 'NoClassDefFoundError', 'UnsatisfiedLinkError', 'Exception in thread', 'ACCOUNT-ASYNC-FAIL', 'VINIX-ACCOUNT-PASSWORD-SENTINEL-2026', 'VINIX-ACCOUNT-USERDATA-SENTINEL-2026'] {
+fn fixture_log(log string, kind string) !bool {
+	expected := fixture_marker(kind)!
+	for marker in ['APK-SUITE-EXIT id=', 'ANDROID-WS-FAIL', 'java.lang.AssertionError', 'java.lang.VerifyError', 'NoClassDefFoundError', 'UnsatisfiedLinkError', 'Exception in thread', 'ACCOUNT-ASYNC-FAIL', 'AUTHENTICATOR-RESPONSE-FAIL', 'VINIX-ACCOUNT-PASSWORD-SENTINEL-2026', 'VINIX-ACCOUNT-USERDATA-SENTINEL-2026'] {
 		if log.contains(marker) { return error('ART fixture failure marker: ' + marker) }
 	}
-	if log.count(fixture_pass) > 1 { return error('duplicate fixture pass marker') }
-	return log.contains('APK-SUITE-BEGIN id=account-contract ') && log.count(fixture_pass) == 1
+	mut passes := 0
+	for line in log.split_into_lines() {
+		if line.contains('ACCOUNT-ASYNC-PASS') || line.contains('AUTHENTICATOR-RESPONSE-PASS') {
+			if line.trim_space() != expected { return error('unexpected fixture pass marker') }
+			passes++
+		}
+	}
+	if passes > 1 { return error('duplicate fixture pass marker') }
+	return log.contains('APK-SUITE-BEGIN id=account-contract ') && passes == 1
 }
 
 fn observe(root string) ! {
 	config := json2.decode[map[string]json2.Any](os.read_file(root + '/prepare.json')!)!
-	if config['kind']!.str() != 'fixture' { return error('fixture observation requires fixture image') }
+	kind := config['kind']!.str()
+	fixture_marker(kind)!
 	mut passed_at := i64(0)
 	begin := time.now().unix()
 	for time.now().unix() - begin < 180 {
 		owned(root)!
 		log := os.read_file(root + '/serial.log') or { '' }
-		if fixture_log(log)! {
+		if fixture_log(log, kind)! {
 			if passed_at == 0 { passed_at = time.now().unix() }
 			if time.now().unix() - passed_at >= 10 {
-				write_json(root + '/fixture-result.json', {'passed': json2.Any(true), 'scope': json2.Any('unsupported account future/callback contract in guest ART'), 'quiet_seconds_after_pass': json2.Any(10), 'serial_sha256': json2.Any(digest(root + '/serial.log')!)})!
+				write_json(root + '/fixture-result.json', {'passed': json2.Any(true), 'scope': json2.Any(fixture_scope(kind)!), 'quiet_seconds_after_pass': json2.Any(10), 'serial_sha256': json2.Any(digest(root + '/serial.log')!)})!
 				println('ACCOUNT-CONTRACT-ART-PASS ten seconds after exact semantic marker')
 				return
 			}
@@ -286,20 +362,28 @@ fn ownership_test() ! {
 
 fn main() {
 	if os.args.len == 2 && os.args[1] == '--self-test' {
-		assert !fixture_log('no begin')!
-		assert fixture_log('APK-SUITE-BEGIN id=account-contract backend=vinix-ws\n' + fixture_pass)!
-		for suffix in ['\njava.lang.AssertionError late', '\n' + fixture_pass, '\nAPK-SUITE-EXIT id=account-contract code=1', '\nVINIX-ACCOUNT-PASSWORD-SENTINEL-2026', '\nVINIX-ACCOUNT-USERDATA-SENTINEL-2026'] {
-			fixture_log('APK-SUITE-BEGIN id=account-contract backend=vinix-ws\n' + fixture_pass + suffix) or { continue }
-			panic('late fixture failure accepted')
+		for kind in ['fixture', 'response-fixture'] {
+			marker := fixture_marker(kind)!
+			assert !fixture_log('no begin', kind)!
+			assert !fixture_log(marker, kind)!
+			assert fixture_log('APK-SUITE-BEGIN id=account-contract backend=vinix-ws\n' + marker + '\r\n', kind)!
+			for suffix in [' extra', '\njava.lang.AssertionError late', '\n' + marker, '\nAPK-SUITE-EXIT id=account-contract code=1', '\nVINIX-ACCOUNT-PASSWORD-SENTINEL-2026', '\nVINIX-ACCOUNT-USERDATA-SENTINEL-2026', '\nAUTHENTICATOR-RESPONSE-FAIL', '\nACCOUNT-ASYNC-FAIL'] {
+				fixture_log('APK-SUITE-BEGIN id=account-contract backend=vinix-ws\n' + marker + suffix, kind) or { continue }
+				panic('late or malformed fixture failure accepted')
+			}
+			other := fixture_marker(if kind == 'fixture' { 'response-fixture' } else { 'fixture' })!
+			fixture_log('APK-SUITE-BEGIN id=account-contract backend=vinix-ws\n' + other, kind) or { continue }
+			panic('wrong fixture contract accepted')
 		}
 		ownership_test()!
 		println('ACCOUNT-CONTRACT-RUN-SELF-TEST-PASS late errors, sentinels and duplicate markers rejected; unrelated process protected')
 		return
 	}
-	if os.args.len < 3 { eprintln('usage: account-contract-run prepare ROOT BUILD [FIXTURE_APK] | start|stop|status|observe ROOT'); exit(2) }
+	if os.args.len < 3 { eprintln('usage: account-contract-run prepare ROOT BUILD [FIXTURE_APK] | prepare-response ROOT BUILD FIXTURE_APK | start|stop|status|observe ROOT'); exit(2) }
 	root := os.abs_path(os.args[2])
 	match os.args[1] {
-		'prepare' { if os.args.len !in [4, 5] { exit(2) }; prepare(root, os.abs_path(os.args[3]), if os.args.len == 5 { os.abs_path(os.args[4]) } else { '' }) or { eprintln(err); exit(1) } }
+		'prepare' { if os.args.len !in [4, 5] { exit(2) }; prepare(root, os.abs_path(os.args[3]), if os.args.len == 5 { os.abs_path(os.args[4]) } else { '' }, if os.args.len == 5 { 'fixture' } else { 'maps' }) or { eprintln(err); exit(1) } }
+		'prepare-response' { if os.args.len != 5 { exit(2) }; prepare(root, os.abs_path(os.args[3]), os.abs_path(os.args[4]), 'response-fixture') or { eprintln(err); exit(1) } }
 		'start' { start(root) or { eprintln(err); exit(1) } }
 		'stop' { stop(root) or { eprintln(err); exit(1) } }
 		'status' { println(json2.encode(owned(root) or { eprintln(err); exit(1) })) }
