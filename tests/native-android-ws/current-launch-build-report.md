@@ -1,36 +1,37 @@
 # Current seven-argument launch executables
 
-The current entry, launcher and headless lifecycle controller cross-build and
-link for AArch64. The retained source revision is
-`bddf43de8a2f443e711f24863847f8135658d7d5`. This includes the typed browser
-wait-status binding fix and the explicit static startup-object pin.
+The current entry, launcher, headless lifecycle controller and production
+account broker cross-build and link for AArch64. The retained source revision
+is `e9505d350b11fd936401c85aa645cb954bc1f894`; the bundle records the exact
+working-tree source closure alongside that revision.
 
 The complete audit bundle is
-`/Users/alex/.local/state/vinix/android/current-launch-build-2026-10-26-r9`.
+`/Users/alex/.local/state/vinix/android/current-launch-build-2026-10-26-r12`.
 Its `sha256.json` SHA-256 is
-`e94c9fc2262bc1c19857e406e250db739bf106034d36559190215cbfb7399b58`.
+`1ed02f160821299531d4617a10387d4bf54d7d3703485565537c07b2f3ac8a1e`.
 The maintained builder is `build-current-launch.v`; the retained builder
 source SHA-256 is
-`fb0c1700fe60d0b041db97f609dc0726d11ca2bf8b44113886dfdab81c900640`.
+`b760d34a9a9378de3f4cf25109b397ea5503af27386fbdb8fffd3232d8a4c2b3`.
 
 | Output | SHA-256 |
 | --- | --- |
-| `bin/vinix-android-native` | `f8b55b3aacadd45168b13e18fb91b9a58a56da1a73a1749ab0f9873f9c2fdb65` |
-| `bin/run-android` | `7f2778c013203581cccd7fd9b5aabf59607d0580c39a3b63876fb3a5926133e1` |
-| `bin/headless-service-controller` | `eb30bb51147019c5b77d7a7a7029958efe922fd7a1cef24692d22916d59a0d75` |
+| `bin/vinix-android-native` | `f30ff41c607c72f67e40e979171af7a71d053cc470288cf19a0cd7d568ead2a9` |
+| `bin/run-android` | `74be0a389342a95a35ecfd6393e2c1cc00e7d3e9e63522faeb623455f9d64251` |
+| `bin/headless-service-controller` | `92db3737fcdaca322ef4e03df68942b094ea00370e1789936077737e7f4a9946` |
+| `bin/native-account-broker` | `a821e52ef8fe7a1d2b77cb16a543d14ea8972501bbcf1a8058003d0b7e442cf9` |
 
 The entry uses the seven-argument `vinix_android_native_service_main` ABI.
 Its retained `abi/headless.v` SHA-256 is
 `c453f9a0a4ab8b5f8ad4ea17d0c932304d61aafb6126d55b9bcc55efe0aa9b57`,
-matching the JNI source in `current-native-build-2026-10-26-r13`. The entry is
-a dynamic ELF executable; the launcher and controller are static ELF
-executables. All three have valid ELF64 AArch64 program headers.
+matching the JNI source in `current-native-build-2026-10-26-r15`. The entry is
+a dynamic ELF executable; the other three executables are static. All four
+have valid ELF64 AArch64 program headers.
 
 The build pins these input manifests:
 
 - The 2,102-class framework bundle at
-  `combined-account-webview-interaction-framework-2026-10-26`, seal
-  `dc5c0470c4cdc7a075ded61680e4ac89cef056dbcb515ce55a32f74bf82aef87`.
+  `combined-account-webview-cache-framework-2026-10-26-r3`, seal
+  `f37e13b84b5dfb2c71ad852e2bae5b03fed04e8ee319f44e77fc7605f3b1994a`.
 - The native dependency bundle at
   `headless-service-native-build-2026-10-26-r5`, seal
   `d99195272b8af813679cf54fed9f1e0341e6f1115804ac09c1cd2d5a8f942e3e`.
@@ -46,6 +47,14 @@ directory set to the retained compiler root. The supported exclusion of
 as the sole implementation. Host helper compilation records and verifies
 the actual cached object inputs selected by `-showcc`.
 
+The builder applies one exact compatibility correction to each retained
+`os/process_nix.c.v`: `mut cstatus := 0` becomes `mut cstatus := i32(0)`.
+This matches the Linux wait-status pointer width. The original is retained
+under `compatibility/`; each target's `*-linux-compatibility.json` records
+both hashes, and `*-compiled-closure.json` pins the corrected input. The
+live compiler library remains unchanged. Self-tests reject source drift or
+an already-applied correction.
+
 Validation completed:
 
 - Actual target C compilation with implicit-function and integer-conversion
@@ -53,15 +62,30 @@ Validation completed:
 - Consumed header and linker-input audits against retained or sealed inputs,
   including `crtbeginT.o`; before-and-after input hashes; full bundle inventory.
 - Builder self-tests for dependency parsing, incomplete source closures,
-  helper-object paths, the seven-argument ABI and ELF program headers.
-- Executed entry parser and ABI checker, including rejection mutations
-  (`1e1d8501a`); account/UI lifecycle pump checker with 28 cases and 17
-  mutations (`1dc0393f3`).
-- Browser process ABI regression (`fb40158df`): real host child-process waits,
-  strict ARM64 compilation and rejection of the old conflicting `waitpid`
-  declaration. Evidence is retained at
-  `/Users/alex/.local/state/vinix/android/browser-process-abi-2026-10-26b`.
+  helper-object paths, the seven-argument ABI, ELF program headers, exact
+  wait-status correction and both executable profiles.
+- The retained failed r10/r11 attempts exposed strict poll/execve pointer
+  types. Fixes `827f336c7` and `5534dc628` pass strict host control tests and
+  this final ARM build without relaxing compiler checks.
 
-This qualifies the executable build and its ABI coupling. The bundle was
-handed off for guest execution. Maps login, account persistence and the
-requested running screenshot require separate guest evidence.
+Earlier executed entry parser/ABI checks (`1e1d8501a`), account/UI lifecycle
+pump checks (`1dc0393f3`) and browser process ABI regression (`fb40158df`)
+remain separately retained evidence; they were not rerun by this build.
+
+## Token-cache guest controller
+
+The same builder's single-target profile completed at
+`/Users/alex/.local/state/vinix/android/current-token-cache-controller-build-2026-10-26-r1`.
+Its `sha256.json` SHA-256 is
+`fd979a301fc622dc4e4fd6e08bb97a926083172dfa5c8726f4fcb0fffe651816`.
+The only executable, `bin/account-token-cache-controller`, has SHA-256
+`eecf2f8055accc1f62b24b0effb4210b5ce17e5601c9a4e3f92ed4648a0a9d36`.
+Its receipt kind is `vinix-account-token-cache-controller-v1`, with the
+same framework, baseline and compiler pins above. It retains the frozen
+controller from `2f5d81cd8`, source SHA-256
+`bd5caee4dcbb5530ffd279ffa5d86723d6a71eb3854d64dabdddbd57f3cbc7f2`,
+and its complete closure, strict static ARM link and ELF checks.
+
+These receipts qualify executable builds and ABI coupling. They were handed
+off for guest execution. Maps login, account persistence and the requested
+running screenshot require separate guest evidence.
