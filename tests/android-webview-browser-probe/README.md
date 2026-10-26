@@ -131,6 +131,21 @@ extension from loading a separate DRI driver. The launcher also sends an
 authenticated X11 `QueryExtension` request and requires GLX to be absent before
 starting the browser; `session.json` records the policy and the checked result.
 This diagnostic setting does not qualify accelerated rendering or account use.
+The launcher also selects WebKit's Skia CPU image buffers with
+`WEBKIT_SKIA_ENABLE_CPU_RENDERING=1` and disables compositing before WebKit
+initializes with `WEBKIT_DISABLE_COMPOSITING_MODE=1`. GTK's separate
+`GSK_RENDERER=cairo` setting does not control Skia image buffers. These switches
+are implemented by the exact installed release's
+[WebProcess initialization](https://github.com/WebKit/WebKit/blob/webkitgtk-2.48.1/Source/WebKit/WebProcess/glib/WebProcessGLib.cpp)
+and [hardware acceleration manager](https://github.com/WebKit/WebKit/blob/webkitgtk-2.48.1/Source/WebKit/UIProcess/gtk/HardwareAccelerationManager.cpp).
+The inherited force-compositing override is removed. The launcher sets
+`WEBKIT_INJECTED_BUNDLE_PATH` to the relocated runtime's pinned
+`usr/lib/webkitgtk-6.0/injected-bundle` directory, as supported by
+[WebKitWebContext](https://github.com/WebKit/WebKit/blob/webkitgtk-2.48.1/Source/WebKit/UIProcess/API/glib/WebKitWebContext.cpp).
+Preparation records the bundle's SHA-256; the session rejects an absent,
+unpinned, or changed bundle. `session.json` records the selected renderer,
+compositing policy, bundle directory, and checked bundle hash. These settings
+exercise the local document's CPU path; they do not establish WebGL support.
 Results and the real snapshot are written beneath the output directory. A
 successful browser phase prints `BROWSER-PROBE PASS`; the launcher separately
 reports whether setup, execution, and cleanup succeeded.

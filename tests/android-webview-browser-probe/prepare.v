@@ -410,7 +410,8 @@ fn prepare() ! {
 	for name in ['lib/ld-musl-aarch64.so.1', 'usr/bin/mkfontscale', 'usr/lib/libwebkitgtk-6.0.so.4',
 		'usr/lib/libjavascriptcoregtk-6.0.so.1', 'usr/lib/libgtk-4.so.1',
 		'usr/libexec/webkitgtk-6.0/WebKitWebProcess', 'usr/libexec/webkitgtk-6.0/WebKitNetworkProcess',
-		'usr/libexec/webkitgtk-6.0/WebKitGPUProcess'] {
+		'usr/libexec/webkitgtk-6.0/WebKitGPUProcess',
+		'usr/lib/webkitgtk-6.0/injected-bundle/libwebkitgtkinjectedbundle.so'] {
 		runtime_pins[name] = hash(runtime + '/' + name)!
 	}
 	os.write_file(root + '/build.json', json2.encode({

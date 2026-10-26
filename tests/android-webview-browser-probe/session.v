@@ -16,6 +16,7 @@ import time
 #include <signal.h>
 
 const webkit_helpers = ['WebKitWebProcess', 'WebKitNetworkProcess', 'WebKitGPUProcess']
+const injected_bundle = 'usr/lib/webkitgtk-6.0/injected-bundle/libwebkitgtkinjectedbundle.so'
 
 struct BuildPins {
 	runtime_references map[string]string
@@ -103,23 +104,27 @@ fn static_aarch64(path string) !bool {
 	return executable
 }
 
+fn validate_runtime(base string, references map[string]string) ! {
+	for name, expected in references {
+		if !safe_relative(name) { return error('unsafe runtime receipt path') }
+		equal_hash(base + '/' + name, expected)!
+	}
+	for name in ['lib/ld-musl-aarch64.so.1', 'usr/libexec/webkitgtk-6.0/WebKitWebProcess',
+		'usr/libexec/webkitgtk-6.0/WebKitNetworkProcess', 'usr/libexec/webkitgtk-6.0/WebKitGPUProcess',
+		'usr/bin/mkfontscale', injected_bundle] {
+		if name !in references {
+			return error('runtime receipt does not pin ' + name)
+		}
+	}
+}
+
 fn validate(base string, addon string, executable string) !(string, string) {
 	root := os.dir(addon)
 	build_path := root + '/build.json'
 	addon_path := root + '/addon-files.json'
 	build := json2.decode[BuildPins](os.read_file(build_path)!)!
 	files := json2.decode[map[string]string](os.read_file(addon_path)!)!
-	for name, expected in build.runtime_references {
-		if !safe_relative(name) { return error('unsafe runtime receipt path') }
-		equal_hash(base + '/' + name, expected)!
-	}
-	for name in ['lib/ld-musl-aarch64.so.1', 'usr/libexec/webkitgtk-6.0/WebKitWebProcess',
-		'usr/libexec/webkitgtk-6.0/WebKitNetworkProcess', 'usr/libexec/webkitgtk-6.0/WebKitGPUProcess',
-		'usr/bin/mkfontscale'] {
-		if name !in build.runtime_references {
-			return error('runtime receipt does not pin ' + name)
-		}
-	}
+	validate_runtime(base, build.runtime_references)!
 	for name in ['usr/bin/Xvfb', 'usr/bin/xkbcomp'] {
 		if name !in files { return error('addon receipt does not pin ' + name) }
 		equal_hash(addon + '/' + name, files[name])!
@@ -127,6 +132,18 @@ fn validate(base string, addon string, executable string) !(string, string) {
 	equal_hash(executable, build.session_sha256)!
 	equal_hash(os.dir(executable) + '/browser-probe', build.probe_sha256)!
 	return hash(build_path)!, hash(addon_path)!
+}
+
+// GTK's Cairo renderer does not select WebKit's Skia image-buffer backend.
+// Set these before WebKit initialization, including its initial preferences.
+// The release's bundle override takes a directory, not a shared-library path.
+fn cpu_webkit_environment(base string, inherited map[string]string) map[string]string {
+	mut environment := inherited.clone()
+	environment.delete('WEBKIT_FORCE_COMPOSITING_MODE')
+	environment['WEBKIT_SKIA_ENABLE_CPU_RENDERING'] = '1'
+	environment['WEBKIT_DISABLE_COMPOSITING_MODE'] = '1'
+	environment['WEBKIT_INJECTED_BUNDLE_PATH'] = os.dir(base + '/' + injected_bundle)
+	return environment
 }
 
 // Aliases execute this static binary. The immutable receipt hashes inherited
@@ -605,7 +622,7 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 	}
 	loader := base + '/lib/ld-musl-aarch64.so.1'
 	libraries := library_path(base, addon)
-	mut environment := os.environ()
+	mut environment := cpu_webkit_environment(base, os.environ())
 	for key in ['WAYLAND_DISPLAY', 'DBUS_SESSION_BUS_ADDRESS', 'DBUS_STARTER_ADDRESS', 'GTK_MODULES',
 		'GTK_PATH', 'LD_PRELOAD'] {
 		environment.delete(key)
@@ -630,6 +647,10 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 	// bubblewrap's Linux namespace sandbox. Never use this mode for accounts.
 	environment['WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS'] = '1'
 	receipt['webkit_sandbox'] = 'disabled-for-credential-free-local-diagnostic'
+	receipt['webkit_skia_renderer'] = 'cpu'
+	receipt['webkit_compositing_policy'] = 'disabled-for-cpu-rendered-local-diagnostic'
+	receipt['webkit_injected_bundle_path'] = environment['WEBKIT_INJECTED_BUNDLE_PATH']
+	receipt['webkit_injected_bundle_sha256'] = build.runtime_references[injected_bundle]
 	environment['VINIX_BROWSER_BASE'] = base
 	environment['VINIX_BROWSER_ADDON'] = addon
 	environment['VINIX_BROWSER_BUILD_SHA256'] = build_hash
@@ -748,6 +769,31 @@ fn self_test() ! {
 	if os.exists(root) || os.is_link(root) { return error('selftest directory already exists') }
 	os.mkdir(root)!
 	defer { os.rmdir_all(root) or {} }
+	mut runtime_pins := map[string]string{}
+	for name in ['lib/ld-musl-aarch64.so.1', 'usr/libexec/webkitgtk-6.0/WebKitWebProcess',
+		'usr/libexec/webkitgtk-6.0/WebKitNetworkProcess', 'usr/libexec/webkitgtk-6.0/WebKitGPUProcess',
+		'usr/bin/mkfontscale', injected_bundle] {
+		os.mkdir_all(os.dir(root + '/' + name))!
+		os.write_file(root + '/' + name, 'fixture-' + name)!
+		runtime_pins[name] = hash(root + '/' + name)!
+	}
+	validate_runtime(root, runtime_pins)!
+	mut missing_bundle := runtime_pins.clone()
+	missing_bundle.delete(injected_bundle)
+	if _ := validate_runtime(root, missing_bundle) { return error('unpinned injected bundle accepted') }
+	os.write_file(root + '/' + injected_bundle, 'changed-bundle')!
+	if _ := validate_runtime(root, runtime_pins) { return error('changed injected bundle accepted') }
+	os.rm(root + '/' + injected_bundle)!
+	if _ := validate_runtime(root, runtime_pins) { return error('missing injected bundle accepted') }
+	inherited := {'WEBKIT_SKIA_ENABLE_CPU_RENDERING': '0',
+		'WEBKIT_DISABLE_COMPOSITING_MODE': '0', 'WEBKIT_FORCE_COMPOSITING_MODE': '1',
+		'WEBKIT_INJECTED_BUNDLE_PATH': '/foreign/bundle', 'DISPLAY': ':120'}
+	webkit_env := cpu_webkit_environment(root, inherited)
+	assert webkit_env['WEBKIT_SKIA_ENABLE_CPU_RENDERING'] == '1'
+	assert webkit_env['WEBKIT_DISABLE_COMPOSITING_MODE'] == '1'
+	assert 'WEBKIT_FORCE_COMPOSITING_MODE' !in webkit_env
+	assert webkit_env['WEBKIT_INJECTED_BUNDLE_PATH'] == os.dir(root + '/' + injected_bundle)
+	assert webkit_env['DISPLAY'] == ':120' && inherited['WEBKIT_SKIA_ENABLE_CPU_RENDERING'] == '0'
 	mut events := os.open_file(root + '/events', 'w', 0o600)!
 	defer { events.close() }
 	original := root + '/original'
@@ -809,7 +855,7 @@ fn self_test() ! {
 		context.replace('X11-MAPS-END\n', '')] {
 		if _ := known_fault_evidence(bad) { return error('incomplete or inconsistent fault evidence accepted') }
 	}
-	println('BROWSER-SESSION SELF-TEST PASS glx-arguments glx-wire-query glx-absence-negative authority-record x11-setup receipt-paths pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins complete-context negative-context')
+	println('BROWSER-SESSION SELF-TEST PASS glx-arguments glx-wire-query glx-absence-negative authority-record x11-setup receipt-paths bundle-pins bundle-tamper bundle-missing cpu-renderer-environment pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins complete-context negative-context')
 }
 
 fn main() {
