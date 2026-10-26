@@ -57,6 +57,12 @@ fn connection_posix_error(url u64, native i32) u64 {
 }
 fn connection_file_load(request u64, response &u64, error_output &u64) u64 {
 	url := connection_file_request(request)
+	return url_file_load(url, ios_runtime.names['NSData'], response, error_output)
+}
+
+// Shared by NSData's file factory and the connection transport. The caller
+// validates the URL profile before opening; all results own their byte storage.
+fn url_file_load(url u64, data_class u64, response &u64, error_output &u64) u64 {
 	if response != unsafe { nil } { unsafe { *response = 0 } }
 	path := ns_file_manager_path(obj_header(url).fields[0])
 	mut buffer := [1024]u8{}
@@ -68,7 +74,7 @@ fn connection_file_load(request u64, response &u64, error_output &u64) u64 {
 	if C.ios_stat_info(unsafe { nil }, i32(fd), 2, unsafe { &fields[0] }) != 0 { native := unsafe { *C.ios_errno_address() }; if error_output != unsafe { nil } { unsafe { *error_output = connection_posix_error(url, native) } }; return 0 }
 	if fields[1] & 0xf000 != 0x8000 { if error_output != unsafe { nil } { unsafe { *error_output = connection_posix_error(url, if fields[1] & 0xf000 == 0x4000 { C.EISDIR } else { C.EINVAL }) } }; return 0 }
 	if fields[15] > 16777216 { if error_output != unsafe { nil } { unsafe { *error_output = connection_error(url, 'NSURLErrorDomain', -1103) } }; return 0 }
-	data := objc_allocate(ios_runtime.names['NSData'])
+	data := objc_allocate(data_class)
 	mut header := obj_header(data)
 	header.data.flags |= .noslices
 	mut chunk := [8192]u8{}

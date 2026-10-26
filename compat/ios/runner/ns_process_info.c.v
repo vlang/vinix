@@ -59,6 +59,15 @@ fn ns_process_info_at_least(requested IosOperatingSystemVersion) bool {
 	return actual.patch >= requested.patch
 }
 
+fn ns_process_info_physical_memory() u64 {
+	mut value := u64(0)
+	mut length := usize(8)
+	if sysctl_read_hardware(.memory, &value, &length, unsafe { nil }, 0) != 0 {
+		panic('iOS: cannot query physical memory')
+	}
+	return value
+}
+
 fn ns_process_info_types(name string, meta bool, selector string) ?string {
 	if name != 'NSProcessInfo' { return none }
 	if meta {
@@ -71,6 +80,7 @@ fn ns_process_info_types(name string, meta bool, selector string) ?string {
 	return match selector {
 		'init', 'arguments' { '@16@0:8' }
 		'operatingSystemVersion' { '{?=qqq}16@0:8' }
+		'physicalMemory' { 'Q16@0:8' }
 		'isOperatingSystemAtLeastVersion:' { 'B40@0:8{?=qqq}16' }
 		'isiOSAppOnMac', 'isMacCatalystApp' { 'B16@0:8' }
 		else { return none }
@@ -94,6 +104,7 @@ fn ns_process_info_dispatch(object u64, selector string, mut frame RegisterFrame
 	match selector {
 		'init' {}
 		'arguments' { frame.x[0] = ns_process_info_arguments(object) }
+		'physicalMemory' { frame.x[0] = ns_process_info_physical_memory() }
 		'operatingSystemVersion' {
 			if frame.x[8] == 0 { panic('iOS: process info version requires an indirect result buffer') }
 			// Darwin ARM64 returns this 24-byte aggregate through x8.

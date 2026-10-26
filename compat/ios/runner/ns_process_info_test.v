@@ -11,6 +11,8 @@ $if macos {
 fn C.objc_getClass(&char) voidptr
 fn C.sel_registerName(&char) voidptr
 fn C.dlsym(voidptr, &char) voidptr
+fn C.class_getInstanceMethod(voidptr, voidptr) voidptr
+fn C.method_getTypeEncoding(voidptr) &char
 type ProcessInfoSend = fn (u64, u64, u64) u64
 type ProcessInfoVersion = fn (u64, u64) IosOperatingSystemVersion
 type ProcessInfoCompare = fn (u64, u64, IosOperatingSystemVersion) bool
@@ -36,6 +38,8 @@ fn process_info_cases(api ProcessInfoApi, expected []string) {
 	assert fresh != singleton && allocated != singleton && allocated != fresh;
 	assert api.message(allocated, c'init', 0) == allocated;
 	for object in [singleton, fresh, allocated]! {
+		memory := api.message(object, c'physicalMemory', 0)
+		assert memory == u64(C.sysconf(C._SC_PHYS_PAGES)) * u64(C.getpagesize()) && memory > 0;
 		version := api.version(object)
 		assert version.major > 0 && version.minor >= 0 && version.patch >= 0;
 		for requested in [version, IosOperatingSystemVersion{major: version.major - 1, minor: 99, patch: 99}, IosOperatingSystemVersion{major: -1, minor: 0, patch: 0}]! { assert api.at_least(object, requested); }
@@ -64,15 +68,19 @@ fn process_info_worker(api ProcessInfoApi, singleton u64, arguments u64) {
 		assert api.message(api.cls, c'processInfo', 0) == singleton;
 		assert api.message(singleton, c'arguments', 0) == arguments;
 		assert api.version(singleton) == IosOperatingSystemVersion{major: 17};
+		assert api.message(singleton, c'physicalMemory', 0) == u64(C.sysconf(C._SC_PHYS_PAGES)) * u64(C.getpagesize());
 	}
 }
 fn test_process_info_native() {
 	$if macos {
 		api := ProcessInfoApi{native: true, send: u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend')), cls: u64(C.objc_getClass(c'NSProcessInfo'))}
 		pool := api.message(u64(C.objc_getClass(c'NSAutoreleasePool')), c'new', 0)
+		method := C.class_getInstanceMethod(unsafe { voidptr(api.cls) }, C.sel_registerName(c'physicalMemory'))
+		assert method != unsafe { nil } && ctext(u64(C.method_getTypeEncoding(method))) == 'Q16@0:8';
 		process_info_cases(api, os.args)
 		api.message(pool, c'drain', 0)
 		println('IOS-PROCESSINFO-NATIVE: distinct allocation, singleton instance, owned argument snapshots, typed 24-byte version ABI and signed comparisons')
+		println('IOS-PROCESSINFO-MEMORY-NATIVE: unsigned 64-bit scalar matches physical pages times page size')
 	}
 }
 fn test_process_info_runtime() {
@@ -94,7 +102,7 @@ fn test_process_info_runtime() {
 			assert !objc_responds(singleton, selector);
 			assert objc_instance_method(api.cls, u64(selector)) == 0;
 		}
-		for name, types in {'operatingSystemVersion': '{?=qqq}16@0:8', 'isOperatingSystemAtLeastVersion:': 'B40@0:8{?=qqq}16', 'arguments': '@16@0:8', 'isiOSAppOnMac': 'B16@0:8'} {
+		for name, types in {'operatingSystemVersion': '{?=qqq}16@0:8', 'physicalMemory': 'Q16@0:8', 'isOperatingSystemAtLeastVersion:': 'B40@0:8{?=qqq}16', 'arguments': '@16@0:8', 'isiOSAppOnMac': 'B16@0:8'} {
 			method := objc_instance_method(api.cls, u64(name.str))
 			assert method != 0 && ctext(u64(objc_method_types(method))) == types;
 		}
@@ -102,6 +110,12 @@ fn test_process_info_runtime() {
 		mut frame := RegisterFrame{}
 		frame.x[8] = u64(unsafe { &guarded[1] })
 		assert ns_process_info_dispatch(singleton, 'operatingSystemVersion', mut frame);
+		assert guarded == [u64(0x1122334455667788), 17, 0, 0, 0x8877665544332211]!;
+		assert objc_responds(singleton, c'physicalMemory') && !objc_responds(api.cls, c'physicalMemory');
+		darwin_set_errno(37)
+		assert ns_process_info_dispatch(singleton, 'physicalMemory', mut frame);
+		assert frame.x[0] == u64(C.sysconf(C._SC_PHYS_PAGES)) * u64(C.getpagesize());
+		assert unsafe { *C.ios_errno_address() } == 37;
 		assert guarded == [u64(0x1122334455667788), 17, 0, 0, 0x8877665544332211]!;
 		mut workers := []thread{}
 		for _ in 0 .. 8 { workers << spawn process_info_worker(api, singleton, arguments) }
@@ -120,6 +134,7 @@ fn test_process_info_runtime() {
 		objc_stop(); assert ios_runtime.live == 0;
 	}
 	println('IOS-PROCESSINFO: copied app arguments, guarded version result, 8,000 concurrent queries, caller storage, isa changes and two zero-live-object shutdowns')
+	println('IOS-PROCESSINFO-MEMORY: reflected scalar ABI, preserved indirect buffer and errno, 8,000 concurrent queries without new objects')
 }
 fn test_process_info_rejections() {
 	objc_start(); cls := ios_runtime.names['NSProcessInfo']

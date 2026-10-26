@@ -20,12 +20,36 @@ fn run(out string, label string, args []string, deterministic bool) {
 	}
 	println(label + ': PASS')
 }
+fn run_host_fixture(root string, old string, out string, fixture string) ! {
+	cfile := out + '/payload/center-host.c'; bundle := out + "/NotificationChecks.app/Contents"
+	os.mkdir_all(bundle + "/MacOS")!
+	os.write_file(bundle + "/Info.plist", "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>org.vinix.notification-checks</string><key>CFBundleExecutable</key><string>center-host</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>")!
+	binary := bundle + "/MacOS/center-host"
+	run(out, 'host-generate', [old + '/v', '-enable-globals', '-nocache', '-gc', 'none', '-cc', 'clang', '-d', 'ios_video', '-d', 'ios_cxx', '-d', 'ios_sqlite', '-os', 'macos', '-arch', 'arm64', '-path', '@vlib|' + root + '/compat/ios|@vmodules', '-o', cfile, root + '/compat/ios/runner/' + fixture], false)
+	mut objects := []string{}
+	for i, source in [cfile, old + '/vlib/os/execute_capture_nix.c', old + '/vlib/builtin/segfault_handler_nix.c', root + '/compat/ios/runner/abi/dispatch.S']! {
+		object := out + '/payload/host-' + i.str() + '.o'; objects << object
+		run(out, 'host-object-' + i.str(), ['/usr/bin/clang', '-I/opt/homebrew/include', '-I/opt/homebrew/opt/freetype/include/freetype2', '-O0', '-g', '-w', '-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-c', source, '-o', object], false)
+	}
+	mut link := ['/usr/bin/clang', '-g', '-fsanitize=address,undefined']; link << objects
+	link << ['-L/opt/homebrew/lib', '-lavcodec', '-lswscale', '-lavutil', '-framework', 'AppKit', '-lc++', '-lsqlite3', '-lresolv', '-framework', 'Foundation', '-framework', 'UserNotifications', '-framework', 'CoreFoundation', '-pthread', '-lproc', '-lm', '-o', binary]
+	run(out, 'host-link', link, false)
+	run(out, 'host', [binary], false); run(out, 'host-deterministic', [binary], true)
+}
+
 fn main() {
 	if os.args.len != 3 { panic('usage: notification-checks MODE EXTERNAL_BUNDLE') }
 	root := os.real_path(os.getwd()); out := os.abs_path(os.args[2]); old := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
-	if os.args[1] == 'driver-build' {
+	if os.args[1] in ['processinfo-host', 'data-url-host', 'connection-host'] {
+		fixture := match os.args[1] {
+			'processinfo-host' { 'ns_process_info_test.v' }
+			'data-url-host' { 'ns_data_url_test.v' }
+			else { 'ns_url_connection_test.v' }
+		}
+		run_host_fixture(root, old, out, fixture)!
+	} else if os.args[1] == 'driver-build' {
 		run(out, 'driver-build', [old + '/v', '-nocache', '-prod', '-gc', 'none', '-cc', 'clang', '-o', out + '/native-checks', root + '/tests/ios/native-checks.v'], false)
 	} else if os.args[1] == 'scene-notifications-inspector-build' {
 		run(out, 'inspect-build', [old + '/v', '-nocache', '-gc', 'none', '-cc', 'clang', '-cflags', '-target arm64-apple-ios14.0-macabi', '-ldflags', '-target arm64-apple-ios14.0-macabi', '-o', out + '/inspect-scene-notifications', root + '/tests/ios/inspect-scene-notifications.v'], false)
@@ -185,19 +209,6 @@ fn main() {
 	} else if os.args[1] in ['host', 'content-host', 'sound-host', 'attachment-host', 'cache-host', 'telephony-host', 'credential-host', 'map-table-host', 'lock-host', 'recursive-lock-host', 'number-formatter-host', 'date-formatter-host', 'bundle-resource-host', 'adsupport-host', 'feedback-host', 'session-task-host', 'game-controller-host', 'haptic-dynamic-parameter-host', 'image-initializers-host', 'class-update-host', 'singleton-metadata-host', 'native-value-host', 'unknown-value-host', 'bridge-value-host', 'capture-audio-output-host', 'gk-match-request-host', 'gk-achievement-host', 'gk-achievement-description-host', 'gk-player-host', 'gk-turn-based-participant-host', 'gk-turn-based-match-host', 'gk-local-player-host', 'gk-leaderboard-host', 'capture-discovery-host', 'app-attest-host', 'gc-event-view-controller-host', 'snapshot-configuration-host', 'text-field-host', 'haptic-pattern-host', 'haptic-event-host', 'haptic-event-parameter-host', 'long-press-gesture-host', 'tap-gesture-host', 'rotation-gesture-host', 'pinch-gesture-host', 'pan-gesture-host', 'text-input-host', 'game-center-host', 'av-player-host', 'ns-proxy-host', 'swift-object-host', 'probe-no-ads-host', 'storekit-purchase-host', 'storyboard-host', 'audio-application-host', 'string-character-search-host', 'scene-notifications-host']! {
 		content := os.args[1] == 'content-host'
 		fixture := if os.args[1] == 'scene-notifications-host' { 'scene_notifications_test.v' } else if os.args[1] == 'string-character-search-host' { 'ns_string_character_search_test.v' } else if os.args[1] == 'image-initializers-host' { 'image_initializers_test.v' } else if os.args[1] == 'singleton-metadata-host' { 'swift_singleton_metadata_test.v' } else if os.args[1] == 'class-update-host' { 'swift_class_update_test.v' } else if os.args[1] == 'native-value-host' { 'swift_native_value_test.v' } else if os.args[1] == 'unknown-value-host' { 'swift_unknown_value_test.v' } else if os.args[1] == 'bridge-value-host' { 'swift_bridge_value_test.v' } else if os.args[1] == 'gk-match-request-host' { 'gk_match_request_test.v' } else if os.args[1] == 'gk-achievement-host' { 'gk_achievement_test.v' } else if os.args[1] == 'gk-player-host' { 'gk_player_test.v' } else if os.args[1] == 'gk-turn-based-participant-host' { 'gk_turn_based_participant_test.v' } else if os.args[1] == 'gk-turn-based-match-host' { 'gk_turn_based_match_test.v' } else if os.args[1] == 'gk-local-player-host' { 'gk_local_player_test.v' } else if os.args[1] == 'gk-leaderboard-host' { 'gk_leaderboard_test.v' } else if os.args[1] == 'gk-achievement-description-host' { 'gk_achievement_description_test.v' } else if os.args[1] == 'capture-audio-output-host' { 'capture_audio_output_test.v' } else if os.args[1] == 'capture-discovery-host' { 'capture_discovery_test.v' } else if os.args[1] == 'app-attest-host' { 'app_attest_test.v' } else if os.args[1] == 'gc-event-view-controller-host' { 'gc_event_view_controller_test.v' } else if os.args[1] == 'snapshot-configuration-host' { 'wk_snapshot_configuration_test.v' } else if os.args[1] == 'text-field-host' { 'ui_text_field_test.v' } else if os.args[1] == 'haptic-dynamic-parameter-host' { 'ch_haptic_dynamic_parameter_test.v' } else if os.args[1] == 'haptic-pattern-host' { 'ch_haptic_pattern_test.v' } else if os.args[1] == 'haptic-event-host' { 'ch_haptic_event_test.v' } else if os.args[1] == 'haptic-event-parameter-host' { 'ch_haptic_event_parameter_test.v' } else if os.args[1] == 'long-press-gesture-host' { 'ui_long_press_gesture_test.v' } else if os.args[1] == 'tap-gesture-host' { 'ui_tap_gesture_test.v' } else if os.args[1] == 'rotation-gesture-host' { 'ui_rotation_gesture_test.v' } else if os.args[1] == 'pinch-gesture-host' { 'ui_pinch_gesture_test.v' } else if os.args[1] == 'pan-gesture-host' { 'ui_pan_gesture_test.v' } else if os.args[1] == 'text-input-host' { 'ui_text_input_test.v' } else if os.args[1] == 'game-center-host' { 'game_center_test.v' } else if os.args[1] == 'av-player-host' { 'av_player_test.v' } else if os.args[1] == 'ns-proxy-host' { 'ns_proxy_test.v' } else if os.args[1] == 'swift-object-host' { 'swift_object_test.v' } else if os.args[1] == 'probe-no-ads-host' { 'probe_no_ads_test.v' } else if os.args[1] == 'storekit-purchase-host' { 'storekit_purchase_test.v' } else if os.args[1] == 'storyboard-host' { 'ui_storyboard_test.v' } else if os.args[1] == 'audio-application-host' { 'audio_application_test.v' } else if os.args[1] == 'game-controller-host' { 'game_controller_test.v' } else if os.args[1] == 'session-task-host' { 'ns_url_session_task_test.v' } else if os.args[1] == 'feedback-host' { 'ui_feedback_test.v' } else if os.args[1] == 'adsupport-host' { 'adsupport_test.v' } else if os.args[1] == 'bundle-resource-host' { 'ns_bundle_resource_test.v' } else if os.args[1] == 'number-formatter-host' { 'ns_number_formatter_test.v' } else if os.args[1] == 'date-formatter-host' { 'date_formatter_test.v' } else if os.args[1] == 'lock-host' { 'ns_lock_test.v' } else if os.args[1] == 'recursive-lock-host' { 'ns_recursive_lock_test.v' } else if os.args[1] == 'map-table-host' { 'ns_map_table_test.v' } else if os.args[1] == 'credential-host' { 'ns_url_credential_test.v' } else if os.args[1] == 'telephony-host' { 'coretelephony_test.v' } else if os.args[1] == 'cache-host' { 'ns_cache_test.v' } else if content { 'un_notification_content_test.v' } else if os.args[1] == 'sound-host' { 'un_notification_sound_test.v' } else if os.args[1] == 'attachment-host' { 'un_notification_attachment_test.v' } else { 'un_notification_center_test.v' }
-		cfile := out + '/payload/center-host.c'; bundle := out + "/NotificationChecks.app/Contents"
-		os.mkdir_all(bundle + "/MacOS")!
-		os.write_file(bundle + "/Info.plist", "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>org.vinix.notification-checks</string><key>CFBundleExecutable</key><string>center-host</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>")!
-		binary := bundle + "/MacOS/center-host"
-		run(out, 'host-generate', [old + '/v', '-enable-globals', '-nocache', '-gc', 'none', '-cc', 'clang', '-d', 'ios_video', '-d', 'ios_cxx', '-d', 'ios_sqlite', '-os', 'macos', '-arch', 'arm64', '-path', '@vlib|' + root + '/compat/ios|@vmodules', '-o', cfile, root + '/compat/ios/runner/' + fixture], false)
-		mut objects := []string{}
-		for i, source in [cfile, old + '/vlib/os/execute_capture_nix.c', old + '/vlib/builtin/segfault_handler_nix.c', root + '/compat/ios/runner/abi/dispatch.S']! {
-			object := out + '/payload/host-' + i.str() + '.o'; objects << object
-			run(out, 'host-object-' + i.str(), ['/usr/bin/clang', '-I/opt/homebrew/include', '-I/opt/homebrew/opt/freetype/include/freetype2', '-O0', '-g', '-w', '-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-c', source, '-o', object], false)
-		}
-		mut link := ['/usr/bin/clang', '-g', '-fsanitize=address,undefined']; link << objects
-		link << ['-L/opt/homebrew/lib', '-lavcodec', '-lswscale', '-lavutil', '-framework', 'AppKit', '-lc++', '-lsqlite3', '-lresolv', '-framework', 'Foundation', '-framework', 'UserNotifications', '-framework', 'CoreFoundation', '-pthread', '-lproc', '-lm', '-o', binary]
-		run(out, 'host-link', link, false)
-		run(out, 'host', [binary], false); run(out, 'host-deterministic', [binary], true)
+		run_host_fixture(root, old, out, fixture)!
 	} else { run(out, os.args[1], [out + "/notification-vm", os.args[1], out], false) }
 }

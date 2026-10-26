@@ -127,6 +127,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := ns_uuid_types(info.name, info.meta, selector) { return types }
 	if types := ns_file_manager_types(info.name, info.meta, selector) { return types }
 	if types := ns_process_info_types(info.name, info.meta, selector) { return types }
+	if types := ns_data_url_types(info.name, info.meta, selector) { return types }
 	if types := ns_date_types(info.name, info.meta, selector) { return types }
 	if types := ns_date_formatter_types(info.name, info.meta, selector) { return types }
 	if types := ns_number_formatter_types(info.name, info.meta, selector) { return types }
