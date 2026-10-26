@@ -102,22 +102,26 @@ malformed input and smali assembly checks. These checks establish framework
 construction, not guest execution or successful Google account login.
 
 The cache profile supplies the three token-cache APIs invoked by Maps and GMS:
-`peekAuthToken`, `setAuthToken`, and `invalidateAuthToken`. The `--cache` builder
-requires the exact sealed auth baseline above. Its self-tests, provider build,
+`peekAuthToken`, `setAuthToken`, and `invalidateAuthToken`, plus the Java
+`clearPassword(Account)` wrapper which calls `setPassword(account, null)`.
+The `--cache` builder requires the exact sealed auth baseline above. Its self-tests, provider build,
 assembly, canonical disassembly, strict method/class and JAR-member comparisons,
 and a separate complete-bundle integrity check passed. All 2102 classes remain;
 only `AccountManager` changes, adding exactly three public native methods and
-changing zero existing methods. The baseline seal is verified before and after
-construction.
+one Java wrapper while changing zero existing methods. The baseline seal is
+verified before and after construction.
 
-- Builder implementation commit: `d5dc257d0`; provider commit: `52c676fe0`.
-- Build source revision: `f49137658a513e3a003096257a5ff1ab9b7c18b1`.
-- Retained builder source SHA256: `eb4c0e123eb00c7e83849383d24a838c5e5bd6c6317d8604bb45c6fc2a95f7b0`.
-- Retained cache provider SHA256: `4860e5be5967da25e5b19a5cf2d5489571b37023f97189d3a71395ce094b3b78`.
-- Complete retained bundle: `/Users/alex/.local/state/vinix/android/combined-account-webview-cache-framework-2026-10-26-r2`.
-- Bundle manifest SHA256: `8cf0fdd552f165962dcb35f6151605efb647b6d12ebd0b04a3a47a7ede02c1d4`.
-- Output `api-impl.jar` SHA256: `1e0850d1550319a3be7dcf18152cdc3079d96e5027be1aafef1da92f1574e22a`.
-- Output DEX SHA256: `690092b22d82af889058aa6b1e363cbe8971ee408c82b75c95a615dcbb305680`.
+- Builder implementation commits: `d5dc257d0`, `a45944940`; provider commit: `7a9390806`.
+- Build source revision: `4dfcbdad505dd119da8149d5f3067c69d4079ae3`.
+- Retained builder source SHA256: `4f39bd39a079ad06fd59aff0e9727a971a318e23f11a278c3393c8cbedd7acd9`.
+- Retained cache provider SHA256: `7e52ef398747efad6c6885c4ef45f3faa6f2a6133e82b96f67ebbc7f439eac6b`.
+- Complete retained bundle: `/Users/alex/.local/state/vinix/android/combined-account-webview-cache-framework-2026-10-26-r3`.
+- Bundle manifest SHA256: `f37e13b84b5dfb2c71ad852e2bae5b03fed04e8ee319f44e77fc7605f3b1994a`.
+- Output `api-impl.jar` SHA256: `3a590476c53e3f05533c327c5935e395c55694eacb7895b02940feaf888c56d0`.
+- Output DEX SHA256: `8cffe19b26057c8810065c0e137364b573a50e36a596ce7a3b34391511133902`.
+
+The earlier three-native-method r2 bundle remains sealed at its original
+location; r3 supersedes it by adding the missing password-clear wrapper.
 
 The compiler and retained-input policy match the auth profile. These are host
 construction checks; execution of the paired JNI implementation and Google
