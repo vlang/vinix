@@ -904,3 +904,101 @@ gives 1,061,236,888 bytes within 1 GiB. These are inclusive storage charges,
 not filesystem quotas. Actual free space after adaptation was 7,958,472 KiB.
 No controller, target program or VM executed; this binding supplies an
 unchanged-signal diagnostic input, without guest qualification.
+Both original adapter complete seals were also checked independently and
+passed with actual status `0`.
+
+The owner migration changes only its fixed host/output paths and atomic
+kernel/binding pins. Source SHA-256
+`1f5a9325801e2556ea3e6e16f31dea6c638d6283d98ecdf70d459c999436724a`
+bootstrapped with actual status `0` in 6.83 seconds, from source base
+`a0baf40547c09403ec801cbf5e50f6147b473f68`. The production executable at
+`wine-jit-stream-native-owner-bootstrap-04/native-owner` has SHA-256
+`c698c05b3f2bc685d1cdcbf2005bf0367339c7f40b530d4078db9c511fcaa6a7`.
+Its original complete seal passed at
+`wine-jit-stream-native-owner-seal-02/bootstrap-04/complete/inventory.json`,
+SHA-256 `b0ce066c42df9feca56fbe3b584000e6dd7b894d6b1d8244f9ecbd044c754731`.
+Bootstrap and seal retain 533,679 bytes. The fresh host-02 build was
+deferred before execution when actual free space fell to 1,265,380 KiB,
+below the existing 2 GiB admission floor. This bootstrap receipt makes no
+final free-space floor claim.
+
+Host-02 was later admitted at 4,081,224 KiB actual free space and failed
+with actual launcher status `1`. At 5,736 ms the whole owner rejected
+`scratch/ld-support-75758/libLTO.dylib`, whose literal target was
+`/opt/homebrew/Cellar/llvm/23.1.0/lib/libLTO.dylib`. It retired the reserved
+group and recorded both leader and group absent. The exit-status field is
+explicitly unobserved; its placeholder `0` is not successful compilation.
+Peak admitted state was 5,855,938 bytes. The original failed state remains
+at `wine-jit-stream-native-owner-host-02`, with launch observations at
+`wine-jit-stream-native-owner-host-02-launch-01`. Both original complete
+seals passed under `wine-jit-stream-native-owner-seal-02`:
+
+| Manifest | SHA-256 |
+| --- | --- |
+| `host-02/complete/inventory.json` | `e314772b3cb75bd989765e13237314fc98123662099b5a874d85c7b0b80b2e19` |
+| `launch-01/complete/inventory.json` | `678c3c87c2f347f96720ef116073f985f7f3aaf9c920b2cb6ed5d267dac71e4d` |
+
+Bootstrap-04, failed host-02, launch observations and their seals retain
+6,412,364 bytes. Together with the preceding Wine evidence profile and
+reserves, this charges 105,186,926 bytes within 128 MiB. Actual free space
+after the failed launch was 3,869,372 KiB. No controller, target program
+or VM executed; the migrated controller build remained unqualified.
+Independent original checks of bootstrap-04, host-02 and launch-01 also
+passed with actual status `0`.
+
+The fresh owner permits one compiler scratch link form only in its fixed
+host-03 scratch subtree: `ld-support-<decimal>/libLTO.dylib`, with the exact
+literal target `/opt/homebrew/Cellar/llvm/23.1.0/lib/libLTO.dylib`. Scanning
+counts its 49 link bytes without traversal and applies the existing file,
+aggregate and entry bounds. Default scans still refuse links. The target
+must be a canonical ordinary file with SHA-256
+`8d26a21ca863c62342e0c1a22c441a196d279ee14d72f22679871d95ec91a56a`;
+it is included in both full selected host input maps. Its 89,344 bytes
+are included in the named static input charge. Independent source review
+found no blocker.
+
+From source base `a0baf40547c09403ec801cbf5e50f6147b473f68`, bootstrap-05
+completed with actual status `0` in 37.28 seconds. Owner source SHA-256 is
+`51f9657ea2045de18f1f82cdd1fb5114c96f677806d035f49982c0d27dbffc54`;
+guard source SHA-256 is
+`09ade12f049a728501857586c96ca468d9bd38f0c6653e300114b73c8485e499`.
+The production owner executable SHA-256 is
+`8ecddb27a1e8253c8a6632d0fa1742b6f3df73c01abe37b97ba50107aef0c1f7`.
+All 15 fresh controls-03 passed with actual status `0`: seven scratch-link
+cases covering acceptance, target/location/directory/default refusal and
+both byte caps, followed by the eight existing process-owner controls.
+Each process receipt records final leader and group absence.
+
+The fresh host-03 production controller build completed with actual status
+`0` under the unchanged 180-second whole owner and 120-second compiler
+bounds. Whole-owner elapsed time was 73,100 ms; compiler time was
+53,100 ms. Peak admitted state was 6,747,736 bytes. The owner observed
+status `0`, an empty failure reason and final leader/group absence.
+Full selected before/after maps are persisted and equal, both SHA-256
+`ca715b29c404c6d9c69bb6d0214475e44dd0751ff201c656d003302efb00bfdb`.
+The new controller SHA-256 is
+`703d3604ba64f26bdce93e38677c9bb3e81ce87319c5dacd05f7df04ac53d97b`.
+
+Exact environments, commands and actual observations are retained under
+`wine-jit-stream-native-owner-bootstrap-05` and
+`wine-jit-stream-native-owner-host-03-launch-01`. Bootstrap used external
+`gtimeout 300`; controls used external `gtimeout 60`. No independent
+bootstrap or external-timeout group retirement claim is made. All four
+original complete seals passed under `wine-jit-stream-native-owner-seal-03`:
+
+| Manifest | SHA-256 |
+| --- | --- |
+| `bootstrap-05/complete/inventory.json` | `9d6a02ce5b1c76273e19d02c482dd9c3de2c689ed3facf80edaf5a22a76ed24d` |
+| `controls-03/complete/inventory.json` | `b3d10cb97c19406970464026a1cffe8ea62fa9ff0a8425ab8aee079c016f2c37` |
+| `host-03/complete/inventory.json` | `8e89f05df8f36ff46b5f2ddab6c6f78a296e5faf3fa9a3f395ec86afd659abcc` |
+| `launch-01/complete/inventory.json` | `18317bab1023ef5a016721082a460aeb677dd6b89a2fe820b20cb1118aaf78c1` |
+
+The fresh states and seals retain 4,239,440 bytes within the reviewed
+24 MiB reserve. Including all earlier Wine states and reserves charges
+109,426,366 bytes within 128 MiB. Named static inputs now total
+962,551,670 bytes; the combined charge is 1,071,978,036 bytes within
+1.25 GiB. These are inclusive storage charges, not filesystem quotas.
+Final actual free space after closure was 3,011,684 KiB. SDK and other
+transitive dynamic dependencies remain unfrozen. The controller was
+built but never executed; no target program or VM ran. The unchanged-signal
+atomic-kernel native diagnostic remains unqualified.

@@ -24,12 +24,13 @@ const root = '/Users/alex/code/vinix/build/package-wine-adapter-worktree'
 const overlay = '/Users/alex/.cache/vinix-waitpid-width-20261026-02'
 const compiler = overlay + '/toolchain/v'
 const clang = '/opt/homebrew/opt/llvm/bin/clang'
-const host_state = base + '/wine-jit-stream-native-owner-host-01'
-const controls_state = base + '/wine-jit-stream-native-owner-controls-02'
-const native_state = base + '/wine-jit-stream-native-arm-02'
+const compiler_lto = '/opt/homebrew/Cellar/llvm/23.1.0/lib/libLTO.dylib'
+const host_state = base + '/wine-jit-stream-native-owner-host-03'
+const controls_state = base + '/wine-jit-stream-native-owner-controls-03'
+const native_state = base + '/wine-jit-stream-native-arm-atomic-01'
 const controller = host_state + '/capture/controller'
-const kernel = base + '/matched-peer-frame-20261026/build-05/aarch64/bin/vinix'
-const receipt = base + '/wine-jit-stream-native-kernel-bind-01/kernel-binding.json'
+const kernel = base + '/matched-peer-frame-atomic-kernel-20261026/kernel-aarch64/bin/vinix'
+const receipt = base + '/wine-jit-stream-native-kernel-bind-atomic-01/kernel-binding.json'
 const translator = '/Users/alex/code/vinix/build/package-wine-translation-fork-qualified-1/extras/qemu-x86_64'
 const arm_sysroot = '/Users/alex/code/vinix/build/package-rollback-transaction-work/sysroot'
 const arm_gcc = '/Users/alex/code/vinix/build-aarch64-userland/staging/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0'
@@ -104,7 +105,8 @@ fn hard_limits(bytes u64) ! {
 }
 
 // Root names are limited to 32. Each ordinary subtree has the existing
-// 512-entry bound and admits only its relative boot/qmp.sock socket.
+// 512-entry bound and admits only its relative boot/qmp.sock socket. The host
+// compiler scratch subtree additionally admits its exact pinned LTO helper link.
 fn sample(state string, policy OwnerPolicy) !u64 {
 	ordinary_directory(state)!
 	names := os.ls(state)!
@@ -117,6 +119,7 @@ fn sample(state string, policy OwnerPolicy) !u64 {
 			total += winejitstream.native_require_state(path, winejitstream.NativeLimits{
 				file_bytes: policy.file_bytes, total_bytes: policy.state_bytes,
 				log_bytes: policy.log_bytes, serial_bytes: policy.serial_bytes,
+				compiler_scratch_lto: if state == host_state && name == 'scratch' { compiler_lto } else { '' },
 			})!
 		} else if info.get_filetype() == .regular {
 			cap := if name.ends_with('.log') { policy.log_bytes } else { policy.file_bytes }
@@ -210,7 +213,7 @@ fn fixed_environment(scratch string, modules string) map[string]string {
 
 fn host_inputs() !map[string]winejitstream.NativePin {
 	mut pins := map[string]winejitstream.NativePin{}
-	for path in [compiler, clang, os.executable(), overlay + '/bundle.json',
+	for path in [compiler, clang, compiler_lto, os.executable(), overlay + '/bundle.json',
 		overlay + '/overlay-before.json', overlay + '/changes.json', overlay + '/toolchain/v.mod',
 		root + '/tests/packages/wine-fork-jit-stream-native.v',
 		root + '/tests/packages/wine-fork-jit-stream-native-owner.v'] {
@@ -265,9 +268,13 @@ fn host_child() ! {
 	for name, value in fixed_environment(host_state + '/scratch', host_state + '/modules') {
 		os.setenv(name, value, true)
 	}
+	if os.real_path(compiler_lto) != compiler_lto || os.lstat(compiler_lto)!.get_filetype() != .regular {
+		return error('host compiler LTO helper must be a canonical ordinary file')
+	}
 	for path, digest in {
 		compiler: 'ff75a30180b1de305e3c62acc1ebd85341ff83ae5d852c819d11f27d5260c4c5'
 		clang: '4e4fd968922cd634ebb6445325703a6276effde7b39337a6a9ff40b3b0c657b8'
+		compiler_lto: '8d26a21ca863c62342e0c1a22c441a196d279ee14d72f22679871d95ec91a56a'
 		overlay + '/bundle.json': '32d8bc5f46c953aeb5e9ad1ad63e182f10752fe270983943a22c040016617976'
 		overlay + '/overlay-before.json': '65b8b8322a34407c4b16762803c618e2fe8f414cc0bc5ccb10144bf20292786f'
 		overlay + '/changes.json': '4941c055c018c321d7a4cc94c054b26ba6494bc6be7fa508d99a1bb10b7b2b21'
@@ -308,8 +315,8 @@ fn native_child(digest string) ! {
 	if os.read_file(host_state + '/controller.sha256')! != digest + '\n' {
 		return error('controller build digest receipt differs')
 	}
-	require_pin(receipt, 'cdee03dabbcd5af40f5e1b7dc0eed94994042fac48c37f23bd630b8edcdd80dd')!
-	require_pin(kernel, 'e805a73154d61503d6427f1ccc4d19b1eb9ec802ed38255e059e0b2bd1e83174')!
+	require_pin(receipt, '27113003335b4185a59f0671994a7fd99c4fddc895c841cd13df0ec2f382bc8f')!
+	require_pin(kernel, '1111f8d6451a0ab94361c3ebf006e9ceed62baea9dd395ac0a5c3caa7fb3a254')!
 	for path, expected_digest in {
 		'/opt/homebrew/bin/qemu-system-aarch64': '45d74da57beb9be259ca3d6996e5c70d4ab14326ea59c3db3e80308859d91a3e'
 		'/opt/homebrew/Cellar/qemu/11.1.1/share/qemu/edk2-aarch64-code.fd': '47765fe344818cbc464b1c14ae658fb4b854f5c2ceffa982411731eb4865594d'
@@ -400,10 +407,51 @@ fn fixture_controller(state string, mode string) ! {
 	}
 }
 
+fn scratch_link_controls() ! {
+	state := controls_state + '/scratch-links'
+	os.mkdir(state)!
+	for name in ['accepted', 'wrong-target', 'wrong-location', 'default-refused', 'invalid-directory'] {
+		os.mkdir(state + '/' + name)!
+		directory := if name == 'wrong-location' { 'nested/ld-support-123' }
+			else if name == 'invalid-directory' { 'ld-support-abc' } else { 'ld-support-123' }
+		os.mkdir_all(state + '/' + name + '/' + directory)!
+		target := if name == 'wrong-target' { '/nonexistent-wine-lto-target' } else { compiler_lto }
+		os.symlink(target, state + '/' + name + '/' + directory + '/libLTO.dylib')!
+	}
+	mut results := map[string]string{}
+	for name in ['accepted', 'wrong-target', 'wrong-location', 'default-refused', 'invalid-directory'] {
+		bytes := winejitstream.native_require_state(state + '/' + name, winejitstream.NativeLimits{
+			file_bytes: 1024, total_bytes: 1024, log_bytes: 1024, serial_bytes: 1024,
+			compiler_scratch_lto: if name == 'default-refused' { '' } else { compiler_lto },
+		}) or {
+			if name == 'accepted' { return err }
+			results[name] = err.msg()
+			continue
+		}
+		if name != 'accepted' { return error('unsupported scratch link was admitted: ' + name) }
+		if bytes != u64(compiler_lto.len) { return error('scratch link bytes were not charged literally') }
+		results[name] = 'accepted; charged ' + bytes.str() + ' literal link bytes without traversal'
+	}
+	for name in ['file-cap', 'aggregate-cap'] {
+		winejitstream.native_require_state(state + '/accepted', winejitstream.NativeLimits{
+			file_bytes: if name == 'file-cap' { u64(compiler_lto.len) } else { u64(1024) },
+			total_bytes: if name == 'aggregate-cap' { u64(compiler_lto.len - 1) } else { u64(1024) },
+			log_bytes: 1024, serial_bytes: 1024, compiler_scratch_lto: compiler_lto,
+		}) or {
+			if !err.msg().contains('threshold') { return err }
+			results[name] = err.msg()
+			continue
+		}
+		return error('scratch link byte limit was not enforced: ' + name)
+	}
+	os.write_file(state + '/results.json', json2.encode(results) + '\n')!
+}
+
 fn controls() ! {
 	if os.exists(controls_state) || os.is_link(controls_state) { return error('controls already exist') }
 	source_check()!
 	os.mkdir(controls_state)!
+	scratch_link_controls()!
 	mut results := map[string]OwnerResult{}
 	for mode in ['success-descendant', 'controller-crash', 'owner-timeout', 'state-cap',
 		'log-cap', 'inner-timeout', 'group-refusal', 'owner-interrupt'] {
@@ -468,7 +516,7 @@ fn controls() ! {
 			}
 		}
 	}
-	println('PASS inherited native owner: success descendants, crash, outer/inner timeouts, state/log caps, group refusal, cooperative owner interruption; no target or VM')
+	println('PASS exact scratch-link controls and inherited native owner: success descendants, crash, outer/inner timeouts, state/log caps, group refusal, cooperative owner interruption; no target or VM')
 }
 
 fn main() {

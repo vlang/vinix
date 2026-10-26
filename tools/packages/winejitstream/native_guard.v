@@ -38,6 +38,9 @@ pub:
 	log_bytes    u64
 	serial_bytes u64
 	min_free_kib u64
+	// Opt in only for a trusted host compiler's selected scratch root. Links
+	// elsewhere remain unsupported, and the literal target is never traversed.
+	compiler_scratch_lto string
 }
 
 pub struct NativeRun {
@@ -97,25 +100,40 @@ fn native_scan_entry(directory string, relative string, name string, limits Nati
 	match info.get_filetype() {
 		.directory { native_scan(path, rel, limits, mut tree)! }
 		.regular {
-			if tree.bytes > (~u64(0)) - info.size {
-				tree.bytes = ~u64(0)
-			} else {
-				tree.bytes += info.size
+			native_charge_size(name, info.size, limits, mut tree)
+		}
+		.symbolic_link {
+			parts := rel.split('/')
+			if limits.compiler_scratch_lto == '' || !limits.compiler_scratch_lto.starts_with('/')
+				|| parts.len != 2 || parts[1] != 'libLTO.dylib' || !parts[0].starts_with('ld-support-') {
+				return error('capture state contains a link or unsupported type: ' + rel)
 			}
-			if tree.bytes > limits.total_bytes { tree.limited = true }
-			mut cap := limits.file_bytes
-			if name == 'serial.log' {
-				cap = limits.serial_bytes
-			} else if name.ends_with('.log') {
-				cap = limits.log_bytes
+			suffix := parts[0].all_after('ld-support-')
+			if suffix == '' || !suffix.bytes().all(it >= `0` && it <= `9`) {
+				return error('unexpected compiler scratch link directory: ' + rel)
 			}
-			if info.size >= cap { tree.limited = true }
+			target := os.readlink(path) or {
+				if err.code() == C.ENOENT { return }
+				return err
+			}
+			if target != limits.compiler_scratch_lto {
+				return error('compiler scratch link target differs: ' + rel)
+			}
+			native_charge_size(name, u64(target.len), limits, mut tree)
 		}
 		.socket {
 			if rel != 'boot/qmp.sock' { return error('unexpected state socket') }
 		}
 		else { return error('capture state contains a link or unsupported type: ' + rel) }
 	}
+}
+
+fn native_charge_size(name string, size u64, limits NativeLimits, mut tree NativeTree) {
+	if tree.bytes > (~u64(0)) - size { tree.bytes = ~u64(0) } else { tree.bytes += size }
+	if tree.bytes > limits.total_bytes { tree.limited = true }
+	cap := if name == 'serial.log' { limits.serial_bytes }
+		else if name.ends_with('.log') { limits.log_bytes } else { limits.file_bytes }
+	if size >= cap { tree.limited = true }
 }
 
 pub fn native_state_bytes(directory string) !u64 {
