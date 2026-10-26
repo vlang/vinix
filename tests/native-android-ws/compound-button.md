@@ -52,3 +52,27 @@ Recheck sources, binaries and logs are retained at
 its `sha256.json` SHA256 is
 `60dbc2177fd2cc5f4068489b4a7b00cfc8f8cb867958ce2e4b6cb20f5baa0937`.
 The historical bundle and its checksums remain unchanged.
+
+On 2026-10-26 the expanded directory was returned to cold storage using
+`compound247-cold-cleanup.v`. The existing archive above was not changed. Its
+checksum was verified before and after a fresh sparse extraction; the unchanged
+assertion-enabled auditor passed both the original and restored complete bundles.
+Both trees were scanned twice and matched across 5,339 typed entries, including file hashes,
+directory and root modes, and symlink targets. Only then were the original
+expanded directory and temporary restore removed. Restore the complete archive
+before running the audit command above:
+
+```sh
+tar -xSzpf /Users/alex/.local/state/vinix/android/compound247-2026-10-24.tar.gz \
+  -C /Users/alex/.local/state/vinix/android
+```
+
+Consumed source/executable, auditor source/executable, exact command arguments,
+exit codes, logs, reader identity, typed inventory and receipts are retained in
+`/Users/alex/.local/state/vinix/android/compound247-cold-cleanup-2026-10-26`.
+Its complete sidecar manifest SHA256 is
+`2d04494d48a671c32b372ccd4fae6b9dafc246e7218e96e396f02fba43d5bb19`.
+The cleanup source SHA256 is
+`521c6d597490f1ce70afaa4819f3bb421797ff02cb9bbc7322098c524c0c1a87`.
+Cleanup ran 00:36:19–00:36:28 UTC, exit 0; available space changed from
+1,247,132 to 1,625,172 KiB, a 378,040 KiB increase amid concurrent work.
