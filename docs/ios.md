@@ -327,9 +327,20 @@ A further probe captures native Linux ARM64 fault context after verifying a
 real protection fault and signal-handler restoration. The guest PC maps to
 preferred Mach-O address `0x10489b4e4`: the application deliberately writes
 123 to address 3 in a routine containing an allocation-failure message.
-The enforced 2 GiB group again records no OOM event. The failed allocation's
-size, alignment and cause remain unknown; startup is still incomplete.
+The enforced 2 GiB group again records no OOM event. That run did not establish
+the failed allocation's size, alignment or cause; startup remained incomplete.
 See the [native fault checkpoint](../tests/ios/probe-fault-checkpoint-20261026.md).
+
+A VM trace then identifies a failed 24 GiB anonymous reservation with Darwin
+VM accounting tag `0xf1`: the Linux bridge forwards the tag as a file descriptor
+and the guest returns `EBADF`. The bridge now normalizes anonymous accounting
+tags to native descriptor -1 and offset zero. Host sanitizer and ARM64 guest
+regressions pass; the diagnostic application launch reserves that virtual range
+successfully and proceeds to `unsupported block capture disposal`, exiting with
+status 1 and no cgroup OOM event. Reserving the range does not commit 24 GiB of
+physical memory. Initializer completion, application entry, rendering, login and
+gameplay remain unverified. See the
+[VM reservation checkpoint](../tests/ios/probe-vm-checkpoint-20261026.md).
 
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
