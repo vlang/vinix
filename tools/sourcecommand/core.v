@@ -158,6 +158,13 @@ pub fn capture_owned(argv []string, env map[string]string, timeout f64, limit in
 	return capture_policy(argv, env, timeout, limit, cancel, observe, spawned, context, shutdown_grace, false, false, '', '', false, '')
 }
 
+// One bounded pipe preserves stdout/stderr ordering while an owner observes
+// the reserved child identity. A directory uses SDK file actions, not a shell.
+pub fn capture_combined_owned(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
+	observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64, directory string) !Output {
+	return capture_policy(argv, env, timeout, limit, cancel, observe, spawned, context, shutdown_grace, true, false, '', '', false, directory)
+}
+
 fn capture_policy(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
 	observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64, combined bool, inherited bool, executable string, log string, append bool, directory string) !Output {
 	return capture_policy_arch(argv, env, timeout, limit, cancel, observe, spawned, context, shutdown_grace, combined, inherited, executable, log, append, directory, '', false)
