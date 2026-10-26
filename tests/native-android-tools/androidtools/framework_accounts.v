@@ -132,6 +132,7 @@ fn framework_account_listeners(smali string) ! {
  text += '\n.method public getAccountsByTypeForPackage(Ljava/lang/String;Ljava/lang/String;)[Landroid/accounts/Account;\n.locals 1\n' +
   'invoke-virtual {p0, p1}, Landroid/accounts/AccountManager;->getAccountsByType(Ljava/lang/String;)[Landroid/accounts/Account;\n' +
   'move-result-object v0\nreturn-object v0\n.end method\n'
+ text = framework_account_store(text)!
  os.write_file(path, text)!
  os.write_file(smali + '/android/atl/VinixAccountUpdate.smali',
   '.class public final Landroid/atl/VinixAccountUpdate;\n.super Ljava/lang/Object;\n.implements Ljava/lang/Runnable;\n' +
