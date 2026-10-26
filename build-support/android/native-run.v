@@ -30,7 +30,7 @@ fn main() {
 fn run() ! {
 	root := os.getenv_opt('VINIX_ANDROID_ROOT') or { '/opt/vinix-android-aarch64' }
 	if os.args.len == 2 && os.args[1] == '--help' {
-		println('Service mode optionally accepts --authenticator-socket ABS after --service-fd N; the dedicated root-peer channel connects after the app identity drop.')
+		println('Service mode accepts --authenticator-socket ABS and --ui-fd N after --service-fd N; account commands and UI control use separate root-peer channels.')
 		println('usage: run-android APK [-l ACTIVITY] [-w WIDTH -h HEIGHT]\nRequires an inherited Vinix WS surface and input pipe.\nHeadless service host: run-android APK --service-fd N; requires a live root Unix peer,\nroot-provisioned account registry and explicit Unix credentials.\nOptional root-only Unix identity: VINIX_ANDROID_UID/GID=10000..19999,\nANDROID_APP_DATA_DIR and VINIX_ANDROID_HOME must name prepared target-owned directories.')
 		return
 	}
@@ -41,22 +41,13 @@ fn run() ! {
 	mut at := 2
 	mut service_fd := -1
 	mut authenticator_socket := ''
+	mut ui_fd := -1
+	defer { if ui_fd >= 3 { C.close(i32(ui_fd)) } }
 	if os.args.len >= 3 && os.args[2] == '--service-fd' {
-		if os.args.len != 4 && os.args.len != 6 {
-			return error('service host requires APK --service-fd N [--authenticator-socket ABS]')
-		}
-		value := os.args[3]
-		if value.len == 0 || value.len > 10 || !value.bytes().all(it >= `0` && it <= `9`)
-			|| value.u64() < 3 || value.u64() > 0x7fffffff {
-			return error('invalid service control descriptor')
-		}
-		service_fd = value.int()
-		if os.args.len == 6 {
-			if os.args[4] != '--authenticator-socket' || os.args[5] == '' {
-				return error('unsupported service command channel option')
-			}
-			authenticator_socket = os.args[5]
-		}
+		options := nativeaccountauth.parse_service_options(os.args[2..])!
+		service_fd = options.lifetime_fd
+		authenticator_socket = options.authenticator_socket
+		ui_fd = options.ui_fd
 		at = os.args.len
 	}
 	for at < os.args.len {
@@ -102,6 +93,7 @@ fn run() ! {
 			return error('service host requires a protected registry and explicit Unix credentials')
 		}
 		nativeaccountauth.inherit_root_channel(service_fd)!
+		if ui_fd >= 3 { nativeaccountauth.protect_ui_channel(ui_fd)! }
 		identity.activate_headless(apk, root)!
 	} else {
 		identity.activate(apk, root, os.getenv('VINIX_SURFACE_PATH'))!
@@ -145,6 +137,10 @@ fn run() ! {
 	if authenticator_fd >= 3 {
 		nativeaccountauth.inherit_root_channel(authenticator_fd)!
 		arguments << ['--authenticator-fd', authenticator_fd.str()]
+	}
+	if ui_fd >= 3 {
+		nativeaccountauth.inherit_ui_channel(ui_fd)!
+		arguments << ['--ui-fd', ui_fd.str()]
 	}
 	os.execvp(root + '/lib/ld-musl-aarch64.so.1', arguments)!
 }
