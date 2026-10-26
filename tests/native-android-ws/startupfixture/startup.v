@@ -29,6 +29,7 @@ pub fn install(output string, resources string) ! {
  install_character_style_probe(dir)!
  install_service_binding_probe(dir)!
  install_service_stop_probe(dir)!
+ install_bundle_parcel_probe(dir)!
  install_static_layout_probe(dir)!
  install_shadow_color_probe(dir)!
  install_view_configuration_probe(dir)!
@@ -135,6 +136,7 @@ throw v0
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->accessibility(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/ServiceBindingProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/ServiceStopProbe;->check(Landroid/content/Context;)V
+invoke-static {}, Lorg/vinix/bootstrap/BundleParcelProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->appops(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/StartupProbe;->uriPermissions(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/IoProbe;->check(Landroid/content/Context;)V
