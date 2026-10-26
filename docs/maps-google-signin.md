@@ -41,9 +41,11 @@ These are working firmware variables, not the historical prelaunch image.
 The native account backend supplies empty account snapshots and update
 listeners. It has no authenticator broker, account storage, token issuance or
 refresh path. The installed Play Services APK declares a `com.google`
-authenticator service, but the framework lacks its authenticator Binder APIs
-and dispatch path. Companion service support does not supply companion activity
-context and package-aware result routing.
+authenticator service. The response Binder API passes its ART regression. The
+request Binder API and Account Parcelable are implemented and pass host assembly
+checks; their ART validation is pending. The authenticator base class and trusted
+dispatch path remain incomplete. Explicit companion activity routing and
+finish-time result delivery have a maintained three-APK regression fixture.
 
 The installed Play Services APK's `BrowserSignInChimeraActivity` constructs a
 `CustomWebView`, installs WebView clients, enables JavaScript and loads its login
@@ -55,6 +57,14 @@ Real login requires those activity, WebView and authenticator paths, plus an
 explicit caller/permission model: APKs currently share an ART VM and Unix
 identity. Failed futures and empty account stores must not be reported as login
 success.
+
+The installed GMS authenticator is enabled but not exported. Its Chimera
+implementation extends `AbstractAccountAuthenticator`, which is absent from the
+current framework. All companion APKs currently receive the process UID;
+`getPackageUid` and signature checks do not yet establish package authority.
+Forwarding caller-supplied package/UID options to this private service would not
+provide a trusted broker. These gaps must be repaired before forwarding real
+account requests.
 
 ## Credential logging repair
 
@@ -168,6 +178,37 @@ Full read-back verified all 108 files; `sha256.json` digest:
 `47acb203d9e1fe5242729a23e91581d77193ac68f567cdb3ba70747dab9645ea`.
 
 ## Retained evidence
+
+The response fixture originally failed because `Intent.CREATOR` was absent.
+Commits `b974ca1a9` and `8960e11c3` implement the modeled Intent parcel contract
+and its maintained regression fixture. Re-running the unchanged response APK
+now passes the exact `AUTHENTICATOR-RESPONSE-PASS` marker and ten further seconds
+without a fixture failure or APK exit. This includes an Intent carrying the
+response Binder, null results, remote and runtime exceptions, and parcel cleanup.
+The genuine `authenticator-response-pass.png` shows the passing fixture.
+
+The stopped passing guest is retained at
+`/Users/alex/.local/state/vinix/android/account-contract-response-intent-art-2026-10-26`.
+Full read-back verified 103 files; `sha256.json` digest:
+`ce5f3d7f96e5b4bdd6591f9bdff50dd40a3d19e3d79016b8a74b6cb6b157f5ee`.
+The framework JAR digest is
+`5672bcde9890eb2c86f4a1dab5b2e6ffdd0695f27f86039d787a7ee4810cb5ea`.
+The tested response APK digest is
+`9fad77d5bb8450a1fe2c2158f100d9a6e5b2febadacfeed90c6de885807610f2`.
+The bundle retains the actual historical runner source from commit `9610e8d42`
+alongside the checkout source observed during preparation. This is a synthetic
+Binder/Parcelable contract test, not Google authentication.
+
+The first companion activity ART run failed before a companion APK loaded:
+the runner installed APKs under the default home directory, while this guest
+uses `ANDROID_APP_DATA_DIR=/tmp/maps256-data`. The first private-activity check
+therefore received `ActivityNotFoundException` instead of `SecurityException`.
+Preserve that failed run at
+`/Users/alex/.local/state/vinix/android/account-contract-companion-art-2026-10-26`.
+Full read-back verified 168 files; `sha256.json` digest:
+`c011a9bb0b6d0ce5d14c679e12007c9e992aa542c8e1ad32306eed3312939692`.
+It contains the three original signed APKs, build receipts, complete serial log,
+genuine failed-screen PNG and historical runner source from `94c1b9d2b`.
 
 The stopped diagnostic is outside Git at
 `/Users/alex/.local/state/vinix/android/maps-signin-probe-2026-10-26`.
