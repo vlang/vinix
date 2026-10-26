@@ -4,8 +4,8 @@ The fixed native02 and ARM03 helpers preserve two failed Launch options fixture
 attempts. They establish no native acceptance. Source preparation is based on
 `17c1a196180acf2a5a1ae7580d219124aaf980f1`; all results remain under
 `/Users/alex/.cache/vinix-package-hosted-launch-options-guest-20261026-a`.
-The native02 recovery completed under its separately authorized storage lane.
-ARM03 recovery remains pending; its helper has only host build qualification.
+Both fixed recoveries completed under separately authorized, sequential storage
+lanes. Their failed native fixture outcomes remain unqualified.
 
 Each helper requires its exact image and serial failure, copies all five
 controller siblings into the archive, and admits only regular files, literal
@@ -92,3 +92,24 @@ process group, and actual leader reaping plus group absence. Its 479 actual
 observed archive size was 199,299,827 bytes, below the 210 MiB cap. A subsequent
 independent `df` read showed 1,392,332 KiB free. These observations do not
 attribute concurrent filesystem changes or promise continuous storage bounds.
+
+ARM03 subsequently passed the same original/strict/original and final identity
+gates, including unchanged native02 completion/archive/manifest/sidecar bindings.
+Its 158,582,576-byte archive authenticated 1,192 entries: 1,184 regular payloads
+and eight literal symlinks, with 474,400,768 decoded bytes. The exact child-ready
+timeout, controller siblings and external inputs remain preserved; only the
+fixed expanded ARM03 tree was removed.
+
+| ARM03 retained artifact | SHA256 |
+| --- | --- |
+| `native-aarch64-03.tar.gz` | `53b95f8a71256cb87376c094ff1da3490745ad26c28d461b5d6fa4df63226cd5` |
+| `native-aarch64-03.bundle.sha256` | `6d6bd10900e94559435b6c94a5187aebccb08ee0dbbb53334406e66ff9a88b68` |
+| `native-aarch64-03-stream-reclaim-01.json` | `da7905c57b1a68a7ad5c6a2ee96df5875753e76420e29baa6e4057adb0f1a03e` |
+| `native-aarch64-03-supervision-01.json` | `d02480b91a1436071d23e0d8bf809d038a65e0665baea8a0aec36bb37fb2f1d3` |
+
+ARM03 supervision finished with exit0, no guard refusal and confirmed process
+group cleanup. Its 465 actual `df` samples began at 1,253,456 KiB available,
+reached a minimum of 1,034,148 KiB and ended at 1,593,756 KiB after about
+104 seconds. The maximum observed archive size was 158,582,576 bytes. A later
+independent `df` read showed 2,210,148 KiB free. Both recovery helpers and the
+supervisor retained their exact qualified source and executable hashes.
