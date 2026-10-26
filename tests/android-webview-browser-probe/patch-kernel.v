@@ -24,7 +24,7 @@ const protected_base = '/Users/alex/.local/state/vinix/android/maps-account-r5'
 const protected_base_seal = '9a8bf61bd526d7ec020d45920367d45e90a2ef4692c6d8fa8b87de801a14c5ca'
 const protected_boot_sha = 'a37afb3aaaaac0261562df47b6f213bf0ef47eaaa9165d721cb4e097ce35ed70'
 const protected_framework_seal = '67e1cb450fa87305c99480133084b7f9cb684feeeaa2e0c3efa3007ab43ee938'
-const protected_native_seal = 'bd0e3902130f74877abaf269301377c7b5d2cbfe9e7732508838d84ec863d19d'
+const protected_native_seal = 'a62bf4a8a4ef8d1c000f82395ec64b145c9c4d6df25f12077f75d96d341e0a20'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -81,7 +81,7 @@ fn verify_protected_receipt(receipt map[string]json2.Any, stage Stage) ! {
 	for path, expected in {
 		protected_base + '/sha256.json': protected_base_seal
 		'/Users/alex/.local/state/vinix/android/combined-account-webview-protected-storage-framework-2026-10-27-r2/sha256.json': protected_framework_seal
-		'/Users/alex/.local/state/vinix/android/current-native-build-2026-10-27-binding-r2/sha256.json': protected_native_seal
+		'/Users/alex/.local/state/vinix/android/current-native-build-2026-10-27-startup-r1/sha256.json': protected_native_seal
 	} {
 		if stage.inputs_sha256[path] or { '' } != expected {
 			return error('protected Maps input differs: ' + path)
@@ -695,16 +695,16 @@ fn protected_profile_self_test() ! {
 		inputs_sha256: {
 			protected_base + '/sha256.json': protected_base_seal
 			'/Users/alex/.local/state/vinix/android/combined-account-webview-protected-storage-framework-2026-10-27-r2/sha256.json': protected_framework_seal
-			'/Users/alex/.local/state/vinix/android/current-native-build-2026-10-27-binding-r2/sha256.json': protected_native_seal
+			'/Users/alex/.local/state/vinix/android/current-native-build-2026-10-27-startup-r1/sha256.json': protected_native_seal
 		}
 		original_modules_sha256: protected_modules()
 		preserved_modules_sha256: protected_modules()
 	}
 	receipt := protected_receipt_fixture()
 	verify_protected_receipt(receipt, stage)!
-	old_native_seal := '894c9657077cdd913a2c66c1cf78358daaccc4da8b0739ed77bb2a3dbea1b4ee'
-	native_path := '/Users/alex/.local/state/vinix/android/current-native-build-2026-10-27-binding-r2/sha256.json'
-	old_native_path := '/Users/alex/.local/state/vinix/android/current-native-build-2026-10-27-protected-r1/sha256.json'
+	old_native_seal := 'bd0e3902130f74877abaf269301377c7b5d2cbfe9e7732508838d84ec863d19d'
+	native_path := '/Users/alex/.local/state/vinix/android/current-native-build-2026-10-27-startup-r1/sha256.json'
+	old_native_path := '/Users/alex/.local/state/vinix/android/current-native-build-2026-10-27-binding-r2/sha256.json'
 	mut old_receipt := protected_receipt_fixture()
 	old_receipt['native_manifest_sha256'] = json2.Any(old_native_seal)
 	if _ := verify_protected_receipt(old_receipt, stage) {
