@@ -81,8 +81,21 @@ attempt retained a configuration-symlink overlay failure. None is an accepted ru
 
 ## Reproduction and evidence
 
-The complete external tree is
-`/Users/alex/Library/Caches/vinix-codex/section14/package-release-routing-native-20261026`.
+The complete evidence is retained in the archive identified below. The expanded
+tree was reclaimed on 2026-10-26 after fresh original inventory checks before and
+after an independent full archive stream check. All 27,415 regular payloads and
+11,961 literal symlinks matched the original manifest; gzip integrity and the
+reviewed source, tool, control and retained dependency pins also passed. The
+historical manifest does not authenticate directory metadata. Historical
+checkers still require extracting the complete archive into a fresh directory.
+Reclamation source, binary, manifest, reader, control receipts, argv and logs are
+retained under
+`/Users/alex/Library/Caches/vinix-codex/section14/integration-20261026/routing-reclamation-01`;
+its `completed.json` SHA-256 is
+`ac6e2754e529c76bd8d8ec84baa7088d75eff50a038165a4996e8883d502a669`.
+The archive and retained perf desktop, sealer and audio inputs were verified again
+after removal.
+
 Accepted runs are `run-aarch64-06` and `run-x86_64-06`; the maintained fixture
 starts from repository revision `47c4f29f67968f6fda20400ddad6e7433a851f6e`
 with the separately recorded six-source compositor prerequisites. Final source
@@ -110,8 +123,9 @@ the complete `bundle.sha256` inventory digest is
 `94d603c2e43cff1b9a9c9f86d2dc3c631b60181d0c5d5c363994de4291db4174`.
 The maintained sealer exited zero after matching the full inventory before and
 after archiving. Its command used `COPYFILE_DISABLE=1` with
-`software-release-routing-bundle seal ROOT ROOT.tar.gz`, where `ROOT` is the
-complete external tree above. The first seal was stopped before producing a
+`software-release-routing-bundle seal ROOT ROOT.tar.gz`, where `ROOT` was
+`/Users/alex/Library/Caches/vinix-codex/section14/package-release-routing-native-20261026`.
+The first seal was stopped before producing a
 manifest while the maintained receipt producer was added; its attempt receipt
 is retained. The accepted seal was paused before archiving for disk-space
 coordination and resumed without changing evidence. The archive freezes the
@@ -143,7 +157,7 @@ software-release-routing-receipts /evidence /matching/worktree /evidence/final-r
 
 Build controller, retainer and evidence checker with `-prod -enable-globals` and
 the existing repository/tool/hardware-platform module paths. Repeat with the x86
-inputs and new output directories. The external tree retains the literal tool
+inputs and new output directories. The archive retains the literal tool
 invocations, maintained source snapshots, generated guests, original publishers,
 full supplemental build, kernels, disk images and failed attempts.
 
