@@ -3,11 +3,23 @@ module androidtools
 
 import os
 
+// The inherited ATL implementation prints the supplied password and userdata
+// before returning false. Until an authenticator and account store exist,
+// reject insertion without inspecting any caller-supplied account data.
+pub fn framework_account_addition(source string) !string {
+ return framework_replace_method(source, 'addAccountExplicitly(Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;)Z',
+  '.method public addAccountExplicitly(Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;)Z\n.locals 2\n' +
+  'new-instance v0, Ljava/lang/UnsupportedOperationException;\n' +
+  'const-string v1, "Android account storage and authenticators are unavailable"\n' +
+  'invoke-direct {v0, v1}, Ljava/lang/UnsupportedOperationException;-><init>(Ljava/lang/String;)V\n' +
+  'throw v0\n.end method')!
+}
+
 fn framework_account_listeners(smali string) ! {
  os.write_file(smali + '/android/accounts/OnAccountsUpdateListener.smali',
   interface_class('android/accounts/OnAccountsUpdateListener', ['onAccountsUpdated([Landroid/accounts/Account;)V']))!
  path := smali + '/android/accounts/AccountManager.smali'
- mut text := os.read_file(path)! + '\n.field private static vinixInstance:Landroid/accounts/AccountManager;\n' +
+ mut text := framework_account_addition(os.read_file(path)!)! + '\n.field private static vinixInstance:Landroid/accounts/AccountManager;\n' +
   '.field private vinixListeners:Ljava/util/HashMap;\n'
  text = framework_replace_method(text, '<init>()V',
   '.method public constructor <init>()V\n.locals 1\ninvoke-direct {p0}, Ljava/lang/Object;-><init>()V\n' +
