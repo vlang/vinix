@@ -14,6 +14,20 @@ fn main() {
  assert androidtools.framework_authenticator_base_class_names() == names
  assert classes.len == 3
  base, transport, worker := classes[names[0]], classes[names[1]], classes[names[2]]
+ // The transport's exception mapping must resolve its concrete exception
+ // classes on ART, even when the authenticator returns an ordinary result.
+ exceptions := androidtools.framework_account_async_classes()
+ for name in ['AccountsException', 'AuthenticatorException', 'OperationCanceledException', 'NetworkErrorException'] {
+  key := 'android/accounts/' + name
+  assert key in exceptions, key
+  source := exceptions[key]
+  parent := if name == 'AccountsException' { 'Ljava/lang/Exception;' } else { 'Landroid/accounts/AccountsException;' }
+  assert source.contains('.super ' + parent), key
+  assert source.count('.method public constructor <init>(') == 4, key
+  for signature in ['', 'Ljava/lang/String;', 'Ljava/lang/Throwable;', 'Ljava/lang/String;Ljava/lang/Throwable;'] {
+   assert source.contains('<init>(' + signature + ')V'), key
+  }
+ }
  for name in names {
   source := classes[name]
   assert source.count('.method ') == source.count('.end method'), name
@@ -40,6 +54,9 @@ fn main() {
   os.mkdir_all(work + '/smali/android/accounts')!
   defer { os.rmdir_all(work) or {} }
   for name, source in classes { os.write_file(work + '/smali/' + name + '.smali', source)! }
+  for name, source in exceptions {
+   if name.starts_with('android/accounts/') { os.write_file(work + '/smali/' + name + '.smali', source)! }
+  }
   androidtools.framework_assemble(work + '/smali', work + '/classes.dex', os.real_path(os.args[1]), os.args[2])!
   assert os.read_bytes(work + '/classes.dex')!.len > 112
   println('ANDROID-AUTHENTICATOR-BASE-ASSEMBLY-PASS three base classes produce DEX')

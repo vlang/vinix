@@ -33,7 +33,7 @@ pub fn framework_account_async_classes() map[string]string {
   'android/accounts/AccountManagerCallback': interface_class('android/accounts/AccountManagerCallback', ['run(Landroid/accounts/AccountManagerFuture;)V'])
   'android/accounts/AccountManagerFuture': interface_class('android/accounts/AccountManagerFuture', ['cancel(Z)Z', 'isCancelled()Z', 'isDone()Z', 'getResult()Ljava/lang/Object;', 'getResult(JLjava/util/concurrent/TimeUnit;)Ljava/lang/Object;'])
  }
- for name in ['AccountsException', 'AuthenticatorException', 'OperationCanceledException'] {
+ for name in ['AccountsException', 'AuthenticatorException', 'OperationCanceledException', 'NetworkErrorException'] {
   parent := if name == 'AccountsException' { 'Ljava/lang/Exception;' } else { 'Landroid/accounts/AccountsException;' }
   mut text := '.class public Landroid/accounts/' + name + ';\n.super ' + parent + '\n'
   for signature in ['', 'Ljava/lang/String;', 'Ljava/lang/Throwable;', 'Ljava/lang/String;Ljava/lang/Throwable;'] {
