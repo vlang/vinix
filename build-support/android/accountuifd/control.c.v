@@ -334,15 +334,13 @@ pub fn (mut c Controller) begin(session u64, capability []u8) ! {
 }
 
 fn (c &Controller) start_helper(surface int, input int, lifetime int) !int {
-	args := [c.config.helper, '--surface-fd', surface.str(), '--input-fd', input.str(), '--lifetime-fd',
-		lifetime.str(), '--window-socket', c.config.window_socket]
+	args := [c.config.helper.clone(), '--surface-fd', surface.str(), '--input-fd', input.str(), '--lifetime-fd',
+		lifetime.str(), '--window-socket', c.config.window_socket.clone()]
 	mut argv := []&char{cap: args.len + 1}
 	defer {
 		unsafe {
 			argv.free()
-			args[2].free()
-			args[4].free()
-			args[6].free()
+			// []string.free() releases every owned argument, including fd strings.
 			args.free()
 		}
 	}
