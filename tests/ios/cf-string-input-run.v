@@ -27,9 +27,41 @@ fn capture(out string, label string, args []string) ! {
 	println(label + ': PASS')
 }
 
+fn audit(root string, out string, v string, revision string, observation_phase string) ! {
+	if revision.len != 40 || revision.bytes().any(!it.is_hex_digit())
+		|| observation_phase !in ['trace', 'fixed'] { return error('audit requires a full source revision and trace|fixed') }
+	audit_head := os.exec(['git', 'rev-parse', 'HEAD'])
+	if audit_head.exit_code != 0 { return error(audit_head.output) }
+	audit_revision := audit_head.output.trim_space()
+	os.write_file(out + '/audit-revision.txt', audit_revision + '\n')!
+	os.write_file(out + '/observation-phase.txt', observation_phase + '\n')!
+	for name in ['compiled-storyboard-input-inventory', 'cf-string-input-evidence', 'cf-string-input-run'] {
+		path := 'tests/ios/' + name + '.v'
+		source := os.exec(['git', 'show', audit_revision + ':' + path])
+		if source.exit_code != 0 { return error(source.output) }
+		target := out + '/audit-source/' + path
+		os.mkdir_all(os.dir(target))!
+		os.write_file(target, source.output)!
+		binary := if name == 'compiled-storyboard-input-inventory' { 'audit-inventory-inputs' } else { name }
+		label := if name == 'compiled-storyboard-input-inventory' { 'audit-inventory-build' }
+			else if name == 'cf-string-input-evidence' { 'audit-checker-build' } else { 'audit-driver-build' }
+		capture(out, label, [v, '-nocache', '-gc', 'none', '-cc', 'clang', '-cflags', '-O2',
+			'-o', out + '/' + binary, target])!
+	}
+	capture(out, 'audit-inventory', [out + '/audit-inventory-inputs', root, out, revision])!
+	os.mkdir_all(out + '/native')!
+	capture(out, 'native-build', [v, '-nocache', '-gc', 'none', '-cc', 'clang', '-cflags', '-O2',
+		'-o', out + '/native/inspect-cf-string-input', out + '/source/tests/ios/inspect-cf-string-input.v'])!
+	capture(out, 'native-run', [out + '/native/inspect-cf-string-input', out + '/native'])!
+	if observation_phase == 'trace'
+		&& os.read_file(out + '/native/native-input.txt')! != os.read_file(out + '/native-input.txt')! {
+		return error('original native oracle changed')
+	}
+}
+
 fn main() {
-	if os.args.len < 3 || os.args[1] !in ['prepare', 'fixture', 'build', 'probe', 'host'] {
-		panic('usage: cf-string-input-run prepare OUT PRIOR | fixture|build|probe|host OUT')
+	if os.args.len < 3 || os.args[1] !in ['prepare', 'fixture', 'build', 'probe', 'host', 'audit'] {
+		panic('usage: cf-string-input-run prepare OUT PRIOR | fixture|build|probe|host OUT | audit OUT REVISION trace|fixed')
 	}
 	root := os.real_path(os.getwd())
 	out := os.abs_path(os.args[2])
@@ -45,7 +77,10 @@ fn main() {
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0:halt_on_error=1', true)
 	os.setenv('UBSAN_OPTIONS', 'halt_on_error=1', true)
 	v := root + '/build/ios/fortnite/ns-calendar-checks/toolchain/v'
-	if os.args[1] == 'prepare' {
+	if os.args[1] == 'audit' {
+		if os.args.len != 5 { panic('audit requires source revision and trace|fixed') }
+		audit(root, out, v, os.args[3], os.args[4])!
+	} else if os.args[1] == 'prepare' {
 		if os.args.len != 4 { panic('prepare requires the prior desktop bundle') }
 		if os.exists(out + '/prior-manifest.sha256') { panic('already prepared') }
 		prior := os.real_path(os.args[3])
