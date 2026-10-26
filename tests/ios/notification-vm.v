@@ -214,6 +214,11 @@ fn vm(root string, out string, mode string) {
 	if desktop !in ['', '1'] || (desktop == '1' && mode != 'probe-no-ads') {
 		panic('VINIX_IOS_PROBE_DESKTOP=1 requires probe-no-ads')
 	}
+	cooked := os.getenv('VINIX_IOS_COOKED_BUNDLE')
+	if cooked != '' && (mode != 'probe-no-ads' || !os.is_file(cooked + '/uecommandline.txt')
+		|| !os.is_dir(cooked + '/cookeddata')) {
+		panic('VINIX_IOS_COOKED_BUNDLE requires probe-no-ads and an extracted cooked bundle')
+	}
 	mut budget := ''
 	if configured := os.getenv_opt('VINIX_IOS_PROBE_MEMORY_MAX') {
 		if mode != 'probe-no-ads' { panic('VINIX_IOS_PROBE_MEMORY_MAX requires probe-no-ads') }
@@ -446,6 +451,12 @@ fn vm(root string, out string, mode string) {
 		tree(root + '/build/ios/fortnite/local/Payload/FortniteClient-IOS-Shipping.app/Frameworks', fs + '/opt/ios/Frameworks')
 		copy_file(out + '/' + if mode == 'static-audit' { 'run-ios' } else { 'run-ios-gles' }, fs + '/opt/ios/run-ios')
 		if mode == 'probe-no-ads' {
+			// Keep full cooked game content opt-in: historical checkpoints only
+			// supplied the launch screen. Paths are relative to NSBundle's root.
+			if cooked != '' {
+				copy_file(cooked + '/uecommandline.txt', fs + '/opt/ios/uecommandline.txt')
+				tree(cooked + '/cookeddata', fs + '/opt/ios/cookeddata')
+			}
 			// Opt-in resource overlay for the compiled launch-screen checkpoint.
 			// The preserved base archive and historical probes stay reproducible.
 			if bundle := os.getenv_opt('VINIX_IOS_STORYBOARD_BUNDLE') {
@@ -506,7 +517,11 @@ fn vm(root string, out string, mode string) {
 	// Release staged files once the complete archive is ready.
 	os.rmdir_all(fs) or { panic(err) }
 	disk := state + '/boot.img'
-	checked(['mkfile', '-n', '384m', disk])
+	// Cooked content can exceed the old fixed 384 MiB FAT image. Include
+	// filesystem overhead and the kernel; retain the old size for small probes.
+	archive_mb := (os.file_size(archive) + 1024 * 1024 - 1) / (1024 * 1024)
+	boot_mb := if archive_mb + 128 > 384 { ((archive_mb + 128 + 63) / 64) * 64 } else { u64(384) }
+	checked(['mkfile', '-n', boot_mb.str() + 'm', disk])
 	checked(['mformat', '-F', '-i', disk, '::'])
 	for path in ['::/EFI', '::/EFI/BOOT', '::/boot'] { checked(['mmd', '-i', disk, path]) }
 	conf := state + '/limine.conf'
@@ -523,7 +538,9 @@ fn vm(root string, out string, mode string) {
 	checked(['mkfile', '-n', '64m', vars])
 	log := state + '/serial.log'
 	mut p := os.new_process('/opt/homebrew/bin/qemu-system-aarch64')
-	p.set_args(['-machine', 'virt,gic-version=3', '-accel', 'hvf', '-cpu', 'host', '-m', '4096',
+	// The compressed module and unpacked initramfs coexist during boot.
+	guest_mb := if cooked != '' { '8192' } else { '4096' }
+	p.set_args(['-machine', 'virt,gic-version=3', '-accel', 'hvf', '-cpu', 'host', '-m', guest_mb,
 		'-smp', '4', '-device', 'ramfb', '-display', 'none', '-monitor', 'none', '-serial',
 		'file:' + log, '-drive',
 		'if=pflash,format=raw,readonly=on,file=/opt/homebrew/share/qemu/edk2-aarch64-code.fd',
