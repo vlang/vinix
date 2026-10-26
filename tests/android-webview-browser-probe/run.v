@@ -36,6 +36,12 @@ struct Execution {
 	stderr string
 }
 
+struct StopReceipt {
+	pid           int
+	signal        string
+	requested_utc string
+}
+
 fn hash(path string) !string {
 	mut file := os.open(path)!
 	defer { file.close() }
@@ -122,18 +128,41 @@ fn identity(pid int) !Ownership {
 	])!}
 }
 
-fn owned(root string) !Ownership {
+fn recorded_owner(root string) !Ownership {
 	recorded := json2.decode[Ownership](os.read_file(root + '/ownership.json')!)!
+	if recorded.pid <= 1 || recorded.started == '' || !recorded.command.starts_with(qemu + ' ')
+		|| !recorded.command.contains('unix:' + root + '/qmp.sock,server=on,wait=off')
+		|| !recorded.command.ends_with('-pidfile ' + root + '/qemu.pid') {
+		return error('invalid recorded guest ownership')
+	}
+	return recorded
+}
+
+// One ps snapshot avoids the command/start-time race when a process exits.
+// The immutable ownership receipt remains authoritative after QEMU unlinks its
+// transient pidfile; only an initial signal additionally requires that pidfile.
+fn process_gone(recorded Ownership) !bool {
+	if recorded.pid <= 1 { return error('invalid process ID') }
+	result := execute(['/bin/ps', '-ww', '-p', recorded.pid.str(), '-o', 'lstart=,command='])!
+	output := result.stdout.trim_space()
+	if result.code == 1 && output == '' && result.stderr.trim_space() == '' { return true }
+	if result.code != 0 {
+		return error('could not inspect guest process: ps exit ' + result.code.str())
+	}
+	if !output.starts_with(recorded.started + ' ')
+		|| output[recorded.started.len..].trim_space() != recorded.command {
+		return error('live process ownership differs; refusing signal or disappearance receipt')
+	}
+	return false
+}
+
+fn owned(root string) !Ownership {
+	recorded := recorded_owner(root)!
 	if strconv.atoi(os.read_file(root + '/qemu.pid')!.trim_space())! != recorded.pid {
 		return error('PID receipt differs')
 	}
-	current := identity(recorded.pid)!
-	if current != recorded || !current.command.starts_with(qemu + ' ')
-		|| !current.command.contains('unix:' + root + '/qmp.sock,server=on,wait=off')
-		|| !current.command.ends_with('-pidfile ' + root + '/qemu.pid') {
-		return error('live process ownership differs; refusing signal')
-	}
-	return current
+	if process_gone(recorded)! { return error('owned guest is no longer live') }
+	return recorded
 }
 
 fn write_json(path string, value json2.Any) ! {
@@ -194,32 +223,28 @@ fn start(root string) ! {
 }
 
 fn stopped(root string) !bool {
-	recorded := json2.decode[Ownership](os.read_file(root + '/ownership.json')!)!
-	result := execute(['/bin/ps', '-ww', '-p', recorded.pid.str(), '-o', 'command='])!
-	if result.code == 1 && result.stdout.trim_space() == '' { return true }
-	if result.code != 0 { return error('could not inspect guest process') }
-	owned(root)!
-	return false
+	return process_gone(recorded_owner(root)!)
 }
 
-fn stop(root string) ! {
-	if os.exists(root + '/stop.json') || os.is_link(root + '/stop.json') {
-		return error('stop already requested')
+fn reconcile_stop(root string) ! {
+	owner := recorded_owner(root)!
+	stop_receipt := json2.decode[StopReceipt](os.read_file(root + '/stop.json')!)!
+	if stop_receipt.pid != owner.pid || stop_receipt.signal != 'SIGTERM'
+		|| stop_receipt.requested_utc == '' {
+		return error('stop receipt differs from recorded guest')
 	}
-	owner := owned(root)!
-	if C.kill(owner.pid, C.SIGTERM) != 0 { return error('could not signal owned guest') }
-	write_json(root + '/stop.json', json2.decode[json2.Any](json2.encode({
-		'pid':           json2.Any(owner.pid)
-		'signal':        json2.Any('SIGTERM')
-		'requested_utc': json2.Any(time.utc().str())
-	}))!)!
+	if os.exists(root + '/gone.json') || os.is_link(root + '/gone.json') {
+		return error('disappearance receipt already exists')
+	}
 	deadline := time.sys_mono_now() + 5 * time.second
 	for {
 		if stopped(root)! {
 			write_json(root + '/gone.json', json2.decode[json2.Any](json2.encode({
-				'pid':         json2.Any(owner.pid)
-				'checked_utc': json2.Any(time.utc().str())
-				'check':       json2.Any('ps returned exit1 and empty command for recorded owned PID')
+				'pid':              json2.Any(owner.pid)
+				'checked_utc':      json2.Any(time.utc().str())
+				'check':            json2.Any('one ps snapshot returned exit1 with empty stdout and stderr for recorded owned PID')
+				'ownership_sha256': json2.Any(hash(root + '/ownership.json')!)
+				'stop_sha256':      json2.Any(hash(root + '/stop.json')!)
 			}))!)!
 			println('BROWSER-RUN STOPPED pid=' + owner.pid.str())
 			return
@@ -229,6 +254,20 @@ fn stop(root string) ! {
 		}
 		time.sleep(100 * time.millisecond)
 	}
+}
+
+fn stop(root string) ! {
+	if os.exists(root + '/stop.json') || os.is_link(root + '/stop.json') {
+		return error('stop already requested; reconcile-stop sends no additional signal')
+	}
+	owner := owned(root)!
+	if C.kill(owner.pid, C.SIGTERM) != 0 { return error('could not signal owned guest') }
+	write_json(root + '/stop.json', json2.decode[json2.Any](json2.encode(StopReceipt{
+		pid:           owner.pid
+		signal:        'SIGTERM'
+		requested_utc: time.utc().str()
+	}))!)!
+	reconcile_stop(root)!
 }
 
 fn self_test() ! {
@@ -241,6 +280,8 @@ fn self_test() ! {
 	output := execute([os.executable(), '--self-test-output'])!
 	assert output.code == 0 && output.stdout == 'o'.repeat(65536) + '\n'
 	assert output.stderr == 'e'.repeat(65536) + '\n'
+	failed := execute([os.executable(), '--self-test-exit'])!
+	assert failed.code == 7 && failed.stdout == '' && failed.stderr == ''
 	root := os.join_path(os.temp_dir(), 'vinix-browser-run-selftest-' + os.getpid().str())
 	if os.exists(root) || os.is_link(root) { return error('selftest output exists') }
 	os.mkdir(root)!
@@ -248,13 +289,54 @@ fn self_test() ! {
 	os.write_file(root + '/qemu.pid', os.getpid().str())!
 	write_json(root + '/ownership.json', json2.decode[json2.Any](json2.encode(identity(os.getpid())!))!)!
 	if _ := owned(root) { return error('non-QEMU process accepted as owned guest') }
-	println('BROWSER-RUN SELF-TEST PASS qmp-length external-directory unsafe-pid bounded-command complete-output foreign-owner')
+	mut child := os.new_process(os.executable())
+	child.set_args(['--self-test-child'])
+	child.run()
+	defer {
+		if child.is_alive() { child.signal_kill() }
+		child.wait()
+		child.close()
+	}
+	live := identity(child.pid)!
+	os.rm(root + '/qemu.pid')!
+	assert !process_gone(live)!
+	if _ := process_gone(Ownership{ pid: live.pid, started: live.started, command: live.command + ' changed' }) {
+		return error('changed live command accepted')
+	}
+	child.wait()
+	assert process_gone(live)!
+	missing := execute(['/bin/ps', '-ww', '-p', child.pid.str(), '-o', 'lstart=,command='])!
+	assert missing.code == 1 && missing.stdout.trim_space() == '' && missing.stderr.trim_space() == ''
+	assert !os.exists(root + '/qemu.pid')
+	os.rm(root + '/ownership.json')!
+	fake := Ownership{
+		pid:     child.pid
+		started: live.started
+		command: qemu + ' -qmp unix:' + root + '/qmp.sock,server=on,wait=off -pidfile ' + root + '/qemu.pid'
+	}
+	write_json(root + '/ownership.json', json2.decode[json2.Any](json2.encode(fake))!)!
+	assert stopped(root)!
+	if _ := reconcile_stop(root) { return error('missing stop receipt accepted') }
+	write_json(root + '/stop.json', json2.decode[json2.Any](json2.encode(StopReceipt{
+		pid:           child.pid
+		signal:        'SIGTERM'
+		requested_utc: time.utc().str()
+	}))!)!
+	reconcile_stop(root)!
+	assert os.is_file(root + '/gone.json')
+	if _ := reconcile_stop(root) { return error('existing disappearance receipt accepted') }
+	println('BROWSER-RUN SELF-TEST PASS qmp-length external-directory unsafe-pid bounded-command complete-output foreign-owner nonzero-exit live-without-pidfile reaped-child absent-ps reconcile-stop')
 }
 
 fn main() {
 	if os.args.len == 2 && os.args[1] == '--self-test-output' {
 		println('o'.repeat(65536))
 		eprintln('e'.repeat(65536))
+		return
+	}
+	if os.args.len == 2 && os.args[1] == '--self-test-exit' { exit(7) }
+	if os.args.len == 2 && os.args[1] == '--self-test-child' {
+		time.sleep(time.second)
 		return
 	}
 	if os.args.len == 2 && os.args[1] == '--self-test' {
@@ -264,8 +346,8 @@ fn main() {
 		}
 		return
 	}
-	if os.args.len != 3 || os.args[1] !in ['start', 'status', 'stop'] {
-		eprintln('usage: run start|status|stop STAGED_EXTERNAL_DIRECTORY')
+	if os.args.len != 3 || os.args[1] !in ['start', 'status', 'stop', 'reconcile-stop'] {
+		eprintln('usage: run start|status|stop|reconcile-stop STAGED_EXTERNAL_DIRECTORY')
 		exit(2)
 	}
 	root := canonical_root(os.args[2]) or {
@@ -285,6 +367,12 @@ fn main() {
 				exit(1)
 			}
 		}
+		'reconcile-stop' {
+			reconcile_stop(root) or {
+				eprintln(err.msg())
+				exit(1)
+			}
+		}
 		'status' {
 			gone := stopped(root) or {
 				eprintln(err.msg())
@@ -293,7 +381,7 @@ fn main() {
 			println(if gone {
 				'BROWSER-RUN STOPPED'
 			} else {
-				'BROWSER-RUN LIVE pid=' + owned(root) or {
+				'BROWSER-RUN LIVE pid=' + recorded_owner(root) or {
 					eprintln(err.msg())
 					exit(1)
 				}.pid.str()
