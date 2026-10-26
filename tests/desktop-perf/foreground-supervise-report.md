@@ -1,6 +1,95 @@
 # Foreground supervisor and adapter host qualification — 2026-10-26
 
-Latest PASS: `foreground-host10` qualifies the fixed, supervised prepare path
+Latest host PASS: `foreground-host14` qualifies the narrow charged-budget
+ceiling extension from 2 GiB to 4.5 GiB. The default stays 512 MiB; the
+2 GiB admission and 1 GiB continued free-space floors, process owner, live
+watcher and adapter are unchanged. Source SHA256 is
+`1d550994c511dcd83cfe1a0a6d293a20ce8d72558714ed695aa362605f2a3d2d`.
+Normal and production builds each passed the existing 24 controls, with
+actual outer status zero in 39.50 seconds and equal complete input maps
+`35c0d36efb386824affcf24abbc3c0f9fe39626af6fdd670eb64f002afce513b`.
+The production binary SHA256 is
+`ffd49d0425b4893bd2d134c3626140ddfc010c13b5e6b08d6d6e1d5274547248`.
+The qualification SHA256 is
+`3429c21fa8f93a67eced1095d43fedece2af61d5411d53db36440ecef3d05b2c`.
+
+Six limit controls passed: 524288, 2097152, 2097153 and 4718592 KiB
+were admitted at actual low usage; 524287 and 4718593 were refused.
+These controls do not allocate up to the accepted limits. The receipt
+`foreground-host14/limits01/result.json` has SHA256
+`3949f5321eb75855b55c3296e27fbe3aca31a64f2cc28d6a425eed19d4c7e82f`.
+The original full metadata inventory is
+`foreground-host14-seal01/complete/inventory.json`, SHA256
+`0a3cf0b82a3a1a2cbdafaeff58f80e7ca176ee2be253ea233c388b8078e37bc7`;
+a separate unchanged original check and an independent root invocation both
+passed with actual status zero. Worktree plus qualification
+occupied about 44 MiB, below its reviewed 512 MiB budget. No staging or
+guest execution occurred during this qualification.
+
+## Fresh baseline preparation
+
+PASS: `foreground-phase12` completed one baseline preparation with actual
+status zero in 22.88 seconds. The original refused baseline described below
+remains unchanged. A separately approved fresh frame-only build used frozen
+worktree HEAD `b262bf48f44b6cd1e9f3b73a7d8b0a079bc98943`, controller SHA256
+`20aa8efe95413e461a2cb95f1a0fd94331709fa79225029f334cc72103cc43dd`
+and bootstrap SHA256
+`39108da8f5726becc6e36bba74fbe2489f4a80ca2b4dba7353d69282080ad44b`.
+It completed with actual status zero in 156.22 seconds under its reviewed
+512 MiB inclusive worktree/build budget and 900/1100-second build/outer
+bounds. Equal complete source maps have SHA256
+`3f73b192d63460a827f0dcafce95521f4cd7dae847c310d0c3857b9715c61dd1`.
+
+The new authority is
+`/Users/alex/Library/Caches/vinix-codex/section14/frame-peer-baseline-device33-20261026/`.
+Its original complete metadata manifest, under the adjacent
+`frame-peer-baseline-device33-20261026-seal-01/complete/inventory.json`, has
+SHA256 `b826fe4f36b1599c3bbb31c3d5749cae3e32b6944f2220f20ea14d60672b8fe9`.
+Two independent invocations of the unchanged original checker passed.
+Qualification SHA256 is
+`82b27fdc3cfb948db51dd88c9169a1a2031dc6f3bb6ac622575dd166ba041a9a`;
+x86 ELF SHA256 is
+`ca807b0d800c4f5ff13b8ca1e12dad4af022a49851f54f239af8d99ef969636e`.
+The fresh ELF bytes match the refused historical build, but this new complete
+bundle supplies the qualification without replacing the older refusal.
+
+The approved phase12 profile SHA256 is
+`e00d034c6a2441c9736997a694708fab1660e796f4521e12efc6ac9c58fe5885`;
+its read-only selected map is
+`15296512f3e31b2f151f294266c027315ff90e4e4b50566d9c15791051e8c54d`.
+It binds the new baseline audit, host10 owner and adapter, retained desktop,
+complete selected compiler, canonical GNU readelf and literal base manifest
+`fcb2e4351b11b733da9b6a1e5fb182097968773a7af71d3ae3274d77c949ea52`.
+The installed loader and whole SDK dependency closure are not claimed hermetic.
+
+| Phase12 receipt | SHA256 |
+| --- | --- |
+| `prepared-baseline01/prepared.json` | `70dfe42594a8c48599430447eb346543158de841ac2bd25943404e8af4434db8` |
+| `prepare-owner-baseline01/preparation.json` | `ca832573413bd5dd5c1cf5dd3fa1f064c0da1cecc601c2aebe1cc971d5ef6503` |
+| complete equal before/after maps | `2fd213cb17b855eb8124f3e76fa910f82bb23bebdb02dd86398de7d342c21011` |
+| `foreground-phase12-seal02/complete/inventory.json` | `a27b7ac892aeae4a20d71ca4b89eb6c19d709fba4487df283c29b6f7b2d8156b` |
+
+The owner preserved actual child status zero and final ECHILD after private
+process-group retirement. It used the fixed six-scenario preparation argv;
+no QEMU or guest measurement ran. The prepared tree occupies 904,168 KiB;
+complete phase12 occupies 911,112 KiB. Final runtime inclusive usage was
+1,675,252 KiB, below its approved live 2 GiB limit. The earlier 512 MiB
+per-tree estimate understated this tree by 379,880 KiB and cannot justify
+fitting another preparation under the same limit. Future profiles must
+charge all retained roots and reserve at least 1 GiB per new tree plus growth.
+
+Original seal attempt01 hit its 120-second outer deadline after writing a
+manifest and remains incomplete. Fresh attempt02 used the unchanged original
+checker, completed with actual status zero in 130.51 seconds, and passed a
+separate original check in 84.20 seconds. Root independently repeated the
+original check with actual status zero. Both external seals together occupy
+about 2 MiB, within the historical limit. No file inside phase12 changed
+after successful full capture. This state remains immutable; future guest
+execution needs fresh baseline and matched preparations and reviewed profiles.
+
+## Fixed preparation host qualification
+
+PASS: `foreground-host10` qualifies the fixed, supervised prepare path
 on source base `249c50cea` plus the exact existing prerequisite `8f7d7ccca`.
 Normal and production supervisors each passed 24 controls: the existing six
 process and ten run-profile/completion controls, plus eight prepare admission
@@ -92,9 +181,9 @@ SHA256 `0b4e3bb8a26e76e2881aa02de6334eb4a7619e6808ddce93612423f14b9837c1`.
 The preserved phase11 failure/diagnostic bundle has full metadata inventory
 `foreground-phase11-seal01/inventory.json`, SHA256
 `46e046c94230306ed38a389dbadca313b81954b72f1fec5103d477c8d31f5b57`.
-Fresh baseline build evidence, its original full check and a new reviewed
-profile remain required before staging. Neither original evidence nor its
-checker was modified.
+The subsequent fresh baseline and phase12 preparation above use a new
+complete authority. Neither this refused original evidence nor its checker
+was modified.
 
 ## Earlier adapter host qualification
 

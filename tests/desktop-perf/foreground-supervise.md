@@ -60,10 +60,11 @@ limited to two hours. Actual df and du observations run every five seconds,
 with three-second bounded probes: admission needs 2 GiB free, continued
 execution needs 1 GiB, and declared nonoverlapping roots plus supervisor
 state default to at most 512 MiB. An explicitly reviewed `charged_limit_kib`
-may select a limit from 524288 to 2097152 KiB. The prepared runtime must be
-covered by a charged root. These are sampled bounds, not a filesystem quota.
-The named foreground baseline/matched phase uses the approved 2 GiB limit;
-historical states outside its declared roots remain outside that phase's
+may select a limit from 524288 to 4718592 KiB (4.5 GiB). The prepared runtime
+must be covered by a charged root. These are sampled bounds, not a filesystem
+quota. The retained phase12 baseline preparation used its approved 2 GiB
+limit; each subsequent phase needs its own reviewed profile and inclusive
+projection. Historical states outside its declared roots remain outside that phase's
 inclusive total and must be reported separately.
 
 Build with a complete selected V installation and private temporary/module
@@ -126,7 +127,9 @@ input-inventory policy to build maintained `run-x86.v` in normal and
 production modes. Each build must pass its 32 selfcheck cases and
 18 clone controls; their receipts and executable hashes are retained. This
 mode does not stage a guest or run QEMU. `limitcheck NEW-STATE` checks actual
-budget admission at both accepted limits and refusal just outside them.
+budget admission at the minimum, historical 2 GiB ceiling, its successor and
+the 4.5 GiB ceiling, and refusal just outside the accepted range. These are
+admission controls at actual low usage; they do not allocate to those limits.
 
 Host qualification results and checksums are recorded in
 `foreground-supervise-report.md`. No guest performance measurement is

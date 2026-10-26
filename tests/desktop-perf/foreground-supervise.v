@@ -118,7 +118,7 @@ fn number(text string) !i64 {
 }
 
 fn budget(profile Profile, state string, admission bool) !string {
-	require(profile.charged_limit_kib >= 524288 && profile.charged_limit_kib <= 2097152, 'charged limit must be 512 MiB..2 GiB')!
+	require(profile.charged_limit_kib >= 524288 && profile.charged_limit_kib <= 4718592, 'charged limit must be 512 MiB..4.5 GiB')!
 	df := command(['/bin/df', '-k', os.dir(state)])!
 	rows := df.trim_space().split_into_lines()
 	if rows.len != 2 || rows[1].fields().len < 4 { return error('unexpected df output') }
@@ -307,7 +307,7 @@ fn prepare_validated(p PrepareProfile, state string) !Profile {
 	require(os.lstat(p.base)!.mode == p.base_mode && digest_text(p.base_manifest_sha256), 'base mode and manifest pin required')!
 	require(p.timeout_seconds >= 120 && p.timeout_seconds <= 1800, 'preparation deadline must be 120..1800 seconds')!
 	require(p.log_limit_bytes > 0 && p.log_limit_bytes <= 32 * 1024 * 1024, 'log limit must be 1..32 MiB')!
-	require(p.charged_limit_kib >= 524288 && p.charged_limit_kib <= 2097152, 'charged limit must be 512 MiB..2 GiB')!
+	require(p.charged_limit_kib >= 524288 && p.charged_limit_kib <= 4718592, 'charged limit must be 512 MiB..4.5 GiB')!
 	for pair in [[p.adapter, p.adapter_sha256], [p.kernel, p.kernel_sha256], [p.desktop, p.desktop_sha256]] {
 		path := pair[0]; pin := pair[1]
 		require(path == os.real_path(path) && os.is_file(path) && digest_text(pin), 'canonical pinned adapter/kernel/desktop required')!
@@ -485,7 +485,7 @@ fn validated(profile Profile, state string) !PreparedView {
 	require(profile.directory == os.real_path(profile.directory) && os.is_dir(profile.directory), 'canonical working directory required')!
 	require(profile.timeout_seconds >= 1800 && profile.timeout_seconds <= 7200, 'outer deadline must be 1800..7200 seconds')!
 	require(profile.log_limit_bytes > 0 && profile.log_limit_bytes <= 32 * 1024 * 1024, 'log limit must be 1..32 MiB')!
-	require(profile.charged_limit_kib >= 524288 && profile.charged_limit_kib <= 2097152, 'charged limit must be 512 MiB..2 GiB')!
+	require(profile.charged_limit_kib >= 524288 && profile.charged_limit_kib <= 4718592, 'charged limit must be 512 MiB..4.5 GiB')!
 	require(profile.input_roots.len > 0 && profile.charged_roots.len > 0, 'declared input and charged roots required')!
 	for index, root in profile.charged_roots {
 		require(root == os.real_path(root) && os.is_dir(root), 'canonical charged root required')!
@@ -709,21 +709,21 @@ fn limitcheck(state string) ! {
 	fresh(state)!
 	os.mkdir(state)!
 	mut checks := map[string]string{}
-	for limit in [524288, 2097152] {
+	for limit in [524288, 2097152, 2097153, 4718592] {
 		profile := Profile{charged_limit_kib: limit, charged_roots: [state]}
 		checks[limit.str()] = budget(profile, state, true)!
 	}
-	for limit in [524287, 2097153] {
+	for limit in [524287, 4718593] {
 		profile := Profile{charged_limit_kib: limit, charged_roots: [state]}
 		budget(profile, state, true) or {
-			require(err.msg() == 'charged limit must be 512 MiB..2 GiB', 'different limit refusal')!
+			require(err.msg() == 'charged limit must be 512 MiB..4.5 GiB', 'different limit refusal')!
 			checks[limit.str()] = err.msg()
 			continue
 		}
 		return error('out-of-range charged limit accepted')
 	}
 	os.write_file(state + '/result.json', json2.encode(checks) + '\n')!
-	println('PERF FOREGROUND LIMIT PASS four admission boundaries')
+	println('PERF FOREGROUND LIMIT PASS six admission boundaries')
 }
 
 fn qualify(state string, compiler string, adapter bool) ! {
