@@ -478,6 +478,87 @@ struct StopRequest {
 	broker     Identity
 }
 
+struct AuthInitFailure {
+	stage  i32
+	code   i32
+	detail i32
+	loader i32
+}
+
+struct AuthInitDiagnostics {
+mut:
+	failures  []AuthInitFailure
+	truncated bool
+}
+
+// Accept canonical decimal i32 values without an overflowing conversion.
+fn auth_init_integer(text string) ?i32 {
+	if text.len == 0 || text.len > 11 { return none }
+	negative := text[0] == `-`
+	start := if negative { 1 } else { 0 }
+	if start == text.len || (text[start] == `0` && (negative || text.len - start != 1)) {
+		return none
+	}
+	limit := if negative { i64(2147483648) } else { i64(2147483647) }
+	mut value := i64(0)
+	for index := start; index < text.len; index++ {
+		if text[index] < `0` || text[index] > `9` { return none }
+		digit := i64(text[index] - `0`)
+		if value > (limit - digit) / 10 { return none }
+		value = value * 10 + digit
+	}
+	return i32(if negative { -value } else { value })
+}
+
+fn auth_init_line(line string) ?AuthInitFailure {
+	if line.len > 128 || !line.ends_with('\n')
+		|| !line.starts_with('ANDROID-AUTH-INIT-FAIL stage=') { return none }
+	fields := line[..line.len - 1].split(' ')
+	if fields.len != 5 || fields[0] != 'ANDROID-AUTH-INIT-FAIL'
+		|| !fields[1].starts_with('stage=') || !fields[2].starts_with('code=')
+		|| !fields[3].starts_with('detail=') || !fields[4].starts_with('loader=') {
+		return none
+	}
+	stage := auth_init_integer(fields[1][6..]) or { return none }
+	code := auth_init_integer(fields[2][5..]) or { return none }
+	detail := auth_init_integer(fields[3][7..]) or { return none }
+	loader := auth_init_integer(fields[4][7..]) or { return none }
+	if stage < 1 || stage > 8 || loader < 0 || loader > 5
+		|| (stage != 5 && stage != 6 && loader != 0) {
+		return none
+	}
+	if stage == 4 {
+		if detail < 1 || detail > 3 { return none }
+	} else if stage == 6 {
+		if detail < 1 || detail > 22 { return none }
+	} else if detail != 0 {
+		return none
+	}
+	return AuthInitFailure{ stage: stage, code: code, detail: detail, loader: loader }
+}
+
+// Only bounded complete lines become public numeric evidence. Unfinished,
+// overlong and unrecognized private output is never copied into the receipt.
+fn auth_init_diagnostics(output string) AuthInitDiagnostics {
+	mut result := AuthInitDiagnostics{}
+	mut start := 0
+	for index := 0; index < output.len; index++ {
+		if output[index] != `\n` { continue }
+		if index + 1 - start <= 128 {
+			if failure := auth_init_line(output[start..index + 1]) {
+				if result.failures.len < 32 {
+					result.failures << failure
+				} else {
+					result.truncated = true
+					return result
+				}
+			}
+		}
+		start = index + 1
+	}
+	return result
+}
+
 struct Receipt {
 	scope       string = 'Real Maps and Google Play Services transport diagnostics. No credentials supplied; broker readiness does not establish Google authentication.'
 	started_utc string
@@ -492,6 +573,7 @@ mut:
 	service_ready     bool
 	broker_exit       int = -1
 	cleanup_survivors int
+	auth_init         AuthInitDiagnostics
 }
 
 struct DatabaseUpdate {
@@ -1123,6 +1205,7 @@ fn broker_session(mut receipt Receipt) ! {
 	deadline := time.sys_mono_now() + 15 * time.minute
 	startup := time.sys_mono_now() + 45 * time.second
 	mut output := ''
+	defer { receipt.auth_init = auth_init_diagnostics(output) }
 	for {
 		block := child.stdout_read()
 		if block != '' {
@@ -1291,7 +1374,84 @@ fn protected_directory_self_test() ! {
 	os.chmod(root, 0o700)!
 }
 
+fn auth_init_self_test() ! {
+	for text, expected in {'0': i32(0), '2147483647': i32(2147483647),
+		'-2147483648': i32(-2147483648), '-1': i32(-1)} {
+		if auth_init_integer(text) or { return error('canonical auth integer rejected') } != expected {
+			return error('auth integer changed value')
+		}
+	}
+	for text in ['', '-', '+0', '+1', '-0', '00', '01', '-01', ' 1', '1 ', '1\t',
+		'2147483648', '-2147483649', '99999999999999999999999', '1.0', '1\x00'] {
+		if _ := auth_init_integer(text) { return error('noncanonical auth integer accepted') }
+	}
+	for stage in 1 .. 9 {
+		detail := if stage in [4, 6] { 1 } else { 0 }
+		line := 'ANDROID-AUTH-INIT-FAIL stage=' + stage.str() + ' code=0 detail=' + detail.str() + ' loader=0\n'
+		failure := auth_init_line(line) or { return error('valid auth stage rejected') }
+		if failure != AuthInitFailure{ stage: i32(stage), detail: i32(detail) } {
+			return error('auth stage changed fields')
+		}
+	}
+	for line in [
+		'ANDROID-AUTH-INIT-FAIL stage=4 code=-2147483648 detail=3 loader=0\n',
+		'ANDROID-AUTH-INIT-FAIL stage=5 code=2147483647 detail=0 loader=5\n',
+		'ANDROID-AUTH-INIT-FAIL stage=6 code=-1 detail=22 loader=5\n',
+	] {
+		if _ := auth_init_line(line) {} else { return error('valid auth range endpoint rejected') }
+	}
+	valid := 'ANDROID-AUTH-INIT-FAIL stage=6 code=0 detail=22 loader=3\n'
+	for bad in [valid.trim_right('\n'), 'prefix ' + valid, '\n' + valid, valid + 'suffix',
+		valid.replace('\n', '\r\n'), valid.replace(' code=', '  code='),
+		valid.replace(' code=', '\tcode='), valid.replace('stage=6', 'stage=0'),
+		valid.replace('stage=6', 'stage=9'), valid.replace('stage=6', 'stage=06'),
+		valid.replace('stage=6', 'stage=-6'), valid.replace('code=0', 'code=+0'),
+		valid.replace('code=0', 'code=-0'), valid.replace('code=0', 'code=2147483648'),
+		valid.replace('code=0', 'code=-2147483649'), valid.replace('detail=22', 'detail=0'),
+		valid.replace('detail=22', 'detail=23'), valid.replace('detail=22', 'detail=-1'),
+		valid.replace('detail=22', 'detail=022'), valid.replace('loader=3', 'loader=6'),
+		valid.replace('loader=3', 'loader=-1'), valid.replace('loader=3', 'loader=03'),
+		valid.replace('code=0 ', ''), valid.replace('code=0', 'stage=0'),
+		valid.replace('loader=3\n', 'loader=3 email=private@example.invalid\n'),
+		valid.replace('loader=3\n', 'loader=3\x00\n'),
+		'ANDROID-AUTH-INIT-FAIL stage=4 code=0 detail=0 loader=0\n',
+		'ANDROID-AUTH-INIT-FAIL stage=4 code=0 detail=4 loader=0\n',
+		'ANDROID-AUTH-INIT-FAIL stage=5 code=0 detail=1 loader=0\n',
+		'ANDROID-AUTH-INIT-FAIL stage=1 code=0 detail=0 loader=1\n',
+		valid.trim_right('\n') + 'x'.repeat(128) + '\n',
+	] {
+		if _ := auth_init_line(bad) { return error('malformed/private auth line accepted') }
+	}
+	if auth_init_diagnostics(valid.trim_right('\n')).failures.len != 0 {
+		return error('unterminated auth output accepted')
+	}
+	private := 'email=private@example.invalid token=private-secret\n'
+	mixed := auth_init_diagnostics(private + 'x'.repeat(129) + '\n' + valid + valid.trim_right('\n'))
+	if mixed.failures.len != 1 || mixed.truncated || mixed.failures[0].detail != 22 {
+		return error('auth scan did not recover from private/overlong lines')
+	}
+	public := json2.encode(Receipt{ auth_init: mixed })
+	if public.contains('private@example.invalid') || public.contains('private-secret')
+		|| public.contains('ANDROID-AUTH-INIT-FAIL') {
+		return error('raw private auth output entered the receipt')
+	}
+	mut many := ''
+	for code in 0 .. 32 {
+		many += 'ANDROID-AUTH-INIT-FAIL stage=1 code=' + code.str() + ' detail=0 loader=0\n'
+	}
+	full := auth_init_diagnostics(many + private)
+	if full.failures.len != 32 || full.truncated || full.failures[0].code != 0
+		|| full.failures[31].code != 31 {
+		return error('auth cardinality/order differs at the bound')
+	}
+	over := auth_init_diagnostics(many + valid + private)
+	if !over.truncated || over.failures != full.failures {
+		return error('auth truncation did not preserve the first 32 complete records')
+	}
+}
+
 fn self_test() ! {
+	auth_init_self_test()!
 	protected_directory_self_test()!
 	sqlite_self_test()!
 	if !canonical_absolute('/opt/maps/app.apk') || canonical_absolute('/opt/../maps/app.apk')
@@ -1349,7 +1509,7 @@ fn self_test() ! {
 			return error('stale stop request accepted')
 		}
 	}
-	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths protected-directory-symlink-and-mode-rejection process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation')
+	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths protected-directory-symlink-and-mode-rejection process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation bounded-numeric-auth-diagnostics')
 }
 
 fn main() {
