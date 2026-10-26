@@ -51,3 +51,18 @@ only. No continuous bootstrap sampling, sole-reap or descendant-cleanup claim
 is made. Earlier tool-loop build01/build02 refusals and all original refused
 bundles remain preserved; no fresh kernel qualification, seal or guest result
 is claimed by this report.
+
+The approved build03 invocation subsequently returned actual exit1 during its
+initial native admission sample: free space had fallen to 1664132KiB against
+the unchanged 2097152KiB floor. The controller never started; build03 and all
+worktree kernel output directories remained absent. The sample charged
+241824KiB allocated/266755KiB apparent and retained its raw probes in
+`run-01/observations.jsonl`, SHA256
+`94c9ca8e3c68a48b10a64036650a934a13aa25d9e4e76e6461898c5347fd6606`.
+The external `build-03-outer-status.json` SHA256 is
+`a91a80f762607ac44d9c210a517e1ee12199577d4978d2a82444e58ab2f55a14`.
+Initial admission precedes the native command-status writer, so no native
+`run-01/status.json` was produced. The external status records that limitation,
+actual refusal and no-controller scope. Source maps matched after return and
+scoped `pgrep` returned1. The consumed run01 is preserved; execution remains
+held pending capacity and review of a fresh fixed route.
