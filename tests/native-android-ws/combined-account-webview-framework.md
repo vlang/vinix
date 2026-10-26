@@ -23,3 +23,22 @@ the complete retained file set. The pinned baseline is
 `account-contract-authenticator-base-network-build-2026-10-26`, with manifest
 `36a472320e71eb459896c1d52a8f211f475362fb2c6dada682870bf43b6a2b7b` and JAR
 `9e643451d4d82fc3839c91415947f04d3726aa81967a784d4d26db63e2c88cb1`.
+
+The subsequent interaction build also passed assembly, canonical disassembly,
+and full retained-bundle verification. It produces 2102 classes from the same
+2098-class baseline, with exactly eleven changed classes and four additions.
+The new `VinixAccountInteraction` extractor uses three accessors appended to
+`PendingIntent`, `AccountAuthenticatorResponse`, and `Bundle`; removing each
+accessor leaves its baseline canonical class unchanged. All remaining classes
+and non-DEX JAR members retain their original SHA256. Builder self-tests reject
+missing, duplicate, malformed and preexisting accessors, and unrelated method or
+superclass changes. These are host construction checks; ART execution and Google
+account login remain separate validation.
+
+- Builder implementation commit: `88e12dc5a`.
+- Build source revision: `a03cd9975048693643652fc8415ab700cf18c5a5`.
+- Retained builder source SHA256: `7f331e4a68824d40ed9b5c7a82c5f669ca4f5a49bd3027ffd91fa579ecb38835`.
+- Complete retained bundle: `/Users/alex/.local/state/vinix/android/combined-account-webview-interaction-framework-2026-10-26`.
+- Bundle manifest SHA256: `dc5c0470c4cdc7a075ded61680e4ac89cef056dbcb515ce55a32f74bf82aef87`.
+- Output `api-impl.jar` SHA256: `86278c9cbe1f25904b760250f34f859206d719cbb23cf5ff5411a75c480ac36f`.
+- Output DEX SHA256: `7b7684d768573672a47b3a26d3cf82e9ee0f87feecdccf429e6fe053ae93e0ba`.
