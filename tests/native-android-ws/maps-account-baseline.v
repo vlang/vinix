@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Read-only, streaming inspection of a maintained headless stage. No module or
-// APK is extracted; only selected inode metadata and public authority records
+// APK is extracted; only selected archive metadata and public authority records
 // are retained. This reports provisioning, never successful authentication.
 module main
 
@@ -18,9 +18,11 @@ struct Entry {
 	path string
 	module_name string
 	kind u8
-	mode i64
-	uid i64
-	gid i64
+	// These belong to the last archive member, not a live guest stat. The
+	// kernel ignores tar ownership and keeps existing inode modes on overwrite.
+	archive_mode i64
+	archive_uid i64
+	archive_gid i64
 	size i64
 	linkname string
 	sha256 string
@@ -68,6 +70,7 @@ fn normalize(name string) !string {
 fn selected(path string) bool {
 	name := os.base(path).to_lower()
 	return path.ends_with('.apk') || name.contains('account') || name.contains('authenticator')
+		|| name.contains('authority') || name.ends_with('.registry') || name.starts_with('libsqlite')
 		|| name in ['run-android', 'vinix-android-native', 'libvinix-android-native.so', 'inittab',
 		'rc.local', 'profile', 'environment'] || path.starts_with('etc/init.d/')
 		|| path.starts_with('etc/profile.d/') || path.starts_with('etc/rc.d/')
@@ -259,6 +262,7 @@ fn run() ! {
 	os.write_file(root + '/ancestor-entries.json', json2.encode(ancestors))!
 	os.write_file(root + '/inspection.json', json2.encode({
 		'kind': json2.Any('vinix-maps-account-baseline-v1')
+		'archive_metadata_only': json2.Any(true)
 		'stage': json2.Any(stage)
 		'stage_json_sha256': json2.Any(expected)
 		'boot_sha256': json2.Any(boot_pin)
@@ -274,7 +278,8 @@ fn run() ! {
 
 fn self_test() ! {
 	if normalize('./etc/init.d/')! != 'etc/init.d' || !selected('a/native-account-broker')
-		|| !selected('a/services.registry.apk') || selected('etc/shadow') || text_candidate('etc/shadow') {
+		|| !selected('a/services.registry.apk') || !selected('lib/libsqlite3.so.0')
+		|| selected('etc/shadow') || text_candidate('etc/shadow') {
 		return error('path selection self-test')
 	}
 	for value in ['/absolute', '../escape', 'a//b', 'a/../b'] {
