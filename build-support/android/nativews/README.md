@@ -624,11 +624,13 @@ navigation and on-screen keyboard control remain incomplete.
 theme. The guest regression checks both activity and dialog themes.
 
 The verified subset covers Arity calculation, Editor save/reopen, Open
-Sudoku touch entry/database persistence, and the [Maps map/search/route Preview
-workflow](../../../tests/android/results/2026-10-23/maps-action-provider/README.md).
-Maps accepts a manually entered origin, advances and reverses Preview steps,
-and opens its overflow menu; GPS navigation and map layer changes remain
-unverified. Advanced Canvas paths/transforms,
+Sudoku touch entry/database persistence, and the [26 October Maps372
+workflow](../../../docs/maps372-qualified-intent-replay.md). That replay completed
+600 seconds with map tiles, Paris place search and details, a manually entered
+route origin, driving and walking route selection, and successive Route Preview
+instructions. Its report pins the tested runtime and genuine guest PNGs.
+Live GPS navigation, Google sign-in and map layer changes remain unverified.
+Advanced Canvas paths/transforms,
 text selection/shaping, on-screen keyboards, drag scrolling, popup tabs, services and
 modern Android APIs remain incomplete. NinePatch images currently stretch.
 WebView supports static HTML/text help panels without JavaScript, CSS layout

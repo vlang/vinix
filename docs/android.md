@@ -217,7 +217,17 @@ from limited base-APK probes, records exact versions and signatures, and
 retains the first framework/JNI failure for each app. The Arity control still
 calculated `579` through the same runner.
 
-The [23 October Maps continuation](../tests/android/results/2026-10-23/maps-action-provider/README.md)
+The [26 October Maps372 replay](maps372-qualified-intent-replay.md) completed
+its full 600-second observation with map tiles, Paris place search and details,
+driving and walking route selection, and successive Route Preview instructions.
+It used the final Framework371 build with the null-safe `Intent.getDataString()`
+repair. The report records the exact runtime inputs, source revision, complete
+external evidence bundle and SHA-256 checksums for genuine guest PNGs, including
+`google-maps-running.png` and `paris-route-preview-ready.png`. These checks cover
+anonymous use; live GPS navigation, Google sign-in and map layer changes remain
+unverified.
+
+The earlier [23 October Maps continuation](../tests/android/results/2026-10-23/maps-action-provider/README.md)
 displays live map tiles, Paris search and place photos, manually entered
 Versailles-to-Paris route estimates, and Route Preview. Preview's next and previous
 controls change the instruction and map; its overflow menu now opens with All
