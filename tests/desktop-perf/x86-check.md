@@ -3,7 +3,8 @@
 `run-x86.v` stages the existing desktop perf workload for an x86-64 QEMU
 guest. It reuses the unchanged `perfrunner.parse`/`drive`, `measure.c`,
 `perf-init.sh`, result validator and QMP pointer driver. Its small V init
-mounts `/dev/sd0` as ext2 at `/root` and executes the existing script. The
+routes stdout/stderr to `/dev/com1`, mounts `/dev/sd0` as ext2 at `/root`
+and executes the existing script. The
 isolated UEFI ISO uses plain USTAR and 2048×1536 graphics, matching the
 shared pointer coordinates; QEMU uses q35, TCG and USB input.
 
@@ -120,3 +121,56 @@ its complete `bundle.sha256` inventory has SHA-256
 The copy helper verifies selected expanded bytes; archive-stream verification is
 separate. Historical native auditors still require the original complete bundle.
 The original expanded bundle was untouched. No staging or guest run occurred.
+
+## Interrupted first native attempt and serial correction
+
+Based on `fe1e6fd495d2b3c998f1be2069c37a1ea1f6474b`, the first native
+preparation passed full base/copy/source/tool checks and produced receipt
+`69ccf163367ce9f2c690a76358e2bbddbf347726a898a690872ca86927022e6f`.
+The guest reached initramfs unpack completion but emitted no PERF result or
+completion marker. The controller was interrupted and exited 1; this attempt
+does not qualify any scenario. The original init inherited x86 framebuffer
+console descriptors. The correction opens `/dev/com1`, checks both `dup2`
+calls and closes the extra descriptor before mounting and executing the
+unchanged supervisor. No unobserved workload execution is assumed.
+
+Independent review found no descriptor lifetime issue. V generated the
+corrected init C and musl GCC linked it successfully; ELF inspection confirmed
+static x86-64 execution with no interpreter or dynamic dependencies. Generated
+C and ELF are retained in `package-perf-x86-20261026/tools/x86-init-serial{.c,}`
+with SHA-256 `1563b4aaa20a28de3035abf797a1d13359acdf36cbf7fcfb26222a4aea93def2`
+and `c21fe77339d2605b20f090f0f373966c527c5865eb238a3d210fabed6bb4d639`.
+
+The maintained `archive-x86-failure.v` is deliberately limited to this exact
+interrupted attempt, receipt and reviewed sealer/independent reader bytes.
+It preserves the canceled logs, actual controller and tool/source copies,
+then seals the complete tree. It checks the expanded inventory before and
+after independent streamed archive verification. A separate reviewed reclaim
+requires the exact eligibility digest, repeats all three checks, rehashes
+external pins and confirms the canonical directory device/inode before
+removing only the expanded failed attempt. V's remover does not recurse
+through symlinks. This assumes a trusted, quiescent host tree.
+
+Production helper compilation and the wrong-eligibility refusal passed.
+The archive reader checked **3,168 entries: 2,622 regular payloads and 546
+literal symlinks**, plus gzip integrity. Both preservation and reclaim passed;
+archive, original manifest, tools and receipts remain outside the removed tree:
+
+- `package-perf-x86-20261026/attempt01.tar.gz`, SHA-256
+  `994aefc99ea00d56317bbd309c0d500db8a6bba71790428f48336ee5616b438f`.
+- `attempt01-preservation/original-manifest.sha256`, SHA-256
+  `ef4ed6f2ef8a0d9d47794dc9e2abb6f235e5042747da9622ae2286a76d76f7a9`.
+- `attempt01-preservation/eligible.json`, SHA-256
+  `e90e7af8d428e64c383533fb334bcdcb329ebcbb870d3ad85fb4a5e1e59dd9e4`.
+- `attempt01-preservation/completed.json`, SHA-256
+  `eb85b3e8193fb319eab09a12372a26335a433bbcebfb749544f927138a715e6a`.
+
+Paths after the first bullet are relative to `package-perf-x86-20261026/`.
+Command argv, outputs and exact exits are retained beside the receipts.
+The one external executable symlink referent remains pinned outside the
+removed tree and has an ordinary copy inside the archive. The other host
+absolute link targets an empty directory inside the archived tree; actual
+bootloader bytes are regular archived files. Guest-root links retain their
+complete runtime payload. Directory metadata is outside the historical
+manifest's authentication scope. Corrected native execution remains pending
+storage coordination; the shared validator and workloads are unchanged.
