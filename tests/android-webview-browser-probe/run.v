@@ -12,6 +12,7 @@ import time
 
 #include <signal.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <CommonCrypto/CommonDigest.h>
 
 fn C.kill(int, int) int
@@ -206,14 +207,56 @@ fn write_json(path string, value json2.Any) ! {
 	file.write_string(json2.encode(value, prettify: true) + '\n')!
 }
 
-fn start(root string) ! {
-	qmp_check(root)!
+fn fresh_launch(root string) ! {
+	// QEMU interprets %d in -D paths as a filename template.
+	if root.contains('%') { return error('literal daemon log path required') }
 	for name in ['launch.json', 'launch-result.json', 'ownership.json', 'qemu.pid', 'qmp.sock',
-		'serial.log', 'network.pcap', 'stop.json', 'gone.json', 'run-source.v', 'runner'] {
+		'serial.log', 'network.pcap', 'qemu.log', 'stop.json', 'gone.json', 'run-source.v', 'runner'] {
 		if os.exists(root + '/' + name) || os.is_link(root + '/' + name) {
 			return error('guest can be launched once only: ' + name)
 		}
 	}
+}
+
+fn verify_daemon_log(root string, before os.Stat) ! {
+	info := os.lstat(root + '/qemu.log')!
+	if info.get_filetype() != .regular || info.uid != u32(os.geteuid())
+		|| info.nlink != 1 || info.mode & 0o777 != 0o600
+		|| info.dev != before.dev || info.inode != before.inode {
+		return error('same private single-linked daemon log required')
+	}
+}
+
+fn create_daemon_log(root string) !os.Stat {
+	if root.contains('%') { return error('literal daemon log path required') }
+	path := root + '/qemu.log'
+	// This pinned V library ignores x in open_file's mode string.
+	fd := C.open(path.str, C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NOFOLLOW | C.O_CLOEXEC, 0o600)
+	if fd < 0 { return error('cannot exclusively create private daemon log') }
+	defer { C.close(fd) }
+	before := os.lstat(root + '/qemu.log')!
+	verify_daemon_log(root, before)!
+	return before
+}
+
+fn launch_args(root string) []string {
+	return ['-qmp', 'unix:' + root + '/qmp.sock,server=on,wait=off', '-machine', 'virt,gic-version=3',
+		'-accel', 'hvf', '-cpu', 'host', '-m', '12288', '-smp', '4', '-object',
+		'rng-random,filename=/dev/urandom,id=vinix-rng', '-device', 'virtio-rng-device', '-drive',
+		'if=pflash,format=raw,readonly=on,file=' + firmware, '-drive',
+		'if=pflash,format=raw,file=' + root + '/efivars.fd', '-drive',
+		'format=raw,file=' + root + '/boot.img', '-device', 'virtio-keyboard-device', '-device',
+		'virtio-tablet-device', '-device', 'ramfb', '-netdev', 'user,id=net0', '-device',
+		'virtio-net-device,netdev=net0', '-object',
+		'filter-dump,id=capture,netdev=net0,file=' + root + '/network.pcap', '-display', 'none',
+		'-monitor', 'none', '-serial', 'file:' + root + '/serial.log', '-daemonize', '-D',
+		root + '/qemu.log', '-pidfile',
+		root + '/qemu.pid']
+}
+
+fn start(root string) ! {
+	qmp_check(root)!
+	fresh_launch(root)!
 	for line in checked(['/bin/ps', '-axo', 'pid=,command='])!.split_into_lines() {
 		if line.contains('qemu-system-aarch64 ') && line.contains(' -machine ') {
 			return error('another aarch64 QEMU guest is live')
@@ -224,19 +267,9 @@ fn start(root string) ! {
 		|| hash(root + '/efivars.fd')! != stage.staged_efivars_sha256 {
 		return error('staged media changed')
 	}
-	args := ['-qmp', 'unix:' + root + '/qmp.sock,server=on,wait=off', '-machine', 'virt,gic-version=3',
-		'-accel', 'hvf', '-cpu', 'host', '-m', '12288', '-smp', '4', '-object',
-		'rng-random,filename=/dev/urandom,id=vinix-rng', '-device', 'virtio-rng-device', '-drive',
-		'if=pflash,format=raw,readonly=on,file=' + firmware, '-drive',
-		'if=pflash,format=raw,file=' + root + '/efivars.fd', '-drive',
-		'format=raw,file=' + root + '/boot.img', '-device', 'virtio-keyboard-device', '-device',
-		'virtio-tablet-device', '-device', 'ramfb', '-netdev', 'user,id=net0', '-device',
-		'virtio-net-device,netdev=net0', '-object',
-		'filter-dump,id=capture,netdev=net0,file=' + root + '/network.pcap', '-display', 'none',
-		'-monitor', 'none', '-serial', 'file:' + root + '/serial.log', '-daemonize', '-pidfile',
-		root + '/qemu.pid']
+	log_before := create_daemon_log(root)!
 	mut argv := [qemu]
-	argv << args
+	argv << launch_args(root)
 	os.write_file(root + '/run-source.v', source)!
 	os.cp(os.executable(), root + '/runner')!
 	write_json(root + '/launch.json', json2.decode[json2.Any](json2.encode({
@@ -247,11 +280,15 @@ fn start(root string) ! {
 		'firmware_sha256':      json2.Any(hash(firmware)!)
 		'runner_sha256':        json2.Any(hash(os.executable())!)
 		'runner_source_sha256': json2.Any(sha256.sum(source.bytes()).hex())
+		'daemon_stderr_path':   json2.Any(root + '/qemu.log')
+		'daemon_stderr_before': json2.decode[json2.Any](json2.encode(log_before))!
+		'daemon_stderr_scope':  json2.Any('QEMU -D retains normal daemon stderr; no -d tracing; exit cause requires observed evidence.')
 		'scope':                json2.Any('Separate credential-free real-engine diagnostic; no Google authentication proof.')
 	}))!)!
 	result := execute(argv)!
 	write_json(root + '/launch-result.json', json2.decode[json2.Any](json2.encode(result))!)!
 	if result.code != 0 { return error('QEMU launch failed: ' + result.stderr) }
+	verify_daemon_log(root, log_before)!
 	pid := strconv.atoi(os.read_file(root + '/qemu.pid')!.trim_space())!
 	write_json(root + '/ownership.json', json2.decode[json2.Any](json2.encode(identity(pid)!))!)!
 	println('BROWSER-RUN STARTED pid=' + owned(root)!.pid.str() + ' state=' + root)
@@ -545,6 +582,52 @@ fn stop(root string) ! {
 	reconcile_stop(root)!
 }
 
+fn daemon_log_self_test(root string) ! {
+	fresh_launch(root)!
+	if _ := fresh_launch(root + '%d') { return error('QEMU log template accepted') }
+	if _ := create_daemon_log(root + '%d') { return error('QEMU log template created') }
+	if _ := verify_daemon_log(root, os.Stat{}) { return error('missing daemon log accepted') }
+	args := launch_args(root)
+	assert args.filter(it == '-D').len == 1 && '-d' !in args
+	assert args[args.index('-D') + 1] == root + '/qemu.log'
+	assert '-daemonize' in args
+	assert args[0..2] == ['-qmp', 'unix:' + root + '/qmp.sock,server=on,wait=off']
+	assert args[args.len - 2..] == ['-pidfile', root + '/qemu.pid']
+	before := create_daemon_log(root)!
+	assert before.size == 0
+	if _ := fresh_launch(root) { return error('existing daemon log accepted by launch') }
+	if _ := create_daemon_log(root) { return error('existing daemon log overwritten') }
+	// A child reopens the production -D destination and redirects real fd 2,
+	// matching the reviewed QEMU daemon code without starting a guest.
+	fixture := execute([os.executable(), '--self-test-daemon-log', ...args])!
+	assert fixture.code == 0 && fixture.stdout == '' && fixture.stderr == ''
+	assert os.read_file(root + '/qemu.log')! == 'BROWSER-RUN DAEMON-STDERR-FIXTURE\n'
+	verify_daemon_log(root, before)!
+	os.chmod(root + '/qemu.log', 0o644)!
+	if _ := verify_daemon_log(root, before) { return error('public daemon log accepted') }
+	os.chmod(root + '/qemu.log', 0o600)!
+	os.link(root + '/qemu.log', root + '/log-hardlink')!
+	if _ := verify_daemon_log(root, before) { return error('hard-linked daemon log accepted') }
+	os.rm(root + '/log-hardlink')!
+	os.mv(root + '/qemu.log', root + '/log-original')!
+	create_daemon_log(root)!
+	if _ := verify_daemon_log(root, before) { return error('replacement daemon log accepted') }
+	os.rm(root + '/qemu.log')!
+	os.symlink(root + '/absent-log', root + '/qemu.log')!
+	if _ := fresh_launch(root) { return error('dangling daemon log symlink accepted') }
+	if _ := create_daemon_log(root) { return error('daemon log symlink overwritten') }
+	if _ := verify_daemon_log(root, before) { return error('daemon log symlink accepted') }
+	os.rm(root + '/qemu.log')!
+	os.mkdir(root + '/qemu.log')!
+	if _ := verify_daemon_log(root, before) { return error('daemon log directory accepted') }
+	os.rmdir(root + '/qemu.log')!
+	os.mv(root + '/log-original', root + '/qemu.log')!
+	verify_daemon_log(root, before)!
+	os.rm(root + '/qemu.log')!
+	if _ := verify_daemon_log(root, before) { return error('removed daemon log accepted') }
+	println('DAEMON-STDERR SELF-TEST PASS literal-exact-argv no-debug-tracing exclusive-private-file real-fd2-destination missing-existing-symlink-directory-hardlink-permissions-replacement-rejection')
+}
+
 fn self_test() ! {
 	qmp_check('/tmp/browser-probe')!
 	if _ := qmp_check('/' + 'x'.repeat(103)) { return error('oversized QMP path accepted') }
@@ -561,6 +644,7 @@ fn self_test() ! {
 	if os.exists(root) || os.is_link(root) { return error('selftest output exists') }
 	os.mkdir(root)!
 	defer { os.rmdir_all(root) or {} }
+	daemon_log_self_test(root)!
 	hash_self_test(root)!
 	os.write_file(root + '/qemu.pid', os.getpid().str())!
 	write_json(root + '/ownership.json', json2.decode[json2.Any](json2.encode(identity(os.getpid())!))!)!
@@ -617,6 +701,15 @@ fn self_test() ! {
 }
 
 fn main() {
+	if os.args.len > 2 && os.args[1] == '--self-test-daemon-log' {
+		args := os.args[2..]
+		assert args.filter(it == '-D').len == 1 && '-daemonize' in args && '-d' !in args
+		mut file := os.open_file(args[args.index('-D') + 1], 'w')!
+		if C.dup2(file.fd, 2) != 2 { exit(1) }
+		file.close()
+		eprintln('BROWSER-RUN DAEMON-STDERR-FIXTURE')
+		return
+	}
 	if os.args.len == 2 && os.args[1] == '--self-test-output' {
 		println('o'.repeat(65536))
 		eprintln('e'.repeat(65536))
