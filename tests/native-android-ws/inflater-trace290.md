@@ -42,6 +42,13 @@ Artifacts are retained under `/Users/alex/.local/state/vinix/android/`:
 | Maps291 completed bundle manifest | `maps291-2026-10-25/sha256.json` | `b0db74c46c20fd955da17a610df5bfdcae5d9d46bd6e9dcb4b10c316e0c2f878` |
 | Maps291 timing derivative manifest | `maps291-timing-2026-10-25/sha256.json` | `4bfe2d2c2292c062833b390125ea055f894c8ec9d52cd2d128e064ff72465107` |
 
+The failed compiler attempt is now retained as the complete
+`inflater-trace290-failed-build-2026-10-25.tar.gz` archive (SHA-256
+`03e1870821cc12b3722bd79161aee1c9d9ad6fe2955ffd6809ae44fcdef15646`).
+Restore it before using its unchanged complete checker; the qualified restore
+and cleanup receipt are recorded in
+[the storage report](../../docs/android-evidence-storage-2026-10-26.md#inflater290-failed-build-cold-preservation).
+
 The same APK (`42ede5b22789c9fbdbedbec896511d4015c33c43b0f4b402ff2b3b2f9f6ae9d5`)
 passed three actual guest runs:
 
