@@ -319,9 +319,17 @@ application, with the supervisor outside that group. Allocation and OOM checks
 verify enforcement before launch. All four traced `os_proc_available_memory`
 calls return 663,462,822 bytes, but the application still exits with signal 11
 after `Using MallocBinned3 allocator.`, without a cgroup OOM event. The crash
-persists with positive headroom; its location and cause remain undetermined.
+persists with positive headroom; that run did not identify its location or cause.
 See the
 [enforced memory-budget checkpoint](../tests/ios/probe-memory-checkpoint-20261026.md).
+
+A further probe captures native Linux ARM64 fault context after verifying a
+real protection fault and signal-handler restoration. The guest PC maps to
+preferred Mach-O address `0x10489b4e4`: the application deliberately writes
+123 to address 3 in a routine containing an allocation-failure message.
+The enforced 2 GiB group again records no OOM event. The failed allocation's
+size, alignment and cause remain unknown; startup is still incomplete.
+See the [native fault checkpoint](../tests/ios/probe-fault-checkpoint-20261026.md).
 
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
