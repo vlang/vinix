@@ -45,7 +45,8 @@ Build/test logs, the generated C reviewed for the no-builtin build and the
 strict inventory recheck log are retained in
 `browser-waitid-build-2026-10-26-r1/`. The fresh stage uses quiet PID1, authority
 fixture r5 and recvmsg fixture r3. Its preparation passes without launching
-QEMU. The owner must apply the qualified P_PIDFD kernel replacement and launch
-the next guest. r14 and r15 prepared bundles retain earlier builds from before
-the no-builtin correction and must not be used for this replay. The complete
-sealed r12 evidence remains unchanged.
+QEMU. The owner subsequently applied the qualified P_PIDFD kernel replacement
+and completed [the r13 replay](validation-2026-10-26-r13.md), which reports
+SIGABRT termination of WebKitWebProcess. r14 and r15 prepared bundles retain
+earlier builds from before the no-builtin correction and were not used for
+that replay. The complete sealed r12 evidence remains unchanged.
