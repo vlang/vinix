@@ -141,8 +141,10 @@ Adjacent preparation and action logs are
 `permission-info359-fixture-old-2026-10-26.log` and
 `permission-info359-fixture-new-2026-10-26.log`.
 
-Maps360 generation and replay have not started; their unchanged capacity gate
-requires 1,536 MiB free, while the latest root checkpoint recorded 963,360 KiB
-available. The ART fixture establishes the permission metadata behavior above.
-Resolution of Maps' permission failure and later service teardown still requires
-a separate Maps replay.
+[Maps360](maps360-permission-metadata-replay.md) subsequently completed its
+generation and replay. The previous permission exception was absent: Maps
+displayed the map and an Oasis d'Aboukir search suggestion, then exited after
+92 seconds with a separate `Parcel.readBundle` class-loader failure for
+`com.google.firebase.appindexing.internal.Thing`. Its raw outcome remains
+`startup_failed`; collection success does not establish a working Maps session.
+The separate service teardown correction was not included in that replay.
