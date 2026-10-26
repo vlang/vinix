@@ -10,7 +10,8 @@ import time
 
 #include <sys/stat.h>
 
-const prefix = 'VINIX-BROWSER-RESULTS-1 '
+const browser_prefix = 'VINIX-BROWSER-RESULTS-1 '
+const headless_prefix = 'VINIX-HEADLESS-RESULTS-1 '
 const chunk_bytes = 512
 const max_file = 8 * 1024 * 1024
 const max_total = 16 * 1024 * 1024
@@ -39,6 +40,19 @@ struct Export {
 	payload string
 }
 
+struct Protocol {
+	prefix string = browser_prefix
+	label string = 'BROWSER-COLLECT'
+	scope string = 'Exact credential-free browser diagnostic UART archive; not Google authentication proof.'
+}
+
+fn protocol(headless bool) Protocol {
+	return if headless {
+		Protocol{prefix: headless_prefix, label: 'HEADLESS-COLLECT',
+			scope: 'Exact synthetic headless service lifecycle UART archive; no account, token or Google authentication proof.'}
+	} else { Protocol{} }
+}
+
 fn decimal(text string, limit int) !int {
 	if text == '' || text.len > 10 || (text.len > 1 && text[0] == `0`)
 		|| !text.bytes().all(it >= `0` && it <= `9`) {
@@ -53,7 +67,8 @@ fn digest(text string) bool {
 	return text.len == 64 && text.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`))
 }
 
-fn parse_export(log string) !Export {
+fn parse_export(log string, selected Protocol) !Export {
+	prefix := selected.prefix
 	mut begun := false
 	mut ended := false
 	mut sha := ''
@@ -63,6 +78,9 @@ fn parse_export(log string) !Export {
 	mut parts := []string{}
 	for raw in log.split_into_lines() {
 		line := raw.trim_right('\r')
+		if (line.starts_with(browser_prefix) || line.starts_with(headless_prefix)) && !line.starts_with(prefix) {
+			return error('foreign archive protocol')
+		}
 		if !line.starts_with(prefix) { continue }
 		if line.len > 1024 || ended { return error('oversized frame or repeated export') }
 		fields := line[prefix.len..].split(' ')
@@ -158,7 +176,7 @@ fn validate(payload string) !Archive {
 	return archive
 }
 
-fn restore(root string, archive Archive, exported Export, serial string, serial_sha string) ! {
+fn restore(root string, archive Archive, exported Export, serial string, serial_sha string, selected Protocol) ! {
 	if os.exists(root) || os.is_link(root) { return error('fresh external output required') }
 	if unsafe { C.mkdir(root.str, 0o700) } != 0 { return error('cannot exclusively create output') }
 	os.mkdir(root + '/results')!
@@ -200,11 +218,12 @@ fn restore(root string, archive Archive, exported Export, serial string, serial_
 		'archive_bytes':  json2.Any(exported.bytes)
 		'archive_chunks': json2.Any(exported.chunks)
 		'entries':        json2.Any(archive.entries.len)
-		'scope':          json2.Any('Exact credential-free browser diagnostic UART archive; not Google authentication proof.')
+		'scope':          json2.Any(selected.scope)
 	}, prettify: true) + '\n')!
 }
 
-fn frames(payload string) string {
+fn frames(payload string, selected Protocol) string {
+	prefix := selected.prefix
 	sha := sha256.sum(payload.bytes()).hex()
 	count := (payload.len + chunk_bytes - 1) / chunk_bytes
 	header := sha + ' ' + payload.len.str() + ' ' + count.str() + '\n'
@@ -216,7 +235,8 @@ fn frames(payload string) string {
 	return result + prefix + 'END ' + header
 }
 
-fn self_test() ! {
+fn self_test_protocol(selected Protocol) ! {
+	prefix := selected.prefix
 	data := 'exact\x00binary\n'.bytes()
 	fixture := Archive{
 		root_mode: 0o700
@@ -227,8 +247,8 @@ fn self_test() ! {
 		]
 	}
 	payload := json2.encode(fixture)
-	log := frames(payload)
-	exported := parse_export('kernel chatter\n' + log + 'done\n')!
+	log := frames(payload, selected)
+	exported := parse_export('kernel chatter\n' + log + 'done\n', selected)!
 	assert exported.payload == payload && validate(exported.payload)!.entries == fixture.entries
 	changed := payload.replace('/pinned/font', '/pinned/foNt')
 	changed_sha := sha256.sum(changed.bytes()).hex()
@@ -236,9 +256,10 @@ fn self_test() ! {
 		log.replace('CHUNK ' + exported.sha256 + ' 0 ', 'CHUNK ' + exported.sha256 + ' 1 '),
 		log.replace('BEGIN ' + exported.sha256, 'BEGIN ' + '0'.repeat(64)),
 		log.replace('CHUNK ', 'OTHER '), log.replace(' 0 ', ' 00 '),
-		frames(changed).replace(changed_sha, exported.sha256),
-		frames('test').replace('dGVzdA==', 'dGVzdA')] {
-		if _ := parse_export(bad) { return error('malformed export accepted') }
+		frames(changed, selected).replace(changed_sha, exported.sha256),
+		frames('test', selected).replace('dGVzdA==', 'dGVzdA'),
+		log + frames(payload, protocol(selected.prefix == browser_prefix))] {
+		if _ := parse_export(bad, selected) { return error('malformed export accepted') }
 	}
 	for bad in [
 		Archive{ root_mode: 0o700, entries: [Entry{ path: '../escape', kind: 'directory' }] },
@@ -258,7 +279,7 @@ fn self_test() ! {
 	] {
 		if _ := validate(json2.encode(bad)) { return error('unsafe archive accepted') }
 	}
-	root := os.join_path(os.temp_dir(), 'vinix-browser-collect-selftest-' + os.getpid().str())
+	root := os.join_path(os.temp_dir(), 'vinix-archive-collect-selftest-' + selected.label + '-' + os.getpid().str())
 	serial := root + '.serial'
 	if os.exists(root) || os.exists(serial) { return error('selftest output exists') }
 	defer {
@@ -266,30 +287,40 @@ fn self_test() ! {
 		os.rm(serial) or {}
 	}
 	os.write_file(serial, log)!
-	restore(root, fixture, exported, serial, sha256.sum(log.bytes()).hex())!
+	restore(root, fixture, exported, serial, sha256.sum(log.bytes()).hex(), selected)!
 	assert os.read_bytes(root + '/results/d/log')! == data
 	assert os.lstat(root + '/results/d/log')!.mode & 0o777 == 0o640
 	assert os.readlink(root + '/results/font')! == '/pinned/font'
 	assert os.read_file(root + '/archive.json')! == payload
-	if _ := restore(root, fixture, exported, serial, sha256.sum(log.bytes()).hex()) {
+	receipt := json2.decode[map[string]json2.Any](os.read_file(root + '/import.json')!)!
+	assert receipt['scope']!.str() == selected.scope
+	if _ := restore(root, fixture, exported, serial, sha256.sum(log.bytes()).hex(), selected) {
 		return error('existing output accepted')
 	}
-	println('BROWSER-COLLECT SELF-TEST PASS complete-export binary modes links checksum ordering truncation duplicate traversal parent inode fresh-output')
+	println(selected.label + ' SELF-TEST PASS complete-export binary modes links checksum ordering truncation duplicate traversal parent inode fresh-output foreign-protocol scope')
+}
+
+fn self_test() ! {
+	self_test_protocol(protocol(false))!
+	self_test_protocol(protocol(true))!
 }
 
 fn run() ! {
-	if os.args.len != 3 { return error('usage: collect SERIAL_LOG FRESH_EXTERNAL_RESULTS') }
-	serial, root := os.args[1], os.args[2]
+	headless := os.args.len == 4 && os.args[1] == '--headless'
+	if !headless && os.args.len != 3 { return error('usage: collect [--headless] SERIAL_LOG FRESH_EXTERNAL_RESULTS') }
+	selected := protocol(headless)
+	offset := if headless { 1 } else { 0 }
+	serial, root := os.args[1 + offset], os.args[2 + offset]
 	st := os.lstat(serial)!
 	if st.get_filetype() != .regular || st.size > 256 * 1024 * 1024 {
 		return error('regular bounded serial log required')
 	}
 	log := os.read_file(serial)!
 	if u64(log.len) != st.size { return error('serial log changed size while reading') }
-	exported := parse_export(log)!
+	exported := parse_export(log, selected)!
 	archive := validate(exported.payload)!
-	restore(root, archive, exported, serial, sha256.sum(log.bytes()).hex())!
-	println('BROWSER-COLLECT PASS entries=' + archive.entries.len.str() + ' sha256=' + exported.sha256)
+	restore(root, archive, exported, serial, sha256.sum(log.bytes()).hex(), selected)!
+	println(selected.label + ' PASS entries=' + archive.entries.len.str() + ' sha256=' + exported.sha256)
 }
 
 fn main() {
