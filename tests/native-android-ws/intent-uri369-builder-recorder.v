@@ -147,5 +147,31 @@ fn run() ! {
 }
 
 fn main() {
+	if os.args.len >= 3 && os.args[1] == '--hash' {
+		for path in os.args[2..] { println(hash(path)! + ' ' + path) }
+		return
+	}
+	if os.args.len >= 4 && os.args[1] == '--invoke' {
+		prefix := os.args[2]
+		assert prefix.starts_with(state + '/intent-uri369-')
+		for suffix in ['-before.json', '-invocation.json', '.log'] { assert !os.exists(prefix + suffix) }
+		argv := os.args[3..]
+		pin := hash(argv[0])!
+		mut receipt := {'argv': json2.Any(argv), 'working_directory': json2.Any(os.getwd()),
+			'started_utc': json2.Any(time.utc().str()), 'executable_sha256_before': json2.Any(pin),
+			'recorder_source_sha256': json2.Any(hash(@FILE)!),
+			'recorder_binary_sha256': json2.Any(hash(os.executable())!)}
+		write_json(prefix + '-before.json', receipt)!
+		result := os.exec(argv)
+		os.write_file(prefix + '.log', result.output)!
+		receipt['completed_utc'] = time.utc().str()
+		receipt['exit_code'] = result.exit_code
+		receipt['executable_sha256_after'] = hash(argv[0])!
+		receipt['output_sha256'] = hash(prefix + '.log')!
+		write_json(prefix + '-invocation.json', receipt)!
+		print(result.output)
+		assert result.exit_code == 0 && hash(argv[0])! == pin, result.output
+		return
+	}
 	run() or { eprintln(err); exit(1) }
 }
