@@ -95,18 +95,29 @@ fn cf_string_length(object u64) i64 {
 fn cf_string_get_bytes(object u64, range CFRange, encoding u32, loss u8, external bool, buffer u64, max_length i64, used &i64) i64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
-	if encoding !in [u32(0x08000100), 0x0600] { panic('iOS: CFString output encoding is not implemented') }
+	if encoding !in [u32(0x08000100), 0x0600, 0x100, 0x14000100, 0x10000100] { panic('iOS: CFString output encoding is not implemented') }
 	length := cf_string_length(object)
 	if range.location < 0 || range.length < 0 || range.location > length || range.length > length - range.location || max_length < 0 {
 		panic('iOS: invalid CFString range or output buffer')
 	}
-	_ = external // UTF-8/ASCII output has no byte-order marker.
 	text := string_text(object)
 	mut offset := 0
 	mut unit := i64(0)
 	mut converted := i64(0)
 	mut written := i64(0)
-	query := buffer == 0 || max_length == 0
+	// Native UTF-8 treats capacity zero as a sizing query even with a buffer.
+	query := buffer == 0 || (encoding == 0x08000100 && max_length == 0)
+	utf16 := encoding in [u32(0x100), 0x14000100, 0x10000100]
+	big_endian := encoding == 0x10000100
+	if encoding == 0x100 && external {
+		// Native CF writes its BOM even below capacity two. Keep this bounded.
+		if !query && max_length < 2 {
+			if used != unsafe { nil } { unsafe { *used = 0 } }
+			return 0
+		}
+		if !query { unsafe { *(&u8(buffer)) = 0xff; *(&u8(buffer + 1)) = 0xfe } }
+		written = 2
+	}
 	for offset < text.len && unit < range.location + range.length {
 		start := offset
 		first := text[offset]
@@ -117,7 +128,28 @@ fn cf_string_get_bytes(object u64, range CFRange, encoding u32, loss u8, externa
 		selected_start := if unit < range.location { range.location } else { unit }
 		selected_end := if unit + units > range.location + range.length { range.location + range.length } else { unit + units }
 		selected := selected_end - selected_start
-		if encoding == 0x08000100 {
+		if utf16 {
+			mut scalar := u32(first)
+			if width > 1 {
+				scalar = u32(first & (u8(0x7f) >> width))
+				for index in 1 .. width { scalar = (scalar << 6) | u32(text[start + index] & 0x3f) }
+			}
+			for index := selected_start - unit; index < selected_end - unit; index++ {
+				if !query && max_length - written < 2 {
+					if used != unsafe { nil } { unsafe { *used = written } }
+					return converted
+				}
+				value := if units == 1 { u16(scalar) } else if index == 0 { u16(0xd800 + ((scalar - 0x10000) >> 10)) } else { u16(0xdc00 + ((scalar - 0x10000) & 0x3ff)) }
+				if !query {
+					unsafe {
+						*(&u8(buffer + u64(written))) = if big_endian { u8(value >> 8) } else { u8(value) }
+						*(&u8(buffer + u64(written) + 1)) = if big_endian { u8(value) } else { u8(value >> 8) }
+					}
+				}
+				written += 2
+				converted++
+			}
+		} else if encoding == 0x08000100 {
 			if selected != units || (!query && i64(width) > max_length - written) { break }
 			if !query { unsafe { C.memcpy(voidptr(buffer + u64(written)), text.str + start, usize(width)) } }
 			written += width
@@ -141,9 +173,9 @@ fn cf_string_get_cstring(object u64, buffer u64, capacity i64, encoding u32) boo
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if buffer == 0 || capacity <= 0 { return false }
+	if encoding !in [u32(0x08000100), 0x0600] { panic('iOS: CFString C-string encoding is not implemented') }
 	mut used := i64(0)
 	length := cf_string_length(object)
-	// A zero-sized CFStringGetBytes call is a query, so handle capacity == 1 here.
 	if capacity == 1 && length != 0 { return false }
 	converted := cf_string_get_bytes(object, CFRange{0, length}, encoding, 0, false, buffer, capacity - 1, &used)
 	if converted != length { return false }

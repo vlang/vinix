@@ -36,7 +36,7 @@ fn main() {
 	listing := os.exec(['git', 'ls-tree', '-r', '--name-only', revision, '--', 'compat/ios', 'tests/ios/native-checks.v', 'tests/ios/native-init.v', 'tests/ios/notification-checks.v', 'tests/ios/notification-vm.v', 'tests/ios/image-initializers-evidence.v', 'tests/ios/image-initializers-input-inventory.v', 'tests/ios/string-character-search-evidence.v', 'tests/ios/scene-notifications-evidence.v', 'tests/ios/foundation-file-memory-evidence.v', 'tests/ios/foundation-http-evidence.v', 'tests/ios/probe-memory-evidence.v', 'tests/ios/probe-fault-evidence.v', 'tests/ios/probefault', 'tests/ios/probebudget', 'tests/ios/tlsbuild', 'tests/ios/startup-host.v', 'tests/ios/inspect-string-character-search.v', 'tests/ios/inspect-scene-notifications.v', 'tests/ios/inspect-probe-fault.v'])
 	if listing.exit_code != 0 { panic(listing.output) }
 	mut paths_in_revision := listing.output.trim_space().split_into_lines()
-	for checker in ['tests/ios/search-path-run.v', 'tests/ios/search-path-evidence.v', 'tests/ios/inspect-search-path-calls.v', 'tests/ios/probe-vm-evidence.v', 'tests/ios/probe-vm-tags-evidence.v', 'tests/ios/block-byref-evidence.v', 'tests/ios/dictionary-snapshot-evidence.v', 'tests/ios/inspect-dictionary-snapshot-fault.v', 'tests/ios/inline-pthread-self-run.v', 'tests/ios/inline-pthread-self-evidence.v'] {
+	for checker in ['tests/ios/cf-string-output-run.v', 'tests/ios/cf-string-output-evidence.v', 'tests/ios/inspect-cf-string-output.v', 'tests/ios/search-path-run.v', 'tests/ios/search-path-evidence.v', 'tests/ios/inspect-search-path-calls.v', 'tests/ios/probe-vm-evidence.v', 'tests/ios/probe-vm-tags-evidence.v', 'tests/ios/block-byref-evidence.v', 'tests/ios/dictionary-snapshot-evidence.v', 'tests/ios/inspect-dictionary-snapshot-fault.v', 'tests/ios/inline-pthread-self-run.v', 'tests/ios/inline-pthread-self-evidence.v'] {
 		listing_checker := os.exec(['git', 'ls-tree', '-r', '--name-only', revision, '--', checker])
 		if listing_checker.exit_code != 0 { panic(listing_checker.output) }
 		if listing_checker.output.trim_space() == checker { paths_in_revision << checker }
@@ -86,6 +86,7 @@ fn main() {
 	for path in ['/opt/homebrew/opt/llvm/bin/clang', '/opt/homebrew/opt/llvm/bin/llvm-ar', '/opt/homebrew/opt/llvm/bin/llvm-objdump', '/usr/bin/clang', '/usr/bin/ar', '/usr/bin/openssl', '/etc/ssl/cert.pem',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSObject.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSPathUtilities.h',
+		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/CoreFoundation.framework/Versions/A/Headers/CFString.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/objc/runtime.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/iOSSupport/System/Library/Frameworks/UIKit.framework/Versions/A/Headers/UIScene.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/iOSSupport/System/Library/Frameworks/UIKit.framework/Versions/A/UIKit.tbd',
