@@ -1,5 +1,35 @@
 # Current account transport and store library, 2026-10-26
 
+The r6 retained-source AArch64 account library build passed with trusted APK
+authenticator metadata discovery and the operation-6 description query. It
+captures the metadata parser (`638e9984c`) and broker/client query (`1507fec33`)
+while preserving the existing token store and transport APIs. All 75 public
+functions declared by the retained client sources are defined text symbols.
+This checks ABI completeness; it does not establish Google account login.
+
+- Complete retained bundle: `/Users/alex/.local/state/vinix/android/current-account-build-2026-10-26-r6`.
+- Bundle `sha256.json`: `0cfc569921b7afee59e538064e91683868200fe2b62f34da887636cde58fc0a4`.
+- `lib/libvinix-android-account.so`: `5db6b9f206460fdd8418a43a5e8f53ab706f622d6f0c21985c87fd627a9b19c1`.
+- Retained SQLite: `5a228127ca3ffa0c88bcae0aa5f7ab10e15b383dfb46822c573013105628bbaa`.
+- Source revision: `bd119e164cb7aa4f5bb4c6910015d8b4bbe3a054`.
+- Builder implementation: `a3e6718c3`; retained builder source SHA256: `6373dd5181bcdea1fc91185c09b79cff222890744ab4e05ac96a822f730c30fa`.
+
+The ZIP metadata reader uses the retained PIC static zlib producer
+`account-zlib-static-build-2026-10-26-r1`, manifest SHA256
+`f2652acfdf8963998d51d767990ac72daae4c54a9ee6e956327cdf2ee462272f`.
+The bundle includes its complete inventory, provenance, headers and archive
+`40238b02e19ba4776180f997828faadddc5347f379b70b031ef8629b6e75fee0`.
+Both the consumed headers and exact static archive are checked; dynamic zlib
+inputs are rejected. The producer is verified again after the consumer build.
+
+Builder self-tests and the actual producer check passed. The strict PIC compile,
+`-z defs` shared link, ELF, consumed-header, dependency and complete inventory
+checks passed. Compiler and r5 dependency pins remain those below. Pair this
+library with the descriptions framework and rebuilt JNI, launcher and broker;
+guest authenticator discovery and account sign-in require separate evidence.
+
+## Previous r5 evidence
+
 The retained-source AArch64 account library build passed, including the SQLite
 account store, token cache and synchronous token invalidation. This is build
 and host behavior evidence; Google account login needs separate guest evidence.
