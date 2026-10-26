@@ -922,7 +922,8 @@ throw v0')
 	os.write_file(smali + '/Main.smali', main_class)!
 	manifest := '<?xml version="1.0"?><manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.vinix.bootstrap" android:versionCode="1" android:versionName="1"><uses-sdk android:minSdkVersion="23"/><application android:name=".App" android:label="Runtime fixture"><activity android:name=".Main" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity><provider android:name=".Low" android:authorities="fixture.low" android:initOrder="10"/><provider android:name=".High" android:authorities="fixture.high;fixture.alias" android:initOrder="100"/><provider android:name=".MustNotLoadDisabled" android:authorities="fixture.disabled" android:enabled="false"/><provider android:name=".MustNotLoadOtherProcess" android:authorities="fixture.other" android:process=":other"/></application></manifest>'
 	os.write_file(output + '/AndroidManifest.xml', manifest.replace('</application>',
-		'<service android:name=".BindingService" android:exported="false"/></application>'))!
+		'<service android:name=".BindingService" android:exported="false"/>' +
+		'<service android:name=".ServiceStopService" android:exported="false"/></application>'))!
 	checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', output + '/smali', '-o',
 		output + '/classes.dex'])
  os.mkdir_all(output + '/compiled-res')!
