@@ -7,6 +7,7 @@ import os
 import nativeapk
 import nativeidentity
 import nativecache
+import nativeaccountauth
 
 #include <sys/resource.h>
 struct C.rlimit {
@@ -69,6 +70,7 @@ fn run() ! {
 	data_root := os.getenv_opt('XDG_DATA_HOME') or { (os.getenv_opt('HOME') or { '/root' }) + '/.local/share' }
 	data := os.getenv_opt('ANDROID_APP_DATA_DIR') or { data_root + '/vinix/android/' + os.base(apk) + '_' }
 	identity := nativeidentity.from_environment()!
+	nativeaccountauth.verify_environment_launch(apk, identity.uid, identity.gid, identity.enabled)!
 	identity.activate(apk, root, os.getenv('VINIX_SURFACE_PATH'))!
 	nativecache.prepare()!
 	os.mkdir_all(data)!
