@@ -689,3 +689,56 @@ ffba1cb35c74b11d035661dd7e66108dea5bee7200195ca57a11508191cd5290  tools/packages
 57665ad238efda0166fa0a00fb2c861b4988a82ba7bd94ac665ec6fe10777e01  tools/packages/winejitstream/native_wait_test.v
 a09498d71da51f11d3beee34992a601767b5d5b5b51d41fa7e1a1a4246a618be  tests/packages/wine-fork-jit-stream-width-host.v
 ```
+
+## Standalone caller marker followup
+
+After `4ebaeda2220327bf512f50a0cb0b2c57dfc61cfd`, source review found that
+the controller itself selected `V_MACOS_V3_NO_FALLBACK=1` but recorded its
+caller value as absent. The qualified overlay's `vlib/v/pref/pref.v`
+restores delegated child environments from those caller markers, so absence
+could remove the child prohibition. Direct compiler checks still observed
+the actual value `1`; no fallback is established by this source defect.
+The controller now selects both `V_MACOS_V3_CALLER_NO_FALLBACK` and
+`V_MACOS_V3_CALLER_NO_FALLBACK_PRESENT` as `1`, matching the host-16 observer.
+The child compiler marker remains absent with its presence marker `0`.
+Independent source review checked this narrow fix against the qualified
+overlay. Host-16 and its complete evidence above remain unchanged.
+
+The first followup in external `wine-jit-stream-native-host-17` timed out
+the production controller build at 60,031 ms: raw wait status `9`,
+`timed_out=true`, leader reaped and group absent. Its complete failed state
+is preserved. Fresh `wine-jit-stream-native-host-18` used a reviewed
+120-second bound and completed that one host production build in 62,529 ms,
+raw wait status `0`, without timeout or size limit. Its external bootstrap
+completed with status `0` in 36,770 ms. The coherent caller environment,
+private empty modules and all 7,258 selected static inputs matched before
+and after; their binding digest was
+`df06b7a1a5d8290684062a037e8c611473bc12ac39684be3a7840e03e6bebfe4`.
+The rebuilt controller SHA-256 is
+`d7239ec811f723c1c93d82871f618e40af3154605584948d372cbc631b1ca820`;
+its source SHA-256 is
+`73d2faeed2d0184c6d237d37048b490e5dfa9c2c1a9c75bb33e9c8d1f6fe48d1`.
+No controller execution, target compilation, staging or VM ran.
+
+Under `/Users/alex/Library/Caches/vinix-codex/section14`, the original
+complete checker passed both retained states. The manifests are
+`wine-jit-stream-native-caller-seal-01/17/complete/inventory.json`
+(`095e76d14c08e5a0714d5cba00a9e2bbe8b1d2fbeb854a5b6391d02164297337`)
+and `wine-jit-stream-native-caller-seal-01/18/complete/inventory.json`
+(`f65f6db35abfdcc833cf4e9fb74c6c173708327a663edd68f6b1b1003a44893e`).
+Host-08 through host-18 and both width/caller seals total 34,483,736 logical
+bytes within the collective 40 MiB cap; with the prior 56,318,391-byte
+profile and 2 MiB reserve, the inclusive charge is 92,899,279 bytes within
+128 MiB. Final actual `df -k` showed 37,701,152 KiB available. Bootstrap
+and input inventories remain outside the guarded compiler child; host SDK
+and transitive dynamic dependencies remain unfrozen. Prepared target
+execution is still required.
+
+The old fault kernel's private source revision
+`c6b5455ee837f44b843d03255294c8b610ad7635` and matched build-05's baseline
+`9acefa77bee69247c837e97987a2377536aa41cc` have identical signal, clone and
+process source. Their complete kernel source diff changes only `elf/elf.v`,
+`memory/aligned.v` and `memory/heap_selftest.v`. The later process-wide
+one-shot handler, Linux action-flag and automatic alternate-stack disarming
+changes on main are absent from that matched baseline. A retest using it
+must preserve this distinction when interpreting the result.

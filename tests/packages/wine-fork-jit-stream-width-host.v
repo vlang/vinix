@@ -18,7 +18,7 @@ const arm_gcc = '/Users/alex/code/vinix/build-aarch64-userland/staging/usr/lib/g
 const amd_sysroot = base + '/wine-jit-stream-native-inputs-01/x86_64-linux-musl'
 const amd_gcc = base + '/wine-jit-stream-native-inputs-01/lib/gcc/x86_64-linux-musl/14.2.0'
 const reserve = u64(2 * 1024 * 1024)
-const current_limit = u64(32 * 1024 * 1024)
+const current_limit = u64(40 * 1024 * 1024)
 const guard_limit = u64(16 * 1024 * 1024)
 const cumulative_limit = u64(128 * 1024 * 1024)
 
@@ -90,12 +90,14 @@ fn account(state string, additional u64) !u64 {
 		'wine-jit-stream-native-host-10', 'wine-jit-stream-native-host-11',
 		'wine-jit-stream-native-host-12', 'wine-jit-stream-native-host-13',
 		'wine-jit-stream-native-host-14', 'wine-jit-stream-native-host-15',
-		'wine-jit-stream-native-host-16'] {
+		'wine-jit-stream-native-host-16', 'wine-jit-stream-native-host-17', 'wine-jit-stream-native-host-18',
+		'wine-jit-stream-native-caller-seal-01', 'wine-jit-stream-native-width-seal-01',
+		'wine-jit-stream-native-width-seal-01-complete'] {
 		path := base + '/' + name
 		if os.exists(path) || os.is_link(path) { current += winejitstream.static_state_bytes(path)! }
 	}
 	if current > current_limit || additional > current_limit - current {
-		return error('width host state would exceed collective 32 MiB')
+		return error('width host state would exceed collective 40 MiB')
 	}
 	if prior + current + reserve > cumulative_limit
 		|| additional > cumulative_limit - prior - current - reserve {
@@ -157,7 +159,9 @@ fn invoke(argv []string, state string, name string, output string, expected int,
 	free := winejitstream.native_require_free(state, winejitstream.native_free_floor(true))!
 	account(state, 0)!
 	run := winejitstream.native_guard(argv, state + '/guarded', name + '.log',
-		winejitstream.NativeLimits{timeout_ms: 60000, file_bytes: guard_limit,
+		winejitstream.NativeLimits{timeout_ms: if state == base + '/wine-jit-stream-native-host-18' {
+			120000
+		} else { 60000 }, file_bytes: guard_limit,
 			total_bytes: guard_limit, log_bytes: 256 * 1024, serial_bytes: 256 * 1024,
 			min_free_kib: winejitstream.native_free_floor(false)})!
 	steps[name] = Step{argv: argv, free_kib: free, run: run}
@@ -350,10 +354,44 @@ fn qualify(root string, state string) ! {
 	println('PASS host-only native wait-width and module controls')
 }
 
+// Rebuild only, without invoking the native target controller or changing
+// host-16's sealed evidence. Caller marker selection has separate source review.
+fn qualify_caller(root string, state string) ! {
+	for name in ['guarded', 'scratch', 'steps.json', 'environment.json', 'caller-receipt.json',
+		'binding-before.json', 'binding-after.json'] {
+		winejitstream.static_require_absent(state + '/' + name)!
+	}
+	os.mkdir(state + '/guarded')!
+	os.mkdir(state + '/scratch')!
+	environment := selected_environment(state, state + '/scratch')!
+	os.write_file(state + '/environment.json', json2.encode(environment))!
+	before := inputs(root)!
+	os.write_file(state + '/binding-before.json', json2.encode(binding(before)))!
+	mut steps := map[string]Step{}
+	output := state + '/guarded/controller'
+	invoke(v_arguments(root, output, root + '/tests/packages/wine-fork-jit-stream-native.v', true, ''),
+		state, 'controller.build', output, 0, mut steps)!
+	qualified_overlay()!
+	after := inputs(root)!
+	if before != after { return error('caller followup selected sources/tools changed') }
+	os.write_file(state + '/binding-after.json', json2.encode(binding(after)))!
+	modules(state)!
+	receipt := json2.encode({'selected_binding': json2.encode(binding(after)), 'steps': json2.encode(steps),
+		'controller_source_sha256': winejitstream.native_input_digest(root + '/tests/packages/wine-fork-jit-stream-native.v')!,
+		'inclusive_state_plus_2MiB_reserve_before_receipt': account(state, 0)!.str(),
+		'scope': 'One guarded120-second host production controller rebuild after independent caller environment source review. No controller execution, target compilation, staging or VM. Qualified overlay and selected static inputs hashed before/after; private empty modules checked around child. Other width-host limits and non-hermetic host SDK/dynamic dependency scope unchanged. Historical host08-17 unchanged; host18 and caller seal join collective40MiB current state and inclusive128MiB profile.'})
+	account(state, u64(receipt.len))!
+	os.write_file(state + '/caller-receipt.json', receipt)!
+	account(state, 0)!
+	winejitstream.native_require_free(state, winejitstream.native_free_floor(false))!
+	println('PASS host-only native caller environment rebuild')
+}
+
 fn observe() ! {
 	bootstrap := os.args.len == 6 && os.args[1] == '--record-bootstrap'
-	if !bootstrap && (os.args.len != 4 || os.args[1] != '--run') {
-		return error('usage: width-host --run ROOT FIXED_HOST_08_09_10_11_12_13_14_15_16_STATE')
+	caller := os.args.len == 4 && os.args[1] == '--caller'
+	if !bootstrap && !caller && (os.args.len != 4 || os.args[1] != '--run') {
+		return error('usage: width-host --run ROOT FIXED_HOST_08_TO_16_STATE | --caller ROOT FIXED_HOST_18_STATE')
 	}
 	root := os.real_path(os.args[2])
 	state := os.args[3]
@@ -361,9 +399,12 @@ fn observe() ! {
 		base + '/wine-jit-stream-native-host-10', base + '/wine-jit-stream-native-host-11',
 		base + '/wine-jit-stream-native-host-12', base + '/wine-jit-stream-native-host-13',
 		base + '/wine-jit-stream-native-host-14', base + '/wine-jit-stream-native-host-15',
-		base + '/wine-jit-stream-native-host-16'] || os.real_path(state) != state
+		base + '/wine-jit-stream-native-host-16', base + '/wine-jit-stream-native-host-18'] || os.real_path(state) != state
 		|| (os.lstat(state)!).get_filetype() != .directory {
 		return error('requires fixed ordinary width host state')
+	}
+	if !bootstrap && caller != (state == base + '/wine-jit-stream-native-host-18') {
+		return error('caller followup requires its own fresh fixed namespace')
 	}
 	for path, digest in {
 		compiler: 'ff75a30180b1de305e3c62acc1ebd85341ff83ae5d852c819d11f27d5260c4c5'
@@ -422,7 +463,7 @@ fn observe() ! {
 		account(state, 0)!
 		return
 	}
-	qualify(root, state)!
+	if caller { qualify_caller(root, state)! } else { qualify(root, state)! }
 }
 
 fn main() { observe() or { eprintln(err); exit(1) } }

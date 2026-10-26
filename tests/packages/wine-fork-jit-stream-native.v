@@ -159,13 +159,13 @@ fn native_run() ! {
 	for name in ['V', 'VEXE', 'VINIX_V_COMPILER', 'V_MACOS_V3_CALLER_VEXE'] {
 		os.setenv(name, v, true)
 	}
-	for name in ['V_MACOS_V3_CALLER_VEXE_PRESENT', 'V_MACOS_V3_NO_FALLBACK',
+	for name in ['V_MACOS_V3_CALLER_VEXE_PRESENT', 'V_MACOS_V3_CALLER_NO_FALLBACK',
+		'V_MACOS_V3_CALLER_NO_FALLBACK_PRESENT', 'V_MACOS_V3_NO_FALLBACK',
 		'V_C_ERROR_BUG_REPORT_DISABLED'] {
 		os.setenv(name, '1', true)
 	}
 	os.setenv('V_MACOS_V3_CALLER_VCHILD_PRESENT', '0', true)
-	os.setenv('V_MACOS_V3_CALLER_NO_FALLBACK_PRESENT', '0', true)
-	for name in ['VCHILD', 'V_MACOS_V3_CALLER_VCHILD', 'V_MACOS_V3_CALLER_NO_FALLBACK',
+	for name in ['VCHILD', 'V_MACOS_V3_CALLER_VCHILD',
 		'V_MACOS_V3_CHILD_VEXE_PRESENT'] {
 		os.unsetenv(name)
 	}
