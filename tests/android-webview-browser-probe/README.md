@@ -48,6 +48,13 @@ dynamic `bin/browser-probe` and static `bin/browser-session` and
 collector), and records commands, hashes, compiler pins, and selected base
 runtime references in `build.json` and `addon-files.json`.
 
+For a complete prepared-tree inventory before guest staging, build
+`inventory.v`, run its `--self-test`, then use
+`inventory --write OUTPUT EXTERNAL_MANIFEST` and
+`inventory --check OUTPUT EXTERNAL_MANIFEST`. The manifest records child
+directory/file modes, content hashes and symlink targets without following
+links. Keep it outside `OUTPUT`; creation refuses an existing manifest.
+
 For an Xvfb startup fault investigation, preparation accepts an optional final
 `FAULT_BUILD_DIR` from the maintained
 [`android-x11-fault-probe`](../android-x11-fault-probe) builder. It copies the
