@@ -300,14 +300,15 @@ Imports:    2,239 (chained fixups)
 
 The 2026-10-26 diagnostic launch with `--probe-no-ads` passes the remaining
 SKAdNetwork import, initializer-table collection and Swift image metadata
-registration. It reaches Objective-C `+load`, then stops at
-`GDTCORApplication +load` with signal 11 and guest exit status 139, before
-application initializers or entry. Implementing checked NSString character-set
-searches cleared the preceding `FIRMessaging +load` failure. The host sanitizer
-probe identifies a null read in application code at preferred PC `0x10009b674`.
-Rendering, login and gameplay remain unverified. The ordinary launch
+registration. Both host and Vinix guest probes pass all nine Objective-C
+`+load` methods and reach image initialization. Resolving the scene foreground
+notification export cleared the preceding null read at preferred PC
+`0x10009b674` in `GDTCORApplication +load`. Startup now reports unsupported
+`NSData dataWithContentsOfURL:` on a worker and `NSProcessInfo physicalMemory`
+during application initialization, with process exit status 1. Application
+entry, rendering, login and gameplay remain unverified. The ordinary launch
 still requires SKAdNetwork; advertising work is skipped. See the
-[diagnostic checkpoint](../tests/ios/string-character-search-checkpoint-20261026.md).
+[diagnostic checkpoint](../tests/ios/scene-notifications-checkpoint-20261026.md).
 
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
