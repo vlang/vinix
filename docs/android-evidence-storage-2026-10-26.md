@@ -78,3 +78,22 @@ To audit later, verify the adjacent archive checksum, restore it into a fresh
 directory with `/usr/bin/tar -xSzpf`, then invoke the preserved unchanged checker
 with restored root, original manifest SHA-256 and a fresh external receipt path.
 The original checker remains complete; it was not changed for cold storage.
+
+## Read-only rehydration feasibility
+
+`tests/native-android-ws/inflater290-rehydrate-analysis.v` accounts for all 751
+regular members, including the manifest, using the retained typed inventory and
+archive listing. Actual file hashes in successful Framework290/288 bundles match
+736 members totaling 153,700,506 bytes. The remaining 15 members total 426,614
+bytes: failure receipts/logs, two generator copies, source inventories and the
+original manifest. Both R8 copies and the historical V compiler have matching
+donors. No file was cloned or restored, and the archive/checksum remain intact.
+
+The read-only receipt is
+`/Users/alex/.local/state/vinix/android/inflater290-rehydrate-analysis-final-2026-10-26.json`,
+SHA-256 `daccb79ac50ee22e0142ec69d3e051c91ac85b85821d878ca5ad16c51b6d7ed0`.
+It records each expected hash, size, mode and validated donor, plus consumed
+source/binary and manifest pins. A future clone rehydration would require fresh
+donor checks, full typed comparison and unchanged original-auditor passes before
+changing archive retention. That work was paused when unrelated storage release
+restored the build gates; the complete archive remains the retained original.
