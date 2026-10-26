@@ -249,14 +249,28 @@ fn cached_payload_progress(config Config, installed Installed, payload Payload, 
 	return path
 }
 
+// XDG string values interpret backslash escapes; encode boundary spaces as \s.
+// Encode directly into the existing builder; the signed metadata stays intact.
+fn desktop_entry_value(mut text strings.Builder, value string) {
+	mut first := 0
+	for first < value.len && value[first] == ` ` { first++ }
+	mut end := value.len
+	for end > first && value[end - 1] == ` ` { end-- }
+	for index, byte in value {
+		if byte == `\\` { text.write_string('\\\\') }
+		else if byte == ` ` && (index < first || index >= end) { text.write_string('\\s') }
+		else { text.write_u8(byte) }
+	}
+}
+
 fn desktop_entry(p Package) string {
-	mut capacity := 256 + p.name.len + p.description.len + 2 * p.id.len + p.runtime.len + p.associations.len
+	mut capacity := 256 + 2 * p.name.len + 2 * p.description.len + 2 * p.id.len + p.runtime.len + p.associations.len
 	for mime in p.associations { capacity += mime.len }
 	mut text := &strings.Builder(strings.new_builder(capacity))
 	// Builder is an array alias: retire both its buffer and owned descriptor.
 	defer { unsafe { text.free(); free(voidptr(text)) } }
-	text.write_string('[Desktop Entry]\nType=Application\nName='); text.write_string(p.name)
-	text.write_string('\nComment='); text.write_string(p.description)
+	text.write_string('[Desktop Entry]\nType=Application\nName='); desktop_entry_value(mut text, p.name)
+	text.write_string('\nComment='); desktop_entry_value(mut text, p.description)
 	text.write_string('\nExec=/usr/bin/vinix-package run '); text.write_string(p.id)
 	text.write_string(' %F\nTerminal=false\nMimeType=')
 	for i, mime in p.associations { if i > 0 { text.write_u8(`;`) }; text.write_string(mime) }
