@@ -518,12 +518,15 @@ v -cc cc -path '@vlib|@vmodules|build-support/android' -o build/android-maps/sui
 
 Account listeners retain their registrations and deliver an empty snapshot on
 the requested Handler (or the main Looper). Duplicate registrations fail and
-removal permits registration again. Vinix has no account authenticator or stored
-accounts. Package-scoped account queries return fresh empty snapshots for both
+removal permits registration again. Vinix has no registered account authenticator
+or stored accounts. Package-scoped account queries return fresh empty snapshots for both
 typed and all-type requests. The service fixture checks these through the client
 and companion contexts and on the service executor.
 Account insertion explicitly throws without reading or logging supplied
-credentials. Authenticator dispatch, account storage and authentication tokens
+credentials. Asynchronous account addition returns a completed failed future
+and posts its callback on the supplied Handler, or the main Looper. Its result
+throws `AuthenticatorException`; it never invents a successful account.
+Authenticator dispatch, account storage and authentication tokens
 are not implemented; see the [Maps sign-in probe](../../../docs/maps-google-signin.md).
 External-storage path queries validate the runtime's ordinary, non-removable
 directory. Process CPU time reads the kernel's process CPU clock.
@@ -633,9 +636,12 @@ workflow](../../../docs/maps372-qualified-intent-replay.md). That replay complet
 route origin, driving and walking route selection, and successive Route Preview
 instructions. Its report pins the tested runtime and genuine guest PNGs.
 Live GPS navigation and map layer changes remain unverified. Google account
-sign-in is unsupported: the [sign-in probe](../../../docs/maps-google-signin.md)
-reaches the account chooser, then exits on **Add account** because the account
-callback API is missing.
+sign-in is unsupported. The [sign-in probe](../../../docs/maps-google-signin.md)
+reproduced an **Add account** crash from a missing callback API. That API is now
+implemented with an asynchronous authenticator error. A fresh Maps guest
+returned to onboarding without exiting, reopened and cancelled the chooser,
+then reached the map screen through Skip. Real account creation requires the
+missing authenticator and browser paths.
 Advanced Canvas paths/transforms,
 text selection/shaping, on-screen keyboards, drag scrolling, popup tabs, services and
 modern Android APIs remain incomplete. NinePatch images currently stretch.
