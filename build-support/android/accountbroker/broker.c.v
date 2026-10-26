@@ -160,6 +160,17 @@ fn (mut b Broker) admit(incoming Incoming) ! {
 		output:     output
 		caller:     incoming.authorized.caller
 	}
+	// Metadata belongs to the trusted APK registry, not the authenticator
+	// process. Admission has already authenticated the socket's kernel peer.
+	if incoming.authorized.request.operation == .get_authenticator_types {
+		descriptions := b.registry.authenticator_descriptions(b.selected) or {
+			b.fail(id, 1, 'Account authenticator metadata is unavailable')!
+			return
+		}
+		defer { nativeaccountauth.dispose_authenticator_descriptions(descriptions) }
+		b.finish(id, accountipc.Event{kind: .authenticators, id: id, authenticators: descriptions})!
+		return
+	}
 	if b.service == unsafe { nil } {
 		b.fail(id, 1, 'Account authenticator is unavailable')!
 		return
@@ -250,6 +261,7 @@ fn (mut b Broker) finish(id u64, event accountipc.Event) ! {
 		id:          session.request
 		options:     event.options
 		accounts:    event.accounts
+		authenticators: event.authenticators
 		interaction: event.interaction
 	}
 	bytes := accountipc.encode_event(client_event, false)!

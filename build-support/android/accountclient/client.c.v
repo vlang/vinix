@@ -38,6 +38,7 @@ mut:
 	closed     bool
 	terminal   bool
 	id         u64
+	operation  nativeaccountauth.Operation
 	request    []u8
 	used       int
 	started    i64
@@ -80,7 +81,8 @@ pub fn submit(request nativeaccountauth.Request, endpoint string) !&Client {
 	}
 	ok = true
 	frame_owned = false
-	return &Client{ fd: int(fd), connecting: !connected, id: request.id, request: frame, started: time.sys_mono_now() }
+	return &Client{ fd: int(fd), connecting: !connected, id: request.id,
+		operation: request.operation, request: frame, started: time.sys_mono_now() }
 }
 
 fn (mut c Client) fail() {
@@ -165,7 +167,9 @@ pub fn (mut c Client) read(timeout int) !bool {
 		c.fail()
 		return err
 	}
-	if event.id != c.id || event.kind !in [.result, .failure, .accounts, .interaction, .continued] {
+	if event.id != c.id || event.kind !in [.result, .failure, .accounts, .interaction, .continued, .authenticators]
+		|| (event.kind == .authenticators && c.operation != .get_authenticator_types)
+		|| (c.operation == .get_authenticator_types && event.kind !in [.authenticators, .failure]) {
 		accountipc.dispose_event(event)
 		c.fail()
 		return error('account broker returned an unrelated event')

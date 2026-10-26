@@ -17,6 +17,7 @@ pub enum Operation {
 	redeem_interaction = 3
 	get_auth_token = 4
 	invalidate_auth_token = 5
+	get_authenticator_types = 6
 }
 
 pub enum ScalarKind {
@@ -90,7 +91,7 @@ fn append_string(mut bytes []u8, value ?string) ! {
 
 fn validate_request(request Request) ! {
 	if request.id == 0 { return error('account request ID must be nonzero') }
-	if request.operation !in [.get_accounts, .add_account, .redeem_interaction, .get_auth_token, .invalidate_auth_token] {
+	if request.operation !in [.get_accounts, .add_account, .redeem_interaction, .get_auth_token, .invalidate_auth_token, .get_authenticator_types] {
 		return error('unknown account operation')
 	}
 	if request.operation == .redeem_interaction {
@@ -103,6 +104,13 @@ fn validate_request(request Request) ! {
 		return
 	}
 	if request.redemption != none { return error('unexpected account interaction ticket') }
+	if request.operation == .get_authenticator_types {
+		if request.account_name != none || request.account_type != none || request.auth_token_type != none
+			|| request.token_value != none || request.features.len != 0 || request.options.len != 0 {
+			return error('authenticator metadata query has unrelated fields')
+		}
+		return
+	}
 	if request.operation == .invalidate_auth_token {
 		kind := request.account_type or { return error('token invalidation requires account type') }
 		token := request.token_value or { return error('token invalidation requires token value') }
@@ -176,7 +184,7 @@ pub fn encode_request(request Request) ![]u8 {
 	defer { unsafe { body.free() } }
 	if request.operation == .redeem_interaction {
 		append_redemption(mut body, request.redemption or { return error('missing account interaction ticket') })!
-	} else {
+	} else if request.operation != .get_authenticator_types {
 		if request.operation == .get_auth_token { append_string(mut body, request.account_name)! }
 		append_string(mut body, request.account_type)!
 		if request.operation == .invalidate_auth_token { append_string(mut body, request.token_value)! }
@@ -325,7 +333,7 @@ fn request_header(bytes []u8) !(Operation, u64, int) {
 	mut reader := RequestReader{ bytes: bytes, position: 4 }
 	if reader.uint_value(2)! != 1 { return error('unsupported account request version') }
 	op := reader.uint_value(2)!
-	if op !in [u64(1), 2, 3, 4, 5] { return error('unknown account request operation') }
+	if op !in [u64(1), 2, 3, 4, 5, 6] { return error('unknown account request operation') }
 	id := reader.uint_value(8)!
 	length := reader.uint_value(4)!
 	if id == 0 || length > max_request_body { return error('invalid account request bound') }
@@ -352,7 +360,7 @@ fn decode_request(header []u8, body []u8) !Request {
 	}
 	if op == .redeem_interaction {
 		redemption = reader.redemption()!
-	} else {
+	} else if op != .get_authenticator_types {
 		if op == .get_auth_token { account_name = reader.string_value()!.value }
 		account_type = reader.string_value()!.value
 		if op == .invalidate_auth_token { token_value = reader.string_value()!.value }

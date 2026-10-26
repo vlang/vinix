@@ -19,6 +19,7 @@ pub enum Kind {
 	dispatch    = 6
 	cancel      = 7
 	launch      = 8
+	authenticators = 9
 }
 
 pub struct Header {
@@ -41,6 +42,7 @@ pub:
 	capability  []u8
 	options     []nativeaccountauth.Option
 	accounts    []Account
+	authenticators []nativeaccountauth.AuthenticatorDescription
 	interaction Interaction
 }
 
@@ -182,7 +184,7 @@ fn (mut r Reader) scalar() !nativeaccountauth.Scalar {
 
 pub fn encode_header(header Header) ![]u8 {
 	if header.kind !in [.result, .failure, .accounts, .interaction, .continued, .dispatch, .cancel,
-		.launch]
+		.launch, .authenticators]
 		|| header.session == 0 || header.length < 0 || header.length > max_payload {
 		return error('invalid account IPC header')
 	}
@@ -205,7 +207,7 @@ pub fn decode_header(bytes []u8) !Header {
 	mut r := Reader{ bytes: bytes, index: 4 }
 	if r.number(2)! != 1 { return error('unsupported account IPC version') }
 	kind := r.number(2)!
-	if kind < 1 || kind > 8 { return error('unknown account IPC event kind') }
+	if kind < 1 || kind > 9 { return error('unknown account IPC event kind') }
 	session := r.number(8)!
 	length := r.number(4)!
 	if session == 0 || length > max_payload { return error('invalid account IPC bound') }
@@ -221,11 +223,15 @@ fn frame(kind Kind, id u64, payload []u8) ![]u8 {
 	return result
 }
 
-pub fn terminal(kind Kind) bool { return kind in [.result, .failure, .accounts] }
+pub fn terminal(kind Kind) bool { return kind in [.result, .failure, .accounts, .authenticators] }
 
 pub fn encode_event(event Event, service bool) ![]u8 {
-	if event.kind !in [.result, .failure, .accounts, .interaction, .continued, .cancel] {
+	if event.kind !in [.result, .failure, .accounts, .interaction, .continued, .cancel, .authenticators] {
 		return error('not an account result event')
+	}
+	if (service && event.kind == .authenticators)
+		|| (event.kind != .authenticators && event.authenticators.len != 0) {
+		return error('authenticator metadata is broker-owned')
 	}
 	if event.kind != .interaction && !empty_interaction(event.interaction) {
 		return error('unexpected account interaction fields')
@@ -239,6 +245,12 @@ pub fn encode_event(event Event, service bool) ![]u8 {
 		return error('client event must not expose response capability')
 	}
 	match event.kind {
+		.authenticators {
+			if event.options.len != 0 || event.accounts.len != 0 {
+				return error('unexpected authenticator metadata fields')
+			}
+			authenticator_bytes(mut body, event.authenticators)!
+		}
 		.result, .failure {
 			if event.accounts.len != 0 { return error('unexpected account event snapshot') }
 			options_bytes(mut body, event.options)!
@@ -282,21 +294,25 @@ pub fn encode_event(event Event, service bool) ![]u8 {
 
 pub fn decode_event(header Header, bytes []u8, service bool) !Event {
 	if bytes.len != header.length || bytes.len > max_payload || header.session == 0
-		|| header.kind !in [.result, .failure, .accounts, .interaction, .continued, .cancel] {
+		|| header.kind !in [.result, .failure, .accounts, .interaction, .continued, .cancel, .authenticators]
+		|| (service && header.kind == .authenticators) {
 		return error('invalid account event body')
 	}
 	mut r := Reader{ bytes: bytes }
 	capability := if service { r.take(32)! } else { []u8{} }
 	mut options := []nativeaccountauth.Option{}
 	mut accounts := []Account{cap: 256}
+	mut authenticators := []nativeaccountauth.AuthenticatorDescription{}
 	mut interaction := Interaction{}
 	mut complete := false
 	defer {
 		if !complete {
-			dispose_event(Event{ capability: capability, options: options, accounts: accounts, interaction: interaction })
+			dispose_event(Event{ capability: capability, options: options, accounts: accounts,
+				authenticators: authenticators, interaction: interaction })
 		}
 	}
 	match header.kind {
+		.authenticators { authenticators = r.authenticators()! }
 		.result, .failure { options = r.options()! }
 		.accounts {
 			count := r.number(2)!
@@ -343,7 +359,8 @@ pub fn decode_event(header Header, bytes []u8, service bool) !Event {
 	}
 	if r.index != bytes.len { return error('trailing account event fields') }
 	complete = true
-	return Event{ kind: header.kind, id: header.session, capability: capability, options: options, accounts: accounts, interaction: interaction }
+	return Event{ kind: header.kind, id: header.session, capability: capability, options: options,
+		accounts: accounts, authenticators: authenticators, interaction: interaction }
 }
 
 fn valid_caller(caller nativeaccountauth.Caller) ! {
@@ -366,6 +383,9 @@ fn valid_caller(caller nativeaccountauth.Caller) ! {
 pub fn encode_command(command Command) ![]u8 {
 	valid_caller(command.caller)!
 	if command.capability.len != 32 { return error('invalid account session capability') }
+	if command.request.operation == .get_authenticator_types {
+		return error('authenticator metadata query is broker-local')
+	}
 	request := nativeaccountauth.encode_request(command.request)!
 	defer { unsafe { request.free() } }
 	mut body := []u8{cap: max_payload}
@@ -411,6 +431,10 @@ pub fn decode_command(header Header, bytes []u8) !Command {
 	caller = nativeaccountauth.Caller{ ...caller, certificate_sha256: certificate }
 	valid_caller(caller)!
 	request := nativeaccountauth.decode_request_bytes(bytes[r.index..])!
+	if request.operation == .get_authenticator_types {
+		nativeaccountauth.dispose_request(request)
+		return error('authenticator metadata query is broker-local')
+	}
 	complete = true
 	return Command{header.session, capability, caller, request}
 }
@@ -437,6 +461,7 @@ pub fn dispose_event(event Event) {
 		}
 	}
 	unsafe { event.accounts.free() }
+	nativeaccountauth.dispose_authenticator_descriptions(event.authenticators)
 	dispose_interaction(event.interaction)
 }
 

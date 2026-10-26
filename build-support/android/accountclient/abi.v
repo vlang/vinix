@@ -91,6 +91,14 @@ pub fn abi_invalidate_request(id u64, account_type &u8, token &u8) voidptr {
 	return builder
 }
 
+// An authenticated metadata query carries no application-selected package,
+// account type, resources or options. The broker resolves its pinned registry.
+@[export: 'vinix_android_account_authenticators_request']
+pub fn abi_authenticators_request(id u64) voidptr {
+	if id == 0 { return unsafe { nil } }
+	return &RequestBuilder{id: id, op: .get_authenticator_types}
+}
+
 @[export: 'vinix_android_account_feature']
 pub fn abi_feature(handle voidptr, value &u8) i32 {
 	if handle == unsafe { nil } { return -1 }
