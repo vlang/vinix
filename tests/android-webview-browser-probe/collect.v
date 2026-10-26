@@ -42,15 +42,20 @@ struct Export {
 
 struct Protocol {
 	prefix string = browser_prefix
-	label string = 'BROWSER-COLLECT'
-	scope string = 'Exact credential-free browser diagnostic UART archive; not Google authentication proof.'
+	label  string = 'BROWSER-COLLECT'
+	scope  string = 'Exact credential-free browser diagnostic UART archive; not Google authentication proof.'
 }
 
 fn protocol(headless bool) Protocol {
 	return if headless {
-		Protocol{prefix: headless_prefix, label: 'HEADLESS-COLLECT',
-			scope: 'Exact synthetic headless service lifecycle UART archive; no account, token or Google authentication proof.'}
-	} else { Protocol{} }
+		Protocol{
+			prefix: headless_prefix
+			label:  'HEADLESS-COLLECT'
+			scope:  'Exact synthetic headless service lifecycle UART archive; no account, token or Google authentication proof.'
+		}
+	} else {
+		Protocol{}
+	}
 }
 
 fn decimal(text string, limit int) !int {
@@ -76,10 +81,21 @@ fn parse_export(log string, selected Protocol) !Export {
 	mut chunks := 0
 	mut index := 0
 	mut parts := []string{}
-	for raw in log.split_into_lines() {
+	for number, raw in log.split_into_lines() {
 		line := raw.trim_right('\r')
+		where := ' at serial line=' + (number + 1).str()
+		// A concurrent console writer can fuse chatter and a frame onto one
+		// physical line. Reject that damage rather than silently skipping it.
+		for known in [browser_prefix, headless_prefix] {
+			if offset := line.index(known) {
+				if offset != 0 {
+					return error('embedded archive frame' + where + ' prefix-offset=' + offset.str() +
+						' expected-chunk=' + index.str())
+				}
+			}
+		}
 		if (line.starts_with(browser_prefix) || line.starts_with(headless_prefix)) && !line.starts_with(prefix) {
-			return error('foreign archive protocol')
+			return error('foreign archive protocol' + where)
 		}
 		if !line.starts_with(prefix) { continue }
 		if line.len > 1024 || ended { return error('oversized frame or repeated export') }
@@ -95,25 +111,31 @@ fn parse_export(log string, selected Protocol) !Export {
 			}
 			begun = true
 		} else if fields.len == 4 && fields[0] == 'CHUNK' {
+			received := decimal(fields[2], chunks) or {
+				return error('invalid chunk index' + where + ' expected-chunk=' + index.str() + ': ' + err.msg())
+			}
 			if !begun || fields[1] != sha || index >= chunks
-				|| decimal(fields[2], chunks)! != index {
-				return error('out-of-order/foreign chunk')
+				|| received != index {
+				return error('out-of-order/foreign chunk' + where + ' expected-chunk=' + index.str() +
+					' received-chunk=' + received.str() + ' declared-chunks=' + chunks.str() +
+					' digest-match=' + (fields[1] == sha).str() + ' begun=' + begun.str())
 			}
 			data := base64.decode(fields[3])
 			expected := if index + 1 == chunks { bytes - index * chunk_bytes } else { chunk_bytes }
 			if data.len != expected || base64.encode(data) != fields[3] {
-				return error('invalid chunk encoding/length')
+				return error('invalid chunk encoding/length' + where + ' chunk=' + index.str())
 			}
 			parts << data.bytestr()
 			index++
 		} else if fields.len == 4 && fields[0] == 'END' {
 			if !begun || index != chunks || fields[1] != sha || decimal(fields[2], max_archive)! != bytes
 				|| decimal(fields[3], chunks)! != chunks {
-				return error('incomplete/foreign END')
+				return error('incomplete/foreign END' + where + ' received-chunks=' + index.str() +
+					' declared-chunks=' + chunks.str())
 			}
 			ended = true
 		} else {
-			return error('unknown export frame')
+			return error('unknown export frame' + where)
 		}
 	}
 	if !ended { return error('complete export absent') }
@@ -261,18 +283,45 @@ fn self_test_protocol(selected Protocol) ! {
 		log + frames(payload, protocol(selected.prefix == browser_prefix))] {
 		if _ := parse_export(bad, selected) { return error('malformed export accepted') }
 	}
+	for frame in ['BEGIN ', 'CHUNK ', 'END '] {
+		fused := log.replace(prefix + frame, 'concurrent console chatter' + prefix + frame)
+		if _ := parse_export(fused, selected) {
+			return error('embedded frame accepted')
+		} else {
+			if !err.msg().starts_with('embedded archive frame at serial line=')
+				|| !err.msg().contains('prefix-offset=26 expected-chunk=') || err.msg().len > 180 {
+				return error('embedded frame diagnostic lost bounded physical-line context: ' + err.msg())
+			}
+		}
+	}
+	gap_log := frames('x'.repeat(chunk_bytes + 1), selected).split_into_lines()
+	gap := gap_log[0] + '\n' + gap_log[2..].join('\n')
+	if _ := parse_export(gap, selected) {
+		return error('missing first chunk accepted')
+	} else {
+		if !err.msg().contains('serial line=2 expected-chunk=0 received-chunk=1 declared-chunks=2')
+			|| err.msg().len > 220 {
+			return error('chunk-gap diagnostic lost bounded indices')
+		}
+	}
 	for bad in [
 		Archive{ root_mode: 0o700, entries: [Entry{ path: '../escape', kind: 'directory' }] },
 		Archive{ root_mode: 0o700, entries: [Entry{ path: '/escape', kind: 'directory' }] },
 		Archive{ root_mode: 0o700, entries: [fixture.entries[1]] },
-		Archive{ root_mode: 0o700, entries: [
-			fixture.entries[0],
-			fixture.entries[0],
-		] },
-		Archive{ root_mode: 0o700, entries: [
-			Entry{ path: 'd', kind: 'symlink', link: '/' },
-			fixture.entries[1],
-		] },
+		Archive{
+			root_mode: 0o700
+			entries:   [
+				fixture.entries[0],
+				fixture.entries[0],
+			]
+		},
+		Archive{
+			root_mode: 0o700
+			entries:   [
+				Entry{ path: 'd', kind: 'symlink', link: '/' },
+				fixture.entries[1],
+			]
+		},
 		Archive{ root_mode: 0o700, entries: [Entry{ path: 'fifo', kind: 'fifo' }] },
 		Archive{ root_mode: 0o700, entries: [Entry{ path: 'log', kind: 'regular', size: 1, sha256: '0'.repeat(64), data: 'YQ==' }] },
 		Archive{ root_mode: 0o4700, entries: []Entry{} },
@@ -297,7 +346,7 @@ fn self_test_protocol(selected Protocol) ! {
 	if _ := restore(root, fixture, exported, serial, sha256.sum(log.bytes()).hex(), selected) {
 		return error('existing output accepted')
 	}
-	println(selected.label + ' SELF-TEST PASS complete-export binary modes links checksum ordering truncation duplicate traversal parent inode fresh-output foreign-protocol scope')
+	println(selected.label + ' SELF-TEST PASS complete-export binary modes links checksum ordering truncation duplicate traversal parent inode fresh-output foreign-protocol scope embedded-frame bounded-diagnostics')
 }
 
 fn self_test() ! {
@@ -307,7 +356,9 @@ fn self_test() ! {
 
 fn run() ! {
 	headless := os.args.len == 4 && os.args[1] == '--headless'
-	if !headless && os.args.len != 3 { return error('usage: collect [--headless] SERIAL_LOG FRESH_EXTERNAL_RESULTS') }
+	if !headless && os.args.len != 3 {
+		return error('usage: collect [--headless] SERIAL_LOG FRESH_EXTERNAL_RESULTS')
+	}
 	selected := protocol(headless)
 	offset := if headless { 1 } else { 0 }
 	serial, root := os.args[1 + offset], os.args[2 + offset]
