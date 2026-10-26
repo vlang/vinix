@@ -61,6 +61,8 @@ type ValueInit = fn (&GlibValue, u64) &GlibValue
 type ValueObject = fn (&GlibValue, voidptr)
 type ValueUnset = fn (&GlibValue)
 type NewWithProperties = fn (u64, u32, &&char, &GlibValue) voidptr
+type SignalConnect = fn (voidptr, &char, voidptr, voidptr, voidptr, u32) u64
+type SignalDisconnect = fn (voidptr, u64)
 
 struct CpuViewApi {
 	settings_new    NewObject         @[required]
@@ -114,6 +116,9 @@ struct Api {
 	view_title       GetText          @[required]
 	view_load_html   LoadHtml         @[required]
 	view_session     GetObject        @[required]
+	view_loading     GetFlag          @[required]
+	connect          SignalConnect    @[required]
+	disconnect       SignalDisconnect @[required]
 	session_cookies  GetObject        @[required]
 	cookie_new       CookieNew        @[required]
 	cookie_free      ObjectCall       @[required]
@@ -169,6 +174,9 @@ fn load_api() !Api {
 		view_title:       unsafe { GetText(dl.sym_opt(h, 'webkit_web_view_get_title')!) }
 		view_load_html:   unsafe { LoadHtml(dl.sym_opt(h, 'webkit_web_view_load_html')!) }
 		view_session:     unsafe { GetObject(dl.sym_opt(h, 'webkit_web_view_get_network_session')!) }
+		view_loading:     unsafe { GetFlag(dl.sym_opt(h, 'webkit_web_view_is_loading')!) }
+		connect:          unsafe { SignalConnect(dl.sym_opt(h, 'g_signal_connect_data')!) }
+		disconnect:       unsafe { SignalDisconnect(dl.sym_opt(h, 'g_signal_handler_disconnect')!) }
 		session_cookies:  unsafe { GetObject(dl.sym_opt(h, 'webkit_network_session_get_cookie_manager')!) }
 		cookie_new:       unsafe { CookieNew(dl.sym_opt(h, 'soup_cookie_new')!) }
 		cookie_free:      unsafe { ObjectCall(dl.sym_opt(h, 'soup_cookie_free')!) }
@@ -205,6 +213,72 @@ mut:
 	texture    voidptr
 	api_cookie bool
 	js_cookie  bool
+	events     ProbeEvents
+}
+
+enum ProbeEvent {
+	load_changed
+	load_failed
+	process_terminated
+	title_changed
+}
+
+struct ProbeEvents {
+mut:
+	started u64
+	count   int
+}
+
+// Emit only numeric values and stable event classes. URLs, page titles and
+// engine error messages never enter these records. Saturation bounds output
+// even if a broken helper emits repeated notifications.
+fn (mut events ProbeEvents) record(kind ProbeEvent, value int, domain u32) {
+	if events.count >= 32 {
+		if events.count == 32 {
+			println('BROWSER-PROBE event-limit=32')
+			events.count++
+		}
+		return
+	}
+	events.count++
+	elapsed := (time.sys_mono_now() - events.started) / u64(time.millisecond)
+	println('BROWSER-PROBE event=${kind} elapsed-ms=${elapsed} value=${value} domain=${domain}')
+}
+
+// 0 absent, 1 waiting, 2 expected, 3 missing-cookie, 4 other. Do not log a
+// title supplied by an engine error document or unexpected navigation.
+fn title_class(title &char) int {
+	if title == unsafe { nil } { return 0 }
+	return match unsafe { title.vstring() } {
+		'waiting-for-javascript' { 1 }
+		expected_title { 2 }
+		'vinix-cookie-missing' { 3 }
+		else { 4 }
+	}
+}
+
+fn load_changed(_ voidptr, event i32, data voidptr) {
+	mut probe := unsafe { &Probe(data) }
+	probe.events.record(.load_changed, int(event), 0)
+}
+
+fn load_failed(_ voidptr, _event i32, _uri &char, err &GlibError, data voidptr) i32 {
+	mut probe := unsafe { &Probe(data) }
+	code := if err == unsafe { nil } { 0 } else { int(err.code) }
+	domain := if err == unsafe { nil } { u32(0) } else { err.domain }
+	probe.events.record(.load_failed, code, domain)
+	// Preserve WebKit's default error handling and the borrowed GError.
+	return 0
+}
+
+fn process_terminated(_ voidptr, reason i32, data voidptr) {
+	mut probe := unsafe { &Probe(data) }
+	probe.events.record(.process_terminated, int(reason), 0)
+}
+
+fn title_changed(view voidptr, _spec voidptr, data voidptr) {
+	mut probe := unsafe { &Probe(data) }
+	probe.events.record(.title_changed, title_class(probe.api.view_title(view)), 0)
 }
 
 fn take_error(api Api, err &GlibError) string {
@@ -306,7 +380,21 @@ fn run(output string) ! {
 	manager := api.session_cookies(api.view_session(view))
 	// Heap lifetime intentionally extends until exit, including timeout paths:
 	// cancelling a wait does not make outstanding GLib callback data safe to free.
-	mut probe := &Probe{ api: api }
+	mut probe := &Probe{ api: api, events: ProbeEvents{ started: time.sys_mono_now() } }
+	mut signals := []u64{}
+	defer {
+		for id in signals { api.disconnect(view, id) }
+	}
+	for name, callback in {
+		'load-changed': voidptr(load_changed)
+		'load-failed': voidptr(load_failed)
+		'web-process-terminated': voidptr(process_terminated)
+		'notify::title': voidptr(title_changed)
+	} {
+		id := api.connect(view, name.str, callback, probe, unsafe { nil }, 0)
+		if id == 0 { return error('could not connect diagnostic signal ' + name) }
+		signals << id
+	}
 	cookie := api.cookie_new(c'vinix_api_cookie', c'api-roundtrip', c'vinix-webview-probe.invalid', c'/', 3600)
 	if cookie == unsafe { nil } {
 		return error('could not construct diagnostic cookie')
@@ -314,7 +402,9 @@ fn run(output string) ! {
 	api.cookies_add(manager, cookie, unsafe { nil }, cookie_added, probe)
 	api.cookie_free(cookie)
 	wait_async(mut probe, 'add-cookie')!
+	println('BROWSER-PROBE add-cookie=complete')
 	api.view_load_html(view, html.str, base_uri.str)
+	println('BROWSER-PROBE local-load=requested')
 	deadline := time.sys_mono_now() + u64(30 * time.second)
 	for {
 		api.iterate(unsafe { nil }, 0)
@@ -327,6 +417,7 @@ fn run(output string) ! {
 			}
 		}
 		if time.sys_mono_now() >= deadline {
+			println('BROWSER-PROBE dom-timeout loading=${api.view_loading(view)} title-class=${title_class(title_ptr)} events=${probe.events.count}')
 			return error('JavaScript DOM update timed out after 30 seconds')
 		}
 		time.sleep(5 * time.millisecond)

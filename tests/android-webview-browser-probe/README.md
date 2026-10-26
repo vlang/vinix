@@ -17,6 +17,13 @@ It checks that the policy and JavaScript settings exist when the view is
 constructed, that the same settings survive construction, and that temporary
 references are released on success and rejected construction paths.
 
+The guest probe also records at most 32 load, title and process-termination
+signal events, using numeric values and stable classes only. It records the
+loading flag and title class on a DOM timeout. The helper trampoline records
+its verified helper name, PID and parent PID so warnings can be assigned to a
+process; arguments, URLs, raw titles and engine error messages are omitted.
+These diagnostics preserve the existing DOM, cookie and PNG pass requirements.
+
 From the repository root, build the V host preparation tool:
 
 ```sh

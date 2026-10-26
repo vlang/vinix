@@ -217,6 +217,9 @@ fn trampoline(name string) ! {
 	}
 	mut argv := ['--library-path', library_path(base, addon), target]
 	argv << os.args[1..]
+	// A stable helper class and numeric PID let the credential-free diagnostic
+	// associate GLib warnings with this verified dispatch without logging argv.
+	println('BROWSER-HELPER name=${name} pid=${os.getpid()} ppid=${os.getppid()}')
 	os.execve(base + '/lib/ld-musl-aarch64.so.1', argv, environment)!
 }
 
