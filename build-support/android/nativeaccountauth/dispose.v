@@ -17,9 +17,8 @@ pub fn dispose_request(request Request) {
 	if value := request.account_type { unsafe { value.free() } }
 	if value := request.auth_token_type { unsafe { value.free() } }
 	if value := request.token_value { unsafe { value.free() } }
-	for feature in request.features {
-		unsafe { feature.free() }
-	}
+	// []string.free() also releases its strings; freeing each feature first
+	// would release every decoded feature twice.
 	unsafe { request.features.free() }
 	dispose_options(request.options)
 }
