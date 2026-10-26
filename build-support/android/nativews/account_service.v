@@ -22,6 +22,7 @@ type WsAuthSend = fn (voidptr) i32
 type WsAuthInteraction = fn (voidptr,&char,&char) i32
 type WsAuthUiAuthority = fn (voidptr,u64,&u8,u32) i32
 type WsAuthLaunchTarget = fn (voidptr,u64,&char,&char) i32
+type WsAuthTokenAuthorized = fn (voidptr,voidptr,u64) i32
 
 struct WsAuthSlot {
 mut:
@@ -43,6 +44,7 @@ mut:
 struct WsAuthCommand {
 mut:
 	id u64
+	account_name &char
 	account_type &char
 	operation u16
 	token_type &char
@@ -64,7 +66,9 @@ __global ws_auth_read WsAuthRead
 __global ws_auth_operation WsAuthOperation
 __global ws_auth_close WsAuthFree
 __global ws_auth_type WsAuthString
+__global ws_auth_name WsAuthString
 __global ws_auth_token WsAuthString
+__global ws_auth_token_authorized WsAuthTokenAuthorized
 __global ws_auth_features WsAuthCount
 __global ws_auth_feature WsAuthText
 __global ws_auth_count WsAuthCount
@@ -109,7 +113,9 @@ fn ws_account_service_init() bool {
 		ws_auth_operation = WsAuthOperation(C.dlsym(ws_auth_library,c'vinix_android_authenticator_operation'))
 		ws_auth_close = WsAuthFree(C.dlsym(ws_auth_library,c'vinix_android_authenticator_close'))
 		ws_auth_type = WsAuthString(C.dlsym(ws_auth_library,c'vinix_android_authenticator_account_type'))
+		ws_auth_name = WsAuthString(C.dlsym(ws_auth_library,c'vinix_android_authenticator_account_name'))
 		ws_auth_token = WsAuthString(C.dlsym(ws_auth_library,c'vinix_android_authenticator_auth_token_type'))
+		ws_auth_token_authorized = WsAuthTokenAuthorized(C.dlsym(ws_auth_library,c'vinix_android_account_store_token_authorized'))
 		ws_auth_features = WsAuthCount(C.dlsym(ws_auth_library,c'vinix_android_authenticator_feature_count'))
 		ws_auth_feature = WsAuthText(C.dlsym(ws_auth_library,c'vinix_android_authenticator_feature'))
 		ws_auth_count = WsAuthCount(C.dlsym(ws_auth_library,c'vinix_android_authenticator_count'))
@@ -125,7 +131,7 @@ fn ws_account_service_init() bool {
 		ws_auth_ui_authority = WsAuthUiAuthority(C.dlsym(ws_auth_library,c'vinix_android_authenticator_ui_authority'))
 		ws_auth_launch_target = WsAuthLaunchTarget(C.dlsym(ws_auth_library,c'vinix_android_authenticator_launch_target'))
 		if voidptr(ws_auth_open) == nil || voidptr(ws_auth_read) == nil || voidptr(ws_auth_operation) == nil || voidptr(ws_auth_close) == nil
-			|| voidptr(ws_auth_type) == nil || voidptr(ws_auth_token) == nil || voidptr(ws_auth_features) == nil || voidptr(ws_auth_feature) == nil
+			|| voidptr(ws_auth_type) == nil || voidptr(ws_auth_name) == nil || voidptr(ws_auth_token) == nil || voidptr(ws_auth_token_authorized) == nil || voidptr(ws_auth_features) == nil || voidptr(ws_auth_feature) == nil
 			|| voidptr(ws_auth_count) == nil || voidptr(ws_auth_key) == nil || voidptr(ws_auth_tag) == nil || voidptr(ws_auth_text) == nil || voidptr(ws_auth_number) == nil
 			|| voidptr(ws_auth_response) == nil || voidptr(ws_auth_option) == nil || voidptr(ws_auth_send) == nil || voidptr(ws_auth_free) == nil || voidptr(ws_auth_interaction) == nil || voidptr(ws_auth_ui_authority) == nil || voidptr(ws_auth_launch_target) == nil {
 			C.close(fd); return false
@@ -363,7 +369,7 @@ fn ws_auth_permission(e voidptr, permission voidptr, pid i32, uid i32) i32 {
 
 fn ws_auth_command_free(command &WsAuthCommand) {
 	unsafe {
-		C.free(command.account_type); C.free(command.token_type)
+		C.free(command.account_name); C.free(command.account_type); C.free(command.token_type)
 		for i := u32(0); i < command.feature_count; i++ { C.free(command.features[i]) }
 		for i := u32(0); i < command.count; i++ {
 			C.free(command.options[i].key); C.free(command.options[i].text)
@@ -381,8 +387,10 @@ fn ws_auth_copy(id u64) &WsAuthCommand {
 		command.id = id
 		command.operation = ws_auth_operation(ws_auth_handle)
 		name := ws_auth_type(ws_auth_handle)
-		if command.operation != 1 && command.operation != 2 { ws_auth_command_free(command); return nil }
+		if command.operation != 1 && command.operation != 2 && command.operation != 4 { ws_auth_command_free(command); return nil }
 		if name != nil { command.account_type = C.strdup(name) }
+		account := ws_auth_name(ws_auth_handle)
+		if account != nil { command.account_name = C.strdup(account) }
 		token := ws_auth_token(ws_auth_handle)
 		if token != nil { command.token_type = C.strdup(token) }
 		command.feature_count = ws_auth_features(ws_auth_handle)
@@ -391,7 +399,9 @@ fn ws_auth_copy(id u64) &WsAuthCommand {
 			command.feature_count = 0; command.count = 0
 			ws_auth_command_free(command); return nil
 		}
-		mut valid := (name == nil || command.account_type != nil) && (command.operation != 2 || name != nil) && (token == nil || command.token_type != nil)
+		mut valid := (name == nil || command.account_type != nil) && (command.operation == 1 || name != nil) && (token == nil || command.token_type != nil)
+			&& (account == nil || command.account_name != nil)
+			&& (command.operation != 4 || (account != nil && account[0] != 0 && token != nil && token[0] != 0 && command.feature_count == 0))
 		for i := u32(0); i < command.feature_count; i++ {
 			value := ws_auth_feature(ws_auth_handle,i)
 			if value == nil { valid = false; continue }
@@ -440,9 +450,30 @@ fn ws_auth_bundle(e voidptr, command &WsAuthCommand) voidptr {
 	}
 }
 
+// The normal store checks the exact account and root-authenticated requesting
+// package against the active session. Denial never initializes APK classes.
+// Return one for authorized, zero for a queued denial, minus one for failure.
+fn ws_auth_token_check(id u64) i32 {
+	unsafe {
+		C.pthread_mutex_lock(&ws_auth_mutex)
+		allowed := ws_store_live() && ws_auth_token_authorized(ws_store_handle,ws_auth_handle,id) == 0
+		failure := if allowed || ws_auth_handle == nil { voidptr(nil) } else { ws_auth_response(ws_auth_handle,id,2) }
+		C.pthread_mutex_unlock(&ws_auth_mutex)
+		if allowed { return 1 }
+		if failure == nil { return -1 }
+		defer { ws_auth_free(failure) }
+		if !ws_auth_error_fields(failure,7,c'account is unavailable to this caller') { return -1 }
+		return if ws_auth_send(failure) == 0 { i32(0) } else { i32(-1) }
+	}
+}
+
 fn ws_auth_dispatch(e voidptr, binder voidptr, command &WsAuthCommand) bool {
 	unsafe {
 		if command.operation == 1 { return ws_store_dispatch(command.id) }
+		if command.operation == 4 {
+			status := ws_auth_token_check(command.id)
+			if status != 1 { return status == 0 }
+		}
 		arg := &Value(C.alloca(sizeof(Value)))
 		arg.l = binder
 		authenticator := static_obj(e,c'android/accounts/IAccountAuthenticator$Stub',c'asInterface',c'(Landroid/os/IBinder;)Landroid/accounts/IAccountAuthenticator;',arg)
@@ -451,15 +482,27 @@ fn ws_auth_dispatch(e voidptr, binder voidptr, command &WsAuthCommand) bool {
 		constructor.j = i64(command.id)
 		response := new_object(e,c'android/atl/VinixAuthenticatorResponse',c'(J)V',constructor)
 		bundle := ws_auth_bundle(e,command)
-		string_class := cls(e,c'java/lang/String')
-		features := WsAuthArray(slot(e,172))(e,i32(command.feature_count),string_class,nil)
-		Drop(slot(e,23))(e,string_class)
-		for i := u32(0); i < command.feature_count && !pending(e); i++ {
-			text := ws_account_java_text(e,command.features[i])
-			WsArraySet(slot(e,174))(e,features,i32(i),text)
-			Drop(slot(e,23))(e,text)
+		if pending(e) || response == nil || bundle == nil { return false }
+		mut account := voidptr(nil)
+		mut features := voidptr(nil)
+		if command.operation == 4 {
+			identity := &Value(C.alloca(2 * sizeof(Value)))
+			identity[0] = Value{l:ws_account_java_text(e,command.account_name)}
+			identity[1] = Value{l:ws_account_java_text(e,command.account_type)}
+			if pending(e) || identity[0].l == nil || identity[1].l == nil { return false }
+			account = new_object(e,c'android/accounts/Account',c'(Ljava/lang/String;Ljava/lang/String;)V',identity)
+			if pending(e) || account == nil { return false }
+		} else {
+			string_class := cls(e,c'java/lang/String')
+			features = WsAuthArray(slot(e,172))(e,i32(command.feature_count),string_class,nil)
+			Drop(slot(e,23))(e,string_class)
+			for i := u32(0); i < command.feature_count && !pending(e); i++ {
+				text := ws_account_java_text(e,command.features[i])
+				WsArraySet(slot(e,174))(e,features,i32(i),text)
+				Drop(slot(e,23))(e,text)
+			}
+			if pending(e) || features == nil { return false }
 		}
-		if pending(e) || response == nil || bundle == nil || features == nil { return false }
 		node := &WsAuthSlot(C.calloc(1,sizeof(WsAuthSlot)))
 		if node == nil { return false }
 		node.id = command.id
@@ -468,10 +511,19 @@ fn ws_auth_dispatch(e voidptr, binder voidptr, command &WsAuthCommand) bool {
 		C.pthread_mutex_lock(&ws_auth_mutex)
 		node.next = ws_auth_slots; ws_auth_slots = node
 		C.pthread_mutex_unlock(&ws_auth_mutex)
-		args := [Value{l:response},Value{l:ws_account_java_text(e,command.account_type)},Value{l:ws_account_java_text(e,command.token_type)},Value{l:features},Value{l:bundle}]!
-		if pending(e) { return false }
+		args := &Value(C.alloca(5 * sizeof(Value)))
+		args[0] = Value{l:response}
+		args[1] = Value{l:if command.operation == 4 { account } else { ws_account_java_text(e,command.account_type) }}
+		args[2] = Value{l:ws_account_java_text(e,command.token_type)}
+		args[3] = Value{l:if command.operation == 4 { bundle } else { features }}
+		args[4] = Value{l:bundle}
+		if pending(e) || (command.operation == 4 && args[2].l == nil) { return false }
 		ws_auth_scope = true
-		call(e,authenticator,c'android/accounts/IAccountAuthenticator',c'addAccount',c'(Landroid/accounts/IAccountAuthenticatorResponse;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Landroid/os/Bundle;)V',&args[0])
+		if command.operation == 4 {
+			call(e,authenticator,c'android/accounts/IAccountAuthenticator',c'getAuthToken',c'(Landroid/accounts/IAccountAuthenticatorResponse;Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;)V',args)
+		} else {
+			call(e,authenticator,c'android/accounts/IAccountAuthenticator',c'addAccount',c'(Landroid/accounts/IAccountAuthenticatorResponse;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Landroid/os/Bundle;)V',&args[0])
+		}
 		ws_auth_scope = false
 		return !pending(e)
 	}

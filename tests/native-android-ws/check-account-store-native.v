@@ -99,7 +99,7 @@ type WsAuthText = fn (voidptr,u32) &char
 type WsAccountCount = fn (voidptr) u32
 union Value { l voidptr i i32 j i64 }
 struct WsState { mut: service bool data &char }
-struct WsAuthCommand { mut: operation u16 id u64 feature_count u32 features [8]&char account_type &char token_type &char }
+struct WsAuthCommand { mut: operation u16 id u64 feature_count u32 features [8]&char account_name &char account_type &char token_type &char }
 struct WsAuthSlot { mut: next &WsAuthSlot id u64 response voidptr }
 struct ProbeObject { mut: kind string text string keys []voidptr values []voidptr index int first voidptr second voidptr items []voidptr }
 __global ws WsState
@@ -272,6 +272,7 @@ fn ws_auth_free(builder voidptr) { assert !held && builder == voidptr(206); resp
 fn ws_auth_close(auth voidptr) { assert held && auth == voidptr(200) && store_closes == 1; auth_closes++ }
 fn ws_auth_slot_free(e voidptr, node &WsAuthSlot) { assert !held; C.free(node) }
 fn ws_auth_bundle(e voidptr, command &WsAuthCommand) voidptr { panic("query must bypass Java bundle") }
+fn ws_auth_token_check(id u64) i32 { panic("query must bypass token authorization") }
 fn ws_account_build(id u64, operation u16, kind &char, token &char) voidptr { assert !held && id == 901 && operation == 1; return voidptr(207) }
 fn ws_account_submit(builder voidptr, endpoint &char) voidptr { assert !held && builder == voidptr(207) && text(endpoint) == "/selected/accounts.sock"; transport_submits++; return voidptr(205) }
 fn ws_account_free(builder voidptr) { assert !held && builder == voidptr(207) }
@@ -419,7 +420,7 @@ fn main() {
  assert ws_store_visibility(e,nilp(),account("name","registered.type"),string_object("key"),2) == 1 && writes == 3
  // Execute the production service dispatch. No Java object may be made for a
  // query; only the authenticated session id enters the authoritative store.
- reset(); before := java_calls; command := WsAuthCommand{operation:1,id:901,account_type:c"",token_type:c""}
+ reset(); before := java_calls; command := WsAuthCommand{operation:1,id:901,account_name:c"",account_type:c"",token_type:c""}
  assert ws_auth_dispatch(e,nilp(),&command) && query_calls == 1 && java_calls == before && snapshots == 0
  reset(); query_result = -1; assert !ws_auth_dispatch(e,nilp(),&command) && query_calls == 1
  reset(); unsafe { ws_store_handle = nil }; assert ws_auth_dispatch(e,nilp(),&command)
