@@ -27,6 +27,7 @@ fn native_sources(root string) ! {
 		'tests/packages/wine-fork-jit-stream-native.v': $embed_file('wine-fork-jit-stream-native.v').to_string()
 		'tools/packages/winejitstream/native_guard.v':  $embed_file('../../tools/packages/winejitstream/native_guard.v').to_string()
 		'tools/packages/winejitstream/native_inputs.v': $embed_file('../../tools/packages/winejitstream/native_inputs.v').to_string()
+		'tools/packages/winejitstream/native_policy.v': $embed_file('../../tools/packages/winejitstream/native_policy.v').to_string()
 		'tools/packages/winejitstream/supervisor.v':    $embed_file('../../tools/packages/winejitstream/supervisor.v').to_string()
 		'tools/packages/winejitstream/parse.v':         $embed_file('../../tools/packages/winejitstream/parse.v').to_string()
 		'tests/hardware-platform/hwhost/boot.v':        $embed_file('../hardware-platform/hwhost/boot.v').to_string()
@@ -45,20 +46,9 @@ fn native_sources(root string) ! {
 	}
 }
 
-fn native_limits(timeout_ms int) winejitstream.NativeLimits {
-	return winejitstream.NativeLimits{
-		timeout_ms:   timeout_ms
-		file_bytes:   128 * 1024 * 1024
-		total_bytes:  256 * 1024 * 1024
-		log_bytes:    256 * 1024
-		serial_bytes: 6 * 1024 * 1024
-		min_free_kib: 550 * 1024
-	}
-}
-
 fn native_invoke(arguments []string, work string, name string, timeout_ms int) ! {
 	os.write_file(work + '/' + name + '.argv.json', json2.encode(arguments))!
-	result := winejitstream.native_guard(arguments, work, name + '.log', native_limits(timeout_ms))!
+	result := winejitstream.native_guard(arguments, work, name + '.log', winejitstream.native_capture_limits(timeout_ms))!
 	os.write_file(work + '/' + name + '.guard.json', json2.encode(result))!
 	if !result.stopped || result.wait_status != 0 || result.timed_out || result.size_limited || result.reason != '' {
 		return error('native operation failed or exceeded bounds: ' + name)
@@ -176,6 +166,7 @@ fn native_run() ! {
 	for name in ['VINIX_ALLOW_WX', 'QEMU_LOG_FILENAME', 'QEMU_LOG', 'QEMU_STRACE'] {
 		os.unsetenv(name)
 	}
+	compiler_environment := winejitstream.native_clear_compiler_environment()
 	host := hwhost.find_host(root, 'aarch64', '')!
 	loader := os.getenv_opt('VINIX_LIMINE_BOOTAA64') or { hwhost.shared_path(root, 'boot-image/limine-bin/BOOTAA64.EFI') }
 	os.setenv('VINIX_LIMINE_BOOTAA64', loader, true)
@@ -198,10 +189,11 @@ fn native_run() ! {
 		winejitstream.native_input_add(root + '/' + relative, mut inputs)!
 	}
 	// Reserve for private boot media, retained state and monitored-threshold overshoot.
-	winejitstream.native_require_free(os.dir(work), 1100 * 1024)!
+	winejitstream.native_require_free(os.dir(work), winejitstream.native_free_floor(true))!
 	os.mkdir(work)!
 	for directory in ['guest', 'probe', 'extras', 'tmp'] { os.mkdir(work + '/' + directory)! }
 	os.setenv('TMPDIR', work + '/tmp', true)
+	os.setenv('VTMP', work + '/tmp', true)
 	os.write_file(work + '/inputs.json', json2.encode(inputs))!
 	os.write_file(work + '/controller.argv.json', json2.encode(os.args))!
 	mut environment := map[string]string{}
@@ -209,24 +201,24 @@ fn native_run() ! {
 		'V_MACOS_V3_CALLER_VEXE_PRESENT', 'V_MACOS_V3_CALLER_VCHILD', 'V_MACOS_V3_CALLER_VCHILD_PRESENT',
 		'V_MACOS_V3_CALLER_NO_FALLBACK', 'V_MACOS_V3_CALLER_NO_FALLBACK_PRESENT',
 		'V_MACOS_V3_NO_FALLBACK', 'VCHILD', 'V_C_ERROR_BUG_REPORT_DISABLED', 'LANG', 'LC_ALL',
-		'PATH', 'TMPDIR', 'VINIX_LIMINE_BOOTAA64', 'VINIX_HWTEST_TCG'] {
+		'PATH', 'TMPDIR', 'VTMP', 'VINIX_LIMINE_BOOTAA64', 'VINIX_HWTEST_TCG'] {
 		environment[name] = os.getenv(name)
 	}
 	os.write_file(work + '/environment.json', json2.encode(environment))!
+	os.write_file(work + '/compiler-environment.json', json2.encode(compiler_environment))!
 	for role in ['probe', 'guest'] {
 		arch := if role == 'guest' { 'arm64' } else { 'amd64' }
 		cfile := work + '/' + role + '/program.c'
-		native_invoke([v, '-prod', '-backend', 'c', '-os', 'linux', '-arch', arch, '-gc', 'none',
+		native_invoke([v, '-nocache', '-prod', '-backend', 'c', '-os', 'linux', '-arch', arch, '-gc', 'none',
 			'-manualfree', '-d', 'no_backtrace', '-d', 'no_segfault_handler', '-path',
 			'@vlib|' + root + '|@vmodules', '-o', cfile,
 			root + '/tests/packages/wine-fork-jit-stream-' + role], work, role + '-v', 60000)!
 		sysroot := if role == 'guest' { arm_sysroot } else { amd_sysroot }
 		gcc := if role == 'guest' { arm_gcc } else { amd_gcc }
 		target := if role == 'guest' { 'aarch64' } else { 'x86_64' }
-		native_invoke([native_clang, '--target=' + target + '-linux-musl', '--sysroot=' + sysroot,
-			'--gcc-install-dir=' + gcc, '-resource-dir=' + native_resource,
-			'-fuse-ld=' + native_linker, '-static', '-O2', '-w', '-D_GNU_SOURCE', '-fno-stack-protector',
-			cfile, '-lm', '-lpthread', '-o', work + '/' + role + '/program'], work, role + '-cc', 60000)!
+		native_invoke(winejitstream.native_target_c_arguments(native_clang, native_linker,
+			native_resource, target, sysroot, gcc, cfile, work + '/' + role + '/program')!,
+			work, role + '-cc', 60000)!
 		native_static_elf(work + '/' + role + '/program', if role == 'guest' {
 			u16(183)
 		} else {
@@ -244,7 +236,7 @@ fn native_run() ! {
 	}
 	os.write_file(work + '/generated.json', json2.encode(generated))!
 	winejitstream.native_input_verify(inputs)!
-	winejitstream.native_require_free(work, 1100 * 1024)!
+	winejitstream.native_require_free(work, winejitstream.native_free_floor(true))!
 	native_invoke([os.executable(), '--boot', root, work, kernel], work, 'boot-worker', 90000)!
 	winejitstream.native_input_verify(inputs)!
 	winejitstream.native_input_verify(generated)!
@@ -253,7 +245,7 @@ fn native_run() ! {
 		'scope':                   'Supplemental PID stream capture only. No canonical workload, ARM, Wine, shared backing, failure cause or complete corresponding-source qualification.'
 		'kernel_candidate_commit': binding.candidate_commit
 		'observed_state_bytes':    winejitstream.native_state_bytes(work)!.str()
-		'limits':                  'VM worker90s plus cleanup2s; innerVM60s; build steps60s each; file hard128MiB; monitored state256MiB/log256KiB/serial6MiB every10ms, thresholds may overshoot; checked statvfs >=1100MiB initially/pre-VM and >=550MiB before each child and once per second during it.'
+		'limits':                  'VM worker90s plus cleanup2s; innerVM60s; build steps60s each; file hard128MiB; monitored state256MiB/log256KiB/serial6MiB every10ms, thresholds may overshoot; checked statvfs >=2GiB initially/pre-VM and >=1GiB before each child and once per second during it.'
 		'toolchain_limit':         'Captured paths for selected sources, compiler, resources, target dependencies and host tools are pinned and rechecked. Newly added directory entries, host SDK, transitive dynamic libraries and external tool behavior are not hermetically frozen.'
 	}))!
 	println('STANDALONE JIT STREAM CAPTURE COMPLETE (not workload qualification): ' + work)

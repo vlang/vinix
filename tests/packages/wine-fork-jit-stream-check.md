@@ -448,3 +448,90 @@ mistyped posthoc elapsed field is preserved separately as
 seconds from unchanged raw timing output. No earlier evidence was removed.
 This followup ran no target build, staging, image or VM. The canonical probe
 and translated ARM fork result remain unchanged.
+
+## Standalone compiler policy and host controls
+
+Following source revision `7bd0390a20ff979ae9a198c88f949c8a6f1e8d38`, the
+standalone controller now preserves Clang warnings, passes
+`--no-default-config`, and clears and records 18 inherited compiler, search,
+configuration and test-selection variables. This includes `CFLAGS`, `LDFLAGS`,
+`VTEST_ONLY_FN` and `V3CACHE`. V invocations use `-nocache`; both `TMPDIR` and
+`VTMP` select retained private scratch. Initial and pre-VM free-space admission
+is 2 GiB, with a 1 GiB floor for guarded children. The existing 60-second
+compile guards, 90-second VM-worker guard, 60-second inner VM limit,
+128 MiB file limit and sampled 256 MiB state/256 KiB log/6 MiB serial limits
+remain. Inventory, parent copies and final receipts are outside a whole-run
+hard deadline; sampled thresholds can overshoot. No warning-suppression
+option is added by the maintained target Clang argument builder.
+
+The four implementation/control source SHA-256 values are:
+
+- `tests/packages/wine-fork-jit-stream-native.v`:
+  `f376189ee03517d5bdc0b39a4a8276ced57906b18427536326e89808cdd2760b`.
+- `tools/packages/winejitstream/native_policy.v`:
+  `9588d9a91b8bcb5ab276d261e2a9ccd3d7b9b3f59073df12996d595164f8daae`.
+- `tools/packages/winejitstream/native_policy_test.v`:
+  `bb90e8f9652cfa20721718a351702a4fafc0b047418ca4a33f2356a4bd069b0c`.
+- `tests/packages/wine-fork-jit-stream-native-host.v`:
+  `5f8bca9522adc1eb440c6c7153ce0f6213c6b09bc53b1c526fad8920f5540bc7`.
+
+Host-only evidence is retained at
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-jit-stream-native-host-07`.
+`policy-receipt.json` SHA-256 is
+`dd2a164e558421234b3ee74920a49e82e6d5fe1e4d153e2f2f713f2056434849`;
+`steps.json` is
+`42431dc0928ea5a229e89b6c1d8836a5b30590bb92126322a82f36e98560631f`.
+The selected private V binary remains `ff75a301...` described above. Full
+selected private compiler libraries and maintained source trees were
+re-enumerated and hashed before/after: all 3,770 entries matched binding
+digest `fa69dda5c8c5047b3540a37062506986e1c97d6a0710caa166e99d76a980319c`.
+The observer also refuses a changed embedded policy-helper source. This binds
+selected binary/library bytes; it does not establish exact compiler source
+provenance or freeze the host SDK, dynamic libraries or ambient module search.
+Before a target run, a private empty `VMODULES` directory must be selected,
+charged and inventoried rather than relying on the default home module path.
+
+The final observed bootstrap used `-nocache`, exited 0 in 6.12 seconds and
+retained empty compiler output. It was outside its own guard, observed with a
+300-second stop policy. `host-02` SHA-256 is
+`304ce4e15f51479c2666f0ce9a447ecc8cbb453f7e462d748f8694d613b7d564`;
+`bootstrap-02.json` is
+`6b0b3f38043e4c584213cbe5df4814c2e89e41a5ca68346b578f33340da24135`.
+The earlier host-07 bootstrap and its receipt remain beside it. Three
+subsequent builds used hard 60-second process-group guards and exited 0 in
+9,303, 1,079 and 1,777 ms with confirmed cleanup. The host-built controller
+SHA-256 is
+`bf1a920e392f43176876562757dd71478686fee94f117b1b3739d6eb25d5bb44`.
+
+All five explicit `if`/`panic` unit functions passed in normal and production
+builds, in 263 and 242 ms. They verify both target architectures' exact
+warning-preserving argv, unsupported targets and every invalid path position,
+all 18 independently enumerated inherited environment keys and exact presence
+restoration, and the shared admission/output limits. Both intentional-failure
+sentinels retained raw wait status 256 and the expected diagnostic, in 15 ms
+each. Every guarded build/run confirmed process-group cleanup. No target
+controller was invoked.
+
+The separate host-policy profile allows 64 MiB inclusive logical retained
+state, counts all selected earlier native/static host attempts, both ARM
+launch refusals, the immutable composition, host-06 and host-07, and retains
+a 2 MiB reserve. Its exact no-follow count after the final 7,794-byte receipt
+was 58,415,543 bytes including reserve, below 67,108,864. Host-07 remained
+below its separate 20 MiB bound. This profile does not change the static
+composer's 32 MiB contract. Completed free-space checks exceeded 2 GiB before
+every build/run; final actual `df -k` available space was 5,861,228 KiB.
+
+The preceding host-06 bootstrap is preserved without deletion. Its compiler
+exited 0 in 13.50 seconds, but retained compiler-cache state made the subsequent
+posthoc recorder exit 1 with `static composition would exceed cumulative
+32 MiB`; no guarded qualification ran there. Its empty `bootstrap.log`, raw
+`bootstrap.time`, binary and scratch remain at
+`section14/wine-jit-stream-native-host-06`. The binary SHA-256 is
+`a1a60f9ad7f0dd231f815b2b1e627752c58285313737710e9525deb5e946c338`;
+its then-observer source was
+`4c1313f8cc2b581421ec23d66460e2c86a3ff589d0777619fc30a796755dc707`.
+The first host-07 `-nocache` bootstrap exited 0 in 7.49 seconds; the final
+rebuild followed the test-filter/environment review. These are retained
+attempts, not target qualifications. Project-local wait-status width repair
+and strict target compilation remain separate work. No target build, staging,
+image or VM ran in this policy followup; canonical results are unchanged.

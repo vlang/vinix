@@ -99,10 +99,232 @@ fn checked_df(state string) !string {
 }
 
 fn main() {
+	if os.args.len > 1 && os.args[1].starts_with('--policy') {
+		policy_observe() or { eprintln(err); exit(1) }
+		return
+	}
 	observe() or {
 		eprintln(err)
 		exit(1)
 	}
+}
+
+// Fixed small policy qualification. Never invokes the target controller.
+const policy_base = '/Users/alex/Library/Caches/vinix-codex/section14'
+const policy_compiler = '/Users/alex/code/vinix/build/package-https-runtime-work/toolchain/v'
+const policy_compiler_sha = 'ff75a30180b1de305e3c62acc1ebd85341ff83ae5d852c819d11f27d5260c4c5'
+const policy_limit = u64(64 * 1024 * 1024)
+
+struct PolicyBinding {
+	entries int
+	digest string
+}
+
+fn policy_binding(pins map[string]winejitstream.NativePin) PolicyBinding {
+	mut keys := pins.keys()
+	keys.sort()
+	mut hash := sha256.new()
+	for key in keys { hash.write((json2.encode(key) + ':' + json2.encode(pins[key]) + '\n').bytes()) or { panic(err) } }
+	mut sum := []u8{len: sha256.size}
+	hash.checksum_into(mut sum)
+	return PolicyBinding{entries: keys.len, digest: sum.hex()}
+}
+
+fn policy_inputs(root string) !map[string]winejitstream.NativePin {
+	mut pins := map[string]winejitstream.NativePin{}
+	for path in [policy_compiler, os.dir(policy_compiler) + '/v.mod',
+		os.dir(policy_compiler) + '/snapshot.json', clang, os.executable(),
+		root + '/tests/packages/wine-fork-jit-stream-native.v',
+		root + '/tests/packages/wine-fork-jit-stream-native-host.v'] {
+		winejitstream.native_input_add(path, mut pins)!
+	}
+	for path in [os.dir(policy_compiler) + '/vlib', os.dir(policy_compiler) + '/thirdparty',
+		root + '/tools/packages/winejitstream', root + '/tests/hardware-platform/hwhost'] {
+		winejitstream.native_input_tree(path, mut pins)!
+	}
+	return pins
+}
+
+fn policy_account(state string, reserve u64) !u64 {
+	mut historical := u64(0)
+	for name in ['wine-jit-stream-native-host-01', 'wine-jit-stream-native-host-02',
+		'wine-jit-stream-native-host-03', 'wine-jit-stream-native-host-04', 'wine-jit-stream-native-host-05',
+		'wine-jit-stream-native-arm-01.launch-refusal.json', 'wine-jit-stream-native-arm-01.launch-02.json'] {
+		historical += winejitstream.static_state_bytes(policy_base + '/' + name)!
+	}
+	if historical != 7638328 { return error('historical selected evidence changed') }
+	current := winejitstream.static_state_bytes(state)!
+	if current > 20 * 1024 * 1024 { return error('current policy host state exceeds 20 MiB') }
+	selected := winejitstream.static_host_states_bytes(policy_base)!
+		+ winejitstream.static_state_bytes(policy_base + '/wine-jit-stream-native-inputs-01')!
+		+ winejitstream.static_state_bytes(policy_base + '/wine-jit-stream-native-host-06')!
+		+ current
+	return policy_budget(historical + selected, reserve)
+}
+
+fn policy_budget(selected u64, reserve u64) !u64 {
+	if selected > policy_limit || reserve > policy_limit - selected {
+		return error('host policy would exceed cumulative 64 MiB')
+	}
+	return selected + reserve
+}
+
+fn policy_observe() ! {
+	bootstrap := os.args.len == 7 && os.args[1] == '--policy-bootstrap-record'
+	if !bootstrap && (os.args.len != 4 || os.args[1] != '--policy') {
+		return error('usage: native-host --policy ROOT EXISTING_HOST_07_STATE')
+	}
+	root := os.real_path(os.args[2])
+	state := os.args[3]
+	if state != policy_base + '/wine-jit-stream-native-host-07'
+		|| os.real_path(state) != state || (os.lstat(state)!).get_filetype() != .directory {
+		return error('requires fixed ordinary host-07 state')
+	}
+	if os.read_file(@FILE)! != $embed_file('wine-fork-jit-stream-native-host.v').to_string() {
+		return error('compiled policy observer source differs')
+	}
+	if os.read_file(root + '/tools/packages/winejitstream/native_policy.v')!
+		!= $embed_file('../../tools/packages/winejitstream/native_policy.v').to_string() {
+		return error('compiled native compiler policy source differs')
+	}
+	if winejitstream.native_input_digest(policy_compiler)! != policy_compiler_sha {
+		return error('selected private compiler changed')
+	}
+	winejitstream.native_require_free(state, winejitstream.native_free_floor(true))!
+	policy_account(state, 2 * 1024 * 1024)!
+	if bootstrap {
+		policy_bootstrap(root, state)!
+		return
+	}
+	policy_qualify(root, state)!
+}
+
+fn policy_bootstrap(root string, state string) ! {
+	if os.args[4] != 'bootstrap-02.log' || os.executable() != state + '/host-02' {
+		return error('requires fixed second bootstrap log and executable')
+	}
+	winejitstream.static_require_absent(state + '/bootstrap-02.json')!
+	mut environment := map[string]string{}
+	for name in ['V', 'VEXE', 'VINIX_V_COMPILER', 'V_MACOS_V3_CALLER_VEXE',
+		'V_MACOS_V3_CALLER_VEXE_PRESENT', 'V_MACOS_V3_CALLER_VCHILD_PRESENT',
+		'V_MACOS_V3_CALLER_NO_FALLBACK_PRESENT', 'V_MACOS_V3_NO_FALLBACK',
+		'V_C_ERROR_BUG_REPORT_DISABLED', 'TMPDIR', 'VTMP', 'LC_ALL', 'LANG', 'VFLAGS',
+		'VCHILD', 'V_MACOS_V3_CALLER_VCHILD', 'V_MACOS_V3_CALLER_NO_FALLBACK',
+		'V_MACOS_V3_CHILD_VEXE_PRESENT', 'CFLAGS', 'LDFLAGS', 'VTEST_ONLY_FN', 'V3CACHE',
+		'CPATH', 'C_INCLUDE_PATH', 'CPLUS_INCLUDE_PATH', 'OBJC_INCLUDE_PATH',
+		'OBJCPLUS_INCLUDE_PATH', 'LIBRARY_PATH', 'COMPILER_PATH', 'GCC_EXEC_PREFIX',
+		'CCC_OVERRIDE_OPTIONS', 'CLANG_CONFIG_FILE_SYSTEM_DIR', 'CLANG_CONFIG_FILE_USER_DIR',
+		'SDKROOT', 'MACOSX_DEPLOYMENT_TARGET'] {
+		environment[name] = os.getenv_opt(name) or { '<unset>' }
+	}
+	os.write_file(state + '/bootstrap-02.json', json2.encode({
+		'kind': 'Posthoc completed external tool observation; bootstrap outside its own guard, observed with 300-second stop policy.'
+		'exit_code': os.args[5]
+		'observed_elapsed_ms': os.args[6]
+		'argv': json2.encode([policy_compiler, '-nocache', '-cc', clang, '-prod', '-gc', 'none', '-manualfree',
+			'-path', '@vlib|' + root + '|@vmodules', '-o', state + '/host-02',
+			root + '/tests/packages/wine-fork-jit-stream-native-host.v'])
+		'environment': json2.encode(environment)
+		'log_sha256': winejitstream.native_input_digest(state + '/bootstrap-02.log')!
+		'observer_sha256': winejitstream.native_input_digest(os.executable())!
+		'selected_binding_after': json2.encode(policy_binding(policy_inputs(root)!))
+	}))!
+	policy_account(state, 2 * 1024 * 1024)!
+}
+
+fn policy_qualify(root string, state string) ! {
+	for name in ['guarded', 'scratch', 'steps.json', 'environment.json', 'policy-receipt.json'] {
+		winejitstream.static_require_absent(state + '/' + name)!
+	}
+	os.mkdir(state + '/guarded')!
+	os.mkdir(state + '/scratch')!
+	mut environment := winejitstream.native_clear_compiler_environment()
+	for pair in ['V=' + policy_compiler, 'VEXE=' + policy_compiler,
+		'VINIX_V_COMPILER=' + policy_compiler, 'V_MACOS_V3_CALLER_VEXE=' + policy_compiler,
+		'V_MACOS_V3_CALLER_VEXE_PRESENT=1', 'V_MACOS_V3_CALLER_VCHILD_PRESENT=0',
+		'V_MACOS_V3_CALLER_NO_FALLBACK_PRESENT=0', 'V_MACOS_V3_NO_FALLBACK=1',
+		'V_C_ERROR_BUG_REPORT_DISABLED=1', 'TMPDIR=' + state + '/scratch',
+		'VTMP=' + state + '/scratch', 'LC_ALL=C', 'LANG=C'] {
+		at := pair.index('=') or { return error('invalid fixed policy environment') }
+		os.setenv(pair[..at], pair[at + 1..], true)
+		environment[pair[..at]] = pair[at + 1..]
+	}
+	for name in ['VCHILD', 'V_MACOS_V3_CALLER_VCHILD', 'V_MACOS_V3_CALLER_NO_FALLBACK',
+		'V_MACOS_V3_CHILD_VEXE_PRESENT', 'VINIX_WINE_POLICY_ASSERT_SENTINEL'] {
+		os.unsetenv(name)
+		environment[name] = '<unset>'
+	}
+	os.write_file(state + '/environment.json', json2.encode(environment))!
+	before := policy_inputs(root)!
+	os.write_file(state + '/binding-before.json', json2.encode(policy_binding(before)))!
+	limits := winejitstream.NativeLimits{timeout_ms: 60000, file_bytes: 20 * 1024 * 1024,
+		total_bytes: 20 * 1024 * 1024, log_bytes: 256 * 1024, serial_bytes: 256 * 1024,
+		min_free_kib: winejitstream.native_free_floor(false)}
+	mut steps := map[string]Step{}
+	for name in ['controller', 'policy-test', 'policy-test-prod'] {
+		controller := name == 'controller'
+		source := if controller { root + '/tests/packages/wine-fork-jit-stream-native.v' }
+			else { root + '/tools/packages/winejitstream/native_policy_test.v' }
+		mut argv := [policy_compiler, '-nocache', '-cc', clang]
+		if name != 'policy-test' { argv << '-prod' }
+		argv << ['-gc', 'none', '-manualfree', '-path', '@vlib|' + root
+			+ if controller { '|' + root + '/tests/hardware-platform' } else { '' }
+			+ '|@vmodules', '-o', state + '/guarded/' + name, source]
+		df := checked_df(state)!
+		winejitstream.native_require_free(state, winejitstream.native_free_floor(true))!
+		policy_account(state, 2 * 1024 * 1024)!
+		run := winejitstream.native_guard(argv, state + '/guarded', name + '.build.log', limits)!
+		steps[name + '.build'] = Step{argv: argv, df: df, run: run}
+		os.write_file(state + '/steps.json', json2.encode(steps))!
+		policy_account(state, 2 * 1024 * 1024)!
+		if !run.stopped || run.wait_status != 0 || run.timed_out || run.size_limited || run.reason != '' {
+			return error('policy build failed; raw result retained: ' + name)
+		}
+		if (os.lstat(state + '/guarded/' + name)!).get_filetype() != .regular {
+			return error('policy build output not ordinary')
+		}
+		steps[name + '.build'] = Step{argv: argv, df: df, run: run,
+			output_pin: winejitstream.native_input_digest(state + '/guarded/' + name)!}
+		os.write_file(state + '/steps.json', json2.encode(steps))!
+	}
+	for name in ['policy-test', 'policy-test-prod', 'policy-sentinel', 'policy-sentinel-prod'] {
+		sentinel := name.starts_with('policy-sentinel')
+		if sentinel { os.setenv('VINIX_WINE_POLICY_ASSERT_SENTINEL', '1', true) }
+		else { os.unsetenv('VINIX_WINE_POLICY_ASSERT_SENTINEL') }
+		argv := [state + '/guarded/' + if name.ends_with('-prod') { 'policy-test-prod' } else { 'policy-test' }]
+		df := checked_df(state)!
+		winejitstream.native_require_free(state, winejitstream.native_free_floor(true))!
+		policy_account(state, 2 * 1024 * 1024)!
+		run := winejitstream.native_guard(argv, state + '/guarded', name + '.run.log', limits)!
+		steps[name + '.run'] = Step{argv: argv, df: df, run: run}
+		os.write_file(state + '/steps.json', json2.encode(steps))!
+		policy_account(state, 2 * 1024 * 1024)!
+		expected := if sentinel { 256 } else { 0 }
+		if !run.stopped || run.wait_status != expected || run.timed_out || run.size_limited || run.reason != '' {
+			return error('policy control failed; raw result retained: ' + name)
+		}
+		if sentinel && !os.read_file(state + '/guarded/' + name + '.run.log')!.contains('wine-native-policy intentional assertion sentinel') {
+			return error('policy assertion sentinel missing')
+		}
+	}
+	os.unsetenv('VINIX_WINE_POLICY_ASSERT_SENTINEL')
+	after := policy_inputs(root)!
+	if before != after { return error('selected policy source/compiler inputs changed') }
+	os.write_file(state + '/binding-after.json', json2.encode(policy_binding(after)))!
+	measured := policy_account(state, 2 * 1024 * 1024)!
+	receipt := json2.encode({
+		'argv': json2.encode(os.args)
+		'environment': json2.encode(environment)
+		'selected_binding': json2.encode(policy_binding(after))
+		'steps': json2.encode(steps)
+		'inclusive_state_plus_2MiB_reserve_before_receipt': measured.str()
+		'scope': 'Host-only target-policy controller build and explicit normal/production controls. No target build, staging, image or VM. Full selected private compiler libraries and source trees re-enumerated/hashed before/after. Bootstrap observed outside its own guard. Host SDK and dynamic libraries are not frozen. Separate compiler scratch counted without following links before/after each guarded child; cumulative selected historical/composed/host-06/current state <=64MiB with 2MiB reserve. This profile does not change the static composer 32MiB contract.'
+	})
+	policy_budget(measured, u64(receipt.len))!
+	os.write_file(state + '/policy-receipt.json', receipt)!
+	policy_account(state, 2 * 1024 * 1024)!
+	winejitstream.native_require_free(state, winejitstream.native_free_floor(false))!
+	println('PASS host-only native compiler policy controls')
 }
 
 fn state_bytes(path string) !u64 {
