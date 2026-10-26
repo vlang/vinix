@@ -3,6 +3,7 @@
 module main
 
 import os
+import crypto.sha256
 
 fn checked(args []string) {
  r := os.exec(args)
@@ -25,6 +26,32 @@ fn main() {
  mut text := '.class public ' + main_cls + '\n.super Landroid/app/Activity;\n.implements Ljava/lang/Runnable;\n' +
   '.field public handler:Landroid/os/Handler;\n.field private worker:Landroid/os/HandlerThread;\n.field private completed:I\n'
  text += method('public constructor <init>()V', 'invoke-direct {p0}, Landroid/app/Activity;-><init>()V\nreturn-void', 0)
+ text += method('private static checkInsertion(Landroid/accounts/AccountManager;)V', '
+# Synthetic values exercise the former plaintext logging path. The runner must
+# reject the password and userdata sentinels anywhere in the guest serial log.
+new-instance v0, Landroid/accounts/Account;
+const-string v1, "credential-regression"
+const-string v2, "com.google"
+invoke-direct {v0, v1, v2}, Landroid/accounts/Account;-><init>(Ljava/lang/String;Ljava/lang/String;)V
+const-string v1, "VINIX-ACCOUNT-PASSWORD-SENTINEL-2026"
+new-instance v2, Landroid/os/Bundle;
+invoke-direct {v2}, Landroid/os/Bundle;-><init>()V
+const-string v3, "credential-regression"
+const-string v4, "VINIX-ACCOUNT-USERDATA-SENTINEL-2026"
+invoke-virtual {v2, v3, v4}, Landroid/os/Bundle;->putString(Ljava/lang/String;Ljava/lang/String;)V
+:insertion_start
+invoke-virtual {p0, v0, v1, v2}, Landroid/accounts/AccountManager;->addAccountExplicitly(Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;)Z
+:insertion_end
+goto :bad
+.catch Ljava/lang/UnsupportedOperationException; {:insertion_start .. :insertion_end} :insertion_failed
+:insertion_failed
+move-exception v0
+invoke-virtual {p0}, Landroid/accounts/AccountManager;->getAccounts()[Landroid/accounts/Account;
+move-result-object v0
+array-length v0, v0
+if-nez v0, :bad
+return-void
+' + failure, 5)
  text += method('public static checkFuture(Landroid/accounts/AccountManagerFuture;)V', '
 invoke-interface {p0}, Landroid/accounts/AccountManagerFuture;->isDone()Z
 move-result v0
@@ -88,6 +115,7 @@ return-void
 invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 invoke-static {p0}, Landroid/accounts/AccountManager;->get(Landroid/content/Context;)Landroid/accounts/AccountManager;
 move-result-object v0
+invoke-static {v0}, ${main_cls}->checkInsertion(Landroid/accounts/AccountManager;)V
 const/4 v1, 0
 const/4 v2, 0
 const/4 v3, 0
@@ -158,7 +186,7 @@ if-ne v0, v1, :done
 iget-object v0, p0, ${main_cls}->worker:Landroid/os/HandlerThread;
 invoke-virtual {v0}, Landroid/os/HandlerThread;->quit()Z
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "ACCOUNT-ASYNC-PASS null-type no-callback no-accounts main-queued worker-to-main explicit-handler callback-once same-future done cancel-false result-authenticator-exception repeat timed null-unit"
+const-string v1, "ACCOUNT-ASYNC-PASS credential-insertion-rejected null-type no-callback no-accounts main-queued worker-to-main explicit-handler callback-once same-future done cancel-false result-authenticator-exception repeat timed null-unit"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 new-instance v0, Landroid/widget/TextView;
 invoke-direct {v0, p0}, Landroid/widget/TextView;-><init>(Landroid/content/Context;)V
@@ -238,4 +266,5 @@ return-void
  checked(['zip', '-q', '-j', out + '/unsigned.apk', dex])
  checked([java, '-jar', signer, 'sign', '--ks', fixture + '/fixture.p12', '--ks-key-alias', 'fixture', '--ks-pass', 'pass:android', '--key-pass', 'pass:android', '--out', out + '/probe.apk', out + '/unsigned.apk'])
  println('ACCOUNT-ASYNC-APK ' + out + '/probe.apk')
+ println('ACCOUNT-ASYNC-APK-SHA256 ' + sha256.sum(os.read_bytes(out + '/probe.apk')!).hex())
 }
