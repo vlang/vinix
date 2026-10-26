@@ -14,12 +14,13 @@ const trees = ['tools/packages', 'tools/accounts', 'tools/security-events', 'too
 	'tests/native-guest-tools/guesthost', 'tests/linuxkpi/hosttest', 'tests/native-policy-tools/nativepolicy',
 	'tests/host-policy/policyhost', 'tests/hardware-platform/hwhost',
 	'tests/packages/audio-portal-guest', 'tests/packages/audio-portal-tone', 'tests/packages/audiotest',
-	'tests/packages/audioinputs']
+	'tests/packages/audioinputs', 'tests/packages/audioprepare']
 const files = ['tests/packages/audio-portal-runtime-check.v', 'tests/packages/audio-portal-retain.v',
 	'tests/packages/audio-portal-evidence-check.v', 'tests/packages/audio-portal-wave-check.v',
 	'build-support/native-compat-tools/main.v', 'build-support/security-tools/compile-v-core',
 	'build-support/run-v-tool.sh', 'build-support/find-v.sh', 'tests/packages/audio-cross-cc.v',
-	'tests/packages/audio-input-check.v', 'tests/packages/audio-cross-probe.v']
+	'tests/packages/audio-input-check.v', 'tests/packages/audio-cross-probe.v',
+	'tests/packages/audio-portal-prepare-check.v', 'build-support/limine.conf']
 const inputs = ['guest', 'tone', 'package-cli', 'account-cli', 'session-cli', 'authd', 'kernel',
 	'v', 'clang', 'qemu', 'firmware', 'sandbox', 'sandbox-c', 'adapter-host-cc',
 	'cross-backend', 'cross-cc1', 'cross-collect2', 'cross-as', 'cross-ld', 'cross-lto-wrapper', 'cross-lto-plugin', 'cross-adapter',
@@ -295,6 +296,9 @@ fn embedded() map[string]string {
 		'tests/packages/audio-portal-wave-check.v': $embed_file('audio-portal-wave-check.v').to_string()
 		'tests/packages/audio-input-check.v': $embed_file('audio-input-check.v').to_string()
 		'tests/packages/audioinputs/tree.v': $embed_file('audioinputs/tree.v').to_string()
+		'tests/packages/audioprepare/prepare.v': $embed_file('audioprepare/prepare.v').to_string()
+		'tests/packages/audio-portal-prepare-check.v': $embed_file('audio-portal-prepare-check.v').to_string()
+		'build-support/limine.conf': $embed_file('../../build-support/limine.conf').to_string()
 		'tests/packages/audio-cross-cc.v': $embed_file('audio-cross-cc.v').to_string()
 		'tests/packages/audio-cross-probe.v': $embed_file('audio-cross-probe.v').to_string()
 		'tests/packages/audiotest/wave.v': $embed_file('audiotest/wave.v').to_string()

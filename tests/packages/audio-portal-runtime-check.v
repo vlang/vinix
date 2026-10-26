@@ -8,6 +8,7 @@ import json2
 import os
 import time
 import tests.packages.audioinputs
+import tests.packages.audioprepare
 import tools.packages.pkgcore
 
 const source_trees = ['tools/packages', 'tools/accounts', 'tools/security-events', 'tools/keyring',
@@ -15,13 +16,14 @@ const source_trees = ['tools/packages', 'tools/accounts', 'tools/security-events
 	'tests/native-guest-tools/guesthost', 'tests/linuxkpi/hosttest', 'tests/native-policy-tools/nativepolicy',
 	'tests/host-policy/policyhost', 'tests/hardware-platform/hwhost',
 	'tests/packages/audio-portal-guest', 'tests/packages/audio-portal-tone', 'tests/packages/audiotest',
-	'tests/packages/audioinputs']
+	'tests/packages/audioinputs', 'tests/packages/audioprepare']
 const source_files = ['tests/packages/audio-portal-runtime-check.v',
 	'tests/packages/audio-portal-retain.v', 'tests/packages/audio-portal-evidence-check.v',
 	'tests/packages/audio-portal-wave-check.v', 'build-support/native-compat-tools/main.v',
 	'build-support/security-tools/compile-v-core',
 	'build-support/run-v-tool.sh', 'build-support/find-v.sh', 'tests/packages/audio-cross-cc.v',
-	'tests/packages/audio-input-check.v', 'tests/packages/audio-cross-probe.v']
+	'tests/packages/audio-input-check.v', 'tests/packages/audio-cross-probe.v',
+	'tests/packages/audio-portal-prepare-check.v', 'build-support/limine.conf']
 const generated_files = ['guest-build/init.c', 'tone-build/tone.c',
 	'tools/program-0/vinix-package.c', 'tools/program-1/vinix-account.c',
 	'tools/program-2/vinix-session.c', 'tools/program-3/vinix-authd.c']
@@ -38,6 +40,45 @@ struct Qualification {
 	artifacts       map[string]string
 	artifact_paths  map[string]string
 }
+
+// The external digest is the review checkpoint. Resume executes no serialized
+// command or scenario table: it uses the compiled scenarios below.
+struct PreparedHost {
+	qemu string
+	firmware string
+	firmware_vars string
+}
+
+struct Preparation {
+	format int = 1
+	architecture string
+	state_root string
+	source_root string
+	source_revision string
+	sources map[string]string
+	generated map[string]string
+	inputs map[string]string
+	artifact_paths map[string]string
+	original_paths map[string]string
+	scenarios []string
+	extras_root string
+	host PreparedHost
+	environment map[string]string
+	tree []audioprepare.Entry
+}
+
+struct PreparedKernel {
+	elf_path string
+	elf_sha256 string
+}
+
+struct PreparedKernelSeal {
+	format int
+	kernels map[string]PreparedKernel
+}
+
+const reviewed_kernel_seal = '839ad75dd1ec376a8cae4e75dc1cfbddc913406dc3e136e8d4f4a412657f9b73'
+const runtime_tools = ['cp', 'tar', 'mformat', 'mmd', 'mcopy']
 
 fn digest(path string) !string { return sha256.sum(os.read_bytes(path)!).hex() }
 
@@ -242,6 +283,24 @@ fn audio_suite(root string, out string, arch string, sandbox string, key string)
 	for name in files(root + '/tools/accounts/actions')! {
 		entries << hwhost.RootFile{ path: 'usr/share/vinix/actions/' + name, text: os.read_file(root + '/tools/accounts/actions/' + name)! }
 	}
+	return hwhost.Suite{
+		name:         'package-audio-portal'
+		guest:        'tests/packages/audio-portal-guest'
+		module_paths: ['.', 'tools/accounts', 'tools/security-events', 'tools/keyring']
+		programs:     [
+			hwhost.Program{ source: 'tools/packages/main.v', path: 'usr/bin/vinix-package', flags: ['-prod'] },
+			hwhost.Program{ source: 'tools/accounts/account.v', path: 'usr/sbin/vinix-account', flags: ['-prod'] },
+			hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session', flags: ['-prod'] },
+			hwhost.Program{ source: 'tools/accounts/authd.v', path: 'usr/sbin/vinix-authd', flags: ['-prod'] },
+		]
+		binaries:     [hwhost.RootBinary{ source: sandbox, path: 'usr/bin/vinix-sandbox' }]
+		files:        entries
+		directories:  ['run', 'home', 'var/log', 'tmp:1777']
+		scenarios:    audio_scenarios()
+	}
+}
+
+fn audio_scenarios() []hwhost.Scenario {
 	mut scenarios := []hwhost.Scenario{}
 	for name in ['basic', 'lifecycle', 'seat'] {
 		full := 'packages-audio-' + name
@@ -260,25 +319,11 @@ fn audio_suite(root string, out string, arch string, sandbox string, key string)
 			qemu_x86_64:  ['-device', 'intel-hda', '-device', 'hda-output,audiodev=pcm,mixer=off']
 		}
 	}
-	return hwhost.Suite{
-		name:         'package-audio-portal'
-		guest:        'tests/packages/audio-portal-guest'
-		module_paths: ['.', 'tools/accounts', 'tools/security-events', 'tools/keyring']
-		programs:     [
-			hwhost.Program{ source: 'tools/packages/main.v', path: 'usr/bin/vinix-package', flags: ['-prod'] },
-			hwhost.Program{ source: 'tools/accounts/account.v', path: 'usr/sbin/vinix-account', flags: ['-prod'] },
-			hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session', flags: ['-prod'] },
-			hwhost.Program{ source: 'tools/accounts/authd.v', path: 'usr/sbin/vinix-authd', flags: ['-prod'] },
-		]
-		binaries:     [hwhost.RootBinary{ source: sandbox, path: 'usr/bin/vinix-sandbox' }]
-		files:        entries
-		directories:  ['run', 'home', 'var/log', 'tmp:1777']
-		scenarios:    scenarios
-	}
+	return scenarios
 }
 
 fn prepare_check(options hwhost.Options, root string, out string, before map[string]string,
-	revision string, host hwhost.Host, mut paths map[string]string, mut originals map[string]string) ! {
+	revision string, host hwhost.Host, prepare_only bool, mut paths map[string]string, mut originals map[string]string) ! {
 	variable := if host.arch == 'aarch64' { 'CC_AARCH64' } else { 'CC_AMD64' }
 	default_cc := if host.arch == 'aarch64' { 'clang' } else { 'x86_64-linux-musl-gcc' }
 	cc_name := os.getenv_opt(variable) or { default_cc }
@@ -355,7 +400,255 @@ fn prepare_check(options hwhost.Options, root string, out string, before map[str
 	paths['input-origins'] = out + '/original-input-paths.json'
 	paths['source-revision'] = out + '/repository-head.log'
 	paths['source-patch'] = out + '/production.diff'
-	finish_check(options, root, out, before, revision, host, suite, extras, mut paths, originals)!
+	if prepare_only {
+		seal_preparation(options, root, out, before, revision, host, extras, mut paths, mut originals)!
+		return
+	}
+	finish_check(options, root, out, before, revision, host, suite, extras, false, mut paths, originals)!
+}
+
+fn selected_scenarios(names []string) ![]string {
+	mut selected := []string{}
+	for scenario in audio_scenarios() {
+		if names.len == 0 || scenario.name in names { selected << scenario.name }
+	}
+	if names.len > 0 && selected.len != names.len { return error('unknown or duplicate audio scenario') }
+	return selected
+}
+
+fn ordinary_under(out string, path string) ! {
+	if !path.starts_with(out + '/') || path != os.real_path(path) {
+		return error('prepared artifact must be inside canonical state: ' + path)
+	}
+	audioprepare.regular(path)!
+}
+
+fn prepared_elf(path string) ! {
+	audioprepare.regular(path)!
+	mut file := os.open(path)!
+	defer { file.close() }
+	mut header := []u8{len: 64}
+	if file.read(mut header)! != 64 || header[..7] != [u8(127), `E`, `L`, `F`, 2, 1, 1]
+		|| header[16] != 2 || header[17] != 0 || header[18] != 183 || header[19] != 0 {
+		return error('prepared program must be an AArch64 ET_EXEC ELF: ' + path)
+	}
+}
+
+fn prepared_extras(p Preparation) ! {
+	out := p.state_root
+	if p.extras_root != out + '/tools/root' { return error('unexpected prepared extras root') }
+	mut expected := map[string]string{
+		'etc/passwd': 'root:x:0:0:root:/root:/bin/sh\n'
+		'etc/group': 'root:x:0:\ntty:x:5:\n'
+		'etc/vinix/auth.conf': 'scrypt_ln = 10\n'
+		'etc/vinix-packages/config.json': os.read_file(out + '/inputs/config.json')!
+	}
+	for pair in ['inputs/publisher|usr/share/audio-publisher', 'inputs/source/tools/accounts/actions|usr/share/vinix/actions'] {
+		parts := pair.split('|')
+		for name in files(out + '/' + parts[0])! {
+			expected[parts[1] + '/' + name] = os.read_file(out + '/' + parts[0] + '/' + name)!
+		}
+	}
+	mut binaries := map[string]string{}
+	for pair in ['package-cli|usr/bin/vinix-package', 'account-cli|usr/sbin/vinix-account',
+		'session-cli|usr/sbin/vinix-session', 'authd|usr/sbin/vinix-authd', 'sandbox|usr/bin/vinix-sandbox'] {
+		parts := pair.split('|')
+		binaries[parts[1]] = p.artifact_paths[parts[0]]
+	}
+	mut directories := map[string]bool{'': true, 'run': true, 'home': true, 'var': true, 'var/log': true, 'tmp': true}
+	for path in expected.keys() {
+		mut parent := os.dir(path)
+		for parent != '.' { directories[parent] = true; parent = os.dir(parent) }
+	}
+	for path in binaries.keys() {
+		mut parent := os.dir(path)
+		for parent != '.' { directories[parent] = true; parent = os.dir(parent) }
+	}
+	entries := audioprepare.capture(p.extras_root, [])!
+	if entries.len != expected.len + binaries.len + directories.len { return error('prepared extras coverage differs') }
+	for entry in entries {
+		if entry.kind == 'directory' {
+			if entry.path !in directories || entry.mode != u32(if entry.path == 'tmp' { 0o1777 } else { 0o755 }) {
+				return error('unexpected prepared extras directory or mode: ' + entry.path)
+			}
+		} else if entry.path in binaries {
+			if entry.mode != 0o755 || entry.sha256 != digest(binaries[entry.path])! { return error('prepared binary differs: ' + entry.path) }
+		} else if entry.path !in expected || entry.mode != 0o644 || os.read_file(p.extras_root + '/' + entry.path)! != expected[entry.path] {
+			return error('prepared root file differs: ' + entry.path)
+		}
+	}
+	config := json2.decode[pkgcore.Config](expected['etc/vinix-packages/config.json'])!
+	key := os.read_file(out + '/inputs/public-key')!.trim_space()
+	expected_config := pkgcore.Config{architecture: 'aarch64', launch_user: 'sam',
+		repositories: [pkgcore.Repository{id: 'audio-fixture', url: 'file:///usr/share/audio-publisher', public_key: key}],
+		policy: pkgcore.Policy{offline: true, reserve_bytes: 0}}
+	if key.len != 64 || !key.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`))
+		|| config != expected_config {
+		return error('prepared package configuration differs')
+	}
+}
+
+fn validate_preparation(out string, expected_sha string) !Preparation {
+	if !os.is_abs_path(out) || os.real_path(out) != out { return error('requires canonical absolute prepared state') }
+	if expected_sha.len != 64 || !expected_sha.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`))
+		|| audioprepare.digest(out + '/preparation.json')! != expected_sha { return error('prepared receipt digest differs from reviewed digest') }
+	p := json2.decode[Preparation](os.read_file(out + '/preparation.json')!)!
+	if p.format != 1 || p.architecture != 'aarch64' || p.state_root != out
+		|| p.source_root != hwhost.find_root(@FILE)! || p.source_revision.len != 40
+		|| p.scenarios.len == 0 || selected_scenarios(p.scenarios)! != p.scenarios {
+		return error('prepared identity, source root or scenario selection differs')
+	}
+	for name in ['run', 'source-after.json', 'generated-after.json', 'input-after.json', 'qualification.json'] {
+		path := out + '/' + name
+		if os.exists(path) || os.is_link(path) { return error('prepared state already contains execution results: ' + name) }
+	}
+	audioprepare.verify(out, p.tree, ['preparation.json'])!
+	if source_inventory(p.source_root)! != p.sources || source_inventory(out + '/inputs/source')! != p.sources
+		|| json2.decode[map[string]string](os.read_file(out + '/source-before.json')!)! != p.sources
+		|| os.read_file(out + '/repository-head.log')!.trim_space() != p.source_revision
+		|| p.sources['tests/packages/audio-portal-runtime-check.v'] != sha256.sum($embed_file('audio-portal-runtime-check.v').to_string().bytes()).hex() {
+		return error('prepared source closure differs')
+	}
+	for _, path in p.artifact_paths { ordinary_under(out, path)! }
+	if p.inputs.len != p.artifact_paths.len || artifact_inventory(p.artifact_paths)! != p.inputs
+		|| generated_inventory(out)! != p.generated
+		|| json2.decode[map[string]string](os.read_file(out + '/input-before.json')!)! != p.inputs
+		|| json2.decode[map[string]string](os.read_file(out + '/generated-before.json')!)! != p.generated
+		|| json2.decode[map[string]string](os.read_file(out + '/original-input-paths.json')!)! != p.original_paths {
+		return error('prepared input/generated maps differ')
+	}
+	for name, path in p.original_paths {
+		if name !in p.inputs || !os.is_abs_path(path) || os.real_path(path) != path { return error('unbound prepared original: ' + name) }
+	}
+	for name in ['kernel', 'v', 'qemu', 'firmware', 'firmware-vars', 'controller', 'clang',
+		'cross-backend', 'cross-cc1', 'cross-collect2', 'cross-as', 'cross-ld', 'cross-lto-wrapper',
+		'cross-lto-plugin', 'adapter-host-cc', 'runtime/BOOTAA64.EFI'] {
+		if name !in p.original_paths { return error('missing prepared original: ' + name) }
+	}
+	for name, _ in p.artifact_paths {
+		if name.starts_with('vlib/') || name.starts_with('v-thirdparty/') || name.starts_with('v-compiler/')
+			|| name.starts_with('cross-sysroot/') || name.starts_with('cross-gcc/')
+			|| name.starts_with('kernel-evidence/') || name.starts_with('runtime/') {
+			if name !in p.original_paths { return error('missing prepared original: ' + name) }
+		}
+	}
+	for name in ['guest', 'tone', 'sandbox', 'package-cli', 'account-cli', 'session-cli', 'authd', 'cross-probe'] {
+		prepared_elf(p.artifact_paths[name])!
+	}
+	for key, relative in {
+		'guest': 'guest-build/init', 'tone': 'tone-build/tone', 'sandbox': 'sandbox-build/vinix-sandbox',
+		'package-cli': 'tools/program-0/vinix-package', 'account-cli': 'tools/program-1/vinix-account',
+		'session-cli': 'tools/program-2/vinix-session', 'authd': 'tools/program-3/vinix-authd',
+		'cross-probe': 'cross-probe', 'input-origins': 'original-input-paths.json',
+		'source-revision': 'repository-head.log', 'source-patch': 'production.diff'
+	} {
+		if p.artifact_paths[key] != out + '/' + relative { return error('prepared artifact location differs: ' + key) }
+	}
+	if p.inputs['controller'] != audioprepare.digest(os.executable())!
+		|| p.artifact_paths['kernel-seal'] != out + '/inputs/kernel-evidence/kernel-seal.json'
+		|| p.inputs['kernel-seal'] != reviewed_kernel_seal { return error('controller or reviewed kernel seal differs') }
+	seal := json2.decode[PreparedKernelSeal](os.read_file(p.artifact_paths['kernel-seal'])!)!
+	build := seal.kernels['aarch64']
+	if seal.format != 1 || build.elf_path != 'kernel-aarch64/bin/vinix'
+		|| digest(out + '/inputs/kernel-evidence/' + build.elf_path)! != build.elf_sha256
+		|| p.inputs['kernel'] != build.elf_sha256 { return error('prepared kernel differs from reviewed seal') }
+	allowed := audioinputs.header_allowlist(out + '/inputs/source', p.sources, p.original_paths)
+	for name in audioinputs.trace_files() {
+		if p.artifact_paths['trace/' + name] != out + '/' + name
+			|| p.artifact_paths['trace-object/' + name] != audioinputs.trace_object(out, name)! {
+			return error('prepared trace/object binding differs: ' + name)
+		}
+		audioinputs.verify_trace(os.read_file(out + '/' + name)!, out, name, allowed)!
+	}
+	if p.host.qemu != p.original_paths['qemu'] || p.host.firmware != p.artifact_paths['firmware']
+		|| p.host.firmware_vars != p.artifact_paths['firmware-vars']
+		|| audioprepare.digest(p.host.qemu)! != p.inputs['qemu']
+		|| p.environment.len != 3 || p.environment['PATH'] != out + '/runtime-bin'
+		|| p.environment['VINIX_LIMINE_BOOTAA64'] != p.artifact_paths['runtime/BOOTAA64.EFI']
+		|| p.environment['VINIX_HWTEST_TCG'] !in ['', '1'] { return error('prepared runtime binding differs') }
+	for name in runtime_tools {
+		path := out + '/runtime-bin/' + name
+		if p.artifact_paths['runtime/' + name] != path || (os.lstat(path)!).mode & 0o7777 != 0o755 {
+			return error('prepared runtime executable differs: ' + name)
+		}
+	}
+	prepared_extras(p)!
+	return p
+}
+
+fn seal_preparation(options hwhost.Options, root string, out string, before map[string]string,
+	revision string, host hwhost.Host, extras string, mut paths map[string]string,
+	mut originals map[string]string) ! {
+	if host.arch != 'aarch64' { return error('two-phase execution currently requires AArch64') }
+	loader := os.getenv_opt('VINIX_LIMINE_BOOTAA64') or { hwhost.shared_path(root, 'boot-image/limine-bin/BOOTAA64.EFI') }
+	paths['runtime/BOOTAA64.EFI'] = retained(os.real_path(loader), out, 'runtime/BOOTAA64.EFI')!
+	originals['runtime/BOOTAA64.EFI'] = os.real_path(loader)
+	os.mkdir(out + '/runtime-bin')!
+	for name in runtime_tools {
+		original := os.real_path(os.find_abs_path_of_executable(name)!)
+		path := out + '/runtime-bin/' + name
+		os.cp(original, path)!
+		os.chmod(path, 0o755)!
+		paths['runtime/' + name] = path
+		originals['runtime/' + name] = original
+	}
+	write_json(out + '/original-input-paths.json', originals)!
+	generated := generated_inventory(out)!
+	inputs := artifact_inventory(paths)!
+	write_json(out + '/generated-before.json', generated)!
+	write_json(out + '/input-before.json', inputs)!
+	if source_inventory(root)! != before { return error('producer sources changed during preparation') }
+	for name, path in originals { if digest(path)! != inputs[name] { return error('original changed during preparation: ' + name) } }
+	verify_sysroot(out)!
+	p := Preparation{
+		architecture: host.arch, state_root: out, source_root: root, source_revision: revision,
+		sources: before, generated: generated, inputs: inputs, artifact_paths: paths,
+		original_paths: originals, scenarios: selected_scenarios(options.scenarios)!, extras_root: extras,
+		host: PreparedHost{qemu: originals['qemu'], firmware: paths['firmware'], firmware_vars: paths['firmware-vars']},
+		environment: {'PATH': out + '/runtime-bin', 'VINIX_LIMINE_BOOTAA64': paths['runtime/BOOTAA64.EFI'],
+			'VINIX_HWTEST_TCG': if os.getenv('VINIX_HWTEST_TCG') == '' { '' } else { '1' }},
+		tree: audioprepare.capture(out, ['preparation.json'])!
+	}
+	os.write_file(out + '/preparation.json', json2.encode(p) + '\n')!
+	sha := audioprepare.digest(out + '/preparation.json')!
+	validate_preparation(out, sha)!
+	println('AUDIO PREPARATION PASS ' + sha + ' (no guest executed)')
+}
+
+fn prepared_command(resume bool, out string, expected_sha string) ! {
+	p := validate_preparation(out, expected_sha)!
+	if !resume { println('AUDIO PREPARATION VERIFIED ' + expected_sha + ' (read-only; no guest executed)'); return }
+	for name, path in p.original_paths {
+		if audioprepare.digest(path)! != p.inputs[name] { return error('external original changed before resume: ' + name) }
+	}
+	verify_sysroot(out)!
+	// This exclusive claim survives every failure. A used preparation cannot boot again.
+	os.mkdir(out + '/run')!
+	mut previous := map[string]string{}
+	mut present := map[string]bool{}
+	for key, value in p.environment {
+		if old := os.getenv_opt(key) { previous[key] = old; present[key] = true }
+		os.setenv(key, value, true)
+	}
+	defer {
+		for key, _ in p.environment {
+			if present[key] { os.setenv(key, previous[key], true) } else { os.unsetenv(key) }
+		}
+	}
+	host := hwhost.Host{root: out + '/inputs/source', arch: p.architecture, v: p.artifact_paths['v'],
+		qemu: p.host.qemu, firmware: p.host.firmware, firmware_vars: p.host.firmware_vars}
+	mut paths := p.artifact_paths.clone()
+	finish_check(hwhost.Options{scenarios: p.scenarios}, p.source_root, out, p.sources,
+		p.source_revision, host, hwhost.Suite{scenarios: audio_scenarios()}, p.extras_root,
+		true, mut paths, p.original_paths) or {
+		if audioprepare.digest(out + '/preparation.json')! != expected_sha { return error('preparation receipt changed during execution') }
+		audioprepare.verify(out, p.tree, ['preparation.json', 'run', 'source-after.json',
+			'generated-after.json', 'input-after.json', 'qualification.json'])!
+		return err
+	}
+	if audioprepare.digest(out + '/preparation.json')! != expected_sha { return error('preparation receipt changed during execution') }
+	audioprepare.verify(out, p.tree, ['preparation.json', 'run', 'source-after.json',
+		'generated-after.json', 'input-after.json', 'qualification.json'])!
 }
 
 fn generated_inventory(out string) !map[string]string {
@@ -374,11 +667,13 @@ fn artifact_inventory(paths map[string]string) !map[string]string {
 
 fn finish_check(options hwhost.Options, root string, out string, before map[string]string,
 	revision string, host hwhost.Host, suite hwhost.Suite, extras string,
-	mut paths map[string]string, originals map[string]string) ! {
+	prepared bool, mut paths map[string]string, originals map[string]string) ! {
 	generated_before := generated_inventory(out)!
 	inputs_before := artifact_inventory(paths)!
-	write_json(out + '/generated-before.json', generated_before)!
-	write_json(out + '/input-before.json', inputs_before)!
+	if !prepared {
+		write_json(out + '/generated-before.json', generated_before)!
+		write_json(out + '/input-before.json', inputs_before)!
+	}
 	if source_inventory(root)! != before { return error('producer sources changed during build') }
 	mut passed := true
 	mut count := 0
@@ -447,15 +742,49 @@ fn finish_check(options hwhost.Options, root string, out string, before map[stri
 }
 
 fn check() ! {
-	options := hwhost.parse_options(os.args[1..])!
+	arguments := os.args[1..]
+	if arguments.len > 0 && arguments[0] in ['--resume', '--verify-prepared'] {
+		if arguments.len != 4 || arguments[2] != '--prepared-sha256' {
+			return error('use --verify-prepared|--resume CANONICAL_STATE --prepared-sha256 REVIEWED_SHA256; no overrides')
+		}
+		prepared_command(arguments[0] == '--resume', arguments[1], arguments[3])!
+		return
+	}
+	mut ordinary := []string{}
+	mut prepare_only := false
+	for argument in arguments {
+		if argument == '--prepare-only' {
+			if prepare_only { return error('duplicate --prepare-only') }
+			prepare_only = true
+		} else { ordinary << argument }
+	}
+	options := hwhost.parse_options(ordinary)!
 	if options.help || options.list {
-		println('audio-portal-runtime-check --arch ARCH --kernel PATH --state-dir NEW')
+		println('audio-portal-runtime-check [--prepare-only] --arch ARCH --kernel PATH --state-dir NEW')
+		println('audio-portal-runtime-check --verify-prepared|--resume STATE --prepared-sha256 REVIEWED_SHA256')
 		return
 	}
 	if options.arch !in ['aarch64', 'x86_64'] || !os.is_file(options.kernel) || !os.is_abs_path(options.state_dir)
 		|| os.exists(options.state_dir) || options.failures_only {
 		return error('requires architecture, existing kernel, NEW absolute --state-dir and complete retention')
 	}
+	if prepare_only && options.arch != 'aarch64' { return error('--prepare-only currently requires AArch64') }
+	if prepare_only {
+		parent := os.dir(options.state_dir)
+		if parent != os.real_path(parent) || (os.lstat(parent)!).mode & 0o170000 != 0o040000
+			|| options.state_dir != os.join_path(parent, os.base(options.state_dir)) {
+			return error('--prepare-only requires a new state below an existing canonical ordinary parent')
+		}
+		evidence := os.getenv('VINIX_AUDIO_KERNEL_EVIDENCE')
+		if evidence == '' || audioprepare.digest(evidence + '/kernel-seal.json')! != reviewed_kernel_seal {
+			return error('--prepare-only requires reviewed SO_PEERLOGIN kernel evidence')
+		}
+		seal := json2.decode[PreparedKernelSeal](os.read_file(evidence + '/kernel-seal.json')!)!
+		if audioprepare.digest(options.kernel)! != seal.kernels['aarch64'].elf_sha256 {
+			return error('--prepare-only kernel differs from reviewed AArch64 kernel')
+		}
+	}
+	selected_scenarios(options.scenarios)!
 	root := hwhost.find_root(@FILE)!
 	out := options.state_dir
 	os.mkdir_all(out + '/inputs/source')!
@@ -488,7 +817,7 @@ fn check() ! {
 	}
 	paths['controller'] = retained(os.executable(), out, 'controller')!
 	originals['controller'] = os.real_path(os.executable())
-	prepare_check(options, root, out, before, revision, host, mut paths, mut originals)!
+	prepare_check(options, root, out, before, revision, host, prepare_only, mut paths, mut originals)!
 }
 
 fn main() {

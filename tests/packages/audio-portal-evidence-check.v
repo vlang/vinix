@@ -600,13 +600,13 @@ fn self_test(program string, out string, arch string) ! {
 		'tools/sandbox', 'tests/qemu-core/fixturehost', 'tests/native-guest-tools/guesthost', 'tests/linuxkpi/hosttest',
 		'tests/native-policy-tools/nativepolicy', 'tests/host-policy/policyhost',
 		'tests/hardware-platform/hwhost', 'tests/packages/audio-portal-guest', 'tests/packages/audio-portal-tone', 'tests/packages/audiotest',
-		'tests/packages/audioinputs'] {
+		'tests/packages/audioinputs', 'tests/packages/audioprepare'] {
 		frozen_tree(root, raw + '/inputs/source', tree, mut sources)!
 	}
 	for path in ['tests/packages/audio-portal-runtime-check.v', 'tests/packages/audio-portal-retain.v', 'tests/packages/audio-portal-evidence-check.v',
 		'tests/packages/audio-portal-wave-check.v', 'build-support/native-compat-tools/main.v', 'build-support/security-tools/compile-v-core',
 		'build-support/run-v-tool.sh', 'build-support/find-v.sh', 'tests/packages/audio-cross-cc.v', 'tests/packages/audio-input-check.v',
-		'tests/packages/audio-cross-probe.v'] {
+		'tests/packages/audio-cross-probe.v', 'tests/packages/audio-portal-prepare-check.v', 'build-support/limine.conf'] {
 		os.mkdir_all(os.dir(raw + '/inputs/source/' + path))!
 		os.cp(root + '/' + path, raw + '/inputs/source/' + path)!
 		sources[path] = digest(raw + '/inputs/source/' + path)!
