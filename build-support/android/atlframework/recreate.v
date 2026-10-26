@@ -112,22 +112,22 @@ fn dispatch_start(e voidptr, activity voidptr) {
 }
 
 fn activity_recreate(e voidptr, activity voidptr) {
+    if boolean(e, activity, c'android/app/Activity', c'isFinishing', c'()Z', unsafe { nil }) != 0 { return }
     bundle := new_object(e, c'android/os/Bundle', c'()V', unsafe { nil })
     args := [Value{l: bundle}]!
     call(e, activity, c'android/app/Activity', c'vinixPerformSaveInstanceState', c'(Landroid/os/Bundle;)V', unsafe { &args[0] })
     views := new_object(e, c'android/util/SparseArray', c'()V', unsafe { nil })
     view_text_state(e, activity_decor(e, activity), views, false)
-    class := unsafe { GetObjectClass(slot(e, 31))(e, activity) }
-    name := obj(e, class, c'java/lang/Class', c'getName', c'()Ljava/lang/String;', unsafe { nil })
     window := obj(e, activity, c'android/app/Activity', c'getWindow', c'()Landroid/view/Window;', unsafe { nil })
-    intent := obj(e, activity, c'android/app/Activity', c'getIntent', c'()Landroid/content/Intent;', unsafe { nil })
-    create_args := [Value{l: name}, Value{j: get_long(e, window, c'android/view/Window', c'native_window')}, Value{l: intent}]!
-    next := static_obj(e, c'android/app/Activity', c'internalCreateActivity', c'(Ljava/lang/String;JLandroid/content/Intent;)Landroid/app/Activity;', unsafe { &create_args[0] })
+    create_args := [Value{l: activity}, Value{j: get_long(e, window, c'android/view/Window', c'native_window')}]!
+    next := static_obj(e, c'android/app/Activity', c'vinixRecreateActivity', c'(Landroid/app/Activity;J)Landroid/app/Activity;', unsafe { &create_args[0] })
     if pending(e) || next == unsafe { nil } { return }
     put_object(e, next, c'android/app/Activity', c'vinixSavedState', c'Landroid/os/Bundle;', bundle)
     put_object(e, next, c'android/app/Activity', c'vinixSavedViews', c'Landroid/util/SparseArray;', views)
     put_object(e, next, c'android/app/Activity', c'resultActivity', c'Landroid/app/Activity;', get_object(e, activity, c'android/app/Activity', c'resultActivity', c'Landroid/app/Activity;'))
     put_int(e, next, c'android/app/Activity', c'resultRequestCode', get_int(e, activity, c'android/app/Activity', c'resultRequestCode'))
+    put_int(e, next, c'android/app/Activity', c'vinixResultCode', get_int(e, activity, c'android/app/Activity', c'vinixResultCode'))
+    put_object(e, next, c'android/app/Activity', c'vinixResultData', c'Landroid/content/Intent;', get_object(e, activity, c'android/app/Activity', c'vinixResultData', c'Landroid/content/Intent;'))
     task := new_object(e, c'android/app/VinixRecreate', c'()V', unsafe { nil })
     put_object(e, task, c'android/app/VinixRecreate', c'old', c'Landroid/app/Activity;', activity)
     put_object(e, task, c'android/app/VinixRecreate', c'next', c'Landroid/app/Activity;', next)
