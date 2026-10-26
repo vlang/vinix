@@ -50,6 +50,24 @@ fn freeze_tree(source string, target string, mut pins map[string]string) ! {
 	}
 }
 
+// Optional uncommitted changes are copied and pinned before application. This
+// keeps a kernel candidate testable without committing it before guest checks.
+fn apply_source_patch(root string, worktree string, source string, mut pins map[string]string) !string {
+	copy_pin(source, root + '/source.patch', mut pins)!
+	pins[root + '/source.patch'] = hash(root + '/source.patch')!
+	command(root, 'patch-check', ['git', '-C', worktree, 'apply', '--check', root + '/source.patch'])!
+	command(root, 'patch-apply', ['git', '-C', worktree, 'apply', root + '/source.patch'])!
+	if command(root, 'patch-untracked', ['git', '-C', worktree, 'ls-files', '--others', '-z'])! != '' {
+		return error('patch may only change tracked kernel files')
+	}
+	names := command(root, 'patch-paths', ['git', '-C', worktree, 'diff', '--name-only', '-z'])!
+	if names == '' { return error('patch must change tracked kernel sources') }
+	for name in names.split('\x00') {
+		if name != '' && !name.starts_with('kernel/') { return error('patch may only change tracked kernel files') }
+	}
+	return command(root, 'patch-diff', ['git', '-C', worktree, 'diff', '--binary', '--', 'kernel'])!
+}
+
 // Dependencies remain shared with the checkout. Compare their complete path and
 // type set as well as hashes so newly added Makefile inputs cannot evade pins.
 fn dependency_inventory(path string, mut entries map[string]string) ! {
@@ -139,6 +157,38 @@ fn self_test(root string) ! {
 	verify_tracked_inputs(root + '/tracked', tracked) or { rejected = true }
 	if !rejected { return error('tracked symlink replaced with file accepted') }
 	println('UNIX-RECVMSG-KERNEL-TRACKED-PASS unchanged=1 rejected=2')
+	os.mkdir_all(root + '/patch-repo/kernel')!
+	os.mkdir(root + '/patch-good')!
+	os.mkdir(root + '/patch-bad')!
+	command(root, 'patch-repo-init', ['git', '-C', root + '/patch-repo', 'init'])!
+	os.write_file(root + '/patch-repo/kernel/policy.v', 'old\n')!
+	command(root, 'patch-repo-add', ['git', '-C', root + '/patch-repo', 'add', 'kernel/policy.v'])!
+	valid_patch := 'diff --git a/kernel/policy.v b/kernel/policy.v\n--- a/kernel/policy.v\n+++ b/kernel/policy.v\n@@ -1 +1 @@\n-old\n+new\n'
+	os.write_file(root + '/valid.patch', valid_patch)!
+	mut patch_pins := map[string]string{}
+	applied := apply_source_patch(root + '/patch-good', root + '/patch-repo', root + '/valid.patch', mut patch_pins)!
+	if applied == '' || os.read_file(root + '/patch-repo/kernel/policy.v')! != 'new\n'
+		|| hash(root + '/patch-good/source.patch')! != hash(root + '/valid.patch')! {
+		return error('applied patch was not retained or did not change source')
+	}
+	rejected = false
+	apply_source_patch(root + '/patch-bad', root + '/patch-repo', root + '/valid.patch', mut patch_pins) or { rejected = true }
+	if !rejected { return error('inapplicable patch accepted') }
+	os.mkdir(root + '/patch-outside')!
+	os.write_file(root + '/patch-repo/outside.v', 'old\n')!
+	command(root, 'patch-repo-add-outside', ['git', '-C', root + '/patch-repo', 'add', 'outside.v'])!
+	os.write_file(root + '/outside.patch', 'diff --git a/outside.v b/outside.v\n--- a/outside.v\n+++ b/outside.v\n@@ -1 +1 @@\n-old\n+new\n')!
+	rejected = false
+	apply_source_patch(root + '/patch-outside', root + '/patch-repo', root + '/outside.patch', mut patch_pins) or { rejected = true }
+	if !rejected { return error('patch outside kernel accepted') }
+	// Restore this tracked path so the next case isolates new-file rejection.
+	os.write_file(root + '/patch-repo/outside.v', 'old\n')!
+	os.mkdir(root + '/patch-new')!
+	os.write_file(root + '/new.patch', 'diff --git a/kernel/new.v b/kernel/new.v\nnew file mode 100644\n--- /dev/null\n+++ b/kernel/new.v\n@@ -0,0 +1 @@\n+untracked\n')!
+	rejected = false
+	apply_source_patch(root + '/patch-new', root + '/patch-repo', root + '/new.patch', mut patch_pins) or { rejected = true }
+	if !rejected { return error('untracked patch output accepted') }
+	println('UNIX-RECVMSG-KERNEL-PATCH-PASS applied=1 rejected=3')
 }
 
 fn freeze_library(source string, target string, mut pins map[string]string) ! {
@@ -170,11 +220,12 @@ fn run() ! {
 		self_test(os.abs_path(os.args[2]))!
 		return
 	}
-	if os.args.len != 6 {
-		return error('usage: kernel-build REPO V_COMPILER FRESH_ROOT REVISION aarch64|x86_64')
+	if os.args.len !in [6, 7] {
+		return error('usage: kernel-build REPO V_COMPILER FRESH_ROOT REVISION aarch64|x86_64 [PATCH]')
 	}
 	repo, compiler, root := os.real_path(os.args[1]), os.real_path(os.args[2]), os.abs_path(os.args[3])
 	revision, arch := os.args[4], os.args[5]
+	patch := if os.args.len == 7 { os.real_path(os.args[6]) } else { '' }
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported architecture') }
 	if os.exists(root) || os.is_link(root) || root == repo || root.starts_with(repo + '/') {
 		return error('fresh external root required')
@@ -200,6 +251,7 @@ fn run() ! {
 	command(root, 'checkout', ['git', '-C', worktree, 'checkout', '--detach', resolved])!
 	mut pins := map[string]string{}
 	copy_pin(os.real_path(@FILE), root + '/builder.v', mut pins)!
+	applied_patch := if patch != '' { apply_source_patch(root, worktree, patch, mut pins)! } else { '' }
 	mut shared := map[string]string{}
 	mut dependency_roots := []string{}
 	mut dependency_entries := map[string]string{}
@@ -271,6 +323,9 @@ fn run() ! {
 	for path, pin in pins { if hash(path)! != pin { return error('shared build input changed') } }
 	verify_tracked_inputs(worktree, kernel_pins)!
 	verify_tracked_inputs(worktree, generator_pins)!
+	if patch != '' && command(root, 'patch-diff-after', ['git', '-C', worktree, 'diff', '--binary', '--', 'kernel'])! != applied_patch {
+		return error('applied patch changed during build')
+	}
 	for path, pin in tools { if hash(path)! != pin { return error('build tool changed') } }
 	for target, source in shared {
 		if os.readlink(target)! != source { return error('dependency link changed') }
@@ -284,7 +339,7 @@ fn run() ! {
 	}) || inspection.contains('INTERP') {
 		return error('unexpected kernel ELF')
 	}
-	os.write_file(root + '/build.json', json2.encode({
+	mut build_info := {
 		'format':                    json2.Any(1)
 		'source_revision':           json2.Any(resolved)
 		'architecture':              json2.Any(arch)
@@ -296,7 +351,9 @@ fn run() ! {
 		'builder_source_sha256':     json2.Any(hash(root + '/builder.v')!)
 		'guest_executed':            json2.Any(false)
 		'link_seed':                 json2.Any(20261026)
-	}, prettify: true) + '\n')!
+	}
+	if patch != '' { build_info['source_patch_sha256'] = hash(root + '/source.patch')! }
+	os.write_file(root + '/build.json', json2.encode(build_info, prettify: true) + '\n')!
 	mut files := map[string]string{}
 	mut links := map[string]string{}
 	inventory(root, '', mut files, mut links)!
