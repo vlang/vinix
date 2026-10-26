@@ -246,7 +246,7 @@ pub fn (p Package) validate() ! {
 		return error('${p.id}: invalid launch arguments')
 	}
 	check_package_permissions(p)!
-	if p.associations.len > 128 || p.associations.any(!printable(it, 128) || !it.contains('/') || it.contains(';') || it.contains('=')) {
+	if p.associations.len > 128 || p.associations.any(!pkgprotocol.valid_mime_association(it)) {
 		return error('${p.id}: invalid MIME association')
 	}
 	if p.dependencies.len > 128 { return error('${p.id}: too many dependencies') }

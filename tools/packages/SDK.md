@@ -2208,7 +2208,12 @@ remain alive while children use runtime files.
 
 Installed apps register automatically in Start and Quick Launch. A declared
 `associations` MIME type plus the `files` permission makes an app available in
-the shared Open With chooser. Documents are appended as literal arguments;
+the shared Open With chooser. Associations are bare `type/subtype` names, at
+most 128 ASCII bytes in total. Both components start with a letter or digit;
+remaining characters may also be `!#$&-^_.+`. Vendor names, structured suffixes
+and `x-scheme-handler/https` are supported. Parameters, whitespace, wildcards,
+backslashes and additional slashes are refused. Literal case is preserved.
+Documents are appended as literal arguments;
 install/upgrade never changes user defaults. Uninstall removes active handlers,
 with user preferences retained for rollback/reinstall. Desktop launches use a
 Software output/diagnostic window and the same `run` contract; terminal input
@@ -3074,8 +3079,10 @@ Every projected field is explicit, typed and unique, including escaped key
 spellings. Empty strings/arrays remain explicit; null, malformed Unicode,
 trailing input, duplicate package IDs and fractional/overflowing generation
 numbers are refused. Bounds are 8 MiB, 4096 packages, five permissions and 128
-MIME associations per package, with the existing ID/text limits. Other stored
-state fields are syntax-checked with at most 32 extension nesting levels and
+MIME associations per package, with the existing ID/text limits.
+Association names follow the same bare MIME grammar and 128-byte total limit
+used for package manifests; JSON escapes are decoded before validation.
+Other stored state fields are syntax-checked with at most 32 extension nesting levels and
 retired without building a payload/provenance tree. Partial input releases its
 owned fields and arrays on refusal. The compositor also requires a canonical
 positive u64 activation target and matching snapshot generation/architecture.

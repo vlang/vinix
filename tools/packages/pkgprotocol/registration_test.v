@@ -108,6 +108,22 @@ fn test_registration_syntax_checks_unused_fields_with_bounded_nesting() {
 	bounded.close()
 }
 
+fn test_registration_applies_bare_mime_rules_after_json_decoding() {
+	text := registration_fixture()
+	for value in ['/', 'text/', '/plain', 'text/plain/extra', 'text/ plain', 'text/plain ',
+		'text/pl\\ain', 'text/é', 'text/*', 'text/.plain', 'text/plain;charset=utf-8'] {
+		encoded := json2.encode(value)
+		input := text.replace('"text/plain"', encoded)
+		if !registration_refused(input) { panic('registration admitted malformed MIME association') }
+	}
+	for value in ['application/vnd.example.editor+json', 'x-scheme-handler/https', 'Text/Plain'] {
+		input := text.replace('"text/plain"', json2.encode(value))
+		mut snapshot := decode_registration(input)!
+		if snapshot.packages[0].associations != [value] { panic('registration changed literal MIME identity') }
+		snapshot.close()
+	}
+}
+
 fn test_registration_bounds_packages_fields_collections_and_reply_size() {
 	text := registration_fixture()
 	for invalid in [text.replace('Write text', 'x'.repeat(4097)), text.replace('Editor é🚀', 'x'.repeat(257)),

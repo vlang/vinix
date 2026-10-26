@@ -58,7 +58,7 @@ fn (snapshot &RegistrationSnapshot) validate() ! {
 		}
 		ids[p.id] = true
 		for mime in p.associations {
-			if !printable(mime, 128) || !mime.contains('/') || mime.contains(';') || mime.contains('=') {
+			if !valid_mime_association(mime) {
 				return error('invalid package MIME registration')
 			}
 		}

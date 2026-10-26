@@ -1028,6 +1028,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     across 18,000 trees. Guest graphical acceptance remains open.
 - [ ] Package native, Linux, Windows and Apple-compatible apps with isolated
   runtimes, launcher/association registration and clean uninstall behavior.
+  - [x] [Bare MIME association admission](tests/packages/mime-association-check.md)
+    applies one bounded grammar to signed manifests and decoded registrations,
+    preserving literal case, vendor names and structured suffixes. Four
+    old-validator controls and nine fixed normal/production/sanitizer profiles
+    pass on the host, with zero retained allocations during repeated scans.
+    Guest Open With and broader runtime acceptance remain separate.
   - [x] [Lossless XDG launcher labels](tests/packages/desktop-entry-check.md)
     preserve signed names and comments containing literal backslashes or boundary
     spaces. Exact encoding, signed install/repair/update/remove/rollback,
