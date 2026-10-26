@@ -301,11 +301,13 @@ Imports:    2,239 (chained fixups)
 The 2026-10-26 diagnostic launch with `--probe-no-ads` passes the remaining
 SKAdNetwork import, initializer-table collection and Swift image metadata
 registration. It reaches Objective-C `+load`, then stops at
-`V panic: iOS: object has no live runtime metadata`, with guest exit status 1,
-before application initializers or entry. Rendering, login and gameplay remain
-unverified. The ordinary launch
+`GDTCORApplication +load` with signal 11 and guest exit status 139, before
+application initializers or entry. Implementing checked NSString character-set
+searches cleared the preceding `FIRMessaging +load` failure. The host sanitizer
+probe identifies a null read in application code at preferred PC `0x10009b674`.
+Rendering, login and gameplay remain unverified. The ordinary launch
 still requires SKAdNetwork; advertising work is skipped. See the
-[diagnostic checkpoint](../tests/ios/image-initializers-checkpoint-20261026.md).
+[diagnostic checkpoint](../tests/ios/string-character-search-checkpoint-20261026.md).
 
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
