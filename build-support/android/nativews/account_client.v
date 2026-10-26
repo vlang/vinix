@@ -13,6 +13,8 @@ type WsAccountCount = fn (voidptr) u32
 type WsAccountText = fn (voidptr, u32) &char
 type WsAccountTag = fn (voidptr, u32) u16
 type WsAccountNumber = fn (voidptr, u32) i64
+type WsAccountInteraction = fn (voidptr, &u8, u32) i32
+type WsAccountRedeem = fn (u64, u64, &u8, u32, &char) voidptr
 struct WsAccountItem {
 mut:
 	key &char
@@ -25,6 +27,12 @@ mut:
 	next &WsAccountRequest
 	handle voidptr
 	future voidptr
+	activity voidptr
+	endpoint &char
+	redemption voidptr
+	redemption_id u64
+	interacted bool
+	error_code i32
 	id u64
 	started i64
 	kind u16
@@ -44,6 +52,8 @@ __global ws_account_tag WsAccountTag
 __global ws_account_text WsAccountText
 __global ws_account_number WsAccountNumber
 __global ws_account_close WsAccountFree
+__global ws_account_interaction WsAccountInteraction
+__global ws_account_redeem WsAccountRedeem
 __global ws_account_mutex C.pthread_mutex_t
 __global ws_account_initialized bool
 __global ws_account_requests &WsAccountRequest
@@ -72,6 +82,8 @@ fn ws_account_client_init() bool {
 		ws_account_text = WsAccountText(C.dlsym(ws_account_library, c'vinix_android_account_text'))
 		ws_account_number = WsAccountNumber(C.dlsym(ws_account_library, c'vinix_android_account_number'))
 		ws_account_close = WsAccountFree(C.dlsym(ws_account_library, c'vinix_android_account_close'))
+		ws_account_interaction = WsAccountInteraction(C.dlsym(ws_account_library, c'vinix_android_account_interaction'))
+		ws_account_redeem = WsAccountRedeem(C.dlsym(ws_account_library, c'vinix_android_account_redeem'))
 		if voidptr(ws_account_build) == nil || voidptr(ws_account_feature) == nil || voidptr(ws_account_option) == nil
 			|| voidptr(ws_account_free) == nil || voidptr(ws_account_submit) == nil || voidptr(ws_account_read) == nil
 			|| voidptr(ws_account_count) == nil || voidptr(ws_account_key) == nil || voidptr(ws_account_tag) == nil
@@ -173,13 +185,19 @@ fn ws_account_start(e voidptr, manager voidptr, account_type voidptr, token_type
 		node.id = id; node.started = ws_millis()
 		node.future = WsRef(slot(e, 21))(e, future)
 		if node.future == nil { C.free(node); return 0 }
+		if activity != nil {
+			node.activity = WsRef(slot(e, 21))(e, activity)
+			if node.activity == nil { ws_account_dispose(e, node); return 0 }
+		}
 		endpoint := C.getenv(c'VINIX_ANDROID_ACCOUNT_SOCKET')
-		node.handle = ws_account_submit(builder, if endpoint == nil { c'/run/vinix/android/accounts.sock' } else { endpoint })
-		if node.handle == nil { Drop(slot(e, 22))(e, node.future); C.free(node); return 0 }
+		node.endpoint = C.strdup(if endpoint == nil { c'/run/vinix/android/accounts.sock' } else { endpoint })
+		if node.endpoint == nil { ws_account_dispose(e, node); return 0 }
+		node.handle = ws_account_submit(builder, node.endpoint)
+		if node.handle == nil { ws_account_dispose(e, node); return 0 }
 		C.pthread_mutex_lock(&ws_account_mutex)
 		if ws_account_closing || ws_account_active >= 32 {
 			C.pthread_mutex_unlock(&ws_account_mutex)
-			ws_account_close(node.handle); Drop(slot(e, 22))(e, node.future); C.free(node); return 0
+			ws_account_dispose(e, node); return 0
 		}
 		node.next = ws_account_requests; ws_account_requests = node; ws_account_active++
 		C.pthread_mutex_unlock(&ws_account_mutex)
@@ -190,7 +208,10 @@ fn ws_account_start(e voidptr, manager voidptr, account_type voidptr, token_type
 fn ws_account_dispose(e voidptr, node &WsAccountRequest) {
 	unsafe {
 		if node.handle != nil { ws_account_close(node.handle) }
+		if node.redemption != nil { ws_account_close(node.redemption) }
 		if node.future != nil { Drop(slot(e, 22))(e, node.future) }
+		if node.activity != nil { Drop(slot(e, 22))(e, node.activity) }
+		C.free(node.endpoint)
 		for i := u32(0); i < node.count; i++ { C.free(node.items[i].key); C.free(node.items[i].text) }
 		C.free(node)
 	}
@@ -259,8 +280,8 @@ fn ws_account_complete(e voidptr, node &WsAccountRequest) {
 			}
 		}
 		if pending(e) { return }
-		mut code := i32(1)
-		mut message := ws_string(e, c'Account broker request failed')
+		mut code := if node.error_code != 0 { node.error_code } else { i32(1) }
+		mut message := ws_string(e, if node.error_code == 6 { c'Account interaction requires an Activity and supported broker transport' } else { c'Account broker request failed' })
 		for i := u32(0); i < node.count; i++ {
 			item := &node.items[i]
 			if item.key != nil && item.tag == 3 && C.strcmp(item.key, c'errorCode') == 0 { code = i32(item.number) }
@@ -268,6 +289,48 @@ fn ws_account_complete(e voidptr, node &WsAccountRequest) {
 		}
 		args := [Value{ i: code }, Value{ l: message }]!
 		call(e, node.future, c'android/atl/VinixAccountFuture', c'vinixError', c'(ILjava/lang/String;)V', &args[0])
+	}
+}
+
+// Called only under ws_account_mutex. Redeem encodes an owning copy before
+// returning and never waits for the broker. The original future stays pending:
+// an acknowledgement proves launch delivery, never successful account login.
+fn ws_account_interact(node &WsAccountRequest) bool {
+	unsafe {
+		if node.activity == nil || voidptr(ws_account_interaction) == nil || voidptr(ws_account_redeem) == nil {
+			node.error_code = 6
+			return false
+		}
+		if node.interacted || node.endpoint == nil || ws_account_sequence == ~u64(0) {
+			node.error_code = 7
+			return false
+		}
+		mut ticket := [32]u8{}
+		if ws_account_interaction(node.handle, &ticket[0], 32) != 0 { return false }
+		ws_account_sequence++
+		node.redemption_id = ws_account_sequence
+		node.interacted = true
+		node.redemption = ws_account_redeem(node.redemption_id, node.id, &ticket[0], 32, node.endpoint)
+		C.memset(&ticket[0], 0, 32)
+		return node.redemption != nil
+	}
+}
+
+fn ws_account_copy_result(node &WsAccountRequest, handle voidptr) {
+	unsafe {
+		count := ws_account_count(handle)
+		if count > 32 { node.kind = 2; return }
+		for i := u32(0); i < count; i++ {
+			key := ws_account_key(handle, i)
+			text := ws_account_text(handle, i)
+			if key == nil || C.strlen(key) > 4096 || (text != nil && C.strlen(text) > 4096) { node.kind = 2; break }
+			node.items[i].key = C.strdup(key)
+			node.items[i].text = if text == nil { &char(nil) } else { C.strdup(text) }
+			node.items[i].tag = ws_account_tag(handle, i)
+			node.items[i].number = ws_account_number(handle, i)
+			node.count++
+			if node.items[i].key == nil || (text != nil && node.items[i].text == nil) { node.kind = 2; break }
+		}
 	}
 }
 
@@ -280,34 +343,42 @@ fn ws_account_client_pump(e voidptr) {
 			C.pthread_mutex_lock(&ws_account_mutex)
 			mut link := &ws_account_requests
 			mut ready := &WsAccountRequest(nil)
+			mut retired := voidptr(nil)
 			for *link != nil {
 				node := *link
 				mut kind := u16(0)
 				mut id := u64(0)
 				status := ws_account_read(node.handle, &kind, &id, 0)
-				if status < 0 || ws_millis() - node.started > 300000 || (status == 1 && (id != node.id || (kind != 4 && kind != 5))) {
-					node.kind = if status == 1 && id == node.id && (kind == 1 || kind == 2) { kind } else { u16(2) }
-					if status == 1 && id == node.id && (kind == 1 || kind == 2) {
-						count := ws_account_count(node.handle)
-						if count <= 32 {
-							for i := u32(0); i < count; i++ {
-								key := ws_account_key(node.handle, i)
-								text := ws_account_text(node.handle, i)
-								if key == nil || C.strlen(key) > 4096 || (text != nil && C.strlen(text) > 4096) { node.kind = 2; break }
-								node.items[i].key = C.strdup(key)
-								node.items[i].text = if text == nil { &char(nil) } else { C.strdup(text) }
-								node.items[i].tag = ws_account_tag(node.handle, i)
-								node.items[i].number = ws_account_number(node.handle, i)
-								node.count++
-								if node.items[i].key == nil || (text != nil && node.items[i].text == nil) { node.kind = 2; break }
-							}
-						} else { node.kind = 2 }
+				mut done := status < 0 || ws_millis() - node.started > 300000
+				mut result := voidptr(nil)
+				node.kind = 2
+				if !done && status == 1 {
+					if id != node.id { done = true }
+					else if kind == 4 { done = !ws_account_interact(node) }
+					else if kind != 5 {
+						done = true
+						if kind == 1 || kind == 2 { node.kind = kind; result = node.handle }
 					}
+				}
+				if !done && node.redemption != nil {
+					ack := ws_account_read(node.redemption, &kind, &id, 0)
+					if ack < 0 || (ack == 1 && (id != node.redemption_id || (kind != 1 && kind != 2))) {
+						done = true
+					} else if ack == 1 {
+						if kind == 2 { done = true; result = node.redemption }
+						else if ws_account_count(node.redemption) != 0 { done = true }
+						else { retired = node.redemption; node.redemption = nil }
+					}
+				}
+				if done {
+					if result != nil { ws_account_copy_result(node, result) }
 					*link = node.next; ws_account_active--; ready = node; break
 				}
+				if retired != nil { break }
 				link = &node.next
 			}
 			C.pthread_mutex_unlock(&ws_account_mutex)
+			if retired != nil { ws_account_close(retired); continue }
 			if ready == nil { return }
 			push_frame(e)
 			ws_account_complete(e, ready)

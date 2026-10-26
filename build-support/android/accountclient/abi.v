@@ -142,6 +142,19 @@ pub fn abi_read(handle voidptr, kind &u16, id &u64, timeout i32) i32 {
 	return 1
 }
 
+// Copy the broker's public ticket while the caller still owns the current
+// event. No service response capability, Java object or target crosses this ABI.
+@[export: 'vinix_android_account_interaction']
+pub fn abi_interaction(handle voidptr, output &u8, length u32) i32 {
+	if handle == unsafe { nil } || output == unsafe { nil } || length != 32 { return -1 }
+	client := unsafe { &Client(handle) }
+	if client.current.kind != .interaction || client.current.interaction.handle.len != 32 {
+		return -1
+	}
+	unsafe { C.memcpy(output, client.current.interaction.handle.data, 32) }
+	return 0
+}
+
 @[export: 'vinix_android_account_close']
 pub fn abi_close(handle voidptr) {
 	if handle == unsafe { nil } { return }

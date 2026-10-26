@@ -2,6 +2,7 @@
 module accountclient
 
 import nativeaccountauth
+import accountipc
 import net.unix
 import os
 
@@ -48,4 +49,32 @@ fn test_redemption_abi_rejects_invalid_tickets_and_identifiers_before_connect() 
 	assert abi_redeem(1, 2, zero.data, 32, path.str) == unsafe { nil }
 	mut ready := ClientPoll{fd: i32(listener.sock.handle), events: i16(C.POLLIN)}
 	assert C.poll(voidptr(&ready), 1, 0) == 0
+}
+
+fn test_interaction_abi_copies_only_the_public_current_ticket() {
+	ticket := []u8{len: 32, init: u8(index + 1)}
+	mut client := Client{
+		current: accountipc.Event{
+			kind: .interaction
+			id: 17
+			interaction: accountipc.Interaction{handle: ticket}
+		}
+	}
+	mut output := [32]u8{}
+	assert abi_interaction(&client, &output[0], 32) == 0
+	assert output[0] == 1 && output[31] == 32
+	// The consumer owns its copy across the next read/disposal of current.
+	client.current = accountipc.Event{}
+	assert output[0] == 1 && output[31] == 32
+	assert abi_interaction(&client, &output[0], 32) == -1
+	client.current = accountipc.Event{kind: .result}
+	assert abi_interaction(&client, &output[0], 32) == -1
+	client.current = accountipc.Event{kind: .interaction, interaction: accountipc.Interaction{handle: ticket[..31]}}
+	assert abi_interaction(&client, &output[0], 32) == -1
+	client.current = accountipc.Event{kind: .interaction, interaction: accountipc.Interaction{handle: ticket}}
+	assert abi_interaction(unsafe { nil }, &output[0], 32) == -1
+	assert abi_interaction(&client, unsafe { nil }, 32) == -1
+	for length in [u32(0), 31, 33, 0xffffffff] {
+		assert abi_interaction(&client, &output[0], length) == -1
+	}
 }
