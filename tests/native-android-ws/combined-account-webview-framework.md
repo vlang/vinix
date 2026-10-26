@@ -70,3 +70,33 @@ compiler executable, smali tool JARs, commands and executable hashes, before/aft
 class inventories, and output hashes. Host SDK and dynamic libraries remain
 environmental dependencies. These host checks establish framework construction;
 guest execution and Google account login require separate evidence.
+
+The auth profile adds account token requests and native cookie clearing over the
+sealed store profile above. The builder self-test, provider compilation,
+assembly, canonical disassembly, exact method/class delta checks, and complete
+retained-bundle verification passed. Exactly 2102 classes remain: AccountManager
+adds five token methods without changing any existing method; CookieManager
+changes its four clear APIs and adds `nativeClear(Z)Z`. All unrelated methods,
+class/field metadata, other classes and non-DEX JAR members retain their content.
+The original store bundle is verified before and after construction.
+
+- Builder implementation commit: `b509163bf`.
+- Token provider commit: `34cf9e5dc`; cookie clear provider commit: `ef43a13db`.
+- Build source revision: `9bdaf6e1f39fd87da4029a52ab7c745cf75fb4f5`.
+- Retained builder source SHA256: `7f92305c250f8c75b752474cea8a96ef3ed24943bd112a16fbe0578e88eb5f29`.
+- Retained token provider SHA256: `dd96c9c2b63f4a9fbf04cf4f12ee1978d410e93b1a51cb8dfd675f211ac7267e`.
+- Retained cookie clear provider SHA256: `fa8a3979ae381a9f57346f8d05065bf919f62b43fd42b607bebe083eb25e345a`.
+- Complete retained bundle: `/Users/alex/.local/state/vinix/android/combined-account-webview-auth-framework-2026-10-26`.
+- Bundle manifest SHA256: `1299ddd064ebe89bae35cafd4c509794894c7466fda0bfaee2dfb85cf404d309`.
+- Output `api-impl.jar` SHA256: `c677808eb55f58845b4ce3dd5c72be481d4ca585fd4980cec18266271d4740bf`.
+- Output DEX SHA256: `f41992bf7dc921c00d869b7500096ebf7b97b766e18e41d91b3cc708633a5ba0`.
+
+The auth driver was compiled with the same pinned compiler using
+`-nocache -cc cc`. Its `--auth` invocation requires the exact store bundle and
+manifest/JAR pins above. The bundle retains compiler and provider source
+closures, executable/tool hashes, command receipts, both canonical inventories,
+and output hashes; host SDK and dynamic libraries remain environmental inputs.
+The maintained WebView checker also passed clear-all/session mode, backend
+Boolean, caller Handler ordering, null callback, error propagation, idempotence,
+malformed input and smali assembly checks. These checks establish framework
+construction, not guest execution or successful Google account login.
