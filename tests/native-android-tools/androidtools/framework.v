@@ -151,6 +151,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_asset_cookies(smali)!
  framework_local_binder(smali)!
  framework_parcel_binders(smali)!
+ framework_bundle_parcel(smali)!
  framework_user_identity(smali)!
  framework_package_signatures(smali)!
  framework_native_digests(smali)!
