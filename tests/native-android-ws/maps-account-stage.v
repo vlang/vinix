@@ -117,9 +117,11 @@ fn safe_identity(passwd string, group string) ! {
 		}
 	}
 }
-// Tar overwrites retain inode modes. Check every occurrence and each ancestor.
+// Existing inodes retain their first creation mode. Check every occurrence and
+// ancestor; later safe tar headers do not change the effective inode mode.
 fn safe_destinations(original []stage.Entry, planned []stage.Entry) ! {
 	mut destinations := map[string]stage.Entry{}
+	mut observed := map[string]bool{}
 	for entry in planned {
 		if entry.name in destinations || !stage.relative(entry.name) || entry.kind !in ['regular', 'directory']
 			|| entry.mode & 0o7022 != 0 { return error('unsafe or duplicate overlay destination') }
@@ -128,7 +130,11 @@ fn safe_destinations(original []stage.Entry, planned []stage.Entry) ! {
 	for old in original {
 		for name, target in destinations {
 			if old.name == name {
-				if old.kind != target.kind || old.mode != target.mode { return error('existing destination kind/mode differs: ' + name) }
+				if old.kind != target.kind || old.mode & 0o7022 != 0
+					|| (name !in observed && old.mode != target.mode) {
+					return error('existing destination kind/effective mode differs: ' + name)
+				}
+				observed[name] = true
 			} else if name.starts_with(old.name + '/') && (old.kind != 'directory' || old.mode & 0o7022 != 0) {
 				return error('unprotected or aliased overlay ancestor: ' + old.name)
 			}
@@ -136,22 +142,25 @@ fn safe_destinations(original []stage.Entry, planned []stage.Entry) ! {
 	}
 }
 // The kernel replaces existing regular contents without changing inode modes.
-// Match those audited modes in the tar; the guest removes write bits only after
-// validating every protected input and records the resulting inode identities.
+// Match the first audited mode in the tar. Later headers leave it unchanged.
+// The guest removes write bits after validating every protected input and
+// records the resulting inode identities.
 fn inherited_modes(original []stage.Entry, planned []stage.Entry) !map[string]u32 {
 	mut result := map[string]u32{}
 	for target in planned {
 		for old in original.filter(it.name == target.name) {
 			if old.kind != target.kind || old.kind !in ['regular', 'directory']
-				|| old.mode & 0o7022 != 0 || target.mode & 0o7022 != 0
-				|| (old.mode & ~u32(0o222)) != (target.mode & ~u32(0o222))
-				|| (old.kind == 'directory' && old.mode != target.mode) {
+				|| old.mode & 0o7022 != 0 || target.mode & 0o7022 != 0 {
 				return error('unsafe inherited overlay mode: ' + target.name)
 			}
-			if previous := result[target.name] {
-				if previous != old.mode { return error('inconsistent original overlay modes: ' + target.name) }
+			if target.name !in result {
+				required := target.mode & ~u32(0o222)
+				if old.mode & required != required
+					|| (old.kind == 'directory' && old.mode != target.mode) {
+					return error('insufficient inherited overlay mode: ' + target.name)
+				}
+				result[target.name] = old.mode
 			}
-			result[target.name] = old.mode
 		}
 	}
 	return result
@@ -537,10 +546,16 @@ fn self_test() ! {
 		stage.Entry{name: 'lib/loader', kind: 'regular', mode: 0o644}] {
 		if _ := inherited_modes([bad], readonly) { return error('unsafe inherited mode accepted') }
 	}
-	if _ := inherited_modes([stage.Entry{name: 'lib/loader', kind: 'regular', mode: 0o755},
-		stage.Entry{name: 'lib/loader', kind: 'regular', mode: 0o555}], readonly) {
-		return error('inconsistent inherited modes accepted')
+	for modes in [[u32(0o755), 0o555], [u32(0o555), 0o755]] {
+		old := modes.map(stage.Entry{name: 'lib/loader', kind: 'regular', mode: it})
+		actual := inherited_modes(old, readonly)!
+		if actual['lib/loader']! != modes[0] { return error('first creation mode replaced by later header') }
+		safe_destinations(old, [stage.Entry{name: 'lib/loader', kind: 'regular', mode: modes[0]}])!
 	}
+	data_mode := inherited_modes([stage.Entry{name: 'opt/a/b', kind: 'regular', mode: 0o755}], plan)!
+	if data_mode['opt/a/b']! != 0o755 { return error('existing executable data mode not preserved') }
+	if _ := inherited_modes([stage.Entry{name: 'lib/loader', kind: 'regular', mode: 0o755},
+		stage.Entry{name: 'lib/loader', kind: 'regular', mode: 0o777}], readonly) { return error('unsafe later header accepted') }
 	println('MAPS-ACCOUNT-STAGE SELFTEST PASS identity collisions protected ancestors inode modes streaming media')
 }
 

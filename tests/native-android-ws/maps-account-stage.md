@@ -13,8 +13,12 @@ Maps controller, browser, token APK and token controller bundles. The overlay
 includes the unchanged UI fixture and headless fixture, updating the latter's
 runtime pins. UID/GID 10014 is reserved for the synthetic token cache fixture;
 the Maps controller provisions its separately audited IDs 10012 and 10013.
-Existing regular-file modes are preserved in the tar and recorded; the guest
-controller verifies all protected inputs before removing file write bits.
+The first original creation establishes each existing inode's mode. Later tar
+headers overwrite contents while leaving that mode intact. Every occurrence is
+audited for kind and protection; the first mode must cover the payload's required
+read/execute permissions. The overlay retains that effective mode, and the guest
+verifies all protected inputs before removing file write bits. Ordered overwrite
+checks cover the baseline's executable SQLite library and later DSO headers.
 The initial passwd/group contents are retained in the overlay inventory. They
 are excluded from immutable controller pins because provisioning appends the
 validated Maps/GMS identities and records both database versions.
@@ -48,9 +52,10 @@ Evidence under `/Users/alex/.local/state/vinix/android/`:
 - `maps-account-stage-module-tests-r8.log` records all four module test files
   passing with assertions enabled, including inventory/identity mutations,
   ELF validation, headless pin replacement and streaming media readback.
-  `maps-account-stage-selftests-r7.log` records the executable's explicit
-  rejection checks. Retained tool binaries and build logs use the
-  `maps-account-stage-tool-r*` names; exact sources are embedded in each tool.
+  `maps-account-stage-selftests-r10.log` records the executable's explicit
+  rejection checks, including ordered original-mode inheritance. Retained tool
+  binaries and build logs use the `maps-account-stage-tool-r*` names; exact
+  sources are embedded in each tool.
 
 The final runtime bundles and actual guest results are separate evidence.
 Staging and synthetic fixture success must not be reported as Google account
