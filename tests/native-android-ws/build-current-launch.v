@@ -371,6 +371,7 @@ fn launch_items() [][]string {
 		['launcher', repo + '/build-support/android/native-run.v', 'run-android'],
 		['controller', repo + '/tests/native-android-ws/headless-service-controller.v',
 			'headless-service-controller'],
+		['broker', repo + '/build-support/android/native-account-broker.v', 'native-account-broker'],
 	]
 }
 
