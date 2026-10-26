@@ -4,8 +4,9 @@ Maps370 uses the qualified [Framework369](intent-uri369-framework-build.md)
 to address the missing `Intent.parseUri(String,int)` method that stopped
 [Maps368](maps368-timing-logger-replay.md) during background GMS AppIndexing.
 Framework369 changes only `android.content.Intent` among the 2,076 framework
-classes. This report records the host gates; the Maps runtime observation is
-pending.
+classes. Maps370 completed the full 600-second runtime observation with real
+map tiles, place search, place details, driving and walking routes, and an
+interactive route preview.
 
 The generator is commit `fb3b07283`, replacement pin writer and receipt wrapper
 `1179973a5`, independent prelaunch checker `6d52f5ca0`, and its command recorder
@@ -87,3 +88,75 @@ and unchanged checker identity are retained in
 `maps370-independent-prelaunch-review-2026-10-26-command.json`, SHA-256
 `a81c7dd9f9f05fd53b8203450616bb31a34fee60f875dcf4ca61c60cf04cc076`.
 The adjacent recorder source and binary match their recorded identities.
+
+## Runtime observation
+
+The guest reached onboarding and Skip completed at 03:32:09 UTC. Visual review
+confirmed North American map tiles at 03:32:16. The search for
+`Oasis d Aboukir Paris` returned Oasis d'Aboukir on Rue d'Aboukir, Paris; selecting
+it opened Paris street tiles, its 4.6-star rating, opening hours, photos and the
+Directions button at 03:33:41. This passed the interaction point preceding
+Maps368's background AppIndexing crash.
+
+Directions accepted Palais-Royal as the start and returned a four-minute driving
+route. Switching to walking displayed a sixteen-minute route and alternatives
+over Paris street tiles. Preview displayed “Head toward Rue Thérèse”; advancing
+the preview changed the instruction to “Turn right onto Rue des Petits Champs”.
+The final suite screenshot retains that second instruction and the route map.
+The origin text injection dropped letters, but the screenshot confirms the
+correct Palais-Royal suggestion was selected.
+
+The unchanged classifier recorded `window_observed`, `native_maps_observed=true`,
+`backend_ready=true`, `process_exited=false`, `qemu_alive_before_capture=true`
+and `observation_elapsed_seconds=600`. The serial log contains no fatal
+exception, missing-method failure, `ANDROID-WS-FAIL` or `APK-SUITE-EXIT` marker.
+This qualifies the observed search, place and route-preview workflow; live GPS
+navigation and signed-in features were not tested.
+
+The complete results remain under
+`/Users/alex/.local/state/vinix/android/maps370-2026-10-26/results/attempt370/`.
+Screenshots in its `google-maps/` directory include `google-maps-running.png`,
+`paris-place.png`, `paris-route.png`, `paris-walking-route.png`,
+`paris-walking-preview.png` and the suite's final `application.png`.
+
+| Runtime artifact | SHA-256 |
+| --- | --- |
+| Complete `maps370-2026-10-26/sha256.json` | `c00c4f026d2aebd6826983f90274241b22c1763e95da1916bd1ca292ec7a769a` |
+| `google-maps-running.png` | `eaff2f063015b23c5c5128376b42bfbbe3f70a4317e216e2f54b3b89d029b277` |
+| `paris-walking-route.png` | `5f098457386c64dfa6b34ff94656469b5991655321af4513ed6f36ffce787ce0` |
+| Final `application.png` | `8332669d46981bcac4fce522aaa808689f3313f49fcbdef57cbf68b76c2467ba` |
+| Uncompressed `serial.log` | `a789a74ef68bb644f53907341d9ad10dd00fef744e21d80e5eb5fed3ebce8c81` |
+| `maps370-run-receipt-2026-10-26/sha256.json` | `c6dd1c4026148bab0d9359bfeb32c80e571793dd283320abcab10299eec11eef` |
+| `maps370-run-receipt-peer-readback-2026-10-26.json` | `19161bf233487afd1bca3fef03743dcce0b9968bd58eab49e8a71604146be68a` |
+
+The recorded run wrapper ran 03:29:09–03:44:57 UTC, actual exit 0, including
+launch, result collection and complete post-run input verification. The run
+used 50 clean environment entries; pinned non-media inputs remained unchanged. The
+original complete290 checker independently passed all nine wrapper files,
+actual exit 0; the adjacent command receipt SHA-256 is
+`6b03aedad4a739e548cc4e3f56d473507779ffe1781cfd55b0ba3a8e5943f0e2`.
+The recorder's run-stage extension is committed in `5b69cd3da`.
+
+The sole independent complete canonical readback ran 03:45:44–03:47:10 UTC,
+actual exit 0. The unchanged pinned runner's `verify` command matched every
+one of 163,476 typed entries, including files, directories, modes and links.
+The committed recorder `5c4569b4e` retained its exact source/binary, argv,
+actual status, output hash and unchanged input identities in
+`maps370-report-peer-readback-2026-10-26/`. Its `receipt.json` SHA-256 is
+`41e3d3e84d8f7b85907528cb269f0f293813cb18caeada8228e2ee7284e87189`.
+
+A manual capture at 03:42:03 UTC followed the suite's final capture and guest
+shutdown. It failed with `No such file or directory` and produced no PNG.
+Its 851 additional interaction-log bytes and original command streams are
+preserved separately in `maps370-late-capture-2026-10-26`, whose manifest SHA-256
+is `d99908d468982441f7108302b0b04db616921a0cf2e4c2738003a33c99e94fb5`.
+The collector and complete eight-file readback passed with actual exit 0;
+collector source is committed in `35f133e44`. Canonical Maps370 evidence was
+unchanged before and after that collection.
+
+The separate unchanged Intent369 ART fixture exposed an inherited
+`Intent.getDataString()` null-handling error after its first four parser phases.
+It remains a failed regression, documented in
+[the Intent369 report](intent-uri369-regression.md). That failure did not occur
+in this Maps workflow. [Provider371](intent-uri371-provider.md) repairs the
+accessor in a fresh framework build without changing these Maps370 artifacts.
