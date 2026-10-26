@@ -12,7 +12,7 @@ import tests.packages.audioinputs
 const trees = ['tools/packages', 'tools/accounts', 'tools/security-events', 'tools/keyring',
 	'build-support/native-compat-tools/compathost', 'tools/sandbox', 'tests/qemu-core/fixturehost',
 	'tests/native-guest-tools/guesthost', 'tests/linuxkpi/hosttest', 'tests/native-policy-tools/nativepolicy',
-	'tests/host-policy/policyhost', 'tests/hardware-platform/hwhost',
+	'tests/native-policy-tools/cpufixture', 'tests/host-policy/policyhost', 'tests/hardware-platform/hwhost',
 	'tests/packages/audio-portal-guest', 'tests/packages/audio-portal-tone', 'tests/packages/audiotest',
 	'tests/packages/audioinputs', 'tests/packages/audioprepare']
 const files = ['tests/packages/audio-portal-runtime-check.v', 'tests/packages/audio-portal-retain.v',

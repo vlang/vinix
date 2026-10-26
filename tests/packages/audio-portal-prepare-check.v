@@ -139,7 +139,7 @@ fn synthetic_preparation(out string, controller string, kernel string) !FixtureP
 	mut sources := map[string]string{}
 	for name in ['tools/packages', 'tools/accounts', 'tools/security-events', 'tools/keyring', 'tools/sandbox',
 		'build-support/native-compat-tools/compathost', 'tests/qemu-core/fixturehost', 'tests/native-guest-tools/guesthost',
-		'tests/linuxkpi/hosttest', 'tests/native-policy-tools/nativepolicy', 'tests/host-policy/policyhost',
+		'tests/linuxkpi/hosttest', 'tests/native-policy-tools/nativepolicy', 'tests/native-policy-tools/cpufixture', 'tests/host-policy/policyhost',
 		'tests/hardware-platform/hwhost', 'tests/packages/audio-portal-guest', 'tests/packages/audio-portal-tone',
 		'tests/packages/audiotest', 'tests/packages/audioinputs', 'tests/packages/audioprepare'] {
 		source_tree(root, prep + '/inputs/source', name, mut sources)!

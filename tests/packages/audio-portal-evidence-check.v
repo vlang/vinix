@@ -598,7 +598,7 @@ fn self_test(program string, out string, arch string) ! {
 	mut sources := map[string]string{}
 	for tree in ['tools/packages', 'tools/accounts', 'tools/security-events', 'tools/keyring', 'build-support/native-compat-tools/compathost',
 		'tools/sandbox', 'tests/qemu-core/fixturehost', 'tests/native-guest-tools/guesthost', 'tests/linuxkpi/hosttest',
-		'tests/native-policy-tools/nativepolicy', 'tests/host-policy/policyhost',
+		'tests/native-policy-tools/nativepolicy', 'tests/native-policy-tools/cpufixture', 'tests/host-policy/policyhost',
 		'tests/hardware-platform/hwhost', 'tests/packages/audio-portal-guest', 'tests/packages/audio-portal-tone', 'tests/packages/audiotest',
 		'tests/packages/audioinputs', 'tests/packages/audioprepare'] {
 		frozen_tree(root, raw + '/inputs/source', tree, mut sources)!
