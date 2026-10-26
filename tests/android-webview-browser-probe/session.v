@@ -25,6 +25,7 @@ struct BuildPins {
 	probe_sha256       string
 	session_sha256     string
 	waitid_probe_sha256 string
+	abort_probe_sha256 string
 	fault_probe_build_sha256 string
 	fault_probe_shim_sha256 string
 	fault_probe_fixture_sha256 string
@@ -165,6 +166,7 @@ fn validate(base string, addon string, executable string) !(string, string) {
 	equal_hash(executable, build.session_sha256)!
 	equal_hash(os.dir(executable) + '/browser-probe', build.probe_sha256)!
 	waitid_loader_arguments(os.dir(executable), build)!
+	abort_loader_arguments(os.dir(executable), build)!
 	return hash(build_path)!, hash(addon_path)!
 }
 
@@ -177,6 +179,27 @@ fn waitid_loader_arguments(bin string, build BuildPins) ![]string {
 	}
 	equal_hash(path, build.waitid_probe_sha256)!
 	return ['--preload', path]
+}
+
+// This separate module observes exported abort calls in WebKitWebProcess.
+// A fresh helper loader keeps it out of the UI and every other helper class.
+fn abort_loader_arguments(bin string, build BuildPins) ![]string {
+	path := bin + '/libbrowser-abort.so'
+	if !protected_library_stat(os.lstat(path)!, false) {
+		return error('abort diagnostic must be a root-protected regular file')
+	}
+	equal_hash(path, build.abort_probe_sha256)!
+	return ['--preload', path]
+}
+
+fn helper_loader_arguments(name string, base string, addon string, build BuildPins, target string) ![]string {
+	if name != 'xkbcomp' && name !in webkit_helpers { return error('unsupported helper name') }
+	mut argv := []string{}
+	if name == 'WebKitWebProcess' {
+		argv << abort_loader_arguments(os.dir(addon) + '/bin', build)!
+	}
+	argv << ['--library-path', library_path(base, addon), target]
+	return argv
 }
 
 // GTK's Cairo renderer does not select WebKit's Skia image-buffer backend.
@@ -228,7 +251,7 @@ fn trampoline(name string) ! {
 			environment << '${key}=${value}'
 		}
 	}
-	mut argv := ['--library-path', library_path(base, addon), target]
+	mut argv := helper_loader_arguments(name, base, addon, build, target)!
 	argv << os.args[1..]
 	// A stable helper class and numeric PID let the credential-free diagnostic
 	// associate GLib warnings with this verified dispatch without logging argv.
@@ -608,6 +631,8 @@ fn run(base_arg string, addon_arg string, output_arg string) ! {
 		'probe_result':          'incomplete'
 		'waitid_probe_sha256':   build.waitid_probe_sha256
 		'waitid_probe_scope':    'UI process only; at most 32 populated successful waits; native wait result, arguments, errno preserved'
+		'abort_probe_sha256':    build.abort_probe_sha256
+		'abort_probe_scope':     'WebKitWebProcess only; one numeric exported-abort caller record; native abort forwarded once; hidden/direct/kernel abort paths not covered'
 		'scope':                 'Separate real-engine diagnostic; no Android integration or Google authentication proof.'
 	}
 	defer {
@@ -862,6 +887,43 @@ fn self_test() ! {
 	}
 	os.write_file(root + '/libbrowser-waitid.so', 'changed-waitid-shim')!
 	if _ := equal_hash(root + '/libbrowser-waitid.so', wait_pin) { return error('changed waitid shim accepted') }
+	os.mkdir(root + '/bin')!
+	abort_path := root + '/bin/libbrowser-abort.so'
+	os.write_file(abort_path, 'abort-shim-fixture')!
+	os.chmod(abort_path, 0o644)!
+	abort_pin := hash(abort_path)!
+	abort_pins := BuildPins{abort_probe_sha256: abort_pin}
+	// Ordinary host users still exercise ownership/mode/type rejection. The
+	// actual root-owned file path is additionally tested when running as root.
+	for bad in [os.Stat{uid: 1, mode: 0o100644, nlink: 1},
+		os.Stat{uid: 0, mode: 0o100666, nlink: 1},
+		os.Stat{uid: 0, mode: 0o120777, nlink: 1},
+		os.Stat{uid: 0, mode: 0o100644, nlink: 2}] {
+		if protected_library_stat(bad, false) { return error('unsafe abort diagnostic metadata accepted') }
+	}
+	for name in ['xkbcomp', 'WebKitNetworkProcess', 'WebKitGPUProcess'] {
+		assert helper_loader_arguments(name, '/base', root + '/runtime', BuildPins{}, '/target')! ==
+			['--library-path', library_path('/base', root + '/runtime'), '/target']
+	}
+	if _ := helper_loader_arguments('foreign', '/base', root + '/runtime', abort_pins, '/target') {
+		return error('foreign abort helper role accepted')
+	}
+	equal_hash(abort_path, abort_pin)!
+	if os.getuid() == 0 {
+		assert helper_loader_arguments('WebKitWebProcess', '/base', root + '/runtime', abort_pins, '/target')! ==
+			['--preload', abort_path, '--library-path', library_path('/base', root + '/runtime'), '/target']
+		if _ := abort_loader_arguments(root + '/bin', BuildPins{}) { return error('missing abort pin accepted') }
+		os.chmod(abort_path, 0o666)!
+		if _ := abort_loader_arguments(root + '/bin', abort_pins) { return error('writable abort shim accepted') }
+		os.chmod(abort_path, 0o644)!
+	}
+	os.write_file(abort_path, 'changed-abort-shim')!
+	if _ := equal_hash(abort_path, abort_pin) { return error('changed abort shim accepted') }
+	os.rm(abort_path)!
+	if _ := abort_loader_arguments(root + '/bin', abort_pins) { return error('missing abort shim accepted') }
+	os.write_file(root + '/abort-original', 'abort-shim-fixture')!
+	os.symlink(root + '/abort-original', abort_path)!
+	if _ := abort_loader_arguments(root + '/bin', abort_pins) { return error('linked abort shim accepted') }
 	mut runtime_pins := map[string]string{}
 	for name in ['lib/ld-musl-aarch64.so.1', 'usr/libexec/webkitgtk-6.0/WebKitWebProcess',
 		'usr/libexec/webkitgtk-6.0/WebKitNetworkProcess', 'usr/libexec/webkitgtk-6.0/WebKitGPUProcess',
@@ -968,7 +1030,7 @@ fn self_test() ! {
 		context.replace('X11-MAPS-END\n', '')] {
 		if _ := known_fault_evidence(bad) { return error('incomplete or inconsistent fault evidence accepted') }
 	}
-	println('BROWSER-SESSION SELF-TEST PASS library-path libproxy-protection libproxy-pins libproxy-tamper libproxy-missing glx-arguments glx-wire-query glx-absence-negative authority-record x11-setup receipt-paths bundle-pins bundle-tamper bundle-missing cpu-renderer-environment mesa-packaged-driver-environment dmabuf-renderer-environment pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins complete-context buffered-context negative-context')
+	println('BROWSER-SESSION SELF-TEST PASS library-path libproxy-protection libproxy-pins libproxy-tamper libproxy-missing glx-arguments glx-wire-query glx-absence-negative authority-record x11-setup receipt-paths bundle-pins bundle-tamper bundle-missing cpu-renderer-environment mesa-packaged-driver-environment dmabuf-renderer-environment pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation abort-role-isolation abort-metadata abort-pins abort-tamper abort-missing abort-link tamper link partial-pins complete-context buffered-context negative-context')
 }
 
 fn main() {

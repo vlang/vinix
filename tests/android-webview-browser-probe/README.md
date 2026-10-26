@@ -36,6 +36,31 @@ WebKit's termination classification from libc's actual child status. Run its
 host regressions with `v -cc /usr/bin/cc -gc none test
 tests/android-webview-browser-probe/waitshim`.
 
+Only `WebKitWebProcess` additionally loads the pinned V `abort` diagnostic,
+using its own explicit loader argument. It emits at most one numeric
+`BROWSER-ABORT` record with the original caller PC, module base and offset,
+then forwards native `abort` once with the incoming errno restored. The
+root-owned, nonwritable, single-link DSO is hash-checked before use. It changes
+no signal handler or child watcher and is absent from the UI process, other
+helpers and production account processes. Hidden libc calls, direct syscalls
+and kernel termination paths are outside this diagnostic's coverage.
+
+Run its forwarding, errno, failure and child-only fatal-path regressions with
+`v -cc /usr/bin/cc -gc none test tests/android-webview-browser-probe/abortshim`.
+The separate native ABI check catches export wrappers that would record the
+DSO's own return address instead of the original caller:
+
+```sh
+v -gc none -prod -no-builtin -shared -d abort_probe_preload -o /tmp/libbrowser-abort.dylib tests/android-webview-browser-probe/abortshim
+v -gc none -o /tmp/browser-abort-abi tests/android-webview-browser-probe/abortshim-abi.v
+/tmp/browser-abort-abi /tmp/libbrowser-abort.dylib
+```
+
+These commands target the macOS host. Preparation creates an explicit export
+map for the Linux aarch64 DSO and retains it with the exact sources; its
+`abort` entry captures the caller before entering a forwarding helper. This
+instrumentation supplies no browser success or Google authentication evidence.
+
 From the repository root, build the V host preparation tool:
 
 ```sh
@@ -62,10 +87,10 @@ cryptographically verified by this diagnostic.
 
 The host requires libarchive (used by the existing V `tarstream` compression
 reader) and `/opt/homebrew/bin/aarch64-linux-musl-gcc`. Preparation builds a
-dynamic `bin/browser-probe` and static `bin/browser-session` and
-`bin/browser-guest`, retains the exact source copies (including the host
-collector), and records commands, hashes, compiler pins, and selected base
-runtime references in `build.json` and `addon-files.json`.
+dynamic `bin/browser-probe`, static `bin/browser-session` and
+`bin/browser-guest`, and the two diagnostic DSOs. It retains the exact source
+copies (including the host collector), and records commands, hashes, compiler
+pins, and selected base runtime references in `build.json` and `addon-files.json`.
 
 For a complete prepared-tree inventory before guest staging, build
 `inventory.v`, run its `--self-test`, then use
