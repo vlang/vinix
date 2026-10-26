@@ -188,6 +188,58 @@ fn qmp_path_check(root string) ! {
 	}
 }
 
+fn paths_overlap(first string, second string) bool {
+	return first == second || first.starts_with(second + '/') || second.starts_with(first + '/')
+}
+
+fn scratch_path(root string, requested string, protected []string) !string {
+	if requested == '' { return root + '/scratch' }
+	parent := os.dir(requested)
+	if !os.is_abs_path(requested) || os.abs_path(requested) != requested
+		|| requested.contains_any(' \n\t\x00') || os.exists(requested) || os.is_link(requested)
+		|| !os.is_dir(parent) || os.real_path(parent) != parent || os.is_link(parent) {
+		return error('scratch requires a fresh absolute canonical path with an existing directory parent')
+	}
+	for path in [root, repo, baseline] { if paths_overlap(requested, path) { return error('scratch overlaps audit root or runtime source: ' + path) } }
+	for path in protected {
+		if path != '' && paths_overlap(requested, os.real_path(path)) {
+			return error('scratch overlaps a preparation input: ' + path)
+		}
+	}
+	return requested
+}
+
+struct ScratchOwnership {
+	path string
+	dev u64
+	inode u64
+}
+
+fn create_scratch(path string) !ScratchOwnership {
+	// mkdir, unlike mkdir_all, refuses an existing entry. Never adopt a caller's
+	// directory, even when it is empty, and retain failures for inspection.
+	os.mkdir(path, mode: 0o700)!
+	info := os.lstat(path)!
+	if info.get_filetype() != .directory || os.real_path(path) != path { return error('created scratch path changed') }
+	return ScratchOwnership{path: path, dev: info.dev, inode: info.inode}
+}
+
+fn remove_scratch(owned_scratch ScratchOwnership) ! {
+	info := os.lstat(owned_scratch.path)!
+	if info.get_filetype() != .directory || info.dev != owned_scratch.dev || info.inode != owned_scratch.inode
+		|| os.real_path(owned_scratch.path) != owned_scratch.path { return error('scratch ownership changed; refusing cleanup') }
+	os.rmdir_all(owned_scratch.path)!
+}
+
+fn scratch_completed(root string, prepared map[string]json2.Any) ! {
+	// Historical preparations have no external scratch receipt.
+	if 'scratch_path' !in prepared { return }
+	path := prepared['scratch_path']!.str()
+	completion := json2.decode[map[string]string](os.read_file(root + '/scratch.json')!)!
+	if completion['path'] != path || completion['state'] != 'complete'
+		|| os.exists(path) || os.is_link(path) { return error('scratch preparation did not complete') }
+}
+
 // New files are allowed only when this preparation names their exact paths and
 // expected contents. Every original file remains present, with only the named
 // replacements changing; a replacement already present is also rejected.
@@ -405,8 +457,14 @@ fn prepare(root string, build string, apk string, kind string, companions []stri
 	if companions.len != expected_companions { return error('fixture companion set differs') }
 	if apk != '' { fixture_source(kind)! }
 	if os.exists(root) || os.is_link(root) { return error('fresh external state required') }
+	requested_scratch := os.getenv('VINIX_ACCOUNT_CONTRACT_SCRATCH')
+	mut protected := [build]
+	if apk != '' { protected << os.dir(apk) }
+	protected << companions.map(os.dir(it))
+	scratch := scratch_path(root, requested_scratch, protected)!
 	os.mkdir_all(root + '/commands')!
 	root_check(root)!
+	write_json(root + '/scratch.json', {'path': scratch, 'selection': if requested_scratch == '' { 'default' } else { 'VINIX_ACCOUNT_CONTRACT_SCRATCH' }, 'state': 'planned; failed composition is retained'})!
 	receipt := json2.decode[map[string]json2.Any](os.read_file(build + '/build.json')!)!
 	jar := build + '/api-impl.jar'
 	jar_hash := digest(jar)!
@@ -432,6 +490,9 @@ fn prepare(root string, build string, apk string, kind string, companions []stri
 		if kind == 'authenticator-request-fixture' { native = request_native(receipt, mut inputs)! }
 		if kind == 'authenticator-base-fixture' { native = authenticator_base_native(receipt, mut inputs)! }
 	}
+	// The native reference may live outside BUILD; protect every resolved input
+	// directory as well before creating scratch or cloning audit media.
+	scratch_path(root, requested_scratch, inputs.keys().map(os.dir(it)))!
 	for name in ['boot.img', 'efivars.fd'] {
 		from := baseline + '/' + name
 		to := root + '/' + name
@@ -443,30 +504,31 @@ fn prepare(root string, build string, apk string, kind string, companions []stri
 	if module_lines != modules.map('module_path: boot():/boot/' + it) { return error('unexpected baseline module load order') }
 	os.write_file(root + '/limine-before.conf', config)!
 	mut module_pins := map[string]string{}
-	os.mkdir_all(root + '/scratch')!
+	owned_scratch := create_scratch(scratch)!
+	write_json(root + '/scratch-ownership.json', owned_scratch)!
 	for name in modules {
 		module_pins[name] = stream_module(root, 'hash-' + name, baseline + '/boot.img', name, '')!
 		// initramfs supplies the OS; the Android runtime and ordered overlays
 		// form the application tree whose exact file delta is checked below.
 		if name != 'initramfs.tar' {
-			stream_module(root, 'compose-' + name, baseline + '/boot.img', name, root + '/scratch')!
+			stream_module(root, 'compose-' + name, baseline + '/boot.img', name, scratch)!
 		}
 		if name !in ['initramfs.tar', 'qemu-runtime.tar'] {
 			command(root, 'extract-' + name, ['mcopy', '-i', baseline + '/boot.img', '::/boot/' + name, root + '/' + name])!
 			if digest(root + '/' + name)! != module_pins[name]! { return error('retained original module differs: ' + name) }
 		}
 	}
-	if digest(root + '/scratch/' + jar_member)! != baseline_jar { return error('composed runtime framework is not Framework371') }
+	if digest(scratch + '/' + jar_member)! != baseline_jar { return error('composed runtime framework is not Framework371') }
 	mut before := map[string]string{}
-	inventory(root + '/scratch', '', mut before)!
-	os.cp(jar, root + '/scratch/' + jar_member)!
+	inventory(scratch, '', mut before)!
+	os.cp(jar, scratch + '/' + jar_member)!
 	mut changed := [jar_member]
 	mut replacements := {jar_member: jar_hash}
 	mut additions := map[string]string{}
 	if apk != '' {
-		os.cp(apk, root + '/scratch/opt/android-test/application.apk')!
-		os.write_file(root + '/scratch/opt/android-test/popular-id', 'account-contract')!
-		os.write_file(root + '/scratch/usr/share/vinix/android-app-label', 'Account contract')!
+		os.cp(apk, scratch + '/opt/android-test/application.apk')!
+		os.write_file(scratch + '/opt/android-test/popular-id', 'account-contract')!
+		os.write_file(scratch + '/usr/share/vinix/android-app-label', 'Account contract')!
 		changed << ['opt/android-test/application.apk', 'opt/android-test/popular-id', 'usr/share/vinix/android-app-label']
 		replacements['opt/android-test/application.apk'] = inputs[apk]!
 		replacements['opt/android-test/popular-id'] = sha256.sum('account-contract'.bytes()).hex()
@@ -474,7 +536,7 @@ fn prepare(root string, build string, apk string, kind string, companions []stri
 	}
 	if native != '' {
 		if before[native_member] != baseline_native { return error('composed runtime native library is not frozen351') }
-		os.cp(native, root + '/scratch/' + native_member)!
+		os.cp(native, scratch + '/' + native_member)!
 		replacements[native_member] = inputs[native]!
 		changed << native_member
 	}
@@ -482,20 +544,20 @@ fn prepare(root string, build string, apk string, kind string, companions []stri
 		for i, companion in companions {
 			member := installed_apks + packages[i + 1] + '.apk'
 			if member in before { return error('fixture companion already exists in baseline: ' + member) }
-			os.mkdir_all(os.dir(root + '/scratch/' + member))!
-			os.cp(companion, root + '/scratch/' + member)!
+			os.mkdir_all(os.dir(scratch + '/' + member))!
+			os.cp(companion, scratch + '/' + member)!
 			additions[member] = inputs[companion]!
 			changed << member
 		}
 	}
 	mut after := map[string]string{}
-	inventory(root + '/scratch', '', mut after)!
+	inventory(scratch, '', mut after)!
 	runtime_delta(before, after, replacements, additions)!
 	write_json(root + '/module-before.json', before)!
 	write_json(root + '/module-after.json', after)!
 	for name in changed {
 		os.mkdir_all(os.dir(root + '/overlay/' + name))!
-		os.cp(root + '/scratch/' + name, root + '/overlay/' + name)!
+		os.cp(scratch + '/' + name, root + '/overlay/' + name)!
 	}
 	command(root, 'create-account-overlay', ['/usr/bin/tar', '--format=ustar', '-b', '1', '-cf', root + '/account-contract.tar', '-C', root + '/overlay', '.'])!
 	overlay_pin := digest(root + '/account-contract.tar')!
@@ -516,7 +578,6 @@ fn prepare(root string, build string, apk string, kind string, companions []stri
 	}
 	os.rmdir_all(root + '/overlay')!
 	os.rmdir_all(root + '/read-back-overlay')!
-	os.rmdir_all(root + '/scratch')!
 	for path, pin in inputs { if digest(path)! != pin { return error('input changed while preparing: ' + path) } }
 	if apk != '' {
 		os.cp(apk, root + '/fixture.apk')!
@@ -530,6 +591,8 @@ fn prepare(root string, build string, apk string, kind string, companions []stri
 	write_json(root + '/prepare.json', {
 		'scope': json2.Any(if apk == '' { 'Maps precredential Add account retest; no authenticator or account store' } else { fixture_scope(kind)! }),
 		'kind': json2.Any(kind),
+		'scratch_path': json2.Any(scratch),
+		'scratch_selection': json2.Any(if requested_scratch == '' { 'default' } else { 'VINIX_ACCOUNT_CONTRACT_SCRATCH' }),
 		'source_revision': json2.Any(checked(['/usr/bin/git', '-C', repo, 'rev-parse', 'HEAD'])!),
 		'source_revision_scope': json2.Any('checkout revision at preparation; embedded runner source is identified separately'),
 		'runner_source_sha256': json2.Any(inputs[root + '/runner-source.v']!),
@@ -541,6 +604,10 @@ fn prepare(root string, build string, apk string, kind string, companions []stri
 		'changed_runtime_files': json2.Any(changed),
 		'added_runtime_files': json2.decode[json2.Any](json2.encode(additions))!
 	})!
+	// Complete all checks and the preparation receipt before discarding scratch.
+	// A separate final marker prevents start after cleanup/finalization failure.
+	remove_scratch(owned_scratch)!
+	write_json(root + '/scratch.json', {'path': scratch, 'selection': if requested_scratch == '' { 'default' } else { 'VINIX_ACCOUNT_CONTRACT_SCRATCH' }, 'state': 'complete'})!
 	println('ACCOUNT-CONTRACT-PREPARED ' + root)
 }
 
@@ -568,6 +635,7 @@ fn start(root string) ! {
 		if line.contains(qemu + ' ') && (line.contains('/maps372/') || line.contains('/maps-signin-') || line.contains('/account-contract-')) { return error('another Maps/account guest is live') }
 	}
 	prepared := json2.decode[map[string]json2.Any](os.read_file(root + '/prepare.json')!)!
+	scratch_completed(root, prepared)!
 	if digest(root + '/boot.img')! != prepared['prepared_boot_sha256']!.str() { return error('prepared image changed') }
 	args := ['-qmp', 'unix:' + root + '/qmp.sock,server=on,wait=off', '-machine', 'virt,gic-version=3', '-accel', 'hvf', '-cpu', 'host', '-m', '12288', '-smp', '4', '-object', 'rng-random,filename=/dev/urandom,id=vinix-rng', '-device', 'virtio-rng-device', '-drive', 'if=pflash,format=raw,readonly=on,file=' + firmware, '-drive', 'if=pflash,format=raw,file=' + root + '/efivars.fd', '-drive', 'format=raw,file=' + root + '/boot.img', '-device', 'virtio-keyboard-device', '-device', 'virtio-tablet-device', '-device', 'ramfb', '-netdev', 'user,id=net0', '-device', 'virtio-net-device,netdev=net0', '-object', 'filter-dump,id=capture,netdev=net0,file=' + root + '/network.pcap', '-display', 'none', '-monitor', 'none', '-serial', 'file:' + root + '/serial.log', '-daemonize', '-pidfile', root + '/qemu.pid']
 	mut argv := [qemu]
@@ -750,6 +818,76 @@ fn qmp_path_test() ! {
 	}
 }
 
+fn scratch_test() ! {
+	parent := '/Users/alex/.local/state/vinix/android/account-contract-scratch-test-' + os.getpid().str()
+	if os.exists(parent) || os.is_link(parent) { return error('fresh scratch test directory required') }
+	os.mkdir(parent)!
+	defer { os.rmdir_all(parent) or {} }
+	root := parent + '/audit'
+	path := parent + '/composition'
+	input := parent + '/inputs'
+	os.mkdir(input)!
+	os.write_file(parent + '/existing-file', 'untouched')!
+	os.symlink(parent, parent + '/alias')!
+	os.symlink(parent + '/missing', parent + '/broken')!
+	if scratch_path(root, '', [input])! != root + '/scratch'
+		|| scratch_path(root, path, [input])! != path
+		|| scratch_path(root, root + '-sibling', [input])! != root + '-sibling' {
+		return error('valid scratch path rejected')
+	}
+	for bad in ['relative', parent + '/composition/', parent + '/./composition', parent + '/missing/child',
+		parent + '/alias/child', parent + '/broken', parent + '/existing-file', input,
+		input + '/child', root, root + '/child', parent, repo + '/untracked-scratch', path + '\x00bad'] {
+		scratch_path(root, bad, [input]) or { continue }
+		return error('unsafe scratch path accepted: ' + bad)
+	}
+	if !paths_overlap(root, root + '/child') || !paths_overlap(root + '/child', root)
+		|| paths_overlap(root, root + '-sibling') { return error('scratch ancestry check differs') }
+	owned_scratch := create_scratch(path)!
+	os.write_file(path + '/partial', 'retained')!
+	create_scratch(path) or {
+		if os.read_file(path + '/partial')! != 'retained' { return error('existing scratch was modified') }
+		// A replacement directory must survive cleanup attempted with old ownership.
+		os.mv(path, path + '-original')!
+		os.mkdir(path)!
+		os.write_file(path + '/unrelated', 'untouched')!
+		mut rejected := false
+		remove_scratch(owned_scratch) or { rejected = true }
+		if !rejected || os.read_file(path + '/unrelated')! != 'untouched'
+			|| os.read_file(path + '-original/partial')! != 'retained' { return error('scratch cleanup accepted a replacement directory') }
+		os.rmdir_all(path)!
+		os.mv(path + '-original', path)!
+		remove_scratch(owned_scratch)!
+		if os.exists(path) { return error('owned scratch cleanup failed') }
+		scratch_completed(parent, map[string]json2.Any{})!
+		prepared := {'scratch_path': json2.Any(path)}
+		for completion in [
+			{'path': path, 'state': 'planned'},
+			{'path': path + '-different', 'state': 'complete'}
+		] {
+			write_json(parent + '/scratch.json', completion)!
+			scratch_completed(parent, prepared) or { continue }
+			return error('incomplete scratch preparation accepted')
+		}
+		write_json(parent + '/scratch.json', {'path': path, 'state': 'complete'})!
+		scratch_completed(parent, prepared)!
+		os.symlink(input, path)!
+		mut linked_rejected := false
+		scratch_completed(parent, prepared) or { linked_rejected = true }
+		os.rm(path)!
+		if !linked_rejected { return error('scratch completion accepted a remaining symlink') }
+		previous := os.getenv('VINIX_ACCOUNT_CONTRACT_SCRATCH')
+		os.setenv('VINIX_ACCOUNT_CONTRACT_SCRATCH', input, true)
+		defer { os.setenv('VINIX_ACCOUNT_CONTRACT_SCRATCH', previous, true) }
+		mut prepare_rejected := false
+		prepare(root, input, '', 'maps', []string{}) or { prepare_rejected = err.msg().starts_with('scratch ') }
+		if !prepare_rejected || os.exists(root) || os.is_link(root) { return error('unsafe scratch was not rejected before prepare mutation') }
+		println('ACCOUNT-CONTRACT-SCRATCH-PASS freshness aliases overlap ownership cleanup and pre-mutation rejection')
+		return
+	}
+	return error('scratch creation adopted an existing directory')
+}
+
 fn main() {
 	if os.args.len == 2 && os.args[1] == '--self-test' {
 		for kind in fixture_kinds {
@@ -771,12 +909,13 @@ fn main() {
 		runtime_delta_test()!
 		service_additions_test()!
 		qmp_path_test()!
+		scratch_test()!
 		compiled_sources_test()!
 		ownership_test()!
 		println('ACCOUNT-CONTRACT-RUN-SELF-TEST-PASS exact replacements/additions checked; late errors, sentinels and duplicate markers rejected; unrelated process protected')
 		return
 	}
-	if os.args.len < 3 { eprintln('usage: account-contract-run prepare ROOT BUILD [FIXTURE_APK] | prepare-response|prepare-intent|prepare-request|prepare-base ROOT BUILD FIXTURE_APK | prepare-activity ROOT BUILD CLIENT_APK COMPANION_APK DISABLED_APK | prepare-service ROOT BUILD CLIENT_APK COMPANION_APK BLOCKED_APK DISABLED_APK | start|stop|status|observe ROOT'); exit(2) }
+	if os.args.len < 3 { eprintln('usage: account-contract-run prepare ROOT BUILD [FIXTURE_APK] | prepare-response|prepare-intent|prepare-request|prepare-base ROOT BUILD FIXTURE_APK | prepare-activity ROOT BUILD CLIENT_APK COMPANION_APK DISABLED_APK | prepare-service ROOT BUILD CLIENT_APK COMPANION_APK BLOCKED_APK DISABLED_APK | start|stop|status|observe ROOT\nOptional preparation scratch: VINIX_ACCOUNT_CONTRACT_SCRATCH=/fresh/absolute/path (default ROOT/scratch; failed composition retained)'); exit(2) }
 	root := os.abs_path(os.args[2])
 	match os.args[1] {
 		'prepare' { if os.args.len !in [4, 5] { exit(2) }; prepare(root, os.abs_path(os.args[3]), if os.args.len == 5 { os.abs_path(os.args[4]) } else { '' }, if os.args.len == 5 { 'fixture' } else { 'maps' }, []string{}) or { eprintln(err); exit(1) } }
