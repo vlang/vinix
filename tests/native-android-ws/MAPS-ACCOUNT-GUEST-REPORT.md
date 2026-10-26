@@ -79,3 +79,31 @@ The controller exports `VINIX-MAPS-ACCOUNT-RESULTS-1` serial frames containing
 receipts, identity and input-hardening evidence, and raw-log hashes. Native Maps
 and broker logs remain root-private in the guest and are excluded from the
 serial archive. No account credentials are supplied by this fixture.
+
+The r5 controller adds public numeric authenticator initialization diagnostics
+in `receipt.auth_init`. Commit `19bb95f17` accepts only complete, exact LF records
+with canonical signed 32-bit values and the native producer's stage, detail and
+loader bounds. It retains at most 32 records and marks overflow explicitly.
+Malformed, partial and private log fields are excluded. Capture occurs on both
+success and failure without changing readiness, deadlines or cleanup. Pure host
+self-tests cover integer limits, malformed records, field bounds, privacy,
+partial lines and cardinality; independent source review passed.
+
+The fully retained r5 build completed `2026-10-26 19:03:15 UTC`, recording source
+revision `ecbd3964aff243304e16df45271c7de8dee4d2da`. Its exact compiled controller
+source is `312e6a02d7c4ec51a3615ac100f1e8f045c06fda6d39dadfb5f750c1f9f99c47`.
+Both retained host self-tests, source/header/link membership checks and strict
+static AArch64 compilation passed. The unchanged builder and native baseline
+retain their complete original and frozen input closures. A separate production
+stager audit rehashed all 3,100 regular files successfully; its log is
+`/Users/alex/.local/state/vinix/android/maps-account-guest-build-r5-inventory-audit.log`
+with SHA-256 `384fcf951b0f776ac90b782cea79a65ff1f2c78b789bd3873c6e2754fbaa9447`.
+
+Select the complete r5 bundle at
+`/Users/alex/.local/state/vinix/android/maps-account-guest-build-2026-10-26-r5`,
+whose `sha256.json` digest is
+`1841922e5196125b5a6198635fd28fe0d87d49e530bec9db903b3fe44d7cac92`.
+Its sole ARM output, `bin/maps-account-guest`, is
+`72fdd227adc3244329b673ea9ca46b3ecffd4e3d1d7725368475d6d5e4048cb2`.
+This supersedes r4 for subsequent staging; historical bundles remain intact.
+No guest boot or Google account login is established by this build.
