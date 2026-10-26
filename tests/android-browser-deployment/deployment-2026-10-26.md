@@ -4,25 +4,32 @@ Host reconstruction passed. This prepares the protected browser closure for
 Maps and Google Play Services; it does not verify Google account login.
 
 Source changes: `ccd77a135` (mandatory injected bundle and CA pins),
-`7c9d9dda4` (deployment builder), and `0f7e6e499` (musl ABI verification).
-The build captured repository HEAD `577a2d8c29ba6d4a95a655d507ef38414d3b8c77`
-with exact live source hashes in its retained `source-inputs.json`; the ABI
-change was committed immediately after the successful build. Imported Maps
-stager source is retained independently in the artifact.
+`7c9d9dda4` (deployment builder), `0f7e6e499` (musl ABI verification), and
+`b12359ea7` (bind ABI tables to unique loader mappings). The final build captured
+repository HEAD `b12359ea77841e482677ede71d5ad231f5985ff3` with exact live
+source hashes in its retained `source-inputs.json`. Imported Maps stager source
+is retained independently in the artifact.
 
 Complete audit bundle, outside Git:
 
-`/Users/alex/.local/state/vinix/android/maps-account-browser-deployment-2026-10-26-r6`
+`/Users/alex/.local/state/vinix/android/maps-account-browser-deployment-2026-10-26-r7`
 
 | Artifact | SHA256 |
 | --- | --- |
-| `sha256.json` | `5b634ad800523588729d70270e7612f1fa32b153ae57578916eae28d8dff116a` |
-| `build.json` | `e4160962f3212ca72b84c0c0609b6cecdaf6fcc15c6a0448aa7a4b274551cdca` |
-| `source-inputs.json` | `5d4845649458f7fabe005de07c68f411793ec5cc159bb465b2b73a473ae2446a` |
+| `sha256.json` | `bc9f6e776d0c81bb1bca160ab1e4289e31db9f2a05983e00ba0fcb42be86244d` |
+| `build.json` | `14b91a03eac6eaf5cfabe10c14ec0ca81503f92347ce6dfc0ab3eb29aa95b8b2` |
+| `source-inputs.json` | `cbb50ee8bb100f55ed51b2e332df7855bbd810fbe602e359bd92503d97406df5` |
 | `payload-files.json` | `958f96ff554757b7a14d4002341dfb87a4898dce7d6b160152c30ceeb7da4e94` |
 | `musl-abi.json` | `b09936e93b3c9de2ac102a586236551cb91131bcc4fdfd82dfc047ca71f75d92` |
 | `manifests/maps.manifest` | `67dbaf1b6c7b62cb5f9e739bbccb32ca616059875fb290a248c4ec325f40891f` |
 | `manifests/gms.manifest` | `ac3f534bdeaad7480ca050453df1f95252afd32e4aecae4ed6be11199c03df69` |
+
+The previous complete R6 bundle remains sealed at the sibling `-r6` path, with
+inventory seal `5b634ad800523588729d70270e7612f1fa32b153ae57578916eae28d8dff116a`.
+Review found that its ABI checker trusted section file offsets without proving
+that they describe the loader's table bytes. R7 adds that proof and passed with
+the same pinned inputs. The payload inventory, ABI receipt and both manifests
+are byte-identical to R6.
 
 Pinned input receipts:
 
@@ -43,10 +50,14 @@ unversioned-symbol checks against compiler and runtime musl passed, including
 the executable's COPY data symbols. The alias uses the exact runtime musl
 bytes, independently copied rather than linked.
 
-All five host test suites passed (24 test functions). Coverage includes archive
+All five host test suites passed (26 test functions). Coverage includes archive
 path/link rejection, exact dependency providers, font parsing and decompression
 bounds, manifest identities, search-path exceptions, symbol types/data sizes,
-weak imports, COPY data, symbol versions and malformed ELF tables. Host V:
+weak imports, COPY data, symbol versions and malformed ELF tables. ABI regression
+fixtures also reject alternative section copies, duplicate and partial LOAD
+mappings, zero-fill overlaps and symbol spans crossing file-backed bytes; valid
+adjacent and empty LOADs remain accepted. Independent mapping review passed.
+Host V:
 `/Users/alex/code/v-tccbin-bootstrap-20261026/v`, SHA256
 `0cc6c1d34c1811a818e4ae89853116861a4b067d4251af257851a7714f0d11fe`.
 
