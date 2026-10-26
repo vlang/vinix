@@ -18,12 +18,17 @@ type WsAuthNumber = fn (voidptr,u32) i64
 type WsAuthResponse = fn (voidptr,u64,u16) voidptr
 type WsAuthOption = fn (voidptr,&char,u16,&char,i64) i32
 type WsAuthSend = fn (voidptr) i32
+type WsAuthInteraction = fn (voidptr,&char,&char) i32
+type WsAuthUiAuthority = fn (voidptr,u64,&u8,u32) i32
+type WsAuthLaunchTarget = fn (voidptr,u64,&char,&char) i32
 
 struct WsAuthSlot {
 mut:
 	next &WsAuthSlot
 	id u64
 	response voidptr
+	bundle voidptr
+	intent voidptr
 }
 
 struct WsAuthValue {
@@ -68,6 +73,10 @@ __global ws_auth_response WsAuthResponse
 __global ws_auth_option WsAuthOption
 __global ws_auth_send WsAuthSend
 __global ws_auth_free WsAuthFree
+__global ws_auth_interaction WsAuthInteraction
+__global ws_auth_origin &char
+__global ws_auth_ui_authority WsAuthUiAuthority
+__global ws_auth_launch_target WsAuthLaunchTarget
 
 fn ws_account_service_init() bool {
 	unsafe {
@@ -106,15 +115,29 @@ fn ws_account_service_init() bool {
 		ws_auth_option = WsAuthOption(C.dlsym(ws_auth_library,c'vinix_android_authenticator_response_option'))
 		ws_auth_send = WsAuthSend(C.dlsym(ws_auth_library,c'vinix_android_authenticator_response_send'))
 		ws_auth_free = WsAuthFree(C.dlsym(ws_auth_library,c'vinix_android_authenticator_response_free'))
+		ws_auth_interaction = WsAuthInteraction(C.dlsym(ws_auth_library,c'vinix_android_authenticator_response_interaction'))
+		ws_auth_ui_authority = WsAuthUiAuthority(C.dlsym(ws_auth_library,c'vinix_android_authenticator_ui_authority'))
+		ws_auth_launch_target = WsAuthLaunchTarget(C.dlsym(ws_auth_library,c'vinix_android_authenticator_launch_target'))
 		if voidptr(ws_auth_open) == nil || voidptr(ws_auth_read) == nil || voidptr(ws_auth_close) == nil
 			|| voidptr(ws_auth_type) == nil || voidptr(ws_auth_token) == nil || voidptr(ws_auth_features) == nil || voidptr(ws_auth_feature) == nil
 			|| voidptr(ws_auth_count) == nil || voidptr(ws_auth_key) == nil || voidptr(ws_auth_tag) == nil || voidptr(ws_auth_text) == nil || voidptr(ws_auth_number) == nil
-			|| voidptr(ws_auth_response) == nil || voidptr(ws_auth_option) == nil || voidptr(ws_auth_send) == nil || voidptr(ws_auth_free) == nil {
+			|| voidptr(ws_auth_response) == nil || voidptr(ws_auth_option) == nil || voidptr(ws_auth_send) == nil || voidptr(ws_auth_free) == nil || voidptr(ws_auth_interaction) == nil || voidptr(ws_auth_ui_authority) == nil || voidptr(ws_auth_launch_target) == nil {
 			C.close(fd); return false
 		}
 		ws_auth_handle = ws_auth_open(fd)
 		if ws_auth_handle == nil { C.close(fd); return false }
 		return true
+	}
+}
+
+fn ws_auth_slot_free(e voidptr, node &WsAuthSlot) {
+	unsafe {
+		if e != nil {
+			Drop(slot(e,22))(e,node.response)
+			if node.bundle != nil { Drop(slot(e,22))(e,node.bundle) }
+			if node.intent != nil { Drop(slot(e,22))(e,node.intent) }
+		}
+		C.free(node)
 	}
 }
 
@@ -134,11 +157,11 @@ fn ws_auth_claim(e voidptr, response voidptr, kind u16, id &u64) voidptr {
 			*id = node.id
 			builder = ws_auth_response(ws_auth_handle,node.id,kind)
 		}
-		if node != nil && kind != 5 {
+		if node != nil && kind != 5 && kind != 4 {
 			if previous == nil { ws_auth_slots = node.next } else { previous.next = node.next }
 		}
 		C.pthread_mutex_unlock(&ws_auth_mutex)
-		if node != nil && kind != 5 { Drop(slot(e,22))(e,node.response); C.free(node) }
+		if node != nil && kind != 5 && kind != 4 { ws_auth_slot_free(e,node) }
 		return builder
 	}
 }
@@ -170,8 +193,70 @@ fn ws_auth_continued(e voidptr, response voidptr) {
 	}
 }
 
+fn ws_auth_extract(e voidptr, bundle voidptr, response voidptr) voidptr {
+	unsafe {
+		if bundle == nil || ws_auth_origin == nil { return nil }
+		args := [Value{l:bundle},Value{l:response},Value{l:ws_account_java_text(e,ws_auth_origin)}]!
+		if args[2].l == nil || pending(e) { return nil }
+		return static_obj(e,c'android/atl/VinixAccountInteraction',c'extract',c'(Landroid/os/Bundle;Landroid/accounts/IAccountAuthenticatorResponse;Ljava/lang/String;)Landroid/content/Intent;',&args[0])
+	}
+}
+
+// Keep the original graph in its VM. No class loader, Parcelable or Java
+// object crosses the broker boundary; only a random normal-side handle does.
+fn ws_auth_try_interaction(e voidptr, response voidptr, bundle voidptr) bool {
+	unsafe {
+		mut id := u64(0)
+		builder := ws_auth_claim(e,response,4,&id)
+		if builder == nil { return true }
+		defer { ws_auth_free(builder) }
+		intent := ws_auth_extract(e,bundle,response)
+		if intent == nil || pending(e) {
+			if pending(e) { WsApplicationClear(slot(e,17))(e) }
+			return false
+		}
+		component := obj(e,intent,c'android/content/Intent',c'getComponent',c'()Landroid/content/ComponentName;',nil)
+		if component == nil || pending(e) { return false }
+		pkg := obj(e,component,c'android/content/ComponentName',c'getPackageName',c'()Ljava/lang/String;',nil)
+		if pkg == nil || pending(e) { return false }
+		name := obj(e,component,c'android/content/ComponentName',c'getClassName',c'()Ljava/lang/String;',nil)
+		if name == nil || pending(e) { return false }
+		package_text := ws_account_utf8(e,pkg)
+		if package_text == nil || pending(e) { C.free(package_text); return false }
+		class_text := ws_account_utf8(e,name)
+		defer { C.free(package_text); C.free(class_text) }
+		if pending(e) || package_text == nil || class_text == nil
+			|| ws_auth_interaction(builder,package_text,class_text) != 0 { return false }
+		bundle_ref := WsRef(slot(e,21))(e,bundle)
+		if bundle_ref == nil || pending(e) {
+			if bundle_ref != nil { Drop(slot(e,22))(e,bundle_ref) }
+			return false
+		}
+		intent_ref := WsRef(slot(e,21))(e,intent)
+		if intent_ref == nil || pending(e) {
+			if bundle_ref != nil { Drop(slot(e,22))(e,bundle_ref) }
+			if intent_ref != nil { Drop(slot(e,22))(e,intent_ref) }
+			return false
+		}
+		C.pthread_mutex_lock(&ws_auth_mutex)
+		mut node := ws_auth_slots
+		for node != nil && Same(slot(e,24))(e,node.response,response) == 0 { node = node.next }
+		installed := node != nil && ws_auth_handle != nil && node.bundle == nil && node.intent == nil
+		if installed { node.bundle = bundle_ref; node.intent = intent_ref }
+		C.pthread_mutex_unlock(&ws_auth_mutex)
+		if !installed {
+			Drop(slot(e,22))(e,bundle_ref); Drop(slot(e,22))(e,intent_ref)
+			return true
+		}
+		if ws_auth_send(builder) != 0 { ws_auth_cancel(e,id) }
+		return true
+	}
+}
+
 fn ws_auth_result(e voidptr, response voidptr, bundle voidptr) {
 	unsafe {
+		if ws_auth_try_interaction(e,response,bundle) { return }
+		if pending(e) { WsApplicationClear(slot(e,17))(e) }
 		mut id := u64(0)
 		builder := ws_auth_claim(e,response,1,&id)
 		if builder == nil { return }
@@ -189,6 +274,65 @@ fn ws_auth_result(e voidptr, response voidptr, bundle voidptr) {
 			if ws_auth_error_fields(failure,6,c'unsupported authenticator result') { ws_auth_send(failure) }
 			ws_auth_free(failure)
 		}
+	}
+}
+
+// Transport has already validated the session capability, opaque local handle
+// and explicit target before this main-Looper entry point can run.
+fn ws_auth_launch(e voidptr, id u64) bool {
+	unsafe {
+		C.pthread_mutex_lock(&ws_auth_mutex)
+		mut node := ws_auth_slots
+		for node != nil && node.id != id { node = node.next }
+		mut bundle := voidptr(nil)
+		mut intent := voidptr(nil)
+		mut response := voidptr(nil)
+		if node != nil && ws_auth_handle != nil && node.bundle != nil && node.intent != nil {
+			bundle = WsRef(slot(e,25))(e,node.bundle)
+			if bundle != nil && !pending(e) {
+				intent = WsRef(slot(e,25))(e,node.intent)
+				if intent != nil && !pending(e) { response = WsRef(slot(e,25))(e,node.response) }
+			}
+		}
+		C.pthread_mutex_unlock(&ws_auth_mutex)
+		defer {
+			if bundle != nil { Drop(slot(e,23))(e,bundle) }
+			if intent != nil { Drop(slot(e,23))(e,intent) }
+			if response != nil { Drop(slot(e,23))(e,response) }
+		}
+		if bundle == nil || intent == nil || response == nil || pending(e) { return false }
+		again := ws_auth_extract(e,bundle,response)
+		if again == nil || pending(e) || Same(slot(e,24))(e,again,intent) == 0 { return false }
+		component := obj(e,intent,c'android/content/Intent',c'getComponent',c'()Landroid/content/ComponentName;',nil)
+		if component == nil || pending(e) { return false }
+		pkg := obj(e,component,c'android/content/ComponentName',c'getPackageName',c'()Ljava/lang/String;',nil)
+		if pkg == nil || pending(e) { return false }
+		name := obj(e,component,c'android/content/ComponentName',c'getClassName',c'()Ljava/lang/String;',nil)
+		if name == nil || pending(e) { return false }
+		package_text := ws_account_utf8(e,pkg)
+		if package_text == nil || pending(e) { C.free(package_text); return false }
+		class_text := ws_account_utf8(e,name)
+		defer { C.free(package_text); C.free(class_text) }
+		if package_text == nil || class_text == nil || pending(e) { return false }
+		C.pthread_mutex_lock(&ws_auth_mutex)
+		matches := ws_auth_handle != nil && ws_auth_launch_target(ws_auth_handle,id,package_text,class_text) == 0
+		C.pthread_mutex_unlock(&ws_auth_mutex)
+		if !matches { return false }
+		return ws_service_activity(e,intent,id)
+	}
+}
+
+fn ws_auth_launch_failed(e voidptr, id u64) {
+	unsafe {
+		if pending(e) { WsApplicationClear(slot(e,17))(e) }
+		C.pthread_mutex_lock(&ws_auth_mutex)
+		builder := if ws_auth_handle == nil { voidptr(nil) } else { ws_auth_response(ws_auth_handle,id,2) }
+		C.pthread_mutex_unlock(&ws_auth_mutex)
+		if builder != nil {
+			if ws_auth_error_fields(builder,6,c'authenticator activity launch failed') { ws_auth_send(builder) }
+			ws_auth_free(builder)
+		}
+		ws_auth_cancel(e,id)
 	}
 }
 
@@ -332,7 +476,7 @@ fn ws_auth_cancel(e voidptr, id u64) {
 			if previous == nil { ws_auth_slots = node.next } else { previous.next = node.next }
 		}
 		C.pthread_mutex_unlock(&ws_auth_mutex)
-		if node != nil { Drop(slot(e,22))(e,node.response); C.free(node) }
+		if node != nil { ws_auth_slot_free(e,node) }
 	}
 }
 
@@ -348,6 +492,10 @@ fn ws_account_service_pump(e voidptr, binder voidptr) bool {
 			if status < 0 { return false }
 			if status == 0 { return true }
 			if status == 2 { ws_auth_cancel(e,id); continue }
+			if status == 3 {
+				if !ws_auth_launch(e,id) { ws_auth_launch_failed(e,id); return false }
+				continue
+			}
 			if command == nil { return false }
 			ok := ws_auth_dispatch(e,binder,command)
 			ws_auth_command_free(command)
@@ -371,8 +519,7 @@ fn ws_account_service_shutdown(e voidptr) {
 		C.pthread_mutex_unlock(&ws_auth_mutex)
 		for nodes != nil {
 			next := nodes.next
-			if e != nil { Drop(slot(e,22))(e,nodes.response) }
-			C.free(nodes); nodes = next
+			ws_auth_slot_free(e,nodes); nodes = next
 		}
 	}
 }

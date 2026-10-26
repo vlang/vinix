@@ -14,7 +14,7 @@ fn main() {
 	source := os.read_file('build-support/android/nativews/account_service.v')!
 	at := source.index('type WsAuthArray') or { panic('missing authenticator declarations') }
 	mut code := source[at..].all_before('fn ws_account_service_init(')
-	for name in ['ws_auth_claim', 'ws_auth_error_fields', 'ws_auth_error', 'ws_auth_continued',
+	for name in ['ws_auth_slot_free', 'ws_auth_claim', 'ws_auth_error_fields', 'ws_auth_error', 'ws_auth_continued',
 		'ws_auth_result', 'ws_auth_calling_uid', 'ws_auth_calling_pid', 'ws_auth_permission',
 		'ws_auth_cancel', 'ws_account_service_shutdown'] {
 		code += '\n' + block(source,name)
@@ -86,6 +86,7 @@ fn ws_account_copy_options(e voidptr,builder voidptr,bundle voidptr,put WsAccoun
  if valid_bundle { return put(builder,c"key",1,c"value",0) == 0 }
  failed = true; return false
 }
+fn ws_auth_try_interaction(e voidptr,response voidptr,bundle voidptr) bool { return false }
 '
 
 const cases = '

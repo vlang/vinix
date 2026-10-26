@@ -2,6 +2,7 @@
 module accountclient
 
 import accountipc
+import crypto.rand
 import encoding.utf8
 import nativeaccountauth
 import sync
@@ -11,6 +12,10 @@ import time
 struct AuthSession {
 	command accountipc.Command
 	started i64
+mut:
+	interaction accountipc.Interaction
+	launched bool
+	ui_accepted bool
 }
 
 @[heap]
@@ -33,10 +38,12 @@ struct AuthResponse {
 	kind accountipc.Kind
 mut:
 	options []nativeaccountauth.Option
+	interaction accountipc.Interaction
 }
 
 fn auth_session_free(s &AuthSession) {
 	accountipc.dispose_command(s.command)
+	accountipc.dispose_interaction(s.interaction)
 	unsafe { free(s) }
 }
 
@@ -118,8 +125,66 @@ pub fn auth_read(handle voidptr, session &u64, timeout i32) i32 {
 		unsafe { *session = event.id }
 		return 2
 	}
+	if packet.header.kind == .launch {
+		launch := accountipc.decode_launch(packet.header,packet.body) or { a.disconnect(); return -1 }
+		defer { accountipc.dispose_launch(launch) }
+		mut value := a.sessions[launch.session] or { a.disconnect(); return -1 }
+		if value.launched || !same_capability(launch.capability,value.command.capability)
+			|| !same_capability(launch.interaction.handle,value.interaction.handle)
+			|| launch.interaction.target_package != value.interaction.target_package
+			|| launch.interaction.target_class != value.interaction.target_class {
+			a.disconnect(); return -1
+		}
+		value.launched = true
+		a.current = value
+		unsafe { *session = launch.session }
+		return 3
+	}
 	a.disconnect()
 	return -1
+}
+
+// Only a matching authenticated launch can redeem this descriptor frame.
+// Descriptor types and geometry are validated by the native UI owner.
+@[export: 'vinix_android_authenticator_ui_authority']
+pub fn auth_ui_authority(handle voidptr, session u64, frame &u8, length u32) i32 {
+	if handle == unsafe { nil } || frame == unsafe { nil } || length != 64 { return -1 }
+	unsafe {
+		if frame[0] != `W` || frame[1] != `S` || frame[2] != `U` || frame[3] != `I`
+			|| frame[4] != 0 || frame[5] != 1 || frame[6] != 0 || frame[7] != 0
+			|| frame[60] != 0 || frame[61] != 0 || frame[62] != 0 || frame[63] != 0 { return -1 }
+		mut encoded := u64(0)
+		for i in 8 .. 16 { encoded = encoded << 8 | u64(frame[i]) }
+		if encoded != session { return -1 }
+		mut a := &Authenticator(handle)
+		a.mutex.lock()
+		defer { a.mutex.unlock() }
+		if a.closed { return -1 }
+		mut value := a.sessions[session] or { return -1 }
+		if !value.launched || value.ui_accepted { return -1 }
+		mut difference := u8(0)
+		for i in 0 .. 32 { difference |= frame[16+i] ^ value.command.capability[i] }
+		if difference != 0 { return -1 }
+		value.ui_accepted = true
+		return 0
+	}
+}
+
+// Recheck the live Java Intent metadata against the descriptor that root
+// authorized. Retaining object identity alone does not freeze a mutable Intent.
+@[export: 'vinix_android_authenticator_launch_target']
+pub fn auth_launch_target(handle voidptr, session u64, package_name &char, class_name &char) i32 {
+	if handle == unsafe { nil } { return -1 }
+	pkg := auth_cstring(package_name) or { return -1 }
+	defer { unsafe { pkg.free() } }
+	name := auth_cstring(class_name) or { return -1 }
+	defer { unsafe { name.free() } }
+	mut a := unsafe { &Authenticator(handle) }
+	a.mutex.lock()
+	defer { a.mutex.unlock() }
+	if a.closed { return -1 }
+	s := a.sessions[session] or { return -1 }
+	return if s.launched && s.interaction.target_package == pkg && s.interaction.target_class == name { 0 } else { -1 }
 }
 
 @[export: 'vinix_android_authenticator_close']
@@ -242,7 +307,7 @@ pub fn auth_number(handle voidptr, index u32) i64 {
 
 @[export: 'vinix_android_authenticator_response']
 pub fn auth_response(handle voidptr, session u64, kind u16) voidptr {
-	if handle == unsafe { nil } || kind !in [u16(1),u16(2),u16(5)] { return unsafe { nil } }
+	if handle == unsafe { nil } || kind !in [u16(1),u16(2),u16(4),u16(5)] { return unsafe { nil } }
 	mut a := unsafe { &Authenticator(handle) }
 	a.mutex.lock()
 	defer { a.mutex.unlock() }
@@ -268,7 +333,7 @@ fn auth_cstring(value &char) !string {
 pub fn auth_response_option(handle voidptr, key &char, tag u16, text &char, number i64) i32 {
 	if handle == unsafe { nil } || tag > 4 { return -1 }
 	mut b := unsafe { &AuthResponse(handle) }
-	if b.kind == .continued || b.options.len >= 32 { return -1 }
+	if b.kind in [.continued,.interaction] || b.options.len >= 32 { return -1 }
 	name := auth_cstring(key) or { return -1 }
 	if name.len == 0 || b.options.any(it.key == name) { unsafe { name.free() }; return -1 }
 	value := match tag {
@@ -288,6 +353,21 @@ pub fn auth_response_option(handle voidptr, key &char, tag u16, text &char, numb
 	return 0
 }
 
+// The opaque handle never leaves normal transport code. JNI retains the exact
+// local Java graph under the numeric session; root must return both secrets.
+@[export: 'vinix_android_authenticator_response_interaction']
+pub fn auth_response_interaction(handle voidptr, package_name &char, class_name &char) i32 {
+	if handle == unsafe { nil } { return -1 }
+	mut b := unsafe { &AuthResponse(handle) }
+	if b.kind != .interaction || b.interaction.handle.len != 0 { return -1 }
+	pkg := auth_cstring(package_name) or { return -1 }
+	name := auth_cstring(class_name) or { unsafe { pkg.free() }; return -1 }
+	if pkg.len == 0 || name.len == 0 { unsafe { pkg.free(); name.free() }; return -1 }
+	opaque := rand.bytes(32) or { unsafe { pkg.free(); name.free() }; return -1 }
+	b.interaction = accountipc.Interaction{opaque,pkg,name}
+	return 0
+}
+
 @[export: 'vinix_android_authenticator_response_send']
 pub fn auth_response_send(handle voidptr) i32 {
 	if handle == unsafe { nil } { return -1 }
@@ -296,11 +376,15 @@ pub fn auth_response_send(handle voidptr) i32 {
 	a.mutex.lock()
 	defer { a.mutex.unlock() }
 	if a.closed { return -1 }
-	s := a.sessions[b.session] or { return -1 }
+	mut s := a.sessions[b.session] or { return -1 }
 	if !same_capability(b.capability,s.command.capability) { return -1 }
-	wire := accountipc.encode_event(accountipc.Event{kind:b.kind,id:b.session,capability:b.capability,options:b.options},true) or { return -1 }
+	if b.kind == .interaction && s.interaction.handle.len != 0 { return -1 }
+	wire := accountipc.encode_event(accountipc.Event{kind:b.kind,id:b.session,capability:b.capability,options:b.options,interaction:b.interaction},true) or { return -1 }
 	defer { unsafe { wire.free() } }
 	a.stream.enqueue(wire) or { a.disconnect(); return -1 }
+	if b.kind == .interaction {
+		s.interaction = accountipc.Interaction{b.interaction.handle.clone(),b.interaction.target_package.clone(),b.interaction.target_class.clone()}
+	}
 	if accountipc.terminal(b.kind) { a.retire(b.session) }
 	return 0
 }
@@ -315,6 +399,7 @@ pub fn auth_response_free(handle voidptr) {
 	dispose := a.refs == 0
 	a.mutex.unlock()
 	unsafe { b.capability.free() }
+	accountipc.dispose_interaction(b.interaction)
 	for item in b.options { unsafe { item.key.free(); item.value.text.free() } }
 	unsafe { b.options.free(); free(b) }
 	if dispose { auth_free(mut a) }
