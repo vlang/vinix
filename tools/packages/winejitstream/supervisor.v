@@ -18,7 +18,7 @@ struct C.rlimit {
 
 fn C.fork() int
 fn C.setpgid(int, int) int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(i32, &i32, i32) i32
 fn C.kill(int, int) int
 fn C.dup2(int, int) int
 fn C.execv(&char, &&char) int
@@ -31,6 +31,12 @@ fn C.setresgid(u32, u32, u32) int
 fn C.getresuid(&u32, &u32, &u32) int
 fn C.getresgid(&u32, &u32, &u32) int
 fn C.getgroups(int, voidptr) int
+
+// POSIX wait status is a C int even when this compiler's V int is wider.
+// Both supervisors use this exact raw path; widen only for public receipts.
+fn raw_waitpid(pid int, status &i32, options int) i32 {
+	return C.waitpid(i32(pid), status, i32(options))
+}
 
 pub struct Run {
 pub:
@@ -117,7 +123,7 @@ pub fn capture(command []string, directory string, ordinary bool, timeout_ms int
 		C._exit(125)
 	}
 	mut reaped := false
-	mut status := int(-1)
+	mut status := i32(-1)
 	mut timed_out := false
 	mut size_limited := false
 	mut monitor_error := ''
@@ -129,7 +135,7 @@ pub fn capture(command []string, directory string, ordinary bool, timeout_ms int
 			}
 			if size >= u64(log_limit) { size_limited = true }
 		}
-		waited := C.waitpid(pid, &status, C.WNOHANG)
+		waited := raw_waitpid(pid, &status, C.WNOHANG)
 		if waited == pid {
 			reaped = true
 			break
@@ -148,13 +154,13 @@ pub fn capture(command []string, directory string, ordinary bool, timeout_ms int
 	mut stopped := false
 	for _ in 0 .. 200 {
 		if !reaped {
-			waited := C.waitpid(pid, &status, C.WNOHANG)
+			waited := raw_waitpid(pid, &status, C.WNOHANG)
 			if waited == pid { reaped = true }
 		}
 		// PID 1 can reap adopted members; a host may have no such children.
 		if reaped {
-			mut descendant_status := int(0)
-			for C.waitpid(-pid, &descendant_status, C.WNOHANG) > 0 {
+			mut descendant_status := i32(0)
+			for raw_waitpid(-pid, &descendant_status, C.WNOHANG) > 0 {
 			}
 		}
 		if C.kill(-pid, 0) < 0 && C.errno == C.ESRCH && reaped {
@@ -168,7 +174,7 @@ pub fn capture(command []string, directory string, ordinary bool, timeout_ms int
 	for path in paths { if log_size(path)! >= u64(log_limit) { size_limited = true } }
 	return Run{
 		leader_pid:   pid
-		wait_status:  status
+		wait_status:  int(status)
 		timed_out:    timed_out
 		size_limited: size_limited
 		stopped:      stopped

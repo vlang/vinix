@@ -35,6 +35,20 @@ pub fn native_clear_compiler_environment() map[string]string {
 	return inherited
 }
 
+// The compiler expands @vmodules even when the variable was inherited unset.
+// A private, empty, canonical directory makes that search root explicit.
+pub fn native_require_empty_modules(path string) ! {
+	if !os.is_abs_path(path) || path.contains(os.path_delimiter)
+		|| path.contains('\n') || path.contains('\r') {
+		return error('module search root must be one absolute path')
+	}
+	info := os.lstat(path) or { return error('module search root unavailable: ' + path) }
+	if info.get_filetype() != .directory || os.real_path(path) != path {
+		return error('module search root must be a canonical ordinary directory')
+	}
+	if os.ls(path)!.len != 0 { return error('private module search root must remain empty') }
+}
+
 pub fn native_target_c_arguments(clang string, linker string, resource string,
 	target string, sysroot string, gcc string, source string, output string) ![]string {
 	if target !in ['aarch64', 'x86_64'] { return error('unsupported standalone target') }

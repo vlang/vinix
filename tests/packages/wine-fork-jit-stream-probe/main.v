@@ -11,7 +11,7 @@ import os
 fn C.fork() int
 fn C.getpid() int
 fn C.dup2(int, int) int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(i32, &i32, i32) i32
 fn C._exit(int)
 fn C.write(int, voidptr, usize) isize
 
@@ -78,9 +78,9 @@ fn main() {
 		C._exit(0)
 	}
 	if parent_loop() != u64(0x708db3450649c883) { C._exit(97) }
-	mut status := int(0)
+	mut status := i32(0)
 	for {
-		waited := C.waitpid(pid, &status, 0)
+		waited := C.waitpid(i32(pid), &status, 0)
 		if waited == pid { break }
 		if waited >= 0 || C.errno != C.EINTR { C._exit(98) }
 	}

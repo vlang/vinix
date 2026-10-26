@@ -19,7 +19,7 @@ import tools.packages.winejitstream
 fn C.fork() int
 fn C.setpgid(int, int) int
 fn C.execv(&char, &&char) int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(i32, &i32, i32) i32
 fn C.kill(int, int) int
 fn C._exit(int)
 
@@ -387,7 +387,7 @@ fn cooperative_controls(binary string, output string, state string, previous str
 		C._exit(125)
 	}
 	C.close(fd)
-	mut status := int(-1)
+	mut status := i32(-1)
 	mut forwarded := 0
 	mut injected := false
 	mut overrun := false
@@ -414,7 +414,7 @@ fn cooperative_controls(binary string, output string, state string, previous str
 		if signal != 0 && forwarded == 0 {
 			if C.kill(pid, signal) == 0 { forwarded = signal }
 		}
-		waited := C.waitpid(pid, &status, C.WNOHANG)
+		waited := C.waitpid(i32(pid), &status, i32(C.WNOHANG))
 		if waited == pid { break }
 		if waited < 0 && C.errno != C.EINTR { return error('cooperative controls wait failed') }
 		time.sleep(10 * time.millisecond)
@@ -423,7 +423,7 @@ fn cooperative_controls(binary string, output string, state string, previous str
 		argv:             argv
 		df:               df
 		leader_pid:       pid
-		wait_status:      status
+		wait_status:      int(status)
 		duration_ms:      (time.sys_mono_now() - started) / 1000000
 		overrun:          overrun
 		forwarded_signal: forwarded

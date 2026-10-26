@@ -535,3 +535,157 @@ rebuild followed the test-filter/environment review. These are retained
 attempts, not target qualifications. Project-local wait-status width repair
 and strict target compilation remain separate work. No target build, staging,
 image or VM ran in this policy followup; canonical results are unchanged.
+
+## Local wait ABI and private module search
+
+Following source revision `2477eb6eb687c81f7c167729851e88e236c86805`, the
+supplemental probe and its host/guest supervisors declare POSIX `waitpid`
+with explicit `i32` arguments, return value and status storage. The shared
+`raw_waitpid` path casts PID/options at the C boundary; leader and descendant
+status stays four bytes through polling and cleanup. Only public result
+fields widen status to V `int`. The older maintained host observer receives
+the same local declaration/storage correction. This change does not modify
+the shared `hwhost` implementation or the canonical 32-fork probe.
+
+The standalone controller creates and records a private empty `VMODULES`
+directory under its charged state. It refuses noncanonical paths, symlinks,
+files, missing or nonempty roots and module path lists. Selection and empty
+contents are checked before and after each guarded child and before the
+final receipt. This replaces reliance on an inherited or default home
+module directory. The controls use explicit `if`/`panic` checks so production
+compilation cannot remove their assertions or cleanup side effects.
+
+The fixed-scope `wine-fork-jit-stream-width-host.v` observer permits only
+host controls, a host controller build and strict relocatable C objects. It
+cannot invoke the target controller. All retained host-08 through host-16 attempts
+share a 32 MiB allowance; the selected prior evidence plus these attempts
+and a 2 MiB reserve must remain below the separate 128 MiB host profile.
+It preserves failures, records raw guarded results before checking success,
+and admits the final receipt using its actual encoded length. The static
+composer's 32 MiB contract remains unchanged.
+
+The earlier 7 MiB width allowance could not accommodate preserved host-08
+and host-09 failures plus the complete host-10 C/object checks. Before any
+host-10 execution, its fixed profile was raised to 16 MiB and the separate
+128 MiB host profile. Preserved attempts through host-12 totaled 12,722,831
+bytes; a 4 MiB host-13 projection exceeded the remaining 16 MiB allowance.
+Before host-13, the collective allowance was raised to 24 MiB. Each guarded
+child retains its 16 MiB file/subtree bounds, 256 KiB sampled log threshold
+and 60-second timeout, with 2 GiB admission and a 1 GiB free-space floor. The
+retained attempts remain charged; the historical 64 MiB policy qualification
+and the static composer's limit are unchanged. The new width profile's
+maximum charged prior bytes, 32 MiB attempts and 2 MiB reserve sum to
+91,969,975 bytes, below its 134,217,728-byte ceiling.
+
+The strict object controls retain `-Werror=incompatible-pointer-types` and
+never use `-w`. Only `-Wno-pointer-sign` suppresses the generated V string
+literal `char *`/`u8 *` flood. The qualified overlay's unrelated rune table
+initializes `i32 *` from `const i32 *`; the exact
+`-Wno-error=incompatible-pointer-types-discards-qualifiers` exception keeps
+that diagnostic visible as a warning. A negative control changes only the
+actual generated `capture` body's unique status declaration from `i32` to
+`i64` and compiles under identical flags. It must retain raw status 256, the
+hard incompatible `i64 *`/`i32 *` error, and no object output. These flags are
+local to this object fixture; the standalone target link policy is unchanged.
+
+The live guard now tolerates only `ENOENT` for a vanished child entry or
+nested directory between enumeration and inspection. A missing selected root,
+`ENOTDIR`, other errors, links and unsupported file types remain refusals.
+Vanished entries still consume the 512-entry budget. A deterministic sixth
+control covers those exact paths and retained-file byte accounting.
+
+All preceding attempts remain intact. Host-08's controller log contains
+the old shared `hwhost` `i64 *` wait-status error; its guard also observed
+`ENOENT` and retained raw status 9. Host-09 refused an incorrect generated
+symbol prefix; host-10 refused a checker body match that selected an earlier
+call site. Host-11 retained raw status 9 when the signed-char warning flood
+crossed its 256 KiB sampled log threshold. Host-12 retained raw status 256
+for the rune-table qualifier error. Host-13 retained raw status 9 after a
+compiler temporary disappeared during scanning (`No such file or directory`),
+despite its controller binary and empty compiler log being present. This
+last refusal motivated the narrow scan repair and deterministic control.
+
+Host-14 passed all six controls in normal and production builds, both sentinel
+failures, the host controller build and the strict ARM relocatable object.
+Its actual-capture `i64` mutation failed with raw status 256 and no object,
+but the observer required `[-Werror,-Wincompatible-pointer-types]` instead of
+Clang's actual `[-Wincompatible-pointer-types]` suffix. The corrected anchor
+still requires the hard `error:` diagnostic, exact incompatible pointer types,
+raw status 256 and absent object under identical flags. All host-08 through
+host-14 state totaled 19,709,648 bytes before the fresh host-15 attempt; its
+4 MiB projection fit the unchanged 24 MiB allowance.
+
+Host-15 also passed the ARM wrong-width refusal, then refused an assumed
+`void main__main` symbol. The qualified compiler instead places the probe
+inside `int main(int argc, char** argv)`; retained generated C has the exact
+`i32` storage and raw `waitpid` call. The corrected anchor checks that actual
+entry signature. All host-08 through host-15 state totaled 23,684,897 bytes;
+the fresh host-16 4.5 MiB projection required raising only the collective
+attempt allowance to 32 MiB. The inclusive 128 MiB and per-child limits stay
+unchanged. No prior attempt is removed or recast as a pass.
+
+Fresh `section14/wine-jit-stream-native-host-16` passed with the qualified
+compiler at `/Users/alex/.cache/vinix-waitpid-width-20261026-02/toolchain/v`
+(SHA-256 `ff75a30180b1de305e3c62acc1ebd85341ff83ae5d852c819d11f27d5260c4c5`).
+The external bootstrap exited 0 in 16.19 seconds and its posthoc recorder
+exited 0. The maintained observer then exited 0. All six explicit controls
+passed in normal and production builds: adjacent four-byte status canaries,
+pending `WNOHANG` sentinel preservation, exact exit/signal statuses 9472/9,
+already-reaped `ECHILD`, real supervisor zero-status replacement and cleanup,
+private module refusals and deterministic vanished-entry scan behavior.
+Both intentional-failure sentinels retained raw status 256. All guarded
+children confirmed cleanup, with no timeout or size-limit result.
+
+The controller build took 36,521 ms, normal/production control runs 336/899 ms,
+ARM shared-unit object compilation 2,974 ms and AMD probe object compilation
+819 ms. Both positive objects have ELF64 little-endian `ET_REL` headers and
+the matching machine IDs 183/62. The actual ARM capture mutation retained
+raw status 256, the required hard incompatible-pointer errors and no object
+in 491 ms. No target executable was linked or run.
+
+The 7,258 selected bindings were equal before and after qualification, digest
+`b030e72f7157983cbf59a36a95ae83065fd4237366d95c695d7751aaf5345be6`.
+The complete qualified compiler-root inventory matched before and after.
+`width-receipt.json` SHA-256 is
+`5042ad2aa5d233292af086256c167e5f31c4322dc913fe826294cf090e5547c9`;
+`bootstrap.json` is
+`502e93e6684127c41864b0455f3ef6673eb8c58f240e6ba0530e95ff17f21afa`.
+The host controller SHA-256 is
+`ad4b3a2c0cdc3f71906459143670702d7443f5258cab5c0c2291d1a77016e525`.
+Its shared host dependency was the exact `hwhost/process.v` from main revision
+`8f7d7ccca1097a94b5f38e4c8713f493b014c675`, SHA-256
+`1cefdf1ce196bbe4f05813969107144dd2c123662c56815124da56c92dc5e5d5`;
+that previously committed dependency is excluded from this Wine change.
+
+All complete attempt bundles remain under
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-jit-stream-native-host-08`
+through `wine-jit-stream-native-host-16`. Their complete inventories and
+checksums are in `wine-jit-stream-native-width-seal-01/08` through `/16` under
+the same cache root; all nine full inventory rechecks passed. Host-16's
+inventory SHA-256 is
+`39ea33238ea141f3c21e810aa3fcea783ff9c57813ee7af84e519a251fd5c0f8`.
+The metadata bundle's complete inventory is in
+`wine-jit-stream-native-width-seal-01-complete/inventory.json`, SHA-256
+`b156b6870ab0072c94388a46ee0f978ca8a6f0bd0caf773b0cea48f96f532aca`.
+Final no-follow attempt bytes were 27,828,945; prior evidence plus attempts
+and the 2 MiB reserve were 86,244,488 bytes. Metadata and its complete seal
+used 331,727 bytes within that reserve. Recorded child admission readings
+exceeded 2 GiB; final actual `df -k` showed 55,608,168 KiB available.
+
+These are host and relocatable-object checks. Bootstrap and before/after
+inventories sit outside each child's 60-second guard. Namespace/log limits
+are sampled, rather than filesystem quotas; trusted tools must not detach
+or write elsewhere. Host SDK and transitive dynamic dependencies are not
+frozen. No staging, image or VM ran, and the translated ARM fork failure
+remains open. Source base is the revision above with these changed V bytes:
+
+```text
+ffba1cb35c74b11d035661dd7e66108dea5bee7200195ca57a11508191cd5290  tools/packages/winejitstream/supervisor.v
+22d86f7348caa05bd14211b57845b885df3d5a94a68d21da9f9fab2aee3a1110  tools/packages/winejitstream/native_guard.v
+15851702a1c2b0ffc6baa393bf1fb52563a4faff210e1e28ffd593f9d21ec581  tools/packages/winejitstream/native_policy.v
+83847d4794eb4ff281ab4463a2f08bd4265c7bd0902669829f52d5cf48cee9c6  tests/packages/wine-fork-jit-stream-native.v
+8a38f3691df4c38b922435b8304e8c737ce097dd532c256c5a2e638e3d8f3815  tests/packages/wine-fork-jit-stream-native-host.v
+72213ec18bec6a6935fee7cccbdbee30ef5e550abe7771f0ad470c238b54b0ab  tests/packages/wine-fork-jit-stream-probe/main.v
+57665ad238efda0166fa0a00fb2c861b4988a82ba7bd94ac665ec6fe10777e01  tools/packages/winejitstream/native_wait_test.v
+a09498d71da51f11d3beee34992a601767b5d5b5b51d41fa7e1a1a4246a618be  tests/packages/wine-fork-jit-stream-width-host.v
+```

@@ -47,9 +47,14 @@ fn native_sources(root string) ! {
 }
 
 fn native_invoke(arguments []string, work string, name string, timeout_ms int) ! {
+	if os.getenv('VMODULES') != work + '/modules' {
+		return error('standalone private module search selection changed')
+	}
+	winejitstream.native_require_empty_modules(work + '/modules')!
 	os.write_file(work + '/' + name + '.argv.json', json2.encode(arguments))!
 	result := winejitstream.native_guard(arguments, work, name + '.log', winejitstream.native_capture_limits(timeout_ms))!
 	os.write_file(work + '/' + name + '.guard.json', json2.encode(result))!
+	winejitstream.native_require_empty_modules(work + '/modules')!
 	if !result.stopped || result.wait_status != 0 || result.timed_out || result.size_limited || result.reason != '' {
 		return error('native operation failed or exceeded bounds: ' + name)
 	}
@@ -91,6 +96,10 @@ fn native_static_elf(path string, machine u16) ! {
 
 fn native_boot(root string, work string, kernel string) ! {
 	native_sources(root)!
+	if os.getenv('VMODULES') != work + '/modules' {
+		return error('boot worker private module search selection changed')
+	}
+	winejitstream.native_require_empty_modules(work + '/modules')!
 	host := hwhost.find_host(root, 'aarch64', '')!
 	hwhost.watch_interrupts()
 	outcome := hwhost.run_scenario(host, hwhost.Scenario{
@@ -167,6 +176,7 @@ fn native_run() ! {
 		os.unsetenv(name)
 	}
 	compiler_environment := winejitstream.native_clear_compiler_environment()
+	inherited_modules := os.getenv_opt('VMODULES') or { '<unset>' }
 	host := hwhost.find_host(root, 'aarch64', '')!
 	loader := os.getenv_opt('VINIX_LIMINE_BOOTAA64') or { hwhost.shared_path(root, 'boot-image/limine-bin/BOOTAA64.EFI') }
 	os.setenv('VINIX_LIMINE_BOOTAA64', loader, true)
@@ -191,9 +201,17 @@ fn native_run() ! {
 	// Reserve for private boot media, retained state and monitored-threshold overshoot.
 	winejitstream.native_require_free(os.dir(work), winejitstream.native_free_floor(true))!
 	os.mkdir(work)!
-	for directory in ['guest', 'probe', 'extras', 'tmp'] { os.mkdir(work + '/' + directory)! }
+	for directory in ['guest', 'probe', 'extras', 'tmp', 'modules'] { os.mkdir(work + '/' + directory)! }
 	os.setenv('TMPDIR', work + '/tmp', true)
 	os.setenv('VTMP', work + '/tmp', true)
+	os.setenv('VMODULES', work + '/modules', true)
+	winejitstream.native_require_empty_modules(work + '/modules')!
+	os.write_file(work + '/modules.json', json2.encode({
+		'inherited': inherited_modules
+		'path': work + '/modules'
+		'kind': 'canonical ordinary empty directory'
+		'entries': '0; checked before and after every guarded child'
+	}))!
 	os.write_file(work + '/inputs.json', json2.encode(inputs))!
 	os.write_file(work + '/controller.argv.json', json2.encode(os.args))!
 	mut environment := map[string]string{}
@@ -201,7 +219,7 @@ fn native_run() ! {
 		'V_MACOS_V3_CALLER_VEXE_PRESENT', 'V_MACOS_V3_CALLER_VCHILD', 'V_MACOS_V3_CALLER_VCHILD_PRESENT',
 		'V_MACOS_V3_CALLER_NO_FALLBACK', 'V_MACOS_V3_CALLER_NO_FALLBACK_PRESENT',
 		'V_MACOS_V3_NO_FALLBACK', 'VCHILD', 'V_C_ERROR_BUG_REPORT_DISABLED', 'LANG', 'LC_ALL',
-		'PATH', 'TMPDIR', 'VTMP', 'VINIX_LIMINE_BOOTAA64', 'VINIX_HWTEST_TCG'] {
+		'PATH', 'TMPDIR', 'VTMP', 'VMODULES', 'VINIX_LIMINE_BOOTAA64', 'VINIX_HWTEST_TCG'] {
 		environment[name] = os.getenv(name)
 	}
 	os.write_file(work + '/environment.json', json2.encode(environment))!
@@ -240,6 +258,7 @@ fn native_run() ! {
 	native_invoke([os.executable(), '--boot', root, work, kernel], work, 'boot-worker', 90000)!
 	winejitstream.native_input_verify(inputs)!
 	winejitstream.native_input_verify(generated)!
+	winejitstream.native_require_empty_modules(work + '/modules')!
 	os.write_file(work + '/inputs-verified.json', json2.encode(inputs))!
 	os.write_file(work + '/scope.json', json2.encode({
 		'scope':                   'Supplemental PID stream capture only. No canonical workload, ARM, Wine, shared backing, failure cause or complete corresponding-source qualification.'

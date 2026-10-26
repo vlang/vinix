@@ -72,34 +72,46 @@ mut:
 }
 
 fn native_scan(directory string, relative string, limits NativeLimits, mut tree NativeTree) ! {
-	for name in os.ls(directory)! {
-		tree.entries++
-		if tree.entries > 512 { return error('capture state exceeds 512 entries') }
-		path := directory + '/' + name
-		rel := if relative == '' { name } else { relative + '/' + name }
-		info := os.lstat(path)!
-		match info.get_filetype() {
-			.directory { native_scan(path, rel, limits, mut tree)! }
-			.regular {
-				if tree.bytes > (~u64(0)) - info.size {
-					tree.bytes = ~u64(0)
-				} else {
-					tree.bytes += info.size
-				}
-				if tree.bytes > limits.total_bytes { tree.limited = true }
-				mut cap := limits.file_bytes
-				if name == 'serial.log' {
-					cap = limits.serial_bytes
-				} else if name.ends_with('.log') {
-					cap = limits.log_bytes
-				}
-				if info.size >= cap { tree.limited = true }
+	names := os.ls(directory) or {
+		// Trusted compilers remove temporary subdirectories between samples.
+		// The selected scan root must always remain present.
+		if relative != '' && err.code() == C.ENOENT { return }
+		return err
+	}
+	for name in names { native_scan_entry(directory, relative, name, limits, mut tree)! }
+}
+
+fn native_scan_entry(directory string, relative string, name string, limits NativeLimits, mut tree NativeTree) ! {
+	tree.entries++
+	if tree.entries > 512 { return error('capture state exceeds 512 entries') }
+	path := directory + '/' + name
+	rel := if relative == '' { name } else { relative + '/' + name }
+	info := os.lstat(path) or {
+		// A name from ls may already have been unlinked by the guarded tool.
+		if err.code() == C.ENOENT { return }
+		return err
+	}
+	match info.get_filetype() {
+		.directory { native_scan(path, rel, limits, mut tree)! }
+		.regular {
+			if tree.bytes > (~u64(0)) - info.size {
+				tree.bytes = ~u64(0)
+			} else {
+				tree.bytes += info.size
 			}
-			.socket {
-				if rel != 'boot/qmp.sock' { return error('unexpected state socket') }
+			if tree.bytes > limits.total_bytes { tree.limited = true }
+			mut cap := limits.file_bytes
+			if name == 'serial.log' {
+				cap = limits.serial_bytes
+			} else if name.ends_with('.log') {
+				cap = limits.log_bytes
 			}
-			else { return error('capture state contains a link or unsupported type: ' + rel) }
+			if info.size >= cap { tree.limited = true }
 		}
+		.socket {
+			if rel != 'boot/qmp.sock' { return error('unexpected state socket') }
+		}
+		else { return error('capture state contains a link or unsupported type: ' + rel) }
 	}
 }
 
@@ -160,7 +172,7 @@ pub fn native_guard(command []string, directory string, log_name string, limits 
 	// narrows immediate-cancellation races (exec may already have happened).
 	C.setpgid(pid, pid)
 	mut reaped := false
-	mut status := int(-1)
+	mut status := i32(-1)
 	mut timed_out := false
 	mut limited := false
 	mut reason := ''
@@ -177,7 +189,7 @@ pub fn native_guard(command []string, directory string, log_name string, limits 
 			next_free_check = elapsed + 1000
 		}
 		if native_interrupted != 0 { reason = 'native guard interrupted' }
-		waited := C.waitpid(pid, &status, C.WNOHANG)
+		waited := raw_waitpid(pid, &status, C.WNOHANG)
 		if waited == pid {
 			reaped = true
 			break
@@ -199,10 +211,10 @@ pub fn native_guard(command []string, directory string, log_name string, limits 
 		// while it settles, and keep the leader stopped until it is reaped.
 		C.kill(-pid, C.SIGKILL)
 		if !reaped { C.kill(pid, C.SIGKILL) }
-		if !reaped && C.waitpid(pid, &status, C.WNOHANG) == pid { reaped = true }
+		if !reaped && raw_waitpid(pid, &status, C.WNOHANG) == pid { reaped = true }
 		if reaped {
-			mut descendant_status := int(0)
-			for C.waitpid(-pid, &descendant_status, C.WNOHANG) > 0 {
+			mut descendant_status := i32(0)
+			for raw_waitpid(-pid, &descendant_status, C.WNOHANG) > 0 {
 			}
 		}
 		if reaped && C.kill(-pid, 0) < 0 && C.errno == C.ESRCH {
@@ -217,7 +229,7 @@ pub fn native_guard(command []string, directory string, log_name string, limits 
 	observed = after.bytes
 	return NativeRun{
 		leader_pid:     pid
-		wait_status:    status
+		wait_status:    int(status)
 		duration_ms:    (time.sys_mono_now() - started) / 1000000
 		timed_out:      timed_out
 		size_limited:   limited
