@@ -85,6 +85,26 @@ Evidence under `/Users/alex/.local/state/vinix/android/`:
   provenance `maps-account-vm-r1-clone.json` has SHA-256
   `11eefc5fd71734d0502c95625aef0859faecb0c468d992ac9b78b4b42968a9e6`.
   See `maps-account-clone-run-r1.log`. Guest mutation belongs only in the copy.
+- `maps-account-r2` passed the same frozen stager from source `af6402672`,
+  changing only the selected Maps controller from r3 to r4 (`e9273eb11`).
+  `maps-account-stage-request-r2.json` SHA-256 is
+  `60ad5773726977e2930605ab61f4fb3f4ed4fbfb3ea2646407f83c871f412a61`.
+  Framework, JNI, account, launcher, browser, token and standalone UI inputs
+  remain the r1 selections. Both signatures, complete input rechecks, overlay
+  readback and all six unchanged modules passed. The complete manifest is
+  `de73d7510ff7138eaff38f61b8da26c5c48017ba2927e7d1278be58f5c9fca31`;
+  stage receipt SHA-256 is
+  `0448dc6b7692afa278086d041808b9627bcab7faaad8173d1049ca2060ee7d36`.
+  An earlier incomplete attempt remains preserved as
+  `maps-account-r2-interrupted-2026-10-26-1725`; the successful fresh run is
+  `maps-account-stage-run-r2-restarted.log` (exit 0).
+- `maps-account-vm-r2` passed the frozen exact clone helper from source
+  `9f2d74d4c`, matching all 1,910 files and the complete metadata tree before
+  any kernel patch or boot. Source and copy passed the complete r2 manifest
+  above. Adjacent provenance `maps-account-vm-r2-clone.json` SHA-256 is
+  `4bce7d50ae09deb938e984d6ffa5d3c890ebc9e5ae8ad9d05ce0cd05eccb46f2`.
+  See `maps-account-clone-run-r2.log` (exit 0). The original r2 stays sealed;
+  kernel and guest mutations belong only in its VM copy.
 
 The final runtime bundles and actual guest results are separate evidence.
 Staging and synthetic fixture success must not be reported as Google account
