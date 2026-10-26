@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
-// This source-only reader owns every node/attribute. Names borrow the immutable
+// This XML reader owns every node/attribute. Names borrow the immutable
 // source buffer; callers must free the tree before that buffer. No external
 // entities, DTDs, text content or compiled Interface Builder archives are read.
 struct StoryboardNode {
@@ -9,12 +9,21 @@ mut:
 	name string
 	attributes map[string]string
 	children []&StoryboardNode
+	compiled bool
+	compiled_frame ObjRect
+	compiled_mask u64
+	compiled_color ?u32
+	compiled_image []u8
+	compiled_mode i64
+	compiled_clips bool
+	compiled_opaque bool
+	compiled_interaction bool
 }
 
 fn storyboard_node_free(node &StoryboardNode) {
 	for child in node.children { storyboard_node_free(child) }
 	for _, value in node.attributes { unsafe { value.free() } }
-	unsafe { node.attributes.free(); node.children.free(); free(node) }
+	unsafe { node.attributes.free(); node.children.free(); node.compiled_image.free(); free(node) }
 }
 
 struct StoryboardReader {

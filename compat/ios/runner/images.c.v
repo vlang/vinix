@@ -10,6 +10,8 @@ import math
 fn C.stbi_info_from_memory(&u8, int, &int, &int, &int) int
 fn C.stbi_load_from_memory(&u8, int, &int, &int, &int, int) &u8
 fn C.stbi_image_free(voidptr)
+fn C.stbi_set_unpremultiply_on_load_thread(int)
+fn C.stbi_convert_iphone_png_to_rgb_thread(int)
 fn C.stbi_write_png_to_mem(&u8, int, int, int, int, &int) &u8
 fn C.stbi_write_jpg_to_func(voidptr, voidptr, int, int, int, &u8, int) int
 
@@ -38,6 +40,10 @@ fn ui_image_decode(data u64) u64 {
 	if C.stbi_info_from_memory(bytes, length, &width, &height, &components) == 0 || width <= 0 || height <= 0 || i64(width) * height > 32 * 1024 * 1024 {
 		return 0
 	}
+	// Apple's CgBI PNGs store premultiplied BGR. Normalize to straight RGBA
+	// before the common premultiplication below. Ordinary PNGs are unaffected.
+	C.stbi_set_unpremultiply_on_load_thread(1)
+	C.stbi_convert_iphone_png_to_rgb_thread(1)
 	pixels := C.stbi_load_from_memory(bytes, length, &width, &height, &components, 4)
 	if pixels == unsafe { nil } { return 0 }
 	defer { C.stbi_image_free(pixels) }

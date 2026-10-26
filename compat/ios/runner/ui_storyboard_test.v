@@ -2,6 +2,7 @@
 module main
 
 import os
+import nibfixture
 
 type StoryboardSend = fn (u64, u64, u64, u64) u64
 
@@ -50,6 +51,148 @@ fn storyboard_wrong_init(object u64, _ u64) u64 {
 fn storyboard_unmanaged_init(object u64, _ u64) u64 {
 	objc_release(object)
 	return ios_runtime.names['UIViewController']
+}
+
+fn storyboard_compiled_fixture() string {
+	path := os.join_path(os.temp_dir(), 'vinix-compiled-storyboard-' + os.getpid().str())
+	os.mkdir_all(path + '/Base.lproj/LaunchScreen.storyboardc') or { panic(err) }
+	os.write_file(path + '/Base.lproj/LaunchScreen.storyboardc/Info.plist', nibfixture.index) or { panic(err) }
+	os.write_file_array(path + '/Base.lproj/LaunchScreen.storyboardc/LaunchScreen.nib', nibfixture.encode(nibfixture.controller())) or { panic(err) }
+	os.write_file_array(path + '/Base.lproj/LaunchScreen.storyboardc/View.nib', nibfixture.encode(nibfixture.view())) or { panic(err) }
+	os.write_file_array(path + '/Pixel.png', nibfixture.cgbi_png()) or { panic(err) }
+	return path
+}
+
+fn storyboard_compiled_graph(controller u64, width f64, height f64, image_width int, image_height int) {
+	assert read64(controller) == ios_runtime.names['UIViewController']
+	view := obj_header(controller).fields[6]
+	assert obj_header(view).frame == ObjRect{0, 0, width, height}
+	assert obj_header(view).autoresizing == 18
+	assert obj_header(obj_header(view).fields[2]).color == 0xffffff
+	assert obj_header(view).child_count == 1
+	image := obj_header(view).children[0]
+	assert read64(image) == ios_runtime.names['UIImageView']
+	assert obj_header(image).frame == ObjRect{0, 0, width, height}
+	state := obj_header(image).image_view
+	assert state.mode == 2 && state.clips && state.opaque && !state.interaction
+	cg := obj_header(state.images[0]).fields[0]
+	assert cg_bitmap_width(cg) == image_width && cg_bitmap_height(cg) == image_height
+	if image_width == 1 { assert bitmap_pixel(cg, 0, 0) == [u32(128), 0, 0, 128]! }
+}
+
+fn test_ui_storyboard_compiled() {
+	for _ in 0 .. 2 {
+		objc_start()
+		path := storyboard_compiled_fixture()
+		ios_runtime.bundle = path
+		pool := objc_pool_push()
+		object := storyboard_open('LaunchScreen', 0)!
+		// Opening takes an independent snapshot, including the image bytes.
+		os.rmdir_all(path)!
+		first := storyboard_msg(object, c'instantiateInitialViewController', 0, 0)
+		identifier := owned_string('LaunchScreen')
+		second := storyboard_msg(object, c'instantiateViewControllerWithIdentifier:', identifier, 0)
+		objc_release(identifier)
+		assert first != second
+		assert obj_header(first).fields[6] != obj_header(second).fields[6]
+		storyboard_compiled_graph(first, 64, 48, 1, 1)
+		storyboard_compiled_graph(second, 64, 48, 1, 1)
+		objc_release(object)
+		objc_pool_pop(pool)
+		objc_stop()
+		assert ios_runtime.live == 0
+	}
+	println('IOS-STORYBOARD-COMPILED: source-generated NIB graph, CgBI alpha/channel order, independent snapshots, fresh instances and drained lifetimes PASS')
+	// Optional read-only check against the preserved application resources.
+	if path := os.getenv_opt('VINIX_IOS_STORYBOARD_BUNDLE') {
+		for _ in 0 .. 2 {
+			objc_start(); ios_runtime.bundle = path
+			pool := objc_pool_push()
+			object := storyboard_open('LaunchScreen', 0)!
+			first := storyboard_msg(object, c'instantiateInitialViewController', 0, 0)
+			second := storyboard_msg(object, c'instantiateInitialViewController', 0, 0)
+			assert first != second && obj_header(first).fields[6] != obj_header(second).fields[6]
+			storyboard_compiled_graph(first, 1024, 1366, 2048, 1536)
+			storyboard_compiled_graph(second, 1024, 1366, 2048, 1536)
+			objc_release(object); objc_pool_pop(pool); objc_stop()
+			assert ios_runtime.live == 0
+		}
+		println('IOS-STORYBOARD-FORTNITE: actual compiled LaunchScreen resources, 1024x1366 view, 2048x1536 CgBI image and drained lifetimes PASS')
+	}
+}
+
+fn storyboard_fixture_property(mut objects []nibfixture.Object, object int, value nibfixture.Value) {
+	for i, old in objects[object].values {
+		if old.key == value.key { objects[object].values[i] = value; return }
+	}
+	objects[object].values << value
+}
+
+fn test_ui_storyboard_compiled_rejections() {
+	objc_start()
+	path := storyboard_compiled_fixture()
+	ios_runtime.bundle = path
+	view_path := path + '/Base.lproj/LaunchScreen.storyboardc/View.nib'
+	for mode in ['class', 'property', 'duplicate', 'cycle', 'alias', 'geometry', 'bounds', 'mask', 'mode', 'color', 'path', 'outlet', 'inline', 'flags']! {
+		mut objects := nibfixture.view()
+		match mode {
+			'class' { objects[6].class_name = 'ApplicationSuppliedClass' }
+			'property' { objects[4].values << nibfixture.flag('UIUnknown', true) }
+			'duplicate' { objects[4].values << objects[4].values[0] }
+			'cycle' { objects[8] = nibfixture.list([4]) }
+			'alias' { objects[8] = nibfixture.list([6, 6]) }
+			'geometry' { storyboard_fixture_property(mut objects, 4, nibfixture.data('UIBounds', [u8(7)])) }
+			'bounds' { storyboard_fixture_property(mut objects, 4, nibfixture.geometry('UIBounds', [f64(0), 0, -1, 48])) }
+			'mask' { storyboard_fixture_property(mut objects, 4, nibfixture.int_value('UIAutoresizingMask', 64)) }
+			'mode' { storyboard_fixture_property(mut objects, 6, nibfixture.int_value('UIContentMode', 13)) }
+			'color' { storyboard_fixture_property(mut objects, 9, nibfixture.real('UIAlpha', 0.5)) }
+			'path' { objects[13] = nibfixture.text('../Pixel.png') }
+			'outlet' { objects[12] = nibfixture.text('unknownOutlet') }
+			'inline' { objects[8].values[0] = nibfixture.flag('NSInlinedValue', false) }
+			'flags' { objects[4].values << nibfixture.flag('UIUserInteractionDisabled', true) }
+			else {}
+		}
+		os.write_file_array(view_path, nibfixture.encode(objects))!
+		if tree := storyboard_compiled('LaunchScreen') { storyboard_node_free(tree); assert false, mode }
+	}
+	os.write_file_array(view_path, nibfixture.encode(nibfixture.view()))!
+	mut controllers := nibfixture.controller()
+	controllers[12] = nibfixture.text('CustomController')
+	os.write_file_array(path + '/Base.lproj/LaunchScreen.storyboardc/LaunchScreen.nib', nibfixture.encode(controllers))!
+	if tree := storyboard_compiled('LaunchScreen') { storyboard_node_free(tree); assert false }
+	os.write_file_array(path + '/Base.lproj/LaunchScreen.storyboardc/LaunchScreen.nib', nibfixture.encode(nibfixture.controller()))!
+	os.rm(path + '/Pixel.png')!
+	if tree := storyboard_compiled('LaunchScreen') { storyboard_node_free(tree); assert false }
+	outside := path + '-outside.png'
+	os.write_file_array(outside, nibfixture.cgbi_png())!
+	os.symlink(outside, path + '/Pixel.png')!
+	if tree := storyboard_compiled('LaunchScreen') { storyboard_node_free(tree); assert false }
+	os.rm(path + '/Pixel.png')!; os.rm(outside)!
+	// Decode failure must release the partially constructed runtime graph.
+	os.write_file(path + '/Pixel.png', 'invalid image')!
+	object := storyboard_open('LaunchScreen', 0)!
+	if controller := storyboard_controller(obj_header(object).storyboard_root, 'id', 'LaunchScreen') {
+		objc_release(controller); assert false
+	}
+	objc_release(object); objc_stop()
+	assert ios_runtime.live == 0
+	os.rmdir_all(path)!
+	println('IOS-STORYBOARD-COMPILED-REJECT: classes, properties, geometry, cycles/aliases, outlets, image paths/symlinks and partial decode failures PASS')
+}
+
+fn test_ui_storyboard_png_alpha() {
+	objc_start()
+	mut pixel := [u8(255), 0, 0, 128]!
+	mut length := 0
+	encoded := C.stbi_write_png_to_mem(&pixel[0], 4, 1, 1, 4, &length)
+	assert encoded != unsafe { nil } && length > 0
+	data := cf_data_create(0, u64(encoded), length)
+	C.free(encoded)
+	cg := ui_image_decode(data)
+	assert cg != 0 && bitmap_pixel(cg, 0, 0) == [u32(128), 0, 0, 128]!
+	objc_release(cg); objc_release(data); objc_stop()
+	assert ios_runtime.live == 0
+	println('IOS-STORYBOARD-PNG: ordinary RGBA PNG remains correctly premultiplied PASS')
 }
 
 fn test_ui_storyboard() {
@@ -227,7 +370,7 @@ fn test_ui_storyboard_rejections() {
 			'nil-name', 'wrong-name', 'nil-id' { 'requires an NSString argument' }
 			'wrong-bundle' { 'requires the main bundle' }
 			'escape' { 'invalid storyboard resource name' }
-			'missing' { 'compiled storyboardc resources are unsupported' }
+			'missing' { 'storyboard resource is missing' }
 			'xml-id' { 'controller identifier is missing or ambiguous' }
 			'empty-id' { 'controller identifier is empty' }
 			'corrupt-storage' { 'requires live built-in storage' }

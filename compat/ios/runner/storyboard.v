@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// A bounded source-storyboard subset for builds without Apple's ibtool.
+// Bounded source and compiled launch-storyboard graphs.
 module main
 
 import os
@@ -11,6 +11,7 @@ fn storyboard_view(node &StoryboardNode, controller u64, controller_id string, d
 		'view' { 'UIView' }
 		'button' { 'UIButton' }
 		'label' { 'UILabel' }
+		'imageView' { 'UIImageView' }
 		else { return error('unsupported storyboard view: ${node.name}') }
 	}
 	if node.attributes['customClass'] != '' { return error('custom storyboard views are unsupported') }
@@ -20,6 +21,31 @@ fn storyboard_view(node &StoryboardNode, controller u64, controller_id string, d
 	mut header := obj_header(object)
 	if rect := storyboard_child(node, 'rect') {
 		header.frame = ObjRect{rect.attributes['x'].f64(), rect.attributes['y'].f64(), rect.attributes['width'].f64(), rect.attributes['height'].f64()}
+	}
+	if node.compiled {
+		header.frame = node.compiled_frame
+		header.autoresizing = node.compiled_mask
+		if rgb := node.compiled_color {
+			color := objc_allocate(ios_runtime.names['UIColor'])
+			obj_header(color).color = rgb
+			store_field(object, 2, color)
+			objc_release(color)
+		}
+	}
+	if class_name == 'UIImageView' {
+		if !node.compiled || node.compiled_image.len == 0 { return error('storyboard image resource is missing') }
+		data := cf_data_create(0, u64(node.compiled_image.data), node.compiled_image.len)
+		defer { objc_release(data) }
+		cg := ui_image_decode(data)
+		if cg == 0 { return error('cannot decode storyboard image') }
+		defer { objc_release(cg) }
+		image := ui_image_from_cg(cg, 1)
+		defer { objc_release(image) }
+		image_view_initialize(object, image, 0, header.frame, false)
+		header.image_view.mode = node.compiled_mode
+		header.image_view.clips = node.compiled_clips
+		header.image_view.opaque = node.compiled_opaque
+		header.image_view.interaction = node.compiled_interaction
 	}
 	for child in node.children {
 		match child.name {

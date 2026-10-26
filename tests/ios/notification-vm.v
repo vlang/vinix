@@ -173,7 +173,7 @@ fn build(root string, out string, only string) {
 		} else {
 			mut args := [root + '/build/ios/fortnite/ns-calendar-checks/toolchain/v', '-enable-globals','-nocache', '-cc', 'clang', '-os', 'linux', '-arch', 'arm64', '-enable-globals', '-gc', 'none',
 				'-prod', '-d', 'ios_video', '-d', 'glibc', '-d', 'no_backtrace', '-d', 'ios_cxx', '-d', 'ios_sqlite', '-path',
-				'@vlib|' + root + '/compat/ios|@vmodules', '-o', generated]
+				'@vlib|' + root + '/compat/ios|' + root + '/tests/ios|@vmodules', '-o', generated]
 			if item.ends_with('-checks') { args = args.filter(it != '-prod') }
 			if item in ['run-ios-gles']! { args << ['-d', 'ios_gles', '-d', 'ios_text'] }
 			args << root + if item.ends_with('-checks') {
@@ -438,6 +438,15 @@ fn vm(root string, out string, mode string) {
 		tree(root + '/build/ios/fortnite/local/Payload/FortniteClient-IOS-Shipping.app/Frameworks', fs + '/opt/ios/Frameworks')
 		copy_file(out + '/' + if mode == 'static-audit' { 'run-ios' } else { 'run-ios-gles' }, fs + '/opt/ios/run-ios')
 		if mode == 'probe-no-ads' {
+			// Opt-in resource overlay for the compiled launch-screen checkpoint.
+			// The preserved base archive and historical probes stay reproducible.
+			if bundle := os.getenv_opt('VINIX_IOS_STORYBOARD_BUNDLE') {
+				for resource in ['Info.plist', 'LaunchScreen.storyboardc/Info.plist',
+					'LaunchScreen.storyboardc/LaunchScreen.nib',
+					'LaunchScreen.storyboardc/01J-lp-oVM-view-Ze5-6b-2t3.nib', 'LaunchScreenIOS.png']! {
+					copy_file(bundle + '/' + resource, fs + '/opt/ios/' + resource)
+				}
+			}
 			copy_file(out + '/application-badge-checks', fs + '/opt/ios/application-badge-checks')
 			copy_file(out + '/window-checks', fs + '/opt/ios/window-checks')
 			copy_file(out + '/string-float-checks', fs + '/opt/ios/string-float-checks')

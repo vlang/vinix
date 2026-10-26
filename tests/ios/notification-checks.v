@@ -26,7 +26,7 @@ fn run_host_fixture(root string, old string, out string, fixture string) ! {
 	os.mkdir_all(bundle + "/MacOS")!
 	os.write_file(bundle + "/Info.plist", "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>org.vinix.notification-checks</string><key>CFBundleExecutable</key><string>center-host</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>")!
 	binary := bundle + "/MacOS/center-host"
-	run(out, 'host-generate', [old + '/v', '-enable-globals', '-nocache', '-gc', 'none', '-cc', 'clang', '-d', 'ios_video', '-d', 'ios_cxx', '-d', 'ios_sqlite', '-os', 'macos', '-arch', 'arm64', '-path', '@vlib|' + root + '/compat/ios|@vmodules', '-o', cfile, root + '/compat/ios/runner/' + fixture], false)
+	run(out, 'host-generate', [old + '/v', '-enable-globals', '-nocache', '-gc', 'none', '-cc', 'clang', '-d', 'ios_video', '-d', 'ios_cxx', '-d', 'ios_sqlite', '-os', 'macos', '-arch', 'arm64', '-path', '@vlib|' + root + '/compat/ios|' + root + '/tests/ios|@vmodules', '-o', cfile, root + '/compat/ios/runner/' + fixture], false)
 	// Shared UIKit fixtures require Catalyst for native comparisons.
 	target := if fixture in ['ui_alert_test.v', 'ui_application_badge_test.v'] { ['-target', 'arm64-apple-ios14.0-macabi'] } else { []string{} }
 	mut tls_cc := ['/usr/bin/clang', '-fsanitize=address,undefined', '-fno-omit-frame-pointer']

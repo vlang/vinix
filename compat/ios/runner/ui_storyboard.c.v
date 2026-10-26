@@ -49,7 +49,11 @@ fn storyboard_open(name string, bundle u64) !u64 {
 	plain := os.join_path(ios_runtime.bundle, filename)
 	defer { unsafe { base.free(); plain.free() } }
 	path := if os.is_file(base) { base } else { plain }
-	if !os.is_file(path) { return error('storyboard source is missing; compiled storyboardc resources are unsupported') }
+	if !os.is_file(path) {
+		tree := storyboard_compiled(name)!
+		object := storyboard_storage(tree, []u8{}) or { storyboard_node_free(tree); return err }
+		return object
+	}
 	resolved := os.real_path(path)
 	bundle_root := os.real_path(ios_runtime.bundle)
 	root := bundle_root + os.path_separator
@@ -61,6 +65,13 @@ fn storyboard_open(name string, bundle u64) !u64 {
 	defer { if !complete { unsafe { bytes.free() } } }
 	tree := storyboard_parse(unsafe { tos(bytes.data, bytes.len) })!
 	defer { if !complete { storyboard_node_free(tree) } }
+	object := storyboard_storage(tree, bytes)!
+	complete = true
+	return object
+}
+
+// Takes ownership only on success.
+fn storyboard_storage(tree &StoryboardNode, bytes []u8) !u64 {
 	cls := ios_runtime.names['UIStoryboard']
 	objc_initialize(cls)
 	// Opaque compatibility storage, not Apple's private instance layout.
@@ -71,7 +82,6 @@ fn storyboard_open(name string, bundle u64) !u64 {
 	unsafe { header.data.free() }
 	header.data = bytes
 	header.storyboard_root = tree
-	complete = true
 	return object
 }
 
