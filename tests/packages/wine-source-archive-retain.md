@@ -31,10 +31,17 @@ The receipt pins the fixture, manifest, raw archives and trimmed derivatives:
 The unchanged original checker passed before and after these controls with
 identical output. Failed tools05/06 compiler attempts are preserved.
 
-The full clone continuation and reclamation are pending. The continuation
-requires a distinct APFS clone, exact validated zero-suffix removal, the
-unchanged full archive reader and original checker before/after, and unchanged
-whole-bundle inode metadata, original capture, tools and external link pins.
+The exact tools07 clone continuation exited 1 before creating a derivative
+or retention02: its historical inode inventory no longer matches. The root
+inode is unchanged, but its modification/change times differ; `SHA256SUMS`
+changed inode 370949865 to 373427967 and allocation 3736 to 1520 blocks. Its
+current flag 32 denotes filesystem compression. The fresh original checker
+still passes all 12,305 sealed files and five objects with the same manifest;
+this does not establish unchanged inodes. The refusal, exit and selected
+metadata are retained in `wine-source-retention-bootstrap-08/clone-refusal.json`
+(SHA256 `486185bd0e86e49a1deaf4937df6dff4fa00416173c589523bcf62f369d008ad`)
+and adjacent logs. No clone retry, readmission or reclamation occurred.
+
 Historical reruns require restoring the complete archived `original/`
 contents at the original absolute root, retaining the original tools and
 external aliases; the wrapper manifest is not part of that original root.
