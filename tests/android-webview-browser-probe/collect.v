@@ -14,6 +14,7 @@ const browser_prefix = 'VINIX-BROWSER-RESULTS-1 '
 const headless_prefix = 'VINIX-HEADLESS-RESULTS-1 '
 const account_ui_prefix = 'VINIX-ACCOUNT-UI-RESULTS-1 '
 const maps_account_prefix = 'VINIX-MAPS-ACCOUNT-RESULTS-1 '
+const token_cache_prefix = 'VINIX-ACCOUNT-TOKEN-CACHE-RESULTS-1 '
 const chunk_bytes = 512
 const max_file = 8 * 1024 * 1024
 const max_total = 16 * 1024 * 1024
@@ -82,8 +83,16 @@ fn maps_account_protocol() Protocol {
 	}
 }
 
+fn token_cache_protocol() Protocol {
+	return Protocol{
+		prefix: token_cache_prefix
+		label: 'ACCOUNT-TOKEN-CACHE-COLLECT'
+		scope: 'Exact signed synthetic account token-cache lifecycle UART archive; fixture tokens and accounts only, no Google authentication proof.'
+	}
+}
+
 fn protocols() []Protocol {
-	return [protocol(false), protocol(true), account_ui_protocol(), maps_account_protocol()]
+	return [protocol(false), protocol(true), account_ui_protocol(), maps_account_protocol(), token_cache_protocol()]
 }
 
 fn decimal(text string, limit int) !int {
@@ -114,7 +123,7 @@ fn parse_export(log string, selected Protocol) !Export {
 		where := ' at serial line=' + (number + 1).str()
 		// A concurrent console writer can fuse chatter and a frame onto one
 		// physical line. Reject that damage rather than silently skipping it.
-		for known in [browser_prefix, headless_prefix, account_ui_prefix, maps_account_prefix] {
+		for known in [browser_prefix, headless_prefix, account_ui_prefix, maps_account_prefix, token_cache_prefix] {
 			if offset := line.index(known) {
 				if offset != 0 {
 					return error('embedded archive frame' + where + ' prefix-offset=' + offset.str() +
@@ -122,7 +131,7 @@ fn parse_export(log string, selected Protocol) !Export {
 				}
 			}
 		}
-		if [browser_prefix, headless_prefix, account_ui_prefix, maps_account_prefix].any(line.starts_with(it)) && !line.starts_with(prefix) {
+		if [browser_prefix, headless_prefix, account_ui_prefix, maps_account_prefix, token_cache_prefix].any(line.starts_with(it)) && !line.starts_with(prefix) {
 			return error('foreign archive protocol' + where)
 		}
 		if !line.starts_with(prefix) { continue }
@@ -397,11 +406,12 @@ fn run() ! {
 	headless := os.args.len == 4 && os.args[1] == '--headless'
 	account_ui := os.args.len == 4 && os.args[1] == '--account-ui'
 	maps_account := os.args.len == 4 && os.args[1] == '--maps-account'
-	if !headless && !account_ui && !maps_account && os.args.len != 3 {
-		return error('usage: collect [--headless|--account-ui|--maps-account] SERIAL_LOG FRESH_EXTERNAL_RESULTS')
+	token_cache := os.args.len == 4 && os.args[1] == '--token-cache'
+	if !headless && !account_ui && !maps_account && !token_cache && os.args.len != 3 {
+		return error('usage: collect [--headless|--account-ui|--maps-account|--token-cache] SERIAL_LOG FRESH_EXTERNAL_RESULTS')
 	}
-	selected := if maps_account { maps_account_protocol() } else if account_ui { account_ui_protocol() } else { protocol(headless) }
-	offset := if headless || account_ui || maps_account { 1 } else { 0 }
+	selected := if token_cache { token_cache_protocol() } else if maps_account { maps_account_protocol() } else if account_ui { account_ui_protocol() } else { protocol(headless) }
+	offset := if headless || account_ui || maps_account || token_cache { 1 } else { 0 }
 	serial, root := os.args[1 + offset], os.args[2 + offset]
 	st := os.lstat(serial)!
 	if st.get_filetype() != .regular || st.size > 256 * 1024 * 1024 {

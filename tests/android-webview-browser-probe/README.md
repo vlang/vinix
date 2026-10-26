@@ -137,12 +137,15 @@ The collector requires a complete, contiguous export and checks the archive's
 size and SHA-256, strict paths, inode types, and every regular file's content
 hash before restoring the fresh destination. Keep the serial log and prepared
 and staged bundles with the restored result tree. `--headless`, `--account-ui`,
-and `--maps-account` select their respective guest protocols. Each mode rejects
+`--maps-account`, and `--token-cache` select their respective guest protocols. Each mode rejects
 frames from every other protocol, including frames embedded in console chatter.
 The Maps/GMS controller permits at most 16 MiB per file, 48 MiB of file content,
 and a 72 MiB archive; the other modes retain their 8/16/32 MiB bounds. Maps/GMS
 readiness records transport setup and does not prove Google authentication.
 The producer excludes private Maps and broker logs from its serial export.
+The token-cache mode retains the signed synthetic fixture's lifecycle receipt
+and logs. Its accounts and tokens are test values; a passing fixture does not
+prove Google authentication.
 
 Direct session execution is also available when a guest filesystem transport
 is already present.
