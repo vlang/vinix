@@ -98,3 +98,113 @@ files hashed in the observation receipt. External artifacts:
 No target observation has been collected by this diagnostic. The next target
 run needs separately reviewed input pins and resource bounds; it must preserve
 the canonical workload result independently of these supplemental streams.
+
+## Standalone ARM controller and host guard
+
+The maintained controller is `wine-fork-jit-stream-native.v`. Build it with
+`-prod -gc none -manualfree` and module path
+`@vlib|.|tests/hardware-platform|@vmodules`. Its arguments are:
+
+```text
+ROOT PATCHED_TRANSLATOR KERNEL KERNEL_RECEIPT V ARM_SYSROOT ARM_GCC AMD_SYSROOT AMD_GCC NEW_OUTPUT
+```
+
+It builds only the small static ARM init fixture and x86-64 probe. The image
+contains `/sbin/init`, `/qemu-x86_64`, `/fork-jit-stream-probe`, the scenario file
+and empty mount directories. Existing `hwhost/boot.v:70` composes that initramfs;
+`boot.v:97` sizes the FAT volume and `vm.v:110` selects the ARM machine. No full
+Wine root, DLL set, full QEMU rebuild, network or GUI is needed. The canonical
+32-fork probe and its earlier failure evidence remain independent.
+
+The selected retained translator is the ARM static ELF at
+`build/package-wine-translation-fork-qualified-1/extras/qemu-x86_64`, SHA-256
+`93f1e83fbb7cedcfe2813f6b65775685a8dbc46943c1280ad3da650567985475`.
+It is admitted by exact bytes, not by a claim of complete corresponding source.
+The selected kernel candidate is:
+
+```text
+/Users/alex/.cache/vinix-linux-compat/altstackclone-20261026/states/kernel-first-arm-prod/kernel/bin/vinix
+SHA256 98bfeb6bbfb247ef476e462cd89f055d7b9ec92c2452f5a550cdf277ef394999
+candidate commit c6b5455ee837f44b843d03255294c8b610ad7635
+```
+
+Its preserved build receipt is
+`section14/wine-arm-fork-reclamation-01/kernel-receipt.json`, SHA-256
+`724884d18e429c89ba4f2ac3e25f8128109dc2db0c43c2e0db9d9240337a3500`
+under `/Users/alex/Library/Caches/vinix-codex`. The controller requires a
+successful ARM prod build receipt binding the exact kernel output bytes.
+
+Before any separately authorized target run, selected source and tool paths
+are inventoried: V and its libraries, Clang/resource directory, LLD, both musl
+sysroots/GCC libraries, host QEMU, firmware, Limine, image tools and fixture
+sources. Captured paths are rechecked before and after the VM. New directory
+entries, the host SDK, transitive dynamic libraries and external tool behavior
+are outside this binding. Exact selected environment and argv are retained.
+
+The native resource plan is:
+
+| Resource | Bound or budget |
+| --- | --- |
+| Each of four target compilation steps | 60 s plus at most 2 s group cleanup |
+| Complete boot worker, including image tools | 90 s plus at most 2 s group cleanup |
+| Inner `hwhost` VM timeout | 60 s |
+| Trusted host child groups | Leader reaped and group disappearance confirmed after success, failure, cancellation or timeout; children must retain their inherited host group |
+| Hard file ceiling inherited by worker | 128 MiB per file, core output disabled |
+| Sampled thresholds, checked every 10 ms | State 256 MiB; ordinary logs 256 KiB; serial log 6 MiB; at most 512 state entries |
+| Actual free space | Checked `statvfs.f_frsize * f_bavail`: at least 1100 MiB initially and immediately before the VM, 550 MiB before each child and once per second during it |
+| Expected ordinary retained state | Approximately 160–180 MiB, including a 64 MiB FAT volume and a private 64 MiB UEFI variable file |
+
+Sampled thresholds may overshoot; 256 MiB is an admission threshold, not a hard
+aggregate disk ceiling. A worker can reach its larger per-file ceiling between
+polls. The 1100 MiB admission reserve is intentionally larger than the expected
+image state. Input hashing and host file operations outside a child guard do
+not have a claimed whole-controller deadline. Capture completion still needs
+the offline checker and both PID-ready streams before any RX comparison.
+
+Host-only validation uses `wine-fork-jit-stream-native-host.v` with
+`ROOT EXISTING_STATE V_COMPILER [PREVIOUS_STATE]`. It maintains source/tool and
+executable hashes, argv, selected environment, completed actual `df -k`
+readings and raw wait results. Its builds and unit executable have hard outer
+group deadlines. Controls deliberately use cooperative cancellation: the
+wrapper forwards INT/TERM/HUP to the controls leader and waits for its inner
+fixture-group cleanup; a 60 s overrun requests cancellation and is recorded,
+without a hard outer-deadline claim. A cancellation control signals the wrapper
+after a descendant starts, verifies forwarding and disappearance of the nested
+leader/group/descendant, and requires the sequence to stop before case four.
+
+Host source base: `b9e739333ee5bc7c2d34db36ebd3c240adc4031b`, plus the five V
+sources hashed in the receipt. Final external evidence is under
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-jit-stream-native-host-02`:
+
+- `receipt.json` SHA-256:
+  `8228bab632d856f26b3ddb76ac36f44ad84117abdfdfec17aa70263d981b293a`.
+  It binds the maintained observer, selected source/tool paths, host outputs,
+  environment, argv, completed `df` readings and raw results.
+- Three host builds and all four unit functions passed. The native controls
+  passed ten entries, including sixteen pre-cancelled guard repetitions with
+  confirmed leader/group disappearance. Each build and the unit executable
+  completed within its hard guard deadline with confirmed cleanup.
+- The cooperative cancellation control signalled the wrapper after the third
+  case's descendant marker, forwarded SIGTERM to the controls leader and
+  observed raw controls status 256 (exit 1). The interrupted fixture retained
+  raw status 9, reason `native guard interrupted` and confirmed cleanup. The
+  nested leader/group/descendant were absent, and case four did not start.
+  The normal wrapper completed in 841 ms and cancellation in 57 ms, with no
+  60 s overrun. This does not establish a hard cooperative-wrapper deadline.
+- Combined current and preserved `wine-jit-stream-native-host-01` state was
+  4,891,551 bytes after the small V summary helper, including failures and
+  compiler scratch. The maintained runner reserved final receipt bytes before
+  writing and rechecked the combined 20 MiB budget afterward. All recorded
+  build/run `df -k` readings exceeded 550 MiB; the final receipt recorded
+  15,737,800 KiB available. These are observations, not reserved disk space.
+
+The first host attempt is preserved in `wine-jit-stream-native-host-01`: the
+guard refused a compiler-created scratch symlink, killed/reaped the compiler
+and retained raw status 9. Qualification then isolated compiler scratch from
+the guarded operation-log directory and counted the complete host state
+without following links before/after each step; link refusal in the maintained
+guard remains enforced. That directory also retains an earlier nine-control
+run; only the final `host-02` receipt qualifies the final source bytes.
+
+No target compilation, staging, image creation or VM run is included in this
+source and host-controls change. The translated ARM fork failure remains open.
