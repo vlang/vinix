@@ -60,7 +60,10 @@ fn cf_string_bytes(allocator u64, bytes u64, length i64, encoding u32, external 
 	_ = external
 	cf_allocator_check(allocator)
 	if length < 0 || length > 16777216 || (bytes == 0 && length != 0) { panic('iOS: invalid CFString byte buffer') }
-	if encoding !in [u32(0x08000100), 0x0600] { panic('iOS: CFString encoding is not implemented') }
+	if encoding !in [u32(0x08000100), 0x0600] {
+		cf_string_input_probe(bytes, length, encoding, external)
+		panic('iOS: CFString encoding is not implemented')
+	}
 	mut text := if length == 0 { '' } else { unsafe { tos(&u8(bytes), int(length)) } }
 	if encoding == 0x08000100 {
 		if !utf8.validate_str(text) { return 0 }
@@ -77,6 +80,25 @@ fn cf_string_bytes(allocator u64, bytes u64, length i64, encoding u32, external 
 		return owned_string(if converted.len == 0 { '' } else { unsafe { tos(converted.data, converted.len) } })
 	}
 	return owned_string(text)
+}
+
+// Unsupported input diagnostics belong only to the explicit no-ad startup probe.
+// Read at most eight bytes, after the caller has validated the buffer length.
+fn cf_string_input_probe(bytes u64, length i64, encoding u32, external bool) {
+	if module_runtime == unsafe { nil } || !module_runtime.probe_no_ads { return }
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
+	mut buffer := [256]char{}
+	mut count := C.snprintf(unsafe { &buffer[0] }, buffer.len,
+		c'IOS-PROBE-CFSTRING: encoding=0x%08x length=%lld external=%d bytes=', encoding, length, int(external))
+	for index in 0 .. int(if length < 8 { length } else { i64(8) }) {
+		if count < 0 || count >= buffer.len - 4 { return }
+		count += C.snprintf(unsafe { &buffer[count] }, usize(buffer.len - count), c'%02x', u32(unsafe { *(&u8(bytes + u64(index))) }))
+	}
+	if count > 0 && count < buffer.len - 1 {
+		buffer[count] = char(10)
+		C.write(2, unsafe { &buffer[0] }, usize(count + 1))
+	}
 }
 
 fn cf_string_length(object u64) i64 {
