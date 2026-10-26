@@ -17,6 +17,8 @@ const interaction_manifest = 'dc5c0470c4cdc7a075ded61680e4ac89cef056dbcb515ce55a
 const interaction_jar = '86278c9cbe1f25904b760250f34f859206d719cbb23cf5ff5411a75c480ac36f'
 const store_manifest = '7cc408299a3a7d37578735e79b31c5c2ff96dbd1de00a2d7dd0d1e149b156690'
 const store_jar = '9e89db595defb905b0322183f176613f2b42f951ec1b51d4ceb91431876c3c8e'
+const auth_manifest = '1299ddd064ebe89bae35cafd4c509794894c7466fda0bfaee2dfb85cf404d309'
+const auth_jar = 'c677808eb55f58845b4ce3dd5c72be481d4ca585fd4980cec18266271d4740bf'
 const java = '/opt/homebrew/opt/openjdk@25/bin/java'
 const tools = repo + '/build/android-framework/tools'
 const source_file = repo + '/tests/native-android-ws/combined-account-webview-build.v'
@@ -54,6 +56,9 @@ const token_methods = ['getAuthToken(Landroid/accounts/Account;Ljava/lang/String
  'getAuthToken(Landroid/accounts/Account;Ljava/lang/String;ZLandroid/accounts/AccountManagerCallback;Landroid/os/Handler;)Landroid/accounts/AccountManagerFuture;',
  'blockingGetAuthToken(Landroid/accounts/Account;Ljava/lang/String;Z)Ljava/lang/String;',
  'vinixStartToken(Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;Landroid/app/Activity;Landroid/atl/VinixAccountFuture;)Z']
+const cache_methods = ['peekAuthToken(Landroid/accounts/Account;Ljava/lang/String;)Ljava/lang/String;',
+ 'setAuthToken(Landroid/accounts/Account;Ljava/lang/String;Ljava/lang/String;)V',
+ 'invalidateAuthToken(Ljava/lang/String;Ljava/lang/String;)V']
 
 struct StoreClassParts {
  methods map[string]string
@@ -99,6 +104,20 @@ fn auth_profile() NarrowProfile {
    'android/webkit/CookieManager.smali': clear_methods}
   changed: {'android/accounts/AccountManager.smali': 0, 'android/webkit/CookieManager.smali': 4}
   added: {'android/accounts/AccountManager.smali': 5, 'android/webkit/CookieManager.smali': 1}
+ }
+}
+
+fn cache_profile() NarrowProfile {
+ return NarrowProfile{
+  name: 'cache'
+  baseline_name: 'combined-account-webview-auth-framework-2026-10-26'
+  manifest_pin: auth_manifest
+  jar_pin: auth_jar
+  providers: ['framework_account_token_cache.v']
+  calls: {'android/accounts/AccountManager.smali': 'framework_account_token_cache'}
+  methods: {'android/accounts/AccountManager.smali': cache_methods}
+  changed: {'android/accounts/AccountManager.smali': 0}
+  added: {'android/accounts/AccountManager.smali': 3}
  }
 }
 
@@ -159,6 +178,7 @@ fn store_method_self_test() ! {
  narrow_method_self_test(store_methods, 4, 8)!
  narrow_method_self_test(clear_methods, 4, 1)!
  narrow_method_self_test(token_methods, 0, 5)!
+ narrow_method_self_test(cache_methods, 0, 3)!
 }
 
 fn narrow_method_self_test(allowed []string, changed int, added int) ! {
@@ -762,11 +782,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] in ['--store', '--auth'] {
-  profile := if os.args[1] == '--store' { storage_profile() } else { auth_profile() }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache'] {
+  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } else { cache_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
