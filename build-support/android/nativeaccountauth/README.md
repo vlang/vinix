@@ -1,8 +1,9 @@
 # Native account caller authority
 
-This module supplies a caller boundary for a future account broker running in
-its own process. It grants no Android permission, discovers no authenticator,
-stores no account and forwards no GMS request. The existing shared ART process
+This module supplies a caller boundary and a narrow request transport for an
+account broker running in its own process. It grants no Android permission,
+discovers no authenticator, stores no account and forwards no GMS request.
+The existing shared ART process
 cannot become a privileged broker through a Java `Context` or package string.
 
 An administrator may opt a native APK launch into registry verification with
@@ -55,7 +56,7 @@ checked. It never derives identity from a Java object, environment option or
 request payload. Companions loaded in a primary package's process have that
 primary process's authority, and cannot claim their own distinct package.
 
-A future broker must consume this result for each request, overwrite identity
+The broker must consume this result for each request, overwrite identity
 options before authenticator dispatch, and keep its privileged role on a
 separate administrator-provisioned process/channel. Exporting this socket helper
 does not itself make a private service accessible. APKs which still run as Unix
@@ -99,5 +100,55 @@ plus the frozen change is retained outside Git at
 `/Users/alex/.local/state/vinix/android/account-authority-build-2026-10-26-r1`.
 `inputs.json` pins every changed source; `build.json` and per-command receipts pin
 the static binary, tools and commands. Host tests passed (2/2), and both the
-fixture and launcher cross-compiled for AArch64. The Linux fixture has not yet
-been executed; these results establish no GMS or Google sign-in success.
+fixture and launcher cross-compiled for AArch64. That original build was not
+executed. A later frozen build, described below, passes on Vinix; neither build
+establishes GMS or Google sign-in success.
+
+## Narrow request transport
+
+Commit `958b97f8a` adds a versioned, bounded binary request on a separate
+connected Unix stream. It accepts `get_accounts` and `add_account`, nullable
+types, bounded features and scalar options. It rejects caller identity and
+response capability keys supplied as options. The receiver authenticates the
+socket's kernel peer against the protected registry and returns that immutable
+caller with the decoded request. The client verifies its root peer before
+sending. One monotonic deadline covers framing and the mandatory write-half
+close; delayed trailing frames are rejected. Both endpoints protect the
+descriptor against inheritance.
+
+The four host test suites pass, including fragmented requests, delayed and
+coalesced extra frames, malformed fields, forged identity options and deadline
+failures. The module also cross-compiles into the static AArch64 authority
+fixture. This transport has no account dispatcher, response protocol or account
+store yet. Its stream must never be substituted for the service lifetime
+channel described above.
+
+## Vinix authority verification
+
+The credential-free authority fixture passed in an isolated AArch64 Vinix guest
+on 26 October 2026. The exact `ACCOUNT-AUTHORITY-PASS` marker covers protected
+launch, wrong UID, writable registry/APK/ancestors, ancestor and file symlinks,
+hard links, digest and owner changes, real Unix peer credentials, the child UID,
+and forged package/UID/PID claims. Its synthetic APK bytes grant no account
+authority. The independent browser phase stopped before starting WebKit because
+an existing guest helper could not be replaced; that failure does not change
+the separately recorded authority result.
+
+The tested frozen build is retained at
+`/Users/alex/.local/state/vinix/android/account-authority-build-2026-10-26-r5`.
+Its receipt records source revision
+`d3d9ccf7b86442d2671a1e11d7bff4a2fc6881c3` plus the complete frozen source
+inventory (SHA-256
+`4d105cc4287ec710962eb672b4e3ebc2848b3aa5d48c1ead90e82731482f81f1`).
+The executed static binary SHA-256 is
+`8b4eacffb316404965280e4056eccb5bcbd8ab545bfdbce5f068f9b247c5c5c2`.
+
+The complete guest export was restored at
+`/Users/alex/.local/state/vinix/android/browser-probe-results-2026-10-26-r1`.
+Its strict collector verified all nine entries and the 131,804-byte archive
+(SHA-256
+`5d8e307ba3e5c31dc7aa4c2ba6a36cc682107d12f9f8dc31af6a4d371103e771`).
+`results/authority.log` retains the exact marker and `results/guest.json` records
+exit zero, no timeout and zero cleanup survivors. The original serial log and
+guest media remain in
+`/Users/alex/.local/state/vinix/android/browser-probe-vm-2026-10-26-r1`.
