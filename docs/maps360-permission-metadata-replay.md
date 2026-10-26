@@ -112,3 +112,24 @@ readback receipt is `maps360-run-receipt-root-readback-2026-10-26.json`.
 | Retained `oasis-search-typed.png` | `1ad9ace6e266b449708eabc95283300a85e5ef30890a075f5b234c99bf03ed21` |
 | Retained serial | `92a2ecce1fc9040588997c4cceef6563f92073e1c6224aac9f22a234861d74ef` |
 | Retained final `application.png` | `20ad6ca8e995bf15ed0c2b650ed1b6e5e072a7eabc0492cb7782121a6eb0dc36` |
+
+## Redundant working copy cleanup
+
+`tests/native-android-ws/maps360-working-cleanup.v` removed only the repository's
+`build/android-maps/maps360` and `attempt360` working directories on 2026-10-26.
+It first revalidated all 84,812 canonical typed entries and their pinned manifest,
+then compared the working copies twice: 390 typed entries for Maps360 using the
+authenticated postrun VM, and 84 for attempt360. The latter includes three exact
+late failed-details-capture files retained separately: the updated interaction
+log and command64536 stdout/stderr. No historical checker or canonical seal was
+changed. Its hash/type/mode/file-set rejection test passed; a production build
+refused execution before inspecting or removing any tree.
+
+Consumed V source, executable, late files, qualification and completion receipts
+are retained in `maps360-working-cleanup-2026-10-26`. The tool sealed and read back
+that complete sidecar; manifest SHA-256 is
+`4e40636f7d03425100700f431346dcb3723f88949927307dbf2a895f122de3f8`.
+The original canonical manifest remained `591cdedd…2b7068`. Cleanup ran
+00:30:31–00:31:18 UTC, exit 0. Available space was 1,167,256 KiB before and
+1,138,016 KiB after; removing cloned working copies did not establish physical
+space recovery amid concurrent work.
