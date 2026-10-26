@@ -38,7 +38,6 @@ fn C.posix_spawnattr_setbinpref_np(voidptr, usize, &i32, &usize) i32
 fn C.poll(&C.pollfd, usize, i32) i32
 fn C.waitid(i32, u32, &C.vinix_source_child_info, i32) i32
 fn C.waitpid(i32, &i32, i32) i32
-fn C.WIFEXITED(i32) i32
 fn C.WEXITSTATUS(i32) i32
 fn C.killpg(i32, i32) i32
 fn C.mkdtemp(&char) &char

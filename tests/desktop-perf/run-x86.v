@@ -29,6 +29,12 @@ struct Prepared {
 	storage         string
 }
 
+fn serial_console_arguments() []string {
+	// perfconsole retires the foreground QEMU owner with Ctrl-A X. The monitor
+	// must share stdio with serial for that escape to exit QEMU cleanly.
+	return ['-serial', 'mon:stdio']
+}
+
 fn clone_mode() !bool {
 	value := os.getenv('VINIX_PERF_X86_APFS_CLONE')
 	if value !in ['', '0', '1'] { return error('invalid VINIX_PERF_X86_APFS_CLONE') }
@@ -401,10 +407,11 @@ fn prepare(args []string, stage bool) ! {
 		'filetype,sparse_super,^has_journal,^resize_inode,^dir_index,^extent,^64bit,^metadata_csum',
 		state + '/root.ext2'], {}, state + '/prepare.log', 300)!
 	socket := '/tmp/vinix-perf-x86-' + sha256.sum(state.bytes()).hex()[..16] + '.qmp'
+	console := serial_console_arguments()
 	command := [host.qemu, '-machine', 'q35,smm=off', '-accel', 'tcg', '-cpu', 'max', '-vga', 'std',
 		'-device', 'qemu-xhci,id=gui-input', '-device', 'usb-kbd,bus=gui-input.0', '-device',
 		'usb-tablet,bus=gui-input.0', '-m', plan.mem.str(), '-smp', '2', ...media, '-display',
-		'none', '-serial', 'stdio', '-qmp', 'unix:' + socket + ',server=on,wait=off', '-no-reboot',
+		'none', ...console, '-qmp', 'unix:' + socket + ',server=on,wait=off', '-no-reboot',
 		'-nic', 'none', '-drive', 'if=ide,format=raw,file=' + state + '/root.ext2']
 	for path in [archive, state + '/test.iso', state + '/root.ext2'] { pins[path] = digest(path)! }
 	// Preserve the actual maintained adapter and unchanged supervisor/workloads.
@@ -529,6 +536,9 @@ fn selfcheck(state string) ! {
 		|| iso_configuration().count('    cmdline:') != 1 {
 		return error('production disk boot arguments changed')
 	}
+	if serial_console_arguments() != ['-serial', 'mon:stdio'] {
+		return error('foreground serial monitor escape changed')
+	}
 	for options in [['--scenarios=ops', '--timeout=1799'], ['--scenarios=idle', '--mem=-1'],
 		['--scenarios=pointer'], ['--scenarios=idle', "--desktop-args='bad'"]] {
 		mut args := [state, state + '/base', state + '/empty', state + '/never',
@@ -550,8 +560,8 @@ fn selfcheck(state string) ! {
 	os.rm(state + '/host-tool')!
 	os.symlink('tool-a', state + '/host-tool')!
 	verify(tool, state)!
-	os.write_file(state + '/result', 'PASS 25 checks including 15 refusals: final/intermediate absolute and relative guest links, escape/cycle/referral/link/staged mutations, streaming digest, restore, geometry, production disk boot arguments, timeout/memory/scenario/quote controls, host-tool symlink retarget\n')!
-	println('PERF X86 SELFCHECK PASS 25 checks including 15 refusals')
+	os.write_file(state + '/result', 'PASS 26 checks including 15 refusals: final/intermediate absolute and relative guest links, escape/cycle/referral/link/staged mutations, streaming digest, restore, geometry, production disk boot arguments, foreground serial monitor escape, timeout/memory/scenario/quote controls, host-tool symlink retarget\n')!
+	println('PERF X86 SELFCHECK PASS 26 checks including 15 refusals')
 }
 
 fn clonecheck(state string) ! {
