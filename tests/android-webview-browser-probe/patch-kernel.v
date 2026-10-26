@@ -20,6 +20,11 @@ fn C.CC_SHA256_Final(&u8, voidptr) i32
 
 const baseline_sha = '176094564fba09181b1a2f334f240dc49f0e5f25032696a84db12c2316d0445c'
 const maps_baseline_sha = '08b0a9c6d0eaf109a5027eac802cb5add897e7612aac85528a08fdba794b3f5e'
+const protected_base = '/Users/alex/.local/state/vinix/android/maps-account-r5'
+const protected_base_seal = '9a8bf61bd526d7ec020d45920367d45e90a2ef4692c6d8fa8b87de801a14c5ca'
+const protected_boot_sha = 'a37afb3aaaaac0261562df47b6f213bf0ef47eaaa9165d721cb4e097ce35ed70'
+const protected_framework_seal = '67e1cb450fa87305c99480133084b7f9cb684feeeaa2e0c3efa3007ab43ee938'
+const protected_native_seal = '894c9657077cdd913a2c66c1cf78358daaccc4da8b0739ed77bb2a3dbea1b4ee'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -38,6 +43,68 @@ fn maps_profile() Profile {
 		'initramfs.tar', 'qemu-runtime.tar', 'maps335-diagnostics.tar',
 		'maps350-diagnostics.tar', 'maps372-diagnostics.tar', 'headless-service.tar',
 	]}
+}
+
+fn protected_maps_profile() Profile {
+	mut modules := maps_profile().modules.clone()
+	modules << 'maps-account.tar'
+	return Profile{'protected-storage-maps', protected_boot_sha,
+		'protected-storage-diagnostic.tar', modules}
+}
+
+fn protected_modules() map[string]string {
+	return {
+		'headless-service.tar': 'c3466dcfda28617c91242e54f382da22b5b67187fba6ab93d5926c6481d5175c'
+		'initramfs.tar': '863944c8ff791dbf94841cb48bbfa0ad8adbab427589bf76a2d20276f5040efb'
+		'maps335-diagnostics.tar': '50c1e8aeef5aab5bc6a1a2d7aeb862ff6f674172eec308b827f654a580cabf56'
+		'maps350-diagnostics.tar': '27fab286f1d162a997acef67aaac5670118ef6e6eb83969310c0182123a82ead'
+		'maps372-diagnostics.tar': '6ab69d2a2c86ce8c7c51543dd596a789cacb7c0880a5f33b2429cf5008cd74d0'
+		'qemu-runtime.tar': '1c6988d1f3d3844425f0e8cbb49a878b3a16f2a270b4eb3852c71dfaa8fe200e'
+		'maps-account.tar': 'db724d216208abfb1ae873035fb7cbc21d646ba2ff5e5773dd1f18fd05c2ac81'
+	}
+}
+
+// This diagnostic producer declares a sealed r5 base instead of a direct
+// boot.img input. Its separate profile accepts only that exact producer contract.
+fn verify_protected_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for name, expected in {
+		'kind': 'vinix-protected-storage-maps-diagnostic-v1'
+		'base_root': protected_base
+		'base_manifest_sha256': protected_base_seal
+		'framework_manifest_sha256': protected_framework_seal
+		'native_manifest_sha256': protected_native_seal
+		'retained_launch_manifest_sha256': '920ed6f1a5f5d9e705bdcc108937db6266066718fe4203859a6ac8577bd405be'
+	} {
+		actual := receipt[name] or { return error('protected Maps receipt field absent: ' + name) }
+		if actual != json2.Any(expected) { return error('protected Maps receipt differs: ' + name) }
+	}
+	for path, expected in {
+		protected_base + '/sha256.json': protected_base_seal
+		'/Users/alex/.local/state/vinix/android/combined-account-webview-protected-storage-framework-2026-10-27-r2/sha256.json': protected_framework_seal
+		'/Users/alex/.local/state/vinix/android/current-native-build-2026-10-27-protected-r1/sha256.json': protected_native_seal
+	} {
+		if stage.inputs_sha256[path] or { '' } != expected {
+			return error('protected Maps input differs: ' + path)
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != protected_modules()
+		|| stage.preserved_modules_sha256 != protected_modules() {
+		return error('protected Maps original seven module pins differ')
+	}
+}
+
+fn protected_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_protected_receipt(receipt, stage)!
+	path := protected_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != protected_base_seal {
+		return error('protected Maps original r5 manifest differs')
+	}
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != protected_boot_sha {
+		return error('protected Maps original boot inventory differs')
+	}
+	return protected_base + '/boot.img'
 }
 
 struct Stage {
@@ -81,6 +148,7 @@ fn hash(path string) !string {
 	mut digest := C.CC_SHA256_CTX{}
 	if C.CC_SHA256_Init(unsafe { &digest }) != 1 { return error('SHA256 initialization') }
 	mut buffer := []u8{len: 1024 * 1024}
+	defer { unsafe { buffer.free() } }
 	for {
 		n := file.read(mut buffer) or {
 			if err is os.Eof { break }
@@ -340,10 +408,14 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		return error('fresh stage media or configuration pin differs')
 	}
 	mut baseline := ''
-	for path, expected in stage.inputs_sha256 {
-		if os.file_name(path) == 'boot.img' && expected == baseline_pin {
-			if baseline != '' { return error('ambiguous baseline boot input') }
-			baseline = path
+	if profile.name == 'protected-storage-maps' {
+		baseline = protected_baseline(stage_map, stage)!
+	} else {
+		for path, expected in stage.inputs_sha256 {
+			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
+				if baseline != '' { return error('ambiguous baseline boot input') }
+				baseline = path
+			}
 		}
 	}
 	if baseline == '' || baseline == root + '/boot.img' {
@@ -488,14 +560,15 @@ fn external(path string) !string {
 	return root
 }
 
-fn fat_self_test(root string, overlay string) ! {
+fn fat_self_test(root string, overlay string, module_names []string) ! {
 	os.mkdir(root)!
 	os.mkdir(root + '/kernel-patch-commands')!
 	os.mkdir(root + '/baseline')!
 	os.mkdir(root + '/stage')!
 	os.mkdir_all(root + '/build/kernel/socket/unix')!
 	baseline := root + '/baseline/boot.img'
-	config := '/Vinix\n kernel_path: boot():/boot/vinix\n module_path: boot():/boot/runtime.tar\n'
+	mut config := '/Vinix\n kernel_path: boot():/boot/vinix\n'
+	for name in module_names { config += ' module_path: boot():/boot/' + name + '\n' }
 	updated := config + ' module_path: boot():/boot/' + overlay + '\n'
 	os.write_file(root + '/config', config)!
 	os.write_file(root + '/old-kernel', 'old baseline kernel')!
@@ -505,9 +578,13 @@ fn fat_self_test(root string, overlay string) ! {
 	execute(root, 'fixture-format', [os.find_abs_path_of_executable('mformat')!, '-i', baseline,
 		'-C', '-f', '1440', '::'])!
 	execute(root, 'fixture-mkdir', [os.find_abs_path_of_executable('mmd')!, '-i', baseline, '::/boot'])!
-	for pair in [['config', 'limine.conf'], ['old-kernel', 'vinix'], ['runtime', 'runtime.tar']] {
+	for pair in [['config', 'limine.conf'], ['old-kernel', 'vinix']] {
 		execute(root, 'fixture-install-' + pair[0], [mcopy, '-i', baseline, root + '/' + pair[0],
 			'::/boot/' + pair[1]])!
+	}
+	for name in module_names {
+		execute(root, 'fixture-install-' + name, [mcopy, '-i', baseline, root + '/runtime',
+			'::/boot/' + name])!
 	}
 	os.cp(baseline, root + '/stage/boot.img')!
 	os.write_file(root + '/config-after', updated)!
@@ -518,9 +595,8 @@ fn fat_self_test(root string, overlay string) ! {
 	os.write_file(root + '/stage/efivars.fd', 'unchanged firmware state')!
 	os.write_file(root + '/stage/limine-before.conf', config)!
 	os.write_file(root + '/stage/limine-after.conf', updated)!
-	original_modules := {
-		'runtime.tar': hash(root + '/runtime')!
-	}
+	mut original_modules := map[string]string{}
+	for name in module_names { original_modules[name] = hash(root + '/runtime')! }
 	stage := Stage{
 		format:                   1
 		inputs_sha256:            {
@@ -567,7 +643,7 @@ fn fat_self_test(root string, overlay string) ! {
 		}
 	}))!
 	receipt_sha := hash(root + '/build/build.json')!
-	profile := Profile{'fixture', hash(baseline)!, overlay, ['runtime.tar']}
+	profile := Profile{'fixture', hash(baseline)!, overlay, module_names}
 	if _ := patch(root + '/stage', root + '/build', '0'.repeat(64), profile) {
 		return error('wrong build receipt pin accepted')
 	}
@@ -589,7 +665,68 @@ fn fat_self_test(root string, overlay string) ! {
 	println('BROWSER-KERNEL-PATCH FAT-SELF-TEST PASS pinned build rejection exact kernel readback baseline modules overlay firmware receipts once-only')
 }
 
+fn protected_receipt_fixture() map[string]json2.Any {
+	return {
+		'kind': json2.Any('vinix-protected-storage-maps-diagnostic-v1')
+		'base_root': json2.Any(protected_base)
+		'base_manifest_sha256': json2.Any(protected_base_seal)
+		'framework_manifest_sha256': json2.Any(protected_framework_seal)
+		'native_manifest_sha256': json2.Any(protected_native_seal)
+		'retained_launch_manifest_sha256': json2.Any('920ed6f1a5f5d9e705bdcc108937db6266066718fe4203859a6ac8577bd405be')
+	}
+}
+
+fn protected_profile_self_test() ! {
+	profile := protected_maps_profile()
+	assert profile.baseline_sha == protected_boot_sha
+	assert profile.modules.len == 7 && profile.modules.last() == 'maps-account.tar'
+	before := Config{'vinix', profile.modules}
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	verify_modules(profile, before, Config{'vinix', modules})!
+	for bad in [Config{'vinix', profile.modules}, Config{'vinix', modules.reverse()},
+		Config{'vinix', modules[..7].clone()}, Config{'other', modules}] {
+		if _ := verify_modules(profile, before, bad) { return error('unsafe protected Maps modules accepted') }
+	}
+	if _ := verify_modules(profile, Config{'vinix', maps_profile().modules},
+		Config{'vinix', modules}) { return error('six-module protected Maps baseline accepted') }
+	stage := Stage{
+		format: 1
+		inputs_sha256: {
+			protected_base + '/sha256.json': protected_base_seal
+			'/Users/alex/.local/state/vinix/android/combined-account-webview-protected-storage-framework-2026-10-27-r2/sha256.json': protected_framework_seal
+			'/Users/alex/.local/state/vinix/android/current-native-build-2026-10-27-protected-r1/sha256.json': protected_native_seal
+		}
+		original_modules_sha256: protected_modules()
+		preserved_modules_sha256: protected_modules()
+	}
+	receipt := protected_receipt_fixture()
+	verify_protected_receipt(receipt, stage)!
+	for name in receipt.keys() {
+		mut bad := protected_receipt_fixture()
+		bad[name] = json2.Any('wrong')
+		if _ := verify_protected_receipt(bad, stage) { return error('changed protected receipt accepted: ' + name) }
+		bad.delete(name)
+		if _ := verify_protected_receipt(bad, stage) { return error('missing protected receipt accepted: ' + name) }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut bad_inputs := stage.inputs_sha256.clone()
+		bad_inputs[path] = '0'.repeat(64)
+		if _ := verify_protected_receipt(receipt, Stage{...stage, inputs_sha256: bad_inputs}) {
+			return error('changed protected input pin accepted')
+		}
+	}
+	mut bad_modules := protected_modules()
+	bad_modules['maps-account.tar'] = '0'.repeat(64)
+	for bad in [Stage{...stage, format: 2}, Stage{...stage, original_modules_sha256: bad_modules},
+		Stage{...stage, preserved_modules_sha256: map[string]string{}}] {
+		if _ := verify_protected_receipt(receipt, bad) { return error('changed protected module contract accepted') }
+	}
+	println('PROTECTED-STORAGE-MAPS KERNEL-PROFILE-SELF-TEST PASS exact receipt base framework native launch inputs seven modules')
+}
+
 fn self_test() ! {
+	protected_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -642,8 +779,9 @@ fn self_test() ! {
 	unlaunched(root)!
 	os.write_file(root + '/launch.json', '{}')!
 	if _ := unlaunched(root) { return error('historical launched stage accepted') }
-	fat_self_test(root + '/browser', 'browser-probe.tar')!
-	fat_self_test(root + '/maps', 'maps-account.tar')!
+	fat_self_test(root + '/browser', 'browser-probe.tar', ['runtime.tar'])!
+	fat_self_test(root + '/maps', 'maps-account.tar', ['runtime.tar'])!
+	fat_self_test(root + '/protected-maps', 'protected-storage-diagnostic.tar', protected_maps_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -656,11 +794,12 @@ fn main() {
 		return
 	}
 	is_maps := os.args.len == 5 && os.args[1] == '--maps-account'
-	if os.args.len != 4 && !is_maps {
-		eprintln('usage: patch-kernel [--maps-account] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+	is_protected := os.args.len == 5 && os.args[1] == '--protected-storage-maps'
+	if os.args.len != 4 && !is_maps && !is_protected {
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_maps { 1 } else { 0 }
+	offset := if is_maps || is_protected { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -669,7 +808,8 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	patch(root, build_root, os.args[3 + offset], if is_maps { maps_profile() } else { browser_profile() }) or {
+	profile := if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
 	}
