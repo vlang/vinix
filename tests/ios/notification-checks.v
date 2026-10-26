@@ -2,6 +2,7 @@
 // Frozen-toolchain notification checks; all generated output is external.
 module main
 import os
+import tlsbuild
 fn run(out string, label string, args []string, deterministic bool) {
 	mut p := os.new_process(args[0]); p.set_args(args[1..]); p.set_redirect_stdio_merged()
 	mut env := os.environ()
@@ -26,14 +27,23 @@ fn run_host_fixture(root string, old string, out string, fixture string) ! {
 	os.write_file(bundle + "/Info.plist", "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>org.vinix.notification-checks</string><key>CFBundleExecutable</key><string>center-host</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>")!
 	binary := bundle + "/MacOS/center-host"
 	run(out, 'host-generate', [old + '/v', '-enable-globals', '-nocache', '-gc', 'none', '-cc', 'clang', '-d', 'ios_video', '-d', 'ios_cxx', '-d', 'ios_sqlite', '-os', 'macos', '-arch', 'arm64', '-path', '@vlib|' + root + '/compat/ios|@vmodules', '-o', cfile, root + '/compat/ios/runner/' + fixture], false)
+	tls := tlsbuild.build(root, old, out + '/payload', ['/usr/bin/clang', '-fsanitize=address,undefined', '-fno-omit-frame-pointer'])
 	mut objects := []string{}
 	for i, source in [cfile, old + '/vlib/os/execute_capture_nix.c', old + '/vlib/builtin/segfault_handler_nix.c', root + '/compat/ios/runner/abi/dispatch.S']! {
 		object := out + '/payload/host-' + i.str() + '.o'; objects << object
-		run(out, 'host-object-' + i.str(), ['/usr/bin/clang', '-I/opt/homebrew/include', '-I/opt/homebrew/opt/freetype/include/freetype2', '-O0', '-g', '-w', '-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-c', source, '-o', object], false)
+		mut compile := ['/usr/bin/clang', '-I/opt/homebrew/include', '-I/opt/homebrew/opt/freetype/include/freetype2', '-O0', '-g', '-w', '-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-c', source, '-o', object]
+		compile << tlsbuild.includes(old)
+		run(out, 'host-object-' + i.str(), compile, false)
 	}
 	mut link := ['/usr/bin/clang', '-g', '-fsanitize=address,undefined']; link << objects
+	link << tls
 	link << ['-L/opt/homebrew/lib', '-lavcodec', '-lswscale', '-lavutil', '-framework', 'AppKit', '-lc++', '-lsqlite3', '-lresolv', '-framework', 'Foundation', '-framework', 'UserNotifications', '-framework', 'CoreFoundation', '-pthread', '-lproc', '-lm', '-o', binary]
 	run(out, 'host-link', link, false)
+	if fixture == 'ns_data_http_test.v' {
+		run(out, 'certificate', ['/usr/bin/openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost', '-days', '1', '-keyout', out + '/server.key', '-out', out + '/server.pem'], false)
+		os.setenv('VINIX_IOS_HTTP_CERT', out + '/server.pem', true)
+		os.setenv('VINIX_IOS_HTTP_KEY', out + '/server.key', true)
+	}
 	run(out, 'host', [binary], false); run(out, 'host-deterministic', [binary], true)
 }
 
@@ -42,10 +52,11 @@ fn main() {
 	root := os.real_path(os.getwd()); out := os.abs_path(os.args[2]); old := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
-	if os.args[1] in ['processinfo-host', 'data-url-host', 'connection-host'] {
+	if os.args[1] in ['processinfo-host', 'data-url-host', 'data-http-host', 'connection-host'] {
 		fixture := match os.args[1] {
 			'processinfo-host' { 'ns_process_info_test.v' }
 			'data-url-host' { 'ns_data_url_test.v' }
+			'data-http-host' { 'ns_data_http_test.v' }
 			else { 'ns_url_connection_test.v' }
 		}
 		run_host_fixture(root, old, out, fixture)!

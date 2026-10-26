@@ -26,7 +26,10 @@ fn ns_data_url_dispatch(object u64, selector string, mut frame RegisterFrame) bo
 	if !ns_data_url_selector(object, selector) { return false }
 	url := frame.x[2]
 	if url == 0 || !objc_is_kind(url, ios_runtime.names['NSURL']) { panic('iOS: data loading requires NSURL') }
-	if obj_header(url).number == 1 { panic('iOS: HTTP and HTTPS data loading is not implemented') }
+	if obj_header(url).number == 1 {
+		frame.x[0] = data_http_load(url, object)
+		return true
+	}
 	frame.x[0] = url_file_load(url, object, unsafe { nil }, unsafe { nil })
 	return true
 }

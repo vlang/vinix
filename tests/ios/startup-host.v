@@ -5,6 +5,7 @@ module main
 import os
 import strings
 import time
+import tlsbuild
 
 fn capture(out string, label string, args []string) int {
 	mut p := os.new_process(args[0])
@@ -58,13 +59,17 @@ fn main() {
 		generated := out + '/startup-host.c'
 		checked(out, 'generate', [old + '/v', '-enable-globals', '-nocache', '-gc', 'none', '-cc', 'clang', '-d', 'ios_video', '-d', 'ios_cxx', '-d', 'ios_sqlite', '-d', 'ios_gles', '-d', 'ios_text', '-os', 'macos', '-arch', 'arm64', '-path', '@vlib|' + root + '/compat/ios|@vmodules', '-o', generated, root + '/compat/ios/runner'])
 		mut objects := []string{}
+		tls := tlsbuild.build(root, old, out, ['/usr/bin/clang', '-fsanitize=address,undefined', '-fno-omit-frame-pointer'])
 		for i, source in [generated, old + '/vlib/os/execute_capture_nix.c', old + '/vlib/builtin/segfault_handler_nix.c', root + '/compat/ios/runner/abi/dispatch.S']! {
 			object := out + '/host-' + i.str() + '.o'
 			objects << object
-			checked(out, 'object-' + i.str(), ['/usr/bin/clang', '-I/opt/homebrew/include', '-I/opt/homebrew/opt/freetype/include/freetype2', '-O0', '-g', '-w', '-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-c', source, '-o', object])
+			mut compile := ['/usr/bin/clang', '-I/opt/homebrew/include', '-I/opt/homebrew/opt/freetype/include/freetype2', '-O0', '-g', '-w', '-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-c', source, '-o', object]
+			compile << tlsbuild.includes(old)
+			checked(out, 'object-' + i.str(), compile)
 		}
 		mut link := ['/usr/bin/clang', '-g', '-fsanitize=address,undefined', '-Wl,-rpath,/opt/homebrew/lib']
 		link << objects
+		link << tls
 		link << ['-L/opt/homebrew/lib', '-lavcodec', '-lswscale', '-lavutil', '-lEGL', '-lGLESv2', '-lfreetype', '-framework', 'AppKit', '-lc++', '-lsqlite3', '-lresolv', '-framework', 'Foundation', '-framework', 'UserNotifications', '-framework', 'CoreFoundation', '-pthread', '-lproc', '-lm', '-o', out + '/run-ios-host']
 		checked(out, 'link', link)
 	} else {

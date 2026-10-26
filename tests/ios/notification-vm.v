@@ -4,6 +4,7 @@ module main
 
 import os
 import time
+import tlsbuild
 
 const llvm = '/opt/homebrew/opt/llvm/bin/clang'
 
@@ -58,6 +59,13 @@ fn compile_c(root string, generated string, output string, gles bool) {
 		gcc + if gles { '/crtbegin.o' } else { '/crtbeginT.o' }, generated]
 	// Newer V toolchains keep these runtime helpers outside generated C.
 	vroot := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
+	if !generated.ends_with('/native-init.c') {
+		args << tlsbuild.includes(vroot)
+		// TLS uses ARM intrinsics: pair clang with its own intrinsic headers.
+		resource := os.exec([llvm, '--print-resource-dir'])
+		if resource.exit_code != 0 { panic(resource.output) }
+		args << tlsbuild.build(root, vroot, os.dir(output), [llvm, '--target=aarch64-linux-musl', '-nostdinc', '-isystem', root + '/build-support/aarch64-cc-shim', '-isystem', resource.output.trim_space() + '/include', '-isystem', sysroot + '/usr/include', '-D_GNU_SOURCE', '-ffixed-x18'])
+	}
 	for helper in ['os/execute_capture_nix.c', 'builtin/segfault_handler_nix.c']! {
 		path := vroot + '/vlib/' + helper
 		if os.exists(path) { args << path }
@@ -274,6 +282,7 @@ fn vm(root string, out string, mode string) {
 	payload := state
 	os.mkdir_all(payload + '/rootfs') or { panic(err) }
 	fs := payload + '/rootfs'
+	copy_file('/etc/ssl/cert.pem', fs + '/etc/ssl/cert.pem')
 	if mode == 'class-update' {
 		copy_file(out + '/class-update-checks', fs + '/opt/ios/class-update-checks')
 	} else if mode == 'native-value' {

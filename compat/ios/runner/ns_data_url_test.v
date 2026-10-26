@@ -122,18 +122,13 @@ fn test_data_url_runtime() {
 }
 fn test_data_url_rejections() {
 	objc_start()
-	for mode in ['nil', 'wrong-class', 'http']! {
+	for mode in ['nil', 'wrong-class']! {
 		mut fds := [2]i32{}; assert C.pipe(unsafe { &fds[0] }) == 0;
 		pid := C.fork(); assert pid >= 0;
 		if pid == 0 {
 			C.close(fds[0]); assert C.dup2(fds[1], 2) == 2; C.close(fds[1])
 			mut frame := RegisterFrame{}
 			if mode == 'wrong-class' { frame.x[2] = owned_string('not a URL') }
-			if mode == 'http' {
-				url := objc_allocate(ios_runtime.names['NSURL'])
-				assert http_url_initialize(url, owned_string('https://example.invalid/data'));
-				frame.x[2] = url
-			}
 			ns_data_url_dispatch(ios_runtime.names['NSData'], 'dataWithContentsOfURL:', mut frame)
 			C._exit(0)
 		}
@@ -141,9 +136,9 @@ fn test_data_url_rejections() {
 		for { assert length < buffer.len; count := C.read(fds[0], unsafe { &buffer[length] }, usize(buffer.len - length)); if count == 0 { break }; if count < 0 && unsafe { *C.ios_errno_address() } == C.EINTR { continue }; assert count > 0; length += int(count) }
 		C.close(fds[0]); mut status := i32(0); assert C.ios_waitpid(pid, &status, 0) == pid && status == 256;
 		output := unsafe { tos(&buffer[0], length) }
-		reason := if mode == 'http' { 'HTTP and HTTPS data loading is not implemented' } else { 'data loading requires NSURL' }
+		reason := 'data loading requires NSURL'
 		assert output.contains('iOS: ' + reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output;
 	}
 	objc_stop(); assert ios_runtime.live == 0;
-	println('IOS-DATA-URL-REJECT: nil, wrong-class and HTTP URLs fail explicitly')
+	println('IOS-DATA-URL-REJECT: nil and wrong-class URLs fail explicitly')
 }
