@@ -42,8 +42,8 @@ The native account backend supplies empty account snapshots and update
 listeners. It has no authenticator broker, account storage, token issuance or
 refresh path. The installed Play Services APK declares a `com.google`
 authenticator service. The response Binder API passes its ART regression. The
-request Binder API and Account Parcelable are implemented and pass host assembly
-checks; their ART validation is pending. `AbstractAccountAuthenticator` now
+request Binder API and Account Parcelable pass their maintained ART regression.
+`AbstractAccountAuthenticator` now
 implements its API and transport defaults and passes host assembly checks;
 its ART validation is pending. Trusted account dispatch remains incomplete.
 Explicit companion activity routing and finish-time result delivery pass their
@@ -201,6 +201,33 @@ The tested response APK digest is
 The bundle retains the actual historical runner source from commit `9610e8d42`
 alongside the checkout source observed during preparation. This is a synthetic
 Binder/Parcelable contract test, not Google authentication.
+
+The dedicated Intent fixture also passes `INTENT-PARCEL-PASS`, including
+categories, selectors, components, source bounds, response Binders, cursor
+position, typed arrays, null clearing, atomic failed reads and rejected
+unsupported/ClipData values. This checks the modeled Vinix codec; it does not
+establish Android wire-format interoperability. The stopped guest is retained at
+`/Users/alex/.local/state/vinix/android/account-contract-intent-art-2026-10-26`.
+Full read-back verified 111 files; `sha256.json` digest:
+`8a9a884d654af334cbc389a45ad2960582421edb64a6c93452750b9afe63c41b`.
+The tested APK digest is
+`d124da9e906bda3f3cda8177fe3fb68f9e7251e69b3f2dee2e2fd6de0814d8d0`.
+
+The request fixture passes `AUTHENTICATOR-REQUEST-PASS`: Account parcel round
+trips, all fourteen local/proxy dispatches, nullable values, response Binder,
+oneway/descriptor checks, unknown transactions, trailing-data rejection,
+remote/runtime exceptions and parcel cleanup. The stopped guest is retained at
+`/Users/alex/.local/state/vinix/android/account-contract-request-art-2026-10-26`.
+Full read-back verified 107 files; `sha256.json` digest:
+`5a089480c7c8302bd30d34bc6b74754061cefbd588e43f14dfae64361d17df63`.
+The framework JAR digest is
+`a596d5617b9e354676df3c51dea34355b8757c621579a946d5af85b287db8655`;
+the APK digest is
+`39c90d67ec2b7bd1997406c9a6f320eea63d2137cee45eae5feb314b69dabe70`.
+Both guests passed ten further seconds without a fixture failure or APK exit;
+their genuine passing-screen PNGs were visually reviewed. Both bundles retain
+the runner's compiled source from `44da73f1b`, signed APK/build inputs and full
+logs. Neither test creates an account or issues a Google token.
 
 The first companion activity ART run failed before a companion APK loaded:
 the runner installed APKs under the default home directory, while this guest
