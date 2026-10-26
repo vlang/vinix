@@ -559,6 +559,52 @@ fn auth_init_diagnostics(output string) AuthInitDiagnostics {
 	return result
 }
 
+fn browser_init_line(line string) ?AuthInitFailure {
+	if line.len > 128 || !line.ends_with('\n')
+		|| !line.starts_with('ANDROID-BROWSER-INIT-FAIL stage=') { return none }
+	fields := line[..line.len - 1].split(' ')
+	if fields.len != 5 || fields[0] != 'ANDROID-BROWSER-INIT-FAIL'
+		|| !fields[1].starts_with('stage=') || !fields[2].starts_with('code=')
+		|| !fields[3].starts_with('detail=') || !fields[4].starts_with('loader=') {
+		return none
+	}
+	stage := auth_init_integer(fields[1][6..]) or { return none }
+	code := auth_init_integer(fields[2][5..]) or { return none }
+	detail := auth_init_integer(fields[3][7..]) or { return none }
+	loader := auth_init_integer(fields[4][7..]) or { return none }
+	if stage < 1 || stage > 7 || loader < 0 || loader > 5
+		|| (stage != 5 && stage != 6 && loader != 0) {
+		return none
+	}
+	if stage == 6 {
+		if detail < 1 || detail > 4 { return none }
+	} else if detail != 0 {
+		return none
+	}
+	return AuthInitFailure{ stage: stage, code: code, detail: detail, loader: loader }
+}
+
+// Browser diagnostics use the same public numeric bounds as account diagnostics.
+fn browser_init_diagnostics(output string) AuthInitDiagnostics {
+	mut result := AuthInitDiagnostics{}
+	mut start := 0
+	for index := 0; index < output.len; index++ {
+		if output[index] != `\n` { continue }
+		if index + 1 - start <= 128 {
+			if failure := browser_init_line(output[start..index + 1]) {
+				if result.failures.len < 32 {
+					result.failures << failure
+				} else {
+					result.truncated = true
+					return result
+				}
+			}
+		}
+		start = index + 1
+	}
+	return result
+}
+
 struct Receipt {
 	scope       string = 'Real Maps and Google Play Services transport diagnostics. No credentials supplied; broker readiness does not establish Google authentication.'
 	started_utc string
@@ -574,6 +620,7 @@ mut:
 	broker_exit       int = -1
 	cleanup_survivors int
 	auth_init         AuthInitDiagnostics
+	browser_init      AuthInitDiagnostics
 }
 
 struct DatabaseUpdate {
@@ -1205,7 +1252,10 @@ fn broker_session(mut receipt Receipt) ! {
 	deadline := time.sys_mono_now() + 15 * time.minute
 	startup := time.sys_mono_now() + 45 * time.second
 	mut output := ''
-	defer { receipt.auth_init = auth_init_diagnostics(output) }
+	defer {
+		receipt.auth_init = auth_init_diagnostics(output)
+		receipt.browser_init = browser_init_diagnostics(output)
+	}
 	for {
 		block := child.stdout_read()
 		if block != '' {
@@ -1450,8 +1500,84 @@ fn auth_init_self_test() ! {
 	}
 }
 
+fn browser_init_self_test() ! {
+	for stage in 1 .. 8 {
+		for detail in 0 .. 6 {
+			for loader in 0 .. 7 {
+				line := 'ANDROID-BROWSER-INIT-FAIL stage=' + stage.str() + ' code=0 detail=' + detail.str() + ' loader=' + loader.str() + '\n'
+				valid := (if stage == 6 { detail >= 1 && detail <= 4 } else { detail == 0 })
+					&& loader <= 5 && (stage in [5, 6] || loader == 0)
+				if failure := browser_init_line(line) {
+					if !valid || failure != AuthInitFailure{ stage: i32(stage), detail: i32(detail), loader: i32(loader) } {
+						return error('browser stage/detail/loader combination accepted incorrectly')
+					}
+				} else if valid {
+					return error('valid browser stage/detail/loader combination rejected')
+				}
+			}
+		}
+	}
+	for code in [i32(-2147483648), i32(-1), i32(0), i32(2147483647)] {
+		failure := browser_init_line('ANDROID-BROWSER-INIT-FAIL stage=7 code=' + code.str() + ' detail=0 loader=0\n') or {
+			return error('canonical browser code endpoint rejected')
+		}
+		if failure != AuthInitFailure{ stage: 7, code: code } {
+			return error('browser code changed value')
+		}
+	}
+	valid := 'ANDROID-BROWSER-INIT-FAIL stage=6 code=0 detail=4 loader=3\n'
+	for bad in [valid.trim_right('\n'), 'prefix ' + valid, '\n' + valid, valid + 'suffix',
+		valid.replace('\n', '\r\n'), valid.replace(' code=', '  code='),
+		valid.replace(' code=', '\tcode='), valid.replace('stage=6', 'stage=0'),
+		valid.replace('stage=6', 'stage=8'), valid.replace('stage=6', 'stage=06'),
+		valid.replace('stage=6', 'stage=-6'), valid.replace('code=0', 'code='),
+		valid.replace('code=0', 'code=+0'), valid.replace('code=0', 'code=-0'),
+		valid.replace('code=0', 'code=00'), valid.replace('code=0', 'code=1.0'),
+		valid.replace('code=0', 'code=2147483648'), valid.replace('code=0', 'code=-2147483649'),
+		valid.replace('detail=4', 'detail=0'), valid.replace('detail=4', 'detail=5'),
+		valid.replace('detail=4', 'detail=-1'), valid.replace('detail=4', 'detail=04'),
+		valid.replace('loader=3', 'loader=6'), valid.replace('loader=3', 'loader=-1'),
+		valid.replace('loader=3', 'loader=03'), valid.replace('code=0 ', ''),
+		valid.replace('code=0', 'stage=0'), valid.replace('detail=4 loader=3', 'loader=3 detail=4'),
+		valid.replace('loader=3\n', 'loader=3 email=private@example.invalid\n'),
+		valid.replace('loader=3\n', 'loader=3\x00\n'),
+		valid.replace('ANDROID-BROWSER-INIT-FAIL', 'ANDROID-AUTH-INIT-FAIL'),
+		valid.trim_right('\n') + 'x'.repeat(128) + '\n',
+	] {
+		if _ := browser_init_line(bad) { return error('malformed/private browser line accepted') }
+	}
+	if browser_init_diagnostics(valid.trim_right('\n')).failures.len != 0 {
+		return error('unterminated browser output accepted')
+	}
+	private := 'email=private@example.invalid token=private-secret\n'
+	auth := 'ANDROID-AUTH-INIT-FAIL stage=6 code=0 detail=4 loader=3\n'
+	mixed := browser_init_diagnostics(private + 'x'.repeat(129) + '\n' + auth + valid + valid.trim_right('\n'))
+	if mixed.failures.len != 1 || mixed.truncated || mixed.failures[0] != AuthInitFailure{ stage: 6, detail: 4, loader: 3 } {
+		return error('browser scan did not recover from private/overlong/auth lines')
+	}
+	public := json2.encode(Receipt{ browser_init: mixed })
+	if public.contains('private@example.invalid') || public.contains('private-secret')
+		|| public.contains('ANDROID-BROWSER-INIT-FAIL') || public.contains('ANDROID-AUTH-INIT-FAIL') {
+		return error('raw private browser output entered the receipt')
+	}
+	mut many := ''
+	for code in 0 .. 32 {
+		many += 'ANDROID-BROWSER-INIT-FAIL stage=1 code=' + code.str() + ' detail=0 loader=0\n'
+	}
+	full := browser_init_diagnostics(many + private + auth + valid.trim_right('\n'))
+	if full.failures.len != 32 || full.truncated || full.failures[0].code != 0
+		|| full.failures[31].code != 31 {
+		return error('browser cardinality/order differs at the bound')
+	}
+	over := browser_init_diagnostics(many + valid + private)
+	if !over.truncated || over.failures != full.failures {
+		return error('browser truncation did not preserve the first 32 complete records')
+	}
+}
+
 fn self_test() ! {
 	auth_init_self_test()!
+	browser_init_self_test()!
 	protected_directory_self_test()!
 	sqlite_self_test()!
 	if !canonical_absolute('/opt/maps/app.apk') || canonical_absolute('/opt/../maps/app.apk')
@@ -1509,7 +1635,7 @@ fn self_test() ! {
 			return error('stale stop request accepted')
 		}
 	}
-	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths protected-directory-symlink-and-mode-rejection process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation bounded-numeric-auth-diagnostics')
+	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths protected-directory-symlink-and-mode-rejection process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation bounded-numeric-auth-diagnostics bounded-numeric-browser-diagnostics')
 }
 
 fn main() {
