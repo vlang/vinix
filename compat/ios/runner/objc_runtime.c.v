@@ -83,6 +83,11 @@ fn objc_record_method(cls u64, name &char, imp u64, types &char, builtin bool) &
 fn C.ios_objc_builtin()
 fn objc_builtin_types(cls u64, selector string) ?string {
 	info := ios_runtime.classes[cls] or { return none }
+	if info.name == 'UIView' && !info.meta {
+		if selector == 'viewWithTag:' { return '@24@0:8q16' }
+		if selector == 'tag' { return 'q16@0:8' }
+		if selector == 'setTag:' { return 'v24@0:8q16' }
+	}
 	if info.name == 'NSBundle' && !info.meta && selector == 'appStoreReceiptURL' { return '@16@0:8' }
 	if info.name == 'UIApplication' && !info.meta {
 		if selector == 'applicationIconBadgeNumber' { return 'q16@0:8' }

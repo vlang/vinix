@@ -109,6 +109,34 @@ fn ui_contains(root u64, object u64, depth int) bool {
 	return false
 }
 
+fn ui_view_with_tag(root u64, tag i64) u64 {
+	// Walk in subview order, including the receiver. Parent links let deep
+	// hierarchies use constant space without retaining or allocating views.
+	mut view := root
+	for {
+		header := obj_header(view)
+		if header.tag == tag { return view }
+		if header.child_count != 0 {
+			view = header.children[0]
+			continue
+		}
+		for {
+			if view == root { return 0 }
+			parent := obj_header(view).parent_view
+			header_parent := obj_header(parent)
+			mut index := 0
+			for index < header_parent.child_count && header_parent.children[index] != view { index++ }
+			if index == header_parent.child_count { panic('iOS: inconsistent UIView parent') }
+			if index + 1 < header_parent.child_count {
+				view = header_parent.children[index + 1]
+				break
+			}
+			view = parent
+		}
+	}
+	return 0
+}
+
 fn ui_swipe(root u64, direction i64, depth int) bool {
 	if depth > 32 { return false }
 	header := obj_header(root)
