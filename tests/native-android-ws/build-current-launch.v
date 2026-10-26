@@ -8,6 +8,17 @@ import json2
 import os
 import time
 
+$if macos {
+	#include <CommonCrypto/CommonDigest.h>
+}
+
+@[typedef]
+struct C.CC_SHA256_CTX {}
+
+fn C.CC_SHA256_Init(voidptr) i32
+fn C.CC_SHA256_Update(voidptr, voidptr, u32) i32
+fn C.CC_SHA256_Final(&u8, voidptr) i32
+
 const repo = '/Users/alex/code/vinix'
 const state = '/Users/alex/.local/state/vinix/android/'
 const base = state + 'headless-service-native-build-2026-10-26-r5'
@@ -29,17 +40,61 @@ fn pinned_compiler() !string {
 fn hash(path string) !string {
 	mut file := os.open(path)!
 	defer { file.close() }
-	mut sum := sha256.new()
 	mut buffer := []u8{len: 1024 * 1024}
-	for {
-		n := file.read(mut buffer) or {
-			if err is os.Eof { break }
-			return err
+	defer { unsafe { buffer.free() } }
+	mut checksum := []u8{len: 32}
+	defer { unsafe { checksum.free() } }
+	$if macos {
+		mut context := C.CC_SHA256_CTX{}
+		if C.CC_SHA256_Init(unsafe { &context }) != 1 { return error('SHA256 initialization') }
+		for {
+			n := file.read(mut buffer) or {
+				if err is os.Eof { break }
+				return err
+			}
+			if n == 0 { break }
+			if C.CC_SHA256_Update(unsafe { &context }, buffer.data, u32(n)) != 1 {
+				return error('SHA256 update')
+			}
 		}
-		if n == 0 { break }
-		sum.write(buffer[..n])!
+		if C.CC_SHA256_Final(checksum.data, unsafe { &context }) != 1 {
+			return error('SHA256 finalization')
+		}
+	} $else {
+		mut digest := sha256.new()
+		defer { unsafe { digest.free(); free(digest) } }
+		for {
+			n := file.read(mut buffer) or {
+				if err is os.Eof { break }
+				return err
+			}
+			if n == 0 { break }
+			if digest.write(buffer[..n])! != n { return error('SHA256 short write') }
+		}
+		digest.checksum_into(mut checksum)
 	}
-	return sum.sum([]u8{}).hex()
+	return checksum.hex()
+}
+
+// Read-only diagnostic used by the retained hash checker; returned digests
+// are freed on every iteration so repeated calls measure the real hash path.
+fn hash_file_probe(path string, count_text string) ! {
+	count := count_text.int()
+	if count < 1 || count > 1000000 || count.str() != count_text {
+		return error('hash iteration count must be canonical decimal in 1..1000000')
+	}
+	bytes := os.file_size(path)
+	checksum := hash(path)!
+	defer { unsafe { checksum.free() } }
+	for _ in 1 .. count {
+		next := hash(path)!
+		if next != checksum {
+			unsafe { next.free() }
+			return error('hash input changed between iterations')
+		}
+		unsafe { next.free() }
+	}
+	println('CURRENT-BUILDER-HASH-PASS sha256=${checksum} iterations=${count} bytes=${bytes}')
 }
 
 fn write_json[T](path string, value T) ! {
@@ -1088,6 +1143,10 @@ fn self_test() ! {
 }
 
 fn main() {
+	if os.args.len == 4 && os.args[1] == '--hash-file' {
+		hash_file_probe(os.args[2], os.args[3]) or { eprintln(err); exit(1) }
+		return
+	}
 	if os.args.len == 2 && os.args[1] == '--check-zlib' {
 		validate_zlib_producer() or {
 			eprintln(err)

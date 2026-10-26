@@ -239,7 +239,17 @@ fn check(builder string, root string) ! {
 	if missing.exit_code == 0 || missing.output.contains(pass_prefix) {
 		return error('builder accepted a missing input or emitted a success marker')
 	}
+	directory := command(root, 'directory-read', [builder, '--hash-file', root + '/fixtures', '1'])!
+	if directory.exit_code == 0 || directory.output.contains(pass_prefix) {
+		return error('builder accepted a directory read or emitted a success marker')
+	}
 	one := fixtures[1]
+	for count in ['0', '-1', '01', 'abc', '1000001', '999999999999999999999999999999'] {
+		invalid := command(root, 'invalid-count-' + count, [builder, '--hash-file', one.path, count])!
+		if invalid.exit_code == 0 || invalid.output.contains(pass_prefix) {
+			return error('builder accepted an invalid iteration count: ' + count)
+		}
+	}
 	baseline := command(root, 'rss-baseline', ['/usr/bin/time', '-l', builder, '--hash-file', one.path,
 		'1'])!
 	baseline_rss := measured_rss(baseline, one.sha256, 1, one.bytes)!
