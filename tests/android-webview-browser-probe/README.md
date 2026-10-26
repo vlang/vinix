@@ -6,6 +6,17 @@ JavaScript, cookies in both directions between JavaScript and WebKit's cookie
 API, and a snapshot whose pixels and PNG signature are checked. It does not
 implement Android WebView, use a Google account, or establish Google sign-in.
 
+The constructor regression can run on the host without GTK or WebKit:
+
+```sh
+v -o /tmp/vinix-browser-probe tests/android-webview-browser-probe/probe.v
+/tmp/vinix-browser-probe --self-test
+```
+
+It checks that the policy and JavaScript settings exist when the view is
+constructed, that the same settings survive construction, and that temporary
+references are released on success and rejected construction paths.
+
 From the repository root, build the V host preparation tool:
 
 ```sh
@@ -173,6 +184,20 @@ which the release's
 checks before probing EGL transport capabilities. This setting was already
 present in the r8 launcher; recording and testing it does not resolve that
 run's surfaceless EGL initialization failure.
+The probe now creates `WebKitSettings`, selects the GTK4 `NEVER` hardware policy,
+then passes those settings through the view's public `settings` construct
+property. The exact release's
+[WebKitWebView construction](https://github.com/WebKit/WebKit/blob/webkitgtk-2.48.1/Source/WebKit/UIProcess/API/glib/WebKitWebView.cpp)
+copies the settings into its initial page configuration. Applying the policy
+only after `webkit_web_view_new()` leaves that initial configuration exposed
+to the default policy. This change tests that ordering hypothesis; a real
+guest pass is still required. The probe checks the accepted policy before and
+after construction and logs `cpu-settings=preconstructed policy=never`.
+The FFI uses GLib 2.90.0's nonvariadic
+[`g_object_new_with_properties`](https://github.com/GNOME/glib/blob/2.90.0/gobject/gobject.h)
+and initializes/releases its public
+[`GValue`](https://github.com/GNOME/glib/blob/2.90.0/gobject/gvalue.h)
+through GLib APIs. The self-test checks the 64-bit structure size and data offset.
 The inherited force-compositing override is removed. The launcher sets
 `WEBKIT_INJECTED_BUNDLE_PATH` to the relocated runtime's pinned
 `usr/lib/webkitgtk-6.0/injected-bundle` directory, as supported by

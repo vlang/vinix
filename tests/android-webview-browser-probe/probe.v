@@ -25,6 +25,14 @@ struct GlibList {
 	prev &GlibList
 }
 
+// GLib's public GValue ABI on the supported 64-bit host/guest architectures:
+// GType followed by two union slots, each large enough for guint64/pointers.
+struct GlibValue {
+mut:
+	value_type u64
+	data       [2]u64
+}
+
 type InitCheck = fn () i32
 type NewObject = fn () voidptr
 type GetObject = fn (voidptr) voidptr
@@ -47,6 +55,53 @@ type AddCookieFinish = fn (voidptr, voidptr, &&GlibError) i32
 type GetCookies = fn (voidptr, &char, voidptr, AsyncReady, voidptr)
 type GetCookiesFinish = fn (voidptr, voidptr, &&GlibError) &GlibList
 type Version = fn () u32
+type ObjectType = fn () u64
+type GetFlag = fn (voidptr) i32
+type ValueInit = fn (&GlibValue, u64) &GlibValue
+type ValueObject = fn (&GlibValue, voidptr)
+type ValueUnset = fn (&GlibValue)
+type NewWithProperties = fn (u64, u32, &&char, &GlibValue) voidptr
+
+struct CpuViewApi {
+	settings_new    NewObject         @[required]
+	settings_type   ObjectType        @[required]
+	settings_js     SetFlag           @[required]
+	settings_accel  SetFlag           @[required]
+	settings_policy GetFlag           @[required]
+	view_type       ObjectType        @[required]
+	view_settings   GetObject         @[required]
+	new_properties  NewWithProperties @[required]
+	value_init      ValueInit         @[required]
+	value_object    ValueObject       @[required]
+	value_unset     ValueUnset        @[required]
+	unref           ObjectCall        @[required]
+}
+
+fn new_cpu_view(api CpuViewApi) !voidptr {
+	settings := api.settings_new()
+	if settings == unsafe { nil } { return error('could not create WebKitSettings') }
+	defer { api.unref(settings) }
+	api.settings_js(settings, 1)
+	// GTK4's enum omits GTK3 ON_DEMAND: NEVER is 1 in WebKit 2.48.1.
+	api.settings_accel(settings, 1)
+	if api.settings_policy(settings) != 1 {
+		return error('WebKitSettings did not accept CPU compositing policy')
+	}
+	// WebView construction creates its PageConfiguration. Set the policy before
+	// that initial preference snapshot, rather than updating a constructed view.
+	mut value := GlibValue{}
+	api.value_init(&value, api.settings_type())
+	defer { api.value_unset(&value) }
+	api.value_object(&value, settings)
+	names := [c'settings']!
+	view := api.new_properties(api.view_type(), 1, unsafe { &names[0] }, &value)
+	if view == unsafe { nil } { return error('could not construct WebKitWebView with settings') }
+	if api.view_settings(view) != settings || api.settings_policy(api.view_settings(view)) != 1 {
+		api.unref(view)
+		return error('constructed WebKitWebView did not preserve CPU settings')
+	}
+	return view
+}
 
 struct Api {
 	init_check       InitCheck        @[required]
@@ -55,10 +110,7 @@ struct Api {
 	window_size      SetSize          @[required]
 	window_present   ObjectCall       @[required]
 	window_destroy   ObjectCall       @[required]
-	view_new         NewObject        @[required]
-	view_settings    GetObject        @[required]
-	settings_js      SetFlag          @[required]
-	settings_accel   SetFlag          @[required]
+	cpu_view         CpuViewApi       @[required]
 	view_title       GetText          @[required]
 	view_load_html   LoadHtml         @[required]
 	view_session     GetObject        @[required]
@@ -100,10 +152,20 @@ fn load_api() !Api {
 		window_size:      unsafe { SetSize(dl.sym_opt(h, 'gtk_window_set_default_size')!) }
 		window_present:   unsafe { ObjectCall(dl.sym_opt(h, 'gtk_window_present')!) }
 		window_destroy:   unsafe { ObjectCall(dl.sym_opt(h, 'gtk_window_destroy')!) }
-		view_new:         unsafe { NewObject(dl.sym_opt(h, 'webkit_web_view_new')!) }
-		view_settings:    unsafe { GetObject(dl.sym_opt(h, 'webkit_web_view_get_settings')!) }
-		settings_js:      unsafe { SetFlag(dl.sym_opt(h, 'webkit_settings_set_enable_javascript')!) }
-		settings_accel:   unsafe { SetFlag(dl.sym_opt(h, 'webkit_settings_set_hardware_acceleration_policy')!) }
+		cpu_view:         CpuViewApi{
+			settings_new:    unsafe { NewObject(dl.sym_opt(h, 'webkit_settings_new')!) }
+			settings_type:   unsafe { ObjectType(dl.sym_opt(h, 'webkit_settings_get_type')!) }
+			settings_js:     unsafe { SetFlag(dl.sym_opt(h, 'webkit_settings_set_enable_javascript')!) }
+			settings_accel:  unsafe { SetFlag(dl.sym_opt(h, 'webkit_settings_set_hardware_acceleration_policy')!) }
+			settings_policy: unsafe { GetFlag(dl.sym_opt(h, 'webkit_settings_get_hardware_acceleration_policy')!) }
+			view_type:       unsafe { ObjectType(dl.sym_opt(h, 'webkit_web_view_get_type')!) }
+			view_settings:   unsafe { GetObject(dl.sym_opt(h, 'webkit_web_view_get_settings')!) }
+			new_properties:  unsafe { NewWithProperties(dl.sym_opt(h, 'g_object_new_with_properties')!) }
+			value_init:      unsafe { ValueInit(dl.sym_opt(h, 'g_value_init')!) }
+			value_object:    unsafe { ValueObject(dl.sym_opt(h, 'g_value_set_object')!) }
+			value_unset:     unsafe { ValueUnset(dl.sym_opt(h, 'g_value_unset')!) }
+			unref:           unsafe { ObjectCall(dl.sym_opt(h, 'g_object_unref')!) }
+		}
 		view_title:       unsafe { GetText(dl.sym_opt(h, 'webkit_web_view_get_title')!) }
 		view_load_html:   unsafe { LoadHtml(dl.sym_opt(h, 'webkit_web_view_load_html')!) }
 		view_session:     unsafe { GetObject(dl.sym_opt(h, 'webkit_web_view_get_network_session')!) }
@@ -232,17 +294,14 @@ fn run(output string) ! {
 		return error('GTK could not open the authenticated display')
 	}
 	window := api.window_new()
-	view := api.view_new()
-	if window == unsafe { nil } || view == unsafe { nil } {
-		return error('GTK/WebKit object creation failed')
+	if window == unsafe { nil } {
+		return error('GTK window creation failed')
 	}
 	defer { api.window_destroy(window) }
+	view := new_cpu_view(api.cpu_view)!
 	api.window_size(window, 320, 240)
 	api.window_child(window, view)
-	settings := api.view_settings(view)
-	api.settings_js(settings, 1)
-	// GTK4's enum omits GTK3 ON_DEMAND: NEVER is 1 in WebKit 2.48.1.
-	api.settings_accel(settings, 1)
+	println('BROWSER-PROBE cpu-settings=preconstructed policy=never')
 	api.window_present(window)
 	manager := api.session_cookies(api.view_session(view))
 	// Heap lifetime intentionally extends until exit, including timeout paths:
@@ -309,7 +368,127 @@ fn run(output string) ! {
 	println('BROWSER-PROBE PASS png=${path}')
 }
 
+struct MockCpuSettings {
+mut:
+	javascript i32
+	policy     i32
+	references int = 1
+}
+
+fn mock_settings_new() voidptr { return &MockCpuSettings{} }
+
+fn mock_settings_type() u64 { return 101 }
+
+fn mock_view_type() u64 { return 102 }
+
+fn mock_settings_js(object voidptr, enabled i32) {
+	unsafe { (&MockCpuSettings(object)).javascript = enabled }
+}
+
+fn mock_settings_accel(object voidptr, policy i32) {
+	unsafe { (&MockCpuSettings(object)).policy = policy }
+}
+
+fn mock_settings_policy(object voidptr) i32 {
+	return unsafe { (&MockCpuSettings(object)).policy }
+}
+
+fn mock_view_settings(object voidptr) voidptr { return object }
+
+fn mock_value_init(value &GlibValue, kind u64) &GlibValue {
+	assert kind == 101
+	unsafe { value.value_type = kind }
+	return value
+}
+
+fn mock_value_object(value &GlibValue, object voidptr) {
+	unsafe {
+		value.data[0] = u64(object)
+		(&MockCpuSettings(object)).references++
+	}
+}
+
+fn mock_unref(object voidptr) {
+	unsafe {
+		assert (&MockCpuSettings(object)).references > 0
+		(&MockCpuSettings(object)).references--
+		if (&MockCpuSettings(object)).references == 0 { free(object) }
+	}
+}
+
+fn mock_value_unset(value &GlibValue) {
+	mock_unref(unsafe { voidptr(value.data[0]) })
+}
+
+fn mock_new_properties(kind u64, count u32, names &&char, values &GlibValue) voidptr {
+	assert kind == 102 && count == 1
+	assert unsafe { names[0].vstring() } == 'settings'
+	assert values.value_type == 101
+	settings := unsafe { &MockCpuSettings(values.data[0]) }
+	// This assertion fails if construction happens before policy/JS setup.
+	assert settings.policy == 1 && settings.javascript == 1
+	assert settings.references == 2
+	unsafe { settings.references++ }
+	return settings
+}
+
+fn mock_rejected_policy(_ voidptr) i32 { return 0 }
+
+fn mock_missing_settings(_ voidptr) voidptr { return unsafe { nil } }
+
+fn mock_failed_construction(_ u64, _ u32, _ &&char, _ &GlibValue) voidptr {
+	return unsafe { nil }
+}
+
+fn expect_constructor_failure(api CpuViewApi, expected string) ! {
+	new_cpu_view(api) or {
+		if err.msg() != expected { return err }
+		return
+	}
+	return error('constructor accepted invalid settings or failed construction')
+}
+
+fn constructor_self_test() ! {
+	mut value := GlibValue{}
+	if sizeof(GlibValue) != 24
+		|| u64(unsafe { &value.data[0] }) - u64(&value) != 8 {
+		return error('64-bit GValue ABI layout mismatch')
+	}
+	api := CpuViewApi{
+		settings_new:    mock_settings_new
+		settings_type:   mock_settings_type
+		settings_js:     mock_settings_js
+		settings_accel:  mock_settings_accel
+		settings_policy: mock_settings_policy
+		view_type:       mock_view_type
+		view_settings:   mock_view_settings
+		new_properties:  mock_new_properties
+		value_init:      mock_value_init
+		value_object:    mock_value_object
+		value_unset:     mock_value_unset
+		unref:           mock_unref
+	}
+	view := new_cpu_view(api)!
+	settings := unsafe { &MockCpuSettings(view) }
+	assert settings.references == 1
+	mock_unref(view)
+	expect_constructor_failure(CpuViewApi{ ...api, settings_policy: mock_rejected_policy },
+		'WebKitSettings did not accept CPU compositing policy')!
+	expect_constructor_failure(CpuViewApi{ ...api, new_properties: mock_failed_construction },
+		'could not construct WebKitWebView with settings')!
+	expect_constructor_failure(CpuViewApi{ ...api, view_settings: mock_missing_settings },
+		'constructed WebKitWebView did not preserve CPU settings')!
+	println('BROWSER-PROBE SELF-TEST PASS GValue-abi settings-before-view policy-retained temporary-references-released construction-failure-rejected')
+}
+
 fn main() {
+	if os.args.len == 2 && os.args[1] == '--self-test' {
+		constructor_self_test() or {
+			eprintln('BROWSER-PROBE SELF-TEST FAIL: ${err}')
+			exit(1)
+		}
+		return
+	}
 	if os.args.len == 2 && os.args[1] == '--help' {
 		println('Usage: browser-probe OUTPUT_DIRECTORY\nRequires an authenticated private X11 display, GTK 4.24.1 and WebKitGTK 2.48.1. Tests local JavaScript, shared cookies and a real PNG snapshot; no account credentials or network access are used.')
 		return
