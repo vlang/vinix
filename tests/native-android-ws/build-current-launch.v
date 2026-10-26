@@ -543,7 +543,10 @@ fn build(root string, framework string, profile string) ! {
 	implementation := repo + '/build-support/android/nativews/headless.v'
 	originals[implementation] = hash(implementation)!
 	copy_pin(implementation, root + '/abi/headless.v', originals[implementation]!)!
-	service_abi(os.read_file(repo + '/build-support/android/native-entry.v')!, os.read_file(root + '/abi/headless.v')!)!
+	entry_source := repo + '/build-support/android/native-entry.v'
+	originals[entry_source] = hash(entry_source)!
+	copy_pin(entry_source, root + '/abi/native-entry.v', originals[entry_source]!)!
+	service_abi(os.read_file(root + '/abi/native-entry.v')!, os.read_file(root + '/abi/headless.v')!)!
 	write_json(root + '/current-inputs.json', originals)!
 	unchanged(originals)!
 	cross_pins := cross_inputs(root, base_pins)!
