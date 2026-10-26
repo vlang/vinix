@@ -8,6 +8,7 @@ import json2
 import net
 import net.unix
 import os
+import strconv
 import time
 
 #include <sys/stat.h>
@@ -308,6 +309,34 @@ fn fault_loader_arguments(root string, build BuildPins) []string {
 	}
 }
 
+fn fault_number(line string, key string) !u64 {
+	if !line.contains(key + '=0x') { return error('missing fault field: ' + key) }
+	return strconv.parse_uint(line.all_after(key + '=0x').all_before(' ').trim_space(), 16, 64)
+}
+
+fn known_fault_evidence(raw string) ! {
+	text := raw.replace('\r\n', '\n')
+	lines := text.split_into_lines()
+	expected := lines.filter(it.starts_with('X11-KNOWN-FAULT-EXPECTED '))
+	fault := lines.filter(it.starts_with('X11-FAULT '))
+	registers := lines.filter(it.starts_with('X11-REGS '))
+	if expected.len != 1 || fault.len != 1 || registers.len != 1 {
+		return error('one complete controlled fault required')
+	}
+	if fault_number(expected[0], 'address')! == 0
+		|| fault_number(fault[0], 'address')! != fault_number(expected[0], 'address')!
+		|| fault_number(fault[0], 'signal')! != 11 || fault_number(fault[0], 'code')! != 2
+		|| fault_number(fault[0], 'pc')! == 0 || fault_number(fault[0], 'sp')! == 0 {
+		return error('controlled fault context mismatch')
+	}
+	for index in 0 .. 31 { _ := fault_number(registers[0], 'x${index:02}')! }
+	if fault_number(registers[0], 'x30')! == 0 { return error('controlled fault link register missing') }
+	for marker in ['X11-KNOWN-FAULT-CHAINED', 'X11-MAPS-BEGIN', 'X11-MAPS-END',
+		'X11-KNOWN-FAULT-PASS query=preserved restoration=preserved chain=preserved'] {
+		if !lines.contains(marker) { return error('missing controlled fault marker: ' + marker) }
+	}
+}
+
 fn fault_preflight(loader string, libraries string, root string, output string, environment map[string]string) ! {
 	mut log := os.open_file(output + '/x11-known-fault.log', 'w', 0o600)!
 	defer { log.close() }
@@ -322,12 +351,7 @@ fn fault_preflight(loader string, libraries string, root string, output string, 
 	}
 	stop(mut fixture, mut log)
 	if fixture.code != 0 { return error('fault diagnostic preflight failed; see x11-known-fault.log') }
-	text := os.read_file(output + '/x11-known-fault.log')!
-	if !text.split_into_lines().contains('X11-KNOWN-FAULT-PASS query=preserved restoration=preserved chain=preserved')
-		|| !text.contains('X11-FAULT ') || !text.contains('X11-REGS ')
-		|| !text.contains('X11-MAPS-BEGIN') || !text.contains('X11-MAPS-END') {
-		return error('fault diagnostic preflight lacks complete success evidence')
-	}
+	known_fault_evidence(os.read_file(output + '/x11-known-fault.log')!)!
 }
 
 fn remove_aliases(paths []string, directories []string, executable string, mut events os.File) ! {
@@ -706,7 +730,17 @@ fn self_test() ! {
 	if _ := fault_environment(root, BuildPins{fault_probe_shim_sha256: pin}, clean_environment) {
 		return error('partial fault diagnostic pins accepted')
 	}
-	println('BROWSER-SESSION SELF-TEST PASS authority-record x11-setup receipt-paths pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins')
+	mut context := 'X11-KNOWN-FAULT-EXPECTED address=0x1234\nX11-FAULT signal=0xb code=0x2 address=0x1234 pc=0x5678 sp=0x9abc\nX11-REGS'
+	for index in 0 .. 31 { context += ' x${index:02}=0x1' }
+	context += '\nX11-MAPS-BEGIN\nX11-MAPS-END\nX11-KNOWN-FAULT-CHAINED\nX11-KNOWN-FAULT-PASS query=preserved restoration=preserved chain=preserved\n'
+	known_fault_evidence(context)!
+	for bad in [context.replace('address=0x1234 pc=', 'address=0x1235 pc='),
+		context.replace('signal=0xb', 'signal=0x6'), context.replace(' x29=0x1', ''),
+		context.replace('x30=0x1', 'x30=0x0'), context + 'X11-FAULT signal=0xb\n',
+		context.replace('X11-MAPS-END\n', '')] {
+		if _ := known_fault_evidence(bad) { return error('incomplete or inconsistent fault evidence accepted') }
+	}
+	println('BROWSER-SESSION SELF-TEST PASS authority-record x11-setup receipt-paths pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins complete-context negative-context')
 }
 
 fn main() {
