@@ -138,7 +138,23 @@ fn normalize(name string) !string {
 
 fn replacements() []string { return [jar_member, native_member, entry_member, launcher_member] }
 
-// Existing runtime members may be replaced only at these four regular paths.
+fn baseline_members() map[string]Entry {
+	return {
+		jar_member:    Entry{ name: jar_member, kind: 'regular', mode: 0o644, size: 1170131, sha256: baseline_jar_sha }
+		native_member: Entry{ name: native_member, kind: 'regular', mode: 0o755, size: 809288, sha256: baseline_native_sha }
+		entry_member:  Entry{ name: entry_member, kind: 'regular', mode: 0o755, size: 236592, sha256: '611b0e74b21c669aad9d17cef0d3e83d93be6cb57c103cc3f1d3444015e4b5da' }
+	}
+}
+
+fn verify_baseline(effective map[string]Entry) ! {
+	// The launcher is a new runtime file; the other three must exactly match
+	// their qualified baseline metadata. Equality also requires launcher absence.
+	if effective != baseline_members() {
+		return error('baseline effective replacement/addition set differs')
+	}
+}
+
+// Three existing runtime members are replaced and one new launcher is added.
 // Inspect every historical entry, including shadowed ancestors, so an alias
 // cannot redirect a later overlay outside the intended tree.
 fn collision(member tarcore.Member) ! {
@@ -327,11 +343,13 @@ fn write_overlay(path string, sources map[string]string, entries []Entry) ! {
 			mut file := os.open(source)!
 			mut remaining := entry.size
 			for remaining > 0 {
-				mut part := unsafe { buffer[..int(if remaining < u64(buffer.len) {
-					remaining
-				} else {
-					u64(buffer.len)
-				})] }
+				mut part := unsafe {
+					buffer[..int(if remaining < u64(buffer.len) {
+						remaining
+					} else {
+						u64(buffer.len)
+					})]
+				}
 				n := file.read(mut part) or {
 					file.close()
 					return err
@@ -646,11 +664,8 @@ fn stage() ! {
 		before[name] = module_hash(root, 'original-' + name, boot, name)!
 		check_module(mcopy, boot, name, mut effective)!
 	}
-	if effective.len != 4 || effective[jar_member]!.sha256 != baseline_jar_sha
-		|| effective[native_member]!.sha256 != baseline_native_sha {
-		return error('baseline effective replacement set differs')
-	}
 	write_json(root + '/runtime-replacements-before.json', effective)!
+	verify_baseline(effective)!
 	for pair in [[boot, root + '/boot.img'], [efivars, root + '/efivars.fd']] {
 		if C.clonefile(pair[0].str, pair[1].str, 0) != 0 {
 			return error('APFS clonefile failed: ' + pair[0])
@@ -702,6 +717,9 @@ fn stage() ! {
 		'original_modules_sha256':          json2.decode[json2.Any](json2.encode(before))!
 		'preserved_modules_sha256':         json2.decode[json2.Any](json2.encode(after))!
 		'overlay_inventory':                json2.decode[json2.Any](json2.encode(entries))!
+		'runtime_replaced':                 json2.Any([json2.Any(jar_member), json2.Any(native_member),
+			json2.Any(entry_member)])
+		'runtime_added':                    json2.Any([json2.Any(launcher_member)])
 		'overlay_sha256':                   json2.Any(overlay_hash)
 		'limine_before_sha256':             json2.Any(sha256.sum(original.bytes()).hex())
 		'limine_after_sha256':              json2.Any(sha256.sum(config.updated.bytes()).hex())
@@ -720,6 +738,20 @@ fn self_test() ! {
 	assert parsed.modules == ['initramfs.tar', 'runtime.tar']
 	assert parsed.updated == config + '    module_path: boot():/boot/' + overlay_name + '\n'
 	assert configure(config.trim_right('\n'))!.updated == parsed.updated
+	verify_baseline(baseline_members())!
+	mut baseline_missing := baseline_members()
+	baseline_missing.delete(entry_member)
+	mut baseline_extra := baseline_members()
+	baseline_extra[launcher_member] = Entry{ name: launcher_member, kind: 'regular', mode: 0o755 }
+	mut baseline_changed := baseline_members()
+	baseline_changed[entry_member] = Entry{ name: entry_member, kind: 'regular', mode: 0o755, size: 236592, sha256: '0'.repeat(64) }
+	mut baseline_mode := baseline_members()
+	baseline_mode[entry_member] = Entry{ name: entry_member, kind: 'regular', mode: 0o644, size: 236592, sha256: '611b0e74b21c669aad9d17cef0d3e83d93be6cb57c103cc3f1d3444015e4b5da' }
+	for bad in [baseline_missing, baseline_extra, baseline_changed, baseline_mode] {
+		mut rejected := false
+		verify_baseline(bad) or { rejected = true }
+		assert rejected
+	}
 	for bad in [config + '/Other\n', config + '    module_path: boot():/boot/runtime.tar\n',
 		config + '    module_path: boot():/boot/../escape.tar\n', parsed.updated] {
 		mut rejected := false
@@ -833,12 +865,19 @@ fn self_test() ! {
 	mut rejected_dynamic := false
 	static_elf(root + '/dynamic') or { rejected_dynamic = true }
 	assert rejected_dynamic
-	println('HEADLESS-STAGE SELF-TEST PASS config-prefix collision caches exact-allowlist streamed-archive modes fresh-output QMP-limit full-seal static-ELF')
+	println('HEADLESS-STAGE SELF-TEST PASS config-prefix baseline-existing added-launcher collision caches exact-allowlist streamed-archive modes fresh-output QMP-limit full-seal static-ELF')
 	println('HEADLESS-STAGE COMPILED-SOURCES ' + sha256.sum(compiled_source.bytes()).hex() +
 		' ' + sha256.sum(compiled_guest.bytes()).hex() + ' ' + sha256.sum(compiled_collector.bytes()).hex())
 }
 
 fn main() {
+	if os.args.len == 3 && os.args[1] == '--inspect-baseline' {
+		inspect_baseline(os.args[2]) or {
+			eprintln(err)
+			exit(1)
+		}
+		return
+	}
 	if os.args.len == 2 && os.args[1] == '--self-test' {
 		self_test() or {
 			eprintln(err)
@@ -850,4 +889,18 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
+}
+
+// Read-only diagnostic for the effective targets, including targets absent
+// from the original modules. Keep failed staging roots unchanged.
+fn inspect_baseline(boot string) ! {
+	if hash(boot)! != baseline_boot_sha { return error('qualified baseline boot differs') }
+	mcopy := os.find_abs_path_of_executable('mcopy')!
+	mut effective := map[string]Entry{}
+	for name in ['initramfs.tar', 'qemu-runtime.tar', 'maps335-diagnostics.tar',
+		'maps350-diagnostics.tar', 'maps372-diagnostics.tar'] {
+		check_module(mcopy, boot, name, mut effective)!
+	}
+	verify_baseline(effective)!
+	println(json2.encode(effective, prettify: true))
 }
