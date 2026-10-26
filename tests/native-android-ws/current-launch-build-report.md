@@ -1,5 +1,36 @@
 # Current seven-argument launch executables
 
+The r13 entry, launcher, headless lifecycle controller and account broker
+passed the retained-source AArch64 build against the 2,104-class descriptions
+framework. The broker captures the real APK authenticator metadata query and
+resource parser; all four targets use the retained static zlib dependency.
+
+- Complete bundle: `/Users/alex/.local/state/vinix/android/current-launch-build-2026-10-26-r13`.
+- Bundle `sha256.json`: `920ed6f1a5f5d9e705bdcc108937db6266066718fe4203859a6ac8577bd405be`.
+- Source revision: `9d5323f685730e4c015eb7fef7d3fa39173fced6`.
+- Retained builder source: `6373dd5181bcdea1fc91185c09b79cff222890744ab4e05ac96a822f730c30fa`.
+- Descriptions framework `sha256.json`: `d898fdcca66df0c32b9863dca99c7185d10f8e3b3fb5ab7708999b3619803021`.
+- Original complete zlib producer `sha256.json`: `f2652acfdf8963998d51d767990ac72daae4c54a9ee6e956327cdf2ee462272f`.
+- Consumed static zlib archive: `40238b02e19ba4776180f997828faadddc5347f379b70b031ef8629b6e75fee0`.
+
+| Output | SHA-256 |
+| --- | --- |
+| `bin/vinix-android-native` | `b1061601ebbcd5bc4c81c68d354704e58ff472a2bc9c8666fad6a588a614b98d` |
+| `bin/run-android` | `1b4d3e3d2dbc2eb5ae95343847218d4afd44d64aeb9d52cc0b07cb8f9c37b112` |
+| `bin/headless-service-controller` | `70f23b12fb5a770587bfcebcf33ed1320fe050399f08bd256362a037f24eb0b6` |
+| `bin/native-account-broker` | `b674064be8d3635ee7433bef2c1894fa5fe045674ed0e98cf7d3215adca66a4d` |
+
+The pinned compiler, r5 dependency input, seven-argument ABI, exact Linux
+wait-status correction, source closure, consumed headers, strict declaration
+and conversion checks, native signal objects, ELF checks and before/after
+input checks follow the policy below. The original complete zlib producer
+was revalidated before and after use; the consumer retains its full inventory,
+provenance and the exact headers and archive it consumed. The entry is dynamic
+and the other three executables are static. Pair these with JNI r16 and account
+r6. Host validation does not establish successful Google account sign-in.
+
+## Previous r12 evidence
+
 The current entry, launcher, headless lifecycle controller and production
 account broker cross-build and link for AArch64. The retained source revision
 is `e9505d350b11fd936401c85aa645cb954bc1f894`; the bundle records the exact
