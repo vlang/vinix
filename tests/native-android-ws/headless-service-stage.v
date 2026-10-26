@@ -30,6 +30,8 @@ const baseline_jar_sha = '3b345e1661ca9f5b616f5abe25c9f4abc1df383204d25333477dae
 const baseline_native_sha = 'd3da7eefd58c8f1faf7a88dd0b6fa0839cebdba145d236bd5fe1ecc185e257a1'
 const framework_seal = '36a472320e71eb459896c1d52a8f211f475362fb2c6dada682870bf43b6a2b7b'
 const framework_jar_sha = '9e643451d4d82fc3839c91415947f04d3726aa81967a784d4d26db63e2c88cb1'
+const combined_framework_seal = '798b574b811203313b185480ddfd9349bfc5b7e1863d96e99d9c1afca3be4dd2'
+const combined_framework_jar_sha = '296cb0bd9d16801322a18d40bca0facfb0593e50be47d424f199d02ceeb7e15f'
 const fixture_apk_sha = '4df9e3cd757b463259c73dc038eb84d149d7ec1461a1889bc8f2d531f6980634'
 const compiler = '/Users/alex/code/v/v'
 const cross = '/opt/homebrew/bin/aarch64-linux-musl-gcc'
@@ -65,6 +67,34 @@ struct Entry {
 struct Config {
 	modules []string
 	updated string
+}
+
+struct FrameworkProfile {
+	name        string
+	seal        string
+	jar_sha256  string
+	class_count int
+}
+
+// Only these reviewed complete bundles are eligible; a caller cannot supply
+// a new manifest pin or pair a known manifest with a different framework.
+fn framework_profile(seal string) !FrameworkProfile {
+	return match seal {
+		framework_seal {
+			FrameworkProfile{'authenticator-base-network-2098', framework_seal, framework_jar_sha, 2098}
+		}
+		combined_framework_seal {
+			FrameworkProfile{'combined-account-webview-2101', combined_framework_seal, combined_framework_jar_sha, 2101}
+		}
+		else { return error('framework manifest is outside the audited profiles') }
+	}
+}
+
+fn verify_framework(profile FrameworkProfile, jar_sha string, receipt map[string]json2.Any) ! {
+	if jar_sha != profile.jar_sha256 || receipt['api_impl_sha256']!.str() != profile.jar_sha256
+		|| receipt['class_count']!.int() != profile.class_count {
+		return error('framework JAR or build receipt differs from audited profile')
+	}
 }
 
 fn hash(path string) !string {
@@ -568,9 +598,10 @@ fn stage() ! {
 			return error('output overlaps an input')
 		}
 	}
-	if hash(boot)! != baseline_boot_sha || hash(framework + '/api-impl.jar')! != framework_jar_sha
+	profile := framework_profile(hash(framework + '/sha256.json')!)!
+	if hash(boot)! != baseline_boot_sha
 		|| hash(fixture + '/probe.apk')! != fixture_apk_sha {
-		return error('fixed baseline/framework/fixture pin differs')
+		return error('fixed baseline/fixture pin differs')
 	}
 	mcopy, mtype, mdir := os.find_abs_path_of_executable('mcopy')!, os.find_abs_path_of_executable('mtype')!, os.find_abs_path_of_executable('mdir')!
 	os.setenv('PATH', os.dir(mcopy) + ':' + os.getenv('PATH'), true)
@@ -579,15 +610,14 @@ fn stage() ! {
 		cross, os.executable()] {
 		inputs[path] = hash(path)!
 	}
-	framework_pins := sealed_bundle(framework, framework_seal, mut inputs)!
+	framework_pins := sealed_bundle(framework, profile.seal, mut inputs)!
 	native_pins := sealed_bundle(native, os.args[5], mut inputs)!
 	framework_receipt := json2.decode[map[string]json2.Any](os.read_file(framework + '/build.json')!)!
 	native_receipt := json2.decode[map[string]json2.Any](os.read_file(native + '/build.json')!)!
-	if framework_receipt['api_impl_sha256']!.str() != framework_jar_sha
-		|| framework_receipt['class_count']!.int() != 2098
-		|| native_receipt['baseline_native_sha256']!.str() != 'aa460c06686e2d1f60ea6dd27ab8f158a3b9794440499c6cdc5e7840cafda0cb'
+	verify_framework(profile, hash(framework + '/api-impl.jar')!, framework_receipt)!
+	if native_receipt['baseline_native_sha256']!.str() != 'aa460c06686e2d1f60ea6dd27ab8f158a3b9794440499c6cdc5e7840cafda0cb'
 		|| native_receipt['native_sha256']!.str() != native_pins['native/libvinix-android-native.so']! {
-		return error('framework/native build receipt identity differs')
+		return error('native build receipt identity differs')
 	}
 	fixture_receipt := json2.decode[map[string]json2.Any](os.read_file(fixture + '/build.json')!)!
 	if fixture_receipt['apk_sha256']!.str() != fixture_apk_sha
@@ -701,7 +731,7 @@ fn stage() ! {
 		if hash(path)! != expected { return error('input changed during staging: ' + path) }
 	}
 	// Full bundle inventories are checked twice, including absence of extra files.
-	if sealed_bundle(framework, framework_seal, mut inputs)! != framework_pins
+	if sealed_bundle(framework, profile.seal, mut inputs)! != framework_pins
 		|| sealed_bundle(native, os.args[5], mut inputs)! != native_pins {
 		return error('bundle changed during staging')
 	}
@@ -713,6 +743,10 @@ fn stage() ! {
 		'compiled_stage_source_sha256':     json2.Any(sha256.sum(compiled_source.bytes()).hex())
 		'compiled_guest_source_sha256':     json2.Any(sha256.sum(compiled_guest.bytes()).hex())
 		'compiled_collector_source_sha256': json2.Any(sha256.sum(compiled_collector.bytes()).hex())
+		'framework_profile':                json2.Any(profile.name)
+		'framework_manifest_sha256':        json2.Any(profile.seal)
+		'framework_jar_sha256':             json2.Any(profile.jar_sha256)
+		'framework_class_count':            json2.Any(profile.class_count)
 		'inputs_sha256':                    json2.decode[json2.Any](json2.encode(inputs))!
 		'original_modules_sha256':          json2.decode[json2.Any](json2.encode(before))!
 		'preserved_modules_sha256':         json2.decode[json2.Any](json2.encode(after))!
@@ -733,6 +767,34 @@ fn stage() ! {
 }
 
 fn self_test() ! {
+	for seal in [framework_seal, combined_framework_seal] {
+		profile := framework_profile(seal)!
+		assert profile.seal == seal
+		assert profile.class_count == if seal == framework_seal { 2098 } else { 2101 }
+		receipt := {
+			'api_impl_sha256': json2.Any(profile.jar_sha256)
+			'class_count': json2.Any(profile.class_count)
+		}
+		verify_framework(profile, profile.jar_sha256, receipt)!
+		other := framework_profile(if seal == framework_seal { combined_framework_seal } else { framework_seal })!
+		if _ := verify_framework(profile, other.jar_sha256, receipt) {
+			return error('cross-paired framework JAR accepted')
+		}
+		for bad in [{
+			'api_impl_sha256': json2.Any(other.jar_sha256)
+			'class_count': json2.Any(profile.class_count)
+		}, {
+			'api_impl_sha256': json2.Any(profile.jar_sha256)
+			'class_count': json2.Any(other.class_count)
+		}, map[string]json2.Any{}] {
+			if _ := verify_framework(profile, profile.jar_sha256, bad) {
+				return error('cross-paired or incomplete framework receipt accepted')
+			}
+		}
+	}
+	for bad in ['', '0'.repeat(64), combined_framework_seal.to_upper()] {
+		if _ := framework_profile(bad) { return error('unknown framework profile accepted') }
+	}
 	config := '/Vinix\n    protocol: limine\n    module_path: boot():/boot/initramfs.tar\n    module_path: boot():/boot/runtime.tar\n'
 	parsed := configure(config)!
 	assert parsed.modules == ['initramfs.tar', 'runtime.tar']
@@ -865,7 +927,7 @@ fn self_test() ! {
 	mut rejected_dynamic := false
 	static_elf(root + '/dynamic') or { rejected_dynamic = true }
 	assert rejected_dynamic
-	println('HEADLESS-STAGE SELF-TEST PASS config-prefix baseline-existing added-launcher collision caches exact-allowlist streamed-archive modes fresh-output QMP-limit full-seal static-ELF')
+	println('HEADLESS-STAGE SELF-TEST PASS audited-framework-profiles mixed-framework-rejection config-prefix baseline-existing added-launcher collision caches exact-allowlist streamed-archive modes fresh-output QMP-limit full-seal static-ELF')
 	println('HEADLESS-STAGE COMPILED-SOURCES ' + sha256.sum(compiled_source.bytes()).hex() +
 		' ' + sha256.sum(compiled_guest.bytes()).hex() + ' ' + sha256.sum(compiled_collector.bytes()).hex())
 }
