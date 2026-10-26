@@ -15,6 +15,7 @@ pub enum Operation {
 	get_accounts = 1
 	add_account  = 2
 	redeem_interaction = 3
+	get_auth_token = 4
 }
 
 pub enum ScalarKind {
@@ -43,6 +44,7 @@ pub struct Request {
 pub:
 	id              u64
 	operation       Operation
+	account_name    ?string
 	account_type    ?string
 	auth_token_type ?string
 	features        []string
@@ -86,19 +88,31 @@ fn append_string(mut bytes []u8, value ?string) ! {
 
 fn validate_request(request Request) ! {
 	if request.id == 0 { return error('account request ID must be nonzero') }
-	if request.operation !in [.get_accounts, .add_account, .redeem_interaction] {
+	if request.operation !in [.get_accounts, .add_account, .redeem_interaction, .get_auth_token] {
 		return error('unknown account operation')
 	}
 	if request.operation == .redeem_interaction {
 		value := request.redemption or { return error('missing account interaction ticket') }
 		validate_redemption(value)!
-		if request.account_type != none || request.auth_token_type != none
+		if request.account_name != none || request.account_type != none || request.auth_token_type != none
 			|| request.features.len != 0 || request.options.len != 0 {
 			return error('account interaction redemption has unrelated fields')
 		}
 		return
 	}
 	if request.redemption != none { return error('unexpected account interaction ticket') }
+	if request.operation == .get_auth_token {
+		name := request.account_name or { return error('token request requires account name') }
+		kind := request.account_type or { return error('token request requires account type') }
+		token := request.auth_token_type or { return error('token request requires token type') }
+		request_text(name, false)!
+		request_text(token, false)!
+		if name.len > 1024 || kind.len > 255 || request.features.len != 0 {
+			return error('invalid token account identity or features')
+		}
+	} else if request.account_name != none {
+		return error('unexpected token account name')
+	}
 	if value := request.account_type { request_text(value, false)! }
 	if value := request.auth_token_type { request_text(value, true)! }
 	if request.operation == .get_accounts {
@@ -149,12 +163,15 @@ pub fn encode_request(request Request) ![]u8 {
 	if request.operation == .redeem_interaction {
 		append_redemption(mut body, request.redemption or { return error('missing account interaction ticket') })!
 	} else {
+		if request.operation == .get_auth_token { append_string(mut body, request.account_name)! }
 		append_string(mut body, request.account_type)!
 	}
-	if request.operation == .add_account {
+	if request.operation in [.add_account, .get_auth_token] {
 		append_string(mut body, request.auth_token_type)!
-		body << u8(request.features.len)
-		for feature in request.features { append_string(mut body, feature)! }
+		if request.operation == .add_account {
+			body << u8(request.features.len)
+			for feature in request.features { append_string(mut body, feature)! }
+		}
 		body << u8(request.options.len)
 		for option in request.options {
 			append_string(mut body, option.key)!
@@ -293,7 +310,7 @@ fn request_header(bytes []u8) !(Operation, u64, int) {
 	mut reader := RequestReader{ bytes: bytes, position: 4 }
 	if reader.uint_value(2)! != 1 { return error('unsupported account request version') }
 	op := reader.uint_value(2)!
-	if op !in [u64(1), 2, 3] { return error('unknown account request operation') }
+	if op !in [u64(1), 2, 3, 4] { return error('unknown account request operation') }
 	id := reader.uint_value(8)!
 	length := reader.uint_value(4)!
 	if id == 0 || length > max_request_body { return error('invalid account request bound') }
@@ -304,6 +321,7 @@ fn decode_request(header []u8, body []u8) !Request {
 	op, id, length := request_header(header)!
 	if body.len != length { return error('account request body length mismatch') }
 	mut reader := RequestReader{ bytes: body }
+	mut account_name := ?string(none)
 	mut account_type := ?string(none)
 	mut auth_type := ?string(none)
 	mut features := []string{cap: 32}
@@ -312,20 +330,23 @@ fn decode_request(header []u8, body []u8) !Request {
 	mut complete := false
 	defer {
 		if !complete {
-			dispose_request(Request{id: id, operation: op, account_type: account_type,
+			dispose_request(Request{id: id, operation: op, account_name: account_name, account_type: account_type,
 				auth_token_type: auth_type, features: features, options: options, redemption: redemption})
 		}
 	}
 	if op == .redeem_interaction {
 		redemption = reader.redemption()!
 	} else {
+		if op == .get_auth_token { account_name = reader.string_value()!.value }
 		account_type = reader.string_value()!.value
 	}
-	if op == .add_account {
+	if op in [.add_account, .get_auth_token] {
 		auth_type = reader.string_value()!.value
-		feature_count := reader.uint_value(1)!
-		if feature_count > 32 { return error('too many account features') }
-		for _ in 0 .. int(feature_count) { features << reader.required_string()! }
+		if op == .add_account {
+			feature_count := reader.uint_value(1)!
+			if feature_count > 32 { return error('too many account features') }
+			for _ in 0 .. int(feature_count) { features << reader.required_string()! }
+		}
 		option_count := reader.uint_value(1)!
 		if option_count > 32 { return error('too many account options') }
 		for _ in 0 .. int(option_count) {
@@ -333,7 +354,7 @@ fn decode_request(header []u8, body []u8) !Request {
 		}
 	}
 	if reader.position != body.len { return error('trailing account request fields') }
-	request := Request{id: id, operation: op, account_type: account_type,
+	request := Request{id: id, operation: op, account_name: account_name, account_type: account_type,
 		auth_token_type: auth_type, features: features, options: options, redemption: redemption}
 	validate_request(request)!
 	complete = true

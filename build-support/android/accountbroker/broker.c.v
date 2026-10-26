@@ -170,7 +170,7 @@ fn (mut b Broker) admit(incoming Incoming) ! {
 	}
 	// The selected service owns its private account database. Its query sees
 	// the same authenticated caller as addAccount, never an option claim.
-	if incoming.authorized.request.operation !in [.add_account, .get_accounts] {
+	if incoming.authorized.request.operation !in [.add_account, .get_accounts, .get_auth_token] {
 		b.fail(id, 6, 'Account operation is not available')!
 		return
 	}
@@ -271,7 +271,7 @@ fn (mut b Broker) callback(packet accountipc.Packet) ! {
 		return error('authenticator response capability is invalid or consumed')
 	}
 	if event.kind == .interaction {
-		if session.operation != .add_account { return error('account query cannot start an interaction') }
+		if session.operation !in [.add_account, .get_auth_token] { return error('account query cannot start an interaction') }
 		if b.interactions == unsafe { nil } {
 			b.cancel_service(event.id)
 			b.fail(event.id, 6, 'Account interaction is unavailable')!

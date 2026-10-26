@@ -13,6 +13,7 @@ struct RequestBuilder {
 mut:
 	id              u64
 	op              nativeaccountauth.Operation
+	account_name    ?string
 	account_type    ?string
 	auth_token_type ?string
 	features        []string
@@ -66,6 +67,18 @@ pub fn abi_request(id u64, op u16, account_type &u8, token_type &u8) voidptr {
 	return builder
 }
 
+// A separate builder preserves the existing addition/query C ABI. Every field
+// is copied before returning; submit performs the complete wire validation.
+@[export: 'vinix_android_account_token_request']
+pub fn abi_token_request(id u64, name &u8, account_type &u8, token_type &u8) voidptr {
+	if id == 0 { return unsafe { nil } }
+	mut builder := &RequestBuilder{id: id, op: .get_auth_token}
+	builder.account_name = abi_string(name) or { abi_request_free(builder); return unsafe { nil } }
+	builder.account_type = abi_string(account_type) or { abi_request_free(builder); return unsafe { nil } }
+	builder.auth_token_type = abi_string(token_type) or { abi_request_free(builder); return unsafe { nil } }
+	return builder
+}
+
 @[export: 'vinix_android_account_feature']
 pub fn abi_feature(handle voidptr, value &u8) i32 {
 	if handle == unsafe { nil } { return -1 }
@@ -106,6 +119,7 @@ pub fn abi_submit(handle voidptr, endpoint &u8) voidptr {
 	request := nativeaccountauth.Request{
 		id:              builder.id
 		operation:       builder.op
+		account_name:    builder.account_name
 		account_type:    builder.account_type
 		auth_token_type: builder.auth_token_type
 		features:        builder.features
@@ -122,6 +136,7 @@ pub fn abi_request_free(handle voidptr) {
 	nativeaccountauth.dispose_request(nativeaccountauth.Request{
 		id:              builder.id
 		operation:       builder.op
+		account_name:    builder.account_name
 		account_type:    builder.account_type
 		auth_token_type: builder.auth_token_type
 		features:        builder.features

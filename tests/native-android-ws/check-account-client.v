@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Execute production queue ownership against instrumented JNI and transport.
 module main
+import crypto.sha256
 import os
 
 fn block(source string, name string) string {
@@ -12,8 +13,10 @@ fn main() {
 	assert os.args.len == 2, 'usage: check-account-client OUTPUT_DIR'
 	work := os.abs_path(os.args[1]); assert !os.exists(work); os.mkdir_all(work)!
 	source := os.read_file('build-support/android/nativews/account_client.v')!
+	os.write_file(work + '/account_client.v', source)!
+	os.write_file(work + '/checker.v', os.read_file(@FILE)!)!
 	mut code := source.all_after('module atlframework').all_before('// Bootstrap')
-	for name in ['ws_account_start', 'ws_account_dispose', 'ws_account_finished', 'ws_account_client_shutdown', 'ws_account_interact', 'ws_account_copy_result', 'ws_account_client_pump'] {
+	for name in ['ws_account_start', 'ws_account_token', 'ws_account_queue', 'ws_account_dispose', 'ws_account_finished', 'ws_account_client_shutdown', 'ws_account_interact', 'ws_account_copy_result', 'ws_account_client_pump'] {
 		code += '\n' + block(source, name)
 	}
 	code = code.replace('C.pthread_mutex_t', 'int').replace('C.pthread_mutex_lock', 'lock').replace('C.pthread_mutex_unlock', 'unlock')
@@ -21,6 +24,11 @@ fn main() {
 	compiler := os.getenv_opt('VINIX_V_COMPILER') or { 'v' }
 	r := os.exec([compiler, '-w', '-n', '-enable-globals', '-cc', 'cc', 'run', work + '/main.v'])
 	os.write_file(work + '/run.log', r.output)!
+	mut inventory := ''
+	for name in ['account_client.v', 'checker.v', 'main.v', 'run.log'] {
+		inventory += sha256.sum(os.read_bytes(work + '/' + name)!).hex() + '  ' + name + '\n'
+	}
+	os.write_file(work + '/sha256.txt', inventory)!
 	if r.exit_code != 0 { panic(r.output) }
 	println(r.output.trim_space())
 }
@@ -59,13 +67,19 @@ __global ticket_bad bool
 __global submit_bad bool
 __global ref_bad voidptr
 __global seen_error i32
+__global token_built int
 fn lock(mutex &int) { assert !held; held = true }
 fn unlock(mutex &int) { assert held; held = false }
 fn pending(e voidptr) bool { return false }
 fn same(e voidptr, a voidptr, b voidptr) u8 { return u8(a == b) }
 fn drop(e voidptr, ref voidptr) { assert !held; assert ref == voidptr(2) || ref == voidptr(4); dropped++ }
 fn ref(e voidptr, value voidptr) voidptr { assert !held; return if value == ref_bad { unsafe { nil } } else { value } }
-fn slot(e voidptr, index int) voidptr { return match index { 21 { voidptr(ref) } 22 { voidptr(drop) } 24 { voidptr(same) } else { panic("unexpected JNI slot") } } }
+fn local_drop(e voidptr, value voidptr) { assert !held && value in [voidptr(10), voidptr(11)] }
+fn slot(e voidptr, index int) voidptr { return match index { 21 { voidptr(ref) } 22 { voidptr(drop) } 23 { voidptr(local_drop) } 24 { voidptr(same) } else { panic("unexpected JNI slot") } } }
+fn get_object(e voidptr, value voidptr, owner &char, field &char, signature &char) voidptr {
+ assert !held && value == voidptr(9)
+ return if unsafe { cstring_to_vstring(field) } == "name" { voidptr(10) } else { voidptr(11) }
+}
 fn push_frame(e voidptr) { depth++; assert depth == 1 }
 fn pop_frame(e voidptr) { depth--; assert depth == 0 }
 fn ws_millis() i64 { return now }
@@ -96,10 +110,23 @@ fn redeem(id u64, original u64, value &u8, size u32, endpoint &char) voidptr {
  redeemed++
  return if submit_bad { unsafe { nil } } else { voidptr(6) }
 }
-fn ws_account_utf8(e voidptr, value voidptr) &char { return if value == unsafe { nil } { unsafe { nil } } else { C.strdup(c"com.google") } }
+fn ws_account_utf8(e voidptr, value voidptr) &char {
+ return if value == unsafe { nil } { unsafe { nil } }
+  else if value == voidptr(10) { C.strdup(c"Zoë@example.test") }
+  else if value == voidptr(12) { C.strdup(c"oauth2:scope") }
+  else { C.strdup(c"com.google") }
+}
 fn ws_array_len(e voidptr, value voidptr) i32 { return 0 }
 fn ws_account_options(e voidptr, builder voidptr, original voidptr) bool { return true }
 fn build(id u64, op u16, kind &char, token &char) voidptr { assert !held && op == 2; return voidptr(5) }
+fn token_build(id u64, name &char, kind &char, token &char) voidptr {
+ assert !held && id == 8
+ assert unsafe { cstring_to_vstring(name) } == "Zoë@example.test"
+ assert unsafe { cstring_to_vstring(kind) } == "com.google"
+ assert unsafe { cstring_to_vstring(token) } == "oauth2:scope"
+ token_built++
+ return voidptr(5)
+}
 fn free_builder(handle voidptr) { assert !held && handle == voidptr(5) }
 fn submit(builder voidptr, endpoint &char) voidptr { assert !held && builder == voidptr(5); return voidptr(3) }
 fn ws_account_complete(e voidptr, node &WsAccountRequest) {
@@ -127,6 +154,7 @@ fn reset() {
   ws_account_tag = item_tag; ws_account_number = item_number
   ws_account_interaction = ticket; ws_account_redeem = redeem
   ws_account_build = build; ws_account_free = free_builder; ws_account_submit = submit
+  ws_account_token_build = token_build; token_built = 0
   node := &WsAccountRequest(C.calloc(1, sizeof(WsAccountRequest)))
   node.id = 7; node.future = voidptr(2); node.handle = voidptr(3)
   node.endpoint = C.strdup(c"/captured/accounts.sock")
@@ -211,6 +239,17 @@ fn main() {
   else { assert result == 0 && closed == 0 && dropped == if bad == voidptr(2) { 0 } else { 1 } }
   assert ws_account_active == 0
  }
- println("ACCOUNT-CLIENT-PASS terminal cancellation reentry timeout identity bounds continuation shutdown activity opaque-redemption acknowledgement replay cleanup")
+ // The token JNI entry reads exact Account fields and retains optional Activity.
+ for activity in [voidptr(0), voidptr(4)] {
+  reset(); ws_account_finished(e,voidptr(2)); closed = 0; dropped = 0
+  assert ws_account_token(e,voidptr(1),voidptr(9),voidptr(12),unsafe { nil },activity,voidptr(2)) == 1
+  assert token_built == 1 && ws_account_active == 1
+  ws_account_finished(e,voidptr(2))
+  assert closed == 1 && dropped == if activity == voidptr(0) { 1 } else { 2 }
+ }
+ reset(); ws_account_finished(e,voidptr(2)); closed = 0; dropped = 0
+ assert ws_account_token(e,voidptr(1),unsafe { nil },voidptr(12),unsafe { nil },unsafe { nil },voidptr(2)) == 0
+ assert token_built == 0 && ws_account_active == 0
+ println("ACCOUNT-CLIENT-PASS terminal cancellation reentry timeout identity bounds continuation shutdown activity opaque-redemption acknowledgement replay cleanup token-identity")
 }
 '

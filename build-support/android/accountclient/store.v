@@ -4,6 +4,7 @@ module accountclient
 import accountstore
 import encoding.utf8
 import os
+import time
 
 // These owner capabilities retain the selected authenticator's root-peer
 // channel. Only query() exposes accounts to another package, using the caller
@@ -302,6 +303,30 @@ pub fn store_query(handle voidptr, auth voidptr, session u64) i32 {
 		if auth_response_account(response, &char(account.name.str), &char(account.account_type.str)) != 0 { return -1 }
 	}
 	return auth_response_send(response)
+}
+
+// Only a live root-forwarded token session can authorize this exact account.
+// Visibility is read on every request; no grant or token is cached here.
+@[export: 'vinix_android_account_store_token_authorized']
+pub fn store_token_authorized(handle voidptr, auth voidptr, session u64) i32 {
+	if handle == unsafe { nil } || auth == unsafe { nil } { return -1 }
+	s := unsafe { &AccountStoreHandle(handle) }
+	mut a := s.auth
+	if voidptr(a) != auth { return -1 }
+	a.mutex.lock()
+	defer { a.mutex.unlock() }
+	if !store_live(s) { return -1 }
+	command := a.sessions[session] or { return -1 }
+	request := command.command.request
+	if request.operation != .get_auth_token || time.sys_mono_now() - command.started >= 5 * time.minute { return -1 }
+	name := request.account_name or { return -1 }
+	kind := request.account_type or { return -1 }
+	accounts := s.db.accounts(kind, command.command.caller.package_name) or { return -1 }
+	defer { accountstore.dispose_accounts(accounts) }
+	for account in accounts {
+		if account.name == name && account.account_type == kind { return 0 }
+	}
+	return -1
 }
 
 fn store_get(handle voidptr, name &char, account_type &char, key &char, password bool) voidptr {

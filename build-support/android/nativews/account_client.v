@@ -4,6 +4,7 @@
 module atlframework
 
 type WsAccountBuild = fn (u64, u16, &char, &char) voidptr
+type WsAccountTokenBuild = fn (u64, &char, &char, &char) voidptr
 type WsAccountFeature = fn (voidptr, &char) i32
 type WsAccountOption = fn (voidptr, &char, u16, &char, i64) i32
 type WsAccountFree = fn (voidptr)
@@ -41,6 +42,7 @@ mut:
 }
 __global ws_account_library voidptr
 __global ws_account_build WsAccountBuild
+__global ws_account_token_build WsAccountTokenBuild
 __global ws_account_feature WsAccountFeature
 __global ws_account_option WsAccountOption
 __global ws_account_free WsAccountFree
@@ -71,6 +73,7 @@ fn ws_account_client_init() bool {
 		ws_account_library = C.dlopen(c'libvinix-android-account.so', 2)
 		if ws_account_library == nil { return true }
 		ws_account_build = WsAccountBuild(C.dlsym(ws_account_library, c'vinix_android_account_request'))
+		ws_account_token_build = WsAccountTokenBuild(C.dlsym(ws_account_library, c'vinix_android_account_token_request'))
 		ws_account_feature = WsAccountFeature(C.dlsym(ws_account_library, c'vinix_android_account_feature'))
 		ws_account_option = WsAccountOption(C.dlsym(ws_account_library, c'vinix_android_account_option'))
 		ws_account_free = WsAccountFree(C.dlsym(ws_account_library, c'vinix_android_account_request_free'))
@@ -179,6 +182,39 @@ fn ws_account_start(e voidptr, manager voidptr, account_type voidptr, token_type
 			if feature != nil { Drop(slot(e, 23))(e, feature) }
 			if !valid || pending(e) { return 0 }
 		}
+		return ws_account_queue(e, id, builder, options, activity, future)
+	}
+}
+
+// Token requests share the existing future/cancellation/opaque interaction
+// path. The broker-selected authenticator checks account visibility separately.
+fn ws_account_token(e voidptr, manager voidptr, account voidptr, token_type voidptr, options voidptr, activity voidptr, future voidptr) u8 {
+	unsafe {
+		if !ws_account_initialized || ws_account_library == nil || voidptr(ws_account_token_build) == nil
+			|| account == nil || token_type == nil || future == nil { return 0 }
+		name_value := get_object(e, account, c'android/accounts/Account', c'name', c'Ljava/lang/String;')
+		kind_value := get_object(e, account, c'android/accounts/Account', c'type', c'Ljava/lang/String;')
+		name := ws_account_utf8(e, name_value)
+		kind := ws_account_utf8(e, kind_value)
+		token := ws_account_utf8(e, token_type)
+		if name_value != nil { Drop(slot(e,23))(e,name_value) }
+		if kind_value != nil { Drop(slot(e,23))(e,kind_value) }
+		defer { C.free(name); C.free(kind); C.free(token) }
+		if name == nil || kind == nil || token == nil || pending(e) { return 0 }
+		C.pthread_mutex_lock(&ws_account_mutex)
+		if ws_account_closing || ws_account_active >= 32 || ws_account_sequence == ~u64(0) { C.pthread_mutex_unlock(&ws_account_mutex); return 0 }
+		ws_account_sequence++
+		id := ws_account_sequence
+		C.pthread_mutex_unlock(&ws_account_mutex)
+		builder := ws_account_token_build(id, name, kind, token)
+		if builder == nil { return 0 }
+		defer { ws_account_free(builder) }
+		return ws_account_queue(e, id, builder, options, activity, future)
+	}
+}
+
+fn ws_account_queue(e voidptr, id u64, builder voidptr, options voidptr, activity voidptr, future voidptr) u8 {
+	unsafe {
 		if !ws_account_options(e, builder, options) || pending(e) { return 0 }
 		node := &WsAccountRequest(C.calloc(1, sizeof(WsAccountRequest)))
 		if node == nil { return 0 }

@@ -21,11 +21,13 @@ fn interaction_caller() nativeaccountauth.Caller {
 	return nativeaccountauth.Caller{'org.vinix.app', 10001, 10001, 1234, 'a'.repeat(64), 'b'.repeat(64)}
 }
 
-fn interaction_request() nativeaccountauth.Request {
+fn interaction_request(operation nativeaccountauth.Operation) nativeaccountauth.Request {
 	bytes := nativeaccountauth.encode_request(nativeaccountauth.Request{
 		id:           77
-		operation:    .add_account
+		operation:    operation
+		account_name: if operation == .get_auth_token { ?string('account@example.test') } else { none }
 		account_type: 'com.google'
+		auth_token_type: if operation == .get_auth_token { ?string('oauth2:scope') } else { none }
 	}) or { panic(err) }
 	defer { unsafe { bytes.free() } }
 	return nativeaccountauth.decode_request_bytes(bytes) or { panic(err) }
@@ -46,6 +48,10 @@ mut:
 // Authentication has already happened at this unit boundary. These exercise
 // the actual distinct request, service, result and one-shot redemption frames.
 fn interaction_fixture() &InteractionFixture {
+	return interaction_fixture_for(.add_account)
+}
+
+fn interaction_fixture_for(operation nativeaccountauth.Operation) &InteractionFixture {
 	service_fd, service_peer := interaction_pair()
 	client_fd, client_peer := interaction_pair()
 	assert C.shutdown(i32(client_peer), C.SHUT_WR) == 0
@@ -70,7 +76,7 @@ fn interaction_fixture() &InteractionFixture {
 	fixture.broker.admit(Incoming{
 		fd:         client_fd
 		ok:         true
-		authorized: nativeaccountauth.AuthorizedRequest{interaction_caller(), interaction_request()}
+		authorized: nativeaccountauth.AuthorizedRequest{interaction_caller(), interaction_request(operation)}
 	}) or { panic(err) }
 	fixture.broker.pump(0) or { panic(err) }
 	packet := fixture.service.read(0) or { panic(err) }
@@ -185,6 +191,32 @@ fn test_interaction_redeems_only_for_original_caller_once_and_preserves_actual_r
 	assert event.id == 77
 	assert event.options[0].value.text == 'actual-fixture-authenticator-result'
 	assert fixture.broker.active() == 0
+}
+
+fn test_token_interaction_reuses_bound_single_use_launch_without_exposing_service_capability() {
+	mut fixture := interaction_fixture_for(.get_auth_token)
+	defer { fixture.close() }
+	assert fixture.command.request.account_name == ?string('account@example.test')
+	assert fixture.command.request.auth_token_type == ?string('oauth2:scope')
+	ticket := fixture.offer()
+	defer { unsafe { ticket.free() } }
+	wrong := fixture.redeem(nativeaccountauth.Caller{...interaction_caller(), pid: 1235}, ticket)
+	defer { accountipc.dispose_event(wrong) }
+	assert wrong.kind == .failure && fixture.broker.interactions.len() == 1
+	ack := fixture.redeem(interaction_caller(), ticket)
+	defer { accountipc.dispose_event(ack) }
+	assert ack.kind == .result && fixture.broker.active() == 1
+	packet := fixture.service.read(0)!
+	assert packet.available
+	defer { unsafe { packet.body.free() } }
+	launch := accountipc.decode_launch(packet.header, packet.body)!
+	defer { accountipc.dispose_launch(launch) }
+	assert launch.session == fixture.command.session
+	assert launch.capability == fixture.command.capability
+	assert launch.interaction.handle == []u8{len: 32, init: 8}
+	replay := fixture.redeem(interaction_caller(), ticket)
+	defer { accountipc.dispose_event(replay) }
+	assert replay.kind == .failure && !(fixture.service.read(0)!).available
 }
 
 fn test_pending_interaction_is_revoked_on_disconnect_timeout_and_completion() {

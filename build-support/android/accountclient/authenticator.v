@@ -107,7 +107,7 @@ pub fn auth_read(handle voidptr, session &u64, timeout i32) i32 {
 	if packet.header.kind == .dispatch {
 		command := accountipc.decode_command(packet.header, packet.body) or { a.disconnect(); return -1 }
 		if a.sessions.len >= accountipc.max_sessions || command.session in a.sessions
-			|| command.request.operation !in [.add_account, .get_accounts]
+			|| command.request.operation !in [.add_account, .get_accounts, .get_auth_token]
 			|| (command.request.operation == .add_account && command.request.account_type == none) {
 			accountipc.dispose_command(command)
 			a.disconnect(); return -1
@@ -237,6 +237,14 @@ pub fn auth_account_type(handle voidptr) &char {
 	s := auth_current(handle)
 	if s == unsafe { nil } { return unsafe { nil } }
 	if value := s.command.request.account_type { return &char(value.str) }
+	return unsafe { nil }
+}
+
+@[export: 'vinix_android_authenticator_account_name']
+pub fn auth_account_name(handle voidptr) &char {
+	s := auth_current(handle)
+	if s == unsafe { nil } { return unsafe { nil } }
+	if value := s.command.request.account_name { return &char(value.str) }
 	return unsafe { nil }
 }
 
