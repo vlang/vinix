@@ -52,8 +52,9 @@ fn main() {
 	root := os.real_path(os.getwd()); out := os.abs_path(os.args[2]); old := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
-	if os.args[1] in ['string-cstring-host', 'bundle-receipt-host', 'cf-string-output-host', 'search-path-host', 'home-directory-host', 'inline-pthread-self-host', 'dictionary-snapshot-host', 'block-byref-host', 'block-imp-host', 'vm-probe-host', 'proc-memory-host', 'processinfo-host', 'data-url-host', 'data-http-host', 'connection-host'] {
+	if os.args[1] in ['string-float-host', 'string-cstring-host', 'bundle-receipt-host', 'cf-string-output-host', 'search-path-host', 'home-directory-host', 'inline-pthread-self-host', 'dictionary-snapshot-host', 'block-byref-host', 'block-imp-host', 'vm-probe-host', 'proc-memory-host', 'processinfo-host', 'data-url-host', 'data-http-host', 'connection-host'] {
 		fixture := match os.args[1] {
+			'string-float-host' { 'ns_string_float_test.v' }
 			'string-cstring-host' { 'ns_string_cstring_test.v' }
 			'bundle-receipt-host' { 'ns_bundle_receipt_test.v' }
 			'cf-string-output-host' { 'cf_string_output_test.v' }
@@ -71,6 +72,10 @@ fn main() {
 			else { 'ns_url_connection_test.v' }
 		}
 		run_host_fixture(root, old, out, fixture)!
+	} else if os.args[1] == 'string-float-inspector-build' {
+		run(out, 'inspect-build', [old + '/v', '-nocache', '-gc', 'none', '-cc', 'clang', '-path', '@vlib|' + root + '/compat/ios|@vmodules', '-o', out + '/inspect-string-float', root + '/tests/ios/inspect-string-float.v'], false)
+	} else if os.args[1] == 'string-float-inspect' {
+		run(out, 'inspect', [out + '/inspect-string-float'], false)
 	} else if os.args[1] == 'string-cstring-inspector-build' {
 		run(out, 'inspect-build', [old + '/v', '-nocache', '-gc', 'none', '-cc', 'clang', '-o', out + '/inspect-string-cstring', root + '/tests/ios/inspect-string-cstring.v'], false)
 	} else if os.args[1] == 'string-cstring-inspect' {

@@ -33,6 +33,7 @@ fn mutable_string_state(object u64) &ObjHeader {
 }
 
 fn mutable_string_types(name string, meta bool, selector string) ?string {
+	if !meta && name in ['NSString', 'NSMutableString']! && selector == 'floatValue' { return 'f16@0:8' }
 	if meta && name in ['NSString', 'NSMutableString']! && selector == 'stringWithCString:encoding:' {
 		return '@32@0:8r*16Q24'
 	}
@@ -271,6 +272,10 @@ fn mutable_string_encoded_cstring(cls u64, address u64, encoding u64) u64 {
 
 fn mutable_string_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	meta := object in ios_runtime.classes
+	if !meta && selector == 'floatValue' && objc_is_kind(object, ios_runtime.names['NSString']) {
+		ns_string_float_return(object, mut frame)
+		return true
+	}
 	family := mutable_string_family(if meta { object } else { read64(object) })
 	if meta && (family || object == ios_runtime.names['NSString']) && selector == 'stringWithCString:encoding:' {
 		frame.x[0] = mutable_string_encoded_cstring(object, frame.x[2], frame.x[3])
@@ -283,9 +288,12 @@ fn mutable_string_dispatch(object u64, selector string, mut frame RegisterFrame)
 		}
 		if !meta && objc_is_kind(object, ios_runtime.names['NSString']) {
 			if selector == 'description' { return true }
-			if header := ios_runtime.objects[object] {
+			if selector in ['copy', 'copyWithZone:']! || selector.starts_with('init') {
+				C.ios_objc_initialize_lock()
+				owned_mutable := if header := ios_runtime.objects[object] { header.mutable_string_owned } else { false }
+				C.ios_objc_initialize_unlock()
 				// Changing isa does not make the original mutable buffer immutable.
-				if header.mutable_string_owned {
+				if owned_mutable {
 					if selector in ['copy', 'copyWithZone:']! { frame.x[0] = mutable_string_snapshot(object, false); return true }
 					if selector.starts_with('init') { panic('iOS: mutable string initialization after isa replacement is not implemented') }
 				}
