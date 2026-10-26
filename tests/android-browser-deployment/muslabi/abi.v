@@ -29,6 +29,33 @@ fn span(bytes []u8, offset u64, size u64) ![]u8 {
 	return bytes[int(offset)..int(offset + size)]
 }
 
+// Section headers are not used by the runtime loader. Require the complete
+// table to refer to exactly the same bytes through its unique PT_LOAD mapping,
+// including rejection of partial overlaps with file-backed or zero-fill LOADs.
+fn mapped_span(bytes []u8, address u64, size u64, section_offset u64) ! {
+	if size == 0 || size > ~u64(0) - address { return error('invalid musl ABI mapped span') }
+	mut mappings := 0
+	mut intersections := 0
+	mut mapped_offset := u64(0)
+	programs := word(bytes, 32, 8)
+	for i in 0 .. int(word(bytes, 56, 2)) {
+		at := int(programs) + i * 56
+		if word(bytes, at, 4) != 1 { continue }
+		start := word(bytes, at + 16, 8)
+		filesize := word(bytes, at + 32, 8)
+		memory := word(bytes, at + 40, 8)
+		// inspect_elf has already checked these program headers, bounds and sums.
+		if memory != 0 && address < start + memory && start < address + size { intersections++ }
+		if address >= start && address - start <= filesize && size <= filesize - (address - start) {
+			mapped_offset = word(bytes, at + 8, 8) + (address - start)
+			mappings++
+		}
+	}
+	if mappings != 1 || intersections != 1 || mapped_offset != section_offset {
+		return error('musl ABI section does not match unique loader file mapping')
+	}
+}
+
 // Inspect only a fully described, unversioned dynamic symbol table. The engine
 // and both musl implementations are pinned separately; this checks the ABI the
 // engine actually requests rather than assuming matching library filenames.
@@ -77,12 +104,14 @@ pub fn inspect(bytes []u8) !Table {
 		if symbols.len == 0 || symbols.len % 24 != 0 || symbols.len > 16 * 1024 * 1024 || link >= count {
 			return error('invalid musl ABI symbols or string link')
 		}
+		mapped_span(bytes, tags[6], u64(symbols.len), word(sections, at + 24, 8))!
 		string_at := int(link) * 64
 		if word(sections, string_at + 4, 4) != 3 || word(sections, string_at + 16, 8) != tags[5]
 			|| tags[10] > word(sections, string_at + 32, 8) {
 			return error('musl ABI dynamic strings disagree with sections')
 		}
 		strings = span(bytes, word(sections, string_at + 24, 8), tags[10])!
+		mapped_span(bytes, tags[5], tags[10], word(sections, string_at + 24, 8))!
 	}
 	if !found { return error('missing musl ABI symbols') }
 	mut imports := map[string]Symbol{}
