@@ -13,6 +13,7 @@ import time
 const browser_prefix = 'VINIX-BROWSER-RESULTS-1 '
 const headless_prefix = 'VINIX-HEADLESS-RESULTS-1 '
 const account_ui_prefix = 'VINIX-ACCOUNT-UI-RESULTS-1 '
+const maps_account_prefix = 'VINIX-MAPS-ACCOUNT-RESULTS-1 '
 const chunk_bytes = 512
 const max_file = 8 * 1024 * 1024
 const max_total = 16 * 1024 * 1024
@@ -45,6 +46,9 @@ struct Protocol {
 	prefix string = browser_prefix
 	label  string = 'BROWSER-COLLECT'
 	scope  string = 'Exact credential-free browser diagnostic UART archive; not Google authentication proof.'
+	file_limit int = max_file
+	total_limit int = max_total
+	archive_limit int = max_archive
 }
 
 fn protocol(headless bool) Protocol {
@@ -65,6 +69,21 @@ fn account_ui_protocol() Protocol {
 		label: 'ACCOUNT-UI-COLLECT'
 		scope: 'Exact real desktop helper and root UI controller UART archive; no Android Activity, account, credential or Google sign-in proof.'
 	}
+}
+
+fn maps_account_protocol() Protocol {
+	return Protocol{
+		prefix: maps_account_prefix
+		label: 'MAPS-ACCOUNT-COLLECT'
+		scope: 'Exact Maps/GMS deployment controller UART archive; private app and broker logs excluded by the producer. Readiness is transport evidence, not Google authentication proof.'
+		file_limit: 16 * 1024 * 1024
+		total_limit: 48 * 1024 * 1024
+		archive_limit: 72 * 1024 * 1024
+	}
+}
+
+fn protocols() []Protocol {
+	return [protocol(false), protocol(true), account_ui_protocol(), maps_account_protocol()]
 }
 
 fn decimal(text string, limit int) !int {
@@ -95,7 +114,7 @@ fn parse_export(log string, selected Protocol) !Export {
 		where := ' at serial line=' + (number + 1).str()
 		// A concurrent console writer can fuse chatter and a frame onto one
 		// physical line. Reject that damage rather than silently skipping it.
-		for known in [browser_prefix, headless_prefix, account_ui_prefix] {
+		for known in [browser_prefix, headless_prefix, account_ui_prefix, maps_account_prefix] {
 			if offset := line.index(known) {
 				if offset != 0 {
 					return error('embedded archive frame' + where + ' prefix-offset=' + offset.str() +
@@ -103,7 +122,7 @@ fn parse_export(log string, selected Protocol) !Export {
 				}
 			}
 		}
-		if [browser_prefix, headless_prefix, account_ui_prefix].any(line.starts_with(it)) && !line.starts_with(prefix) {
+		if [browser_prefix, headless_prefix, account_ui_prefix, maps_account_prefix].any(line.starts_with(it)) && !line.starts_with(prefix) {
 			return error('foreign archive protocol' + where)
 		}
 		if !line.starts_with(prefix) { continue }
@@ -113,8 +132,8 @@ fn parse_export(log string, selected Protocol) !Export {
 		if fields.len == 4 && fields[0] == 'BEGIN' {
 			if begun || !digest(fields[1]) { return error('duplicate/invalid BEGIN') }
 			sha = fields[1]
-			bytes = decimal(fields[2], max_archive)!
-			chunks = decimal(fields[3], (max_archive + chunk_bytes - 1) / chunk_bytes)!
+			bytes = decimal(fields[2], selected.archive_limit)!
+			chunks = decimal(fields[3], (selected.archive_limit + chunk_bytes - 1) / chunk_bytes)!
 			if bytes == 0 || chunks != (bytes + chunk_bytes - 1) / chunk_bytes {
 				return error('invalid export bounds')
 			}
@@ -137,7 +156,7 @@ fn parse_export(log string, selected Protocol) !Export {
 			parts << data.bytestr()
 			index++
 		} else if fields.len == 4 && fields[0] == 'END' {
-			if !begun || index != chunks || fields[1] != sha || decimal(fields[2], max_archive)! != bytes
+			if !begun || index != chunks || fields[1] != sha || decimal(fields[2], selected.archive_limit)! != bytes
 				|| decimal(fields[3], chunks)! != chunks {
 				return error('incomplete/foreign END' + where + ' received-chunks=' + index.str() +
 					' declared-chunks=' + chunks.str())
@@ -160,8 +179,8 @@ fn safe_relative(path string) bool {
 		&& !path.contains_any('\x00\n\r\\') && !path.split('/').any(it in ['', '.', '..'])
 }
 
-fn validate(payload string) !Archive {
-	if payload.len > max_archive { return error('archive exceeds limit') }
+fn validate(payload string, selected Protocol) !Archive {
+	if payload.len > selected.archive_limit { return error('archive exceeds limit') }
 	archive := json2.decode[Archive](payload)!
 	if archive.version != 1 || archive.entries.len > 4096 || archive.root_mode > 0o777 {
 		return error('unsupported archive version/count/root mode')
@@ -183,8 +202,8 @@ fn validate(payload string) !Archive {
 				}
 			}
 			'regular' {
-				if entry.size > max_file || total + entry.size > max_total || !digest(entry.sha256) || entry.link != ''
-					|| entry.data.len > (max_file + 2) / 3 * 4 {
+				if entry.size > u64(selected.file_limit) || total + entry.size > u64(selected.total_limit) || !digest(entry.sha256) || entry.link != ''
+					|| entry.data.len > (selected.file_limit + 2) / 3 * 4 {
 					return error('regular file exceeds bounds')
 				}
 				data := base64.decode(entry.data)
@@ -280,7 +299,7 @@ fn self_test_protocol(selected Protocol) ! {
 	payload := json2.encode(fixture)
 	log := frames(payload, selected)
 	exported := parse_export('kernel chatter\n' + log + 'done\n', selected)!
-	assert exported.payload == payload && validate(exported.payload)!.entries == fixture.entries
+	assert exported.payload == payload && validate(exported.payload, selected)!.entries == fixture.entries
 	changed := payload.replace('/pinned/font', '/pinned/foNt')
 	changed_sha := sha256.sum(changed.bytes()).hex()
 	for bad in [log.all_before(prefix + 'END'), log + log,
@@ -335,7 +354,7 @@ fn self_test_protocol(selected Protocol) ! {
 		Archive{ root_mode: 0o700, entries: [Entry{ path: 'log', kind: 'regular', size: 1, sha256: '0'.repeat(64), data: 'YQ==' }] },
 		Archive{ root_mode: 0o4700, entries: []Entry{} },
 	] {
-		if _ := validate(json2.encode(bad)) { return error('unsafe archive accepted') }
+		if _ := validate(json2.encode(bad), selected) { return error('unsafe archive accepted') }
 	}
 	root := os.join_path(os.temp_dir(), 'vinix-archive-collect-selftest-' + selected.label + '-' + os.getpid().str())
 	serial := root + '.serial'
@@ -359,27 +378,30 @@ fn self_test_protocol(selected Protocol) ! {
 }
 
 fn self_test() ! {
-	self_test_protocol(protocol(false))!
-	self_test_protocol(protocol(true))!
-	self_test_protocol(account_ui_protocol())!
-	for selected in [protocol(false), protocol(true), account_ui_protocol()] {
-		for foreign in [protocol(false), protocol(true), account_ui_protocol()] {
+	for selected in protocols() {
+		self_test_protocol(selected)!
+		for foreign in protocols() {
 			if foreign.prefix == selected.prefix { continue }
 			if _ := parse_export(frames('test', foreign), selected) {
 				return error('foreign archive protocol accepted')
 			}
 		}
+		oversized := selected.prefix + 'BEGIN ' + '0'.repeat(64) + ' ' + (selected.archive_limit + 1).str() + ' 1\n'
+		if _ := parse_export(oversized, selected) { return error('protocol archive bound ignored') }
+		bad := Archive{ root_mode: 0o700, entries: [Entry{ path: 'oversized', kind: 'regular', size: u64(selected.file_limit + 1), sha256: '0'.repeat(64) }] }
+		if _ := validate(json2.encode(bad), selected) { return error('protocol file bound ignored') }
 	}
 }
 
 fn run() ! {
 	headless := os.args.len == 4 && os.args[1] == '--headless'
 	account_ui := os.args.len == 4 && os.args[1] == '--account-ui'
-	if !headless && !account_ui && os.args.len != 3 {
-		return error('usage: collect [--headless|--account-ui] SERIAL_LOG FRESH_EXTERNAL_RESULTS')
+	maps_account := os.args.len == 4 && os.args[1] == '--maps-account'
+	if !headless && !account_ui && !maps_account && os.args.len != 3 {
+		return error('usage: collect [--headless|--account-ui|--maps-account] SERIAL_LOG FRESH_EXTERNAL_RESULTS')
 	}
-	selected := if account_ui { account_ui_protocol() } else { protocol(headless) }
-	offset := if headless || account_ui { 1 } else { 0 }
+	selected := if maps_account { maps_account_protocol() } else if account_ui { account_ui_protocol() } else { protocol(headless) }
+	offset := if headless || account_ui || maps_account { 1 } else { 0 }
 	serial, root := os.args[1 + offset], os.args[2 + offset]
 	st := os.lstat(serial)!
 	if st.get_filetype() != .regular || st.size > 256 * 1024 * 1024 {
@@ -388,7 +410,7 @@ fn run() ! {
 	log := os.read_file(serial)!
 	if u64(log.len) != st.size { return error('serial log changed size while reading') }
 	exported := parse_export(log, selected)!
-	archive := validate(exported.payload)!
+	archive := validate(exported.payload, selected)!
 	restore(root, archive, exported, serial, sha256.sum(log.bytes()).hex(), selected)!
 	println(selected.label + ' PASS entries=' + archive.entries.len.str() + ' sha256=' + exported.sha256)
 }
