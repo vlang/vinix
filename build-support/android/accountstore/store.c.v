@@ -284,6 +284,8 @@ pub fn open(data_directory string, expected_uid u32, owner_package string, allow
 	execute(db, 'CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL, password TEXT, UNIQUE(name,type))')!
 	execute(db, 'CREATE TABLE IF NOT EXISTS userdata (account INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(account,key))')!
 	execute(db, 'CREATE TABLE IF NOT EXISTS visibility (account INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, package TEXT NOT NULL, value INTEGER NOT NULL CHECK(value BETWEEN 1 AND 4), PRIMARY KEY(account,package))')!
+	// An additive migration preserves stores created before explicit token APIs.
+	execute(db, 'CREATE TABLE IF NOT EXISTS authtokens (account INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, token_type TEXT NOT NULL, token TEXT NOT NULL, PRIMARY KEY(account,token_type))')!
 	execute(db, 'COMMIT')!
 	committed = true
 	if C.fsync(directory) != 0 || C.fsync(parent) != 0 {
@@ -512,6 +514,7 @@ pub fn (mut s Store) set_password(account Account, value ?string) ! {
 	status := C.sqlite3_step(statement)
 	C.sqlite3_finalize(statement)
 	if status != C.SQLITE_DONE { return error('cannot store account password') }
+	delete_account_tokens(s.db, id)!
 	execute(s.db, 'COMMIT')!
 	committed = true
 }
