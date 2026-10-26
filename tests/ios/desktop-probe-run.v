@@ -53,8 +53,9 @@ fn main() {
 		os.cp(prior + '/manifest.sha256', out + '/prior-manifest.sha256')!
 		if os.args[1] == 'tools' {
 			for tool in ['desktop-probe-run', 'desktop-probe-evidence'] {
+				// Optimize streaming hashes without disabling V assertions with -prod.
 				capture(out, 'tool-' + tool, [v, '-nocache', '-gc', 'none', '-cc', 'clang',
-					'-o', out + '/' + tool, root + '/tests/ios/' + tool + '.v'])!
+					'-cflags', '-O2', '-o', out + '/' + tool, root + '/tests/ios/' + tool + '.v'])!
 			}
 			return
 		}
