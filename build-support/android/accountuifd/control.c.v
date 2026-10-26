@@ -380,7 +380,7 @@ fn (c &Controller) start_helper(surface int, input int, lifetime int) !int {
 		} $else {
 			C._exit(125)
 		}
-		C.execve(&char(c.config.helper.str), argv.data, &environment[0])
+		C.execve(&char(c.config.helper.str), argv.data, &&char(&environment[0]))
 		C._exit(126)
 	}
 	return pid
