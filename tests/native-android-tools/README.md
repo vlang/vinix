@@ -40,3 +40,21 @@ The application supervisor and interactive fixtures now live in
 `_run_native.py` adapters are retired after fresh native dispatcher and suite
 qualification. The generic `_boot_native.py` bridge remains for unported
 consumers; its file receives no retirement credit here.
+
+Protected storage extends `ApplicationInfo` with both Android directory fields,
+preserves them in copies, and initializes them together with `dataDir` for primary
+and companion packages. Ordinary contexts retain the existing private app root;
+device-protected contexts use its private `device_protected` child, including
+after configuration cloning. This provides separate storage namespaces. Vinix
+does not implement Android's separate encryption keys or unlock lifecycle.
+The checker exercises the actual sealed baseline and rejects incompatible or
+repeated extensions before writing any class:
+
+```sh
+v -path tests/native-android-tools:@vlib -o /tmp/check-protected-storage tests/native-android-tools/check-protected-storage.v
+/tmp/check-protected-storage BASELINE_SMALI SMALI_TOOLS JAVA
+```
+
+The native bootstrap and extended framework must be deployed together: the
+bootstrap uses `ApplicationInfo.vinixSetDataDirectory(String)` to keep the
+primary package's shared metadata object consistent before app startup.

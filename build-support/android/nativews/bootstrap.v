@@ -104,7 +104,8 @@ fn ws_bootstrap(root &char, apk &char, display bool) voidptr {
 		loaded := static_obj(e, c'android/atl/ATLLoadedApp', c'getPrimaryApplication', c'()Landroid/atl/ATLLoadedApp;', nil)
 		pkg := get_object(e, loaded, c'android/atl/ATLLoadedApp', c'pkg', c'Landroid/content/pm/PackageParser$Package;')
 		info := get_object(e, pkg, c'android/content/pm/PackageParser$Package', c'applicationInfo', c'Landroid/content/pm/ApplicationInfo;')
-		put_object(e, info, c'android/content/pm/ApplicationInfo', c'dataDir', c'Ljava/lang/String;', ws_string(e, ws.data))
+		mut data_args := [Value{l:ws_string(e, ws.data)}]!
+		call(e, info, c'android/content/pm/ApplicationInfo', c'vinixSetDataDirectory', c'(Ljava/lang/String;)V', &data_args[0])
 		put_object(e, info, c'android/content/pm/ApplicationInfo', c'sourceDir', c'Ljava/lang/String;', ws_string(e, apk))
 		put_object(e, info, c'android/content/pm/ApplicationInfo', c'publicSourceDir', c'Ljava/lang/String;', ws_string(e, apk))
 		put_object(e, info, c'android/content/pm/ApplicationInfo', c'nativeLibraryDir', c'Ljava/lang/String;', ws_string(e, native))
