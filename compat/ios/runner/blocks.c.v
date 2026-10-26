@@ -83,20 +83,92 @@ fn block_invoke_bool(block u64, value bool) {
 	method(block, value)
 }
 
+fn block_byref_copy(source u64) u64 {
+	C.ios_objc_initialize_lock()
+	forwarded := read64(source + 8)
+	flags := read32(forwarded + 16)
+	if flags & 0xfffe != 0 {
+		if flags & (u32(1) << 24) != 0 && flags & 0xfffe != 0xfffe {
+			write32(forwarded + 16, flags + 2)
+		}
+		C.ios_objc_initialize_unlock()
+		return forwarded
+	}
+	source_flags := read32(source + 16)
+	size := read32(source + 20)
+	has_helpers := source_flags & (u32(1) << 25) != 0
+	extended := source_flags & 0xf0000000 == u32(1) << 28
+	minimum := u32(24) + if has_helpers { u32(16) } else { u32(0) }
+	if size < minimum + if extended { u32(8) } else { u32(0) } || size > 1024 * 1024 {
+		panic('iOS: invalid by-reference block capture size')
+	}
+	copied := u64(C.malloc(usize(size)))
+	if copied == 0 { panic('iOS: cannot copy by-reference block capture') }
+	write64(copied, 0)
+	write64(copied + 8, copied)
+	// One owner for the stack scope and one for the first copied block.
+	write32(copied + 16, source_flags | (u32(1) << 24) | 4)
+	write32(copied + 20, size)
+	if has_helpers {
+		write64(copied + 24, read64(source + 24))
+		write64(copied + 32, read64(source + 32))
+		if extended { write64(copied + 40, read64(source + 40)) }
+	} else {
+		unsafe { C.memcpy(voidptr(copied + 24), voidptr(source + 24), usize(size - 24)) }
+	}
+	write64(source + 8, copied)
+	C.ios_objc_initialize_unlock()
+	// Compiler helpers can reenter the runtime. They initialize the payload;
+	// copying it ourselves would break ARC move/weak and C++ constructors.
+	if has_helpers {
+		helper := unsafe { BlockCopyHelper(voidptr(read64(source + 24))) }
+		helper(copied, source)
+	}
+	return copied
+}
+
+fn write64(address u64, value u64) {
+	unsafe { *(&u64(address)) = value }
+}
+
+fn block_byref_release(source u64) {
+	C.ios_objc_initialize_lock()
+	forwarded := read64(source + 8)
+	flags := read32(forwarded + 16)
+	count := flags & 0xfffe
+	if flags & (u32(1) << 24) == 0 || count == 0 || count == 0xfffe {
+		C.ios_objc_initialize_unlock()
+		return
+	}
+	last := flags & 0xffff == 2
+	write32(forwarded + 16, flags - if last { u32(1) } else { u32(2) })
+	C.ios_objc_initialize_unlock()
+	if !last { return }
+	if flags & (u32(1) << 25) != 0 {
+		helper := unsafe { BlockDisposeHelper(voidptr(read64(forwarded + 32))) }
+		helper(forwarded)
+	}
+	C.free(unsafe { voidptr(forwarded) })
+}
+
 fn block_object_assign(destination &u64, object u64, flags int) {
-	value := match flags & 0xf {
+	value := match flags & 0x9f {
 		3 { objc_retain(object) }
 		7 { block_copy(object) }
-		else { panic('iOS: unsupported block capture flags') }
+		8, 24 { block_byref_copy(object) }
+		131, 135, 147, 151 { object } // MRC byref helpers do not retain their payload.
+		else { panic('iOS: unsupported block capture flags 0x${flags.hex()}') }
 	}
 	unsafe { *destination = value }
 }
 
 fn block_object_dispose(object u64, flags int) {
-	match flags & 0xf {
+	match flags & 0x9f {
 		3 { objc_release(object) }
 		7 { block_release(object) }
-		else { panic('iOS: unsupported block capture disposal') }
+		8, 24 { block_byref_release(object) }
+		131, 135, 147, 151 {}
+		else { panic('iOS: unsupported block capture disposal flags 0x${flags.hex()}') }
 	}
 }
 
