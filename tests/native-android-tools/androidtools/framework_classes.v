@@ -94,6 +94,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_media_router(smali)!
  framework_media_codec_exceptions(smali)!
  framework_account_listeners(smali)!
+ framework_account_authenticator_response(smali)!
  framework_storage_queries(smali)!
  framework_startup_apis(smali)!
  framework_absent_hardware(smali)!
