@@ -7,6 +7,7 @@ import os
 #include <sys/wait.h>
 #include <errno.h>
 #include <signal.h>
+#include <fcntl.h>
 
 @[typedef]
 struct C.posix_spawn_file_actions_t {}
@@ -22,9 +23,16 @@ fn C.WEXITSTATUS(i32) i32
 fn C.WTERMSIG(i32) i32
 fn C.kill(i32, i32) i32
 
-struct Statuses {
+pub struct Statuses {
+pub:
 	producer int
 	consumer int
+}
+
+pub struct HashResult {
+pub:
+	sha256   string
+	statuses Statuses
 }
 
 fn spawn_child(arguments []string, read_fd int, write_fd int, pipe_fds []int) !i32 {
@@ -75,12 +83,20 @@ fn wait_child(pid i32) !int {
 // Diagnostics inherit the parent's descriptors, so neither child can block on
 // an undrained diagnostic pipe. Always reap both children, including spawn errors.
 fn commands(producer []string, consumer []string) !Statuses {
+	return commands_to(producer, consumer, -1)
+}
+
+fn commands_to(producer []string, consumer []string, output_fd int) !Statuses {
 	mut pipe := os.pipe()!
 	defer { pipe.close() }
 	if pipe.read_fd < 3 || pipe.write_fd < 3 {
 		return error('stream requires open standard descriptors')
 	}
-	descriptors := [pipe.read_fd, pipe.write_fd]
+	mut descriptors := [pipe.read_fd, pipe.write_fd]
+	if output_fd >= 0 {
+		if output_fd < 3 { return error('stream requires a separate output descriptor') }
+		descriptors << output_fd
+	}
 	producer_pid := spawn_child(producer, -1, pipe.write_fd, descriptors)!
 	mut producer_reaped := false
 	defer {
@@ -89,7 +105,7 @@ fn commands(producer []string, consumer []string) !Statuses {
 			wait_child(producer_pid) or {}
 		}
 	}
-	consumer_pid := spawn_child(consumer, pipe.read_fd, -1, descriptors)!
+	consumer_pid := spawn_child(consumer, pipe.read_fd, output_fd, descriptors)!
 	mut consumer_reaped := false
 	defer {
 		if !consumer_reaped {
@@ -103,6 +119,44 @@ fn commands(producer []string, consumer []string) !Statuses {
 	consumer_status := wait_child(consumer_pid)!
 	consumer_reaped = true
 	return Statuses{ producer: producer_status, consumer: consumer_status }
+}
+
+fn fat_member(member string) !string {
+	if member.len == 0 || member.len > 255 || member in ['.', '..']
+		|| !member.bytes().all((it >= `a` && it <= `z`) || (it >= `A` && it <= `Z`)
+			|| (it >= `0` && it <= `9`) || it in [`_`, `-`, `.`]) {
+		return error('stream requires a literal FAT member basename')
+	}
+	return '::/boot/' + member
+}
+
+// extract_member streams the exact binary FAT member into tar without a host
+// archive. Diagnostics inherit the parent's descriptors. The destination may
+// contain partial extraction on failure; callers must check BOTH child statuses.
+pub fn extract_member(boot_image string, member string, destination string) !Statuses {
+	return commands(['mcopy', '-i', boot_image, fat_member(member)!, '-'],
+		['/usr/bin/tar', '-xf', '-', '-C', destination])
+}
+
+// hash_member streams the exact binary FAT member into shasum. Only its small
+// stdout receipt is retained at a fresh output path; diagnostics remain inherited.
+// Both child statuses are returned on command failure, with an empty sha256.
+// Setup/spawn/invalid-success-output errors are returned after children are reaped.
+pub fn hash_member(boot_image string, member string, output_path string) !HashResult {
+	path := fat_member(member)!
+	if output_path.contains('\x00') { return error('invalid stream output path') }
+	output_fd := C.open(output_path.str, C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_CLOEXEC, 0o600)
+	if output_fd < 0 { return error('stream output: ' + os.get_error_msg(C.errno)) }
+	defer { os.fd_close(output_fd) }
+	statuses := commands_to(['mcopy', '-i', boot_image, path, '-'],
+		['/usr/bin/shasum', '-a', '256'], output_fd)!
+	if statuses.producer != 0 || statuses.consumer != 0 { return HashResult{ statuses: statuses } }
+	output := os.read_file(output_path)!
+	if output.len != 68 || output[64..] != '  -\n'
+		|| !output[..64].bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`)) {
+		return error('invalid stream SHA-256 receipt')
+	}
+	return HashResult{ sha256: output[..64], statuses: statuses }
 }
 
 // copy streams a ustar module into the FAT boot image without a temporary tar.
