@@ -1,4 +1,4 @@
-# Ordinary explicit service access: host validation
+# Ordinary explicit service access: host and ART validation
 
 Core change `217dec6e350c9e99a152a48cd0736d487138e273` validates explicit
 `Context.bindService` and `Context.startService` targets before registering a
@@ -97,10 +97,10 @@ the build. The native reference remains `aa460c06686e2d1f60ea6dd27ab8f158a3b9794
 An independent full integrity recheck is retained in
 `/Users/alex/.local/state/vinix/android/service-access-final-source-readback-2026-10-26.log`.
 
-This qualifies the rebuilt host artifact for an isolated ART run. Runtime
-service-access behavior and Google account sign-in remain unverified here.
+The isolated ART run below qualifies this rebuilt artifact's ordinary
+service-access behavior. Google account sign-in remains unsupported.
 
-## Signed runtime fixture: host build only
+## Signed runtime fixture
 
 `tests/native-android-ws/service-access-fixture.v` builds four signed APKs. The
 client tests start and bind rejection for missing declarations/APKs, disabled
@@ -143,6 +143,33 @@ SHA-256 `2f68c43aed0395a4836a8f9922eb95106d19d26d6a52c70438d16234ff336729`.
 | `blocked/probe.apk` | `ff0e1edab41f4f847938e24f42f1abec7a5b5181dd4174e803c23de6a1e41994` |
 | `disabled/probe.apk` | `9c59d18e48208977675d36eb2fd8673305cdac9b7b31588a7d31394b39419434` |
 
-This establishes fixture construction and transformer validation. ART execution
-of the repaired isolated framework overlay remains required; no runtime pass or Google
-account sign-in success is claimed here.
+## ART result
+
+The unchanged four-APK fixture passed on 26 October 2026 against the repaired
+2,098-class framework and pinned native library above. The runner required one
+exact marker and ten further seconds without a fixture failure or APK exit:
+
+```text
+SERVICE-ACCESS-PASS declared enabled application-enabled exported permission requested-permission same-package application-once classloader resources intent-copy bind start cached-invisible no-denied-callback
+```
+
+The genuine `service-access-pass.png` displays the passing fixture. The complete
+serial log also retains a caught `NoSuchFieldError` from the inherited
+Maps-specific diagnostic probing `nge.bB` in the synthetic activity. It did not
+terminate the fixture or affect its assertions.
+
+The stopped, collected guest is retained at
+`/Users/alex/.local/state/vinix/android/account-contract-service-r2-2026-10-26`.
+Full readback verified 202 files; its sealed `sha256.json` digest is
+`80580b4a50adbfef7a4a298eca9673dc505a42a14d1f1ebc87cdd4a2583dc319`.
+The runner source is commit `e27a11a6c4d1ee7734d6bfb1964bc8ab8ab33354`;
+the tested binary SHA-256 is
+`096732ded0726c8cfa29d3e334fa94374e77d9784e0af35f92ee2defd7b56d72`.
+Preparation used a fresh RAM-disk scratch directory, retained the complete
+runtime inventories and exact file-delta checks, and removed only its own
+scratch after successful preparation. The earlier disk-full preparation remains
+separately recorded at `service-art-2026-10-26`; it never launched a guest.
+
+This verifies ordinary service startup and access rules within the shared ART
+compatibility model. It does not establish trusted account dispatch, a Google
+login page, or an authenticated Maps account.
