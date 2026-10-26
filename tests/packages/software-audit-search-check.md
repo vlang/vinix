@@ -113,5 +113,30 @@ V_EXECUTABLE -prod -cc CLANG_EXECUTABLE -o /external/audit-check tests/packages/
 The maintained runner passed production typechecking and executable compilation;
 the receipt is `maintained-runner-01/result.json` beside the prior bundle,
 SHA-256 `86c258602b29cee1c0e9cfa396e96a1f2dbd4580a09c3b237a45cd52295e3570`.
-The prior bundle qualifies audit recovery only; combined execution with
-installed-name search remains pending integration.
+The prior bundle qualifies audit recovery only.
+
+The maintained runner was subsequently rebuilt from the main checkout and
+passed combined installed-name search and compact audit recovery checks in all
+five modes, plus the historical Software fixture in normal mode only. Each
+tracked mode again retained zero V bytes and records over 3,000 steady render
+cycles (18,000 trees). The captured source revision is
+`51ecd7240cf893c692b7fa385c6a16b569682c36`; `run/sources.json` binds the exact
+318 project inputs, SHA-256
+`e89dca856f742def36e87cc0d3f3261b2853f6eefb67f84d6bc94619dd11e506`.
+All original/staged project and UI inventories and V/Clang executable pins
+matched before and after execution.
+
+The combined bundle is
+`/Users/alex/Library/Caches/vinix-codex/section14/deployment-audit-compact-20261026/main-combined-01`.
+Its maintained `run/result.json` SHA-256 is
+`efcf48abce12b4512854039184664cd5e3f7bc1f9b31587536fcb944c2596a8b`;
+the outer build/run `result.json` SHA-256 is
+`ec5b63edebb31792ad5c43e7bce8cd75bc21caf227d0538a4c276f8f948acdc7`.
+`build-run.v`, `invoke.argv.json`, and the retained build/run argument vectors
+record the actual main-checkout runner compilation and invocation. Runner
+source SHA-256 is
+`ca102f2e2f08aeef2f12c9043639ca3c8bb62d1e80192042f8808218c17fe103`.
+The final output occupies approximately 85 MiB and passed a 100 MiB observed
+post-run size check; that check is not a quota on intermediate compiler writes.
+This remains headless host evidence with the transitive toolchain limitation
+above; it claims no guest rendering or wider section 14 acceptance.
