@@ -139,6 +139,25 @@ const storyboard_markers = ['IOS-STORYBOARD-COMPILED: source-generated NIB graph
 'IOS-STORYBOARD-XML: bounded parser rejects malformed XML, DTDs/entities, text, depth/nodes; partial view failures release their graphs',
 'IOS-STORYBOARD-REJECT: 20 construction, subclass, caller/isa, argument, resource, identifier and corrupt-storage cases fail explicitly']
 
+fn guest_resources(out string) ! {
+	// The VM removes its staging directory after preserving this archive.
+	temporary := os.join_path(os.temp_dir(), 'compiled-storyboard-evidence-' + os.getpid().str())
+	if os.exists(temporary) { return error('resource check temporary directory exists') }
+	os.mkdir(temporary)!
+	defer { os.rmdir_all(temporary) or {} }
+	paths := ['Info.plist', 'LaunchScreen.storyboardc/Info.plist', 'LaunchScreen.storyboardc/LaunchScreen.nib',
+		'LaunchScreen.storyboardc/01J-lp-oVM-view-Ze5-6b-2t3.nib', 'LaunchScreenIOS.png']
+	mut args := ['/usr/bin/tar', '-xzf', out + '/' + probe_state(out)! + '/initramfs.tar.gz', '-C', temporary, '--']
+	for path in paths { args << './opt/ios/' + path }
+	extracted := os.exec(args)
+	if extracted.exit_code != 0 { return error('extract preserved guest resources: ' + extracted.output) }
+	for path in paths {
+		if digest(out + '/application/' + path)! != digest(temporary + '/opt/ios/' + path)! {
+			return error('probe resource differs from preserved application: ' + path)
+		}
+	}
+}
+
 fn results(out string) ! {
 	revision := os.read_file(out + '/source-revision.txt')!.trim_space()
 	if revision.len != 40 || revision.bytes().any(!it.is_hex_digit()) { return error('invalid revision') }
@@ -220,12 +239,6 @@ fn results(out string) ! {
 	require_text(out, 'resource-provenance.txt', ['Prior manifest SHA-256: a3abbb60855bf8871a1462fd2866296ed2e20cda126e882fee8a14f8ba21b454',
 		'Five launch resources extracted from com.epicgames.FortniteGame_42.30.1_und3fined(1).ipa.', 'All test runs in this checkpoint are fresh;',
 		'ASan leak detection disabled; ASan/UBSan errors remain fatal.'])!
-	for path in ['Info.plist', 'LaunchScreen.storyboardc/Info.plist', 'LaunchScreen.storyboardc/LaunchScreen.nib',
-		'LaunchScreen.storyboardc/01J-lp-oVM-view-Ze5-6b-2t3.nib', 'LaunchScreenIOS.png'] {
-		if digest(out + '/application/' + path)! != digest(out + '/' + probe_state(out)! + '/rootfs/opt/ios/' + path)! {
-			return error('probe resource differs from preserved application: ' + path)
-		}
-	}
 	if digest(out + '/application/FortniteClient-IOS-Shipping')! != '6aae5109d316864fb67bea6a92046c347edbb04dc2a104c6666713da989cd373' {
 		return error('unexpected application executable')
 	}
@@ -291,6 +304,7 @@ fn results(out string) ! {
 }
 fn seal(out string) ! {
 	results(out)!
+	guest_resources(out)!
 	mut lines := []string{}
 	for path in files(out, '')! {
 		if path != 'manifest.sha256' { lines << digest(out + '/' + path)! + '  ' + path }
@@ -318,10 +332,19 @@ fn check(out string) ! {
 		if digest(out + '/' + line[66..])! != line[..64] { return error('checksum mismatch: ' + line[66..]) }
 	}
 	results(out)!
+	guest_resources(out)!
 }
 
 fn selftest(out string) ! {
 	check(out)!
+	image := out + '/application/LaunchScreenIOS.png'
+	image_before := os.read_file(image)!
+	os.write_file(image, 'SELFTEST-CHANGED-RESOURCE')!
+	mut resource_rejected := false
+	guest_resources(out) or { resource_rejected = true }
+	os.write_file(image, image_before)!
+	if !resource_rejected { return error('changed application resource accepted') }
+	println('application resource differing from preserved guest archive: rejected')
 	media := out + '/' + probe_state(out)! + '/boot.img'
 	backup := media + '.selftest'
 	if os.exists(backup) { return error('selftest backup exists') }

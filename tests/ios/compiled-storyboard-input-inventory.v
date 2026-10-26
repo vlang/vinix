@@ -85,7 +85,7 @@ fn main() {
 	for path in paths {
 		lines << (digest(root + '/' + path) or { panic(err) }) + '  ' + path
 	}
-	for path in ['/opt/homebrew/opt/llvm/bin/clang', '/opt/homebrew/opt/llvm/bin/llvm-ar', '/opt/homebrew/opt/llvm/bin/llvm-objdump', '/usr/bin/clang', '/usr/bin/ar', '/usr/bin/openssl', '/etc/ssl/cert.pem',
+	for path in ['/opt/homebrew/opt/llvm/bin/clang', '/opt/homebrew/opt/llvm/bin/llvm-ar', '/opt/homebrew/opt/llvm/bin/llvm-objdump', '/usr/bin/clang', '/usr/bin/ar', '/usr/bin/tar', '/usr/bin/openssl', '/etc/ssl/cert.pem',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSObject.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSBundle.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSString.h',
