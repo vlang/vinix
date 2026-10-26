@@ -16,11 +16,11 @@ const base_root = state_root + '/maps-account-r5'
 const base_seal = '9a8bf61bd526d7ec020d45920367d45e90a2ef4692c6d8fa8b87de801a14c5ca'
 const framework_root = state_root + '/combined-account-webview-protected-storage-framework-2026-10-27-r2'
 const framework_seal = '67e1cb450fa87305c99480133084b7f9cb684feeeaa2e0c3efa3007ab43ee938'
-const native_root = state_root + '/current-native-build-2026-10-27-protected-r1'
-const native_seal = '894c9657077cdd913a2c66c1cf78358daaccc4da8b0739ed77bb2a3dbea1b4ee'
+const native_root = state_root + '/current-native-build-2026-10-27-binding-r2'
+const native_seal = 'bd0e3902130f74877abaf269301377c7b5d2cbfe9e7732508838d84ec863d19d'
 const jar_pin = 'a8ba34eb79be2473f89042c8ee940ab1994dbc902c3d45143877f8891d3b428b'
 const dex_pin = '2739569a157276b76da82ed51ce41ef805457f95c01fe23ec524b5666bd486c6'
-const native_pin = '05ed64c8c0778cc09ea2db7d820c873c7e53c493f99c886c4992f3243f8f913a'
+const native_pin = '8508d4acb9a96c15eddd3a4afd075855270e2dae48006a9675a86ead0b2f6f19'
 const runtime = 'opt/vinix-android-aarch64'
 const jar_path = runtime + '/usr/lib/java/dex/android_translation_layer/api-impl.jar'
 const dex_path = runtime + '/usr/lib/java/dex/android_translation_layer/classes.dex'
@@ -77,8 +77,25 @@ fn exact_regular_names(names []string) ! {
 	expected.sort()
 	if actual != expected { return error('nine-file payload allowlist differs') }
 }
-fn exact_service_abi(launch string, native string) ! {
-	if !stage.valid_pin(launch) || launch != native { return error('retained launcher service ABI differs') }
+// The only unequal source pair audited here adds opt-in numeric timeout logging
+// and portable printf casts. It preserves the retained seven-argument entry ABI.
+fn exact_service_abi(launch string, native string, manifest string, library string) ! {
+	if !stage.valid_pin(launch) || !stage.valid_pin(native) { return error('retained launcher service ABI differs') }
+	if launch == native { return }
+	if launch != 'c453f9a0a4ab8b5f8ad4ea17d0c932304d61aafb6126d55b9bcc55efe0aa9b57'
+		|| native != 'e0f72ab74ccf89d91dd66c23ae35823079e9ead4552e965ab198b3b91057c489'
+		|| manifest != 'bd0e3902130f74877abaf269301377c7b5d2cbfe9e7732508838d84ec863d19d'
+		|| library != '8508d4acb9a96c15eddd3a4afd075855270e2dae48006a9675a86ead0b2f6f19' {
+		return error('retained launcher service ABI differs')
+	}
+}
+// Same declaration and call checks used by build-current-launch.v.
+fn service_abi(entry string, implementation string) ! {
+	if !entry.contains('type NativeServiceMain = fn (&char, &char, &char, &char, &char, i32, i32) i32')
+		|| !entry.contains('launch.action.str, i32(control_fd), i32(ui_fd))')
+		|| !implementation.contains('fn ws_service_main(root &char, apk &char, package_name &char, service &char, action &char, control_fd i32, ui_fd i32) i32 {') {
+		return error('native service entry and implementation must use the seven-argument UI ABI')
+	}
 }
 fn pins(value map[string]json2.Any) !map[string]string {
 	return json2.decode[map[string]string](json2.encode(value['inputs_sha256']!))!
@@ -225,7 +242,14 @@ fn run(destination string) ! {
 		|| stage.text_field(framework.receipt, 'classes_dex_sha256')! != dex_pin { return error('exact protected framework profile differs') }
 	stage.verify_native(native, framework)!
 	if native.files['native/libvinix-android-native.so']! != native_pin { return error('protected native pin differs') }
-	exact_service_abi(launch.files['abi/headless.v']!, native.files['native/atlframework/headless.v']!)!
+	exact_service_abi(launch.files['abi/headless.v']!, native.files['native/atlframework/headless.v']!, native.seal, native.files['native/libvinix-android-native.so']!)!
+	service_entry := os.read_file(launch.root + '/abi/native-entry.v')!
+	service_implementation := os.read_file(native.root + '/native/atlframework/headless.v')!
+	if sha256.sum(service_entry.bytes()).hex() != launch.files['abi/native-entry.v']!
+		|| sha256.sum(service_implementation.bytes()).hex() != native.files['native/atlframework/headless.v']! {
+		return error('service ABI source bytes differ from sealed inputs')
+	}
+	service_abi(service_entry, service_implementation)!
 	mut bundles := [old_framework, old_native, launch, framework, native]
 	account := original_bundle(request, 'account')!
 	dependencies := stage.verify_account(account)!
@@ -374,9 +398,23 @@ fn self_test() ! {
 	}
 	allowed << 'opt/escape'
 	if _ := exact_regular_names(allowed) { return error('additional payload accepted') }
-	exact_service_abi(jar_pin, jar_pin)!
-	if _ := exact_service_abi(jar_pin, dex_pin) { return error('ABI mismatch accepted') }
-	if _ := exact_service_abi('', '') { return error('empty ABI accepted') }
+	exact_service_abi(jar_pin, jar_pin, native_seal, native_pin)!
+	old_service := 'c453f9a0a4ab8b5f8ad4ea17d0c932304d61aafb6126d55b9bcc55efe0aa9b57'
+	new_service := 'e0f72ab74ccf89d91dd66c23ae35823079e9ead4552e965ab198b3b91057c489'
+	exact_service_abi(old_service, new_service, native_seal, native_pin)!
+	for pair in [[jar_pin, dex_pin], ['', ''], [new_service, old_service], [old_service, jar_pin], [jar_pin, new_service]] {
+		if _ := exact_service_abi(pair[0], pair[1], native_seal, native_pin) { return error('unknown or reversed ABI pair accepted') }
+	}
+	for profile in [[jar_pin, native_pin], [native_seal, jar_pin]] {
+		if _ := exact_service_abi(old_service, new_service, profile[0], profile[1]) { return error('unrelated native ABI profile accepted') }
+	}
+	entry := 'type NativeServiceMain = fn (&char, &char, &char, &char, &char, i32, i32) i32\ncall(launch.action.str, i32(control_fd), i32(ui_fd))'
+	implementation := 'fn ws_service_main(root &char, apk &char, package_name &char, service &char, action &char, control_fd i32, ui_fd i32) i32 {'
+	service_abi(entry, implementation)!
+	for changed in [entry.replace('&char, i32, i32) i32', '&char, i32) i32'), entry.replace('i32(ui_fd))', 'i32(control_fd))')] {
+		if _ := service_abi(changed, implementation) { return error('changed retained service declaration or call accepted') }
+	}
+	if _ := service_abi(entry, implementation.replace(', ui_fd i32', '')) { return error('changed native service signature accepted') }
 	plan := [stage.Entry{name: 'opt/a', kind: 'regular', mode: 0o644}]
 	good := [stage.Entry{name: 'opt', kind: 'directory', mode: 0o755}, stage.Entry{name: 'opt/a', kind: 'regular', mode: 0o755}]
 	if inherited_modes(good, plan)!['opt/a']! != 0o755 { return error('first mode not retained') }
