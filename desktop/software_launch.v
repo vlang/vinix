@@ -20,6 +20,7 @@ fn (mut a SoftwareApp) clear_launch_options() {
 	a.launch_id = ''; a.launch_name = ''
 	a.launch_arguments = []u8{}; a.launch_file = []u8{}
 	a.launch_mode = false; a.launch_focus = 0
+	a.launch_compact = false; a.launch_page = 0
 	a.launch_file_selected = -1; a.launch_file_scroll = 0
 	a.launch_read_file = -1
 	a.launch_data_cwd = true; a.launch_files_allowed = false; a.launch_hosted_display = false
@@ -48,7 +49,7 @@ fn (mut a SoftwareApp) prepare_launch_details() {
 	values << 'Entered file path (not yet granted): ' + if a.launch_file.len == 0 { '(empty)' } else { editor_bytes_text(a.launch_file) }
 	values << 'An entered file must be added or cleared before running. Allowed paths must be used explicitly in arguments when needed.'.clone()
 	values << 'The ordinary-account service checks current installed state, trust, policy, file existence and access at launch.'.clone()
-	values << 'Return to the full launch form to edit, add or remove grants, change the working folder or run.'.clone()
+	values << 'Return to Launch options to edit, add or remove grants, change the working folder or run.'.clone()
 	a.details_values(0, values)
 	software_policy_free_lines(mut values)
 	total := a.details_pages.len.str()
@@ -131,8 +132,12 @@ fn (mut a SoftwareApp) handle_launch_options(event_id string) {
 		}
 	}
 	match event_id {
-		'software.launch.arguments' { a.launch_focus = 1; a.select_all = false }
-		'software.launch.file' { a.launch_focus = 2; a.select_all = false }
+		'software.launch.arguments' { a.launch_focus = 1; a.launch_page = 0; a.select_all = false }
+		'software.launch.file' { a.launch_focus = 2; a.launch_page = 1; a.select_all = false }
+		'software.launch.page.previous' { a.navigate_launch_page(-1) }
+		'software.launch.page.next' { a.navigate_launch_page(1) }
+		'software.launch.file.previous' { if a.launch_file_scroll > 0 { a.launch_file_scroll-- } }
+		'software.launch.file.next' { if a.launch_file_scroll + 1 < a.launch_documents.len { a.launch_file_scroll++ } }
 		'software.launch.add-file' { a.add_launch_file() }
 		'software.launch.remove-file' {
 			if a.launch_file_selected >= 0 && a.launch_file_selected < a.launch_documents.len {
@@ -162,7 +167,16 @@ fn (mut a SoftwareApp) launch_key_input(input string) {
 		else { a.handle_launch_options('software.launch.back') }
 		return
 	}
-	if a.launch_focus == 0 { return }
+	if a.launch_focus == 0 {
+		if a.launch_compact {
+			match input {
+				'\x1b[D', '\x1b[5~' { a.navigate_launch_page(-1) }
+				'\x1b[C', '\x1b[6~' { a.navigate_launch_page(1) }
+				else {}
+			}
+		}
+		return
+	}
 	if input == '\x01' { a.select_all = true; return }
 	if input in ['\r', '\n'] { a.launch_focus = 0; a.select_all = false; return }
 	if input in ['\x7f', '\x08'] {
@@ -191,6 +205,7 @@ fn (mut a SoftwareApp) launch_paste_input(input string) {
 }
 
 fn (mut a SoftwareApp) build_launch_options(width int, height int) ui2.Element {
+	a.launch_compact = false
 	mut children := frame_elements(28)
 	busy := a.worker != unsafe { nil }
 	children << software_label('Launch options · ' + a.launch_name, 14, 8, width - 202, 28, true)

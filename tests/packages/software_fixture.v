@@ -382,6 +382,7 @@ fn check_software_window_text() ! {
 
 fn main() {
 	unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+	if os.args.len == 2 && os.args[1] == 'launch-compact' { check_software_launch_compact() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'admin-status' { check_software_admin_status() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'dependencies' { check_software_dependencies() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'release-memory' { check_software_release_memory() or { panic(err) }; return }

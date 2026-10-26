@@ -201,6 +201,8 @@ mut:
 	launch_file []u8
 	launch_documents []string
 	launch_focus int
+	launch_compact bool
+	launch_page int
 	launch_file_selected int = -1
 	launch_file_scroll int
 	launch_data_cwd bool = true
