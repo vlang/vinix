@@ -2,7 +2,6 @@
 // Streaming media helpers. Archive metadata describes module bytes, not live inode ownership.
 module mapsaccountstage
 
-import crypto.sha256
 import json2
 import modulestream
 import os
@@ -40,19 +39,7 @@ pub:
 }
 
 pub fn hash(path string) !string {
-	mut file := os.open(path)!
-	defer { file.close() }
-	mut state := sha256.new()
-	mut buffer := []u8{len: 1024 * 1024}
-	for {
-		n := file.read(mut buffer) or {
-			if err is os.Eof { break }
-			return err
-		}
-		if n == 0 { break }
-		state.write(buffer[..n])!
-	}
-	return state.sum([]u8{}).hex()
+	return digest(path)
 }
 
 fn safe_name(name string) bool {
@@ -263,35 +250,7 @@ pub fn write_overlay(path string, sources map[string]string, entries []Entry) ! 
 		position += 512
 		if entry.kind == 'regular' {
 			source := sources[entry.name] or { return error('overlay entry has no source') }
-			mut file := os.open(source)!
-			mut state := sha256.new()
-			mut remaining := entry.size
-			for remaining > 0 {
-				mut part := unsafe {
-					buffer[..int(if remaining < u64(buffer.len) {
-						remaining
-					} else {
-						u64(buffer.len)
-					})]
-				}
-				n := file.read(mut part) or {
-					file.close()
-					return err
-				}
-				if n == 0 {
-					file.close()
-					return error('bundle file truncated')
-				}
-				state.write(part[..n]) or { file.close(); return err }
-				write_all(fd, part[..n]) or { file.close(); return err }
-				remaining -= u64(n)
-			}
-			mut extra := []u8{len: 1}
-			n := file.read(mut extra) or { if err is os.Eof { 0 } else { file.close(); return err } }
-			file.close()
-			if n != 0 || state.sum([]u8{}).hex() != entry.sha256 {
-				return error('overlay source changed or hash differs')
-			}
+			write_overlay_file(fd, source, entry, mut buffer)!
 		}
 		padding := (512 - entry.size % 512) % 512
 		write_all(fd, []u8{len: int(padding)})!
@@ -302,6 +261,27 @@ pub fn write_overlay(path string, sources map[string]string, entries []Entry) ! 
 	write_all(fd, []u8{len: int((10240 - position % 10240) % 10240)})!
 	closed = true
 	if C.vinix_maps_media_close(fd) != 0 { return os.error_posix() }
+}
+
+fn write_overlay_file(fd int, source string, entry Entry, mut buffer []u8) ! {
+	mut file := os.open(source)!
+	defer { file.close() }
+	mut state := new_host_sha256()!
+	defer { state.close() }
+	mut remaining := entry.size
+	for remaining > 0 {
+		mut part := unsafe { buffer[..int(if remaining < u64(buffer.len) { remaining } else { u64(buffer.len) })] }
+		n := file.read(mut part)!
+		if n == 0 { return error('bundle file truncated') }
+		state.update(part[..n])!
+		write_all(fd, part[..n])!
+		remaining -= u64(n)
+	}
+	mut extra := []u8{len: 1}
+	n := file.read(mut extra) or { if err is os.Eof { 0 } else { return err } }
+	if n != 0 || state.finish()! != entry.sha256 {
+		return error('overlay source changed or hash differs')
+	}
 }
 
 fn validate_overlay(entries []Entry) ! {
@@ -497,22 +477,26 @@ fn scan_reader(mut archive tarstream.Reader, extraction_root string, selected ma
 			extracted[entry.name] = true
 		}
 		if entry.kind == 'regular' {
-			mut state := sha256.new()
-			for {
-				n := archive.read(mut buffer) or { if fd >= 0 { os.fd_close(fd) }; return err }
-				if n == 0 { break }
-				state.write(buffer[..n]) or { if fd >= 0 { os.fd_close(fd) }; return err }
-				if fd >= 0 {
-					write_all(fd, buffer[..n]) or { os.fd_close(fd); return err }
-				}
-			}
-			entry = Entry{...entry, sha256: state.sum([]u8{}).hex()}
+			pin := scan_regular(mut archive, fd, mut buffer) or { if fd >= 0 { os.fd_close(fd) }; return err }
+			entry = Entry{...entry, sha256: pin}
 		}
 		if fd >= 0 { os.fd_close(fd) }
 		actual << entry
 	}
 	if extracted.len != selected.len { return error('selected module member missing') }
 	return actual
+}
+
+fn scan_regular(mut archive tarstream.Reader, fd int, mut buffer []u8) !string {
+	mut state := new_host_sha256()!
+	defer { state.close() }
+	for {
+		n := archive.read(mut buffer)!
+		if n == 0 { break }
+		state.update(buffer[..n])!
+		if fd >= 0 { write_all(fd, buffer[..n])! }
+	}
+	return state.finish()
 }
 
 pub fn scan_module(mcopy string, image string, name string, extraction_root string, selected_paths []string) ![]Entry {
