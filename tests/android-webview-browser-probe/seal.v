@@ -73,12 +73,18 @@ fn hash(path string) !string {
 	return result[..].hex()
 }
 
-fn canonical(path string) !string {
+fn canonical_input(path string) !string {
 	absolute := os.abs_path(path)
-	if !os.is_dir(absolute) || os.is_link(absolute) || os.real_path(absolute) != absolute
+	if (!os.is_dir(absolute) && !os.is_file(absolute)) || os.is_link(absolute) || os.real_path(absolute) != absolute
 		|| absolute.contains_any('\x00\r\n') || absolute == repo || absolute.starts_with(repo + '/') {
-		return error('canonical external directory required: ' + path)
+		return error('canonical external regular file or directory required: ' + path)
 	}
+	return absolute
+}
+
+fn canonical(path string) !string {
+	absolute := canonical_input(path)!
+	if !os.is_dir(absolute) { return error('external directory required: ' + path) }
 	return absolute
 }
 
@@ -102,6 +108,18 @@ fn inventory(root string, relative string, exclude_manifest bool, mut entries ma
 			return error('special evidence entry refused: ' + path)
 		}
 	}
+}
+
+fn tree(root string, exclude_manifest bool) !map[string]Entry {
+	mut entries := map[string]Entry{}
+	stat := os.lstat(root)!
+	if stat.mode & 0o170000 == 0o040000 {
+		entries['.'] = Entry{kind: 'directory', mode: stat.mode}
+		inventory(root, '', exclude_manifest, mut entries)!
+	} else if stat.mode & 0o170000 == 0o100000 {
+		entries['.'] = Entry{kind: 'regular', mode: stat.mode, size: stat.size, sha256: hash(root)!}
+	} else { return error('special root refused') }
+	return entries
 }
 
 fn stopped(root string, require_absent bool) ! {
@@ -140,12 +158,11 @@ fn check(output_arg string, expected string) ! {
 	if manifest.format != 1 || manifest.roots.len < 2 { return error('unsupported manifest') }
 	mut seen := []string{}
 	for root in manifest.roots {
-		if canonical(root.path)! != root.path || root.path in seen {
+		if canonical_input(root.path)! != root.path || root.path in seen {
 			return error('duplicate or noncanonical manifest root')
 		}
 		seen << root.path
-		mut current := map[string]Entry{}
-		inventory(root.path, '', root.path == output, mut current)!
+		current := tree(root.path, root.path == output)!
 		if current != root.entries { return error('evidence tree differs: ' + root.path) }
 	}
 	if output !in seen || manifest.vm !in seen { return error('missing output or VM root') }
@@ -163,7 +180,7 @@ fn seal(output_arg string, arguments []string) ! {
 	if output != parent + '/' + os.file_name(output) { return error('canonical output required') }
 	mut roots := []string{}
 	for argument in arguments {
-		root := canonical(argument)!
+		root := canonical_input(argument)!
 		for prior in roots {
 			if root == prior || root.starts_with(prior + '/') || prior.starts_with(root + '/') {
 				return error('duplicate or overlapping evidence roots')
@@ -190,8 +207,7 @@ fn seal(output_arg string, arguments []string) ! {
 	mut records := []Root{}
 	mut count := 0
 	for root in roots {
-		mut entries := map[string]Entry{}
-		inventory(root, '', root == output, mut entries)!
+		entries := tree(root, root == output)!
 		count += entries.len
 		records << Root{root, entries}
 	}
@@ -221,9 +237,13 @@ fn self_test() ! {
 		hash(vm + '/ownership.json')!, hash(vm + '/stop.json')!, 'fixture'}))!)!
 	os.write_file(vm + '/data', 'original')!
 	os.symlink('data', vm + '/link')!
+	os.write_file(root + '/tool', 'frozen-tool')!
 	output := root + '/sealed'
-	seal(output, [vm])!
+	seal(output, [vm, root + '/tool'])!
 	expected := hash(output + '/manifest.json')!
+	os.write_file(root + '/tool', 'changed-tool')!
+	if _ := check(output, expected) { return error('accepted changed individual file') }
+	os.write_file(root + '/tool', 'frozen-tool')!
 	for action in ['changed', 'added', 'missing', 'link', 'stop'] {
 		match action {
 			'changed' { os.write_file(vm + '/data', 'mutated')! }
@@ -255,7 +275,7 @@ fn self_test() ! {
 	if C.mkfifo((vm + '/fifo').str, 0o600) != 0 { return error('selftest FIFO creation') }
 	mut entries := map[string]Entry{}
 	if _ := inventory(vm, '', false, mut entries) { return error('accepted special evidence entry') }
-	println('BROWSER-SEAL SELF-TEST PASS full-tree changed added missing symlink stop-receipt manifest-pin live-pid special-entry')
+	println('BROWSER-SEAL SELF-TEST PASS full-tree single-file changed added missing symlink stop-receipt manifest-pin live-pid special-entry')
 }
 
 fn main() {

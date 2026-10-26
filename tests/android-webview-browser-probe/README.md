@@ -143,7 +143,8 @@ PNG files, binaries, caches, inventories, and raw logs out of Git.
 Build it on macOS with `v -prod -o /tmp/vinix-browser-seal tests/android-webview-browser-probe/seal.v` and run its
 `--self-test`. After stopping the guest and collecting the export, run
 `/tmp/vinix-browser-seal seal FRESH_SEAL_DIR STOPPED_VM_DIR BUILD_DIR RESULTS_DIR`
-with any additional complete fixture/tool roots. It requires matching ownership,
+with any additional complete fixture/tool directories or individual external
+tool files. It requires matching ownership,
 stop, and disappearance receipts and an absent guest PID. It freezes its own
 source and binary and prints the manifest hash. Later use
 `/tmp/vinix-browser-seal check SEAL_DIR MANIFEST_SHA256` to detect added, missing,
