@@ -117,6 +117,16 @@ hash before restoring the fresh destination. Keep the serial log and prepared
 and staged bundles with the restored result tree. Direct session execution is
 also available when a guest filesystem transport is already present:
 
+If unrelated console output corrupts the transfer, retain that failed transfer
+and retransmit the unchanged `/tmp/vinix-browser-probe-results.json` archive
+after stopping the noisy application. `recover-export.v SERIAL_LOG FRESH_OUTPUT`
+accepts only one raw archive matching the original transfer header's exact
+length and SHA-256. It preserves the original serial bytes and reconstructs
+framing for the ordinary strict collector; run that collector on
+`FRESH_OUTPUT/serial-reconstructed.log`. Its `--self-test` rejects altered,
+truncated and ambiguous retransmissions. This does not replace archive or
+file validation.
+
 ```sh
 /opt/vinix-browser-probe/bin/browser-session /opt/vinix-android-aarch64 /opt/vinix-browser-probe/runtime /tmp/vinix-browser-probe-results
 ```

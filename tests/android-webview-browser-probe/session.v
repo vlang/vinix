@@ -405,6 +405,13 @@ fn known_fault_evidence(raw string) ! {
 	}
 }
 
+fn known_fault_log(mut log os.File, path string) ! {
+	// The child can exit with its final marker still in the parent's stdio
+	// buffer. Validate the complete stream before the deferred close runs.
+	log.flush()
+	known_fault_evidence(os.read_file(path)!)!
+}
+
 fn fault_preflight(loader string, libraries string, root string, output string, environment map[string]string) ! {
 	mut log := os.open_file(output + '/x11-known-fault.log', 'w', 0o600)!
 	defer { log.close() }
@@ -419,7 +426,7 @@ fn fault_preflight(loader string, libraries string, root string, output string, 
 	}
 	stop(mut fixture, mut log)
 	if fixture.code != 0 { return error('fault diagnostic preflight failed; see x11-known-fault.log') }
-	known_fault_evidence(os.read_file(output + '/x11-known-fault.log')!)!
+	known_fault_log(mut log, output + '/x11-known-fault.log')!
 }
 
 fn remove_aliases(paths []string, directories []string, executable string, mut events os.File) ! {
@@ -849,13 +856,17 @@ fn self_test() ! {
 	for index in 0 .. 31 { context += ' x${index:02}=0x1' }
 	context += '\nX11-MAPS-BEGIN\nX11-MAPS-END\nX11-KNOWN-FAULT-CHAINED\nX11-KNOWN-FAULT-PASS query=preserved restoration=preserved chain=preserved\n'
 	known_fault_evidence(context)!
+	mut context_log := os.open_file(root + '/controlled-fault.log', 'w', 0o600)!
+	defer { context_log.close() }
+	context_log.write_string(context)!
+	known_fault_log(mut context_log, root + '/controlled-fault.log')!
 	for bad in [context.replace('address=0x1234 pc=', 'address=0x1235 pc='),
 		context.replace('signal=0xb', 'signal=0x6'), context.replace(' x29=0x1', ''),
 		context.replace('x30=0x1', 'x30=0x0'), context + 'X11-FAULT signal=0xb\n',
 		context.replace('X11-MAPS-END\n', '')] {
 		if _ := known_fault_evidence(bad) { return error('incomplete or inconsistent fault evidence accepted') }
 	}
-	println('BROWSER-SESSION SELF-TEST PASS glx-arguments glx-wire-query glx-absence-negative authority-record x11-setup receipt-paths bundle-pins bundle-tamper bundle-missing cpu-renderer-environment pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins complete-context negative-context')
+	println('BROWSER-SESSION SELF-TEST PASS glx-arguments glx-wire-query glx-absence-negative authority-record x11-setup receipt-paths bundle-pins bundle-tamper bundle-missing cpu-renderer-environment pinned-reuse foreign-helper dangling-link owned-cleanup changed-helper fault-pins preload-isolation tamper link partial-pins complete-context buffered-context negative-context')
 }
 
 fn main() {
