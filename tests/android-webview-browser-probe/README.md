@@ -259,3 +259,29 @@ source and binary and prints the manifest hash. Later use
 or changed entries across every retained root. Symlinks are recorded without
 following them; sockets and other special entries fail closed. Keep the roots
 at their recorded paths and preserve the full trees.
+
+When one stopped VM's UART contains several independent protocol phases, use
+`serial-range.v` to preserve the full capture and select explicit bytes for a
+single strict collector invocation:
+
+```sh
+v -o /tmp/vinix-serial-range tests/android-webview-browser-probe/serial-range.v
+/tmp/vinix-serial-range --self-test
+/tmp/vinix-serial-range /absolute/canonical/uart.log START END /absolute/canonical/fresh-range
+/tmp/vinix-serial-range --check /absolute/canonical/fresh-range
+```
+
+`START` is inclusive and `END` exclusive, both canonical decimal byte offsets.
+The range must start at byte zero or after LF, and end immediately after LF;
+a partial final line is rejected. The source must be a stable, single-link
+regular file of at most 256 MiB. Two complete reads, matching SHA-256 hashes,
+and descriptor/path metadata checks reject observed changes and replacement.
+Input and output parents must exist without symlinks; output must be fresh and
+outside the checkout. Each bundle contains the complete `serial-original.log`,
+the byte-exact `serial-range.log`, and `range.json` with both byte counts and
+SHA-256 hashes plus the explicit offsets. `--check` verifies all retained bytes
+against the receipt and the exact original range, without requiring the live
+source. Preserve and seal the full bundle; its self-contained hashes do not
+authenticate a replacement of the entire bundle. Pass only `serial-range.log`
+to the appropriate unchanged strict protocol collector. Selection does not
+establish that any protocol, browser, or account test passed.
