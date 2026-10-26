@@ -318,9 +318,11 @@ fn scene_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 			'applicationState' { frame.x[0] = 0 } // This runner owns one active foreground window.
 			'applicationIconBadgeNumber' { frame.x[0] = 0 }
 			'setApplicationIconBadgeNumber:' {
-				// There is no launcher badge backend. Clearing an absent badge is
-				// supported; never claim to display a requested nonzero count.
-				if frame.x[2] != 0 { panic('iOS: application icon badge count ${i64(frame.x[2])} requires a badge backend') }
+				// Zero clears the absent badge. iOS push clients also use -1 to
+				// clear it without removing delivered notifications. Neither
+				// operation needs a launcher badge backend; other counts do.
+				count := i64(frame.x[2])
+				if count != 0 && count != -1 { panic('iOS: application icon badge count ${count} requires a badge backend') }
 			}
 			'isIdleTimerDisabled' { frame.x[0] = u64(obj_header(object).idle_timer_disabled) }
 			'setIdleTimerDisabled:' { obj_header(object).idle_timer_disabled = frame.x[2] != 0 }

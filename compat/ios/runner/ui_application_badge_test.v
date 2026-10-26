@@ -28,6 +28,7 @@ fn badge_cases(api BadgeApi, cls u64, application u64) {
 	assert application != 0
 	assert api.message(application, c'applicationIconBadgeNumber', 0) == 0
 	assert api.message(0, c'applicationIconBadgeNumber', 0) == 0
+	api.message(0, c'setApplicationIconBadgeNumber:', u64(i64(-1)))
 	for index, name in [c'applicationIconBadgeNumber', c'setApplicationIconBadgeNumber:']! {
 		selector := api.selector(name)
 		assert api.message(application, c'respondsToSelector:', selector) == 1
@@ -53,13 +54,18 @@ fn badge_cases(api BadgeApi, cls u64, application u64) {
 		assert api.message(signature, c'methodReturnLength', 0) == if index == 0 { u64(8) } else { u64(0) }
 		assert ctext(api.message(signature, c'methodReturnType', 0)) == if index == 0 { 'q' } else { 'v' }
 		if index == 1 { assert ctext(api.message(signature, c'getArgumentTypeAtIndex:', 2)) == 'q' }
-		result := unsafe { BadgeTestSend(voidptr(imp))(application, selector, 0) }
-		if index == 0 { assert result == 0 }
+		for value in [i64(0), -1]! {
+			result := unsafe { BadgeTestSend(voidptr(imp))(application, selector, u64(value)) }
+			if index == 0 { assert result == 0 }
+			assert api.message(application, c'applicationIconBadgeNumber', 0) == 0
+		}
 	}
 	assert api.message(application, c'respondsToSelector:', api.selector(c'vinixMissingBadgeSelector')) == 0
 	for _ in 0 .. 256 {
-		api.message(application, c'setApplicationIconBadgeNumber:', 0)
-		assert api.message(application, c'applicationIconBadgeNumber', 0) == 0
+		for value in [i64(0), -1]! {
+			api.message(application, c'setApplicationIconBadgeNumber:', u64(value))
+			assert api.message(application, c'applicationIconBadgeNumber', 0) == 0
+		}
 	}
 }
 fn test_application_badge_native() {
@@ -75,7 +81,7 @@ fn test_application_badge_native() {
 		if application == 0 { application = api.message(cls, c'alloc', 0) }
 		badge_cases(api, cls, application)
 		api.message(pool, c'drain', 0)
-		println('IOS-APPLICATION-BADGE-NATIVE: isolated default/clear, 64-bit instance metadata, signatures and direct IMP PASS; badge authorization/display unverified')
+		println('IOS-APPLICATION-BADGE-NATIVE: isolated default/zero/minus-one clears, 64-bit instance metadata, signatures and direct IMP PASS; badge authorization/display unverified')
 	}
 }
 fn test_application_badge_runtime() {
@@ -87,8 +93,10 @@ fn test_application_badge_runtime() {
 		application := objc_allocate(cls)
 		badge_cases(api, cls, application)
 		api.message(application, c'setIdleTimerDisabled:', 1)
-		api.message(application, c'setApplicationIconBadgeNumber:', 0)
-		assert api.message(application, c'isIdleTimerDisabled', 0) == 1
+		for value in [i64(0), -1]! {
+			api.message(application, c'setApplicationIconBadgeNumber:', u64(value))
+			assert api.message(application, c'isIdleTimerDisabled', 0) == 1
+		}
 		objc_release(application)
 		subclass := objc_allocate_class(cls, c'VinixBadgeApplication', 0)
 		objc_register_class(subclass)
@@ -99,13 +107,13 @@ fn test_application_badge_runtime() {
 		objc_stop()
 		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
 	}
-	println('IOS-APPLICATION-BADGE: absent badge getter/clear, metadata, signatures, direct IMP, subclass, idle timer independence and two drained runtimes PASS')
+	println('IOS-APPLICATION-BADGE: absent badge getter, zero/minus-one clears, metadata, signatures, direct IMP, subclass, idle timer independence and two drained runtimes PASS')
 }
 fn test_application_badge_rejections() {
 	objc_start()
 	api := BadgeApi{false, u64(unsafe { voidptr(C.ios_objc_msgsend) })}
 	application := objc_allocate(ios_runtime.names['UIApplication'])
-	for value in [i64(1), -1, i64(2147483648), i64(9223372036854775807), i64(-9223372036854775807) - 1]! {
+	for value in [i64(1), -2, -42, i64(2147483648), i64(4294967295), i64(9223372036854775807), i64(-9223372036854775807) - 1]! {
 		mut fds := [2]i32{}
 		assert C.pipe(unsafe { &fds[0] }) == 0
 		pid := C.ios_fork()
@@ -132,5 +140,5 @@ fn test_application_badge_rejections() {
 	}
 	objc_release(application); objc_stop()
 	assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
-	println('IOS-APPLICATION-BADGE-REJECT: nonzero signed 64-bit counts fail explicitly without a badge backend PASS')
+	println('IOS-APPLICATION-BADGE-REJECT: counts outside zero/minus-one fail explicitly across signed 64-bit boundaries without a badge backend PASS')
 }
