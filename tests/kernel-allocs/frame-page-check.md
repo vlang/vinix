@@ -165,11 +165,28 @@ and build attempt, has a separate typed checksum inventory at
 `/Users/alex/Library/Caches/vinix-codex/section14/alloc-track-frame-kernel-20261026-seal-02/complete/inventory.json`,
 SHA256 `e8612e004f2191ee94bc6a021258df7ef2805d8b0dfdefabbb5726ca953862df`.
 The maintained `frame-page-seal.v` performs two complete scans and a post-write
-check; a separate final check passed. It records every regular file's bytes,
+check; a separate final check passed at capture. It records every regular file's bytes,
 literal symlink targets and directory metadata. Symlinks are never traversed:
 external dependency referents remain covered by the selected-input records,
 not copied into this bundle. This is a quiescent trusted-host inventory, not
 a hostile namespace guarantee or an archive/extraction qualification.
+
+A later 2026-10-26 strict check refused this original inventory with
+`state inventory mismatch`. The original inventory remains unchanged. A separate
+diagnostic scan, not a replacement qualification, is retained at
+`/Users/alex/Library/Caches/vinix-codex/section14/alloc-track-frame-kernel-20261026-diagnostic-01/inventory.json`
+(SHA256 `f6bea2be21897a1fc2e2739f6af063826bbd302f6e4c79b8d90a7c850eff4255`).
+Its all-field comparison against the original is `all-field-inventory-diff.txt`
+in that directory (SHA256
+`c27a3ebe03780a5ad1370e025083e4f3fb2ea9cd893811fefd7bc8d98d93b964`).
+Both inventories have the same 5,059 paths, file hashes, sizes, kinds, modes,
+owners and literal link targets. Every device number changed from 16777229 to
+16777232; 28 entries also changed ctime, including 15 changed inodes and 13
+changed mtimes. Thus the failure is not solely a device-number change. The
+diagnostic does not establish who replaced the byte-identical artifacts.
+Strict metadata identity is not portable across such host changes; the original
+checker remains unchanged and currently refuses this bundle. The diagnostic
+directory preserves the failing check output as `original-check-current.txt`.
 
 Sealer source SHA256 is
 `8cd5e58df42e07760d0e1b73c49807b0ee2c7e353412e7d54aca34a7597577d4`;
