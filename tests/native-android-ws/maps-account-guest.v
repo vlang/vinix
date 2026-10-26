@@ -31,7 +31,7 @@ fn C.dup2(int, int) int
 const bundle_root = '/opt/vinix-maps-account'
 const result_root = bundle_root + '/results'
 const runtime_root = '/opt/vinix-android-aarch64'
-const broker_root = '/var/run/vinix-maps-account'
+const broker_root = '/run/vinix-maps-account'
 const controller_path = bundle_root + '/bin/maps-account-guest'
 const helper_path = runtime_root + '/usr/bin/vinix-android-account-ui'
 const broker_path = runtime_root + '/usr/bin/native-account-broker'
@@ -918,7 +918,7 @@ fn provision() ! {
 	if selected_processes()!.len != 0 {
 		return error('selected app identity already has a process')
 	}
-	for path in ['/var', '/var/lib', '/var/lib/vinix', '/var/lib/vinix/apps', '/var/run'] {
+	for path in ['/var', '/var/lib', '/var/lib/vinix', '/var/lib/vinix/apps', '/run'] {
 		if !os.exists(path) {
 			os.mkdir(path)!
 			os.chmod(path, 0o755)!
@@ -1272,7 +1272,27 @@ fn sqlite_self_test() ! {
 	}
 }
 
+fn protected_directory_self_test() ! {
+	root := os.join_path(os.temp_dir(), 'vinix-maps-protected-' + os.getpid().str() + '-' + time.sys_mono_now().str())
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {} }
+	os.chmod(root, 0o700)!
+	owner := u32(C.geteuid())
+	protected(root, owner, true, .directory)!
+	alias := root + '/run-alias'
+	os.symlink(root, alias)!
+	if _ := protected(alias, owner, false, .directory) {
+		return error('protected directory accepted a symlink alias')
+	}
+	os.chmod(root, 0o777)!
+	if _ := protected(root, owner, false, .directory) {
+		return error('protected directory accepted a writable parent')
+	}
+	os.chmod(root, 0o700)!
+}
+
 fn self_test() ! {
+	protected_directory_self_test()!
 	sqlite_self_test()!
 	if !canonical_absolute('/opt/maps/app.apk') || canonical_absolute('/opt/../maps/app.apk')
 		|| canonical_absolute('/opt//maps.apk') || canonical_absolute('maps.apk')
@@ -1329,7 +1349,7 @@ fn self_test() ! {
 			return error('stale stop request accepted')
 		}
 	}
-	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation')
+	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths protected-directory-symlink-and-mode-rejection process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation')
 }
 
 fn main() {
