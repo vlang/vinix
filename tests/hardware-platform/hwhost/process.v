@@ -144,12 +144,12 @@ pub fn (mut c Child) poll() bool {
 	if c.ended {
 		return true
 	}
-	mut status := 0
+	mut status := i32(0)
 	for {
 		waited := C.waitpid(c.pid, &status, C.WNOHANG)
 		if waited == c.pid {
 			c.ended = true
-			c.status = status
+			c.status = int(status)
 			return true
 		}
 		if waited < 0 && C.errno == C.EINTR {
