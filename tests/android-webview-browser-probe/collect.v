@@ -7,6 +7,7 @@ import encoding.base64
 import json2
 import os
 import time
+import browsertransfer
 
 #include <sys/stat.h>
 
@@ -235,7 +236,7 @@ fn validate(payload string, selected Protocol) !Archive {
 	return archive
 }
 
-fn restore(root string, archive Archive, exported Export, serial string, serial_sha string, selected Protocol) ! {
+fn restore_files(root string, archive Archive, exported Export) ! {
 	if os.exists(root) || os.is_link(root) { return error('fresh external output required') }
 	if unsafe { C.mkdir(root.str, 0o700) } != 0 { return error('cannot exclusively create output') }
 	os.mkdir(root + '/results')!
@@ -268,6 +269,10 @@ fn restore(root string, archive Archive, exported Export, serial string, serial_
 	if sha256.sum(os.read_bytes(root + '/archive.json')!).hex() != exported.sha256 {
 		return error('archive readback mismatch')
 	}
+}
+
+fn restore(root string, archive Archive, exported Export, serial string, serial_sha string, selected Protocol) ! {
+	restore_files(root, archive, exported)!
 	os.write_file(root + '/import.json', json2.encode({
 		'format':         json2.Any(1)
 		'created_utc':    json2.Any(time.utc().str())
@@ -279,6 +284,38 @@ fn restore(root string, archive Archive, exported Export, serial string, serial_
 		'entries':        json2.Any(archive.entries.len)
 		'scope':          json2.Any(selected.scope)
 	}, prettify: true) + '\n')!
+}
+
+// This is a new transport receipt, never a repaired or synthesized UART log.
+fn collect_tcp(transfer string, root string) ! {
+	browsertransfer.external_path(root)!
+	r := browsertransfer.checked(transfer)!
+	payload := os.read_file(transfer + '/archive.json')!
+	if payload.len != r.archive_bytes || sha256.sum(payload.bytes()).hex() != r.archive_sha256 {
+		return error('TCP archive changed before import')
+	}
+	exported := Export{sha256: r.archive_sha256, bytes: r.archive_bytes, payload: payload}
+	archive := validate(payload, protocol(false))!
+	restore_files(root, archive, exported)!
+	// Keep the exact received bytes and transfer receipt; source UART is an
+	// independent pinned input, whose historical strict parser still rejects damage.
+	os.cp(transfer + '/transfer.json', root + '/transfer.json')!
+	os.write_file(root + '/import.json', json2.encode({
+		'format': json2.Any(1)
+		'created_utc': json2.Any(time.utc().str())
+		'transport': json2.Any('browser-tcp-v1')
+		'transfer_path': json2.Any(os.real_path(transfer))
+		'transfer_receipt_sha256': json2.Any(browsertransfer.file_hash(root + '/transfer.json')!)
+		'source_uart_path': json2.Any(r.source_serial_path)
+		'source_uart_sha256': json2.Any(r.source_serial_sha256)
+		'archive_sha256': json2.Any(exported.sha256)
+		'archive_bytes': json2.Any(exported.bytes)
+		'entries': json2.Any(archive.entries.len)
+		'scope': json2.Any(r.scope)
+	}, prettify: true) + '\n')!
+	// Recheck all retained input pins after restore as well.
+	if browsertransfer.checked(transfer)! != r { return error('TCP input receipt changed during import') }
+	println('BROWSER-TCP-COLLECT PASS entries=' + archive.entries.len.str() + ' sha256=' + exported.sha256)
 }
 
 fn frames(payload string, selected Protocol) string {
@@ -400,15 +437,73 @@ fn self_test() ! {
 		bad := Archive{ root_mode: 0o700, entries: [Entry{ path: 'oversized', kind: 'regular', size: u64(selected.file_limit + 1), sha256: '0'.repeat(64) }] }
 		if _ := validate(json2.encode(bad), selected) { return error('protocol file bound ignored') }
 	}
+	self_test_tcp()!
+}
+
+fn self_test_tcp() ! {
+	base := os.join_path(os.real_path(os.temp_dir()), 'vinix-browser-tcp-import-selftest-' + os.getpid().str())
+	if os.exists(base) { return error('fresh TCP selftest required') }
+	os.mkdir(base)!
+	defer { os.rmdir_all(base) or {} }
+	transfer := base + '/transfer'
+	os.mkdir(transfer)!
+	os.chmod(transfer, 0o700)!
+	data := 'synthetic\x00browser\n'.bytes()
+	fixture := Archive{root_mode: 0o700, entries: [Entry{
+		path: 'log', kind: 'regular', mode: 0o600, size: u64(data.len),
+		sha256: sha256.sum(data).hex(), data: base64.encode(data)
+	}]}
+	payload := json2.encode(fixture)
+	sha := sha256.sum(payload.bytes()).hex()
+	serial := base + '/failed-uart.log'
+	os.write_file(serial, browser_prefix + 'BEGIN ' + sha + ' ' + payload.len.str() + ' ' + ((payload.len + 511) / 512).str() + '\n' + browser_prefix + 'CHUNK damaged\n')!
+	if _ := parse_export(os.read_file(serial)!, protocol(false)) { return error('damaged UART accepted') }
+	os.write_file(transfer + '/archive.json', payload)!
+	receipt := browsertransfer.Receipt{
+		started_utc: 'synthetic-start'
+		finished_utc: 'synthetic-end'
+		source_serial_path: serial
+		source_serial_sha256: browsertransfer.file_hash(serial)!
+		source_serial_bytes: u64(os.file_size(serial))
+		archive_sha256: sha
+		archive_bytes: payload.len
+		listen_address: '127.0.0.1:12345'
+		receiver_sha256: browsertransfer.file_hash(os.executable())!
+		eof: true
+	}
+	os.write_file(transfer + '/transfer.json', json2.encode(receipt))!
+	collect_tcp(transfer, base + '/import')!
+	assert os.read_bytes(base + '/import/results/log')! == data
+	assert os.read_file(base + '/import/archive.json')! == payload
+	imported := json2.decode[map[string]json2.Any](os.read_file(base + '/import/import.json')!)!
+	assert imported['transport']!.str() == 'browser-tcp-v1'
+	assert 'serial_path' !in imported && 'serial_sha256' !in imported
+	assert imported['source_uart_sha256']!.str() == receipt.source_serial_sha256
+	if _ := collect_tcp(transfer, base + '/import') { return error('existing TCP output accepted') }
+	os.write_file(transfer + '/transfer.json', json2.encode(browsertransfer.Receipt{...receipt, eof: false}))!
+	if _ := collect_tcp(transfer, base + '/bad-eof') { return error('missing EOF receipt accepted') }
+	os.write_file(transfer + '/transfer.json', json2.encode(browsertransfer.Receipt{...receipt, receiver_sha256: ''}))!
+	if _ := collect_tcp(transfer, base + '/bad-receiver') { return error('missing receiver pin accepted') }
+	os.write_file(transfer + '/transfer.json', json2.encode(receipt))!
+	os.write_file(transfer + '/archive.json', payload + 'x')!
+	if _ := collect_tcp(transfer, base + '/bad-data') { return error('changed TCP payload accepted') }
+	os.write_file(transfer + '/archive.json', payload)!
+	os.write_file(serial, 'changed original source')!
+	if _ := collect_tcp(transfer, base + '/bad-source') { return error('changed source UART accepted') }
+	println('BROWSER-TCP-COLLECT SELF-TEST PASS exact-archive binary provenance existing-output EOF-receipt mutated-payload mutated-source UART-still-rejected')
 }
 
 fn run() ! {
+	if os.args.len == 4 && os.args[1] == '--browser-tcp' {
+		collect_tcp(os.args[2], os.args[3])!
+		return
+	}
 	headless := os.args.len == 4 && os.args[1] == '--headless'
 	account_ui := os.args.len == 4 && os.args[1] == '--account-ui'
 	maps_account := os.args.len == 4 && os.args[1] == '--maps-account'
 	token_cache := os.args.len == 4 && os.args[1] == '--token-cache'
 	if !headless && !account_ui && !maps_account && !token_cache && os.args.len != 3 {
-		return error('usage: collect [--headless|--account-ui|--maps-account|--token-cache] SERIAL_LOG FRESH_EXTERNAL_RESULTS')
+		return error('usage: collect [--headless|--account-ui|--maps-account|--token-cache] SERIAL_LOG FRESH_EXTERNAL_RESULTS | --browser-tcp TRANSFER_DIR FRESH_RESULTS')
 	}
 	selected := if token_cache { token_cache_protocol() } else if maps_account { maps_account_protocol() } else if account_ui { account_ui_protocol() } else { protocol(headless) }
 	offset := if headless || account_ui || maps_account || token_cache { 1 } else { 0 }
