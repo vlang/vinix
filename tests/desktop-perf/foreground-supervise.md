@@ -1,4 +1,4 @@
-# Foreground x86 performance supervisor
+# Foreground performance supervisor
 
 `foreground-supervise.v` owns the maintained `run-x86 run STATE SHA256`
 adapter. It requires a fresh prepared runtime with all six scenarios
@@ -134,3 +134,37 @@ admission controls at actual low usage; they do not allocate to those limits.
 Host qualification results and checksums are recorded in
 `foreground-supervise-report.md`. No guest performance measurement is
 implied by the host controls.
+
+ARM preparation uses `arch: "aarch64"` and the separate `run-arm.v` adapter.
+It retains a pinned base archive and a small ordered overlay instead of an
+APFS clone. Additional typed fields are `firmware_vars`, `sysroot`, `gcc`,
+`linker`, `mformat`, `mmd` and `mcopy`; `xorriso` is empty. The `linker` path
+must name an absolute `ld.lld` driver alias: its literal link and canonical
+referent are both inventoried because lld selects its driver from argv[0].
+Other tools remain canonical. The whole selected guest sysroot is hashed
+in place with literal symlinks, and excluded from the ordinary host-resolving
+input roots. ARM admission scans the base archive and full sysroot before
+creating its output. The approved base pin is the archive's SHA256; its
+retained `base-before.tsv` separately binds the absolute path and lstat mode.
+
+The ARM owner admits only the exact fixed QEMU command, including a read-only
+PCI FAT boot disk, one MMIO ext2 workload disk, private firmware variables,
+2048x1536 geometry and foreground serial monitor. Only `root.ext2` and
+`vars.fd` may change during an ARM run. Preparation and run input maps bind
+the complete selected sysroot before and after execution. The adapter also
+compares its literal sysroot manifest. Preparation retains its final input
+map or inventory error. A run failure attempts a final input map; if that
+inventory also fails, the receipt has an empty map and does not retain the
+inventory error text. An adapter drive error does not manufacture a
+successful local completion receipt.
+
+`armcheck NEW-STATE COMPLETE-V` adds sixteen document, fixed-argv, disk and
+literal-sysroot controls without executing an adapter. `qualify-arm-owner`
+builds normal and production owners and runs the historical twenty-four
+controls plus these sixteen on each. `qualify-arm-adapter` builds normal
+and production ARM adapters and runs their eighteen controls on each. Both
+use the existing bounded qualifier; neither stages a guest nor runs QEMU.
+Normal and production ARM owner and adapter controls passed in the separate
+host-only qualification recorded in `foreground-supervise-report.md`.
+Guest cross-compilation, preparation, boot and measurements remain pending.
+See `run-arm.md` for the selected inputs and remaining validation.

@@ -1,6 +1,104 @@
 # Foreground supervisor and adapter host qualification — 2026-10-26
 
-Latest host PASS: `foreground-host14` qualifies the narrow charged-budget
+## ARM foreground host qualification
+
+PASS: `package-perf-arm-host-20261026-01` qualifies the ARM foreground owner
+and adapter on source base `a8fb4cb74fc17a397473c398d8fa611990ac5511`, plus
+the already imported hwhost wait-status prerequisite `8f7d7ccca` (excluded
+from this change). Normal and production owners each passed the historical
+twenty-four controls plus sixteen ARM controls. Normal and production ARM
+adapters each passed eighteen controls. Six limit admission controls passed.
+This was host-only: no guest compilation, staging, QEMU, guest measurement or
+raw kernel bundle consumption occurred.
+
+| Qualified source | SHA256 |
+| --- | --- |
+| `foreground-supervise.v` | `dfd3c36a9e3d0b85268bc55f29a398afce11e7732e26f3d41e7ffd482bcc46d7` |
+| `run-arm.v` | `c63e6e3334357e098ad8bb8bcc6c195fe0b7f3d96b5c57ba891caa78bb0f8080` |
+| `arm-init/main.v` (unbuilt guest source) | `bd9ffa5dd8883e68bce16ecafabfb7e9251e31b390e2f3d9f13b442ae578cea9` |
+| existing `hwhost/process.v` prerequisite | `1cefdf1ce196bbe4f05813969107144dd2c123662c56815124da56c92dc5e5d5` |
+
+The retained host14 production bootstrap
+`ffd49d0425b4893bd2d134c3626140ddfc010c13b5e6b08d6d6e1d5274547248`
+first qualified the new supervisor. Its production binary then ran
+`qualify-arm-owner`, `qualify-arm-adapter` and `limitcheck` in fresh states.
+The complete selected V binary is
+`/Users/alex/.cache/vinix-waitpid-width-20261026-02/toolchain/v`, SHA256
+`ff75a30180b1de305e3c62acc1ebd85341ff83ae5d852c819d11f27d5260c4c5`.
+Each compiler invocation cleared inherited tool choices and used coherent V
+markers, private temporary/module/cache directories, `-nocache -keepc`,
+inventoried absolute clang and an explicit SDKROOT. Complete selected compiler
+and source maps, host compiler/SDK metadata, argv, environments, generated C,
+binaries, raw logs and actual process status are retained. The installed
+loader and whole SDK dependency closure are not claimed hermetic.
+
+| Final receipt, relative to the host root | SHA256 |
+| --- | --- |
+| `supervisorbootstrap01/qualification.json` | `4d763a865418155a4259c59c4cfc3046132a052c9b14de412b21b45be48ce599` |
+| `owner03/qualification.json` | `b61e11ce4c7f207cb213cf15f019078af24014251c3b369d7c0a6b9a68bdee30` |
+| owner equal complete before/after maps | `dfdc585017b968139ae9c7eab05f2ce5692a52480552d7962880be0d759d5ba0` |
+| `adapter03/qualification.json` | `38c2c6aa1ce3fc56007e816f7af0954b091d91df74f2c2df6e86b33574172a3c` |
+| adapter equal complete before/after maps | `dcc07a25ed742d730d2f5d41970deb088cc5d4d914afc5ad8e664b979ba322a2` |
+| `limits01/result.json` | `c22f702a133b26c151f8acf9d54c94fb7bf278767ca1308a65a68464dc7a5462` |
+
+| Qualified executable | Normal SHA256 | Production SHA256 |
+| --- | --- | --- |
+| foreground owner | `c302b4f9fc135a0e7bf503fd47376fc7604d8901341b8b8abec41ab76f1b2c5d` | `5cc7bd764b37287f948e9c217a2c958d891cab5c866a01a699e6d545ae3dcaa4` |
+| ARM adapter | `54957e58919cd2bceb8aa9027a47c0eb000570e9a32791191903bc39321aadc6` | `76e42323890d12e92ba9f3579bcfc6e7a973d9ea0379e0e56d84d823eb56c2d3` |
+
+All host phases used a clean fixed outer environment and GNU timeout with
+TERM, a ten-second kill grace and a 300-second deadline; inner qualification
+commands retained their 120-second and 4 MiB bounds. Actual outer statuses
+were zero for bootstrap (108.200 seconds), final adapter (18.117 seconds),
+final owner (30.143 seconds) and limits (2.092 seconds). The adapter's original
+and first compatibility attempt both exited 1 with retained compiler errors:
+`string.index` returns an Option. The final compiler-only selfcheck patch
+unwraps both indices with explicit missing-module errors before comparing
+their order; its complete diff and all earlier sources and attempts remain
+in the host bundle. Earlier owner attempts passed but do not replace the
+final source-bound owner03 result.
+
+The limit controls admitted 524288, 2097152, 2097153 and 4718592 KiB at actual
+low usage, and refused 524287 and 4718593. They did not allocate to those
+limits. Fresh admission measured 17048 KiB allocated and 15301 KiB apparent
+across the worktree, host and external seal roots, with 52967380 KiB free.
+Adding the 294912 KiB growth reserve projected 311960 KiB under the inclusive
+512 MiB limit; admission required 2 GiB free and continued execution 1 GiB.
+Automatic direct-tool observations targeted two-second intervals, with a
+five-second maximum. Every actual start interval across host controls,
+seal and check was at most 2006 ms. Each running observation retained exact wrapper
+pgrep, df, allocated `du -skl`, apparent `du -skAl`, log-size probe commands,
+raw stdout/stderr and status. No budget, probe or interval refusal occurred.
+
+The immutable host root is
+`/Users/alex/Library/Caches/vinix-codex/section14/package-perf-arm-host-20261026-01`.
+The adjacent `package-perf-arm-host-20261026-01-seal-01` retains seal/check
+logs outside that root and `complete/inventory.json`, SHA256
+`ca493daf62c93f17f2b3e653e5d3bf921766ab5d4155f9ee024fe3335865f460`.
+The unchanged original full checker binary SHA256 is
+`fcc0e1f0d557e980a99dbcaf68d45ed8da851b07bf0810e8c99c931c865001b6`
+and its source SHA256 is
+`8cd5e58df42e07760d0e1b73c49807b0ee2c7e353412e7d54aca34a7597577d4`.
+Full sealing passed with actual status zero in 12.109 seconds under a
+600-second bound; the separate original check passed in 4.099 seconds under
+a 300-second bound. Root independently repeated the unchanged original full
+check against the same manifest and received actual status zero.
+Final inclusive worktree/host/seal usage was 148896 KiB allocated and
+135725 KiB apparent, with 43765876 KiB free. No host file changed after
+freezing for the full seal. Source copies bind the pre-report documentation;
+these documentation updates do not change the qualified code bytes.
+
+Independent source and receipt review approved the final compatibility diff,
+normal/production results, generated C, private environments, equal maps,
+actual outer exits and ECHILD retirement. Guest PID1/measure compilation,
+a reviewed preparation profile, runtime disk admission, staging, actual
+PCI firmware boot, six-scenario results and allocation-site symbolization
+remain pending. The historical candidate input table in `run-arm.md` is
+not runtime authority.
+
+## Earlier budget ceiling host qualification
+
+Earlier host PASS: `foreground-host14` qualifies the narrow charged-budget
 ceiling extension from 2 GiB to 4.5 GiB. The default stays 512 MiB; the
 2 GiB admission and 1 GiB continued free-space floors, process owner, live
 watcher and adapter are unchanged. Source SHA256 is

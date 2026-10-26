@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Foreground owner for the maintained x86 prepared performance adapter.
+// Foreground owner for the maintained prepared performance adapters.
 @[has_globals]
 module main
 
@@ -32,6 +32,7 @@ struct Profile {
 }
 
 struct PreparedView {
+	arch string = 'x86_64'
 	root string
 	base string
 	arguments []string
@@ -40,10 +41,15 @@ struct PreparedView {
 	base_manifest string
 	staged_manifest string
 	storage string
+	socket string
+	firmware string
+	sysroot string
+	sysroot_manifest string
 }
 
 // A fixed preparation operation, not a caller-supplied command or environment.
 struct PrepareProfile {
+	arch string = 'x86_64'
 	adapter string
 	adapter_sha256 string
 	directory string
@@ -63,6 +69,13 @@ struct PrepareProfile {
 	mkfs string
 	xorriso string
 	limine string
+	firmware_vars string
+	sysroot string
+	gcc string
+	linker string
+	mformat string
+	mmd string
+	mcopy string
 	sdk string
 	inputs_sha256 string
 	timeout_seconds int = 1800
@@ -169,6 +182,66 @@ fn inputs(paths []string) !map[string]string {
 	deadline := time.sys_mono_now() + 120 * u64(time.second)
 	for path in paths { inventory(path, [], deadline, mut context, mut result)! }
 	return result
+}
+
+// The cross sysroot is a guest tree. Bind its literal links without resolving
+// /usr/... targets into the host filesystem. The selected compiler searches
+// only the explicit include/library directories retained in the build argv.
+fn literal_inventory(path string, depth int, deadline u64, mut context Inventory, mut values map[string]string) ! {
+	context.count++
+	require(depth <= 128 && context.count <= 250000 && time.sys_mono_now() <= deadline, 'literal inventory entry/deadline limit')!
+	info := os.lstat(path)!
+	values['literal-mode:' + path] = info.mode.str()
+	match info.get_filetype() {
+		.regular { values[path] = hash_bounded(path, deadline)! }
+		.symbolic_link { values['literal-link:' + path] = os.readlink(path)! }
+		.directory {
+			mut names := os.ls(path)!; names.sort()
+			for name in names { literal_inventory(path + '/' + name, depth + 1, deadline, mut context, mut values)! }
+		}
+		else { return error('special literal input: ' + path) }
+	}
+}
+
+fn prepare_inputs(p PrepareProfile, paths []string) !map[string]string {
+	mut result := inputs(paths)!
+	if p.arch == 'aarch64' {
+		mut context := Inventory{}
+		literal_inventory(p.sysroot, 0, time.sys_mono_now() + 120 * u64(time.second), mut context, mut result)!
+	}
+	return result
+}
+
+fn runtime_inputs(p PreparedView, paths []string) !map[string]string {
+	mut result := inputs(paths)!
+	if p.arch == 'aarch64' {
+		mut context := Inventory{}
+		literal_inventory(p.sysroot, 0, time.sys_mono_now() + 120 * u64(time.second), mut context, mut result)!
+	}
+	return result
+}
+
+fn arm_command(qemu string, firmware string, state string, socket string) []string {
+	return [qemu, '-machine', 'virt,gic-version=3', '-accel', 'hvf', '-cpu', 'host', '-m', '3072', '-smp', '2',
+		'-object', 'rng-random,filename=/dev/urandom,id=vinix-rng', '-device', 'virtio-rng-device,rng=vinix-rng',
+		'-drive', 'if=pflash,format=raw,readonly=on,file=' + firmware,
+		'-drive', 'if=pflash,format=raw,file=' + state + '/vars.fd',
+		'-drive', 'if=none,id=vinix-boot,format=raw,readonly=on,file=' + state + '/boot.img',
+		'-device', 'virtio-blk-pci,drive=vinix-boot',
+		'-drive', 'if=none,format=raw,file=' + state + '/root.ext2,id=vinix-persist',
+		'-device', 'virtio-blk-device,drive=vinix-persist', '-device', 'virtio-keyboard-device',
+		'-device', 'virtio-tablet-device', '-device', 'ramfb', '-display', 'none', '-serial', 'mon:stdio',
+		'-qmp', 'unix:' + socket + ',server=on,wait=off', '-no-reboot', '-nic', 'none']
+}
+
+fn arm_prepared(p PreparedView, state string) ! {
+	require(p.sysroot == os.real_path(p.sysroot) && os.is_dir(p.sysroot), 'canonical prepared ARM sysroot required')!
+	require(digest_text(p.sysroot_manifest) && hash(state + '/sysroot-before.tsv')! == p.sysroot_manifest,
+		'prepared ARM sysroot manifest differs')!
+	require(p.firmware == os.real_path(p.firmware) && p.firmware in p.inputs, 'prepared ARM firmware pin missing')!
+	expected_socket := '/tmp/vinix-perf-arm-' + sha256.sum(state.bytes()).hex()[..16] + '.qmp'
+	require(p.socket == expected_socket && p.command.len > 0
+		&& p.command == arm_command(p.command[0], p.firmware, state, expected_socket), 'fixed prepared ARM QEMU command differs')!
 }
 
 fn preserve_source(source string, destination string, depth int, deadline u64, mut context Inventory) ! {
@@ -303,8 +376,10 @@ fn prepare_validated(p PrepareProfile, state string) !Profile {
 	fresh(state)!; fresh(p.prepared_state)!
 	require(!inside(state, p.prepared_state) && !inside(p.prepared_state, state), 'preparation outputs must be separate')!
 	require(p.directory == os.real_path(p.directory) && os.is_dir(p.directory), 'canonical source directory required')!
-	require(p.base == os.real_path(p.base) && os.is_dir(p.base), 'canonical base directory required')!
+	require(p.arch in ['x86_64', 'aarch64'], 'unsupported preparation architecture')!
+	require(p.base == os.real_path(p.base) && (if p.arch == 'aarch64' { os.is_file(p.base) } else { os.is_dir(p.base) }), 'canonical base directory/archive required')!
 	require(os.lstat(p.base)!.mode == p.base_mode && digest_text(p.base_manifest_sha256), 'base mode and manifest pin required')!
+	if p.arch == 'aarch64' { require(hash(p.base)! == p.base_manifest_sha256, 'base archive digest mismatch')! }
 	require(p.timeout_seconds >= 120 && p.timeout_seconds <= 1800, 'preparation deadline must be 120..1800 seconds')!
 	require(p.log_limit_bytes > 0 && p.log_limit_bytes <= 32 * 1024 * 1024, 'log limit must be 1..32 MiB')!
 	require(p.charged_limit_kib >= 524288 && p.charged_limit_kib <= 4718592, 'charged limit must be 512 MiB..4.5 GiB')!
@@ -313,16 +388,28 @@ fn prepare_validated(p PrepareProfile, state string) !Profile {
 		require(path == os.real_path(path) && os.is_file(path) && digest_text(pin), 'canonical pinned adapter/kernel/desktop required')!
 		require(hash(path)! == pin, 'preparation input digest mismatch: ' + path)!
 	}
-	for path in [p.adapter, p.compiler, p.qemu, p.cc, p.readelf, p.mkfs, p.xorriso] {
+	mut executables := [p.adapter, p.compiler, p.qemu, p.cc, p.readelf, p.mkfs]
+	if p.arch == 'aarch64' { executables << [p.mformat, p.mmd, p.mcopy] } else { executables << p.xorriso }
+	for path in executables {
 		require(path == os.real_path(path) && os.is_file(path) && os.is_executable(path), 'canonical executable preparation tool required: ' + path)!
 	}
 	require(p.firmware == os.real_path(p.firmware) && os.is_file(p.firmware), 'canonical firmware required')!
 	for path in [p.limine, p.sdk] { require(path == os.real_path(path) && os.is_dir(path), 'canonical preparation tool directory required')! }
-	require(os.base(p.xorriso) == 'xorriso', 'selected xorriso filename required')!
+	if p.arch == 'aarch64' {
+		require(p.xorriso == '', 'ARM preparation does not select xorriso')!
+		require(p.linker.starts_with('/') && os.base(p.linker) == 'ld.lld' && os.is_executable(p.linker)
+			&& os.is_file(os.real_path(p.linker)), 'absolute selected ld.lld driver required')!
+		require(p.firmware_vars == os.real_path(p.firmware_vars) && os.is_file(p.firmware_vars)
+			&& p.firmware_vars != p.firmware, 'separate canonical ARM firmware variables required')!
+		for path in [p.sysroot, p.gcc] { require(path == os.real_path(path) && os.is_dir(path), 'canonical ARM build directory required')! }
+		require(inside(p.gcc, p.sysroot), 'ARM GCC directory must be inside sysroot')!
+		require(os.is_file(p.limine + '/BOOTAA64.EFI'), 'ARM Limine loader required')!
+	} else { require(os.base(p.xorriso) == 'xorriso', 'selected xorriso filename required')! }
 	require(p.input_roots.len > 0 && p.charged_roots.len > 0, 'declared input and charged roots required')!
 	for root in p.input_roots {
 		resolved := os.real_path(root)
 		require(!inside(resolved, p.base) && !inside(p.base, resolved), 'base must use its literal adapter manifest, not the host input inventory')!
+		if p.arch == 'aarch64' { require(!inside(resolved, p.sysroot) && !inside(p.sysroot, resolved), 'ARM sysroot must use its literal input inventory')! }
 	}
 	for index, root in p.charged_roots {
 		require(root == os.real_path(root) && os.is_dir(root), 'canonical charged root required')!
@@ -335,6 +422,7 @@ fn prepare_validated(p PrepareProfile, state string) !Profile {
 			resolved := os.real_path(root)
 			require(!inside(output, resolved) && !inside(resolved, output), 'preparation output overlaps an input tree')!
 		}
+		if p.arch == 'aarch64' { require(!inside(output, p.sysroot) && !inside(p.sysroot, output), 'preparation output overlaps ARM sysroot')! }
 	}
 	return Profile{adapter: p.adapter, directory: p.directory, timeout_seconds: p.timeout_seconds,
 		log_limit_bytes: p.log_limit_bytes, charged_limit_kib: p.charged_limit_kib,
@@ -344,7 +432,7 @@ fn prepare_validated(p PrepareProfile, state string) !Profile {
 fn prepare_environment(p PrepareProfile, state string) ! {
 	for key, _ in os.environ() { if key !in ['HOME', 'USER', 'LOGNAME'] { os.unsetenv(key) } }
 	for key, value in {
-		'PATH': '/usr/bin:/bin:/usr/sbin:/sbin:' + os.dir(p.xorriso) + ':' + os.dir(p.cc)
+		'PATH': '/usr/bin:/bin:/usr/sbin:/sbin:' + (if p.arch == 'x86_64' { os.dir(p.xorriso) + ':' + os.dir(p.cc) } else { os.dir(p.cc) })
 		'DEVELOPER_DIR': '/Library/Developer/CommandLineTools'
 		'SDKROOT': p.sdk
 		'V': p.compiler
@@ -361,15 +449,33 @@ fn prepare_environment(p PrepareProfile, state string) ! {
 		'VMODULES': state + '/modules'
 		'V3CACHE': state + '/cache'
 		'XDG_CACHE_HOME': state + '/cache'
-		'VINIX_QEMU_X86_64': p.qemu
-		'VINIX_OVMF_CODE_X86_64': p.firmware
-		'CC_AMD64': p.cc
 		'VINIX_PERF_READELF': p.readelf
 		'VINIX_PERF_MKFS': p.mkfs
-		'VINIX_PLAIN_ISO_LIMINE': p.limine
-		'VINIX_PERF_X86_APFS_CLONE': '1'
 	} { os.setenv(key, value, true) }
-	require(os.real_path(os.find_abs_path_of_executable('xorriso')!) == p.xorriso, 'selected xorriso differs from fixed PATH')!
+	if p.arch == 'aarch64' {
+		for key, value in {
+			'VINIX_QEMU_AARCH64': p.qemu
+			'VINIX_OVMF_CODE_AARCH64': p.firmware
+			'VINIX_OVMF_VARS_AARCH64': p.firmware_vars
+			'CC_AARCH64': p.cc
+			'VINIX_AARCH64_SYSROOT': p.sysroot
+			'VINIX_PERF_ARM_GCC': p.gcc
+			'VINIX_PERF_ARM_LINKER': p.linker
+			'VINIX_PERF_ARM_MFORMAT': p.mformat
+			'VINIX_PERF_ARM_MMD': p.mmd
+			'VINIX_PERF_ARM_MCOPY': p.mcopy
+			'VINIX_LIMINE_BOOTAA64': os.real_path(p.limine + '/BOOTAA64.EFI')
+		} { os.setenv(key, value, true) }
+	} else {
+		for key, value in {
+			'VINIX_QEMU_X86_64': p.qemu
+			'VINIX_OVMF_CODE_X86_64': p.firmware
+			'CC_AMD64': p.cc
+			'VINIX_PLAIN_ISO_LIMINE': p.limine
+			'VINIX_PERF_X86_APFS_CLONE': '1'
+		} { os.setenv(key, value, true) }
+		require(os.real_path(os.find_abs_path_of_executable('xorriso')!) == p.xorriso, 'selected xorriso differs from fixed PATH')!
+	}
 }
 
 fn prepare_paths(p PrepareProfile, profile_path string) ![]string {
@@ -378,10 +484,15 @@ fn prepare_paths(p PrepareProfile, profile_path string) ![]string {
 		'tests/linuxkpi/hosttest', 'tools/hosttest', 'tools/sourcecommand', 'tools/qmpclient'] { paths << p.directory + '/' + directory }
 	clang := '/Library/Developer/CommandLineTools/usr/bin/clang'
 	resource := command([clang, '-print-resource-dir'])!.trim_space()
-	paths << [p.adapter, p.kernel, p.desktop, os.dir(p.compiler), p.qemu, p.firmware, p.cc, p.readelf, p.mkfs, p.xorriso,
-		p.limine + '/BOOTX64.EFI', p.limine + '/limine-uefi-cd.bin', p.sdk + '/SDKSettings.json', p.sdk + '/SDKSettings.plist',
+	paths << [p.adapter, p.kernel, p.desktop, os.dir(p.compiler), p.qemu, p.firmware, p.cc, p.readelf, p.mkfs,
+		p.sdk + '/SDKSettings.json', p.sdk + '/SDKSettings.plist',
 		'/bin/cp', '/usr/bin/tar', '/bin/df', '/usr/bin/du', '/usr/bin/xcrun', clang,
 		'/Library/Developer/CommandLineTools/usr/bin/ld', resource + '/include', os.executable(), @FILE, profile_path]
+	if p.arch == 'aarch64' {
+		// The whole selected sysroot, including headers and all library search
+		// directories, is inventoried. It is read in place, never copied.
+		paths << [p.base, p.firmware_vars, p.linker, p.mformat, p.mmd, p.mcopy, p.limine + '/BOOTAA64.EFI']
+	} else { paths << [p.xorriso, p.limine + '/BOOTX64.EFI', p.limine + '/limine-uefi-cd.bin'] }
 	return paths
 }
 
@@ -390,9 +501,15 @@ fn prepared_checked(p PrepareProfile, profile Profile, state string, before map[
 	prepared := json2.decode[PreparedView](os.read_file(path)!)!
 	require(prepared.root == p.directory && prepared.base == p.base
 		&& prepared.arguments == prepare_arguments(p), 'prepared roots or fixed arguments differ')!
-	require(prepared.storage == 'apfs-clone', 'prepared storage mode differs')!
-	require(prepared.base_manifest == p.base_manifest_sha256
-		&& hash(p.prepared_state + '/base-before.tsv')! == p.base_manifest_sha256, 'prepared base manifest differs')!
+	require(prepared.arch == p.arch, 'prepared architecture differs')!
+	require(prepared.storage == (if p.arch == 'aarch64' { 'archive-overlay' } else { 'apfs-clone' }), 'prepared storage mode differs')!
+	require(prepared.base_manifest == p.base_manifest_sha256, 'prepared base manifest differs')!
+	if p.arch == 'aarch64' {
+		require(prepared.sysroot == p.sysroot && prepared.firmware == p.firmware, 'prepared ARM selected paths differ')!
+		arm_prepared(prepared, p.prepared_state)!
+		require(hash(p.base)! == p.base_manifest_sha256 && os.read_file(p.prepared_state + '/base-before.tsv')!
+			== 'file\t' + p.base_manifest_sha256 + '\t' + p.base_mode.str() + '\t' + p.base + '\n', 'prepared base archive differs')!
+	} else { require(hash(p.prepared_state + '/base-before.tsv')! == p.base_manifest_sha256, 'prepared base manifest differs')! }
 	require(digest_text(prepared.staged_manifest)
 		&& hash(p.prepared_state + '/staged-before.tsv')! == prepared.staged_manifest, 'prepared staged manifest differs')!
 	require(prepared.command.len > 0 && prepared.command[0] == p.qemu, 'prepared QEMU differs')!
@@ -429,7 +546,7 @@ fn prepare_owned(state string, profile_path string, admission_only bool) ! {
 			require(!inside(output, resolved) && !inside(resolved, output), 'preparation output overlaps a selected input')!
 		}
 	}
-	before := inputs(paths)!
+	before := prepare_inputs(p, paths)!
 	require(before[profile_path] == sha256.sum(profile_text.bytes()).hex(), 'profile changed before inventory')!
 	// The approved digest excludes the profile itself: adding that digest to
 	// the profile would otherwise require a cryptographic fixed point.
@@ -450,7 +567,7 @@ fn prepare_owned(state string, profile_path string, admission_only bool) ! {
 		os.write_file(state + '/admission.json', json2.encode({
 			'inputs_sha256': selected_sha
 			'profile_sha256': sha256.sum(profile_text.bytes()).hex()
-			'scope': 'read-only selected input admission; base manifest pin recorded, not scanned; no staging or VM execution'
+			'scope': if p.arch == 'aarch64' { 'read-only ARM archive and selected input admission; no staging or VM execution' } else { 'read-only selected input admission; base manifest pin recorded, not scanned; no staging or VM execution' }
 		}) + '\n')!
 		println('PERF FOREGROUND PREPARE ADMISSION ' + selected_sha)
 		return
@@ -458,7 +575,7 @@ fn prepare_owned(state string, profile_path string, admission_only bool) ! {
 	for name in ['tmp', 'modules', 'cache'] { os.mkdir(state + '/' + name)! }
 	mut failure := ''
 	status := supervise(profile, state, prepare_argv(p)) or { failure = err.msg(); -1 }
-	after := inputs(paths) or {
+	after := prepare_inputs(p, paths) or {
 		os.write_file(state + '/inputs-after-error.txt', err.msg() + '\n')!
 		if failure == '' { failure = err.msg() }
 		map[string]string{}
@@ -474,7 +591,7 @@ fn prepare_owned(state string, profile_path string, admission_only bool) ! {
 		'prepared_sha256': prepared_sha
 		'inputs_sha256': selected_sha
 		'profile_sha256': sha256.sum(profile_text.bytes()).hex()
-		'scope': 'fixed maintained x86 prepare under foreground owner and live charged-root budget; no VM execution'
+		'scope': 'fixed maintained ' + p.arch + ' prepare under foreground owner and live charged-root budget; no VM execution'
 	}) + '\n')!
 	println('PERF FOREGROUND PREPARE PASS ' + prepared_sha)
 }
@@ -498,6 +615,15 @@ fn validated(profile Profile, state string) !PreparedView {
 	receipt := profile.prepared_state + '/prepared.json'
 	require(hash(receipt)! == profile.prepared_sha256, 'prepared receipt digest mismatch')!
 	p := json2.decode[PreparedView](os.read_file(receipt)!)!
+	mutable_paths(p, profile.prepared_state)!
+	if p.arch == 'aarch64' {
+		arm_prepared(p, profile.prepared_state)!
+		for root in profile.input_roots {
+			resolved := os.real_path(root)
+			require(!inside(resolved, p.sysroot) && !inside(p.sysroot, resolved), 'ARM sysroot must use its literal input inventory')!
+		}
+		require(!inside(state, p.sysroot) && !inside(p.sysroot, state), 'runtime output overlaps ARM sysroot')!
+	}
 	require(!inside(state, p.root) && !inside(state, profile.prepared_state), 'supervisor state must be external to source and prepared state')!
 	require(p.inputs[profile.adapter] == hash(profile.adapter)!, 'adapter must match prepared input pin')!
 	plan := perfrunner.parse(p.arguments, p.root, p.root + '/tests/desktop-perf', '')!
@@ -512,13 +638,23 @@ fn validated(profile Profile, state string) !PreparedView {
 	return p
 }
 
+fn mutable_paths(p PreparedView, state string) ![]string {
+	require(p.arch in ['x86_64', 'aarch64'], 'unsupported prepared architecture')!
+	mut names := ['root.ext2']
+	if p.arch == 'aarch64' {
+		require(p.storage == 'archive-overlay', 'ARM prepared storage differs')!
+		names << 'vars.fd'
+	}
+	paths := names.map(state + '/' + it)
+	for path in paths { require(path in p.inputs, 'prepared mutable disk pin missing')! }
+	return paths
+}
+
 fn completed(profile Profile, p PreparedView) ! {
 	require(os.read_file(profile.prepared_state + '/results/status')! == '0\n', 'adapter completion receipt missing')!
 	after := json2.decode[map[string]string](os.read_file(profile.prepared_state + '/after-inputs.json')!)!
 	mut expected := p.inputs.clone()
-	disk := profile.prepared_state + '/root.ext2'
-	require(disk in expected, 'prepared mutable disk pin missing')!
-	expected[disk] = hash(disk)!
+	for disk in mutable_paths(p, profile.prepared_state)! { expected[disk] = hash(disk)! }
 	require(after == expected, 'adapter input verification receipt differs')!
 	serial := os.read_file(profile.prepared_state + '/results/serial.log')!
 	require(serial.split_into_lines().any(it.trim_space() == perfreport.done), 'guest completion marker missing')!
@@ -535,16 +671,17 @@ fn run(state string, profile_path string) !int {
 	os.write_file(state + '/profile.json', profile_text)!
 	mut paths := profile.input_roots.clone()
 	paths << [profile_path, profile.adapter, profile.prepared_state + '/prepared.json', p.command[0], os.executable(), @FILE]
-	for path, _ in p.inputs { if path != profile.prepared_state + '/root.ext2' { paths << path } }
-	before := inputs(paths)!
+	mutable := mutable_paths(p, profile.prepared_state)!
+	for path, _ in p.inputs { if path !in mutable { paths << path } }
+	before := runtime_inputs(p, paths)!
 	require(before[profile_path] == sha256.sum(profile_text.bytes()).hex(), 'profile changed before inventory')!
 	os.write_file(state + '/inputs-before.json', json2.encode(before) + '\n')!
 	status := supervise(profile, state, [profile.adapter, 'run', profile.prepared_state, profile.prepared_sha256]) or {
-		after := inputs(paths) or { map[string]string{} }
+		after := runtime_inputs(p, paths) or { map[string]string{} }
 		os.write_file(state + '/inputs-after.json', json2.encode(after) + '\n')!
 		return err
 	}
-	after := inputs(paths)!
+	after := runtime_inputs(p, paths)!
 	os.write_file(state + '/inputs-after.json', json2.encode(after) + '\n')!
 	require(before == after, 'declared input identity changed')!
 	os.write_file(state + '/budget-after.log', budget(profile, state, false)!)!
@@ -554,7 +691,7 @@ fn run(state string, profile_path string) !int {
 		'verdict': 'PASS'
 		'prepared_sha256': profile.prepared_sha256
 		'inputs_sha256': hash(state + '/inputs-before.json')!
-		'scope': 'maintained x86 prepared adapter; its own successful shutdown and input verification receipts required; no arbitrary escaped-descendant guarantee'
+		'scope': 'maintained ' + p.arch + ' prepared adapter; its own successful shutdown and input verification receipts required; no arbitrary escaped-descendant guarantee'
 	}) + '\n')!
 	println('PERF FOREGROUND PASS ' + hash(state + '/result.json')!)
 	return 0
@@ -661,6 +798,87 @@ fn profile_controls(state string) !string {
 	return 'PASS ten profile/completion controls; fake prepared documents only; no adapter or QEMU execution'
 }
 
+// Separate ARM controls preserve the historical x86 twenty-four-case receipt.
+fn armcheck(state string, compiler string) ! {
+	fresh(state)!
+	os.mkdir(state)!
+	root := state + '/source'; sysroot := state + '/sysroot'; staged := state + '/prepared'; output := state + '/output'
+	for path in [root, sysroot, staged, sysroot + '/gcc'] { os.mkdir(path)! }
+	base := state + '/base.tar'; os.write_file(base, 'fixture archive')!
+	firmware := state + '/firmware'; variables := state + '/variables'
+	os.write_file(firmware, 'firmware')!; os.write_file(variables, 'variables')!
+	os.write_file(root + '/BOOTAA64.EFI', 'fixture loader')!
+	os.symlink(os.executable(), state + '/ld.lld')!
+	pin := hash(os.executable())!
+	preparation := PrepareProfile{arch: 'aarch64', adapter: os.executable(), adapter_sha256: pin,
+		directory: root, base: base, base_mode: os.lstat(base)!.mode, base_manifest_sha256: hash(base)!,
+		kernel: os.executable(), kernel_sha256: pin, desktop: os.executable(), desktop_sha256: pin,
+		prepared_state: state + '/new-prepared', compiler: compiler, qemu: os.executable(), firmware: firmware,
+		firmware_vars: variables, cc: os.executable(), readelf: os.executable(), mkfs: os.executable(),
+		limine: root, sdk: root, sysroot: sysroot, gcc: sysroot + '/gcc', linker: state + '/ld.lld',
+		mformat: os.executable(), mmd: os.executable(), mcopy: os.executable(), charged_roots: [state], input_roots: [root]}
+	prepare_validated(preparation, output)!
+	require(prepare_argv(preparation)[2..6] == [root, base, preparation.kernel, preparation.prepared_state], 'ARM fixed prepare argv differs')!
+	mut checks := ['valid fixed ARM preparation admission']
+	prepare_refuses(PrepareProfile{...preparation, base_manifest_sha256: '0'.repeat(64)}, output, 'archive digest mismatch')!
+	checks << 'refused changed archive'
+	prepare_refuses(PrepareProfile{...preparation, firmware_vars: firmware}, output, 'separate canonical ARM firmware variables')!
+	checks << 'refused shared firmware code and variables'
+	prepare_refuses(PrepareProfile{...preparation, gcc: root}, output, 'GCC directory must be inside')!
+	checks << 'refused external GCC directory'
+	prepare_refuses(PrepareProfile{...preparation, xorriso: os.executable()}, output, 'does not select xorriso')!
+	checks << 'refused x86-only preparation tool'
+	prepare_refuses(PrepareProfile{...preparation, input_roots: [sysroot]}, output, 'literal input inventory')!
+	checks << 'refused host resolution of guest sysroot'
+	prepare_refuses(preparation, sysroot + '/output', 'overlaps ARM sysroot')!
+	checks << 'refused output inside sysroot'
+	for name in ['root.ext2', 'vars.fd', 'boot.img'] { os.write_file(staged + '/' + name, name)! }
+	os.write_file(staged + '/sysroot-before.tsv', 'fixture manifest\n')!
+	socket := '/tmp/vinix-perf-arm-' + sha256.sum(staged.bytes()).hex()[..16] + '.qmp'
+	p := PreparedView{arch: 'aarch64', root: root, storage: 'archive-overlay', sysroot: sysroot,
+		sysroot_manifest: hash(staged + '/sysroot-before.tsv')!, firmware: firmware, socket: socket,
+		arguments: ['new=' + os.executable(), '--scenarios=ops,churn,cache,idle,apps,drag', '--timeout=1800'],
+		command: arm_command(os.executable(), firmware, staged, socket),
+		inputs: {os.executable(): pin, firmware: hash(firmware)!, staged + '/boot.img': hash(staged + '/boot.img')!,
+			staged + '/root.ext2': hash(staged + '/root.ext2')!, staged + '/vars.fd': hash(staged + '/vars.fd')!}}
+	profile := Profile{adapter: os.executable(), prepared_state: staged, directory: root, timeout_seconds: 1860,
+		log_limit_bytes: 65536, charged_roots: [staged], input_roots: [root]}
+	validated(fake_profile(profile, p)!, output)!
+	checks << 'valid fixed ARM runtime admission'
+	mut wrong_command := p.command.clone(); wrong_command[wrong_command.index('virtio-blk-pci,drive=vinix-boot')] = 'virtio-blk-device,drive=vinix-boot'
+	refuses(fake_profile(profile, PreparedView{...p, command: wrong_command})!, output, 'fixed prepared ARM QEMU command differs')!
+	checks << 'refused second MMIO block device'
+	mut missing := p.inputs.clone(); missing.delete(staged + '/vars.fd')
+	refuses(fake_profile(profile, PreparedView{...p, inputs: missing})!, output, 'mutable disk pin missing')!
+	checks << 'refused absent variables pin'
+	refuses(fake_profile(profile, PreparedView{...p, storage: 'apfs-clone'})!, output, 'ARM prepared storage differs')!
+	checks << 'refused ARM storage mismatch'
+	refuses(fake_profile(profile, PreparedView{...p, arch: 'unknown'})!, output, 'unsupported prepared architecture')!
+	checks << 'refused unknown architecture'
+	valid := fake_profile(profile, p)!
+	os.mkdir(staged + '/results')!
+	os.write_file(staged + '/results/status', '0\n')!; os.write_file(staged + '/results/serial.log', perfreport.done + '\n')!
+	mut after := p.inputs.clone()
+	for name in ['root.ext2', 'vars.fd'] { os.write_file(staged + '/' + name, 'changed ' + name)!; after[staged + '/' + name] = hash(staged + '/' + name)! }
+	os.write_file(staged + '/after-inputs.json', json2.encode(after) + '\n')!; completed(valid, p)!
+	checks << 'accepted both fixed mutable outputs'
+	os.write_file(staged + '/boot.img', 'changed immutable boot image')!; after[staged + '/boot.img'] = hash(staged + '/boot.img')!
+	os.write_file(staged + '/after-inputs.json', json2.encode(after) + '\n')!
+	completion_refuses(valid, p, 'input verification receipt differs')!
+	checks << 'refused mutable boot image'
+	os.symlink('/lib/libc.so', sysroot + '/loader')!
+	before := runtime_inputs(p, [root])!
+	require(before['literal-link:' + sysroot + '/loader'] == '/lib/libc.so'
+		&& 'resolved:' + sysroot + '/loader' !in before, 'guest link was host-resolved')!
+	checks << 'literal guest absolute link without host resolution'
+	os.rm(sysroot + '/loader')!; os.symlink('/other', sysroot + '/loader')!
+	require(runtime_inputs(p, [root])! != before, 'changed sysroot link accepted')!
+	checks << 'changed sysroot link changes owner inventory'
+	require(checks.len == 16 && !os.exists(output) && !os.exists(preparation.prepared_state), 'ARM control count or output differs')!
+	os.write_file(state + '/result.json', json2.encode(checks) + '\n')!
+	println('PERF FOREGROUND ARM HOST PASS sixteen controls; no adapter or guest executed')
+}
+
 fn selfcheck(state string, compiler string) ! {
 	fresh(state)!
 	require(compiler.starts_with('/') && os.is_file(compiler), 'absolute complete V executable required')!
@@ -726,7 +944,10 @@ fn limitcheck(state string) ! {
 	println('PERF FOREGROUND LIMIT PASS six admission boundaries')
 }
 
-fn qualify(state string, compiler string, adapter bool) ! {
+fn qualify(state string, compiler string, mode string) ! {
+	adapter := mode in ['qualify-adapter', 'qualify-arm-adapter']
+	arm := mode == 'qualify-arm-adapter'
+	arm_owner := mode == 'qualify-arm-owner'
 	fresh(state)!
 	require(compiler == os.real_path(compiler) && os.is_file(compiler), 'canonical complete V executable required')!
 	root := os.real_path(@DIR + '/../..')
@@ -775,7 +996,7 @@ fn qualify(state string, compiler string, adapter bool) ! {
 		}
 	}
 	mut results := map[string]string{}
-	target := if adapter { 'run-x86' } else { 'foreground-supervise' }
+	target := if arm { 'run-arm' } else if adapter { 'run-x86' } else { 'foreground-supervise' }
 	for kind in ['normal', 'production'] {
 		work := state + '/' + kind; os.mkdir(work)!
 		build := work + '/build'; os.mkdir(build)!
@@ -790,7 +1011,11 @@ fn qualify(state string, compiler string, adapter bool) ! {
 		if !adapter { control_argv << compiler }
 		require(supervise(profile, control, control_argv)! == 0, kind + ' controls failed')!
 		results[kind + ':binary_sha256'] = hash(work + '/' + target)!
-		if adapter {
+		if arm {
+			checks := json2.decode[[]string](os.read_file(work + '/controls/result.json')!)!
+			require(checks.len == 18, 'ARM adapter control receipt count differs')!
+			results[kind + ':selfcheck_sha256'] = hash(work + '/controls/result.json')!
+		} else if adapter {
 			require(os.read_file(work + '/controls/result')!.starts_with('PASS 32 checks including 19 refusals:'), 'adapter control receipt differs')!
 			results[kind + ':selfcheck_sha256'] = hash(work + '/controls/result')!
 			clone_driver := work + '/clone-driver'; os.mkdir(clone_driver)!
@@ -800,6 +1025,13 @@ fn qualify(state string, compiler string, adapter bool) ! {
 			results[kind + ':clonecheck_sha256'] = hash(work + '/clone-controls/result.json')!
 		} else {
 			results[kind + ':qualification_sha256'] = hash(work + '/controls/qualification.json')!
+			if arm_owner {
+				arm_driver := work + '/arm-driver'; os.mkdir(arm_driver)!
+				require(supervise(profile, arm_driver, [work + '/' + target, 'armcheck', work + '/arm-controls', compiler])! == 0, kind + ' ARM owner controls failed')!
+				checks := json2.decode[[]string](os.read_file(work + '/arm-controls/result.json')!)!
+				require(checks.len == 16, 'ARM owner control receipt count differs')!
+				results[kind + ':armcheck_sha256'] = hash(work + '/arm-controls/result.json')!
+			}
 		}
 		os.write_file(state + '/progress.json', json2.encode(results) + '\n')!
 	}
@@ -808,7 +1040,7 @@ fn qualify(state string, compiler string, adapter bool) ! {
 	require(before == after, 'build/control input identity changed')!
 	os.write_file(state + '/budget-after.log', budget(profile, state, false)!)!
 	results['inputs_sha256'] = hash(state + '/inputs-before.json')!
-	results['verdict'] = if adapter { 'PASS normal and production; 32 selfcheck and 18 clone controls each; no guest execution' } else { 'PASS normal and production; twenty-four controls each; no guest execution' }
+	results['verdict'] = if arm { 'PASS normal and production; eighteen ARM adapter controls each; no guest execution' } else if arm_owner { 'PASS normal and production; twenty-four historical and sixteen ARM owner controls each; no guest execution' } else if adapter { 'PASS normal and production; 32 selfcheck and 18 clone controls each; no guest execution' } else { 'PASS normal and production; twenty-four controls each; no guest execution' }
 	results['scope'] = 'selected complete compiler, maintained sources and recorded host compiler/SDK metadata; installed loader and SDK dependency closure is not hermetic'
 	os.write_file(state + '/qualification.json', json2.encode(results) + '\n')!
 	println('PERF FOREGROUND QUALIFIED ' + hash(state + '/qualification.json')!)
@@ -819,11 +1051,14 @@ fn main() {
 	if os.args.len == 4 && os.args[1] == 'selfcheck' {
 		selfcheck(os.args[2], os.args[3]) or { eprintln(err); exit(1) }; return
 	}
+	if os.args.len == 4 && os.args[1] == 'armcheck' {
+		armcheck(os.args[2], os.args[3]) or { eprintln(err); exit(1) }; return
+	}
 	if os.args.len == 3 && os.args[1] == 'limitcheck' {
 		limitcheck(os.args[2]) or { eprintln(err); exit(1) }; return
 	}
-	if os.args.len == 4 && os.args[1] in ['qualify', 'qualify-adapter'] {
-		qualify(os.args[2], os.args[3], os.args[1] == 'qualify-adapter') or { eprintln(err); exit(1) }; return
+	if os.args.len == 4 && os.args[1] in ['qualify', 'qualify-adapter', 'qualify-arm-adapter', 'qualify-arm-owner'] {
+		qualify(os.args[2], os.args[3], os.args[1]) or { eprintln(err); exit(1) }; return
 	}
 	if os.args.len == 4 && os.args[1] in ['admit-prepare', 'prepare'] {
 		prepare_owned(os.args[2], os.args[3], os.args[1] == 'admit-prepare') or {
@@ -837,6 +1072,6 @@ fn main() {
 			eprintln(err); exit(1)
 		}; exit(status)
 	}
-	eprintln('usage: foreground-supervise run|admit-prepare|prepare NEW-STATE PROFILE.json\n       foreground-supervise selfcheck|qualify|qualify-adapter NEW-STATE COMPLETE-V\n       foreground-supervise limitcheck NEW-STATE')
+	eprintln('usage: foreground-supervise run|admit-prepare|prepare NEW-STATE PROFILE.json\n       foreground-supervise selfcheck|armcheck|qualify|qualify-adapter|qualify-arm-adapter|qualify-arm-owner NEW-STATE COMPLETE-V\n       foreground-supervise limitcheck NEW-STATE')
 	exit(2)
 }
