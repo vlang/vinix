@@ -127,7 +127,7 @@ fn storyboard_controller(root &StoryboardNode, key string, identifier string) !u
 		return error('storyboard controller initialization must return UIViewController')
 	}
 	view := storyboard_view(view_node, controller, initial.attributes['id'], 0)!
-	store_field(controller, 6, view)
+	ui_set_controller_view(controller, view)
 	objc_release(view)
 	complete = true
 	return controller

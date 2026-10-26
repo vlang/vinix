@@ -294,6 +294,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	response_dispose(mut header)
 	alert_dispose(mut header)
 	objc_destroy_weak(unsafe { &header.presenter })
+	objc_destroy_weak(unsafe { &header.view_controller })
 	capture_audio_dispose(mut header)
 	for field in header.fields { objc_release(field) }
 	for i in 0 .. header.child_count {

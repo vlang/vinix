@@ -92,6 +92,7 @@ mut:
 	gestures    []u64
 	mutation    u64
 	parent_view u64 // Non-owning, cleared when detached.
+	view_controller u64 // Zeroing weak: the controller owns this view in fields[6].
 	number      i64
 	section     i64
 	valid       bool

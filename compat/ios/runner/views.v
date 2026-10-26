@@ -44,13 +44,47 @@ fn ui_set_root_controller(window u64, controller u64) {
 	if window == ios_runtime.window && controller != 0 { ui_load_controller(controller) }
 }
 
-fn ui_load_controller(controller u64) {
-	mut header := obj_header(controller)
-	if header.fields[6] == 0 {
-		header.fields[6] = objc_allocate(ios_runtime.names['UIView'])
-		mut view := obj_header(header.fields[6])
-		view.frame = ObjRect{0, 0, 390, 680}
+fn ui_set_controller_view(controller u64, view u64) {
+	old := obj_header(controller).fields[6]
+	if old == view { return }
+	if old != 0 && obj_header(old).view_controller == controller {
+		objc_store_weak(unsafe { &obj_header(old).view_controller }, 0)
 	}
+	if old != 0 { ui_remove_child(old) }
+	store_field(controller, 6, view)
+	if view != 0 { objc_store_weak(unsafe { &obj_header(view).view_controller }, controller) }
+}
+
+fn ui_controller_view(controller u64) u64 {
+	if obj_header(controller).fields[6] == 0 {
+		view_object := objc_allocate(ios_runtime.names['UIView'])
+		mut view := obj_header(view_object)
+		view.frame = ObjRect{0, 0, 390, 680}
+		ui_set_controller_view(controller, view_object)
+		objc_release(view_object)
+	}
+	return obj_header(controller).fields[6]
+}
+
+fn ui_next_responder(object u64) u64 {
+	header := obj_header(object)
+	if objc_is_kind(object, ios_runtime.names['UIWindow']) { return ios_runtime.application }
+	if objc_is_kind(object, ios_runtime.names['UIView']) {
+		return if header.view_controller != 0 { header.view_controller } else { header.parent_view }
+	}
+	if objc_is_kind(object, ios_runtime.names['UIViewController']) {
+		return if header.fields[6] == 0 { u64(0) } else { obj_header(header.fields[6]).parent_view }
+	}
+	if objc_is_kind(object, ios_runtime.names['UIApplication']) {
+		delegate := header.fields[0]
+		return if delegate != 0 && objc_is_kind(delegate, ios_runtime.names['UIResponder']) { delegate } else { u64(0) }
+	}
+	return 0
+}
+
+fn ui_load_controller(controller u64) {
+	ui_controller_view(controller)
+	mut header := obj_header(controller)
 	if !header.loaded {
 		header.loaded = true
 		invoke_void(controller, c'viewDidLoad')

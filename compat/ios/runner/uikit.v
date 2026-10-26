@@ -351,6 +351,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	}
 	if objc_is_kind(object, ios_runtime.names['UIResponder']) {
 		match selector {
+			'nextResponder' { frame.x[0] = ui_next_responder(object); return true }
 			'isFirstResponder' { frame.x[0] = u64(ios_runtime.first_responder == object); return true }
 			'resignFirstResponder' {
 				if ios_runtime.first_responder == object { ios_runtime.first_responder = 0 }
@@ -381,15 +382,8 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 		'presentedViewController' { frame.x[0] = header.fields[8] }
 		'presentingViewController' { frame.x[0] = header.presenter }
 		'viewDidLoad', 'viewDidLayoutSubviews' {}
-		'view' {
-			if header.fields[6] == 0 {
-				header.fields[6] = objc_allocate(ios_runtime.names['UIView'])
-				mut view := obj_header(header.fields[6])
-				view.frame = ObjRect{0, 0, 390, 680}
-			}
-			frame.x[0] = header.fields[6]
-		}
-		'setView:' { store_field(object, 6, frame.x[2]) }
+		'view' { frame.x[0] = ui_controller_view(object) }
+		'setView:' { ui_set_controller_view(object, frame.x[2]) }
 		'frame' { return_rect(mut frame, header.frame) }
 		'bounds' { return_rect(mut frame, ObjRect{0, 0, header.frame.width, header.frame.height}) }
 		'safeAreaInsets' { return_rect(mut frame, ObjRect{}) }
