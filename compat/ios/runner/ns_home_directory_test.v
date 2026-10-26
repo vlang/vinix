@@ -96,12 +96,11 @@ fn home_private_cases(api HomeApi) {
 	if _:=ns_home_directory_checked(){assert false};unsafe{long_name.free();too_long.free()}
 	os.unsetenv('VINIX_IOS_DOCUMENTS');ios_runtime.bundle=''
 	if _:=ns_home_directory_checked(){assert false}
-	// Home lookup performs no filesystem operations. Only the existing
-	// Documents search creates the directory, under the same selected parent.
+	// Neither home nor search-path queries create directories.
 	pid:=os.getpid().str();base:='/tmp/vinix-home-'+pid;bundle:=base+'/Fortnite.app';docs:=base+'/Documents'
 	assert !os.exists(base);ios_runtime.bundle=bundle;home_case(api,base,true);assert !os.exists(base)
 	pool:=api.push();paths:=ns_search_paths(9,1,true);assert obj_header(paths).items.len==1&&string_text(obj_header(paths).items[0])==docs;api.pop(pool)
-	assert os.is_dir(docs);os.rmdir(docs) or {panic(err)};os.rmdir(base) or {panic(err)}
+	assert !os.exists(base)
 	home_threads(api,base);ios_runtime.bundle='';unsafe{pid.free();base.free();bundle.free();docs.free()}
 	if _:=runtime_symbol('/System/Library/Frameworks/UIKit.framework/UIKit','_NSHomeDirectory'){assert false}
 	assert ios_runtime.live==0

@@ -379,18 +379,6 @@ fn ns_string_from_selector(selector &char) u64 {
 	return make_string(selector)
 }
 
-fn ns_search_paths(directory u64, domain u64, expand bool) u64 {
-	_ = expand
-	if directory != 9 || domain != 1 { panic('iOS: unsupported Foundation search path/domain') }
-	path := os.getenv('VINIX_IOS_DOCUMENTS')
-	documents := if path != '' { path } else { os.join_path(os.dir(ios_runtime.bundle), 'Documents') }
-	os.mkdir_all(documents) or { panic('iOS: cannot create Documents directory: ${err}') }
-	array := objc_allocate(ios_runtime.names['NSArray'])
-	mut header := obj_header(array)
-	array_append(mut header, make_string(unsafe { &char(documents.str) }))
-	return objc_autorelease(array)
-}
-
 fn C.ios_nslog()
 
 @[export: 'ios_nslog_stack']
