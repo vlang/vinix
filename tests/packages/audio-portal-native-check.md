@@ -157,3 +157,55 @@ No target pointer-error suppression is applied. Retained original V header
 paths bind exact captured keys and hashes without requiring live originals
 during an archival audit. Full native execution remains pending.
 This report makes no roadmap completion claim.
+
+## Single ARM basic diagnostic
+
+`audio-portal-retain --diagnostic-basic RAW_RUN NEW_OUTPUT aarch64` inspects
+the raw `run/packages-audio-basic` outcome, exact ordered serial controls,
+guest-initiated QMP shutdown and actual stereo WAV. It calls the same
+per-scenario checks as complete admission, including all three expected tones,
+both channels, amplitude/frequency, one-second gaps and leading/trailing quiet.
+The new output contains only `basic-diagnostic.json`, explicitly marked
+`diagnostic_only: true` and `qualification: false`. Its architecture field is
+the requested architecture, not independent hardware provenance. It records
+the inspected raw artifact digests, checker/source digests and detected regions.
+It does not admit the kernel, publisher, source/build inputs, lifecycle or seat
+behavior. The normal command still requires a complete qualification receipt
+and all three scenarios; no admission requirement is relaxed.
+
+`audio-portal-basic-check RETAINER_PROGRAM NEW_CONTROL_OUTPUT` exercises a
+synthetic representative raw basic positive and focused refusal controls.
+These controls do not represent a guest run. Both tools must be built with
+`-prod`; generated output stays outside Git. Independent source review passed.
+On source base `27a05e7172f03c3b944f7f6a7a0cf3f8628481e7`, both pinned host
+builds passed, all 31 focused controls passed, and the existing strict AArch64
+34-control synthetic admission matrix passed with the changed retainer. The
+matrix also refused its synthetic receipt in native mode. No audio VM, target
+staging or image was created for this change; real guest execution is pending.
+
+Complete external evidence is under
+`/Users/alex/Library/Caches/vinix-codex/section14/package-audio-portal/`.
+`basic-diagnostic-01` preserves the initial old-V argv-concatenation compile
+failure; `basic-diagnostic-02` preserves the corrected builds, generated C,
+source copies, literal arguments/environment, raw logs and all control inputs.
+Its `controls/basic-controls.json` SHA-256 is
+`44f2c53d52b18d261588e612204d1086604546610977dc216f5eed07e96be33d`;
+`strict-arm/proof/evidence-controls.json` SHA-256 is
+`96fc02deadde07f4091b3737f468c5ac7c87b817c1c9a8821fcbb7e423548965`.
+The complete regular-file/literal-symlink inventories are `bundle.sha256`:
+`basic-diagnostic-01` SHA-256
+`dbcfb07714ce214edc90ac8d70fa60f541a9b2b016539c567383a0da2ac2826c`;
+`basic-diagnostic-02` SHA-256
+`dec3da6499fbf061809f97674b7dec8c65ca9c2fd3a07ad5b20fe5068b9c1b2a`.
+
+The selected source/tool maps before and after validation are equal, with
+SHA-256 `fefedd98b16e8c278c7be7ef45aa6edc82a7555061a0baf9f77d82dc5b161156`.
+The host builds used V SHA-256
+`ff75a30180b1de305e3c62acc1ebd85341ff83ae5d852c819d11f27d5260c4c5`
+and LLVM 23 clang SHA-256
+`4e4fd968922cd634ebb6445325703a6276effde7b39337a6a9ff40b3b0c657b8`.
+This pins observed selected inputs, not a hermetic host toolchain closure.
+The tested retainer source SHA-256 is
+`25ed785df391d2dd574b76a1a49833856c8484df900e5252b236f6256636d2d0`;
+the focused runner source SHA-256 is
+`ec95d77ad5a4c657fbbb23397d0727ab1b4e82d28b9f506c5de233b658feee8c`.

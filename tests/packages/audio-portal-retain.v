@@ -93,6 +93,20 @@ struct Retained {
 	limitation string = 'Critical producer and authority sources are embedded; remaining frozen source inventory is provenance, not a source signature. Healthy-device execution does not qualify stalled drain.'
 }
 
+struct BasicDiagnostic {
+	format int = 1
+	result string = 'PASS'
+	diagnostic_only bool = true
+	qualification bool
+	requested_architecture string = 'aarch64'
+	raw_run string
+	checker string
+	checker_sources map[string]string
+	artifacts map[string]string
+	regions []audiotest.Region
+	limitation string = 'Only raw basic outcome, serial, guest shutdown and stereo waveform are checked. This does not admit kernel, publisher, build provenance, lifecycle, seat or complete native qualification.'
+}
+
 fn digest(path string) !string {
 	mut file := os.open(path)!
 	defer { file.close() }
@@ -361,6 +375,71 @@ fn admit_shutdown(path string) ! {
 	if count != 1 { return error('missing or duplicated guest QMP shutdown') }
 }
 
+// Shared by complete admission and the explicitly incomplete raw diagnostic.
+fn scenario_evidence(state string, scenario string) ![]audiotest.Region {
+	outcome := json2.decode[Outcome](bounded(state + '/outcome.json')!)!
+	if !outcome.passed || outcome.interrupted || outcome.reason != '' || outcome.scenario != 'packages-audio-' + scenario
+		|| outcome.state != state || !math.is_finite(outcome.seconds) || outcome.seconds <= 0 || outcome.seconds > 300 {
+		return error('raw hardware outcome did not pass: ' + scenario)
+	}
+	serial(state + '/serial.log', scenario)!
+	admit_shutdown(state + '/qmp.log')!
+	recording := audiotest.read(state + '/sound.wav')!
+	frequencies := match scenario { 'basic' { [440, 660, 880] } 'lifecycle' { [440, 660, 880, 440] } else { [440, 880] } }
+	tone_regions := recording.check_sequence(frequencies.map(audiotest.Tone{ frequency: f64(it) }))!
+	for index in 1 .. tone_regions.len { recording.require_gap(tone_regions[index - 1], tone_regions[index], 1, 0.04)! }
+	if tone_regions[0].start_frame < 48000 || recording.seconds() - f64(tone_regions.last().end_frame) / 48000 < 1 {
+		return error('recording lacks one-second leading or trailing quiet: ' + scenario)
+	}
+	recording.require_quiet(0, f64(tone_regions[0].start_frame) / 48000 - 0.04, 64)!
+	recording.require_quiet(f64(tone_regions.last().end_frame) / 48000 + 0.04, recording.seconds(), 64)!
+	return tone_regions
+}
+
+fn basic_diagnostic(run string, out string, arch string) ! {
+	$if prod {} $else { return error('compile audio retainer with -prod') }
+	if arch != 'aarch64' { return error('basic diagnostic requires aarch64') }
+	if !os.is_abs_path(run) || os.real_path(run) != run || !os.is_dir(run)
+		|| !os.is_abs_path(out) || os.abs_path(out) != out || os.exists(out) || os.is_link(out)
+		|| os.real_path(os.dir(out)) != os.dir(out) || out.starts_with(run + '/') {
+		return error('requires canonical raw run and new external diagnostic output')
+	}
+	mut sources := map[string]string{}
+	for name, expected in {
+		'audio-portal-retain.v': sha256.sum($embed_file('audio-portal-retain.v').to_string().bytes()).hex()
+		'audiotest/wave.v': sha256.sum($embed_file('audiotest/wave.v').to_string().bytes()).hex()
+	} {
+		path := os.dir(@FILE) + '/' + name
+		regular(path)!
+		if digest(path)! != expected { return error('diagnostic checker source changed after compilation') }
+		sources[path] = expected
+	}
+	state := run + '/run/packages-audio-basic'
+	if os.real_path(state) != state { return error('basic state must be canonical') }
+	mut artifacts := map[string]string{}
+	for name in ['outcome.json', 'serial.log', 'sound.wav', 'qemu.log', 'qmp.log'] {
+		path := state + '/' + name
+		if !os.exists(path) && !os.is_link(path) { return error('missing raw basic artifact: ' + name) }
+		regular(path)!
+		limit := if name == 'sound.wav' { 512 * 1024 * 1024 } else { 16 * 1024 * 1024 }
+		if (os.stat(path)!).size > limit { return error('raw basic artifact exceeds diagnostic limit') }
+		artifacts[path] = digest(path)!
+	}
+	regions := scenario_evidence(state, 'basic')!
+	for path, expected in artifacts {
+		if digest(path)! != expected { return error('raw basic artifact changed during diagnostic') }
+	}
+	for path, expected in sources {
+		if digest(path)! != expected { return error('diagnostic source changed during inspection') }
+	}
+	os.mkdir(out)!
+	os.write_file(out + '/basic-diagnostic.json', json2.encode(BasicDiagnostic{
+		raw_run: run, checker: digest(os.executable())!, checker_sources: sources,
+		artifacts: artifacts, regions: regions,
+	}) + '\n')!
+	println('AUDIO BASIC DIAGNOSTIC PASS qualification=false requested_architecture=aarch64')
+}
+
 fn retain(run string, out string, arch string, synthetic bool) ! {
 	$if prod {} $else { return error('compile audio retainer with -prod') }
 	if digest(@FILE)! != sha256.sum($embed_file('audio-portal-retain.v').to_string().bytes()).hex() { return error('retainer changed after compilation') }
@@ -438,23 +517,7 @@ fn retain(run string, out string, arch string, synthetic bool) ! {
 		for suffix, name in {'outcome': 'outcome.json', 'serial': 'serial.log', 'wav': 'sound.wav', 'qemu-log': 'qemu.log', 'qmp-log': 'qmp.log'} {
 			if receipt.artifact_paths[scenario + '-' + suffix] != state + '/' + name { return error('scenario artifact path differs: ' + scenario + '-' + suffix) }
 		}
-		outcome := json2.decode[Outcome](bounded(state + '/outcome.json')!)!
-		if !outcome.passed || outcome.interrupted || outcome.reason != '' || outcome.scenario != 'packages-audio-' + scenario
-			|| outcome.state != state || !math.is_finite(outcome.seconds) || outcome.seconds <= 0 || outcome.seconds > 300 {
-			return error('raw hardware outcome did not pass: ' + scenario)
-		}
-		serial(state + '/serial.log', scenario)!
-		admit_shutdown(state + '/qmp.log')!
-		recording := audiotest.read(state + '/sound.wav')!
-		frequencies := match scenario { 'basic' { [440, 660, 880] } 'lifecycle' { [440, 660, 880, 440] } else { [440, 880] } }
-		tone_regions := recording.check_sequence(frequencies.map(audiotest.Tone{ frequency: f64(it) }))!
-		for index in 1 .. tone_regions.len { recording.require_gap(tone_regions[index - 1], tone_regions[index], 1, 0.04)! }
-		if tone_regions[0].start_frame < 48000 || recording.seconds() - f64(tone_regions.last().end_frame) / 48000 < 1 {
-			return error('recording lacks one-second leading or trailing quiet: ' + scenario)
-		}
-		recording.require_quiet(0, f64(tone_regions[0].start_frame) / 48000 - 0.04, 64)!
-		recording.require_quiet(f64(tone_regions.last().end_frame) / 48000 + 0.04, recording.seconds(), 64)!
-		regions[scenario] = tone_regions
+		regions[scenario] = scenario_evidence(state, scenario)!
 	}
 	os.mkdir_all(out)!
 	os.write_file(out + '/retained.json', json2.encode(Retained{ architecture: arch, platform: platform,
@@ -463,6 +526,10 @@ fn retain(run string, out string, arch string, synthetic bool) ! {
 }
 
 fn main() {
+	if os.args.len == 5 && os.args[1] == '--diagnostic-basic' {
+		basic_diagnostic(os.args[2], os.args[3], os.args[4]) or { eprintln(err); exit(1) }
+		return
+	}
 	synthetic := os.args.len == 5 && os.args[1] == '--self-test'
 	args := if synthetic { os.args[2..] } else { os.args[1..] }
 	if args.len != 3 { eprintln('use [--self-test] RUN_DIRECTORY NEW_OUTPUT_DIRECTORY aarch64|x86_64'); exit(1) }
