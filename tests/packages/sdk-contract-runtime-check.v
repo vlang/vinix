@@ -101,6 +101,22 @@ fn sdk_suite(architecture string) hwhost.Suite {
 	}
 }
 
+// Keep the copied and extracted kernels in the caller's retained namespace.
+// The harness needs an empty state directory of its own, so it receives run/.
+fn sdk_state(path string) !string {
+	base := os.abs_path(path)
+	parent := os.dir(base)
+	if os.is_link(parent) || !os.is_dir(parent) || os.real_path(parent) != parent {
+		return error('--state-dir requires an existing ordinary canonical parent')
+	}
+	if os.exists(base) || os.is_link(base) {
+		return error('--state-dir requires a new state container')
+	}
+	os.mkdir(base, mode: 0o700)!
+	os.mkdir(base + '/work', mode: 0o700)!
+	return base
+}
+
 fn sdk_check() !int {
 	if sdk_hash(@FILE)! != sha256.hexhash($embed_file('sdk-contract-runtime-check.v').to_string()) {
 		return error('controller source differs from executable')
@@ -110,18 +126,18 @@ fn sdk_check() !int {
 	if options.help || options.list { return hwhost.run_suite(sdk_suite(options.arch), args, @FILE) }
 	if options.state_dir == '' || options.failures_only { return error('provide a fresh --state-dir and retain passing artifacts') }
 	if !os.is_file(options.kernel) { return error('--kernel is not a file') }
+	base := sdk_state(options.state_dir)!
+	work := base + '/work'
+	os.cp(options.kernel, work + '/kernel')!
+	kernel := sdk_artifact('kernel', work + '/kernel', options.arch)!
 	root := hwhost.find_root(@FILE)!
 	host := hwhost.find_host(root, options.arch, options.qemu)!
 	sources := sdk_sources(root)!
 	revision := sdk_command(['git', 'rev-parse', 'HEAD'], root)!
 	compiler := sdk_artifact('v-compiler', host.v, '')!
 	controller := sdk_artifact('host-controller', os.executable(), '')!
-	work := os.temp_dir() + '/vinix-sdk-contract-' + os.getpid().str()
-	os.mkdir(work)!
-	defer { os.rmdir_all(work) or {} }
-	os.cp(options.kernel, work + '/kernel')!
-	kernel := sdk_artifact('kernel', work + '/kernel', options.arch)!
-	status := hwhost.run_suite(sdk_suite(options.arch), [...args, '--kernel', work + '/kernel'], @FILE)
+	run := base + '/run'
+	status := hwhost.run_suite(sdk_suite(options.arch), [...args, '--kernel', work + '/kernel', '--state-dir', run], @FILE)
 	if sdk_sources(root)! != sources || sdk_command(['git', 'rev-parse', 'HEAD'], root)! != revision
 		|| sdk_artifact('v-compiler', host.v, '')! != compiler
 		|| sdk_artifact('host-controller', os.executable(), '')! != controller {
@@ -131,8 +147,7 @@ fn sdk_check() !int {
 	if sdk_artifact('kernel', work + '/kernel', options.arch)! != kernel {
 		return error('copied kernel changed during qualification')
 	}
-	base := os.abs_path(options.state_dir)
-	scenario := base + '/packages-sdk-contract'
+	scenario := run + '/packages-sdk-contract'
 	serial := scenario + '/serial.log'
 	lines := os.read_file(serial)!.split_into_lines()
 	for marker in sdk_markers(options.arch) {
@@ -151,11 +166,11 @@ fn sdk_check() !int {
 	mut artifacts := [kernel, compiler, controller,
 		boot_kernel, sdk_artifact('boot-medium', medium, '')!,
 		sdk_artifact('initramfs', scenario + '/initramfs.tar', '')!,
-		sdk_staged('guest-init', base + '/guest/init', scenario + '/rootfs/sbin/init', options.arch)!,
-		sdk_staged('package-cli', base + '/guest/root/usr/bin/vinix-package', scenario + '/rootfs/usr/bin/vinix-package', options.arch)!,
+		sdk_staged('guest-init', run + '/guest/init', scenario + '/rootfs/sbin/init', options.arch)!,
+		sdk_staged('package-cli', run + '/guest/root/usr/bin/vinix-package', scenario + '/rootfs/usr/bin/vinix-package', options.arch)!,
 		sdk_artifact('serial-log', serial, '')!]
 	for name in ['capabilities', 'deployment-writer', 'repository-url', 'policy-writer'] {
-		artifacts << sdk_staged(name, base + '/guest/root' + fixture + name,
+		artifacts << sdk_staged(name, run + '/guest/root' + fixture + name,
 			scenario + '/rootfs' + fixture + name, options.arch)!
 	}
 	os.write_file(base + '/sources.json', json2.encode(sources) + '\n')!
