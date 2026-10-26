@@ -31,7 +31,8 @@ const response_pass = 'AUTHENTICATOR-RESPONSE-PASS local proxy oneway descriptor
 const activity_pass = 'COMPANION-ACTIVITY-PASS package classloader resources theme application-once caller intent-copy cached-result result-overwrite finish-once default-canceled recreate-pending primary-recreate missing disabled unexported permission cached-invisible'
 const intent_pass = 'INTENT-PARCEL-PASS values categories selector component source-bounds response-binder bundle cursor typed-array null-clear atomic-read unsupported malformed clip-rejected'
 const request_pass = 'AUTHENTICATOR-REQUEST-PASS account-parcel fourteen-local fourteen-proxy typed-values typed-nulls response-binder oneway descriptor unknown trailing-data remote-exception runtime-exception parcel-cleanup'
-const fixture_kinds = ['fixture', 'response-fixture', 'companion-activity-fixture', 'intent-parcel-fixture', 'authenticator-request-fixture']
+const authenticator_base_pass = 'AUTHENTICATOR-BASE-PASS fourteen-dispatch permission-denied-before-dispatch result error-mapping async-null label default-removal default-cloning default-sessions suggested-false no-account-registration'
+const fixture_kinds = ['fixture', 'response-fixture', 'companion-activity-fixture', 'intent-parcel-fixture', 'authenticator-request-fixture', 'authenticator-base-fixture']
 const compiled_runner_source = $embed_file(@FILE).to_string()
 const compiled_stream_source = $embed_file('../../build-support/android/modulestream/stream.v').to_string()
 const compiled_stream_header = $embed_file('../../build-support/android/modulestream/spawn_abi.h').to_string()
@@ -43,6 +44,7 @@ fn fixture_source(kind string) !string {
 		'companion-activity-fixture' { repo + '/tests/native-android-ws/companion-activity-fixture.v' }
 		'intent-parcel-fixture' { repo + '/tests/native-android-ws/intent-parcel-fixture.v' }
 		'authenticator-request-fixture' { repo + '/tests/native-android-ws/authenticator-request-fixture.v' }
+		'authenticator-base-fixture' { repo + '/tests/native-android-ws/authenticator-base-fixture.v' }
 		else { return error('unknown account fixture kind') }
 	}
 }
@@ -54,6 +56,7 @@ fn fixture_marker(kind string) !string {
 		'companion-activity-fixture' { activity_pass }
 		'intent-parcel-fixture' { intent_pass }
 		'authenticator-request-fixture' { request_pass }
+		'authenticator-base-fixture' { authenticator_base_pass }
 		else { return error('unknown account fixture kind') }
 	}
 }
@@ -65,6 +68,7 @@ fn fixture_scope(kind string) !string {
 		'companion-activity-fixture' { 'explicit companion Activity ownership, recreation and result lifetime in guest ART; no Google authentication' }
 		'intent-parcel-fixture' { 'modeled Intent Parcelable codec in guest ART; no native Android byte interoperability or Google authentication' }
 		'authenticator-request-fixture' { 'Account Parcelable and authenticator request Binder ABI in guest ART; no account broker, account storage or Google authentication' }
+		'authenticator-base-fixture' { 'AbstractAccountAuthenticator base API and transport dispatch in guest ART; no broker, account storage, tokens or Google authentication' }
 		else { return error('unknown account fixture kind') }
 	}
 }
@@ -289,6 +293,37 @@ fn request_native(receipt map[string]json2.Any, mut inputs map[string]string) !s
 	return native_artifact(base, base_receipt, mut inputs)
 }
 
+fn authenticator_base_native(receipt map[string]json2.Any, mut inputs map[string]string) !string {
+	base := receipt['baseline_path']!.str()
+	pins := receipt['input_sha256']!.as_map()
+	for name in ['api-impl.jar', 'build.json', 'sha256.json'] {
+		path := base + '/' + name
+		if digest(path)! != pins[path]!.str() { return error('authenticator base framework input changed: ' + path) }
+		inputs[path] = pins[path]!.str()
+	}
+	base_receipt := json2.decode[map[string]json2.Any](os.read_file(base + '/build.json')!)!
+	if inputs[base + '/api-impl.jar']! != receipt['baseline_api_impl_sha256']!.str()
+		|| inputs[base + '/api-impl.jar']! != base_receipt['api_impl_sha256']!.str()
+		|| inputs[base + '/sha256.json']! != receipt['baseline_manifest_sha256']!.str() {
+		return error('authenticator base framework receipt differs')
+	}
+	native := request_native(base_receipt, mut inputs)!
+	native_base := receipt['native_reference_path']!.str()
+	if native != native_base + '/native/libvinix-android-native.so'
+		|| inputs[native]! != receipt['native_sha256']!.str() {
+		return error('authenticator base native reference differs from request baseline')
+	}
+	for name in ['build.json', 'sha256.json', 'native/libvinix-android-native.so'] {
+		path := native_base + '/' + name
+		if digest(path)! != pins[path]!.str() { return error('authenticator base native reference changed: ' + path) }
+		inputs[path] = pins[path]!.str()
+	}
+	if inputs[native_base + '/sha256.json']! != receipt['native_reference_manifest_sha256']!.str() {
+		return error('authenticator base native reference manifest differs')
+	}
+	return native
+}
+
 fn retain_compiled_sources(root string, mut inputs map[string]string) ! {
 	$if !prod { return error('compile this source-capturing runner with -prod; development embeds reload checkout files') }
 	for name, source in {
@@ -330,9 +365,10 @@ fn prepare(root string, build string, apk string, kind string, companions []stri
 	if kind == 'companion-activity-fixture' {
 		fixture_receipt = activity_apks(root, [apk, companions[0], companions[1]], mut inputs)!
 		native = native_artifact(build, receipt, mut inputs)!
-	} else if kind in ['intent-parcel-fixture', 'authenticator-request-fixture'] {
+	} else if kind in ['intent-parcel-fixture', 'authenticator-request-fixture', 'authenticator-base-fixture'] {
 		fixture_receipt = single_fixture_apk(root, apk, kind, mut inputs)!
 		if kind == 'authenticator-request-fixture' { native = request_native(receipt, mut inputs)! }
+		if kind == 'authenticator-base-fixture' { native = authenticator_base_native(receipt, mut inputs)! }
 	}
 	for name in ['boot.img', 'efivars.fd'] {
 		from := baseline + '/' + name
@@ -488,12 +524,12 @@ fn stop(root string) ! {
 
 fn fixture_log(log string, kind string) !bool {
 	expected := fixture_marker(kind)!
-	for marker in ['APK-SUITE-EXIT id=', 'ANDROID-WS-FAIL', 'java.lang.AssertionError', 'java.lang.VerifyError', 'NoClassDefFoundError', 'UnsatisfiedLinkError', 'Exception in thread', 'ACCOUNT-ASYNC-FAIL', 'AUTHENTICATOR-RESPONSE-FAIL', 'COMPANION-ACTIVITY-FAIL', 'INTENT-PARCEL-FAIL', 'AUTHENTICATOR-REQUEST-FAIL', 'VINIX-ACCOUNT-PASSWORD-SENTINEL-2026', 'VINIX-ACCOUNT-USERDATA-SENTINEL-2026'] {
+	for marker in ['APK-SUITE-EXIT id=', 'ANDROID-WS-FAIL', 'java.lang.AssertionError', 'java.lang.VerifyError', 'NoClassDefFoundError', 'UnsatisfiedLinkError', 'Exception in thread', 'ACCOUNT-ASYNC-FAIL', 'AUTHENTICATOR-RESPONSE-FAIL', 'COMPANION-ACTIVITY-FAIL', 'INTENT-PARCEL-FAIL', 'AUTHENTICATOR-REQUEST-FAIL', 'AUTHENTICATOR-BASE-FAIL', 'VINIX-ACCOUNT-PASSWORD-SENTINEL-2026', 'VINIX-ACCOUNT-USERDATA-SENTINEL-2026'] {
 		if log.contains(marker) { return error('ART fixture failure marker: ' + marker) }
 	}
 	mut passes := 0
 	for line in log.split_into_lines() {
-		if line.contains('ACCOUNT-ASYNC-PASS') || line.contains('AUTHENTICATOR-RESPONSE-PASS') || line.contains('COMPANION-ACTIVITY-PASS') || line.contains('INTENT-PARCEL-PASS') || line.contains('AUTHENTICATOR-REQUEST-PASS') {
+		if line.contains('ACCOUNT-ASYNC-PASS') || line.contains('AUTHENTICATOR-RESPONSE-PASS') || line.contains('COMPANION-ACTIVITY-PASS') || line.contains('INTENT-PARCEL-PASS') || line.contains('AUTHENTICATOR-REQUEST-PASS') || line.contains('AUTHENTICATOR-BASE-PASS') {
 			if line.trim_space() != expected { return error('unexpected fixture pass marker') }
 			passes++
 		}
@@ -613,7 +649,7 @@ fn main() {
 				|| !fixture_log('APK-SUITE-BEGIN id=account-contract backend=vinix-ws\n' + marker + '\r\n', kind)! {
 				panic('fixture begin or exact marker classification differs')
 			}
-			for suffix in [' extra', '\njava.lang.AssertionError late', '\n' + marker, '\nAPK-SUITE-EXIT id=account-contract code=1', '\nVINIX-ACCOUNT-PASSWORD-SENTINEL-2026', '\nVINIX-ACCOUNT-USERDATA-SENTINEL-2026', '\nAUTHENTICATOR-RESPONSE-FAIL', '\nACCOUNT-ASYNC-FAIL', '\nCOMPANION-ACTIVITY-FAIL', '\nINTENT-PARCEL-FAIL', '\nAUTHENTICATOR-REQUEST-FAIL'] {
+			for suffix in [' extra', '\njava.lang.AssertionError late', '\n' + marker, '\nAPK-SUITE-EXIT id=account-contract code=1', '\nVINIX-ACCOUNT-PASSWORD-SENTINEL-2026', '\nVINIX-ACCOUNT-USERDATA-SENTINEL-2026', '\nAUTHENTICATOR-RESPONSE-FAIL', '\nACCOUNT-ASYNC-FAIL', '\nCOMPANION-ACTIVITY-FAIL', '\nINTENT-PARCEL-FAIL', '\nAUTHENTICATOR-REQUEST-FAIL', '\nAUTHENTICATOR-BASE-FAIL'] {
 				fixture_log('APK-SUITE-BEGIN id=account-contract backend=vinix-ws\n' + marker + suffix, kind) or { continue }
 				panic('late or malformed fixture failure accepted')
 			}
@@ -629,13 +665,14 @@ fn main() {
 		println('ACCOUNT-CONTRACT-RUN-SELF-TEST-PASS exact replacements/additions checked; late errors, sentinels and duplicate markers rejected; unrelated process protected')
 		return
 	}
-	if os.args.len < 3 { eprintln('usage: account-contract-run prepare ROOT BUILD [FIXTURE_APK] | prepare-response|prepare-intent|prepare-request ROOT BUILD FIXTURE_APK | prepare-activity ROOT BUILD CLIENT_APK COMPANION_APK DISABLED_APK | start|stop|status|observe ROOT'); exit(2) }
+	if os.args.len < 3 { eprintln('usage: account-contract-run prepare ROOT BUILD [FIXTURE_APK] | prepare-response|prepare-intent|prepare-request|prepare-base ROOT BUILD FIXTURE_APK | prepare-activity ROOT BUILD CLIENT_APK COMPANION_APK DISABLED_APK | start|stop|status|observe ROOT'); exit(2) }
 	root := os.abs_path(os.args[2])
 	match os.args[1] {
 		'prepare' { if os.args.len !in [4, 5] { exit(2) }; prepare(root, os.abs_path(os.args[3]), if os.args.len == 5 { os.abs_path(os.args[4]) } else { '' }, if os.args.len == 5 { 'fixture' } else { 'maps' }, []string{}) or { eprintln(err); exit(1) } }
 		'prepare-response' { if os.args.len != 5 { exit(2) }; prepare(root, os.abs_path(os.args[3]), os.abs_path(os.args[4]), 'response-fixture', []string{}) or { eprintln(err); exit(1) } }
 		'prepare-intent' { if os.args.len != 5 { exit(2) }; prepare(root, os.abs_path(os.args[3]), os.abs_path(os.args[4]), 'intent-parcel-fixture', []string{}) or { eprintln(err); exit(1) } }
 		'prepare-request' { if os.args.len != 5 { exit(2) }; prepare(root, os.abs_path(os.args[3]), os.abs_path(os.args[4]), 'authenticator-request-fixture', []string{}) or { eprintln(err); exit(1) } }
+		'prepare-base' { if os.args.len != 5 { exit(2) }; prepare(root, os.abs_path(os.args[3]), os.abs_path(os.args[4]), 'authenticator-base-fixture', []string{}) or { eprintln(err); exit(1) } }
 		'prepare-activity' { if os.args.len != 7 { exit(2) }; prepare(root, os.abs_path(os.args[3]), os.abs_path(os.args[4]), 'companion-activity-fixture', [os.abs_path(os.args[5]), os.abs_path(os.args[6])]) or { eprintln(err); exit(1) } }
 		'start' { start(root) or { eprintln(err); exit(1) } }
 		'stop' { stop(root) or { eprintln(err); exit(1) } }
