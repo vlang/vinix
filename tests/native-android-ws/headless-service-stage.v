@@ -216,14 +216,44 @@ fn executable_outputs(pins map[string]string) !map[string]string {
 fn verify_executable_identity(profile FrameworkProfile, framework string, baseline string,
 	pins map[string]string, receipt map[string]json2.Any) ! {
 	expected := executable_outputs(pins)!
-	if profile.seal != interaction_framework_seal
-		|| receipt['kind']!.str() != 'vinix-current-launch-v1'
-		|| receipt['framework']!.str() != framework || receipt['framework_sha256']!.str() != profile.seal
-		|| receipt['native_base']!.str() != baseline || receipt['native_base_sha256']!.str() != full_native_seal
-		|| receipt['service_main_argc']! != json2.Any(7) || receipt['compiler_sha256']!.str() != compiler_pin
-		|| receipt['source_revision']!.str() == '' || receipt['completed_utc']!.str() == ''
-		|| json2.decode[map[string]string](json2.encode(receipt['outputs_sha256']!))! != expected {
-		return error('current executable receipt does not couple the exact seven-argument outputs and framework')
+	if profile.seal != interaction_framework_seal {
+		return error('current executable receipt requires the audited interaction framework profile')
+	}
+	for field, value in {
+		'kind': 'vinix-current-launch-v1'
+		'framework': framework
+		'framework_sha256': profile.seal
+		'native_base': baseline
+		'native_base_sha256': full_native_seal
+		'compiler_sha256': compiler_pin
+	} {
+		if receipt[field]!.str() != value {
+			return error('current executable receipt field differs: ' + field)
+		}
+	}
+	if !seven_arguments(receipt['service_main_argc']!) {
+		return error('current executable receipt service_main_argc must be the integer 7')
+	}
+	for field in ['source_revision', 'completed_utc'] {
+		if receipt[field]!.str() == '' {
+			return error('current executable receipt field is empty: ' + field)
+		}
+	}
+	if json2.decode[map[string]string](json2.encode(receipt['outputs_sha256']!))! != expected {
+		return error('current executable receipt outputs_sha256 differs from the exact sealed output set')
+	}
+}
+
+fn seven_arguments(value json2.Any) bool {
+	// This decoder represents an untagged JSON number as f64, including 7.
+	// Compare the numeric value exactly; coercion would accept fractions and
+	// wrapped values. Strings, booleans and all other variants remain invalid.
+	return match value {
+		int { value == 7 }
+		i64 { value == 7 }
+		u64 { value == 7 }
+		f64 { value == 7.0 }
+		else { false }
 	}
 }
 
@@ -1183,6 +1213,18 @@ fn self_test() ! {
 		'completed_utc': json2.Any('2026-10-26 00:00:00')
 	}
 	verify_executable_identity(interaction, '/framework', '/native-base', executable_pins, executable_receipt)!
+	parsed_executable_receipt := json2.decode[map[string]json2.Any](json2.encode(executable_receipt))!
+	verify_executable_identity(interaction, '/framework', '/native-base', executable_pins, parsed_executable_receipt)!
+	for valid in ['7', '7.0', '7e0'] {
+		assert seven_arguments(json2.decode[json2.Any](valid)!)
+	}
+	for invalid in ['6', '7.9', '"7"', 'true', 'null', '4294967303', '-4294967289'] {
+		mut bad := json2.decode[map[string]json2.Any](json2.encode(parsed_executable_receipt))!
+		bad['service_main_argc'] = json2.decode[json2.Any](invalid)!
+		if _ := verify_executable_identity(interaction, '/framework', '/native-base', executable_pins, bad) {
+			return error('non-integer or wrong current executable argument count accepted: ' + invalid)
+		}
+	}
 	for field in executable_receipt.keys() {
 		mut bad := json2.decode[map[string]json2.Any](json2.encode(executable_receipt))!
 		bad[field] = if field == 'service_main_argc' { json2.Any(6) } else { json2.Any('') }
