@@ -36,10 +36,11 @@ fn main() {
 	listing := os.exec(['git', 'ls-tree', '-r', '--name-only', revision, '--', 'compat/ios', 'tests/ios/native-checks.v', 'tests/ios/native-init.v', 'tests/ios/notification-checks.v', 'tests/ios/notification-vm.v', 'tests/ios/image-initializers-evidence.v', 'tests/ios/image-initializers-input-inventory.v', 'tests/ios/string-character-search-evidence.v', 'tests/ios/scene-notifications-evidence.v', 'tests/ios/foundation-file-memory-evidence.v', 'tests/ios/foundation-http-evidence.v', 'tests/ios/probe-memory-evidence.v', 'tests/ios/probe-fault-evidence.v', 'tests/ios/probefault', 'tests/ios/probebudget', 'tests/ios/tlsbuild', 'tests/ios/startup-host.v', 'tests/ios/inspect-string-character-search.v', 'tests/ios/inspect-scene-notifications.v', 'tests/ios/inspect-probe-fault.v'])
 	if listing.exit_code != 0 { panic(listing.output) }
 	mut paths_in_revision := listing.output.trim_space().split_into_lines()
-	vm_checker := 'tests/ios/probe-vm-evidence.v'
-	vm_listing := os.exec(['git', 'ls-tree', '-r', '--name-only', revision, '--', vm_checker])
-	if vm_listing.exit_code != 0 { panic(vm_listing.output) }
-	if vm_listing.output.trim_space() == vm_checker { paths_in_revision << vm_checker }
+	for checker in ['tests/ios/probe-vm-evidence.v', 'tests/ios/probe-vm-tags-evidence.v'] {
+		listing_checker := os.exec(['git', 'ls-tree', '-r', '--name-only', revision, '--', checker])
+		if listing_checker.exit_code != 0 { panic(listing_checker.output) }
+		if listing_checker.output.trim_space() == checker { paths_in_revision << checker }
+	}
 	paths_in_revision.sort()
 	os.write_file(out + '/source-files.txt', paths_in_revision.join('\n') + '\n') or { panic(err) }
 	for path in paths_in_revision {

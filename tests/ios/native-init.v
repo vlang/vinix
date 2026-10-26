@@ -484,6 +484,7 @@ fn main() {
 			['/opt/ios/FortniteClient-IOS-Shipping']
 		}
 		if mode == 'probe-no-ads' {
+			require_child('/opt/ios/vm-probe-checks')
 			probefault.verify() or {
 				eprintln('IOS-NATIVE: FAIL fault context: ' + err.msg())
 				panic(err)

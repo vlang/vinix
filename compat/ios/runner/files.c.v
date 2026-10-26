@@ -106,13 +106,30 @@ fn darwin_mmap_impl(address voidptr, size usize, protection i32, flags i32, file
 			return unsafe { voidptr(-1) }
 		}
 		mut native := flags & (1 | 2 | 0x10)
-		if flags & 0x1000 != 0 { native |= C.MAP_ANONYMOUS }
+		mut native_file := file
+		mut native_offset := offset
+		if flags & 0x1000 != 0 {
+			// Darwin uses the descriptor's high byte as an anonymous VM tag.
+			// Accounting tags need no Linux descriptor; other VM semantics
+			// (superpages, purgable memory, 4GB chunks) remain unsupported.
+			native_file = darwin_mmap_anonymous_file(file) or {
+				darwin_set_errno(45)
+				return unsafe { voidptr(-1) }
+			}
+			native_offset = 0
+			native |= C.MAP_ANONYMOUS
+		}
 		if flags & 0x40 != 0 { native |= C.MAP_NORESERVE }
-		if native & C.MAP_FIXED != 0 { return darwin_mmap_fixed(address, size, protection, native, file, offset) }
-		return C.mmap(address, size, protection, native, file, offset)
+		if native & C.MAP_FIXED != 0 { return darwin_mmap_fixed(address, size, protection, native, native_file, native_offset) }
+		return C.mmap(address, size, protection, native, native_file, native_offset)
 	}
 	if flags & C.MAP_FIXED != 0 { return darwin_mmap_fixed(address, size, protection, flags, file, offset) }
 	return C.mmap(address, size, protection, flags, file, offset)
+}
+
+fn darwin_mmap_anonymous_file(file i32) ?i32 {
+	if file != -1 && u32(file) & 0x00ffffff != 0 { return none }
+	return -1
 }
 
 fn darwin_mmap_fixed(address voidptr, size usize, protection i32, flags i32, file i32, offset i64) voidptr {
