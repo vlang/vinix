@@ -66,7 +66,7 @@ pub fn runtime_inputs() ![]u8 {
 	mut paths := ['tests/native-android-tools/main.v', 'build-support/android/runtime-v-abi.h', 'build-support/android/musl-statistics.h', 'build-support/compile-v-module', 'tests/linuxkpi/generate_module.v', 'build-support/find-v.sh']
 	for directory in ['build-support/android/runtimecore', 'build-support/android/atlframework', 'tests/native-android-tools/androidtools', 'tests/native-generators/generators', 'tests/linuxkpi/hosttest', 'tools/sourcecommand', 'build-support/cachecli', 'build-support/cachekey', 'tests/native-guest-tools/guesthost', 'tests/qemu-core/fixturehost', 'tests/host-policy/policyhost', 'tests/native-policy-tools/nativepolicy', 'compat/ios/plist', 'tools/qmpclient', 'build-support/tarcore', 'build-support/tarstream'] { closure(directory, mut paths)! }
 	version := checked(['sh', '-c', '. "$1/build-support/find-v.sh"; "$V" -version', 'find-v', root()])!.stdout.trim_space()
-	for directory in ['build-support/android/nativews','build-support/android/wsloader','build-support/android/nativeapk','build-support/android/nativeidentity','build-support/android/nativecache'] { closure(directory,mut paths)! }
+	for directory in ['build-support/android/nativews','build-support/android/wsloader','build-support/android/nativeapk','build-support/android/nativeidentity','build-support/android/nativecache','build-support/android/nativeaccountauth'] { closure(directory,mut paths)! }
 	paths << ['build-support/android/nativews/bindings.txt','build-support/android/native-run.v','build-support/android/native-entry.v']
 	mut result := []u8{}
 	for path in paths { result << path.bytes(); result << u8(0); result << os.read_bytes(root() + '/' + path)!; result << u8(0) }

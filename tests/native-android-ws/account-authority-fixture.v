@@ -35,6 +35,14 @@ fn C.waitpid(i32, &i32, i32) i32
 fn C.kill(i32, i32) i32
 fn C._exit(i32)
 
+// poll(2)'s fixed wire layout; keep the imported module's C type private.
+struct FixturePoll {
+mut:
+	fd i32
+	events i16
+	revents i16
+}
+
 fn check(condition bool, stage string) ! {
 	if !condition { return error('account authority fixture: ' + stage) }
 }
@@ -99,8 +107,8 @@ fn peer_case(registry nativeaccountauth.Registry, root string) ! {
 			}
 		}
 	}
-	mut readiness := C.pollfd{fd: i32(fd), events: C.POLLIN}
-	check(C.poll(&readiness, 1, 5000) == 1 && readiness.revents & C.POLLIN != 0, 'child connect deadline')!
+	mut readiness := FixturePoll{fd: i32(fd), events: C.POLLIN}
+	check(C.poll(voidptr(&readiness), 1, 5000) == 1 && readiness.revents & C.POLLIN != 0, 'child connect deadline')!
 	connection := C.accept(fd, unsafe { nil }, unsafe { nil })
 	check(connection >= 0, 'accept')!
 	defer { C.close(connection) }
