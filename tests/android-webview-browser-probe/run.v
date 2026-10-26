@@ -4,11 +4,14 @@ module main
 
 import crypto.sha256
 import json2
+import net
+import net.unix
 import os
 import strconv
 import time
 
 #include <signal.h>
+#include <errno.h>
 
 fn C.kill(int, int) int
 
@@ -252,6 +255,220 @@ fn observe_gone(root string) ! {
 	println('BROWSER-RUN OBSERVED-GONE pid=' + owner.pid.str() + ' exit=unknown cause=unobserved')
 }
 
+fn observed_receipt(root string, owner Ownership, ownership_sha string) !string {
+	for name in ['ownership.json', 'gone.json'] {
+		if os.lstat(root + '/' + name)!.get_filetype() != .regular {
+			return error('regular non-symlink receipt required for cleanup: ' + name)
+		}
+	}
+	if os.exists(root + '/stop.json') || os.is_link(root + '/stop.json') {
+		return error('cleanup-gone requires an unrequested disappearance')
+	}
+	text := os.read_file(root + '/gone.json')!
+	fields := json2.decode[map[string]json2.Any](text)!
+	mut names := fields.keys()
+	names.sort()
+	if names != ['cause', 'check', 'checked_utc', 'exit_status', 'ownership_sha256', 'pid',
+		'stop_requested']
+		|| json2.encode(fields['pid']!) != owner.pid.str()
+		|| fields['ownership_sha256']!.str() != ownership_sha
+		|| fields['checked_utc']!.str() == ''
+		|| json2.encode(fields['stop_requested']!) != 'false'
+		|| json2.encode(fields['exit_status']!) != '"unknown"'
+		|| json2.encode(fields['cause']!) != '"unobserved; this command sent no signal"'
+		|| json2.encode(fields['check']!) != '"one ps snapshot returned exit1 with empty stdout and stderr for recorded owned PID"' {
+		return error('exact observed-absence receipt required for cleanup')
+	}
+	return sha256.sum(text.bytes()).hex()
+}
+
+fn refused_socket(path string) ! {
+	addresses := net.resolve_addrs(path, .unix, .tcp)!
+	if addresses.len != 1 { return error('one exact Unix socket address required') }
+	address := addresses[0]
+	fd := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
+	if fd < 0 { return error('cannot create cleanup socket probe') }
+	defer { C.close(fd) }
+	net.set_blocking(fd, false)!
+	if C.connect(fd, voidptr(&address), address.len()) == 0 {
+		return error('QMP socket has an active listener; refusing cleanup')
+	}
+	if net.error_code() != C.ECONNREFUSED {
+		return error('QMP socket probe did not return ECONNREFUSED; refusing cleanup')
+	}
+}
+
+// Remove only the exact stale socket of an already observed absent guest.
+// A separate request survives failures; no signal or exit status is inferred.
+fn cleanup_gone(root string) ! {
+	for name in ['qmp-cleanup-request.json', 'qmp-cleanup.json', 'qmp-cleanup-source.v',
+		'qmp-cleanup-runner'] {
+		if os.exists(root + '/' + name) || os.is_link(root + '/' + name) {
+			return error('cleanup evidence already exists: ' + name)
+		}
+	}
+	ownership_sha := hash(root + '/ownership.json')!
+	owner := recorded_owner(root)!
+	gone_sha := observed_receipt(root, owner, ownership_sha)!
+	if !process_gone(owner)! { return error('owned guest remains live; no signal sent') }
+	path := root + '/qmp.sock'
+	before := os.lstat(path)!
+	if before.get_filetype() != .socket || before.uid != u32(os.geteuid()) {
+		return error('exact non-symlink socket owned by this user required')
+	}
+	refused_socket(path)!
+	os.write_file(root + '/qmp-cleanup-source.v', source)!
+	os.cp(os.executable(), root + '/qmp-cleanup-runner')!
+	write_json(root + '/qmp-cleanup-request.json', json2.Any({
+		'action': json2.Any('unlink exact stale QMP socket after observed guest disappearance')
+		'path': json2.Any(path)
+		'path_kind': json2.Any('socket; lstat did not follow a symlink')
+		'socket_before': json2.decode[json2.Any](json2.encode(before))!
+		'pid': json2.Any(owner.pid)
+		'ownership_sha256': json2.Any(ownership_sha)
+		'gone_sha256': json2.Any(gone_sha)
+		'socket_check': json2.Any('nonblocking AF_UNIX connect returned ECONNREFUSED')
+		'requested_utc': json2.Any(time.utc().str())
+		'runner_sha256': json2.Any(hash(root + '/qmp-cleanup-runner')!)
+		'runner_source_sha256': json2.Any(hash(root + '/qmp-cleanup-source.v')!)
+		'signal_sent': json2.Any(false)
+	}))!
+	if !process_gone(owner)! || hash(root + '/ownership.json')! != ownership_sha
+		|| observed_receipt(root, owner, ownership_sha)! != gone_sha {
+		return error('guest ownership or disappearance changed before cleanup')
+	}
+	refused_socket(path)!
+	current := os.lstat(path)!
+	if current != before { return error('QMP socket identity changed before cleanup') }
+	os.rm(path)!
+	if os.exists(path) || os.is_link(path) { return error('QMP socket remains after cleanup') }
+	if hash(root + '/ownership.json')! != ownership_sha
+		|| observed_receipt(root, owner, ownership_sha)! != gone_sha {
+		return error('guest ownership or disappearance changed during cleanup')
+	}
+	write_json(root + '/qmp-cleanup.json', json2.Any({
+		'path': json2.Any(path)
+		'removed': json2.Any(true)
+		'completed_utc': json2.Any(time.utc().str())
+		'request_sha256': json2.Any(hash(root + '/qmp-cleanup-request.json')!)
+		'ownership_sha256': json2.Any(ownership_sha)
+		'gone_sha256': json2.Any(gone_sha)
+		'signal_sent': json2.Any(false)
+	}))!
+	println('BROWSER-RUN CLEANED-GONE-QMP pid=' + owner.pid.str() + ' path=' + path + ' signal=none')
+}
+
+fn cleanup_self_test(root string) ! {
+	owner_text := os.read_file(root + '/ownership.json')!
+	gone_text := os.read_file(root + '/gone.json')!
+	path := root + '/qmp.sock'
+	if _ := cleanup_gone(root) { return error('missing QMP socket accepted') }
+	os.write_file(path, 'regular evidence')!
+	if _ := cleanup_gone(root) { return error('regular QMP path accepted') }
+	if os.read_file(path)! != 'regular evidence' { return error('regular QMP evidence changed') }
+	os.rm(path)!
+	os.mkdir(path)!
+	if _ := cleanup_gone(root) { return error('directory QMP path accepted') }
+	if !os.is_dir(path) { return error('directory QMP evidence changed') }
+	os.rmdir(path)!
+	mut listener := unix.listen_stream(path)!
+	if _ := cleanup_gone(root) { return error('active replacement QMP listener accepted') }
+	if os.lstat(path)!.get_filetype() != .socket { return error('active QMP socket changed') }
+	// Drain the rejected connection before closing this test listener.
+	mut accepted := listener.accept()!
+	accepted.close()!
+	unix.shutdown(listener.sock.handle)
+	if C.close(listener.sock.handle) != 0 { return error('cannot close test QMP listener') }
+	os.mv(path, root + '/actual.sock')!
+	os.symlink(root + '/actual.sock', path)!
+	if _ := cleanup_gone(root) { return error('QMP symlink accepted') }
+	if !os.is_link(path) || os.lstat(root + '/actual.sock')!.get_filetype() != .socket {
+		return error('symlink QMP evidence changed')
+	}
+	os.rm(path)!
+	os.mv(root + '/actual.sock', path)!
+	mut live_owner := json2.decode[Ownership](owner_text)!
+	live_identity := identity(os.getpid())!
+	live_owner = Ownership{ pid: live_identity.pid, started: live_identity.started, command: live_owner.command }
+	os.write_file(root + '/ownership.json', json2.encode(live_owner))!
+	mut live_gone := json2.decode[map[string]json2.Any](gone_text)!
+	live_gone['pid'] = live_owner.pid
+	live_gone['ownership_sha256'] = hash(root + '/ownership.json')!
+	os.write_file(root + '/gone.json', json2.encode(live_gone))!
+	if _ := cleanup_gone(root) { return error('reused live PID accepted for QMP cleanup') }
+	if os.lstat(path)!.get_filetype() != .socket || os.exists(root + '/qmp-cleanup-request.json') {
+		return error('live PID caused cleanup mutation')
+	}
+	os.write_file(root + '/ownership.json', owner_text)!
+	os.write_file(root + '/gone.json', gone_text)!
+	for action in ['wrong-owner', 'wrong-pid', 'missing-false', 'signal-claim', 'true-stop'] {
+		mut fields := json2.decode[map[string]json2.Any](gone_text)!
+		match action {
+			'wrong-owner' { fields['ownership_sha256'] = '0'.repeat(64) }
+			'wrong-pid' { fields['pid'] = os.getpid() }
+			'missing-false' { fields.delete('stop_requested') }
+			'signal-claim' { fields['signal'] = 'SIGTERM' }
+			'true-stop' { fields['stop_requested'] = true }
+			else {}
+		}
+		os.write_file(root + '/gone.json', json2.encode(fields))!
+		if _ := cleanup_gone(root) { return error('QMP cleanup accepted ' + action) }
+		if os.lstat(path)!.get_filetype() != .socket || os.exists(root + '/qmp-cleanup-request.json') {
+			return error('invalid disappearance caused cleanup mutation')
+		}
+	}
+	os.write_file(root + '/gone.json', gone_text)!
+	for name in ['ownership.json', 'gone.json'] {
+		os.mv(root + '/' + name, root + '/' + name + '.saved')!
+		os.symlink(root + '/' + name + '.saved', root + '/' + name)!
+		if _ := cleanup_gone(root) { return error('symlink cleanup receipt accepted') }
+		os.rm(root + '/' + name)!
+		os.mv(root + '/' + name + '.saved', root + '/' + name)!
+	}
+	os.symlink(root + '/absent-stop', root + '/stop.json')!
+	if _ := cleanup_gone(root) { return error('stop symlink accepted for cleanup') }
+	os.rm(root + '/stop.json')!
+	os.write_file(root + '/qmp-cleanup-request.json', 'previous request')!
+	if _ := cleanup_gone(root) { return error('previous cleanup request accepted') }
+	if os.read_file(root + '/qmp-cleanup-request.json')! != 'previous request' {
+		return error('previous cleanup request changed')
+	}
+	os.rm(root + '/qmp-cleanup-request.json')!
+	os.symlink(root + '/absent-cleanup', root + '/qmp-cleanup.json')!
+	if _ := cleanup_gone(root) { return error('cleanup receipt symlink accepted') }
+	os.rm(root + '/qmp-cleanup.json')!
+	if os.read_file(root + '/ownership.json')! != owner_text || os.read_file(root + '/gone.json')! != gone_text {
+		return error('rejected cleanup changed original ownership or disappearance')
+	}
+	os.write_file(root + '/retained-serial.log', 'unchanged UART evidence\x00exact')!
+	before := os.lstat(path)!
+	cleanup_gone(root)!
+	if os.exists(path) || os.is_link(path) || os.read_file(root + '/ownership.json')! != owner_text
+		|| os.read_file(root + '/gone.json')! != gone_text
+		|| os.read_file(root + '/retained-serial.log')! != 'unchanged UART evidence\x00exact' {
+		return error('cleanup failed to remove only the stale socket')
+	}
+	request := json2.decode[map[string]json2.Any](os.read_file(root + '/qmp-cleanup-request.json')!)!
+	if request['path']!.str() != path || request['signal_sent']!.bool()
+		|| request['ownership_sha256']!.str() != hash(root + '/ownership.json')!
+		|| request['gone_sha256']!.str() != hash(root + '/gone.json')!
+		|| json2.decode[os.Stat](json2.encode(request['socket_before']!))! != before {
+		return error('cleanup request receipt differs from observed socket or ownership')
+	}
+	completion := json2.decode[map[string]json2.Any](os.read_file(root + '/qmp-cleanup.json')!)!
+	if !completion['removed']!.bool() || completion['signal_sent']!.bool()
+		|| completion['request_sha256']!.str() != hash(root + '/qmp-cleanup-request.json')! {
+		return error('cleanup completion receipt differs')
+	}
+	mut files := os.ls(root)!
+	files.sort()
+	if files != ['gone.json', 'ownership.json', 'qmp-cleanup-request.json',
+		'qmp-cleanup-runner', 'qmp-cleanup-source.v', 'qmp-cleanup.json', 'retained-serial.log'] {
+		return error('cleanup changed the exact evidence file allowlist')
+	}
+	if _ := cleanup_gone(root) { return error('repeated cleanup accepted') }
+}
+
 fn reconcile_stop(root string) ! {
 	owner := recorded_owner(root)!
 	stop_receipt := json2.decode[StopReceipt](os.read_file(root + '/stop.json')!)!
@@ -351,6 +568,7 @@ fn self_test() ! {
 	assert observed.as_map()['exit_status']!.str() == 'unknown'
 	assert !os.exists(root + '/stop.json')
 	if _ := observe_gone(root) { return error('existing disappearance observation accepted') }
+	cleanup_self_test(root)!
 	os.rm(root + '/gone.json')!
 	write_json(root + '/stop.json', json2.decode[json2.Any](json2.encode(StopReceipt{
 		pid:           child.pid
@@ -362,7 +580,7 @@ fn self_test() ! {
 	reconcile_stop(root)!
 	assert os.is_file(root + '/gone.json')
 	if _ := reconcile_stop(root) { return error('existing disappearance receipt accepted') }
-	println('BROWSER-RUN SELF-TEST PASS qmp-length external-directory unsafe-pid bounded-command complete-output foreign-owner nonzero-exit live-without-pidfile reaped-child absent-ps reconcile-stop observe-gone no-invented-signal')
+	println('BROWSER-RUN SELF-TEST PASS qmp-length external-directory unsafe-pid bounded-command complete-output foreign-owner nonzero-exit live-without-pidfile reaped-child absent-ps reconcile-stop observe-gone no-invented-signal stale-socket-cleanup active-socket-rejection exact-cleanup-allowlist')
 }
 
 fn main() {
@@ -383,8 +601,8 @@ fn main() {
 		}
 		return
 	}
-	if os.args.len != 3 || os.args[1] !in ['start', 'status', 'stop', 'reconcile-stop', 'observe-gone'] {
-		eprintln('usage: run start|status|stop|reconcile-stop|observe-gone STAGED_EXTERNAL_DIRECTORY')
+	if os.args.len != 3 || os.args[1] !in ['start', 'status', 'stop', 'reconcile-stop', 'observe-gone', 'cleanup-gone'] {
+		eprintln('usage: run start|status|stop|reconcile-stop|observe-gone|cleanup-gone STAGED_EXTERNAL_DIRECTORY')
 		exit(2)
 	}
 	root := canonical_root(os.args[2]) or {
@@ -412,6 +630,12 @@ fn main() {
 		}
 		'observe-gone' {
 			observe_gone(root) or {
+				eprintln(err.msg())
+				exit(1)
+			}
+		}
+		'cleanup-gone' {
+			cleanup_gone(root) or {
 				eprintln(err.msg())
 				exit(1)
 			}
