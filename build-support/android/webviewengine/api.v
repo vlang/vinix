@@ -47,6 +47,11 @@ type CookieOp = fn (voidptr, voidptr, voidptr, Ready, voidptr)
 type CookieDone = fn (voidptr, voidptr, &&GError) i32
 type GetCookies = fn (voidptr, &char, voidptr, Ready, voidptr)
 type CookiesDone = fn (voidptr, voidptr, &&GError) &GList
+type AllCookies = fn (voidptr, voidptr, Ready, voidptr)
+type CookieNew = fn (&char, &char, &char, &char, i32) voidptr
+type GetFlag = fn (voidptr) i32
+type GetUnix = fn (voidptr) i64
+type NewUnix = fn (i64) voidptr
 type Xid = fn (voidptr) u64
 type Root = fn (voidptr) u64
 type Translate = fn (voidptr, u64, u64, i32, i32, &i32, &i32, &u64) i32
@@ -110,6 +115,24 @@ struct Api {
 	cookie_delete_done CookieDone    @[required]
 	cookies_get        GetCookies    @[required]
 	cookies_done       CookiesDone   @[required]
+	cookies_all        AllCookies    @[required]
+	cookies_all_done   CookiesDone   @[required]
+	cookie_new         CookieNew     @[required]
+	cookie_name        GetText       @[required]
+	cookie_value       GetText       @[required]
+	cookie_domain      GetText       @[required]
+	cookie_path        GetText       @[required]
+	cookie_expires     Get           @[required]
+	cookie_secure      GetFlag       @[required]
+	cookie_http_only   GetFlag       @[required]
+	cookie_same_site   GetFlag       @[required]
+	cookie_set_expires Child         @[required]
+	cookie_set_secure  SetFlag       @[required]
+	cookie_set_http    SetFlag       @[required]
+	cookie_set_same    SetFlag       @[required]
+	date_unix          GetUnix       @[required]
+	date_new           NewUnix       @[required]
+	date_unref         Call          @[required]
 	list_free          Call          @[required]
 	policy_action      Get           @[required]
 	action_request     Get           @[required]
@@ -189,6 +212,24 @@ fn api() !Api {
 		cookie_delete_done: unsafe { CookieDone(dl.sym_opt(w, 'webkit_cookie_manager_delete_cookie_finish')!) }
 		cookies_get:        unsafe { GetCookies(dl.sym_opt(w, 'webkit_cookie_manager_get_cookies')!) }
 		cookies_done:       unsafe { CookiesDone(dl.sym_opt(w, 'webkit_cookie_manager_get_cookies_finish')!) }
+		cookies_all:        unsafe { AllCookies(dl.sym_opt(w, 'webkit_cookie_manager_get_all_cookies')!) }
+		cookies_all_done:   unsafe { CookiesDone(dl.sym_opt(w, 'webkit_cookie_manager_get_all_cookies_finish')!) }
+		cookie_new:         unsafe { CookieNew(dl.sym_opt(w, 'soup_cookie_new')!) }
+		cookie_name:        unsafe { GetText(dl.sym_opt(w, 'soup_cookie_get_name')!) }
+		cookie_value:       unsafe { GetText(dl.sym_opt(w, 'soup_cookie_get_value')!) }
+		cookie_domain:      unsafe { GetText(dl.sym_opt(w, 'soup_cookie_get_domain')!) }
+		cookie_path:        unsafe { GetText(dl.sym_opt(w, 'soup_cookie_get_path')!) }
+		cookie_expires:     unsafe { Get(dl.sym_opt(w, 'soup_cookie_get_expires')!) }
+		cookie_secure:      unsafe { GetFlag(dl.sym_opt(w, 'soup_cookie_get_secure')!) }
+		cookie_http_only:   unsafe { GetFlag(dl.sym_opt(w, 'soup_cookie_get_http_only')!) }
+		cookie_same_site:   unsafe { GetFlag(dl.sym_opt(w, 'soup_cookie_get_same_site_policy')!) }
+		cookie_set_expires: unsafe { Child(dl.sym_opt(w, 'soup_cookie_set_expires')!) }
+		cookie_set_secure:  unsafe { SetFlag(dl.sym_opt(w, 'soup_cookie_set_secure')!) }
+		cookie_set_http:    unsafe { SetFlag(dl.sym_opt(w, 'soup_cookie_set_http_only')!) }
+		cookie_set_same:    unsafe { SetFlag(dl.sym_opt(w, 'soup_cookie_set_same_site_policy')!) }
+		date_unix:          unsafe { GetUnix(dl.sym_opt(w, 'g_date_time_to_unix')!) }
+		date_new:           unsafe { NewUnix(dl.sym_opt(w, 'g_date_time_new_from_unix_utc')!) }
+		date_unref:         unsafe { Call(dl.sym_opt(w, 'g_date_time_unref')!) }
 		list_free:          unsafe { Call(dl.sym_opt(w, 'g_list_free')!) }
 		policy_action:      unsafe { Get(dl.sym_opt(w, 'webkit_navigation_policy_decision_get_navigation_action')!) }
 		action_request:     unsafe { Get(dl.sym_opt(w, 'webkit_navigation_action_get_request')!) }

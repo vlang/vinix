@@ -10,8 +10,10 @@ struct CookieJob {
 	header   browseripc.Header
 	deadline u64
 mut:
-	remaining []voidptr
-	failed    bool
+	remaining    []voidptr
+	failed       bool
+	session_only bool
+	matched      bool
 }
 
 fn fields(bytes []u8) []string {
@@ -71,9 +73,11 @@ fn cookie_added(manager voidptr, result voidptr, data voidptr) {
 	mut e := job.engine
 	mut err := unsafe { &GError(nil) }
 	ok := e.api.cookie_add_done(manager, result, &err)
+	failed := err != unsafe { nil } || ok == 0
 	if err != unsafe { nil } { e.api.error_free(err) }
 	e.jobs.delete(job.header.request)
-	if ok == 0 { e.fail(job.header, 'cookie-set-failed') } else { e.ack(job.header) }
+	if e.closed { return }
+	if failed { e.fail(job.header, 'cookie-set-failed') } else { e.ack(job.header) }
 }
 
 fn cookies_ready(manager voidptr, result voidptr, data voidptr) {
@@ -127,6 +131,10 @@ fn (mut job CookieJob) delete_next() {
 		return
 	}
 	if job.remaining.len == 0 {
+		if job.header.op == .cookie_clear && !job.failed {
+			e.api.cookies_all(e.cookies, unsafe { nil }, cookie_snapshot_ready, &job)
+			return
+		}
 		e.jobs.delete(job.header.request)
 		if job.failed { e.fail(job.header, 'cookie-delete-failed') } else { e.ack(job.header) }
 		return
@@ -141,7 +149,8 @@ fn cookie_deleted(manager voidptr, result voidptr, data voidptr) {
 	mut job := unsafe { &CookieJob(data) }
 	mut err := unsafe { &GError(nil) }
 	ok := job.engine.api.cookie_delete_done(manager, result, &err)
+	failed := err != unsafe { nil } || ok == 0
 	if err != unsafe { nil } { job.engine.api.error_free(err) }
-	if ok == 0 { job.failed = true }
+	if failed { job.failed = true }
 	job.delete_next()
 }

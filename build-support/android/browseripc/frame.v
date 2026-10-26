@@ -27,12 +27,15 @@ pub enum Op as u16 {
 	cookie_get
 	cookie_delete
 	policy_reply
+	cookie_flush
+	cookie_clear
 	ack    = 256
 	pixels
 	navigation
 	failure
 	cookie_result
 	policy_request
+	cookie_cleared
 }
 
 pub enum Direction {
@@ -69,12 +72,15 @@ fn valid_op(number u16) !Op {
 		11 { .cookie_get }
 		12 { .cookie_delete }
 		13 { .policy_reply }
+		14 { .cookie_flush }
+		15 { .cookie_clear }
 		256 { .ack }
 		257 { .pixels }
 		258 { .navigation }
 		259 { .failure }
 		260 { .cookie_result }
 		261 { .policy_request }
+		262 { .cookie_cleared }
 		else { return error('unknown browser operation') }
 	}
 }
@@ -85,7 +91,7 @@ fn (h Header) validate(direction Direction) ! {
 		return error('browser operation has wrong direction')
 	}
 	if h.payload_size > max_payload { return error('browser payload exceeds limit') }
-	if h.op in [.cookie_set, .cookie_get, .cookie_delete, .cookie_result]
+	if h.op in [.cookie_set, .cookie_get, .cookie_delete, .cookie_flush, .cookie_clear, .cookie_result, .cookie_cleared]
 		|| (h.op in [.ack, .failure] && h.view == 0) {
 		if h.view != 0 || h.generation != 0 || h.navigation != 0 || h.request == 0 {
 			return error('cookie operation must address the channel network session')
@@ -182,7 +188,7 @@ pub fn validate_payload(h Header, bytes []u8) ! {
 	match h.op {
 		.create, .resize { dimensions(bytes)! }
 		.navigate { text(bytes, 64 * 1024, false)! }
-		.javascript {
+		.javascript, .cookie_clear, .cookie_cleared {
 			if bytes.len != 1 || bytes[0] > 1 { return error('invalid browser boolean') }
 		}
 		.policy_reply {
@@ -211,7 +217,7 @@ pub fn validate_payload(h Header, bytes []u8) ! {
 				if n < -10000 || n > 10000 { return error('browser scroll exceeds limit') }
 			}
 		}
-		.destroy, .ack {
+		.destroy, .ack, .cookie_flush {
 			if bytes.len != 0 { return error('unexpected browser payload') }
 		}
 		.cookie_set { strings(bytes, 2)! }

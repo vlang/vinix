@@ -15,11 +15,22 @@ WebKit's sandbox on Vinix: sandbox-enabled WebProcess startup still requires
 execution evidence. Production must fail if that startup is unsupported.
 
 One principal-owned `WebKitNetworkSession` supplies both the displayed views
-and the native CookieManager operations. Cookies use explicit SQLite persistent
-storage under the private locked profile. The pinned [WebKit header defines
-SQLite as storage enum 1](https://github.com/WebKit/WebKit/blob/webkitgtk-2.48.1/Source/WebKit/UIProcess/API/glib/WebKitCookieManager.h.in).
-There is no separate in-memory compatibility jar and no claimed synchronous
-cookie flush operation.
+and the native CookieManager operations. `flush()` enumerates that session and
+commits a complete, bounded SQLite snapshot under the private locked profile
+before acknowledging the request. The snapshot includes session cookies,
+nullable expiry, domain, path, Secure, HttpOnly and SameSite. Startup restores
+the snapshot through WebKit's asynchronous cookie API before admitting any
+commands. WebKit remains the authority for live cookies; the snapshot is used
+only for durable flush and restart. SoupCookieJarDB is not used because it
+excludes session cookies and does not expose checked durable completion.
+
+All-cookie and session-cookie removal enumerate and delete real WebKit
+cookies, then durably replace the snapshot before returning the Boolean result.
+An empty successful snapshot replaces old state, so clearing cannot resurrect
+the old jar after restart. Enumeration, deletion, restoration, storage and
+deadline failures report failure or close the channel. No completion is sent
+after the channel closes. Cookie operations serialize command admission and
+use the same 30-second deadline as the JNI wait.
 
 Views default to JavaScript disabled until an explicit setting command. Pixels
 come from real asynchronous viewport snapshots; stale navigation, destroyed
@@ -44,12 +55,13 @@ v -gc vgc -os linux -arch arm64 -cc aarch64-linux-musl-gcc -cflags -O2 \
   -path '/path/to/v/vlib|/path/to/vinix/build-support/android' \
   -o /external/state/webview-engine build-support/android/webviewengine
 
-v -path '/path/to/v/vlib|/path/to/vinix/build-support/android' \
+v -gc none -enable-globals -path '@vlib|/path/to/vinix/build-support/android' \
   test build-support/android/webviewengine
 
 v run tests/android-webview-engine/verify_symbols.v \
   aarch64-linux-musl-nm BASE_RUNTIME:ADDON_RUNTIME \
-  build-support/android/webviewengine/api.v /external/state/symbol-audit.json
+  build-support/android/webviewengine/api.v /external/state/symbol-audit.json \
+  build-support/android/browsercookies/store.c.v
 
 v run tests/android-webview-engine/build.v REPO V_COMPILER \
   BASE_RUNTIME ADDON_RUNTIME FRESH_EXTERNAL_ROOT
@@ -59,6 +71,19 @@ The build runner freezes the compiler-selected V closure and test/tool sources,
 builds the copied modules, checks they remain unchanged, and records command
 arguments, tool hashes, complete logs, binary and artifact checksums. It does
 not execute the guest.
+
+Cookie coverage executes the production callback bodies against controlled
+WebKit completions and real SQLite storage. It checks full attribute/session
+round trips, restore barriers, clear/no-match results, empty snapshots,
+storage/backend failures, callback lifetimes and deadlines. The protocol tests
+check exact request/completion identity. The native checker extracts the real
+JNI bodies and verifies 19 success/error cases, reply ownership, and Java
+exceptions after releasing the browser mutex; five compiled mutations must fail:
+
+```sh
+VINIX_V_COMPILER=/path/to/v_old276 v run \
+  tests/native-android-ws/check-webview-cookie-native.v /external/state/native-cookie-check
+```
 
 The ABI audit reads AArch64 exports without loading foreign libraries, requires
 each library to exist in exactly one supplied runtime root, and records source

@@ -78,7 +78,7 @@ pub fn (mut s State) receive(h Header, payload []u8) !bool {
 	h.validate(.engine_to_client)!
 	validate_payload(h, payload)!
 	if s.closed { return false }
-	if h.op in [.ack, .cookie_result] || (h.op == .failure && h.request != 0) {
+	if h.op in [.ack, .cookie_result, .cookie_cleared] || (h.op == .failure && h.request != 0) {
 		p := s.pending[h.request] or {
 			// Destroy cancels outstanding work. Replies already queued by the
 			// engine may still arrive, but a never-created view is a violation.
@@ -89,6 +89,9 @@ pub fn (mut s State) receive(h Header, payload []u8) !bool {
 			return error('browser completion identity mismatch')
 		}
 		if (h.op == .cookie_result) != (p.op == .cookie_get) && h.op != .failure {
+			return error('browser completion operation mismatch')
+		}
+		if (h.op == .cookie_cleared) != (p.op == .cookie_clear) && h.op != .failure {
 			return error('browser completion operation mismatch')
 		}
 		s.pending.delete(h.request)

@@ -25,10 +25,10 @@ fn command(root string, label string, argv []string) !string {
 	result := os.exec(argv)
 	os.write_file(root + '/' + label + '.log', result.output)!
 	os.write_file(root + '/' + label + '-command.json', json2.encode({
-		'argv': json2.Any(argv)
-		'executable': json2.Any(executable)
+		'argv':              json2.Any(argv)
+		'executable':        json2.Any(executable)
 		'executable_sha256': json2.Any(pin)
-		'exit_code': json2.Any(result.exit_code)
+		'exit_code':         json2.Any(result.exit_code)
 	}, prettify: true) + '\n')!
 	if result.exit_code != 0 { return error('command failed: ' + label) }
 	if digest(executable)! != pin { return error('tool changed: ' + label) }
@@ -58,9 +58,10 @@ fn inventory(root string, prefix string, mut pins map[string]string) ! {
 }
 
 fn run() ! {
-	if os.args.len != 6 { return error('usage: build REPO V_COMPILER BASE_RUNTIME ADDON_RUNTIME FRESH_EXTERNAL_ROOT') }
-	repo, compiler, base, addon, root := os.real_path(os.args[1]), os.real_path(os.args[2]),
-		os.real_path(os.args[3]), os.real_path(os.args[4]), os.abs_path(os.args[5])
+	if os.args.len != 6 {
+		return error('usage: build REPO V_COMPILER BASE_RUNTIME ADDON_RUNTIME FRESH_EXTERNAL_ROOT')
+	}
+	repo, compiler, base, addon, root := os.real_path(os.args[1]), os.real_path(os.args[2]), os.real_path(os.args[3]), os.real_path(os.args[4]), os.abs_path(os.args[5])
 	if os.exists(root) || os.is_link(root) || root.starts_with(repo + '/') || root == repo {
 		return error('fresh external build root required')
 	}
@@ -68,17 +69,23 @@ fn run() ! {
 	if os.real_path(root) != root { return error('canonical build root required') }
 	os.chdir(repo)!
 	revision := command(root, 'revision', ['git', 'rev-parse', 'HEAD'])!.trim_space()
-	vlib := os.dir(compiler) + '/vlib'
-	path := vlib + '|' + repo + '/build-support/android'
+	path := '@vlib|' + repo + '/build-support/android'
 	engine := repo + '/build-support/android/webviewengine'
 	mut sources := map[string]string{}
-	listing := command(root, 'source-closure', [compiler, '-gc', 'vgc', '-os', 'linux', '-arch', 'arm64',
-		'-path', path, '-print-v-files', engine])!
+	listing := command(root, 'source-closure', [compiler, '-gc', 'vgc', '-os', 'linux', '-arch',
+		'arm64', '-path', path, '-print-v-files', engine])!
+	// A compiler can have a baked-in V root distinct from its executable's
+	// directory. Pin the library actually selected by this compiler.
+	mut vlib := ''
 	for line in listing.split_into_lines() {
-		if line.ends_with('.v') { copy_source(root, line, mut sources)! }
+		if line.ends_with('.v') {
+			copy_source(root, line, mut sources)!
+			if line.contains('/vlib/builtin/') { vlib = line.all_before('/builtin/') }
+		}
 	}
-	if sources.len < 20 { return error('incomplete compiler source closure') }
-	for directory in [engine, repo + '/tests/android-webview-engine'] {
+	if sources.len < 20 || vlib == '' { return error('incomplete compiler source closure') }
+	for directory in [engine, repo + '/build-support/android/browsercookies',
+		repo + '/build-support/android/browseripc', repo + '/tests/android-webview-engine'] {
 		for name in os.ls(directory)! {
 			if name.ends_with('.v') { copy_source(root, directory + '/' + name, mut sources)! }
 		}
@@ -88,27 +95,42 @@ fn run() ! {
 	// than rereading mutable app/dependency files during code generation.
 	frozen_path := vlib + '|' + root + '/sources' + repo + '/build-support/android'
 	frozen_engine := root + '/sources' + engine
-	command(root, 'host-tests', [compiler, '-path', frozen_path, 'test', frozen_engine])!
+	command(root, 'host-tests', [compiler, '-gc', 'none', '-enable-globals', '-path', frozen_path,
+		'test', frozen_engine])!
+	for name in ['browsercookies', 'browseripc'] {
+		command(root, name + '-tests', [compiler, '-gc', 'none', '-path', frozen_path, 'test',
+			root + '/sources' + repo + '/build-support/android/' + name])!
+	}
 	command(root, 'cross-build', [compiler, '-gc', 'vgc', '-os', 'linux', '-arch', 'arm64', '-cc',
-		'aarch64-linux-musl-gcc', '-cflags', '-O2', '-showcc', '-path', frozen_path, '-o', root + '/webview-engine', frozen_engine])!
-	command(root, 'api-audit', [compiler, 'run', repo + '/tests/android-webview-engine/verify_symbols.v',
-		'aarch64-linux-musl-nm', base + ':' + addon, frozen_engine + '/api.v', root + '/api-audit.json'])!
+		'aarch64-linux-musl-gcc', '-cflags', '-O2', '-showcc', '-path', frozen_path, '-o',
+		root + '/webview-engine', frozen_engine])!
+	command(root, 'api-audit', [compiler, 'run',
+		root + '/sources' + repo + '/tests/android-webview-engine/verify_symbols.v',
+		'aarch64-linux-musl-nm', base + ':' + addon, frozen_engine + '/api.v',
+		root + '/api-audit.json',
+		root + '/sources' + repo + '/build-support/android/browsercookies/store.c.v'])!
 	symbols := command(root, 'gc-symbols', ['aarch64-linux-musl-nm', root + '/webview-engine'])!
 	for name in ['vgc_gc_run', 'vgc_mark_roots', 'v3_vgc_runtime_init'] {
-		if !symbols.contains(' T ' + name + '\n') { return error('missing VGC root/runtime symbol') }
+		if !symbols.contains(' T ' + name + '\n') {
+			return error('missing VGC root/runtime symbol')
+		}
 	}
 	command(root, 'elf', ['aarch64-linux-musl-readelf', '-h', '-d', root + '/webview-engine'])!
 	for source, pin in sources {
-		if digest(root + '/sources' + source)! != pin { return error('frozen source changed: ' + source) }
-		if source.starts_with(vlib + '/') && digest(source)! != pin { return error('compiler library changed') }
+		if digest(root + '/sources' + source)! != pin {
+			return error('frozen source changed: ' + source)
+		}
+		if source.starts_with(vlib + '/') && digest(source)! != pin {
+			return error('compiler library changed')
+		}
 	}
 	os.write_file(root + '/build.json', json2.encode({
-		'format': json2.Any(1)
-		'source_revision': json2.Any(revision)
-		'source_files': json2.Any(sources.len)
+		'format':                json2.Any(1)
+		'source_revision':       json2.Any(revision)
+		'source_files':          json2.Any(sources.len)
 		'builder_source_sha256': json2.Any(digest(repo + '/tests/android-webview-engine/build.v')!)
-		'engine_sha256': json2.Any(digest(root + '/webview-engine')!)
-		'guest_executed': json2.Any(false)
+		'engine_sha256':         json2.Any(digest(root + '/webview-engine')!)
+		'guest_executed':        json2.Any(false)
 	}, prettify: true) + '\n')!
 	mut artifacts := map[string]string{}
 	inventory(root, '', mut artifacts)!
@@ -116,4 +138,7 @@ fn run() ! {
 	println('WEBVIEW-ENGINE-BUILD-PASS root=' + root + ' build_manifest_sha256=' + digest(root + '/build-sha256.json')!)
 }
 
-run() or { eprintln(err); exit(1) }
+run() or {
+	eprintln(err)
+	exit(1)
+}

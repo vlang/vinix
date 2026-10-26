@@ -166,7 +166,9 @@ fn (mut e Engine) flush() {
 fn (mut e Engine) read() {
 	// A committed-text query and its insertion form one ordered input action.
 	// Do not process another focus/navigation command before its callback.
-	if e.text_jobs.len > 0 || e.input_pending { return }
+	if e.closed || e.text_jobs.len > 0 || e.input_pending || e.jobs.len > 0 || e.restore != unsafe { nil } {
+		return
+	}
 	// Bound work per main-context turn, including a stream of tiny messages.
 	for _ in 0 .. 16 {
 		if e.header_position < browseripc.header_size {
@@ -201,6 +203,6 @@ fn (mut e Engine) read() {
 		}
 		e.handle(e.incoming, e.payload)
 		e.header_position = 0
-		if e.closed || e.text_jobs.len > 0 || e.input_pending { return }
+		if e.closed || e.text_jobs.len > 0 || e.input_pending || e.jobs.len > 0 { return }
 	}
 }

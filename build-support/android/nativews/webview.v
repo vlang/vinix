@@ -570,9 +570,54 @@ fn ws_web_cookie_get(e voidptr, url voidptr) voidptr {
 }
 
 fn ws_web_cookie_flush(e voidptr) u8 {
-	// WebKit persists its jar, but this API has no synchronous persistence fence.
-	throw(e, c'java/lang/UnsupportedOperationException', c'WebView cookie persistence fence is unavailable')
-	return 0
+	unsafe {
+		if ws_browser_handle == nil {
+			throw(e, c'java/lang/IllegalStateException', c'Real WebView cookie store is unavailable')
+			return 0
+		}
+		mut header := [48]u8{}
+		mut payload := &u8(nil)
+		mut length := u32(0)
+		C.pthread_mutex_lock(&ws_browser_mutex)
+		request := ws_web_send(14, nil, nil, 0)
+		status := if request == 0 { i32(-1) } else {
+			ws_web_read_copy(request, &header[0], &payload, &length, 30000)
+		}
+		C.pthread_mutex_unlock(&ws_browser_mutex)
+		defer { C.free(payload) }
+		op := u16(header[6]) | u16(header[7]) << 8
+		if status != 1 || op != 256 || length != 0 {
+			throw(e, c'java/lang/IllegalStateException', c'WebView cookie persistence failed')
+			return 0
+		}
+		return 1
+	}
+}
+
+fn ws_web_cookie_clear(e voidptr, session_only u8) u8 {
+	unsafe {
+		if ws_browser_handle == nil {
+			throw(e, c'java/lang/IllegalStateException', c'Real WebView cookie store is unavailable')
+			return 0
+		}
+		mut header := [48]u8{}
+		mut payload := &u8(nil)
+		mut length := u32(0)
+		mode := u8(session_only != 0)
+		C.pthread_mutex_lock(&ws_browser_mutex)
+		request := ws_web_send(15, nil, &mode, 1)
+		status := if request == 0 { i32(-1) } else {
+			ws_web_read_copy(request, &header[0], &payload, &length, 30000)
+		}
+		C.pthread_mutex_unlock(&ws_browser_mutex)
+		defer { C.free(payload) }
+		op := u16(header[6]) | u16(header[7]) << 8
+		if status != 1 || op != 262 || length != 1 || payload == nil || payload[0] > 1 {
+			throw(e, c'java/lang/IllegalStateException', c'WebView cookie removal failed')
+			return 0
+		}
+		return payload[0]
+	}
 }
 
 fn ws_web_shutdown(e voidptr) {

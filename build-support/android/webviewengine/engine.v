@@ -2,6 +2,7 @@
 module main
 
 import browseripc
+import browsercookies
 import encoding.binary
 import time
 
@@ -10,6 +11,7 @@ struct Engine {
 	fd      int
 	session voidptr
 	cookies voidptr
+	store   &browsercookies.Store = unsafe { nil }
 mut:
 	closed           bool
 	state            browseripc.State
@@ -29,6 +31,7 @@ mut:
 	input_pending    bool
 	input_header     browseripc.Header
 	input_deadline   u64
+	restore          &CookieRestore = unsafe { nil }
 }
 
 @[heap]
@@ -224,6 +227,14 @@ fn (mut e Engine) remove_policy(id u64, use bool) {
 }
 
 fn (mut e Engine) handle(h browseripc.Header, bytes []u8) {
+	if h.op == .cookie_flush {
+		e.cookie_flush(h)
+		return
+	}
+	if h.op == .cookie_clear {
+		e.cookie_clear(h, bytes[0] != 0)
+		return
+	}
 	if h.op in [.cookie_set, .cookie_get, .cookie_delete] {
 		e.cookie(h, bytes)
 		return

@@ -4,6 +4,7 @@ module main
 
 import os
 import time
+import browsercookies
 
 #include <signal.h>
 
@@ -62,23 +63,19 @@ fn run() ! {
 	defer { a.unref(session) }
 	cookies := a.session_cookies(session)
 	if cookies == unsafe { nil } { return error('cookie manager unavailable') }
-	jar := private_profile + '/data/cookies.sqlite'
-	for suffix in ['', '-wal', '-shm', '-journal'] { private_file(jar + suffix)! }
-	// WebKitGTK does not enable persistent cookies merely because the network
-	// session has data/cache directories. Storage enum SQLITE=1 in 2.48.1.
-	a.cookie_storage(cookies, jar.str, 1)
-	mut engine := &Engine{ api: a, fd: fd, session: session, cookies: cookies }
+	// The engine's checked snapshot includes session cookies and is the only
+	// persistence writer. SoupCookieJarDB uses synchronous=OFF, excludes session
+	// cookies, and does not propagate SQL write failures through WebKit's API.
+	mut store := browsercookies.open(data)!
+	defer { browsercookies.dispose(mut store) or {} }
+	mut engine := &Engine{ api: a, fd: fd, session: session, cookies: cookies, store: store }
+	engine.restore_cookies()!
 	for !engine.closed {
 		engine.read()
 		a.iterate(unsafe { nil }, 0)
 		engine.tick()
 		engine.flush()
-		for _, job in engine.jobs {
-			if time.sys_mono_now() >= job.deadline {
-				engine.closed = true
-				break
-			}
-		}
+		engine.expire_cookie_operations(time.sys_mono_now())
 		for _, job in engine.text_jobs {
 			if time.sys_mono_now() >= job.deadline {
 				engine.closed = true
@@ -87,7 +84,8 @@ fn run() ! {
 		}
 		mut ready := C.pollfd{
 			fd:     i32(fd)
-			events: (if engine.text_jobs.len == 0 && !engine.input_pending {
+			events: (if engine.text_jobs.len == 0 && !engine.input_pending && engine.jobs.len == 0
+				&& engine.restore == unsafe { nil } {
 				C.POLLIN
 			} else {
 				i16(0)
