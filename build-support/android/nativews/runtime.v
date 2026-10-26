@@ -110,6 +110,7 @@ mut:
 	dirty         bool
 	layout_requests u64
 	running       bool
+	service       bool
 	animated      bool
 	animation_last i64
 }
@@ -182,7 +183,7 @@ fn ws_input_layout_ready(e voidptr, decor voidptr, width i32, height i32) bool {
 // behind its draw. New or replaced trees still need layout before hit testing.
 fn ws_input_before_render(e voidptr) bool {
 	unsafe {
-		if ws.surface.sequence == 0 || ws.activity == nil || pending(e) { return false }
+		if ws.surface == nil || ws.surface.sequence == 0 || ws.activity == nil || pending(e) { return false }
 		decor := activity_decor(e, ws.activity)
 		if !ws_input_layout_ready(e, decor, ws.width, ws.height) { return false }
 		if ws.dialog != nil {
@@ -212,6 +213,10 @@ fn ws_config(e voidptr, config voidptr) {
 }
 
 fn ws_start(e voidptr, activity voidptr) {
+	if ws.service && ws_ui_closing {
+		throw(e, c'java/lang/IllegalStateException', c'Account UI is closing')
+		return
+	}
 	unsafe {
 		if ws.activity != nil {
 			if ws.back_count >= 64 {
@@ -256,7 +261,7 @@ fn ws_finish(e voidptr, activity voidptr, window i64) {
 		if window == 0 { return } // recreation transfers saved state to a new instance
 		if ws.back_count == 0 {
 			ws_uid_lifecycle(e, 300)
-			ws.running = false
+			ws.running = ws.service
 			return
 		}
 		ws.back_count--

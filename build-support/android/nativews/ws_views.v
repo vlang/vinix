@@ -476,14 +476,15 @@ fn ws_dispatch_traversal(e voidptr, window voidptr) bool {
 fn ws_render(e voidptr) {
 	unsafe {
 		surface := ws.surface
-		target := C.__atomic_load_n(&surface.active, 2) ^ 1
+		target := (C.__atomic_load_n(&surface.active, 2) & 1) ^ 1
 		if C.__atomic_load_n(&surface.reader, 2) == target { return }
 		previous := C.pthread_getspecific(ws_draw_key)
 		C.pthread_setspecific(ws_draw_key, ws_root_draw)
 		defer { ws_canvas_leave(previous) }
 		ws_root_draw.width = ws.width
 		ws_root_draw.height = ws.height
-		ws_root_draw.pixels = &u32(usize(surface) + 48 + usize(target) * usize(surface.buffer_size))
+		// The reader shares this header; only cached geometry may address pixels.
+		ws_root_draw.pixels = &u32(usize(surface) + 48 + usize(target) * usize(ws.width) * usize(ws.height) * 4)
 		ws_path_clip_release(ws_root_draw, nil)
 		ws_root_draw.transform = WsTransform{ right: ws.width, bottom: ws.height }
 		ws_root_draw.save_count = 0

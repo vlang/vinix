@@ -7,6 +7,7 @@ module atlframework
 
 struct C.stat {
 	st_size i64
+	st_mode u32
 }
 fn C.memfd_create(&char, u32) i32
 fn C.fstat(i32, &C.stat) i32

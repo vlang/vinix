@@ -181,6 +181,7 @@ fn ws_service_run(e voidptr, binding voidptr, control_fd i32, package_name &char
 					ok = binder != nil && !pending(e) && ws_account_service_pump(e,binder)
 				}
 			}
+			if ok { ok = ws_service_ui_pump(e) }
 			pop_frame(e)
 			if !ok { return 1 }
 			state_after := ws_service_control(control_fd, 0)
@@ -230,7 +231,7 @@ fn ws_service_shutdown(e voidptr, loaded voidptr, binding voidptr, intent voidpt
 }
 
 @[export: 'vinix_android_native_service_main']
-fn ws_service_main(root &char, apk &char, package_name &char, service &char, action &char, control_fd i32) i32 {
+fn ws_service_main(root &char, apk &char, package_name &char, service &char, action &char, control_fd i32, ui_fd i32) i32 {
 	unsafe {
 		if !ws_service_channel(control_fd) || C.getuid() < 10000 || C.getuid() > 19999 {
 			C.puts(c'ANDROID-SERVICE-FAIL trusted channel')
@@ -243,9 +244,13 @@ fn ws_service_main(root &char, apk &char, package_name &char, service &char, act
 		ws.apk = apk
 		ws.main_thread = usize(C.pthread_self())
 		ws.running = true
+		ws.service = true
 		ws.input = -1
+		if !ws_service_ui_init(ui_fd) { return 1 }
+		defer { ws_service_ui_shutdown(ws.e) }
 		ws.data = C.getenv(c'ANDROID_APP_DATA_DIR')
 		if ws.data == nil || ws.data[0] == 0 { return 1 }
+		ws_auth_origin = package_name
 		if !ws_account_service_init() {
 			C.puts(c'ANDROID-SERVICE-FAIL authenticator channel')
 			return 1
