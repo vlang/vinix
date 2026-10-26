@@ -17,6 +17,8 @@ $if linux {
 }
 #define vinix_pcm_address sockaddr_un
 #define vinix_pcm_poll(fds, count, timeout) poll((struct pollfd *)(fds), (count), (timeout))
+#define vinix_pcm_bind(fd, address, length) bind((fd), (const struct sockaddr *)(address), (length))
+#define vinix_pcm_connect(fd, address, length) connect((fd), (const struct sockaddr *)(address), (length))
 #define vinix_pcm_send send
 #define vinix_pcm_recv recv
 
@@ -27,8 +29,8 @@ struct LoginIdentity { mut: uid u32 session u32 }
 fn C.vinix_pcm_poll(voidptr, u64, int) int
 fn C.socket(int, int, int) int
 fn C.socketpair(int, int, int, &i32) int
-fn C.bind(int, voidptr, u32) int
-fn C.connect(int, voidptr, u32) int
+fn C.vinix_pcm_bind(int, voidptr, u32) int
+fn C.vinix_pcm_connect(int, voidptr, u32) int
 fn C.listen(int, int) int
 fn C.accept(int, voidptr, voidptr) int
 fn C.getsockopt(int, int, int, voidptr, &u32) int

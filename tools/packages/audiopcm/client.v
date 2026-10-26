@@ -24,7 +24,7 @@ fn endpoint_connection(capability Capability, uid u32) !int {
 	mut accepted := false
 	defer { if !accepted { C.close(fd) } }
 	nonblocking(fd)!
-	if C.connect(fd, &location, u32(sizeof(C.vinix_pcm_address))) != 0 {
+	if C.vinix_pcm_connect(fd, &location, u32(sizeof(C.vinix_pcm_address))) != 0 {
 		if C.errno !in [C.EINPROGRESS, C.EAGAIN] { return error('audio worker unavailable') }
 		ready(fd, 4, -1, 5000)!
 		mut failure := i32(0)

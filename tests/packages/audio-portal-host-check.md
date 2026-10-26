@@ -58,3 +58,20 @@ socket; normal portal closure removes only its recorded inode. Actual healthy
 VirtIO/HDA output, seat switching and launch cleanup require the separate native
 guest qualification. Mixing, capture, ALSA/Pulse compatibility and Wine audio
 translation are outside this fixed PCM transport.
+
+The native compiler exposed incompatible socket-address pointers at the C
+boundary. Revision `f50041955e6f68b8464503c357b30e89abd77d1e` adds
+module-specific bind/connect aliases with explicit `const struct sockaddr *`
+casts. The maintained portal test now binds, listens, connects and accepts a
+real pathname socket. Independent review found no descriptor lifetime issue.
+All six focused normal, production and ASan/UBSan compile/run checks passed
+with tracking enabled, including the existing 1,000 proof cycles.
+
+The complete delta evidence is retained at
+`/Users/alex/Library/Caches/vinix-codex/section14/audio-connect-delta-20261026-02`;
+`qualification.json` SHA-256 is
+`c9eb7f31728406c251ab7bb028f666bdb82e5dec68f5ffafd4c82ca8eeb92ecf`.
+Its source inventory binds the four changed files. These host checks reuse the
+previous frozen standard library without independently rehashing it and tolerate
+its historical waitpid pointer warnings. Target compiler diagnostics remain
+enabled; a corrected target link and guest playback remain pending.

@@ -59,7 +59,7 @@ fn worker_owner(runtime int, path string, name string, guard int, uid u32, id st
 	nonblocking(listener)!
 	// The worker creates the listener: SO_PEERCRED names this process, rather
 	// than the parent which passed the socket through fork.
-	if C.bind(listener, &location, u32(sizeof(C.vinix_pcm_address))) != 0 { return error('cannot bind fresh private audio output') }
+	if C.vinix_pcm_bind(listener, &location, u32(sizeof(C.vinix_pcm_address))) != 0 { return error('cannot bind fresh private audio output') }
 	mut info := C.stat{}
 	if C.fstatat(runtime, name.str, &info, C.AT_SYMLINK_NOFOLLOW) != 0 { return error('private audio endpoint unavailable') }
 	defer {

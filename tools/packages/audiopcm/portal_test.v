@@ -46,7 +46,15 @@ fn test_audio_runtime_admission_uses_descriptor_identity_and_private_modes() {
 	fd := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
 	pcm_check(fd >= 0, 'fixture socket')
 	defer { C.close(fd) }
-	pcm_check(C.bind(fd, &location, u32(sizeof(C.vinix_pcm_address))) == 0, 'fixture bind')
+	pcm_check(C.vinix_pcm_bind(fd, &location, u32(sizeof(C.vinix_pcm_address))) == 0, 'fixture bind')
+	pcm_check(C.listen(fd, 1) == 0, 'fixture listen')
+	client := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
+	pcm_check(client >= 0, 'fixture client socket')
+	defer { C.close(client) }
+	pcm_check(C.vinix_pcm_connect(client, &location, u32(sizeof(C.vinix_pcm_address))) == 0, 'real pathname audio connection')
+	accepted := C.accept(fd, unsafe { nil }, unsafe { nil })
+	pcm_check(accepted >= 0, 'fixture accepted connection')
+	C.close(accepted)
 	os.chmod(actual, 0o600)!
 	mut info := C.stat{}
 	pcm_check(C.fstatat(C.AT_FDCWD, actual.str, &info, C.AT_SYMLINK_NOFOLLOW) == 0, 'fixture inode')
