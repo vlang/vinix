@@ -102,6 +102,14 @@ fn array_append(mut header ObjHeader, object u64) {
 	header.mutation++
 }
 
+fn dictionary_snapshot(header &ObjHeader, keys bool) u64 {
+	array := objc_allocate(ios_runtime.names['NSArray'])
+	mut target := obj_header(array)
+	if keys { for key in header.keys { array_append(mut target, key) } }
+	else { for value in header.items { array_append(mut target, value) } }
+	return objc_autorelease(array)
+}
+
 fn collection_remove(mut header ObjHeader, index int) {
 	if index < 0 || index >= header.items.len { panic('iOS: collection index out of range') }
 	value := header.items[index]
@@ -246,6 +254,11 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 			'removeAllObjects', 'addObject:', 'removeObjectAtIndex:', 'setObject:atIndexedSubscript:'] {
 			panic('iOS: mutation of an immutable image dictionary')
 		}
+	}
+	if selector in ['allKeys', 'allValues'] {
+		if !objc_is_kind(object, ios_runtime.names['NSDictionary']) { return false }
+		frame.x[0] = dictionary_snapshot(header, selector == 'allKeys')
+		return true
 	}
 	if selector == 'initWithBytes:length:encoding:' && objc_is_kind(object, ios_runtime.names['NSString']) {
 		if frame.x[3] > 16 * 1024 * 1024 { panic('iOS: NSString exceeds size limit') }

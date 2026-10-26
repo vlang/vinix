@@ -17,6 +17,7 @@ fn C.dlopen(&char, int) voidptr
 fn C.dlsym(voidptr, &char) voidptr
 fn C.dlclose(voidptr) int
 fn C.sel_registerName(&char) voidptr
+fn C.objc_getClass(&char) voidptr
 fn C.class_getSuperclass(voidptr) voidptr
 fn C.class_getInstanceSize(voidptr) usize
 fn C.CFStringCreateMutable(voidptr, i64) voidptr
@@ -89,6 +90,94 @@ fn (api ConstantDictionaryApi) pool() u64 {
 fn (api ConstantDictionaryApi) drain(pool u64) {
 	$if macos { if api.native { unsafe { ConstantDictionaryPop(voidptr(api.pop))(pool) }; return } }
 	objc_pool_pop(pool)
+}
+
+fn (api ConstantDictionaryApi) cls(name &char) u64 {
+	$if macos { if api.native { return u64(C.objc_getClass(name)) } }
+	return ios_runtime.names[ctext(u64(name))]
+}
+
+fn (api ConstantDictionaryApi) responds(object u64, name &char) bool {
+	mut selector := u64(name)
+	$if macos { if api.native { selector = u64(C.sel_registerName(name)) } }
+	return api.message(object, c'respondsToSelector:', selector, 0, 0) != 0
+}
+
+fn dictionary_snapshot_cases(api ConstantDictionaryApi) {
+	for mutable in [false, true]! {
+		pool := api.pool()
+		keys := [api.text(c'alpha'), api.text(c'beta'), api.text(c'gamma')]!
+		values := [api.text(c'first'), api.text(c'second')]!
+		entries := [values[0], values[1], values[0]]!
+		cls := api.cls(if mutable { c'NSMutableDictionary' } else { c'NSDictionary' })
+		dictionary := api.message(cls, c'dictionaryWithObjects:forKeys:count:', u64(unsafe { &entries[0] }), u64(unsafe { &keys[0] }), 3)
+		assert api.responds(dictionary, c'allKeys') && api.responds(dictionary, c'allValues')
+		assert !api.responds(cls, c'allKeys') && !api.responds(cls, c'allValues')
+		unrelated := api.message(api.cls(c'NSObject'), c'new', 0, 0, 0)
+		assert !api.responds(unrelated, c'allKeys') && !api.responds(unrelated, c'allValues')
+		api.release(unrelated)
+		all_keys := api.message(dictionary, c'allKeys', 0, 0, 0)
+		all_values := api.message(dictionary, c'allValues', 0, 0, 0)
+		for array in [all_keys, all_values]! {
+			assert api.array_count(array) == 3
+			assert api.message(array, c'isKindOfClass:', api.cls(c'NSArray'), 0, 0) == 1
+			api.message(array, c'retain', 0, 0, 0)
+		}
+		// No ordering guarantee; preserve duplicate values and object identity.
+		mut occurrences := [2]int{}
+		mut key_occurrences := [3]int{}
+		for i in 0 .. 3 {
+			key := api.array_value(all_keys, i)
+			mut matches := 0
+			for j, expected in keys {
+				if api.message(key, c'isEqualToString:', expected, 0, 0) != 0 { matches++; key_occurrences[j]++ }
+			}
+			assert matches == 1
+			value := api.array_value(all_values, i)
+			assert value in values
+			occurrences[if value == values[0] { 0 } else { 1 }]++
+		}
+		assert occurrences[0] == 2 && occurrences[1] == 1
+		for count in key_occurrences { assert count == 1 }
+		if mutable {
+			api.message(dictionary, c'removeAllObjects', 0, 0, 0)
+			assert api.count(dictionary) == 0
+			assert api.array_count(all_keys) == 3 && api.array_count(all_values) == 3
+		}
+		for key in keys { api.release(key) }
+		for value in values { api.release(value) }
+		api.drain(pool)
+		// Both the dictionary and its original owners have gone away.
+		assert api.array_count(all_keys) == 3 && api.array_count(all_values) == 3
+		for i in 0 .. 3 {
+			assert api.message(api.array_value(all_keys, i), c'length', 0, 0, 0) >= 4
+			assert api.message(api.array_value(all_values, i), c'length', 0, 0, 0) >= 5
+		}
+		api.release(all_keys); api.release(all_values)
+		pool_empty := api.pool()
+		empty := api.message(cls, c'dictionary', 0, 0, 0)
+		assert api.array_count(api.message(empty, c'allKeys', 0, 0, 0)) == 0
+		assert api.array_count(api.message(empty, c'allValues', 0, 0, 0)) == 0
+		api.drain(pool_empty)
+	}
+}
+
+fn test_dictionary_snapshots_native_and_runtime() {
+	$if macos {
+		objc := C.dlopen(c'/usr/lib/libobjc.A.dylib', 2)
+		assert objc != unsafe { nil }
+		api := ConstantDictionaryApi{native: true, send: u64(C.dlsym(objc, c'objc_msgSend')), push: u64(C.dlsym(objc, c'objc_autoreleasePoolPush')), pop: u64(C.dlsym(objc, c'objc_autoreleasePoolPop'))}
+		dictionary_snapshot_cases(api)
+		assert C.dlclose(objc) == 0
+		println('IOS-DICTIONARY-SNAPSHOT-NATIVE: empty/populated immutable/mutable dictionaries, unordered keys, duplicate value identities, selector scope and snapshots surviving mutation, owner release and pool drain PASS')
+	}
+	objc_start()
+	for _ in 0 .. 20 {
+		dictionary_snapshot_cases(ConstantDictionaryApi{})
+		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
+	}
+	objc_stop()
+	println('IOS-DICTIONARY-SNAPSHOT: empty/populated immutable/mutable dictionaries, unordered keys, duplicate value identities, selector scope and snapshots surviving mutation, owner release and pool drain PASS')
 }
 
 fn constant_dictionary_cases(api ConstantDictionaryApi, object u64, keys [3]u64, values [3]u64) {

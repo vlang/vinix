@@ -486,6 +486,7 @@ fn main() {
 		if mode == 'probe-no-ads' {
 			require_child('/opt/ios/vm-probe-checks')
 			require_child('/opt/ios/block-byref-checks')
+			require_child('/opt/ios/dictionary-snapshot-checks')
 			probefault.verify() or {
 				eprintln('IOS-NATIVE: FAIL fault context: ' + err.msg())
 				panic(err)

@@ -136,11 +136,7 @@ fn constant_dictionary_dispatch(object u64, selector string, mut frame RegisterF
 			frame.x[0] = copy
 		}
 		'allKeys', 'allValues' {
-			array := objc_allocate(ios_runtime.names['NSArray'])
-			mut target := obj_header(array)
-			if selector == 'allKeys' { for key in header.keys { array_append(mut target, key) } }
-			else { for value in header.items { array_append(mut target, value) } }
-			frame.x[0] = objc_autorelease(array)
+			frame.x[0] = dictionary_snapshot(header, selector == 'allKeys')
 		}
 		'getObjects:andKeys:count:' {
 			// Native NSConstantDictionary fills all pairs even when the count
