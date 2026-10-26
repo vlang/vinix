@@ -4,6 +4,15 @@ module main
 
 import os
 import crypto.sha256
+import json2
+
+struct FixtureBuild {
+ argv []string
+ source_revision string
+ inputs_sha256 map[string]string
+ java_version string
+ apk_sha256 string
+}
 
 fn checked(args []string) {
  r := os.exec(args)
@@ -265,6 +274,27 @@ return-void
  os.cp(fixture + '/unsigned.apk', out + '/unsigned.apk')!
  checked(['zip', '-q', '-j', out + '/unsigned.apk', dex])
  checked([java, '-jar', signer, 'sign', '--ks', fixture + '/fixture.p12', '--ks-key-alias', 'fixture', '--ks-pass', 'pass:android', '--key-pass', 'pass:android', '--out', out + '/probe.apk', out + '/unsigned.apk'])
+ mut inputs := map[string]string{}
+ for path in [@FILE, os.executable(), fixture + '/unsigned.apk', fixture + '/fixture.p12', java, signer] {
+  inputs[os.real_path(path)] = sha256.sum(os.read_bytes(path)!).hex()
+ }
+ for directory in [tools, root] {
+  for name in os.ls(directory)! {
+   path := directory + '/' + name
+   if os.is_file(path) { inputs[os.real_path(path)] = sha256.sum(os.read_bytes(path)!).hex() }
+  }
+ }
+ revision := os.exec(['git', 'rev-parse', 'HEAD'])
+ assert revision.exit_code == 0
+ java_version := os.exec([java, '-version'])
+ assert java_version.exit_code == 0
+ os.write_file(out + '/build.json', json2.encode(FixtureBuild{
+  argv: os.args,
+  source_revision: revision.output.trim_space(),
+  inputs_sha256: inputs,
+  java_version: java_version.output.trim_space(),
+  apk_sha256: sha256.sum(os.read_bytes(out + '/probe.apk')!).hex()
+ }, prettify: true) + '\n')!
  println('ACCOUNT-ASYNC-APK ' + out + '/probe.apk')
  println('ACCOUNT-ASYNC-APK-SHA256 ' + sha256.sum(os.read_bytes(out + '/probe.apk')!).hex())
 }
