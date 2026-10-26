@@ -138,6 +138,25 @@ pub fn extract_member(boot_image string, member string, destination string) !Sta
 		['/usr/bin/tar', '-xf', '-', '-C', destination])
 }
 
+// Extract only literal relative paths from a trusted, separately pinned archive.
+// Selection is nonrecursive; callers must verify extracted bytes and BOTH statuses.
+pub fn extract_members(boot_image string, member string, destination string, paths []string) !Statuses {
+	if paths.len == 0 || paths.len > 1024 { return error('invalid stream selection count') }
+	mut seen := map[string]bool{}
+	for path in paths {
+		if path.len == 0 || path.len > 1024 || path.starts_with('-') || seen[path]
+			|| !path.bytes().all((it >= `a` && it <= `z`) || (it >= `A` && it <= `Z`)
+				|| (it >= `0` && it <= `9`) || it in [`/`, `_`, `-`, `.`, `+`])
+			|| path.split('/').any(it in ['', '.', '..']) {
+			return error('stream selection requires distinct literal relative paths')
+		}
+		seen[path] = true
+	}
+	mut consumer := ['/usr/bin/tar', '--no-recursion', '-xf', '-', '-C', destination, '--']
+	consumer << paths
+	return commands(['mcopy', '-i', boot_image, fat_member(member)!, '-'], consumer)
+}
+
 // hash_member streams the exact binary FAT member into shasum. Only its small
 // stdout receipt is retained at a fresh output path; diagnostics remain inherited.
 // Both child statuses are returned on command failure, with an empty sha256.

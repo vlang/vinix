@@ -49,6 +49,23 @@ fn test_fat_member_streams_preserve_bytes_and_failures() ! {
 		assert os.read_bytes(stream_dest + '/' + name)! == os.read_bytes(regular_dest + '/' + name)!
 		assert os.read_bytes(stream_dest + '/' + name)! == os.read_bytes(root + '/' + name)!
 	}
+	selected_dest := task + '/selected extraction'
+	os.mkdir_all(selected_dest)!
+	selected := extract_members(image, 'module.tar', selected_dest, ['nested/payload.bin'])!
+	assert selected.producer == 0 && selected.consumer == 0
+	assert os.read_bytes(selected_dest + '/nested/payload.bin')! == data
+	assert !os.exists(selected_dest + '/marker')
+	missing_selection := extract_members(image, 'module.tar', selected_dest, ['absent'])!
+	assert missing_selection.consumer != 0
+	selected_producer_failure := extract_members(image, 'absent.tar', selected_dest, ['marker'])!
+	assert selected_producer_failure.producer != 0
+	for paths in [[]string{}, ['marker', 'marker'], ['../marker'], ['/marker'],
+		['nested//payload.bin'], ['nested/./payload.bin'], ['nested/../marker'], ['-C'],
+		['nested/*'], ['marker\n'], ['marker\x00']] {
+		mut invalid_selection := false
+		extract_members(image, 'module.tar', selected_dest, paths) or { invalid_selection = true }
+		assert invalid_selection
+	}
 	// Producer failure still lets shasum finish successfully: its empty-stream hash
 	// must never be returned as the absent member's digest.
 	missing := hash_member(image, 'absent.tar', task + '/missing-hash.txt')!

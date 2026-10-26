@@ -21,9 +21,21 @@ time and an external output directory:
 The fixed input catalogs are checked before use. Preparation APFS-clones the
 retained boot media and efivars, overlays the 400 KiB retained base module and
 required native providers, and appends the fixture/controller plus matched
-framework/JNI pair. It copies no SDK. Each deployed APK, framework JAR, JNI
-library and PID 1 binary is independently read back from the FAT module and
-hashed. `prepared.json` records exact 2 GiB, two CPU QEMU argument arrays; run
+framework/JNI pair. It copies no SDK. Mesa provider files are selected from
+the sealed `maps-account-r5` original runtime inventory, streamed directly
+from its FAT runtime module, and installed at their original flat
+`native-ws` paths, including Mesa EGL, `dri/swrast_dri.so`, LLVM and their
+dependencies. The same provider bytes are used in both cases. The source
+module digest is checked before and after preparation; licenses and source
+archives remain in the retained original bundle. The inventory concatenates
+original modules, so its conflicting `libdl_bio.so.0` translator entries are
+excluded from that selection; the explicit sealed baseline translator is
+retained. Every selected GPU provider must have a unique inventory entry.
+Each deployed provider, translator, APK, framework JAR, JNI library and PID 1
+binary is independently read back from the FAT module and hashed. Other
+runtime dependencies remain inherited from the pinned boot image; the
+small overlay is not a standalone runtime.
+`prepared.json` records exact 2 GiB, two CPU QEMU argument arrays; run
 the old and new cases sequentially. Preserve the complete external bundle,
 including both serial logs and readback inventories.
 
@@ -77,11 +89,19 @@ the 22-case semantic selftest passed with maximum RSS 3,768,320 bytes.
 Whole preparation, including the guest compilation, both media overlays,
 four-way payload readbacks and full input rehashing, passed in 56.31 seconds
 with maximum RSS 350,863,360 bytes and zero swaps. Both target V inventories
-match; their frozen source tree is 2.2 MiB. Guest execution is pending.
+match; their frozen source tree is 2.2 MiB.
 The first preparation (`r1`) is retained but was not qualified for boot:
 its source inventory selected host files rather than the compiled Linux
 target. The coherent `r2` preparation corrects that inventory and includes
-the reviewed child cleanup and output-tail fixes.
+the reviewed child cleanup and output-tail fixes. Its old guest then failed
+before ART: `libvinix-ws-mesa-EGL.so` was missing and graphics dispatch failed.
+The strict checker rejected that run because the required protected-field
+failure was absent; it produced no successful result JSON. The failed `r2`
+bundle is preserved. Its provider directories were incorrectly nested under
+`egl-ws`/`vulkan-ws`, and its readback covered only four application payloads.
+The subsequent `r3` preparation selects original runtime provider paths and
+checks every deployed provider as well. No fixture success or authentication
+success follows from the `r2` run.
 
 The fixture APK is 17,031 bytes, SHA-256
 `786681da81d8b075e38f844014ab767e26f4388bfb5f8bf62e4cd380c978f0e6`.
@@ -100,3 +120,30 @@ The prepared manifest SHA-256 is
 `d8c792beea9bb3c47605f014570713544a5231d4970d71c038123f2837d8a26e`.
 Guest controller SHA-256:
 `fa9e0888a8f28cf5794028b5c38b30e6c52351c0baa0d25b5edbac142ee46394`.
+
+The provider correction is prepared at
+`/Users/alex/.local/state/vinix/android/protected-storage-guest-validation-2026-10-27-r3`;
+its build and test logs are in the corresponding
+`protected-storage-run-build-2026-10-27-r3` directory. The selective FAT
+extraction test passed in 13.83 seconds with maximum RSS 158,842,880 bytes,
+including success, missing input/member and invalid path cases. The host
+build passed in 7.34 seconds with maximum RSS 360,513,536 bytes; all 22
+semantic tests passed with maximum RSS 3,751,936 bytes. Whole preparation
+passed in 71.50 seconds with maximum RSS 354,369,536 bytes and zero swaps.
+It installed the same 18 provider/translator files (117,846,960 bytes) in
+both cases, verified all 22 deployed payload hashes per case, and matched
+the Linux target source inventories. The rebuilt checker also rejected the
+actual failed `r2` serial log with exit 1 and no successful result JSON.
+The `r3` guest results remain pending.
+
+The `r3` preparation recorded source base
+`d32325678505b726b2e89a572e58baafac569af4` and runner source SHA-256
+`709643eca22b99523765a18ed8a843fe3ac7b9a01335c165982826fab4afaced`.
+Its prepared manifest SHA-256 is
+`a3567dfc87d2e02bf7d7deb331eeb43d38ec308daa83a5c87b336c4283552e5d`;
+guest SHA-256 is
+`66673e91ffb5fa9381f4dbdb4ecfd41486197e530c59fa0272c43401ec03b0ab`.
+The original runtime module SHA-256, checked before and after extraction,
+is `1c6988d1f3d3844425f0e8cbb49a878b3a16f2a270b4eb3852c71dfaa8fe200e`;
+the complete original inventory SHA-256 is
+`d3c2fcc3ede63edc181729940123929c60acb07fdf2d76972f0bd41e3a6f5423`.

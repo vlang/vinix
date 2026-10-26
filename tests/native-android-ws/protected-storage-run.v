@@ -22,6 +22,10 @@ fn C.CC_SHA256_Final(&u8, voidptr) i32
 const state = '/Users/alex/.local/state/vinix/android/'
 const baseline = state + 'layout-parent-dispatch336-v3-2026-10-25'
 const baseline_seal = 'a583f89a37bc7d59a275fef01396a864efe04915dd070227631599058ae46762'
+const provider_root = state + 'maps-account-r5'
+const provider_seal = '9a8bf61bd526d7ec020d45920367d45e90a2ef4692c6d8fa8b87de801a14c5ca'
+const provider_module_pin = '1c6988d1f3d3844425f0e8cbb49a878b3a16f2a270b4eb3852c71dfaa8fe200e'
+const provider_inventory_pin = 'd3c2fcc3ede63edc181729940123929c60acb07fdf2d76972f0bd41e3a6f5423'
 const suite_root = state + 'vpa-translation-z338-2026-10-25'
 const suite_seal = 'c8e780dfd7439d8f85a3f8abd70a43f78a53652128d489adbfec5e5079aeaaf2'
 const fixture = state + 'protected-storage-fixture-2026-10-27-r1'
@@ -47,6 +51,15 @@ struct Variant {
 	jni_root string
 	jni_seal string
 	jni_sha256 string
+}
+
+struct RuntimeMember {
+	kind string
+	linkname string
+	mode int
+	name string
+	sha256 string
+	size u64
 }
 
 fn variants() []Variant {
@@ -146,6 +159,61 @@ fn closure(output string, label string, argv []string) !map[string]string {
 	return pins
 }
 
+fn provider_module(output string, label string) ! {
+	r := modulestream.hash_member(provider_root + '/boot.img', 'qemu-runtime.tar',
+		output + '/commands/' + label + '.sha256')!
+	write_json(output + '/commands/' + label + '.json', r)!
+	if r.statuses.producer != 0 || r.statuses.consumer != 0 || r.sha256 != provider_module_pin {
+		return error('retained provider FAT module differs')
+	}
+}
+
+fn prepare_providers(output string, baseline_pins map[string]string) !map[string]string {
+	pins := sealed(provider_root, provider_seal)!
+	if pins['original-module-inventory.json']! != provider_inventory_pin {
+		return error('retained provider inventory seal differs')
+	}
+	copy_pin(provider_root + '/original-module-inventory.json', output + '/source/provider-module-inventory.json', provider_inventory_pin)!
+	entries := json2.decode[[]RuntimeMember](os.read_file(output + '/source/provider-module-inventory.json')!)!
+	prefix := runtime.trim_left('/') + '/usr/lib/art/native-ws/'
+	mut selected := []string{}
+	mut expected := map[string]string{}
+	mut sizes := u64(0)
+	for entry in entries {
+		// This catalog concatenates original modules. The translator also has a
+		// later diagnostic replacement; use the explicit retained baseline below.
+		if !entry.name.starts_with(prefix) || entry.name.starts_with(prefix + 'licenses/')
+			|| entry.name == prefix + 'libdl_bio.so.0' { continue }
+		if entry.kind == 'directory' { continue }
+		if entry.kind != 'regular' || entry.linkname != '' || entry.sha256.len != 64
+			|| entry.size == 0 || expected[entry.name] != '' { return error('unexpected provider member') }
+		selected << entry.name
+		expected[entry.name] = entry.sha256
+		sizes += entry.size
+	}
+	if selected.len < 10 || sizes > 160 * 1024 * 1024
+		|| expected[prefix + 'libvinix-ws-mesa-EGL.so'] == ''
+		|| expected[prefix + 'dri/swrast_dri.so'] == ''
+		|| expected[prefix + 'libLLVM-12.so'] == '' { return error('provider selection incomplete or oversized') }
+	selected.sort()
+	provider_module(output, 'provider-module-before')!
+	os.mkdir(output + '/providers')!
+	r := modulestream.extract_members(provider_root + '/boot.img', 'qemu-runtime.tar', output + '/providers', selected)!
+	write_json(output + '/commands/extract-providers.json', r)!
+	if r.producer != 0 || r.consumer != 0 { return error('provider extraction failed') }
+	for path, pin in expected {
+		if hash(output + '/providers/' + path)! != pin { return error('provider bytes differ: ' + path) }
+	}
+	translator := prefix + 'libdl_bio.so.0'
+	translator_pin := baseline_pins['native-new/libdl_bio.so.0']!
+	copy_pin(baseline + '/native-new/libdl_bio.so.0', output + '/providers/' + translator, translator_pin)!
+	expected[translator] = translator_pin
+	sizes += os.file_size(output + '/providers/' + translator)
+	write_json(output + '/provider-payload.json', expected)!
+	println('PROTECTED-STORAGE-PROVIDERS count=' + expected.len.str() + ' bytes=' + sizes.str())
+	return expected
+}
+
 fn prepare(output string) ! {
 	$if !macos { return error('prepare requires macOS APFS') }
 	if !output.starts_with(state) || output.contains_any('\n\r\x00,') || os.exists(output) || os.is_link(output) {
@@ -167,10 +235,12 @@ fn prepare(output string) ! {
 	copy_pin(source_path, output + '/source/protected-storage-run.v', hash(source_path)!)!
 	copy_pin(suite_root + '/tools/suite', output + '/tools/retained-suite', sp['tools/suite']!)!
 	copy_pin(fixture + '/probe.apk', output + '/probe.apk', apk_pin)!
+	providers := prepare_providers(output, bp)!
 	mut input_pins := map[string]string{}
 	for path in [source_path, compiler, '/opt/homebrew/bin/aarch64-linux-musl-gcc',
 		os.abs_path('build-support/android/modulestream/spawn_abi.h'),
 		baseline + '/sha256.json', suite_root + '/sha256.json', fixture + '/sha256.json',
+		provider_root + '/sha256.json', provider_root + '/original-module-inventory.json', provider_root + '/boot.img',
 		baseline + '/base-runtime.tar', baseline + '/vm-new/boot.img', baseline + '/vm-new/efivars.fd',
 		os.abs_path('build/qemu-horizontal/bin/qemu-system-aarch64'),
 		'/opt/homebrew/share/qemu/edk2-aarch64-code.fd',
@@ -212,27 +282,18 @@ fn prepare(output string) ! {
 		command(output, v.name + '-base-overlay', ['/usr/bin/tar', '-xf', baseline + '/base-runtime.tar', '-C', module_root])!
 		for source, target in {
 			'libvinix-android-native.so': runtime + '/usr/lib/art/libvinix-android-native.so'
-			'libdl_bio.so.0': runtime + '/usr/lib/art/native-ws/libdl_bio.so.0'
 			'vinix-android-native': runtime + '/usr/bin/vinix-android-native'
 			'run-android': runtime + '/usr/bin/run-android'
 			'libvinix-android-compat.so': runtime + '/usr/lib/libvinix-android-compat.so'
 			'tzdata': runtime + '/usr/share/zoneinfo/tzdata'
 			'cacerts': runtime + '/etc/ssl/certs/java/cacerts'
 			'bionic-ws.cfg': runtime + '/usr/share/vinix-android-ws/bionic_translation/cfg.d/native.cfg'
-			'libglapi.so.0': runtime + '/usr/lib/art/native-ws/libglapi.so.0'
-			'libvinix-ws-GLESv1_CM.so': runtime + '/usr/lib/art/native-ws/libvinix-ws-GLESv1_CM.so'
-			'libvinix-ws-GLESv2.so': runtime + '/usr/lib/art/native-ws/libvinix-ws-GLESv2.so'
 		} {
 			if source == 'libvinix-android-native.so' { continue }
 			copy_pin(baseline + '/native-new/' + source, module_root + target, bp['native-new/' + source]!)!
 		}
-		for provider in ['egl-ws', 'vulkan-ws'] {
-			for key, pin in bp {
-				prefix := 'native-new/' + provider + '/'
-				if key.starts_with(prefix) {
-					copy_pin(baseline + '/' + key, module_root + runtime + '/usr/lib/art/native-ws/' + provider + '/' + key[prefix.len..], pin)!
-				}
-			}
+		for relative, pin in providers {
+			copy_pin(output + '/providers/' + relative, module_root + '/' + relative, pin)!
 		}
 		copy_pin(v.framework_root + '/api-impl.jar', module_root + runtime + '/usr/lib/java/dex/android_translation_layer/api-impl.jar', v.framework_sha256)!
 		copy_pin(v.jni_root + '/native/libvinix-android-native.so', module_root + runtime + '/usr/lib/art/libvinix-android-native.so', v.jni_sha256)!
@@ -252,6 +313,11 @@ fn prepare(output string) ! {
 		readback := modulestream.extract_member(root + '/boot.img', 'qemu-runtime.tar', root + '/readback')!
 		if readback.producer != 0 || readback.consumer != 0 { return error('module readback failed') }
 		mut deployed := map[string]string{}
+		for relative, pin in providers {
+			observed := hash(root + '/readback/' + relative)!
+			if observed != pin { return error('deployed provider differs: ' + relative) }
+			deployed['/' + relative] = observed
+		}
 		for relative, pin in {
 			guest_root + '/probe.apk': apk_pin
 			runtime + '/usr/lib/art/libvinix-android-native.so': v.jni_sha256
@@ -270,6 +336,7 @@ fn prepare(output string) ! {
 			'qemu_argv': json2.Any(qemu_argv(output, v.name))}
 		println('PROTECTED-STORAGE-PREPARED case=' + v.name)
 	}
+	provider_module(output, 'provider-module-after')!
 	for path, pin in input_pins { if hash(path)! != pin { return error('input changed during preparation: ' + path) } }
 	write_json(output + '/input-sha256.json', input_pins)!
 	write_json(output + '/prepared.json', {'version': json2.Any(1), 'cases': json2.Any(cases),
