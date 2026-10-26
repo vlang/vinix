@@ -361,6 +361,18 @@ exits 139 with no cgroup OOM event. Progress remains 2 of 8 observable launch
 gates; initializer completion and application entry remain unverified.
 See the [dictionary snapshot checkpoint](../tests/ios/dictionary-snapshot-checkpoint-20261026.md).
 
+The latest diagnostic checkpoint reaches application entry after all nine
+`+load` calls and three initializer groups return. Compiled launch-storyboard
+construction and the nominal `NSProcessInfo.thermalState` fallback now pass.
+All 13 guest regression fixtures and both sanitized host runs pass. Fortnite
+then reaches the check for the desktop's `VINIX_REQUEST_FD` and
+`VINIX_RESPONSE_FD` pipes, which this probe does not supply, and the VM harness
+times out without observing a natural application exit. Progress is 4 of 8
+observable gates (50% of that checklist, without estimating remaining work).
+A rendered frame, interactive menu, login and playable match remain
+unverified. Advertising remains skipped. See the
+[thermal-state checkpoint](../tests/ios/thermal-state-checkpoint-20261026.md).
+
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
 runner previously rejected as reserved bits. The decoder now preserves pointer
