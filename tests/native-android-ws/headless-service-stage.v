@@ -32,6 +32,7 @@ const framework_seal = '36a472320e71eb459896c1d52a8f211f475362fb2c6dada682870bf4
 const framework_jar_sha = '9e643451d4d82fc3839c91415947f04d3726aa81967a784d4d26db63e2c88cb1'
 const combined_framework_seal = '798b574b811203313b185480ddfd9349bfc5b7e1863d96e99d9c1afca3be4dd2'
 const combined_framework_jar_sha = '296cb0bd9d16801322a18d40bca0facfb0593e50be47d424f199d02ceeb7e15f'
+const full_native_seal = 'd99195272b8af813679cf54fed9f1e0341e6f1115804ac09c1cd2d5a8f942e3e'
 const fixture_apk_sha = '4df9e3cd757b463259c73dc038eb84d149d7ec1461a1889bc8f2d531f6980634'
 const compiler = '/Users/alex/code/v/v'
 const cross = '/opt/homebrew/bin/aarch64-linux-musl-gcc'
@@ -95,6 +96,84 @@ fn verify_framework(profile FrameworkProfile, jar_sha string, receipt map[string
 		|| receipt['class_count']!.int() != profile.class_count {
 		return error('framework JAR or build receipt differs from audited profile')
 	}
+}
+
+fn shared_elf(path string) ! {
+	bytes := os.read_bytes(path)!
+	if bytes.len < 64 || bytes[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1]
+		|| bytes[16..20] != [u8(3), 0, 183, 0] {
+		return error('current native input is not an AArch64 ELF64 shared library')
+	}
+}
+
+fn current_native_receipts() []string {
+	return ['build.json', 'sha256.json', 'native/exports.json', 'commands/build-native.json',
+		'commands/exports.json']
+}
+
+fn current_native_destinations() []string {
+	return ['current-native-build.json', 'current-native-sha256.json', 'current-native-exports.json',
+		'current-native-build-command.json', 'current-native-exports-command.json']
+}
+
+fn verify_current_identity(profile FrameworkProfile, framework string, native_seal string,
+	baseline string, dso_sha string, receipt map[string]json2.Any) ! {
+	if profile.seal != combined_framework_seal || native_seal != full_native_seal
+		|| receipt['framework']!.str() != framework
+		|| receipt['framework_sha256']!.str() != profile.seal
+		|| receipt['baseline_sha256']!.str() != full_native_seal
+		|| receipt['native_sha256']!.str() != dso_sha
+		|| receipt['source_revision']!.str() == '' || receipt['completed_utc']!.str() == ''
+		|| receipt['baseline']!.str() != baseline {
+		return error('current native receipt does not couple the audited framework and full native base')
+	}
+}
+
+fn verify_current_native(current string, framework string, profile FrameworkProfile,
+	baseline string, native_seal string, pins map[string]string) ![]string {
+	dso := current + '/native/libvinix-android-native.so'
+	shared_elf(dso)!
+	receipt := json2.decode[map[string]json2.Any](os.read_file(current + '/build.json')!)!
+	verify_current_identity(profile, framework, native_seal, baseline,
+		pins['native/libvinix-android-native.so']!, receipt)!
+	if hash(current + '/framework-sha256.json')! != profile.seal
+		|| hash(current + '/baseline-sha256.json')! != full_native_seal {
+		return error('current native retained input manifests differ')
+	}
+	build := json2.decode[map[string]json2.Any](os.read_file(current + '/commands/build-native.json')!)!
+	args := json2.decode[[]string](json2.encode(build['argv']!))!
+	if build['exit_code']!.int() != 0 || args.len < 3 || args[0] != cross
+		|| args.count(it == '-Werror') != 1 || args.count(it == '-Wl,--no-undefined') != 1
+		|| args.count(it == '-shared') != 1 || args.count(it == '-o') != 1
+		|| args[args.len - 2..] != ['-o', dso] {
+		return error('current native Werror shared-link command receipt differs')
+	}
+	export_command := json2.decode[map[string]json2.Any](os.read_file(current + '/commands/exports.json')!)!
+	export_args := json2.decode[[]string](json2.encode(export_command['argv']!))!
+	if export_command['exit_code']!.int() != 0 || export_args != [
+		'/opt/homebrew/bin/aarch64-linux-musl-nm', '-D', '--defined-only', dso] {
+		return error('current native export command receipt differs')
+	}
+	exports := json2.decode[[]string](os.read_file(current + '/native/exports.json')!)!
+	mut expected := ['_init', '_fini']
+	for source in os.ls(current + '/native/atlframework')! {
+		if !source.ends_with('.v') { return error('unexpected native source closure member') }
+		for line in os.read_file(current + '/native/atlframework/' + source)!.split_into_lines() {
+			if line.starts_with("@[export: '") { expected << line.all_after("@[export: '").all_before("'") }
+		}
+	}
+	expected.sort()
+	if expected.len <= 2 || expected != exports {
+		return error('current native export receipt differs from complete source annotations')
+	}
+	for i, symbol in exports {
+		if symbol == '' || !symbol.bytes().all((it >= `a` && it <= `z`)
+			|| (it >= `A` && it <= `Z`) || (it >= `0` && it <= `9`) || it == `_`)
+			|| (i > 0 && exports[i - 1] == symbol) {
+			return error('unsafe or duplicate current native export')
+		}
+	}
+	return exports
 }
 
 fn hash(path string) !string {
@@ -559,7 +638,7 @@ fn replacement_entry(name string, source string, mode u32) !Entry {
 	return Entry{ name: name, kind: 'regular', mode: mode, size: os.lstat(source)!.size, sha256: hash(source)! }
 }
 
-fn verify_plan(entries []Entry) ! {
+fn verify_plan(entries []Entry, current_native bool) ! {
 	mut names := map[string]bool{}
 	mut expected := {
 		diagnostic_prefix:          'directory'
@@ -570,6 +649,9 @@ fn verify_plan(entries []Entry) ! {
 		'fixture-build.json', 'native-build.json', 'native-sha256.json', 'framework-build.json',
 		'framework-sha256.json', 'guest-inputs.json'] {
 		expected[diagnostic_prefix + '/' + name] = 'regular'
+	}
+	if current_native {
+		for name in current_native_destinations() { expected[diagnostic_prefix + '/' + name] = 'regular' }
 	}
 	for entry in entries {
 		if !relative(entry.name) || entry.name in names || entry.mode > 0o777 {
@@ -584,16 +666,20 @@ fn verify_plan(entries []Entry) ! {
 }
 
 fn stage() ! {
-	if os.args.len != 8 {
-		return error('usage: headless-service-stage BASE_BOOT BASE_EFIVARS FRAMEWORK_BUILD NATIVE_BUILD NATIVE_SEAL FIXTURE_DIR FRESH_OUTPUT')
+	if os.args.len !in [8, 10] {
+		return error('usage: headless-service-stage BASE_BOOT BASE_EFIVARS FRAMEWORK_BUILD NATIVE_BUILD NATIVE_SEAL FIXTURE_DIR FRESH_OUTPUT [CURRENT_DSO_BUILD CURRENT_DSO_SEAL]')
 	}
 	$if !macos {
 		return error('staging requires macOS APFS clonefile')
 	}
 	boot, efivars := os.real_path(os.args[1]), os.real_path(os.args[2])
 	framework, native, fixture := os.real_path(os.args[3]), os.real_path(os.args[4]), os.real_path(os.args[6])
+	current_native := os.args.len == 10
+	current := if current_native { os.real_path(os.args[8]) } else { '' }
 	root := external(os.args[7])!
-	for input in [boot, efivars, framework, native, fixture] {
+	mut input_roots := [boot, efivars, framework, native, fixture]
+	if current_native { input_roots << current }
+	for input in input_roots {
 		if root == input || input.starts_with(root + '/') || root.starts_with(input + '/') {
 			return error('output overlaps an input')
 		}
@@ -619,6 +705,13 @@ fn stage() ! {
 		|| native_receipt['native_sha256']!.str() != native_pins['native/libvinix-android-native.so']! {
 		return error('native build receipt identity differs')
 	}
+	mut current_pins := map[string]string{}
+	mut current_exports := []string{}
+	if current_native {
+		current_pins = sealed_bundle(current, os.args[9], mut inputs)!
+		current_exports = verify_current_native(current, framework, profile, native, os.args[5], current_pins)!
+		inputs['/opt/homebrew/bin/aarch64-linux-musl-nm'] = hash('/opt/homebrew/bin/aarch64-linux-musl-nm')!
+	}
 	fixture_receipt := json2.decode[map[string]json2.Any](os.read_file(fixture + '/build.json')!)!
 	if fixture_receipt['apk_sha256']!.str() != fixture_apk_sha
 		|| fixture_receipt['package_name']!.str() != 'org.vinix.headless'
@@ -634,6 +727,17 @@ fn stage() ! {
 	}
 	retain_sources(root)!
 	os.cp(os.executable(), root + '/stage')!
+	if current_native {
+		listing := command(root, 'verify-current-native-exports', [
+			'/opt/homebrew/bin/aarch64-linux-musl-nm', '-D', '--defined-only',
+			current + '/native/libvinix-android-native.so'])!
+		mut exports := listing.split_into_lines().filter(it.fields().len >= 3).map(it.fields().last())
+		exports.sort()
+		if exports != current_exports { return error('current native ELF exports differ from audited receipt') }
+		for i, name in current_native_receipts() {
+			os.cp(current + '/' + name, root + '/payload/' + current_native_destinations()[i])!
+		}
+	}
 	for pair in [
 		[native + '/bin/headless-service-controller',
 			root + '/payload/bin/headless-service-controller'],
@@ -655,6 +759,7 @@ fn stage() ! {
 		entry_member:    native + '/bin/vinix-android-native'
 		launcher_member: native + '/bin/run-android'
 	}
+	if current_native { sources[native_member] = current + '/native/libvinix-android-native.so' }
 	mut entries := []Entry{}
 	for name in replacements() {
 		entry := replacement_entry(name, sources[name]!, if name in [entry_member, launcher_member] {
@@ -677,7 +782,7 @@ fn stage() ! {
 			sources[entry.name] = root + '/payload' + entry.name[diagnostic_prefix.len..]
 		}
 	}
-	verify_plan(entries)!
+	verify_plan(entries, current_native)!
 	write_json(root + '/overlay-plan.json', entries)!
 	original := command(root, 'read-limine', [mtype, '-i', boot, '::/boot/limine.conf'])!
 	config := configure(original)!
@@ -735,6 +840,9 @@ fn stage() ! {
 		|| sealed_bundle(native, os.args[5], mut inputs)! != native_pins {
 		return error('bundle changed during staging')
 	}
+	if current_native && sealed_bundle(current, os.args[9], mut inputs)! != current_pins {
+		return error('current native bundle changed during staging')
+	}
 	revision := command(root, 'source-revision', ['/usr/bin/git', 'rev-parse', 'HEAD'])!.trim_space()
 	write_json(root + '/stage.json', {
 		'format':                           json2.Any(1)
@@ -747,6 +855,9 @@ fn stage() ! {
 		'framework_manifest_sha256':        json2.Any(profile.seal)
 		'framework_jar_sha256':             json2.Any(profile.jar_sha256)
 		'framework_class_count':            json2.Any(profile.class_count)
+		'native_base_manifest_sha256':      json2.Any(os.args[5])
+		'current_native_manifest_sha256':   json2.Any(if current_native { os.args[9] } else { '' })
+		'current_native_sha256':            json2.Any(if current_native { current_pins['native/libvinix-android-native.so']! } else { '' })
 		'inputs_sha256':                    json2.decode[json2.Any](json2.encode(inputs))!
 		'original_modules_sha256':          json2.decode[json2.Any](json2.encode(before))!
 		'preserved_modules_sha256':         json2.decode[json2.Any](json2.encode(after))!
@@ -795,6 +906,28 @@ fn self_test() ! {
 	for bad in ['', '0'.repeat(64), combined_framework_seal.to_upper()] {
 		if _ := framework_profile(bad) { return error('unknown framework profile accepted') }
 	}
+	combined := framework_profile(combined_framework_seal)!
+	current_receipt := {
+		'framework': json2.Any('/framework')
+		'framework_sha256': json2.Any(combined_framework_seal)
+		'baseline': json2.Any('/native-base')
+		'baseline_sha256': json2.Any(full_native_seal)
+		'native_sha256': json2.Any('a'.repeat(64))
+		'source_revision': json2.Any('reviewed-source')
+		'completed_utc': json2.Any('2026-10-26 00:00:00')
+	}
+	verify_current_identity(combined, '/framework', full_native_seal, '/native-base', 'a'.repeat(64), current_receipt)!
+	for field in current_receipt.keys() {
+		mut bad := json2.decode[map[string]json2.Any](json2.encode(current_receipt))!
+		bad[field] = json2.Any(if field == 'baseline' { '/current' } else { '' })
+		if _ := verify_current_identity(combined, '/framework', full_native_seal, '/native-base', 'a'.repeat(64), bad) {
+			return error('incomplete or mismatched current native identity accepted: ' + field)
+		}
+	}
+	if _ := verify_current_identity(framework_profile(framework_seal)!, '/framework', full_native_seal,
+		'/native-base', 'a'.repeat(64), current_receipt) { return error('current DSO paired with old framework') }
+	if _ := verify_current_identity(combined, '/framework', '0'.repeat(64), '/native-base',
+		'a'.repeat(64), current_receipt) { return error('current DSO paired with unknown full native base') }
 	config := '/Vinix\n    protocol: limine\n    module_path: boot():/boot/initramfs.tar\n    module_path: boot():/boot/runtime.tar\n'
 	parsed := configure(config)!
 	assert parsed.modules == ['initramfs.tar', 'runtime.tar']
@@ -860,7 +993,7 @@ fn self_test() ! {
 		sources[name] = root + '/bundle/fixture.apk'
 	}
 	inventory(root + '/bundle', '', diagnostic_prefix, mut entries)!
-	verify_plan(entries)!
+	verify_plan(entries, false)!
 	assert entries.len == 15
 	for entry in entries {
 		if entry.kind == 'regular' && entry.name.starts_with(diagnostic_prefix + '/') {
@@ -879,8 +1012,21 @@ fn self_test() ! {
 	alias[0] = Entry{ name: jar_member, kind: 'symlink', linkname: 'elsewhere' }
 	for bad in [missing, duplicate, extra, alias] {
 		mut rejected := false
-		verify_plan(bad) or { rejected = true }
+		verify_plan(bad, false) or { rejected = true }
 		assert rejected
+	}
+	mut current_entries := entries.clone()
+	for name in current_native_destinations() {
+		current_entries << Entry{ name: diagnostic_prefix + '/' + name, kind: 'regular', mode: 0o644 }
+	}
+	verify_plan(current_entries, true)!
+	assert current_entries.len == 20
+	if _ := verify_plan(current_entries, false) { return error('current native receipts leaked into old exact allowlist') }
+	if _ := verify_plan(entries, true) { return error('missing current native receipts accepted') }
+	for i in entries.len .. current_entries.len {
+		mut missing_receipt := current_entries.clone()
+		missing_receipt.delete(i)
+		if _ := verify_plan(missing_receipt, true) { return error('incomplete current native receipt set accepted') }
 	}
 	assert external(root + '/fresh')! == root + '/fresh'
 	for bad in [root, root + '/./alias', root + '/' + 'x'.repeat(110)] {
@@ -917,17 +1063,25 @@ fn self_test() ! {
 	mut elf := []u8{len: 120}
 	for i, value in [u8(0x7f), `E`, `L`, `F`, 2, 1] { elf[i] = value }
 	elf[18] = 183
+	elf[16] = 3
 	elf[32] = 64
 	elf[54] = 56
 	elf[56] = 1
 	os.write_file_array(root + '/static', elf)!
 	static_elf(root + '/static')!
+	shared_elf(root + '/static')!
+	for bad in [16, 18] {
+		mut invalid := elf.clone()
+		invalid[bad] = 0
+		os.write_file_array(root + '/invalid-shared', invalid)!
+		if _ := shared_elf(root + '/invalid-shared') { return error('invalid current native ELF accepted') }
+	}
 	elf[64] = 3
 	os.write_file_array(root + '/dynamic', elf)!
 	mut rejected_dynamic := false
 	static_elf(root + '/dynamic') or { rejected_dynamic = true }
 	assert rejected_dynamic
-	println('HEADLESS-STAGE SELF-TEST PASS audited-framework-profiles mixed-framework-rejection config-prefix baseline-existing added-launcher collision caches exact-allowlist streamed-archive modes fresh-output QMP-limit full-seal static-ELF')
+	println('HEADLESS-STAGE SELF-TEST PASS audited-framework-profiles mixed-framework-rejection current-native-coupling current-native-exact-receipts config-prefix baseline-existing added-launcher collision caches exact-allowlist streamed-archive modes fresh-output QMP-limit full-seal static-ELF shared-ELF')
 	println('HEADLESS-STAGE COMPILED-SOURCES ' + sha256.sum(compiled_source.bytes()).hex() +
 		' ' + sha256.sum(compiled_guest.bytes()).hex() + ' ' + sha256.sum(compiled_collector.bytes()).hex())
 }
