@@ -60,6 +60,42 @@ kernel, compiler and desktop input audits are separate. Exact fresh profiles,
 the selected admission maps and original baseline audit pins still require
 review before staging. Guest results remain pending.
 
+## Fresh baseline original check refusal
+
+A later check of `frame-peer-baseline-20261026` against its original complete
+inventory `503911b74414ef977bf6453a172ab25b44e5de4466164a66db9bd4d79e61bfcb`
+failed with actual exit status 1: `state inventory mismatch`. Its existing
+qualification is consequently refused for foreground consumption. No prepare
+admission, staging or VM was executed. The initial unapproved profile and
+failure are retained under `foreground-phase11`; invocation/result records
+explicitly identify themselves as recorded after direct command execution.
+
+The maintained V diagnostic `state-inventory-diff.v` requires the exact full
+canonical inventory schema and compares every header, entry, field and order.
+Its eleven synthetic controls passed, including all eleven entry metadata
+fields, path membership, header/order differences and schema refusals. Source
+SHA256 is `f6739b47a72c316b36b7f6cc0bf1c6b4330b082c916de294aaa7848ed09d65df`;
+the normal host binary is
+`67b1b0f82d1bb6e498c353fe80283822816a95a5f72d2a797e42d8003ddadafa`.
+This diagnostic supplies no replacement qualification.
+
+The original retained sealer captured a separate diagnostic inventory,
+`foreground-phase11/baseline-diagnostic01/inventory.json`, SHA256
+`a9c63e2eefb400024ce21217142702611a7f5091e7a526e8ae5b26461356793e`.
+Full comparison found 1,754 entries in each inventory and 1,754 device-field
+changes, with zero missing/extra entries and every other recorded field,
+header and entry order equal. For example, the root device changed from
+16777232 to 16777233 while its inode, mode, ownership and times match.
+Device renumbering is a plausible cause; the original checker remains strict.
+The complete field delta `foreground-phase11/baseline-field-diff01.json` has
+SHA256 `0b4e3bb8a26e76e2881aa02de6334eb4a7619e6808ddce93612423f14b9837c1`.
+The preserved phase11 failure/diagnostic bundle has full metadata inventory
+`foreground-phase11-seal01/inventory.json`, SHA256
+`46e046c94230306ed38a389dbadca313b81954b72f1fec5103d477c8d31f5b57`.
+Fresh baseline build evidence, its original full check and a new reviewed
+profile remain required before staging. Neither original evidence nor its
+checker was modified.
+
 ## Earlier adapter host qualification
 
 PASS: `foreground-host08` rebuilt the foreground supervisor in normal
