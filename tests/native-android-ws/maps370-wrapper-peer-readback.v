@@ -22,8 +22,8 @@ fn object(path string) !map[string]json2.Any {
 }
 
 fn run() ! {
-	assert os.args.len == 3 && os.args[1] in ['prepare', 'check'],
-		'usage: maps370-wrapper-peer-readback prepare|check MANIFEST_SHA'
+	assert os.args.len == 3 && os.args[1] in ['prepare', 'check', 'run'],
+		'usage: maps370-wrapper-peer-readback prepare|check|run MANIFEST_SHA'
 	assert os.getwd() == repo && os.real_path(state) == state
 	stage, pin := os.args[1], os.args[2]
 	assert pin.len == 64 && pin.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`))
