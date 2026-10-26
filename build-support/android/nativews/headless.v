@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// A single trusted, preselected service. The channel carries lifetime only;
-// it never accepts Binder transactions or grants account permissions.
+// A single trusted, preselected service. Its lifetime channel never accepts
+// transactions; optional account commands use a separately authenticated fd.
 @[translated]
 module atlframework
 
@@ -128,6 +128,7 @@ fn ws_service_pump(e voidptr) bool {
 	ws_queue_begin_pump()
 	static_void(e, c'android/os/Looper', c'loop', c'()V', unsafe { nil })
 	ws_queue_end_pump()
+	ws_web_pump(e)
 	return !ws_failure(e, c'ANDROID-SERVICE-FAIL main looper')
 }
 
@@ -172,7 +173,14 @@ fn ws_service_run(e voidptr, binding voidptr, control_fd i32, package_name &char
 				return 1
 			}
 			push_frame(e)
-			ok := ws_service_pump(e)
+			mut ok := ws_service_pump(e)
+			if ok {
+				record := get_object(e, binding, c'android/atl/VinixServiceBinding', c'record', c'Landroid/atl/VinixServiceBindingRecord;')
+				if record == nil || pending(e) { ok = false } else {
+					binder := get_object(e, record, c'android/atl/VinixServiceBindingRecord', c'binder', c'Landroid/os/IBinder;')
+					ok = binder != nil && !pending(e) && ws_account_service_pump(e,binder)
+				}
+			}
 			pop_frame(e)
 			if !ok { return 1 }
 			state_after := ws_service_control(control_fd, 0)
@@ -238,6 +246,11 @@ fn ws_service_main(root &char, apk &char, package_name &char, service &char, act
 		ws.input = -1
 		ws.data = C.getenv(c'ANDROID_APP_DATA_DIR')
 		if ws.data == nil || ws.data[0] == 0 { return 1 }
+		if !ws_account_service_init() {
+			C.puts(c'ANDROID-SERVICE-FAIL authenticator channel')
+			return 1
+		}
+		defer { ws_account_service_shutdown(ws.e); ws_web_shutdown(ws.e) }
 		// No surface, fonts, codecs, EGL, drawing state, Activity or Canvas.
 		loaded := ws_bootstrap(root, apk, false)
 		if loaded == nil { return 1 }
@@ -264,12 +277,13 @@ fn ws_service_main(root &char, apk &char, package_name &char, service &char, act
 		binding := static_obj(e, c'android/atl/VinixServiceBinding', c'register', c'(Landroid/content/Context;Landroid/content/ServiceConnection;)Landroid/atl/VinixServiceBinding;', &binding_args[0])
 		if ws_failure(e, c'ANDROID-SERVICE-FAIL binding setup') || binding == nil { return 1 }
 		start_args := [Value{ l: intent }, Value{ l: binding }]!
-		call(e, loaded, c'android/atl/ATLLoadedApp', c'startOrBindService', c'(Landroid/content/Intent;Landroid/atl/VinixServiceBinding;)V', &start_args[0])
+		obj(e, loaded, c'android/atl/ATLLoadedApp', c'startOrBindService', c'(Landroid/content/Intent;Landroid/content/ServiceConnection;)Landroid/content/ComponentName;', &start_args[0])
 		status := if ws_failure(e, c'ANDROID-SERVICE-FAIL service scheduling') {
 			i32(1)
 		} else {
 			ws_service_run(e, binding, control_fd, package_name, service)
 		}
+		ws_account_service_shutdown(e)
 		return ws_service_shutdown(e, loaded, binding, intent, application, callback, status)
 	}
 }

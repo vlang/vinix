@@ -20,8 +20,9 @@ type NativeMain = fn (&char, &char, &char) i32
 type NativeServiceMain = fn (&char, &char, &char, &char, &char, i32) i32
 
 fn service_launch() !(nativeaccountauth.ServiceLaunch, int) {
-	if os.args.len != 4 || os.args[2] != '--service-fd' {
-		return error('usage: vinix-android-native APK --service-fd FD')
+	if os.args.len !in [4, 6] || os.args[2] != '--service-fd'
+		|| (os.args.len == 6 && os.args[4] != '--authenticator-fd') {
+		return error('usage: vinix-android-native APK --service-fd FD [--authenticator-fd FD]')
 	}
 	fd := strconv.atoi(os.args[3])!
 	if fd < 3 || fd > 2147483647 || fd.str() != os.args[3] {
@@ -34,13 +35,27 @@ fn service_launch() !(nativeaccountauth.ServiceLaunch, int) {
 	if flags < 0 || C.fcntl(i32(fd), C.F_SETFD, flags | C.FD_CLOEXEC) != 0 {
 		return error('cannot protect service control descriptor')
 	}
+	if os.args.len == 6 {
+		auth_fd := strconv.atoi(os.args[5])!
+		if auth_fd < 3 || auth_fd > 2147483647 || auth_fd == fd || auth_fd.str() != os.args[5] {
+			return error('invalid authenticator command descriptor')
+		}
+		nativeaccountauth.verify_root_channel(auth_fd)!
+		auth_flags := C.fcntl(i32(auth_fd), C.F_GETFD)
+		if auth_flags < 0 || C.fcntl(i32(auth_fd), C.F_SETFD, auth_flags | C.FD_CLOEXEC) != 0 {
+			return error('cannot protect authenticator command descriptor')
+		}
+		os.setenv('VINIX_ANDROID_AUTHENTICATOR_FD',auth_fd.str(),true)
+	}
 	return launch, fd
 }
 
 fn main() {
+	// Only the verified service argv may introduce a command channel.
+	os.unsetenv('VINIX_ANDROID_AUTHENTICATOR_FD')
 	root := os.getenv_opt('VINIX_ANDROID_ROOT') or { '/opt/vinix-android-aarch64' }
 	if os.args.len < 2 {
-		eprintln('usage: vinix-android-native APK [ACTIVITY] | APK --service-fd FD')
+		eprintln('usage: vinix-android-native APK [ACTIVITY] | APK --service-fd FD [--authenticator-fd FD]')
 		exit(2)
 	}
 	service_mode := os.args.len > 2 && os.args[2] == '--service-fd'

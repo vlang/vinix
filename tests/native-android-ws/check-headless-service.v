@@ -49,12 +49,32 @@ fn startup(entry string, service string, bootstrap string) bool {
 	return true
 }
 
+fn binding_abi(service string, loaded string) bool {
+	signature := '(Landroid/content/Intent;Landroid/content/ServiceConnection;)Landroid/content/ComponentName;'
+	if !service.contains("obj(e, loaded, c'android/atl/ATLLoadedApp', c'startOrBindService', c'" + signature + "'") {
+		return false
+	}
+	for method in ['startOrBindService' + signature, 'stopService(Landroid/content/Intent;)Z'] {
+		mut count := 0
+		for line in loaded.split_into_lines() {
+			if line.starts_with('.method ') && line.ends_with(' ' + method) { count++ }
+		}
+		if count != 1 { return false }
+	}
+	return true
+}
+
 fn main() {
-	assert os.args.len in [1, 2], 'usage: check-headless-service [REPO]'
-	repo := if os.args.len == 2 { os.real_path(os.args[1]) } else { os.getwd() }
+	assert os.args.len in [1, 2, 3], 'usage: check-headless-service [REPO [FRAMEWORK_SMALI]]'
+	repo := if os.args.len >= 2 { os.real_path(os.args[1]) } else { os.getwd() }
 	entry := os.read_file(repo + '/build-support/android/native-entry.v')!
 	service := os.read_file(repo + '/build-support/android/nativews/headless.v')!
 	bootstrap := os.read_file(repo + '/build-support/android/nativews/bootstrap.v')!
+	smali := if os.args.len == 3 { os.real_path(os.args[2]) } else { repo + '/build/android-framework/smali' }
+	loaded := os.read_file(smali + '/android/atl/ATLLoadedApp.smali')!
+	assert binding_abi(service,loaded), 'native binding descriptor must match the assembled framework API'
+	assert !binding_abi(service.replace('Landroid/content/ServiceConnection;)Landroid/content/ComponentName;', 'Landroid/atl/VinixServiceBinding;)V'),loaded)
+	assert !binding_abi(service,loaded.replace('startOrBindService(', 'missingServiceMethod('))
 	assert startup(entry, service, bootstrap), 'headless startup contract'
 	for mutation in [service.replace('ws_service_channel(control_fd)', 'true'),
 		service.replace('ws_bootstrap(root, apk, false)', 'ws_bootstrap(root, apk, true)'),
@@ -87,6 +107,7 @@ fn main() {
 	if result.exit_code != 0 { panic(result.output) }
 	assert result.output.trim_space() == 'HEADLESS-CHANNEL-PASS cases=29'
 	println(result.output.trim_space())
+	println('HEADLESS-BINDING-ABI-PASS real ATLLoadedApp service descriptor return type negative-mutations=2')
 	println('HEADLESS-STARTUP-PASS trust-before-dlopen manifest-before-application binder-before-ready common-teardown no-display negative-mutations=12')
 }
 
