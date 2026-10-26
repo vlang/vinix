@@ -60,7 +60,7 @@ pub fn terminate_group(mut p os.Process, timeout_ms int) ! {
 		present := group_present(p.pid) or { return err }
 		mut reaped := false
 		if !alive && p.status in [.exited, .aborted] && p.code >= 0 {
-			mut status := 0
+			mut status := i32(0)
 			waited := C.waitpid(p.pid, &status, C.WNOHANG)
 			saved_errno := int(C.errno)
 			reaped = waited == -1 && saved_errno == C.ECHILD

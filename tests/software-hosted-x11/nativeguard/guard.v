@@ -155,12 +155,12 @@ pub fn launch(args []string, cwd string, lifecycle string) !Child {
 
 pub fn poll(mut child Child) !bool {
 	if child.reaped { return false }
-	mut status := 0
+	mut status := i32(0)
 	result := C.waitpid(child.pid, &status, C.WNOHANG)
 	saved_errno := int(C.errno)
 	if result == child.pid {
 		child.reaped = true
-		child.exit_code = if status & 127 == 0 { (status >> 8) & 255 } else { 128 + (status & 127) }
+		child.exit_code = int(if status & 127 == 0 { (status >> 8) & 255 } else { 128 + (status & 127) })
 		return false
 	}
 	if result == 0 || (result == -1 && saved_errno == C.EINTR) { return true }
@@ -191,11 +191,11 @@ pub fn cleanup(mut child Child, timeout_ms int) !Cleanup {
 		poll(mut child)!
 		empty := !recoveryguard.group_present(child.pid)!
 		if child.reaped && empty {
-			mut status := 0
+			mut status := i32(0)
 			waited := C.waitpid(child.pid, &status, C.WNOHANG)
 			saved_errno := int(C.errno)
 			if waited != -1 || saved_errno != C.ECHILD { return error('leader reaping proof differs') }
-			return Cleanup{pid: child.pid, reaped: true, group_empty: true, final_wait: waited,
+			return Cleanup{pid: child.pid, reaped: true, group_empty: true, final_wait: int(waited),
 				final_errno: saved_errno, exit_code: child.exit_code, kill_attempts: attempts, kills: kills}
 		}
 		if recoveryguard.deadline_expired(start, timeout_ms) { return error('bounded group cleanup failed: reaped=' + child.reaped.str() +
