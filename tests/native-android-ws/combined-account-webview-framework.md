@@ -42,3 +42,31 @@ account login remain separate validation.
 - Bundle manifest SHA256: `dc5c0470c4cdc7a075ded61680e4ac89cef056dbcb515ce55a32f74bf82aef87`.
 - Output `api-impl.jar` SHA256: `86278c9cbe1f25904b760250f34f859206d719cbb23cf5ff5411a75c480ac36f`.
 - Output DEX SHA256: `7b7684d768573672a47b3a26d3cf82e9ee0f87feecdccf429e6fe053ae93e0ba`.
+
+The account store profile passed the builder self-test, assembly, canonical
+disassembly, and complete retained-bundle verification. The `--store` mode
+requires exactly the sealed interaction baseline and its pins above. It applies
+the committed AccountManager storage provider (`230ddc24f`) to a fresh copy:
+2102 classes remain, with only `AccountManager` changed. Exactly four existing
+methods change and eight methods are added; unrelated methods, class/field
+metadata, other classes, and non-DEX JAR members retain their content. The full
+original baseline seal is verified before construction and again afterward.
+
+- Builder implementation commit: `97490a023`.
+- Build source revision: `9a3ebced53c7367d42b310d7f5b694657a7ce542`.
+- Retained builder source SHA256: `9c6186716dd99ab76e3d5161e35bf76dd6f03cac04a8e3ca9e692be94b99f418`.
+- Retained store provider SHA256: `427f412c37e46a977c068ae56fffa489c3d8087c952b76c03b5b00c3ead5fbd1`.
+- Complete retained bundle: `/Users/alex/.local/state/vinix/android/combined-account-webview-store-framework-2026-10-26`.
+- Bundle manifest SHA256: `7cc408299a3a7d37578735e79b31c5c2ff96dbd1de00a2d7dd0d1e149b156690`.
+- Output `api-impl.jar` SHA256: `9e89db595defb905b0322183f176613f2b42f951ec1b51d4ceb91431876c3c8e`.
+- Output DEX SHA256: `b93c8b664c313c7dca70e5adf5e8f6f6a21b831161700ea3be9e0a265766f9f8`.
+
+The driver was compiled with the frozen compiler
+`/Users/alex/code/v-tccbin-bootstrap-20261026/v`, using
+`-gc none -nocache -cc cc`; the compiler SHA256 is
+`0cc6c1d34c1811a818e4ae89853116861a4b067d4251af257851a7714f0d11fe`.
+The bundle retains the driver and provider source closures, full helper input,
+compiler executable, smali tool JARs, commands and executable hashes, before/after
+class inventories, and output hashes. Host SDK and dynamic libraries remain
+environmental dependencies. These host checks establish framework construction;
+guest execution and Google account login require separate evidence.
