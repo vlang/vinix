@@ -64,7 +64,7 @@ Actual cached inputs passed ELF/dependency closure admission:
 - Full base: `/Users/alex/code/vinix/build-release/work/amd64-desktop/initramfs-root`.
 - Kernel: `audio-peer-login-20261026/kernel-evidence/kernel-x86_64/bin/vinix`,
   SHA-256 `8ec2d8c93bb1e1f44e71d66314de9408c7b4965f58baf56e1465e385fda1a325`.
-  Its preserved provenance bundle manifest is
+  Its preserved `kernel-evidence/kernel-seal.json` has SHA-256
   `839ad75dd1ec376a8cae4e75dc1cfbddc913406dc3e136e8d4f4a412657f9b73`.
 - Desktop: `package-release-routing-native-20261026/desktop-x86_64/vinix-desktop`,
   SHA-256 `259613b8f95ddde359a70f338baeca27bd96f0ae2b56391f6d6c3cc35de67a83`.
@@ -85,3 +85,38 @@ installations remain external, admitted by their observed identities.
 Large preparation and guest execution were held for storage coordination.
 All six native scenarios remain pending. This report makes no native
 kernel memory or current-main compositor qualification claim.
+
+## Routing input retention, 2026-10-26
+
+`retain-routing-inputs.v`, based on `d542212d8e0d4d2ab3b9d098e02c554ddf5b98a5`,
+preserves the desktop and bundle executable as ordinary byte-identical files.
+It requires the pinned complete original inventory and its unique selected-file
+rows, checks source/copy hashes and modes before and after, retains the complete
+inventory and producer source/executable, and records provenance. Existing output
+is refused. Build and invocation:
+
+```sh
+v -prod -keepc -cc clang -o /external/retain-routing-inputs \
+  tests/desktop-perf/retain-routing-inputs.v
+/external/retain-routing-inputs ORIGINAL_ROUTING_ROOT /external/fresh-retained-inputs
+```
+
+The production build, copy, existing-output refusal and actual retained-desktop
+ELF/dependency admission passed. Preserved inputs are under
+`integration-20261026/routing-retained-inputs/`, relative to the section14 state
+directory above. Future preparation selects
+`new=/Users/alex/Library/Caches/vinix-codex/section14/integration-20261026/routing-retained-inputs/desktop-x86_64/vinix-desktop`.
+The desktop retains SHA-256 `259613b8f95ddde359a70f338baeca27bd96f0ae2b56391f6d6c3cc35de67a83`;
+`tools/software-release-routing-bundle` retains
+`0bf024564aba9cedfac1fd8f92b3f117e5735511cafb1dfb409f449ca00ca94b`.
+
+The retained bundle contains generated producer C, literal commands, build logs,
+refusal/admission results and `provenance.json`, SHA-256
+`c05e4397ba47102f9cb90ea3315c08e7644a67559c142235455b8dceeb3eef33`.
+Archive `integration-20261026/routing-retained-inputs.tar.gz` has SHA-256
+`21451fafaf5edd56ac5bb3574bfb0b6b49d4acfb4dfaecebdc69afdd0cfb61c5`;
+its complete `bundle.sha256` inventory has SHA-256
+`37fd94d6e4a2b96dc126784c47d8fe3ce60bf4d88fdfbd0d43f3db2f7a678878`.
+The copy helper verifies selected expanded bytes; archive-stream verification is
+separate. Historical native auditors still require the original complete bundle.
+The original expanded bundle was untouched. No staging or guest run occurred.
