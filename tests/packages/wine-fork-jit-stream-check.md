@@ -204,7 +204,71 @@ and retained raw status 9. Qualification then isolated compiler scratch from
 the guarded operation-log directory and counted the complete host state
 without following links before/after each step; link refusal in the maintained
 guard remains enforced. That directory also retains an earlier nine-control
-run; only the final `host-02` receipt qualifies the final source bytes.
+run; the `host-02` receipt qualifies the source bytes at that stage. The input
+inventory change below has a separate receipt.
 
 No target compilation, staging, image creation or VM run is included in this
 source and host-controls change. The translated ARM fork failure remains open.
+
+## Compiler directory-link preflight refusal
+
+The first authorized standalone launch used controller SHA-256
+`d0de81c794776d80d74bf214c9ae4cf7f149577707ef5bb1368e0b7b0e4a3fb9`
+from source commit `e5aab57def36deaee945eb396346697c1e8d78d6`. All five selected
+controller/translator/kernel/receipt/V pins matched before launch, and completed
+`df -k` reported 45,257,236 KiB available. Input inventory then exited 1 with:
+
+```text
+unsupported input entry: /Users/alex/code/v/thirdparty/tcc/tcc
+```
+
+That entry is a directory symlink to `/Users/alex/code/v/thirdparty/tcc`, its
+own parent. Refusal happened before output-directory creation, target builds
+or any VM child. The external posthoc tool-trace transcription is
+`section14/wine-jit-stream-native-arm-01.launch-refusal.json`, SHA-256
+`53052e3ed96d98fc51014baab4af757bc21c7b4a432f955ec99966edf80925be`.
+It preserves argv, explicit environment overrides/unset, observed raw output,
+exit code and input pins; it explicitly does not reconstruct the uncaptured
+inherited environment. There is no serial or offline-parser target result.
+
+`tools/packages/winejitstream/native_inputs.v` now binds each input's kind,
+literal link and canonical path. File bytes remain hashed. A directory link
+is recorded without traversal only if its canonical target is inside the
+same explicitly walked tree; ordinary traversal covers the target's files.
+This admits the finite TCC self-cycle, rejects escaping directory links,
+dangling links and special entries, and rechecks kinds, links, paths and
+covered file bytes.
+The output-state guard's link refusal is unchanged.
+
+Source base is `e5aab57def36deaee945eb396346697c1e8d78d6`, with these V hashes:
+
+- `wine-fork-jit-stream-native.v`:
+  `0764644fed666ebefdff2526f0becdd291119ad7457d2fa4e45b48e2743db1a9`.
+- `native_inputs.v`:
+  `c120a301f8688156a3edf5c63995a210276a67109f644fd96ade509fbb5b6fda`.
+- `native_guard_test.v`:
+  `30f7aea5c859d3b45fae05a3f8154b226431097386a36d92c14d5a032948aaca`.
+
+Host-only evidence is in `section14/wine-jit-stream-native-host-03` under the
+same external cache root. Its `receipt.json` SHA-256 is
+`0b1fb961fcb6491ab08fa263ec9dd7bae6e89ddf011e14842bc6b8d63d7509c1`.
+The unchanged maintained observer's executable/source pins are retained in
+that receipt; it inventories the complete diagnostic module before and after
+the run. Those two inventories were identical. Three host builds and all eight
+unit functions passed, including four new functions covering internal cycles,
+covered byte mutation, literal retargeting, sibling-prefix escapes, uncovered
+directory-link admission, dangling links, FIFO refusal and file-link type
+replacement. The new controller executable SHA-256 is
+`3694fc5d84bb676c712b0e47f9bb92d21673bd6298f59b2d36763445b4947799`.
+
+The ten guard-control entries passed again, including sixteen pre-cancelled
+repetitions. Normal cooperative controls completed in 940 ms; injected SIGTERM
+cancellation completed in 65 ms with raw controls status 256. Its interrupted
+fixture retained raw status 9, `native guard interrupted`, and cleanup confirmed
+in 24 ms. Case four did not start; the nested leader/group/descendant were
+absent. All hard build/unit guards completed successfully with confirmed
+cleanup. Combined
+`host-01`, `host-02`, `host-03` and refusal-receipt state was 6,260,180 bytes,
+including failure and compiler scratch. Recorded build/run free-space checks
+exceeded 550 MiB. This followup contains no target build, image or VM result;
+the translated ARM fork failure remains open.

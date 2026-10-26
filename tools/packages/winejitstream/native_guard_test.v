@@ -4,6 +4,10 @@ module winejitstream
 import os
 import time
 
+#include <sys/stat.h>
+
+fn C.mkfifo(&char, u32) int
+
 fn native_test_limits() NativeLimits {
 	return NativeLimits{
 		timeout_ms:   1000
@@ -125,4 +129,96 @@ fn test_native_scan_classifies_file_log_serial_and_aggregate_thresholds() {
 	assert aggregate.limited
 	assert aggregate.bytes == 150
 	assert native_state_bytes(directory)! == 150
+}
+
+fn test_native_inputs_cover_internal_directory_links_without_following_cycles() {
+	directory := native_test_directory('input-links')!
+	defer { os.rmdir_all(directory) or {} }
+	os.mkdir(directory + '/nested')!
+	os.write_file(directory + '/payload', 'root')!
+	os.write_file(directory + '/nested/payload', 'nested')!
+	os.symlink(directory, directory + '/cycle')!
+	os.symlink('nested', directory + '/alias')!
+	mut pins := map[string]NativePin{}
+	native_input_tree(directory, mut pins)!
+	assert pins.len == 4
+	assert pins[directory + '/cycle'].kind == 'directory-link'
+	assert pins[directory + '/cycle'].canonical == directory
+	assert pins[directory + '/alias'].link == 'nested'
+	assert pins[directory + '/alias'].canonical == directory + '/nested'
+	assert pins[directory + '/alias'].digest == ''
+	native_input_verify(pins)!
+	// Content behind the alias is bound through the ordinary directory walk.
+	os.write_file(directory + '/nested/payload', 'changed')!
+	mut refused := false
+	native_input_verify(pins) or { refused = true }
+	assert refused
+	os.write_file(directory + '/nested/payload', 'nested')!
+	native_input_verify(pins)!
+	// The literal link matters even when its canonical target is unchanged.
+	os.rm(directory + '/alias')!
+	os.symlink('nested/.', directory + '/alias')!
+	refused = false
+	native_input_verify(pins) or { refused = true }
+	assert refused
+}
+
+fn test_native_inputs_refuse_directory_link_escape_and_uncovered_addition() {
+	directory := native_test_directory('input-escape')!
+	outside := directory + '-outside'
+	defer {
+		os.rmdir_all(directory) or {}
+		os.rmdir_all(outside) or {}
+	}
+	os.mkdir(outside)!
+	os.write_file(outside + '/payload', 'retain')!
+	os.symlink(outside, directory + '/escape')!
+	mut pins := map[string]NativePin{}
+	mut refused := false
+	native_input_tree(directory, mut pins) or {
+		assert err.msg().contains('directory link escapes input tree')
+		refused = true
+	}
+	assert refused
+	assert outside + '/payload' !in pins
+	refused = false
+	native_input_add(directory + '/escape', mut pins) or { refused = true }
+	assert refused
+	assert os.read_file(outside + '/payload')! == 'retain'
+}
+
+fn test_native_inputs_refuse_dangling_links_and_special_entries() {
+	directory := native_test_directory('input-types')!
+	defer { os.rmdir_all(directory) or {} }
+	os.symlink('absent', directory + '/dangling')!
+	mut pins := map[string]NativePin{}
+	mut refused := false
+	native_input_tree(directory, mut pins) or { refused = true }
+	assert refused
+	os.rm(directory + '/dangling')!
+	assert C.mkfifo((directory + '/fifo').str, 0o600) == 0
+	refused = false
+	native_input_tree(directory, mut pins) or {
+		assert err.msg().contains('unsupported input entry')
+		refused = true
+	}
+	assert refused
+}
+
+fn test_native_inputs_bind_regular_file_links_and_detect_type_changes() {
+	directory := native_test_directory('input-files')!
+	defer { os.rmdir_all(directory) or {} }
+	os.write_file(directory + '/payload', 'retain')!
+	os.symlink('payload', directory + '/alias')!
+	mut pins := map[string]NativePin{}
+	native_input_tree(directory, mut pins)!
+	assert pins.len == 2
+	assert pins[directory + '/alias'].kind == 'file-link'
+	assert pins[directory + '/alias'].digest == pins[directory + '/payload'].digest
+	native_input_verify(pins)!
+	os.rm(directory + '/alias')!
+	os.write_file(directory + '/alias', 'retain')!
+	mut refused := false
+	native_input_verify(pins) or { refused = true }
+	assert refused
 }

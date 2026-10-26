@@ -13,12 +13,6 @@ const native_linker = '/opt/homebrew/bin/ld.lld'
 const native_resource = '/opt/homebrew/opt/llvm/lib/clang/23'
 const native_translator_sha = '93f1e83fbb7cedcfe2813f6b65775685a8dbc46943c1280ad3da650567985475'
 
-struct NativePin {
-	digest    string
-	link      string
-	canonical string
-}
-
 struct KernelBinding {
 	architecture     string
 	profile          string
@@ -28,75 +22,11 @@ struct KernelBinding {
 	outputs          map[string]string
 }
 
-fn native_digest(path string) !string {
-	mut file := os.open(path)!
-	defer { file.close() }
-	mut hash := sha256.new()
-	mut buffer := []u8{len: 65536}
-	mut sum := []u8{len: sha256.size}
-	defer {
-		unsafe {
-			buffer.free()
-			sum.free()
-			hash.free()
-			free(hash)
-		}
-	}
-	for {
-		count := file.read(mut buffer) or {
-			if file.eof() {
-				unsafe { err.free() }
-				break
-			}
-			return error('cannot hash ' + path)
-		}
-		if count == 0 { break }
-		hash.write(buffer[..count])!
-	}
-	hash.checksum_into(mut sum)
-	return sum.hex()
-}
-
-fn native_pin(path string) !NativePin {
-	if !os.is_file(path) { return error('missing ordinary input: ' + path) }
-	return NativePin{
-		digest:    native_digest(path)!
-		canonical: os.real_path(path)
-		link:      if os.is_link(path) { os.readlink(path)! } else { '' }
-	}
-}
-
-fn native_add(path string, mut pins map[string]NativePin) ! {
-	pins[path] = native_pin(path)!
-	canonical := os.real_path(path)
-	if canonical != path { pins[canonical] = native_pin(canonical)! }
-}
-
-fn native_tree(path string, mut pins map[string]NativePin) ! {
-	for name in os.ls(path)! {
-		entry := path + '/' + name
-		if os.is_dir(entry) && !os.is_link(entry) {
-			native_tree(entry, mut pins)!
-		} else if os.is_file(entry) {
-			native_add(entry, mut pins)!
-		} else {
-			return error('unsupported input entry: ' + entry)
-		}
-		if pins.len > 30000 { return error('input inventory exceeds 30000 entries') }
-	}
-}
-
-fn native_verify(pins map[string]NativePin) ! {
-	if pins.len == 0 { return error('empty native input binding') }
-	for path, expected in pins {
-		if native_pin(path)! != expected { return error('input changed: ' + path) }
-	}
-}
-
 fn native_sources(root string) ! {
 	expected := {
 		'tests/packages/wine-fork-jit-stream-native.v': $embed_file('wine-fork-jit-stream-native.v').to_string()
 		'tools/packages/winejitstream/native_guard.v':  $embed_file('../../tools/packages/winejitstream/native_guard.v').to_string()
+		'tools/packages/winejitstream/native_inputs.v': $embed_file('../../tools/packages/winejitstream/native_inputs.v').to_string()
 		'tools/packages/winejitstream/supervisor.v':    $embed_file('../../tools/packages/winejitstream/supervisor.v').to_string()
 		'tools/packages/winejitstream/parse.v':         $embed_file('../../tools/packages/winejitstream/parse.v').to_string()
 		'tests/hardware-platform/hwhost/boot.v':        $embed_file('../hardware-platform/hwhost/boot.v').to_string()
@@ -109,7 +39,7 @@ fn native_sources(root string) ! {
 		'tests/hardware-platform/hwhost/scenario.v':    $embed_file('../hardware-platform/hwhost/scenario.v').to_string()
 	}
 	for relative, text in expected {
-		if native_digest(root + '/' + relative)! != sha256.hexhash(text) {
+		if winejitstream.native_input_digest(root + '/' + relative)! != sha256.hexhash(text) {
 			return error('compiled native source differs: ' + relative)
 		}
 	}
@@ -217,14 +147,14 @@ fn native_run() ! {
 		return error('output parent must be canonical')
 	}
 	native_sources(root)!
-	if native_digest(translator)! != native_translator_sha {
+	if winejitstream.native_input_digest(translator)! != native_translator_sha {
 		return error('patched translator differs')
 	}
 	native_static_elf(translator, 183)!
 	binding := json2.decode[KernelBinding](os.read_file(receipt)!)!
 	if binding.architecture != 'arm' || binding.profile != 'prod' || !binding.build_executed
 		|| binding.build_exit_code != 0 || binding.candidate_commit.len != 40
-		|| binding.outputs[kernel] != native_digest(kernel)! {
+		|| binding.outputs[kernel] != winejitstream.native_input_digest(kernel)! {
 		return error('kernel bytes not bound by ARM build receipt')
 	}
 	for name in ['V', 'VEXE', 'VINIX_V_COMPILER', 'V_MACOS_V3_CALLER_VEXE'] {
@@ -249,23 +179,23 @@ fn native_run() ! {
 	host := hwhost.find_host(root, 'aarch64', '')!
 	loader := os.getenv_opt('VINIX_LIMINE_BOOTAA64') or { hwhost.shared_path(root, 'boot-image/limine-bin/BOOTAA64.EFI') }
 	os.setenv('VINIX_LIMINE_BOOTAA64', loader, true)
-	mut inputs := map[string]NativePin{}
+	mut inputs := map[string]winejitstream.NativePin{}
 	for path in [os.executable(), v, translator, kernel, receipt, native_clang, native_linker,
 		host.qemu, host.firmware, host.firmware_vars, loader, root + '/build-support/limine.conf'] {
-		native_add(path, mut inputs)!
+		winejitstream.native_input_add(path, mut inputs)!
 	}
 	for name in ['mformat', 'mmd', 'mcopy', 'tar', 'cp'] {
-		native_add(os.find_abs_path_of_executable(name)!, mut inputs)!
+		winejitstream.native_input_add(os.find_abs_path_of_executable(name)!, mut inputs)!
 	}
 	for directory in [os.dir(v) + '/vlib', os.dir(v) + '/thirdparty', arm_sysroot, arm_gcc,
 		amd_sysroot, amd_gcc, native_resource, root + '/tests/hardware-platform/hwhost',
 		root + '/tools/packages/winejitstream', root + '/tests/packages/wine-fork-jit-stream-probe',
 		root + '/tests/packages/wine-fork-jit-stream-guest'] {
-		native_tree(directory, mut inputs)!
+		winejitstream.native_input_tree(directory, mut inputs)!
 	}
 	for relative in ['tests/packages/wine-fork-jit-stream-native.v',
 		'tests/packages/wine-fork-jit-stream-check.v'] {
-		native_add(root + '/' + relative, mut inputs)!
+		winejitstream.native_input_add(root + '/' + relative, mut inputs)!
 	}
 	// Reserve for private boot media, retained state and monitored-threshold overshoot.
 	winejitstream.native_require_free(os.dir(work), 1100 * 1024)!
@@ -308,16 +238,16 @@ fn native_run() ! {
 	for name in ['qemu-x86_64', 'fork-jit-stream-probe'] {
 		os.chmod(work + '/extras/' + name, 0o755)!
 	}
-	mut generated := map[string]NativePin{}
+	mut generated := map[string]winejitstream.NativePin{}
 	for directory in ['guest', 'probe', 'extras'] {
-		native_tree(work + '/' + directory, mut generated)!
+		winejitstream.native_input_tree(work + '/' + directory, mut generated)!
 	}
 	os.write_file(work + '/generated.json', json2.encode(generated))!
-	native_verify(inputs)!
+	winejitstream.native_input_verify(inputs)!
 	winejitstream.native_require_free(work, 1100 * 1024)!
 	native_invoke([os.executable(), '--boot', root, work, kernel], work, 'boot-worker', 90000)!
-	native_verify(inputs)!
-	native_verify(generated)!
+	winejitstream.native_input_verify(inputs)!
+	winejitstream.native_input_verify(generated)!
 	os.write_file(work + '/inputs-verified.json', json2.encode(inputs))!
 	os.write_file(work + '/scope.json', json2.encode({
 		'scope':                   'Supplemental PID stream capture only. No canonical workload, ARM, Wine, shared backing, failure cause or complete corresponding-source qualification.'
