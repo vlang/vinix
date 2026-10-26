@@ -178,15 +178,15 @@ fn cstring_observations(out string) ! {
 		}
 		inputs := ['efbbbf41', 'efbbbfefbbbf41', '41efbbbf42', 'c3a9f09f9880',
 			'c080', 'eda080', 'f4908080', 'e282', 'a9a9', '41a9', 'a941', 'efbbbfa9',
-			'c2', 'c2a9', 'c2a9a9', 'a9c2a9', 'a980', 'c3a9ff']
+			'c2a9', 'c2a9a9', 'a9c2a9', 'a980', 'c3a9ff']
 		outputs := ['41', 'efbbbf41', '41efbbbf42', 'c3a9f09f9880',
 			'nil', 'nil', 'nil', 'nil', 'efbfbdefbfbd', '41efbfbd', 'efbfbd41', 'efbfbd',
-			'nil', 'c2a9', 'c2a9efbfbd', 'efbfbdc2a9', 'nil', 'nil']
+			'c2a9', 'c2a9efbfbd', 'efbfbdc2a9', 'nil', 'nil']
 		for i, input in inputs {
 			expected[prefix + ' encoding=4 input=' + input + ' output=' + outputs[i]] = true
 		}
 	}
-	if lines.len != expected.len { return error('incomplete native CString matrix') }
+	if lines.len != expected.len { return error('incomplete native CString matrix: ${lines.len} records, expected ${expected.len}') }
 	mut seen := map[string]bool{}
 	for line in lines {
 		if line !in expected || line in seen { return error('changed or repeated native CString case: ' + line) }

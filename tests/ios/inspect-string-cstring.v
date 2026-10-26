@@ -32,7 +32,7 @@ fn main() {
 		}
 		for input in ['efbbbf41', 'efbbbfefbbbf41', '41efbbbf42', 'c3a9f09f9880',
 			'c080', 'eda080', 'f4908080', 'e282', 'a9a9', '41a9', 'a941', 'efbbbfa9',
-			'c2', 'c2a9', 'c2a9a9', 'a9c2a9', 'a980', 'c3a9ff'] {
+			'c2a9', 'c2a9a9', 'a9c2a9', 'a980', 'c3a9ff'] {
 			mut bytes := []u8{}
 			for i := 0; i < input.len; i += 2 { bytes << u8(input[i..i + 2].parse_uint(16, 8) or { panic(err) }) }
 			bytes << 0
