@@ -34,6 +34,7 @@ fn main() {
 		run.replace('if state == 0 { return 0 }', 'if state == 0 { return 1 }'),
 		run.replace('if !ok { return 1 }', 'if !ok { return 0 }'),
 		run.replace('ws_millis() >= deadline', '(ws_millis() >= deadline && false)'),
+		run.replace('started_ms + 45000', 'started_ms + 5000'),
 		run.replace('probe_fflush(nil)', ''),
 		run.replace(' && ws_account_service_pump(e,binder)', ''),
 		run.replace('if ok { ok = ws_service_ui_pump(e) }', ''),
@@ -63,7 +64,7 @@ fn main() {
 		program += '\n' + mutation.replace('fn ws_service_shutdown(', 'fn ' + name + '(')
 		checks += ' assert !lifecycle_suite(ws_service_run, ${name}, false), "shutdown mutant ${i} escaped"\n'
 	}
-	checks += ' println("HEADLESS-LIFECYCLE-PASS cases=28 negative-mutations=17")\n}\n'
+	checks += ' println("HEADLESS-LIFECYCLE-PASS cases=33 negative-mutations=18")\n}\n'
 	work := os.join_path(os.temp_dir(), 'vinix-headless-lifecycle-' + os.getpid().str())
 	assert !os.exists(work)
 	os.mkdir_all(work)!
@@ -72,7 +73,7 @@ fn main() {
 	compiler := os.getenv_opt('VINIX_V_COMPILER') or { 'v' }
 	result := os.exec([compiler, '-w', '-n', '-enable-globals', '-cc', 'cc', 'run', work + '/main.v'])
 	if result.exit_code != 0 { panic(result.output) }
-	assert result.output.trim_space() == 'HEADLESS-LIFECYCLE-PASS cases=28 negative-mutations=17'
+	assert result.output.trim_space() == 'HEADLESS-LIFECYCLE-PASS cases=33 negative-mutations=18'
 	println(result.output.trim_space())
 }
 
@@ -101,6 +102,7 @@ mut:
  cleanup_record_throws bool
  inject_shutdown_exception bool
  tick i64
+ ticks []i64
  now i64
  record bool
  shutting_down bool
@@ -199,8 +201,8 @@ fn ws_service_pump(e voidptr) bool {
   }
   return true
  }
+ p.now += if p.run_pumps < p.ticks.len { p.ticks[p.run_pumps] } else { p.tick }
  p.run_pumps++
- p.now += p.tick
  if p.run_pumps == p.fail_run_pump { return false }
  if p.run_pumps >= p.bind_after { p.record = true }
  return true
@@ -332,9 +334,14 @@ fn lifecycle_suite(run ServiceRun, shutdown ServiceShutdown, loud bool) bool {
   lifecycle_case("EOF before READY", Probe{controls:[i32(1),1,0]}, Expected{result:1}, run, shutdown, loud),
   lifecycle_case("nil Binder", Probe{controls:[i32(1),1,1,0],binder_present:false}, Expected{result:1,controls:1}, run, shutdown, loud),
   lifecycle_case("onBind pump failure", Probe{controls:[i32(1)],fail_run_pump:1}, Expected{result:1,callbacks:0}, run, shutdown, loud),
-  lifecycle_case("binding deadline", Probe{controls:[i32(1),1,1,0],bind_after:100,tick:6000}, Expected{result:1,callbacks:0,controls:2}, run, shutdown, loud),
+  lifecycle_case("binding deadline", Probe{controls:[i32(1),1,1,0],bind_after:100,tick:45000}, Expected{result:1,callbacks:0,controls:2}, run, shutdown, loud),
+  lifecycle_case("cumulative startup deadline", Probe{controls:[i32(1),1,1,1,1,1,1,1],bind_after:100,tick:15000}, Expected{result:1,pumps:3,callbacks:0}, run, shutdown, loud),
   lifecycle_case("EOF awaiting binding", Probe{controls:[i32(1),1,0],bind_after:100}, Expected{result:1,callbacks:0}, run, shutdown, loud),
   lifecycle_case("delayed binding", Probe{controls:[i32(1),1,1,1,1,1,0],bind_after:2}, Expected{ready:1,pumps:2,closed:1}, run, shutdown, loud),
+  lifecycle_case("slow earlier initialization", Probe{controls:[i32(1),1,1,1,1,1,0],bind_after:2,ticks:[i64(12011),0]}, Expected{ready:1,pumps:2,closed:1}, run, shutdown, loud),
+  lifecycle_case("EOF during earlier initialization", Probe{controls:[i32(1),0],bind_after:2,tick:12011}, Expected{result:1,callbacks:0}, run, shutdown, loud),
+  lifecycle_case("protocol during earlier initialization", Probe{controls:[i32(1),-1],bind_after:2,tick:12011}, Expected{result:1,callbacks:0}, run, shutdown, loud),
+  lifecycle_case("slow valid binding", Probe{controls:[i32(1),1,1,0],tick:45001}, Expected{ready:1,closed:1}, run, shutdown, loud),
   lifecycle_case("orderly EOF", Probe{controls:[i32(1),1,1,0]}, Expected{ready:1,closed:1}, run, shutdown, loud),
   lifecycle_case("EOF during main callback", Probe{controls:[i32(1),1,1,1,0]}, Expected{ready:1,pumps:2,closed:1,account:1,ui:1}, run, shutdown, loud),
   lifecycle_case("main pump failure", Probe{controls:[i32(1),1,1,1],fail_run_pump:2}, Expected{result:1,ready:1,pumps:2}, run, shutdown, loud),
@@ -354,7 +361,7 @@ fn lifecycle_suite(run ServiceRun, shutdown ServiceShutdown, loud bool) bool {
   lifecycle_case("Binder access exception", Probe{controls:[i32(1)],binder_throws:true}, Expected{result:1}, run, shutdown, loud),
   lifecycle_case("cleanup record exception", Probe{controls:[i32(1),1,1,0],cleanup_record_throws:true}, Expected{result:1,ready:1}, run, shutdown, loud),
  ]
- assert cases.len == 28
+ assert cases.len == 33
  for ok in cases { if !ok { return false } }
  return true
 }

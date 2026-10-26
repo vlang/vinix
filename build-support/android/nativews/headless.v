@@ -166,7 +166,10 @@ fn ws_service_binding_timeout(e voidptr, binding voidptr, started_ms i64, pumps 
 fn ws_service_run(e voidptr, binding voidptr, control_fd i32, package_name &char, service &char) i32 {
 	unsafe {
 		started_ms := ws_millis()
-		deadline := started_ms + 5000
+		// Service startup can follow queued application initialization callbacks.
+		// Its finite 45-second budget is separate from five-second account IPC.
+		// Java callbacks run to completion before the missing Binder is checked.
+		deadline := started_ms + 45000
 		mut pumps := u64(0)
 		mut bound := false
 		for !bound {

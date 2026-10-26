@@ -50,7 +50,7 @@ fn main() {
 	if built.exit_code != 0 { panic(built.output) }
 	result := os.exec([work + '/probe'])
 	if result.exit_code != 0 { panic(result.output) }
-	assert result.output.trim_space() == 'HEADLESS-BINDING-TIMEOUT-PASS cases=15'
+	assert result.output.trim_space() == 'HEADLESS-BINDING-TIMEOUT-PASS cases=20'
 	binding_format_abis(compiler, work)!
 	println(result.output.trim_space() + ' format-abis=2')
 }
@@ -71,6 +71,7 @@ mut:
  env &char = unsafe { nil }
  now i64
  tick i64
+ ticks []i64
  controls []i32
  polls []i32
  control_index int
@@ -134,7 +135,12 @@ fn ws_service_control(fd i32, timeout i32) i32 {
 }
 fn push_frame(e voidptr) { assert !pending(e) && p.frame_depth == 0; p.frame_depth++ }
 fn pop_frame(e voidptr) { assert !pending(e) && p.frame_depth == 1; p.frame_depth-- }
-fn ws_service_pump(e voidptr) bool { assert !pending(e); p.now += p.tick; p.pumps++; return true }
+fn ws_service_pump(e voidptr) bool {
+ assert !pending(e)
+ p.now += if p.pumps < p.ticks.len { p.ticks[p.pumps] } else { p.tick }
+ p.pumps++
+ return true
+}
 fn ws_failure(e voidptr, message &char) bool { assert !pending(e); return false }
 fn get_object(e voidptr, object voidptr, class &char, name &char, descriptor &char) voidptr {
  assert !pending(e) && p.frame_depth == 1
@@ -155,6 +161,12 @@ fn run_case(setup Probe) {
  assert p.frame_depth == 0 && !p.exception && p.ready == 0 && p.failed == 1
  assert p.control_index == p.controls.len
 }
+fn run_ready_case(setup Probe) {
+ p = setup
+ assert ws_service_run(voidptr(1), voidptr(2), 7, c"private-package", c"private-service") == 0
+ assert p.frame_depth == 0 && !p.exception && p.ready == 1 && p.failed == 0
+ assert p.control_index == p.controls.len && p.writes == 0
+}
 fn trace(record bool, reason i32, control i32) {
  ws_service_binding_timeout(voidptr(1), voidptr(2), 10, 7, record, reason, control)
 }
@@ -162,24 +174,40 @@ fn trace(record bool, reason i32, control i32) {
 
 const binding_cases = '
 fn main() {
- // The unchanged deadline is inclusive, and expiry skips the blocking poll.
- run_case(Probe{env:c"1",now:100,tick:5000,controls:[i32(1),1]})
- assert p.output == "ANDROID-SERVICE-BINDING-WAIT elapsed_ms=5000 pumps=1 active=1 record=0 reason=1 control=1\n"
+ // The startup budget is inclusive, and expiry skips the blocking poll.
+ run_case(Probe{env:c"1",now:100,tick:45000,controls:[i32(1),1]})
+ assert p.output == "ANDROID-SERVICE-BINDING-WAIT elapsed_ms=45000 pumps=1 active=1 record=0 reason=1 control=1\n"
  assert p.polls == [i32(0),0] && p.pumps == 1 && p.writes == 1
- run_case(Probe{env:c"1",now:100,tick:4999,controls:[i32(1),1,1,1,1]})
- assert p.output == "ANDROID-SERVICE-BINDING-WAIT elapsed_ms=9998 pumps=2 active=1 record=0 reason=1 control=1\n"
+ run_case(Probe{env:c"1",now:100,tick:44999,controls:[i32(1),1,1,1,1]})
+ assert p.output == "ANDROID-SERVICE-BINDING-WAIT elapsed_ms=89998 pumps=2 active=1 record=0 reason=1 control=1\n"
  assert p.polls == [i32(0),0,16,0,0] && p.pumps == 2
- // A slow callback is observed only after it returns; do not extend 5 seconds.
- run_case(Probe{env:c"1",tick:6000,controls:[i32(1),1]})
- assert p.output.contains("elapsed_ms=6000 pumps=1") && p.polls == [i32(0),0]
+ // Missing binding is observed after an unpreemptible callback returns.
+ run_case(Probe{env:c"1",tick:45001,controls:[i32(1),1]})
+ assert p.output.contains("elapsed_ms=45001 pumps=1") && p.polls == [i32(0),0]
+ // Pumping earlier work never resets the finite startup deadline.
+ run_case(Probe{env:c"1",tick:15000,controls:[i32(1),1,1,1,1,1,1,1]})
+ assert p.output.contains("elapsed_ms=45000 pumps=3")
+ assert p.polls == [i32(0),0,16,0,0,16,0,0]
+ // A 12-second unrelated callback may precede the queued service callback.
+ run_ready_case(Probe{env:c"1",ticks:[i64(12011),0],bind_after:2,controls:[i32(1),1,1,1,1,1,0]})
+ assert p.pumps == 2 && p.now == 12011
+ // Preserve acceptance of a valid Binder produced by a slow callback.
+ run_ready_case(Probe{env:c"1",tick:45001,bind_after:1,controls:[i32(1),1,1,0]})
+ assert p.pumps == 1 && p.now == 45001
  for state in [i32(0), -1] {
-  run_case(Probe{env:c"1",tick:4999,controls:[i32(1),1,state]})
-  assert p.output == "ANDROID-SERVICE-BINDING-WAIT elapsed_ms=4999 pumps=1 active=1 record=0 reason=2 control=" + state.str() + "\n"
+  p = Probe{env:c"1",tick:12011,bind_after:2,controls:[i32(1),state]}
+  assert ws_service_run(voidptr(1),voidptr(2),7,c"private-package",c"private-service") == 1
+  assert p.pumps == 1 && p.control_index == 2 && p.ready == 0 && p.failed == 0
+  assert p.frame_depth == 0 && !p.exception && p.writes == 0
+ }
+ for state in [i32(0), -1] {
+  run_case(Probe{env:c"1",tick:12011,controls:[i32(1),1,state]})
+  assert p.output == "ANDROID-SERVICE-BINDING-WAIT elapsed_ms=12011 pumps=1 active=1 record=0 reason=2 control=" + state.str() + "\n"
   assert p.polls == [i32(0),0,16]
  }
  // Opt-in is exact and disabled diagnostics perform no Java field lookup.
  for env in [unsafe { &char(nil) }, c"", c"0", c"1extra"] {
-  run_case(Probe{env:env,tick:5000,controls:[i32(1),1]})
+  run_case(Probe{env:env,tick:45000,controls:[i32(1),1]})
   assert p.field_calls == 0 && p.read_calls == 0 && p.writes == 0 && p.output == ""
  }
  p = Probe{env:c"1",now:123,active:0}
@@ -203,6 +231,6 @@ fn main() {
  ws_service_binding_timeout(voidptr(1), unsafe { nil }, 0, u64(18446744073709551615), false, 1, -1)
  assert p.output == "ANDROID-SERVICE-BINDING-WAIT elapsed_ms=9223372036854775807 pumps=18446744073709551615 active=-1 record=0 reason=1 control=-1\n"
  assert p.writes == 1 && p.field_calls == 0
- println("HEADLESS-BINDING-TIMEOUT-PASS cases=15")
+ println("HEADLESS-BINDING-TIMEOUT-PASS cases=20")
 }
 '
