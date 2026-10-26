@@ -4,6 +4,7 @@ module main
 
 import os
 import crypto.sha256
+import json2
 
 fn block(source string, name string) string {
 	at := source.index('fn ' + name + '(') or { panic(name) }
@@ -26,11 +27,14 @@ fn adapt(source string) string {
 fn main() {
 	assert os.args.len == 2, 'usage: check-account-store-native OUTPUT_DIR'
 	work := os.abs_path(os.args[1])
-	assert !os.exists(work)
+	repo := os.getwd()
+	assert !os.exists(work) && work != repo && !work.starts_with(repo + '/'), 'use a new external evidence directory'
 	os.mkdir_all(work)!
 	store := os.read_file('build-support/android/nativews/account_store.v')!
 	accounts := os.read_file('build-support/android/nativews/accounts.v')!
 	service := os.read_file('build-support/android/nativews/account_service.v')!
+	checker := os.read_file('tests/native-android-ws/check-account-store-native.v')!
+	os.write_file(work + '/checker.v.input', checker)!
 	// Preserve complete inputs so a passing closure is attributable to source.
 	for name, source in {'account_store.v': store, 'accounts.v': accounts, 'account_service.v': service} {
 		os.write_file(work + '/' + name + '.input', source)!
@@ -46,18 +50,28 @@ fn main() {
 		['java-under-mutex', 'C.pthread_mutex_unlock(&ws_auth_mutex)\n\t\tif !live', 'if !live'],
 		['metadata-bound', 'if count > 64 { return false }', 'if count > 65 { return false }'],
 		['snapshot-bound', 'if count < 0 || count > 64', 'if count < 0 || count > 65'],
-		['null-versus-error', 'if cell == nil || !copied', 'if !copied'],
+		['null-versus-error', "if cell == nil || !copied { throw(e,c'java/lang/UnsupportedOperationException',c'account value read failed')", "if !copied { throw(e,c'java/lang/UnsupportedOperationException',c'account value read failed')"],
 		['query-session', 'ws_store_query(ws_store_handle,ws_auth_handle,id)', 'ws_store_query(ws_store_handle,ws_auth_handle,id + 1)'],
 		['query-java-bypass', 'if command.operation == 1 { return ws_store_dispatch(command.id) }', 'if command.operation == 0 { return ws_store_dispatch(command.id) }'],
 		['store-retirement', 'ws_store_handle = nil', '// retained stale handle'],
 		['listener-snapshot', 'accounts := ws_store_accounts(e, nil, nil, nil)', 'accounts := ObjectArrayNew(slot(e,172))(e,0,cls(e,c\'android/accounts/Account\'),nil)'],
+		['token-null-versus-error', "if cell == nil || !copied { throw(e,c'java/lang/UnsupportedOperationException',c'account token read failed')", "if !copied { throw(e,c'java/lang/UnsupportedOperationException',c'account token read failed')"],
+		['token-write-routing', 'result = ws_store_token_put(ws_store_handle,identity.name,identity.kind,key_text,value_text)', 'result = ws_store_data_put(ws_store_handle,identity.name,identity.kind,key_text,value_text)'],
+		['invalidate-session', 'ws_store_invalidate(ws_store_handle,ws_auth_handle,id)', 'ws_store_invalidate(ws_store_handle,ws_auth_handle,id + 1)'],
+		['invalidate-java-bypass', 'if command.operation == 5 { return ws_store_invalidate_dispatch(command.id) }', 'if command.operation == 0 { return ws_store_invalidate_dispatch(command.id) }'],
+		['invalidate-builder-session', 'builder := build(id,kind,value)', 'builder := build(id + 1,kind,value)'],
+		['invalidate-builder-value', 'builder := build(id,kind,value)', 'builder := build(id,kind,kind)'],
+		['invalidate-ack', 'if response_kind == 1 { return }', 'if response_kind == 3 { return }'],
+		['invalidate-waits', 'if response_kind == 5 { continue }\n\t\t\tif response_kind == 1 { return }', 'if response_kind == 5 { return }\n\t\t\tif response_kind == 1 { return }'],
+		['invalidate-response-id', 'if status != 1 || response_id != id { break }\n\t\t\tif response_kind == 5 { continue }\n\t\t\tif response_kind == 1 { return }', 'if status != 1 { break }\n\t\t\tif response_kind == 5 { continue }\n\t\t\tif response_kind == 1 { return }'],
 	] {
 		names << mutation[0]
 		variants << replace_once(code, mutation[1], mutation[2])
 	}
-	compiler := os.getenv_opt('VINIX_V_COMPILER') or { 'v' }
+	compiler := os.real_path(os.getenv_opt('VINIX_V_COMPILER') or { os.find_abs_path_of_executable('v')! })
 	mut receipt := ['store_sha256=' + sha256.hexhash(store), 'accounts_sha256=' + sha256.hexhash(accounts),
-		'service_sha256=' + sha256.hexhash(service)]
+		'service_sha256=' + sha256.hexhash(service), 'checker_sha256=' + sha256.hexhash(checker),
+		'compiler=' + compiler, 'compiler_sha256=' + sha256.sum(os.read_bytes(compiler)!).hex()]
 	for i, variant in variants {
 		dir := work + '/case-' + i.str()
 		os.mkdir(dir)!
@@ -76,6 +90,11 @@ fn main() {
 		receipt << names[i] + ': compiled; ' + if i == 0 { 'passed' } else { 'runtime assertion rejected mutation' }
 	}
 	os.write_file(work + '/receipt.txt', receipt.join('\n') + '\n')!
+	mut sums := map[string]string{}
+	for path in os.walk_ext(work, '') {
+		if os.is_file(path) { sums[path[work.len + 1..]] = sha256.sum(os.read_bytes(path)!).hex() }
+	}
+	os.write_file(work + '/sha256.json', json2.encode(sums, prettify: true))!
 	println('ACCOUNT-STORE-NATIVE-PASS production closure and ${variants.len - 1} compiled negative mutations')
 }
 
@@ -145,6 +164,13 @@ __global copy_bad bool
 __global cell_frees int
 __global writes int
 __global null_write bool
+__global token_reads int
+__global token_writes int
+__global token_write_result i32
+__global invalidates int
+__global invalidate_result i32
+__global invalidate_value string
+__global invalidate_dispatches int
 __global query_calls int
 __global query_result i32
 __global response_builds int
@@ -159,6 +185,10 @@ __global transport_mode int
 __global transport_reads int
 __global transport_closes int
 __global transport_submits int
+__global transport_request u16
+__global transport_builds int
+__global transport_frees int
+__global transport_submit_bad bool
 __global now i64
 fn nilp() voidptr { return unsafe { nil } }
 fn text(p &char) string { return if p == unsafe { nil } { "<null>" } else { unsafe { cstring_to_vstring(p) } } }
@@ -265,6 +295,24 @@ fn cell_free(handle voidptr) { assert !held && handle == voidptr(204); cell_free
 fn password_put(handle voidptr, name &char, kind &char, value &char) i32 { assert held && handle == voidptr(201); writes++; null_write = value == unsafe { nil }; return 0 }
 fn data_put(handle voidptr, name &char, kind &char, key &char, value &char) i32 { assert text(key) == "key"; return password_put(handle,name,kind,value) }
 fn account_visibility_put(handle voidptr, name &char, kind &char, key &char, value i32) i32 { assert held && handle == voidptr(201) && text(key) == "key" && value == 2; writes++; return 1 }
+fn token_get(handle voidptr, name &char, kind &char, key &char) voidptr {
+ assert held && handle == voidptr(201) && text(name) == "name" && text(kind) == "registered.type" && text(key) == "oauth2:maps"
+ token_reads++; return if cell_bad { nilp() } else { voidptr(204) }
+}
+fn token_put(handle voidptr, name &char, kind &char, key &char, value &char) i32 {
+ assert held && handle == voidptr(201) && text(name) == "name" && text(kind) == "registered.type"
+ assert text(key) == "oauth2:maps" || text(key) == ""
+ assert text(value) == "secret" || value == unsafe { nil }
+ token_writes++; null_write = value == unsafe { nil }; return token_write_result
+}
+fn invalidate_token(handle voidptr, kind &char, value &char) i32 {
+ assert held && handle == voidptr(201) && text(kind) == "registered.type" && text(value) == invalidate_value
+ invalidates++; return invalidate_result
+}
+fn invalidate_session(handle voidptr, auth voidptr, id u64) i32 {
+ assert held && handle == voidptr(201) && auth == voidptr(200) && id == 901
+ invalidate_dispatches++; return invalidate_result
+}
 fn ws_auth_response(auth voidptr, id u64, kind u16) voidptr { assert held && auth == voidptr(200) && id == 901 && kind == 2; response_builds++; built_response_kind = kind; return voidptr(206) }
 fn ws_auth_error_fields(builder voidptr, code i32, message &char) bool { assert !held && builder == voidptr(206) && code == 6; return true }
 fn ws_auth_send(builder voidptr) i32 { assert !held && builder == voidptr(206); sent++; return 0 }
@@ -273,14 +321,22 @@ fn ws_auth_close(auth voidptr) { assert held && auth == voidptr(200) && store_cl
 fn ws_auth_slot_free(e voidptr, node &WsAuthSlot) { assert !held; C.free(node) }
 fn ws_auth_bundle(e voidptr, command &WsAuthCommand) voidptr { panic("query must bypass Java bundle") }
 fn ws_auth_token_check(id u64) i32 { panic("query must bypass token authorization") }
-fn ws_account_build(id u64, operation u16, kind &char, token &char) voidptr { assert !held && id == 901 && operation == 1; return voidptr(207) }
-fn ws_account_submit(builder voidptr, endpoint &char) voidptr { assert !held && builder == voidptr(207) && text(endpoint) == "/selected/accounts.sock"; transport_submits++; return voidptr(205) }
-fn ws_account_free(builder voidptr) { assert !held && builder == voidptr(207) }
+fn ws_account_build(id u64, operation u16, kind &char, token &char) voidptr { assert !held && id == 901 && operation == 1; transport_request = 1; return voidptr(207) }
+fn invalidate_build(id u64, kind &char, token &char) voidptr {
+ assert !held && id == 901 && text(kind) == "registered.type" && text(token) == invalidate_value
+ transport_request = 5; transport_builds++; return if builder_bad { nilp() } else { voidptr(207) }
+}
+fn ws_account_submit(builder voidptr, endpoint &char) voidptr { assert !held && builder == voidptr(207) && text(endpoint) == "/selected/accounts.sock"; transport_submits++; return if transport_submit_bad { nilp() } else { voidptr(205) } }
+fn ws_account_free(builder voidptr) { assert !held && builder == voidptr(207); transport_frees++ }
 fn ws_account_close(client voidptr) { assert !held && client == voidptr(205); transport_closes++ }
 fn ws_account_read(client voidptr, kind &u16, id &u64, timeout i32) i32 {
  assert !held && client == voidptr(205) && timeout == 100; transport_reads++
- unsafe { *id = if transport_mode == 1 { u64(902) } else { u64(901) }; *kind = if transport_mode == 3 { u16(5) } else { u16(3) } }
- return if transport_mode == 2 { i32(-1) } else if transport_mode == 4 { i32(0) } else { i32(1) }
+ unsafe {
+  *id = if transport_mode == 1 { u64(902) } else { u64(901) }
+  *kind = if transport_mode == 3 || (transport_mode == 5 && transport_reads == 2) { u16(5) }
+    else if transport_mode == 6 { u16(3) } else if transport_request == 5 { u16(1) } else { u16(3) }
+ }
+ return if transport_mode == 2 { i32(-1) } else if transport_mode == 4 || (transport_mode == 5 && transport_reads == 1) { i32(0) } else { i32(1) }
 }
 fn account_count(client voidptr) u32 { assert !held && client == voidptr(205); return u32(snapshot_count) }
 fn symbol(library voidptr, name &char) voidptr {
@@ -307,6 +363,11 @@ fn symbol(library voidptr, name &char) voidptr {
   "vinix_android_account_store_set_password" { voidptr(password_put) }
   "vinix_android_account_store_set_data" { voidptr(data_put) }
   "vinix_android_account_store_set_visibility" { voidptr(account_visibility_put) }
+  "vinix_android_account_store_peek_token" { voidptr(token_get) }
+  "vinix_android_account_store_set_token" { voidptr(token_put) }
+  "vinix_android_account_store_invalidate_token" { voidptr(invalidate_token) }
+  "vinix_android_account_store_invalidate" { voidptr(invalidate_session) }
+  "vinix_android_account_invalidate_request" { voidptr(invalidate_build) }
   "vinix_android_account_account_count" { voidptr(account_count) }
   else { panic("unexpected symbol " + value) }
  }
@@ -327,8 +388,10 @@ fn reset() {
  metadata_writes = 0; visibility_writes = 0; map_bad = false; snapshots = 0; snapshot_frees = 0; snapshot_count = 2
  snapshot_bad = false; snapshot_text_bad = false; cell_bad = false; cell_null = false; copy_bad = false; cell_frees = 0
  writes = 0; null_write = false; query_calls = 0; query_result = 0; response_builds = 0; response_frees = 0; sent = 0
+ token_reads = 0; token_writes = 0; token_write_result = 0; invalidates = 0; invalidate_result = 0; invalidate_value = "secret"; invalidate_dispatches = 0
  built_response_kind = 0; delivered = nilp(); posted = nilp(); registered = false; app_owns = true; transport_mode = 0
  transport_reads = 0; transport_closes = 0; transport_submits = 0; now = 0; env_reads = 0; env_clears = 0
+ transport_request = 0; transport_builds = 0; transport_frees = 0; transport_submit_bad = false
  assert ws_store_init(c"registered.type") && opens == 1
 }
 fn expect_exception(kind string) { assert exception == "java/lang/" + kind && !held; exception = "" }
@@ -345,7 +408,7 @@ fn main() {
   unsafe { match variant { 0 { ws.service = false } 1 { ws_auth_handle = nil } 2 { ws_auth_origin = nil } else { ws.data = nil } } }
   assert !ws_store_init(c"registered.type") && opens == 0
  }
- for suffix in ["open","close","insertion","userdata","visibility","commit","insertion_free","snapshot","snapshot_count","snapshot_name","snapshot_type","snapshot_free","query","password","get_data","cell_text","cell_free","set_password","set_data","set_visibility"] {
+ for suffix in ["open","close","insertion","userdata","visibility","commit","insertion_free","snapshot","snapshot_count","snapshot_name","snapshot_type","snapshot_free","query","password","get_data","cell_text","cell_free","set_password","set_data","set_visibility","peek_token","set_token","invalidate_token","invalidate"] {
   reset(); opens = 0; missing_symbol = "vinix_android_account_store_" + suffix
   assert !ws_store_init(c"registered.type") && opens == 0
  }
@@ -418,6 +481,86 @@ fn main() {
  reset(); ws_store_set_password(e,nilp(),account("name","registered.type"),nilp()); assert writes == 1 && null_write && exception == ""
  ws_store_set_data(e,nilp(),account("name","registered.type"),string_object("key"),string_object("value")); assert writes == 2 && !null_write
  assert ws_store_visibility(e,nilp(),account("name","registered.type"),string_object("key"),2) == 1 && writes == 3
+ // Cache access stays with the selected owner. Null token cells differ from
+ // backend/copy failures, and each cell is retired after leaving the mutex.
+ reset(); cached := ws_store_peek_token(e,nilp(),account("name","registered.type"),string_object("oauth2:maps"))
+ assert object(cached).text == "secret" && token_reads == 1 && cell_frees == 1 && exception == ""
+ for variant in 0 .. 3 {
+  reset(); cell_null = variant == 0; cell_bad = variant == 1; copy_bad = variant == 2
+  assert ws_store_peek_token(e,nilp(),account("name","registered.type"),string_object("oauth2:maps")) == nilp()
+  assert token_reads == 1 && cell_frees == if cell_bad { 0 } else { 1 }
+  if variant == 0 { assert exception == "" } else { expect_exception("UnsupportedOperationException") }
+ }
+ for variant in 0 .. 2 {
+  reset(); key := if variant == 0 { nilp() } else { string_object("") }
+  assert ws_store_peek_token(e,nilp(),account("name","registered.type"),key) == nilp() && token_reads == 0
+  expect_exception("IllegalArgumentException")
+ }
+ reset(); ws_store_set_token(e,nilp(),account("name","registered.type"),string_object("oauth2:maps"),string_object("secret"))
+ assert token_writes == 1 && writes == 0 && !null_write && exception == ""
+ ws_store_set_token(e,nilp(),account("name","registered.type"),string_object("oauth2:maps"),nilp())
+ assert token_writes == 2 && null_write && exception == ""
+ reset(); token_write_result = -1; ws_store_set_token(e,nilp(),account("name","registered.type"),string_object(""),string_object("secret"))
+ assert token_writes == 1; expect_exception("UnsupportedOperationException")
+ reset(); ws_store_set_token(e,nilp(),account("name","registered.type"),nilp(),nilp())
+ assert token_writes == 0; expect_exception("IllegalArgumentException")
+ for variant in 0 .. 3 {
+  reset()
+  if variant == 0 { ws.service = false } else if variant == 1 { ws_auth_ready = false } else { ws_store_handle = nilp() }
+  assert ws_store_peek_token(e,nilp(),account("name","registered.type"),string_object("oauth2:maps")) == nilp() && token_reads == 0
+  expect_exception(if variant == 2 { "UnsupportedOperationException" } else { "SecurityException" })
+  ws_store_set_token(e,nilp(),account("name","registered.type"),string_object("oauth2:maps"),string_object("secret"))
+  assert token_writes == 0; expect_exception(if variant == 2 { "UnsupportedOperationException" } else { "SecurityException" })
+ }
+ // Owner invalidation reaches only its native store; ordinary callers submit
+ // the exact type/token/id and wait through pending frames for a final ACK.
+ for status in [i32(-1),i32(0),i32(1)] {
+  reset(); invalidate_result = status
+  ws_store_invalidate_token(e,nilp(),string_object("registered.type"),string_object("secret"))
+  assert invalidates == 1 && transport_submits == 0
+  if status < 0 { expect_exception("UnsupportedOperationException") } else { assert exception == "" }
+ }
+ reset(); ws_auth_ready = false; ws_store_invalidate_token(e,nilp(),string_object("registered.type"),string_object("secret"))
+ assert invalidates == 0 && transport_submits == 0; expect_exception("SecurityException")
+ for service in [true,false] {
+  reset(); ws.service = service
+  ws_store_invalidate_token(e,nilp(),string_object("registered.type"),nilp())
+  assert exception == "" && invalidates == 0 && transport_builds == 0
+  invalidate_value = ""; ws_store_invalidate_token(e,nilp(),string_object("registered.type"),string_object(""))
+  assert exception == "" && invalidates == if service { 1 } else { 0 }
+  assert transport_builds == if service { 0 } else { 1 }
+ }
+ for variant in 0 .. 3 {
+  reset(); key := if variant == 0 { nilp() } else if variant == 1 { string_object("") } else { string_object("registered.type") }
+  value := if variant == 2 { alloc_object(ProbeObject{kind:"bad"}) } else { nilp() }
+  ws_store_invalidate_token(e,nilp(),key,value); assert invalidates == 0 && transport_builds == 0
+  expect_exception("IllegalArgumentException")
+ }
+ for mode in [0,5,1,2,3,4,6] {
+  reset(); ws.service = false; transport_mode = mode
+  ws_store_invalidate_token(e,nilp(),string_object("registered.type"),string_object("secret"))
+  assert invalidates == 0 && transport_builds == 1 && transport_submits == 1 && transport_frees == 1 && transport_closes == 1
+  if mode == 0 || mode == 5 {
+   assert exception == "" && transport_reads == if mode == 5 { 3 } else { 1 }
+  } else { expect_exception("UnsupportedOperationException") }
+ }
+ for variant in 0 .. 7 {
+  reset(); ws.service = false
+  match variant {
+   0 { ws_account_initialized = false }
+   1 { ws_account_library = nilp() }
+   2 { missing_symbol = "vinix_android_account_invalidate_request" }
+   3 { ws_account_closing = true }
+   4 { ws_account_sequence = ~u64(0) }
+   5 { builder_bad = true }
+   else { transport_submit_bad = true }
+  }
+  ws_store_invalidate_token(e,nilp(),string_object("registered.type"),string_object("secret"))
+  assert invalidates == 0 && transport_closes == 0
+  assert transport_submits == if variant == 6 { 1 } else { 0 }
+  assert transport_frees == if variant == 6 { 1 } else { 0 }
+  expect_exception(if variant == 5 { "IllegalArgumentException" } else { "UnsupportedOperationException" })
+ }
  // Execute the production service dispatch. No Java object may be made for a
  // query; only the authenticated session id enters the authoritative store.
  reset(); before := java_calls; command := WsAuthCommand{operation:1,id:901,account_name:c"",account_type:c"",token_type:c""}
@@ -426,6 +569,12 @@ fn main() {
  reset(); unsafe { ws_store_handle = nil }; assert ws_auth_dispatch(e,nilp(),&command)
  assert query_calls == 0 && response_builds == 1 && built_response_kind == 2 && sent == 1 && response_frees == 1
  reset(); unsafe { ws_store_handle = nil; ws_auth_handle = nil }; assert !ws_auth_dispatch(e,nilp(),&command) && sent == 0
+ reset(); invalidate_command := WsAuthCommand{operation:5,id:901,account_type:c"registered.type",account_name:unsafe { nil },token_type:unsafe { nil }}
+ assert ws_auth_dispatch(e,nilp(),&invalidate_command) && invalidate_dispatches == 1 && java_calls == 0 && query_calls == 0
+ reset(); invalidate_result = -1; assert !ws_auth_dispatch(e,nilp(),&invalidate_command) && invalidate_dispatches == 1 && java_calls == 0
+ reset(); ws_store_handle = nilp(); assert ws_auth_dispatch(e,nilp(),&invalidate_command)
+ assert invalidate_dispatches == 0 && response_builds == 1 && sent == 1 && response_frees == 1 && java_calls == 0
+ reset(); ws_store_handle = nilp(); ws_auth_handle = nilp(); assert !ws_auth_dispatch(e,nilp(),&invalidate_command) && sent == 0 && java_calls == 0
  // Immediate registration posts through Handler and queries at notification
  // time; this fixture fails if an empty array is substituted for real accounts.
  reset(); listener := alloc_object(ProbeObject{kind:"listener"})
@@ -437,6 +586,6 @@ fn main() {
  ws_accounts_remove(e,manager,listener); assert !registered
  reset(); ws_account_service_shutdown(e); ws_account_service_shutdown(e)
  assert ws_store_handle == nilp() && ws_auth_handle == nilp() && store_closes == 1 && auth_closes == 1 && !held
- println("ACCOUNT-STORE-NATIVE-PASS attestation lifecycle listener snapshot original-caller session map-bounds nullable error cleanup mutex")
+ println("ACCOUNT-STORE-NATIVE-PASS attestation lifecycle listener snapshot original-caller session map-bounds nullable token-cache synchronous-invalidation native-bypass cleanup mutex")
 }
 '

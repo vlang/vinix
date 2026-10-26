@@ -79,6 +79,12 @@ fn main() {
 		['token-features', '&& command.feature_count == 0', '&& command.feature_count <= 1'],
 		['missing-account-name', 'account != nil && account[0] != 0 && ', ''],
 		['missing-token-type', 'token != nil && token[0] != 0 && ', ''],
+		['invalidate-java-bypass', 'if command.operation == 5 { return ws_store_invalidate_dispatch(command.id) }',
+			'if command.operation == 0 { return ws_store_invalidate_dispatch(command.id) }'],
+		['invalidate-empty-type', 'if name == nil || name[0] == 0 || command.account_type == nil',
+			'if name == nil || command.account_type == nil'],
+		['borrowed-account-type', 'command.account_type = C.strdup(name)',
+			'command.account_type = name'],
 	] {
 		names << mutation[0]
 		variants << replace_once(code, mutation[1], mutation[2])
@@ -107,7 +113,7 @@ fn main() {
 	revision := command(work, 'source-revision', ['git', 'rev-parse', 'HEAD'])
 	assert revision.exit_code == 0
 	os.write_file(work + '/evidence.json', json2.encode({
-		'scope':           'Actual production command copying, Bundle construction, store authorization and Binder token dispatch with instrumented JNI/normal ABI; host execution, no guest or Google authentication.'
+		'scope':           'Actual production command copying, Bundle construction, store authorization, Binder token dispatch and native invalidation bypass without copying the token into Java, with instrumented JNI/normal ABI; host execution, no guest or Google authentication.'
 		'source_revision': revision.output.trim_space()
 		'source_sha256':   sha256.hexhash(source)
 		'checker_sha256':  sha256.hexhash(checker)
@@ -151,6 +157,8 @@ __global java_calls int
 __global token_calls int
 __global add_calls int
 __global query_calls int
+__global invalidate_calls int
+__global invalidate_result bool
 __global retained int
 __global pending_exception bool
 __global throw_token bool
@@ -205,12 +213,12 @@ fn release(value voidptr) {
 }
 fn wire() { assert held && ws_auth_handle == voidptr(20) }
 fn operation(handle voidptr) u16 { wire(); return mode }
-fn account_name(handle voidptr) &char { wire(); return wire_account }
+fn account_name(handle voidptr) &char { wire(); assert mode != 5, "invalidation must not read account name"; return wire_account }
 fn account_type(handle voidptr) &char { wire(); return wire_type }
-fn token_type(handle voidptr) &char { wire(); return wire_token }
-fn features_count(handle voidptr) u32 { wire(); return wire_features }
+fn token_type(handle voidptr) &char { wire(); assert mode != 5, "invalidation must not read token"; return wire_token }
+fn features_count(handle voidptr) u32 { wire(); assert mode != 5, "invalidation must not read features"; return wire_features }
 fn feature(handle voidptr,index u32) &char { wire(); assert index < wire_features; return c"feature" }
-fn options_count(handle voidptr) u32 { wire(); return wire_options }
+fn options_count(handle voidptr) u32 { wire(); assert mode != 5, "invalidation must not read options"; return wire_options }
 fn option_key(handle voidptr,index u32) &char { wire(); assert index < wire_options; return if index == 0 { c"androidPackageName" } else { c"number" } }
 fn option_tag(handle voidptr,index u32) u16 { wire(); return if index == 0 { u16(1) } else { u16(3) } }
 fn option_text(handle voidptr,index u32) &char { wire(); return unsafe { if index == 0 { c"com.google.android.apps.maps" } else { &char(nil) } } }
@@ -309,6 +317,12 @@ fn call(e voidptr,receiver voidptr,kind &char,method &char,sig &char,args &Value
  if throw_token { pending_exception = true }
 }
 fn ws_store_dispatch(id u64) bool { assert !held && !ws_auth_scope && id == 901 && java_calls == 0; query_calls++; return true }
+fn ws_store_invalidate_dispatch(id u64) bool {
+ assert !held && !ws_auth_scope && mode == 5 && id == 901
+ assert java_calls == 0 && auth_calls == 0 && token_calls == 0 && add_calls == 0 && query_calls == 0
+ assert retained == 0 && ws_auth_slots == unsafe { nil }
+ invalidate_calls++; return invalidate_result
+}
 '
 
 const cases = '
@@ -331,6 +345,7 @@ fn reset() {
  cleanup()
  mode = 4; policy_allowed = true; store_available = true; authenticated = false; auth_calls = 0
  java_calls = 0; token_calls = 0; add_calls = 0; query_calls = 0; retained = 0
+ invalidate_calls = 0; invalidate_result = true
  pending_exception = false; throw_token = false; fail_jni = ""; fail_text = unsafe { nil }
  response_available = true; send_result = 0; option_result = 0
  builders = 0; sent = 0; freed = 0; error_code = 0; option_writes = 0; feature_writes = 0
@@ -378,6 +393,28 @@ fn main() {
  reset(); mode = 1
  command := read_command(); assert command != unsafe { nil }; assert ws_auth_dispatch(voidptr(1),voidptr(2),command)
  ws_auth_command_free(command); assert query_calls == 1 && auth_calls == 0 && java_calls == 0
+ // Invalidation retains only a copied account type. The secret remains in the
+ // authenticated native session; no Java callback, options or token read occurs.
+ for result in [true,false] {
+  reset(); mode = 5; invalidate_result = result; wire_features = 99; wire_options = 99
+  invalidation := read_command(); assert invalidation != unsafe { nil }
+  assert invalidation.operation == 5 && invalidation.id == 901
+  assert invalidation.account_type != wire_type && text(invalidation.account_type) == "com.google"
+  assert invalidation.account_name == nilp() && invalidation.token_type == nilp()
+  assert invalidation.feature_count == 0 && invalidation.count == 0 && allocation_calls == 2
+  wire_type = c"changed"
+  assert text(invalidation.account_type) == "com.google"
+  assert ws_auth_dispatch(voidptr(1),voidptr(2),invalidation) == result && invalidate_calls == 1
+  ws_auth_command_free(invalidation); assert allocated == 0 && java_calls == 0 && builders == 0
+ }
+ for missing in 0 .. 2 {
+  reset(); mode = 5; wire_type = if missing == 0 { unsafe { &char(nil) } } else { c"" }
+  assert read_command() == unsafe { nil } && allocated == 0 && invalidate_calls == 0 && java_calls == 0
+ }
+ for failure in 1 .. 3 {
+  reset(); mode = 5; fail_allocation = failure
+  assert read_command() == unsafe { nil } && allocated == 0 && invalidate_calls == 0 && java_calls == 0
+ }
  reset(); command2 := read_command(); assert command2 != unsafe { nil }
  wire_account = c"changed"; assert text(command2.account_name) == "alice@example.test"
  ws_auth_command_free(command2); assert allocated == 0
@@ -401,6 +438,6 @@ fn main() {
  }
  reset(); ws_auth_handle = nilp(); assert ws_auth_token_check(901) == -1 && builders == 0 && java_calls == 0
  cleanup()
- println("ACCOUNT-TOKEN-SERVICE-RUN-PASS authorization-before-Java exact-account-callback-token-bundle scoped-call denial failures query addAccount copied-ownership")
+ println("ACCOUNT-TOKEN-SERVICE-RUN-PASS authorization-before-Java exact-account-callback-token-bundle scoped-call denial failures query addAccount copied-ownership invalidation-no-token-copy native-bypass")
 }
 '
