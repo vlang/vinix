@@ -16,6 +16,7 @@ mut:
 	account_name    ?string
 	account_type    ?string
 	auth_token_type ?string
+	token_value     ?string
 	features        []string
 	options         []nativeaccountauth.Option
 }
@@ -79,6 +80,17 @@ pub fn abi_token_request(id u64, name &u8, account_type &u8, token_type &u8) voi
 	return builder
 }
 
+// Invalidation discloses no account or token and completes only after the
+// authenticator-owned store acknowledges the durable deletion.
+@[export: 'vinix_android_account_invalidate_request']
+pub fn abi_invalidate_request(id u64, account_type &u8, token &u8) voidptr {
+	if id == 0 { return unsafe { nil } }
+	mut builder := &RequestBuilder{id: id, op: .invalidate_auth_token}
+	builder.account_type = abi_string(account_type) or { abi_request_free(builder); return unsafe { nil } }
+	builder.token_value = abi_string(token) or { abi_request_free(builder); return unsafe { nil } }
+	return builder
+}
+
 @[export: 'vinix_android_account_feature']
 pub fn abi_feature(handle voidptr, value &u8) i32 {
 	if handle == unsafe { nil } { return -1 }
@@ -122,6 +134,7 @@ pub fn abi_submit(handle voidptr, endpoint &u8) voidptr {
 		account_name:    builder.account_name
 		account_type:    builder.account_type
 		auth_token_type: builder.auth_token_type
+		token_value:     builder.token_value
 		features:        builder.features
 		options:         builder.options
 	}
@@ -139,6 +152,7 @@ pub fn abi_request_free(handle voidptr) {
 		account_name:    builder.account_name
 		account_type:    builder.account_type
 		auth_token_type: builder.auth_token_type
+		token_value:     builder.token_value
 		features:        builder.features
 		options:         builder.options
 	})

@@ -170,7 +170,7 @@ fn (mut b Broker) admit(incoming Incoming) ! {
 	}
 	// The selected service owns its private account database. Its query sees
 	// the same authenticated caller as addAccount, never an option claim.
-	if incoming.authorized.request.operation !in [.add_account, .get_accounts, .get_auth_token] {
+	if incoming.authorized.request.operation !in [.add_account, .get_accounts, .get_auth_token, .invalidate_auth_token] {
 		b.fail(id, 6, 'Account operation is not available')!
 		return
 	}

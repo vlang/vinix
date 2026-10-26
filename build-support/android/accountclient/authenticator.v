@@ -107,7 +107,7 @@ pub fn auth_read(handle voidptr, session &u64, timeout i32) i32 {
 	if packet.header.kind == .dispatch {
 		command := accountipc.decode_command(packet.header, packet.body) or { a.disconnect(); return -1 }
 		if a.sessions.len >= accountipc.max_sessions || command.session in a.sessions
-			|| command.request.operation !in [.add_account, .get_accounts, .get_auth_token]
+			|| command.request.operation !in [.add_account, .get_accounts, .get_auth_token, .invalidate_auth_token]
 			|| (command.request.operation == .add_account && command.request.account_type == none) {
 			accountipc.dispose_command(command)
 			a.disconnect(); return -1
@@ -331,6 +331,7 @@ pub fn auth_response(handle voidptr, session u64, kind u16) voidptr {
 	s := a.sessions[session] or { return unsafe { nil } }
 	if (kind == 3 && s.command.request.operation != .get_accounts)
 		|| (kind in [u16(1),u16(4)] && s.command.request.operation == .get_accounts) { return unsafe { nil } }
+	if kind == u16(4) && s.command.request.operation !in [.add_account, .get_auth_token] { return unsafe { nil } }
 	a.refs++
 	return &AuthResponse{owner: a, session: session, capability: s.command.capability.clone(), kind: unsafe { accountipc.Kind(kind) }, options: []nativeaccountauth.Option{cap:32}}
 }

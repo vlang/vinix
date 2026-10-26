@@ -16,6 +16,7 @@ pub fn dispose_request(request Request) {
 	if value := request.account_name { unsafe { value.free() } }
 	if value := request.account_type { unsafe { value.free() } }
 	if value := request.auth_token_type { unsafe { value.free() } }
+	if value := request.token_value { unsafe { value.free() } }
 	for feature in request.features {
 		unsafe { feature.free() }
 	}
