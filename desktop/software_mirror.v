@@ -256,6 +256,12 @@ fn (mut a SoftwareApp) handle_mirror(event_id string) {
 		return
 	}
 	match event_id {
+		'software.mirror.field' {
+			if a.mirror_locked {
+				a.mirror_lock_focus = !a.mirror_lock_focus
+				a.focus = false; a.select_all = false
+			}
+		}
 		'software.mirror.path' { a.focus = true; a.mirror_lock_focus = false; a.select_all = false }
 		'software.mirror.lock' {
 			if a.mirror_locked && a.mirror_source == '' { a.focus = true; a.mirror_lock_focus = true; a.select_all = false }
@@ -319,9 +325,47 @@ fn (mut a SoftwareApp) mirror_field_paste(mut field []u8, input string) {
 }
 
 fn (a &SoftwareApp) build_mirror_compact(width int, height int) ui2.Element {
-	mut children := frame_elements(9)
+	mut children := frame_elements(10)
 	available := a.failure_pages.len > 0 && a.worker == unsafe { nil } && !a.details_mode
 	readable := a.mirror_review_readable() && !a.details_mode
+	if width < 320 || height < 240 {
+		children << software_label('Offline export · enlarge for details', 14, 8, width - 28, 28, false)
+		if a.mirror_review_running() {
+			children << software_button('software.mirror.stop', 'Stop review', 14, 46, width - 28)
+		} else if a.worker == unsafe { nil } {
+			children << software_button(if a.review != '' { 'software.cancel' } else { 'software.mirror.back' },
+				if a.review != '' { 'Cancel review' } else { 'Back to catalog' }, 14, 46, width - 28)
+		} else {
+			children << software_label('Wait for the export to finish.', 14, 46, width - 28, 28, false)
+		}
+		children << software_label(a.status, 14, 78, width - 28, if height > 86 { height - 86 } else { 1 }, false)
+		return ui2.screen(app_surface, children)
+	}
+	if a.worker == unsafe { nil } && a.review == '' {
+		children << software_label('Export offline', 14, 8, width - 98, 28, false)
+		children << software_button('software.mirror.back', 'Back', width - 70, 8, 56)
+		source := a.mirror_locked && a.mirror_lock_focus
+		children << software_label(if source { if a.mirror_source != '' { 'Saved deployment source (fixed)' } else { 'Deployment lock file (absolute path)' } }
+			else { 'New export directory (absolute path)' }, 14, 42, width - 28, 18, false)
+		children << console_field(if source { 'software.mirror.lock' } else { 'software.mirror.path' },
+			if source { if a.mirror_source != '' { a.mirror_source } else { editor_bytes_text(a.mirror_lock_path) } }
+			else { editor_bytes_text(a.mirror_path) }, 14, 64, width - 28,
+			a.focus && (!source || a.mirror_source == ''))
+		button_width := (width - 40) / 2
+		if a.mirror_source != '' {
+			children << software_label('Saved source · fixed', 14, 104, button_width, 28, false)
+		} else {
+			children << software_button('software.mirror.scope', if a.mirror_locked { 'Deployment lock' }
+				else if a.mirror_all { 'Installed roots' } else { 'Selected app' }, 14, 104, if a.mirror_locked { button_width } else { width - 28 })
+		}
+		if a.mirror_locked {
+			children << software_button('software.mirror.field', if source { 'Destination' } else { 'Source file' }, 26 + button_width, 104, button_width)
+		}
+		children << software_button('software.mirror.review', 'Review export', 14, 140, button_width)
+		if available { children << software_button('software.failure', 'Failure details', 26 + button_width, 140, button_width) }
+		children << software_label(a.status, 14, 178, width - 28, height - 186, false)
+		return ui2.screen(app_surface, children)
+	}
 	children << software_label('Offline export · enlarge to confirm', 14, 8, width - 28, 28, false)
 	if a.details_mode {
 		children << software_button('software.details.back', 'Back to review', 14, 46, if width > 202 { 174 } else { width - 28 })
