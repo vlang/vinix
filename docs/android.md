@@ -224,8 +224,10 @@ It used the final Framework371 build with the null-safe `Intent.getDataString()`
 repair. The report records the exact runtime inputs, source revision, complete
 external evidence bundle and SHA-256 checksums for genuine guest PNGs, including
 `google-maps-running.png` and `paris-route-preview-ready.png`. These checks cover
-anonymous use; live GPS navigation, Google sign-in and map layer changes remain
-unverified.
+anonymous use; live GPS navigation and map layer changes remain unverified.
+The subsequent [Google account sign-in probe](maps-google-signin.md) confirmed
+that **Sign in → Add account** exits Maps because the account callback API is
+missing. Account authentication is currently unsupported.
 
 The earlier [23 October Maps continuation](../tests/android/results/2026-10-23/maps-action-provider/README.md)
 displays live map tiles, Paris search and place photos, manually entered

@@ -522,6 +522,9 @@ removal permits registration again. Vinix has no account authenticator or stored
 accounts. Package-scoped account queries return fresh empty snapshots for both
 typed and all-type requests. The service fixture checks these through the client
 and companion contexts and on the service executor.
+Account insertion explicitly throws without reading or logging supplied
+credentials. Authenticator dispatch, account storage and authentication tokens
+are not implemented; see the [Maps sign-in probe](../../../docs/maps-google-signin.md).
 External-storage path queries validate the runtime's ordinary, non-removable
 directory. Process CPU time reads the kernel's process CPU clock.
 BatteryManager is available through both Context service lookup forms. With
@@ -629,7 +632,10 @@ workflow](../../../docs/maps372-qualified-intent-replay.md). That replay complet
 600 seconds with map tiles, Paris place search and details, a manually entered
 route origin, driving and walking route selection, and successive Route Preview
 instructions. Its report pins the tested runtime and genuine guest PNGs.
-Live GPS navigation, Google sign-in and map layer changes remain unverified.
+Live GPS navigation and map layer changes remain unverified. Google account
+sign-in is unsupported: the [sign-in probe](../../../docs/maps-google-signin.md)
+reaches the account chooser, then exits on **Add account** because the account
+callback API is missing.
 Advanced Canvas paths/transforms,
 text selection/shaping, on-screen keyboards, drag scrolling, popup tabs, services and
 modern Android APIs remain incomplete. NinePatch images currently stretch.
