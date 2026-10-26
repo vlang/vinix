@@ -5,6 +5,7 @@ module accountbroker
 
 import accountipc
 import accountinteraction
+import accountuifd
 import crypto.rand
 import nativeaccountauth
 import time
@@ -49,6 +50,10 @@ pub struct Broker {
 mut:
 	service      &accountipc.Stream        = unsafe { nil }
 	interactions &accountinteraction.Table = unsafe { nil }
+	ui           &accountuifd.Controller   = unsafe { nil }
+	ui_launch    []u8
+	ui_ack       u64
+	ui_session   u64
 	sessions     map[u64]Session
 	next         u64 = 1
 	pending      int
@@ -69,6 +74,16 @@ pub fn (mut b Broker) allow_interactions(targets []accountinteraction.Target) ! 
 		return error('account interaction policy is already fixed')
 	}
 	b.interactions = accountinteraction.create(b.origin(), targets)!
+}
+
+// Takes ownership on success. Only the administrator's root launcher supplies
+// this dedicated channel, helper executable, desktop identity and socket path.
+pub fn (mut b Broker) configure_ui(controller &accountuifd.Controller) ! {
+	if b.closed || b.service != unsafe { nil } || b.active() != 0 || b.ui != unsafe { nil }
+		|| controller == unsafe { nil } {
+		return error('account UI configuration is already fixed')
+	}
+	b.ui = controller
 }
 
 pub fn create(registry nativeaccountauth.Registry, selected nativeaccountauth.Entry, pid int, lifetime int) !&Broker {
@@ -202,6 +217,18 @@ fn (mut b Broker) redeem(id u64, authorized nativeaccountauth.AuthorizedRequest)
 		interaction: accountipc.Interaction{launch.local_handle, launch.target.package_name, launch.target.class_name}
 	})!
 	defer { unsafe { bytes.free() } }
+	if b.ui != unsafe { nil } {
+		b.ui.begin(launch.session, launch.response_capability) or {
+			b.cancel_service(launch.session)
+			b.fail(launch.session, 6, 'Account sign-in window is unavailable')!
+			b.fail(id, 6, 'Account sign-in window is unavailable')!
+			return
+		}
+		b.ui_launch = bytes.clone()
+		b.ui_ack = id
+		b.ui_session = launch.session
+		return
+	}
 	b.service.enqueue(bytes)!
 	// This acknowledges delivery of a launch command only. The original
 	// addAccount request still waits for an actual authenticator result.
@@ -229,6 +256,7 @@ fn (mut b Broker) finish(id u64, event accountipc.Event) ! {
 	defer { unsafe { bytes.free() } }
 	session.output.enqueue(bytes)!
 	if accountipc.terminal(event.kind) {
+		if b.ui != unsafe { nil } { b.ui.end(id) }
 		if b.interactions != unsafe { nil } { b.interactions.revoke(id) }
 		session.terminal = true
 		b.sessions[id] = session
@@ -289,6 +317,7 @@ fn (mut b Broker) cancel_service(id u64) {
 }
 
 fn (mut b Broker) revoke(id u64) {
+	if b.ui != unsafe { nil } { b.ui.end(id) }
 	if b.interactions != unsafe { nil } { b.interactions.revoke(id) }
 	b.cancel_service(id)
 	session := b.sessions[id] or { return }
@@ -298,6 +327,61 @@ fn (mut b Broker) revoke(id u64) {
 		session.capability.free()
 	}
 	b.sessions.delete(id)
+}
+
+fn (mut b Broker) clear_ui_launch() {
+	unsafe { b.ui_launch.free() }
+	b.ui_launch = []u8{}
+	b.ui_ack = 0
+	b.ui_session = 0
+}
+
+fn (mut b Broker) fail_ui(session u64, message string) {
+	ack := b.ui_ack
+	b.ui.end(session)
+	if current := b.sessions[session] {
+		if !current.terminal {
+			b.cancel_service(session)
+			b.fail(session, 4, message) or { b.revoke(session) }
+		}
+	}
+	if current := b.sessions[ack] {
+		if !current.terminal { b.fail(ack, 4, message) or { b.revoke(ack) } }
+	}
+	b.clear_ui_launch()
+}
+
+fn (mut b Broker) pump_ui() ! {
+	if b.ui == unsafe { nil } { return }
+	if b.ui_session != 0 {
+		current := b.sessions[b.ui_session] or {
+			b.fail_ui(b.ui_session, 'Account request has ended')
+			return
+		}
+		if current.terminal || current.output.peer_gone() || time.sys_mono_now() >= current.deadline {
+			b.fail_ui(b.ui_session, 'Account request has ended')
+			return
+		}
+	}
+	session := b.ui.active_session()
+	tick := b.ui.tick() or {
+		b.fail_ui(session, 'Account sign-in window failed')
+		return
+	}
+	if tick.ended {
+		b.fail_ui(tick.session, 'Account sign-in window closed')
+		return
+	}
+	if tick.ready {
+		if tick.session != b.ui_session || b.ui_ack == 0 || b.ui_launch.len == 0 {
+			return error('unexpected account UI readiness')
+		}
+		// The SCM_RIGHTS attachment has completed before this launch enters
+		// the separate account-command stream. The original result stays pending.
+		b.service.enqueue(b.ui_launch)!
+		b.finish(b.ui_ack, accountipc.Event{ kind: .result, id: b.ui_ack })!
+		b.clear_ui_launch()
+	}
 }
 
 // One root event loop owns this object. Persistent service input/output and
@@ -336,6 +420,7 @@ pub fn (mut b Broker) pump(timeout int) ! {
 			unsafe { packet.body.free() }
 		}
 	}
+	b.pump_ui()!
 	now := time.sys_mono_now()
 	for id, session in b.sessions {
 		if session.output.peer_gone() {
@@ -374,6 +459,12 @@ pub fn (mut b Broker) close() {
 	b.pending = 0
 	unsafe { b.workers.free() }
 	for id, _ in b.sessions { b.revoke(id) }
+	b.clear_ui_launch()
+	if b.ui != unsafe { nil } {
+		b.ui.close()
+		unsafe { free(b.ui) }
+		b.ui = unsafe { nil }
+	}
 	unsafe { b.sessions.free() }
 	if b.interactions != unsafe { nil } {
 		b.interactions.close()

@@ -6,8 +6,10 @@ module main
 import accountbroker
 import accountinteraction
 import accountmanifest
+import accountuifd
 import nativeaccountauth
 import os
+import strconv
 import time
 
 #include <errno.h>
@@ -111,8 +113,8 @@ fn stop_child(pid i32) {
 }
 
 fn run() ! {
-	if os.args.len !in [12, 13] || C.getuid() != 0 || C.geteuid() != 0 {
-		return error('usage (root): native-account-broker REGISTRY RUNTIME_ROOT APK UID GID SERVICE ACTION DIRECTORY DATA_DIRECTORY HOME_DIRECTORY PACKAGE [INTERACTION_ACTIVITY]')
+	if os.args.len !in [12, 13, 18] || C.getuid() != 0 || C.geteuid() != 0 {
+		return error('usage (root): native-account-broker REGISTRY RUNTIME_ROOT APK UID GID SERVICE ACTION DIRECTORY DATA_DIRECTORY HOME_DIRECTORY PACKAGE [INTERACTION_ACTIVITY [--ui UID GID ABS_HELPER ABS_WINDOW_SOCKET]]')
 	}
 	registry_path, runtime, apk := os.args[1], os.args[2], os.args[3]
 	uid_text, gid_text := os.args[4], os.args[5]
@@ -123,8 +125,40 @@ fn run() ! {
 	uid, gid := uid_text.u32(), gid_text.u32()
 	registry := nativeaccountauth.load(registry_path)!
 	entry := registry.verify_service(apk, uid, gid, os.args[6], os.args[7])!
-	if os.args.len == 13 {
+	if os.args.len >= 13 {
 		accountmanifest.verify_activity(apk, entry.package_name, os.args[12])!
+	}
+	mut ui := &accountuifd.Controller(unsafe { nil })
+	mut ui_owned := false
+	mut ui_pair := [i32(-1), i32(-1)]!
+	mut ui_child_owned := false
+	defer {
+		if ui_owned {
+			ui.close()
+			unsafe { free(ui) }
+		}
+		if ui_child_owned { C.close(ui_pair[1]) }
+	}
+	if os.args.len == 18 {
+		if os.args[13] != '--ui' { return error('invalid account UI option') }
+		desktop_uid := strconv.parse_uint(os.args[14], 10, 32)!
+		desktop_gid := strconv.parse_uint(os.args[15], 10, 32)!
+		if desktop_uid.str() != os.args[14] || desktop_gid.str() != os.args[15] {
+			return error('desktop IDs must be canonical unsigned decimal')
+		}
+		ui_pair = accountuifd.socket_pair()!
+		ui_child_owned = true
+		ui = accountuifd.create(int(ui_pair[0]), accountuifd.Config{
+			helper:        os.args[16]
+			window_socket: os.args[17]
+			uid:           u32(desktop_uid)
+			gid:           u32(desktop_gid)
+		}) or {
+			C.close(ui_pair[0])
+			return err
+		}
+		ui_owned = true
+		nativeaccountauth.inherit_ui_channel(int(ui_pair[1]))!
 	}
 	directory := os.args[8]
 	protected_directory(directory)!
@@ -139,18 +173,16 @@ fn run() ! {
 		C.close(i32(services))
 		os.rm(service_path) or {}
 	}
-	mut pair := [i32(-1), i32(-1)]!
-	if C.socketpair(C.AF_UNIX, C.SOCK_STREAM, 0, &pair[0]) != 0 {
-		return error('cannot create service lifetime pair')
-	}
+	pair := accountuifd.socket_pair()!
 	mut root_lifetime_owned := true
 	defer { if root_lifetime_owned { C.close(pair[0]) } }
 	mut child_lifetime_owned := true
 	defer { if child_lifetime_owned { C.close(pair[1]) } }
 	nativeaccountauth.inherit_root_channel(int(pair[1]))!
 	launcher := runtime + '/usr/bin/run-android'
-	launch_args := [launcher, apk, '--service-fd', pair[1].str(), '--authenticator-socket',
+	mut launch_args := [launcher, apk, '--service-fd', pair[1].str(), '--authenticator-socket',
 		service_path]
+	if ui_owned { launch_args << ['--ui-fd', ui_pair[1].str()] }
 	mut argv := []&u8{cap: launch_args.len + 1}
 	for arg in launch_args { argv << arg.str }
 	argv << unsafe { &u8(nil) }
@@ -170,6 +202,7 @@ fn run() ! {
 		return error('cannot fork selected account service')
 	}
 	if pid == 0 {
+		if ui_owned { C.close(ui_pair[0]) }
 		C.close(pair[0])
 		C.close(i32(clients))
 		C.close(i32(services))
@@ -179,6 +212,10 @@ fn run() ! {
 	}
 	C.close(pair[1])
 	child_lifetime_owned = false
+	if ui_child_owned {
+		C.close(ui_pair[1])
+		ui_child_owned = false
+	}
 	defer { stop_child(pid) }
 	frame := 'vinix-android-service-host-v1\t${entry.package_name}\t${os.args[6]}\t${os.args[7]}\t${entry.apk_sha256}\n'
 	mut send_flags := i32(0)
@@ -197,8 +234,12 @@ fn run() ! {
 	mut broker := accountbroker.create(registry, entry, int(pid), int(pair[0]))!
 	root_lifetime_owned = false
 	defer { broker.close() }
-	if os.args.len == 13 {
+	if os.args.len >= 13 {
 		broker.allow_interactions([accountinteraction.Target{entry.package_name, os.args[12]}])!
+	}
+	if ui_owned {
+		broker.configure_ui(ui)!
+		ui_owned = false
 	}
 	println('ANDROID-ACCOUNT-BROKER-LISTENING pid=${pid} clients=${client_path} service=${service_path}')
 	C.fflush(unsafe { nil })
