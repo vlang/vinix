@@ -12,6 +12,7 @@ import time
 
 const browser_prefix = 'VINIX-BROWSER-RESULTS-1 '
 const headless_prefix = 'VINIX-HEADLESS-RESULTS-1 '
+const account_ui_prefix = 'VINIX-ACCOUNT-UI-RESULTS-1 '
 const chunk_bytes = 512
 const max_file = 8 * 1024 * 1024
 const max_total = 16 * 1024 * 1024
@@ -58,6 +59,14 @@ fn protocol(headless bool) Protocol {
 	}
 }
 
+fn account_ui_protocol() Protocol {
+	return Protocol{
+		prefix: account_ui_prefix
+		label: 'ACCOUNT-UI-COLLECT'
+		scope: 'Exact real desktop helper and root UI controller UART archive; no Android Activity, account, credential or Google sign-in proof.'
+	}
+}
+
 fn decimal(text string, limit int) !int {
 	if text == '' || text.len > 10 || (text.len > 1 && text[0] == `0`)
 		|| !text.bytes().all(it >= `0` && it <= `9`) {
@@ -86,7 +95,7 @@ fn parse_export(log string, selected Protocol) !Export {
 		where := ' at serial line=' + (number + 1).str()
 		// A concurrent console writer can fuse chatter and a frame onto one
 		// physical line. Reject that damage rather than silently skipping it.
-		for known in [browser_prefix, headless_prefix] {
+		for known in [browser_prefix, headless_prefix, account_ui_prefix] {
 			if offset := line.index(known) {
 				if offset != 0 {
 					return error('embedded archive frame' + where + ' prefix-offset=' + offset.str() +
@@ -94,7 +103,7 @@ fn parse_export(log string, selected Protocol) !Export {
 				}
 			}
 		}
-		if (line.starts_with(browser_prefix) || line.starts_with(headless_prefix)) && !line.starts_with(prefix) {
+		if [browser_prefix, headless_prefix, account_ui_prefix].any(line.starts_with(it)) && !line.starts_with(prefix) {
 			return error('foreign archive protocol' + where)
 		}
 		if !line.starts_with(prefix) { continue }
@@ -352,15 +361,25 @@ fn self_test_protocol(selected Protocol) ! {
 fn self_test() ! {
 	self_test_protocol(protocol(false))!
 	self_test_protocol(protocol(true))!
+	self_test_protocol(account_ui_protocol())!
+	for selected in [protocol(false), protocol(true), account_ui_protocol()] {
+		for foreign in [protocol(false), protocol(true), account_ui_protocol()] {
+			if foreign.prefix == selected.prefix { continue }
+			if _ := parse_export(frames('test', foreign), selected) {
+				return error('foreign archive protocol accepted')
+			}
+		}
+	}
 }
 
 fn run() ! {
 	headless := os.args.len == 4 && os.args[1] == '--headless'
-	if !headless && os.args.len != 3 {
-		return error('usage: collect [--headless] SERIAL_LOG FRESH_EXTERNAL_RESULTS')
+	account_ui := os.args.len == 4 && os.args[1] == '--account-ui'
+	if !headless && !account_ui && os.args.len != 3 {
+		return error('usage: collect [--headless|--account-ui] SERIAL_LOG FRESH_EXTERNAL_RESULTS')
 	}
-	selected := protocol(headless)
-	offset := if headless { 1 } else { 0 }
+	selected := if account_ui { account_ui_protocol() } else { protocol(headless) }
+	offset := if headless || account_ui { 1 } else { 0 }
 	serial, root := os.args[1 + offset], os.args[2 + offset]
 	st := os.lstat(serial)!
 	if st.get_filetype() != .regular || st.size > 256 * 1024 * 1024 {
