@@ -40,6 +40,8 @@ const k_sigaction_size = u64(32)
 // applications use that property to probe newly introduced signal flags.
 const linux_uapi_sa_flags = u64(0xdc000807)
 
+const linux_sa_resethand = int(u32(0x80000000))
+
 // stack_t: void *ss_sp; int ss_flags; size_t ss_size.
 const stack_t_size = u64(24)
 
@@ -63,6 +65,23 @@ fn valid_signal(signum int) bool {
 }
 
 // ── disposition and masking ──────────────────────────────────────────────────
+
+// Select the action and consume a native Linux one-shot handler atomically
+// with rt_sigaction and thread attachment. Dispositions are stored per thread,
+// but Linux shares them across the process. Retain the flags, mask and restorer
+// when resetting the handler, as Linux does before entering userspace.
+fn take_signal_action(mut t proc.Thread, signum int, native bool) proc.SigAction {
+	mut process := t.process
+	process.threads_lock.acquire()
+	action := t.sigactions[signum]
+	if native && u64(action.sa_sigaction) > 1 && action.sa_flags & linux_sa_resethand != 0 {
+		for mut target in process.threads {
+			target.sigactions[signum].sa_sigaction = voidptr(0)
+		}
+	}
+	process.threads_lock.release()
+	return action
+}
 
 // rt_sigaction(signum, act, oldact, sigsetsize).
 pub fn syscall_rt_sigaction(_ voidptr, signum int, act_ptr u64, oldact_ptr u64, sigsetsize u64) (u64, u64) {
@@ -96,6 +115,8 @@ pub fn syscall_rt_sigaction(_ voidptr, signum int, act_ptr u64, oldact_ptr u64, 
 
 	// Snapshot before updating: act and oldact may alias.
 	mut raw := [4]u64{}
+	mut process := current_thread.process
+	process.threads_lock.acquire()
 	if oldact_ptr != 0 {
 		previous := current_thread.sigactions[signum]
 		raw[0] = u64(previous.sa_sigaction)
@@ -111,13 +132,11 @@ pub fn syscall_rt_sigaction(_ voidptr, signum int, act_ptr u64, oldact_ptr u64, 
 		// Linux shares signal dispositions across every thread in a process.
 		// Musl installs its dynamic-TLS barrier handler after worker threads may
 		// already exist, so updating only the caller deadlocks GTK applications.
-		mut process := current_thread.process
-		process.threads_lock.acquire()
 		for mut target_thread in process.threads {
 			target_thread.sigactions[signum] = incoming
 		}
-		process.threads_lock.release()
 	}
+	process.threads_lock.release()
 
 	// Linux retains a valid disposition update if old-action output faults.
 	if oldact_ptr != 0 && !usercopy.copy_to_user(oldact_ptr, voidptr(&raw[0]), k_sigaction_size) {

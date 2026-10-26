@@ -2705,3 +2705,16 @@ storage and probing; individual flag delivery needs separate tests.
 controls. Compile `sigactionflags-evidence.v` without `-prod`, run `self-test`
 (eleven positive and 190 negative controls), then `check` on the complete
 bundle in [the qualification](../../docs/linux-signal-action-flags.md).
+
+The `resethand` case checks process-wide SA_RESETHAND consumption before
+handler entry. Persistent/one-shot actions, SA_NODEFER/SA_RESTART, sibling
+queries and replacement, new threads, fork inheritance, fatal/ignored defaults
+and SIG_IGN run for three signals as root and UID 1000/GID 2000. Identical
+musl ELFs pass 420 checks on both production architectures and Linux references;
+original kernels fail 84 on AArch64 and 30 on x86-64.
+
+`resethand-reference.v` accepts the same arguments as
+`sigwaitcopy-reference.v`; `--self-test` has two positive and 35 negative
+controls. Compile `resethand-evidence.v` without `-prod`, run `self-test`
+(eleven positive and 429 negative controls), then `check` on the complete
+bundle in [the qualification](../../docs/linux-signal-one-shot.md).

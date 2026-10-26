@@ -443,7 +443,7 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 	timer_info := if shared { posixtimer.SignalInfo{} } else { posixtimer.signal_info(t, which) }
 	if !shared { posixtimer.acknowledge_signal(mut t, which) }
 
-	sigaction := t.sigactions[which]
+	sigaction := take_signal_action(mut t, which, t.sigentry == 0)
 	handler := sigaction.sa_sigaction
 
 	if which == sigstop || (handler == sig_dfl && stop_signal(which)) {

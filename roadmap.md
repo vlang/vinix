@@ -1992,6 +1992,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   architecture. Individual flag delivery requires separate tests.
   See [the flag-probing qualification](docs/linux-signal-action-flags.md).
 
+- [x] Consume native Linux SA_RESETHAND process-wide before handler entry,
+  preserving action metadata and sibling-installed replacements. Sibling/new
+  thread queries, fork inheritance and fatal/ignored defaults pass 420 checks
+  on both production architectures and Linux; originals fail 84 on AArch64
+  and 30 on x86-64. See [the one-shot qualification](docs/linux-signal-one-shot.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

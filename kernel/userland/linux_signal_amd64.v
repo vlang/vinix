@@ -29,8 +29,6 @@ const linux_sa_onstack = 0x08000000
 const linux_sa_restorer = 0x04000000
 const linux_sa_nodefer = 0x40000000
 const linux_sa_restart = 0x10000000
-const linux_sa_resethand = int(u32(0x80000000))
-
 // struct rt_sigframe (arch/x86/kernel/signal_64.c): the return address the
 // handler's `ret` pops, a struct ucontext, then a siginfo.
 const frame_ucontext = u64(8)
@@ -90,7 +88,7 @@ fn get_u64(buf []u8, offset u64) u64 {
 fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int, info_code int, info_addr u64, restarting bool, shared bool) {
 	mut t := unsafe { proc.current_thread() }
 	seccomp_info := take_seccomp_signal(mut t, which, shared)
-	sigaction := t.sigactions[which]
+	sigaction := take_signal_action(mut t, which, true)
 	handler := u64(sigaction.sa_sigaction)
 
 	// A mask sigsuspend() put in place for the wait belongs to the handler's
@@ -203,9 +201,6 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 		t.masked_signals |= signal_bit(which)
 	}
 	t.masked_signals &= ~unblockable_mask()
-	if sigaction.sa_flags & linux_sa_resethand != 0 {
-		t.sigactions[which].sa_sigaction = voidptr(0)
-	}
 
 	// Enter the handler as handler(signal, &info, &ucontext), with the frame's
 	// return address on top of the stack.
