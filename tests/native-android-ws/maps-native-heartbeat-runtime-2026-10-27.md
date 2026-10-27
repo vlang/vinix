@@ -94,6 +94,18 @@ After a disk-space hold and recovery, the bounded streaming seal attempt
 observed shared disk growth 37,220,352 B exceeded its 16 MiB limit. The guard
 exited 125, child 137, cleanup complete; minimum free space was 1,450,995,712 B,
 above its 1 GiB reserve. The incomplete output and exact receipt are preserved.
-No complete manifest or full readback is claimed. Complete sealing remains
-pending; a later retry preflight found only 250,784 KiB free and did not launch.
-The individual hashes, strict import and independent review above pass.
+A later retry preflight found only 250,784 KiB free and did not launch.
+
+After space recovered on 2026-10-28, the unchanged 41-root plan sealed into
+fresh `maps-native-heartbeat-runtime-sealed-2026-10-28-r1/manifest.json`, SHA-256
+`1667db21c28282185d0cf4e45e522962873bac30162aadabaa347738da99227e`.
+Complete inventories bind 29,697 typed entries. Sealing and internal full
+readback passed in 19.12 s, 27,344,896 B maximum RSS, zero swaps. A separate
+agent's complete readback passed in 10.19 s, 23,511,040 B maximum RSS, zero
+swaps. Both guards and children exited 0 with cleanup complete, under limits
+of 600 MiB aggregate RSS, 300 s, 1 GiB reserve, 128 MiB observed growth and
+4 MiB output. Exact command receipts and measurements remain adjacent to the
+new seal; all original evidence and the incomplete first attempt are preserved.
+The adjacent `maps-native-heartbeat-runtime-sealed-2026-10-28-r1-independent-execution.txt`
+records exact argv and receipt/log pins, SHA-256
+`6d688d0433853e1e4e98896625a592ee9a3d96e82bac73a1dc6182f04810982c`.
