@@ -52,6 +52,15 @@ fails if free space falls below a 1 GiB reserve or decreases by more than
 trip this guard. APFS cloning has no full-copy fallback; no immutable evidence
 is deleted or rewritten to recover space.
 
+Samples use `/usr/bin/env LC_ALL=C /bin/df -kP` for the output parent filesystem,
+with a two-second deadline, an 8 KiB output bound and checked KiB-to-byte
+conversion. The command identity and tool hashes are retained. The pinned
+bootstrap's `os.disk_usage` declares an incompatible Darwin `statvfs` layout;
+its impossible 1.17 TB reading tripped the guard during the first input audit,
+before creating an output directory. That failed 38.48-second preparation
+used 36,028,416 bytes maximum RSS and zero swaps. Its complete build and failure
+logs remain in the `maps-context-storage-stage-build-2026-10-27-r1/` state bundle.
+
 With the shared compiler slot released:
 
 ```sh
@@ -68,11 +77,12 @@ Preparation preserves the base kernel. A separately audited receipt profile
 must install the same frozen pidfd kernel in a fresh mutable clone before boot.
 No runtime or kernel rebuild is required for this framework overlay.
 
-The pinned compiler built the Boehm host tool in 5.41 seconds with
-529,711,104 bytes maximum RSS and zero swaps. Its self-test passed disk reserve
-and growth boundaries, exact producer profile, obsolete pins, receipt deltas,
+The pinned compiler built the corrected Boehm host tool in 9.37 seconds with
+527,286,272 bytes maximum RSS and zero swaps. Its self-test passed malformed and
+overflowing `df` output, disk reserve and growth boundaries, exact producer
+profile, obsolete pins, receipt deltas,
 six-file payload, inherited modes and protected ancestors. Build/self-test logs
 and executable are retained in
-`/Users/alex/.local/state/vinix/android/maps-context-storage-stage-build-2026-10-27-r1/`.
+`/Users/alex/.local/state/vinix/android/maps-context-storage-stage-build-2026-10-27-r2/`.
 The executable SHA-256 is
-`a17d2dbe029645c1471be3af7463d347159627dfc831eb35072e5e91b87b63fa`.
+`e06aa25dc9e8ec090abaebead26768b2dce051ebe04a393bedd54821d6bc468e`.

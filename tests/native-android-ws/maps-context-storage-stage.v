@@ -6,6 +6,7 @@ import crypto.sha256
 import json2
 import mapsaccountstage as stage
 import os
+import time
 import v.embed_file
 
 #include <sys/clonefile.h>
@@ -88,8 +89,66 @@ fn disk_budget(start u64, available u64) ! {
 		return error('preparation disk budget exceeded: 1 GiB reserve and 512 MiB growth limit required')
 	}
 }
+fn disk_blocks(value string) !u64 {
+	if value == '' || value.len > 17 { return error('invalid df block count') }
+	mut result := u64(0)
+	limit := u64(0xffff_ffff_ffff_ffff) / 1024
+	for digit in value.bytes() {
+		if digit < `0` || digit > `9` || result > (limit - u64(digit - `0`)) / 10 {
+			return error('invalid or overflowing df block count')
+		}
+		result = result * 10 + u64(digit - `0`)
+	}
+	return result
+}
+fn parse_disk_available(output string) !u64 {
+	lines := output.trim_space().split_into_lines()
+	if output.len > 8192 || lines.len != 2
+		|| lines[0].fields() != ['Filesystem', '1024-blocks', 'Used', 'Available', 'Capacity', 'Mounted', 'on'] {
+		return error('unexpected df -kP output')
+	}
+	fields := lines[1].fields()
+	if fields.len < 6 || !fields[0].starts_with('/') || !fields[5].starts_with('/')
+		|| !fields[4].ends_with('%') { return error('invalid df filesystem row') }
+	total := disk_blocks(fields[1])!
+	used := disk_blocks(fields[2])!
+	available := disk_blocks(fields[3])!
+	if total == 0 || used > total || available > total { return error('inconsistent df counts') }
+	disk_blocks(fields[4][..fields[4].len - 1])!
+	return available * 1024
+}
+fn disk_available(path string) !u64 {
+	// The pinned bootstrap's os.disk_usage has an incompatible Darwin statvfs layout.
+	mut child := os.new_process('/usr/bin/env')
+	child.set_args(['LC_ALL=C', '/bin/df', '-kP', path])
+	child.set_stdin_path('/dev/null')
+	child.set_redirect_stdio()
+	child.run()
+	mut finished := false
+	defer {
+		if !finished { child.signal_kill(); child.wait() }
+		child.close()
+	}
+	mut stdout := ''
+	mut stderr := ''
+	deadline := time.sys_mono_now() + 2 * time.second
+	for {
+		out := child.stdout_read()
+		errout := child.stderr_read()
+		if stdout.len + stderr.len + out.len + errout.len > 8192 { return error('df output exceeds bound') }
+		stdout += out
+		stderr += errout
+		if !child.is_alive() && out == '' && errout == '' { break }
+		if time.sys_mono_now() >= deadline { return error('df deadline exceeded') }
+		time.sleep(10 * time.millisecond)
+	}
+	child.wait()
+	finished = true
+	if child.code != 0 || stderr != '' { return error('df failed: ' + stderr) }
+	return parse_disk_available(stdout)
+}
 fn disk_sample(root string, label string, start u64, mut samples map[string]u64) ! {
-	available := os.disk_usage(os.dir(root))!.available
+	available := disk_available(os.dir(root))!
 	samples[label] = available
 	println('MAPS-CONTEXT-STORAGE disk ' + label + ' available_bytes=' + available.str())
 	disk_budget(start, available)!
@@ -284,9 +343,10 @@ fn run(destination string) ! {
 	exact_profile(base_seal, framework_seal, jar_pin, dex_pin)!
 	root := stage.external(destination)!
 	stage.disjoint(root, [base_root, framework_root, os.getwd()])!
-	disk_start := os.disk_usage(os.dir(root))!.available
+	disk_start := disk_available(os.dir(root))!
 	disk_budget(disk_start, disk_start)!
 	mut disk_samples := {'preflight': disk_start}
+	println('MAPS-CONTEXT-STORAGE disk preflight available_bytes=' + disk_start.str())
 	println('MAPS-CONTEXT-STORAGE auditing immutable inputs')
 	base_files := stage.load_inventory(base_root, base_seal)!
 	base := read_json(base_root + '/stage.json')!
@@ -329,6 +389,8 @@ fn run(destination string) ! {
 	}
 	inputs[os.real_path(os.executable())] = stage.hash(os.real_path(os.executable()))!
 	inputs['/usr/bin/git'] = stage.hash('/usr/bin/git')!
+	inputs['/usr/bin/env'] = stage.hash('/usr/bin/env')!
+	inputs['/bin/df'] = stage.hash('/bin/df')!
 	revision := stage.command(root, 'source-revision', ['/usr/bin/git', 'rev-parse', 'HEAD'])!.trim_space()
 	if revision.len != 40 { return error('full source revision required') }
 	os.mkdir(root + '/tools', mode: 0o755)!
@@ -441,6 +503,7 @@ fn run(destination string) ! {
 		'guest_terminal_command': json2.Any('/opt/vinix-maps-account/bin/maps-account-guest --broker'),
 		'disk_reserve_bytes': as_json(disk_reserve_bytes)!, 'disk_growth_limit_bytes': as_json(disk_growth_limit_bytes)!,
 		'disk_available_samples_bytes': as_json(disk_samples)!,
+		'disk_sample_argv': as_json(['/usr/bin/env', 'LC_ALL=C', '/bin/df', '-kP', os.dir(root)])!,
 	})!
 	mut files := map[string]string{}
 	collect(root, '', mut files)!
@@ -448,6 +511,17 @@ fn run(destination string) ! {
 	println('MAPS-CONTEXT-STORAGE-STAGE PASS ' + root + ' seal=' + stage.hash(root + '/sha256.json')!)
 }
 fn self_test() ! {
+	header := 'Filesystem 1024-blocks Used Available Capacity Mounted on\n'
+	if parse_disk_available(header + '/dev/disk3s5 1948404040 1912096216 4311392 100% /System/Volumes/Data\n')! != u64(4311392) * 1024 {
+		return error('df sample parsed incorrectly')
+	}
+	for bad in ['', header, header + '/dev/disk 10 1 -1 1% /data\n',
+		header + '/dev/disk 10 1 11 1% /data\n', header + '/dev/disk 10 11 1 1% /data\n',
+		header + '/dev/disk 10 1 1x 1% /data\n', header + '/dev/disk 18014398509481984 1 1 1% /data\n',
+		header + '/dev/disk 10 1 1 1% /data\nextra\n', header.replace('1024-blocks', '512-blocks') + '/dev/disk 10 1 1 1% /data\n'] {
+		if _ := parse_disk_available(bad) { return error('malformed or overflowing df output accepted') }
+	}
+	if disk_blocks('18014398509481983')! != u64(0xffff_ffff_ffff_ffff) / 1024 { return error('df upper boundary rejected') }
 	disk_start := disk_reserve_bytes + disk_growth_limit_bytes + 32
 	disk_budget(disk_start, disk_start)!
 	disk_budget(disk_start, disk_start - disk_growth_limit_bytes)!
@@ -545,7 +619,7 @@ fn self_test() ! {
 		if _ := inherited_modes(original, plan) { return error('unsafe old inode accepted') }
 	}
 	if _ := inherited_modes([stage.Entry{name: jar_path, kind: 'regular', mode: 0o600}], plan) { return error('unreadable original accepted') }
-	println('MAPS-CONTEXT-STORAGE-STAGE SELFTEST PASS disk reserve/growth boundaries exact profile five-input deployment delta one-input headless delta six-file payload inherited modes protected ancestors')
+	println('MAPS-CONTEXT-STORAGE-STAGE SELFTEST PASS strict df parser disk reserve/growth boundaries exact profile five-input deployment delta one-input headless delta six-file payload inherited modes protected ancestors')
 }
 fn main() {
 	if os.args.len == 2 && os.args[1] == '--self-test' { self_test() or { eprintln(err); exit(1) }; return }
