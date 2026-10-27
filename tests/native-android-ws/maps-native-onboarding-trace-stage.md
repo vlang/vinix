@@ -142,3 +142,38 @@ The staged boot digest is
 `f90cb8b87b0fa2e4f34af9fe2f23026fbd2d029ac35481a735eeff507cdb3cd9`.
 Fresh-clone, kernel-patch and live Maps validation remain pending at this stage
 checkpoint; successful Google login is unverified.
+
+At the subsequent 08:53 UTC checkpoint, a second fresh mutable clone was
+prepared at
+`/Users/alex/.local/state/vinix/android/maps-native-onboarding-trace-vm-r2`.
+The earlier `maps-native-onboarding-trace-vm-r1` directory was preserved.
+The complete sealed source/destination inventory and metadata checks passed
+in 7.52 seconds at 21,250,048 bytes peak RSS, zero swaps. The adjacent
+`maps-native-onboarding-trace-vm-r2-clone.json` receipt has SHA-256
+`d0c24f26723e0a27ae4da475853e75a30d6a893e3c3d056e34ace83cf3cb44b8`.
+
+The frozen kernel profile then passed all inherited media checks and kernel
+readback in 46.19 seconds at 14,598,144 bytes peak RSS, zero swaps. Its
+`kernel-patch.json` receipt has SHA-256
+`1b51cf146b47cc33f8b820b28c8deedcfdb8cfab55e84fbe2b22eccaaf0fcc6f`;
+the patched boot digest is
+`7ad9f01f84ef4489629a9d989a0c1f888745bdc6b506aefaf15b336d50339766`.
+The frozen kernel build receipt remains
+`1e9077779aaed08188e6f8111ca9ceb27b479517ece736a58157049f004fb36d`.
+Both operations passed the r3 process-tree guard with verified cleanup and
+unchanged limits: 2 GiB RSS, 300 seconds, 1 GiB reserve and an explicitly
+backed 8 GiB volume-growth allowance. The maximum sampled process-tree RSS
+was 22,495,232 bytes for cloning and 27,164,672 bytes for patching.
+
+The corrected build directory retains `fresh-clone-r2.log` (SHA-256
+`b48234f037441a77ba4a0fe4c7c98f8060b7c4fe0d38e80e10423061b44718ca`),
+`fresh-kernel-patch-r2.log` (SHA-256
+`6505496a1392eb2ba2660c6834489066541b2252b42dbf8778a1191f5fbb6e99`),
+and their `-bounded.json` guard receipts. The verified existing owned runner
+was copied to that build directory as `runner-vm-r2`, digest
+`2419d0760fa92a3e9caa3e60c5596836400616cad8205ca8e6118ade14979908`.
+Its retained embedded source matches the current
+`tests/android-webview-browser-probe/run.v`, digest
+`c13a45576372481b911e0623dda7b0080438c7c5ba54b668c681459d57b67e12`.
+No compiler or VM was started during this preparation. VM launch and live
+Maps validation remain pending at this handoff; successful login is unverified.
