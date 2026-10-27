@@ -276,7 +276,8 @@ fn memory_observation(serial string) ! {
 }
 
 fn guest_resources(out string) ! {
-	temporary := os.join_path(os.temp_dir(), 'bundle-identifier-guest-' + os.getpid().str())
+	// The frozen V's os.temp_dir() returns /tmp unconditionally on macOS.
+	temporary := os.join_path(os.getenv('TMPDIR'), 'bundle-identifier-guest-' + os.getpid().str())
 	if os.exists(temporary) { return error('temporary directory exists') }
 	os.mkdir(temporary)!
 	defer { os.rmdir_all(temporary) or {} }
@@ -437,7 +438,7 @@ fn selftest(out string) ! {
 	mut rejected_link := false
 	ipa_members(good_members, good_types + 'lrwxr-xr-x link\n') or { rejected_link = true }
 	if !rejected_link { return error('IPA symlink accepted') }
-	temporary := os.join_path(os.temp_dir(), 'bundle-identifier-selftest-' + os.getpid().str())
+	temporary := os.join_path(os.getenv('TMPDIR'), 'bundle-identifier-selftest-' + os.getpid().str())
 	if os.exists(temporary) { return error('selftest directory exists') }
 	os.mkdir(temporary)!
 	defer { os.rmdir_all(temporary) or {} }
