@@ -8,9 +8,11 @@ import os
 
 const owner = 'Lorg/vinix/servicequery/Main;'
 const context = 'Landroid/content/Context;'
+const prefs = 'Landroid/content/SharedPreferences;'
+const editor = 'Landroid/content/SharedPreferences$Editor;'
 const client = 'org.vinix.servicequery.client'
 const disabled = 'org.vinix.servicequery.disabled'
-const marker = 'SERVICE-QUERY-PASS no-filter disabled-component disabled-application unexported multifilter-single missing-no-action-fallback component-package wrapper implicit-preserved metadata-preserved no-initialization direct-boot-metadata'
+const marker = 'SERVICE-QUERY-PASS no-filter disabled-component disabled-application unexported multifilter-single missing-no-action-fallback component-package wrapper implicit-preserved metadata-preserved no-initialization direct-boot-metadata credential-context'
 
 fn method(signature string, locals int, body string) string {
 	return '.method ${signature}\n.locals ${locals}\n${body}\n.end method\n'
@@ -180,6 +182,190 @@ if-eqz v0, :bad
  return method('private static metadata(${context})V', 4, body + 'return-void\n' + failure('ComponentInfo default/copy or companion metadata'))
 }
 
+fn checks() string {
+	return method('private static checkEqual(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;)V', 1, '
+if-eq p0, p1, :ok
+if-eqz p0, :bad
+invoke-virtual {p0, p1}, Ljava/lang/Object;->equals(Ljava/lang/Object;)Z
+move-result v0
+if-nez v0, :ok
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+invoke-direct {v0, p2}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0
+:ok
+return-void') + method('private static checkDirectory(Ljava/io/File;Ljava/io/File;Ljava/lang/String;)V', 1, '
+invoke-static {p0, p1, p2}, ${owner}->checkEqual(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;)V
+invoke-virtual {p1}, Ljava/io/File;->isDirectory()Z
+move-result v0
+if-nez v0, :ok
+new-instance v0, Ljava/lang/AssertionError;
+invoke-direct {v0, p2}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v0
+:ok
+return-void')
+}
+
+fn path_checks() string {
+	mut body := '
+invoke-virtual {p0}, ${context}->isDeviceProtectedStorage()Z
+move-result v0
+if-ne v0, p2, :bad
+invoke-virtual {p0}, ${context}->isCredentialProtectedStorage()Z
+move-result v0
+xor-int/lit8 v1, p2, 1
+if-ne v0, v1, :bad
+new-instance v0, Ljava/io/File;
+invoke-direct {v0, p1}, Ljava/io/File;-><init>(Ljava/lang/String;)V
+invoke-virtual {p0}, ${context}->getDataDir()Ljava/io/File;
+move-result-object v1
+const-string v2, "context data root"
+invoke-static {v0, v1, v2}, ${owner}->checkDirectory(Ljava/io/File;Ljava/io/File;Ljava/lang/String;)V
+'
+	for signature, child in {'getFilesDir()': 'files', 'getCacheDir()': 'cache'} {
+		body += 'new-instance v1, Ljava/io/File;\nconst-string v2, "${child}"\n' +
+			'invoke-direct {v1, v0, v2}, Ljava/io/File;-><init>(Ljava/io/File;Ljava/lang/String;)V\n' +
+			'invoke-virtual {p0}, ${context}->${signature}Ljava/io/File;\nmove-result-object v3\n' +
+			'invoke-static {v1, v3, v2}, ${owner}->checkDirectory(Ljava/io/File;Ljava/io/File;Ljava/lang/String;)V\n'
+	}
+	body += '
+new-instance v1, Ljava/io/File;
+const-string v2, "app_storage_probe"
+invoke-direct {v1, v0, v2}, Ljava/io/File;-><init>(Ljava/io/File;Ljava/lang/String;)V
+const-string v2, "storage_probe"
+const/4 v3, 0
+invoke-virtual {p0, v2, v3}, ${context}->getDir(Ljava/lang/String;I)Ljava/io/File;
+move-result-object v3
+invoke-static {v1, v3, v2}, ${owner}->checkDirectory(Ljava/io/File;Ljava/io/File;Ljava/lang/String;)V
+new-instance v1, Ljava/io/File;
+const-string v2, "databases/storage_probe.db"
+invoke-direct {v1, v0, v2}, Ljava/io/File;-><init>(Ljava/io/File;Ljava/lang/String;)V
+const-string v2, "storage_probe.db"
+invoke-virtual {p0, v2}, ${context}->getDatabasePath(Ljava/lang/String;)Ljava/io/File;
+move-result-object v3
+invoke-static {v1, v3, v2}, ${owner}->checkEqual(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;)V
+return-void
+' + failure('device flag or storage path')
+	return method('private static checkPaths(${context}Ljava/lang/String;Z)V', 4, body)
+}
+
+fn preferences_check() string {
+	mut body := '
+const-string v2, "protected_storage_probe"
+const/4 v3, 0
+invoke-virtual {p0, v2, v3}, ${context}->getSharedPreferences(Ljava/lang/String;I)${prefs}
+move-result-object v0
+invoke-virtual {p1, v2, v3}, ${context}->getSharedPreferences(Ljava/lang/String;I)${prefs}
+move-result-object v1
+if-eq v0, v1, :bad
+'
+	for register, value in {'v0': 'credential', 'v1': 'device'} {
+		body += 'invoke-interface {${register}}, ${prefs}->edit()${editor}\nmove-result-object v2\n' +
+			'const-string v3, "storage"\nconst-string v4, "${value}"\n' +
+			'invoke-interface {v2, v3, v4}, ${editor}->putString(Ljava/lang/String;Ljava/lang/String;)${editor}\n' +
+			'invoke-interface {v2}, ${editor}->commit()Z\nmove-result v2\nif-eqz v2, :bad\n'
+	}
+	for register, value in {'v0': 'credential', 'v1': 'device'} {
+		body += 'const-string v2, "storage"\nconst/4 v3, 0\n' +
+			'invoke-interface {${register}, v2, v3}, ${prefs}->getString(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\nmove-result-object v2\n' +
+			'const-string v3, "${value}"\nconst-string v4, "isolated preferences"\n' +
+			'invoke-static {v3, v2, v4}, ${owner}->checkEqual(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;)V\n'
+	}
+	for register in ['p0', 'p1'] {
+		body += 'invoke-virtual {${register}}, ${context}->getDataDir()Ljava/io/File;\nmove-result-object v0\n' +
+			'new-instance v1, Ljava/io/File;\nconst-string v2, "shared_prefs/protected_storage_probe.xml"\n' +
+			'invoke-direct {v1, v0, v2}, Ljava/io/File;-><init>(Ljava/io/File;Ljava/lang/String;)V\n' +
+			'invoke-virtual {v1}, Ljava/io/File;->isFile()Z\nmove-result v0\nif-eqz v0, :bad\n'
+	}
+	body += 'return-void\n' + failure('CE and DE preference storage must be isolated and committed')
+	return method('private static checkPreferences(${context}${context})V', 5, body)
+}
+
+
+fn storage_check() string {
+	mut body := '
+invoke-virtual {p0}, ${context}->getApplicationInfo()Landroid/content/pm/ApplicationInfo;
+move-result-object v0
+iget-object v1, v0, Landroid/content/pm/ApplicationInfo;->credentialProtectedDataDir:Ljava/lang/String;
+iget-object v2, v0, Landroid/content/pm/ApplicationInfo;->deviceProtectedDataDir:Ljava/lang/String;
+if-eqz v1, :bad
+if-eqz v2, :bad
+invoke-virtual {v1, v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v0
+if-nez v0, :bad
+const/4 v7, 0
+invoke-static {p0, v1, v7}, ${owner}->checkPaths(${context}Ljava/lang/String;Z)V
+invoke-virtual {p0}, ${context}->createCredentialProtectedStorageContext()${context}
+move-result-object v4
+if-eq v4, p0, :bad
+invoke-static {v4, v1, v7}, ${owner}->checkPaths(${context}Ljava/lang/String;Z)V
+invoke-virtual {p0}, ${context}->createDeviceProtectedStorageContext()${context}
+move-result-object v3
+if-eq v3, p0, :bad
+const/4 v7, 1
+invoke-static {v3, v2, v7}, ${owner}->checkPaths(${context}Ljava/lang/String;Z)V
+# Both original directory caches are now primed before switching DE back to CE.
+invoke-virtual {v3}, ${context}->createCredentialProtectedStorageContext()${context}
+move-result-object v4
+if-eq v4, v3, :bad
+const/4 v7, 0
+invoke-static {v4, v1, v7}, ${owner}->checkPaths(${context}Ljava/lang/String;Z)V
+invoke-virtual {v3}, ${context}->createCredentialProtectedStorageContext()${context}
+move-result-object v5
+if-eq v4, v5, :bad
+invoke-static {v5, v1, v7}, ${owner}->checkPaths(${context}Ljava/lang/String;Z)V
+invoke-static {v4, v3}, ${owner}->checkPreferences(${context}${context})V
+invoke-static {v5, v3}, ${owner}->checkPreferences(${context}${context})V
+'
+	for spec in [['v4', 'v1', '0'], ['v3', 'v2', '1']] {
+		body += '
+new-instance v5, Landroid/content/ContextWrapper;
+invoke-direct {v5, ${spec[0]}}, Landroid/content/ContextWrapper;-><init>(${context})V
+new-instance v6, Landroid/content/ContextWrapper;
+invoke-direct {v6, v5}, Landroid/content/ContextWrapper;-><init>(${context})V
+const/4 v7, ${spec[2]}
+invoke-static {v6, ${spec[1]}, v7}, ${owner}->checkPaths(${context}Ljava/lang/String;Z)V
+invoke-virtual {v6}, ${context}->createCredentialProtectedStorageContext()${context}
+move-result-object v5
+const/4 v7, 0
+invoke-static {v5, v1, v7}, ${owner}->checkPaths(${context}Ljava/lang/String;Z)V
+invoke-virtual {v6}, ${context}->createDeviceProtectedStorageContext()${context}
+move-result-object v5
+const/4 v7, 1
+invoke-static {v5, v2, v7}, ${owner}->checkPaths(${context}Ljava/lang/String;Z)V
+invoke-virtual {${spec[0]}}, ${context}->getResources()Landroid/content/res/Resources;
+move-result-object v5
+invoke-virtual {v5}, Landroid/content/res/Resources;->getConfiguration()Landroid/content/res/Configuration;
+move-result-object v5
+new-instance v6, Landroid/content/res/Configuration;
+invoke-direct {v6, v5}, Landroid/content/res/Configuration;-><init>(Landroid/content/res/Configuration;)V
+invoke-virtual {${spec[0]}, v6}, ${context}->createConfigurationContext(Landroid/content/res/Configuration;)${context}
+move-result-object v5
+const/4 v7, ${spec[2]}
+invoke-static {v5, ${spec[1]}, v7}, ${owner}->checkPaths(${context}Ljava/lang/String;Z)V
+invoke-virtual {${spec[0]}}, ${context}->getApplicationContext()${context}
+move-result-object v5
+invoke-virtual {p0}, ${context}->getApplicationContext()${context}
+move-result-object v6
+if-ne v5, v6, :bad
+invoke-virtual {${spec[0]}}, ${context}->getResources()Landroid/content/res/Resources;
+move-result-object v5
+invoke-virtual {p0}, ${context}->getResources()Landroid/content/res/Resources;
+move-result-object v6
+if-ne v5, v6, :bad
+'
+	}
+	body += '
+const/4 v7, 0
+invoke-static {p0, v1, v7}, ${owner}->checkPaths(${context}Ljava/lang/String;Z)V
+invoke-static {v4, v1, v7}, ${owner}->checkPaths(${context}Ljava/lang/String;Z)V
+const/4 v7, 1
+invoke-static {v3, v2, v7}, ${owner}->checkPaths(${context}Ljava/lang/String;Z)V
+return-void
+' + failure('credential factory freshness, state, namespace, wrappers, configuration or identity')
+	return method('private static storage(${context})V', 8, body)
+}
+
 fn main_class() string {
 	mut source := '.class public ${owner}\n.super Landroid/app/Activity;\n'
 	source += method('public constructor <init>()V', 0, 'invoke-direct {p0}, Landroid/app/Activity;-><init>()V\nreturn-void')
@@ -187,6 +373,7 @@ fn main_class() string {
 	source += implicit_check()
 	source += component_array_check()
 	source += metadata_check()
+	source += checks() + path_checks() + preferences_check() + storage_check()
 	mut body := 'invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V\nmove-object v0, p0\n'
 	for wrapped in [false, true] {
 		if wrapped {
@@ -203,6 +390,7 @@ fn main_class() string {
 		body += query(disabled, 'Enabled', 0x200, 1)
 		body += 'invoke-static {v0}, ${owner}->implicit(${context})V\n'
 		body += 'invoke-static {v0}, ${owner}->metadata(${context})V\n'
+		body += 'invoke-static {v0}, ${owner}->storage(${context})V\n'
 	}
 	body += 'sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v1, "${marker}"\ninvoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\ninvoke-virtual {v0}, Ljava/io/PrintStream;->flush()V\nnew-instance v0, Landroid/widget/TextView;\ninvoke-direct {v0, p0}, Landroid/widget/TextView;-><init>(${context})V\nconst-string v1, "Explicit service metadata query passed"\ninvoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V\ninvoke-virtual {p0, v0}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V\nreturn-void'
 	return source + method('public onCreate(Landroid/os/Bundle;)V', 5, body)
@@ -289,7 +477,11 @@ fn build_apk(out string, name string, dir string, tools string, java string, sig
 	assembly := recorded(out, name + '-assemble', [java, '-Xmx512m', '-XX:ActiveProcessorCount=2', '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', '--jobs', '2', dir + '/smali', '-o', dir + '/classes.dex'])
 	assert assembly.trim_space() == '', assembly
 	recorded(out, name + '-roundtrip', [java, '-Xmx512m', '-XX:ActiveProcessorCount=2', '-cp', tools + '/*', 'org.jf.baksmali.Main', 'disassemble', '--jobs', '2', dir + '/classes.dex', '-o', dir + '/roundtrip'])
-	if name == 'client' { assert os.read_file(dir + '/roundtrip/org/vinix/servicequery/Main.smali')!.contains(marker) }
+	if name == 'client' {
+		decoded := os.read_file(dir + '/roundtrip/org/vinix/servicequery/Main.smali')!
+		for expected in [marker, '->createCredentialProtectedStorageContext()', '->isCredentialProtectedStorage()Z',
+			'->createConfigurationContext(', '->commit()Z'] { assert decoded.contains(expected), expected }
+	}
 	recorded(out, name + '-zip', ['/usr/bin/zip', '-q', '-j', dir + '/unsigned.apk', dir + '/classes.dex'])
 	apk := dir + '/probe.apk'
 	recorded(out, name + '-sign', [java, '-Xmx512m', '-jar', signer, 'sign', '--ks', key, '--ks-key-alias', 'fixture', '--ks-pass', 'pass:android', '--key-pass', 'pass:android', '--out', apk, dir + '/unsigned.apk'])
@@ -304,7 +496,7 @@ fn finish(out string, repo string, inputs map[string]string, apks map[string]str
 	os.write_file(out + '/build.json', json2.encode({
 		'argv': json2.Any(os.args), 'source_revision': json2.Any(revision.output.trim_space()),
 		'inputs_sha256': json2.decode[json2.Any](json2.encode(inputs))!, 'apks_sha256': json2.decode[json2.Any](json2.encode(apks))!,
-		'pass_marker': json2.Any(marker), 'scope': json2.Any('Generic explicit query API regression. Signed APK generation and DEX roundtrip only until run under ART; no account or network activity. Metadata lookup must not construct services or companion Application.')
+		'pass_marker': json2.Any(marker), 'scope': json2.Any('Generic explicit query, direct-boot metadata and credential/device storage Context API regression. Tests fresh CE factories and primed-cache DE-to-CE roundtrips; distinct paths/preferences, dual storage predicates, nested wrappers, configuration and app/resources identity. Storage namespaces are separate private directories without separate encryption/unlock states. Signed APK generation and DEX roundtrip only until ART execution; no account/network activity. Metadata lookup must not construct services or companion Application.')
 	}, prettify: true) + '\n')!
 	os.cp(@FILE, out + '/builder.v')!
 	os.cp(os.executable(), out + '/builder')!

@@ -27,6 +27,8 @@ const protected_storage_manifest = '67e1cb450fa87305c99480133084b7f9cb684feeeaa2
 const protected_storage_jar = 'a8ba34eb79be2473f89042c8ee940ab1994dbc902c3d45143877f8891d3b428b'
 const service_query_manifest = '12f21e139e2602fa9517c6df7d2fda866d366d4d5f0cce6d7e07d62bbd044559'
 const service_query_jar = '74892a013cb72fdaef39852325a3fa46db217fbcd3a4f11fcba4cc7272b2a50b'
+const direct_boot_manifest = 'a3445b78a7c4049fa71ee0f81469dca7da2236c36788500cd8bd3c8bb0b81552'
+const direct_boot_jar = 'bf3853c98155e420162dc8d1759735a497e8d8bb9724cd9eb7f209c4edb04c0d'
 const java = '/opt/homebrew/opt/openjdk@25/bin/java'
 const tools = repo + '/build/android-framework/tools'
 const source_file = repo + '/tests/native-android-ws/combined-account-webview-build.v'
@@ -215,6 +217,25 @@ fn direct_boot_profile() NarrowProfile {
   changed: {'android/content/pm/ComponentInfo.smali': 1, 'android/content/pm/PackageParser.smali': 4}
   added: {'android/content/pm/ComponentInfo.smali': 0, 'android/content/pm/PackageParser.smali': 1}
   fields: {'android/content/pm/ComponentInfo.smali': ['.field public directBootAware:Z']}
+ }
+}
+
+fn credential_storage_profile() NarrowProfile {
+ signatures := ['createCredentialProtectedStorageContext()Landroid/content/Context;', 'isCredentialProtectedStorage()Z']
+ return NarrowProfile{
+  name: 'credential-storage'
+  baseline_name: 'combined-account-webview-direct-boot-framework-2026-10-27-r1'
+  manifest_pin: direct_boot_manifest
+  jar_pin: direct_boot_jar
+  baseline_classes: 2104
+  providers: ['framework_credential_storage.v']
+  calls: {'android/content/Context.smali': 'framework_credential_storage_context',
+   'android/content/ContextWrapper.smali': 'framework_credential_storage_wrapper',
+   'android/app/ContextImpl.smali': 'framework_credential_storage_impl'}
+  methods: {'android/content/Context.smali': signatures, 'android/content/ContextWrapper.smali': signatures,
+   'android/app/ContextImpl.smali': signatures}
+  changed: {'android/content/Context.smali': 0, 'android/content/ContextWrapper.smali': 0, 'android/app/ContextImpl.smali': 0}
+  added: {'android/content/Context.smali': 2, 'android/content/ContextWrapper.smali': 2, 'android/app/ContextImpl.smali': 2}
  }
 }
 
@@ -546,6 +567,8 @@ fn self_test() ! {
  boot_profile := direct_boot_profile()
  narrow_method_self_test(boot_profile.methods['android/content/pm/ComponentInfo.smali']!, 1, 0)!
  narrow_method_self_test(boot_profile.methods['android/content/pm/PackageParser.smali']!, 4, 1)!
+ credential_profile := credential_storage_profile()
+ for _, signatures in credential_profile.methods { narrow_method_self_test(signatures, 0, 2)! }
  boot_metadata := '.class public LExample;\n.super Ljava/lang/Object;\n'
  boot_fields := boot_profile.fields['android/content/pm/ComponentInfo.smali']!
  boot_extended := boot_metadata + boot_fields[0] + '\n'
@@ -1007,11 +1030,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot'] {
-  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } else { direct_boot_profile() } }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage'] {
+  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } else { credential_storage_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
