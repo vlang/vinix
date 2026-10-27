@@ -37,6 +37,7 @@ struct Span {
 
 struct Plan {
 	version int
+	frame_prefix string
 	serial_sha256 string
 	archive_sha256 string
 	archive_bytes int
@@ -64,6 +65,14 @@ fn hash(data string) string { return sha256.sum(data.bytes()).hex() }
 
 fn digest(value string) bool {
 	return value.len == 64 && value.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`))
+}
+
+fn selected_prefix(plan Plan) !string {
+	if plan.version == 1 && plan.frame_prefix == '' { return prefix }
+	if plan.version == 2 && plan.frame_prefix in [prefix, 'VINIX-SERVICE-QUERY-RESULTS-1 '] {
+		return plan.frame_prefix
+	}
+	return error('plan version/prefix rejected')
 }
 
 fn read_bounded(path string, limit int) !string {
@@ -98,23 +107,24 @@ fn decimal(value string, limit int) !int {
 // Audit original frame occurrences and protect their headers before deleting
 // any byte. Adjacent removal ranges cannot disguise a removed frame prefix.
 fn protected_headers(raw string, plan Plan) ![]Span {
+	selected := selected_prefix(plan)!
 	for known in known_prefixes {
-		if known != prefix && raw.contains(known) { return error('foreign raw frame') }
+		if plan.version == 1 && known != selected && raw.contains(known) { return error('foreign raw frame') }
 	}
 	mut spans := []Span{cap: plan.archive_chunks + 2}
 	mut start := 0
 	mut ordinal := 0
 	for start < raw.len {
-		pos := raw[start..].index(prefix) or { break }
+		pos := raw[start..].index(selected) or { break }
 		at := start + pos
 		if at != 0 && raw[at - 1] != `\n` { return error('embedded raw frame') }
 		if ordinal > plan.archive_chunks + 1 { return error('extra raw frame') }
 		header := if ordinal == 0 {
-			prefix + 'BEGIN ' + plan.archive_sha256 + ' ' + plan.archive_bytes.str() + ' ' + plan.archive_chunks.str()
+			selected + 'BEGIN ' + plan.archive_sha256 + ' ' + plan.archive_bytes.str() + ' ' + plan.archive_chunks.str()
 		} else if ordinal == plan.archive_chunks + 1 {
-			prefix + 'END ' + plan.archive_sha256 + ' ' + plan.archive_bytes.str() + ' ' + plan.archive_chunks.str()
+			selected + 'END ' + plan.archive_sha256 + ' ' + plan.archive_bytes.str() + ' ' + plan.archive_chunks.str()
 		} else {
-			prefix + 'CHUNK ' + plan.archive_sha256 + ' ' + (ordinal - 1).str() + ' '
+			selected + 'CHUNK ' + plan.archive_sha256 + ' ' + (ordinal - 1).str() + ' '
 		}
 		if !raw[at..].starts_with(header) { return error('original frame header rejected') }
 		if ordinal == 0 || ordinal == plan.archive_chunks + 1 {
@@ -123,22 +133,32 @@ fn protected_headers(raw string, plan Plan) ![]Span {
 		}
 		spans << Span{start: at, end: at + header.len}
 		ordinal++
-		start = at + prefix.len
+		start = at + selected.len
 	}
 	if ordinal != plan.archive_chunks + 2 { return error('raw frame count rejected') }
+	// V2 selects exactly one complete export from a full pinned UART. Other
+	// protocol families may occur outside it, never inside or in its headers.
+	if plan.version == 2 {
+		selected_raw := raw[spans[0].start..spans.last().end]
+		for known in known_prefixes {
+			if known != selected && selected_raw.contains(known) { return error('foreign selected frame') }
+		}
+	}
 	return spans
 }
 
 fn derived_payload(raw string, plan Plan) !string {
-	if plan.version != 1 || !digest(plan.serial_sha256) || !digest(plan.archive_sha256)
+	selected := selected_prefix(plan)!
+	if !digest(plan.serial_sha256) || !digest(plan.archive_sha256)
 		|| hash(raw) != plan.serial_sha256 || raw.len > raw_limit || plan.archive_bytes <= 0
 		|| plan.archive_bytes > archive_limit || plan.archive_chunks != (plan.archive_bytes + 511) / 512
-		|| plan.removals.len == 0 || plan.removals.len > 32 {
+		|| (plan.version == 1 && plan.removals.len == 0) || plan.removals.len > 32 {
 		return error('plan bounds or raw SHA256 rejected')
 	}
 	headers := protected_headers(raw, plan)!
 	mut segments := []string{}
-	mut previous := 0
+	mut previous := if plan.version == 2 { headers[0].start } else { 0 }
+	boundary := if plan.version == 2 { headers.last().end } else { raw.len }
 	mut removed := 0
 	for item in plan.removals {
 		if item.offset < previous || item.offset > raw.len || item.expected == '' || item.expected.len > 512
@@ -146,6 +166,7 @@ fn derived_payload(raw string, plan Plan) !string {
 			return error('overlapping or out-of-bounds byte removal')
 		}
 		end := item.offset + item.expected.len
+		if end > boundary { return error('removal outside selected export') }
 		if headers.any(item.offset < it.end && end > it.start)
 			|| raw[item.offset..end] != item.expected {
 			return error('nonexact, overlapping or invalid byte removal')
@@ -155,7 +176,7 @@ fn derived_payload(raw string, plan Plan) !string {
 		segments << raw[previous..item.offset]
 		previous = end
 	}
-	segments << raw[previous..]
+	segments << raw[previous..boundary]
 	// This ephemeral parsing view is never written as a replacement serial log.
 	view := segments.join('')
 	mut begun := false
@@ -166,12 +187,12 @@ fn derived_payload(raw string, plan Plan) !string {
 		line := raw_line.trim_right('\r')
 		for known in known_prefixes {
 			if pos := line.index(known) {
-				if pos != 0 || known != prefix { return error('embedded/foreign frame') }
+				if pos != 0 || known != selected { return error('embedded/foreign frame') }
 			}
 		}
-		if !line.starts_with(prefix) { continue }
+		if !line.starts_with(selected) { continue }
 		if ended || line.len > 1024 { return error('repeated/oversized frame') }
-		fields := line[prefix.len..].split(' ')
+		fields := line[selected.len..].split(' ')
 		if fields.len != 4 || fields.any(it == '') || fields[1] != plan.archive_sha256 {
 			return error('frame syntax or digest mismatch')
 		}
@@ -281,6 +302,7 @@ fn reconstruct(serial string, plan_path string, output string) ! {
 	raw := read_bounded(serial, raw_limit)!
 	plan_text := read_bounded(plan_path, 65536)!
 	plan := json2.decode[Plan](plan_text)!
+	selected := selected_prefix(plan)!
 	payload := derived_payload(raw, plan)!
 	archive := validate(payload)!
 	// Recheck the complete immutable inputs before creating any output.
@@ -293,7 +315,8 @@ fn reconstruct(serial string, plan_path string, output string) ! {
 		}
 	}
 	write_private(output + '/diagnostic.json', json2.encode({
-		'kind': json2.Any('vinix-explicit-byte-removal-diagnostic-v1')
+		'kind': json2.Any(if plan.version == 1 { 'vinix-explicit-byte-removal-diagnostic-v1' } else { 'vinix-selected-export-byte-removal-diagnostic-v2' })
+		'frame_prefix': json2.Any(selected)
 		'created_utc': json2.Any(time.utc().str())
 		'raw_uart_path': json2.Any(serial)
 		'raw_uart_sha256': json2.Any(plan.serial_sha256)
@@ -309,16 +332,18 @@ fn reconstruct(serial string, plan_path string, output string) ! {
 	println('DIAGNOSTIC DERIVATION PASS archive=' + plan.archive_sha256 + ' entries=' + archive.entries.len.str())
 }
 
-fn frames(payload string) string {
+fn selected_frames(payload string, selected string) string {
 	sha := hash(payload)
 	count := (payload.len + 511) / 512
-	mut result := prefix + 'BEGIN ' + sha + ' ' + payload.len.str() + ' ' + count.str() + '\n'
+	mut result := selected + 'BEGIN ' + sha + ' ' + payload.len.str() + ' ' + count.str() + '\n'
 	for index in 0 .. count {
 		end := int_min((index + 1) * 512, payload.len)
-		result += prefix + 'CHUNK ' + sha + ' ' + index.str() + ' ' + base64.encode(payload[index * 512..end].bytes()) + '\n'
+		result += selected + 'CHUNK ' + sha + ' ' + index.str() + ' ' + base64.encode(payload[index * 512..end].bytes()) + '\n'
 	}
-	return result + prefix + 'END ' + sha + ' ' + payload.len.str() + ' ' + count.str() + '\n'
+	return result + selected + 'END ' + sha + ' ' + payload.len.str() + ' ' + count.str() + '\n'
 }
+
+fn frames(payload string) string { return selected_frames(payload, prefix) }
 
 fn expect_rejection(raw string, plan Plan, expected string) ! {
 	_ := derived_payload(raw, plan) or {
@@ -401,7 +426,37 @@ fn self_test() ! {
 	defer { os.rmdir_all(fixture_dir) or {} }
 	write_private(fixture_dir + '/readback', data.repeat(8))!
 	if _ := write_private(fixture_dir + '/readback', data) { return error('existing output accepted') }
-	println('DIAGNOSTIC SELF-TEST PASS positive=4 rejected=' + (rejected + 2).str())
+	// An explicit v2 selector binds the full source but parses one entire export.
+	// It never deletes the other export or accepts a foreign prefix inside one.
+	fixture_prefix := 'VINIX-SERVICE-QUERY-RESULTS-1 '
+	fixture_frames := selected_frames(payload, fixture_prefix)
+	before := 'unselected prelude\n'
+	multi := before + raw + fixture_frames
+	selected_plan := Plan{...plan, version: 2, frame_prefix: prefix, serial_sha256: hash(multi),
+		removals: [Removal{offset: before.len + at, expected: noise}]}
+	assert derived_payload(multi, selected_plan)! == payload
+	fixture_plan := Plan{...selected_plan, frame_prefix: fixture_prefix, removals: []}
+	assert derived_payload(multi, fixture_plan)! == payload
+	assert derived_payload(clean, Plan{...selected_plan, serial_sha256: hash(clean), removals: []})! == payload
+	assert derived_payload(fixture_frames + raw, Plan{...selected_plan, serial_sha256: hash(fixture_frames + raw),
+		removals: [Removal{offset: fixture_frames.len + at, expected: noise}]})! == payload
+	for bad in [Plan{...selected_plan, frame_prefix: ''}, Plan{...selected_plan, frame_prefix: 'VINIX-BROWSER-RESULTS-1 '},
+		Plan{...selected_plan, version: 3}, Plan{...selected_plan, version: 1}] {
+		expect_rejection(multi, bad, 'plan version/prefix rejected')!
+		rejected++
+	}
+	expect_rejection(multi, Plan{...plan, serial_sha256: hash(multi), removals: selected_plan.removals}, 'foreign raw frame')!
+	rejected++
+	expect_rejection(multi, Plan{...selected_plan, removals: [Removal{offset: 0, expected: before}]}, 'overlapping or out-of-bounds byte removal')!
+	rejected++
+	expect_rejection(multi, Plan{...selected_plan, removals: [Removal{offset: (before + raw).len, expected: fixture_prefix[..3]}]}, 'removal outside selected export')!
+	rejected++
+	interleaved := clean[..at] + fixture_prefix + 'CHUNK forbidden\n' + clean[at..]
+	expect_rejection(interleaved, Plan{...selected_plan, serial_sha256: hash(interleaved), removals: []}, 'foreign selected frame')!
+	rejected++
+	if _ := derived_payload(multi + clean, Plan{...selected_plan, serial_sha256: hash(multi + clean)}) { return error('duplicate selected export accepted') }
+	rejected++
+	println('DIAGNOSTIC SELF-TEST PASS positive=8 rejected=' + (rejected + 2).str())
 }
 
 fn run() ! {
