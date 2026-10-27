@@ -21,6 +21,8 @@ Only `child.log` and `receipt.json` are exported, using the existing
 The receipt kind is `vinix-onboarding-api-runtime-v1` and its profile selects the
 fixture. Application data remains in the guest. Keep the two runs' serial
 captures separate.
+Use [uart-snapshot.md](uart-snapshot.md) to preserve the complete growing UART
+and derive one exact appended interval per fixture without rotating its sink.
 
 `service-query-transfer.v serve --onboarding-apis FRESH_EXTERNAL_DIR PORT`
 snapshots and serves exactly `/onboarding-api-run`, `/child-attach.apk`, and
@@ -47,6 +49,7 @@ wget -O /var/lib/onboarding-api-input-r1/settings-global.apk http://10.0.2.2:187
 chmod 755 /var/lib/onboarding-api-input-r1/run
 chmod 644 /var/lib/onboarding-api-input-r1/child-attach.apk /var/lib/onboarding-api-input-r1/settings-global.apk
 /var/lib/onboarding-api-input-r1/run --child-attach /opt/vinix-android-aarch64 /var/lib/onboarding-api-input-r1/child-attach.apk 10117 10117 /var/lib/onboarding-api-child-result-r1
+# Preserve the child UART interval on the host before starting the next fixture.
 /var/lib/onboarding-api-input-r1/run --settings-global /opt/vinix-android-aarch64 /var/lib/onboarding-api-input-r1/settings-global.apk 10117 10117 /var/lib/onboarding-api-settings-result-r1
 ```
 
