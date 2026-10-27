@@ -44,6 +44,21 @@ const service_query_jar_path = 'opt/vinix-android-aarch64/usr/lib/java/dex/andro
 const service_query_dex_path = 'opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/classes.dex'
 const service_query_headless = 'opt/vinix-headless-service'
 const service_query_deployment = 'opt/vinix-maps-account/build.json'
+const controller_memory_base = '/Users/alex/.local/state/vinix/android/maps-service-query-r1'
+const controller_memory_base_seal = '4d4850aa0f4204999e0d8d9c0cdd3ef0466b4d67c9b26ea371005e4cc93e0b9b'
+const controller_memory_boot_sha = 'cd244cb944409f0e1446de7987951a63a8e13721abd90f7dcbb7a81a567c3efc'
+const controller_memory_root = '/Users/alex/.local/state/vinix/android/maps-account-guest-build-2026-10-27-r7'
+const controller_memory_seal = '680942c83d4877b8258e5f53ac454aebc3c021331470a002754bc1647ae1e890'
+const controller_memory_pin = '9c213a85235b802fc3b068ff2d195ea207ba82ded7fe6cdee408e0bd55921c0c'
+const direct_boot_base = '/Users/alex/.local/state/vinix/android/maps-controller-memory-r1'
+const direct_boot_base_seal = '944007c40fff691ad3c2973970ad5e840aea7bff7370bda5486377c274a1fd21'
+const direct_boot_boot_sha = 'b534f94cede89e250f710d367fae062bd1c71c6024dabd85c5aa2444aa010b00'
+const direct_boot_memory_overlay = '6fbaafd334d0008b548df7557b65aa6cf99ae08be7fa584ed46789657ac51b13'
+const direct_boot_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-direct-boot-framework-2026-10-27-r1'
+const direct_boot_framework_seal = 'a3445b78a7c4049fa71ee0f81469dca7da2236c36788500cd8bd3c8bb0b81552'
+const direct_boot_jar = 'bf3853c98155e420162dc8d1759735a497e8d8bb9724cd9eb7f209c4edb04c0d'
+const direct_boot_dex = '3742f3915d4989ced425914e1fe4f6f662bd32566183534a849f8ad8ccd07213'
+const direct_boot_build = '017232d7cef0527e639c3689cca3cc87502746aaa9608760d6bb7f362cbbd2f4'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -81,6 +96,247 @@ fn service_query_profile() Profile {
 	mut modules := controller_profile().modules.clone()
 	modules << 'maps-controller-diagnostic.tar'
 	return Profile{'maps-service-query', service_query_boot_sha, 'maps-service-query-diagnostic.tar', modules}
+}
+
+fn controller_memory_profile() Profile {
+	mut modules := service_query_profile().modules.clone()
+	modules << 'maps-service-query-diagnostic.tar'
+	return Profile{'maps-controller-memory', controller_memory_boot_sha,
+		'maps-controller-memory-diagnostic.tar', modules}
+}
+
+fn controller_memory_modules() map[string]string {
+	mut modules := service_query_modules()
+	modules['maps-service-query-diagnostic.tar'] = 'beab8be6e214199a1e7a509bc386943b31ccf45f89cc8580b94666a3b42fe5a0'
+	return modules
+}
+
+fn controller_memory_fields() map[string]string {
+	return {
+		'kind': 'vinix-maps-controller-memory-diagnostic-v1'
+		'base_root': controller_memory_base
+		'base_manifest_sha256': controller_memory_base_seal
+		'controller_build_root': controller_memory_root
+		'controller_manifest_sha256': controller_memory_seal
+		'controller_sha256': controller_memory_pin
+		'retained_controller_manifest_sha256': controller_seal
+		'framework_manifest_sha256': service_query_framework_seal
+		'native_manifest_sha256': protected_native_seal
+		'retained_launch_manifest_sha256': '920ed6f1a5f5d9e705bdcc108937db6266066718fe4203859a6ac8577bd405be'
+	}
+}
+
+fn controller_memory_inputs() map[string]string {
+	mut inputs := service_query_inputs()
+	inputs[controller_memory_base + '/sha256.json'] = controller_memory_base_seal
+	inputs[controller_memory_root + '/sha256.json'] = controller_memory_seal
+	return inputs
+}
+
+fn controller_memory_delta() map[string]string {
+	return {
+		'/opt/vinix-maps-account/bin/maps-account-guest': controller_memory_pin
+		'/usr/bin/run-android-calculator': controller_memory_pin
+	}
+}
+
+fn verify_controller_memory_overlay(receipt map[string]json2.Any) ! {
+	input_delta := receipt['deployment_input_delta'] or { return error('controller memory deployment input delta absent') }
+	top_delta := receipt['deployment_top_level_delta'] or { return error('controller memory deployment top delta absent') }
+	if input_delta != json2.decode[json2.Any](json2.encode(controller_memory_delta()))!
+		|| top_delta != json2.decode[json2.Any](json2.encode(['inputs_sha256']))! {
+		return error('controller memory deployment delta differs')
+	}
+	inventory := receipt['overlay_inventory'] or { return error('controller memory overlay inventory absent') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(inventory))!
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	mut paths := controller_memory_delta().keys().map(it.trim_left('/'))
+	paths << service_query_deployment
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 {
+			return error('unsafe controller memory overlay inventory entry')
+		}
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) {
+				return error('controller memory regular allowlist differs')
+			}
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || !paths.any(it.starts_with(entry.name + '/')) {
+			return error('unexpected controller memory overlay inode')
+		}
+	}
+	if regulars.len != 3 { return error('exact three controller memory files required') }
+	for path, pin in controller_memory_delta() {
+		if regulars[path.trim_left('/')] or { '' } != pin {
+			return error('controller memory aliases differ from exact executable')
+		}
+	}
+}
+
+// A separate three-file successor preserves the service-query framework and all
+// ten original modules. Its prior controller remains a complete sealed input.
+fn verify_controller_memory_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	if !digest_valid(controller_memory_seal) || !digest_valid(controller_memory_pin)
+		|| controller_memory_seal == controller_seal || controller_memory_pin == controller_pin {
+		return error('sealed new controller memory producer pins required')
+	}
+	for name, expected in controller_memory_fields() {
+		if receipt[name] or { json2.Any('absent') } != json2.Any(expected) {
+			return error('controller memory receipt differs: ' + name)
+		}
+	}
+	for path, pin in controller_memory_inputs() {
+		if stage.inputs_sha256[path] or { '' } != pin { return error('controller memory input differs: ' + path) }
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != controller_memory_modules()
+		|| stage.preserved_modules_sha256 != controller_memory_modules() {
+		return error('controller memory original ten module pins differ')
+	}
+	verify_controller_memory_overlay(receipt)!
+}
+
+fn controller_memory_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_controller_memory_receipt(receipt, stage)!
+	path := controller_memory_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != controller_memory_base_seal {
+		return error('controller memory original service-query manifest differs')
+	}
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != controller_memory_boot_sha {
+		return error('controller memory original boot inventory differs')
+	}
+	return controller_memory_base + '/boot.img'
+}
+
+fn direct_boot_profile() Profile {
+	mut modules := controller_memory_profile().modules.clone()
+	modules << 'maps-controller-memory-diagnostic.tar'
+	return Profile{'maps-direct-boot', direct_boot_boot_sha, 'maps-direct-boot-diagnostic.tar', modules}
+}
+
+fn direct_boot_modules() map[string]string {
+	mut modules := controller_memory_modules()
+	modules['maps-controller-memory-diagnostic.tar'] = direct_boot_memory_overlay
+	return modules
+}
+
+fn direct_boot_fields() map[string]string {
+	return {
+		'kind': 'vinix-maps-direct-boot-diagnostic-v1'
+		'base_root': direct_boot_base
+		'base_manifest_sha256': direct_boot_base_seal
+		'controller_build_root': controller_memory_root
+		'controller_manifest_sha256': controller_memory_seal
+		'controller_sha256': controller_memory_pin
+		'framework_build_root': direct_boot_framework
+		'framework_manifest_sha256': direct_boot_framework_seal
+		'framework_jar_sha256': direct_boot_jar
+		'framework_dex_sha256': direct_boot_dex
+		'retained_framework_manifest_sha256': service_query_framework_seal
+		'native_manifest_sha256': protected_native_seal
+		'retained_launch_manifest_sha256': '920ed6f1a5f5d9e705bdcc108937db6266066718fe4203859a6ac8577bd405be'
+	}
+}
+
+fn direct_boot_inputs() map[string]string {
+	mut inputs := controller_memory_inputs()
+	inputs[direct_boot_base + '/sha256.json'] = direct_boot_base_seal
+	inputs[direct_boot_framework + '/sha256.json'] = direct_boot_framework_seal
+	return inputs
+}
+
+fn direct_boot_known_delta() map[string]string {
+	return {
+		'/' + service_query_jar_path: direct_boot_jar
+		'/' + service_query_dex_path: direct_boot_dex
+		'/' + service_query_headless + '/framework-build.json': direct_boot_build
+		'/' + service_query_headless + '/framework-sha256.json': direct_boot_framework_seal
+	}
+}
+
+fn verify_direct_boot_overlay(receipt map[string]json2.Any) ! {
+	input_delta := receipt['deployment_input_delta'] or { return error('direct-boot deployment input delta absent') }
+	delta := json2.decode[map[string]string](json2.encode(input_delta))!
+	mut expected := direct_boot_known_delta()
+	guest_path := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest_path] or { return error('direct-boot headless receipt pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == '11920c8c77da858898ef2dfaca45ecf70f32d41b8884d41c450f6691f7e16292' {
+		return error('invalid or retained direct-boot headless receipt pin')
+	}
+	expected[guest_path] = guest_pin
+	if delta != expected { return error('direct-boot five deployment input changes differ') }
+	for name, value in {
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: direct_boot_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256'])
+	} {
+		if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](value)! {
+			return error('direct-boot receipt delta differs: ' + name)
+		}
+	}
+	inventory := receipt['overlay_inventory'] or { return error('direct-boot overlay inventory absent') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(inventory))!
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	mut paths := expected.keys().map(it.trim_left('/'))
+	paths << service_query_deployment
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 {
+			return error('unsafe direct-boot overlay inventory entry')
+		}
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) {
+				return error('direct-boot regular allowlist differs')
+			}
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || !paths.any(it.starts_with(entry.name + '/')) {
+			return error('unexpected direct-boot overlay inode')
+		}
+	}
+	if regulars.len != 6 { return error('exact six direct-boot files required') }
+	for path, pin in expected {
+		if regulars[path.trim_left('/')] or { '' } != pin {
+			return error('direct-boot declared input differs from overlay inventory')
+		}
+	}
+}
+
+fn verify_direct_boot_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [direct_boot_base_seal, direct_boot_boot_sha, direct_boot_memory_overlay,
+		direct_boot_framework_seal, direct_boot_jar, direct_boot_dex, direct_boot_build] {
+		if !digest_valid(pin) { return error('sealed direct-boot base and framework pins required') }
+	}
+	for name, expected in direct_boot_fields() {
+		if receipt[name] or { json2.Any('absent') } != json2.Any(expected) {
+			return error('direct-boot receipt differs: ' + name)
+		}
+	}
+	for path, pin in direct_boot_inputs() {
+		if stage.inputs_sha256[path] or { '' } != pin { return error('direct-boot input differs: ' + path) }
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != direct_boot_modules()
+		|| stage.preserved_modules_sha256 != direct_boot_modules() {
+		return error('direct-boot original eleven module pins differ')
+	}
+	verify_direct_boot_overlay(receipt)!
+}
+
+fn direct_boot_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_direct_boot_receipt(receipt, stage)!
+	path := direct_boot_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != direct_boot_base_seal {
+		return error('direct-boot original memory-stage manifest differs')
+	}
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != direct_boot_boot_sha {
+		return error('direct-boot original boot inventory differs')
+	}
+	return direct_boot_base + '/boot.img'
 }
 
 fn service_query_modules() map[string]string {
@@ -655,6 +911,10 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = controller_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-service-query' {
 		baseline = service_query_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-controller-memory' {
+		baseline = controller_memory_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-direct-boot' {
+		baseline = direct_boot_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -1225,10 +1485,303 @@ fn service_query_profile_self_test() ! {
 	println('MAPS-SERVICE-QUERY KERNEL-PROFILE-SELF-TEST PASS exact controller base framework inputs five-path deployment one-path headless delta six-file inventory nine modules historical profile rejection')
 }
 
+fn controller_memory_entries_fixture() []ServiceQueryEntry {
+	mut entries := []ServiceQueryEntry{}
+	for path, pin in controller_memory_delta() {
+		entries << ServiceQueryEntry{name: path.trim_left('/'), kind: 'regular', sha256: pin, mode: 0o755}
+	}
+	entries << ServiceQueryEntry{name: service_query_deployment, kind: 'regular', sha256: 'c'.repeat(64), mode: 0o644}
+	entries << ServiceQueryEntry{name: 'opt', kind: 'directory', mode: 0o755}
+	return entries
+}
+
+fn controller_memory_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in controller_memory_fields() { receipt[name] = json2.Any(value) }
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(controller_memory_delta()))!
+	receipt['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256']))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(controller_memory_entries_fixture()))!
+	return receipt
+}
+
+fn controller_memory_profile_self_test() ! {
+	profile := controller_memory_profile()
+	assert profile.baseline_sha == controller_memory_boot_sha
+	assert profile.modules.len == 10 && profile.modules.last() == 'maps-service-query-diagnostic.tar'
+	before := Config{'vinix', profile.modules}
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	verify_modules(profile, before, Config{'vinix', modules})!
+	for bad in [Config{'vinix', profile.modules}, Config{'vinix', modules.reverse()},
+		Config{'vinix', modules[..10].clone()}, Config{'other', modules},
+		Config{'vinix', service_query_profile().modules}] {
+		if _ := verify_modules(profile, before, bad) { return error('unsafe controller memory modules accepted') }
+	}
+	if _ := verify_modules(profile, Config{'vinix', service_query_profile().modules}, Config{'vinix', modules}) {
+		return error('nine-module controller memory baseline accepted')
+	}
+	stage := Stage{format: 1, inputs_sha256: controller_memory_inputs(),
+		original_modules_sha256: controller_memory_modules(), preserved_modules_sha256: controller_memory_modules()}
+	receipt := controller_memory_receipt_fixture()!
+	verify_controller_memory_receipt(receipt, stage)!
+	for name in receipt.keys() {
+		mut bad := controller_memory_receipt_fixture()!
+		bad[name] = json2.Any('wrong')
+		if _ := verify_controller_memory_receipt(bad, stage) { return error('changed controller memory receipt accepted: ' + name) }
+		bad.delete(name)
+		if _ := verify_controller_memory_receipt(bad, stage) { return error('missing controller memory receipt accepted: ' + name) }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut inputs := stage.inputs_sha256.clone()
+		inputs[path] = '0'.repeat(64)
+		if _ := verify_controller_memory_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) {
+			return error('changed controller memory input pin accepted')
+		}
+		inputs.delete(path)
+		if _ := verify_controller_memory_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) {
+			return error('missing controller memory input accepted')
+		}
+	}
+	mut old := controller_memory_receipt_fixture()!
+	old['controller_manifest_sha256'] = json2.Any(controller_seal)
+	if _ := verify_controller_memory_receipt(old, stage) { return error('old controller memory receipt accepted') }
+	mut old_inputs := stage.inputs_sha256.clone()
+	old_inputs.delete(controller_memory_root + '/sha256.json')
+	old_inputs[controller_root + '/sha256.json'] = controller_memory_seal
+	if _ := verify_controller_memory_receipt(receipt, Stage{...stage, inputs_sha256: old_inputs}) {
+		return error('old controller path with memory seal accepted')
+	}
+	mut old_seal := stage.inputs_sha256.clone()
+	old_seal[controller_memory_root + '/sha256.json'] = controller_seal
+	if _ := verify_controller_memory_receipt(receipt, Stage{...stage, inputs_sha256: old_seal}) {
+		return error('memory controller path with old seal accepted')
+	}
+	for name in controller_memory_modules().keys() {
+		mut pins := controller_memory_modules()
+		pins[name] = '0'.repeat(64)
+		for bad in [Stage{...stage, original_modules_sha256: pins}, Stage{...stage, preserved_modules_sha256: pins}] {
+			if _ := verify_controller_memory_receipt(receipt, bad) { return error('changed controller memory module accepted') }
+		}
+	}
+	for bad in [Stage{...stage, format: 2}, Stage{...stage, original_modules_sha256: service_query_modules()},
+		Stage{...stage, preserved_modules_sha256: map[string]string{}}] {
+		if _ := verify_controller_memory_receipt(receipt, bad) { return error('changed controller memory module contract accepted') }
+	}
+	for delta in [map[string]string{}, {'/opt/vinix-maps-account/bin/maps-account-guest': controller_memory_pin},
+		{'/opt/vinix-maps-account/bin/maps-account-guest': controller_memory_pin, '/usr/bin/run-android-calculator': controller_pin},
+		{'/opt/vinix-maps-account/bin/maps-account-guest': controller_memory_pin, '/usr/bin/run-android-calculator': controller_memory_pin, '/extra': controller_memory_pin}] {
+		mut bad := controller_memory_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+		if _ := verify_controller_memory_receipt(bad, stage) { return error('unsafe controller memory input delta accepted') }
+	}
+	for delta in [[]string{}, ['inputs_sha256', 'framework_manifest_sha256'], ['inputs_sha256', 'inputs_sha256']] {
+		mut bad := controller_memory_receipt_fixture()!
+		bad['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+		if _ := verify_controller_memory_receipt(bad, stage) { return error('unsafe controller memory top delta accepted') }
+	}
+	entries := controller_memory_entries_fixture()
+	for index, entry in entries {
+		mut changed := entries.clone()
+		changed[index] = ServiceQueryEntry{...entry, kind: 'symlink'}
+		mut bad := controller_memory_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_controller_memory_receipt(bad, stage) { return error('controller memory symlink accepted') }
+		changed[index] = ServiceQueryEntry{...entry, mode: 0o777}
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_controller_memory_receipt(bad, stage) { return error('unsafe controller memory mode accepted') }
+		if entry.kind == 'regular' {
+			changed[index] = ServiceQueryEntry{...entry, sha256: if entry.name == service_query_deployment { 'invalid' } else { controller_pin }}
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+			if _ := verify_controller_memory_receipt(bad, stage) { return error('changed controller memory inventory digest accepted') }
+		}
+	}
+	for addition in [ServiceQueryEntry{name: 'extra', kind: 'regular', sha256: controller_memory_pin, mode: 0o644},
+		ServiceQueryEntry{name: '../escape', kind: 'directory', mode: 0o755},
+		ServiceQueryEntry{name: 'unrelated', kind: 'directory', mode: 0o755}, entries[0]] {
+		mut changed := entries.clone()
+		changed << addition
+		mut bad := controller_memory_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_controller_memory_receipt(bad, stage) { return error('extra or duplicate controller memory inode accepted') }
+	}
+	mut removed := controller_memory_receipt_fixture()!
+	removed['overlay_inventory'] = json2.decode[json2.Any](json2.encode(entries[1..]))!
+	if _ := verify_controller_memory_receipt(removed, stage) { return error('missing controller memory file accepted') }
+	if _ := verify_service_query_receipt(receipt, stage) { return error('memory receipt accepted by service-query profile') }
+	if _ := verify_controller_memory_receipt(service_query_receipt_fixture()!, stage) { return error('service-query receipt accepted by memory profile') }
+	if _ := verify_controller_receipt(receipt, stage) { return error('memory receipt accepted by controller profile') }
+	if _ := verify_controller_memory_receipt(controller_receipt_fixture()!, stage) { return error('old controller receipt accepted by memory profile') }
+	println('MAPS-CONTROLLER-MEMORY KERNEL-PROFILE-SELF-TEST PASS exact service-query base controller inputs two-alias deployment delta three-file inventory ten modules historical profile rejection')
+}
+
+fn direct_boot_delta_fixture() map[string]string {
+	mut delta := direct_boot_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'b'.repeat(64)
+	return delta
+}
+
+fn direct_boot_entries_fixture() []ServiceQueryEntry {
+	mut entries := []ServiceQueryEntry{}
+	for path, pin in direct_boot_delta_fixture() {
+		entries << ServiceQueryEntry{name: path.trim_left('/'), kind: 'regular', sha256: pin, mode: 0o644}
+	}
+	entries << ServiceQueryEntry{name: service_query_deployment, kind: 'regular', sha256: 'c'.repeat(64), mode: 0o644}
+	entries << ServiceQueryEntry{name: 'opt', kind: 'directory', mode: 0o755}
+	return entries
+}
+
+fn direct_boot_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in direct_boot_fields() { receipt[name] = json2.Any(value) }
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(direct_boot_delta_fixture()))!
+	receipt['headless_input_delta'] = json2.decode[json2.Any](json2.encode({'/' + service_query_jar_path: direct_boot_jar}))!
+	receipt['headless_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256']))!
+	receipt['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256', 'framework_manifest_sha256']))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(direct_boot_entries_fixture()))!
+	return receipt
+}
+
+fn direct_boot_profile_self_test() ! {
+	profile := direct_boot_profile()
+	assert profile.baseline_sha == direct_boot_boot_sha
+	assert profile.modules.len == 11 && profile.modules.last() == 'maps-controller-memory-diagnostic.tar'
+	before := Config{'vinix', profile.modules}
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	verify_modules(profile, before, Config{'vinix', modules})!
+	for bad in [Config{'vinix', profile.modules}, Config{'vinix', modules.reverse()},
+		Config{'vinix', modules[..11].clone()}, Config{'other', modules}] {
+		if _ := verify_modules(profile, before, bad) { return error('unsafe direct-boot modules accepted') }
+	}
+	if _ := verify_modules(profile, Config{'vinix', controller_memory_profile().modules}, Config{'vinix', modules}) {
+		return error('ten-module direct-boot baseline accepted')
+	}
+	stage := Stage{format: 1, inputs_sha256: direct_boot_inputs(),
+		original_modules_sha256: direct_boot_modules(), preserved_modules_sha256: direct_boot_modules()}
+	receipt := direct_boot_receipt_fixture()!
+	verify_direct_boot_receipt(receipt, stage)!
+	for name in receipt.keys() {
+		mut bad := direct_boot_receipt_fixture()!
+		bad[name] = json2.Any('wrong')
+		if _ := verify_direct_boot_receipt(bad, stage) { return error('changed direct-boot receipt accepted: ' + name) }
+		bad.delete(name)
+		if _ := verify_direct_boot_receipt(bad, stage) { return error('missing direct-boot receipt accepted: ' + name) }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut inputs := stage.inputs_sha256.clone()
+		inputs[path] = '0'.repeat(64)
+		if _ := verify_direct_boot_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) {
+			return error('changed direct-boot input pin accepted')
+		}
+		inputs.delete(path)
+		if _ := verify_direct_boot_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) {
+			return error('missing direct-boot input accepted')
+		}
+	}
+	mut old_inputs := stage.inputs_sha256.clone()
+	old_inputs.delete(direct_boot_framework + '/sha256.json')
+	old_inputs[service_query_framework + '/sha256.json'] = direct_boot_framework_seal
+	if _ := verify_direct_boot_receipt(receipt, Stage{...stage, inputs_sha256: old_inputs}) {
+		return error('old framework path with direct-boot seal accepted')
+	}
+	mut old_seal := stage.inputs_sha256.clone()
+	old_seal[direct_boot_framework + '/sha256.json'] = service_query_framework_seal
+	if _ := verify_direct_boot_receipt(receipt, Stage{...stage, inputs_sha256: old_seal}) {
+		return error('direct-boot framework path with old seal accepted')
+	}
+	for name in direct_boot_modules().keys() {
+		mut pins := direct_boot_modules()
+		pins[name] = '0'.repeat(64)
+		for bad in [Stage{...stage, original_modules_sha256: pins}, Stage{...stage, preserved_modules_sha256: pins}] {
+			if _ := verify_direct_boot_receipt(receipt, bad) { return error('changed direct-boot module accepted') }
+		}
+	}
+	for bad in [Stage{...stage, format: 2}, Stage{...stage, original_modules_sha256: controller_memory_modules()},
+		Stage{...stage, preserved_modules_sha256: map[string]string{}}] {
+		if _ := verify_direct_boot_receipt(receipt, bad) { return error('changed direct-boot module contract accepted') }
+	}
+	delta := direct_boot_delta_fixture()
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := direct_boot_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_direct_boot_receipt(bad, stage) { return error('partial direct-boot delta accepted') }
+		changed = delta.clone()
+		changed[path] = '0'.repeat(64)
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_direct_boot_receipt(bad, stage) { return error('changed direct-boot delta accepted') }
+	}
+	for addition in ['/extra', '/opt/vinix-maps-account/bin/maps-account-guest'] {
+		mut changed := delta.clone()
+		changed[addition] = controller_memory_pin
+		mut bad := direct_boot_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_direct_boot_receipt(bad, stage) { return error('extra direct-boot input accepted') }
+	}
+	for name, alternatives in {
+		'headless_top_level_delta': [[]string{}, ['inputs_sha256', 'extra'], ['inputs_sha256', 'inputs_sha256']]
+		'deployment_top_level_delta': [[]string{}, ['inputs_sha256'], ['inputs_sha256', 'native_manifest_sha256'], ['framework_manifest_sha256', 'inputs_sha256']]
+	} {
+		for alternative in alternatives {
+			mut bad := direct_boot_receipt_fixture()!
+			bad[name] = json2.decode[json2.Any](json2.encode(alternative))!
+			if _ := verify_direct_boot_receipt(bad, stage) { return error('unsafe direct-boot top delta accepted') }
+		}
+	}
+	for changed in [map[string]string{}, {'/' + service_query_jar_path: service_query_jar},
+		{'/' + service_query_jar_path: direct_boot_jar, '/extra': direct_boot_jar}] {
+		mut bad := direct_boot_receipt_fixture()!
+		bad['headless_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_direct_boot_receipt(bad, stage) { return error('unsafe direct-boot headless delta accepted') }
+	}
+	for pin in ['invalid', '11920c8c77da858898ef2dfaca45ecf70f32d41b8884d41c450f6691f7e16292'] {
+		mut changed := delta.clone()
+		changed['/' + service_query_headless + '/guest-inputs.json'] = pin
+		mut bad := direct_boot_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_direct_boot_receipt(bad, stage) { return error('retained direct-boot guest input pin accepted') }
+	}
+	entries := direct_boot_entries_fixture()
+	for index, entry in entries {
+		mut changed := entries.clone()
+		changed[index] = ServiceQueryEntry{...entry, kind: 'symlink'}
+		mut bad := direct_boot_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_direct_boot_receipt(bad, stage) { return error('direct-boot symlink accepted') }
+		changed[index] = ServiceQueryEntry{...entry, mode: 0o777}
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_direct_boot_receipt(bad, stage) { return error('unsafe direct-boot mode accepted') }
+		if entry.kind == 'regular' {
+			changed[index] = ServiceQueryEntry{...entry, sha256: if entry.name == service_query_deployment { 'invalid' } else { '0'.repeat(64) }}
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+			if _ := verify_direct_boot_receipt(bad, stage) { return error('changed direct-boot inventory digest accepted') }
+		}
+	}
+	for addition in [entries[0], ServiceQueryEntry{name: 'opt/vinix-maps-account/bin/maps-account-guest', kind: 'regular', sha256: controller_memory_pin, mode: 0o755},
+		ServiceQueryEntry{name: 'extra', kind: 'directory', mode: 0o755}, ServiceQueryEntry{name: 'opt/../escape', kind: 'directory', mode: 0o755}] {
+		mut changed := entries.clone()
+		changed << addition
+		mut bad := direct_boot_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_direct_boot_receipt(bad, stage) { return error('extra or duplicate direct-boot inode accepted') }
+	}
+	mut removed := direct_boot_receipt_fixture()!
+	removed['overlay_inventory'] = json2.decode[json2.Any](json2.encode(entries[1..]))!
+	if _ := verify_direct_boot_receipt(removed, stage) { return error('missing direct-boot file accepted') }
+	if _ := verify_controller_memory_receipt(receipt, stage) { return error('direct-boot receipt accepted by memory profile') }
+	if _ := verify_direct_boot_receipt(controller_memory_receipt_fixture()!, stage) { return error('memory receipt accepted by direct-boot profile') }
+	if _ := verify_service_query_receipt(receipt, stage) { return error('direct-boot receipt accepted by service-query profile') }
+	if _ := verify_direct_boot_receipt(service_query_receipt_fixture()!, stage) { return error('service-query receipt accepted by direct-boot profile') }
+	println('MAPS-DIRECT-BOOT KERNEL-PROFILE-SELF-TEST PASS exact memory base framework inputs five-path deployment one-path headless delta six-file inventory eleven modules historical profile rejection')
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
 	service_query_profile_self_test()!
+	controller_memory_profile_self_test()!
+	direct_boot_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -1286,6 +1839,8 @@ fn self_test() ! {
 	fat_self_test(root + '/protected-maps', 'protected-storage-diagnostic.tar', protected_maps_profile().modules)!
 	fat_self_test(root + '/controller', 'maps-controller-diagnostic.tar', controller_profile().modules)!
 	fat_self_test(root + '/service-query', 'maps-service-query-diagnostic.tar', service_query_profile().modules)!
+	fat_self_test(root + '/controller-memory', 'maps-controller-memory-diagnostic.tar', controller_memory_profile().modules)!
+	fat_self_test(root + '/direct-boot', 'maps-direct-boot-diagnostic.tar', direct_boot_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -1301,11 +1856,13 @@ fn main() {
 	is_protected := os.args.len == 5 && os.args[1] == '--protected-storage-maps'
 	is_controller := os.args.len == 5 && os.args[1] == '--maps-controller'
 	is_service_query := os.args.len == 5 && os.args[1] == '--maps-service-query'
-	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+	is_controller_memory := os.args.len == 5 && os.args[1] == '--maps-controller-memory'
+	is_direct_boot := os.args.len == 5 && os.args[1] == '--maps-direct-boot'
+	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot {
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_maps || is_protected || is_controller || is_service_query { 1 } else { 0 }
+	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -1314,7 +1871,7 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	profile := if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	profile := if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
