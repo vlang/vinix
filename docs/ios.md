@@ -361,7 +361,7 @@ exits 139 with no cgroup OOM event. Progress remains 2 of 8 observable launch
 gates; initializer completion and application entry remain unverified.
 See the [dictionary snapshot checkpoint](../tests/ios/dictionary-snapshot-checkpoint-20261026.md).
 
-The latest diagnostic checkpoint reaches application entry after all nine
+An earlier diagnostic checkpoint reaches application entry after all nine
 `+load` calls and three initializer groups return. Compiled launch-storyboard
 construction and the nominal `NSProcessInfo.thermalState` fallback now pass.
 All 13 guest regression fixtures and both sanitized host runs pass. A bounded
@@ -374,6 +374,14 @@ remaining work).
 A rendered frame, interactive menu, login and playable match remain
 unverified. Advertising remains skipped. See the
 [desktop probe checkpoint](../tests/ios/desktop-probe-checkpoint-20261026.md).
+
+The latest no-ads checkpoint implements `NSString stringByAppendingPathComponent:`
+for immutable and mutable strings. Native Foundation comparisons, both sanitized
+host runs and all 23 guest fixtures pass. With the original cooked content,
+Fortnite advances to the unsupported `NSString getCString:maxLength:encoding:`
+method. The game exits 1 without an OOM event or supervisor kill. Progress remains
+4 of 8 observable launch gates; frame, menu, login and playable match are unverified.
+See the [path-appending checkpoint](../tests/ios/string-append-path-checkpoint-20261027.md).
 
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
