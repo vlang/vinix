@@ -485,6 +485,9 @@ fn main() {
 			['/opt/ios/FortniteClient-IOS-Shipping']
 		}
 		if mode == 'probe-no-ads' {
+			if os.exists('/opt/ios/string-path-checks') {
+				require_child('/opt/ios/string-path-checks')
+			}
 			if os.exists('/opt/ios/url-resource-checks') {
 				require_child('/opt/ios/url-resource-checks')
 			}
