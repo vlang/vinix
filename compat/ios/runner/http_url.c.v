@@ -127,6 +127,7 @@ fn http_url_builtin_types(name string, meta bool, selector string) ?string {
 		'initWithString:' { '@24@0:8@16' }
 		'host', 'path', 'absoluteString', 'scheme', 'query', 'fragment', 'port' { '@16@0:8' }
 		'isFileURL' { 'B16@0:8' }
+		'setResourceValue:forKey:error:' { 'B40@0:8@16@24^@32' }
 		else { return none }
 	}
 }
@@ -144,6 +145,10 @@ fn http_url_dispatch(object u64, selector string, mut frame RegisterFrame) bool 
 		return true
 	}
 	if !objc_is_kind(object, ios_runtime.names['NSURL']) { return false }
+	if selector == 'setResourceValue:forKey:error:' {
+		frame.x[0] = u64(ns_url_set_resource(object, frame.x[2], frame.x[3], frame.x[4]))
+		return true
+	}
 	if selector == 'initWithString:' {
 		if !http_url_initialize(object, frame.x[2]) {
 			objc_release(object)

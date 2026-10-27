@@ -9,7 +9,8 @@ fn ns_url_resource_key_cell_offset(index int) u64 {
 }
 
 // Native NSURL and CFURL share an NSString pointer cell for each resource key.
-// Exporting these keys does not implement URL resource metadata reads/writes.
+// Backup-exclusion writes are implemented in ns_url_resource.c.v; metadata
+// reads and other writable resource keys are outside the current profile.
 fn ns_url_resource_key_symbol(symbol string) ?u64 {
 	index := match symbol {
 		'_NSURLCreationDateKey', '_kCFURLCreationDateKey' { 0 }
