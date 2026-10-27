@@ -69,6 +69,16 @@ fn direct_boot_profile() FixtureProfile {
 	}
 }
 
+fn credential_storage_profile() FixtureProfile {
+	return FixtureProfile{
+		name: 'credential-storage'
+		client_sha: '22bc2b0aa822b2305f8ed63b50be32114ca55d1d83f79ca468f8f6addc6e373e'
+		companion_sha: '42723f25adaf0a5ae789a37e4bddff512d10b219c187d368fce61de1f700f752'
+		framework_sha: '9b894cc92c5d3d0e871b5389285b09b107d49cd5c4493fcc2449f3510f961352'
+		pass_marker: pass_marker + ' direct-boot-metadata credential-context'
+	}
+}
+
 struct Configuration {
 	runtime   string
 	client    string
@@ -373,7 +383,7 @@ fn export_evidence(output string) ! {
 
 fn selftest() ! {
 	mut cases := 0
-	profiles := [service_query_profile(), direct_boot_profile()]
+	profiles := [service_query_profile(), direct_boot_profile(), credential_storage_profile()]
 	for profile in profiles {
 		good := profile.pass_marker + '\n' + ready_marker + '\n'
 		check_log(good, profile.pass_marker)!
@@ -415,8 +425,11 @@ fn run() ! {
 	if arguments.len > 0 && arguments[0] == '--direct-boot' {
 		profile = direct_boot_profile()
 		arguments = arguments[1..]
+	} else if arguments.len > 0 && arguments[0] == '--credential-storage' {
+		profile = credential_storage_profile()
+		arguments = arguments[1..]
 	}
-	require(arguments.len == 6, 'usage: service-query-run [--direct-boot] RUNTIME CLIENT_APK DISABLED_APK UID GID FRESH_OUTPUT | selftest')!
+	require(arguments.len == 6, 'usage: service-query-run [--direct-boot|--credential-storage] RUNTIME CLIENT_APK DISABLED_APK UID GID FRESH_OUTPUT | selftest')!
 	require(canonical(arguments[0]), 'canonical runtime path and exact optional profile selector')!
 	$if !linux {
 		return error('runtime fixture requires Linux/Vinix')
