@@ -84,3 +84,19 @@ The retained preparation logs are:
 
 These results establish image preparation only. Maps interaction and Google
 account authentication require separate evidence from the fresh VM clone.
+
+The generic clone tool subsequently passed full source/destination hash and
+metadata checks for the mutable copy
+`/Users/alex/.local/state/vinix/android/maps-onboarding-trace-vm-r1`.
+Cloning took 12.70 seconds (7.01 user, 3.14 system), peaked at 34,881,536 bytes
+RSS, and reported zero swaps. The adjacent `maps-onboarding-trace-vm-r1-clone.json`
+receipt has SHA-256
+`a28a4c7965ec156959d0116f2c6331c1a2829c65a8270cb04b9162045f982ca6`;
+`fresh-clone.log` in the build directory above has SHA-256
+`5f1abd484fe77a960d5b7dd751f56879addc756df44c5e13e8b303a6d1ff3b73`.
+
+At this checkpoint the clone has no kernel patch and has not launched a VM.
+Available space was 1,425,708 KiB, below the 1.5 GiB preflight requirement;
+the cleanup audit found no safe task-owned candidate of roughly 1 GiB.
+Kernel patching, boot, fresh onboarding traces and account validation remain
+pending resource clearance.
