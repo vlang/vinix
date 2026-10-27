@@ -16,7 +16,11 @@ broadcast-result framework, the unchanged seven-argument service ABI sources,
 all module digests, payload paths, cumulative inherited inode modes and media
 readback. APFS clones have no copy fallback. Streaming hashes, bounded command
 output and the predecessor's 1 GiB reserve/512 MiB cumulative writable-phase
-growth policy remain enabled; read-only audits refresh the disk baseline.
+growth policy remain enabled; explicit read-only audits refresh the disk
+baseline. Module audits retain exact 68-byte, mode-0600 digest receipts and
+charge a conservative 1 MiB budget allocation per receipt. Clone creation is
+charged before its separate read-only hash verification. Receipt charges and
+writable-phase drops remain cumulative without refunds.
 
 Native tracing uses the existing `VINIX_ANDROID_TRACE_TREE` activation from
 `maps-account-guest --broker --trace-onboarding`. The native changes print
@@ -97,3 +101,23 @@ pending safe supervision of those subprocess groups. The comparison's first
 `v run` attempt encountered the same guard restriction; the successful
 comparison uses a separately compiled executable. Runtime validation remains
 pending; no new stage or guest pass is claimed here.
+
+The complete kernel patcher self-test subsequently passed under the nested
+process-group-aware r3 guard in 10.77 seconds at 26,443,776 bytes peak RSS,
+zero swaps. This includes all nine profile validators and eleven FAT tests;
+`kernel-patcher-selftest-r2.log` and `.json` retain the successful evidence.
+
+Initial stage attempts remain preserved as `maps-native-onboarding-trace-r1`
+and `-r2`. The first was stopped by the old guard's process-group restriction
+after 73.616 seconds, with cleanup verified. The second passed outer process
+supervision but stopped at the stager's 512 MiB write budget after 78.12 seconds
+(52,330,496 bytes peak RSS, zero swaps): bulk original-module hashing had been
+charged for unrelated shared-volume writes. Both failed before media cloning.
+Their `prepare.log`/`.json` and `prepare-r2.log`/`.json` remain in the original
+build directory. The accounting correction separates those audited media
+reads and their bounded digest receipts; it retains both original disk limits
+and all complete media checks. The corrected tool's build/evidence directory
+is `maps-native-onboarding-trace-build-2026-10-27-r2` under the same external
+Android state root. The corrected stager built in 7.23 seconds at 451,166,208
+bytes peak RSS, zero swaps, then passed its focused self-test under the r3
+guard. A successful preparation is still pending.

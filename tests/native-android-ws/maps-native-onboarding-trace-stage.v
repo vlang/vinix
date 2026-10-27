@@ -49,6 +49,9 @@ const deployment_path = 'opt/vinix-maps-account/build.json'
 const overlay = 'maps-native-onboarding-trace-diagnostic.tar'
 const disk_reserve_bytes = u64(1024) * 1024 * 1024
 const disk_growth_limit_bytes = u64(512) * 1024 * 1024
+// Charge a full MiB for each exact 68-byte receipt; this is a budget allocation,
+// not a claim to measure APFS physical allocation.
+const digest_receipt_charge_bytes = u64(1024) * 1024
 const retained = {
 	'tests/native-android-ws/maps-native-onboarding-trace-stage.v': carry($embed_file(@FILE))
 	'tests/native-android-ws/mapsaccountstage/bundle.v': carry($embed_file('mapsaccountstage/bundle.v'))
@@ -155,6 +158,7 @@ struct DiskBudget {
 mut:
 	available u64
 	charged u64
+	digest_receipt_charged u64
 }
 fn disk_update(available u64, writing bool, mut budget DiskBudget) ! {
 	budget.charged = disk_budget(if writing { budget.available } else { available }, available, budget.charged)!
@@ -167,6 +171,35 @@ fn disk_sample(root string, label string, writing bool, mut budget DiskBudget, m
 	// Drops during writable phases stay cumulatively charged, including other writers.
 	disk_update(available, writing, mut budget)!
 	println('MAPS-NATIVE-ONBOARDING-TRACE disk ' + label + ' available_bytes=' + available.str() + ' charged_growth_bytes=' + budget.charged.str())
+}
+fn charge_digest_receipts(count int, mut budget DiskBudget) ! {
+	if count < 1 || count > 16 { return error('bounded digest audit requires one to sixteen receipts') }
+	charge := u64(count) * digest_receipt_charge_bytes
+	if budget.charged > disk_growth_limit_bytes || charge > disk_growth_limit_bytes - budget.charged {
+		return error('digest receipts exceed cumulative write budget')
+	}
+	budget.charged += charge
+	budget.digest_receipt_charged += charge
+}
+fn audit_modules(root string, label string, image string, names []string, expected map[string]string,
+	mut budget DiskBudget, mut samples map[string]u64) !map[string]string {
+	if names.len < 1 || names.len > 16 || names.len != expected.len { return error('bounded exact module audit required') }
+	mut pins := map[string]string{}
+	for name in names {
+		if name in pins { return error('duplicate module audit member') }
+		pin := stage.module_hash(root, label + '-' + name, image, name)!
+		if pin != expected[name]! { return error('audited module differs: ' + name) }
+		path := root + '/commands/' + label + '-' + name + '.sha256'
+		info := os.lstat(path)!
+		if info.get_filetype() != .regular || info.mode & 0o7777 != 0o600 || info.size != 68
+			|| os.read_file(path)! != pin + '  -\n' { return error('exact bounded digest receipt required') }
+		pins[name] = pin
+	}
+	// These operations read media and write only the validated digest receipts.
+	// Charge those writes independently, excluding unrelated volume drift.
+	charge_digest_receipts(names.len, mut budget)!
+	disk_sample(root, label + '-module-audit', false, mut budget, mut samples)!
+	return pins
 }
 fn exact_profile(base string, manifest string, executable string) ! {
 	if base != base_seal || manifest != native_seal || executable != native_pin
@@ -418,9 +451,8 @@ fn run(destination string) ! {
 	if stage.command(root, 'original-limine', [root + '/tools/mtype', '-i', base_root + '/boot.img', '::/boot/limine.conf'])! != original {
 		return error('source media configuration differs')
 	}
-	for name in config.modules {
-		if stage.module_hash(root, 'original-' + name, base_root + '/boot.img', name)! != before[name]! { return error('original module differs: ' + name) }
-	}
+	disk_sample(root, 'original-limine', true, mut disk, mut disk_samples)!
+	audit_modules(root, 'original', base_root + '/boot.img', config.modules, before, mut disk, mut disk_samples)!
 	startup := read_json(startup_root + '/stage.json')!
 	r5_root := stage.text_field(startup, 'base_root')!
 	mut original_entries := json2.decode[[]stage.Entry](os.read_file(r5_root + '/original-module-inventory.json')!)!
@@ -455,9 +487,10 @@ fn run(destination string) ! {
 	disk_sample(root, 'payload', true, mut disk, mut disk_samples)!
 	println('MAPS-NATIVE-ONBOARDING-TRACE cloning media and appending five files')
 	for name in ['boot.img', 'efivars.fd'] {
-		if C.clonefile((base_root + '/' + name).str, (root + '/' + name).str, 0) != 0
-			|| stage.hash(root + '/' + name)! != base_files[name]! { return error('fresh APFS media clone differs') }
-		disk_sample(root, 'clone-' + name, true, mut disk, mut disk_samples)!
+		if C.clonefile((base_root + '/' + name).str, (root + '/' + name).str, 0) != 0 { return error('fresh APFS media clone failed') }
+		disk_sample(root, 'clone-' + name + '-created', true, mut disk, mut disk_samples)!
+		if stage.hash(root + '/' + name)! != base_files[name]! { return error('fresh APFS media clone differs') }
+		disk_sample(root, 'clone-' + name + '-verified', false, mut disk, mut disk_samples)!
 	}
 	stage.command_expected(root, 'overlay-absent', [root + '/tools/mdir', '-i', root + '/boot.img', '::/boot/' + overlay], 1)!
 	mut sources := map[string]string{}
@@ -469,16 +502,16 @@ fn run(destination string) ! {
 	disk_sample(root, 'install-overlay', true, mut disk, mut disk_samples)!
 	stage.command(root, 'install-limine', [root + '/tools/mcopy', '-o', '-i', root + '/boot.img', root + '/limine-after.conf', '::/boot/limine.conf'])!
 	disk_sample(root, 'install-limine', true, mut disk, mut disk_samples)!
-	if stage.command(root, 'readback-limine', [root + '/tools/mtype', '-i', root + '/boot.img', '::/boot/limine.conf'])! != config.updated
-		|| stage.module_hash(root, 'readback-overlay', root + '/boot.img', overlay)! != stage.hash(root + '/' + overlay)! {
+	if stage.command(root, 'readback-limine', [root + '/tools/mtype', '-i', root + '/boot.img', '::/boot/limine.conf'])! != config.updated {
 		return error('diagnostic media readback differs')
 	}
-	mut after := map[string]string{}
-	for name in config.modules {
-		after[name] = stage.module_hash(root, 'preserved-' + name, root + '/boot.img', name)!
-		if after[name] != before[name] { return error('existing module changed') }
-	}
-	disk_sample(root, 'media-readback', true, mut disk, mut disk_samples)!
+	disk_sample(root, 'readback-limine', true, mut disk, mut disk_samples)!
+	mut media_pins := before.clone()
+	media_pins[overlay] = stage.hash(root + '/' + overlay)!
+	mut media_modules := config.modules.clone()
+	media_modules << overlay
+	mut after := audit_modules(root, 'readback', root + '/boot.img', media_modules, media_pins, mut disk, mut disk_samples)!
+	after.delete(overlay)
 	println('MAPS-NATIVE-ONBOARDING-TRACE rechecking complete inputs')
 	for path, pin in deps { stage.load_inventory(path, pin)! }
 	stage.recheck(controller)!
@@ -511,7 +544,8 @@ fn run(destination string) ! {
 		'staged_boot_sha256': json2.Any(boot_pin), 'staged_efivars_sha256': json2.Any(efivars_pin),
 		'guest_terminal_command': json2.Any('/opt/vinix-maps-account/bin/maps-account-guest --broker --trace-onboarding'),
 		'disk_reserve_bytes': as_json(disk_reserve_bytes)!, 'disk_growth_limit_bytes': as_json(disk_growth_limit_bytes)!,
-		'disk_growth_policy': json2.Any('Cumulative observed volume drops during writable phases; read-only input audits and output inventory refresh baseline with reserve enforced. No refunds.'),
+		'disk_growth_policy': json2.Any('Cumulative observed volume drops during writable phases plus 1 MiB per exact 68-byte module digest receipt; explicit read-only media/input audits and output inventory refresh baseline with reserve enforced. No refunds.'),
+		'disk_digest_receipt_charge_bytes': as_json(disk.digest_receipt_charged)!,
 		'disk_charged_growth_bytes': as_json(disk.charged)!,
 		'disk_available_samples_bytes': as_json(disk_samples)!,
 		'disk_sample_argv': as_json(['/usr/bin/env', 'LC_ALL=C', '/bin/df', '-kP', os.dir(root)])!,
@@ -554,6 +588,20 @@ fn self_test() ! {
 	assert budget.charged == disk_growth_limit_bytes
 	if _ := disk_update(budget.available - 1, true, mut budget) { return error('cumulative phase growth limit reset') }
 	if _ := disk_update(disk_reserve_bytes - 1, false, mut budget) { return error('read-only audit bypassed disk reserve') }
+	mut audit_budget := DiskBudget{available: disk_start + 4 * disk_growth_limit_bytes, charged: 17}
+	charge_digest_receipts(15, mut audit_budget)!
+	disk_update(disk_start, false, mut audit_budget)!
+	if audit_budget.charged != 17 + 15 * digest_receipt_charge_bytes { return error('audit drift changed cumulative receipt charge') }
+	disk_update(disk_start - 31, true, mut audit_budget)!
+	if audit_budget.charged != 48 + 15 * digest_receipt_charge_bytes
+		|| audit_budget.digest_receipt_charged != 15 * digest_receipt_charge_bytes { return error('writable drop or receipt charge lost') }
+	for count in [0, 17, -1] {
+		if _ := charge_digest_receipts(count, mut audit_budget) { return error('unbounded receipt count accepted') }
+	}
+	mut full_budget := DiskBudget{available: disk_start, charged: disk_growth_limit_bytes - digest_receipt_charge_bytes}
+	charge_digest_receipts(1, mut full_budget)!
+	if full_budget.charged != disk_growth_limit_bytes { return error('receipt charge boundary differs') }
+	if _ := charge_digest_receipts(1, mut full_budget) { return error('receipt charge bypassed cumulative limit') }
 	for bad in [[disk_start, disk_reserve_bytes - 1, u64(0)],
 		[disk_start, disk_start - disk_growth_limit_bytes - 1, u64(0)],
 		[disk_start, disk_start - 1, disk_growth_limit_bytes],
