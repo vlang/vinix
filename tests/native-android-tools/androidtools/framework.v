@@ -151,6 +151,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_application_info(smali)!
  framework_protected_storage(smali)!
  framework_credential_storage(smali)!
+ framework_broadcast_results(smali)!
  framework_asset_cookies(smali)!
  framework_local_binder(smali)!
  framework_parcel_binders(smali)!

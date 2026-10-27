@@ -82,6 +82,24 @@ pub fn native_ws_cli(argv []string) !int {
 	return 0
 }
 
+fn native_ws_broadcast_bridge(source string) !bool {
+	if source.count('.method public run()V') != 1 { return false }
+	if source.split_into_lines().filter(it.starts_with('.class ')) != ['.class public final Landroid/atl/VinixBroadcast;']
+		|| source.split_into_lines().filter(it.starts_with('.super ')) != ['.super Ljava/lang/Object;']
+		|| source.count('.method ') != 4 || source.count('.end method') != 4
+		|| source.count('run()V') != 1 {
+		return error('unexpected broadcast Java task')
+	}
+	header := '.method public run()V'
+	actual := header + source.all_after(header).all_before('.end method') + '.end method'
+	// Baksmali emits .registers instead of .locals and adds blank/comment lines.
+	// Compare every semantic line after that single equivalent register spelling.
+	canonical := framework_broadcast_run_method().split_into_lines().map(it.trim_space()).filter(it != '' && !it.starts_with('#'))
+	normalized := actual.replace('.registers 5', '.locals 4').split_into_lines().map(it.trim_space()).filter(it != '' && !it.starts_with('#'))
+	if normalized != canonical { return error('noncanonical broadcast Java bridge') }
+	return true
+}
+
 // Generate bindings separately so native delta fixtures can validate the exact
 // framework declarations without rebuilding every runtime dependency.
 pub fn native_ws_bindings(spec string, smali string) !string {
@@ -93,6 +111,14 @@ pub fn native_ws_bindings(spec string, smali string) !string {
 		if parts.len != 3 { return error('invalid native binding: ' + line) }
 		class_name, method_name, body := parts[0], parts[1], parts[2]
 		source := os.read_file(smali + '/' + class_name + '.smali')!
+		// Historical frameworks still require this lazy JNI export. New ones
+		// replace only this task with the canonical Java pending-result bridge.
+		// Keep every other stale/non-native binding an error.
+		if class_name == 'android/atl/VinixBroadcast' && method_name == 'run'
+			&& body == 'ws_broadcast_run(e,this)'
+			&& native_ws_broadcast_bridge(source)! {
+			continue
+		}
 		mut found := false
 		for declaration in source.split_into_lines() {
 			if !declaration.starts_with('.method ') || !declaration.contains(' native ') {

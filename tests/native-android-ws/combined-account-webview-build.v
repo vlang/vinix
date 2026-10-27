@@ -239,6 +239,48 @@ fn credential_storage_profile() NarrowProfile {
  }
 }
 
+fn broadcast_result_profile() NarrowProfile {
+ receiver := 'android/content/BroadcastReceiver.smali'
+ pending := 'android/content/BroadcastReceiver$PendingResult.smali'
+ loaded := 'android/atl/ATLLoadedApp.smali'
+ task := 'android/atl/VinixBroadcast.smali'
+ result_methods := ['setResultCode(I)V', 'getResultCode()I', 'setResultData(Ljava/lang/String;)V',
+  'getResultData()Ljava/lang/String;', 'setResultExtras(Landroid/os/Bundle;)V',
+  'getResultExtras(Z)Landroid/os/Bundle;', 'setResult(ILjava/lang/String;Landroid/os/Bundle;)V',
+  'getAbortBroadcast()Z', 'abortBroadcast()V', 'clearAbortBroadcast()V']
+ mut receiver_methods := result_methods.clone()
+ receiver_methods << ['goAsync()Landroid/content/BroadcastReceiver$PendingResult;',
+  'isOrderedBroadcast()Z', 'isInitialStickyBroadcast()Z',
+  'vinixRequirePending()Landroid/content/BroadcastReceiver$PendingResult;', 'vinixFinish()V',
+  'vinixDispatch(Landroid/content/Context;Landroid/content/Intent;Z)V']
+ mut pending_methods := result_methods.clone()
+ pending_methods << ['finish()V', '<init>(Z)V', 'vinixWarnUnordered()V']
+ return NarrowProfile{
+  name: 'broadcast-result'
+  baseline_name: 'combined-account-webview-credential-storage-framework-2026-10-27-r1'
+  manifest_pin: 'cb07c656d6c63e9713926a0c2fac15f14060098baf8efb56d12fa7d1fd8c2691'
+  jar_pin: '9b894cc92c5d3d0e871b5389285b09b107d49cd5c4493fcc2449f3510f961352'
+  baseline_classes: 2104
+  providers: ['framework_broadcast_result.v']
+  calls: {receiver: 'framework_broadcast_receiver', pending: 'framework_broadcast_pending',
+   loaded: 'framework_broadcast_loaded_app', task: 'framework_broadcast_run'}
+  methods: {
+   receiver: receiver_methods
+   pending: pending_methods
+   loaded: ['receiveBroadcast(Landroid/content/Context;Landroid/content/Intent;)V']
+   task: ['run()V']
+  }
+  changed: {receiver: 2, pending: 2, loaded: 1, task: 1}
+  added: {receiver: 14, pending: 11, loaded: 0, task: 0}
+  fields: {
+   receiver: ['.field private vinixPending:Landroid/content/BroadcastReceiver$PendingResult;']
+   pending: ['.field private final vinixRegistered:Z', '.field private vinixCode:I',
+    '.field private vinixData:Ljava/lang/String;', '.field private vinixExtras:Landroid/os/Bundle;',
+    '.field private vinixAbort:Z', '.field private vinixFinished:Z']
+  }
+ }
+}
+
 fn store_parts(source string) !StoreClassParts {
  mut methods := map[string]string{}
  mut metadata := []string{}
@@ -569,6 +611,20 @@ fn self_test() ! {
  narrow_method_self_test(boot_profile.methods['android/content/pm/PackageParser.smali']!, 4, 1)!
  credential_profile := credential_storage_profile()
  for _, signatures in credential_profile.methods { narrow_method_self_test(signatures, 0, 2)! }
+ broadcast_profile := broadcast_result_profile()
+ for target, signatures in broadcast_profile.methods {
+  narrow_method_self_test(signatures, broadcast_profile.changed[target]!, broadcast_profile.added[target]!)!
+ }
+ for _, fields in broadcast_profile.fields {
+  original := '.class public LExample;\n.super Ljava/lang/Object;\n'
+  extended := original + fields.join('\n') + '\n'
+  narrow_member_delta(original, extended, []string{}, 0, 0, fields)!
+  for bad in [original, extended + fields[0] + '\n', extended + '.field public extra:I\n',
+   extended.replace(fields[0], fields[0] + ' = 0x0')] {
+   narrow_member_delta(original, bad, []string{}, 0, 0, fields) or { continue }
+   return error('invalid broadcast field metadata accepted')
+  }
+ }
  boot_metadata := '.class public LExample;\n.super Ljava/lang/Object;\n'
  boot_fields := boot_profile.fields['android/content/pm/ComponentInfo.smali']!
  boot_extended := boot_metadata + boot_fields[0] + '\n'
@@ -1030,11 +1086,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage'] {
-  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } else { credential_storage_profile() } }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result'] {
+  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } else { broadcast_result_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }

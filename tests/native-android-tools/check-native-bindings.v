@@ -39,7 +39,27 @@ fn self_test() ! {
 	call := 'invoke-super {p0}, Landroid/widget/TextView;->getText()Ljava/lang/CharSequence;'
 	assert java_dispatch(fixture, 'getText()Ljava/lang/CharSequence;', call)
 	assert !java_dispatch(fixture.replace(call, 'const/4 v0, 0x0'), 'getText()Ljava/lang/CharSequence;', call)
-	println('NATIVE-BINDINGS-SELF-PASS Java-dispatch-rejected exact-native-signature JNI-widths')
+	os.mkdir_all(work + '/android/atl')!
+	task := '.class public final Landroid/atl/VinixBroadcast;\n.super Ljava/lang/Object;\n' +
+		'.field public receiver:Landroid/content/BroadcastReceiver;\n' +
+		'.field public context:Landroid/content/Context;\n.field public intent:Landroid/content/Intent;\n' +
+		'.method static constructor <clinit>()V\n.locals 0\nreturn-void\n.end method\n' +
+		'.method public constructor <init>()V\n.locals 0\nreturn-void\n.end method\n' +
+		'.method public static getRegistrations()Ljava/util/List;\n.locals 1\nconst/4 v0, 0\nreturn-object v0\n.end method\n' +
+		'.method public native run()V\n.end method\n'
+	path := work + '/android/atl/VinixBroadcast.smali'
+	binding := 'android/atl/VinixBroadcast|run|ws_broadcast_run(e,this)'
+	os.write_file(path, task)!
+	assert androidtools.native_ws_bindings(binding, work)!.contains('Java_android_atl_VinixBroadcast_run__')
+	bridge := androidtools.framework_broadcast_run(task)!
+	os.write_file(path, bridge)!
+	assert !androidtools.native_ws_bindings(binding, work)!.contains('@[export:')
+	os.write_file(path, bridge.replace('.locals 4', '.registers 5').replace('    iget-object', '\n    # disassembly whitespace\n    iget-object'))!
+	assert !androidtools.native_ws_bindings(binding, work)!.contains('@[export:')
+	assert rejects(binding.replace('ws_broadcast_run(e,this)', 'other(e,this)'), work)
+	os.write_file(path, bridge.replace('const/4 v3, 0x1', 'const/4 v3, 0x0'))!
+	assert rejects(binding, work)
+	println('NATIVE-BINDINGS-SELF-PASS Java-dispatch-rejected exact-native-signature JNI-widths legacy-broadcast-export canonical-Java-bridge-only')
 }
 
 fn check(smali string, output string) ! {
