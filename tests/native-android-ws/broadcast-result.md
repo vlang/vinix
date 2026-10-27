@@ -53,8 +53,9 @@ fixture. Their peak resident sizes were respectively 453,591,040; 447,266,816;
 311,033,856; and 279,822,336 bytes, with zero swaps. Typechecks found and corrected
 V string continuation and array concatenation errors. `git diff --check` passed.
 The initial executable checker build stopped before C compilation at those
-syntax errors. No executable selftests, DEX assembly, signed APK build, sealed
-successor framework or ARM execution has passed for this checkpoint.
+syntax errors. At that source-only checkpoint, executable selftests, DEX
+assembly, signed APK generation, a sealed successor framework and ARM execution
+had not passed.
 
 The retained source snapshots, initial failures and final typecheck logs are in
 `/Users/alex/.local/state/vinix/android/broadcast-result-host-tools-2026-10-27-r1/`.
@@ -69,24 +70,67 @@ retained separately in
 `/Users/alex/.local/state/vinix/android/broadcast-result-initial-code-2026-10-27-r1/`,
 whose `sha256.txt` checksum is
 `e500ba05f9afdb666a0e1ac1cfcd530b5ccf758cafddd9361a39370860cfafcc`.
-The original source-only bundle remains unchanged; executable and ARM checks
-are still pending.
+The original source-only bundle remains unchanged. Executable checks subsequently
+passed for source `e82ca648198b9e412a5c4defb8e2724503abf01c`; ARM checks remain
+pending.
 
-Host disk pressure blocked executable validation. Resume with the pinned V
-compiler at `/Users/alex/code/v-tccbin-bootstrap-20261026/v` and serialize builds:
+The focused transform checker and four-class DEX assembly passed. The native
+binding selftest and complete baseline binding check passed (628 spec entries,
+629 historical exports); the strict framework producer's selftest also passed.
+The enhanced fixture built both signed APKs, disassembled their DEX and verified
+APK v3 signatures. Its complete bundle is
+`/Users/alex/.local/state/vinix/android/broadcast-result-fixture-2026-10-27-r1/`,
+inventory SHA-256
+`93146d2bff516752ca62ea21cfb7bd532ced9abfe81345beb61e40a0b5d9b77d`.
+The client APK is
+`44f6c4356a5d031cf68191476bb0d2fb0fc2ceec8ecea26ffd395024d19321e7`;
+the disabled companion is
+`5293215a5899d2adb3ca9c6a52248c10874a2ad5b2e9cf08168935e829527966`.
 
-1. Build and run `check-broadcast-result.v` against the credential baseline's
-   `smali` tree, with the retained smali tools and Java for assembly.
-2. Build and run `check-native-bindings.v` and the combined builder's
-   `--self-test`, then build the enhanced signed fixture.
-3. Run the combined builder with `--broadcast-result`, the two baseline pins
+Builds ran sequentially using the pinned V compiler at
+`/Users/alex/code/v-tccbin-bootstrap-20261026/v`, SHA-256
+`0cc6c1d34c1811a818e4ae89853116861a4b067d4251af257851a7714f0d11fe`.
+The four host builds peaked at 553,254,912; 550,518,784; 375,635,968; and
+374,767,616 bytes RSS. Checker execution and four-class assembly peaked at
+104,038,400 bytes; binding execution at 21,790,720; producer selftest at
+9,977,856; and signed fixture generation at 111,247,360. All eight measurements
+recorded zero swaps. Commands used 45-second CPU and 32 MiB file-size limits;
+smali used two workers. These measurements do not explain the earlier reported
+92 GiB session usage or establish sustained broker memory behavior.
+
+Raw logs and host executables are retained in
+`/Users/alex/.local/state/vinix/android/broadcast-result-executable-checks-2026-10-27-r1/`.
+The complete retained inputs and results are bound by the fourteen-root streamed
+seal in
+`/Users/alex/.local/state/vinix/android/broadcast-result-host-evidence-sealed-2026-10-27-r1/`,
+manifest SHA-256
+`0ffbd89937df2a811d9d98131e0fc373125af03157e320707fec1eb7216aa9ce`.
+Both sealing and a separate full readback check passed for all 8,292 entries.
+The committed `broadcast-result-host-evidence.v` captures the pinned seven
+relevant source files, a newly observed V source closure, compiler and fixture
+inputs. Its plan inventory is
+`70d0856a9956041ab3f977f96b8c8da9c737a9b8f738f3f55a6b8ec2034cb572`.
+Historical host command arguments and limits are explicitly reconstructed from
+the session; these are not contemporaneous command receipts. The signed
+fixture's run arguments come from its original sealed build receipt. The
+capture is not a hermetic SDK, C toolchain or dynamic-library closure.
+
+The remaining work requires the full sealed framework successor:
+
+1. Run the combined builder with `--broadcast-result`, the two baseline pins
    above, and fresh output
    `combined-account-webview-broadcast-result-framework-2026-10-27-r1` below the
    Android state directory. Preserve at least 1 GiB free while producing it.
-4. Add a separate strict runner/transfer profile with the newly sealed JAR/APK
+2. Add a separate strict runner/transfer profile with the newly sealed JAR/APK
    pins and exact `broadcast-results` marker; preserve historical profiles.
-5. Stage the six-file framework successor and execute the fixture on ARM before
+3. Stage the six-file framework successor and execute the fixture on ARM before
    retrying real Play Services, Maps and Google account authentication.
 
-Google account login remains unverified; this checkpoint supplies source for
-the next observed framework failure and records the outstanding validation.
+Host free space fell below 1 GiB while preparing this checkpoint, then varied
+around 1.2–1.4 GiB during the final read-only disk audit. Full framework
+production remains below its 1.7 GiB start requirement, and staging requires
+1.5 GiB initially with a 1 GiB reserve. No safe task-owned cleanup large enough
+was found; no old evidence was removed and no VM was launched. Independent
+source review found no concrete register, ownership or cleanup defect. Assembly and APK
+verification do not establish ART verification, actual Maps startup, a fresh
+Maps screenshot or Google account login. Those runtime results remain pending.
