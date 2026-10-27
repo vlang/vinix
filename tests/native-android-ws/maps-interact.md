@@ -8,11 +8,39 @@ Build and run from the repository root:
 
 ```sh
 v -nocache -cc cc -o build/android-maps/maps-interact-bounded tests/native-android-ws/maps-interact.v
-build/android-maps/maps-interact-bounded /external/guest-run onboarding
+build/android-maps/maps-interact-bounded --self-test
+build/android-maps/maps-interact-bounded /external/guest-run capture before-skip
+build/android-maps/maps-interact-bounded /external/guest-run onboarding --client-rect 171 94 480 640
 build/android-maps/maps-interact-bounded /external/guest-run map
 build/android-maps/maps-interact-bounded /external/guest-run capture after-skip
-build/android-maps/maps-interact-bounded /external/guest-run input click 556 134
+build/android-maps/maps-interact-bounded /external/guest-run input click 575 148
 ```
+
+`onboarding` requires the current client rectangle measured from the screenshot:
+the left/top content origin and its visible width/height, excluding the window
+frame and title bar. The example rectangle maps Skip's native `(404,54)` point
+to screen `(575,148)`; replace it with the actual current rectangle. Desktop
+windows cascade and can move or resize, so onboarding no longer assumes a fixed
+screen position. All four values must be unsigned decimal integers, the dimensions
+must be positive, and the rectangle must fit within the 1024×768 screenshot.
+The driver transforms both onboarding probes and Skip into that rectangle and
+records the selected geometry before waiting. Keep the window in place until the
+click completes. `map`, `capture` and direct `input` retain their existing behavior;
+the map probe still uses its original fixed screen regions.
+
+The selftest checks rectangle rejection, translated and scaled click coordinates,
+synthetic onboarding probes at several sizes, and rejection of the stale probe
+position. It needs no guest or QMP server.
+
+The rectangle change (source base `f30d5acaf`, driver source SHA-256
+`c7c6a4766bd9754c499d50a610b33b418940f68a513fcdf742ab8b61455d7d9f`)
+passed the selftest and a real missing-rectangle CLI rejection. The bounded
+production build peaked at 209,469,440 bytes RSS; selftest peaked at 12,140,544
+bytes, both with zero swaps. Sources, executable, commands and logs remain at
+`/Users/alex/.local/state/vinix/android/maps-interact-client-rect-2026-10-27-r1`;
+its `sha256.txt` digest is
+`585631000e1f4d4674331425cef0d455681860cf20dc0da2e8d139facd830213`.
+These checks qualify geometry and parsing; no guest interaction was performed.
 
 The guest run directory supplies `serial.log` and `qmp.sock`; `build/android-run`
 must exist. Screen waits allow 600 seconds. Each input or screenshot subprocess

@@ -5,7 +5,49 @@ module main
 
 import os
 import stbi
+import strconv
 import time
+
+struct ClientRect {
+	x      int
+	y      int
+	width  int
+	height int
+}
+
+struct PixelPoint {
+	x int
+	y int
+}
+
+// Legacy probes used a 480x640 client at (120,80). Keep its local coordinates
+// while requiring the caller to measure the current onboarding client area.
+const legacy_client = ClientRect{120, 80, 480, 640}
+
+fn client_rect(args []string) !ClientRect {
+	if args.len != 5 || args[0] != '--client-rect' {
+		return error('onboarding requires --client-rect X Y WIDTH HEIGHT from the current screenshot')
+	}
+	mut values := []int{cap: 4}
+	for value in args[1..] {
+		if value == '' || value.bytes().any(it < `0` || it > `9`) {
+			return error('client rectangle values must be unsigned decimal integers')
+		}
+		values << int(strconv.parse_uint(value, 10, 31)!)
+	}
+	rect := ClientRect{values[0], values[1], values[2], values[3]}
+	// Subtraction avoids overflow before rejecting rectangles outside the frame.
+	if rect.x >= 1024 || rect.y >= 768 || rect.width <= 0 || rect.height <= 0
+		|| rect.width > 1024 - rect.x || rect.height > 768 - rect.y {
+		return error('client rectangle must fit wholly inside the 1024x768 screenshot')
+	}
+	return rect
+}
+
+fn (rect ClientRect) point(local_x int, local_y int) PixelPoint {
+	return PixelPoint{rect.x + local_x * rect.width / 480,
+		rect.y + local_y * rect.height / 640}
+}
 
 fn record(run string, message string) ! {
 	line := time.utc().str() + ' UTC ' + message + '\n'
@@ -107,9 +149,7 @@ fn input(run string, arguments []string) ! {
 		'0.15'])!
 }
 
-fn presented(path string, screen string) !bool {
-	image := stbi.load(path, desired_channels: 4)!
-	defer { image.free() }
+fn probe_image(image &stbi.Image, screen string, rect ClientRect) !bool {
 	if image.width != 1024 || image.height != 768 {
 		return error('Maps probe requires a 1024x768 screenshot')
 	}
@@ -117,20 +157,24 @@ fn presented(path string, screen string) !bool {
 	mut black := 0
 	mut cyan := 0
 	unsafe {
-		for y in 150 .. 500 {
-			for x in 140 .. 580 {
-				i := (y * image.width + x) * 4
+		// Sample in canonical client coordinates so thresholds retain the same
+		// meaning when the compositor stretches or shrinks the native surface.
+		for y in 70 .. 420 {
+			for x in 20 .. 460 {
+				point := rect.point(x, y)
+				i := (point.y * image.width + point.x) * 4
 				if image.data[i] > 230 && image.data[i + 1] > 230 && image.data[i + 2] > 230 {
 					white++
 				}
-				if y >= 200 && image.data[i] < 180 && image.data[i + 1] > 150 && image.data[i + 2] > 150 {
+				if y >= 120 && image.data[i] < 180 && image.data[i + 1] > 150 && image.data[i + 2] > 150 {
 					cyan++
 				}
 			}
 		}
-		for y in 555 .. 597 {
-			for x in 300 .. 419 {
-				i := (y * image.width + x) * 4
+		for y in 475 .. 517 {
+			for x in 180 .. 299 {
+				point := rect.point(x, y)
+				i := (point.y * image.width + point.x) * 4
 				if image.data[i] < 20 && image.data[i + 1] < 20 && image.data[i + 2] < 20 {
 					black++
 				}
@@ -140,7 +184,13 @@ fn presented(path string, screen string) !bool {
 	return if screen == 'onboarding' { white > 50000 && black > 4500 } else { cyan > 25000 }
 }
 
-fn wait_screen(run string, screen string) ! {
+fn presented(path string, screen string, rect ClientRect) !bool {
+	image := stbi.load(path, desired_channels: 4)!
+	defer { image.free() }
+	return probe_image(&image, screen, rect)
+}
+
+fn wait_screen(run string, screen string, rect ClientRect) ! {
 	begin := time.now().unix()
 	for time.now().unix() - begin < 600 {
 		serial := os.read_file(run + '/serial.log') or { '' }
@@ -149,7 +199,7 @@ fn wait_screen(run string, screen string) ! {
 		}
 		if serial.contains('ANDROID-WS-READY backend=vinix-native') && os.exists(run + '/qmp.sock') {
 			capture(run, screen + '-probe')!
-			if presented(run + '/' + screen + '-probe.png', screen)! {
+			if presented(run + '/' + screen + '-probe.png', screen, rect)! {
 				os.cp(run + '/' + screen + '-probe.png', run + '/' + screen + '.png')!
 				record(run, 'PIXEL-PROBE-PRESENTED ' + screen + '; screenshot requires visual review')!
 				return
@@ -160,9 +210,62 @@ fn wait_screen(run string, screen string) ! {
 	return error('timed out waiting for ' + screen)
 }
 
+fn self_test() ! {
+	for arguments in [ []string{}, ['--client-rect', '0', '0', '480'],
+		['--origin', '0', '0', '480', '640'], ['--client-rect', '-1', '0', '480', '640'],
+		['--client-rect', '+1', '0', '480', '640'], ['--client-rect', '1_0', '0', '480', '640'],
+		['--client-rect', '', '0', '480', '640'], ['--client-rect', '0 ', '0', '480', '640'],
+		['--client-rect', '2147483648', '0', '1', '1'],
+		['--client-rect', '1024', '0', '1', '1'], ['--client-rect', '0', '768', '1', '1'],
+		['--client-rect', '0', '0', '0', '640'], ['--client-rect', '0', '0', '480', '0'],
+		['--client-rect', '1000', '0', '25', '640'], ['--client-rect', '0', '700', '480', '69'],
+		['--client-rect', '0', '0', '480', '640', 'extra']] {
+		if _ := client_rect(arguments) { return error('invalid client rectangle accepted: ' + arguments.str()) }
+	}
+	if client_rect(['--client-rect', '120', '80', '480', '640'])! != legacy_client
+		|| legacy_client.point(404, 54) != PixelPoint{524, 134} {
+		return error('legacy client geometry changed')
+	}
+	if client_rect(['--client-rect', '171', '94', '480', '640'])!.point(404, 54) != PixelPoint{575, 148}
+		|| client_rect(['--client-rect', '20', '30', '240', '320'])!.point(404, 54) != PixelPoint{222, 57}
+		|| client_rect(['--client-rect', '50', '40', '960', '640'])!.point(404, 54) != PixelPoint{858, 94}
+		|| client_rect(['--client-rect', '1023', '767', '1', '1'])!.point(479, 639) != PixelPoint{1023, 767} {
+		return error('translated or scaled client point is wrong')
+	}
+	for rect in [legacy_client, ClientRect{171, 94, 480, 640}, ClientRect{20, 30, 240, 320},
+		ClientRect{50, 40, 960, 640}] {
+		mut pixels := []u8{len: 1024 * 768 * 4}
+		image := stbi.Image{width: 1024, height: 768, nr_channels: 4, data: unsafe { &u8(pixels.data) }}
+		if probe_image(&image, 'onboarding', rect)! { return error('blank image passed onboarding probe') }
+		for y in rect.y .. rect.y + rect.height {
+			for x in rect.x .. rect.x + rect.width {
+				i := (y * 1024 + x) * 4
+				for channel in 0 .. 3 { pixels[i + channel] = 255 }
+			}
+		}
+		if probe_image(&image, 'onboarding', rect)! { return error('white image without sign-in passed probe') }
+		for y in 475 .. 517 {
+			for x in 180 .. 299 {
+				point := rect.point(x, y)
+				i := (point.y * 1024 + point.x) * 4
+				for channel in 0 .. 3 { pixels[i + channel] = 0 }
+			}
+		}
+		if !probe_image(&image, 'onboarding', rect)! { return error('translated/scaled onboarding probe was lost') }
+		if rect == ClientRect{171, 94, 480, 640} && probe_image(&image, 'onboarding', legacy_client)! {
+			return error('stale coordinates matched translated onboarding')
+		}
+	}
+	println('MAPS-INTERACT-SELFTEST-PASS explicit-client-rectangle strict-bounds scaled-click translated-pixel-probes stale-coordinate-rejection')
+}
+
 fn main() {
+	if os.args.len == 2 && os.args[1] == '--self-test' {
+		self_test() or { eprintln(err); exit(1) }
+		return
+	}
 	if os.args.len < 3 {
-		eprintln('usage: maps-interact RUN_DIRECTORY onboarding|map|capture NAME|input ARGS...')
+		eprintln('usage: maps-interact --self-test | RUN_DIRECTORY onboarding --client-rect X Y WIDTH HEIGHT | map | capture NAME | input ARGS...')
 		exit(2)
 	}
 	run := os.abs_path(os.args[1])
@@ -176,15 +279,16 @@ fn main() {
 fn run_action(run string, action string, args []string) ! {
 	match action {
 		'onboarding' {
-			if args.len != 0 { return error('onboarding takes no extra arguments') }
-			wait_screen(run, action)!
-			// Click the label centre; 556 falls to its right in this layout.
-			input(run, ['click', '524', '134'])!
-			record(run, 'SKIP-CLICK')!
+			rect := client_rect(args)!
+			point := rect.point(404, 54)
+			record(run, 'ONBOARDING-CLIENT x=${rect.x} y=${rect.y} width=${rect.width} height=${rect.height} skip_local=404,54 skip_screen=${point.x},${point.y}')!
+			wait_screen(run, action, rect)!
+			input(run, ['click', point.x.str(), point.y.str()])!
+			record(run, 'SKIP-CLICK screen=${point.x},${point.y}')!
 		}
 		'map' {
 			if args.len != 0 { return error('map takes no extra arguments') }
-			wait_screen(run, action)!
+			wait_screen(run, action, legacy_client)!
 		}
 		'capture' {
 			if args.len != 1 { return error('capture requires a name') }
