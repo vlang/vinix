@@ -12,7 +12,13 @@ const prefs = 'Landroid/content/SharedPreferences;'
 const editor = 'Landroid/content/SharedPreferences$Editor;'
 const client = 'org.vinix.servicequery.client'
 const disabled = 'org.vinix.servicequery.disabled'
-const marker = 'SERVICE-QUERY-PASS no-filter disabled-component disabled-application unexported multifilter-single missing-no-action-fallback component-package wrapper implicit-preserved metadata-preserved no-initialization direct-boot-metadata credential-context'
+const receiver = 'Landroid/content/BroadcastReceiver;'
+const pending_result = 'Landroid/content/BroadcastReceiver$PendingResult;'
+const dynamic_receiver = 'Lorg/vinix/servicequery/DynamicReceiver;'
+const sibling_receiver = 'Lorg/vinix/servicequery/SiblingReceiver;'
+const manifest_receiver = 'Lorg/vinix/servicequery/ManifestReceiver;'
+const throw_receiver = 'Lorg/vinix/servicequery/ThrowReceiver;'
+const marker = 'SERVICE-QUERY-PASS no-filter disabled-component disabled-application unexported multifilter-single missing-no-action-fallback component-package wrapper implicit-preserved metadata-preserved no-initialization direct-boot-metadata credential-context broadcast-results'
 
 fn method(signature string, locals int, body string) string {
 	return '.method ${signature}\n.locals ${locals}\n${body}\n.end method\n'
@@ -366,14 +372,433 @@ return-void
 	return method('private static storage(${context})V', 8, body)
 }
 
+// These probes use the real Context.sendBroadcast routes. Only exceptional
+// cleanup calls the hidden dispatcher directly, so callback failures cannot be
+// mistaken for successful manifest/registered delivery.
+fn broadcast_defaults() string {
+	mut body := '
+invoke-virtual {p0}, ${receiver}->getResultCode()I
+move-result v0
+if-nez v0, :bad
+invoke-virtual {p0}, ${receiver}->getResultData()Ljava/lang/String;
+move-result-object v0
+if-nez v0, :bad
+const/4 v1, 0
+invoke-virtual {p0, v1}, ${receiver}->getResultExtras(Z)Landroid/os/Bundle;
+move-result-object v0
+if-nez v0, :bad
+invoke-virtual {p0}, ${receiver}->getAbortBroadcast()Z
+move-result v0
+if-nez v0, :bad
+invoke-virtual {p0}, ${receiver}->isOrderedBroadcast()Z
+move-result v0
+if-nez v0, :bad
+invoke-virtual {p0}, ${receiver}->isInitialStickyBroadcast()Z
+move-result v0
+if-nez v0, :bad
+return-void
+'
+	body += failure('fresh unordered broadcast defaults')
+	return method('public static broadcastFresh(${receiver})V', 2, body)
+}
+
+fn broadcast_mutation(target string, name string) string {
+	return method('public static ${name}(${target})Landroid/os/Bundle;', 4, '
+const/16 v0, 17
+invoke-virtual {p0, v0}, ${target}->setResultCode(I)V
+invoke-virtual {p0}, ${target}->getResultCode()I
+move-result v1
+if-ne v0, v1, :bad
+const-string v0, "first-data"
+invoke-virtual {p0, v0}, ${target}->setResultData(Ljava/lang/String;)V
+invoke-virtual {p0}, ${target}->getResultData()Ljava/lang/String;
+move-result-object v1
+invoke-virtual {v0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v1
+if-eqz v1, :bad
+const/4 v0, 1
+invoke-virtual {p0, v0}, ${target}->getResultExtras(Z)Landroid/os/Bundle;
+move-result-object v1
+if-eqz v1, :bad
+const/4 v0, 0
+invoke-virtual {p0, v0}, ${target}->getResultExtras(Z)Landroid/os/Bundle;
+move-result-object v2
+if-ne v1, v2, :bad
+new-instance v2, Landroid/os/Bundle;
+invoke-direct {v2}, Landroid/os/Bundle;-><init>()V
+const-string v0, "probe"
+const-string v1, "retained-extra"
+invoke-virtual {v2, v0, v1}, Landroid/os/Bundle;->putString(Ljava/lang/String;Ljava/lang/String;)V
+invoke-virtual {p0, v2}, ${target}->setResultExtras(Landroid/os/Bundle;)V
+const/4 v0, 0
+invoke-virtual {p0, v0}, ${target}->getResultExtras(Z)Landroid/os/Bundle;
+move-result-object v1
+if-ne v1, v2, :bad
+const/16 v0, 41
+const-string v1, "retained-data"
+invoke-virtual {p0, v0, v1, v2}, ${target}->setResult(ILjava/lang/String;Landroid/os/Bundle;)V
+invoke-virtual {p0}, ${target}->getResultCode()I
+move-result v3
+if-ne v0, v3, :bad
+invoke-virtual {p0}, ${target}->getResultData()Ljava/lang/String;
+move-result-object v3
+invoke-virtual {v1, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v3
+if-eqz v3, :bad
+const/4 v0, 0
+invoke-virtual {p0, v0}, ${target}->getResultExtras(Z)Landroid/os/Bundle;
+move-result-object v1
+if-ne v1, v2, :bad
+invoke-virtual {p0}, ${target}->abortBroadcast()V
+invoke-virtual {p0}, ${target}->getAbortBroadcast()Z
+move-result v0
+if-eqz v0, :bad
+invoke-virtual {p0}, ${target}->clearAbortBroadcast()V
+invoke-virtual {p0}, ${target}->getAbortBroadcast()Z
+move-result v0
+if-nez v0, :bad
+invoke-virtual {p0}, ${target}->abortBroadcast()V
+return-object v2
+' + failure('broadcast result mutation or extras identity'))
+}
+
+fn broadcast_outside() string {
+	mut body := '
+invoke-static {p0}, ${owner}->broadcastFresh(${receiver})V
+const/4 v1, 1
+invoke-virtual {p0, v1}, ${receiver}->getResultExtras(Z)Landroid/os/Bundle;
+move-result-object v0
+if-nez v0, :bad
+invoke-virtual {p0}, ${receiver}->goAsync()${pending_result}
+move-result-object v0
+if-nez v0, :bad
+invoke-virtual {p0}, ${receiver}->clearAbortBroadcast()V
+const/4 v1, 0
+const/4 v2, 0
+const/4 v3, 0
+'
+	for index, spec in [
+		['setResultCode(I)V', 'p0, v1'],
+		['setResultData(Ljava/lang/String;)V', 'p0, v2'],
+		['setResultExtras(Landroid/os/Bundle;)V', 'p0, v3'],
+		['setResult(ILjava/lang/String;Landroid/os/Bundle;)V', 'p0, v1, v2, v3'],
+		['abortBroadcast()V', 'p0'],
+	] {
+		body += ':outside_start_${index}\ninvoke-virtual {${spec[1]}}, ${receiver}->${spec[0]}\n' +
+			':outside_end_${index}\ngoto :bad\n.catch Ljava/lang/IllegalStateException; {:outside_start_${index} .. :outside_end_${index}} :outside_caught_${index}\n' +
+			':outside_caught_${index}\nmove-exception v0\n'
+	}
+	return method('public static broadcastOutside(${receiver})V', 4,
+		body + 'return-void\n' + failure('detached receiver accepted a result mutation'))
+}
+
+fn broadcast_cleanup() string {
+	return method('private static broadcastCleanup(${context}${dynamic_receiver}${sibling_receiver}Landroid/os/HandlerThread;I)V', 4, '
+const/4 v0, 0
+and-int/lit8 v1, p4, 1
+if-eqz v1, :second
+:first_start
+invoke-virtual {p0, p1}, ${context}->unregisterReceiver(${receiver})V
+:first_end
+goto :second
+.catchall {:first_start .. :first_end} :first_failed
+:first_failed
+move-exception v0
+:second
+and-int/lit8 v1, p4, 2
+if-eqz v1, :quit
+:second_start
+invoke-virtual {p0, p2}, ${context}->unregisterReceiver(${receiver})V
+:second_end
+goto :quit
+.catchall {:second_start .. :second_end} :second_failed
+:second_failed
+move-exception v0
+:quit
+invoke-virtual {p3}, Landroid/os/HandlerThread;->quit()Z
+const-wide/16 v1, 1000
+invoke-virtual {p3, v1, v2}, Ljava/lang/Thread;->join(J)V
+invoke-virtual {p3}, Ljava/lang/Thread;->isAlive()Z
+move-result v1
+if-nez v1, :bad
+if-eqz v0, :done
+throw v0
+:done
+return-void
+' + failure('broadcast HandlerThread did not terminate'))
+}
+
+fn broadcast_checks() string {
+	mut source := broadcast_defaults() + broadcast_mutation(receiver, 'broadcastMutate') +
+		broadcast_mutation(pending_result, 'pendingMutate') + broadcast_outside() + broadcast_cleanup()
+	source += method('private static broadcasts(${context})V', 10, '
+new-instance v0, Landroid/os/HandlerThread;
+const-string v7, "broadcast-result-fixture"
+invoke-direct {v0, v7}, Landroid/os/HandlerThread;-><init>(Ljava/lang/String;)V
+const/4 v3, 0
+const/4 v4, 0
+const/4 v6, 0
+:broadcast_start
+invoke-virtual {v0}, Ljava/lang/Thread;->start()V
+invoke-virtual {v0}, Landroid/os/HandlerThread;->getLooper()Landroid/os/Looper;
+move-result-object v1
+new-instance v2, Landroid/os/Handler;
+invoke-direct {v2, v1}, Landroid/os/Handler;-><init>(Landroid/os/Looper;)V
+new-instance v8, Ljava/util/concurrent/CountDownLatch;
+const/4 v7, 5
+invoke-direct {v8, v7}, Ljava/util/concurrent/CountDownLatch;-><init>(I)V
+new-instance v5, ${dynamic_receiver}
+invoke-direct {v5, v1, v8}, ${dynamic_receiver}-><init>(Landroid/os/Looper;Ljava/util/concurrent/CountDownLatch;)V
+move-object v3, v5
+new-instance v5, ${sibling_receiver}
+invoke-direct {v5, v1, v8}, ${sibling_receiver}-><init>(Landroid/os/Looper;Ljava/util/concurrent/CountDownLatch;)V
+move-object v4, v5
+invoke-static {v3}, ${owner}->broadcastOutside(${receiver})V
+new-instance v5, Landroid/content/IntentFilter;
+const-string v7, "org.vinix.servicequery.REGISTERED_BROADCAST"
+invoke-direct {v5, v7}, Landroid/content/IntentFilter;-><init>(Ljava/lang/String;)V
+const/4 v9, 0
+invoke-virtual {p0, v3, v5, v9, v2}, ${context}->registerReceiver(${receiver}Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;)Landroid/content/Intent;
+const/4 v6, 1
+invoke-virtual {p0, v4, v5, v9, v2}, ${context}->registerReceiver(${receiver}Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;)Landroid/content/Intent;
+const/4 v6, 3
+new-instance v5, Landroid/content/Intent;
+const-string v7, "org.vinix.servicequery.MANIFEST_BROADCAST"
+invoke-direct {v5, v7}, Landroid/content/Intent;-><init>(Ljava/lang/String;)V
+const-string v7, "${client}"
+const-string v9, "org.vinix.servicequery.ManifestReceiver"
+invoke-virtual {v5, v7, v9}, Landroid/content/Intent;->setClassName(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;
+invoke-virtual {p0, v5}, ${context}->sendBroadcast(Landroid/content/Intent;)V
+sget v7, ${owner}->manifestCalls:I
+const/4 v9, 1
+if-ne v7, v9, :bad
+new-instance v5, Landroid/content/Intent;
+const-string v7, "org.vinix.servicequery.REGISTERED_BROADCAST"
+invoke-direct {v5, v7}, Landroid/content/Intent;-><init>(Ljava/lang/String;)V
+invoke-virtual {p0, v5}, ${context}->sendBroadcast(Landroid/content/Intent;)V
+invoke-virtual {p0, v5}, ${context}->sendBroadcast(Landroid/content/Intent;)V
+# The callback latch alone can wake before dispatch finally detaches the result.
+# This queued barrier runs after all four receiver dispatches fully return.
+new-instance v5, Lorg/vinix/servicequery/BroadcastBarrier;
+invoke-direct {v5, v8}, Lorg/vinix/servicequery/BroadcastBarrier;-><init>(Ljava/util/concurrent/CountDownLatch;)V
+invoke-virtual {v2, v5}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
+move-result v5
+if-eqz v5, :bad
+const-wide/16 v7, 8
+sget-object v9, Ljava/util/concurrent/TimeUnit;->SECONDS:Ljava/util/concurrent/TimeUnit;
+iget-object v5, v3, ${dynamic_receiver}->latch:Ljava/util/concurrent/CountDownLatch;
+invoke-virtual {v5, v7, v8, v9}, Ljava/util/concurrent/CountDownLatch;->await(JLjava/util/concurrent/TimeUnit;)Z
+move-result v5
+if-eqz v5, :bad
+iget-object v5, v3, ${dynamic_receiver}->error:Ljava/lang/Throwable;
+if-nez v5, :callback_failed
+iget-object v5, v4, ${sibling_receiver}->error:Ljava/lang/Throwable;
+if-nez v5, :callback_failed
+iget v5, v3, ${dynamic_receiver}->calls:I
+const/4 v7, 2
+if-ne v5, v7, :bad
+iget v5, v4, ${sibling_receiver}->calls:I
+if-ne v5, v7, :bad
+invoke-static {v3}, ${owner}->broadcastOutside(${receiver})V
+invoke-static {v4}, ${owner}->broadcastOutside(${receiver})V
+new-instance v5, ${throw_receiver}
+invoke-direct {v5}, ${throw_receiver}-><init>()V
+new-instance v7, Landroid/content/Intent;
+invoke-direct {v7}, Landroid/content/Intent;-><init>()V
+const/4 v8, 0
+:throw_start
+invoke-virtual {v5, p0, v7, v8}, ${receiver}->vinixDispatch(${context}Landroid/content/Intent;Z)V
+:throw_end
+goto :bad
+.catch Ljava/lang/RuntimeException; {:throw_start .. :throw_end} :throw_caught
+:throw_caught
+move-exception v7
+iget-object v8, v5, ${throw_receiver}->failure:Ljava/lang/RuntimeException;
+if-ne v7, v8, :bad
+invoke-static {v5}, ${owner}->broadcastOutside(${receiver})V
+goto :broadcast_end
+:callback_failed
+throw v5
+:bad
+new-instance v5, Ljava/lang/AssertionError;
+const-string v7, "real broadcast dispatch, callback state or async ownership"
+invoke-direct {v5, v7}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+throw v5
+:broadcast_end
+goto :success
+.catchall {:broadcast_start .. :broadcast_end} :broadcast_failed
+:broadcast_failed
+move-exception v5
+invoke-static {p0, v3, v4, v0, v6}, ${owner}->broadcastCleanup(${context}${dynamic_receiver}${sibling_receiver}Landroid/os/HandlerThread;I)V
+throw v5
+:success
+invoke-static {p0, v3, v4, v0, v6}, ${owner}->broadcastCleanup(${context}${dynamic_receiver}${sibling_receiver}Landroid/os/HandlerThread;I)V
+return-void')
+	return source
+}
+
+fn broadcast_classes() map[string]string {
+	mut classes := map[string]string{}
+	classes['ManifestReceiver'] = '.class public ${manifest_receiver}\n.super ${receiver}\n' +
+		method('public constructor <init>()V', 0, 'invoke-direct {p0}, ${receiver}-><init>()V\nreturn-void') +
+		method('public onReceive(${context}Landroid/content/Intent;)V', 4, '
+invoke-static {p0}, ${owner}->broadcastFresh(${receiver})V
+# Reproduce the actual GMS invoke-super linkage failure.
+const/16 v0, 23
+invoke-super {p0, v0}, ${receiver}->setResultCode(I)V
+invoke-virtual {p0}, ${receiver}->getResultCode()I
+move-result v1
+if-ne v0, v1, :bad
+invoke-static {p0}, ${owner}->broadcastMutate(${receiver})Landroid/os/Bundle;
+invoke-virtual {p0}, ${receiver}->goAsync()${pending_result}
+move-result-object v0
+if-eqz v0, :bad
+invoke-static {p0}, ${owner}->broadcastOutside(${receiver})V
+invoke-static {v0}, ${owner}->pendingMutate(${pending_result})Landroid/os/Bundle;
+invoke-virtual {v0}, ${pending_result}->finish()V
+:finish_start
+invoke-virtual {v0}, ${pending_result}->finish()V
+:finish_end
+goto :bad
+.catch Ljava/lang/IllegalStateException; {:finish_start .. :finish_end} :finished_twice
+:finished_twice
+move-exception v1
+sget v0, ${owner}->manifestCalls:I
+add-int/lit8 v0, v0, 1
+sput v0, ${owner}->manifestCalls:I
+return-void
+' + failure('manifest broadcast super call, async transfer or component finish'))
+	for name, class_name in {'DynamicReceiver': dynamic_receiver, 'SiblingReceiver': sibling_receiver} {
+		mut source := '.class public ${class_name}\n.super ${receiver}\n' +
+			'.field public calls:I\n.field public error:Ljava/lang/Throwable;\n.field public expected:Landroid/os/Looper;\n' +
+			'.field public latch:Ljava/util/concurrent/CountDownLatch;\n'
+		if name == 'DynamicReceiver' {
+			source += '.field public first:${pending_result}\n.field public extras:Landroid/os/Bundle;\n'
+		}
+		source += method('public constructor <init>(Landroid/os/Looper;Ljava/util/concurrent/CountDownLatch;)V', 0,
+			'invoke-direct {p0}, ${receiver}-><init>()V\niput-object p1, p0, ${class_name}->expected:Landroid/os/Looper;\n' +
+			'iput-object p2, p0, ${class_name}->latch:Ljava/util/concurrent/CountDownLatch;\nreturn-void')
+		mut body := '
+:callback_start
+invoke-static {}, Landroid/os/Looper;->myLooper()Landroid/os/Looper;
+move-result-object v0
+iget-object v1, p0, ${class_name}->expected:Landroid/os/Looper;
+if-ne v0, v1, :bad
+invoke-static {p0}, ${owner}->broadcastFresh(${receiver})V
+iget v0, p0, ${class_name}->calls:I
+add-int/lit8 v0, v0, 1
+iput v0, p0, ${class_name}->calls:I
+const/4 v1, 2
+if-gt v0, v1, :bad
+'
+		if name == 'DynamicReceiver' {
+			body += '
+const/4 v1, 1
+if-ne v0, v1, :second
+invoke-static {p0}, ${owner}->broadcastMutate(${receiver})Landroid/os/Bundle;
+move-result-object v1
+iput-object v1, p0, ${class_name}->extras:Landroid/os/Bundle;
+invoke-virtual {p0}, ${receiver}->goAsync()${pending_result}
+move-result-object v0
+if-eqz v0, :bad
+iput-object v0, p0, ${class_name}->first:${pending_result}
+invoke-static {p0}, ${owner}->broadcastOutside(${receiver})V
+goto/16 :callback_end
+:second
+invoke-static {p0}, ${owner}->broadcastMutate(${receiver})Landroid/os/Bundle;
+invoke-virtual {p0}, ${receiver}->goAsync()${pending_result}
+move-result-object v0
+if-eqz v0, :bad
+iget-object v1, p0, ${class_name}->first:${pending_result}
+if-eqz v1, :bad
+if-eq v0, v1, :bad
+invoke-static {v0}, ${owner}->pendingMutate(${pending_result})Landroid/os/Bundle;
+const/16 v2, 99
+invoke-virtual {v0, v2}, ${pending_result}->setResultCode(I)V
+invoke-virtual {v1}, ${pending_result}->getResultCode()I
+move-result v2
+const/16 v3, 41
+if-ne v2, v3, :bad
+invoke-virtual {v1}, ${pending_result}->getResultData()Ljava/lang/String;
+move-result-object v2
+const-string v3, "retained-data"
+invoke-virtual {v3, v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v2
+if-eqz v2, :bad
+const/4 v2, 0
+invoke-virtual {v1, v2}, ${pending_result}->getResultExtras(Z)Landroid/os/Bundle;
+move-result-object v2
+iget-object v3, p0, ${class_name}->extras:Landroid/os/Bundle;
+if-ne v2, v3, :bad
+invoke-virtual {v1}, ${pending_result}->getAbortBroadcast()Z
+move-result v2
+if-eqz v2, :bad
+invoke-virtual {v1}, ${pending_result}->finish()V
+invoke-virtual {v1}, ${pending_result}->finish()V
+invoke-virtual {v0}, ${pending_result}->finish()V
+invoke-virtual {v0}, ${pending_result}->finish()V
+invoke-static {p0}, ${owner}->broadcastOutside(${receiver})V
+'
+		} else {
+			body += '
+const/4 v1, 1
+if-ne v0, v1, :callback_end
+invoke-static {p0}, ${owner}->broadcastMutate(${receiver})Landroid/os/Bundle;
+'
+		}
+		body += '
+:callback_end
+goto :signal
+.catchall {:callback_start .. :callback_end} :callback_failed
+:bad
+new-instance v0, Ljava/lang/AssertionError;
+const-string v1, "registered broadcast thread, fresh state or async ownership"
+invoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
+iput-object v0, p0, ${class_name}->error:Ljava/lang/Throwable;
+goto :signal
+:callback_failed
+move-exception v0
+iput-object v0, p0, ${class_name}->error:Ljava/lang/Throwable;
+:signal
+iget-object v0, p0, ${class_name}->latch:Ljava/util/concurrent/CountDownLatch;
+invoke-virtual {v0}, Ljava/util/concurrent/CountDownLatch;->countDown()V
+return-void'
+		source += method('public onReceive(${context}Landroid/content/Intent;)V', 4, body)
+		classes[name] = source
+	}
+	classes['ThrowReceiver'] = '.class public ${throw_receiver}\n.super ${receiver}\n' +
+		'.field public failure:Ljava/lang/RuntimeException;\n' +
+		method('public constructor <init>()V', 2, '
+invoke-direct {p0}, ${receiver}-><init>()V
+new-instance v0, Ljava/lang/RuntimeException;
+const-string v1, "expected broadcast callback failure"
+invoke-direct {v0, v1}, Ljava/lang/RuntimeException;-><init>(Ljava/lang/String;)V
+iput-object v0, p0, ${throw_receiver}->failure:Ljava/lang/RuntimeException;
+return-void') + method('public onReceive(${context}Landroid/content/Intent;)V', 1, '
+invoke-static {p0}, ${owner}->broadcastFresh(${receiver})V
+const/16 v0, 73
+invoke-virtual {p0, v0}, ${receiver}->setResultCode(I)V
+invoke-virtual {p0}, ${receiver}->abortBroadcast()V
+iget-object v0, p0, ${throw_receiver}->failure:Ljava/lang/RuntimeException;
+throw v0')
+	classes['BroadcastBarrier'] = '.class public Lorg/vinix/servicequery/BroadcastBarrier;\n.super Ljava/lang/Object;\n.implements Ljava/lang/Runnable;\n' +
+		'.field private latch:Ljava/util/concurrent/CountDownLatch;\n' +
+		method('public constructor <init>(Ljava/util/concurrent/CountDownLatch;)V', 0,
+			'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\niput-object p1, p0, Lorg/vinix/servicequery/BroadcastBarrier;->latch:Ljava/util/concurrent/CountDownLatch;\nreturn-void') +
+		method('public run()V', 1,
+			'iget-object v0, p0, Lorg/vinix/servicequery/BroadcastBarrier;->latch:Ljava/util/concurrent/CountDownLatch;\ninvoke-virtual {v0}, Ljava/util/concurrent/CountDownLatch;->countDown()V\nreturn-void')
+	return classes
+}
+
 fn main_class() string {
-	mut source := '.class public ${owner}\n.super Landroid/app/Activity;\n'
+	mut source := '.class public ${owner}\n.super Landroid/app/Activity;\n.field public static manifestCalls:I\n'
 	source += method('public constructor <init>()V', 0, 'invoke-direct {p0}, Landroid/app/Activity;-><init>()V\nreturn-void')
 	source += query_check()
 	source += implicit_check()
 	source += component_array_check()
 	source += metadata_check()
 	source += checks() + path_checks() + preferences_check() + storage_check()
+	source += broadcast_checks()
 	mut body := 'invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V\nmove-object v0, p0\n'
 	for wrapped in [false, true] {
 		if wrapped {
@@ -392,6 +817,7 @@ fn main_class() string {
 		body += 'invoke-static {v0}, ${owner}->metadata(${context})V\n'
 		body += 'invoke-static {v0}, ${owner}->storage(${context})V\n'
 	}
+	body += 'invoke-static {p0}, ${owner}->broadcasts(${context})V\n'
 	body += 'sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v1, "${marker}"\ninvoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\ninvoke-virtual {v0}, Ljava/io/PrintStream;->flush()V\nnew-instance v0, Landroid/widget/TextView;\ninvoke-direct {v0, p0}, Landroid/widget/TextView;-><init>(${context})V\nconst-string v1, "Explicit service metadata query passed"\ninvoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V\ninvoke-virtual {p0, v0}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V\nreturn-void'
 	return source + method('public onCreate(Landroid/os/Bundle;)V', 5, body)
 }
@@ -409,6 +835,7 @@ fn manifest(name string) string {
 		components += '<service android:name="org.vinix.servicequery.Multi" android:exported="true"><intent-filter><action android:name="org.vinix.servicequery.ACTION"/></intent-filter><intent-filter><action android:name="org.vinix.servicequery.ACTION"/></intent-filter></service>'
 		components += '<service android:name="org.vinix.servicequery.BootAware" android:exported="false" android:directBootAware="true"/><service android:name="org.vinix.servicequery.BootResource" android:exported="false" android:directBootAware="@bool/direct_boot_true"/><service android:name="org.vinix.servicequery.BootFalse" android:exported="false" android:directBootAware="@bool/direct_boot_false"/>'
 		components += '<activity android:name="org.vinix.servicequery.Main" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>'
+		components += '<receiver android:name="org.vinix.servicequery.ManifestReceiver" android:exported="false"><intent-filter><action android:name="org.vinix.servicequery.MANIFEST_BROADCAST"/></intent-filter></receiver>'
 	} else {
 		// The disabled companion is parsed for metadata only. Its Application
 		// constructor traps any accidental startup while resolving these entries.
@@ -462,7 +889,10 @@ fn main() {
 		os.mkdir_all(dir + '/res/values')!
 		os.write_file(dir + '/res/values/values.xml', '<resources><string name="probe">Service query</string><bool name="direct_boot_true">true</bool><bool name="direct_boot_false">false</bool></resources>')!
 		os.write_file(dir + '/AndroidManifest.xml', manifest(name))!
-		if name == 'client' { os.write_file(smali + '/Main.smali', main_class())! } else { os.write_file(smali + '/TrapApp.smali', trap_class('TrapApp', 'Application'))! }
+		if name == 'client' {
+			os.write_file(smali + '/Main.smali', main_class())!
+			for class_name, source in broadcast_classes() { os.write_file(smali + '/' + class_name + '.smali', source)! }
+		} else { os.write_file(smali + '/TrapApp.smali', trap_class('TrapApp', 'Application'))! }
 		for service in if name == 'client' { ['Enabled', 'Disabled', 'Multi', 'BootAware', 'BootResource', 'BootFalse'] } else { ['Enabled'] } { os.write_file(smali + '/' + service + '.smali', trap_class(service, 'Service'))! }
 		recorded(out, name + '-compile', [aapt, 'compile', '--dir', dir + '/res', '-o', dir + '/resources.zip'])
 		recorded(out, name + '-link', [aapt, 'link', '-I', resources, dir + '/resources.zip', '--manifest', dir + '/AndroidManifest.xml', '-o', dir + '/unsigned.apk'])
@@ -480,7 +910,15 @@ fn build_apk(out string, name string, dir string, tools string, java string, sig
 	if name == 'client' {
 		decoded := os.read_file(dir + '/roundtrip/org/vinix/servicequery/Main.smali')!
 		for expected in [marker, '->createCredentialProtectedStorageContext()', '->isCredentialProtectedStorage()Z',
-			'->createConfigurationContext(', '->commit()Z'] { assert decoded.contains(expected), expected }
+			'->createConfigurationContext(', '->commit()Z', '->sendBroadcast(Landroid/content/Intent;)V',
+			'->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;)',
+			'->vinixDispatch(Landroid/content/Context;Landroid/content/Intent;Z)V'] { assert decoded.contains(expected), expected }
+		manifest_probe := os.read_file(dir + '/roundtrip/org/vinix/servicequery/ManifestReceiver.smali')!
+		assert manifest_probe.contains('invoke-super') && manifest_probe.contains('${receiver}->setResultCode(I)V')
+		registered_probe := os.read_file(dir + '/roundtrip/org/vinix/servicequery/DynamicReceiver.smali')!
+		for expected in ['->myLooper()', '${receiver}->goAsync()${pending_result}', '${pending_result}->finish()V'] {
+			assert registered_probe.contains(expected), expected
+		}
 	}
 	recorded(out, name + '-zip', ['/usr/bin/zip', '-q', '-j', dir + '/unsigned.apk', dir + '/classes.dex'])
 	apk := dir + '/probe.apk'
@@ -496,7 +934,7 @@ fn finish(out string, repo string, inputs map[string]string, apks map[string]str
 	os.write_file(out + '/build.json', json2.encode({
 		'argv': json2.Any(os.args), 'source_revision': json2.Any(revision.output.trim_space()),
 		'inputs_sha256': json2.decode[json2.Any](json2.encode(inputs))!, 'apks_sha256': json2.decode[json2.Any](json2.encode(apks))!,
-		'pass_marker': json2.Any(marker), 'scope': json2.Any('Generic explicit query, direct-boot metadata and credential/device storage Context API regression. Tests fresh CE factories and primed-cache DE-to-CE roundtrips; distinct paths/preferences, dual storage predicates, nested wrappers, configuration and app/resources identity. Storage namespaces are separate private directories without separate encryption/unlock states. Signed APK generation and DEX roundtrip only until ART execution; no account/network activity. Metadata lookup must not construct services or companion Application.')
+		'pass_marker': json2.Any(marker), 'scope': json2.Any('Generic explicit query, direct-boot metadata, credential/device storage Context and broadcast result API regression. Tests fresh CE factories and primed-cache DE-to-CE roundtrips; distinct paths/preferences, dual storage predicates, nested wrappers, configuration and app/resources identity. Real Context.sendBroadcast drives a manifest invoke-super result setter and registered receivers on a dedicated HandlerThread. Probes unordered/sticky hints, result code/data/extras/abort, detached receiver behavior, exact goAsync transfer, independent consecutive deliveries, sibling delivery despite abort, component versus registered finish, and exceptional dispatcher cleanup. Callback errors reach the main checker; shared callback wait and thread join total at most nine seconds. Storage namespaces are separate private directories without separate encryption/unlock states. Signed APK generation and DEX roundtrip only until ART execution; no account/network activity. Metadata lookup must not construct services or companion Application.')
 	}, prettify: true) + '\n')!
 	os.cp(@FILE, out + '/builder.v')!
 	os.cp(os.executable(), out + '/builder')!
