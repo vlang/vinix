@@ -187,3 +187,69 @@ Their adjacent evidence remains in the external state directory:
 No guest execution or Google login is established by preparation. The subsequent
 root-run diagnostic must record its explicit
 `VINIX_ANDROID_TRACE_SERVICE_BINDING=1` environment prefix.
+
+## Separate service startup budget
+
+Implementation revision `85cdab8c6ff830ede63e853ef499c39f7d946a2b` selects the
+new sealed `current-native-build-2026-10-27-startup-r1` producer, source revision
+`302628d15c27306e6f394237010af59fdd63a413`. Its manifest SHA-256 is
+`a62bf4a8a4ef8d1c000f82395ec64b145c9c4d6df25f12077f75d96d341e0a20`,
+and JNI SHA-256 is
+`82e4bdb907a300634b304b37339b2e9a836f6f1a61d01a369d0f5aa707fddca7`.
+The retained launch source remains
+`c453f9a0a4ab8b5f8ad4ea17d0c932304d61aafb6126d55b9bcc55efe0aa9b57`;
+the new JNI service source is
+`e2be36f866ac321a7d681112e3514d8b1c8ac06553538758d7c1c220b9f3c72f`.
+This exact ordered pair requires the new manifest and JNI hashes. The previous
+producer and stages remain immutable; the current profile rejects obsolete
+binding-r2 and mixed old/new source or native identities.
+
+Independent read-only review compared the sealed source and export receipts.
+Relative to binding-r2, the only source change is the service startup deadline
+from five to 45 seconds and its explanatory comments. The existing numeric
+diagnostics, seven-argument exported entry, declaration and call remain
+unchanged. Account IPC retains its five-second budget. The nine-file payload,
+decoded receipt deltas, complete role checks and production checker are
+unchanged.
+
+The retained `protected-storage-map-stage-r6` executable SHA-256 is
+`a6880d56310a565e655da5559832ab28b75c2b989fdd4bb31fc24cc63970e073`;
+its source SHA-256 is
+`1085f7065093dc5c4a39ef8a7ee246fac23355352302cfccbf2ca5b02ecc512a`.
+The pinned compiler and Boehm command above were reused. Host compilation
+passed in 8.20 seconds with maximum RSS 446,513,152 bytes. Expanded positive
+and rejection self-tests passed in 1.51 seconds with maximum RSS 7,389,184
+bytes. Both recorded zero swaps. The adjacent logs remain external:
+
+| Evidence | SHA-256 |
+| --- | --- |
+| `protected-storage-map-stage-compile-r6.log` | `e6d3338c0e12734c67077f860fa6cf8b72fa919e30e376cfa7e76a1aec68e12c` |
+| `protected-storage-map-stage-selftest-r6.log` | `40253b9784c287372e2dd7a67cacc0c176f26cca2a5081a46a43ae96c4625411` |
+| `current-native-build-2026-10-27-startup-r1.log` | `6877dde2809a546d3bc7790101d19ac49ad4a49774ad0c28760ff4b03791599f` |
+| `current-native-build-2026-10-27-startup-r1-independent-check.log` | `d19558fb3235ce9f974da5098f6524a807cd18cb995b9cb9ac28fb263af635b7` |
+| `current-native-build-2026-10-27-startup-r1-independent-check.json` | `a7101371b781d096f2d7e6332d72ae59bd12edb30ca1bedbc7c5710f905b0331` |
+
+The strict AArch64 native build passed in 46.39 seconds with maximum RSS
+604,930,048 bytes. Its independent complete 1,197-file check passed in 2.00
+seconds with maximum RSS 1,288,978,432 bytes. Both recorded zero swaps.
+
+Fresh preparation passed in 112.56 seconds with maximum RSS 61,915,136 bytes
+and zero swaps. The immutable output is
+`/Users/alex/.local/state/vinix/android/maps-startup-r1`, with complete manifest
+SHA-256 `f79065bc79d816f8cf35a21c72ef375369229b0ee8170165890808e3d194e332`.
+Its receipt records the implementation revision above. The prepare log is
+`protected-storage-map-stage-prepare-startup-r1.log`, SHA-256
+`acdfa85a7817206211aec26fd46aae45d00094c4e36b8e1c64891d22ce58bc81`.
+All complete input bundles, seven original modules, overlay and media readbacks
+passed. The 6,604,800-byte overlay SHA-256 is
+`cb2d855ac82924d6bc0f2221bea0d6cccbf2f9a9d467c455fbf9acba5d594ac3`;
+boot image SHA-256 is
+`24999d2743f4c86196b39113b68062908a698945864c2ca551dff4f0578677c6`.
+Firmware and Limine retain the hashes recorded for the binding stage above.
+
+Only the boot image and firmware were APFS-cloned. `du -sk` reports
+4,208,576 KiB including shared media. Filesystem free space was 56,176,044 KiB
+before and 51,730,096 KiB after; other sessions were active, so this is not a
+unique allocation measure. No guest or Google login result is established by
+preparation. The root-run retry must record the explicit diagnostic environment
+prefix and preserve this sealed stage by running a fresh clone.
