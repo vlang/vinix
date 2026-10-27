@@ -61,3 +61,52 @@ Use the selected runtime, an isolated fixture principal/data/home, a private
 surface and a held input pipe. Require the exact `pass_marker` from `build.json`
 once, without assertion, verifier or uncaught errors. ART execution and real
 Google account login remain pending for this fixture bundle.
+
+`service-query-run.v` is a separate root fixture controller transferred after
+boot; it does not change the six-file diagnostic image overlay. It pins the
+two signed APKs and corrected JAR, creates fresh target-owned data/home and a
+private 64×64 surface, and uses the existing launcher for permanent UID/GID,
+group and capability changes. The child receives only an explicit fixture
+environment and pipe-backed stdin/stdout/stderr; inherited descriptors above
+stdio are closed. No account registry, authenticator or browser channel is set.
+
+The parent limits output to 4 MiB and lines to 8192 bytes. It waits up to 180
+seconds for the exact fixture pass marker and native WS readiness once, then
+closes stdin and allows 20 seconds for clean shutdown. It drains output through
+EOF, rejects exception/error markers and verifies clean wait status. Failure
+cleanup kills the owned process group while the direct child is still unreaped.
+Only `child.log` and `receipt.json` leave the guest in checksummed atomic serial
+frames prefixed `VINIX-SERVICE-QUERY-RESULTS-1`. Application data stays local.
+
+Host checker self-test passed 23 malformed/error cases. Static AArch64 build
+took 3.38 seconds and peaked at 359 MB RSS. Independent source review passed;
+ART execution remains pending. Source SHA-256:
+`27b31609282bd86ccb05fa1108734778662e64d3bbca5d9e862962bb2a05f7ba`.
+Runner evidence is retained at
+`/Users/alex/.local/state/vinix/android/service-query-run-2026-10-27-r1`.
+Static runner SHA-256:
+`8ef76b9e4c9f1eb0cc84780eaa0b618a3a70f317cd4f0e87824ddcdffcae8727`.
+
+Build with the retained compiler and ARM musl compiler:
+
+```sh
+/Users/alex/code/v-tccbin-bootstrap-20261026/v -new-compiler -nocache \
+  -os linux -arch arm64 -cc /opt/homebrew/bin/aarch64-linux-musl-gcc \
+  -gc none -cflags -static -ldflags -static -o NEW_EXTERNAL_RUNNER \
+  tests/native-android-ws/service-query-run.v
+```
+
+Transfer the pinned runner and APKs into a new root-owned directory under
+`/var/lib` (0755 directory/runner, 0644 APKs). All ancestors must be root-owned,
+target-traversable and not group/other writable. Provision an unused Unix
+user/group in 10000..19999, for example 10117. The selected runtime must already
+have the existing readonly/nosuid/nodev/`wxallowed` attachment policy; the native
+launcher's `VINIX_ALLOW_WX=1` alone does not grant executable mount admission.
+Then, as root, with a fresh result directory:
+
+```sh
+/var/lib/service-query-input-r1/run /opt/vinix-android-aarch64 \
+  /var/lib/service-query-input-r1/client.apk \
+  /var/lib/service-query-input-r1/disabled.apk \
+  10117 10117 /var/lib/service-query-result-r1
+```
