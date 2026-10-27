@@ -38,6 +38,12 @@ const broadcast_result_runner_pin = '95be25cf1f8837bc717d200b0b92642c3085adbd789
 const broadcast_result_fixture = '/Users/alex/.local/state/vinix/android/broadcast-result-fixture-2026-10-27-r1'
 const broadcast_result_client_pin = '44f6c4356a5d031cf68191476bb0d2fb0fc2ceec8ecea26ffd395024d19321e7'
 const broadcast_result_disabled_pin = '5293215a5899d2adb3ca9c6a52248c10874a2ad5b2e9cf08168935e829527966'
+const onboarding_api_runner = '/Users/alex/.local/state/vinix/android/onboarding-api-run-2026-10-27-r1/run'
+const onboarding_api_runner_pin = '0c8926b74244b7f505ffa6aafb6ff8a6e7beef2bd96369310a30d35d063b10b8'
+const child_attach_apk = '/Users/alex/.local/state/vinix/android/child-attach-checks-2026-10-27-r1/apk/probe.apk'
+const child_attach_apk_pin = '27869d74fd03598dda9b75b740cbaf2efcc423ee0c5ff3b2f447d22ade9f999e'
+const settings_global_apk = '/Users/alex/.local/state/vinix/android/settings-global-checks-2026-10-27-r1/apk/probe.apk'
+const settings_global_apk_pin = 'c3e912e4e05c2af28d6d64d1fcb46874136a6164f7e2e19cc5ba1b62d950fedd'
 const file_limit = 32 * 1024 * 1024
 const request_limit = 12
 const seconds_limit = 600
@@ -267,13 +273,19 @@ fn broadcast_result_assets() []Asset {
 		Asset{url: '/disabled.apk', path: broadcast_result_fixture + '/disabled/probe.apk', sha256: broadcast_result_disabled_pin}]
 }
 
-fn serve(root string, port string, is_direct_boot bool, is_credential_storage bool, is_broadcast_result bool) ! {
+fn onboarding_api_assets() []Asset {
+	return [Asset{url: '/onboarding-api-run', path: onboarding_api_runner, sha256: onboarding_api_runner_pin},
+		Asset{url: '/child-attach.apk', path: child_attach_apk, sha256: child_attach_apk_pin},
+		Asset{url: '/settings-global.apk', path: settings_global_apk, sha256: settings_global_apk_pin}]
+}
+
+fn serve(root string, port string, is_direct_boot bool, is_credential_storage bool, is_broadcast_result bool, is_onboarding_api bool) ! {
 	$if !net_nonblocking_sockets ? { return error('build with -d net_nonblocking_sockets for socket deadlines') }
 	external(root)!
 	if port == '' || port.len > 5 || !port.bytes().all(it >= `0` && it <= `9`)
 		|| port.u64() > 65535 || port != port.u64().str() { return error('canonical port 0..65535 required') }
 	if unsafe { C.mkdir(root.str, 0o700) } != 0 { return error('fresh private output directory required') }
-	inputs := if is_broadcast_result { broadcast_result_assets() } else if is_credential_storage { credential_storage_assets() } else if is_direct_boot { direct_boot_assets() } else { pinned_assets() }
+	inputs := if is_onboarding_api { onboarding_api_assets() } else if is_broadcast_result { broadcast_result_assets() } else if is_credential_storage { credential_storage_assets() } else if is_direct_boot { direct_boot_assets() } else { pinned_assets() }
 	mut assets := []Asset{}
 	for asset in inputs { assets << snapshot(asset, root + asset.url)! }
 	mut listener := net.listen_tcp(.ip, '127.0.0.1:' + port)!
@@ -281,7 +293,7 @@ fn serve(root string, port string, is_direct_boot bool, is_credential_storage bo
 	address := listener.addr()!.str()
 	deadline := time.now().add(seconds_limit * time.second)
 	write_json(root + '/ready.json', json2.encode({
-		'kind': json2.Any(if is_broadcast_result { 'vinix-broadcast-result-http-v1' } else if is_credential_storage { 'vinix-credential-storage-http-v1' } else if is_direct_boot { 'vinix-direct-boot-http-v1' } else { 'vinix-service-query-http-v1' })
+		'kind': json2.Any(if is_onboarding_api { 'vinix-onboarding-api-http-v1' } else if is_broadcast_result { 'vinix-broadcast-result-http-v1' } else if is_credential_storage { 'vinix-credential-storage-http-v1' } else if is_direct_boot { 'vinix-direct-boot-http-v1' } else { 'vinix-service-query-http-v1' })
 		'scope': json2.Any(scope)
 		'address': json2.Any(address)
 		'deadline_utc': json2.Any(deadline.str())
@@ -305,12 +317,13 @@ fn main() {
 	is_direct_boot := os.args.len == 5 && os.args[1] == 'serve' && os.args[2] == '--direct-boot'
 	is_credential_storage := os.args.len == 5 && os.args[1] == 'serve' && os.args[2] == '--credential-storage'
 	is_broadcast_result := os.args.len == 5 && os.args[1] == 'serve' && os.args[2] == '--broadcast-result'
-	if !is_direct_boot && !is_credential_storage && !is_broadcast_result && (os.args.len != 4 || os.args[1] != 'serve') {
-		eprintln('usage: service-query-transfer serve [--direct-boot|--credential-storage|--broadcast-result] FRESH_EXTERNAL_DIR PORT | --self-test FRESH_EXTERNAL_DIR')
+	is_onboarding_api := os.args.len == 5 && os.args[1] == 'serve' && os.args[2] == '--onboarding-apis'
+	if !is_direct_boot && !is_credential_storage && !is_broadcast_result && !is_onboarding_api && (os.args.len != 4 || os.args[1] != 'serve') {
+		eprintln('usage: service-query-transfer serve [--direct-boot|--credential-storage|--broadcast-result|--onboarding-apis] FRESH_EXTERNAL_DIR PORT | --self-test FRESH_EXTERNAL_DIR')
 		exit(2)
 	}
-	offset := if is_direct_boot || is_credential_storage || is_broadcast_result { 1 } else { 0 }
-	serve(os.args[2 + offset], os.args[3 + offset], is_direct_boot, is_credential_storage, is_broadcast_result) or { eprintln(err); exit(1) }
+	offset := if is_direct_boot || is_credential_storage || is_broadcast_result || is_onboarding_api { 1 } else { 0 }
+	serve(os.args[2 + offset], os.args[3 + offset], is_direct_boot, is_credential_storage, is_broadcast_result, is_onboarding_api) or { eprintln(err); exit(1) }
 }
 
 fn get(address string, request string) !string {
@@ -339,6 +352,14 @@ fn self_test(root string) ! {
 	assert pinned_assets()[0].url == '/service-query-run' && direct_boot_assets()[0].url == '/direct-boot-run'
 	assert credential_storage_assets()[0].url == '/credential-storage-run'
 	assert broadcast_result_assets()[0].url == '/broadcast-result-run'
+	assert onboarding_api_assets().len == 3
+	assert onboarding_api_assets().map(it.url) == ['/onboarding-api-run', '/child-attach.apk', '/settings-global.apk']
+	for asset in onboarding_api_assets() {
+		assert valid_digest(asset.sha256)
+		for older in [pinned_assets(), direct_boot_assets(), credential_storage_assets(), broadcast_result_assets()] {
+			for old in older { assert asset.path != old.path && asset.sha256 != old.sha256 }
+		}
+	}
 	for index, asset in direct_boot_assets() {
 		assert valid_digest(asset.sha256) && asset.sha256 != pinned_assets()[index].sha256
 		assert asset.path != pinned_assets()[index].path
