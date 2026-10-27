@@ -3,6 +3,7 @@
 // Readiness is transport evidence only; this never claims Google authentication.
 module main
 
+import arena
 import crypto.sha256
 import encoding.base64
 import json2
@@ -234,6 +235,10 @@ fn export_serial(payload string) ! {
 // helpers create additional process groups, so track the whole child tree.
 fn identity(pid int) !Identity {
 	text := os.read_file('/proc/' + pid.str() + '/stat')!
+	return proc_identity(pid, text)
+}
+
+fn proc_identity(pid int, text string) !Identity {
 	end := text.last_index(')') or { return error('invalid proc stat') }
 	fields := text[end + 1..].fields()
 	if fields.len < 20 { return error('short proc stat') }
@@ -283,22 +288,36 @@ fn enable_subreaper() ! {
 	}
 }
 
-fn cleanup(mut owned map[int]Identity) !int {
+fn cleanup_observation(scratch &arena.Arena, known map[int]Identity) !(map[int]Identity, int) {
+	scratch.push()
+	defer { scratch.pop() }
+	mut observed := known.clone()
+	discover(mut observed)!
+	kill_owned(observed)
+	$if linux {
+		mut status := 0
+		for C.waitpid(-1, &status, 1) > 0 {
+		}
+	}
+	mut survivors := 0
+	for pid, previous in observed {
+		if pid == os.getpid() { continue }
+		current := identity(pid) or { continue }
+		if current.start == previous.start { survivors++ }
+	}
+	return observed, survivors
+}
+
+fn cleanup(mut owned map[int]Identity, mut scratch arena.Arena) !int {
 	deadline := time.sys_mono_now() + 2 * time.second
 	for {
-		discover(mut owned)!
-		kill_owned(owned)
-		$if linux {
-			mut status := 0
-			for C.waitpid(-1, &status, 1) > 0 {
-			}
+		observed, survivors := cleanup_observation(&scratch, owned) or {
+			message := err.msg().clone()
+			scratch.reset()
+			return error(message)
 		}
-		mut survivors := 0
-		for pid, previous in owned {
-			if pid == os.getpid() { continue }
-			current := identity(pid) or { continue }
-			if current.start == previous.start { survivors++ }
-		}
+		for _, item in observed { retain_polled_process(mut owned, item)! }
+		scratch.reset()
 		if survivors == 0 || time.sys_mono_now() >= deadline { return survivors }
 		time.sleep(20 * time.millisecond)
 	}
@@ -1274,6 +1293,25 @@ fn stop_requested(controller Identity, broker Identity) !bool {
 	return true
 }
 
+fn session_stop_observation(scratch &arena.Arena, controller Identity, broker Identity) !bool {
+	scratch.push()
+	defer { scratch.pop() }
+	if os.exists(result_root + '/maps.log') && os.lstat(result_root + '/maps.log')!.size > max_file {
+		return error('Maps diagnostic log limit')
+	}
+	return stop_requested(controller, broker)
+}
+
+fn check_session_stop(mut scratch arena.Arena, controller Identity, broker Identity) !bool {
+	stopped := session_stop_observation(&scratch, controller, broker) or {
+		message := err.msg().clone()
+		scratch.reset()
+		return error(message)
+	}
+	scratch.reset()
+	return stopped
+}
+
 fn check_maps_launch(launched MapsLaunch, desktop DesktopIdentity) ! {
 	if launched.kind != 'vinix-maps-account-launch-v1' || launched.desktop != desktop.process {
 		return error('Maps launch receipt compositor differs')
@@ -1286,6 +1324,106 @@ fn retain_receipted_process(mut owned map[int]Identity, current Identity, expect
 		&& current.start == expected.start {
 		owned[current.pid] = current
 	}
+}
+
+// Only this function writes process identities retained between polls. Its
+// callers have popped the scratch arena, so both map growth and start ticks
+// belong to the session rather than to the next arena reset.
+fn retain_polled_process(mut owned map[int]Identity, item Identity) ! {
+	if previous := owned[item.pid] {
+		if previous == item { return }
+		replacement := Identity{pid: item.pid, parent: item.parent, start: item.start.clone()}
+		unsafe { previous.start.free() }
+		owned[item.pid] = replacement
+	} else {
+		if owned.len >= 4096 { return error('retained process limit') }
+		owned[item.pid] = Identity{pid: item.pid, parent: item.parent, start: item.start.clone()}
+	}
+}
+
+struct ProcessObservation {
+	processes map[int]Identity
+	failure string
+}
+
+fn collect_polled_processes(scratch &arena.Arena, known map[int]Identity,
+	desktop DesktopIdentity) ProcessObservation {
+	scratch.push()
+	defer { scratch.pop() }
+	mut observed := known.clone()
+	// Finish the independent inventories before exposing the first failure.
+	// Cleanup still needs descendants and selected principals if a launch
+	// receipt failed validation, just as it did before scratch reclamation.
+	mut failure := ''
+	track_maps_launch(mut observed, desktop) or { failure = err.msg() }
+	discover(mut observed) or { if failure == '' { failure = err.msg() } }
+	selected := selected_processes() or {
+		if failure == '' { failure = err.msg() }
+		[]Identity{}
+	}
+	for item in selected {
+		if item.pid !in observed && observed.len >= 4096 {
+			return ProcessObservation{observed, 'retained process limit'}
+		}
+		observed[item.pid] = item
+	}
+	return ProcessObservation{processes: observed, failure: failure}
+}
+
+fn refresh_polled_processes(mut scratch arena.Arena, mut owned map[int]Identity,
+	desktop DesktopIdentity) ! {
+	observed := collect_polled_processes(&scratch, owned, desktop)
+	defer { scratch.reset() }
+	adopt_polled_processes(mut owned, observed)!
+}
+
+fn adopt_polled_processes(mut owned map[int]Identity, observed ProcessObservation) ! {
+	// Preserve already attested processes even when later validation fails,
+	// so the cleanup path still owns a native host whose Maps child has exited.
+	for _, item in observed.processes { retain_polled_process(mut owned, item)! }
+	if observed.failure != '' { return error(observed.failure.clone()) }
+}
+
+fn warm_poll_decoders() ! {
+	// json2 lazily stores typed field metadata in process-wide caches. Populate
+	// every nested poll type before any decode can allocate in scratch.
+	json2.decode[MapsLaunch](json2.encode(MapsLaunch{}))!
+	json2.decode[StopRequest](json2.encode(StopRequest{}))!
+}
+
+fn broker_service_ready(output []u8) bool {
+	ready_prefix := 'ANDROID-ACCOUNT-BROKER-SERVICE package=com.google.android.gms pid='
+	mut start := 0
+	for index := 0; index <= output.len; index++ {
+		if index < output.len && output[index] != `\n` { continue }
+		if index - start >= ready_prefix.len {
+			mut matches := true
+			for offset := 0; offset < ready_prefix.len; offset++ {
+				if output[start + offset] != ready_prefix[offset] { matches = false; break }
+			}
+			if matches { return true }
+		}
+		start = index + 1
+	}
+	return false
+}
+
+fn append_broker_output(mut child os.Process, mut log os.File, mut output []u8) ! {
+	block := child.stdout_read()
+	defer { unsafe { block.free() } }
+	if block == '' { return }
+	if output.len + block.len > max_file { return error('broker diagnostic log limit') }
+	log.write_string(block)!
+	append_output_block(mut output, block)!
+}
+
+fn append_output_block(mut output []u8, block string) ! {
+	if output.cap < max_file || output.len + block.len > max_file {
+		return error('broker diagnostic buffer limit')
+	}
+	bytes := block.bytes()
+	defer { unsafe { bytes.free() } }
+	output << bytes
 }
 
 fn track_maps_launch(mut owned map[int]Identity, desktop DesktopIdentity) ! {
@@ -1328,6 +1466,8 @@ fn broker_session(mut receipt Receipt) ! {
 	receipt.runtime_mount = approve_runtime()!
 	enable_subreaper()!
 	select_environment(build, '10013')!
+	warm_poll_decoders()!
+	controller := identity(os.getpid())!
 	argv := [registry_path, runtime_root, gms_apk, '10013', '10013', service_class,
 		'android.accounts.AccountAuthenticator', broker_root, '/var/lib/vinix/apps/10013/data',
 		'/var/lib/vinix/apps/10013/home', 'com.google.android.gms', account_activity, '--ui',
@@ -1352,38 +1492,39 @@ fn broker_session(mut receipt Receipt) ! {
 		reap_broker(mut child)
 		return error('broker identity unavailable after spawn: ' + err.msg())
 	}
-	mut owned := {
-		os.getpid(): identity(os.getpid())!
-		child.pid:   receipt.broker
+	mut scratch := arena.new()
+	defer { scratch.free() }
+	mut owned := map[int]Identity{}
+	retain_polled_process(mut owned, controller)!
+	retain_polled_process(mut owned, receipt.broker)!
+	defer {
+		for _, item in owned { unsafe { item.start.free() } }
+		unsafe { owned.free() }
 	}
 	defer {
-		track_maps_launch(mut owned, receipt.desktop) or {}
-		discover(mut owned) or {}
-		for item in selected_processes() or { []Identity{} } { owned[item.pid] = item }
+		refresh_polled_processes(mut scratch, mut owned, receipt.desktop) or {}
 		kill_owned(owned)
 		reap_broker(mut child)
 		receipt.broker_exit = child.code
-		receipt.cleanup_survivors = cleanup(mut owned) or { -1 }
+		receipt.cleanup_survivors = cleanup(mut owned, mut scratch) or { -1 }
 		os.rm(broker_root + '/session.json') or {}
 	}
 	deadline := time.sys_mono_now() + 15 * time.minute
 	startup := time.sys_mono_now() + 45 * time.second
-	mut output := ''
+	// Reserve once: string concatenation otherwise retains all preceding log
+	// prefixes under -gc none. No append may grow or replace this buffer.
+	mut output := []u8{cap: max_file}
+	defer { unsafe { output.free() } }
 	defer {
-		receipt.auth_init = auth_init_diagnostics(output)
-		receipt.browser_init = browser_init_diagnostics(output)
+		text := output.bytestr()
+		receipt.auth_init = auth_init_diagnostics(text)
+		receipt.browser_init = browser_init_diagnostics(text)
+		unsafe { text.free() }
 	}
 	for {
-		block := child.stdout_read()
-		if block != '' {
-			if output.len + block.len > max_file { return error('broker diagnostic log limit') }
-			log.write_string(block)!
-			output += block
-		}
-		track_maps_launch(mut owned, receipt.desktop)!
-		discover(mut owned)!
-		for item in selected_processes()! { owned[item.pid] = item }
-		if !receipt.service_ready && output.split_into_lines().any(it.starts_with('ANDROID-ACCOUNT-BROKER-SERVICE package=com.google.android.gms pid=')) {
+		append_broker_output(mut child, mut log, mut output)!
+		refresh_polled_processes(mut scratch, mut owned, receipt.desktop)!
+		if !receipt.service_ready && broker_service_ready(output) {
 			window_identity(receipt.desktop.uid)!
 			if window_peer(receipt.desktop.window_socket)! != receipt.desktop.peer
 				|| identity(receipt.desktop.process.pid)! != receipt.desktop.process {
@@ -1405,10 +1546,7 @@ fn broker_session(mut receipt Receipt) ! {
 		if !receipt.service_ready && time.sys_mono_now() >= startup {
 			return error('real GMS authenticator did not attach before deadline')
 		}
-		if os.exists(result_root + '/maps.log') && os.lstat(result_root + '/maps.log')!.size > max_file {
-			return error('Maps diagnostic log limit')
-		}
-		if stop_requested(owned[os.getpid()]!, receipt.broker)! {
+		if check_session_stop(mut scratch, controller, receipt.broker)! {
 			receipt.status = 'user-stopped-no-authentication-claim'
 			return
 		}
@@ -1818,7 +1956,119 @@ fn app_host_self_test() ! {
 	}
 }
 
+// Exercise the production ownership boundary with repeated stat parsing,
+// typed Maps JSON decoding, changed start ticks and late validation errors.
+// This runs without a guest or app credentials and can be profiled separately.
+fn synthetic_poll(scratch &arena.Arena, known map[int]Identity, iteration int,
+	launch_json string) !ProcessObservation {
+	scratch.push()
+	defer { scratch.pop() }
+	return synthetic_poll_workload(known, iteration, launch_json)
+}
+
+fn synthetic_poll_workload(known map[int]Identity, iteration int, launch_json string) !ProcessObservation {
+	mut observed := known.clone()
+	launched := json2.decode[MapsLaunch](launch_json)!
+	if launched.process.pid != 43 { return error('poll fixture JSON changed') }
+	for index in 0 .. 64 {
+		start := if index == 0 { (iteration + 100).str() } else { '100' }
+		parent := if index == 0 { iteration % 2 + 1 } else { 1 }
+		stat := (index + 1).str() + ' (worker with spaces) S ' + parent.str() + ' 0'.repeat(17) + ' ' + start
+		item := proc_identity(index + 1, stat)!
+		observed[item.pid] = item
+	}
+	return ProcessObservation{
+		processes: observed
+		failure: if iteration % 511 == 510 { 'synthetic failure ' + iteration.str() } else { '' }
+	}
+}
+
+// A deliberately bounded counterfactual: the same parser workload without
+// scratch reclamation, matching the previous -gc none polling lifetime.
+fn poll_memory_baseline() ! {
+	warm_poll_decoders()!
+	launch_json := json2.encode(MapsLaunch{process: Identity{pid: 43, parent: 42, start: '102'}})
+	mut owned := map[int]Identity{}
+	for iteration in 0 .. 4096 {
+		owned = synthetic_poll_workload(owned, iteration, launch_json)!.processes
+	}
+	println('MAPS-ACCOUNT-POLL-MEMORY-BASELINE iterations=4096 processes=${owned.len} reclamation=disabled')
+}
+
+fn poll_memory_self_test(iterations int) ! {
+	warm_poll_decoders()!
+	launch_json := json2.encode(MapsLaunch{process: Identity{pid: 43, parent: 42, start: '102'}})
+	defer { unsafe { launch_json.free() } }
+	mut scratch := arena.new()
+	defer { scratch.free() }
+	mut owned := map[int]Identity{}
+	defer {
+		for _, item in owned { unsafe { item.start.free() } }
+		unsafe { owned.free() }
+	}
+	mut peak_used := 0
+	mut peak_capacity := 0
+	mut total_scratch := u64(0)
+	mut failures := 0
+	for iteration in 0 .. iterations {
+		observed := synthetic_poll(&scratch, owned, iteration, launch_json) or {
+			message := err.msg().clone()
+			scratch.reset()
+			return error(message)
+		}
+		mut failure := ''
+		adopt_polled_processes(mut owned, observed) or { failure = err.msg() }
+		if arena.active() { return error('poll arena remained active after observation') }
+		if failure != '' && scratch.owns(failure.str) { return error('scratch error escaped') }
+		if scratch.used() > peak_used { peak_used = scratch.used() }
+		if scratch.capacity() > peak_capacity { peak_capacity = scratch.capacity() }
+		total_scratch += u64(scratch.used())
+		for _, item in owned {
+			if scratch.owns(item.start.str) { return error('scratch start ticks escaped') }
+		}
+		scratch.reset()
+		if scratch.used() != 0 || scratch.capacity() > 4 * 1024 * 1024
+			|| owned.len != 64 || owned[1]!.start.u64() != u64(iteration + 100) {
+			return error('poll fixture retained state or arena bound differs')
+		}
+		// Reuse the released storage before reading retained starts and errors.
+		scratch.push()
+		poison := []u8{len: 65536, init: u8(0xa5)}
+		if poison[0] != 0xa5 { panic('scratch poison changed') }
+		scratch.pop()
+		for pid, item in owned {
+			if item.start.u64() != u64(if pid == 1 { iteration + 100 } else { 100 })
+				|| item.parent != if pid == 1 { iteration % 2 + 1 } else { 1 } {
+				return error('retained identity changed after arena reuse')
+			}
+		}
+		scratch.reset()
+		if iteration % 511 == 510 {
+			expected := 'synthetic failure ' + iteration.str()
+			if failure != expected { return error('poll error did not survive arena reset') }
+			unsafe { expected.free(); failure.free() }
+			failures++
+		} else if failure != '' {
+			return error('unexpected poll fixture failure')
+		}
+	}
+	mut output := []u8{cap: max_file}
+	defer { unsafe { output.free() } }
+	buffer := output.data
+	for block in ['private prefix\nANDROID-ACCOUNT-', 'BROKER-SERVICE package=com.google.android.gms pid=43\n'] {
+		append_output_block(mut output, block)!
+	}
+	if !broker_service_ready(output) || output.data != buffer || output.cap != max_file {
+		return error('fragmented readiness or fixed diagnostic buffer differs')
+	}
+	if broker_service_ready('private ANDROID-ACCOUNT-BROKER-SERVICE package=com.google.android.gms pid=43\n'.bytes()) {
+		return error('readiness accepted away from line start')
+	}
+	println('MAPS-ACCOUNT-POLL-MEMORY-PASS iterations=${iterations} processes=${owned.len} scratch_peak_used=${peak_used} scratch_peak_capacity=${peak_capacity} scratch_total=${total_scratch} copied_errors=${failures} output_capacity=${output.cap}')
+}
+
 fn self_test() ! {
+	poll_memory_self_test(256)!
 	auth_init_self_test()!
 	browser_init_self_test()!
 	required_deployment_inputs_self_test()!
@@ -1884,6 +2134,17 @@ fn self_test() ! {
 }
 
 fn main() {
+	if os.args.len == 2 && os.args[1] == '--poll-memory-baseline' {
+		poll_memory_baseline() or { eprintln(err); exit(1) }
+		return
+	}
+	if os.args.len == 2 && os.args[1] == '--poll-memory-self-test' {
+		poll_memory_self_test(18000) or {
+			eprintln(err)
+			exit(1)
+		}
+		return
+	}
 	if os.args.len == 2 && os.args[1] == '--self-test' {
 		self_test() or {
 			eprintln(err)
