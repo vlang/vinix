@@ -32,6 +32,18 @@ const controller_root = '/Users/alex/.local/state/vinix/android/maps-account-gue
 const controller_seal = '1b8e4555a67eae4c3b1c109f3d94064c96eba65dd3fd3c88d72649b5fdbc9106'
 const controller_pin = '894e57f0eaf773777b3107100068edf1f9b57b427b565756767c576a0de8c6b6'
 const retained_controller_seal = '5a46182682b5f3c9bf47478ab0fcfc9f9dd40f8aeee589851765df8458776773'
+const service_query_base = '/Users/alex/.local/state/vinix/android/maps-controller-r1'
+const service_query_base_seal = '3026dfd0e7d69fe81d0b8ba4d504d952fd14fa34d20c9b4cdf6d0b98cc9d857a'
+const service_query_boot_sha = '0b8ba1493633c38b599dd368b437da31b5ef2bc421cd7d77c1b5e3960250cd58'
+const service_query_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-service-query-framework-2026-10-27-r1'
+const service_query_framework_seal = '12f21e139e2602fa9517c6df7d2fda866d366d4d5f0cce6d7e07d62bbd044559'
+const service_query_jar = '74892a013cb72fdaef39852325a3fa46db217fbcd3a4f11fcba4cc7272b2a50b'
+const service_query_dex = 'c453e3b480a6dbd0295a46b2a29f5ada5f7d0f7ee8c2bc07b5b9a76355d43e5e'
+const service_query_build = 'ba4e01cfe7aa4433795de93ee0142f0fcf2501c30b07635b9ef7ab166caf2a83'
+const service_query_jar_path = 'opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/api-impl.jar'
+const service_query_dex_path = 'opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/classes.dex'
+const service_query_headless = 'opt/vinix-headless-service'
+const service_query_deployment = 'opt/vinix-maps-account/build.json'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -63,6 +75,142 @@ fn controller_profile() Profile {
 	mut modules := protected_maps_profile().modules.clone()
 	modules << 'protected-storage-diagnostic.tar'
 	return Profile{'maps-controller', controller_boot_sha, 'maps-controller-diagnostic.tar', modules}
+}
+
+fn service_query_profile() Profile {
+	mut modules := controller_profile().modules.clone()
+	modules << 'maps-controller-diagnostic.tar'
+	return Profile{'maps-service-query', service_query_boot_sha, 'maps-service-query-diagnostic.tar', modules}
+}
+
+fn service_query_modules() map[string]string {
+	mut modules := controller_modules()
+	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
+	return modules
+}
+
+fn service_query_fields() map[string]string {
+	return {
+		'kind': 'vinix-maps-service-query-diagnostic-v1'
+		'base_root': service_query_base
+		'base_manifest_sha256': service_query_base_seal
+		'framework_build_root': service_query_framework
+		'framework_manifest_sha256': service_query_framework_seal
+		'framework_jar_sha256': service_query_jar
+		'framework_dex_sha256': service_query_dex
+		'retained_framework_manifest_sha256': protected_framework_seal
+		'controller_build_root': controller_root
+		'controller_manifest_sha256': controller_seal
+		'controller_sha256': controller_pin
+		'native_manifest_sha256': protected_native_seal
+		'retained_launch_manifest_sha256': '920ed6f1a5f5d9e705bdcc108937db6266066718fe4203859a6ac8577bd405be'
+	}
+}
+
+fn service_query_inputs() map[string]string {
+	mut inputs := controller_inputs()
+	inputs[service_query_base + '/sha256.json'] = service_query_base_seal
+	inputs[service_query_framework + '/sha256.json'] = service_query_framework_seal
+	return inputs
+}
+
+fn service_query_known_delta() map[string]string {
+	return {
+		'/' + service_query_jar_path: service_query_jar
+		'/' + service_query_dex_path: service_query_dex
+		'/' + service_query_headless + '/framework-build.json': service_query_build
+		'/' + service_query_headless + '/framework-sha256.json': service_query_framework_seal
+	}
+}
+
+struct ServiceQueryEntry {
+	name string
+	kind string
+	sha256 string
+	mode u32
+}
+
+// The generated headless input receipt has a digest declared by the stager.
+// All other framework files are pinned here to the complete sealed producer.
+fn verify_service_query_overlay(receipt map[string]json2.Any) ! {
+	input_delta := receipt['deployment_input_delta'] or { return error('service-query deployment input delta absent') }
+	delta := json2.decode[map[string]string](json2.encode(input_delta))!
+	mut expected := service_query_known_delta()
+	guest_path := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest_path] or { return error('service-query headless receipt pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == 'e60879ad6b10077c22fd271b29f741b28ad54b7eb7aed256782afe7f5a7550a9' {
+		return error('invalid or retained service-query headless receipt pin')
+	}
+	expected[guest_path] = guest_pin
+	if delta != expected { return error('service-query five deployment input changes differ') }
+	for name, value in {
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: service_query_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256'])
+	} {
+		if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](value)! {
+			return error('service-query receipt delta differs: ' + name)
+		}
+	}
+	inventory := receipt['overlay_inventory'] or { return error('service-query overlay inventory absent') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(inventory))!
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	mut paths := expected.keys().map(it.trim_left('/'))
+	paths << service_query_deployment
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 {
+			return error('unsafe service-query overlay inventory entry')
+		}
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) {
+				return error('service-query regular allowlist differs')
+			}
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || !paths.any(it.starts_with(entry.name + '/')) {
+			return error('unexpected service-query overlay inode')
+		}
+	}
+	if regulars.len != 6 { return error('exact six service-query files required') }
+	for path, pin in expected {
+		if regulars[path.trim_left('/')] or { '' } != pin {
+			return error('service-query declared input differs from overlay inventory')
+		}
+	}
+}
+
+fn verify_service_query_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [service_query_framework_seal, service_query_jar, service_query_dex, service_query_build] {
+		if !digest_valid(pin) { return error('sealed service-query framework pins required') }
+	}
+	for name, expected in service_query_fields() {
+		if receipt[name] or { json2.Any('absent') } != json2.Any(expected) {
+			return error('service-query receipt differs: ' + name)
+		}
+	}
+	for path, pin in service_query_inputs() {
+		if stage.inputs_sha256[path] or { '' } != pin { return error('service-query input differs: ' + path) }
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != service_query_modules()
+		|| stage.preserved_modules_sha256 != service_query_modules() {
+		return error('service-query original nine module pins differ')
+	}
+	verify_service_query_overlay(receipt)!
+}
+
+fn service_query_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_service_query_receipt(receipt, stage)!
+	path := service_query_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != service_query_base_seal {
+		return error('service-query original controller manifest differs')
+	}
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != service_query_boot_sha {
+		return error('service-query original boot inventory differs')
+	}
+	return service_query_base + '/boot.img'
 }
 
 fn controller_modules() map[string]string {
@@ -505,6 +653,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = protected_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-controller' {
 		baseline = controller_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-service-query' {
+		baseline = service_query_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -929,9 +1079,156 @@ fn controller_profile_self_test() ! {
 	println('MAPS-CONTROLLER KERNEL-PROFILE-SELF-TEST PASS exact startup base controller receipt inputs deployment delta eight modules historical profile rejection')
 }
 
+fn service_query_entries_fixture() []ServiceQueryEntry {
+	mut entries := []ServiceQueryEntry{}
+	for path, pin in service_query_known_delta() {
+		entries << ServiceQueryEntry{name: path.trim_left('/'), kind: 'regular', sha256: pin, mode: 0o644}
+	}
+	entries << ServiceQueryEntry{name: service_query_headless + '/guest-inputs.json', kind: 'regular', sha256: 'b'.repeat(64), mode: 0o644}
+	entries << ServiceQueryEntry{name: service_query_deployment, kind: 'regular', sha256: 'c'.repeat(64), mode: 0o644}
+	entries << ServiceQueryEntry{name: 'opt', kind: 'directory', mode: 0o755}
+	return entries
+}
+
+fn service_query_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in service_query_fields() { receipt[name] = json2.Any(value) }
+	mut delta := service_query_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'b'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['headless_input_delta'] = json2.decode[json2.Any](json2.encode({'/' + service_query_jar_path: service_query_jar}))!
+	receipt['headless_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256']))!
+	receipt['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256', 'framework_manifest_sha256']))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(service_query_entries_fixture()))!
+	return receipt
+}
+
+fn service_query_profile_self_test() ! {
+	profile := service_query_profile()
+	assert profile.baseline_sha == service_query_boot_sha
+	assert profile.modules.len == 9 && profile.modules.last() == 'maps-controller-diagnostic.tar'
+	before := Config{'vinix', profile.modules}
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	verify_modules(profile, before, Config{'vinix', modules})!
+	for bad in [Config{'vinix', profile.modules}, Config{'vinix', modules.reverse()},
+		Config{'vinix', modules[..9].clone()}, Config{'other', modules}] {
+		if _ := verify_modules(profile, before, bad) { return error('unsafe service-query modules accepted') }
+	}
+	if _ := verify_modules(profile, Config{'vinix', controller_profile().modules}, Config{'vinix', modules}) {
+		return error('eight-module service-query baseline accepted')
+	}
+	stage := Stage{format: 1, inputs_sha256: service_query_inputs(),
+		original_modules_sha256: service_query_modules(), preserved_modules_sha256: service_query_modules()}
+	receipt := service_query_receipt_fixture()!
+	verify_service_query_receipt(receipt, stage)!
+	for name in receipt.keys() {
+		mut bad := service_query_receipt_fixture()!
+		bad[name] = json2.Any('wrong')
+		if _ := verify_service_query_receipt(bad, stage) { return error('changed service-query receipt accepted: ' + name) }
+		bad.delete(name)
+		if _ := verify_service_query_receipt(bad, stage) { return error('missing service-query receipt accepted: ' + name) }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut inputs := stage.inputs_sha256.clone()
+		inputs[path] = '0'.repeat(64)
+		if _ := verify_service_query_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) {
+			return error('changed service-query input pin accepted')
+		}
+		inputs.delete(path)
+		if _ := verify_service_query_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) {
+			return error('missing service-query input accepted')
+		}
+	}
+	mut old_inputs := stage.inputs_sha256.clone()
+	old_inputs.delete(service_query_framework + '/sha256.json')
+	old_inputs['/Users/alex/.local/state/vinix/android/combined-account-webview-protected-storage-framework-2026-10-27-r2/sha256.json'] = service_query_framework_seal
+	if _ := verify_service_query_receipt(receipt, Stage{...stage, inputs_sha256: old_inputs}) {
+		return error('old framework path with service-query seal accepted')
+	}
+	mut old := service_query_receipt_fixture()!
+	old['framework_manifest_sha256'] = json2.Any(protected_framework_seal)
+	if _ := verify_service_query_receipt(old, stage) { return error('retained framework accepted') }
+	for name in service_query_modules().keys() {
+		mut pins := service_query_modules()
+		pins[name] = '0'.repeat(64)
+		for bad in [Stage{...stage, original_modules_sha256: pins}, Stage{...stage, preserved_modules_sha256: pins}] {
+			if _ := verify_service_query_receipt(receipt, bad) { return error('changed service-query module accepted') }
+		}
+	}
+	for bad in [Stage{...stage, format: 2}, Stage{...stage, original_modules_sha256: controller_modules()},
+		Stage{...stage, preserved_modules_sha256: map[string]string{}}] {
+		if _ := verify_service_query_receipt(receipt, bad) { return error('changed service-query module contract accepted') }
+	}
+	mut delta := service_query_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'b'.repeat(64)
+	for path in delta.keys() {
+		mut bad_delta := delta.clone()
+		bad_delta.delete(path)
+		mut bad := service_query_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(bad_delta))!
+		if _ := verify_service_query_receipt(bad, stage) { return error('partial service-query delta accepted') }
+		bad_delta = delta.clone()
+		bad_delta[path] = '0'.repeat(64)
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(bad_delta))!
+		if _ := verify_service_query_receipt(bad, stage) { return error('changed service-query delta accepted') }
+	}
+	delta['/extra'] = 'd'.repeat(64)
+	mut extra := service_query_receipt_fixture()!
+	extra['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	if _ := verify_service_query_receipt(extra, stage) { return error('extra service-query input accepted') }
+	for name, alternatives in {
+		'headless_top_level_delta': [ []string{}, ['inputs_sha256', 'extra'], ['inputs_sha256', 'inputs_sha256'] ]
+		'deployment_top_level_delta': [ []string{}, ['inputs_sha256'], ['inputs_sha256', 'native_manifest_sha256'], ['framework_manifest_sha256', 'inputs_sha256'] ]
+	} {
+		for alternative in alternatives {
+			mut bad := service_query_receipt_fixture()!
+			bad[name] = json2.decode[json2.Any](json2.encode(alternative))!
+			if _ := verify_service_query_receipt(bad, stage) { return error('unsafe service-query top delta accepted') }
+		}
+	}
+	for bad_delta in [map[string]string{}, {'/' + service_query_jar_path: '0'.repeat(64)},
+		{'/' + service_query_jar_path: service_query_jar, '/extra': service_query_jar}] {
+		mut bad := service_query_receipt_fixture()!
+		bad['headless_input_delta'] = json2.decode[json2.Any](json2.encode(bad_delta))!
+		if _ := verify_service_query_receipt(bad, stage) { return error('unsafe service-query headless delta accepted') }
+	}
+	entries := service_query_entries_fixture()
+	for index, entry in entries {
+		mut bad_entries := entries.clone()
+		bad_entries[index] = ServiceQueryEntry{...entry, kind: 'symlink'}
+		mut bad := service_query_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+		if _ := verify_service_query_receipt(bad, stage) { return error('service-query symlink accepted') }
+		bad_entries[index] = ServiceQueryEntry{...entry, mode: 0o777}
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+		if _ := verify_service_query_receipt(bad, stage) { return error('unsafe service-query mode accepted') }
+		if entry.kind == 'regular' && entry.name != service_query_deployment {
+			bad_entries[index] = ServiceQueryEntry{...entry, sha256: '0'.repeat(64)}
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_service_query_receipt(bad, stage) { return error('changed service-query inventory digest accepted') }
+		}
+	}
+	for addition in [entries[0], ServiceQueryEntry{name: 'opt/extra', kind: 'regular', sha256: 'd'.repeat(64), mode: 0o644},
+		ServiceQueryEntry{name: 'extra', kind: 'directory', mode: 0o755}, ServiceQueryEntry{name: 'opt/../escape', kind: 'directory', mode: 0o755}] {
+		mut bad_entries := entries.clone()
+		bad_entries << addition
+		mut bad := service_query_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+		if _ := verify_service_query_receipt(bad, stage) { return error('extra or duplicate service-query inode accepted') }
+	}
+	mut removed := service_query_receipt_fixture()!
+	removed['overlay_inventory'] = json2.decode[json2.Any](json2.encode(entries[1..]))!
+	if _ := verify_service_query_receipt(removed, stage) { return error('missing service-query file accepted') }
+	if _ := verify_controller_receipt(receipt, stage) { return error('service-query receipt accepted by controller profile') }
+	if _ := verify_service_query_receipt(controller_receipt_fixture()!, stage) { return error('controller receipt accepted by service-query profile') }
+	println('MAPS-SERVICE-QUERY KERNEL-PROFILE-SELF-TEST PASS exact controller base framework inputs five-path deployment one-path headless delta six-file inventory nine modules historical profile rejection')
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
+	service_query_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -988,6 +1285,7 @@ fn self_test() ! {
 	fat_self_test(root + '/maps', 'maps-account.tar', ['runtime.tar'])!
 	fat_self_test(root + '/protected-maps', 'protected-storage-diagnostic.tar', protected_maps_profile().modules)!
 	fat_self_test(root + '/controller', 'maps-controller-diagnostic.tar', controller_profile().modules)!
+	fat_self_test(root + '/service-query', 'maps-service-query-diagnostic.tar', service_query_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -1002,11 +1300,12 @@ fn main() {
 	is_maps := os.args.len == 5 && os.args[1] == '--maps-account'
 	is_protected := os.args.len == 5 && os.args[1] == '--protected-storage-maps'
 	is_controller := os.args.len == 5 && os.args[1] == '--maps-controller'
-	if os.args.len != 4 && !is_maps && !is_protected && !is_controller {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+	is_service_query := os.args.len == 5 && os.args[1] == '--maps-service-query'
+	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query {
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_maps || is_protected || is_controller { 1 } else { 0 }
+	offset := if is_maps || is_protected || is_controller || is_service_query { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -1015,7 +1314,7 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	profile := if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	profile := if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
