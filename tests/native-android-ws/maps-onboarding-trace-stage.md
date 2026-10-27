@@ -55,3 +55,32 @@ before launching Maps from the desktop. This opt-in records view trees and
 threads in the existing private Maps log. The regular account-result export
 continues to exclude that log. This diagnostic overlay establishes no Google
 authentication result; runtime evidence must be recorded separately.
+
+## Preparation evidence, 2026-10-27
+
+Source revision `527981b8cf3961a889dcbc2de83553e33d3f2b97` prepared the
+immutable external stage
+`/Users/alex/.local/state/vinix/android/maps-onboarding-trace-r2` successfully.
+Its manifest SHA-256 is
+`de315f3f5f0120efbd1368a47e11db945aa9212160fc7e1ff351e522e9435be5`;
+the staged boot image hash recorded in its receipt is
+`962a9983c22099485fdb8e7e07105e2bcc2c14a33c2dd6a0fef1cc16b33ad070`.
+Preparation took 191.96 seconds (93.83 user, 67.09 system), peaked at
+68,599,808 bytes RSS, and reported zero swaps. Final charged growth was
+163,901,440 bytes, with 5,216,178,176 bytes available. All complete-input,
+payload, module-preservation, media-readback and final disk checks passed.
+
+Tools and logs remain under
+`/Users/alex/.local/state/vinix/android/maps-onboarding-trace-build-2026-10-27-r1`.
+The successful `maps-onboarding-trace-stage-receipt-accounting` executable has
+SHA-256 `48f3af7b2d6306b03104099469a47df1acdf46eff62351f0349752b5a8abee44`.
+The retained preparation logs are:
+
+| Log | Result | SHA-256 |
+| --- | --- | --- |
+| `prepare.log` | Failed before output creation: concurrent volume writes during the initial read-only audit counted toward growth. 116.45 s, 35,373,056 bytes peak RSS, zero swaps. | `f9f2938707a0a7ed860909a9f8ee1c1da0c81b40b8fad1a1b3341acf5a912cd3` |
+| `prepare-audit-accounting.log` | Failed final guard: eager receipt/image-inventory hashing still counted as writable time. 202.62 s, 67,846,144 bytes peak RSS, zero swaps. Its `maps-onboarding-trace-r1` output remains a failed attempt. | `983fc845b34982d8cd7cc8d03a46e2ce98a8c2cde2a6bc38c272de93283bd449` |
+| `prepare-receipt-accounting.log` | Passed preparation of the r2 stage above. | `e4b28e0eff2ace313c48fbbe5cd13b3948e3a110902e9ac17c8522aaedf73b7f` |
+
+These results establish image preparation only. Maps interaction and Google
+account authentication require separate evidence from the fresh VM clone.
