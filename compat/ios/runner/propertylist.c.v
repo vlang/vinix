@@ -10,6 +10,17 @@ fn plist_object(value plist.Value) u64 {
 // Return one owned immutable tree. Children transfer to their collection;
 // none of the intermediate objects depend on an autorelease pool.
 fn plist_owned_object(value plist.Value) u64 {
+	return plist_owned_object_mode(value, .immutable)
+}
+
+enum PlistObjectMode {
+	immutable
+	xml_file
+	binary_file
+	mutable_containers
+}
+
+fn plist_owned_object_mode(value plist.Value, mode PlistObjectMode) u64 {
 	match value.kind {
 		.string { return owned_string(value.text) }
 		.integer, .boolean, .real {
@@ -28,26 +39,28 @@ fn plist_owned_object(value plist.Value) u64 {
 			return object
 		}
 		.array {
-			object := objc_allocate(ios_runtime.names['NSArray'])
+			mutable := mode != .immutable
+			object := objc_allocate(ios_runtime.names[if mutable { 'NSMutableArray' } else { 'NSArray' }])
 			mut header := obj_header(object)
-			header.json_immutable = true
+			header.json_immutable = !mutable
 			for item in value.values {
-				child := plist_owned_object(item)
+				child := plist_owned_object_mode(item, mode)
 				array_append(mut header, child)
 				objc_release(child)
 			}
 			return object
 		}
 		.dictionary {
-			object := objc_allocate(ios_runtime.names['NSDictionary'])
+			mutable := mode == .mutable_containers || (mode == .xml_file && value.fields.len != 0)
+			object := objc_allocate(ios_runtime.names[if mutable { 'NSMutableDictionary' } else { 'NSDictionary' }])
 			mut header := obj_header(object)
-			header.json_immutable = true
+			header.json_immutable = !mutable
 			for key, item in value.fields {
 				header.keys << owned_string(key)
 				// V clones an escaping map iteration key. The NSString has
 				// copied its bytes, so release that iteration copy now.
 				unsafe { key.free() }
-				child := plist_owned_object(item)
+				child := plist_owned_object_mode(item, mode)
 				array_append(mut header, child)
 				objc_release(child)
 			}

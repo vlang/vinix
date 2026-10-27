@@ -152,6 +152,10 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 	}
 	if object in ios_runtime.classes {
 		match selector {
+			'dictionaryWithContentsOfFile:' {
+				if object !in [ios_runtime.names['NSDictionary'], ios_runtime.names['NSMutableDictionary']] { return false }
+				frame.x[0] = dictionary_from_file(object, frame.x[2])
+			}
 			'array', 'arrayWithCapacity:', 'dictionary' {
 				frame.x[0] = objc_autorelease(objc_allocate(object))
 			}

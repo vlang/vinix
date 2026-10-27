@@ -269,7 +269,7 @@ fn objc_responds(object u64, selector &char) bool {
 			'NSString' { name in ['stringWithUTF8String:', 'stringWithCString:encoding:', 'stringWithFormat:'] }
 			'NSNumber' { name == 'numberWithInteger:' }
 			'NSArray', 'NSMutableArray' { name in ['array', 'arrayWithArray:', 'arrayWithCapacity:', 'arrayWithObjects:count:'] }
-			'NSDictionary', 'NSMutableDictionary' { name in ['dictionary', 'dictionaryWithObjects:forKeys:count:'] }
+			'NSDictionary', 'NSMutableDictionary' { name in ['dictionary', 'dictionaryWithObjects:forKeys:count:', 'dictionaryWithContentsOfFile:'] }
 			'NSUserDefaults' { name == 'standardUserDefaults' }
 			'NSNotificationCenter' { name == 'defaultCenter' }
 			'NSNotification' { name == 'notificationWithName:object:userInfo:' }
