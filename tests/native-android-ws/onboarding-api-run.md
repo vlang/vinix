@@ -61,6 +61,22 @@ Do not repeat provisioning if the exact account already exists. Reserve
 10012/10013 for Maps/GMS and 10014 for the token fixture. Both standalone tests
 can reuse the dedicated fixture identity sequentially with fresh output paths.
 
+Before starting a fixture, apply the existing executable attachment policy to
+the selected immutable runtime only. A fresh guest may not have this dedicated
+mount until the Maps controller or these root setup commands create it:
+
+```sh
+mount -o bind /opt/vinix-android-aarch64 /opt/vinix-android-aarch64
+mount -o remount,bind,ro,nosuid,nodev,strictatime,wxallowed none /opt/vinix-android-aarch64
+grep ' /opt/vinix-android-aarch64 ' /proc/self/mounts
+```
+
+Require a dedicated runtime entry with `ro,nosuid,nodev,wxallowed` and without
+`noexec` before launching. The tested guest reports `relatime` after the remount;
+the required protection and execution flags are still present. This uses the
+existing kernel policy on that runtime attachment, with no global exception.
+If the dedicated attachment is already present and has those flags, retain it.
+
 Download from the QEMU guest through usernet:
 
 ```sh
