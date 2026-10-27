@@ -324,6 +324,8 @@ fn framework_empty_dictionary() u64 {
 }
 
 fn framework_object(symbol string) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	if address := ios_runtime.framework_data[symbol] { return read64(address) }
 	allocator := symbol in ['_kCFAllocatorSystemDefault', '_kCFAllocatorNull']!
 	object := objc_allocate(ios_runtime.names[if allocator { 'NSObject' } else { 'NSNumber' }])

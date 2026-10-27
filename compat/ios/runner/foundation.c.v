@@ -191,6 +191,12 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 				header.section = i64(frame.x[3])
 				frame.x[0] = objc_autorelease(path)
 			}
+			'numberWithBool:' {
+				if !objc_is_kind(object, read64(ios_runtime.names['NSNumber'])) { return false }
+				// Foundation's arm64 factory normalizes the low 32 argument bits.
+				// The framework cache owns the +0 result through runtime shutdown.
+				frame.x[0] = framework_object(if u32(frame.x[2]) != 0 { '_kCFBooleanTrue' } else { '_kCFBooleanFalse' })
+			}
 			'numberWithInteger:' {
 				number := objc_allocate(object)
 				mut header := obj_header(number)
@@ -239,6 +245,10 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 		return true
 	}
 	mut header := obj_header(object)
+	if selector == 'isEqual:' && objc_is_kind(object, ios_runtime.names['NSNumber']) {
+		frame.x[0] = u64(object_equal(object, frame.x[2]))
+		return true
+	}
 	if header.response_headers && selector in ['setObject:forKeyedSubscript:', 'setObject:forKey:', 'removeObjectForKey:', 'removeAllObjects'] { panic('iOS: mutation of immutable response headers') }
 	if header.web_history_array && selector in ['addObject:', 'removeObjectAtIndex:', 'removeAllObjects', 'setObject:atIndexedSubscript:'] { panic('iOS: mutation of a read-only WebKit history array') }
 	if header.webkit_array && selector in ['addObject:', 'removeObjectAtIndex:', 'removeAllObjects', 'setObject:atIndexedSubscript:'] { panic('iOS: mutation of a read-only WebKit script array') }
