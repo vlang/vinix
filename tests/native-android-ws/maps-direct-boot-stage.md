@@ -65,3 +65,14 @@ producer audit, obsolete pins, five-input deployment delta, one-input headless
 delta, six-file payload, inherited modes and protected ancestors. Build and
 self-test logs are retained outside Git in
 `/Users/alex/.local/state/vinix/android/maps-stage-build-2026-10-27-r1/`.
+
+Preparation passed at source revision
+`374dfb6c1842c3523b49c582403347fc49be99f6`. The immutable output is
+`/Users/alex/.local/state/vinix/android/maps-direct-boot-r1/`, with manifest
+`fa9e552f7faf4aabfcf17821efc442918bab5576ea230d25eb9dcd6788d62285`,
+receipt `6a26ae2fb065f53d2d37f379eb9089df5a5beb3e6386426fb6fee74f5823c2c9`
+and overlay `33c2c38893f72f389601666dc8039c8855c935c91e20c9b8dc04816a6142ae56`.
+It passed complete input inventories before and after preparation, all twelve
+module readbacks and source-closure checks. Preparation took 170.82 seconds,
+with 65,945,600 bytes maximum RSS and zero swaps. The original kernel remained
+unchanged; ARM runtime and Google account sign-in still require separate checks.
