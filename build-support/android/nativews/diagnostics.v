@@ -255,11 +255,14 @@ fn ws_dump_threads(e voidptr) {
 fn ws_trace_threads(vm voidptr) voidptr {
 	unsafe {
 		mut e := voidptr(nil)
-		if WsTextureAttach(slot(vm, 7))(vm, &e, nil) != 0 { return nil }
-		defer { WsTextureDetach(slot(vm, 5))(vm) }
+		if C.getenv(c'VINIX_ANDROID_TRACE_THREADS') != nil {
+			if WsTextureAttach(slot(vm, 7))(vm, &e, nil) != 0 { e = nil }
+		}
+		defer { if e != nil { WsTextureDetach(slot(vm, 5))(vm) } }
 		for _ in 0 .. 10 {
 			C.usleep(30000000)
-			ws_dump_threads(e)
+			ws_trace_main_sample()
+			if e != nil { ws_dump_threads(e) }
 		}
 		return nil
 	}
@@ -267,12 +270,119 @@ fn ws_trace_threads(vm voidptr) voidptr {
 
 fn ws_start_diagnostics(vm voidptr) {
 	unsafe {
-		if C.getenv(c'VINIX_ANDROID_TRACE_THREADS') == nil { return }
+		if C.getenv(c'VINIX_ANDROID_TRACE_THREADS') == nil && C.getenv(c'VINIX_ANDROID_TRACE_TREE') == nil { return }
+		if !ws.service {
+			C.__atomic_store_n(&ws_main_trace_input, u32(ws.input + 1), 5)
+			C.__atomic_store_n(&ws_main_trace_enabled, 1, 5)
+			ws_trace_main(.bootstrap)
+		}
 		mut worker := C.pthread_t{}
 		if C.pthread_create(&worker, nil, ws_trace_threads, vm) == 0 {
 			C.pthread_detach(worker)
 		} else {
 			C.puts(c'ANDROID-WS-THREADS-FAIL create thread')
 		}
+	}
+}
+
+// Only the native main thread writes these fields. The sampler never reads ws
+// itself: its input fd is fixed before the sampler starts, and the sequence
+// publishes a consistent stage/time pair without locks or JNI calls.
+__global ws_main_trace_enabled u32
+__global ws_main_trace_sequence u32
+__global ws_main_trace_stage u32
+__global ws_main_trace_at u32
+__global ws_main_trace_input u32
+
+enum WsMainStage {
+	bootstrap
+	application
+	activity
+	canvas
+	loop
+	looper
+	web
+	account
+	input_ready
+	input_before
+	input_poll
+	input_header
+	input_text
+	frames
+	render
+	input_after
+	sleep
+	shutdown
+	stopped
+}
+
+fn ws_main_stage_name(stage u32) &char {
+	return match stage {
+		u32(WsMainStage.bootstrap) { c'bootstrap' }
+		u32(WsMainStage.application) { c'application' }
+		u32(WsMainStage.activity) { c'activity' }
+		u32(WsMainStage.canvas) { c'canvas' }
+		u32(WsMainStage.loop) { c'loop' }
+		u32(WsMainStage.looper) { c'looper' }
+		u32(WsMainStage.web) { c'web' }
+		u32(WsMainStage.account) { c'account' }
+		u32(WsMainStage.input_ready) { c'input-ready' }
+		u32(WsMainStage.input_before) { c'input-before' }
+		u32(WsMainStage.input_poll) { c'input-poll' }
+		u32(WsMainStage.input_header) { c'input-header-read' }
+		u32(WsMainStage.input_text) { c'input-text-read' }
+		u32(WsMainStage.frames) { c'frame-callbacks' }
+		u32(WsMainStage.render) { c'render' }
+		u32(WsMainStage.input_after) { c'input-after' }
+		u32(WsMainStage.sleep) { c'sleep' }
+		u32(WsMainStage.shutdown) { c'shutdown' }
+		u32(WsMainStage.stopped) { c'stopped' }
+		else { c'unknown' }
+	}
+}
+
+fn ws_trace_main(stage WsMainStage) {
+	unsafe {
+		if C.__atomic_load_n(&ws_main_trace_enabled, 5) == 0 { return }
+		sequence := C.__atomic_load_n(&ws_main_trace_sequence, 5)
+		C.__atomic_store_n(&ws_main_trace_sequence, sequence + 1, 5)
+		C.__atomic_store_n(&ws_main_trace_stage, u32(stage), 5)
+		// Unsigned millisecond subtraction remains valid across the 32-bit
+		// clock wrap; the bounded sampler runs for only five minutes.
+		C.__atomic_store_n(&ws_main_trace_at, u32(ws_millis()), 5)
+		C.__atomic_store_n(&ws_main_trace_sequence, sequence + 2, 5)
+	}
+}
+
+fn ws_trace_main_sample() {
+	unsafe {
+		if C.__atomic_load_n(&ws_main_trace_enabled, 5) == 0 { return }
+		mut sequence := u32(0)
+		mut stage := u32(0)
+		mut at := u32(0)
+		mut stable := false
+		for _ in 0 .. 3 {
+			sequence = C.__atomic_load_n(&ws_main_trace_sequence, 5)
+			stage = C.__atomic_load_n(&ws_main_trace_stage, 5)
+			at = C.__atomic_load_n(&ws_main_trace_at, 5)
+			if sequence & 1 == 0 && sequence == C.__atomic_load_n(&ws_main_trace_sequence, 5) {
+				stable = true
+				break
+			}
+		}
+		now := ws_millis()
+		age := u32(now) - at
+		fd := i32(C.__atomic_load_n(&ws_main_trace_input, 5)) - 1
+		mut ready := WsPoll{ fd: fd, events: 1 }
+		buffer := &char(C.alloca(256))
+		count := C.snprintf(buffer, 256, c'ANDROID-WS-MAIN mono_ms=%jd stage=%s progress=%u age_ms=%u stable=%d input_fd=%d\n',
+			C.intmax_t(now), ws_main_stage_name(stage), sequence / 2, age, i32(stable), fd)
+		if count > 0 && count < 256 { C.write(2, buffer, usize(count)) }
+		// Publish the snapshot first, even if a faulty kernel blocks this poll.
+		// poll observes readiness/HUP/error without consuming a protocol byte.
+		status := C.poll(voidptr(&ready), 1, 0)
+		poll_count := C.snprintf(buffer, 256, c'ANDROID-WS-MAIN-POLL mono_ms=%jd input_fd=%d poll=%d revents=%d\n',
+			C.intmax_t(now), fd, status, i32(ready.returned))
+		if poll_count > 0 && poll_count < 256 { C.write(2, buffer, usize(poll_count)) }
 	}
 }

@@ -731,6 +731,7 @@ fn ws_input(e voidptr) {
 	for _ in 0 .. 64 {
 		if !ws.running || pending(e) { return }
 		mut descriptor := WsPoll{ fd: ws.input, events: 1 }
+		ws_trace_main(.input_poll)
 		if C.poll(voidptr(&descriptor), 1, 0) <= 0 { return }
 		unsafe { if FramePush(slot(e, 19))(e, 128) < 0 { return } }
 		ws_input_event(e)
@@ -741,6 +742,7 @@ fn ws_input(e voidptr) {
 // A separate call releases each text payload stack buffer before the next event.
 fn ws_input_event(e voidptr) {
 	mut event := WsEvent{}
+	ws_trace_main(.input_header)
 	count := C.read(ws.input, &event, sizeof(WsEvent))
 	if count == 0 {
 		ws.running = false
@@ -755,6 +757,7 @@ fn ws_input_event(e voidptr) {
 			bytes := &u8(C.alloca(4096))
 			mut read := usize(0)
 			for read < usize(event.length) {
+				ws_trace_main(.input_text)
 				n := C.read(ws.input, &bytes[read], usize(event.length) - read)
 				if n <= 0 {
 					ws.running = false

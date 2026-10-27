@@ -335,6 +335,7 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		loaded := ws_bootstrap(root, apk, true)
 		if loaded == nil { return 1 }
 		e := ws.e
+		ws_trace_main(.application)
 		ws_ensure_application(e, loaded)
 		if ws_failure(e, c'ANDROID-WS-FAIL application startup') { return 1 }
 		launch_args := [
@@ -342,6 +343,7 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 			Value{ j: 1 },
 			Value{ l: nil },
 		]!
+		ws_trace_main(.activity)
 		app := static_obj(e, c'android/app/Activity', c'createMainActivity', c'(Ljava/lang/String;JLjava/lang/String;)Landroid/app/Activity;', &launch_args[0])
 		if ws_failure(e, c'ANDROID-WS-FAIL create activity') { return 1 }
 		intent := obj(e, app, c'android/app/Activity', c'getIntent', c'()Landroid/content/Intent;', nil)
@@ -349,6 +351,7 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		obj(e, intent, c'android/content/Intent', c'setAction', c'(Ljava/lang/String;)Landroid/content/Intent;', &main_action[0])
 		ws_start(e, app)
 		if ws_failure(e, c'ANDROID-WS-FAIL start activity') { return 1 }
+		ws_trace_main(.canvas)
 		canvas_args := &Value(C.alloca(sizeof(Value)))
 		canvas_args[0] = Value{ j: 1 }
 		canvas := new_object(e, c'android/atl/GskCanvas', c'(J)V', canvas_args)
@@ -356,11 +359,15 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		ws.canvas = WsRef(slot(e, 21))(e, canvas)
 		C.puts(c'ANDROID-WS-READY backend=vinix-native gtk=absent x11=absent')
 		for ws.running {
+			ws_trace_main(.loop)
 			push_frame(e)
 			ws_queue_begin_pump()
+			ws_trace_main(.looper)
 			static_void(e, c'android/os/Looper', c'loop', c'()V', nil)
 			ws_queue_end_pump()
+			ws_trace_main(.web)
 			ws_web_pump(e)
+			ws_trace_main(.account)
 			ws_account_client_pump(e)
 			if ws_failure(e, c'ANDROID-WS-FAIL main looper') {
 				pop_frame(e)
@@ -370,8 +377,12 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 				pop_frame(e)
 				break
 			}
+			ws_trace_main(.input_ready)
 			input_dispatched := ws_input_before_render(e)
-			if input_dispatched { ws_input(e) }
+			if input_dispatched {
+				ws_trace_main(.input_before)
+				ws_input(e)
+			}
 			if ws_failure(e, c'ANDROID-WS-FAIL input') {
 				pop_frame(e)
 				return 1
@@ -380,23 +391,32 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 				pop_frame(e)
 				break
 			}
+			ws_trace_main(.frames)
 			ws_frames_dispatch()
 			if ws.animated && ws_millis() - ws.animation_last >= 80 { ws.dirty = true }
 			if C.__atomic_exchange_n(&ws_window_pending, 0, 5) != 0 { ws.dirty = true }
-			if ws.dirty { ws_render(e) }
+			if ws.dirty {
+				ws_trace_main(.render)
+				ws_render(e)
+			}
 			// Rendering may leave the original Java exception pending. Input
 			// dispatch uses JNI calls that are forbidden until it is reported.
-			if !input_dispatched && !pending(e) { ws_input(e) }
+			if !input_dispatched && !pending(e) {
+				ws_trace_main(.input_after)
+				ws_input(e)
+			}
 			if ws_failure(e, c'ANDROID-WS-FAIL input or render') {
 				pop_frame(e)
 				return 1
 			}
 			pop_frame(e)
+			ws_trace_main(.sleep)
 			C.usleep(16000)
 		}
 		// Closing the WS pipe must deliver the lifecycle callbacks that save
 		// application state. Native globals remain valid until process exit:
 		// Java worker threads can still reference their JNI providers.
+		ws_trace_main(.shutdown)
 		ws_uid_lifecycle(e, 300)
 		if ws.activity != nil {
 			call(e, ws.activity, c'android/app/Activity', c'vinixPerformPause', c'()V', nil)
@@ -409,6 +429,7 @@ pub fn ws_main(root &char, apk &char, activity &char) i32 {
 		ws_account_client_shutdown(e)
 		ws_web_shutdown(e)
 		if ws_failure(e, c'ANDROID-WS-FAIL shutdown') { return 1 }
+		ws_trace_main(.stopped)
 		return 0
 	}
 }
