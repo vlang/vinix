@@ -86,3 +86,26 @@ and executable are retained in
 `/Users/alex/.local/state/vinix/android/maps-context-storage-stage-build-2026-10-27-r2/`.
 The executable SHA-256 is
 `e06aa25dc9e8ec090abaebead26768b2dce051ebe04a393bedd54821d6bc468e`.
+
+Preparation from source revision
+`d095ddece430ffe1ff39d2cb25ae9e922f6dd6be` passed in 133.72 seconds with
+61,669,376 bytes maximum RSS and zero swaps. The immutable output is
+`/Users/alex/.local/state/vinix/android/maps-context-storage-r1/`.
+All inherited complete bundles were verified again unchanged. All disk samples
+passed: initial available space was 4,113,915,904 bytes and the final sample was
+3,966,201,856 bytes, a decrease of 147,714,048 bytes. The final sample was also
+the minimum observed; the 1 GiB reserve and 512 MiB growth limit both held.
+
+The final inventory manifest SHA-256 is
+`6296bcff89e1a6555c803b0ee94f435cbae1f01c37ce97451080612a95fdde2c`;
+`stage.json` is
+`d277a4bace4ad663c4a43741667f3ff85417d9c0dc2f80f62260b2841bad8a5c`.
+The overlay is
+`a524dcda373cf0ff6b688991924e3c2faaa33a998c4e2ec54596fdbb34df6fc2`,
+the staged boot media is
+`0bc1652062a78d3878c4404b6be907cf76c1215268798025d925c3f8a946eceb`
+and unchanged EFI variables are
+`d3b3f7afddb44de7020b8544270a67791fca44a48864dcd550cefee633463cbf`.
+The r2 build bundle retains `prepare.log`, including every disk sample and
+resource measurement. Runtime execution and Google account login remain
+separate checks against a fresh mutable clone.
