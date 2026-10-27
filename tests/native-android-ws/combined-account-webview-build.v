@@ -23,6 +23,8 @@ const cache_manifest = 'f37e13b84b5dfb2c71ad852e2bae5b03fed04e8ee319f44e77fc7605
 const cache_jar = '3a590476c53e3f05533c327c5935e395c55694eacb7895b02940feaf888c56d0'
 const descriptions_manifest = 'd898fdcca66df0c32b9863dca99c7185d10f8e3b3fb5ab7708999b3619803021'
 const descriptions_jar = '71d05c6e6288978de66a5c71279e8cb27d92c9166950813ddbf0c33ff86e1d0d'
+const protected_storage_manifest = '67e1cb450fa87305c99480133084b7f9cb684feeeaa2e0c3efa3007ab43ee938'
+const protected_storage_jar = 'a8ba34eb79be2473f89042c8ee940ab1994dbc902c3d45143877f8891d3b428b'
 const java = '/opt/homebrew/opt/openjdk@25/bin/java'
 const tools = repo + '/build/android-framework/tools'
 const source_file = repo + '/tests/native-android-ws/combined-account-webview-build.v'
@@ -171,6 +173,21 @@ fn protected_storage_profile() NarrowProfile {
    'android/atl/ATLLoadedAppManager.smali': 0, 'android/app/ContextImpl.smali': 0}
   fields: {'android/content/pm/ApplicationInfo.smali': ['.field public credentialProtectedDataDir:Ljava/lang/String;',
    '.field public deviceProtectedDataDir:Ljava/lang/String;']}
+ }
+}
+
+fn service_query_profile() NarrowProfile {
+ return NarrowProfile{
+  name: 'service-query'
+  baseline_name: 'combined-account-webview-protected-storage-framework-2026-10-27-r2'
+  manifest_pin: protected_storage_manifest
+  jar_pin: protected_storage_jar
+  baseline_classes: 2104
+  providers: ['framework_service_query.v']
+  calls: {'android/content/pm/PackageManager.smali': 'framework_service_query'}
+  methods: {'android/content/pm/PackageManager.smali': ['queryIntentServices(Landroid/content/Intent;I)Ljava/util/List;']}
+  changed: {'android/content/pm/PackageManager.smali': 1}
+  added: {'android/content/pm/PackageManager.smali': 0}
  }
 }
 
@@ -497,6 +514,8 @@ fn self_test() ! {
  store_delta_self_test()!
  store_method_self_test()!
  protected_storage_self_test()!
+ query_profile := service_query_profile()
+ narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  mut old := map[string]string{}
  for name in changes { old[name] = 'old' }
  for i in 0 .. 2098 - changes.len { old['other/' + i.str() + '.smali'] = 'old' }
@@ -947,11 +966,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage'] {
-  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } else { protected_storage_profile() } }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query'] {
+  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } else { service_query_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
