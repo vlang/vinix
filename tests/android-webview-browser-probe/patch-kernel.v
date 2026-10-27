@@ -84,6 +84,19 @@ const onboarding_trace_base_overlay = '497626f8ce4fe4c7571177a8394d0697cae33a390
 const onboarding_trace_controller = '/Users/alex/.local/state/vinix/android/maps-account-guest-build-2026-10-27-r8'
 const onboarding_trace_controller_seal = 'c2c08ed987052e5170f9b90cd4af7f9de6fcb4e98684def4dc5e28f058409b4f'
 const onboarding_trace_controller_pin = 'e15e14d135de930f29caf6b8708adc83390c3e12fdb37d368edb6d5cb1899bcf'
+const native_onboarding_trace_base = '/Users/alex/.local/state/vinix/android/maps-onboarding-trace-r2'
+const native_onboarding_trace_base_seal = 'de315f3f5f0120efbd1368a47e11db945aa9212160fc7e1ff351e522e9435be5'
+const native_onboarding_trace_boot_sha = '962a9983c22099485fdb8e7e07105e2bcc2c14a33c2dd6a0fef1cc16b33ad070'
+const native_onboarding_trace_base_overlay = '09e96149189b7b171ed67098eac52b8759e18d09b58e49130494dd672ce267fe'
+const native_onboarding_trace_root = '/Users/alex/.local/state/vinix/android/current-native-build-2026-10-27-onboarding-r5'
+// Replace only with the complete reviewed producer's sealed output pins.
+const native_onboarding_trace_seal = '05baf5d011337d54aab26f6cc3c535f801221d51aceb966ebc9442d88b5fd6b8'
+const native_onboarding_trace_pin = 'efcf0a270d2116245558b35811a2a2b714f8348c90c5e1bdb9aaf91ae278f65c'
+const native_onboarding_trace_build = '3ed2de875f39583ac86b83ebeeca027185757cbce396a29556cff48b679d1b04'
+const native_onboarding_trace_path = 'opt/vinix-android-aarch64/usr/lib/art/libvinix-android-native.so'
+const native_onboarding_trace_retained_pin = '82e4bdb907a300634b304b37339b2e9a836f6f1a61d01a369d0f5aa707fddca7'
+const native_onboarding_trace_retained_build = '08ea36ea9bfcc4406ece5a80250a3c91b1833851035a783c8339d75c1904391b'
+const native_onboarding_trace_retained_guest = '67296ef608b18e6ec328ccead8bf8811393db0e9adbafb56920f71150b60db74'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -719,6 +732,134 @@ fn onboarding_trace_baseline(receipt map[string]json2.Any, stage Stage) !string 
 	return onboarding_trace_base + '/boot.img'
 }
 
+fn native_onboarding_trace_profile() Profile {
+	mut modules := onboarding_trace_profile().modules.clone()
+	modules << 'maps-onboarding-trace-diagnostic.tar'
+	return Profile{'maps-native-onboarding-trace', native_onboarding_trace_boot_sha,
+		'maps-native-onboarding-trace-diagnostic.tar', modules}
+}
+
+fn native_onboarding_trace_modules() map[string]string {
+	mut modules := onboarding_trace_modules()
+	modules['maps-onboarding-trace-diagnostic.tar'] = native_onboarding_trace_base_overlay
+	return modules
+}
+
+fn native_onboarding_trace_fields() map[string]string {
+	return {
+		'kind': 'vinix-maps-native-onboarding-trace-diagnostic-v1'
+		'base_root': native_onboarding_trace_base
+		'base_manifest_sha256': native_onboarding_trace_base_seal
+		'controller_build_root': onboarding_trace_controller
+		'controller_manifest_sha256': onboarding_trace_controller_seal
+		'controller_sha256': onboarding_trace_controller_pin
+		'native_build_root': native_onboarding_trace_root
+		'native_manifest_sha256': native_onboarding_trace_seal
+		'native_sha256': native_onboarding_trace_pin
+		'retained_native_manifest_sha256': protected_native_seal
+		'framework_manifest_sha256': broadcast_result_framework_seal
+		'retained_launch_manifest_sha256': '920ed6f1a5f5d9e705bdcc108937db6266066718fe4203859a6ac8577bd405be'
+	}
+}
+
+fn native_onboarding_trace_inputs() map[string]string {
+	mut inputs := onboarding_trace_inputs()
+	inputs[native_onboarding_trace_base + '/sha256.json'] = native_onboarding_trace_base_seal
+	inputs[native_onboarding_trace_root + '/sha256.json'] = native_onboarding_trace_seal
+	return inputs
+}
+
+fn native_onboarding_trace_known_delta() map[string]string {
+	return {
+		'/' + native_onboarding_trace_path: native_onboarding_trace_pin
+		'/' + service_query_headless + '/native-build.json': native_onboarding_trace_build
+		'/' + service_query_headless + '/native-sha256.json': native_onboarding_trace_seal
+	}
+}
+
+fn verify_native_onboarding_trace_overlay(receipt map[string]json2.Any) ! {
+	input_delta := receipt['deployment_input_delta'] or { return error('native onboarding trace deployment input delta absent') }
+	delta := json2.decode[map[string]string](json2.encode(input_delta))!
+	mut expected := native_onboarding_trace_known_delta()
+	guest_path := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest_path] or { return error('native onboarding trace headless receipt pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == native_onboarding_trace_retained_guest {
+		return error('invalid or retained native onboarding trace headless receipt pin')
+	}
+	expected[guest_path] = guest_pin
+	if delta != expected { return error('native onboarding trace four deployment input changes differ') }
+	for name, value in {
+		'headless_input_delta': json2.encode({'/' + native_onboarding_trace_path: native_onboarding_trace_pin})
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'native_manifest_sha256'])
+	} {
+		if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](value)! {
+			return error('native onboarding trace receipt delta differs: ' + name)
+		}
+	}
+	inventory := receipt['overlay_inventory'] or { return error('native onboarding trace overlay inventory absent') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(inventory))!
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	mut paths := expected.keys().map(it.trim_left('/'))
+	paths << service_query_deployment
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 {
+			return error('unsafe native onboarding trace overlay inventory entry')
+		}
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) { return error('native onboarding trace regular allowlist differs') }
+			expected_mode := if entry.name == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }
+			if entry.mode != expected_mode { return error('native onboarding trace inherited regular mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) {
+			return error('unexpected native onboarding trace overlay inode')
+		}
+	}
+	if regulars.len != 5 { return error('exact five native onboarding trace files required') }
+	for path, pin in expected {
+		if regulars[path.trim_left('/')] or { '' } != pin {
+			return error('native onboarding trace declared input differs from overlay inventory')
+		}
+	}
+}
+
+fn verify_native_onboarding_trace_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [native_onboarding_trace_base_seal, native_onboarding_trace_boot_sha,
+		native_onboarding_trace_base_overlay, native_onboarding_trace_seal,
+		native_onboarding_trace_pin, native_onboarding_trace_build] {
+		if !digest_valid(pin) { return error('sealed native onboarding trace base and producer pins required') }
+	}
+	if native_onboarding_trace_seal == protected_native_seal
+		|| native_onboarding_trace_pin == native_onboarding_trace_retained_pin
+		|| native_onboarding_trace_build == native_onboarding_trace_retained_build {
+		return error('new native onboarding trace producer required')
+	}
+	for name, expected in native_onboarding_trace_fields() {
+		if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('native onboarding trace receipt differs: ' + name) }
+	}
+	for path, pin in native_onboarding_trace_inputs() {
+		if stage.inputs_sha256[path] or { '' } != pin { return error('native onboarding trace input differs: ' + path) }
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != native_onboarding_trace_modules()
+		|| stage.preserved_modules_sha256 != native_onboarding_trace_modules() {
+		return error('native onboarding trace original fifteen module pins differ')
+	}
+	verify_native_onboarding_trace_overlay(receipt)!
+}
+
+fn native_onboarding_trace_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_native_onboarding_trace_receipt(receipt, stage)!
+	path := native_onboarding_trace_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != native_onboarding_trace_base_seal {
+		return error('native onboarding trace original onboarding manifest differs')
+	}
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != native_onboarding_trace_boot_sha { return error('native onboarding trace original boot inventory differs') }
+	return native_onboarding_trace_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -1301,6 +1442,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = broadcast_result_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-onboarding-trace' {
 		baseline = onboarding_trace_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-native-onboarding-trace' {
+		baseline = native_onboarding_trace_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -2605,6 +2748,128 @@ fn onboarding_trace_profile_self_test() ! {
 	println('MAPS-ONBOARDING-TRACE KERNEL-PROFILE-SELF-TEST PASS exact controller input aliases delta inventory fourteen modules historical rejection')
 }
 
+fn native_onboarding_trace_delta_fixture() map[string]string {
+	mut delta := native_onboarding_trace_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'd'.repeat(64)
+	return delta
+}
+
+fn native_onboarding_trace_entries_fixture() []ServiceQueryEntry {
+	mut entries := []ServiceQueryEntry{}
+	for path, pin in native_onboarding_trace_delta_fixture() {
+		entries << ServiceQueryEntry{name: path.trim_left('/'), kind: 'regular', sha256: pin,
+			mode: if path == '/' + native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }}
+	}
+	entries << ServiceQueryEntry{name: service_query_deployment, kind: 'regular', sha256: 'c'.repeat(64), mode: 0o644}
+	entries << ServiceQueryEntry{name: 'opt', kind: 'directory', mode: 0o755}
+	return entries
+}
+
+fn native_onboarding_trace_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in native_onboarding_trace_fields() { receipt[name] = json2.Any(value) }
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(native_onboarding_trace_delta_fixture()))!
+	receipt['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256', 'native_manifest_sha256']))!
+	receipt['headless_input_delta'] = json2.decode[json2.Any](json2.encode({'/' + native_onboarding_trace_path: native_onboarding_trace_pin}))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(native_onboarding_trace_entries_fixture()))!
+	return receipt
+}
+
+fn native_onboarding_trace_profile_self_test() ! {
+	profile := native_onboarding_trace_profile()
+	assert profile.baseline_sha == native_onboarding_trace_boot_sha
+	assert profile.modules.len == 15 && profile.modules.last() == 'maps-onboarding-trace-diagnostic.tar'
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', profile.modules}, Config{'vinix', modules.reverse()},
+		Config{'vinix', onboarding_trace_profile().modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('unsafe native onboarding trace modules accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: native_onboarding_trace_inputs(),
+		original_modules_sha256: native_onboarding_trace_modules(), preserved_modules_sha256: native_onboarding_trace_modules()}
+	receipt := native_onboarding_trace_receipt_fixture()!
+	verify_native_onboarding_trace_receipt(receipt, stage)!
+	for name in receipt.keys() {
+		mut bad := native_onboarding_trace_receipt_fixture()!
+		bad[name] = json2.Any('wrong')
+		if _ := verify_native_onboarding_trace_receipt(bad, stage) { return error('changed native onboarding trace field accepted') }
+		bad.delete(name)
+		if _ := verify_native_onboarding_trace_receipt(bad, stage) { return error('missing native onboarding trace field accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut inputs := stage.inputs_sha256.clone()
+		inputs[path] = '0'.repeat(64)
+		if _ := verify_native_onboarding_trace_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) { return error('changed native onboarding trace input accepted') }
+		inputs.delete(path)
+		if _ := verify_native_onboarding_trace_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) { return error('missing native onboarding trace input accepted') }
+	}
+	for bad in [Stage{...stage, format: 2}, Stage{...stage, original_modules_sha256: onboarding_trace_modules()},
+		Stage{...stage, preserved_modules_sha256: map[string]string{}}] {
+		if _ := verify_native_onboarding_trace_receipt(receipt, bad) { return error('wrong native onboarding trace module inventory accepted') }
+	}
+	for changed in [map[string]string{}, {'/' + native_onboarding_trace_path: native_onboarding_trace_retained_pin},
+		{'/' + native_onboarding_trace_path: native_onboarding_trace_pin, '/extra': native_onboarding_trace_pin}] {
+		mut bad := native_onboarding_trace_receipt_fixture()!
+		bad['headless_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_native_onboarding_trace_receipt(bad, stage) { return error('unsafe native onboarding trace headless delta accepted') }
+	}
+	for changed in [[]string{}, ['inputs_sha256'], ['native_manifest_sha256', 'inputs_sha256'],
+		['inputs_sha256', 'native_manifest_sha256', 'framework_manifest_sha256']] {
+		mut bad := native_onboarding_trace_receipt_fixture()!
+		bad['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_native_onboarding_trace_receipt(bad, stage) { return error('unsafe native onboarding trace top delta accepted') }
+	}
+	entries := native_onboarding_trace_entries_fixture()
+	for path, old_pin in {
+		'/' + native_onboarding_trace_path: native_onboarding_trace_retained_pin
+		'/' + service_query_headless + '/native-build.json': native_onboarding_trace_retained_build
+		'/' + service_query_headless + '/native-sha256.json': protected_native_seal
+		'/' + service_query_headless + '/guest-inputs.json': native_onboarding_trace_retained_guest
+	} {
+		mut delta := native_onboarding_trace_delta_fixture()
+		delta[path] = old_pin
+		mut inventory := entries.clone()
+		for index, entry in inventory {
+			if entry.name == path.trim_left('/') { inventory[index] = ServiceQueryEntry{...entry, sha256: old_pin} }
+		}
+		mut bad := native_onboarding_trace_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(inventory))!
+		if path == '/' + native_onboarding_trace_path {
+			bad['headless_input_delta'] = json2.decode[json2.Any](json2.encode({path: old_pin}))!
+		}
+		if _ := verify_native_onboarding_trace_receipt(bad, stage) { return error('coherent retained native onboarding trace payload accepted') }
+	}
+	for index, entry in entries {
+		mut changed := entries.clone()
+		for replacement in [ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777},
+			ServiceQueryEntry{...entry, mode: if entry.mode == 0o755 { u32(0o644) } else { u32(0o755) }},
+			ServiceQueryEntry{...entry, sha256: if entry.name == service_query_deployment { 'invalid' } else { '0'.repeat(64) }}] {
+			if replacement.sha256 != entry.sha256 && entry.kind != 'regular' { continue }
+			changed[index] = replacement
+			mut bad := native_onboarding_trace_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+			if _ := verify_native_onboarding_trace_receipt(bad, stage) { return error('unsafe native onboarding trace inode accepted') }
+		}
+	}
+	for addition in [entries[0], ServiceQueryEntry{name: 'opt/vinix-maps-account/bin/maps-account-guest', kind: 'regular', sha256: onboarding_trace_controller_pin, mode: 0o755},
+		ServiceQueryEntry{name: 'extra', kind: 'directory', mode: 0o755}, ServiceQueryEntry{name: 'opt/../escape', kind: 'directory', mode: 0o755}] {
+		mut changed := entries.clone()
+		changed << addition
+		mut bad := native_onboarding_trace_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_native_onboarding_trace_receipt(bad, stage) { return error('extra or duplicate native onboarding trace inode accepted') }
+	}
+	mut removed := native_onboarding_trace_receipt_fixture()!
+	removed['overlay_inventory'] = json2.decode[json2.Any](json2.encode(entries[1..]))!
+	if _ := verify_native_onboarding_trace_receipt(removed, stage) { return error('missing native onboarding trace file accepted') }
+	if _ := verify_native_onboarding_trace_receipt(onboarding_trace_receipt_fixture()!, stage) { return error('controller trace receipt accepted by native onboarding profile') }
+	if _ := verify_onboarding_trace_receipt(receipt, stage) { return error('native trace receipt accepted by controller onboarding profile') }
+	if _ := verify_broadcast_result_receipt(receipt, stage) { return error('native trace receipt accepted by broadcast profile') }
+	println('MAPS-NATIVE-ONBOARDING-TRACE KERNEL-PROFILE-SELF-TEST PASS exact native four-input delta five-file inventory fifteen modules historical rejection')
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
@@ -2614,6 +2879,7 @@ fn self_test() ! {
 	context_storage_profile_self_test()!
 	broadcast_result_profile_self_test()!
 	onboarding_trace_profile_self_test()!
+	native_onboarding_trace_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -2676,6 +2942,7 @@ fn self_test() ! {
 	fat_self_test(root + '/context-storage', 'maps-context-storage-diagnostic.tar', context_storage_profile().modules)!
 	fat_self_test(root + '/broadcast-result', 'maps-broadcast-result-diagnostic.tar', broadcast_result_profile().modules)!
 	fat_self_test(root + '/onboarding-trace', 'maps-onboarding-trace-diagnostic.tar', onboarding_trace_profile().modules)!
+	fat_self_test(root + '/native-onboarding-trace', 'maps-native-onboarding-trace-diagnostic.tar', native_onboarding_trace_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -2696,11 +2963,12 @@ fn main() {
 	is_context_storage := os.args.len == 5 && os.args[1] == '--maps-context-storage'
 	is_broadcast_result := os.args.len == 5 && os.args[1] == '--maps-broadcast-result'
 	is_onboarding_trace := os.args.len == 5 && os.args[1] == '--maps-onboarding-trace'
-	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot && !is_context_storage && !is_broadcast_result && !is_onboarding_trace {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+	is_native_onboarding_trace := os.args.len == 5 && os.args[1] == '--maps-native-onboarding-trace'
+	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot && !is_context_storage && !is_broadcast_result && !is_onboarding_trace && !is_native_onboarding_trace {
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace { 1 } else { 0 }
+	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -2709,7 +2977,7 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	profile := if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	profile := if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
