@@ -11,6 +11,29 @@ fn trace_block(source string, name string) !string {
 	return source[start..start + end + 2]
 }
 
+// The old compiler emits signedness warnings in its builtin support too. Scope
+// the strict warning to the actual production input function, without changing
+// any generated declaration, assignment or call in that function.
+fn trace_pointer_c(code string, path string) ! {
+	mut focused := '#pragma GCC diagnostic ignored "-Wpointer-sign"\n'
+	mut inside := false
+	mut count := 0
+	for line in code.split_into_lines() {
+		if line.contains('ws_pointer(') && line.trim_space().ends_with('{') {
+			focused += '#pragma GCC diagnostic push\n#pragma GCC diagnostic error "-Wpointer-sign"\n'
+			inside = true
+			count++
+		}
+		focused += line + '\n'
+		if inside && line == '}' {
+			focused += '#pragma GCC diagnostic pop\n'
+			inside = false
+		}
+	}
+	assert count == 1 && !inside, 'missing generated production pointer function'
+	os.write_file(path, focused)!
+}
+
 fn trace_format_abis(compiler string, work string) ! {
 	generated := os.exec([compiler, '-w', '-n', '-gc', 'none', '-enable-globals', '-o', work + '/probe.c', work + '/main.v'])
 	assert generated.exit_code == 0, generated.output
@@ -18,6 +41,9 @@ fn trace_format_abis(compiler string, work string) ! {
 	lines := code.split_into_lines().filter(it.contains('ANDROID-WS-') && it.contains('snprintf('))
 	assert lines.len == 3, 'missing production diagnostic calls'
 	cc := os.find_abs_path_of_executable('cc')!
+	trace_pointer_c(code, work + '/pointer-positive.c')!
+	strict := os.exec([cc, '-std=gnu11', '-fsyntax-only', '-Werror=pointer-sign', work + '/pointer-positive.c'])
+	assert strict.exit_code == 0, strict.output
 	for i, spelling in ['long', 'long long'] {
 		mut checks := '#include <stdio.h>\n#include <stdint.h>\n#include <stdbool.h>\ntypedef ${spelling} i64;\ntypedef unsigned ${spelling} u64;\ntypedef uint32_t u32;\ntypedef int32_t i32;\n'
 		for j, original in lines {
@@ -36,9 +62,28 @@ fn trace_format_abis(compiler string, work string) ! {
 		checks = checks.replace('void check_0(', 'typedef struct { u32 kind; i32 x; i32 y; } main__WsEvent;\ntypedef struct { u64 events; } main__WsFrameTrace;\nvoid check_0(')
 		path := work + '/format-' + i.str() + '.c'
 		os.write_file(path, checks)!
-		checked := os.exec([cc, '-std=gnu11', '-fsyntax-only', '-Wformat=2', '-Werror=format', path])
+		checked := os.exec([cc, '-std=gnu11', '-fsyntax-only', '-Wformat=2', '-Werror=format', '-Werror=pointer-sign', path])
 		assert checked.exit_code == 0, '${spelling}: ${checked.output}'
 	}
+}
+
+fn trace_pointer_sign_refusal(compiler string, work string) ! {
+	original := os.read_file(work + '/main.v')!
+	needle := "mut outcome := &char(c'ignored-kind')"
+	assert original.count(needle) == 1, 'pointer-sign negative mutation must apply once'
+	mutation := original.replace(needle, "mut outcome := c'ignored-kind'")
+	os.write_file(work + '/main.v', mutation)!
+	defer { os.write_file(work + '/main.v', original) or { panic(err) } }
+	generated := os.exec([compiler, '-w', '-n', '-gc', 'none', '-enable-globals',
+		'-o', work + '/pointer-mutation.c', work + '/main.v'])
+	assert generated.exit_code == 0, generated.output
+	cc := os.find_abs_path_of_executable('cc')!
+	trace_pointer_c(os.read_file(work + '/pointer-mutation.c')!, work + '/pointer-negative.c')!
+	refused := os.exec([cc, '-std=gnu11', '-fsyntax-only', '-Werror=pointer-sign', work + '/pointer-negative.c'])
+	signedness_error := refused.output.contains('[-Werror,-Wpointer-sign]') ||
+		refused.output.contains('[-Werror=pointer-sign]')
+	assert refused.exit_code != 0 && signedness_error,
+		'unsigned outcome mutation did not fail for pointer signedness: ${refused.output}'
 }
 
 fn main() {
@@ -57,13 +102,14 @@ fn main() {
 	os.write_file(work + '/main.v', trace_model + '\n' + trace_block(runtime, 'struct WsEvent {')! + '\n' + probe + '\n' +
 		trace_block(views, 'fn ws_pointer(')! + '\n' + trace_block(views, 'fn ws_dispatch_traversal(')! + trace_cases)!
 	compiler := os.real_path(os.getenv_opt('VINIX_V_COMPILER') or { os.find_abs_path_of_executable('v')! })
-	built := os.exec([compiler, '-w', '-n', '-gc', 'none', '-enable-globals', '-cc', 'cc', '-cflags', '-Wformat=2 -Werror=format', '-o', work + '/probe', work + '/main.v'])
+	built := os.exec([compiler, '-w', '-n', '-gc', 'none', '-enable-globals', '-cc', 'cc', '-cflags', '-Wformat=2 -Werror=format -Werror=pointer-sign', '-o', work + '/probe', work + '/main.v'])
 	assert built.exit_code == 0, built.output
 	ran := os.exec([work + '/probe'])
 	assert ran.exit_code == 0, ran.output
 	assert ran.output.trim_space() == 'INPUT-FRAME-TRACE-PASS opt-in bounds independent-rates input-outcomes traversal-exceptions'
 	trace_format_abis(compiler, work)!
-	println(ran.output.trim_space() + ' format-abis=2')
+	trace_pointer_sign_refusal(compiler, work)!
+	println(ran.output.trim_space() + ' format-abis=2 pointer-mutation=rejected')
 }
 
 const trace_model = '
