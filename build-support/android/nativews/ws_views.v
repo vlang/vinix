@@ -623,7 +623,7 @@ fn ws_motion(e voidptr, target voidptr, action i32, x i32, y i32) u8 {
 fn ws_pointer(e voidptr, event &WsEvent) {
 	unsafe {
 		trace := ws_trace_pointer_begin(event)
-		mut outcome := c'ignored-kind'
+		mut outcome := &char(c'ignored-kind')
 		mut handled := i32(-1)
 		defer {
 			if trace != 0 { ws_trace_pointer_end(event, trace, outcome, handled, pending(e)) }
