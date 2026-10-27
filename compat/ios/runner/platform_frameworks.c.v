@@ -120,6 +120,7 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 		}
 		'NSBundle' {
 			match selector {
+				'bundleIdentifier' { frame.x[0] = ns_bundle_identifier(object) }
 				'appStoreReceiptURL' {
 					// App Store receipt support is unavailable in this runtime.
 					frame.x[0] = 0
