@@ -18,12 +18,14 @@ source closure, tool identities, command receipts and output checksums remain
 in the external stage bundle.
 
 Disk growth accumulates observed volume drops during writable phases without
-refunds. Only the initial and final complete-input audits refresh the available
-space baseline: these audits read immutable inputs and write no stage files.
+refunds. Only the initial and final input/media audits and the final output
+inventory refresh the available-space baseline: these phases read files and
+write no stage files. Media hashes finish before the receipt-writing interval.
 The 1 GiB reserve is enforced at both ends; preflight still requires 1.5 GiB.
 Other sessions' writes during writable phases remain conservatively charged.
 Command and module-hash receipts are writable phases. The final receipt and
-seal writes receive a final disk check printed to the external preparation log.
+seal writes receive separate disk checks printed to the external preparation
+log, with the read-only output inventory measured between them.
 
 Build and self-test one tool at a time with the pinned V compiler and Boehm GC:
 Record peak RSS and swaps with `/usr/bin/time -l`. Image preparation and kernel

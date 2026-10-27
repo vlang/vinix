@@ -418,6 +418,12 @@ fn run(destination string) ! {
 	if stage.load_inventory(base_root, base_seal)! != base_files { return error('immutable broadcast-result stage changed') }
 	for path, pin in inputs { if stage.hash(path)! != pin { return error('source/tool changed: ' + path) } }
 	if payload_inventory(root + '/payload')! != entries { return error('payload changed') }
+	// Hashing the media reads several GiB; finish it before charging receipt writes.
+	overlay_pin := stage.hash(root + '/' + overlay)!
+	limine_before_pin := stage.hash(root + '/limine-before.conf')!
+	limine_after_pin := stage.hash(root + '/limine-after.conf')!
+	boot_pin := stage.hash(root + '/boot.img')!
+	efivars_pin := stage.hash(root + '/efivars.fd')!
 	disk_sample(root, 'complete-recheck', false, mut disk, mut disk_samples)!
 	write_json(root + '/stage.json', {
 		'kind': json2.Any('vinix-maps-onboarding-trace-diagnostic-v1'), 'format': json2.Any(1),
@@ -430,18 +436,20 @@ fn run(destination string) ! {
 		'deployment_input_delta': as_json({'/' + controller_path: controller_pin, '/' + alias_path: controller_pin})!,
 		'deployment_top_level_delta': as_json(['inputs_sha256'])!, 'inputs_sha256': as_json(inputs)!,
 		'original_modules_sha256': as_json(before)!, 'preserved_modules_sha256': as_json(after)!,
-		'overlay_inventory': as_json(entries)!, 'overlay_sha256': json2.Any(stage.hash(root + '/' + overlay)!),
-		'limine_before_sha256': json2.Any(stage.hash(root + '/limine-before.conf')!), 'limine_after_sha256': json2.Any(stage.hash(root + '/limine-after.conf')!),
-		'staged_boot_sha256': json2.Any(stage.hash(root + '/boot.img')!), 'staged_efivars_sha256': json2.Any(stage.hash(root + '/efivars.fd')!),
+		'overlay_inventory': as_json(entries)!, 'overlay_sha256': json2.Any(overlay_pin),
+		'limine_before_sha256': json2.Any(limine_before_pin), 'limine_after_sha256': json2.Any(limine_after_pin),
+		'staged_boot_sha256': json2.Any(boot_pin), 'staged_efivars_sha256': json2.Any(efivars_pin),
 		'guest_terminal_command': json2.Any('/opt/vinix-maps-account/bin/maps-account-guest --broker --trace-onboarding'),
 		'disk_reserve_bytes': as_json(disk_reserve_bytes)!, 'disk_growth_limit_bytes': as_json(disk_growth_limit_bytes)!,
-		'disk_growth_policy': json2.Any('Cumulative observed volume drops during writable phases; read-only initial and final complete-input audits refresh baseline with reserve enforced. No refunds.'),
+		'disk_growth_policy': json2.Any('Cumulative observed volume drops during writable phases; read-only input audits and output inventory refresh baseline with reserve enforced. No refunds.'),
 		'disk_charged_growth_bytes': as_json(disk.charged)!,
 		'disk_available_samples_bytes': as_json(disk_samples)!,
 		'disk_sample_argv': as_json(['/usr/bin/env', 'LC_ALL=C', '/bin/df', '-kP', os.dir(root)])!,
 	})!
+	disk_sample(root, 'receipt-complete', true, mut disk, mut disk_samples)!
 	mut files := map[string]string{}
 	collect(root, '', mut files)!
+	disk_sample(root, 'output-inventory', false, mut disk, mut disk_samples)!
 	write_json(root + '/sha256.json', as_json(files)!)!
 	disk_sample(root, 'seal-complete', true, mut disk, mut disk_samples)!
 	println('MAPS-ONBOARDING-TRACE-STAGE PASS ' + root + ' seal=' + stage.hash(root + '/sha256.json')!)
