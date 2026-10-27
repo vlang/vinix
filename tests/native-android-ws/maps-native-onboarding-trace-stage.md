@@ -96,11 +96,11 @@ module search path and was corrected in `kernel-patcher-build-r2.log`.
 All nine kernel profile self-tests passed before the outer process guard
 rejected the generic FAT test's intentional command-helper process group.
 That rejected attempt and verified cleanup remain in
-`kernel-patcher-selftest.json`; complete FAT self-test and preparation remain
-pending safe supervision of those subprocess groups. The comparison's first
+`kernel-patcher-selftest.json`; that attempt did not complete the FAT tests.
+The comparison's first
 `v run` attempt encountered the same guard restriction; the successful
-comparison uses a separately compiled executable. Runtime validation remains
-pending; no new stage or guest pass is claimed here.
+comparison uses a separately compiled executable. Guest validation remains
+pending at this host-only checkpoint.
 
 The complete kernel patcher self-test subsequently passed under the nested
 process-group-aware r3 guard in 10.77 seconds at 26,443,776 bytes peak RSS,
@@ -120,4 +120,25 @@ and all complete media checks. The corrected tool's build/evidence directory
 is `maps-native-onboarding-trace-build-2026-10-27-r2` under the same external
 Android state root. The corrected stager built in 7.23 seconds at 451,166,208
 bytes peak RSS, zero swaps, then passed its focused self-test under the r3
-guard. A successful preparation is still pending.
+guard.
+
+Preparation passed for
+`/Users/alex/.local/state/vinix/android/maps-native-onboarding-trace-r3`,
+manifest `96b90172e338080ff50bf0e1188bdefc1f50e61fe3ad654593dfbac4d918d741`,
+source revision `1fefb8dc2844175cb579b2cb7e5311f2241d8d21`.
+All exact inherited module/dependency checks, payload inventory, inode modes,
+APFS clone checks and media readback passed. The run took 191.56 seconds
+(92.14 user, 61.60 sys), with 64,946,176 bytes peak RSS and zero swaps.
+Final charged growth was 85,250,048 bytes, including 32,505,856 bytes allocated
+to digest receipts; final free space was 19,385,405,440 bytes. The outer guard
+passed with 66,256,896 bytes peak sampled process-tree RSS and verified cleanup.
+
+The successful evidence in the corrected build directory is
+`prepare-r3.log`, SHA-256
+`37fe3b047117eca66b65cd261d1532ad7f7c2764f3c12ca6d2abce465371bccd`,
+and `prepare-r3.json`, SHA-256
+`553570f0993d2297358d756884996599b7f46c593e5ceb3d09cd9a4cdd889ec2`.
+The staged boot digest is
+`f90cb8b87b0fa2e4f34af9fe2f23026fbd2d029ac35481a735eeff507cdb3cd9`.
+Fresh-clone, kernel-patch and live Maps validation remain pending at this stage
+checkpoint; successful Google login is unverified.
