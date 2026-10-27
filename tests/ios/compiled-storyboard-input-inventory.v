@@ -40,7 +40,7 @@ fn main() {
 		'tests/ios/main-selector-run.v', 'tests/ios/main-selector-evidence.v',
 		'tests/ios/view-tag-run.v', 'tests/ios/view-tag-evidence.v',
 		'tests/ios/responder-run.v', 'tests/ios/responder-evidence.v',
-		'tests/ios/cooked-content.v', 'tests/ios/string-normalization.v',
+		'tests/ios/cooked-content.v', 'tests/ios/string-normalization.v', 'tests/ios/string-cstring-output.v',
 		'tests/ios/application-badge-run.v', 'tests/ios/application-badge-evidence.v', 'tests/ios/inspect-application-badge.v', 'tests/ios/window-run.v', 'tests/ios/window-evidence.v', 'tests/ios/string-float-run.v', 'tests/ios/string-float-evidence.v', 'tests/ios/inspect-string-float.v',
 		'tests/ios/string-cstring-run.v', 'tests/ios/string-cstring-evidence.v', 'tests/ios/inspect-string-cstring.v', 'tests/ios/bundle-receipt-run.v', 'tests/ios/bundle-receipt-evidence.v', 'tests/ios/inspect-bundle-receipt.v', 'tests/ios/cf-string-output-run.v', 'tests/ios/cf-string-output-evidence.v', 'tests/ios/inspect-cf-string-output.v', 'tests/ios/search-path-run.v', 'tests/ios/search-path-evidence.v', 'tests/ios/inspect-search-path-calls.v', 'tests/ios/probe-vm-evidence.v', 'tests/ios/probe-vm-tags-evidence.v', 'tests/ios/block-byref-evidence.v', 'tests/ios/dictionary-snapshot-evidence.v', 'tests/ios/inspect-dictionary-snapshot-fault.v', 'tests/ios/inline-pthread-self-run.v', 'tests/ios/inline-pthread-self-evidence.v'] {
 		listing_checker := os.exec(['git', 'ls-tree', '-r', '--name-only', revision, '--', checker])
