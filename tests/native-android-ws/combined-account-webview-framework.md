@@ -183,3 +183,30 @@ with two workers. Device-protected storage is a distinct private child directory
 within Vinix's app root; there is no separate Android encryption/unlock lifecycle.
 These checks establish framework construction. Paired native execution, the
 storage fixture in ART and actual Google account sign-in need guest validation.
+
+The `--onboarding` narrow profile repairs duplicate fresh-child insertion in
+`ViewGroup.attachViewToParent` and adds the missing `Settings.Global.putInt`
+entry point reached by Play Services. Its providers are
+`framework_child_attach.v` and `framework_settings_global.v`. It requires the sealed
+`combined-account-webview-broadcast-result-framework-2026-10-27-r1` baseline:
+manifest `21d53cc9cd2ccd9c53fc7774a826d83673f3391d30c1757074e3edcba2c8b046`,
+JAR `5dfba8c7e0006f6c84510d72b8fde84706bcb7f3489b3620cd340ec0361d8564`.
+Exactly 2104 classes must remain. Only the existing
+`android/view/ViewGroup.attachViewToParent(View,int,LayoutParams)` method may
+change, and only `android/provider/Settings$Global.putInt(ContentResolver,String,int)`
+may be added. No fields or classes may be added. The existing builder checks
+that delta before assembly and after canonical DEX disassembly, preserves all
+other class/method/metadata and non-DEX JAR member hashes, retains the complete
+source/tool closures and verifies both complete bundle inventories. Its
+self-test exercises both exact method restrictions and rejects either unchanged target,
+unrelated class changes, class substitution, additions, omissions and a
+smaller baseline. Framework construction and ARM/runtime validation remain
+pending at this source checkpoint.
+
+The retained `0cc6c1d3` V compiler with its own `VROOT` built this profile driver
+in 2.07 seconds at 378,060,800 bytes maximum RSS and zero swaps. The complete
+driver self-test passed in 0.26 seconds at 8,404,992 bytes RSS and zero swaps.
+Logs and process-tree guard receipts are retained under
+`/Users/alex/.local/state/vinix/android/maps-onboarding-framework-build-2026-10-27-r1/`
+as `driver-compile.*` and `driver-selftest.*`. Both provider fixtures are checked
+separately before the combined producer runs.

@@ -281,6 +281,26 @@ fn broadcast_result_profile() NarrowProfile {
  }
 }
 
+fn onboarding_profile() NarrowProfile {
+ group := 'android/view/ViewGroup.smali'
+ settings := 'android/provider/Settings$Global.smali'
+ return NarrowProfile{
+  name: 'onboarding'
+  baseline_name: 'combined-account-webview-broadcast-result-framework-2026-10-27-r1'
+  manifest_pin: '21d53cc9cd2ccd9c53fc7774a826d83673f3391d30c1757074e3edcba2c8b046'
+  jar_pin: '5dfba8c7e0006f6c84510d72b8fde84706bcb7f3489b3620cd340ec0361d8564'
+  baseline_classes: 2104
+  providers: ['framework_child_attach.v', 'framework_settings_global.v']
+  calls: {group: 'framework_child_attach', settings: 'framework_settings_global_put_int'}
+  methods: {
+   group: ['attachViewToParent(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;)V']
+   settings: ['putInt(Landroid/content/ContentResolver;Ljava/lang/String;I)Z']
+  }
+  changed: {group: 1, settings: 0}
+  added: {group: 0, settings: 1}
+ }
+}
+
 fn store_parts(source string) !StoreClassParts {
  mut methods := map[string]string{}
  mut metadata := []string{}
@@ -600,10 +620,45 @@ fn accessor_delta(old string, new string, declaration string) ! {
  }
 }
 
+fn onboarding_self_test() ! {
+ profile := onboarding_profile()
+ targets := ['android/view/ViewGroup.smali', 'android/provider/Settings$Global.smali']
+ if profile.methods.len != 2 || profile.calls.len != 2
+  || profile.changed[targets[0]]! != 1 || profile.added[targets[0]]! != 0
+  || profile.changed[targets[1]]! != 0 || profile.added[targets[1]]! != 1
+  || profile.fields.len != 0 || profile.extra_classes.len != 0
+  || profile.baseline_classes != 2104 {
+  return error('onboarding profile requires exactly two narrow classes and no field or class additions')
+ }
+ narrow_method_self_test(profile.methods[targets[0]]!, 1, 0)!
+ narrow_method_self_test(profile.methods[targets[1]]!, 0, 1)!
+ mut before := {targets[0]: 'old', targets[1]: 'old'}
+ for i in 0 .. 2102 { before['other/' + i.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ for target in targets { after[target] = 'new' }
+ narrow_profile_class_delta(before, after, targets, []string{}, 2104)!
+ for case in 0 .. 7 {
+  mut old := before.clone()
+  mut bad := after.clone()
+  match case {
+   0 { bad[targets[0]] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(targets[0]); bad['substitute.smali'] = 'new' }
+   3 { bad.delete('other/0.smali') }
+   4 { bad['extra.smali'] = 'new' }
+   5 { old.delete('other/0.smali'); bad.delete('other/0.smali') }
+   else { bad[targets[1]] = 'old' }
+  }
+  narrow_profile_class_delta(old, bad, targets, []string{}, 2104) or { continue }
+  return error('invalid onboarding class delta accepted: ' + case.str())
+ }
+}
+
 fn self_test() ! {
  store_delta_self_test()!
  store_method_self_test()!
  protected_storage_self_test()!
+ onboarding_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -1086,11 +1141,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result'] {
-  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } else { broadcast_result_profile() } }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding'] {
+  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
