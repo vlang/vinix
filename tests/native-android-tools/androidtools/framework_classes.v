@@ -108,6 +108,7 @@ pub fn write_framework_classes(smali string) ! {
   os.write_file(smali + '/' + name + '.smali', text)!
  }
  framework_storage_queries(smali)!
+ framework_settings_global(smali)!
  framework_startup_apis(smali)!
  framework_absent_hardware(smali)!
  framework_hardware_buffer(smali)!
