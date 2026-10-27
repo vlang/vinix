@@ -68,5 +68,31 @@ receipts. The successful tools are:
 Preparation uses the stager's `--prepare FRESH_EXTERNAL_OUTPUT` command. After
 the complete sealed stage is cloned separately, the patcher accepts
 `--maps-onboarding-framework FRESH_CLONE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256`.
-Stage preparation and subsequent ARM checks remain pending. Generated
+Stage preparation subsequently passed in the fresh immutable output
+`/Users/alex/.local/state/vinix/android/maps-onboarding-framework-r1`, sealed by
+`fcba5511b0cc2d305ee6e3ba48081bf6bc40fd6117cd91abc691fb2fd7ad01cf`.
+All 32 dependency seals, 16 preserved media modules, appended overlay, complete
+source/readback inventories, six-file scope and inherited modes passed. The
+stage records checkout revision `b64291c5bba76c5799136982c7fd48ef459ffd5c` and
+retains the exact tool sources from stage/profile commit `a87c76837`.
+
+Preparation took 161.05 seconds (76.23 user, 49.47 system), peaked at
+77,496,320 bytes RSS and used zero swaps. The final logged write charge was
+494,768,128 bytes, including 34,603,008 bytes allocated for exact module digest
+receipts, below the unchanged 536,870,912-byte limit. Final free space was
+15,710,146,560 bytes. The external guard passed with cleanup complete and a
+4,533,383,168-byte maximum observed shared-volume drop under its explicitly
+budgeted 8 GiB limit.
+
+| Evidence within the build directory | SHA-256 |
+| --- | --- |
+| `framework-producer.log` | `a8d60a7adef98ddb84e2e54f71b16c8fe3f974e2ed28326abe0001db79bd1c58` |
+| `framework-producer.guard.json` | `50a3c2a44291588618512fc48d0eeddf9f5f1ace980bb4381f52eacdcd0fd9d5` |
+| `prepare.log` | `abfcccaaef6e49c4d6ed6aab2c8225466eebc2d465e76e9cb9c0a4c6a3acc913` |
+| `prepare.guard.json` | `1ea8ffbb9931aab5619b83fcef9a39899e07ff4309eab9416998a95516040576` |
+
+Stage receipt `stage.json` has SHA-256
+`f06087f5fdc596ac85f84d501f0bcb2a0cec53457709c9f82d8954b0ffb9acb0`.
+Fresh mutable clone, frozen kernel patch and ARM/runtime validation are the
+next steps; this preparation is not Maps or Google login proof. Generated
 artifacts belong under the external Android state directory, not Git.
