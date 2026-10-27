@@ -594,6 +594,9 @@ fn build(root string, framework string) ! {
 	copy_pin(find_v, root + '/tools/find-v.sh', find_v_pin)!
 	command(root, 'generate-native', [root + '/tools/native-generator',
 		root + '/native/atlframework', root + '/native/android-native.c', '--arch', 'arm64'])!
+	// The sealed runtime input map includes repository-relative paths. Old V
+	// needs its private cwd only through generation; audit those paths from repo.
+	os.chdir(repo)!
 	if hash(find_v)! != find_v_pin { return error('compiler selector changed') }
 	unchanged(closure)!
 	check_dependencies(root, reused)!
