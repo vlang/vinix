@@ -375,18 +375,17 @@ A rendered frame, interactive menu, login and playable match remain
 unverified. Advertising remains skipped. See the
 [desktop probe checkpoint](../tests/ios/desktop-probe-checkpoint-20261026.md).
 
-The latest no-ads checkpoint implements `NSLocale preferredLanguages` after
-clearing `NSString getCString:maxLength:encoding:` and `NSBundle infoDictionary`.
-Native Foundation comparisons, regular and deterministic ASan/UBSan runs, the
-CoreFoundation preferred-language regressions and all 26 guest fixtures pass.
-With the original cooked content, Fortnite reaches the unresolved weak
-`MTLCreateSystemDefaultDevice` import and branches to address zero. Saved ARM64
-registers, both branch veneers and the Mach-O indirect symbols identify that call.
-The game exits 139 without an OOM event or supervisor kill. The existing Metal
+The latest no-ads checkpoint resolves `MTLCreateSystemDefaultDevice` and returns
+nil while Vinix has no Metal backend. Native API comparisons, regular and
+deterministic ASan/UBSan runs, Metal cache regressions and all 27 guest fixtures
+pass. With the original cooked content, Fortnite passes the import and reaches
+`NSNotificationCenter addObserverForName:object:queue:usingBlock:`. Static code
+checks verify the import and the caller's nil branch. The game exits 1 without
+an application signal fault, OOM event or supervisor kill. The existing Metal
 texture cache delegates to supplied devices; a Metal device, shader, rendering
 and presentation backend remains to be implemented. Progress remains 4 of 8
 observable launch gates; frame, menu, login and playable match are unverified.
-See the [preferred-language checkpoint](../tests/ios/locale-preferred-checkpoint-20261027.md).
+See the [Metal availability checkpoint](../tests/ios/metal-device-checkpoint-20261027.md).
 
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
