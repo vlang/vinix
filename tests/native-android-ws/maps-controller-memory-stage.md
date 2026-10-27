@@ -55,3 +55,13 @@ maximum RSS and zero swaps. The self-test passed its exact-profile, obsolete-pin
 alias, receipt-delta, payload, inherited-mode and protected-ancestor cases.
 Build and self-test logs are retained outside Git in
 `/Users/alex/.local/state/vinix/android/maps-stage-build-2026-10-27-r1/`.
+
+Preparation passed from source revision
+`99de7484d7dd3c2b1fd4c2d519c73a60c881b7b3`. The complete immutable output at
+`/Users/alex/.local/state/vinix/android/maps-controller-memory-r1/` has manifest
+`944007c40fff691ad3c2973970ad5e840aea7bff7370bda5486377c274a1fd21`.
+It checked all complete inherited bundles before and after preparation, read
+back the overlay and every original module, and retained the source/tool closure.
+Preparation took 163.63 seconds with 64,913,408 bytes maximum RSS and zero swaps.
+This is host staging evidence; the corrected ARM controller still needs a guest
+runtime check.
