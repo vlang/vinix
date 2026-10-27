@@ -491,6 +491,9 @@ fn main() {
 			if os.exists('/opt/ios/bundle-identifier-checks') {
 				require_child('/opt/ios/bundle-identifier-checks')
 			}
+			if os.exists('/opt/ios/string-get-cstring-checks') {
+				require_child('/opt/ios/string-get-cstring-checks')
+			}
 			if os.exists('/opt/ios/string-path-checks') {
 				require_child('/opt/ios/string-path-checks')
 			}
