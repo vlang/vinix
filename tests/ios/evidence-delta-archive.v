@@ -16,6 +16,7 @@ struct Chunk {
 	offset u64
 	size u64
 	hash string
+	base_offset u64
 	base_size u64
 	base_hash string
 	payload string
@@ -38,7 +39,7 @@ struct Entry {
 }
 
 struct Recipe {
-	version int = 1
+	version int = 2
 	original string
 	prior string
 	prior_manifest string
@@ -74,12 +75,132 @@ fn safe(path string) bool {
 // zstd patch mode cannot accept files above 2 GiB. Bound each input and
 // concatenate decoded chunks before checking the original complete tar hash.
 fn copy_range(source string, target string, offset u64, size u64) ! {
+	length := os.file_size(source)
+	if offset > u64(0x7fffffffffffffff) || offset > length || size > length - offset {
+		return error('chunk reference outside input')
+	}
 	mut input := os.open(source)!
 	defer { input.close() }
 	input.seek(i64(offset), .start)!
 	mut output := os.create(target)!
 	defer { output.close() }
 	append_range(mut input, mut output, size)!
+}
+
+struct TarSpan {
+	key string
+	offset u64
+	size u64
+}
+
+fn tar_octal(bytes []u8) !u64 {
+	mut value := u64(0)
+	mut ended := false
+	mut started := false
+	for b in bytes {
+		if b == 0 || b == ` ` {
+			if started { ended = true }
+			continue
+		}
+		if ended || b < `0` || b > `7` || value > (u64(0x7fffffffffffffff) - 7) / 8 {
+			return error('unsupported tar number')
+		}
+		started = true
+		value = value * 8 + u64(b - `0`)
+	}
+	return value
+}
+
+fn tar_text(bytes []u8) string {
+	end := bytes.index(u8(0))
+	return if end < 0 { bytes.bytestr() } else { bytes[..end].bytestr() }
+}
+
+// These are compression hints, never extraction instructions. Unsupported or
+// malformed tar layouts use the original fixed-offset codec. All bytes are
+// still covered by chunk, complete tar and original gzip hashes on restoration.
+fn tar_spans(path string) ![]TarSpan {
+	mut file := os.open(path)!
+	defer { file.close() }
+	length := os.file_size(path)
+	mut offset := u64(0)
+	mut header := []u8{len: 512}
+	mut spans := []TarSpan{}
+	mut occurrences := map[string]int{}
+	mut long_name := ''
+	for offset < length {
+		if length - offset < 512 { return []TarSpan{} }
+		file.seek(i64(offset), .start)!
+		if file.read(mut header)! != 512 { return error('short tar header') }
+		if header.all(it == 0) { break }
+		stored_sum := tar_octal(header[148..156]) or { return []TarSpan{} }
+		mut sum := u64(0)
+		for i, b in header { sum += if i >= 148 && i < 156 { u64(32) } else { u64(b) } }
+		if stored_sum != sum { return []TarSpan{} }
+		size := tar_octal(header[124..136]) or { return []TarSpan{} }
+		data := offset + 512
+		if size > length - data { return []TarSpan{} }
+		padded := (size + 511) / 512 * 512
+		if padded > length - data { return []TarSpan{} }
+		type_flag := header[156]
+		if type_flag in [u8(`x`), `g`, `S`] { return []TarSpan{} }
+		if type_flag == `L` {
+			if size > 1024 * 1024 { return []TarSpan{} }
+			mut name := []u8{len: int(size)}
+			if size > 0 && file.read(mut name)! != int(size) { return error('short tar long name') }
+			long_name = tar_text(name)
+		} else if type_flag != `K` {
+			mut name := tar_text(header[..100])
+			if long_name != '' { name = long_name; long_name = '' }
+			else if header[257..263] == 'ustar\x00'.bytes() {
+				prefix := tar_text(header[345..500])
+				if prefix != '' { name = prefix + '/' + name }
+			}
+			occurrence := occurrences[name]
+			occurrences[name] = occurrence + 1
+			if type_flag in [u8(0), `0`] && size >= 1024 * 1024 {
+				spans << TarSpan{key: name + '\x00' + occurrence.str(), offset: data, size: padded}
+			}
+		}
+		offset = data + padded
+	}
+	return spans
+}
+
+fn chunk_ranges(current string, prior string) ![]Chunk {
+	mut bases := map[string]TarSpan{}
+	for span in tar_spans(prior)! { bases[span.key] = span }
+	mut regions := []Chunk{}
+	mut offset := u64(0)
+	prior_size := os.file_size(prior)
+	total := os.file_size(current)
+	for span in tar_spans(current)! {
+		if span.key !in bases { continue }
+		if span.offset > offset {
+			regions << Chunk{offset: offset, size: span.offset - offset,
+				base_offset: offset, base_size: if offset < prior_size { prior_size - offset } else { u64(0) }}
+		}
+		base := bases[span.key]
+		regions << Chunk{offset: span.offset, size: span.size, base_offset: base.offset, base_size: base.size}
+		offset = span.offset + span.size
+	}
+	if offset < total {
+		regions << Chunk{offset: offset, size: total - offset,
+			base_offset: offset, base_size: if offset < prior_size { prior_size - offset } else { u64(0) }}
+	}
+	mut chunks := []Chunk{}
+	for region in regions {
+		mut part := u64(0)
+		for part < region.size {
+			size := if region.size - part < chunk_size { region.size - part } else { chunk_size }
+			available := if part < region.base_size { region.base_size - part } else { u64(0) }
+			base_size := if available < size { available } else { size }
+			chunks << Chunk{offset: region.offset + part, size: size, base_size: base_size,
+				base_offset: if base_size > 0 { region.base_offset + part } else { u64(0) }}
+			part += size
+		}
+	}
+	return chunks
 }
 
 fn append_range(mut input os.File, mut output os.File, size u64) ! {
@@ -147,7 +268,7 @@ fn load_archive(archive string) !Recipe {
 		return error('archive inventory mismatch')
 	}
 	r := json2.decode[Recipe](os.read_file(archive + '/recipe.json')!)!
-	if r.version != 1 || !os.is_abs_path(r.original) || !os.is_abs_path(r.prior)
+	if r.version !in [1, 2] || !os.is_abs_path(r.original) || !os.is_abs_path(r.prior)
 		|| r.root_mode < 0 || r.root_mode > 0o7777
 		|| digest(r.prior + '/manifest.sha256')! != r.prior_manifest {
 		return error('wrong prior bundle or archive version')
@@ -179,6 +300,9 @@ fn load_archive(archive string) !Recipe {
 				if chunk.offset != offset || chunk.size == 0 || chunk.size > chunk_size
 					|| offset > e.tar_size || chunk.size > e.tar_size - offset
 					|| chunk.hash.len != 64 || chunk.base_size > chunk_size
+					|| chunk.base_offset > u64(0x7fffffffffffffff)
+					|| (r.version == 1 && chunk.base_offset != 0)
+					|| (chunk.base_size == 0 && chunk.base_offset != 0)
 					|| (chunk.base_size > 0 && chunk.base_hash.len != 64)
 					|| (chunk.base_size == 0 && chunk.base_hash != '')
 					|| !safe(chunk.payload) || !chunk.payload.starts_with('payload/') {
@@ -288,26 +412,20 @@ fn create(source string, prior string, archive string, zstd string, work string)
 			input = work + '/current.tar'
 			tar_size = os.file_size(input)
 			tar_hash = digest(input)!
-			prior_size := os.file_size(work + '/prior.tar')
-			mut offset := u64(0)
-			for offset < tar_size {
-				size := if tar_size - offset < chunk_size { tar_size - offset } else { chunk_size }
-				base_size := if offset >= prior_size { u64(0) }
-					else if prior_size - offset < chunk_size { prior_size - offset } else { chunk_size }
-				copy_range(input, work + '/current.chunk', offset, size)!
+			for range in chunk_ranges(input, work + '/prior.tar')! {
+				copy_range(input, work + '/current.chunk', range.offset, range.size)!
 				mut patch_args := [zstd, '-q', '-3', '--long=31']
 				mut chunk_base_hash := ''
-				if base_size > 0 {
-					copy_range(work + '/prior.tar', work + '/prior.chunk', offset, base_size)!
+				if range.base_size > 0 {
+					copy_range(work + '/prior.tar', work + '/prior.chunk', range.base_offset, range.base_size)!
 					chunk_base_hash = digest(work + '/prior.chunk')!
 					patch_args << '--patch-from=' + work + '/prior.chunk'
 				}
 				chunk_payload := 'payload/' + index.str() + '-' + chunks.len.str() + '.zst'
 				patch_args << [work + '/current.chunk', '-o', archive + '/' + chunk_payload]
 				run(patch_args)!
-				chunks << Chunk{offset: offset, size: size, hash: digest(work + '/current.chunk')!,
-					base_size: base_size, base_hash: chunk_base_hash, payload: chunk_payload}
-				offset += size
+				chunks << Chunk{...range, hash: digest(work + '/current.chunk')!,
+					base_hash: chunk_base_hash, payload: chunk_payload}
 			}
 			payload = ''
 		}
@@ -359,7 +477,7 @@ fn restore_entry(r Recipe, archive string, target string, work string, e Entry, 
 			decode_gzip(archive + '/tools/gzip', base_path, work + '/prior.tar')!
 			base_path = work + '/prior.tar'
 			output = work + '/current.tar'
-			restore_chunks(archive, work, e)!
+			restore_chunks(r.version, archive, work, e)!
 		} else {
 			mut args := [archive + '/tools/zstd', '-q', '-d', '--memory=2048MB']
 			if e.storage == 'bundle-patch' { args << '--patch-from=' + base_path }
@@ -384,13 +502,14 @@ fn restore_entry(r Recipe, archive string, target string, work string, e Entry, 
 	pending.delete(e.path)
 }
 
-fn restore_chunks(archive string, work string, e Entry) ! {
+fn restore_chunks(version int, archive string, work string, e Entry) ! {
 	mut output := os.create(work + '/current.tar')!
 	defer { output.close() }
 	for chunk in e.chunks {
 		mut args := [archive + '/tools/zstd', '-q', '-d', '-f', '--memory=2048MB']
 		if chunk.base_size > 0 {
-			copy_range(work + '/prior.tar', work + '/prior.chunk', chunk.offset, chunk.base_size)!
+			base_offset := if version == 1 { chunk.offset } else { chunk.base_offset }
+			copy_range(work + '/prior.tar', work + '/prior.chunk', base_offset, chunk.base_size)!
 			if digest(work + '/prior.chunk')! != chunk.base_hash { return error('changed prior tar chunk') }
 			args << '--patch-from=' + work + '/prior.chunk'
 		}
@@ -436,6 +555,64 @@ fn reseal(archive string, r Recipe) ! {
 	os.write_file(archive + '/archive.sha256', manifest(archive)!)!
 }
 
+fn alignment_selftest(root string, zstd string) ! {
+	prior := root + '/aligned-prior'
+	source := root + '/aligned-source'
+	archive := root + '/aligned-archive'
+	work := root + '/aligned-work'
+	large_name := 'large-' + 'a'.repeat(150)
+	// Incompressible shared content spans two codec chunks and has a GNU long
+	// name. Reorder it and shift both its header and data in the current tar.
+	mut raw := []u8{len: int(chunk_size) + 513}
+	mut random := u64(0x8bd27e145a936fc1)
+	for i in 0 .. raw.len {
+		random ^= random << 13
+		random ^= random >> 7
+		random ^= random << 17
+		raw[i] = u8(random >> 32)
+	}
+	for base in [prior, source] {
+		os.mkdir_all(base + '/probe-no-ads-aligned')!
+		os.mkdir_all(base + '/inputs')!
+		os.write_file(base + '/manifest.sha256', 'aligned synthetic fixture\n')!
+		os.write_file(base + '/probe-no-ads-state.txt', base + '/probe-no-ads-aligned\n')!
+		os.write_file_array(base + '/inputs/' + large_name, raw)!
+		os.write_file(base + '/inputs/prefix', if base == prior { 'old' } else { 'changed'.repeat(2000) })!
+		os.write_file_array(base + '/inputs/tail', raw[..2 * 1024 * 1024])!
+		members := if base == prior { ['prefix', large_name, 'tail'] } else { ['tail', 'prefix', large_name] }
+		mut tar_args := ['/usr/bin/tar', '--format=gnutar', '-cf', base + '/probe-no-ads-aligned/initramfs.tar',
+			'-C', base + '/inputs']
+		tar_args << members
+		run(tar_args)!
+		os.rmdir_all(base + '/inputs')!
+		run(['/usr/bin/gzip', '-9', '-n', base + '/probe-no-ads-aligned/initramfs.tar'])!
+	}
+	create(source, prior, archive, zstd, work)!
+	r := load_archive(archive)!
+	e := r.entries.filter(it.storage == 'gzip-prior-patch')[0]
+	if r.version != 2 || e.chunks.filter(it.base_size > 0 && it.base_offset != it.offset).len < 3 {
+		return error('moved multi-chunk tar members not aligned')
+	}
+	mut payload_bytes := u64(0)
+	for chunk in e.chunks { payload_bytes += os.file_size(archive + '/' + chunk.payload) }
+	if payload_bytes >= 1024 * 1024 { return error('aligned shared random data was stored literally') }
+	restore(archive, root + '/aligned-restored', work)!
+	for base_offset in [u64(0x8000000000000000), u64(0x7fffffffffffffff), u64(1)] {
+		mut chunks := e.chunks.clone()
+		index := chunks.index(chunks.filter(it.base_size > 0 && it.base_offset != it.offset)[0])
+		chunks[index] = Chunk{...chunks[index], base_offset: base_offset}
+		mut entries := r.entries.clone()
+		for i, entry in entries { if entry.path == e.path { entries[i] = Entry{...entry, chunks: chunks} } }
+		reseal(archive, Recipe{...r, entries: entries})!
+		if base_offset > u64(0x7fffffffffffffff) { reject_load(archive)! }
+		else { reject_restore(archive, root + '/bad-aligned-' + base_offset.str(), work)! }
+	}
+	reseal(archive, r)!
+	load_archive(archive)!
+	compare(r, root + '/aligned-restored')!
+	println('Selftest: shifted/reordered GNU long-name tar members, shared random data across multiple chunks, exact restoration and three invalid reference offsets: PASS')
+}
+
 fn selftest(root string, zstd string) ! {
 	if os.exists(root) || os.is_link(root) { return error('selftest requires a fresh directory') }
 	source := root + '/source'
@@ -473,6 +650,21 @@ fn selftest(root string, zstd string) ! {
 	restore(archive, target, work)!
 	compare(r, target)!
 	println('Selftest: four storage modes, multiple chunks, exact gzip, modes, empty directory and complete inventory: PASS')
+	// Version 1 recipes had no base_offset field and used each output offset.
+	mut legacy_entries := r.entries.clone()
+	for i, e in legacy_entries {
+		if e.storage == 'gzip-prior-patch' {
+			mut chunks := []Chunk{}
+			for chunk in e.chunks { chunks << Chunk{...chunk, base_offset: 0} }
+			legacy_entries[i] = Entry{...e, chunks: chunks}
+		}
+	}
+	legacy := Recipe{...r, version: 1, entries: legacy_entries}
+	reseal(archive, legacy)!
+	restore(archive, root + '/legacy-restored', work)!
+	compare(legacy, root + '/legacy-restored')!
+	reseal(archive, r)!
+	println('Selftest: version 1 fixed-offset recipe restoration: PASS')
 
 	// Corruption without resealing must fail inventory validation.
 	payload := archive + '/' + r.entries.filter(it.storage == 'literal')[0].payload
@@ -550,6 +742,7 @@ fn selftest(root string, zstd string) ! {
 	os.chmod(target, 0o750)!
 	compare(r, target)!
 	println('Selftest: 22 negative controls rejected; final complete inventory: PASS')
+	alignment_selftest(root, zstd)!
 }
 
 fn main() {
