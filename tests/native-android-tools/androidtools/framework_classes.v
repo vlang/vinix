@@ -92,6 +92,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_work_source(smali)!
  framework_package_enumeration(smali)!
  framework_service_queries(smali)!
+ framework_direct_boot(smali)!
  framework_vibrator(smali)!
  framework_media_router(smali)!
  framework_media_codec_exceptions(smali)!

@@ -25,6 +25,8 @@ const descriptions_manifest = 'd898fdcca66df0c32b9863dca99c7185d10f8e3b3fb5ab770
 const descriptions_jar = '71d05c6e6288978de66a5c71279e8cb27d92c9166950813ddbf0c33ff86e1d0d'
 const protected_storage_manifest = '67e1cb450fa87305c99480133084b7f9cb684feeeaa2e0c3efa3007ab43ee938'
 const protected_storage_jar = 'a8ba34eb79be2473f89042c8ee940ab1994dbc902c3d45143877f8891d3b428b'
+const service_query_manifest = '12f21e139e2602fa9517c6df7d2fda866d366d4d5f0cce6d7e07d62bbd044559'
+const service_query_jar = '74892a013cb72fdaef39852325a3fa46db217fbcd3a4f11fcba4cc7272b2a50b'
 const java = '/opt/homebrew/opt/openjdk@25/bin/java'
 const tools = repo + '/build/android-framework/tools'
 const source_file = repo + '/tests/native-android-ws/combined-account-webview-build.v'
@@ -188,6 +190,31 @@ fn service_query_profile() NarrowProfile {
   methods: {'android/content/pm/PackageManager.smali': ['queryIntentServices(Landroid/content/Intent;I)Ljava/util/List;']}
   changed: {'android/content/pm/PackageManager.smali': 1}
   added: {'android/content/pm/PackageManager.smali': 0}
+ }
+}
+
+fn direct_boot_profile() NarrowProfile {
+ return NarrowProfile{
+  name: 'direct-boot'
+  baseline_name: 'combined-account-webview-service-query-framework-2026-10-27-r1'
+  manifest_pin: service_query_manifest
+  jar_pin: service_query_jar
+  baseline_classes: 2104
+  providers: ['framework_direct_boot.v']
+  calls: {'android/content/pm/ComponentInfo.smali': 'framework_component_direct_boot',
+   'android/content/pm/PackageParser.smali': 'framework_parser_direct_boot'}
+  methods: {
+   'android/content/pm/ComponentInfo.smali': ['<init>(Landroid/content/pm/ComponentInfo;)V']
+   'android/content/pm/PackageParser.smali': [
+    'parseActivity(Landroid/content/pm/PackageParser$Package;Landroid/content/res/Resources;Lorg/xmlpull/v1/XmlPullParser;Landroid/util/AttributeSet;I[Ljava/lang/String;ZZ)Landroid/content/pm/PackageParser$Activity;',
+    'parseService(Landroid/content/pm/PackageParser$Package;Landroid/content/res/Resources;Lorg/xmlpull/v1/XmlPullParser;Landroid/util/AttributeSet;I[Ljava/lang/String;)Landroid/content/pm/PackageParser$Service;',
+    'parseProvider(Landroid/content/pm/PackageParser$Package;Landroid/content/res/Resources;Lorg/xmlpull/v1/XmlPullParser;Landroid/util/AttributeSet;I[Ljava/lang/String;)Landroid/content/pm/PackageParser$Provider;',
+    'parseActivityAlias(Landroid/content/pm/PackageParser$Package;Landroid/content/res/Resources;Lorg/xmlpull/v1/XmlPullParser;Landroid/util/AttributeSet;I[Ljava/lang/String;)Landroid/content/pm/PackageParser$Activity;',
+    'vinixParseDirectBoot(Landroid/content/res/Resources;Landroid/util/AttributeSet;Landroid/content/pm/ComponentInfo;)V']
+  }
+  changed: {'android/content/pm/ComponentInfo.smali': 1, 'android/content/pm/PackageParser.smali': 4}
+  added: {'android/content/pm/ComponentInfo.smali': 0, 'android/content/pm/PackageParser.smali': 1}
+  fields: {'android/content/pm/ComponentInfo.smali': ['.field public directBootAware:Z']}
  }
 }
 
@@ -516,6 +543,20 @@ fn self_test() ! {
  protected_storage_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
+ boot_profile := direct_boot_profile()
+ narrow_method_self_test(boot_profile.methods['android/content/pm/ComponentInfo.smali']!, 1, 0)!
+ narrow_method_self_test(boot_profile.methods['android/content/pm/PackageParser.smali']!, 4, 1)!
+ boot_metadata := '.class public LExample;\n.super Ljava/lang/Object;\n'
+ boot_fields := boot_profile.fields['android/content/pm/ComponentInfo.smali']!
+ boot_extended := boot_metadata + boot_fields[0] + '\n'
+ narrow_member_delta(boot_metadata, boot_extended, []string{}, 0, 0, boot_fields)!
+ for bad in [boot_metadata, boot_extended + boot_fields[0] + '\n',
+  boot_extended.replace('directBootAware:Z', 'directBootAware:I'),
+  boot_extended.replace('.field public ', '.field private '),
+  boot_extended + '.field public extra:I\n'] {
+  narrow_member_delta(boot_metadata, bad, []string{}, 0, 0, boot_fields) or { continue }
+  return error('invalid direct boot field metadata accepted')
+ }
  mut old := map[string]string{}
  for name in changes { old[name] = 'old' }
  for i in 0 .. 2098 - changes.len { old['other/' + i.str() + '.smali'] = 'old' }
@@ -966,11 +1007,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query'] {
-  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } else { service_query_profile() } }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot'] {
+  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } else { direct_boot_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }

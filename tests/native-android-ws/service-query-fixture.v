@@ -10,7 +10,7 @@ const owner = 'Lorg/vinix/servicequery/Main;'
 const context = 'Landroid/content/Context;'
 const client = 'org.vinix.servicequery.client'
 const disabled = 'org.vinix.servicequery.disabled'
-const marker = 'SERVICE-QUERY-PASS no-filter disabled-component disabled-application unexported multifilter-single missing-no-action-fallback component-package wrapper implicit-preserved metadata-preserved no-initialization'
+const marker = 'SERVICE-QUERY-PASS no-filter disabled-component disabled-application unexported multifilter-single missing-no-action-fallback component-package wrapper implicit-preserved metadata-preserved no-initialization direct-boot-metadata'
 
 fn method(signature string, locals int, body string) string {
 	return '.method ${signature}\n.locals ${locals}\n${body}\n.end method\n'
@@ -53,11 +53,28 @@ if-eqz v2, :bad
 const-string v2, "org.vinix.servicequery.Disabled"
 invoke-virtual {p2, v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 move-result v2
-if-eqz v2, :app_metadata
+if-eqz v2, :boot_metadata
 iget-boolean v2, v1, Landroid/content/pm/ComponentInfo;->enabled:Z
 if-nez v2, :bad
-iget-boolean v2, v1, Landroid/content/pm/ComponentInfo;->directBootAware:Z
-if-nez v2, :bad
+:boot_metadata
+const/4 v3, 0
+const-string v2, "org.vinix.servicequery.BootAware"
+invoke-virtual {p2, v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v2
+if-nez v2, :boot_true
+const-string v2, "org.vinix.servicequery.BootResource"
+invoke-virtual {p2, v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v2
+if-eqz v2, :boot_compare
+:boot_true
+const/4 v3, 1
+:boot_compare
+iget-boolean v2, v1, Landroid/content/pm/ServiceInfo;->directBootAware:Z
+if-ne v2, v3, :bad
+new-instance v4, Landroid/content/pm/ServiceInfo;
+invoke-direct {v4, v1}, Landroid/content/pm/ServiceInfo;-><init>(Landroid/content/pm/ServiceInfo;)V
+iget-boolean v2, v4, Landroid/content/pm/ServiceInfo;->directBootAware:Z
+if-ne v2, v3, :bad
 :app_metadata
 const-string v2, "org.vinix.servicequery.disabled"
 invoke-virtual {p1, v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
@@ -107,11 +124,69 @@ fn query(package_name string, class_name string, flags int, count int) string {
 	return 'const-string v1, "${package_name}"\nconst-string v2, "org.vinix.servicequery.${class_name}"\nconst v3, ${flags}\nconst/4 v4, ${count}\ninvoke-static {v0, v1, v2, v3, v4}, ${owner}->check(${context}Ljava/lang/String;Ljava/lang/String;II)V\n'
 }
 
+fn component_array_check() string {
+ return method('private static component([Landroid/content/pm/ComponentInfo;Ljava/lang/String;Z)V', 5, '
+if-eqz p0, :bad
+const/4 v0, 0
+array-length v1, p0
+:scan
+if-ge v0, v1, :bad
+aget-object v2, p0, v0
+iget-object v3, v2, Landroid/content/pm/PackageItemInfo;->name:Ljava/lang/String;
+invoke-virtual {p1, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v3
+if-nez v3, :found
+add-int/lit8 v0, v0, 1
+goto :scan
+:found
+iget-boolean v3, v2, Landroid/content/pm/ComponentInfo;->directBootAware:Z
+if-ne v3, p2, :bad
+new-instance v4, Landroid/content/pm/ComponentInfo;
+invoke-direct {v4, v2}, Landroid/content/pm/ComponentInfo;-><init>(Landroid/content/pm/ComponentInfo;)V
+iget-boolean v3, v4, Landroid/content/pm/ComponentInfo;->directBootAware:Z
+if-ne v3, p2, :bad
+return-void
+' + failure('component direct boot metadata or copy'))
+}
+
+fn metadata_check() string {
+ mut body := '
+new-instance v0, Landroid/content/pm/ComponentInfo;
+invoke-direct {v0}, Landroid/content/pm/ComponentInfo;-><init>()V
+iget-boolean v1, v0, Landroid/content/pm/ComponentInfo;->directBootAware:Z
+if-nez v1, :bad
+const/4 v1, 1
+iput-boolean v1, v0, Landroid/content/pm/ComponentInfo;->directBootAware:Z
+new-instance v2, Landroid/content/pm/ComponentInfo;
+invoke-direct {v2, v0}, Landroid/content/pm/ComponentInfo;-><init>(Landroid/content/pm/ComponentInfo;)V
+iget-boolean v1, v2, Landroid/content/pm/ComponentInfo;->directBootAware:Z
+if-eqz v1, :bad
+invoke-virtual {p0}, ${context}->getPackageManager()Landroid/content/pm/PackageManager;
+move-result-object v0
+const-string v1, "${disabled}"
+const v2, 0x20b
+invoke-virtual {v0, v1, v2}, Landroid/content/pm/PackageManager;->getPackageInfo(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;
+move-result-object v0
+if-eqz v0, :bad
+'
+ for spec in [['activities', 'ActivityInfo', 'BootActivity', '1'], ['activities', 'ActivityInfo', 'BootAlias', '1'],
+  ['activities', 'ActivityInfo', 'DefaultActivity', '0'], ['receivers', 'ActivityInfo', 'BootReceiver', '1'],
+  ['receivers', 'ActivityInfo', 'DefaultReceiver', '0'], ['providers', 'ProviderInfo', 'BootProvider', '1'],
+  ['providers', 'ProviderInfo', 'DefaultProvider', '0']] {
+  body += 'iget-object v1, v0, Landroid/content/pm/PackageInfo;->' + spec[0] + ':[Landroid/content/pm/' + spec[1] + ';\n' +
+   'const-string v2, "org.vinix.servicequery.' + spec[2] + '"\nconst/4 v3, ' + spec[3] + '\n' +
+   'invoke-static {v1, v2, v3}, ${owner}->component([Landroid/content/pm/ComponentInfo;Ljava/lang/String;Z)V\n'
+ }
+ return method('private static metadata(${context})V', 4, body + 'return-void\n' + failure('ComponentInfo default/copy or companion metadata'))
+}
+
 fn main_class() string {
 	mut source := '.class public ${owner}\n.super Landroid/app/Activity;\n'
 	source += method('public constructor <init>()V', 0, 'invoke-direct {p0}, Landroid/app/Activity;-><init>()V\nreturn-void')
 	source += query_check()
 	source += implicit_check()
+	source += component_array_check()
+	source += metadata_check()
 	mut body := 'invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V\nmove-object v0, p0\n'
 	for wrapped in [false, true] {
 		if wrapped {
@@ -121,11 +196,13 @@ fn main_class() string {
 		body += query(client, 'Disabled', 0, 0)
 		body += query(client, 'Disabled', 0x10000200, 1)
 		body += query(client, 'Multi', 0, 1)
+		for name in ['BootAware', 'BootResource', 'BootFalse'] { body += query(client, name, 0, 1) }
 		body += query(client, 'Missing', 0, 0)
 		body += query('org.vinix.servicequery.absent', 'Multi', 0x200, 0)
 		body += query(disabled, 'Enabled', 0, 0)
 		body += query(disabled, 'Enabled', 0x200, 1)
 		body += 'invoke-static {v0}, ${owner}->implicit(${context})V\n'
+		body += 'invoke-static {v0}, ${owner}->metadata(${context})V\n'
 	}
 	body += 'sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v1, "${marker}"\ninvoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\ninvoke-virtual {v0}, Ljava/io/PrintStream;->flush()V\nnew-instance v0, Landroid/widget/TextView;\ninvoke-direct {v0, p0}, Landroid/widget/TextView;-><init>(${context})V\nconst-string v1, "Explicit service metadata query passed"\ninvoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V\ninvoke-virtual {p0, v0}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V\nreturn-void'
 	return source + method('public onCreate(Landroid/os/Bundle;)V', 5, body)
@@ -142,7 +219,14 @@ fn manifest(name string) string {
 	if name == 'client' {
 		components += '<service android:name="org.vinix.servicequery.Disabled" android:enabled="false" android:exported="false" android:directBootAware="false"/>'
 		components += '<service android:name="org.vinix.servicequery.Multi" android:exported="true"><intent-filter><action android:name="org.vinix.servicequery.ACTION"/></intent-filter><intent-filter><action android:name="org.vinix.servicequery.ACTION"/></intent-filter></service>'
+		components += '<service android:name="org.vinix.servicequery.BootAware" android:exported="false" android:directBootAware="true"/><service android:name="org.vinix.servicequery.BootResource" android:exported="false" android:directBootAware="@bool/direct_boot_true"/><service android:name="org.vinix.servicequery.BootFalse" android:exported="false" android:directBootAware="@bool/direct_boot_false"/>'
 		components += '<activity android:name="org.vinix.servicequery.Main" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>'
+	} else {
+		// The disabled companion is parsed for metadata only. Its Application
+		// constructor traps any accidental startup while resolving these entries.
+		components += '<activity android:name="org.vinix.servicequery.BootActivity" android:directBootAware="true"/><activity-alias android:name="org.vinix.servicequery.BootAlias" android:targetActivity="org.vinix.servicequery.BootActivity"/><activity android:name="org.vinix.servicequery.DefaultActivity"/>'
+		components += '<receiver android:name="org.vinix.servicequery.BootReceiver" android:directBootAware="@bool/direct_boot_true"/><receiver android:name="org.vinix.servicequery.DefaultReceiver"/>'
+		components += '<provider android:name="org.vinix.servicequery.BootProvider" android:authorities="org.vinix.servicequery.boot" android:directBootAware="true"/><provider android:name="org.vinix.servicequery.DefaultProvider" android:authorities="org.vinix.servicequery.default"/>'
 	}
 	app := if name == 'client' { '' } else { ' android:enabled="false" android:name="org.vinix.servicequery.TrapApp"' }
 	return '<?xml version="1.0"?><manifest xmlns:android="http://schemas.android.com/apk/res/android" package="${package_name}" android:versionCode="1"><uses-sdk android:minSdkVersion="29" android:targetSdkVersion="29"/><application android:label="Service query ${name}"${app}>${components}</application></manifest>'
@@ -188,10 +272,10 @@ fn main() {
 		smali := dir + '/smali/org/vinix/servicequery'
 		os.mkdir_all(smali)!
 		os.mkdir_all(dir + '/res/values')!
-		os.write_file(dir + '/res/values/values.xml', '<resources><string name="probe">Service query</string></resources>')!
+		os.write_file(dir + '/res/values/values.xml', '<resources><string name="probe">Service query</string><bool name="direct_boot_true">true</bool><bool name="direct_boot_false">false</bool></resources>')!
 		os.write_file(dir + '/AndroidManifest.xml', manifest(name))!
 		if name == 'client' { os.write_file(smali + '/Main.smali', main_class())! } else { os.write_file(smali + '/TrapApp.smali', trap_class('TrapApp', 'Application'))! }
-		for service in if name == 'client' { ['Enabled', 'Disabled', 'Multi'] } else { ['Enabled'] } { os.write_file(smali + '/' + service + '.smali', trap_class(service, 'Service'))! }
+		for service in if name == 'client' { ['Enabled', 'Disabled', 'Multi', 'BootAware', 'BootResource', 'BootFalse'] } else { ['Enabled'] } { os.write_file(smali + '/' + service + '.smali', trap_class(service, 'Service'))! }
 		recorded(out, name + '-compile', [aapt, 'compile', '--dir', dir + '/res', '-o', dir + '/resources.zip'])
 		recorded(out, name + '-link', [aapt, 'link', '-I', resources, dir + '/resources.zip', '--manifest', dir + '/AndroidManifest.xml', '-o', dir + '/unsigned.apk'])
 		recorded(out, name + '-manifest', [aapt, 'dump', 'xmltree', dir + '/unsigned.apk', '--file', 'AndroidManifest.xml'])
