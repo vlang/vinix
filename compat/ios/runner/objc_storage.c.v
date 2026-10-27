@@ -187,6 +187,7 @@ fn objc_destruct_instance(object u64) u64 {
 
 fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	if header.destroyed || header.destroying { return }
+	notification_retire(object, mut header)
 	achievement_retire(header)
 	app_attest_retire(object)
 	audio_application_retire(object)

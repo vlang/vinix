@@ -282,6 +282,7 @@ fn objc_responds(object u64, selector &char) bool {
 		}
 	}
 	if name == 'nextResponder' && objc_is_kind(object, ios_runtime.names['UIResponder']) { return true }
+	if name == 'addObserverForName:object:queue:usingBlock:' && objc_is_kind(object, ios_runtime.names['NSNotificationCenter']) { return true }
 	if objc_is_kind(object, ios_runtime.names['NSNumber']) {
 		return name in ['boolValue', 'integerValue', 'unsignedIntegerValue', 'intValue', 'doubleValue', 'stringValue', 'objCType']
 	}

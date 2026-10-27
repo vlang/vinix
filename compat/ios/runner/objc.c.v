@@ -82,6 +82,7 @@ mut:
 	target      u64 // UIControl targets are non-owning.
 	action      u64
 	fields      [9]u64
+	notification_block u64 // Owned capture of an opaque block-observer token.
 	children    [64]u64
 	child_count int
 	items       []u64
@@ -605,7 +606,7 @@ fn objc_start() {
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
         'UIScreenEdgePanGestureRecognizer', 'UIFeedbackGenerator', 'UINotificationFeedbackGenerator', 'UISelectionFeedbackGenerator', 'UIImpactFeedbackGenerator', 'CADisplayLink',
-		'UIAccessibilityElement',
+		'UIAccessibilityElement', 'VinixNotificationObserver',
         'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',
         'AVAsset', 'AVURLAsset', 'AVPlayer', 'AVPlayerItem', 'AVPlayerItemOutput', 'AVPlayerItemLegibleOutput', 'AVPlayerItemVideoOutput',
         'SKPaymentQueue', 'SKPayment', 'SKMutablePayment', 'SKRequest', 'SKReceiptRefreshRequest', 'SKProductsRequest',
