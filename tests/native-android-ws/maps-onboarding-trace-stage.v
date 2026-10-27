@@ -76,11 +76,13 @@ fn copy_file(source string, destination string, mode u32) ! {
 	os.cp(source, destination)!
 	os.chmod(destination, int(mode))!
 }
-fn disk_budget(start u64, available u64) ! {
-	if start < disk_reserve_bytes + disk_growth_limit_bytes || available < disk_reserve_bytes
-		|| (available < start && start - available > disk_growth_limit_bytes) {
+fn disk_budget(start u64, available u64, charged u64) !u64 {
+	drop := if available < start { start - available } else { u64(0) }
+	if available < disk_reserve_bytes || charged > disk_growth_limit_bytes
+		|| drop > disk_growth_limit_bytes - charged {
 		return error('preparation disk budget exceeded: 1 GiB reserve and 512 MiB growth limit required')
 	}
+	return charged + drop
 }
 fn disk_blocks(value string) !u64 {
 	if value == '' || value.len > 17 { return error('invalid df block count') }
@@ -140,11 +142,22 @@ fn disk_available(path string) !u64 {
 	if child.code != 0 || stderr != '' { return error('df failed: ' + stderr) }
 	return parse_disk_available(stdout)
 }
-fn disk_sample(root string, label string, start u64, mut samples map[string]u64) ! {
+struct DiskBudget {
+mut:
+	available u64
+	charged u64
+}
+fn disk_update(available u64, writing bool, mut budget DiskBudget) ! {
+	budget.charged = disk_budget(if writing { budget.available } else { available }, available, budget.charged)!
+	budget.available = available
+}
+fn disk_sample(root string, label string, writing bool, mut budget DiskBudget, mut samples map[string]u64) ! {
 	available := disk_available(os.dir(root))!
 	samples[label] = available
-	println('MAPS-ONBOARDING-TRACE disk ' + label + ' available_bytes=' + available.str())
-	disk_budget(start, available)!
+	// Only these explicitly read-only audits may refresh the volume baseline.
+	// Drops during writable phases stay cumulatively charged, including other writers.
+	disk_update(available, writing, mut budget)!
+	println('MAPS-ONBOARDING-TRACE disk ' + label + ' available_bytes=' + available.str() + ' charged_growth_bytes=' + budget.charged.str())
 }
 fn exact_profile(base string, manifest string, executable string) ! {
 	if base != base_seal || manifest != controller_seal || executable != controller_pin
@@ -276,7 +289,8 @@ fn run(destination string) ! {
 	root := stage.external(destination)!
 	stage.disjoint(root, [base_root, controller_root, os.getwd()])!
 	disk_start := disk_available(os.dir(root))!
-	disk_budget(disk_start, disk_start)!
+	if disk_start < disk_reserve_bytes + disk_growth_limit_bytes { return error('preparation requires 1.5 GiB initial free space') }
+	mut disk := DiskBudget{available: disk_start}
 	mut disk_samples := {'preflight': disk_start}
 	println('MAPS-ONBOARDING-TRACE auditing immutable inputs')
 	base_files := stage.load_inventory(base_root, base_seal)!
@@ -307,7 +321,7 @@ fn run(destination string) ! {
 	stage.verify_static_controller(controller, 'vinix-maps-account-guest-build-v1', 'maps-account-guest')!
 	if controller.files['bin/maps-account-guest']! != controller_pin { return error('new executable differs') }
 	inputs[controller_root + '/sha256.json'] = controller_seal
-	disk_sample(root, 'inputs-audited', disk_start, mut disk_samples)!
+	disk_sample(root, 'inputs-audited', false, mut disk, mut disk_samples)!
 	os.mkdir(root, mode: 0o755)!
 	os.mkdir(root + '/commands', mode: 0o755)!
 	for path, source in retained {
@@ -331,7 +345,7 @@ fn run(destination string) ! {
 		inputs[root + '/tools/' + name] = inputs[source]!
 	}
 	os.setenv('PATH', root + '/tools:' + os.getenv('PATH'), true)
-	disk_sample(root, 'retained-source-tools', disk_start, mut disk_samples)!
+	disk_sample(root, 'retained-source-tools', true, mut disk, mut disk_samples)!
 	original := os.read_file(base_root + '/limine-after.conf')!
 	config := stage.configure(original, overlay)!
 	mut before := json2.decode[map[string]string](json2.encode(base['preserved_modules_sha256']!))!
@@ -371,23 +385,23 @@ fn run(destination string) ! {
 	write_json(root + '/original-inode-modes.json', as_json(modes)!)!
 	os.write_file(root + '/limine-before.conf', original)!
 	os.write_file(root + '/limine-after.conf', config.updated)!
-	disk_sample(root, 'payload', disk_start, mut disk_samples)!
+	disk_sample(root, 'payload', true, mut disk, mut disk_samples)!
 	println('MAPS-ONBOARDING-TRACE cloning media and appending three files')
 	for name in ['boot.img', 'efivars.fd'] {
 		if C.clonefile((base_root + '/' + name).str, (root + '/' + name).str, 0) != 0
 			|| stage.hash(root + '/' + name)! != base_files[name]! { return error('fresh APFS media clone differs') }
-		disk_sample(root, 'clone-' + name, disk_start, mut disk_samples)!
+		disk_sample(root, 'clone-' + name, true, mut disk, mut disk_samples)!
 	}
 	stage.command_expected(root, 'overlay-absent', [root + '/tools/mdir', '-i', root + '/boot.img', '::/boot/' + overlay], 1)!
 	mut sources := map[string]string{}
 	for entry in entries.filter(it.kind == 'regular') { sources[entry.name] = root + '/payload/' + entry.name }
 	stage.write_overlay(root + '/' + overlay, sources, entries)!
 	stage.verify_overlay(root + '/' + overlay, entries)!
-	disk_sample(root, 'overlay', disk_start, mut disk_samples)!
+	disk_sample(root, 'overlay', true, mut disk, mut disk_samples)!
 	stage.command(root, 'install-overlay', [root + '/tools/mcopy', '-i', root + '/boot.img', root + '/' + overlay, '::/boot/' + overlay])!
-	disk_sample(root, 'install-overlay', disk_start, mut disk_samples)!
+	disk_sample(root, 'install-overlay', true, mut disk, mut disk_samples)!
 	stage.command(root, 'install-limine', [root + '/tools/mcopy', '-o', '-i', root + '/boot.img', root + '/limine-after.conf', '::/boot/limine.conf'])!
-	disk_sample(root, 'install-limine', disk_start, mut disk_samples)!
+	disk_sample(root, 'install-limine', true, mut disk, mut disk_samples)!
 	if stage.command(root, 'readback-limine', [root + '/tools/mtype', '-i', root + '/boot.img', '::/boot/limine.conf'])! != config.updated
 		|| stage.module_hash(root, 'readback-overlay', root + '/boot.img', overlay)! != stage.hash(root + '/' + overlay)! {
 		return error('diagnostic media readback differs')
@@ -397,13 +411,14 @@ fn run(destination string) ! {
 		after[name] = stage.module_hash(root, 'preserved-' + name, root + '/boot.img', name)!
 		if after[name] != before[name] { return error('existing module changed') }
 	}
+	disk_sample(root, 'media-readback', true, mut disk, mut disk_samples)!
 	println('MAPS-ONBOARDING-TRACE rechecking complete inputs')
 	for path, pin in deps { stage.load_inventory(path, pin)! }
 	stage.recheck(controller)!
 	if stage.load_inventory(base_root, base_seal)! != base_files { return error('immutable broadcast-result stage changed') }
 	for path, pin in inputs { if stage.hash(path)! != pin { return error('source/tool changed: ' + path) } }
 	if payload_inventory(root + '/payload')! != entries { return error('payload changed') }
-	disk_sample(root, 'complete-recheck', disk_start, mut disk_samples)!
+	disk_sample(root, 'complete-recheck', false, mut disk, mut disk_samples)!
 	write_json(root + '/stage.json', {
 		'kind': json2.Any('vinix-maps-onboarding-trace-diagnostic-v1'), 'format': json2.Any(1),
 		'scope': json2.Any('Credential-free opt-in onboarding trace controller only; broadcast-result framework/JNI and all original role receipts retained. No Google login proof.'),
@@ -420,12 +435,15 @@ fn run(destination string) ! {
 		'staged_boot_sha256': json2.Any(stage.hash(root + '/boot.img')!), 'staged_efivars_sha256': json2.Any(stage.hash(root + '/efivars.fd')!),
 		'guest_terminal_command': json2.Any('/opt/vinix-maps-account/bin/maps-account-guest --broker --trace-onboarding'),
 		'disk_reserve_bytes': as_json(disk_reserve_bytes)!, 'disk_growth_limit_bytes': as_json(disk_growth_limit_bytes)!,
+		'disk_growth_policy': json2.Any('Cumulative observed volume drops during writable phases; read-only initial and final complete-input audits refresh baseline with reserve enforced. No refunds.'),
+		'disk_charged_growth_bytes': as_json(disk.charged)!,
 		'disk_available_samples_bytes': as_json(disk_samples)!,
 		'disk_sample_argv': as_json(['/usr/bin/env', 'LC_ALL=C', '/bin/df', '-kP', os.dir(root)])!,
 	})!
 	mut files := map[string]string{}
 	collect(root, '', mut files)!
 	write_json(root + '/sha256.json', as_json(files)!)!
+	disk_sample(root, 'seal-complete', true, mut disk, mut disk_samples)!
 	println('MAPS-ONBOARDING-TRACE-STAGE PASS ' + root + ' seal=' + stage.hash(root + '/sha256.json')!)
 }
 fn self_test() ! {
@@ -441,12 +459,28 @@ fn self_test() ! {
 	}
 	if disk_blocks('18014398509481983')! != u64(0xffff_ffff_ffff_ffff) / 1024 { return error('df upper boundary rejected') }
 	disk_start := disk_reserve_bytes + disk_growth_limit_bytes + 32
-	disk_budget(disk_start, disk_start)!
-	disk_budget(disk_start, disk_start - disk_growth_limit_bytes)!
-	disk_budget(disk_start, disk_start + 32)!
-	for bad in [[disk_reserve_bytes, disk_reserve_bytes], [disk_start, disk_reserve_bytes - 1],
-		[disk_start, disk_start - disk_growth_limit_bytes - 1]] {
-		if _ := disk_budget(bad[0], bad[1]) { return error('disk reserve or growth violation accepted') }
+	assert disk_budget(disk_start, disk_start, 0)! == 0
+	assert disk_budget(disk_start, disk_start - disk_growth_limit_bytes, 0)! == disk_growth_limit_bytes
+	assert disk_budget(disk_start, disk_start + 32, 17)! == 17
+	assert disk_budget(disk_start, disk_start - 31, 17)! == 48
+	// Read-only volume drift rebases the available count, retaining all charged writes.
+	assert disk_budget(disk_reserve_bytes, disk_reserve_bytes, 48)! == 48
+	mut budget := DiskBudget{available: disk_start + 2 * disk_growth_limit_bytes}
+	disk_update(disk_start + disk_growth_limit_bytes / 2, false, mut budget)!
+	assert budget.charged == 0
+	disk_update(disk_start, true, mut budget)!
+	assert budget.charged == disk_growth_limit_bytes / 2
+	disk_update(disk_start + 32, false, mut budget)!
+	assert budget.charged == disk_growth_limit_bytes / 2
+	disk_update(disk_start + 32 - disk_growth_limit_bytes / 2, true, mut budget)!
+	assert budget.charged == disk_growth_limit_bytes
+	if _ := disk_update(budget.available - 1, true, mut budget) { return error('cumulative phase growth limit reset') }
+	if _ := disk_update(disk_reserve_bytes - 1, false, mut budget) { return error('read-only audit bypassed disk reserve') }
+	for bad in [[disk_start, disk_reserve_bytes - 1, u64(0)],
+		[disk_start, disk_start - disk_growth_limit_bytes - 1, u64(0)],
+		[disk_start, disk_start - 1, disk_growth_limit_bytes],
+		[disk_start, disk_start, disk_growth_limit_bytes + 1]] {
+		if _ := disk_budget(bad[0], bad[1], bad[2]) { return error('disk reserve or cumulative growth violation accepted') }
 	}
 	exact_profile(base_seal, controller_seal, controller_pin)!
 	for values in [[old_controller_seal, controller_pin], [controller_seal, old_controller_pin], [native_seal, controller_pin]] {

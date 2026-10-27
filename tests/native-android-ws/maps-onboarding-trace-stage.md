@@ -17,6 +17,14 @@ streaming media checks, a 1 GiB reserve and a 512 MiB disk-growth limit. The
 source closure, tool identities, command receipts and output checksums remain
 in the external stage bundle.
 
+Disk growth accumulates observed volume drops during writable phases without
+refunds. Only the initial and final complete-input audits refresh the available
+space baseline: these audits read immutable inputs and write no stage files.
+The 1 GiB reserve is enforced at both ends; preflight still requires 1.5 GiB.
+Other sessions' writes during writable phases remain conservatively charged.
+Command and module-hash receipts are writable phases. The final receipt and
+seal writes receive a final disk check printed to the external preparation log.
+
 Build and self-test one tool at a time with the pinned V compiler and Boehm GC:
 Record peak RSS and swaps with `/usr/bin/time -l`. Image preparation and kernel
 patching need an outer file-size limit of at least 16 GiB for the existing boot
