@@ -113,10 +113,11 @@ struct AppHostIdentity {
 }
 
 struct MapsLaunch {
-	kind     string = 'vinix-maps-account-launch-v1'
-	process  Identity
-	app_host AppHostIdentity
-	desktop  Identity
+	kind             string = 'vinix-maps-account-launch-v1'
+	process          Identity
+	app_host         AppHostIdentity
+	desktop          Identity
+	trace_onboarding bool
 }
 
 fn hash(path string) !string {
@@ -568,11 +569,12 @@ struct Build {
 }
 
 struct Session {
-	kind         string = 'vinix-maps-account-session-v1'
-	build_sha256 string
-	controller   Identity
-	broker       Identity
-	desktop      DesktopIdentity
+	kind             string = 'vinix-maps-account-session-v1'
+	build_sha256     string
+	controller       Identity
+	broker           Identity
+	desktop          DesktopIdentity
+	trace_onboarding bool
 }
 
 struct StopRequest {
@@ -709,8 +711,9 @@ fn browser_init_diagnostics(output string) AuthInitDiagnostics {
 }
 
 struct Receipt {
-	scope       string = 'Real Maps and Google Play Services transport diagnostics. No credentials supplied; broker readiness does not establish Google authentication.'
-	started_utc string
+	scope            string = 'Real Maps and Google Play Services transport diagnostics. No credentials supplied; broker readiness does not establish Google authentication.'
+	started_utc      string
+	trace_onboarding bool
 mut:
 	finished_utc      string
 	status            string = 'failed'
@@ -1220,6 +1223,38 @@ fn select_environment(build Build, principal string) ! {
 	}
 }
 
+// The desktop builds a closed native-client environment, so terminal exports
+// never reach its Maps child. Only the protected live broker session selects
+// these diagnostics; unrelated ambient values cannot enable them.
+fn select_maps_diagnostics(session Session) {
+	for key in ['VINIX_ANDROID_TRACE_TREE', 'VINIX_ANDROID_TRACE_THREADS'] {
+		if session.trace_onboarding {
+			os.setenv(key, '1', true)
+		} else {
+			os.unsetenv(key)
+		}
+	}
+}
+
+fn broker_trace_onboarding(args []string) !bool {
+	mut broker := false
+	mut trace := false
+	for argument in args {
+		match argument {
+			'--broker' {
+				if broker { return error('duplicate broker option') }
+				broker = true
+			}
+			'--trace-onboarding' {
+				if trace { return error('duplicate onboarding trace option') }
+				trace = true
+			}
+			else { return error('unsupported broker option: ' + argument) }
+		}
+	}
+	return trace
+}
+
 fn private_result_root() ! {
 	protected(bundle_root, 0, false, .directory)!
 	make_root_directory(result_root, 0o700)!
@@ -1531,10 +1566,11 @@ fn broker_session(mut receipt Receipt) ! {
 				return error('desktop identity changed before service readiness')
 			}
 			session := Session{
-				build_sha256: receipt.build_sha256
-				controller:   identity(os.getpid())!
-				broker:       receipt.broker
-				desktop:      receipt.desktop
+				build_sha256:     receipt.build_sha256
+				controller:       identity(os.getpid())!
+				broker:           receipt.broker
+				desktop:          receipt.desktop
+				trace_onboarding: receipt.trace_onboarding
 			}
 			publish_fresh(broker_root + '/session.json', json2.encode(session) + '\n', 0o444)!
 			receipt.service_ready = true
@@ -1581,19 +1617,77 @@ fn launch_maps() ! {
 		}
 	}
 	select_environment(build, '10012')!
+	select_maps_diagnostics(session)
 	mut log := os.open_file(result_root + '/maps.log', 'wx', 0o600)!
 	if C.dup2(log.fd, 1) != 1 || C.dup2(log.fd, 2) != 2 {
 		return error('cannot retain private Maps diagnostics')
 	}
 	log.close()
-	launched := MapsLaunch{ process: identity(os.getpid())!, app_host: host, desktop: desktop.process }
+	launched := MapsLaunch{
+		process: identity(os.getpid())!, app_host: host, desktop: desktop.process
+		trace_onboarding: session.trace_onboarding
+	}
 	check_maps_launch(launched, desktop)!
 	if app_host_identity(launched.process, desktop)! != host {
 		return error('Maps app host changed before launch')
 	}
 	publish_fresh(result_root + '/maps-launch.json', json2.encode(launched) + '\n', 0o600)!
 	println('MAPS-ACCOUNT-LAUNCH uid=10012 gid=10012 package=com.google.android.apps.maps')
+	if session.trace_onboarding {
+		println('MAPS-ACCOUNT-ONBOARDING-TRACE tree=1 threads=1 private-log=maps.log')
+	}
 	os.execvp(launcher_path, [maps_apk])!
+}
+
+fn onboarding_trace_self_test() ! {
+	for arguments in [ []string{}, ['--broker'] ] {
+		if broker_trace_onboarding(arguments)! { return error('default broker enabled onboarding traces') }
+	}
+	for arguments in [['--trace-onboarding'], ['--broker', '--trace-onboarding'],
+		['--trace-onboarding', '--broker']] {
+		if !broker_trace_onboarding(arguments)! { return error('broker onboarding trace opt-in was lost') }
+	}
+	for arguments in [['--broker', '--broker'], ['--trace-onboarding', '--trace-onboarding'],
+		['--launch', '--trace-onboarding'], ['--trace-onboarding=1'], ['']] {
+		if _ := broker_trace_onboarding(arguments) { return error('invalid trace invocation accepted') }
+	}
+	keys := ['VINIX_ANDROID_TRACE_TREE', 'VINIX_ANDROID_TRACE_THREADS']
+	mut previous := map[string]string{}
+	for key in keys {
+		if value := os.getenv_opt(key) { previous[key] = value }
+	}
+	defer {
+		for key in keys {
+			if value := previous[key] { os.setenv(key, value, true) } else { os.unsetenv(key) }
+		}
+	}
+	legacy := json2.decode[Session]('{"kind":"vinix-maps-account-session-v1"}')!
+	if legacy.trace_onboarding { return error('legacy session enabled onboarding traces') }
+	for enabled in [true, false] {
+		for key in keys { os.setenv(key, 'ambient-must-not-select-diagnostics', true) }
+		session := json2.decode[Session](json2.encode(Session{ trace_onboarding: enabled }))!
+		select_maps_diagnostics(session)
+		for key in keys {
+			if enabled {
+				if os.getenv(key) != '1' { return error('session trace selection did not reach Maps environment') }
+			} else if _ := os.getenv_opt(key) {
+				return error('ambient Maps trace survived disabled session')
+			}
+		}
+		launch := json2.decode[MapsLaunch](json2.encode(MapsLaunch{ trace_onboarding: session.trace_onboarding }))!
+		if launch.trace_onboarding != enabled { return error('Maps trace receipt lost session selection') }
+	}
+	root := os.join_path(os.temp_dir(), 'vinix-maps-trace-' + os.getpid().str() + '-' + time.sys_mono_now().str())
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {} }
+	os.chmod(root, 0o700)!
+	for name in ['broker.log', 'maps.log'] { os.write_file(root + '/' + name, 'private-onboarding-sentinel')! }
+	os.write_file(root + '/receipt.json', json2.encode(Receipt{ trace_onboarding: true }))!
+	retained := json2.decode[Archive](archive(root)!)!
+	if retained.entries.len != 1 || retained.entries[0].path != 'receipt.json'
+		|| !json2.decode[Receipt](base64.decode_str(retained.entries[0].data))!.trace_onboarding {
+		return error('onboarding diagnostics escaped private logs or lost public opt-in receipt')
+	}
 }
 
 fn sqlite_self_test() ! {
@@ -2068,6 +2162,7 @@ fn poll_memory_self_test(iterations int) ! {
 }
 
 fn self_test() ! {
+	onboarding_trace_self_test()!
 	poll_memory_self_test(256)!
 	auth_init_self_test()!
 	browser_init_self_test()!
@@ -2130,7 +2225,7 @@ fn self_test() ! {
 			return error('stale stop request accepted')
 		}
 	}
-	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths protected-directory-symlink-and-mode-rejection process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation bounded-numeric-auth-diagnostics bounded-numeric-browser-diagnostics mandatory-browser-client native-app-host-identity-and-selector fresh-app-host-surface grandchild-launch-receipt-binding')
+	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths protected-directory-symlink-and-mode-rejection process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation bounded-numeric-auth-diagnostics bounded-numeric-browser-diagnostics mandatory-browser-client native-app-host-identity-and-selector fresh-app-host-surface grandchild-launch-receipt-binding session-selected-onboarding-traces private-diagnostic-export-exclusion')
 }
 
 fn main() {
@@ -2171,15 +2266,16 @@ fn main() {
 		}
 		return
 	}
-	if os.args.len > 2 || (os.args.len == 2 && os.args[1] != '--broker') {
-		eprintln('usage: maps-account-guest [--broker|--launch|--stop|--self-test]')
+	trace_onboarding := broker_trace_onboarding(os.args[1..]) or {
+		eprintln('usage: maps-account-guest [--broker [--trace-onboarding]|--launch|--stop|--self-test]')
+		eprintln(err)
 		exit(1)
 	}
 	private_result_root() or {
 		eprintln(err)
 		exit(1)
 	}
-	mut receipt := Receipt{ started_utc: time.utc().str() }
+	mut receipt := Receipt{ started_utc: time.utc().str(), trace_onboarding: trace_onboarding }
 	broker_session(mut receipt) or {
 		receipt.status = 'failed'
 		receipt.error = err.msg()
