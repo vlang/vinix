@@ -375,17 +375,17 @@ A rendered frame, interactive menu, login and playable match remain
 unverified. Advertising remains skipped. See the
 [desktop probe checkpoint](../tests/ios/desktop-probe-checkpoint-20261026.md).
 
-The latest no-ads checkpoint implements `AVAudioSession isOtherAudioPlaying`
-with a false fallback when no audio activity provider is attached, plus
-synchronized shared-session caching. Independent OSS clients cannot be detected.
-Regular and deterministic ASan/UBSan runs, audio-constant regressions and all
-29 guest fixtures pass. Native Catalyst comparisons cover method metadata;
-native session calls remain unverified after an audio-server XPC stall.
-With the original cooked content, Fortnite passes the activity query and
-reaches `AVAudioSession category`. The game exits 1 without an
-application signal fault, OOM event or supervisor kill. Progress remains 4 of 8
-observable launch gates; frame, menu, login and playable match are unverified.
-See the [audio activity checkpoint](../tests/ios/audio-activity-checkpoint-20261027.md).
+The latest no-ads checkpoint implements `AVAudioSession category` with the
+documented `SoloAmbient` default. Regular and deterministic ASan/UBSan runs,
+the activity-query regression and all 30 guest fixtures pass. Native Catalyst
+comparisons cover method metadata and the constant; native session calls remain
+unverified after an audio-server XPC stall. With the original cooked content,
+Fortnite passes the getter and reaches `NSString compare:`. The game exits 1
+without an application signal fault, OOM event or supervisor kill. Progress
+remains 4 of 8 observable launch gates; frame, menu, login and playable match
+are unverified. The replay runner now clears stale serial logs and validates
+CPU settings before replacing firmware. See the
+[audio category checkpoint](../tests/ios/audio-category-checkpoint-20261027.md).
 `MTLCreateSystemDefaultDevice` still returns nil: a Metal device, shader,
 rendering and presentation backend remains to be implemented. The existing
 texture cache delegates to supplied devices; see the
