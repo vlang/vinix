@@ -21,7 +21,7 @@ const descriptor_alert = 'Showing Alert:\n  Title:Message\n  Message:Failed to o
 const startup_boundary = 'iOS: unimplemented Objective-C method NSString compare:\n'
 const output_marker = 'IOS-AUDIO-CATEGORY: SoloAmbient default, object signatures, direct IMP, framework identity, eight concurrent workers, both lookup orders and two drained runtimes PASS'
 const native_marker = 'IOS-AUDIO-CATEGORY-NATIVE: object metadata, instance-only getter and guarded SoloAmbient constant PASS; native session calls unverified'
-const application_stop = 'IOS-PROBE-DESKTOP: stop=desktop pipe closed handshake=true builds=13 polls=12 closed=false supervisor_kill=false wait=256'
+const application_stop = 'IOS-PROBE-DESKTOP: stop=desktop pipe closed handshake=true builds=12 polls=11 closed=false supervisor_kill=false wait=256'
 const fixture_stop = 'IOS-PROBE-DESKTOP: stop=session complete handshake=true builds=1 polls=2 closed=true supervisor_kill=false wait=0'
 const zero_events = 'events=low 0;high 0;max 0;oom 0;oom_kill 0;oom_group_kill 0;'
 
@@ -585,7 +585,7 @@ fn summary(out string) ! {
 }
 
 fn main() {
-	if os.args.len < 3 { panic('usage: audio-category prepare OUT PRIOR | fixture|build|host|regression-host|probe|retry-probe|retry-budget|upgrade-kernel|retry-serial OUT | audit OUT REVISION | seal|check|selftest|summary OUT | hash FILE') }
+	if os.args.len < 3 { panic('usage: audio-category prepare OUT PRIOR | fixture|build|host|regression-host|probe|retry-probe|retry-budget|upgrade-kernel|retry-serial|retry-preflight OUT | audit OUT REVISION | seal|check|selftest|summary OUT | hash FILE') }
 	if os.args[1] == 'hash' { println(digest(os.args[2])!); return }
 	root := os.real_path(os.getwd())
 	out := os.abs_path(os.args[2])
@@ -695,6 +695,31 @@ fn main() {
 				os.cp(out + '/' + name, archive + '/' + name)!
 			}
 			for name in ['serial.log', 'efivars.fd'] { os.cp(vm_state + '/' + name, archive + '/' + name)! }
+			mut media := ''
+			for name in ['boot.img', 'initramfs.tar.gz', 'limine.conf'] { media += digest(vm_state + '/' + name)! + '  ' + name + '\n' }
+			os.write_file(archive + '/media.sha256', media)!
+			capture(out, 'build-notification-vm', [v, '-nocache', '-gc', 'none', '-cc', 'clang', '-cflags', '-O2',
+				'-path', '@vlib|' + root + '/compat/ios|' + root + '/tests/ios|@vmodules', '-o', out + '/notification-vm', root + '/tests/ios/notification-vm.v'])!
+			os.setenv('VINIX_IOS_VM_CPUS', '1', true)
+			capture(out, 'probe-no-ads', [out + '/notification-vm', 'replay-probe-no-ads', out])!
+			verify_inventory_media(vm_state, media)!
+		}
+		'retry-preflight' {
+			// An invalid-CPU negative check exposed firmware deletion before
+			// validation. Preserve the clean log; rebuild and capture fresh firmware.
+			vm_state := os.read_file(out + '/probe-no-ads-state.txt')!.trim_space()
+			if os.dir(vm_state) != out || !os.file_name(vm_state).starts_with('probe-no-ads-')
+				|| os.exists(vm_state + '/efivars.fd') { panic('expected preflight firmware deletion') }
+			archive := out + '/preflight-firmware-deletion'
+			if os.exists(archive) { panic('preflight retry already attempted') }
+			guest_observation(os.read_file(vm_state + '/serial.log')!.replace('\r\n', '\n'))!
+			os.mkdir(archive)!
+			for name in ['probe-no-ads.log', 'probe-no-ads.status.txt', 'notification-vm',
+				'build-notification-vm.log', 'build-notification-vm.status.txt', 'audit-selftest.log', 'audit-selftest.status.txt'] {
+				os.cp(out + '/' + name, archive + '/' + name)!
+			}
+			os.cp(vm_state + '/serial.log', archive + '/serial.log')!
+			os.write_file(archive + '/provenance.txt', 'Fresh one-CPU capture passed guest observations. A subsequent VINIX_IOS_VM_CPUS=0 negative check deleted efivars.fd before rejecting its configuration. Firmware from this run is missing; this attempt cannot be the complete checkpoint.\n')!
 			mut media := ''
 			for name in ['boot.img', 'initramfs.tar.gz', 'limine.conf'] { media += digest(vm_state + '/' + name)! + '  ' + name + '\n' }
 			os.write_file(archive + '/media.sha256', media)!

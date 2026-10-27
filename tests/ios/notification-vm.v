@@ -601,6 +601,7 @@ fn run_vm(mode string, state string, guest_mb string, timeout_seconds int) {
 	if cpus !in ['1', '2', '3', '4'] { panic('VINIX_IOS_VM_CPUS must be 1 through 4') }
 	disk := state + '/boot.img'
 	vars := state + '/efivars.fd'
+	if os.exists(vars) { os.rm(vars) or { panic(err) } }
 	checked(['mkfile', '-n', '64m', vars])
 	log := state + '/serial.log'
 	// A replay can otherwise accept the old completion/failure marker before
@@ -660,7 +661,6 @@ fn main() {
 		for item in ['boot.img', 'initramfs.tar.gz', 'limine.conf'] {
 			if !os.is_file(path + '/' + item) { panic('incomplete replay media') }
 		}
-		if os.exists(path + '/efivars.fd') { os.rm(path + '/efivars.fd') or { panic(err) } }
 		run_vm('probe-no-ads', path, '8192', 1800)
 		return
 	}
