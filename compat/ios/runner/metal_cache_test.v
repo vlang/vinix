@@ -165,7 +165,9 @@ fn mt_private_failures(){
  out=0;assert cv_metal_create_view(0,configured,image,0,81,8,4,0,&out)==0;assert mt_property(MTApi{},cv_metal_get_texture(out),c'usage')==1
  objc_release(out);objc_release(configured)
  objc_release(image);objc_release(cache)
- for name in ['_MTLCreateSystemDefaultDevice','_OBJC_CLASS_$_MTLDevice']!{if _:=runtime_symbol('/System/Library/Frameworks/Metal.framework/Metal',name){assert false}}
+ create:=runtime_symbol('/System/Library/Frameworks/Metal.framework/Metal','_MTLCreateSystemDefaultDevice')or{panic(err)}
+ assert unsafe{MTDevice(voidptr(create))()}==0
+ if _:=runtime_symbol('/System/Library/Frameworks/Metal.framework/Metal','_OBJC_CLASS_$_MTLDevice'){assert false}
  for name in ['_OBJC_CLASS_$_MTLTextureDescriptor','_OBJC_METACLASS_$_MTLTextureDescriptor']!{assert (runtime_symbol('/System/Library/Frameworks/Metal.framework/Metal',name)or{panic(err)})!=0;for library in ['/System/Library/Frameworks/Foundation.framework/Foundation','/System/Library/Frameworks/UIKit.framework/UIKit','/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics','/usr/lib/libobjc.A.dylib','/usr/lib/libSystem.B.dylib']!{if _:=runtime_symbol(library,name){assert false}}}
 }
 fn test_metal_cache(){
