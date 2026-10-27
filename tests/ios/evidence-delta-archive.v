@@ -294,7 +294,10 @@ fn load_archive(archive string) !Recipe {
 		if e.storage == 'gzip-prior-patch' {
 			if e.gzip_header.len != 20 || e.tar_hash.len != 64 || e.tar_size == 0
 				|| e.chunks.len == 0 || e.payload != '' { return error('invalid gzip reconstruction') }
-			hex.decode(e.gzip_header)!
+			header := hex.decode(e.gzip_header)!
+			if header[..4] != [u8(31), 139, 8, 0] || header[8] !in [u8(2), 4] {
+				return error('unsupported gzip header')
+			}
 			mut offset := u64(0)
 			for chunk in e.chunks {
 				if chunk.offset != offset || chunk.size == 0 || chunk.size > chunk_size
@@ -405,7 +408,7 @@ fn create(source string, prior string, archive string, zstd string, work string)
 			count := compressed.read(mut header) or { compressed.close(); return err }
 			compressed.close()
 			if count != 10 || header[..4] != [u8(31), 139, 8, 0]
-				|| header[8] != 2 { return error('unsupported gzip header') }
+				|| header[8] !in [u8(2), 4] { return error('unsupported gzip header') }
 			gzip_header = header.hex()
 			decode_gzip('/usr/bin/gzip', base_path, work + '/prior.tar')!
 			decode_gzip('/usr/bin/gzip', input, work + '/current.tar')!
@@ -488,7 +491,9 @@ fn restore_entry(r Recipe, archive string, target string, work string, e Entry, 
 			if os.file_size(output) != e.tar_size || digest(output)! != e.tar_hash {
 				return error('reconstructed tar mismatch')
 			}
-			run([archive + '/tools/gzip', '-9', '-n', output])!
+			header := hex.decode(e.gzip_header)!
+			level := if header[8] == 4 { '-1' } else { '-9' }
+			run([archive + '/tools/gzip', level, '-n', output])!
 			mut encoded := os.open_file(output + '.gz', 'r+')!
 			encoded.write(hex.decode(e.gzip_header)!)!
 			encoded.close()
@@ -585,7 +590,7 @@ fn alignment_selftest(root string, zstd string) ! {
 		tar_args << members
 		run(tar_args)!
 		os.rmdir_all(base + '/inputs')!
-		run(['/usr/bin/gzip', '-9', '-n', base + '/probe-no-ads-aligned/initramfs.tar'])!
+		run(['/usr/bin/gzip', if base == source { '-1' } else { '-9' }, '-n', base + '/probe-no-ads-aligned/initramfs.tar'])!
 	}
 	create(source, prior, archive, zstd, work)!
 	r := load_archive(archive)!
@@ -610,7 +615,7 @@ fn alignment_selftest(root string, zstd string) ! {
 	reseal(archive, r)!
 	load_archive(archive)!
 	compare(r, root + '/aligned-restored')!
-	println('Selftest: shifted/reordered GNU long-name tar members, shared random data across multiple chunks, exact restoration and three invalid reference offsets: PASS')
+	println('Selftest: shifted/reordered GNU long-name tar members, shared random data across multiple chunks, level-1 gzip from level-9 prior, exact restoration and three invalid reference offsets: PASS')
 }
 
 fn selftest(root string, zstd string) ! {

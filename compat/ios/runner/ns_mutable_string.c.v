@@ -33,6 +33,7 @@ fn mutable_string_state(object u64) &ObjHeader {
 }
 
 fn mutable_string_types(name string, meta bool, selector string) ?string {
+	if !meta && name in ['NSString', 'NSMutableString']! && selector == 'compare:' { return 'q24@0:8@16' }
 	if !meta && name in ['NSString', 'NSMutableString']! && selector == 'getCString:maxLength:encoding:' {
 		return 'B40@0:8*16Q24Q32'
 	}
@@ -293,6 +294,10 @@ fn mutable_string_dispatch(object u64, selector string, mut frame RegisterFrame)
 	}
 	if !meta && selector == 'cStringUsingEncoding:' && objc_is_kind(object, ios_runtime.names['NSString']) {
 		frame.x[0] = ns_string_cstring_output(object, frame.x[2])
+		return true
+	}
+	if !meta && selector == 'compare:' && objc_is_kind(object, ios_runtime.names['NSString']) {
+		frame.x[0] = u64(ns_string_compare(object, frame.x[2]) or { panic(err) })
 		return true
 	}
 	if !meta && selector == 'precomposedStringWithCanonicalMapping' && objc_is_kind(object, ios_runtime.names['NSString']) {
