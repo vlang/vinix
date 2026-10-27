@@ -62,8 +62,10 @@ Host evidence is retained in
   `checker-compile-guard.json`; the successful retry is `checker-compile-r2-guard.json`.
 - Checker selftest passed in 0.30 seconds at 20,905,984 bytes RSS; the live source
   audit passed in 0.83 seconds at 32,292,864 bytes RSS, both with zero swaps.
-- The browser producer passed in 10.03 seconds at 398,835,712 bytes RSS with zero
-  swaps and complete guard cleanup. The sealed-bundle source audit passed in
+- The browser producer passed in 10.03 seconds; `/usr/bin/time` recorded
+  398,835,712 bytes maximum process RSS, while the guard's sampled supervised
+  process-tree peak was 442,531,840 bytes. It recorded zero swaps and complete
+  guard cleanup. The sealed-bundle source audit passed in
   0.82 seconds at 45,187,072 bytes RSS with zero swaps. Its manifest is
   `fa39f1486d651dff8904a9d75e82cf67d462b2c41511a1a4cd3a184c49239e62`,
   library `16def2047bf7605a23d949ff7b6b56bc56dcece038136553a98a0524b26ded1a`,
