@@ -58,8 +58,9 @@ fn main() {
 	root := os.real_path(os.getwd()); out := os.abs_path(os.args[2]); old := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
-	if os.args[1] in ['string-get-cstring-host', 'dictionary-file-host', 'bundle-identifier-host', 'string-path-host', 'url-resource-host', 'number-bool-host', 'string-cstring-output-host', 'string-normalization-host', 'responder-host', 'view-tag-host', 'main-selector-host', 'application-badge-host', 'window-host', 'alert-host', 'string-float-host', 'string-cstring-host', 'bundle-receipt-host', 'cf-string-output-host', 'search-path-host', 'home-directory-host', 'inline-pthread-self-host', 'dictionary-snapshot-host', 'block-byref-host', 'block-imp-host', 'vm-probe-host', 'proc-memory-host', 'processinfo-host', 'data-url-host', 'data-http-host', 'connection-host'] {
+	if os.args[1] in ['bundle-info-host', 'string-get-cstring-host', 'dictionary-file-host', 'bundle-identifier-host', 'string-path-host', 'url-resource-host', 'number-bool-host', 'string-cstring-output-host', 'string-normalization-host', 'responder-host', 'view-tag-host', 'main-selector-host', 'application-badge-host', 'window-host', 'alert-host', 'string-float-host', 'string-cstring-host', 'bundle-receipt-host', 'cf-string-output-host', 'search-path-host', 'home-directory-host', 'inline-pthread-self-host', 'dictionary-snapshot-host', 'block-byref-host', 'block-imp-host', 'vm-probe-host', 'proc-memory-host', 'processinfo-host', 'data-url-host', 'data-http-host', 'connection-host'] {
 		fixture := match os.args[1] {
+			'bundle-info-host' { 'ns_bundle_info_test.v' }
 			'string-get-cstring-host' { 'ns_string_get_cstring_test.v' }
 			'dictionary-file-host' { 'ns_dictionary_file_test.v' }
 			'bundle-identifier-host' { 'ns_bundle_identifier_test.v' }

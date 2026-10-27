@@ -159,7 +159,7 @@ fn test_bundle_identifier_runtime() {
 		os.write_file(root + '/Info.plist', identifier_xml('<string>org.vinix.notification-checks</string>')) or { panic(err) }
 		objc_start(); ios_runtime.bundle = root
 		identifier_shared(api)
-		assert ios_runtime.live == 2 && ios_runtime.objects.len == 2
+		assert ios_runtime.live == 4 && ios_runtime.objects.len == 4
 		assert obj_header(ios_runtime.bundle_object).refs == 1
 		assert obj_header(obj_header(ios_runtime.bundle_object).fields[0]).refs == 1
 		objc_stop()

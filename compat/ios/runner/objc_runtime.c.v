@@ -92,7 +92,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 		if selector == 'tag' { return 'q16@0:8' }
 		if selector == 'setTag:' { return 'v24@0:8q16' }
 	}
-	if info.name == 'NSBundle' && !info.meta && selector in ['appStoreReceiptURL', 'bundleIdentifier'] { return '@16@0:8' }
+	if info.name == 'NSBundle' && !info.meta && selector in ['appStoreReceiptURL', 'bundleIdentifier', 'infoDictionary'] { return '@16@0:8' }
 	if info.name == 'UIApplication' && !info.meta {
 		if selector == 'applicationIconBadgeNumber' { return 'q16@0:8' }
 		if selector == 'setApplicationIconBadgeNumber:' { return 'v24@0:8q16' }
