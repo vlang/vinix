@@ -4,6 +4,24 @@ module main
 import math.bits
 import os
 
+fn audio_session_shared() u64 {
+	cls := ios_runtime.names['AVAudioSession']
+	// Class initialization can call application code. Finish it before taking
+	// the cache lock; allocation of this built-in then has no user constructor.
+	objc_initialize(cls)
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	if ios_runtime.audio_session == 0 { ios_runtime.audio_session = objc_allocate(cls) }
+	return ios_runtime.audio_session
+}
+
+fn audio_session_types(name string, meta bool, selector string) ?string {
+	if name != 'AVAudioSession' { return none }
+	if meta && selector == 'sharedInstance' { return '@16@0:8' }
+	if !meta && selector == 'isOtherAudioPlaying' { return 'B16@0:8' }
+	return none
+}
+
 fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	if swift_data_bridge_dispatch(object, selector, mut frame) { return true }
 	if touch_dispatch(object, selector, mut frame) { return true }
@@ -13,6 +31,14 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 	if propertylist_dispatch(object, selector, mut frame) { return true }
 	if ns_data_url_dispatch(object, selector, mut frame) { return true }
 	if scene_dispatch(object, selector, mut frame) { return true }
+	if object !in ios_runtime.classes && objc_is_kind(object, ios_runtime.names['AVAudioSession']) {
+		if selector != 'isOtherAudioPlaying' { return false }
+		// No cross-application audio-session provider is attached. Report the
+		// inactive default; this cannot detect independent OSS clients. Offline
+		// AudioUnit rendering is not evidence of another application's playback.
+		frame.x[0] = 0
+		return true
+	}
 	if object !in ios_runtime.classes && objc_is_kind(object, ios_runtime.names['CMMotionManager']) {
 		if selector !in ['isAccelerometerAvailable', 'isAccelerometerActive', 'isGyroAvailable', 'isGyroActive'] { return false }
 		frame.x[0] = 0 // Vinix currently has no motion sensor provider.
@@ -65,8 +91,7 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 			}
 			'AVAudioSession' {
 				if selector != 'sharedInstance' { return false }
-				if ios_runtime.audio_session == 0 { ios_runtime.audio_session = objc_allocate(cls) }
-				frame.x[0] = ios_runtime.audio_session
+				frame.x[0] = audio_session_shared()
 			}
 			'NSLocale' {
 				match selector {

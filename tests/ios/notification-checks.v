@@ -29,8 +29,8 @@ fn run_host_fixture(root string, old string, out string, fixture string) ! {
 	os.write_file(bundle + "/Info.plist", "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>org.vinix.notification-checks</string><key>CFBundleExecutable</key><string>center-host</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>")!
 	binary := bundle + "/MacOS/center-host"
 	run(out, 'host-generate', [old + '/v', '-enable-globals', '-nocache', '-gc', 'none', '-cc', 'clang', '-d', 'ios_video', '-d', 'ios_cxx', '-d', 'ios_sqlite', '-os', 'macos', '-arch', 'arm64', '-path', '@vlib|' + root + '/compat/ios|' + root + '/tests/ios|@vmodules', '-o', cfile, root + '/compat/ios/runner/' + fixture], false)
-	// Shared UIKit fixtures require Catalyst for native comparisons.
-	target := if fixture in ['ui_responder_test.v', 'ui_view_tag_test.v', 'ui_alert_test.v', 'ui_application_badge_test.v'] { ['-target', 'arm64-apple-ios14.0-macabi'] } else { []string{} }
+	// Shared iOS-only fixtures require Catalyst for native comparisons.
+	target := if fixture in ['audio_session_activity_test.v', 'ui_responder_test.v', 'ui_view_tag_test.v', 'ui_alert_test.v', 'ui_application_badge_test.v'] { ['-target', 'arm64-apple-ios14.0-macabi'] } else { []string{} }
 	mut tls_cc := ['/usr/bin/clang', '-fsanitize=address,undefined', '-fno-omit-frame-pointer']
 	tls_cc << target
 	tls := tlsbuild.build(root, old, out + '/payload', tls_cc)
@@ -60,8 +60,10 @@ fn main() {
 	root := os.real_path(os.getwd()); out := os.abs_path(os.args[2]); old := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
-	if os.args[1] in ['notification-block-host', 'notification-queue-host', 'metal-device-host', 'metal-cache-host', 'locale-preferred-host', 'cf-preferred-languages-host', 'bundle-info-host', 'string-get-cstring-host', 'dictionary-file-host', 'bundle-identifier-host', 'string-path-host', 'url-resource-host', 'number-bool-host', 'string-cstring-output-host', 'string-normalization-host', 'responder-host', 'view-tag-host', 'main-selector-host', 'application-badge-host', 'window-host', 'alert-host', 'string-float-host', 'string-cstring-host', 'bundle-receipt-host', 'cf-string-output-host', 'search-path-host', 'home-directory-host', 'inline-pthread-self-host', 'dictionary-snapshot-host', 'block-byref-host', 'block-imp-host', 'vm-probe-host', 'proc-memory-host', 'processinfo-host', 'data-url-host', 'data-http-host', 'connection-host'] {
+	if os.args[1] in ['audio-activity-host', 'audio-session-host', 'notification-block-host', 'notification-queue-host', 'metal-device-host', 'metal-cache-host', 'locale-preferred-host', 'cf-preferred-languages-host', 'bundle-info-host', 'string-get-cstring-host', 'dictionary-file-host', 'bundle-identifier-host', 'string-path-host', 'url-resource-host', 'number-bool-host', 'string-cstring-output-host', 'string-normalization-host', 'responder-host', 'view-tag-host', 'main-selector-host', 'application-badge-host', 'window-host', 'alert-host', 'string-float-host', 'string-cstring-host', 'bundle-receipt-host', 'cf-string-output-host', 'search-path-host', 'home-directory-host', 'inline-pthread-self-host', 'dictionary-snapshot-host', 'block-byref-host', 'block-imp-host', 'vm-probe-host', 'proc-memory-host', 'processinfo-host', 'data-url-host', 'data-http-host', 'connection-host'] {
 		fixture := match os.args[1] {
+			'audio-activity-host' { 'audio_session_activity_test.v' }
+			'audio-session-host' { 'audio_session_test.v' }
 			'notification-block-host' { 'ns_notification_block_test.v' }
 			'notification-queue-host' { 'notification_queue_test.v' }
 			'metal-device-host' { 'metal_device_test.v' }

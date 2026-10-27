@@ -134,6 +134,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := capture_discovery_types(info.name, info.meta, selector) { return types }
 	if types := capture_audio_types(info.name, info.meta, selector) { return types }
 	if types := audio_application_types(info.name, info.meta, selector) { return types }
+	if types := audio_session_types(info.name, info.meta, selector) { return types }
 	if types := storyboard_types(info.name, info.meta, selector) { return types }
 	if types := haptic_dynamic_parameter_types(info.name, info.meta, selector) { return types }
 	if types := haptic_parameter_types(info.name, info.meta, selector) { return types }
