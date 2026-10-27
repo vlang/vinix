@@ -82,5 +82,18 @@ fixture principal:
 
 The runner preserves bounded startup/shutdown and log limits, live input,
 permanent identity drop, explicit environment and descriptor closure, exact
-success/error checks, and owned process-group cleanup. The new fixture's ART
-execution and subsequent Google account flow remain pending.
+success/error checks, and owned process-group cleanup.
+
+The closed `maps-context-storage-vm-r1` run passed this fixture on ARM. Its
+intact selected export verifies against SHA-256
+`a913fb7fed52bac6a3123c16d1e69d8869801ba38e19076d532ede215543e423`
+with zero removals: 18,791 bytes, 37 chunks and two entries. The public receipt
+records profile `credential-storage`, UID/GID 10117, wait status 0, exact
+PASS/READY checks, drained EOF and unchanged pinned framework/APKs/runner.
+The plain UART pass marker includes `credential-context`.
+
+In the same run, Play Services exposed missing `BroadcastReceiver.setResultCode(int)` and
+exited. This proves the generic fixture's ART execution; Google account flow
+remains unverified. The [closed runtime report](maps-context-storage-runtime-validation-2026-10-27.md)
+retains the strict Maps collection failure separately from verified diagnostic
+exports and identifies the complete original input closure.

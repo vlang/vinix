@@ -94,6 +94,9 @@ These runtime files are retained at
 `/Users/alex/.local/state/vinix/android/maps-direct-boot-vm-r1/`.
 The inspected `broker-exit.png` has SHA-256
 `f6bddd0e8ababfc99c3c9b223d7b29a71bb4447d78245ee3c2a37b768bbe6fbd`.
-The VM and UART log were still active when inspected; a final immutable runtime
-seal remains pending. The ARM fixture pass does not substitute for sustained
-live broker memory measurements or an authenticated Maps session.
+The VM and UART are closed. The [closed runtime report](maps-direct-boot-runtime-validation-2026-10-27.md)
+records the immutable runtime seal
+`addc98839b845b800d966932221a2d33b0d5c4f98c07e3dd1070900315e9dea0`
+at `/Users/alex/.local/state/vinix/android/maps-direct-boot-vm-r1-runtime-sealed-2026-10-27-r1/`.
+The ARM fixture pass does not substitute for sustained live broker memory
+measurements or an authenticated Maps session.
