@@ -6,6 +6,7 @@ import encoding.binary
 
 fn C.socketpair(i32, i32, i32, &i32) i32
 fn C.pipe(&i32) i32
+fn C.shutdown(i32, i32) i32
 
 fn pair() [2]i32 {
 	mut sockets := [2]i32{}
@@ -30,6 +31,56 @@ fn wire(op browseripc.Op, request u64, view u64, generation u64, navigation u64,
 
 fn send_bytes(fd i32, bytes []u8) {
 	assert C.send(fd, bytes.data, usize(bytes.len), 0) == bytes.len
+}
+
+fn test_expired_deadlines_preserve_nonblocking_poll_timeout() {
+	// A zero-timeout probe can cross a clock tick before it reaches poll.
+	assert remaining_millis(100, 101) == 0
+	assert remaining_millis(100, 100) == 0
+	assert remaining_millis(100, ~u64(0)) == 0
+	assert remaining_millis(101, 100) == 1
+	assert remaining_millis(~u64(0), ~u64(0) - 1) == 1
+	assert remaining_millis(30100, 100) == 30000
+	// poll takes a signed 32-bit millisecond count even when V int is 64-bit.
+	assert remaining_millis(u64(0x7fff_ffff), 0) == 0x7fff_ffff
+	assert remaining_millis(~u64(0), 0) == 0x7fff_ffff
+	assert i32(remaining_millis(~u64(0), 0)) > 0
+}
+
+fn test_zero_timeout_socket_probes_preserve_readability_and_eof() {
+	sockets := pair()
+	defer {
+		C.close(sockets[0])
+		C.close(sockets[1])
+	}
+	assert !(ready(sockets[0], i16(C.POLLIN), 0) or { panic(err) })
+	assert !(ready(sockets[0], i16(C.POLLIN), 1) or { panic(err) })
+	send_bytes(sockets[1], [u8(42)])
+	assert ready(sockets[0], i16(C.POLLIN), 0) or { panic(err) }
+	mut byte := u8(0)
+	assert C.recv(sockets[0], &byte, 1, 0) == 1 && byte == 42
+	assert !(ready(sockets[0], i16(C.POLLIN), 0) or { panic(err) })
+	assert C.shutdown(sockets[1], C.SHUT_WR) == 0
+	assert ready(sockets[0], i16(C.POLLIN), 0) or { panic(err) }
+	assert C.recv(sockets[0], &byte, 1, 0) == 0
+}
+
+fn test_empty_zero_timeout_abi_reads_do_not_close_channel() {
+	sockets := pair()
+	handle := abi_open(sockets[0])
+	assert handle != unsafe { nil }
+	defer {
+		abi_close(handle)
+		C.close(sockets[1])
+	}
+	mut header := []u8{len: browseripc.header_size}
+	mut payload := unsafe { &u8(nil) }
+	mut length := u32(0)
+	for _ in 0 .. 256 {
+		assert abi_read(handle, 0, header.data, &payload, &length, 0) == 0
+	}
+	mut c := unsafe { &Client(handle) }
+	assert !c.closed && c.fd == sockets[0]
 }
 
 fn test_fragmented_header_and_cookie_completion_order() {

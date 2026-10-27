@@ -50,7 +50,7 @@ mut:
 	reading_payload bool
 	payload         []u8
 	payload_used    int
-	frame_started   i64
+	frame_started   u64
 	queue           []Event
 	queue_bytes     int
 	current         Event
@@ -74,12 +74,20 @@ pub fn open(fd int) !&Client {
 	return &Client{ fd: fd }
 }
 
+// Monotonic timestamps are unsigned. Subtracting an expired deadline first
+// wraps and can narrow to poll's -1 (an infinite wait) instead of zero.
+fn remaining_millis(deadline u64, now u64) int {
+	if now >= deadline { return 0 }
+	remaining := deadline - now
+	return if remaining > u64(0x7fff_ffff) { 0x7fff_ffff } else { int(remaining) }
+}
+
 fn ready(fd int, events i16, timeout int) !bool {
 	mut watched := C.pollfd{ fd: fd, events: events }
-	deadline := time.sys_mono_now() / 1000000 + timeout
+	deadline := time.sys_mono_now() / 1000000 + u64(timeout)
 	for {
-		remaining := deadline - time.sys_mono_now() / 1000000
-		result := C.poll(&watched, 1, if remaining > 0 { int(remaining) } else { 0 })
+		remaining := remaining_millis(deadline, time.sys_mono_now() / 1000000)
+		result := C.poll(&watched, 1, i32(remaining))
 		if result < 0 {
 			if C.errno == C.EINTR { continue }
 			return error('browser descriptor poll failed')
@@ -93,11 +101,11 @@ fn ready(fd int, events i16, timeout int) !bool {
 }
 
 fn write_all(fd int, bytes []u8) ! {
-	deadline := time.sys_mono_now() / 1000000 + 5000
+	deadline := time.sys_mono_now() / 1000000 + u64(5000)
 	mut used := 0
 	for used < bytes.len {
-		remaining := deadline - time.sys_mono_now() / 1000000
-		if remaining <= 0 || !ready(fd, i16(C.POLLOUT), int(remaining))! {
+		remaining := remaining_millis(deadline, time.sys_mono_now() / 1000000)
+		if remaining == 0 || !ready(fd, i16(C.POLLOUT), remaining)! {
 			return error('browser command write timeout')
 		}
 		mut flags := 0
@@ -156,18 +164,19 @@ pub fn (mut c Client) submit(op browseripc.Op, view u64, generation u64, navigat
 // Receive a single complete frame without ever blocking on a partial read.
 // Allocation follows header validation; a stalled partial frame expires.
 fn (mut c Client) receive(timeout int) !Event {
-	deadline := time.sys_mono_now() / 1000000 + timeout
+	deadline := time.sys_mono_now() / 1000000 + u64(timeout)
 	for {
 		now := time.sys_mono_now() / 1000000
-		if c.frame_started != 0 && now - c.frame_started >= frame_timeout {
+		if c.frame_started != 0 && now - c.frame_started >= u64(frame_timeout) {
 			return error('browser frame timed out')
 		}
-		mut remaining := if deadline > now { int(deadline - now) } else { 0 }
-		if c.frame_started != 0 && remaining > frame_timeout - int(now - c.frame_started) {
-			remaining = frame_timeout - int(now - c.frame_started)
+		mut remaining := remaining_millis(deadline, now)
+		if c.frame_started != 0 {
+			frame_remaining := remaining_millis(c.frame_started + u64(frame_timeout), now)
+			if remaining > frame_remaining { remaining = frame_remaining }
 		}
 		if !ready(c.fd, i16(C.POLLIN), remaining)! {
-			if c.frame_started != 0 && time.sys_mono_now() / 1000000 - c.frame_started >= frame_timeout {
+			if c.frame_started != 0 && time.sys_mono_now() / 1000000 - c.frame_started >= u64(frame_timeout) {
 				return error('browser frame timed out')
 			}
 			return Event{}
@@ -233,10 +242,10 @@ pub fn (mut c Client) read(request u64, timeout int) !Event {
 			return event
 		}
 	}
-	deadline := time.sys_mono_now() / 1000000 + timeout
+	deadline := time.sys_mono_now() / 1000000 + u64(timeout)
 	for _ in 0 .. queue_limit {
-		remaining := deadline - time.sys_mono_now() / 1000000
-		event := c.receive(if remaining > 0 { int(remaining) } else { 0 }) or {
+		remaining := remaining_millis(deadline, time.sys_mono_now() / 1000000)
+		event := c.receive(remaining) or {
 			c.fail()
 			return err
 		}
