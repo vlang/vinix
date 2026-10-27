@@ -62,5 +62,38 @@ swaps. `producer-build.log` is retained in the polling audit directory.
 | `bin/maps-account-guest` | `9c213a85235b802fc3b068ff2d195ea207ba82ded7fe6cdee408e0bd55921c0c` |
 | `build.json` | `c6fe1e548a38fa149e27aecc8ebae6c40a2c5929dfd5a2ce0e19904290ee620b` |
 
-This producer has not yet been booted in the guest. The measured native fixture
-does not substitute for live ARM process RSS or an authenticated Maps session.
+The same ARM executable booted in the `maps-direct-boot-vm-r1` diagnostic on
+2026-10-27. Its staged deployment pins both controller aliases to the producer
+digest above. The isolated, credential-free workload ran with:
+
+```sh
+/usr/bin/time -f 'MAPS-CONTROLLER-POLL maxrss_kib=%M elapsed_s=%e exit=%x' \
+  /opt/vinix-maps-account/bin/maps-account-guest --poll-memory-self-test \
+  >/dev/console 2>&1
+```
+
+UART lines 411–412 record 18,000 iterations over 64 processes, a 173,094-byte
+scratch-use peak, 393,216-byte scratch-capacity peak, 2,642,212,652 bytes recycled,
+35 preserved errors and a 16,777,216-byte output capacity. The test passed and
+exited 0 in 1.25 seconds. BusyBox `time` reported 25,760 KiB maximum RSS
+(26,378,240 bytes), including the ARM process and its runtime. This kernel's
+`wait4` reports maximum RSS in KiB; the isolated fixture does not spawn children.
+Host and guest RSS accounting differ, so this value is not a direct comparison
+with the macOS measurements above.
+
+The subsequent manual broker session reached authenticator transport readiness
+and then exited before sustained live controller RSS samples could be taken.
+The retained GUI capture `broker-exit.png` shows both messages. The later public
+UART excerpt identifies `NoSuchMethodError` for
+`Context.createCredentialProtectedStorageContext()` during
+`GmsApplication.attachBaseContext`, followed by a native SIGSEGV. This does not
+identify a controller memory failure. Transport readiness does not establish
+Google account authentication; login remains unverified.
+
+These runtime files are retained at
+`/Users/alex/.local/state/vinix/android/maps-direct-boot-vm-r1/`.
+The inspected `broker-exit.png` has SHA-256
+`f6bddd0e8ababfc99c3c9b223d7b29a71bb4447d78245ee3c2a37b768bbe6fbd`.
+The VM and UART log were still active when inspected; a final immutable runtime
+seal remains pending. The ARM fixture pass does not substitute for sustained
+live broker memory measurements or an authenticated Maps session.
