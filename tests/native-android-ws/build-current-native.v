@@ -26,6 +26,9 @@ const base = state + 'headless-service-native-build-2026-10-26-r5'
 const base_seal = 'd99195272b8af813679cf54fed9f1e0341e6f1115804ac09c1cd2d5a8f942e3e'
 const old_compiler = '109a0bad877cf42cd19382a87d3e3d62e9c153e3d74a566b2b3e650a1aec318e'
 const compiler = base + '/tools/v_old276'
+const library_base = state + 'current-native-build-2026-10-27-startup-r1'
+const library_seal = 'a62bf4a8a4ef8d1c000f82395ec64b145c9c4d6df25f12077f75d96d341e0a20'
+const library_origin = '/Users/alex/code/v'
 const cross = '/opt/homebrew/bin/aarch64-linux-musl-gcc'
 const self_source = repo + '/tests/native-android-ws/build-current-native.v'
 
@@ -112,6 +115,119 @@ fn sealed_copy(source string, pins map[string]string, relative string, target st
 	copy_pin(source + '/' + relative, target, pin)!
 }
 
+fn compiler_relative(origin string) !string {
+	if !origin.starts_with(library_origin + '/') { return '' }
+	if os.norm_path(origin) != origin || origin.contains('\\') || origin.contains('\x00') {
+		return error('noncanonical retained compiler path: ' + origin)
+	}
+	relative := origin[library_origin.len + 1..]
+	if relative != 'v.mod' && !relative.starts_with('vlib/')
+		&& !relative.starts_with('thirdparty/stdatomic/') {
+		return error('unexpected retained compiler input: ' + origin)
+	}
+	return relative
+}
+
+fn merge_compiler_pin(mut pins map[string]string, relative string, pin string) ! {
+	if previous := pins[relative] {
+		if previous != pin { return error('conflicting retained compiler input: ' + relative) }
+	}
+	pins[relative] = pin
+}
+
+fn regular_input(path string) ! {
+	if os.real_path(path) != path || os.lstat(path)!.get_filetype() != .regular {
+		return error('nonregular or noncanonical retained input: ' + path)
+	}
+}
+
+fn compiler_closure_inputs(label string, closure map[string]string, sealed map[string]string,
+	mut pins map[string]string, mut origins map[string]string) ! {
+	for origin, pin in closure {
+		relative := compiler_relative(origin)!
+		if relative == '' { continue }
+		retained := 'closure/' + label + '/' + origin.trim_left('/')
+		sealed_pin := sealed[retained] or { return error('compiler input absent from seal: ' + retained) }
+		if sealed_pin != pin { return error('compiler closure pin differs from seal: ' + retained) }
+		merge_compiler_pin(mut pins, relative, pin)!
+		origins[relative] = library_base + '/' + retained
+	}
+}
+
+// Reconstruct the old compiler's library from the exact sealed successful build.
+// Never fill missing files from the mutable V checkout.
+fn restore_compiler_root(root string) !map[string]string {
+	if hash(library_base + '/sha256.json')! != library_seal {
+		return error('sealed compiler library baseline differs')
+	}
+	sealed := json2.decode[map[string]string](os.read_file(library_base + '/sha256.json')!)!
+	copy_pin(library_base + '/sha256.json', root + '/compiler-library-sha256.json', library_seal)!
+	mut relative_pins := map[string]string{}
+	mut origins := map[string]string{}
+	for label in ['builder', 'native-generator'] {
+		manifest := label + '-closure.json'
+		regular_input(library_base + '/' + manifest)!
+		sealed_copy(library_base, sealed, manifest, root + '/compiler-library-' + manifest)!
+		closure := json2.decode[map[string]string](os.read_file(root + '/compiler-library-' + manifest)!)!
+		compiler_closure_inputs(label, closure, sealed, mut relative_pins, mut origins)!
+	}
+	if 'v.mod' !in relative_pins || 'vlib/builtin/builtin.v' !in relative_pins {
+		return error('incomplete retained compiler root')
+	}
+	mut pins := map[string]string{}
+	for relative, pin in relative_pins {
+		source := origins[relative]!
+		regular_input(source)!
+		target := root + '/compiler-root/' + relative
+		copy_pin(source, target, pin)!
+		pins[target] = pin
+	}
+	copy_pin(compiler, root + '/compiler-root/v', old_compiler)!
+	os.chmod(root + '/compiler-root/v', 0o755)!
+	pins[root + '/compiler-root/v'] = old_compiler
+	write_json(root + '/compiler-root-inputs.json', pins)!
+	write_json(root + '/compiler-library-origins.json', origins)!
+	if hash(library_base + '/sha256.json')! != library_seal {
+		return error('compiler library baseline changed')
+	}
+	unchanged(pins)!
+	return pins
+}
+
+fn compiler_inputs(root string) !map[string]string {
+	pins := json2.decode[map[string]string](os.read_file(root + '/compiler-root-inputs.json')!)!
+	if (pins[root + '/compiler-root/v'] or { '' }) != old_compiler {
+		return error('restored compiler identity differs')
+	}
+	unchanged(pins)!
+	return pins
+}
+
+fn select_compiler_root(root string) ! {
+	// v_old276 resolves builtin from cwd before its baked-in checkout. VROOT
+	// alone does not select it; VEXE also owns native #flag helper paths.
+	os.chdir(root + '/compiler-root')!
+	for name in ['VEXE', 'V', 'VINIX_V_COMPILER'] {
+		os.setenv(name, root + '/compiler-root/v', true)
+	}
+	os.setenv('VROOT', root + '/compiler-root', true)
+}
+
+fn check_compiler_listing(root string, pins map[string]string, listing string) ! {
+	mut listed := map[string]string{}
+	for path in listing.split_into_lines().filter(it.ends_with('.v')) {
+		if path.starts_with(root + '/compiler-root/') {
+			if path !in pins { return error('unsealed restored compiler source: ' + path) }
+		} else if !path.starts_with(repo + '/') {
+			return error('compiler source outside restored library and repository: ' + path)
+		}
+		listed[path] = ''
+	}
+	if closure_vlib(listed)! != root + '/compiler-root/vlib' {
+		return error('compiler selected a different standard library')
+	}
+}
+
 fn command(root string, label string, argv []string) !string {
 	executable := if argv[0].contains('/') { os.real_path(argv[0]) } else {
 		os.find_abs_path_of_executable(argv[0])!
@@ -140,6 +256,8 @@ fn command(root string, label string, argv []string) !string {
 }
 
 fn freeze_closure(root string, label string, listing string) !map[string]string {
+	library := compiler_inputs(root)!
+	check_compiler_listing(root, library, listing)!
 	mut pins := map[string]string{}
 	for path in listing.split_into_lines().filter(it.ends_with('.v')) {
 		if !os.is_abs_path(path) { return error('nonabsolute source path: ' + path) }
@@ -167,6 +285,9 @@ fn freeze_closure(root string, label string, listing string) !map[string]string 
 		}
 	}
 	for path, pin in pins {
+		if path.starts_with(root + '/compiler-root/') && (library[path] or { '' }) != pin {
+			return error('compiler support input outside restored closure: ' + path)
+		}
 		copy_pin(path, root + '/closure/' + label + '/' + path.trim_left('/'), pin)!
 	}
 	unchanged(pins)!
@@ -330,7 +451,45 @@ fn self_test() ! {
 	mut rejected := false
 	check_source_names(directory, ['a.v']) or { rejected = true }
 	assert rejected, 'accepted concurrently added production source'
-	println('CURRENT-NATIVE-BUILDER-SELF-PASS escaped-header-paths exact-retained-source-closure native-helper-inputs source-set-race')
+	for malformed in [library_origin + '/vlib/../escape.v', library_origin + '//vlib/builtin.v',
+		library_origin + '/vlib/a\\b.v', library_origin + '/vlib/a\x00.v', library_origin + '/unexpected.c'] {
+		mut refused := false
+		compiler_relative(malformed) or { refused = true }
+		assert refused, 'accepted escaping or unsupported compiler path'
+	}
+	mut merged := map[string]string{}
+	mut origins := map[string]string{}
+	origin := library_origin + '/vlib/builtin/builtin.v'
+	retained := 'closure/builder/' + origin.trim_left('/')
+	compiler_closure_inputs('builder', {origin: 'a'}, {retained: 'a'}, mut merged, mut origins)!
+	merge_compiler_pin(mut merged, 'vlib/builtin/builtin.v', 'a')!
+	mut conflict := false
+	merge_compiler_pin(mut merged, 'vlib/builtin/builtin.v', 'changed') or { conflict = true }
+	assert conflict, 'accepted conflicting retained compiler inputs'
+	for bad_seal in [map[string]string{}, {retained: 'changed'}] {
+		mut refused := false
+		compiler_closure_inputs('builder', {origin: 'a'}, bad_seal, mut merged, mut origins) or { refused = true }
+		assert refused, 'accepted missing or mismatched sealed compiler pin'
+	}
+	local := directory + '/compiler-root/vlib/builtin/builtin.v'
+	check_compiler_listing(directory, {local: 'a'}, local + '\n' + self_source)!
+	for invalid in [origin, local + '\n' + origin, local + '\n' + directory + '/compiler-root/vlib/unsealed.v',
+		local + '\n/ambient/module.v'] {
+		mut refused := false
+		check_compiler_listing(directory, {local: 'a'}, invalid) or { refused = true }
+		assert refused, 'accepted live, ambient or unsealed compiler source'
+	}
+	fixture := directory + '/a.v'
+	pin := hash(fixture)!
+	os.write_file(fixture, 'mutated')!
+	mut mutated := false
+	copy_pin(fixture, directory + '/copied.v', pin) or { mutated = true }
+	assert mutated && !os.exists(directory + '/copied.v'), 'copied changed retained compiler input'
+	os.symlink(fixture, directory + '/linked.v')!
+	mut linked := false
+	regular_input(directory + '/linked.v') or { linked = true }
+	assert linked, 'accepted symlinked retained compiler input'
+	println('CURRENT-NATIVE-BUILDER-SELF-PASS escaped-header-paths exact-retained-source-closure native-helper-inputs source-set-race sealed-private-compiler-root')
 }
 
 fn source_names(directory string) ![]string {
@@ -400,6 +559,7 @@ fn build(root string, framework string) ! {
 	revision := command(root, 'revision', ['/usr/bin/git', '-C', repo, 'rev-parse', 'HEAD'])!.trim_space()
 	command(root, 'working-tree', ['/usr/bin/git', '-C', repo, 'status', '--porcelain=v1'])!
 	builder_closure := frozen_pins(root, 'builder')!
+	library_inputs := compiler_inputs(root)!
 	current_sources(root, framework, framework_pins)!
 	for name in ['androidfw_c_api.h', 'sqlite3.h', 'stb_image.h', 'stb_truetype.h'] {
 		sealed_copy(base, base_pins, 'native/' + name, root + '/native/' + name)!
@@ -415,20 +575,18 @@ fn build(root string, framework string) ! {
 	if command(root, 'cross-specs', [cross, '-dumpspecs'])! != os.read_file(root + '/crosscompiler-specs.txt')! {
 		return error('cross compiler specs differ')
 	}
-	os.setenv('VROOT', '/Users/alex/code/v', true)
-	os.setenv('VEXE', root + '/tools/v_old276', true)
-	os.setenv('V', root + '/tools/v_old276', true)
-	os.setenv('VINIX_V_COMPILER', root + '/tools/v_old276', true)
+	select_compiler_root(root)!
+	selected := root + '/compiler-root/v'
 	original := freeze_closure(root, 'native-generator', command(root, 'native-generator-closure', [
-		root + '/tools/v_old276', '-gc', 'none', '-nocache', '-print-v-files', repo + '/tests/linuxkpi/generate_module.v',
+		selected, '-gc', 'none', '-nocache', '-print-v-files', repo + '/tests/linuxkpi/generate_module.v',
 	])!)!
 	closure := frozen_pins(root, 'native-generator')!
 	unchanged(original)!
-	compile_host(root, 'compile-native-generator', [root + '/tools/v_old276', '-gc', 'none', '-nocache',
+	compile_host(root, 'compile-native-generator', [selected, '-gc', 'none', '-nocache',
 		'-cc', 'cc', '-cflags', '-O2', '-showcc', '-o', root + '/tools/native-generator',
 		repo + '/tests/linuxkpi/generate_module.v'], original)!
 	unchanged(original)!
-	check_frozen_listing(original, command(root, 'native-generator-closure-after', [root + '/tools/v_old276',
+	check_frozen_listing(original, command(root, 'native-generator-closure-after', [selected,
 		'-gc', 'none', '-nocache', '-print-v-files', repo + '/tests/linuxkpi/generate_module.v'])!)!
 	unchanged(original)!
 	find_v := repo + '/build-support/find-v.sh'
@@ -473,7 +631,9 @@ fn build(root string, framework string) ! {
 	write_json(root + '/native/exports.json', exports)!
 	unchanged(reused)!
 	unchanged(builder_closure)!
-	if hash(base + '/sha256.json')! != base_seal || hash(framework + '/sha256.json')! != framework_seal {
+	unchanged(library_inputs)!
+	if hash(base + '/sha256.json')! != base_seal || hash(framework + '/sha256.json')! != framework_seal
+		|| hash(library_base + '/sha256.json')! != library_seal {
 		return error('sealed manifest changed')
 	}
 	write_json(root + '/build.json', {
@@ -482,6 +642,9 @@ fn build(root string, framework string) ! {
 		'source_revision': revision
 		'baseline': base
 		'baseline_sha256': base_seal
+		'compiler_library_baseline': library_base
+		'compiler_library_sha256': library_seal
+		'compiler_root': root + '/compiler-root'
 		'framework': framework
 		'framework_sha256': framework_seal
 		'native_sha256': hash(root + '/native/libvinix-android-native.so')!
@@ -502,20 +665,22 @@ fn bootstrap(root string, framework string) ! {
 	os.mkdir_all(root + '/commands')!
 	os.mkdir_all(root + '/tools')!
 	if hash(compiler)! != old_compiler { return error('sealed builder compiler differs') }
-	os.setenv('VROOT', '/Users/alex/code/v', true)
-	os.setenv('VEXE', compiler, true)
 	copy_pin(os.executable(), root + '/bootstrap-builder', hash(os.executable())!)!
+	library := restore_compiler_root(root)!
+	select_compiler_root(root)!
+	selected := root + '/compiler-root/v'
 	original := freeze_closure(root, 'builder', command(root, 'builder-closure', [
-		compiler, '-gc', 'none', '-nocache', '-path', '@vlib|' + repo + '/tests/native-android-tools', '-print-v-files', self_source,
+		selected, '-gc', 'none', '-nocache', '-path', '@vlib|' + repo + '/tests/native-android-tools', '-print-v-files', self_source,
 	])!)!
 	unchanged(original)!
-	compile_host(root, 'compile-frozen-builder', [compiler, '-gc', 'none', '-nocache', '-cc', 'cc', '-showcc',
+	compile_host(root, 'compile-frozen-builder', [selected, '-gc', 'none', '-nocache', '-cc', 'cc', '-showcc',
 		'-path', '@vlib|' + repo + '/tests/native-android-tools', '-o',
 		root + '/tools/frozen-builder', self_source], original)!
 	unchanged(original)!
-	check_frozen_listing(original, command(root, 'builder-closure-after', [compiler, '-gc', 'none', '-nocache',
+	check_frozen_listing(original, command(root, 'builder-closure-after', [selected, '-gc', 'none', '-nocache',
 		'-path', '@vlib|' + repo + '/tests/native-android-tools', '-print-v-files', self_source])!)!
 	unchanged(original)!
+	unchanged(library)!
 	frozen_pins(root, 'builder')!
 	argv := [root + '/tools/frozen-builder', '--frozen-build', framework, root]
 	write_json(root + '/frozen-launch.json', {
