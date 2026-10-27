@@ -23,6 +23,11 @@ const runner_pin = '8ef76b9e4c9f1eb0cc84780eaa0b618a3a70f317cd4f0e87824ddcdffcae
 const fixture_root = '/Users/alex/.local/state/vinix/android/service-query-fixture-2026-10-27-r1'
 const client_pin = '890de9d4ff410aaf5cd87a52b630ccfa7280fd3c0b2b38eee57159d525b1565d'
 const disabled_pin = 'e5075f571f3b8334dded40accb08257ccfdf83e8526a7b61e502d586daa66048'
+const direct_boot_runner = '/Users/alex/.local/state/vinix/android/direct-boot-run-2026-10-27-r1/run'
+const direct_boot_runner_pin = '8caab5559b73dbe1ffc9645006e899fd82dfbe5cfac810df4f189db9eb152a60'
+const direct_boot_fixture = '/Users/alex/.local/state/vinix/android/direct-boot-fixture-2026-10-27-r1'
+const direct_boot_client_pin = 'a77c25679d47032a8bac73a8ec7751dae271f7828973a8f9b722f004a0ad0c02'
+const direct_boot_disabled_pin = '91e209b043a1f65379ecf16107263d513681bb56bbf25bbce11022d0824f9af5'
 const file_limit = 32 * 1024 * 1024
 const request_limit = 12
 const seconds_limit = 600
@@ -234,13 +239,19 @@ fn pinned_assets() []Asset {
 		Asset{url: '/disabled.apk', path: fixture_root + '/disabled/probe.apk', sha256: disabled_pin}]
 }
 
-fn serve(root string, port string) ! {
+fn direct_boot_assets() []Asset {
+	return [Asset{url: '/direct-boot-run', path: direct_boot_runner, sha256: direct_boot_runner_pin},
+		Asset{url: '/client.apk', path: direct_boot_fixture + '/client/probe.apk', sha256: direct_boot_client_pin},
+		Asset{url: '/disabled.apk', path: direct_boot_fixture + '/disabled/probe.apk', sha256: direct_boot_disabled_pin}]
+}
+
+fn serve(root string, port string, is_direct_boot bool) ! {
 	$if !net_nonblocking_sockets ? { return error('build with -d net_nonblocking_sockets for socket deadlines') }
 	external(root)!
 	if port == '' || port.len > 5 || !port.bytes().all(it >= `0` && it <= `9`)
 		|| port.u64() > 65535 || port != port.u64().str() { return error('canonical port 0..65535 required') }
 	if unsafe { C.mkdir(root.str, 0o700) } != 0 { return error('fresh private output directory required') }
-	inputs := pinned_assets()
+	inputs := if is_direct_boot { direct_boot_assets() } else { pinned_assets() }
 	mut assets := []Asset{}
 	for asset in inputs { assets << snapshot(asset, root + asset.url)! }
 	mut listener := net.listen_tcp(.ip, '127.0.0.1:' + port)!
@@ -248,7 +259,7 @@ fn serve(root string, port string) ! {
 	address := listener.addr()!.str()
 	deadline := time.now().add(seconds_limit * time.second)
 	write_json(root + '/ready.json', json2.encode({
-		'kind': json2.Any('vinix-service-query-http-v1')
+		'kind': json2.Any(if is_direct_boot { 'vinix-direct-boot-http-v1' } else { 'vinix-service-query-http-v1' })
 		'scope': json2.Any(scope)
 		'address': json2.Any(address)
 		'deadline_utc': json2.Any(deadline.str())
@@ -269,11 +280,13 @@ fn main() {
 		self_test(os.args[2]) or { eprintln(err); exit(1) }
 		return
 	}
-	if os.args.len != 4 || os.args[1] != 'serve' {
-		eprintln('usage: service-query-transfer serve FRESH_EXTERNAL_DIR PORT | --self-test FRESH_EXTERNAL_DIR')
+	is_direct_boot := os.args.len == 5 && os.args[1] == 'serve' && os.args[2] == '--direct-boot'
+	if !is_direct_boot && (os.args.len != 4 || os.args[1] != 'serve') {
+		eprintln('usage: service-query-transfer serve [--direct-boot] FRESH_EXTERNAL_DIR PORT | --self-test FRESH_EXTERNAL_DIR')
 		exit(2)
 	}
-	serve(os.args[2], os.args[3]) or { eprintln(err); exit(1) }
+	offset := if is_direct_boot { 1 } else { 0 }
+	serve(os.args[2 + offset], os.args[3 + offset], is_direct_boot) or { eprintln(err); exit(1) }
 }
 
 fn get(address string, request string) !string {
@@ -297,6 +310,12 @@ fn self_test(root string) ! {
 	$if !net_nonblocking_sockets ? { return error('self-test requires nonblocking sockets') }
 	external(root)!
 	if unsafe { C.mkdir(root.str, 0o700) } != 0 { return error('fresh self-test output required') }
+	assert pinned_assets().len == 3 && direct_boot_assets().len == 3
+	assert pinned_assets()[0].url == '/service-query-run' && direct_boot_assets()[0].url == '/direct-boot-run'
+	for index, asset in direct_boot_assets() {
+		assert valid_digest(asset.sha256) && asset.sha256 != pinned_assets()[index].sha256
+		assert asset.path != pinned_assets()[index].path
+	}
 	for bad in ['POST /client.apk HTTP/1.1\r\n\r\n', 'HEAD /client.apk HTTP/1.0\r\n\r\n'] {
 		_, code := parse_request(bad)!
 		assert code == 405
