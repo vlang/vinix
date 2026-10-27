@@ -375,13 +375,14 @@ A rendered frame, interactive menu, login and playable match remain
 unverified. Advertising remains skipped. See the
 [desktop probe checkpoint](../tests/ios/desktop-probe-checkpoint-20261026.md).
 
-The latest no-ads checkpoint implements `NSString stringByAppendingPathComponent:`
-for immutable and mutable strings. Native Foundation comparisons, both sanitized
-host runs and all 23 guest fixtures pass. With the original cooked content,
-Fortnite advances to the unsupported `NSString getCString:maxLength:encoding:`
-method. The game exits 1 without an OOM event or supervisor kill. Progress remains
-4 of 8 observable launch gates; frame, menu, login and playable match are unverified.
-See the [path-appending checkpoint](../tests/ios/string-append-path-checkpoint-20261027.md).
+The latest no-ads checkpoint implements `NSString getCString:maxLength:encoding:`
+for immutable and mutable strings with bounded ASCII, UTF-8 and Latin-1 copying.
+Native Foundation observations, both sanitized host runs, the shared-encoder
+regression tests and all 24 guest fixtures pass. With the original cooked content,
+Fortnite advances to the unsupported `NSBundle infoDictionary` method. The game
+exits 1 without an OOM event or supervisor kill. Progress remains 4 of 8 observable
+launch gates; frame, menu, login and playable match are unverified. See the
+[bounded C-string checkpoint](../tests/ios/string-get-cstring-checkpoint-20261027.md).
 
 Its Mach-O metadata and memory layout are accepted. A structural relocation
 probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
