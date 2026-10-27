@@ -83,6 +83,7 @@ fn objc_record_method(cls u64, name &char, imp u64, types &char, builtin bool) &
 fn C.ios_objc_builtin()
 fn objc_builtin_types(cls u64, selector string) ?string {
 	info := ios_runtime.classes[cls] or { return none }
+	if info.name == 'NSLocale' && info.meta && selector == 'preferredLanguages' { return '@16@0:8' }
 	if info.name in ['NSDictionary', 'NSMutableDictionary'] && info.meta && selector == 'dictionaryWithContentsOfFile:' { return '@24@0:8@16' }
 	if info.name == 'NSNumber' && info.meta && selector == 'numberWithBool:' { return '@20@0:8B16' }
 	if info.name == 'NSNumber' && !info.meta && selector == 'isEqual:' { return 'B24@0:8@16' }

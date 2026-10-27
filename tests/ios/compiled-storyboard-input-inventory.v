@@ -33,14 +33,14 @@ fn main() {
 	revision := os.args[3]
 	if revision.len != 40 || revision.bytes().any(!it.is_hex_digit()) { panic('invalid revision') }
 	os.chdir(root) or { panic(err) }
-	listing := os.exec(['git', 'ls-tree', '-r', '--name-only', revision, '--', 'compat/ios', 'tests/ios/native-checks.v', 'tests/ios/native-init.v', 'tests/ios/notification-checks.v', 'tests/ios/notification-vm.v', 'tests/ios/image-initializers-evidence.v', 'tests/ios/image-initializers-input-inventory.v', 'tests/ios/string-character-search-evidence.v', 'tests/ios/scene-notifications-evidence.v', 'tests/ios/foundation-file-memory-evidence.v', 'tests/ios/foundation-http-evidence.v', 'tests/ios/probe-memory-evidence.v', 'tests/ios/probe-fault-evidence.v', 'tests/ios/probefault', 'tests/ios/probebudget', 'tests/ios/tlsbuild', 'tests/ios/startup-host.v', 'tests/ios/inspect-string-character-search.v', 'tests/ios/inspect-scene-notifications.v', 'tests/ios/inspect-probe-fault.v'])
+	listing := os.exec(['git', 'ls-tree', '-r', '--name-only', revision, '--', 'compat/ios', 'tests/ios/native-checks.v', 'tests/ios/native-init.v', 'tests/ios/notification-checks.v', 'tests/ios/notification-vm.v', 'tests/ios/image-initializers-evidence.v', 'tests/ios/image-initializers-input-inventory.v', 'tests/ios/string-character-search-evidence.v', 'tests/ios/scene-notifications-evidence.v', 'tests/ios/foundation-file-memory-evidence.v', 'tests/ios/foundation-http-evidence.v', 'tests/ios/probe-memory-evidence.v', 'tests/ios/probe-fault-evidence.v', 'tests/ios/probefault', 'tests/ios/probebudget', 'tests/ios/tlsbuild', 'tests/ios/frozenv', 'tests/ios/startup-host.v', 'tests/ios/inspect-string-character-search.v', 'tests/ios/inspect-scene-notifications.v', 'tests/ios/inspect-probe-fault.v'])
 	if listing.exit_code != 0 { panic(listing.output) }
 	mut paths_in_revision := listing.output.trim_space().split_into_lines()
 	for checker in ['tests/ios/cf-string-input-run.v', 'tests/ios/cf-string-input-evidence.v', 'tests/ios/inspect-cf-string-input.v', 'tests/ios/probedesktop/peer.c.v', 'tests/ios/desktop-peer-checks.v', 'tests/ios/desktop-probe-run.v', 'tests/ios/desktop-probe-evidence.v', 'tests/ios/thermal-state-prepare.v', 'tests/ios/thermal-state-evidence.v', 'tests/ios/compiled-storyboard-input-inventory.v', 'tests/ios/compiled-storyboard-evidence.v', 'tests/ios/compiled-storyboard-prepare.v', 'tests/ios/nib-archive-checks.v', 'tests/ios/nibfixture/nibfixture.v', 'tests/ios/application-badge-clear-prepare.v', 'tests/ios/application-badge-clear-evidence.v',
-		'tests/ios/main-selector-run.v', 'tests/ios/main-selector-evidence.v',
+		'tests/ios/main-selector-run.v', 'tests/ios/main-selector-evidence.v', 'tests/ios/inspect-locale-preferred-fault.v',
 		'tests/ios/view-tag-run.v', 'tests/ios/view-tag-evidence.v',
 		'tests/ios/responder-run.v', 'tests/ios/responder-evidence.v',
-		'tests/ios/cooked-content.v', 'tests/ios/string-normalization.v', 'tests/ios/string-cstring-output.v', 'tests/ios/number-bool.v', 'tests/ios/url-resource.v', 'tests/ios/url-resource-native.v', 'tests/ios/string-path.v', 'tests/ios/string-path-native.v', 'tests/ios/bundle-identifier.v', 'tests/ios/bundle-identifier-native.v', 'tests/ios/dictionary-file.v', 'tests/ios/dictionary-file-native.v', 'tests/ios/bundle-info.v', 'tests/ios/bundle-info-native.v', 'tests/ios/string-get-cstring.v', 'tests/ios/string-get-cstring-native.v', 'tests/ios/string-append-path.v', 'tests/ios/string-append-path-native.v',
+		'tests/ios/cooked-content.v', 'tests/ios/string-normalization.v', 'tests/ios/string-cstring-output.v', 'tests/ios/number-bool.v', 'tests/ios/url-resource.v', 'tests/ios/url-resource-native.v', 'tests/ios/string-path.v', 'tests/ios/string-path-native.v', 'tests/ios/bundle-identifier.v', 'tests/ios/bundle-identifier-native.v', 'tests/ios/dictionary-file.v', 'tests/ios/dictionary-file-native.v', 'tests/ios/locale-preferred.v', 'tests/ios/bundle-info.v', 'tests/ios/bundle-info-native.v', 'tests/ios/string-get-cstring.v', 'tests/ios/string-get-cstring-native.v', 'tests/ios/string-append-path.v', 'tests/ios/string-append-path-native.v',
 		'tests/ios/application-badge-run.v', 'tests/ios/application-badge-evidence.v', 'tests/ios/inspect-application-badge.v', 'tests/ios/window-run.v', 'tests/ios/window-evidence.v', 'tests/ios/string-float-run.v', 'tests/ios/string-float-evidence.v', 'tests/ios/inspect-string-float.v',
 		'tests/ios/string-cstring-run.v', 'tests/ios/string-cstring-evidence.v', 'tests/ios/inspect-string-cstring.v', 'tests/ios/bundle-receipt-run.v', 'tests/ios/bundle-receipt-evidence.v', 'tests/ios/inspect-bundle-receipt.v', 'tests/ios/cf-string-output-run.v', 'tests/ios/cf-string-output-evidence.v', 'tests/ios/inspect-cf-string-output.v', 'tests/ios/search-path-run.v', 'tests/ios/search-path-evidence.v', 'tests/ios/inspect-search-path-calls.v', 'tests/ios/probe-vm-evidence.v', 'tests/ios/probe-vm-tags-evidence.v', 'tests/ios/block-byref-evidence.v', 'tests/ios/dictionary-snapshot-evidence.v', 'tests/ios/inspect-dictionary-snapshot-fault.v', 'tests/ios/inline-pthread-self-run.v', 'tests/ios/inline-pthread-self-evidence.v'] {
 		listing_checker := os.exec(['git', 'ls-tree', '-r', '--name-only', revision, '--', checker])
@@ -58,6 +58,7 @@ fn main() {
 	}
 	mut paths := [
 		'build/ios/fortnite/ns-calendar-checks/toolchain/v',
+		'build/ios/fortnite/ns-calendar-checks/toolchain/v.mod',
 		'build/ios/fortnite/ns-calendar-checks/toolchain/vlib/os/execute_capture_nix.c',
 		'build/ios/fortnite/ns-calendar-checks/toolchain/vlib/builtin/segfault_handler_nix.c',
 		'build/ios/fortnite/socket-kernel-arm64/bin/vinix',
@@ -93,10 +94,12 @@ fn main() {
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSObject.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSProcessInfo.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSBundle.h',
+		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSLocale.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSDictionary.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSString.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSPathUtilities.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/CoreFoundation.framework/Versions/A/Headers/CFString.h',
+		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/CoreFoundation.framework/Versions/A/Headers/CFLocale.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/CoreFoundation.framework/Versions/A/Headers/CFNumber.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/CoreFoundation.framework/Versions/A/Headers/CFRunLoop.h',
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/Foundation.framework/Versions/C/Headers/NSURL.h',

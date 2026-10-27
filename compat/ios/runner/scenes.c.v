@@ -275,7 +275,7 @@ fn objc_responds(object u64, selector &char) bool {
 			'NSNotification' { name == 'notificationWithName:object:userInfo:' }
 			'NSBundle' { name == 'mainBundle' }
 			'NSURL' { name in ['fileURLWithPath:', 'URLWithString:'] }
-			'NSLocale' { name == 'currentLocale' }
+			'NSLocale' { name in ['currentLocale', 'preferredLanguages'] }
 			'UIDevice' { name == 'currentDevice' }
 			'UIApplication' { name == 'sharedApplication' }
 			else { false }

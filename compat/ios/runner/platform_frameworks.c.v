@@ -69,8 +69,11 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 				frame.x[0] = ios_runtime.audio_session
 			}
 			'NSLocale' {
-				if selector != 'currentLocale' { return false }
-				frame.x[0] = ns_locale_current()
+				match selector {
+					'currentLocale' { frame.x[0] = ns_locale_current() }
+					'preferredLanguages' { frame.x[0] = objc_autorelease(cf_locale_copy_preferred_languages()) }
+					else { return false }
+				}
 			}
 			'NSFileHandle' {
 				if selector != 'fileHandleForReadingFromURL:error:' { return false }

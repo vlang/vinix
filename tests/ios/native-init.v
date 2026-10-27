@@ -488,6 +488,9 @@ fn main() {
 			if os.exists('/opt/ios/dictionary-file-checks') {
 				require_child('/opt/ios/dictionary-file-checks')
 			}
+			if os.exists('/opt/ios/locale-preferred-checks') {
+				require_child('/opt/ios/locale-preferred-checks')
+			}
 			if os.exists('/opt/ios/bundle-info-checks') {
 				require_child('/opt/ios/bundle-info-checks')
 			}
