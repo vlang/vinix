@@ -47,3 +47,20 @@ The source baseline was `57a10806915c7539c6ac50468f81d2a700051f58`.
 `profile-final-run.log` retain the native qualification. The pinned compiler is
 `/Users/alex/code/v-tccbin-bootstrap-20261026/v`, SHA-256
 `0cc6c1d34c1811a818e4ae89853116861a4b067d4251af257851a7714f0d11fe`.
+
+The complete static ARM producer is retained at
+`/Users/alex/.local/state/vinix/android/maps-account-guest-build-2026-10-27-r7/`,
+from source revision `d55f919c628712617a8c8cda0b68e5f683fd5270` and the controller
+source digest above. Its frozen native complete self-test passed; generation,
+cross-compilation, static linking and input-closure verification passed. The
+producer took 70.57 seconds, used at most 460,374,016 bytes RSS and reported zero
+swaps. `producer-build.log` is retained in the polling audit directory.
+
+| Producer file | SHA-256 |
+| --- | --- |
+| `sha256.json` | `680942c83d4877b8258e5f53ac454aebc3c021331470a002754bc1647ae1e890` |
+| `bin/maps-account-guest` | `9c213a85235b802fc3b068ff2d195ea207ba82ded7fe6cdee408e0bd55921c0c` |
+| `build.json` | `c6fe1e548a38fa149e27aecc8ebae6c40a2c5929dfd5a2ce0e19904290ee620b` |
+
+This producer has not yet been booted in the guest. The measured native fixture
+does not substitute for live ARM process RSS or an authenticated Maps session.
