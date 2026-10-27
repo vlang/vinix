@@ -22,3 +22,35 @@ fn ns_string_last_path_component(object u64) u64 {
 	component := unsafe { tos(text.str + start, end - start) }
 	return objc_autorelease(owned_string(component))
 }
+
+fn ns_string_append_path_component(object u64, other u64) u64 {
+	C.ios_objc_initialize_lock()
+	left := mutable_string_source(object)
+	right := mutable_string_source(other)
+	// Foundation rejects NULs anywhere in either input, even in a component
+	// that would otherwise be empty after separator normalization.
+	if left.contains('\x00') || right.contains('\x00') {
+		C.ios_objc_initialize_unlock()
+		return 0
+	}
+	if u64(left.len) + u64(right.len) + 1 > mutable_string_limit {
+		panic('iOS: path append exceeds the supported size')
+	}
+	mut joined := []u8{cap: left.len + right.len + 1}
+	defer { unsafe { joined.free() } }
+	for part in [left, right]! {
+		if joined.len > 0 && joined[joined.len - 1] != `/` && part.len > 0 {
+			joined << `/`
+		}
+		for byte in part {
+			if byte == `/` && joined.len > 0 && joined[joined.len - 1] == `/` { continue }
+			joined << byte
+		}
+	}
+	if joined.len > 1 && joined[joined.len - 1] == `/` { joined.delete_last() }
+	// The borrowed source bytes no longer participate after dropping the lock.
+	// Construct an immutable, autoreleased result outside application callbacks.
+	C.ios_objc_initialize_unlock()
+	text := unsafe { tos(joined.data, joined.len) }
+	return objc_autorelease(owned_string(text))
+}
