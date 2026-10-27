@@ -39,6 +39,28 @@ Start it with a fresh result directory:
 /Users/alex/.local/state/vinix/android/onboarding-api-transfer-build-2026-10-27-r1/transfer serve --onboarding-apis /Users/alex/.local/state/vinix/android/onboarding-api-transfer-live-2026-10-27-r1 18765
 ```
 
+As root in a fresh guest, provision the dedicated fixture identity before
+running either APK. UID/GID 10117 is an example selected for this run; staging
+does not create it. First check that neither the name nor numeric ID is used:
+
+```sh
+grep -nE '(^onboarding-probe:|:10117:)' /etc/passwd /etc/group
+```
+
+Proceed only when that check reports no matches. The guest's account tools
+create both records without a home or login shell:
+
+```sh
+/usr/sbin/addgroup -g 10117 onboarding-probe
+/usr/sbin/adduser -D -H -u 10117 -G onboarding-probe -s /bin/false onboarding-probe
+grep -nE '^onboarding-probe:' /etc/passwd /etc/group
+```
+
+Verify that the passwd UID and primary GID, and the group GID, are all 10117.
+Do not repeat provisioning if the exact account already exists. Reserve
+10012/10013 for Maps/GMS and 10014 for the token fixture. Both standalone tests
+can reuse the dedicated fixture identity sequentially with fresh output paths.
+
 Download from the QEMU guest through usernet:
 
 ```sh
