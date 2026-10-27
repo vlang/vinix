@@ -20,12 +20,17 @@ struct Result {
 	pid int
 	peak_sampled_rss_bytes u64
 	output_bytes u64
+	initial_free_bytes u64
+	limits ObservedLimits
 }
+
+struct ObservedLimits { reserve u64; growth u64 }
 
 fn fixture(mode string) {
 	C.alarm(10)
 	match mode {
 		'literal' { print(os.args[3]); eprint(':stderr'); exit(37) }
+		'growth' { exit(0) }
 		'flood' { for _ in 0 .. 1024 { print('x'.repeat(8192)) } }
 		'wall' { time.sleep(5 * time.second) }
 		'leader' {
@@ -66,6 +71,14 @@ fn control(runner string, out string, mode string, options []string, expected st
 			os.read_file(log)! != 'literal $(no-shell) `no-shell` $HOME:stderr' {
 			return error('literal argv, merged output or exit code differs')
 		}
+		if report.limits.growth != 512 * u64(1024 * 1024) { return error('default disk growth budget differs') }
+	} else if mode == 'growth' {
+		if result.exit_code != 0 || report.exit_code != 0 || report.reason != '' ||
+			report.limits.growth != 8 * u64(1024 * 1024 * 1024) ||
+			report.initial_free_bytes < report.limits.reserve ||
+			report.initial_free_bytes - report.limits.reserve < report.limits.growth {
+			return error('maximum backed disk growth budget differs')
+		}
 	} else if result.exit_code != 125 || report.exit_code != 125 || report.reason != expected {
 		return error(mode + ': expected ' + expected + ', got ' + report.reason)
 	}
@@ -90,7 +103,22 @@ fn main() {
 	runner := os.real_path(os.args[1]); out := os.args[2]
 	if os.exists(out) { eprintln('fresh output directory required'); exit(2) }
 	os.mkdir_all(out) or { eprintln(err); exit(1) }
+	self := os.exec([runner, '--self-test'])
+	if self.exit_code != 0 || !self.output.contains('BOUNDED-COMMAND-SELF-PASS') {
+		eprintln('disk budget boundary selftest failed'); exit(1)
+	}
+	os.write_file(out + '/self-test.log', self.output) or { eprintln(err); exit(1) }
 	control(runner, out, 'literal', []string{}, '') or { eprintln(err); exit(1) }
+	control(runner, out, 'growth', ['growth=8589934592'], '') or { eprintln(err); exit(1) }
+	for invalid in ['8589934593', '18446744073709551615'] {
+		receipt := out + '/invalid-growth-' + invalid + '.json'
+		refused_growth := os.exec([runner, 'root=' + out + '/absent', 'log=' + out + '/invalid-growth.log',
+			'receipt=' + receipt, 'growth=' + invalid, '--', '/usr/bin/true'])
+		if refused_growth.exit_code != 125 || os.exists(receipt) || !refused_growth.output.contains('invalid resource limit') {
+			eprintln('oversized growth budget accepted'); exit(1)
+		}
+		os.write_file(out + '/invalid-growth-' + invalid + '.log', refused_growth.output) or { eprintln(err); exit(1) }
+	}
 	control(runner, out, 'flood', ['output=4096'], 'output limit') or { eprintln(err); exit(1) }
 	control(runner, out, 'wall', ['wall_ms=250'], 'wall time') or { eprintln(err); exit(1) }
 	control(runner, out, 'leader', ['wall_ms=250'], 'wall time') or { eprintln(err); exit(1) }
@@ -110,5 +138,5 @@ fn main() {
 	if reserve.exit_code != 125 || reserve_report.pid != 0 || reserve_report.reason != 'disk reserve' {
 		eprintln('initial disk reserve did not refuse before spawn'); exit(1)
 	}
-	println('BOUNDED-COMMAND-PASS literal exit37 fresh-root fresh-evidence flood wall exited-leader descendant-rss')
+	println('BOUNDED-COMMAND-PASS literal exit37 fresh-root fresh-evidence backed-growth max-growth-refusal flood wall exited-leader descendant-rss')
 }

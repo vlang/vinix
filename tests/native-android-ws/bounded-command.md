@@ -13,9 +13,14 @@ evidence, and the receipt survives a producer that removes its generated root.
 
 Defaults are 2 GiB aggregate sampled RSS, 300 seconds, 1 GiB free disk reserve,
 512 MiB observed free-space decrease, and 4 MiB merged stdout/stderr. Explicit
-`rss=BYTES`, `wall_ms=MS`, `output=BYTES`, `growth=BYTES` can tighten those bounds;
-`reserve=BYTES` can raise the reserve. Disk readings use bounded `df` output,
-avoiding the pinned V library's macOS `statvfs` layout problem. Shared-volume
+`rss=BYTES`, `wall_ms=MS`, `output=BYTES` can tighten those bounds;
+`reserve=BYTES` can raise the reserve. An explicit `growth=BYTES` can select a
+budget up to 8 GiB; its default remains 512 MiB. Before spawning, free space must
+cover the whole reserve plus the growth budget, with overflow-safe arithmetic.
+For example, `growth=8589934592` requires at least 9 GiB free with the default
+reserve. The reserve and observed growth limits remain enforced during the run.
+Disk readings use bounded `df` output, avoiding the pinned V library's macOS
+`statvfs` layout problem. Shared-volume
 activity contributes to the observed disk decrease.
 
 The command and ordinary compiler descendants inherit a fresh process group.
@@ -46,5 +51,9 @@ check-bounded-command /absolute/bounded-command /external/fresh-controls
 The controls cover literal arguments, exit 37, merged output, absent generated
 root, exclusive evidence creation, output overflow, wall timeout, an exited
 leader with a live stdout-holding descendant, aggregate descendant RSS, and
-initial disk-reserve refusal. Each fixture has an alarm, and the checker has a
-30-second alarm. No VM, native build or large disk fixture is involved.
+initial disk-reserve refusal. They also verify the default growth budget, accept
+an explicitly backed 8 GiB budget, reject larger values, and check capacity
+boundaries and integer overflow without writing a large disk fixture. The
+maximum-budget acceptance control requires 9 GiB free. Each fixture has an alarm,
+and the checker has a 30-second alarm. No VM, native build or large disk fixture
+is involved.

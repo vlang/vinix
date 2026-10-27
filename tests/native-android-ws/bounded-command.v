@@ -237,6 +237,11 @@ fn free_bytes(path string) !u64 {
 
 fn outside(path string, root string) bool { return path != root && !path.starts_with(root + os.path_separator) }
 
+// Subtraction after the reserve check avoids overflow for large explicit reserves.
+fn disk_budget_backed(available u64, reserve u64, growth u64) bool {
+	return available >= reserve && available - reserve >= growth
+}
+
 fn run(args []string) !int {
 	separator := args.index('--')
 	if separator < 0 || separator + 1 >= args.len { return error('missing -- COMMAND [ARGS]') }
@@ -255,7 +260,7 @@ fn run(args []string) !int {
 			else { return error('unknown option: ' + key) }
 		}
 	}
-	if limits.rss == 0 || limits.rss > 2 * u64(1024 * 1024 * 1024) || limits.wall_ms <= 0 || limits.output == 0 || limits.output > 4 * u64(1024 * 1024) || limits.reserve < 1024 * u64(1024 * 1024) || limits.growth > 512 * u64(1024 * 1024) {
+	if limits.rss == 0 || limits.rss > 2 * u64(1024 * 1024 * 1024) || limits.wall_ms <= 0 || limits.output == 0 || limits.output > 4 * u64(1024 * 1024) || limits.reserve < 1024 * u64(1024 * 1024) || limits.growth > 8 * u64(1024 * 1024 * 1024) {
 		return error('invalid resource limit')
 	}
 	if root == '' || log == '' || receipt_path == '' { return error('root, log and receipt paths required') }
@@ -287,6 +292,9 @@ fn run(args []string) !int {
 	initial := free_bytes(disk_path) or { report.reason = 'initial disk probe failed: ' + err.msg(); return 125 }
 	report.initial_free_bytes = initial; report.minimum_free_bytes = initial
 	if initial < limits.reserve { report.reason = 'disk reserve'; return 125 }
+	if !disk_budget_backed(initial, limits.reserve, limits.growth) {
+		report.reason = 'disk growth budget'; return 125
+	}
 	mut p := start_command(report.argv) or { report.reason = err.msg(); return 125 }
 	report.pid = p.pid
 	defer { p.close() }
@@ -340,6 +348,16 @@ fn run(args []string) !int {
 }
 
 fn main() {
+	if os.args.len == 2 && os.args[1] == '--self-test' {
+		assert disk_budget_backed(0, 0, 0)
+		assert disk_budget_backed(9, 1, 8)
+		assert !disk_budget_backed(8, 1, 8)
+		assert !disk_budget_backed(0, ~u64(0), 1)
+		assert !disk_budget_backed(~u64(0), ~u64(0), 1)
+		assert disk_budget_backed(~u64(0), ~u64(0), 0)
+		println('BOUNDED-COMMAND-SELF-PASS backed-disk-budget overflow-refusal')
+		return
+	}
 	code := run(os.args[1..]) or {
 		eprintln('bounded-command: ${err}\nusage: bounded-command root=GENERATED_DIR log=FRESH_LOG receipt=FRESH_JSON -- COMMAND [ARGS]')
 		exit(125)
