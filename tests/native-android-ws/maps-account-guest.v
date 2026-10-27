@@ -33,6 +33,9 @@ const result_root = bundle_root + '/results'
 const runtime_root = '/opt/vinix-android-aarch64'
 const broker_root = '/run/vinix-maps-account'
 const controller_path = bundle_root + '/bin/maps-account-guest'
+const app_host_path = '/usr/bin/vinix-android-calculator'
+// The retained base image's native app host; it is a separate compositor child.
+const app_host_pin = '6a48bc4174eccc330606629b99cd266989c80bde894e7ff7beed07f67b45c2c2'
 const helper_path = runtime_root + '/usr/bin/vinix-android-account-ui'
 const broker_path = runtime_root + '/usr/bin/native-account-broker'
 const launcher_path = runtime_root + '/usr/bin/run-android'
@@ -97,6 +100,22 @@ struct DesktopIdentity {
 	window_socket     string
 	peer              Peer
 	paths             []PathIdentity
+}
+
+struct AppHostIdentity {
+	process           Identity
+	uid               u32
+	gid               u32
+	executable        string
+	executable_sha256 string
+	app_selector      string
+}
+
+struct MapsLaunch {
+	kind     string = 'vinix-maps-account-launch-v1'
+	process  Identity
+	app_host AppHostIdentity
+	desktop  Identity
 }
 
 fn hash(path string) !string {
@@ -447,6 +466,71 @@ fn desktop_identity() !DesktopIdentity {
 		pid = current.parent
 	}
 	return error('invoke from the real desktop GUI terminal; compositor ancestor absent')
+}
+
+fn check_app_host(host AppHostIdentity, launched Identity, desktop DesktopIdentity) ! {
+	if host.process.pid <= 0 || host.process.start == '' || launched.pid <= 0
+		|| launched.start == '' || launched.pid == host.process.pid
+		|| host.process.pid == desktop.process.pid || launched.pid == desktop.process.pid
+		|| launched.parent != host.process.pid || host.process.parent != desktop.process.pid
+		|| host.uid != desktop.uid || host.gid != desktop.gid
+		|| host.executable !in [app_host_path, '/usr/bin/vinix-desktop']
+		|| host.executable_sha256 != app_host_pin
+		|| host.app_selector != '--vinix-app=vinix-android-calculator' {
+		return error('Maps must be launched by the selected native Android app host')
+	}
+}
+
+fn app_host_path_target(kind os.FileType, owner u32, link string) !string {
+	if owner != 0 { return error('native Android app host path owner differs') }
+	if kind == .regular && link == '' { return app_host_path }
+	if kind != .symbolic_link || link != 'vinix-desktop' {
+		return error('native Android app host path shape differs')
+	}
+	return '/usr/bin/vinix-desktop'
+}
+
+fn app_host_target() !string {
+	for path in ['/', '/usr', '/usr/bin'] { protected(path, 0, false, .directory)! }
+	st := os.lstat(app_host_path)!
+	link := if st.get_filetype() == .symbolic_link { os.readlink(app_host_path)! } else { '' }
+	target := app_host_path_target(st.get_filetype(), st.uid, link)!
+	protected(target, 0, false, .regular)!
+	return target
+}
+
+fn app_host_selector(args []string) !string {
+	if args.len < 3 || args[0] != app_host_path
+		|| args[1] != '--vinix-app=vinix-android-calculator'
+		|| args.count(it.starts_with('--vinix-app=')) != 1 {
+		return error('native Android app host command differs')
+	}
+	return args[1]
+}
+
+fn app_host_identity(launched Identity, desktop DesktopIdentity) !AppHostIdentity {
+	current := identity(launched.parent)!
+	base := '/proc/' + current.pid.str()
+	target := app_host_target()!
+	executable := os.readlink(base + '/exe')!
+	if executable !in [app_host_path, target] { return error('native Android app host executable differs') }
+	status := os.read_file(base + '/status')!
+	args := os.read_file(base + '/cmdline')!.split('\x00')
+	host := AppHostIdentity{current, status_id(status, 'Uid')!, status_id(status, 'Gid')!,
+		executable, hash(base + '/exe')!, app_host_selector(args)!}
+	check_app_host(host, launched, desktop)!
+	if identity(launched.pid)! != launched || identity(current.pid)! != current
+		|| identity(desktop.process.pid)! != desktop.process || app_host_target()! != target {
+		return error('native Android app host ancestry changed')
+	}
+	return host
+}
+
+fn check_fresh_surface(surface string, host Identity, exists bool, symlink bool) ! {
+	if surface != '/tmp/vinix-android-' + host.pid.str() + '.surface' {
+		return error('surface path differs from selected native Android app host')
+	}
+	if exists || symlink { return error('fresh native Android app surface required') }
 }
 
 struct BrowserPin {
@@ -1190,19 +1274,47 @@ fn stop_requested(controller Identity, broker Identity) !bool {
 	return true
 }
 
-fn track_maps_launch(mut owned map[int]Identity, desktop Identity) ! {
+fn check_maps_launch(launched MapsLaunch, desktop DesktopIdentity) ! {
+	if launched.kind != 'vinix-maps-account-launch-v1' || launched.desktop != desktop.process {
+		return error('Maps launch receipt compositor differs')
+	}
+	check_app_host(launched.app_host, launched.process, desktop)!
+}
+
+fn retain_receipted_process(mut owned map[int]Identity, current Identity, expected Identity) {
+	if expected.pid > 0 && expected.start != '' && current.pid == expected.pid
+		&& current.start == expected.start {
+		owned[current.pid] = current
+	}
+}
+
+fn track_maps_launch(mut owned map[int]Identity, desktop DesktopIdentity) ! {
 	path := result_root + '/maps-launch.json'
 	if !os.exists(path) && !os.is_link(path) { return }
 	protected(path, 0, true, .regular)!
 	if os.lstat(path)!.nlink != 1 || os.lstat(path)!.size > 4096 {
 		return error('Maps process receipt shape differs')
 	}
-	launched := json2.decode[Identity](os.read_file(path)!)!
-	if launched.pid <= 0 || launched.parent != desktop.pid {
-		return error('Maps process is not the selected desktop child')
+	launched := json2.decode[MapsLaunch](os.read_file(path)!)!
+	check_maps_launch(launched, desktop)!
+	first := launched.app_host.process.pid !in owned
+	current := identity(launched.process.pid) or { Identity{} }
+	host := identity(launched.app_host.process.pid) or { Identity{} }
+	// The root-owned receipt attests both start ticks. Keep each live process
+	// independently: the Maps child can exit before the first broker poll,
+	// while its native app host remains alive displaying the failed window.
+	retain_receipted_process(mut owned, current, launched.process)
+	retain_receipted_process(mut owned, host, launched.app_host.process)
+	if current.pid == 0 { return }
+	if current.start != launched.process.start { return error('Maps launch PID was reused') }
+	if current != launched.process || host != launched.app_host.process
+		|| identity(desktop.process.pid)! != desktop.process {
+		return error('Maps launch app host ancestry changed')
 	}
-	current := identity(launched.pid) or { return }
-	if current.start == launched.start { owned[launched.pid] = launched }
+	// Hash the 18 MiB host once at acceptance, not on every 50 ms broker poll.
+	if first && app_host_identity(current, desktop)! != launched.app_host {
+		return error('Maps launch app host executable or principal changed')
+	}
 }
 
 fn broker_session(mut receipt Receipt) ! {
@@ -1245,7 +1357,7 @@ fn broker_session(mut receipt Receipt) ! {
 		child.pid:   receipt.broker
 	}
 	defer {
-		track_maps_launch(mut owned, receipt.desktop.process) or {}
+		track_maps_launch(mut owned, receipt.desktop) or {}
 		discover(mut owned) or {}
 		for item in selected_processes() or { []Identity{} } { owned[item.pid] = item }
 		kill_owned(owned)
@@ -1268,7 +1380,7 @@ fn broker_session(mut receipt Receipt) ! {
 			log.write_string(block)!
 			output += block
 		}
-		track_maps_launch(mut owned, receipt.desktop.process)!
+		track_maps_launch(mut owned, receipt.desktop)!
 		discover(mut owned)!
 		for item in selected_processes()! { owned[item.pid] = item }
 		if !receipt.service_ready && output.split_into_lines().any(it.starts_with('ANDROID-ACCOUNT-BROKER-SERVICE package=com.google.android.gms pid=')) {
@@ -1317,11 +1429,9 @@ fn launch_maps() ! {
 		return error('Maps compositor differs from broker UI compositor')
 	}
 	approved_runtime_mount()!
+	host := app_host_identity(identity(os.getpid())!, desktop)!
 	surface := os.getenv('VINIX_SURFACE_PATH')
-	if surface != '/tmp/vinix-android-' + desktop.process.pid.str() + '.surface'
-		|| os.exists(surface) || os.is_link(surface) {
-		return error('fresh compositor surface required')
-	}
+	check_fresh_surface(surface, host.process, os.exists(surface), os.is_link(surface))!
 	// Inspect the inherited descriptor, not its /proc symlink.
 	mut pipe := C.stat{}
 	if C.fstat(0, &pipe) != 0 || u32(pipe.st_mode) & u32(C.S_IFMT) != u32(C.S_IFIFO) {
@@ -1338,7 +1448,12 @@ fn launch_maps() ! {
 		return error('cannot retain private Maps diagnostics')
 	}
 	log.close()
-	publish_fresh(result_root + '/maps-launch.json', json2.encode(identity(os.getpid())!) + '\n', 0o600)!
+	launched := MapsLaunch{ process: identity(os.getpid())!, app_host: host, desktop: desktop.process }
+	check_maps_launch(launched, desktop)!
+	if app_host_identity(launched.process, desktop)! != host {
+		return error('Maps app host changed before launch')
+	}
+	publish_fresh(result_root + '/maps-launch.json', json2.encode(launched) + '\n', 0o600)!
 	println('MAPS-ACCOUNT-LAUNCH uid=10012 gid=10012 package=com.google.android.apps.maps')
 	os.execvp(launcher_path, [maps_apk])!
 }
@@ -1609,12 +1724,107 @@ fn required_deployment_inputs_self_test() ! {
 	}
 }
 
+fn app_host_self_test() ! {
+	if app_host_path_target(.regular, 0, '')! != app_host_path
+		|| app_host_path_target(.symbolic_link, 0, 'vinix-desktop')! != '/usr/bin/vinix-desktop' {
+		return error('retained native app host path shapes rejected')
+	}
+	for link in ['', '/usr/bin/vinix-desktop', '../bin/vinix-desktop', 'vinix-desktop-gpu', 'other'] {
+		if _ := app_host_path_target(.symbolic_link, 0, link) {
+			return error('unselected app host symlink accepted')
+		}
+	}
+	for kind in [os.FileType.regular, .symbolic_link, .directory] {
+		if _ := app_host_path_target(kind, 10012, if kind == .symbolic_link { 'vinix-desktop' } else { '' }) {
+			return error('foreign app host path owner accepted')
+		}
+	}
+	if _ := app_host_path_target(.directory, 0, '') { return error('app host directory accepted') }
+	desktop := DesktopIdentity{ process: Identity{ pid: 41, parent: 1, start: '100' } }
+	host := AppHostIdentity{
+		process: Identity{ pid: 42, parent: 41, start: '101' }
+		executable: app_host_path
+		executable_sha256: app_host_pin
+		app_selector: '--vinix-app=vinix-android-calculator'
+	}
+	process := Identity{ pid: 43, parent: 42, start: '102' }
+	check_app_host(host, process, desktop)!
+	check_app_host(AppHostIdentity{ ...host, executable: '/usr/bin/vinix-desktop' }, process, desktop)!
+	for case in 0 .. 10 {
+		invalid := match case {
+			0 { AppHostIdentity{ ...host, process: Identity{ ...host.process, parent: 1 } } }
+			1 { AppHostIdentity{ ...host, process: Identity{ ...host.process, pid: 41 } } }
+			2 { AppHostIdentity{ ...host, process: Identity{ ...host.process, start: '' } } }
+			3 { AppHostIdentity{ ...host, uid: 10012 } }
+			4 { AppHostIdentity{ ...host, gid: 10013 } }
+			5 { AppHostIdentity{ ...host, executable: '/tmp/vinix-android-calculator' } }
+			6 { AppHostIdentity{ ...host, executable_sha256: '0'.repeat(64) } }
+			7 { AppHostIdentity{ ...host, app_selector: '--vinix-app=vinix-terminal' } }
+			8 { AppHostIdentity{ ...host, process: Identity{ ...host.process, pid: 0 } } }
+			else { AppHostIdentity{ ...host, executable: '/usr/bin/vinix-desktop-gpu' } }
+		}
+		if _ := check_app_host(invalid, process, desktop) {
+			return error('unselected app host accepted: ' + case.str())
+		}
+	}
+	for invalid in [Identity{ ...process, parent: 41 }, Identity{ ...process, pid: 42 },
+		Identity{ ...process, pid: 41 }, Identity{ ...process, pid: 0 }, Identity{ ...process, start: '' }] {
+		if _ := check_app_host(host, invalid, desktop) { return error('unbound Maps child accepted') }
+	}
+	args := [app_host_path, '--vinix-app=vinix-android-calculator', '--request-fd=3', '--response-fd=6']
+	app_host_selector(args)!
+	for invalid in [
+		[app_host_path],
+		['/usr/bin/vinix-desktop', args[1], args[2]],
+		[app_host_path, '--vinix-app=vinix-terminal', args[2]],
+		[app_host_path, args[1], '--vinix-app=vinix-terminal'],
+		[app_host_path, args[1], args[1]],
+	] {
+		if _ := app_host_selector(invalid) { return error('ambiguous app host selector accepted') }
+	}
+	surface := '/tmp/vinix-android-42.surface'
+	check_fresh_surface(surface, host.process, false, false)!
+	for invalid in ['/tmp/vinix-android-41.surface', '/tmp/vinix-android-43.surface',
+		'/tmp/vinix-android-042.surface', '/tmp/../tmp/vinix-android-42.surface', '', 'vinix-android-42.surface'] {
+		if _ := check_fresh_surface(invalid, host.process, false, false) {
+			return error('unowned surface path accepted')
+		}
+	}
+	for flags in [[true, false], [false, true], [true, true]] {
+		if _ := check_fresh_surface(surface, host.process, flags[0], flags[1]) {
+			return error('existing or dangling-symlink surface accepted')
+		}
+	}
+	launch := MapsLaunch{ process: process, app_host: host, desktop: desktop.process }
+	check_maps_launch(json2.decode[MapsLaunch](json2.encode(launch))!, desktop)!
+	for invalid in [MapsLaunch{ ...launch, kind: 'other' },
+		MapsLaunch{ ...launch, desktop: Identity{ ...desktop.process, start: '99' } },
+		MapsLaunch{ ...launch, process: Identity{ ...process, parent: 41 } },
+		MapsLaunch{ ...launch, app_host: AppHostIdentity{ ...host, process: Identity{ ...host.process, parent: 1 } } }] {
+		if _ := check_maps_launch(invalid, desktop) { return error('unbound launch receipt accepted') }
+	}
+	mut retained := map[int]Identity{}
+	retain_receipted_process(mut retained, Identity{}, process)
+	retain_receipted_process(mut retained, host.process, host.process)
+	if retained.len != 1 || retained[host.process.pid] != host.process {
+		return error('early Maps exit lost its live app host cleanup')
+	}
+	retain_receipted_process(mut retained, Identity{ ...process, parent: 1 }, process)
+	if retained[process.pid].parent != 1 { return error('reparented Maps process lost cleanup') }
+	for invalid in [Identity{}, Identity{ ...process, pid: 44 }, Identity{ ...process, start: '103' }] {
+		mut rejected := map[int]Identity{}
+		retain_receipted_process(mut rejected, invalid, process)
+		if rejected.len != 0 { return error('unreceipted process retained for cleanup') }
+	}
+}
+
 fn self_test() ! {
 	auth_init_self_test()!
 	browser_init_self_test()!
 	required_deployment_inputs_self_test()!
 	protected_directory_self_test()!
 	sqlite_self_test()!
+	app_host_self_test()!
 	if !canonical_absolute('/opt/maps/app.apk') || canonical_absolute('/opt/../maps/app.apk')
 		|| canonical_absolute('/opt//maps.apk') || canonical_absolute('maps.apk')
 		|| valid_pin('A'.repeat(64)) || !valid_pin('a'.repeat(64)) {
@@ -1670,7 +1880,7 @@ fn self_test() ! {
 			return error('stale stop request accepted')
 		}
 	}
-	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths protected-directory-symlink-and-mode-rejection process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation bounded-numeric-auth-diagnostics bounded-numeric-browser-diagnostics mandatory-browser-client')
+	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths protected-directory-symlink-and-mode-rejection process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation bounded-numeric-auth-diagnostics bounded-numeric-browser-diagnostics mandatory-browser-client native-app-host-identity-and-selector fresh-app-host-surface grandchild-launch-receipt-binding')
 }
 
 fn main() {
