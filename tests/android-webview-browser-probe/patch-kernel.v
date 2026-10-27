@@ -59,6 +59,15 @@ const direct_boot_framework_seal = 'a3445b78a7c4049fa71ee0f81469dca7da2236c36788
 const direct_boot_jar = 'bf3853c98155e420162dc8d1759735a497e8d8bb9724cd9eb7f209c4edb04c0d'
 const direct_boot_dex = '3742f3915d4989ced425914e1fe4f6f662bd32566183534a849f8ad8ccd07213'
 const direct_boot_build = '017232d7cef0527e639c3689cca3cc87502746aaa9608760d6bb7f362cbbd2f4'
+const context_storage_base = '/Users/alex/.local/state/vinix/android/maps-direct-boot-r1'
+const context_storage_base_seal = 'fa9e552f7faf4aabfcf17821efc442918bab5576ea230d25eb9dcd6788d62285'
+const context_storage_boot_sha = 'b66d6c7d6666d492edc6a93af84a7b258d277196273e4270691fc8349ecd7ab8'
+const context_storage_direct_boot_overlay = '33c2c38893f72f389601666dc8039c8855c935c91e20c9b8dc04816a6142ae56'
+const context_storage_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-credential-storage-framework-2026-10-27-r1'
+const context_storage_framework_seal = 'cb07c656d6c63e9713926a0c2fac15f14060098baf8efb56d12fa7d1fd8c2691'
+const context_storage_jar = '9b894cc92c5d3d0e871b5389285b09b107d49cd5c4493fcc2449f3510f961352'
+const context_storage_dex = 'b96a441b6eca36e0a6fa7a6da01d9e4508136e64ec0f0f3850cf15e2d90ff132'
+const context_storage_build = '486dfea3930686a5b846e2782f759e7ab7a4f55f320a603a145a471b18cabe3e'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -337,6 +346,134 @@ fn direct_boot_baseline(receipt map[string]json2.Any, stage Stage) !string {
 		return error('direct-boot original boot inventory differs')
 	}
 	return direct_boot_base + '/boot.img'
+}
+
+fn context_storage_profile() Profile {
+	mut modules := direct_boot_profile().modules.clone()
+	modules << 'maps-direct-boot-diagnostic.tar'
+	return Profile{'maps-context-storage', context_storage_boot_sha, 'maps-context-storage-diagnostic.tar', modules}
+}
+
+fn context_storage_modules() map[string]string {
+	mut modules := direct_boot_modules()
+	modules['maps-direct-boot-diagnostic.tar'] = context_storage_direct_boot_overlay
+	return modules
+}
+
+fn context_storage_fields() map[string]string {
+	return {
+		'kind': 'vinix-maps-context-storage-diagnostic-v1'
+		'base_root': context_storage_base
+		'base_manifest_sha256': context_storage_base_seal
+		'controller_build_root': controller_memory_root
+		'controller_manifest_sha256': controller_memory_seal
+		'controller_sha256': controller_memory_pin
+		'framework_build_root': context_storage_framework
+		'framework_manifest_sha256': context_storage_framework_seal
+		'framework_jar_sha256': context_storage_jar
+		'framework_dex_sha256': context_storage_dex
+		'retained_framework_manifest_sha256': direct_boot_framework_seal
+		'native_manifest_sha256': protected_native_seal
+		'retained_launch_manifest_sha256': '920ed6f1a5f5d9e705bdcc108937db6266066718fe4203859a6ac8577bd405be'
+	}
+}
+
+fn context_storage_inputs() map[string]string {
+	mut inputs := direct_boot_inputs()
+	inputs[context_storage_base + '/sha256.json'] = context_storage_base_seal
+	inputs[context_storage_framework + '/sha256.json'] = context_storage_framework_seal
+	return inputs
+}
+
+fn context_storage_known_delta() map[string]string {
+	return {
+		'/' + service_query_jar_path: context_storage_jar
+		'/' + service_query_dex_path: context_storage_dex
+		'/' + service_query_headless + '/framework-build.json': context_storage_build
+		'/' + service_query_headless + '/framework-sha256.json': context_storage_framework_seal
+	}
+}
+
+fn verify_context_storage_overlay(receipt map[string]json2.Any) ! {
+	input_delta := receipt['deployment_input_delta'] or { return error('context storage deployment input delta absent') }
+	delta := json2.decode[map[string]string](json2.encode(input_delta))!
+	mut expected := context_storage_known_delta()
+	guest_path := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest_path] or { return error('context storage headless receipt pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == '88404ba463ab108502adaaec46c2038abb0a4984d4af6c68e72e887558f50651' {
+		return error('invalid or retained context storage headless receipt pin')
+	}
+	expected[guest_path] = guest_pin
+	if delta != expected { return error('context storage five deployment input changes differ') }
+	for name, value in {
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: context_storage_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256'])
+	} {
+		if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](value)! {
+			return error('context storage receipt delta differs: ' + name)
+		}
+	}
+	inventory := receipt['overlay_inventory'] or { return error('context storage overlay inventory absent') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(inventory))!
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	mut paths := expected.keys().map(it.trim_left('/'))
+	paths << service_query_deployment
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 {
+			return error('unsafe context storage overlay inventory entry')
+		}
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) {
+				return error('context storage regular allowlist differs')
+			}
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || !paths.any(it.starts_with(entry.name + '/')) {
+			return error('unexpected context storage overlay inode')
+		}
+	}
+	if regulars.len != 6 { return error('exact six context storage files required') }
+	for path, pin in expected {
+		if regulars[path.trim_left('/')] or { '' } != pin {
+			return error('context storage declared input differs from overlay inventory')
+		}
+	}
+}
+
+fn verify_context_storage_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [context_storage_base_seal, context_storage_boot_sha, context_storage_direct_boot_overlay,
+		context_storage_framework_seal, context_storage_jar, context_storage_dex, context_storage_build] {
+		if !digest_valid(pin) { return error('sealed context storage base and framework pins required') }
+	}
+	for name, expected in context_storage_fields() {
+		if receipt[name] or { json2.Any('absent') } != json2.Any(expected) {
+			return error('context storage receipt differs: ' + name)
+		}
+	}
+	for path, pin in context_storage_inputs() {
+		if stage.inputs_sha256[path] or { '' } != pin { return error('context storage input differs: ' + path) }
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != context_storage_modules()
+		|| stage.preserved_modules_sha256 != context_storage_modules() {
+		return error('context storage original twelve module pins differ')
+	}
+	verify_context_storage_overlay(receipt)!
+}
+
+fn context_storage_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_context_storage_receipt(receipt, stage)!
+	path := context_storage_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != context_storage_base_seal {
+		return error('context storage original direct-boot manifest differs')
+	}
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != context_storage_boot_sha {
+		return error('context storage original boot inventory differs')
+	}
+	return context_storage_base + '/boot.img'
 }
 
 fn service_query_modules() map[string]string {
@@ -915,6 +1052,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = controller_memory_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-direct-boot' {
 		baseline = direct_boot_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-context-storage' {
+		baseline = context_storage_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -1776,12 +1915,204 @@ fn direct_boot_profile_self_test() ! {
 	println('MAPS-DIRECT-BOOT KERNEL-PROFILE-SELF-TEST PASS exact memory base framework inputs five-path deployment one-path headless delta six-file inventory eleven modules historical profile rejection')
 }
 
+fn context_storage_delta_fixture() map[string]string {
+	mut delta := context_storage_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'b'.repeat(64)
+	return delta
+}
+
+fn context_storage_entries_fixture() []ServiceQueryEntry {
+	mut entries := []ServiceQueryEntry{}
+	for path, pin in context_storage_delta_fixture() {
+		entries << ServiceQueryEntry{name: path.trim_left('/'), kind: 'regular', sha256: pin, mode: 0o644}
+	}
+	entries << ServiceQueryEntry{name: service_query_deployment, kind: 'regular', sha256: 'c'.repeat(64), mode: 0o644}
+	entries << ServiceQueryEntry{name: 'opt', kind: 'directory', mode: 0o755}
+	return entries
+}
+
+fn context_storage_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in context_storage_fields() { receipt[name] = json2.Any(value) }
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(context_storage_delta_fixture()))!
+	receipt['headless_input_delta'] = json2.decode[json2.Any](json2.encode({'/' + service_query_jar_path: context_storage_jar}))!
+	receipt['headless_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256']))!
+	receipt['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256', 'framework_manifest_sha256']))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(context_storage_entries_fixture()))!
+	return receipt
+}
+
+fn context_storage_profile_self_test() ! {
+	profile := context_storage_profile()
+	assert profile.baseline_sha == context_storage_boot_sha
+	assert profile.modules.len == 12 && profile.modules.last() == 'maps-direct-boot-diagnostic.tar'
+	before := Config{'vinix', profile.modules}
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	verify_modules(profile, before, Config{'vinix', modules})!
+	for bad in [Config{'vinix', profile.modules}, Config{'vinix', modules.reverse()},
+		Config{'vinix', modules[..12].clone()}, Config{'other', modules}] {
+		if _ := verify_modules(profile, before, bad) { return error('unsafe context storage modules accepted') }
+	}
+	if _ := verify_modules(profile, Config{'vinix', direct_boot_profile().modules}, Config{'vinix', modules}) {
+		return error('eleven-module context storage baseline accepted')
+	}
+	stage := Stage{format: 1, inputs_sha256: context_storage_inputs(),
+		original_modules_sha256: context_storage_modules(), preserved_modules_sha256: context_storage_modules()}
+	receipt := context_storage_receipt_fixture()!
+	verify_context_storage_receipt(receipt, stage)!
+	for name in receipt.keys() {
+		mut bad := context_storage_receipt_fixture()!
+		bad[name] = json2.Any('wrong')
+		if _ := verify_context_storage_receipt(bad, stage) { return error('changed context storage receipt accepted: ' + name) }
+		bad.delete(name)
+		if _ := verify_context_storage_receipt(bad, stage) { return error('missing context storage receipt accepted: ' + name) }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut inputs := stage.inputs_sha256.clone()
+		inputs[path] = '0'.repeat(64)
+		if _ := verify_context_storage_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) {
+			return error('changed context storage input pin accepted')
+		}
+		inputs.delete(path)
+		if _ := verify_context_storage_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) {
+			return error('missing context storage input accepted')
+		}
+	}
+	mut old_inputs := stage.inputs_sha256.clone()
+	old_inputs.delete(context_storage_framework + '/sha256.json')
+	old_inputs[direct_boot_framework + '/sha256.json'] = context_storage_framework_seal
+	if _ := verify_context_storage_receipt(receipt, Stage{...stage, inputs_sha256: old_inputs}) {
+		return error('old framework path with context storage seal accepted')
+	}
+	mut old_seal := stage.inputs_sha256.clone()
+	old_seal[context_storage_framework + '/sha256.json'] = direct_boot_framework_seal
+	if _ := verify_context_storage_receipt(receipt, Stage{...stage, inputs_sha256: old_seal}) {
+		return error('context storage framework path with old seal accepted')
+	}
+	for name in context_storage_modules().keys() {
+		mut pins := context_storage_modules()
+		pins[name] = '0'.repeat(64)
+		for bad in [Stage{...stage, original_modules_sha256: pins}, Stage{...stage, preserved_modules_sha256: pins}] {
+			if _ := verify_context_storage_receipt(receipt, bad) { return error('changed context storage module accepted') }
+		}
+	}
+	for bad in [Stage{...stage, format: 2}, Stage{...stage, original_modules_sha256: direct_boot_modules()},
+		Stage{...stage, preserved_modules_sha256: map[string]string{}}] {
+		if _ := verify_context_storage_receipt(receipt, bad) { return error('changed context storage module contract accepted') }
+	}
+	context_storage_overlay_self_test(receipt, stage)!
+	if _ := verify_direct_boot_receipt(receipt, stage) { return error('context storage receipt accepted by direct-boot profile') }
+	if _ := verify_context_storage_receipt(direct_boot_receipt_fixture()!, stage) { return error('direct-boot receipt accepted by context storage profile') }
+	if _ := verify_context_storage_receipt(controller_memory_receipt_fixture()!, stage) { return error('memory receipt accepted by context storage profile') }
+	println('MAPS-CONTEXT-STORAGE KERNEL-PROFILE-SELF-TEST PASS exact direct-boot base framework inputs five-path deployment one-path headless delta six-file inventory twelve modules historical profile rejection')
+}
+
+fn context_storage_overlay_self_test(receipt map[string]json2.Any, stage Stage) ! {
+	delta := context_storage_delta_fixture()
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := context_storage_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_context_storage_receipt(bad, stage) { return error('partial context storage delta accepted') }
+		changed = delta.clone()
+		changed[path] = '0'.repeat(64)
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_context_storage_receipt(bad, stage) { return error('changed context storage delta accepted') }
+	}
+	for addition in ['/extra', '/opt/vinix-maps-account/bin/maps-account-guest'] {
+		mut changed := delta.clone()
+		changed[addition] = controller_memory_pin
+		mut bad := context_storage_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_context_storage_receipt(bad, stage) { return error('extra context storage input accepted') }
+	}
+	for name, alternatives in {
+		'headless_top_level_delta': [[]string{}, ['inputs_sha256', 'extra'], ['inputs_sha256', 'inputs_sha256']]
+		'deployment_top_level_delta': [[]string{}, ['inputs_sha256'], ['inputs_sha256', 'native_manifest_sha256'], ['framework_manifest_sha256', 'inputs_sha256']]
+	} {
+		for alternative in alternatives {
+			mut bad := context_storage_receipt_fixture()!
+			bad[name] = json2.decode[json2.Any](json2.encode(alternative))!
+			if _ := verify_context_storage_receipt(bad, stage) { return error('unsafe context storage top delta accepted') }
+		}
+	}
+	for changed in [map[string]string{}, {'/' + service_query_jar_path: direct_boot_jar},
+		{'/' + service_query_jar_path: context_storage_jar, '/extra': context_storage_jar}] {
+		mut bad := context_storage_receipt_fixture()!
+		bad['headless_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_context_storage_receipt(bad, stage) { return error('unsafe context storage headless delta accepted') }
+	}
+	entries := context_storage_entries_fixture()
+	// Keep the inventory coherent to exercise the retained digest guard itself.
+	for pin in ['invalid', '88404ba463ab108502adaaec46c2038abb0a4984d4af6c68e72e887558f50651'] {
+		mut changed := delta.clone()
+		guest_path := '/' + service_query_headless + '/guest-inputs.json'
+		changed[guest_path] = pin
+		mut inventory := entries.clone()
+		for index, entry in inventory {
+			if entry.name == guest_path.trim_left('/') { inventory[index] = ServiceQueryEntry{...entry, sha256: pin} }
+		}
+		mut bad := context_storage_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(inventory))!
+		if _ := verify_context_storage_receipt(bad, stage) { return error('retained context storage guest input pin accepted') }
+	}
+	// A coherent old payload and delta must still fail the new producer pins.
+	for path, old_pin in {
+		'/' + service_query_jar_path: direct_boot_jar
+		'/' + service_query_dex_path: direct_boot_dex
+		'/' + service_query_headless + '/framework-build.json': direct_boot_build
+		'/' + service_query_headless + '/framework-sha256.json': direct_boot_framework_seal
+	} {
+		mut changed := delta.clone()
+		changed[path] = old_pin
+		mut inventory := entries.clone()
+		for index, entry in inventory {
+			if entry.name == path.trim_left('/') { inventory[index] = ServiceQueryEntry{...entry, sha256: old_pin} }
+		}
+		mut bad := context_storage_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(inventory))!
+		if _ := verify_context_storage_receipt(bad, stage) { return error('mixed old context storage framework accepted') }
+	}
+	for index, entry in entries {
+		mut changed := entries.clone()
+		changed[index] = ServiceQueryEntry{...entry, kind: 'symlink'}
+		mut bad := context_storage_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_context_storage_receipt(bad, stage) { return error('context storage symlink accepted') }
+		changed[index] = ServiceQueryEntry{...entry, mode: 0o777}
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_context_storage_receipt(bad, stage) { return error('unsafe context storage mode accepted') }
+		if entry.kind == 'regular' {
+			changed[index] = ServiceQueryEntry{...entry, sha256: if entry.name == service_query_deployment { 'invalid' } else { '0'.repeat(64) }}
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+			if _ := verify_context_storage_receipt(bad, stage) { return error('changed context storage inventory digest accepted') }
+		}
+	}
+	for addition in [entries[0], ServiceQueryEntry{name: 'opt/vinix-maps-account/bin/maps-account-guest', kind: 'regular', sha256: controller_memory_pin, mode: 0o755},
+		ServiceQueryEntry{name: 'extra', kind: 'directory', mode: 0o755}, ServiceQueryEntry{name: 'opt/../escape', kind: 'directory', mode: 0o755}] {
+		mut changed := entries.clone()
+		changed << addition
+		mut bad := context_storage_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_context_storage_receipt(bad, stage) { return error('extra or duplicate context storage inode accepted') }
+	}
+	mut removed := context_storage_receipt_fixture()!
+	removed['overlay_inventory'] = json2.decode[json2.Any](json2.encode(entries[1..]))!
+	if _ := verify_context_storage_receipt(removed, stage) { return error('missing context storage file accepted') }
+	verify_context_storage_receipt(receipt, stage)!
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
 	service_query_profile_self_test()!
 	controller_memory_profile_self_test()!
 	direct_boot_profile_self_test()!
+	context_storage_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -1841,6 +2172,7 @@ fn self_test() ! {
 	fat_self_test(root + '/service-query', 'maps-service-query-diagnostic.tar', service_query_profile().modules)!
 	fat_self_test(root + '/controller-memory', 'maps-controller-memory-diagnostic.tar', controller_memory_profile().modules)!
 	fat_self_test(root + '/direct-boot', 'maps-direct-boot-diagnostic.tar', direct_boot_profile().modules)!
+	fat_self_test(root + '/context-storage', 'maps-context-storage-diagnostic.tar', context_storage_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -1858,11 +2190,12 @@ fn main() {
 	is_service_query := os.args.len == 5 && os.args[1] == '--maps-service-query'
 	is_controller_memory := os.args.len == 5 && os.args[1] == '--maps-controller-memory'
 	is_direct_boot := os.args.len == 5 && os.args[1] == '--maps-direct-boot'
-	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+	is_context_storage := os.args.len == 5 && os.args[1] == '--maps-context-storage'
+	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot && !is_context_storage {
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot { 1 } else { 0 }
+	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -1871,7 +2204,7 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	profile := if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	profile := if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
