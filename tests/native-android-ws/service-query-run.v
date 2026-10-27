@@ -41,6 +41,34 @@ const serial_prefix = 'VINIX-SERVICE-QUERY-RESULTS-1 '
 const log_limit = 4 * 1024 * 1024
 const line_limit = 8192
 
+struct FixtureProfile {
+	name          string
+	client_sha    string
+	companion_sha string
+	framework_sha string
+	pass_marker   string
+}
+
+fn service_query_profile() FixtureProfile {
+	return FixtureProfile{
+		name: 'service-query'
+		client_sha: client_sha
+		companion_sha: companion_sha
+		framework_sha: framework_sha
+		pass_marker: pass_marker
+	}
+}
+
+fn direct_boot_profile() FixtureProfile {
+	return FixtureProfile{
+		name: 'direct-boot'
+		client_sha: 'a77c25679d47032a8bac73a8ec7751dae271f7828973a8f9b722f004a0ad0c02'
+		companion_sha: '91e209b043a1f65379ecf16107263d513681bb56bbf25bbce11022d0824f9af5'
+		framework_sha: 'bf3853c98155e420162dc8d1759735a497e8d8bb9724cd9eb7f209c4edb04c0d'
+		pass_marker: pass_marker + ' direct-boot-metadata'
+	}
+}
+
 struct Configuration {
 	runtime   string
 	client    string
@@ -48,11 +76,13 @@ struct Configuration {
 	output    string
 	uid       u32
 	gid       u32
+	profile   FixtureProfile
 }
 
 struct Receipt {
 	kind             string = 'vinix-service-query-runtime-v1'
 	created_utc      string
+	profile          string
 	uid              u32
 	gid              u32
 	child_pid        i32
@@ -135,14 +165,14 @@ fn owned_directory(path string, config Configuration) ! {
 	require(unsafe { C.chown(&char(path.str), int(config.uid), int(config.gid)) } == 0, 'chown fixture directory')!
 }
 
-fn health(line string) ! {
+fn health(line string, expected_marker string) ! {
 	for bad in ['-FAIL', 'FATAL EXCEPTION', 'JNI DETECTED ERROR', 'JNI exception', 'VerifyError',
 		'Exception in thread', 'Abort message:', 'AssertionError', 'NoSuchMethodError',
 		'NoSuchFieldError', 'ClassNotFoundException', 'NoClassDefFoundError', 'Exception:', 'Error:',
 		'SIGABRT', 'SIGSEGV', 'panic:'] {
 		if line.contains(bad) { return error('child failure marker: ' + bad) }
 	}
-	if line.contains('SERVICE-QUERY-PASS') && line != pass_marker {
+	if line.contains('SERVICE-QUERY-PASS') && line != expected_marker {
 		return error('conflicting fixture marker')
 	}
 }
@@ -151,14 +181,14 @@ fn is_ready(line string) bool {
 	return line == ready_marker || line.starts_with(ready_marker + ' ')
 }
 
-fn check_log(text string) ! {
+fn check_log(text string, expected_marker string) ! {
 	require(text.len <= log_limit && text.ends_with('\n'), 'bounded complete child log')!
 	lines := text.split_into_lines()
-	require(lines.filter(it == pass_marker).len == 1 && text.count(pass_marker) == 1, 'exact fixture pass once')!
+	require(lines.filter(it == expected_marker).len == 1 && text.count(expected_marker) == 1, 'exact fixture pass once')!
 	require(lines.filter(is_ready(it)).len == 1, 'native WS readiness once')!
 	for line in lines {
 		require(line.len <= line_limit, 'bounded child line')!
-		health(line)!
+		health(line, expected_marker)!
 	}
 }
 
@@ -274,8 +304,8 @@ fn execute(config Configuration) !i32 {
 					continue
 				}
 				text := line.bytestr()
-				health(text)!
-				if text == pass_marker { passed++ }
+				health(text, config.profile.pass_marker)!
+				if text == config.profile.pass_marker { passed++ }
 				if is_ready(text) { ready++ }
 				require(passed <= 1 && ready <= 1, 'duplicate pass/readiness marker')!
 				line.clear()
@@ -301,7 +331,7 @@ fn execute(config Configuration) !i32 {
 	}
 	require(line.len == 0 && passed == 1 && ready == 1 && input_writer == -1 && status == 0,
 		'exact fixture markers, complete output, stdin shutdown and clean child exit')!
-	check_log(os.read_file(config.output + '/child.log')!)!
+	check_log(os.read_file(config.output + '/child.log')!, config.profile.pass_marker)!
 	println('SERVICE-QUERY-RUN-EXIT status=' + status.str())
 	return pid
 }
@@ -342,20 +372,30 @@ fn export_evidence(output string) ! {
 }
 
 fn selftest() ! {
-	good := pass_marker + '\n' + ready_marker + '\n'
-	check_log(good)!
 	mut cases := 0
-	for bad in [good + pass_marker + '\n', good + ready_marker + '\n', good.replace(pass_marker, ''),
-		good.replace(ready_marker, ''), good.trim_right('\n'),
-		good.replace(pass_marker, pass_marker + ' other'), good + 'JNI exception\n',
-		good + 'AssertionError\n', good + 'NoSuchFieldError\n', good + 'ClassNotFoundException\n',
-		good + 'SIGSEGV\n', good.replace(ready_marker, ready_marker + 'other'),
-		good + 'java.lang.IllegalStateException: unexpected\n',
-		good + 'x'.repeat(line_limit + 1) + '\n', good + 'x'.repeat(log_limit) + '\n'] {
-		mut rejected := false
-		check_log(bad) or { rejected = true }
-		require(rejected, 'checker accepted invalid log')!
-		cases++
+	profiles := [service_query_profile(), direct_boot_profile()]
+	for profile in profiles {
+		good := profile.pass_marker + '\n' + ready_marker + '\n'
+		check_log(good, profile.pass_marker)!
+		for bad in [good + profile.pass_marker + '\n', good + ready_marker + '\n', good.replace(profile.pass_marker, ''),
+			good.replace(ready_marker, ''), good.trim_right('\n'),
+			good.replace(profile.pass_marker, profile.pass_marker + ' other'), good + 'JNI exception\n',
+			good + 'AssertionError\n', good + 'NoSuchFieldError\n', good + 'ClassNotFoundException\n',
+			good + 'SIGSEGV\n', good.replace(ready_marker, ready_marker + 'other'),
+			good + 'java.lang.IllegalStateException: unexpected\n',
+			good + 'x'.repeat(line_limit + 1) + '\n', good + 'x'.repeat(log_limit) + '\n'] {
+			mut rejected := false
+			check_log(bad, profile.pass_marker) or { rejected = true }
+			require(rejected, 'checker accepted invalid log')!
+			cases++
+		}
+		for other in profiles {
+			if other.name == profile.name { continue }
+			mut rejected := false
+			check_log(good, other.pass_marker) or { rejected = true }
+			require(rejected, 'checker accepted another profile marker')!
+			cases++
+		}
 	}
 	for path in ['relative', '/', '/a/', '/a//b', '/a/../b', '/a/./b', '/a\\b', '/a\x00b'] {
 		require(!canonical(path), 'checker accepted noncanonical path')!
@@ -370,29 +410,37 @@ fn run() ! {
 		selftest()!
 		return
 	}
-	require(os.args.len == 7, 'usage: service-query-run RUNTIME CLIENT_APK DISABLED_APK UID GID FRESH_OUTPUT | selftest')!
+	mut arguments := os.args[1..]
+	mut profile := service_query_profile()
+	if arguments.len > 0 && arguments[0] == '--direct-boot' {
+		profile = direct_boot_profile()
+		arguments = arguments[1..]
+	}
+	require(arguments.len == 6, 'usage: service-query-run [--direct-boot] RUNTIME CLIENT_APK DISABLED_APK UID GID FRESH_OUTPUT | selftest')!
+	require(canonical(arguments[0]), 'canonical runtime path and exact optional profile selector')!
 	$if !linux {
 		return error('runtime fixture requires Linux/Vinix')
 	}
 	require(C.getuid() == 0 && C.geteuid() == 0, 'fixture controller requires root')!
-	for value in os.args[4..6] {
+	for value in arguments[3..5] {
 		require(value.len == 5 && value.bytes().all(it >= `0` && it <= `9`)
 			&& value.int() >= 10000 && value.int() <= 19999, 'fixture UID/GID in 10000..19999')!
 	}
 	config := Configuration{
-		runtime:   os.args[1]
-		client:    os.args[2]
-		companion: os.args[3]
-		uid:       os.args[4].u32()
-		gid:       os.args[5].u32()
-		output:    os.args[6]
+		runtime:   arguments[0]
+		client:    arguments[1]
+		companion: arguments[2]
+		uid:       arguments[3].u32()
+		gid:       arguments[4].u32()
+		output:    arguments[5]
+		profile:   profile
 	}
 	require(C.getpwuid(config.uid) != unsafe { nil } && C.getgrgid(config.gid) != unsafe { nil }, 'pre-provisioned fixture user/group')!
 	protected_parents(config.output)!
 	require(!os.exists(config.output) && !os.is_link(config.output), 'fresh fixture output')!
-	require(input_pin(config.client)! == client_sha && input_pin(config.companion)! == companion_sha, 'signed fixture APK pins')!
+	require(input_pin(config.client)! == config.profile.client_sha && input_pin(config.companion)! == config.profile.companion_sha, 'signed fixture APK pins')!
 	framework := config.runtime + '/usr/lib/java/dex/android_translation_layer/api-impl.jar'
-	require(input_pin(framework)! == framework_sha, 'corrected framework JAR pin')!
+	require(input_pin(framework)! == config.profile.framework_sha, 'corrected framework JAR pin')!
 	mut inputs := map[string]string{}
 	for path in [config.client, config.companion, framework, config.runtime + '/usr/bin/run-android',
 		config.runtime + '/usr/bin/vinix-android-native', os.executable()] {
@@ -407,14 +455,15 @@ fn run() ! {
 	companion := config.output + '/data/_installed_apks_/org.vinix.servicequery.disabled.apk'
 	os.cp(config.companion, companion)!
 	os.chmod(companion, 0o444)!
-	require(digest(config.output + '/client.apk')! == client_sha && digest(companion)! == companion_sha, 'staged fixture APK pins')!
+	require(digest(config.output + '/client.apk')! == config.profile.client_sha && digest(companion)! == config.profile.companion_sha, 'staged fixture APK pins')!
 	println('SERVICE-QUERY-RUN-BEGIN uid=' + config.uid.str() + ' gid=' + config.gid.str())
 	pid := execute(config)!
 	for path, pin in inputs { require(input_pin(path)! == pin, 'input unchanged after ART run')! }
-	require(digest(config.output + '/client.apk')! == client_sha && digest(companion)! == companion_sha, 'staged APKs unchanged after ART run')!
+	require(digest(config.output + '/client.apk')! == config.profile.client_sha && digest(companion)! == config.profile.companion_sha, 'staged APKs unchanged after ART run')!
 	log_sha := digest(config.output + '/child.log')!
 	receipt := Receipt{
 		created_utc:  time.utc().format_rfc3339()
+		profile:      config.profile.name
 		uid:          config.uid
 		gid:          config.gid
 		child_pid:    pid
