@@ -134,6 +134,8 @@ pub fn write_framework_classes(smali string) ! {
  framework_egl(smali)!
  framework_glutils(smali)!
  framework_view_attachment(smali)!
+ child_attach := smali + '/android/view/ViewGroup.smali'
+ os.write_file(child_attach, framework_child_attach(os.read_file(child_attach)!)!)!
  framework_content_capture(smali)!
  framework_autofill(smali)!
  framework_view_traversal(smali)!
