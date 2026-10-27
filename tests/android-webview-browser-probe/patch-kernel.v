@@ -68,6 +68,15 @@ const context_storage_framework_seal = 'cb07c656d6c63e9713926a0c2fac15f14060098b
 const context_storage_jar = '9b894cc92c5d3d0e871b5389285b09b107d49cd5c4493fcc2449f3510f961352'
 const context_storage_dex = 'b96a441b6eca36e0a6fa7a6da01d9e4508136e64ec0f0f3850cf15e2d90ff132'
 const context_storage_build = '486dfea3930686a5b846e2782f759e7ab7a4f55f320a603a145a471b18cabe3e'
+const broadcast_result_base = '/Users/alex/.local/state/vinix/android/maps-context-storage-r1'
+const broadcast_result_base_seal = '6296bcff89e1a6555c803b0ee94f435cbae1f01c37ce97451080612a95fdde2c'
+const broadcast_result_boot_sha = '0bc1652062a78d3878c4404b6be907cf76c1215268798025d925c3f8a946eceb'
+const broadcast_result_context_overlay = 'a524dcda373cf0ff6b688991924e3c2faaa33a998c4e2ec54596fdbb34df6fc2'
+const broadcast_result_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-broadcast-result-framework-2026-10-27-r1'
+const broadcast_result_framework_seal = '21d53cc9cd2ccd9c53fc7774a826d83673f3391d30c1757074e3edcba2c8b046'
+const broadcast_result_jar = '5dfba8c7e0006f6c84510d72b8fde84706bcb7f3489b3620cd340ec0361d8564'
+const broadcast_result_dex = '5305155d203c856a1828596d06c48ba130fbf9a373dec6b558a3fc4e53bdac11'
+const broadcast_result_build = '280b6de249825cfc773e16e12c933d18a6013a4ac8b7e9a0cbbc9e7f1cdbc1e1'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -474,6 +483,128 @@ fn context_storage_baseline(receipt map[string]json2.Any, stage Stage) !string {
 		return error('context storage original boot inventory differs')
 	}
 	return context_storage_base + '/boot.img'
+}
+
+fn broadcast_result_profile() Profile {
+	mut modules := context_storage_profile().modules.clone()
+	modules << 'maps-context-storage-diagnostic.tar'
+	return Profile{'maps-broadcast-result', broadcast_result_boot_sha, 'maps-broadcast-result-diagnostic.tar', modules}
+}
+
+fn broadcast_result_modules() map[string]string {
+	mut modules := context_storage_modules()
+	modules['maps-context-storage-diagnostic.tar'] = broadcast_result_context_overlay
+	return modules
+}
+
+fn broadcast_result_fields() map[string]string {
+	return {
+		'kind': 'vinix-maps-broadcast-result-diagnostic-v1'
+		'base_root': broadcast_result_base
+		'base_manifest_sha256': broadcast_result_base_seal
+		'controller_build_root': controller_memory_root
+		'controller_manifest_sha256': controller_memory_seal
+		'controller_sha256': controller_memory_pin
+		'framework_build_root': broadcast_result_framework
+		'framework_manifest_sha256': broadcast_result_framework_seal
+		'framework_jar_sha256': broadcast_result_jar
+		'framework_dex_sha256': broadcast_result_dex
+		'retained_framework_manifest_sha256': context_storage_framework_seal
+		'native_manifest_sha256': protected_native_seal
+		'retained_launch_manifest_sha256': '920ed6f1a5f5d9e705bdcc108937db6266066718fe4203859a6ac8577bd405be'
+	}
+}
+
+fn broadcast_result_inputs() map[string]string {
+	mut inputs := context_storage_inputs()
+	inputs[broadcast_result_base + '/sha256.json'] = broadcast_result_base_seal
+	inputs[broadcast_result_framework + '/sha256.json'] = broadcast_result_framework_seal
+	return inputs
+}
+
+fn broadcast_result_known_delta() map[string]string {
+	return {
+		'/' + service_query_jar_path: broadcast_result_jar
+		'/' + service_query_dex_path: broadcast_result_dex
+		'/' + service_query_headless + '/framework-build.json': broadcast_result_build
+		'/' + service_query_headless + '/framework-sha256.json': broadcast_result_framework_seal
+	}
+}
+
+fn verify_broadcast_result_overlay(receipt map[string]json2.Any) ! {
+	input_delta := receipt['deployment_input_delta'] or { return error('broadcast result deployment input delta absent') }
+	delta := json2.decode[map[string]string](json2.encode(input_delta))!
+	mut expected := broadcast_result_known_delta()
+	guest_path := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest_path] or { return error('broadcast result headless receipt pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == 'c9ff204863dec37bc1913e0eef2bdf6c9edca1c8cecebeefb7e3659f90e05ab6' {
+		return error('invalid or retained broadcast result headless receipt pin')
+	}
+	expected[guest_path] = guest_pin
+	if delta != expected { return error('broadcast result five deployment input changes differ') }
+	for name, value in {
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: broadcast_result_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256'])
+	} {
+		if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](value)! {
+			return error('broadcast result receipt delta differs: ' + name)
+		}
+	}
+	inventory := receipt['overlay_inventory'] or { return error('broadcast result overlay inventory absent') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(inventory))!
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	mut paths := expected.keys().map(it.trim_left('/'))
+	paths << service_query_deployment
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 {
+			return error('unsafe broadcast result overlay inventory entry')
+		}
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) { return error('broadcast result regular allowlist differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || !paths.any(it.starts_with(entry.name + '/')) {
+			return error('unexpected broadcast result overlay inode')
+		}
+	}
+	if regulars.len != 6 { return error('exact six broadcast result files required') }
+	for path, pin in expected {
+		if regulars[path.trim_left('/')] or { '' } != pin {
+			return error('broadcast result declared input differs from overlay inventory')
+		}
+	}
+}
+
+fn verify_broadcast_result_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [broadcast_result_base_seal, broadcast_result_boot_sha, broadcast_result_context_overlay,
+		broadcast_result_framework_seal, broadcast_result_jar, broadcast_result_dex, broadcast_result_build] {
+		if !digest_valid(pin) { return error('sealed broadcast result base and framework pins required') }
+	}
+	for name, expected in broadcast_result_fields() {
+		if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('broadcast result receipt differs: ' + name) }
+	}
+	for path, pin in broadcast_result_inputs() {
+		if stage.inputs_sha256[path] or { '' } != pin { return error('broadcast result input differs: ' + path) }
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != broadcast_result_modules()
+		|| stage.preserved_modules_sha256 != broadcast_result_modules() {
+		return error('broadcast result original thirteen module pins differ')
+	}
+	verify_broadcast_result_overlay(receipt)!
+}
+
+fn broadcast_result_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_broadcast_result_receipt(receipt, stage)!
+	path := broadcast_result_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != broadcast_result_base_seal {
+		return error('broadcast result original Context storage manifest differs')
+	}
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != broadcast_result_boot_sha { return error('broadcast result original boot inventory differs') }
+	return broadcast_result_base + '/boot.img'
 }
 
 fn service_query_modules() map[string]string {
@@ -1054,6 +1185,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = direct_boot_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-context-storage' {
 		baseline = context_storage_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-broadcast-result' {
+		baseline = broadcast_result_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -2106,6 +2239,188 @@ fn context_storage_overlay_self_test(receipt map[string]json2.Any, stage Stage) 
 	verify_context_storage_receipt(receipt, stage)!
 }
 
+fn broadcast_result_delta_fixture() map[string]string {
+	mut delta := broadcast_result_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'b'.repeat(64)
+	return delta
+}
+
+fn broadcast_result_entries_fixture() []ServiceQueryEntry {
+	mut entries := []ServiceQueryEntry{}
+	for path, pin in broadcast_result_delta_fixture() {
+		entries << ServiceQueryEntry{name: path.trim_left('/'), kind: 'regular', sha256: pin, mode: 0o644}
+	}
+	entries << ServiceQueryEntry{name: service_query_deployment, kind: 'regular', sha256: 'c'.repeat(64), mode: 0o644}
+	entries << ServiceQueryEntry{name: 'opt', kind: 'directory', mode: 0o755}
+	return entries
+}
+
+fn broadcast_result_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in broadcast_result_fields() { receipt[name] = json2.Any(value) }
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(broadcast_result_delta_fixture()))!
+	receipt['headless_input_delta'] = json2.decode[json2.Any](json2.encode({'/' + service_query_jar_path: broadcast_result_jar}))!
+	receipt['headless_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256']))!
+	receipt['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256', 'framework_manifest_sha256']))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(broadcast_result_entries_fixture()))!
+	return receipt
+}
+
+fn broadcast_result_profile_self_test() ! {
+	profile := broadcast_result_profile()
+	assert profile.baseline_sha == broadcast_result_boot_sha
+	assert profile.modules.len == 13 && profile.modules.last() == 'maps-context-storage-diagnostic.tar'
+	before := Config{'vinix', profile.modules}
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	verify_modules(profile, before, Config{'vinix', modules})!
+	mut duplicate := modules.clone()
+	duplicate << profile.overlay
+	for bad in [Config{'vinix', profile.modules}, Config{'vinix', modules.reverse()},
+		Config{'vinix', modules[..13].clone()}, Config{'other', modules}, Config{'vinix', duplicate}] {
+		if _ := verify_modules(profile, before, bad) { return error('unsafe broadcast result modules accepted') }
+	}
+	if _ := verify_modules(profile, Config{'vinix', context_storage_profile().modules}, Config{'vinix', modules}) {
+		return error('twelve-module broadcast result baseline accepted')
+	}
+	stage := Stage{format: 1, inputs_sha256: broadcast_result_inputs(),
+		original_modules_sha256: broadcast_result_modules(), preserved_modules_sha256: broadcast_result_modules()}
+	receipt := broadcast_result_receipt_fixture()!
+	verify_broadcast_result_receipt(receipt, stage)!
+	for name in receipt.keys() {
+		mut bad := broadcast_result_receipt_fixture()!
+		bad[name] = json2.Any('wrong')
+		if _ := verify_broadcast_result_receipt(bad, stage) { return error('changed broadcast result receipt accepted: ' + name) }
+		bad.delete(name)
+		if _ := verify_broadcast_result_receipt(bad, stage) { return error('missing broadcast result receipt accepted: ' + name) }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut inputs := stage.inputs_sha256.clone()
+		inputs[path] = '0'.repeat(64)
+		if _ := verify_broadcast_result_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) { return error('changed broadcast result input pin accepted') }
+		inputs.delete(path)
+		if _ := verify_broadcast_result_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) { return error('missing broadcast result input accepted') }
+	}
+	mut old_path := stage.inputs_sha256.clone()
+	old_path.delete(broadcast_result_framework + '/sha256.json')
+	old_path[context_storage_framework + '/sha256.json'] = broadcast_result_framework_seal
+	if _ := verify_broadcast_result_receipt(receipt, Stage{...stage, inputs_sha256: old_path}) { return error('old framework path with broadcast result seal accepted') }
+	mut old_seal := stage.inputs_sha256.clone()
+	old_seal[broadcast_result_framework + '/sha256.json'] = context_storage_framework_seal
+	if _ := verify_broadcast_result_receipt(receipt, Stage{...stage, inputs_sha256: old_seal}) { return error('broadcast result framework path with old seal accepted') }
+	for name in broadcast_result_modules().keys() {
+		for remove in [false, true] {
+			mut pins := broadcast_result_modules()
+			if remove { pins.delete(name) } else { pins[name] = '0'.repeat(64) }
+			for bad in [Stage{...stage, original_modules_sha256: pins}, Stage{...stage, preserved_modules_sha256: pins}] {
+				if _ := verify_broadcast_result_receipt(receipt, bad) { return error('changed or missing broadcast result module accepted') }
+			}
+		}
+	}
+	for bad in [Stage{...stage, format: 2}, Stage{...stage, original_modules_sha256: context_storage_modules()},
+		Stage{...stage, preserved_modules_sha256: map[string]string{}}] {
+		if _ := verify_broadcast_result_receipt(receipt, bad) { return error('changed broadcast result module contract accepted') }
+	}
+	broadcast_result_overlay_self_test(receipt, stage)!
+	if _ := verify_context_storage_receipt(receipt, stage) { return error('broadcast result receipt accepted by Context storage profile') }
+	if _ := verify_broadcast_result_receipt(context_storage_receipt_fixture()!, stage) { return error('Context storage receipt accepted by broadcast result profile') }
+	// Replacing all producer headers and payload declarations coherently still fails.
+	mut old := context_storage_receipt_fixture()!
+	old['kind'] = receipt['kind'] or { return error('fixture kind absent') }
+	old['base_root'] = json2.Any(broadcast_result_base)
+	old['base_manifest_sha256'] = json2.Any(broadcast_result_base_seal)
+	old['retained_framework_manifest_sha256'] = json2.Any(context_storage_framework_seal)
+	mut old_inputs := broadcast_result_inputs()
+	old_inputs.delete(broadcast_result_framework + '/sha256.json')
+	if _ := verify_broadcast_result_receipt(old, Stage{...stage, inputs_sha256: old_inputs}) { return error('coherent old Context framework accepted') }
+	println('MAPS-BROADCAST-RESULT KERNEL-PROFILE-SELF-TEST PASS exact Context base framework inputs five-path deployment one-path headless delta six-file inventory thirteen modules coherent old producer rejection')
+}
+
+fn broadcast_result_overlay_self_test(receipt map[string]json2.Any, stage Stage) ! {
+	delta := broadcast_result_delta_fixture()
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := broadcast_result_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_broadcast_result_receipt(bad, stage) { return error('partial broadcast result delta accepted') }
+		changed = delta.clone()
+		changed[path] = '0'.repeat(64)
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_broadcast_result_receipt(bad, stage) { return error('changed broadcast result delta accepted') }
+	}
+	for addition in ['/extra', '/opt/vinix-maps-account/bin/maps-account-guest'] {
+		mut changed := delta.clone()
+		changed[addition] = controller_memory_pin
+		mut bad := broadcast_result_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_broadcast_result_receipt(bad, stage) { return error('extra broadcast result input accepted') }
+	}
+	for name, alternatives in {
+		'headless_top_level_delta': [[]string{}, ['inputs_sha256', 'extra'], ['inputs_sha256', 'inputs_sha256']]
+		'deployment_top_level_delta': [[]string{}, ['inputs_sha256'], ['inputs_sha256', 'native_manifest_sha256'], ['framework_manifest_sha256', 'inputs_sha256']]
+	} {
+		for alternative in alternatives {
+			mut bad := broadcast_result_receipt_fixture()!
+			bad[name] = json2.decode[json2.Any](json2.encode(alternative))!
+			if _ := verify_broadcast_result_receipt(bad, stage) { return error('unsafe broadcast result top delta accepted') }
+		}
+	}
+	for changed in [map[string]string{}, {'/' + service_query_jar_path: context_storage_jar},
+		{'/' + service_query_jar_path: broadcast_result_jar, '/extra': broadcast_result_jar}] {
+		mut bad := broadcast_result_receipt_fixture()!
+		bad['headless_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_broadcast_result_receipt(bad, stage) { return error('unsafe broadcast result headless delta accepted') }
+	}
+	entries := broadcast_result_entries_fixture()
+	mut retained := context_storage_known_delta()
+	retained['/' + service_query_headless + '/guest-inputs.json'] = 'c9ff204863dec37bc1913e0eef2bdf6c9edca1c8cecebeefb7e3659f90e05ab6'
+	retained['/' + service_query_headless + '/guest-inputs.json-invalid'] = 'invalid'
+	for original_path, old_pin in retained {
+		path := original_path.replace('-invalid', '')
+		mut changed := delta.clone()
+		changed[path] = old_pin
+		mut inventory := entries.clone()
+		for index, entry in inventory {
+			if entry.name == path.trim_left('/') { inventory[index] = ServiceQueryEntry{...entry, sha256: old_pin} }
+		}
+		mut bad := broadcast_result_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(inventory))!
+		if path == '/' + service_query_jar_path {
+			bad['headless_input_delta'] = json2.decode[json2.Any](json2.encode({path: old_pin}))!
+		}
+		if _ := verify_broadcast_result_receipt(bad, stage) { return error('coherent retained broadcast result payload accepted') }
+	}
+	for index, entry in entries {
+		mut changed := entries.clone()
+		changed[index] = ServiceQueryEntry{...entry, kind: 'symlink'}
+		mut bad := broadcast_result_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_broadcast_result_receipt(bad, stage) { return error('broadcast result symlink accepted') }
+		changed[index] = ServiceQueryEntry{...entry, mode: 0o777}
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_broadcast_result_receipt(bad, stage) { return error('unsafe broadcast result mode accepted') }
+		if entry.kind == 'regular' {
+			changed[index] = ServiceQueryEntry{...entry, sha256: if entry.name == service_query_deployment { 'invalid' } else { '0'.repeat(64) }}
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+			if _ := verify_broadcast_result_receipt(bad, stage) { return error('changed broadcast result inventory digest accepted') }
+		}
+	}
+	for addition in [entries[0], ServiceQueryEntry{name: 'opt/vinix-maps-account/bin/maps-account-guest', kind: 'regular', sha256: controller_memory_pin, mode: 0o755},
+		ServiceQueryEntry{name: 'extra', kind: 'directory', mode: 0o755}, ServiceQueryEntry{name: 'opt/../escape', kind: 'directory', mode: 0o755}] {
+		mut changed := entries.clone()
+		changed << addition
+		mut bad := broadcast_result_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_broadcast_result_receipt(bad, stage) { return error('extra or duplicate broadcast result inode accepted') }
+	}
+	mut removed := broadcast_result_receipt_fixture()!
+	removed['overlay_inventory'] = json2.decode[json2.Any](json2.encode(entries[1..]))!
+	if _ := verify_broadcast_result_receipt(removed, stage) { return error('missing broadcast result file accepted') }
+	verify_broadcast_result_receipt(receipt, stage)!
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
@@ -2113,6 +2428,7 @@ fn self_test() ! {
 	controller_memory_profile_self_test()!
 	direct_boot_profile_self_test()!
 	context_storage_profile_self_test()!
+	broadcast_result_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -2173,6 +2489,7 @@ fn self_test() ! {
 	fat_self_test(root + '/controller-memory', 'maps-controller-memory-diagnostic.tar', controller_memory_profile().modules)!
 	fat_self_test(root + '/direct-boot', 'maps-direct-boot-diagnostic.tar', direct_boot_profile().modules)!
 	fat_self_test(root + '/context-storage', 'maps-context-storage-diagnostic.tar', context_storage_profile().modules)!
+	fat_self_test(root + '/broadcast-result', 'maps-broadcast-result-diagnostic.tar', broadcast_result_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -2191,11 +2508,12 @@ fn main() {
 	is_controller_memory := os.args.len == 5 && os.args[1] == '--maps-controller-memory'
 	is_direct_boot := os.args.len == 5 && os.args[1] == '--maps-direct-boot'
 	is_context_storage := os.args.len == 5 && os.args[1] == '--maps-context-storage'
-	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot && !is_context_storage {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+	is_broadcast_result := os.args.len == 5 && os.args[1] == '--maps-broadcast-result'
+	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot && !is_context_storage && !is_broadcast_result {
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage { 1 } else { 0 }
+	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -2204,7 +2522,7 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	profile := if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	profile := if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
