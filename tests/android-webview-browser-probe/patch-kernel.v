@@ -25,6 +25,13 @@ const protected_base_seal = '9a8bf61bd526d7ec020d45920367d45e90a2ef4692c6d8fa8b8
 const protected_boot_sha = 'a37afb3aaaaac0261562df47b6f213bf0ef47eaaa9165d721cb4e097ce35ed70'
 const protected_framework_seal = '67e1cb450fa87305c99480133084b7f9cb684feeeaa2e0c3efa3007ab43ee938'
 const protected_native_seal = 'a62bf4a8a4ef8d1c000f82395ec64b145c9c4d6df25f12077f75d96d341e0a20'
+const controller_base = '/Users/alex/.local/state/vinix/android/maps-startup-r1'
+const controller_base_seal = 'f79065bc79d816f8cf35a21c72ef375369229b0ee8170165890808e3d194e332'
+const controller_boot_sha = '24999d2743f4c86196b39113b68062908a698945864c2ca551dff4f0578677c6'
+const controller_root = '/Users/alex/.local/state/vinix/android/maps-account-guest-build-2026-10-27-r6'
+const controller_seal = '1b8e4555a67eae4c3b1c109f3d94064c96eba65dd3fd3c88d72649b5fdbc9106'
+const controller_pin = '894e57f0eaf773777b3107100068edf1f9b57b427b565756767c576a0de8c6b6'
+const retained_controller_seal = '5a46182682b5f3c9bf47478ab0fcfc9f9dd40f8aeee589851765df8458776773'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -50,6 +57,92 @@ fn protected_maps_profile() Profile {
 	modules << 'maps-account.tar'
 	return Profile{'protected-storage-maps', protected_boot_sha,
 		'protected-storage-diagnostic.tar', modules}
+}
+
+fn controller_profile() Profile {
+	mut modules := protected_maps_profile().modules.clone()
+	modules << 'protected-storage-diagnostic.tar'
+	return Profile{'maps-controller', controller_boot_sha, 'maps-controller-diagnostic.tar', modules}
+}
+
+fn controller_modules() map[string]string {
+	mut modules := protected_modules()
+	modules['protected-storage-diagnostic.tar'] = 'cb2d855ac82924d6bc0f2221bea0d6cccbf2f9a9d467c455fbf9acba5d594ac3'
+	return modules
+}
+
+fn controller_fields() map[string]string {
+	return {
+		'kind': 'vinix-maps-controller-diagnostic-v1'
+		'base_root': controller_base
+		'base_manifest_sha256': controller_base_seal
+		'controller_build_root': controller_root
+		'controller_manifest_sha256': controller_seal
+		'controller_sha256': controller_pin
+		'retained_controller_manifest_sha256': retained_controller_seal
+		'framework_manifest_sha256': protected_framework_seal
+		'native_manifest_sha256': protected_native_seal
+		'retained_launch_manifest_sha256': '920ed6f1a5f5d9e705bdcc108937db6266066718fe4203859a6ac8577bd405be'
+	}
+}
+
+fn controller_inputs() map[string]string {
+	return {
+		controller_base + '/sha256.json': controller_base_seal
+		controller_root + '/sha256.json': controller_seal
+		'/Users/alex/.local/state/vinix/android/maps-account-guest-build-2026-10-26-r6/sha256.json': retained_controller_seal
+		'/Users/alex/.local/state/vinix/android/combined-account-webview-protected-storage-framework-2026-10-27-r2/sha256.json': protected_framework_seal
+		'/Users/alex/.local/state/vinix/android/current-native-build-2026-10-27-startup-r1/sha256.json': protected_native_seal
+		'/Users/alex/.local/state/vinix/android/current-launch-build-2026-10-26-r13/sha256.json': '920ed6f1a5f5d9e705bdcc108937db6266066718fe4203859a6ac8577bd405be'
+	}
+}
+
+fn controller_delta() map[string]string {
+	return {
+		'/opt/vinix-maps-account/bin/maps-account-guest': controller_pin
+		'/usr/bin/run-android-calculator': controller_pin
+	}
+}
+
+// This separate producer changes only the controller and its identical alias.
+// The original startup stage and its eight modules remain immutable inputs.
+fn verify_controller_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	if !digest_valid(controller_seal) || !digest_valid(controller_pin) {
+		return error('sealed controller producer pins required')
+	}
+	for name, expected in controller_fields() {
+		actual := receipt[name] or { return error('Maps controller receipt field absent: ' + name) }
+		if actual != json2.Any(expected) { return error('Maps controller receipt differs: ' + name) }
+	}
+	for path, expected in controller_inputs() {
+		if stage.inputs_sha256[path] or { '' } != expected {
+			return error('Maps controller input differs: ' + path)
+		}
+	}
+	input_delta := receipt['deployment_input_delta'] or { return error('controller deployment input delta absent') }
+	top_delta := receipt['deployment_top_level_delta'] or { return error('controller deployment top delta absent') }
+	if input_delta != json2.decode[json2.Any](json2.encode(controller_delta()))!
+		|| top_delta != json2.decode[json2.Any](json2.encode(['inputs_sha256']))! {
+		return error('Maps controller deployment delta differs')
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != controller_modules()
+		|| stage.preserved_modules_sha256 != controller_modules() {
+		return error('Maps controller original eight module pins differ')
+	}
+}
+
+fn controller_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_controller_receipt(receipt, stage)!
+	path := controller_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != controller_base_seal {
+		return error('Maps controller original startup manifest differs')
+	}
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != controller_boot_sha {
+		return error('Maps controller original boot inventory differs')
+	}
+	return controller_base + '/boot.img'
 }
 
 fn protected_modules() map[string]string {
@@ -410,6 +503,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 	mut baseline := ''
 	if profile.name == 'protected-storage-maps' {
 		baseline = protected_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-controller' {
+		baseline = controller_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -746,8 +841,97 @@ fn protected_profile_self_test() ! {
 	println('PROTECTED-STORAGE-MAPS KERNEL-PROFILE-SELF-TEST PASS exact receipt base framework native launch inputs seven modules obsolete native rejection')
 }
 
+fn controller_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, expected in controller_fields() { receipt[name] = json2.Any(expected) }
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(controller_delta()))!
+	receipt['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256']))!
+	return receipt
+}
+
+fn controller_profile_self_test() ! {
+	profile := controller_profile()
+	assert profile.baseline_sha == controller_boot_sha
+	assert profile.modules.len == 8 && profile.modules.last() == 'protected-storage-diagnostic.tar'
+	before := Config{'vinix', profile.modules}
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	verify_modules(profile, before, Config{'vinix', modules})!
+	for bad in [Config{'vinix', profile.modules}, Config{'vinix', modules.reverse()},
+		Config{'vinix', modules[..8].clone()}, Config{'other', modules},
+		Config{'vinix', protected_maps_profile().modules}] {
+		if _ := verify_modules(profile, before, bad) { return error('unsafe controller modules accepted') }
+	}
+	if _ := verify_modules(profile, Config{'vinix', protected_maps_profile().modules}, Config{'vinix', modules}) {
+		return error('seven-module controller baseline accepted')
+	}
+	stage := Stage{
+		format: 1
+		inputs_sha256: controller_inputs()
+		original_modules_sha256: controller_modules()
+		preserved_modules_sha256: controller_modules()
+	}
+	receipt := controller_receipt_fixture()!
+	verify_controller_receipt(receipt, stage)!
+	for name in receipt.keys() {
+		mut bad := controller_receipt_fixture()!
+		bad[name] = json2.Any('wrong')
+		if _ := verify_controller_receipt(bad, stage) { return error('changed controller receipt accepted: ' + name) }
+		bad.delete(name)
+		if _ := verify_controller_receipt(bad, stage) { return error('missing controller receipt accepted: ' + name) }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut bad_inputs := stage.inputs_sha256.clone()
+		bad_inputs[path] = '0'.repeat(64)
+		if _ := verify_controller_receipt(receipt, Stage{...stage, inputs_sha256: bad_inputs}) {
+			return error('changed controller input pin accepted')
+		}
+		bad_inputs.delete(path)
+		if _ := verify_controller_receipt(receipt, Stage{...stage, inputs_sha256: bad_inputs}) {
+			return error('missing controller input accepted')
+		}
+	}
+	mut obsolete_receipt := controller_receipt_fixture()!
+	obsolete_receipt['controller_manifest_sha256'] = json2.Any(retained_controller_seal)
+	if _ := verify_controller_receipt(obsolete_receipt, stage) { return error('obsolete controller receipt accepted') }
+	mut old_inputs := stage.inputs_sha256.clone()
+	old_inputs.delete(controller_root + '/sha256.json')
+	old_inputs['/Users/alex/.local/state/vinix/android/maps-account-guest-build-2026-10-26-r6/sha256.json'] = controller_seal
+	if _ := verify_controller_receipt(receipt, Stage{...stage, inputs_sha256: old_inputs}) {
+		return error('old controller path with new seal accepted')
+	}
+	for name in controller_modules().keys() {
+		mut bad_modules := controller_modules()
+		bad_modules[name] = '0'.repeat(64)
+		for bad in [Stage{...stage, original_modules_sha256: bad_modules},
+			Stage{...stage, preserved_modules_sha256: bad_modules}] {
+			if _ := verify_controller_receipt(receipt, bad) { return error('changed controller module accepted') }
+		}
+	}
+	for bad in [Stage{...stage, format: 2}, Stage{...stage, original_modules_sha256: protected_modules()},
+		Stage{...stage, preserved_modules_sha256: map[string]string{}}] {
+		if _ := verify_controller_receipt(receipt, bad) { return error('changed controller module contract accepted') }
+	}
+	for deltas in [map[string]string{}, {'/opt/vinix-maps-account/bin/maps-account-guest': controller_pin},
+		{'/opt/vinix-maps-account/bin/maps-account-guest': controller_pin, '/usr/bin/run-android-calculator': '0'.repeat(64)},
+		{'/opt/vinix-maps-account/bin/maps-account-guest': controller_pin, '/usr/bin/run-android-calculator': controller_pin, '/extra': controller_pin}] {
+		mut bad := controller_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(deltas))!
+		if _ := verify_controller_receipt(bad, stage) { return error('unsafe controller deployment input delta accepted') }
+	}
+	for deltas in [ []string{}, ['inputs_sha256', 'native_manifest_sha256'], ['inputs_sha256', 'inputs_sha256'] ] {
+		mut bad := controller_receipt_fixture()!
+		bad['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(deltas))!
+		if _ := verify_controller_receipt(bad, stage) { return error('unsafe controller deployment top delta accepted') }
+	}
+	if _ := verify_protected_receipt(receipt, stage) { return error('controller receipt accepted by protected profile') }
+	if _ := verify_controller_receipt(protected_receipt_fixture(), stage) { return error('protected receipt accepted by controller profile') }
+	println('MAPS-CONTROLLER KERNEL-PROFILE-SELF-TEST PASS exact startup base controller receipt inputs deployment delta eight modules historical profile rejection')
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
+	controller_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -803,6 +987,7 @@ fn self_test() ! {
 	fat_self_test(root + '/browser', 'browser-probe.tar', ['runtime.tar'])!
 	fat_self_test(root + '/maps', 'maps-account.tar', ['runtime.tar'])!
 	fat_self_test(root + '/protected-maps', 'protected-storage-diagnostic.tar', protected_maps_profile().modules)!
+	fat_self_test(root + '/controller', 'maps-controller-diagnostic.tar', controller_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -816,11 +1001,12 @@ fn main() {
 	}
 	is_maps := os.args.len == 5 && os.args[1] == '--maps-account'
 	is_protected := os.args.len == 5 && os.args[1] == '--protected-storage-maps'
-	if os.args.len != 4 && !is_maps && !is_protected {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+	is_controller := os.args.len == 5 && os.args[1] == '--maps-controller'
+	if os.args.len != 4 && !is_maps && !is_protected && !is_controller {
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_maps || is_protected { 1 } else { 0 }
+	offset := if is_maps || is_protected || is_controller { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -829,7 +1015,7 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	profile := if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	profile := if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
