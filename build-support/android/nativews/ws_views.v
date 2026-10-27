@@ -459,18 +459,21 @@ fn ws_draw_children(e voidptr, object voidptr, canvas voidptr) {
 // Keep the old front buffer until a later traversal accepts the frame.
 fn ws_dispatch_traversal(e voidptr, window voidptr) bool {
 	observer := get_object(e, window, c'android/view/Window', c'view_tree_observer', c'Landroid/view/ViewTreeObserver;')
-	if pending(e) { return false }
-	if observer == unsafe { nil } { return true }
+	if pending(e) { ws_trace_traversal(false, true); return false }
+	if observer == unsafe { nil } { ws_trace_traversal(false, false); return true }
 	call(e, observer, c'android/view/ViewTreeObserver', c'dispatchOnGlobalLayout', c'()V', unsafe { nil })
-	if pending(e) { return false }
+	if pending(e) { ws_trace_traversal(false, true); return false }
 	cancel := boolean(e, observer, c'android/view/ViewTreeObserver', c'dispatchOnPreDraw', c'()Z', unsafe { nil })
-	if pending(e) { return false }
+	if pending(e) { ws_trace_traversal(false, true); return false }
 	if cancel != 0 {
 		ws.dirty = true
+		ws_trace_traversal(true, false)
 		return false
 	}
 	call(e, observer, c'android/view/ViewTreeObserver', c'dispatchOnDraw', c'()V', unsafe { nil })
-	return !pending(e)
+	exception := pending(e)
+	ws_trace_traversal(false, exception)
+	return !exception
 }
 
 fn ws_render(e voidptr) {
@@ -512,6 +515,7 @@ fn ws_render(e voidptr) {
 		if ws.dialog != nil && !ws_render_dialog(e) { return }
 		surface.sequence++
 		C.__atomic_store_n(&surface.active, target, 3)
+		ws_trace_publication()
 		ws.animation_last = ws_millis()
 	}
 }
@@ -618,9 +622,16 @@ fn ws_motion(e voidptr, target voidptr, action i32, x i32, y i32) u8 {
 
 fn ws_pointer(e voidptr, event &WsEvent) {
 	unsafe {
+		trace := ws_trace_pointer_begin(event)
+		mut outcome := c'ignored-kind'
+		mut handled := i32(-1)
+		defer {
+			if trace != 0 { ws_trace_pointer_end(event, trace, outcome, handled, pending(e)) }
+		}
 		if event.kind == 1 || event.kind == 3 {
-			if ws.pressed == nil { return }
-			ws_motion(e, ws.pressed, if event.kind == 1 { 2 } else { 1 }, event.x, event.y)
+			if ws.pressed == nil { outcome = c'no-capture'; return }
+			handled = i32(ws_motion(e, ws.pressed, if event.kind == 1 { 2 } else { 1 }, event.x, event.y))
+			outcome = c'dispatched'
 			if event.kind == 3 {
 				Drop(slot(e, 22))(e, ws.pressed)
 				ws.pressed = nil
@@ -630,6 +641,7 @@ fn ws_pointer(e voidptr, event &WsEvent) {
 		}
 		if event.kind != 2 && event.kind != 5 { return }
 		if ws.dialog != nil && (event.x < ws.dialog_x || event.y < ws.dialog_y || event.x >= ws.dialog_x + ws.dialog_width || event.y >= ws.dialog_y + ws.dialog_height) {
+			outcome = c'outside-dialog'
 			return
 		}
 		root := if ws.dialog == nil {
@@ -642,7 +654,7 @@ fn ws_pointer(e voidptr, event &WsEvent) {
 		} else {
 			ws.dialog_y
 		}), 0)
-		if target == nil { return }
+		if target == nil { outcome = c'no-target'; return }
 		if event.kind == 5 { ws_wheel(e, target, event.value); return }
 		if ws.pressed != nil {
 			ws_motion(e, ws.pressed, 3, event.x, event.y)
@@ -650,7 +662,9 @@ fn ws_pointer(e voidptr, event &WsEvent) {
 			ws.pressed = nil
 		}
 		ws.press_time = ws_millis()
-		if ws_motion(e, root, 0, event.x, event.y) != 0 {
+		handled = i32(ws_motion(e, root, 0, event.x, event.y))
+		outcome = c'dispatched'
+		if handled != 0 {
 			ws.pressed = WsRef(slot(e, 21))(e, root)
 		}
 		ws_mark()

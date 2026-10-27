@@ -15,6 +15,75 @@ type WsObjectClass = fn (voidptr, voidptr) voidptr
 
 __global ws_surface_dump_count i32
 __global ws_tree_trace_at i64
+__global ws_pointer_trace_count u32
+__global ws_cancel_trace WsFrameTrace
+__global ws_accepted_trace WsFrameTrace
+__global ws_exception_trace WsFrameTrace
+__global ws_publication_trace WsFrameTrace
+
+struct WsFrameTrace {
+mut:
+	events u64
+	at i64
+}
+
+// These probes use native state only: no Java lookups, callbacks or exception
+// handling. Separate counters keep accepted frames from hiding cancellations.
+fn ws_trace_frame(trace &WsFrameTrace, stage &char) {
+	unsafe {
+		if C.getenv(c'VINIX_ANDROID_TRACE_TREE') == nil { return }
+		trace.events++
+		now := ws_millis()
+		if trace.events > 3 && now - trace.at < 30000 { return }
+		trace.at = now
+		buffer := &char(C.alloca(256))
+		count := C.snprintf(buffer, 256, c'ANDROID-WS-FRAME stage=%s mono_ms=%jd sequence=%u events=%ju\n',
+			stage, C.intmax_t(now), ws.surface.sequence, C.uintmax_t(trace.events))
+		if count > 0 && count < 256 { C.write(2, buffer, usize(count)) }
+	}
+}
+
+fn ws_trace_traversal(cancelled bool, exception bool) {
+	unsafe {
+		if exception {
+			ws_trace_frame(&ws_exception_trace, c'traversal-exception')
+		} else if cancelled {
+			ws_trace_frame(&ws_cancel_trace, c'predraw-cancel')
+		} else {
+			ws_trace_frame(&ws_accepted_trace, c'traversal-accepted')
+		}
+	}
+}
+
+fn ws_trace_publication() {
+	unsafe { ws_trace_frame(&ws_publication_trace, c'published') }
+}
+
+// Log receipt before entering Java, so a blocked callback still leaves evidence.
+// At most 64 DOWN/UP events produce two lines each; movement is never logged.
+fn ws_trace_pointer_begin(event &WsEvent) u32 {
+	unsafe {
+		if event.kind != 2 && event.kind != 3 { return 0 }
+		if C.getenv(c'VINIX_ANDROID_TRACE_TREE') == nil || ws_pointer_trace_count >= 64 { return 0 }
+		ws_pointer_trace_count++
+		buffer := &char(C.alloca(256))
+		count := C.snprintf(buffer, 256, c'ANDROID-WS-INPUT event=%u phase=received kind=%u mono_ms=%jd sequence=%u x=%d y=%d capture=%d\n',
+			ws_pointer_trace_count, event.kind, C.intmax_t(ws_millis()), ws.surface.sequence,
+			event.x, event.y, i32(ws.pressed != nil))
+		if count > 0 && count < 256 { C.write(2, buffer, usize(count)) }
+		return ws_pointer_trace_count
+	}
+}
+
+fn ws_trace_pointer_end(event &WsEvent, id u32, outcome &char, handled i32, exception bool) {
+	unsafe {
+		if id == 0 { return }
+		buffer := &char(C.alloca(256))
+		count := C.snprintf(buffer, 256, c'ANDROID-WS-INPUT event=%u phase=%s kind=%u mono_ms=%jd sequence=%u handled=%d exception=%d\n',
+			id, outcome, event.kind, C.intmax_t(ws_millis()), ws.surface.sequence, handled, i32(exception))
+		if count > 0 && count < 256 { C.write(2, buffer, usize(count)) }
+	}
+}
 
 struct WsPixelTrace {
 mut:

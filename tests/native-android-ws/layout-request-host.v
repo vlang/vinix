@@ -83,6 +83,8 @@ fn main() {
 	bindings := os.read_file(out + '/inputs/bindings.txt')!
 	mut methods := extracted(views, 'fn ws_mark()', '\nfn ws_set_text(')
 	methods += extracted(views, 'fn ws_dispatch_traversal(', '\nfn ws_debug_tree(')
+	// Opt-in native diagnostics do not participate in traversal decisions.
+	methods += '\nfn ws_trace_traversal(_ bool, _ bool) {}\nfn ws_trace_publication() {}\n'
 	assert dialogs.count('fn ws_render_dialog(') == 1
 	methods += 'fn ws_render_dialog(' + dialogs.all_after('fn ws_render_dialog(')
 	// Read the native entry point from the selected production bindings too.

@@ -590,6 +590,17 @@ activity name. `ANDROID_APP_DATA_DIR` overrides the per-APK directory under
 `VINIX_ANDROID_TRACE_TREE` enable test-only diagnostic logging of app content.
 Tree snapshots are limited to one every 30 seconds so serial logging does not
 delay rendering. Surface lifecycle changes are still logged as they happen.
+Tree tracing also writes bounded native input and frame diagnostics. The first
+64 pointer DOWN/UP events record receipt before Java dispatch and its returned
+outcome, with monotonic milliseconds and the current published frame sequence.
+`handled=-1` means the event was ignored before dispatch; `exception=1` preserves
+an existing Java exception. Movement, view text and account data are omitted.
+`ANDROID-WS-FRAME` distinguishes `predraw-cancel`, `traversal-accepted`,
+`traversal-exception` and `published`, each logging its first three occurrences
+then at most once every 30 seconds. Cancellation keeps the previous frame
+sequence; publication logs after the new buffer becomes active. These probes
+perform no Java calls and write directly to stderr so a blocked callback cannot
+leave its receipt in a stdio buffer.
 Tree tracing also samples the existing EGL readback and composed SurfaceView
 buffers: dimensions, frame counts, RGB variation, alpha coverage and two RGBA
 pixels. Each surface logs its first three frames, then at most once per 30

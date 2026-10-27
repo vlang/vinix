@@ -155,6 +155,9 @@ mut:
  draw bool
  attached int
  clips int
+ publications int
+ published_active u32
+ published_sequence u32
 }
 struct Value { i i32 l voidptr }
 type Render = fn (voidptr)
@@ -184,6 +187,11 @@ fn call(e voidptr, value voidptr, class &char, method &char, signature &char, ar
 }
 fn ws_dispatch_traversal(e voidptr, window voidptr) bool { return rp.traversal }
 fn ws_trace_tree(e voidptr, decor voidptr) {}
+fn ws_trace_publication() {
+ rp.publications++
+ rp.published_active = ws.surface.active
+ rp.published_sequence = ws.surface.sequence
+}
 fn ws_render_dialog(e voidptr) bool { return true }
 fn ws_millis() i64 { return 99 }
 '
@@ -226,6 +234,8 @@ fn render_case(render Render, active u32, size u32, reader u32, fail_call int, t
   assert surface.format == 77 && surface.reader == reader && surface.buffer_size == size && surface.reserved == 0xffffffff
   assert surface.active == if completed { target } else { active }
   assert surface.sequence == if completed { u32(0) } else { u32(0xffffffff) }
+  assert rp.publications == if completed { 1 } else { 0 }
+  if completed { assert rp.published_active == target && rp.published_sequence == 0 }
   assert rp.tls == voidptr(55)
   assert rp.leaves == if blocked { 0 } else { 1 }
   assert rp.attached == if blocked { 0 } else { 1 }
