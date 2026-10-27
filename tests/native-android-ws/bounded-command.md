@@ -23,19 +23,24 @@ Disk readings use bounded `df` output, avoiding the pinned V library's macOS
 `statvfs` layout problem. Shared-volume
 activity contributes to the observed disk decrease.
 
-The command and ordinary compiler descendants inherit a fresh process group.
-RSS is summed from bounded `ps` output about every 100 ms, including descendants
-after the leader exits. These are sampled guards: transient peaks between
+The command inherits a fresh process group. A nested group is supervised when
+its leader is observed as a descendant and its group did not exist before the
+command started. Its members remain supervised after their parent exits; an
+observed empty group is retired. Joining the guard's group or an existing
+unowned group causes refusal. RSS is summed across all supervised groups and
+descendants from bounded `ps` output about every 100 ms. These are sampled
+guards: a group created and orphaned entirely between samples cannot be proven
+by ancestry, transient peaks between
 samples can exceed the limit, and a slow monitor can add its one-second timeout
 to detection latency. Output is streamed with a strict file-size cap.
 
-On a guard failure the runner kills the group, reaps its child, and verifies
-that the group disappeared. If host policy rejects negative-PGID signals, it
+At completion or guard failure the runner rescans descendants, kills all owned
+groups, reaps its child, and verifies that every owned group disappeared. The
+receipt lists all discovered groups. If host policy rejects negative-PGID signals, it
 repeatedly lists group members and verifies each PID's group immediately before
 signaling it. Cleanup has a two-second deadline. Fixed `ps` and `df` monitors
-have separate one-second/output limits and no child processes. Commands must
-preserve the inherited process group; a detected descendant that changes group
-causes refusal, and `cleanup_complete` describes only the original group.
+have separate one-second/output limits and no child processes. Unowned groups
+are never signaled; if a descendant joins one, cleanup is reported incomplete.
 
 Successful commands preserve their exit code; guard refusal returns 125. The
 JSON receipt records arguments, limits, sampled peak, disk readings, output
@@ -50,7 +55,9 @@ check-bounded-command /absolute/bounded-command /external/fresh-controls
 
 The controls cover literal arguments, exit 37, merged output, absent generated
 root, exclusive evidence creation, output overflow, wall timeout, an exited
-leader with a live stdout-holding descendant, aggregate descendant RSS, and
+leader with a live stdout-holding descendant, aggregate descendant RSS,
+successful nested groups, cleanup of nested members after the original leader
+exits, combined RSS across nested groups, and
 initial disk-reserve refusal. They also verify the default growth budget, accept
 an explicitly backed 8 GiB budget, reject larger values, and check capacity
 boundaries and integer overflow without writing a large disk fixture. The

@@ -42,6 +42,7 @@ mut:
 	minimum_free_bytes u64
 	maximum_observed_disk_growth_bytes u64
 	output_bytes u64
+	supervised_groups []int
 }
 
 fn monotonic_ms() i64 { return time.sys_mono_now() / time.millisecond }
@@ -189,7 +190,7 @@ fn probe(args []string) !string {
 
 struct ProcessRow { pid int; parent int; group int; rss u64 }
 
-fn tree_rss(table string, leader int) !u64 {
+fn process_rows(table string) ![]ProcessRow {
 	mut rows := []ProcessRow{}
 	for line in table.split_into_lines() {
 		fields := line.fields()
@@ -202,26 +203,97 @@ fn tree_rss(table string, leader int) !u64 {
 		}
 		rows << ProcessRow{int(pid), int(parent), int(group), rss * 1024}
 	}
+	return rows
+}
+
+struct Supervision {
+	guard_group int
+mut:
+	groups map[int]bool
+	unowned map[int]bool
+	retired map[int]bool
+	history []int
+}
+
+fn supervision(before []ProcessRow, leader int) Supervision {
+	mut result := Supervision{guard_group: C.getpgid(0)}
+	for row in before { result.unowned[row.group] = true }
+	result.groups[leader] = true
+	result.history << leader
+	return result
+}
+
+// A nested group is owned only when its leader is an observed descendant and
+// the group did not exist before spawn. Keep it after reparenting, until empty.
+fn supervised_rss(rows []ProcessRow, mut state Supervision) !u64 {
+	mut present := map[int]bool{}
+	for row in rows { present[row.group] = true }
+	for group in state.groups.keys() {
+		if !present[group] { state.groups.delete(group); state.retired[group] = true }
+	}
 	mut selected := map[int]bool{}
-	selected[leader] = true
-	// Include the group after leader exit, plus descendants in the same group.
-	for row in rows { if row.group == leader { selected[row.pid] = true } }
+	for row in rows { if state.groups[row.group] { selected[row.pid] = true } }
 	for _ in 0 .. rows.len {
 		mut changed := false
 		for row in rows {
-			if !selected[row.pid] && selected[row.parent] { selected[row.pid] = true; changed = true }
+			if !selected[row.pid] && (selected[row.parent] || state.groups[row.group]) {
+				selected[row.pid] = true; changed = true
+			}
+			if selected[row.pid] && row.pid == row.group && !state.groups[row.group] &&
+				row.group > 1 && row.group != state.guard_group && !state.unowned[row.group] && !state.retired[row.group] {
+				state.groups[row.group] = true
+				state.history << row.group
+				changed = true
+			}
 		}
 		if !changed { break }
 	}
 	mut total := u64(0)
+	mut refusal := false
 	for row in rows {
 		if selected[row.pid] {
-			if row.group != leader { return error('descendant left supervised process group') }
+			if !state.groups[row.group] { refusal = true }
 			if row.rss > ~u64(0) - total { return error('RSS aggregate overflow') }
 			total += row.rss
 		}
 	}
+	if refusal { return error('descendant joined an unowned process group') }
 	return total
+}
+
+fn cleanup_supervised(mut p os.Process, mut state Supervision) ! {
+	start := monotonic_ms()
+	mut problem := ''
+	for {
+		rows := process_rows(probe(['/bin/ps', '-axo', 'pid=,ppid=,pgid=,rss='])!)!
+		// Discover groups made since the last sample before stopping their parents.
+		supervised_rss(rows, mut state) or { problem = err.msg() }
+		for group, _ in state.groups {
+			if group <= 1 || group == state.guard_group || state.unowned[group] {
+				return error('unsafe supervised cleanup group')
+			}
+			if C.kill(-group, C.SIGKILL) != 0 {
+				code := int(C.errno)
+				if code != C.EPERM && code != C.ESRCH { return error('cannot kill supervised group') }
+				if code == C.EPERM {
+					for row in rows {
+						if row.group == group && row.pid > 1 && C.getpgid(row.pid) == group {
+							if C.kill(row.pid, C.SIGKILL) != 0 && C.errno != C.ESRCH {
+								return error('cannot stop supervised group member')
+							}
+						}
+					}
+				}
+			}
+		}
+		alive := p.is_alive()
+		if !alive && state.groups.len == 0 {
+			if problem != '' { return error(problem + '; unowned descendants not claimed as cleaned') }
+			return
+		}
+		if monotonic_ms() - start >= 2000 { return error('supervised process group cleanup timed out') }
+		time.sleep(10 * time.millisecond)
+	}
 }
 
 fn free_bytes(path string) !u64 {
@@ -295,8 +367,11 @@ fn run(args []string) !int {
 	if !disk_budget_backed(initial, limits.reserve, limits.growth) {
 		report.reason = 'disk growth budget'; return 125
 	}
+	before := process_rows(probe(['/bin/ps', '-axo', 'pid=,ppid=,pgid=,rss='])!)!
 	mut p := start_command(report.argv) or { report.reason = err.msg(); return 125 }
 	report.pid = p.pid
+	mut state := supervision(before, p.pid)
+	defer { report.supervised_groups = state.history.clone() }
 	defer { p.close() }
 	mut buf := []u8{len: 8192}
 	mut next_sample := i64(0)
@@ -319,7 +394,8 @@ fn run(args []string) !int {
 		if !alive && eof { report.child_exit_code = p.code; report.exit_code = p.code; break }
 		if monotonic_ms() >= next_sample {
 			table := probe(['/bin/ps', '-axo', 'pid=,ppid=,pgid=,rss=']) or { report.reason = 'RSS probe failed: ' + err.msg(); break }
-			rss := tree_rss(table, p.pid) or { report.reason = err.msg(); break }
+			rows := process_rows(table) or { report.reason = err.msg(); break }
+			rss := supervised_rss(rows, mut state) or { report.reason = err.msg(); break }
 			report.rss_samples++
 			if rss > report.peak_sampled_rss_bytes { report.peak_sampled_rss_bytes = rss }
 			if rss > limits.rss { report.reason = 'aggregate RSS'; break }
@@ -333,7 +409,7 @@ fn run(args []string) !int {
 		}
 		time.sleep(2 * time.millisecond)
 	}
-	cleanup(mut p) or { report.reason += '; ' + err.msg(); report.exit_code = 125; return 125 }
+	cleanup_supervised(mut p, mut state) or { report.reason += '; ' + err.msg(); report.exit_code = 125; return 125 }
 	report.cleanup_complete = true
 	report.child_exit_code = p.code
 	// Also enforce disk bounds for commands that finish between samples.
@@ -355,7 +431,25 @@ fn main() {
 		assert !disk_budget_backed(0, ~u64(0), 1)
 		assert !disk_budget_backed(~u64(0), ~u64(0), 1)
 		assert disk_budget_backed(~u64(0), ~u64(0), 0)
-		println('BOUNDED-COMMAND-SELF-PASS backed-disk-budget overflow-refusal')
+		mut state := supervision([ProcessRow{99, 1, 99, 1}], 31)
+		first := supervised_rss([ProcessRow{34, 1, 32, 5}, ProcessRow{31, 1, 31, 10}, ProcessRow{32, 31, 32, 20}], mut state) or { panic(err) }
+		assert first == 35
+		assert state.groups[32]
+		orphan := supervised_rss([ProcessRow{33, 1, 32, 40}], mut state) or { panic(err) }
+		assert orphan == 40
+		assert !state.groups[31] && state.retired[31]
+		empty := supervised_rss([]ProcessRow{}, mut state) or { panic(err) }
+		assert empty == 0
+		assert state.groups.len == 0 && state.retired[32]
+		for rejected in [99, C.getpgid(0)] {
+			mut refusal := supervision([ProcessRow{99, 1, 99, 1}], 31)
+			mut refused := false
+			supervised_rss([ProcessRow{31, 1, 31, 10}, ProcessRow{rejected, 31, rejected, 20}], mut refusal) or {
+				refused = true
+			}
+			assert refused && !refusal.groups[rejected]
+		}
+		println('BOUNDED-COMMAND-SELF-PASS backed-disk-budget overflow-refusal nested-ownership retired-groups unowned-refusal')
 		return
 	}
 	code := run(os.args[1..]) or {
