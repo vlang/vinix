@@ -488,6 +488,9 @@ fn main() {
 			if os.exists('/opt/ios/dictionary-file-checks') {
 				require_child('/opt/ios/dictionary-file-checks')
 			}
+			if os.exists('/opt/ios/audio-category-checks') {
+				require_child('/opt/ios/audio-category-checks')
+			}
 			if os.exists('/opt/ios/audio-activity-checks') {
 				require_child('/opt/ios/audio-activity-checks')
 			}

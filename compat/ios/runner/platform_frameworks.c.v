@@ -18,6 +18,7 @@ fn audio_session_shared() u64 {
 fn audio_session_types(name string, meta bool, selector string) ?string {
 	if name != 'AVAudioSession' { return none }
 	if meta && selector == 'sharedInstance' { return '@16@0:8' }
+	if !meta && selector == 'category' { return '@16@0:8' }
 	if !meta && selector == 'isOtherAudioPlaying' { return 'B16@0:8' }
 	return none
 }
@@ -32,6 +33,13 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 	if ns_data_url_dispatch(object, selector, mut frame) { return true }
 	if scene_dispatch(object, selector, mut frame) { return true }
 	if object !in ios_runtime.classes && objc_is_kind(object, ios_runtime.names['AVAudioSession']) {
+		if selector == 'category' {
+			// No category configuration has been implemented. Return the documented
+			// initial category, using the framework constant's runtime-owned string.
+			frame.x[0] = read64(framework_string_constant('_AVAudioSessionCategorySoloAmbient',
+				'AVAudioSessionCategorySoloAmbient'))
+			return true
+		}
 		if selector != 'isOtherAudioPlaying' { return false }
 		// No cross-application audio-session provider is attached. Report the
 		// inactive default; this cannot detect independent OSS clients. Offline
