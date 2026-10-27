@@ -24,6 +24,38 @@ struct PixelPoint {
 // while requiring the caller to measure the current onboarding client area.
 const legacy_client = ClientRect{120, 80, 480, 640}
 
+struct WaitOptions {
+	client      ClientRect
+	screen_only bool
+}
+
+fn wait_options(action string, args []string) !WaitOptions {
+	mut remaining := []string{}
+	mut screen_only := false
+	for argument in args {
+		if argument == '--screen-only' {
+			if screen_only { return error('duplicate --screen-only option') }
+			screen_only = true
+		} else {
+			remaining << argument
+		}
+	}
+	if action == 'onboarding' {
+		return WaitOptions{client_rect(remaining)!, screen_only}
+	}
+	if action != 'map' || remaining.len != 0 {
+		return error('map accepts only the optional --screen-only flag')
+	}
+	return WaitOptions{legacy_client, screen_only}
+}
+
+fn can_probe(serial string, qmp_exists bool, screen_only bool) !bool {
+	if serial.contains('APK-SUITE-EXIT id=') {
+		return error('Maps exited while waiting for a screen')
+	}
+	return qmp_exists && (screen_only || serial.contains('ANDROID-WS-READY backend=vinix-native'))
+}
+
 fn client_rect(args []string) !ClientRect {
 	if args.len != 5 || args[0] != '--client-rect' {
 		return error('onboarding requires --client-rect X Y WIDTH HEIGHT from the current screenshot')
@@ -190,16 +222,15 @@ fn presented(path string, screen string, rect ClientRect) !bool {
 	return probe_image(&image, screen, rect)
 }
 
-fn wait_screen(run string, screen string, rect ClientRect) ! {
+fn wait_screen(run string, screen string, options WaitOptions) ! {
+	mode := if options.screen_only { 'screen-only runtime_readiness_required=false' } else { 'uart-and-screen runtime_readiness_required=true' }
+	record(run, 'SCREEN-WAIT mode=' + mode + '; pixel matches require visual review')!
 	begin := time.now().unix()
 	for time.now().unix() - begin < 600 {
 		serial := os.read_file(run + '/serial.log') or { '' }
-		if serial.contains('APK-SUITE-EXIT id=') {
-			return error('Maps exited while waiting for ' + screen)
-		}
-		if serial.contains('ANDROID-WS-READY backend=vinix-native') && os.exists(run + '/qmp.sock') {
+		if can_probe(serial, os.exists(run + '/qmp.sock'), options.screen_only)! {
 			capture(run, screen + '-probe')!
-			if presented(run + '/' + screen + '-probe.png', screen, rect)! {
+			if presented(run + '/' + screen + '-probe.png', screen, options.client)! {
 				os.cp(run + '/' + screen + '-probe.png', run + '/' + screen + '.png')!
 				record(run, 'PIXEL-PROBE-PRESENTED ' + screen + '; screenshot requires visual review')!
 				return
@@ -211,6 +242,30 @@ fn wait_screen(run string, screen string, rect ClientRect) ! {
 }
 
 fn self_test() ! {
+	for action in ['onboarding', 'map'] {
+		geometry := if action == 'onboarding' { ['--client-rect', '171', '94', '480', '640'] } else { []string{} }
+		if wait_options(action, geometry)!.screen_only { return error('default screen wait bypassed UART') }
+		for arguments in [[...geometry, '--screen-only'], ['--screen-only', ...geometry]] {
+			if !wait_options(action, arguments)!.screen_only { return error('screen-only opt-in was lost') }
+		}
+		if _ := wait_options(action, [...geometry, '--screen-only', '--screen-only']) {
+			return error('duplicate screen-only option accepted')
+		}
+	}
+	if _ := wait_options('map', ['--private-log', '/private/maps.log']) {
+		return error('unsupported private log argument accepted')
+	}
+	for qmp_exists in [false, true] {
+		for screen_only in [false, true] {
+			if can_probe('', qmp_exists, screen_only)! != (qmp_exists && screen_only)
+				|| can_probe('ANDROID-WS-READY backend=vinix-native', qmp_exists, screen_only)! != qmp_exists {
+				return error('screen wait ignored readiness mode or missing QMP')
+			}
+			if _ := can_probe('APK-SUITE-EXIT id=google-maps', qmp_exists, screen_only) {
+				return error('screen wait ignored an observed app exit')
+			}
+		}
+	}
 	for arguments in [ []string{}, ['--client-rect', '0', '0', '480'],
 		['--origin', '0', '0', '480', '640'], ['--client-rect', '-1', '0', '480', '640'],
 		['--client-rect', '+1', '0', '480', '640'], ['--client-rect', '1_0', '0', '480', '640'],
@@ -256,7 +311,7 @@ fn self_test() ! {
 			return error('stale coordinates matched translated onboarding')
 		}
 	}
-	println('MAPS-INTERACT-SELFTEST-PASS explicit-client-rectangle strict-bounds scaled-click translated-pixel-probes stale-coordinate-rejection')
+	println('MAPS-INTERACT-SELFTEST-PASS explicit-client-rectangle strict-bounds scaled-click translated-pixel-probes stale-coordinate-rejection explicit-screen-only-readiness QMP-required app-exit-rejection')
 }
 
 fn main() {
@@ -265,7 +320,7 @@ fn main() {
 		return
 	}
 	if os.args.len < 3 {
-		eprintln('usage: maps-interact --self-test | RUN_DIRECTORY onboarding --client-rect X Y WIDTH HEIGHT | map | capture NAME | input ARGS...')
+		eprintln('usage: maps-interact --self-test | RUN_DIRECTORY onboarding --client-rect X Y WIDTH HEIGHT [--screen-only] | map [--screen-only] | capture NAME | input ARGS...')
 		exit(2)
 	}
 	run := os.abs_path(os.args[1])
@@ -279,16 +334,16 @@ fn main() {
 fn run_action(run string, action string, args []string) ! {
 	match action {
 		'onboarding' {
-			rect := client_rect(args)!
+			options := wait_options(action, args)!
+			rect := options.client
 			point := rect.point(404, 54)
 			record(run, 'ONBOARDING-CLIENT x=${rect.x} y=${rect.y} width=${rect.width} height=${rect.height} skip_local=404,54 skip_screen=${point.x},${point.y}')!
-			wait_screen(run, action, rect)!
+			wait_screen(run, action, options)!
 			input(run, ['click', point.x.str(), point.y.str()])!
 			record(run, 'SKIP-CLICK screen=${point.x},${point.y}')!
 		}
 		'map' {
-			if args.len != 0 { return error('map takes no extra arguments') }
-			wait_screen(run, action, legacy_client)!
+			wait_screen(run, action, wait_options(action, args)!)!
 		}
 		'capture' {
 			if args.len != 1 { return error('capture requires a name') }

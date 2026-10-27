@@ -16,6 +16,21 @@ build/android-maps/maps-interact-bounded /external/guest-run capture after-skip
 build/android-maps/maps-interact-bounded /external/guest-run input click 575 148
 ```
 
+Broker-launched Maps keeps runtime output in its private guest log, so its
+`ANDROID-WS-READY` marker does not appear in host `serial.log`. Select
+`--screen-only` explicitly for these waits:
+
+```sh
+build/android-maps/maps-interact-bounded /external/guest-run onboarding --client-rect 198 95 480 640 --screen-only
+build/android-maps/maps-interact-bounded /external/guest-run map --screen-only
+```
+
+This mode requires the QMP endpoint and a matching screenshot probe, and rejects
+any app-exit marker observed in UART. It does not claim runtime readiness or read
+private logs. The default still requires the UART readiness marker as well as the
+pixel probe. Both modes retain screenshots for visual review and log the selected
+readiness mode. The map probe retains its original fixed screen regions.
+
 `onboarding` requires the current client rectangle measured from the screenshot:
 the left/top content origin and its visible width/height, excluding the window
 frame and title bar. The example rectangle maps Skip's native `(404,54)` point
@@ -29,8 +44,9 @@ click completes. `map`, `capture` and direct `input` retain their existing behav
 the map probe still uses its original fixed screen regions.
 
 The selftest checks rectangle rejection, translated and scaled click coordinates,
-synthetic onboarding probes at several sizes, and rejection of the stale probe
-position. It needs no guest or QMP server.
+synthetic onboarding probes at several sizes, rejection of the stale probe
+position, explicit readiness selection, missing QMP and observed app exits. It
+needs no guest or QMP server.
 
 The rectangle change (source base `f30d5acaf`, driver source SHA-256
 `c7c6a4766bd9754c499d50a610b33b418940f68a513fcdf742ab8b61455d7d9f`)
@@ -59,6 +75,21 @@ The controlled V fixture runs without a guest or QMP server:
 v -nocache -cc cc -o build/android-maps/maps-interact-check tests/native-android-ws/maps-interact-check.v
 build/android-maps/maps-interact-check build/android-maps/maps-interact-bounded /external/fresh-driver-check
 ```
+
+The fixture also supplies synthetic screenshots through a controlled command and
+checks onboarding's transformed click plus map presentation without a UART
+readiness marker. Add `--screen-only` to the checker invocation to run only these
+two cases, without the output-flood and 30-second timeout regressions.
+
+The screen-only change (base `d605dcda9`, driver source SHA-256
+`b789c06739ce1ccd3f60b09a54552963e172c95ddfd5ca45770be041e71aef11`)
+passed the selftest and both controlled screenshot cases. Sequential driver and
+checker builds each stayed below 210 MB RSS; checks stayed below 13 MB, all with
+zero swaps. Complete inputs, commands and results remain at
+`/Users/alex/.local/state/vinix/android/maps-interact-screen-only-2026-10-27-r1`;
+`sha256.txt` has digest
+`2014f629db01ce23de5cead33883b7b9a1a267b1aae01a54925d27e993737eca`.
+No live guest or QMP server was used for these checks.
 
 Two runs passed exact preservation of 262,155 bytes including binary tails on
 each stream, exit-7 propagation, and termination/reaping of a hung command:
