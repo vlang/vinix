@@ -375,11 +375,12 @@ return-void
 // These probes use the real Context.sendBroadcast routes. Only exceptional
 // cleanup calls the hidden dispatcher directly, so callback failures cannot be
 // mistaken for successful manifest/registered delivery.
-fn broadcast_defaults() string {
+fn broadcast_defaults(code int, name string) string {
 	mut body := '
 invoke-virtual {p0}, ${receiver}->getResultCode()I
 move-result v0
-if-nez v0, :bad
+const/4 v1, ${code}
+if-ne v0, v1, :bad
 invoke-virtual {p0}, ${receiver}->getResultData()Ljava/lang/String;
 move-result-object v0
 if-nez v0, :bad
@@ -398,8 +399,8 @@ move-result v0
 if-nez v0, :bad
 return-void
 '
-	body += failure('fresh unordered broadcast defaults')
-	return method('public static broadcastFresh(${receiver})V', 2, body)
+	body += failure('${name} unordered broadcast defaults')
+	return method('public static ${name}(${receiver})V', 2, body)
 }
 
 fn broadcast_mutation(target string, name string) string {
@@ -464,7 +465,7 @@ return-object v2
 
 fn broadcast_outside() string {
 	mut body := '
-invoke-static {p0}, ${owner}->broadcastFresh(${receiver})V
+invoke-static {p0}, ${owner}->broadcastDetached(${receiver})V
 const/4 v1, 1
 invoke-virtual {p0, v1}, ${receiver}->getResultExtras(Z)Landroid/os/Bundle;
 move-result-object v0
@@ -529,7 +530,8 @@ return-void
 }
 
 fn broadcast_checks() string {
-	mut source := broadcast_defaults() + broadcast_mutation(receiver, 'broadcastMutate') +
+	mut source := broadcast_defaults(-1, 'broadcastFresh') + broadcast_defaults(0, 'broadcastDetached') +
+		broadcast_mutation(receiver, 'broadcastMutate') +
 		broadcast_mutation(pending_result, 'pendingMutate') + broadcast_outside() + broadcast_cleanup()
 	source += method('private static broadcasts(${context})V', 10, '
 new-instance v0, Landroid/os/HandlerThread;

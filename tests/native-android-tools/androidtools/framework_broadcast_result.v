@@ -148,9 +148,11 @@ pub fn framework_broadcast_pending(source string) !string {
 .field private vinixAbort:Z
 .field private vinixFinished:Z
 '
-	result += broadcast_method('public constructor <init>(Z)V', 0, '
+	result += broadcast_method('public constructor <init>(Z)V', 1, '
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
     iput-boolean p1, p0, Landroid/content/BroadcastReceiver$PendingResult;->vinixRegistered:Z
+    const/4 v0, -0x1
+    iput v0, p0, Landroid/content/BroadcastReceiver$PendingResult;->vinixCode:I
     return-void')
 	result += broadcast_method('private static vinixWarnUnordered()V', 2, '
     const-string v0, "BroadcastReceiver"

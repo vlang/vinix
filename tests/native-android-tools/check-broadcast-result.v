@@ -69,6 +69,7 @@ fn main() {
 			assert new.count('.field ') == 1
 		} else if name.ends_with('$PendingResult') {
 			assert new.count('.field ') == 6
+			assert after['<init>(Z)V'].contains('const/4 v0, -0x1\n    iput v0, p0, Landroid/content/BroadcastReceiver$PendingResult;->vinixCode:I')
 			assert after['finish()V'].contains('if-nez v0, :done')
 			assert after['finish()V'].contains('monitor-enter p0')
 			assert after['finish()V'].count('monitor-exit p0') == 2
