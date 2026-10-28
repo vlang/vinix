@@ -18,7 +18,9 @@ fn audio_session_shared() u64 {
 fn audio_session_types(name string, meta bool, selector string) ?string {
 	if name != 'AVAudioSession' { return none }
 	if meta && selector == 'sharedInstance' { return '@16@0:8' }
-	if !meta && selector == 'category' { return '@16@0:8' }
+	if !meta && selector in ['category', 'mode'] { return '@16@0:8' }
+	if !meta && selector == 'categoryOptions' { return 'Q16@0:8' }
+	if !meta && selector == 'setCategory:mode:options:error:' { return 'B48@0:8@16@24Q32^@40' }
 	if !meta && selector == 'isOtherAudioPlaying' { return 'B16@0:8' }
 	return none
 }
@@ -33,19 +35,7 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 	if ns_data_url_dispatch(object, selector, mut frame) { return true }
 	if scene_dispatch(object, selector, mut frame) { return true }
 	if object !in ios_runtime.classes && objc_is_kind(object, ios_runtime.names['AVAudioSession']) {
-		if selector == 'category' {
-			// No category configuration has been implemented. Return the documented
-			// initial category, using the framework constant's runtime-owned string.
-			frame.x[0] = read64(framework_string_constant('_AVAudioSessionCategorySoloAmbient',
-				'AVAudioSessionCategorySoloAmbient'))
-			return true
-		}
-		if selector != 'isOtherAudioPlaying' { return false }
-		// No cross-application audio-session provider is attached. Report the
-		// inactive default; this cannot detect independent OSS clients. Offline
-		// AudioUnit rendering is not evidence of another application's playback.
-		frame.x[0] = 0
-		return true
+		return audio_session_dispatch(object, selector, mut frame)
 	}
 	if object !in ios_runtime.classes && objc_is_kind(object, ios_runtime.names['CMMotionManager']) {
 		if selector !in ['isAccelerometerAvailable', 'isAccelerometerActive', 'isGyroAvailable', 'isGyroActive'] { return false }

@@ -485,6 +485,9 @@ fn main() {
 			['/opt/ios/FortniteClient-IOS-Shipping']
 		}
 		if mode == 'probe-no-ads' {
+			if os.exists('/opt/ios/audio-configuration-checks') {
+				require_child('/opt/ios/audio-configuration-checks')
+			}
 			if os.exists('/opt/ios/string-compare-checks') {
 				require_child('/opt/ios/string-compare-checks')
 			}
