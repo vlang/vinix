@@ -139,6 +139,16 @@ const account_pump_seal = 'a6a7f207b07083726b9708eea2c67290bcf8baced755651c50bdc
 const account_pump_pin = 'cce3eb926d3bc8b2b3c9e9a4f0d42cc4ab6bfdc23b0532beb2c42f5f9b384791'
 const account_pump_build = '2802af6636568126359765ac00d09b0771f0b4d22a09c45db55dfe21ba557924'
 const account_pump_source_pin = '0fd27e8edece566671eb824b537858938478300ca16c3572a9aa64bf102cebea'
+const application_restrictions_base = '/Users/alex/.local/state/vinix/android/maps-account-pump-r2'
+const application_restrictions_base_seal = 'd432d4cf4fa1522b07cb2b7ada498a32d375d44cf7830e50858681fcf118035c'
+const application_restrictions_boot_sha = 'c03e92d18d4dc4e321ed8e48010a47fac92efbc486c88f61bd14f1b354b61d41'
+const application_restrictions_base_overlay = 'f3386cd853826fffe8fb83b667cda5a7f75211bd4e99db2f33f925e0b2944f5b'
+const application_restrictions_root = '/Users/alex/.local/state/vinix/android/combined-account-webview-application-restrictions-framework-2026-10-28-r1'
+const application_restrictions_seal = '8907c1f11d8886b47358b458a8026d8351c6feac44d78346d6d426208b8ffe15'
+const application_restrictions_jar = 'd4e8678bf5deda99358defd912e64e4fcba92fec4ad3b87b39fc9f7e9f6ebf32'
+const application_restrictions_dex = '45c25a081702f299ae3f8a883347d624cae6ab4bda3b5f2538be89421cdf32ab'
+const application_restrictions_build = 'a2a31c49975032e4051a2cb9a737d5bdd31a57e7472bafc60411f723c2ebea3a'
+const application_restrictions_retained_guest = 'b22889a7279f5d1f3523e6968a0ee6d107ffaab2c43bd80080b44b633ba29450'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -1428,6 +1438,145 @@ fn account_pump_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return account_pump_base + '/boot.img'
 }
 
+fn application_restrictions_profile() Profile {
+	mut modules := account_pump_profile().modules.clone()
+	modules << 'maps-account-pump.tar'
+	return Profile{'maps-application-restrictions', application_restrictions_boot_sha,
+		'maps-application-restrictions.tar', modules}
+}
+
+fn application_restrictions_modules() map[string]string {
+	mut modules := account_pump_modules()
+	modules['maps-account-pump.tar'] = application_restrictions_base_overlay
+	return modules
+}
+
+fn application_restrictions_fields() map[string]string {
+	mut fields := onboarding_framework_fields()
+	fields['kind'] = 'vinix-maps-application-restrictions-v1'
+	fields['base_root'] = application_restrictions_base
+	fields['base_manifest_sha256'] = application_restrictions_base_seal
+	fields['framework_build_root'] = application_restrictions_root
+	fields['framework_manifest_sha256'] = application_restrictions_seal
+	fields['retained_framework_manifest_sha256'] = onboarding_framework_seal
+	fields['native_build_root'] = account_pump_root
+	fields['native_manifest_sha256'] = account_pump_seal
+	fields['native_sha256'] = account_pump_pin
+	fields['native_build_sha256'] = account_pump_build
+	fields['browser_client_build_root'] = browser_poll_root
+	fields['browser_client_manifest_sha256'] = browser_poll_seal
+	fields['browser_client_sha256'] = browser_poll_pin
+	return fields
+}
+
+fn application_restrictions_inputs() map[string]string {
+	mut inputs := account_pump_inputs()
+	inputs[application_restrictions_base + '/sha256.json'] = application_restrictions_base_seal
+	inputs[application_restrictions_root + '/sha256.json'] = application_restrictions_seal
+	return inputs
+}
+
+fn application_restrictions_known_delta() map[string]string {
+	return {
+		'/' + service_query_jar_path: application_restrictions_jar
+		'/' + service_query_dex_path: application_restrictions_dex
+		'/' + service_query_headless + '/framework-build.json': application_restrictions_build
+		'/' + service_query_headless + '/framework-sha256.json': application_restrictions_seal
+	}
+}
+
+fn verify_application_restrictions_overlay(receipt map[string]json2.Any) ! {
+	input_delta := receipt['deployment_input_delta'] or { return error('application restrictions deployment input delta absent') }
+	delta := json2.decode[map[string]string](json2.encode(input_delta))!
+	mut expected := application_restrictions_known_delta()
+	guest_path := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest_path] or { return error('application restrictions headless receipt pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == application_restrictions_retained_guest {
+		return error('invalid or retained application restrictions headless receipt pin')
+	}
+	expected[guest_path] = guest_pin
+	if delta != expected { return error('application restrictions exact five deployment input changes differ') }
+	for name, value in {
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: application_restrictions_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256'])
+	} {
+		if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](value)! {
+			return error('application restrictions receipt delta differs: ' + name)
+		}
+	}
+	inventory := receipt['overlay_inventory'] or { return error('application restrictions overlay inventory absent') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(inventory))!
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	mut paths := expected.keys().map(it.trim_left('/'))
+	paths << service_query_deployment
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 {
+			return error('unsafe application restrictions overlay inventory entry')
+		}
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != 0o644 {
+				return error('application restrictions regular allowlist or inherited mode differs')
+			}
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) {
+			return error('unexpected application restrictions overlay inode')
+		}
+	}
+	if regulars.len != 6 { return error('exact six application restrictions files required') }
+	for path, pin in expected {
+		if regulars[path.trim_left('/')] or { '' } != pin {
+			return error('application restrictions declared input differs from overlay inventory')
+		}
+	}
+}
+
+fn verify_application_restrictions_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [application_restrictions_base_seal, application_restrictions_boot_sha,
+		application_restrictions_base_overlay, application_restrictions_seal,
+		application_restrictions_jar, application_restrictions_dex, application_restrictions_build,
+		application_restrictions_retained_guest, account_pump_seal, account_pump_pin,
+		account_pump_build, browser_poll_seal, browser_poll_pin] {
+		if !digest_valid(pin) { return error('sealed application restrictions base and producer pins required') }
+	}
+	if application_restrictions_seal == onboarding_framework_seal || application_restrictions_jar == onboarding_framework_jar
+		|| application_restrictions_dex == onboarding_framework_dex || application_restrictions_build == onboarding_framework_build {
+		return error('new application restrictions framework producer required')
+	}
+	for name, expected in application_restrictions_fields() {
+		if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('application restrictions receipt differs: ' + name) }
+	}
+	mut sealed_inputs := map[string]string{}
+	for path, pin in stage.inputs_sha256 {
+		if path.ends_with('/sha256.json') { sealed_inputs[path] = pin }
+	}
+	if sealed_inputs.len != 40 || sealed_inputs != application_restrictions_inputs() {
+		return error('application restrictions exact forty complete dependency seals differ')
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != application_restrictions_modules()
+		|| stage.preserved_modules_sha256 != application_restrictions_modules() {
+		return error('application restrictions original twenty module pins differ')
+	}
+	verify_application_restrictions_overlay(receipt)!
+}
+
+fn application_restrictions_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_application_restrictions_receipt(receipt, stage)!
+	path := application_restrictions_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != application_restrictions_base_seal {
+		return error('application restrictions original account pump manifest differs')
+	}
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != application_restrictions_boot_sha
+		|| pins['maps-account-pump.tar'] or { '' } != application_restrictions_base_overlay {
+		return error('application restrictions original boot or account pump overlay inventory differs')
+	}
+	return application_restrictions_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -2020,6 +2169,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = browser_poll_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-account-pump' {
 		baseline = account_pump_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-application-restrictions' {
+		baseline = application_restrictions_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -2257,18 +2408,22 @@ fn fat_self_test(root string, overlay string, module_names []string) ! {
 	if _ := patch(root + '/stage', root + '/build', '0'.repeat(64), profile) {
 		return error('wrong build receipt pin accepted')
 	}
-	assert os.read_file(root + '/stage/stage.json')! == stage_text
-	assert hash(root + '/stage/boot.img')! == stage.staged_boot_sha256
+	if os.read_file(root + '/stage/stage.json')! != stage_text
+		|| hash(root + '/stage/boot.img')! != stage.staged_boot_sha256 {
+		return error('rejected kernel patch changed fixture media or receipt')
+	}
 	patch(root + '/stage', root + '/build', receipt_sha, profile)!
 	updated_stage := json2.decode[Stage](os.read_file(root + '/stage/stage.json')!)!
-	assert updated_stage.staged_boot_sha256 != stage.staged_boot_sha256
-	assert updated_stage.inputs_sha256 == stage.inputs_sha256
-	assert updated_stage.original_modules_sha256 == stage.original_modules_sha256
-	assert updated_stage.preserved_modules_sha256 == stage.preserved_modules_sha256
-	assert updated_stage.overlay_sha256 == stage.overlay_sha256
-	assert updated_stage.staged_efivars_sha256 == stage.staged_efivars_sha256
-	assert os.read_file(root + '/stage/stage-before-kernel.json')! == stage_text
-	assert os.is_file(root + '/stage/kernel-patch.json')
+	if updated_stage.staged_boot_sha256 == stage.staged_boot_sha256
+		|| updated_stage.inputs_sha256 != stage.inputs_sha256
+		|| updated_stage.original_modules_sha256 != stage.original_modules_sha256
+		|| updated_stage.preserved_modules_sha256 != stage.preserved_modules_sha256
+		|| updated_stage.overlay_sha256 != stage.overlay_sha256
+		|| updated_stage.staged_efivars_sha256 != stage.staged_efivars_sha256
+		|| os.read_file(root + '/stage/stage-before-kernel.json')! != stage_text
+		|| !os.is_file(root + '/stage/kernel-patch.json') {
+		return error('successful kernel patch fixture preservation or provenance differs')
+	}
 	if _ := patch(root + '/stage', root + '/build', receipt_sha, profile) {
 		return error('second patch of same stage accepted')
 	}
@@ -3940,6 +4095,158 @@ fn account_pump_profile_self_test() ! {
 	println('MAPS-ACCOUNT-PUMP KERNEL-PROFILE-SELF-TEST PASS exact native source and one-input deployment delta two-file inventory nineteen inherited modules twenty final thirty-eight dependencies historical rejection')
 }
 
+fn application_restrictions_delta_fixture() map[string]string {
+	mut delta := application_restrictions_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'd'.repeat(64)
+	return delta
+}
+
+fn application_restrictions_entries_fixture() []ServiceQueryEntry {
+	mut entries := []ServiceQueryEntry{}
+	for path, pin in application_restrictions_delta_fixture() {
+		entries << ServiceQueryEntry{name: path.trim_left('/'), kind: 'regular', sha256: pin, mode: 0o644}
+	}
+	entries << ServiceQueryEntry{name: service_query_deployment, kind: 'regular', sha256: 'c'.repeat(64), mode: 0o644}
+	entries << ServiceQueryEntry{name: 'opt', kind: 'directory', mode: 0o755}
+	return entries
+}
+
+fn application_restrictions_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in application_restrictions_fields() { receipt[name] = json2.Any(value) }
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(application_restrictions_delta_fixture()))!
+	receipt['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256', 'framework_manifest_sha256']))!
+	receipt['headless_input_delta'] = json2.decode[json2.Any](json2.encode({'/' + service_query_jar_path: application_restrictions_jar}))!
+	receipt['headless_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256']))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(application_restrictions_entries_fixture()))!
+	return receipt
+}
+
+fn application_restrictions_profile_self_test() ! {
+	profile := application_restrictions_profile()
+	if profile.baseline_sha != application_restrictions_boot_sha || profile.modules.len != 20
+		|| profile.modules.last() != 'maps-account-pump.tar' || application_restrictions_inputs().len != 40 {
+		return error('application restrictions positive profile fixture differs')
+	}
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 21 { return error('application restrictions final module count differs') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', profile.modules}, Config{'vinix', modules.reverse()},
+		Config{'vinix', account_pump_profile().modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('unsafe application restrictions modules accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: application_restrictions_inputs(),
+		original_modules_sha256: application_restrictions_modules(), preserved_modules_sha256: application_restrictions_modules()}
+	receipt := application_restrictions_receipt_fixture()!
+	verify_application_restrictions_receipt(receipt, stage)!
+	for name in receipt.keys() {
+		mut bad := application_restrictions_receipt_fixture()!
+		bad[name] = json2.Any('wrong')
+		if _ := verify_application_restrictions_receipt(bad, stage) { return error('changed application restrictions field accepted') }
+		bad.delete(name)
+		if _ := verify_application_restrictions_receipt(bad, stage) { return error('missing application restrictions field accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut inputs := stage.inputs_sha256.clone()
+		inputs[path] = '0'.repeat(64)
+		if _ := verify_application_restrictions_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) { return error('changed application restrictions dependency accepted') }
+		inputs.delete(path)
+		if _ := verify_application_restrictions_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) { return error('missing application restrictions dependency accepted') }
+	}
+	mut extra_inputs := stage.inputs_sha256.clone()
+	extra_inputs['/unexpected/sha256.json'] = 'a'.repeat(64)
+	if _ := verify_application_restrictions_receipt(receipt, Stage{...stage, inputs_sha256: extra_inputs}) { return error('extra application restrictions dependency accepted') }
+	for bad in [Stage{...stage, format: 2}, Stage{...stage, original_modules_sha256: account_pump_modules()},
+		Stage{...stage, preserved_modules_sha256: map[string]string{}}] {
+		if _ := verify_application_restrictions_receipt(receipt, bad) { return error('wrong application restrictions module inventory accepted') }
+	}
+	for changed in [map[string]string{}, {'/' + service_query_jar_path: onboarding_framework_jar},
+		{'/' + service_query_jar_path: application_restrictions_jar, '/' + native_onboarding_trace_path: account_pump_pin}] {
+		mut bad := application_restrictions_receipt_fixture()!
+		bad['headless_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_application_restrictions_receipt(bad, stage) { return error('unsafe application restrictions headless delta accepted') }
+	}
+	for changed in [map[string]string{}, application_restrictions_known_delta()] {
+		mut bad := application_restrictions_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_application_restrictions_receipt(bad, stage) { return error('incomplete application restrictions deployment delta accepted') }
+	}
+	mut extra_delta := application_restrictions_delta_fixture()
+	extra_delta['/' + native_onboarding_trace_path] = account_pump_pin
+	mut extra_delta_receipt := application_restrictions_receipt_fixture()!
+	extra_delta_receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(extra_delta))!
+	if _ := verify_application_restrictions_receipt(extra_delta_receipt, stage) { return error('extra application restrictions deployment input accepted') }
+	mut invalid_guest := application_restrictions_delta_fixture()
+	invalid_guest['/' + service_query_headless + '/guest-inputs.json'] = 'invalid'
+	mut invalid_guest_receipt := application_restrictions_receipt_fixture()!
+	invalid_guest_receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(invalid_guest))!
+	if _ := verify_application_restrictions_receipt(invalid_guest_receipt, stage) { return error('invalid application restrictions headless receipt digest accepted') }
+	for name in ['headless_top_level_delta', 'deployment_top_level_delta'] {
+		for changed in [[]string{}, ['inputs_sha256', 'native_manifest_sha256'], ['framework_manifest_sha256', 'inputs_sha256']] {
+			mut bad := application_restrictions_receipt_fixture()!
+			bad[name] = json2.decode[json2.Any](json2.encode(changed))!
+			if _ := verify_application_restrictions_receipt(bad, stage) { return error('unsafe application restrictions top delta accepted') }
+		}
+	}
+	entries := application_restrictions_entries_fixture()
+	for path, old_pin in {
+		'/' + service_query_jar_path: onboarding_framework_jar
+		'/' + service_query_dex_path: onboarding_framework_dex
+		'/' + service_query_headless + '/framework-build.json': onboarding_framework_build
+		'/' + service_query_headless + '/framework-sha256.json': onboarding_framework_seal
+		'/' + service_query_headless + '/guest-inputs.json': application_restrictions_retained_guest
+	} {
+		mut delta := application_restrictions_delta_fixture()
+		delta[path] = old_pin
+		mut inventory := entries.clone()
+		for index, entry in inventory {
+			if entry.name == path.trim_left('/') { inventory[index] = ServiceQueryEntry{...entry, sha256: old_pin} }
+		}
+		mut bad := application_restrictions_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(inventory))!
+		if path == '/' + service_query_jar_path {
+			bad['headless_input_delta'] = json2.decode[json2.Any](json2.encode({path: old_pin}))!
+		}
+		if _ := verify_application_restrictions_receipt(bad, stage) { return error('coherent retained application restrictions payload accepted') }
+	}
+	for index, entry in entries {
+		for replacement in [ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777},
+			ServiceQueryEntry{...entry, mode: 0o755},
+			ServiceQueryEntry{...entry, sha256: if entry.name == service_query_deployment { 'invalid' } else { '0'.repeat(64) }}] {
+			if replacement == entry || (replacement.sha256 != entry.sha256 && entry.kind != 'regular') { continue }
+			mut changed := entries.clone()
+			changed[index] = replacement
+			mut bad := application_restrictions_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+			if _ := verify_application_restrictions_receipt(bad, stage) { return error('unsafe application restrictions inode accepted') }
+		}
+	}
+	for addition in [entries[0], ServiceQueryEntry{name: native_onboarding_trace_path, kind: 'regular', sha256: account_pump_pin, mode: 0o755},
+		ServiceQueryEntry{name: browser_poll_path, kind: 'regular', sha256: browser_poll_pin, mode: 0o644},
+		ServiceQueryEntry{name: 'opt/vinix-maps-account/bin/maps-account-guest', kind: 'regular', sha256: onboarding_trace_controller_pin, mode: 0o755},
+		ServiceQueryEntry{name: 'extra', kind: 'directory', mode: 0o755}, ServiceQueryEntry{name: 'opt/../escape', kind: 'directory', mode: 0o755}] {
+		mut changed := entries.clone()
+		changed << addition
+		mut bad := application_restrictions_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_application_restrictions_receipt(bad, stage) { return error('extra or duplicate application restrictions inode accepted') }
+	}
+	for removed_index in 0 .. entries.len {
+		if entries[removed_index].kind != 'regular' { continue }
+		mut changed := entries.clone()
+		changed.delete(removed_index)
+		mut bad := application_restrictions_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_application_restrictions_receipt(bad, stage) { return error('missing application restrictions file accepted') }
+	}
+	if _ := verify_application_restrictions_receipt(account_pump_receipt_fixture()!, stage) { return error('account pump receipt accepted by application restrictions profile') }
+	if _ := verify_account_pump_receipt(receipt, stage) { return error('application restrictions receipt accepted by account pump profile') }
+	if _ := verify_onboarding_framework_receipt(receipt, stage) { return error('application restrictions receipt accepted by onboarding framework profile') }
+	println('MAPS-APPLICATION-RESTRICTIONS KERNEL-PROFILE-SELF-TEST PASS exact five-input delta six-file inventory twenty inherited modules twenty-one final forty dependencies historical rejection')
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
@@ -3954,6 +4261,7 @@ fn self_test() ! {
 	native_heartbeat_profile_self_test()!
 	browser_poll_profile_self_test()!
 	account_pump_profile_self_test()!
+	application_restrictions_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -4021,6 +4329,7 @@ fn self_test() ! {
 	fat_self_test(root + '/native-heartbeat', 'maps-native-heartbeat-diagnostic.tar', native_heartbeat_profile().modules)!
 	fat_self_test(root + '/browser-poll', 'maps-browser-poll.tar', browser_poll_profile().modules)!
 	fat_self_test(root + '/account-pump', 'maps-account-pump.tar', account_pump_profile().modules)!
+	fat_self_test(root + '/application-restrictions', 'maps-application-restrictions.tar', application_restrictions_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -4046,11 +4355,12 @@ fn main() {
 	is_native_heartbeat := os.args.len == 5 && os.args[1] == '--maps-native-heartbeat'
 	is_browser_poll := os.args.len == 5 && os.args[1] == '--maps-browser-poll'
 	is_account_pump := os.args.len == 5 && os.args[1] == '--maps-account-pump'
-	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot && !is_context_storage && !is_broadcast_result && !is_onboarding_trace && !is_native_onboarding_trace && !is_onboarding_framework && !is_native_heartbeat && !is_browser_poll && !is_account_pump {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+	is_application_restrictions := os.args.len == 5 && os.args[1] == '--maps-application-restrictions'
+	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot && !is_context_storage && !is_broadcast_result && !is_onboarding_trace && !is_native_onboarding_trace && !is_onboarding_framework && !is_native_heartbeat && !is_browser_poll && !is_account_pump && !is_application_restrictions {
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump { 1 } else { 0 }
+	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -4059,7 +4369,7 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	profile := if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	profile := if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
