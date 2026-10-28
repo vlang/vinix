@@ -639,7 +639,7 @@ fn self_test() ! {
 	for name in fixture_pins.keys() {
 		mut bad := json2.decode[map[string]json2.Any](json2.encode(updated))!
 		mut pins := json2.decode[map[string]string](json2.encode(bad['inputs_sha256']!))!
-		pins[name] = controller_seal
+		pins[name] = if pins[name] == controller_seal { controller_pin } else { controller_seal }
 		bad['inputs_sha256'] = as_json(pins)!
 		if _ := verify_deployment_delta(deployment, bad, replacements) { return error('unrelated or missing deployment input delta accepted') }
 	}
@@ -664,7 +664,7 @@ fn self_test() ! {
 	if _ := repin_deployment(deployment, wrong_pin) { return error('wrong new browser pin accepted') }
 	for name in ['native_manifest_sha256', 'framework_manifest_sha256', 'launch_manifest_sha256',
 		'browser_client_manifest_sha256', 'browser_manifest_sha256'] {
-		mut bad := deployment.clone()
+		mut bad := json2.decode[map[string]json2.Any](json2.encode(deployment))!
 		bad[name] = json2.Any(controller_pin)
 		if _ := repin_deployment(bad, replacements) { return error('wrong inherited deployment identity accepted') }
 	}
