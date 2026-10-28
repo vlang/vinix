@@ -72,5 +72,7 @@ The sibling `native-account-pump-build-2026-10-28-r1.json` and `.log` record
 exit zero, complete cleanup, 29.291 seconds, 637,255,680 bytes sampled process-tree
 RSS, 634,880,000 bytes maximum RSS from `/usr/bin/time`, and zero swaps. The
 producer used a 1 GiB RSS ceiling, 300-second deadline, 1 GiB reserve and 2 GiB
-growth allowance. Runtime validation of these diagnostics remains pending;
-this report establishes no successful Google authentication or Maps rendering.
+growth allowance. [ARM runtime validation](maps-account-pump-runtime-2026-10-28.md)
+now records dispatch failure `stage=4 status=1 pending=1` and the preserved
+missing `UserManager.getApplicationRestrictions(String): Bundle` method.
+Google authentication and usable Maps tiles remain unverified.
