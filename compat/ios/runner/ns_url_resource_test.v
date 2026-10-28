@@ -180,7 +180,9 @@ fn test_url_resource_runtime() {
 		objc_stop()
 		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
 	}
-	println('IOS-URL-RESOURCE: metadata, IMP, filesystem bytes, symlinks, errors, ownership, ignored keys and two balanced lifetimes PASS')
+	$if !ios_url_resource_values ? {
+		println('IOS-URL-RESOURCE: metadata, IMP, filesystem bytes, symlinks, errors, ownership, ignored keys and two balanced lifetimes PASS')
+	}
 	println('IOS-URL-RESOURCE-VALUES: metadata, IMP, filesystem values, cache invalidation, errors, concurrent publication, reentrant invalidation, isa cleanup and two balanced lifetimes PASS')
 }
 

@@ -565,6 +565,9 @@ fn main() {
 			if os.exists('/opt/ios/url-resource-checks') {
 				require_child('/opt/ios/url-resource-checks')
 			}
+			if os.exists('/opt/ios/url-resource-values-checks') {
+				require_child('/opt/ios/url-resource-values-checks')
+			}
 			if os.exists('/opt/ios/number-bool-checks') {
 				require_child('/opt/ios/number-bool-checks')
 			}

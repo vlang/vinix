@@ -2,6 +2,7 @@
 // Reuse the complete sealed dictionary checkpoint with a fresh runtime.
 // Queue mode replaces init and StoreKit; data-task mode adds its fresh fixture
 // and rebuilds the VM driver so the new build target has recorded provenance.
+// Resource-values mode adds a separate fixture and preserves the pinned setter fixture.
 module main
 
 import crypto.sha256
@@ -151,9 +152,9 @@ fn replace_runtime(out string, state string) ! {
 			'-s', ',^data-task-new$,./opt/ios/session-data-task-checks,']
 	}
 	if os.exists(out + '/url-resource-values-probe.txt') {
-		os.cp(out + '/url-resource-checks', out + '/replacement/url-resource-new')!
-		args << ['-s', ',^opt/ios/url-resource-checks$,,', '-s', ',^[.]/opt/ios/url-resource-checks$,,',
-			'-s', ',^url-resource-new$,./opt/ios/url-resource-checks,']
+		os.cp(out + '/url-resource-values-checks', out + '/replacement/url-resource-new')!
+		args << ['-s', ',^opt/ios/url-resource-values-checks$,,', '-s', ',^[.]/opt/ios/url-resource-values-checks$,,',
+			'-s', ',^url-resource-new$,./opt/ios/url-resource-values-checks,']
 	}
 	args << ['@' + state + '/initramfs.tar.gz', '-C', out + '/replacement', 'runtime-new']
 	if queue { args << ['init-new', 'storekit-new'] }
@@ -175,7 +176,7 @@ fn queue_media(out string, state string) ! {
 	preflight := out + '/runtime-preflight'
 	mut pairs := [['native-init', 'sbin/init'], ['storekit-purchase-checks', 'opt/ios/storekit-purchase-checks']]
 	if os.exists(out + '/data-task-probe.txt') { pairs << ['session-data-task-checks', 'opt/ios/session-data-task-checks'] }
-	if os.exists(out + '/url-resource-values-probe.txt') { pairs << ['url-resource-checks', 'opt/ios/url-resource-checks'] }
+	if os.exists(out + '/url-resource-values-probe.txt') { pairs << ['url-resource-values-checks', 'opt/ios/url-resource-values-checks'] }
 	mut args := ['/usr/bin/tar', '-xzf', state + '/initramfs.tar.gz', '-C', preflight]
 	for pair in pairs { args << './' + pair[1] }
 	capture(out + '/queue-media', args)!
@@ -213,7 +214,7 @@ fn validate_data_task_results(raw string) ! {
 
 fn validate_url_resource_values_results(raw string) ! {
 	serial := raw.replace('\r\n', '\n')
-	for marker in ['IOS-NATIVE: /opt/ios/url-resource-checks wait status 0\n',
+	for marker in ['IOS-NATIVE: /opt/ios/url-resource-values-checks wait status 0\n',
 		'IOS-URL-RESOURCE-VALUES:', 'IOS-URL-RESOURCE-VALUES-REJECT: four '] {
 		if serial.count(marker) != 1 { return error('missing or duplicated URL resource values guest result: ' + marker) }
 	}
@@ -260,7 +261,7 @@ fn queue_results_selftest() ! {
 		assert rejected
 	}
 	println('Data-task guest result validation: LF/CRLF accepted; failure, missing and duplicate results rejected PASS')
-	resources := 'IOS-NATIVE: /opt/ios/url-resource-checks wait status 0\n'
+	resources := 'IOS-NATIVE: /opt/ios/url-resource-values-checks wait status 0\n'
 		+ 'IOS-URL-RESOURCE-VALUES: PASS\nIOS-URL-RESOURCE-VALUES-REJECT: four PASS\n'
 	validate_url_resource_values_results(resources)!
 	validate_url_resource_values_results(resources.replace('\n', '\r\n'))!
@@ -299,6 +300,8 @@ fn replacement_selftest(out string) ! {
 		path := out + '/' + profile + '/' + if spelling == 'absent' { 'absent' } else if spelling.starts_with('.') { 'dot' } else { 'plain' }
 		os.mkdir_all(path + '/old/opt/ios')!
 		os.write_file(path + '/old/keep', 'unchanged')!
+		os.write_file(path + '/old/opt/ios/url-resource-checks', 'pinned URL setter fixture')!
+		os.chmod(path + '/old/opt/ios/url-resource-checks', 0o755)!
 		os.write_file(path + '/old/opt/ios/run-ios', 'old runtime')!
 		os.write_file(path + '/run-ios-gles', 'new runtime')!
 		os.chmod(path + '/run-ios-gles', 0o755)!
@@ -316,18 +319,18 @@ fn replacement_selftest(out string) ! {
 		}
 		if profile == 'url-resource-values' {
 			os.write_file(path + '/url-resource-values-probe.txt', 'selftest\n')!
-			os.write_file(path + '/url-resource-checks', 'new URL resource fixture')!
-			os.chmod(path + '/url-resource-checks', 0o755)!
-			os.write_file(path + '/old/opt/ios/url-resource-checks', 'old URL resource fixture')!
+			os.write_file(path + '/url-resource-values-checks', 'new URL resource fixture')!
+			os.chmod(path + '/url-resource-values-checks', 0o755)!
+			os.write_file(path + '/old/opt/ios/url-resource-values-checks', 'old URL resource fixture')!
 		}
-		mut args := ['/usr/bin/tar', '-czf', path + '/initramfs.tar.gz', '-C', path + '/old', 'keep',
+		mut args := ['/usr/bin/tar', '-czf', path + '/initramfs.tar.gz', '-C', path + '/old', 'keep', 'opt/ios/url-resource-checks',
 			if spelling.starts_with('.') { './sbin/init' } else { 'sbin/init' }]
 		if spelling != 'absent' { args << spelling }
 		if profile != 'queue' && spelling != 'absent' {
 			args << if spelling.starts_with('.') { './opt/ios/session-data-task-checks' } else { 'opt/ios/session-data-task-checks' }
 		}
 		if profile == 'url-resource-values' && spelling != 'absent' {
-			args << if spelling.starts_with('.') { './opt/ios/url-resource-checks' } else { 'opt/ios/url-resource-checks' }
+			args << if spelling.starts_with('.') { './opt/ios/url-resource-values-checks' } else { 'opt/ios/url-resource-values-checks' }
 		}
 		capture(path + '/input', args)!
 		// replace_runtime also embeds the archive in FAT. Use a tiny real
@@ -340,6 +343,9 @@ fn replacement_selftest(out string) ! {
 		if listing.exit_code != 0 || listing.output.split_into_lines().filter(it == './opt/ios/run-ios' || it == 'opt/ios/run-ios').len != 1 { return error('runtime omitted or duplicated') }
 		keep := os.exec(['/usr/bin/tar', '-xOzf', path + '/initramfs.tar.gz', 'keep'])
 		if keep.exit_code != 0 || keep.output != 'unchanged' { return error('changed unrelated member') }
+		capture(path + '/pinned-resource', ['/usr/bin/tar', '-xzf', path + '/initramfs.tar.gz', '-C', path + '/runtime-preflight', 'opt/ios/url-resource-checks'])!
+		pinned := path + '/runtime-preflight/opt/ios/url-resource-checks'
+		if os.read_file(pinned)! != 'pinned URL setter fixture' || !os.is_executable(pinned) { return error('changed pinned historical resource fixture') }
 	}
 	}
 	println('Runtime, init, StoreKit, data-task and URL resource fixture replacement: plain, dot-prefixed and absent prior members; exact bytes, executable permissions, unique members and unchanged content PASS')
@@ -374,9 +380,9 @@ fn main() {
 		}
 		if os.exists(out + '/url-resource-values-probe.txt') {
 			capture(scratch + '/url-resource-media', ['/usr/bin/tar', '-xzf', state + '/initramfs.tar.gz',
-				'-C', scratch, './opt/ios/url-resource-checks'])!
-			if digest(out + '/url-resource-checks')! != digest(scratch + '/opt/ios/url-resource-checks')!
-				|| !os.is_executable(scratch + '/opt/ios/url-resource-checks') { panic('changed URL resource values fixture') }
+				'-C', scratch, './opt/ios/url-resource-values-checks'])!
+			if digest(out + '/url-resource-values-checks')! != digest(scratch + '/opt/ios/url-resource-values-checks')!
+				|| !os.is_executable(scratch + '/opt/ios/url-resource-values-checks') { panic('changed URL resource values fixture') }
 		}
 		queue_results(out, state)!
 		return
@@ -427,7 +433,7 @@ fn main() {
 	} else { capture(out + '-clone', ['/bin/cp', '-cRp', parent, out])! }
 	if queue { os.write_file(out + '/queue-probe.txt', 'fresh StoreKit fixture and native init; 45 reused guest fixtures\n')! }
 	if data_task { os.write_file(out + '/data-task-probe.txt', 'fresh suspended data-task and StoreKit fixtures; fresh native init and VM driver; 45 reused guest fixtures\n')! }
-	if resource_values { os.write_file(out + '/url-resource-values-probe.txt', 'fresh URL resources, suspended data-task and StoreKit fixtures; fresh native init and VM driver; 44 reused guest fixtures\n')! }
+	if resource_values { os.write_file(out + '/url-resource-values-probe.txt', 'fresh URL resources, suspended data-task and StoreKit fixtures; fresh native init and VM driver; 45 reused guest fixtures\n')! }
 	os.rename(out + '/manifest.sha256', out + '/parent-manifest.sha256')!
 	os.write_file(out + '/parent-bundle.txt', parent + '\n' + parent_manifest + '\n')!
 	os.cp(os.executable(), out + '/storekit-operation-probe')!
@@ -475,14 +481,13 @@ fn main() {
 		capture(out + '/build-storekit', [out + '/notification-vm', 'build-storekit-purchase', out])!
 	}
 	if data_task { capture(out + '/build-data-task', [out + '/notification-vm', 'build-session-data-task', out])! }
-	if resource_values { capture(out + '/build-url-resource', [out + '/notification-vm', 'build-url-resource', out])! }
+	if resource_values { capture(out + '/build-url-resource-values', [out + '/notification-vm', 'build-url-resource-values', out])! }
 	capture(out + '/built-source-check', ['git', 'diff', '--exit-code', revision.output.trim_space(), '--', 'compat/ios', 'tests/ios'])!
 	mut hashes := []string{}
 	for line in os.read_lines(out + '/built-inputs.sha256')! {
 		path := line[66..]
 		if path !in ['run-ios-gles', 'run-ios-gles.c'] && !(queue && path in ['native-init', 'native-init.c'])
 			&& !(data_task && path == 'notification-vm')
-			&& !(resource_values && path in ['url-resource-checks', 'url-resource-checks.c'])
 			&& digest(out + '/' + path)! != line[..64] {
 			panic('changed reused fixture or driver: ' + path)
 		}
