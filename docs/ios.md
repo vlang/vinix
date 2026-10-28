@@ -482,12 +482,20 @@ pass. Fortnite gets past `PLCrashReporter isEqual:` and stops at
 rendering is unverified. See the
 [identity equality checkpoint](../tests/ios/object-equality-checkpoint-20261028.md).
 
-The latest no-ads checkpoint implements `NSNumber numberWithUnsignedLong:`
+An earlier no-ads checkpoint implements `NSNumber numberWithUnsignedLong:`
 across the complete 64-bit range. All 43 guest fixtures, the fresh sanitized
 unsigned-number host suite and 311 audit negative controls pass. Fortnite gets
 past the constructor and stops at `NSDictionary dictionaryWithObject:forKey:`.
 Progress remains 4/8 observed gates; game rendering is unverified. See the
 [unsigned-number checkpoint](../tests/ios/number-unsigned-checkpoint-20261028.md).
+
+The latest no-ads checkpoint implements `NSDictionary dictionaryWithObject:forKey:`,
+including the mutable factory, copied keys and retained values. All 44 guest
+fixtures, the fresh sanitized dictionary host suite and 325 audit negative
+controls pass. Fortnite gets past the constructor and stops at
+`NSMutableDictionary dictionaryWithObjectsAndKeys:`. Progress remains 4/8
+observed gates; game rendering is unverified. See the
+[single-entry dictionary checkpoint](../tests/ios/dictionary-single-checkpoint-20261028.md).
 
 `MTLCreateSystemDefaultDevice` still returns nil: a Metal device, shader,
 rendering and presentation backend remains to be implemented. The existing
