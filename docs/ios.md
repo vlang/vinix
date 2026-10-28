@@ -431,13 +431,23 @@ No game frame, menu, login or playable match is verified. The complete capture
 restores exactly from its persistent archive and passes the unchanged auditor.
 See the [NSError checkpoint](../tests/ios/error-description-checkpoint-20261028.md).
 
-The latest no-ads checkpoint resolves `TaskPriority?` (`ScPSg`) through bounded
+The preceding no-ads checkpoint resolves `TaskPriority?` (`ScPSg`) through bounded
 Swift Optional/Array name lookup. All seven native comparison and sanitized
 host suites and all 36 guest fixtures pass. Fortnite advances to an unsupported
 `NSURLSessionConfiguration` API, without an application signal fault, OOM event
 or supervisor kill. Progress remains 4/8 observable launch gates (50% of the
 checklist); no game frame, menu, login or playable match is verified. See the
 [Swift Optional checkpoint](../tests/ios/swift-optional-lookup-checkpoint-20261028.md).
+
+The latest no-ads checkpoint implements the supported default settings for
+`+[NSURLSessionConfiguration defaultSessionConfiguration]`. Native comparisons,
+both sanitized host runs and all 37 guest fixtures pass. Fortnite gets past the
+factory and reaches a Swift Optional Wrapped metadata rejection. Progress
+remains 4/8 observed launch gates; no game frame, menu, login or playable match
+is verified. URL transport and the configuration's built-in protocols and
+stores remain unsupported. Complete persistent evidence passes its saved
+auditor and 207 negative controls. See the
+[default session checkpoint](../tests/ios/session-defaults-checkpoint-20261028.md).
 
 `MTLCreateSystemDefaultDevice` still returns nil: a Metal device, shader,
 rendering and presentation backend remains to be implemented. The existing
