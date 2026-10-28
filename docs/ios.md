@@ -387,7 +387,7 @@ audio-category bundle lost four boot-media files; its full audit remains
 unavailable. See the
 [string comparison checkpoint](../tests/ios/string-compare-checkpoint-20261028.md).
 
-The latest no-ads checkpoint implements inactive output-session configuration
+A preceding no-ads checkpoint implements inactive output-session configuration
 through `AVAudioSession setCategory:mode:options:error:`, with validated options,
 immutable getter values and NSError failures that preserve prior state.
 Both sanitized host runs, native ABI metadata checks, the category regression
@@ -397,6 +397,17 @@ application signal fault, OOM event or supervisor kill. Audio activation,
 recording and output still need a backend. Progress remains 4 of 8 observable
 launch gates; no game frame, menu, login or playable match is verified. See the
 [audio configuration checkpoint](../tests/ios/audio-configuration-checkpoint-20261028.md).
+
+The latest no-ads checkpoint stores the inactive recording policy through
+`AVAudioSession setAllowHapticsAndSystemSoundsDuringRecording:error:`. Both
+sanitized host runs, native ABI metadata checks, the configuration regression
+and all 33 guest fixtures pass. Fortnite reaches `setActive:error:` and exits 1
+without an application signal fault, OOM event or supervisor kill. The policy
+starts no recording or haptics provider. Progress remains 4 of 8 observable
+launch gates; no game frame, menu, login or playable match is verified. The
+complete capture restores exactly from its persistent archive and passes the
+unchanged auditor. See the
+[recording-policy checkpoint](../tests/ios/audio-haptics-checkpoint-20261028.md).
 
 `MTLCreateSystemDefaultDevice` still returns nil: a Metal device, shader,
 rendering and presentation backend remains to be implemented. The existing
