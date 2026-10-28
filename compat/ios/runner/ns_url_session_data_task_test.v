@@ -230,7 +230,7 @@ fn test_session_data_task_rejections() {
 			'custom' { 'data task custom request subclasses are not implemented' }
 			'retired-session' { 'URL session requires live base session storage' }
 			'exhausted' { 'URL session task identifiers exhausted' }
-			'resume', 'suspend', 'cancel' { 'URL session task transfers, cancellation, delegates, progress and coding are not implemented' }
+			'resume', 'suspend', 'cancel' { 'URL session task transfers, cancellation, delegate delivery, progress and coding are not implemented' }
 			else { 'data task requires an initialized URL request' }
 		}
 		assert output.contains('iOS: ' + reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output

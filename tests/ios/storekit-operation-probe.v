@@ -4,6 +4,7 @@
 // and rebuilds the VM driver so the new build target has recorded provenance.
 // Resource-values mode adds a separate fixture and preserves the pinned setter fixture.
 // Number mode adds the signed getter fixture without replacing unsigned coverage.
+// Task-delegate mode adds independent retained task delegate coverage.
 module main
 
 import crypto.sha256
@@ -162,11 +163,17 @@ fn replace_runtime(out string, state string) ! {
 		args << ['-s', ',^opt/ios/number-long-long-checks$,,', '-s', ',^[.]/opt/ios/number-long-long-checks$,,',
 			'-s', ',^number-long-new$,./opt/ios/number-long-long-checks,']
 	}
+	if os.exists(out + '/task-delegate-probe.txt') {
+		os.cp(out + '/session-task-delegate-checks', out + '/replacement/task-delegate-new')!
+		args << ['-s', ',^opt/ios/session-task-delegate-checks$,,', '-s', ',^[.]/opt/ios/session-task-delegate-checks$,,',
+			'-s', ',^task-delegate-new$,./opt/ios/session-task-delegate-checks,']
+	}
 	args << ['@' + state + '/initramfs.tar.gz', '-C', out + '/replacement', 'runtime-new']
 	if queue { args << ['init-new', 'storekit-new'] }
 	if os.exists(out + '/data-task-probe.txt') { args << 'data-task-new' }
 	if os.exists(out + '/url-resource-values-probe.txt') { args << 'url-resource-new' }
 	if os.exists(out + '/number-long-long-probe.txt') { args << 'number-long-new' }
+	if os.exists(out + '/task-delegate-probe.txt') { args << 'task-delegate-new' }
 	capture(out + '/replace-runtime', args)!
 	os.rename(state + '/replacement.tar.gz', state + '/initramfs.tar.gz')!
 	preflight := out + '/runtime-preflight'
@@ -185,6 +192,7 @@ fn queue_media(out string, state string) ! {
 	if os.exists(out + '/data-task-probe.txt') { pairs << ['session-data-task-checks', 'opt/ios/session-data-task-checks'] }
 	if os.exists(out + '/url-resource-values-probe.txt') { pairs << ['url-resource-values-checks', 'opt/ios/url-resource-values-checks'] }
 	if os.exists(out + '/number-long-long-probe.txt') { pairs << ['number-long-long-checks', 'opt/ios/number-long-long-checks'] }
+	if os.exists(out + '/task-delegate-probe.txt') { pairs << ['session-task-delegate-checks', 'opt/ios/session-task-delegate-checks'] }
 	mut args := ['/usr/bin/tar', '-xzf', state + '/initramfs.tar.gz', '-C', preflight]
 	for pair in pairs { args << './' + pair[1] }
 	capture(out + '/queue-media', args)!
@@ -235,6 +243,13 @@ fn validate_number_long_long_results(raw string) ! {
 	}
 }
 
+fn validate_task_delegate_results(raw string) ! {
+	serial := raw.replace('\r\n', '\n')
+	for marker in ['IOS-NATIVE: /opt/ios/session-task-delegate-checks wait status 0\n', 'IOS-TASK-DELEGATE:'] {
+		if serial.count(marker) != 1 { return error('missing or duplicated task delegate guest result: ' + marker) }
+	}
+}
+
 fn queue_results(out string, state string) ! {
 	serial := os.read_file(state + '/serial.log')!
 	validate_queue_results(serial)!
@@ -250,6 +265,10 @@ fn queue_results(out string, state string) ! {
 	if os.exists(out + '/number-long-long-probe.txt') {
 		validate_number_long_long_results(serial)!
 		println('Fresh number long-long guest fixture: PASS')
+	}
+	if os.exists(out + '/task-delegate-probe.txt') {
+		validate_task_delegate_results(serial)!
+		println('Fresh task delegate guest fixture: PASS')
 	}
 }
 
@@ -302,6 +321,16 @@ fn queue_results_selftest() ! {
 		assert rejected
 	}
 	println('Number long-long guest result validation: LF/CRLF accepted; failure, missing and duplicate results rejected PASS')
+	delegates := 'IOS-NATIVE: /opt/ios/session-task-delegate-checks wait status 0\nIOS-TASK-DELEGATE: PASS\n'
+	validate_task_delegate_results(delegates)!
+	validate_task_delegate_results(delegates.replace('\n', '\r\n'))!
+	for bad in [delegates.replace('wait status 0', 'wait status 1'),
+		delegates.replace('IOS-TASK-DELEGATE: PASS\n', ''), delegates + delegates] {
+		mut rejected := false
+		validate_task_delegate_results(bad) or { rejected = true }
+		assert rejected
+	}
+	println('Task delegate guest result validation: LF/CRLF accepted; failure, missing and duplicate results rejected PASS')
 }
 
 fn replay(out string) ! {
@@ -324,7 +353,7 @@ fn replacement_selftest(out string) ! {
 	if os.exists(out) { return error('selftest requires a fresh directory') }
 	queue_results_selftest()!
 	stream_copy_selftest(out + '/stream-copy')!
-	for profile in ['queue', 'data-task', 'url-resource-values', 'number-long-long'] {
+	for profile in ['queue', 'data-task', 'url-resource-values', 'number-long-long', 'task-delegate'] {
 	for spelling in ['opt/ios/run-ios', './opt/ios/run-ios', 'absent'] {
 		path := out + '/' + profile + '/' + if spelling == 'absent' { 'absent' } else if spelling.starts_with('.') { 'dot' } else { 'plain' }
 		os.mkdir_all(path + '/old/opt/ios')!
@@ -348,17 +377,23 @@ fn replacement_selftest(out string) ! {
 			os.chmod(path + '/session-data-task-checks', 0o755)!
 			os.write_file(path + '/old/opt/ios/session-data-task-checks', 'old data-task fixture')!
 		}
-		if profile in ['url-resource-values', 'number-long-long'] {
+		if profile in ['url-resource-values', 'number-long-long', 'task-delegate'] {
 			os.write_file(path + '/url-resource-values-probe.txt', 'selftest\n')!
 			os.write_file(path + '/url-resource-values-checks', 'new URL resource fixture')!
 			os.chmod(path + '/url-resource-values-checks', 0o755)!
 			os.write_file(path + '/old/opt/ios/url-resource-values-checks', 'old URL resource fixture')!
 		}
-		if profile == 'number-long-long' {
+		if profile in ['number-long-long', 'task-delegate'] {
 			os.write_file(path + '/number-long-long-probe.txt', 'selftest\n')!
 			os.write_file(path + '/number-long-long-checks', 'new number long-long fixture')!
 			os.chmod(path + '/number-long-long-checks', 0o755)!
 			os.write_file(path + '/old/opt/ios/number-long-long-checks', 'old number long-long fixture')!
+		}
+		if profile == 'task-delegate' {
+			os.write_file(path + '/task-delegate-probe.txt', 'selftest\n')!
+			os.write_file(path + '/session-task-delegate-checks', 'new task delegate fixture')!
+			os.chmod(path + '/session-task-delegate-checks', 0o755)!
+			os.write_file(path + '/old/opt/ios/session-task-delegate-checks', 'old task delegate fixture')!
 		}
 		mut args := ['/usr/bin/tar', '-czf', path + '/initramfs.tar.gz', '-C', path + '/old', 'keep', 'opt/ios/url-resource-checks', 'opt/ios/number-unsigned-checks',
 			if spelling.starts_with('.') { './sbin/init' } else { 'sbin/init' }]
@@ -366,11 +401,14 @@ fn replacement_selftest(out string) ! {
 		if profile != 'queue' && spelling != 'absent' {
 			args << if spelling.starts_with('.') { './opt/ios/session-data-task-checks' } else { 'opt/ios/session-data-task-checks' }
 		}
-		if profile in ['url-resource-values', 'number-long-long'] && spelling != 'absent' {
+		if profile in ['url-resource-values', 'number-long-long', 'task-delegate'] && spelling != 'absent' {
 			args << if spelling.starts_with('.') { './opt/ios/url-resource-values-checks' } else { 'opt/ios/url-resource-values-checks' }
 		}
-		if profile == 'number-long-long' && spelling != 'absent' {
+		if profile in ['number-long-long', 'task-delegate'] && spelling != 'absent' {
 			args << if spelling.starts_with('.') { './opt/ios/number-long-long-checks' } else { 'opt/ios/number-long-long-checks' }
+		}
+		if profile == 'task-delegate' && spelling != 'absent' {
+			args << if spelling.starts_with('.') { './opt/ios/session-task-delegate-checks' } else { 'opt/ios/session-task-delegate-checks' }
 		}
 		capture(path + '/input', args)!
 		// replace_runtime also embeds the archive in FAT. Use a tiny real
@@ -391,7 +429,7 @@ fn replacement_selftest(out string) ! {
 		if os.read_file(pinned_number)! != 'pinned unsigned number fixture' || !os.is_executable(pinned_number) { return error('changed pinned historical number fixture') }
 	}
 	}
-	println('Runtime, init, StoreKit, data-task, URL resource and number fixture replacement: plain, dot-prefixed and absent prior members; exact bytes, executable permissions, unique members and unchanged content PASS')
+	println('Runtime, init, StoreKit, data-task, URL resource, number and task delegate fixture replacement: plain, dot-prefixed and absent prior members; exact bytes, executable permissions, unique members and unchanged content PASS')
 }
 
 fn main() {
@@ -433,6 +471,12 @@ fn main() {
 			if digest(out + '/number-long-long-checks')! != digest(scratch + '/opt/ios/number-long-long-checks')!
 				|| !os.is_executable(scratch + '/opt/ios/number-long-long-checks') { panic('changed number long-long fixture') }
 		}
+		if os.exists(out + '/task-delegate-probe.txt') {
+			capture(scratch + '/task-delegate-media', ['/usr/bin/tar', '-xzf', state + '/initramfs.tar.gz',
+				'-C', scratch, './opt/ios/session-task-delegate-checks'])!
+			if digest(out + '/session-task-delegate-checks')! != digest(scratch + '/opt/ios/session-task-delegate-checks')!
+				|| !os.is_executable(scratch + '/opt/ios/session-task-delegate-checks') { panic('changed task delegate fixture') }
+		}
 		queue_results(out, state)!
 		return
 	}
@@ -456,11 +500,12 @@ fn main() {
 		replay(out)!
 		return
 	}
-	if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] !in ['--queue-copy', '--data-task-copy', '--url-resource-values-copy', '--number-long-long-copy']) { panic('usage: storekit-operation-probe COMPLETE_PARENT FRESH_EXTERNAL_OUT FRESH_HOST [--queue-copy|--data-task-copy|--url-resource-values-copy|--number-long-long-copy]') }
+	if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] !in ['--queue-copy', '--data-task-copy', '--url-resource-values-copy', '--number-long-long-copy', '--task-delegate-copy']) { panic('usage: storekit-operation-probe COMPLETE_PARENT FRESH_EXTERNAL_OUT FRESH_HOST [--queue-copy|--data-task-copy|--url-resource-values-copy|--number-long-long-copy|--task-delegate-copy]') }
 	queue := os.args.len == 5
-	number_long_long := queue && os.args[4] == '--number-long-long-copy'
-	resource_values := queue && os.args[4] in ['--url-resource-values-copy', '--number-long-long-copy']
-	data_task := queue && os.args[4] in ['--data-task-copy', '--url-resource-values-copy', '--number-long-long-copy']
+	task_delegate := queue && os.args[4] == '--task-delegate-copy'
+	number_long_long := queue && os.args[4] in ['--number-long-long-copy', '--task-delegate-copy']
+	resource_values := queue && os.args[4] in ['--url-resource-values-copy', '--number-long-long-copy', '--task-delegate-copy']
+	data_task := queue && os.args[4] in ['--data-task-copy', '--url-resource-values-copy', '--number-long-long-copy', '--task-delegate-copy']
 	root := os.real_path(os.getwd())
 	parent := os.real_path(os.args[1])
 	out := os.abs_path(os.args[2])
@@ -485,6 +530,7 @@ fn main() {
 	if data_task { os.write_file(out + '/data-task-probe.txt', 'fresh suspended data-task and StoreKit fixtures; fresh native init and VM driver; 45 reused guest fixtures\n')! }
 	if resource_values { os.write_file(out + '/url-resource-values-probe.txt', 'fresh URL resources, suspended data-task and StoreKit fixtures; fresh native init and VM driver; 45 reused guest fixtures\n')! }
 	if number_long_long { os.write_file(out + '/number-long-long-probe.txt', 'fresh number long-long, URL resources, suspended data-task and StoreKit fixtures; fresh native init and VM driver; 45 reused guest fixtures\n')! }
+	if task_delegate { os.write_file(out + '/task-delegate-probe.txt', 'fresh task delegate, number, URL resources, suspended data-task and StoreKit fixtures; fresh native init and VM driver; 45 reused guest fixtures\n')! }
 	os.rename(out + '/manifest.sha256', out + '/parent-manifest.sha256')!
 	os.write_file(out + '/parent-bundle.txt', parent + '\n' + parent_manifest + '\n')!
 	os.cp(os.executable(), out + '/storekit-operation-probe')!
@@ -494,7 +540,7 @@ fn main() {
 	}
 	for label in ['host', 'host-deterministic'] {
 		log := os.read_file(host + '/' + label + '.log')!
-		markers := if number_long_long { ['IOS-NUMBER-LONG-LONG-NATIVE:', 'IOS-NUMBER-LONG-LONG:'] } else if resource_values { ['IOS-URL-RESOURCE-VALUES-NATIVE:', 'IOS-URL-RESOURCE-VALUES:', 'IOS-URL-RESOURCE-VALUES-REJECT: four '] } else if data_task { ['IOS-SESSION-DATA-TASK-NATIVE:', 'IOS-SESSION-DATA-TASK:', 'IOS-SESSION-DATA-TASK-REJECT: ten '] } else { ['IOS-STOREKIT-PURCHASE:', 'IOS-STOREKIT-PURCHASE-REJECT: 276 ',
+		markers := if task_delegate { ['IOS-TASK-DELEGATE-NATIVE:', 'IOS-TASK-DELEGATE:'] } else if number_long_long { ['IOS-NUMBER-LONG-LONG-NATIVE:', 'IOS-NUMBER-LONG-LONG:'] } else if resource_values { ['IOS-URL-RESOURCE-VALUES-NATIVE:', 'IOS-URL-RESOURCE-VALUES:', 'IOS-URL-RESOURCE-VALUES-REJECT: four '] } else if data_task { ['IOS-SESSION-DATA-TASK-NATIVE:', 'IOS-SESSION-DATA-TASK:', 'IOS-SESSION-DATA-TASK-REJECT: ten '] } else { ['IOS-STOREKIT-PURCHASE:', 'IOS-STOREKIT-PURCHASE-REJECT: 276 ',
 			'IOS-STOREKIT-QUEUE:', 'IOS-STOREKIT-QUEUE-REJECT: seven ',
 			'IOS-STOREKIT-OBSERVERS:', 'IOS-STOREKIT-OBSERVERS-REJECT:'] }
 		for marker in markers {
@@ -504,7 +550,7 @@ fn main() {
 			if log.contains(failure) { panic('failed host log: ' + label) }
 		}
 	}
-	capture(out + '/copy-fresh-host', ['/bin/cp', '-Rp', host, out + '/host/' + if number_long_long { 'number-long-long-host' } else if resource_values { 'url-resource-values-host' } else if data_task { 'session-data-task-host' } else { 'storekit-operation-host' }])!
+	capture(out + '/copy-fresh-host', ['/bin/cp', '-Rp', host, out + '/host/' + if task_delegate { 'task-delegate-host' } else if number_long_long { 'number-long-long-host' } else if resource_values { 'url-resource-values-host' } else if data_task { 'session-data-task-host' } else { 'storekit-operation-host' }])!
 	previous := os.read_file(out + '/source-revision.txt')!
 	os.write_file(out + '/reused-fixture-revision.txt', previous)!
 	revision := os.exec(['git', 'rev-parse', 'HEAD'])
@@ -534,6 +580,7 @@ fn main() {
 	if data_task { capture(out + '/build-data-task', [out + '/notification-vm', 'build-session-data-task', out])! }
 	if resource_values { capture(out + '/build-url-resource-values', [out + '/notification-vm', 'build-url-resource-values', out])! }
 	if number_long_long { capture(out + '/build-number-long-long', [out + '/notification-vm', 'build-number-long-long', out])! }
+	if task_delegate { capture(out + '/build-task-delegate', [out + '/notification-vm', 'build-session-task-delegate', out])! }
 	capture(out + '/built-source-check', ['git', 'diff', '--exit-code', revision.output.trim_space(), '--', 'compat/ios', 'tests/ios'])!
 	mut hashes := []string{}
 	for line in os.read_lines(out + '/built-inputs.sha256')! {

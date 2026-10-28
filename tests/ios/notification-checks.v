@@ -94,6 +94,10 @@ fn main() {
 		run_host_fixture(root, old, out, 'ns_number_long_long_test.v')!
 		return
 	}
+	if os.args[1] == 'session-task-delegate-host' {
+		run_host_fixture(root, old, out, 'ns_url_session_task_delegate_test.v')!
+		return
+	}
 	if os.args[1] == 'dictionary-single-host' {
 		run_host_fixture(root, old, out, 'ns_dictionary_single_test.v')!
 		return

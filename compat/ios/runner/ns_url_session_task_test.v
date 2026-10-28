@@ -171,7 +171,7 @@ fn test_session_task_runtime() {
 			}
 			task_base_cases(api); assert ios_runtime.live == 0
 			pool := api.pool(); object := api.message(cls, c'new', 0)
-			for selector in [c'resume', c'suspend', c'cancel', c'cancelByProducingResumeData:', c'delegate', c'setDelegate:', c'progress', c'mutableCopy', c'mutableCopyWithZone:', c'initWithCoder:', c'encodeWithCoder:', c'setCountOfBytesSent:', c'setCountOfBytesReceived:', c'setCountOfBytesExpectedToSend:', c'setCountOfBytesExpectedToReceive:']! {
+			for selector in [c'resume', c'suspend', c'cancel', c'cancelByProducingResumeData:', c'progress', c'mutableCopy', c'mutableCopyWithZone:', c'initWithCoder:', c'encodeWithCoder:', c'setCountOfBytesSent:', c'setCountOfBytesReceived:', c'setCountOfBytesExpectedToSend:', c'setCountOfBytesExpectedToReceive:']! {
 				assert !objc_responds(object, selector) && objc_instance_method(cls, u64(selector)) == 0
 			}
 			left := api.string(c'left task'); right := api.string(c'right task')
@@ -210,7 +210,7 @@ fn test_session_task_runtime() {
 }
 fn test_session_task_rejections() {
 	objc_start(); api := task_runtime_api(ios_runtime.names['NSURLSessionTask'])
-	for mode in ['resume', 'suspend', 'cancel', 'cancelByProducingResumeData:', 'delegate', 'progress', 'mutableCopy', 'initWithCoder:', 'setCountOfBytesSent:', 'description', 'bad-copy', 'subclass', 'caller-subclass', 'spoof']! {
+	for mode in ['resume', 'suspend', 'cancel', 'cancelByProducingResumeData:', 'setCountOfBytesReceived:', 'progress', 'mutableCopy', 'initWithCoder:', 'setCountOfBytesSent:', 'description', 'bad-copy', 'subclass', 'caller-subclass', 'spoof']! {
 		mut fds := [2]i32{}; assert C.pipe(unsafe { &fds[0] }) == 0; pid := C.fork(); assert pid >= 0
 		if pid == 0 {
 			C.close(fds[0]); assert C.dup2(fds[1], 2) == 2; C.close(fds[1]); object := api.message(api.cls, c'new', 0)
@@ -243,7 +243,7 @@ fn test_session_task_rejections() {
 			'bad-copy' { 'task description copy must be a string' }
 			'subclass', 'caller-subclass' { 'custom URL session task subclass construction is not implemented' }
 			'spoof' { 'URL session task requires live base task storage' }
-			else { 'URL session task transfers, cancellation, delegates, progress and coding are not implemented' }
+			else { 'URL session task transfers, cancellation, delegate delivery, progress and coding are not implemented' }
 		}
 		assert output.contains('iOS: ' + reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output
 		if url_session_task_unsupported(mode) { assert output.contains('-[NSURLSessionTask ${mode}]'), output }
