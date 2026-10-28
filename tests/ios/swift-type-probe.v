@@ -44,6 +44,7 @@ fn capture(out string, label string, args []string) ! {
 
 fn safe_path(path string) bool {
 	return path != '' && !path.starts_with('/') && !path.contains('\\') && !path.contains('\n')
+		&& !path.contains_any('\r\t')
 		&& path.split('/').all(it != '' && it != '.' && it != '..')
 }
 
@@ -58,10 +59,58 @@ fn input_paths(out string, relative string) ![]string {
 	return paths
 }
 
-fn verify_inputs(out string) ! {
-	for line in os.read_lines(out + '/reused-inputs.sha256')! {
+fn hash_records(text string) !map[string]string {
+	mut records := map[string]string{}
+	for line in text.trim_right('\n').split_into_lines() {
 		if line.len < 67 || line[64..66] != '  ' || !safe_path(line[66..])
-			|| digest(out + '/' + line[66..])! != line[..64] { return error('changed reused input') }
+			|| line[..64].bytes().any(!it.is_hex_digit()) || line[66..] in records {
+			return error('invalid or duplicate input hash')
+		}
+		records[line[66..]] = line[..64]
+	}
+	return records
+}
+
+fn reused_records(text string, prior map[string]string, expected []string) !map[string]string {
+	listed := hash_records(text)!
+	mut paths := listed.keys()
+	paths.sort()
+	if paths != expected { return error('changed or incomplete reused input list') }
+	for path in expected {
+		if listed[path] != prior[path] { return error('reused input differs from pinned prior') }
+	}
+	return listed
+}
+
+fn verify_inputs(out string) ! {
+	if digest(out + '/prior-manifest.sha256')! != prior_hash { return error('changed prior manifest') }
+	prior := hash_records(os.read_file(out + '/prior-manifest.sha256')!)!
+	mut fixtures := []string{}
+	mut expected := ['vinix']
+	for path in prior.keys() {
+		if !path.contains('/') && path.ends_with('-checks') && path != 'notification-checks' {
+			fixtures << path
+			expected << [path, path + '.c']
+		}
+		if path.starts_with('application/') || path.starts_with('resources/') { expected << path }
+	}
+	fixtures.sort()
+	if fixtures.len != 35 || os.read_file(out + '/fixtures.txt')! != fixtures.join('\n') + '\n' {
+		return error('changed or incomplete fixture list')
+	}
+	if !optional_probe(out)! { expected << ['native-init', 'native-init.c', 'notification-vm'] }
+	expected.sort()
+	listed := reused_records(os.read_file(out + '/reused-inputs.sha256')!, prior, expected)!
+	mut resources := input_paths(out, 'application')!
+	resources << input_paths(out, 'resources')!
+	resources.sort()
+	if resources != expected.filter(it.starts_with('application/') || it.starts_with('resources/')) {
+		return error('changed resource list')
+	}
+	for path in expected {
+		if digest(out + '/' + path)! != listed[path] {
+			return error('changed reused input: ' + path)
+		}
 	}
 }
 
@@ -134,15 +183,9 @@ fn verify_built(out string) ! {
 	}
 }
 
-fn inspect(out string) ! {
-	verify_inputs(out)!
-	verify_built(out)!
-	optional_lookup := optional_probe(out)!
-	state := os.read_file(out + '/probe-no-ads-state.txt')!.trim_space()
-	if os.dir(state) != out || !os.file_name(state).starts_with('probe-no-ads-') { return error('unsafe state') }
-	serial := os.read_file(state + '/serial.log')!.replace('\r\n', '\n')
-	for fixture in os.read_lines(out + '/fixtures.txt')! {
-		if serial.count('IOS-NATIVE: /opt/ios/' + fixture + ' wait status 0') != 1 { return error('fixture failed: ' + fixture) }
+fn validate_serial(serial string, fixtures []string, optional_lookup bool) !(string, []string) {
+	for fixture in fixtures {
+		if serial.count('IOS-NATIVE: /opt/ios/' + fixture + ' wait status 0\n') != 1 { return error('fixture failed: ' + fixture) }
 	}
 	if optional_lookup {
 		for marker in ['IOS-NATIVE: /opt/ios/swift-optional-lookup-checks wait status 0',
@@ -159,6 +202,13 @@ fn inspect(out string) ! {
 		if serial.count(marker) != 1 { return error('missing or duplicated marker: ' + marker) }
 	}
 	app := serial.all_after('iOS startup: application entry')
+	stops := app.split_into_lines().filter(it.starts_with('IOS-PROBE-DESKTOP: stop='))
+	if app.count('IOS-PROBE-DESKTOP: handshake version=10\n') != 1
+		|| app.count('IOS-PROBE-DESKTOP: tree build=1 nodes=1 images=0 bytes=336\n') != 1
+		|| stops.len != 1 || !stops[0].contains(' handshake=true builds=')
+		|| !stops[0].ends_with(' closed=false supervisor_kill=false wait=256') {
+		return error('missing application desktop guard')
+	}
 	finals := app.split_into_lines().filter(it.starts_with('IOS-PROBE-BUDGET: final '))
 	if finals.len != 1 || !finals[0].ends_with(' events=low 0;high 0;max 0;oom 0;oom_kill 0;oom_group_kill 0;') {
 		return error('missing clean application budget result')
@@ -178,15 +228,64 @@ fn inspect(out string) ! {
 			|| bytes.len != int(copied * 2) || bytes.bytes().any(!it.is_hex_digit()) { return error('invalid bounded diagnostic') }
 		if optional_lookup && bytes == '5363505367' { return error('Optional TaskPriority remains unresolved') }
 	}
-	launch := os.read_file(out + '/probe-no-ads.log')!
+	return boundaries[0], lines
+}
+
+fn validate_launch(launch string) ! {
 	for marker in ['guest memory: 8192 MiB; virtual CPUs: 1', 'VM probe memory.max: 2147483648', 'VM startup limit: 1800 seconds', 'Serial capture reset before VM launch'] {
 		if !launch.contains(marker) { return error('missing launch guard: ' + marker) }
 	}
-	diagnostic := boundaries[0] + '\n' + lines.join('\n') + '\nserial SHA-256: ' + digest(state + '/serial.log')! + '\nruntime SHA-256: ' + digest(out + '/run-ios-gles')! + '\n'
+}
+
+fn host_markers() map[string][]string {
+	return {
+		'swift-optional-lookup-host': ['IOS-SWIFT-OPTIONAL-LOOKUP-NATIVE:', 'IOS-SWIFT-OPTIONAL-LOOKUP:']
+		'swift-mangled-optional-regression': ['IOS-SWIFT-MANGLED-NATIVE:', 'IOS-SWIFT-MANGLED:']
+		'swift-context2-optional-regression': ['NATIVE-CONTEXT2:', 'IOS-CONTEXT2:']
+		'swift-mangled-state-optional-regression': ['IOS-MANGLED-STATE-NATIVE:', 'IOS-MANGLED-STATE:']
+		'swift-mangled-state2-optional-regression': ['NATIVE-MANGLED-STATE2:', 'IOS-MANGLED-STATE2:']
+		'swift-optional-metadata-regression': ['NATIVE-OPTIONAL-METADATA:', 'IOS-OPTIONAL-METADATA:']
+		'swift-task-priority-optional-regression-fixed': ['IOS-SWIFT-TASK-PRIORITY-NATIVE:', 'IOS-SWIFT-TASK-PRIORITY:']
+	}
+}
+
+fn validate_host_log(log string, markers []string) ! {
+	if !log.starts_with('COMMAND: ') { return error('missing host command') }
+	for marker in markers {
+		if log.count(marker) != 1 { return error('missing or duplicated host marker') }
+	}
+	for bad in ['runtime error:', 'ERROR: AddressSanitizer', 'V panic:', '> assert '] {
+		if log.contains(bad) { return error('failed sanitized host run') }
+	}
+}
+
+fn verify_host(out string) ! {
+	for directory, markers in host_markers() {
+		for label in ['host-generate', 'host-object-0', 'host-object-1', 'host-object-2', 'host-object-3', 'host-link', 'host', 'host-deterministic'] {
+			base := out + '/host/' + directory + '/' + label
+			if os.read_file(base + '.status.txt')! != '0\n' { return error('failed host step: ' + base) }
+			log := os.read_file(base + '.log')!
+			if !log.starts_with('COMMAND: ') { return error('missing host command') }
+			if label in ['host', 'host-deterministic'] { validate_host_log(log, markers)! }
+		}
+	}
+}
+
+fn inspect(out string) ! {
+	verify_inputs(out)!
+	verify_built(out)!
+	optional_lookup := optional_probe(out)!
+	if optional_lookup { verify_host(out)! }
+	state := os.read_file(out + '/probe-no-ads-state.txt')!.trim_space()
+	if os.dir(state) != out || !os.file_name(state).starts_with('probe-no-ads-') { return error('unsafe state') }
+	serial := os.read_file(state + '/serial.log')!.replace('\r\n', '\n')
+	boundary, lines := validate_serial(serial, os.read_lines(out + '/fixtures.txt')!, optional_lookup)!
+	validate_launch(os.read_file(out + '/probe-no-ads.log')!)!
+	diagnostic := boundary + '\n' + lines.join('\n') + '\nserial SHA-256: ' + digest(state + '/serial.log')! + '\nruntime SHA-256: ' + digest(out + '/run-ios-gles')! + '\n'
 	if os.exists(out + '/manifest.sha256') {
 		if os.read_file(out + '/diagnostic.txt')! != diagnostic { return error('changed diagnostic') }
 	} else { os.write_file(out + '/diagnostic.txt', diagnostic)! }
-	println(boundaries[0])
+	println(boundary)
 	for line in lines { println(line) }
 	println(if optional_lookup { 'Swift Optional launch: new lookup fixture and 35 reused guest fixtures PASS; rendering unverified' }
 		else { 'Swift diagnostic launch: 35 reused guest fixtures PASS; rendering unverified' })
@@ -246,14 +345,125 @@ fn checkpoint(out string, seal bool) ! {
 	println('Complete Swift probe checkpoint: PASS (game rendering unverified)')
 }
 
+fn reject_serial(serial string, fixtures []string, optional_lookup bool) ! {
+	if _ , _ := validate_serial(serial, fixtures, optional_lookup) { return error('accepted changed guest log') }
+}
+
+fn negative_controls(out string, scratch string) ! {
+	if os.exists(scratch) || os.is_link(scratch) || scratch.starts_with(out + '/') {
+		return error('negative controls need fresh external scratch')
+	}
+	os.mkdir_all(scratch)!
+	optional_lookup := optional_probe(out)!
+	state := os.read_file(out + '/probe-no-ads-state.txt')!.trim_space()
+	serial := os.read_file(state + '/serial.log')!.replace('\r\n', '\n')
+	fixtures := os.read_lines(out + '/fixtures.txt')!
+	_, _ := validate_serial(serial, fixtures, optional_lookup)!
+	mut markers := []string{}
+	for fixture in fixtures { markers << 'IOS-NATIVE: /opt/ios/' + fixture + ' wait status 0' }
+	markers << serial.split_into_lines().filter(it.starts_with('IOS-SWIFT-OPTIONAL-LOOKUP:')
+		|| it.starts_with('IOS-NATIVE: /opt/ios/swift-optional-lookup-checks wait status '))
+	markers << ['iOS startup: application entry', 'IOS-PROBE-BUDGET: enforcement and supervisor isolation PASS',
+		'IOS-PROBE-FAULT: signal context and restoration PASS', 'IOS-PROBE-DESKTOP: UIKit window fixture PASS',
+		'FORTNITE PROBE: process exit status 1', 'FORTNITE PROBE COMPLETE']
+	app := serial.all_after('iOS startup: application entry')
+	markers << app.split_into_lines().filter(it.starts_with('V panic:')
+		|| it.starts_with('IOS-PROBE-DESKTOP: handshake ')
+		|| it.starts_with('IOS-PROBE-DESKTOP: tree build=1 ')
+		|| it.starts_with('IOS-PROBE-DESKTOP: stop=')
+		|| it.starts_with('IOS-PROBE-BUDGET: final '))
+	mut count := 0
+	prior := {'a': '0'.repeat(64), 'b': '1'.repeat(64)}
+	valid := prior['a'] + '  a\n' + prior['b'] + '  b\n'
+	reused_records(valid, prior, ['a', 'b'])!
+	for changed in ['', prior['a'] + '  a\n', valid + prior['a'] + '  a\n', valid + prior['a'] + '  c\n',
+		valid.replace(prior['a'], '2'.repeat(64)), valid.replace('  a', '  ../a'),
+		valid.replace(prior['a'], 'z'.repeat(64)), valid.replace('  b', '  /b')] {
+		reused_records(changed, prior, ['a', 'b']) or { count++; continue }
+		return error('accepted changed, incomplete or unsafe reused records')
+	}
+	for marker in markers {
+		reject_serial(serial.replace(marker + '\n', ''), fixtures, optional_lookup)!
+		reject_serial(serial + '\n' + marker + '\n', fixtures, optional_lookup)!
+		count += 2
+	}
+	for bad in ['IOS-PROBE-FAULT: signal=11', 'IOS-PROBE-REGS: pc=0', 'supervisor_kill=true',
+		'KERNEL PANIC', 'FATAL EXCEPTION', '> assert failed', 'runtime error: alignment'] {
+		reject_serial(serial.replace('iOS startup: application entry', 'iOS startup: application entry\n' + bad), fixtures, optional_lookup)!
+		count++
+	}
+	for event in ['low', 'high', 'max', 'oom', 'oom_kill', 'oom_group_kill'] {
+		reject_serial(serial.all_before('iOS startup: application entry') + 'iOS startup: application entry'
+			+ app.replace(event + ' 0;', event + ' 1;'), fixtures, optional_lookup)!
+		count++
+	}
+	launch := os.read_file(out + '/probe-no-ads.log')!
+	validate_launch(launch)!
+	for marker in ['guest memory: 8192 MiB; virtual CPUs: 1', 'VM probe memory.max: 2147483648',
+		'VM startup limit: 1800 seconds', 'Serial capture reset before VM launch'] {
+		validate_launch(launch.replace(marker, '')) or { count++; continue }
+		return error('accepted missing launch guard')
+	}
+	if optional_lookup {
+		for directory, host_checks in host_markers() {
+			log := os.read_file(out + '/host/' + directory + '/host.log')!
+			validate_host_log(log, host_checks)!
+			for marker in host_checks {
+				mut rejected := 0
+				validate_host_log(log.replace(marker, ''), host_checks) or { rejected++ }
+				validate_host_log(log + marker, host_checks) or { rejected++ }
+				if rejected != 2 { return error('accepted missing or duplicate host marker') }
+				count += rejected
+			}
+			for bad in ['runtime error:', 'ERROR: AddressSanitizer', 'V panic:', '> assert '] {
+				validate_host_log(log + bad, host_checks) or { count++; continue }
+				return error('accepted failed host log')
+			}
+		}
+		built := scratch + '/built'
+		os.mkdir_all(built)!
+		os.write_file(built + '/probe-kind.txt', 'optional-lookup\n')!
+		os.write_file(built + '/source.tar', 'synthetic source snapshot')!
+		os.write_file(built + '/source.sha256', digest(built + '/source.tar')! + '  source.tar\n')!
+		mut hashes := []string{}
+		for path in built_paths {
+			os.write_file(built + '/' + path, path)!
+			hashes << digest(built + '/' + path)! + '  ' + path
+		}
+		original := hashes.join('\n') + '\n'
+		os.write_file(built + '/built-inputs.sha256', original)!
+		verify_built(built)!
+		for changed in ['', hashes[..6].join('\n') + '\n', original + hashes[0] + '\n', original.replace(hashes[0][..64], '0'.repeat(64))] {
+			os.write_file(built + '/built-inputs.sha256', changed)!
+			verify_built(built) or { count++; continue }
+			return error('accepted incomplete or changed built input list')
+		}
+		os.write_file(built + '/built-inputs.sha256', original)!
+		os.write_file(built + '/source.tar', 'changed snapshot')!
+		mut rejected := false
+		verify_built(built) or { rejected = true }
+		if !rejected { return error('accepted changed source snapshot') }
+		count++
+	}
+	os.write_file(scratch + '/negative-controls.txt', count.str() + ' corruptions rejected; baseline guest and host logs pass\n')!
+	println(count.str() + ' Swift checkpoint negative controls PASS')
+}
+
 fn main() {
-	if os.args.len < 3 { panic('usage: swift-type-probe prepare FRESH_OUT PRIOR [--optional-lookup] | build|probe|inspect|seal|check OUT') }
+	if os.args.len < 3 { panic('usage: swift-type-probe prepare FRESH_OUT PRIOR [--optional-lookup] | build|probe|inspect|seal|check OUT | negative-controls OUT FRESH_SCRATCH') }
 	root := os.real_path(os.getwd())
 	out := os.abs_path(os.args[2])
 	if out == root || out.starts_with(root + '/') || os.is_link(out) { panic('output must be external') }
 	os.setenv('VINIX_IOS_CHECK_NAME', 'notification-center-checks', true)
 	os.setenv('V_RESOURCE_PATH', root + '/build/ios/fortnite/ns-calendar-checks/toolchain', true)
 	os.setenv('V_MACOS_V3_NO_FALLBACK', '1', true)
+	if os.args[1] == 'negative-controls' {
+		if os.args.len != 4 { panic('negative-controls requires OUT FRESH_SCRATCH') }
+		scratch := os.abs_path(os.args[3])
+		if scratch == root || scratch.starts_with(root + '/') { panic('scratch must be external') }
+		negative_controls(out, scratch)!
+		return
+	}
 	if os.args[1] == 'prepare' {
 		if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] != '--optional-lookup') { panic('prepare requires PRIOR [--optional-lookup]') }
 		prepare(out, os.real_path(os.args[3]), os.args.len == 5)!
@@ -292,7 +502,9 @@ fn main() {
 			verify_built(out)!
 			// Staging briefly retains both cooked resources and their archive.
 			// Keep headroom for the boot image and failure logs as well.
-			available := os.disk_usage(out)!.available
+			// The frozen V os.disk_usage implementation frees its path argument.
+			// Give it an owned copy so later process arguments keep their bytes.
+			available := os.disk_usage(out.clone())!.available
 			if available < u64(8) * 1024 * 1024 * 1024 {
 				panic('Swift probe needs at least 8 GiB free before staging; available bytes: ' + available.str())
 			}
