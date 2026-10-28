@@ -266,8 +266,11 @@ fn http_transport_case(method string, payload string, reply string, status int, 
 	worker := spawn http_transport_serve(listener, method, payload, reply, tls)
 	length := payload.len.str()
 	defer { unsafe { length.free() } }
+	authority := 'localhost:${listener.port}'
+	defer { unsafe { authority.free() } }
 	fields := [HTTPTransportField{'X-Test', 'exact value\tand tab'},
-		HTTPTransportField{'Content-Type', 'application/octet-stream'}, HTTPTransportField{'Content-Length', length}]
+		HTTPTransportField{'Content-Type', 'application/octet-stream'}, HTTPTransportField{'cOnTeNt-LeNgTh', length},
+		HTTPTransportField{'hOsT', authority}, HTTPTransportField{'CONNECTION', 'close'}, HTTPTransportField{'accept-ENCODING', 'identity'}]
 	defer { unsafe { fields.free() } }
 	bytes := payload.bytes()
 	defer { unsafe { bytes.free() } }
@@ -290,8 +293,11 @@ fn http_transport_case(method string, payload string, reply string, status int, 
 
 fn test_http_transport_requests_and_status() {
 	final_headers := 'X-Result: saved\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\n'
+	large := 'a\x00\xffz'.repeat(16385)
+	defer { unsafe { large.free() } }
 	for tls in [false, true] {
 		http_transport_case('POST', 'a\x00\xffz', 'HTTP/1.1 201 Created\r\n${final_headers}Content-Length: 4\r\n\r\nx\x00\xfez', 201, 'x\x00\xfez', tls)
+		http_transport_case('POST', large, 'HTTP/1.1 200 OK\r\n${final_headers}Content-Length: 2\r\n\r\nok', 200, 'ok', tls)
 		http_transport_case('PUT', 'upload', 'HTTP/1.1 404 Missing\r\n${final_headers}Content-Length: 7\r\n\r\nmissing', 404, 'missing', tls)
 		http_transport_case('PATCH', 'update', 'HTTP/1.1 103 Early Hints\r\nX-Interim: ignored\r\n\r\nHTTP/1.1 500 Failure\r\n${final_headers}Transfer-Encoding: chunked\r\n\r\n3\r\nbad\r\n0\r\nX-Trailer: final\r\n\r\n', 500, 'bad', tls)
 		http_transport_case('HEAD', '', 'HTTP/1.1 200 OK\r\n${final_headers}Content-Length: 999\r\n\r\n', 200, '', tls)
