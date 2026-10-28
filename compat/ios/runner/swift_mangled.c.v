@@ -155,7 +155,10 @@ fn swift_mangled_generic_type_checked(context u64, generic_args u64, value_param
 }
 
 fn swift_mangled_lookup_request_checked(request u64, name u64, length u64, context u64, generic_args u64) !u64 {
-	parsed := swift_mangled_parse(name, length)!
+	parsed := swift_mangled_parse(name, length) or {
+		swift_mangled_probe(name, length, context, generic_args)
+		return err
+	}
 	mut metadata := u64(0)
 	match parsed.kind {
 		0 { return 0 }

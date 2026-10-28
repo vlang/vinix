@@ -60,6 +60,14 @@ fn main() {
 	root := os.real_path(os.getwd()); out := os.abs_path(os.args[2]); old := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
+	if os.args[1] == 'swift-type-probe-host' {
+		run_host_fixture(root, old, out, 'swift_mangled_probe_test.v')!
+		return
+	}
+	if os.args[1] == 'swift-mangled-host' {
+		run_host_fixture(root, old, out, 'swift_mangled_test.v')!
+		return
+	}
 	if os.args[1] == 'error-description-host' {
 		run_host_fixture(root, old, out, 'ns_error_description_test.v')!
 		return
