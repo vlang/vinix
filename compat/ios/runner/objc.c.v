@@ -205,6 +205,7 @@ mut:
 	connection_scheduled bool
 	connection_cancelled bool
 	url_session_owned bool
+	url_session_next_task u64
 	url_session_configuration_owned bool
 	url_session_configuration_default_protocols bool
 	url_session_task_owned bool

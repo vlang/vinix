@@ -26,7 +26,8 @@ fn url_session_task_require_class(cls u64) {
 
 fn url_session_task_metadata() {
 	// Measured public property backing fields in the otherwise opaque 720-byte
-	// CFNetwork record. These tasks have no session and cannot perform a load.
+	// CFNetwork record. Base tasks remain inert; session-created tasks start
+	// suspended and own request snapshots. Transfers require a backend.
 	mut cls := ios_runtime.classes[ios_runtime.names['NSURLSessionTask']] or { panic('iOS: missing task class') }
 	for i, name in ['_priorityAPIStorage', '_taskIdentifier', '_taskDescription', '_originalRequest',
 		'_currentRequest', '_response', '_countOfBytesClientExpectsToSend', '_countOfBytesClientExpectsToReceive',
@@ -89,6 +90,10 @@ fn url_session_task_dispatch(object u64, selector string, mut frame RegisterFram
 	match selector {
 		'init' {}
 		'copy', 'copyWithZone:' { frame.x[0] = objc_retain(object) }
+		'originalRequest' { frame.x[0] = objc_retain_autorelease(header.fields[1]) }
+		'currentRequest' { frame.x[0] = objc_retain_autorelease(header.fields[2]) }
+		'taskIdentifier' { frame.x[0] = read64(object + 120) }
+		'state' { frame.x[0] = read64(object + 232) }
 		'taskDescription' { frame.x[0] = objc_retain_autorelease(header.fields[0]) }
 		'setTaskDescription:' {
 			retired = header.fields[0]; header.fields[0] = copied
@@ -115,6 +120,7 @@ fn url_session_task_dispatch(object u64, selector string, mut frame RegisterFram
 
 fn url_session_task_dispose(object u64, header &ObjHeader) {
 	if !header.url_session_task_owned { return }
-	// The generic fields own the description even following an isa replacement.
-	unsafe { *(&u64(object + 128)) = 0 }
+	// Generic fields own the description, both requests and session, including
+	// after an isa replacement. No task is kept alive by its session before resume.
+	unsafe { *(&u64(object + 128)) = 0; *(&u64(object + 144)) = 0; *(&u64(object + 152)) = 0 }
 }

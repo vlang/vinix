@@ -13,6 +13,9 @@ fn C.sel_registerName(&char) voidptr
 fn C.dlsym(voidptr, &char) voidptr
 fn C.class_getInstanceSize(voidptr) usize
 fn C.class_getSuperclass(voidptr) voidptr
+fn C.class_getInstanceVariable(voidptr, &char) voidptr
+fn C.ivar_getOffset(voidptr) isize
+fn C.ivar_getTypeEncoding(voidptr) &char
 type TaskMessage = fn (u64, u64, u64) u64
 type TaskPriorityGet = fn (u64, u64) f32
 type TaskPrioritySet = fn (u64, u64, f32)
@@ -125,12 +128,22 @@ fn test_session_task_native() {
 	$if macos {
 		for index, name in ['NSURLSessionTask', 'NSURLSessionDownloadTask', 'NSURLSessionDataTask', 'NSURLSessionUploadTask']! {
 			cls := u64(C.objc_getClass(name.str))
-			assert C.class_getInstanceSize(unsafe { voidptr(cls) }) == 720
+			// Newer host Foundation adds one private tail pointer. The measured
+			// public fields and Vinix's 720-byte compatibility layout stay fixed.
+			tail := C.class_getInstanceVariable(unsafe { voidptr(cls) }, c'_sourceApplicationBundleIdentifierForMobileAsset')
+			assert C.class_getInstanceSize(unsafe { voidptr(cls) }) == if tail == unsafe { nil } { usize(720) } else { usize(728) }
+			if tail != unsafe { nil } {
+				assert C.ivar_getOffset(tail) == 720 && ctext(u64(C.ivar_getTypeEncoding(tail))) == '@"NSString"'
+			}
+			for ivar_name, offset in {'_priorityAPIStorage': 116, '_taskIdentifier': 120, '_taskDescription': 128, '_originalRequest': 144, '_currentRequest': 152, '_response': 160, '_countOfBytesClientExpectsToSend': 168, '_countOfBytesClientExpectsToReceive': 176, '_countOfBytesReceived': 184, '_countOfBytesSent': 208, '_countOfBytesExpectedToSend': 216, '_countOfBytesExpectedToReceive': 224, '_state': 232, '_error': 240} {
+				ivar := C.class_getInstanceVariable(unsafe { voidptr(cls) }, ivar_name.str)
+				assert ivar != unsafe { nil } && C.ivar_getOffset(ivar) == offset
+			}
 			parent := ['NSObject', 'NSURLSessionTask', 'NSURLSessionTask', 'NSURLSessionDataTask']![index]
 			assert C.class_getSuperclass(unsafe { voidptr(cls) }) == C.objc_getClass(parent.str)
 			task_base_cases(TaskApi{native: true, send: u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend')), cls: cls, strings: u64(C.objc_getClass(c'NSString')), mutable_strings: u64(C.objc_getClass(c'NSMutableString'))})
 		}
-		println('IOS-SESSION-TASK-NATIVE: four 720-byte classes, hierarchy, base init/copy identity, copied description, signed client counts and float priority including nonfinite inputs')
+		println('IOS-SESSION-TASK-NATIVE: four classes with measured public offsets and optional private tail pointer, hierarchy, base init/copy identity, copied description, signed client counts and float priority including nonfinite inputs')
 	}
 }
 fn test_session_task_runtime() {

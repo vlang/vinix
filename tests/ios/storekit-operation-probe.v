@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Reuse the complete sealed dictionary checkpoint with a fresh runtime.
-// Queue mode also replaces init and adds a fresh StoreKit fixture.
+// Queue mode replaces init and StoreKit; data-task mode adds its fresh fixture
+// and rebuilds the VM driver so the new build target has recorded provenance.
 module main
 
 import crypto.sha256
@@ -144,8 +145,14 @@ fn replace_runtime(out string, state string) ! {
 			'-s', ',^opt/ios/storekit-purchase-checks$,,', '-s', ',^[.]/opt/ios/storekit-purchase-checks$,,',
 			'-s', ',^init-new$,./sbin/init,', '-s', ',^storekit-new$,./opt/ios/storekit-purchase-checks,']
 	}
+	if os.exists(out + '/data-task-probe.txt') {
+		os.cp(out + '/session-data-task-checks', out + '/replacement/data-task-new')!
+		args << ['-s', ',^opt/ios/session-data-task-checks$,,', '-s', ',^[.]/opt/ios/session-data-task-checks$,,',
+			'-s', ',^data-task-new$,./opt/ios/session-data-task-checks,']
+	}
 	args << ['@' + state + '/initramfs.tar.gz', '-C', out + '/replacement', 'runtime-new']
 	if queue { args << ['init-new', 'storekit-new'] }
+	if os.exists(out + '/data-task-probe.txt') { args << 'data-task-new' }
 	capture(out + '/replace-runtime', args)!
 	os.rename(state + '/replacement.tar.gz', state + '/initramfs.tar.gz')!
 	preflight := out + '/runtime-preflight'
@@ -160,15 +167,19 @@ fn replace_runtime(out string, state string) ! {
 
 fn queue_media(out string, state string) ! {
 	preflight := out + '/runtime-preflight'
-	capture(out + '/queue-media', ['/usr/bin/tar', '-xzf', state + '/initramfs.tar.gz',
-		'-C', preflight, './sbin/init', './opt/ios/storekit-purchase-checks'])!
-	for pair in [['native-init', 'sbin/init'], ['storekit-purchase-checks', 'opt/ios/storekit-purchase-checks']] {
+	mut pairs := [['native-init', 'sbin/init'], ['storekit-purchase-checks', 'opt/ios/storekit-purchase-checks']]
+	if os.exists(out + '/data-task-probe.txt') { pairs << ['session-data-task-checks', 'opt/ios/session-data-task-checks'] }
+	mut args := ['/usr/bin/tar', '-xzf', state + '/initramfs.tar.gz', '-C', preflight]
+	for pair in pairs { args << './' + pair[1] }
+	capture(out + '/queue-media', args)!
+	for pair in pairs {
 		if digest(out + '/' + pair[0])! != digest(preflight + '/' + pair[1])!
 			|| !os.is_executable(preflight + '/' + pair[1]) { return error('changed supplemental guest input: ' + pair[1]) }
 	}
 	listing := os.exec(['/usr/bin/tar', '-tzf', state + '/initramfs.tar.gz'])
 	if listing.exit_code != 0 { return error('cannot inspect supplemental guest input inventory') }
-	for member in ['sbin/init', 'opt/ios/storekit-purchase-checks'] {
+	for pair in pairs {
+		member := pair[1]
 		if listing.output.split_into_lines().filter(it == member || it == './' + member).len != 1 {
 			return error('missing or duplicated supplemental guest input: ' + member)
 		}
@@ -185,9 +196,22 @@ fn validate_queue_results(raw string) ! {
 	}
 }
 
-fn queue_results(state string) ! {
-	validate_queue_results(os.read_file(state + '/serial.log')!)!
+fn validate_data_task_results(raw string) ! {
+	serial := raw.replace('\r\n', '\n')
+	for marker in ['IOS-NATIVE: /opt/ios/session-data-task-checks wait status 0\n',
+		'IOS-SESSION-DATA-TASK:', 'IOS-SESSION-DATA-TASK-REJECT: ten '] {
+		if serial.count(marker) != 1 { return error('missing or duplicated data-task guest result: ' + marker) }
+	}
+}
+
+fn queue_results(out string, state string) ! {
+	serial := os.read_file(state + '/serial.log')!
+	validate_queue_results(serial)!
 	println('Supplemental fresh StoreKit guest fixture: PASS')
+	if os.exists(out + '/data-task-probe.txt') {
+		validate_data_task_results(serial)!
+		println('Supplemental fresh suspended data-task guest fixture: PASS')
+	}
 }
 
 fn queue_results_selftest() ! {
@@ -205,6 +229,18 @@ fn queue_results_selftest() ! {
 		assert rejected
 	}
 	println('Queue guest result validation: LF/CRLF accepted; failure, missing and duplicate results rejected PASS')
+	tasks := 'IOS-NATIVE: /opt/ios/session-data-task-checks wait status 0\n'
+		+ 'IOS-SESSION-DATA-TASK: PASS\nIOS-SESSION-DATA-TASK-REJECT: ten PASS\n'
+	validate_data_task_results(tasks)!
+	validate_data_task_results(tasks.replace('\n', '\r\n'))!
+	for bad in [tasks.replace('wait status 0', 'wait status 1'),
+		tasks.replace('IOS-SESSION-DATA-TASK: PASS\n', ''),
+		tasks.replace('IOS-SESSION-DATA-TASK-REJECT: ten PASS\n', ''), tasks + tasks] {
+		mut rejected := false
+		validate_data_task_results(bad) or { rejected = true }
+		assert rejected
+	}
+	println('Data-task guest result validation: LF/CRLF accepted; failure, missing and duplicate results rejected PASS')
 }
 
 fn replay(out string) ! {
@@ -219,7 +255,7 @@ fn replay(out string) ! {
 	log := os.read_file(out + '/probe-no-ads.log')!
 	os.write_file(out + '/probe-no-ads.log', log + 'VM probe memory.max: 2147483648 (retained configuration; checked by the full guest-media auditor)\n')!
 	capture(out + '/operation-inspect', [out + '/checkpoint', 'inspect', out])!
-	if os.exists(out + '/queue-probe.txt') { queue_results(state)! }
+	if os.exists(out + '/queue-probe.txt') { queue_results(out, state)! }
 	println('Fresh runtime probe complete. Run the unchanged checkpoint seal/check and negative-controls before reporting qualification.')
 }
 
@@ -227,8 +263,9 @@ fn replacement_selftest(out string) ! {
 	if os.exists(out) { return error('selftest requires a fresh directory') }
 	queue_results_selftest()!
 	stream_copy_selftest(out + '/stream-copy')!
+	for profile in ['queue', 'data-task'] {
 	for spelling in ['opt/ios/run-ios', './opt/ios/run-ios', 'absent'] {
-		path := out + '/' + if spelling == 'absent' { 'absent' } else if spelling.starts_with('.') { 'dot' } else { 'plain' }
+		path := out + '/' + profile + '/' + if spelling == 'absent' { 'absent' } else if spelling.starts_with('.') { 'dot' } else { 'plain' }
 		os.mkdir_all(path + '/old/opt/ios')!
 		os.write_file(path + '/old/keep', 'unchanged')!
 		os.write_file(path + '/old/opt/ios/run-ios', 'old runtime')!
@@ -240,9 +277,18 @@ fn replacement_selftest(out string) ! {
 		os.write_file(path + '/storekit-purchase-checks', 'new StoreKit fixture')!
 		for file in ['native-init', 'storekit-purchase-checks'] { os.chmod(path + '/' + file, 0o755)! }
 		os.write_file(path + '/queue-probe.txt', 'selftest\n')!
+		if profile == 'data-task' {
+			os.write_file(path + '/data-task-probe.txt', 'selftest\n')!
+			os.write_file(path + '/session-data-task-checks', 'new data-task fixture')!
+			os.chmod(path + '/session-data-task-checks', 0o755)!
+			os.write_file(path + '/old/opt/ios/session-data-task-checks', 'old data-task fixture')!
+		}
 		mut args := ['/usr/bin/tar', '-czf', path + '/initramfs.tar.gz', '-C', path + '/old', 'keep',
 			if spelling.starts_with('.') { './sbin/init' } else { 'sbin/init' }]
 		if spelling != 'absent' { args << spelling }
+		if profile == 'data-task' && spelling != 'absent' {
+			args << if spelling.starts_with('.') { './opt/ios/session-data-task-checks' } else { 'opt/ios/session-data-task-checks' }
+		}
 		capture(path + '/input', args)!
 		// replace_runtime also embeds the archive in FAT. Use a tiny real
 		// filesystem so the regression exercises exactly the production path.
@@ -255,7 +301,8 @@ fn replacement_selftest(out string) ! {
 		keep := os.exec(['/usr/bin/tar', '-xOzf', path + '/initramfs.tar.gz', 'keep'])
 		if keep.exit_code != 0 || keep.output != 'unchanged' { return error('changed unrelated member') }
 	}
-	println('Runtime, init and fixture replacement: plain, dot-prefixed and absent prior runtime; exact bytes, executable permissions, unique members and unchanged content PASS')
+	}
+	println('Runtime, init, StoreKit and data-task fixture replacement: plain, dot-prefixed and absent prior members; exact bytes, executable permissions, unique members and unchanged content PASS')
 }
 
 fn main() {
@@ -264,7 +311,7 @@ fn main() {
 		out := os.real_path(os.args[2])
 		state := os.read_file(out + '/probe-no-ads-state.txt')!.trim_space()
 		if os.dir(state) != out { panic('unsafe queue state pointer') }
-		queue_results(state)!
+		queue_results(out, state)!
 		return
 	}
 	if os.args.len == 4 && os.args[1] == 'check-queue' {
@@ -279,7 +326,13 @@ fn main() {
 			'-C', scratch, './opt/ios/storekit-purchase-checks'])!
 		if digest(out + '/storekit-purchase-checks')! != digest(scratch + '/opt/ios/storekit-purchase-checks')!
 			|| !os.is_executable(scratch + '/opt/ios/storekit-purchase-checks') { panic('changed supplemental StoreKit fixture') }
-		queue_results(state)!
+		if os.exists(out + '/data-task-probe.txt') {
+			capture(scratch + '/data-task-media', ['/usr/bin/tar', '-xzf', state + '/initramfs.tar.gz',
+				'-C', scratch, './opt/ios/session-data-task-checks'])!
+			if digest(out + '/session-data-task-checks')! != digest(scratch + '/opt/ios/session-data-task-checks')!
+				|| !os.is_executable(scratch + '/opt/ios/session-data-task-checks') { panic('changed supplemental data-task fixture') }
+		}
+		queue_results(out, state)!
 		return
 	}
 	if os.args.len == 4 && os.args[1] == 'recover' {
@@ -302,8 +355,9 @@ fn main() {
 		replay(out)!
 		return
 	}
-	if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] != '--queue-copy') { panic('usage: storekit-operation-probe COMPLETE_PARENT FRESH_EXTERNAL_OUT FRESH_STOREKIT_HOST [--queue-copy]') }
+	if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] !in ['--queue-copy', '--data-task-copy']) { panic('usage: storekit-operation-probe COMPLETE_PARENT FRESH_EXTERNAL_OUT FRESH_HOST [--queue-copy|--data-task-copy]') }
 	queue := os.args.len == 5
+	data_task := queue && os.args[4] == '--data-task-copy'
 	root := os.real_path(os.getwd())
 	parent := os.real_path(os.args[1])
 	out := os.abs_path(os.args[2])
@@ -325,25 +379,27 @@ fn main() {
 		os.write_file(out + '-clone.status.txt', '0\n')!
 	} else { capture(out + '-clone', ['/bin/cp', '-cRp', parent, out])! }
 	if queue { os.write_file(out + '/queue-probe.txt', 'fresh StoreKit fixture and native init; 45 reused guest fixtures\n')! }
+	if data_task { os.write_file(out + '/data-task-probe.txt', 'fresh suspended data-task and StoreKit fixtures; fresh native init and VM driver; 45 reused guest fixtures\n')! }
 	os.rename(out + '/manifest.sha256', out + '/parent-manifest.sha256')!
 	os.write_file(out + '/parent-bundle.txt', parent + '\n' + parent_manifest + '\n')!
 	os.cp(os.executable(), out + '/storekit-operation-probe')!
 	os.cp(root + '/tests/ios/storekit-operation-probe.v', out + '/storekit-operation-probe.v')!
 	for label in ['host-generate', 'host-object-0', 'host-object-1', 'host-object-2', 'host-object-3', 'host-link', 'host', 'host-deterministic'] {
-		if os.read_file(host + '/' + label + '.status.txt')! != '0\n' { panic('failed fresh StoreKit host step') }
+		if os.read_file(host + '/' + label + '.status.txt')! != '0\n' { panic('failed fresh host step: ' + label) }
 	}
 	for label in ['host', 'host-deterministic'] {
 		log := os.read_file(host + '/' + label + '.log')!
-		for marker in ['IOS-STOREKIT-PURCHASE:', 'IOS-STOREKIT-PURCHASE-REJECT: 276 ',
+		markers := if data_task { ['IOS-SESSION-DATA-TASK-NATIVE:', 'IOS-SESSION-DATA-TASK:', 'IOS-SESSION-DATA-TASK-REJECT: ten '] } else { ['IOS-STOREKIT-PURCHASE:', 'IOS-STOREKIT-PURCHASE-REJECT: 276 ',
 			'IOS-STOREKIT-QUEUE:', 'IOS-STOREKIT-QUEUE-REJECT: seven ',
-			'IOS-STOREKIT-OBSERVERS:', 'IOS-STOREKIT-OBSERVERS-REJECT:'] {
-			if log.count(marker) != 1 { panic('missing or duplicate StoreKit host result: ' + marker) }
+			'IOS-STOREKIT-OBSERVERS:', 'IOS-STOREKIT-OBSERVERS-REJECT:'] }
+		for marker in markers {
+			if log.count(marker) != 1 { panic('missing or duplicate host result: ' + marker) }
 		}
 		for failure in ['ERROR: AddressSanitizer', 'runtime error:', 'V panic:', '> assert '] {
-			if log.contains(failure) { panic('failed StoreKit host log: ' + label) }
+			if log.contains(failure) { panic('failed host log: ' + label) }
 		}
 	}
-	capture(out + '/copy-storekit-host', ['/bin/cp', '-Rp', host, out + '/host/storekit-operation-host'])!
+	capture(out + '/copy-fresh-host', ['/bin/cp', '-Rp', host, out + '/host/' + if data_task { 'session-data-task-host' } else { 'storekit-operation-host' }])!
 	previous := os.read_file(out + '/source-revision.txt')!
 	os.write_file(out + '/reused-fixture-revision.txt', previous)!
 	revision := os.exec(['git', 'rev-parse', 'HEAD'])
@@ -357,16 +413,26 @@ fn main() {
 	os.setenv('VINIX_IOS_VM_CPUS', '1', true)
 	os.setenv('V_RESOURCE_PATH', root + '/build/ios/fortnite/ns-calendar-checks/toolchain', true)
 	os.setenv('V_MACOS_V3_NO_FALLBACK', '1', true)
+	if data_task {
+		os.rename(out + '/notification-vm', out + '/reused-notification-vm')!
+		os.cp(root + '/tests/ios/notification-vm.v', out + '/session-data-task-notification-vm.v')!
+		capture(out + '/build-notification-vm', [root + '/build/ios/fortnite/ns-calendar-checks/toolchain/v',
+			'-nocache', '-gc', 'none', '-cc', 'clang', '-path', '@vlib|' + root + '/compat/ios|' + root + '/tests/ios|@vmodules',
+			'-o', out + '/notification-vm', out + '/session-data-task-notification-vm.v'])!
+		os.write_file(out + '/notification-vm-revision.txt', revision.output)!
+	}
 	capture(out + '/build-runtime', [out + '/notification-vm', 'build-run-ios-gles', out])!
 	if queue {
 		capture(out + '/build-native-init', [out + '/notification-vm', 'build-init', out])!
 		capture(out + '/build-storekit', [out + '/notification-vm', 'build-storekit-purchase', out])!
 	}
+	if data_task { capture(out + '/build-data-task', [out + '/notification-vm', 'build-session-data-task', out])! }
 	capture(out + '/built-source-check', ['git', 'diff', '--exit-code', revision.output.trim_space(), '--', 'compat/ios', 'tests/ios'])!
 	mut hashes := []string{}
 	for line in os.read_lines(out + '/built-inputs.sha256')! {
 		path := line[66..]
 		if path !in ['run-ios-gles', 'run-ios-gles.c'] && !(queue && path in ['native-init', 'native-init.c'])
+			&& !(data_task && path == 'notification-vm')
 			&& digest(out + '/' + path)! != line[..64] {
 			panic('changed reused fixture or driver: ' + path)
 		}

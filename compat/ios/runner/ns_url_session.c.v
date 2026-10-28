@@ -66,6 +66,7 @@ fn url_session_types(name string, meta bool, selector string) ?string {
 	return match selector {
 		'init', 'copy', 'delegate', 'delegateQueue', 'configuration', 'sessionDescription' { '@16@0:8' }
 		'copyWithZone:' { '@24@0:8^{_NSZone=}16' }
+		'dataTaskWithRequest:' { '@24@0:8@16' }
 		'setSessionDescription:' { 'v24@0:8@16' }
 		else { return none }
 	}
@@ -82,7 +83,64 @@ fn url_session_unsupported(selector string) bool {
 		'initWithCoder:', 'encodeWithCoder:', 'supportsSecureCoding',
 		'finishTasksAndInvalidate', 'invalidateAndCancel', 'flushWithCompletionHandler:',
 		'resetWithCompletionHandler:', 'getTasksWithCompletionHandler:', 'getAllTasksWithCompletionHandler:']!
-		|| selector.starts_with('initWithConfiguration:') || selector.contains('TaskWith')
+		|| selector.starts_with('initWithConfiguration:')
+		|| (selector.contains('TaskWith') && selector != 'dataTaskWithRequest:')
+}
+
+fn url_session_data_task(object u64, request u64) u64 {
+	C.ios_objc_initialize_lock()
+	header := url_session_state(object)
+	configured := header.fields[2] != 0
+	if !configured { panic('iOS: data task requires a configured URL session: -[NSURLSession dataTaskWithRequest:]') }
+	if request == 0 || !objc_is_kind(request, ios_runtime.names['NSURLRequest']) {
+		panic('iOS: data task requires an initialized URL request')
+	}
+	source := obj_header(request)
+	if !source.request_owned || source.request == unsafe { nil } || source.destroyed || source.destroying {
+		panic('iOS: data task requires an initialized URL request')
+	}
+	if read64(request) !in [ios_runtime.names['NSURLRequest'], ios_runtime.names['NSMutableURLRequest']]! {
+		panic('iOS: data task custom request subclasses are not implemented')
+	}
+	mutable_request := source.request.mutable
+	// Constructors may reenter application code. Pin both inputs until the
+	// snapshots and task have acquired their own references.
+	objc_retain(object)
+	objc_retain(request)
+	C.ios_objc_initialize_unlock()
+	// Request copies can allocate and run constructors. Do not hold the session
+	// lock across them. Each property owns an independent snapshot; an unresumed
+	// task is owned only by its caller/autorelease pool, so no session/task cycle
+	// is introduced. Starting a transfer still requires a separate backend.
+	original := request_copy(request, mutable_request)
+	current := request_copy(original, true)
+	objc_release(request)
+	task := objc_allocate(ios_runtime.names['NSURLSessionDataTask'])
+	if task == 0 {
+		objc_release(original)
+		objc_release(current)
+		objc_release(object)
+		return 0
+	}
+	C.ios_objc_initialize_lock()
+	mut owner := url_session_state(object)
+	if owner.url_session_next_task == ~u64(0) { panic('iOS: URL session task identifiers exhausted') }
+	owner.url_session_next_task++
+	mut state := url_session_task_state(task)
+	state.fields[1] = original
+	state.fields[2] = current
+	state.fields[3] = object
+	unsafe {
+		*(&f32(task + 116)) = 0.5
+		*(&u64(task + 120)) = owner.url_session_next_task
+		*(&u64(task + 144)) = original
+		*(&u64(task + 152)) = current
+		*(&i64(task + 168)) = -1
+		*(&i64(task + 176)) = -1
+		*(&u64(task + 232)) = 1 // NSURLSessionTaskStateSuspended.
+	}
+	C.ios_objc_initialize_unlock()
+	return objc_autorelease(task)
 }
 
 fn url_session_configured(cls u64, configuration u64, delegate u64, queue u64) u64 {
@@ -175,6 +233,7 @@ fn url_session_dispatch(object u64, selector string, mut frame RegisterFrame) bo
 				if selector == 'sessionWithConfiguration:' { u64(0) } else { frame.x[4] }) }
 		return true
 	}
+	if selector == 'dataTaskWithRequest:' { frame.x[0] = url_session_data_task(object, frame.x[2]); return true }
 	if selector == 'delegateQueue' { frame.x[0] = url_session_delegate_queue(object); return true }
 	if selector == 'configuration' { frame.x[0] = url_session_configuration_snapshot(object); return true }
 	// Acquire a setter's copied argument before retiring the old value. A copy

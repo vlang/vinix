@@ -330,7 +330,7 @@ fn test_url_session_runtime() {
 		for selector in [c'sharedSession']! {
 			assert !objc_responds(api.cls, selector) && objc_instance_method(read64(api.cls), u64(selector)) == 0
 		}
-		for selector in [c'mutableCopy', c'mutableCopyWithZone:', c'finishTasksAndInvalidate', c'invalidateAndCancel', c'flushWithCompletionHandler:', c'resetWithCompletionHandler:', c'getTasksWithCompletionHandler:', c'getAllTasksWithCompletionHandler:', c'dataTaskWithRequest:', c'dataTaskWithURL:completionHandler:', c'initWithCoder:', c'encodeWithCoder:']! {
+		for selector in [c'mutableCopy', c'mutableCopyWithZone:', c'finishTasksAndInvalidate', c'invalidateAndCancel', c'flushWithCompletionHandler:', c'resetWithCompletionHandler:', c'getTasksWithCompletionHandler:', c'getAllTasksWithCompletionHandler:', c'dataTaskWithURL:completionHandler:', c'initWithCoder:', c'encodeWithCoder:']! {
 			assert !objc_responds(object, selector) && objc_instance_method(api.cls, u64(selector)) == 0
 		}
 		assert objc_add_method(api.cls, u64(c'getAllTasksWithCompletionHandler:'), u64(unsafe { voidptr(session_app_tasks) }), c'@24@0:8@16')
@@ -431,6 +431,7 @@ fn test_url_session_rejections() {
 		C.close(fds[0]); mut status := i32(0); assert C.ios_waitpid(pid, &status, 0) == pid && status == 256
 		output := unsafe { tos(&bytes[0], length) }
 		reason := match mode {
+			'task' { 'data task requires a configured URL session' }
 			'configured', 'configured-delegate' { 'URL session requires a session configuration' }
 			'description' { 'URL session description must be a string' }
 			'bad-copy' { 'URL session description copy must be a string' }
