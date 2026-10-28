@@ -301,6 +301,22 @@ fn onboarding_profile() NarrowProfile {
  }
 }
 
+fn application_restrictions_profile() NarrowProfile {
+ manager := 'android/os/UserManager.smali'
+ return NarrowProfile{
+  name: 'application-restrictions'
+  baseline_name: 'combined-account-webview-onboarding-framework-2026-10-27-r1'
+  manifest_pin: 'bfd56090052ec6612179741c5ad88ecfe7fad83027a38cc5949c13892abd1c42'
+  jar_pin: 'e7d7d590da1ae5f9eb8f9f27aae0c003a30f10f5d79effc0c63f463f958263fd'
+  baseline_classes: 2104
+  providers: ['framework_application_restrictions.v']
+  calls: {manager: 'framework_application_restrictions_user_manager'}
+  methods: {manager: ['getApplicationRestrictions(Ljava/lang/String;)Landroid/os/Bundle;']}
+  changed: {manager: 0}
+  added: {manager: 1}
+ }
+}
+
 fn store_parts(source string) !StoreClassParts {
  mut methods := map[string]string{}
  mut metadata := []string{}
@@ -666,6 +682,8 @@ fn self_test() ! {
  narrow_method_self_test(boot_profile.methods['android/content/pm/PackageParser.smali']!, 4, 1)!
  credential_profile := credential_storage_profile()
  for _, signatures in credential_profile.methods { narrow_method_self_test(signatures, 0, 2)! }
+ restrictions_profile := application_restrictions_profile()
+ narrow_method_self_test(restrictions_profile.methods['android/os/UserManager.smali']!, 0, 1)!
  broadcast_profile := broadcast_result_profile()
  for target, signatures in broadcast_profile.methods {
   narrow_method_self_test(signatures, broadcast_profile.changed[target]!, broadcast_profile.added[target]!)!
@@ -1141,11 +1159,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding'] {
-  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } else { onboarding_profile() } }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions'] {
+  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
