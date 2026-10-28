@@ -485,6 +485,9 @@ fn main() {
 			['/opt/ios/FortniteClient-IOS-Shipping']
 		}
 		if mode == 'probe-no-ads' {
+			if os.exists('/opt/ios/session-defaults-checks') {
+				require_child('/opt/ios/session-defaults-checks')
+			}
 			if os.exists('/opt/ios/swift-optional-lookup-checks') {
 				require_child('/opt/ios/swift-optional-lookup-checks')
 			}

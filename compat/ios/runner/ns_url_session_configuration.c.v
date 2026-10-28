@@ -4,8 +4,9 @@ module main
 import math
 
 // Public base configurations have a measured 560-byte record. This profile
-// stores settings only: factories requiring Foundation's persistent/shared
-// stores and configured NSURLSessions remain separate unsupported APIs.
+// stores settings only. Default factory settings are supported; access to its
+// unresolved built-in protocols, persistent/shared stores and configured
+// NSURLSessions remains an explicit unsupported boundary.
 // Ownership follows the allocation, independently of its current isa.
 fn url_session_configuration_family(cls u64) bool {
 	mut current := cls
@@ -127,7 +128,7 @@ fn url_session_configuration_property(selector string) ?SessionConfigurationProp
 
 fn url_session_configuration_types(name string, meta bool, selector string) ?string {
 	if name != 'NSURLSessionConfiguration' { return none }
-	if meta { return if selector == 'new' { '@16@0:8' } else { none } }
+	if meta { return if selector in ['new', 'defaultSessionConfiguration']! { '@16@0:8' } else { none } }
 	if selector in ['init', 'copy']! { return '@16@0:8' }
 	if selector == 'copyWithZone:' { return '@24@0:8^{_NSZone=}16' }
 	property := url_session_configuration_property(selector) or { return none }
@@ -143,7 +144,7 @@ fn url_session_configuration_types(name string, meta bool, selector string) ?str
 }
 
 fn url_session_configuration_unsupported(selector string) bool {
-	return selector in ['defaultSessionConfiguration', 'ephemeralSessionConfiguration',
+	return selector in ['ephemeralSessionConfiguration',
 		'backgroundSessionConfiguration:', 'backgroundSessionConfigurationWithIdentifier:',
 		'HTTPCookieStorage', 'setHTTPCookieStorage:', 'URLCredentialStorage', 'setURLCredentialStorage:',
 		'URLCache', 'setURLCache:', 'TLSMinimumSupportedProtocolVersion', 'setTLSMinimumSupportedProtocolVersion:',
@@ -178,6 +179,7 @@ fn url_session_configuration_copy(object u64) u64 {
 	C.ios_objc_initialize_lock()
 	source := url_session_configuration_state(object)
 	unsafe { C.memcpy(&bytes[0], voidptr(object), 560) }
+	default_protocols := source.url_session_configuration_default_protocols
 	for i in 0 .. 5 { refs[i] = objc_retain(source.fields[i]) }
 	C.ios_objc_initialize_unlock()
 	// Allocation can run a replaced +initialize or C++ constructor. The captured
@@ -187,6 +189,7 @@ fn url_session_configuration_copy(object u64) u64 {
 	mut retired := [5]u64{}
 	C.ios_objc_initialize_lock()
 	mut target := url_session_configuration_state(copy)
+	target.url_session_configuration_default_protocols = default_protocols
 	unsafe { C.memcpy(voidptr(copy + 8), &bytes[8], 552) }
 	for i, offset in [u64(160), 200, 208, 224, 232]! {
 		retired[i] = target.fields[i]
@@ -198,6 +201,26 @@ fn url_session_configuration_copy(object u64) u64 {
 	return copy
 }
 
+fn url_session_configuration_default(cls u64) u64 {
+	url_session_configuration_require_class(cls)
+	object := objc_new(cls)
+	if object == 0 { return 0 }
+	C.ios_objc_initialize_lock()
+	mut header := url_session_configuration_state(object)
+	for offset in [u64(64), 65, 66, 71]! { unsafe { *(&u8(object + offset)) = 1 } }
+	write32(object + 140, 8) // kTLSProtocol12; modern-version selectors remain unsupported.
+	unsafe {
+		*(&u64(object + 216)) = 2 // NSHTTPCookieAcceptPolicyOnlyFromMainDocumentDomain
+		*(&f64(object + 176)) = 60.0
+		*(&f64(object + 184)) = 604800.0
+	}
+	// Do not expose nil/empty built-in protocols as a usable transport profile.
+	// An explicit protocolClasses setter replaces this unresolved default.
+	header.url_session_configuration_default_protocols = true
+	C.ios_objc_initialize_unlock()
+	return objc_autorelease(object)
+}
+
 fn url_session_configuration_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	meta := object in ios_runtime.classes
 	if !url_session_configuration_family(if meta { object } else { read64(object) }) { return false }
@@ -205,7 +228,10 @@ fn url_session_configuration_dispatch(object u64, selector string, mut frame Reg
 		panic('iOS: configuration factories, stores, coding and this property are not implemented: ' + selector)
 	}
 	if url_session_configuration_types('NSURLSessionConfiguration', meta, selector) == none { return false }
-	if meta { frame.x[0] = objc_new(object); return true }
+	if meta {
+		frame.x[0] = if selector == 'defaultSessionConfiguration' { url_session_configuration_default(object) } else { objc_new(object) }
+		return true
+	}
 	if selector in ['copy', 'copyWithZone:']! { frame.x[0] = url_session_configuration_copy(object); return true }
 	if selector == 'init' { url_session_configuration_state(object); return true }
 	property := url_session_configuration_property(selector) or { return false }
@@ -224,6 +250,7 @@ fn url_session_configuration_dispatch(object u64, selector string, mut frame Reg
 		mut header := url_session_configuration_state(object)
 		retired := header.fields[index]
 		header.fields[index] = copied
+		if index == 4 { header.url_session_configuration_default_protocols = false }
 		unsafe { *(&u64(object + property.offset)) = copied }
 		C.ios_objc_initialize_unlock()
 		objc_release(retired)
@@ -232,6 +259,9 @@ fn url_session_configuration_dispatch(object u64, selector string, mut frame Reg
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	header := url_session_configuration_state(object)
+	if selector == 'protocolClasses' && header.url_session_configuration_default_protocols {
+		panic('iOS: default session protocol classes are not implemented')
+	}
 	address := object + property.offset
 	value := frame.x[2]
 	match property.kind {

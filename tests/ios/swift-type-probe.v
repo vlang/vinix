@@ -11,6 +11,12 @@ const prior_hash = '8b4028c3d90c69e6b4e418820ab287eb93c8fdc4f6f0ecd10ce99346e069
 const built_paths = ['notification-vm', 'native-init', 'native-init.c', 'swift-optional-lookup-checks',
 	'swift-optional-lookup-checks.c', 'run-ios-gles', 'run-ios-gles.c']
 
+fn required_built_paths(out string) ![]string {
+	mut paths := built_paths.clone()
+	if session_defaults_probe(out)! { paths << ['session-defaults-checks', 'session-defaults-checks.c'] }
+	return paths
+}
+
 fn digest(path string) !string {
 	mut file := os.open(path)!
 	defer { file.close() }
@@ -114,7 +120,7 @@ fn verify_inputs(out string) ! {
 	}
 }
 
-fn prepare(out string, prior string, optional_lookup bool) ! {
+fn prepare(out string, prior string, optional_lookup bool, session_defaults bool) ! {
 	if os.exists(out) || os.is_link(out) { return error('prepare needs a fresh directory') }
 	if digest(prior + '/manifest.sha256')! != prior_hash { return error('unexpected prior checkpoint') }
 	os.mkdir_all(out)!
@@ -154,8 +160,11 @@ fn prepare(out string, prior string, optional_lookup bool) ! {
 	capture(out, 'source-check', ['git', 'diff', '--exit-code', revision.output.trim_space(), '--', 'compat/ios', 'tests/ios'])!
 	capture(out, 'source-snapshot', ['git', 'archive', '--format=tar', '--output=' + out + '/source.tar', revision.output.trim_space(), '--', 'compat/ios', 'tests/ios'])!
 	os.write_file(out + '/source.sha256', digest(out + '/source.tar')! + '  source.tar\n')!
+	os.cp(os.executable(), out + '/checkpoint')!
+	os.cp(os.getwd() + '/tests/ios/swift-type-probe.v', out + '/checkpoint.v')!
+	os.write_file(out + '/checkpoint-revision.txt', revision.output)!
 	if optional_lookup {
-		os.write_file(out + '/probe-kind.txt', 'optional-lookup\n')!
+		os.write_file(out + '/probe-kind.txt', if session_defaults { 'session-defaults\n' } else { 'optional-lookup\n' })!
 		v := os.real_path(os.getwd()) + '/build/ios/fortnite/ns-calendar-checks/toolchain/v'
 		capture(out, 'build-notification-vm', [v, '-nocache', '-gc', 'none', '-cc', 'clang', '-cflags', '-O2',
 			'-path', '@vlib|' + os.getwd() + '/compat/ios|' + os.getwd() + '/tests/ios|@vmodules',
@@ -165,8 +174,13 @@ fn prepare(out string, prior string, optional_lookup bool) ! {
 
 fn optional_probe(out string) !bool {
 	if !os.exists(out + '/probe-kind.txt') { return false }
-	if os.read_file(out + '/probe-kind.txt')! != 'optional-lookup\n' { return error('unknown probe kind') }
+	if os.read_file(out + '/probe-kind.txt')! !in ['optional-lookup\n', 'session-defaults\n'] { return error('unknown probe kind') }
 	return true
+}
+
+fn session_defaults_probe(out string) !bool {
+	if !optional_probe(out)! { return false }
+	return os.read_file(out + '/probe-kind.txt')! == 'session-defaults\n'
 }
 
 fn verify_built(out string) ! {
@@ -175,7 +189,7 @@ fn verify_built(out string) ! {
 		return error('changed source snapshot')
 	}
 	mut expected := []string{}
-	for path in built_paths {
+	for path in required_built_paths(out)! {
 		expected << digest(out + '/' + path)! + '  ' + path
 	}
 	if os.read_file(out + '/built-inputs.sha256')! != expected.join('\n') + '\n' {
@@ -237,8 +251,8 @@ fn validate_launch(launch string) ! {
 	}
 }
 
-fn host_markers() map[string][]string {
-	return {
+fn host_markers(defaults bool) map[string][]string {
+	mut markers := {
 		'swift-optional-lookup-host': ['IOS-SWIFT-OPTIONAL-LOOKUP-NATIVE:', 'IOS-SWIFT-OPTIONAL-LOOKUP:']
 		'swift-mangled-optional-regression': ['IOS-SWIFT-MANGLED-NATIVE:', 'IOS-SWIFT-MANGLED:']
 		'swift-context2-optional-regression': ['NATIVE-CONTEXT2:', 'IOS-CONTEXT2:']
@@ -247,6 +261,12 @@ fn host_markers() map[string][]string {
 		'swift-optional-metadata-regression': ['NATIVE-OPTIONAL-METADATA:', 'IOS-OPTIONAL-METADATA:']
 		'swift-task-priority-optional-regression-fixed': ['IOS-SWIFT-TASK-PRIORITY-NATIVE:', 'IOS-SWIFT-TASK-PRIORITY:']
 	}
+	if defaults {
+		markers['session-defaults-host'] = ['IOS-SESSION-CONFIGURATION-NATIVE:',
+			'IOS-SESSION-DEFAULTS-NATIVE:', 'IOS-SESSION-CONFIGURATION:',
+			'IOS-SESSION-DEFAULTS:', 'IOS-SESSION-CONFIGURATION-REJECT:31']
+	}
+	return markers
 }
 
 fn validate_host_log(log string, markers []string) ! {
@@ -260,7 +280,7 @@ fn validate_host_log(log string, markers []string) ! {
 }
 
 fn verify_host(out string) ! {
-	for directory, markers in host_markers() {
+	for directory, markers in host_markers(session_defaults_probe(out)!) {
 		for label in ['host-generate', 'host-object-0', 'host-object-1', 'host-object-2', 'host-object-3', 'host-link', 'host', 'host-deterministic'] {
 			base := out + '/host/' + directory + '/' + label
 			if os.read_file(base + '.status.txt')! != '0\n' { return error('failed host step: ' + base) }
@@ -280,6 +300,7 @@ fn inspect(out string) ! {
 	if os.dir(state) != out || !os.file_name(state).starts_with('probe-no-ads-') { return error('unsafe state') }
 	serial := os.read_file(state + '/serial.log')!.replace('\r\n', '\n')
 	boundary, lines := validate_serial(serial, os.read_lines(out + '/fixtures.txt')!, optional_lookup)!
+	if session_defaults_probe(out)! { validate_session_defaults(serial)! }
 	validate_launch(os.read_file(out + '/probe-no-ads.log')!)!
 	diagnostic := boundary + '\n' + lines.join('\n') + '\nserial SHA-256: ' + digest(state + '/serial.log')! + '\nruntime SHA-256: ' + digest(out + '/run-ios-gles')! + '\n'
 	if os.exists(out + '/manifest.sha256') {
@@ -287,7 +308,8 @@ fn inspect(out string) ! {
 	} else { os.write_file(out + '/diagnostic.txt', diagnostic)! }
 	println(boundary)
 	for line in lines { println(line) }
-	println(if optional_lookup { 'Swift Optional launch: new lookup fixture and 35 reused guest fixtures PASS; rendering unverified' }
+	println(if session_defaults_probe(out)! { 'Default session launch: two new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
+		else if optional_lookup { 'Swift Optional launch: new lookup fixture and 35 reused guest fixtures PASS; rendering unverified' }
 		else { 'Swift diagnostic launch: 35 reused guest fixtures PASS; rendering unverified' })
 }
 
@@ -310,6 +332,7 @@ fn guest_media(out string) ! {
 	mut pairs := [['native-init', 'sbin/init'], ['run-ios-gles', 'opt/ios/run-ios']]
 	for name in os.read_lines(out + '/fixtures.txt')! { pairs << [name, 'opt/ios/' + name] }
 	if optional_probe(out)! { pairs << ['swift-optional-lookup-checks', 'opt/ios/swift-optional-lookup-checks'] }
+	if session_defaults_probe(out)! { pairs << ['session-defaults-checks', 'opt/ios/session-defaults-checks'] }
 	for path in input_paths(out, 'application')! { pairs << [path, 'opt/ios/' + path['application/'.len..]] }
 	for path in input_paths(out, 'resources')! { pairs << [path, 'opt/ios/' + path['resources/'.len..]] }
 	mut args := ['/usr/bin/tar', '-xzf', state + '/initramfs.tar.gz', '-C', temporary, '--']
@@ -347,6 +370,14 @@ fn checkpoint(out string, seal bool) ! {
 
 fn reject_serial(serial string, fixtures []string, optional_lookup bool) ! {
 	if _ , _ := validate_serial(serial, fixtures, optional_lookup) { return error('accepted changed guest log') }
+}
+
+fn validate_session_defaults(serial string) ! {
+	for marker in ['IOS-NATIVE: /opt/ios/session-defaults-checks wait status 0\n',
+		'IOS-SESSION-CONFIGURATION:', 'IOS-SESSION-CONFIGURATION-REJECT:31',
+		'IOS-SESSION-DEFAULTS: fresh settings, explicit protocol replacement, copies across pool drainage, nil constructor, eight workers and two drained runtimes PASS\n'] {
+		if serial.count(marker) != 1 { return error('missing or duplicated default session fixture: ' + marker) }
+	}
 }
 
 fn negative_controls(out string, scratch string) ! {
@@ -405,7 +436,7 @@ fn negative_controls(out string, scratch string) ! {
 		return error('accepted missing launch guard')
 	}
 	if optional_lookup {
-		for directory, host_checks in host_markers() {
+		for directory, host_checks in host_markers(session_defaults_probe(out)!) {
 			log := os.read_file(out + '/host/' + directory + '/host.log')!
 			validate_host_log(log, host_checks)!
 			for marker in host_checks {
@@ -445,12 +476,42 @@ fn negative_controls(out string, scratch string) ! {
 		if !rejected { return error('accepted changed source snapshot') }
 		count++
 	}
+	if session_defaults_probe(out)! {
+		validate_session_defaults(serial)!
+		for marker in serial.split_into_lines().filter(it.starts_with('IOS-NATIVE: /opt/ios/session-defaults-checks ')
+			|| it.starts_with('IOS-SESSION-CONFIGURATION:') || it.starts_with('IOS-SESSION-CONFIGURATION-REJECT:')
+			|| it.starts_with('IOS-SESSION-DEFAULTS:')) {
+			mut rejected := 0
+			validate_session_defaults(serial.replace(marker + '\n', '')) or { rejected++ }
+			validate_session_defaults(serial + marker + '\n') or { rejected++ }
+			if rejected != 2 { return error('accepted missing or duplicate configuration marker') }
+			count += rejected
+		}
+		built := scratch + '/default-built'
+		os.mkdir_all(built)!
+		os.write_file(built + '/probe-kind.txt', 'session-defaults\n')!
+		os.write_file(built + '/source.tar', 'synthetic source snapshot')!
+		os.write_file(built + '/source.sha256', digest(built + '/source.tar')! + '  source.tar\n')!
+		mut hashes := []string{}
+		for path in required_built_paths(built)! {
+			os.write_file(built + '/' + path, path)!
+			hashes << digest(built + '/' + path)! + '  ' + path
+		}
+		original := hashes.join('\n') + '\n'
+		os.write_file(built + '/built-inputs.sha256', original)!
+		verify_built(built)!
+		for changed in [hashes[..7].join('\n') + '\n', original.replace(hashes[7][..64], '0'.repeat(64)), original.replace(hashes[8][..64], '0'.repeat(64))] {
+			os.write_file(built + '/built-inputs.sha256', changed)!
+			verify_built(built) or { count++; continue }
+			return error('accepted incomplete or changed configuration built inputs')
+		}
+	}
 	os.write_file(scratch + '/negative-controls.txt', count.str() + ' corruptions rejected; baseline guest and host logs pass\n')!
 	println(count.str() + ' Swift checkpoint negative controls PASS')
 }
 
 fn main() {
-	if os.args.len < 3 { panic('usage: swift-type-probe prepare FRESH_OUT PRIOR [--optional-lookup] | build|probe|inspect|seal|check OUT | negative-controls OUT FRESH_SCRATCH') }
+	if os.args.len < 3 { panic('usage: swift-type-probe prepare FRESH_OUT PRIOR [--optional-lookup|--session-defaults] | build|probe|inspect|seal|check OUT | negative-controls OUT FRESH_SCRATCH') }
 	root := os.real_path(os.getwd())
 	out := os.abs_path(os.args[2])
 	if out == root || out.starts_with(root + '/') || os.is_link(out) { panic('output must be external') }
@@ -465,8 +526,8 @@ fn main() {
 		return
 	}
 	if os.args[1] == 'prepare' {
-		if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] != '--optional-lookup') { panic('prepare requires PRIOR [--optional-lookup]') }
-		prepare(out, os.real_path(os.args[3]), os.args.len == 5)!
+		if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] !in ['--optional-lookup', '--session-defaults']) { panic('prepare requires PRIOR [--optional-lookup|--session-defaults]') }
+		prepare(out, os.real_path(os.args[3]), os.args.len == 5, os.args.len == 5 && os.args[4] == '--session-defaults')!
 		return
 	}
 	if os.args.len != 3 { panic('unexpected arguments') }
@@ -486,12 +547,13 @@ fn main() {
 			if optional_probe(out)! {
 				capture(out, 'build-init', [out + '/notification-vm', 'build-init', out])!
 				capture(out, 'build-optional-fixture', [out + '/notification-vm', 'build-swift-optional-lookup', out])!
+				if session_defaults_probe(out)! { capture(out, 'build-default-session-fixture', [out + '/notification-vm', 'build-session-defaults', out])! }
 			}
 			capture(out, 'build-runtime', [out + '/notification-vm', 'build-run-ios-gles', out])!
 			capture(out, 'built-source-check', ['git', 'diff', '--exit-code', revision, '--', 'compat/ios', 'tests/ios'])!
 			if optional_probe(out)! {
 				mut hashes := []string{}
-				for path in built_paths {
+				for path in required_built_paths(out)! {
 					hashes << digest(out + '/' + path)! + '  ' + path
 				}
 				os.write_file(out + '/built-inputs.sha256', hashes.join('\n') + '\n')!

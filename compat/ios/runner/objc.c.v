@@ -206,6 +206,7 @@ mut:
 	connection_cancelled bool
 	url_session_owned bool
 	url_session_configuration_owned bool
+	url_session_configuration_default_protocols bool
 	url_session_task_owned bool
 	sort_descriptor_owned bool
 	sort_descriptor_initialized bool

@@ -140,6 +140,52 @@ fn configuration_shared_objects(api ConfigurationApi) {
 	api.release(retained); api.drain(after)
 }
 
+fn configuration_shared_defaults(api ConfigurationApi) {
+	pool := api.pool()
+	object := api.message(api.cls, c'defaultSessionConfiguration', 0, 0)
+	other := api.message(api.cls, c'defaultSessionConfiguration', 0, 0)
+	assert object != 0 && other != 0 && object != other
+	assert api.message(object, c'class', 0, 0) == api.cls
+	for name, expected in {'HTTPMaximumConnectionsPerHost': u64(6), 'allowsCellularAccess': 1,
+		'allowsExpensiveNetworkAccess': 1, 'allowsConstrainedNetworkAccess': 1,
+		'HTTPShouldSetCookies': 1, 'HTTPCookieAcceptPolicy': 2, 'TLSMinimumSupportedProtocol': 8,
+		'TLSMaximumSupportedProtocol': 0, 'requestCachePolicy': 0, 'networkServiceType': 0,
+		'waitsForConnectivity': 0, 'isDiscretionary': 0, 'sessionSendsLaunchEvents': 0,
+		'HTTPShouldUsePipelining': 0, 'requiresDNSSECValidation': 0, 'multipathServiceType': 0,
+		'identifier': 0, 'sharedContainerIdentifier': 0, 'HTTPAdditionalHeaders': 0,
+		'connectionProxyDictionary': 0} {
+		assert api.message(object, name.str, 0, 0) == expected, name
+	}
+	assert api.get_double(object, c'timeoutIntervalForRequest') == 60.0
+	assert api.get_double(object, c'timeoutIntervalForResource') == 604800.0
+	assert api.message(object, c'init', 0, 0) == object
+	assert api.get_double(object, c'timeoutIntervalForRequest') == 60.0
+	api.message(object, c'setAllowsCellularAccess:', 0, 0)
+	api.set_double(object, c'setTimeoutIntervalForRequest:', 17.25)
+	assert api.message(other, c'allowsCellularAccess', 0, 0) == 1
+	assert api.get_double(other, c'timeoutIntervalForRequest') == 60.0
+	// Explicit protocols replace the unresolved built-in transport profile.
+	protocols := api.message(api.arrays, c'new', 0, 0)
+	api.message(protocols, c'addObject:', api.strings, 0)
+	api.message(object, c'setProtocolClasses:', protocols, 0)
+	api.message(protocols, c'removeAllObjects', 0, 0); api.release(protocols)
+	assert api.message(api.message(object, c'protocolClasses', 0, 0), c'count', 0, 0) == 1
+	copy := api.message(object, c'copy', 0, 0)
+	api.message(object, c'setProtocolClasses:', 0, 0)
+	assert api.message(object, c'protocolClasses', 0, 0) == 0
+	assert api.message(api.message(copy, c'protocolClasses', 0, 0), c'count', 0, 0) == 1
+	api.drain(pool)
+	after := api.pool()
+	assert api.get_double(copy, c'timeoutIntervalForRequest') == 17.25
+	assert api.message(copy, c'allowsCellularAccess', 0, 0) == 0
+	assert api.message(api.message(copy, c'protocolClasses', 0, 0), c'count', 0, 0) == 1
+	api.release(copy); api.drain(after)
+}
+
+fn configuration_defaults_worker(api ConfigurationApi) {
+	for _ in 0 .. 16 { configuration_shared_defaults(api) }
+}
+
 fn configuration_encoding_cases(api ConfigurationApi) {
 	for getter, encoding in {'identifier': '@', 'sharedContainerIdentifier': '@', 'connectionProxyDictionary': '@', 'HTTPAdditionalHeaders': '@', 'protocolClasses': '@', 'requestCachePolicy': 'Q', 'networkServiceType': 'Q', 'HTTPCookieAcceptPolicy': 'Q', 'multipathServiceType': 'q', 'HTTPMaximumConnectionsPerHost': 'q', 'TLSMinimumSupportedProtocol': 'i', 'TLSMaximumSupportedProtocol': 'i', 'timeoutIntervalForRequest': 'd', 'timeoutIntervalForResource': 'd', 'allowsCellularAccess': 'B', 'allowsExpensiveNetworkAccess': 'B', 'allowsConstrainedNetworkAccess': 'B', 'waitsForConnectivity': 'B', 'isDiscretionary': 'B', 'sessionSendsLaunchEvents': 'B', 'HTTPShouldUsePipelining': 'B', 'HTTPShouldSetCookies': 'B', 'requiresDNSSECValidation': 'B'} {
 		setter := if getter == 'isDiscretionary' { 'setDiscretionary:' } else { 'set' + getter[0].ascii_str().to_upper() + getter[1..] + ':' }
@@ -165,7 +211,9 @@ fn test_url_session_configuration_native() {
 			assert ivar != unsafe { nil } && C.ivar_getOffset(ivar) == offset
 		}
 		configuration_encoding_cases(api); configuration_shared_base(api); configuration_shared_scalars(api); configuration_shared_objects(api)
+		configuration_shared_defaults(api)
 		println('IOS-SESSION-CONFIGURATION-NATIVE: base allocation and preserved init, typed settings, signed connection truncation, TLS widths, copied properties, independent configuration snapshots and copied owners after pool drainage')
+		println('IOS-SESSION-DEFAULTS-NATIVE: fresh defaults, preserved init, mutation, protocol replacement and independent copies after pool drainage PASS')
 	}
 }
 
@@ -224,6 +272,9 @@ fn configuration_runtime_callbacks(api ConfigurationApi) {
 	configuration_callback_mode = 2
 	assert api.message(api.cls, c'new', 0, 0) == 0 && configuration_constructor_weak == 0
 	objc_destroy_weak(unsafe { &configuration_constructor_weak })
+	configuration_callback_mode = 2
+	assert api.message(api.cls, c'defaultSessionConfiguration', 0, 0) == 0 && configuration_constructor_weak == 0
+	objc_destroy_weak(unsafe { &configuration_constructor_weak })
 	custom := objc_allocate_class(api.strings, c'VinixConfigurationCopyString', 0)
 	assert objc_add_method(custom, u64(c'copy'), u64(unsafe { voidptr(configuration_property_copy) }), c'@16@0:8'); objc_register_class(custom)
 	property := owned_string('property copy callback')
@@ -253,6 +304,18 @@ fn test_url_session_configuration_runtime() {
 			assert ctext(u64(objc_ivar_types(ivar))) == ['@"NSString"', 'Q', 'd', '@"NSString"', '@"NSDictionary"', '@"NSArray"', 'q']![i]
 		}
 		configuration_encoding_cases(api); configuration_shared_base(api); configuration_shared_scalars(api); configuration_shared_objects(api)
+		factory_method := objc_class_method(api.cls, u64(c'defaultSessionConfiguration'))
+		assert factory_method != 0 && ctext(u64(objc_method_types(factory_method))) == '@16@0:8'
+		configuration_shared_defaults(api)
+		mut workers := []thread{}
+		for _ in 0 .. 8 { workers << spawn configuration_defaults_worker(api) }
+		workers.wait()
+		pool_defaults := api.pool()
+		mut factory_weak := u64(0)
+		objc_store_weak(unsafe { &factory_weak }, api.message(api.cls, c'defaultSessionConfiguration', 0, 0))
+		assert factory_weak != 0
+		api.drain(pool_defaults); assert factory_weak == 0
+		objc_destroy_weak(unsafe { &factory_weak })
 		assert ios_runtime.live == 0
 		configuration_runtime_callbacks(api); assert ios_runtime.live == 0
 		mut guarded := [72]u64{}; guarded[0] = 0x1122334455667788; guarded[71] = 0x8877665544332211
@@ -277,18 +340,26 @@ fn test_url_session_configuration_runtime() {
 		objc_stop(); assert ios_runtime.live == 0
 	}
 	println('IOS-SESSION-CONFIGURATION: typed settings and metadata, copied properties and snapshots, guarded caller storage,64 isa replacements and two drained runtimes')
+	println('IOS-SESSION-DEFAULTS: fresh settings, explicit protocol replacement, copies across pool drainage, nil constructor, eight workers and two drained runtimes PASS')
 }
 
 fn test_url_session_configuration_rejections() {
 	objc_start(); api := configuration_runtime_api()
-	for mode in ['default', 'ephemeral', 'background', 'cookie', 'cookie-set', 'credential', 'credential-set', 'cache', 'cache-set', 'tls-version', 'idle', 'proxies', 'mutable', 'coding', 'description', 'hash', 'equal', 'string-type', 'dictionary-type', 'array-type', 'bad-copy', 'nil-copy', 'large', 'raw', 'subclass', 'caller-subclass', 'spoof', 'nan', 'infinite']! {
+	for mode in ['default-protocols', 'copied-default-protocols', 'default-subclass', 'ephemeral', 'background', 'cookie', 'cookie-set', 'credential', 'credential-set', 'cache', 'cache-set', 'tls-version', 'idle', 'proxies', 'mutable', 'coding', 'description', 'hash', 'equal', 'string-type', 'dictionary-type', 'array-type', 'bad-copy', 'nil-copy', 'large', 'raw', 'subclass', 'caller-subclass', 'spoof', 'nan', 'infinite']! {
 		mut fds := [2]i32{}; assert C.pipe(unsafe { &fds[0] }) == 0
 		pid := C.fork(); assert pid >= 0
 		if pid == 0 {
 			C.close(fds[0]); assert C.dup2(fds[1], 2) == 2; C.close(fds[1])
 			object := api.message(api.cls, c'new', 0, 0)
 			match mode {
-				'default' { api.message(api.cls, c'defaultSessionConfiguration', 0, 0) }
+				'default-protocols', 'copied-default-protocols' {
+					defaults := api.message(api.cls, c'defaultSessionConfiguration', 0, 0)
+					api.message(if mode == 'default-protocols' { defaults } else { api.message(defaults, c'copy', 0, 0) }, c'protocolClasses', 0, 0)
+				}
+				'default-subclass' {
+					sub := objc_allocate_class(api.cls, c'VinixUnsupportedDefaultConfigurationSubclass', 0); objc_register_class(sub)
+					api.message(sub, c'defaultSessionConfiguration', 0, 0)
+				}
 				'ephemeral' { api.message(api.cls, c'ephemeralSessionConfiguration', 0, 0) }
 				'background' { api.message(api.cls, c'backgroundSessionConfigurationWithIdentifier:', api.string(c'background'), 0) }
 				'cookie' { api.message(object, c'HTTPCookieStorage', 0, 0) }
@@ -342,15 +413,15 @@ fn test_url_session_configuration_rejections() {
 			'string-type', 'dictionary-type', 'array-type', 'bad-copy' { 'configuration property has the wrong object type' }
 			'nil-copy' { 'configuration property copy returned nil' }
 			'large', 'raw' { 'configuration collections require at most 1024 owned objects' }
-			'subclass', 'caller-subclass' { 'custom session configuration subclass construction is not implemented' }
+			'subclass', 'caller-subclass', 'default-subclass' { 'custom session configuration subclass construction is not implemented' }
+			'default-protocols', 'copied-default-protocols' { 'default session protocol classes are not implemented' }
 			'spoof' { 'session configuration requires live base configuration storage' }
 			'nan', 'infinite' { 'configuration timeouts require finite values' }
 			else { 'configuration factories, stores, coding and this property are not implemented' }
 		}
 		assert output.contains('iOS: ' + reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), mode + ': ' + output
-		if mode in ['default', 'ephemeral', 'background', 'cookie', 'cookie-set', 'credential', 'credential-set', 'cache', 'cache-set', 'tls-version', 'idle', 'proxies', 'mutable', 'coding', 'description', 'hash', 'equal']! {
+		if mode in ['ephemeral', 'background', 'cookie', 'cookie-set', 'credential', 'credential-set', 'cache', 'cache-set', 'tls-version', 'idle', 'proxies', 'mutable', 'coding', 'description', 'hash', 'equal']! {
 			selector := match mode {
-				'default' { 'defaultSessionConfiguration' }
 				'ephemeral' { 'ephemeralSessionConfiguration' }
 				'background' { 'backgroundSessionConfigurationWithIdentifier:' }
 				'cookie' { 'HTTPCookieStorage' }
@@ -372,5 +443,5 @@ fn test_url_session_configuration_rejections() {
 		}
 	}
 	assert ios_runtime.live == 0; objc_stop()
-	println('IOS-SESSION-CONFIGURATION-REJECT:29 factory, storage, modern TLS, idle, proxy, copy, coding, type, nil copy, collection, subclass, spoof and nonfinite cases fail explicitly')
+	println('IOS-SESSION-CONFIGURATION-REJECT:31 factory, unresolved protocols, storage, modern TLS, idle, proxy, copy, coding, type, nil copy, collection, subclass, spoof and nonfinite cases fail explicitly')
 }
