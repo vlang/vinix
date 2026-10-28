@@ -549,6 +549,7 @@ mut:
 	audio_application_retired bool
 	storekit_queue u64 // One factory-owned reference; no App Store provider.
 	storekit_queue_retired bool
+	storekit_observers []&StorekitObserver // Weak registrations, under the runtime lock.
 	audio_converters map[u64]&AudioConverter
 	audio_units map[u64]&AudioUnit
 	audio_graphs map[u64]&AudioGraph
@@ -593,6 +594,7 @@ fn objc_start() {
 	ios_runtime.connections.flags |= .noslices
 	ios_runtime.main_thread = u64(C.pthread_self())
 	ios_runtime.observers.flags |= .noslices
+	ios_runtime.storekit_observers.flags |= .noslices
 	ios_runtime.notification_queues.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!

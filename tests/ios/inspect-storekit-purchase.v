@@ -37,5 +37,13 @@ fn main() {
 		assert types == if selector == 'defaultQueue' { '@16@0:8' } else { 'B16@0:8' }
 		println('SKPaymentQueue +' + selector + ' ' + types)
 	}
+	for selector in ['addTransactionObserver:', 'removeTransactionObserver:', 'transactionObservers', 'transactions']! {
+		sel := C.sel_registerName(selector.str)
+		method := C.class_getInstanceMethod(queue, sel)
+		assert method != unsafe { nil } && C.class_getClassMethod(queue, sel) == unsafe { nil }
+		types := unsafe { cstring_to_vstring(C.method_getTypeEncoding(method)) }
+		assert types == if selector.ends_with(':') { 'v24@0:8@16' } else { '@16@0:8' }
+		println('SKPaymentQueue -' + selector + ' ' + types)
+	}
 	println('IOS-STOREKIT-PURCHASE-INSPECT: PASS (metadata only; no purchases or requests)')
 }

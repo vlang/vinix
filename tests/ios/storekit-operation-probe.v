@@ -179,7 +179,8 @@ fn validate_queue_results(raw string) ! {
 	serial := raw.replace('\r\n', '\n')
 	for marker in ['IOS-NATIVE: /opt/ios/storekit-purchase-checks wait status 0\n',
 		'IOS-STOREKIT-PURCHASE:', 'IOS-STOREKIT-PURCHASE-REJECT: 276 ',
-		'IOS-STOREKIT-QUEUE:', 'IOS-STOREKIT-QUEUE-REJECT: seven '] {
+		'IOS-STOREKIT-QUEUE:', 'IOS-STOREKIT-QUEUE-REJECT: seven ',
+		'IOS-STOREKIT-OBSERVERS:', 'IOS-STOREKIT-OBSERVERS-REJECT:'] {
 		if serial.count(marker) != 1 { return error('missing or duplicated queue guest result: ' + marker) }
 	}
 }
@@ -193,10 +194,12 @@ fn queue_results_selftest() ! {
 	serial := 'IOS-NATIVE: /opt/ios/storekit-purchase-checks wait status 0\n'
 		+ 'IOS-STOREKIT-PURCHASE: PASS\nIOS-STOREKIT-PURCHASE-REJECT: 276 PASS\n'
 		+ 'IOS-STOREKIT-QUEUE: PASS\nIOS-STOREKIT-QUEUE-REJECT: seven PASS\n'
+		+ 'IOS-STOREKIT-OBSERVERS: PASS\nIOS-STOREKIT-OBSERVERS-REJECT: PASS\n'
 	validate_queue_results(serial)!
 	validate_queue_results(serial.replace('\n', '\r\n'))!
 	for bad in [serial.replace('wait status 0', 'wait status 1'),
-		serial.replace('IOS-STOREKIT-QUEUE: PASS\n', ''), serial + serial] {
+		serial.replace('IOS-STOREKIT-QUEUE: PASS\n', ''),
+		serial.replace('IOS-STOREKIT-OBSERVERS: PASS\n', ''), serial + serial] {
 		mut rejected := false
 		validate_queue_results(bad) or { rejected = true }
 		assert rejected
@@ -328,6 +331,17 @@ fn main() {
 	os.cp(root + '/tests/ios/storekit-operation-probe.v', out + '/storekit-operation-probe.v')!
 	for label in ['host-generate', 'host-object-0', 'host-object-1', 'host-object-2', 'host-object-3', 'host-link', 'host', 'host-deterministic'] {
 		if os.read_file(host + '/' + label + '.status.txt')! != '0\n' { panic('failed fresh StoreKit host step') }
+	}
+	for label in ['host', 'host-deterministic'] {
+		log := os.read_file(host + '/' + label + '.log')!
+		for marker in ['IOS-STOREKIT-PURCHASE:', 'IOS-STOREKIT-PURCHASE-REJECT: 276 ',
+			'IOS-STOREKIT-QUEUE:', 'IOS-STOREKIT-QUEUE-REJECT: seven ',
+			'IOS-STOREKIT-OBSERVERS:', 'IOS-STOREKIT-OBSERVERS-REJECT:'] {
+			if log.count(marker) != 1 { panic('missing or duplicate StoreKit host result: ' + marker) }
+		}
+		for failure in ['ERROR: AddressSanitizer', 'runtime error:', 'V panic:', '> assert '] {
+			if log.contains(failure) { panic('failed StoreKit host log: ' + label) }
+		}
 	}
 	capture(out + '/copy-storekit-host', ['/bin/cp', '-Rp', host, out + '/host/storekit-operation-host'])!
 	previous := os.read_file(out + '/source-revision.txt')!
