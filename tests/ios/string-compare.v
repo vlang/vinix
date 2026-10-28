@@ -21,7 +21,7 @@ const descriptor_alert = 'Showing Alert:\n  Title:Message\n  Message:Failed to o
 const startup_boundary = 'iOS: unimplemented Objective-C method AVAudioSession setCategory:mode:options:error:\n'
 const output_marker = 'IOS-STRING-COMPARE: canonical scalar order, signed ABI, concrete IMP, mutation, constants, rejected invalid inputs, eight workers and two drained runtimes PASS'
 const native_marker = 'IOS-STRING-COMPARE-NATIVE: canonical scalar ordering, case, prefixes, NUL, Hangul, metadata, concrete IMP and mutation PASS'
-const application_stop = 'IOS-PROBE-DESKTOP: stop=Broken pipe handshake=true builds=11 polls=10 closed=false supervisor_kill=false wait=256'
+const application_stop = 'IOS-PROBE-DESKTOP: stop=Broken pipe handshake=true builds=10 polls=9 closed=false supervisor_kill=false wait=256'
 const fixture_stop = 'IOS-PROBE-DESKTOP: stop=session complete handshake=true builds=1 polls=2 closed=true supervisor_kill=false wait=0'
 const zero_events = 'events=low 0;high 0;max 0;oom 0;oom_kill 0;oom_group_kill 0;'
 const lost_prior_media = ['probe-no-ads-509166/boot.img', 'probe-no-ads-509166/initramfs.tar.gz',

@@ -540,6 +540,14 @@ fn compare(r Recipe, target string) ! {
 	}
 }
 
+// Also verify standalone archives, which do not depend on an older bundle.
+fn compare_trees(source string, target string) ! {
+	if os.is_link(source) || os.is_link(target) || !os.is_dir(source) || !os.is_dir(target) {
+		return error('comparison roots must be directories')
+	}
+	compare(Recipe{root_mode: int(os.stat(source)!.mode) & 0o7777, entries: walk(source, '')!}, target)!
+}
+
 fn reject_load(archive string) ! {
 	load_archive(archive) or { return }
 	return error('selftest accepted invalid archive')
@@ -746,12 +754,13 @@ fn selftest(root string, zstd string) ! {
 	reject_compare(r, target)!
 	os.chmod(target, 0o750)!
 	compare(r, target)!
+	compare_trees(source, target)!
 	println('Selftest: 22 negative controls rejected; final complete inventory: PASS')
 	alignment_selftest(root, zstd)!
 }
 
 fn main() {
-	if os.args.len < 3 { panic('usage: evidence-delta-archive create SOURCE PRIOR ARCHIVE ZSTD WORK | verify ARCHIVE | restore ARCHIVE TARGET WORK | compare ARCHIVE TARGET | selftest FRESH_DIR ZSTD') }
+	if os.args.len < 3 { panic('usage: evidence-delta-archive create SOURCE PRIOR ARCHIVE ZSTD WORK | verify ARCHIVE | restore ARCHIVE TARGET WORK | compare ARCHIVE TARGET | compare-trees SOURCE TARGET | selftest FRESH_DIR ZSTD') }
 	match os.args[1] {
 		'create' {
 			if os.args.len != 7 { panic('create needs SOURCE PRIOR ARCHIVE ZSTD WORK') }
@@ -771,6 +780,11 @@ fn main() {
 			if os.args.len != 4 { panic('compare needs ARCHIVE TARGET') }
 			compare(load_archive(os.abs_path(os.args[2]))!, os.abs_path(os.args[3]))!
 			println('Complete typed inventory: PASS')
+		}
+		'compare-trees' {
+			if os.args.len != 4 { panic('compare-trees needs SOURCE TARGET') }
+			compare_trees(os.abs_path(os.args[2]), os.abs_path(os.args[3]))!
+			println('Complete standalone typed inventory: PASS')
 		}
 		'selftest' {
 			if os.args.len != 4 { panic('selftest needs FRESH_DIR ZSTD') }
