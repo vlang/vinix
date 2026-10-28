@@ -420,7 +420,7 @@ complete capture restores exactly from its persistent archive and passes the
 unchanged auditor. See the
 [activation checkpoint](../tests/ios/audio-activation-checkpoint-20261028.md).
 
-The latest no-ads checkpoint implements `NSError description`, including
+A preceding no-ads checkpoint implements `NSError description`, including
 signed 64-bit codes, string userInfo precedence and independent diagnostic
 results. Native comparisons, both sanitized host runs, the JSON/NSError
 regression and all 35 guest fixtures pass. Fortnite passes this method and
@@ -430,6 +430,14 @@ launch gates (50% of the checklist, not an estimate of remaining effort).
 No game frame, menu, login or playable match is verified. The complete capture
 restores exactly from its persistent archive and passes the unchanged auditor.
 See the [NSError checkpoint](../tests/ios/error-description-checkpoint-20261028.md).
+
+The latest no-ads checkpoint resolves `TaskPriority?` (`ScPSg`) through bounded
+Swift Optional/Array name lookup. All seven native comparison and sanitized
+host suites and all 36 guest fixtures pass. Fortnite advances to an unsupported
+`NSURLSessionConfiguration` API, without an application signal fault, OOM event
+or supervisor kill. Progress remains 4/8 observable launch gates (50% of the
+checklist); no game frame, menu, login or playable match is verified. See the
+[Swift Optional checkpoint](../tests/ios/swift-optional-lookup-checkpoint-20261028.md).
 
 `MTLCreateSystemDefaultDevice` still returns nil: a Metal device, shader,
 rendering and presentation backend remains to be implemented. The existing
