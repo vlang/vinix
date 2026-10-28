@@ -348,6 +348,84 @@ fn guest_media(out string) ! {
 		|| os.read_file(temporary + '/opt/ios/check-mode')! != 'probe-no-ads' { return error('changed guest configuration') }
 }
 
+// Resume only an interrupted compression, before any guest has run. Keep the
+// partial archive and use the frozen VM launcher; the normal full media audit
+// still verifies the recovered image against every recorded input afterwards.
+fn resume_staging(root string, out string) ! {
+	verify_built(out)!
+	state := os.read_file(out + '/probe-no-ads-state.txt')!.trim_space()
+	if os.dir(state) != out || !os.file_name(state).starts_with('probe-no-ads-')
+		|| os.is_link(state) || os.exists(out + '/probe-no-ads.status.txt') {
+		return error('unsafe or completed staging state')
+	}
+	for name in ['boot.img', 'serial.log', 'initramfs-interrupted.tar.gz', 'initramfs-resumed.tar.gz'] {
+		if os.exists(state + '/' + name) { return error('recovery already started or guest already launched') }
+	}
+	fs := state + '/rootfs'
+	if !os.is_dir(fs) || os.is_link(fs) { return error('missing staging directory') }
+	mut pairs := [['native-init', 'sbin/init'], ['run-ios-gles', 'opt/ios/run-ios']]
+	for name in os.read_lines(out + '/fixtures.txt')! { pairs << [name, 'opt/ios/' + name] }
+	if optional_probe(out)! { pairs << ['swift-optional-lookup-checks', 'opt/ios/swift-optional-lookup-checks'] }
+	if session_defaults_probe(out)! { pairs << ['session-defaults-checks', 'opt/ios/session-defaults-checks'] }
+	// The executable is supplied by the preserved base tar, not the overlay.
+	for path in input_paths(out, 'application')! {
+		if path != 'application/FortniteClient-IOS-Shipping' {
+			pairs << [path, 'opt/ios/' + path['application/'.len..]]
+		}
+	}
+	for path in input_paths(out, 'resources')! { pairs << [path, 'opt/ios/' + path['resources/'.len..]] }
+	mut staged := u64(0)
+	for pair in pairs {
+		path := fs + '/' + pair[1]
+		if os.is_link(path) || digest(out + '/' + pair[0])! != digest(path)! {
+			return error('changed staged input: ' + pair[0])
+		}
+		staged += os.file_size(path)
+	}
+	for name, value in {'probe-desktop': '1', 'probe-memory-max': '2147483648', 'check-mode': 'probe-no-ads'} {
+		if os.read_file(fs + '/opt/ios/' + name)! != value { return error('changed staged guard') }
+	}
+	// The initial launch already required 8 GiB before staging. Account only
+	// for validated staged files and the incomplete archive against that same
+	// headroom requirement, rather than charging for their storage twice.
+	archive := state + '/initramfs.tar.gz'
+	available := os.disk_usage(out.clone())!.available
+	if available + staged + os.file_size(archive) < u64(8) * 1024 * 1024 * 1024 {
+		return error('insufficient headroom to resume compression')
+	}
+	new_archive := state + '/initramfs-resumed.tar.gz'
+	capture(out, 'resume-compress', ['tar', '--format=ustar', '--options', 'gzip:compression-level=1',
+		'-czf', new_archive, '-s', ',^opt/ios/run-ios$,,',
+		'@' + root + '/build/ios/fortnite/probe-initramfs.tar.gz', '-C', fs, '.'])!
+	capture(out, 'resume-archive-check', ['tar', '-tzf', new_archive])!
+	os.rename(archive, state + '/initramfs-interrupted.tar.gz')!
+	os.rename(new_archive, archive)!
+	os.rmdir_all(fs)!
+	archive_mb := (os.file_size(archive) + 1024 * 1024 - 1) / (1024 * 1024)
+	boot_mb := if archive_mb + 128 > 384 { ((archive_mb + 128 + 63) / 64) * 64 } else { u64(384) }
+	if os.disk_usage(out.clone())!.available < (boot_mb + 2048) * 1024 * 1024 {
+		return error('insufficient headroom for boot media and audit')
+	}
+	disk := state + '/boot.img'
+	capture(out, 'resume-boot-create', ['mkfile', '-n', boot_mb.str() + 'm', disk])!
+	capture(out, 'resume-boot-format', ['mformat', '-F', '-i', disk, '::'])!
+	for i, path in ['::/EFI', '::/EFI/BOOT', '::/boot'] {
+		capture(out, 'resume-boot-dir-' + i.str(), ['mmd', '-i', disk, path])!
+	}
+	conf := state + '/limine.conf'
+	os.write_file(conf, 'timeout: 0\nverbose: yes\n/Vinix\n    protocol: limine\n    kernel_path: boot():/boot/vinix\n    module_path: $boot():/boot/initramfs.tar.gz\n    resolution: 1024x768x32\n    kbacktracer: no\n')!
+	for source, target in {root + '/boot-image/limine-bin/BOOTAA64.EFI': '::/EFI/BOOT/BOOTAA64.EFI',
+		conf: '::/boot/limine.conf', out + '/vinix': '::/boot/vinix', archive: '::/boot/initramfs.tar.gz'} {
+		capture(out, 'resume-copy-' + os.file_name(source), ['mcopy', '-i', disk, source, target])!
+	}
+	os.setenv('VINIX_IOS_VM_CPUS', '1', true)
+	// The replay path uses exactly the guarded configuration checked above.
+	capture(out, 'probe-no-ads', [out + '/notification-vm', 'replay-probe-no-ads', out])!
+	log := os.read_file(out + '/probe-no-ads.log')!
+	os.write_file(out + '/probe-no-ads.log', log + 'Recovered staged VM probe memory.max: 2147483648\n')!
+	inspect(out)!
+}
+
 fn bundle_manifest(out string) !string {
 	mut paths := input_paths(out, '')!.filter(it != 'manifest.sha256')
 	paths.sort()
@@ -511,7 +589,7 @@ fn negative_controls(out string, scratch string) ! {
 }
 
 fn main() {
-	if os.args.len < 3 { panic('usage: swift-type-probe prepare FRESH_OUT PRIOR [--optional-lookup|--session-defaults] | build|probe|inspect|seal|check OUT | negative-controls OUT FRESH_SCRATCH') }
+	if os.args.len < 3 { panic('usage: swift-type-probe prepare FRESH_OUT PRIOR [--optional-lookup|--session-defaults] | build|probe|resume-staging|inspect|seal|check OUT | negative-controls OUT FRESH_SCRATCH') }
 	root := os.real_path(os.getwd())
 	out := os.abs_path(os.args[2])
 	if out == root || out.starts_with(root + '/') || os.is_link(out) { panic('output must be external') }
@@ -540,6 +618,7 @@ fn main() {
 	if os.exists(out + '/manifest.sha256') && os.args[1] != 'inspect' { panic('bundle is sealed') }
 	verify_inputs(out)!
 	match os.args[1] {
+		'resume-staging' { resume_staging(root, out)! }
 		'build' {
 			if os.exists(out + '/run-ios-gles') { panic('runtime already built') }
 			revision := os.read_file(out + '/source-revision.txt')!.trim_space()
