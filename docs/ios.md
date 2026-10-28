@@ -457,7 +457,7 @@ unverified. The complete archive restores and passes its saved auditor and
 231 negative controls. See the
 [configured session checkpoint](../tests/ios/session-configured-checkpoint-20261028.md).
 
-The latest no-ads checkpoint supports out-of-line Swift Optional layouts through
+An earlier no-ads checkpoint supports out-of-line Swift Optional layouts through
 65,536 bytes. All 41 guest fixtures, three fresh sanitized Optional host suites
 and 273 audit negative controls pass. Fortnite gets past the 48-byte Wrapped
 layout rejection and reaches
@@ -465,6 +465,14 @@ layout rejection and reaches
 Progress remains 4/8 observed gates; no frame, menu, login or playable match is
 verified. See the
 [Optional layout checkpoint](../tests/ios/swift-optional-outline-checkpoint-20261028.md).
+
+The latest no-ads checkpoint implements both background URL-session
+configuration factories, including copied identifiers and measured defaults.
+All 41 guest fixtures, both fresh sanitized session host suites and 283 audit
+negative controls pass. Fortnite gets past the factory and stops at
+`PLCrashReporter isEqual:`. Progress remains 4/8 observed gates; game rendering
+is unverified. See the
+[background session checkpoint](../tests/ios/session-background-checkpoint-20261028.md).
 
 `MTLCreateSystemDefaultDevice` still returns nil: a Metal device, shader,
 rendering and presentation backend remains to be implemented. The existing
