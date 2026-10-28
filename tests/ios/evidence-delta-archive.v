@@ -12,6 +12,13 @@ import os
 
 const chunk_size = u64(64 * 1024 * 1024)
 
+// Patch mode bounds both inputs; ordinary streaming compression has no such
+// limit. Boot images grow in filesystem-sized increments and can cross it
+// independently of the embedded initramfs.
+fn bundle_patch_fits(output_size u64, base_size u64) bool {
+	return output_size < u64(1) << 31 && base_size < u64(1) << 31
+}
+
 struct Chunk {
 	offset u64
 	size u64
@@ -394,7 +401,8 @@ fn create(source string, prior string, archive string, zstd string, work string)
 		mut tar_hash := ''
 		mut chunks := []Chunk{}
 		mut args := [zstd, '-q', '-3', '--long=31']
-		if e.path == current_vm + '/boot.img' {
+		if e.path == current_vm + '/boot.img'
+			&& bundle_patch_fits(e.size, os.file_size(source + '/' + current_vm + '/initramfs.tar.gz')) {
 			storage = 'bundle-patch'
 			base = current_vm + '/initramfs.tar.gz'
 			base_hash = digest(source + '/' + base)!
@@ -627,6 +635,11 @@ fn alignment_selftest(root string, zstd string) ! {
 }
 
 fn selftest(root string, zstd string) ! {
+	limit := u64(1) << 31
+	assert bundle_patch_fits(limit - 1, limit - 1)
+	assert !bundle_patch_fits(limit, 1)
+	assert !bundle_patch_fits(1, limit)
+	assert !bundle_patch_fits(~u64(0), ~u64(0))
 	if os.exists(root) || os.is_link(root) { return error('selftest requires a fresh directory') }
 	source := root + '/source'
 	prior := root + '/prior'
