@@ -207,6 +207,15 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 				header.number = i64(frame.x[2])
 				frame.x[0] = objc_autorelease(number)
 			}
+			'numberWithUnsignedLong:' {
+				if !objc_is_kind(object, read64(ios_runtime.names['NSNumber'])) { return false }
+				number := objc_allocate(object)
+				mut header := obj_header(number)
+				header.number = i64(frame.x[2])
+				// Native Foundation uses q until the value requires unsigned storage.
+				header.unsigned_number = frame.x[2] > u64(9223372036854775807)
+				frame.x[0] = objc_autorelease(number)
+			}
 			'stringWithFormat:' { frame.x[0] = ns_format(frame.x[2], frame.stack) }
 			'scheduledTimerWithTimeInterval:target:selector:userInfo:repeats:' {
 				timer := objc_allocate(object)

@@ -87,6 +87,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if info.name == 'NSLocale' && info.meta && selector == 'preferredLanguages' { return '@16@0:8' }
 	if info.name in ['NSDictionary', 'NSMutableDictionary'] && info.meta && selector == 'dictionaryWithContentsOfFile:' { return '@24@0:8@16' }
 	if info.name == 'NSNumber' && info.meta && selector == 'numberWithBool:' { return '@20@0:8B16' }
+	if info.name == 'NSNumber' && info.meta && selector == 'numberWithUnsignedLong:' { return '@24@0:8Q16' }
 	if info.name == 'NSNumber' && !info.meta && selector == 'isEqual:' { return 'B24@0:8@16' }
 	if info.name == 'UIResponder' && !info.meta && selector == 'nextResponder' { return '@16@0:8' }
 	if info.name == 'UIView' && !info.meta {
