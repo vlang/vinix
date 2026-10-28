@@ -4,7 +4,7 @@ module main
 import math
 
 // Public base configurations have a measured 560-byte record. This profile
-// stores settings only. Default factory settings are supported; access to its
+// stores settings only. Default and background factories are supported; their
 // unresolved built-in protocols, persistent/shared stores and session loading
 // remains an explicit unsupported boundary.
 // Ownership follows the allocation, independently of its current isa.
@@ -128,7 +128,13 @@ fn url_session_configuration_property(selector string) ?SessionConfigurationProp
 
 fn url_session_configuration_types(name string, meta bool, selector string) ?string {
 	if name != 'NSURLSessionConfiguration' { return none }
-	if meta { return if selector in ['new', 'defaultSessionConfiguration']! { '@16@0:8' } else { none } }
+	if meta {
+		return match selector {
+			'new', 'defaultSessionConfiguration' { '@16@0:8' }
+			'backgroundSessionConfigurationWithIdentifier:', 'backgroundSessionConfiguration:' { '@24@0:8@16' }
+			else { return none }
+		}
+	}
 	if selector in ['init', 'copy']! { return '@16@0:8' }
 	if selector == 'copyWithZone:' { return '@24@0:8^{_NSZone=}16' }
 	property := url_session_configuration_property(selector) or { return none }
@@ -145,7 +151,6 @@ fn url_session_configuration_types(name string, meta bool, selector string) ?str
 
 fn url_session_configuration_unsupported(selector string) bool {
 	return selector in ['ephemeralSessionConfiguration',
-		'backgroundSessionConfiguration:', 'backgroundSessionConfigurationWithIdentifier:',
 		'HTTPCookieStorage', 'setHTTPCookieStorage:', 'URLCredentialStorage', 'setURLCredentialStorage:',
 		'URLCache', 'setURLCache:', 'TLSMinimumSupportedProtocolVersion', 'setTLSMinimumSupportedProtocolVersion:',
 		'TLSMaximumSupportedProtocolVersion', 'setTLSMaximumSupportedProtocolVersion:',
@@ -201,10 +206,22 @@ fn url_session_configuration_copy(object u64) u64 {
 	return copy
 }
 
-fn url_session_configuration_default(cls u64) u64 {
+fn url_session_configuration_factory(cls u64, identifier u64, background bool) u64 {
 	url_session_configuration_require_class(cls)
+	mut copied := u64(0)
+	if background {
+		if identifier == 0 { panic('iOS: background session configuration requires a non-nil identifier') }
+		url_session_configuration_value(identifier, 0)
+		// Both copying and construction can invoke application code. Pin the
+		// caller's identifier across copy and capture its value before allocation.
+		objc_retain(identifier)
+		copied = objc_copy_value(identifier, false)
+		objc_release(identifier)
+		if copied == 0 { panic('iOS: configuration property copy returned nil') }
+		url_session_configuration_value(copied, 0)
+	}
 	object := objc_new(cls)
-	if object == 0 { return 0 }
+	if object == 0 { objc_release(copied); return 0 }
 	C.ios_objc_initialize_lock()
 	mut header := url_session_configuration_state(object)
 	for offset in [u64(64), 65, 66, 71]! { unsafe { *(&u8(object + offset)) = 1 } }
@@ -214,10 +231,21 @@ fn url_session_configuration_default(cls u64) u64 {
 		*(&f64(object + 176)) = 60.0
 		*(&f64(object + 184)) = 604800.0
 	}
+	mut retired := u64(0)
+	if background {
+		retired = header.fields[0]
+		header.fields[0] = copied
+		unsafe {
+			*(&u64(object + 160)) = copied
+			*(&u8(object + 69)) = 1 // sessionSendsLaunchEvents
+			*(&u8(object + 117)) = 1 // _backgroundSession, measured common prefix
+		}
+	}
 	// Do not expose nil/empty built-in protocols as a usable transport profile.
 	// An explicit protocolClasses setter replaces this unresolved default.
 	header.url_session_configuration_default_protocols = true
 	C.ios_objc_initialize_unlock()
+	objc_release(retired)
 	return objc_autorelease(object)
 }
 
@@ -229,7 +257,11 @@ fn url_session_configuration_dispatch(object u64, selector string, mut frame Reg
 	}
 	if url_session_configuration_types('NSURLSessionConfiguration', meta, selector) == none { return false }
 	if meta {
-		frame.x[0] = if selector == 'defaultSessionConfiguration' { url_session_configuration_default(object) } else { objc_new(object) }
+		frame.x[0] = match selector {
+			'defaultSessionConfiguration' { url_session_configuration_factory(object, 0, false) }
+			'backgroundSessionConfigurationWithIdentifier:', 'backgroundSessionConfiguration:' { url_session_configuration_factory(object, frame.x[2], true) }
+			else { objc_new(object) }
+		}
 		return true
 	}
 	if selector in ['copy', 'copyWithZone:']! { frame.x[0] = url_session_configuration_copy(object); return true }

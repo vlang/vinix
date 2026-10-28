@@ -126,7 +126,7 @@ fn verify_inputs(out string) ! {
 	}
 }
 
-fn prepare(out string, prior string, optional_lookup bool, session_defaults bool, session_configured bool, outline bool) ! {
+fn prepare(out string, prior string, optional_lookup bool, session_defaults bool, session_configured bool, outline bool, background bool) ! {
 	if os.exists(out) || os.is_link(out) { return error('prepare needs a fresh directory') }
 	if digest(prior + '/manifest.sha256')! != prior_hash { return error('unexpected prior checkpoint') }
 	os.mkdir_all(out)!
@@ -170,7 +170,7 @@ fn prepare(out string, prior string, optional_lookup bool, session_defaults bool
 	os.cp(os.getwd() + '/tests/ios/swift-type-probe.v', out + '/checkpoint.v')!
 	os.write_file(out + '/checkpoint-revision.txt', revision.output)!
 	if optional_lookup {
-		os.write_file(out + '/probe-kind.txt', if outline { 'optional-outline\n' } else if session_configured { 'session-configured\n' }
+		os.write_file(out + '/probe-kind.txt', if background { 'session-background\n' } else if outline { 'optional-outline\n' } else if session_configured { 'session-configured\n' }
 			else if session_defaults { 'session-defaults\n' } else { 'optional-lookup\n' })!
 		v := os.real_path(os.getwd()) + '/build/ios/fortnite/ns-calendar-checks/toolchain/v'
 		capture(out, 'build-notification-vm', [v, '-nocache', '-gc', 'none', '-cc', 'clang', '-cflags', '-O2',
@@ -181,21 +181,25 @@ fn prepare(out string, prior string, optional_lookup bool, session_defaults bool
 
 fn optional_probe(out string) !bool {
 	if !os.exists(out + '/probe-kind.txt') { return false }
-	if os.read_file(out + '/probe-kind.txt')! !in ['optional-lookup\n', 'session-defaults\n', 'session-configured\n', 'optional-outline\n'] { return error('unknown probe kind') }
+	if os.read_file(out + '/probe-kind.txt')! !in ['optional-lookup\n', 'session-defaults\n', 'session-configured\n', 'optional-outline\n', 'session-background\n'] { return error('unknown probe kind') }
 	return true
 }
 
 fn session_defaults_probe(out string) !bool {
 	if !optional_probe(out)! { return false }
-	return os.read_file(out + '/probe-kind.txt')! in ['session-defaults\n', 'session-configured\n', 'optional-outline\n']
+	return os.read_file(out + '/probe-kind.txt')! in ['session-defaults\n', 'session-configured\n', 'optional-outline\n', 'session-background\n']
 }
 
 fn session_configured_probe(out string) !bool {
-	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['session-configured\n', 'optional-outline\n']
+	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['session-configured\n', 'optional-outline\n', 'session-background\n']
 }
 
 fn outline_probe(out string) !bool {
-	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! == 'optional-outline\n'
+	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['optional-outline\n', 'session-background\n']
+}
+
+fn background_probe(out string) !bool {
+	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! == 'session-background\n'
 }
 
 fn verify_built(out string) ! {
@@ -266,7 +270,7 @@ fn validate_launch(launch string) ! {
 	}
 }
 
-fn host_markers(defaults bool, configured bool, outline bool) map[string][]string {
+fn host_markers(defaults bool, configured bool, outline bool, background bool) map[string][]string {
 	mut markers := {
 		'swift-optional-lookup-host': ['IOS-SWIFT-OPTIONAL-LOOKUP-NATIVE:', 'IOS-SWIFT-OPTIONAL-LOOKUP:']
 		'swift-mangled-optional-regression': ['IOS-SWIFT-MANGLED-NATIVE:', 'IOS-SWIFT-MANGLED:']
@@ -284,6 +288,9 @@ fn host_markers(defaults bool, configured bool, outline bool) map[string][]strin
 	if configured {
 		markers['session-configured-host'] = ['IOS-URL-SESSION-NATIVE:', 'IOS-SESSION-CONFIGURED-NATIVE:',
 			'IOS-URL-SESSION:', 'IOS-SESSION-CONFIGURED:', 'IOS-URL-SESSION-REJECT:']
+	}
+	if background {
+		markers['session-defaults-host'] << ['IOS-SESSION-BACKGROUND-NATIVE:', 'IOS-SESSION-BACKGROUND:', 'IOS-SESSION-BACKGROUND-REJECT:']
 	}
 	if outline {
 		for kind in ['METADATA', 'ENCODING', 'DECODING'] {
@@ -304,7 +311,7 @@ fn validate_host_log(log string, markers []string) ! {
 }
 
 fn verify_host(out string) ! {
-	for directory, markers in host_markers(session_defaults_probe(out)!, session_configured_probe(out)!, outline_probe(out)!) {
+	for directory, markers in host_markers(session_defaults_probe(out)!, session_configured_probe(out)!, outline_probe(out)!, background_probe(out)!) {
 		for label in ['host-generate', 'host-object-0', 'host-object-1', 'host-object-2', 'host-object-3', 'host-link', 'host', 'host-deterministic'] {
 			base := out + '/host/' + directory + '/' + label
 			if os.read_file(base + '.status.txt')! != '0\n' { return error('failed host step: ' + base) }
@@ -327,6 +334,7 @@ fn inspect(out string) ! {
 	if session_defaults_probe(out)! { validate_session_defaults(serial)! }
 	if session_configured_probe(out)! { validate_session_configured(serial)! }
 	if outline_probe(out)! { validate_outline(serial)! }
+	if background_probe(out)! { validate_background(serial)! }
 	validate_launch(os.read_file(out + '/probe-no-ads.log')!)!
 	diagnostic := boundary + '\n' + lines.join('\n') + '\nserial SHA-256: ' + digest(state + '/serial.log')! + '\nruntime SHA-256: ' + digest(out + '/run-ios-gles')! + '\n'
 	if os.exists(out + '/manifest.sha256') {
@@ -334,7 +342,8 @@ fn inspect(out string) ! {
 	} else { os.write_file(out + '/diagnostic.txt', diagnostic)! }
 	println(boundary)
 	for line in lines { println(line) }
-	println(if outline_probe(out)! { 'Outline Optional launch: six new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
+	println(if background_probe(out)! { 'Background session launch: six new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
+		else if outline_probe(out)! { 'Outline Optional launch: six new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
 		else if session_configured_probe(out)! { 'Configured session launch: three new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
 		else if session_defaults_probe(out)! { 'Default session launch: two new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
 		else if optional_lookup { 'Swift Optional launch: new lookup fixture and 35 reused guest fixtures PASS; rendering unverified' }
@@ -555,6 +564,12 @@ fn validate_outline(serial string) ! {
 	}
 }
 
+fn validate_background(serial string) ! {
+	for marker in ['IOS-SESSION-BACKGROUND:', 'IOS-SESSION-BACKGROUND-REJECT:'] {
+		if serial.count(marker) != 1 { return error('missing or duplicated background session fixture: ' + marker) }
+	}
+}
+
 fn negative_controls(out string, scratch string) ! {
 	if os.exists(scratch) || os.is_link(scratch) || scratch.starts_with(out + '/') {
 		return error('negative controls need fresh external scratch')
@@ -611,7 +626,7 @@ fn negative_controls(out string, scratch string) ! {
 		return error('accepted missing launch guard')
 	}
 	if optional_lookup {
-		for directory, host_checks in host_markers(session_defaults_probe(out)!, session_configured_probe(out)!, outline_probe(out)!) {
+		for directory, host_checks in host_markers(session_defaults_probe(out)!, session_configured_probe(out)!, outline_probe(out)!, background_probe(out)!) {
 			log := os.read_file(out + '/host/' + directory + '/host.log')!
 			validate_host_log(log, host_checks)!
 			for marker in host_checks {
@@ -704,12 +719,22 @@ fn negative_controls(out string, scratch string) ! {
 			count += rejected
 		}
 	}
+	if background_probe(out)! {
+		validate_background(serial)!
+		for marker in ['IOS-SESSION-BACKGROUND:', 'IOS-SESSION-BACKGROUND-REJECT:'] {
+			mut rejected := 0
+			validate_background(serial.replace(marker, '')) or { rejected++ }
+			validate_background(serial + marker) or { rejected++ }
+			if rejected != 2 { return error('accepted missing or duplicated background session marker') }
+			count += rejected
+		}
+	}
 	os.write_file(scratch + '/negative-controls.txt', count.str() + ' corruptions rejected; baseline guest and host logs pass\n')!
 	println(count.str() + ' Swift checkpoint negative controls PASS')
 }
 
 fn main() {
-	if os.args.len < 3 { panic('usage: swift-type-probe prepare FRESH_OUT PRIOR [--optional-lookup|--session-defaults|--session-configured|--optional-outline] | build|probe|resume-staging|retry-budget|inspect|seal|check OUT | negative-controls OUT FRESH_SCRATCH') }
+	if os.args.len < 3 { panic('usage: swift-type-probe prepare FRESH_OUT PRIOR [--optional-lookup|--session-defaults|--session-configured|--optional-outline|--session-background] | build|probe|resume-staging|retry-budget|inspect|seal|check OUT | negative-controls OUT FRESH_SCRATCH') }
 	root := os.real_path(os.getwd())
 	out := os.abs_path(os.args[2])
 	if out == root || out.starts_with(root + '/') || os.is_link(out) { panic('output must be external') }
@@ -724,11 +749,12 @@ fn main() {
 		return
 	}
 	if os.args[1] == 'prepare' {
-		if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] !in ['--optional-lookup', '--session-defaults', '--session-configured', '--optional-outline']) { panic('prepare requires PRIOR [--optional-lookup|--session-defaults|--session-configured|--optional-outline]') }
+		if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] !in ['--optional-lookup', '--session-defaults', '--session-configured', '--optional-outline', '--session-background']) { panic('prepare requires PRIOR [--optional-lookup|--session-defaults|--session-configured|--optional-outline|--session-background]') }
 		prepare(out, os.real_path(os.args[3]), os.args.len == 5,
-			os.args.len == 5 && os.args[4] in ['--session-defaults', '--session-configured', '--optional-outline'],
-			os.args.len == 5 && os.args[4] in ['--session-configured', '--optional-outline'],
-			os.args.len == 5 && os.args[4] == '--optional-outline')!
+			os.args.len == 5 && os.args[4] in ['--session-defaults', '--session-configured', '--optional-outline', '--session-background'],
+			os.args.len == 5 && os.args[4] in ['--session-configured', '--optional-outline', '--session-background'],
+			os.args.len == 5 && os.args[4] in ['--optional-outline', '--session-background'],
+			os.args.len == 5 && os.args[4] == '--session-background')!
 		return
 	}
 	if os.args.len != 3 { panic('unexpected arguments') }

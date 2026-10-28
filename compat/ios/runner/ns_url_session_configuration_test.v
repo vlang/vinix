@@ -14,7 +14,9 @@ fn C.class_getSuperclass(voidptr) voidptr
 fn C.class_getInstanceVariable(voidptr, &char) voidptr
 fn C.ivar_getOffset(voidptr) isize
 fn C.class_getInstanceMethod(voidptr, voidptr) voidptr
+fn C.class_getClassMethod(voidptr, voidptr) voidptr
 fn C.method_getTypeEncoding(voidptr) &char
+fn C.method_getImplementation(voidptr) voidptr
 
 type ConfigurationMessage = fn (u64, u64, u64, u64, u64) u64
 type ConfigurationDoubleGet = fn (u64, u64) f64
@@ -186,6 +188,72 @@ fn configuration_defaults_worker(api ConfigurationApi) {
 	for _ in 0 .. 16 { configuration_shared_defaults(api) }
 }
 
+fn configuration_shared_background(api ConfigurationApi) {
+	for factory in [c'backgroundSessionConfigurationWithIdentifier:', c'backgroundSessionConfiguration:']! {
+		mut implementation := u64(0)
+		$if macos { if api.native {
+			method := C.class_getClassMethod(unsafe { voidptr(api.cls) }, C.sel_registerName(factory))
+			assert method != unsafe { nil }
+			assert unsafe { C.method_getTypeEncoding(method).vstring() } == '@24@0:8@16'
+			implementation = u64(C.method_getImplementation(method))
+		} }
+		if !api.native {
+			method := objc_class_method(api.cls, u64(factory))
+			assert method != 0 && ctext(u64(objc_method_types(method))) == '@24@0:8@16'
+			implementation = objc_method_imp(method)
+		}
+		for text in [c'', c'org.vinix.background😀', c'long background identifier whose copy survives the source pool']! {
+			pool := api.pool()
+			source := api.message(api.message(api.mutable_strings, c'alloc', 0, 0), c'initWithUTF8String:', u64(text), 0)
+			object := api.message(api.cls, factory, source, 0)
+			other := unsafe { ConfigurationMessage(voidptr(implementation))(api.cls, api.selector(factory), source, 0, 0) }
+			assert object != 0 && other != 0 && object != other
+			assert api.message(object, c'class', 0, 0) == api.cls
+			stored := api.message(object, c'identifier', 0, 0)
+			assert stored != source && api.text(stored) == unsafe { text.vstring() }
+			api.message(source, c'setString:', api.string(c'changed after factory'), 0)
+			assert api.text(api.message(object, c'identifier', 0, 0)) == unsafe { text.vstring() }
+			for name, expected in {'HTTPMaximumConnectionsPerHost': u64(6), 'allowsCellularAccess': 1,
+				'allowsExpensiveNetworkAccess': 1, 'allowsConstrainedNetworkAccess': 1, 'HTTPShouldSetCookies': 1,
+				'HTTPCookieAcceptPolicy': 2, 'TLSMinimumSupportedProtocol': 8, 'TLSMaximumSupportedProtocol': 0,
+				'requestCachePolicy': 0, 'networkServiceType': 0, 'waitsForConnectivity': 0,
+				'isDiscretionary': 0, 'sessionSendsLaunchEvents': 1, 'HTTPShouldUsePipelining': 0,
+				'requiresDNSSECValidation': 0, 'multipathServiceType': 0, 'sharedContainerIdentifier': 0,
+				'HTTPAdditionalHeaders': 0, 'connectionProxyDictionary': 0} {
+				assert api.message(object, name.str, 0, 0) == expected, name
+			}
+			assert api.get_double(object, c'timeoutIntervalForRequest') == 60.0
+			assert api.get_double(object, c'timeoutIntervalForResource') == 604800.0
+			assert unsafe { *(&u8(object + 117)) } == 1
+			assert api.message(object, c'init', 0, 0) == object
+			api.message(object, c'setSessionSendsLaunchEvents:', 0, 0)
+			assert api.message(other, c'sessionSendsLaunchEvents', 0, 0) == 1
+			copy := api.message(object, c'copy', 0, 0)
+			api.message(object, c'setIdentifier:', api.string(c'changed configuration'), 0)
+			assert api.text(api.message(copy, c'identifier', 0, 0)) == unsafe { text.vstring() }
+			api.release(source); api.drain(pool)
+			after := api.pool()
+			assert api.text(api.message(copy, c'identifier', 0, 0)) == unsafe { text.vstring() }
+			assert api.message(copy, c'sessionSendsLaunchEvents', 0, 0) == 0
+			assert unsafe { *(&u8(copy + 117)) } == 1
+			api.release(copy); api.drain(after)
+		}
+		pool := api.pool()
+		text := 'b\x00g😀'
+		identifier := unsafe { ConfigurationMessage(voidptr(api.send))(api.message(api.strings, c'alloc', 0, 0), api.selector(c'initWithBytes:length:encoding:'), u64(text.str), u64(text.len), 4) }
+		object := api.message(api.cls, factory, identifier, 0)
+		stored := api.message(object, c'identifier', 0, 0)
+		assert api.message(stored, c'length', 0, 0) == 5
+		assert api.message(stored, c'isEqualToString:', identifier, 0) == 1
+		api.release(identifier)
+		api.drain(pool)
+	}
+}
+
+fn configuration_background_worker(api ConfigurationApi) {
+	for _ in 0 .. 8 { configuration_shared_background(api) }
+}
+
 fn configuration_encoding_cases(api ConfigurationApi) {
 	for getter, encoding in {'identifier': '@', 'sharedContainerIdentifier': '@', 'connectionProxyDictionary': '@', 'HTTPAdditionalHeaders': '@', 'protocolClasses': '@', 'requestCachePolicy': 'Q', 'networkServiceType': 'Q', 'HTTPCookieAcceptPolicy': 'Q', 'multipathServiceType': 'q', 'HTTPMaximumConnectionsPerHost': 'q', 'TLSMinimumSupportedProtocol': 'i', 'TLSMaximumSupportedProtocol': 'i', 'timeoutIntervalForRequest': 'd', 'timeoutIntervalForResource': 'd', 'allowsCellularAccess': 'B', 'allowsExpensiveNetworkAccess': 'B', 'allowsConstrainedNetworkAccess': 'B', 'waitsForConnectivity': 'B', 'isDiscretionary': 'B', 'sessionSendsLaunchEvents': 'B', 'HTTPShouldUsePipelining': 'B', 'HTTPShouldSetCookies': 'B', 'requiresDNSSECValidation': 'B'} {
 		setter := if getter == 'isDiscretionary' { 'setDiscretionary:' } else { 'set' + getter[0].ascii_str().to_upper() + getter[1..] + ':' }
@@ -212,8 +280,10 @@ fn test_url_session_configuration_native() {
 		}
 		configuration_encoding_cases(api); configuration_shared_base(api); configuration_shared_scalars(api); configuration_shared_objects(api)
 		configuration_shared_defaults(api)
+		configuration_shared_background(api)
 		println('IOS-SESSION-CONFIGURATION-NATIVE: base allocation and preserved init, typed settings, signed connection truncation, TLS widths, copied properties, independent configuration snapshots and copied owners after pool drainage')
 		println('IOS-SESSION-DEFAULTS-NATIVE: fresh defaults, preserved init, mutation, protocol replacement and independent copies after pool drainage PASS')
+		println('IOS-SESSION-BACKGROUND-NATIVE: both factories and IMPs, copied empty/Unicode/NUL identifiers, measured settings, independent copies and pool ownership PASS')
 	}
 }
 
@@ -221,6 +291,15 @@ __global configuration_callback_api = ConfigurationApi{}
 __global configuration_callback_source = u64(0)
 __global configuration_callback_mode = 0
 __global configuration_constructor_weak = u64(0)
+__global configuration_background_identifier = u64(0)
+fn configuration_background_identifier_worker() {
+	assert string_text(configuration_background_identifier) == 'background callback snapshot'
+	objc_release(configuration_background_identifier)
+}
+fn configuration_background_identifier_copy(object u64, selector &char) u64 {
+	worker := spawn configuration_background_identifier_worker(); worker.wait()
+	return owned_string(string_text(object))
+}
 fn configuration_constructor_worker() {
 	api := configuration_callback_api
 	pool := api.pool()
@@ -275,6 +354,27 @@ fn configuration_runtime_callbacks(api ConfigurationApi) {
 	configuration_callback_mode = 2
 	assert api.message(api.cls, c'defaultSessionConfiguration', 0, 0) == 0 && configuration_constructor_weak == 0
 	objc_destroy_weak(unsafe { &configuration_constructor_weak })
+	for factory in [c'backgroundSessionConfigurationWithIdentifier:', c'backgroundSessionConfiguration:']! {
+		identifier := api.message(api.message(api.mutable_strings, c'alloc', 0, 0), c'initWithUTF8String:', u64(c'failed background factory'), 0)
+		configuration_callback_mode = 2
+		assert api.message(api.cls, factory, identifier, 0) == 0 && configuration_constructor_weak == 0
+		objc_destroy_weak(unsafe { &configuration_constructor_weak }); api.release(identifier)
+	}
+	background_class := objc_allocate_class(api.strings, c'VinixBackgroundIdentifierCopyString', 0)
+	assert objc_add_method(background_class, u64(c'copy'), u64(unsafe { voidptr(configuration_background_identifier_copy) }), c'@16@0:8')
+	objc_register_class(background_class)
+	for factory in [c'backgroundSessionConfigurationWithIdentifier:', c'backgroundSessionConfiguration:']! {
+		configuration_background_identifier = owned_string('background callback snapshot')
+		assert objc_set_class(configuration_background_identifier, background_class) == api.strings
+		mut identifier_weak := u64(0)
+		objc_store_weak(unsafe { &identifier_weak }, configuration_background_identifier)
+		object := api.message(api.cls, factory, configuration_background_identifier, 0)
+		assert object != 0 && identifier_weak == 0
+		assert api.text(api.message(object, c'identifier', 0, 0)) == 'background callback snapshot'
+		assert configuration_constructor_weak == 0
+		objc_destroy_weak(unsafe { &identifier_weak }); objc_destroy_weak(unsafe { &configuration_constructor_weak })
+	}
+	configuration_background_identifier = 0
 	custom := objc_allocate_class(api.strings, c'VinixConfigurationCopyString', 0)
 	assert objc_add_method(custom, u64(c'copy'), u64(unsafe { voidptr(configuration_property_copy) }), c'@16@0:8'); objc_register_class(custom)
 	property := owned_string('property copy callback')
@@ -307,8 +407,12 @@ fn test_url_session_configuration_runtime() {
 		factory_method := objc_class_method(api.cls, u64(c'defaultSessionConfiguration'))
 		assert factory_method != 0 && ctext(u64(objc_method_types(factory_method))) == '@16@0:8'
 		configuration_shared_defaults(api)
+		configuration_shared_background(api)
 		mut workers := []thread{}
 		for _ in 0 .. 8 { workers << spawn configuration_defaults_worker(api) }
+		workers.wait()
+		workers.clear()
+		for _ in 0 .. 8 { workers << spawn configuration_background_worker(api) }
 		workers.wait()
 		pool_defaults := api.pool()
 		mut factory_weak := u64(0)
@@ -341,6 +445,7 @@ fn test_url_session_configuration_runtime() {
 	}
 	println('IOS-SESSION-CONFIGURATION: typed settings and metadata, copied properties and snapshots, guarded caller storage,64 isa replacements and two drained runtimes')
 	println('IOS-SESSION-DEFAULTS: fresh settings, explicit protocol replacement, copies across pool drainage, nil constructor, eight workers and two drained runtimes PASS')
+	println('IOS-SESSION-BACKGROUND: both factories and IMPs, copied identifiers and settings, failed construction, eight workers and two drained runtimes PASS')
 }
 
 fn test_url_session_configuration_rejections() {
@@ -361,7 +466,7 @@ fn test_url_session_configuration_rejections() {
 					api.message(sub, c'defaultSessionConfiguration', 0, 0)
 				}
 				'ephemeral' { api.message(api.cls, c'ephemeralSessionConfiguration', 0, 0) }
-				'background' { api.message(api.cls, c'backgroundSessionConfigurationWithIdentifier:', api.string(c'background'), 0) }
+				'background' { api.message(api.cls, c'backgroundSessionConfigurationWithIdentifier:', 0, 0) }
 				'cookie' { api.message(object, c'HTTPCookieStorage', 0, 0) }
 				'cookie-set' { api.message(object, c'setHTTPCookieStorage:', 0, 0) }
 				'credential' { api.message(object, c'URLCredentialStorage', 0, 0) }
@@ -410,6 +515,7 @@ fn test_url_session_configuration_rejections() {
 		C.close(fds[0]); mut status := i32(0); assert C.ios_waitpid(pid, &status, 0) == pid && status == 256
 		output := unsafe { tos(&bytes[0], length) }
 		reason := match mode {
+			'background' { 'background session configuration requires a non-nil identifier' }
 			'string-type', 'dictionary-type', 'array-type', 'bad-copy' { 'configuration property has the wrong object type' }
 			'nil-copy' { 'configuration property copy returned nil' }
 			'large', 'raw' { 'configuration collections require at most 1024 owned objects' }
@@ -420,10 +526,9 @@ fn test_url_session_configuration_rejections() {
 			else { 'configuration factories, stores, coding and this property are not implemented' }
 		}
 		assert output.contains('iOS: ' + reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), mode + ': ' + output
-		if mode in ['ephemeral', 'background', 'cookie', 'cookie-set', 'credential', 'credential-set', 'cache', 'cache-set', 'tls-version', 'idle', 'proxies', 'mutable', 'coding', 'description', 'hash', 'equal']! {
+		if mode in ['ephemeral', 'cookie', 'cookie-set', 'credential', 'credential-set', 'cache', 'cache-set', 'tls-version', 'idle', 'proxies', 'mutable', 'coding', 'description', 'hash', 'equal']! {
 			selector := match mode {
 				'ephemeral' { 'ephemeralSessionConfiguration' }
-				'background' { 'backgroundSessionConfigurationWithIdentifier:' }
 				'cookie' { 'HTTPCookieStorage' }
 				'cookie-set' { 'setHTTPCookieStorage:' }
 				'credential' { 'URLCredentialStorage' }
@@ -444,4 +549,56 @@ fn test_url_session_configuration_rejections() {
 	}
 	assert ios_runtime.live == 0; objc_stop()
 	println('IOS-SESSION-CONFIGURATION-REJECT:31 factory, unresolved protocols, storage, modern TLS, idle, proxy, copy, coding, type, nil copy, collection, subclass, spoof and nonfinite cases fail explicitly')
+}
+
+fn test_url_session_background_rejections() {
+	objc_start(); api := configuration_runtime_api()
+	for factory in [c'backgroundSessionConfigurationWithIdentifier:', c'backgroundSessionConfiguration:']! {
+		for mode in ['nil', 'type', 'bad-copy', 'nil-copy', 'subclass', 'protocols']! {
+			mut fds := [2]i32{}; assert C.pipe(unsafe { &fds[0] }) == 0
+			pid := C.fork(); assert pid >= 0
+			if pid == 0 {
+				C.close(fds[0]); assert C.dup2(fds[1], 2) == 2; C.close(fds[1])
+				mut identifier := api.string(c'rejected background configuration')
+				mut cls := api.cls
+				match mode {
+					'nil' { identifier = 0 }
+					'type' { identifier = api.message(ios_runtime.names['NSObject'], c'new', 0, 0) }
+					'bad-copy', 'nil-copy' {
+						custom := objc_allocate_class(api.strings, c'VinixBackgroundBadCopyString', 0)
+						implementation := if mode == 'bad-copy' { u64(unsafe { voidptr(configuration_bad_property_copy) }) } else { u64(unsafe { voidptr(configuration_nil_property_copy) }) }
+						assert objc_add_method(custom, u64(c'copy'), implementation, c'@16@0:8'); objc_register_class(custom)
+						identifier = objc_new(custom)
+					}
+					'subclass' {
+						cls = objc_allocate_class(api.cls, c'VinixBackgroundConfigurationSubclass', 0); objc_register_class(cls)
+					}
+					else {}
+				}
+				object := api.message(cls, factory, identifier, 0)
+				if mode == 'protocols' { api.message(api.message(object, c'copy', 0, 0), c'protocolClasses', 0, 0) }
+				C._exit(0)
+			}
+			C.close(fds[1]); mut bytes := [16384]u8{}; mut length := 0
+			for {
+				assert length < bytes.len
+				count := C.read(fds[0], unsafe { &bytes[length] }, usize(bytes.len - length))
+				if count == 0 { break }
+				if count < 0 && unsafe { *C.ios_errno_address() } == C.EINTR { continue }
+				assert count > 0; length += int(count)
+			}
+			C.close(fds[0]); mut status := i32(0); assert C.ios_waitpid(pid, &status, 0) == pid && status == 256
+			output := unsafe { tos(&bytes[0], length) }
+			reason := match mode {
+				'nil' { 'background session configuration requires a non-nil identifier' }
+				'type', 'bad-copy' { 'configuration property has the wrong object type' }
+				'nil-copy' { 'configuration property copy returned nil' }
+				'subclass' { 'custom session configuration subclass construction is not implemented' }
+				else { 'default session protocol classes are not implemented' }
+			}
+			assert output.contains('iOS: ' + reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), mode + ': ' + output
+		}
+	}
+	objc_stop()
+	println('IOS-SESSION-BACKGROUND-REJECT:12 nil and invalid identifiers, invalid copies, subclasses and unresolved protocols PASS')
 }

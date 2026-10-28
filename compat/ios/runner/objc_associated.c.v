@@ -69,6 +69,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	un_center := value in ios_runtime.objects && obj_header(value).un_center_owned
 	un_content := value in ios_runtime.objects && obj_header(value).un_content != unsafe { nil }
 	query_item := value in ios_runtime.objects && obj_header(value).url_query_item_owned
+	mutable_string := value in ios_runtime.objects && obj_header(value).mutable_string_owned
 	C.ios_objc_initialize_unlock()
 	if formatter { return ns_date_formatter_copy(value) }
 	if number_formatter { return ns_number_formatter_copy(value) }
@@ -100,9 +101,7 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 	if objc_is_kind(value, ios_runtime.names['NSURLSession']) { url_session_state(value); return objc_retain(value) }
 	if objc_is_kind(value, ios_runtime.names['NSURLSessionConfiguration']) { return url_session_configuration_copy(value) }
 	if url_session_task_family(cls) { url_session_task_state(value); return objc_retain(value) }
-	if header := ios_runtime.objects[value] {
-		if header.mutable_string_owned { return mutable_string_snapshot(value, false) }
-	}
+	if mutable_string { return mutable_string_snapshot(value, false) }
 	if objc_is_kind(value, ios_runtime.names['NSSortDescriptor']) { sort_descriptor_state(value); return objc_retain(value) }
 	if objc_is_kind(value, ios_runtime.names['NSRegularExpression']) { regular_expression_state(value); return objc_retain(value) }
 	if objc_is_kind(value, ios_runtime.names['NSTextCheckingResult']) { regex_result_state(value); return objc_retain(value) }
