@@ -149,6 +149,20 @@ const application_restrictions_jar = 'd4e8678bf5deda99358defd912e64e4fcba92fec4a
 const application_restrictions_dex = '45c25a081702f299ae3f8a883347d624cae6ab4bda3b5f2538be89421cdf32ab'
 const application_restrictions_build = 'a2a31c49975032e4051a2cb9a737d5bdd31a57e7472bafc60411f723c2ebea3a'
 const application_restrictions_retained_guest = 'b22889a7279f5d1f3523e6968a0ee6d107ffaab2c43bd80080b44b633ba29450'
+const account_handoff_base = '/Users/alex/.local/state/vinix/android/maps-application-restrictions-r2'
+const account_handoff_base_seal = 'd8507cb61499306398adecaae7fb9e1fe34ac9f1ccc9c9e42f1232b29c49623a'
+const account_handoff_boot_sha = 'c86cb354f7c0afe99ec78e563a7dd9281cf85f01316178e6956402ae14ac5d9a'
+const account_handoff_base_overlay = '9ae52763b10d642e2e035df244039c352dd25ef63d21a38b1eeb0ab7fd430143'
+const account_handoff_retained_deployment = '14b1907be12ce988a4c5b36e449aa690843035966c4545543bcb1b9b327b67c8'
+const account_handoff_retained_broker = 'b674064be8d3635ee7433bef2c1894fa5fe045674ed0e98cf7d3215adca66a4d'
+const account_handoff_broker_root = '/Users/alex/.local/state/vinix/android/current-account-broker-build-2026-10-28-handoff-r1'
+const account_handoff_controller_root = '/Users/alex/.local/state/vinix/android/maps-account-guest-build-2026-10-28-handoff-r2'
+// Bind the complete reviewed successor producers and their deployed executables.
+const account_handoff_broker_seal = 'b06d4aadb661eb1ba13ac07e9033d88db1db731d54d2b1685df6dba1e69cd8f6'
+const account_handoff_broker_pin = '9f0b8ac37881ab8377e70793609882fb9b07f681b8a79264fc7f95435d8b2823'
+const account_handoff_controller_seal = '1cf0e472fb977e705204f06fcad806f0c1ea16d213d469d0174c658c27fb041d'
+const account_handoff_controller_pin = '0253f16da634ffef92e1efa2b3102d1ad91af15d1f521081f60e920e78affc6b'
+const account_handoff_broker_path = 'opt/vinix-android-aarch64/usr/bin/native-account-broker'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -1577,6 +1591,141 @@ fn application_restrictions_baseline(receipt map[string]json2.Any, stage Stage) 
 	return application_restrictions_base + '/boot.img'
 }
 
+fn account_handoff_profile() Profile {
+	mut modules := application_restrictions_profile().modules.clone()
+	modules << 'maps-application-restrictions.tar'
+	return Profile{'maps-account-handoff', account_handoff_boot_sha, 'maps-account-handoff.tar', modules}
+}
+
+fn account_handoff_modules() map[string]string {
+	mut modules := application_restrictions_modules()
+	modules['maps-application-restrictions.tar'] = account_handoff_base_overlay
+	return modules
+}
+
+fn account_handoff_fields() map[string]string {
+	mut fields := application_restrictions_fields()
+	fields['kind'] = 'vinix-maps-account-handoff-v1'
+	fields['base_root'] = account_handoff_base
+	fields['base_manifest_sha256'] = account_handoff_base_seal
+	fields['broker_build_root'] = account_handoff_broker_root
+	fields['broker_manifest_sha256'] = account_handoff_broker_seal
+	fields['broker_sha256'] = account_handoff_broker_pin
+	fields['retained_broker_manifest_sha256'] = fields['retained_launch_manifest_sha256']!
+	fields['controller_build_root'] = account_handoff_controller_root
+	fields['controller_manifest_sha256'] = account_handoff_controller_seal
+	fields['controller_sha256'] = account_handoff_controller_pin
+	fields['retained_controller_manifest_sha256'] = onboarding_trace_controller_seal
+	return fields
+}
+
+fn account_handoff_inputs() map[string]string {
+	mut inputs := application_restrictions_inputs()
+	inputs[account_handoff_base + '/sha256.json'] = account_handoff_base_seal
+	inputs[account_handoff_broker_root + '/sha256.json'] = account_handoff_broker_seal
+	inputs[account_handoff_controller_root + '/sha256.json'] = account_handoff_controller_seal
+	return inputs
+}
+
+fn account_handoff_delta() map[string]string {
+	return {
+		'/' + account_handoff_broker_path: account_handoff_broker_pin
+		'/opt/vinix-maps-account/bin/maps-account-guest': account_handoff_controller_pin
+		'/usr/bin/run-android-calculator': account_handoff_controller_pin
+	}
+}
+
+fn verify_account_handoff_overlay(receipt map[string]json2.Any) ! {
+	for name, value in {
+		'deployment_input_delta': json2.encode(account_handoff_delta())
+		'deployment_top_level_delta': json2.encode(['inputs_sha256'])
+	} {
+		if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](value)! {
+			return error('account handoff exact deployment delta differs: ' + name)
+		}
+	}
+	for name in ['headless_input_delta', 'headless_top_level_delta'] {
+		if name in receipt { return error('account handoff declares an unexpected headless delta') }
+	}
+	inventory := receipt['overlay_inventory'] or { return error('account handoff overlay inventory absent') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(inventory))!
+	mut paths := account_handoff_delta().keys().map(it.trim_left('/'))
+	paths << service_query_deployment
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 {
+			return error('unsafe account handoff overlay inventory entry')
+		}
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			mode := if entry.name == service_query_deployment { u32(0o644) } else { u32(0o755) }
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != mode {
+				return error('account handoff regular allowlist or inherited mode differs')
+			}
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) {
+			return error('unexpected account handoff overlay inode')
+		}
+	}
+	if regulars.len != 4 { return error('exact four account handoff files required') }
+	for path, pin in account_handoff_delta() {
+		if regulars[path.trim_left('/')] or { '' } != pin {
+			return error('account handoff executable differs from exact producer')
+		}
+	}
+	if regulars[service_query_deployment] or { '' } == account_handoff_retained_deployment {
+		return error('account handoff retained deployment receipt supplied')
+	}
+}
+
+fn verify_account_handoff_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [account_handoff_base_seal, account_handoff_boot_sha, account_handoff_base_overlay,
+		account_handoff_retained_deployment, account_handoff_retained_broker,
+		account_handoff_broker_seal, account_handoff_broker_pin,
+		account_handoff_controller_seal, account_handoff_controller_pin] {
+		if !digest_valid(pin) { return error('sealed account handoff base and producer pins required') }
+	}
+	if account_handoff_controller_seal == onboarding_trace_controller_seal
+		|| account_handoff_controller_pin == onboarding_trace_controller_pin
+		|| account_handoff_broker_pin == account_handoff_retained_broker
+		|| account_handoff_broker_seal == account_handoff_fields()['retained_launch_manifest_sha256']! {
+		return error('new account handoff broker and controller producers required')
+	}
+	for name, expected in account_handoff_fields() {
+		if receipt[name] or { json2.Any('absent') } != json2.Any(expected) {
+			return error('account handoff receipt differs: ' + name)
+		}
+	}
+	mut sealed_inputs := map[string]string{}
+	for path, pin in stage.inputs_sha256 {
+		if path.ends_with('/sha256.json') { sealed_inputs[path] = pin }
+	}
+	if sealed_inputs.len != 43 || sealed_inputs != account_handoff_inputs() {
+		return error('account handoff exact forty-three complete dependency seals differ')
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != account_handoff_modules()
+		|| stage.preserved_modules_sha256 != account_handoff_modules() {
+		return error('account handoff original twenty-one module pins differ')
+	}
+	verify_account_handoff_overlay(receipt)!
+}
+
+fn account_handoff_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_account_handoff_receipt(receipt, stage)!
+	path := account_handoff_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != account_handoff_base_seal {
+		return error('account handoff original application restrictions manifest differs')
+	}
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != account_handoff_boot_sha
+		|| pins['maps-application-restrictions.tar'] or { '' } != account_handoff_base_overlay {
+		return error('account handoff original boot or application restrictions overlay differs')
+	}
+	return account_handoff_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -2171,6 +2320,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = account_pump_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-application-restrictions' {
 		baseline = application_restrictions_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-account-handoff' {
+		baseline = account_handoff_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -4247,6 +4398,124 @@ fn application_restrictions_profile_self_test() ! {
 	println('MAPS-APPLICATION-RESTRICTIONS KERNEL-PROFILE-SELF-TEST PASS exact five-input delta six-file inventory twenty inherited modules twenty-one final forty dependencies historical rejection')
 }
 
+fn account_handoff_entries_fixture() []ServiceQueryEntry {
+	mut entries := []ServiceQueryEntry{}
+	for path, pin in account_handoff_delta() {
+		entries << ServiceQueryEntry{name: path.trim_left('/'), kind: 'regular', sha256: pin, mode: 0o755}
+	}
+	entries << ServiceQueryEntry{name: service_query_deployment, kind: 'regular', sha256: 'c'.repeat(64), mode: 0o644}
+	entries << ServiceQueryEntry{name: 'opt', kind: 'directory', mode: 0o755}
+	return entries
+}
+
+fn account_handoff_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in account_handoff_fields() { receipt[name] = json2.Any(value) }
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(account_handoff_delta()))!
+	receipt['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256']))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(account_handoff_entries_fixture()))!
+	return receipt
+}
+
+fn account_handoff_profile_self_test() ! {
+	profile := account_handoff_profile()
+	if profile.baseline_sha != account_handoff_boot_sha || profile.modules.len != 21
+		|| profile.modules.last() != 'maps-application-restrictions.tar' || account_handoff_inputs().len != 43 {
+		return error('account handoff positive profile fixture differs')
+	}
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 22 { return error('account handoff final module count differs') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', profile.modules}, Config{'vinix', modules.reverse()},
+		Config{'vinix', application_restrictions_profile().modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('unsafe account handoff modules accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: account_handoff_inputs(),
+		original_modules_sha256: account_handoff_modules(), preserved_modules_sha256: account_handoff_modules()}
+	receipt := account_handoff_receipt_fixture()!
+	verify_account_handoff_receipt(receipt, stage)!
+	for name in receipt.keys() {
+		mut bad := account_handoff_receipt_fixture()!
+		bad[name] = json2.Any('wrong')
+		if _ := verify_account_handoff_receipt(bad, stage) { return error('changed account handoff field accepted') }
+		bad.delete(name)
+		if _ := verify_account_handoff_receipt(bad, stage) { return error('missing account handoff field accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut inputs := stage.inputs_sha256.clone()
+		inputs[path] = '0'.repeat(64)
+		if _ := verify_account_handoff_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) { return error('changed account handoff dependency accepted') }
+		inputs.delete(path)
+		if _ := verify_account_handoff_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) { return error('missing account handoff dependency accepted') }
+	}
+	mut extra_inputs := stage.inputs_sha256.clone()
+	extra_inputs['/unreviewed/sha256.json'] = '0'.repeat(64)
+	if _ := verify_account_handoff_receipt(receipt, Stage{...stage, inputs_sha256: extra_inputs}) { return error('extra account handoff dependency accepted') }
+	for bad in [Stage{...stage, format: 2}, Stage{...stage, original_modules_sha256: application_restrictions_modules()},
+		Stage{...stage, preserved_modules_sha256: map[string]string{}}] {
+		if _ := verify_account_handoff_receipt(receipt, bad) { return error('wrong account handoff module inventory accepted') }
+	}
+	mut extra_delta := account_handoff_delta()
+	extra_delta['/' + native_onboarding_trace_path] = account_pump_pin
+	for changed in [map[string]string{}, controller_delta(), extra_delta] {
+		mut bad := account_handoff_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_account_handoff_receipt(bad, stage) { return error('unsafe account handoff input delta accepted') }
+	}
+	for changed in [[]string{}, ['inputs_sha256', 'framework_manifest_sha256'],
+		['inputs_sha256', 'native_manifest_sha256'], ['inputs_sha256', 'browser_client_manifest_sha256']] {
+		mut bad := account_handoff_receipt_fixture()!
+		bad['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_account_handoff_receipt(bad, stage) { return error('unsafe account handoff top-level delta accepted') }
+	}
+	for name in ['headless_input_delta', 'headless_top_level_delta'] {
+		mut bad := account_handoff_receipt_fixture()!
+		bad[name] = json2.decode[json2.Any](json2.encode([]string{}))!
+		if _ := verify_account_handoff_receipt(bad, stage) { return error('account handoff headless declaration accepted') }
+	}
+	entries := account_handoff_entries_fixture()
+	for index, entry in entries {
+		for replacement in [ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777},
+			ServiceQueryEntry{...entry, mode: if entry.mode == 0o755 { u32(0o644) } else { u32(0o755) }},
+			ServiceQueryEntry{...entry, sha256: if entry.name == service_query_deployment { 'invalid' } else { '0'.repeat(64) }}] {
+			if replacement.sha256 != entry.sha256 && entry.kind != 'regular' { continue }
+			mut changed := entries.clone()
+			changed[index] = replacement
+			mut bad := account_handoff_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+			if _ := verify_account_handoff_receipt(bad, stage) { return error('unsafe account handoff inode accepted') }
+		}
+		if entry.kind != 'regular' { continue }
+		mut missing := entries.clone()
+		missing.delete(index)
+		mut bad := account_handoff_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(missing))!
+		if _ := verify_account_handoff_receipt(bad, stage) { return error('missing account handoff file accepted') }
+	}
+	for addition in [entries[0], ServiceQueryEntry{name: browser_poll_path, kind: 'regular', sha256: browser_poll_pin, mode: 0o644},
+		ServiceQueryEntry{name: service_query_jar_path, kind: 'regular', sha256: application_restrictions_jar, mode: 0o644},
+		ServiceQueryEntry{name: 'extra', kind: 'directory', mode: 0o755}, ServiceQueryEntry{name: 'opt/../escape', kind: 'directory', mode: 0o755}] {
+		mut changed := entries.clone()
+		changed << addition
+		mut bad := account_handoff_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_account_handoff_receipt(bad, stage) { return error('extra or duplicate account handoff inode accepted') }
+	}
+	mut retained_entries := entries.clone()
+	for index, entry in entries {
+		if entry.name == service_query_deployment {
+			retained_entries[index] = ServiceQueryEntry{...entry, sha256: account_handoff_retained_deployment}
+		}
+	}
+	mut retained := account_handoff_receipt_fixture()!
+	retained['overlay_inventory'] = json2.decode[json2.Any](json2.encode(retained_entries))!
+	if _ := verify_account_handoff_receipt(retained, stage) { return error('retained account handoff deployment receipt accepted') }
+	if _ := verify_account_handoff_receipt(application_restrictions_receipt_fixture()!, stage) { return error('application restrictions receipt accepted by account handoff profile') }
+	if _ := verify_application_restrictions_receipt(receipt, stage) { return error('account handoff receipt accepted by application restrictions profile') }
+	println('MAPS-ACCOUNT-HANDOFF KERNEL-PROFILE-SELF-TEST PASS exact broker and controller aliases four-file inventory twenty-one inherited modules twenty-two final forty-three dependencies inherited runtime and historical rejection')
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
@@ -4262,6 +4531,7 @@ fn self_test() ! {
 	browser_poll_profile_self_test()!
 	account_pump_profile_self_test()!
 	application_restrictions_profile_self_test()!
+	account_handoff_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -4330,6 +4600,7 @@ fn self_test() ! {
 	fat_self_test(root + '/browser-poll', 'maps-browser-poll.tar', browser_poll_profile().modules)!
 	fat_self_test(root + '/account-pump', 'maps-account-pump.tar', account_pump_profile().modules)!
 	fat_self_test(root + '/application-restrictions', 'maps-application-restrictions.tar', application_restrictions_profile().modules)!
+	fat_self_test(root + '/account-handoff', 'maps-account-handoff.tar', account_handoff_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -4356,11 +4627,12 @@ fn main() {
 	is_browser_poll := os.args.len == 5 && os.args[1] == '--maps-browser-poll'
 	is_account_pump := os.args.len == 5 && os.args[1] == '--maps-account-pump'
 	is_application_restrictions := os.args.len == 5 && os.args[1] == '--maps-application-restrictions'
-	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot && !is_context_storage && !is_broadcast_result && !is_onboarding_trace && !is_native_onboarding_trace && !is_onboarding_framework && !is_native_heartbeat && !is_browser_poll && !is_account_pump && !is_application_restrictions {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+	is_account_handoff := os.args.len == 5 && os.args[1] == '--maps-account-handoff'
+	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot && !is_context_storage && !is_broadcast_result && !is_onboarding_trace && !is_native_onboarding_trace && !is_onboarding_framework && !is_native_heartbeat && !is_browser_poll && !is_account_pump && !is_application_restrictions && !is_account_handoff {
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions { 1 } else { 0 }
+	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -4369,7 +4641,7 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	profile := if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	profile := if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
