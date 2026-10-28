@@ -60,15 +60,18 @@ fn audio_session_category_value(category string) u64 {
 	return read64(cell)
 }
 
+fn audio_session_error(output u64, code i64) {
+	if output == 0 { return }
+	domain := owned_string('NSOSStatusErrorDomain')
+	error_object := ns_error_create(domain, code, 0)
+	objc_release(domain)
+	unsafe { *(&u64(output)) = objc_autorelease(error_object) }
+}
+
 fn audio_session_set_configuration(object u64, category u64, mode u64, options u64, output u64) bool {
 	canonical, effective_options, code := audio_session_configuration(category, mode, options)
 	if code != 0 {
-		if output != 0 {
-			domain := owned_string('NSOSStatusErrorDomain')
-			error_object := ns_error_create(domain, code, 0)
-			objc_release(domain)
-			unsafe { *(&u64(output)) = objc_autorelease(error_object) }
-		}
+		audio_session_error(output, code)
 		return false
 	}
 	// Initialize cache constants before locking state: NSString initialization
@@ -84,6 +87,14 @@ fn audio_session_set_configuration(object u64, category u64, mode u64, options u
 }
 
 fn audio_session_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if selector == 'setActive:error:' {
+		// No hardware audio-session provider is attached. The session stays
+		// inactive; deactivation is idempotent, activation reports !res.
+		active := u8(frame.x[2]) != 0
+		if active { audio_session_error(frame.x[3], 561145203) }
+		frame.x[0] = u64(!active)
+		return true
+	}
 	if selector == 'setAllowHapticsAndSystemSoundsDuringRecording:error:' {
 		// Desired inactive-session policy only. ObjHeader.valid is unused by
 		// AVAudioSession otherwise; no recording or haptics provider is started.

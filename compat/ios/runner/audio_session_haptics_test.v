@@ -63,7 +63,7 @@ fn test_audio_session_haptics() {
 			assert session_haptics_msg(session, c'respondsToSelector:', u64(selector), 0) == 1
 			assert session_haptics_msg(cls, c'respondsToSelector:', u64(selector), 0) == 0
 		}
-		for missing in [c'setActive:error:', c'setAllowHapticsAndSystemSoundsDuringRecording:', c'vinixMissingAudioQuery']! {
+		for missing in [c'setAllowHapticsAndSystemSoundsDuringRecording:', c'vinixMissingAudioQuery']! {
 			assert session_haptics_msg(session, c'respondsToSelector:', u64(missing), 0) == 0
 		}
 		signature := session_haptics_msg(session, c'methodSignatureForSelector:', u64(selectors[0]), 0)

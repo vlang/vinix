@@ -70,7 +70,7 @@ fn test_audio_session_configuration() {
 			assert objc_instance_method(read64(cls), u64(selector)) == 0
 			assert session_configuration_msg(session, c'respondsToSelector:', u64(selector)) == 1
 		}
-		for missing in [c'setActive:error:', c'setCategory:', c'setCategory:error:', c'vinixMissingAudioQuery']! {
+		for missing in [c'setCategory:', c'setCategory:error:', c'vinixMissingAudioQuery']! {
 			assert session_configuration_msg(session, c'respondsToSelector:', u64(missing)) == 0
 		}
 		signature := session_configuration_msg(session, c'methodSignatureForSelector:', u64(selectors[0]))
