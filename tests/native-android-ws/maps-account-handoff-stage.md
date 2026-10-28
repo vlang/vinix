@@ -72,6 +72,20 @@ report review matched the measurements, artifact hashes and incomplete outputs.
 | `A/prepare-r2.guard.json` | `6f28b1f1b3b8d0cc5be7f2b87068ec1d9f9be45a9e6e0f31129a8a86d323ee9c` |
 | `A/prepare-r2.log` | `e9c26794ef5d7eae0c61482920d1c44fd5cd7eb2048f22bb6c085433a16213c9` |
 
+The quiescent build-evidence root `A` and both failed outputs are also bound in
+place by `S/maps-account-handoff-stage-failed-audit-2026-10-28-r1/sealed/manifest.json`,
+SHA-256 `c06fbff50155915eaaf3a91a08e34bb54241d0e49b7816fd898168cfeadf43bf`.
+The existing streamed evidence tool and a fresh-process complete readback both
+passed: three roots, 707 entries. This preserves the incomplete attempts without
+qualifying either as a completed stage. Seal/check guards exited zero with
+complete cleanup and zero swaps, taking 14.497/8.965 seconds with peak sampled
+RSS 22,937,600/22,953,984 bytes. Limits were 600 MiB RSS, 900 seconds, 64 MiB
+shared-volume growth and a 1 GiB reserve. Their receipts remain beside `sealed/`:
+`seal.guard.json` SHA-256
+`126bbdd2e4cdbebabb42c6994a8aa87d60d949e0275491cf51783b92b83c8ea6`,
+and `check.guard.json` SHA-256
+`252ac99f583af242c14c182432eed47d3d4434e8d76abf9ef6ba23a5f584f215`.
+
 Resume with a fresh output and the existing fully checked producer after free
 space backs the complete outer growth allowance plus reserve. A single tighter
 2-GiB outer-growth attempt is authorized only when at least 3 GiB free backs
