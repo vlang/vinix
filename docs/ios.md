@@ -489,13 +489,22 @@ past the constructor and stops at `NSDictionary dictionaryWithObject:forKey:`.
 Progress remains 4/8 observed gates; game rendering is unverified. See the
 [unsigned-number checkpoint](../tests/ios/number-unsigned-checkpoint-20261028.md).
 
-The latest no-ads checkpoint implements `NSDictionary dictionaryWithObject:forKey:`,
+An earlier no-ads checkpoint implements `NSDictionary dictionaryWithObject:forKey:`,
 including the mutable factory, copied keys and retained values. All 44 guest
 fixtures, the fresh sanitized dictionary host suite and 325 audit negative
 controls pass. Fortnite gets past the constructor and stops at
 `NSMutableDictionary dictionaryWithObjectsAndKeys:`. Progress remains 4/8
 observed gates; game rendering is unverified. See the
 [single-entry dictionary checkpoint](../tests/ios/dictionary-single-checkpoint-20261028.md).
+
+The latest no-ads checkpoint implements `dictionaryWithObjectsAndKeys:` for
+both dictionary families, including Darwin arm64 stack arguments, copied keys,
+retained values and native duplicate-key behavior. All 45 guest fixtures, the
+fresh sanitized host suite and 339 audit negative controls pass. Fortnite gets
+past the mutable constructor and stops at the StoreKit purchase/request guard;
+the specific operation is not identified by that diagnostic. Progress remains
+4/8 observed gates; game rendering is unverified. See the
+[variadic dictionary checkpoint](../tests/ios/dictionary-variadic-checkpoint-20261028.md).
 
 `MTLCreateSystemDefaultDevice` still returns nil: a Metal device, shader,
 rendering and presentation backend remains to be implemented. The existing
