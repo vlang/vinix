@@ -291,7 +291,7 @@ fn objc_responds(object u64, selector &char) bool {
 	}
 	if name == 'addObserverForName:object:queue:usingBlock:' && objc_is_kind(object, ios_runtime.names['NSNotificationCenter']) { return true }
 	if objc_is_kind(object, ios_runtime.names['NSNumber']) {
-		return name in ['boolValue', 'integerValue', 'unsignedIntegerValue', 'intValue', 'doubleValue', 'stringValue', 'objCType']
+		return name in ['boolValue', 'integerValue', 'unsignedIntegerValue', 'intValue', 'longLongValue', 'doubleValue', 'stringValue', 'objCType']
 	}
 	if objc_is_kind(object, ios_runtime.names['NSString']) { return name in ['UTF8String', 'length', 'isEqualToString:', 'stringByAppendingString:', 'initWithBytes:length:encoding:'] }
 	if objc_is_kind(object, ios_runtime.names['NSAttributedString']) { return name == 'initWithString:attributes:' }

@@ -369,6 +369,15 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 	}
 	match selector {
 		'boolValue' { frame.x[0] = u64(header.number != 0 || header.real_number != 0) }
+		'longLongValue' {
+			if !objc_is_kind(object, ios_runtime.names['NSNumber']) { return false }
+			// Match Foundation's saturation and NaN handling before a bounded cast.
+			if !header.is_real { frame.x[0] = u64(header.number) }
+			else if header.real_number != header.real_number { frame.x[0] = 0 }
+			else if header.real_number >= 9223372036854775808.0 { frame.x[0] = u64(9223372036854775807) }
+			else if header.real_number <= -9223372036854775808.0 { frame.x[0] = u64(0x8000000000000000) }
+			else { frame.x[0] = u64(i64(header.real_number)) }
+		}
 		'integerValue', 'unsignedIntegerValue', 'intValue' { frame.x[0] = u64(if header.is_real { i64(header.real_number) } else { header.number }) }
 		'doubleValue' { frame_float_return(mut frame, 0, json_number_double(header)) }
 		'objCType' { frame.x[0] = u64(if header.cf_boolean { c'c' } else if header.is_real { c'd' } else if header.unsigned_number { c'Q' } else { c'q' }) }

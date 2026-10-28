@@ -3,6 +3,7 @@
 // Queue mode replaces init and StoreKit; data-task mode adds its fresh fixture
 // and rebuilds the VM driver so the new build target has recorded provenance.
 // Resource-values mode adds a separate fixture and preserves the pinned setter fixture.
+// Number mode adds the signed getter fixture without replacing unsigned coverage.
 module main
 
 import crypto.sha256
@@ -156,10 +157,16 @@ fn replace_runtime(out string, state string) ! {
 		args << ['-s', ',^opt/ios/url-resource-values-checks$,,', '-s', ',^[.]/opt/ios/url-resource-values-checks$,,',
 			'-s', ',^url-resource-new$,./opt/ios/url-resource-values-checks,']
 	}
+	if os.exists(out + '/number-long-long-probe.txt') {
+		os.cp(out + '/number-long-long-checks', out + '/replacement/number-long-new')!
+		args << ['-s', ',^opt/ios/number-long-long-checks$,,', '-s', ',^[.]/opt/ios/number-long-long-checks$,,',
+			'-s', ',^number-long-new$,./opt/ios/number-long-long-checks,']
+	}
 	args << ['@' + state + '/initramfs.tar.gz', '-C', out + '/replacement', 'runtime-new']
 	if queue { args << ['init-new', 'storekit-new'] }
 	if os.exists(out + '/data-task-probe.txt') { args << 'data-task-new' }
 	if os.exists(out + '/url-resource-values-probe.txt') { args << 'url-resource-new' }
+	if os.exists(out + '/number-long-long-probe.txt') { args << 'number-long-new' }
 	capture(out + '/replace-runtime', args)!
 	os.rename(state + '/replacement.tar.gz', state + '/initramfs.tar.gz')!
 	preflight := out + '/runtime-preflight'
@@ -177,6 +184,7 @@ fn queue_media(out string, state string) ! {
 	mut pairs := [['native-init', 'sbin/init'], ['storekit-purchase-checks', 'opt/ios/storekit-purchase-checks']]
 	if os.exists(out + '/data-task-probe.txt') { pairs << ['session-data-task-checks', 'opt/ios/session-data-task-checks'] }
 	if os.exists(out + '/url-resource-values-probe.txt') { pairs << ['url-resource-values-checks', 'opt/ios/url-resource-values-checks'] }
+	if os.exists(out + '/number-long-long-probe.txt') { pairs << ['number-long-long-checks', 'opt/ios/number-long-long-checks'] }
 	mut args := ['/usr/bin/tar', '-xzf', state + '/initramfs.tar.gz', '-C', preflight]
 	for pair in pairs { args << './' + pair[1] }
 	capture(out + '/queue-media', args)!
@@ -220,6 +228,13 @@ fn validate_url_resource_values_results(raw string) ! {
 	}
 }
 
+fn validate_number_long_long_results(raw string) ! {
+	serial := raw.replace('\r\n', '\n')
+	for marker in ['IOS-NATIVE: /opt/ios/number-long-long-checks wait status 0\n', 'IOS-NUMBER-LONG-LONG:'] {
+		if serial.count(marker) != 1 { return error('missing or duplicated number long-long guest result: ' + marker) }
+	}
+}
+
 fn queue_results(out string, state string) ! {
 	serial := os.read_file(state + '/serial.log')!
 	validate_queue_results(serial)!
@@ -231,6 +246,10 @@ fn queue_results(out string, state string) ! {
 	if os.exists(out + '/url-resource-values-probe.txt') {
 		validate_url_resource_values_results(serial)!
 		println('Fresh URL resource values guest fixture: PASS')
+	}
+	if os.exists(out + '/number-long-long-probe.txt') {
+		validate_number_long_long_results(serial)!
+		println('Fresh number long-long guest fixture: PASS')
 	}
 }
 
@@ -273,6 +292,16 @@ fn queue_results_selftest() ! {
 		assert rejected
 	}
 	println('URL resource values guest result validation: LF/CRLF accepted; failure, missing and duplicate results rejected PASS')
+	numbers := 'IOS-NATIVE: /opt/ios/number-long-long-checks wait status 0\nIOS-NUMBER-LONG-LONG: PASS\n'
+	validate_number_long_long_results(numbers)!
+	validate_number_long_long_results(numbers.replace('\n', '\r\n'))!
+	for bad in [numbers.replace('wait status 0', 'wait status 1'),
+		numbers.replace('IOS-NUMBER-LONG-LONG: PASS\n', ''), numbers + numbers] {
+		mut rejected := false
+		validate_number_long_long_results(bad) or { rejected = true }
+		assert rejected
+	}
+	println('Number long-long guest result validation: LF/CRLF accepted; failure, missing and duplicate results rejected PASS')
 }
 
 fn replay(out string) ! {
@@ -295,13 +324,15 @@ fn replacement_selftest(out string) ! {
 	if os.exists(out) { return error('selftest requires a fresh directory') }
 	queue_results_selftest()!
 	stream_copy_selftest(out + '/stream-copy')!
-	for profile in ['queue', 'data-task', 'url-resource-values'] {
+	for profile in ['queue', 'data-task', 'url-resource-values', 'number-long-long'] {
 	for spelling in ['opt/ios/run-ios', './opt/ios/run-ios', 'absent'] {
 		path := out + '/' + profile + '/' + if spelling == 'absent' { 'absent' } else if spelling.starts_with('.') { 'dot' } else { 'plain' }
 		os.mkdir_all(path + '/old/opt/ios')!
 		os.write_file(path + '/old/keep', 'unchanged')!
 		os.write_file(path + '/old/opt/ios/url-resource-checks', 'pinned URL setter fixture')!
 		os.chmod(path + '/old/opt/ios/url-resource-checks', 0o755)!
+		os.write_file(path + '/old/opt/ios/number-unsigned-checks', 'pinned unsigned number fixture')!
+		os.chmod(path + '/old/opt/ios/number-unsigned-checks', 0o755)!
 		os.write_file(path + '/old/opt/ios/run-ios', 'old runtime')!
 		os.write_file(path + '/run-ios-gles', 'new runtime')!
 		os.chmod(path + '/run-ios-gles', 0o755)!
@@ -317,20 +348,29 @@ fn replacement_selftest(out string) ! {
 			os.chmod(path + '/session-data-task-checks', 0o755)!
 			os.write_file(path + '/old/opt/ios/session-data-task-checks', 'old data-task fixture')!
 		}
-		if profile == 'url-resource-values' {
+		if profile in ['url-resource-values', 'number-long-long'] {
 			os.write_file(path + '/url-resource-values-probe.txt', 'selftest\n')!
 			os.write_file(path + '/url-resource-values-checks', 'new URL resource fixture')!
 			os.chmod(path + '/url-resource-values-checks', 0o755)!
 			os.write_file(path + '/old/opt/ios/url-resource-values-checks', 'old URL resource fixture')!
 		}
-		mut args := ['/usr/bin/tar', '-czf', path + '/initramfs.tar.gz', '-C', path + '/old', 'keep', 'opt/ios/url-resource-checks',
+		if profile == 'number-long-long' {
+			os.write_file(path + '/number-long-long-probe.txt', 'selftest\n')!
+			os.write_file(path + '/number-long-long-checks', 'new number long-long fixture')!
+			os.chmod(path + '/number-long-long-checks', 0o755)!
+			os.write_file(path + '/old/opt/ios/number-long-long-checks', 'old number long-long fixture')!
+		}
+		mut args := ['/usr/bin/tar', '-czf', path + '/initramfs.tar.gz', '-C', path + '/old', 'keep', 'opt/ios/url-resource-checks', 'opt/ios/number-unsigned-checks',
 			if spelling.starts_with('.') { './sbin/init' } else { 'sbin/init' }]
 		if spelling != 'absent' { args << spelling }
 		if profile != 'queue' && spelling != 'absent' {
 			args << if spelling.starts_with('.') { './opt/ios/session-data-task-checks' } else { 'opt/ios/session-data-task-checks' }
 		}
-		if profile == 'url-resource-values' && spelling != 'absent' {
+		if profile in ['url-resource-values', 'number-long-long'] && spelling != 'absent' {
 			args << if spelling.starts_with('.') { './opt/ios/url-resource-values-checks' } else { 'opt/ios/url-resource-values-checks' }
+		}
+		if profile == 'number-long-long' && spelling != 'absent' {
+			args << if spelling.starts_with('.') { './opt/ios/number-long-long-checks' } else { 'opt/ios/number-long-long-checks' }
 		}
 		capture(path + '/input', args)!
 		// replace_runtime also embeds the archive in FAT. Use a tiny real
@@ -346,9 +386,12 @@ fn replacement_selftest(out string) ! {
 		capture(path + '/pinned-resource', ['/usr/bin/tar', '-xzf', path + '/initramfs.tar.gz', '-C', path + '/runtime-preflight', 'opt/ios/url-resource-checks'])!
 		pinned := path + '/runtime-preflight/opt/ios/url-resource-checks'
 		if os.read_file(pinned)! != 'pinned URL setter fixture' || !os.is_executable(pinned) { return error('changed pinned historical resource fixture') }
+		capture(path + '/pinned-number', ['/usr/bin/tar', '-xzf', path + '/initramfs.tar.gz', '-C', path + '/runtime-preflight', 'opt/ios/number-unsigned-checks'])!
+		pinned_number := path + '/runtime-preflight/opt/ios/number-unsigned-checks'
+		if os.read_file(pinned_number)! != 'pinned unsigned number fixture' || !os.is_executable(pinned_number) { return error('changed pinned historical number fixture') }
 	}
 	}
-	println('Runtime, init, StoreKit, data-task and URL resource fixture replacement: plain, dot-prefixed and absent prior members; exact bytes, executable permissions, unique members and unchanged content PASS')
+	println('Runtime, init, StoreKit, data-task, URL resource and number fixture replacement: plain, dot-prefixed and absent prior members; exact bytes, executable permissions, unique members and unchanged content PASS')
 }
 
 fn main() {
@@ -384,6 +427,12 @@ fn main() {
 			if digest(out + '/url-resource-values-checks')! != digest(scratch + '/opt/ios/url-resource-values-checks')!
 				|| !os.is_executable(scratch + '/opt/ios/url-resource-values-checks') { panic('changed URL resource values fixture') }
 		}
+		if os.exists(out + '/number-long-long-probe.txt') {
+			capture(scratch + '/number-long-long-media', ['/usr/bin/tar', '-xzf', state + '/initramfs.tar.gz',
+				'-C', scratch, './opt/ios/number-long-long-checks'])!
+			if digest(out + '/number-long-long-checks')! != digest(scratch + '/opt/ios/number-long-long-checks')!
+				|| !os.is_executable(scratch + '/opt/ios/number-long-long-checks') { panic('changed number long-long fixture') }
+		}
 		queue_results(out, state)!
 		return
 	}
@@ -407,10 +456,11 @@ fn main() {
 		replay(out)!
 		return
 	}
-	if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] !in ['--queue-copy', '--data-task-copy', '--url-resource-values-copy']) { panic('usage: storekit-operation-probe COMPLETE_PARENT FRESH_EXTERNAL_OUT FRESH_HOST [--queue-copy|--data-task-copy|--url-resource-values-copy]') }
+	if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] !in ['--queue-copy', '--data-task-copy', '--url-resource-values-copy', '--number-long-long-copy']) { panic('usage: storekit-operation-probe COMPLETE_PARENT FRESH_EXTERNAL_OUT FRESH_HOST [--queue-copy|--data-task-copy|--url-resource-values-copy|--number-long-long-copy]') }
 	queue := os.args.len == 5
-	resource_values := queue && os.args[4] == '--url-resource-values-copy'
-	data_task := queue && os.args[4] in ['--data-task-copy', '--url-resource-values-copy']
+	number_long_long := queue && os.args[4] == '--number-long-long-copy'
+	resource_values := queue && os.args[4] in ['--url-resource-values-copy', '--number-long-long-copy']
+	data_task := queue && os.args[4] in ['--data-task-copy', '--url-resource-values-copy', '--number-long-long-copy']
 	root := os.real_path(os.getwd())
 	parent := os.real_path(os.args[1])
 	out := os.abs_path(os.args[2])
@@ -434,6 +484,7 @@ fn main() {
 	if queue { os.write_file(out + '/queue-probe.txt', 'fresh StoreKit fixture and native init; 45 reused guest fixtures\n')! }
 	if data_task { os.write_file(out + '/data-task-probe.txt', 'fresh suspended data-task and StoreKit fixtures; fresh native init and VM driver; 45 reused guest fixtures\n')! }
 	if resource_values { os.write_file(out + '/url-resource-values-probe.txt', 'fresh URL resources, suspended data-task and StoreKit fixtures; fresh native init and VM driver; 45 reused guest fixtures\n')! }
+	if number_long_long { os.write_file(out + '/number-long-long-probe.txt', 'fresh number long-long, URL resources, suspended data-task and StoreKit fixtures; fresh native init and VM driver; 45 reused guest fixtures\n')! }
 	os.rename(out + '/manifest.sha256', out + '/parent-manifest.sha256')!
 	os.write_file(out + '/parent-bundle.txt', parent + '\n' + parent_manifest + '\n')!
 	os.cp(os.executable(), out + '/storekit-operation-probe')!
@@ -443,7 +494,7 @@ fn main() {
 	}
 	for label in ['host', 'host-deterministic'] {
 		log := os.read_file(host + '/' + label + '.log')!
-		markers := if resource_values { ['IOS-URL-RESOURCE-VALUES-NATIVE:', 'IOS-URL-RESOURCE-VALUES:', 'IOS-URL-RESOURCE-VALUES-REJECT: four '] } else if data_task { ['IOS-SESSION-DATA-TASK-NATIVE:', 'IOS-SESSION-DATA-TASK:', 'IOS-SESSION-DATA-TASK-REJECT: ten '] } else { ['IOS-STOREKIT-PURCHASE:', 'IOS-STOREKIT-PURCHASE-REJECT: 276 ',
+		markers := if number_long_long { ['IOS-NUMBER-LONG-LONG-NATIVE:', 'IOS-NUMBER-LONG-LONG:'] } else if resource_values { ['IOS-URL-RESOURCE-VALUES-NATIVE:', 'IOS-URL-RESOURCE-VALUES:', 'IOS-URL-RESOURCE-VALUES-REJECT: four '] } else if data_task { ['IOS-SESSION-DATA-TASK-NATIVE:', 'IOS-SESSION-DATA-TASK:', 'IOS-SESSION-DATA-TASK-REJECT: ten '] } else { ['IOS-STOREKIT-PURCHASE:', 'IOS-STOREKIT-PURCHASE-REJECT: 276 ',
 			'IOS-STOREKIT-QUEUE:', 'IOS-STOREKIT-QUEUE-REJECT: seven ',
 			'IOS-STOREKIT-OBSERVERS:', 'IOS-STOREKIT-OBSERVERS-REJECT:'] }
 		for marker in markers {
@@ -453,7 +504,7 @@ fn main() {
 			if log.contains(failure) { panic('failed host log: ' + label) }
 		}
 	}
-	capture(out + '/copy-fresh-host', ['/bin/cp', '-Rp', host, out + '/host/' + if resource_values { 'url-resource-values-host' } else if data_task { 'session-data-task-host' } else { 'storekit-operation-host' }])!
+	capture(out + '/copy-fresh-host', ['/bin/cp', '-Rp', host, out + '/host/' + if number_long_long { 'number-long-long-host' } else if resource_values { 'url-resource-values-host' } else if data_task { 'session-data-task-host' } else { 'storekit-operation-host' }])!
 	previous := os.read_file(out + '/source-revision.txt')!
 	os.write_file(out + '/reused-fixture-revision.txt', previous)!
 	revision := os.exec(['git', 'rev-parse', 'HEAD'])
@@ -482,6 +533,7 @@ fn main() {
 	}
 	if data_task { capture(out + '/build-data-task', [out + '/notification-vm', 'build-session-data-task', out])! }
 	if resource_values { capture(out + '/build-url-resource-values', [out + '/notification-vm', 'build-url-resource-values', out])! }
+	if number_long_long { capture(out + '/build-number-long-long', [out + '/notification-vm', 'build-number-long-long', out])! }
 	capture(out + '/built-source-check', ['git', 'diff', '--exit-code', revision.output.trim_space(), '--', 'compat/ios', 'tests/ios'])!
 	mut hashes := []string{}
 	for line in os.read_lines(out + '/built-inputs.sha256')! {

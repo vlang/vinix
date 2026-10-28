@@ -505,6 +505,9 @@ fn main() {
 			if os.exists('/opt/ios/number-unsigned-checks') {
 				require_child('/opt/ios/number-unsigned-checks')
 			}
+			if os.exists('/opt/ios/number-long-long-checks') {
+				require_child('/opt/ios/number-long-long-checks')
+			}
 			if os.exists('/opt/ios/dictionary-single-checks') {
 				require_child('/opt/ios/dictionary-single-checks')
 			}
