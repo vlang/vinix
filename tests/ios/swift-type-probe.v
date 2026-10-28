@@ -170,6 +170,12 @@ fn main() {
 		}
 		'probe' {
 			if os.exists(out + '/probe-no-ads-state.txt') { panic('probe already recorded') }
+			// Staging briefly retains both cooked resources and their archive.
+			// Keep headroom for the boot image and failure logs as well.
+			available := os.disk_usage(out)!.available
+			if available < u64(8) * 1024 * 1024 * 1024 {
+				panic('Swift probe needs at least 8 GiB free before staging; available bytes: ' + available.str())
+			}
 			for key, value in {'VINIX_IOS_VM_CPUS': '1', 'VINIX_IOS_KERNEL': out + '/vinix',
 				'VINIX_IOS_PROBE_MEMORY_MAX': '2147483648', 'VINIX_IOS_VM_GZIP_LEVEL': '1',
 				'VINIX_IOS_PROBE_DESKTOP': '1', 'VINIX_IOS_STORYBOARD_BUNDLE': out + '/application',
