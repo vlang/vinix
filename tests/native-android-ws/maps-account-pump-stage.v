@@ -327,7 +327,10 @@ fn inherited_modes(original []stage.Entry, planned []stage.Entry) !map[string]u3
 		}
 		for old in original {
 			if old.name == target.name {
-				if old.kind != target.kind || old.mode != target.mode { return error('unexpected existing destination mode: ' + old.name) }
+				// An earlier diagnostic TAR used 0644 for this DSO. The first
+				// inode must still supply 0755; later regular members only replace bytes.
+				legacy_native := target.name == native_path && target.mode == 0o755 && old.mode == 0o644
+				if old.kind != target.kind || (old.mode != target.mode && !legacy_native) { return error('unexpected existing destination mode: ' + old.name) }
 				if target.name !in modes {
 					if old.mode & (target.mode & ~u32(0o222)) != target.mode & ~u32(0o222) { return error('insufficient original mode') }
 					modes[target.name] = old.mode
@@ -805,8 +808,14 @@ fn self_test() ! {
 	plan := [stage.Entry{name: native_path, kind: 'regular', mode: 0o755}]
 	good := [stage.Entry{name: 'opt', kind: 'directory', mode: 0o755}, stage.Entry{name: native_path, kind: 'regular', mode: 0o755}]
 	if inherited_modes(good, plan)![native_path]! != 0o755 { return error('native mode lost') }
+	mut historical := good.clone()
+	historical << stage.Entry{name: native_path, kind: 'regular', mode: 0o644}
+	if inherited_modes(historical, plan)![native_path]! != 0o755 { return error('historical native member changed first inode mode') }
+	if _ := inherited_modes([stage.Entry{name: native_path, kind: 'regular', mode: 0o644}], plan) {
+		return error('non-executable first native inode accepted')
+	}
 	for bad in [stage.Entry{name: 'opt', kind: 'symlink', mode: 0o755}, stage.Entry{name: native_path, kind: 'regular', mode: 0o777},
-		stage.Entry{name: native_path, kind: 'regular', mode: 0o4755}, stage.Entry{name: native_path, kind: 'regular', mode: 0o644}] {
+		stage.Entry{name: native_path, kind: 'regular', mode: 0o4755}, stage.Entry{name: native_path, kind: 'regular', mode: 0o600}] {
 		mut original := good.clone()
 		original << bad
 		if _ := inherited_modes(original, plan) { return error('unsafe old inode accepted') }
