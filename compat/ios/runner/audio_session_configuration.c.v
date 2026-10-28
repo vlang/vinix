@@ -84,6 +84,21 @@ fn audio_session_set_configuration(object u64, category u64, mode u64, options u
 }
 
 fn audio_session_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if selector == 'setAllowHapticsAndSystemSoundsDuringRecording:error:' {
+		// Desired inactive-session policy only. ObjHeader.valid is unused by
+		// AVAudioSession otherwise; no recording or haptics provider is started.
+		C.ios_objc_initialize_lock()
+		obj_header(object).valid = u8(frame.x[2]) != 0
+		C.ios_objc_initialize_unlock()
+		frame.x[0] = 1 // Success leaves the caller's NSError ** untouched.
+		return true
+	}
+	if selector == 'allowHapticsAndSystemSoundsDuringRecording' {
+		C.ios_objc_initialize_lock()
+		frame.x[0] = u64(obj_header(object).valid)
+		C.ios_objc_initialize_unlock()
+		return true
+	}
 	if selector == 'setCategory:mode:options:error:' {
 		frame.x[0] = u64(audio_session_set_configuration(object, frame.x[2], frame.x[3], frame.x[4], frame.x[5]))
 		return true

@@ -21,6 +21,8 @@ fn audio_session_types(name string, meta bool, selector string) ?string {
 	if !meta && selector in ['category', 'mode'] { return '@16@0:8' }
 	if !meta && selector == 'categoryOptions' { return 'Q16@0:8' }
 	if !meta && selector == 'setCategory:mode:options:error:' { return 'B48@0:8@16@24Q32^@40' }
+	if !meta && selector == 'setAllowHapticsAndSystemSoundsDuringRecording:error:' { return 'B28@0:8B16^@20' }
+	if !meta && selector == 'allowHapticsAndSystemSoundsDuringRecording' { return 'B16@0:8' }
 	if !meta && selector == 'isOtherAudioPlaying' { return 'B16@0:8' }
 	return none
 }
