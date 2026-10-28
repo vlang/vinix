@@ -152,8 +152,13 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 		frame.x[0] = objc_class_parent(object)
 		return true
 	}
+	if storekit_queue_dispatch(object, selector, mut frame) { return true }
 	if storekit_purchase_unsupported(selector) {
-		storekit_purchase_require_operation(if object in ios_runtime.classes { object } else { read64(object) }, selector)
+		meta := object in ios_runtime.classes
+		cls := if meta { object } else { read64(object) }
+		if !storekit_queue_allows(ctext(u64(objc_class_name(cls))), meta, selector) {
+			storekit_purchase_require_operation(cls, selector)
+		}
 	}
 	if selector == 'superclass' && object in ios_runtime.classes && ns_proxy_family(object) {
 		frame.x[0] = objc_class_parent(object)

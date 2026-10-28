@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Reuse the complete sealed dictionary checkpoint; replace only its runtime.
+// Reuse the complete sealed dictionary checkpoint with a fresh runtime.
+// Queue mode also replaces init and adds a fresh StoreKit fixture.
 module main
 
 import crypto.sha256
@@ -58,10 +59,21 @@ fn replace_runtime(out string, state string) ! {
 	// The omission patterns also apply to newly added files. Give the new
 	// source a distinct name and rename it only after skipping old members.
 	os.cp(out + '/run-ios-gles', out + '/replacement/runtime-new')!
-	capture(out + '/replace-runtime', ['/usr/bin/tar', '--format=ustar', '--options', 'gzip:compression-level=1',
+	mut args := ['/usr/bin/tar', '--format=ustar', '--options', 'gzip:compression-level=1',
 		'-czf', state + '/replacement.tar.gz', '-s', ',^opt/ios/run-ios$,,', '-s', ',^[.]/opt/ios/run-ios$,,',
-		'-s', ',^runtime-new$,./opt/ios/run-ios,',
-		'@' + state + '/initramfs.tar.gz', '-C', out + '/replacement', 'runtime-new'])!
+		'-s', ',^runtime-new$,./opt/ios/run-ios,']
+	queue := os.exists(out + '/queue-probe.txt')
+	if queue {
+		for pair in [['native-init', 'init-new'], ['storekit-purchase-checks', 'storekit-new']] {
+			os.cp(out + '/' + pair[0], out + '/replacement/' + pair[1])!
+		}
+		args << ['-s', ',^sbin/init$,,', '-s', ',^[.]/sbin/init$,,',
+			'-s', ',^opt/ios/storekit-purchase-checks$,,', '-s', ',^[.]/opt/ios/storekit-purchase-checks$,,',
+			'-s', ',^init-new$,./sbin/init,', '-s', ',^storekit-new$,./opt/ios/storekit-purchase-checks,']
+	}
+	args << ['@' + state + '/initramfs.tar.gz', '-C', out + '/replacement', 'runtime-new']
+	if queue { args << ['init-new', 'storekit-new'] }
+	capture(out + '/replace-runtime', args)!
 	os.rename(state + '/replacement.tar.gz', state + '/initramfs.tar.gz')!
 	preflight := out + '/runtime-preflight'
 	os.mkdir_all(preflight)!
@@ -69,7 +81,35 @@ fn replace_runtime(out string, state string) ! {
 		'-C', preflight, '--fast-read', './opt/ios/run-ios'])!
 	if digest(preflight + '/opt/ios/run-ios')! != digest(out + '/run-ios-gles')!
 		|| !os.is_executable(preflight + '/opt/ios/run-ios') { return error('missing, changed or non-executable guest runtime') }
+	if queue { queue_media(out, state)! }
 	capture(out + '/replace-boot-member', ['mcopy', '-o', '-i', state + '/boot.img', state + '/initramfs.tar.gz', '::/boot/initramfs.tar.gz'])!
+}
+
+fn queue_media(out string, state string) ! {
+	preflight := out + '/runtime-preflight'
+	capture(out + '/queue-media', ['/usr/bin/tar', '-xzf', state + '/initramfs.tar.gz',
+		'-C', preflight, './sbin/init', './opt/ios/storekit-purchase-checks'])!
+	for pair in [['native-init', 'sbin/init'], ['storekit-purchase-checks', 'opt/ios/storekit-purchase-checks']] {
+		if digest(out + '/' + pair[0])! != digest(preflight + '/' + pair[1])!
+			|| !os.is_executable(preflight + '/' + pair[1]) { return error('changed supplemental guest input: ' + pair[1]) }
+	}
+	listing := os.exec(['/usr/bin/tar', '-tzf', state + '/initramfs.tar.gz'])
+	if listing.exit_code != 0 { return error('cannot inspect supplemental guest input inventory') }
+	for member in ['sbin/init', 'opt/ios/storekit-purchase-checks'] {
+		if listing.output.split_into_lines().filter(it == member || it == './' + member).len != 1 {
+			return error('missing or duplicated supplemental guest input: ' + member)
+		}
+	}
+}
+
+fn queue_results(state string) ! {
+	serial := os.read_file(state + '/serial.log')!
+	for marker in ['IOS-NATIVE: /opt/ios/storekit-purchase-checks wait status 0\n',
+		'IOS-STOREKIT-PURCHASE:', 'IOS-STOREKIT-PURCHASE-REJECT: 276 ',
+		'IOS-STOREKIT-QUEUE:', 'IOS-STOREKIT-QUEUE-REJECT: seven '] {
+		if serial.count(marker) != 1 { return error('missing or duplicated queue guest result: ' + marker) }
+	}
+	println('Supplemental fresh StoreKit guest fixture: PASS')
 }
 
 fn replay(out string) ! {
@@ -84,6 +124,7 @@ fn replay(out string) ! {
 	log := os.read_file(out + '/probe-no-ads.log')!
 	os.write_file(out + '/probe-no-ads.log', log + 'VM probe memory.max: 2147483648 (retained configuration; checked by the full guest-media auditor)\n')!
 	capture(out + '/operation-inspect', [out + '/checkpoint', 'inspect', out])!
+	if os.exists(out + '/queue-probe.txt') { queue_results(state)! }
 	println('Fresh runtime probe complete. Run the unchanged checkpoint seal/check and negative-controls before reporting qualification.')
 }
 
@@ -96,7 +137,14 @@ fn replacement_selftest(out string) ! {
 		os.write_file(path + '/old/opt/ios/run-ios', 'old runtime')!
 		os.write_file(path + '/run-ios-gles', 'new runtime')!
 		os.chmod(path + '/run-ios-gles', 0o755)!
-		mut args := ['/usr/bin/tar', '-czf', path + '/initramfs.tar.gz', '-C', path + '/old', 'keep']
+		os.mkdir_all(path + '/old/sbin')!
+		os.write_file(path + '/old/sbin/init', 'old init')!
+		os.write_file(path + '/native-init', 'new init')!
+		os.write_file(path + '/storekit-purchase-checks', 'new StoreKit fixture')!
+		for file in ['native-init', 'storekit-purchase-checks'] { os.chmod(path + '/' + file, 0o755)! }
+		os.write_file(path + '/queue-probe.txt', 'selftest\n')!
+		mut args := ['/usr/bin/tar', '-czf', path + '/initramfs.tar.gz', '-C', path + '/old', 'keep',
+			if spelling.starts_with('.') { './sbin/init' } else { 'sbin/init' }]
 		if spelling != 'absent' { args << spelling }
 		capture(path + '/input', args)!
 		// replace_runtime also embeds the archive in FAT. Use a tiny real
@@ -110,11 +158,26 @@ fn replacement_selftest(out string) ! {
 		keep := os.exec(['/usr/bin/tar', '-xOzf', path + '/initramfs.tar.gz', 'keep'])
 		if keep.exit_code != 0 || keep.output != 'unchanged' { return error('changed unrelated member') }
 	}
-	println('Runtime replacement: plain, dot-prefixed and absent prior member; exact bytes, executable permissions, unique member and unchanged content PASS')
+	println('Runtime, init and fixture replacement: plain, dot-prefixed and absent prior runtime; exact bytes, executable permissions, unique members and unchanged content PASS')
 }
 
 fn main() {
 	if os.args.len == 3 && os.args[1] == 'selftest' { replacement_selftest(os.abs_path(os.args[2]))!; return }
+	if os.args.len == 4 && os.args[1] == 'check-queue' {
+		out := os.real_path(os.args[2])
+		scratch := os.abs_path(os.args[3])
+		if os.exists(scratch) || scratch.starts_with(out + '/') { panic('check-queue needs fresh independent scratch') }
+		os.mkdir_all(scratch)!
+		capture(scratch + '/historical-check', [out + '/checkpoint', 'check', out])!
+		state := os.read_file(out + '/probe-no-ads-state.txt')!.trim_space()
+		if os.dir(state) != out { panic('unsafe queue state pointer') }
+		capture(scratch + '/queue-media', ['/usr/bin/tar', '-xzf', state + '/initramfs.tar.gz',
+			'-C', scratch, './opt/ios/storekit-purchase-checks'])!
+		if digest(out + '/storekit-purchase-checks')! != digest(scratch + '/opt/ios/storekit-purchase-checks')!
+			|| !os.is_executable(scratch + '/opt/ios/storekit-purchase-checks') { panic('changed supplemental StoreKit fixture') }
+		queue_results(state)!
+		return
+	}
 	if os.args.len == 4 && os.args[1] == 'recover' {
 		failed := os.real_path(os.args[2])
 		out := os.abs_path(os.args[3])
@@ -135,7 +198,8 @@ fn main() {
 		replay(out)!
 		return
 	}
-	if os.args.len != 4 { panic('usage: storekit-operation-probe COMPLETE_PARENT FRESH_EXTERNAL_OUT FRESH_STOREKIT_HOST') }
+	if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] != '--queue-copy') { panic('usage: storekit-operation-probe COMPLETE_PARENT FRESH_EXTERNAL_OUT FRESH_STOREKIT_HOST [--queue-copy]') }
+	queue := os.args.len == 5
 	root := os.real_path(os.getwd())
 	parent := os.real_path(os.args[1])
 	out := os.abs_path(os.args[2])
@@ -145,12 +209,13 @@ fn main() {
 		panic('requires external evidence and a fresh independent output directory')
 	}
 	verify_parent(parent)!
-	// An APFS clone preserves the entire parent while sharing unchanged extents.
-	// Fail rather than silently making a space-consuming ordinary copy.
-	if os.disk_usage(os.dir(out).clone())!.available < u64(8) * 1024 * 1024 * 1024 {
-		panic('runtime replacement and its full media audit need at least 8 GiB free')
+	// Default mode requires an APFS clone. Queue mode explicitly permits a
+	// complete cross-volume copy, for example to a guarded RAM disk.
+	if os.disk_usage(os.dir(out).clone())!.available < u64(if queue { 12 } else { 8 }) * 1024 * 1024 * 1024 {
+		panic('runtime replacement and its full media audit need 8 GiB free (12 GiB in queue mode)')
 	}
-	capture(out + '-clone', ['/bin/cp', '-cRp', parent, out])!
+	capture(out + '-clone', ['/bin/cp', if queue { '-Rp' } else { '-cRp' }, parent, out])!
+	if queue { os.write_file(out + '/queue-probe.txt', 'fresh StoreKit fixture and native init; 45 reused guest fixtures\n')! }
 	os.rename(out + '/manifest.sha256', out + '/parent-manifest.sha256')!
 	os.write_file(out + '/parent-bundle.txt', parent + '\n' + parent_manifest + '\n')!
 	os.cp(os.executable(), out + '/storekit-operation-probe')!
@@ -173,11 +238,16 @@ fn main() {
 	os.setenv('V_RESOURCE_PATH', root + '/build/ios/fortnite/ns-calendar-checks/toolchain', true)
 	os.setenv('V_MACOS_V3_NO_FALLBACK', '1', true)
 	capture(out + '/build-runtime', [out + '/notification-vm', 'build-run-ios-gles', out])!
+	if queue {
+		capture(out + '/build-native-init', [out + '/notification-vm', 'build-init', out])!
+		capture(out + '/build-storekit', [out + '/notification-vm', 'build-storekit-purchase', out])!
+	}
 	capture(out + '/built-source-check', ['git', 'diff', '--exit-code', revision.output.trim_space(), '--', 'compat/ios', 'tests/ios'])!
 	mut hashes := []string{}
 	for line in os.read_lines(out + '/built-inputs.sha256')! {
 		path := line[66..]
-		if path !in ['run-ios-gles', 'run-ios-gles.c'] && digest(out + '/' + path)! != line[..64] {
+		if path !in ['run-ios-gles', 'run-ios-gles.c'] && !(queue && path in ['native-init', 'native-init.c'])
+			&& digest(out + '/' + path)! != line[..64] {
 			panic('changed reused fixture or driver: ' + path)
 		}
 		hashes << digest(out + '/' + path)! + '  ' + path

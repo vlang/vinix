@@ -547,6 +547,8 @@ mut:
 	app_attest_retired bool
 	audio_application u64 // One factory-owned reference.
 	audio_application_retired bool
+	storekit_queue u64 // One factory-owned reference; no App Store provider.
+	storekit_queue_retired bool
 	audio_converters map[u64]&AudioConverter
 	audio_units map[u64]&AudioUnit
 	audio_graphs map[u64]&AudioGraph
@@ -727,7 +729,7 @@ fn objc_start() {
 			'UIImageView' { u32(512) }
 			'GCKeyboard' { u32(32) }
 			'GCMouse' { u32(40) }
-			'GCColor', 'CHHapticEventParameter', 'AVAudioApplication' { u32(24) }
+			'GCColor', 'CHHapticEventParameter', 'AVAudioApplication', 'SKPaymentQueue' { u32(24) }
 			'DCAppAttestService' { u32(16) } // Catalyst size; opaque shim storage.
 			'AVCaptureDeviceDiscoverySession' { u32(48) } // Catalyst size; opaque shim storage.
 			'AVCaptureOutput' { u32(16) }
@@ -1145,6 +1147,7 @@ fn objc_stop() {
 	objc_release(ios_runtime.audio_session)
 	app_attest_stop()
 	audio_application_stop()
+	storekit_queue_stop()
 	objc_release(ios_runtime.defaults)
 	objc_release(ios_runtime.file_manager)
 	ios_runtime.file_manager = 0

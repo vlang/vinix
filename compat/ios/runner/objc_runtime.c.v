@@ -137,6 +137,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := capture_discovery_types(info.name, info.meta, selector) { return types }
 	if types := capture_audio_types(info.name, info.meta, selector) { return types }
 	if types := audio_application_types(info.name, info.meta, selector) { return types }
+	if types := storekit_queue_types(info.name, info.meta, selector) { return types }
 	if types := audio_session_types(info.name, info.meta, selector) { return types }
 	if types := storyboard_types(info.name, info.meta, selector) { return types }
 	if types := haptic_dynamic_parameter_types(info.name, info.meta, selector) { return types }
@@ -222,7 +223,8 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if method := info.method_info[name] { return u64(method) }
 		if ns_object_equality_unavailable(info.name, info.meta, name) { return 0 }
 		if av_player_name(info.name) && av_player_unsupported(name) { return 0 }
-		if storekit_purchase_name(info.name) && storekit_purchase_unsupported(name) { return 0 }
+		if storekit_purchase_name(info.name) && storekit_purchase_unsupported(name)
+			&& !storekit_queue_allows(info.name, info.meta, name) { return 0 }
 		if info.name == 'NSProxy' && ns_proxy_unsupported(name) { return 0 }
 		if info.name == '_TtCs12_SwiftObject' && swift_object_unsupported(name) { return 0 }
 		if info.name in ['UITextPosition', 'UITextRange']! && text_input_unsupported(name) { return 0 }
