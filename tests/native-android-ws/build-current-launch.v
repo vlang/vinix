@@ -474,6 +474,9 @@ fn launch_items(profile string) ![][]string {
 		return [['account-ui-controller', repo + '/tests/native-android-ws/account-ui-controller.v',
 			'account-ui-controller']]
 	}
+	if profile == 'account-broker' {
+		return [['broker', repo + '/build-support/android/native-account-broker.v', 'native-account-broker']]
+	}
 	if profile != 'launch' { return error('unknown executable profile') }
 	return [
 		['native-entry', repo + '/build-support/android/native-entry.v', 'vinix-android-native'],
@@ -489,6 +492,7 @@ fn profile_prefix(profile string) !string {
 		'launch' { 'current-launch-build-' }
 		'token-cache-controller' { 'current-token-cache-controller-build-' }
 		'ui-controller' { 'current-ui-controller-build-' }
+		'account-broker' { 'current-account-broker-build-' }
 		else { return error('unknown executable profile') }
 	}
 }
@@ -498,6 +502,7 @@ fn profile_kind(profile string) !string {
 		'launch' { 'vinix-current-launch-v1' }
 		'token-cache-controller' { 'vinix-account-token-cache-controller-v1' }
 		'ui-controller' { 'vinix-account-ui-controller-build-v1' }
+		'account-broker' { 'vinix-account-broker-build-v1' }
 		else { return error('unknown executable profile') }
 	}
 }
@@ -1025,6 +1030,8 @@ fn bootstrap(root string, framework string, profile string) ! {
 		[root + '/tools/frozen-builder', '--frozen-token-cache-controller', framework, root]
 	} else if profile == 'ui-controller' {
 		[root + '/tools/frozen-builder', '--frozen-ui-controller', framework, root]
+	} else if profile == 'account-broker' {
+		[root + '/tools/frozen-builder', '--frozen-account-broker', framework, root]
 	} else {
 		[root + '/tools/frozen-builder', '--frozen-build', framework, root]
 	}
@@ -1100,7 +1107,8 @@ fn self_test() ! {
 	if !needs_zlib({'/frozen/accountmanifest/authenticator_zip.v': 'pin'})
 		|| needs_zlib({'/frozen/unrelated.v': 'pin'}) { return error('zlib source selection differs') }
 	if launch_items('launch')!.len != 4 || launch_items('token-cache-controller')!.len != 1
-		|| launch_items('ui-controller')! != [['account-ui-controller', repo + '/tests/native-android-ws/account-ui-controller.v', 'account-ui-controller']] {
+		|| launch_items('ui-controller')! != [['account-ui-controller', repo + '/tests/native-android-ws/account-ui-controller.v', 'account-ui-controller']]
+		|| launch_items('account-broker')! != [['broker', repo + '/build-support/android/native-account-broker.v', 'native-account-broker']] {
 		return error('executable profile membership differs')
 	}
 	if profile_prefix('ui-controller')! != 'current-ui-controller-build-'
@@ -1108,7 +1116,9 @@ fn self_test() ! {
 		|| profile_prefix('launch')! != 'current-launch-build-'
 		|| profile_kind('launch')! != 'vinix-current-launch-v1'
 		|| profile_prefix('token-cache-controller')! != 'current-token-cache-controller-build-'
-		|| profile_kind('token-cache-controller')! != 'vinix-account-token-cache-controller-v1' {
+		|| profile_kind('token-cache-controller')! != 'vinix-account-token-cache-controller-v1'
+		|| profile_prefix('account-broker')! != 'current-account-broker-build-'
+		|| profile_kind('account-broker')! != 'vinix-account-broker-build-v1' {
 		return error('executable profile receipt differs')
 	}
 	mut rejected_profile := false
@@ -1242,12 +1252,13 @@ fn main() {
 		}
 		return
 	}
-	if os.args.len == 4 && os.args[1] in ['--frozen-build', '--frozen-token-cache-controller', '--frozen-ui-controller'] {
+	if os.args.len == 4 && os.args[1] in ['--frozen-build', '--frozen-token-cache-controller', '--frozen-ui-controller', '--frozen-account-broker'] {
 		framework := os.abs_path(os.args[2])
 		root := os.abs_path(os.args[3])
 		profile := match os.args[1] {
 			'--frozen-build' { 'launch' }
 			'--frozen-token-cache-controller' { 'token-cache-controller' }
+			'--frozen-account-broker' { 'account-broker' }
 			else { 'ui-controller' }
 		}
 		prefix := profile_prefix(profile)!
@@ -1262,15 +1273,15 @@ fn main() {
 		}
 		return
 	}
-	controller := os.args.len == 4 && os.args[1] in ['--token-cache-controller', '--ui-controller']
-	if os.args.len != 3 && !controller {
-		eprintln('usage: build-current-launch [--token-cache-controller|--ui-controller] SEALED_FRAMEWORK_BUNDLE FRESH_EXTERNAL_OUTPUT; or build-current-launch --account|--browser FRESH_EXTERNAL_OUTPUT')
+	single_executable := os.args.len == 4 && os.args[1] in ['--token-cache-controller', '--ui-controller', '--account-broker']
+	if os.args.len != 3 && !single_executable {
+		eprintln('usage: build-current-launch [--token-cache-controller|--ui-controller|--account-broker] SEALED_FRAMEWORK_BUNDLE FRESH_EXTERNAL_OUTPUT; or build-current-launch --account|--browser FRESH_EXTERNAL_OUTPUT')
 		exit(2)
 	}
-	transport := !controller && os.args[1] in ['--account', '--browser']
-	profile := if controller || transport { os.args[1].trim_left('-') } else { 'launch' }
-	framework := if transport { os.args[1] } else { os.abs_path(os.args[if controller { 2 } else { 1 }]) }
-	root := os.abs_path(os.args[if controller { 3 } else { 2 }])
+	transport := !single_executable && os.args[1] in ['--account', '--browser']
+	profile := if single_executable || transport { os.args[1].trim_left('-') } else { 'launch' }
+	framework := if transport { os.args[1] } else { os.abs_path(os.args[if single_executable { 2 } else { 1 }]) }
+	root := os.abs_path(os.args[if single_executable { 3 } else { 2 }])
 	prefix := if transport { 'current-' + profile + '-build-' } else { profile_prefix(profile)! }
 	if (!transport && (!framework.starts_with(state) || os.real_path(framework) != framework))
 		|| !root.starts_with(state + prefix) || os.exists(root)
