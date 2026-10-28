@@ -53,7 +53,88 @@ fn verify_parent(parent string) ! {
 	if expected.len == 0 { return error('empty parent manifest') }
 }
 
+fn replace_runtime(out string, state string) ! {
+	os.mkdir_all(out + '/replacement')!
+	// The omission patterns also apply to newly added files. Give the new
+	// source a distinct name and rename it only after skipping old members.
+	os.cp(out + '/run-ios-gles', out + '/replacement/runtime-new')!
+	capture(out + '/replace-runtime', ['/usr/bin/tar', '--format=ustar', '--options', 'gzip:compression-level=1',
+		'-czf', state + '/replacement.tar.gz', '-s', ',^opt/ios/run-ios$,,', '-s', ',^[.]/opt/ios/run-ios$,,',
+		'-s', ',^runtime-new$,./opt/ios/run-ios,',
+		'@' + state + '/initramfs.tar.gz', '-C', out + '/replacement', 'runtime-new'])!
+	os.rename(state + '/replacement.tar.gz', state + '/initramfs.tar.gz')!
+	preflight := out + '/runtime-preflight'
+	os.mkdir_all(preflight)!
+	capture(out + '/runtime-preflight', ['/usr/bin/tar', '-xzf', state + '/initramfs.tar.gz',
+		'-C', preflight, '--fast-read', './opt/ios/run-ios'])!
+	if digest(preflight + '/opt/ios/run-ios')! != digest(out + '/run-ios-gles')!
+		|| !os.is_executable(preflight + '/opt/ios/run-ios') { return error('missing, changed or non-executable guest runtime') }
+	capture(out + '/replace-boot-member', ['mcopy', '-o', '-i', state + '/boot.img', state + '/initramfs.tar.gz', '::/boot/initramfs.tar.gz'])!
+}
+
+fn replay(out string) ! {
+	os.setenv('VINIX_IOS_CHECK_NAME', 'notification-center-checks', true)
+	os.setenv('VINIX_IOS_VM_CPUS', '1', true)
+	state_name := os.file_name(os.read_file(out + '/probe-no-ads-state.txt')!.trim_space())
+	if !state_name.starts_with('probe-no-ads-') || state_name.contains('/') { return error('unsafe parent VM state') }
+	state := out + '/' + state_name
+	os.write_file(out + '/probe-no-ads-state.txt', state + '\n')!
+	replace_runtime(out, state)!
+	capture(out + '/probe-no-ads', [out + '/notification-vm', 'replay-probe-no-ads', out])!
+	log := os.read_file(out + '/probe-no-ads.log')!
+	os.write_file(out + '/probe-no-ads.log', log + 'VM probe memory.max: 2147483648 (retained configuration; checked by the full guest-media auditor)\n')!
+	capture(out + '/operation-inspect', [out + '/checkpoint', 'inspect', out])!
+	println('Fresh runtime probe complete. Run the unchanged checkpoint seal/check and negative-controls before reporting qualification.')
+}
+
+fn replacement_selftest(out string) ! {
+	if os.exists(out) { return error('selftest requires a fresh directory') }
+	for spelling in ['opt/ios/run-ios', './opt/ios/run-ios', 'absent'] {
+		path := out + '/' + if spelling == 'absent' { 'absent' } else if spelling.starts_with('.') { 'dot' } else { 'plain' }
+		os.mkdir_all(path + '/old/opt/ios')!
+		os.write_file(path + '/old/keep', 'unchanged')!
+		os.write_file(path + '/old/opt/ios/run-ios', 'old runtime')!
+		os.write_file(path + '/run-ios-gles', 'new runtime')!
+		os.chmod(path + '/run-ios-gles', 0o755)!
+		mut args := ['/usr/bin/tar', '-czf', path + '/initramfs.tar.gz', '-C', path + '/old', 'keep']
+		if spelling != 'absent' { args << spelling }
+		capture(path + '/input', args)!
+		// replace_runtime also embeds the archive in FAT. Use a tiny real
+		// filesystem so the regression exercises exactly the production path.
+		capture(path + '/disk', ['mkfile', '-n', '16m', path + '/boot.img'])!
+		capture(path + '/fat', ['mformat', '-i', path + '/boot.img', '::'])!
+		capture(path + '/boot-dir', ['mmd', '-i', path + '/boot.img', '::/boot'])!
+		replace_runtime(path, path)!
+		listing := os.exec(['/usr/bin/tar', '-tzf', path + '/initramfs.tar.gz'])
+		if listing.exit_code != 0 || listing.output.split_into_lines().filter(it == './opt/ios/run-ios' || it == 'opt/ios/run-ios').len != 1 { return error('runtime omitted or duplicated') }
+		keep := os.exec(['/usr/bin/tar', '-xOzf', path + '/initramfs.tar.gz', 'keep'])
+		if keep.exit_code != 0 || keep.output != 'unchanged' { return error('changed unrelated member') }
+	}
+	println('Runtime replacement: plain, dot-prefixed and absent prior member; exact bytes, executable permissions, unique member and unchanged content PASS')
+}
+
 fn main() {
+	if os.args.len == 3 && os.args[1] == 'selftest' { replacement_selftest(os.abs_path(os.args[2]))!; return }
+	if os.args.len == 4 && os.args[1] == 'recover' {
+		failed := os.real_path(os.args[2])
+		out := os.abs_path(os.args[3])
+		root := os.real_path(os.getwd())
+		if failed == root || out == root || failed.starts_with(root + '/') || out.starts_with(root + '/')
+			|| os.exists(out) || out.starts_with(failed + '/') { panic('recovery needs a fresh external copy') }
+		if os.read_file(failed + '/operation-inspect.status.txt')! != '1\n' { panic('expected failed staging probe') }
+		if os.disk_usage(os.dir(out).clone())!.available < u64(12) * 1024 * 1024 * 1024 { panic('recovery and full media audit need 12 GiB free') }
+		capture(out + '-copy', ['/bin/cp', '-Rp', failed, out])!
+		os.write_file(out + '/failed-staging-bundle.txt', failed + '\n')!
+		os.cp(os.executable(), out + '/storekit-operation-probe')!
+		os.cp(root + '/tests/ios/storekit-operation-probe.v', out + '/storekit-operation-probe.v')!
+		revision := os.exec(['git', 'rev-parse', 'HEAD'])
+		if revision.exit_code != 0 { panic(revision.output) }
+		os.write_file(out + '/staging-revision.txt', revision.output)!
+		capture(out + '/staging-source-check', ['git', 'diff', '--exit-code', revision.output.trim_space(), '--', 'compat/ios', 'tests/ios'])!
+		capture(out + '/staging-source-snapshot', ['git', 'archive', '--format=tar', '--output=' + out + '/staging-source.tar', revision.output.trim_space(), '--', 'compat/ios', 'tests/ios'])!
+		replay(out)!
+		return
+	}
 	if os.args.len != 4 { panic('usage: storekit-operation-probe COMPLETE_PARENT FRESH_EXTERNAL_OUT FRESH_STOREKIT_HOST') }
 	root := os.real_path(os.getwd())
 	parent := os.real_path(os.args[1])
@@ -102,20 +183,5 @@ fn main() {
 		hashes << digest(out + '/' + path)! + '  ' + path
 	}
 	os.write_file(out + '/built-inputs.sha256', hashes.join('\n') + '\n')!
-	state_name := os.file_name(os.read_file(out + '/probe-no-ads-state.txt')!.trim_space())
-	if !state_name.starts_with('probe-no-ads-') || state_name.contains('/') { panic('unsafe parent VM state') }
-	state := out + '/' + state_name
-	os.write_file(out + '/probe-no-ads-state.txt', state + '\n')!
-	os.mkdir_all(out + '/replacement/opt/ios')!
-	os.cp(out + '/run-ios-gles', out + '/replacement/opt/ios/run-ios')!
-	capture(out + '/replace-runtime', ['/usr/bin/tar', '--format=ustar', '--options', 'gzip:compression-level=1',
-		'-czf', state + '/replacement.tar.gz', '-s', ',^opt/ios/run-ios$,,', '-s', ',^[.]/opt/ios/run-ios$,,',
-		'@' + state + '/initramfs.tar.gz', '-C', out + '/replacement', './opt/ios/run-ios'])!
-	os.rename(state + '/replacement.tar.gz', state + '/initramfs.tar.gz')!
-	capture(out + '/replace-boot-member', ['mcopy', '-o', '-i', state + '/boot.img', state + '/initramfs.tar.gz', '::/boot/initramfs.tar.gz'])!
-	capture(out + '/probe-no-ads', [out + '/notification-vm', 'replay-probe-no-ads', out])!
-	log := os.read_file(out + '/probe-no-ads.log')!
-	os.write_file(out + '/probe-no-ads.log', log + 'VM probe memory.max: 2147483648 (retained configuration; checked by the full guest-media auditor)\n')!
-	capture(out + '/operation-inspect', [out + '/checkpoint', 'inspect', out])!
-	println('Fresh runtime probe complete. Run the unchanged checkpoint seal/check and negative-controls before reporting qualification.')
+	replay(out)!
 }
