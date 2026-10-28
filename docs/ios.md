@@ -375,7 +375,7 @@ A rendered frame, interactive menu, login and playable match remain
 unverified. Advertising remains skipped. See the
 [desktop probe checkpoint](../tests/ios/desktop-probe-checkpoint-20261026.md).
 
-The latest no-ads checkpoint implements canonical `NSString compare:`.
+A preceding no-ads checkpoint implements canonical `NSString compare:`.
 Regular and deterministic ASan/UBSan runs, the normalization regression,
 2,704 native ordered-pair comparisons and all 31 guest fixtures pass. A fresh
 boot with the original cooked content reaches
@@ -386,6 +386,18 @@ unverified. The complete fresh capture has a standalone archive. The older
 audio-category bundle lost four boot-media files; its full audit remains
 unavailable. See the
 [string comparison checkpoint](../tests/ios/string-compare-checkpoint-20261028.md).
+
+The latest no-ads checkpoint implements inactive output-session configuration
+through `AVAudioSession setCategory:mode:options:error:`, with validated options,
+immutable getter values and NSError failures that preserve prior state.
+Both sanitized host runs, native ABI metadata checks, the category regression
+and all 32 guest fixtures pass. Fortnite now reaches
+`setAllowHapticsAndSystemSoundsDuringRecording:error:` and exits 1 without an
+application signal fault, OOM event or supervisor kill. Audio activation,
+recording and output still need a backend. Progress remains 4 of 8 observable
+launch gates; no game frame, menu, login or playable match is verified. See the
+[audio configuration checkpoint](../tests/ios/audio-configuration-checkpoint-20261028.md).
+
 `MTLCreateSystemDefaultDevice` still returns nil: a Metal device, shader,
 rendering and presentation backend remains to be implemented. The existing
 texture cache delegates to supplied devices; see the
