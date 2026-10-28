@@ -22,6 +22,10 @@ fn (api SessionApi) string(value &char) u64 { return api.message(api.strings, c'
 fn (api SessionApi) text(object u64) string { assert object != 0; return ctext(api.message(object, c'UTF8String', 0, 0, 0)) }
 fn (api SessionApi) retain(object u64) u64 { return api.message(object, c'retain', 0, 0, 0) }
 fn (api SessionApi) release(object u64) { api.message(object, c'release', 0, 0, 0) }
+fn (api SessionApi) lookup(name &char) u64 {
+	$if macos { if api.native { return u64(C.objc_getClass(name)) } }
+	return ios_runtime.names[ctext(u64(name))]
+}
 fn (api SessionApi) pool() u64 {
 	$if macos { if api.native { return api.message(u64(C.objc_getClass(c'NSAutoreleasePool')), c'new', 0, 0, 0) } }
 	return objc_pool_push()
@@ -159,13 +163,133 @@ fn session_write_worker(api SessionApi, object u64, left u64, right u64, offset 
 	api.drain(pool)
 }
 
+fn session_configured_reader(api SessionApi, object u64) {
+	pool := api.pool()
+	for index in 0 .. 64 {
+		configuration := api.message(object, c'configuration', 0, 0, 0)
+		assert api.message(configuration, c'HTTPMaximumConnectionsPerHost', 0, 0, 0) == 9
+		api.message(configuration, c'setHTTPMaximumConnectionsPerHost:', u64(index + 1), 0, 0)
+	}
+	api.drain(pool)
+}
+
+fn session_configured_cases(api SessionApi) {
+	for mode in ['simple', 'default-queue', 'provided-queue']! {
+		pool := api.pool()
+		configuration := api.retain(api.message(api.lookup(c'NSURLSessionConfiguration'), c'defaultSessionConfiguration', 0, 0, 0))
+		api.message(configuration, c'setHTTPMaximumConnectionsPerHost:', 9, 0, 0)
+		delegate := if mode == 'simple' { u64(0) } else { api.message(api.lookup(c'NSObject'), c'new', 0, 0, 0) }
+		queue := if mode == 'provided-queue' { api.message(api.queues, c'new', 0, 0, 0) } else { u64(0) }
+		if queue != 0 { api.message(queue, c'setMaxConcurrentOperationCount:', 2, 0, 0) }
+		object := api.retain(if mode == 'simple' { api.message(api.cls, c'sessionWithConfiguration:', configuration, 0, 0) }
+			else { api.message(api.cls, c'sessionWithConfiguration:delegate:delegateQueue:', configuration, delegate, queue) })
+		assert object != 0 && api.message(object, c'isKindOfClass:', api.cls, 0, 0) == 1
+		assert api.message(object, c'delegate', 0, 0, 0) == delegate
+		actual_queue := api.message(object, c'delegateQueue', 0, 0, 0)
+		assert actual_queue != 0 && api.message(object, c'delegateQueue', 0, 0, 0) == actual_queue
+		assert api.message(actual_queue, c'maxConcurrentOperationCount', 0, 0, 0) == if queue == 0 { u64(1) } else { u64(2) }
+		if queue != 0 { assert actual_queue == queue }
+		left := api.message(object, c'configuration', 0, 0, 0)
+		right := api.message(object, c'configuration', 0, 0, 0)
+		assert left != 0 && left != right && left != configuration && right != configuration
+		api.message(configuration, c'setHTTPMaximumConnectionsPerHost:', 41, 0, 0)
+		api.message(left, c'setHTTPMaximumConnectionsPerHost:', 23, 0, 0)
+		assert api.message(right, c'HTTPMaximumConnectionsPerHost', 0, 0, 0) == 9
+		assert api.message(api.message(object, c'configuration', 0, 0, 0), c'HTTPMaximumConnectionsPerHost', 0, 0, 0) == 9
+		copy := api.message(object, c'copy', 0, 0, 0)
+		assert copy == object; api.release(copy)
+		assert api.message(object, c'sessionDescription', 0, 0, 0) == 0
+		api.message(object, c'setSessionDescription:', api.string(c'configured session'), 0, 0)
+		if !api.native {
+			assert read64(object + 96) == delegate && read64(object + 80) == actual_queue
+			assert read64(object + 112) != configuration && read64(object + 112) != left
+			assert obj_header(read64(object + 112)).url_session_configuration_default_protocols
+		}
+		api.release(configuration); api.release(delegate); api.release(queue)
+		api.drain(pool)
+		inner := api.pool()
+		assert api.text(api.message(object, c'sessionDescription', 0, 0, 0)) == 'configured session'
+		assert api.message(object, c'delegate', 0, 0, 0) == delegate
+		mut readers := []thread{}
+		for _ in 0 .. 8 { readers << spawn session_configured_reader(api, object) }
+		readers.wait(); unsafe { readers.free() }
+		if api.native { api.message(object, c'invalidateAndCancel', 0, 0, 0) }
+		api.release(object); api.drain(inner)
+	}
+}
+
+__global session_constructor_api = SessionApi{}
+__global session_constructor_source = u64(0)
+__global session_constructor_delegate = u64(0)
+__global session_constructor_queue = u64(0)
+__global session_constructor_active = false
+__global session_constructor_fail_class = u64(0)
+__global session_constructor_retired_weak = u64(0)
+fn session_constructor_worker() {
+	api := session_constructor_api
+	assert api.message(session_constructor_source, c'HTTPMaximumConnectionsPerHost', 0, 0, 0) == 9
+	api.release(session_constructor_source)
+	api.release(session_constructor_delegate)
+	api.release(session_constructor_queue)
+}
+fn session_configured_constructor(object u64, selector &char) u64 {
+	api := session_constructor_api
+	if read64(object) == api.cls {
+		pool := api.pool()
+		objc_store_weak(unsafe { &session_constructor_retired_weak }, api.message(object, c'delegateQueue', 0, 0, 0))
+		api.drain(pool)
+	} else if session_constructor_active {
+		session_constructor_active = false
+		worker := spawn session_constructor_worker(); worker.wait()
+	}
+	return if read64(object) == session_constructor_fail_class { u64(0) } else { object }
+}
+fn session_configured_lifetimes(api SessionApi) {
+	session_constructor_api = api
+	configuration_class := api.lookup(c'NSURLSessionConfiguration')
+	for cls in [configuration_class, api.cls]! {
+		assert objc_add_method(cls, u64(c'.cxx_construct'), u64(unsafe { voidptr(session_configured_constructor) }), c'@16@0:8')
+	}
+	for fail_class in [u64(0), configuration_class, api.cls]! {
+		pool := api.pool()
+		session_constructor_fail_class = 0
+		session_constructor_source = api.message(configuration_class, c'new', 0, 0, 0)
+		api.message(session_constructor_source, c'setHTTPMaximumConnectionsPerHost:', 9, 0, 0)
+		session_constructor_delegate = api.message(api.lookup(c'NSObject'), c'new', 0, 0, 0)
+		session_constructor_queue = api.message(api.queues, c'new', 0, 0, 0)
+		mut source_weak := u64(0); mut delegate_weak := u64(0); mut queue_weak := u64(0); mut copy_weak := u64(0)
+		objc_store_weak(unsafe { &source_weak }, session_constructor_source)
+		objc_store_weak(unsafe { &delegate_weak }, session_constructor_delegate)
+		objc_store_weak(unsafe { &queue_weak }, session_constructor_queue)
+		session_constructor_fail_class = fail_class; session_constructor_active = true
+		object := api.retain(api.message(api.cls, c'sessionWithConfiguration:delegate:delegateQueue:', session_constructor_source, session_constructor_delegate, session_constructor_queue))
+		assert !session_constructor_active && source_weak == 0
+		assert (object == 0) == (fail_class != 0) && session_constructor_retired_weak == 0
+		if object != 0 { objc_store_weak(unsafe { &copy_weak }, read64(object + 112)) }
+		api.drain(pool)
+		if object != 0 {
+			assert delegate_weak != 0 && queue_weak != 0 && copy_weak != 0
+			assert objc_set_class(object, api.lookup(c'NSObject')) == api.cls
+			api.release(object)
+		}
+		assert delegate_weak == 0 && queue_weak == 0 && copy_weak == 0
+		objc_destroy_weak(unsafe { &source_weak }); objc_destroy_weak(unsafe { &delegate_weak })
+		objc_destroy_weak(unsafe { &queue_weak }); objc_destroy_weak(unsafe { &copy_weak })
+		objc_destroy_weak(unsafe { &session_constructor_retired_weak })
+		assert ios_runtime.live == 0
+	}
+	session_constructor_fail_class = 0
+}
+
 fn test_url_session_native() {
 	$if macos {
 		api := SessionApi{native: true, send: u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend')), cls: u64(C.objc_getClass(c'NSURLSession')), strings: u64(C.objc_getClass(c'NSString')), mutable_strings: u64(C.objc_getClass(c'NSMutableString')), queues: u64(C.objc_getClass(c'NSOperationQueue'))}
 		assert C.class_getInstanceSize(unsafe { voidptr(api.cls) }) == 160
 		assert C.class_getSuperclass(unsafe { voidptr(api.cls) }) == C.objc_getClass(c'NSObject')
 		session_base_cases(api); session_concurrent_cases(api)
+		session_configured_cases(api)
 		println('IOS-URL-SESSION-NATIVE: base allocation/init identity, nil configuration/delegate, copied description at104, lazy serial delegate queue at80, retained-self copies and eight concurrent readers')
+		println('IOS-SESSION-CONFIGURED-NATIVE: both factories, independent configuration snapshots, delegate and queue identity, serial default queue and concurrent configuration readers')
 	}
 }
 
@@ -181,12 +305,17 @@ fn test_url_session_runtime() {
 			assert method != 0 && ctext(u64(objc_method_types(method))) == types
 		}
 		assert ctext(u64(objc_method_types(objc_instance_method(read64(api.cls), u64(c'new'))))) == '@16@0:8'
+		for name, types in {'sessionWithConfiguration:': '@24@0:8@16', 'sessionWithConfiguration:delegate:delegateQueue:': '@40@0:8@16@24@32'} {
+			assert objc_responds(api.cls, name.str)
+			assert ctext(u64(objc_method_types(objc_instance_method(read64(api.cls), u64(name.str))))) == types
+		}
 		for index, name in ['_delegateQueue_ivar', '_sessionDescription_ivar', '_delegate_ivar', '_local_immutable_configuration_ivar', '_workQueue']! {
 			ivar := objc_find_ivar(api.cls, unsafe { &char(name.str) })
 			assert ivar != 0 && objc_ivar_offset(ivar) == [i64(80), 104, 96, 112, 120]![index]
 			assert ctext(u64(objc_ivar_types(ivar))) == ['@"NSOperationQueue"', '@"NSString"', '@"<NSURLSessionDelegate>"', '@"NSURLSessionConfiguration"', '@"NSObject<OS_dispatch_queue>"']![index]
 		}
 		session_base_cases(api); session_concurrent_cases(api)
+		session_configured_cases(api)
 		assert ios_runtime.live == 0
 		reentry_pool := api.pool(); session_initializer_owner = api.message(api.cls, c'new', 0, 0, 0)
 		api.message(session_initializer_owner, c'setSessionDescription:', api.string(c'initializer reentry'), 0, 0)
@@ -198,7 +327,7 @@ fn test_url_session_runtime() {
 		api.release(session_initializer_owner); session_initializer_owner = 0; api.drain(reentry_pool)
 		assert ios_runtime.live == 0
 		pool := api.pool(); object := api.message(api.cls, c'new', 0, 0, 0)
-		for selector in [c'sharedSession', c'sessionWithConfiguration:', c'sessionWithConfiguration:delegate:delegateQueue:']! {
+		for selector in [c'sharedSession']! {
 			assert !objc_responds(api.cls, selector) && objc_instance_method(read64(api.cls), u64(selector)) == 0
 		}
 		for selector in [c'mutableCopy', c'mutableCopyWithZone:', c'finishTasksAndInvalidate', c'invalidateAndCancel', c'flushWithCompletionHandler:', c'resetWithCompletionHandler:', c'getTasksWithCompletionHandler:', c'getAllTasksWithCompletionHandler:', c'dataTaskWithRequest:', c'dataTaskWithURL:completionHandler:', c'initWithCoder:', c'encodeWithCoder:']! {
@@ -236,6 +365,7 @@ fn test_url_session_runtime() {
 			api.release(changed); api.drain(inner2)
 		}
 		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
+		session_configured_lifetimes(api)
 		// Leave the final base session and its property getter temporaries in the
 		// root pool so runtime shutdown must retire all three owners itself.
 		pooled := objc_autorelease(api.message(api.cls, c'new', 0, 0, 0))
@@ -250,6 +380,7 @@ fn test_url_session_runtime() {
 		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
 	}
 	println('IOS-URL-SESSION: typed base ABI and metadata, immutable description snapshots, queue ownership, concurrent getters/setters, guarded caller storage,64 isa replacements and two drained runtimes')
+	println('IOS-SESSION-CONFIGURED: copied input and getter settings, retained delegate/queue across pool drains, independent concurrent snapshots, reentrant constructors, failure cleanup, isa replacement and clean shutdown')
 }
 
 fn test_url_session_rejections() {
@@ -300,6 +431,7 @@ fn test_url_session_rejections() {
 		C.close(fds[0]); mut status := i32(0); assert C.ios_waitpid(pid, &status, 0) == pid && status == 256
 		output := unsafe { tos(&bytes[0], length) }
 		reason := match mode {
+			'configured', 'configured-delegate' { 'URL session requires a session configuration' }
 			'description' { 'URL session description must be a string' }
 			'bad-copy' { 'URL session description copy must be a string' }
 			'subclass', 'caller-subclass' { 'custom URL session subclass construction is not implemented' }
@@ -324,7 +456,7 @@ fn test_url_session_rejections() {
 			'mutable' { '-[NSURLSession mutableCopy]' }
 			else { '' }
 		}
-		if selector != '' { assert output.contains(': ' + selector + '\n'), output }
+		if selector != '' && mode !in ['configured', 'configured-delegate']! { assert output.contains(': ' + selector + '\n'), output }
 	}
 	assert ios_runtime.live == 0; objc_stop()
 	println('IOS-URL-SESSION-REJECT: nineteen configured/shared/task/lifecycle/coding/mutability/type/copy/subclass/spoof cases fail explicitly')

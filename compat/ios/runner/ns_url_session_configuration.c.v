@@ -5,8 +5,8 @@ import math
 
 // Public base configurations have a measured 560-byte record. This profile
 // stores settings only. Default factory settings are supported; access to its
-// unresolved built-in protocols, persistent/shared stores and configured
-// NSURLSessions remains an explicit unsupported boundary.
+// unresolved built-in protocols, persistent/shared stores and session loading
+// remains an explicit unsupported boundary.
 // Ownership follows the allocation, independently of its current isa.
 fn url_session_configuration_family(cls u64) bool {
 	mut current := cls

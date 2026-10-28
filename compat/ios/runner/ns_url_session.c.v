@@ -3,7 +3,8 @@ module main
 
 // The public base class is a 160-byte NSObject. Its Foundation/CFNetwork
 // implementation state remains opaque. A base session has no configuration
-// or delegate and cannot start a load; configured sessions are a separate API.
+// or delegate. Configured factories store settings and delegate/queue ownership;
+// starting loads and lifecycle callbacks still require a transport backend.
 // Owned references follow the allocation, including after an isa replacement.
 fn url_session_family(cls u64) bool {
 	mut current := cls
@@ -57,6 +58,8 @@ fn url_session_types(name string, meta bool, selector string) ?string {
 	if meta {
 		return match selector {
 			'new' { '@16@0:8' }
+			'sessionWithConfiguration:' { '@24@0:8@16' }
+			'sessionWithConfiguration:delegate:delegateQueue:' { '@40@0:8@16@24@32' }
 			else { return none }
 		}
 	}
@@ -76,11 +79,54 @@ fn url_session_selector(object u64, selector string) bool {
 
 fn url_session_unsupported(selector string) bool {
 	return selector in ['sharedSession', 'mutableCopy', 'mutableCopyWithZone:',
-		'sessionWithConfiguration:', 'sessionWithConfiguration:delegate:delegateQueue:',
 		'initWithCoder:', 'encodeWithCoder:', 'supportsSecureCoding',
 		'finishTasksAndInvalidate', 'invalidateAndCancel', 'flushWithCompletionHandler:',
 		'resetWithCompletionHandler:', 'getTasksWithCompletionHandler:', 'getAllTasksWithCompletionHandler:']!
 		|| selector.starts_with('initWithConfiguration:') || selector.contains('TaskWith')
+}
+
+fn url_session_configured(cls u64, configuration u64, delegate u64, queue u64) u64 {
+	url_session_require_class(cls)
+	if configuration == 0 || !objc_is_kind(configuration, ios_runtime.names['NSURLSessionConfiguration']) {
+		panic('iOS: URL session requires a session configuration')
+	}
+	if queue != 0 && !objc_is_kind(queue, ios_runtime.names['NSOperationQueue']) {
+		panic('iOS: URL session delegate queue must be NSOperationQueue')
+	}
+	// Copy/allocation may invoke application initializers or constructors. Keep
+	// supplied references alive, and hold no state lock across those callbacks.
+	owned_delegate := objc_retain(delegate)
+	owned_queue := objc_retain(queue)
+	copied := url_session_configuration_copy(configuration)
+	if copied == 0 { objc_release(owned_queue); objc_release(owned_delegate); return 0 }
+	object := objc_allocate(cls)
+	if object == 0 {
+		objc_release(copied); objc_release(owned_queue); objc_release(owned_delegate)
+		return 0
+	}
+	C.ios_objc_initialize_lock()
+	mut header := url_session_state(object)
+	retired := [header.fields[1], header.fields[2], header.fields[3]]!
+	header.fields[1] = owned_queue
+	header.fields[2] = copied
+	header.fields[3] = owned_delegate
+	unsafe {
+		*(&u64(object + 80)) = owned_queue
+		*(&u64(object + 96)) = owned_delegate
+		*(&u64(object + 112)) = copied
+	}
+	C.ios_objc_initialize_unlock()
+	for value in retired { objc_release(value) }
+	return objc_autorelease(object)
+}
+
+fn url_session_configuration_snapshot(object u64) u64 {
+	C.ios_objc_initialize_lock()
+	configuration := objc_retain(url_session_state(object).fields[2])
+	C.ios_objc_initialize_unlock()
+	if configuration == 0 { return 0 }
+	defer { objc_release(configuration) }
+	return objc_autorelease(url_session_configuration_copy(configuration))
 }
 
 fn url_session_delegate_queue(object u64) u64 {
@@ -122,8 +168,15 @@ fn url_session_dispatch(object u64, selector string, mut frame RegisterFrame) bo
 			+ kind + '[NSURLSession ' + selector + ']')
 	}
 	if url_session_types('NSURLSession', meta, selector) == none { return false }
-	if meta { frame.x[0] = objc_new(object); return true }
+	if meta {
+		frame.x[0] = if selector == 'new' { objc_new(object) }
+			else { url_session_configured(object, frame.x[2],
+				if selector == 'sessionWithConfiguration:' { u64(0) } else { frame.x[3] },
+				if selector == 'sessionWithConfiguration:' { u64(0) } else { frame.x[4] }) }
+		return true
+	}
 	if selector == 'delegateQueue' { frame.x[0] = url_session_delegate_queue(object); return true }
+	if selector == 'configuration' { frame.x[0] = url_session_configuration_snapshot(object); return true }
 	// Acquire a setter's copied argument before retiring the old value. A copy
 	// method can run application code, so do not hold the state lock across it.
 	mut copied := u64(0)
@@ -138,7 +191,7 @@ fn url_session_dispatch(object u64, selector string, mut frame RegisterFrame) bo
 	match selector {
 		'init' {}
 		'copy', 'copyWithZone:' { frame.x[0] = objc_retain(object) }
-		'delegate', 'configuration' { frame.x[0] = 0 }
+		'delegate' { frame.x[0] = objc_retain_autorelease(header.fields[3]) }
 		'sessionDescription' { frame.x[0] = objc_retain_autorelease(header.fields[0]) }
 		'setSessionDescription:' {
 			retired = header.fields[0]
@@ -154,7 +207,10 @@ fn url_session_dispatch(object u64, selector string, mut frame RegisterFrame) bo
 
 fn url_session_dispose(object u64, header &ObjHeader) {
 	if !header.url_session_owned { return }
-	// Generic fields own both references and release them after disposal. Clear
+	// Generic fields own all references and release them after disposal. Clear
 	// the public record as well when its bytes belong to a caller.
-	unsafe { *(&u64(object + 80)) = 0; *(&u64(object + 104)) = 0 }
+	unsafe {
+		*(&u64(object + 80)) = 0; *(&u64(object + 96)) = 0
+		*(&u64(object + 104)) = 0; *(&u64(object + 112)) = 0
+	}
 }
