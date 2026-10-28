@@ -434,6 +434,50 @@ fn bundle_manifest(out string) !string {
 	return hashes.join('\n') + '\n'
 }
 
+// Preserve a failed pre-launch budget check before retrying identical media.
+// Full input/media verification runs before the frozen launcher replaces logs.
+fn retry_budget(out string) ! {
+	verify_built(out)!
+	state := os.read_file(out + '/probe-no-ads-state.txt')!.trim_space()
+	if os.dir(state) != out || !os.file_name(state).starts_with('probe-no-ads-') || os.is_link(state) {
+		return error('unsafe retry state')
+	}
+	serial := os.read_file(state + '/serial.log')!
+	if !serial.contains('IOS-NATIVE: FAIL budget setup: budget check unexpected wait status ')
+		|| serial.contains('iOS startup: application entry')
+		|| os.read_file(out + '/probe-no-ads.status.txt')! == '0\n' {
+		return error('retry requires a failed budget self-test before application launch')
+	}
+	if os.disk_usage(os.getenv('TMPDIR').clone())!.available < u64(4) * 1024 * 1024 * 1024 {
+		return error('retry media verification needs 4 GiB of scratch headroom')
+	}
+	guest_media(out)!
+	mut hashes := []string{}
+	for name in ['boot.img', 'initramfs.tar.gz', 'limine.conf'] {
+		hashes << digest(state + '/' + name)! + '  ' + name
+	}
+	failure := out + '/budget-failure-' + os.getpid().str()
+	os.mkdir(failure)!
+	for name in ['serial.log', 'efivars.fd'] { os.cp(state + '/' + name, failure + '/' + name)! }
+	for name in ['probe-no-ads.log', 'probe-no-ads.status.txt'] { os.cp(out + '/' + name, failure + '/' + name)! }
+	os.write_file(failure + '/media.sha256', hashes.join('\n') + '\n')!
+	os.cp(os.executable(), failure + '/retry-checkpoint')!
+	os.cp(os.getwd() + '/tests/ios/swift-type-probe.v', failure + '/retry-checkpoint.v')!
+	revision := os.exec(['git', 'rev-parse', 'HEAD'])
+	if revision.exit_code != 0 { return error(revision.output) }
+	os.write_file(failure + '/retry-revision.txt', revision.output)!
+	os.setenv('VINIX_IOS_VM_CPUS', '1', true)
+	mut failed := ''
+	capture(out, 'probe-no-ads', [out + '/notification-vm', 'replay-probe-no-ads', out]) or { failed = err.msg() }
+	for line in hashes {
+		if digest(state + '/' + line[66..])! != line[..64] { return error('retry changed boot media') }
+	}
+	log := os.read_file(out + '/probe-no-ads.log')!
+	os.write_file(out + '/probe-no-ads.log', log + 'Replayed verified VM probe memory.max: 2147483648\n')!
+	if failed != '' { return error(failed) }
+	inspect(out)!
+}
+
 fn checkpoint(out string, seal bool) ! {
 	if seal {
 		if os.exists(out + '/manifest.sha256') { return error('already sealed') }
@@ -589,7 +633,7 @@ fn negative_controls(out string, scratch string) ! {
 }
 
 fn main() {
-	if os.args.len < 3 { panic('usage: swift-type-probe prepare FRESH_OUT PRIOR [--optional-lookup|--session-defaults] | build|probe|resume-staging|inspect|seal|check OUT | negative-controls OUT FRESH_SCRATCH') }
+	if os.args.len < 3 { panic('usage: swift-type-probe prepare FRESH_OUT PRIOR [--optional-lookup|--session-defaults] | build|probe|resume-staging|retry-budget|inspect|seal|check OUT | negative-controls OUT FRESH_SCRATCH') }
 	root := os.real_path(os.getwd())
 	out := os.abs_path(os.args[2])
 	if out == root || out.starts_with(root + '/') || os.is_link(out) { panic('output must be external') }
@@ -610,7 +654,9 @@ fn main() {
 	}
 	if os.args.len != 3 { panic('unexpected arguments') }
 	os.mkdir_all(out + '/tmp')!
-	os.setenv('TMPDIR', out + '/tmp', true)
+	os.setenv('TMPDIR', if os.args[1] == 'retry-budget' && os.getenv('VINIX_IOS_AUDIT_TMPDIR') != '' {
+		os.getenv('VINIX_IOS_AUDIT_TMPDIR')
+	} else { out + '/tmp' }, true)
 	if os.args[1] in ['seal', 'check'] {
 		checkpoint(out, os.args[1] == 'seal')!
 		return
@@ -618,6 +664,7 @@ fn main() {
 	if os.exists(out + '/manifest.sha256') && os.args[1] != 'inspect' { panic('bundle is sealed') }
 	verify_inputs(out)!
 	match os.args[1] {
+		'retry-budget' { retry_budget(out)! }
 		'resume-staging' { resume_staging(root, out)! }
 		'build' {
 			if os.exists(out + '/run-ios-gles') { panic('runtime already built') }
