@@ -5,7 +5,6 @@ module main
 // and frees its socket, TLS state and response storage, including error paths.
 import iostls as _
 import time
-import strings
 
 const data_http_limit = 16 * 1024 * 1024
 const data_http_headers = 64 * 1024
@@ -22,8 +21,10 @@ fn data_http_equal(a string, b string) bool {
 	if a.len != b.len { return false }
 	for i in 0 .. a.len {
 		mut byte := a[i]
+		mut other := b[i]
 		if byte >= `A` && byte <= `Z` { byte += 32 }
-		if byte != b[i] { return false }
+		if other >= `A` && other <= `Z` { other += 32 }
+		if byte != other { return false }
 	}
 	return true
 }
@@ -312,26 +313,12 @@ fn data_http_fetch(original string, ca_file string, timeout i64) ?[]u8 {
 	deadline := time.sys_mono_now() + timeout
 	for _ in 0 .. 6 {
 		url := data_http_url(current) or { return none }
-		// TLS callbacks borrow this state only for the synchronous load. Own
-		// the allocation explicitly: V boxes an escaping mutable local too.
-		mut stream := &DataHTTPStream{fd: data_http_connect(url, deadline), deadline: deadline}
-		defer { stream.close(); unsafe { free(stream) } }
-		if stream.fd < 0 || (url.tls && !stream.secure(url.host, ca_file)) { return none }
-		target := if url.target.len == 0 { '/'.clone() } else if url.target[0] == `?` { '/' + url.target } else { url.target.clone() }
-		mut builder := strings.new_builder(target.len + url.authority.len + 100)
-		builder.write_string('GET '); builder.write_string(target)
-		builder.write_string(' HTTP/1.1\r\nHost: '); builder.write_string(url.authority)
-		builder.write_string('\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n')
-		request := builder.str()
-		sent := stream.send(request)
-		unsafe { target.free(); request.free() }
-		if !sent { return none }
-		mut headers := []u8{cap: data_http_headers}; headers.flags |= .noslices
-		defer { unsafe { headers.free() } }
-		mut response := stream.headers(mut headers) or { return none }
-		for response.status in [100, 102, 103] { response = stream.headers(mut headers) or { return none } }
+		response := http_transport_exchange(current, HTTPTransportRequest{}, ca_file, deadline - time.sys_mono_now()) or { return none }
+		mut transferred := false
+		defer { response.dispose_fields(); if !transferred { unsafe { response.body.free() } } }
 		if response.status in [301, 302, 303, 307, 308] {
-			next := data_http_redirect(current, response.location) or { return none }
+			location := response.field('location') or { return none }
+			next := data_http_redirect(current, location) or { return none }
 			// Refuse transport downgrade rather than expose an HTTPS request.
 			next_url := data_http_url(next) or { unsafe { next.free() }; return none }
 			if url.tls && !next_url.tls { unsafe { next.free() }; return none }
@@ -339,44 +326,52 @@ fn data_http_fetch(original string, ca_file string, timeout i64) ?[]u8 {
 			continue
 		}
 		if response.status < 200 || response.status >= 300 { return none }
-		mut body := []u8{cap: if response.length >= 0 { response.length } else { 8192 }}; body.flags |= .noslices
-		mut success := false
-		defer { if !success { unsafe { body.free() } } }
-		if response.status in [204, 205] {
-			if response.length > 0 || response.chunked { return none }
-			success = true; return body
-		}
-		if !response.chunked && response.length < 0 {
-			for {
-				byte := stream.read() or {
-					if !stream.eof { return none }
-					break
-				}
-				if body.len == data_http_limit { return none }
-				body << byte
-			}
-			success = true; return body
-		}
-		for {
-			mut count := response.length
-			if response.chunked {
-				line := stream.line(mut headers) or { return none }
-				end := line.index(';') or { line.len }
-				count = data_http_number(http_borrow(line, 0, end), 16) or { return none }
-				if count == 0 {
-					for { trailer := stream.line(mut headers) or { return none }; if trailer.len == 0 { break }; if !trailer.contains(':') { return none } }
-					break
-				}
-			}
-			if count > data_http_limit - body.len { return none }
-			for _ in 0 .. count { body << stream.read() or { return none } }
-			if !response.chunked { break }
-			if stream.read() or { return none } != `\r` || stream.read() or { return none } != `\n` { return none }
-		}
-		success = true
-		return body
+		transferred = true
+		return response.body
 	}
 	return none
+}
+
+// Shared framing for NSData and the session transport. The caller decides
+// whether an HTTP status is acceptable; framing errors never become success.
+fn data_http_body(mut stream DataHTTPStream, response DataHTTPResponse, mut headers []u8, head bool) ?[]u8 {
+	mut body := []u8{cap: if head { 0 } else if response.length >= 0 { response.length } else { 8192 }}; body.flags |= .noslices
+	mut success := false
+	defer { if !success { unsafe { body.free() } } }
+	if head || response.status == 304 { success = true; return body }
+	if response.status in [204, 205] {
+		if response.length > 0 || response.chunked { return none }
+		success = true; return body
+	}
+	if !response.chunked && response.length < 0 {
+		for {
+			byte := stream.read() or {
+				if !stream.eof { return none }
+				break
+			}
+			if body.len == data_http_limit { return none }
+			body << byte
+		}
+		success = true; return body
+	}
+	for {
+		mut count := response.length
+		if response.chunked {
+			line := stream.line(mut headers) or { return none }
+			end := line.index(';') or { line.len }
+			count = data_http_number(http_borrow(line, 0, end), 16) or { return none }
+			if count == 0 {
+				for { trailer := stream.line(mut headers) or { return none }; if trailer.len == 0 { break }; if !trailer.contains(':') { return none } }
+				break
+			}
+		}
+		if count > data_http_limit - body.len { return none }
+		for _ in 0 .. count { body << stream.read() or { return none } }
+		if !response.chunked { break }
+		if stream.read() or { return none } != `\r` || stream.read() or { return none } != `\n` { return none }
+	}
+	success = true
+	return body
 }
 
 fn data_http_load(url u64, cls u64) u64 {

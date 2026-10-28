@@ -226,3 +226,150 @@ fn test_data_http_factory() {
 	}
 	println('IOS-DATA-HTTP-FACTORY: native ABI and binary oracle, mutable results, retained data, concurrent loads and two zero-live-object shutdowns')
 }
+
+fn http_transport_serve(listener DataHTTPListener, method string, expected_body string, reply string, tls bool) bool {
+	defer { C.close(listener.fd) }
+	deadline := time.sys_mono_now() + 5 * time.second
+	if !data_http_wait(listener.fd, false, deadline) { return false }
+	fd := C.accept(listener.fd, unsafe { nil }, unsafe { nil })
+	if fd < 0 { return false }
+	data_http_no_sigpipe(fd)
+	if C.fcntl(fd, C.F_SETFL, usize(C.O_NONBLOCK)) != 0 { return false }
+	mut key := C.mbedtls_pk_context{}
+	C.mbedtls_pk_init(&key)
+	defer { C.mbedtls_pk_free(&key) }
+	mut stream := &DataHTTPStream{fd: fd, deadline: deadline}
+	defer { stream.close(); unsafe { free(stream) } }
+	if tls && !data_http_server_tls(mut stream, os.getenv('VINIX_IOS_HTTP_CERT'), os.getenv('VINIX_IOS_HTTP_KEY'), mut key) { return false }
+	mut storage := []u8{cap: data_http_headers}; storage.flags |= .noslices
+	defer { unsafe { storage.free() } }
+	line := stream.line(mut storage) or { return false }
+	if line != '${method} /submit?q=%00 HTTP/1.1' { return false }
+	mut host := 0; mut lengths := 0; mut custom := 0; mut content_type := 0
+	for {
+		header := stream.line(mut storage) or { return false }
+		if header.len == 0 { break }
+		if header.starts_with('Host: ') { host++; if header != 'Host: localhost:${listener.port}' { return false } }
+		if header.starts_with('Content-Length: ') { lengths++; if header != 'Content-Length: ${expected_body.len}' { return false } }
+		if header == 'X-Test: exact value\tand tab' { custom++ }
+		if header == 'Content-Type: application/octet-stream' { content_type++ }
+	}
+	if host != 1 || lengths != 1 || custom != 1 || content_type != 1 { return false }
+	for byte in expected_body { if stream.read() or { return false } != byte { return false } }
+	if !stream.send(reply) { return false }
+	if tls { C.mbedtls_ssl_close_notify(&stream.ssl) }
+	return true
+}
+
+fn http_transport_case(method string, payload string, reply string, status int, expected string, tls bool) {
+	listener := data_http_listener()
+	worker := spawn http_transport_serve(listener, method, payload, reply, tls)
+	length := payload.len.str()
+	defer { unsafe { length.free() } }
+	fields := [HTTPTransportField{'X-Test', 'exact value\tand tab'},
+		HTTPTransportField{'Content-Type', 'application/octet-stream'}, HTTPTransportField{'Content-Length', length}]
+	defer { unsafe { fields.free() } }
+	bytes := payload.bytes()
+	defer { unsafe { bytes.free() } }
+	input := HTTPTransportRequest{method: method, fields: fields, body: bytes}
+	address := '${if tls { 'https' } else { 'http' }}://localhost:${listener.port}/submit?q=%00#fragment'
+	defer { unsafe { address.free() } }
+	result := http_transport_exchange(address, input, os.getenv('VINIX_IOS_HTTP_CERT'), 2 * time.second) or { panic('request/response exchange failed') }
+	defer { result.dispose() }
+	assert worker.wait() && result.status == status && result.body.len == expected.len;
+	if expected.len > 0 { assert C.memcmp(result.body.data, expected.str, usize(expected.len)) == 0; }
+	assert result.fields.len >= 1;
+	// Returned strings and binary data must survive unrelated parser allocations.
+	mut churn := []u8{len: data_http_headers, init: 0xaa}
+	assert result.fields[0].name == 'X-Result' && result.fields[0].value == 'saved';
+	unsafe { churn.free() }
+	mut cookies := 0
+	for field in result.fields { if field.name == 'Set-Cookie' { cookies++; assert field.value in ['a=1', 'b=2']; } }
+	assert cookies == 2;
+}
+
+fn test_http_transport_requests_and_status() {
+	final_headers := 'X-Result: saved\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\n'
+	for tls in [false, true] {
+		http_transport_case('POST', 'a\x00\xffz', 'HTTP/1.1 201 Created\r\n${final_headers}Content-Length: 4\r\n\r\nx\x00\xfez', 201, 'x\x00\xfez', tls)
+		http_transport_case('PUT', 'upload', 'HTTP/1.1 404 Missing\r\n${final_headers}Content-Length: 7\r\n\r\nmissing', 404, 'missing', tls)
+		http_transport_case('PATCH', 'update', 'HTTP/1.1 103 Early Hints\r\nX-Interim: ignored\r\n\r\nHTTP/1.1 500 Failure\r\n${final_headers}Transfer-Encoding: chunked\r\n\r\n3\r\nbad\r\n0\r\nX-Trailer: final\r\n\r\n', 500, 'bad', tls)
+		http_transport_case('HEAD', '', 'HTTP/1.1 200 OK\r\n${final_headers}Content-Length: 999\r\n\r\n', 200, '', tls)
+		http_transport_case('GET', '', 'HTTP/1.1 304 Not Modified\r\n${final_headers}Content-Length: 999\r\n\r\n', 304, '', tls)
+		http_transport_case('DELETE', '', 'HTTP/1.1 302 Found\r\n${final_headers}Location: http://127.0.0.1:1/private\r\nContent-Length: 0\r\n\r\n', 302, '', tls)
+	}
+	println('IOS-HTTP-TRANSPORT: HTTP/TLS methods, binary bodies, HEAD/304, 404/500, informational/chunked responses, duplicate fields, owned results and redirects returned to caller')
+}
+
+fn test_http_transport_validation() {
+	assert data_http_equal('Content-Length', 'content-LENGTH') && data_http_equal('hOsT', 'HOST');
+	assert !data_http_equal('Host', 'hosts') && !data_http_equal('X-Test', 'X-Text');
+	url := data_http_url('http://localhost:1234/') or { panic('URL fixture') }
+	for fields in [
+		[HTTPTransportField{'X-Test', 'bad\r\nInjected: value'}],
+		[HTTPTransportField{'Bad Field', 'value'}],
+		[HTTPTransportField{'X-Test', 'a\x00b'}],
+		[HTTPTransportField{'X-Test', '\x7f'}],
+		[HTTPTransportField{'X-Test', 'one'}, HTTPTransportField{'x-test', 'two'}],
+		[HTTPTransportField{'Transfer-Encoding', 'chunked'}],
+		[HTTPTransportField{'Host', 'other-origin'}],
+		[HTTPTransportField{'Content-Length', '3'}],
+		[HTTPTransportField{'Content-Length', '-1'}],
+		[HTTPTransportField{'Expect', '100-continue'}],
+		[HTTPTransportField{'Accept-Encoding', 'gzip'}],
+		[HTTPTransportField{'Connection', 'keep-alive'}],
+		[HTTPTransportField{'Upgrade', 'websocket'}],
+		[HTTPTransportField{'Trailer', 'X-Test'}],
+		[HTTPTransportField{'X-Large', 'x'.repeat(data_http_headers)}],
+	] {
+		if wire := http_transport_wire(url, HTTPTransportRequest{fields: fields}) { unsafe { wire.free() }; assert false; }
+	}
+	for method in ['CONNECT', 'TRACE', 'GET\r\nX-Test:', '', 'get'] {
+		if wire := http_transport_wire(url, HTTPTransportRequest{method: method}) { unsafe { wire.free() }; assert false; }
+	}
+	for timeout in [i64(0), -1, 25 * time.hour] {
+		if _ := http_transport_exchange('http://localhost:1/', HTTPTransportRequest{}, '', timeout) { assert false; }
+	}
+	println('IOS-HTTP-TRANSPORT-VALIDATION: conflicting framing/origin, control bytes, duplicate request fields, unsupported coding/methods, header bound and timeout range rejected')
+}
+
+type HTTPTransportNative4 = fn (u64, u64, u64, u64) u64
+type HTTPTransportNativeLoad = fn (u64, u64, u64, &u64, &u64) u64
+
+fn test_http_transport_native_status_oracle() {
+	$if macos {
+		api := DataHTTPApi{native: true, send: u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend'))}
+		pool := api.pool()
+		defer { api.drain(pool) }
+		listener := data_http_listener()
+		worker := spawn http_transport_serve(listener, 'POST', 'a\x00\xffz', 'HTTP/1.1 404 Missing\r\nX-Result: saved\r\nContent-Length: 4\r\n\r\nx\x00\xfez', false)
+		url := api.url('http://localhost:${listener.port}/submit?q=%00')
+		request := api.msg(api.cls(c'NSMutableURLRequest'), c'requestWithURL:', url)
+		api.msg(request, c'setHTTPMethod:', api.msg(api.cls(c'NSString'), c'stringWithUTF8String:', u64(c'POST')))
+		data := unsafe { HTTPTransportNative4(voidptr(api.send))(api.cls(c'NSData'), u64(C.sel_registerName(c'dataWithBytes:length:')), u64(c'a\x00\xffz'), 4) }
+		api.msg(request, c'setHTTPBody:', data)
+		for field in [HTTPTransportField{'X-Test', 'exact value\tand tab'}, HTTPTransportField{'Content-Type', 'application/octet-stream'}] {
+			name := api.msg(api.cls(c'NSString'), c'stringWithUTF8String:', u64(field.name.str))
+			value := api.msg(api.cls(c'NSString'), c'stringWithUTF8String:', u64(field.value.str))
+			unsafe { HTTPTransportNative4(voidptr(api.send))(request, u64(C.sel_registerName(c'setValue:forHTTPHeaderField:')), value, name) }
+		}
+		mut response := u64(0); mut error_object := u64(0)
+		body := unsafe { HTTPTransportNativeLoad(voidptr(api.send))(api.cls(c'NSURLConnection'), u64(C.sel_registerName(c'sendSynchronousRequest:returningResponse:error:')), request, &response, &error_object) }
+		assert worker.wait() && response != 0 && body != 0 && error_object == 0;
+		assert api.msg(response, c'statusCode', 0) == 404 && api.msg(body, c'length', 0) == 4;
+		assert C.memcmp(unsafe { voidptr(api.msg(body, c'bytes', 0)) }, c'x\x00\xfez', 4) == 0;
+		println('IOS-HTTP-TRANSPORT-NATIVE: Foundation sends binary POST with custom headers and preserves the 404 response/body without a transport error')
+	}
+}
+
+fn test_http_transport_header_count_bound() {
+	listener := data_http_listener()
+	reply := 'HTTP/1.1 200 OK\r\n' + 'X-Test: value\r\n'.repeat(129) + 'Content-Length: 0\r\n\r\n'
+	worker := spawn data_http_serve(listener, [reply], ['/'], false, false)
+	url := 'http://127.0.0.1:${listener.port}/'
+	result := http_transport_exchange(url, HTTPTransportRequest{}, '', 2 * time.second)
+	assert worker.wait();
+	if value := result { value.dispose(); assert false; }
+	unsafe { url.free(); reply.free() }
+	println('IOS-HTTP-TRANSPORT-BOUNDS: excessive response fields reject the exchange and retire previously copied fields')
+}
