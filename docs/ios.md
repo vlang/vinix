@@ -439,7 +439,7 @@ or supervisor kill. Progress remains 4/8 observable launch gates (50% of the
 checklist); no game frame, menu, login or playable match is verified. See the
 [Swift Optional checkpoint](../tests/ios/swift-optional-lookup-checkpoint-20261028.md).
 
-The latest no-ads checkpoint implements the supported default settings for
+The preceding no-ads checkpoint implements the supported default settings for
 `+[NSURLSessionConfiguration defaultSessionConfiguration]`. Native comparisons,
 both sanitized host runs and all 37 guest fixtures pass. Fortnite gets past the
 factory and reaches a Swift Optional Wrapped metadata rejection. Progress
@@ -448,6 +448,14 @@ is verified. URL transport and the configuration's built-in protocols and
 stores remain unsupported. Complete persistent evidence passes its saved
 auditor and 207 negative controls. See the
 [default session checkpoint](../tests/ios/session-defaults-checkpoint-20261028.md).
+
+The latest no-ads checkpoint implements configured `NSURLSession` ownership and
+configuration snapshots. Native comparisons, both sanitized host runs and all
+38 guest fixtures pass. Fortnite still reaches the 48-byte Swift Optional
+Wrapped layout rejection. Progress remains 4/8 observed gates; rendering is
+unverified. The complete archive restores and passes its saved auditor and
+231 negative controls. See the
+[configured session checkpoint](../tests/ios/session-configured-checkpoint-20261028.md).
 
 `MTLCreateSystemDefaultDevice` still returns nil: a Metal device, shader,
 rendering and presentation backend remains to be implemented. The existing
