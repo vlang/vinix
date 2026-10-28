@@ -409,7 +409,7 @@ complete capture restores exactly from its persistent archive and passes the
 unchanged auditor. See the
 [recording-policy checkpoint](../tests/ios/audio-haptics-checkpoint-20261028.md).
 
-The latest no-ads checkpoint implements `AVAudioSession setActive:error:`.
+A preceding no-ads checkpoint implements `AVAudioSession setActive:error:`.
 Activation reports the unavailable audio provider through NSError; deactivation
 succeeds without changing configuration. Both sanitized host runs, native ABI
 metadata checks, the configuration regression and all 34 guest fixtures pass.
@@ -419,6 +419,17 @@ launch gates; no game frame, menu, login or playable match is verified. The
 complete capture restores exactly from its persistent archive and passes the
 unchanged auditor. See the
 [activation checkpoint](../tests/ios/audio-activation-checkpoint-20261028.md).
+
+The latest no-ads checkpoint implements `NSError description`, including
+signed 64-bit codes, string userInfo precedence and independent diagnostic
+results. Native comparisons, both sanitized host runs, the JSON/NSError
+regression and all 35 guest fixtures pass. Fortnite passes this method and
+stops at `iOS: unsupported Swift mangled type suffix`, without an application
+signal fault, OOM event or supervisor kill. Progress remains 4 of 8 observable
+launch gates (50% of the checklist, not an estimate of remaining effort).
+No game frame, menu, login or playable match is verified. The complete capture
+restores exactly from its persistent archive and passes the unchanged auditor.
+See the [NSError checkpoint](../tests/ios/error-description-checkpoint-20261028.md).
 
 `MTLCreateSystemDefaultDevice` still returns nil: a Metal device, shader,
 rendering and presentation backend remains to be implemented. The existing
