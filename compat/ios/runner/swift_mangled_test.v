@@ -134,7 +134,7 @@ fn mangled_suite(probe MangledProbe) {
 	assert lookup(u64('x'.str), 1, read64(text + 8), u64(unsafe { &args[0] })) == 0
 	assert lookup(u64('x'.str), 1, array_descriptor, 0) == 0 // Reject missing caller input safely.
 	mangled_reject(u64('x'.str), 1, 1, u64(unsafe { &args[0] }))
-	for name in ['Sb', 'SSSg', 'SaySSGG', 'SSx', '$sSi']! { mangled_reject(u64(name.str), u64(name.len), 0, 0) }
+	for name in ['Sb', 'SSSg?', 'SaySSGG', 'SSx', '$sSi']! { mangled_reject(u64(name.str), u64(name.len), 0, 0) }
 	assert swift_mangled_lookup(u64(c'q_'), 2, 0, 0) == 0
 	mangled_reject(0, 1, 0, 0); mangled_reject(1, 1048577, 0, 0); mangled_reject(~u64(0) - 1, 2, 0, 0)
 	page := usize(C.getpagesize())
@@ -163,8 +163,10 @@ fn mangled_suite(probe MangledProbe) {
 	swift_protocol_relative(descriptor + 12, base)
 	mangled_reentry_calls = 0
 	assert lookup(name, 5, 0, 0) == integer && mangled_reentry_calls == 1
-	unsafe { *(&u8(name + 5)) = `?` }; mangled_reject(name, 6, 0, 0)
-	assert mangled_reentry_calls == 1 // Full syntax is checked before callbacks.
+	C.memcpy(voidptr(name + 5), c'Sg', 2)
+	assert lookup(name, 7, 0, 0) == swift_optional_access(0, integer).metadata && mangled_reentry_calls == 2
+	unsafe { *(&u8(name + 7)) = `?` }; mangled_reject(name, 8, 0, 0)
+	assert mangled_reentry_calls == 2 // Full syntax is checked before callbacks.
 	assert C.mprotect(unsafe { voidptr(base) }, page, C.PROT_READ | C.PROT_WRITE) == 0
 	unsafe { *(&u64(base + 8)) = u64(voidptr(mangled_incomplete_access)) }
 	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 16) })

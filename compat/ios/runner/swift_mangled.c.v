@@ -8,7 +8,9 @@ type SwiftMangledAccessor = fn (u64) SwiftAssociatedMetadata
 // any accessor. Only the existing metadata caches own the resulting pointers.
 struct SwiftMangledType {
 	kind u8
-	arrays u64
+	// Postfix operations in application order: Array=1, Optional=2.
+	wrappers [64]u8
+	wrappers_count int
 	value u64
 	name_length u64
 }
@@ -96,14 +98,30 @@ fn swift_mangled_parse(name u64, length u64) !SwiftMangledType {
 	} else {
 		return error('iOS: unsupported Swift mangled type expression')
 	}
-	for _ in u64(0) .. arrays {
-		if swift_mangled_byte(name, length, offset) != `G` { return SwiftMangledType{} }
-		offset++
+	mut wrappers := [64]u8{}
+	mut wrappers_count := 0
+	mut nesting := arrays
+	for {
+		if swift_mangled_byte(name, length, offset) == `S`
+			&& swift_mangled_byte(name, length, offset + 1) == `g` {
+			nesting++
+			if nesting > 64 { return error('iOS: Swift type nesting exceeds limit') }
+			wrappers[wrappers_count] = 2
+			wrappers_count++
+			offset += 2
+		} else if swift_mangled_byte(name, length, offset) == `G` && arrays != 0 {
+			wrappers[wrappers_count] = 1
+			wrappers_count++
+			arrays--
+			offset++
+		} else { break }
 	}
+	if arrays != 0 { return SwiftMangledType{} }
 	if swift_mangled_byte(name, length, offset) != 0 {
 		return error('iOS: unsupported Swift mangled type suffix')
 	}
-	return SwiftMangledType{kind: kind, arrays: arrays, value: value, name_length: name_length}
+	return SwiftMangledType{kind: kind, wrappers: wrappers, wrappers_count: wrappers_count,
+		value: value, name_length: name_length}
 }
 
 fn swift_mangled_nominal_request(descriptor u64, request u64) !u64 {
@@ -195,7 +213,10 @@ fn swift_mangled_lookup_request_checked(request u64, name u64, length u64, conte
 		}
 		else { return error('iOS: invalid Swift type expression') }
 	}
-	for _ in u64(0) .. parsed.arrays { metadata = swift_array_access(request, metadata).metadata }
+	for i in 0 .. parsed.wrappers_count {
+		metadata = if parsed.wrappers[i] == 1 { swift_array_access(request, metadata).metadata }
+			else { swift_optional_access_checked(request, metadata)!.metadata }
+	}
 	return metadata
 }
 

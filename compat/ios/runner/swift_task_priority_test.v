@@ -76,7 +76,8 @@ fn priority_layout(api PriorityApi, probe PriorityProbe) {
 	assert read32(descriptor) == 0x51 && read32(descriptor + 20) == 1 && read32(descriptor + 24) == 2
 	assert ctext(priority_relative(descriptor + 8)) == 'TaskPriority'
 	parent := priority_relative(descriptor + 4)
-	assert read64(parent) == 0 && ctext(priority_relative(parent + 8)) == 'Swift'
+	// Context descriptors have four-byte alignment, including native Swift's.
+	assert read32(parent) == 0 && read32(parent + 4) == 0 && ctext(priority_relative(parent + 8)) == 'Swift'
 	if !api.native {
 		assert priority_relative(descriptor + 16) == 0 // Reflection remains unsupported.
 		priority_protection(metadata - 8, 224, false); priority_protection(api.entry, 24, true)
@@ -216,7 +217,7 @@ fn test_swift_task_priority() {
 	for _ in 0 .. 2 {
 		objc_start()
 		assert ios_runtime.swift_task_priority_arena == 0
-		for text in ['ScPSg', 'SayScPSgG', 'ScPjunk', 'Sc']! {
+		for text in ['ScPSg?', 'SayScPSgG?', 'ScPjunk', 'Sc']! {
 			if result := swift_mangled_lookup_checked(u64(text.str), u64(text.len), 0, 0) { assert result == 0, text }
 		}
 		for name in ['_$sScPSgMa', '_$sScPSQsMc', '_$sScMs11GlobalActorsMc']! {
@@ -237,5 +238,5 @@ fn test_swift_task_priority() {
 		$else { mut residency := u8(0); assert C.mincore(unsafe { voidptr(arena) }, page * 2, &residency) == -1 }
 	}
 	assert C.munmap(unsafe { voidptr(code) }, page) == 0
-	println('IOS-SWIFT-TASK-PRIORITY: canonical sealed accessor/read-only byte metadata, descriptor and eight value witnesses; guarded UInt8/unaligned enum width/wrap boundaries; ScP and nested Array ownership, eight resolvers/workers, unsupported Optional/conformances before allocation, wrong-library rejection, two drained/unmapped runtime lifetimes')
+	println('IOS-SWIFT-TASK-PRIORITY: canonical sealed accessor/read-only byte metadata, descriptor and eight value witnesses; guarded UInt8/unaligned enum width/wrap boundaries; ScP and nested Array ownership, eight resolvers/workers, malformed suffixes/conformances before allocation, wrong-library rejection, two drained/unmapped runtime lifetimes')
 }
