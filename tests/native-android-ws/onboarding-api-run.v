@@ -43,6 +43,7 @@ const line_limit = 8192
 struct FixtureProfile {
 	name          string
 	apk_sha       string
+	framework_sha string
 	pass_marker   string
 }
 
@@ -50,6 +51,7 @@ fn child_attach_profile() FixtureProfile {
 	return FixtureProfile{
 		name: 'child-attach'
 		apk_sha: '27869d74fd03598dda9b75b740cbaf2efcc423ee0c5ff3b2f447d22ade9f999e'
+		framework_sha: framework_sha
 		pass_marker: 'CHILD-ATTACH-PASS fresh-once repeated-once remove-no-orphan detached-reattach-order params-parent'
 	}
 }
@@ -58,7 +60,17 @@ fn settings_global_profile() FixtureProfile {
 	return FixtureProfile{
 		name: 'settings-global'
 		apk_sha: 'c3e912e4e05c2af28d6d64d1fcb46874136a6164f7e2e19cc5ba1b62d950fedd'
+		framework_sha: framework_sha
 		pass_marker: 'SETTINGS-GLOBAL-PASS linkage virtual-insert URI exact-string-values zero negative min max repeated-key null-result SQLException SecurityException-identity absent-provider'
+	}
+}
+
+fn application_restrictions_profile() FixtureProfile {
+	return FixtureProfile{
+		name: 'application-restrictions'
+		apk_sha: '1fcd38978709198743aa9127b14f02bbebbf55e1f4d7793cd03270f3c3c25a07'
+		framework_sha: 'd4e8678bf5deda99358defd912e64e4fcba92fec4ad3b87b39fc9f7e9f6ebf32'
+		pass_marker: 'APPLICATION-RESTRICTIONS-PASS own-package nonnull empty fresh-bundles missing-string-array mutation-isolation repeated-32'
 	}
 }
 
@@ -164,7 +176,8 @@ fn health(line string, expected_marker string) ! {
 		'SIGABRT', 'SIGSEGV', 'panic:'] {
 		if line.contains(bad) { return error('child failure marker: ' + bad) }
 	}
-	if (line.contains('CHILD-ATTACH-PASS') || line.contains('SETTINGS-GLOBAL-PASS')) && line != expected_marker {
+	if (line.contains('CHILD-ATTACH-PASS') || line.contains('SETTINGS-GLOBAL-PASS')
+		|| line.contains('APPLICATION-RESTRICTIONS-PASS')) && line != expected_marker {
 		return error('conflicting fixture marker')
 	}
 }
@@ -365,7 +378,10 @@ fn export_evidence(output string) ! {
 
 fn selftest() ! {
 	mut cases := 0
-	profiles := [child_attach_profile(), settings_global_profile()]
+	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile()]
+	require(child_attach_profile().framework_sha == framework_sha
+		&& settings_global_profile().framework_sha == framework_sha
+		&& application_restrictions_profile().framework_sha != framework_sha, 'exact per-profile framework identities')!
 	for profile in profiles {
 		good := profile.pass_marker + '\n' + ready_marker + '\n'
 		check_log(good, profile.pass_marker)!
@@ -407,9 +423,10 @@ fn run() ! {
 		return
 	}
 	mut arguments := os.args[1..]
-	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global'],
-		'usage: onboarding-api-run (--child-attach|--settings-global) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
-	profile := if arguments[0] == '--child-attach' { child_attach_profile() } else { settings_global_profile() }
+	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions'],
+		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
+	profile := if arguments[0] == '--application-restrictions' { application_restrictions_profile() }
+		else if arguments[0] == '--child-attach' { child_attach_profile() } else { settings_global_profile() }
 	arguments = arguments[1..]
 	require(canonical(arguments[0]), 'canonical runtime path')!
 	$if !linux {
@@ -433,7 +450,7 @@ fn run() ! {
 	require(!os.exists(config.output) && !os.is_link(config.output), 'fresh fixture output')!
 	require(input_pin(config.apk)! == config.profile.apk_sha, 'signed fixture APK pin')!
 	framework := config.runtime + '/usr/lib/java/dex/android_translation_layer/api-impl.jar'
-	require(input_pin(framework)! == framework_sha, 'corrected framework JAR pin')!
+	require(input_pin(framework)! == config.profile.framework_sha, 'corrected framework JAR pin')!
 	mut inputs := map[string]string{}
 	for path in [config.apk, framework, config.runtime + '/usr/bin/run-android',
 		config.runtime + '/usr/bin/vinix-android-native', os.executable()] {
