@@ -234,6 +234,7 @@ fn test_session_data_task_rejections() {
 			else { 'data task requires an initialized URL request' }
 		}
 		assert output.contains('iOS: ' + reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output
+		if mode in ['resume', 'suspend', 'cancel']! { assert output.contains('-[NSURLSessionDataTask ${mode}]'), output }
 	}
 	assert ios_runtime.live == 0
 	objc_stop()

@@ -246,6 +246,7 @@ fn test_session_task_rejections() {
 			else { 'URL session task transfers, cancellation, delegates, progress and coding are not implemented' }
 		}
 		assert output.contains('iOS: ' + reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output
+		if url_session_task_unsupported(mode) { assert output.contains('-[NSURLSessionTask ${mode}]'), output }
 	}
 	assert ios_runtime.live == 0; objc_stop()
 	println('IOS-SESSION-TASK-REJECT: fourteen unsupported operation, type, copy, subclass and spoof cases fail explicitly')

@@ -74,7 +74,11 @@ fn url_session_task_state(object u64) &ObjHeader {
 fn url_session_task_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	meta := object in ios_runtime.classes
 	if !url_session_task_family(if meta { object } else { read64(object) }) { return false }
-	if url_session_task_unsupported(selector) { panic('iOS: URL session task transfers, cancellation, delegates, progress and coding are not implemented') }
+	if url_session_task_unsupported(selector) {
+		name := ctext(u64(objc_class_name(if meta { object } else { read64(object) })))
+		scope := if meta { '+' } else { '-' }
+		panic('iOS: URL session task transfers, cancellation, delegates, progress and coding are not implemented: ${scope}[${name} ${selector}]')
+	}
 	if url_session_task_types('NSURLSessionTask', meta, selector) == none { return false }
 	if meta { frame.x[0] = objc_new(object); return true }
 	// Copy can invoke application code. Keep it, and retirement, outside the lock.
