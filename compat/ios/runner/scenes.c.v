@@ -251,6 +251,7 @@ fn objc_responds(object u64, selector &char) bool {
 	if value_selector(object, name) { return true }
 	if swift_data_bridge_selector(object, name) { return true }
 	webkit := webkit_object_name(object)
+	if name == 'isEqual:' { return objc_instance_method(read64(object), u64(selector)) != 0 }
 	if native_method(read64(object), name) != 0 { return true }
 	if webkit != '' && object !in ios_runtime.classes && name in ['copy', 'copyWithZone:', 'init'] {
 		return webkit_builtin_types(webkit, false, name) != none
@@ -260,7 +261,6 @@ fn objc_responds(object u64, selector &char) bool {
 	if name == 'numberWithBool:' {
 		return object in ios_runtime.classes && objc_is_kind(object, read64(ios_runtime.names['NSNumber']))
 	}
-	if name == 'isEqual:' && object !in ios_runtime.classes && objc_is_kind(object, ios_runtime.names['NSNumber']) { return true }
 	if name in ['class', 'isKindOfClass:', 'respondsToSelector:', 'conformsToProtocol:', 'methodSignatureForSelector:', 'performSelectorOnMainThread:withObject:waitUntilDone:', 'copy', 'init', 'dealloc'] { return true }
 	if object in ios_runtime.classes {
 		if name in ['alloc', 'new', 'instanceMethodSignatureForSelector:'] { return true }

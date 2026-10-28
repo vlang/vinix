@@ -197,6 +197,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 		'dealloc', 'release' { 'v16@0:8' }
 		'performSelectorOnMainThread:withObject:waitUntilDone:' { 'v36@0:8:16@24B32' }
 		'isKindOfClass:' { 'B24@0:8#16' }
+		'isEqual:' { 'B24@0:8@16' }
 		'respondsToSelector:' { 'B24@0:8:16' }
 		'methodSignatureForSelector:' { '@24@0:8:16' }
 		'instanceMethodSignatureForSelector:' { if info.meta { '@24@0:8:16' } else { return none } }
@@ -216,6 +217,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if current == 0 { return 0 }
 		info := ios_runtime.classes[current] or { return 0 }
 		if method := info.method_info[name] { return u64(method) }
+		if ns_object_equality_unavailable(info.name, info.meta, name) { return 0 }
 		if av_player_name(info.name) && av_player_unsupported(name) { return 0 }
 		if storekit_purchase_name(info.name) && storekit_purchase_unsupported(name) { return 0 }
 		if info.name == 'NSProxy' && ns_proxy_unsupported(name) { return 0 }
@@ -294,7 +296,10 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if info.name == 'NSTimeZone' && name in ['init', 'new', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
 		if !info.meta && webkit_name(info.name) && name == 'copy' && webkit_builtin_types(info.name, false, name) == none { return 0 }
 		if types := objc_builtin_types(current, name) {
-			return u64(objc_record_method(current, unsafe { &char(selector) }, u64(unsafe { voidptr(C.ios_objc_builtin) }), unsafe { &char(types.str) }, true))
+			imp := if info.name == 'NSObject' && name == 'isEqual:' {
+				u64(unsafe { voidptr(ns_object_identity_equal) })
+			} else { u64(unsafe { voidptr(C.ios_objc_builtin) }) }
+			return u64(objc_record_method(current, unsafe { &char(selector) }, imp, unsafe { &char(types.str) }, true))
 		}
 		current = info.parent
 	}

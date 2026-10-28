@@ -15,6 +15,7 @@ fn required_built_paths(out string) ![]string {
 	mut paths := built_paths.clone()
 	if session_defaults_probe(out)! { paths << ['session-defaults-checks', 'session-defaults-checks.c'] }
 	if session_configured_probe(out)! { paths << ['session-configured-checks', 'session-configured-checks.c'] }
+	if object_equality_probe(out)! { paths << ['object-equality-checks', 'object-equality-checks.c'] }
 	if outline_probe(out)! {
 		for kind in ['metadata', 'encoding', 'decoding'] {
 			paths << ['optional-' + kind + '-checks', 'optional-' + kind + '-checks.c']
@@ -126,7 +127,7 @@ fn verify_inputs(out string) ! {
 	}
 }
 
-fn prepare(out string, prior string, optional_lookup bool, session_defaults bool, session_configured bool, outline bool, background bool) ! {
+fn prepare(out string, prior string, optional_lookup bool, session_defaults bool, session_configured bool, outline bool, background bool, equality bool) ! {
 	if os.exists(out) || os.is_link(out) { return error('prepare needs a fresh directory') }
 	if digest(prior + '/manifest.sha256')! != prior_hash { return error('unexpected prior checkpoint') }
 	os.mkdir_all(out)!
@@ -170,7 +171,7 @@ fn prepare(out string, prior string, optional_lookup bool, session_defaults bool
 	os.cp(os.getwd() + '/tests/ios/swift-type-probe.v', out + '/checkpoint.v')!
 	os.write_file(out + '/checkpoint-revision.txt', revision.output)!
 	if optional_lookup {
-		os.write_file(out + '/probe-kind.txt', if background { 'session-background\n' } else if outline { 'optional-outline\n' } else if session_configured { 'session-configured\n' }
+		os.write_file(out + '/probe-kind.txt', if equality { 'object-equality\n' } else if background { 'session-background\n' } else if outline { 'optional-outline\n' } else if session_configured { 'session-configured\n' }
 			else if session_defaults { 'session-defaults\n' } else { 'optional-lookup\n' })!
 		v := os.real_path(os.getwd()) + '/build/ios/fortnite/ns-calendar-checks/toolchain/v'
 		capture(out, 'build-notification-vm', [v, '-nocache', '-gc', 'none', '-cc', 'clang', '-cflags', '-O2',
@@ -181,25 +182,29 @@ fn prepare(out string, prior string, optional_lookup bool, session_defaults bool
 
 fn optional_probe(out string) !bool {
 	if !os.exists(out + '/probe-kind.txt') { return false }
-	if os.read_file(out + '/probe-kind.txt')! !in ['optional-lookup\n', 'session-defaults\n', 'session-configured\n', 'optional-outline\n', 'session-background\n'] { return error('unknown probe kind') }
+	if os.read_file(out + '/probe-kind.txt')! !in ['optional-lookup\n', 'session-defaults\n', 'session-configured\n', 'optional-outline\n', 'session-background\n', 'object-equality\n'] { return error('unknown probe kind') }
 	return true
 }
 
 fn session_defaults_probe(out string) !bool {
 	if !optional_probe(out)! { return false }
-	return os.read_file(out + '/probe-kind.txt')! in ['session-defaults\n', 'session-configured\n', 'optional-outline\n', 'session-background\n']
+	return os.read_file(out + '/probe-kind.txt')! in ['session-defaults\n', 'session-configured\n', 'optional-outline\n', 'session-background\n', 'object-equality\n']
 }
 
 fn session_configured_probe(out string) !bool {
-	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['session-configured\n', 'optional-outline\n', 'session-background\n']
+	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['session-configured\n', 'optional-outline\n', 'session-background\n', 'object-equality\n']
 }
 
 fn outline_probe(out string) !bool {
-	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['optional-outline\n', 'session-background\n']
+	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['optional-outline\n', 'session-background\n', 'object-equality\n']
 }
 
 fn background_probe(out string) !bool {
-	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! == 'session-background\n'
+	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['session-background\n', 'object-equality\n']
+}
+
+fn object_equality_probe(out string) !bool {
+	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! == 'object-equality\n'
 }
 
 fn verify_built(out string) ! {
@@ -270,7 +275,7 @@ fn validate_launch(launch string) ! {
 	}
 }
 
-fn host_markers(defaults bool, configured bool, outline bool, background bool) map[string][]string {
+fn host_markers(defaults bool, configured bool, outline bool, background bool, equality bool) map[string][]string {
 	mut markers := {
 		'swift-optional-lookup-host': ['IOS-SWIFT-OPTIONAL-LOOKUP-NATIVE:', 'IOS-SWIFT-OPTIONAL-LOOKUP:']
 		'swift-mangled-optional-regression': ['IOS-SWIFT-MANGLED-NATIVE:', 'IOS-SWIFT-MANGLED:']
@@ -292,6 +297,9 @@ fn host_markers(defaults bool, configured bool, outline bool, background bool) m
 	if background {
 		markers['session-defaults-host'] << ['IOS-SESSION-BACKGROUND-NATIVE:', 'IOS-SESSION-BACKGROUND:', 'IOS-SESSION-BACKGROUND-REJECT:']
 	}
+	if equality {
+		markers['object-equality-host'] = ['IOS-OBJECT-EQUALITY-NATIVE:', 'IOS-OBJECT-EQUALITY:']
+	}
 	if outline {
 		for kind in ['METADATA', 'ENCODING', 'DECODING'] {
 			markers['swift-optional-outline-' + kind.to_lower() + '-host'] = ['NATIVE-OPTIONAL-' + kind + ':', 'IOS-OPTIONAL-' + kind + ':']
@@ -311,7 +319,7 @@ fn validate_host_log(log string, markers []string) ! {
 }
 
 fn verify_host(out string) ! {
-	for directory, markers in host_markers(session_defaults_probe(out)!, session_configured_probe(out)!, outline_probe(out)!, background_probe(out)!) {
+	for directory, markers in host_markers(session_defaults_probe(out)!, session_configured_probe(out)!, outline_probe(out)!, background_probe(out)!, object_equality_probe(out)!) {
 		for label in ['host-generate', 'host-object-0', 'host-object-1', 'host-object-2', 'host-object-3', 'host-link', 'host', 'host-deterministic'] {
 			base := out + '/host/' + directory + '/' + label
 			if os.read_file(base + '.status.txt')! != '0\n' { return error('failed host step: ' + base) }
@@ -335,6 +343,7 @@ fn inspect(out string) ! {
 	if session_configured_probe(out)! { validate_session_configured(serial)! }
 	if outline_probe(out)! { validate_outline(serial)! }
 	if background_probe(out)! { validate_background(serial)! }
+	if object_equality_probe(out)! { validate_object_equality(serial)! }
 	validate_launch(os.read_file(out + '/probe-no-ads.log')!)!
 	diagnostic := boundary + '\n' + lines.join('\n') + '\nserial SHA-256: ' + digest(state + '/serial.log')! + '\nruntime SHA-256: ' + digest(out + '/run-ios-gles')! + '\n'
 	if os.exists(out + '/manifest.sha256') {
@@ -342,7 +351,8 @@ fn inspect(out string) ! {
 	} else { os.write_file(out + '/diagnostic.txt', diagnostic)! }
 	println(boundary)
 	for line in lines { println(line) }
-	println(if background_probe(out)! { 'Background session launch: six new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
+	println(if object_equality_probe(out)! { 'Object equality launch: seven new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
+		else if background_probe(out)! { 'Background session launch: six new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
 		else if outline_probe(out)! { 'Outline Optional launch: six new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
 		else if session_configured_probe(out)! { 'Configured session launch: three new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
 		else if session_defaults_probe(out)! { 'Default session launch: two new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
@@ -371,6 +381,7 @@ fn guest_media(out string) ! {
 	if optional_probe(out)! { pairs << ['swift-optional-lookup-checks', 'opt/ios/swift-optional-lookup-checks'] }
 	if session_defaults_probe(out)! { pairs << ['session-defaults-checks', 'opt/ios/session-defaults-checks'] }
 	if session_configured_probe(out)! { pairs << ['session-configured-checks', 'opt/ios/session-configured-checks'] }
+	if object_equality_probe(out)! { pairs << ['object-equality-checks', 'opt/ios/object-equality-checks'] }
 	if outline_probe(out)! {
 		for kind in ['metadata', 'encoding', 'decoding'] { pairs << ['optional-' + kind + '-checks', 'opt/ios/optional-' + kind + '-checks'] }
 	}
@@ -408,6 +419,11 @@ fn resume_staging(root string, out string) ! {
 	for name in os.read_lines(out + '/fixtures.txt')! { pairs << [name, 'opt/ios/' + name] }
 	if optional_probe(out)! { pairs << ['swift-optional-lookup-checks', 'opt/ios/swift-optional-lookup-checks'] }
 	if session_defaults_probe(out)! { pairs << ['session-defaults-checks', 'opt/ios/session-defaults-checks'] }
+	if session_configured_probe(out)! { pairs << ['session-configured-checks', 'opt/ios/session-configured-checks'] }
+	if object_equality_probe(out)! { pairs << ['object-equality-checks', 'opt/ios/object-equality-checks'] }
+	if outline_probe(out)! {
+		for kind in ['metadata', 'encoding', 'decoding'] { pairs << ['optional-' + kind + '-checks', 'opt/ios/optional-' + kind + '-checks'] }
+	}
 	// The executable is supplied by the preserved base tar, not the overlay.
 	for path in input_paths(out, 'application')! {
 		if path != 'application/FortniteClient-IOS-Shipping' {
@@ -570,6 +586,16 @@ fn validate_background(serial string) ! {
 	}
 }
 
+fn object_equality_markers() []string {
+	return ['IOS-NATIVE: /opt/ios/object-equality-checks wait status 0\n', 'IOS-OBJECT-EQUALITY:']
+}
+
+fn validate_object_equality(serial string) ! {
+	for marker in object_equality_markers() {
+		if serial.count(marker) != 1 { return error('missing or duplicated object equality fixture: ' + marker) }
+	}
+}
+
 fn negative_controls(out string, scratch string) ! {
 	if os.exists(scratch) || os.is_link(scratch) || scratch.starts_with(out + '/') {
 		return error('negative controls need fresh external scratch')
@@ -626,7 +652,7 @@ fn negative_controls(out string, scratch string) ! {
 		return error('accepted missing launch guard')
 	}
 	if optional_lookup {
-		for directory, host_checks in host_markers(session_defaults_probe(out)!, session_configured_probe(out)!, outline_probe(out)!, background_probe(out)!) {
+		for directory, host_checks in host_markers(session_defaults_probe(out)!, session_configured_probe(out)!, outline_probe(out)!, background_probe(out)!, object_equality_probe(out)!) {
 			log := os.read_file(out + '/host/' + directory + '/host.log')!
 			validate_host_log(log, host_checks)!
 			for marker in host_checks {
@@ -729,12 +755,22 @@ fn negative_controls(out string, scratch string) ! {
 			count += rejected
 		}
 	}
+	if object_equality_probe(out)! {
+		validate_object_equality(serial)!
+		for marker in object_equality_markers() {
+			mut rejected := 0
+			validate_object_equality(serial.replace(marker, '')) or { rejected++ }
+			validate_object_equality(serial + marker) or { rejected++ }
+			if rejected != 2 { return error('accepted missing or duplicated object equality marker') }
+			count += rejected
+		}
+	}
 	os.write_file(scratch + '/negative-controls.txt', count.str() + ' corruptions rejected; baseline guest and host logs pass\n')!
 	println(count.str() + ' Swift checkpoint negative controls PASS')
 }
 
 fn main() {
-	if os.args.len < 3 { panic('usage: swift-type-probe prepare FRESH_OUT PRIOR [--optional-lookup|--session-defaults|--session-configured|--optional-outline|--session-background] | build|probe|resume-staging|retry-budget|inspect|seal|check OUT | negative-controls OUT FRESH_SCRATCH') }
+	if os.args.len < 3 { panic('usage: swift-type-probe prepare FRESH_OUT PRIOR [--optional-lookup|--session-defaults|--session-configured|--optional-outline|--session-background|--object-equality] | build|probe|resume-staging|retry-budget|inspect|seal|check OUT | negative-controls OUT FRESH_SCRATCH') }
 	root := os.real_path(os.getwd())
 	out := os.abs_path(os.args[2])
 	if out == root || out.starts_with(root + '/') || os.is_link(out) { panic('output must be external') }
@@ -749,12 +785,13 @@ fn main() {
 		return
 	}
 	if os.args[1] == 'prepare' {
-		if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] !in ['--optional-lookup', '--session-defaults', '--session-configured', '--optional-outline', '--session-background']) { panic('prepare requires PRIOR [--optional-lookup|--session-defaults|--session-configured|--optional-outline|--session-background]') }
+		if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] !in ['--optional-lookup', '--session-defaults', '--session-configured', '--optional-outline', '--session-background', '--object-equality']) { panic('prepare requires PRIOR [--optional-lookup|--session-defaults|--session-configured|--optional-outline|--session-background|--object-equality]') }
 		prepare(out, os.real_path(os.args[3]), os.args.len == 5,
-			os.args.len == 5 && os.args[4] in ['--session-defaults', '--session-configured', '--optional-outline', '--session-background'],
-			os.args.len == 5 && os.args[4] in ['--session-configured', '--optional-outline', '--session-background'],
-			os.args.len == 5 && os.args[4] in ['--optional-outline', '--session-background'],
-			os.args.len == 5 && os.args[4] == '--session-background')!
+			os.args.len == 5 && os.args[4] in ['--session-defaults', '--session-configured', '--optional-outline', '--session-background', '--object-equality'],
+			os.args.len == 5 && os.args[4] in ['--session-configured', '--optional-outline', '--session-background', '--object-equality'],
+			os.args.len == 5 && os.args[4] in ['--optional-outline', '--session-background', '--object-equality'],
+			os.args.len == 5 && os.args[4] in ['--session-background', '--object-equality'],
+			os.args.len == 5 && os.args[4] == '--object-equality')!
 		return
 	}
 	if os.args.len != 3 { panic('unexpected arguments') }
@@ -780,6 +817,7 @@ fn main() {
 				capture(out, 'build-optional-fixture', [out + '/notification-vm', 'build-swift-optional-lookup', out])!
 				if session_defaults_probe(out)! { capture(out, 'build-default-session-fixture', [out + '/notification-vm', 'build-session-defaults', out])! }
 				if session_configured_probe(out)! { capture(out, 'build-configured-session-fixture', [out + '/notification-vm', 'build-session-configured', out])! }
+				if object_equality_probe(out)! { capture(out, 'build-object-equality-fixture', [out + '/notification-vm', 'build-object-equality', out])! }
 				if outline_probe(out)! {
 					for kind in ['metadata', 'encoding', 'decoding'] {
 						capture(out, 'build-outline-' + kind + '-fixture', [out + '/notification-vm', 'build-optional-' + kind, out])!

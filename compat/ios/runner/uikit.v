@@ -91,8 +91,14 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 	}
 	objc_initialize(if object in ios_runtime.classes { object } else { read64(object) })
 	if super_call != 2 {
-		imp := native_method(cls, selector)
-		if imp != 0 { return imp }
+		if selector == 'isEqual:' {
+			method := objc_instance_method(cls, frame.x[1])
+			imp := objc_method_imp(method)
+			if imp != 0 && imp != u64(unsafe { voidptr(C.ios_objc_builtin) }) { return imp }
+		} else {
+			imp := native_method(cls, selector)
+			if imp != 0 { return imp }
+		}
 	}
 	info := ios_runtime.classes[cls] or { panic('iOS: message to an unknown class') }
 	if !framework_dispatch(object, selector, mut frame) {

@@ -493,6 +493,9 @@ fn main() {
 			if os.exists('/opt/ios/session-configured-checks') {
 				require_child('/opt/ios/session-configured-checks')
 			}
+			if os.exists('/opt/ios/object-equality-checks') {
+				require_child('/opt/ios/object-equality-checks')
+			}
 			if os.exists('/opt/ios/session-defaults-checks') {
 				require_child('/opt/ios/session-defaults-checks')
 			}
