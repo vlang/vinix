@@ -58,6 +58,7 @@ fn swift_sequence_value_checked(metadata u64) !SwiftSequenceValue {
 		|| alignment & (alignment - 1) != 0 || flags & 0x00400000 != 0
 		|| copy == 0 || take == 0 || destroy == 0 || tag == 0
 		|| copy & 3 != 0 || take & 3 != 0 || destroy & 3 != 0 || tag & 3 != 0 {
+		swift_sequence_value_probe(metadata, size, stride, flags, copy, take, destroy, tag)
 		return swift_sequence_failure()
 	}
 	return SwiftSequenceValue{ metadata: metadata, size: size, alignment: alignment,

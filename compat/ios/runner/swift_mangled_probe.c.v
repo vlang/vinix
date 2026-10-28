@@ -1,6 +1,31 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+// Values come from checks that already read the live Wrapped metadata. This
+// diagnostic never follows metadata pointers, invokes witnesses or allocates.
+fn swift_optional_probe(wrapped u64, stage u32, size u64, alignment u64, flags u32, extra u32) {
+	if module_runtime == unsafe { nil } || !module_runtime.probe_no_ads { return }
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
+	mut buffer := [256]char{}
+	count := C.snprintf(unsafe { &buffer[0] }, buffer.len,
+		c'IOS-PROBE-SWIFT-OPTIONAL: wrapped=0x%llx stage=%u size=%llu alignment=%llu flags=0x%x extra=%u\n',
+		wrapped, stage, size, alignment, flags, extra)
+	if count > 0 && count < buffer.len { C.write(2, unsafe { &buffer[0] }, usize(count)) }
+}
+
+fn swift_sequence_value_probe(metadata u64, size u64, stride u64, flags u32,
+	copy u64, take u64, destroy u64, tag u64) {
+	if module_runtime == unsafe { nil } || !module_runtime.probe_no_ads { return }
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
+	mut buffer := [384]char{}
+	count := C.snprintf(unsafe { &buffer[0] }, buffer.len,
+		c'IOS-PROBE-SWIFT-VALUE: metadata=0x%llx size=%llu stride=%llu flags=0x%x copy=0x%llx take=0x%llx destroy=0x%llx tag=0x%llx\n',
+		metadata, size, stride, flags, copy, take, destroy, tag)
+	if count > 0 && count < buffer.len { C.write(2, unsafe { &buffer[0] }, usize(count)) }
+}
+
 // Failed bounded lookups are visible only in the explicit startup probe.
 // Symbolic names contain NULs, so record raw bytes rather than a C string.
 // Fixed stack storage bounds the diagnostic and leaves errno unchanged even

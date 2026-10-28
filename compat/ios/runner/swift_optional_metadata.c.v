@@ -176,16 +176,21 @@ fn swift_optional_access_checked(_request u64, wrapped u64) !SwiftAssociatedMeta
 	if metadata := ios_runtime.swift_optional_metadata[wrapped] {
 		return SwiftAssociatedMetadata{ metadata: metadata }
 	}
-	layout := swift_sequence_value_checked(wrapped) or { return swift_optional_failure() }
+	layout := swift_sequence_value_checked(wrapped) or {
+		swift_optional_probe(wrapped, 1, 0, 0, 0, 0)
+		return swift_optional_failure()
+	}
 	witness := read64(wrapped - 8)
 	flags := read32(witness + 80)
 	wrapped_extra := read32(witness + 84)
 	size := layout.size + if wrapped_extra == 0 { u64(1) } else { u64(0) }
 	if size > 24 || layout.alignment > 8 || flags & ~u32(0x022100ff) != 0 {
+		swift_optional_probe(wrapped, 2, layout.size, layout.alignment, flags, wrapped_extra)
 		return swift_optional_failure()
 	}
 	for offset in [u64(24), 40, 56]! {
 		if read64(witness + offset) == 0 || read64(witness + offset) & 3 != 0 {
+			swift_optional_probe(wrapped, 3, layout.size, layout.alignment, flags, wrapped_extra)
 			return swift_optional_failure()
 		}
 	}

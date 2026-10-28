@@ -215,7 +215,13 @@ fn swift_mangled_lookup_request_checked(request u64, name u64, length u64, conte
 	}
 	for i in 0 .. parsed.wrappers_count {
 		metadata = if parsed.wrappers[i] == 1 { swift_array_access(request, metadata).metadata }
-			else { swift_optional_access_checked(request, metadata)!.metadata }
+			else {
+				optional := swift_optional_access_checked(request, metadata) or {
+					swift_mangled_probe(name, length, context, generic_args)
+					return err
+				}
+				optional.metadata
+			}
 	}
 	return metadata
 }
