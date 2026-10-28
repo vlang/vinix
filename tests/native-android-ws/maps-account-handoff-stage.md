@@ -111,3 +111,43 @@ Resume with a fresh output and the existing fully checked producer when stable
 free space backs the complete outer growth allowance plus reserve. Preserve the
 failed evidence. A successful prepare, independent manifest readback, frozen
 kernel installation and live Maps/account-flow checks remain required.
+
+The subsequent r4 preparation used the same pinned producer, the original
+4-GiB outer growth allowance, 1-GiB reserve, 600-MiB RSS and 900-second limits,
+and the unchanged internal 512-MiB cumulative growth limit. It exited 1 with
+child exit 1 and complete cleanup after 175.845 seconds. Peak sampled aggregate
+RSS was 54,820,864 bytes, maximum observed shared-volume growth was
+1,164,320,768 bytes, and the time report recorded zero swaps. The outer guard
+did not stop the producer; its minimum free-space sample was 8,319,885,312 bytes.
+
+The internal growth check failed immediately after the successful overlay
+`mcopy` command. The preceding accepted charge was 115,859,456 bytes, leaving
+421,011,456 bytes of the internal allowance; the rejected sample is not logged.
+The retained output `S/maps-account-handoff-r4` has neither `stage.json` nor
+`sha256.json` and remains incomplete. This is a valid budget failure, with no
+arithmetic defect established by the evidence. The shared-volume measurements
+do not attribute growth to the producer or other writers. An APFS clone's
+initial sharing and the TAR's logical size do not bound allocation when FAT
+data and metadata are modified; file block counts do not isolate clone-owned
+storage.
+
+The preparation evidence is
+`S/maps-account-handoff-stage-prepare-2026-10-28-r4`:
+`prepare.guard.json` SHA-256
+`0dc580717f69503dbbbb9442686bb1de72ee033bc396535514759d3df4ad90ca`,
+and `prepare.log` SHA-256
+`74cf76839daa70d8b9784101c68ec5b110fcfb0796b22cdf62853b0fc6c656e7`.
+That root and the failed output are preserved by
+`S/maps-account-handoff-stage-failed-audit-2026-10-28-r4/sealed/manifest.json`,
+SHA-256 `7e0c56a8e83f387187567c4c39ecebc5d2d25ab8e885465fe2e7d7f8b8d2ffce`.
+The seal and a separate fresh-process full check passed for two roots and
+77 entries. Both guards recorded exit 0, child exit 0, complete cleanup and
+zero swaps, under 600-MiB RSS, 900-second, 64-MiB shared-volume growth and
+1-GiB reserve limits. Seal/check elapsed times were 7.603/3.224 seconds,
+peak sampled RSS 13,418,496/12,238,848 bytes and observed shared-volume growth
+27,267,072/36,630,528 bytes. The adjacent `seal.guard.json` and
+`check.guard.json` hashes are respectively
+`9ad5420978662a88d40f86641dbdefde5f5838c342655f9aaac8a227083489e2` and
+`617714879da91bfcb07f5dd020461bc6267fd81bd45520c805447560a5e0d694`.
+Sealing preserves this failure; it does not qualify the output as a stage or
+validate a VM, Maps startup or Google login.
