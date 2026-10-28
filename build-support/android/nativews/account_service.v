@@ -614,6 +614,27 @@ fn ws_auth_cancel(e voidptr, id u64) {
 	}
 }
 
+// One bounded record on the terminal pump failure. Stage: 1 transport read,
+// 2 Activity launch, 3 command copy, 4 command dispatch. No session/account data
+// enters this record. The exception trace stays in the private service log.
+fn ws_auth_pump_failure(e voidptr, stage i32, status i32) bool {
+	unsafe {
+		exception := pending(e)
+		failure := if exception { WsApplicationException(slot(e,15))(e) } else { nil }
+		buffer := &char(C.alloca(128))
+		length := C.snprintf(buffer,128,c'ANDROID-AUTH-PUMP-FAIL stage=%d status=%d pending=%d\n',stage,status,i32(exception))
+		if length > 0 && length < 128 { C.write(2,buffer,usize(length)) }
+		// ExceptionDescribe clears pending. Restore the same Throwable so the
+		// existing launch/shutdown cleanup retains ownership of clearing it.
+		if failure != nil {
+			ws_failure(e,c'ANDROID-SERVICE-FAIL account pump')
+			WsApplicationThrow(slot(e,13))(e,failure)
+			Drop(slot(e,23))(e,failure)
+		}
+		return false
+	}
+}
+
 fn ws_account_service_pump(e voidptr, binder voidptr) bool {
 	unsafe {
 		if !ws_auth_ready { return true }
@@ -623,17 +644,21 @@ fn ws_account_service_pump(e voidptr, binder voidptr) bool {
 			status := if ws_auth_handle == nil { i32(-1) } else { ws_auth_read(ws_auth_handle,&id,0) }
 			command := if status == 1 { ws_auth_copy(id) } else { &WsAuthCommand(nil) }
 			C.pthread_mutex_unlock(&ws_auth_mutex)
-			if status < 0 { return false }
+			if status < 0 { return ws_auth_pump_failure(e,1,status) }
 			if status == 0 { return true }
 			if status == 2 { ws_auth_cancel(e,id); continue }
 			if status == 3 {
-				if !ws_auth_launch(e,id) { ws_auth_launch_failed(e,id); return false }
+				if !ws_auth_launch(e,id) {
+					ws_auth_pump_failure(e,2,status)
+					ws_auth_launch_failed(e,id)
+					return false
+				}
 				continue
 			}
-			if command == nil { return false }
+			if command == nil { return ws_auth_pump_failure(e,3,status) }
 			ok := ws_auth_dispatch(e,binder,command)
 			ws_auth_command_free(command)
-			if !ok { return false }
+			if !ok { return ws_auth_pump_failure(e,4,status) }
 		}
 		return true
 	}
