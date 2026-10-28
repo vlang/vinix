@@ -4,6 +4,7 @@
 module main
 
 import arena
+import accounthandoff
 import crypto.sha256
 import encoding.base64
 import json2
@@ -118,6 +119,7 @@ struct MapsLaunch {
 	app_host         AppHostIdentity
 	desktop          Identity
 	trace_onboarding bool
+	trace_tls        bool
 }
 
 fn hash(path string) !string {
@@ -575,6 +577,7 @@ struct Session {
 	broker           Identity
 	desktop          DesktopIdentity
 	trace_onboarding bool
+	trace_tls        bool
 }
 
 struct StopRequest {
@@ -593,6 +596,24 @@ struct AuthInitFailure {
 struct AuthInitDiagnostics {
 mut:
 	failures  []AuthInitFailure
+	truncated bool
+}
+
+struct AuthPumpFailure {
+	stage   i32
+	status  i32
+	pending i32
+}
+
+struct AuthPumpDiagnostics {
+mut:
+	failures  []AuthPumpFailure
+	truncated bool
+}
+
+struct AccountHandoffDiagnostics {
+mut:
+	records   []accounthandoff.HandoffDiagnostic
 	truncated bool
 }
 
@@ -710,10 +731,93 @@ fn browser_init_diagnostics(output string) AuthInitDiagnostics {
 	return result
 }
 
+fn auth_pump_line(line string) ?AuthPumpFailure {
+	if line.len > 128 || !line.ends_with('\n')
+		|| !line.starts_with('ANDROID-AUTH-PUMP-FAIL stage=') { return none }
+	body := line[..line.len - 1]
+	defer { unsafe { body.free() } }
+	fields := body.split(' ')
+	// The pinned compiler generates a typed free that owns the split strings.
+	defer { unsafe { fields.free() } }
+	if fields.len != 4 || fields[0] != 'ANDROID-AUTH-PUMP-FAIL'
+		|| !fields[1].starts_with('stage=') || !fields[2].starts_with('status=')
+		|| !fields[3].starts_with('pending=') { return none }
+	stage_text := fields[1][6..]
+	status_text := fields[2][7..]
+	pending_text := fields[3][8..]
+	defer { unsafe { stage_text.free(); status_text.free(); pending_text.free() } }
+	stage := auth_init_integer(stage_text) or { return none }
+	status := auth_init_integer(status_text) or { return none }
+	pending := auth_init_integer(pending_text) or { return none }
+	if stage < 1 || stage > 4 || pending < 0 || pending > 1 { return none }
+	return AuthPumpFailure{ stage: stage, status: status, pending: pending }
+}
+
+// Inspect the byte range before allocating a line. Most broker output is
+// private text and must not allocate parser work under the no-GC controller.
+fn diagnostic_prefix_at(output string, start int, end int, prefix string) bool {
+	if end - start < prefix.len { return false }
+	for index, value in prefix {
+		if output[start + index] != value { return false }
+	}
+	return true
+}
+
+fn auth_pump_diagnostics(output string) AuthPumpDiagnostics {
+	mut result := AuthPumpDiagnostics{}
+	mut start := 0
+	for index := 0; index < output.len; index++ {
+		if output[index] != `\n` { continue }
+		if index + 1 - start <= 128
+			&& diagnostic_prefix_at(output, start, index, 'ANDROID-AUTH-PUMP-FAIL stage=') {
+			line := output[start..index + 1]
+			if failure := auth_pump_line(line) {
+				if result.failures.len < 32 {
+					result.failures << failure
+				} else {
+					result.truncated = true
+					unsafe { line.free() }
+					return result
+				}
+			}
+			unsafe { line.free() }
+		}
+		start = index + 1
+	}
+	return result
+}
+
+// Broker and controller share one strict numeric handoff parser. Only complete
+// bounded lines reach it; raw broker output never enters the public receipt.
+fn account_handoff_diagnostics(output string) AccountHandoffDiagnostics {
+	mut result := AccountHandoffDiagnostics{}
+	mut start := 0
+	for index := 0; index < output.len; index++ {
+		if output[index] != `\n` { continue }
+		if index + 1 - start <= 128
+			&& diagnostic_prefix_at(output, start, index, 'ANDROID-ACCOUNT-HANDOFF stage=') {
+			line := output[start..index]
+			if record := accounthandoff.parse_handoff_diagnostic(line) {
+				if result.records.len < 32 {
+					result.records << record
+				} else {
+					result.truncated = true
+					unsafe { line.free() }
+					return result
+				}
+			}
+			unsafe { line.free() }
+		}
+		start = index + 1
+	}
+	return result
+}
+
 struct Receipt {
 	scope            string = 'Real Maps and Google Play Services transport diagnostics. No credentials supplied; broker readiness does not establish Google authentication.'
 	started_utc      string
 	trace_onboarding bool
+	trace_tls        bool
 mut:
 	finished_utc      string
 	status            string = 'failed'
@@ -727,6 +831,8 @@ mut:
 	cleanup_survivors int
 	auth_init         AuthInitDiagnostics
 	browser_init      AuthInitDiagnostics
+	auth_pump         AuthPumpDiagnostics
+	account_handoff   AccountHandoffDiagnostics
 }
 
 struct DatabaseUpdate {
@@ -1234,11 +1340,22 @@ fn select_maps_diagnostics(session Session) {
 			os.unsetenv(key)
 		}
 	}
+	if session.trace_tls {
+		os.setenv('VINIX_ANDROID_TRACE_TLS', '1', true)
+	} else {
+		os.unsetenv('VINIX_ANDROID_TRACE_TLS')
+	}
 }
 
-fn broker_trace_onboarding(args []string) !bool {
+struct DiagnosticSelection {
+mut:
+	trace_onboarding bool
+	trace_tls        bool
+}
+
+fn broker_diagnostics(args []string) !DiagnosticSelection {
 	mut broker := false
-	mut trace := false
+	mut selected := DiagnosticSelection{}
 	for argument in args {
 		match argument {
 			'--broker' {
@@ -1246,13 +1363,17 @@ fn broker_trace_onboarding(args []string) !bool {
 				broker = true
 			}
 			'--trace-onboarding' {
-				if trace { return error('duplicate onboarding trace option') }
-				trace = true
+				if selected.trace_onboarding { return error('duplicate onboarding trace option') }
+				selected.trace_onboarding = true
+			}
+			'--trace-tls' {
+				if selected.trace_tls { return error('duplicate TLS trace option') }
+				selected.trace_tls = true
 			}
 			else { return error('unsupported broker option: ' + argument) }
 		}
 	}
-	return trace
+	return selected
 }
 
 fn private_result_root() ! {
@@ -1554,6 +1675,8 @@ fn broker_session(mut receipt Receipt) ! {
 		text := output.bytestr()
 		receipt.auth_init = auth_init_diagnostics(text)
 		receipt.browser_init = browser_init_diagnostics(text)
+		receipt.auth_pump = auth_pump_diagnostics(text)
+		receipt.account_handoff = account_handoff_diagnostics(text)
 		unsafe { text.free() }
 	}
 	for {
@@ -1571,6 +1694,7 @@ fn broker_session(mut receipt Receipt) ! {
 				broker:           receipt.broker
 				desktop:          receipt.desktop
 				trace_onboarding: receipt.trace_onboarding
+				trace_tls:        receipt.trace_tls
 			}
 			publish_fresh(broker_root + '/session.json', json2.encode(session) + '\n', 0o444)!
 			receipt.service_ready = true
@@ -1626,6 +1750,7 @@ fn launch_maps() ! {
 	launched := MapsLaunch{
 		process: identity(os.getpid())!, app_host: host, desktop: desktop.process
 		trace_onboarding: session.trace_onboarding
+		trace_tls:        session.trace_tls
 	}
 	check_maps_launch(launched, desktop)!
 	if app_host_identity(launched.process, desktop)! != host {
@@ -1636,22 +1761,34 @@ fn launch_maps() ! {
 	if session.trace_onboarding {
 		println('MAPS-ACCOUNT-ONBOARDING-TRACE tree=1 threads=1 private-log=maps.log')
 	}
+	if session.trace_tls { println('MAPS-ACCOUNT-TLS-TRACE private-log=maps.log') }
 	os.execvp(launcher_path, [maps_apk])!
 }
 
 fn onboarding_trace_self_test() ! {
 	for arguments in [ []string{}, ['--broker'] ] {
-		if broker_trace_onboarding(arguments)! { return error('default broker enabled onboarding traces') }
+		if broker_diagnostics(arguments)! != DiagnosticSelection{} { return error('default broker enabled diagnostics') }
 	}
 	for arguments in [['--trace-onboarding'], ['--broker', '--trace-onboarding'],
 		['--trace-onboarding', '--broker']] {
-		if !broker_trace_onboarding(arguments)! { return error('broker onboarding trace opt-in was lost') }
+		selected := broker_diagnostics(arguments)!
+		if !selected.trace_onboarding || selected.trace_tls { return error('broker onboarding trace opt-in differs') }
+	}
+	for arguments in [['--trace-tls'], ['--broker', '--trace-tls'], ['--trace-tls', '--broker']] {
+		selected := broker_diagnostics(arguments)!
+		if !selected.trace_tls || selected.trace_onboarding { return error('broker TLS trace opt-in differs') }
+	}
+	for arguments in [['--trace-tls', '--trace-onboarding'], ['--broker', '--trace-onboarding', '--trace-tls'],
+		['--trace-tls', '--broker', '--trace-onboarding']] {
+		selected := broker_diagnostics(arguments)!
+		if !selected.trace_tls || !selected.trace_onboarding { return error('independent diagnostics selections lost') }
 	}
 	for arguments in [['--broker', '--broker'], ['--trace-onboarding', '--trace-onboarding'],
-		['--launch', '--trace-onboarding'], ['--trace-onboarding=1'], ['']] {
-		if _ := broker_trace_onboarding(arguments) { return error('invalid trace invocation accepted') }
+		['--trace-tls', '--trace-tls'], ['--launch', '--trace-onboarding'], ['--launch', '--trace-tls'],
+		['--trace-onboarding=1'], ['--trace-tls=1'], ['--trace-TLS'], ['']] {
+		if _ := broker_diagnostics(arguments) { return error('invalid trace invocation accepted') }
 	}
-	keys := ['VINIX_ANDROID_TRACE_TREE', 'VINIX_ANDROID_TRACE_THREADS']
+	keys := ['VINIX_ANDROID_TRACE_TREE', 'VINIX_ANDROID_TRACE_THREADS', 'VINIX_ANDROID_TRACE_TLS']
 	mut previous := map[string]string{}
 	for key in keys {
 		if value := os.getenv_opt(key) { previous[key] = value }
@@ -1662,31 +1799,43 @@ fn onboarding_trace_self_test() ! {
 		}
 	}
 	legacy := json2.decode[Session]('{"kind":"vinix-maps-account-session-v1"}')!
-	if legacy.trace_onboarding { return error('legacy session enabled onboarding traces') }
-	for enabled in [true, false] {
+	if legacy.trace_onboarding || legacy.trace_tls { return error('legacy session enabled diagnostics') }
+	legacy_launch := json2.decode[MapsLaunch]('{}')!
+	legacy_receipt := json2.decode[Receipt]('{}')!
+	if legacy_launch.trace_tls || legacy_receipt.trace_tls { return error('legacy receipt enabled TLS traces') }
+	for selection in [DiagnosticSelection{}, DiagnosticSelection{ trace_onboarding: true },
+		DiagnosticSelection{ trace_tls: true }, DiagnosticSelection{ trace_onboarding: true, trace_tls: true }] {
 		for key in keys { os.setenv(key, 'ambient-must-not-select-diagnostics', true) }
-		session := json2.decode[Session](json2.encode(Session{ trace_onboarding: enabled }))!
+		session := json2.decode[Session](json2.encode(Session{
+			trace_onboarding: selection.trace_onboarding, trace_tls: selection.trace_tls
+		}))!
 		select_maps_diagnostics(session)
 		for key in keys {
+			enabled := if key == 'VINIX_ANDROID_TRACE_TLS' { selection.trace_tls } else { selection.trace_onboarding }
 			if enabled {
 				if os.getenv(key) != '1' { return error('session trace selection did not reach Maps environment') }
 			} else if _ := os.getenv_opt(key) {
 				return error('ambient Maps trace survived disabled session')
 			}
 		}
-		launch := json2.decode[MapsLaunch](json2.encode(MapsLaunch{ trace_onboarding: session.trace_onboarding }))!
-		if launch.trace_onboarding != enabled { return error('Maps trace receipt lost session selection') }
+		launch := json2.decode[MapsLaunch](json2.encode(MapsLaunch{
+			trace_onboarding: session.trace_onboarding, trace_tls: session.trace_tls
+		}))!
+		if launch.trace_onboarding != selection.trace_onboarding || launch.trace_tls != selection.trace_tls {
+			return error('Maps trace receipt lost session selection')
+		}
 	}
 	root := os.join_path(os.temp_dir(), 'vinix-maps-trace-' + os.getpid().str() + '-' + time.sys_mono_now().str())
 	os.mkdir(root)!
 	defer { os.rmdir_all(root) or {} }
 	os.chmod(root, 0o700)!
-	for name in ['broker.log', 'maps.log'] { os.write_file(root + '/' + name, 'private-onboarding-sentinel')! }
-	os.write_file(root + '/receipt.json', json2.encode(Receipt{ trace_onboarding: true }))!
+	for name in ['broker.log', 'maps.log'] { os.write_file(root + '/' + name, 'private-onboarding-and-tls-sentinel')! }
+	os.write_file(root + '/receipt.json', json2.encode(Receipt{ trace_onboarding: true, trace_tls: true }))!
 	retained := json2.decode[Archive](archive(root)!)!
 	if retained.entries.len != 1 || retained.entries[0].path != 'receipt.json'
-		|| !json2.decode[Receipt](base64.decode_str(retained.entries[0].data))!.trace_onboarding {
-		return error('onboarding diagnostics escaped private logs or lost public opt-in receipt')
+		|| !json2.decode[Receipt](base64.decode_str(retained.entries[0].data))!.trace_onboarding
+		|| !json2.decode[Receipt](base64.decode_str(retained.entries[0].data))!.trace_tls {
+		return error('diagnostics escaped private logs or lost public opt-in receipt')
 	}
 }
 
@@ -1924,6 +2073,133 @@ fn browser_init_self_test() ! {
 	over := browser_init_diagnostics(many + valid + private)
 	if !over.truncated || over.failures != full.failures {
 		return error('browser truncation did not preserve the first 32 complete records')
+	}
+}
+
+fn auth_pump_self_test() ! {
+	for stage in 0 .. 6 {
+		for pending in -1 .. 3 {
+			for status in [i32(-2147483648), i32(-1), i32(0), i32(1), i32(3), i32(2147483647)] {
+				line := 'ANDROID-AUTH-PUMP-FAIL stage=' + stage.str() + ' status=' + status.str() + ' pending=' + pending.str() + '\n'
+				valid := stage >= 1 && stage <= 4 && pending >= 0 && pending <= 1
+				if failure := auth_pump_line(line) {
+					if !valid || failure != AuthPumpFailure{ stage: i32(stage), status: status, pending: i32(pending) } {
+						return error('pump stage/status/pending combination accepted incorrectly')
+					}
+				} else if valid {
+					return error('valid pump stage/status/pending combination rejected')
+				}
+			}
+		}
+	}
+	valid := 'ANDROID-AUTH-PUMP-FAIL stage=4 status=-1 pending=1\n'
+	for bad in [valid.trim_right('\n'), 'prefix ' + valid, '\n' + valid, valid + 'suffix',
+		valid.replace('\n', '\r\n'), valid.replace(' status=', '  status='),
+		valid.replace(' status=', '\tstatus='), valid.replace('stage=4', 'stage=04'),
+		valid.replace('stage=4', 'stage=-4'), valid.replace('stage=4', 'stage=+4'),
+		valid.replace('status=-1', 'status='), valid.replace('status=-1', 'status=+1'),
+		valid.replace('status=-1', 'status=-0'), valid.replace('status=-1', 'status=00'),
+		valid.replace('status=-1', 'status=-01'), valid.replace('status=-1', 'status=1.0'),
+		valid.replace('status=-1', 'status=2147483648'), valid.replace('status=-1', 'status=-2147483649'),
+		valid.replace('pending=1', 'pending=01'), valid.replace('pending=1', 'pending=+1'),
+		valid.replace('pending=1', 'pending=-0'), valid.replace('status=-1 ', ''),
+		valid.replace('status=-1', 'stage=-1'), valid.replace('status=-1 pending=1', 'pending=1 status=-1'),
+		valid.replace('pending=1\n', 'pending=1 email=private@example.invalid\n'),
+		valid.replace('pending=1\n', 'pending=1\x00\n'),
+		valid.replace('ANDROID-AUTH-PUMP-FAIL', 'ANDROID-AUTH-INIT-FAIL'),
+		valid.trim_right('\n') + 'x'.repeat(128) + '\n',
+	] {
+		if _ := auth_pump_line(bad) { return error('malformed/private pump line accepted') }
+	}
+	if auth_pump_diagnostics(valid.trim_right('\n')).failures.len != 0 {
+		return error('unterminated pump output accepted')
+	}
+	private := 'email=private@example.invalid token=private-secret\n'
+	init := 'ANDROID-AUTH-INIT-FAIL stage=1 code=0 detail=0 loader=0\n'
+	mixed := auth_pump_diagnostics(private + 'x'.repeat(129) + '\n' + init + valid + valid.trim_right('\n'))
+	if mixed.failures != [AuthPumpFailure{ stage: 4, status: -1, pending: 1 }] || mixed.truncated {
+		return error('pump scan did not recover from private/overlong/init lines')
+	}
+	public := json2.encode(Receipt{ auth_pump: mixed })
+	if public.contains('private@example.invalid') || public.contains('private-secret')
+		|| public.contains('ANDROID-AUTH-PUMP-FAIL') || public.contains('ANDROID-AUTH-INIT-FAIL') {
+		return error('raw private pump output entered the receipt')
+	}
+	mut many := ''
+	for status in 0 .. 32 {
+		many += 'ANDROID-AUTH-PUMP-FAIL stage=1 status=' + status.str() + ' pending=0\n'
+	}
+	full := auth_pump_diagnostics(many + private + init + valid.trim_right('\n'))
+	if full.failures.len != 32 || full.truncated || full.failures[0].status != 0
+		|| full.failures[31].status != 31 {
+		return error('pump cardinality/order differs at the bound')
+	}
+	over := auth_pump_diagnostics(many + valid + private)
+	if !over.truncated || over.failures != full.failures {
+		return error('pump truncation did not preserve the first 32 complete records')
+	}
+}
+
+fn account_handoff_self_test() ! {
+	valid := 'ANDROID-ACCOUNT-HANDOFF stage=9 operation=2 event=2 code=-1\n'
+	expected := accounthandoff.HandoffDiagnostic{ stage: 9, operation: 2, event: 2, code: -1 }
+	for stage in 1 .. 14 {
+		for operation in 2 .. 5 {
+			line := 'ANDROID-ACCOUNT-HANDOFF stage=' + stage.str() + ' operation=' + operation.str() + ' event=' + (if stage == 9 { '1' } else { '0' }) + ' code=0\n'
+			result := account_handoff_diagnostics(line)
+			if operation == 3 && stage !in [1, 9] {
+				if result.records.len != 0 || result.truncated {
+					return error('redemption transport accepted an original-operation milestone')
+				}
+				continue
+			}
+			if result.truncated || result.records.len != 1 || result.records[0].stage != stage
+				|| result.records[0].operation != operation || result.records[0].code != 0
+				|| result.records[0].event != (if stage == 9 { 1 } else { 0 }) {
+				return error('valid handoff milestone lost or changed')
+			}
+		}
+	}
+	for bad in [valid.trim_right('\n'), 'prefix ' + valid, valid.replace('\n', '\r\n'),
+		valid.replace(' operation=', '  operation='), valid.replace(' operation=', '\toperation='),
+		valid.replace('stage=9', 'stage=0'), valid.replace('stage=9', 'stage=14'),
+		valid.replace('stage=9', 'stage=09'), valid.replace('operation=2', 'operation=1'),
+		valid.replace('operation=2', 'operation=5'), valid.replace('event=2', 'event=3'),
+		valid.replace('event=2', 'event=0'), valid.replace('code=-1', 'code=0'),
+		valid.replace('code=-1', 'code=-2'), valid.replace('code=-1', 'code=10'),
+		valid.replace('code=-1', 'code=-0'), valid.replace('code=-1', 'code=+1'),
+		valid.replace('code=-1', 'code=01'), valid.replace('code=-1', 'code=2147483648'),
+		valid.replace('event=2 code=-1', 'code=-1 event=2'),
+		valid.replace('code=-1\n', 'code=-1 email=private@example.invalid\n'),
+		valid.replace('code=-1\n', 'code=-1\x00\n'),
+		valid.trim_right('\n') + 'x'.repeat(128) + '\n',
+	] {
+		if account_handoff_diagnostics(bad).records.len != 0 {
+			return error('malformed/private handoff output accepted')
+		}
+	}
+	private := 'email=private@example.invalid token=private-secret\n'
+	pump := 'ANDROID-AUTH-PUMP-FAIL stage=4 status=-1 pending=1\n'
+	mixed := account_handoff_diagnostics(private + 'x'.repeat(129) + '\n' + pump + valid + valid.trim_right('\n'))
+	if mixed.records != [expected] || mixed.truncated {
+		return error('handoff scan did not recover from private/overlong/pump lines')
+	}
+	public := json2.encode(Receipt{ account_handoff: mixed })
+	if public.contains('private@example.invalid') || public.contains('private-secret')
+		|| public.contains('ANDROID-ACCOUNT-HANDOFF') || public.contains('ANDROID-AUTH-PUMP-FAIL') {
+		return error('raw private handoff output entered the receipt')
+	}
+	mut many := ''
+	for index in 0 .. 32 {
+		many += 'ANDROID-ACCOUNT-HANDOFF stage=' + (index % 8 + 1).str() + ' operation=2 event=0 code=0\n'
+	}
+	full := account_handoff_diagnostics(many + private + pump + valid.trim_right('\n'))
+	if full.records.len != 32 || full.truncated || full.records[0].stage != 1 || full.records[31].stage != 8 {
+		return error('handoff cardinality/order differs at the bound')
+	}
+	over := account_handoff_diagnostics(many + valid + private)
+	if !over.truncated || over.records != full.records {
+		return error('handoff truncation did not preserve the first 32 complete records')
 	}
 }
 
@@ -2166,6 +2442,8 @@ fn self_test() ! {
 	poll_memory_self_test(256)!
 	auth_init_self_test()!
 	browser_init_self_test()!
+	auth_pump_self_test()!
+	account_handoff_self_test()!
 	required_deployment_inputs_self_test()!
 	protected_directory_self_test()!
 	sqlite_self_test()!
@@ -2225,7 +2503,7 @@ fn self_test() ! {
 			return error('stale stop request accepted')
 		}
 	}
-	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths protected-directory-symlink-and-mode-rejection process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation bounded-numeric-auth-diagnostics bounded-numeric-browser-diagnostics mandatory-browser-client native-app-host-identity-and-selector fresh-app-host-surface grandchild-launch-receipt-binding session-selected-onboarding-traces private-diagnostic-export-exclusion')
+	println('MAPS-ACCOUNT-GUEST-SELFTEST-PASS canonical-paths protected-directory-symlink-and-mode-rejection process-credentials registry-principals service-selector APK-pins database-prefix UID-GID-name-collisions stop-session-binding SQLite-exact-hardlink-group exclusive-create bounded-copy atomic-alias-preservation bounded-numeric-auth-diagnostics bounded-numeric-browser-diagnostics bounded-numeric-pump-diagnostics bounded-numeric-account-handoff mandatory-browser-client native-app-host-identity-and-selector fresh-app-host-surface grandchild-launch-receipt-binding independent-session-selected-onboarding-and-TLS-traces private-diagnostic-export-exclusion')
 }
 
 fn main() {
@@ -2266,8 +2544,8 @@ fn main() {
 		}
 		return
 	}
-	trace_onboarding := broker_trace_onboarding(os.args[1..]) or {
-		eprintln('usage: maps-account-guest [--broker [--trace-onboarding]|--launch|--stop|--self-test]')
+	diagnostics := broker_diagnostics(os.args[1..]) or {
+		eprintln('usage: maps-account-guest [--broker [--trace-onboarding] [--trace-tls]|--launch|--stop|--self-test]')
 		eprintln(err)
 		exit(1)
 	}
@@ -2275,7 +2553,9 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	mut receipt := Receipt{ started_utc: time.utc().str(), trace_onboarding: trace_onboarding }
+	mut receipt := Receipt{
+		started_utc: time.utc().str(), trace_onboarding: diagnostics.trace_onboarding, trace_tls: diagnostics.trace_tls
+	}
 	broker_session(mut receipt) or {
 		receipt.status = 'failed'
 		receipt.error = err.msg()

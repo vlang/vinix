@@ -477,7 +477,6 @@ fn frozen_compiler(root string, closure map[string]string) !string {
 
 fn build(root string) ! {
 	if hash(base + '/sha256.json')! != base_seal { return error('sealed native baseline differs') }
-	base_pins := json2.decode[map[string]string](os.read_file(base + '/sha256.json')!)!
 	copy_pin(base + '/sha256.json', root + '/baseline-sha256.json', base_seal)!
 	copy_pin(os.executable(), root + '/builder', hash(os.executable())!)!
 	builder_pins := frozen_pins(root, 'builder')!
@@ -487,10 +486,11 @@ fn build(root string) ! {
 	command(root, 'working-tree', ['/usr/bin/git', '-C', repo, 'status', '--porcelain=v1'])!
 	if hash(compiler)! != compiler_pin { return error('pinned discovery compiler differs') }
 	set_compiler(compiler)
-	mut host_discover := [compiler, '-new-compiler', '-gc', 'none', '-nocache', '-path', '@vlib',
+	discovery_imports := repo + '/build-support/android|@vlib'
+	mut host_discover := [compiler, '-new-compiler', '-gc', 'none', '-nocache', '-path', discovery_imports,
 		'-print-v-files', guest_source]
 	host_originals := freeze_closure(root, 'host-controller', command(root, 'host-controller-closure', host_discover)!)!
-	mut arm_discover := flags(compiler, '@vlib')
+	mut arm_discover := flags(compiler, discovery_imports)
 	arm_discover << ['-print-v-files', guest_source]
 	arm_originals := freeze_closure(root, 'arm-controller', command(root, 'arm-controller-closure', arm_discover)!)!
 	mut originals := host_originals.clone()
@@ -502,6 +502,45 @@ fn build(root string) ! {
 	}
 	write_json(root + '/current-inputs.json', originals)!
 	unchanged(originals)!
+	unchanged(builder_pins)!
+	mut prepared := {
+		'kind':              'vinix-maps-controller-preparation-v1'
+		'executable_sha256': hash(os.executable())!
+		'source_revision':   revision
+	}
+	for relative in ['current-inputs.json', 'builder-closure.json', 'host-controller-closure.json',
+		'arm-controller-closure.json', 'baseline-sha256.json'] {
+		prepared[relative] = hash(root + '/' + relative)!
+	}
+	write_json(root + '/controller-preparation.json', prepared)!
+	// Source discovery reads entire closures with gc none. Replace this process
+	// before compiling so that workspace cannot overlap the compiler's peak RSS.
+	os.execvp(os.executable(), ['--frozen-compile', root])!
+}
+
+fn compile_controller(root string) ! {
+	prepared := json2.decode[map[string]string](os.read_file(root + '/controller-preparation.json')!)!
+	if prepared['kind'] or { '' } != 'vinix-maps-controller-preparation-v1'
+		|| prepared['executable_sha256'] or { '' } != hash(os.executable())! {
+		return error('retained controller preparation differs')
+	}
+	for relative in ['current-inputs.json', 'builder-closure.json', 'host-controller-closure.json',
+		'arm-controller-closure.json', 'baseline-sha256.json'] {
+		if prepared[relative] or { '' } != hash(root + '/' + relative)! {
+			return error('retained controller preparation input differs: ' + relative)
+		}
+	}
+	if hash(base + '/sha256.json')! != base_seal
+		|| hash(root + '/baseline-sha256.json')! != base_seal {
+		return error('sealed native baseline differs')
+	}
+	revision := prepared['source_revision'] or { return error('source revision absent') }
+	if revision != os.read_file(root + '/commands/revision.log')!.trim_space() {
+		return error('source revision differs from preparation')
+	}
+	originals := json2.decode[map[string]string](os.read_file(root + '/current-inputs.json')!)!
+	unchanged(originals)!
+	builder_pins := frozen_pins(root, 'builder')!
 	host_closure := frozen_pins(root, 'host-controller')!
 	host_v := frozen_compiler(root, host_closure)!
 	host_imports := closure_imports(host_closure)!
@@ -513,6 +552,7 @@ fn build(root string) ! {
 		'-cc', 'cc', '-showcc', '-path', host_imports, '-o', root + '/hosttest/maps-account-guest',
 		host_source], host_closure)!
 	command(root, 'controller-host-self-test', [root + '/hosttest/maps-account-guest', '--self-test'])!
+	base_pins := json2.decode[map[string]string](os.read_file(base + '/sha256.json')!)!
 	mut cross_pins := cross_inputs(root, base_pins)!
 	// Retain every sealed cross compiler/header/startup input, including those
 	// inherited from the baseline; the output bundle is independently auditable.
@@ -620,9 +660,9 @@ fn bootstrap(root string) ! {
 		'executable_sha256': json2.Any(hash(argv[0])!)
 		'started_utc':       json2.Any(time.utc().str())
 	})!
-	result := os.exec(argv)
-	if result.exit_code != 0 { return error(result.output) }
-	print(result.output)
+	// Replace the bootstrap so its retained workspace cannot overlap the frozen
+	// builder and compiler in the aggregate memory guard.
+	os.execvp(argv[0], argv[1..])!
 }
 
 fn self_test() ! {
@@ -684,13 +724,17 @@ fn main() {
 		}
 		return
 	}
-	if os.args.len == 3 && os.args[1] == '--frozen-build' {
+	if os.args.len == 3 && os.args[1] in ['--frozen-build', '--frozen-compile'] {
 		root := os.abs_path(os.args[2])
 		if os.executable() != root + '/tools/frozen-builder' || !root.starts_with(state + 'maps-account-guest-build-') {
 			eprintln('internal build requires its retained executable')
 			exit(2)
 		}
 		os.chdir(repo)!
+		if os.args[1] == '--frozen-compile' {
+			compile_controller(root) or { eprintln(err); exit(1) }
+			return
+		}
 		build(root) or {
 			eprintln(err)
 			exit(1)
