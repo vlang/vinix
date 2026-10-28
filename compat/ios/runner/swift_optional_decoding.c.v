@@ -2,8 +2,8 @@
 module main
 
 // Compare registered identities before reading metadata. Optional's existing
-// accessor admits complete, copyable inline Wrapped layouts of at most 24
-// bytes/alignment 8; this conformance uses that same bounded lifetime.
+// accessor admits complete, copyable bitwise-takable layouts with Optional
+// size at most 65536/alignment 8; scratch follows that same bounded layout.
 fn swift_optional_decoding_wrapped_checked(metadata u64) !u64 {
 	if ios_runtime == unsafe { nil } || ios_runtime.swift_optional_retired
 		|| ios_runtime.swift_concurrency_retired { return swift_optional_failure() }
@@ -62,7 +62,7 @@ fn swift_optional_decoding_checked(decoder u64, metadata u64, table u64, output 
  thrown := get(getter, container, decoder_value.metadata, decoder_value.table, decoder_self, incoming)
  if thrown != 0 { return thrown } // No container or Wrapped value was initialized.
  container_value := swift_raw_encoding_value_checked(container)!
- optional := u64(C.__builtin_alloca(24))
+ optional := u64(C.__builtin_alloca(usize(read64(read64(metadata - 8) + 64) + 1)))
  mut live := false
  defer { if live { swift_optional_destroy(optional, metadata) } }
  {
@@ -74,7 +74,7 @@ fn swift_optional_decoding_checked(decoder u64, metadata u64, table u64, output 
    swift_optional_inject(optional, 1, metadata)
   } else {
    decode := swift_raw_encoding_callback_checked(container_value.table, 152)!
-   payload := u64(C.__builtin_alloca(24))
+   payload := u64(C.__builtin_alloca(usize(layout.size + 1)))
    call := unsafe { SwiftArrayDecodingCall(voidptr(ios_runtime.swift_optional_decoding_arena + 64)) }
    error := call(decode, payload, wrapped, wrapped_table, container_value.metadata, container_value.table, container_self, 0)
    if error != 0 { return error } // A throwing decode initialized no payload.

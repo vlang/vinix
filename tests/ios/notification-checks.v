@@ -60,10 +60,12 @@ fn main() {
 	root := os.real_path(os.getwd()); out := os.abs_path(os.args[2]); old := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
-	if os.args[1] in ['swift-optional-lookup-host', 'swift-optional-metadata-host', 'swift-task-priority-host', 'swift-context2-host', 'swift-mangled-state-host', 'swift-mangled-state2-host'] {
+	if os.args[1] in ['swift-optional-lookup-host', 'swift-optional-metadata-host', 'swift-optional-encoding-host', 'swift-optional-decoding-host', 'swift-task-priority-host', 'swift-context2-host', 'swift-mangled-state-host', 'swift-mangled-state2-host'] {
 		fixture := match os.args[1] {
 			'swift-optional-lookup-host' { 'swift_mangled_optional_test.v' }
 			'swift-optional-metadata-host' { 'swift_optional_metadata_test.v' }
+			'swift-optional-encoding-host' { 'swift_optional_encoding_test.v' }
+			'swift-optional-decoding-host' { 'swift_optional_decoding_test.v' }
 			'swift-task-priority-host' { 'swift_task_priority_test.v' }
 			'swift-context2-host' { 'swift_context2_test.v' }
 			'swift-mangled-state-host' { 'swift_mangled_state_test.v' }

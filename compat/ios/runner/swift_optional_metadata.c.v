@@ -4,7 +4,7 @@ module main
 struct SwiftOptionalFailure {}
 
 fn (_ &SwiftOptionalFailure) msg() string {
-	return 'iOS: Optional requires live, complete, copyable inline Wrapped metadata (at most 24 bytes, alignment at most 8)'
+	return 'iOS: Optional requires live, complete, copyable, bitwise-takable Wrapped metadata (Optional at most 65536 bytes, alignment at most 8)'
 }
 
 fn (_ &SwiftOptionalFailure) code() int { return 1 }
@@ -61,6 +61,45 @@ fn swift_optional_copy(destination u64, source u64, metadata u64) u64 {
 	return swift_optional_initialize(destination, source, metadata, false)
 }
 
+// A value buffer contains the value inline or one retained heap-box pointer.
+// Copying an out-of-line buffer shares its box; it does not copy size bytes
+// from the three-word buffer, nor does it retain the payload a second time.
+fn swift_optional_buffer_copy_checked(destination u64, source u64, metadata u64) !u64 {
+	witness := read64(metadata - 8)
+	if read32(witness + 80) & 0x20000 == 0 {
+		return swift_optional_copy(destination, source, metadata)
+	}
+	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired
+		|| ios_runtime.swift_optional_retired || destination == 0 || source == 0
+		|| (destination | source) & 7 != 0
+		|| destination > ~u64(0) - 24 || source > ~u64(0) - 24 {
+		return swift_optional_failure()
+	}
+	owner := read64(source)
+	C.ios_objc_initialize_lock()
+	heap := ios_runtime.swift_heap[owner] or {
+		C.ios_objc_initialize_unlock()
+		return swift_optional_failure()
+	}
+	kind := read64(heap.metadata)
+	valid := !heap.deiniting && owner & 7 == 0
+		&& heap.size >= 16 + read64(witness + 64) && heap.mask & 7 == 7
+		&& read64(owner) == heap.metadata
+		&& (kind == 0x400 || (kind == 0x500
+			&& swift_box_matches(heap, metadata, read64(witness + 64))))
+	C.ios_objc_initialize_unlock()
+	if !valid { return swift_optional_failure() }
+	// Source owns a live box throughout this borrowed operation. No callback
+	// runs while the registry lock is held.
+	swift_retain(owner)
+	unsafe { *(&u64(destination)) = owner }
+	return owner + 16
+}
+
+fn swift_optional_buffer_copy(destination u64, source u64, metadata u64) u64 {
+	return swift_optional_buffer_copy_checked(destination, source, metadata) or { panic(err) }
+}
+
 fn swift_optional_take(destination u64, source u64, metadata u64) u64 {
 	return swift_optional_initialize(destination, source, metadata, true)
 }
@@ -83,7 +122,7 @@ fn swift_optional_assign(destination u64, source u64, metadata u64, taking bool)
 	} else if old_some {
 		// Publish nil before a retiring payload can reenter the runtime. The
 		// bounded stack temporary owns the old payload until destruction ends.
-		temporary := u64(C.__builtin_alloca(24))
+		temporary := u64(C.__builtin_alloca(usize(read64(witness + 64) + 1)))
 		move := unsafe { SwiftSequenceCopy(voidptr(read64(witness + 32))) }
 		move(temporary, destination, wrapped)
 		C.memmove(voidptr(destination), voidptr(source), usize(read64(read64(metadata - 8) + 64)))
@@ -184,7 +223,8 @@ fn swift_optional_access_checked(_request u64, wrapped u64) !SwiftAssociatedMeta
 	flags := read32(witness + 80)
 	wrapped_extra := read32(witness + 84)
 	size := layout.size + if wrapped_extra == 0 { u64(1) } else { u64(0) }
-	if size > 24 || layout.alignment > 8 || flags & ~u32(0x022100ff) != 0 {
+	if size > 65536 || layout.alignment > 8 || flags & ~u32(0x022300ff) != 0
+		|| (flags & 0x20000 != 0) != (layout.size > 24) {
 		swift_optional_probe(wrapped, 2, layout.size, layout.alignment, flags, wrapped_extra)
 		return swift_optional_failure()
 	}
@@ -206,7 +246,7 @@ fn swift_optional_access_checked(_request u64, wrapped u64) !SwiftAssociatedMeta
 		*(&u64(metadata + 8)) = base + u64(page) + 160
 		*(&u64(metadata + 16)) = wrapped
 	}
-	for i, entry in [u64(unsafe { voidptr(swift_optional_copy) }),
+	for i, entry in [u64(unsafe { voidptr(swift_optional_buffer_copy) }),
 		u64(unsafe { voidptr(swift_optional_destroy) }), u64(unsafe { voidptr(swift_optional_copy) }),
 		u64(unsafe { voidptr(swift_optional_assign_copy) }),
 		u64(unsafe { voidptr(swift_optional_take) }),
@@ -226,7 +266,9 @@ fn swift_optional_access_checked(_request u64, wrapped u64) !SwiftAssociatedMeta
 		*(&u64(optional_witness + 96)) = u64(voidptr(swift_optional_project))
 		*(&u64(optional_witness + 104)) = u64(voidptr(swift_optional_inject))
 	}
-	write32(optional_witness + 80, flags | 0x00200000)
+	// Appending a tag can turn a 24-byte inline Wrapped into a boxed Optional.
+	write32(optional_witness + 80, (flags & ~u32(0x20000)) | 0x00200000
+		| if size > 24 { u32(0x20000) } else { u32(0) })
 	write32(optional_witness + 84, if wrapped_extra > 0 { wrapped_extra - u32(1) } else { u32(0) })
 	if C.mprotect(allocation, page, C.PROT_READ) != 0 {
 		if C.munmap(allocation, page) != 0 {

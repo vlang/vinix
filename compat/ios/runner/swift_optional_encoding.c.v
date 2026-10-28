@@ -2,8 +2,8 @@
 module main
 
 // Compare registered identities before reading metadata. Optional's existing
-// accessor admits complete, copyable inline Wrapped layouts of at most 24
-// bytes/alignment 8; this conformance uses that same bounded lifetime.
+// accessor admits complete, copyable bitwise-takable layouts with Optional
+// size at most 65536/alignment 8; scratch follows that same bounded layout.
 fn swift_optional_encoding_wrapped_checked(metadata u64) !u64 {
 	if ios_runtime == unsafe { nil } || ios_runtime.swift_optional_retired
 		|| ios_runtime.swift_concurrency_retired { return swift_optional_failure() }
@@ -59,10 +59,10 @@ fn swift_optional_encoding_checked(encoder u64, metadata u64, table u64, receive
 	get(getter, container, encoder_value.metadata, encoder_value.table, encoder_self)
 	container_value := swift_raw_encoding_value_checked(container)!
 	defer { swift_raw_encoding_destroy(container, container_value) }
-	// Native creates the container before copying the Optional and inspecting
-	// its tag. A some payload is then moved out, borrowed by generic encode,
+	// Create the container before inspecting an owned copy of the Optional.
+	// A some payload is then moved out, borrowed by generic encode,
 	// and destroyed on success, throw and checked dispatch failures.
-	optional := u64(C.__builtin_alloca(24))
+	optional := u64(C.__builtin_alloca(usize(read64(read64(metadata - 8) + 64) + 1)))
 	swift_optional_copy(optional, receiver, metadata)
 	tag := swift_optional_tag(optional, metadata)
 	if tag == 1 {
@@ -72,7 +72,7 @@ fn swift_optional_encoding_checked(encoder u64, metadata u64, table u64, receive
 		return call(encode_nil, container_value.metadata, container_value.table, container_self, incoming)
 	}
 	if tag != 0 { return swift_optional_failure() }
-	payload := u64(C.__builtin_alloca(24))
+	payload := u64(C.__builtin_alloca(usize(layout.size + 1)))
 	take := unsafe { SwiftSequenceCopy(voidptr(read64(read64(wrapped - 8) + 32))) }
 	take(payload, optional, wrapped)
 	destroy := unsafe { SwiftSequenceDestroy(voidptr(layout.destroy)) }

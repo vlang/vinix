@@ -47,8 +47,8 @@ struct OdApi {
 	keep_box   OdKeep   @[required]
 	drop_box   OdDrop   @[required]
 	box        u64
-	elements   [3]u64
-	witnesses  [3]u64
+	elements   [4]u64
+	witnesses  [4]u64
 }
 
 struct OdState {
@@ -113,10 +113,44 @@ fn od_api(native bool, code u64, guard u64) OdApi {
 		keep_box:   unsafe { OdKeep(voidptr(od_symbol(native, core, '_swift_retain'))) }
 		drop_box:   unsafe { OdDrop(voidptr(od_symbol(native, core, '_swift_release'))) }
 		box:        if native { od_symbol(true, core, '_swift_allocBox') } else { u64(0) }
-		elements:   [od_symbol(native, core, '_$sSiN'), od_symbol(native, core, '_$sSSN'), date]!
+		elements:   [od_symbol(native, core, '_$sSiN'), od_symbol(native, core, '_$sSSN'), date, od_wide_metadata()]!
 		witnesses:  [if native { od_symbol(true, core, '_$sSiSesWP') } else { guard },
-			if native { od_symbol(true, core, '_$sSSSesWP') } else { guard + 8 }, date_table]!
+			if native { od_symbol(true, core, '_$sSSSesWP') } else { guard + 8 }, date_table,
+			if native { od_symbol(true, core, '_$sSiSesWP') } else { guard + 16 }]!
 	}
+}
+
+// Synthetic complete POD metadata; the conditional table is forwarded only
+// to this fixture's container. Compare all 48 output bytes with native Swift.
+fn od_wide_copy(destination u64, source u64, _metadata u64) u64 {
+	C.memmove(voidptr(destination), voidptr(source), 48)
+	return destination
+}
+fn od_wide_destroy(_value u64, _metadata u64) {}
+fn od_wide_tag(value u64, cases u32, _metadata u64) u32 {
+	return if cases == 0 || unsafe { *(&u8(value + 48)) } == 0 { u32(0) } else { read32(value) + u32(1) }
+}
+fn od_wide_store(value u64, which u32, cases u32, _metadata u64) {
+	if cases == 0 { return }
+	unsafe { *(&u8(value + 48)) = if which == 0 { u8(0) } else { u8(1) } }
+	if which != 0 { C.memset(voidptr(value), 0, 48); write32(value, which - u32(1)) }
+}
+fn od_wide_metadata() u64 {
+	page := usize(C.getpagesize())
+	base := u64(C.mmap(unsafe { nil }, page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	assert base != ~u64(0)
+	metadata := base + 8
+	witness := base + 64
+	unsafe { *(&u64(base)) = witness; *(&u64(metadata)) = 0x200; *(&u64(metadata + 8)) = base + 256 }
+	for i, entry in [u64(unsafe { voidptr(od_wide_copy) }), u64(unsafe { voidptr(od_wide_destroy) }),
+		u64(unsafe { voidptr(od_wide_copy) }), u64(unsafe { voidptr(od_wide_copy) }),
+		u64(unsafe { voidptr(od_wide_copy) }), u64(unsafe { voidptr(od_wide_copy) }),
+		u64(unsafe { voidptr(od_wide_tag) }), u64(unsafe { voidptr(od_wide_store) }),
+		u64(48), 48, 0x20007, 0, 0, 0]! {
+		unsafe { *(&u64(witness + u64(i * 8))) = entry }
+	}
+	assert C.mprotect(voidptr(base), page, C.PROT_READ) == 0
+	return metadata
 }
 
 fn od_box(s &OdState, metadata u64, heap u64) SwiftArrayAllocation {
@@ -171,7 +205,7 @@ fn od_decode(type_arg u64, metadata u64, element_table u64, container u64, table
  s.decodes++; od_reenter(s)
  if s.failure == 0 { od_object_keep(s.api,s.error_owner); return s.error_owner }
  if s.kind == 1 { od_object_keep(s.api,s.object); unsafe { *(&SwiftStringWords(output)) = SwiftStringWords{second:s.object|0x5000000000000000} } }
- else { unsafe { *(&u64(output)) = 0x8123456789abcdef } }
+ else { if s.kind==3{C.memset(voidptr(output),0x67,48)};unsafe { *(&u64(output)) = 0x8123456789abcdef } }
  return 0
 }
 
@@ -298,6 +332,7 @@ fn od_case(api OdApi, kind int, count u64, boxed bool, shared bool, at_end bool,
  if !throws&&!unsupported{
   tag:=unsafe{OdTag(voidptr(read64(vwt+88)&0x0000ffffffffffff))};assert tag(result,metadata)==if count==0{u32(1)}else{u32(0)}
   if count==1{if kind==1{assert read64(result)==0&&read64(result+8)==object|0x5000000000000000}else{assert read64(result)==0x8123456789abcdef}}
+  if count==1&&kind==3{for i in u64(8)..48{assert unsafe{*(&u8(result+i))}==0x67}}
   assert od_refs(api,object)==1+if kind==1{i64(count)}else{i64(0)}
   destroy:=unsafe{OdDestroy(voidptr(read64(vwt+8)&0x0000ffffffffffff))};destroy(result,metadata)
  }else{assert read64(result)==0xfeedface}
@@ -310,7 +345,7 @@ fn od_case(api OdApi, kind int, count u64, boxed bool, shared bool, at_end bool,
 }
 
 fn od_matrix(api OdApi) {
- for kind in 0..3{for count in [u64(0),1]!{for boxed in [false,true]!{for shared in [false,true]!{for at_end in [false,true]!{for failure in [-2,-1,0]!{for profile in [0,2]!{od_case(api,kind,count,boxed,shared,at_end,failure,profile)}}}}}}}
+ for kind in 0..4{for count in [u64(0),1]!{for boxed in [false,true]!{for shared in [false,true]!{for at_end in [false,true]!{for failure in [-2,-1,0]!{for profile in [0,2]!{od_case(api,kind,count,boxed,shared,at_end,failure,profile)}}}}}}}
 }
 
 fn od_object(api OdApi) u64 {
@@ -458,7 +493,7 @@ fn test_swift_optional_decoding() {
 		api := od_api(true, code, guard)
 		od_descriptor(api, guard)
 		od_matrix(api)
-		println('NATIVE-OPTIONAL-DECODING: 288 Int/String/Date some/nil cases, shared Decoder/container boxes, nested conditional witnesses, decodeNil low bit, original owned errors, container cleanup before result publication and Decoder consumption')
+		println('NATIVE-OPTIONAL-DECODING: 384 Int/String/Date/48-byte POD some/nil cases, shared Decoder/container boxes, nested conditional witnesses, decodeNil low bit, original owned errors, container cleanup before result publication and Decoder consumption')
 	}
 	for _ in 0 .. 2 {
 		objc_start()
@@ -512,6 +547,7 @@ fn test_swift_optional_decoding() {
 		tables := ios_runtime.swift_optional_decoding.values()
 		arena := ios_runtime.swift_optional_decoding_arena
 		objc_stop()
+		assert C.munmap(voidptr(api.elements[3] - 8), page) == 0
 		assert ios_runtime.swift_optional_decoding.len == 0 && ios_runtime.swift_optional_decoding_arena == 0
 		if _ := swift_witness_table_checked(api.descriptor, opaque, guard) {
 			assert false

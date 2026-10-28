@@ -44,8 +44,8 @@ struct OeApi {
 	lookup     OeLookup   @[required]
 	keep       OeKeep     @[required]
 	drop       OeDrop     @[required]
-	elements   [3]u64
-	witnesses  [3]u64
+	elements   [4]u64
+	witnesses  [4]u64
 }
 
 struct OeState {
@@ -105,10 +105,45 @@ fn oe_api(native bool, code u64, guard u64) OeApi {
 		lookup:     lookup
 		keep:       unsafe { OeKeep(voidptr(oe_symbol(native, core, '_swift_bridgeObjectRetain'))) }
 		drop:       unsafe { OeDrop(voidptr(oe_symbol(native, core, '_swift_bridgeObjectRelease'))) }
-		elements:   [oe_symbol(native, core, '_$sSiN'), oe_symbol(native, core, '_$sSSN'), date]!
+		elements:   [oe_symbol(native, core, '_$sSiN'), oe_symbol(native, core, '_$sSSN'), date, oe_wide_metadata()]!
 		witnesses:  [if native { oe_symbol(true, core, '_$sSiSEsWP') } else { guard },
-			if native { oe_symbol(true, core, '_$sSSSEsWP') } else { guard + 8 }, date_table]!
+			if native { oe_symbol(true, core, '_$sSSSEsWP') } else { guard + 8 }, date_table,
+			if native { oe_symbol(true, core, '_$sSiSEsWP') } else { guard + 16 }]!
 	}
+}
+
+// Caller-owned synthetic POD metadata. Its borrowed conditional table is
+// forwarded to this fixture's generic container, which never dispatches it.
+// Native Swift and Vinix must forward all 48 bytes to the container.
+fn oe_wide_copy(destination u64, source u64, _metadata u64) u64 {
+	C.memmove(voidptr(destination), voidptr(source), 48)
+	return destination
+}
+fn oe_wide_destroy(_value u64, _metadata u64) {}
+fn oe_wide_tag(value u64, cases u32, _metadata u64) u32 {
+	return if cases == 0 || unsafe { *(&u8(value + 48)) } == 0 { u32(0) } else { read32(value) + u32(1) }
+}
+fn oe_wide_store(value u64, which u32, cases u32, _metadata u64) {
+	if cases == 0 { return }
+	unsafe { *(&u8(value + 48)) = if which == 0 { u8(0) } else { u8(1) } }
+	if which != 0 { C.memset(voidptr(value), 0, 48); write32(value, which - u32(1)) }
+}
+fn oe_wide_metadata() u64 {
+	page := usize(C.getpagesize())
+	base := u64(C.mmap(unsafe { nil }, page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+	assert base != ~u64(0)
+	metadata := base + 8
+	witness := base + 64
+	unsafe { *(&u64(base)) = witness; *(&u64(metadata)) = 0x200; *(&u64(metadata + 8)) = base + 256 }
+	for i, entry in [u64(unsafe { voidptr(oe_wide_copy) }), u64(unsafe { voidptr(oe_wide_destroy) }),
+		u64(unsafe { voidptr(oe_wide_copy) }), u64(unsafe { voidptr(oe_wide_copy) }),
+		u64(unsafe { voidptr(oe_wide_copy) }), u64(unsafe { voidptr(oe_wide_copy) }),
+		u64(unsafe { voidptr(oe_wide_tag) }), u64(unsafe { voidptr(oe_wide_store) }),
+		u64(48), 48, 0x20007, 0, 0, 0]! {
+		unsafe { *(&u64(witness + u64(i * 8))) = entry }
+	}
+	assert C.mprotect(voidptr(base), page, C.PROT_READ) == 0
+	return metadata
 }
 
 fn oe_object(api OeApi) u64 {
@@ -188,8 +223,12 @@ fn oe_encode(value u64, element u64, element_table u64, metadata u64, table u64,
  mut s:=unsafe{&OeState(read64(receiver))}
  assert s.count==1&&element==s.api.elements[s.kind]&&element_table==s.api.witnesses[s.kind]
  assert metadata==s.container_metadata&&table==s.container_table&&receiver==s.container&&incoming==s.incoming
- assert value!=s.source&&s.getters==1&&s.encodes==0&&s.drops==0&&read64(receiver+16)==0
- if s.kind==1{assert read64(value)==0&&read64(value+8)==s.object|0x5000000000000000;assert oe_refs(s.api,s.object)==3}else{assert read64(value)==0x8123456789abcdef}
+ // Native Swift can borrow the payload directly. Both implementations must
+ // preserve its ownership; Vinix deliberately copies into owned scratch.
+ assert s.api.native||value!=s.source
+ assert s.getters==1&&s.encodes==0&&s.drops==0&&read64(receiver+16)==0
+ if s.kind==1{assert read64(value)==0&&read64(value+8)==s.object|0x5000000000000000;assert oe_refs(s.api,s.object)==if s.api.native{i64(2)}else{i64(3)}}else{assert read64(value)==0x8123456789abcdef}
+ if s.kind==3{for i in u64(8)..48{assert unsafe{*(&u8(value+i))}==0x67}}
  s.encodes++;unsafe{*(&u64(receiver+16))=1};oe_reenter(s)
  if s.failure==0{oe_object_keep(s.api,s.error_owner);return s.error_owner};return 0
 }
@@ -258,6 +297,7 @@ fn oe_case(api OeApi,kind int,count u64,boxed bool,at_end bool,failure int,profi
  size:=read64(vwt+64);alignment:=u64(read32(vwt+80)&255)+1;stride:=(size+alignment-1)&~(alignment-1)
  source:=span+u64(page*3)+if at_end{u64(page)-stride}else{u64(0)}
  if count==1{
+  if kind==3{C.memset(voidptr(source),0x67,48)}
   if kind==1{oe_object_keep(api,object);unsafe{*(&SwiftStringWords(source))=SwiftStringWords{second:object|0x5000000000000000}}}else{unsafe{*(&u64(source))=0x8123456789abcdef}}
  }
  inject:=unsafe{OeInject(voidptr(read64(vwt+104)&0x0000ffffffffffff))};inject(source,if count==0{u32(1)}else{u32(0)},metadata)
@@ -299,7 +339,7 @@ fn oe_case(api OeApi,kind int,count u64,boxed bool,at_end bool,failure int,profi
 }
 
 fn oe_matrix(api OeApi){
- for kind in 0..3{for count in [u64(0),1]!{for boxed in [false,true]!{for at_end in [false,true]!{for failure in [-1,0]!{oe_case(api,kind,count,boxed,at_end,failure,0)}}}}}
+ for kind in 0..4{for count in [u64(0),1]!{for boxed in [false,true]!{for at_end in [false,true]!{for failure in [-1,0]!{oe_case(api,kind,count,boxed,at_end,failure,0)}}}}}
 }
 fn oe_protection(address u64, length u64, executable bool) {
 	$if macos {
@@ -399,7 +439,7 @@ fn test_swift_optional_encoding() {
 		api := oe_api(true, code, guard)
 		oe_descriptor(api, guard)
 		oe_matrix(api)
-		println('NATIVE-OPTIONAL-ENCODING: 48 Int/String/Date some/nil cases, single-value nil/generic, nested conditional witnesses, expired argument cache hits, payload copy/destroy before container cleanup and original owned errors')
+		println('NATIVE-OPTIONAL-ENCODING: 64 Int/String/Date/48-byte POD some/nil cases, single-value nil/generic, nested conditional witnesses, expired argument cache hits, payload copy/destroy before container cleanup and original owned errors')
 	}
 	for _ in 0 .. 2 {
 		objc_start()
@@ -454,6 +494,7 @@ fn test_swift_optional_encoding() {
 		tables := ios_runtime.swift_optional_encoding.values()
 		arena := ios_runtime.swift_optional_encoding_arena
 		objc_stop()
+		assert C.munmap(voidptr(api.elements[3] - 8), page) == 0
 		assert ios_runtime.swift_optional_encoding.len == 0 && ios_runtime.swift_optional_encoding_arena == 0
 		if _ := swift_witness_table_checked(api.descriptor, opaque, guard) {
 			assert false

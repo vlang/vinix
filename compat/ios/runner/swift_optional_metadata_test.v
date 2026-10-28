@@ -66,7 +66,8 @@ fn om_metadata(api OmApi, wrapped u64) u64 {
 	align := u64(read32(wrapped_witness + 80) & 255) + 1
 	assert read64(witness + 64) == size && read64(witness + 72) == (size + align - 1) & ~(align - 1)
 	assert read32(witness + 84) == if extra == 0 { u32(0) } else { extra - u32(1) }
-	assert read32(witness + 80) == read32(wrapped_witness + 80) | u32(0x200000)
+	assert read32(witness + 80) == (read32(wrapped_witness + 80) & ~u32(0x20000))
+		| u32(0x200000) | if size > 24 { u32(0x20000) } else { u32(0) }
 	return metadata
 }
 
@@ -200,6 +201,258 @@ fn om_strings(api OmApi) {
 
 fn om_publish(wrapped u64) u64 { return swift_optional_access(0, wrapped).metadata }
 
+// Synthetic caller-owned complete records exercise the same generic accessor
+// against native Swift and Vinix. A non-POD payload composes the installed
+// String witnesses with a large POD tail; none of its owners are invented.
+struct OmOutline {
+	string_metadata u64
+	size u64
+}
+
+fn om_outline_context(metadata u64) &OmOutline {
+	return unsafe { &OmOutline(read64(metadata + 8)) }
+}
+
+fn om_outline_copy(destination u64, source u64, metadata u64) u64 {
+	context := om_outline_context(metadata)
+	if context.string_metadata != 0 {
+		clone_payload := unsafe { SwiftSequenceCopy(voidptr(om_entry(context.string_metadata, 2))) }
+		clone_payload(destination, source, context.string_metadata)
+		C.memmove(voidptr(destination + 16), voidptr(source + 16), usize(context.size - 16))
+	} else {
+		C.memmove(voidptr(destination), voidptr(source), usize(context.size))
+	}
+	return destination
+}
+
+fn om_outline_destroy(value u64, metadata u64) {
+	context := om_outline_context(metadata)
+	if context.string_metadata != 0 {
+		destroy := unsafe { SwiftSequenceDestroy(voidptr(om_entry(context.string_metadata, 1))) }
+		destroy(value, context.string_metadata)
+	}
+}
+
+fn om_outline_assign_copy(destination u64, source u64, metadata u64) u64 {
+	if destination == source { return destination }
+	context := om_outline_context(metadata)
+	if context.string_metadata != 0 {
+		assign := unsafe { SwiftSequenceCopy(voidptr(om_entry(context.string_metadata, 3))) }
+		assign(destination, source, context.string_metadata)
+		C.memmove(voidptr(destination + 16), voidptr(source + 16), usize(context.size - 16))
+	} else {
+		C.memmove(voidptr(destination), voidptr(source), usize(context.size))
+	}
+	return destination
+}
+
+fn om_outline_take(destination u64, source u64, metadata u64) u64 {
+	C.memmove(voidptr(destination), voidptr(source), usize(om_outline_context(metadata).size))
+	return destination
+}
+
+fn om_outline_assign_take(destination u64, source u64, metadata u64) u64 {
+	if destination == source { return destination }
+	om_outline_destroy(destination, metadata)
+	return om_outline_take(destination, source, metadata)
+}
+
+fn om_outline_get(value u64, cases u32, metadata u64) u32 {
+	context := om_outline_context(metadata)
+	extra := if context.string_metadata == 0 { u32(0) } else {
+		read32(read64(context.string_metadata - 8) + 84)
+	}
+	if cases > extra && unsafe { *(&u8(value + context.size)) } != 0 {
+		return read32(value) + extra + u32(1)
+	}
+	if extra == 0 { return 0 }
+	get := unsafe { SwiftSequenceTag(voidptr(om_entry(context.string_metadata, 6))) }
+	return get(value, extra, context.string_metadata)
+}
+
+fn om_outline_store(value u64, which u32, cases u32, metadata u64) {
+	context := om_outline_context(metadata)
+	extra := if context.string_metadata == 0 { u32(0) } else {
+		read32(read64(context.string_metadata - 8) + 84)
+	}
+	if cases > extra { unsafe { *(&u8(value + context.size)) = if which > extra { u8(1) } else { u8(0) } } }
+	if which > extra {
+		C.memset(voidptr(value), 0, usize(context.size))
+		write32(value, which - extra - u32(1))
+	} else if which != 0 {
+		store := unsafe { SwiftOptionalStore(voidptr(om_entry(context.string_metadata, 7))) }
+		store(value, which, extra, context.string_metadata)
+	}
+}
+
+type OmBox = fn (u64) SwiftArrayAllocation
+
+fn om_outline_values(api OmApi) {
+	// The 24-byte payload has no spare inhabitant: its extra tag changes the
+	// Optional's buffer packing. Both ends of the supported bound are tested.
+	for profile in [[24, 0]!, [25, 0]!, [48, 0]!, [48, 1]!, [65535, 0]!, [65536, 1]!]! {
+		context := OmOutline{
+			string_metadata: if profile[1] == 1 { om_symbol(api.native, '_$sSSN') } else { u64(0) }
+			size: u64(profile[0])
+		}
+		mut witness := [14]u64{}
+		for i, entry in [u64(unsafe { voidptr(om_outline_copy) }), u64(unsafe { voidptr(om_outline_destroy) }),
+			u64(unsafe { voidptr(om_outline_copy) }), u64(unsafe { voidptr(om_outline_assign_copy) }),
+			u64(unsafe { voidptr(om_outline_take) }), u64(unsafe { voidptr(om_outline_assign_take) }),
+			u64(unsafe { voidptr(om_outline_get) }), u64(unsafe { voidptr(om_outline_store) })]! {
+			witness[i] = entry
+		}
+		witness[8] = context.size
+		witness[9] = (context.size + 7) & ~u64(7)
+		witness[10] = 7 | if context.size > 24 { u64(0x20000) } else { u64(0) }
+		if context.string_metadata != 0 {
+			witness[10] |= 0x10000 | (u64(read32(read64(context.string_metadata - 8) + 84)) << 32)
+		}
+		// Native Swift caches by Wrapped identity for the process lifetime.
+		// Give each borrowed test record a distinct persistent address.
+		page := u64(C.getpagesize())
+		record_page := u64(C.mmap(unsafe { nil }, usize(page), C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+		assert record_page != ~u64(0)
+		wrapped := record_page + 8
+		C.memcpy(voidptr(record_page + 64), unsafe { &witness[0] }, usize(sizeof(witness)))
+		unsafe {
+			*(&u64(record_page)) = record_page + 64
+			*(&u64(wrapped)) = 0x200
+			*(&u64(wrapped + 8)) = record_page + 256
+			*(&OmOutline(record_page + 256)) = context
+		}
+		assert C.mprotect(voidptr(record_page), usize(page), C.PROT_READ) == 0
+		metadata := om_metadata(api, wrapped)
+		optional_size := read64(read64(metadata - 8) + 64)
+		length := (optional_size + 7 + page - 1) & ~(page - 1)
+		span := u64(C.mmap(unsafe { nil }, usize(2 * (length + page)), C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+		assert span != ~u64(0)
+		for offset in [u64(0), length + page]! {
+			assert C.mprotect(voidptr(span + offset), usize(length), C.PROT_READ | C.PROT_WRITE) == 0
+		}
+		source := span + length - ((optional_size + 7) & ~u64(7))
+		destination := source + length + page
+		for slot in [2, 3, 4, 5]! {
+			for old_nil in [false, true]! {
+				for new_nil in [false, true]! {
+					C.memset(voidptr(source), 0x67, usize(optional_size))
+					C.memset(voidptr(destination), 0x5a, usize(optional_size))
+					mut words := SwiftStringWords{}
+					if context.string_metadata != 0 {
+						text := 'out-of-line Optional owns an actual long Swift String allocation'
+						if api.native {
+							words = unsafe { OmCString(voidptr(om_symbol(true, '_$sSS7cStringSSSPys4Int8VG_tcfC')))(text.str) }
+						} else {
+							words = swift_interpolation_init(i64(text.len), 0)
+							swift_string_append_bytes(u64(unsafe { &words }), u64(text.str), u64(text.len))
+						}
+						unsafe { *(&SwiftStringWords(source)) = words }
+					}
+					om_call(api.code, source, if new_nil { u64(1) } else { u64(0) }, metadata, 0, om_entry(metadata, 13))
+					if slot in [3, 5]! {
+						om_call(api.code, destination, 1, metadata, 0, om_entry(metadata, 13))
+						if !old_nil {
+							C.memset(voidptr(destination), 0x78, usize(context.size))
+							if context.string_metadata != 0 {
+								clone_payload := unsafe { SwiftSequenceCopy(voidptr(om_entry(context.string_metadata, 2))) }
+								clone_payload(destination, u64(unsafe { &words }), context.string_metadata)
+							}
+							om_call(api.code, destination, 0, metadata, 0, om_entry(metadata, 13))
+						}
+					}
+					assert om_call(api.code, destination, source, metadata, 0, om_entry(metadata, slot))[0] == destination
+					assert u32(om_call(api.code, destination, metadata, 0, 0, om_entry(metadata, 11))[0]) == if new_nil { u32(1) } else { u32(0) }
+					if !new_nil { assert C.memcmp(voidptr(destination), voidptr(source), usize(context.size)) == 0 }
+					om_call(api.code, destination, metadata, 0, 0, om_entry(metadata, 1))
+					if context.string_metadata != 0 && (new_nil || slot !in [4, 5]!) {
+						destroy := unsafe { SwiftSequenceDestroy(voidptr(om_entry(context.string_metadata, 1))) }
+						destroy(u64(unsafe { &words }), context.string_metadata)
+					}
+				}
+			}
+		}
+		// Guard each three-word buffer independently from the much larger
+		// payload. Copying shares one box without duplicating String owners.
+		for nil_value in [false, true]! {
+			box := if api.native {
+				unsafe { OmBox(voidptr(om_symbol(true, '_swift_allocBox')))(metadata) }
+			} else {
+				value := swift_dynamic_cast_value_checked(metadata) or { panic(err) }
+				record := swift_box_metadata_checked(value, om_entry(metadata, 2), om_entry(metadata, 1)) or { panic(err) }
+				owner := swift_heap_allocate(record.metadata, record.size, record.mask)
+				SwiftArrayAllocation{ owner: owner, bytes: owner + record.offset }
+			}
+			C.memset(voidptr(box.bytes), 0x67, usize(optional_size))
+			mut words := SwiftStringWords{}
+			if !nil_value && context.string_metadata != 0 {
+				text := 'one String owner shared by two out-of-line Optional value buffers'
+				if api.native {
+					words = unsafe { OmCString(voidptr(om_symbol(true, '_$sSS7cStringSSSPys4Int8VG_tcfC')))(text.str) }
+				} else {
+					words = swift_interpolation_init(i64(text.len), 0)
+					swift_string_append_bytes(u64(unsafe { &words }), u64(text.str), u64(text.len))
+				}
+				unsafe { *(&SwiftStringWords(box.bytes)) = words }
+			}
+			om_call(api.code, box.bytes, if nil_value { u64(1) } else { u64(0) }, metadata, 0, om_entry(metadata, 13))
+			src := span + length - 24
+			dst := src + length + page
+			unsafe {
+				*(&[3]u64(src)) = [box.owner, u64(0xcafe), 0xbeef]!
+				*(&[3]u64(dst)) = [u64(0), 0x1234, 0x5678]!
+			}
+			if !api.native {
+				// Unregistered, retired, undersized and mistyped boxes must not
+				// publish an owner or change its reference count.
+				for invalid_owner in [u64(0), span + length, box.owner + 1]! {
+					unsafe { *(&u64(src)) = invalid_owner }
+					if _ := swift_optional_buffer_copy_checked(dst, src, metadata) { assert false }
+				}
+				unsafe { *(&u64(src)) = box.owner }
+				heap := ios_runtime.swift_heap[box.owner] or { panic('missing box') }
+				mut invalid := heap
+				invalid.deiniting = true
+				ios_runtime.swift_heap[box.owner] = invalid
+				if _ := swift_optional_buffer_copy_checked(dst, src, metadata) { assert false }
+				invalid = SwiftHeapStorage{...heap, size: 16}
+				ios_runtime.swift_heap[box.owner] = invalid
+				if _ := swift_optional_buffer_copy_checked(dst, src, metadata) { assert false }
+				ios_runtime.swift_heap[box.owner] = heap
+				// A canonical box of this size still belongs to one exact type.
+				if optional_size < 65536 || read32(read64(metadata - 8) + 84) > 0 {
+					other := swift_optional_access(0, metadata).metadata
+					if _ := swift_optional_buffer_copy_checked(dst, src, other) { assert false }
+					ios_runtime.swift_optional_metadata.delete(metadata)
+					assert C.munmap(voidptr(other - 8), usize(page)) == 0
+				}
+				assert read64(dst) == 0 && read64(box.owner + 8) >> 33 == 0
+			}
+			assert C.mprotect(voidptr(span), usize(length), C.PROT_READ) == 0
+			assert om_call(api.code, dst, src, metadata, 0, om_entry(metadata, 0))[0] == box.bytes
+			assert read64(dst) == box.owner && read64(dst + 8) == 0x1234 && read64(dst + 16) == 0x5678
+			assert read64(src) == box.owner && read64(src + 8) == 0xcafe && read64(src + 16) == 0xbeef
+			assert read64(box.owner + 8) >> 33 == 1
+			if words.second != 0 { assert read64(words.second + 8) >> 33 == 0 }
+			release := unsafe { OmRelease(voidptr(om_symbol(api.native, '_swift_release'))) }
+			release(box.owner)
+			assert read64(box.owner + 8) >> 33 == 0
+			release(box.owner)
+			if !api.native { assert box.owner !in ios_runtime.swift_heap && ios_runtime.swift_strings.len == 0 }
+			assert C.mprotect(voidptr(span), usize(length), C.PROT_READ | C.PROT_WRITE) == 0
+		}
+		assert C.munmap(voidptr(span), usize(2 * (length + page))) == 0
+		if !api.native {
+			// End all borrowed metadata/box lifetimes before reusing stack records.
+			record := ios_runtime.swift_box_metadata[metadata] or { panic('missing box') }
+			ios_runtime.swift_box_metadata.delete(metadata)
+			assert C.munmap(voidptr(record.arena), usize(page)) == 0
+			ios_runtime.swift_optional_metadata.delete(wrapped)
+			assert C.munmap(voidptr(metadata - 8), usize(page)) == 0
+			assert C.munmap(voidptr(record_page), usize(page)) == 0
+		}
+	}
+}
+
 fn om_worker(api OmApi, wrapped u64) {
 	for _ in 0 .. 32 {
 		assert om_metadata(api, wrapped) == swift_optional_access(0, wrapped).metadata
@@ -214,6 +467,9 @@ __global (
 
 fn om_reentrant_destroy(value u64, _metadata u64) {
 	assert read64(value) == 0x1234
+	for i in u64(8) .. read64(read64(_metadata - 8) + 64) {
+		assert unsafe { *(&u8(value + i)) } == 0x67
+	}
 	assert swift_optional_tag(om_retiring_destination, om_retiring_metadata) == 1
 	worker := spawn om_publish(swift_integer_metadata())
 	assert worker.wait() == swift_optional_access(0, swift_integer_metadata()).metadata
@@ -221,27 +477,31 @@ fn om_reentrant_destroy(value u64, _metadata u64) {
 }
 
 fn om_reentrant() {
+	for size in [u64(8), 48]! {
+	context := OmOutline{size: size}
 	mut witness := [14]u64{}
-	for i in 0 .. 8 { witness[i] = u64(unsafe { voidptr(swift_integer_copy) }) }
+	for i in 0 .. 8 { witness[i] = u64(unsafe { voidptr(om_outline_take) }) }
 	witness[1] = u64(unsafe { voidptr(om_reentrant_destroy) })
-	witness[6] = u64(unsafe { voidptr(swift_integer_enum_get) })
-	witness[7] = u64(unsafe { voidptr(swift_integer_enum_store) })
-	witness[8] = 8
-	witness[9] = 8
-	witness[10] = 0x10007
-	mut full := [u64(unsafe { &witness[0] }), 0x200, 0]!
+	witness[6] = u64(unsafe { voidptr(om_outline_get) })
+	witness[7] = u64(unsafe { voidptr(om_outline_store) })
+	witness[8] = size
+	witness[9] = size
+	witness[10] = if size > 24 { u64(0x30007) } else { u64(0x10007) }
+	mut full := [u64(unsafe { &witness[0] }), 0x200, u64(unsafe { &context })]!
 	wrapped := u64(unsafe { &full[1] })
 	metadata := swift_optional_access(0, wrapped).metadata
-	mut destination := [u64(0x1234), 0]!
-	mut source := [u64(0), 1]!
+	mut destination := [9]u64{}
+	mut source := [9]u64{}
+	swift_optional_inject(u64(unsafe { &source[0] }), 1, metadata)
 	om_retiring_destination = u64(unsafe { &destination[0] })
 	om_retiring_metadata = metadata
 	om_retiring_calls = 0
 	for taking in [false, true]! {
+		C.memset(unsafe { &destination[0] }, 0x67, usize(size))
 		destination[0] = 0x1234
-		destination[1] = 0
+		swift_optional_inject(om_retiring_destination, 0, metadata)
 		swift_optional_assign(om_retiring_destination, u64(unsafe { &source[0] }), metadata, taking)
-		assert destination == source
+		assert C.memcmp(unsafe { &destination[0] }, unsafe { &source[0] }, usize(size + 1)) == 0
 	}
 	assert om_retiring_calls == 2
 	// The synthetic caller-owned metadata stays alive until no values use it.
@@ -250,6 +510,7 @@ fn om_reentrant() {
 	ios_runtime.swift_optional_metadata.delete(wrapped)
 	C.ios_objc_initialize_unlock()
 	assert C.munmap(voidptr(metadata - 8), usize(C.getpagesize())) == 0
+	}
 }
 
 fn om_reject() {
@@ -296,7 +557,14 @@ fn om_integration(api OmApi) {
 			assert false
 		}
 	}
+	for size in [u64(65536), 65537]! {
+		witness[8] = size
+		witness[9] = (size + 7) & ~u64(7)
+		witness[10] = 0x20007
+		if _ := swift_optional_access_checked(0, bad) { assert false }
+	}
 	witness[8] = 8
+	witness[9] = 8
 	witness[10] = 7
 	witness[7] = 0
 	if _ := swift_optional_access_checked(0, bad) {
@@ -327,6 +595,7 @@ fn test_swift_optional_metadata() {
 			}
 		}
 		om_strings(api)
+		om_outline_values(api)
 		println('NATIVE-OPTIONAL-METADATA: generic complete responses, exact Optional layouts/flags and remaining extra inhabitants, nested enum byte footprints and UInt32 transitions, protected copy/take spans, owned String payloads and preserved x20/x21')
 	}
 	om_reject()
@@ -358,6 +627,7 @@ fn test_swift_optional_metadata() {
 			}
 		}
 		om_strings(api)
+		om_outline_values(api)
 		om_integration(api)
 		om_reentrant()
 		mut nested := om_symbol(false, '_$sSbN')
