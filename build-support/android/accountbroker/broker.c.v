@@ -160,6 +160,7 @@ fn (mut b Broker) admit(incoming Incoming) ! {
 		output:     output
 		caller:     incoming.authorized.caller
 	}
+	handoff_stage(.admitted, incoming.authorized.request.operation)
 	// Metadata belongs to the trusted APK registry, not the authenticator
 	// process. Admission has already authenticated the socket's kernel peer.
 	if incoming.authorized.request.operation == .get_authenticator_types {
@@ -189,6 +190,7 @@ fn (mut b Broker) admit(incoming Incoming) ! {
 	bytes := accountipc.encode_command(command)!
 	defer { unsafe { bytes.free() } }
 	b.service.enqueue(bytes)!
+	handoff_stage(.dispatch_queued, incoming.authorized.request.operation)
 }
 
 fn (mut b Broker) fail(id u64, code int, message string) ! {
@@ -222,6 +224,7 @@ fn (mut b Broker) redeem(id u64, authorized nativeaccountauth.AuthorizedRequest)
 		b.fail(id, 7, 'Account request has ended')!
 		return
 	}
+	handoff_stage(.redeemed, session.operation)
 	bytes := accountipc.encode_launch(accountipc.Launch{
 		session:     launch.session
 		capability:  launch.response_capability
@@ -230,17 +233,20 @@ fn (mut b Broker) redeem(id u64, authorized nativeaccountauth.AuthorizedRequest)
 	defer { unsafe { bytes.free() } }
 	if b.ui != unsafe { nil } {
 		b.ui.begin(launch.session, launch.response_capability) or {
+			handoff_stage(.ui_begin_failed, session.operation)
 			b.cancel_service(launch.session)
 			b.fail(launch.session, 6, 'Account sign-in window is unavailable')!
 			b.fail(id, 6, 'Account sign-in window is unavailable')!
 			return
 		}
+		handoff_stage(.ui_begin, session.operation)
 		b.ui_launch = bytes.clone()
 		b.ui_ack = id
 		b.ui_session = launch.session
 		return
 	}
 	b.service.enqueue(bytes)!
+	handoff_stage(.launch_queued, session.operation)
 	// This acknowledges delivery of a launch command only. The original
 	// addAccount request still waits for an actual authenticator result.
 	b.finish(id, accountipc.Event{ kind: .result, id: id })!
@@ -272,6 +278,7 @@ fn (mut b Broker) finish(id u64, event accountipc.Event) ! {
 		if b.interactions != unsafe { nil } { b.interactions.revoke(id) }
 		session.terminal = true
 		b.sessions[id] = session
+		handoff_terminal(session.operation, event)
 	}
 }
 
@@ -284,6 +291,7 @@ fn (mut b Broker) callback(packet accountipc.Packet) ! {
 	}
 	if event.kind == .interaction {
 		if session.operation !in [.add_account, .get_auth_token] { return error('account query cannot start an interaction') }
+		handoff_stage(.interaction_received, session.operation)
 		if b.interactions == unsafe { nil } {
 			b.cancel_service(event.id)
 			b.fail(event.id, 6, 'Account interaction is unavailable')!
@@ -305,6 +313,7 @@ fn (mut b Broker) callback(packet accountipc.Packet) ! {
 			id:          event.id
 			interaction: accountipc.Interaction{ handle: ticket }
 		})!
+		handoff_stage(.interaction_delivered, session.operation)
 		return
 	}
 	if event.kind !in [.result, .failure, .continued, .accounts]
@@ -374,16 +383,19 @@ fn (mut b Broker) pump_ui() ! {
 			return
 		}
 		if current.terminal || current.output.peer_gone() || time.sys_mono_now() >= current.deadline {
+			handoff_stage(.ui_request_ended, current.operation)
 			b.fail_ui(b.ui_session, 'Account request has ended')
 			return
 		}
 	}
 	session := b.ui.active_session()
 	tick := b.ui.tick() or {
+		if current := b.sessions[session] { handoff_stage(.ui_tick_failed, current.operation) }
 		b.fail_ui(session, 'Account sign-in window failed')
 		return
 	}
 	if tick.ended {
+		if current := b.sessions[tick.session] { handoff_stage(.ui_closed, current.operation) }
 		b.fail_ui(tick.session, 'Account sign-in window closed')
 		return
 	}
@@ -393,7 +405,9 @@ fn (mut b Broker) pump_ui() ! {
 		}
 		// The SCM_RIGHTS attachment has completed before this launch enters
 		// the separate account-command stream. The original result stays pending.
+		if current := b.sessions[tick.session] { handoff_stage(.ui_ready, current.operation) }
 		b.service.enqueue(b.ui_launch)!
+		if current := b.sessions[tick.session] { handoff_stage(.launch_queued, current.operation) }
 		b.finish(b.ui_ack, accountipc.Event{ kind: .result, id: b.ui_ack })!
 		b.clear_ui_launch()
 	}

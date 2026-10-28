@@ -3,6 +3,7 @@ module accountbroker
 
 import accountinteraction
 import accountipc
+import accounthandoff
 import nativeaccountauth
 import time
 
@@ -10,6 +11,111 @@ import time
 
 fn C.socketpair(i32, i32, i32, &i32) i32
 fn C.shutdown(i32, i32) i32
+fn C.pipe(&i32) i32
+fn C.dup(i32) i32
+fn C.dup2(i32, i32) i32
+fn C.read(i32, voidptr, usize) isize
+
+fn handoff_capture_start() (i32, i32) {
+	mut fds := [i32(-1), i32(-1)]!
+	assert C.pipe(&fds[0]) == 0
+	saved := C.dup(2)
+	assert saved >= 0 && C.dup2(fds[1], 2) == 2
+	C.close(fds[1])
+	return fds[0], saved
+}
+
+fn handoff_capture_end(fd i32, saved i32) []accounthandoff.HandoffDiagnostic {
+	assert C.dup2(saved, 2) == 2
+	C.close(saved)
+	mut bytes := []u8{}
+	mut buffer := [4096]u8{}
+	for {
+		count := C.read(fd, &buffer[0], 4096)
+		assert count >= 0
+		if count == 0 { break }
+		bytes << buffer[..int(count)]
+	}
+	C.close(fd)
+	mut records := []accounthandoff.HandoffDiagnostic{}
+	for line in bytes.bytestr().split_into_lines() {
+		records << accounthandoff.parse_handoff_diagnostic(line) or { panic('unexpected diagnostic output') }
+	}
+	return records
+}
+
+fn handoff_record(stage int, operation int, event int, code int) accounthandoff.HandoffDiagnostic {
+	return accounthandoff.HandoffDiagnostic{stage, operation, event, code}
+}
+
+fn test_handoff_records_follow_real_redemption_and_terminal_result_without_private_data() {
+	for operation in [nativeaccountauth.Operation.add_account, .get_auth_token] {
+		fd, saved := handoff_capture_start()
+		mut fixture := interaction_fixture_for(operation)
+		ticket := fixture.offer()
+		wrong := fixture.redeem(nativeaccountauth.Caller{...interaction_caller(), pid: 1235}, ticket)
+		assert wrong.kind == .failure && fixture.broker.interactions.len() == 1
+		accountipc.dispose_event(wrong)
+		ack := fixture.redeem(interaction_caller(), ticket)
+		assert ack.kind == .result && fixture.broker.active() == 1
+		accountipc.dispose_event(ack)
+		// Completion still carries the actual result, including private values;
+		// only its kind is available to the diagnostic writer.
+		fixture.broker.finish(fixture.command.session, accountipc.Event{
+			kind: .result
+			options: [nativeaccountauth.Option{'authAccount', nativeaccountauth.Scalar{
+				kind: .text
+				text: 'private-diagnostic-fixture@example.test'
+			}}]
+		}) or { panic(err) }
+		completed := fixture.broker.sessions[fixture.command.session] or { panic('missing completed session') }
+		assert completed.terminal
+		fixture.close()
+		unsafe { ticket.free() }
+		records := handoff_capture_end(fd, saved)
+		op := int(operation)
+		assert records == [
+			handoff_record(1, op, 0, 0), handoff_record(2, op, 0, 0),
+			handoff_record(3, op, 0, 0), handoff_record(4, op, 0, 0),
+			handoff_record(1, 3, 0, 0), handoff_record(9, 3, 2, 7),
+			handoff_record(1, 3, 0, 0), handoff_record(5, op, 0, 0),
+			handoff_record(8, op, 0, 0), handoff_record(9, 3, 1, 0),
+			handoff_record(9, op, 1, 0),
+		]
+	}
+}
+
+fn test_handoff_terminal_error_codes_are_bounded_and_queries_stay_silent() {
+	fd, saved := handoff_capture_start()
+	for code in [-2147483647, -1, 0, 1, 3, 4, 6, 7, 9, 10, 2147483647] {
+		event := accountipc.failure(999999, code, 'private-error-message@example.test')
+		assert handoff_error_code(event) == if code >= 1 && code <= 9 { code } else { -1 }
+		handoff_terminal(.add_account, event)
+		unsafe { event.options.free() }
+	}
+	for options in [
+		[]nativeaccountauth.Option{},
+		[nativeaccountauth.Option{'errorCode', nativeaccountauth.Scalar{kind: .text, text: 'private@example.test'}}],
+		[nativeaccountauth.Option{'errorCode', nativeaccountauth.Scalar{kind: .int64, number: 6}}],
+		[nativeaccountauth.Option{'errorCode', nativeaccountauth.Scalar{kind: .int32, number: 6}},
+		 nativeaccountauth.Option{'errorCode', nativeaccountauth.Scalar{kind: .int32, number: 7}}],
+	] {
+		event := accountipc.Event{kind: .failure, options: options}
+		assert handoff_error_code(event) == -1
+		handoff_terminal(.get_auth_token, event)
+	}
+	for operation in [nativeaccountauth.Operation.get_accounts, .invalidate_auth_token, .get_authenticator_types] {
+		handoff_stage(.admitted, operation)
+		handoff_stage(.dispatch_queued, operation)
+		handoff_terminal(operation, accountipc.Event{kind: .result})
+	}
+	records := handoff_capture_end(fd, saved)
+	assert records.len == 15
+	for record in records {
+		assert record.stage == 9 && record.event == 2
+		assert record.operation in [2, 4] && (record.code == -1 || record.code in [1, 3, 4, 6, 7, 9])
+	}
+}
 
 fn interaction_pair() (int, int) {
 	mut fds := [i32(-1), i32(-1)]!
