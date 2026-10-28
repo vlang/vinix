@@ -133,7 +133,9 @@ validation therefore remains pending.
 
 After the fixture exited, its dedicated runtime attachment remained read-only.
 Broker preparation could not create its SQLite replacement alias, before GMS
-or Maps started. `broker-start-01.png` has SHA-256
+started or Maps launched through the account session. The desktop's earlier
+automatic Maps launch had already exited before the fixture.
+`broker-start-01.png` has SHA-256
 `00539ade23c159810853ffeed492ec807e2b213693faba3c7e9aecd5d17cff81`.
 Commit `484b7305b` documents the required
 [fixture-to-broker handoff](onboarding-api-run.md); that corrected handoff
