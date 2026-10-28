@@ -24,6 +24,9 @@ const native_marker = 'IOS-STRING-COMPARE-NATIVE: canonical scalar ordering, cas
 const application_stop = 'IOS-PROBE-DESKTOP: stop=Broken pipe handshake=true builds=11 polls=10 closed=false supervisor_kill=false wait=256'
 const fixture_stop = 'IOS-PROBE-DESKTOP: stop=session complete handshake=true builds=1 polls=2 closed=true supervisor_kill=false wait=0'
 const zero_events = 'events=low 0;high 0;max 0;oom 0;oom_kill 0;oom_group_kill 0;'
+const lost_prior_media = ['probe-no-ads-509166/boot.img', 'probe-no-ads-509166/initramfs.tar.gz',
+	'probe-no-ads-kernel-upgrade/boot.img', 'probe-no-ads-kernel-upgrade/initramfs.tar.gz']
+const retained_marker = 'All surviving prior files match the sealed manifest; four boot-media files are missing. Historical full audit remains unavailable.'
 
 fn digest(path string) !string {
 	mut file := os.open(path)!
@@ -137,11 +140,36 @@ fn ipa_members(listing string, verbose string) ![]string {
 	return selected
 }
 
-fn prepare(root string, out string, prior string, v string) ! {
+fn retained_paths(expected []string, actual []string) ! {
+	mut missing := expected.filter(it !in actual)
+	missing.sort()
+	if missing != lost_prior_media || actual.any(it !in expected)
+		|| actual.len + missing.len != expected.len {
+		return error('unexpected retained prior inventory')
+	}
+}
+
+fn verify_retained(prior string) ! {
+	if digest(prior + '/manifest.sha256')! != prior_hash { return error('unexpected prior checkpoint') }
+	manifest := records(os.read_file(prior + '/manifest.sha256')!)!
+	actual := files(prior, '')!.filter(it != 'manifest.sha256')
+	retained_paths(manifest.keys(), actual)!
+	for path in actual {
+		if digest(prior + '/' + path)! != manifest[path] { return error('changed retained evidence: ' + path) }
+	}
+	println(retained_marker)
+}
+
+fn prepare(root string, out string, prior string, v string, retained bool) ! {
 	if os.exists(out + '/prior-manifest.sha256') { return error('already prepared') }
 	os.mkdir_all(out)!
 	if digest(prior + '/manifest.sha256')! != prior_hash { return error('unexpected prior checkpoint') }
-	capture(out, 'prior-check', [prior + '/audio-category', 'check', prior])!
+	if retained {
+		capture(out, 'prior-retained-check', [os.executable(), 'verify-retained', prior])!
+		os.write_file(out + '/missing-prior-media.txt', lost_prior_media.join('\n') + '\n')!
+	} else {
+		capture(out, 'prior-check', [prior + '/audio-category', 'check', prior])!
+	}
 	os.cp(prior + '/manifest.sha256', out + '/prior-manifest.sha256')!
 	os.write_file(out + '/prior-bundle.txt', prior + '\n')!
 	if digest(prior + '/kernel-upgrade/vinix')! != upgraded_kernel_hash { return error('unexpected prior kernel') }
@@ -161,7 +189,8 @@ fn prepare(root string, out string, prior string, v string) ! {
 		}
 	}
 	os.write_file(out + '/reused-files.txt', paths.join('\n') + '\n')!
-	os.write_file(out + '/provenance.txt', 'Prior complete bundle: ' + prior + '\nPrior manifest SHA-256: ' + prior_hash +
+	prior_description := if retained { 'Prior retained bundle (four boot-media files missing): ' } else { 'Prior complete bundle: ' }
+	os.write_file(out + '/provenance.txt', prior_description + prior + '\nPrior manifest SHA-256: ' + prior_hash +
 		'\nOriginal IPA, application, cooked resources and 30 regression fixture builds reused unchanged.\n' +
 		'Runtime, supervisor, string comparison fixture rebuilt. Advertising skipped. Rendering unverified.\n')!
 	for tool in ['notification-vm', 'notification-checks'] {
@@ -374,12 +403,24 @@ fn results(out string) ! {
 		return error('changed resource inventory')
 	}
 	if os.read_file(out + '/resources.sha256')! != inventory(out + '/resources')! { return error('changed resources') }
-	for label in ['prior-check', 'clone-application', 'clone-ipa', 'clone-resources',
+	for label in ['clone-application', 'clone-ipa', 'clone-resources',
 		'build-notification-vm', 'build-notification-checks', 'build-string-compare', 'build-init', 'build-runtime',
 		'probe-no-ads', 'host-checks', 'regression-host-checks', 'audit-compiler-version', 'audit-inventory-build', 'audit-inventory', 'audit-checker-build', 'audit-selftest'] {
 		successful(out, label)!
 	}
-	if !os.read_file(out + '/prior-check.log')!.contains('Audio session category check: PASS') { return error('missing prior independent check') }
+	if os.exists(out + '/missing-prior-media.txt') {
+		if os.exists(out + '/prior-check.log') || os.exists(out + '/prior-check.status.txt')
+			|| os.read_file(out + '/missing-prior-media.txt')! != lost_prior_media.join('\n') + '\n' {
+			return error('invalid prior recovery record')
+		}
+		successful(out, 'prior-retained-check')!
+		if os.read_file(out + '/prior-retained-check.log')!.count(retained_marker) != 1 {
+			return error('missing retained prior verification')
+		}
+	} else {
+		successful(out, 'prior-check')!
+		if !os.read_file(out + '/prior-check.log')!.contains('Audio session category check: PASS') { return error('missing prior independent check') }
+	}
 	revision := os.read_file(out + '/source-revision.txt')!.trim_space()
 	if revision.len != 40 || revision.bytes().any(!it.is_hex_digit()) { return error('invalid source revision') }
 	for path in ['tests/ios/string-compare.v', 'tests/ios/notification-vm.v', 'tests/ios/native-init.v',
@@ -452,7 +493,21 @@ fn kernel_preflight(out string, temporary string) ! {
 	println('Kernel preflight: missing, truncated and x86-64 inputs rejected; firmware and serial capture preserved PASS')
 }
 
+fn retained_selftest() ! {
+	mut retained_expected := lost_prior_media.clone()
+	retained_expected << 'retained'
+	retained_paths(retained_expected, ['retained'])!
+	for bad in [retained_expected, []string{}, ['retained', 'extra'],
+		['retained', lost_prior_media[0]], ['retained', 'retained']] {
+		mut rejected := false
+		retained_paths(retained_expected, bad) or { rejected = true }
+		if !rejected { return error('invalid retained prior inventory accepted') }
+	}
+	println('Retained prior recovery: exact missing inventory PASS; five inventory mutations rejected')
+}
+
 fn selftest(out string) ! {
+	retained_selftest()!
 	serial := os.read_file(state(out)! + '/serial.log')!.replace('\r\n', '\n')
 	guest_observation(serial)!
 	headroom := serial.split_into_lines().filter(it.starts_with('iOS memory: os_proc_available_memory='))[0]
@@ -584,12 +639,12 @@ fn summary(out string) ! {
 }
 
 fn main() {
-	if os.args.len < 3 { panic('usage: string-compare prepare OUT PRIOR | fixture|build|host|regression-host|probe OUT | audit OUT REVISION | seal|check|selftest|summary OUT | hash FILE') }
+	if os.args.len < 3 { panic('usage: string-compare prepare|prepare-retained OUT PRIOR | verify-retained PRIOR | fixture|build|host|regression-host|probe OUT | audit OUT REVISION | seal|check|selftest|recovery-selftest|summary OUT | hash FILE') }
 	if os.args[1] == 'hash' { println(digest(os.args[2])!); return }
 	root := os.real_path(os.getwd())
 	out := os.abs_path(os.args[2])
 	if out == root || out.starts_with(root + '/') { panic('output must be external') }
-	if os.args[1] !in ['check', 'selftest', 'summary'] && os.exists(out + '/manifest.sha256') { panic('bundle is sealed') }
+	if os.args[1] !in ['check', 'selftest', 'summary', 'verify-retained', 'recovery-selftest'] && os.exists(out + '/manifest.sha256') { panic('bundle is sealed') }
 	// Resource extraction can use separate scratch storage on space-limited hosts.
 	// The complete input and evidence inventories are still checked in OUT.
 	scratch := os.abs_path(os.getenv_opt('VINIX_IOS_AUDIT_TMPDIR') or { out + '/tmp' })
@@ -603,10 +658,12 @@ fn main() {
 	os.setenv('VINIX_IOS_CHECK_NAME', 'notification-center-checks', true)
 	v := root + '/build/ios/fortnite/ns-calendar-checks/toolchain/v'
 	match os.args[1] {
-		'prepare' {
+		'prepare', 'prepare-retained' {
 			if os.args.len != 4 { panic('prepare requires PRIOR') }
-			prepare(root, out, os.real_path(os.args[3]), v)!
+			prepare(root, out, os.real_path(os.args[3]), v, os.args[1] == 'prepare-retained')!
 		}
+		'verify-retained' { verify_retained(out)! }
+		'recovery-selftest' { retained_selftest()! }
 		'fixture' {
 			for target in ['string-compare', 'init'] {
 				capture(out, 'build-' + target, [out + '/notification-vm', 'build-' + target, out])!
