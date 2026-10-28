@@ -261,6 +261,9 @@ fn objc_responds(object u64, selector &char) bool {
 	if name in ['numberWithBool:', 'numberWithUnsignedLong:'] {
 		return object in ios_runtime.classes && objc_is_kind(object, read64(ios_runtime.names['NSNumber']))
 	}
+	if name == 'dictionaryWithObject:forKey:' {
+		return object in ios_runtime.classes && objc_is_kind(object, read64(ios_runtime.names['NSDictionary']))
+	}
 	if name in ['class', 'isKindOfClass:', 'respondsToSelector:', 'conformsToProtocol:', 'methodSignatureForSelector:', 'performSelectorOnMainThread:withObject:waitUntilDone:', 'copy', 'init', 'dealloc'] { return true }
 	if object in ios_runtime.classes {
 		if name in ['alloc', 'new', 'instanceMethodSignatureForSelector:'] { return true }

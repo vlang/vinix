@@ -188,6 +188,21 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 				}
 				frame.x[0] = objc_autorelease(dictionary)
 			}
+			'dictionaryWithObject:forKey:' {
+				if !objc_is_kind(object, read64(ios_runtime.names['NSDictionary'])) { return false }
+				if frame.x[2] == 0 || frame.x[3] == 0 { panic('iOS: nil dictionary entry') }
+				// Copying a key can call application code. Own the value first and
+				// acquire the destination header only after copying and allocation.
+				value := objc_retain(frame.x[2])
+				key := objc_copy_value(frame.x[3], true)
+				if key == 0 { objc_release(value); panic('iOS: nil dictionary key copy') }
+				dictionary := objc_allocate(object)
+				mut header := obj_header(dictionary)
+				header.keys << key
+				header.items << value
+				header.mutation++
+				frame.x[0] = objc_autorelease(dictionary)
+			}
 			'indexPathForRow:inSection:' {
 				path := objc_allocate(object)
 				mut header := obj_header(path)

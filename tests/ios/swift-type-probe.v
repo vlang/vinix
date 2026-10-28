@@ -17,6 +17,7 @@ fn required_built_paths(out string) ![]string {
 	if session_configured_probe(out)! { paths << ['session-configured-checks', 'session-configured-checks.c'] }
 	if object_equality_probe(out)! { paths << ['object-equality-checks', 'object-equality-checks.c'] }
 	if number_unsigned_probe(out)! { paths << ['number-unsigned-checks', 'number-unsigned-checks.c'] }
+	if dictionary_single_probe(out)! { paths << ['dictionary-single-checks', 'dictionary-single-checks.c'] }
 	if outline_probe(out)! {
 		for kind in ['metadata', 'encoding', 'decoding'] {
 			paths << ['optional-' + kind + '-checks', 'optional-' + kind + '-checks.c']
@@ -128,7 +129,7 @@ fn verify_inputs(out string) ! {
 	}
 }
 
-fn prepare(out string, prior string, optional_lookup bool, session_defaults bool, session_configured bool, outline bool, background bool, equality bool, unsigned bool) ! {
+fn prepare(out string, prior string, optional_lookup bool, session_defaults bool, session_configured bool, outline bool, background bool, equality bool, unsigned bool, single bool) ! {
 	if os.exists(out) || os.is_link(out) { return error('prepare needs a fresh directory') }
 	if digest(prior + '/manifest.sha256')! != prior_hash { return error('unexpected prior checkpoint') }
 	os.mkdir_all(out)!
@@ -172,7 +173,7 @@ fn prepare(out string, prior string, optional_lookup bool, session_defaults bool
 	os.cp(os.getwd() + '/tests/ios/swift-type-probe.v', out + '/checkpoint.v')!
 	os.write_file(out + '/checkpoint-revision.txt', revision.output)!
 	if optional_lookup {
-		os.write_file(out + '/probe-kind.txt', if unsigned { 'number-unsigned\n' } else if equality { 'object-equality\n' } else if background { 'session-background\n' } else if outline { 'optional-outline\n' } else if session_configured { 'session-configured\n' }
+		os.write_file(out + '/probe-kind.txt', if single { 'dictionary-single\n' } else if unsigned { 'number-unsigned\n' } else if equality { 'object-equality\n' } else if background { 'session-background\n' } else if outline { 'optional-outline\n' } else if session_configured { 'session-configured\n' }
 			else if session_defaults { 'session-defaults\n' } else { 'optional-lookup\n' })!
 		v := os.real_path(os.getwd()) + '/build/ios/fortnite/ns-calendar-checks/toolchain/v'
 		capture(out, 'build-notification-vm', [v, '-nocache', '-gc', 'none', '-cc', 'clang', '-cflags', '-O2',
@@ -183,33 +184,37 @@ fn prepare(out string, prior string, optional_lookup bool, session_defaults bool
 
 fn optional_probe(out string) !bool {
 	if !os.exists(out + '/probe-kind.txt') { return false }
-	if os.read_file(out + '/probe-kind.txt')! !in ['optional-lookup\n', 'session-defaults\n', 'session-configured\n', 'optional-outline\n', 'session-background\n', 'object-equality\n', 'number-unsigned\n'] { return error('unknown probe kind') }
+	if os.read_file(out + '/probe-kind.txt')! !in ['optional-lookup\n', 'session-defaults\n', 'session-configured\n', 'optional-outline\n', 'session-background\n', 'object-equality\n', 'number-unsigned\n', 'dictionary-single\n'] { return error('unknown probe kind') }
 	return true
 }
 
 fn session_defaults_probe(out string) !bool {
 	if !optional_probe(out)! { return false }
-	return os.read_file(out + '/probe-kind.txt')! in ['session-defaults\n', 'session-configured\n', 'optional-outline\n', 'session-background\n', 'object-equality\n', 'number-unsigned\n']
+	return os.read_file(out + '/probe-kind.txt')! in ['session-defaults\n', 'session-configured\n', 'optional-outline\n', 'session-background\n', 'object-equality\n', 'number-unsigned\n', 'dictionary-single\n']
 }
 
 fn session_configured_probe(out string) !bool {
-	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['session-configured\n', 'optional-outline\n', 'session-background\n', 'object-equality\n', 'number-unsigned\n']
+	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['session-configured\n', 'optional-outline\n', 'session-background\n', 'object-equality\n', 'number-unsigned\n', 'dictionary-single\n']
 }
 
 fn outline_probe(out string) !bool {
-	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['optional-outline\n', 'session-background\n', 'object-equality\n', 'number-unsigned\n']
+	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['optional-outline\n', 'session-background\n', 'object-equality\n', 'number-unsigned\n', 'dictionary-single\n']
 }
 
 fn background_probe(out string) !bool {
-	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['session-background\n', 'object-equality\n', 'number-unsigned\n']
+	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['session-background\n', 'object-equality\n', 'number-unsigned\n', 'dictionary-single\n']
 }
 
 fn object_equality_probe(out string) !bool {
-	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['object-equality\n', 'number-unsigned\n']
+	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['object-equality\n', 'number-unsigned\n', 'dictionary-single\n']
 }
 
 fn number_unsigned_probe(out string) !bool {
-	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! == 'number-unsigned\n'
+	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! in ['number-unsigned\n', 'dictionary-single\n']
+}
+
+fn dictionary_single_probe(out string) !bool {
+	return optional_probe(out)! && os.read_file(out + '/probe-kind.txt')! == 'dictionary-single\n'
 }
 
 fn verify_built(out string) ! {
@@ -280,7 +285,7 @@ fn validate_launch(launch string) ! {
 	}
 }
 
-fn host_markers(defaults bool, configured bool, outline bool, background bool, equality bool, unsigned bool) map[string][]string {
+fn host_markers(defaults bool, configured bool, outline bool, background bool, equality bool, unsigned bool, single bool) map[string][]string {
 	mut markers := {
 		'swift-optional-lookup-host': ['IOS-SWIFT-OPTIONAL-LOOKUP-NATIVE:', 'IOS-SWIFT-OPTIONAL-LOOKUP:']
 		'swift-mangled-optional-regression': ['IOS-SWIFT-MANGLED-NATIVE:', 'IOS-SWIFT-MANGLED:']
@@ -301,6 +306,9 @@ fn host_markers(defaults bool, configured bool, outline bool, background bool, e
 	}
 	if background {
 		markers['session-defaults-host'] << ['IOS-SESSION-BACKGROUND-NATIVE:', 'IOS-SESSION-BACKGROUND:', 'IOS-SESSION-BACKGROUND-REJECT:']
+	}
+	if single {
+		markers['dictionary-single-host'] = ['IOS-DICTIONARY-SINGLE-NATIVE:', 'IOS-DICTIONARY-SINGLE:']
 	}
 	if unsigned {
 		markers['number-unsigned-host'] = ['IOS-NUMBER-UNSIGNED-NATIVE:', 'IOS-NUMBER-UNSIGNED:']
@@ -327,7 +335,7 @@ fn validate_host_log(log string, markers []string) ! {
 }
 
 fn verify_host(out string) ! {
-	for directory, markers in host_markers(session_defaults_probe(out)!, session_configured_probe(out)!, outline_probe(out)!, background_probe(out)!, object_equality_probe(out)!, number_unsigned_probe(out)!) {
+	for directory, markers in host_markers(session_defaults_probe(out)!, session_configured_probe(out)!, outline_probe(out)!, background_probe(out)!, object_equality_probe(out)!, number_unsigned_probe(out)!, dictionary_single_probe(out)!) {
 		for label in ['host-generate', 'host-object-0', 'host-object-1', 'host-object-2', 'host-object-3', 'host-link', 'host', 'host-deterministic'] {
 			base := out + '/host/' + directory + '/' + label
 			if os.read_file(base + '.status.txt')! != '0\n' { return error('failed host step: ' + base) }
@@ -353,6 +361,7 @@ fn inspect(out string) ! {
 	if background_probe(out)! { validate_background(serial)! }
 	if object_equality_probe(out)! { validate_object_equality(serial)! }
 	if number_unsigned_probe(out)! { validate_number_unsigned(serial)! }
+	if dictionary_single_probe(out)! { validate_dictionary_single(serial)! }
 	validate_launch(os.read_file(out + '/probe-no-ads.log')!)!
 	diagnostic := boundary + '\n' + lines.join('\n') + '\nserial SHA-256: ' + digest(state + '/serial.log')! + '\nruntime SHA-256: ' + digest(out + '/run-ios-gles')! + '\n'
 	if os.exists(out + '/manifest.sha256') {
@@ -360,7 +369,8 @@ fn inspect(out string) ! {
 	} else { os.write_file(out + '/diagnostic.txt', diagnostic)! }
 	println(boundary)
 	for line in lines { println(line) }
-	println(if number_unsigned_probe(out)! { 'Unsigned number launch: eight new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
+	println(if dictionary_single_probe(out)! { 'Single dictionary launch: nine new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
+		else if number_unsigned_probe(out)! { 'Unsigned number launch: eight new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
 		else if object_equality_probe(out)! { 'Object equality launch: seven new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
 		else if background_probe(out)! { 'Background session launch: six new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
 		else if outline_probe(out)! { 'Outline Optional launch: six new fixtures and 35 reused guest fixtures PASS; rendering unverified' }
@@ -393,6 +403,7 @@ fn guest_media(out string) ! {
 	if session_configured_probe(out)! { pairs << ['session-configured-checks', 'opt/ios/session-configured-checks'] }
 	if object_equality_probe(out)! { pairs << ['object-equality-checks', 'opt/ios/object-equality-checks'] }
 	if number_unsigned_probe(out)! { pairs << ['number-unsigned-checks', 'opt/ios/number-unsigned-checks'] }
+	if dictionary_single_probe(out)! { pairs << ['dictionary-single-checks', 'opt/ios/dictionary-single-checks'] }
 	if outline_probe(out)! {
 		for kind in ['metadata', 'encoding', 'decoding'] { pairs << ['optional-' + kind + '-checks', 'opt/ios/optional-' + kind + '-checks'] }
 	}
@@ -433,6 +444,7 @@ fn resume_staging(root string, out string) ! {
 	if session_configured_probe(out)! { pairs << ['session-configured-checks', 'opt/ios/session-configured-checks'] }
 	if object_equality_probe(out)! { pairs << ['object-equality-checks', 'opt/ios/object-equality-checks'] }
 	if number_unsigned_probe(out)! { pairs << ['number-unsigned-checks', 'opt/ios/number-unsigned-checks'] }
+	if dictionary_single_probe(out)! { pairs << ['dictionary-single-checks', 'opt/ios/dictionary-single-checks'] }
 	if outline_probe(out)! {
 		for kind in ['metadata', 'encoding', 'decoding'] { pairs << ['optional-' + kind + '-checks', 'opt/ios/optional-' + kind + '-checks'] }
 	}
@@ -618,6 +630,16 @@ fn validate_number_unsigned(serial string) ! {
 	}
 }
 
+fn dictionary_single_markers() []string {
+	return ['IOS-NATIVE: /opt/ios/dictionary-single-checks wait status 0\n', 'IOS-DICTIONARY-SINGLE:']
+}
+
+fn validate_dictionary_single(serial string) ! {
+	for marker in dictionary_single_markers() {
+		if serial.count(marker) != 1 { return error('missing or duplicated single dictionary fixture: ' + marker) }
+	}
+}
+
 fn negative_controls(out string, scratch string) ! {
 	if os.exists(scratch) || os.is_link(scratch) || scratch.starts_with(out + '/') {
 		return error('negative controls need fresh external scratch')
@@ -674,7 +696,7 @@ fn negative_controls(out string, scratch string) ! {
 		return error('accepted missing launch guard')
 	}
 	if optional_lookup {
-		for directory, host_checks in host_markers(session_defaults_probe(out)!, session_configured_probe(out)!, outline_probe(out)!, background_probe(out)!, object_equality_probe(out)!, number_unsigned_probe(out)!) {
+		for directory, host_checks in host_markers(session_defaults_probe(out)!, session_configured_probe(out)!, outline_probe(out)!, background_probe(out)!, object_equality_probe(out)!, number_unsigned_probe(out)!, dictionary_single_probe(out)!) {
 			log := os.read_file(out + '/host/' + directory + '/host.log')!
 			validate_host_log(log, host_checks)!
 			for marker in host_checks {
@@ -797,12 +819,22 @@ fn negative_controls(out string, scratch string) ! {
 			count += rejected
 		}
 	}
+	if dictionary_single_probe(out)! {
+		validate_dictionary_single(serial)!
+		for marker in dictionary_single_markers() {
+			mut rejected := 0
+			validate_dictionary_single(serial.replace(marker, '')) or { rejected++ }
+			validate_dictionary_single(serial + marker) or { rejected++ }
+			if rejected != 2 { return error('accepted missing or duplicated single dictionary marker') }
+			count += rejected
+		}
+	}
 	os.write_file(scratch + '/negative-controls.txt', count.str() + ' corruptions rejected; baseline guest and host logs pass\n')!
 	println(count.str() + ' Swift checkpoint negative controls PASS')
 }
 
 fn main() {
-	if os.args.len < 3 { panic('usage: swift-type-probe prepare FRESH_OUT PRIOR [--optional-lookup|--session-defaults|--session-configured|--optional-outline|--session-background|--object-equality|--number-unsigned] | build|probe|resume-staging|retry-budget|inspect|seal|check OUT | negative-controls OUT FRESH_SCRATCH') }
+	if os.args.len < 3 { panic('usage: swift-type-probe prepare FRESH_OUT PRIOR [--optional-lookup|--session-defaults|--session-configured|--optional-outline|--session-background|--object-equality|--number-unsigned|--dictionary-single] | build|probe|resume-staging|retry-budget|inspect|seal|check OUT | negative-controls OUT FRESH_SCRATCH') }
 	root := os.real_path(os.getwd())
 	out := os.abs_path(os.args[2])
 	if out == root || out.starts_with(root + '/') || os.is_link(out) { panic('output must be external') }
@@ -817,14 +849,15 @@ fn main() {
 		return
 	}
 	if os.args[1] == 'prepare' {
-		if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] !in ['--optional-lookup', '--session-defaults', '--session-configured', '--optional-outline', '--session-background', '--object-equality', '--number-unsigned']) { panic('prepare requires PRIOR [--optional-lookup|--session-defaults|--session-configured|--optional-outline|--session-background|--object-equality|--number-unsigned]') }
+		if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] !in ['--optional-lookup', '--session-defaults', '--session-configured', '--optional-outline', '--session-background', '--object-equality', '--number-unsigned', '--dictionary-single']) { panic('prepare requires PRIOR [--optional-lookup|--session-defaults|--session-configured|--optional-outline|--session-background|--object-equality|--number-unsigned|--dictionary-single]') }
 		prepare(out, os.real_path(os.args[3]), os.args.len == 5,
-			os.args.len == 5 && os.args[4] in ['--session-defaults', '--session-configured', '--optional-outline', '--session-background', '--object-equality', '--number-unsigned'],
-			os.args.len == 5 && os.args[4] in ['--session-configured', '--optional-outline', '--session-background', '--object-equality', '--number-unsigned'],
-			os.args.len == 5 && os.args[4] in ['--optional-outline', '--session-background', '--object-equality', '--number-unsigned'],
-			os.args.len == 5 && os.args[4] in ['--session-background', '--object-equality', '--number-unsigned'],
-			os.args.len == 5 && os.args[4] in ['--object-equality', '--number-unsigned'],
-			os.args.len == 5 && os.args[4] == '--number-unsigned')!
+			os.args.len == 5 && os.args[4] in ['--session-defaults', '--session-configured', '--optional-outline', '--session-background', '--object-equality', '--number-unsigned', '--dictionary-single'],
+			os.args.len == 5 && os.args[4] in ['--session-configured', '--optional-outline', '--session-background', '--object-equality', '--number-unsigned', '--dictionary-single'],
+			os.args.len == 5 && os.args[4] in ['--optional-outline', '--session-background', '--object-equality', '--number-unsigned', '--dictionary-single'],
+			os.args.len == 5 && os.args[4] in ['--session-background', '--object-equality', '--number-unsigned', '--dictionary-single'],
+			os.args.len == 5 && os.args[4] in ['--object-equality', '--number-unsigned', '--dictionary-single'],
+			os.args.len == 5 && os.args[4] in ['--number-unsigned', '--dictionary-single'],
+			os.args.len == 5 && os.args[4] == '--dictionary-single')!
 		return
 	}
 	if os.args.len != 3 { panic('unexpected arguments') }
@@ -852,6 +885,7 @@ fn main() {
 				if session_configured_probe(out)! { capture(out, 'build-configured-session-fixture', [out + '/notification-vm', 'build-session-configured', out])! }
 				if object_equality_probe(out)! { capture(out, 'build-object-equality-fixture', [out + '/notification-vm', 'build-object-equality', out])! }
 				if number_unsigned_probe(out)! { capture(out, 'build-number-unsigned-fixture', [out + '/notification-vm', 'build-number-unsigned', out])! }
+				if dictionary_single_probe(out)! { capture(out, 'build-dictionary-single-fixture', [out + '/notification-vm', 'build-dictionary-single', out])! }
 				if outline_probe(out)! {
 					for kind in ['metadata', 'encoding', 'decoding'] {
 						capture(out, 'build-outline-' + kind + '-fixture', [out + '/notification-vm', 'build-optional-' + kind, out])!
