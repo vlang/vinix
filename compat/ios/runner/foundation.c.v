@@ -96,6 +96,31 @@ fn dictionary_index(header &ObjHeader, key u64) int {
 	return -1
 }
 
+fn dictionary_insert_copy(dictionary u64, input_value u64, input_key u64) {
+	if input_value == 0 || input_key == 0 { panic('iOS: nil dictionary entry') }
+	// A key's copy implementation can reenter and grow the object table.
+	value := objc_retain(input_value)
+	key := objc_copy_value(input_key, true)
+	if key == 0 { objc_release(value); panic('iOS: nil dictionary key copy') }
+	mut header := obj_header(dictionary)
+	index := dictionary_index(header, key)
+	if index >= 0 {
+		// The immutable factory keeps the first value; the mutable one replaces it.
+		mut discarded := value
+		if objc_is_kind(dictionary, ios_runtime.names['NSMutableDictionary']) {
+			discarded = header.items[index]
+			header.items[index] = value
+			header.mutation++
+		}
+		objc_release(key)
+		objc_release(discarded)
+	} else {
+		header.keys << key
+		header.items << value
+		header.mutation++
+	}
+}
+
 fn array_append(mut header ObjHeader, object u64) {
 	if object == 0 { panic('iOS: nil inserted into collection') }
 	header.items << if header.cf_raw_values { object } else { objc_retain(object) }
@@ -201,6 +226,24 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 				header.keys << key
 				header.items << value
 				header.mutation++
+				frame.x[0] = objc_autorelease(dictionary)
+			}
+			'dictionaryWithObjectsAndKeys:' {
+				if !objc_is_kind(object, read64(ios_runtime.names['NSDictionary'])) { return false }
+				dictionary := objc_allocate(object)
+				mut value := frame.x[2]
+				mut count := u64(0)
+				// Darwin arm64 puts all anonymous arguments on the original stack;
+				// x3 and the remaining argument registers are unrelated to the list.
+				for value != 0 {
+					if count == 65536 { panic('iOS: variadic dictionary exceeds limit') }
+					if frame.stack == 0 || frame.stack & 7 != 0 || frame.stack > ~u64(0) - (count * 16 + 16) {
+						panic('iOS: invalid variadic dictionary arguments')
+					}
+					dictionary_insert_copy(dictionary, value, read64(frame.stack + count * 16))
+					value = read64(frame.stack + count * 16 + 8)
+					count++
+				}
 				frame.x[0] = objc_autorelease(dictionary)
 			}
 			'indexPathForRow:inSection:' {

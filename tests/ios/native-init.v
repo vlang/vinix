@@ -502,6 +502,9 @@ fn main() {
 			if os.exists('/opt/ios/dictionary-single-checks') {
 				require_child('/opt/ios/dictionary-single-checks')
 			}
+			if os.exists('/opt/ios/dictionary-variadic-checks') {
+				require_child('/opt/ios/dictionary-variadic-checks')
+			}
 			if os.exists('/opt/ios/session-defaults-checks') {
 				require_child('/opt/ios/session-defaults-checks')
 			}

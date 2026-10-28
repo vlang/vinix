@@ -94,6 +94,10 @@ fn main() {
 		run_host_fixture(root, old, out, 'ns_dictionary_single_test.v')!
 		return
 	}
+	if os.args[1] == 'dictionary-variadic-host' {
+		run_host_fixture(root, old, out, 'ns_dictionary_variadic_test.v')!
+		return
+	}
 	if os.args[1] == 'session-base-host' {
 		run_host_fixture(root, old, out, 'ns_url_session_test.v')!
 		return
