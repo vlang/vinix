@@ -24,8 +24,14 @@ fn storekit_purchase_unsupported(selector string) bool {
 }
 
 fn storekit_purchase_require_storage(cls u64) {
+	storekit_purchase_require_operation(cls, 'allocation/storage')
+}
+
+fn storekit_purchase_require_operation(cls u64, selector string) {
 	if storekit_purchase_family(cls) {
-		panic('iOS: StoreKit payment and request construction or operations are not implemented')
+		info := ios_runtime.classes[cls] or { panic('iOS: missing StoreKit receiver class') }
+		panic('iOS: StoreKit payment and request construction or operations are not implemented: '
+			+ info.name + ' ' + selector)
 	}
 }
 

@@ -153,7 +153,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 		return true
 	}
 	if storekit_purchase_unsupported(selector) {
-		storekit_purchase_require_storage(if object in ios_runtime.classes { object } else { read64(object) })
+		storekit_purchase_require_operation(if object in ios_runtime.classes { object } else { read64(object) }, selector)
 	}
 	if selector == 'superclass' && object in ios_runtime.classes && ns_proxy_family(object) {
 		frame.x[0] = objc_class_parent(object)

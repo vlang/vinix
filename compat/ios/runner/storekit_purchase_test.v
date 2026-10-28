@@ -119,6 +119,17 @@ fn test_storekit_purchase_construction_rejected() {
 				output := unsafe { tos(&bytes[0], length) }
 				reason := if mode.starts_with('isa-') { 'changing StoreKit purchase storage isa is not implemented' } else { 'StoreKit payment and request construction or operations are not implemented' }
 				assert output.contains(reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:') && !output.contains('> assert '), mode + ': ' + output
+				if !mode.starts_with('isa-') {
+					assert output.contains(ctext(u64(objc_class_name(target))) + ' '), mode + ': ' + output
+					operation := match mode {
+						'allocate', 'caller', 'install', 'metaclass' { 'allocation/storage' }
+						'super-alloc' { 'alloc' }
+						'super-new' { 'new' }
+						'missing-imp' { 'notAPurchaseMethod' }
+						else { mode }
+					}
+					assert output.contains(': ' + ctext(u64(objc_class_name(target))) + ' ' + operation + '\n'), mode + ': ' + output
+				}
 			}
 		}
 	}
