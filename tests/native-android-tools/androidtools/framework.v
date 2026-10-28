@@ -159,6 +159,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_intent_parcel(smali)!
  framework_timing_logger(smali)!
  framework_user_identity(smali)!
+ framework_application_restrictions_api(smali)!
  framework_package_signatures(smali)!
  framework_native_digests(smali)!
  framework_tls_provider(smali)!
