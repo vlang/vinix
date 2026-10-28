@@ -86,7 +86,7 @@ fn json_builtin_types(name string, meta bool, selector string) ?string {
 	if name == 'NSError' && !meta {
 		return match selector {
 			'code' { 'q16@0:8' }
-			'domain', 'userInfo', 'localizedDescription' { '@16@0:8' }
+			'domain', 'userInfo', 'localizedDescription', 'description' { '@16@0:8' }
 			else { return none }
 		}
 	}
@@ -140,6 +140,7 @@ fn json_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 		'code' { frame.x[0] = u64(record.code) }
 		'domain' { frame.x[0] = record.domain }
 		'userInfo' { frame.x[0] = record.user_info }
+		'description' { frame.x[0] = objc_autorelease(ns_error_description(object) or { panic(err) }) }
 		'localizedDescription' {
 			mut header := obj_header(object)
 			if header.fields[0] == 0 {
