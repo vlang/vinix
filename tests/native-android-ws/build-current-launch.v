@@ -1040,6 +1040,12 @@ fn bootstrap(root string, framework string, profile string) ! {
 		'executable_sha256': json2.Any(hash(argv[0])!)
 		'started_utc':       json2.Any(time.utc().str())
 	})!
+	if profile == 'account-broker' {
+		// Release the bootstrap workspace before the frozen broker producer
+		// starts its compiler, keeping the aggregate memory guard meaningful.
+		os.execvp(argv[0], argv[1..])!
+		return
+	}
 	result := os.exec(argv)
 	if result.exit_code != 0 { return error(result.output) }
 	print(result.output)
