@@ -54,6 +54,79 @@ fn verify_parent(parent string) ! {
 	if expected.len == 0 { return error('empty parent manifest') }
 }
 
+// Avoid copyfile's sparse-extent seeking on cross-volume APFS copies. Evidence
+// needs exact bytes and permissions; regular buffered reads also bound memory.
+fn stream_copy(source string, target string) ! {
+	if os.exists(target) || os.is_link(target) || os.is_link(source) {
+		return error('stream copy requires an absent target and no symbolic links')
+	}
+	mode := int(os.stat(source)!.mode) & 0o7777
+	if os.is_dir(source) {
+		os.mkdir(target)!
+		for name in os.ls(source)! { stream_copy(source + '/' + name, target + '/' + name)! }
+		os.chmod(target, mode)!
+		return
+	}
+	if !os.is_file(source) { return error('non-regular evidence: ' + source) }
+	size := os.file_size(source)
+	mut input := os.open(source)!
+	defer { input.close() }
+	mut output := os.create(target)!
+	defer { output.close() }
+	mut buffer := []u8{len: 1048576}
+	defer { unsafe { buffer.free() } }
+	mut remaining := size
+	for remaining > 0 {
+		limit := int(if remaining < u64(buffer.len) { remaining } else { u64(buffer.len) })
+		n := input.read(mut buffer[..limit])!
+		if n == 0 { return error('source ended during stream copy') }
+		mut written := 0
+		for written < n {
+			count := output.write(buffer[written..n])!
+			if count == 0 { return error('stream copy made no write progress') }
+			written += count
+		}
+		remaining -= u64(n)
+	}
+	output.close()
+	if os.file_size(source) != size || os.file_size(target) != size || digest(source)! != digest(target)! {
+		return error('stream copy changed evidence: ' + source)
+	}
+	os.chmod(target, mode)!
+	if size >= 1024 * 1024 * 1024 { println('Stream copy verified: ' + os.file_name(source)) }
+}
+
+fn stream_copy_selftest(out string) ! {
+	os.mkdir_all(out + '/source/nested/empty')!
+	os.write_file(out + '/source/nested/small', 'exact bytes\x00\xff')!
+	os.chmod(out + '/source/nested/small', 0o640)!
+	os.chmod(out + '/source/nested/empty', 0o750)!
+	large := out + '/source/sparse'
+	mut file := os.create(large)!
+	file.write_string('head')!
+	file.seek(i64(2) * 1024 * 1024 * 1024 + 17, .start)!
+	file.write_string('tail')!
+	file.close()
+	stream_copy(out + '/source', out + '/copy')!
+	assert digest(large)! == digest(out + '/copy/sparse')!
+	assert os.file_size(out + '/copy/sparse') == u64(2) * 1024 * 1024 * 1024 + 21
+	assert os.is_dir(out + '/copy/nested/empty')
+	assert int(os.stat(out + '/copy/nested/empty')!.mode) & 0o7777 == 0o750
+	assert int(os.stat(out + '/copy/nested/small')!.mode) & 0o7777 == 0o640
+	mut rejected := false
+	stream_copy(out + '/source', out + '/copy') or { rejected = true }
+	assert rejected
+	os.symlink('small', out + '/source/nested/link')!
+	rejected = false
+	stream_copy(out + '/source/nested/link', out + '/link-copy') or { rejected = true }
+	assert rejected && !os.exists(out + '/link-copy')
+	// Keep the small evidence; the generated multi-GiB copy is scratch only.
+	os.rm(large)!
+	os.rm(out + '/copy/sparse')!
+	os.rm(out + '/source/nested/link')!
+	println('Stream copy: nested and empty directories, exact bytes and modes, sparse input above 2 GiB, existing target and symlink rejection PASS')
+}
+
 fn replace_runtime(out string, state string) ! {
 	os.mkdir_all(out + '/replacement')!
 	// The omission patterns also apply to newly added files. Give the new
@@ -130,6 +203,7 @@ fn replay(out string) ! {
 
 fn replacement_selftest(out string) ! {
 	if os.exists(out) { return error('selftest requires a fresh directory') }
+	stream_copy_selftest(out + '/stream-copy')!
 	for spelling in ['opt/ios/run-ios', './opt/ios/run-ios', 'absent'] {
 		path := out + '/' + if spelling == 'absent' { 'absent' } else if spelling.starts_with('.') { 'dot' } else { 'plain' }
 		os.mkdir_all(path + '/old/opt/ios')!
@@ -214,7 +288,12 @@ fn main() {
 	if os.disk_usage(os.dir(out).clone())!.available < u64(if queue { 12 } else { 8 }) * 1024 * 1024 * 1024 {
 		panic('runtime replacement and its full media audit need 8 GiB free (12 GiB in queue mode)')
 	}
-	capture(out + '-clone', ['/bin/cp', if queue { '-Rp' } else { '-cRp' }, parent, out])!
+	if queue {
+		stream_copy(parent, out)!
+		verify_parent(out)!
+		os.write_file(out + '-clone.log', 'V stream copy: complete bytes and permissions verified\n')!
+		os.write_file(out + '-clone.status.txt', '0\n')!
+	} else { capture(out + '-clone', ['/bin/cp', '-cRp', parent, out])! }
 	if queue { os.write_file(out + '/queue-probe.txt', 'fresh StoreKit fixture and native init; 45 reused guest fixtures\n')! }
 	os.rename(out + '/manifest.sha256', out + '/parent-manifest.sha256')!
 	os.write_file(out + '/parent-bundle.txt', parent + '\n' + parent_manifest + '\n')!
