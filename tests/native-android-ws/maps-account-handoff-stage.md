@@ -9,11 +9,12 @@ deployment input hashes change. Original inode ancestry, exact TAR contents and
 all 21 inherited modules are checked; the diagnostic overlay becomes module 22.
 Historical producer and patcher profiles remain unchanged.
 
-No complete diagnostic stage was produced. Both attempts reached the final
+No complete diagnostic stage was produced. The first two attempts reached the final
 complete-input recheck after successful media readbacks, then an outer guard
 stopped them. Neither retained output contains `stage.json` or `sha256.json`;
-both remain incomplete staging attempts. No VM or Google login is
-validated by this checkpoint.
+both remain incomplete staging attempts. A third attempt stopped during the
+initial input audit before creating its output directory. No VM or Google login
+is validated by this checkpoint.
 
 Artifacts are retained under `/Users/alex/.local/state/vinix/android` (`S`):
 
@@ -41,8 +42,9 @@ for a successful producer and complete manifest verification.
 | Broker retained-input and ELF negative tests | Pass | 3.945 | 355,385,344 | 49,893,376 |
 | Prepare r1 | Stopped: 300-second wall limit | 300.108 | 56,623,104 | 122,261,504 |
 | Prepare r2 | Stopped: 4-GiB shared-volume growth limit | 256.624 | 54,837,248 | 4,326,821,888 |
+| Prepare r3 | Stopped: 2-GiB shared-volume growth limit | 86.593 | 38,813,696 | 2,161,033,216 |
 
-Both prepare guards record exit 125, child exit 137 and completed process-group
+The first two prepare guards record exit 125, child exit 137 and completed process-group
 cleanup. Their RSS limit was 629,145,600 bytes, disk reserve 1,073,741,824 bytes
 and shared-volume growth ceiling 4,294,967,296 bytes. Both launches also set
 `ulimit -f 16777216` (8 GiB in zsh); this launch setting is outside the guard
@@ -86,10 +88,26 @@ shared-volume growth and a 1 GiB reserve. Their receipts remain beside `sealed/`
 and `check.guard.json` SHA-256
 `252ac99f583af242c14c182432eed47d3d4434e8d76abf9ef6ba23a5f584f215`.
 
-Resume with a fresh output and the existing fully checked producer after free
-space backs the complete outer growth allowance plus reserve. A single tighter
-2-GiB outer-growth attempt is authorized only when at least 3 GiB free backs
-that ceiling plus reserve; its other checks and limits stay unchanged. It has
-not been launched at this checkpoint. Preserve both failed attempts. A
-successful prepare, independent manifest readback, frozen kernel installation
-and live Maps/account-flow checks remain required.
+The single tighter r3 retry started with 3,925,180,416 free bytes, backing its
+2-GiB growth ceiling and 1-GiB reserve. It retained the 600-MiB RSS, 900-second,
+internal 512-MiB growth and inherited 8-GiB shell file limits. The outer guard
+recorded a minimum 1,764,147,200 free bytes and stopped with exit 125, child 137
+and complete cleanup. The log contains only the initial immutable-input-audit
+message. `S/maps-account-handoff-r3` was not created. As with r2, the global
+free-space change cannot be attributed to this producer.
+
+Its quiescent evidence directory is
+`S/maps-account-handoff-stage-prepare-2026-10-28-r3`:
+`prepare.guard.json` SHA-256
+`c506e8c13add2df299642ba9a16252ae0260473f6c295073d490575c215442b7`,
+and `prepare.log` SHA-256
+`882c7056614955494fd86a077cdeee2262dd91949502ddae4ca92a7da42f0cd0`.
+Both were independently rehashed after producer cleanup. No further retry or VM
+was started. The completed [GMS caller audit](gms-npe-three-class-audit.md)
+separately identifies the r5 NPE as a caught logger failure; it does not establish
+the account failure's cause.
+
+Resume with a fresh output and the existing fully checked producer when stable
+free space backs the complete outer growth allowance plus reserve. Preserve the
+failed evidence. A successful prepare, independent manifest readback, frozen
+kernel installation and live Maps/account-flow checks remain required.
