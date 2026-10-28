@@ -449,13 +449,22 @@ stores remain unsupported. Complete persistent evidence passes its saved
 auditor and 207 negative controls. See the
 [default session checkpoint](../tests/ios/session-defaults-checkpoint-20261028.md).
 
-The latest no-ads checkpoint implements configured `NSURLSession` ownership and
+An earlier no-ads checkpoint implements configured `NSURLSession` ownership and
 configuration snapshots. Native comparisons, both sanitized host runs and all
 38 guest fixtures pass. Fortnite still reaches the 48-byte Swift Optional
 Wrapped layout rejection. Progress remains 4/8 observed gates; rendering is
 unverified. The complete archive restores and passes its saved auditor and
 231 negative controls. See the
 [configured session checkpoint](../tests/ios/session-configured-checkpoint-20261028.md).
+
+The latest no-ads checkpoint supports out-of-line Swift Optional layouts through
+65,536 bytes. All 41 guest fixtures, three fresh sanitized Optional host suites
+and 273 audit negative controls pass. Fortnite gets past the 48-byte Wrapped
+layout rejection and reaches
+`NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:`.
+Progress remains 4/8 observed gates; no frame, menu, login or playable match is
+verified. See the
+[Optional layout checkpoint](../tests/ios/swift-optional-outline-checkpoint-20261028.md).
 
 `MTLCreateSystemDefaultDevice` still returns nil: a Metal device, shader,
 rendering and presentation backend remains to be implemented. The existing
