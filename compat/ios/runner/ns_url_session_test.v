@@ -307,6 +307,24 @@ fn test_url_session_rejections() {
 			else { 'URL session shared/configured sessions' }
 		}
 		assert output.contains('iOS: ' + reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output
+		selector := match mode {
+			'shared' { '+[NSURLSession sharedSession]' }
+			'configured' { '+[NSURLSession sessionWithConfiguration:]' }
+			'configured-delegate' { '+[NSURLSession sessionWithConfiguration:delegate:delegateQueue:]' }
+			'task' { '-[NSURLSession dataTaskWithRequest:]' }
+			'upload' { '-[NSURLSession uploadTaskWithRequest:fromData:]' }
+			'download' { '-[NSURLSession downloadTaskWithURL:]' }
+			'socket' { '-[NSURLSession webSocketTaskWithURL:]' }
+			'cancel' { '-[NSURLSession invalidateAndCancel]' }
+			'finish' { '-[NSURLSession finishTasksAndInvalidate]' }
+			'flush' { '-[NSURLSession flushWithCompletionHandler:]' }
+			'reset' { '-[NSURLSession resetWithCompletionHandler:]' }
+			'tasks' { '-[NSURLSession getAllTasksWithCompletionHandler:]' }
+			'coding' { '-[NSURLSession initWithCoder:]' }
+			'mutable' { '-[NSURLSession mutableCopy]' }
+			else { '' }
+		}
+		if selector != '' { assert output.contains(': ' + selector + '\n'), output }
 	}
 	assert ios_runtime.live == 0; objc_stop()
 	println('IOS-URL-SESSION-REJECT: nineteen configured/shared/task/lifecycle/coding/mutability/type/copy/subclass/spoof cases fail explicitly')

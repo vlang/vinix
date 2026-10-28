@@ -117,7 +117,9 @@ fn url_session_dispatch(object u64, selector string, mut frame RegisterFrame) bo
 	meta := object in ios_runtime.classes
 	if !url_session_family(if meta { object } else { read64(object) }) { return false }
 	if url_session_unsupported(selector) {
-		panic('iOS: URL session shared/configured sessions, mutable copying, lifecycle callbacks, tasks and coding are not implemented')
+		kind := if meta { '+' } else { '-' }
+		panic('iOS: URL session shared/configured sessions, mutable copying, lifecycle callbacks, tasks and coding are not implemented: '
+			+ kind + '[NSURLSession ' + selector + ']')
 	}
 	if url_session_types('NSURLSession', meta, selector) == none { return false }
 	if meta { frame.x[0] = objc_new(object); return true }
