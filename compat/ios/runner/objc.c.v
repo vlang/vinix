@@ -82,6 +82,9 @@ mut:
 	target      u64 // UIControl targets are non-owning.
 	action      u64
 	fields      [9]u64
+	url_resource_values [7]u64 // Owned successful NSURL metadata snapshots, including cached nils.
+	url_resource_mask u8
+	url_resource_generation u64 // Invalidations prevent an in-flight query publishing stale data.
 	notification_block u64 // Owned capture of an opaque block-observer token.
 	children    [64]u64
 	child_count int

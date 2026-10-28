@@ -92,6 +92,7 @@ fn http_url_initialize(object u64, input u64) bool {
 		for query_end < text.len && text[query_end] != `#` { query_end++ }
 	}
 	// Reinitialization must retire the old components too.
+	ns_url_resource_clear(object, -1)
 	for j in 0 .. 7 { store_field(object, j, 0) }
 	for j, value in [http_borrow(path, 0, path_length), text, scheme, host]! {
 		component := owned_string(value)
@@ -128,6 +129,9 @@ fn http_url_builtin_types(name string, meta bool, selector string) ?string {
 		'host', 'path', 'absoluteString', 'scheme', 'query', 'fragment', 'port' { '@16@0:8' }
 		'isFileURL' { 'B16@0:8' }
 		'setResourceValue:forKey:error:' { 'B40@0:8@16@24^@32' }
+		'getResourceValue:forKey:error:' { 'B40@0:8o^@16@24o^@32' }
+		'removeCachedResourceValueForKey:' { 'v24@0:8@16' }
+		'removeAllCachedResourceValues' { 'v16@0:8' }
 		else { return none }
 	}
 }
@@ -145,6 +149,15 @@ fn http_url_dispatch(object u64, selector string, mut frame RegisterFrame) bool 
 		return true
 	}
 	if !objc_is_kind(object, ios_runtime.names['NSURL']) { return false }
+	if selector == 'getResourceValue:forKey:error:' {
+		frame.x[0] = u64(ns_url_get_resource(object, frame.x[2], frame.x[3], frame.x[4]))
+		return true
+	}
+	if selector in ['removeCachedResourceValueForKey:', 'removeAllCachedResourceValues'] {
+		index := if selector == 'removeAllCachedResourceValues' { -1 } else { ns_url_resource_index(frame.x[2]) }
+		if index != -2 { ns_url_resource_clear(object, index) }
+		return true
+	}
 	if selector == 'setResourceValue:forKey:error:' {
 		frame.x[0] = u64(ns_url_set_resource(object, frame.x[2], frame.x[3], frame.x[4]))
 		return true

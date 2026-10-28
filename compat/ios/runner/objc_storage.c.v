@@ -280,6 +280,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	un_center_dispose(object, mut header)
 	un_content_dispose(object, mut header)
 	ns_url_query_item_dispose(object, mut header)
+	ns_url_resource_dispose(mut header)
 	web_auth_dispose(mut header)
 	image_view_dispose(mut header)
 	text_field_dispose(mut header)
