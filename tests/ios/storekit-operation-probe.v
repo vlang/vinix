@@ -175,14 +175,33 @@ fn queue_media(out string, state string) ! {
 	}
 }
 
-fn queue_results(state string) ! {
-	serial := os.read_file(state + '/serial.log')!
+fn validate_queue_results(raw string) ! {
+	serial := raw.replace('\r\n', '\n')
 	for marker in ['IOS-NATIVE: /opt/ios/storekit-purchase-checks wait status 0\n',
 		'IOS-STOREKIT-PURCHASE:', 'IOS-STOREKIT-PURCHASE-REJECT: 276 ',
 		'IOS-STOREKIT-QUEUE:', 'IOS-STOREKIT-QUEUE-REJECT: seven '] {
 		if serial.count(marker) != 1 { return error('missing or duplicated queue guest result: ' + marker) }
 	}
+}
+
+fn queue_results(state string) ! {
+	validate_queue_results(os.read_file(state + '/serial.log')!)!
 	println('Supplemental fresh StoreKit guest fixture: PASS')
+}
+
+fn queue_results_selftest() ! {
+	serial := 'IOS-NATIVE: /opt/ios/storekit-purchase-checks wait status 0\n'
+		+ 'IOS-STOREKIT-PURCHASE: PASS\nIOS-STOREKIT-PURCHASE-REJECT: 276 PASS\n'
+		+ 'IOS-STOREKIT-QUEUE: PASS\nIOS-STOREKIT-QUEUE-REJECT: seven PASS\n'
+	validate_queue_results(serial)!
+	validate_queue_results(serial.replace('\n', '\r\n'))!
+	for bad in [serial.replace('wait status 0', 'wait status 1'),
+		serial.replace('IOS-STOREKIT-QUEUE: PASS\n', ''), serial + serial] {
+		mut rejected := false
+		validate_queue_results(bad) or { rejected = true }
+		assert rejected
+	}
+	println('Queue guest result validation: LF/CRLF accepted; failure, missing and duplicate results rejected PASS')
 }
 
 fn replay(out string) ! {
@@ -203,6 +222,7 @@ fn replay(out string) ! {
 
 fn replacement_selftest(out string) ! {
 	if os.exists(out) { return error('selftest requires a fresh directory') }
+	queue_results_selftest()!
 	stream_copy_selftest(out + '/stream-copy')!
 	for spelling in ['opt/ios/run-ios', './opt/ios/run-ios', 'absent'] {
 		path := out + '/' + if spelling == 'absent' { 'absent' } else if spelling.starts_with('.') { 'dot' } else { 'plain' }
@@ -237,6 +257,13 @@ fn replacement_selftest(out string) ! {
 
 fn main() {
 	if os.args.len == 3 && os.args[1] == 'selftest' { replacement_selftest(os.abs_path(os.args[2]))!; return }
+	if os.args.len == 3 && os.args[1] == 'inspect-queue' {
+		out := os.real_path(os.args[2])
+		state := os.read_file(out + '/probe-no-ads-state.txt')!.trim_space()
+		if os.dir(state) != out { panic('unsafe queue state pointer') }
+		queue_results(state)!
+		return
+	}
 	if os.args.len == 4 && os.args[1] == 'check-queue' {
 		out := os.real_path(os.args[2])
 		scratch := os.abs_path(os.args[3])
