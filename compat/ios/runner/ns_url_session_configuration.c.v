@@ -202,7 +202,7 @@ fn url_session_configuration_dispatch(object u64, selector string, mut frame Reg
 	meta := object in ios_runtime.classes
 	if !url_session_configuration_family(if meta { object } else { read64(object) }) { return false }
 	if url_session_configuration_unsupported(selector) {
-		panic('iOS: configuration factories, stores, coding and this property are not implemented')
+		panic('iOS: configuration factories, stores, coding and this property are not implemented: ' + selector)
 	}
 	if url_session_configuration_types('NSURLSessionConfiguration', meta, selector) == none { return false }
 	if meta { frame.x[0] = objc_new(object); return true }

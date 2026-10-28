@@ -76,6 +76,10 @@ fn main() {
 		run_host_fixture(root, old, out, 'swift_mangled_probe_test.v')!
 		return
 	}
+	if os.args[1] == 'session-configuration-host' {
+		run_host_fixture(root, old, out, 'ns_url_session_configuration_test.v')!
+		return
+	}
 	if os.args[1] == 'swift-mangled-host' {
 		run_host_fixture(root, old, out, 'swift_mangled_test.v')!
 		return

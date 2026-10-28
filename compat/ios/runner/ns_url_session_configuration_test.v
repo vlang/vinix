@@ -11,6 +11,8 @@ fn C.sel_registerName(&char) voidptr
 fn C.dlsym(voidptr, &char) voidptr
 fn C.class_getInstanceSize(voidptr) usize
 fn C.class_getSuperclass(voidptr) voidptr
+fn C.class_getInstanceVariable(voidptr, &char) voidptr
+fn C.ivar_getOffset(voidptr) isize
 fn C.class_getInstanceMethod(voidptr, voidptr) voidptr
 fn C.method_getTypeEncoding(voidptr) &char
 
@@ -153,7 +155,15 @@ fn configuration_encoding_cases(api ConfigurationApi) {
 fn test_url_session_configuration_native() {
 	$if macos {
 		api := ConfigurationApi{native: true, send: u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend')), cls: u64(C.objc_getClass(c'NSURLSessionConfiguration')), strings: u64(C.objc_getClass(c'NSString')), mutable_strings: u64(C.objc_getClass(c'NSMutableString')), dictionaries: u64(C.objc_getClass(c'NSMutableDictionary')), arrays: u64(C.objc_getClass(c'NSMutableArray'))}
-		assert C.class_getInstanceSize(unsafe { voidptr(api.cls) }) == 560 && C.class_getSuperclass(unsafe { voidptr(api.cls) }) == C.objc_getClass(c'NSObject')
+		size := C.class_getInstanceSize(unsafe { voidptr(api.cls) })
+		// Installed Foundation versions differ in private trailing storage. The
+		// shared raw-record checks use only the measured common prefix; public
+		// property/copy comparisons below still run against both native profiles.
+		assert size in [usize(552), 560]! && C.class_getSuperclass(unsafe { voidptr(api.cls) }) == C.objc_getClass(c'NSObject')
+		for name, offset in {'_limits': isize(8), '_identifier': 160, '_protocolClasses': 232, '_multipathServiceType': if size == 552 { 536 } else { 544 }} {
+			ivar := C.class_getInstanceVariable(unsafe { voidptr(api.cls) }, name.str)
+			assert ivar != unsafe { nil } && C.ivar_getOffset(ivar) == offset
+		}
 		configuration_encoding_cases(api); configuration_shared_base(api); configuration_shared_scalars(api); configuration_shared_objects(api)
 		println('IOS-SESSION-CONFIGURATION-NATIVE: base allocation and preserved init, typed settings, signed connection truncation, TLS widths, copied properties, independent configuration snapshots and copied owners after pool drainage')
 	}
@@ -338,6 +348,28 @@ fn test_url_session_configuration_rejections() {
 			else { 'configuration factories, stores, coding and this property are not implemented' }
 		}
 		assert output.contains('iOS: ' + reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), mode + ': ' + output
+		if mode in ['default', 'ephemeral', 'background', 'cookie', 'cookie-set', 'credential', 'credential-set', 'cache', 'cache-set', 'tls-version', 'idle', 'proxies', 'mutable', 'coding', 'description', 'hash', 'equal']! {
+			selector := match mode {
+				'default' { 'defaultSessionConfiguration' }
+				'ephemeral' { 'ephemeralSessionConfiguration' }
+				'background' { 'backgroundSessionConfigurationWithIdentifier:' }
+				'cookie' { 'HTTPCookieStorage' }
+				'cookie-set' { 'setHTTPCookieStorage:' }
+				'credential' { 'URLCredentialStorage' }
+				'credential-set' { 'setURLCredentialStorage:' }
+				'cache' { 'URLCache' }
+				'cache-set' { 'setURLCache:' }
+				'tls-version' { 'TLSMinimumSupportedProtocolVersion' }
+				'idle' { 'shouldUseExtendedBackgroundIdleMode' }
+				'proxies' { 'proxyConfigurations' }
+				'mutable' { 'mutableCopy' }
+				'coding' { 'initWithCoder:' }
+				'description' { 'description' }
+				'hash' { 'hash' }
+				else { 'isEqual:' }
+			}
+			assert output.contains(reason + ': ' + selector + '\n'), output
+		}
 	}
 	assert ios_runtime.live == 0; objc_stop()
 	println('IOS-SESSION-CONFIGURATION-REJECT:29 factory, storage, modern TLS, idle, proxy, copy, coding, type, nil copy, collection, subclass, spoof and nonfinite cases fail explicitly')
