@@ -56,7 +56,7 @@ fn fresh_file(path string) !int {
 fn write_all(fd int, data []u8) ! {
 	mut written := 0
 	for written < data.len {
-		n := C.write(fd, unsafe { &u8(data.data) + written }, usize(data.len - written))
+		n := C.write(fd, unsafe { &u8(data.data) + written }, uint(data.len - written))
 		if n < 0 && C.errno == C.EINTR { continue }
 		if n <= 0 { return error('file write failed') }
 		written += int(n)
@@ -158,7 +158,7 @@ fn start_command(args []string) !&os.Process {
 // One bounded read, including explicit EOF. The caller must keep draining while
 // monitoring so a compiler can never block the supervisor on a full pipe.
 fn read_block(mut p os.Process, mut buf []u8) !(int, bool) {
-	n := C.read(p.stdio_fd[1], buf.data, usize(buf.len))
+	n := C.read(p.stdio_fd[1], buf.data, uint(buf.len))
 	saved_errno := int(C.errno)
 	if n > 0 { return int(n), false }
 	if n == 0 { return 0, true }
@@ -325,7 +325,7 @@ fn run(args []string) !int {
 			'log' { log = value }
 			'receipt' { receipt_path = value }
 			'rss' { limits.rss = number(value)! }
-			'wall_ms' { n := number(value)!; if n > 300_000 { return error('wall limit exceeds 300 seconds') }; limits.wall_ms = i64(n) }
+			'wall_ms' { n := number(value)!; if n > 900_000 { return error('wall limit exceeds 900 seconds') }; limits.wall_ms = i64(n) }
 			'reserve' { limits.reserve = number(value)! }
 			'growth' { limits.growth = number(value)! }
 			'output' { limits.output = number(value)! }

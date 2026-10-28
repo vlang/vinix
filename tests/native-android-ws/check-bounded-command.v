@@ -27,13 +27,13 @@ struct Result {
 	supervised_groups []int
 }
 
-struct ObservedLimits { reserve u64; growth u64 }
+struct ObservedLimits { reserve u64; growth u64; wall_ms i64 }
 
 fn fixture(mode string) {
 	C.alarm(10)
 	match mode {
 		'literal' { print(os.args[3]); eprint(':stderr'); exit(37) }
-		'growth' { exit(0) }
+		'growth', 'long-wall' { exit(0) }
 		'flood' { for _ in 0 .. 1024 { print('x'.repeat(8192)) } }
 		'wall' { time.sleep(5 * time.second) }
 		'leader' {
@@ -92,8 +92,13 @@ fn control(runner string, out string, mode string, options []string, expected st
 			return error('literal argv, merged output or exit code differs')
 		}
 		if report.limits.growth != 512 * u64(1024 * 1024) { return error('default disk growth budget differs') }
+		if report.limits.wall_ms != 300_000 { return error('default wall time differs') }
 	} else if mode == 'nested-success' {
 		if result.exit_code != 0 || report.exit_code != 0 || report.reason != '' { return error('nested command refused') }
+	} else if mode == 'long-wall' {
+		if result.exit_code != 0 || report.exit_code != 0 || report.reason != '' || report.limits.wall_ms != 900_000 {
+			return error('maximum explicit wall time differs')
+		}
 	} else if mode == 'growth' {
 		if result.exit_code != 0 || report.exit_code != 0 || report.reason != '' ||
 			report.limits.growth != 8 * u64(1024 * 1024 * 1024) ||
@@ -145,6 +150,16 @@ fn main() {
 	}
 	os.write_file(out + '/self-test.log', self.output) or { eprintln(err); exit(1) }
 	control(runner, out, 'literal', []string{}, '') or { eprintln(err); exit(1) }
+	control(runner, out, 'long-wall', ['wall_ms=900000'], '') or { eprintln(err); exit(1) }
+	for invalid in ['900001', '18446744073709551615'] {
+		receipt := out + '/invalid-wall-' + invalid + '.json'
+		refused_wall := os.exec([runner, 'root=' + out + '/absent', 'log=' + out + '/invalid-wall.log',
+			'receipt=' + receipt, 'wall_ms=' + invalid, '--', '/usr/bin/true'])
+		if refused_wall.exit_code != 125 || os.exists(receipt) || !refused_wall.output.contains('wall limit exceeds 900 seconds') {
+			eprintln('oversized wall time accepted'); exit(1)
+		}
+		os.write_file(out + '/invalid-wall-' + invalid + '.log', refused_wall.output) or { eprintln(err); exit(1) }
+	}
 	control(runner, out, 'growth', ['growth=8589934592'], '') or { eprintln(err); exit(1) }
 	for invalid in ['8589934593', '18446744073709551615'] {
 		receipt := out + '/invalid-growth-' + invalid + '.json'
@@ -177,5 +192,5 @@ fn main() {
 	if reserve.exit_code != 125 || reserve_report.pid != 0 || reserve_report.reason != 'disk reserve' {
 		eprintln('initial disk reserve did not refuse before spawn'); exit(1)
 	}
-	println('BOUNDED-COMMAND-PASS literal exit37 fresh-root fresh-evidence backed-growth max-growth-refusal flood wall exited-leader descendant-rss nested-success nested-orphan nested-rss')
+	println('BOUNDED-COMMAND-PASS literal exit37 fresh-root fresh-evidence default-wall max-wall max-wall-refusal backed-growth max-growth-refusal flood wall exited-leader descendant-rss nested-success nested-orphan nested-rss')
 }

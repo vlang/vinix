@@ -13,9 +13,11 @@ evidence, and the receipt survives a producer that removes its generated root.
 
 Defaults are 2 GiB aggregate sampled RSS, 300 seconds, 1 GiB free disk reserve,
 512 MiB observed free-space decrease, and 4 MiB merged stdout/stderr. Explicit
-`rss=BYTES`, `wall_ms=MS`, `output=BYTES` can tighten those bounds;
-`reserve=BYTES` can raise the reserve. An explicit `growth=BYTES` can select a
-budget up to 8 GiB; its default remains 512 MiB. Before spawning, free space must
+`rss=BYTES` and `output=BYTES` can tighten those bounds; `reserve=BYTES` can
+raise the reserve. An explicit `wall_ms=MS` can select up to 900 seconds for
+complete input and readback audits; its default remains 300 seconds. An explicit
+`growth=BYTES` can select a budget up to 8 GiB; its default remains 512 MiB.
+Before spawning, free space must
 cover the whole reserve plus the growth budget, with overflow-safe arithmetic.
 For example, `growth=8589934592` requires at least 9 GiB free with the default
 reserve. The reserve and observed growth limits remain enforced during the run.
@@ -58,9 +60,20 @@ root, exclusive evidence creation, output overflow, wall timeout, an exited
 leader with a live stdout-holding descendant, aggregate descendant RSS,
 successful nested groups, cleanup of nested members after the original leader
 exits, combined RSS across nested groups, and
-initial disk-reserve refusal. They also verify the default growth budget, accept
-an explicitly backed 8 GiB budget, reject larger values, and check capacity
+initial disk-reserve refusal. They verify the unchanged 300-second default,
+accept an explicit 900-second limit, reject larger values before spawning, and
+exercise real timeout cleanup with short limits. They also verify the default
+growth budget, accept an explicitly backed 8 GiB budget, reject larger values,
+and check capacity
 boundaries and integer overflow without writing a large disk fixture. The
 maximum-budget acceptance control requires 9 GiB free. Each fixture has an alarm,
 and the checker has a 30-second alarm. No VM, native build or large disk fixture
 is involved.
+
+The 2026-10-28 full control run passed in 5.38 seconds against sources based on
+`fb745db92`. Production builds peaked below 342 MB RSS with zero swaps; the
+control run's aggregate sampled peak was 85.6 MB, with cleanup complete. The
+900-second control verifies configuration acceptance; short timeout controls
+verify enforcement. Exact source snapshots, binaries, logs, receipts and a
+SHA-256 manifest are retained outside Git at
+`~/.local/state/vinix/android/long-audit-guard-2026-10-28-r1`.
