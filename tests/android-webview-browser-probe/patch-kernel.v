@@ -129,6 +129,16 @@ const browser_poll_retained_pin = 'ad55dfd4d1e7fd11e092ef75bada71eb4c176845451b8
 const browser_poll_root = '/Users/alex/.local/state/vinix/android/current-browser-build-2026-10-27-poll-r1'
 const browser_poll_seal = 'fa39f1486d651dff8904a9d75e82cf67d462b2c41511a1a4cd3a184c49239e62'
 const browser_poll_pin = '16def2047bf7605a23d949ff7b6b56bc56dcece038136553a98a0524b26ded1a'
+const account_pump_base = '/Users/alex/.local/state/vinix/android/maps-browser-poll-r3'
+const account_pump_base_seal = 'f27b08e45994fb2e9cf2c2aac695e73c62f17e0b4785fdb310cbebb1f54ac297'
+const account_pump_boot_sha = '8dbdf03669e6ed7545c172095112bc3e3008ad3a08d341ce389fe718158f6434'
+const account_pump_base_overlay = '12d307eb52c908fbf38cb1cf94fda7c202a2caa8869a1f6c8762ccc2cc6d035b'
+const account_pump_root = '/Users/alex/.local/state/vinix/android/current-native-build-2026-10-28-account-pump-r1'
+// Complete strict native producer and exact account service source-delta audit passed.
+const account_pump_seal = 'a6a7f207b07083726b9708eea2c67290bcf8baced755651c50bdc205cd7097cd'
+const account_pump_pin = 'cce3eb926d3bc8b2b3c9e9a4f0d42cc4ab6bfdc23b0532beb2c42f5f9b384791'
+const account_pump_build = '2802af6636568126359765ac00d09b0771f0b4d22a09c45db55dfe21ba557924'
+const account_pump_source_pin = '0fd27e8edece566671eb824b537858938478300ca16c3572a9aa64bf102cebea'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -1295,6 +1305,129 @@ fn browser_poll_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return browser_poll_base + '/boot.img'
 }
 
+fn account_pump_profile() Profile {
+	mut modules := browser_poll_profile().modules.clone()
+	modules << 'maps-browser-poll.tar'
+	return Profile{'maps-account-pump', account_pump_boot_sha, 'maps-account-pump.tar', modules}
+}
+
+fn account_pump_modules() map[string]string {
+	mut modules := browser_poll_modules()
+	modules['maps-browser-poll.tar'] = account_pump_base_overlay
+	return modules
+}
+
+fn account_pump_fields() map[string]string {
+	mut fields := browser_poll_fields()
+	fields['kind'] = 'vinix-maps-account-pump-v1'
+	fields['base_root'] = account_pump_base
+	fields['base_manifest_sha256'] = account_pump_base_seal
+	fields['native_build_root'] = account_pump_root
+	fields['native_manifest_sha256'] = account_pump_seal
+	fields['native_sha256'] = account_pump_pin
+	fields['native_build_sha256'] = account_pump_build
+	fields['retained_native_manifest_sha256'] = native_heartbeat_seal
+	fields['retained_browser_client_manifest_sha256'] = browser_poll_seal
+	return fields
+}
+
+fn account_pump_inputs() map[string]string {
+	mut inputs := browser_poll_inputs()
+	inputs[account_pump_base + '/sha256.json'] = account_pump_base_seal
+	inputs[account_pump_root + '/sha256.json'] = account_pump_seal
+	return inputs
+}
+
+fn verify_account_pump_overlay(receipt map[string]json2.Any) ! {
+	expected := {'/' + native_onboarding_trace_path: account_pump_pin}
+	input_delta := receipt['deployment_input_delta'] or { return error('account pump deployment input delta absent') }
+	if json2.decode[map[string]string](json2.encode(input_delta))! != expected {
+		return error('account pump exact one native library input change required')
+	}
+	if receipt['deployment_top_level_delta'] or { json2.Any('absent') }
+		!= json2.decode[json2.Any](json2.encode(['inputs_sha256', 'native_manifest_sha256']))! {
+		return error('account pump deployment top-level delta differs')
+	}
+	if 'headless_input_delta' in receipt || 'headless_top_level_delta' in receipt {
+		return error('account pump must preserve headless receipts')
+	}
+	source_delta := receipt['native_source_delta'] or { return error('account pump source delta absent') }
+	if json2.decode[map[string]string](json2.encode(source_delta))!
+		!= {'build-support/android/nativews/account_service.v': account_pump_source_pin} {
+		return error('account pump exact reviewed account service source delta required')
+	}
+	inventory := receipt['overlay_inventory'] or { return error('account pump overlay inventory absent') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(inventory))!
+	paths := [native_onboarding_trace_path, service_query_deployment]
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 {
+			return error('unsafe account pump overlay inventory entry')
+		}
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			expected_mode := if entry.name == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != expected_mode {
+				return error('account pump regular file allowlist or mode differs')
+			}
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) {
+			return error('unexpected account pump overlay inode')
+		}
+	}
+	if regulars.len != 2 || regulars[native_onboarding_trace_path] or { '' } != account_pump_pin {
+		return error('exact two account pump files with selected native library required')
+	}
+}
+
+fn verify_account_pump_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [account_pump_base_seal, account_pump_boot_sha, account_pump_base_overlay,
+		account_pump_seal, account_pump_pin, account_pump_build, account_pump_source_pin,
+		native_heartbeat_seal, native_heartbeat_pin, native_heartbeat_build,
+		browser_poll_seal, browser_poll_pin, onboarding_framework_seal,
+		onboarding_framework_jar, onboarding_framework_dex, onboarding_trace_controller_seal,
+		onboarding_trace_controller_pin] {
+		if !digest_valid(pin) { return error('sealed account pump base and reviewed native producer pins required') }
+	}
+	if account_pump_seal == native_heartbeat_seal || account_pump_pin == native_heartbeat_pin
+		|| account_pump_build == native_heartbeat_build {
+		return error('new account pump native producer required')
+	}
+	for name, expected in account_pump_fields() {
+		if receipt[name] or { json2.Any('absent') } != json2.Any(expected) {
+			return error('account pump receipt differs: ' + name)
+		}
+	}
+	mut sealed_inputs := map[string]string{}
+	for path, pin in stage.inputs_sha256 {
+		if path.ends_with('/sha256.json') { sealed_inputs[path] = pin }
+	}
+	if sealed_inputs.len != 38 || sealed_inputs != account_pump_inputs() {
+		return error('account pump exact thirty-eight complete dependency seals differ')
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != account_pump_modules()
+		|| stage.preserved_modules_sha256 != account_pump_modules() {
+		return error('account pump original nineteen module pins differ')
+	}
+	verify_account_pump_overlay(receipt)!
+}
+
+fn account_pump_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_account_pump_receipt(receipt, stage)!
+	path := account_pump_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != account_pump_base_seal {
+		return error('account pump original browser poll manifest differs')
+	}
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != account_pump_boot_sha
+		|| pins['maps-browser-poll.tar'] or { '' } != account_pump_base_overlay {
+		return error('account pump original boot or browser poll overlay inventory differs')
+	}
+	return account_pump_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -1885,6 +2018,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = native_heartbeat_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-browser-poll' {
 		baseline = browser_poll_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-account-pump' {
+		baseline = account_pump_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -3685,6 +3820,126 @@ fn browser_poll_profile_self_test() ! {
 	println('MAPS-BROWSER-POLL KERNEL-PROFILE-SELF-TEST PASS exact browser one-input delta two-file inventory eighteen inherited modules nineteen final thirty-six dependencies historical rejection')
 }
 
+fn account_pump_entries_fixture() []ServiceQueryEntry {
+	return [ServiceQueryEntry{name: native_onboarding_trace_path, kind: 'regular', sha256: account_pump_pin, mode: 0o755},
+		ServiceQueryEntry{name: service_query_deployment, kind: 'regular', sha256: 'c'.repeat(64), mode: 0o644},
+		ServiceQueryEntry{name: 'opt', kind: 'directory', mode: 0o755}]
+}
+
+fn account_pump_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in account_pump_fields() { receipt[name] = json2.Any(value) }
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode({'/' + native_onboarding_trace_path: account_pump_pin}))!
+	receipt['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256', 'native_manifest_sha256']))!
+	receipt['native_source_delta'] = json2.decode[json2.Any](json2.encode({'build-support/android/nativews/account_service.v': account_pump_source_pin}))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(account_pump_entries_fixture()))!
+	return receipt
+}
+
+fn account_pump_profile_self_test() ! {
+	profile := account_pump_profile()
+	assert profile.baseline_sha == account_pump_boot_sha
+	assert profile.modules.len == 19 && profile.modules.last() == 'maps-browser-poll.tar'
+	assert account_pump_inputs().len == 38
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	assert modules.len == 20
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', profile.modules}, Config{'vinix', modules.reverse()},
+		Config{'vinix', browser_poll_profile().modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('unsafe account pump modules accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: account_pump_inputs(),
+		original_modules_sha256: account_pump_modules(), preserved_modules_sha256: account_pump_modules()}
+	receipt := account_pump_receipt_fixture()!
+	verify_account_pump_receipt(receipt, stage)!
+	for name in receipt.keys() {
+		mut bad := account_pump_receipt_fixture()!
+		bad[name] = json2.Any('wrong')
+		if _ := verify_account_pump_receipt(bad, stage) { return error('changed account pump field accepted') }
+		bad.delete(name)
+		if _ := verify_account_pump_receipt(bad, stage) { return error('missing account pump field accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut inputs := stage.inputs_sha256.clone()
+		inputs[path] = '0'.repeat(64)
+		if _ := verify_account_pump_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) { return error('changed account pump input accepted') }
+		inputs.delete(path)
+		if _ := verify_account_pump_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) { return error('missing account pump input accepted') }
+	}
+	mut extra_inputs := stage.inputs_sha256.clone()
+	extra_inputs['/unreviewed/sha256.json'] = '0'.repeat(64)
+	if _ := verify_account_pump_receipt(receipt, Stage{...stage, inputs_sha256: extra_inputs}) { return error('extra account pump dependency accepted') }
+	for bad in [Stage{...stage, format: 2}, Stage{...stage, original_modules_sha256: browser_poll_modules()},
+		Stage{...stage, preserved_modules_sha256: map[string]string{}}] {
+		if _ := verify_account_pump_receipt(receipt, bad) { return error('wrong account pump module inventory accepted') }
+	}
+	for changed in [map[string]string{}, {'/' + native_onboarding_trace_path: native_heartbeat_pin},
+		{'/' + native_onboarding_trace_path: account_pump_pin, '/' + browser_poll_path: browser_poll_pin}] {
+		mut bad := account_pump_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_account_pump_receipt(bad, stage) { return error('unsafe account pump input delta accepted') }
+	}
+	for changed in [[]string{}, ['inputs_sha256'], ['inputs_sha256', 'browser_client_manifest_sha256'],
+		['native_manifest_sha256', 'inputs_sha256'],
+		['inputs_sha256', 'native_manifest_sha256', 'browser_client_manifest_sha256']] {
+		mut bad := account_pump_receipt_fixture()!
+		bad['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_account_pump_receipt(bad, stage) { return error('unsafe account pump top-level delta accepted') }
+	}
+	for changed in [map[string]string{}, {'build-support/android/nativews/account_service.v': '0'.repeat(64)},
+		{'build-support/android/nativews/account_service.v': account_pump_source_pin, 'build-support/android/nativews/core.v': '0'.repeat(64)}] {
+		mut bad := account_pump_receipt_fixture()!
+		bad['native_source_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_account_pump_receipt(bad, stage) { return error('unsafe account pump source delta accepted') }
+	}
+	for name in ['headless_input_delta', 'headless_top_level_delta'] {
+		mut bad := account_pump_receipt_fixture()!
+		bad[name] = json2.decode[json2.Any](json2.encode([]string{}))!
+		if _ := verify_account_pump_receipt(bad, stage) { return error('account pump headless change accepted') }
+	}
+	entries := account_pump_entries_fixture()
+	mut retained := account_pump_receipt_fixture()!
+	mut retained_entries := entries.clone()
+	retained_entries[0] = ServiceQueryEntry{...entries[0], sha256: native_heartbeat_pin}
+	retained['deployment_input_delta'] = json2.decode[json2.Any](json2.encode({'/' + native_onboarding_trace_path: native_heartbeat_pin}))!
+	retained['overlay_inventory'] = json2.decode[json2.Any](json2.encode(retained_entries))!
+	if _ := verify_account_pump_receipt(retained, stage) { return error('coherent retained account pump payload accepted') }
+	for index, entry in entries {
+		for replacement in [ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777},
+			ServiceQueryEntry{...entry, mode: if entry.mode == 0o755 { u32(0o644) } else { u32(0o755) }},
+			ServiceQueryEntry{...entry, sha256: if entry.name == service_query_deployment { 'invalid' } else { '0'.repeat(64) }}] {
+			if replacement.sha256 != entry.sha256 && entry.kind != 'regular' { continue }
+			mut changed := entries.clone()
+			changed[index] = replacement
+			mut bad := account_pump_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+			if _ := verify_account_pump_receipt(bad, stage) { return error('unsafe account pump inode accepted') }
+		}
+	}
+	for addition in [entries[0], ServiceQueryEntry{name: browser_poll_path, kind: 'regular', sha256: browser_poll_pin, mode: 0o644},
+		ServiceQueryEntry{name: service_query_headless + '/native-build.json', kind: 'regular', sha256: account_pump_build, mode: 0o644},
+		ServiceQueryEntry{name: service_query_jar_path, kind: 'regular', sha256: onboarding_framework_jar, mode: 0o644},
+		ServiceQueryEntry{name: 'extra', kind: 'directory', mode: 0o755}, ServiceQueryEntry{name: 'opt/../escape', kind: 'directory', mode: 0o755}] {
+		mut changed := entries.clone()
+		changed << addition
+		mut bad := account_pump_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_account_pump_receipt(bad, stage) { return error('extra or duplicate account pump inode accepted') }
+	}
+	for removed_index in [0, 1] {
+		mut changed := entries.clone()
+		changed.delete(removed_index)
+		mut bad := account_pump_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_account_pump_receipt(bad, stage) { return error('missing account pump file accepted') }
+	}
+	if _ := verify_account_pump_receipt(browser_poll_receipt_fixture()!, stage) { return error('browser poll receipt accepted by account pump profile') }
+	if _ := verify_browser_poll_receipt(receipt, stage) { return error('account pump receipt accepted by browser poll profile') }
+	if _ := verify_native_heartbeat_receipt(receipt, stage) { return error('account pump receipt accepted by native heartbeat profile') }
+	println('MAPS-ACCOUNT-PUMP KERNEL-PROFILE-SELF-TEST PASS exact native source and one-input deployment delta two-file inventory nineteen inherited modules twenty final thirty-eight dependencies historical rejection')
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
@@ -3698,6 +3953,7 @@ fn self_test() ! {
 	onboarding_framework_profile_self_test()!
 	native_heartbeat_profile_self_test()!
 	browser_poll_profile_self_test()!
+	account_pump_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -3764,6 +4020,7 @@ fn self_test() ! {
 	fat_self_test(root + '/onboarding-framework', 'maps-onboarding-framework-diagnostic.tar', onboarding_framework_profile().modules)!
 	fat_self_test(root + '/native-heartbeat', 'maps-native-heartbeat-diagnostic.tar', native_heartbeat_profile().modules)!
 	fat_self_test(root + '/browser-poll', 'maps-browser-poll.tar', browser_poll_profile().modules)!
+	fat_self_test(root + '/account-pump', 'maps-account-pump.tar', account_pump_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -3788,11 +4045,12 @@ fn main() {
 	is_onboarding_framework := os.args.len == 5 && os.args[1] == '--maps-onboarding-framework'
 	is_native_heartbeat := os.args.len == 5 && os.args[1] == '--maps-native-heartbeat'
 	is_browser_poll := os.args.len == 5 && os.args[1] == '--maps-browser-poll'
-	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot && !is_context_storage && !is_broadcast_result && !is_onboarding_trace && !is_native_onboarding_trace && !is_onboarding_framework && !is_native_heartbeat && !is_browser_poll {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+	is_account_pump := os.args.len == 5 && os.args[1] == '--maps-account-pump'
+	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot && !is_context_storage && !is_broadcast_result && !is_onboarding_trace && !is_native_onboarding_trace && !is_onboarding_framework && !is_native_heartbeat && !is_browser_poll && !is_account_pump {
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll { 1 } else { 0 }
+	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -3801,7 +4059,7 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	profile := if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	profile := if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
