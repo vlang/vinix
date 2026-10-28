@@ -409,6 +409,63 @@ pub fn verify_launch(bundle Bundle, framework Bundle, native Bundle) ! {
 	}
 }
 
+// A broker replacement carries the same retained compiler, framework, header,
+// static-zlib and link contracts as the four-executable launcher producer.
+pub fn verify_account_broker(bundle Bundle, framework Bundle) ! {
+	common_receipt(bundle, 'vinix-account-broker-build-v1')!
+	exact_text(bundle.receipt, 'profile', 'account-broker')!
+	exact_text(bundle.receipt, 'scope', 'Retained executable sources, typed Linux library correction and cross inputs; no guest or account login claim.')!
+	coupled_framework(bundle, framework)!
+	retained_manifest(bundle, 'baseline-sha256.json', baseline_seal)!
+	verify_zlib_dependency(bundle)!
+	if !exact_integer(bundle.receipt['service_main_argc']!, 7) { return error('seven-argument service ABI required') }
+	output_map(bundle, 'outputs_sha256', ['bin/native-account-broker'])!
+	verify_broker_static_elf(os.read_bytes(bundle.root + '/bin/native-account-broker')!)!
+	label := 'broker'
+	verify_generated(bundle, label, closure_source(bundle, label, '/build-support/android/native-account-broker.v')!, [])!
+	verify_broker_build_inputs(bundle)!
+	verify_zlib_consumption(bundle, label)!
+}
+
+fn verify_broker_static_elf(bytes []u8) ! {
+	elf := inspect_elf(bytes)!
+	if u16_at(bytes, 16) != 2 || elf.runpath != '' || elf.interpreter != '' || elf.needed.len != 0 { return error('broker must be a static AArch64 executable') }
+	mut load := false
+	for index in 0 .. int(u16_at(bytes, 56)) {
+		if u32_at(bytes, int(u64_at(bytes, 32)) + index * 56) == 1 { load = true }
+	}
+	if !load { return error('broker executable lacks load segment') }
+}
+
+fn verify_broker_build_inputs(bundle Bundle) ! {
+	label := 'broker'
+	header_flags := build_includes(bundle, label)
+	generated := bundle.root + '/generated/broker.c'
+	runtime_source := closure_source(bundle, label, '/vlib/builtin/segfault_handler_nix.c')!
+	for pair in [[label, generated], ['broker-runtime', runtime_source]] {
+		if pair[1][bundle.root.len + 1..] !in bundle.files { return error('retained broker C source absent') }
+		verify_compile(bundle, label, pair[1], header_flags, false, pair[0] == 'broker-runtime')!
+		mut expected := [cross, '-D_GNU_SOURCE', '-O2', '-fwrapv', '-pthread', '-M', '-MT', pair[0]]
+		expected << header_flags
+		expected << pair[1]
+		if command_args(bundle, pair[0] + '-headers')! != expected { return error('broker header scan receipt differs') }
+		verify_browser_consumed(bundle, 'generated/' + pair[0] + '-headers.json', [pair[1]], '')!
+		verify_browser_headers(bundle, pair[0])!
+	}
+	mut expected := [cross, '-v', '-no-pie', '-pthread', '-Wl,-t', '-static',
+		bundle.root + '/generated/broker.o', bundle.root + '/generated/broker-runtime.o']
+	if uses_zlib(bundle, label) { expected << bundle.root + '/zlib/lib/libz.a' }
+	expected << ['-ldl', '-lm', '-o', bundle.root + '/bin/native-account-broker']
+	if command_args(bundle, 'build-broker')! != expected { return error('broker link receipt differs') }
+	log := 'commands/build-broker.log'
+	if log !in bundle.files { return error('sealed broker link trace absent') }
+	trace := os.read_file(bundle.root + '/' + log)!
+	if trace.trim_space() == '' { return error('sealed broker link trace empty') }
+	mut required := [bundle.root + '/generated/broker.o', bundle.root + '/generated/broker-runtime.o']
+	if uses_zlib(bundle, label) { required << bundle.root + '/zlib/lib/libz.a' }
+	verify_browser_consumed(bundle, 'generated/broker-link-inputs.json', required, trace)!
+}
+
 pub fn verify_account(bundle Bundle) !map[string]string {
 	common_receipt(bundle, 'vinix-current-account-v1')!
 	retained_manifest(bundle, 'baseline-sha256.json', baseline_seal)!
