@@ -46,7 +46,7 @@ struct Entry {
 }
 
 struct Recipe {
-	version int = 2
+	version int = 3
 	original string
 	prior string
 	prior_manifest string
@@ -275,7 +275,7 @@ fn load_archive(archive string) !Recipe {
 		return error('archive inventory mismatch')
 	}
 	r := json2.decode[Recipe](os.read_file(archive + '/recipe.json')!)!
-	if r.version !in [1, 2] || !os.is_abs_path(r.original) || !os.is_abs_path(r.prior)
+	if r.version !in [1, 2, 3] || !os.is_abs_path(r.original) || !os.is_abs_path(r.prior)
 		|| r.root_mode < 0 || r.root_mode > 0o7777
 		|| digest(r.prior + '/manifest.sha256')! != r.prior_manifest {
 		return error('wrong prior bundle or archive version')
@@ -290,12 +290,12 @@ fn load_archive(archive string) !Recipe {
 		if parent != '.' && seen[parent] != 'directory' { return error('invalid entry parent') }
 		seen[e.path] = e.kind
 		if e.kind == 'directory' { continue }
-		if e.storage !in ['prior', 'literal', 'gzip-prior-patch', 'bundle-patch']
+		if e.storage !in ['prior', 'literal', 'gzip-prior-patch', 'bundle-patch', 'prior-chunks']
 			|| e.hash.len != 64 { return error('invalid storage or digest') }
 		if e.storage != 'literal' && (!safe(e.base) || e.base_hash.len != 64) {
 			return error('invalid base')
 		}
-		if e.storage !in ['prior', 'gzip-prior-patch'] && (!safe(e.payload) || !e.payload.starts_with('payload/')) {
+		if e.storage !in ['prior', 'gzip-prior-patch', 'prior-chunks'] && (!safe(e.payload) || !e.payload.starts_with('payload/')) {
 			return error('invalid payload')
 		}
 		if e.storage == 'gzip-prior-patch' {
@@ -305,10 +305,16 @@ fn load_archive(archive string) !Recipe {
 			if header[..4] != [u8(31), 139, 8, 0] || header[8] !in [u8(2), 4] {
 				return error('unsupported gzip header')
 			}
+		}
+		if e.storage == 'prior-chunks' && (r.version < 3 || e.size == 0
+			|| e.chunks.len == 0 || e.payload != '' || e.gzip_header != ''
+			|| e.tar_size != 0 || e.tar_hash != '') { return error('invalid raw reconstruction') }
+		if e.storage in ['gzip-prior-patch', 'prior-chunks'] {
+			length := if e.storage == 'gzip-prior-patch' { e.tar_size } else { e.size }
 			mut offset := u64(0)
 			for chunk in e.chunks {
 				if chunk.offset != offset || chunk.size == 0 || chunk.size > chunk_size
-					|| offset > e.tar_size || chunk.size > e.tar_size - offset
+					|| offset > length || chunk.size > length - offset
 					|| chunk.hash.len != 64 || chunk.base_size > chunk_size
 					|| chunk.base_offset > u64(0x7fffffffffffffff)
 					|| (r.version == 1 && chunk.base_offset != 0)
@@ -316,11 +322,11 @@ fn load_archive(archive string) !Recipe {
 					|| (chunk.base_size > 0 && chunk.base_hash.len != 64)
 					|| (chunk.base_size == 0 && chunk.base_hash != '')
 					|| !safe(chunk.payload) || !chunk.payload.starts_with('payload/') {
-					return error('invalid gzip chunk')
+					return error('invalid reconstruction chunk')
 				}
 				offset += chunk.size
 			}
-			if offset != e.tar_size { return error('incomplete gzip chunks') }
+			if offset != length { return error('incomplete reconstruction chunks') }
 		} else if e.chunks.len != 0 { return error('unexpected chunks')
 		}
 	}
@@ -439,8 +445,35 @@ fn create(source string, prior string, archive string, zstd string, work string)
 					base_hash: chunk_base_hash, payload: chunk_payload}
 			}
 			payload = ''
+		} else if e.size > chunk_size && os.is_file(base_path) && !os.is_link(base_path) {
+			// Large raw images cannot use one zstd patch. Fixed-size inputs keep
+			// each codec invocation bounded while retaining the complete file hash.
+			storage = 'prior-chunks'
+			base = candidate
+			base_hash = digest(base_path)!
+			base_length := os.file_size(base_path)
+			for offset := u64(0); offset < e.size; offset += chunk_size {
+				size := if e.size - offset < chunk_size { e.size - offset } else { chunk_size }
+				base_size := if offset >= base_length { u64(0) }
+					else if base_length - offset < chunk_size { base_length - offset } else { chunk_size }
+				copy_range(input, work + '/current.chunk', offset, size)!
+				mut patch_args := [zstd, '-q', '-3', '--long=31']
+				mut chunk_base_hash := ''
+				if base_size > 0 {
+					copy_range(base_path, work + '/prior.chunk', offset, base_size)!
+					chunk_base_hash = digest(work + '/prior.chunk')!
+					patch_args << '--patch-from=' + work + '/prior.chunk'
+				}
+				chunk_payload := 'payload/' + index.str() + '-' + chunks.len.str() + '.zst'
+				patch_args << [work + '/current.chunk', '-o', archive + '/' + chunk_payload]
+				run(patch_args)!
+				chunks << Chunk{offset: offset, size: size, hash: digest(work + '/current.chunk')!,
+					base_offset: if base_size == 0 { u64(0) } else { offset }, base_size: base_size,
+					base_hash: chunk_base_hash, payload: chunk_payload}
+			}
+			payload = ''
 		}
-		if storage != 'gzip-prior-patch' {
+		if storage !in ['gzip-prior-patch', 'prior-chunks'] {
 			args << [input, '-o', archive + '/' + payload]
 			run(args)!
 		}
@@ -488,7 +521,9 @@ fn restore_entry(r Recipe, archive string, target string, work string, e Entry, 
 			decode_gzip(archive + '/tools/gzip', base_path, work + '/prior.tar')!
 			base_path = work + '/prior.tar'
 			output = work + '/current.tar'
-			restore_chunks(r.version, archive, work, e)!
+			restore_chunks(r.version, archive, work, e, base_path, output)!
+		} else if e.storage == 'prior-chunks' {
+			restore_chunks(r.version, archive, work, e, base_path, output)!
 		} else {
 			mut args := [archive + '/tools/zstd', '-q', '-d', '--memory=2048MB']
 			if e.storage == 'bundle-patch' { args << '--patch-from=' + base_path }
@@ -515,14 +550,14 @@ fn restore_entry(r Recipe, archive string, target string, work string, e Entry, 
 	pending.delete(e.path)
 }
 
-fn restore_chunks(version int, archive string, work string, e Entry) ! {
-	mut output := os.create(work + '/current.tar')!
+fn restore_chunks(version int, archive string, work string, e Entry, base string, target string) ! {
+	mut output := os.create(target)!
 	defer { output.close() }
 	for chunk in e.chunks {
 		mut args := [archive + '/tools/zstd', '-q', '-d', '-f', '--memory=2048MB']
 		if chunk.base_size > 0 {
 			base_offset := if version == 1 { chunk.offset } else { chunk.base_offset }
-			copy_range(work + '/prior.tar', work + '/prior.chunk', base_offset, chunk.base_size)!
+			copy_range(base, work + '/prior.chunk', base_offset, chunk.base_size)!
 			if digest(work + '/prior.chunk')! != chunk.base_hash { return error('changed prior tar chunk') }
 			args << '--patch-from=' + work + '/prior.chunk'
 		}
@@ -611,7 +646,7 @@ fn alignment_selftest(root string, zstd string) ! {
 	create(source, prior, archive, zstd, work)!
 	r := load_archive(archive)!
 	e := r.entries.filter(it.storage == 'gzip-prior-patch')[0]
-	if r.version != 2 || e.chunks.filter(it.base_size > 0 && it.base_offset != it.offset).len < 3 {
+	if r.version != 3 || e.chunks.filter(it.base_size > 0 && it.base_offset != it.offset).len < 3 {
 		return error('moved multi-chunk tar members not aligned')
 	}
 	mut payload_bytes := u64(0)
@@ -628,10 +663,14 @@ fn alignment_selftest(root string, zstd string) ! {
 		if base_offset > u64(0x7fffffffffffffff) { reject_load(archive)! }
 		else { reject_restore(archive, root + '/bad-aligned-' + base_offset.str(), work)! }
 	}
+	legacy := Recipe{...r, version: 2}
+	reseal(archive, legacy)!
+	restore(archive, root + '/alignment-v2-restored', work)!
+	compare(legacy, root + '/alignment-v2-restored')!
 	reseal(archive, r)!
 	load_archive(archive)!
 	compare(r, root + '/aligned-restored')!
-	println('Selftest: shifted/reordered GNU long-name tar members, shared random data across multiple chunks, level-1 gzip from level-9 prior, exact restoration and three invalid reference offsets: PASS')
+	println('Selftest: shifted/reordered GNU long-name tar members, shared random data across multiple chunks, level-1 gzip from level-9 prior, version 2 restoration and three invalid reference offsets: PASS')
 }
 
 fn selftest(root string, zstd string) ! {
@@ -659,6 +698,8 @@ fn selftest(root string, zstd string) ! {
 		// Compress a deterministic large shared input with a small content change.
 		mut raw := []u8{len: int(chunk_size) + 129, init: u8(index % 251)}
 		if base == source { raw[500_000] ^= 1 }
+		os.write_file_array(base + '/raw-grow', if base == prior { raw[..raw.len - 258] } else { raw })!
+		os.write_file_array(base + '/raw-shrink', if base == source { raw[..raw.len - 64] } else { raw })!
 		os.write_file_array(base + '/' + vm + '/initramfs.tar', raw)!
 		run(['/usr/bin/gzip', '-9', '-n', base + '/' + vm + '/initramfs.tar'])!
 		mut boot := os.read_bytes(base + '/' + vm + '/initramfs.tar.gz')!
@@ -668,17 +709,27 @@ fn selftest(root string, zstd string) ! {
 	os.chmod(source, 0o750)!
 	create(source, prior, archive, zstd, work)!
 	r := load_archive(archive)!
-	for storage in ['prior', 'literal', 'gzip-prior-patch', 'bundle-patch'] {
+	for storage in ['prior', 'literal', 'gzip-prior-patch', 'bundle-patch', 'prior-chunks'] {
 		if !r.entries.any(it.storage == storage) { return error('unexercised codec: ' + storage) }
 	}
 	gzip_entry := r.entries.filter(it.storage == 'gzip-prior-patch')[0]
 	if gzip_entry.chunks.len != 2 { return error('multi-chunk reconstruction not exercised') }
+	raw_entry := r.entries.filter(it.path == 'raw-grow')[0]
+	if raw_entry.storage != 'prior-chunks' || raw_entry.chunks.len != 2
+		|| raw_entry.chunks[1].base_size != 0 || raw_entry.chunks[1].base_offset != 0 {
+		return error('raw growth beyond prior file not exercised')
+	}
 	restore(archive, target, work)!
 	compare(r, target)!
-	println('Selftest: four storage modes, multiple chunks, exact gzip, modes, empty directory and complete inventory: PASS')
+	println('Selftest: five storage modes, raw growth/shrinkage across chunks, exact gzip, modes, empty directory and complete inventory: PASS')
 	// Version 1 recipes had no base_offset field and used each output offset.
 	mut legacy_entries := r.entries.clone()
 	for i, e in legacy_entries {
+		if e.storage == 'prior-chunks' {
+			payload := 'payload/legacy-' + i.str() + '.zst'
+			run([zstd, '-q', '-3', source + '/' + e.path, '-o', archive + '/' + payload])!
+			legacy_entries[i] = Entry{...e, storage: 'literal', base: '', base_hash: '', payload: payload, chunks: []Chunk{}}
+		}
 		if e.storage == 'gzip-prior-patch' {
 			mut chunks := []Chunk{}
 			for chunk in e.chunks { chunks << Chunk{...chunk, base_offset: 0} }
@@ -691,6 +742,45 @@ fn selftest(root string, zstd string) ! {
 	compare(legacy, root + '/legacy-restored')!
 	reseal(archive, r)!
 	println('Selftest: version 1 fixed-offset recipe restoration: PASS')
+	// Resealing must not hide malformed raw references or altered chunk hashes.
+	for bad_chunk in [
+		Chunk{...raw_entry.chunks[0], offset: 1},
+		Chunk{...raw_entry.chunks[0], size: chunk_size + 1},
+		Chunk{...raw_entry.chunks[0], base_size: chunk_size + 1},
+		Chunk{...raw_entry.chunks[0], payload: '../escape'},
+		Chunk{...raw_entry.chunks[0], base_hash: ''},
+		Chunk{...raw_entry.chunks[0], base_offset: ~u64(0)},
+		Chunk{...raw_entry.chunks[0], base_size: 0, base_hash: '', base_offset: 1},
+	] {
+		mut entries := r.entries.clone()
+		mut chunks := raw_entry.chunks.clone()
+		chunks[0] = bad_chunk
+		for i, e in entries { if e.path == raw_entry.path { entries[i] = Entry{...e, chunks: chunks} } }
+		reseal(archive, Recipe{...r, entries: entries})!
+		reject_load(archive)!
+	}
+	for i, bad_chunk in [
+		Chunk{...raw_entry.chunks[0], base_offset: 1},
+		Chunk{...raw_entry.chunks[0], base_hash: '0'.repeat(64)},
+		Chunk{...raw_entry.chunks[0], hash: '0'.repeat(64)},
+	] {
+		mut entries := r.entries.clone()
+		mut chunks := raw_entry.chunks.clone()
+		chunks[0] = bad_chunk
+		for j, e in entries { if e.path == raw_entry.path { entries[j] = Entry{...e, chunks: chunks} } }
+		reseal(archive, Recipe{...r, entries: entries})!
+		reject_restore(archive, root + '/raw-bad-' + i.str(), work)!
+	}
+	mut wrong_hash := r.entries.clone()
+	for i, e in wrong_hash { if e.path == raw_entry.path { wrong_hash[i] = Entry{...e, hash: '0'.repeat(64)} } }
+	reseal(archive, Recipe{...r, entries: wrong_hash})!
+	reject_restore(archive, root + '/raw-bad-final-hash', work)!
+	for bad_version in [1, 2] {
+		reseal(archive, Recipe{...r, version: bad_version})!
+		reject_load(archive)!
+	}
+	reseal(archive, r)!
+	println('Selftest: 13 malformed raw chunk, final-hash and wrong-version controls rejected: PASS')
 
 	// Corruption without resealing must fail inventory validation.
 	payload := archive + '/' + r.entries.filter(it.storage == 'literal')[0].payload
