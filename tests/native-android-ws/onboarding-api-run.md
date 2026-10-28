@@ -95,6 +95,25 @@ The input directory and all ancestors must be root-owned, traversable and not
 group/other writable; the Unix user/group must already exist. Use fresh output
 directories. The runtime must retain the existing executable-mount policy.
 
+Before switching a fresh guest from standalone fixtures to the Maps account
+broker, require the fixture's clean exit and completed UART export. If these
+setup commands created the dedicated runtime attachment and no runtime process
+remains, release that attachment:
+
+```sh
+umount /opt/vinix-android-aarch64
+grep ' /opt/vinix-android-aarch64 ' /proc/self/mounts
+```
+
+Require no remaining dedicated entry before starting the broker. If unmounting
+fails or another runtime is active, stop and inspect it; do not force unmount.
+The broker prepares its audited SQLite alias replacement and immutable input
+modes before creating its own read-only attachment. Leaving the fixture's
+read-only mount in place makes that preparation fail with
+`cannot exclusively create regular file: .../libsqlite3.so.0.maps-account-fresh`.
+This handoff applies before the broker's first start in a fresh guest; it does
+not authorize detaching the runtime from a running Maps or Play Services session.
+
 The host runner selftest passed, rejecting 42 malformed, duplicate, mixed-profile,
 error and incomplete-log cases. Transfer selftests passed binary multi-buffer
 delivery, pin mismatch, symlink/empty/existing-output refusal, GET-only and
