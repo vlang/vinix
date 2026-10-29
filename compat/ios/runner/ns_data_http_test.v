@@ -368,6 +368,26 @@ fn test_http_transport_native_status_oracle() {
 	}
 }
 
+fn test_http_session_native_response_fields() {
+	$if macos {
+		api := DataHTTPApi{native: true, send: u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend'))}
+		pool := api.pool()
+		defer { api.drain(pool) }
+		listener := data_http_listener()
+		worker := spawn data_http_serve(listener, [session_adapter_reply()], ['/'], false, false)
+		request := api.msg(api.cls(c'NSURLRequest'), c'requestWithURL:', api.url('http://127.0.0.1:${listener.port}/'))
+		mut response := u64(0); mut error_object := u64(0)
+		body := unsafe { HTTPTransportNativeLoad(voidptr(api.send))(api.cls(c'NSURLConnection'), u64(C.sel_registerName(c'sendSynchronousRequest:returningResponse:error:')), request, &response, &error_object) }
+		assert worker.wait() && response != 0 && body != 0 && error_object == 0;
+		session_adapter_response_properties(api, response)
+		println('IOS-SESSION-NATIVE-FIELD: repeated fields join with comma-space; wire octets decode Latin-1 (including UTF-8 byte sequences and C1) PASS')
+	}
+}
+
+fn session_adapter_reply() string {
+	return 'HTTP/1.1 500 Error\r\nContent-Length: 0\r\nContent-Type: Text/Plain; charset=UTF-8\r\nX-Mixed: first\r\nx-mixed: second\r\nSet-Cookie: a=1; Expires=Wed, 21 Oct 2037 07:28:00 GMT\r\nset-cookie: b=2\r\nWWW-Authenticate: Basic realm="first"\r\nwww-authenticate: Bearer realm="second"\r\nX-Latin: caf\xe9\r\nX-Utf8: caf\xc3\xa9\r\nX-C1: \x80\r\n\r\n'
+}
+
 fn test_http_transport_header_count_bound() {
 	listener := data_http_listener()
 	reply := 'HTTP/1.1 200 OK\r\n' + 'X-Test: value\r\n'.repeat(129) + 'Content-Length: 0\r\n\r\n'
@@ -1123,4 +1143,364 @@ fn test_session_worker_shutdown_rejections() {
 		assert !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output;
 	}
 	println('IOS-SESSION-WORKERS-REJECT: shutdown from run, worker cleanup and synchronous rejected cleanup fails before joins/retirement PASS')
+}
+
+fn (api DataHTTPApi) string(text string) u64 {
+	return api.msg(api.cls(c'NSString'), c'stringWithUTF8String:', u64(text.str))
+}
+fn (api DataHTTPApi) put(dictionary u64, key string, value u64) {
+	mut selector := u64(c'setObject:forKey:')
+	$if macos { if api.native { selector = u64(C.sel_registerName(c'setObject:forKey:')) } }
+	unsafe { HTTPTransportNative4(voidptr(api.send))(dictionary, selector, value, api.string(key)) }
+}
+fn (api DataHTTPApi) header(request u64, key string, value string) {
+	mut selector := u64(c'setValue:forHTTPHeaderField:')
+	$if macos { if api.native { selector = u64(C.sel_registerName(c'setValue:forHTTPHeaderField:')) } }
+	unsafe { HTTPTransportNative4(voidptr(api.send))(request, selector, api.string(value), api.string(key)) }
+}
+fn session_adapter_configure(api DataHTTPApi, config u64, request u64) {
+	api.msg(config, c'setProtocolClasses:', api.msg(api.cls(c'NSArray'), c'array', 0))
+	api.msg(config, c'setHTTPShouldSetCookies:', 0)
+	api.msg(request, c'setHTTPShouldHandleCookies:', 0)
+	api.msg(config, c'setRequestCachePolicy:', 1)
+	api.msg(request, c'setCachePolicy:', 1)
+}
+fn session_adapter_request(api DataHTTPApi, url string) (u64, u64) {
+	config := api.msg(api.cls(c'NSURLSessionConfiguration'), c'defaultSessionConfiguration', 0)
+	request := api.msg(api.cls(c'NSMutableURLRequest'), c'requestWithURL:', api.url(url))
+	api.msg(request, c'setHTTPMethod:', api.string('POST'))
+	data := if api.native {
+		$if macos { unsafe { HTTPTransportNative4(voidptr(api.send))(api.cls(c'NSData'), u64(C.sel_registerName(c'dataWithBytes:length:')), u64(c'a\x00\xffz'), 4) } }
+		$else { u64(0) }
+	} else { objc_autorelease(cf_data_create(0, u64(c'a\x00\xffz'), 4)) }
+	api.msg(request, c'setHTTPBody:', data)
+	headers := api.msg(api.cls(c'NSMutableDictionary'), c'dictionary', 0)
+	api.put(headers, 'x-test', api.string('configuration value'))
+	api.put(headers, 'Content-Type', api.string('application/octet-stream'))
+	api.msg(config, c'setHTTPAdditionalHeaders:', headers)
+	api.header(request, 'X-Test', 'exact value\tand tab')
+	return config, request
+}
+
+fn test_session_adapter_native_request_merge() {
+	$if macos {
+		api := DataHTTPApi{native: true, send: u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend'))}
+		pool := api.pool()
+		defer { api.drain(pool) }
+		cls := C.objc_allocateClassPair(unsafe { voidptr(api.cls(c'NSObject')) }, c'VinixSessionAdapterOracle', 0)
+		assert cls != unsafe { nil };
+		assert C.class_addProtocol(cls, C.objc_getProtocol(c'NSURLSessionTaskDelegate'));
+		assert C.class_addMethod(cls, C.sel_registerName(c'URLSession:task:didCompleteWithError:'), unsafe { voidptr(task_http_oracle_complete) }, c'v40@0:8@16@24@32');
+		C.objc_registerClassPair(cls)
+		listener := data_http_listener()
+		worker := spawn http_transport_serve(listener, 'POST', 'a\x00\xffz', 'HTTP/1.1 204 Empty\r\n\r\n', false)
+		address := 'http://localhost:${listener.port}/submit?q=%00'
+		config, request := session_adapter_request(api, address)
+		unsafe { address.free() }
+		session_adapter_configure(api, config, request)
+		queue := api.msg(api.cls(c'NSOperationQueue'), c'new', 0)
+		api.msg(queue, c'setMaxConcurrentOperationCount:', 1)
+		delegate := api.msg(u64(cls), c'new', 0)
+		mut probe := TaskHTTPOracle{send: api.send, session_delegate: delegate, queue: queue}
+		task_http_oracle = unsafe { &probe }
+		session := unsafe { TaskHTTPNative5(voidptr(api.send))(api.cls(c'NSURLSession'), u64(C.sel_registerName(c'sessionWithConfiguration:delegate:delegateQueue:')), config, delegate, queue) }
+		task := api.msg(session, c'dataTaskWithRequest:', request)
+		api.msg(task, c'resume', 0)
+		deadline := time.sys_mono_now() + 6 * time.second
+		for C.__atomic_load_n(unsafe { &probe.finished }, 5) == 0 {
+			if time.sys_mono_now() >= deadline { eprintln('IOS-SESSION-ADAPTER-NATIVE: completion timeout'); C._exit(124) }
+			time.sleep(time.millisecond)
+		}
+		api.msg(queue, c'waitUntilAllOperationsAreFinished', 0)
+		assert worker.wait() && probe.error_code == 0 && probe.bad_queue == 0 && probe.state == 3;
+		api.msg(session, c'invalidateAndCancel', 0)
+		api.msg(delegate, c'release', 0); api.msg(queue, c'release', 0)
+		task_http_oracle = unsafe { nil }
+		println('IOS-SESSION-ADAPTER-NATIVE: session headers merge case-insensitively; request wins; binary POST survives configuration capture PASS')
+	}
+}
+
+fn session_adapter_change_string(object u64, text string) {
+	mut header := obj_header(object)
+	C.free(header.text)
+	header.text = unsafe { &char(C.malloc(usize(text.len + 1))) }
+	assert header.text != unsafe { nil };
+	unsafe { C.memcpy(header.text, text.str, usize(text.len)); header.text[text.len] = 0 }
+	header.text_length = text.len
+}
+
+fn session_adapter_snapshot_reads(request u64, config u64) bool {
+	for _ in 0 .. 32 {
+		snapshot := url_session_request_snapshot(request, config)
+		valid := snapshot.issue == .none && snapshot.transport_profile() == .supported && snapshot.body.len == 4
+			&& snapshot.body[0] == 97 && snapshot.body[1] == 0 && snapshot.body[2] == 255 && snapshot.body[3] == 122
+			&& snapshot.fields.len == 2 && snapshot.fields[0].value == 'exact value\tand tab'
+		snapshot.dispose()
+		if !valid { return false }
+	}
+	return true
+}
+
+fn test_session_adapter_owned_requests() {
+	api := DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
+	for _ in 0 .. 2 {
+		objc_start()
+		pool := api.pool()
+		listener := data_http_listener()
+		server := spawn http_transport_serve(listener, 'POST', 'a\x00\xffz', 'HTTP/1.1 500 Error\r\nContent-Length: 4\r\n\r\nping', false)
+		address := 'http://localhost:${listener.port}/submit?q=%00'
+		config, request := session_adapter_request(api, address)
+		unsafe { address.free() }
+		defaults := url_session_request_snapshot(request, config)
+		assert defaults.issue == .none && defaults.transport_profile() == .protocols;
+		assert defaults.request.cookies && defaults.configuration.cookies && defaults.configuration.default_protocols;
+		assert defaults.configuration.request_timeout == 60 && defaults.configuration.resource_timeout == 604800;
+		defaults.dispose()
+		session_adapter_configure(api, config, request)
+		api.msg(request, c'setMainDocumentURL:', api.url('https://example.test/document'))
+		snapshot := url_session_request_snapshot(request, config)
+		assert snapshot.issue == .none && snapshot.transport_profile() == .supported;
+		assert snapshot.method == 'POST' && snapshot.main_document == 'https://example.test/document' && snapshot.body == [u8(97), 0, 255, 122];
+		assert snapshot.fields.len == 2;
+		assert snapshot.fields[0].name == 'X-Test' && snapshot.fields[0].value == 'exact value\tand tab';
+		assert snapshot.fields[1].name == 'Content-Type' && snapshot.fields[1].value == 'application/octet-stream';
+		mut readers := []thread bool{}
+		for _ in 0 .. 8 { readers << spawn session_adapter_snapshot_reads(request, config) }
+		for reader in readers { assert reader.wait(); }
+		unsafe { readers.free() }
+		// Mutate aliased string bytes, configuration dictionaries and request body
+		// after capture. None of these objects is retained by the wire snapshot.
+		config_fields := obj_header(config).fields[3]
+		session_adapter_change_string(obj_header(config_fields).items[1], 'changed/type')
+		source := obj_header(request).request
+		session_adapter_change_string(source.refs[2], 'DELETE')
+		session_adapter_change_string(obj_header(source.refs[4]).items[0], 'changed request field')
+		unsafe { *(&u8(data_pointer(source.refs[3]))) = 42 }
+		api.msg(config, c'setHTTPAdditionalHeaders:', 0)
+		api.msg(request, c'setHTTPBody:', 0)
+		api.msg(request, c'setURL:', api.url('https://example.test/replaced'))
+		mut weak_request := u64(0); mut weak_config := u64(0)
+		objc_store_weak(unsafe { &weak_request }, request); objc_store_weak(unsafe { &weak_config }, config)
+		api.drain(pool)
+		assert weak_request == 0 && weak_config == 0 && ios_runtime.live == 0;
+		objc_destroy_weak(unsafe { &weak_request }); objc_destroy_weak(unsafe { &weak_config })
+		// Real exchange after all Objective-C inputs and the runtime are gone.
+		objc_stop()
+		result := http_transport_exchange(snapshot.url, snapshot.borrowed_request(), '', 2 * time.second) or { assert false; return }
+		assert server.wait() && result.status == 500 && result.body == [u8(112), 105, 110, 103];
+		assert snapshot.transport_profile() == .supported;
+		result.dispose(); snapshot.dispose()
+	}
+	println('IOS-SESSION-ADAPTER-REQUEST: merged owned fields, binary bodies, mutation isolation, weak ownership, exchange after runtime teardown and two lifetimes PASS')
+}
+
+fn test_session_adapter_policy_boundaries() {
+	objc_start()
+	api := DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
+	pool := api.pool()
+	config, request := session_adapter_request(api, 'https://localhost/submit?q=%00')
+	session_adapter_configure(api, config, request)
+	for entry in [
+		SessionAdapterPolicyCase{false, c'setHTTPShouldHandleCookies:', 1, .cookies},
+		SessionAdapterPolicyCase{true, c'setHTTPShouldSetCookies:', 1, .cookies},
+		SessionAdapterPolicyCase{false, c'setCachePolicy:', 0, .cache},
+		SessionAdapterPolicyCase{true, c'setRequestCachePolicy:', 0, .cache},
+		SessionAdapterPolicyCase{false, c'setAllowsCellularAccess:', 0, .network},
+		SessionAdapterPolicyCase{true, c'setAllowsExpensiveNetworkAccess:', 0, .network},
+		SessionAdapterPolicyCase{false, c'setRequiresDNSSECValidation:', 1, .network},
+		SessionAdapterPolicyCase{true, c'setWaitsForConnectivity:', 1, .network},
+		SessionAdapterPolicyCase{true, c'setTLSMinimumSupportedProtocol:', 7, .tls},
+		SessionAdapterPolicyCase{true, c'setTLSMaximumSupportedProtocol:', 10, .tls},
+		SessionAdapterPolicyCase{true, c'setSessionSendsLaunchEvents:', 1, .background},
+		SessionAdapterPolicyCase{true, c'setHTTPMaximumConnectionsPerHost:', ~u64(0), .network},
+	]! {
+		object := if entry.configuration { config } else { request }
+		// Read the scalar value directly; setters still exercise public dispatch.
+		old := match ctext(u64(entry.selector)) {
+			'setHTTPMaximumConnectionsPerHost:' { u64(read32(config + 8)) }
+			'setTLSMinimumSupportedProtocol:' { u64(read32(config + 140)) }
+			'setAllowsCellularAccess:', 'setAllowsExpensiveNetworkAccess:', 'setCachePolicy:', 'setRequestCachePolicy:' { u64(1) }
+			else { u64(0) }
+		}
+		api.msg(object, entry.selector, entry.value)
+		snapshot := url_session_request_snapshot(request, config)
+		assert snapshot.transport_profile() == entry.expected, ctext(u64(entry.selector));
+		snapshot.dispose()
+		api.msg(object, entry.selector, old)
+	}
+	for selector in [c'setConnectionProxyDictionary:', c'setSharedContainerIdentifier:', c'setProtocolClasses:', c'setCookiePartitionIdentifier:']! {
+		object := if selector == c'setCookiePartitionIdentifier:' { request } else { config }
+		value := if selector == c'setConnectionProxyDictionary:' { api.msg(api.cls(c'NSDictionary'), c'dictionary', 0) }
+			else if selector == c'setProtocolClasses:' { api.msg(api.cls(c'NSMutableArray'), c'array', 0) }
+			else { api.string('unsupported') }
+		if selector == c'setProtocolClasses:' { api.msg(value, c'addObject:', api.cls(c'NSObject')) }
+		api.msg(object, selector, value)
+		snapshot := url_session_request_snapshot(request, config)
+		assert snapshot.transport_profile() == if selector == c'setConnectionProxyDictionary:' { URLSessionTransportProfile.proxy }
+			else if selector == c'setSharedContainerIdentifier:' { URLSessionTransportProfile.background }
+			else if selector == c'setProtocolClasses:' { URLSessionTransportProfile.protocols } else { URLSessionTransportProfile.cookies };
+		snapshot.dispose(); api.msg(object, selector, 0)
+	}
+	// Invalid and unsupported wire values return a typed issue/profile, never
+	// an empty successful request. Every partial snapshot is still disposable.
+	for mode in ['nil', 'uninitialized', 'url', 'header-type', 'header-control', 'header-nonascii', 'method', 'framing', 'timeout', 'large-body'] {
+		local_config, local_request := session_adapter_request(api, 'https://localhost/submit?q=%00')
+		session_adapter_configure(api, local_config, local_request)
+		mut input := local_request
+		match mode {
+			'nil' { input = 0 }
+			'uninitialized' { input = objc_autorelease(objc_allocate(api.cls(c'NSURLRequest'))) }
+			'url' { api.msg(local_request, c'setURL:', 0) }
+			'header-type' { fields := api.msg(api.cls(c'NSMutableDictionary'), c'dictionary', 0); api.put(fields, 'X-Object', api.cls(c'NSObject')); api.msg(local_config, c'setHTTPAdditionalHeaders:', fields) }
+			'header-control' { session_adapter_change_string(obj_header(obj_header(local_request).request.refs[4]).items[0], 'bad\r\nX-Injected: yes') }
+			'header-nonascii' { api.header(local_request, 'X-Test', 'café') }
+			'method' { session_adapter_change_string(obj_header(local_request).request.refs[2], 'POST bad') }
+			'framing' { api.header(local_request, 'Content-Length', '5') }
+			'timeout' { obj_header(local_request).request.timeout = 0 }
+			'large-body' { data := objc_autorelease(objc_allocate(api.cls(c'NSData'))); obj_header(data).external_data = u64(c'x'); obj_header(data).external_size = u64(data_http_limit) + 1; objc_store_strong(unsafe { &obj_header(local_request).request.refs[3] }, data) }
+			else {}
+		}
+		snapshot := url_session_request_snapshot(input, local_config)
+		assert snapshot.transport_profile() == if mode in ['framing', 'header-nonascii'] { URLSessionTransportProfile.wire }
+			else if mode == 'timeout' { URLSessionTransportProfile.timeout } else { URLSessionTransportProfile.snapshot }, mode;
+		snapshot.dispose()
+	}
+	api.drain(pool)
+	assert ios_runtime.live == 0;
+	objc_stop()
+	println('IOS-SESSION-ADAPTER-POLICY: explicit protocol/store/cookie/cache/proxy/network/TLS/timeouts and malformed input boundaries PASS')
+}
+struct SessionAdapterPolicyCase { configuration bool selector &char value u64 expected URLSessionTransportProfile }
+
+fn session_adapter_response_properties(api DataHTTPApi, response u64) {
+	assert api.msg(response, c'statusCode', 0) == 500 && api.msg(response, c'expectedContentLength', 0) == 0;
+	assert ctext(api.msg(api.msg(response, c'MIMEType', 0), c'UTF8String', 0)) == 'text/plain';
+	assert ctext(api.msg(api.msg(response, c'textEncodingName', 0), c'UTF8String', 0)) == 'utf-8';
+	for field in [HTTPTransportField{'X-Mixed', 'first, second'},
+		HTTPTransportField{'Set-Cookie', 'a=1; Expires=Wed, 21 Oct 2037 07:28:00 GMT, b=2'},
+		HTTPTransportField{'WWW-Authenticate', 'Basic realm="first", Bearer realm="second"'},
+		HTTPTransportField{'X-Latin', 'café'}, HTTPTransportField{'X-Utf8', 'cafÃ©'}, HTTPTransportField{'X-C1', '\xc2\x80'}]! {
+		value := api.msg(response, c'valueForHTTPHeaderField:', api.string(field.name))
+		assert value != 0 && ctext(api.msg(value, c'UTF8String', 0)) == field.value;
+	}
+	assert api.msg(response, c'valueForHTTPHeaderField:', api.string('X-Missing')) == 0;
+}
+
+fn test_session_adapter_owned_responses() {
+	api := DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
+	for _ in 0 .. 2 {
+		objc_start()
+		for tls in [false, true]! {
+			pool := api.pool()
+			listener := data_http_listener()
+			server := spawn data_http_serve(listener, [session_adapter_reply()], ['/'], tls, false)
+			url_text := '${if tls { 'https' } else { 'http' }}://localhost:${listener.port}/'
+			url := api.url(url_text)
+			result := http_transport_exchange(url_text, HTTPTransportRequest{}, if tls { os.getenv('VINIX_IOS_HTTP_CERT') } else { '' }, 3 * time.second) or { assert false; return }
+			assert server.wait() && result.status == 500 && result.fields.len == 11 && result.body.len == 0;
+			response := url_session_response_object(url, HTTPTransportResponseHead{status: result.status, fields: result.fields})
+			assert response != 0;
+			result.dispose()
+			unsafe { url_text.free() }
+			mut weak_url := u64(0); mut weak_response := u64(0)
+			objc_store_weak(unsafe { &weak_url }, url); objc_store_weak(unsafe { &weak_response }, response)
+			api.drain(pool)
+			assert weak_url != 0 && weak_response != 0;
+			check_pool := api.pool()
+			session_adapter_response_properties(api, response)
+			api.msg(response, c'allHeaderFields', 0)
+			api.drain(check_pool)
+			objc_release(response)
+			assert weak_url == 0 && weak_response == 0 && ios_runtime.live == 0;
+			objc_destroy_weak(unsafe { &weak_url }); objc_destroy_weak(unsafe { &weak_response })
+		}
+		objc_stop()
+	}
+	println('IOS-SESSION-ADAPTER-RESPONSE: HTTP/TLS 500 headers, duplicate cookies/auth fields, Latin-1, MIME, ownership after input disposal and two lifetimes PASS')
+}
+
+struct SessionAdapterReentry {
+	url u64
+	cls u64
+	bytes &u8 = unsafe { nil }
+mut:
+	active bool
+	fail bool
+	done u64
+}
+__global session_adapter_reentry = unsafe { &SessionAdapterReentry(nil) }
+fn session_adapter_reenter_worker() {
+	p := session_adapter_reentry
+	assert objc_get_class(c'NSObject') != 0;
+	if p.bytes != unsafe { nil } { unsafe { p.bytes[0] = `X` } }
+	objc_release(p.url)
+	C.__atomic_store_n(unsafe { &p.done }, 1, 5)
+}
+fn session_adapter_construct(object u64, _ &char) u64 {
+	mut p := session_adapter_reentry
+	if p == unsafe { nil } || !p.active || read64(object) != p.cls { return object }
+	p.active = false
+	worker := spawn session_adapter_reenter_worker()
+	deadline := time.sys_mono_now() + 5 * time.second
+	for C.__atomic_load_n(unsafe { &p.done }, 5) == 0 {
+		if time.sys_mono_now() >= deadline { eprintln('IOS-SESSION-ADAPTER-REENTRY: constructor held runtime lock'); C._exit(124) }
+		time.sleep(time.millisecond)
+	}
+	worker.wait()
+	return if p.fail { u64(0) } else { object }
+}
+
+fn test_session_adapter_reentrant_constructors() {
+	api := DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
+	objc_start()
+	for name in [c'NSMutableDictionary', c'NSHTTPURLResponse', c'NSData']! {
+		assert objc_add_method(api.cls(name), u64(c'.cxx_construct'), u64(unsafe { voidptr(session_adapter_construct) }), c'@16@0:8');
+	}
+	for kind in ['dictionary', 'response', 'data'] {
+		for fail in [false, true]! {
+			pool := api.pool()
+			url := api.msg(api.url('https://localhost/original'), c'retain', 0)
+			mut bytes := [u8(97), 0, 255, 122]
+			mut value := 'before'.clone()
+			mut p := unsafe { &SessionAdapterReentry(C.calloc(1, sizeof(SessionAdapterReentry))) }
+			assert p != unsafe { nil };
+			unsafe { *p = SessionAdapterReentry{url: url, cls: api.cls(if kind == 'data' { c'NSData' } else if kind == 'response' { c'NSHTTPURLResponse' } else { c'NSMutableDictionary' }),
+				bytes: if kind == 'data' { bytes.data } else { value.str }, fail: fail} }
+			session_adapter_reentry = p
+			p.active = true
+			fields := [HTTPTransportField{'X-Test', value}]
+			object := if kind == 'data' { url_session_data_object(bytes) }
+				else { url_session_response_object(url, HTTPTransportResponseHead{status: 200, fields: fields}) }
+			assert !p.active && (object == 0) == fail;
+			if object != 0 {
+				if kind == 'data' { assert data_length(object) == 4 && C.memcmp(unsafe { voidptr(data_pointer(object)) }, c'a\x00\xffz', 4) == 0; }
+				else { assert string_text(api.msg(object, c'valueForHTTPHeaderField:', api.string('X-Test'))) == 'before'; }
+				objc_release(object)
+			}
+			session_adapter_reentry = unsafe { nil }
+			api.drain(pool)
+			assert ios_runtime.live == 0;
+			unsafe { bytes.free(); value.free(); fields.free(); C.free(p) }
+		}
+	}
+	objc_stop()
+	println('IOS-SESSION-ADAPTER-REENTRY: unlocked constructors, caller URL retirement, header/body freezing and allocation failure cleanup PASS')
+}
+
+fn test_session_adapter_response_bounds() {
+	for status in [0, 101, 199, 600, 999] { assert url_session_response_snapshot(HTTPTransportResponseHead{status: status}) == unsafe { nil }; }
+	for field in [HTTPTransportField{'Bad Name', 'value'}, HTTPTransportField{'X-Test', 'bad\r\nInjected: yes'},
+		HTTPTransportField{'X-Test', 'bad\x00data'}, HTTPTransportField{'X-Test', 'bad\x7fdata'}]! {
+		fields := [field]
+		assert url_session_response_snapshot(HTTPTransportResponseHead{status: 200, fields: fields}) == unsafe { nil };
+		unsafe { fields.free() }
+	}
+	large := '\xff'.repeat(data_http_headers / 2 + 1)
+	large_fields := [HTTPTransportField{'X-Large', large}]
+	assert url_session_response_snapshot(HTTPTransportResponseHead{status: 200, fields: large_fields}) == unsafe { nil };
+	unsafe { large.free(); large_fields.free() }
+	mut fields := []HTTPTransportField{len: 129, init: HTTPTransportField{'X-Test', 'value'}}
+	assert url_session_response_snapshot(HTTPTransportResponseHead{status: 200, fields: fields}) == unsafe { nil };
+	unsafe { fields.free() }
+	println('IOS-SESSION-ADAPTER-BOUNDS: invalid final status, fields, controls, decoded size and count reject without partial responses PASS')
 }
