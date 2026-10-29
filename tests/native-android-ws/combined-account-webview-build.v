@@ -354,6 +354,22 @@ fn binder_identity_profile() NarrowProfile {
  }
 }
 
+fn service_lifecycle_profile() NarrowProfile {
+ service := 'android/app/Service.smali'
+ return NarrowProfile{
+  name: 'service-lifecycle'
+  baseline_name: 'combined-account-webview-binder-identity-framework-2026-10-29-r1'
+  manifest_pin: '739fc9c17258915b0ce7ee01fa3d9e03f47c9d4f4de05ef0c6178d624f8ff3c5'
+  jar_pin: '3f2e3220d6c38feb885044fdb4806d4d3ca7736352bbcc7813e2ee6510463636'
+  baseline_classes: 2104
+  providers: ['framework_service_lifecycle.v']
+  calls: {service: 'framework_service_lifecycle_source'}
+  methods: {service: ['attachBaseContext(Landroid/content/Context;)V', 'onCreate()V', 'onDestroy()V']}
+  changed: {service: 3}
+  added: {service: 0}
+ }
+}
+
 fn store_parts(source string) !StoreClassParts {
  mut methods := map[string]string{}
  mut metadata := []string{}
@@ -852,6 +868,66 @@ fn binder_identity_self_test() ! {
  }
 }
 
+fn service_lifecycle_self_test() ! {
+ profile := service_lifecycle_profile()
+ service := 'android/app/Service.smali'
+ if profile.methods.len != 1 || profile.calls.len != 1
+  || profile.changed[service]! != 3 || profile.added[service]! != 0
+  || profile.fields.len != 0 || profile.extra_classes.len != 0
+  || profile.baseline_classes != 2104 {
+  return error('service lifecycle profile requires only three changed callbacks')
+ }
+ allowed := profile.methods[service]!
+ narrow_method_self_test(allowed, 3, 0)!
+ metadata := '.class public abstract Landroid/app/Service;\n.super Landroid/content/ContextWrapper;\n.field private retained:I\n'
+ unrelated := '.method public retained()V\n.locals 0\nreturn-void\n.end method\n'
+ mut before_methods := metadata + unrelated
+ mut after_methods := metadata + unrelated
+ for signature in allowed {
+  method := '.method public ' + signature + '\n.locals 1\nreturn-void\n.end method\n'
+  before_methods += method
+  after_methods += method.replace('.locals 1', '.locals 2')
+ }
+ narrow_method_delta(before_methods, after_methods, allowed, 3, 0)!
+ for bad in [after_methods.replace('.field private retained:I', '.field private retained:J'),
+  after_methods.replace('public retained()V', 'private retained()V'),
+  after_methods.replace(unrelated, ''),
+  after_methods + '.method public unexpected()V\n.locals 0\nreturn-void\n.end method\n'] {
+  narrow_method_delta(before_methods, bad, allowed, 3, 0) or { continue }
+  return error('invalid Service member or field delta accepted')
+ }
+ mut before := {
+  service: 'old'
+  'android/os/StrictMode.smali': 'same'
+  'android/os/StrictMode$ThreadPolicy.smali': 'same'
+  'android/content/ContextWrapper.smali': 'same'
+  'android/os/Binder.smali': 'same'
+  'android/atl/VinixAccountBrokerContext.smali': 'same'
+ }
+ for i in 0 .. 2098 { before['other/' + i.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ after[service] = 'new'
+ narrow_profile_class_delta(before, after, [service], []string{}, 2104)!
+ for case in 0 .. 10 {
+  mut old := before.clone()
+  mut bad := after.clone()
+  match case {
+   0 { bad[service] = 'old' }
+   1 { bad['android/os/StrictMode.smali'] = 'changed' }
+   2 { bad['android/os/StrictMode$ThreadPolicy.smali'] = 'changed' }
+   3 { bad['android/content/ContextWrapper.smali'] = 'changed' }
+   4 { bad['android/os/Binder.smali'] = 'changed' }
+   5 { bad['android/atl/VinixAccountBrokerContext.smali'] = 'changed' }
+   6 { bad['extra.smali'] = 'new' }
+   7 { bad.delete('other/0.smali') }
+   8 { bad.delete(service); bad['substitute.smali'] = 'new' }
+   else { old.delete('other/0.smali'); bad.delete('other/0.smali') }
+  }
+  narrow_profile_class_delta(old, bad, [service], []string{}, 2104) or { continue }
+  return error('invalid Service-only class delta accepted: ' + case.str())
+ }
+}
+
 fn self_test() ! {
  store_delta_self_test()!
  store_method_self_test()!
@@ -859,6 +935,7 @@ fn self_test() ! {
  onboarding_self_test()!
  auth_exception_self_test()!
  binder_identity_self_test()!
+ service_lifecycle_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -1349,11 +1426,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity'] {
-  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } else { onboarding_profile() } }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle'] {
+  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
