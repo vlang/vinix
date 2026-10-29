@@ -213,6 +213,7 @@ mut:
 	url_session_configuration_owned bool
 	url_session_configuration_default_protocols bool
 	url_session_task_owned bool
+	url_session_task_callback_thread u64
 	sort_descriptor_owned bool
 	sort_descriptor_initialized bool
 	sort_descriptor_initializing bool
@@ -1119,6 +1120,7 @@ fn objc_new(cls u64) u64 {
 
 fn objc_stop() {
 	connection_require_shutdown()
+	url_session_task_require_shutdown()
 	ns_threads_join()
 	swift_tasks_join()
 	nw_stop()

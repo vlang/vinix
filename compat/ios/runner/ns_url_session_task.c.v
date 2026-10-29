@@ -47,6 +47,7 @@ fn url_session_task_types(name string, meta bool, selector string) ?string {
 		'init', 'copy', 'taskDescription', 'originalRequest', 'currentRequest', 'response', 'error', 'delegate' { '@16@0:8' }
 		'copyWithZone:' { '@24@0:8^{_NSZone=}16' }
 		'setTaskDescription:', 'setDelegate:' { 'v24@0:8@16' }
+		'cancel' { 'v16@0:8' }
 		'taskIdentifier' { 'Q16@0:8' }
 		'state', 'countOfBytesClientExpectsToSend', 'countOfBytesClientExpectsToReceive',
 		'countOfBytesSent', 'countOfBytesReceived', 'countOfBytesExpectedToSend', 'countOfBytesExpectedToReceive' { 'q16@0:8' }
@@ -58,7 +59,7 @@ fn url_session_task_types(name string, meta bool, selector string) ?string {
 }
 
 fn url_session_task_unsupported(selector string) bool {
-	return selector in ['resume', 'suspend', 'cancel', 'cancelByProducingResumeData:', 'progress',
+	return selector in ['resume', 'suspend', 'cancelByProducingResumeData:', 'progress',
 		'mutableCopy', 'mutableCopyWithZone:', 'initWithCoder:', 'encodeWithCoder:', 'supportsSecureCoding',
 		'setCountOfBytesSent:', 'setCountOfBytesReceived:', 'setCountOfBytesExpectedToSend:', 'setCountOfBytesExpectedToReceive:']!
 }
@@ -81,6 +82,7 @@ fn url_session_task_dispatch(object u64, selector string, mut frame RegisterFram
 	}
 	if url_session_task_types('NSURLSessionTask', meta, selector) == none { return false }
 	if meta { frame.x[0] = objc_new(object); return true }
+	if selector == 'cancel' { url_session_task_cancel(object); return true }
 	// Copy can invoke application code. Keep it, and retirement, outside the lock.
 	mut copied := u64(0)
 	if selector == 'setTaskDescription:' && frame.x[2] != 0 {
@@ -96,6 +98,8 @@ fn url_session_task_dispatch(object u64, selector string, mut frame RegisterFram
 		'copy', 'copyWithZone:' { frame.x[0] = objc_retain(object) }
 		'originalRequest' { frame.x[0] = objc_retain_autorelease(header.fields[1]) }
 		'currentRequest' { frame.x[0] = objc_retain_autorelease(header.fields[2]) }
+		'response' { frame.x[0] = objc_retain_autorelease(header.fields[5]) }
+		'error' { frame.x[0] = objc_retain_autorelease(header.fields[6]) }
 		'delegate' { frame.x[0] = objc_retain_autorelease(header.fields[4]) }
 		'setDelegate:' {
 			// Foundation retains task delegates independently of the session's
@@ -130,7 +134,11 @@ fn url_session_task_dispatch(object u64, selector string, mut frame RegisterFram
 
 fn url_session_task_dispose(object u64, header &ObjHeader) {
 	if !header.url_session_task_owned { return }
-	// Generic fields own the description, requests, session and task delegate, including
+	if read64(object + 232) == 2 || header.url_session_task_callback_thread != 0 {
+		panic('iOS: cannot destruct pending URL session completion storage')
+	}
+	// Generic fields own the description, requests, session, task delegate and result, including
 	// after an isa replacement. No task is kept alive by its session before resume.
-	unsafe { *(&u64(object + 128)) = 0; *(&u64(object + 144)) = 0; *(&u64(object + 152)) = 0 }
+	unsafe { *(&u64(object + 128)) = 0; *(&u64(object + 144)) = 0; *(&u64(object + 152)) = 0
+		*(&u64(object + 160)) = 0; *(&u64(object + 240)) = 0 }
 }

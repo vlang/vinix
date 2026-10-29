@@ -46,7 +46,7 @@ fn (api TaskApi) drain(pool u64) {
 }
 fn task_string_copy(object u64, selector &char) u64 { return owned_string(string_text(object)) }
 fn task_bad_copy(object u64, selector &char) u64 { return objc_new(ios_runtime.names['NSObject']) }
-fn task_cancel_override(object u64, selector &char) u64 { return object }
+fn task_progress_override(object u64, selector &char) u64 { return object }
 fn task_runtime_api(cls u64) TaskApi {
 	return TaskApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) }), cls: cls,
 		strings: ios_runtime.names['NSString'], mutable_strings: ios_runtime.names['VinixTaskMutableString']}
@@ -171,7 +171,8 @@ fn test_session_task_runtime() {
 			}
 			task_base_cases(api); assert ios_runtime.live == 0
 			pool := api.pool(); object := api.message(cls, c'new', 0)
-			for selector in [c'resume', c'suspend', c'cancel', c'cancelByProducingResumeData:', c'progress', c'mutableCopy', c'mutableCopyWithZone:', c'initWithCoder:', c'encodeWithCoder:', c'setCountOfBytesSent:', c'setCountOfBytesReceived:', c'setCountOfBytesExpectedToSend:', c'setCountOfBytesExpectedToReceive:']! {
+			assert objc_responds(object, c'cancel') && ctext(u64(objc_method_types(objc_instance_method(cls, u64(c'cancel'))))) == 'v16@0:8'
+			for selector in [c'resume', c'suspend', c'cancelByProducingResumeData:', c'progress', c'mutableCopy', c'mutableCopyWithZone:', c'initWithCoder:', c'encodeWithCoder:', c'setCountOfBytesSent:', c'setCountOfBytesReceived:', c'setCountOfBytesExpectedToSend:', c'setCountOfBytesExpectedToReceive:']! {
 				assert !objc_responds(object, selector) && objc_instance_method(cls, u64(selector)) == 0
 			}
 			left := api.string(c'left task'); right := api.string(c'right task')
@@ -192,10 +193,10 @@ fn test_session_task_runtime() {
 				api.release(changed); api.drain(inner2)
 			}
 			if index == 3 {
-				assert objc_add_method(cls, u64(c'cancel'), u64(unsafe { voidptr(task_cancel_override) }), c'@16@0:8')
+				assert objc_add_method(cls, u64(c'progress'), u64(unsafe { voidptr(task_progress_override) }), c'@16@0:8')
 				overridden := api.message(cls, c'new', 0)
-				assert objc_responds(overridden, c'cancel') && objc_instance_method(cls, u64(c'cancel')) != 0
-				assert api.message(overridden, c'cancel', 0) == overridden; api.release(overridden)
+				assert objc_responds(overridden, c'progress') && objc_instance_method(cls, u64(c'progress')) != 0
+				assert api.message(overridden, c'progress', 0) == overridden; api.release(overridden)
 			}
 			assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
 		}
@@ -239,6 +240,7 @@ fn test_session_task_rejections() {
 		C.close(fds[0]); mut status := i32(0); assert C.ios_waitpid(pid, &status, 0) == pid && status == 256
 		output := unsafe { tos(&bytes[0], length) }
 		reason := match mode {
+			'cancel' { 'cancellation requires a session-created data task' }
 			'description' { 'task description must be a string' }
 			'bad-copy' { 'task description copy must be a string' }
 			'subclass', 'caller-subclass' { 'custom URL session task subclass construction is not implemented' }

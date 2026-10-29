@@ -53,7 +53,11 @@ fn require_child(path string) {
 
 fn main() {
 	mode := os.read_file('/opt/ios/check-mode') or { panic(err) }
-	if mode == 'data-http' {
+	if mode == 'session-cancel' {
+		require_child('/opt/ios/session-cancel-checks')
+		println('VINIX iOS SESSIONCANCEL: PASS')
+		C.fflush(unsafe { nil })
+	} else if mode == 'data-http' {
 		os.setenv('VINIX_IOS_HTTP_TRACE', '1', true)
 		os.setenv('VINIX_IOS_HTTP_CERT', '/opt/ios/server.pem', true)
 		os.setenv('VINIX_IOS_HTTP_KEY', '/opt/ios/server.key', true)

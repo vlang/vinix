@@ -98,6 +98,10 @@ fn main() {
 		run_host_fixture(root, old, out, 'ns_url_session_task_delegate_test.v')!
 		return
 	}
+	if os.args[1] == 'session-cancel-host' {
+		run_host_fixture(root, old, out, 'ns_url_session_cancel_test.v')!
+		return
+	}
 	if os.args[1] == 'operation-queue-host' {
 		run_host_fixture(root, old, out, 'ns_operation_queue_test.v')!
 		return

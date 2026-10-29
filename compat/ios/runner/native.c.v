@@ -52,6 +52,7 @@ fn execute_with_options(image macho.Image, arguments []string, options Execution
 		eprintln('iOS DIAGNOSTIC PROBE: SKAdNetwork class import will bind to nil; application behavior is modified')
 	}
 	defer {
+		url_session_task_require_shutdown()
 		dispatch_stop()
 		ns_threads_join()
 		swift_tasks_join()

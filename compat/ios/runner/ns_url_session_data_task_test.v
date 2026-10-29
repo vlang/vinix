@@ -180,7 +180,7 @@ fn test_session_data_task_runtime() {
 fn test_session_data_task_rejections() {
 	objc_start()
 	api := DataTaskApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
-	for mode in ['nil', 'wrong-type', 'uninitialized', 'custom', 'spoof', 'retired-session', 'exhausted', 'resume', 'suspend', 'cancel']! {
+	for mode in ['nil', 'wrong-type', 'uninitialized', 'custom', 'spoof', 'retired-session', 'exhausted', 'resume', 'suspend']! {
 		mut fds := [2]i32{}
 		assert C.pipe(unsafe { &fds[0] }) == 0
 		pid := C.fork()
@@ -210,8 +210,8 @@ fn test_session_data_task_rejections() {
 				else {}
 			}
 			task := api.msg(session, c'dataTaskWithRequest:', request)
-			if mode in ['resume', 'suspend', 'cancel']! {
-				api.msg(task, match mode { 'resume' { c'resume' } 'suspend' { c'suspend' } else { c'cancel' } }, 0)
+			if mode in ['resume', 'suspend']! {
+				api.msg(task, if mode == 'resume' { c'resume' } else { c'suspend' }, 0)
 			}
 			C._exit(0)
 		}
@@ -230,11 +230,11 @@ fn test_session_data_task_rejections() {
 			'custom' { 'data task custom request subclasses are not implemented' }
 			'retired-session' { 'URL session requires live base session storage' }
 			'exhausted' { 'URL session task identifiers exhausted' }
-			'resume', 'suspend', 'cancel' { 'URL session task transfers, cancellation, delegate delivery, progress and coding are not implemented' }
+			'resume', 'suspend' { 'URL session task transfers, cancellation, delegate delivery, progress and coding are not implemented' }
 			else { 'data task requires an initialized URL request' }
 		}
 		assert output.contains('iOS: ' + reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output
-		if mode in ['resume', 'suspend', 'cancel']! { assert output.contains('-[NSURLSessionDataTask ${mode}]'), output }
+		if mode in ['resume', 'suspend']! { assert output.contains('-[NSURLSessionDataTask ${mode}]'), output }
 	}
 	assert ios_runtime.live == 0
 	objc_stop()
