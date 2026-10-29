@@ -43,6 +43,9 @@ const auth_worker_native_sha = '0ef0acd98c148b9b972f754e5fb1e23683e8dc7d0b56f05d
 const binder_identity_native_sha = '6a87d8c2fd003c55cb572ab397342d0c39aa54376ffe7a5a2ba2fa4592099eae'
 const binder_identity_framework_sha = '3f2e3220d6c38feb885044fdb4806d4d3ca7736352bbcc7813e2ee6510463636'
 const maps_network_v3_apk_sha = 'bd07eddf7594fd6cc6b90b984baf7ee5855af0fc56ee0322fbc45ea318cf393a'
+const service_lifecycle_framework_sha = '7017b4845f91cb1c37057f6e8da07476b9b1b44c523827acaf00baad2432fe74'
+const service_lifecycle_native_sha = 'ea8b899971ac96335c1f53a32eb3dee8e5e8f87600c0bcd5b7edaa683b9a8136'
+const service_lifecycle_apk_sha = 'd15082450bbc70efc761ec8403e5544e40a98efe3f0a3d69b75b9d142e25b283'
 
 struct FixtureProfile {
 	name          string
@@ -140,6 +143,17 @@ fn maps_network_v3_profile() FixtureProfile {
 		framework_sha: binder_identity_framework_sha
 		native_sha: binder_identity_native_sha
 		pass_marker: 'MAPS-NETWORK-V3-PASS observations-complete'
+	}
+}
+
+fn service_lifecycle_profile() FixtureProfile {
+	return FixtureProfile{
+		name: 'service-lifecycle'
+		apk_sha: service_lifecycle_apk_sha
+		framework_sha: service_lifecycle_framework_sha
+		native_sha: service_lifecycle_native_sha
+		pass_marker: 'SERVICE-LIFECYCLE-PASS constructors attach-base-context create destroy no-disk-callback policy-identity duplicate-attach null-attach real-write-control restored-original'
+		scope: 'standalone Service construction, attachment and StrictMode callback regression; no GMS or Google authentication claim'
 	}
 }
 
@@ -248,7 +262,7 @@ fn health(line string, expected_marker string) ! {
 	if (line.contains('CHILD-ATTACH-PASS') || line.contains('SETTINGS-GLOBAL-PASS')
 		|| line.contains('APPLICATION-RESTRICTIONS-PASS') || line.contains('AUTHENTICATOR-BASE-PASS')
 		|| line.contains('MAPS-NETWORK-PASS') || line.contains('MAPS-NETWORK-V2-PASS')
-		|| line.contains('MAPS-NETWORK-V3-PASS')) && line != expected_marker {
+		|| line.contains('MAPS-NETWORK-V3-PASS') || line.contains('SERVICE-LIFECYCLE-PASS')) && line != expected_marker {
 		return error('conflicting fixture marker')
 	}
 }
@@ -449,7 +463,7 @@ fn export_evidence(output string) ! {
 
 fn selftest() ! {
 	mut cases := 0
-	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile(), authenticator_worker_profile(), maps_network_v2_profile(), authenticator_binder_identity_profile(), maps_network_v3_profile()]
+	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile(), authenticator_worker_profile(), maps_network_v2_profile(), authenticator_binder_identity_profile(), maps_network_v3_profile(), service_lifecycle_profile()]
 	require(child_attach_profile().framework_sha == framework_sha
 		&& settings_global_profile().framework_sha == framework_sha
 		&& application_restrictions_profile().framework_sha != framework_sha, 'exact per-profile framework identities')!
@@ -468,6 +482,12 @@ fn selftest() ! {
 		&& authenticator_binder_identity_profile().framework_sha != authenticator_worker_profile().framework_sha
 		&& maps_network_v3_profile().apk_sha != maps_network_v2_profile().apk_sha,
 		'Binder identity and TLS-v3 require their distinct pinned runtime pair')!
+	require(service_lifecycle_profile().native_sha == service_lifecycle_native_sha
+		&& service_lifecycle_profile().native_sha != binder_identity_native_sha
+		&& service_lifecycle_profile().framework_sha != binder_identity_framework_sha
+		&& service_lifecycle_profile().apk_sha != authenticator_binder_identity_profile().apk_sha
+		&& service_lifecycle_profile().apk_sha != maps_network_v3_profile().apk_sha,
+		'Service lifecycle uses its new framework and terminal-exit diagnostic native')!
 	for profile in profiles {
 		mut pins := [profile.apk_sha, profile.framework_sha]
 		if profile.native_sha != '' { pins << profile.native_sha }
@@ -513,14 +533,14 @@ fn selftest() ! {
 		cases++
 	}
 	require(canonical('/var/lib/onboarding-api-r1'), 'canonical path rejected')!
-	for selector in ['--authenticator-binder-identity', '--maps-network-v3'] {
+	for selector in ['--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle'] {
 		full := [selector, '/runtime', '/fixture.apk', '10117', '10117', '/results']
 		for count in 1 .. full.len {
 			mut argv := [os.executable()]
 			argv << full[..count]
 			result := os.exec(argv)
 			require(result.exit_code == 1 && result.output.contains('usage: onboarding-api-run'),
-				'incomplete Binder identity fixture CLI accepted')!
+				'incomplete explicit fixture CLI accepted')!
 			cases++
 		}
 		for bad in [[selector + '-other', '/runtime', '/fixture.apk', '10117', '10117', '/results'],
@@ -529,7 +549,7 @@ fn selftest() ! {
 			argv << bad
 			result := os.exec(argv)
 			require(result.exit_code == 1 && result.output.contains('usage: onboarding-api-run'),
-				'unknown or surplus Binder identity fixture CLI accepted')!
+				'unknown or surplus explicit fixture CLI accepted')!
 			cases++
 		}
 	}
@@ -542,9 +562,10 @@ fn run() ! {
 		return
 	}
 	mut arguments := os.args[1..]
-	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network', '--authenticator-worker', '--maps-network-v2', '--authenticator-binder-identity', '--maps-network-v3'],
-		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network|--authenticator-worker|--maps-network-v2|--authenticator-binder-identity|--maps-network-v3) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
+	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network', '--authenticator-worker', '--maps-network-v2', '--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle'],
+		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network|--authenticator-worker|--maps-network-v2|--authenticator-binder-identity|--maps-network-v3|--service-lifecycle) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
 	profile := if arguments[0] == '--authenticator-private-exception' { authenticator_exception_profile() }
+		else if arguments[0] == '--service-lifecycle' { service_lifecycle_profile() }
 		else if arguments[0] == '--authenticator-binder-identity' { authenticator_binder_identity_profile() }
 		else if arguments[0] == '--maps-network-v3' { maps_network_v3_profile() }
 		else if arguments[0] == '--authenticator-worker' { authenticator_worker_profile() }
