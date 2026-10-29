@@ -389,6 +389,7 @@ fn C.objc_getProtocol(&char) voidptr
 fn C.class_addProtocol(voidptr, voidptr) bool
 fn C.__atomic_load_n(&u64, int) u64
 fn C.__atomic_store_n(&u64, u64, int)
+fn C.__atomic_fetch_add(&u64, u64, int) u64
 type TaskHTTPNative5 = fn (u64, u64, u64, u64, u64) u64
 type TaskHTTPDisposition = fn (u64, u64)
 struct TaskHTTPOracle {
@@ -859,4 +860,267 @@ fn test_http_response_decision_rejections() {
 		assert !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output;
 	}
 	println('IOS-HTTP-RESPONSE-DECISION-REJECT: unsupported download/stream and invalid dispositions fail explicitly PASS')
+}
+
+@[heap]
+struct SessionWorkerProbe {
+mut:
+	entered u64
+	release_gate u64
+	runs u64
+	done u64
+	completed u64
+	cancelled u64
+	rejected u64
+	stopped u64
+	responses u64
+	bad u64
+	held_weak [69]u64
+	temporary_weak [69]u64
+}
+fn session_worker_require(good bool, reason string) {
+	if !good { eprintln('IOS-SESSION-WORKERS: FAIL ' + reason); C._exit(125) }
+}
+fn session_worker_wait(value &u64, wanted u64) {
+	deadline := time.sys_mono_now() + 10 * time.second
+	for C.__atomic_load_n(value, 5) != wanted {
+		if time.sys_mono_now() >= deadline { eprintln('IOS-SESSION-WORKERS: FAIL work/cleanup timeout'); C._exit(124) }
+		time.sleep(time.millisecond)
+	}
+}
+fn session_worker_count(probe &SessionWorkerProbe, outcome URLSessionWorkerOutcome) {
+	match outcome {
+		.completed { C.__atomic_fetch_add(unsafe { &probe.completed }, 1, 5) }
+		.cancelled { C.__atomic_fetch_add(unsafe { &probe.cancelled }, 1, 5) }
+		.rejected { C.__atomic_fetch_add(unsafe { &probe.rejected }, 1, 5) }
+		.stopped { C.__atomic_fetch_add(unsafe { &probe.stopped }, 1, 5) }
+	}
+}
+struct SessionWorkerUnit {
+	probe &SessionWorkerProbe
+	index int
+	held bool
+	object u64
+}
+fn session_worker_unit(probe &SessionWorkerProbe, index int, held bool) &SessionWorkerUnit {
+	mut context := unsafe { &SessionWorkerUnit(C.calloc(1, sizeof(SessionWorkerUnit))) }
+	object := objc_new(ios_runtime.names['NSObject'])
+	objc_store_weak(unsafe { &probe.held_weak[index] }, object)
+	unsafe { *context = SessionWorkerUnit{probe: probe, index: index, held: held, object: object} }
+	return context
+}
+fn session_worker_unit_run(pointer voidptr, cancel &u64) {
+	context := unsafe { &SessionWorkerUnit(pointer) }
+	p := context.probe
+	C.__atomic_fetch_add(unsafe { &p.runs }, 1, 5)
+	object := objc_autorelease(objc_new(ios_runtime.names['NSObject']))
+	objc_store_weak(unsafe { &p.temporary_weak[context.index] }, object)
+	if context.held {
+		C.__atomic_fetch_add(unsafe { &p.entered }, 1, 5)
+		for C.__atomic_load_n(unsafe { &p.release_gate }, 5) == 0 && !data_http_cancelled(cancel) { time.sleep(time.millisecond) }
+	}
+}
+fn session_worker_query(probe &SessionWorkerProbe) {
+	if url_session_workers_cancel(~u64(0)) { C.__atomic_store_n(unsafe { &probe.bad }, 1, 5) }
+}
+fn session_worker_unit_cleanup(pointer voidptr, outcome URLSessionWorkerOutcome) {
+	context := unsafe { &SessionWorkerUnit(pointer) }
+	p := context.probe
+	if context.index == 0 {
+		// A different thread must reenter both locks while cleanup is waiting.
+		query := spawn session_worker_query(p)
+		query.wait()
+	}
+	objc_release(context.object)
+	session_worker_count(p, outcome)
+	C.free(pointer)
+	C.__atomic_fetch_add(unsafe { &p.done }, 1, 5)
+}
+fn test_session_worker_capacity_and_ownership() {
+	mut previous := u64(0)
+	for _ in 0 .. 2 {
+		objc_start(); system_data_start()!
+		mut p := unsafe { &SessionWorkerProbe(C.calloc(1, sizeof(SessionWorkerProbe))) }
+		mut identities := [68]u64{}
+		for i in 0 .. 4 { identities[i] = url_session_workers_submit(session_worker_unit(p, i, true), session_worker_unit_run, session_worker_unit_cleanup) }
+		session_worker_wait(unsafe { &p.entered }, 4)
+		session_worker_require(identities[0] > previous && !url_session_workers_cancel(previous), 'old identity aliased a new runtime')
+		for i in 4 .. 68 { identities[i] = url_session_workers_submit(session_worker_unit(p, i, false), session_worker_unit_run, session_worker_unit_cleanup) }
+		rejected := url_session_workers_submit(session_worker_unit(p, 68, false), session_worker_unit_run, session_worker_unit_cleanup)
+		session_worker_require(rejected == 0 && p.rejected == 1 && p.held_weak[68] == 0, 'queue limit did not retire rejected context')
+		session_worker_require(url_session_workers_cancel(identities[4]) && url_session_workers_cancel(identities[4]), 'queued cancellation failed')
+		C.__atomic_store_n(unsafe { &p.release_gate }, 1, 5)
+		session_worker_wait(unsafe { &p.done }, 69)
+		previous = identities[0]
+		objc_stop()
+		assert p.runs == 67 && p.completed == 67 && p.cancelled == 1 && p.rejected == 1 && p.stopped == 0 && p.bad == 0;
+		for i in 0 .. 69 {
+			assert p.held_weak[i] == 0 && p.temporary_weak[i] == 0;
+			objc_destroy_weak(unsafe { &p.held_weak[i] }); objc_destroy_weak(unsafe { &p.temporary_weak[i] })
+		}
+		assert url_session_workers == unsafe { nil } && !url_session_workers_cancel(previous) && ios_runtime.live == 0;
+		system_data_stop(); C.free(p)
+	}
+	println('IOS-SESSION-WORKERS-OWNERSHIP: four independent workers, 64 queued contexts, rejection cleanup, queued cancellation, unlocked reentrant retirement, autorelease/weak ownership and unique IDs across two runtimes PASS')
+}
+
+struct SessionWorkerDecisionCallback { block u64 }
+fn session_worker_decision_run(pointer voidptr) {
+	context := unsafe { &SessionWorkerDecisionCallback(pointer) }
+	http_decision_invoke(context.block, 1)
+}
+fn session_worker_decision_drop(pointer voidptr) {
+	context := unsafe { &SessionWorkerDecisionCallback(pointer) }
+	block_release(context.block)
+	C.free(pointer)
+}
+struct SessionWorkerHTTP {
+	probe &SessionWorkerProbe
+	server_probe &HTTPDecisionProbe
+	gate &URLSessionResponseDecision
+	queue u64
+	object u64
+	url string
+	ca string
+	mode string
+mut:
+	control &u64 = unsafe { nil } // Borrowed only until run returns.
+}
+fn session_worker_http_policy(pointer voidptr, response HTTPTransportResponseHead, deadline i64) bool {
+	context := unsafe { &SessionWorkerHTTP(pointer) }
+	if response.status != 500 { C.__atomic_store_n(unsafe { &context.probe.bad }, 1, 5) }
+	mut callback := unsafe { &SessionWorkerDecisionCallback(C.calloc(1, sizeof(SessionWorkerDecisionCallback))) }
+	unsafe { *callback = SessionWorkerDecisionCallback{block: url_session_response_decision_block(context.gate)} }
+	// This queued context owns only the completion block, whose independent
+	// gate can outlive the HTTP context and the executor's cancellation cell.
+	ns_operation_queue_submit(context.queue, callback, session_worker_decision_run, session_worker_decision_drop)
+	C.__atomic_store_n(unsafe { &context.server_probe.entered }, 1, 5)
+	C.__atomic_fetch_add(unsafe { &context.probe.entered }, 1, 5)
+	return url_session_response_decision_wait(context.gate, context.control, deadline)
+}
+fn session_worker_http_run(pointer voidptr, control &u64) {
+	mut context := unsafe { &SessionWorkerHTTP(pointer) }
+	context.control = unsafe { control }
+	C.__atomic_fetch_add(unsafe { &context.probe.runs }, 1, 5)
+	if response := http_transport_exchange_policy(context.url, HTTPTransportRequest{}, context.ca, 6 * time.second, control, pointer, session_worker_http_policy) {
+		if context.mode != 'allow' || response.status != 500 || response.body.len != 4 || C.memcmp(response.body.data, c'ping', 4) != 0 {
+			C.__atomic_store_n(unsafe { &context.probe.bad }, 1, 5)
+		}
+		C.__atomic_fetch_add(unsafe { &context.probe.responses }, 1, 5)
+		response.dispose()
+	} else if context.mode == 'allow' { C.__atomic_store_n(unsafe { &context.probe.bad }, 1, 5) }
+	context.control = unsafe { nil }
+}
+fn session_worker_http_cleanup(pointer voidptr, outcome URLSessionWorkerOutcome) {
+	context := unsafe { &SessionWorkerHTTP(pointer) }
+	p := context.probe
+	url_session_response_decision_close(context.gate)
+	url_session_response_decision_release(context.gate)
+	objc_release(context.queue); objc_release(context.object)
+	unsafe { context.url.free(); context.ca.free() }
+	session_worker_count(p, outcome)
+	C.free(pointer)
+	C.__atomic_fetch_add(unsafe { &p.done }, 1, 5)
+}
+fn test_session_workers_http_callbacks_and_shutdown() {
+	cert := os.getenv('VINIX_IOS_HTTP_CERT')
+	defer { unsafe { cert.free() } }
+	for tls in [false, true] {
+		for mode in ['allow', 'cancel', 'stop'] {
+			objc_start(); system_data_start()!
+			pool := objc_pool_push()
+			mut p := unsafe { &SessionWorkerProbe(C.calloc(1, sizeof(SessionWorkerProbe))) }
+			queue := objc_new(ios_runtime.names['NSOperationQueue'])
+			api := DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
+			api.msg(queue, c'setSuspended:', 1)
+			mut weak_queue := u64(0)
+			objc_store_weak(unsafe { &weak_queue }, queue)
+			mut servers := []thread bool{}
+			mut probes := [4]&HTTPDecisionProbe{}
+			mut identities := [4]u64{}
+			for i in 0 .. 4 {
+				gate := url_session_response_decision_new()
+				mut server_probe := unsafe { &HTTPDecisionProbe(C.calloc(1, sizeof(HTTPDecisionProbe))) }
+				unsafe { *server_probe = HTTPDecisionProbe{gate: gate, mode: 'allow'} }
+				probes[i] = server_probe
+				listener := data_http_listener()
+				servers << spawn http_decision_server(listener, tls, server_probe)
+				object := objc_new(ios_runtime.names['NSObject'])
+				objc_store_weak(unsafe { &p.held_weak[i] }, object)
+				mut context := unsafe { &SessionWorkerHTTP(C.calloc(1, sizeof(SessionWorkerHTTP))) }
+				unsafe { *context = SessionWorkerHTTP{probe: p, server_probe: server_probe, gate: gate, queue: objc_retain(queue), object: object,
+					url: '${if tls { 'https' } else { 'http' }}://localhost:${listener.port}/', ca: cert.clone(), mode: mode} }
+				identities[i] = url_session_workers_submit(context, session_worker_http_run, session_worker_http_cleanup)
+				session_worker_require(identities[i] != 0, 'HTTP work was not accepted')
+			}
+			session_worker_wait(unsafe { &p.entered }, 4)
+			session_worker_require(api.msg(queue, c'operationCount', 0) == 4, 'missing deferred response operations')
+			if mode == 'stop' {
+				for i in 4 .. 8 { session_worker_require(url_session_workers_submit(session_worker_unit(p, i, false), session_worker_unit_run, session_worker_unit_cleanup) != 0, 'queued shutdown work rejected') }
+				url_session_workers_stop()
+				session_worker_require(p.done == 8 && p.stopped == 8 && p.runs == 4, 'shutdown did not join running and discard queued work')
+				session_worker_require(url_session_workers_submit(session_worker_unit(p, 8, false), session_worker_unit_run, session_worker_unit_cleanup) == 0 && p.stopped == 9, 'retired pool accepted new work')
+				// Keep callbacks suspended: objc_stop must discard them after
+				// the network contexts/cancellation cells have already retired.
+			} else {
+				if mode == 'cancel' { for id in identities { session_worker_require(url_session_workers_cancel(id), 'running cancellation failed') } }
+				else { api.msg(queue, c'setSuspended:', 0) }
+				session_worker_wait(unsafe { &p.done }, 4)
+				if mode == 'cancel' { api.msg(queue, c'setSuspended:', 0) }
+				api.msg(queue, c'waitUntilAllOperationsAreFinished', 0)
+			}
+			for server in servers { session_worker_require(server.wait(), 'loopback server failed') }
+			unsafe { servers.free() }
+			objc_release(queue); objc_pool_pop(pool)
+			objc_stop()
+			assert p.bad == 0 && p.responses == if mode == 'allow' { u64(4) } else { u64(0) };
+			assert p.completed == if mode == 'stop' { u64(0) } else { u64(4) };
+			for i in 0 .. 9 {
+				assert p.held_weak[i] == 0;
+				objc_destroy_weak(unsafe { &p.held_weak[i] })
+			}
+			assert weak_queue == 0 && ios_runtime.live == 0 && ios_runtime.block_refs.len == 0 && url_session_workers == unsafe { nil };
+			objc_destroy_weak(unsafe { &weak_queue })
+			for probe in probes { C.free(probe) }
+			system_data_stop(); C.free(p)
+		}
+	}
+	println('IOS-SESSION-WORKERS-HTTP: four blocked HTTP/TLS exchanges leave delegate workers available; cancellation, late response blocks, stop/join before dispatch discard, queued work retirement and weak ownership PASS')
+}
+
+fn session_worker_shutdown_run(_ voidptr, _ &u64) { objc_stop() }
+fn session_worker_noop_run(_ voidptr, _ &u64) {}
+fn session_worker_shutdown_cleanup(_ voidptr, _ URLSessionWorkerOutcome) { objc_stop() }
+fn session_worker_noop_cleanup(_ voidptr, _ URLSessionWorkerOutcome) {}
+fn session_worker_reject_watchdog() { time.sleep(5 * time.second); C._exit(124) }
+fn test_session_worker_shutdown_rejections() {
+	for mode in ['run', 'cleanup', 'rejected-cleanup'] {
+		mut fds := [2]i32{}
+		assert C.pipe(unsafe { &fds[0] }) == 0;
+		pid := C.fork()
+		assert pid >= 0;
+		if pid == 0 {
+			C.close(fds[0]); C.dup2(fds[1], 2); C.close(fds[1])
+			spawn session_worker_reject_watchdog()
+			objc_start(); system_data_start()!
+			if mode == 'rejected-cleanup' { url_session_workers_stop() }
+			url_session_workers_submit(unsafe { nil }, if mode == 'run' { session_worker_shutdown_run } else { session_worker_noop_run },
+				if mode == 'run' { session_worker_noop_cleanup } else { session_worker_shutdown_cleanup })
+			time.sleep(6 * time.second); C._exit(0)
+		}
+		C.close(fds[1]); mut bytes := [8192]u8{}; mut length := 0
+		for {
+			count := C.read(fds[0], unsafe { &bytes[length] }, usize(bytes.len - length))
+			if count == 0 { break }
+			if count < 0 && unsafe { *C.ios_errno_address() } == C.EINTR { continue }
+			assert count > 0 && length + int(count) < bytes.len;
+			length += int(count)
+		}
+		C.close(fds[0]); mut status := i32(0)
+		assert C.ios_waitpid(pid, &status, 0) == pid && status == 256;
+		output := unsafe { tos(&bytes[0], length) }
+		assert output.contains('runtime shutdown inside URL session work or cleanup is not implemented'), output;
+		assert !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output;
+	}
+	println('IOS-SESSION-WORKERS-REJECT: shutdown from run, worker cleanup and synchronous rejected cleanup fails before joins/retirement PASS')
 }

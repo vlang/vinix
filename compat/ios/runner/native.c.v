@@ -53,6 +53,7 @@ fn execute_with_options(image macho.Image, arguments []string, options Execution
 	}
 	defer {
 		url_session_task_require_shutdown()
+		url_session_workers_stop()
 		dispatch_stop()
 		ns_threads_join()
 		swift_tasks_join()

@@ -521,6 +521,7 @@ mut:
 	adsupport_retired bool
 	connections []u64 // Main-thread pending connections, one owning reference each.
 	connection_callbacks int
+	url_session_workers_stopping bool
 	weak         map[u64]u64 // Location -> object; weak loads retain before returning.
 	swift_unknown_weak map[u64]u64 // Opaque Swift weak cells, zeroed before referent teardown.
 	timers       []u64
@@ -1121,6 +1122,7 @@ fn objc_new(cls u64) u64 {
 fn objc_stop() {
 	connection_require_shutdown()
 	url_session_task_require_shutdown()
+	url_session_workers_stop()
 	ns_threads_join()
 	swift_tasks_join()
 	nw_stop()
@@ -1132,6 +1134,7 @@ fn objc_stop() {
 	reachability_free()
 	nw_free()
 	connection_stop()
+	url_session_workers_free()
 	audio_stop()
 	ui_context_stop()
 	$if ios_gles ? { gles_set_current(0) }
