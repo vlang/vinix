@@ -194,6 +194,12 @@ fn cases(tool string, work string) ! {
 		result := invoke(args, os.environ())!
 		assert result.status == 0, result.str()
 	}
+	missing_compiler := options.stage + '/missing-target-compiler'
+	missing_command := [tool, '--arch', 'x86_64', '--staging', options.stage, '--build-dir', options.cache,
+		'--cc', missing_compiler, '--support-dir', options.support]
+	missing_result := invoke(missing_command, os.environ())!
+	assert missing_result.status == 2, missing_result.str()
+	assert missing_result.str().contains('target compiler missing: ' + missing_compiler), missing_result.str()
 	for arguments in [['--jobs', '0'], ['--max-page-size', '4097'], ['--arch', 'invalid'],
 		['--require-export', 'absent']] {
 		result := invoke([...command, ...arguments], os.environ())!

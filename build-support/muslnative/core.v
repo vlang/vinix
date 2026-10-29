@@ -178,6 +178,7 @@ pub fn plan(raw Options, retain string) !Plan {
 	})!
 	if cc.len == 0 { return InputError{'target compiler missing'} }
 	selected := cachekey.which(cc[0], os.environ()) or { return InputError{'target compiler missing: ' + hosttest.shell_join(cc)} }
+	if selected == '' { return InputError{'target compiler missing: ' + hosttest.shell_join(cc)} }
 	cc[0] = cachekey.resolve_path(selected)!
 	machine := captured([...cc, '-dumpmachine'])!.trim_space()
 	if !machine.starts_with(options.arch + '-') || !machine.contains('linux') {
