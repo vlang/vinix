@@ -145,6 +145,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_application_startup(smali)!
  framework_companion_contexts(smali)!
  framework_service_bindings(smali)!
+ framework_service_lifecycle(smali)!
  framework_service_stop(smali)!
  framework_companion_activities(smali)!
  framework_package_storage(smali)!
