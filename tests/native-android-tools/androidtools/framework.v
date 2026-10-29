@@ -164,6 +164,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_package_signatures(smali)!
  framework_native_digests(smali)!
  framework_tls_provider(smali)!
+ framework_platform_fragments(smali)!
  framework_assemble(smali, work + '/classes.dex', tools, java)!
  next := work + '/api-impl.jar'
  os.cp(input, next)!
