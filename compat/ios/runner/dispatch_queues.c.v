@@ -14,6 +14,7 @@ mut:
 	concurrent bool
 	main bool
 	immortal bool
+	operation_owner u64 // Borrowed while an operation job retains its ObjC queue.
 	context voidptr
 	finalizer DispatchFunction = unsafe { nil }
 	specific &DispatchSpecific = unsafe { nil }

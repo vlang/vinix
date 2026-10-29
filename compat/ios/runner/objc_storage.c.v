@@ -258,6 +258,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	ns_recursive_lock_dispose(object, mut header)
 	ns_thread_dispose(mut header)
 	ns_operation_dispose(object, mut header)
+	ns_operation_queue_dispose(mut header)
 	ns_invocation_dispose(object, mut header)
 	ns_date_formatter_dispose(mut header)
 	ns_number_formatter_dispose(mut header)

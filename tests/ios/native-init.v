@@ -53,7 +53,11 @@ fn require_child(path string) {
 
 fn main() {
 	mode := os.read_file('/opt/ios/check-mode') or { panic(err) }
-	if mode == 'class-update' {
+	if mode == 'operation-queue' {
+		require_child('/opt/ios/operation-queue-checks')
+		println('VINIX iOS OPERATIONQUEUE: PASS')
+		C.fflush(unsafe { nil })
+	} else if mode == 'class-update' {
 		require_child('/opt/ios/class-update-checks')
 		println('VINIX iOS CLASSUPDATE: PASS')
 		C.fflush(unsafe { nil })

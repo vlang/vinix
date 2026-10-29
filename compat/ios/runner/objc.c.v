@@ -138,6 +138,7 @@ mut:
 	recursive_lock_calls u64
 	recursive_lock &RecursiveLockState = unsafe { nil }
 	operation &FoundationOperation = unsafe { nil }
+	operation_queue &FoundationOperationQueue = unsafe { nil }
 	invocation &FoundationInvocation = unsafe { nil }
 	date_formatter &FoundationDateFormatter = unsafe { nil }
 	number_formatter &FoundationNumberFormatter = unsafe { nil }

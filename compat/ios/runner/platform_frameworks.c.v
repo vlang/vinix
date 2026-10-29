@@ -35,6 +35,7 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 	if defaults_dispatch(object, selector, mut frame) { return true }
 	if notification_dispatch(object, selector, mut frame) { return true }
 	if propertylist_dispatch(object, selector, mut frame) { return true }
+	if ns_operation_queue_dispatch(object, selector, mut frame) { return true }
 	if ns_data_url_dispatch(object, selector, mut frame) { return true }
 	if scene_dispatch(object, selector, mut frame) { return true }
 	if object !in ios_runtime.classes && objc_is_kind(object, ios_runtime.names['AVAudioSession']) {

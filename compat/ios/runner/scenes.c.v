@@ -303,7 +303,10 @@ fn objc_responds(object u64, selector &char) bool {
 	if objc_is_kind(object, ios_runtime.names['NSURL']) { return http_url_builtin_types('NSURL', false, name) != none }
 	if objc_is_kind(object, ios_runtime.names['NSLocale']) { return name in ['objectForKey:', 'localeIdentifier'] }
 	if objc_is_kind(object, ios_runtime.names['NSBundle']) && name in ['appStoreReceiptURL', 'bundleIdentifier', 'infoDictionary'] { return true }
-	if objc_is_kind(object, ios_runtime.names['NSOperationQueue']) { return name in ['name', 'setName:', 'maxConcurrentOperationCount', 'setMaxConcurrentOperationCount:'] }
+	queue_meta := object in ios_runtime.classes
+	if (queue_meta && object == ios_runtime.names['NSOperationQueue']) || (!queue_meta && objc_is_kind(object, ios_runtime.names['NSOperationQueue'])) {
+		return ns_operation_queue_types('NSOperationQueue', queue_meta, name) != none
+	}
 	if objc_is_kind(object, ios_runtime.names['CLLocationManager']) { return name in ['delegate', 'setDelegate:'] }
 	if objc_is_kind(object, ios_runtime.names['UIApplication']) { return name in ['delegate', 'setDelegate:', 'applicationState', 'isIdleTimerDisabled', 'setIdleTimerDisabled:', 'applicationIconBadgeNumber', 'setApplicationIconBadgeNumber:'] }
 	if objc_is_kind(object, ios_runtime.names['UIViewController']) {
