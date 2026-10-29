@@ -4,6 +4,14 @@ module mapsaccountstage
 import json2
 import os
 
+$if macos {
+	#include <fcntl.h>
+	#include <sys/stat.h>
+}
+
+@[c: 'fstat']
+fn C.vinix_maps_hash_fstat(i32, &C.stat) i32
+
 pub const baseline_seal = 'd99195272b8af813679cf54fed9f1e0341e6f1115804ac09c1cd2d5a8f942e3e'
 pub const compiler_seal = '0cc6c1d34c1811a818e4ae89853116861a4b067d4251af257851a7714f0d11fe'
 pub const sqlite_seal = '5a228127ca3ffa0c88bcae0aa5f7ab10e15b383dfb46822c573013105628bbaa'
@@ -26,9 +34,31 @@ pub:
 	profile string
 }
 
+const uncached_hash_min_size = i64(64) * 1024 * 1024
+
+// The native C stat object uses the SDK's size/alignment and named fields.
+// Only this newly opened file description is affected; no vnode/global policy
+// changes. Failure is explicit before any large input bytes are read.
+fn prepare_hash_input(fd int) !bool {
+	$if macos {
+		metadata := &C.stat{}
+		defer { unsafe { free(metadata) } }
+		if C.vinix_maps_hash_fstat(i32(fd), metadata) != 0 { return os.error_posix() }
+		if u32(metadata.st_mode) & u32(C.S_IFMT) != u32(C.S_IFREG)
+			|| metadata.st_size < uncached_hash_min_size { return false }
+		if C.fcntl(fd, C.F_NOCACHE, 1) < 0 {
+			return error('large hash input F_NOCACHE failed: ' + os.error_posix().msg())
+		}
+		return true
+	} $else {
+		return false
+	}
+}
+
 pub fn digest(path string) !string {
 	mut input := os.open(path)!
 	defer { input.close() }
+	prepare_hash_input(input.fd)!
 	mut state := new_host_sha256()!
 	defer { state.close() }
 	mut buffer := []u8{len: 1024 * 1024}
