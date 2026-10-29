@@ -280,6 +280,52 @@ fn storekit_observer_worker(cls u64, queue u64) {
 	objc_release(observer)
 }
 
+struct SelectorGrowthProbe {
+	object u64
+mut:
+	start u64
+	bad u64
+}
+fn C.sched_yield() i32
+fn selector_growth_reader(p &SelectorGrowthProbe) {
+	for C.ios_load_pointer(unsafe { &p.start }) == 0 { C.sched_yield() }
+	for _ in 0 .. 2048 {
+		if !objc_responds(p.object, c'paymentQueue:updatedTransactions:') || objc_responds(p.object, c'vinixUnknownCapability') {
+			C.ios_store_pointer(unsafe { &p.bad }, 1)
+		}
+	}
+}
+fn selector_growth_writer(p &SelectorGrowthProbe) {
+	for C.ios_load_pointer(unsafe { &p.start }) == 0 { C.sched_yield() }
+	mut objects := []u64{cap: 1024}; objects.flags |= .noslices
+	for i in 0 .. 1024 {
+		objects << objc_allocate(ios_runtime.names['NSObject'])
+		if i % 16 == 0 { C.sched_yield() }
+	}
+	for object in objects { objc_release(object) }
+	unsafe { objects.free() }
+}
+fn test_selector_capabilities_during_object_growth() {
+	for _ in 0 .. 2 {
+		objc_start()
+		object := objc_allocate(storekit_observer_class())
+		mut p := unsafe { &SelectorGrowthProbe(C.calloc(1, sizeof(SelectorGrowthProbe))) }
+		assert p != unsafe { nil };
+		unsafe { *p = SelectorGrowthProbe{object: object} }
+		mut workers := []thread{cap: 6}; workers.flags |= .noslices
+		for _ in 0 .. 4 { workers << spawn selector_growth_reader(p) }
+		for _ in 0 .. 2 { workers << spawn selector_growth_writer(p) }
+		C.ios_store_pointer(unsafe { &p.start }, 1)
+		workers.wait()
+		assert p.bad == 0;
+		objc_release(object)
+		assert ios_runtime.live == 0;
+		objc_stop()
+		unsafe { workers.free(); C.free(p) }
+	}
+	println('IOS-SELECTOR-GROWTH: four capability readers race two allocation-table writers across two drained runtimes without stale table reads PASS')
+}
+
 fn test_storekit_queue_observers() {
 	for _ in 0 .. 2 {
 		objc_start()

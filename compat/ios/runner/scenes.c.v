@@ -18,6 +18,19 @@ fn objc_is_kind(object u64, cls u64) bool {
 
 fn objc_responds(object u64, selector &char) bool {
 	if object == 0 || selector == unsafe { nil } { return false }
+	// Object-table growth can relocate its backing storage on another thread.
+	// Snapshot these allocation flags under the same lock as object insertion;
+	// keep selector discovery and its other locks outside this critical section.
+	mut image_integer := false
+	mut image_array := false
+	mut image_dictionary := false
+	C.ios_objc_initialize_lock()
+	if header := ios_runtime.objects[object] {
+		image_integer = header.image_integer
+		image_array = header.image_array
+		image_dictionary = header.image_dictionary
+	}
+	C.ios_objc_initialize_unlock()
 	name := ctext(u64(selector))
 	if app_attest_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| capture_discovery_family(if object in ios_runtime.classes { object } else { read64(object) })
@@ -50,7 +63,7 @@ fn objc_responds(object u64, selector &char) bool {
 		|| storyboard_family(if object in ios_runtime.classes { object } else { read64(object) }) {
 		return objc_instance_method(read64(object), u64(selector)) != 0
 	}
-	if object in ios_runtime.objects && obj_header(object).image_integer
+	if image_integer
 		&& constant_integer_types('NSConstantIntegerNumber', false, name) != none { return true }
 	if ns_empty_array_selector(object, name) { return true }
 	if _ := dispatch_objc_view(object) { return dispatch_objc_types('OS_dispatch_queue',false,name) != none }
@@ -58,9 +71,9 @@ fn objc_responds(object u64, selector &char) bool {
 		if name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return false }
 		if ns_pool_selector(object, name) { return true }
 	}
-	if object in ios_runtime.objects && obj_header(object).image_array
+	if image_array
 		&& name in ['copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:', 'lastObject', 'getObjects:range:'] { return true }
-	if object in ios_runtime.objects && obj_header(object).image_dictionary
+	if image_dictionary
 		&& name in ['copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:', 'allKeys', 'allValues', 'getObjects:andKeys:count:'] { return true }
 	if image_selector(object, name) { return true }
 	if image_view_selector(object, name) { return true }
