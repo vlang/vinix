@@ -76,6 +76,10 @@ fn send(builder voidptr) i32 { assert !held && builder == voidptr(90); sent++; r
 fn free_response(builder voidptr) { assert !held && builder == voidptr(90); freed++ }
 fn close_service(handle voidptr) { assert held && handle == voidptr(3); closed++ }
 fn ws_store_shutdown() { assert held }
+// Worker ownership is exercised by its dedicated pthread checker. These
+// callback tests retain the production cancel/shutdown lock boundary.
+fn ws_auth_worker_cancel(id u64) { assert !held }
+fn ws_auth_worker_shutdown(e voidptr) { assert !held }
 fn ws_account_utf8(e voidptr,text voidptr) &char { assert !held; return unsafe { if text == nil { &char(nil) } else { C.strdup(&char(text)) } } }
 fn ws_service_string(e voidptr,value voidptr,text &char) bool {
  assert !held
@@ -126,7 +130,7 @@ fn main() {
  reset(); ws_account_service_shutdown(e); ws_account_service_shutdown(e)
  assert closed == 1; terminal(0,0); ws_auth_error(e,callback,5,unsafe {nil}); terminal(0,0)
  unsafe { ws = &State(C.calloc(1,sizeof(State))) }
- ws.main_thread = 10; thread_id = 10; ws_auth_broker_pid = 42; ws_auth_scope = false
+ ws.main_thread = 10; ws_auth_worker_thread = 11; thread_id = 11; ws_auth_broker_pid = 42; ws_auth_scope = false
  assert ws_auth_calling_uid() == -2 && ws_auth_calling_pid() == -2
  permission := voidptr(c"android.permission.ACCOUNT_MANAGER")
  assert ws_auth_permission(e,permission,-1,-1) == -2
@@ -137,7 +141,15 @@ fn main() {
  assert ws_auth_permission(e,permission,42,1001) == -2
  assert ws_auth_permission(e,permission,43,1000) == -2
  assert ws_auth_permission(e,voidptr(c"android.permission.GET_ACCOUNTS"),-1,-1) == -2
- thread_id = 11
+ // Main and unrelated app threads cannot borrow the worker identity even
+ // while a root-authorized synchronous worker call has its scope enabled.
+ thread_id = 10
+ assert ws_auth_calling_uid() == -2 && ws_auth_permission(e,permission,-1,-1) == -2
+ thread_id = 12
+ assert ws_auth_calling_uid() == -2 && ws_auth_permission(e,permission,-1,-1) == -2
+ thread_id = 11; ws_auth_scope = false
+ assert ws_auth_calling_uid() == -2 && ws_auth_permission(e,permission,-1,-1) == -2
+ ws_auth_scope = true; ws_auth_worker_thread = 0
  assert ws_auth_calling_uid() == -2 && ws_auth_permission(e,permission,-1,-1) == -2
  unsafe { C.free(ws); ws = nil }
  assert ws_auth_calling_uid() == -2

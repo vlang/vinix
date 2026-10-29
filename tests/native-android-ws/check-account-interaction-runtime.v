@@ -63,6 +63,11 @@ __global oom_ref int
 __global oom_local int
 fn lock(mutex &int) { assert !held; held = true }
 fn unlock(mutex &int) { assert held; held = false }
+// Queue lifetime has its own real-pthread checker; retained-graph callbacks
+// still must invoke cancellation and shutdown outside their native lock.
+fn ws_auth_worker_cancel(id u64) { assert !held }
+fn ws_auth_worker_shutdown(e voidptr) { assert !held }
+fn ws_store_shutdown() { assert held }
 fn pending(e voidptr) bool { return failed }
 fn same(e voidptr,a voidptr,b voidptr) u8 { return u8(a == b) }
 fn global_ref(e voidptr,ref voidptr) voidptr {

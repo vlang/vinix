@@ -40,7 +40,8 @@ fn main() {
 		os.write_file(work + '/' + name + '.input', source)!
 	}
 	code := store.all_after('module atlframework') + '\n' + accounts.all_after('module atlframework') +
-		'\n' + block(service, 'ws_auth_dispatch') + '\n' + block(service, 'ws_account_service_shutdown')
+		'\n' + block(service, 'ws_auth_dispatch') + '\n' + block(service, 'ws_auth_dispatch_call') +
+		'\n' + block(service, 'ws_account_service_shutdown')
 	mut variants := [code]
 	mut names := ['production']
 	for mutation in [
@@ -194,6 +195,10 @@ fn nilp() voidptr { return unsafe { nil } }
 fn text(p &char) string { return if p == unsafe { nil } { "<null>" } else { unsafe { cstring_to_vstring(p) } } }
 fn lock(p &int) { assert !held; held = true }
 fn unlock(p &int) { assert held; held = false }
+// Native query/invalidation tests never admit a Java worker job. Preserve
+// the production synchronization boundary for the referenced worker hooks.
+fn ws_auth_worker_active_locked(id u64) bool { assert held; return true }
+fn ws_auth_worker_shutdown(e voidptr) { assert !held }
 fn java() { assert !held; java_calls++ }
 fn pending(e voidptr) bool { return exception != "" }
 fn throw(e voidptr, kind &char, message &char) { java(); assert exception == ""; exception = text(kind) }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Root-authorized account dispatch on the service main Looper. Never accepts
-// commands on the separate service lifetime channel.
+// Root-authorized account dispatch through one bounded Binder-style worker.
+// The main Looper retains UI delivery and the separate service lifetime channel.
 @[translated]
 module atlframework
 
@@ -60,6 +60,7 @@ __global ws_auth_mutex C.pthread_mutex_t
 __global ws_auth_ready bool
 __global ws_auth_slots &WsAuthSlot
 __global ws_auth_scope bool
+__global ws_auth_worker_thread usize
 __global ws_auth_broker_pid i32
 __global ws_auth_open WsAuthOpen
 __global ws_auth_read WsAuthRead
@@ -418,8 +419,14 @@ fn ws_auth_launch_failed(e voidptr, id u64) {
 }
 
 fn ws_auth_calling_uid() i32 {
-	if ws != unsafe { nil } && usize(C.pthread_self()) == ws.main_thread && ws_auth_scope { return 1000 }
-	return -2
+	unsafe {
+		if !ws_auth_ready { return -2 }
+		C.pthread_mutex_lock(&ws_auth_mutex)
+		allowed := ws != nil && ws_auth_worker_thread != 0
+			&& usize(C.pthread_self()) == ws_auth_worker_thread && ws_auth_scope
+		C.pthread_mutex_unlock(&ws_auth_mutex)
+		return if allowed { i32(1000) } else { i32(-2) }
+	}
 }
 
 fn ws_auth_calling_pid() i32 {
@@ -580,6 +587,11 @@ fn ws_auth_dispatch(e voidptr, binder voidptr, command &WsAuthCommand) bool {
 		node.response = WsRef(slot(e,21))(e,response)
 		if node.response == nil { C.free(node); return false }
 		C.pthread_mutex_lock(&ws_auth_mutex)
+		if ws_auth_handle == nil || !ws_auth_worker_active_locked(command.id) {
+			C.pthread_mutex_unlock(&ws_auth_mutex)
+			ws_auth_slot_free(e,node)
+			return true
+		}
 		node.next = ws_auth_slots; ws_auth_slots = node
 		C.pthread_mutex_unlock(&ws_auth_mutex)
 		args := &Value(C.alloca(5 * sizeof(Value)))
@@ -589,19 +601,32 @@ fn ws_auth_dispatch(e voidptr, binder voidptr, command &WsAuthCommand) bool {
 		args[3] = Value{l:if command.operation == 4 { bundle } else { features }}
 		args[4] = Value{l:bundle}
 		if pending(e) || (command.operation == 4 && args[2].l == nil) { return false }
+		return ws_auth_dispatch_call(e,authenticator,command.operation,args)
+	}
+}
+
+// Synthetic Binder identity is scoped to this synchronous call on the exact
+// dedicated worker; concurrent app and main threads retain their own identity.
+fn ws_auth_dispatch_call(e voidptr, authenticator voidptr, operation u16, args &Value) bool {
+	unsafe {
+		C.pthread_mutex_lock(&ws_auth_mutex)
 		ws_auth_scope = true
-		if command.operation == 4 {
+		C.pthread_mutex_unlock(&ws_auth_mutex)
+		if operation == 4 {
 			call(e,authenticator,c'android/accounts/IAccountAuthenticator',c'getAuthToken',c'(Landroid/accounts/IAccountAuthenticatorResponse;Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;)V',args)
 		} else {
-			call(e,authenticator,c'android/accounts/IAccountAuthenticator',c'addAccount',c'(Landroid/accounts/IAccountAuthenticatorResponse;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Landroid/os/Bundle;)V',&args[0])
+			call(e,authenticator,c'android/accounts/IAccountAuthenticator',c'addAccount',c'(Landroid/accounts/IAccountAuthenticatorResponse;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Landroid/os/Bundle;)V',args)
 		}
+		C.pthread_mutex_lock(&ws_auth_mutex)
 		ws_auth_scope = false
+		C.pthread_mutex_unlock(&ws_auth_mutex)
 		return !pending(e)
 	}
 }
 
 fn ws_auth_cancel(e voidptr, id u64) {
 	unsafe {
+		ws_auth_worker_cancel(id)
 		C.pthread_mutex_lock(&ws_auth_mutex)
 		mut previous := &WsAuthSlot(nil)
 		mut node := ws_auth_slots
@@ -638,6 +663,8 @@ fn ws_auth_pump_failure(e voidptr, stage i32, status i32) bool {
 fn ws_account_service_pump(e voidptr, binder voidptr) bool {
 	unsafe {
 		if !ws_auth_ready { return true }
+		worker_error := ws_auth_worker_error()
+		if worker_error != 0 { return ws_auth_pump_failure(e,4,worker_error) }
 		for _ in 0 .. 8 {
 			mut id := u64(0)
 			C.pthread_mutex_lock(&ws_auth_mutex)
@@ -656,8 +683,17 @@ fn ws_account_service_pump(e voidptr, binder voidptr) bool {
 				continue
 			}
 			if command == nil { return ws_auth_pump_failure(e,3,status) }
-			ok := ws_auth_dispatch(e,binder,command)
-			ws_auth_command_free(command)
+			mut transferred := false
+			mut ok := true
+			// An authenticator may synchronously query/invalidate its own store.
+			// Those native-only operations must not wait behind its Java call.
+			if command.operation == 1 || command.operation == 5 {
+				ok = ws_auth_dispatch(e,binder,command)
+			} else {
+				transferred = ws_auth_worker_enqueue(e,binder,command)
+				ok = transferred
+			}
+			if !transferred { ws_auth_command_free(command) }
 			if !ok { return ws_auth_pump_failure(e,4,status) }
 		}
 		return true
@@ -667,6 +703,7 @@ fn ws_account_service_pump(e voidptr, binder voidptr) bool {
 fn ws_account_service_shutdown(e voidptr) {
 	unsafe {
 		if !ws_auth_ready { return }
+		ws_auth_worker_shutdown(e)
 		C.pthread_mutex_lock(&ws_auth_mutex)
 		mut nodes := ws_auth_slots
 		ws_auth_slots = nil

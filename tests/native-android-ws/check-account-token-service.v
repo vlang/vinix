@@ -55,7 +55,7 @@ fn main() {
 	at := source.index('type WsAuthArray') or { panic('authenticator declarations') }
 	mut code := source[at..].all_before('fn ws_account_service_init(')
 	for name in ['ws_auth_command_free', 'ws_auth_copy', 'ws_auth_error_fields', 'ws_auth_bundle',
-		'ws_auth_token_check', 'ws_auth_dispatch'] {
+		'ws_auth_token_check', 'ws_auth_dispatch', 'ws_auth_dispatch_call'] {
 		code += '\n' + block(source, name)
 	}
 	mut names := ['production']
@@ -179,11 +179,17 @@ __global wire_token &char
 __global wire_features u32
 __global wire_options u32
 __global ws_store_handle voidptr
+__global worker_active bool = true
 
 fn nilp() voidptr { return unsafe { nil } }
 fn text(value &char) string { return unsafe { value.vstring() } }
 fn lock(mutex &int) { assert mutex == &ws_auth_mutex && !held; held = true }
 fn unlock(mutex &int) { assert mutex == &ws_auth_mutex && held; held = false }
+fn ws_auth_worker_active_locked(id u64) bool { assert held && id == 901; return worker_active }
+fn ws_auth_slot_free(e voidptr,node &WsAuthSlot) {
+ assert !held && node.response == voidptr(4) && node.id == 901 && retained > 0
+ retained--; release(node)
+}
 fn allocate(count u64,size u64) voidptr {
  allocation_calls++
  if allocation_calls == fail_allocation { return nilp() }
@@ -343,7 +349,7 @@ fn cleanup() {
 }
 fn reset() {
  cleanup()
- mode = 4; policy_allowed = true; store_available = true; authenticated = false; auth_calls = 0
+ mode = 4; policy_allowed = true; store_available = true; authenticated = false; auth_calls = 0; worker_active = true
  java_calls = 0; token_calls = 0; add_calls = 0; query_calls = 0; retained = 0
  invalidate_calls = 0; invalidate_result = true
  pending_exception = false; throw_token = false; fail_jni = ""; fail_text = unsafe { nil }
@@ -377,6 +383,11 @@ fn denied() {
 }
 fn main() {
  reset(); assert run_dispatch(); assert auth_calls == 1 && token_calls == 1 && add_calls == 0 && builders == 0 && !ws_auth_scope
+ // A copied command cancelled before slot publication must release its new
+ // response reference and native node without invoking APK Java code.
+ reset(); worker_active = false; assert run_dispatch()
+ assert auth_calls == 1 && token_calls == 0 && add_calls == 0 && retained == 0
+ assert ws_auth_slots == unsafe { nil } && allocated == 0 && native_allocations.len == 0 && !ws_auth_scope
  reset(); policy_allowed = false; denied(); assert auth_calls == 1
  reset(); store_available = false; denied(); assert auth_calls == 0
  reset(); ws_store_handle = nilp(); denied(); assert auth_calls == 0

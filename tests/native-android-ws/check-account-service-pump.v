@@ -49,11 +49,15 @@ fn main() {
 		once(production, 'if status < 0 { return ws_auth_pump_failure(e,1,status) }', 'if status < 0 { return false }'),
 		once(production, 'ws_auth_pump_failure(e,2,status)\n\t\t\t\t\tws_auth_launch_failed(e,id)',
 			'ws_auth_launch_failed(e,id)\n\t\t\t\t\tws_auth_pump_failure(e,2,status)'),
-		once(production, 'ws_auth_command_free(command)', '// lost command ownership'),
+		once(production, 'if !transferred { ws_auth_command_free(command) }', 'if !transferred {}'),
 		once(production, 'WsApplicationThrow(slot(e,13))(e,failure)', '// lost original exception'),
 		once(production, 'stage,status,i32(exception)', 'stage,status,i32(0)'),
 		once(production, 'ws_auth_pump_failure(e,4,status)', 'ws_auth_pump_failure(e,3,status)'),
 		once(production, "ws_failure(e,c'ANDROID-SERVICE-FAIL account pump')", '// lost exception report'),
+		once(production, 'if worker_error != 0 { return ws_auth_pump_failure(e,4,worker_error) }',
+			'if worker_error != 0 { return true }'),
+		once(production, 'transferred = ws_auth_worker_enqueue(e,binder,command)',
+			'transferred = !ws_auth_worker_enqueue(e,binder,command)'),
 	]
 	mut dispatch := 'fn main() {\n mut pump := Pump(ws_account_service_pump)\n'
 	for i, mutant in mutants {
@@ -80,7 +84,7 @@ fn main() {
 	revision := command(work, 'source-revision', ['git', 'rev-parse', 'HEAD'])
 	assert revision.exit_code == 0
 	os.write_file(work + '/evidence.json', json2.encode({
-		'scope': 'Production-extracted pump and failure reporting, instrumented JNI/transport boundaries. Four terminal stages, original Throwable identity/lifetime, launch ordering, success/cancel/budget checks; seven compiled negative mutations. No ART or authentication claim.'
+		'scope': 'Production-extracted pump and failure reporting, instrumented JNI/transport/worker-admission boundaries. Four terminal stages, original Throwable identity/lifetime, launch ordering, native-store main-path ownership, Java-command transfer/failure ownership, worker failure, success/cancel/budget checks and compiled negative mutations. No ART or authentication claim.'
 		'source_revision': revision.output.trim_space()
 		'source_sha256': sha256.hexhash(source)
 		'runtime_sha256': sha256.hexhash(runtime)
@@ -109,7 +113,7 @@ type WsApplicationException = fn (voidptr) voidptr
 type WsApplicationThrow = fn (voidptr, voidptr) i32
 type Drop = fn (voidptr, voidptr)
 type Check = fn (voidptr)
-struct WsAuthCommand { id u64 }
+struct WsAuthCommand { mut: id u64 operation u16 }
 struct Probe {
 mut:
  statuses []i32 = [i32(0)]
@@ -117,6 +121,8 @@ mut:
  locked bool
  copy_ok bool = true
  dispatch_ok bool = true
+ operation u16 = 2
+ worker_error i32
  launch_ok bool = true
  dispatch_exception bool
  launch_exception bool
@@ -128,6 +134,8 @@ mut:
  events []string
  copied int
  dispatched int
+ native_dispatched int
+ enqueued int
  freed int
  launched int
  cleaned int
@@ -141,12 +149,13 @@ __global probe = Probe{}
 __global ws_auth_ready = true
 __global ws_auth_handle = voidptr(1)
 __global ws_auth_mutex = 0
-__global test_command = WsAuthCommand{726492}
+__global test_command = WsAuthCommand{726492,2}
 fn pending(e voidptr) bool { assert !probe.locked; return probe.exception != unsafe { nil } }
 fn probe_lock(m &int) i32 { assert !probe.locked; probe.locked = true; return 0 }
 fn probe_unlock(m &int) i32 { assert probe.locked; probe.locked = false; return 0 }
 fn ws_auth_read(h voidptr, id &u64, timeout i32) i32 {
  assert probe.locked && h == voidptr(1) && timeout == 0
+ assert probe.cursor < probe.statuses.len, "pump read beyond the scheduled transport events"
  unsafe { *id = 726492 }
  status := probe.statuses[probe.cursor]; probe.cursor++; return status
 }
@@ -155,10 +164,20 @@ fn ws_auth_copy(id u64) &WsAuthCommand {
  probe.copied++
  return if probe.copy_ok { &test_command } else { unsafe { nil } }
 }
+fn ws_auth_worker_error() i32 { assert !probe.locked; return probe.worker_error }
 fn ws_auth_dispatch(e voidptr, b voidptr, c &WsAuthCommand) bool {
- assert !probe.locked && c == &test_command
- probe.dispatched++
+ assert !probe.locked && c == &test_command && c.operation in [u16(1), 5]
+ probe.dispatched++; probe.native_dispatched++
  if probe.dispatch_exception { probe.exception = voidptr(77) }
+ return probe.dispatch_ok
+}
+// Isolate asynchronous worker execution while exercising real pump
+// ownership contract: admission owns/frees on success, caller owns on failure.
+fn ws_auth_worker_enqueue(e voidptr, b voidptr, c &WsAuthCommand) bool {
+ assert !probe.locked && c == &test_command && c.operation in [u16(2), 4]
+ probe.dispatched++; probe.enqueued++
+ if probe.dispatch_exception { probe.exception = voidptr(77) }
+ if probe.dispatch_ok { ws_auth_command_free(c) }
  return probe.dispatch_ok
 }
 fn ws_auth_command_free(c &WsAuthCommand) {
@@ -218,7 +237,7 @@ fn slot(e voidptr, index int) voidptr {
 
 const cases = '
 fn reset(config Probe) {
- probe = config; ws_auth_ready = true; ws_auth_handle = voidptr(1)
+ probe = config; test_command.operation = config.operation; ws_auth_ready = true; ws_auth_handle = voidptr(1)
 }
 fn check_failure(pump Pump, stage int, status i32, exception bool, capture_nil bool) {
  assert !pump(unsafe { nil }, unsafe { nil })
@@ -234,9 +253,11 @@ fn check_failure(pump Pump, stage int, status i32, exception bool, capture_nil b
  } else {
   assert probe.exception == if exception { voidptr(77) } else { unsafe { nil } }
  }
- if stage == 4 {
+ if stage == 4 && status >= 0 {
   assert probe.copied == 1 && probe.dispatched == 1 && probe.freed == 1
   assert probe.events[0] == "free"
+ } else if stage == 4 {
+  assert probe.cursor == 0 && probe.copied == 0 && probe.dispatched == 0 && probe.freed == 0
  }
 }
 fn silent(pump Pump) {
@@ -248,6 +269,9 @@ fn suite(pump Pump) {
  reset(Probe{}); ws_auth_ready = false; silent(pump); assert probe.cursor == 0
  reset(Probe{}); silent(pump); assert probe.cursor == 1
  reset(Probe{}); ws_auth_handle = unsafe { nil }; check_failure(pump, 1, -1, false, false); assert probe.cursor == 0
+ for status in [i32(-1), -2, -3, -4] {
+  reset(Probe{worker_error:status}); check_failure(pump, 4, status, false, false)
+ }
  for exception in [false, true] {
   original := if exception { voidptr(77) } else { unsafe { nil } }
   reset(Probe{statuses: [i32(-2147483647 - 1)], exception: original})
@@ -268,7 +292,18 @@ fn suite(pump Pump) {
  reset(Probe{statuses: [i32(2), 0]}); silent(pump); assert probe.cancelled == 1 && probe.cursor == 2
  reset(Probe{statuses: [i32(3), 0]}); silent(pump); assert probe.launched == 1 && probe.cleaned == 0
  reset(Probe{statuses: [i32(1), 0]}); silent(pump)
- assert probe.copied == 1 && probe.dispatched == 1 && probe.freed == 1
+ assert probe.copied == 1 && probe.dispatched == 1 && probe.enqueued == 1 && probe.native_dispatched == 0 && probe.freed == 1
+ for operation in [u16(1), 5] {
+  reset(Probe{operation:operation, statuses:[i32(1), 0]}); silent(pump)
+  assert probe.copied == 1 && probe.dispatched == 1 && probe.native_dispatched == 1 && probe.enqueued == 0 && probe.freed == 1
+  for exception in [false, true] {
+   reset(Probe{operation:operation, statuses:[i32(1)], dispatch_ok:false, dispatch_exception:exception})
+   check_failure(pump, 4, 1, exception, false)
+   assert probe.native_dispatched == 1 && probe.enqueued == 0
+  }
+ }
+ reset(Probe{operation:4, statuses:[i32(1), 0]}); silent(pump)
+ assert probe.enqueued == 1 && probe.native_dispatched == 0 && probe.freed == 1
  reset(Probe{statuses: [i32(1), 1, 1, 1, 1, 1, 1, 1, -1]}); silent(pump)
  assert probe.cursor == 8 && probe.copied == 8 && probe.dispatched == 8 && probe.freed == 8
 }
