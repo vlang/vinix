@@ -130,6 +130,9 @@ __global ws_auth_ready bool
 __global ws_auth_mutex int
 __global ws_auth_slots &WsAuthSlot
 __global ws_auth_scope bool
+__global ws_auth_identity_epoch u64
+__global ws_auth_identity_cleared bool
+__global ws_auth_identity_issued u8
 __global ws_account_initialized bool
 __global ws_account_library voidptr
 __global ws_account_mutex int

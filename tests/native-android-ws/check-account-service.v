@@ -15,7 +15,7 @@ fn main() {
 	at := source.index('type WsAuthArray') or { panic('missing authenticator declarations') }
 	mut code := source[at..].all_before('fn ws_account_service_init(')
 	for name in ['ws_auth_slot_free', 'ws_auth_claim', 'ws_auth_error_fields', 'ws_auth_error', 'ws_auth_continued',
-		'ws_auth_result', 'ws_auth_calling_uid', 'ws_auth_calling_pid', 'ws_auth_permission',
+		'ws_auth_result', 'ws_auth_identity_locked', 'ws_auth_calling_uid', 'ws_auth_calling_pid', 'ws_auth_permission',
 		'ws_auth_cancel', 'ws_account_service_shutdown'] {
 		code += '\n' + block(source,name)
 	}
@@ -33,6 +33,9 @@ const model = '
 module main
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+fn C.getuid() u32
+fn C.getpid() int
 fn C.calloc(u64,u64) voidptr
 fn C.free(voidptr)
 fn C.strdup(&char) &char

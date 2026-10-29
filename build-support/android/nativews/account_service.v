@@ -61,6 +61,9 @@ __global ws_auth_ready bool
 __global ws_auth_slots &WsAuthSlot
 __global ws_auth_scope bool
 __global ws_auth_worker_thread usize
+__global ws_auth_identity_epoch u64
+__global ws_auth_identity_cleared bool
+__global ws_auth_identity_issued u8
 __global ws_auth_broker_pid i32
 __global ws_auth_open WsAuthOpen
 __global ws_auth_read WsAuthRead
@@ -418,23 +421,82 @@ fn ws_auth_launch_failed(e voidptr, id u64) {
 	}
 }
 
+// The caller identity belongs to one synchronous incoming transaction on the
+// dedicated worker. Clearing it must leave that transaction gate intact so a
+// valid snapshot can restore the caller before the transaction returns.
+fn ws_auth_identity_locked() bool {
+	unsafe {
+		return ws != nil && ws_auth_worker_thread != 0
+			&& usize(C.pthread_self()) == ws_auth_worker_thread && ws_auth_scope
+	}
+}
+
 fn ws_auth_calling_uid() i32 {
 	unsafe {
 		if !ws_auth_ready { return -2 }
 		C.pthread_mutex_lock(&ws_auth_mutex)
-		allowed := ws != nil && ws_auth_worker_thread != 0
-			&& usize(C.pthread_self()) == ws_auth_worker_thread && ws_auth_scope
+		allowed := ws_auth_identity_locked()
+		uid := if ws_auth_identity_cleared { i32(C.getuid()) } else { i32(1000) }
 		C.pthread_mutex_unlock(&ws_auth_mutex)
-		return if allowed { i32(1000) } else { i32(-2) }
+		return if allowed { uid } else { i32(-2) }
+	}
+}
+
+// There are only two snapshots in each dispatch: incoming caller and self.
+// Repeated clear/restore operations reuse those snapshots, as Binder does;
+// memory use is constant and restores need not be strictly nested. The epoch
+// and issued-state mask prevent another dispatch's token from granting caller
+// permissions. Zero is reserved for the framework's unchanged fallback.
+fn ws_auth_clear_identity() i64 {
+	unsafe {
+		if !ws_auth_ready { return 0 }
+		C.pthread_mutex_lock(&ws_auth_mutex)
+		mut token := i64(0)
+		if ws_auth_identity_locked() && ws_auth_identity_epoch != 0 {
+			identity := if ws_auth_identity_cleared { u8(2) } else { u8(1) }
+			token = i64((ws_auth_identity_epoch << 2) | u64(identity))
+			ws_auth_identity_issued |= identity
+			ws_auth_identity_cleared = true
+		}
+		C.pthread_mutex_unlock(&ws_auth_mutex)
+		return token
+	}
+}
+
+fn ws_auth_restore_identity(token i64) bool {
+	unsafe {
+		if !ws_auth_ready || token <= 0 { return false }
+		C.pthread_mutex_lock(&ws_auth_mutex)
+		identity := u8(u64(token) & 3)
+		allowed := ws_auth_identity_locked() && ws_auth_identity_epoch != 0
+			&& u64(token) >> 2 == ws_auth_identity_epoch && (identity == 1 || identity == 2)
+			&& (ws_auth_identity_issued & identity) != 0
+		if allowed { ws_auth_identity_cleared = identity == 2 }
+		C.pthread_mutex_unlock(&ws_auth_mutex)
+		return allowed
 	}
 }
 
 fn ws_auth_calling_pid() i32 {
-	return if ws_auth_calling_uid() == 1000 { ws_auth_broker_pid } else { -2 }
+	unsafe {
+		if !ws_auth_ready { return -2 }
+		C.pthread_mutex_lock(&ws_auth_mutex)
+		allowed := ws_auth_identity_locked()
+		pid := if ws_auth_identity_cleared { i32(C.getpid()) } else { ws_auth_broker_pid }
+		C.pthread_mutex_unlock(&ws_auth_mutex)
+		return if allowed { pid } else { i32(-2) }
+	}
 }
 
 fn ws_auth_permission(e voidptr, permission voidptr, pid i32, uid i32) i32 {
-	if ws_auth_calling_uid() != 1000 || (uid != -1 && uid != 1000)
+	if !ws_auth_ready { return -2 }
+	unsafe {
+		C.pthread_mutex_lock(&ws_auth_mutex)
+		allowed := ws_auth_identity_locked() && !ws_auth_identity_cleared
+		C.pthread_mutex_unlock(&ws_auth_mutex)
+		if !allowed { return -2 }
+	}
+	if (uid != -1 && uid != 1000)
 		|| (pid != -1 && pid != ws_auth_broker_pid) { return -2 }
 	if ws_service_string(e,permission,c'android.permission.ACCOUNT_MANAGER') { return 0 }
 	return -2
@@ -610,6 +672,15 @@ fn ws_auth_dispatch(e voidptr, binder voidptr, command &WsAuthCommand) bool {
 fn ws_auth_dispatch_call(e voidptr, authenticator voidptr, operation u16, args &Value) bool {
 	unsafe {
 		C.pthread_mutex_lock(&ws_auth_mutex)
+		// Keep every positive token within Java's signed long, and never
+		// reuse an epoch. Exhaustion fails closed before entering app code.
+		if ws_auth_identity_epoch == u64(0x1fffffffffffffff) {
+			C.pthread_mutex_unlock(&ws_auth_mutex)
+			return false
+		}
+		ws_auth_identity_epoch++
+		ws_auth_identity_cleared = false
+		ws_auth_identity_issued = 0
 		ws_auth_scope = true
 		C.pthread_mutex_unlock(&ws_auth_mutex)
 		if operation == 4 {
@@ -619,6 +690,8 @@ fn ws_auth_dispatch_call(e voidptr, authenticator voidptr, operation u16, args &
 		}
 		C.pthread_mutex_lock(&ws_auth_mutex)
 		ws_auth_scope = false
+		ws_auth_identity_cleared = false
+		ws_auth_identity_issued = 0
 		C.pthread_mutex_unlock(&ws_auth_mutex)
 		return !pending(e)
 	}

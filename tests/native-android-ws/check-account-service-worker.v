@@ -37,7 +37,8 @@ fn main() {
 	assert function(service, 'ws_auth_dispatch').contains('ws_auth_handle == nil || !ws_auth_worker_active_locked(command.id)')
 	assert function(service, 'ws_auth_dispatch').contains('return ws_auth_dispatch_call(e,authenticator,command.operation,args)')
 	mut production := worker.all_after('module atlframework\n')
-	for name in ['ws_auth_calling_uid', 'ws_auth_dispatch_call', 'ws_account_service_pump', 'ws_account_service_shutdown'] {
+	for name in ['ws_auth_identity_locked', 'ws_auth_calling_uid', 'ws_auth_calling_pid', 'ws_auth_permission',
+		'ws_auth_clear_identity', 'ws_auth_restore_identity', 'ws_auth_dispatch_call', 'ws_account_service_pump', 'ws_account_service_shutdown'] {
 		production += '\n' + function(service, name)
 	}
 	production = production.replace('C.pthread_create(', 'probe_create(')
@@ -70,11 +71,15 @@ import time
 #include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 @[typedef]
 struct C.pthread_t {}
 fn C.calloc(usize,usize) voidptr
 fn C.free(voidptr)
 fn C.usleep(u32) i32
+fn C.strcmp(&char,&char) i32
+fn C.getuid() u32
+fn C.getpid() int
 fn C.pthread_self() C.pthread_t
 fn C.pthread_create(&C.pthread_t,voidptr,fn(voidptr)voidptr,voidptr) i32
 fn C.pthread_detach(C.pthread_t) i32
@@ -121,6 +126,7 @@ mut:
  frame_fail bool
  call_fail bool
  create_fail bool
+ identity_token i64
 }
 __global metrics = Metrics{}
 __global probe_mutex C.pthread_mutex_t
@@ -129,6 +135,10 @@ __global ws_auth_ready = true
 __global ws_auth_handle = voidptr(1)
 __global ws_auth_scope bool
 __global ws_auth_worker_thread usize
+__global ws_auth_identity_epoch u64
+__global ws_auth_identity_cleared bool
+__global ws_auth_identity_issued u8
+__global ws_auth_broker_pid = i32(42)
 __global ws_auth_slots &WsAuthSlot
 __global main_thread usize
 __global test_state State
@@ -187,13 +197,42 @@ fn gate(id u64,phase int) {
  }
  panic("test gate did not release")
 }
+fn ws_service_string(e voidptr,value voidptr,text &char)bool {
+ return value != unsafe { nil } && unsafe { C.strcmp(&char(value),text) == 0 }
+}
 fn call(e voidptr,obj voidptr,owner &char,name &char,signature &char,args &Value) {
  assert e == voidptr(2) && obj == voidptr(99) && usize(C.pthread_self()) != main_thread
  assert ws_auth_calling_uid() == 1000
+ permission := voidptr(c"android.permission.ACCOUNT_MANAGER")
+ assert ws_auth_calling_pid() == 42 && ws_auth_permission(e,permission,-1,-1) == 0
+ stale := snapshot().identity_token
+ if stale != 0 { assert !ws_auth_restore_identity(stale) }
+ // A syntactically valid token which was never issued cannot restore scope.
+ assert !ws_auth_restore_identity(i64((ws_auth_identity_epoch << 2) | 1))
+ assert !ws_auth_restore_identity(i64((ws_auth_identity_epoch << 2) | 2))
+ caller := ws_auth_clear_identity()
+ assert caller > 0 && ws_auth_calling_uid() == i32(C.getuid()) && ws_auth_calling_pid() == C.getpid()
+ assert ws_auth_permission(e,permission,-1,-1) == -2
+ if stale != 0 { assert !ws_auth_restore_identity(stale) && ws_auth_calling_uid() == i32(C.getuid()) }
+ self := ws_auth_clear_identity()
+ assert self > 0 && self != caller && ws_auth_calling_uid() == i32(C.getuid())
+ assert ws_auth_restore_identity(self) && ws_auth_calling_uid() == i32(C.getuid())
+ assert ws_auth_restore_identity(caller) && ws_auth_calling_uid() == 1000
+ // Binder tokens are prior-identity snapshots, not a strict nesting stack.
+ assert ws_auth_restore_identity(caller) && ws_auth_calling_uid() == 1000
+ assert ws_auth_restore_identity(self) && ws_auth_calling_uid() == i32(C.getuid())
+ assert ws_auth_restore_identity(caller) && ws_auth_calling_uid() == 1000
+ assert ws_auth_clear_identity() == caller && ws_auth_calling_uid() == i32(C.getuid())
+ assert ws_auth_restore_identity(caller) && ws_auth_permission(e,permission,42,1000) == 0
+ assert !ws_auth_restore_identity(0) && !ws_auth_restore_identity(-1)
+ assert !ws_auth_restore_identity(i64((ws_auth_identity_epoch << 2) | 3))
+ for _ in 0 .. 1024 { assert ws_auth_clear_identity() == caller && ws_auth_restore_identity(caller) }
+ C.pthread_mutex_lock(&probe_mutex); metrics.identity_token = caller; C.pthread_mutex_unlock(&probe_mutex)
  id := u64(unsafe { args[0].j })
  C.pthread_mutex_lock(&probe_mutex); metrics.calls[id]++; C.pthread_mutex_unlock(&probe_mutex)
  gate(id,2)
- if snapshot().call_fail { exception_pending = true }
+ assert ws_auth_calling_uid() == 1000 && ws_auth_permission(e,permission,-1,-1) == 0
+ if snapshot().call_fail { assert ws_auth_clear_identity() > 0; exception_pending = true }
 }
 fn ws_auth_dispatch(e voidptr,binder voidptr,command &WsAuthCommand)bool {
  if command.operation == 1 || command.operation == 5 {
@@ -268,14 +307,19 @@ fn wait_exit(detached int) {
   if gone && snapshot().detached == detached { return }; C.usleep(1000)
  }; panic("worker did not retire")
 }
-fn denied(arg voidptr)voidptr { assert ws_auth_calling_uid() == -2; return unsafe { nil } }
+fn denied(arg voidptr)voidptr {
+ assert ws_auth_calling_uid() == -2 && ws_auth_clear_identity() == 0
+ assert !ws_auth_restore_identity(snapshot().identity_token)
+ return unsafe { nil }
+}
 fn delayed_release(arg voidptr)voidptr { C.usleep(1000000); assert ws_auth_calling_uid() == -2; release(); return unsafe { nil } }
 fn main() {
  assert C.pthread_mutex_init(&ws_auth_mutex,unsafe { nil }) == 0
  assert C.pthread_mutex_init(&probe_mutex,unsafe { nil }) == 0
  main_thread = usize(C.pthread_self()); test_state.main_thread = main_thread; ws = &test_state
  reset(); set_gate(1,2); assert submit(1); wait_gate()
- assert ws_auth_calling_uid() == -2
+ assert ws_auth_calling_uid() == -2 && ws_auth_clear_identity() == 0
+ assert !ws_auth_restore_identity(snapshot().identity_token)
  mut other := C.pthread_t{}; assert C.pthread_create(&other,unsafe { nil },denied,unsafe { nil }) == 0; C.pthread_join(other,unsafe { nil })
  // Native store queries remain on main even while the Java call is blocked.
  assert ws_account_service_pump(voidptr(1),voidptr(88))
@@ -306,6 +350,10 @@ fn main() {
  reset(); C.pthread_mutex_lock(&probe_mutex); metrics.call_fail = true; C.pthread_mutex_unlock(&probe_mutex)
  assert submit(45); wait_error(); wait_free(45); wait_exit(1)
  assert snapshot().calls[45] == 1 && snapshot().pushed == 1 && snapshot().popped == 1 && snapshot().failures == 1 && !exception_pending
+ C.pthread_mutex_lock(&ws_auth_mutex)
+ assert !ws_auth_scope && !ws_auth_identity_cleared && ws_auth_identity_issued == 0
+ C.pthread_mutex_unlock(&ws_auth_mutex)
+ assert !ws_auth_restore_identity(snapshot().identity_token)
  ws_account_service_shutdown(voidptr(1)); assert snapshot().dropped == 1
  reset(); C.pthread_mutex_lock(&probe_mutex); metrics.attach_fail = true; C.pthread_mutex_unlock(&probe_mutex)
  submit(50); wait_error(); wait_free(50); assert snapshot().dropped == 0
@@ -313,6 +361,10 @@ fn main() {
  reset(); C.pthread_mutex_lock(&probe_mutex); metrics.create_fail = true; C.pthread_mutex_unlock(&probe_mutex)
  assert !submit(60) && snapshot().frees[60] == 1 && snapshot().dropped == 1
  ws_account_service_shutdown(voidptr(1)); wait_exit(0)
- println("ACCOUNT-WORKER-PASS off-main FIFO queue-full-reply scoped-worker-only queued-and-active-cancel nonblocking-shutdown attach-frame-create-failures exactly-once-ownership")
+ reset(); C.pthread_mutex_lock(&ws_auth_mutex); ws_auth_identity_epoch = u64(0x1fffffffffffffff); C.pthread_mutex_unlock(&ws_auth_mutex)
+ assert submit(70); wait_error(); wait_free(70); wait_exit(1)
+ assert snapshot().calls[70] == 0 && !ws_auth_scope && ws_auth_identity_issued == 0
+ ws_account_service_shutdown(voidptr(1))
+ println("ACCOUNT-WORKER-PASS off-main FIFO queue-full-reply scoped-worker-only nested-identity-clear-restore stale-token-rejection exception-reset epoch-exhaustion queued-and-active-cancel nonblocking-shutdown attach-frame-create-failures exactly-once-ownership")
 }
 '
