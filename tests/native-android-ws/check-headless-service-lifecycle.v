@@ -29,14 +29,16 @@ fn main() {
 	// lifecycle with a second implementation in the checker.
 	mutations := [
 		run.replace(' || binder == nil', ' || (binder == nil && false)'),
-		run.replace('if ws_service_control(control_fd, 0) != 1 { return 1 }', ''),
+		run.replace('if ws_service_control(control_fd, 0) != 1 { return ws_service_terminal_fail(2, 1) }', '')
+			.replace('if ws_service_control(control_fd, 0) != 1 { return ws_service_terminal_fail(2, 5) }', '')
+			.replace('if ws_service_control(control_fd, 0) != 1 { return ws_service_terminal_fail(2, 8) }', ''),
 		run.replace('if state_after == 0 { return 0 }', 'if state_after == 0 { return 1 }'),
 		run.replace('if state == 0 { return 0 }', 'if state == 0 { return 1 }'),
-		run.replace('if !ok { return 1 }', 'if !ok { return 0 }'),
+		run.replace('if !ok { return ws_service_terminal_fail(3, terminal_reason) }', 'if !ok { return 0 }'),
 		run.replace('ws_millis() >= deadline', '(ws_millis() >= deadline && false)'),
 		run.replace('started_ms + 45000', 'started_ms + 5000'),
 		run.replace('probe_fflush(nil)', ''),
-		run.replace(' && ws_account_service_pump(e,binder)', ''),
+		run.replace('ok = ws_account_service_pump(e,binder)', 'ok = true'),
 		run.replace('if ok { ok = ws_service_ui_pump(e) }', ''),
 		run.replace('if ok { ok = ws_service_ui_pump(e) }', 'ok = ws_service_ui_pump(e)'),
 	]
@@ -47,7 +49,7 @@ fn main() {
 		program += '\n' + mutation.replace('fn ws_service_run(', 'fn ' + name + '(')
 		checks += ' assert !lifecycle_suite(${name}, ws_service_shutdown, false), "run mutant ${i} escaped"\n'
 	}
-	stop_check := "if ws_failure(e, c'ANDROID-SERVICE-FAIL stop scheduling')"
+	stop_check := "if ws_service_failure(e, c'ANDROID-SERVICE-FAIL stop scheduling', 4, 1)"
 	clear_check := 'if pending(e) { WsApplicationClear(slot(e, 17))(e) }'
 	shutdown_mutations := [
 		shutdown.replace("boolean(e, loaded, c'android/atl/ATLLoadedApp', c'stopService', c'(Landroid/content/Intent;)Z', &stop_arg)", '_ = loaded; _ = stop_arg'),
@@ -71,7 +73,11 @@ fn main() {
 	defer { os.rmdir_all(work) or {} }
 	os.write_file(work + '/main.v', program + checks)!
 	compiler := os.getenv_opt('VINIX_V_COMPILER') or { 'v' }
-	result := os.exec([compiler, '-w', '-n', '-enable-globals', '-cc', 'cc', 'run', work + '/main.v'])
+	// Mutants may leave an unused diagnostic variable. Keep compiler output
+	// separate so it cannot masquerade as behavioral output from the probe.
+	built := os.exec([compiler, '-w', '-n', '-enable-globals', '-cc', 'cc', '-o', work + '/probe', work + '/main.v'])
+	if built.exit_code != 0 { panic(built.output) }
+	result := os.exec([work + '/probe'])
 	if result.exit_code != 0 { panic(result.output) }
 	assert result.output.trim_space() == 'HEADLESS-LIFECYCLE-PASS cases=33 negative-mutations=18'
 	println(result.output.trim_space())
@@ -83,6 +89,10 @@ struct Value { l voidptr }
 type WsApplicationClear = fn (voidptr)
 type ServiceRun = fn (voidptr, voidptr, i32, &char, &char) i32
 type ServiceShutdown = fn (voidptr, voidptr, voidptr, voidptr, voidptr, voidptr, i32) i32
+// Terminal observability is separately executed by check-service-terminal.v.
+// Keep these lifecycle cases focused on production status/control/teardown.
+fn ws_service_terminal_fail(phase i32, reason i32) i32 { return 1 }
+fn ws_service_failure(e voidptr, stage &char, phase i32, reason i32) bool { return ws_failure(e, stage) }
 // The separate binding-timeout checker executes the production diagnostic.
 fn ws_service_binding_timeout(e voidptr, binding voidptr, started_ms i64, pumps u64, record bool, reason i32, control i32) {}
 struct Probe {

@@ -142,6 +142,9 @@ fn ws_service_pump(e voidptr) bool {
  return true
 }
 fn ws_failure(e voidptr, message &char) bool { assert !pending(e); return false }
+// The terminal observer has its own executable ordering/quietness check.
+fn ws_service_terminal_fail(phase i32, reason i32) i32 { return 1 }
+fn ws_service_failure(e voidptr, stage &char, phase i32, reason i32) bool { return ws_failure(e, stage) }
 fn get_object(e voidptr, object voidptr, class &char, name &char, descriptor &char) voidptr {
  assert !pending(e) && p.frame_depth == 1
  return if p.pumps >= p.bind_after { voidptr(4) } else { unsafe { nil } }
