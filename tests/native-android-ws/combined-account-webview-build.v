@@ -370,6 +370,100 @@ fn service_lifecycle_profile() NarrowProfile {
  }
 }
 
+fn platform_fragments_profile() NarrowProfile {
+ activity := 'android/app/Activity.smali'
+ fragment := 'android/app/Fragment.smali'
+ manager := 'android/app/FragmentManager.smali'
+ transaction := 'android/app/FragmentTransaction.smali'
+ return NarrowProfile{
+  name: 'platform-fragments'
+  baseline_name: 'combined-account-webview-service-lifecycle-framework-2026-10-29-r1'
+  manifest_pin: '9453286e07d3bd727782355413d4fa8059bd1332e89850748fb4db02680c9488'
+  jar_pin: '7017b4845f91cb1c37057f6e8da07476b9b1b44c523827acaf00baad2432fe74'
+  baseline_classes: 2104
+  providers: ['framework_platform_fragments.v']
+  calls: {
+   activity: 'framework_platform_fragments_activity'
+   fragment: 'framework_platform_fragments_fragment'
+   manager: 'framework_platform_fragments_manager'
+   transaction: 'framework_platform_fragments_transaction'
+  }
+  methods: {
+   activity: ['getFragmentManager()Landroid/app/FragmentManager;',
+    'vinixLifecycleOnCreate(Landroid/os/Bundle;)V', 'vinixLifecycleOnStart()V',
+    'vinixLifecycleOnResume()V', 'vinixLifecycleOnPause()V', 'vinixLifecycleOnStop()V',
+    'vinixLifecycleOnDestroy()V', 'vinixPerformCreate(Landroid/os/Bundle;)V',
+    'vinixPerformStart()V', 'vinixPerformResume()V', 'vinixPerformPause()V',
+    'vinixPerformStop()V', 'vinixPerformDestroy()V']
+   fragment: ['getTag()Ljava/lang/String;', 'onAttach(Landroid/app/Activity;)V',
+    'onAttach(Landroid/content/Context;)V', 'onActivityCreated(Landroid/os/Bundle;)V', 'onDetach()V']
+   manager: ['<init>(Landroid/app/Activity;)V', 'beginTransaction()Landroid/app/FragmentTransaction;',
+    'executePendingTransactions()Z', 'findFragmentByTag(Ljava/lang/String;)Landroid/app/Fragment;',
+    'vinixCheckHost()V', 'vinixEnqueue(Landroid/app/FragmentTransaction;)V',
+    'vinixAdd(Landroid/app/Fragment;)V', 'vinixMoveToState(I)V', 'vinixCancelPosted()V',
+    'vinixSynchronize()V', 'vinixMoveFragment(Landroid/app/Fragment;)V', 'vinixTerminalCleanup()V']
+   transaction: ['<init>(Landroid/app/Activity;)V',
+    'add(Landroid/app/Fragment;Ljava/lang/String;)Landroid/app/FragmentTransaction;',
+    'commit()I', 'vinixExecute()V', 'vinixCancel()V']
+  }
+  changed: {activity: 13, fragment: 0, manager: 4, transaction: 3}
+  added: {activity: 0, fragment: 5, manager: 8, transaction: 2}
+  fields: {
+   activity: ['.field private vinixPlatformFragments:Landroid/app/FragmentManager;']
+   fragment: ['.field vinixManager:Landroid/app/FragmentManager;',
+    '.field vinixTag:Ljava/lang/String;', '.field vinixState:I', '.field vinixAdded:Z']
+   manager: ['.field private vinixPending:Ljava/util/ArrayList;',
+    '.field private vinixHandler:Landroid/os/Handler;', '.field private vinixRunner:Ljava/lang/Runnable;',
+    '.field private vinixState:I', '.field private vinixExecuting:Z', '.field private vinixDestroyed:Z']
+   transaction: ['.field vinixManager:Landroid/app/FragmentManager;',
+    '.field private vinixAdds:Ljava/util/ArrayList;', '.field private vinixCommitted:Z']
+  }
+  class_provider: 'framework_platform_fragments_classes'
+  extra_classes: ['android/app/VinixFragmentCommit.smali']
+ }
+}
+
+fn platform_fragments_method_headers(target string) !map[string]string {
+ profile := platform_fragments_profile()
+ signatures := profile.methods[target] or { return error('unexpected platform fragment target') }
+ mut headers := map[string]string{}
+ for signature in signatures {
+  flags := if signature.starts_with('<init>(') { 'public constructor' }
+   else if target == 'android/app/FragmentManager.smali'
+    && signature in ['vinixCancelPosted()V', 'vinixSynchronize()V', 'vinixMoveFragment(Landroid/app/Fragment;)V', 'vinixTerminalCleanup()V'] { 'private' }
+   else { 'public' }
+  headers[signature] = '.method ' + flags + ' ' + signature
+ }
+ if target == 'android/app/Activity.smali' {
+  for signature in ['onStart()V', 'onStop()V', 'onDestroy()V'] {
+   headers[signature] = '.method public native ' + signature
+  }
+ }
+ return headers
+}
+
+fn platform_fragments_abi(source string, target string) ! {
+ parts := store_parts(source)!
+ if target == 'android/app/VinixFragmentCommit.smali' {
+  expected := '.class public final Landroid/app/VinixFragmentCommit;\n.super Ljava/lang/Object;\n.implements Ljava/lang/Runnable;\n.field private manager:Landroid/app/FragmentManager;'
+  if parts.metadata != expected || parts.methods.len != 2 {
+   return error('unexpected platform fragment Runnable metadata or member count')
+  }
+  for signature, header in {
+   '<init>(Landroid/app/FragmentManager;)V': '.method public constructor <init>(Landroid/app/FragmentManager;)V'
+   'run()V': '.method public run()V'
+  } {
+   method := parts.methods[signature] or { return error('missing platform fragment Runnable member') }
+   if method.all_before('\n').trim_space() != header { return error('unexpected platform fragment Runnable ABI') }
+  }
+  return
+ }
+ for signature, header in platform_fragments_method_headers(target)! {
+  method := parts.methods[signature] or { return error('missing platform fragment ABI member: ' + signature) }
+  if method.all_before('\n').trim_space() != header { return error('unexpected platform fragment method ABI: ' + signature) }
+ }
+}
+
 fn store_parts(source string) !StoreClassParts {
  mut methods := map[string]string{}
  mut metadata := []string{}
@@ -928,6 +1022,120 @@ fn service_lifecycle_self_test() ! {
  }
 }
 
+fn platform_fragments_self_test() ! {
+ profile := platform_fragments_profile()
+ targets := ['android/app/Activity.smali', 'android/app/Fragment.smali',
+  'android/app/FragmentManager.smali', 'android/app/FragmentTransaction.smali']
+ helper := 'android/app/VinixFragmentCommit.smali'
+ if profile.methods.len != 4 || profile.calls.len != 4 || profile.fields.len != 4
+  || profile.baseline_classes != 2104 || profile.extra_classes != [helper]
+  || profile.class_provider != 'framework_platform_fragments_classes' {
+  return error('platform fragments require exactly four targets and one explicit helper')
+ }
+ mut changed := 0
+ mut added := 0
+ mut fields_count := 0
+ for target in targets {
+  allowed := profile.methods[target]!
+  count := profile.changed[target]!
+  additions_count := profile.added[target]!
+  fields := profile.fields[target]!
+  changed += count
+  added += additions_count
+  fields_count += fields.len
+  narrow_method_self_test(allowed, count, additions_count)!
+  headers := platform_fragments_method_headers(target)!
+  metadata := '.class public LFixture;\n.super Ljava/lang/Object;\n.field private retained:I\n'
+  retained := '.method public retained()V\n.locals 0\nreturn-void\n.end method\n'
+  mut before := metadata + retained
+  mut after := metadata + retained
+  for i, signature in allowed {
+   header := headers[signature]!
+   if i < count { before += header + '\n.locals 1\nreturn-void\n.end method\n' }
+   after += header + '\n.locals 2\nreturn-void\n.end method\n'
+  }
+  if target == 'android/app/Activity.smali' {
+   for signature in ['onStart()V', 'onStop()V', 'onDestroy()V'] {
+    declaration := headers[signature]! + '\n.end method\n'
+    before += declaration
+    after += declaration
+   }
+  }
+  after += fields.join('\n') + '\n'
+  narrow_member_delta(before, after, allowed, count, additions_count, fields)!
+  platform_fragments_abi(after, target)!
+  for bad in [after.replace(fields[0], fields[0] + '\n' + fields[0]),
+   after.replace(fields[0], ''), after + '.field private unexpected:I\n',
+   after.replace('.field private retained:I', '.field private retained:J'),
+   after.replace('public retained()V', 'private retained()V')] {
+   narrow_member_delta(before, bad, allowed, count, additions_count, fields) or { continue }
+   return error('invalid platform fragment field/member delta accepted: ' + target)
+  }
+  for signature, header in headers {
+   bad := after.replace(header, header.replace('.method ', '.method static '))
+   platform_fragments_abi(bad, target) or { continue }
+   return error('invalid platform fragment method flags accepted: ' + signature)
+  }
+  if target == 'android/app/Activity.smali' {
+   for signature in ['onStart()V', 'onStop()V', 'onDestroy()V'] {
+    bad := after.replace(headers[signature]!, '.method public ' + signature)
+    platform_fragments_abi(bad, target) or { continue }
+    return error('removed Activity native declaration accepted')
+   }
+  }
+ }
+ if changed != 20 || added != 15 || fields_count != 14 {
+  return error('platform fragment exact method/field counts differ')
+ }
+ helper_source := '.class public final Landroid/app/VinixFragmentCommit;\n.super Ljava/lang/Object;\n.implements Ljava/lang/Runnable;\n.field private manager:Landroid/app/FragmentManager;\n' +
+  '.method public constructor <init>(Landroid/app/FragmentManager;)V\n.locals 0\nreturn-void\n.end method\n' +
+  '.method public run()V\n.locals 0\nreturn-void\n.end method\n'
+ platform_fragments_abi(helper_source, helper)!
+ for bad in [helper_source.replace('.super Ljava/lang/Object;', '.super Landroid/app/Fragment;'),
+  helper_source.replace('.class public final', '.class public'),
+  helper_source.replace('.implements Ljava/lang/Runnable;', ''),
+  helper_source.replace('private manager:', 'public manager:'),
+  helper_source.replace('.method public run()V', '.method public native run()V'),
+  helper_source.replace('.method public constructor', '.method private constructor'),
+  helper_source + '.field private unexpected:I\n',
+  helper_source + '.method public extra()V\n.locals 0\nreturn-void\n.end method\n'] {
+  platform_fragments_abi(bad, helper) or { continue }
+  return error('invalid platform fragment Runnable ABI accepted')
+ }
+ mut before_classes := {
+  'android/app/Service.smali': 'same'
+  'android/os/StrictMode.smali': 'same'
+  'android/os/Binder.smali': 'same'
+  'android/atl/VinixAccountBrokerContext.smali': 'same'
+ }
+ for target in targets { before_classes[target] = 'old' }
+ for i in 0 .. 2096 { before_classes['other/' + i.str() + '.smali'] = 'same' }
+ mut after_classes := before_classes.clone()
+ for target in targets { after_classes[target] = 'new' }
+ after_classes[helper] = 'added'
+ narrow_profile_class_delta(before_classes, after_classes, targets, [helper], 2104)!
+ for case in 0 .. 13 {
+  mut old := before_classes.clone()
+  mut bad := after_classes.clone()
+  match case {
+   0...3 { bad[targets[case]] = 'old' }
+   4 { bad['android/app/Service.smali'] = 'changed' }
+   5 { bad['android/os/StrictMode.smali'] = 'changed' }
+   6 { bad['android/os/Binder.smali'] = 'changed' }
+   7 { bad['android/atl/VinixAccountBrokerContext.smali'] = 'changed' }
+   8 { bad.delete(helper) }
+   9 { bad['unexpected.smali'] = 'added' }
+   10 { bad.delete(helper); bad['substitute.smali'] = 'added' }
+   11 { old[helper] = 'preexisting' }
+   else { old.delete('other/0.smali'); bad.delete('other/0.smali') }
+  }
+  narrow_profile_class_delta(old, bad, targets, [helper], 2104) or { continue }
+  return error('invalid platform fragment class delta accepted: ' + case.str())
+ }
+ narrow_profile_class_delta(before_classes, after_classes, targets, [helper, helper], 2104) or { return }
+ return error('duplicate platform fragment helper addition accepted')
+}
+
 fn self_test() ! {
  store_delta_self_test()!
  store_method_self_test()!
@@ -936,6 +1144,7 @@ fn self_test() ! {
  auth_exception_self_test()!
  binder_identity_self_test()!
  service_lifecycle_self_test()!
+ platform_fragments_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -1141,6 +1350,12 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'binder-identity' {
    binder_identity_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)!
   }
+  if profile.name == 'platform-fragments' {
+   platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)!
+  }
+ }
+ if profile.name == 'platform-fragments' {
+  for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
  }
  command(root, 'assemble', [java, '-Xmx512m', '-XX:ActiveProcessorCount=2', '-cp', classpath.join(':'), 'org.jf.smali.Main', 'assemble', '--jobs', '2', root + '/smali', '-o', root + '/classes.dex'])!
  if !os.is_file(root + '/classes.dex') || os.file_size(root + '/classes.dex') < 112 { return error('store assembly produced no fresh DEX') }
@@ -1155,6 +1370,12 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'binder-identity' {
    binder_identity_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)!
   }
+  if profile.name == 'platform-fragments' {
+   platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)!
+  }
+ }
+ if profile.name == 'platform-fragments' {
+  for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
  }
  write_json(root + '/framework-dex-before.json', old)!
  write_json(root + '/framework-dex-after.json', new)!
@@ -1426,11 +1647,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle'] {
-  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } else { onboarding_profile() } }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments'] {
+  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
