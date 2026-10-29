@@ -686,14 +686,25 @@ fn bootstrap(root string, framework string) ! {
 	unchanged(library)!
 	frozen_pins(root, 'builder')!
 	argv := [root + '/tools/frozen-builder', '--frozen-build', framework, root]
+	executable_pin := hash(argv[0])!
 	write_json(root + '/frozen-launch.json', {
 		'argv': json2.Any(argv)
-		'executable_sha256': json2.Any(hash(argv[0])!)
+		'executable_sha256': json2.Any(executable_pin)
 		'started_utc': json2.Any(time.utc().str())
 	})!
-	result := os.exec(argv)
-	if result.exit_code != 0 { return error(result.output) }
-	print(result.output)
+	replace_frozen_builder(argv, executable_pin)!
+}
+
+fn replace_frozen_builder(argv []string, executable_pin string) ! {
+	if argv.len != 4 || argv[1] != '--frozen-build'
+		|| argv[0] != argv[3] + '/tools/frozen-builder'
+		|| hash(argv[0])! != executable_pin {
+		return error('frozen builder handoff argv or executable changed')
+	}
+	// The pinned old-vlib execvp prepends cmdpath itself. Replace this process
+	// so bootstrap discovery/compiler workspace cannot overlap the next phase;
+	// the outer supervisor retains the same PID, stdout, stderr and exit status.
+	os.execvp(argv[0], argv[1..])!
 }
 
 fn main() {
