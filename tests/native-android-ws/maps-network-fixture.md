@@ -158,3 +158,73 @@ by `maps-network-tls-v2-fixture-evidence-2026-10-29-r1/sealed/manifest.json`,
 SHA-256 `9da362cccb824a80af9162a7413789edd383939c9bcd660c6d0877f5bb520a54`.
 The seal and a separate complete readback passed for two roots and 18,208
 entries. Closed roots remain immutable; runtime output belongs elsewhere.
+
+## Opt-in standard JSSE TLS v3
+
+The subsequent real ART v2 observation was `status=1,error=11,step=3`:
+the fixture's cast to `VinixSSLSocket` failed before its handshake. That
+observation does not establish a TLS transport failure. V3 removes that
+assumption and uses the same default factory through standard `SSLSocket`:
+
+```sh
+maps-network-fixture --tls-v3 OUTPUT AAPT2 FRAMEWORK_RES SMALI_TOOLS JAVA APKSIGNER
+maps-network-fixture --check-v3 GUEST_STDOUT_LOG
+```
+
+It obtains `SSLParameters`, sets `SNIHostName` for the fixed target and the
+`HTTPS` endpoint identification algorithm, applies those parameters, and starts
+the handshake. Both the connected plain socket and the resulting SSL socket
+receive three-second read timeouts. It keeps the installed default trust store,
+factory and hostname verifier, with no global defaults or trust overrides.
+
+V3 records handshake/setup as stage 6, correct-host default verifier result as
+stage 7, and an offline wrong-host verifier control as stage 10. The control
+checks `vinix-network-probe.invalid` against the same session; it sends no extra
+request. Verification stages are skipped after an unfinished or failed
+prerequisite. A returned verifier result is `verified=1` (accepted) or
+`verified=2` (rejected); all other records carry `verified=0`. A rejected correct
+host or accepted wrong host remains visible as an adverse observation. The
+completion marker alone never certifies trust or hostname policy.
+
+Public lines use `MAPS-NETWORK-V3 `, the six historical numeric fields,
+`step=0..12` and `verified=0..2`. The terminal marker is
+`MAPS-NETWORK-V3-PASS observations-complete`. Step 1 obtains the default factory;
+2 sets the plain read timeout and wraps the socket; 3 casts to standard
+`SSLSocket`; 4 obtains parameters; 5 sets SNI; 6 sets HTTPS identification;
+7 applies parameters; 8 sets the SSL read timeout; 9 performs the handshake;
+10 obtains the session; 11 obtains the default hostname verifier; and 12 invokes
+that verifier. A timeout can occur at step zero before its worker starts.
+Historical error classifications 1–18 remain unchanged.
+
+Only v3 caps retained DNS addresses at four. Four addresses with independently
+observed TCP, handshake and two verifier phases, plus DNS and the normal host
+constructor, have a 54-second phase budget inside the unchanged 60-second
+watchdog. V1/v2 retain eight addresses and their exact emitted source pins.
+The v3 checker requires all five ordered records per address, matching
+families, valid prerequisites and exact finite fields. Its negative controls
+cover malformed numbers, reordered/missing phases, skipped prerequisites,
+invalid verifier outcomes, private extensions and incomplete/duplicate markers.
+
+Compilation, self-test, signed APK creation, v1/v2/v3 signature checks and
+signed-APK DEX member equality passed. The self-test also checks exact v1/v2
+emitted-class hashes. Complete canonical disassembly before and after DEX
+reassembly matched; the raw DEX encoding comparison differed and its failing
+receipt is preserved. Source review found no remaining blocker. Real ART v3
+execution remains pending; no TLS or networking repair is claimed.
+
+V3 source SHA-256 is
+`7df039efb5e79b87c40de45f94ade6787402697e33a4352e0fda16e7183de3b5`.
+Under the same external state directory, build inputs, exact command receipts,
+checks and copied compiler/signing closure are retained in
+`maps-network-tls-v3-fixture-build-2026-10-29-r1`; its verifier is
+`tools/maps-network-fixture`, SHA-256
+`77e9643c8840556a9135e3c1423b90e27658c2874ccecf826986d8c60f8acc9c`.
+Signed APK `maps-network-tls-v3-fixture-2026-10-29-r1/probe.apk` has SHA-256
+`bd07eddf7594fd6cc6b90b984baf7ee5855af0fc56ee0322fbc45ea318cf393a`.
+
+Compile / self-test / APK build took 3.455 / 0.226 / 3.146 seconds with sampled
+peak aggregate RSS 373,817,344 / 32,768 / 83,574,784 bytes. Their guards exited
+zero with complete cleanup under the unchanged 600 MiB RSS, 300-second,
+512 MiB growth and 1 GiB reserve limits. Copied compiler and signing inputs
+matched their closed originals after the build. Historical v1/v2 artifacts and
+checkers remain unchanged.
