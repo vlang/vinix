@@ -205,6 +205,26 @@ const binder_identity_bindings = 'e3fa613993c1ca60aab021ebdbacc93dc71ae68e4bef3d
 const binder_identity_generated = 'b349742dff2bdcc464e3df011ccf54d0ff546ea36a1feb9cd82b26ec3da67dde'
 const binder_identity_binder = 'ce609f4d797c4406d86799a7c70c2581649a067e57a286d9a1ce39076a78711d'
 const binder_identity_context = '90fddf01e6bd8785d64b873aaa5632d2cd15e768de425fd5c91d7b75c4097888'
+const service_lifecycle_base = '/Users/alex/.local/state/vinix/android/maps-binder-identity-r1'
+const service_lifecycle_base_seal = '5140b0afe5ced3c5a17f8566547cd23941d46ae228b75f2ed5ee3ba5cb4f2854'
+const service_lifecycle_boot = '2fc9164b0403e99c49d6c333f1f5f697249ee2ab9c12f71390f19519f4a6a46f'
+const service_lifecycle_base_overlay = '6bfac01ed524b91c3a1e2d2258840db1a1a45ecb275885f8e00b0876e58077e7'
+const service_lifecycle_old_deployment = '42ceb17cd3924d60d341919eda3c4cbf4faf0c2df91f8ed3b51cd6a1c6533dd5'
+const service_lifecycle_old_headless = '11702ab76663f90be750e7152f42b49bbfe3b39adb853e65b77654958423e82e'
+const service_lifecycle_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-service-lifecycle-framework-2026-10-29-r1'
+const service_lifecycle_seal = '9453286e07d3bd727782355413d4fa8059bd1332e89850748fb4db02680c9488'
+const service_lifecycle_build = 'b90d3e561dd34903bc1d5fa1687dea9360d9496fc212dd02686d75cd1b1d75e0'
+const service_lifecycle_jar = '7017b4845f91cb1c37057f6e8da07476b9b1b44c523827acaf00baad2432fe74'
+const service_lifecycle_dex = '95073976c0936acdbf7d0cf5c13c190ef5f50f9eefedb6c20e303fea38007b8a'
+const service_lifecycle_raw = '3a956a18495fb47aa060f228f240ea5ef3b07cfba8f200b9dcb42d9897f11275'
+const service_lifecycle_canonical = '47929da39372e89dc5b2f46671583a41dff5b3f4eaee195474b650e1fa6492bf'
+const service_lifecycle_native = '/Users/alex/.local/state/vinix/android/current-native-build-2026-10-29-service-lifecycle-r1'
+const service_lifecycle_native_seal = '2c61783de1aab68bbf8177329215b27881e95afaa87d16272f03ba7fda98c401'
+const service_lifecycle_native_pin = 'ea8b899971ac96335c1f53a32eb3dee8e5e8f87600c0bcd5b7edaa683b9a8136'
+const service_lifecycle_native_build = 'f5c1638e7d486336379d21e27f3fdd7519dca5a9aceff806983c90d7402f3afa'
+const service_lifecycle_headless_source = 'd22892cc47def3c2e830a6e29873acd5c0eb08b944f68d131e39f4922c1663ff'
+const service_lifecycle_framework_helper = 'e7f5af6032619936414d2e9c56ddc9e8fab3b9af28d90e2af7348e6699a78e8b'
+const service_lifecycle_service_helper = '5117e4a20d30ca738b442aa93de239bba6ef2a67349a1303650f237dca057436'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -2067,6 +2087,124 @@ fn binder_identity_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return binder_identity_base + '/boot.img'
 }
 
+fn service_lifecycle_profile() Profile {
+	mut modules := binder_identity_profile().modules.clone()
+	modules << 'maps-binder-identity.tar'
+	return Profile{'maps-service-lifecycle', service_lifecycle_boot, 'maps-service-lifecycle.tar', modules}
+}
+fn service_lifecycle_modules() map[string]string {
+	mut modules := binder_identity_modules()
+	modules['maps-binder-identity.tar'] = service_lifecycle_base_overlay
+	return modules
+}
+fn service_lifecycle_fields() map[string]string {
+	mut fields := binder_identity_fields()
+	fields['kind'] = 'vinix-maps-service-lifecycle-v1'
+	fields['base_root'] = service_lifecycle_base
+	fields['base_manifest_sha256'] = service_lifecycle_base_seal
+	fields['framework_build_root'] = service_lifecycle_framework
+	fields['framework_manifest_sha256'] = service_lifecycle_seal
+	fields['framework_jar_sha256'] = service_lifecycle_jar
+	fields['framework_dex_sha256'] = service_lifecycle_dex
+	fields['retained_framework_manifest_sha256'] = binder_identity_framework_seal
+	fields['native_compatibility_framework_manifest_sha256'] = binder_identity_framework_seal
+	fields['native_build_root'] = service_lifecycle_native
+	fields['native_manifest_sha256'] = service_lifecycle_native_seal
+	fields['native_sha256'] = service_lifecycle_native_pin
+	fields['native_build_sha256'] = service_lifecycle_native_build
+	fields['retained_native_manifest_sha256'] = binder_identity_native_seal
+	fields['native_framework_manifest_sha256'] = service_lifecycle_seal
+	return fields
+}
+fn service_lifecycle_inputs() map[string]string {
+	mut inputs := binder_identity_inputs()
+	inputs[service_lifecycle_base + '/sha256.json'] = service_lifecycle_base_seal
+	inputs[service_lifecycle_framework + '/sha256.json'] = service_lifecycle_seal
+	inputs[service_lifecycle_native + '/sha256.json'] = service_lifecycle_native_seal
+	return inputs
+}
+fn service_lifecycle_known_delta() map[string]string {
+	return {'/' + service_query_jar_path: service_lifecycle_jar, '/' + service_query_dex_path: service_lifecycle_dex,
+		'/' + native_onboarding_trace_path: service_lifecycle_native_pin,
+		'/' + service_query_headless + '/framework-build.json': service_lifecycle_build,
+		'/' + service_query_headless + '/framework-sha256.json': service_lifecycle_seal}
+}
+fn service_lifecycle_raw_delta() map[string][]string {
+	return {'smali/android/atl/VinixAccountBrokerContext.smali': [binder_identity_context,
+		'96f550a8c6dae78e504082b6651b105b98e5d49680311b5220fb0ad13cf364aa']}
+}
+fn verify_service_lifecycle_overlay(receipt map[string]json2.Any) ! {
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('Service lifecycle deployment delta absent') }))!
+	mut expected := service_lifecycle_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('Service lifecycle headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == service_lifecycle_old_headless { return error('new Service lifecycle headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('Service lifecycle exact six deployment input changes differ') }
+	for name, value in {
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: service_lifecycle_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256', 'native_manifest_sha256'])
+		'native_source_delta': json2.encode({'build-support/android/nativews/headless.v': service_lifecycle_headless_source})
+		'native_builder_helper_delta': json2.encode({'tests/native-android-tools/androidtools/framework.v': service_lifecycle_framework_helper,
+			'tests/native-android-tools/androidtools/framework_service_lifecycle.v': service_lifecycle_service_helper})
+		'framework_source_delta': json2.encode({'smali/android/app/Service.smali': service_lifecycle_raw})
+		'framework_canonical_delta': json2.encode({'new-dex/android/app/Service.smali': service_lifecycle_canonical})
+		'native_consumed_raw_delta': json2.encode(service_lifecycle_raw_delta())
+		'native_consumed_class_count': json2.encode(68)
+	} {
+		if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](value)! { return error('Service lifecycle declared proof/delta differs: ' + name) }
+	}
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('Service lifecycle overlay inventory absent') }))!
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	mut paths := expected.keys().map(it.trim_left('/'))
+	paths << service_query_deployment
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe Service lifecycle overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			mode := if entry.name == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != mode { return error('Service lifecycle file allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected Service lifecycle inode') }
+	}
+	if regulars.len != 7 || regulars[service_query_deployment] or { '' } == service_lifecycle_old_deployment { return error('exact seven new Service lifecycle files required') }
+	for path, pin in expected {
+		if regulars[path.trim_left('/')] or { '' } != pin { return error('Service lifecycle declared input differs from inventory') }
+	}
+}
+fn verify_service_lifecycle_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [service_lifecycle_base_seal, service_lifecycle_boot, service_lifecycle_base_overlay,
+		service_lifecycle_old_deployment, service_lifecycle_old_headless, service_lifecycle_seal,
+		service_lifecycle_build, service_lifecycle_jar, service_lifecycle_dex, service_lifecycle_raw, service_lifecycle_canonical,
+		service_lifecycle_native_seal, service_lifecycle_native_pin, service_lifecycle_native_build, service_lifecycle_headless_source,
+		service_lifecycle_framework_helper, service_lifecycle_service_helper] {
+		if !digest_valid(pin) { return error('completed Service lifecycle producer required') }
+	}
+	if service_lifecycle_seal == binder_identity_framework_seal || service_lifecycle_jar == binder_identity_jar
+		|| service_lifecycle_dex == binder_identity_dex || service_lifecycle_native_seal == binder_identity_native_seal
+		|| service_lifecycle_native_pin == binder_identity_native_pin
+		|| service_lifecycle_headless_source == 'e2be36f866ac321a7d681112e3514d8b1c8ac06553538758d7c1c220b9f3c72f' { return error('new Service framework/headless observer native required') }
+	for name, expected in service_lifecycle_fields() {
+		if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('Service lifecycle receipt differs: ' + name) }
+	}
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 53 || seals != service_lifecycle_inputs() { return error('Service lifecycle exact fifty-three dependency seals differ') }
+	if stage.format != 1 || stage.original_modules_sha256 != service_lifecycle_modules() || stage.preserved_modules_sha256 != service_lifecycle_modules() { return error('Service lifecycle original twenty-five modules differ') }
+	verify_service_lifecycle_overlay(receipt)!
+}
+fn service_lifecycle_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_service_lifecycle_receipt(receipt, stage)!
+	path := service_lifecycle_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != service_lifecycle_base_seal { return error('Service lifecycle original Binder image manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != service_lifecycle_boot || pins['maps-binder-identity.tar'] or { '' } != service_lifecycle_base_overlay { return error('Service lifecycle original boot or Binder overlay differs') }
+	return service_lifecycle_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -2669,6 +2807,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = auth_worker_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-binder-identity' {
 		baseline = binder_identity_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-service-lifecycle' {
+		baseline = service_lifecycle_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -5133,6 +5273,108 @@ fn binder_identity_profile_self_test() ! {
 	println('MAPS-BINDER-IDENTITY KERNEL-PROFILE-SELF-TEST PASS seven files six input changes fifty seals twenty-four inherited modules twenty-five final retained roles historical rejection')
 }
 
+fn service_lifecycle_entries_fixture() []ServiceQueryEntry {
+	mut entries := [ServiceQueryEntry{name: 'opt', kind: 'directory', mode: 0o755}]
+	for path, pin in service_lifecycle_known_delta() {
+		name := path.trim_left('/')
+		entries << ServiceQueryEntry{name: name, kind: 'regular', sha256: pin, mode: if name == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }}
+	}
+	entries << ServiceQueryEntry{name: service_query_headless + '/guest-inputs.json', kind: 'regular', sha256: 'c'.repeat(64), mode: 0o644}
+	entries << ServiceQueryEntry{name: service_query_deployment, kind: 'regular', sha256: 'd'.repeat(64), mode: 0o644}
+	return entries
+}
+fn service_lifecycle_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in service_lifecycle_fields() { receipt[name] = json2.Any(value) }
+	mut delta := service_lifecycle_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'c'.repeat(64)
+	for name, value in {
+		'deployment_input_delta': json2.encode(delta)
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256', 'native_manifest_sha256'])
+		'native_source_delta': json2.encode({'build-support/android/nativews/headless.v': service_lifecycle_headless_source})
+		'native_builder_helper_delta': json2.encode({'tests/native-android-tools/androidtools/framework.v': service_lifecycle_framework_helper,
+			'tests/native-android-tools/androidtools/framework_service_lifecycle.v': service_lifecycle_service_helper})
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: service_lifecycle_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'framework_source_delta': json2.encode({'smali/android/app/Service.smali': service_lifecycle_raw})
+		'framework_canonical_delta': json2.encode({'new-dex/android/app/Service.smali': service_lifecycle_canonical})
+		'native_consumed_class_count': json2.encode(68)
+		'native_consumed_raw_delta': json2.encode(service_lifecycle_raw_delta())
+		'overlay_inventory': json2.encode(service_lifecycle_entries_fixture())
+	} { receipt[name] = json2.decode[json2.Any](value)! }
+	return receipt
+}
+fn service_lifecycle_profile_self_test() ! {
+	profile := service_lifecycle_profile()
+	if profile.baseline_sha != service_lifecycle_boot || profile.modules.len != 25
+		|| profile.modules.last() != 'maps-binder-identity.tar' || service_lifecycle_inputs().len != 53 { return error('Service lifecycle strict profile differs') }
+	mut final_modules := profile.modules.clone()
+	final_modules << profile.overlay
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', final_modules})!
+	stage := Stage{format: 1, inputs_sha256: service_lifecycle_inputs(), original_modules_sha256: service_lifecycle_modules(), preserved_modules_sha256: service_lifecycle_modules()}
+	receipt := service_lifecycle_receipt_fixture()!
+	verify_service_lifecycle_receipt(receipt, stage)!
+	for field in service_lifecycle_fields().keys() {
+		mut bad := service_lifecycle_receipt_fixture()!
+		bad[field] = json2.Any('changed')
+		if _ := verify_service_lifecycle_receipt(bad, stage) { return error('changed Service lifecycle field accepted') }
+		bad.delete(field)
+		if _ := verify_service_lifecycle_receipt(bad, stage) { return error('missing Service lifecycle field accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := service_lifecycle_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_service_lifecycle_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed Service lifecycle dependency accepted') }
+		pins.delete(path)
+		if _ := verify_service_lifecycle_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing Service lifecycle dependency accepted') }
+	}
+	mut extra := service_lifecycle_inputs()
+	extra['/unreviewed/sha256.json'] = 'a'.repeat(64)
+	if _ := verify_service_lifecycle_receipt(receipt, Stage{...stage, inputs_sha256: extra}) { return error('extra Service lifecycle dependency accepted') }
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: binder_identity_modules()}, Stage{...stage, preserved_modules_sha256: binder_identity_modules()}] {
+		if _ := verify_service_lifecycle_receipt(receipt, bad) { return error('wrong Service lifecycle module inventory accepted') }
+	}
+	for field in ['deployment_input_delta', 'deployment_top_level_delta', 'headless_input_delta', 'headless_top_level_delta',
+		'framework_source_delta', 'framework_canonical_delta', 'native_consumed_raw_delta', 'native_consumed_class_count', 'native_source_delta', 'native_builder_helper_delta'] {
+		mut bad := service_lifecycle_receipt_fixture()!
+		bad[field] = json2.Any('changed')
+		if _ := verify_service_lifecycle_receipt(bad, stage) { return error('changed Service lifecycle proof accepted') }
+		bad.delete(field)
+		if _ := verify_service_lifecycle_receipt(bad, stage) { return error('missing Service lifecycle proof accepted') }
+	}
+	mut native_change := service_lifecycle_receipt_fixture()!
+	native_change['native_source_delta'] = json2.decode[json2.Any](json2.encode({'unexpected': 'a'.repeat(64)}))!
+	if _ := verify_service_lifecycle_receipt(native_change, stage) { return error('unreviewed native source change declaration accepted') }
+	entries := service_lifecycle_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'},
+			ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := service_lifecycle_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_service_lifecycle_receipt(bad, stage) { return error('unsafe Service lifecycle inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := service_lifecycle_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_service_lifecycle_receipt(bad, stage) { return error('missing Service lifecycle file accepted') }
+		}
+	}
+	for extra_entry in [entries.last(), ServiceQueryEntry{name: native_onboarding_trace_path, kind: 'regular', sha256: binder_identity_native_pin, mode: 0o755}] {
+		mut bad_entries := entries.clone()
+		bad_entries << extra_entry
+		mut bad := service_lifecycle_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+		if _ := verify_service_lifecycle_receipt(bad, stage) { return error('extra or native Service lifecycle file accepted') }
+	}
+	if _ := verify_service_lifecycle_receipt(binder_identity_receipt_fixture()!, stage) { return error('Binder receipt accepted by Service lifecycle profile') }
+	if _ := verify_binder_identity_receipt(receipt, stage) { return error('Service lifecycle receipt accepted by Binder profile') }
+	println('MAPS-SERVICE-LIFECYCLE KERNEL-PROFILE-SELF-TEST PASS seven files six input changes fifty-three seals twenty-five inherited modules exact headless native delta canonical compatibility proof and historical rejection')
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
@@ -5152,6 +5394,7 @@ fn self_test() ! {
 	auth_exception_profile_self_test()!
 	auth_worker_profile_self_test()!
 	binder_identity_profile_self_test()!
+	service_lifecycle_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -5251,9 +5494,10 @@ fn main() {
 	is_auth_exception := os.args.len == 5 && os.args[1] == '--maps-auth-exception'
 	is_auth_worker := os.args.len == 5 && os.args[1] == '--maps-auth-worker'
 	is_binder_identity := os.args.len == 5 && os.args[1] == '--maps-binder-identity'
-	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity
+	is_service_lifecycle := os.args.len == 5 && os.args[1] == '--maps-service-lifecycle'
+	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle
 	if os.args.len != 4 && !is_selected {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
 	offset := if is_selected { 1 } else { 0 }
@@ -5265,7 +5509,7 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	profile := if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	profile := if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
