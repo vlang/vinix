@@ -190,13 +190,48 @@ fn main_class() string {
 	text += method('private static features()[Ljava/lang/String;', 'const-string v0, "feature-left"\nconst/4 v1, 0\nfilled-new-array {v0, v1}, [Ljava/lang/String;\nmove-result-object v0\nreturn-object v0', 2)
 	text += sends()
 	text += dispatch_probe()
+ text += diagnostic_probe()
 	text += wait_probe()
 	text += defaults_probe()
 	text += method('public onCreate(Landroid/os/Bundle;)V', 'invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V\n' +
-		'invoke-static {}, ${main_type}->dispatch()V\ninvoke-static {}, ${main_type}->defaults()V\n' +
+  'invoke-static {}, ${main_type}->diagnostics()V\ninvoke-static {}, ${main_type}->defaults()V\n' +
 		'sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v1, "${pass_marker}"\ninvoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\n' +
 		'new-instance v0, Landroid/widget/TextView;\ninvoke-direct {v0, p0}, Landroid/widget/TextView;-><init>(Landroid/content/Context;)V\nconst-string v1, "Authenticator base contract passed"\ninvoke-virtual {v0, v1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V\ninvoke-virtual {p0, v0}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V\nreturn-void', 2)
 	return text
+}
+
+// Run the real transport's existing result/error assertions while retaining
+// only synthetic stack traces. Restore stderr even when a dispatch test fails.
+fn diagnostic_probe() string {
+ mut body := 'sget-object v0, Ljava/lang/System;->err:Ljava/io/PrintStream;\n' +
+  'new-instance v1, Ljava/io/ByteArrayOutputStream;\ninvoke-direct {v1}, Ljava/io/ByteArrayOutputStream;-><init>()V\n' +
+  'new-instance v2, Ljava/io/PrintStream;\ninvoke-direct {v2, v1}, Ljava/io/PrintStream;-><init>(Ljava/io/OutputStream;)V\n' +
+  'invoke-static {v2}, Ljava/lang/System;->setErr(Ljava/io/PrintStream;)V\n' +
+  ':dispatch_start\ninvoke-static {}, ${main_type}->dispatch()V\n:dispatch_end\n' +
+  'invoke-static {v0}, Ljava/lang/System;->setErr(Ljava/io/PrintStream;)V\n' +
+  'invoke-virtual {v1}, Ljava/io/ByteArrayOutputStream;->toString()Ljava/lang/String;\nmove-result-object v3\n'
+ for expected in ['ANDROID-AUTHENTICATOR-EXCEPTION',
+  'android.accounts.NetworkErrorException: synthetic-error',
+  'java.lang.UnsupportedOperationException: synthetic-error',
+  'java.lang.IllegalArgumentException: synthetic-error',
+  'java.lang.IllegalStateException: synthetic-error'] {
+  body += 'const-string v1, "${expected}"\ninvoke-virtual {v3, v1}, Ljava/lang/String;->contains(Ljava/lang/CharSequence;)Z\nmove-result v1\nif-eqz v1, :bad\n'
+ }
+ // A missing diagnostic sink must still deliver exactly the original failure.
+ body += 'new-instance v1, ${context_type}\ninvoke-direct {v1}, ${context_type}-><init>()V\nconst/4 v4, 1\niput-boolean v4, v1, ${context_type}->allowed:Z\n' +
+  'new-instance v2, ${full_type}\ninvoke-direct {v2, v1}, ${full_type}-><init>(Landroid/content/Context;)V\nconst/4 v4, 5\niput v4, v2, ${core_type}->mode:I\n' +
+  'new-instance v3, ${reply_type}\ninvoke-direct {v3}, ${reply_type}-><init>()V\ninvoke-virtual {v2}, ${base_type}->getIBinder()Landroid/os/IBinder;\nmove-result-object v2\n' +
+  'invoke-static {v2}, Landroid/accounts/IAccountAuthenticator$Stub;->asInterface(Landroid/os/IBinder;)${request_type}\nmove-result-object v2\n' +
+  'const/4 v4, 0\ninvoke-static {v4}, Ljava/lang/System;->setErr(Ljava/io/PrintStream;)V\n' +
+  ':missing_sink_start\ninvoke-static {v2, v3}, ${main_type}->send1(${request_type}${response_type})V\n:missing_sink_end\n' +
+  'invoke-static {v0}, Ljava/lang/System;->setErr(Ljava/io/PrintStream;)V\n' +
+  'iget v4, v3, ${reply_type}->results:I\nif-nez v4, :bad\niget v4, v3, ${reply_type}->errors:I\nconst/4 v1, 1\nif-ne v4, v1, :bad\n' +
+  'iget v4, v3, ${reply_type}->code:I\nif-ne v4, v1, :bad\niget-object v3, v3, ${reply_type}->message:Ljava/lang/String;\nconst-string v1, "addAccount failed"\n' +
+  'invoke-virtual {v1, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\nmove-result v1\nif-eqz v1, :bad\n' +
+  'return-void\n.catchall {:dispatch_start .. :dispatch_end} :restore_failed\n.catchall {:missing_sink_start .. :missing_sink_end} :restore_failed\n' +
+  ':restore_failed\nmove-exception v1\ninvoke-static {v0}, Ljava/lang/System;->setErr(Ljava/io/PrintStream;)V\nthrow v1\n' +
+  failure('private stack traces and unchanged error mappings')
+ return method('private static diagnostics()V', body, 5)
 }
 
 fn dispatch_probe() string {

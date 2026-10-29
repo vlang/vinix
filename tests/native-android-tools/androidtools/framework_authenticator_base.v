@@ -27,6 +27,29 @@ pub fn framework_authenticator_base_class_names() []string {
   'android/accounts/AbstractAccountAuthenticator$DefaultResponse']
 }
 
+// Apply only the diagnostic handler to an existing canonical class. Retain
+// unrelated methods and disassembler formatting byte-for-byte.
+pub fn framework_authenticator_private_exception(original string) !string {
+ signature := 'vinixHandleException(${auth_raw_response}Ljava/lang/String;Ljava/lang/Exception;)V'
+ if original.count('.class public abstract ${auth_base}\n') != 1 {
+  return error('authenticator base class required')
+ }
+ mut matches := 0
+ for block in original.split('.method ') {
+  if block.all_before('\n').ends_with(' ' + signature) { matches++ }
+ }
+ if matches != 1 { return error('one existing authenticator exception handler required') }
+ generated := framework_authenticator_base_classes()['android/accounts/AbstractAccountAuthenticator'] or {
+  return error('generated authenticator base absent')
+ }
+ for block in generated.split('.method ') {
+  if !block.all_before('\n').ends_with(' ' + signature) { continue }
+  end := block.index('.end method') or { return error('unterminated generated handler') }
+  return framework_replace_method(original, signature, '.method ' + block[..end + '.end method'.len])!
+ }
+ return error('generated authenticator exception handler absent')
+}
+
 fn auth_base_signature(method AuthenticatorRequestMethod) string {
  if method.name == 'getAuthTokenLabel' { return 'getAuthTokenLabel(Ljava/lang/String;)Ljava/lang/String;' }
  return method.name + '(${auth_wrapper}' + method.arguments.join('') + ')Landroid/os/Bundle;'
@@ -96,6 +119,12 @@ pub fn framework_authenticator_base_classes() map[string]string {
   'invoke-virtual {v0}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\nmove-result-object v1\nnew-instance v0, Ljava/lang/SecurityException;\n' +
   'invoke-direct {v0, v1}, Ljava/lang/SecurityException;-><init>(Ljava/lang/String;)V\nthrow v0\n:allowed\nreturn-void')
  text += auth_base_method('final vinixHandleException(${auth_raw_response}Ljava/lang/String;Ljava/lang/Exception;)V', 3,
+  // The broker keeps stderr private; the public result retains only the
+  // original Android error mapping. A failed diagnostic must not mask it.
+  ':trace_start\nsget-object v0, Ljava/lang/System;->err:Ljava/io/PrintStream;\n' +
+  'const-string v1, "ANDROID-AUTHENTICATOR-EXCEPTION"\ninvoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\n' +
+  'invoke-virtual {p3}, Ljava/lang/Throwable;->printStackTrace()V\n:trace_end\ngoto :trace_done\n' +
+  '.catchall {:trace_start .. :trace_end} :trace_failed\n:trace_failed\nmove-exception v0\n:trace_done\n' +
   'instance-of v0, p3, Landroid/accounts/NetworkErrorException;\nif-eqz v0, :unsupported\nconst/4 v0, 0x3\n' +
   'invoke-virtual {p3}, Ljava/lang/Exception;->getMessage()Ljava/lang/String;\nmove-result-object v1\ngoto :send\n' +
   ':unsupported\ninstance-of v0, p3, Ljava/lang/UnsupportedOperationException;\nif-eqz v0, :arguments\nconst/4 v0, 0x6\ngoto :not_supported\n' +
