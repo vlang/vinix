@@ -46,6 +46,11 @@ const maps_network_v3_apk_sha = 'bd07eddf7594fd6cc6b90b984baf7ee5855af0fc56ee032
 const service_lifecycle_framework_sha = '7017b4845f91cb1c37057f6e8da07476b9b1b44c523827acaf00baad2432fe74'
 const service_lifecycle_native_sha = 'ea8b899971ac96335c1f53a32eb3dee8e5e8f87600c0bcd5b7edaa683b9a8136'
 const service_lifecycle_apk_sha = 'd15082450bbc70efc761ec8403e5544e40a98efe3f0a3d69b75b9d142e25b283'
+// Distinct platform-fragment fixture and verified coupled runtime identities.
+const platform_fragments_framework_sha = '6970582da55b15dd30391491d2be2213abe665fe0256167f45cccdd3de25bcd4'
+const platform_fragments_native_sha = '613c6b2c7b1e816a5d7b0694d626a52a5b4df19604a6a224df99ad13055aa74c'
+const platform_fragments_apk_sha = 'f2e08f444782607a408bd25766da399100e908cf2b99edeebcfb80d267dc21de'
+const platform_fragments_pass_marker = 'PLATFORM-FRAGMENTS-PASS stable-manager tagged-queue fifo-once application-injection lifecycle-order late-add host-isolation callback-identity'
 
 struct FixtureProfile {
 	name          string
@@ -157,6 +162,17 @@ fn service_lifecycle_profile() FixtureProfile {
 	}
 }
 
+fn platform_fragments_profile() FixtureProfile {
+	return FixtureProfile{
+		name: 'platform-fragments'
+		apk_sha: platform_fragments_apk_sha
+		framework_sha: platform_fragments_framework_sha
+		native_sha: platform_fragments_native_sha
+		pass_marker: platform_fragments_pass_marker
+		scope: 'standalone platform FragmentManager lifecycle regression; no GMS or Google authentication claim'
+	}
+}
+
 struct Configuration {
 	runtime   string
 	apk       string
@@ -262,7 +278,8 @@ fn health(line string, expected_marker string) ! {
 	if (line.contains('CHILD-ATTACH-PASS') || line.contains('SETTINGS-GLOBAL-PASS')
 		|| line.contains('APPLICATION-RESTRICTIONS-PASS') || line.contains('AUTHENTICATOR-BASE-PASS')
 		|| line.contains('MAPS-NETWORK-PASS') || line.contains('MAPS-NETWORK-V2-PASS')
-		|| line.contains('MAPS-NETWORK-V3-PASS') || line.contains('SERVICE-LIFECYCLE-PASS')) && line != expected_marker {
+		|| line.contains('MAPS-NETWORK-V3-PASS') || line.contains('SERVICE-LIFECYCLE-PASS')
+		|| line.contains('PLATFORM-FRAGMENTS-PASS')) && line != expected_marker {
 		return error('conflicting fixture marker')
 	}
 }
@@ -463,7 +480,7 @@ fn export_evidence(output string) ! {
 
 fn selftest() ! {
 	mut cases := 0
-	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile(), authenticator_worker_profile(), maps_network_v2_profile(), authenticator_binder_identity_profile(), maps_network_v3_profile(), service_lifecycle_profile()]
+	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile(), authenticator_worker_profile(), maps_network_v2_profile(), authenticator_binder_identity_profile(), maps_network_v3_profile(), service_lifecycle_profile(), platform_fragments_profile()]
 	require(child_attach_profile().framework_sha == framework_sha
 		&& settings_global_profile().framework_sha == framework_sha
 		&& application_restrictions_profile().framework_sha != framework_sha, 'exact per-profile framework identities')!
@@ -488,6 +505,10 @@ fn selftest() ! {
 		&& service_lifecycle_profile().apk_sha != authenticator_binder_identity_profile().apk_sha
 		&& service_lifecycle_profile().apk_sha != maps_network_v3_profile().apk_sha,
 		'Service lifecycle uses its new framework and terminal-exit diagnostic native')!
+	require(platform_fragments_profile().framework_sha != service_lifecycle_profile().framework_sha
+		&& platform_fragments_profile().native_sha != service_lifecycle_profile().native_sha
+		&& platform_fragments_profile().apk_sha != service_lifecycle_profile().apk_sha,
+		'platform fragments requires its distinct framework, exception-restore native and fixture')!
 	for profile in profiles {
 		mut pins := [profile.apk_sha, profile.framework_sha]
 		if profile.native_sha != '' { pins << profile.native_sha }
@@ -533,7 +554,7 @@ fn selftest() ! {
 		cases++
 	}
 	require(canonical('/var/lib/onboarding-api-r1'), 'canonical path rejected')!
-	for selector in ['--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle'] {
+	for selector in ['--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments'] {
 		full := [selector, '/runtime', '/fixture.apk', '10117', '10117', '/results']
 		for count in 1 .. full.len {
 			mut argv := [os.executable()]
@@ -562,9 +583,10 @@ fn run() ! {
 		return
 	}
 	mut arguments := os.args[1..]
-	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network', '--authenticator-worker', '--maps-network-v2', '--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle'],
-		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network|--authenticator-worker|--maps-network-v2|--authenticator-binder-identity|--maps-network-v3|--service-lifecycle) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
+	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network', '--authenticator-worker', '--maps-network-v2', '--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments'],
+		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network|--authenticator-worker|--maps-network-v2|--authenticator-binder-identity|--maps-network-v3|--service-lifecycle|--platform-fragments) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
 	profile := if arguments[0] == '--authenticator-private-exception' { authenticator_exception_profile() }
+		else if arguments[0] == '--platform-fragments' { platform_fragments_profile() }
 		else if arguments[0] == '--service-lifecycle' { service_lifecycle_profile() }
 		else if arguments[0] == '--authenticator-binder-identity' { authenticator_binder_identity_profile() }
 		else if arguments[0] == '--maps-network-v3' { maps_network_v3_profile() }
