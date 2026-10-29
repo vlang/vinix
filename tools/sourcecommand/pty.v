@@ -27,9 +27,9 @@ mut:
 
 pub fn spawn_pty(argv []string, environment map[string]string, directory string) !PtyChild {
 	if argv.len == 0 || argv.any(it.contains('\x00')) || directory.contains('\x00') { return error('invalid PTY command') }
-	mut arguments := []&char{}
-	for value in argv { arguments << unsafe { &char(value.str) } }
-	arguments << &char(unsafe { nil })
+	mut argv_pointers := []&char{}
+	for value in argv { argv_pointers << unsafe { &char(value.str) } }
+	argv_pointers << &char(unsafe { nil })
 	mut values := []string{}
 	for name, value in environment {
 		if name.contains_any('=\x00') || value.contains('\x00') { return error('invalid PTY environment') }
@@ -64,7 +64,7 @@ pub fn spawn_pty(argv []string, environment map[string]string, directory string)
 		if C.write(handshake[1], c'1', 1) != 1 { C._exit(127) }
 		C.close(handshake[1])
 		if directory != '' && C.chdir(directory.str) != 0 { C._exit(127) }
-		unsafe { C.execve(argv[0].str, arguments.data, envp.data) }
+		unsafe { C.execve(argv[0].str, argv_pointers.data, envp.data) }
 		C._exit(127)
 	}
 	mut child := PtyChild{int(pid), int(descriptor), false}
