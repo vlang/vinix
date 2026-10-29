@@ -1252,7 +1252,8 @@ fn test_session_adapter_owned_requests() {
 		config, request := session_adapter_request(api, address)
 		unsafe { address.free() }
 		defaults := url_session_request_snapshot(request, config)
-		assert defaults.issue == .none && defaults.transport_profile() == .protocols;
+		assert defaults.issue == .none && defaults.transport_profile() == .cookies;
+		assert defaults.protocol_route() == .http;
 		assert defaults.request.cookies && defaults.configuration.cookies && defaults.configuration.default_protocols;
 		assert defaults.configuration.request_timeout == 60 && defaults.configuration.resource_timeout == 604800;
 		defaults.dispose()
@@ -1765,4 +1766,165 @@ fn test_session_transfer_shutdown_pending() {
 		unsafe { address.free(); C.free(p) }
 	}
 	println('IOS-SESSION-TRANSFER-SHUTDOWN: queued response, copied pending handler and queued terminal work cancel/join, disconnect observations and retire without callbacks PASS')
+}
+
+// Native protocolClasses exposes private class identities. Loading with the
+// built-in HTTP backend does not require manufacturing those classes locally.
+// Characterize default versus explicit nil/empty lists over real loopback I/O.
+fn test_session_native_builtin_protocol_routes() {
+	$if macos {
+		api := DataHTTPApi{native: true, send: u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend'))}
+		cls := C.objc_allocateClassPair(unsafe { voidptr(api.cls(c'NSObject')) }, c'VinixBuiltinProtocolOracle', 0)
+		assert cls != unsafe { nil };
+		assert C.class_addProtocol(cls, C.objc_getProtocol(c'NSURLSessionDataDelegate'));
+		assert C.class_addMethod(cls, C.sel_registerName(c'URLSession:dataTask:didReceiveResponse:completionHandler:'), unsafe { voidptr(task_http_oracle_response) }, c'v48@0:8@16@24@32@?40');
+		assert C.class_addMethod(cls, C.sel_registerName(c'URLSession:dataTask:didReceiveData:'), unsafe { voidptr(task_http_oracle_data) }, c'v40@0:8@16@24@32');
+		assert C.class_addMethod(cls, C.sel_registerName(c'URLSession:task:didCompleteWithError:'), unsafe { voidptr(task_http_oracle_complete) }, c'v40@0:8@16@24@32');
+		C.objc_registerClassPair(cls)
+		for mode in ['default', 'nil', 'empty']! {
+			pool := api.pool()
+			listener := data_http_listener()
+			server := spawn data_http_serve(listener, ['HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nping'], ['/'], false, false)
+			config := api.msg(api.cls(c'NSURLSessionConfiguration'), c'defaultSessionConfiguration', 0)
+			if mode != 'default' { api.msg(config, c'setProtocolClasses:', if mode == 'nil' { u64(0) } else { api.msg(api.cls(c'NSArray'), c'array', 0) }) }
+			protocols := api.msg(config, c'protocolClasses', 0)
+			assert if mode == 'default' { protocols != 0 && api.msg(protocols, c'count', 0) > 0 } else if mode == 'nil' { protocols == 0 } else { protocols != 0 && api.msg(protocols, c'count', 0) == 0 };
+			queue := api.msg(api.cls(c'NSOperationQueue'), c'new', 0)
+			api.msg(queue, c'setMaxConcurrentOperationCount:', 1)
+			delegate := api.msg(u64(cls), c'new', 0)
+			mut p := unsafe { &TaskHTTPOracle(C.calloc(1, sizeof(TaskHTTPOracle))) }
+			unsafe { *p = TaskHTTPOracle{send: api.send, session_delegate: delegate, queue: queue} }
+			task_http_oracle = p
+			address := 'http://localhost:${listener.port}/'
+			request := api.msg(api.cls(c'NSMutableURLRequest'), c'requestWithURL:', api.url(address))
+			session_protocol_preferences(api, config, request)
+			session := unsafe { TaskHTTPNative5(voidptr(api.send))(api.cls(c'NSURLSession'), u64(C.sel_registerName(c'sessionWithConfiguration:delegate:delegateQueue:')), config, delegate, queue) }
+			task := api.msg(session, c'dataTaskWithRequest:', request)
+			api.msg(task, c'resume', 0)
+			deadline := time.sys_mono_now() + 6 * time.second
+			for C.__atomic_load_n(unsafe { &p.finished }, 5) == 0 {
+				if time.sys_mono_now() >= deadline { eprintln('IOS-BUILTIN-PROTOCOL-NATIVE: completion timeout ' + mode); C._exit(124) }
+				time.sleep(time.millisecond)
+			}
+			api.msg(queue, c'waitUntilAllOperationsAreFinished', 0)
+			assert server.wait() && p.bad_queue == 0 && p.state == 3 && p.error_code == 0 && p.body_size == 4;
+			assert p.events == [u64(1), 2, 3, 0, 0, 0, 0, 0]! && C.memcmp(&p.body[0], c'ping', 4) == 0;
+			api.msg(session, c'invalidateAndCancel', 0)
+			api.msg(delegate, c'release', 0); api.msg(queue, c'release', 0)
+			api.drain(pool); task_http_oracle = unsafe { nil }
+			unsafe { address.free(); C.free(p) }
+		}
+		println('IOS-BUILTIN-PROTOCOL-NATIVE: default, nil and empty protocol lists all retain built-in HTTP routing PASS')
+	}
+}
+
+fn session_protocol_preferences(api DataHTTPApi, config u64, request u64) {
+	api.msg(config, c'setHTTPShouldSetCookies:', 0)
+	api.msg(request, c'setHTTPShouldHandleCookies:', 0)
+	api.msg(config, c'setRequestCachePolicy:', 1)
+	api.msg(request, c'setCachePolicy:', 1)
+}
+
+fn test_session_builtin_protocol_routes() {
+	api := DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
+	for _ in 0 .. 2 {
+		objc_start(); system_data_start()!
+		all, _ := session_transfer_classes()
+		for mode in ['default', 'nil', 'empty']! {
+			for scheme in ['http', 'https', 'untrusted']! {
+				pool := api.pool()
+				listener := data_http_listener()
+				server := spawn data_http_serve(listener, ['HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nping'], ['/'], scheme != 'http', false)
+				address := '${if scheme == 'http' { 'http' } else { 'https' }}://localhost:${listener.port}/'
+				config, request := session_transfer_inputs(api, address, false)
+				if mode != 'default' { api.msg(config, c'setProtocolClasses:', if mode == 'nil' { u64(0) } else { api.msg(api.cls(c'NSArray'), c'array', 0) }) }
+				session_protocol_preferences(api, config, request)
+				snapshot := url_session_request_snapshot(request, config)
+				session_worker_require(snapshot.issue == .none && snapshot.transport_profile() == .supported, 'built-in protocol profile rejected ' + mode)
+				session_worker_require(snapshot.protocol_route() == if scheme == 'http' { URLSessionProtocolRoute.http } else { URLSessionProtocolRoute.https }, 'wrong scheme route')
+				snapshot.dispose()
+				queue := api.msg(api.cls(c'NSOperationQueue'), c'new', 0)
+				delegate := objc_new(all)
+				mut p := unsafe { &SessionTransferProbe(C.calloc(1, sizeof(SessionTransferProbe))) }
+				unsafe { *p = SessionTransferProbe{queue: queue} }
+				session_transfer_probe = p
+				session := unsafe { TaskHTTPNative5(voidptr(api.send))(api.cls(c'NSURLSession'), u64(c'sessionWithConfiguration:delegate:delegateQueue:'), config, delegate, queue) }
+				task := api.msg(session, c'dataTaskWithRequest:', request)
+				if scheme == 'http' { api.msg(task, c'resume', 0) }
+				else { url_session_task_resume_with_ca(task, if scheme == 'untrusted' { '' } else { os.getenv('VINIX_IOS_HTTP_CERT') }) }
+				api.msg(task, c'resume', 0)
+				session_transfer_wait(p, task, queue, false)
+				served := server.wait()
+				session_worker_require(p.bad == 0 && p.error_code == if scheme == 'untrusted' { i64(-1200) } else { i64(0) }, 'built-in route changed error/trust behavior')
+				if scheme != 'untrusted' {
+					session_worker_require(served && p.status == 200 && p.length == 4 && C.memcmp(&p.data[0], c'ping', 4) == 0, 'built-in route did not transfer the response')
+					session_worker_require(p.events == [u64(1), 2, 3, 0, 0, 0, 0, 0]!, 'built-in callback order changed')
+				}
+				stored := url_session_configuration_state(url_session_state(session).fields[2])
+				session_worker_require(stored.url_session_configuration_default_protocols == (mode == 'default'), 'routing rewrote the configuration protocol marker')
+				if mode != 'empty' { session_worker_require(stored.fields[4] == 0, 'routing manufactured a private class array') }
+				objc_release(delegate); objc_release(queue); api.drain(pool)
+				session_worker_require(ios_runtime.live == 0 && ios_runtime.block_refs.len == 0, 'built-in routing retained objects or blocks')
+				session_transfer_probe = unsafe { nil }
+				unsafe { address.free(); C.free(p) }
+			}
+		}
+		objc_stop(); system_data_stop()
+	}
+	println('IOS-BUILTIN-PROTOCOL: default/nil/empty HTTP and HTTPS routing, trust rejection, ordered public task callbacks and untouched configuration ownership across two lifetimes PASS')
+}
+
+fn C.alarm(u32) u32
+fn test_session_builtin_protocol_policy_boundaries() {
+	for mode in ['cookies', 'cache', 'protocols']! {
+		listener := data_http_listener()
+		mut fds := [2]i32{}
+		assert C.pipe(&fds[0]) == 0;
+		pid := C.fork()
+		assert pid >= 0;
+		if pid == 0 {
+			C.close(fds[0]); C.dup2(fds[1], 2); C.close(fds[1]); C.alarm(8)
+			objc_start(); system_data_start() or { C._exit(125) }
+			api := DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
+			address := 'http://localhost:${listener.port}/'
+			config, request := session_transfer_inputs(api, address, false)
+			mut list := u64(0)
+			if mode != 'cookies' { api.msg(config, c'setHTTPShouldSetCookies:', 0); api.msg(request, c'setHTTPShouldHandleCookies:', 0) }
+			if mode == 'protocols' {
+				session_protocol_preferences(api, config, request)
+				list = api.msg(api.cls(c'NSMutableArray'), c'array', 0)
+				api.msg(list, c'addObject:', api.cls(c'NSObject'))
+				api.msg(config, c'setProtocolClasses:', list)
+			}
+			session := api.msg(api.cls(c'NSURLSession'), c'sessionWithConfiguration:', config)
+			// Loading uses the session's configuration copy, including its custom
+			// list after the caller clears/replaces both original inputs.
+			if mode == 'protocols' {
+				api.msg(list, c'removeAllObjects', 0)
+				api.msg(config, c'setProtocolClasses:', 0)
+			}
+			task := api.msg(session, c'dataTaskWithRequest:', request)
+			api.msg(task, c'resume', 0)
+			C._exit(0)
+		}
+		C.close(fds[1])
+		mut bytes := [16384]u8{}
+		mut length := 0
+		for {
+			assert length < bytes.len;
+			count := C.read(fds[0], unsafe { &bytes[length] }, usize(bytes.len - length))
+			if count == 0 { break }
+			if count < 0 && unsafe { *C.ios_errno_address() } == C.EINTR { continue }
+			assert count > 0; length += int(count)
+		}
+		C.close(fds[0])
+		mut status := i32(0)
+		assert C.ios_waitpid(pid, &status, 0) == pid && status == 256;
+		output := unsafe { tos(&bytes[0], length) }
+		assert output.contains('URL session request transport profile is not implemented: ' + mode), output;
+		assert !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output;
+		assert !data_http_wait(listener.fd, false, time.sys_mono_now() + time.millisecond);
+		C.close(listener.fd)
+	}
+	println('IOS-BUILTIN-PROTOCOL-POLICY: public resume rejects custom-list, cookie and cache profiles before connecting; configuration copies preserve custom selection PASS')
 }

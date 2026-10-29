@@ -241,8 +241,9 @@ fn url_session_configuration_factory(cls u64, identifier u64, background bool) u
 			*(&u8(object + 117)) = 1 // _backgroundSession, measured common prefix
 		}
 	}
-	// Do not expose nil/empty built-in protocols as a usable transport profile.
-	// An explicit protocolClasses setter replaces this unresolved default.
+	// The private built-in class identities remain an unsupported getter. HTTP(S)
+	// routing can use the built-in backend without exposing a fabricated array.
+	// An explicit protocolClasses setter replaces the unresolved getter value.
 	header.url_session_configuration_default_protocols = true
 	C.ios_objc_initialize_unlock()
 	objc_release(retired)

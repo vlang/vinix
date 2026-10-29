@@ -172,13 +172,13 @@ enum URLSessionTransportProfile {
 	supported snapshot protocols background proxy cookies cache network tls timeout wire
 }
 
-// Keep unimplemented policy visible to the future task adapter. In particular,
-// a default configuration is not implicitly permission to ignore shared stores,
+// Built-in HTTP(S) selection does not imply permission to ignore shared stores,
 // custom protocols, proxy, TLS or network constraints.
 fn (snapshot &URLSessionRequestSnapshot) transport_profile() URLSessionTransportProfile {
 	if snapshot.issue != .none { return .snapshot }
 	r := snapshot.request; c := snapshot.configuration
-	if c.default_protocols || c.custom_protocols { return .protocols }
+	route := snapshot.protocol_route()
+	if route == .custom { return .protocols }
 	if c.background || c.identifier || c.shared_container || c.launch_events { return .background }
 	if c.proxy { return .proxy }
 	if r.cookies || c.cookies || r.cookie_partition { return .cookies }
@@ -192,6 +192,7 @@ fn (snapshot &URLSessionRequestSnapshot) transport_profile() URLSessionTransport
 	// NSString request-field encoding has not yet been characterized beyond
 	// ASCII. Preserve its bytes in the snapshot without claiming a wire mapping.
 	for field in snapshot.fields { for byte in field.value { if byte >= 127 { return .wire } } }
+	if route == .unsupported { return .wire }
 	url := data_http_url(snapshot.url) or { return .wire }
 	wire := http_transport_wire(url, snapshot.borrowed_request()) or { return .wire }
 	unsafe { wire.free() }
