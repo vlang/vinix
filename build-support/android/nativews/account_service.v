@@ -722,10 +722,12 @@ fn ws_auth_pump_failure(e voidptr, stage i32, status i32) bool {
 		buffer := &char(C.alloca(128))
 		length := C.snprintf(buffer,128,c'ANDROID-AUTH-PUMP-FAIL stage=%d status=%d pending=%d\n',stage,status,i32(exception))
 		if length > 0 && length < 128 { C.write(2,buffer,usize(length)) }
-		// ExceptionDescribe clears pending. Restore the same Throwable so the
-		// existing launch/shutdown cleanup retains ownership of clearing it.
+		// Do not rely on reporting to leave JNI clear: it may retain the
+		// exception or raise another one. Restore the original Throwable so
+		// launch/shutdown cleanup retains ownership of clearing that cause.
 		if failure != nil {
 			ws_failure(e,c'ANDROID-SERVICE-FAIL account pump')
+			if pending(e) { WsApplicationClear(slot(e,17))(e) }
 			WsApplicationThrow(slot(e,13))(e,failure)
 			Drop(slot(e,23))(e,failure)
 		}

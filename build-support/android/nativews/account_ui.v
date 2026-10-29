@@ -346,7 +346,12 @@ fn ws_service_ui_shutdown(e voidptr) {
 				ws_ui_clear_exception(e)
 			}
 			ws_ui_cancel(e)
-			if failure != nil { WsApplicationThrow(slot(e, 13))(e, failure); Drop(slot(e, 23))(e, failure) }
+			if failure != nil {
+				// Cleanup must not leave a secondary exception pending at Throw.
+				ws_ui_clear_exception(e)
+				WsApplicationThrow(slot(e, 13))(e, failure)
+				Drop(slot(e, 23))(e, failure)
+			}
 		}
 		if ws.surface != nil && !ws_ui_retained {
 			C.munmap(ws.surface, ws_ui_mapping_size)

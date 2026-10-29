@@ -276,6 +276,8 @@ mut:
  complete_during_destroy bool
  results int
  lifecycle_exception bool
+ cancel_exception bool
+ secondary_exception bool
  reentrant_shutdown bool
  reentered bool
  background_count int
@@ -472,11 +474,16 @@ fn ws_auth_free(builder voidptr) {
 fn probe_free(node voidptr) {
  if p.lock_depth != 0 { p.lock_errors++ }
  p.slot_freed << unsafe { (&WsAuthSlot(node)).id }
+ // Fault-inject a late cleanup boundary that leaves JNI pending.
+ if p.cancel_exception { p.exception = true; p.secondary_exception = true }
 }
-fn probe_exception(e voidptr) voidptr { assert e == voidptr(1) && p.exception; return voidptr(99) }
-fn probe_clear(e voidptr) { assert e == voidptr(1); p.exception = false; p.clear_count++ }
+fn probe_exception(e voidptr) voidptr { assert e == voidptr(1) && p.exception && !p.secondary_exception; return voidptr(99) }
+fn probe_clear(e voidptr) { assert e == voidptr(1); p.exception = false; p.secondary_exception = false; p.clear_count++ }
 fn probe_throw(e voidptr,exception voidptr) i32 {
- assert e == voidptr(1) && exception == voidptr(99) && !p.exception
+ assert e == voidptr(1) && exception == voidptr(99)
+ // Model CheckJNI rejection in the safety result, allowing mutant cases to
+ // fail the suite without terminating all the other behavioral checks.
+ if p.exception { p.unsafe_jni++; return -1 }
  p.exception = true; p.throws++
  return 0
 }
@@ -767,6 +774,12 @@ fn shutdown_suite(run Cancel,loud bool) bool {
  live_session(); p.exception = true; p.lifecycle_exception = true
  run(voidptr(1))
  if !check(ws.running && p.exception && p.throws == 1 && p.clear_count == 5 && p.lifecycle.len == 3 && p.background_count == 1 && p.sent == 1 && p.builder_freed == 1,"launch exception preserved around clean lifecycle",loud) { return false }
+ live_session(); p.exception = true; p.cancel_exception = true
+ run(voidptr(1))
+ if !check(p.exception && !p.secondary_exception && p.throws == 1 && p.clear_count == 2 && p.drops.filter(it == voidptr(99)).len == 1 && p.sent == 1 && p.slot_freed == [u64(42)],"original cause restored after secondary cleanup exception",loud) { return false }
+ live_session(); p.cancel_exception = true
+ run(voidptr(1))
+ if !check(p.exception && p.secondary_exception && p.throws == 0 && p.clear_count == 0 && p.drops.filter(it == voidptr(99)).len == 0,"secondary cleanup exception retained when no original exists",loud) { return false }
  live_session(); ws.back_count = 2; ws.back_stack[0] = voidptr(3); ws.back_stack[1] = voidptr(4)
  run(voidptr(1))
  if !check(ws.running && ws.back_count == 0 && ws.back_stack.all(it == unsafe { nil }) && p.lifecycle.len == 9 && p.detached.len == 3 && p.sent == 1,"all covered activities destroyed without resume",loud) { return false }
@@ -821,6 +834,7 @@ fn ui_mutations(name string, source string) []string {
 				source.replace(' && !ws_ui_retained', ''),
 				source.replace('ws_uid_lifecycle(e, 300)', ''),
 				source.replace('ws_ui_clear_exception(e)\n\t\t\t// Clear each root', 'ws_ui_clear_exception(e)\n\t\t\tws_ui_cancel(e)\n\t\t\t// Clear each root'),
+				source.replace('ws_ui_clear_exception(e)\n\t\t\t\tWsApplicationThrow', 'WsApplicationThrow'),
 			]
 		}
 		else {

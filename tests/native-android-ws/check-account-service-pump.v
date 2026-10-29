@@ -58,6 +58,9 @@ fn main() {
 			'if worker_error != 0 { return true }'),
 		once(production, 'transferred = ws_auth_worker_enqueue(e,binder,command)',
 			'transferred = !ws_auth_worker_enqueue(e,binder,command)'),
+		once(production, 'if pending(e) { WsApplicationClear(slot(e,17))(e) }', '// left reporting exception pending'),
+		once(production, "ws_failure(e,c'ANDROID-SERVICE-FAIL account pump')\n\t\t\tif pending(e) { WsApplicationClear(slot(e,17))(e) }",
+			"if pending(e) { WsApplicationClear(slot(e,17))(e) }\n\t\t\tws_failure(e,c'ANDROID-SERVICE-FAIL account pump')"),
 	]
 	mut dispatch := 'fn main() {\n mut pump := Pump(ws_account_service_pump)\n'
 	for i, mutant in mutants {
@@ -111,6 +114,7 @@ fn C.snprintf(&char, usize, &char, ...) i32
 type Pump = fn (voidptr, voidptr) bool
 type WsApplicationException = fn (voidptr) voidptr
 type WsApplicationThrow = fn (voidptr, voidptr) i32
+type WsApplicationClear = fn (voidptr)
 type Drop = fn (voidptr, voidptr)
 type Check = fn (voidptr)
 struct WsAuthCommand { mut: id u64 operation u16 }
@@ -127,6 +131,7 @@ mut:
  dispatch_exception bool
  launch_exception bool
  capture_nil bool
+ describe_pending int
  write_bad bool
  exception voidptr
  writes []string
@@ -142,6 +147,7 @@ mut:
  cancelled int
  captured int
  described int
+ cleared int
  restored int
  dropped int
 }
@@ -214,7 +220,16 @@ fn probe_capture(e voidptr) voidptr {
 }
 fn probe_describe(e voidptr) {
  assert !probe.locked && probe.exception == voidptr(77) && probe.markers.len == 1
- probe.described++; probe.events << "describe"; probe.exception = unsafe { nil }
+ probe.described++; probe.events << "describe"
+ probe.exception = match probe.describe_pending {
+  1 { voidptr(77) }
+  2 { voidptr(88) }
+  else { unsafe { nil } }
+ }
+}
+fn probe_clear(e voidptr) {
+ assert !probe.locked && probe.exception in [voidptr(77), voidptr(88)]
+ probe.cleared++; probe.events << "clear"; probe.exception = unsafe { nil }
 }
 fn probe_throw(e voidptr, original voidptr) i32 {
  assert !probe.locked && probe.exception == unsafe { nil } && original == voidptr(77)
@@ -229,6 +244,7 @@ fn slot(e voidptr, index int) voidptr {
   13 { voidptr(probe_throw) }
   15 { voidptr(probe_capture) }
   16 { voidptr(probe_describe) }
+  17 { voidptr(probe_clear) }
   23 { voidptr(probe_drop) }
   else { panic("unexpected JNI slot") }
  }
@@ -246,6 +262,7 @@ fn check_failure(pump Pump, stage int, status i32, exception bool, capture_nil b
  assert probe.captured == int(exception)
  reporting := exception && !capture_nil
  assert probe.described == int(reporting) && probe.restored == int(reporting) && probe.dropped == int(reporting)
+ assert probe.cleared == int(reporting && probe.describe_pending != 0)
  assert probe.markers == if reporting { ["ANDROID-SERVICE-FAIL account pump"] } else { []string{} }
  if stage == 2 {
   assert probe.cleaned == 1 && probe.exception == unsafe { nil }
@@ -285,6 +302,16 @@ fn suite(pump Pump) {
   check_failure(pump, 2, 3, exception, false)
  }
  reset(Probe{statuses: [i32(4)]}); check_failure(pump, 3, 4, false, false)
+ // Reporting may retain the original exception or replace it with a new one.
+ // Both paths must clear JNI before restoring the same original local ref.
+ for mode in [1, 2] {
+  reset(Probe{statuses:[i32(-1)], exception:voidptr(77), describe_pending:mode})
+  check_failure(pump, 1, -1, true, false)
+  assert probe.events == ["capture","write","marker","describe","clear","restore","drop"]
+  reset(Probe{statuses:[i32(3)], launch_ok:false, launch_exception:true, describe_pending:mode})
+  check_failure(pump, 2, 3, true, false)
+  assert probe.events.last() == "cleanup"
+ }
  reset(Probe{statuses: [i32(-1)], exception: voidptr(77), write_bad: true})
  check_failure(pump, 1, -1, true, false)
  reset(Probe{statuses: [i32(-1)], exception: voidptr(77), capture_nil: true})
