@@ -90,3 +90,64 @@ included. Signing inputs matched before/after the build and retained content
 matched their originals. Seal and independent complete readback passed for two
 roots and 18,207 entries, with zero exit statuses and complete cleanup. The
 closed artifact roots must remain unchanged; new guest results belong elsewhere.
+
+## Opt-in TLS substeps v2
+
+The v1 guest observation `status=1,error=10` means an unclassified TLS-probe
+throwable. The probe casts the factory result to `VinixSSLSocket` before its
+handshake, so that result alone does not establish a transport or handshake
+failure. V2 retains those same operations and adds fixed diagnostics:
+
+```sh
+maps-network-fixture --tls-diagnostics-v2 OUTPUT AAPT2 FRAMEWORK_RES SMALI_TOOLS JAVA APKSIGNER
+maps-network-fixture --check-v2 GUEST_STDOUT_LOG
+```
+
+V2 uses prefix `MAPS-NETWORK-V2 ` with the six original fields followed by
+`step=0..9`, and terminal marker
+`MAPS-NETWORK-V2-PASS observations-complete`. Step is zero outside TLS and for
+skipped TLS; a timeout at step zero means the worker had not entered its first
+TLS operation. A positive value identifies the last operation attempted:
+
+| Step | TLS operation |
+| --- | --- |
+| 1 | Obtain default factory and cast to `SSLSocketFactory` |
+| 2 | Wrap the connected plain socket with that factory |
+| 3 | Cast the returned socket to `VinixSSLSocket` |
+| 4 | Set the existing SNI hostname |
+| 5 | Set the read timeout |
+| 6 | Start handshake |
+| 7 | Obtain session |
+| 8 | Obtain default hostname verifier |
+| 9 | Verify the fixed hostname |
+
+Additional fixed error values are 11 `ClassCastException`, 12 `NoSuchMethodError`,
+13 `NoClassDefFoundError`, 14 `VerifyError`, 15 `UnsupportedOperationException`,
+16 `NoSuchMethodException`, 17 `AbstractMethodError` and 18 other `LinkageError`.
+The original classifications remain unchanged. No exception message, class-name
+string, certificate or address is exported. V2 does not change factory selection,
+socket arguments, address policy, trust policy or network requests.
+
+The default v1 emitted Main, NetworkTask and NetworkDeadline sources remain
+byte-identical to their pinned originals; the host self-test checks all three
+hashes. Its original artifacts and checker remain sealed unchanged. V2 checks
+also cover extended-class bounds, malformed steps, pre-start timeout, canonical
+complete lines and duplicate markers. Peer review identified the valid timeout
+at step zero before signing; that case is now accepted and tested.
+
+The v2 source SHA-256 is
+`9a419c4104e5f32c8d81afba895856141cfc5beb7e29a356182e50d790e924a8`.
+Under the same external state directory, retained build inputs and checks are
+`maps-network-tls-v2-fixture-build-2026-10-29-r1`; its final tool is
+`tools/maps-network-fixture-r2`. Signed APK
+`maps-network-tls-v2-fixture-2026-10-29-r1/probe.apk` has SHA-256
+`abfa8127b920dd7156d3cdee056a98d725411c6b5b2f8cb081149393c0b9c051`.
+
+Compilation, self-test, v1/v2/v3 signature verification and equality of the
+signed APK's DEX member passed. The raw DEX roundtrip comparison differed in
+encoding; complete canonical disassembly before and after reassembly matched.
+Both comparison receipts are preserved, without changing the v1 checks.
+Final compile / self-test / APK build took 5.275 / 0.263 / 4.357 seconds with
+sampled peak aggregate RSS 372,654,080 / 1,245,184 / 89,702,400 bytes. Their
+guards exited zero with complete cleanup under the unchanged limits. V2 ART
+execution remains pending; these checks identify no TLS or networking fix.

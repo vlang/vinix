@@ -12,6 +12,8 @@ const task = 'Lorg/vinix/bootstrap/NetworkTask;'
 const host = 'mobilemaps.googleapis.com'
 const prefix = 'MAPS-NETWORK '
 const pass_marker = 'MAPS-NETWORK-PASS observations-complete'
+const prefix_v2 = 'MAPS-NETWORK-V2 '
+const pass_marker_v2 = 'MAPS-NETWORK-V2-PASS observations-complete'
 
 fn method(signature string, locals int, body string) string {
 	return '.method ${signature}\n.locals ${locals}\n${body}\n.end method\n'
@@ -324,6 +326,64 @@ invoke-static {v0}, Ljava/lang/System;->exit(I)V
 return-void')
 }
 
+// Keep the original generator byte-for-byte stable. The opt-in profile adds
+// observations around the same operations without selecting another factory.
+fn replace_once(text string, before string, after string) !string {
+	if text.count(before) != 1 { return error('diagnostic insertion point differs') }
+	return text.replace(before, after)
+}
+
+fn task_source_v2() !string {
+	mut text := replace_once(task_source(), '.field public volatile mode:I\n',
+		'.field public volatile mode:I\n.field public volatile tls_step:I\n')!
+	for index, operation in [
+		'invoke-static {}, Ljavax/net/ssl/SSLSocketFactory;->getDefault()Ljavax/net/SocketFactory;',
+		'invoke-virtual/range {v0 .. v4}, Ljavax/net/ssl/SSLSocketFactory;->createSocket(Ljava/net/Socket;Ljava/lang/String;IZ)Ljava/net/Socket;',
+		'check-cast v0, Landroid/atl/VinixSSLSocket;',
+		'invoke-virtual {v0, v2}, Landroid/atl/VinixSSLSocket;->setHostname(Ljava/lang/String;)V',
+		'invoke-virtual {v0, v1}, Ljava/net/Socket;->setSoTimeout(I)V',
+		'invoke-virtual {v0}, Ljavax/net/ssl/SSLSocket;->startHandshake()V',
+		'invoke-virtual {v0}, Ljavax/net/ssl/SSLSocket;->getSession()Ljavax/net/ssl/SSLSession;',
+		'invoke-static {}, Ljavax/net/ssl/HttpsURLConnection;->getDefaultHostnameVerifier()Ljavax/net/ssl/HostnameVerifier;',
+		'invoke-interface {v0, v2, v1}, Ljavax/net/ssl/HostnameVerifier;->verify(Ljava/lang/String;Ljavax/net/ssl/SSLSession;)Z',
+	] {
+		text = replace_once(text, operation, 'const/16 v7, ${index + 1}\niput v7, p0, ${task}->tls_step:I\n' + operation)!
+	}
+	return text
+}
+
+fn main_source_v2() !string {
+	mut text := replace_once(main_source(), '.field public static volatile finished:Z\n',
+		'.field public static volatile finished:Z\n.field public static tls_step:I\n')!
+	text = replace_once(text, '"${prefix}stage="', '"${prefix_v2}stage="')!
+	text = replace_once(text, '"${pass_marker}"', '"${pass_marker_v2}"')!
+	text = replace_once(text, emit(3, 'v10', 'v11', 'v13'),
+		'const/4 v0, 0\nsput v0, ${owner}->tls_step:I\n' + emit(3, 'v10', 'v11', 'v13'))!
+	text = replace_once(text, emit_task(6, 'v7', 'v10', 'v11'),
+		'iget v0, v7, ${task}->tls_step:I\nsput v0, ${owner}->tls_step:I\n' + emit_task(6, 'v7', 'v10', 'v11'))!
+	text = replace_once(text, 'invoke-virtual {v0}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;', '
+const-string v1, " step="
+invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+const/4 v1, 6
+if-ne p0, v1, :no_step
+sget v1, ${owner}->tls_step:I
+goto :append_step
+:no_step
+const/4 v1, 0
+:append_step
+invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+invoke-virtual {v0}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;')!
+	mut extra := ''
+	for index, class in ['java/lang/ClassCastException', 'java/lang/NoSuchMethodError',
+		'java/lang/NoClassDefFoundError', 'java/lang/VerifyError',
+		'java/lang/UnsupportedOperationException', 'java/lang/NoSuchMethodException',
+		'java/lang/AbstractMethodError', 'java/lang/LinkageError'] {
+		extra += 'instance-of v0, p0, L${class};\nif-eqz v0, :extra${index}\nconst/16 v0, ${index + 11}\nreturn v0\n:extra${index}\n'
+	}
+	head := '.method public static classify(Ljava/lang/Throwable;)I\n.locals 1\n'
+	return replace_once(text, head, head + extra)!
+}
+
 struct Record {
 	stage int
 	index int
@@ -334,6 +394,10 @@ struct Record {
 }
 
 fn parse(line string) !Record {
+	return parse_record(line, 10)
+}
+
+fn parse_record(line string, max_error int) !Record {
 	if line.len > 128 || !line.starts_with(prefix) { return error('invalid record prefix or length') }
 	parts := line[prefix.len..].split(' ')
 	keys := ['stage', 'index', 'family', 'status', 'error', 'errno']
@@ -347,7 +411,7 @@ fn parse(line string) !Record {
 		values << strconv.atoi(value)!
 	}
 	r := Record{values[0], values[1], values[2], values[3], values[4], values[5]}
-	if r.stage !in [1, 2, 3, 4, 5, 6, 8, 9] || r.index > 8 || r.family !in [0, 4, 6] || r.status > 3 || r.error > 10 || r.system_errno > 4095 { return error('record outside finite schema') }
+	if r.stage !in [1, 2, 3, 4, 5, 6, 8, 9] || r.index > 8 || r.family !in [0, 4, 6] || r.status > 3 || r.error > max_error || r.system_errno > 4095 { return error('record outside finite schema') }
 	if r.status != 1 && (r.error != 0 || r.system_errno != 0) { return error('nonexception record contains error data') }
 	if r.status == 1 && r.error == 0 { return error('exception classification absent') }
 	return r
@@ -392,6 +456,58 @@ fn read_records(text string) ![]Record {
 	return records
 }
 
+struct TlsRecord {
+	stage int
+	index int
+	family int
+	status int
+	error int
+	system_errno int
+	step int
+}
+
+fn parse_v2(line string) !TlsRecord {
+	if line.len > 144 || !line.starts_with(prefix_v2) { return error('invalid v2 prefix or length') }
+	parts := line.split(' step=')
+	if parts.len != 2 || parts[1].len != 1 || parts[1][0] < `0` || parts[1][0] > `9` {
+		return error('invalid v2 step')
+	}
+	base := parse_record(prefix + parts[0][prefix_v2.len..], 18)!
+	step := int(parts[1][0] - `0`)
+	if (base.stage != 6 && step != 0) || (base.stage == 6 && base.status == 3 && step != 0)
+		|| (base.stage == 6 && base.status == 0 && step != 9)
+		|| (base.stage == 6 && base.status == 1 && step == 0) {
+		return error('v2 step does not match operation')
+	}
+	return TlsRecord{base.stage, base.index, base.family, base.status, base.error, base.system_errno, step}
+}
+
+fn validate_v2(records []TlsRecord) ! {
+	mut base := []Record{}
+	for r in records { base << Record{r.stage, r.index, r.family, r.status, r.error, r.system_errno} }
+	validate(base)!
+}
+
+fn read_records_v2(text string) ![]TlsRecord {
+	mut records := []TlsRecord{}
+	mut completed := false
+	lines := text.split('\n')
+	for index, line in lines {
+		if !line.starts_with('MAPS-NETWORK') { continue }
+		if index == lines.len - 1 || completed { return error('incomplete or trailing v2 public output') }
+		if line == pass_marker_v2 {
+			validate_v2(records)!
+			completed = true
+			continue
+		}
+		if records.len >= 28 { return error('oversized v2 observations') }
+		records << parse_v2(line)!
+	}
+	if !completed { return error('v2 completion marker absent') }
+	validate_v2(records)!
+	return records
+}
+
 fn self_test() ! {
 	lines := ['MAPS-NETWORK stage=1 index=0 family=0 status=0 error=0 errno=0', 'MAPS-NETWORK stage=2 index=1 family=0 status=0 error=0 errno=0', 'MAPS-NETWORK stage=3 index=0 family=4 status=0 error=0 errno=0', 'MAPS-NETWORK stage=4 index=0 family=4 status=0 error=0 errno=0', 'MAPS-NETWORK stage=6 index=0 family=4 status=1 error=4 errno=0', 'MAPS-NETWORK stage=5 index=0 family=0 status=2 error=0 errno=0', 'MAPS-NETWORK stage=9 index=1 family=0 status=0 error=0 errno=0']
 	mut records := []Record{}
@@ -410,6 +526,30 @@ fn self_test() ! {
 	swapped[2], swapped[3] = swapped[3], swapped[2]
 	if _ := validate(swapped) { return error('reordered observations accepted') }
 	assert !task_source().contains('printStackTrace') && !task_source().contains('getMessage')
+	// The original emitted classes remain pinned independently of v2.
+	assert sha256.sum(main_source().bytes()).hex() == 'd8cdb2e0b440ef78dd423253b7ddaa6d4b3783fb1b8e2b418a32fe112b0a0f2c'
+	assert sha256.sum(task_source().bytes()).hex() == '80ae068d0b16282f1e829fc43781f82df81cc97156fbb63b15c397b9fb4ac3ea'
+	assert sha256.sum(deadline_source().bytes()).hex() == 'e41339ed53124f6b4695f4bca420dc0cdab221d615454b12ecdd3ce050cd405b'
+	mut v2 := []string{}
+	for line in lines {
+		v2 << line.replace(prefix, prefix_v2) + if line.contains('stage=6 ') { ' step=3' } else { ' step=0' }
+	}
+	v2[4] = v2[4].replace('error=4', 'error=11')
+	v2_stream := v2.join('\n') + '\n' + pass_marker_v2 + '\n'
+	parsed_v2 := read_records_v2(v2_stream)!
+	assert parsed_v2[4].error == 11
+	startup_timeout := read_records_v2(v2_stream.replace('status=1 error=11 errno=0 step=3',
+		'status=2 error=0 errno=0 step=0'))!
+	assert startup_timeout[4].status == 2 && startup_timeout[4].step == 0
+	for malformed in [v2_stream.replace('step=3', 'step=0'), v2_stream.replace('error=11', 'error=19'),
+		v2_stream.replace('step=3', 'step=03'), v2_stream + pass_marker_v2 + '\n',
+		v2_stream.trim_right('\n'), v2_stream.replace('\n', '\r\n')] {
+		if _ := read_records_v2(malformed) { return error('invalid v2 observation accepted') }
+	}
+	new_task := task_source_v2()!
+	new_main := main_source_v2()!
+	assert new_task.count('->tls_step:I\n') == 9
+	assert new_main.contains(pass_marker_v2)
 	println('MAPS-NETWORK SELF-TEST PASS canonical-finite-schema ordered-observations incomplete-and-private-extension-rejection')
 }
 
@@ -428,18 +568,28 @@ fn main() {
 		println('MAPS-NETWORK CHECK PASS observations complete; connectivity outcomes remain diagnostic')
 		return
 	}
-	if os.args.len != 7 { eprintln('usage: maps-network-fixture OUTPUT AAPT2 FRAMEWORK_RES SMALI_TOOLS JAVA APKSIGNER | --check LOG | --self-test'); exit(2) }
-	build() or { eprintln(err); exit(1) }
+	if os.args.len == 3 && os.args[1] == '--check-v2' {
+		if os.file_size(os.args[2]) > 8 * 1024 * 1024 { eprintln('bounded log required'); exit(1) }
+		text := os.read_file(os.args[2]) or { eprintln(err); exit(1) }
+		records := read_records_v2(text) or { eprintln(err); exit(1) }
+		println(json2.encode(records))
+		println('MAPS-NETWORK-V2 CHECK PASS observations complete; TLS steps remain diagnostic')
+		return
+	}
+	v2 := os.args.len == 8 && os.args[1] == '--tls-diagnostics-v2'
+	if os.args.len != 7 && !v2 { eprintln('usage: maps-network-fixture [--tls-diagnostics-v2] OUTPUT AAPT2 FRAMEWORK_RES SMALI_TOOLS JAVA APKSIGNER | --check[-v2] LOG | --self-test'); exit(2) }
+	build(v2) or { eprintln(err); exit(1) }
 }
 
-fn build() ! {
-	out, aapt, resources := os.abs_path(os.args[1]), os.real_path(os.args[2]), os.real_path(os.args[3])
-	tools, java, signer := os.real_path(os.args[4]), os.real_path(os.args[5]), os.real_path(os.args[6])
+fn build(v2 bool) ! {
+	offset := if v2 { 1 } else { 0 }
+	out, aapt, resources := os.abs_path(os.args[1 + offset]), os.real_path(os.args[2 + offset]), os.real_path(os.args[3 + offset])
+	tools, java, signer := os.real_path(os.args[4 + offset]), os.real_path(os.args[5 + offset]), os.real_path(os.args[6 + offset])
 	if os.exists(out) || os.is_link(out) { return error('fresh output directory required') }
 	dir := out + '/smali/org/vinix/bootstrap'
 	os.mkdir_all(dir)!
-	os.write_file(dir + '/Main.smali', main_source())!
-	os.write_file(dir + '/NetworkTask.smali', task_source())!
+	os.write_file(dir + '/Main.smali', if v2 { main_source_v2()! } else { main_source() })!
+	os.write_file(dir + '/NetworkTask.smali', if v2 { task_source_v2()! } else { task_source() })!
 	os.write_file(dir + '/NetworkDeadline.smali', deadline_source())!
 	os.write_file(out + '/AndroidManifest.xml', '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.vinix.bootstrap"><uses-sdk android:minSdkVersion="23" android:targetSdkVersion="35"/><uses-permission android:name="android.permission.INTERNET"/><application android:label="ART network observations"><activity android:name=".Main" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>')!
 	checked([java, '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', out + '/smali', '-o', out + '/classes.dex'])!
@@ -447,6 +597,6 @@ fn build() ! {
 	checked(['zip', '-q', '-j', out + '/unsigned.apk', out + '/classes.dex'])!
 	checked([os.dir(java) + '/keytool', '-genkeypair', '-keystore', out + '/fixture.p12', '-storetype', 'PKCS12', '-storepass', 'android', '-keypass', 'android', '-alias', 'fixture', '-dname', 'CN=Vinix ART Network Fixture', '-keyalg', 'RSA', '-keysize', '2048', '-validity', '3650'])!
 	checked([java, '-jar', signer, 'sign', '--ks', out + '/fixture.p12', '--ks-key-alias', 'fixture', '--ks-pass', 'pass:android', '--key-pass', 'pass:android', '--out', out + '/probe.apk', out + '/unsigned.apk'])!
-	os.write_file(out + '/fixture.json', json2.encode({'format': json2.Any(1), 'source_sha256': json2.Any(sha256.sum(os.read_bytes(@FILE)!).hex()), 'host': json2.Any(host), 'port': json2.Any(443), 'address_cap': json2.Any(8), 'phase_deadline_ms': json2.Any(3000), 'process_deadline_ms': json2.Any(60000), 'scope': json2.Any('Real ART DNS, TCP and verified TLS observations; no HTTP requests, credentials or authentication claim. Exit zero means complete observations, not Internet availability.')}, prettify: true) + '\n')!
+	os.write_file(out + '/fixture.json', json2.encode({'format': json2.Any(1), 'profile': json2.Any(if v2 { 'tls-diagnostics-v2' } else { 'network-v1' }), 'source_sha256': json2.Any(sha256.sum(os.read_bytes(@FILE)!).hex()), 'host': json2.Any(host), 'port': json2.Any(443), 'address_cap': json2.Any(8), 'phase_deadline_ms': json2.Any(3000), 'process_deadline_ms': json2.Any(60000), 'scope': json2.Any('Real ART DNS, TCP and TLS observations; no HTTP requests, credentials or authentication claim. The completion marker and checker establish complete observations, not Internet availability.')}, prettify: true) + '\n')!
 	println('MAPS-NETWORK-APK ' + out + '/probe.apk')
 }
