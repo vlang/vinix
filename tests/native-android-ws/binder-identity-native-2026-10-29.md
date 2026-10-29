@@ -45,9 +45,10 @@ with ASAN; service continuation, terminal replay, cancellation and isolation;
 broker legacy/generic integration and nested wide identity ABI assembly; exact
 JNI 64-bit-token/boolean-result generation; account-store/token mutation checks;
 and the retained authenticator-base runner. Their original successful receipts
-record zero exits and completed cleanup. Earlier service and broker-runner
-compilation failures remain in the complete bundle; the named passes refer to
-the final successful checks, not every retained attempt.
+record zero exits and completed cleanup. The earlier service compile request was
+refused by disk preflight before child launch (`pid: 0`); the broker-runner compiler
+failure is also retained. The named passes refer to the final successful checks,
+not every retained attempt.
 
 | Output | SHA-256 |
 | --- | --- |
