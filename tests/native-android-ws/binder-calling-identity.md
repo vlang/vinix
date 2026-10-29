@@ -68,3 +68,27 @@ Independent source review found no blocking security or lifetime defect.
 Focused host checks pass. Full producer results are recorded separately; ARM
 regression and Maps retry with this fix remain pending. Google login remains
 unverified.
+
+## Continuation checkpoint
+
+Source fix `40724ff01` now has a completed, sealed
+[framework successor](binder-identity-framework-2026-10-29.md) and
+[native companion](binder-identity-native-2026-10-29.md). The
+[image and kernel tools](maps-binder-identity-stage.md) passed their compiles,
+selftests and complete framework/native audit. The
+[fixture runner and transfer profiles](binder-identity-fixture-run.md) pair
+those exact outputs with the authenticator regression and
+[standard JSSE TLS v3 probe](maps-network-fixture.md).
+
+Image preparation refused before launching a child: 2,998,128,640 bytes free
+versus the unchanged 5 GiB backing requirement (4 GiB growth plus 1 GiB reserve).
+The failure is preserved in the sealed stage evidence. The planned output
+`/Users/alex/.local/state/vinix/android/maps-binder-identity-r1` is absent;
+no VM is running. All reported evidence roots are closed and must stay unchanged.
+
+Once at least 5 GiB is available, use fresh controls for guarded preparation,
+verify and clone its complete image, and install the frozen kernel with the
+new explicit profile. Keep the original resource guards and one 12 GiB,
+four-CPU VM. Run both fixture profiles, start the account broker before Maps,
+then inspect Add account and map imagery. ARM/ART execution, Google sign-in
+and tile rendering with this coupled identity build still need live evidence.
