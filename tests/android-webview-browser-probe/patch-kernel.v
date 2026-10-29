@@ -225,6 +225,38 @@ const service_lifecycle_native_build = 'f5c1638e7d486336379d21e27f3fdd7519dca5a9
 const service_lifecycle_headless_source = 'd22892cc47def3c2e830a6e29873acd5c0eb08b944f68d131e39f4922c1663ff'
 const service_lifecycle_framework_helper = 'e7f5af6032619936414d2e9c56ddc9e8fab3b9af28d90e2af7348e6699a78e8b'
 const service_lifecycle_service_helper = '5117e4a20d30ca738b442aa93de239bba6ef2a67349a1303650f237dca057436'
+const platform_fragments_base = '/Users/alex/.local/state/vinix/android/maps-service-lifecycle-r1'
+const platform_fragments_base_seal = '8886ba277d9cb8b834bceaa2cf36dd2b8ee00dadb2589e52edb97a7cc62a0f92'
+const platform_fragments_boot = '24c99d0378f66428ff0c88b90bb66ccb22455a06c24fd284f82e36564bd1ef24'
+const platform_fragments_base_overlay = '3f49a12e4c760ed1146049427dde5989faaf94bec32f5fbb12b67b037e4c0cc4'
+const platform_fragments_old_deployment = '17dfb74f6c4107f70ad757ab5fec48a01c9ef8b1256555fccfae67f69e89f308'
+const platform_fragments_old_headless = '8dd51618893dac61f34b6707397b0008680776cf65dcdcb7d88c8b939d69cf76'
+const platform_fragments_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-platform-fragments-framework-2026-10-29-r1'
+const platform_fragments_seal = '5b452702e033f72f9056f994b94295f7925958c62fcaad039827710368249bfb'
+const platform_fragments_build = 'b6365978bad4c2c74ab0e7588b82cdfc8ef6323d7cddee97036160f491c13b7a'
+const platform_fragments_jar = '6970582da55b15dd30391491d2be2213abe665fe0256167f45cccdd3de25bcd4'
+const platform_fragments_dex = 'cb705ab384bf4cc057e1fd55c35148151e33a0471d1ea12fc2973f1b9be2fd5d'
+const platform_fragments_native = '/Users/alex/.local/state/vinix/android/current-native-build-2026-10-29-exception-restore-r2'
+const platform_fragments_native_seal = '6a6410f9d62a2d28174d7cc8213acaabcca89b548402337dbb5e5bed34f99f72'
+const platform_fragments_native_pin = '613c6b2c7b1e816a5d7b0694d626a52a5b4df19604a6a224df99ad13055aa74c'
+const platform_fragments_native_build = '962683e6e67f8d86f2b365034c6d87713c373af50bdd2ddead6daf2d74de2914'
+const platform_fragments_service_source = '26ea5c897b6796ed7307e4ba46afd5adbf1836824a19f0613ed662df485775a5'
+const platform_fragments_ui_source = '6dc63a006044a16aa044020c9f05b90ae8480e0e8b439ef63bb3f5ee76cd6bc8'
+const platform_fragments_framework_helper = '26ad5000db6790de88312d81af055abd915858122f32117c36450c159fcbc31f'
+const platform_fragments_provider_helper = '838192c98ee5f782b926bb167756d589f5baf86e32f47b35913c29bdf9dfa7a0'
+const platform_fragments_activity_raw = '16546cc49fa0bdbb74ec4b0d1554bacac9850446dce25bbd5e9a5b2b2d516e18'
+const platform_fragments_activity_canonical = '8a0bba8b9b2837522a51f18a5f9889c6865f224ce5655577458b3c74690ff54a'
+const platform_fragments_activity_before_raw = '3c4291f628831f93c3d22ae66b3a062719e70be360da9638e233f493ff3432d1'
+const platform_fragments_activity_before_canonical = '3c4291f628831f93c3d22ae66b3a062719e70be360da9638e233f493ff3432d1'
+const platform_fragments_fragment_raw = '1f2cdb322b9f89cbf1d85aef4f700bc62e28e960b99c53ad07fd336ba3bb5928'
+const platform_fragments_fragment_canonical = '13527f959769c19d30177c0992a4487c98693c6532d3b3ecb7faea91dc3b5138'
+const platform_fragments_manager_raw = '465c4f8b486c9259be557927238d4d63a2b25b81da44fcc3c29307e22023df83'
+const platform_fragments_manager_canonical = 'b0288c3305b50a1a626589a92f2116d6ead1dbb0cbade0fd8ad2968b460ae802'
+const platform_fragments_transaction_raw = 'a9a27718d75e502fe78e295772e3d420d902b509883594c028d82e454ce2270a'
+const platform_fragments_transaction_canonical = '8ca0812c9d83251eed4befb750309afe6a6c4ef72f06099d2b315d74e1859798'
+const platform_fragments_added_class = 'android/app/VinixFragmentCommit.smali'
+const platform_fragments_added_raw = '9c1b575f2fd9d254ccf068948b52b0229e1b1d3435bc97fe7702b6e6d80fcd2a'
+const platform_fragments_added_canonical = '445b9ed0be07cbe8f8018d357f9ce277b560dd545fdae039a71193eca4223011'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -2205,6 +2237,156 @@ fn service_lifecycle_baseline(receipt map[string]json2.Any, stage Stage) !string
 	return service_lifecycle_base + '/boot.img'
 }
 
+fn platform_fragments_profile() Profile {
+	mut modules := service_lifecycle_profile().modules.clone()
+	modules << 'maps-service-lifecycle.tar'
+	return Profile{'maps-platform-fragments', platform_fragments_boot, 'maps-platform-fragments.tar', modules}
+}
+fn platform_fragments_modules() map[string]string {
+	mut modules := service_lifecycle_modules()
+	modules['maps-service-lifecycle.tar'] = platform_fragments_base_overlay
+	return modules
+}
+fn platform_fragments_fields() map[string]string {
+	mut fields := service_lifecycle_fields()
+	fields['kind'] = 'vinix-maps-platform-fragments-v1'
+	fields['base_root'] = platform_fragments_base
+	fields['base_manifest_sha256'] = platform_fragments_base_seal
+	fields['framework_build_root'] = platform_fragments_framework
+	fields['framework_manifest_sha256'] = platform_fragments_seal
+	fields['framework_jar_sha256'] = platform_fragments_jar
+	fields['framework_dex_sha256'] = platform_fragments_dex
+	fields['retained_framework_manifest_sha256'] = service_lifecycle_seal
+	fields['native_compatibility_framework_manifest_sha256'] = service_lifecycle_seal
+	fields['native_build_root'] = platform_fragments_native
+	fields['native_manifest_sha256'] = platform_fragments_native_seal
+	fields['native_sha256'] = platform_fragments_native_pin
+	fields['native_build_sha256'] = platform_fragments_native_build
+	fields['retained_native_manifest_sha256'] = service_lifecycle_native_seal
+	fields['native_framework_manifest_sha256'] = platform_fragments_seal
+	return fields
+}
+fn platform_fragments_inputs() map[string]string {
+	mut inputs := service_lifecycle_inputs()
+	inputs[platform_fragments_base + '/sha256.json'] = platform_fragments_base_seal
+	inputs[platform_fragments_framework + '/sha256.json'] = platform_fragments_seal
+	inputs[platform_fragments_native + '/sha256.json'] = platform_fragments_native_seal
+	return inputs
+}
+fn platform_fragments_known_delta() map[string]string {
+	return {'/' + service_query_jar_path: platform_fragments_jar, '/' + service_query_dex_path: platform_fragments_dex,
+		'/' + native_onboarding_trace_path: platform_fragments_native_pin,
+		'/' + service_query_headless + '/framework-build.json': platform_fragments_build,
+		'/' + service_query_headless + '/framework-sha256.json': platform_fragments_seal}
+}
+fn platform_fragments_raw_delta() map[string][]string {
+	return {'smali/android/app/Activity.smali': [platform_fragments_activity_before_raw, platform_fragments_activity_raw]}
+}
+fn platform_fragments_canonical_delta() map[string][]string {
+	return {'android/app/Activity.smali': [platform_fragments_activity_before_canonical, platform_fragments_activity_canonical]}
+}
+fn platform_fragments_source_delta() map[string]string {
+	return {'smali/android/app/Activity.smali': platform_fragments_activity_raw,
+		'smali/android/app/Fragment.smali': platform_fragments_fragment_raw,
+		'smali/android/app/FragmentManager.smali': platform_fragments_manager_raw,
+		'smali/android/app/FragmentTransaction.smali': platform_fragments_transaction_raw,
+		'smali/' + platform_fragments_added_class: platform_fragments_added_raw}
+}
+fn platform_fragments_framework_canonical_delta() map[string]string {
+	return {'new-dex/android/app/Activity.smali': platform_fragments_activity_canonical,
+		'new-dex/android/app/Fragment.smali': platform_fragments_fragment_canonical,
+		'new-dex/android/app/FragmentManager.smali': platform_fragments_manager_canonical,
+		'new-dex/android/app/FragmentTransaction.smali': platform_fragments_transaction_canonical,
+		'new-dex/' + platform_fragments_added_class: platform_fragments_added_canonical}
+}
+fn platform_fragments_proofs() map[string]string {
+	return {
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: platform_fragments_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256', 'native_manifest_sha256'])
+		'native_source_delta': json2.encode({'build-support/android/nativews/account_service.v': platform_fragments_service_source,
+			'build-support/android/nativews/account_ui.v': platform_fragments_ui_source})
+		'native_builder_helper_delta': json2.encode({'tests/native-android-tools/androidtools/framework.v': platform_fragments_framework_helper,
+			'tests/native-android-tools/androidtools/framework_platform_fragments.v': platform_fragments_provider_helper})
+		'framework_source_delta': json2.encode(platform_fragments_source_delta())
+		'framework_canonical_delta': json2.encode(platform_fragments_framework_canonical_delta())
+		'framework_class_count': json2.encode(2105)
+		'native_consumed_raw_delta': json2.encode(platform_fragments_raw_delta())
+		'native_consumed_canonical_delta': json2.encode(platform_fragments_canonical_delta())
+		'native_consumed_class_count': json2.encode(68)
+	}
+}
+fn verify_platform_fragments_overlay(receipt map[string]json2.Any) ! {
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('platform fragments deployment delta absent') }))!
+	mut expected := platform_fragments_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('platform fragments headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == platform_fragments_old_headless { return error('new platform fragments headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('platform fragments exact six deployment input changes differ') }
+	for name, value in platform_fragments_proofs() {
+		if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](value)! { return error('platform fragments declared proof/delta differs: ' + name) }
+	}
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('platform fragments overlay inventory absent') }))!
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	mut paths := expected.keys().map(it.trim_left('/'))
+	paths << service_query_deployment
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe platform fragments overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			mode := if entry.name == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != mode { return error('platform fragments file allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected platform fragments inode') }
+	}
+	if regulars.len != 7 || regulars[service_query_deployment] or { '' } == platform_fragments_old_deployment { return error('exact seven new platform fragments files required') }
+	for path, pin in expected {
+		if regulars[path.trim_left('/')] or { '' } != pin { return error('platform fragments declared input differs from inventory') }
+	}
+}
+fn verify_platform_fragments_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [platform_fragments_base_seal, platform_fragments_boot, platform_fragments_base_overlay,
+		platform_fragments_old_deployment, platform_fragments_old_headless, platform_fragments_seal,
+		platform_fragments_build, platform_fragments_jar, platform_fragments_dex,
+		platform_fragments_native_seal, platform_fragments_native_pin, platform_fragments_native_build,
+		platform_fragments_service_source, platform_fragments_ui_source, platform_fragments_framework_helper,
+		platform_fragments_provider_helper, platform_fragments_activity_raw, platform_fragments_activity_canonical,
+		platform_fragments_activity_before_raw, platform_fragments_activity_before_canonical,
+		platform_fragments_fragment_raw, platform_fragments_fragment_canonical, platform_fragments_manager_raw,
+		platform_fragments_manager_canonical, platform_fragments_transaction_raw, platform_fragments_transaction_canonical,
+		platform_fragments_added_raw, platform_fragments_added_canonical] {
+		if !digest_valid(pin) { return error('completed platform fragments framework/native producer required') }
+	}
+	if platform_fragments_seal == service_lifecycle_seal || platform_fragments_jar == service_lifecycle_jar
+		|| platform_fragments_dex == service_lifecycle_dex || platform_fragments_native_seal == service_lifecycle_native_seal
+		|| platform_fragments_native_pin == service_lifecycle_native_pin
+		|| platform_fragments_service_source == binder_identity_service_source
+		|| platform_fragments_ui_source == 'f3d7accf8562c7384f07f46320536babda95038897a425d3f5609879d06114c4'
+		|| platform_fragments_activity_raw == platform_fragments_activity_before_raw
+		|| platform_fragments_activity_canonical == platform_fragments_activity_before_canonical
+		|| !relative(platform_fragments_added_class) || !platform_fragments_added_class.starts_with('android/')
+		|| !platform_fragments_added_class.ends_with('.smali') { return error('new platform fragments framework and exception restore native required') }
+	for name, expected in platform_fragments_fields() {
+		if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('platform fragments receipt differs: ' + name) }
+	}
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 56 || seals != platform_fragments_inputs() { return error('platform fragments exact fifty-six dependency seals differ') }
+	if stage.format != 1 || stage.original_modules_sha256 != platform_fragments_modules() || stage.preserved_modules_sha256 != platform_fragments_modules() { return error('platform fragments original twenty-six modules differ') }
+	verify_platform_fragments_overlay(receipt)!
+}
+fn platform_fragments_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_platform_fragments_receipt(receipt, stage)!
+	path := platform_fragments_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != platform_fragments_base_seal { return error('platform fragments original Service image manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != platform_fragments_boot || pins['maps-service-lifecycle.tar'] or { '' } != platform_fragments_base_overlay { return error('platform fragments original boot or Service overlay differs') }
+	return platform_fragments_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -2809,6 +2991,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = binder_identity_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-service-lifecycle' {
 		baseline = service_lifecycle_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-platform-fragments' {
+		baseline = platform_fragments_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -5375,6 +5559,101 @@ fn service_lifecycle_profile_self_test() ! {
 	println('MAPS-SERVICE-LIFECYCLE KERNEL-PROFILE-SELF-TEST PASS seven files six input changes fifty-three seals twenty-five inherited modules exact headless native delta canonical compatibility proof and historical rejection')
 }
 
+fn platform_fragments_entries_fixture() []ServiceQueryEntry {
+	mut entries := [ServiceQueryEntry{name: 'opt', kind: 'directory', mode: 0o755}]
+	for path, pin in platform_fragments_known_delta() {
+		name := path.trim_left('/')
+		entries << ServiceQueryEntry{name: name, kind: 'regular', sha256: pin, mode: if name == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }}
+	}
+	entries << ServiceQueryEntry{name: service_query_headless + '/guest-inputs.json', kind: 'regular', sha256: 'c'.repeat(64), mode: 0o644}
+	entries << ServiceQueryEntry{name: service_query_deployment, kind: 'regular', sha256: 'd'.repeat(64), mode: 0o644}
+	return entries
+}
+fn platform_fragments_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in platform_fragments_fields() { receipt[name] = json2.Any(value) }
+	mut delta := platform_fragments_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'c'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	for name, value in platform_fragments_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(platform_fragments_entries_fixture()))!
+	return receipt
+}
+fn platform_fragments_profile_self_test() ! {
+	profile := platform_fragments_profile()
+	if profile.baseline_sha != platform_fragments_boot || profile.modules.len != 26
+		|| profile.modules.last() != 'maps-service-lifecycle.tar' || platform_fragments_inputs().len != 56 { return error('platform fragments strict profile differs') }
+	mut final_modules := profile.modules.clone()
+	final_modules << profile.overlay
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', final_modules})!
+	stage := Stage{format: 1, inputs_sha256: platform_fragments_inputs(), original_modules_sha256: platform_fragments_modules(), preserved_modules_sha256: platform_fragments_modules()}
+	receipt := platform_fragments_receipt_fixture()!
+	verify_platform_fragments_receipt(receipt, stage)!
+	for field in platform_fragments_fields().keys() {
+		mut bad := platform_fragments_receipt_fixture()!
+		bad[field] = json2.Any('changed')
+		if _ := verify_platform_fragments_receipt(bad, stage) { return error('changed platform fragments field accepted') }
+		bad.delete(field)
+		if _ := verify_platform_fragments_receipt(bad, stage) { return error('missing platform fragments field accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := platform_fragments_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_platform_fragments_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed platform fragments dependency accepted') }
+		pins.delete(path)
+		if _ := verify_platform_fragments_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing platform fragments dependency accepted') }
+	}
+	mut extra := platform_fragments_inputs()
+	extra['/unreviewed/sha256.json'] = 'a'.repeat(64)
+	if _ := verify_platform_fragments_receipt(receipt, Stage{...stage, inputs_sha256: extra}) { return error('extra platform fragments dependency accepted') }
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: service_lifecycle_modules()}, Stage{...stage, preserved_modules_sha256: service_lifecycle_modules()}] {
+		if _ := verify_platform_fragments_receipt(receipt, bad) { return error('wrong platform fragments module inventory accepted') }
+	}
+	mut proof_fields := platform_fragments_proofs().keys()
+	proof_fields << 'deployment_input_delta'
+	for field in proof_fields {
+		mut bad := platform_fragments_receipt_fixture()!
+		bad[field] = json2.Any('changed')
+		if _ := verify_platform_fragments_receipt(bad, stage) { return error('changed platform fragments proof accepted') }
+		bad.delete(field)
+		if _ := verify_platform_fragments_receipt(bad, stage) { return error('missing platform fragments proof accepted') }
+	}
+	service_receipt := service_lifecycle_receipt_fixture()!
+	for field in ['native_source_delta', 'native_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta', 'native_consumed_raw_delta'] {
+		mut stale := platform_fragments_receipt_fixture()!
+		stale[field] = service_receipt[field]!
+		if _ := verify_platform_fragments_receipt(stale, stage) { return error('stale Service transition proof accepted') }
+	}
+	entries := platform_fragments_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'},
+			ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := platform_fragments_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_platform_fragments_receipt(bad, stage) { return error('unsafe platform fragments inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := platform_fragments_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_platform_fragments_receipt(bad, stage) { return error('missing platform fragments file accepted') }
+		}
+	}
+	for extra_entry in [entries.last(), ServiceQueryEntry{name: native_onboarding_trace_path, kind: 'regular', sha256: service_lifecycle_native_pin, mode: 0o755}] {
+		mut bad_entries := entries.clone()
+		bad_entries << extra_entry
+		mut bad := platform_fragments_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+		if _ := verify_platform_fragments_receipt(bad, stage) { return error('extra or stale platform fragments file accepted') }
+	}
+	if _ := verify_platform_fragments_receipt(service_lifecycle_receipt_fixture()!, stage) { return error('Service receipt accepted by platform fragments profile') }
+	if _ := verify_service_lifecycle_receipt(receipt, stage) { return error('platform fragments receipt accepted by Service profile') }
+	println('MAPS-PLATFORM-FRAGMENTS KERNEL-PROFILE-SELF-TEST PASS seven files six input changes fifty-six seals twenty-six inherited modules exact framework/native deltas consumed Activity proof and historical rejection')
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
@@ -5395,6 +5674,7 @@ fn self_test() ! {
 	auth_worker_profile_self_test()!
 	binder_identity_profile_self_test()!
 	service_lifecycle_profile_self_test()!
+	platform_fragments_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -5495,9 +5775,10 @@ fn main() {
 	is_auth_worker := os.args.len == 5 && os.args[1] == '--maps-auth-worker'
 	is_binder_identity := os.args.len == 5 && os.args[1] == '--maps-binder-identity'
 	is_service_lifecycle := os.args.len == 5 && os.args[1] == '--maps-service-lifecycle'
-	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle
+	is_platform_fragments := os.args.len == 5 && os.args[1] == '--maps-platform-fragments'
+	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments
 	if os.args.len != 4 && !is_selected {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
 	offset := if is_selected { 1 } else { 0 }
@@ -5509,7 +5790,7 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	profile := if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	profile := if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
