@@ -44,7 +44,9 @@ struct FixtureProfile {
 	name          string
 	apk_sha       string
 	framework_sha string
+	native_sha    string
 	pass_marker   string
+	scope         string = 'standalone generic framework contract fixture; Google login and SettingsProvider persistence are not exercised'
 }
 
 fn child_attach_profile() FixtureProfile {
@@ -71,6 +73,27 @@ fn application_restrictions_profile() FixtureProfile {
 		apk_sha: '1fcd38978709198743aa9127b14f02bbebbf55e1f4d7793cd03270f3c3c25a07'
 		framework_sha: 'd4e8678bf5deda99358defd912e64e4fcba92fec4ad3b87b39fc9f7e9f6ebf32'
 		pass_marker: 'APPLICATION-RESTRICTIONS-PASS own-package nonnull empty fresh-bundles missing-string-array mutation-isolation repeated-32'
+	}
+}
+
+fn authenticator_exception_profile() FixtureProfile {
+	return FixtureProfile{
+		name: 'authenticator-private-exception'
+		apk_sha: 'c4e78b7c46d2d35f63d60bb8d45c3964ede94553f63e3cca9d0bebbcd261a941'
+		framework_sha: '0daae54d7755b255ed3335f58d8cafd6da4d03c8c95343ebb0f174d166da6916'
+		native_sha: 'cce3eb926d3bc8b2b3c9e9a4f0d42cc4ab6bfdc23b0532beb2c42f5f9b384791'
+		pass_marker: 'AUTHENTICATOR-BASE-PASS fourteen-dispatch permission-denied-before-dispatch result error-mapping async-null label default-removal default-cloning default-sessions suggested-false no-account-registration'
+	}
+}
+
+fn maps_network_profile() FixtureProfile {
+	return FixtureProfile{
+		name: 'maps-network-observations'
+		apk_sha: 'f66dfd858b52c1b7da9c2bac635106cc33a956a425860b86527cdc909e88ad43'
+		framework_sha: '0daae54d7755b255ed3335f58d8cafd6da4d03c8c95343ebb0f174d166da6916'
+		native_sha: 'cce3eb926d3bc8b2b3c9e9a4f0d42cc4ab6bfdc23b0532beb2c42f5f9b384791'
+		pass_marker: 'MAPS-NETWORK-PASS observations-complete'
+		scope: 'standalone credential-free network observations; completion does not establish DNS, TCP, TLS or Google login success; validate the finite observation sequence separately'
 	}
 }
 
@@ -177,7 +200,8 @@ fn health(line string, expected_marker string) ! {
 		if line.contains(bad) { return error('child failure marker: ' + bad) }
 	}
 	if (line.contains('CHILD-ATTACH-PASS') || line.contains('SETTINGS-GLOBAL-PASS')
-		|| line.contains('APPLICATION-RESTRICTIONS-PASS')) && line != expected_marker {
+		|| line.contains('APPLICATION-RESTRICTIONS-PASS') || line.contains('AUTHENTICATOR-BASE-PASS')
+		|| line.contains('MAPS-NETWORK-PASS')) && line != expected_marker {
 		return error('conflicting fixture marker')
 	}
 }
@@ -378,11 +402,18 @@ fn export_evidence(output string) ! {
 
 fn selftest() ! {
 	mut cases := 0
-	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile()]
+	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile()]
 	require(child_attach_profile().framework_sha == framework_sha
 		&& settings_global_profile().framework_sha == framework_sha
 		&& application_restrictions_profile().framework_sha != framework_sha, 'exact per-profile framework identities')!
+	require(authenticator_exception_profile().framework_sha == '0daae54d7755b255ed3335f58d8cafd6da4d03c8c95343ebb0f174d166da6916'
+		&& authenticator_exception_profile().native_sha == 'cce3eb926d3bc8b2b3c9e9a4f0d42cc4ab6bfdc23b0532beb2c42f5f9b384791', 'exact diagnostic runtime identities')!
+	require(maps_network_profile().framework_sha == authenticator_exception_profile().framework_sha
+		&& maps_network_profile().native_sha == authenticator_exception_profile().native_sha, 'network observations use the same pinned runtime')!
 	for profile in profiles {
+		for pin in [profile.apk_sha, profile.framework_sha] {
+			require(pin.len == 64 && pin.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`)), 'canonical profile SHA256')!
+		}
 		good := profile.pass_marker + '\n' + ready_marker + '\n'
 		check_log(good, profile.pass_marker)!
 		for bad in [good + profile.pass_marker + '\n', good + ready_marker + '\n', good.replace(profile.pass_marker, ''),
@@ -423,9 +454,11 @@ fn run() ! {
 		return
 	}
 	mut arguments := os.args[1..]
-	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions'],
-		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
-	profile := if arguments[0] == '--application-restrictions' { application_restrictions_profile() }
+	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network'],
+		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
+	profile := if arguments[0] == '--authenticator-private-exception' { authenticator_exception_profile() }
+		else if arguments[0] == '--maps-network' { maps_network_profile() }
+		else if arguments[0] == '--application-restrictions' { application_restrictions_profile() }
 		else if arguments[0] == '--child-attach' { child_attach_profile() } else { settings_global_profile() }
 	arguments = arguments[1..]
 	require(canonical(arguments[0]), 'canonical runtime path')!
@@ -456,6 +489,11 @@ fn run() ! {
 		config.runtime + '/usr/bin/vinix-android-native', os.executable()] {
 		inputs[path] = input_pin(path)!
 	}
+	if config.profile.native_sha != '' {
+		native := config.runtime + '/usr/lib/art/libvinix-android-native.so'
+		inputs[native] = input_pin(native)!
+		require(inputs[native] == config.profile.native_sha, 'corrected native library pin')!
+	}
 	os.mkdir(config.output, mode: 0o755)!
 	os.chmod(config.output, 0o755)!
 	for name in ['data', 'home'] { owned_directory(config.output + '/' + name, config)! }
@@ -475,6 +513,7 @@ fn run() ! {
 		child_pid:    pid
 		input_sha256: inputs
 		log_sha256:   log_sha
+		scope:        config.profile.scope
 		checks:       ['exact-pass-once', 'native-ws-ready-once', 'bounded-log-and-lines',
 			'live-input-until-pass-and-ready', 'drained-through-eof', 'clean-exit',
 			'isolated-unix-identity-data-home-surface', 'standalone-explicit-activity',
