@@ -317,6 +317,22 @@ fn application_restrictions_profile() NarrowProfile {
  }
 }
 
+fn auth_exception_profile() NarrowProfile {
+ authenticator := 'android/accounts/AbstractAccountAuthenticator.smali'
+ return NarrowProfile{
+  name: 'auth-exception'
+  baseline_name: 'combined-account-webview-application-restrictions-framework-2026-10-28-r1'
+  manifest_pin: '8907c1f11d8886b47358b458a8026d8351c6feac44d78346d6d426208b8ffe15'
+  jar_pin: 'd4e8678bf5deda99358defd912e64e4fcba92fec4ad3b87b39fc9f7e9f6ebf32'
+  baseline_classes: 2104
+  providers: ['framework_authenticator_request.v', 'framework_authenticator_base.v']
+  calls: {authenticator: 'framework_authenticator_private_exception'}
+  methods: {authenticator: ['vinixHandleException(Landroid/accounts/IAccountAuthenticatorResponse;Ljava/lang/String;Ljava/lang/Exception;)V']}
+  changed: {authenticator: 1}
+  added: {authenticator: 0}
+ }
+}
+
 fn store_parts(source string) !StoreClassParts {
  mut methods := map[string]string{}
  mut metadata := []string{}
@@ -670,11 +686,48 @@ fn onboarding_self_test() ! {
  }
 }
 
+fn auth_exception_self_test() ! {
+ profile := auth_exception_profile()
+ target := 'android/accounts/AbstractAccountAuthenticator.smali'
+ if profile.methods.len != 1 || profile.calls.len != 1
+  || profile.changed[target]! != 1 || profile.added[target]! != 0
+  || profile.fields.len != 0 || profile.extra_classes.len != 0
+  || profile.baseline_classes != 2104 {
+  return error('auth exception profile requires one changed method with no field or class additions')
+ }
+ narrow_method_self_test(profile.methods[target]!, 1, 0)!
+ mut before := {
+  target: 'old'
+  'android/accounts/AbstractAccountAuthenticator$Transport.smali': 'same'
+  'android/accounts/AbstractAccountAuthenticator$DefaultResponse.smali': 'same'
+ }
+ for i in 0 .. 2101 { before['other/' + i.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ after[target] = 'new'
+ narrow_profile_class_delta(before, after, [target], []string{}, 2104)!
+ for case in 0 .. 7 {
+  mut old := before.clone()
+  mut bad := after.clone()
+  match case {
+   0 { bad[target] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(target); bad['substitute.smali'] = 'new' }
+   3 { bad.delete('other/0.smali') }
+   4 { bad['android/accounts/AbstractAccountAuthenticator$Transport.smali'] = 'changed' }
+   5 { old.delete('other/0.smali'); bad.delete('other/0.smali') }
+   else { bad['android/accounts/AbstractAccountAuthenticator$DefaultResponse.smali'] = 'changed' }
+  }
+  narrow_profile_class_delta(old, bad, [target], []string{}, 2104) or { continue }
+  return error('invalid auth exception class delta accepted: ' + case.str())
+ }
+}
+
 fn self_test() ! {
  store_delta_self_test()!
  store_method_self_test()!
  protected_storage_self_test()!
  onboarding_self_test()!
+ auth_exception_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -1159,11 +1212,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions'] {
-  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } else { onboarding_profile() } }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception'] {
+  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
