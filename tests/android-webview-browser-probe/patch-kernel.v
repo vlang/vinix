@@ -185,6 +185,26 @@ const auth_worker_pin = '0ef0acd98c148b9b972f754e5fb1e23683e8dc7d0b56f05d2f0a4c7
 const auth_worker_build = '3e7d063ed01484a91ae9ef02bb78b648168dc815700a28522adf88d622aed2d9'
 const auth_worker_service_source = '7369030274a40f2c9b4abafbd854c61fe9f48b29152dd0de7e78dce1df56bae6'
 const auth_worker_added_source = 'db0f426089da7b3397662a1dcf93a1de37aa32979e4edfa746a63b01855a1c5c'
+const binder_identity_base = '/Users/alex/.local/state/vinix/android/maps-auth-worker-r1'
+const binder_identity_base_seal = '0e90067339cacf85987da7d0cae72a95f2a67b6455f601275ca10ba1af40783b'
+const binder_identity_boot_sha = '67ca05f1a9572a4ddb25be7c01f484224e38904ada92403645a0d5ba30110c6b'
+const binder_identity_base_overlay = '237f7428045f0f718a1ca3550d9bf04a7f4dd761a2fe09aa7a909da045712fdb'
+const binder_identity_retained_deployment = '43cbedb5114225580010594890364a8a8e19cbd5337b3a79248684de3049320b'
+const binder_identity_retained_headless = '343cbf22322775efa414b0135e3fccf2992afa51a342c6496b03c207403f7fd3'
+const binder_identity_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-binder-identity-framework-2026-10-29-r1'
+const binder_identity_framework_seal = '739fc9c17258915b0ce7ee01fa3d9e03f47c9d4f4de05ef0c6178d624f8ff3c5'
+const binder_identity_jar = '3f2e3220d6c38feb885044fdb4806d4d3ca7736352bbcc7813e2ee6510463636'
+const binder_identity_dex = '2bbe60c766a65daeb09b336ff9bd61c4d4f0c228ddbb97f9584eb44cb2b0e79a'
+const binder_identity_framework_build = 'adc6074626f03ff776cc260a17e1594d220e1647e51721d754f3d7c74666b7c2'
+const binder_identity_native = '/Users/alex/.local/state/vinix/android/current-native-build-2026-10-29-binder-identity-r1'
+const binder_identity_native_seal = '2a68a45164d830cb2b3cdfcc43b2e3590ff42dc15152041fea166cd6c8f58985'
+const binder_identity_native_pin = '6a87d8c2fd003c55cb572ab397342d0c39aa54376ffe7a5a2ba2fa4592099eae'
+const binder_identity_native_build = 'e43f3c32c9b410cc03772aeb2554a70881426fa0348e9ba9294ea12693aab452'
+const binder_identity_service_source = 'de33aa1ae37bb430942bccd1f28f629519dd9d29da866898d78130fcbf7ae8bf'
+const binder_identity_bindings = 'e3fa613993c1ca60aab021ebdbacc93dc71ae68e4bef3d112482f77c8ddeb95b'
+const binder_identity_generated = 'b349742dff2bdcc464e3df011ccf54d0ff546ea36a1feb9cd82b26ec3da67dde'
+const binder_identity_binder = 'ce609f4d797c4406d86799a7c70c2581649a067e57a286d9a1ce39076a78711d'
+const binder_identity_context = '90fddf01e6bd8785d64b873aaa5632d2cd15e768de425fd5c91d7b75c4097888'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -1938,6 +1958,115 @@ fn auth_worker_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return auth_worker_base + '/boot.img'
 }
 
+fn binder_identity_profile() Profile {
+	mut modules := auth_worker_profile().modules.clone()
+	modules << 'maps-auth-worker.tar'
+	return Profile{'maps-binder-identity', binder_identity_boot_sha, 'maps-binder-identity.tar', modules}
+}
+fn binder_identity_modules() map[string]string {
+	mut modules := auth_worker_modules()
+	modules['maps-auth-worker.tar'] = binder_identity_base_overlay
+	return modules
+}
+fn binder_identity_fields() map[string]string {
+	mut fields := auth_worker_fields()
+	fields['kind'] = 'vinix-maps-binder-identity-v1'
+	fields['base_root'] = binder_identity_base
+	fields['base_manifest_sha256'] = binder_identity_base_seal
+	fields['framework_build_root'] = binder_identity_framework
+	fields['framework_manifest_sha256'] = binder_identity_framework_seal
+	fields['framework_jar_sha256'] = binder_identity_jar
+	fields['framework_dex_sha256'] = binder_identity_dex
+	fields['retained_framework_manifest_sha256'] = auth_exception_framework_seal
+	fields['native_build_root'] = binder_identity_native
+	fields['native_manifest_sha256'] = binder_identity_native_seal
+	fields['native_sha256'] = binder_identity_native_pin
+	fields['native_build_sha256'] = binder_identity_native_build
+	fields['retained_native_manifest_sha256'] = auth_worker_seal
+	fields['generated_jni_sha256'] = binder_identity_generated
+	return fields
+}
+fn binder_identity_inputs() map[string]string {
+	mut inputs := auth_worker_inputs()
+	inputs[binder_identity_base + '/sha256.json'] = binder_identity_base_seal
+	inputs[binder_identity_framework + '/sha256.json'] = binder_identity_framework_seal
+	inputs[binder_identity_native + '/sha256.json'] = binder_identity_native_seal
+	return inputs
+}
+fn binder_identity_known_delta() map[string]string {
+	return {'/' + service_query_jar_path: binder_identity_jar, '/' + service_query_dex_path: binder_identity_dex,
+		'/' + native_onboarding_trace_path: binder_identity_native_pin,
+		'/' + service_query_headless + '/framework-build.json': binder_identity_framework_build,
+		'/' + service_query_headless + '/framework-sha256.json': binder_identity_framework_seal}
+}
+fn verify_binder_identity_overlay(receipt map[string]json2.Any) ! {
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('Binder identity deployment delta absent') }))!
+	mut expected := binder_identity_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('Binder identity headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == binder_identity_retained_headless { return error('new Binder identity headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('Binder identity exact six deployment input changes differ') }
+	for name, value in {
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: binder_identity_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256', 'native_manifest_sha256'])
+		'native_source_delta': json2.encode({'build-support/android/nativews/account_service.v': binder_identity_service_source,
+			'build-support/android/nativews/bindings.txt': binder_identity_bindings})
+		'framework_source_delta': json2.encode({'smali/android/os/Binder.smali': binder_identity_binder,
+			'smali/android/atl/VinixAccountBrokerContext.smali': binder_identity_context})
+	} {
+		if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](value)! { return error('Binder identity declared delta differs: ' + name) }
+	}
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('Binder identity overlay inventory absent') }))!
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	mut paths := expected.keys().map(it.trim_left('/'))
+	paths << service_query_deployment
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe Binder identity overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			mode := if entry.name == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != mode { return error('Binder identity file allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected Binder identity inode') }
+	}
+	if regulars.len != 7 || regulars[service_query_deployment] or { '' } == binder_identity_retained_deployment { return error('exact seven new Binder identity files required') }
+	for path, pin in expected {
+		if regulars[path.trim_left('/')] or { '' } != pin { return error('Binder identity declared input differs from inventory') }
+	}
+}
+fn verify_binder_identity_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [binder_identity_base_seal, binder_identity_boot_sha, binder_identity_base_overlay,
+		binder_identity_retained_deployment, binder_identity_retained_headless, binder_identity_framework_seal,
+		binder_identity_jar, binder_identity_dex, binder_identity_framework_build, binder_identity_native_seal,
+		binder_identity_native_pin, binder_identity_native_build, binder_identity_service_source,
+		binder_identity_bindings, binder_identity_generated, binder_identity_binder, binder_identity_context] {
+		if !digest_valid(pin) { return error('completed reviewed Binder identity producer required') }
+	}
+	if binder_identity_framework_seal == auth_exception_framework_seal || binder_identity_jar == auth_exception_jar
+		|| binder_identity_dex == auth_exception_dex || binder_identity_native_seal == auth_worker_seal
+		|| binder_identity_native_pin == auth_worker_pin || binder_identity_service_source == auth_worker_service_source { return error('new Binder identity framework/native required') }
+	for name, expected in binder_identity_fields() {
+		if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('Binder identity receipt differs: ' + name) }
+	}
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 50 || seals != binder_identity_inputs() { return error('Binder identity exact fifty dependency seals differ') }
+	if stage.format != 1 || stage.original_modules_sha256 != binder_identity_modules() || stage.preserved_modules_sha256 != binder_identity_modules() { return error('Binder identity original twenty-four modules differ') }
+	verify_binder_identity_overlay(receipt)!
+}
+fn binder_identity_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_binder_identity_receipt(receipt, stage)!
+	path := binder_identity_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != binder_identity_base_seal { return error('Binder identity original worker manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != binder_identity_boot_sha || pins['maps-auth-worker.tar'] or { '' } != binder_identity_base_overlay { return error('Binder identity original boot or worker overlay differs') }
+	return binder_identity_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -2538,6 +2667,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = auth_exception_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-auth-worker' {
 		baseline = auth_worker_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-binder-identity' {
+		baseline = binder_identity_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -4907,6 +5038,101 @@ fn auth_worker_profile_self_test() ! {
 	println('MAPS-AUTH-WORKER KERNEL-PROFILE-SELF-TEST PASS exact native two-file inventory one-input delta twenty-three inherited modules twenty-four final forty-seven dependencies retained roles historical rejection')
 }
 
+fn binder_identity_entries_fixture() []ServiceQueryEntry {
+	mut entries := [ServiceQueryEntry{name: 'opt', kind: 'directory', mode: 0o755}]
+	for path, pin in binder_identity_known_delta() {
+		name := path.trim_left('/')
+		entries << ServiceQueryEntry{name: name, kind: 'regular', sha256: pin, mode: if name == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }}
+	}
+	entries << ServiceQueryEntry{name: service_query_headless + '/guest-inputs.json', kind: 'regular', sha256: 'c'.repeat(64), mode: 0o644}
+	entries << ServiceQueryEntry{name: service_query_deployment, kind: 'regular', sha256: 'd'.repeat(64), mode: 0o644}
+	return entries
+}
+fn binder_identity_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in binder_identity_fields() { receipt[name] = json2.Any(value) }
+	mut delta := binder_identity_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'c'.repeat(64)
+	for name, value in {
+		'deployment_input_delta': json2.encode(delta)
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256', 'native_manifest_sha256'])
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: binder_identity_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'native_source_delta': json2.encode({'build-support/android/nativews/account_service.v': binder_identity_service_source,
+			'build-support/android/nativews/bindings.txt': binder_identity_bindings})
+		'framework_source_delta': json2.encode({'smali/android/os/Binder.smali': binder_identity_binder,
+			'smali/android/atl/VinixAccountBrokerContext.smali': binder_identity_context})
+		'overlay_inventory': json2.encode(binder_identity_entries_fixture())
+	} { receipt[name] = json2.decode[json2.Any](value)! }
+	return receipt
+}
+fn binder_identity_profile_self_test() ! {
+	profile := binder_identity_profile()
+	if profile.baseline_sha != binder_identity_boot_sha || profile.modules.len != 24
+		|| profile.modules.last() != 'maps-auth-worker.tar' || binder_identity_inputs().len != 50 { return error('Binder identity strict profile differs') }
+	mut final_modules := profile.modules.clone()
+	final_modules << profile.overlay
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', final_modules})!
+	stage := Stage{format: 1, inputs_sha256: binder_identity_inputs(), original_modules_sha256: binder_identity_modules(), preserved_modules_sha256: binder_identity_modules()}
+	receipt := binder_identity_receipt_fixture()!
+	verify_binder_identity_receipt(receipt, stage)!
+	for field in binder_identity_fields().keys() {
+		mut bad := binder_identity_receipt_fixture()!
+		bad[field] = json2.Any('changed')
+		if _ := verify_binder_identity_receipt(bad, stage) { return error('changed Binder identity field accepted') }
+		bad.delete(field)
+		if _ := verify_binder_identity_receipt(bad, stage) { return error('missing Binder identity field accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := binder_identity_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_binder_identity_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed Binder identity dependency accepted') }
+		pins.delete(path)
+		if _ := verify_binder_identity_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing Binder identity dependency accepted') }
+	}
+	mut extra := binder_identity_inputs()
+	extra['/unreviewed/sha256.json'] = 'a'.repeat(64)
+	if _ := verify_binder_identity_receipt(receipt, Stage{...stage, inputs_sha256: extra}) { return error('extra Binder identity dependency accepted') }
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: auth_worker_modules()}, Stage{...stage, preserved_modules_sha256: auth_worker_modules()}] {
+		if _ := verify_binder_identity_receipt(receipt, bad) { return error('wrong Binder identity module inventory accepted') }
+	}
+	for field in ['deployment_input_delta', 'deployment_top_level_delta', 'headless_input_delta', 'headless_top_level_delta', 'native_source_delta', 'framework_source_delta'] {
+		mut bad := binder_identity_receipt_fixture()!
+		bad[field] = json2.Any('changed')
+		if _ := verify_binder_identity_receipt(bad, stage) { return error('changed Binder identity declared delta accepted') }
+		bad.delete(field)
+		if _ := verify_binder_identity_receipt(bad, stage) { return error('missing Binder identity declared delta accepted') }
+	}
+	entries := binder_identity_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'},
+			ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := binder_identity_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_binder_identity_receipt(bad, stage) { return error('unsafe Binder identity inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := binder_identity_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_binder_identity_receipt(bad, stage) { return error('missing Binder identity file accepted') }
+		}
+	}
+	for extra_entry in [entries.last(), ServiceQueryEntry{name: 'opt/unreviewed', kind: 'regular', sha256: 'a'.repeat(64), mode: 0o644}] {
+		mut bad_entries := entries.clone()
+		bad_entries << extra_entry
+		mut bad := binder_identity_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+		if _ := verify_binder_identity_receipt(bad, stage) { return error('extra Binder identity inode accepted') }
+	}
+	if _ := verify_binder_identity_receipt(auth_worker_receipt_fixture()!, stage) { return error('worker receipt accepted by Binder identity profile') }
+	if _ := verify_auth_worker_receipt(receipt, stage) { return error('Binder identity receipt accepted by worker profile') }
+	println('MAPS-BINDER-IDENTITY KERNEL-PROFILE-SELF-TEST PASS seven files six input changes fifty seals twenty-four inherited modules twenty-five final retained roles historical rejection')
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
@@ -4925,6 +5151,7 @@ fn self_test() ! {
 	account_handoff_profile_self_test()!
 	auth_exception_profile_self_test()!
 	auth_worker_profile_self_test()!
+	binder_identity_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -5023,9 +5250,10 @@ fn main() {
 	is_account_handoff := os.args.len == 5 && os.args[1] == '--maps-account-handoff'
 	is_auth_exception := os.args.len == 5 && os.args[1] == '--maps-auth-exception'
 	is_auth_worker := os.args.len == 5 && os.args[1] == '--maps-auth-worker'
-	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker
+	is_binder_identity := os.args.len == 5 && os.args[1] == '--maps-binder-identity'
+	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity
 	if os.args.len != 4 && !is_selected {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
 	offset := if is_selected { 1 } else { 0 }
@@ -5037,7 +5265,7 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	profile := if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	profile := if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
