@@ -24,6 +24,10 @@ Evidence is under `/Users/alex/.local/state/vinix/android/maps-binder-identity-r
 in maps-diagnostic-classifier-build-r1 and maps-diagnostic-classification-r1/r2.
 Frozen source SHA: `914613d3d18e4be13101653ac7eb14aeb6c9168e01d5ae4f04d1cf3352cc745e`;
 executable: `8bcd22a6ed294bd5e7e90e15c64590f1c6f39701b4c796b4262320fe88807fd0`.
+The frozen compile input was named `uart-frame-audit-r3.v` in that build root.
+Its bytes exactly match the uniquely named tracked source above; the source
+has no file/executable-path identity dependency. The historical
+`uart-frame-audit.v` and `.md` have zero differences from their original HEAD.
 The owner seals the full runtime bundle separately.
 
 For interval `99a81170ae2d902d9760e2af2c00aebcf1f602437d13cde79f094e72648a00a5`,
