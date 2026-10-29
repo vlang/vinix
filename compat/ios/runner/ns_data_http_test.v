@@ -379,3 +379,116 @@ fn test_http_transport_header_count_bound() {
 	unsafe { url.free(); reply.free() }
 	println('IOS-HTTP-TRANSPORT-BOUNDS: excessive response fields reject the exchange and retire previously copied fields')
 }
+
+// Characterize Foundation's per-selector task/session delegate fallback before
+// connecting the transport to the task lifecycle. All traffic stays on loopback.
+fn C.objc_allocateClassPair(voidptr, &char, usize) voidptr
+fn C.objc_registerClassPair(voidptr)
+fn C.class_addMethod(voidptr, voidptr, voidptr, &char) bool
+fn C.objc_getProtocol(&char) voidptr
+fn C.class_addProtocol(voidptr, voidptr) bool
+fn C.__atomic_load_n(&u64, int) u64
+fn C.__atomic_store_n(&u64, u64, int)
+type TaskHTTPNative5 = fn (u64, u64, u64, u64, u64) u64
+type TaskHTTPDisposition = fn (u64, u64)
+struct TaskHTTPOracle {
+	send u64
+	session_delegate u64
+	task_delegate u64
+	queue u64
+mut:
+	events [8]u64
+	count u64
+	finished u64
+	bad_queue u64
+	state u64
+	error_code i64
+	body [8]u8
+	body_size u64
+}
+__global task_http_oracle = unsafe { &TaskHTTPOracle(nil) }
+fn task_http_oracle_event(delegate u64, kind u64) {
+	mut p := task_http_oracle
+	if p.count >= 8 { C.__atomic_store_n(unsafe { &p.bad_queue }, 1, 5); return }
+	p.events[p.count] = kind + if delegate == p.task_delegate { u64(10) } else { u64(0) }
+	p.count++
+	api := DataHTTPApi{native: true, send: p.send}
+	if api.msg(api.cls(c'NSOperationQueue'), c'currentQueue', 0) != p.queue { p.bad_queue = 1 }
+}
+fn task_http_oracle_response(delegate u64, _ &char, _session u64, _task u64, _response u64, complete u64) {
+	task_http_oracle_event(delegate, 1)
+	unsafe { TaskHTTPDisposition(voidptr(read64(complete + 16)))(complete, 1) }
+}
+fn task_http_oracle_data(delegate u64, _ &char, _session u64, _task u64, data u64) {
+	task_http_oracle_event(delegate, 2)
+	mut p := task_http_oracle
+	api := DataHTTPApi{native: true, send: p.send}
+	length := api.msg(data, c'length', 0)
+	if length > 8 - p.body_size { p.bad_queue = 1; return }
+	unsafe { C.memcpy(&p.body[int(p.body_size)], voidptr(api.msg(data, c'bytes', 0)), usize(length)) }
+	p.body_size += length
+}
+fn task_http_oracle_complete(delegate u64, _ &char, _session u64, task u64, error_object u64) {
+	task_http_oracle_event(delegate, 3)
+	mut p := task_http_oracle
+	api := DataHTTPApi{native: true, send: p.send}
+	p.state = api.msg(task, c'state', 0)
+	p.error_code = if error_object == 0 { i64(0) } else { i64(api.msg(error_object, c'code', 0)) }
+	C.__atomic_store_n(unsafe { &p.finished }, 1, 5)
+}
+fn test_http_session_native_delegate_routing() {
+	$if macos {
+		api := DataHTTPApi{native: true, send: u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend'))}
+		all := C.objc_allocateClassPair(unsafe { voidptr(api.cls(c'NSObject')) }, c'VinixHTTPNativeDelegateOracle', 0)
+		partial := C.objc_allocateClassPair(unsafe { voidptr(api.cls(c'NSObject')) }, c'VinixHTTPNativeCompleteOracle', 0)
+		for cls in [all, partial] {
+			assert cls != unsafe { nil };
+			assert C.class_addProtocol(cls, C.objc_getProtocol(c'NSURLSessionTaskDelegate'));
+			assert C.class_addMethod(cls, C.sel_registerName(c'URLSession:task:didCompleteWithError:'), unsafe { voidptr(task_http_oracle_complete) }, c'v40@0:8@16@24@32');
+		}
+		assert C.class_addProtocol(all, C.objc_getProtocol(c'NSURLSessionDataDelegate'));
+		assert C.class_addMethod(all, C.sel_registerName(c'URLSession:dataTask:didReceiveResponse:completionHandler:'), unsafe { voidptr(task_http_oracle_response) }, c'v48@0:8@16@24@32@?40');
+		assert C.class_addMethod(all, C.sel_registerName(c'URLSession:dataTask:didReceiveData:'), unsafe { voidptr(task_http_oracle_data) }, c'v40@0:8@16@24@32');
+		C.objc_registerClassPair(all); C.objc_registerClassPair(partial)
+		for mode in ['session', 'task', 'partial', 'cancel-before-resume'] {
+			pool := api.pool()
+			listener := data_http_listener()
+			mut workers := []thread bool{}
+			if mode != 'cancel-before-resume' { workers << spawn data_http_serve(listener, ['HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nping'], ['/'], false, false) }
+			queue := api.msg(api.cls(c'NSOperationQueue'), c'new', 0)
+			api.msg(queue, c'setMaxConcurrentOperationCount:', 1)
+			session_delegate := api.msg(u64(all), c'new', 0)
+			task_delegate := if mode == 'session' { u64(0) } else { api.msg(if mode == 'partial' { u64(partial) } else { u64(all) }, c'new', 0) }
+			mut probe := TaskHTTPOracle{send: api.send, session_delegate: session_delegate, task_delegate: task_delegate, queue: queue}
+			task_http_oracle = unsafe { &probe }
+			config := api.msg(api.cls(c'NSURLSessionConfiguration'), c'defaultSessionConfiguration', 0)
+			session := unsafe { TaskHTTPNative5(voidptr(api.send))(api.cls(c'NSURLSession'), u64(C.sel_registerName(c'sessionWithConfiguration:delegate:delegateQueue:')), config, session_delegate, queue) }
+			api.msg(session, c'retain', 0)
+			request := api.msg(api.cls(c'NSURLRequest'), c'requestWithURL:', api.url('http://127.0.0.1:${listener.port}/'))
+			task := api.msg(session, c'dataTaskWithRequest:', request)
+			api.msg(task, c'setDelegate:', task_delegate)
+			api.msg(task, if mode == 'cancel-before-resume' { c'cancel' } else { c'resume' }, 0)
+			deadline := time.sys_mono_now() + 5 * time.second
+			for C.__atomic_load_n(unsafe { &probe.finished }, 5) == 0 { assert time.sys_mono_now() < deadline; time.sleep(time.millisecond) }
+			api.msg(queue, c'waitUntilAllOperationsAreFinished', 0)
+			if mode == 'cancel-before-resume' { C.close(listener.fd) } else { assert workers[0].wait(); }
+			unsafe { workers.free() }
+			assert probe.bad_queue == 0 && probe.state == 3;
+			assert probe.error_code == if mode == 'cancel-before-resume' { i64(-999) } else { i64(0) };
+			expected := match mode {
+				'session' { [u64(1), 2, 3, 0, 0, 0, 0, 0]! }
+				'task' { [u64(11), 12, 13, 0, 0, 0, 0, 0]! }
+				'partial' { [u64(1), 2, 13, 0, 0, 0, 0, 0]! }
+				else { [u64(13), 0, 0, 0, 0, 0, 0, 0]! }
+			}
+			assert probe.events == expected && probe.count == if mode == 'cancel-before-resume' { u64(1) } else { u64(3) };
+			assert probe.body_size == if mode == 'cancel-before-resume' { u64(0) } else { u64(4) };
+			if probe.body_size != 0 { assert C.memcmp(&probe.body[0], c'ping', 4) == 0; }
+			println('IOS-SESSION-NATIVE-ROUTING: ${mode} events=${probe.events} count=${probe.count} body=${probe.body_size} code=${probe.error_code} state=${probe.state}')
+			api.msg(session, c'invalidateAndCancel', 0)
+			api.msg(session, c'release', 0); api.msg(task_delegate, c'release', 0); api.msg(session_delegate, c'release', 0); api.msg(queue, c'release', 0)
+			api.drain(pool)
+			task_http_oracle = unsafe { nil }
+		}
+	}
+}
