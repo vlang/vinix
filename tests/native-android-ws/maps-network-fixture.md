@@ -81,3 +81,12 @@ with sampled peak aggregate RSS 368,852,992 / 1,245,184 / 86,065,152 bytes.
 All guards exited zero with complete cleanup under 600 MiB RSS, 300 seconds,
 512 MiB observed shared-volume growth and a 1 GiB reserve. Limits were not
 raised. These are host checks; real ART execution remains pending.
+
+Source/report checkpoint `9152d75e3` and both artifact roots are retained in
+`maps-network-fixture-evidence-2026-10-29-r1/sealed/manifest.json`, SHA-256
+`a1be729ee2de952ec71b86ffbaefd3936d0ae28c01beb9fc44267c8aecd11653`.
+The source/compiler closure and copied signing inputs (including the JDK) are
+included. Signing inputs matched before/after the build and retained content
+matched their originals. Seal and independent complete readback passed for two
+roots and 18,207 entries, with zero exit statuses and complete cleanup. The
+closed artifact roots must remain unchanged; new guest results belong elsewhere.
