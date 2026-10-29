@@ -333,6 +333,27 @@ fn auth_exception_profile() NarrowProfile {
  }
 }
 
+fn binder_identity_profile() NarrowProfile {
+ binder := 'android/os/Binder.smali'
+ context := 'android/atl/VinixAccountBrokerContext.smali'
+ return NarrowProfile{
+  name: 'binder-identity'
+  baseline_name: 'combined-account-webview-auth-exception-framework-2026-10-29-r1'
+  manifest_pin: '4aa0c09e05c0d4fe3180a909648ebb344881ec1d2d6e60bba5d959148d93a284'
+  jar_pin: '0daae54d7755b255ed3335f58d8cafd6da4d03c8c95343ebb0f174d166da6916'
+  baseline_classes: 2104
+  providers: ['framework_account_broker_context.v']
+  calls: {binder: 'framework_account_broker_identity', context: 'framework_account_broker_identity_context'}
+  methods: {
+   binder: ['clearCallingIdentity()J', 'restoreCallingIdentity(J)V',
+    'vinixOriginalClearCallingIdentity()J', 'vinixOriginalRestoreCallingIdentity(J)V']
+   context: ['clearCallingIdentity()J', 'restoreCallingIdentity(J)Z']
+  }
+  changed: {binder: 2, context: 0}
+  added: {binder: 2, context: 2}
+ }
+}
+
 fn store_parts(source string) !StoreClassParts {
  mut methods := map[string]string{}
  mut metadata := []string{}
@@ -363,6 +384,72 @@ fn store_parts(source string) !StoreClassParts {
 
 fn narrow_method_delta(old string, new string, allowed []string, expected_changed int, expected_added int) ! {
  narrow_member_delta(old, new, allowed, expected_changed, expected_added, []string{})!
+}
+
+fn binder_identity_members(old string, new string, target string) ! {
+ before := store_parts(old)!
+ after := store_parts(new)!
+ if target == 'android/os/Binder.smali' {
+  for signature, fallback in {
+   'clearCallingIdentity()J': 'vinixOriginalClearCallingIdentity()J'
+   'restoreCallingIdentity(J)V': 'vinixOriginalRestoreCallingIdentity(J)V'
+  } {
+   original := before.methods[signature] or { return error('original identity method absent') }
+   public_header := '.method public static ' + signature + '\n'
+   if !original.starts_with(public_header)
+    || !(after.methods[signature] or { '' }).starts_with(public_header) {
+    return error('identity method public/static ABI changed')
+   }
+   expected := '.method private static ' + fallback + '\n' + original.all_after('\n')
+   if (after.methods[fallback] or { '' }) != expected {
+    return error('private identity fallback must preserve the complete original body')
+   }
+  }
+ } else if target == 'android/atl/VinixAccountBrokerContext.smali' {
+  for signature in ['clearCallingIdentity()J', 'restoreCallingIdentity(J)Z'] {
+   if signature in before.methods
+    || (after.methods[signature] or { '' }) != '.method public static native ' + signature + '\n.end method' {
+    return error('identity context addition must be exactly its public static native declaration')
+   }
+  }
+ } else {
+  return error('unexpected binder identity class')
+ }
+}
+
+fn binder_identity_members_self_test() ! {
+ binder := 'android/os/Binder.smali'
+ context := 'android/atl/VinixAccountBrokerContext.smali'
+ clear := '.method public static clearCallingIdentity()J\n.registers 2\nconst-wide/16 v0, 0x0\nreturn-wide v0\n.end method\n'
+ restore := '.method public static restoreCallingIdentity(J)V\n.registers 2\nreturn-void\n.end method\n'
+ old := '.class public Landroid/os/Binder;\n.super Ljava/lang/Object;\n' + clear + restore
+ new := old.replace('const-wide/16 v0, 0x0', 'const-wide/16 v0, 0x1')
+  + clear.replace('public static clearCallingIdentity', 'private static vinixOriginalClearCallingIdentity')
+  + restore.replace('public static restoreCallingIdentity', 'private static vinixOriginalRestoreCallingIdentity')
+ binder_identity_members(old, new, binder)!
+ for bad in [new.replace('private static vinixOriginalClearCallingIdentity', 'public static vinixOriginalClearCallingIdentity'),
+  new.replace('private static vinixOriginalRestoreCallingIdentity', 'public static vinixOriginalRestoreCallingIdentity'),
+  new.replace('const-wide/16 v0, 0x0', 'const-wide/16 v0, 0x2'),
+  new.replace('public static clearCallingIdentity', 'private static clearCallingIdentity'),
+  new.replace('public static restoreCallingIdentity', 'private static restoreCallingIdentity'),
+  new.replace('vinixOriginalRestoreCallingIdentity', 'unexpectedRestoreCallingIdentity')] {
+  binder_identity_members(old, bad, binder) or { continue }
+  return error('invalid identity original-body or access delta accepted')
+ }
+ context_old := '.class public final Landroid/atl/VinixAccountBrokerContext;\n.super Ljava/lang/Object;\n'
+ clear_native := '.method public static native clearCallingIdentity()J\n.end method\n'
+ restore_native := '.method public static native restoreCallingIdentity(J)Z\n.end method\n'
+ context_new := context_old + clear_native + restore_native
+ binder_identity_members(context_old, context_new, context)!
+ for bad in [context_old + clear_native, context_new.replace(' static native ', ' native '),
+  context_new.replace(' native ', ' '), context_new.replace('restoreCallingIdentity(J)Z', 'restoreCallingIdentity(J)V'),
+  context_new.replace('clearCallingIdentity()J\n.end method', 'clearCallingIdentity()J\n.locals 0\nreturn-void\n.end method')] {
+  binder_identity_members(context_old, bad, context) or { continue }
+  return error('invalid identity native declaration accepted')
+ }
+ mut preexisting_rejected := false
+ binder_identity_members(context_new, context_new, context) or { preexisting_rejected = true }
+ if !preexisting_rejected { return error('preexisting identity context natives accepted') }
 }
 
 fn narrow_member_delta(old string, new string, allowed []string, expected_changed int, expected_added int, fields []string) ! {
@@ -722,12 +809,56 @@ fn auth_exception_self_test() ! {
  }
 }
 
+fn binder_identity_self_test() ! {
+ profile := binder_identity_profile()
+ binder := 'android/os/Binder.smali'
+ context := 'android/atl/VinixAccountBrokerContext.smali'
+ if profile.methods.len != 2 || profile.calls.len != 2
+  || profile.changed[binder]! != 2 || profile.added[binder]! != 2
+  || profile.changed[context]! != 0 || profile.added[context]! != 2
+  || profile.fields.len != 0 || profile.extra_classes.len != 0
+  || profile.baseline_classes != 2104 {
+  return error('binder identity profile requires two identity changes, two original-body helpers and two context natives')
+ }
+ for target, signatures in profile.methods {
+  narrow_method_self_test(signatures, profile.changed[target]!, profile.added[target]!)!
+ }
+ binder_identity_members_self_test()!
+ mut before := {
+  binder: 'old'
+  context: 'old'
+  'android/accounts/AbstractAccountAuthenticator.smali': 'same'
+ }
+ for i in 0 .. 2101 { before['other/' + i.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ after[binder] = 'new'
+ after[context] = 'new'
+ narrow_profile_class_delta(before, after, [binder, context], []string{}, 2104)!
+ for case in 0 .. 8 {
+  mut old := before.clone()
+  mut bad := after.clone()
+  match case {
+   0 { bad[binder] = 'old' }
+   1 { bad[context] = 'old' }
+   2 { bad['android/accounts/AbstractAccountAuthenticator.smali'] = 'changed' }
+   3 { bad.delete(binder); bad['substitute.smali'] = 'new' }
+   4 { bad.delete('other/0.smali') }
+   5 { bad['extra.smali'] = 'new' }
+   6 { old.delete('other/0.smali'); bad.delete('other/0.smali') }
+   else { bad['other/0.smali'] = 'changed' }
+  }
+  narrow_profile_class_delta(old, bad, [binder, context], []string{}, 2104) or { continue }
+  return error('invalid binder identity class delta accepted: ' + case.str())
+ }
+}
+
 fn self_test() ! {
  store_delta_self_test()!
  store_method_self_test()!
  protected_storage_self_test()!
  onboarding_self_test()!
  auth_exception_self_test()!
+ binder_identity_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -930,6 +1061,9 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  for target in targets {
   narrow_member_delta(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!,
    profile.methods[target]!, profile.changed[target]!, profile.added[target]!, profile.fields[target] or { []string{} })!
+  if profile.name == 'binder-identity' {
+   binder_identity_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)!
+  }
  }
  command(root, 'assemble', [java, '-Xmx512m', '-XX:ActiveProcessorCount=2', '-cp', classpath.join(':'), 'org.jf.smali.Main', 'assemble', '--jobs', '2', root + '/smali', '-o', root + '/classes.dex'])!
  if !os.is_file(root + '/classes.dex') || os.file_size(root + '/classes.dex') < 112 { return error('store assembly produced no fresh DEX') }
@@ -941,6 +1075,9 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  for target in targets {
   narrow_member_delta(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!,
    profile.methods[target]!, profile.changed[target]!, profile.added[target]!, profile.fields[target] or { []string{} })!
+  if profile.name == 'binder-identity' {
+   binder_identity_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)!
+  }
  }
  write_json(root + '/framework-dex-before.json', old)!
  write_json(root + '/framework-dex-after.json', new)!
@@ -1212,11 +1349,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception'] {
-  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } else { onboarding_profile() } }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity'] {
+  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
