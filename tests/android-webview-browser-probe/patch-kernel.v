@@ -173,6 +173,18 @@ const auth_exception_framework_seal = '4aa0c09e05c0d4fe3180a909648ebb344881ec1d2
 const auth_exception_jar = '0daae54d7755b255ed3335f58d8cafd6da4d03c8c95343ebb0f174d166da6916'
 const auth_exception_dex = '6cf2173aedc5adbf187aed5db4c37a8a95a413cc35343272cd45c88f2734d615'
 const auth_exception_build = '51b78458f8da4c0d6598cf3856327111cc3094a489af7ac7e56470bd59dec225'
+const auth_worker_base = '/Users/alex/.local/state/vinix/android/maps-auth-exception-r1'
+const auth_worker_base_seal = 'b8b214ffc061366718511b4d293077e8901d797884e884ebaad84f346d5341e1'
+const auth_worker_boot_sha = '648886cef0035cba445c1f8d74fd85a647228781457fa919e4ad543d73db59c5'
+const auth_worker_base_overlay = '6b643c0fa9ea98abd0fe55219915406b04df9b2b101e47b73908f3f292515bac'
+const auth_worker_retained_deployment = 'f24a0194fcba6f9ea314f979124e5144341c331cf2b1b01a20eba4c20bba65aa'
+const auth_worker_root = '/Users/alex/.local/state/vinix/android/current-native-build-2026-10-29-auth-worker-r1'
+// Complete reviewed native producer and its exact implementation delta.
+const auth_worker_seal = '048602ab4aa188111bad295a5af9d1b47c6cceee0fd82f0eb73858689b22a921'
+const auth_worker_pin = '0ef0acd98c148b9b972f754e5fb1e23683e8dc7d0b56f05d2f0a4c7792206136'
+const auth_worker_build = '3e7d063ed01484a91ae9ef02bb78b648168dc815700a28522adf88d622aed2d9'
+const auth_worker_service_source = '7369030274a40f2c9b4abafbd854c61fe9f48b29152dd0de7e78dce1df56bae6'
+const auth_worker_added_source = 'db0f426089da7b3397662a1dcf93a1de37aa32979e4edfa746a63b01855a1c5c'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -1844,6 +1856,88 @@ fn auth_exception_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return auth_exception_base + '/boot.img'
 }
 
+fn auth_worker_profile() Profile {
+	mut modules := auth_exception_profile().modules.clone()
+	modules << 'maps-auth-exception.tar'
+	return Profile{'maps-auth-worker', auth_worker_boot_sha, 'maps-auth-worker.tar', modules}
+}
+fn auth_worker_modules() map[string]string {
+	mut modules := auth_exception_modules()
+	modules['maps-auth-exception.tar'] = auth_worker_base_overlay
+	return modules
+}
+fn auth_worker_fields() map[string]string {
+	mut fields := auth_exception_fields()
+	fields['kind'] = 'vinix-maps-auth-worker-v1'
+	fields['base_root'] = auth_worker_base
+	fields['base_manifest_sha256'] = auth_worker_base_seal
+	fields['native_build_root'] = auth_worker_root
+	fields['native_manifest_sha256'] = auth_worker_seal
+	fields['native_sha256'] = auth_worker_pin
+	fields['native_build_sha256'] = auth_worker_build
+	fields['retained_native_manifest_sha256'] = account_pump_seal
+	return fields
+}
+fn auth_worker_inputs() map[string]string {
+	mut inputs := auth_exception_inputs()
+	inputs[auth_worker_base + '/sha256.json'] = auth_worker_base_seal
+	inputs[auth_worker_root + '/sha256.json'] = auth_worker_seal
+	return inputs
+}
+fn auth_worker_delta() map[string]string {
+	return {'/' + native_onboarding_trace_path: auth_worker_pin}
+}
+fn verify_auth_worker_overlay(receipt map[string]json2.Any) ! {
+	for name, value in {
+		'deployment_input_delta': json2.encode(auth_worker_delta())
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'native_manifest_sha256'])
+		'native_source_delta': json2.encode({'build-support/android/nativews/account_service.v': auth_worker_service_source,
+			'build-support/android/nativews/account_worker.v': auth_worker_added_source})
+	} {
+		if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](value)! { return error('auth worker declared delta differs: ' + name) }
+	}
+	for name in ['headless_input_delta', 'headless_top_level_delta'] { if name in receipt { return error('auth worker may not change retained headless roles') } }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('auth worker overlay inventory absent') }))!
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	paths := [native_onboarding_trace_path, service_query_deployment]
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe auth worker overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			mode := if entry.name == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != mode { return error('auth worker file allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected auth worker inode') }
+	}
+	if regulars.len != 2 || regulars[native_onboarding_trace_path] or { '' } != auth_worker_pin
+		|| regulars[service_query_deployment] or { '' } == auth_worker_retained_deployment { return error('exact two new auth worker files required') }
+}
+fn verify_auth_worker_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [auth_worker_base_seal, auth_worker_boot_sha, auth_worker_base_overlay,
+		auth_worker_retained_deployment, auth_worker_seal, auth_worker_pin, auth_worker_build, auth_worker_service_source, auth_worker_added_source] {
+		if !digest_valid(pin) { return error('completed reviewed auth worker producer required') }
+	}
+	if auth_worker_seal == account_pump_seal || auth_worker_pin == account_pump_pin || auth_worker_service_source == account_pump_source_pin { return error('new auth worker implementation required') }
+	for name, expected in auth_worker_fields() {
+		if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('auth worker receipt differs: ' + name) }
+	}
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 47 || seals != auth_worker_inputs() { return error('auth worker exact forty-seven dependency seals differ') }
+	if stage.format != 1 || stage.original_modules_sha256 != auth_worker_modules() || stage.preserved_modules_sha256 != auth_worker_modules() { return error('auth worker original twenty-three modules differ') }
+	verify_auth_worker_overlay(receipt)!
+}
+fn auth_worker_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_auth_worker_receipt(receipt, stage)!
+	path := auth_worker_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != auth_worker_base_seal { return error('auth worker original exception-stage manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != auth_worker_boot_sha || pins['maps-auth-exception.tar'] or { '' } != auth_worker_base_overlay { return error('auth worker original boot or exception overlay differs') }
+	return auth_worker_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -2442,6 +2536,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = account_handoff_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-auth-exception' {
 		baseline = auth_exception_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-auth-worker' {
+		baseline = auth_worker_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -4725,6 +4821,92 @@ fn auth_exception_profile_self_test() ! {
 	println('MAPS-AUTH-EXCEPTION KERNEL-PROFILE-SELF-TEST PASS exact framework six-file inventory five-input delta twenty-two inherited modules twenty-three final forty-five dependencies retained roles historical rejection')
 }
 
+fn auth_worker_entries_fixture() []ServiceQueryEntry {
+	return [ServiceQueryEntry{name: native_onboarding_trace_path, kind: 'regular', sha256: auth_worker_pin, mode: 0o755},
+		ServiceQueryEntry{name: service_query_deployment, kind: 'regular', sha256: 'd'.repeat(64), mode: 0o644},
+		ServiceQueryEntry{name: 'opt', kind: 'directory', mode: 0o755}]
+}
+fn auth_worker_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in auth_worker_fields() { receipt[name] = json2.Any(value) }
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(auth_worker_delta()))!
+	receipt['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256', 'native_manifest_sha256']))!
+	receipt['native_source_delta'] = json2.decode[json2.Any](json2.encode({'build-support/android/nativews/account_service.v': auth_worker_service_source,
+		'build-support/android/nativews/account_worker.v': auth_worker_added_source}))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(auth_worker_entries_fixture()))!
+	return receipt
+}
+fn auth_worker_profile_self_test() ! {
+	profile := auth_worker_profile()
+	if profile.baseline_sha != auth_worker_boot_sha || profile.modules.len != 23 || profile.modules.last() != 'maps-auth-exception.tar' || auth_worker_inputs().len != 47 {
+		return error('auth worker positive profile fixture differs')
+	}
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 24 { return error('auth worker final module count differs') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', profile.modules}, Config{'vinix', modules.reverse()}, Config{'vinix', auth_exception_profile().modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('unsafe auth worker modules accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: auth_worker_inputs(), original_modules_sha256: auth_worker_modules(), preserved_modules_sha256: auth_worker_modules()}
+	receipt := auth_worker_receipt_fixture()!
+	verify_auth_worker_receipt(receipt, stage)!
+	for name in receipt.keys() {
+		mut bad := auth_worker_receipt_fixture()!
+		bad[name] = json2.Any('wrong')
+		if _ := verify_auth_worker_receipt(bad, stage) { return error('changed auth worker field accepted') }
+		bad.delete(name)
+		if _ := verify_auth_worker_receipt(bad, stage) { return error('missing auth worker field accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut inputs := stage.inputs_sha256.clone()
+		inputs[path] = '0'.repeat(64)
+		if _ := verify_auth_worker_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) { return error('changed auth worker dependency accepted') }
+		inputs.delete(path)
+		if _ := verify_auth_worker_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) { return error('missing auth worker dependency accepted') }
+	}
+	mut extra := stage.inputs_sha256.clone()
+	extra['/unreviewed/sha256.json'] = '0'.repeat(64)
+	if _ := verify_auth_worker_receipt(receipt, Stage{...stage, inputs_sha256: extra}) { return error('extra auth worker dependency accepted') }
+	for bad in [Stage{...stage, format: 2}, Stage{...stage, original_modules_sha256: auth_exception_modules()}, Stage{...stage, preserved_modules_sha256: map[string]string{}}] {
+		if _ := verify_auth_worker_receipt(receipt, bad) { return error('wrong auth worker module inventory accepted') }
+	}
+	for field in ['headless_input_delta', 'headless_top_level_delta'] {
+		mut bad := auth_worker_receipt_fixture()!
+		bad[field] = json2.decode[json2.Any](json2.encode([]string{}))!
+		if _ := verify_auth_worker_receipt(bad, stage) { return error('auth worker headless declaration accepted') }
+	}
+	entries := auth_worker_entries_fixture()
+	for index, entry in entries {
+		for replacement in [ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777},
+			ServiceQueryEntry{...entry, mode: if entry.name == native_onboarding_trace_path { u32(0o644) } else { u32(0o755) }}, ServiceQueryEntry{...entry, sha256: 'invalid'}] {
+			if replacement == entry || (entry.kind != 'regular' && replacement.sha256 != entry.sha256) { continue }
+			mut changed := entries.clone()
+			changed[index] = replacement
+			mut bad := auth_worker_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+			if _ := verify_auth_worker_receipt(bad, stage) { return error('unsafe auth worker inode accepted') }
+		}
+		if entry.kind != 'regular' { continue }
+		mut missing := entries.clone()
+		missing.delete(index)
+		mut bad := auth_worker_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(missing))!
+		if _ := verify_auth_worker_receipt(bad, stage) { return error('missing auth worker file accepted') }
+	}
+	for addition in [entries[0], ServiceQueryEntry{name: 'extra', kind: 'directory', mode: 0o755}, ServiceQueryEntry{name: 'opt/../escape', kind: 'directory', mode: 0o755},
+		ServiceQueryEntry{name: service_query_jar_path, kind: 'regular', sha256: auth_exception_jar, mode: 0o644}] {
+		mut changed := entries.clone()
+		changed << addition
+		mut bad := auth_worker_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_auth_worker_receipt(bad, stage) { return error('extra auth worker inode accepted') }
+	}
+	if _ := verify_auth_worker_receipt(auth_exception_receipt_fixture()!, stage) { return error('historical exception receipt accepted by worker profile') }
+	if _ := verify_auth_exception_receipt(receipt, stage) { return error('worker receipt accepted by exception profile') }
+	println('MAPS-AUTH-WORKER KERNEL-PROFILE-SELF-TEST PASS exact native two-file inventory one-input delta twenty-three inherited modules twenty-four final forty-seven dependencies retained roles historical rejection')
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
@@ -4742,6 +4924,7 @@ fn self_test() ! {
 	application_restrictions_profile_self_test()!
 	account_handoff_profile_self_test()!
 	auth_exception_profile_self_test()!
+	auth_worker_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -4839,11 +5022,13 @@ fn main() {
 	is_application_restrictions := os.args.len == 5 && os.args[1] == '--maps-application-restrictions'
 	is_account_handoff := os.args.len == 5 && os.args[1] == '--maps-account-handoff'
 	is_auth_exception := os.args.len == 5 && os.args[1] == '--maps-auth-exception'
-	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot && !is_context_storage && !is_broadcast_result && !is_onboarding_trace && !is_native_onboarding_trace && !is_onboarding_framework && !is_native_heartbeat && !is_browser_poll && !is_account_pump && !is_application_restrictions && !is_account_handoff && !is_auth_exception {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+	is_auth_worker := os.args.len == 5 && os.args[1] == '--maps-auth-worker'
+	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker
+	if os.args.len != 4 && !is_selected {
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception { 1 } else { 0 }
+	offset := if is_selected { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -4852,7 +5037,7 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	profile := if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	profile := if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
