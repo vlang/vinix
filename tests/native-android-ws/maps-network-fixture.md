@@ -228,3 +228,11 @@ zero with complete cleanup under the unchanged 600 MiB RSS, 300-second,
 512 MiB growth and 1 GiB reserve limits. Copied compiler and signing inputs
 matched their closed originals after the build. Historical v1/v2 artifacts and
 checkers remain unchanged.
+
+Source/report checkpoint `96b29b0b8` and both complete v3 artifact roots are
+sealed by `maps-network-tls-v3-fixture-evidence-2026-10-29-r1/sealed/manifest.json`,
+SHA-256 `e1c36ecc890527feb88b8a9e30b65016255cf8bea6e6f8574bdedef3373b1a47`.
+Seal and separate independent complete readback passed for two roots and
+18,211 entries. The readback guard/child exited 0/0 with complete cleanup in
+1.457 seconds at 24,805,376 bytes peak sampled RSS. Closed roots remain
+immutable; new runtime results belong elsewhere.
