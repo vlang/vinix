@@ -40,6 +40,9 @@ const serial_prefix = 'VINIX-SERVICE-QUERY-RESULTS-1 '
 const log_limit = 4 * 1024 * 1024
 const line_limit = 8192
 const auth_worker_native_sha = '0ef0acd98c148b9b972f754e5fb1e23683e8dc7d0b56f05d2f0a4c7792206136'
+const binder_identity_native_sha = '6a87d8c2fd003c55cb572ab397342d0c39aa54376ffe7a5a2ba2fa4592099eae'
+const binder_identity_framework_sha = '3f2e3220d6c38feb885044fdb4806d4d3ca7736352bbcc7813e2ee6510463636'
+const maps_network_v3_apk_sha = 'bd07eddf7594fd6cc6b90b984baf7ee5855af0fc56ee0322fbc45ea318cf393a'
 
 struct FixtureProfile {
 	name          string
@@ -115,6 +118,28 @@ fn maps_network_v2_profile() FixtureProfile {
 		apk_sha: 'abfa8127b920dd7156d3cdee056a98d725411c6b5b2f8cb081149393c0b9c051'
 		native_sha: auth_worker_native_sha
 		pass_marker: 'MAPS-NETWORK-V2-PASS observations-complete'
+	}
+}
+
+fn authenticator_binder_identity_profile() FixtureProfile {
+	base := authenticator_exception_profile()
+	return FixtureProfile{
+		...base
+		name: 'authenticator-binder-identity-private-exception'
+		framework_sha: binder_identity_framework_sha
+		native_sha: binder_identity_native_sha
+	}
+}
+
+fn maps_network_v3_profile() FixtureProfile {
+	base := maps_network_profile()
+	return FixtureProfile{
+		...base
+		name: 'maps-network-tls-v3-binder-identity-observations'
+		apk_sha: maps_network_v3_apk_sha
+		framework_sha: binder_identity_framework_sha
+		native_sha: binder_identity_native_sha
+		pass_marker: 'MAPS-NETWORK-V3-PASS observations-complete'
 	}
 }
 
@@ -222,7 +247,8 @@ fn health(line string, expected_marker string) ! {
 	}
 	if (line.contains('CHILD-ATTACH-PASS') || line.contains('SETTINGS-GLOBAL-PASS')
 		|| line.contains('APPLICATION-RESTRICTIONS-PASS') || line.contains('AUTHENTICATOR-BASE-PASS')
-		|| line.contains('MAPS-NETWORK-PASS') || line.contains('MAPS-NETWORK-V2-PASS')) && line != expected_marker {
+		|| line.contains('MAPS-NETWORK-PASS') || line.contains('MAPS-NETWORK-V2-PASS')
+		|| line.contains('MAPS-NETWORK-V3-PASS')) && line != expected_marker {
 		return error('conflicting fixture marker')
 	}
 }
@@ -423,7 +449,7 @@ fn export_evidence(output string) ! {
 
 fn selftest() ! {
 	mut cases := 0
-	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile(), authenticator_worker_profile(), maps_network_v2_profile()]
+	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile(), authenticator_worker_profile(), maps_network_v2_profile(), authenticator_binder_identity_profile(), maps_network_v3_profile()]
 	require(child_attach_profile().framework_sha == framework_sha
 		&& settings_global_profile().framework_sha == framework_sha
 		&& application_restrictions_profile().framework_sha != framework_sha, 'exact per-profile framework identities')!
@@ -435,6 +461,13 @@ fn selftest() ! {
 		&& authenticator_worker_profile().native_sha != authenticator_exception_profile().native_sha
 		&& maps_network_v2_profile().framework_sha == maps_network_profile().framework_sha
 		&& maps_network_v2_profile().apk_sha != maps_network_profile().apk_sha, 'worker and TLS-v2 identities are distinct opt-ins')!
+	require(authenticator_binder_identity_profile().apk_sha == authenticator_exception_profile().apk_sha
+		&& authenticator_binder_identity_profile().native_sha == maps_network_v3_profile().native_sha
+		&& authenticator_binder_identity_profile().native_sha != authenticator_worker_profile().native_sha
+		&& authenticator_binder_identity_profile().framework_sha == maps_network_v3_profile().framework_sha
+		&& authenticator_binder_identity_profile().framework_sha != authenticator_worker_profile().framework_sha
+		&& maps_network_v3_profile().apk_sha != maps_network_v2_profile().apk_sha,
+		'Binder identity and TLS-v3 require their distinct pinned runtime pair')!
 	for profile in profiles {
 		mut pins := [profile.apk_sha, profile.framework_sha]
 		if profile.native_sha != '' { pins << profile.native_sha }
@@ -457,12 +490,12 @@ fn selftest() ! {
 		}
 		for other in profiles {
 			if other.name == profile.name { continue }
-			// The worker regression uses the same APK on a different pinned
-			// native runtime. Its log marker alone cannot identify that runtime.
+			// Reused APKs share a marker; exact framework/native pin pairs
+			// identify their runtime before execution, independently of the log.
 			if other.pass_marker == profile.pass_marker {
-				require(other.apk_sha == profile.apk_sha && other.framework_sha == profile.framework_sha
-					&& other.native_sha != '' && profile.native_sha != '' && other.native_sha != profile.native_sha,
-					'shared fixture marker requires distinct pinned native runtimes')!
+				require(other.apk_sha == profile.apk_sha && other.native_sha != '' && profile.native_sha != ''
+					&& (other.framework_sha != profile.framework_sha || other.native_sha != profile.native_sha),
+					'shared fixture marker requires distinct pinned runtime pairs')!
 				continue
 			}
 			mut rejected := false
@@ -480,6 +513,26 @@ fn selftest() ! {
 		cases++
 	}
 	require(canonical('/var/lib/onboarding-api-r1'), 'canonical path rejected')!
+	for selector in ['--authenticator-binder-identity', '--maps-network-v3'] {
+		full := [selector, '/runtime', '/fixture.apk', '10117', '10117', '/results']
+		for count in 1 .. full.len {
+			mut argv := [os.executable()]
+			argv << full[..count]
+			result := os.exec(argv)
+			require(result.exit_code == 1 && result.output.contains('usage: onboarding-api-run'),
+				'incomplete Binder identity fixture CLI accepted')!
+			cases++
+		}
+		for bad in [[selector + '-other', '/runtime', '/fixture.apk', '10117', '10117', '/results'],
+			[selector, '/runtime', '/fixture.apk', '10117', '10117', '/results', 'extra']] {
+			mut argv := [os.executable()]
+			argv << bad
+			result := os.exec(argv)
+			require(result.exit_code == 1 && result.output.contains('usage: onboarding-api-run'),
+				'unknown or surplus Binder identity fixture CLI accepted')!
+			cases++
+		}
+	}
 	println('ONBOARDING-API-RUN-SELFTEST-PASS rejected=' + cases.str())
 }
 
@@ -489,9 +542,11 @@ fn run() ! {
 		return
 	}
 	mut arguments := os.args[1..]
-	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network', '--authenticator-worker', '--maps-network-v2'],
-		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network|--authenticator-worker|--maps-network-v2) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
+	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network', '--authenticator-worker', '--maps-network-v2', '--authenticator-binder-identity', '--maps-network-v3'],
+		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network|--authenticator-worker|--maps-network-v2|--authenticator-binder-identity|--maps-network-v3) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
 	profile := if arguments[0] == '--authenticator-private-exception' { authenticator_exception_profile() }
+		else if arguments[0] == '--authenticator-binder-identity' { authenticator_binder_identity_profile() }
+		else if arguments[0] == '--maps-network-v3' { maps_network_v3_profile() }
 		else if arguments[0] == '--authenticator-worker' { authenticator_worker_profile() }
 		else if arguments[0] == '--maps-network-v2' { maps_network_v2_profile() }
 		else if arguments[0] == '--maps-network' { maps_network_profile() }
