@@ -235,11 +235,19 @@ fn (stream &DataHTTPStream) tls_failure(stage string, code int) bool {
 }
 
 fn (mut stream DataHTTPStream) send(request string) bool {
+	return stream.send_counted(request, unsafe { nil })
+}
+
+fn (mut stream DataHTTPStream) send_counted(request string, sent &u64) bool {
 	mut offset := 0
 	for offset < request.len && time.sys_mono_now() < stream.deadline && !data_http_cancelled(stream.cancel) {
 		result := if stream.tls { int(C.mbedtls_ssl_write(&stream.ssl, unsafe { request.str + offset }, usize(request.len - offset))) }
 			else { int(C.send(stream.fd, unsafe { request.str + offset }, usize(request.len - offset), C.MSG_NOSIGNAL)) }
-		if result > 0 { offset += result; continue }
+		if result > 0 {
+			offset += result
+			if sent != unsafe { nil } { C.ios_store_pointer(sent, u64(offset)) }
+			continue
+		}
 		if result == 0 { return false }
 		if !stream.tls {
 			error := unsafe { *C.ios_errno_address() }
@@ -385,6 +393,10 @@ fn data_http_fetch(original string, ca_file string, timeout i64) ?[]u8 {
 // Shared framing for NSData and the session transport. The caller decides
 // whether an HTTP status is acceptable; framing errors never become success.
 fn data_http_body(mut stream DataHTTPStream, response DataHTTPResponse, mut headers []u8, head bool) ?[]u8 {
+	return data_http_body_counted(mut stream, response, mut headers, head, unsafe { nil })
+}
+
+fn data_http_body_counted(mut stream DataHTTPStream, response DataHTTPResponse, mut headers []u8, head bool, received &u64) ?[]u8 {
 	mut body := []u8{cap: if head { 0 } else if response.length >= 0 { response.length } else { 8192 }}; body.flags |= .noslices
 	mut success := false
 	defer { if !success { unsafe { body.free() } } }
@@ -401,6 +413,7 @@ fn data_http_body(mut stream DataHTTPStream, response DataHTTPResponse, mut head
 			}
 			if body.len == data_http_limit { return none }
 			body << byte
+			if received != unsafe { nil } { C.ios_store_pointer(received, u64(body.len)) }
 		}
 		success = true; return body
 	}
@@ -416,7 +429,10 @@ fn data_http_body(mut stream DataHTTPStream, response DataHTTPResponse, mut head
 			}
 		}
 		if count > data_http_limit - body.len { return none }
-		for _ in 0 .. count { body << stream.read() or { return none } }
+		for _ in 0 .. count {
+			body << stream.read() or { return none }
+			if received != unsafe { nil } { C.ios_store_pointer(received, u64(body.len)) }
+		}
 		if !response.chunked { break }
 		if stream.read() or { return none } != `\r` || stream.read() or { return none } != `\n` { return none }
 	}

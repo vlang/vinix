@@ -33,6 +33,10 @@ struct HTTPTransportResponseHead {
 }
 type HTTPTransportResponsePolicy = fn (voidptr, HTTPTransportResponseHead, i64) bool
 
+// Failure stages preserve what is known without inventing a DNS, socket or
+// certificate diagnosis. Cancellation and deadline expiry take precedence.
+enum HTTPTransportFailure { none invalid_request cancelled timed_out connection tls request response policy body }
+
 fn (head HTTPTransportResponseHead) field(name string) ?string {
 	for field in head.fields { if data_http_equal(field.name, name) { return field.value } }
 	return none
@@ -129,19 +133,40 @@ fn http_transport_exchange_control(text string, input HTTPTransportRequest, ca_f
 
 fn http_transport_exchange_policy(text string, input HTTPTransportRequest, ca_file string, timeout i64, cancel &u64,
 	context voidptr, policy HTTPTransportResponsePolicy) ?HTTPTransportResult {
+	return http_transport_exchange_observed(text, input, ca_file, timeout, cancel, context, policy, unsafe { nil }, unsafe { nil }, unsafe { nil })
+}
+
+fn http_transport_exchange_observed(text string, input HTTPTransportRequest, ca_file string, timeout i64, cancel &u64,
+	context voidptr, policy HTTPTransportResponsePolicy, failure &HTTPTransportFailure, sent &u64, received &u64) ?HTTPTransportResult {
+	mut stage := HTTPTransportFailure.invalid_request
+	mut deadline := i64(0)
+	defer {
+		if failure != unsafe { nil } {
+			unsafe { *failure = if stage == .none { HTTPTransportFailure.none }
+				else if data_http_cancelled(cancel) { HTTPTransportFailure.cancelled }
+				else if deadline != 0 && time.sys_mono_now() >= deadline { HTTPTransportFailure.timed_out }
+				else { stage } }
+		}
+	}
 	if data_http_cancelled(cancel) { return none }
 	url := data_http_url(text) or { return none }
 	wire := http_transport_wire(url, input) or { return none }
 	defer { unsafe { wire.free() } }
 	if timeout <= 0 || timeout > 24 * time.hour { return none }
-	deadline := time.sys_mono_now() + timeout
+	deadline = time.sys_mono_now() + timeout
+	stage = .connection
 	mut stream := &DataHTTPStream{fd: data_http_connect_control(url, deadline, cancel), deadline: deadline, cancel: cancel}
 	defer { stream.close(); unsafe { free(stream) } }
-	if stream.fd < 0 || data_http_cancelled(cancel) || (url.tls && !stream.secure(url.host, ca_file)) || !stream.send(wire) { return none }
-	if input.body.len != 0 && !stream.send(unsafe { tos(input.body.data, input.body.len) }) { return none }
+	if stream.fd < 0 || data_http_cancelled(cancel) { return none }
+	stage = .tls
+	if url.tls && !stream.secure(url.host, ca_file) { return none }
+	stage = .request
+	if !stream.send(wire) { return none }
+	if input.body.len != 0 && !stream.send_counted(unsafe { tos(input.body.data, input.body.len) }, sent) { return none }
 	mut storage := []u8{cap: data_http_headers}; storage.flags |= .noslices
 	defer { unsafe { storage.free() } }
 	mut start := 0
+	stage = .response
 	mut response := stream.headers(mut storage) or { return none }
 	for response.status in [100, 102, 103] {
 		start = storage.len
@@ -172,12 +197,15 @@ fn http_transport_exchange_policy(text string, input HTTPTransportRequest, ca_fi
 			value: data_http_trim(http_borrow(line, colon + 1, line.len)).clone()}
 		offset = line_end + 2
 	}
+	stage = .policy
 	if policy != unsafe { nil } && !policy(context, HTTPTransportResponseHead{status: response.status, fields: fields}, deadline) { return none }
 	// A deferred decision cannot extend the exchange deadline or revive a
 	// cancelled load, even when all body bytes were coalesced with the headers.
 	if time.sys_mono_now() >= deadline || data_http_cancelled(cancel) { return none }
-	body := data_http_body(mut stream, response, mut storage, input.method == 'HEAD') or { return none }
+	stage = .body
+	body := data_http_body_counted(mut stream, response, mut storage, input.method == 'HEAD', received) or { return none }
 	if data_http_cancelled(cancel) { unsafe { body.free() }; return none }
 	success = true
+	stage = .none
 	return HTTPTransportResult{status: response.status, fields: fields, body: body}
 }

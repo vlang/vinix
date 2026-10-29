@@ -230,11 +230,12 @@ fn test_session_data_task_rejections() {
 			'custom' { 'data task custom request subclasses are not implemented' }
 			'retired-session' { 'URL session requires live base session storage' }
 			'exhausted' { 'URL session task identifiers exhausted' }
-			'resume', 'suspend' { 'URL session task transfers, cancellation, delegate delivery, progress and coding are not implemented' }
+			'resume' { 'URL session resume requires a live transfer and dispatch runtime' }
+			'suspend' { 'URL session task suspension, task conversion, progress and coding are not implemented' }
 			else { 'data task requires an initialized URL request' }
 		}
 		assert output.contains('iOS: ' + reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output
-		if mode in ['resume', 'suspend']! { assert output.contains('-[NSURLSessionDataTask ${mode}]'), output }
+		if mode == 'suspend' { assert output.contains('-[NSURLSessionDataTask suspend]'), output }
 	}
 	assert ios_runtime.live == 0
 	objc_stop()

@@ -27,7 +27,7 @@ fn url_session_task_require_class(cls u64) {
 fn url_session_task_metadata() {
 	// Measured public property backing fields in the otherwise opaque 720-byte
 	// CFNetwork record. Base tasks remain inert; session-created tasks start
-	// suspended and own request snapshots. Transfers require a backend.
+	// suspended and can resume using the bounded HTTP(S) transport profile.
 	mut cls := ios_runtime.classes[ios_runtime.names['NSURLSessionTask']] or { panic('iOS: missing task class') }
 	for i, name in ['_priorityAPIStorage', '_taskIdentifier', '_taskDescription', '_originalRequest',
 		'_currentRequest', '_response', '_countOfBytesClientExpectsToSend', '_countOfBytesClientExpectsToReceive',
@@ -47,7 +47,7 @@ fn url_session_task_types(name string, meta bool, selector string) ?string {
 		'init', 'copy', 'taskDescription', 'originalRequest', 'currentRequest', 'response', 'error', 'delegate' { '@16@0:8' }
 		'copyWithZone:' { '@24@0:8^{_NSZone=}16' }
 		'setTaskDescription:', 'setDelegate:' { 'v24@0:8@16' }
-		'cancel' { 'v16@0:8' }
+		'cancel', 'resume' { 'v16@0:8' }
 		'taskIdentifier' { 'Q16@0:8' }
 		'state', 'countOfBytesClientExpectsToSend', 'countOfBytesClientExpectsToReceive',
 		'countOfBytesSent', 'countOfBytesReceived', 'countOfBytesExpectedToSend', 'countOfBytesExpectedToReceive' { 'q16@0:8' }
@@ -59,7 +59,7 @@ fn url_session_task_types(name string, meta bool, selector string) ?string {
 }
 
 fn url_session_task_unsupported(selector string) bool {
-	return selector in ['resume', 'suspend', 'cancelByProducingResumeData:', 'progress',
+	return selector in ['suspend', 'cancelByProducingResumeData:', 'progress',
 		'mutableCopy', 'mutableCopyWithZone:', 'initWithCoder:', 'encodeWithCoder:', 'supportsSecureCoding',
 		'setCountOfBytesSent:', 'setCountOfBytesReceived:', 'setCountOfBytesExpectedToSend:', 'setCountOfBytesExpectedToReceive:']!
 }
@@ -78,11 +78,12 @@ fn url_session_task_dispatch(object u64, selector string, mut frame RegisterFram
 	if url_session_task_unsupported(selector) {
 		name := ctext(u64(objc_class_name(if meta { object } else { read64(object) })))
 		scope := if meta { '+' } else { '-' }
-		panic('iOS: URL session task transfers, cancellation, delegate delivery, progress and coding are not implemented: ${scope}[${name} ${selector}]')
+		panic('iOS: URL session task suspension, task conversion, progress and coding are not implemented: ${scope}[${name} ${selector}]')
 	}
 	if url_session_task_types('NSURLSessionTask', meta, selector) == none { return false }
 	if meta { frame.x[0] = objc_new(object); return true }
 	if selector == 'cancel' { url_session_task_cancel(object); return true }
+	if selector == 'resume' { url_session_task_resume(object); return true }
 	// Copy can invoke application code. Keep it, and retirement, outside the lock.
 	mut copied := u64(0)
 	if selector == 'setTaskDescription:' && frame.x[2] != 0 {
@@ -115,6 +116,10 @@ fn url_session_task_dispatch(object u64, selector string, mut frame RegisterFram
 		}
 		'countOfBytesClientExpectsToSend' { frame.x[0] = read64(object + 168) }
 		'countOfBytesClientExpectsToReceive' { frame.x[0] = read64(object + 176) }
+		'countOfBytesReceived' { frame.x[0] = C.ios_load_pointer(unsafe { &u64(object + 184) }) }
+		'countOfBytesSent' { frame.x[0] = C.ios_load_pointer(unsafe { &u64(object + 208) }) }
+		'countOfBytesExpectedToSend' { frame.x[0] = read64(object + 216) }
+		'countOfBytesExpectedToReceive' { frame.x[0] = read64(object + 224) }
 		'setCountOfBytesClientExpectsToSend:' { unsafe { *(&u64(object + 168)) = frame.x[2] } }
 		'setCountOfBytesClientExpectsToReceive:' { unsafe { *(&u64(object + 176)) = frame.x[2] } }
 		'priority' { frame.q[0] = u64(bits.f32_bits(unsafe { *(&f32(object + 116)) })); frame.q[1] = 0 }
@@ -134,7 +139,7 @@ fn url_session_task_dispatch(object u64, selector string, mut frame RegisterFram
 
 fn url_session_task_dispose(object u64, header &ObjHeader) {
 	if !header.url_session_task_owned { return }
-	if read64(object + 232) == 2 || header.url_session_task_callback_thread != 0 {
+	if read64(object + 232) == 2 || header.url_session_task_callback_thread != 0 || header.url_session_transfer != unsafe { nil } {
 		panic('iOS: cannot destruct pending URL session completion storage')
 	}
 	// Generic fields own the description, requests, session, task delegate and result, including

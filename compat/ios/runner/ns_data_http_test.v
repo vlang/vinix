@@ -1504,3 +1504,265 @@ fn test_session_adapter_response_bounds() {
 	unsafe { fields.free() }
 	println('IOS-SESSION-ADAPTER-BOUNDS: invalid final status, fields, controls, decoded size and count reject without partial responses PASS')
 }
+
+struct SessionTransferProbe {
+	queue u64
+	task_delegate u64
+	deferred bool
+	cancel_data bool
+	constructor_cancel bool
+mut:
+	task u64
+	events [8]u64
+	count u64
+	finished u64
+	response_seen u64
+	pending_block u64
+	bad u64
+	error_code i64
+	status u64
+	data [16]u8
+	length int
+}
+__global session_transfer_probe = unsafe { &SessionTransferProbe(nil) }
+type SessionTransferResume = fn (u64, &char)
+fn session_transfer_event(delegate u64, kind u64) {
+	mut p := session_transfer_probe
+	if p.count >= 8 || ns_operation_queue_current() != p.queue { p.bad = 1; return }
+	p.events[int(p.count)] = kind + if delegate == p.task_delegate { u64(10) } else { u64(0) }
+	p.count++
+}
+fn session_transfer_response(delegate u64, _ &char, _session u64, task u64, response u64, block u64) {
+	session_transfer_event(delegate, 1)
+	mut p := session_transfer_probe
+	api := DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
+	if api.msg(task, c'response', 0) != response || api.msg(task, c'state', 0) !in [u64(0), 2]! { p.bad = 1 }
+	p.status = api.msg(response, c'statusCode', 0)
+	if p.deferred { p.pending_block = block_copy(block) }
+	else { unsafe { TaskHTTPDisposition(voidptr(read64(block + 16)))(block, 1) } }
+	C.__atomic_store_n(unsafe { &p.response_seen }, 1, 5)
+}
+fn session_transfer_data(delegate u64, _ &char, _session u64, task u64, data u64) {
+	session_transfer_event(delegate, 2)
+	mut p := session_transfer_probe
+	length := int(data_length(data))
+	if length > p.data.len - p.length { p.bad = 1; return }
+	unsafe { C.memcpy(&p.data[p.length], voidptr(data_pointer(data)), usize(length)) }
+	p.length += length
+	if p.cancel_data { url_session_task_cancel(task) }
+}
+fn session_transfer_complete(delegate u64, _ &char, _session u64, task u64, error_object u64) {
+	session_transfer_event(delegate, 3)
+	mut p := session_transfer_probe
+	api := DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
+	p.error_code = if error_object == 0 { i64(0) } else { i64(api.msg(error_object, c'code', 0)) }
+	stored := api.msg(task, c'error', 0)
+	if api.msg(task, c'state', 0) != 3 || stored != error_object { p.bad = 1 }
+	// Reentrant resume/cancel after terminal publication must be harmless.
+	api.msg(task, c'resume', 0); api.msg(task, c'cancel', 0)
+	C.__atomic_store_n(unsafe { &p.finished }, 1, 5)
+}
+fn session_transfer_classes() (u64, u64) {
+	mut classes := [2]u64{}
+	for i, name in [c'VinixSessionTransferAll', c'VinixSessionTransferPartial']! {
+		cls := objc_allocate_class(ios_runtime.names['NSObject'], name, 0)
+		assert objc_add_method(cls, u64(c'URLSession:task:didCompleteWithError:'), u64(unsafe { voidptr(session_transfer_complete) }), c'v40@0:8@16@24@32');
+		if i == 0 {
+			assert objc_add_method(cls, u64(c'URLSession:dataTask:didReceiveResponse:completionHandler:'), u64(unsafe { voidptr(session_transfer_response) }), c'v48@0:8@16@24@32@?40');
+			assert objc_add_method(cls, u64(c'URLSession:dataTask:didReceiveData:'), u64(unsafe { voidptr(session_transfer_data) }), c'v40@0:8@16@24@32');
+		}
+		objc_register_class(cls); classes[i] = cls
+	}
+	return classes[0], classes[1]
+}
+fn session_transfer_barrier(_ voidptr) {}
+fn session_transfer_repeat(task u64, cancel bool) {
+	pool := objc_pool_push()
+	for _ in 0 .. 32 { if cancel { url_session_task_cancel(task) } else { url_session_task_resume(task) } }
+	objc_pool_pop(pool)
+}
+fn session_transfer_data_constructor(object u64, _ &char) u64 {
+	p := session_transfer_probe
+	if p != unsafe { nil } && p.constructor_cancel && p.task != 0 { url_session_task_cancel(p.task) }
+	return object
+}
+fn session_transfer_server(listener DataHTTPListener, mode string, tls bool, reply string) bool {
+	if mode.starts_with('post') { return http_transport_serve(listener, 'POST', 'a\x00\xffz', reply, tls) }
+	return data_http_serve(listener, [reply], ['/'], tls, mode == 'timeout')
+}
+fn session_transfer_inputs(api DataHTTPApi, address string, post bool) (u64, u64) {
+	if post { return session_adapter_request(api, address) }
+	return api.msg(api.cls(c'NSURLSessionConfiguration'), c'defaultSessionConfiguration', 0),
+		api.msg(api.cls(c'NSMutableURLRequest'), c'requestWithURL:', api.url(address))
+}
+fn session_transfer_wait(p &SessionTransferProbe, task u64, queue u64, no_delegate bool) {
+	api := DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
+	deadline := time.sys_mono_now() + 8 * time.second
+	for {
+		complete := if no_delegate { api.msg(task, c'state', 0) == 3 } else { C.__atomic_load_n(unsafe { &p.finished }, 5) != 0 }
+		if complete { break }
+		if time.sys_mono_now() >= deadline { eprintln('IOS-SESSION-TRANSFER: completion timeout'); C._exit(124) }
+		time.sleep(time.millisecond)
+	}
+	api.msg(queue, c'waitUntilAllOperationsAreFinished', 0)
+	darwin_dispatch_sync_f(ns_operation_queue_state(queue).backing, unsafe { nil }, session_transfer_barrier)
+}
+
+fn test_session_transfer_delegate_lifecycle() {
+	api := DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
+	for _ in 0 .. 2 {
+		objc_start(); system_data_start()!
+		all, partial := session_transfer_classes()
+		assert objc_add_method(api.cls(c'NSData'), u64(c'.cxx_construct'), u64(unsafe { voidptr(session_transfer_data_constructor) }), c'@16@0:8');
+		assert objc_add_method(api.cls(c'NSError'), u64(c'.cxx_construct'), u64(unsafe { voidptr(session_transfer_data_constructor) }), c'@16@0:8');
+		for mode in ['session', 'task', 'partial', 'deferred-allow', 'deferred-deny', 'cancel-pending', 'cancel-data', 'no-delegate', 'tls', 'untrusted', 'timeout', 'malformed', 'post', 'post-malformed', 'data-constructor-cancel', 'error-constructor-cancel'] {
+			pool := api.pool()
+			listener := data_http_listener()
+			tls := mode in ['tls', 'untrusted', 'error-constructor-cancel']
+			reply := if mode in ['malformed', 'post-malformed'] { 'HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nx' }
+				else { 'HTTP/1.1 500 Error\r\nContent-Length: 4\r\nContent-Type: application/octet-stream\r\n\r\na\x00\xffz' }
+			server := spawn session_transfer_server(listener, mode, tls, reply)
+			queue := api.msg(api.cls(c'NSOperationQueue'), c'new', 0)
+			session_delegate := if mode == 'no-delegate' { u64(0) } else { objc_new(all) }
+			task_delegate := if mode in ['session', 'no-delegate'] { u64(0) } else { objc_new(if mode == 'partial' { partial } else { all }) }
+			mut p := unsafe { &SessionTransferProbe(C.calloc(1, sizeof(SessionTransferProbe))) }
+			unsafe { *p = SessionTransferProbe{queue: queue, task_delegate: task_delegate,
+				deferred: mode in ['deferred-allow', 'deferred-deny', 'cancel-pending'], cancel_data: mode == 'cancel-data',
+				constructor_cancel: mode in ['data-constructor-cancel', 'error-constructor-cancel']} }
+			session_transfer_probe = p
+			address := '${if tls { 'https' } else { 'http' }}://localhost:${listener.port}${if mode.starts_with('post') { '/submit?q=%00' } else { '/' }}'
+			config, request := session_transfer_inputs(api, address, mode.starts_with('post'))
+			session_adapter_configure(api, config, request)
+			if mode == 'timeout' {
+				obj_header(request).request.timeout = 0.02
+				unsafe { *(&f64(config + 176)) = 0.02 }
+			}
+			session := unsafe { TaskHTTPNative5(voidptr(api.send))(api.cls(c'NSURLSession'), u64(c'sessionWithConfiguration:delegate:delegateQueue:'), config, session_delegate, queue) }
+			task := api.msg(session, c'dataTaskWithRequest:', request)
+			p.task = task
+			api.msg(task, c'setDelegate:', task_delegate)
+			imp := objc_method_implementation(api.cls(c'NSURLSessionDataTask'), u64(c'resume'))
+			session_worker_require(imp != 0 && ctext(u64(objc_method_types(objc_instance_method(api.cls(c'NSURLSessionDataTask'), u64(c'resume'))))) == 'v16@0:8', 'resume metadata missing')
+			if tls { url_session_task_resume_with_ca(task, if mode in ['untrusted', 'error-constructor-cancel'] { '' } else { os.getenv('VINIX_IOS_HTTP_CERT') }) }
+			else { unsafe { SessionTransferResume(voidptr(imp))(task, c'resume') } }
+			// Repeat public resume while work is active, and mutate the original
+			// request after capture. No second transfer or changed wire URL occurs.
+			api.msg(task, c'resume', 0)
+			api.msg(request, c'setURL:', api.url('https://example.test/changed'))
+			api.msg(api.msg(task, c'currentRequest', 0), c'setURL:', api.url('https://example.test/current-changed'))
+			mut callers := []thread{cap: 8}; callers.flags |= .noslices
+			for _ in 0 .. 8 { callers << spawn session_transfer_repeat(task, false) }
+			callers.wait()
+			unsafe { callers.free() }
+			if p.deferred {
+				session_worker_wait(unsafe { &p.response_seen }, 1)
+				if mode == 'cancel-pending' {
+					mut cancellers := []thread{cap: 8}; cancellers.flags |= .noslices
+					for _ in 0 .. 8 { cancellers << spawn session_transfer_repeat(task, true) }
+					cancellers.wait()
+					unsafe { cancellers.free() }
+					deadline := time.sys_mono_now() + 3 * time.second
+					for {
+						C.ios_objc_initialize_lock()
+						work := url_session_task_state(task).url_session_transfer
+						done := work != unsafe { nil } && work.network_done
+						C.ios_objc_initialize_unlock()
+						if done { break }
+						if time.sys_mono_now() >= deadline { eprintln('IOS-SESSION-TRANSFER: cancelled worker did not retire'); C._exit(124) }
+						time.sleep(time.millisecond)
+					}
+					session_worker_require(api.msg(task, c'state', 0) == 2 && p.finished == 0 && p.length == 0, 'pending handler cancellation completed prematurely')
+				}
+				unsafe { TaskHTTPDisposition(voidptr(read64(p.pending_block + 16)))(p.pending_block, if mode == 'deferred-deny' { u64(0) } else { u64(1) }) }
+				// Duplicate invocations are harmless after terminal publication too.
+			}
+			session_transfer_wait(p, task, queue, mode == 'no-delegate')
+			served := server.wait()
+			if mode !in ['untrusted', 'timeout', 'error-constructor-cancel'] { session_worker_require(served, 'loopback server failed') }
+			expected_error := match mode { 'deferred-deny', 'cancel-pending', 'cancel-data', 'data-constructor-cancel', 'error-constructor-cancel' { i64(-999) } 'untrusted' { i64(-1200) } 'timeout' { i64(-1001) } 'malformed', 'post-malformed' { i64(-1) } else { i64(0) } }
+			session_worker_require(p.bad == 0 && p.error_code == expected_error, 'delegate queue/state/error mismatch in ' + mode)
+			if mode != 'no-delegate' {
+				expected_length := if expected_error == 0 || mode == 'cancel-data' { 4 } else { 0 }
+				session_worker_require(p.length == expected_length, 'body delivery mismatch in ' + mode)
+				if p.length != 0 { session_worker_require(C.memcmp(&p.data[0], c'a\x00\xffz', 4) == 0, 'binary data changed') }
+				if expected_error == 0 || mode == 'cancel-data' {
+					session_worker_require(p.status == 500 && p.count == 3, 'response/data/complete order missing')
+					session_worker_require(p.events == if mode == 'session' { [u64(1), 2, 3, 0, 0, 0, 0, 0]! }
+						else if mode == 'partial' { [u64(1), 2, 13, 0, 0, 0, 0, 0]! } else { [u64(11), 12, 13, 0, 0, 0, 0, 0]! }, 'per-selector delegate fallback/order changed')
+				}
+			}
+			if expected_error == 0 || mode == 'cancel-data' {
+				session_worker_require(api.msg(task, c'countOfBytesReceived', 0) == 4 && api.msg(task, c'countOfBytesExpectedToReceive', 0) == 4, 'receive counters changed')
+			}
+			session_worker_require(api.msg(task, c'countOfBytesSent', 0) == if mode.starts_with('post') { u64(4) } else { u64(0) }, 'send counters changed')
+			if mode in ['malformed', 'post-malformed'] { session_worker_require(api.msg(task, c'countOfBytesReceived', 0) == 1, 'partial received bytes were erased by a framing error') }
+			if mode == 'data-constructor-cancel' { session_worker_require(api.msg(task, c'countOfBytesReceived', 0) == 4, 'received bytes were erased by callback suppression') }
+			if p.pending_block != 0 {
+				unsafe { TaskHTTPDisposition(voidptr(read64(p.pending_block + 16)))(p.pending_block, 0) }
+				block_release(p.pending_block)
+			}
+			session_worker_require(url_session_task_state(task).url_session_transfer == unsafe { nil }, 'terminal owner retained task context')
+			session_worker_require(api.msg(task, c'delegate', 0) == 0, 'task delegate not retired')
+			objc_release(task_delegate); objc_release(session_delegate); objc_release(queue)
+			api.drain(pool)
+			session_worker_require(ios_runtime.live == 0 && ios_runtime.block_refs.len == 0, 'objects or blocks left after completed task')
+			session_transfer_probe = unsafe { nil }
+			unsafe { address.free(); C.free(p) }
+		}
+		objc_stop(); system_data_stop()
+	}
+	println('IOS-SESSION-TRANSFER: public/typed resume, binary HTTP/TLS 500 loads, delegate fallback/order, deferred allow/deny, cancel-pending worker retirement, cancel in data, nil delegate, trust/timeouts/errors and two lifetimes PASS')
+}
+
+fn test_session_transfer_shutdown_pending() {
+	api := DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
+	for mode in ['queued-response', 'pending-handler', 'pending-terminal'] {
+		objc_start(); system_data_start()!
+		pool := api.pool()
+		all, _ := session_transfer_classes()
+		queue := api.msg(api.cls(c'NSOperationQueue'), c'new', 0)
+		delegate := objc_new(all)
+		mut p := unsafe { &SessionTransferProbe(C.calloc(1, sizeof(SessionTransferProbe))) }
+		unsafe { *p = SessionTransferProbe{queue: queue, deferred: true} }
+		session_transfer_probe = p
+		listener := data_http_listener()
+		server := spawn data_http_serve(listener, ['HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nping'], ['/'], false, false)
+		address := 'http://localhost:${listener.port}/'
+		config, request := session_transfer_inputs(api, address, false)
+		session_adapter_configure(api, config, request)
+		session := unsafe { TaskHTTPNative5(voidptr(api.send))(api.cls(c'NSURLSession'), u64(c'sessionWithConfiguration:delegate:delegateQueue:'), config, delegate, queue) }
+		task := api.msg(session, c'dataTaskWithRequest:', request)
+		mut weak_task := u64(0); mut weak_session := u64(0); mut weak_queue := u64(0)
+		objc_store_weak(unsafe { &weak_task }, task); objc_store_weak(unsafe { &weak_session }, session); objc_store_weak(unsafe { &weak_queue }, queue)
+		if mode == 'queued-response' { api.msg(queue, c'setSuspended:', 1) }
+		api.msg(task, c'resume', 0)
+		if mode != 'queued-response' {
+			session_worker_wait(unsafe { &p.response_seen }, 1)
+			api.msg(queue, c'waitUntilAllOperationsAreFinished', 0)
+			darwin_dispatch_sync_f(ns_operation_queue_state(queue).backing, unsafe { nil }, session_transfer_barrier)
+			if mode == 'pending-terminal' {
+				api.msg(queue, c'setSuspended:', 1)
+				unsafe { TaskHTTPDisposition(voidptr(read64(p.pending_block + 16)))(p.pending_block, 1) }
+			}
+		}
+		if mode != 'pending-handler' {
+			deadline := time.sys_mono_now() + 4 * time.second
+			for api.msg(queue, c'operationCount', 0) == 0 {
+				if time.sys_mono_now() >= deadline { eprintln('IOS-SESSION-TRANSFER: queued shutdown operation missing'); C._exit(124) }
+				time.sleep(time.millisecond)
+			}
+		}
+		if p.pending_block != 0 { block_release(p.pending_block); p.pending_block = 0 }
+		objc_release(delegate); objc_release(queue)
+		api.drain(pool)
+		objc_stop()
+		session_worker_require(server.wait(), 'shutdown server failed')
+		session_worker_require(p.finished == 0 && p.length == 0 && p.bad == 0, 'shutdown delivered a discarded terminal callback')
+		session_worker_require(weak_task == 0 && weak_session == 0 && weak_queue == 0 && ios_runtime.live == 0
+			&& ios_runtime.block_refs.len == 0 && url_session_workers == unsafe { nil }, 'shutdown retained a transfer, observation, block or object')
+		for slot in [unsafe { &weak_task }, &weak_session, &weak_queue]! { objc_destroy_weak(slot) }
+		system_data_stop(); session_transfer_probe = unsafe { nil }
+		unsafe { address.free(); C.free(p) }
+	}
+	println('IOS-SESSION-TRANSFER-SHUTDOWN: queued response, copied pending handler and queued terminal work cancel/join, disconnect observations and retire without callbacks PASS')
+}

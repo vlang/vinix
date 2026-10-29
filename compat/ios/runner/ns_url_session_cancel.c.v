@@ -3,8 +3,8 @@ module main
 
 // A never-resumed task has no socket or transfer worker to cancel. Its one
 // pending completion is an owned operation, independent of the caller's pool.
-// Network-task cancellation will use the same terminal publication/delivery
-// contract when the transfer lifecycle is connected.
+// Running tasks instead signal their owned transfer worker. Both paths publish
+// terminal state before completion and retire task delegates after delivery.
 struct URLSessionCancellation {
 	task u64
 	error_object u64
@@ -90,6 +90,15 @@ fn url_session_task_cancel(object u64) {
 	}
 	state := read64(object + 232)
 	if state in [u64(2), 3]! { C.ios_objc_initialize_unlock(); return }
+	if header.url_session_transfer != unsafe { nil } {
+		mut transfer := header.url_session_transfer
+		transfer.cancelled = true
+		identity := transfer.worker
+		write64(object + 232, 2)
+		C.ios_objc_initialize_unlock()
+		url_session_workers_cancel(identity)
+		return
+	}
 	if state != 1 { panic('iOS: cancellation of a running URL session transfer is not implemented') }
 	if dispatch_runtime == unsafe { nil } { panic('iOS: URL session cancellation requires the dispatch runtime') }
 	// Reserve the single completion before constructors can reenter or another

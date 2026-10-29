@@ -172,7 +172,8 @@ fn test_session_task_runtime() {
 			task_base_cases(api); assert ios_runtime.live == 0
 			pool := api.pool(); object := api.message(cls, c'new', 0)
 			assert objc_responds(object, c'cancel') && ctext(u64(objc_method_types(objc_instance_method(cls, u64(c'cancel'))))) == 'v16@0:8'
-			for selector in [c'resume', c'suspend', c'cancelByProducingResumeData:', c'progress', c'mutableCopy', c'mutableCopyWithZone:', c'initWithCoder:', c'encodeWithCoder:', c'setCountOfBytesSent:', c'setCountOfBytesReceived:', c'setCountOfBytesExpectedToSend:', c'setCountOfBytesExpectedToReceive:']! {
+			assert objc_responds(object, c'resume') && ctext(u64(objc_method_types(objc_instance_method(cls, u64(c'resume'))))) == 'v16@0:8'
+			for selector in [c'suspend', c'cancelByProducingResumeData:', c'progress', c'mutableCopy', c'mutableCopyWithZone:', c'initWithCoder:', c'encodeWithCoder:', c'setCountOfBytesSent:', c'setCountOfBytesReceived:', c'setCountOfBytesExpectedToSend:', c'setCountOfBytesExpectedToReceive:']! {
 				assert !objc_responds(object, selector) && objc_instance_method(cls, u64(selector)) == 0
 			}
 			left := api.string(c'left task'); right := api.string(c'right task')
@@ -240,12 +241,13 @@ fn test_session_task_rejections() {
 		C.close(fds[0]); mut status := i32(0); assert C.ios_waitpid(pid, &status, 0) == pid && status == 256
 		output := unsafe { tos(&bytes[0], length) }
 		reason := match mode {
+			'resume' { 'resume requires a session-created data task' }
 			'cancel' { 'cancellation requires a session-created data task' }
 			'description' { 'task description must be a string' }
 			'bad-copy' { 'task description copy must be a string' }
 			'subclass', 'caller-subclass' { 'custom URL session task subclass construction is not implemented' }
 			'spoof' { 'URL session task requires live base task storage' }
-			else { 'URL session task transfers, cancellation, delegate delivery, progress and coding are not implemented' }
+			else { 'URL session task suspension, task conversion, progress and coding are not implemented' }
 		}
 		assert output.contains('iOS: ' + reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output
 		if url_session_task_unsupported(mode) { assert output.contains('-[NSURLSessionTask ${mode}]'), output }

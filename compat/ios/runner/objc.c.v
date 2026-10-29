@@ -214,6 +214,7 @@ mut:
 	url_session_configuration_default_protocols bool
 	url_session_task_owned bool
 	url_session_task_callback_thread u64
+	url_session_transfer &URLSessionTransfer = unsafe { nil }
 	sort_descriptor_owned bool
 	sort_descriptor_initialized bool
 	sort_descriptor_initializing bool
@@ -1128,6 +1129,7 @@ fn objc_stop() {
 	nw_stop()
 	reachability_stop()
 	dispatch_stop()
+	url_session_transfers_stop()
 	dispatch_sources_stop()
 	dispatch_specific_stop()
 	dispatch_group_stop()

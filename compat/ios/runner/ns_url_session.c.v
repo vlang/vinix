@@ -4,7 +4,8 @@ module main
 // The public base class is a 160-byte NSObject. Its Foundation/CFNetwork
 // implementation state remains opaque. A base session has no configuration
 // or delegate. Configured factories store settings and delegate/queue ownership;
-// starting loads and lifecycle callbacks still require a transport backend.
+// data tasks can resume using the bounded HTTP(S) profile; full session policy
+// and invalidation callbacks remain unsupported.
 // Owned references follow the allocation, including after an isa replacement.
 fn url_session_family(cls u64) bool {
 	mut current := cls
@@ -111,7 +112,7 @@ fn url_session_data_task(object u64, request u64) u64 {
 	// Request copies can allocate and run constructors. Do not hold the session
 	// lock across them. Each property owns an independent snapshot; an unresumed
 	// task is owned only by its caller/autorelease pool, so no session/task cycle
-	// is introduced. Starting a transfer still requires a separate backend.
+	// is introduced. Resume acquires a separate owned transfer context.
 	original := request_copy(request, mutable_request)
 	current := request_copy(original, true)
 	objc_release(request)
