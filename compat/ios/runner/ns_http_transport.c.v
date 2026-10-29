@@ -104,14 +104,21 @@ fn http_transport_wire(url DataHTTPURL, input HTTPTransportRequest) ?string {
 }
 
 fn http_transport_exchange(text string, input HTTPTransportRequest, ca_file string, timeout i64) ?HTTPTransportResult {
+	return http_transport_exchange_control(text, input, ca_file, timeout, unsafe { nil })
+}
+
+// The caller keeps the atomic cancellation cell alive until return. Cancelled
+// reads remain failures, including close-delimited and partially cached bodies.
+fn http_transport_exchange_control(text string, input HTTPTransportRequest, ca_file string, timeout i64, cancel &u64) ?HTTPTransportResult {
+	if data_http_cancelled(cancel) { return none }
 	url := data_http_url(text) or { return none }
 	wire := http_transport_wire(url, input) or { return none }
 	defer { unsafe { wire.free() } }
 	if timeout <= 0 || timeout > 24 * time.hour { return none }
 	deadline := time.sys_mono_now() + timeout
-	mut stream := &DataHTTPStream{fd: data_http_connect(url, deadline), deadline: deadline}
+	mut stream := &DataHTTPStream{fd: data_http_connect_control(url, deadline, cancel), deadline: deadline, cancel: cancel}
 	defer { stream.close(); unsafe { free(stream) } }
-	if stream.fd < 0 || (url.tls && !stream.secure(url.host, ca_file)) || !stream.send(wire) { return none }
+	if stream.fd < 0 || data_http_cancelled(cancel) || (url.tls && !stream.secure(url.host, ca_file)) || !stream.send(wire) { return none }
 	if input.body.len != 0 && !stream.send(unsafe { tos(input.body.data, input.body.len) }) { return none }
 	mut storage := []u8{cap: data_http_headers}; storage.flags |= .noslices
 	defer { unsafe { storage.free() } }
@@ -147,6 +154,7 @@ fn http_transport_exchange(text string, input HTTPTransportRequest, ca_file stri
 		offset = line_end + 2
 	}
 	body := data_http_body(mut stream, response, mut storage, input.method == 'HEAD') or { return none }
+	if data_http_cancelled(cancel) { unsafe { body.free() }; return none }
 	success = true
 	return HTTPTransportResult{status: response.status, fields: fields, body: body}
 }

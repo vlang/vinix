@@ -49,11 +49,11 @@ pub fn C.mbedtls_x509_crt_init(&C.mbedtls_x509_crt)
 pub fn C.mbedtls_x509_crt_parse_file(&C.mbedtls_x509_crt, &char) int
 pub fn C.mbedtls_x509_crt_free(&C.mbedtls_x509_crt)
 pub fn C.mbedtls_ctr_drbg_init(&C.mbedtls_ctr_drbg_context)
-pub fn C.mbedtls_ctr_drbg_seed(&C.mbedtls_ctr_drbg_context, fn (voidptr, &u8, usize) int, voidptr, &u8, usize) int
+pub fn C.mbedtls_ctr_drbg_seed(&C.mbedtls_ctr_drbg_context, fn (voidptr, &u8, usize) i32, voidptr, &u8, usize) int
 pub fn C.mbedtls_ctr_drbg_random(voidptr, &u8, usize) int
 pub fn C.mbedtls_ctr_drbg_free(&C.mbedtls_ctr_drbg_context)
 pub fn C.mbedtls_entropy_init(&C.mbedtls_entropy_context)
-pub fn C.mbedtls_entropy_func(voidptr, &u8, usize) int
+pub fn C.mbedtls_entropy_func(voidptr, &u8, usize) i32
 pub fn C.mbedtls_entropy_free(&C.mbedtls_entropy_context)
 pub fn C.mbedtls_pk_init(&C.mbedtls_pk_context)
 pub fn C.mbedtls_pk_parse_keyfile(&C.mbedtls_pk_context, &char, &char, fn (voidptr, &u8, usize) int, voidptr) int

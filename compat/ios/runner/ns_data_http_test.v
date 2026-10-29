@@ -45,9 +45,9 @@ fn data_http_listener() DataHTTPListener {
 	mut address := [16]u8{}
 	$if macos { address[0] = 16; address[1] = u8(C.AF_INET) } $else { address[0] = u8(C.AF_INET) }
 	address[4] = 127; address[7] = 1
-	assert C.bind(fd, &address[0], 16) == 0 && C.listen(fd, 8) == 0;
+	assert C.bind(fd, unsafe { voidptr(&address[0]) }, 16) == 0 && C.listen(fd, 8) == 0;
 	mut size := u32(16)
-	assert C.getsockname(fd, &address[0], &size) == 0;
+	assert C.getsockname(fd, unsafe { voidptr(&address[0]) }, &size) == 0;
 	assert C.fcntl(fd, C.F_SETFL, usize(C.O_NONBLOCK)) == 0;
 	return DataHTTPListener{fd, int(address[2]) * 256 + int(address[3])}
 }
@@ -56,7 +56,7 @@ fn data_http_server_tls(mut stream DataHTTPStream, cert string, key string, mut 
 	stream.tls = true
 	C.mbedtls_ssl_init(&stream.ssl); C.mbedtls_ssl_config_init(&stream.config)
 	C.mbedtls_x509_crt_init(&stream.ca); C.mbedtls_ctr_drbg_init(&stream.rng); C.mbedtls_entropy_init(&stream.entropy)
-	if C.mbedtls_ctr_drbg_seed(&stream.rng, C.mbedtls_entropy_func, &stream.entropy, c'http-test', 9) != 0
+	if C.mbedtls_ctr_drbg_seed(&stream.rng, data_http_os_entropy, unsafe { nil }, c'http-test', 9) != 0
 		|| C.mbedtls_x509_crt_parse_file(&stream.ca, cert.str) != 0
 		|| C.mbedtls_pk_parse_keyfile(&private_key, key.str, unsafe { nil }, C.mbedtls_ctr_drbg_random, &stream.rng) != 0
 		|| C.mbedtls_ssl_config_defaults(&stream.config, C.MBEDTLS_SSL_IS_SERVER, C.MBEDTLS_SSL_TRANSPORT_STREAM, C.MBEDTLS_SSL_PRESET_DEFAULT) != 0 { return false }
@@ -491,4 +491,96 @@ fn test_http_session_native_delegate_routing() {
 			task_http_oracle = unsafe { nil }
 		}
 	}
+}
+
+fn test_http_transport_os_entropy() {
+	mut bytes := [515]u8{}
+	bytes[0] = 0xa5; bytes[514] = 0x5a
+	assert data_http_os_entropy(unsafe { nil }, unsafe { nil }, 1) == C.MBEDTLS_ERR_ENTROPY_SOURCE_FAILED;
+	assert data_http_os_entropy(unsafe { nil }, unsafe { nil }, 0) == 0;
+	assert data_http_os_entropy(unsafe { nil }, unsafe { &bytes[1] }, 513) == 0;
+	assert bytes[0] == 0xa5 && bytes[514] == 0x5a;
+	println('IOS-HTTP-TRANSPORT-ENTROPY: OS CSPRNG callback, 513-byte chunked fill, canaries and rejected invalid buffer')
+}
+
+struct HTTPControlProbe {
+mut:
+	ready u64
+	cancel u64
+}
+fn http_control_cancel(probe &HTTPControlProbe) bool {
+	deadline := time.sys_mono_now() + 3 * time.second
+	for C.ios_load_pointer(unsafe { &probe.ready }) == 0 {
+		if time.sys_mono_now() > deadline { C.ios_store_pointer(unsafe { &probe.cancel }, 1); return false }
+		time.sleep(time.millisecond)
+	}
+	time.sleep(40 * time.millisecond)
+	C.ios_store_pointer(unsafe { &probe.cancel }, 1)
+	return true
+}
+fn http_control_server(listener DataHTTPListener, tls bool, mode string, probe &HTTPControlProbe) bool {
+	defer { C.close(listener.fd); C.ios_store_pointer(unsafe { &probe.ready }, 1) }
+	deadline := time.sys_mono_now() + 5 * time.second
+	if !data_http_wait(listener.fd, false, deadline) { return false }
+	fd := C.accept(listener.fd, unsafe { nil }, unsafe { nil })
+	if fd < 0 { return false }
+	data_http_no_sigpipe(fd)
+	mut receive_buffer := i32(8192)
+	if C.fcntl(fd, C.F_SETFL, usize(C.O_NONBLOCK)) != 0
+		|| C.setsockopt(fd, C.SOL_SOCKET, C.SO_RCVBUF, &receive_buffer, u32(sizeof(receive_buffer))) != 0 { C.close(fd); return false }
+	mut key := C.mbedtls_pk_context{}
+	C.mbedtls_pk_init(&key)
+	defer { C.mbedtls_pk_free(&key) }
+	mut stream := &DataHTTPStream{fd: fd, deadline: deadline}
+	defer { stream.close(); unsafe { free(stream) } }
+	if mode == 'handshake' {
+		C.ios_store_pointer(unsafe { &probe.ready }, 1)
+		time.sleep(1500 * time.millisecond)
+		return true
+	}
+	if tls && !data_http_server_tls(mut stream, os.getenv('VINIX_IOS_HTTP_CERT'), os.getenv('VINIX_IOS_HTTP_KEY'), mut key) { return false }
+	mut headers := []u8{cap: data_http_headers}; headers.flags |= .noslices
+	defer { unsafe { headers.free() } }
+	for { line := stream.line(mut headers) or { return false }; if line.len == 0 { break } }
+	prefix := match mode {
+		'length' { 'HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nab' }
+		'eof' { 'HTTP/1.0 200 OK\r\n\r\nab' }
+		'chunk' { 'HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nab' }
+		else { '' }
+	}
+	if prefix.len != 0 && !stream.send(prefix) { return false }
+	C.ios_store_pointer(unsafe { &probe.ready }, 1)
+	time.sleep(1500 * time.millisecond)
+	// The client must have cancelled before this tail arrives. A closed peer
+	// is expected; sending it still exercises SIGPIPE suppression for TLS too.
+	stream.send(if mode == 'headers' { 'HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nlate' }
+		else if mode == 'chunk' { 'cd\r\n0\r\n\r\n' } else { 'cd' })
+	if tls { C.mbedtls_ssl_close_notify(&stream.ssl) }
+	return true
+}
+fn test_http_transport_cancellation() {
+	mut cancelled := u64(1)
+	start := time.sys_mono_now()
+	if result := http_transport_exchange_control('http://127.0.0.1:1/', HTTPTransportRequest{}, '', 4 * time.second, unsafe { &cancelled }) { result.dispose(); assert false; }
+	assert time.sys_mono_now() - start < time.second;
+	for tls in [false, true] {
+		for mode in ['headers', 'length', 'eof', 'chunk', 'upload', 'handshake'] {
+			if mode == 'handshake' && !tls { continue }
+			listener := data_http_listener()
+			mut probe := HTTPControlProbe{}
+			server := spawn http_control_server(listener, tls, mode, unsafe { &probe })
+			canceller := spawn http_control_cancel(unsafe { &probe })
+			body := []u8{len: if mode == 'upload' { data_http_limit } else { 0 }, init: 0x61}
+			request := HTTPTransportRequest{method: if mode == 'upload' { 'POST' } else { 'GET' }, body: body}
+			address := '${if tls { 'https' } else { 'http' }}://localhost:${listener.port}/'
+			began := time.sys_mono_now()
+			result := http_transport_exchange_control(address, request, os.getenv('VINIX_IOS_HTTP_CERT'), 4 * time.second, unsafe { &probe.cancel })
+			elapsed := time.sys_mono_now() - began
+			assert canceller.wait() && server.wait();
+			unsafe { body.free(); address.free() }
+			if value := result { value.dispose(); assert false, mode; }
+			assert elapsed < time.second, 'cancellation waited for peer/timeout: ${mode} tls=${tls}';
+		}
+	}
+	println('IOS-HTTP-TRANSPORT-CANCEL: pre-cancel, stalled headers, fixed/EOF/chunked partial bodies, blocked 16 MiB uploads and TLS handshake; cancellation remains failure and wakes before peer completion')
 }
