@@ -151,3 +151,10 @@ Final compile / self-test / APK build took 5.275 / 0.263 / 4.357 seconds with
 sampled peak aggregate RSS 372,654,080 / 1,245,184 / 89,702,400 bytes. Their
 guards exited zero with complete cleanup under the unchanged limits. V2 ART
 execution remains pending; these checks identify no TLS or networking fix.
+
+The v2 source/report checkpoint is `f7d636b40`. Both complete artifact roots,
+including source/compiler/signing closure and all comparison receipts, are bound
+by `maps-network-tls-v2-fixture-evidence-2026-10-29-r1/sealed/manifest.json`,
+SHA-256 `9da362cccb824a80af9162a7413789edd383939c9bcd660c6d0877f5bb520a54`.
+The seal and a separate complete readback passed for two roots and 18,208
+entries. Closed roots remain immutable; runtime output belongs elsewhere.
