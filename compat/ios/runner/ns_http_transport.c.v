@@ -24,6 +24,20 @@ struct HTTPTransportResult {
 	body []u8
 }
 
+// Synchronous policy hook after validated final headers, before body decoding.
+// The response view and context are borrowed until return; the view has no
+// body and must not be disposed or saved. The hook may wait on an owned gate.
+struct HTTPTransportResponseHead {
+	status int
+	fields []HTTPTransportField
+}
+type HTTPTransportResponsePolicy = fn (voidptr, HTTPTransportResponseHead, i64) bool
+
+fn (head HTTPTransportResponseHead) field(name string) ?string {
+	for field in head.fields { if data_http_equal(field.name, name) { return field.value } }
+	return none
+}
+
 fn (result HTTPTransportResult) dispose() {
 	result.dispose_fields()
 	unsafe { result.body.free() }
@@ -110,6 +124,11 @@ fn http_transport_exchange(text string, input HTTPTransportRequest, ca_file stri
 // The caller keeps the atomic cancellation cell alive until return. Cancelled
 // reads remain failures, including close-delimited and partially cached bodies.
 fn http_transport_exchange_control(text string, input HTTPTransportRequest, ca_file string, timeout i64, cancel &u64) ?HTTPTransportResult {
+	return http_transport_exchange_policy(text, input, ca_file, timeout, cancel, unsafe { nil }, unsafe { nil })
+}
+
+fn http_transport_exchange_policy(text string, input HTTPTransportRequest, ca_file string, timeout i64, cancel &u64,
+	context voidptr, policy HTTPTransportResponsePolicy) ?HTTPTransportResult {
 	if data_http_cancelled(cancel) { return none }
 	url := data_http_url(text) or { return none }
 	wire := http_transport_wire(url, input) or { return none }
@@ -153,6 +172,10 @@ fn http_transport_exchange_control(text string, input HTTPTransportRequest, ca_f
 			value: data_http_trim(http_borrow(line, colon + 1, line.len)).clone()}
 		offset = line_end + 2
 	}
+	if policy != unsafe { nil } && !policy(context, HTTPTransportResponseHead{status: response.status, fields: fields}, deadline) { return none }
+	// A deferred decision cannot extend the exchange deadline or revive a
+	// cancelled load, even when all body bytes were coalesced with the headers.
+	if time.sys_mono_now() >= deadline || data_http_cancelled(cancel) { return none }
 	body := data_http_body(mut stream, response, mut storage, input.method == 'HEAD') or { return none }
 	if data_http_cancelled(cancel) { unsafe { body.free() }; return none }
 	success = true

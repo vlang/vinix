@@ -405,6 +405,10 @@ mut:
 	error_code i64
 	body [8]u8
 	body_size u64
+	deferred bool
+	response_seen u64
+	pending_block u64
+	block_signature [64]u8
 }
 __global task_http_oracle = unsafe { &TaskHTTPOracle(nil) }
 fn task_http_oracle_event(delegate u64, kind u64) {
@@ -417,6 +421,19 @@ fn task_http_oracle_event(delegate u64, kind u64) {
 }
 fn task_http_oracle_response(delegate u64, _ &char, _session u64, _task u64, _response u64, complete u64) {
 	task_http_oracle_event(delegate, 1)
+	mut p := task_http_oracle
+	if p.deferred {
+		api := DataHTTPApi{native: true, send: p.send}
+		p.pending_block = api.msg(complete, c'copy', 0)
+		flags := read32(complete + 8)
+		if flags & (u32(1) << 30) != 0 {
+			descriptor := read64(complete + 24)
+			signature := ctext(read64(descriptor + if flags & (u32(1) << 25) != 0 { u64(32) } else { u64(16) }))
+			if signature.len < p.block_signature.len { unsafe { C.memcpy(&p.block_signature[0], signature.str, usize(signature.len)) } }
+		}
+		C.__atomic_store_n(unsafe { &p.response_seen }, 1, 5)
+		return
+	}
 	unsafe { TaskHTTPDisposition(voidptr(read64(complete + 16)))(complete, 1) }
 }
 fn task_http_oracle_data(delegate u64, _ &char, _session u64, _task u64, data u64) {
@@ -450,7 +467,7 @@ fn test_http_session_native_delegate_routing() {
 		assert C.class_addMethod(all, C.sel_registerName(c'URLSession:dataTask:didReceiveResponse:completionHandler:'), unsafe { voidptr(task_http_oracle_response) }, c'v48@0:8@16@24@32@?40');
 		assert C.class_addMethod(all, C.sel_registerName(c'URLSession:dataTask:didReceiveData:'), unsafe { voidptr(task_http_oracle_data) }, c'v40@0:8@16@24@32');
 		C.objc_registerClassPair(all); C.objc_registerClassPair(partial)
-		for mode in ['session', 'task', 'partial', 'cancel-before-resume'] {
+		for mode in ['session', 'task', 'partial', 'cancel-before-resume', 'deferred-allow', 'deferred-deny', 'cancel-pending-decision'] {
 			pool := api.pool()
 			listener := data_http_listener()
 			mut workers := []thread bool{}
@@ -459,7 +476,8 @@ fn test_http_session_native_delegate_routing() {
 			api.msg(queue, c'setMaxConcurrentOperationCount:', 1)
 			session_delegate := api.msg(u64(all), c'new', 0)
 			task_delegate := if mode == 'session' { u64(0) } else { api.msg(if mode == 'partial' { u64(partial) } else { u64(all) }, c'new', 0) }
-			mut probe := TaskHTTPOracle{send: api.send, session_delegate: session_delegate, task_delegate: task_delegate, queue: queue}
+			mut probe := TaskHTTPOracle{send: api.send, session_delegate: session_delegate, task_delegate: task_delegate, queue: queue,
+				deferred: mode in ['deferred-allow', 'deferred-deny', 'cancel-pending-decision']}
 			task_http_oracle = unsafe { &probe }
 			config := api.msg(api.cls(c'NSURLSessionConfiguration'), c'defaultSessionConfiguration', 0)
 			session := unsafe { TaskHTTPNative5(voidptr(api.send))(api.cls(c'NSURLSession'), u64(C.sel_registerName(c'sessionWithConfiguration:delegate:delegateQueue:')), config, session_delegate, queue) }
@@ -469,23 +487,53 @@ fn test_http_session_native_delegate_routing() {
 			api.msg(task, c'setDelegate:', task_delegate)
 			api.msg(task, if mode == 'cancel-before-resume' { c'cancel' } else { c'resume' }, 0)
 			deadline := time.sys_mono_now() + 5 * time.second
-			for C.__atomic_load_n(unsafe { &probe.finished }, 5) == 0 { assert time.sys_mono_now() < deadline; time.sleep(time.millisecond) }
+			if probe.deferred {
+				for C.__atomic_load_n(unsafe { &probe.response_seen }, 5) == 0 {
+					if time.sys_mono_now() >= deadline { eprintln('IOS-SESSION-NATIVE-ROUTING: response timeout ' + mode); C._exit(124) }
+					time.sleep(time.millisecond)
+				}
+				time.sleep(20 * time.millisecond)
+				// End the process on an unsafe native contract failure. Returning
+				// through V's test assertion recovery could leave a native task
+				// holding callback state on this expired stack frame.
+				if probe.pending_block == 0 || ctext(u64(unsafe { &probe.block_signature[0] })) != 'v16@?0q8' {
+					eprintln('IOS-SESSION-NATIVE-ROUTING: invalid response completion block'); C._exit(125)
+				}
+				if probe.count != 1 || probe.body_size != 0 || C.__atomic_load_n(unsafe { &probe.finished }, 5) != 0 { probe.bad_queue = 1 }
+				if mode == 'cancel-pending-decision' {
+					api.msg(task, c'cancel', 0)
+					time.sleep(40 * time.millisecond)
+					if C.__atomic_load_n(unsafe { &probe.finished }, 5) != 0 || probe.body_size != 0 || api.msg(task, c'state', 0) != 2 { probe.bad_queue = 1 }
+					// Native cancellation remains pending until this response
+					// handler is called. A late allow must still end as -999.
+					unsafe { TaskHTTPDisposition(voidptr(read64(probe.pending_block + 16)))(probe.pending_block, 1) }
+				}
+				else { unsafe { TaskHTTPDisposition(voidptr(read64(probe.pending_block + 16)))(probe.pending_block, if mode == 'deferred-allow' { u64(1) } else { u64(0) }) } }
+			}
+			for C.__atomic_load_n(unsafe { &probe.finished }, 5) == 0 {
+				if time.sys_mono_now() >= deadline { eprintln('IOS-SESSION-NATIVE-ROUTING: completion timeout ' + mode); C._exit(124) }
+				time.sleep(time.millisecond)
+			}
 			api.msg(queue, c'waitUntilAllOperationsAreFinished', 0)
 			if mode == 'cancel-before-resume' { C.close(listener.fd) } else { assert workers[0].wait(); }
 			unsafe { workers.free() }
 			assert probe.bad_queue == 0 && probe.state == 3;
-			assert probe.error_code == if mode == 'cancel-before-resume' { i64(-999) } else { i64(0) };
+			cancelled := mode in ['cancel-before-resume', 'deferred-deny', 'cancel-pending-decision']
+			assert probe.error_code == if cancelled { i64(-999) } else { i64(0) };
 			expected := match mode {
 				'session' { [u64(1), 2, 3, 0, 0, 0, 0, 0]! }
 				'task' { [u64(11), 12, 13, 0, 0, 0, 0, 0]! }
 				'partial' { [u64(1), 2, 13, 0, 0, 0, 0, 0]! }
+				'deferred-allow' { [u64(11), 12, 13, 0, 0, 0, 0, 0]! }
+				'deferred-deny', 'cancel-pending-decision' { [u64(11), 13, 0, 0, 0, 0, 0, 0]! }
 				else { [u64(13), 0, 0, 0, 0, 0, 0, 0]! }
 			}
-			assert probe.events == expected && probe.count == if mode == 'cancel-before-resume' { u64(1) } else { u64(3) };
-			assert probe.body_size == if mode == 'cancel-before-resume' { u64(0) } else { u64(4) };
+			assert probe.events == expected && probe.count == if mode == 'cancel-before-resume' { u64(1) } else if cancelled { u64(2) } else { u64(3) };
+			assert probe.body_size == if cancelled { u64(0) } else { u64(4) };
 			if probe.body_size != 0 { assert C.memcmp(&probe.body[0], c'ping', 4) == 0; }
 			println('IOS-SESSION-NATIVE-ROUTING: ${mode} events=${probe.events} count=${probe.count} body=${probe.body_size} code=${probe.error_code} state=${probe.state}')
 			api.msg(session, c'invalidateAndCancel', 0)
+			if probe.pending_block != 0 { api.msg(probe.pending_block, c'release', 0) }
 			api.msg(session, c'release', 0); api.msg(task_delegate, c'release', 0); api.msg(session_delegate, c'release', 0); api.msg(queue, c'release', 0)
 			api.drain(pool)
 			task_http_oracle = unsafe { nil }
@@ -583,4 +631,232 @@ fn test_http_transport_cancellation() {
 		}
 	}
 	println('IOS-HTTP-TRANSPORT-CANCEL: pre-cancel, stalled headers, fixed/EOF/chunked partial bodies, blocked 16 MiB uploads and TLS handshake; cancellation remains failure and wakes before peer completion')
+}
+
+type HTTPDecisionInvoke = fn (u64, i64)
+fn http_decision_invoke(block u64, value i64) {
+	unsafe { HTTPDecisionInvoke(voidptr(read64(block + 16)))(block, value) }
+}
+fn http_decision_concurrent(block u64, value i64) {
+	for _ in 0 .. 64 {
+		copy := block_copy(block)
+		http_decision_invoke(copy, value)
+		block_release(copy)
+	}
+}
+fn http_decision_waiter(gate &URLSessionResponseDecision, cancel &u64, entered &u64) bool {
+	C.__atomic_store_n(entered, 1, 5)
+	result := url_session_response_decision_wait(gate, cancel, time.sys_mono_now() + 4 * time.second)
+	url_session_response_decision_release(gate)
+	return result
+}
+fn test_http_response_decision_blocks() {
+	for _ in 0 .. 2 {
+		objc_start()
+		for allow in [false, true]! {
+			gate := url_session_response_decision_new()
+			block := url_session_response_decision_block(gate)
+			copy := block_copy(block)
+			assert copy == block && gate.refs == 2;
+			assert is_block(block) && read64(block + 24) == u64(unsafe { &gate.descriptor[0] });
+			assert read64(read64(block + 24) + 8) == 40 && ctext(read64(read64(block + 24) + 32)) == 'v16@?0q8';
+			http_decision_invoke(block, if allow { i64(1) } else { i64(0) })
+			http_decision_invoke(copy, if allow { i64(0) } else { i64(1) })
+			assert url_session_response_decision_wait(gate, unsafe { nil }, time.sys_mono_now() + time.second) == allow;
+			block_release(block); assert gate.refs == 2;
+			block_release(copy); assert gate.refs == 1;
+			url_session_response_decision_release(gate)
+		}
+		for action in ['close', 'cancel', 'timeout', 'pre-cancel'] {
+			gate := url_session_response_decision_new()
+			block := url_session_response_decision_block(gate)
+			mut cancel := u64(0); mut entered := u64(0)
+			if action in ['close', 'cancel'] {
+				url_session_response_decision_retain(gate) // The worker owns its wait.
+				worker := spawn http_decision_waiter(gate, unsafe { &cancel }, unsafe { &entered })
+				deadline := time.sys_mono_now() + time.second
+				for C.__atomic_load_n(unsafe { &entered }, 5) == 0 { assert time.sys_mono_now() < deadline; time.sleep(time.millisecond) }
+				time.sleep(10 * time.millisecond)
+				began := time.sys_mono_now()
+				if action == 'close' { url_session_response_decision_close(gate) }
+				else { C.__atomic_store_n(unsafe { &cancel }, 1, 5) }
+				assert !worker.wait() && time.sys_mono_now() - began < time.second;
+			} else {
+				if action == 'pre-cancel' { C.__atomic_store_n(unsafe { &cancel }, 1, 5); http_decision_invoke(block, 1) }
+				assert !url_session_response_decision_wait(gate, unsafe { &cancel }, time.sys_mono_now() + 20 * time.millisecond);
+			}
+			assert gate.refs == 2 && gate.closed;
+			url_session_response_decision_release(gate)
+			// The descriptor and gate outlive the worker/transfer owner's reference.
+			http_decision_invoke(block, 1)
+			assert gate.closed && gate.settled;
+			copy := block_copy(block)
+			block_release(block); http_decision_invoke(copy, 0); block_release(copy)
+		}
+		gate := url_session_response_decision_new()
+		block := url_session_response_decision_block(gate)
+		mut workers := []thread{}
+		for i in 0 .. 8 { workers << spawn http_decision_concurrent(block, i64(i & 1)) }
+		workers.wait(); unsafe { workers.free() }
+		assert gate.settled && gate.refs == 2;
+		chosen := gate.allow
+		assert url_session_response_decision_wait(gate, unsafe { nil }, time.sys_mono_now() + time.second) == chosen;
+		url_session_response_decision_release(gate); block_release(block)
+		assert ios_runtime.block_refs.len == 0 && ios_runtime.live == 0;
+		objc_stop()
+	}
+	println('IOS-HTTP-RESPONSE-DECISION: signed 64-bit block ABI, copy identity/descriptor lifetime, first choice, 512 competing copied-block calls, close/cancel/timeout and late invocation after owner release PASS')
+}
+
+struct HTTPDecisionProbe {
+	gate &URLSessionResponseDecision
+	mode string
+mut:
+	cancel u64
+	entered u64
+	calls u64
+	bad bool
+}
+fn http_decision_policy(context voidptr, response HTTPTransportResponseHead, deadline i64) bool {
+	mut p := unsafe { &HTTPDecisionProbe(context) }
+	p.calls++
+	empty := p.mode in ['empty', 'expired-allow']
+	wanted_status := if empty { 204 } else { 500 }
+	final_value := response.field('X-Final') or { '' }
+	if response.status != wanted_status
+		|| final_value != 'yes' || response.field('X-Interim') != none { p.bad = true }
+	mut cookies := 0
+	for field in response.fields { if data_http_equal(field.name, 'Set-Cookie') { cookies++; if field.value !in ['a=1', 'b=2'] { p.bad = true } } }
+	if cookies != 2 { p.bad = true }
+	C.__atomic_store_n(unsafe { &p.entered }, 1, 5)
+	if p.mode == 'cached-cancel' { C.__atomic_store_n(unsafe { &p.cancel }, 1, 5); return true }
+	if p.mode == 'expired-allow' {
+		for time.sys_mono_now() <= deadline { time.sleep(time.millisecond) }
+		return true
+	}
+	return url_session_response_decision_wait(p.gate, unsafe { &p.cancel }, deadline)
+}
+fn http_decision_server(listener DataHTTPListener, tls bool, probe &HTTPDecisionProbe) bool {
+	defer { C.close(listener.fd) }
+	deadline := time.sys_mono_now() + 4 * time.second
+	if !data_http_wait(listener.fd, false, deadline) { return false }
+	fd := C.accept(listener.fd, unsafe { nil }, unsafe { nil })
+	if fd < 0 { return false }
+	data_http_no_sigpipe(fd)
+	if C.fcntl(fd, C.F_SETFL, usize(C.O_NONBLOCK)) != 0 { C.close(fd); return false }
+	mut key := C.mbedtls_pk_context{}
+	C.mbedtls_pk_init(&key)
+	defer { C.mbedtls_pk_free(&key) }
+	mut stream := &DataHTTPStream{fd: fd, deadline: deadline}
+	defer { stream.close(); unsafe { free(stream) } }
+	if tls && !data_http_server_tls(mut stream, os.getenv('VINIX_IOS_HTTP_CERT'), os.getenv('VINIX_IOS_HTTP_KEY'), mut key) { return false }
+	mut storage := []u8{cap: data_http_headers}; storage.flags |= .noslices
+	defer { unsafe { storage.free() } }
+	line := stream.line(mut storage) or { return false }
+	if line != 'GET / HTTP/1.1' { return false }
+	for { header := stream.line(mut storage) or { return false }; if header.len == 0 { break } }
+	if probe.mode == 'malformed' { return stream.send('HTTP/1.1 200 OK\r\nContent-Length: 4\r\nTransfer-Encoding: chunked\r\n\r\nping') }
+	empty := probe.mode in ['empty', 'expired-allow']
+	head := 'HTTP/1.1 103 Early Hints\r\nX-Interim: ignored\r\n\r\nHTTP/1.1 ${if empty { '204 No Content' } else { '500 Failure' }}\r\nX-Final: yes\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\nContent-Length: ${if empty { '0' } else { '4' }}\r\n\r\n'
+	defer { unsafe { head.free() } }
+	if probe.mode == 'cached-cancel' {
+		wire := head + 'ping'
+		defer { unsafe { wire.free() } }
+		return stream.send(wire)
+	}
+	if !stream.send(head) { return false }
+	// Withhold the body until the policy has actually seen the final headers.
+	// Reading the full body before invoking the policy would deadlock this case.
+	for C.__atomic_load_n(unsafe { &probe.entered }, 5) == 0 {
+		if time.sys_mono_now() >= deadline { return false }
+		time.sleep(time.millisecond)
+	}
+	if !empty { stream.send('ping') }
+	if tls { C.mbedtls_ssl_close_notify(&stream.ssl) }
+	return true
+}
+fn http_decision_choose(block u64, probe &HTTPDecisionProbe) bool {
+	defer { block_release(block) }
+	deadline := time.sys_mono_now() + 4 * time.second
+	for C.__atomic_load_n(unsafe { &probe.entered }, 5) == 0 {
+		if time.sys_mono_now() >= deadline { return false }
+		time.sleep(time.millisecond)
+	}
+	time.sleep(20 * time.millisecond)
+	match probe.mode {
+		'allow', 'empty' { http_decision_invoke(block, 1) }
+		'deny' { http_decision_invoke(block, 0) }
+		'cancel' { C.__atomic_store_n(unsafe { &probe.cancel }, 1, 5); http_decision_invoke(block, 1) }
+		'close' { url_session_response_decision_close(probe.gate); http_decision_invoke(block, 1) }
+		else {}
+	}
+	return true
+}
+fn test_http_transport_response_decisions() {
+	objc_start()
+	for tls in [false, true] {
+		for mode in ['allow', 'deny', 'cancel', 'close', 'timeout', 'empty', 'cached-cancel', 'expired-allow', 'malformed'] {
+			gate := url_session_response_decision_new()
+			block := url_session_response_decision_block(gate)
+			mut probe := HTTPDecisionProbe{gate: gate, mode: mode}
+			listener := data_http_listener()
+			server := spawn http_decision_server(listener, tls, unsafe { &probe })
+			mut choosers := []thread bool{}
+			if mode !in ['malformed', 'cached-cancel', 'expired-allow'] { choosers << spawn http_decision_choose(block_copy(block), unsafe { &probe }) }
+			address := '${if tls { 'https' } else { 'http' }}://localhost:${listener.port}/'
+			timeout := if mode in ['timeout', 'expired-allow'] { time.second } else { 3 * time.second }
+			result := http_transport_exchange_policy(address, HTTPTransportRequest{}, os.getenv('VINIX_IOS_HTTP_CERT'), timeout,
+				unsafe { &probe.cancel }, unsafe { &probe }, http_decision_policy)
+			for chooser in choosers { assert chooser.wait(); }
+			unsafe { choosers.free(); address.free() }
+			assert server.wait() && !probe.bad;
+			assert probe.calls == if mode == 'malformed' { u64(0) } else { u64(1) };
+			if value := result {
+				assert mode in ['allow', 'empty'], mode;
+				assert value.status == if mode == 'empty' { 204 } else { 500 };
+				assert value.body == if mode == 'empty' { []u8{} } else { 'ping'.bytes() };
+				value.dispose()
+			} else { assert mode !in ['allow', 'empty'], mode; }
+			url_session_response_decision_close(gate)
+			url_session_response_decision_release(gate)
+			http_decision_invoke(block, 1) // Late completion cannot revive a closed load.
+			block_release(block)
+		}
+	}
+	assert ios_runtime.block_refs.len == 0 && ios_runtime.live == 0;
+	objc_stop()
+	println('IOS-HTTP-TRANSPORT-DECISION: HTTP/TLS headers precede body, deferred allow/deny, close/cancel/deadline, cached body cancellation, empty body, final status/error body, repeated fields and malformed framing PASS')
+}
+
+fn test_http_response_decision_rejections() {
+	for value in [i64(-1), 2, 3, 4]! {
+		mut fds := [2]i32{}
+		assert C.pipe(unsafe { &fds[0] }) == 0;
+		pid := C.fork()
+		assert pid >= 0;
+		if pid == 0 {
+			C.close(fds[0]); C.dup2(fds[1], 2); C.close(fds[1])
+			objc_start()
+			gate := url_session_response_decision_new()
+			block := url_session_response_decision_block(gate)
+			http_decision_invoke(block, value)
+			C._exit(0)
+		}
+		C.close(fds[1])
+		mut bytes := [8192]u8{}
+		mut length := 0
+		for {
+			count := C.read(fds[0], unsafe { &bytes[length] }, usize(bytes.len - length))
+			if count == 0 { break }
+			if count < 0 && unsafe { *C.ios_errno_address() } == C.EINTR { continue }
+			assert count > 0 && length + int(count) < bytes.len;
+			length += int(count)
+		}
+		C.close(fds[0]); mut status := i32(0)
+		assert C.ios_waitpid(pid, &status, 0) == pid && status == 256;
+		output := unsafe { tos(&bytes[0], length) }
+		assert output.contains('response conversion to a download/stream task and invalid dispositions are not implemented'), output;
+		assert !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output;
+	}
+	println('IOS-HTTP-RESPONSE-DECISION-REJECT: unsupported download/stream and invalid dispositions fail explicitly PASS')
 }
