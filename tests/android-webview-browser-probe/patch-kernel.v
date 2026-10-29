@@ -163,6 +163,16 @@ const account_handoff_broker_pin = '9f0b8ac37881ab8377e70793609882fb9b07f681b8a7
 const account_handoff_controller_seal = '1cf0e472fb977e705204f06fcad806f0c1ea16d213d469d0174c658c27fb041d'
 const account_handoff_controller_pin = '0253f16da634ffef92e1efa2b3102d1ad91af15d1f521081f60e920e78affc6b'
 const account_handoff_broker_path = 'opt/vinix-android-aarch64/usr/bin/native-account-broker'
+const auth_exception_base = '/Users/alex/.local/state/vinix/android/maps-account-handoff-r5'
+const auth_exception_base_seal = '256b9c62ad2c6c83668cac756697941c8cdba6e6eae9a31543016d6f85b90e7a'
+const auth_exception_boot_sha = 'bd0cd42b8fb7f4684b9ca71efa5936ae7ef691d81a170421d452001eb8d4f9e4'
+const auth_exception_base_overlay = '95d9a625dba2af22b32e5c61e844af97dd34809e35d04ddacd9accca07bf3c47'
+const auth_exception_retained_deployment = '90e0de9745c0a4326dae72d7f2aa1e3e662f11c70dad33dda50f0fcfb170fedf'
+const auth_exception_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-auth-exception-framework-2026-10-29-r1'
+const auth_exception_framework_seal = '4aa0c09e05c0d4fe3180a909648ebb344881ec1d2d6e60bba5d959148d93a284'
+const auth_exception_jar = '0daae54d7755b255ed3335f58d8cafd6da4d03c8c95343ebb0f174d166da6916'
+const auth_exception_dex = '6cf2173aedc5adbf187aed5db4c37a8a95a413cc35343272cd45c88f2734d615'
+const auth_exception_build = '51b78458f8da4c0d6598cf3856327111cc3094a489af7ac7e56470bd59dec225'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -1726,6 +1736,114 @@ fn account_handoff_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return account_handoff_base + '/boot.img'
 }
 
+fn auth_exception_profile() Profile {
+	mut modules := account_handoff_profile().modules.clone()
+	modules << 'maps-account-handoff.tar'
+	return Profile{'maps-auth-exception', auth_exception_boot_sha, 'maps-auth-exception.tar', modules}
+}
+
+fn auth_exception_modules() map[string]string {
+	mut modules := account_handoff_modules()
+	modules['maps-account-handoff.tar'] = auth_exception_base_overlay
+	return modules
+}
+
+fn auth_exception_fields() map[string]string {
+	mut fields := account_handoff_fields()
+	fields['kind'] = 'vinix-maps-auth-exception-v1'
+	fields['base_root'] = auth_exception_base
+	fields['base_manifest_sha256'] = auth_exception_base_seal
+	fields['framework_build_root'] = auth_exception_framework
+	fields['framework_manifest_sha256'] = auth_exception_framework_seal
+	fields['framework_jar_sha256'] = auth_exception_jar
+	fields['framework_dex_sha256'] = auth_exception_dex
+	fields['retained_framework_manifest_sha256'] = application_restrictions_seal
+	return fields
+}
+
+fn auth_exception_inputs() map[string]string {
+	mut inputs := account_handoff_inputs()
+	inputs[auth_exception_base + '/sha256.json'] = auth_exception_base_seal
+	inputs[auth_exception_framework + '/sha256.json'] = auth_exception_framework_seal
+	return inputs
+}
+
+fn auth_exception_known_delta() map[string]string {
+	return {
+		'/' + service_query_jar_path: auth_exception_jar
+		'/' + service_query_dex_path: auth_exception_dex
+		'/' + service_query_headless + '/framework-build.json': auth_exception_build
+		'/' + service_query_headless + '/framework-sha256.json': auth_exception_framework_seal
+	}
+}
+
+fn verify_auth_exception_overlay(receipt map[string]json2.Any) ! {
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('auth exception deployment delta absent') }))!
+	mut expected := auth_exception_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('auth exception headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == '3564b3199e852f5ca7046fbe4fd199ccd02ba150c1c1f20b6d87e202a8dec930' {
+		return error('invalid or retained auth exception headless receipt')
+	}
+	expected[guest] = guest_pin
+	if delta != expected { return error('auth exception exact five deployment changes differ') }
+	for name, value in {
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: auth_exception_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256'])
+	} {
+		if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](value)! { return error('auth exception receipt delta differs: ' + name) }
+	}
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('auth exception inventory absent') }))!
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	mut paths := expected.keys().map(it.trim_left('/'))
+	paths << service_query_deployment
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe auth exception inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != 0o644 { return error('auth exception file allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected auth exception inode') }
+	}
+	if regulars.len != 6 || regulars[service_query_deployment] or { '' } == auth_exception_retained_deployment { return error('exact six new auth exception files required') }
+	for path, pin in expected {
+		if regulars[path.trim_left('/')] or { '' } != pin { return error('auth exception declared input differs from inventory') }
+	}
+}
+
+fn verify_auth_exception_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [auth_exception_base_seal, auth_exception_boot_sha, auth_exception_base_overlay,
+		auth_exception_retained_deployment, auth_exception_framework_seal, auth_exception_jar, auth_exception_dex, auth_exception_build] {
+		if !digest_valid(pin) { return error('sealed auth exception producer pins required') }
+	}
+	if auth_exception_framework_seal == application_restrictions_seal || auth_exception_jar == application_restrictions_jar
+		|| auth_exception_dex == application_restrictions_dex { return error('new auth exception framework required') }
+	for name, expected in auth_exception_fields() {
+		if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('auth exception receipt differs: ' + name) }
+	}
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 45 || seals != auth_exception_inputs() { return error('auth exception exact forty-five dependency seals differ') }
+	if stage.format != 1 || stage.original_modules_sha256 != auth_exception_modules() || stage.preserved_modules_sha256 != auth_exception_modules() {
+		return error('auth exception original twenty-two modules differ')
+	}
+	verify_auth_exception_overlay(receipt)!
+}
+
+fn auth_exception_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_auth_exception_receipt(receipt, stage)!
+	path := auth_exception_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != auth_exception_base_seal { return error('auth exception original handoff manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != auth_exception_boot_sha || pins['maps-account-handoff.tar'] or { '' } != auth_exception_base_overlay {
+		return error('auth exception original boot or handoff overlay differs')
+	}
+	return auth_exception_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -2322,6 +2440,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = application_restrictions_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-account-handoff' {
 		baseline = account_handoff_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-auth-exception' {
+		baseline = auth_exception_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -4516,6 +4636,95 @@ fn account_handoff_profile_self_test() ! {
 	println('MAPS-ACCOUNT-HANDOFF KERNEL-PROFILE-SELF-TEST PASS exact broker and controller aliases four-file inventory twenty-one inherited modules twenty-two final forty-three dependencies inherited runtime and historical rejection')
 }
 
+fn auth_exception_entries_fixture() []ServiceQueryEntry {
+	mut pins := auth_exception_known_delta()
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'c'.repeat(64)
+	mut entries := []ServiceQueryEntry{}
+	for path, pin in pins { entries << ServiceQueryEntry{name: path.trim_left('/'), kind: 'regular', sha256: pin, mode: 0o644} }
+	entries << ServiceQueryEntry{name: service_query_deployment, kind: 'regular', sha256: 'd'.repeat(64), mode: 0o644}
+	entries << ServiceQueryEntry{name: 'opt', kind: 'directory', mode: 0o755}
+	return entries
+}
+
+fn auth_exception_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in auth_exception_fields() { receipt[name] = json2.Any(value) }
+	mut delta := auth_exception_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'c'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['deployment_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256', 'framework_manifest_sha256']))!
+	receipt['headless_input_delta'] = json2.decode[json2.Any](json2.encode({'/' + service_query_jar_path: auth_exception_jar}))!
+	receipt['headless_top_level_delta'] = json2.decode[json2.Any](json2.encode(['inputs_sha256']))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(auth_exception_entries_fixture()))!
+	return receipt
+}
+
+fn auth_exception_profile_self_test() ! {
+	profile := auth_exception_profile()
+	if profile.baseline_sha != auth_exception_boot_sha || profile.modules.len != 22
+		|| profile.modules.last() != 'maps-account-handoff.tar' || auth_exception_inputs().len != 45 { return error('auth exception positive profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 23 { return error('auth exception final module count differs') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', profile.modules}, Config{'vinix', modules.reverse()},
+		Config{'vinix', account_handoff_profile().modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('unsafe auth exception modules accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: auth_exception_inputs(), original_modules_sha256: auth_exception_modules(), preserved_modules_sha256: auth_exception_modules()}
+	receipt := auth_exception_receipt_fixture()!
+	verify_auth_exception_receipt(receipt, stage)!
+	for name in receipt.keys() {
+		mut bad := auth_exception_receipt_fixture()!
+		bad[name] = json2.Any('wrong')
+		if _ := verify_auth_exception_receipt(bad, stage) { return error('changed auth exception field accepted') }
+		bad.delete(name)
+		if _ := verify_auth_exception_receipt(bad, stage) { return error('missing auth exception field accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut inputs := stage.inputs_sha256.clone()
+		inputs[path] = '0'.repeat(64)
+		if _ := verify_auth_exception_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) { return error('changed auth exception dependency accepted') }
+		inputs.delete(path)
+		if _ := verify_auth_exception_receipt(receipt, Stage{...stage, inputs_sha256: inputs}) { return error('missing auth exception dependency accepted') }
+	}
+	mut extra := stage.inputs_sha256.clone()
+	extra['/unexpected/sha256.json'] = '0'.repeat(64)
+	if _ := verify_auth_exception_receipt(receipt, Stage{...stage, inputs_sha256: extra}) { return error('extra auth exception dependency accepted') }
+	for bad in [Stage{...stage, format: 2}, Stage{...stage, original_modules_sha256: account_handoff_modules()}, Stage{...stage, preserved_modules_sha256: map[string]string{}}] {
+		if _ := verify_auth_exception_receipt(receipt, bad) { return error('wrong auth exception module inventory accepted') }
+	}
+	entries := auth_exception_entries_fixture()
+	for index, entry in entries {
+		for replacement in [ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777},
+			ServiceQueryEntry{...entry, mode: if entry.kind == 'regular' { u32(0o755) } else { u32(0o644) }}, ServiceQueryEntry{...entry, sha256: 'invalid'}] {
+			if entry.kind != 'regular' && replacement.sha256 != entry.sha256 { continue }
+			mut changed := entries.clone()
+			changed[index] = replacement
+			mut bad := auth_exception_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+			if _ := verify_auth_exception_receipt(bad, stage) { return error('unsafe auth exception inode accepted') }
+		}
+		if entry.kind != 'regular' { continue }
+		mut missing := entries.clone()
+		missing.delete(index)
+		mut bad := auth_exception_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(missing))!
+		if _ := verify_auth_exception_receipt(bad, stage) { return error('missing auth exception file accepted') }
+	}
+	for addition in [entries[0], ServiceQueryEntry{name: 'extra', kind: 'directory', mode: 0o755}, ServiceQueryEntry{name: 'opt/../escape', kind: 'directory', mode: 0o755},
+		ServiceQueryEntry{name: account_handoff_broker_path, kind: 'regular', sha256: account_handoff_broker_pin, mode: 0o755}] {
+		mut changed := entries.clone()
+		changed << addition
+		mut bad := auth_exception_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_auth_exception_receipt(bad, stage) { return error('extra auth exception inode accepted') }
+	}
+	if _ := verify_auth_exception_receipt(account_handoff_receipt_fixture()!, stage) { return error('historical handoff receipt accepted by auth exception profile') }
+	if _ := verify_account_handoff_receipt(receipt, stage) { return error('auth exception receipt accepted by handoff profile') }
+	println('MAPS-AUTH-EXCEPTION KERNEL-PROFILE-SELF-TEST PASS exact framework six-file inventory five-input delta twenty-two inherited modules twenty-three final forty-five dependencies retained roles historical rejection')
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
@@ -4532,6 +4741,7 @@ fn self_test() ! {
 	account_pump_profile_self_test()!
 	application_restrictions_profile_self_test()!
 	account_handoff_profile_self_test()!
+	auth_exception_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -4628,11 +4838,12 @@ fn main() {
 	is_account_pump := os.args.len == 5 && os.args[1] == '--maps-account-pump'
 	is_application_restrictions := os.args.len == 5 && os.args[1] == '--maps-application-restrictions'
 	is_account_handoff := os.args.len == 5 && os.args[1] == '--maps-account-handoff'
-	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot && !is_context_storage && !is_broadcast_result && !is_onboarding_trace && !is_native_onboarding_trace && !is_onboarding_framework && !is_native_heartbeat && !is_browser_poll && !is_account_pump && !is_application_restrictions && !is_account_handoff {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+	is_auth_exception := os.args.len == 5 && os.args[1] == '--maps-auth-exception'
+	if os.args.len != 4 && !is_maps && !is_protected && !is_controller && !is_service_query && !is_controller_memory && !is_direct_boot && !is_context_storage && !is_broadcast_result && !is_onboarding_trace && !is_native_onboarding_trace && !is_onboarding_framework && !is_native_heartbeat && !is_browser_poll && !is_account_pump && !is_application_restrictions && !is_account_handoff && !is_auth_exception {
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff { 1 } else { 0 }
+	offset := if is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -4641,7 +4852,7 @@ fn main() {
 		eprintln(err)
 		exit(1)
 	}
-	profile := if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
+	profile := if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	patch(root, build_root, os.args[3 + offset], profile) or {
 		eprintln(err)
 		exit(1)
