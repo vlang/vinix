@@ -39,6 +39,22 @@ struct Stage {
 	staged_efivars_sha256 string
 }
 
+enum NetworkMode {
+	user_default
+	ipv4_only
+}
+
+fn (mode NetworkMode) backend() string {
+	return if mode == .ipv4_only { 'user,id=net0,ipv6=off' } else { 'user,id=net0' }
+}
+
+fn (mode NetworkMode) evidence() json2.Any {
+	return json2.Any({
+		'mode': json2.Any(if mode == .ipv4_only { 'ipv4-only' } else { 'user-default' })
+		'backend': json2.Any(mode.backend())
+	})
+}
+
 struct Execution {
 	argv   []string
 	code   int
@@ -254,7 +270,13 @@ fn launch_args(root string) []string {
 		root + '/qemu.pid']
 }
 
-fn start(root string) ! {
+fn network_launch_args(root string, mode NetworkMode) []string {
+	mut args := launch_args(root)
+	args[args.index('-netdev') + 1] = mode.backend()
+	return args
+}
+
+fn start(root string, mode NetworkMode) ! {
 	qmp_check(root)!
 	fresh_launch(root)!
 	for line in checked(['/bin/ps', '-axo', 'pid=,command='])!.split_into_lines() {
@@ -269,11 +291,12 @@ fn start(root string) ! {
 	}
 	log_before := create_daemon_log(root)!
 	mut argv := [qemu]
-	argv << launch_args(root)
+	argv << network_launch_args(root, mode)
 	os.write_file(root + '/run-source.v', source)!
 	os.cp(os.executable(), root + '/runner')!
 	write_json(root + '/launch.json', json2.decode[json2.Any](json2.encode({
 		'argv':                 json2.Any(argv)
+		'network':              mode.evidence()
 		'started_utc':          json2.Any(time.utc().str())
 		'stage_sha256':         json2.Any(hash(root + '/stage.json')!)
 		'qemu_sha256':          json2.Any(hash(qemu)!)
@@ -628,7 +651,30 @@ fn daemon_log_self_test(root string) ! {
 	println('DAEMON-STDERR SELF-TEST PASS literal-exact-argv no-debug-tracing exclusive-private-file real-fd2-destination missing-existing-symlink-directory-hardlink-permissions-replacement-rejection')
 }
 
+fn network_self_test() ! {
+	root := '/tmp/browser-network-profile'
+	baseline := launch_args(root)
+	standard := network_launch_args(root, .user_default)
+	ipv4 := network_launch_args(root, .ipv4_only)
+	assert standard == baseline
+	assert baseline.filter(it == '-netdev').len == 1
+	position := baseline.index('-netdev') + 1
+	assert baseline[position] == 'user,id=net0'
+	assert ipv4.len == baseline.len && ipv4[position] == 'user,id=net0,ipv6=off'
+	for i, arg in baseline {
+		if i != position { assert ipv4[i] == arg }
+	}
+	for mode in [NetworkMode.user_default, NetworkMode.ipv4_only] {
+		recorded := json2.decode[map[string]string](json2.encode(mode.evidence()))!
+		assert recorded.len == 2
+		assert recorded['mode']! == if mode == .ipv4_only { 'ipv4-only' } else { 'user-default' }
+		assert recorded['backend']! == network_launch_args(root, mode)[position]
+	}
+	println('NETWORK-PROFILE SELF-TEST PASS unchanged-default exact-ipv4-only-argv explicit-network-provenance')
+}
+
 fn self_test() ! {
+	network_self_test()!
 	qmp_check('/tmp/browser-probe')!
 	if _ := qmp_check('/' + 'x'.repeat(103)) { return error('oversized QMP path accepted') }
 	if _ := canonical_root(repo) { return error('repository output accepted') }
@@ -727,8 +773,8 @@ fn main() {
 		}
 		return
 	}
-	if os.args.len != 3 || os.args[1] !in ['start', 'status', 'stop', 'reconcile-stop', 'observe-gone', 'cleanup-gone'] {
-		eprintln('usage: run start|status|stop|reconcile-stop|observe-gone|cleanup-gone STAGED_EXTERNAL_DIRECTORY')
+	if os.args.len != 3 || os.args[1] !in ['start', 'start-ipv4', 'status', 'stop', 'reconcile-stop', 'observe-gone', 'cleanup-gone'] {
+		eprintln('usage: run start|start-ipv4|status|stop|reconcile-stop|observe-gone|cleanup-gone STAGED_EXTERNAL_DIRECTORY')
 		exit(2)
 	}
 	root := canonical_root(os.args[2]) or {
@@ -736,8 +782,9 @@ fn main() {
 		exit(1)
 	}
 	match os.args[1] {
-		'start' {
-			start(root) or {
+		'start', 'start-ipv4' {
+			mode := if os.args[1] == 'start-ipv4' { NetworkMode.ipv4_only } else { NetworkMode.user_default }
+			start(root, mode) or {
 				eprintln(err.msg())
 				exit(1)
 			}
