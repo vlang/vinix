@@ -54,6 +54,10 @@ const authenticator_exception_apk = '/Users/alex/.local/state/vinix/android/auth
 const authenticator_exception_apk_pin = 'c4e78b7c46d2d35f63d60bb8d45c3964ede94553f63e3cca9d0bebbcd261a941'
 const maps_network_apk = '/Users/alex/.local/state/vinix/android/maps-network-fixture-2026-10-29-r1/probe.apk'
 const maps_network_apk_pin = 'f66dfd858b52c1b7da9c2bac635106cc33a956a425860b86527cdc909e88ad43'
+const auth_worker_api_runner = '/Users/alex/.local/state/vinix/android/auth-worker-api-run-2026-10-29-r1/run'
+const auth_worker_api_runner_pin = '35bb212db62c2734ecf1198deddee04f20a8761d4b3cfb383cd978d4670856e9'
+const maps_network_v2_apk = '/Users/alex/.local/state/vinix/android/maps-network-tls-v2-fixture-2026-10-29-r1/probe.apk'
+const maps_network_v2_apk_pin = 'abfa8127b920dd7156d3cdee056a98d725411c6b5b2f8cb081149393c0b9c051'
 const file_limit = 32 * 1024 * 1024
 const request_limit = 12
 const seconds_limit = 600
@@ -300,13 +304,19 @@ fn auth_exception_api_assets() []Asset {
 		Asset{url: '/maps-network.apk', path: maps_network_apk, sha256: maps_network_apk_pin}]
 }
 
-fn serve(root string, port string, is_direct_boot bool, is_credential_storage bool, is_broadcast_result bool, is_onboarding_api bool, is_application_restrictions bool, is_auth_exception_api bool) ! {
+fn auth_worker_api_assets() []Asset {
+	return [Asset{url: '/auth-worker-api-run', path: auth_worker_api_runner, sha256: auth_worker_api_runner_pin},
+		Asset{url: '/authenticator-exception.apk', path: authenticator_exception_apk, sha256: authenticator_exception_apk_pin},
+		Asset{url: '/maps-network-v2.apk', path: maps_network_v2_apk, sha256: maps_network_v2_apk_pin}]
+}
+
+fn serve(root string, port string, is_direct_boot bool, is_credential_storage bool, is_broadcast_result bool, is_onboarding_api bool, is_application_restrictions bool, is_auth_exception_api bool, is_auth_worker_api bool) ! {
 	$if !net_nonblocking_sockets ? { return error('build with -d net_nonblocking_sockets for socket deadlines') }
 	external(root)!
 	if port == '' || port.len > 5 || !port.bytes().all(it >= `0` && it <= `9`)
 		|| port.u64() > 65535 || port != port.u64().str() { return error('canonical port 0..65535 required') }
 	if unsafe { C.mkdir(root.str, 0o700) } != 0 { return error('fresh private output directory required') }
-	inputs := if is_auth_exception_api { auth_exception_api_assets() } else if is_application_restrictions { application_restrictions_assets() } else if is_onboarding_api { onboarding_api_assets() } else if is_broadcast_result { broadcast_result_assets() } else if is_credential_storage { credential_storage_assets() } else if is_direct_boot { direct_boot_assets() } else { pinned_assets() }
+	inputs := if is_auth_worker_api { auth_worker_api_assets() } else if is_auth_exception_api { auth_exception_api_assets() } else if is_application_restrictions { application_restrictions_assets() } else if is_onboarding_api { onboarding_api_assets() } else if is_broadcast_result { broadcast_result_assets() } else if is_credential_storage { credential_storage_assets() } else if is_direct_boot { direct_boot_assets() } else { pinned_assets() }
 	mut assets := []Asset{}
 	for asset in inputs { assets << snapshot(asset, root + asset.url)! }
 	mut listener := net.listen_tcp(.ip, '127.0.0.1:' + port)!
@@ -314,7 +324,7 @@ fn serve(root string, port string, is_direct_boot bool, is_credential_storage bo
 	address := listener.addr()!.str()
 	deadline := time.now().add(seconds_limit * time.second)
 	write_json(root + '/ready.json', json2.encode({
-		'kind': json2.Any(if is_auth_exception_api { 'vinix-auth-exception-api-http-v1' } else if is_application_restrictions { 'vinix-application-restrictions-http-v1' } else if is_onboarding_api { 'vinix-onboarding-api-http-v1' } else if is_broadcast_result { 'vinix-broadcast-result-http-v1' } else if is_credential_storage { 'vinix-credential-storage-http-v1' } else if is_direct_boot { 'vinix-direct-boot-http-v1' } else { 'vinix-service-query-http-v1' })
+		'kind': json2.Any(if is_auth_worker_api { 'vinix-auth-worker-api-http-v1' } else if is_auth_exception_api { 'vinix-auth-exception-api-http-v1' } else if is_application_restrictions { 'vinix-application-restrictions-http-v1' } else if is_onboarding_api { 'vinix-onboarding-api-http-v1' } else if is_broadcast_result { 'vinix-broadcast-result-http-v1' } else if is_credential_storage { 'vinix-credential-storage-http-v1' } else if is_direct_boot { 'vinix-direct-boot-http-v1' } else { 'vinix-service-query-http-v1' })
 		'scope': json2.Any(scope)
 		'address': json2.Any(address)
 		'deadline_utc': json2.Any(deadline.str())
@@ -341,12 +351,13 @@ fn main() {
 	is_onboarding_api := os.args.len == 5 && os.args[1] == 'serve' && os.args[2] == '--onboarding-apis'
 	is_application_restrictions := os.args.len == 5 && os.args[1] == 'serve' && os.args[2] == '--application-restrictions'
 	is_auth_exception_api := os.args.len == 5 && os.args[1] == 'serve' && os.args[2] == '--auth-exception-apis'
-	if !is_direct_boot && !is_credential_storage && !is_broadcast_result && !is_onboarding_api && !is_application_restrictions && !is_auth_exception_api && (os.args.len != 4 || os.args[1] != 'serve') {
-		eprintln('usage: service-query-transfer serve [--direct-boot|--credential-storage|--broadcast-result|--onboarding-apis|--application-restrictions|--auth-exception-apis] FRESH_EXTERNAL_DIR PORT | --self-test FRESH_EXTERNAL_DIR')
+	is_auth_worker_api := os.args.len == 5 && os.args[1] == 'serve' && os.args[2] == '--auth-worker-apis'
+	if !is_direct_boot && !is_credential_storage && !is_broadcast_result && !is_onboarding_api && !is_application_restrictions && !is_auth_exception_api && !is_auth_worker_api && (os.args.len != 4 || os.args[1] != 'serve') {
+		eprintln('usage: service-query-transfer serve [--direct-boot|--credential-storage|--broadcast-result|--onboarding-apis|--application-restrictions|--auth-exception-apis|--auth-worker-apis] FRESH_EXTERNAL_DIR PORT | --self-test FRESH_EXTERNAL_DIR')
 		exit(2)
 	}
-	offset := if is_direct_boot || is_credential_storage || is_broadcast_result || is_onboarding_api || is_application_restrictions || is_auth_exception_api { 1 } else { 0 }
-	serve(os.args[2 + offset], os.args[3 + offset], is_direct_boot, is_credential_storage, is_broadcast_result, is_onboarding_api, is_application_restrictions, is_auth_exception_api) or { eprintln(err); exit(1) }
+	offset := if is_direct_boot || is_credential_storage || is_broadcast_result || is_onboarding_api || is_application_restrictions || is_auth_exception_api || is_auth_worker_api { 1 } else { 0 }
+	serve(os.args[2 + offset], os.args[3 + offset], is_direct_boot, is_credential_storage, is_broadcast_result, is_onboarding_api, is_application_restrictions, is_auth_exception_api, is_auth_worker_api) or { eprintln(err); exit(1) }
 }
 
 fn get(address string, request string) !string {
@@ -381,6 +392,18 @@ fn self_test(root string) ! {
 	assert application_restrictions_assets().map(it.url) == ['/application-restrictions-run', '/application-restrictions.apk']
 	assert auth_exception_api_assets().len == 3
 	assert auth_exception_api_assets().map(it.url) == ['/auth-exception-api-run', '/authenticator-exception.apk', '/maps-network.apk']
+	assert auth_worker_api_assets().len == 3
+	assert auth_worker_api_assets().map(it.url) == ['/auth-worker-api-run', '/authenticator-exception.apk', '/maps-network-v2.apk']
+	for index, asset in auth_worker_api_assets() {
+		assert valid_digest(asset.sha256)
+		if index == 1 {
+			assert asset == auth_exception_api_assets()[1]
+		} else {
+			for older in [pinned_assets(), direct_boot_assets(), credential_storage_assets(), broadcast_result_assets(), onboarding_api_assets(), application_restrictions_assets(), auth_exception_api_assets()] {
+				for old in older { assert asset.path != old.path && asset.sha256 != old.sha256 }
+			}
+		}
+	}
 	for asset in auth_exception_api_assets() {
 		assert valid_digest(asset.sha256)
 		for older in [pinned_assets(), direct_boot_assets(), credential_storage_assets(), broadcast_result_assets(), onboarding_api_assets(), application_restrictions_assets()] {

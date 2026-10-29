@@ -39,6 +39,7 @@ const ready_marker = 'ANDROID-WS-READY backend=vinix-native'
 const serial_prefix = 'VINIX-SERVICE-QUERY-RESULTS-1 '
 const log_limit = 4 * 1024 * 1024
 const line_limit = 8192
+const auth_worker_native_sha = '0ef0acd98c148b9b972f754e5fb1e23683e8dc7d0b56f05d2f0a4c7792206136'
 
 struct FixtureProfile {
 	name          string
@@ -94,6 +95,26 @@ fn maps_network_profile() FixtureProfile {
 		native_sha: 'cce3eb926d3bc8b2b3c9e9a4f0d42cc4ab6bfdc23b0532beb2c42f5f9b384791'
 		pass_marker: 'MAPS-NETWORK-PASS observations-complete'
 		scope: 'standalone credential-free network observations; completion does not establish DNS, TCP, TLS or Google login success; validate the finite observation sequence separately'
+	}
+}
+
+fn authenticator_worker_profile() FixtureProfile {
+	base := authenticator_exception_profile()
+	return FixtureProfile{
+		...base
+		name: 'authenticator-worker-private-exception'
+		native_sha: auth_worker_native_sha
+	}
+}
+
+fn maps_network_v2_profile() FixtureProfile {
+	base := maps_network_profile()
+	return FixtureProfile{
+		...base
+		name: 'maps-network-tls-v2-observations'
+		apk_sha: 'abfa8127b920dd7156d3cdee056a98d725411c6b5b2f8cb081149393c0b9c051'
+		native_sha: auth_worker_native_sha
+		pass_marker: 'MAPS-NETWORK-V2-PASS observations-complete'
 	}
 }
 
@@ -201,7 +222,7 @@ fn health(line string, expected_marker string) ! {
 	}
 	if (line.contains('CHILD-ATTACH-PASS') || line.contains('SETTINGS-GLOBAL-PASS')
 		|| line.contains('APPLICATION-RESTRICTIONS-PASS') || line.contains('AUTHENTICATOR-BASE-PASS')
-		|| line.contains('MAPS-NETWORK-PASS')) && line != expected_marker {
+		|| line.contains('MAPS-NETWORK-PASS') || line.contains('MAPS-NETWORK-V2-PASS')) && line != expected_marker {
 		return error('conflicting fixture marker')
 	}
 }
@@ -402,7 +423,7 @@ fn export_evidence(output string) ! {
 
 fn selftest() ! {
 	mut cases := 0
-	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile()]
+	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile(), authenticator_worker_profile(), maps_network_v2_profile()]
 	require(child_attach_profile().framework_sha == framework_sha
 		&& settings_global_profile().framework_sha == framework_sha
 		&& application_restrictions_profile().framework_sha != framework_sha, 'exact per-profile framework identities')!
@@ -410,8 +431,14 @@ fn selftest() ! {
 		&& authenticator_exception_profile().native_sha == 'cce3eb926d3bc8b2b3c9e9a4f0d42cc4ab6bfdc23b0532beb2c42f5f9b384791', 'exact diagnostic runtime identities')!
 	require(maps_network_profile().framework_sha == authenticator_exception_profile().framework_sha
 		&& maps_network_profile().native_sha == authenticator_exception_profile().native_sha, 'network observations use the same pinned runtime')!
+	require(authenticator_worker_profile().native_sha == maps_network_v2_profile().native_sha
+		&& authenticator_worker_profile().native_sha != authenticator_exception_profile().native_sha
+		&& maps_network_v2_profile().framework_sha == maps_network_profile().framework_sha
+		&& maps_network_v2_profile().apk_sha != maps_network_profile().apk_sha, 'worker and TLS-v2 identities are distinct opt-ins')!
 	for profile in profiles {
-		for pin in [profile.apk_sha, profile.framework_sha] {
+		mut pins := [profile.apk_sha, profile.framework_sha]
+		if profile.native_sha != '' { pins << profile.native_sha }
+		for pin in pins {
 			require(pin.len == 64 && pin.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`)), 'canonical profile SHA256')!
 		}
 		good := profile.pass_marker + '\n' + ready_marker + '\n'
@@ -430,6 +457,14 @@ fn selftest() ! {
 		}
 		for other in profiles {
 			if other.name == profile.name { continue }
+			// The worker regression uses the same APK on a different pinned
+			// native runtime. Its log marker alone cannot identify that runtime.
+			if other.pass_marker == profile.pass_marker {
+				require(other.apk_sha == profile.apk_sha && other.framework_sha == profile.framework_sha
+					&& other.native_sha != '' && profile.native_sha != '' && other.native_sha != profile.native_sha,
+					'shared fixture marker requires distinct pinned native runtimes')!
+				continue
+			}
 			mut rejected := false
 			check_log(good, other.pass_marker) or { rejected = true }
 			require(rejected, 'checker accepted another profile marker')!
@@ -454,9 +489,11 @@ fn run() ! {
 		return
 	}
 	mut arguments := os.args[1..]
-	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network'],
-		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
+	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network', '--authenticator-worker', '--maps-network-v2'],
+		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network|--authenticator-worker|--maps-network-v2) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
 	profile := if arguments[0] == '--authenticator-private-exception' { authenticator_exception_profile() }
+		else if arguments[0] == '--authenticator-worker' { authenticator_worker_profile() }
+		else if arguments[0] == '--maps-network-v2' { maps_network_v2_profile() }
 		else if arguments[0] == '--maps-network' { maps_network_profile() }
 		else if arguments[0] == '--application-restrictions' { application_restrictions_profile() }
 		else if arguments[0] == '--child-attach' { child_attach_profile() } else { settings_global_profile() }
