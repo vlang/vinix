@@ -81,7 +81,17 @@ It passes archive verification, complete reconstruction and comparison, and
 its unchanged saved auditor at the original recorded path. The restored tree
 was then retained separately; a further complete comparison passes after the
 original bundle and persistent archive are returned to their recorded paths.
-No historical checker was changed or weakened, and all originals remain.
+No historical checker was changed or weakened, and no evidence was lost.
+
+Cold-storage update: the expanded `CACHE/session-transfer-probe-20261029` copy
+was later retired to make room for the protocol checkpoint. Its persistent
+archive and required prior remain at the paths below; the complete restored
+tree remains at `RAM/probe-restored`. Before retirement, the archive and prior
+were verified again and the expanded/restored trees passed another complete
+byte/type/permission comparison. The earlier unchanged original-path auditor
+had passed. Receipts are `WORK/session-protocol-cold-retire-{compare,verify}-20261029.log`
+and `WORK/session-protocol-cold-retirement-20261029.txt`. Restore the complete
+archive at the original recorded path before rerunning this historical auditor.
 
 ```text
 CACHE: /Users/alex/Library/Caches/vinix-ios
