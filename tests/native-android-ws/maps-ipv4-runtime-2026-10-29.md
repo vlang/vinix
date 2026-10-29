@@ -37,13 +37,22 @@ shows no map imagery and displays a 24-minute estimate.
 The private `ipv4-retry-private-01.png` screen shows Maps retrying
 `mobilemaps.googleapis.com/2001:4860:4802:38::87` on port 443 from
 `fe80::5054:ff:fe12:3456%eth0`, failing with `ECONNABORTED`. The prior run's
-`fec0` source is absent from this captured failure, but disabling backend IPv6
-did not force the Android request to use IPv4. After the complete result export,
+`fec0` source is absent from this captured failure, but IPv6 attempts continued.
+These exceptions may describe a final failed fallback; they do not establish
+IPv6-only address selection. After the complete result export,
 a separate guest `getent ahosts mobilemaps.googleapis.com` probe listed
 `216.239.38.135` before the IPv6 address (`ipv4-address-list-01.png`). That native
 resolver output does not establish Android/Maps resolver ordering or fallback.
 The failing connection does not by itself identify every imagery, decoding or
 texture-delivery issue.
+
+A later read-only metadata check of the same closed packet capture confirms an
+IPv4 SYN/SYN-ACK/ACK handshake with `216.239.38.135:443`, followed by TCP payload
+in both directions at 12:38:24. The exact bounded command was `tcpdump -nn -r
+VM/network.pcap -c 24 'host 216.239.38.135 and tcp port 443'`; its output contains
+packet metadata, without payload dumps. This proves IPv4 TCP exchange with that
+address, without establishing TLS, HTTP or Maps request success. The IPv6
+exception alone therefore cannot identify the full connection-attempt sequence.
 
 The controller ran from 12:35:26 to 12:45:25 with TLS tracing enabled and
 onboarding tracing disabled. It recorded service ready, no preparation error,
@@ -85,3 +94,13 @@ under 600 MiB RSS, 900 seconds, 64 MiB observed shared-volume growth and a 1 GiB
 reserve. Elapsed times were 4.921/2.827 seconds; peak sampled RSS was
 23,478,272/13,352,960 bytes. The complete bundle, including private screenshots
 and original UART, remains external; this report does not replace it.
+
+The separate metadata check is retained at
+`S/maps-network-metadata-2026-10-29-r1`, including its exact guard argv, output
+and plain tool/source-PCAP/log/guard hashes in `inputs.sha256`. The command exited
+zero with complete cleanup under 600 MiB RSS, 300 seconds, 64 MiB growth and a
+1 GiB reserve. This root's seal and independent complete readback both passed,
+under 600 MiB RSS, 900 seconds, 64 MiB growth and a 1 GiB reserve, at
+`S/maps-network-metadata-sealed-2026-10-29-r1/sealed/manifest.json`, SHA-256
+`e08a6d4a5c9a207f403134f3d6fbfb9d328400a5403adadb683c3670b6d66d7f`.
+The original closed R2 roots were not changed.
