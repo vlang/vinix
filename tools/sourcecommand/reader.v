@@ -91,9 +91,9 @@ fn spawn_reader_config(argv []string, environment map[string]string, directory s
 		C.posix_spawnattr_setflags(&attributes, flags)] {
 		if status != 0 { return error_with_code('cannot configure reader group', int(status)) }
 	}
-	mut arguments := []&char{}
-	for value in argv { arguments << unsafe { &char(value.str) } }
-	arguments << &char(unsafe { nil })
+	mut argv_pointers := []&char{}
+	for value in argv { argv_pointers << unsafe { &char(value.str) } }
+	argv_pointers << &char(unsafe { nil })
 	mut entries := []string{}
 	for name, value in environment {
 		if name.contains_any('=\x00') || value.contains('\x00') {
@@ -105,7 +105,7 @@ fn spawn_reader_config(argv []string, environment map[string]string, directory s
 	for value in entries { envp << unsafe { &char(value.str) } }
 	envp << &char(unsafe { nil })
 	mut pid := i32(0)
-	status := unsafe { C.posix_spawnp(&pid, argv[0].str, &actions, &attributes, arguments.data, envp.data) }
+	status := unsafe { C.posix_spawnp(&pid, argv[0].str, &actions, &attributes, argv_pointers.data, envp.data) }
 	if status != 0 { return error_with_code('cannot start reader command', int(status)) }
 	C.close(pipes[1])
 	pipes[1] = -1
