@@ -423,6 +423,37 @@ fn platform_fragments_profile() NarrowProfile {
  }
 }
 
+fn imageview_bounds_profile() NarrowProfile {
+ image := 'android/widget/ImageView.smali'
+ return NarrowProfile{
+  name: 'imageview-bounds'
+  baseline_name: 'combined-account-webview-platform-fragments-framework-2026-10-29-r1'
+  manifest_pin: '5b452702e033f72f9056f994b94295f7925958c62fcaad039827710368249bfb'
+  jar_pin: '6970582da55b15dd30391491d2be2213abe665fe0256167f45cccdd3de25bcd4'
+  baseline_classes: 2105
+  providers: ['framework_image_bounds.v']
+  calls: {image: 'framework_image_bounds_source'}
+  methods: {image: ['<init>(Landroid/content/Context;Landroid/util/AttributeSet;II)V',
+   'setMaxWidth(I)V', 'setMaxHeight(I)V', 'getMaxWidth()I', 'getMaxHeight()I']}
+  changed: {image: 3}
+  added: {image: 2}
+  fields: {image: ['.field private vinixMaxWidth:I', '.field private vinixMaxHeight:I']}
+ }
+}
+
+fn imageview_bounds_abi(source string) ! {
+ parts := store_parts(source)!
+ image := 'android/widget/ImageView.smali'
+ for signature in imageview_bounds_profile().methods[image]! {
+  flags := if signature.starts_with('<init>(') { 'public constructor' } else { 'public' }
+  expected := '.method ' + flags + ' ' + signature
+  method := parts.methods[signature] or { return error('missing ImageView bounds ABI member: ' + signature) }
+  if method.all_before('\n').trim_space() != expected {
+   return error('unexpected ImageView bounds method ABI: ' + signature)
+  }
+ }
+}
+
 fn platform_fragments_method_headers(target string) !map[string]string {
  profile := platform_fragments_profile()
  signatures := profile.methods[target] or { return error('unexpected platform fragment target') }
@@ -1145,6 +1176,7 @@ fn self_test() ! {
  binder_identity_self_test()!
  service_lifecycle_self_test()!
  platform_fragments_self_test()!
+ imageview_bounds_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -1241,6 +1273,66 @@ fn self_test() ! {
   return
  }
  return error('preexisting accessor accepted')
+}
+
+fn imageview_bounds_self_test() ! {
+ profile := imageview_bounds_profile()
+ image := 'android/widget/ImageView.smali'
+ allowed := profile.methods[image]!
+ fields := profile.fields[image]!
+ if profile.baseline_classes != 2105 || profile.methods.len != 1
+  || profile.calls != {image: 'framework_image_bounds_source'}
+  || profile.providers != ['framework_image_bounds.v'] || profile.extra_classes.len != 0
+  || profile.class_provider != '' || profile.directory_provider != '' {
+  return error('ImageView bounds require exactly one target and no class additions')
+ }
+ narrow_method_self_test(allowed, 3, 2)!
+ metadata := '.class public Landroid/widget/ImageView;\n.super Landroid/view/View;\n.field private retained:I\n'
+ retained := '.method public retained()V\n.locals 0\nreturn-void\n.end method\n'
+ mut before := metadata + retained
+ mut after := metadata + retained
+ for i, signature in allowed {
+  flags := if signature.starts_with('<init>(') { 'public constructor' } else { 'public' }
+  header := '.method ' + flags + ' ' + signature
+  if i < 3 { before += header + '\n.locals 1\nreturn-void\n.end method\n' }
+  after += header + '\n.locals 2\nreturn-void\n.end method\n'
+ }
+ after += fields.join('\n') + '\n'
+ narrow_member_delta(before, after, allowed, 3, 2, fields)!
+ imageview_bounds_abi(after)!
+ for bad in [after.replace(fields[0], ''), after.replace(fields[0], fields[0] + '\n' + fields[0]),
+  after.replace(fields[1], '.field public vinixMaxHeight:I'),
+  after.replace('.field private retained:I', '.field private retained:J'),
+  after.replace('public retained()V', 'private retained()V'), after + '.field private unrelated:I\n'] {
+  narrow_member_delta(before, bad, allowed, 3, 2, fields) or { continue }
+  return error('invalid ImageView bounds field or retained-member delta accepted')
+ }
+ for signature in allowed {
+  flags := if signature.starts_with('<init>(') { 'public constructor' } else { 'public' }
+  header := '.method ' + flags + ' ' + signature
+  for replacement in [header.replace('public', 'private'), header.replace('.method ', '.method static '),
+   header.replace('.method ', '.method native ')] {
+   imageview_bounds_abi(after.replace(header, replacement)) or { continue }
+   return error('invalid ImageView bounds method flags accepted: ' + signature)
+  }
+ }
+ mut old_classes := {image: 'old'}
+ for i in 0 .. 2104 { old_classes['other/' + i.str() + '.smali'] = 'same' }
+ mut good := old_classes.clone()
+ good[image] = 'new'
+ narrow_profile_class_delta(old_classes, good, [image], []string{}, 2105)!
+ for case in 0 .. 5 {
+  mut bad := good.clone()
+  match case {
+   0 { bad[image] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(image) }
+   3 { bad['unrelated.smali'] = 'added' }
+   else { bad.delete(image); bad['substituted.smali'] = 'new' }
+  }
+  narrow_profile_class_delta(old_classes, bad, [image], []string{}, 2105) or { continue }
+  return error('invalid ImageView-only class delta accepted')
+ }
 }
 
 // Narrow follow-ups retain the complete pinned class set and allow only their
@@ -1353,6 +1445,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'platform-fragments' {
    platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)!
   }
+  if profile.name == 'imageview-bounds' { imageview_bounds_abi(os.read_file(root + '/smali/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -1373,6 +1466,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'platform-fragments' {
    platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)!
   }
+  if profile.name == 'imageview-bounds' { imageview_bounds_abi(os.read_file(root + '/new-dex/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -1647,11 +1741,11 @@ fn main() {
   println('COMBINED-FRAMEWORK-INTEGRITY-PASS ' + os.args[3])
   return
  }
- if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments'] {
-  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } else { onboarding_profile() } }
+ if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds'] {
+  profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
