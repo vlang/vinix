@@ -51,6 +51,11 @@ const platform_fragments_framework_sha = '6970582da55b15dd30391491d2be2213abe665
 const platform_fragments_native_sha = '613c6b2c7b1e816a5d7b0694d626a52a5b4df19604a6a224df99ad13055aa74c'
 const platform_fragments_apk_sha = 'f2e08f444782607a408bd25766da399100e908cf2b99edeebcfb80d267dc21de'
 const platform_fragments_pass_marker = 'PLATFORM-FRAGMENTS-PASS stable-manager tagged-queue fifo-once application-injection lifecycle-order late-add host-isolation callback-identity'
+// ImageView properties use their separately signed fixture and coupled runtime.
+const image_bounds_framework_sha = '9cfdbeaff047b693837508c3f7676510a63c05af118e864964b4b432fb813af9'
+const image_bounds_native_sha = 'fd38d7f8e3c0d17934617242cb95b0412a0c6ed676cb4454e5a52c8cf494dc2c'
+const image_bounds_apk_sha = '7d11a0e6d71b6c556a57f84fd5f27610157f0a49735282f0bb31aaac0ff00a62'
+const image_bounds_pass_marker = 'IMAGE-BOUNDS-PASS defaults setters axis-isolation instance-isolation styled-dimensions'
 
 struct FixtureProfile {
 	name          string
@@ -173,6 +178,17 @@ fn platform_fragments_profile() FixtureProfile {
 	}
 }
 
+fn image_bounds_profile() FixtureProfile {
+	return FixtureProfile{
+		name: 'image-bounds'
+		apk_sha: image_bounds_apk_sha
+		framework_sha: image_bounds_framework_sha
+		native_sha: image_bounds_native_sha
+		pass_marker: image_bounds_pass_marker
+		scope: 'standalone ImageView maximum-dimension property regression; measurement, GMS and Google authentication are not exercised'
+	}
+}
+
 struct Configuration {
 	runtime   string
 	apk       string
@@ -279,7 +295,7 @@ fn health(line string, expected_marker string) ! {
 		|| line.contains('APPLICATION-RESTRICTIONS-PASS') || line.contains('AUTHENTICATOR-BASE-PASS')
 		|| line.contains('MAPS-NETWORK-PASS') || line.contains('MAPS-NETWORK-V2-PASS')
 		|| line.contains('MAPS-NETWORK-V3-PASS') || line.contains('SERVICE-LIFECYCLE-PASS')
-		|| line.contains('PLATFORM-FRAGMENTS-PASS')) && line != expected_marker {
+		|| line.contains('PLATFORM-FRAGMENTS-PASS') || line.contains('IMAGE-BOUNDS-PASS')) && line != expected_marker {
 		return error('conflicting fixture marker')
 	}
 }
@@ -480,7 +496,7 @@ fn export_evidence(output string) ! {
 
 fn selftest() ! {
 	mut cases := 0
-	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile(), authenticator_worker_profile(), maps_network_v2_profile(), authenticator_binder_identity_profile(), maps_network_v3_profile(), service_lifecycle_profile(), platform_fragments_profile()]
+	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile(), authenticator_worker_profile(), maps_network_v2_profile(), authenticator_binder_identity_profile(), maps_network_v3_profile(), service_lifecycle_profile(), platform_fragments_profile(), image_bounds_profile()]
 	require(child_attach_profile().framework_sha == framework_sha
 		&& settings_global_profile().framework_sha == framework_sha
 		&& application_restrictions_profile().framework_sha != framework_sha, 'exact per-profile framework identities')!
@@ -509,6 +525,10 @@ fn selftest() ! {
 		&& platform_fragments_profile().native_sha != service_lifecycle_profile().native_sha
 		&& platform_fragments_profile().apk_sha != service_lifecycle_profile().apk_sha,
 		'platform fragments requires its distinct framework, exception-restore native and fixture')!
+	require(image_bounds_profile().framework_sha != platform_fragments_profile().framework_sha
+		&& image_bounds_profile().native_sha.len == 64
+		&& image_bounds_profile().apk_sha != platform_fragments_profile().apk_sha,
+		'ImageView bounds requires its distinct framework and fixture with an exact coupled native pin')!
 	for profile in profiles {
 		mut pins := [profile.apk_sha, profile.framework_sha]
 		if profile.native_sha != '' { pins << profile.native_sha }
@@ -554,7 +574,7 @@ fn selftest() ! {
 		cases++
 	}
 	require(canonical('/var/lib/onboarding-api-r1'), 'canonical path rejected')!
-	for selector in ['--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments'] {
+	for selector in ['--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments', '--image-bounds'] {
 		full := [selector, '/runtime', '/fixture.apk', '10117', '10117', '/results']
 		for count in 1 .. full.len {
 			mut argv := [os.executable()]
@@ -583,9 +603,10 @@ fn run() ! {
 		return
 	}
 	mut arguments := os.args[1..]
-	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network', '--authenticator-worker', '--maps-network-v2', '--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments'],
-		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network|--authenticator-worker|--maps-network-v2|--authenticator-binder-identity|--maps-network-v3|--service-lifecycle|--platform-fragments) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
+	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network', '--authenticator-worker', '--maps-network-v2', '--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments', '--image-bounds'],
+		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network|--authenticator-worker|--maps-network-v2|--authenticator-binder-identity|--maps-network-v3|--service-lifecycle|--platform-fragments|--image-bounds) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
 	profile := if arguments[0] == '--authenticator-private-exception' { authenticator_exception_profile() }
+		else if arguments[0] == '--image-bounds' { image_bounds_profile() }
 		else if arguments[0] == '--platform-fragments' { platform_fragments_profile() }
 		else if arguments[0] == '--service-lifecycle' { service_lifecycle_profile() }
 		else if arguments[0] == '--authenticator-binder-identity' { authenticator_binder_identity_profile() }
