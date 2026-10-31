@@ -3,10 +3,14 @@ module ext2
 
 import errno
 
+// Preserve native size_t in C interfaces on the pinned and current compilers.
+@[typedef]
+pub type C.size_t = u64
+
 // V promotes mutable metadata receivers even through unsafe addresses and
 // fixed arrays. Native, function-scoped scratch storage makes their lifetime
 // explicit; raw cache I/O copies the bytes before returning.
-fn C.__builtin_alloca(usize) voidptr
+fn C.__builtin_alloca(C.size_t) voidptr
 
 const ea_magic = u32(0xea020000)
 const ea_header_size = 32

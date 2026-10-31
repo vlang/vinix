@@ -2,9 +2,13 @@ module main
 
 import os
 
+// Preserve native size_t in C interfaces on the pinned and current compilers.
+@[typedef]
+pub type C.size_t = u64
+
 #include <sys/mount.h>
 
-fn C.mount(source &char, target &char, filesystem &char, flags usize, data voidptr) i32
+fn C.mount(source &char, target &char, filesystem &char, flags C.size_t, data voidptr) i32
 
 fn main() {
 	// Get command line options, and set defaults.

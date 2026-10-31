@@ -5,8 +5,12 @@ import kprint
 import krandom
 import sched
 
+// Preserve native size_t in C interfaces on the pinned and current compilers.
+@[typedef]
+pub type C.size_t = u64
+
 @[export: 'vinix_linuxkpi_log_write']
-fn log_write(text &char, length usize) {
+fn log_write(text &char, length C.size_t) {
 	assert may_sleep()
 	kprint.kwrite(text, u64(length))
 }

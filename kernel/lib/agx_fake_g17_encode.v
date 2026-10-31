@@ -5,6 +5,10 @@
 @[translated]
 module lib
 
+// Preserve native size_t in C interfaces on the pinned and current compilers.
+@[typedef]
+pub type C.size_t = u64
+
 #include "agx_fake_g17_encode.h"
 
 pub struct C.vinix_fake_g17_encoder_inputs {
@@ -22,10 +26,10 @@ fn g17_width(value u64, bytes u32) u64 {
 	}
 }
 
-fn g17_load(buffer &u8, offset usize, bytes u32, is_signed i32) u64 {
+fn g17_load(buffer &u8, offset u64, bytes u32, is_signed i32) u64 {
 	unsafe {
 	value := u64(0)
-	for i := u32(0); i < bytes; i++ { value |= u64(buffer[offset + usize(i)]) << (8 * i) }
+	for i := u32(0); i < bytes; i++ { value |= u64(buffer[offset + u64(i)]) << (8 * i) }
 	if !is_signed || bytes == u32(8) {
 		return g17_width(value, bytes)
 	}
@@ -1078,16 +1082,16 @@ fn g17_next(event u32, descriptor &u8, command &u8, inputs &C.vinix_fake_g17_enc
 }
 
 @[export: 'vinix_fake_g17_encoder_inputs_size']
-fn fake_g17_encoder_inputs_size() usize { return sizeof(C.vinix_fake_g17_encoder_inputs) }
+fn fake_g17_encoder_inputs_size() C.size_t { return sizeof(C.vinix_fake_g17_encoder_inputs) }
 
 @[export: 'vinix_fake_g17_encode_3d']
-fn fake_g17_encode_3d(command_pointer voidptr, command_bytes usize, descriptor_pointer voidptr, descriptor_bytes usize, command_gpu_address u64, inputs &C.vinix_fake_g17_encoder_inputs, writes &C.vinix_fake_g17_expected_write, write_capacity u32, write_count &u32) i32 {
+fn fake_g17_encode_3d(command_pointer voidptr, command_bytes C.size_t, descriptor_pointer voidptr, descriptor_bytes C.size_t, command_gpu_address u64, inputs &C.vinix_fake_g17_encoder_inputs, writes &C.vinix_fake_g17_expected_write, write_capacity u32, write_count &u32) i32 {
     unsafe {
         command := &u8(command_pointer)
         descriptor := &u8(descriptor_pointer)
-        if usize(command) == 0 || command_bytes < usize(C.VINIX_FAKE_G17_COMMAND_BYTES)
-            || usize(descriptor) == 0 || descriptor_bytes < usize(C.VINIX_FAKE_G17_DESCRIPTOR_BYTES)
-            || command_gpu_address == 0 || usize(inputs) == 0 || usize(writes) == 0 || usize(write_count) == 0 {
+        if u64(command) == 0 || command_bytes < u64(C.VINIX_FAKE_G17_COMMAND_BYTES)
+            || u64(descriptor) == 0 || descriptor_bytes < u64(C.VINIX_FAKE_G17_DESCRIPTOR_BYTES)
+            || command_gpu_address == 0 || u64(inputs) == 0 || u64(writes) == 0 || u64(write_count) == 0 {
             return C.VINIX_FAKE_G17_ENCODE_INVALID_ARGUMENT
         }
         *write_count = 0
@@ -1095,21 +1099,21 @@ fn fake_g17_encode_3d(command_pointer voidptr, command_bytes usize, descriptor_p
 
         mut produced := u32(0)
         for pass := u32(0); pass < u32(C.VINIX_FAKE_G17_REGISTER_PASSES); pass++ {
-            base := usize(pass) * usize(C.VINIX_FAKE_G17_REGISTER_STRIDE)
-            stream_offset := base + usize(C.VINIX_FAKE_G17_STREAM_OFFSET)
-            metadata_offset := base + usize(C.VINIX_FAKE_G17_METADATA_OFFSET)
-            summary_offset := usize(C.VINIX_FAKE_G17_SUMMARY_OFFSET) + usize(pass) * usize(C.VINIX_FAKE_G17_SUMMARY_STRIDE)
+            base := u64(pass) * u64(C.VINIX_FAKE_G17_REGISTER_STRIDE)
+            stream_offset := base + u64(C.VINIX_FAKE_G17_STREAM_OFFSET)
+            metadata_offset := base + u64(C.VINIX_FAKE_G17_METADATA_OFFSET)
+            summary_offset := u64(C.VINIX_FAKE_G17_SUMMARY_OFFSET) + u64(pass) * u64(C.VINIX_FAKE_G17_SUMMARY_STRIDE)
             if command_gpu_address > u64(-1) - u64(stream_offset) { return C.VINIX_FAKE_G17_ENCODE_INVALID_ARGUMENT }
             stream_gpu_address := command_gpu_address + u64(stream_offset)
             mut event := u32(0x104)
             mut count := u16(0)
             for event != 0 {
-                if usize(count + 1) * usize(C.VINIX_FAKE_G17_ENTRY_BYTES) > usize(C.VINIX_FAKE_G17_STREAM_BYTES) { return C.VINIX_FAKE_G17_ENCODE_STREAM_OVERFLOW }
+                if u64(count + 1) * u64(C.VINIX_FAKE_G17_ENTRY_BYTES) > u64(C.VINIX_FAKE_G17_STREAM_BYTES) { return C.VINIX_FAKE_G17_ENCODE_STREAM_OVERFLOW }
                 mut selector := u32(0)
                 mut mode := u32(0)
                 mut value := u64(0)
                 if g17_event(event, descriptor, command, inputs, pass, &selector, &mode, &value) == 0 { return C.VINIX_FAKE_G17_ENCODE_GRAPH }
-                entry := command + stream_offset + usize(count) * usize(C.VINIX_FAKE_G17_ENTRY_BYTES)
+                entry := command + stream_offset + u64(count) * u64(C.VINIX_FAKE_G17_ENTRY_BYTES)
                 mut selector_word := g17_read32(entry)
                 writes[produced] = C.vinix_fake_g17_expected_write{
                     value: value
@@ -1134,7 +1138,7 @@ fn fake_g17_encode_3d(command_pointer voidptr, command_bytes usize, descriptor_p
             g17_write16(command + metadata_offset + 10, count * u16(C.VINIX_FAKE_G17_ENTRY_BYTES))
             g17_write64(descriptor + summary_offset, stream_gpu_address)
             g17_write16(descriptor + summary_offset + 8, count)
-            for i := usize(10); i < 16; i++ { descriptor[summary_offset + i] = 0 }
+            for i := u64(10); i < 16; i++ { descriptor[summary_offset + i] = 0 }
         }
         *write_count = produced
         return C.VINIX_FAKE_G17_ENCODE_OK

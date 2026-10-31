@@ -18,6 +18,10 @@ import proc
 import resource
 import usercopy
 
+// Preserve native size_t in C interfaces on the pinned and current compilers.
+@[typedef]
+pub type C.size_t = u64
+
 // clone(2) flags. Only the ones that change what we build are listed.
 pub const clone_vm = u64(0x00000100)
 pub const clone_fs = u64(0x00000200)
@@ -494,7 +498,7 @@ struct ChildChange {
 	err    u64
 }
 
-fn C.__builtin_alloca(usize) voidptr
+fn C.__builtin_alloca(C.size_t) voidptr
 
 fn wake_child_waiters(mut parent proc.Process) {
 	parent.children_lock.acquire()

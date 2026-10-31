@@ -31,7 +31,7 @@ pub fn fprintf_entry(_ voidptr, format &char, args voidptr) i32 {
 
 @[export: 'vp_arg_string']
 pub fn arg_string(args voidptr) &char {
-	return unsafe { &char(usize(abiargs.word(args))) }
+	return unsafe { &char(u64(abiargs.word(args))) }
 }
 
 @[export: 'vp_arg_int']
