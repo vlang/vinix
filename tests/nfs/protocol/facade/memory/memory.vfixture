@@ -1,0 +1,9 @@
+module memory
+fn C.free(voidptr)
+fn C.vheap_free(voidptr)
+pub fn malloc_packed_fallible(n u64) voidptr { return unsafe { malloc(int(n)) } }
+// Use the same manual-free primitive, including optional heap accounting hooks.
+pub fn free(p voidptr) {
+	$if track_heap ? { C.vheap_free(p) }
+	C.free(p)
+}

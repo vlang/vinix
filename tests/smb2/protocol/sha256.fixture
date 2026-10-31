@@ -1,0 +1,10 @@
+module krandom
+import crypto.sha256
+pub fn explicit_bzero(data voidptr, length usize) {
+	for i in 0 .. int(length) { unsafe { (&u8(data))[i] = 0 } }
+}
+pub fn sha256_digest(data &u8, length u64, output &[32]u8) {
+	bytes := unsafe { data.vbytes(int(length)) }
+	digest := sha256.sum(bytes)
+	for i in 0..32 { unsafe { output[i] = digest[i] } }
+}

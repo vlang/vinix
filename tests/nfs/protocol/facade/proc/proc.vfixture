@@ -1,0 +1,8 @@
+module proc
+pub const policy_inspect = 1
+pub const mac_inspect = 1
+pub struct Process { pub: euid u32 egid u32 groups []u32 }
+pub struct Thread { pub: process &Process = unsafe { nil } }
+pub fn current_thread() &Thread { return unsafe { nil } }
+pub fn lock_table() {}
+pub fn unlock_table() {}

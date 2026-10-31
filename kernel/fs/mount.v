@@ -206,7 +206,7 @@ fn record_mount(mut table MountTable, covered &VFSNode, root &VFSNode, source st
 		source:  source.clone()
 		fstype:  fstype.clone()
 		flags:   flags & ms_per_mount
-		options: options.clone()
+		options: public_mount_options(root, options).clone()
 	}
 	lib.copy_mount_context(&entry.parent, parent_mount)
 	if voidptr(covered) != voidptr(root) {
@@ -373,6 +373,7 @@ fn optional_user_string(pointer charptr, limit int) string {
 	// Sized up front: a buffer that grows leaves each outgrown one behind.
 	mut bytes := []u8{cap: limit} @[freed]
 	defer {
+		erase_mount_scratch(bytes.data, usize(bytes.len))
 		unsafe { bytes.free() }
 	}
 	for i := 0; i < limit; i++ {
@@ -413,7 +414,7 @@ pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mount
 	}
 	defer { unsafe { fstype.free() } }
 	options := optional_user_string(charptr(data), 4096)
-	defer { unsafe { options.free() } }
+	defer { free_mount_options(options) }
 	mut flags := mountflags
 	// Old programs still put MS_MGC_VAL in the top half of the flags.
 	if flags & 0xffff0000 == 0xc0ed0000 {
@@ -514,7 +515,14 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	mut resolving := true
 	defer { if resolving { vfs_lock.release() } }
 	mut source_node := &VFSNode(unsafe { nil })
-	if source.len != 0 && kind !in pseudo_filesystems {
+	// Probe the registered template without instantiating or boxing it. Only
+	// opt-in backends interpret source as a specifier rather than a VFS path.
+	mut raw_specifier := false
+	if kind in filesystems {
+		template := unsafe { filesystems[kind] }
+		raw_specifier = template != unsafe { nil } && template is MountSpecifier
+	}
+	if source.len != 0 && kind !in pseudo_filesystems && !raw_specifier {
 		_, source_node, _ = walk_path(parent, source, 0, true)
 		if voidptr(source_node) == unsafe { nil } {
 			errno.set(errno.enoent)
@@ -631,9 +639,17 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 			unsafe { basename.free() }
 			return none
 		}
-		mount_node = f_sys.mount(parent_of_tgt_node, basename, source_node) or {
-			unsafe { basename.free() }
-			return none
+		if raw_specifier {
+			mount_node = mount_filesystem_specifier(mut f_sys, parent_of_tgt_node, basename,
+				source, flags, options) or {
+				unsafe { basename.free() }
+				return none
+			}
+		} else {
+			mount_node = f_sys.mount(parent_of_tgt_node, basename, source_node) or {
+				unsafe { basename.free() }
+				return none
+			}
 		}
 	}
 	if mount_node.read_only { mount_flags |= ms_rdonly }
@@ -1091,7 +1107,7 @@ fn remount(parent &VFSNode, target string, flags u64, options string) ? {
 	entry.flags = flags & ms_per_mount
 	if flags & ms_bind == 0 && options.len > 0 && options != entry.options {
 		// The old options may be another namespace's too, so they stay.
-		entry.options = options.clone()
+		entry.options = public_mount_options(entry.root, options).clone()
 	}
 }
 
