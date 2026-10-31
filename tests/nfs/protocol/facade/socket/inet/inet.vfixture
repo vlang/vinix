@@ -1,0 +1,19 @@
+module inet
+import klock
+import stat
+import event.eventstruct
+pub struct SockaddrIn { pub mut: sin_family u16 sin_port u16 sin_addr u32 sin_zero [8]u8 }
+pub struct InetSocket { pub mut: refcount int stat stat.Stat l klock.Lock event eventstruct.Event status int can_mmap bool }
+pub fn create(_ int, _ int) ?&InetSocket { return none }
+pub fn (mut s InetSocket) sendto(_ voidptr, _ voidptr, _ u64, _ voidptr, _ u32) ?i64 { return none }
+pub fn (mut s InetSocket) recvfrom(_ voidptr, _ voidptr, _ u64, _ voidptr, _ &u32) ?i64 { return none }
+pub fn (mut s InetSocket) connect(_ voidptr, _ voidptr, _ u32) ? { return none }
+pub fn (mut s InetSocket) getsockopt(_ voidptr, _ int, _ int) ?int { return none }
+pub fn (mut s InetSocket) grow(_ voidptr, _ u64) ? { return none }
+pub fn (mut s InetSocket) read(_ voidptr, _ voidptr, _ u64, _ u64) ?i64 { return none }
+pub fn (mut s InetSocket) write(_ voidptr, _ voidptr, _ u64, _ u64) ?i64 { return none }
+pub fn (mut s InetSocket) ioctl(_ voidptr, _ u64, _ voidptr) ?int { return none }
+pub fn (mut s InetSocket) unref(_ voidptr) ? { return none }
+pub fn (mut s InetSocket) link(_ voidptr) ? { return none }
+pub fn (mut s InetSocket) unlink(_ voidptr) ? { return none }
+pub fn (mut s InetSocket) mmap(_ voidptr, _ u64, _ int) voidptr { return unsafe { nil } }

@@ -903,7 +903,8 @@ fn overlay_unlink(mut dir VFSNode, mut node VFSNode, name string) ? {
   final_name := name.clone()
   mut adopted := false
   defer { if !adopted { unsafe { final_name.free() } } }
-  work.filesystem.rename(work, whiteout.name, upper_dir, name, 0)?
+  guarded := rename_before_publish(mut work.filesystem, work, whiteout.name, whiteout,
+   upper_dir, name, lookup_child(upper_dir, name), 0)?
   mut previous := node.overlay.upper
   children_lock.acquire()
   unsafe {
@@ -914,6 +915,7 @@ fn overlay_unlink(mut dir VFSNode, mut node VFSNode, name string) ? {
   }
   children_lock.release()
   adopt(mut whiteout, mut upper_dir, final_name)
+  rename_after_publish(mut work.filesystem, guarded)
   adopted = true
   whiteout = unsafe { nil }
   if previous != unsafe { nil } {
@@ -990,7 +992,8 @@ fn overlay_rename(mut old_dir VFSNode, old_name string, mut old_node VFSNode, mu
 	mut names_adopted := false
 	defer { if !names_adopted { unsafe { upper_name.free(); merged_name.free(); whiteout_name.free() } } }
 
-	overlay_storage_rename(mut old_upper.filesystem, old_upper, old_name, new_upper, new_name, old_whiteout)?
+	guarded := overlay_storage_rename(mut old_upper.filesystem, old_upper, old_name, real,
+		new_upper, new_name, replaced_real, old_whiteout)?
 	// Upper and merged paths publish together, with no destination deletion.
 	// Readers copy child pointers under this same lock; backend callbacks and
 	// retirement remain outside it.
@@ -1017,6 +1020,7 @@ fn overlay_rename(mut old_dir VFSNode, old_name string, mut old_node VFSNode, mu
 	if old_whiteout != unsafe { nil } && voidptr(old_whiteout.parent) != voidptr(old_upper) {
   adopt(mut old_whiteout, mut old_upper, whiteout_name)
  }
+	rename_after_publish(mut old_upper.filesystem, guarded)
 	names_adopted = true
 	if old_node.overlay.has_lower {
   old_whiteout = unsafe { nil }
@@ -1221,7 +1225,8 @@ fn overlay_commit_created(node &VFSNode) ? {
   final_name := node.name.clone()
   mut adopted := false
   defer { if !adopted { unsafe { final_name.free() } } }
-  work.filesystem.rename(work, real.name, upper, node.name, 0)?
+  guarded := rename_before_publish(mut work.filesystem, work, real.name, real,
+   upper, node.name, lookup_child(upper, node.name), 0)?
   children_lock.acquire()
   unsafe {
    mut slot := &upper.children[node.name]
@@ -1230,6 +1235,7 @@ fn overlay_commit_created(node &VFSNode) ? {
   }
   children_lock.release()
   adopt(mut real, mut upper, final_name)
+  rename_after_publish(mut work.filesystem, guarded)
   adopted = true
   entry.staged = false
   entry.uncommitted = false
