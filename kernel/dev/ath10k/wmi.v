@@ -3,7 +3,11 @@
 // The QCA9377 firmware uses WMI TLV ABI 1.0, namespace QCA_/ML.
 module ath10k
 
-fn C.__builtin_alloca(usize) voidptr
+// Preserve native size_t in C interfaces on the pinned and current compilers.
+@[typedef]
+pub type C.size_t = u64
+
+fn C.__builtin_alloca(C.size_t) voidptr
 
 struct Command {
 mut:

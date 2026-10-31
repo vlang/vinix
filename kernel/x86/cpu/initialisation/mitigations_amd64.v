@@ -2,6 +2,10 @@
 @[has_globals]
 module initialisation
 
+// Preserve native size_t in C interfaces on the pinned and current compilers.
+@[typedef]
+pub type C.size_t = u64
+
 #include "x86_mitigations.h"
 
 struct C.vinix_x86_mitigation_policy {
@@ -28,7 +32,7 @@ mut:
 __global mitigation_policies &C.vinix_x86_mitigation_policy
 __global mitigation_cpu_count u64
 
-fn C.calloc(count usize, size usize) voidptr
+fn C.calloc(count C.size_t, size C.size_t) voidptr
 fn C.kprintf(fmt charptr, ...voidptr) i32
 
 fn mitigation_capabilities() MitigationCaps {
@@ -116,12 +120,12 @@ fn mitigation_select(caps MitigationCaps) C.vinix_x86_mitigation_policy {
 
 @[export: 'vinix_x86_mitigations_setup']
 fn mitigation_setup(count u64) bool {
-	if count == 0 || count > u64(~usize(0)) / u64(sizeof(C.vinix_x86_mitigation_policy))
-		|| usize(mitigation_policies) != 0 { return false }
+	if count == 0 || count > u64(~u64(0)) / u64(sizeof(C.vinix_x86_mitigation_policy))
+		|| u64(mitigation_policies) != 0 { return false }
 	unsafe {
-		mitigation_policies = &C.vinix_x86_mitigation_policy(C.calloc(usize(count), sizeof(C.vinix_x86_mitigation_policy)))
+		mitigation_policies = &C.vinix_x86_mitigation_policy(C.calloc(u64(count), sizeof(C.vinix_x86_mitigation_policy)))
 	}
-	if usize(mitigation_policies) == 0 { return false }
+	if u64(mitigation_policies) == 0 { return false }
 	mitigation_cpu_count = count
 	return true
 }

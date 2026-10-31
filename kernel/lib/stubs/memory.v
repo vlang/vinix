@@ -1,18 +1,22 @@
 module stubs
 
+// Preserve native size_t in C interfaces on the pinned and current compilers.
+@[typedef]
+pub type C.size_t = u64
+
 // These C ABI entry points are also used by V's generated code. Keep them
 // allocation-free: allocating, slicing or copying an aggregate here could
 // call the very memory primitive being implemented.
 // Word accesses are naturally aligned and entirely inside the requested
 // range. The kernel builds with -fno-strict-aliasing for raw memory accesses.
 @[export: 'memcpy']
-pub fn memcpy(dest voidptr, src voidptr, n usize) voidptr {
+pub fn memcpy(dest voidptr, src voidptr, n C.size_t) voidptr {
 	unsafe {
 		mut d := &u8(dest)
 		mut s := &u8(src)
 		mut left := n
-		if (usize(d) ^ usize(s)) & 7 == 0 {
-			for left != 0 && usize(d) & 7 != 0 {
+		if (u64(d) ^ u64(s)) & 7 == 0 {
+			for left != 0 && u64(d) & 7 != 0 {
 				*d = *s
 				d++
 				s++
@@ -53,12 +57,12 @@ pub fn memcpy(dest voidptr, src voidptr, n usize) voidptr {
 }
 
 @[export: 'memset']
-pub fn memset(dest voidptr, value int, n usize) voidptr {
+pub fn memset(dest voidptr, value int, n C.size_t) voidptr {
 	unsafe {
 		mut d := &u8(dest)
 		mut left := n
 		byte := u8(value)
-		for left != 0 && usize(d) & 7 != 0 {
+		for left != 0 && u64(d) & 7 != 0 {
 			*d = byte
 			d++
 			left--
@@ -93,15 +97,15 @@ pub fn memset(dest voidptr, value int, n usize) voidptr {
 }
 
 @[export: 'memmove']
-pub fn memmove(dest voidptr, src voidptr, n usize) voidptr {
+pub fn memmove(dest voidptr, src voidptr, n C.size_t) voidptr {
 	unsafe {
 		mut d := &u8(dest)
 		s := &u8(src)
-		if usize(dest) < usize(src) {
-			for i := usize(0); i < n; i++ {
+		if u64(dest) < u64(src) {
+			for i := u64(0); i < n; i++ {
 				d[i] = s[i]
 			}
-		} else if usize(dest) > usize(src) {
+		} else if u64(dest) > u64(src) {
 			mut i := n
 			for i != 0 {
 				i--
@@ -113,11 +117,11 @@ pub fn memmove(dest voidptr, src voidptr, n usize) voidptr {
 }
 
 @[export: 'memcmp']
-pub fn memcmp(first voidptr, second voidptr, n usize) int {
+pub fn memcmp(first voidptr, second voidptr, n C.size_t) int {
 	unsafe {
 		a := &u8(first)
 		b := &u8(second)
-		for i := usize(0); i < n; i++ {
+		for i := u64(0); i < n; i++ {
 			if a[i] != b[i] {
 				return if a[i] < b[i] { -1 } else { 1 }
 			}

@@ -478,7 +478,7 @@ fn (mut this Cache) write_behind(context voidptr, store IO) {
 			return
 		}
 		if this.behind_run == unsafe { nil } {
-			this.behind_run = unsafe { malloc(isize(max_run_pages * page_bytes)) }
+			this.behind_run = unsafe { malloc(int(max_run_pages * page_bytes)) }
 		}
 		if this.behind_run == unsafe { nil } {
 			this.flush_page(mut oldest, context, store) or { return }
@@ -585,7 +585,7 @@ fn (mut this Cache) write_back(context voidptr, store IO, index u64) ? {
 		return
 	}
 	if this.sync_run == unsafe { nil } {
-		this.sync_run = unsafe { malloc(isize(max_run_pages * page_bytes)) }
+		this.sync_run = unsafe { malloc(int(max_run_pages * page_bytes)) }
 		if this.sync_run == unsafe { nil } {
 			this.l.release()
 			errno.set(errno.enomem)
