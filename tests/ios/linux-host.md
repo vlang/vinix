@@ -82,6 +82,7 @@ These overrides support alternate executable names and relocated SDKs:
 | `VINIX_IOS_TOOLCHAIN` | Frozen V directory; otherwise the directory of `v` on PATH |
 | `VINIX_IOS_LINUX_CC` | Target C compiler; `cc` on ARM64, `aarch64-linux-gnu-gcc` on x86-64 |
 | `VINIX_IOS_LINUX_SYSROOT` | Optional compiler `--sysroot`; unset uses the compiler's configured layout |
+| `VINIX_IOS_LINUX_GCC_LOW_MEMORY` | Set to `1` to lower GCC's collector growth thresholds for generated C; defaults to `0` |
 | `VINIX_IOS_QEMU_USER` | ARM64 user emulator on x86-64; defaults to `qemu-aarch64`; `qemu-aarch64-static` may be selected explicitly |
 | `VINIX_IOS_LINUX_LD_PREFIX` | QEMU target loader/library prefix; defaults to `/usr/aarch64-linux-gnu` |
 
@@ -90,6 +91,13 @@ different purpose from the compiler sysroot. For Ubuntu cross packages
 extracted below `SDK`, the compiler sysroot can be `SDK`, while the loader
 prefix is `SDK/usr/aarch64-linux-gnu`. Relocated binutils may also require
 their extracted **host** shared-library directory in `LD_LIBRARY_PATH`.
+
+On a host where GCC is killed under memory pressure, the optional low-memory
+setting adds `--param=ggc-min-expand=10` and
+`--param=ggc-min-heapsize=16384` to the generated-C/ABI compilation. It requires
+GNU GCC and can trade compilation time for lower peak memory. The capture
+records this choice; V assertions, `-O1`, debug information, ASan/UBSan and
+runtime deadlines remain the same. Values other than `0` or `1` are refused.
 
 ## Run checks
 

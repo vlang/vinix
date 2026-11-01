@@ -18,6 +18,7 @@ struct Qualification {
 	target            string = 'aarch64-linux-gnu'
 	native_foundation bool
 	sanitizers        bool
+	gcc_low_memory    bool
 	optional_backends []string
 	compiler          string
 	toolchain         string
@@ -227,6 +228,11 @@ pub fn run(repository string, mode string, requested string) ! {
 		return error('this execution path requires a Linux host')
 	}
 	fixture_name := fixture(mode)!
+	low_memory_value := os.getenv('VINIX_IOS_LINUX_GCC_LOW_MEMORY')
+	if low_memory_value !in ['', '0', '1'] {
+		return error('VINIX_IOS_LINUX_GCC_LOW_MEMORY must be 0 or 1')
+	}
+	low_memory := low_memory_value == '1'
 	root := os.real_path(repository)
 	if !os.is_file(root + '/compat/ios/runner/objc.c.v') {
 		return error('run from the Vinix repository root')
@@ -299,6 +305,7 @@ pub fn run(repository string, mode string, requested string) ! {
 		mode:          mode
 		host:          if native { 'linux-arm64' } else { 'linux-amd64' }
 		sanitizers:    sanitized
+		gcc_low_memory: low_memory
 		compiler:      cc
 		toolchain:     vroot
 		sysroot:       sysroot
@@ -332,6 +339,10 @@ pub fn run(repository string, mode string, requested string) ! {
 	// Keep V assertions enabled while avoiding prohibitively slow instrumented
 	// dispatch under user-mode ARM64 emulation. Network deadlines stay unchanged.
 	compile << ['-O1', '-c']
+	// Reduce GCC's own garbage-collector growth on constrained build hosts.
+	// This changes compiler memory use, not generated runtime assertions or
+	// sanitizer instrumentation. Keep it explicit and record it in the capture.
+	if low_memory { compile << ['--param=ggc-min-expand=10', '--param=ggc-min-heapsize=16384'] }
 	compile << tlsbuild.includes(vroot)
 	mut objects := []string{}
 	mut c_sources := [generated]
