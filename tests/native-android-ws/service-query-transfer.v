@@ -128,10 +128,10 @@ const intent_extras_api_runner_pin = 'cad7bf5ff030b01af3bcf9a7cfc4b0bd41d3b54d93
 const intent_extras_apk = '/Users/alex/.local/state/vinix/android/intent-extras-fixture-2026-11-01-r2/probe.apk'
 const intent_extras_apk_pin = 'b3e0278a185bb3f7f1a302c2f515fa7a4b98edf4cfcefd69ede3f45f85a5ba2c'
 // Distinct verified resource-lock fixture ARM runner and signed APK.
-const resource_locks_api_runner = '/Users/alex/.local/state/vinix/android/resource-locks-api-run-2026-11-01-r3/run'
-const resource_locks_api_runner_pin = 'fc4584fa5070b7398f4df6987348467e027538c4469377e5042cf395a349af78'
-const resource_locks_apk = '/Users/alex/.local/state/vinix/android/resource-lock-fixture-2026-11-01-r5/probe.apk'
-const resource_locks_apk_pin = 'b90fe510799ddf4d550c1915d3a730ab2db3aacbcdc95122c2862a85afdb814f'
+const resource_locks_api_runner = '/Users/alex/.local/state/vinix/android/resource-locks-api-run-2026-11-01-r4/run'
+const resource_locks_api_runner_pin = '8cf50d0972cda4bfa445f33a944b19026eae862cf5caa00f0292bc44453d6bca'
+const resource_locks_apk = '/Users/alex/.local/state/vinix/android/resource-lock-fixture-2026-11-01-r6/probe.apk'
+const resource_locks_apk_pin = 'eedcc5a40c86f2f6131121e922a7625e416f5df68671baa70cea581246c3e55e'
 const file_limit = 32 * 1024 * 1024
 const request_limit = 12
 const seconds_limit = 600

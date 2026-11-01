@@ -7,7 +7,7 @@ fixture. `serve --resource-locks-api` retains the two-file protocol at
 inside the pinned APK and uses the ordinary APK native-library load path.
 Historical profiles, pins, routes and strict health checks remain intact.
 
-The exact success marker is:
+The original r1–r3 success marker is:
 
 ```text
 RESOURCE-LOCKS-PASS workers=4 iterations=64 ids names strings arrays bags themes same-copy cross-copy configuration paths owned-asset owned-directory
@@ -174,4 +174,63 @@ Seal/readback took 0.115/0.434 seconds with zero guard/child exits, complete
 cleanup and zero swaps under the unchanged 600 MiB/300-second/64 MiB
 shared-growth/1 GiB reserve/output/file-size caps. Controls remain in
 `S/resource-locks-api-tools-seal-controls-2026-11-01-r3`. Independent refresh
+source, pin/artifact/guard/ELF/seal and report reviews passed.
+
+## Explicit copy scope, r4
+
+The r5 ARM diagnostic identified the cross-B2 custom app attribute lookup as
+missing, with cookie -1 and no pending exception; the source and same-owner
+checks had passed. The r6 fixture retains app-attribute apply and same-owner
+copies, and uses a literal `android:colorForeground` item for strict fresh-empty
+and cross-owner value checks. Its success marker and runtime receipt scope name
+those cases explicitly. Cross-owner custom app-key mapping is outside this
+fixture's coverage. All four workers, 64 iterations, other operations, lifetime
+checks, diagnostics and serial preflight remain in place. Native/JAR pins,
+health/selftest/transfer logic and all non-resource profiles are unchanged.
+
+The exact r4 success marker is:
+
+```text
+RESOURCE-LOCKS-PASS workers=4 iterations=64 ids names strings arrays bags themes same-app-copy cross-framework-copy configuration paths owned-asset owned-directory
+```
+
+The signed APK is `S/resource-lock-fixture-2026-11-01-r6/probe.apk`, SHA-256
+`eedcc5a40c86f2f6131121e922a7625e416f5df68671baa70cea581246c3e55e`.
+Its `build.json` SHA-256 is
+`3b969c0dbe6bc2830106069652e24de0ae91f4792618a1d4c03d8cb0ed1c6838`.
+The runner/transfer refresh changes five pin/path constants plus the resource
+marker and scope strings. All five checks passed on their first attempt,
+including 1,941 runner refusals, the transfer selftest and actual static AArch64
+EXEC inspection without INTERP or DYNAMIC segments. This host qualification
+does not establish an r6 ARM, Maps or authentication result.
+
+| Check | Guard seconds | Sampled aggregate RSS bytes | Time maximum bytes |
+| --- | ---: | ---: | ---: |
+| Host runner compile | 2.551 | 350,765,056 | 371,015,680 |
+| Runner selftest | 1.714 | 21,757,952 | 17,793,024 |
+| Static ARM runner compile | 3.579 | 375,029,760 | 360,087,552 |
+| Host transfer compile | 3.132 | 371,261,440 | 382,451,712 |
+| Transfer selftest | 1.459 | 9,863,168 | 8,634,368 |
+
+All guards/children exited zero with complete cleanup and zero swaps under the
+original 600 MiB/300-second/512 MiB shared-growth/1 GiB reserve/output/file-size
+caps. Runtime/tool/artifact pins were rehashed after checks, frozen sources
+match the checkout, and predecessor r3 APK/tool/seal hashes remain unchanged.
+Captured source base is `848b3cbf799773e60fb394d0bf93b5c4b81992fb`; runner and
+transfer source hashes are
+`47137e6a323179199f139246f9ff9f9f81d50526605a1b1b67672d6511b56333`
+and `71dec735f540b60e01e91dfad7b9d8cb31027518cead95255546757287f67666`.
+
+ARM runner `S/resource-locks-api-run-2026-11-01-r4/run` has SHA-256
+`8cf50d0972cda4bfa445f33a944b19026eae862cf5caa00f0292bc44453d6bca`.
+Transfer `S/resource-locks-api-transfer-build-2026-11-01-r4/transfer` has SHA-256
+`4ba62f02d27f69d97efef21e5e52e36ef0c10d5e2747aecc19c216d3548a4eed`.
+The four r4 tool/control roots are closed. Full sealing and separate
+fresh-process readback passed for 35 entries at
+`S/resource-locks-api-tools-sealed-2026-11-01-r4/manifest.json`, SHA-256
+`beefee3061fa9692f9c94081367b6d12a06251d323a7e4fe78e6c0093b89d500`.
+Seal/readback took 0.094/0.253 seconds with zero guard/child exits, complete
+cleanup and zero swaps under the unchanged 600 MiB/300-second/64 MiB
+shared-growth/1 GiB reserve/output/file-size caps. Controls remain in
+`S/resource-locks-api-tools-seal-controls-2026-11-01-r4`. Independent refresh
 source, pin/artifact/guard/ELF/seal and report reviews passed.

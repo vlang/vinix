@@ -119,8 +119,8 @@ const intent_extras_pass_marker = 'INTENT-EXTRAS-PASS merge precedence copies no
 // Resource synchronization uses the retained Intent framework and its corrected native.
 const resource_locks_framework_sha = '02aefc8136cb87eb8e9ebd0928cb15f3e1c2042e47d2a687170a0f9309ac4b20'
 const resource_locks_native_sha = 'aeb5ccd643020cbb20ad5630dabff4bfd0ff8b04a5b0fbcfd1b657b3bcd91dd7'
-const resource_locks_apk_sha = 'b90fe510799ddf4d550c1915d3a730ab2db3aacbcdc95122c2862a85afdb814f'
-const resource_locks_pass_marker = 'RESOURCE-LOCKS-PASS workers=4 iterations=64 ids names strings arrays bags themes same-copy cross-copy configuration paths owned-asset owned-directory'
+const resource_locks_apk_sha = 'eedcc5a40c86f2f6131121e922a7625e416f5df68671baa70cea581246c3e55e'
+const resource_locks_pass_marker = 'RESOURCE-LOCKS-PASS workers=4 iterations=64 ids names strings arrays bags themes same-app-copy cross-framework-copy configuration paths owned-asset owned-directory'
 
 struct FixtureProfile {
 	name          string
@@ -414,7 +414,7 @@ fn resource_locks_profile() FixtureProfile {
 		framework_sha: resource_locks_framework_sha
 		native_sha: resource_locks_native_sha
 		pass_marker: resource_locks_pass_marker
-		scope: 'standalone native resource synchronization regression with four workers, packaged resources and owned NDK assets/directories; Maps UI, GMS and authentication are not exercised'
+		scope: 'standalone native resource synchronization regression with four workers, packaged resources, app-attribute apply and copies within one asset owner, framework-attribute copies across asset owners and owned NDK assets/directories; Maps UI, GMS and authentication are not exercised'
 	}
 }
 
