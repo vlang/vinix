@@ -91,8 +91,10 @@ fn gles_start() ! {
 		C.dlclose(gles_runtime.compression)
 		return error('iOS: cannot create EAGL current-context TLS')
 	}
-	// The supplied driver lives beside the private Mesa dependency closure.
-	if os.getenv('LIBGL_DRIVERS_PATH') == '' {
+	// The Vinix guest keeps its driver beside the private Mesa closure. A
+	// GNU/Linux host can use Mesa's installed default without that guest tree.
+	// Preserve explicit selections, including an intentionally empty value.
+	if os.getenv_opt('LIBGL_DRIVERS_PATH') == none && os.is_dir('/usr/lib/vinix/ios-gles/dri') {
 		C.setenv(c'LIBGL_DRIVERS_PATH', c'/usr/lib/vinix/ios-gles/dri', 0)
 	}
 	// Keep the first software-rendered launch independent of Mesa's disk-cache
@@ -290,7 +292,7 @@ fn gles_dispose(object u64) {
 
 fn gles_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	if object in ios_runtime.classes {
-		if object != ios_runtime.names['EAGLContext'] { return false }
+		if !objc_is_kind(object, read64(ios_runtime.names['EAGLContext'])) { return false }
 		match selector {
 			'currentContext' { frame.x[0] = gles_current() }
 			'setCurrentContext:' { frame.x[0] = u64(gles_set_current(frame.x[2])) }
@@ -339,20 +341,22 @@ fn gles_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 		'delegate' { frame.x[0] = objc_autorelease(objc_load_weak(unsafe { &header.target })) }
 		'setDelegate:' { objc_store_weak(unsafe { &header.target }, frame.x[2]) }
 		'enableSetNeedsDisplay' { frame.x[0] = u64(view.enable_set_needs_display) }
-		'setEnableSetNeedsDisplay:' { view.enable_set_needs_display = frame.x[2] != 0 }
+		'setEnableSetNeedsDisplay:' { view.enable_set_needs_display = u8(frame.x[2]) != 0 }
 		'drawableDepthFormat' { frame.x[0] = view.depth_format }
 		'drawableStencilFormat' { frame.x[0] = view.stencil_format }
 		'drawableColorFormat', 'drawableMultisample' { frame.x[0] = 0 }
 		'setDrawableDepthFormat:' {
-			if frame.x[2] !in [u64(0), 1, 2] { panic('iOS: unsupported GLKView depth format') }
-			gles_view_delete(object); view.depth_format = u32(frame.x[2])
+			value := u32(frame.x[2])
+			if value !in [u32(0), 1, 2] { panic('iOS: unsupported GLKView depth format') }
+			gles_view_delete(object); view.depth_format = value
 		}
 		'setDrawableStencilFormat:' {
-			if frame.x[2] !in [u64(0), 1] { panic('iOS: unsupported GLKView stencil format') }
-			gles_view_delete(object); view.stencil_format = u32(frame.x[2])
+			value := u32(frame.x[2])
+			if value !in [u32(0), 1] { panic('iOS: unsupported GLKView stencil format') }
+			gles_view_delete(object); view.stencil_format = value
 		}
 		'setDrawableColorFormat:', 'setDrawableMultisample:' {
-			if frame.x[2] != 0 { panic('iOS: GLKView only supports RGBA8888 without multisampling') }
+			if u32(frame.x[2]) != 0 { panic('iOS: GLKView only supports RGBA8888 without multisampling') }
 		}
 		'contentScaleFactor' { frame_float_return(mut frame, 0, view.scale) }
 		'setContentScaleFactor:' {
