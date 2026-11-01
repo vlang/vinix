@@ -1,9 +1,11 @@
 # Resource synchronization ARM fixture
 
 The V generator in `resourcelockfixture/` produces a standalone resourceful APK
-for the native resource adapter synchronization change. Host qualification passes;
-ARM execution remains pending. This fixture does not establish the cause of the
-Maps crash, successful map rendering, or Google authentication.
+for the native resource adapter synchronization change. The r6 scoped ARM stress
+and a separate Maps tiles/search/photos/profile run now pass; see the
+[admitted runtime result](maps-resource-lock-stress-runtime-2026-11-01.md).
+Original failed attempts and custom-key scope remain below. Maps crash causation
+and Google authentication are unverified.
 
 Four workers start together and synchronize at each of 64 bounded iterations.
 Two independently owned AssetManagers receive configuration changes and actual
