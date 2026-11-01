@@ -234,7 +234,7 @@ fn nw_stop() {
 	if nw_runtime == unsafe { nil } { C.ios_objc_initialize_unlock(); return }
 	nw_runtime.stopping = true
 	C.ios_objc_initialize_unlock()
-	if nw_runtime.started && C.pthread_join(unsafe { voidptr(nw_runtime.worker) }, unsafe { nil }) != 0 { panic('iOS: cannot join Network monitor worker') }
+	if nw_runtime.started && darwin_pthread_join(u64(nw_runtime.worker), unsafe { nil }) != 0 { panic('iOS: cannot join Network monitor worker') }
 	nw_runtime.started = false
 	for i in 0 .. 64 {
 		C.ios_objc_initialize_lock(); monitor := objc_retain(nw_runtime.monitors[i]); C.ios_objc_initialize_unlock()

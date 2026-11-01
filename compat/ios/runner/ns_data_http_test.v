@@ -227,6 +227,55 @@ fn test_data_http_factory() {
 	println('IOS-DATA-HTTP-FACTORY: native ABI and binary oracle, mutable results, retained data, concurrent loads and two zero-live-object shutdowns')
 }
 
+// Compare each cached body span in one operation. Keep read() responsible for
+// refills, TLS, EOF and deadlines; the fixture must not spend the client's
+// request deadline dispatching one instrumented read per already buffered byte.
+fn http_transport_body_matches(mut stream DataHTTPStream, expected string) bool {
+	mut offset := 0
+	for offset < expected.len {
+		first := stream.read() or { return false }
+		if first != expected[offset] { return false }
+		offset++
+		cached := stream.length - stream.position
+		remaining := expected.len - offset
+		count := if cached < remaining { cached } else { remaining }
+		if count > 0 {
+			if C.memcmp(&stream.buffer[stream.position], unsafe { expected.str + offset }, usize(count)) != 0 { return false }
+			stream.position += count
+			offset += count
+		}
+	}
+	return true
+}
+
+fn test_http_transport_fixture_body_check() {
+	// Preserve unread bytes on both sides of an exact binary body. Checking
+	// every mismatch position also covers the scalar and bulk comparison paths.
+	bytes := 'pa\x00\xffzq'
+	for mismatch in -1 .. 4 {
+		mut stream := &DataHTTPStream{deadline: time.sys_mono_now() + 5 * time.second, position: 1, length: bytes.len}
+		C.memcpy(&stream.buffer[0], bytes.str, usize(bytes.len))
+		if mismatch >= 0 { stream.buffer[mismatch + 1] ^= 1 }
+		assert http_transport_body_matches(mut stream, 'a\x00\xffz') == (mismatch == -1);
+		if mismatch == -1 {
+			assert stream.position == 5 && stream.buffer[0] == `p`;
+			assert stream.read() or { panic('fixture body consumed the next byte') } == `q`;
+		}
+		unsafe { free(stream) }
+	}
+	mut empty := &DataHTTPStream{}
+	defer { unsafe { free(empty) } }
+	assert http_transport_body_matches(mut empty, '');
+	assert empty.position == 0;
+	mut short := &DataHTTPStream{deadline: time.sys_mono_now() + 5 * time.second, length: 3}
+	defer { unsafe { free(short) } }
+	C.memcpy(&short.buffer[0], c'a\x00\xff', 3)
+	assert !http_transport_body_matches(mut short, 'a\x00\xffz');
+	mut expired := &DataHTTPStream{deadline: 1}
+	defer { unsafe { free(expired) } }
+	assert !http_transport_body_matches(mut expired, 'a');
+}
+
 fn http_transport_serve(listener DataHTTPListener, method string, expected_body string, reply string, tls bool) bool {
 	defer { C.close(listener.fd) }
 	deadline := time.sys_mono_now() + 5 * time.second
@@ -255,7 +304,7 @@ fn http_transport_serve(listener DataHTTPListener, method string, expected_body 
 		if header == 'Content-Type: application/octet-stream' { content_type++ }
 	}
 	if host != 1 || lengths != 1 || custom != 1 || content_type != 1 { return false }
-	for byte in expected_body { if stream.read() or { return false } != byte { return false } }
+	if !http_transport_body_matches(mut stream, expected_body) { return false }
 	if !stream.send(reply) { return false }
 	if tls { C.mbedtls_ssl_close_notify(&stream.ssl) }
 	return true
@@ -277,7 +326,9 @@ fn http_transport_case(method string, payload string, reply string, status int, 
 	input := HTTPTransportRequest{method: method, fields: fields, body: bytes}
 	address := '${if tls { 'https' } else { 'http' }}://localhost:${listener.port}/submit?q=%00#fragment'
 	defer { unsafe { address.free() } }
-	result := http_transport_exchange(address, input, os.getenv('VINIX_IOS_HTTP_CERT'), 2 * time.second) or { panic('request/response exchange failed') }
+	result := http_transport_exchange(address, input, os.getenv('VINIX_IOS_HTTP_CERT'), 2 * time.second) or {
+		panic('request/response exchange failed: ${method}, ${payload.len} bytes, TLS=${tls}')
+	}
 	defer { result.dispose() }
 	assert worker.wait() && result.status == status && result.body.len == expected.len;
 	if expected.len > 0 { assert C.memcmp(result.body.data, expected.str, usize(expected.len)) == 0; }
@@ -1091,8 +1142,26 @@ fn test_session_workers_http_callbacks_and_shutdown() {
 			}
 			for server in servers { session_worker_require(server.wait(), 'loopback server failed') }
 			unsafe { servers.free() }
+			mut dispatch_names := [4]u32{}
+			$if linux {
+				session_worker_require(dispatch_runtime.worker_count == dispatch_names.len, 'delegate worker pool was not started')
+				for i in 0 .. dispatch_names.len {
+					dispatch_names[i] = mach_threads_join_begin(u64(dispatch_runtime.workers[i]))
+					session_worker_require(dispatch_names[i] != 0, 'delegate worker has no registered lifetime')
+				}
+			}
 			objc_release(queue); objc_pool_pop(pool)
 			objc_stop()
+			$if linux {
+				// A successful join must retire the borrowed registration itself.
+				// Do not refresh here: native owner-death discovery could hide a
+				// raw pthread_join that bypasses the adapter's retirement path.
+				C.ios_mach_threads_lock()
+				for name in dispatch_names {
+					session_worker_require(mach_thread_find(name) == unsafe { nil }, 'joined delegate worker retained its registration')
+				}
+				C.ios_mach_threads_unlock()
+			}
 			assert p.bad == 0 && p.responses == if mode == 'allow' { u64(4) } else { u64(0) };
 			assert p.completed == if mode == 'stop' { u64(0) } else { u64(4) };
 			for i in 0 .. 9 {
@@ -1105,7 +1174,7 @@ fn test_session_workers_http_callbacks_and_shutdown() {
 			system_data_stop(); C.free(p)
 		}
 	}
-	println('IOS-SESSION-WORKERS-HTTP: four blocked HTTP/TLS exchanges leave delegate workers available; cancellation, late response blocks, stop/join before dispatch discard, queued work retirement and weak ownership PASS')
+	println('IOS-SESSION-WORKERS-HTTP: four blocked HTTP/TLS exchanges leave delegate workers available; cancellation, late response blocks, stop/join before dispatch discard, retired delegate thread registrations, queued work retirement and weak ownership PASS')
 }
 
 fn session_worker_shutdown_run(_ voidptr, _ &u64) { objc_stop() }
