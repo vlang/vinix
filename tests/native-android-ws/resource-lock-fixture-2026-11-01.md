@@ -11,9 +11,10 @@ native asset-set replacements, while two readers assert packaged resource IDs,
 full/package/type/entry names, strings, integer/string/reference arrays, typed
 array bags, XML, directory listings, and Java/NDK asset bytes. Replacement uses
 the retained native method through JNI, avoiding the duplicate-path fast return.
-Raw themes are created, applied, copied within and across distinct managers,
-resolved against literal typed colors, and deleted through production JNI. Both
-copy destinations must lack the attribute before copying, so no-op copies fail.
+Raw themes retain application-attribute apply and same-owner copy checks, plus
+framework-attribute source, same-owner and cross-owner copy checks. Every present
+value must be type 0x1c/data 0xff123456. Copy destinations must first lack the
+tested attribute, so no-op copies fail. All handles use production JNI cleanup.
 
 The test-only V JNI helper opens one independently owned Asset and AssetDir
 before starting workers. After all workers join it checks all 21 asset bytes,
@@ -32,37 +33,46 @@ START_DOCUMENT (0), then the second is START_TAG (2), followed by the exact
 operation has a distinct diagnostic stage. No event, literal resource,
 concurrency, ownership, iteration, timeout or guard assertion was relaxed.
 
-R5 adds one serial call to the same strict `nativeThemes` before held handles
+The fixture calls the same strict `nativeThemes` serially before held handles
 or workers are created. On any theme failure the test-only helper emits one
-fixed-token diagnostic, at most 137 bytes, containing the exact phase, returned
+fixed-token diagnostic, at most 139 bytes, containing the exact phase, returned
 cookie, expected presence, type/data, and pending-exception bit. It explicitly
 flushes C output before returning false. The diagnostic prefix contains no
 `-FAIL`, so it does not trigger the runner before native cleanup completes.
 Negative cookies are authoritative; fields are not read after an absent lookup
 or pending JNI exception. Unavailable cookies use INT32_MIN, fields use
-type=-1/data=0, and setup-only expectations use -1. Every application-attribute,
-typed-color, same/cross-copy assertion and cleanup path remains in force.
+type=-1/data=0, and setup-only expectations use -1.
+
+R6 uses public `android:colorForeground` (0x01010030) for the cross-owner literal
+color. The retained C API requires shared ApkAssets object identities to remap
+application keys across owners; framework keys with literal values do not need
+that map ([retained Theme::SetTo](https://gitlab.com/android_translation_layer/art_standalone/-/raw/e78bf68917bcaaf58fef3960cd88793b3b7f39cc/libandroidfw/AssetManager2.cpp)).
+This still exercises cross-manager operation scopes and the resource
+locks. The parentless style has exactly two items: the original application key
+and the public framework key. The signed oracle asserts both exact values and
+the same seven application resource IDs. Application-key copying across owners
+with separately loaded ApkAssets is outside this fixture's positive claim.
 
 Final evidence is outside Git under
-`/Users/alex/.local/state/vinix/android/resource-lock-fixture-2026-11-01-r5` and
-`resource-lock-fixture-controls-2026-11-01-r5` beneath the same state directory.
-The build observed source revision `fcee5f780796f6df200eb4a44430741b16c80d8e`;
+`/Users/alex/.local/state/vinix/android/resource-lock-fixture-2026-11-01-r6` and
+`resource-lock-fixture-controls-2026-11-01-r6` beneath the same state directory.
+The build observed source revision `848b3cbf799773e60fb394d0bf93b5c4b81992fb`;
 its complete generator bytes are archived and pinned in `build.json`.
 
 | Input or artifact | SHA-256 |
 | --- | --- |
-| `main.v` | `11b3d25b1917599dcc5695c2a649e61debbb1452e6d43379d4fa25441bdc01cf` |
-| `sources.v` | `d7a832287de0c2753d558fe91bf6d6f3996425eae878376cae52510ebea9e337` |
-| `resourcelockprobe/probe.v` | `01b2fe5a9f45ae2ece3c762c6014c08a5b4abc7f44ed4ba9054662a07cd60ca8` |
-| Signed `probe.apk` | `b90fe510799ddf4d550c1915d3a730ab2db3aacbcdc95122c2862a85afdb814f` |
-| `build.json` | `b3f15545d0fb8ef340ef9500bec19044c82a31ca93a4b55626e63f91f4822704` |
-| Bundled `lib/arm64-v8a/libresource-lock-probe.so` | `0192d06f30d20a4ee47f5573c30e50e98248837bb70a1f7e5b8bea1d9b8f0e97` |
+| `main.v` | `8212523e74ffe4cc46dedc72bc7a03db458ee4a5adddfa68d0971ab1f7b0f1cc` |
+| `sources.v` | `eb6d3c973e1367b54cc4bd3130816181195abcc26d96665d1954fde8ec04d158` |
+| `resourcelockprobe/probe.v` | `c4eda6d46fd5b9129597c6db097fcd3a1233766bf309b6136d3b1247925a4a34` |
+| Signed `probe.apk` | `eedcc5a40c86f2f6131121e922a7625e416f5df68671baa70cea581246c3e55e` |
+| `build.json` | `3b969c0dbe6bc2830106069652e24de0ae91f4792618a1d4c03d8cb0ed1c6838` |
+| Bundled `lib/arm64-v8a/libresource-lock-probe.so` | `983890fd9b7b20a31bad4f2f633157fb23f42f405fa328ce10b2aa15b5250516` |
 
 The signed package is `org.vinix.bootstrap`, activity `.Main`, min SDK 29,
 target SDK 35. Its sole success marker is:
 
 ```text
-RESOURCE-LOCKS-PASS workers=4 iterations=64 ids names strings arrays bags themes same-copy cross-copy configuration paths owned-asset owned-directory
+RESOURCE-LOCKS-PASS workers=4 iterations=64 ids names strings arrays bags themes same-app-copy cross-framework-copy configuration paths owned-asset owned-directory
 ```
 
 Host checks cover APK v3 signing, badging, exact seven-entry signed resource
@@ -77,9 +87,9 @@ Loading follows the existing bootstrap assetprobe APK/System.loadLibrary path;
 the helper is not added to the production runtime ABI.
 
 Both final guards and children exited 0 with cleanup complete. Builder compilation
-took 2.541 seconds, sampled 343,965,696 bytes RSS (time high-water 359,645,184),
-and observed 11,624,448 bytes shared-volume growth. APK production took 12.777
-seconds, sampled 103,530,496 bytes RSS and observed 57,139,200 bytes growth.
+took 2.557 seconds, sampled 337,592,320 bytes RSS (time high-water 354,549,760),
+and observed 12,906,496 bytes shared-volume growth. APK production took 13.444
+seconds, sampled 103,596,032 bytes RSS and observed 142,327,808 bytes growth.
 Both recorded zero swaps. Original limits remained 600 MiB RSS, 300 seconds,
 512 MiB growth, 1 GiB reserve, 4 MiB command output, and file limit 16,777,216.
 
@@ -109,7 +119,14 @@ mutator barrier timeouts were secondary. That 11,000-byte original log remains a
 SHA-256 `ce16e26c383b2066ff8d285c4ec6ff8147e426e21e4bd3e8644d1884ba6379e9`.
 The r4 APK `ef4188b65ffd8fd5c2c0b4c71494b45cec3dea9038bc4d2853ae3daa726c1da1`
 and build `de1210a74c5475ff29d86dcf83de0a5a88c3c375ec917e16458b317af15cb683`
-remain immutable. R5 adds observation only: the failing inner phase remains
-unverified until its diagnostic runs. The production framework, native library
-and prepared image are unchanged; no theme oracle, concurrency limit, or guard
-was relaxed.
+remain immutable. R5 then observed the exact failure in serial preflight:
+`phase=cross-B2 cookie=-1 expected_present=1 type=0xffffffff data=0x00000000 pending=0`.
+The prior absent/apply/same-owner checks had returned, and no workers or held
+handles had started. Its 10,069-byte original log remains at
+`/Users/alex/.local/state/vinix/android/maps-resource-lock-runtime-audit-2026-11-01-r3/failed-fixture-decoded-r2/child.log`,
+SHA-256 `8badf5cf8bbf558a54a6d3059cd59dde00a9e600b422036da7e84cda402d47a2`.
+The r5 APK `b90fe510799ddf4d550c1915d3a730ab2db3aacbcdc95122c2862a85afdb814f`
+and build `b3f15545d0fb8ef340ef9500bec19044c82a31ca93a4b55626e63f91f4822704`
+preserve the failed custom-key oracle. R6 corrects that setup prerequisite only;
+the production framework, native library and prepared image remain unchanged.
+Concurrency, lifetime, XML, iteration, timeout and guard checks are unchanged.

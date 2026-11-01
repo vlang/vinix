@@ -4,7 +4,7 @@ module main
 const package_name = 'org.vinix.bootstrap'
 const main_type = 'Lorg/vinix/bootstrap/Main;'
 const worker_type = 'Lorg/vinix/bootstrap/Worker;'
-const pass_marker = 'RESOURCE-LOCKS-PASS workers=4 iterations=64 ids names strings arrays bags themes same-copy cross-copy configuration paths owned-asset owned-directory'
+const pass_marker = 'RESOURCE-LOCKS-PASS workers=4 iterations=64 ids names strings arrays bags themes same-app-copy cross-framework-copy configuration paths owned-asset owned-directory'
 const fail_marker = 'RESOURCE-LOCKS-FAIL'
 
 fn method(signature string, locals int, body string) string {
@@ -17,7 +17,7 @@ fn resource_values() string {
 		'<string-array name="fixture_strings"><item>alpha</item><item>beta</item></string-array>' +
 		'<array name="fixture_bag"><item>@string/fixture_text</item><item>37</item></array>' +
 		'<attr name="fixtureColor" format="color"/><style name="FixtureTheme" parent="">' +
-		'<item name="fixtureColor">#ff123456</item></style></resources>'
+		'<item name="fixtureColor">#ff123456</item><item name="android:colorForeground">#ff123456</item></style></resources>'
 }
 
 fn resource_names() []string {
@@ -45,8 +45,8 @@ fn verify_resource_dump(value string, ids map[string]string) {
 	assert blocks['attr/fixtureColor'] == ['() (attr) type=color'], 'signed attribute differs'
 	assert blocks['xml/proof'] == ['() (file) res/xml/proof.xml type=XML'], 'signed XML table entry differs'
 	style := blocks['style/FixtureTheme']
-	assert style.len == 2 && style[0].contains('(style) size=1') && !style[0].contains('parent='), 'exact signed style bag required'
-	assert style[1] == 'fixtureColor(' + ids['attr/fixtureColor'] + ')=#ff123456', 'signed theme color differs'
+	assert style.len == 3 && style[0] == '() (style) size=2', 'exact parentless signed style bag required'
+	assert style[1..].sorted() == ['0x01010030=#ff123456', 'fixtureColor(' + ids['attr/fixtureColor'] + ')=#ff123456'].sorted(), 'both exact signed theme colors required'
 	for name, count in {'fixture_ints': '3', 'fixture_strings': '2', 'fixture_bag': '2'} {
 		assert blocks['array/' + name].len == 2 && blocks['array/' + name][0] == '() (array) size=' + count, 'signed array size differs: ' + name
 	}
@@ -270,7 +270,7 @@ goto :probe
 const-string v2, "ids-names-strings-arrays-bags-xml-java-assets"
 iput-object v2, p0, ${worker_type}->stage:Ljava/lang/String;
 invoke-static {v0, p0}, ${main_type}->read(Landroid/content/res/Resources;${worker_type})V
-const-string v2, "raw-theme-same-and-cross-copy"
+const-string v2, "raw-theme-same-app-cross-framework-copy"
 iput-object v2, p0, ${worker_type}->stage:Ljava/lang/String;
 iget-object v0, p0, ${worker_type}->peer:Landroid/content/res/Resources;
 invoke-virtual {v0}, Landroid/content/res/Resources;->getAssets()Landroid/content/res/AssetManager;

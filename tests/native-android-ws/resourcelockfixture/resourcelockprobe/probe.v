@@ -28,6 +28,7 @@ fn C.printf(&char, ...) i32
 fn C.fflush(voidptr) i32
 
 const no_theme_cookie = i32(-2147483648)
+const framework_color_attr = i32(0x01010030) // public android.R.attr.colorForeground
 
 struct HeldAssets {
 	asset voidptr
@@ -287,20 +288,24 @@ pub fn native_themes(e voidptr, class voidptr, first voidptr, second voidptr, st
 				theme_failure(phase, no_theme_cookie, -1, 0, probe_pending(e)); return 0
 			}
 		}
-		// Fresh destinations must lack the attribute: a no-op copy cannot pass.
-		if !theme_matches(e, first, load, themes[1], attr, value, type_field, data_field, false, c'blank-A1')
-			|| !theme_matches(e, second, load, themes[2], attr, value, type_field, data_field, false, c'blank-B2') { return 0 }
+		// Each copy has a fresh-empty destination control. The retained C API
+		// remaps app attributes across owners only for shared ApkAssets objects;
+		// a public framework key with a literal color has no such prerequisite.
+		if !theme_matches(e, first, load, themes[1], attr, value, type_field, data_field, false, c'blank-app-A1')
+			|| !theme_matches(e, second, load, themes[2], framework_color_attr, value, type_field, data_field, false, c'blank-framework-B2') { return 0 }
 		apply_args := [ProbeValue{j: themes[0]}, ProbeValue{i: style}, ProbeValue{z: 1}]!
 		ProbeVoidCall(probe_slot(e, 63))(e, first, apply, &apply_args[0])
 		if probe_pending(e) { theme_failure(c'apply-call', no_theme_cookie, -1, 0, true); return 0 }
-		if !theme_matches(e, first, load, themes[0], attr, value, type_field, data_field, true, c'applied-A0') { return 0 }
+		if !theme_matches(e, first, load, themes[0], attr, value, type_field, data_field, true, c'applied-app-A0')
+			|| !theme_matches(e, first, load, themes[0], framework_color_attr, value, type_field, data_field, true, c'applied-framework-A0') { return 0 }
 		same_args := [ProbeValue{j: themes[1]}, ProbeValue{j: themes[0]}]!
 		ProbeVoidCall(probe_slot(e, 63))(e, first, copy, &same_args[0])
 		if probe_pending(e) { theme_failure(c'same-copy-call', no_theme_cookie, -1, 0, true); return 0 }
-		if !theme_matches(e, first, load, themes[1], attr, value, type_field, data_field, true, c'same-A1') { return 0 }
+		if !theme_matches(e, first, load, themes[1], attr, value, type_field, data_field, true, c'same-app-A1')
+			|| !theme_matches(e, first, load, themes[1], framework_color_attr, value, type_field, data_field, true, c'same-framework-A1') { return 0 }
 		cross_args := [ProbeValue{j: themes[2]}, ProbeValue{j: themes[1]}]!
 		ProbeVoidCall(probe_slot(e, 63))(e, second, copy, &cross_args[0])
 		if probe_pending(e) { theme_failure(c'cross-copy-call', no_theme_cookie, -1, 0, true); return 0 }
-		return u8(theme_matches(e, second, load, themes[2], attr, value, type_field, data_field, true, c'cross-B2'))
+		return u8(theme_matches(e, second, load, themes[2], framework_color_attr, value, type_field, data_field, true, c'cross-framework-B2'))
 	}
 }

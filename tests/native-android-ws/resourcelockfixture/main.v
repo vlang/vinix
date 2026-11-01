@@ -296,7 +296,7 @@ fn main() {
 		argv: os.args.clone(), source_revision: revision, inputs_sha256: inputs, artifacts_sha256: artifacts,
 		java_version: java_version.trim_space(), apk_sha256: file_hash(apk)!, package_name: package_name,
 		activity_name: package_name + '.Main', pass_marker: pass_marker, fail_marker: fail_marker,
-		scope: 'Bounded ARM resource stress: four barrier-started workers, 64 iterations each, two independent managers, concurrent native asset-set replacement/configuration and literal resource IDs/names/strings/arrays/bags/XML, same/cross-owner raw theme copy and resolution through production JNI, standard NDK asset opens, and independently owned Asset/AssetDir retained across mutation. Test-only helper uses no unlocked concurrent manager C API. No Maps causation or authentication claim.'
+		scope: 'Bounded ARM resource stress: four barrier-started workers, 64 iterations each, two independent managers, concurrent native asset-set replacement/configuration and literal resource IDs/names/strings/arrays/bags/XML, same-app-copy within one owner and cross-framework-copy across owners through production raw-theme JNI, standard NDK asset opens, and independently owned Asset/AssetDir retained across mutation. Test-only helper uses no unlocked concurrent manager C API. Cross-owner app-attribute copying with separately loaded ApkAssets is not claimed. No Maps causation or authentication claim.'
 	}
 	os.write_file(out + '/build.json', json2.encode(receipt, prettify: true) + '\n')!
 	println('RESOURCE-LOCK-FIXTURE-APK ' + apk)
