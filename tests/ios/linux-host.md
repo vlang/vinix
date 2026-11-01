@@ -39,8 +39,10 @@ and its dependency closure must also be available. Tools may be installed
 normally or extracted into an external directory with appropriate paths.
 
 No Apple SDK, Homebrew, graphical display, Vinix kernel or game bundle is
-needed for these standalone checks. Optional video, C++, SQLite, GLES and
-text backends are disabled in this profile.
+needed for these standalone checks. The core modes disable optional video,
+C++, SQLite, GLES and text backends. The separate `gles` and
+`build-run-ios-gles` modes enable the existing EAGL/GLKView bridge using a
+GNU ARM64 Mesa dependency set, as described below.
 
 ## Build the V host driver
 
@@ -61,7 +63,7 @@ export V_SKIP_VVMRC=1
 export V_MACOS_V3_NO_FALLBACK=1
 
 cd "$VINIX_IOS_TOOLCHAIN"
-./v -gc none -cc cc \
+./v -enable-globals -nocache -gc none -cc cc -cflags -O2 \
   -path "@vlib|$VINIX_CHECK_ROOT/tests/ios|@vmodules" \
   -o "$VINIX_CHECK_STATE/linux-checks" \
   "$VINIX_CHECK_ROOT/tests/ios/linux-checks.v"
@@ -71,6 +73,8 @@ cd "$VINIX_CHECK_ROOT"
 The driver validates the frozen compiler version, the C compiler's Linux
 ARM64 target, and each produced ELF before execution. An x86-64 binary is
 rejected instead of using the runner's non-ARM64 ABI stubs.
+The host driver's optimization keeps large SDK hashing practical; it retains
+V assertions and does not change the separately recorded runtime build flags.
 
 ## Select tools
 
@@ -112,6 +116,7 @@ paths that resolve into the repository through symlinks are refused.
 "$VINIX_CHECK_STATE/linux-checks" netdb-scope "$VINIX_CHECK_STATE/netdb-r1"
 "$VINIX_CHECK_STATE/linux-checks" reachability "$VINIX_CHECK_STATE/reachability-r1"
 "$VINIX_CHECK_STATE/linux-checks" network-path "$VINIX_CHECK_STATE/network-path-r1"
+"$VINIX_CHECK_STATE/linux-checks" image-initializers "$VINIX_CHECK_STATE/initializers-r1"
 "$VINIX_CHECK_STATE/linux-checks" build-run-ios "$VINIX_CHECK_STATE/runner-r1"
 ```
 
@@ -123,7 +128,10 @@ paths that resolve into the repository through symlinks are refused.
 | `netdb-scope` | Linux IPv6 numeric-scope behavior and output-buffer/error semantics |
 | `reachability` | Reachability callbacks, context ownership, cancellation and joined shutdown across two runtime cycles |
 | `network-path` | Network-path monitors, queued/in-flight callbacks, cancellation and joined shutdown across two runtime cycles |
+| `image-initializers` | Constructor table bounds and six actual Mach-O executions with normal and lower-segment layouts, including an executable decoy constructor |
 | `build-run-ios` | Core runner build, help/inspection and execution of a generated synthetic iOS Mach-O |
+| `gles` | Mesa EAGL/GLKView rendering, shader and published pixels, method discovery, ARM64 argument widths, graphics state and thread/context ownership |
+| `build-run-ios-gles` | GLES-enabled Linux runner build and synthetic Mach-O entry/arguments |
 
 Invoke `reachability` and `network-path` through this standalone driver;
 their plain names in `notification-checks` retain VM routing.
@@ -151,6 +159,69 @@ ARM64 Mach-O requires no frameworks or Apple SDK. The entry checks `argc`
 and `argv`, returns **37** for the ordinary invocation, and returns **99**
 when the driver supplies an extra argument. These expected exits check actual
 mapping, entry and argument forwarding. They establish no Fortnite result.
+
+## GNU/Linux GLES profile
+
+`gles` and `build-run-ios-gles` require `VINIX_IOS_LINUX_GLES_ROOT`. Select a
+GNU/glibc ARM64 dependency tree with the Debian/Ubuntu multiarch layout:
+
+| Relative path below that root | Required input |
+| --- | --- |
+| `usr/include/EGL`, `usr/include/GLES2`, `usr/include/GLES3`, `usr/include/KHR` | EGL and GLES headers |
+| `usr/lib/aarch64-linux-gnu/libEGL.so` and `libEGL.so.1` | EGL link and runtime aliases |
+| `usr/lib/aarch64-linux-gnu/libGLESv2.so` and `libGLESv2.so.2` | GLES link and runtime aliases |
+| `usr/lib/aarch64-linux-gnu/libEGL_mesa.so.0` | Mesa GLVND provider |
+| `usr/lib/aarch64-linux-gnu/libz.so.1` | zlib used by the existing GLES symbol bridge |
+| `usr/lib/aarch64-linux-gnu/dri/swrast_dri.so` | Mesa software driver with softpipe and ES3 support |
+
+The dependency closure of those libraries must also be present. The base
+compiler/loader prefix supplies glibc and compiler runtime libraries. On an
+ARM64 Debian/Ubuntu host with the required packages installed, the graphics
+root may be `/`. Cross builds can use a private extracted ARM64 package tree;
+host-architecture graphics libraries are rejected. Relevant package families
+are `libegl-dev`, `libgles-dev`, `libegl-mesa0`, `libgl1-mesa-dri` and `zlib1g`,
+plus their dependencies. Musl Mesa libraries do not satisfy this GNU profile.
+Graphics roots and cross loader prefixes cannot contain `:` or `,`, which
+are delimiters in the loader search path and QEMU environment arguments.
+
+```sh
+export VINIX_IOS_LINUX_GLES_ROOT=/path/to/arm64-gnu-mesa-sdk
+"$VINIX_CHECK_STATE/linux-checks" gles "$VINIX_CHECK_STATE/gles-r1"
+"$VINIX_CHECK_STATE/linux-checks" build-run-ios-gles "$VINIX_CHECK_STATE/gles-runner-r1"
+```
+
+The fixture uses surfaceless EGL and explicitly selects Mesa softpipe software
+rendering. It requires an actual ES3 renderer and checks shader results,
+framebuffer pixels, exported VSF1 XRGB pixels and vertical orientation. It
+also covers pixel-pack/read-framebuffer restoration, resize and drawable
+recreation, weak delegates, context replacement, per-thread current contexts,
+last-reference TLS destruction and two complete runtime lifetimes. Requested
+API2 contexts are checked with pbuffer pixels; ES2 GLKView publication is not
+qualified by this fixture.
+
+GLES capability queries now expose the implemented methods and their argument
+types. Scalar/object `NSMethodSignature` queries are exercised. The CGRect
+initializer is checked through raw method metadata and actual ARM64 HFA
+dispatch; the existing restriction on aggregate `NSMethodSignature` and
+`NSInvocation` values remains.
+
+The driver clears inherited Mesa capability, shader and rasterization
+overrides, emits a private GLVND vendor JSON, and keeps target library paths
+out of host compiler processes. When QEMU is used, its explicit `-E` argument
+sets the target loader path. `gles-environment.json` records the selected
+settings. `gles-inputs.json` pins the selected headers, library entries and
+software driver, including resolved aliases; these inputs are compared again
+before the capture is accepted. Preserve the complete graphics SDK with the
+capture. Packaged Mesa libraries themselves are not sanitizer-instrumented;
+the runtime and V fixture are built with ASan/UBSan.
+
+The `gles` output includes small PPM images in `payload/frames`, written from
+the actual published surfaces. The `build-run-ios-gles` output includes
+`run-ios`, its synthetic Mach-O and complete commands/receipts. A standalone
+invocation of that runner needs the same recorded target library and GLVND
+environment. C++, video, SQLite and text remain disabled in this build.
+The renderer provides no Metal device and this fixture establishes no
+Fortnite frame or game launch gate.
 
 ## Evidence and full game captures
 

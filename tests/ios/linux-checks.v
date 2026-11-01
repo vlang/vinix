@@ -13,7 +13,7 @@ fn main() {
 		return
 	}
 	if os.args.len != 3 {
-		eprintln('usage: linux-checks url-request|data-http|storekit-purchase|netdb-scope|reachability|network-path|build-run-ios FRESH_EXTERNAL_DIRECTORY')
+		eprintln('usage: linux-checks url-request|data-http|storekit-purchase|netdb-scope|reachability|network-path|gles|image-initializers|build-run-ios|build-run-ios-gles FRESH_EXTERNAL_DIRECTORY')
 		exit(2)
 	}
 	linuxcheck.run(os.getwd(), os.args[1], os.args[2]) or {

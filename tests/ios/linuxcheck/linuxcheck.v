@@ -20,6 +20,8 @@ struct Qualification {
 	sanitizers        bool
 	gcc_low_memory    bool
 	optional_backends []string
+	graphics_root     string
+	graphics_driver   string
 	compiler          string
 	toolchain         string
 	sysroot           string
@@ -63,8 +65,7 @@ fn runtime_environment(out string, vroot string) !map[string]string {
 
 // Include hidden entries and propagate traversal errors. Successful sealing
 // must never silently omit a directory or follow an external symlink.
-fn inventory_files(root string, relative string, mut items []FileDigest) ! {
-	directory := if relative == '' { root } else { root + '/' + relative }
+fn directory_names(directory string) ![]string {
 	// Frozen os.ls does not report readdir failures. Check both directory
 	// operations before accepting a complete list of the captured entries.
 	stream := unsafe { C.opendir(directory.str) }
@@ -86,6 +87,12 @@ fn inventory_files(root string, relative string, mut items []FileDigest) ! {
 		if name !in ['.', '..'] { names << name }
 	}
 	names.sort()
+	return names
+}
+
+fn inventory_files(root string, relative string, mut items []FileDigest) ! {
+	directory := if relative == '' { root } else { root + '/' + relative }
+	names := directory_names(directory)!
 	for name in names {
 		path := directory + '/' + name
 		entry := if relative == '' { name } else { relative + '/' + name }
@@ -129,7 +136,9 @@ pub fn fixture(mode string) !string {
 		'netdb-scope' { 'netdb_numeric_scope_test.v' }
 		'reachability' { 'reachability_test.v' }
 		'network-path' { 'network_path_test.v' }
-		'build-run-ios' { '' }
+		'gles' { 'gles_linux_test.v' }
+		'image-initializers' { 'image_initializers_test.v' }
+		'build-run-ios', 'build-run-ios-gles' { '' }
 		else { return error('unsupported Linux mode: ${mode}') }
 	}
 }
@@ -172,6 +181,11 @@ fn require_markers(fixture_name string, output string) ! {
 		'netdb_numeric_scope_test.v' { ['IOS-NETDB-NUMERIC-SCOPE:', 'IOS-NETDB-SCOPE-NAMES:'] }
 		'reachability_test.v' { ['IOS-REACHABILITY:'] }
 		'network_path_test.v' { ['IOS-NETWORK-PATH:'] }
+		'gles_linux_test.v' {
+			['IOS-LINUX-GLES-CONTEXTS:', 'IOS-LINUX-GLES-DRAW:', 'IOS-LINUX-GLES-SURFACE:',
+				'IOS-LINUX-GLES-THREADS:', 'IOS-LINUX-GLES-CLEANUP:']
+		}
+		'image_initializers_test.v' { ['IOS-IMAGE-INITIALIZERS:', 'IOS-IMAGE-INITIALIZER-ENTRY:'] }
 		else { []string{} }
 	}
 	if output.contains('FAIL') || output.contains('V panic:') || output.contains('> assert ') {
@@ -228,6 +242,7 @@ pub fn run(repository string, mode string, requested string) ! {
 		return error('this execution path requires a Linux host')
 	}
 	fixture_name := fixture(mode)!
+	graphics := gles_profile(mode)!
 	low_memory_value := os.getenv('VINIX_IOS_LINUX_GCC_LOW_MEMORY')
 	if low_memory_value !in ['', '0', '1'] {
 		return error('VINIX_IOS_LINUX_GCC_LOW_MEMORY must be 0 or 1')
@@ -268,6 +283,10 @@ pub fn run(repository string, mode string, requested string) ! {
 	}
 	out := fresh_output(root, requested)!
 	mut env := runtime_environment(out, vroot)!
+	graphics_inputs := gles_inputs(graphics)!
+	if graphics.enabled {
+		os.write_file(out + '/gles-inputs.json', json2.encode(graphics_inputs, prettify: true))!
+	}
 	// tlsbuild uses child processes too; its objects remain in this output tree.
 	os.setenv('TMPDIR', env['TMPDIR'], true)
 	version := checked(out, 'v-version', [v, 'version'], vroot, env)!
@@ -306,6 +325,9 @@ pub fn run(repository string, mode string, requested string) ! {
 		host:          if native { 'linux-arm64' } else { 'linux-amd64' }
 		sanitizers:    sanitized
 		gcc_low_memory: low_memory
+		optional_backends: if graphics.enabled { ['gles'] } else { []string{} }
+		graphics_root: graphics.root
+		graphics_driver: if graphics.enabled { 'softpipe' } else { '' }
 		compiler:      cc
 		toolchain:     vroot
 		sysroot:       sysroot
@@ -320,10 +342,12 @@ pub fn run(repository string, mode string, requested string) ! {
 		build_root + '/compat/ios/runner'
 	}
 	generated := out + '/payload/runtime.c'
-	checked(out, 'generate', [v, '-enable-globals', '-nocache', '-gc', 'none', '-cc', 'gcc', '-os',
+	mut generate := [v, '-enable-globals', '-nocache', '-gc', 'none', '-cc', 'gcc', '-os',
 		'linux', '-arch', 'arm64', '-d', 'glibc', '-d', 'no_backtrace', '-path',
-		'@vlib|' + build_root + '/compat/ios|' + build_root + '/tests/ios|@vmodules', '-o', generated,
-		source], vroot, env)!
+		'@vlib|' + build_root + '/compat/ios|' + build_root + '/tests/ios|@vmodules', '-o', generated]
+	if graphics.enabled { generate << ['-d', 'ios_gles'] }
+	generate << source
+	checked(out, 'generate', generate, vroot, env)!
 	mut compile := [cc, '-D_GNU_SOURCE', '-DCUSTOM_DEFINE_no_backtrace', '-ffixed-x18', '-w', '-g',
 		'-fno-omit-frame-pointer']
 	if sysroot.len > 0 { compile << '--sysroot=' + sysroot }
@@ -344,6 +368,7 @@ pub fn run(repository string, mode string, requested string) ! {
 	// sanitizer instrumentation. Keep it explicit and record it in the capture.
 	if low_memory { compile << ['--param=ggc-min-expand=10', '--param=ggc-min-heapsize=16384'] }
 	compile << tlsbuild.includes(vroot)
+	if graphics.enabled { compile << ['-isystem', graphics.include] }
 	mut objects := []string{}
 	mut c_sources := [generated]
 	// Stock c6bb06f includes these helpers as headers. Older prepared
@@ -365,16 +390,45 @@ pub fn run(repository string, mode string, requested string) ! {
 	if sysroot.len > 0 { link << '--sysroot=' + sysroot }
 	if sanitized { link << '-fsanitize=address,undefined' }
 	link << objects
+	if graphics.enabled {
+		link << ['-L' + graphics.libraries, '-Wl,-rpath-link,' + graphics.libraries, '-lEGL', '-lGLESv2']
+	}
 	link << [tls, '-pthread', '-ldl', '-lresolv', '-lm', '-o', binary_path]
 	checked(out, 'link', link, out, env)!
 	require_arm64_elf(binary_path)!
+	// Keep target graphics libraries out of host V/GCC processes. Only the
+	// ARM64 runtime (or QEMU's target loader) receives this environment.
+	mut execution_env := env.clone()
+	if graphics.enabled {
+		gles_environment(graphics, out, prefix, mut execution_env)!
+		os.mkdir(out + '/payload/frames')!
+		execution_env['VINIX_IOS_GLES_FRAME_DIR'] = out + '/payload/frames'
+		os.write_file(out + '/gles-environment.json', json2.encode({
+			'LD_LIBRARY_PATH': execution_env['LD_LIBRARY_PATH']
+			'LIBGL_DRIVERS_PATH': execution_env['LIBGL_DRIVERS_PATH']
+			'__EGL_VENDOR_LIBRARY_FILENAMES': execution_env['__EGL_VENDOR_LIBRARY_FILENAMES']
+			'LIBGL_ALWAYS_SOFTWARE': execution_env['LIBGL_ALWAYS_SOFTWARE']
+			'GALLIUM_DRIVER': execution_env['GALLIUM_DRIVER']
+			'MESA_SHADER_CACHE_DISABLE': execution_env['MESA_SHADER_CACHE_DISABLE']
+			'EGL_PLATFORM': execution_env['EGL_PLATFORM']
+		}, prettify: true))!
+	}
 	mut invocation := []string{}
-	if !native { invocation << [emulator, '-L', prefix] }
+	if !native {
+		invocation << [emulator, '-L', prefix]
+		if graphics.enabled {
+			// QEMU may be dynamically linked for the host architecture. Preserve
+			// its host loader path and set the target path via QEMU's explicit -E.
+			invocation << ['-E', 'LD_LIBRARY_PATH=' + execution_env['LD_LIBRARY_PATH']]
+			if 'LD_LIBRARY_PATH' in env { execution_env['LD_LIBRARY_PATH'] = env['LD_LIBRARY_PATH'] }
+			else { execution_env.delete('LD_LIBRARY_PATH') }
+		}
+	}
 	invocation << binary_path
 	if !sanitized {
 		mut help := invocation.clone()
 		help << '--help'
-		help_output := checked(out, 'help', help, out, env)!
+		help_output := checked(out, 'help', help, out, execution_env)!
 		if !help_output.contains('usage: run-ios ') {
 			return error('runner help output is missing')
 		}
@@ -382,29 +436,36 @@ pub fn run(repository string, mode string, requested string) ! {
 		write_smoke(smoke)!
 		mut command := invocation.clone()
 		command << ['--inspect', smoke]
-		checked(out, 'smoke-inspect', command, out, env)!
+		checked(out, 'smoke-inspect', command, out, execution_env)!
 		command = invocation.clone()
 		command << smoke
-		checked_exit(out, 'smoke-entry', command, out, env, smoke_success_exit)!
+		checked_exit(out, 'smoke-entry', command, out, execution_env, smoke_success_exit)!
 		command << 'extra'
-		checked_exit(out, 'smoke-arguments', command, out, env, smoke_argument_error_exit)!
+		checked_exit(out, 'smoke-arguments', command, out, execution_env, smoke_argument_error_exit)!
 	} else {
 		if fixture_name == 'ns_data_http_test.v' {
 			openssl := os.find_abs_path_of_executable('openssl')!
 			checked(out, 'certificate', [openssl, 'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
 				'-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost', '-days', '1',
 				'-keyout', out + '/server.key', '-out', out + '/server.pem'], out, env)!
-			env['VINIX_IOS_HTTP_CERT'] = out + '/server.pem'
-			env['VINIX_IOS_HTTP_KEY'] = out + '/server.key'
+			execution_env['VINIX_IOS_HTTP_CERT'] = out + '/server.pem'
+			execution_env['VINIX_IOS_HTTP_KEY'] = out + '/server.key'
 		}
 		for deterministic in [false, true] {
 			label := if deterministic { 'runtime-deterministic' } else { 'runtime' }
-			if deterministic { env['SWIFT_DETERMINISTIC_HASHING'] = '1' }
-			output := checked(out, label, invocation, out, env)!
+			if deterministic { execution_env['SWIFT_DETERMINISTIC_HASHING'] = '1' }
+			output := checked(out, label, invocation, out, execution_env)!
 			require_markers(fixture_name, output)!
 		}
 	}
-	result_text := if sanitized {
+	if graphics.enabled && gles_inputs(graphics)! != graphics_inputs {
+		return error('Linux GLES SDK inputs changed during the capture')
+	}
+	result_text := if graphics.enabled && sanitized {
+		'PASS Linux ARM64 GLES runtime fixture with ASan/UBSan and Mesa softpipe; native Foundation and Fortnite not executed; packaged Mesa libraries are not sanitizer-instrumented\n'
+	} else if graphics.enabled {
+		'PASS Linux ARM64 GLES runner build and synthetic iOS application entry/arguments; no Fortnite execution; C++, video, text and SQLite backends disabled\n'
+	} else if sanitized {
 		'PASS Linux ARM64 fixture with ASan/UBSan; native Foundation not executed; optional multimedia backends disabled\n'
 	} else {
 		'PASS Linux ARM64 runner build and synthetic iOS application entry/arguments; no Fortnite execution; optional multimedia backends disabled\n'
