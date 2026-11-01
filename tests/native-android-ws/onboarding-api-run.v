@@ -119,7 +119,7 @@ const intent_extras_pass_marker = 'INTENT-EXTRAS-PASS merge precedence copies no
 // Resource synchronization uses the retained Intent framework and its corrected native.
 const resource_locks_framework_sha = '02aefc8136cb87eb8e9ebd0928cb15f3e1c2042e47d2a687170a0f9309ac4b20'
 const resource_locks_native_sha = 'aeb5ccd643020cbb20ad5630dabff4bfd0ff8b04a5b0fbcfd1b657b3bcd91dd7'
-const resource_locks_apk_sha = 'ef4188b65ffd8fd5c2c0b4c71494b45cec3dea9038bc4d2853ae3daa726c1da1'
+const resource_locks_apk_sha = 'b90fe510799ddf4d550c1915d3a730ab2db3aacbcdc95122c2862a85afdb814f'
 const resource_locks_pass_marker = 'RESOURCE-LOCKS-PASS workers=4 iterations=64 ids names strings arrays bags themes same-copy cross-copy configuration paths owned-asset owned-directory'
 
 struct FixtureProfile {

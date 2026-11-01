@@ -26,8 +26,8 @@ output `/var/lib/resource-locks-r1`. The guest must verify the identity is unuse
 before provisioning it.
 
 Paths below use `S=/Users/alex/.local/state/vinix/android`. The original r1
-qualification follows; the corrected fixture and current r2 tools are recorded
-after it.
+qualification follows; subsequent fixture and tool refreshes are recorded after
+it.
 
 | Input | Path below S | SHA-256 |
 | --- | --- | --- |
@@ -123,4 +123,55 @@ Seal/readback took 0.091/0.283 seconds with zero guard/child exits, complete
 cleanup and zero swaps under the unchanged 600 MiB/300-second/64 MiB
 shared-growth/1 GiB reserve/output/file-size caps. Controls remain in
 `S/resource-locks-api-tools-seal-controls-2026-11-01-r2`. Independent refresh
+source, pin/artifact/guard/ELF/seal and report reviews passed.
+
+## Theme diagnostics, r3
+
+The r4 ARM fixture returned false from `nativeThemes` at worker iteration 0,
+without identifying which native theme assertion failed. The r5 fixture adds
+failure-only phase/cookie/type/data/pending diagnostics and a serial invocation
+of the same strict theme checks before starting workers. Every assertion,
+worker/iteration count, success marker and lifetime check is retained. The
+framework, native library and runner health/check logic remain unchanged.
+This refresh changes only the same five runner/transfer pin/path constants.
+It provides diagnostic evidence collection; it does not establish an ARM pass,
+identify the underlying failure or validate Maps behavior.
+
+The diagnostic APK is `S/resource-lock-fixture-2026-11-01-r5/probe.apk`, SHA-256
+`b90fe510799ddf4d550c1915d3a730ab2db3aacbcdc95122c2862a85afdb814f`.
+Its `build.json` SHA-256 is
+`b3f15545d0fb8ef340ef9500bec19044c82a31ca93a4b55626e63f91f4822704`.
+All five refreshed tool checks passed on their first attempt, including 1,941
+runner refusals, the transfer selftest and static AArch64 EXEC inspection
+without INTERP or DYNAMIC segments.
+
+| Check | Guard seconds | Sampled aggregate RSS bytes | Time maximum bytes |
+| --- | ---: | ---: | ---: |
+| Host runner compile | 3.492 | 348,340,224 | 370,589,696 |
+| Runner selftest | 1.490 | 20,791,296 | 17,776,640 |
+| Static ARM runner compile | 3.504 | 377,946,112 | 359,235,584 |
+| Host transfer compile | 3.321 | 371,097,600 | 379,912,192 |
+| Transfer selftest | 1.832 | 9,453,568 | 9,338,880 |
+
+All guards/children exited zero with complete cleanup and zero swaps under the
+original 600 MiB/300-second/512 MiB shared-growth/1 GiB reserve/output/file-size
+caps. Runtime/tool/artifact pins were rehashed after checks, both frozen sources
+match the checkout, and predecessor r2 APK/tool/seal hashes remain unchanged.
+Captured source base is `fcee5f780796f6df200eb4a44430741b16c80d8e`; runner and
+transfer source hashes are
+`1bd6fe60d69358d2e7f40d3f82e7888089411a99c5657fbb3277a6bed1e0f771`
+and `a90b0c49f0b282bdedbd82d601cd302a713b3fae48f08c08521329dc16d557c3`.
+
+ARM runner `S/resource-locks-api-run-2026-11-01-r3/run` has SHA-256
+`fc4584fa5070b7398f4df6987348467e027538c4469377e5042cf395a349af78`.
+Transfer `S/resource-locks-api-transfer-build-2026-11-01-r3/transfer` has SHA-256
+`21870d9fa926f559c55f4d2466e43340b9af0927a674ceec45ac92c93277d818`.
+The four r3 tool/control roots are closed. Full sealing and a separate
+fresh-process readback passed for 35 entries at
+`S/resource-locks-api-tools-sealed-2026-11-01-r3/manifest.json`, SHA-256
+`2ad3b8facf6ae1ae4af460606664eba05725c7f704de3e181e157016ec98c883`.
+Seal/readback took 0.115/0.434 seconds with zero guard/child exits, complete
+cleanup and zero swaps under the unchanged 600 MiB/300-second/64 MiB
+shared-growth/1 GiB reserve/output/file-size caps. Controls remain in
+`S/resource-locks-api-tools-seal-controls-2026-11-01-r3`. Independent refresh
 source, pin/artifact/guard/ELF/seal and report reviews passed.
