@@ -4,6 +4,7 @@ module main
 import os
 import tlsbuild
 import frozenv
+import linuxcheck
 fn run(out string, label string, args []string, deterministic bool) {
 	mut p := os.new_process(args[0]); p.set_args(args[1..]); p.set_redirect_stdio_merged()
 	frozenv.configure(mut p, args[0]) or { panic(err) }
@@ -56,7 +57,30 @@ fn run_host_fixture(root string, old string, out string, fixture string) ! {
 }
 
 fn main() {
+	if linuxcheck.maybe_tls_child()! { return }
 	if os.args.len != 3 { panic('usage: notification-checks MODE EXTERNAL_BUNDLE') }
+	$if linux {
+		mode := os.args[1]
+		if mode in ['url-request-host', 'data-http-host', 'storekit-purchase-host', 'build-run-ios'] {
+			linuxcheck.run(os.getwd(), mode, os.args[2])!
+			return
+		}
+		if mode == 'host' || mode.ends_with('-host') || mode.contains('inspect') || mode == 'driver-build' {
+			eprintln('this mode requires the native macOS oracle; use linux-checks for supported Linux ARM64 runtime checks')
+			exit(2)
+		}
+		if mode == '' || mode.bytes().any(!((it >= `a` && it <= `z`) || (it >= `0` && it <= `9`) || it == `-`)) {
+			panic('invalid VM mode')
+		}
+		root := os.real_path(os.getwd())
+		out := os.real_path(os.args[2])
+		if out == root || out.starts_with(root + '/') || !os.is_dir(out) || !os.is_file(out + '/notification-vm') {
+			panic('compile notification-vm into an existing external output directory; see tests/ios/hosttools/README.md')
+		}
+		os.mkdir_all(out + '/tmp')!
+		linuxcheck.run_vm(root, out, mode)!
+		return
+	}
 	root := os.real_path(os.getwd()); out := os.abs_path(os.args[2]); old := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
