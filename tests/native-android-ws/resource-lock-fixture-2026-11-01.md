@@ -32,20 +32,31 @@ START_DOCUMENT (0), then the second is START_TAG (2), followed by the exact
 operation has a distinct diagnostic stage. No event, literal resource,
 concurrency, ownership, iteration, timeout or guard assertion was relaxed.
 
+R5 adds one serial call to the same strict `nativeThemes` before held handles
+or workers are created. On any theme failure the test-only helper emits one
+fixed-token diagnostic, at most 137 bytes, containing the exact phase, returned
+cookie, expected presence, type/data, and pending-exception bit. It explicitly
+flushes C output before returning false. The diagnostic prefix contains no
+`-FAIL`, so it does not trigger the runner before native cleanup completes.
+Negative cookies are authoritative; fields are not read after an absent lookup
+or pending JNI exception. Unavailable cookies use INT32_MIN, fields use
+type=-1/data=0, and setup-only expectations use -1. Every application-attribute,
+typed-color, same/cross-copy assertion and cleanup path remains in force.
+
 Final evidence is outside Git under
-`/Users/alex/.local/state/vinix/android/resource-lock-fixture-2026-11-01-r4` and
-`resource-lock-fixture-controls-2026-11-01-r4` beneath the same state directory.
-The build observed source revision `cc5f16b30c026a036a140877d1c983dd13000d96`;
+`/Users/alex/.local/state/vinix/android/resource-lock-fixture-2026-11-01-r5` and
+`resource-lock-fixture-controls-2026-11-01-r5` beneath the same state directory.
+The build observed source revision `fcee5f780796f6df200eb4a44430741b16c80d8e`;
 its complete generator bytes are archived and pinned in `build.json`.
 
 | Input or artifact | SHA-256 |
 | --- | --- |
 | `main.v` | `11b3d25b1917599dcc5695c2a649e61debbb1452e6d43379d4fa25441bdc01cf` |
-| `sources.v` | `ba396eb35793ebe508ddd0113ba9e60b716417e7923f4f5b8598ca2f95c0759d` |
-| `resourcelockprobe/probe.v` | `bd1a3877c3f695e36b19929975ef74bd003a48af8184dfef4ddd548fc0f4a68d` |
-| Signed `probe.apk` | `ef4188b65ffd8fd5c2c0b4c71494b45cec3dea9038bc4d2853ae3daa726c1da1` |
-| `build.json` | `de1210a74c5475ff29d86dcf83de0a5a88c3c375ec917e16458b317af15cb683` |
-| Bundled `lib/arm64-v8a/libresource-lock-probe.so` | `fbb100a58cbdcb624e84750f871f0a472b01ab3f85e4279d853478a6fc076c43` |
+| `sources.v` | `d7a832287de0c2753d558fe91bf6d6f3996425eae878376cae52510ebea9e337` |
+| `resourcelockprobe/probe.v` | `01b2fe5a9f45ae2ece3c762c6014c08a5b4abc7f44ed4ba9054662a07cd60ca8` |
+| Signed `probe.apk` | `b90fe510799ddf4d550c1915d3a730ab2db3aacbcdc95122c2862a85afdb814f` |
+| `build.json` | `b3f15545d0fb8ef340ef9500bec19044c82a31ca93a4b55626e63f91f4822704` |
+| Bundled `lib/arm64-v8a/libresource-lock-probe.so` | `0192d06f30d20a4ee47f5573c30e50e98248837bb70a1f7e5b8bea1d9b8f0e97` |
 
 The signed package is `org.vinix.bootstrap`, activity `.Main`, min SDK 29,
 target SDK 35. Its sole success marker is:
@@ -66,9 +77,9 @@ Loading follows the existing bootstrap assetprobe APK/System.loadLibrary path;
 the helper is not added to the production runtime ABI.
 
 Both final guards and children exited 0 with cleanup complete. Builder compilation
-took 1.808 seconds, sampled 304,791,552 bytes RSS (time high-water 358,940,672),
-and observed 286,720 bytes shared-volume growth. APK production took 12.350
-seconds, sampled 104,071,168 bytes RSS and observed 33,804,288 bytes growth.
+took 2.541 seconds, sampled 343,965,696 bytes RSS (time high-water 359,645,184),
+and observed 11,624,448 bytes shared-volume growth. APK production took 12.777
+seconds, sampled 103,530,496 bytes RSS and observed 57,139,200 bytes growth.
 Both recorded zero swaps. Original limits remained 600 MiB RSS, 300 seconds,
 512 MiB growth, 1 GiB reserve, 4 MiB command output, and file limit 16,777,216.
 
@@ -90,6 +101,15 @@ secondary. IDs, names, strings, arrays and bags preceding XML returned, but
 the complete ARM fixture failed. The 10,948-byte original log is preserved at
 `/Users/alex/.local/state/vinix/android/maps-resource-lock-runtime-audit-2026-11-01-r1/failed-fixture-decoded-r1/child.log`,
 SHA-256 `86e0392e99b7a0c7907f20bdca2a1473ab0bd2692b691e8b0118af242b34a470`.
-R4 changes only fixture XML sequencing and diagnostic labels; the native helper
-is byte-identical and the framework/native/image pair is unchanged. Its ARM
-retry remains pending.
+R4 changed only fixture XML sequencing and diagnostic labels; its native helper
+was byte-identical. Its ARM retry passed the XML and preceding resource reads,
+then both readers failed at iteration 0 in `raw-theme-same-and-cross-copy`;
+mutator barrier timeouts were secondary. That 11,000-byte original log remains at
+`/Users/alex/.local/state/vinix/android/maps-resource-lock-runtime-audit-2026-11-01-r2/failed-fixture-decoded-r1/child.log`,
+SHA-256 `ce16e26c383b2066ff8d285c4ec6ff8147e426e21e4bd3e8644d1884ba6379e9`.
+The r4 APK `ef4188b65ffd8fd5c2c0b4c71494b45cec3dea9038bc4d2853ae3daa726c1da1`
+and build `de1210a74c5475ff29d86dcf83de0a5a88c3c375ec917e16458b317af15cb683`
+remain immutable. R5 adds observation only: the failing inner phase remains
+unverified until its diagnostic runs. The production framework, native library
+and prepared image are unchanged; no theme oracle, concurrency limit, or guard
+was relaxed.

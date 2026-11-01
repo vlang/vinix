@@ -452,6 +452,7 @@ invoke-static {v0}, ${main_type}->resources(Ljava/lang/String;)Landroid/content/
 move-result-object v1
 invoke-static {v0}, ${main_type}->resources(Ljava/lang/String;)Landroid/content/res/Resources;
 move-result-object v2
+invoke-static {v1, v2}, ${main_type}->themePreflight(Landroid/content/res/Resources;Landroid/content/res/Resources;)V
 invoke-virtual {v1}, Landroid/content/res/Resources;->getAssets()Landroid/content/res/AssetManager;
 move-result-object v0
 invoke-static {v0}, ${main_type}->nativeHold(Landroid/content/res/AssetManager;)J
@@ -554,6 +555,20 @@ return-void'
 }
 
 fn fixture_sources(ids map[string]string) map[string]string {
-	return {'org/vinix/bootstrap/Main.smali': main_source() + read_source(ids),
+	return {'org/vinix/bootstrap/Main.smali': main_source() + read_source(ids) + preflight_source(ids),
 		'org/vinix/bootstrap/Worker.smali': worker_source(ids)}
+}
+
+fn preflight_source(ids map[string]string) string {
+	return method('private static themePreflight(Landroid/content/res/Resources;Landroid/content/res/Resources;)V', 4, '
+invoke-virtual {p0}, Landroid/content/res/Resources;->getAssets()Landroid/content/res/AssetManager;
+move-result-object v0
+invoke-virtual {p1}, Landroid/content/res/Resources;->getAssets()Landroid/content/res/AssetManager;
+move-result-object v1
+const v2, ${ids['style/FixtureTheme']}
+const v3, ${ids['attr/fixtureColor']}
+invoke-static {v0, v1, v2, v3}, ${main_type}->nativeThemes(Landroid/content/res/AssetManager;Landroid/content/res/AssetManager;II)Z
+move-result v0
+invoke-static {v0}, ${main_type}->yes(Z)V
+return-void')
 }

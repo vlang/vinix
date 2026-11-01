@@ -7,6 +7,7 @@ module resourcelockprobe
 #define _LARGEFILE64_SOURCE
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include "androidfw_c_api.h"
 #include "native-ndk.h"
 
@@ -23,6 +24,10 @@ fn C.malloc(usize) voidptr
 fn C.free(voidptr)
 fn C.memcmp(voidptr, voidptr, usize) i32
 fn C.strcmp(&char, &char) i32
+fn C.printf(&char, ...) i32
+fn C.fflush(voidptr) i32
+
+const no_theme_cookie = i32(-2147483648)
 
 struct HeldAssets {
 	asset voidptr
@@ -190,66 +195,112 @@ fn themes_close(e voidptr, first voidptr, second voidptr, remove voidptr, themes
 	}
 }
 
+// One fixed-size, failure-only line per nativeThemes invocation. An unavailable
+// cookie is INT32_MIN; unavailable TypedValue fields are type=-1/data=0. fflush
+// preserves the checkpoint even if the Java exception path terminates early.
+fn theme_failure_expected(phase &char, cookie i32, kind i32, data u32, pending bool, expected i32) bool {
+	unsafe {
+		C.printf(c'RESOURCE-LOCKS-THEME-DIAGNOSTIC phase=%s cookie=%d expected_present=%d type=0x%08x data=0x%08x pending=%d\n',
+			phase, cookie, expected, u32(kind), data, i32(pending))
+		C.fflush(nil)
+	}
+	return false
+}
+
+fn theme_failure(phase &char, cookie i32, kind i32, data u32, pending bool) bool {
+	return theme_failure_expected(phase, cookie, kind, data, pending, -1)
+}
+
 fn theme_matches(e voidptr, owner voidptr, load voidptr, theme i64, attr i32, value voidptr,
-	type_field voidptr, data_field voidptr, present bool) bool {
+	type_field voidptr, data_field voidptr, present bool, phase &char) bool {
 	unsafe {
 		args := [ProbeValue{j: theme}, ProbeValue{i: attr}, ProbeValue{l: value}, ProbeValue{z: 1}]!
 		cookie := ProbeIntCall(probe_slot(e, 51))(e, owner, load, &args[0])
-		if probe_pending(e) { return false }
-		if !present { return cookie < 0 }
-		if cookie < 0 { return false }
+		if probe_pending(e) { return theme_failure_expected(phase, no_theme_cookie, -1, 0, true, i32(present)) }
+		// The returned cookie determines presence. Do not interpret stale output
+		// fields after an absent lookup, or call field accessors with an exception.
+		if !present && cookie < 0 { return true }
+		if cookie < 0 { return theme_failure_expected(phase, cookie, -1, 0, false, i32(present)) }
 		kind := ProbeIntField(probe_slot(e, 100))(e, value, type_field)
-		if probe_pending(e) { return false }
+		if probe_pending(e) { return theme_failure_expected(phase, cookie, -1, 0, true, i32(present)) }
 		data := ProbeIntField(probe_slot(e, 100))(e, value, data_field)
-		return !probe_pending(e) && kind == 0x1c && u32(data) == u32(0xff123456)
+		if probe_pending(e) { return theme_failure_expected(phase, cookie, -1, 0, true, i32(present)) }
+		if present && kind == 0x1c && u32(data) == u32(0xff123456) { return true }
+		return theme_failure_expected(phase, cookie, kind, u32(data), false, i32(present))
 	}
 }
 
 @[export: 'Java_org_vinix_bootstrap_Main_nativeThemes']
 pub fn native_themes(e voidptr, class voidptr, first voidptr, second voidptr, style i32, attr i32) u8 {
 	unsafe {
-		if probe_pending(e) { return 0 }
-		if first == nil || second == nil { probe_null(e); return 0 }
-		if ProbeSame(probe_slot(e, 24))(e, first, second) != 0 { return 0 }
+		if probe_pending(e) { theme_failure(c'entry', no_theme_cookie, -1, 0, true); return 0 }
+		if first == nil || second == nil {
+			probe_null(e)
+			theme_failure(c'null-owner', no_theme_cookie, -1, 0, probe_pending(e))
+			return 0
+		}
+		if ProbeSame(probe_slot(e, 24))(e, first, second) != 0 {
+			theme_failure(c'identical-owners', no_theme_cookie, -1, 0, probe_pending(e)); return 0
+		}
 		manager_class := ProbeLookup(probe_slot(e, 6))(e, c'android/content/res/AssetManager')
-		if manager_class == nil { return 0 }
+		if manager_class == nil {
+			theme_failure(c'manager-class', no_theme_cookie, -1, 0, probe_pending(e)); return 0
+		}
 		defer { ProbeDrop(probe_slot(e, 23))(e, manager_class) }
 		create := probe_member(e, manager_class, c'newTheme', c'()J')
 		remove := probe_member(e, manager_class, c'deleteTheme', c'(J)V')
 		apply := probe_member(e, manager_class, c'applyThemeStyle', c'(JIZ)V')
 		copy := probe_member(e, manager_class, c'copyTheme', c'(JJ)V')
 		load := probe_member(e, manager_class, c'loadThemeAttributeValue', c'(JILandroid/util/TypedValue;Z)I')
-		if create == nil || remove == nil || apply == nil || copy == nil || load == nil { return 0 }
+		if create == nil || remove == nil || apply == nil || copy == nil || load == nil {
+			theme_failure(c'manager-methods', no_theme_cookie, -1, 0, probe_pending(e)); return 0
+		}
 		value_class := ProbeLookup(probe_slot(e, 6))(e, c'android/util/TypedValue')
-		if value_class == nil { return 0 }
+		if value_class == nil {
+			theme_failure(c'value-class', no_theme_cookie, -1, 0, probe_pending(e)); return 0
+		}
 		defer { ProbeDrop(probe_slot(e, 23))(e, value_class) }
 		constructor := probe_member(e, value_class, c'<init>', c'()V')
-		if constructor == nil { return 0 }
+		if constructor == nil {
+			theme_failure(c'value-constructor', no_theme_cookie, -1, 0, probe_pending(e)); return 0
+		}
 		type_field := ProbeMember(probe_slot(e, 94))(e, value_class, c'type', c'I')
-		if type_field == nil || probe_pending(e) { return 0 }
+		if type_field == nil || probe_pending(e) {
+			theme_failure(c'value-type-field', no_theme_cookie, -1, 0, probe_pending(e)); return 0
+		}
 		data_field := ProbeMember(probe_slot(e, 94))(e, value_class, c'data', c'I')
-		if data_field == nil || probe_pending(e) { return 0 }
+		if data_field == nil || probe_pending(e) {
+			theme_failure(c'value-data-field', no_theme_cookie, -1, 0, probe_pending(e)); return 0
+		}
 		value := ProbeObjectCall(probe_slot(e, 30))(e, value_class, constructor, nil)
-		if value == nil || probe_pending(e) { return 0 }
+		if value == nil || probe_pending(e) {
+			theme_failure(c'value-allocation', no_theme_cookie, -1, 0, probe_pending(e)); return 0
+		}
 		defer { ProbeDrop(probe_slot(e, 23))(e, value) }
 		mut themes := [i64(0), i64(0), i64(0)]!
 		defer { themes_close(e, first, second, remove, themes) }
 		for index in 0 .. 3 {
 			owner := if index == 2 { second } else { first }
 			themes[index] = ProbeLongCall(probe_slot(e, 54))(e, owner, create, nil)
-			if themes[index] == 0 || probe_pending(e) { return 0 }
+			if themes[index] == 0 || probe_pending(e) {
+				phase := if index == 0 { c'new-A0' } else if index == 1 { c'new-A1' } else { c'new-B2' }
+				theme_failure(phase, no_theme_cookie, -1, 0, probe_pending(e)); return 0
+			}
 		}
 		// Fresh destinations must lack the attribute: a no-op copy cannot pass.
-		if !theme_matches(e, first, load, themes[1], attr, value, type_field, data_field, false)
-			|| !theme_matches(e, second, load, themes[2], attr, value, type_field, data_field, false) { return 0 }
+		if !theme_matches(e, first, load, themes[1], attr, value, type_field, data_field, false, c'blank-A1')
+			|| !theme_matches(e, second, load, themes[2], attr, value, type_field, data_field, false, c'blank-B2') { return 0 }
 		apply_args := [ProbeValue{j: themes[0]}, ProbeValue{i: style}, ProbeValue{z: 1}]!
 		ProbeVoidCall(probe_slot(e, 63))(e, first, apply, &apply_args[0])
-		if probe_pending(e) || !theme_matches(e, first, load, themes[0], attr, value, type_field, data_field, true) { return 0 }
+		if probe_pending(e) { theme_failure(c'apply-call', no_theme_cookie, -1, 0, true); return 0 }
+		if !theme_matches(e, first, load, themes[0], attr, value, type_field, data_field, true, c'applied-A0') { return 0 }
 		same_args := [ProbeValue{j: themes[1]}, ProbeValue{j: themes[0]}]!
 		ProbeVoidCall(probe_slot(e, 63))(e, first, copy, &same_args[0])
-		if probe_pending(e) || !theme_matches(e, first, load, themes[1], attr, value, type_field, data_field, true) { return 0 }
+		if probe_pending(e) { theme_failure(c'same-copy-call', no_theme_cookie, -1, 0, true); return 0 }
+		if !theme_matches(e, first, load, themes[1], attr, value, type_field, data_field, true, c'same-A1') { return 0 }
 		cross_args := [ProbeValue{j: themes[2]}, ProbeValue{j: themes[1]}]!
 		ProbeVoidCall(probe_slot(e, 63))(e, second, copy, &cross_args[0])
-		return u8(!probe_pending(e) && theme_matches(e, second, load, themes[2], attr, value, type_field, data_field, true))
+		if probe_pending(e) { theme_failure(c'cross-copy-call', no_theme_cookie, -1, 0, true); return 0 }
+		return u8(theme_matches(e, second, load, themes[2], attr, value, type_field, data_field, true, c'cross-B2'))
 	}
 }
