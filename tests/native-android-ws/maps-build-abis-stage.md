@@ -95,3 +95,28 @@ The checkout revision observed during tool review was
 Preparation follows qualification under the original 5 GiB initial-space
 gate and resource caps. These host checks establish no Build ABI ARM, Google
 account, checkin or imagery result.
+
+The automatic preparation passed with the same qualified tools and unchanged
+guards. `maps-build-abis-preparation-2026-11-03-r1` records guard/child exits
+zero, empty reason and complete cleanup in 376.082 seconds. All 129 inherited
+inventories were audited twice, including the 64 + 64 + 1 partition, the
+six-file overlay installed and all 57 modules read back. Sampled RSS peaked at
+91,897,856 bytes; detailed RSS was 90,636,288 bytes, with zero swaps. Initial
+free space was 37,524,770,816 bytes, minimum 37,036,421,120 bytes, and observed
+outer growth 488,349,696 bytes. Final internal cumulative charge was
+150,990,848 bytes; the earlier stage snapshot is 148,373,504 bytes before the
+writable receipt/seal disk samples. Every original limit remains unchanged.
+
+The completed `maps-build-abis-r1/sha256.json` hashes to
+`48aec518f620a1684c7ff471ac62b2e3744fc071b307ea584d10059be3170f51`.
+Boot SHA256 is
+`1eb028f974695880d66363f1cba34b65f6f541c1e0e69866f90ff38038bdc3cb`;
+overlay SHA256 is
+`2eb06abfb8317faba4605656671e15a708fb03688a475621dd4ff0b9109d02b4`.
+Recorded source revision is
+`2de660c944a28b586a1d1fec87a370f1b04622cf`. The preparation guard hashes to
+`1bb9f359a6deb939705de73e73783c3de215ea363509b8f36eced8628846ab56`
+and its log to
+`d09547ad9c8e1005048c9cf0e153b0b35fba2dc6c3aa46bddabe5dde492c4a34`.
+All tool, preparation and prepared roots are closed. This host preparation
+establishes no Build ABI ARM, Google account, checkin or imagery result.
