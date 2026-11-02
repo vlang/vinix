@@ -10,7 +10,7 @@ fn method(signature string, locals int, body string) string {
 	return '.method ${signature}\n.locals ${locals}\n${body}\n.end method\n'
 }
 
-fn checks_source() string {
+fn checks_source(sizes []int) string {
 	return method('private static equal(IILjava/lang/String;)V', 1, '
 if-eq p0, p1, :done
 new-instance v0, Ljava/lang/AssertionError;
@@ -23,11 +23,34 @@ new-instance v0, Ljava/lang/AssertionError;
 invoke-direct {v0, p2}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V
 throw v0
 :done
-return-void') + method('private static point(Landroid/graphics/Point;IILjava/lang/String;)V', 1, '
+return-void') + method('private static point(Landroid/graphics/Point;IILjava/lang/String;)V', 4, '
 iget v0, p0, Landroid/graphics/Point;->x:I
+iget v1, p0, Landroid/graphics/Point;->y:I
+if-ne v0, p1, :describe
+if-eq v1, p2, :check
+:describe
+new-instance v2, Ljava/lang/StringBuilder;
+invoke-direct {v2}, Ljava/lang/StringBuilder;-><init>()V
+invoke-virtual {v2, p3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+const-string v3, " actual Point.x="
+invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+const-string v3, " Point.y="
+invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+invoke-virtual {v2, v1}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+const-string v3, " expected x="
+invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+invoke-virtual {v2, p1}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+const-string v3, " y="
+invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+invoke-virtual {v2, p2}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+const-string v3, " configured physical=${sizes[0]}x${sizes[1]} surface=${sizes[2]}x${sizes[3]}"
+invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+invoke-virtual {v2}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+move-result-object p3
+:check
 invoke-static {v0, p1, p3}, ${main_type}->equal(IILjava/lang/String;)V
-iget v0, p0, Landroid/graphics/Point;->y:I
-invoke-static {v0, p2, p3}, ${main_type}->equal(IILjava/lang/String;)V
+invoke-static {v1, p2, p3}, ${main_type}->equal(IILjava/lang/String;)V
 return-void')
 }
 
@@ -69,20 +92,20 @@ invoke-static {v7, v8, v9}, ${main_type}->equal(IILjava/lang/String;)V
 invoke-virtual {v0}, Landroid/hardware/display/DisplayManager;->getStableDisplaySize()Landroid/graphics/Point;
 move-result-object v4
 '
-	body += check_point('v4', physical_width, physical_height, 'stable size must match independently pinned physical desktop')
+	body += check_point('v4', physical_width, physical_height, 'stable query 1 Activity: stable size must match independently pinned physical desktop')
 	body += '
 invoke-virtual {v0}, Landroid/hardware/display/DisplayManager;->getStableDisplaySize()Landroid/graphics/Point;
 move-result-object v5
 const-string v9, "each stable-size call must return a fresh Point"
 invoke-static {v4, v5, v9}, ${main_type}->distinct(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;)V
 '
-	body += check_point('v5', physical_width, physical_height, 'equal-valued Point results must both contain physical dimensions')
+	body += check_point('v5', physical_width, physical_height, 'stable query 2 Activity: equal-valued Point results must both contain physical dimensions')
 	body += '
 const/16 v7, -71
 const/16 v8, -72
 invoke-virtual {v4, v7, v8}, Landroid/graphics/Point;->set(II)V
 '
-	body += check_point('v5', physical_width, physical_height, 'mutating first return must not change second live result')
+	body += check_point('v5', physical_width, physical_height, 'stable query 2 retained: mutating first return must not change second live result')
 	body += '
 invoke-virtual {v0}, Landroid/hardware/display/DisplayManager;->getStableDisplaySize()Landroid/graphics/Point;
 move-result-object v6
@@ -91,8 +114,8 @@ invoke-static {v4, v6, v9}, ${main_type}->distinct(Ljava/lang/Object;Ljava/lang/
 const-string v9, "third stable result must not reuse second Point"
 invoke-static {v5, v6, v9}, ${main_type}->distinct(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;)V
 '
-	body += check_point('v6', physical_width, physical_height, 'mutating a returned Point must not poison later queries')
-	body += check_point('v4', -71, -72, 'later queries must not rewrite an earlier caller-owned Point')
+	body += check_point('v6', physical_width, physical_height, 'stable query 3 Activity: mutating a returned Point must not poison later queries')
+	body += check_point('v4', -71, -72, 'stable query 1 mutated: later queries must not rewrite an earlier caller-owned Point')
 	body += '
 const/16 v7, -81
 const/16 v8, -82
@@ -111,10 +134,10 @@ invoke-static {v4, v7, v9}, ${main_type}->distinct(Ljava/lang/Object;Ljava/lang/
 invoke-static {v6, v7, v9}, ${main_type}->distinct(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;)V
 move-object v0, v7
 '
-	body += check_point('v0', physical_width, physical_height, 'application-context query must retain physical dimensions')
-	body += check_point('v5', physical_width, physical_height, 'later mutation must not change retained second result')
-	body += check_point('v6', -81, -82, 'cross-context query must not rewrite caller-owned third Point')
-	body += check_point('v4', -71, -72, 'cross-context query must not rewrite caller-owned first Point')
+	body += check_point('v0', physical_width, physical_height, 'stable query 4 application: application-context query must retain physical dimensions')
+	body += check_point('v5', physical_width, physical_height, 'stable query 2 retained: later mutation must not change retained second result')
+	body += check_point('v6', -81, -82, 'stable query 3 mutated: cross-context query must not rewrite caller-owned third Point')
+	body += check_point('v4', -71, -72, 'stable query 1 mutated: cross-context query must not rewrite caller-owned first Point')
 	body += '
 invoke-virtual {v1, v2}, Landroid/view/Display;->getRealSize(Landroid/graphics/Point;)V
 '
@@ -136,7 +159,7 @@ return-void'
 fn main_source(sizes []int) string {
 	return '.class public final ${main_type}\n.super Landroid/app/Activity;\n' +
 		method('public constructor <init>()V', 0, 'invoke-direct {p0}, Landroid/app/Activity;-><init>()V\nreturn-void') +
-		checks_source() + probe_source(sizes) + method('public onCreate(Landroid/os/Bundle;)V', 3, '
+		checks_source(sizes) + probe_source(sizes) + method('public onCreate(Landroid/os/Bundle;)V', 3, '
 invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 :try_start
 invoke-static {p0}, ${main_type}->probe(Landroid/content/Context;)V
