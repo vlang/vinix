@@ -90,10 +90,13 @@ struct NarrowProfile {
  changed map[string]int
  added map[string]int
  class_provider string
+ class_providers []string
  extra_classes []string
  baseline_classes int = 2102
  directory_provider string
  fields map[string][]string
+ removed_methods map[string]int
+ removed_fields map[string][]string
 }
 
 fn storage_profile() NarrowProfile {
@@ -3091,6 +3094,510 @@ fn usage_inactive_self_test() ! {
  }
 }
 
+fn messenger_binder_profile() NarrowProfile {
+ handler := 'android/os/Handler\$MessengerImpl.smali'
+ iface := 'android/os/IMessenger.smali'
+ message := 'android/os/Message.smali'
+ creator := 'android/os/Messenger\$1.smali'
+ messenger := 'android/os/Messenger.smali'
+ return NarrowProfile{
+  name: 'messenger-binder'
+  baseline_name: 'combined-account-webview-usage-inactive-framework-2026-11-02-r1'
+  manifest_pin: 'bfadac214671937539a4732b3ca6be22d561c366b96a72a9de045fc362aba1fe'
+  jar_pin: 'd7b6d8c37d5d09d200c19b429f07cf6666ed6d8cf5a1a1b4d29c0dfd27cd632b'
+  baseline_classes: 2112
+  providers: ['framework_messenger.v', 'framework_message_parcel.v']
+  calls: {handler: 'framework_handler_messenger_source', iface: 'framework_imessenger_source',
+   message: 'framework_message_parcel_source', creator: 'framework_messenger_creator_source',
+   messenger: 'framework_messenger_source'}
+  methods: {handler: ['<init>(Landroid/os/Handler;)V', 'send(Landroid/os/Message;)V'],
+   iface: []string{}, message: ['<clinit>()V', '<init>()V', 'clearForRecycle()V',
+    'copyFrom(Landroid/os/Message;)V', 'obtain(Landroid/os/Message;)Landroid/os/Message;',
+    'writeToParcel(Landroid/os/Parcel;I)V'],
+   creator: ['<init>()V', 'createFromParcel(Landroid/os/Parcel;)Landroid/os/Messenger;',
+    'createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;', 'newArray(I)[Landroid/os/Messenger;', 'newArray(I)[Ljava/lang/Object;'],
+   messenger: ['<init>(Landroid/os/IBinder;)V', 'equals(Ljava/lang/Object;)Z',
+    'getBinder()Landroid/os/IBinder;', 'hashCode()I', '<clinit>()V', 'writeToParcel(Landroid/os/Parcel;I)V',
+    'readMessengerOrNullFromParcel(Landroid/os/Parcel;)Landroid/os/Messenger;',
+    'writeMessengerOrNullToParcel(Landroid/os/Messenger;Landroid/os/Parcel;)V']}
+  changed: {handler: 2, iface: 0, message: 5, creator: 0, messenger: 4}
+  added: {handler: 0, iface: 0, message: 1, creator: 5, messenger: 4}
+  removed_methods: {handler: 0, iface: 0, message: 0, creator: 2, messenger: 0}
+  fields: {messenger: ['.field public static final CREATOR:Landroid/os/Parcelable\$Creator;'],
+   message: ['.field public static final CREATOR:Landroid/os/Parcelable\$Creator;', '.field public sendingUid:I']}
+  removed_fields: {creator: ['.field final synthetic this\$0:Landroid/os/Messenger;']}
+  class_providers: ['framework_messenger_classes', 'framework_message_parcel_classes']
+  extra_classes: ['android/os/IMessenger\$Stub.smali', 'android/os/IMessenger\$Stub\$Proxy.smali',
+   'android/os/VinixMessageCreator.smali']
+ }
+}
+
+fn messenger_binder_lines(source string) string {
+ return source.split_into_lines().map(it.trim_space()).filter(it != '' && !it.starts_with('#')).join('\n')
+}
+
+// Rebase labels by actual instruction position. Catch placement may change in
+// DEX; preserve its exact exception type, protected interval and handler.
+fn messenger_binder_method(source string) !string {
+ mut code := []string{}
+ mut catches := []string{}
+ for original in source.split_into_lines() {
+  raw_line := original.trim_space()
+  line := if raw_line.starts_with('const-string ') { raw_line.replace("\\'", "'") } else { raw_line }
+  if line.starts_with('.catch ') || line.starts_with('.catchall ') {
+   catches << line.replace('{:', '{ :').replace('}', ' }')
+  } else if line != '.end method' { code << line }
+ }
+ code << catches
+ code << '.end method'
+ return intent_extras_method(code.join('\n'))!
+}
+
+fn messenger_binder_metadata(metadata string) string {
+ lines := messenger_binder_lines(metadata).split_into_lines()
+ // DEX groups fields by static/instance category and sorts their names. Field
+ // membership and declarations are exact; all other metadata keeps its order.
+ return lines.filter(!it.starts_with('.field ')).join('\n') + '\n' +
+  lines.filter(it.starts_with('.field ')).sorted().join('\n')
+}
+
+fn messenger_binder_m(header string, registers int, body string) string {
+ return '.method ' + header + '\n.registers ' + registers.str() + '\n' + body + '\n.end method'
+}
+
+fn messenger_binder_messenger_methods() map[string]string {
+ return {
+  '<init>(Landroid/os/IBinder;)V': messenger_binder_m('public constructor <init>(Landroid/os/IBinder;)V', 3,
+   'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\ninvoke-static {p1}, Landroid/os/IMessenger\$Stub;->asInterface(Landroid/os/IBinder;)Landroid/os/IMessenger;\nmove-result-object v0\niput-object v0, p0, Landroid/os/Messenger;->mTarget:Landroid/os/IMessenger;\nreturn-void')
+  'equals(Ljava/lang/Object;)Z': messenger_binder_m('public equals(Ljava/lang/Object;)Z', 4,
+   'instance-of v0, p1, Landroid/os/Messenger;\nif-eqz v0, :different\ncheck-cast p1, Landroid/os/Messenger;\ninvoke-virtual {p0}, Landroid/os/Messenger;->getBinder()Landroid/os/IBinder;\nmove-result-object v0\ninvoke-virtual {p1}, Landroid/os/Messenger;->getBinder()Landroid/os/IBinder;\nmove-result-object v1\ninvoke-virtual {v0, v1}, Ljava/lang/Object;->equals(Ljava/lang/Object;)Z\nmove-result v0\nreturn v0\n:different\nconst/4 v0, 0x0\nreturn v0')
+  'getBinder()Landroid/os/IBinder;': messenger_binder_m('public getBinder()Landroid/os/IBinder;', 2,
+   'iget-object v0, p0, Landroid/os/Messenger;->mTarget:Landroid/os/IMessenger;\ninvoke-interface {v0}, Landroid/os/IMessenger;->asBinder()Landroid/os/IBinder;\nmove-result-object v0\nreturn-object v0')
+  'hashCode()I': messenger_binder_m('public hashCode()I', 2,
+   'invoke-virtual {p0}, Landroid/os/Messenger;->getBinder()Landroid/os/IBinder;\nmove-result-object v0\ninvoke-virtual {v0}, Ljava/lang/Object;->hashCode()I\nmove-result v0\nreturn v0')
+  '<clinit>()V': messenger_binder_m('static constructor <clinit>()V', 1,
+   'new-instance v0, Landroid/os/Messenger\$1;\ninvoke-direct {v0}, Landroid/os/Messenger\$1;-><init>()V\nsput-object v0, Landroid/os/Messenger;->CREATOR:Landroid/os/Parcelable\$Creator;\nreturn-void')
+  'writeToParcel(Landroid/os/Parcel;I)V': messenger_binder_m('public writeToParcel(Landroid/os/Parcel;I)V', 4,
+   'invoke-virtual {p0}, Landroid/os/Messenger;->getBinder()Landroid/os/IBinder;\nmove-result-object v0\ninvoke-virtual {p1, v0}, Landroid/os/Parcel;->writeStrongBinder(Landroid/os/IBinder;)V\nreturn-void')
+  'writeMessengerOrNullToParcel(Landroid/os/Messenger;Landroid/os/Parcel;)V': messenger_binder_m('public static writeMessengerOrNullToParcel(Landroid/os/Messenger;Landroid/os/Parcel;)V', 3,
+   'const/4 v0, 0x0\nif-eqz p0, :write\ninvoke-virtual {p0}, Landroid/os/Messenger;->getBinder()Landroid/os/IBinder;\nmove-result-object v0\n:write\ninvoke-virtual {p1, v0}, Landroid/os/Parcel;->writeStrongBinder(Landroid/os/IBinder;)V\nreturn-void')
+  'readMessengerOrNullFromParcel(Landroid/os/Parcel;)Landroid/os/Messenger;': messenger_binder_m('public static readMessengerOrNullFromParcel(Landroid/os/Parcel;)Landroid/os/Messenger;', 3,
+   'invoke-virtual {p0}, Landroid/os/Parcel;->readStrongBinder()Landroid/os/IBinder;\nmove-result-object v0\nif-nez v0, :present\nconst/4 v0, 0x0\nreturn-object v0\n:present\nnew-instance v1, Landroid/os/Messenger;\ninvoke-direct {v1, v0}, Landroid/os/Messenger;-><init>(Landroid/os/IBinder;)V\nreturn-object v1')
+ }
+}
+
+fn messenger_binder_creator_methods() map[string]string {
+ return {
+  '<init>()V': messenger_binder_m('constructor <init>()V', 1, 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void')
+  'createFromParcel(Landroid/os/Parcel;)Landroid/os/Messenger;': messenger_binder_m('public createFromParcel(Landroid/os/Parcel;)Landroid/os/Messenger;', 3,
+   'invoke-static {p1}, Landroid/os/Messenger;->readMessengerOrNullFromParcel(Landroid/os/Parcel;)Landroid/os/Messenger;\nmove-result-object v0\nreturn-object v0')
+  'createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;': messenger_binder_m('public bridge synthetic createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;', 3,
+   'invoke-virtual {p0, p1}, Landroid/os/Messenger\$1;->createFromParcel(Landroid/os/Parcel;)Landroid/os/Messenger;\nmove-result-object v0\nreturn-object v0')
+  'newArray(I)[Landroid/os/Messenger;': messenger_binder_m('public newArray(I)[Landroid/os/Messenger;', 3,
+   'new-array v0, p1, [Landroid/os/Messenger;\nreturn-object v0')
+  'newArray(I)[Ljava/lang/Object;': messenger_binder_m('public bridge synthetic newArray(I)[Ljava/lang/Object;', 3,
+   'invoke-virtual {p0, p1}, Landroid/os/Messenger\$1;->newArray(I)[Landroid/os/Messenger;\nmove-result-object v0\nreturn-object v0')
+ }
+}
+
+fn messenger_binder_message_write() string {
+ return messenger_binder_m('public writeToParcel(Landroid/os/Parcel;I)V', 5,
+  'iget-object v0, p0, Landroid/os/Message;->callback:Ljava/lang/Runnable;
+if-eqz v0, :no_callback
+new-instance v0, Ljava/lang/RuntimeException;
+const-string v1, "Can\'t marshal callbacks across processes."
+invoke-direct {v0, v1}, Ljava/lang/RuntimeException;-><init>(Ljava/lang/String;)V
+throw v0
+:no_callback
+iget v0, p0, Landroid/os/Message;->what:I
+invoke-virtual {p1, v0}, Landroid/os/Parcel;->writeInt(I)V
+iget v0, p0, Landroid/os/Message;->arg1:I
+invoke-virtual {p1, v0}, Landroid/os/Parcel;->writeInt(I)V
+iget v0, p0, Landroid/os/Message;->arg2:I
+invoke-virtual {p1, v0}, Landroid/os/Parcel;->writeInt(I)V
+iget-object v0, p0, Landroid/os/Message;->obj:Ljava/lang/Object;
+if-eqz v0, :null_object
+:object_try_start
+check-cast v0, Landroid/os/Parcelable;
+const/4 v1, 0x1
+invoke-virtual {p1, v1}, Landroid/os/Parcel;->writeInt(I)V
+invoke-virtual {p1, v0, p2}, Landroid/os/Parcel;->writeParcelable(Landroid/os/Parcelable;I)V
+:object_try_end
+goto :object_done
+:object_error
+move-exception v0
+new-instance v0, Ljava/lang/RuntimeException;
+const-string v1, "Can\'t marshal non-Parcelable objects across processes."
+invoke-direct {v0, v1}, Ljava/lang/RuntimeException;-><init>(Ljava/lang/String;)V
+throw v0
+:null_object
+const/4 v0, 0x0
+invoke-virtual {p1, v0}, Landroid/os/Parcel;->writeInt(I)V
+:object_done
+iget-wide v0, p0, Landroid/os/Message;->when:J
+invoke-virtual {p1, v0, v1}, Landroid/os/Parcel;->writeLong(J)V
+iget-object v0, p0, Landroid/os/Message;->data:Landroid/os/Bundle;
+invoke-virtual {p1, v0}, Landroid/os/Parcel;->writeBundle(Landroid/os/Bundle;)V
+iget-object v0, p0, Landroid/os/Message;->replyTo:Landroid/os/Messenger;
+invoke-static {v0, p1}, Landroid/os/Messenger;->writeMessengerOrNullToParcel(Landroid/os/Messenger;Landroid/os/Parcel;)V
+iget v0, p0, Landroid/os/Message;->sendingUid:I
+invoke-virtual {p1, v0}, Landroid/os/Parcel;->writeInt(I)V
+return-void
+.catch Ljava/lang/ClassCastException; {:object_try_start .. :object_try_end} :object_error')
+}
+
+fn messenger_binder_new_parts(target string) !StoreClassParts {
+ match target {
+  'android/os/IMessenger\$Stub.smali' {
+   metadata := '.class public abstract Landroid/os/IMessenger\$Stub;\n.super Landroid/os/Binder;\n.implements Landroid/os/IMessenger;\n.annotation system Ldalvik/annotation/EnclosingClass;\nvalue = Landroid/os/IMessenger;\n.end annotation\n.annotation system Ldalvik/annotation/InnerClass;\naccessFlags = 0x409\nname = "Stub"\n.end annotation\n.field private static final DESCRIPTOR:Ljava/lang/String; = "android.os.IMessenger"\n.field static final TRANSACTION_send:I = 0x1'
+   methods := {
+    '<init>()V': messenger_binder_m('public constructor <init>()V', 2,
+     'invoke-direct {p0}, Landroid/os/Binder;-><init>()V\nconst-string v0, "android.os.IMessenger"\ninvoke-virtual {p0, p0, v0}, Landroid/os/Binder;->attachInterface(Landroid/os/IInterface;Ljava/lang/String;)V\nreturn-void')
+    'asInterface(Landroid/os/IBinder;)Landroid/os/IMessenger;': messenger_binder_m('public static asInterface(Landroid/os/IBinder;)Landroid/os/IMessenger;', 3,
+     'if-nez p0, :present\nconst/4 v0, 0x0\nreturn-object v0\n:present\nconst-string v0, "android.os.IMessenger"\ninvoke-interface {p0, v0}, Landroid/os/IBinder;->queryLocalInterface(Ljava/lang/String;)Landroid/os/IInterface;\nmove-result-object v0\ninstance-of v1, v0, Landroid/os/IMessenger;\nif-eqz v1, :proxy\ncheck-cast v0, Landroid/os/IMessenger;\nreturn-object v0\n:proxy\nnew-instance v0, Landroid/os/IMessenger\$Stub\$Proxy;\ninvoke-direct {v0, p0}, Landroid/os/IMessenger\$Stub\$Proxy;-><init>(Landroid/os/IBinder;)V\nreturn-object v0')
+    'asBinder()Landroid/os/IBinder;': messenger_binder_m('public asBinder()Landroid/os/IBinder;', 1, 'return-object p0')
+    'onTransact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z': messenger_binder_m('public onTransact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z', 7,
+     'const v0, 0x5f4e5446\nif-ne p1, v0, :send\nconst-string v0, "android.os.IMessenger"\ninvoke-virtual {p3, v0}, Landroid/os/Parcel;->writeString(Ljava/lang/String;)V\nconst/4 v0, 0x1\nreturn v0\n:send\nconst/4 v0, 0x1\nif-ne p1, v0, :unknown\nconst-string v0, "android.os.IMessenger"\ninvoke-virtual {p2, v0}, Landroid/os/Parcel;->enforceInterface(Ljava/lang/String;)V\ninvoke-virtual {p2}, Landroid/os/Parcel;->readInt()I\nmove-result v0\nif-eqz v0, :absent\nsget-object v0, Landroid/os/Message;->CREATOR:Landroid/os/Parcelable\$Creator;\ninvoke-interface {v0, p2}, Landroid/os/Parcelable\$Creator;->createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;\nmove-result-object v0\ncheck-cast v0, Landroid/os/Message;\ngoto :deliver\n:absent\nconst/4 v0, 0x0\n:deliver\ninvoke-interface {p0, v0}, Landroid/os/IMessenger;->send(Landroid/os/Message;)V\nconst/4 v0, 0x1\nreturn v0\n:unknown\ninvoke-super {p0, p1, p2, p3, p4}, Landroid/os/Binder;->onTransact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z\nmove-result v0\nreturn v0')
+   }
+   return StoreClassParts{methods, metadata}
+  }
+  'android/os/IMessenger\$Stub\$Proxy.smali' {
+   metadata := '.class Landroid/os/IMessenger\$Stub\$Proxy;\n.super Ljava/lang/Object;\n.implements Landroid/os/IMessenger;\n.annotation system Ldalvik/annotation/EnclosingClass;\nvalue = Landroid/os/IMessenger\$Stub;\n.end annotation\n.annotation system Ldalvik/annotation/InnerClass;\naccessFlags = 0xa\nname = "Proxy"\n.end annotation\n.field private final mRemote:Landroid/os/IBinder;'
+   methods := {
+    '<init>(Landroid/os/IBinder;)V': messenger_binder_m('constructor <init>(Landroid/os/IBinder;)V', 2,
+     'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\niput-object p1, p0, Landroid/os/IMessenger\$Stub\$Proxy;->mRemote:Landroid/os/IBinder;\nreturn-void')
+    'asBinder()Landroid/os/IBinder;': messenger_binder_m('public asBinder()Landroid/os/IBinder;', 2,
+     'iget-object v0, p0, Landroid/os/IMessenger\$Stub\$Proxy;->mRemote:Landroid/os/IBinder;\nreturn-object v0')
+    'getInterfaceDescriptor()Ljava/lang/String;': messenger_binder_m('public getInterfaceDescriptor()Ljava/lang/String;', 2,
+     'const-string v0, "android.os.IMessenger"\nreturn-object v0')
+    'send(Landroid/os/Message;)V': messenger_binder_m('public send(Landroid/os/Message;)V', 7,
+     'invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;\nmove-result-object v0\n:begin\nconst-string v1, "android.os.IMessenger"\ninvoke-virtual {v0, v1}, Landroid/os/Parcel;->writeInterfaceToken(Ljava/lang/String;)V\nif-eqz p1, :absent\nconst/4 v1, 0x1\ninvoke-virtual {v0, v1}, Landroid/os/Parcel;->writeInt(I)V\nconst/4 v1, 0x0\ninvoke-virtual {p1, v0, v1}, Landroid/os/Message;->writeToParcel(Landroid/os/Parcel;I)V\ngoto :dispatch\n:absent\nconst/4 v1, 0x0\ninvoke-virtual {v0, v1}, Landroid/os/Parcel;->writeInt(I)V\n:dispatch\niget-object v1, p0, Landroid/os/IMessenger\$Stub\$Proxy;->mRemote:Landroid/os/IBinder;\nconst/4 v2, 0x1\nconst/4 v3, 0x0\nconst/4 v4, 0x1\ninvoke-interface {v1, v2, v0, v3, v4}, Landroid/os/IBinder;->transact(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z\n:end\ninvoke-virtual {v0}, Landroid/os/Parcel;->recycle()V\nreturn-void\n.catchall {:begin .. :end} :failed\n:failed\nmove-exception v1\ninvoke-virtual {v0}, Landroid/os/Parcel;->recycle()V\nthrow v1')
+   }
+   return StoreClassParts{methods, metadata}
+  }
+  'android/os/VinixMessageCreator.smali' {
+   metadata := '.class final Landroid/os/VinixMessageCreator;\n.super Ljava/lang/Object;\n.implements Landroid/os/Parcelable\$Creator;'
+   methods := {
+    '<init>()V': messenger_binder_m('public constructor <init>()V', 1, 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void')
+    'newArray(I)[Ljava/lang/Object;': messenger_binder_m('public newArray(I)[Ljava/lang/Object;', 3, 'new-array v0, p1, [Landroid/os/Message;\nreturn-object v0')
+    'createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;': messenger_binder_m('public createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;', 5,
+     'invoke-static {}, Landroid/os/Message;->obtain()Landroid/os/Message;
+move-result-object v0
+invoke-virtual {p1}, Landroid/os/Parcel;->readInt()I
+move-result v1
+iput v1, v0, Landroid/os/Message;->what:I
+invoke-virtual {p1}, Landroid/os/Parcel;->readInt()I
+move-result v1
+iput v1, v0, Landroid/os/Message;->arg1:I
+invoke-virtual {p1}, Landroid/os/Parcel;->readInt()I
+move-result v1
+iput v1, v0, Landroid/os/Message;->arg2:I
+invoke-virtual {p1}, Landroid/os/Parcel;->readInt()I
+move-result v1
+if-eqz v1, :object_done
+const-class v1, Landroid/os/Message;
+invoke-virtual {v1}, Ljava/lang/Class;->getClassLoader()Ljava/lang/ClassLoader;
+move-result-object v1
+invoke-virtual {p1, v1}, Landroid/os/Parcel;->readParcelable(Ljava/lang/ClassLoader;)Landroid/os/Parcelable;
+move-result-object v1
+iput-object v1, v0, Landroid/os/Message;->obj:Ljava/lang/Object;
+:object_done
+invoke-virtual {p1}, Landroid/os/Parcel;->readLong()J
+move-result-wide v1
+iput-wide v1, v0, Landroid/os/Message;->when:J
+invoke-virtual {p1}, Landroid/os/Parcel;->readBundle()Landroid/os/Bundle;
+move-result-object v1
+iput-object v1, v0, Landroid/os/Message;->data:Landroid/os/Bundle;
+invoke-static {p1}, Landroid/os/Messenger;->readMessengerOrNullFromParcel(Landroid/os/Parcel;)Landroid/os/Messenger;
+move-result-object v1
+iput-object v1, v0, Landroid/os/Message;->replyTo:Landroid/os/Messenger;
+invoke-virtual {p1}, Landroid/os/Parcel;->readInt()I
+move-result v1
+iput v1, v0, Landroid/os/Message;->sendingUid:I
+return-object v0')
+   }
+   return StoreClassParts{methods, metadata}
+  }
+  else { return error('unexpected added Messenger class') }
+ }
+}
+
+fn messenger_binder_expected(old string, target string) !StoreClassParts {
+ before := store_parts(old)!
+ mut metadata := messenger_binder_lines(before.metadata)
+ mut methods := before.methods.clone()
+ match target {
+  'android/os/Messenger.smali' {
+   metadata += '\n.field public static final CREATOR:Landroid/os/Parcelable\$Creator;'
+   for name, method in messenger_binder_messenger_methods() { methods[name] = method }
+  }
+  'android/os/Messenger\$1.smali' {
+   metadata = metadata.replace('.implements Landroid/os/IMessenger;', '.implements Landroid/os/Parcelable\$Creator;')
+    .replace('value = Landroid/os/Messenger;-><init>(Landroid/os/IBinder;)V', 'value = Landroid/os/Messenger;-><clinit>()V')
+    .replace('\n.field final synthetic this\$0:Landroid/os/Messenger;', '')
+   methods = messenger_binder_creator_methods()
+  }
+  'android/os/IMessenger.smali' {
+   metadata = metadata.replace('.class interface abstract ', '.class public interface abstract ')
+    .replace('.super Ljava/lang/Object;', '.super Ljava/lang/Object;\n.implements Landroid/os/IInterface;')
+  }
+  'android/os/Handler\$MessengerImpl.smali' {
+   metadata = metadata.replace('.super Ljava/lang/Object;', '.super Landroid/os/IMessenger\$Stub;')
+   ctor := '<init>(Landroid/os/Handler;)V'
+   methods[ctor] = (methods[ctor] or { return error('retained Handler messenger constructor missing') })
+    .replace('invoke-direct {p0}, Ljava/lang/Object;-><init>()V', 'invoke-direct {p0}, Landroid/os/IMessenger\$Stub;-><init>()V')
+   send := 'send(Landroid/os/Message;)V'
+   methods[send] = messenger_binder_lines(methods[send] or { return error('retained Handler messenger send missing') })
+    .replace('.registers 3\n', '.registers 3\ninvoke-static {}, Landroid/os/Binder;->getCallingUid()I\nmove-result v0\niput v0, p1, Landroid/os/Message;->sendingUid:I\n')
+  }
+  'android/os/Message.smali' {
+   metadata = metadata.replace('.super Ljava/lang/Object;', '.super Ljava/lang/Object;\n.implements Landroid/os/Parcelable;')
+    + '\n.field public static final CREATOR:Landroid/os/Parcelable\$Creator;\n.field public sendingUid:I'
+   for name in ['<clinit>()V', '<init>()V', 'clearForRecycle()V', 'copyFrom(Landroid/os/Message;)V', 'obtain(Landroid/os/Message;)Landroid/os/Message;'] {
+    mut method := messenger_binder_lines(methods[name] or { return error('retained Message member missing') })
+    match name {
+     '<clinit>()V' { method = method.replace('return-void', 'new-instance v0, Landroid/os/VinixMessageCreator;\ninvoke-direct {v0}, Landroid/os/VinixMessageCreator;-><init>()V\nsput-object v0, Landroid/os/Message;->CREATOR:Landroid/os/Parcelable\$Creator;\nreturn-void') }
+     '<init>()V' { method = method.replace('.registers 1', '.registers 2').replace('return-void', 'const/4 v0, -0x1\niput v0, p0, Landroid/os/Message;->sendingUid:I\nreturn-void') }
+     'clearForRecycle()V' { method = method.replace('return-void', 'const/4 v0, -0x1\niput v0, p0, Landroid/os/Message;->sendingUid:I\nreturn-void') }
+     'copyFrom(Landroid/os/Message;)V' { method = method.replace('.registers 3\n', '.registers 3\niget v0, p1, Landroid/os/Message;->sendingUid:I\niput v0, p0, Landroid/os/Message;->sendingUid:I\n') }
+     else { method = method.replace('return-object v0', 'iget v1, p0, Landroid/os/Message;->sendingUid:I\niput v1, v0, Landroid/os/Message;->sendingUid:I\nreturn-object v0') }
+    }
+    methods[name] = method
+   }
+   methods['writeToParcel(Landroid/os/Parcel;I)V'] = messenger_binder_message_write()
+  }
+  else { return error('unexpected Messenger Binder target') }
+ }
+ return StoreClassParts{methods, metadata}
+}
+
+fn messenger_binder_parts_equal(expected StoreClassParts, actual StoreClassParts) ! {
+ if messenger_binder_metadata(expected.metadata) != messenger_binder_metadata(actual.metadata)
+  || expected.methods.keys().sorted() != actual.methods.keys().sorted() {
+  return error('Messenger class/member/field/interface/annotation metadata differs')
+ }
+ for name, method in expected.methods {
+  if messenger_binder_method(method)! != messenger_binder_method(actual.methods[name]!)! {
+   return error('Messenger instructions/registers/flags/wire/branch/catch differ: ' + name)
+  }
+ }
+}
+
+fn messenger_binder_members(old string, new string, target string) ! {
+ profile := messenger_binder_profile()
+ before, after := store_parts(old)!, store_parts(new)!
+ counts := {'android/os/Messenger.smali': 7, 'android/os/Messenger\$1.smali': 2,
+  'android/os/IMessenger.smali': 1, 'android/os/Handler\$MessengerImpl.smali': 3, 'android/os/Message.smali': 28}
+ count := counts[target] or { return error('unknown Messenger target') }
+ if before.methods.len != count {
+  return error('exact retained Messenger member count required')
+ }
+ messenger_binder_parts_equal(messenger_binder_expected(old, target)!, after)!
+ mut changed := 0
+ mut added := 0
+ mut removed := 0
+ for name, method in before.methods {
+  if next := after.methods[name] {
+   if messenger_binder_method(method)! != messenger_binder_method(next)! { changed++ }
+  } else { removed++ }
+ }
+ for name in after.methods.keys() { if name !in before.methods { added++ } }
+ if changed != profile.changed[target]! || added != profile.added[target]! || removed != profile.removed_methods[target]! {
+  return error('exact Messenger replacement/addition/removal counts required')
+ }
+}
+
+fn messenger_binder_factory_main(profile NarrowProfile) !string {
+ if profile.name != 'messenger-binder' || profile.class_provider != ''
+  || profile.directory_provider != ''
+  || profile.class_providers != ['framework_messenger_classes', 'framework_message_parcel_classes']
+  || profile.extra_classes != ['android/os/IMessenger\$Stub.smali', 'android/os/IMessenger\$Stub\$Proxy.smali', 'android/os/VinixMessageCreator.smali'] {
+  return error('exact two distinct Messenger class factories required')
+ }
+ mut result := 'mut classes := map[string]string{}\n'
+ for i, factory in profile.class_providers {
+  name := 'factory' + i.str()
+  result += name + ' := androidtools.' + factory + '()\nfor name, source in ' + name + ' {\n' +
+   'if name in classes { panic("duplicate added class from factories") }\nclasses[name] = source\n}\n'
+ }
+ result += 'expected := ' + json2.encode(profile.extra_classes.map(it.all_before_last('.smali'))) + '\n' +
+  'if classes.keys().sorted() != expected.sorted() { panic("exact merged Messenger class set required") }\n' +
+  'for name in expected {\npath := os.args[1] + "/" + name + ".smali"\n' +
+  'if os.exists(path) || os.is_link(path) { panic("added class collision") }\n}\n'
+ return result
+}
+
+fn messenger_binder_source(parts StoreClassParts) string {
+ return parts.metadata + '\n' + parts.methods.values().join('\n') + '\n'
+}
+
+// Independent baseline fixtures exercise old-member retention. Production also
+// requires the complete immutable parent SDK, not these reduced test bodies.
+fn messenger_binder_old_fixture(target string) !string {
+ match target {
+  'android/os/Messenger.smali' {
+   metadata := '.class public final Landroid/os/Messenger;\n.super Ljava/lang/Object;\n.implements Landroid/os/Parcelable;\n.field private final mTarget:Landroid/os/IMessenger;'
+   mut methods := map[string]string{}
+   for header in ['public constructor <init>(Landroid/os/Handler;)V', 'public constructor <init>(Landroid/os/IBinder;)V',
+    'public describeContents()I', 'public equals(Ljava/lang/Object;)Z', 'public getBinder()Landroid/os/IBinder;',
+    'public hashCode()I', 'public send(Landroid/os/Message;)V'] {
+    methods[header.all_after_last(' ')] = messenger_binder_m(header, 3, 'const/4 v0, 0x0\nreturn-void')
+   }
+   return messenger_binder_source(StoreClassParts{methods, metadata})
+  }
+  'android/os/Messenger\$1.smali' {
+   return '.class Landroid/os/Messenger\$1;\n.super Ljava/lang/Object;\n.implements Landroid/os/IMessenger;\n.annotation system Ldalvik/annotation/EnclosingMethod;\nvalue = Landroid/os/Messenger;-><init>(Landroid/os/IBinder;)V\n.end annotation\n.annotation system Ldalvik/annotation/InnerClass;\naccessFlags = 0x0\nname = null\n.end annotation\n.field final synthetic this\$0:Landroid/os/Messenger;\n' +
+    messenger_binder_m('constructor <init>(Landroid/os/Messenger;)V', 2, 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void') + '\n' +
+    messenger_binder_m('public send(Landroid/os/Message;)V', 2, 'return-void') + '\n'
+  }
+  'android/os/IMessenger.smali' { return '.class interface abstract Landroid/os/IMessenger;\n.super Ljava/lang/Object;\n.method public abstract send(Landroid/os/Message;)V\n.end method\n' }
+  'android/os/Handler\$MessengerImpl.smali' {
+   return '.class final Landroid/os/Handler\$MessengerImpl;\n.super Ljava/lang/Object;\n.implements Landroid/os/IMessenger;\n.field final synthetic this\$0:Landroid/os/Handler;\n' +
+    messenger_binder_m('private constructor <init>(Landroid/os/Handler;)V', 2, 'iput-object p1, p0, Landroid/os/Handler\$MessengerImpl;->this\$0:Landroid/os/Handler;\ninvoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void') + '\n' +
+    messenger_binder_m('synthetic constructor <init>(Landroid/os/Handler;Landroid/os/Handler\$1;)V', 3, 'invoke-direct {p0, p1}, Landroid/os/Handler\$MessengerImpl;-><init>(Landroid/os/Handler;)V\nreturn-void') + '\n' +
+    messenger_binder_m('public send(Landroid/os/Message;)V', 3, 'iget-object v0, p0, Landroid/os/Handler\$MessengerImpl;->this\$0:Landroid/os/Handler;\ninvoke-virtual {v0, p1}, Landroid/os/Handler;->sendMessage(Landroid/os/Message;)Z\nreturn-void') + '\n'
+  }
+  'android/os/Message.smali' {
+   metadata := '.class public final Landroid/os/Message;\n.super Ljava/lang/Object;\n.field private static sPool:Landroid/os/Message;\n.field public replyTo:Landroid/os/Messenger;'
+   mut methods := {
+    '<clinit>()V': messenger_binder_m('static constructor <clinit>()V', 1, 'const/4 v0, 0x0\nreturn-void')
+    '<init>()V': messenger_binder_m('public constructor <init>()V', 1, 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void')
+    'clearForRecycle()V': messenger_binder_m('clearForRecycle()V', 4, 'const/4 v0, 0x0\nreturn-void')
+    'copyFrom(Landroid/os/Message;)V': messenger_binder_m('public copyFrom(Landroid/os/Message;)V', 3, 'const/4 v0, 0x0\nreturn-void')
+    'obtain(Landroid/os/Message;)Landroid/os/Message;': messenger_binder_m('public static obtain(Landroid/os/Message;)Landroid/os/Message;', 4, 'const/4 v0, 0x0\nreturn-object v0')
+   }
+   for i in 0 .. 23 { methods['retained' + i.str() + '()V'] = messenger_binder_m('public retained' + i.str() + '()V', 1, 'return-void') }
+   return messenger_binder_source(StoreClassParts{methods, metadata})
+  }
+  else { return error('unknown Messenger fixture target') }
+ }
+}
+
+fn messenger_binder_self_test() ! {
+ profile := messenger_binder_profile()
+ if profile.name != 'messenger-binder' || profile.baseline_classes != 2112
+  || profile.baseline_name != 'combined-account-webview-usage-inactive-framework-2026-11-02-r1'
+  || profile.manifest_pin != 'bfadac214671937539a4732b3ca6be22d561c366b96a72a9de045fc362aba1fe'
+  || profile.jar_pin != 'd7b6d8c37d5d09d200c19b429f07cf6666ed6d8cf5a1a1b4d29c0dfd27cd632b'
+  || profile.providers != ['framework_messenger.v', 'framework_message_parcel.v']
+  || profile.calls != {'android/os/Handler\$MessengerImpl.smali': 'framework_handler_messenger_source',
+   'android/os/IMessenger.smali': 'framework_imessenger_source', 'android/os/Message.smali': 'framework_message_parcel_source',
+   'android/os/Messenger\$1.smali': 'framework_messenger_creator_source', 'android/os/Messenger.smali': 'framework_messenger_source'}
+  || profile.methods.keys().sorted() != profile.calls.keys().sorted()
+  || profile.changed != {'android/os/Handler\$MessengerImpl.smali': 2, 'android/os/IMessenger.smali': 0,
+   'android/os/Message.smali': 5, 'android/os/Messenger\$1.smali': 0, 'android/os/Messenger.smali': 4}
+  || profile.added != {'android/os/Handler\$MessengerImpl.smali': 0, 'android/os/IMessenger.smali': 0,
+   'android/os/Message.smali': 1, 'android/os/Messenger\$1.smali': 5, 'android/os/Messenger.smali': 4}
+  || profile.fields != {'android/os/Messenger.smali': ['.field public static final CREATOR:Landroid/os/Parcelable\$Creator;'],
+   'android/os/Message.smali': ['.field public static final CREATOR:Landroid/os/Parcelable\$Creator;', '.field public sendingUid:I']}
+  || profile.removed_fields != {
+   'android/os/Messenger\$1.smali': ['.field final synthetic this\$0:Landroid/os/Messenger;']}
+  || profile.removed_methods != {'android/os/Handler\$MessengerImpl.smali': 0, 'android/os/IMessenger.smali': 0,
+   'android/os/Message.smali': 0, 'android/os/Messenger\$1.smali': 2, 'android/os/Messenger.smali': 0} {
+  return error('exact five-class Messenger profile and explicit removals required')
+ }
+ for target, methods in {
+  'android/os/Handler\$MessengerImpl.smali': ['<init>(Landroid/os/Handler;)V', 'send(Landroid/os/Message;)V'],
+  'android/os/IMessenger.smali': []string{},
+  'android/os/Message.smali': ['<clinit>()V', '<init>()V', 'clearForRecycle()V', 'copyFrom(Landroid/os/Message;)V',
+   'obtain(Landroid/os/Message;)Landroid/os/Message;', 'writeToParcel(Landroid/os/Parcel;I)V'],
+  'android/os/Messenger\$1.smali': messenger_binder_creator_methods().keys(),
+  'android/os/Messenger.smali': messenger_binder_messenger_methods().keys()
+ } {
+  if (profile.methods[target] or { []string{} }).sorted() != methods.sorted() { return error('exact published Messenger changed/added method sets required') }
+ }
+ main_source := messenger_binder_factory_main(profile)!
+ if main_source.count('androidtools.framework_messenger_classes()') != 1
+  || main_source.count('androidtools.framework_message_parcel_classes()') != 1
+  || !main_source.contains('if name in classes') || !main_source.contains('classes.keys().sorted() != expected.sorted()')
+  || main_source.contains('os.write_file') { return error('both class factories must be fully validated before writes') }
+ for case in 0 .. 4 {
+  mut bad := profile
+  match case {
+   0 { bad = NarrowProfile{...profile, class_provider: 'other'} }
+   1 { bad = NarrowProfile{...profile, class_providers: ['framework_messenger_classes', 'framework_messenger_classes']} }
+   2 { bad = NarrowProfile{...profile, directory_provider: 'other'} }
+   else { bad = NarrowProfile{...profile, extra_classes: ['unexpected.smali']} }
+  }
+  messenger_binder_factory_main(bad) or { continue }
+  return error('ambiguous/mixed/duplicate Messenger factory or wrong class set accepted')
+ }
+ for target in profile.methods.keys() {
+  old := messenger_binder_old_fixture(target)!
+  expected := messenger_binder_expected(old, target)!
+  good := messenger_binder_source(expected)
+  messenger_binder_members(old, good, target)!
+  for bad in [good.replace('.super ', '.super Lwrong/Base;\n# '), good + '.field private unrelated:I\n',
+   good + '.method public unrelated()V\n.registers 1\nreturn-void\n.end method\n',
+   good.replace('public ', 'private ')] {
+   messenger_binder_members(old, bad, target) or { continue }
+   return error('Messenger unrelated field/method or class/access metadata mutation accepted')
+  }
+  for name, method in expected.methods {
+   for bad_method in [method.replace('.method ', '.method static '), method.replace('.registers ', '.registers 1 # '),
+    method.replace('return', 'throw'), method + '\n' + method] {
+    if bad_method == method { continue }
+    messenger_binder_members(old, good.replace(method, bad_method), target) or { continue }
+    return error('Messenger changed or retained method flags/registers/return/duplication accepted: ' + name)
+   }
+  }
+ }
+ for target in profile.extra_classes {
+  expected := messenger_binder_new_parts(target)!
+  good := messenger_binder_source(expected)
+  messenger_binder_parts_equal(expected, store_parts(good)!)!
+  for bad in [good + '.field private unrelated:I\n', good.replace('.super ', '.super Lwrong/Base;\n# '),
+   good.replace('.implements Landroid/os/', '.implements Lwrong/'), good.replace('.method ', '.method static ')] {
+   messenger_binder_parts_equal(expected, store_parts(bad)!) or { continue }
+   return error('Messenger added class metadata/field/method ABI mutation accepted')
+  }
+ }
+ message := messenger_binder_message_write()
+ if messenger_binder_method(message)! != messenger_binder_method(message.replace("Can't", "Can\\'t"))! {
+  return error('equivalent Smali apostrophe escaping in const-string rejected')
+ }
+ for changed in [message.replace('->arg1:I', '->arg2:I'), message.replace('->writeLong(J)V', '->writeInt(I)V'),
+  message.replace("Can't marshal callbacks", 'Wrong callback error'),
+  message.replace('->replyTo:', '->target:'), message.replace('->sendingUid:I', '->what:I'),
+  message.replace('if-eqz v0, :no_callback', 'if-nez v0, :no_callback'),
+  message.replace('Ljava/lang/ClassCastException;', 'Ljava/lang/Exception;'),
+  message.replace('{:object_try_start .. :object_try_end}', '{:no_callback .. :object_try_end}'),
+  message.replace('->writeParcelable(Landroid/os/Parcelable;I)V', '->writeParcelable(Landroid/os/Parcelable;)V'),
+  message.replace('invoke-virtual {p1, v0, p2}', 'invoke-virtual {p1, v0, v1}')] {
+  if messenger_binder_method(changed)! == messenger_binder_method(message)! { return error('Message callback/wire/flags/catch-span mutation accepted') }
+ }
+ proxy := messenger_binder_new_parts('android/os/IMessenger\$Stub\$Proxy.smali')!
+ send := proxy.methods['send(Landroid/os/Message;)V']!
+ for bad in [send.replace('"android.os.IMessenger"', '"wrong"'), send.replace('const/4 v4, 0x1', 'const/4 v4, 0x0'),
+  send.replace('const/4 v3, 0x0', 'const/4 v3, 0x1'), send.replace('if-eqz p1, :absent', 'if-nez p1, :absent'),
+  send.replace('invoke-virtual {v0}, Landroid/os/Parcel;->recycle()V', ''),
+  send.replace('.catchall {:begin .. :end}', '.catchall {:dispatch .. :end}'), send.replace('throw v1', 'return-void'),
+  send.replace(':end\n', 'move-result v2\n:end\n')] {
+  if messenger_binder_method(bad)! == messenger_binder_method(send)! { return error('Messenger one-way/null-reply/ignored-bool/finally mutation accepted') }
+ }
+ moved := send.replace('.catchall {:begin .. :end} :failed\n', '').replace(':end\n', ':end\n.catchall {:begin .. :end} :failed\n')
+ if messenger_binder_method(send)! != messenger_binder_method(moved.replace(':begin', ':try_start').replace(':end', ':try_end').replace(':failed', ':caught'))! {
+  return error('equivalent DEX catch relocation/label aliases rejected')
+ }
+ mut before := map[string]string{}
+ for target in profile.methods.keys() { before[target] = 'old' }
+ for i in 0 .. 2107 { before['other/' + i.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ for target in profile.methods.keys() { after[target] = 'new' }
+ for target in profile.extra_classes { after[target] = 'added' }
+ narrow_profile_class_delta(before, after, profile.methods.keys(), profile.extra_classes, 2112)!
+ mut scope_mutations := profile.methods.keys()
+ scope_mutations << profile.extra_classes
+ scope_mutations << 'other/0.smali'
+ for target in scope_mutations {
+  mut bad := after.clone()
+  if target in before { bad[target] = before[target]! } else { bad.delete(target) }
+  if target == 'other/0.smali' { bad[target] = 'changed' }
+  narrow_profile_class_delta(before, bad, profile.methods.keys(), profile.extra_classes, 2112) or { continue }
+  return error('Messenger complete five-change/three-addition class scope mutation accepted')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -4033,6 +4540,7 @@ fn self_test() ! {
  broadcast_permission_self_test()!
  secure_settings_self_test()!
  usage_inactive_self_test()!
+ messenger_binder_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -4194,6 +4702,10 @@ fn imageview_bounds_self_test() ! {
 // Narrow follow-ups retain the complete pinned class set and allow only their
 // named method deltas. The original combined build keeps its historical ABI.
 fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar_pin string, root string) ! {
+ if profile.class_providers.len > 0 { messenger_binder_factory_main(profile)! }
+ if profile.name != 'messenger-binder' && (profile.removed_methods.len > 0 || profile.removed_fields.len > 0) {
+  return error('method and field removals require the dedicated Messenger oracle')
+ }
  if baseline != state + profile.baseline_name
   || manifest_pin != profile.manifest_pin || jar_pin != profile.jar_pin
   || os.real_path(baseline) != baseline || !root.starts_with(state + 'combined-account-webview-' + profile.name + '-')
@@ -4258,6 +4770,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  os.write_file(root + '/provider-source/androidtools/framework_account_helpers.v',
   'module androidtools\n' + helper_function(os.read_file(root + '/provider-helper-inputs/framework.v')!, 'pub fn framework_replace_method(')!)!
  mut application := 'module main\nimport androidtools\nimport os\nfn main() {\n'
+ if profile.class_providers.len > 0 { application += messenger_binder_factory_main(profile)! }
  mut targets := profile.methods.keys()
  targets.sort()
  if profile.directory_provider != '' {
@@ -4267,11 +4780,21 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.calls.len != targets.len { return error('narrow calls differ from explicit method targets') }
   for i, target in targets {
    name := 'path' + i.str()
-   application += name + ' := os.args[1] + "/' + target + '"\n' +
-    'os.write_file(' + name + ',androidtools.' + profile.calls[target]! + '(os.read_file(' + name + ')!)!)!\n'
+   application += name + ' := os.args[1] + "/' + target + '"\n'
+   if profile.name == 'messenger-binder' {
+    application += 'source' + i.str() + ' := androidtools.' + profile.calls[target]! + '(os.read_file(' + name + ')!)!\n'
+   } else {
+    application += 'os.write_file(' + name + ',androidtools.' + profile.calls[target]! + '(os.read_file(' + name + ')!)!)!\n'
+   }
+  }
+  if profile.name == 'messenger-binder' {
+   for i in 0 .. targets.len { application += 'os.write_file(path' + i.str() + ', source' + i.str() + ')!\n' }
   }
  }
- if profile.class_provider != '' {
+ if profile.class_providers.len > 0 {
+  application += 'for name, source in classes {\npath := os.args[1] + "/" + name + ".smali"\n' +
+   'os.mkdir_all(os.dir(path))!\nos.write_file(path, source)!\n}\n'
+ } else if profile.class_provider != '' {
   application += 'classes := androidtools.' + profile.class_provider + '()\n' +
    'expected := ' + json2.encode(profile.extra_classes.map(it.all_before_last('.smali'))) + '\n' +
    'if classes.len != expected.len { panic("unexpected added class count") }\n' +
@@ -4306,8 +4829,12 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  if profile.name == 'paint-drawable' { paint_drawable_class_delta(old, applied)! }
  else { narrow_profile_class_delta(old, applied, targets, profile.extra_classes, profile.baseline_classes)! }
  for target in targets {
-  narrow_member_delta(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!,
-   profile.methods[target]!, profile.changed[target]!, profile.added[target]!, profile.fields[target] or { []string{} })!
+  if profile.name == 'messenger-binder' {
+   messenger_binder_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)!
+  } else {
+   narrow_member_delta(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!,
+    profile.methods[target]!, profile.changed[target]!, profile.added[target]!, profile.fields[target] or { []string{} })!
+  }
   if profile.name == 'binder-identity' {
    binder_identity_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)!
   }
@@ -4351,6 +4878,9 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  if profile.name == 'subscription-service' { subscription_service_type_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'broadcast-permission' { broadcast_permission_helper_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'secure-settings' { secure_settings_tile_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
+ if profile.name == 'messenger-binder' {
+  for target in profile.extra_classes { messenger_binder_parts_equal(messenger_binder_new_parts(target)!, store_parts(os.read_file(root + '/smali/' + target)!)!)! }
+ }
  if profile.name == 'paint-drawable' {
   raw := os.read_file(root + '/smali/' + profile.extra_classes[0])!
   paint_drawable_abi(raw, raw)!
@@ -4364,8 +4894,12 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  if profile.name == 'paint-drawable' { paint_drawable_class_delta(old, new)! }
  else { narrow_profile_class_delta(old, new, targets, profile.extra_classes, profile.baseline_classes)! }
  for target in targets {
-  narrow_member_delta(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!,
-   profile.methods[target]!, profile.changed[target]!, profile.added[target]!, profile.fields[target] or { []string{} })!
+  if profile.name == 'messenger-binder' {
+   messenger_binder_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)!
+  } else {
+   narrow_member_delta(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!,
+    profile.methods[target]!, profile.changed[target]!, profile.added[target]!, profile.fields[target] or { []string{} })!
+  }
   if profile.name == 'binder-identity' {
    binder_identity_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)!
   }
@@ -4409,6 +4943,9 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  if profile.name == 'subscription-service' { subscription_service_type_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'broadcast-permission' { broadcast_permission_helper_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'secure-settings' { secure_settings_tile_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
+ if profile.name == 'messenger-binder' {
+  for target in profile.extra_classes { messenger_binder_parts_equal(messenger_binder_new_parts(target)!, store_parts(os.read_file(root + '/new-dex/' + target)!)!)! }
+ }
  if profile.name == 'paint-drawable' {
   paint_drawable_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!,
    os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)!
@@ -4426,7 +4963,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  sealed_baseline(baseline, manifest_pin)!
  for path, pin in driver_closure { if digest(path)! != pin { return error('store builder source changed: ' + path) } }
  for path, pin in inputs { if digest(path)! != pin { return error('store input changed: ' + path) } }
- write_json(root + '/build.json', {
+ mut build_receipt := {
   'scope': json2.Any('Narrow ' + profile.name + ' provider delta over exact sealed framework; host assembly only, no guest or Google login proof'),
   'profile': json2.Any(profile.name + '-' + new.len.str()),
   'source_revision': json2.Any(command(root, 'revision', ['/usr/bin/git', '-C', repo, 'rev-parse', 'HEAD'])!.trim_space()),
@@ -4440,7 +4977,12 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   'added_method_counts': json2.decode[json2.Any](json2.encode(profile.added))!,
   'added_fields': json2.decode[json2.Any](json2.encode(profile.fields))!,
   'environmental_inputs': json2.Any('Host SDK and dynamic libraries are environmental dependencies; exact V source closures, compiler and smali tool JARs retained and checked')
- })!
+ }
+ if profile.name == 'messenger-binder' {
+  build_receipt['removed_method_counts'] = json2.decode[json2.Any](json2.encode(profile.removed_methods))!
+  build_receipt['removed_fields'] = json2.decode[json2.Any](json2.encode(profile.removed_fields))!
+ }
+ write_json(root + '/build.json', build_receipt)!
  mut pins := map[string]string{}
  inventory(root, '', mut pins)!
  write_json(root + '/sha256.json', pins)!
@@ -4771,11 +5313,15 @@ fn main() {
   build_narrow(usage_inactive_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--messenger-binder' {
+  build_narrow(messenger_binder_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
