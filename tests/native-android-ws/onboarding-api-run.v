@@ -129,7 +129,7 @@ const pending_intent_pass_marker = 'PENDING-INTENT-PASS no-create identity send 
 // Stable display dimensions require their successor framework and native framebuffer query.
 const stable_display_framework_sha = '3b51a6cfe506db8e87908fdf74fcaebd585aaace383e8880a0183cd901780e52'
 const stable_display_native_sha = '364f76761b57da6e0674d9a0c20f85e2589e5b8705d22aac6e6c3a9b82f8fcae'
-const stable_display_apk_sha = 'e29dc54e644e94a5a0a4040858cdca452ee8ebc83e29052c78e4b91b55e9d13c'
+const stable_display_apk_sha = '190b832396158ce1ac584ef41abf279d6f13b82b001d17c35e2bd711d5ebcee1'
 const stable_display_pass_marker = 'STABLE-DISPLAY-PASS physical-size window-size fresh-points mutation-isolation'
 
 struct FixtureProfile {

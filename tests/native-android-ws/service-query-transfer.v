@@ -138,10 +138,10 @@ const pending_intent_api_runner_pin = '1c54386f45e64b1879cc6d0954b8dff59dc605ad6
 const pending_intent_apk = '/Users/alex/.local/state/vinix/android/pending-intent-fixture-2026-11-02-r1/probe.apk'
 const pending_intent_apk_pin = '24ee07ce193fbde0ee448aeceee70a6013095301cbb6b487c9e61aaf175a9456'
 // Distinct verified stable-display fixture ARM runner and signed APK.
-const stable_display_api_runner = '/Users/alex/.local/state/vinix/android/stable-display-api-run-2026-11-02-r1/run'
-const stable_display_api_runner_pin = '7ec0c25e072be272eef051bf3da4c1de72613ede5b5e54ae8d9c03abcebdbecf'
-const stable_display_apk = '/Users/alex/.local/state/vinix/android/stable-display-fixture-2026-11-02-r1/probe.apk'
-const stable_display_apk_pin = 'e29dc54e644e94a5a0a4040858cdca452ee8ebc83e29052c78e4b91b55e9d13c'
+const stable_display_api_runner = '/Users/alex/.local/state/vinix/android/stable-display-api-run-2026-11-02-r2/run'
+const stable_display_api_runner_pin = '2e819f47963d75a09345cacea3a81db28c119d267bff5818c6d0de6e4a5b476b'
+const stable_display_apk = '/Users/alex/.local/state/vinix/android/stable-display-fixture-2026-11-02-r2/probe.apk'
+const stable_display_apk_pin = '190b832396158ce1ac584ef41abf279d6f13b82b001d17c35e2bd711d5ebcee1'
 const file_limit = 32 * 1024 * 1024
 const request_limit = 12
 const seconds_limit = 600
