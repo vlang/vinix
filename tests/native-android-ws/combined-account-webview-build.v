@@ -3598,6 +3598,196 @@ fn messenger_binder_self_test() ! {
  }
 }
 
+fn component_parcel_profile() NarrowProfile {
+ component := 'android/content/ComponentName.smali'
+ return NarrowProfile{
+  name: 'component-parcel'
+  baseline_name: 'combined-account-webview-messenger-binder-framework-2026-11-02-r1'
+  manifest_pin: 'e3d313ae3e51404da203344ef1a6db32a4aaf24fe01ac971a71fd69ae586aa85'
+  jar_pin: 'ddeeb613e7767cbfb3e2bf3818ff02f8f9ab10918f26868dba8047a2cc539129'
+  baseline_classes: 2115
+  providers: ['framework_component_parcel.v']
+  calls: {component: 'framework_component_parcel_source'}
+  methods: {component: ['<clinit>()V', '<init>(Landroid/os/Parcel;)V',
+   '<init>(Ljava/lang/String;Landroid/os/Parcel;)V', 'writeToParcel(Landroid/os/Parcel;I)V',
+   'writeToParcel(Landroid/content/ComponentName;Landroid/os/Parcel;)V',
+   'readFromParcel(Landroid/os/Parcel;)Landroid/content/ComponentName;']}
+  changed: {component: 0}
+  added: {component: 6}
+  fields: {component: ['.field public static final CREATOR:Landroid/os/Parcelable\$Creator;']}
+  class_provider: 'framework_component_parcel_classes'
+  extra_classes: ['android/content/VinixComponentNameCreator.smali']
+ }
+}
+
+fn component_parcel_expected_methods() map[string]string {
+ return {
+  '<clinit>()V': messenger_binder_m('static constructor <clinit>()V', 1,
+   'new-instance v0, Landroid/content/VinixComponentNameCreator;\ninvoke-direct {v0}, Landroid/content/VinixComponentNameCreator;-><init>()V\nsput-object v0, Landroid/content/ComponentName;->CREATOR:Landroid/os/Parcelable\$Creator;\nreturn-void')
+  '<init>(Landroid/os/Parcel;)V': messenger_binder_m('public constructor <init>(Landroid/os/Parcel;)V', 4,
+   'invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+invoke-virtual {p1}, Landroid/os/Parcel;->readString()Ljava/lang/String;
+move-result-object v0
+iput-object v0, p0, Landroid/content/ComponentName;->mPackage:Ljava/lang/String;
+if-nez v0, :package_present
+new-instance v0, Ljava/lang/NullPointerException;
+const-string v1, "package name is null"
+invoke-direct {v0, v1}, Ljava/lang/NullPointerException;-><init>(Ljava/lang/String;)V
+throw v0
+:package_present
+invoke-virtual {p1}, Landroid/os/Parcel;->readString()Ljava/lang/String;
+move-result-object v0
+iput-object v0, p0, Landroid/content/ComponentName;->mClass:Ljava/lang/String;
+if-nez v0, :done
+new-instance v0, Ljava/lang/NullPointerException;
+const-string v1, "class name is null"
+invoke-direct {v0, v1}, Ljava/lang/NullPointerException;-><init>(Ljava/lang/String;)V
+throw v0
+:done
+return-void')
+  '<init>(Ljava/lang/String;Landroid/os/Parcel;)V': messenger_binder_m('private constructor <init>(Ljava/lang/String;Landroid/os/Parcel;)V', 4,
+   'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\niput-object p1, p0, Landroid/content/ComponentName;->mPackage:Ljava/lang/String;\ninvoke-virtual {p2}, Landroid/os/Parcel;->readString()Ljava/lang/String;\nmove-result-object v0\niput-object v0, p0, Landroid/content/ComponentName;->mClass:Ljava/lang/String;\nreturn-void')
+  'writeToParcel(Landroid/os/Parcel;I)V': messenger_binder_m('public writeToParcel(Landroid/os/Parcel;I)V', 4,
+   'iget-object v0, p0, Landroid/content/ComponentName;->mPackage:Ljava/lang/String;\ninvoke-virtual {p1, v0}, Landroid/os/Parcel;->writeString(Ljava/lang/String;)V\niget-object v0, p0, Landroid/content/ComponentName;->mClass:Ljava/lang/String;\ninvoke-virtual {p1, v0}, Landroid/os/Parcel;->writeString(Ljava/lang/String;)V\nreturn-void')
+  'writeToParcel(Landroid/content/ComponentName;Landroid/os/Parcel;)V': messenger_binder_m('public static writeToParcel(Landroid/content/ComponentName;Landroid/os/Parcel;)V', 3,
+   'const/4 v0, 0x0\nif-eqz p0, :absent\ninvoke-virtual {p0, p1, v0}, Landroid/content/ComponentName;->writeToParcel(Landroid/os/Parcel;I)V\nreturn-void\n:absent\ninvoke-virtual {p1, v0}, Landroid/os/Parcel;->writeString(Ljava/lang/String;)V\nreturn-void')
+  'readFromParcel(Landroid/os/Parcel;)Landroid/content/ComponentName;': messenger_binder_m('public static readFromParcel(Landroid/os/Parcel;)Landroid/content/ComponentName;', 3,
+   'invoke-virtual {p0}, Landroid/os/Parcel;->readString()Ljava/lang/String;\nmove-result-object v0\nif-nez v0, :present\nconst/4 v0, 0x0\nreturn-object v0\n:present\nnew-instance v1, Landroid/content/ComponentName;\ninvoke-direct {v1, v0, p0}, Landroid/content/ComponentName;-><init>(Ljava/lang/String;Landroid/os/Parcel;)V\nreturn-object v1')
+ }
+}
+
+fn component_parcel_abi(source string) ! {
+ parts := store_parts(source)!
+ for signature, expected in component_parcel_expected_methods() {
+  method := parts.methods[signature] or { return error('ComponentName parcel method missing') }
+  if intent_extras_method(method)! != intent_extras_method(expected)! {
+   return error('ComponentName requires exact API28 wire, null-validation order and nullable-helper semantics: ' + signature)
+  }
+ }
+}
+
+fn component_parcel_creator_methods() map[string]string {
+ return {
+  '<init>()V': messenger_binder_m('public constructor <init>()V', 1,
+   'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void')
+  'createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;': messenger_binder_m('public createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;', 3,
+   'new-instance v0, Landroid/content/ComponentName;\ninvoke-direct {v0, p1}, Landroid/content/ComponentName;-><init>(Landroid/os/Parcel;)V\nreturn-object v0')
+  'newArray(I)[Ljava/lang/Object;': messenger_binder_m('public newArray(I)[Ljava/lang/Object;', 3,
+   'new-array v0, p1, [Landroid/content/ComponentName;\nreturn-object v0')
+ }
+}
+
+fn component_parcel_creator_abi(source string) ! {
+ parts := store_parts(source)!
+ methods := component_parcel_creator_methods()
+ if parts.methods.keys().sorted() != methods.keys().sorted()
+  || parts.metadata.split_into_lines().map(it.trim_space()).filter(it != '') != [
+   '.class final Landroid/content/VinixComponentNameCreator;', '.super Ljava/lang/Object;',
+   '.implements Landroid/os/Parcelable\$Creator;'] {
+  return error('ComponentName creator requires exact fieldless class and three methods')
+ }
+ for signature, expected in methods {
+  if intent_extras_method(parts.methods[signature]!)! != intent_extras_method(expected)! {
+   return error('ComponentName creator requires public validating Parcel constructor and actual ComponentName array')
+  }
+ }
+}
+
+fn component_parcel_self_test() ! {
+ profile := component_parcel_profile()
+ component := 'android/content/ComponentName.smali'
+ creator := 'android/content/VinixComponentNameCreator.smali'
+ expected := component_parcel_expected_methods()
+ field := '.field public static final CREATOR:Landroid/os/Parcelable\$Creator;'
+ if profile.name != 'component-parcel' || profile.baseline_classes != 2115
+  || profile.baseline_name != 'combined-account-webview-messenger-binder-framework-2026-11-02-r1'
+  || profile.manifest_pin != 'e3d313ae3e51404da203344ef1a6db32a4aaf24fe01ac971a71fd69ae586aa85'
+  || profile.jar_pin != 'ddeeb613e7767cbfb3e2bf3818ff02f8f9ab10918f26868dba8047a2cc539129'
+  || profile.providers != ['framework_component_parcel.v'] || profile.calls != {component: 'framework_component_parcel_source'}
+  || profile.methods.keys() != [component] || profile.methods[component]!.sorted() != expected.keys().sorted()
+  || profile.changed != {component: 0} || profile.added != {component: 6} || profile.fields != {component: [field]}
+  || profile.class_provider != 'framework_component_parcel_classes' || profile.class_providers.len != 0
+  || profile.extra_classes != [creator] || profile.directory_provider != ''
+  || profile.removed_methods.len != 0 || profile.removed_fields.len != 0 {
+  return error('ComponentName parcel profile requires exact six additions, one field and one creator')
+ }
+ narrow_method_self_test(profile.methods[component]!, 0, 6)!
+ raw := expected.values().join('\n') + '\n'
+ component_parcel_abi(raw)!
+ component_parcel_abi(raw.replace(':package_present', ':renamed_package').replace(':done', ':renamed_done')
+  .replace(':absent', ':renamed_absent').replace(':present', ':renamed_present'))!
+ for signature, method in expected {
+  for bad in [method.replace('.method ', '.method native '), method.replace('.registers ', '.registers 9 # '),
+   method.replace('public ', 'private '), method.replace('private ', 'public '), method.replace('return', 'throw'),
+   method.replace('->mPackage:', '->mClass:'), method.replace('->readString()', '->readInt()'),
+   method.replace('->writeString(Ljava/lang/String;)', '->writeInt(I)'), method + '\n' + method] {
+   if bad == method { continue }
+   component_parcel_abi(raw.replace(method, bad)) or { continue }
+   return error('ComponentName parcel flags/register/wire/field/member mutation accepted: ' + signature)
+  }
+ }
+ public_ctor := expected['<init>(Landroid/os/Parcel;)V']!
+ for bad in [public_ctor.replace('if-nez v0, :package_present', 'if-eqz v0, :package_present'),
+  public_ctor.replace('if-nez v0, :done', 'if-eqz v0, :done'),
+  public_ctor.replace('"package name is null"', '"class name is null"'),
+  public_ctor.replace('Ljava/lang/NullPointerException;', 'Ljava/lang/IllegalArgumentException;'),
+  public_ctor.replace(':package_present\n', ':package_present\ninvoke-virtual {p1}, Landroid/os/Parcel;->readString()Ljava/lang/String;\nmove-result-object v0\n')] {
+  component_parcel_abi(raw.replace(public_ctor, bad)) or { continue }
+  return error('ComponentName public Parcel constructor null checks or cursor order mutation accepted')
+ }
+ nullable_read := expected['readFromParcel(Landroid/os/Parcel;)Landroid/content/ComponentName;']!
+ private_ctor := expected['<init>(Ljava/lang/String;Landroid/os/Parcel;)V']!
+ nullable_write := expected['writeToParcel(Landroid/content/ComponentName;Landroid/os/Parcel;)V']!
+ for bad in [raw.replace(nullable_read, nullable_read.replace('if-nez v0, :present', 'if-eqz v0, :present')),
+  raw.replace(nullable_read, nullable_read.replace('invoke-direct {v1, v0, p0}', 'invoke-direct {v1, p0, v0}')),
+  raw.replace(private_ctor, private_ctor.replace('return-void', 'if-nez v0, :ok\nthrow v0\n:ok\nreturn-void')),
+  raw.replace(nullable_write, nullable_write.replace('const/4 v0, 0x0', 'const/4 v0, 0x1')),
+  raw.replace(nullable_write, nullable_write.replace('if-eqz p0, :absent', 'if-nez p0, :absent'))] {
+  component_parcel_abi(bad) or { continue }
+  return error('ComponentName nullable reader/private constructor/null sentinel/flags mutation accepted')
+ }
+ metadata := '.class public final Landroid/content/ComponentName;\n.super Ljava/lang/Object;\n.implements Landroid/os/Parcelable;\n.field private final mClass:Ljava/lang/String;\n.field private final mPackage:Ljava/lang/String;\n'
+ retained := '.method public getPackageName()Ljava/lang/String;\n.registers 2\niget-object v0, p0, Landroid/content/ComponentName;->mPackage:Ljava/lang/String;\nreturn-object v0\n.end method\n'
+ before := metadata + retained
+ after := before + field + '\n' + raw
+ narrow_member_delta(before, after, profile.methods[component]!, 0, 6, [field])!
+ for bad in [after.replace(field, ''), after.replace('private final mClass', 'public mClass'),
+  after.replace('->mPackage:Ljava/lang/String;\nreturn-object v0', '->mClass:Ljava/lang/String;\nreturn-object v0'),
+  after + '.field private unrelated:I\n', after.replace('.implements Landroid/os/Parcelable;', '.implements Lwrong/Interface;')] {
+  narrow_member_delta(before, bad, profile.methods[component]!, 0, 6, [field]) or { continue }
+  return error('ComponentName retained fields/getter/metadata or CREATOR mutation accepted')
+ }
+ creator_source := '.class final Landroid/content/VinixComponentNameCreator;\n.super Ljava/lang/Object;\n.implements Landroid/os/Parcelable\$Creator;\n' + component_parcel_creator_methods().values().join('\n') + '\n'
+ component_parcel_creator_abi(creator_source)!
+ for bad in [creator_source.replace('.class final ', '.class public final '),
+  creator_source + '.field private state:I\n', creator_source.replace('[Landroid/content/ComponentName;', '[Ljava/lang/Object;'),
+  creator_source.replace('public createFromParcel', 'private createFromParcel'),
+  creator_source.replace('-><init>(Landroid/os/Parcel;)V', '-><init>(Ljava/lang/String;Landroid/os/Parcel;)V'),
+  creator_source.replace('public newArray', 'public static newArray')] {
+  component_parcel_creator_abi(bad) or { continue }
+  return error('ComponentName creator metadata/ABI/constructor/array mutation accepted')
+ }
+ mut old := {component: 'old'}
+ for i in 0 .. 2114 { old['other/' + i.str() + '.smali'] = 'same' }
+ mut good := old.clone()
+ good[component] = 'new'
+ good[creator] = 'creator'
+ narrow_profile_class_delta(old, good, [component], [creator], 2115)!
+ for case in 0 .. 6 {
+  mut bad := good.clone()
+  match case {
+   0 { bad[component] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(component) }
+   3 { bad.delete(creator) }
+   4 { bad['unrelated.smali'] = 'extra' }
+   else { bad.delete(creator); bad['substitution.smali'] = 'creator' }
+  }
+  narrow_profile_class_delta(old, bad, [component], [creator], 2115) or { continue }
+  return error('ComponentName-only six-method/one-creator class scope mutation accepted')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -4541,6 +4731,7 @@ fn self_test() ! {
  secure_settings_self_test()!
  usage_inactive_self_test()!
  messenger_binder_self_test()!
+ component_parcel_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -4866,6 +5057,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'broadcast-permission' { broadcast_permission_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
   if profile.name == 'secure-settings' { secure_settings_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'usage-inactive' { usage_inactive_abi(os.read_file(root + '/smali/' + target)!)! }
+  if profile.name == 'component-parcel' { component_parcel_abi(os.read_file(root + '/smali/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -4878,6 +5070,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  if profile.name == 'subscription-service' { subscription_service_type_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'broadcast-permission' { broadcast_permission_helper_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'secure-settings' { secure_settings_tile_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
+ if profile.name == 'component-parcel' { component_parcel_creator_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'messenger-binder' {
   for target in profile.extra_classes { messenger_binder_parts_equal(messenger_binder_new_parts(target)!, store_parts(os.read_file(root + '/smali/' + target)!)!)! }
  }
@@ -4931,6 +5124,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'broadcast-permission' { broadcast_permission_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
   if profile.name == 'secure-settings' { secure_settings_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'usage-inactive' { usage_inactive_abi(os.read_file(root + '/new-dex/' + target)!)! }
+  if profile.name == 'component-parcel' { component_parcel_abi(os.read_file(root + '/new-dex/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -4943,6 +5137,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  if profile.name == 'subscription-service' { subscription_service_type_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'broadcast-permission' { broadcast_permission_helper_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'secure-settings' { secure_settings_tile_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
+ if profile.name == 'component-parcel' { component_parcel_creator_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'messenger-binder' {
   for target in profile.extra_classes { messenger_binder_parts_equal(messenger_binder_new_parts(target)!, store_parts(os.read_file(root + '/new-dex/' + target)!)!)! }
  }
@@ -5317,11 +5512,15 @@ fn main() {
   build_narrow(messenger_binder_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--component-parcel' {
+  build_narrow(component_parcel_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder|--component-parcel] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
