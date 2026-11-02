@@ -76,7 +76,25 @@ the original 64 MiB growth cap and 1 GiB reserve. Independent final artifact
 review approved every guard, tool identity and retained-source comparison.
 The checkout revision observed after qualification was
 `22bda21a007fdafb790f0d4bec52497cbc4e0b52`.
-Automatic preparation follows qualification under the original 5 GiB initial
-preflight, 4 GiB outer growth, 512 MiB internal growth, 1 GiB reserve,
-600 MiB RSS and 900-second limits. This report claims no ComponentName ARM,
-Google account, checkin or current imagery result.
+Source and tool qualification are committed as
+`b8d9473eecd1359fb700692a82aa04704b75c29d`. The authorized automatic preparation
+attempt retained the original 5 GiB initial preflight, 4 GiB outer growth,
+512 MiB internal growth, 1 GiB reserve, 600 MiB RSS and 900-second limits.
+Its outer guard refused startup with 3,836,055,552 bytes free, below the
+5,368,709,120-byte reserve-plus-growth requirement. The receipt records exit
+125, child exit -1, reason `disk growth budget`, PID zero and no supervised
+processes. `cleanup_complete` is false because no child started. The stager
+was not invoked, its log is empty and the intended
+`/Users/alex/.local/state/vinix/android/maps-component-parcel-r1` output is
+absent. No image, ARM, Google account, checkin or current imagery result exists
+for this successor. No retry is permitted until at least 5 GiB is available;
+no limits were relaxed and no closed artifacts were removed.
+
+The preserved attempt is
+`/Users/alex/.local/state/vinix/android/maps-component-parcel-preparation-2026-11-02-r1`.
+Its `prepare.guard.json` hashes to
+`3c03bcb0f8070203fd8a20b4f16eea7c72e8dba775a1898f7dd2fce5c574d183`;
+empty `prepare.log` hashes to
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+Qualified tools and all producer, initial-source, historical and failed-attempt
+evidence remain complete and closed for the eventual retry.
