@@ -803,6 +803,24 @@ const messenger_binder_provider_path = 'tests/native-android-tools/androidtools/
 const messenger_binder_provider_helper = 'ef5c6c6a6dd2ab61da6972b39a1c5735614c8a9157181f8233c501c9f2e2df3b'
 const messenger_binder_message_path = 'tests/native-android-tools/androidtools/framework_message_parcel.v'
 const messenger_binder_message_helper = '881f45173c3f042c1a19214f8a6bc4979a1eeb95cf739a30c079c71cb6c0637c'
+const component_parcel_base = '/Users/alex/.local/state/vinix/android/maps-messenger-binder-r1'
+const component_parcel_base_seal = 'e72282b9881ba4b82a053aa89c3e3b96383c7ee25cad637d5421b50717adff1a'
+const component_parcel_boot = '19e4eb9365cdb234b66a7eb7ea31ecb1055e9fc2a4d48d523e02d8824ce3c537'
+const component_parcel_base_overlay = '1aba5d5f3bbfdfaa0dd3058fdf9cb13246802b3a58b6909a436783b250ed90df'
+const component_parcel_old_deployment = 'c3b4eb87b7c16e4d56bda142fe5569733a12ecf4d9dad223d85a09ce6829ff48'
+const component_parcel_old_headless = 'be8c6861f68b061f6705cabdd978fdce917f738de90bbe63cfb3912e3f9cbf28'
+const component_parcel_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-component-parcel-framework-2026-11-02-r1'
+const component_parcel_seal = '79d78a512ac764807a2ecd3ca39317a5030e133f3749c0dd349c037482dcd512'
+const component_parcel_build = '6bc973d61eb28427a11f7b08c1c5e493ddb2b0d54c5a41838cc15b55fa47c905'
+const component_parcel_jar = '329a45c23bd981b67733f36cde2828b2d890597a384acf1e0ce30f8f8fb582f4'
+const component_parcel_dex = 'e1d9acbc41d653911ec59f1cd40243c4acd3ee1e5e1a3c97172d483ed1cf9625'
+const component_parcel_framework_helper = '9625ff36b7bbf8b926aa64848a515f8f670ac634ff562e3b505c6859aadc9082'
+const component_parcel_provider_path = 'tests/native-android-tools/androidtools/framework_component_parcel.v'
+const component_parcel_provider_helper = 'a0ece9306f6aa5416f3f74f7e57791945cad041304ef95b1a709be98714786ff'
+const component_parcel_raw = 'e0da33559da01d8f2323be046537eb2eeb35fe886d9c89e881df77116566295a'
+const component_parcel_canonical = '645ef164621fbc7a311a74ec3a997eb403231fa5b708e5b6c5645d864a96bfdb'
+const component_parcel_creator_raw = '5ef9c2b472f77ca6f0b0fa8220715b289e5818721644a6bec81c9c592c19fa9c'
+const component_parcel_creator_canonical = '9709ae9678ab2e0d393908087f2ab90f9259244e51db6e116689788e25933c64'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -6753,6 +6771,139 @@ fn messenger_binder_baseline(receipt map[string]json2.Any, stage Stage) !string 
 	return messenger_binder_base + '/boot.img'
 }
 
+fn component_parcel_profile() Profile {
+	mut modules := messenger_binder_profile().modules.clone()
+	modules << 'maps-messenger-binder.tar'
+	return Profile{'maps-component-parcel', component_parcel_boot, 'maps-component-parcel.tar', modules}
+}
+fn component_parcel_modules() map[string]string {
+	mut modules := messenger_binder_modules()
+	modules['maps-messenger-binder.tar'] = component_parcel_base_overlay
+	return modules
+}
+fn component_parcel_fields() map[string]string {
+	mut fields := messenger_binder_fields()
+	fields['kind'] = 'vinix-maps-component-parcel-v1'
+	fields['base_root'] = component_parcel_base
+	fields['base_manifest_sha256'] = component_parcel_base_seal
+	fields['framework_build_root'] = component_parcel_framework
+	fields['framework_manifest_sha256'] = component_parcel_seal
+	fields['framework_jar_sha256'] = component_parcel_jar
+	fields['framework_dex_sha256'] = component_parcel_dex
+	fields['retained_framework_manifest_sha256'] = messenger_binder_seal
+	return fields
+}
+fn component_parcel_inputs() map[string]string {
+	mut inputs := messenger_binder_inputs()
+	inputs[component_parcel_base + '/sha256.json'] = component_parcel_base_seal
+	inputs[component_parcel_framework + '/sha256.json'] = component_parcel_seal
+	return inputs
+}
+fn component_parcel_known_delta() map[string]string {
+	return {'/' + service_query_jar_path: component_parcel_jar,
+		'/' + service_query_dex_path: component_parcel_dex,
+		'/' + service_query_headless + '/framework-build.json': component_parcel_build,
+		'/' + service_query_headless + '/framework-sha256.json': component_parcel_seal}
+}
+fn component_parcel_source_delta() map[string]string {
+	return {'smali/android/content/ComponentName.smali': component_parcel_raw,
+		'smali/android/content/VinixComponentNameCreator.smali': component_parcel_creator_raw}
+}
+fn component_parcel_canonical_delta() map[string]string {
+	return {'new-dex/android/content/ComponentName.smali': component_parcel_canonical,
+		'new-dex/android/content/VinixComponentNameCreator.smali': component_parcel_creator_canonical}
+}
+fn component_parcel_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework.v': component_parcel_framework_helper,
+		component_parcel_provider_path: component_parcel_provider_helper}
+}
+fn component_parcel_method_changes() map[string]int {
+	return {'android/content/ComponentName.smali': 0}
+}
+fn component_parcel_method_additions() map[string]int {
+	return {'android/content/ComponentName.smali': 6}
+}
+fn component_parcel_field_additions() map[string][]string {
+	return {'android/content/ComponentName.smali': ['.field public static final CREATOR:Landroid/os/Parcelable$Creator;']}
+}
+fn component_parcel_proofs() map[string]string {
+	mut proofs := messenger_binder_proofs()
+	proofs.delete('framework_removed_method_counts')
+	proofs.delete('framework_removed_fields')
+	proofs['headless_input_delta'] = json2.encode({'/' + service_query_jar_path: component_parcel_jar})
+	proofs['framework_source_delta'] = json2.encode(component_parcel_source_delta())
+	proofs['framework_canonical_delta'] = json2.encode(component_parcel_canonical_delta())
+	proofs['framework_builder_helper_delta'] = json2.encode(component_parcel_helper_delta())
+	proofs['framework_class_count'] = json2.encode(2116)
+	proofs['framework_changed_method_counts'] = json2.encode(component_parcel_method_changes())
+	proofs['framework_added_method_counts'] = json2.encode(component_parcel_method_additions())
+	proofs['framework_added_fields'] = json2.encode(component_parcel_field_additions())
+	proofs['framework_added_classes'] = json2.encode(['android/content/VinixComponentNameCreator.smali'])
+	return proofs
+}
+fn component_parcel_overlay_paths() []string { return messenger_binder_overlay_paths() }
+fn verify_component_parcel_overlay(receipt map[string]json2.Any) ! {
+	for name in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof',
+		'framework_removed_method_counts', 'framework_removed_fields'] {
+		if name in receipt { return error('ComponentName parcel may only append its exact API and replace existing framework inputs') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('component-parcel deployment delta absent') }))!
+	mut expected := component_parcel_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('component-parcel headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == component_parcel_old_headless { return error('new component-parcel headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('component-parcel exact five deployment input changes differ') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('component-parcel overlay inventory absent') }))!
+	paths := component_parcel_overlay_paths()
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe component-parcel overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != 0o644 { return error('component-parcel regular allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected component-parcel overlay inode') }
+	}
+	if regulars.len != 6 || regulars[service_query_deployment] or { '' } == component_parcel_old_deployment { return error('exact six component-parcel files required') }
+	for path, pin in expected { if regulars[path.trim_left('/')] or { '' } != pin { return error('component-parcel input differs from inventory') } }
+}
+fn verify_component_parcel_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [component_parcel_base_seal, component_parcel_boot, component_parcel_base_overlay,
+		component_parcel_old_deployment, component_parcel_old_headless, component_parcel_seal,
+		component_parcel_build, component_parcel_jar, component_parcel_dex,
+		broadcast_permission_native_seal, broadcast_permission_native_build, broadcast_permission_native_pin,
+		broadcast_permission_seal, asset_locales_generated, asset_locales_c, asset_locales_bindings, broadcast_permission_consumed_headers] {
+		if !digest_valid(pin) { return error('completed ComponentName parcel SDK and retained broadcast native producer required') }
+	}
+	for values in [component_parcel_source_delta(), component_parcel_canonical_delta(), component_parcel_helper_delta()] {
+		for path, pin in values { if !relative(path) || !digest_valid(pin) { return error('completed ComponentName parcel class/helper pins required') } }
+	}
+	if component_parcel_seal == messenger_binder_seal || component_parcel_jar == messenger_binder_jar || component_parcel_dex == messenger_binder_dex { return error('new ComponentName parcel framework required') }
+	for name, expected in component_parcel_fields() { if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('component-parcel receipt differs: ' + name) } }
+	for name, expected in component_parcel_proofs() { if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](expected)! { return error('component-parcel proof differs: ' + name) } }
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 127 || seals != component_parcel_inputs() { return error('component-parcel exact one hundred twenty-seven dependency seals differ') }
+	for path in stage.inputs_sha256.keys() {
+		for root in [dialog_theme_relink_root(), resources_float_relink_root(), layout_alignment_relink_root(), window_animations_relink_root()] {
+			if path == root || path.starts_with(root + '/') { return error('historical relink leaves are not new ComponentName parcel direct inputs') }
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != component_parcel_modules() || stage.preserved_modules_sha256 != component_parcel_modules() { return error('component-parcel original fifty-four modules differ') }
+	verify_component_parcel_overlay(receipt)!
+}
+fn component_parcel_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_component_parcel_receipt(receipt, stage)!
+	path := component_parcel_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != component_parcel_base_seal { return error('component-parcel original Messenger manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != component_parcel_boot || pins['maps-messenger-binder.tar'] or { '' } != component_parcel_base_overlay { return error('component-parcel original boot or Messenger overlay differs') }
+	return component_parcel_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -7413,6 +7564,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = usage_inactive_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-messenger-binder' {
 		baseline = messenger_binder_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-component-parcel' {
+		baseline = component_parcel_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -14437,6 +14590,185 @@ fn messenger_binder_profile_self_test() ! {
 	println('MAPS-MESSENGER-BINDER KERNEL-PROFILE-SELF-TEST PASS six files one hundred twenty-five seals fifty-three inherited modules2115 classes exact Messenger removals retained broadcast native')
 }
 
+fn component_parcel_entries_fixture() []ServiceQueryEntry {
+	paths := component_parcel_overlay_paths()
+	mut parents := map[string]bool{}
+	for path in paths {
+		mut parent := os.dir(path)
+		for parent !in ['', '.'] { parents[parent] = true; parent = os.dir(parent) }
+	}
+	mut entries := []ServiceQueryEntry{}
+	for name in parents.keys().sorted() { entries << ServiceQueryEntry{name: name, kind: 'directory', mode: 0o755} }
+	mut pins := component_parcel_known_delta()
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	pins['/' + service_query_deployment] = 'b'.repeat(64)
+	for path in paths { entries << ServiceQueryEntry{name: path, kind: 'regular', mode: 0o644, sha256: pins['/' + path]!} }
+	return entries
+}
+fn component_parcel_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in component_parcel_fields() { receipt[name] = json2.Any(value) }
+	for name, value in component_parcel_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	mut delta := component_parcel_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(component_parcel_entries_fixture()))!
+	return receipt
+}
+fn component_parcel_profile_self_test() ! {
+	profile := component_parcel_profile()
+	if profile.baseline_sha != component_parcel_boot || profile.modules.len != 54 || profile.modules.last() != 'maps-messenger-binder.tar'
+		|| component_parcel_inputs().len != 127 || component_parcel_inputs().keys().filter(it.ends_with('/sha256.json')).len != 127 { return error('component-parcel retained-native profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 55 || component_parcel_overlay_paths().len != 6 || component_parcel_known_delta().len != 4 { return error('component-parcel exact modules, files or changes differ') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', modules.reverse()}, Config{'vinix', profile.modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('wrong component-parcel module order accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: component_parcel_inputs(), original_modules_sha256: component_parcel_modules(), preserved_modules_sha256: component_parcel_modules()}
+	receipt := component_parcel_receipt_fixture()!
+	verify_component_parcel_receipt(receipt, stage)!
+	mut fields := component_parcel_fields().keys()
+	fields << component_parcel_proofs().keys()
+	fields << ['deployment_input_delta', 'overlay_inventory']
+	for name in fields {
+		mut bad := component_parcel_receipt_fixture()!
+		bad[name] = json2.Any('changed')
+		if _ := verify_component_parcel_receipt(bad, stage) { return error('changed component-parcel field/proof accepted') }
+		bad.delete(name)
+		if _ := verify_component_parcel_receipt(bad, stage) { return error('missing component-parcel field/proof accepted') }
+	}
+	for proof in ['framework_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta',
+		'framework_changed_method_counts', 'framework_added_method_counts', 'framework_added_fields',
+		'native_source_delta', 'native_builder_helper_delta', 'native_bindings_delta', 'native_generated_jni_delta',
+		'native_c_delta', 'native_consumed_header_additions', 'native_consumed_raw_delta', 'native_consumed_canonical_delta',
+		'native_consumed_raw_additions', 'native_consumed_canonical_additions', 'headless_input_delta'] {
+		original := json2.decode[map[string]json2.Any](json2.encode(receipt[proof]!))!
+		for name in original.keys() {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(original))!
+			changed[name] = json2.Any('changed')
+			mut bad := component_parcel_receipt_fixture()!
+			bad[proof] = json2.Any(changed)
+			if _ := verify_component_parcel_receipt(bad, stage) { return error('changed component-parcel proof member accepted') }
+			changed.delete(name)
+			bad[proof] = json2.Any(changed)
+			if _ := verify_component_parcel_receipt(bad, stage) { return error('missing component-parcel proof member accepted') }
+		}
+		mut extra := json2.decode[map[string]json2.Any](json2.encode(original))!
+		extra['unreviewed'] = json2.Any('a'.repeat(64))
+		mut bad := component_parcel_receipt_fixture()!
+		bad[proof] = json2.Any(extra)
+		if _ := verify_component_parcel_receipt(bad, stage) { return error('extra component-parcel proof member accepted') }
+	}
+	for added in [json2.encode([]string{}), json2.encode(['android/content/VinixComponentNameCreator.smali', 'android/content/Unreviewed.smali']), json2.encode(messenger_binder_added_classes())] {
+		mut bad := component_parcel_receipt_fixture()!
+		bad['framework_added_classes'] = json2.decode[json2.Any](added)!
+		if _ := verify_component_parcel_receipt(bad, stage) { return error('wrong component-parcel class additions accepted') }
+	}
+	for field, wrong in {'native_framework_manifest_sha256': messenger_binder_seal,
+		'native_compatibility_framework_manifest_sha256': component_parcel_seal,
+		'retained_native_framework_manifest_sha256': messenger_binder_seal,
+		'retained_framework_manifest_sha256': usage_inactive_seal,
+		'retained_native_manifest_sha256': asset_locales_native_seal,
+		'native_manifest_sha256': asset_locales_native_seal,
+		'native_build_root': asset_locales_native,
+		'native_build_sha256': asset_locales_native_build,
+		'native_sha256': asset_locales_native_pin,
+		'native_consumed_headers_before_sha256': asset_locales_consumed_headers} {
+		mut bad := component_parcel_receipt_fixture()!
+		bad[field] = json2.Any(wrong)
+		if _ := verify_component_parcel_receipt(bad, stage) { return error('stale or relabeled ComponentName parcel native provenance accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := component_parcel_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_component_parcel_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed component-parcel input accepted') }
+		pins.delete(path)
+		if _ := verify_component_parcel_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing component-parcel input accepted') }
+	}
+	for path in ['/unreviewed/sha256.json', dialog_theme_relink_root(), resources_float_relink_root(),
+		layout_alignment_relink_root(), window_animations_relink_root(), dialog_theme_relink_root() + '/out/canonical.so'] {
+		mut pins := component_parcel_inputs()
+		pins[path] = 'a'.repeat(64)
+		if _ := verify_component_parcel_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('extra component-parcel seal or historical proof leaf accepted') }
+	}
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: messenger_binder_modules()}, Stage{...stage, preserved_modules_sha256: messenger_binder_modules()}] {
+		if _ := verify_component_parcel_receipt(receipt, bad) { return error('wrong component-parcel module inventory accepted') }
+	}
+	for addition in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof',
+		'framework_removed_method_counts', 'framework_removed_fields'] {
+		mut values := [json2.encode(map[string]string{})]
+		if historical := messenger_binder_proofs()[addition] { values << historical }
+		for value in values {
+			mut bad := component_parcel_receipt_fixture()!
+			bad[addition] = json2.decode[json2.Any](value)!
+			if _ := verify_component_parcel_receipt(bad, stage) { return error('component-parcel addition, removal or relink proof accepted') }
+		}
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta']!))!
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := component_parcel_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_component_parcel_receipt(bad, stage) { return error('missing component-parcel actual input change accepted') }
+	}
+	mut wrong_delta := delta.clone()
+	wrong_delta['/' + native_onboarding_trace_path] = broadcast_permission_native_pin
+	mut wrong_native := component_parcel_receipt_fixture()!
+	wrong_native['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(wrong_delta))!
+	if _ := verify_component_parcel_receipt(wrong_native, stage) { return error('component-parcel native deployment replacement accepted') }
+	entries := component_parcel_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := component_parcel_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_component_parcel_receipt(bad, stage) { return error('unsafe component-parcel overlay inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := component_parcel_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_component_parcel_receipt(bad, stage) { return error('missing component-parcel overlay file accepted') }
+			if entry.name != service_query_deployment {
+				bad_entries = entries.clone()
+				bad_entries[index] = ServiceQueryEntry{...entry, sha256: '0'.repeat(64)}
+				bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+				if _ := verify_component_parcel_receipt(bad, stage) { return error('changed component-parcel overlay pin accepted') }
+			}
+		}
+	}
+	for extra in [entries.last(), ServiceQueryEntry{name: 'opt/unreviewed', kind: 'regular', mode: 0o644, sha256: 'a'.repeat(64)},
+		ServiceQueryEntry{name: native_onboarding_trace_path, kind: 'regular', mode: 0o755, sha256: broadcast_permission_native_pin}] {
+		mut changed := entries.clone()
+		changed << extra
+		mut bad := component_parcel_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_component_parcel_receipt(bad, stage) { return error('duplicate, native or unreviewed component-parcel overlay file accepted') }
+	}
+	for stale_path, stale_pin in {service_query_headless + '/guest-inputs.json': component_parcel_old_headless, service_query_deployment: component_parcel_old_deployment} {
+		mut changed := entries.clone()
+		for index, entry in changed { if entry.name == stale_path { changed[index] = ServiceQueryEntry{...entry, sha256: stale_pin} } }
+		mut bad := component_parcel_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if stale_path != service_query_deployment {
+			mut stale_delta := delta.clone()
+			stale_delta['/' + stale_path] = stale_pin
+			bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(stale_delta))!
+		}
+		if _ := verify_component_parcel_receipt(bad, stage) { return error('stale component-parcel metadata accepted') }
+	}
+	for old in [messenger_binder_receipt_fixture()!, usage_inactive_receipt_fixture()!, secure_settings_receipt_fixture()!, broadcast_permission_receipt_fixture()!, keyguard_policy_receipt_fixture()!] {
+		if _ := verify_component_parcel_receipt(old, stage) { return error('historical receipt accepted by component-parcel profile') }
+	}
+	if _ := verify_messenger_binder_receipt(receipt, stage) { return error('component-parcel receipt accepted by Messenger profile') }
+	println('MAPS-COMPONENT-PARCEL KERNEL-PROFILE-SELF-TEST PASS six files one hundred twenty-seven seals fifty-four inherited modules2116 classes ComponentName parcel append-only retained broadcast native')
+}
+
 fn resource_lock_entries_fixture() []ServiceQueryEntry {
 	paths := resource_lock_overlay_paths()
 	mut parents := map[string]bool{}
@@ -14644,6 +14976,7 @@ fn self_test() ! {
 	secure_settings_profile_self_test()!
 	usage_inactive_profile_self_test()!
 	messenger_binder_profile_self_test()!
+	component_parcel_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -14736,6 +15069,7 @@ fn self_test() ! {
 	fat_self_test(root + '/secure-settings', 'maps-secure-settings.tar', secure_settings_profile().modules)!
 	fat_self_test(root + '/usage-inactive', 'maps-usage-inactive.tar', usage_inactive_profile().modules)!
 	fat_self_test(root + '/messenger-binder', 'maps-messenger-binder.tar', messenger_binder_profile().modules)!
+	fat_self_test(root + '/component-parcel', 'maps-component-parcel.tar', component_parcel_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -14795,8 +15129,10 @@ fn main() {
 	is_secure_settings := os.args.len == 5 && os.args[1] == '--maps-secure-settings'
 	is_usage_inactive := os.args.len == 5 && os.args[1] == '--maps-usage-inactive'
 	is_messenger_binder := os.args.len == 5 && os.args[1] == '--maps-messenger-binder'
+	is_component_parcel := os.args.len == 5 && os.args[1] == '--maps-component-parcel'
 	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display || is_asset_locales || is_unmanaged_queries || is_stats_unavailable || is_subscription_service
-	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings && !is_usage_inactive && !is_messenger_binder {
+	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings && !is_usage_inactive && !is_messenger_binder && !is_component_parcel {
+		eprintln('       patch-kernel --maps-component-parcel FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-messenger-binder FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-usage-inactive FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-secure-settings FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
@@ -14806,7 +15142,7 @@ fn main() {
 		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display|--maps-asset-locales|--maps-unmanaged-queries|--maps-stats-unavailable|--maps-subscription-service] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings || is_usage_inactive || is_messenger_binder { 1 } else { 0 }
+	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings || is_usage_inactive || is_messenger_binder || is_component_parcel { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -14817,7 +15153,7 @@ fn main() {
 	}
 	profile := if is_seed_companion { seed_companion_profile() } else if is_broker_tail { broker_tail_profile() } else if is_window_system_ui { window_system_ui_profile() } else if is_imageview_bounds { imageview_bounds_profile() } else if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	selected_profile := if is_subscription_service { subscription_service_profile() } else if is_stats_unavailable { stats_unavailable_profile() } else if is_unmanaged_queries { unmanaged_queries_profile() } else if is_asset_locales { asset_locales_profile() } else if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
-	final_profile := if is_messenger_binder { messenger_binder_profile() } else if is_usage_inactive { usage_inactive_profile() } else if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
+	final_profile := if is_component_parcel { component_parcel_profile() } else if is_messenger_binder { messenger_binder_profile() } else if is_usage_inactive { usage_inactive_profile() } else if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
 	patch(root, build_root, os.args[3 + offset], final_profile) or {
 		eprintln(err)
 		exit(1)
