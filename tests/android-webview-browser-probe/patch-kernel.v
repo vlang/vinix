@@ -617,6 +617,30 @@ const stable_display_native_source = '8d8e8f2e81c6b0b4cd6a11648c59184dff1269c97a
 const stable_display_bindings = '76f62e0ceefb04f147856b711cce651380841027ee3d3fd70e4bc9787b956d60'
 const stable_display_generated = 'd0b1eec6e60036e5d231d6ade0450ceeb71fb2fdcb95b2057ba111c2c6a3d19f'
 const stable_display_c = '881a321444643dda277089d591a27e110536f89c4f40f16e54196c62f7f9efba'
+const asset_locales_base = '/Users/alex/.local/state/vinix/android/maps-stable-display-r1'
+const asset_locales_base_seal = 'dc28d10922f90cea0081969562a85d7cf60c489e0684ad3cfaaf75b78e28edc7'
+const asset_locales_boot = 'a60eeceece8520d2585637ebc9f8919b566c4f589b6238b42983fe82780a63c6'
+const asset_locales_base_overlay = '1735cf8ce7d1f0617ea9d3e3d480ace9316efde06f0a4d01c3597165a7b9500f'
+const asset_locales_old_deployment = '3a20ffb504fb0efbde562b67be5fe5b288527908444295cd638852d60f63e63b'
+const asset_locales_old_headless = '94549b16ccbca2c93b621abd4529bd88a407fab8afed2c5f7c8464c0d0bab542'
+const asset_locales_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-device-secure-framework-2026-11-02-r1'
+const asset_locales_seal = 'db98d6fcd6e0c792761f39b07ceb40d5e5818b691dede6eaccd177ec0f9973f2'
+const asset_locales_build = 'dab6370d17bf7ab9f9fe48ffa32b274cd6d7f830200152949bb1c95645d34c7e'
+const asset_locales_jar = '43e3e2b941677cda70021ae9cd674aac6f4897af4ab4bda1d2d751b805d1f137'
+const asset_locales_dex = '6e9323bea9c643630eba4eceb77df1ead9c12c53f134288109817598d3232686'
+const asset_locales_framework_helper = '9aeb45380e61252b9ec1bf2a8b6c8d3a553b2e123313e649e3bbdf607a4e27c3'
+const asset_locales_provider_helper = '8e2a2bfeec96d13f394ba83ceaf6d558bd8a0d6638c8120a43b3a1169260fb3c'
+const asset_locales_raw = '935ea7fa6ea194eafd55a3bb9bd7fd9e445699dfb26fbc67eb9c7f423224c3ae'
+const asset_locales_canonical = 'c21625a68268b19a02910b534dcf5f396d00523d3faab45699ecefabd6c44d46'
+const asset_locales_native = '/Users/alex/.local/state/vinix/android/current-native-build-2026-11-02-asset-locales-r1'
+const asset_locales_native_seal = 'f7140d2ff09d77906a2ef76884c607f64643e53cc981f16dcae90d474128f8f1'
+const asset_locales_native_build = '5bc91099101c53ee288dabf3567414e2a13a31ab57ade78ecbefc7196acae31f'
+const asset_locales_native_pin = 'c87ccc623d70b1d582cd5486a9a6316c5117091ca10113682aa07cc72c80912f'
+const asset_locales_native_source = 'da7712f01e12748363a7afcbe25aa9c052b86ad01538d782f97c486e65b327fd'
+const asset_locales_bindings = '2264b7af0bf4a5b39da876e2ef82a291983d7ea9bd2c5f7374d8448b4f1a03ba'
+const asset_locales_generated = 'd054fd51235e1893db9f5d78a747660abb69f185a803a6caa01c0dfc206d7a6c'
+const asset_locales_c = 'd96b7dd8e1e69bb22575bd7762e8e2890feaed379e8a57031aab73c27c8160c7'
+const asset_locales_consumed_headers = '835fb6533bfa976a3434086d9b05f12f2fb1b17e9a61f149d1e028d3bc27ab41'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -5134,6 +5158,175 @@ fn stable_display_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return stable_display_base + '/boot.img'
 }
 
+fn asset_locales_profile() Profile {
+	mut modules := stable_display_profile().modules.clone()
+	modules << 'maps-stable-display.tar'
+	return Profile{'maps-asset-locales', asset_locales_boot, 'maps-asset-locales.tar', modules}
+}
+fn asset_locales_modules() map[string]string {
+	mut modules := stable_display_modules()
+	modules['maps-stable-display.tar'] = asset_locales_base_overlay
+	return modules
+}
+fn asset_locales_fields() map[string]string {
+	mut fields := stable_display_fields()
+	fields['kind'] = 'vinix-maps-asset-locales-v1'
+	fields['base_root'] = asset_locales_base
+	fields['base_manifest_sha256'] = asset_locales_base_seal
+	fields['framework_build_root'] = asset_locales_framework
+	fields['framework_manifest_sha256'] = asset_locales_seal
+	fields['framework_jar_sha256'] = asset_locales_jar
+	fields['framework_dex_sha256'] = asset_locales_dex
+	fields['retained_framework_manifest_sha256'] = stable_display_seal
+	fields['native_build_root'] = asset_locales_native
+	fields['native_manifest_sha256'] = asset_locales_native_seal
+	fields['native_build_sha256'] = asset_locales_native_build
+	fields['native_sha256'] = asset_locales_native_pin
+	fields['retained_native_manifest_sha256'] = stable_display_native_seal
+	fields['native_framework_manifest_sha256'] = asset_locales_seal
+	fields['native_compatibility_framework_manifest_sha256'] = stable_display_seal
+	fields['retained_native_framework_manifest_sha256'] = stable_display_seal
+	fields['generated_jni_sha256'] = asset_locales_generated
+	fields['native_c_sha256'] = asset_locales_c
+	fields['native_consumed_headers_before_sha256'] = 'a67e79c3f564113389a9606f872fea291f9ea5ea6ab2c351e55715d1d4542d14'
+	fields['native_consumed_headers_sha256'] = asset_locales_consumed_headers
+	return fields
+}
+fn asset_locales_inputs() map[string]string {
+	mut inputs := stable_display_inputs()
+	inputs[asset_locales_base + '/sha256.json'] = asset_locales_base_seal
+	inputs[asset_locales_framework + '/sha256.json'] = asset_locales_seal
+	inputs[asset_locales_native + '/sha256.json'] = asset_locales_native_seal
+	return inputs
+}
+fn asset_locales_known_delta() map[string]string {
+	return {'/' + service_query_jar_path: asset_locales_jar,
+		'/' + service_query_dex_path: asset_locales_dex,
+		'/' + native_onboarding_trace_path: asset_locales_native_pin,
+		'/' + service_query_headless + '/framework-build.json': asset_locales_build,
+		'/' + service_query_headless + '/framework-sha256.json': asset_locales_seal}
+}
+fn asset_locales_source_delta() map[string]string {
+	return {'smali/android/app/KeyguardManager.smali': asset_locales_raw}
+}
+fn asset_locales_canonical_delta() map[string]string {
+	return {'new-dex/android/app/KeyguardManager.smali': asset_locales_canonical}
+}
+fn asset_locales_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework.v': asset_locales_framework_helper,
+		'tests/native-android-tools/androidtools/framework_device_secure.v': asset_locales_provider_helper}
+}
+fn asset_locales_native_source_delta() map[string]string {
+	return {'build-support/android/nativews/asset_locales.v': asset_locales_native_source,
+		'build-support/android/nativews/bindings.txt': asset_locales_bindings}
+}
+fn asset_locales_native_helper_delta() map[string]string {
+	return asset_locales_helper_delta()
+}
+fn asset_locales_export() string { return 'Java_android_content_res_AssetManager_getLocales__' }
+fn asset_locales_consumed_header_additions() map[string]string {
+	return map[string]string{}
+}
+fn asset_locales_consumed_raw_delta() map[string][]string {
+	return {'smali/android/hardware/display/DisplayManager.smali': [stable_display_raw, stable_display_canonical]}
+}
+fn asset_locales_proofs() map[string]string {
+	return {
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: asset_locales_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256', 'native_manifest_sha256'])
+		'framework_source_delta': json2.encode(asset_locales_source_delta())
+		'framework_canonical_delta': json2.encode(asset_locales_canonical_delta())
+		'framework_builder_helper_delta': json2.encode(asset_locales_helper_delta())
+		'framework_class_count': json2.encode(2108)
+		'framework_changed_method_counts': json2.encode({'android/app/KeyguardManager.smali': 0})
+		'framework_added_method_counts': json2.encode({'android/app/KeyguardManager.smali': 1})
+		'framework_added_fields': json2.encode(map[string][]string{})
+		'framework_added_classes': json2.encode([]string{})
+		'native_source_delta': json2.encode(asset_locales_native_source_delta())
+		'native_builder_helper_delta': json2.encode(asset_locales_native_helper_delta())
+		'native_bindings_delta': json2.encode({'native/bindings.txt': [stable_display_bindings, asset_locales_bindings]})
+		'native_generated_jni_delta': json2.encode({'native/atlframework/ws_generated.v': [stable_display_generated, asset_locales_generated]})
+		'native_c_delta': json2.encode({'native/android-native.c': [stable_display_c, asset_locales_c]})
+		'native_consumed_header_additions': json2.encode(asset_locales_consumed_header_additions())
+		'native_consumed_class_count': json2.encode(70)
+		'retained_native_consumed_class_count': json2.encode(70)
+		'native_export_count': json2.encode(721)
+		'native_source_origin_count': json2.encode(91)
+		'native_input_count': json2.encode(92)
+		'native_export_additions': json2.encode([asset_locales_export()])
+		'native_consumed_raw_delta': json2.encode(asset_locales_consumed_raw_delta())
+		'native_consumed_canonical_delta': json2.encode(map[string][]string{})
+		'native_consumed_raw_additions': json2.encode(map[string]string{})
+		'native_consumed_canonical_additions': json2.encode(map[string]string{})
+	}
+}
+fn asset_locales_overlay_paths() []string { return stable_display_overlay_paths() }
+fn verify_asset_locales_overlay(receipt map[string]json2.Any) ! {
+	for name in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		if name in receipt { return error('asset locales may only replace existing framework/native inputs') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('asset-locales deployment delta absent') }))!
+	mut expected := asset_locales_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('asset-locales headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == asset_locales_old_headless { return error('new asset-locales headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('asset-locales exact six deployment input changes differ') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('asset-locales overlay inventory absent') }))!
+	paths := asset_locales_overlay_paths()
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe asset-locales overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			mode := if entry.name == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != mode { return error('asset-locales regular allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected asset-locales overlay inode') }
+	}
+	if regulars.len != 7 || regulars[service_query_deployment] or { '' } == asset_locales_old_deployment { return error('exact seven asset-locales files required') }
+	for path, pin in expected { if regulars[path.trim_left('/')] or { '' } != pin { return error('asset-locales input differs from inventory') } }
+}
+fn verify_asset_locales_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [asset_locales_base_seal, asset_locales_boot, asset_locales_base_overlay,
+		asset_locales_old_deployment, asset_locales_old_headless, asset_locales_seal,
+		asset_locales_build, asset_locales_jar, asset_locales_dex, asset_locales_native_seal,
+		asset_locales_native_build, asset_locales_native_pin, asset_locales_generated,
+		asset_locales_c, asset_locales_bindings, asset_locales_consumed_headers] {
+		if !digest_valid(pin) { return error('completed asset-locales SDK and coupled native producer required') }
+	}
+	for values in [asset_locales_source_delta(), asset_locales_canonical_delta(), asset_locales_helper_delta(),
+		asset_locales_native_source_delta(), asset_locales_native_helper_delta()] {
+		for _, pin in values { if !digest_valid(pin) { return error('completed asset-locales class/helper/native pins required') } }
+	}
+	if asset_locales_seal == stable_display_seal || asset_locales_jar == stable_display_jar || asset_locales_dex == stable_display_dex
+		|| asset_locales_native_seal == stable_display_native_seal || asset_locales_native_pin == stable_display_native_pin
+		|| asset_locales_generated == stable_display_generated || asset_locales_bindings == stable_display_bindings || asset_locales_c == stable_display_c { return error('new asset-locales SDK and native implementation required') }
+	for name, expected in asset_locales_fields() { if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('asset-locales receipt differs: ' + name) } }
+	for name, expected in asset_locales_proofs() { if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](expected)! { return error('asset-locales proof differs: ' + name) } }
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 106 || seals != asset_locales_inputs() { return error('asset-locales exact one hundred six dependency seals differ') }
+	for path in stage.inputs_sha256.keys() {
+		for root in [dialog_theme_relink_root(), resources_float_relink_root(), layout_alignment_relink_root(), window_animations_relink_root()] {
+			if path == root || path.starts_with(root + '/') { return error('historical relink leaves are not new asset-locales direct inputs') }
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != asset_locales_modules() || stage.preserved_modules_sha256 != asset_locales_modules() { return error('asset-locales original forty-four modules differ') }
+	verify_asset_locales_overlay(receipt)!
+}
+fn asset_locales_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_asset_locales_receipt(receipt, stage)!
+	path := asset_locales_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != asset_locales_base_seal { return error('asset-locales original stable-display manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != asset_locales_boot || pins['maps-stable-display.tar'] or { '' } != asset_locales_base_overlay { return error('asset-locales original boot or stable-display overlay differs') }
+	return asset_locales_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -5774,6 +5967,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = pending_intent_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-stable-display' {
 		baseline = stable_display_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-asset-locales' {
+		baseline = asset_locales_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -11047,6 +11242,184 @@ fn stable_display_profile_self_test() ! {
 	println('MAPS-STABLE-DISPLAY KERNEL-PROFILE-SELF-TEST PASS seven files one hundred three seals forty-three inherited modules new native70 classes720 exports separate original Intent provenance')
 }
 
+fn asset_locales_entries_fixture() []ServiceQueryEntry {
+	paths := asset_locales_overlay_paths()
+	mut parents := map[string]bool{}
+	for path in paths {
+		mut parent := os.dir(path)
+		for parent !in ['', '.'] { parents[parent] = true; parent = os.dir(parent) }
+	}
+	mut entries := []ServiceQueryEntry{}
+	for name in parents.keys().sorted() { entries << ServiceQueryEntry{name: name, kind: 'directory', mode: 0o755} }
+	mut pins := asset_locales_known_delta()
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	pins['/' + service_query_deployment] = 'b'.repeat(64)
+	for path in paths { entries << ServiceQueryEntry{name: path, kind: 'regular', mode: if path == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }, sha256: pins['/' + path]!} }
+	return entries
+}
+fn asset_locales_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in asset_locales_fields() { receipt[name] = json2.Any(value) }
+	for name, value in asset_locales_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	mut delta := asset_locales_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(asset_locales_entries_fixture()))!
+	return receipt
+}
+fn asset_locales_profile_self_test() ! {
+	profile := asset_locales_profile()
+	if profile.baseline_sha != asset_locales_boot || profile.modules.len != 44 || profile.modules.last() != 'maps-stable-display.tar'
+		|| asset_locales_inputs().len != 106 || asset_locales_inputs().keys().filter(it.ends_with('/sha256.json')).len != 106 { return error('asset-locales strict coupled SDK/native profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 45 || asset_locales_overlay_paths().len != 7 || asset_locales_known_delta().len != 5 { return error('asset-locales exact modules, files or changes differ') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', modules.reverse()}, Config{'vinix', profile.modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('wrong asset-locales module order accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: asset_locales_inputs(), original_modules_sha256: asset_locales_modules(), preserved_modules_sha256: asset_locales_modules()}
+	receipt := asset_locales_receipt_fixture()!
+	verify_asset_locales_receipt(receipt, stage)!
+	mut fields := asset_locales_fields().keys()
+	fields << asset_locales_proofs().keys()
+	fields << ['deployment_input_delta', 'overlay_inventory']
+	for name in fields {
+		mut bad := asset_locales_receipt_fixture()!
+		bad[name] = json2.Any('changed')
+		if _ := verify_asset_locales_receipt(bad, stage) { return error('changed asset-locales field/proof accepted') }
+		bad.delete(name)
+		if _ := verify_asset_locales_receipt(bad, stage) { return error('missing asset-locales field/proof accepted') }
+	}
+	for proof in ['framework_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta',
+		'framework_changed_method_counts', 'framework_added_method_counts', 'framework_added_fields',
+		'native_source_delta', 'native_builder_helper_delta', 'native_bindings_delta', 'native_generated_jni_delta',
+		'native_c_delta', 'native_consumed_header_additions', 'native_consumed_raw_delta', 'native_consumed_canonical_delta',
+		'native_consumed_raw_additions', 'native_consumed_canonical_additions', 'headless_input_delta'] {
+		original := json2.decode[map[string]json2.Any](json2.encode(receipt[proof]!))!
+		for name in original.keys() {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(original))!
+			changed[name] = json2.Any('changed')
+			mut bad := asset_locales_receipt_fixture()!
+			bad[proof] = json2.Any(changed)
+			if _ := verify_asset_locales_receipt(bad, stage) { return error('changed asset-locales proof member accepted') }
+			changed.delete(name)
+			bad[proof] = json2.Any(changed)
+			if _ := verify_asset_locales_receipt(bad, stage) { return error('missing asset-locales proof member accepted') }
+		}
+		mut extra := json2.decode[map[string]json2.Any](json2.encode(original))!
+		extra['unreviewed'] = json2.Any('a'.repeat(64))
+		mut bad := asset_locales_receipt_fixture()!
+		bad[proof] = json2.Any(extra)
+		if _ := verify_asset_locales_receipt(bad, stage) { return error('extra asset-locales proof member accepted') }
+	}
+	for proof in ['native_bindings_delta', 'native_generated_jni_delta', 'native_c_delta', 'native_consumed_raw_delta'] {
+		original := json2.decode[map[string][]string](json2.encode(receipt[proof]!))!
+		for name, pair in original {
+			for index in 0 .. 2 {
+				mut changed := json2.decode[map[string][]string](json2.encode(original))!
+				mut pins := json2.decode[[]string](json2.encode(pair))!
+				pins[index] = '0'.repeat(64)
+				changed[name] = pins
+				mut bad := asset_locales_receipt_fixture()!
+				bad[proof] = json2.decode[json2.Any](json2.encode(changed))!
+				if _ := verify_asset_locales_receipt(bad, stage) { return error('changed asset-locales native before-after pin accepted') }
+			}
+		}
+	}
+	for field, wrong in {'native_framework_manifest_sha256': stable_display_seal,
+		'retained_native_framework_manifest_sha256': asset_locales_seal,
+		'native_compatibility_framework_manifest_sha256': resource_lock_native_framework,
+		'retained_framework_manifest_sha256': resource_lock_native_framework,
+		'retained_native_manifest_sha256': resource_lock_native_seal} {
+		mut bad := asset_locales_receipt_fixture()!
+		bad[field] = json2.Any(wrong)
+		if _ := verify_asset_locales_receipt(bad, stage) { return error('asset-locales old/new native or SDK provenance substituted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := asset_locales_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_asset_locales_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed asset-locales input accepted') }
+		pins.delete(path)
+		if _ := verify_asset_locales_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing asset-locales input accepted') }
+	}
+	for path in ['/unreviewed/sha256.json', dialog_theme_relink_root(), resources_float_relink_root(),
+		layout_alignment_relink_root(), window_animations_relink_root(), dialog_theme_relink_root() + '/out/canonical.so'] {
+		mut pins := asset_locales_inputs()
+		pins[path] = 'a'.repeat(64)
+		if _ := verify_asset_locales_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('extra asset-locales seal or historical proof leaf accepted') }
+	}
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: stable_display_modules()}, Stage{...stage, preserved_modules_sha256: stable_display_modules()}] {
+		if _ := verify_asset_locales_receipt(receipt, bad) { return error('wrong asset-locales module inventory accepted') }
+	}
+	for addition in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		mut bad := asset_locales_receipt_fixture()!
+		bad[addition] = json2.Any(map[string]json2.Any{})
+		if _ := verify_asset_locales_receipt(bad, stage) { return error('asset-locales addition or relink proof accepted') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta']!))!
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := asset_locales_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_asset_locales_receipt(bad, stage) { return error('missing asset-locales actual input change accepted') }
+	}
+	mut wrong_delta := delta.clone()
+	wrong_delta['/' + native_onboarding_trace_path] = stable_display_native_pin
+	mut wrong_native := asset_locales_receipt_fixture()!
+	wrong_native['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(wrong_delta))!
+	if _ := verify_asset_locales_receipt(wrong_native, stage) { return error('retained native DSO accepted without locale bridge') }
+	entries := asset_locales_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := asset_locales_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_asset_locales_receipt(bad, stage) { return error('unsafe asset-locales overlay inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := asset_locales_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_asset_locales_receipt(bad, stage) { return error('missing asset-locales overlay file accepted') }
+			if entry.name != service_query_deployment {
+				bad_entries = entries.clone()
+				bad_entries[index] = ServiceQueryEntry{...entry, sha256: '0'.repeat(64)}
+				bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+				if _ := verify_asset_locales_receipt(bad, stage) { return error('changed asset-locales overlay pin accepted') }
+			}
+		}
+	}
+	for extra in [entries.last(), ServiceQueryEntry{name: 'opt/unreviewed', kind: 'regular', mode: 0o644, sha256: 'a'.repeat(64)}] {
+		mut changed := entries.clone()
+		changed << extra
+		mut bad := asset_locales_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_asset_locales_receipt(bad, stage) { return error('duplicate or unreviewed asset-locales overlay file accepted') }
+	}
+	for stale_path, stale_pin in {service_query_headless + '/guest-inputs.json': asset_locales_old_headless, service_query_deployment: asset_locales_old_deployment} {
+		mut changed := entries.clone()
+		for index, entry in changed { if entry.name == stale_path { changed[index] = ServiceQueryEntry{...entry, sha256: stale_pin} } }
+		mut bad := asset_locales_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if stale_path != service_query_deployment {
+			mut stale_delta := delta.clone()
+			stale_delta['/' + stale_path] = stale_pin
+			bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(stale_delta))!
+		}
+		if _ := verify_asset_locales_receipt(bad, stage) { return error('stale asset-locales metadata accepted') }
+	}
+	for old in [stable_display_receipt_fixture()!, pending_intent_receipt_fixture()!, resource_lock_receipt_fixture()!] {
+		if _ := verify_asset_locales_receipt(old, stage) { return error('historical receipt accepted by asset-locales profile') }
+	}
+	if _ := verify_stable_display_receipt(receipt, stage) { return error('asset-locales receipt accepted by stable-display profile') }
+	if _ := verify_pending_intent_receipt(receipt, stage) { return error('asset-locales receipt accepted by PendingIntent profile') }
+	println('MAPS-ASSET-LOCALES KERNEL-PROFILE-SELF-TEST PASS seven files one hundred six seals forty-four inherited modules same70 native classes721 exports stableSDK native provenance')
+}
+
 fn resource_lock_entries_fixture() []ServiceQueryEntry {
 	paths := resource_lock_overlay_paths()
 	mut parents := map[string]bool{}
@@ -11244,6 +11617,7 @@ fn self_test() ! {
 	resource_lock_profile_self_test()!
 	pending_intent_profile_self_test()!
 	stable_display_profile_self_test()!
+	asset_locales_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -11326,6 +11700,7 @@ fn self_test() ! {
 	fat_self_test(root + '/resource-lock', 'maps-resource-lock.tar', resource_lock_profile().modules)!
 	fat_self_test(root + '/pending-intent', 'maps-pending-intent.tar', pending_intent_profile().modules)!
 	fat_self_test(root + '/stable-display', 'maps-stable-display.tar', stable_display_profile().modules)!
+	fat_self_test(root + '/asset-locales', 'maps-asset-locales.tar', asset_locales_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -11375,9 +11750,10 @@ fn main() {
 	is_resource_lock := os.args.len == 5 && os.args[1] == '--maps-resource-lock'
 	is_pending_intent := os.args.len == 5 && os.args[1] == '--maps-pending-intent'
 	is_stable_display := os.args.len == 5 && os.args[1] == '--maps-stable-display'
-	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display
+	is_asset_locales := os.args.len == 5 && os.args[1] == '--maps-asset-locales'
+	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display || is_asset_locales
 	if os.args.len != 4 && !is_selected {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display|--maps-asset-locales] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
 	offset := if is_selected { 1 } else { 0 }
@@ -11390,7 +11766,7 @@ fn main() {
 		exit(1)
 	}
 	profile := if is_seed_companion { seed_companion_profile() } else if is_broker_tail { broker_tail_profile() } else if is_window_system_ui { window_system_ui_profile() } else if is_imageview_bounds { imageview_bounds_profile() } else if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
-	selected_profile := if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
+	selected_profile := if is_asset_locales { asset_locales_profile() } else if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
 	patch(root, build_root, os.args[3 + offset], selected_profile) or {
 		eprintln(err)
 		exit(1)

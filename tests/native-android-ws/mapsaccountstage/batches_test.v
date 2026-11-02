@@ -44,7 +44,7 @@ fn batch_outcome(pins map[string]string, count int, audit InventoryBatchAudit, p
 }
 
 fn test_inventory_batch_plan_exact_boundaries_and_selectors() ! {
-	for count in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100] {
+	for count in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103] {
 		pins := batch_selectors(count)
 		before := pins.clone()
 		batches := inventory_batch_plan(pins, count)!
@@ -63,77 +63,82 @@ fn test_inventory_batch_plan_exact_boundaries_and_selectors() ! {
 		}
 		assert combined == pins
 	}
-	for count in [0, 64, 65, 69, 71, 86, 89, 91, 94, 96, 98, 100] {
+	for count in [0, 64, 65, 69, 71, 86, 89, 91, 94, 96, 98, 100, 103] {
 		mut refused := false
 		audit_seventy_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [0, 64, 65, 70, 72, 74, 86, 89, 91, 94, 96, 98, 100] {
+	for count in [0, 64, 65, 70, 72, 74, 86, 89, 91, 94, 96, 98, 100, 103] {
 		mut refused := false
 		audit_seventy_three_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [0, 64, 65, 70, 73, 75, 77, 86, 89, 91, 94, 96, 98, 100] {
+	for count in [0, 64, 65, 70, 73, 75, 77, 86, 89, 91, 94, 96, 98, 100, 103] {
 		mut refused := false
 		audit_seventy_six_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [0, 64, 65, 70, 73, 76, 78, 80, 86, 89, 91, 94, 96, 98, 100] {
+	for count in [0, 64, 65, 70, 73, 76, 78, 80, 86, 89, 91, 94, 96, 98, 100, 103] {
 		mut refused := false
 		audit_seventy_nine_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [0, 64, 65, 70, 73, 76, 79, 81, 83, 86, 89, 91, 94, 96, 98, 100] {
+	for count in [0, 64, 65, 70, 73, 76, 79, 81, 83, 86, 89, 91, 94, 96, 98, 100, 103] {
 		mut refused := false
 		audit_eighty_two_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [0, 64, 65, 70, 73, 76, 79, 82, 83, 85, 86, 89, 91, 94, 96, 98, 100] {
+	for count in [0, 64, 65, 70, 73, 76, 79, 82, 83, 85, 86, 89, 91, 94, 96, 98, 100, 103] {
 		mut refused := false
 		audit_eighty_four_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 85, 87, 89, 91, 94, 96, 98, 100] {
+	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 85, 87, 89, 91, 94, 96, 98, 100, 103] {
 		mut refused := false
 		audit_eighty_six_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 88, 90, 91, 94, 96, 98, 100] {
+	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 88, 90, 91, 94, 96, 98, 100, 103] {
 		mut refused := false
 		audit_eighty_nine_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 90, 92, 94, 96, 98, 100] {
+	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 90, 92, 94, 96, 98, 100, 103] {
 		mut refused := false
 		audit_ninety_one_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 93, 95, 96, 98, 100] {
+	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 93, 95, 96, 98, 100, 103] {
 		mut refused := false
 		audit_ninety_four_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 95, 97, 98, 100] {
+	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 95, 97, 98, 100, 103] {
 		mut refused := false
 		audit_ninety_six_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 97, 99, 100] {
+	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 97, 99, 100, 103] {
 		mut refused := false
 		audit_ninety_eight_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 99, 101] {
+	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 99, 101, 103] {
 		mut refused := false
 		audit_one_hundred_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [64, 66, 69, 71, 95, 97, 99, 101] {
+	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 102, 104] {
+		mut refused := false
+		audit_one_hundred_three_inventories(batch_selectors(count)) or { refused = true }
+		assert refused
+	}
+	for count in [64, 66, 69, 71, 95, 97, 99, 101, 102, 104] {
 		mut refused := false
 		inventory_batch_plan(batch_selectors(count), count) or { refused = true }
 		assert refused
 	}
-	for count in [70, 86, 89, 91, 94, 96, 98, 100] {
+	for count in [70, 86, 89, 91, 94, 96, 98, 100, 103] {
 		last := '/inventory/' + batch_index(count - 1)
 		for invalid_root in ['relative', '/inventory/../alias', '/inventory/trailing/', '/inventory/line\nfeed', '/inventory/back\\slash'] {
 			mut pins := batch_selectors(count)
@@ -284,15 +289,16 @@ fn batch_fixture_selector(root string, payload string) !string {
 	return digest(root + '/sha256.json')!
 }
 
-fn test_inventory_batches_real_65_70_73_76_79_82_84_86_89_91_94_96_98_and_100_inputs_repeat_all_bytes() ! {
-	for count in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100] {
+fn test_inventory_batches_real_65_70_73_76_79_82_84_86_89_91_94_96_98_100_and_103_inputs_repeat_all_bytes() ! {
+	for count in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103] {
 		root := batch_fixture_root('real-' + count.str())!
 		mut pins := map[string]string{}
 		for index := count - 1; index >= 0; index-- {
 			selected := root + '/node-' + batch_index(index)
 			pins[selected] = batch_fixture_selector(selected, batch_fixture_payload(index))!
 		}
-		if count == 100 { audit_one_hundred_inventories(pins)! }
+		if count == 103 { audit_one_hundred_three_inventories(pins)! }
+		else if count == 100 { audit_one_hundred_inventories(pins)! }
 		else if count == 98 { audit_ninety_eight_inventories(pins)! }
 		else if count == 96 { audit_ninety_six_inventories(pins)! }
 		else if count == 94 { audit_ninety_four_inventories(pins)! }
@@ -321,8 +327,8 @@ fn test_inventory_batches_real_65_70_73_76_79_82_84_86_89_91_94_96_98_and_100_in
 		assert second_failure.starts_with('inventory dependency ' + root + '/node-064: ')
 		assert second_failure.contains('nested/payload')
 		os.write_file(root + '/node-064/nested/payload', batch_fixture_payload(64))!
-		if count in [86, 89, 91, 94, 96, 98, 100] {
-			// Include every admitted overflow tail, through node-099 at 100 roots.
+		if count in [86, 89, 91, 94, 96, 98, 100, 103] {
+			// Include every admitted overflow tail, through node-102 at 103 roots.
 			last := '/node-' + batch_index(count - 1)
 			os.write_file(root + last + '/nested/payload', 'changed final overflow root')!
 			mut tail_failure := ''
