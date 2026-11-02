@@ -5,7 +5,8 @@ The maintained GNU/Linux graphics fixture passed ordinary and deterministic
 ASan/UBSan runs using Mesa softpipe under QEMU. The corrected initializer
 fixture also passed both runs, including actual constructor-before-entry
 execution. Implementation, local archive restoration and audits are complete.
-The complete archive's external upload is pending explicit approval.
+The complete archive and audit bundle were saved after explicit approval on
+November 2; the original archive bytes and recorded hashes are unchanged.
 
 **Fortnite remains at the historical 4/8 launch gates.** No fresh Fortnite
 probe, frame, menu, login or gameplay is established. The original application,
@@ -181,15 +182,23 @@ Final command arguments, logs, statuses and timings are retained separately at
 companion `.tar.gz` bundle. The pre-archive execution record is inside the
 main archive; final restoration/publication receipts are in the audit bundle.
 
-**Storage qualification:** automatic approval review rejected the attempted
-bulk upload because it contains source, toolchains, SDKs, binaries, logs and
-captures without explicit approval for that destination. No archive bytes
-were transferred and no workaround was used. The full archive remains local;
-a durable external copy still requires approval. Its complete payload and
-destination must be approved before upload. The small PNG preview was saved
-separately. Prior archive-backed expanded copies were reclaimed only after
-their recorded hashes and restoration/audit receipts were checked; the prior
-full archive remains retained.
+**Storage completion, November 2:** the user explicitly approved the complete
+archive and audit bundle. Both transfers returned HTTP 201 and both saved
+items were finalized successfully:
+
+- [Complete evidence archive](https://chatgpt.com/library?file_id=libfile_23ad2e77377c8191ae8ab25bef2c3bb6&account_id=personal),
+  515,117,768 bytes, with the SHA-256 recorded above.
+- [Audit bundle](https://chatgpt.com/library?file_id=libfile_6f56e626fc2c819187b29f2ebbe00a46&account_id=personal),
+  184,099 bytes, SHA-256
+  `511214cd36fdbde315e2d115c299d813760707dc345515c153cc27f5d02a7280`.
+
+The November 1 audit records the earlier automatic approval rejection; no
+archive bytes were transferred before permission was supplied. Those original
+records remain unchanged. The subsequent completion receipt is
+`/workspace/scratch/6384ba2a563f/ios-linux-full-20261102/prior-gles-storage-complete.json`.
+The small PNG preview was saved separately. Prior archive-backed expanded
+copies were reclaimed only after their recorded hashes and restoration/audit
+receipts were checked; the prior full archive remains retained.
 
 ## Remaining work
 
