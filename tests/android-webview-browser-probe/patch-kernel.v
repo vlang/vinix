@@ -751,6 +751,26 @@ const broadcast_permission_native_seal = 'e371c8d365b78493f9f9d660ceceb1cb2b1382
 const broadcast_permission_native_build = '193944e2025385ae69641fa6fc4dc0da52123d508929748727d479be88628732'
 const broadcast_permission_native_pin = '29b2631c36a4a8c802e904e936c23e090fb2de3b5019ac93548df1b15de2a8f1'
 const broadcast_permission_consumed_headers = '7e36f5094960bb5608d4b537a800cfcaf23894ade36e90efc25cd742d6365764'
+const secure_settings_base = '/Users/alex/.local/state/vinix/android/maps-broadcast-permission-r1'
+const secure_settings_base_seal = 'cd669a48739890494fd4780acd077c25e0bbcbf586330bb2f855ead92ae0fe7b'
+const secure_settings_boot = '0fec03c46b7881fa59bf6b728084c4ee4dfc8dae0cb26c3fdabfbaf11b39de1f'
+const secure_settings_base_overlay = '757b2b533c260ba387b723b50ebc27bfdb54422ba8550b0ed1fc5cb281ad2ff7'
+const secure_settings_old_deployment = '0817fd723945c39b307b0cc5578335af4cd07fbddfc1d2cecbf7e9824e9355f9'
+const secure_settings_old_headless = '45c3f3227a9694d989acedbc7e2b5d77e897bb6de61ddb4fe94467974070786c'
+const secure_settings_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-secure-settings-framework-2026-11-02-r1'
+const secure_settings_seal = '0c7485f9a38c52dd6ef6ddd60c936f49d694da267ae30fccf6dea1163a21529b'
+const secure_settings_build = 'd33d5e2cf55ee88b3176f0702b639292db78497f9418812880c2998a08c56fab'
+const secure_settings_jar = 'f7eef1e9b2a2a7730ce0b024823c9cc38dc1d510252dc6dccd30f1ada79f9768'
+const secure_settings_dex = 'c64944f0bf989cab180f6a41686fb897590c59f8e3ef7ba26f67440a1ac0d55c'
+const secure_settings_framework_helper = 'd4df92e7ca05be5859dc4de38aa89e03accd7dbebe968b3ac2969d1f92540e76'
+const secure_settings_provider_path = 'tests/native-android-tools/androidtools/framework_settings_secure.v'
+const secure_settings_provider_helper = 'dea6f0cdfeaaee7b717fa2a4d8602336e7af67e419ac9af17ab9dfd9756fb03c'
+const secure_settings_quick_provider_path = 'tests/native-android-tools/androidtools/framework_quick_settings.v'
+const secure_settings_quick_provider_helper = '87b5c5cb651d21ec0e4f356e924a2685971effe46db742b9359642b138092949'
+const secure_settings_raw = '2c8f8fb00e04f01c22c349319ba61d69059be983b4aaa91c9bd97b100cab9032'
+const secure_settings_canonical = '2fabe675a8e8cfc8c81907481c0a563d2645fc38998bee73e89bf31cbf049b05'
+const secure_settings_tile_raw = 'da380668dee963d39ddd449157f77bf3f6cd3d090f3dc9ba59fd030101c43956'
+const secure_settings_tile_canonical = '081ded9887866e7e10ecaaab066656068cee3743d5ece44e1363c9994f638f44'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -6279,6 +6299,147 @@ fn broadcast_permission_baseline(receipt map[string]json2.Any, stage Stage) !str
 	return broadcast_permission_base + '/boot.img'
 }
 
+fn secure_settings_profile() Profile {
+	mut modules := broadcast_permission_profile().modules.clone()
+	modules << 'maps-broadcast-permission.tar'
+	return Profile{'maps-secure-settings', secure_settings_boot, 'maps-secure-settings.tar', modules}
+}
+fn secure_settings_modules() map[string]string {
+	mut modules := broadcast_permission_modules()
+	modules['maps-broadcast-permission.tar'] = secure_settings_base_overlay
+	return modules
+}
+fn secure_settings_fields() map[string]string {
+	mut fields := broadcast_permission_fields()
+	fields['kind'] = 'vinix-maps-secure-settings-v1'
+	fields['base_root'] = secure_settings_base
+	fields['base_manifest_sha256'] = secure_settings_base_seal
+	fields['framework_build_root'] = secure_settings_framework
+	fields['framework_manifest_sha256'] = secure_settings_seal
+	fields['framework_jar_sha256'] = secure_settings_jar
+	fields['framework_dex_sha256'] = secure_settings_dex
+	fields['retained_framework_manifest_sha256'] = broadcast_permission_seal
+	fields['retained_native_manifest_sha256'] = broadcast_permission_native_seal
+	fields['retained_native_framework_manifest_sha256'] = broadcast_permission_seal
+	fields['native_consumed_headers_before_sha256'] = broadcast_permission_consumed_headers
+	return fields
+}
+fn secure_settings_inputs() map[string]string {
+	mut inputs := broadcast_permission_inputs()
+	inputs[secure_settings_base + '/sha256.json'] = secure_settings_base_seal
+	inputs[secure_settings_framework + '/sha256.json'] = secure_settings_seal
+	return inputs
+}
+fn secure_settings_known_delta() map[string]string {
+	return {'/' + service_query_jar_path: secure_settings_jar,
+		'/' + service_query_dex_path: secure_settings_dex,
+		'/' + service_query_headless + '/framework-build.json': secure_settings_build,
+		'/' + service_query_headless + '/framework-sha256.json': secure_settings_seal}
+}
+fn secure_settings_source_delta() map[string]string {
+	return {'smali/android/provider/Settings$Secure.smali': secure_settings_raw,
+		'smali/android/service/quicksettings/TileService.smali': secure_settings_tile_raw}
+}
+fn secure_settings_canonical_delta() map[string]string {
+	return {'new-dex/android/provider/Settings$Secure.smali': secure_settings_canonical,
+		'new-dex/android/service/quicksettings/TileService.smali': secure_settings_tile_canonical}
+}
+fn secure_settings_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework.v': secure_settings_framework_helper,
+		secure_settings_provider_path: secure_settings_provider_helper,
+		secure_settings_quick_provider_path: secure_settings_quick_provider_helper}
+}
+fn secure_settings_method_changes() map[string]int {
+	return {'android/provider/Settings$Secure.smali': 0}
+}
+fn secure_settings_method_additions() map[string]int {
+	return {'android/provider/Settings$Secure.smali': 1}
+}
+fn secure_settings_consumed_raw_delta() map[string][]string {
+	// The successor starts from canonical DEX text. These two raw-only changes
+	// preserve the complete canonical API consumed by the retained native build.
+	return {'smali/android/content/Context.smali': [broadcast_permission_source_delta()['smali/android/content/Context.smali']!, broadcast_permission_canonical_delta()['new-dex/android/content/Context.smali']!],
+		'smali/android/atl/ATLLoadedApp.smali': [broadcast_permission_source_delta()['smali/android/atl/ATLLoadedApp.smali']!, broadcast_permission_canonical_delta()['new-dex/android/atl/ATLLoadedApp.smali']!]}
+}
+fn secure_settings_proofs() map[string]string {
+	mut proofs := broadcast_permission_proofs()
+	proofs['headless_input_delta'] = json2.encode({'/' + service_query_jar_path: secure_settings_jar})
+	proofs['deployment_top_level_delta'] = json2.encode(['inputs_sha256', 'framework_manifest_sha256'])
+	proofs['framework_source_delta'] = json2.encode(secure_settings_source_delta())
+	proofs['framework_canonical_delta'] = json2.encode(secure_settings_canonical_delta())
+	proofs['framework_builder_helper_delta'] = json2.encode(secure_settings_helper_delta())
+	proofs['framework_class_count'] = json2.encode(2112)
+	proofs['framework_changed_method_counts'] = json2.encode(secure_settings_method_changes())
+	proofs['framework_added_method_counts'] = json2.encode(secure_settings_method_additions())
+	proofs['framework_added_fields'] = json2.encode(map[string][]string{})
+	proofs['framework_added_classes'] = json2.encode(['android/service/quicksettings/TileService.smali'])
+	proofs['native_builder_helper_delta'] = json2.encode(map[string]string{})
+	proofs['native_consumed_raw_delta'] = json2.encode(secure_settings_consumed_raw_delta())
+	proofs['native_consumed_canonical_delta'] = json2.encode(map[string][]string{})
+	return proofs
+}
+fn secure_settings_overlay_paths() []string { return keyguard_policy_overlay_paths() }
+fn verify_secure_settings_overlay(receipt map[string]json2.Any) ! {
+	for name in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		if name in receipt { return error('secure settings may only replace existing framework inputs') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('secure-settings deployment delta absent') }))!
+	mut expected := secure_settings_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('secure-settings headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == secure_settings_old_headless { return error('new secure-settings headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('secure-settings exact five deployment input changes differ') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('secure-settings overlay inventory absent') }))!
+	paths := secure_settings_overlay_paths()
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe secure-settings overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != 0o644 { return error('secure-settings regular allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected secure-settings overlay inode') }
+	}
+	if regulars.len != 6 || regulars[service_query_deployment] or { '' } == secure_settings_old_deployment { return error('exact six secure-settings files required') }
+	for path, pin in expected { if regulars[path.trim_left('/')] or { '' } != pin { return error('secure-settings input differs from inventory') } }
+}
+fn verify_secure_settings_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [secure_settings_base_seal, secure_settings_boot, secure_settings_base_overlay,
+		secure_settings_old_deployment, secure_settings_old_headless, secure_settings_seal,
+		secure_settings_build, secure_settings_jar, secure_settings_dex,
+		broadcast_permission_native_seal, broadcast_permission_native_build, broadcast_permission_native_pin,
+		broadcast_permission_seal, asset_locales_generated, asset_locales_c, asset_locales_bindings, broadcast_permission_consumed_headers] {
+		if !digest_valid(pin) { return error('completed secure-settings SDK and retained broadcast native producer required') }
+	}
+	for values in [secure_settings_source_delta(), secure_settings_canonical_delta(), secure_settings_helper_delta()] {
+		for path, pin in values { if !relative(path) || !digest_valid(pin) { return error('completed secure-settings class/helper pins required') } }
+	}
+	if secure_settings_seal == broadcast_permission_seal || secure_settings_jar == broadcast_permission_jar || secure_settings_dex == broadcast_permission_dex { return error('new secure-settings framework required') }
+	for name, expected in secure_settings_fields() { if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('secure-settings receipt differs: ' + name) } }
+	for name, expected in secure_settings_proofs() { if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](expected)! { return error('secure-settings proof differs: ' + name) } }
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 121 || seals != secure_settings_inputs() { return error('secure-settings exact one hundred twenty-one dependency seals differ') }
+	for path in stage.inputs_sha256.keys() {
+		for root in [dialog_theme_relink_root(), resources_float_relink_root(), layout_alignment_relink_root(), window_animations_relink_root()] {
+			if path == root || path.starts_with(root + '/') { return error('historical relink leaves are not new secure-settings direct inputs') }
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != secure_settings_modules() || stage.preserved_modules_sha256 != secure_settings_modules() { return error('secure-settings original fifty-one modules differ') }
+	verify_secure_settings_overlay(receipt)!
+}
+fn secure_settings_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_secure_settings_receipt(receipt, stage)!
+	path := secure_settings_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != secure_settings_base_seal { return error('secure-settings original broadcast-permission manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != secure_settings_boot || pins['maps-broadcast-permission.tar'] or { '' } != secure_settings_base_overlay { return error('secure-settings original boot or broadcast-permission overlay differs') }
+	return secure_settings_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -6933,6 +7094,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = keyguard_policy_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-broadcast-permission' {
 		baseline = broadcast_permission_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-secure-settings' {
+		baseline = secure_settings_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -13431,6 +13594,180 @@ fn broadcast_permission_profile_self_test() ! {
 	println('MAPS-BROADCAST-PERMISSION KERNEL-PROFILE-SELF-TEST PASS nine files eight input changes one hundred nineteen seals fifty inherited modules2111 classes two consumed deltas fresh coupled native current headless contract')
 }
 
+fn secure_settings_entries_fixture() []ServiceQueryEntry {
+	paths := secure_settings_overlay_paths()
+	mut parents := map[string]bool{}
+	for path in paths {
+		mut parent := os.dir(path)
+		for parent !in ['', '.'] { parents[parent] = true; parent = os.dir(parent) }
+	}
+	mut entries := []ServiceQueryEntry{}
+	for name in parents.keys().sorted() { entries << ServiceQueryEntry{name: name, kind: 'directory', mode: 0o755} }
+	mut pins := secure_settings_known_delta()
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	pins['/' + service_query_deployment] = 'b'.repeat(64)
+	for path in paths { entries << ServiceQueryEntry{name: path, kind: 'regular', mode: 0o644, sha256: pins['/' + path]!} }
+	return entries
+}
+fn secure_settings_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in secure_settings_fields() { receipt[name] = json2.Any(value) }
+	for name, value in secure_settings_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	mut delta := secure_settings_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(secure_settings_entries_fixture()))!
+	return receipt
+}
+fn secure_settings_profile_self_test() ! {
+	profile := secure_settings_profile()
+	if profile.baseline_sha != secure_settings_boot || profile.modules.len != 51 || profile.modules.last() != 'maps-broadcast-permission.tar'
+		|| secure_settings_inputs().len != 121 || secure_settings_inputs().keys().filter(it.ends_with('/sha256.json')).len != 121 { return error('secure-settings retained-native profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 52 || secure_settings_overlay_paths().len != 6 || secure_settings_known_delta().len != 4 { return error('secure-settings exact modules, files or changes differ') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', modules.reverse()}, Config{'vinix', profile.modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('wrong secure-settings module order accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: secure_settings_inputs(), original_modules_sha256: secure_settings_modules(), preserved_modules_sha256: secure_settings_modules()}
+	receipt := secure_settings_receipt_fixture()!
+	verify_secure_settings_receipt(receipt, stage)!
+	mut fields := secure_settings_fields().keys()
+	fields << secure_settings_proofs().keys()
+	fields << ['deployment_input_delta', 'overlay_inventory']
+	for name in fields {
+		mut bad := secure_settings_receipt_fixture()!
+		bad[name] = json2.Any('changed')
+		if _ := verify_secure_settings_receipt(bad, stage) { return error('changed secure-settings field/proof accepted') }
+		bad.delete(name)
+		if _ := verify_secure_settings_receipt(bad, stage) { return error('missing secure-settings field/proof accepted') }
+	}
+	for proof in ['framework_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta',
+		'framework_changed_method_counts', 'framework_added_method_counts', 'framework_added_fields',
+		'native_source_delta', 'native_builder_helper_delta', 'native_bindings_delta', 'native_generated_jni_delta',
+		'native_c_delta', 'native_consumed_header_additions', 'native_consumed_raw_delta', 'native_consumed_canonical_delta',
+		'native_consumed_raw_additions', 'native_consumed_canonical_additions', 'headless_input_delta'] {
+		original := json2.decode[map[string]json2.Any](json2.encode(receipt[proof]!))!
+		for name in original.keys() {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(original))!
+			changed[name] = json2.Any('changed')
+			mut bad := secure_settings_receipt_fixture()!
+			bad[proof] = json2.Any(changed)
+			if _ := verify_secure_settings_receipt(bad, stage) { return error('changed secure-settings proof member accepted') }
+			changed.delete(name)
+			bad[proof] = json2.Any(changed)
+			if _ := verify_secure_settings_receipt(bad, stage) { return error('missing secure-settings proof member accepted') }
+		}
+		mut extra := json2.decode[map[string]json2.Any](json2.encode(original))!
+		extra['unreviewed'] = json2.Any('a'.repeat(64))
+		mut bad := secure_settings_receipt_fixture()!
+		bad[proof] = json2.Any(extra)
+		if _ := verify_secure_settings_receipt(bad, stage) { return error('extra secure-settings proof member accepted') }
+	}
+	for added in [json2.encode([]string{}), json2.encode(['android/service/quicksettings/TileService.smali', 'android/service/quicksettings/Tile.smali']), json2.encode(['android/atl/VinixBroadcastPolicy.smali'])] {
+		mut bad := secure_settings_receipt_fixture()!
+		bad['framework_added_classes'] = json2.decode[json2.Any](added)!
+		if _ := verify_secure_settings_receipt(bad, stage) { return error('secure-settings added class accepted') }
+	}
+	for field, wrong in {'native_framework_manifest_sha256': asset_locales_seal,
+		'native_compatibility_framework_manifest_sha256': secure_settings_seal,
+		'retained_native_framework_manifest_sha256': asset_locales_seal,
+		'retained_framework_manifest_sha256': secure_settings_seal,
+		'retained_native_manifest_sha256': asset_locales_native_seal,
+		'native_manifest_sha256': asset_locales_native_seal,
+		'native_build_root': asset_locales_native,
+		'native_build_sha256': asset_locales_native_build,
+		'native_sha256': asset_locales_native_pin,
+		'native_consumed_headers_before_sha256': asset_locales_consumed_headers} {
+		mut bad := secure_settings_receipt_fixture()!
+		bad[field] = json2.Any(wrong)
+		if _ := verify_secure_settings_receipt(bad, stage) { return error('stale or relabeled retained native provenance accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := secure_settings_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_secure_settings_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed secure-settings input accepted') }
+		pins.delete(path)
+		if _ := verify_secure_settings_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing secure-settings input accepted') }
+	}
+	for path in ['/unreviewed/sha256.json', dialog_theme_relink_root(), resources_float_relink_root(),
+		layout_alignment_relink_root(), window_animations_relink_root(), dialog_theme_relink_root() + '/out/canonical.so'] {
+		mut pins := secure_settings_inputs()
+		pins[path] = 'a'.repeat(64)
+		if _ := verify_secure_settings_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('extra secure-settings seal or historical proof leaf accepted') }
+	}
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: broadcast_permission_modules()}, Stage{...stage, preserved_modules_sha256: broadcast_permission_modules()}] {
+		if _ := verify_secure_settings_receipt(receipt, bad) { return error('wrong secure-settings module inventory accepted') }
+	}
+	for addition in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		mut bad := secure_settings_receipt_fixture()!
+		bad[addition] = json2.Any(map[string]json2.Any{})
+		if _ := verify_secure_settings_receipt(bad, stage) { return error('secure-settings addition or relink proof accepted') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta']!))!
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := secure_settings_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_secure_settings_receipt(bad, stage) { return error('missing secure-settings actual input change accepted') }
+	}
+	mut wrong_delta := delta.clone()
+	wrong_delta['/' + native_onboarding_trace_path] = broadcast_permission_native_pin
+	mut wrong_native := secure_settings_receipt_fixture()!
+	wrong_native['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(wrong_delta))!
+	if _ := verify_secure_settings_receipt(wrong_native, stage) { return error('secure-settings native deployment replacement accepted') }
+	entries := secure_settings_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := secure_settings_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_secure_settings_receipt(bad, stage) { return error('unsafe secure-settings overlay inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := secure_settings_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_secure_settings_receipt(bad, stage) { return error('missing secure-settings overlay file accepted') }
+			if entry.name != service_query_deployment {
+				bad_entries = entries.clone()
+				bad_entries[index] = ServiceQueryEntry{...entry, sha256: '0'.repeat(64)}
+				bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+				if _ := verify_secure_settings_receipt(bad, stage) { return error('changed secure-settings overlay pin accepted') }
+			}
+		}
+	}
+	for extra in [entries.last(), ServiceQueryEntry{name: 'opt/unreviewed', kind: 'regular', mode: 0o644, sha256: 'a'.repeat(64)},
+		ServiceQueryEntry{name: native_onboarding_trace_path, kind: 'regular', mode: 0o755, sha256: broadcast_permission_native_pin}] {
+		mut changed := entries.clone()
+		changed << extra
+		mut bad := secure_settings_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_secure_settings_receipt(bad, stage) { return error('duplicate, native or unreviewed secure-settings overlay file accepted') }
+	}
+	for stale_path, stale_pin in {service_query_headless + '/guest-inputs.json': secure_settings_old_headless, service_query_deployment: secure_settings_old_deployment} {
+		mut changed := entries.clone()
+		for index, entry in changed { if entry.name == stale_path { changed[index] = ServiceQueryEntry{...entry, sha256: stale_pin} } }
+		mut bad := secure_settings_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if stale_path != service_query_deployment {
+			mut stale_delta := delta.clone()
+			stale_delta['/' + stale_path] = stale_pin
+			bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(stale_delta))!
+		}
+		if _ := verify_secure_settings_receipt(bad, stage) { return error('stale secure-settings metadata accepted') }
+	}
+	for old in [broadcast_permission_receipt_fixture()!, keyguard_policy_receipt_fixture()!, autofill_service_receipt_fixture()!, subscription_service_receipt_fixture()!, stats_unavailable_receipt_fixture()!] {
+		if _ := verify_secure_settings_receipt(old, stage) { return error('historical receipt accepted by secure-settings profile') }
+	}
+	if _ := verify_broadcast_permission_receipt(receipt, stage) { return error('secure-settings receipt accepted by broadcast-permission profile') }
+	println('MAPS-SECURE-SETTINGS KERNEL-PROFILE-SELF-TEST PASS six files one hundred twenty-one seals fifty-one inherited modules2112 classes secure setting write API28 TileService broadcast retained broadcast native')
+}
+
 fn resource_lock_entries_fixture() []ServiceQueryEntry {
 	paths := resource_lock_overlay_paths()
 	mut parents := map[string]bool{}
@@ -13635,6 +13972,7 @@ fn self_test() ! {
 	autofill_service_profile_self_test()!
 	keyguard_policy_profile_self_test()!
 	broadcast_permission_profile_self_test()!
+	secure_settings_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -13724,6 +14062,7 @@ fn self_test() ! {
 	fat_self_test(root + '/autofill-service', 'maps-autofill-service.tar', autofill_service_profile().modules)!
 	fat_self_test(root + '/keyguard-policy', 'maps-keyguard-policy.tar', keyguard_policy_profile().modules)!
 	fat_self_test(root + '/broadcast-permission', 'maps-broadcast-permission.tar', broadcast_permission_profile().modules)!
+	fat_self_test(root + '/secure-settings', 'maps-secure-settings.tar', secure_settings_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -13780,15 +14119,17 @@ fn main() {
 	is_autofill_service := os.args.len == 5 && os.args[1] == '--maps-autofill-service'
 	is_keyguard_policy := os.args.len == 5 && os.args[1] == '--maps-keyguard-policy'
 	is_broadcast_permission := os.args.len == 5 && os.args[1] == '--maps-broadcast-permission'
+	is_secure_settings := os.args.len == 5 && os.args[1] == '--maps-secure-settings'
 	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display || is_asset_locales || is_unmanaged_queries || is_stats_unavailable || is_subscription_service
-	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission {
+	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings {
+		eprintln('       patch-kernel --maps-secure-settings FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-broadcast-permission FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-keyguard-policy FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-autofill-service FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display|--maps-asset-locales|--maps-unmanaged-queries|--maps-stats-unavailable|--maps-subscription-service] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission { 1 } else { 0 }
+	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -13799,7 +14140,7 @@ fn main() {
 	}
 	profile := if is_seed_companion { seed_companion_profile() } else if is_broker_tail { broker_tail_profile() } else if is_window_system_ui { window_system_ui_profile() } else if is_imageview_bounds { imageview_bounds_profile() } else if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	selected_profile := if is_subscription_service { subscription_service_profile() } else if is_stats_unavailable { stats_unavailable_profile() } else if is_unmanaged_queries { unmanaged_queries_profile() } else if is_asset_locales { asset_locales_profile() } else if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
-	final_profile := if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
+	final_profile := if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
 	patch(root, build_root, os.args[3 + offset], final_profile) or {
 		eprintln(err)
 		exit(1)
