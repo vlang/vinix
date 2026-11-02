@@ -126,8 +126,9 @@ Actual admission evidence is
 `1e7093fdecf0d4bf80149bf90ed1391536c8ab4b38a76b40dde2e9b565db2959`;
 the complete log hashes to
 `22d4cd18dce00df6b3be4395c80ec901e12a1ad6b708a1f2af63819090c1b711`.
-Current and frozen admission source both hash to
+The initial admission executable used frozen source SHA-256
 `f92cdf3f889e248af9f67ac4947dc5e50a862b3e6bf0285bf1ad673b63d2af4b`.
-Complete image-tool qualification is pending and reported separately. ARM,
-live GMS/Maps behavior, authentication and imagery remain separate runtime
-checks.
+Its successful evidence remains preserved. Subsequent image-tool qualification
+tightens the new stager's startup reserve to 5 GiB; final source identity and
+fresh qualification results are reported separately. ARM, live GMS/Maps
+behavior, authentication and imagery remain separate runtime checks.
