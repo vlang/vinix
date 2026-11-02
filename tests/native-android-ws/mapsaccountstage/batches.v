@@ -8,40 +8,44 @@ type InventoryBatchAudit = fn (map[string]string) !
 // Each public image contract supplies its exact count. The private sixty-five
 // case exercises the boundary immediately above the unchanged helper limit.
 fn inventory_batch_plan(pins map[string]string, expected int) ![]map[string]string {
-	if expected !in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127] || pins.len != expected {
+	if expected !in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129] || pins.len != expected {
 		return error('exact bounded inventory batch count required')
 	}
 	mut roots := pins.keys()
 	roots.sort()
 	mut first := map[string]string{}
 	mut second := map[string]string{}
+	mut third := map[string]string{}
 	for index, root in roots {
 		if !os.is_abs_path(root) || os.norm_path(root) != root || root.contains_any('\\\x00\r\n\t')
 			|| !valid_pin(pins[root]!) { return error('canonical absolute inventory selector and exact pin required') }
 		if index < 64 {
 			first[root.clone()] = pins[root]!.clone()
-		} else {
+		} else if index < 128 {
 			second[root.clone()] = pins[root]!.clone()
+		} else {
+			third[root.clone()] = pins[root]!.clone()
 		}
 	}
-	if first.len != 64 || second.len != expected - 64 { return error('exact inventory batch partition required') }
+	if first.len != 64 || second.len != (if expected == 129 { 64 } else { expected - 64 })
+		|| third.len != (if expected == 129 { 1 } else { 0 }) { return error('exact inventory batch partition required') }
+	batches := if expected == 129 { [first, second, third] } else { [first, second] }
 	mut combined := map[string]string{}
-	for batch in [first, second] {
+	for batch in batches {
 		for root, pin in batch {
 			if root in combined { return error('inventory batches overlap') }
 			combined[root] = pin
 		}
 	}
 	if combined != pins { return error('complete inventory batch union differs') }
-	return [first, second]
+	return batches
 }
 
 fn audit_inventory_batches_with(pins map[string]string, expected int, audit InventoryBatchAudit) ! {
 	batches := inventory_batch_plan(pins, expected)!
 	// Each call joins every worker it started before returning. Do not spawn
-	// these calls: the second batch starts only after the first succeeds.
-	audit(batches[0])!
-	audit(batches[1])!
+	// these calls: every later batch starts only after its predecessor succeeds.
+	for batch in batches { audit(batch)! }
 }
 
 // Both image audit phases call this afresh. Every root and complete inventory
@@ -168,4 +172,9 @@ pub fn audit_one_hundred_twenty_five_inventories(pins map[string]string) ! {
 // The EventLog successor inherits all one hundred twenty-seven sealed roots.
 pub fn audit_one_hundred_twenty_seven_inventories(pins map[string]string) ! {
 	audit_inventory_batches_with(pins, 127, audit_inventories_parallel)!
+}
+
+// The Build ABI successor crosses the second helper boundary: 64 + 64 + 1.
+pub fn audit_one_hundred_twenty_nine_inventories(pins map[string]string) ! {
+	audit_inventory_batches_with(pins, 129, audit_inventories_parallel)!
 }

@@ -838,6 +838,25 @@ const event_log_provider_path = 'tests/native-android-tools/androidtools/framewo
 const event_log_provider_helper = 'a02d0d549d255bf47dd2ca95a0bf6b5ebb2251cc26fc79864ee02c18bdb38f42'
 const event_log_raw = '9e76d83faf7b556e96823ab97cabfec568e83ebaf1732163cebf93492b70dd28'
 const event_log_canonical = '914acd48f8b12fcbb54695f4497992f958a2658e6d34b93aabc032586b34093d'
+const build_abis_base = '/Users/alex/.local/state/vinix/android/maps-event-log-r1'
+const build_abis_base_seal = '04e6b12c1b1a2336c6103b611c36989b4b869551c8f14e2c8c43ed588b0d462f'
+const build_abis_boot = '922b70239f352901b56c5af54fbf01892b5847b89c6eaca5701fd2daec4a6f85'
+const build_abis_base_overlay = '2de692f19cc1c1c6a97c47e0375c4504beb8c98409b966470d624573a9158937'
+const build_abis_old_deployment = 'c295aa7f985316da6e062a25118cb9e2acdba6713bd46750a6ce20268b7baeec'
+const build_abis_old_headless = '83af89fd41b712909fdd808c79b3170b7eff57e5e10fcf52c2c364266803c2ed'
+// Complete Build ABI producer; original broadcast native remains retained.
+const build_abis_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-build-abis-framework-2026-11-02-r1'
+const build_abis_seal = '23c75e5be1445f177d7a6a801f907235d166b7a0f541c41bf0895f861bbed3e9'
+const build_abis_build = 'b6e2cda589eca9ffcea15da9bb6e863e7b84908006829550890530c900d4ff73'
+const build_abis_jar = '251753fdee85367880a9b0c48d1cb0058fd17a819e4651a8dc29f232673f531f'
+const build_abis_dex = 'f573bc91081977cc6fbeb2b5336962565bd9d057401254ccbbfa1c37ab1cb893'
+const build_abis_framework_helper = 'df41d9726f478e93dbe9edbe62518b85a9baec6dc66d2513562671197a3ab827'
+const build_abis_provider_path = 'tests/native-android-tools/androidtools/framework_build_abis.v'
+const build_abis_provider_helper = '44a6921633df56e14595d7f20d7de0d58eceae464cfb6a124e9131e74ab0ed16'
+const build_abis_raw = 'e85746ba3c04aea7e89785a58d34fe1c9e280b2254e791230992b62c8eb15d4c'
+const build_abis_canonical = 'e51084623eaee7ca5e819af699497d6ddb9f9a6ea585cc1b42140c9c79b47166'
+const build_abis_properties_raw = 'd35c268b48d8f078bc416f88f9ee37dbca1c972f139637d3c753483bf7b2a84a'
+const build_abis_properties_canonical = '2740259e2ff3260d0ab93dc040752b52b1daaae3c037b89e39ab2d35f6c85c34'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -7041,6 +7060,138 @@ fn event_log_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return event_log_base + '/boot.img'
 }
 
+fn build_abis_profile() Profile {
+	mut modules := event_log_profile().modules.clone()
+	modules << 'maps-event-log.tar'
+	return Profile{'maps-build-abis', build_abis_boot, 'maps-build-abis.tar', modules}
+}
+fn build_abis_modules() map[string]string {
+	mut modules := event_log_modules()
+	modules['maps-event-log.tar'] = build_abis_base_overlay
+	return modules
+}
+fn build_abis_fields() map[string]string {
+	mut fields := event_log_fields()
+	fields['kind'] = 'vinix-maps-build-abis-v1'
+	fields['base_root'] = build_abis_base
+	fields['base_manifest_sha256'] = build_abis_base_seal
+	fields['framework_build_root'] = build_abis_framework
+	fields['framework_manifest_sha256'] = build_abis_seal
+	fields['framework_jar_sha256'] = build_abis_jar
+	fields['framework_dex_sha256'] = build_abis_dex
+	fields['retained_framework_manifest_sha256'] = event_log_seal
+	return fields
+}
+fn build_abis_inputs() map[string]string {
+	mut inputs := event_log_inputs()
+	inputs[build_abis_base + '/sha256.json'] = build_abis_base_seal
+	inputs[build_abis_framework + '/sha256.json'] = build_abis_seal
+	return inputs
+}
+fn build_abis_known_delta() map[string]string {
+	return {'/' + service_query_jar_path: build_abis_jar,
+		'/' + service_query_dex_path: build_abis_dex,
+		'/' + service_query_headless + '/framework-build.json': build_abis_build,
+		'/' + service_query_headless + '/framework-sha256.json': build_abis_seal}
+}
+fn build_abis_source_delta() map[string]string {
+	return {'smali/android/os/Build.smali': build_abis_raw,
+		'smali/android/os/SystemProperties.smali': build_abis_properties_raw}
+}
+fn build_abis_canonical_delta() map[string]string {
+	return {'new-dex/android/os/Build.smali': build_abis_canonical,
+		'new-dex/android/os/SystemProperties.smali': build_abis_properties_canonical}
+}
+fn build_abis_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework.v': build_abis_framework_helper,
+		build_abis_provider_path: build_abis_provider_helper}
+}
+fn build_abis_method_changes() map[string]int {
+	return {'android/os/Build.smali': 1, 'android/os/SystemProperties.smali': 1}
+}
+fn build_abis_method_additions() map[string]int {
+	return {'android/os/Build.smali': 1, 'android/os/SystemProperties.smali': 0}
+}
+fn build_abis_field_additions() map[string][]string {
+	return {'android/os/Build.smali': ['.field public static final SUPPORTED_64_BIT_ABIS:[Ljava/lang/String;',
+		'.field public static final SUPPORTED_32_BIT_ABIS:[Ljava/lang/String;']}
+}
+fn build_abis_proofs() map[string]string {
+	mut proofs := event_log_proofs()
+	proofs['headless_input_delta'] = json2.encode({'/' + service_query_jar_path: build_abis_jar})
+	proofs['framework_source_delta'] = json2.encode(build_abis_source_delta())
+	proofs['framework_canonical_delta'] = json2.encode(build_abis_canonical_delta())
+	proofs['framework_builder_helper_delta'] = json2.encode(build_abis_helper_delta())
+	proofs['framework_class_count'] = json2.encode(2117)
+	proofs['framework_changed_method_counts'] = json2.encode(build_abis_method_changes())
+	proofs['framework_added_method_counts'] = json2.encode(build_abis_method_additions())
+	proofs['framework_added_fields'] = json2.encode(build_abis_field_additions())
+	proofs['framework_added_classes'] = json2.encode([]string{})
+	return proofs
+}
+fn build_abis_overlay_paths() []string { return event_log_overlay_paths() }
+fn verify_build_abis_overlay(receipt map[string]json2.Any) ! {
+	for name in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof',
+		'framework_removed_method_counts', 'framework_removed_fields'] {
+		if name in receipt { return error('Build ABI reporting may only apply its exact initializer API and replace existing framework inputs') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('build-abis deployment delta absent') }))!
+	mut expected := build_abis_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('build-abis headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == build_abis_old_headless { return error('new Build ABI headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('build-abis exact five deployment input changes differ') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('build-abis overlay inventory absent') }))!
+	paths := build_abis_overlay_paths()
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe build-abis overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != 0o644 { return error('build-abis regular allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected build-abis overlay inode') }
+	}
+	if regulars.len != 6 || regulars[service_query_deployment] or { '' } == build_abis_old_deployment { return error('exact six build-abis files required') }
+	for path, pin in expected { if regulars[path.trim_left('/')] or { '' } != pin { return error('build-abis input differs from inventory') } }
+}
+fn verify_build_abis_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [build_abis_base_seal, build_abis_boot, build_abis_base_overlay,
+		build_abis_old_deployment, build_abis_old_headless, build_abis_seal,
+		build_abis_build, build_abis_jar, build_abis_dex,
+		broadcast_permission_native_seal, broadcast_permission_native_build, broadcast_permission_native_pin,
+		broadcast_permission_seal, asset_locales_generated, asset_locales_c, asset_locales_bindings, broadcast_permission_consumed_headers] {
+		if !digest_valid(pin) { return error('completed Build ABI SDK and retained broadcast native producer required') }
+	}
+	for values in [build_abis_source_delta(), build_abis_canonical_delta(), build_abis_helper_delta()] {
+		for path, pin in values { if !relative(path) || !digest_valid(pin) { return error('completed Build ABI class/helper pins required') } }
+	}
+	if build_abis_seal == event_log_seal || build_abis_jar == event_log_jar || build_abis_dex == event_log_dex { return error('new Build ABI framework required') }
+	for name, expected in build_abis_fields() { if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('build-abis receipt differs: ' + name) } }
+	for name, expected in build_abis_proofs() { if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](expected)! { return error('build-abis proof differs: ' + name) } }
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 131 || seals != build_abis_inputs() { return error('build-abis exact one hundred thirty-one dependency seals differ') }
+	for path in stage.inputs_sha256.keys() {
+		for root in [dialog_theme_relink_root(), resources_float_relink_root(), layout_alignment_relink_root(), window_animations_relink_root()] {
+			if path == root || path.starts_with(root + '/') { return error('historical relink leaves are not new Build ABI direct inputs') }
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != build_abis_modules() || stage.preserved_modules_sha256 != build_abis_modules() { return error('build-abis original fifty-six modules differ') }
+	verify_build_abis_overlay(receipt)!
+}
+fn build_abis_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_build_abis_receipt(receipt, stage)!
+	path := build_abis_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != build_abis_base_seal { return error('build-abis original EventLog manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != build_abis_boot || pins['maps-event-log.tar'] or { '' } != build_abis_base_overlay { return error('build-abis original boot or EventLog overlay differs') }
+	return build_abis_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -7705,6 +7856,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = component_parcel_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-event-log' {
 		baseline = event_log_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-build-abis' {
+		baseline = build_abis_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -15087,6 +15240,185 @@ fn event_log_profile_self_test() ! {
 	println('MAPS-EVENT-LOG KERNEL-PROFILE-SELF-TEST PASS six files one hundred twenty-nine seals fifty-five inherited modules2117 classes EventLog-only retained broadcast native')
 }
 
+fn build_abis_entries_fixture() []ServiceQueryEntry {
+	paths := build_abis_overlay_paths()
+	mut parents := map[string]bool{}
+	for path in paths {
+		mut parent := os.dir(path)
+		for parent !in ['', '.'] { parents[parent] = true; parent = os.dir(parent) }
+	}
+	mut entries := []ServiceQueryEntry{}
+	for name in parents.keys().sorted() { entries << ServiceQueryEntry{name: name, kind: 'directory', mode: 0o755} }
+	mut pins := build_abis_known_delta()
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	pins['/' + service_query_deployment] = 'b'.repeat(64)
+	for path in paths { entries << ServiceQueryEntry{name: path, kind: 'regular', mode: 0o644, sha256: pins['/' + path]!} }
+	return entries
+}
+fn build_abis_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in build_abis_fields() { receipt[name] = json2.Any(value) }
+	for name, value in build_abis_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	mut delta := build_abis_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(build_abis_entries_fixture()))!
+	return receipt
+}
+fn build_abis_profile_self_test() ! {
+	profile := build_abis_profile()
+	if profile.baseline_sha != build_abis_boot || profile.modules.len != 56 || profile.modules.last() != 'maps-event-log.tar'
+		|| build_abis_inputs().len != 131 || build_abis_inputs().keys().filter(it.ends_with('/sha256.json')).len != 131 { return error('build-abis retained-native profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 57 || build_abis_overlay_paths().len != 6 || build_abis_known_delta().len != 4 { return error('build-abis exact modules, files or changes differ') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', modules.reverse()}, Config{'vinix', profile.modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('wrong build-abis module order accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: build_abis_inputs(), original_modules_sha256: build_abis_modules(), preserved_modules_sha256: build_abis_modules()}
+	receipt := build_abis_receipt_fixture()!
+	verify_build_abis_receipt(receipt, stage)!
+	mut fields := build_abis_fields().keys()
+	fields << build_abis_proofs().keys()
+	fields << ['deployment_input_delta', 'overlay_inventory']
+	for name in fields {
+		mut bad := build_abis_receipt_fixture()!
+		bad[name] = json2.Any('changed')
+		if _ := verify_build_abis_receipt(bad, stage) { return error('changed build-abis field/proof accepted') }
+		bad.delete(name)
+		if _ := verify_build_abis_receipt(bad, stage) { return error('missing build-abis field/proof accepted') }
+	}
+	for proof in ['framework_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta',
+		'framework_changed_method_counts', 'framework_added_method_counts', 'framework_added_fields',
+		'native_source_delta', 'native_builder_helper_delta', 'native_bindings_delta', 'native_generated_jni_delta',
+		'native_c_delta', 'native_consumed_header_additions', 'native_consumed_raw_delta', 'native_consumed_canonical_delta',
+		'native_consumed_raw_additions', 'native_consumed_canonical_additions', 'headless_input_delta'] {
+		original := json2.decode[map[string]json2.Any](json2.encode(receipt[proof]!))!
+		for name in original.keys() {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(original))!
+			changed[name] = json2.Any('changed')
+			mut bad := build_abis_receipt_fixture()!
+			bad[proof] = json2.Any(changed)
+			if _ := verify_build_abis_receipt(bad, stage) { return error('changed build-abis proof member accepted') }
+			changed.delete(name)
+			bad[proof] = json2.Any(changed)
+			if _ := verify_build_abis_receipt(bad, stage) { return error('missing build-abis proof member accepted') }
+		}
+		mut extra := json2.decode[map[string]json2.Any](json2.encode(original))!
+		extra['unreviewed'] = json2.Any('a'.repeat(64))
+		mut bad := build_abis_receipt_fixture()!
+		bad[proof] = json2.Any(extra)
+		if _ := verify_build_abis_receipt(bad, stage) { return error('extra build-abis proof member accepted') }
+	}
+	for added in [['android/os/Build.smali'], ['android/os/Build$VERSION.smali'], ['android/util/EventLog.smali']] {
+		mut bad := build_abis_receipt_fixture()!
+		bad['framework_added_classes'] = json2.decode[json2.Any](json2.encode(added))!
+		if _ := verify_build_abis_receipt(bad, stage) { return error('build-abis class addition accepted') }
+	}
+	for field, wrong in {'native_framework_manifest_sha256': event_log_seal,
+		'native_compatibility_framework_manifest_sha256': build_abis_seal,
+		'retained_native_framework_manifest_sha256': event_log_seal,
+		'retained_framework_manifest_sha256': component_parcel_seal,
+		'retained_native_manifest_sha256': asset_locales_native_seal,
+		'native_manifest_sha256': asset_locales_native_seal,
+		'native_build_root': asset_locales_native,
+		'native_build_sha256': asset_locales_native_build,
+		'native_sha256': asset_locales_native_pin,
+		'native_consumed_headers_before_sha256': asset_locales_consumed_headers} {
+		mut bad := build_abis_receipt_fixture()!
+		bad[field] = json2.Any(wrong)
+		if _ := verify_build_abis_receipt(bad, stage) { return error('stale or relabeled Build ABI native provenance accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := build_abis_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_build_abis_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed build-abis input accepted') }
+		pins.delete(path)
+		if _ := verify_build_abis_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing build-abis input accepted') }
+	}
+	for path in ['/unreviewed/sha256.json', dialog_theme_relink_root(), resources_float_relink_root(),
+		layout_alignment_relink_root(), window_animations_relink_root(), dialog_theme_relink_root() + '/out/canonical.so'] {
+		mut pins := build_abis_inputs()
+		pins[path] = 'a'.repeat(64)
+		if _ := verify_build_abis_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('extra build-abis seal or historical proof leaf accepted') }
+	}
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: event_log_modules()}, Stage{...stage, preserved_modules_sha256: event_log_modules()}] {
+		if _ := verify_build_abis_receipt(receipt, bad) { return error('wrong build-abis module inventory accepted') }
+	}
+	for addition in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof',
+		'framework_removed_method_counts', 'framework_removed_fields'] {
+		mut values := [json2.encode(map[string]string{})]
+		if historical := messenger_binder_proofs()[addition] { values << historical }
+		for value in values {
+			mut bad := build_abis_receipt_fixture()!
+			bad[addition] = json2.decode[json2.Any](value)!
+			if _ := verify_build_abis_receipt(bad, stage) { return error('build-abis addition, removal or relink proof accepted') }
+		}
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta']!))!
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := build_abis_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_build_abis_receipt(bad, stage) { return error('missing build-abis actual input change accepted') }
+	}
+	mut wrong_delta := delta.clone()
+	wrong_delta['/' + native_onboarding_trace_path] = broadcast_permission_native_pin
+	mut wrong_native := build_abis_receipt_fixture()!
+	wrong_native['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(wrong_delta))!
+	if _ := verify_build_abis_receipt(wrong_native, stage) { return error('build-abis native deployment replacement accepted') }
+	entries := build_abis_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := build_abis_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_build_abis_receipt(bad, stage) { return error('unsafe build-abis overlay inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := build_abis_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_build_abis_receipt(bad, stage) { return error('missing build-abis overlay file accepted') }
+			if entry.name != service_query_deployment {
+				bad_entries = entries.clone()
+				bad_entries[index] = ServiceQueryEntry{...entry, sha256: '0'.repeat(64)}
+				bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+				if _ := verify_build_abis_receipt(bad, stage) { return error('changed build-abis overlay pin accepted') }
+			}
+		}
+	}
+	for extra in [entries.last(), ServiceQueryEntry{name: 'opt/unreviewed', kind: 'regular', mode: 0o644, sha256: 'a'.repeat(64)},
+		ServiceQueryEntry{name: native_onboarding_trace_path, kind: 'regular', mode: 0o755, sha256: broadcast_permission_native_pin}] {
+		mut changed := entries.clone()
+		changed << extra
+		mut bad := build_abis_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_build_abis_receipt(bad, stage) { return error('duplicate, native or unreviewed build-abis overlay file accepted') }
+	}
+	for stale_path, stale_pin in {service_query_headless + '/guest-inputs.json': build_abis_old_headless, service_query_deployment: build_abis_old_deployment} {
+		mut changed := entries.clone()
+		for index, entry in changed { if entry.name == stale_path { changed[index] = ServiceQueryEntry{...entry, sha256: stale_pin} } }
+		mut bad := build_abis_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if stale_path != service_query_deployment {
+			mut stale_delta := delta.clone()
+			stale_delta['/' + stale_path] = stale_pin
+			bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(stale_delta))!
+		}
+		if _ := verify_build_abis_receipt(bad, stage) { return error('stale build-abis metadata accepted') }
+	}
+	for old in [event_log_receipt_fixture()!, component_parcel_receipt_fixture()!, messenger_binder_receipt_fixture()!, usage_inactive_receipt_fixture()!, secure_settings_receipt_fixture()!] {
+		if _ := verify_build_abis_receipt(old, stage) { return error('historical receipt accepted by build-abis profile') }
+	}
+	if _ := verify_event_log_receipt(receipt, stage) { return error('build-abis receipt accepted by EventLog profile') }
+	println('MAPS-BUILD-ABIS KERNEL-PROFILE-SELF-TEST PASS six files one hundred thirty-one seals fifty-six inherited modules2117 classes exact ARM ABI initializer delta retained broadcast native')
+}
+
 fn resource_lock_entries_fixture() []ServiceQueryEntry {
 	paths := resource_lock_overlay_paths()
 	mut parents := map[string]bool{}
@@ -15296,6 +15628,7 @@ fn self_test() ! {
 	messenger_binder_profile_self_test()!
 	component_parcel_profile_self_test()!
 	event_log_profile_self_test()!
+	build_abis_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -15390,6 +15723,7 @@ fn self_test() ! {
 	fat_self_test(root + '/messenger-binder', 'maps-messenger-binder.tar', messenger_binder_profile().modules)!
 	fat_self_test(root + '/component-parcel', 'maps-component-parcel.tar', component_parcel_profile().modules)!
 	fat_self_test(root + '/event-log', 'maps-event-log.tar', event_log_profile().modules)!
+	fat_self_test(root + '/build-abis', 'maps-build-abis.tar', build_abis_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -15451,8 +15785,10 @@ fn main() {
 	is_messenger_binder := os.args.len == 5 && os.args[1] == '--maps-messenger-binder'
 	is_component_parcel := os.args.len == 5 && os.args[1] == '--maps-component-parcel'
 	is_event_log := os.args.len == 5 && os.args[1] == '--maps-event-log'
+	is_build_abis := os.args.len == 5 && os.args[1] == '--maps-build-abis'
 	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display || is_asset_locales || is_unmanaged_queries || is_stats_unavailable || is_subscription_service
-	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings && !is_usage_inactive && !is_messenger_binder && !is_component_parcel && !is_event_log {
+	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings && !is_usage_inactive && !is_messenger_binder && !is_component_parcel && !is_event_log && !is_build_abis {
+		eprintln('       patch-kernel --maps-build-abis FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-event-log FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-component-parcel FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-messenger-binder FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
@@ -15464,7 +15800,7 @@ fn main() {
 		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display|--maps-asset-locales|--maps-unmanaged-queries|--maps-stats-unavailable|--maps-subscription-service] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings || is_usage_inactive || is_messenger_binder || is_component_parcel || is_event_log { 1 } else { 0 }
+	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings || is_usage_inactive || is_messenger_binder || is_component_parcel || is_event_log || is_build_abis { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -15475,7 +15811,7 @@ fn main() {
 	}
 	profile := if is_seed_companion { seed_companion_profile() } else if is_broker_tail { broker_tail_profile() } else if is_window_system_ui { window_system_ui_profile() } else if is_imageview_bounds { imageview_bounds_profile() } else if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	selected_profile := if is_subscription_service { subscription_service_profile() } else if is_stats_unavailable { stats_unavailable_profile() } else if is_unmanaged_queries { unmanaged_queries_profile() } else if is_asset_locales { asset_locales_profile() } else if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
-	final_profile := if is_event_log { event_log_profile() } else if is_component_parcel { component_parcel_profile() } else if is_messenger_binder { messenger_binder_profile() } else if is_usage_inactive { usage_inactive_profile() } else if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
+	final_profile := if is_build_abis { build_abis_profile() } else if is_event_log { event_log_profile() } else if is_component_parcel { component_parcel_profile() } else if is_messenger_binder { messenger_binder_profile() } else if is_usage_inactive { usage_inactive_profile() } else if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
 	patch(root, build_root, os.args[3 + offset], final_profile) or {
 		eprintln(err)
 		exit(1)
