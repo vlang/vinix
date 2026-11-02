@@ -44,7 +44,7 @@ fn batch_outcome(pins map[string]string, count int, audit InventoryBatchAudit, p
 }
 
 fn test_inventory_batch_plan_exact_boundaries_and_selectors() ! {
-	for count in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114] {
+	for count in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116] {
 		pins := batch_selectors(count)
 		before := pins.clone()
 		batches := inventory_batch_plan(pins, count)!
@@ -153,17 +153,22 @@ fn test_inventory_batch_plan_exact_boundaries_and_selectors() ! {
 		audit_one_hundred_twelve_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 113, 115] {
+	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 113, 115, 116] {
 		mut refused := false
 		audit_one_hundred_fourteen_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [64, 66, 69, 71, 95, 97, 99, 101, 102, 104, 105, 107, 109, 111, 113, 115] {
+	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 115, 117] {
+		mut refused := false
+		audit_one_hundred_sixteen_inventories(batch_selectors(count)) or { refused = true }
+		assert refused
+	}
+	for count in [64, 66, 69, 71, 95, 97, 99, 101, 102, 104, 105, 107, 109, 111, 113, 115, 117] {
 		mut refused := false
 		inventory_batch_plan(batch_selectors(count), count) or { refused = true }
 		assert refused
 	}
-	for count in [70, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114] {
+	for count in [70, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116] {
 		last := '/inventory/' + batch_index(count - 1)
 		for invalid_root in ['relative', '/inventory/../alias', '/inventory/trailing/', '/inventory/line\nfeed', '/inventory/back\\slash'] {
 			mut pins := batch_selectors(count)
@@ -314,15 +319,16 @@ fn batch_fixture_selector(root string, payload string) !string {
 	return digest(root + '/sha256.json')!
 }
 
-fn test_inventory_batches_real_65_70_73_76_79_82_84_86_89_91_94_96_98_100_103_106_108_110_112_and_114_inputs_repeat_all_bytes() ! {
-	for count in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114] {
+fn test_inventory_batches_real_65_70_73_76_79_82_84_86_89_91_94_96_98_100_103_106_108_110_112_114_and_116_inputs_repeat_all_bytes() ! {
+	for count in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116] {
 		root := batch_fixture_root('real-' + count.str())!
 		mut pins := map[string]string{}
 		for index := count - 1; index >= 0; index-- {
 			selected := root + '/node-' + batch_index(index)
 			pins[selected] = batch_fixture_selector(selected, batch_fixture_payload(index))!
 		}
-		if count == 114 { audit_one_hundred_fourteen_inventories(pins)! }
+		if count == 116 { audit_one_hundred_sixteen_inventories(pins)! }
+		else if count == 114 { audit_one_hundred_fourteen_inventories(pins)! }
 		else if count == 112 { audit_one_hundred_twelve_inventories(pins)! }
 		else if count == 110 { audit_one_hundred_ten_inventories(pins)! }
 		else if count == 108 { audit_one_hundred_eight_inventories(pins)! }
@@ -357,8 +363,8 @@ fn test_inventory_batches_real_65_70_73_76_79_82_84_86_89_91_94_96_98_100_103_10
 		assert second_failure.starts_with('inventory dependency ' + root + '/node-064: ')
 		assert second_failure.contains('nested/payload')
 		os.write_file(root + '/node-064/nested/payload', batch_fixture_payload(64))!
-		if count in [86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114] {
-			// Include every admitted overflow tail, through node-113 at 114 roots.
+		if count in [86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116] {
+			// Include every admitted overflow tail, through node-115 at 116 roots.
 			last := '/node-' + batch_index(count - 1)
 			os.write_file(root + last + '/nested/payload', 'changed final overflow root')!
 			mut tail_failure := ''

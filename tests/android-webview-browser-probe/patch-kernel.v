@@ -730,6 +730,27 @@ const keyguard_policy_provider_path = 'tests/native-android-tools/androidtools/f
 const keyguard_policy_provider_helper = 'ae7bae002ab11e9bde1f32a0ba4fd9482575d413a7ed582ca0eba77fad23734a'
 const keyguard_policy_raw = '2740ae5926de638c5becfb0f5cb1c13b7c724370514d14837004032ac0ddaa40'
 const keyguard_policy_canonical = '5f98acfca8319619f8c97d1d50d7ab90a68967acf438b9f532168a8eb4fc0317'
+const broadcast_permission_base = '/Users/alex/.local/state/vinix/android/maps-keyguard-policy-r1'
+const broadcast_permission_base_seal = '2732a540e40cb95b944eee58ee17c18dc5c20d4fa7909960c19a9d724c1576de'
+const broadcast_permission_boot = '1e909549a2359d88bd69e794b684cf58189791d0aee6358679273d3f05d15288'
+const broadcast_permission_base_overlay = '3874052359c898559bcecc634f58679ededae994653e48eaa94fd819b90ebe34'
+const broadcast_permission_old_deployment = '182f9638462e748bad8b480fec7a0cffcdcd0712c339b7806081e6a22a728083'
+const broadcast_permission_old_headless = 'c9150031dc170774ac2c4c1b53e904b9a627c227e8a3000237c3f99c15f6809c'
+const broadcast_permission_old_headless_native_build = 'ac77be848928c47ea5371a6f6532152d00c3ee8470e8f911d5748b61fa50c1f6'
+const broadcast_permission_old_headless_native_seal = '6619a4cd8dcc7e30aa43120494b874f230d1e9b8ee5c5b756e25fcf5e5148eae'
+const broadcast_permission_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-broadcast-permission-framework-2026-11-02-r1'
+const broadcast_permission_seal = '49daffbfa9dc1dcc598e453eaae3611df7702963aa5b659022545149af7132d5'
+const broadcast_permission_build = '6a23ffb21dce173d251dbfcaadd27a83e4b4f72fcea0b23e908798a5218d2a36'
+const broadcast_permission_jar = '9e998094f8e122c22195e0c9a8f79377dbf16cd04d321ab4d1a47650908082f9'
+const broadcast_permission_dex = '401f89971c21972cd97a6784665ebe0610eea08860f499e453507b68bbd4e1a5'
+const broadcast_permission_framework_helper = 'e1cfa8755302edc63c97dfc568cf9e73f82642017391649c5beaf919de5ad45b'
+const broadcast_permission_provider_path = 'tests/native-android-tools/androidtools/framework_broadcast_permission.v'
+const broadcast_permission_provider_helper = '85e9359270850af0c5725b819ceb023f0d214a04abdc600dc917930edeb2df46'
+const broadcast_permission_native = '/Users/alex/.local/state/vinix/android/current-native-build-2026-11-02-broadcast-permission-r1'
+const broadcast_permission_native_seal = 'e371c8d365b78493f9f9d660ceceb1cb2b1382eaa60cae06bcbe4aad0c6c233b'
+const broadcast_permission_native_build = '193944e2025385ae69641fa6fc4dc0da52123d508929748727d479be88628732'
+const broadcast_permission_native_pin = '29b2631c36a4a8c802e904e936c23e090fb2de3b5019ac93548df1b15de2a8f1'
+const broadcast_permission_consumed_headers = '7e36f5094960bb5608d4b537a800cfcaf23894ade36e90efc25cd742d6365764'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -6074,6 +6095,190 @@ fn keyguard_policy_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return keyguard_policy_base + '/boot.img'
 }
 
+fn broadcast_permission_profile() Profile {
+	mut modules := keyguard_policy_profile().modules.clone()
+	modules << 'maps-keyguard-policy.tar'
+	return Profile{'maps-broadcast-permission', broadcast_permission_boot, 'maps-broadcast-permission.tar', modules}
+}
+fn broadcast_permission_modules() map[string]string {
+	mut modules := keyguard_policy_modules()
+	modules['maps-keyguard-policy.tar'] = broadcast_permission_base_overlay
+	return modules
+}
+fn broadcast_permission_fields() map[string]string {
+	mut fields := keyguard_policy_fields()
+	fields['kind'] = 'vinix-maps-broadcast-permission-v1'
+	fields['base_root'] = broadcast_permission_base
+	fields['base_manifest_sha256'] = broadcast_permission_base_seal
+	fields['framework_build_root'] = broadcast_permission_framework
+	fields['framework_manifest_sha256'] = broadcast_permission_seal
+	fields['framework_jar_sha256'] = broadcast_permission_jar
+	fields['framework_dex_sha256'] = broadcast_permission_dex
+	fields['retained_framework_manifest_sha256'] = keyguard_policy_seal
+	fields['native_build_root'] = broadcast_permission_native
+	fields['native_manifest_sha256'] = broadcast_permission_native_seal
+	fields['native_build_sha256'] = broadcast_permission_native_build
+	fields['native_sha256'] = broadcast_permission_native_pin
+	fields['retained_native_manifest_sha256'] = asset_locales_native_seal
+	fields['native_framework_manifest_sha256'] = broadcast_permission_seal
+	fields['native_compatibility_framework_manifest_sha256'] = broadcast_permission_seal
+	fields['retained_native_framework_manifest_sha256'] = asset_locales_seal
+	fields['native_consumed_headers_before_sha256'] = asset_locales_consumed_headers
+	fields['native_consumed_headers_sha256'] = broadcast_permission_consumed_headers
+	return fields
+}
+fn broadcast_permission_inputs() map[string]string {
+	mut inputs := keyguard_policy_inputs()
+	inputs[broadcast_permission_base + '/sha256.json'] = broadcast_permission_base_seal
+	inputs[broadcast_permission_framework + '/sha256.json'] = broadcast_permission_seal
+	inputs[broadcast_permission_native + '/sha256.json'] = broadcast_permission_native_seal
+	return inputs
+}
+// The payload always carries the freshly produced DSO. This map records only
+// actual deployment hash changes if that producer happens to be byte-identical.
+fn broadcast_permission_known_delta() map[string]string {
+	mut delta := {'/' + service_query_jar_path: broadcast_permission_jar,
+		'/' + service_query_dex_path: broadcast_permission_dex,
+		'/' + service_query_headless + '/framework-build.json': broadcast_permission_build,
+		'/' + service_query_headless + '/framework-sha256.json': broadcast_permission_seal,
+		'/' + service_query_headless + '/native-build.json': broadcast_permission_native_build,
+		'/' + service_query_headless + '/native-sha256.json': broadcast_permission_native_seal}
+	if broadcast_permission_native_pin != asset_locales_native_pin { delta['/' + native_onboarding_trace_path] = broadcast_permission_native_pin }
+	return delta
+}
+fn broadcast_permission_source_delta() map[string]string {
+	return {'smali/android/content/Context.smali': '3819dd399a1ac9e8fba32ada045cc250f670f4fa012d765126ded7d1acbba0e8',
+		'smali/android/atl/ATLLoadedApp.smali': '3e133e9cf9a3a2271bfef87917f2060c14b40a550dfb6f760c5b4278580b729f',
+		'smali/android/atl/VinixBroadcastPolicy.smali': 'e031d2f31dce873931315259e64d7dd521b0cd50dd1f7b3f6a933283d965fd90'}
+}
+fn broadcast_permission_canonical_delta() map[string]string {
+	return {'new-dex/android/content/Context.smali': '60fdbab8aef10711d65afa9a0ddf5e64369ae21e0f9010291288109ebc305ab5',
+		'new-dex/android/atl/ATLLoadedApp.smali': '6e8d9800711ae17e8b8a86de267590c2bb702d7d6fe8db870c57e6a599e5b0bd',
+		'new-dex/android/atl/VinixBroadcastPolicy.smali': '38e186faf379d2188d8eb398aea356102badfbe676350bcf21b1d0e38847ebad'}
+}
+fn broadcast_permission_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework.v': broadcast_permission_framework_helper,
+		broadcast_permission_provider_path: broadcast_permission_provider_helper}
+}
+fn broadcast_permission_native_helper_delta() map[string]string {
+	prefix := os.getwd() + '/tests/native-android-tools/androidtools/'
+	return {prefix + 'framework.v': broadcast_permission_framework_helper,
+		prefix + 'framework_autofill.v': autofill_service_integration_helper,
+		prefix + 'framework_autofill_service.v': autofill_service_provider_helper,
+		prefix + 'framework_broadcast_permission.v': broadcast_permission_provider_helper,
+		prefix + 'framework_keyguard_policy.v': keyguard_policy_provider_helper,
+		prefix + 'framework_stats_service.v': stats_unavailable_provider_helper,
+		prefix + 'framework_subscription_service.v': subscription_service_provider_helper,
+		prefix + 'framework_unmanaged_queries.v': unmanaged_queries_provider_helper}
+}
+fn broadcast_permission_method_changes() map[string]int {
+	return {'android/content/Context.smali': 0, 'android/atl/ATLLoadedApp.smali': 1}
+}
+fn broadcast_permission_method_additions() map[string]int {
+	return {'android/content/Context.smali': 1, 'android/atl/ATLLoadedApp.smali': 1}
+}
+fn broadcast_permission_field_additions() map[string][]string {
+	return {'android/atl/ATLLoadedApp.smali': ['.field private final vinixBroadcastPermissions:Ljava/util/Set;']}
+}
+fn broadcast_permission_consumed_raw_delta() map[string][]string {
+	return {'smali/android/content/Context.smali': ['9f030b8aef9e34edea092354c4aa1a89a841b4a91297db03272c9faf997ad00a', broadcast_permission_source_delta()['smali/android/content/Context.smali']!],
+		'smali/android/atl/ATLLoadedApp.smali': ['330603b4223bb8e8d6f1b357b1bd8a954cffcacedcd31e464a6148139822606b', broadcast_permission_source_delta()['smali/android/atl/ATLLoadedApp.smali']!]}
+}
+fn broadcast_permission_consumed_canonical_delta() map[string][]string {
+	return {'android/content/Context.smali': ['9f030b8aef9e34edea092354c4aa1a89a841b4a91297db03272c9faf997ad00a', broadcast_permission_canonical_delta()['new-dex/android/content/Context.smali']!],
+		'android/atl/ATLLoadedApp.smali': ['330603b4223bb8e8d6f1b357b1bd8a954cffcacedcd31e464a6148139822606b', broadcast_permission_canonical_delta()['new-dex/android/atl/ATLLoadedApp.smali']!]}
+}
+fn broadcast_permission_proofs() map[string]string {
+	mut proofs := keyguard_policy_proofs()
+	proofs['headless_input_delta'] = json2.encode({'/' + service_query_jar_path: broadcast_permission_jar, '/' + native_onboarding_trace_path: broadcast_permission_native_pin})
+	proofs['deployment_top_level_delta'] = json2.encode(['inputs_sha256', 'framework_manifest_sha256', 'native_manifest_sha256'])
+	proofs['framework_source_delta'] = json2.encode(broadcast_permission_source_delta())
+	proofs['framework_canonical_delta'] = json2.encode(broadcast_permission_canonical_delta())
+	proofs['framework_builder_helper_delta'] = json2.encode(broadcast_permission_helper_delta())
+	proofs['framework_class_count'] = json2.encode(2111)
+	proofs['framework_changed_method_counts'] = json2.encode(broadcast_permission_method_changes())
+	proofs['framework_added_method_counts'] = json2.encode(broadcast_permission_method_additions())
+	proofs['framework_added_fields'] = json2.encode(broadcast_permission_field_additions())
+	proofs['framework_added_classes'] = json2.encode(['android/atl/VinixBroadcastPolicy.smali'])
+	proofs['native_builder_helper_delta'] = json2.encode(broadcast_permission_native_helper_delta())
+	proofs['native_consumed_raw_delta'] = json2.encode(broadcast_permission_consumed_raw_delta())
+	proofs['native_consumed_canonical_delta'] = json2.encode(broadcast_permission_consumed_canonical_delta())
+	return proofs
+}
+fn broadcast_permission_overlay_paths() []string {
+	mut paths := keyguard_policy_overlay_paths()
+	paths << [native_onboarding_trace_path, service_query_headless + '/native-build.json', service_query_headless + '/native-sha256.json']
+	return paths
+}
+fn verify_broadcast_permission_overlay(receipt map[string]json2.Any) ! {
+	for name in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		if name in receipt { return error('broadcast permission may only replace existing framework/native inputs') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('broadcast-permission deployment delta absent') }))!
+	mut expected := broadcast_permission_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('broadcast-permission headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == broadcast_permission_old_headless { return error('new broadcast-permission headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('broadcast-permission exact framework/native deployment changes differ') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('broadcast-permission overlay inventory absent') }))!
+	paths := broadcast_permission_overlay_paths()
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe broadcast-permission overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			mode := if entry.name == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != mode { return error('broadcast-permission regular allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected broadcast-permission overlay inode') }
+	}
+	if regulars.len != 9 || regulars[service_query_deployment] or { '' } == broadcast_permission_old_deployment { return error('exact nine broadcast-permission files required') }
+	if regulars[native_onboarding_trace_path] or { '' } != broadcast_permission_native_pin { return error('payload must carry the fresh coupled native DSO') }
+	for path, pin in expected { if regulars[path.trim_left('/')] or { '' } != pin { return error('broadcast-permission input differs from inventory') } }
+}
+fn verify_broadcast_permission_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [broadcast_permission_base_seal, broadcast_permission_boot, broadcast_permission_base_overlay,
+		broadcast_permission_old_deployment, broadcast_permission_old_headless, broadcast_permission_old_headless_native_build,
+		broadcast_permission_old_headless_native_seal, broadcast_permission_seal, broadcast_permission_build,
+		broadcast_permission_jar, broadcast_permission_dex, broadcast_permission_native_seal, broadcast_permission_native_build,
+		broadcast_permission_native_pin, broadcast_permission_consumed_headers, asset_locales_consumed_headers] {
+		if !digest_valid(pin) { return error('completed broadcast-permission SDK and fresh coupled native producer required') }
+	}
+	for values in [broadcast_permission_source_delta(), broadcast_permission_canonical_delta(), broadcast_permission_helper_delta()] {
+		for path, pin in values { if !relative(path) || !digest_valid(pin) { return error('completed broadcast-permission class/helper pins required') } }
+	}
+	for path, pin in broadcast_permission_native_helper_delta() {
+		if !os.is_abs_path(path) || os.norm_path(path) != path || !digest_valid(pin) { return error('frozen complete native builder helper delta required') }
+	}
+	if broadcast_permission_seal == keyguard_policy_seal || broadcast_permission_native == asset_locales_native
+		|| broadcast_permission_native_seal == asset_locales_native_seal || broadcast_permission_native_build == asset_locales_native_build {
+		return error('fresh broadcast-permission SDK and distinct directly coupled native producer required')
+	}
+	for name, expected in broadcast_permission_fields() { if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('broadcast-permission receipt differs: ' + name) } }
+	for name, expected in broadcast_permission_proofs() { if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](expected)! { return error('broadcast-permission proof differs: ' + name) } }
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 119 || seals != broadcast_permission_inputs() { return error('broadcast-permission exact one hundred nineteen dependency seals differ') }
+	for path in stage.inputs_sha256.keys() {
+		for root in [dialog_theme_relink_root(), resources_float_relink_root(), layout_alignment_relink_root(), window_animations_relink_root()] {
+			if path == root || path.starts_with(root + '/') { return error('historical relink leaves are not new broadcast-permission direct inputs') }
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != broadcast_permission_modules() || stage.preserved_modules_sha256 != broadcast_permission_modules() { return error('broadcast-permission original fifty modules differ') }
+	verify_broadcast_permission_overlay(receipt)!
+}
+fn broadcast_permission_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_broadcast_permission_receipt(receipt, stage)!
+	path := broadcast_permission_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != broadcast_permission_base_seal { return error('broadcast-permission original keyguard-policy manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != broadcast_permission_boot || pins['maps-keyguard-policy.tar'] or { '' } != broadcast_permission_base_overlay { return error('broadcast-permission original boot or keyguard-policy overlay differs') }
+	return broadcast_permission_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -6726,6 +6931,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = autofill_service_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-keyguard-policy' {
 		baseline = keyguard_policy_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-broadcast-permission' {
+		baseline = broadcast_permission_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -13032,6 +13239,198 @@ fn keyguard_policy_profile_self_test() ! {
 	println('MAPS-KEYGUARD-POLICY KERNEL-PROFILE-SELF-TEST PASS six files one hundred sixteen seals forty-nine inherited modules2110 classes one absent-policy query unchanged locale native')
 }
 
+fn broadcast_permission_entries_fixture() []ServiceQueryEntry {
+	paths := broadcast_permission_overlay_paths()
+	mut parents := map[string]bool{}
+	for path in paths {
+		mut parent := os.dir(path)
+		for parent !in ['', '.'] { parents[parent] = true; parent = os.dir(parent) }
+	}
+	mut entries := []ServiceQueryEntry{}
+	for name in parents.keys().sorted() { entries << ServiceQueryEntry{name: name, kind: 'directory', mode: 0o755} }
+	mut pins := broadcast_permission_known_delta()
+	pins['/' + native_onboarding_trace_path] = broadcast_permission_native_pin
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	pins['/' + service_query_deployment] = 'b'.repeat(64)
+	for path in paths {
+		mode := if path == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }
+		entries << ServiceQueryEntry{name: path, kind: 'regular', mode: mode, sha256: pins['/' + path]!}
+	}
+	return entries
+}
+fn broadcast_permission_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in broadcast_permission_fields() { receipt[name] = json2.Any(value) }
+	for name, value in broadcast_permission_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	mut delta := broadcast_permission_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(broadcast_permission_entries_fixture()))!
+	return receipt
+}
+fn broadcast_permission_profile_self_test() ! {
+	profile := broadcast_permission_profile()
+	if profile.baseline_sha != broadcast_permission_boot || profile.modules.len != 50 || profile.modules.last() != 'maps-keyguard-policy.tar'
+		|| broadcast_permission_inputs().len != 119 || broadcast_permission_inputs().keys().filter(it.ends_with('/sha256.json')).len != 119 { return error('broadcast-permission fresh-coupled profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 51 || broadcast_permission_overlay_paths().len != 9 || broadcast_permission_known_delta().len != 7 { return error('broadcast-permission exact modules, files or actual changes differ') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', modules.reverse()}, Config{'vinix', profile.modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('wrong broadcast-permission module order accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: broadcast_permission_inputs(), original_modules_sha256: broadcast_permission_modules(), preserved_modules_sha256: broadcast_permission_modules()}
+	receipt := broadcast_permission_receipt_fixture()!
+	verify_broadcast_permission_receipt(receipt, stage)!
+	mut fields := broadcast_permission_fields().keys()
+	fields << broadcast_permission_proofs().keys()
+	fields << ['deployment_input_delta', 'overlay_inventory']
+	for name in fields {
+		mut bad := broadcast_permission_receipt_fixture()!
+		bad[name] = json2.Any('changed')
+		if _ := verify_broadcast_permission_receipt(bad, stage) { return error('changed broadcast-permission field/proof accepted') }
+		bad.delete(name)
+		if _ := verify_broadcast_permission_receipt(bad, stage) { return error('missing broadcast-permission field/proof accepted') }
+	}
+	for proof in ['framework_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta',
+		'framework_changed_method_counts', 'framework_added_method_counts', 'framework_added_fields',
+		'native_source_delta', 'native_builder_helper_delta', 'native_bindings_delta', 'native_generated_jni_delta',
+		'native_c_delta', 'native_consumed_header_additions', 'native_consumed_raw_delta', 'native_consumed_canonical_delta',
+		'native_consumed_raw_additions', 'native_consumed_canonical_additions', 'headless_input_delta'] {
+		original := json2.decode[map[string]json2.Any](json2.encode(receipt[proof]!))!
+		for name in original.keys() {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(original))!
+			changed[name] = json2.Any('changed')
+			mut bad := broadcast_permission_receipt_fixture()!
+			bad[proof] = json2.Any(changed)
+			if _ := verify_broadcast_permission_receipt(bad, stage) { return error('changed broadcast-permission proof member accepted') }
+			changed.delete(name)
+			bad[proof] = json2.Any(changed)
+			if _ := verify_broadcast_permission_receipt(bad, stage) { return error('missing broadcast-permission proof member accepted') }
+		}
+		mut extra := json2.decode[map[string]json2.Any](json2.encode(original))!
+		extra['unreviewed'] = json2.Any('a'.repeat(64))
+		mut bad := broadcast_permission_receipt_fixture()!
+		bad[proof] = json2.Any(extra)
+		if _ := verify_broadcast_permission_receipt(bad, stage) { return error('extra broadcast-permission proof member accepted') }
+	}
+	for proof in ['native_consumed_raw_delta', 'native_consumed_canonical_delta'] {
+		original := json2.decode[map[string][]string](json2.encode(receipt[proof]!))!
+		if original.len != 2 { return error('exact two native-consumed class changes required') }
+		for name, pair in original {
+			if pair.len != 2 || pair[0] == pair[1] { return error('native-consumed class change must be a nonempty pair') }
+			for index in 0 .. 2 {
+				mut changed := json2.decode[map[string][]string](json2.encode(original))!
+				mut altered := pair.clone()
+				altered[index] = '0'.repeat(64)
+				changed[name] = altered
+				mut bad := broadcast_permission_receipt_fixture()!
+				bad[proof] = json2.decode[json2.Any](json2.encode(changed))!
+				if _ := verify_broadcast_permission_receipt(bad, stage) { return error('changed consumed raw/canonical pair accepted') }
+			}
+		}
+	}
+	for added in [json2.encode([]string{}), json2.encode(['android/atl/VinixBroadcastPolicy.smali', 'android/atl/Unreviewed.smali'])] {
+		mut bad := broadcast_permission_receipt_fixture()!
+		bad['framework_added_classes'] = json2.decode[json2.Any](added)!
+		if _ := verify_broadcast_permission_receipt(bad, stage) { return error('wrong broadcast-permission utility class membership accepted') }
+	}
+	for field, wrong in {'native_framework_manifest_sha256': asset_locales_seal,
+		'native_compatibility_framework_manifest_sha256': asset_locales_seal,
+		'retained_native_framework_manifest_sha256': broadcast_permission_seal,
+		'retained_framework_manifest_sha256': broadcast_permission_seal,
+		'retained_native_manifest_sha256': broadcast_permission_native_seal,
+		'native_manifest_sha256': asset_locales_native_seal,
+		'native_build_root': asset_locales_native,
+		'native_build_sha256': asset_locales_native_build,
+		'native_sha256': asset_locales_native_pin,
+		'native_consumed_headers_sha256': asset_locales_consumed_headers} {
+		mut bad := broadcast_permission_receipt_fixture()!
+		bad[field] = json2.Any(wrong)
+		if _ := verify_broadcast_permission_receipt(bad, stage) { return error('stale or relabeled native producer provenance accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := broadcast_permission_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_broadcast_permission_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed broadcast-permission input accepted') }
+		pins.delete(path)
+		if _ := verify_broadcast_permission_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing broadcast-permission input accepted') }
+	}
+	for path in ['/unreviewed/sha256.json', dialog_theme_relink_root(), resources_float_relink_root(),
+		layout_alignment_relink_root(), window_animations_relink_root(), dialog_theme_relink_root() + '/out/canonical.so'] {
+		mut pins := broadcast_permission_inputs()
+		pins[path] = 'a'.repeat(64)
+		if _ := verify_broadcast_permission_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('extra broadcast-permission seal or historical proof leaf accepted') }
+	}
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: keyguard_policy_modules()}, Stage{...stage, preserved_modules_sha256: keyguard_policy_modules()}] {
+		if _ := verify_broadcast_permission_receipt(receipt, bad) { return error('wrong broadcast-permission module inventory accepted') }
+	}
+	for addition in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		mut bad := broadcast_permission_receipt_fixture()!
+		bad[addition] = json2.Any(map[string]json2.Any{})
+		if _ := verify_broadcast_permission_receipt(bad, stage) { return error('broadcast-permission addition or relink proof accepted') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta']!))!
+	if delta.len != 8 { return error('exact eight broadcast-permission deployment input changes required') }
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := broadcast_permission_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_broadcast_permission_receipt(bad, stage) { return error('missing broadcast-permission actual input change accepted') }
+	}
+	entries := broadcast_permission_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := broadcast_permission_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_broadcast_permission_receipt(bad, stage) { return error('unsafe broadcast-permission overlay inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := broadcast_permission_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_broadcast_permission_receipt(bad, stage) { return error('missing broadcast-permission overlay file accepted') }
+			if entry.name != service_query_deployment {
+				bad_entries = entries.clone()
+				bad_entries[index] = ServiceQueryEntry{...entry, sha256: '0'.repeat(64)}
+				bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+				if _ := verify_broadcast_permission_receipt(bad, stage) { return error('changed broadcast-permission overlay pin accepted') }
+			}
+		}
+	}
+	for extra in [entries.last(), ServiceQueryEntry{name: 'opt/unreviewed', kind: 'regular', mode: 0o644, sha256: 'a'.repeat(64)}] {
+		mut changed := entries.clone()
+		changed << extra
+		mut bad := broadcast_permission_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_broadcast_permission_receipt(bad, stage) { return error('duplicate or unreviewed broadcast-permission overlay file accepted') }
+	}
+	for stale_path, stale_pin in {service_query_headless + '/guest-inputs.json': broadcast_permission_old_headless,
+		service_query_headless + '/native-build.json': broadcast_permission_old_headless_native_build,
+		service_query_headless + '/native-sha256.json': broadcast_permission_old_headless_native_seal,
+		native_onboarding_trace_path: asset_locales_native_pin, service_query_deployment: broadcast_permission_old_deployment} {
+		mut changed := entries.clone()
+		for index, entry in changed { if entry.name == stale_path { changed[index] = ServiceQueryEntry{...entry, sha256: stale_pin} } }
+		mut bad := broadcast_permission_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if stale_path != service_query_deployment {
+			mut stale_delta := delta.clone()
+			stale_delta['/' + stale_path] = stale_pin
+			bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(stale_delta))!
+		}
+		if _ := verify_broadcast_permission_receipt(bad, stage) { return error('stale headless/native deployment metadata accepted') }
+	}
+	for old in [keyguard_policy_receipt_fixture()!, autofill_service_receipt_fixture()!, subscription_service_receipt_fixture()!, stats_unavailable_receipt_fixture()!, asset_locales_receipt_fixture()!] {
+		if _ := verify_broadcast_permission_receipt(old, stage) { return error('historical receipt accepted by broadcast-permission profile') }
+	}
+	if _ := verify_keyguard_policy_receipt(receipt, stage) { return error('broadcast-permission receipt accepted by keyguard-policy profile') }
+	println('MAPS-BROADCAST-PERMISSION KERNEL-PROFILE-SELF-TEST PASS nine files eight input changes one hundred nineteen seals fifty inherited modules2111 classes two consumed deltas fresh coupled native current headless contract')
+}
+
 fn resource_lock_entries_fixture() []ServiceQueryEntry {
 	paths := resource_lock_overlay_paths()
 	mut parents := map[string]bool{}
@@ -13235,6 +13634,7 @@ fn self_test() ! {
 	subscription_service_profile_self_test()!
 	autofill_service_profile_self_test()!
 	keyguard_policy_profile_self_test()!
+	broadcast_permission_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -13323,6 +13723,7 @@ fn self_test() ! {
 	fat_self_test(root + '/subscription-service', 'maps-subscription-service.tar', subscription_service_profile().modules)!
 	fat_self_test(root + '/autofill-service', 'maps-autofill-service.tar', autofill_service_profile().modules)!
 	fat_self_test(root + '/keyguard-policy', 'maps-keyguard-policy.tar', keyguard_policy_profile().modules)!
+	fat_self_test(root + '/broadcast-permission', 'maps-broadcast-permission.tar', broadcast_permission_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -13378,14 +13779,16 @@ fn main() {
 	is_subscription_service := os.args.len == 5 && os.args[1] == '--maps-subscription-service'
 	is_autofill_service := os.args.len == 5 && os.args[1] == '--maps-autofill-service'
 	is_keyguard_policy := os.args.len == 5 && os.args[1] == '--maps-keyguard-policy'
+	is_broadcast_permission := os.args.len == 5 && os.args[1] == '--maps-broadcast-permission'
 	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display || is_asset_locales || is_unmanaged_queries || is_stats_unavailable || is_subscription_service
-	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy {
+	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission {
+		eprintln('       patch-kernel --maps-broadcast-permission FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-keyguard-policy FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-autofill-service FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display|--maps-asset-locales|--maps-unmanaged-queries|--maps-stats-unavailable|--maps-subscription-service] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_selected || is_autofill_service || is_keyguard_policy { 1 } else { 0 }
+	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -13396,7 +13799,7 @@ fn main() {
 	}
 	profile := if is_seed_companion { seed_companion_profile() } else if is_broker_tail { broker_tail_profile() } else if is_window_system_ui { window_system_ui_profile() } else if is_imageview_bounds { imageview_bounds_profile() } else if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	selected_profile := if is_subscription_service { subscription_service_profile() } else if is_stats_unavailable { stats_unavailable_profile() } else if is_unmanaged_queries { unmanaged_queries_profile() } else if is_asset_locales { asset_locales_profile() } else if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
-	final_profile := if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
+	final_profile := if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
 	patch(root, build_root, os.args[3 + offset], final_profile) or {
 		eprintln(err)
 		exit(1)
