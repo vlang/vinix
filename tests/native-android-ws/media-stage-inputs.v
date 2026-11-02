@@ -25,7 +25,7 @@ fn headers(directory string, mut selected map[string]bool) ! {
 	}
 }
 fn run(profile string, project string, sources string, root string) ! {
-	if profile !in ['stager', 'patcher', 'persistent-stager', 'bitmap-stager', 'window-stager', 'layout-stager', 'restrictions-stager', 'bundle-cross-profile-stager', 'resources-float-stager', 'paint-drawable-stager', 'dialog-theme-stager', 'intent-extras-stager', 'resource-lock-stager', 'pending-intent-stager', 'stable-display-stager', 'asset-locales-stager', 'unmanaged-queries-stager', 'stats-unavailable-stager'] { return error('literal media discovery profile required') }
+	if profile !in ['stager', 'patcher', 'persistent-stager', 'bitmap-stager', 'window-stager', 'layout-stager', 'restrictions-stager', 'bundle-cross-profile-stager', 'resources-float-stager', 'paint-drawable-stager', 'dialog-theme-stager', 'intent-extras-stager', 'resource-lock-stager', 'pending-intent-stager', 'stable-display-stager', 'asset-locales-stager', 'unmanaged-queries-stager', 'stats-unavailable-stager', 'subscription-service-stager'] { return error('literal media discovery profile required') }
 	if os.real_path(project) != project || !os.is_dir(project) || os.real_path(sources) != sources || !os.is_dir(sources)
 		|| os.exists(root) || os.is_link(root) || os.real_path(os.dir(root)) != os.dir(root) { return error('canonical project/frozen sources and fresh discovery output required') }
 	main_relative := match profile {
@@ -46,6 +46,7 @@ fn run(profile string, project string, sources string, root string) ! {
 		'asset-locales-stager' { '/tests/native-android-ws/maps-asset-locales-stage.v' }
 		'unmanaged-queries-stager' { '/tests/native-android-ws/maps-unmanaged-queries-stage.v' }
 		'stats-unavailable-stager' { '/tests/native-android-ws/maps-stats-unavailable-stage.v' }
+		'subscription-service-stager' { '/tests/native-android-ws/maps-subscription-service-stage.v' }
 		else { '/tests/android-webview-browser-probe/patch-kernel.v' }
 	}
 	main_source := sources + main_relative
@@ -95,6 +96,6 @@ fn run(profile string, project string, sources string, root string) ! {
 	println('MEDIA-STAGE-INPUTS PASS profile=' + profile + ' V=' + v_inputs.len.str() + ' C=' + c_inputs.len.str() + ' post-build discovery only')
 }
 fn main() {
-	if os.args.len != 5 { eprintln('usage: media-stage-inputs stager|patcher|persistent-stager|bitmap-stager|window-stager|layout-stager|restrictions-stager|bundle-cross-profile-stager|resources-float-stager|paint-drawable-stager|dialog-theme-stager|intent-extras-stager|resource-lock-stager|pending-intent-stager|stable-display-stager|asset-locales-stager|unmanaged-queries-stager|stats-unavailable-stager GENERATED_PROJECT FROZEN_SOURCES FRESH_DISCOVERY_OUTPUT'); exit(2) }
+	if os.args.len != 5 { eprintln('usage: media-stage-inputs stager|patcher|persistent-stager|bitmap-stager|window-stager|layout-stager|restrictions-stager|bundle-cross-profile-stager|resources-float-stager|paint-drawable-stager|dialog-theme-stager|intent-extras-stager|resource-lock-stager|pending-intent-stager|stable-display-stager|asset-locales-stager|unmanaged-queries-stager|stats-unavailable-stager|subscription-service-stager GENERATED_PROJECT FROZEN_SOURCES FRESH_DISCOVERY_OUTPUT'); exit(2) }
 	run(os.args[1], os.args[2], os.args[3], os.args[4]) or { eprintln(err); exit(1) }
 }
