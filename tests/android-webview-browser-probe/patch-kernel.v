@@ -698,6 +698,22 @@ const subscription_service_telephony_raw = '0ea28a17a93161e560fe13a2ef90cf8c7d77
 const subscription_service_telephony_canonical = '34e83c28d18a95880cb9c07221cdc20952ea9a802c63dd8cda071fa2234146a5'
 const subscription_service_marker_raw = '6925d83267931e7bd2499bcc6057f869a2839ecc6dac0b8ef96a6c979ee4b978'
 const subscription_service_marker_canonical = '6925d83267931e7bd2499bcc6057f869a2839ecc6dac0b8ef96a6c979ee4b978'
+const autofill_service_base = '/Users/alex/.local/state/vinix/android/maps-subscription-service-r1'
+const autofill_service_base_seal = 'eb4f5508749dfd15968abebfd997f70ab9877b61fbd8b6c6cfc24aae4f258284'
+const autofill_service_boot = '5c3152bbfd60a295b5e9ae666359941dd02269565f51938fc0af55d0eac07a62'
+const autofill_service_base_overlay = 'fa170af9ff7604f7dad45a76339143ac133fc1864e5df914e8967a2f4b8784f1'
+const autofill_service_old_deployment = '3b63c89cd82fbdcd2980ea264e9bd826802450f100c5b4768b1c59701e5332a7'
+const autofill_service_old_headless = '4aa868c633f170e70095a9a8d265a430304733b58679073b1a8c8d6c3686854b'
+const autofill_service_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-autofill-service-framework-2026-11-02-r1'
+const autofill_service_seal = 'df8ec5e67f683f78dd5aca9b42291f4ebcd3638342d8e3a215dbfc42d60c3533'
+const autofill_service_build = 'f8f9e0eefdeb29126641a92620eb1c2a710b5dbad6431fe3f9fd623b8db5c4e9'
+const autofill_service_jar = 'e2bea62dcd6f59269c36612f76b806942018700f37fbf202915cc2e74329a54a'
+const autofill_service_dex = '478976ee0cd5130abd4eb9433c44ded33c0e8840b2095bb674b2520efbfa1881'
+const autofill_service_integration_helper = '673f9979b5889ea5ece5e0800392192688a9f2fdd9a1052bf727f59038f242e0'
+const autofill_service_provider_path = 'tests/native-android-tools/androidtools/framework_autofill_service.v'
+const autofill_service_provider_helper = '6919ea259d19d0cb56fb73bba2adf63ebc1bed512d516a06d45958432839cc06'
+const autofill_service_raw = 'ad60ec49f52eb7071445df19d07ad8dc8113c4c299595e88b59f5f95b496aec1'
+const autofill_service_canonical = '5cbb514cbb04e4e030f951561a179ee8d4cd2474071fb743557b3a6f8a42a130'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -5792,6 +5808,131 @@ fn subscription_service_baseline(receipt map[string]json2.Any, stage Stage) !str
 	return subscription_service_base + '/boot.img'
 }
 
+fn autofill_service_profile() Profile {
+	mut modules := subscription_service_profile().modules.clone()
+	modules << 'maps-subscription-service.tar'
+	return Profile{'maps-autofill-service', autofill_service_boot, 'maps-autofill-service.tar', modules}
+}
+fn autofill_service_modules() map[string]string {
+	mut modules := subscription_service_modules()
+	modules['maps-subscription-service.tar'] = autofill_service_base_overlay
+	return modules
+}
+fn autofill_service_fields() map[string]string {
+	mut fields := subscription_service_fields()
+	fields['kind'] = 'vinix-maps-autofill-service-v1'
+	fields['base_root'] = autofill_service_base
+	fields['base_manifest_sha256'] = autofill_service_base_seal
+	fields['framework_build_root'] = autofill_service_framework
+	fields['framework_manifest_sha256'] = autofill_service_seal
+	fields['framework_jar_sha256'] = autofill_service_jar
+	fields['framework_dex_sha256'] = autofill_service_dex
+	fields['retained_framework_manifest_sha256'] = subscription_service_seal
+	return fields
+}
+fn autofill_service_inputs() map[string]string {
+	mut inputs := subscription_service_inputs()
+	inputs[autofill_service_base + '/sha256.json'] = autofill_service_base_seal
+	inputs[autofill_service_framework + '/sha256.json'] = autofill_service_seal
+	return inputs
+}
+fn autofill_service_known_delta() map[string]string {
+	return {'/' + service_query_jar_path: autofill_service_jar,
+		'/' + service_query_dex_path: autofill_service_dex,
+		'/' + service_query_headless + '/framework-build.json': autofill_service_build,
+		'/' + service_query_headless + '/framework-sha256.json': autofill_service_seal}
+}
+fn autofill_service_source_delta() map[string]string {
+	return {'smali/android/view/autofill/AutofillManager.smali': autofill_service_raw}
+}
+fn autofill_service_canonical_delta() map[string]string {
+	return {'new-dex/android/view/autofill/AutofillManager.smali': autofill_service_canonical}
+}
+fn autofill_service_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework_autofill.v': autofill_service_integration_helper,
+		autofill_service_provider_path: autofill_service_provider_helper}
+}
+fn autofill_service_method_changes() map[string]int {
+	return {'android/view/autofill/AutofillManager.smali': 0}
+}
+fn autofill_service_method_additions() map[string]int {
+	return {'android/view/autofill/AutofillManager.smali': 1}
+}
+fn autofill_service_proofs() map[string]string {
+	mut proofs := subscription_service_proofs()
+	proofs['headless_input_delta'] = json2.encode({'/' + service_query_jar_path: autofill_service_jar})
+	proofs['framework_source_delta'] = json2.encode(autofill_service_source_delta())
+	proofs['framework_canonical_delta'] = json2.encode(autofill_service_canonical_delta())
+	proofs['framework_builder_helper_delta'] = json2.encode(autofill_service_helper_delta())
+	proofs['framework_class_count'] = json2.encode(2110)
+	proofs['framework_changed_method_counts'] = json2.encode(autofill_service_method_changes())
+	proofs['framework_added_method_counts'] = json2.encode(autofill_service_method_additions())
+	proofs['framework_added_fields'] = json2.encode(map[string][]string{})
+	proofs['framework_added_classes'] = json2.encode([]string{})
+	return proofs
+}
+fn autofill_service_overlay_paths() []string { return subscription_service_overlay_paths() }
+fn verify_autofill_service_overlay(receipt map[string]json2.Any) ! {
+	for name in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		if name in receipt { return error('autofill service may only replace existing framework inputs') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('autofill-service deployment delta absent') }))!
+	mut expected := autofill_service_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('autofill-service headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == autofill_service_old_headless { return error('new autofill-service headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('autofill-service exact five deployment input changes differ') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('autofill-service overlay inventory absent') }))!
+	paths := autofill_service_overlay_paths()
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe autofill-service overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != 0o644 { return error('autofill-service regular allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected autofill-service overlay inode') }
+	}
+	if regulars.len != 6 || regulars[service_query_deployment] or { '' } == autofill_service_old_deployment { return error('exact six autofill-service files required') }
+	for path, pin in expected { if regulars[path.trim_left('/')] or { '' } != pin { return error('autofill-service input differs from inventory') } }
+}
+fn verify_autofill_service_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [autofill_service_base_seal, autofill_service_boot, autofill_service_base_overlay,
+		autofill_service_old_deployment, autofill_service_old_headless, autofill_service_seal,
+		autofill_service_build, autofill_service_jar, autofill_service_dex,
+		asset_locales_native_seal, asset_locales_native_build, asset_locales_native_pin,
+		asset_locales_seal, asset_locales_generated, asset_locales_c, asset_locales_bindings, asset_locales_consumed_headers] {
+		if !digest_valid(pin) { return error('completed autofill-service SDK and retained locale native producer required') }
+	}
+	for values in [autofill_service_source_delta(), autofill_service_canonical_delta(), autofill_service_helper_delta()] {
+		for path, pin in values { if !relative(path) || !digest_valid(pin) { return error('completed autofill-service class/helper pins required') } }
+	}
+	if autofill_service_seal == subscription_service_seal || autofill_service_jar == subscription_service_jar || autofill_service_dex == subscription_service_dex { return error('new autofill-service framework required') }
+	for name, expected in autofill_service_fields() { if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('autofill-service receipt differs: ' + name) } }
+	for name, expected in autofill_service_proofs() { if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](expected)! { return error('autofill-service proof differs: ' + name) } }
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 114 || seals != autofill_service_inputs() { return error('autofill-service exact one hundred fourteen dependency seals differ') }
+	for path in stage.inputs_sha256.keys() {
+		for root in [dialog_theme_relink_root(), resources_float_relink_root(), layout_alignment_relink_root(), window_animations_relink_root()] {
+			if path == root || path.starts_with(root + '/') { return error('historical relink leaves are not new autofill-service direct inputs') }
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != autofill_service_modules() || stage.preserved_modules_sha256 != autofill_service_modules() { return error('autofill-service original forty-eight modules differ') }
+	verify_autofill_service_overlay(receipt)!
+}
+fn autofill_service_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_autofill_service_receipt(receipt, stage)!
+	path := autofill_service_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != autofill_service_base_seal { return error('autofill-service original subscription-service manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != autofill_service_boot || pins['maps-subscription-service.tar'] or { '' } != autofill_service_base_overlay { return error('autofill-service original boot or subscription-service overlay differs') }
+	return autofill_service_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -6440,6 +6581,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = stats_unavailable_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-subscription-service' {
 		baseline = subscription_service_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-autofill-service' {
+		baseline = autofill_service_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -12402,6 +12545,178 @@ fn subscription_service_profile_self_test() ! {
 	println('MAPS-SUBSCRIPTION-SERVICE KERNEL-PROFILE-SELF-TEST PASS six files one hundred twelve seals forty-seven inherited modules2110 classes three service classes one SubscriptionInfo marker unchanged locale native')
 }
 
+fn autofill_service_entries_fixture() []ServiceQueryEntry {
+	paths := autofill_service_overlay_paths()
+	mut parents := map[string]bool{}
+	for path in paths {
+		mut parent := os.dir(path)
+		for parent !in ['', '.'] { parents[parent] = true; parent = os.dir(parent) }
+	}
+	mut entries := []ServiceQueryEntry{}
+	for name in parents.keys().sorted() { entries << ServiceQueryEntry{name: name, kind: 'directory', mode: 0o755} }
+	mut pins := autofill_service_known_delta()
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	pins['/' + service_query_deployment] = 'b'.repeat(64)
+	for path in paths { entries << ServiceQueryEntry{name: path, kind: 'regular', mode: 0o644, sha256: pins['/' + path]!} }
+	return entries
+}
+fn autofill_service_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in autofill_service_fields() { receipt[name] = json2.Any(value) }
+	for name, value in autofill_service_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	mut delta := autofill_service_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(autofill_service_entries_fixture()))!
+	return receipt
+}
+fn autofill_service_profile_self_test() ! {
+	profile := autofill_service_profile()
+	if profile.baseline_sha != autofill_service_boot || profile.modules.len != 48 || profile.modules.last() != 'maps-subscription-service.tar'
+		|| autofill_service_inputs().len != 114 || autofill_service_inputs().keys().filter(it.ends_with('/sha256.json')).len != 114 { return error('autofill-service strict retained-native profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 49 || autofill_service_overlay_paths().len != 6 || autofill_service_known_delta().len != 4 { return error('autofill-service exact modules, files or changes differ') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', modules.reverse()}, Config{'vinix', profile.modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('wrong autofill-service module order accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: autofill_service_inputs(), original_modules_sha256: autofill_service_modules(), preserved_modules_sha256: autofill_service_modules()}
+	receipt := autofill_service_receipt_fixture()!
+	verify_autofill_service_receipt(receipt, stage)!
+	mut fields := autofill_service_fields().keys()
+	fields << autofill_service_proofs().keys()
+	fields << ['deployment_input_delta', 'overlay_inventory']
+	for name in fields {
+		mut bad := autofill_service_receipt_fixture()!
+		bad[name] = json2.Any('changed')
+		if _ := verify_autofill_service_receipt(bad, stage) { return error('changed autofill-service field/proof accepted') }
+		bad.delete(name)
+		if _ := verify_autofill_service_receipt(bad, stage) { return error('missing autofill-service field/proof accepted') }
+	}
+	for proof in ['framework_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta',
+		'framework_changed_method_counts', 'framework_added_method_counts', 'framework_added_fields',
+		'native_source_delta', 'native_builder_helper_delta', 'native_bindings_delta', 'native_generated_jni_delta',
+		'native_c_delta', 'native_consumed_header_additions', 'native_consumed_raw_delta', 'native_consumed_canonical_delta',
+		'native_consumed_raw_additions', 'native_consumed_canonical_additions', 'headless_input_delta'] {
+		original := json2.decode[map[string]json2.Any](json2.encode(receipt[proof]!))!
+		for name in original.keys() {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(original))!
+			changed[name] = json2.Any('changed')
+			mut bad := autofill_service_receipt_fixture()!
+			bad[proof] = json2.Any(changed)
+			if _ := verify_autofill_service_receipt(bad, stage) { return error('changed autofill-service proof member accepted') }
+			changed.delete(name)
+			bad[proof] = json2.Any(changed)
+			if _ := verify_autofill_service_receipt(bad, stage) { return error('missing autofill-service proof member accepted') }
+		}
+		mut extra := json2.decode[map[string]json2.Any](json2.encode(original))!
+		extra['unreviewed'] = json2.Any('a'.repeat(64))
+		mut bad := autofill_service_receipt_fixture()!
+		bad[proof] = json2.Any(extra)
+		if _ := verify_autofill_service_receipt(bad, stage) { return error('extra autofill-service proof member accepted') }
+	}
+	for added in [['android/view/autofill/AutofillManager$Unreviewed.smali'], ['android/telephony/SubscriptionInfo.smali']] {
+		mut bad := autofill_service_receipt_fixture()!
+		bad['framework_added_classes'] = json2.decode[json2.Any](json2.encode(added))!
+		if _ := verify_autofill_service_receipt(bad, stage) { return error('autofill-service added class accepted') }
+	}
+	for field, wrong in {'native_framework_manifest_sha256': autofill_service_seal,
+		'retained_native_framework_manifest_sha256': subscription_service_seal,
+		'native_compatibility_framework_manifest_sha256': subscription_service_seal,
+		'retained_framework_manifest_sha256': autofill_service_seal,
+		'retained_native_manifest_sha256': stable_display_native_seal,
+		'native_manifest_sha256': stable_display_native_seal,
+		'native_consumed_headers_before_sha256': stable_display_seal} {
+		mut bad := autofill_service_receipt_fixture()!
+		bad[field] = json2.Any(wrong)
+		if _ := verify_autofill_service_receipt(bad, stage) { return error('autofill-service retained native or SDK provenance substituted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := autofill_service_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_autofill_service_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed autofill-service input accepted') }
+		pins.delete(path)
+		if _ := verify_autofill_service_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing autofill-service input accepted') }
+	}
+	for path in ['/unreviewed/sha256.json', dialog_theme_relink_root(), resources_float_relink_root(),
+		layout_alignment_relink_root(), window_animations_relink_root(), dialog_theme_relink_root() + '/out/canonical.so'] {
+		mut pins := autofill_service_inputs()
+		pins[path] = 'a'.repeat(64)
+		if _ := verify_autofill_service_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('extra autofill-service seal or historical proof leaf accepted') }
+	}
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: subscription_service_modules()}, Stage{...stage, preserved_modules_sha256: subscription_service_modules()}] {
+		if _ := verify_autofill_service_receipt(receipt, bad) { return error('wrong autofill-service module inventory accepted') }
+	}
+	for addition in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		mut bad := autofill_service_receipt_fixture()!
+		bad[addition] = json2.Any(map[string]json2.Any{})
+		if _ := verify_autofill_service_receipt(bad, stage) { return error('autofill-service addition or relink proof accepted') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta']!))!
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := autofill_service_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_autofill_service_receipt(bad, stage) { return error('missing autofill-service actual input change accepted') }
+	}
+	mut wrong_delta := delta.clone()
+	wrong_delta['/' + native_onboarding_trace_path] = asset_locales_native_pin
+	mut wrong_native := autofill_service_receipt_fixture()!
+	wrong_native['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(wrong_delta))!
+	if _ := verify_autofill_service_receipt(wrong_native, stage) { return error('autofill-service native deployment replacement accepted') }
+	entries := autofill_service_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := autofill_service_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_autofill_service_receipt(bad, stage) { return error('unsafe autofill-service overlay inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := autofill_service_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_autofill_service_receipt(bad, stage) { return error('missing autofill-service overlay file accepted') }
+			if entry.name != service_query_deployment {
+				bad_entries = entries.clone()
+				bad_entries[index] = ServiceQueryEntry{...entry, sha256: '0'.repeat(64)}
+				bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+				if _ := verify_autofill_service_receipt(bad, stage) { return error('changed autofill-service overlay pin accepted') }
+			}
+		}
+	}
+	for extra in [entries.last(), ServiceQueryEntry{name: 'opt/unreviewed', kind: 'regular', mode: 0o644, sha256: 'a'.repeat(64)},
+		ServiceQueryEntry{name: native_onboarding_trace_path, kind: 'regular', mode: 0o755, sha256: asset_locales_native_pin}] {
+		mut changed := entries.clone()
+		changed << extra
+		mut bad := autofill_service_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_autofill_service_receipt(bad, stage) { return error('duplicate, native or unreviewed autofill-service overlay file accepted') }
+	}
+	for stale_path, stale_pin in {service_query_headless + '/guest-inputs.json': autofill_service_old_headless, service_query_deployment: autofill_service_old_deployment} {
+		mut changed := entries.clone()
+		for index, entry in changed { if entry.name == stale_path { changed[index] = ServiceQueryEntry{...entry, sha256: stale_pin} } }
+		mut bad := autofill_service_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if stale_path != service_query_deployment {
+			mut stale_delta := delta.clone()
+			stale_delta['/' + stale_path] = stale_pin
+			bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(stale_delta))!
+		}
+		if _ := verify_autofill_service_receipt(bad, stage) { return error('stale autofill-service metadata accepted') }
+	}
+	for old in [subscription_service_receipt_fixture()!, stats_unavailable_receipt_fixture()!, unmanaged_queries_receipt_fixture()!, asset_locales_receipt_fixture()!, pending_intent_receipt_fixture()!] {
+		if _ := verify_autofill_service_receipt(old, stage) { return error('historical receipt accepted by autofill-service profile') }
+	}
+	if _ := verify_subscription_service_receipt(receipt, stage) { return error('autofill-service receipt accepted by subscription-service profile') }
+	if _ := verify_pending_intent_receipt(receipt, stage) { return error('autofill-service receipt accepted by PendingIntent profile') }
+	println('MAPS-AUTOFILL-SERVICE KERNEL-PROFILE-SELF-TEST PASS six files one hundred fourteen seals forty-eight inherited modules2110 classes one null component query unchanged locale native')
+}
+
 fn resource_lock_entries_fixture() []ServiceQueryEntry {
 	paths := resource_lock_overlay_paths()
 	mut parents := map[string]bool{}
@@ -12603,6 +12918,7 @@ fn self_test() ! {
 	unmanaged_queries_profile_self_test()!
 	stats_unavailable_profile_self_test()!
 	subscription_service_profile_self_test()!
+	autofill_service_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -12689,6 +13005,7 @@ fn self_test() ! {
 	fat_self_test(root + '/unmanaged-queries', 'maps-unmanaged-queries.tar', unmanaged_queries_profile().modules)!
 	fat_self_test(root + '/stats-unavailable', 'maps-stats-unavailable.tar', stats_unavailable_profile().modules)!
 	fat_self_test(root + '/subscription-service', 'maps-subscription-service.tar', subscription_service_profile().modules)!
+	fat_self_test(root + '/autofill-service', 'maps-autofill-service.tar', autofill_service_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -12742,12 +13059,14 @@ fn main() {
 	is_unmanaged_queries := os.args.len == 5 && os.args[1] == '--maps-unmanaged-queries'
 	is_stats_unavailable := os.args.len == 5 && os.args[1] == '--maps-stats-unavailable'
 	is_subscription_service := os.args.len == 5 && os.args[1] == '--maps-subscription-service'
+	is_autofill_service := os.args.len == 5 && os.args[1] == '--maps-autofill-service'
 	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display || is_asset_locales || is_unmanaged_queries || is_stats_unavailable || is_subscription_service
-	if os.args.len != 4 && !is_selected {
+	if os.args.len != 4 && !is_selected && !is_autofill_service {
+		eprintln('       patch-kernel --maps-autofill-service FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display|--maps-asset-locales|--maps-unmanaged-queries|--maps-stats-unavailable|--maps-subscription-service] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_selected { 1 } else { 0 }
+	offset := if is_selected || is_autofill_service { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -12758,7 +13077,8 @@ fn main() {
 	}
 	profile := if is_seed_companion { seed_companion_profile() } else if is_broker_tail { broker_tail_profile() } else if is_window_system_ui { window_system_ui_profile() } else if is_imageview_bounds { imageview_bounds_profile() } else if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	selected_profile := if is_subscription_service { subscription_service_profile() } else if is_stats_unavailable { stats_unavailable_profile() } else if is_unmanaged_queries { unmanaged_queries_profile() } else if is_asset_locales { asset_locales_profile() } else if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
-	patch(root, build_root, os.args[3 + offset], selected_profile) or {
+	final_profile := if is_autofill_service { autofill_service_profile() } else { selected_profile }
+	patch(root, build_root, os.args[3 + offset], final_profile) or {
 		eprintln(err)
 		exit(1)
 	}
