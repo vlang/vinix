@@ -821,6 +821,23 @@ const component_parcel_raw = 'e0da33559da01d8f2323be046537eb2eeb35fe886d9c89e881
 const component_parcel_canonical = '645ef164621fbc7a311a74ec3a997eb403231fa5b708e5b6c5645d864a96bfdb'
 const component_parcel_creator_raw = '5ef9c2b472f77ca6f0b0fa8220715b289e5818721644a6bec81c9c592c19fa9c'
 const component_parcel_creator_canonical = '9709ae9678ab2e0d393908087f2ab90f9259244e51db6e116689788e25933c64'
+const event_log_base = '/Users/alex/.local/state/vinix/android/maps-component-parcel-r1'
+const event_log_base_seal = '9c82d40a0a09ab4255a0cea93af74fb50b568d9ed9feb0a80f6870659a239415'
+const event_log_boot = 'cc88a76aec636ea7947d05df36b2221ab7daeda8036b4baed1622c65efd83b8b'
+const event_log_base_overlay = '050df5e66cf038b3a571c12b3a556ffb0e7918b001f7ae0f731352da2c458c78'
+const event_log_old_deployment = 'fde3c1ec307e833976898de6bd7d00b906df510464edddcfd3138055ef4232dc'
+const event_log_old_headless = 'e968e8e1ee8444991c3b78b659fab348017ec33c2c4118e7ec92b0348ed0bed2'
+const event_log_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-event-log-framework-2026-11-02-r1'
+// Complete EventLog class-only producer; original native producer remains retained.
+const event_log_seal = '56adef59b9210f72117709c26c5e008503379586407c70ab00297c32a70f5670'
+const event_log_build = '173dbd5f3ccf8525656cee46571af827082bed97753aea7645821560ed847a03'
+const event_log_jar = '0a331f5595b4b6c1298dd0e944389cbeabe2b93f6e02e536c4d26d5d200967ad'
+const event_log_dex = '7137c2ddab3f670b0927170d09da059352bda1ba05e6a9f9d5b85f7b306c9531'
+const event_log_framework_helper = '54184ddf12ba72bcc66f90ddd2c389c6c8e4731d596295663ef43b8f629401b2'
+const event_log_provider_path = 'tests/native-android-tools/androidtools/framework_event_log.v'
+const event_log_provider_helper = 'a02d0d549d255bf47dd2ca95a0bf6b5ebb2251cc26fc79864ee02c18bdb38f42'
+const event_log_raw = '9e76d83faf7b556e96823ab97cabfec568e83ebaf1732163cebf93492b70dd28'
+const event_log_canonical = '914acd48f8b12fcbb54695f4497992f958a2658e6d34b93aabc032586b34093d'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -6904,6 +6921,126 @@ fn component_parcel_baseline(receipt map[string]json2.Any, stage Stage) !string 
 	return component_parcel_base + '/boot.img'
 }
 
+fn event_log_profile() Profile {
+	mut modules := component_parcel_profile().modules.clone()
+	modules << 'maps-component-parcel.tar'
+	return Profile{'maps-event-log', event_log_boot, 'maps-event-log.tar', modules}
+}
+fn event_log_modules() map[string]string {
+	mut modules := component_parcel_modules()
+	modules['maps-component-parcel.tar'] = event_log_base_overlay
+	return modules
+}
+fn event_log_fields() map[string]string {
+	mut fields := component_parcel_fields()
+	fields['kind'] = 'vinix-maps-event-log-v1'
+	fields['base_root'] = event_log_base
+	fields['base_manifest_sha256'] = event_log_base_seal
+	fields['framework_build_root'] = event_log_framework
+	fields['framework_manifest_sha256'] = event_log_seal
+	fields['framework_jar_sha256'] = event_log_jar
+	fields['framework_dex_sha256'] = event_log_dex
+	fields['retained_framework_manifest_sha256'] = component_parcel_seal
+	return fields
+}
+fn event_log_inputs() map[string]string {
+	mut inputs := component_parcel_inputs()
+	inputs[event_log_base + '/sha256.json'] = event_log_base_seal
+	inputs[event_log_framework + '/sha256.json'] = event_log_seal
+	return inputs
+}
+fn event_log_known_delta() map[string]string {
+	return {'/' + service_query_jar_path: event_log_jar,
+		'/' + service_query_dex_path: event_log_dex,
+		'/' + service_query_headless + '/framework-build.json': event_log_build,
+		'/' + service_query_headless + '/framework-sha256.json': event_log_seal}
+}
+fn event_log_source_delta() map[string]string {
+	return {'smali/android/util/EventLog.smali': event_log_raw}
+}
+fn event_log_canonical_delta() map[string]string {
+	return {'new-dex/android/util/EventLog.smali': event_log_canonical}
+}
+fn event_log_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework.v': event_log_framework_helper,
+		event_log_provider_path: event_log_provider_helper}
+}
+fn event_log_proofs() map[string]string {
+	mut proofs := component_parcel_proofs()
+	proofs['headless_input_delta'] = json2.encode({'/' + service_query_jar_path: event_log_jar})
+	proofs['framework_source_delta'] = json2.encode(event_log_source_delta())
+	proofs['framework_canonical_delta'] = json2.encode(event_log_canonical_delta())
+	proofs['framework_builder_helper_delta'] = json2.encode(event_log_helper_delta())
+	proofs['framework_class_count'] = json2.encode(2117)
+	proofs['framework_changed_method_counts'] = json2.encode(map[string]int{})
+	proofs['framework_added_method_counts'] = json2.encode(map[string]int{})
+	proofs['framework_added_fields'] = json2.encode(map[string][]string{})
+	proofs['framework_added_classes'] = json2.encode(['android/util/EventLog.smali'])
+	return proofs
+}
+fn event_log_overlay_paths() []string { return component_parcel_overlay_paths() }
+fn verify_event_log_overlay(receipt map[string]json2.Any) ! {
+	for name in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof',
+		'framework_removed_method_counts', 'framework_removed_fields'] {
+		if name in receipt { return error('EventLog may only add its exact class and replace existing framework inputs') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('event-log deployment delta absent') }))!
+	mut expected := event_log_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('event-log headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == event_log_old_headless { return error('new EventLog headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('event-log exact five deployment input changes differ') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('event-log overlay inventory absent') }))!
+	paths := event_log_overlay_paths()
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe event-log overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != 0o644 { return error('event-log regular allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected event-log overlay inode') }
+	}
+	if regulars.len != 6 || regulars[service_query_deployment] or { '' } == event_log_old_deployment { return error('exact six event-log files required') }
+	for path, pin in expected { if regulars[path.trim_left('/')] or { '' } != pin { return error('event-log input differs from inventory') } }
+}
+fn verify_event_log_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [event_log_base_seal, event_log_boot, event_log_base_overlay,
+		event_log_old_deployment, event_log_old_headless, event_log_seal,
+		event_log_build, event_log_jar, event_log_dex,
+		broadcast_permission_native_seal, broadcast_permission_native_build, broadcast_permission_native_pin,
+		broadcast_permission_seal, asset_locales_generated, asset_locales_c, asset_locales_bindings, broadcast_permission_consumed_headers] {
+		if !digest_valid(pin) { return error('completed EventLog SDK and retained broadcast native producer required') }
+	}
+	for values in [event_log_source_delta(), event_log_canonical_delta(), event_log_helper_delta()] {
+		for path, pin in values { if !relative(path) || !digest_valid(pin) { return error('completed EventLog class/helper pins required') } }
+	}
+	if event_log_seal == component_parcel_seal || event_log_jar == component_parcel_jar || event_log_dex == component_parcel_dex { return error('new EventLog framework required') }
+	for name, expected in event_log_fields() { if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('event-log receipt differs: ' + name) } }
+	for name, expected in event_log_proofs() { if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](expected)! { return error('event-log proof differs: ' + name) } }
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 129 || seals != event_log_inputs() { return error('event-log exact one hundred twenty-nine dependency seals differ') }
+	for path in stage.inputs_sha256.keys() {
+		for root in [dialog_theme_relink_root(), resources_float_relink_root(), layout_alignment_relink_root(), window_animations_relink_root()] {
+			if path == root || path.starts_with(root + '/') { return error('historical relink leaves are not new EventLog direct inputs') }
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != event_log_modules() || stage.preserved_modules_sha256 != event_log_modules() { return error('event-log original fifty-five modules differ') }
+	verify_event_log_overlay(receipt)!
+}
+fn event_log_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_event_log_receipt(receipt, stage)!
+	path := event_log_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != event_log_base_seal { return error('event-log original Component manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != event_log_boot || pins['maps-component-parcel.tar'] or { '' } != event_log_base_overlay { return error('event-log original boot or Component overlay differs') }
+	return event_log_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -7566,6 +7703,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = messenger_binder_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-component-parcel' {
 		baseline = component_parcel_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-event-log' {
+		baseline = event_log_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -14769,6 +14908,185 @@ fn component_parcel_profile_self_test() ! {
 	println('MAPS-COMPONENT-PARCEL KERNEL-PROFILE-SELF-TEST PASS six files one hundred twenty-seven seals fifty-four inherited modules2116 classes ComponentName parcel append-only retained broadcast native')
 }
 
+fn event_log_entries_fixture() []ServiceQueryEntry {
+	paths := event_log_overlay_paths()
+	mut parents := map[string]bool{}
+	for path in paths {
+		mut parent := os.dir(path)
+		for parent !in ['', '.'] { parents[parent] = true; parent = os.dir(parent) }
+	}
+	mut entries := []ServiceQueryEntry{}
+	for name in parents.keys().sorted() { entries << ServiceQueryEntry{name: name, kind: 'directory', mode: 0o755} }
+	mut pins := event_log_known_delta()
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	pins['/' + service_query_deployment] = 'b'.repeat(64)
+	for path in paths { entries << ServiceQueryEntry{name: path, kind: 'regular', mode: 0o644, sha256: pins['/' + path]!} }
+	return entries
+}
+fn event_log_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in event_log_fields() { receipt[name] = json2.Any(value) }
+	for name, value in event_log_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	mut delta := event_log_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(event_log_entries_fixture()))!
+	return receipt
+}
+fn event_log_profile_self_test() ! {
+	profile := event_log_profile()
+	if profile.baseline_sha != event_log_boot || profile.modules.len != 55 || profile.modules.last() != 'maps-component-parcel.tar'
+		|| event_log_inputs().len != 129 || event_log_inputs().keys().filter(it.ends_with('/sha256.json')).len != 129 { return error('event-log retained-native profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 56 || event_log_overlay_paths().len != 6 || event_log_known_delta().len != 4 { return error('event-log exact modules, files or changes differ') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', modules.reverse()}, Config{'vinix', profile.modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('wrong event-log module order accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: event_log_inputs(), original_modules_sha256: event_log_modules(), preserved_modules_sha256: event_log_modules()}
+	receipt := event_log_receipt_fixture()!
+	verify_event_log_receipt(receipt, stage)!
+	mut fields := event_log_fields().keys()
+	fields << event_log_proofs().keys()
+	fields << ['deployment_input_delta', 'overlay_inventory']
+	for name in fields {
+		mut bad := event_log_receipt_fixture()!
+		bad[name] = json2.Any('changed')
+		if _ := verify_event_log_receipt(bad, stage) { return error('changed event-log field/proof accepted') }
+		bad.delete(name)
+		if _ := verify_event_log_receipt(bad, stage) { return error('missing event-log field/proof accepted') }
+	}
+	for proof in ['framework_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta',
+		'framework_changed_method_counts', 'framework_added_method_counts', 'framework_added_fields',
+		'native_source_delta', 'native_builder_helper_delta', 'native_bindings_delta', 'native_generated_jni_delta',
+		'native_c_delta', 'native_consumed_header_additions', 'native_consumed_raw_delta', 'native_consumed_canonical_delta',
+		'native_consumed_raw_additions', 'native_consumed_canonical_additions', 'headless_input_delta'] {
+		original := json2.decode[map[string]json2.Any](json2.encode(receipt[proof]!))!
+		for name in original.keys() {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(original))!
+			changed[name] = json2.Any('changed')
+			mut bad := event_log_receipt_fixture()!
+			bad[proof] = json2.Any(changed)
+			if _ := verify_event_log_receipt(bad, stage) { return error('changed event-log proof member accepted') }
+			changed.delete(name)
+			bad[proof] = json2.Any(changed)
+			if _ := verify_event_log_receipt(bad, stage) { return error('missing event-log proof member accepted') }
+		}
+		mut extra := json2.decode[map[string]json2.Any](json2.encode(original))!
+		extra['unreviewed'] = json2.Any('a'.repeat(64))
+		mut bad := event_log_receipt_fixture()!
+		bad[proof] = json2.Any(extra)
+		if _ := verify_event_log_receipt(bad, stage) { return error('extra event-log proof member accepted') }
+	}
+	for added in [json2.encode([]string{}), json2.encode(['android/util/EventLog.smali', 'android/util/Unreviewed.smali']), json2.encode(['android/content/VinixComponentNameCreator.smali'])] {
+		mut bad := event_log_receipt_fixture()!
+		bad['framework_added_classes'] = json2.decode[json2.Any](added)!
+		if _ := verify_event_log_receipt(bad, stage) { return error('wrong event-log class additions accepted') }
+	}
+	for field, wrong in {'native_framework_manifest_sha256': component_parcel_seal,
+		'native_compatibility_framework_manifest_sha256': event_log_seal,
+		'retained_native_framework_manifest_sha256': component_parcel_seal,
+		'retained_framework_manifest_sha256': messenger_binder_seal,
+		'retained_native_manifest_sha256': asset_locales_native_seal,
+		'native_manifest_sha256': asset_locales_native_seal,
+		'native_build_root': asset_locales_native,
+		'native_build_sha256': asset_locales_native_build,
+		'native_sha256': asset_locales_native_pin,
+		'native_consumed_headers_before_sha256': asset_locales_consumed_headers} {
+		mut bad := event_log_receipt_fixture()!
+		bad[field] = json2.Any(wrong)
+		if _ := verify_event_log_receipt(bad, stage) { return error('stale or relabeled EventLog native provenance accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := event_log_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_event_log_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed event-log input accepted') }
+		pins.delete(path)
+		if _ := verify_event_log_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing event-log input accepted') }
+	}
+	for path in ['/unreviewed/sha256.json', dialog_theme_relink_root(), resources_float_relink_root(),
+		layout_alignment_relink_root(), window_animations_relink_root(), dialog_theme_relink_root() + '/out/canonical.so'] {
+		mut pins := event_log_inputs()
+		pins[path] = 'a'.repeat(64)
+		if _ := verify_event_log_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('extra event-log seal or historical proof leaf accepted') }
+	}
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: component_parcel_modules()}, Stage{...stage, preserved_modules_sha256: component_parcel_modules()}] {
+		if _ := verify_event_log_receipt(receipt, bad) { return error('wrong event-log module inventory accepted') }
+	}
+	for addition in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof',
+		'framework_removed_method_counts', 'framework_removed_fields'] {
+		mut values := [json2.encode(map[string]string{})]
+		if historical := messenger_binder_proofs()[addition] { values << historical }
+		for value in values {
+			mut bad := event_log_receipt_fixture()!
+			bad[addition] = json2.decode[json2.Any](value)!
+			if _ := verify_event_log_receipt(bad, stage) { return error('event-log addition, removal or relink proof accepted') }
+		}
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta']!))!
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := event_log_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_event_log_receipt(bad, stage) { return error('missing event-log actual input change accepted') }
+	}
+	mut wrong_delta := delta.clone()
+	wrong_delta['/' + native_onboarding_trace_path] = broadcast_permission_native_pin
+	mut wrong_native := event_log_receipt_fixture()!
+	wrong_native['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(wrong_delta))!
+	if _ := verify_event_log_receipt(wrong_native, stage) { return error('event-log native deployment replacement accepted') }
+	entries := event_log_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := event_log_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_event_log_receipt(bad, stage) { return error('unsafe event-log overlay inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := event_log_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_event_log_receipt(bad, stage) { return error('missing event-log overlay file accepted') }
+			if entry.name != service_query_deployment {
+				bad_entries = entries.clone()
+				bad_entries[index] = ServiceQueryEntry{...entry, sha256: '0'.repeat(64)}
+				bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+				if _ := verify_event_log_receipt(bad, stage) { return error('changed event-log overlay pin accepted') }
+			}
+		}
+	}
+	for extra in [entries.last(), ServiceQueryEntry{name: 'opt/unreviewed', kind: 'regular', mode: 0o644, sha256: 'a'.repeat(64)},
+		ServiceQueryEntry{name: native_onboarding_trace_path, kind: 'regular', mode: 0o755, sha256: broadcast_permission_native_pin}] {
+		mut changed := entries.clone()
+		changed << extra
+		mut bad := event_log_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_event_log_receipt(bad, stage) { return error('duplicate, native or unreviewed event-log overlay file accepted') }
+	}
+	for stale_path, stale_pin in {service_query_headless + '/guest-inputs.json': event_log_old_headless, service_query_deployment: event_log_old_deployment} {
+		mut changed := entries.clone()
+		for index, entry in changed { if entry.name == stale_path { changed[index] = ServiceQueryEntry{...entry, sha256: stale_pin} } }
+		mut bad := event_log_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if stale_path != service_query_deployment {
+			mut stale_delta := delta.clone()
+			stale_delta['/' + stale_path] = stale_pin
+			bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(stale_delta))!
+		}
+		if _ := verify_event_log_receipt(bad, stage) { return error('stale event-log metadata accepted') }
+	}
+	for old in [component_parcel_receipt_fixture()!, messenger_binder_receipt_fixture()!, usage_inactive_receipt_fixture()!, secure_settings_receipt_fixture()!, broadcast_permission_receipt_fixture()!] {
+		if _ := verify_event_log_receipt(old, stage) { return error('historical receipt accepted by event-log profile') }
+	}
+	if _ := verify_component_parcel_receipt(receipt, stage) { return error('event-log receipt accepted by Component profile') }
+	println('MAPS-EVENT-LOG KERNEL-PROFILE-SELF-TEST PASS six files one hundred twenty-nine seals fifty-five inherited modules2117 classes EventLog-only retained broadcast native')
+}
+
 fn resource_lock_entries_fixture() []ServiceQueryEntry {
 	paths := resource_lock_overlay_paths()
 	mut parents := map[string]bool{}
@@ -14977,6 +15295,7 @@ fn self_test() ! {
 	usage_inactive_profile_self_test()!
 	messenger_binder_profile_self_test()!
 	component_parcel_profile_self_test()!
+	event_log_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -15070,6 +15389,7 @@ fn self_test() ! {
 	fat_self_test(root + '/usage-inactive', 'maps-usage-inactive.tar', usage_inactive_profile().modules)!
 	fat_self_test(root + '/messenger-binder', 'maps-messenger-binder.tar', messenger_binder_profile().modules)!
 	fat_self_test(root + '/component-parcel', 'maps-component-parcel.tar', component_parcel_profile().modules)!
+	fat_self_test(root + '/event-log', 'maps-event-log.tar', event_log_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -15130,8 +15450,10 @@ fn main() {
 	is_usage_inactive := os.args.len == 5 && os.args[1] == '--maps-usage-inactive'
 	is_messenger_binder := os.args.len == 5 && os.args[1] == '--maps-messenger-binder'
 	is_component_parcel := os.args.len == 5 && os.args[1] == '--maps-component-parcel'
+	is_event_log := os.args.len == 5 && os.args[1] == '--maps-event-log'
 	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display || is_asset_locales || is_unmanaged_queries || is_stats_unavailable || is_subscription_service
-	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings && !is_usage_inactive && !is_messenger_binder && !is_component_parcel {
+	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings && !is_usage_inactive && !is_messenger_binder && !is_component_parcel && !is_event_log {
+		eprintln('       patch-kernel --maps-event-log FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-component-parcel FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-messenger-binder FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-usage-inactive FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
@@ -15142,7 +15464,7 @@ fn main() {
 		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display|--maps-asset-locales|--maps-unmanaged-queries|--maps-stats-unavailable|--maps-subscription-service] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings || is_usage_inactive || is_messenger_binder || is_component_parcel { 1 } else { 0 }
+	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings || is_usage_inactive || is_messenger_binder || is_component_parcel || is_event_log { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -15153,7 +15475,7 @@ fn main() {
 	}
 	profile := if is_seed_companion { seed_companion_profile() } else if is_broker_tail { broker_tail_profile() } else if is_window_system_ui { window_system_ui_profile() } else if is_imageview_bounds { imageview_bounds_profile() } else if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	selected_profile := if is_subscription_service { subscription_service_profile() } else if is_stats_unavailable { stats_unavailable_profile() } else if is_unmanaged_queries { unmanaged_queries_profile() } else if is_asset_locales { asset_locales_profile() } else if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
-	final_profile := if is_component_parcel { component_parcel_profile() } else if is_messenger_binder { messenger_binder_profile() } else if is_usage_inactive { usage_inactive_profile() } else if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
+	final_profile := if is_event_log { event_log_profile() } else if is_component_parcel { component_parcel_profile() } else if is_messenger_binder { messenger_binder_profile() } else if is_usage_inactive { usage_inactive_profile() } else if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
 	patch(root, build_root, os.args[3 + offset], final_profile) or {
 		eprintln(err)
 		exit(1)
