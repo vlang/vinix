@@ -1890,6 +1890,92 @@ fn device_secure_self_test() ! {
  }
 }
 
+fn unmanaged_query_methods() map[string]string {
+ return {'android/app/admin/DevicePolicyManager.smali': 'getDeviceOwner()Ljava/lang/String;',
+  'android/os/UserManager.smali': 'isManagedProfile()Z'}
+}
+
+fn unmanaged_queries_profile() NarrowProfile {
+ policy := 'android/app/admin/DevicePolicyManager.smali'
+ users := 'android/os/UserManager.smali'
+ return NarrowProfile{
+  name: 'unmanaged-queries'
+  baseline_name: 'combined-account-webview-device-secure-framework-2026-11-02-r1'
+  manifest_pin: 'db98d6fcd6e0c792761f39b07ceb40d5e5818b691dede6eaccd177ec0f9973f2'
+  jar_pin: '43e3e2b941677cda70021ae9cd674aac6f4897af4ab4bda1d2d751b805d1f137'
+  baseline_classes: 2108
+  providers: ['framework_unmanaged_queries.v']
+  calls: {policy: 'framework_device_owner_source', users: 'framework_managed_profile_source'}
+  methods: {policy: ['getDeviceOwner()Ljava/lang/String;'], users: ['isManagedProfile()Z']}
+  changed: {policy: 0, users: 0}
+  added: {policy: 1, users: 1}
+ }
+}
+
+fn unmanaged_query_abi(source string, target string) ! {
+ signature := unmanaged_query_methods()[target] or { return error('unsupported unmanaged query class') }
+ method := store_parts(source)!.methods[signature] or { return error('missing unmanaged query: ' + signature) }
+ returned := if target == 'android/app/admin/DevicePolicyManager.smali' { 'return-object v0' } else { 'return v0' }
+ if method.split_into_lines().map(it.trim_space()).filter(it != '' && !it.starts_with('#')) != [
+  '.method public ' + signature, '.registers 2', 'const/4 v0, 0x0', returned, '.end method'] {
+  return error('unmanaged guest query requires exact public virtual null-owner or false-profile result')
+ }
+}
+
+fn unmanaged_queries_self_test() ! {
+ profile := unmanaged_queries_profile()
+ policy := 'android/app/admin/DevicePolicyManager.smali'
+ users := 'android/os/UserManager.smali'
+ if profile.name != 'unmanaged-queries' || profile.baseline_classes != 2108
+  || profile.baseline_name != 'combined-account-webview-device-secure-framework-2026-11-02-r1'
+  || profile.manifest_pin != 'db98d6fcd6e0c792761f39b07ceb40d5e5818b691dede6eaccd177ec0f9973f2'
+  || profile.jar_pin != '43e3e2b941677cda70021ae9cd674aac6f4897af4ab4bda1d2d751b805d1f137'
+  || profile.providers != ['framework_unmanaged_queries.v']
+  || profile.calls != {policy: 'framework_device_owner_source', users: 'framework_managed_profile_source'}
+  || profile.methods != {policy: ['getDeviceOwner()Ljava/lang/String;'], users: ['isManagedProfile()Z']}
+  || profile.changed != {policy: 0, users: 0} || profile.added != {policy: 1, users: 1}
+  || profile.fields.len != 0 || profile.directory_provider != '' || profile.extra_classes.len != 0
+  || profile.class_provider != '' {
+  return error('unmanaged queries require exactly one added method in each of two retained classes')
+ }
+ for target, signature in unmanaged_query_methods() {
+  narrow_method_self_test([signature], 0, 1)!
+  returned := if target == policy { 'return-object v0' } else { 'return v0' }
+  other_return := if target == policy { 'return v0' } else { 'return-object v0' }
+  method := '.method public ' + signature + '\n.registers 2\nconst/4 v0, 0x0\n' + returned + '\n.end method\n'
+  unmanaged_query_abi(method, target)!
+  for bad in [method.replace('public ', 'private '), method.replace('public ', 'public static '),
+   method.replace('public ', 'public native '), method.replace('public ', 'public final '),
+   method.replace('()', '(I)'), method.replace('.registers 2', '.registers 3'),
+   method.replace('const/4 v0, 0x0', 'const/4 v0, 0x1'), method.replace(returned, other_return),
+   method.replace(returned, returned + '\n' + returned), method + method] {
+   unmanaged_query_abi(bad, target) or { continue }
+   return error('unmanaged query ABI/register/result/return-kind mutation accepted')
+  }
+ }
+ mut before := {policy: 'old-policy', users: 'old-users'}
+ for i in 0 .. 2106 { before['other/' + i.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ after[policy] = 'new-policy'
+ after[users] = 'new-users'
+ targets := [policy, users]
+ narrow_profile_class_delta(before, after, targets, []string{}, 2108)!
+ for target in targets {
+  for case in 0 .. 5 {
+   mut bad := after.clone()
+   match case {
+    0 { bad[target] = before[target]! }
+    1 { bad['other/0.smali'] = 'changed' }
+    2 { bad.delete(target) }
+    3 { bad['unrelated.smali'] = 'new' }
+    else { bad.delete(target); bad['substituted.smali'] = 'new' }
+   }
+   narrow_profile_class_delta(before, bad, targets, []string{}, 2108) or { continue }
+   return error('invalid exact two-class unmanaged-query scope accepted')
+  }
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -2824,6 +2910,7 @@ fn self_test() ! {
  pending_intent_self_test()!
  stable_display_self_test()!
  device_secure_self_test()!
+ unmanaged_queries_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -3114,6 +3201,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'pending-intent' { pending_intent_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'stable-display' { stable_display_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'device-secure' { device_secure_abi(os.read_file(root + '/smali/' + target)!)! }
+  if profile.name == 'unmanaged-queries' { unmanaged_query_abi(os.read_file(root + '/smali/' + target)!, target)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -3160,6 +3248,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'pending-intent' { pending_intent_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'stable-display' { stable_display_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'device-secure' { device_secure_abi(os.read_file(root + '/new-dex/' + target)!)! }
+  if profile.name == 'unmanaged-queries' { unmanaged_query_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -3498,11 +3587,15 @@ fn main() {
   build_narrow(device_secure_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--unmanaged-queries' {
+  build_narrow(unmanaged_queries_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
