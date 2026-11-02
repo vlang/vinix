@@ -2386,6 +2386,88 @@ fn subscription_service_self_test() ! {
  }
 }
 
+fn autofill_service_profile() NarrowProfile {
+ manager := 'android/view/autofill/AutofillManager.smali'
+ return NarrowProfile{
+  name: 'autofill-service'
+  baseline_name: 'combined-account-webview-subscription-service-framework-2026-11-02-r1'
+  manifest_pin: '958e5a7c02710a3aa78a04b499f6c6d5ca4701e1c2c8d33b7dda6f640ac561db'
+  jar_pin: '72c57e05b4458d8c62f82cd29fe70065318303af6b741bf1726337ce922c60ef'
+  baseline_classes: 2110
+  providers: ['framework_autofill_service.v']
+  calls: {manager: 'framework_autofill_service_source'}
+  methods: {manager: ['getAutofillServiceComponentName()Landroid/content/ComponentName;']}
+  changed: {manager: 0}
+  added: {manager: 1}
+ }
+}
+
+fn autofill_service_abi(source string) ! {
+ signature := 'getAutofillServiceComponentName()Landroid/content/ComponentName;'
+ method := store_parts(source)!.methods[signature] or { return error('missing autofill service component query') }
+ if method.split_into_lines().map(it.trim_space()).filter(it != '' && !it.starts_with('#')) != [
+  '.method public ' + signature, '.registers 2', 'const/4 v0, 0x0', 'return-object v0', '.end method'] {
+  return error('autofill component query requires the exact public instance null result for the absent backend')
+ }
+}
+
+fn autofill_service_self_test() ! {
+ profile := autofill_service_profile()
+ manager := 'android/view/autofill/AutofillManager.smali'
+ signature := 'getAutofillServiceComponentName()Landroid/content/ComponentName;'
+ if profile.name != 'autofill-service' || profile.baseline_classes != 2110
+  || profile.baseline_name != 'combined-account-webview-subscription-service-framework-2026-11-02-r1'
+  || profile.manifest_pin != '958e5a7c02710a3aa78a04b499f6c6d5ca4701e1c2c8d33b7dda6f640ac561db'
+  || profile.jar_pin != '72c57e05b4458d8c62f82cd29fe70065318303af6b741bf1726337ce922c60ef'
+  || profile.providers != ['framework_autofill_service.v']
+  || profile.calls != {manager: 'framework_autofill_service_source'}
+  || profile.methods != {manager: [signature]} || profile.changed != {manager: 0}
+  || profile.added != {manager: 1} || profile.fields.len != 0 || profile.directory_provider != ''
+  || profile.extra_classes.len != 0 || profile.class_provider != '' {
+  return error('autofill service profile requires exactly one added query in one retained class')
+ }
+ narrow_method_self_test([signature], 0, 1)!
+ method := '.method public ' + signature + '\n.registers 2\nconst/4 v0, 0x0\nreturn-object v0\n.end method\n'
+ autofill_service_abi(method)!
+ for bad in [method.replace('public ', 'private '), method.replace('public ', 'public static '),
+  method.replace('public ', 'public native '), method.replace('public ', 'public final '),
+  method.replace('()', '(I)'), method.replace('.registers 2', '.registers 3'),
+  method.replace('const/4 v0, 0x0', 'const/4 v0, 0x1'), method.replace('return-object v0', 'return v0'),
+  method.replace('return-object v0', 'return-object p0'),
+  method.replace('return-object v0', 'return-object v0\nreturn-object v0'), method + method] {
+  autofill_service_abi(bad) or { continue }
+  return error('autofill component query ABI/register/result/body mutation accepted')
+ }
+ metadata := '.class public Landroid/view/autofill/AutofillManager;\n.super Ljava/lang/Object;\n'
+ retained := '.method public retained()V\n.locals 0\nreturn-void\n.end method\n'
+ before_source := metadata + retained
+ after_source := before_source + method
+ narrow_member_delta(before_source, after_source, [signature], 0, 1, []string{})!
+ for bad in [after_source.replace('public retained()V', 'private retained()V'),
+  after_source.replace('.super Ljava/lang/Object;', '.super Lother/Base;'),
+  after_source + '.field private unexpected:I\n', after_source + retained] {
+  narrow_member_delta(before_source, bad, [signature], 0, 1, []string{}) or { continue }
+  return error('autofill unrelated member or metadata mutation accepted')
+ }
+ mut before := {manager: 'old'}
+ for i in 0 .. 2109 { before['other/' + i.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ after[manager] = 'new'
+ narrow_profile_class_delta(before, after, [manager], []string{}, 2110)!
+ for case in 0 .. 5 {
+  mut bad := after.clone()
+  match case {
+   0 { bad[manager] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(manager) }
+   3 { bad['unrelated.smali'] = 'new' }
+   else { bad.delete(manager); bad['substituted.smali'] = 'new' }
+  }
+  narrow_profile_class_delta(before, bad, [manager], []string{}, 2110) or { continue }
+  return error('invalid AutofillManager-only class scope accepted')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -3323,6 +3405,7 @@ fn self_test() ! {
  unmanaged_queries_self_test()!
  stats_unavailable_self_test()!
  subscription_service_self_test()!
+ autofill_service_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -3537,6 +3620,14 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  if digest(root + '/provider-helper-inputs/framework.v')! != inputs[helper]! {
   return error('provider helper copy differs')
  }
+ if profile.name == 'autofill-service' {
+  integration := repo + '/tests/native-android-tools/androidtools/framework_autofill.v'
+  inputs[integration] = digest(integration)!
+  os.cp(integration, root + '/provider-helper-inputs/framework_autofill.v')!
+  if digest(root + '/provider-helper-inputs/framework_autofill.v')! != inputs[integration]! {
+   return error('autofill integration source copy differs')
+  }
+ }
  os.write_file(root + '/provider-source/androidtools/framework_account_helpers.v',
   'module androidtools\n' + helper_function(os.read_file(root + '/provider-helper-inputs/framework.v')!, 'pub fn framework_replace_method(')!)!
  mut application := 'module main\nimport androidtools\nimport os\nfn main() {\n'
@@ -3616,6 +3707,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'unmanaged-queries' { unmanaged_query_abi(os.read_file(root + '/smali/' + target)!, target)! }
   if profile.name == 'stats-unavailable' { stats_unavailable_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'subscription-service' { subscription_service_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
+  if profile.name == 'autofill-service' { autofill_service_abi(os.read_file(root + '/smali/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -3667,6 +3759,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'unmanaged-queries' { unmanaged_query_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
   if profile.name == 'stats-unavailable' { stats_unavailable_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'subscription-service' { subscription_service_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
+  if profile.name == 'autofill-service' { autofill_service_abi(os.read_file(root + '/new-dex/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -4019,11 +4112,15 @@ fn main() {
   build_narrow(subscription_service_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--autofill-service' {
+  build_narrow(autofill_service_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
