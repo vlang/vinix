@@ -22,3 +22,9 @@ and matching `maps-subscription-service-runtime-audit-2026-11-02-r1`. Qualified
 SDK/tool evidence remains sealed at its original locations. Restore stable host
 disk headroom before the image/ARM retry; current Maps imagery and authentication
 remain unverified.
+
+Disk space later recovered and the original-budget preparation retry passed.
+The [resumed runtime result](maps-subscription-service-runtime-2026-11-02.md)
+records the ARM subscription-service pass, strict account export, next GMS
+AutofillManager linkage failure and clean owned-VM stop. The original failed
+attempts and this checkpoint remain unchanged apart from this continuation link.
