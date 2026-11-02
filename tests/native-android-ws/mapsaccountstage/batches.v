@@ -8,7 +8,7 @@ type InventoryBatchAudit = fn (map[string]string) !
 // Each public image contract supplies its exact count. The private sixty-five
 // case exercises the boundary immediately above the unchanged helper limit.
 fn inventory_batch_plan(pins map[string]string, expected int) ![]map[string]string {
-	if expected !in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103] || pins.len != expected {
+	if expected !in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106] || pins.len != expected {
 		return error('exact bounded inventory batch count required')
 	}
 	mut roots := pins.keys()
@@ -113,4 +113,9 @@ pub fn audit_one_hundred_inventories(pins map[string]string) ! {
 // The asset-locales successor inherits all one hundred three sealed roots.
 pub fn audit_one_hundred_three_inventories(pins map[string]string) ! {
 	audit_inventory_batches_with(pins, 103, audit_inventories_parallel)!
+}
+
+// The unmanaged-queries successor inherits all one hundred six sealed roots.
+pub fn audit_one_hundred_six_inventories(pins map[string]string) ! {
+	audit_inventory_batches_with(pins, 106, audit_inventories_parallel)!
 }

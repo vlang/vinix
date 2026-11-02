@@ -641,6 +641,23 @@ const asset_locales_bindings = '2264b7af0bf4a5b39da876e2ef82a291983d7ea9bd2c5f73
 const asset_locales_generated = 'd054fd51235e1893db9f5d78a747660abb69f185a803a6caa01c0dfc206d7a6c'
 const asset_locales_c = 'd96b7dd8e1e69bb22575bd7762e8e2890feaed379e8a57031aab73c27c8160c7'
 const asset_locales_consumed_headers = '835fb6533bfa976a3434086d9b05f12f2fb1b17e9a61f149d1e028d3bc27ab41'
+const unmanaged_queries_base = '/Users/alex/.local/state/vinix/android/maps-asset-locales-r1'
+const unmanaged_queries_base_seal = '79cec2267e044fde635f557af256eab41d49648ba07828d87a6c0e93417a1dd5'
+const unmanaged_queries_boot = '4a312784a314693288d7b0105c15367d07adef793720a8d5d352228265ca5f57'
+const unmanaged_queries_base_overlay = 'dfd23007302424380cccdaa6d842ff56f06f792281226452031fefad9d2c4b83'
+const unmanaged_queries_old_deployment = 'cef1bdbddf5e5bcf635283fa42d446b4e3917e853b5cd5b72b3794b810070e27'
+const unmanaged_queries_old_headless = '613e2fb112b58bc0f0ee500143edf55688aa03db0f3ac1fac3f79d8be92b2fac'
+const unmanaged_queries_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-unmanaged-queries-framework-2026-11-02-r1'
+const unmanaged_queries_seal = 'c54e83fadd83a1e74f2fc8938c5767c190d5783fba5f95fd583aa6432d8c361e'
+const unmanaged_queries_build = '81c6943bfcf1cc990c4dc66ebcfe11e93393ffbaf646904af1099b4d6df397cf'
+const unmanaged_queries_jar = '25500d52cf7c03a2a1c82656c00284c507dbdb03cff546dbc6e5840aa45b5c1c'
+const unmanaged_queries_dex = '9d3fba4639ddbf6cb987eb270efc5f090c93e1cd852abcacb84fe1d943a10608'
+const unmanaged_queries_framework_helper = 'f37430be3118de11416321ad6dcd180b8358e186f3e808d6c3940dd5be9e0fbf'
+const unmanaged_queries_provider_helper = 'abc514d53493bf65827108671c1d7ab7077a73a62a13b5010c692b1b267d29df'
+const unmanaged_queries_device_owner_raw = 'ca8fe29177db890e6c346e10320474e2305bacb0b66524efdcb0951a22edda22'
+const unmanaged_queries_device_owner_canonical = 'acc9e1082d2ac56903fb23f73dc6121235b46b10fb3f73155d66e95534b0c285'
+const unmanaged_queries_managed_profile_raw = '3b22357f76edf872d8e0539017a3144999aa64f9d1b1522f0cca3eeb302e79cf'
+const unmanaged_queries_managed_profile_canonical = 'ca127b95ac46238d8885f1aed2531e99590bd26ab24eff9b21cfa076e032db1a'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -5327,6 +5344,150 @@ fn asset_locales_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return asset_locales_base + '/boot.img'
 }
 
+fn unmanaged_queries_profile() Profile {
+	mut modules := asset_locales_profile().modules.clone()
+	modules << 'maps-asset-locales.tar'
+	return Profile{'maps-unmanaged-queries', unmanaged_queries_boot, 'maps-unmanaged-queries.tar', modules}
+}
+fn unmanaged_queries_modules() map[string]string {
+	mut modules := asset_locales_modules()
+	modules['maps-asset-locales.tar'] = unmanaged_queries_base_overlay
+	return modules
+}
+fn unmanaged_queries_fields() map[string]string {
+	mut fields := asset_locales_fields()
+	fields['kind'] = 'vinix-maps-unmanaged-queries-v1'
+	fields['base_root'] = unmanaged_queries_base
+	fields['base_manifest_sha256'] = unmanaged_queries_base_seal
+	fields['framework_build_root'] = unmanaged_queries_framework
+	fields['framework_manifest_sha256'] = unmanaged_queries_seal
+	fields['framework_jar_sha256'] = unmanaged_queries_jar
+	fields['framework_dex_sha256'] = unmanaged_queries_dex
+	fields['retained_framework_manifest_sha256'] = asset_locales_seal
+	fields['retained_native_manifest_sha256'] = asset_locales_native_seal
+	fields['native_framework_manifest_sha256'] = asset_locales_seal
+	fields['native_compatibility_framework_manifest_sha256'] = asset_locales_seal
+	fields['retained_native_framework_manifest_sha256'] = asset_locales_seal
+	fields['native_consumed_headers_before_sha256'] = asset_locales_consumed_headers
+	return fields
+}
+fn unmanaged_queries_inputs() map[string]string {
+	mut inputs := asset_locales_inputs()
+	inputs[unmanaged_queries_base + '/sha256.json'] = unmanaged_queries_base_seal
+	inputs[unmanaged_queries_framework + '/sha256.json'] = unmanaged_queries_seal
+	return inputs
+}
+fn unmanaged_queries_known_delta() map[string]string {
+	return {'/' + service_query_jar_path: unmanaged_queries_jar,
+		'/' + service_query_dex_path: unmanaged_queries_dex,
+		'/' + service_query_headless + '/framework-build.json': unmanaged_queries_build,
+		'/' + service_query_headless + '/framework-sha256.json': unmanaged_queries_seal}
+}
+fn unmanaged_queries_source_delta() map[string]string {
+	return {'smali/android/app/admin/DevicePolicyManager.smali': unmanaged_queries_device_owner_raw,
+		'smali/android/os/UserManager.smali': unmanaged_queries_managed_profile_raw}
+}
+fn unmanaged_queries_canonical_delta() map[string]string {
+	return {'new-dex/android/app/admin/DevicePolicyManager.smali': unmanaged_queries_device_owner_canonical,
+		'new-dex/android/os/UserManager.smali': unmanaged_queries_managed_profile_canonical}
+}
+fn unmanaged_queries_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework.v': unmanaged_queries_framework_helper,
+		'tests/native-android-tools/androidtools/framework_unmanaged_queries.v': unmanaged_queries_provider_helper}
+}
+fn unmanaged_queries_proofs() map[string]string {
+	return {
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: unmanaged_queries_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256'])
+		'framework_source_delta': json2.encode(unmanaged_queries_source_delta())
+		'framework_canonical_delta': json2.encode(unmanaged_queries_canonical_delta())
+		'framework_builder_helper_delta': json2.encode(unmanaged_queries_helper_delta())
+		'framework_class_count': json2.encode(2108)
+		'framework_changed_method_counts': json2.encode({'android/app/admin/DevicePolicyManager.smali': 0, 'android/os/UserManager.smali': 0})
+		'framework_added_method_counts': json2.encode({'android/app/admin/DevicePolicyManager.smali': 1, 'android/os/UserManager.smali': 1})
+		'framework_added_fields': json2.encode(map[string][]string{})
+		'framework_added_classes': json2.encode([]string{})
+		'native_source_delta': json2.encode(map[string]string{})
+		'native_builder_helper_delta': json2.encode(map[string]string{})
+		'native_bindings_delta': json2.encode(map[string][]string{})
+		'native_generated_jni_delta': json2.encode(map[string][]string{})
+		'native_c_delta': json2.encode(map[string][]string{})
+		'native_consumed_header_additions': json2.encode(map[string]string{})
+		'native_consumed_class_count': json2.encode(70)
+		'retained_native_consumed_class_count': json2.encode(70)
+		'native_export_count': json2.encode(721)
+		'native_source_origin_count': json2.encode(91)
+		'native_input_count': json2.encode(92)
+		'native_export_additions': json2.encode([]string{})
+		'native_consumed_raw_delta': json2.encode(map[string][]string{})
+		'native_consumed_canonical_delta': json2.encode(map[string][]string{})
+		'native_consumed_raw_additions': json2.encode(map[string]string{})
+		'native_consumed_canonical_additions': json2.encode(map[string]string{})
+	}
+}
+fn unmanaged_queries_overlay_paths() []string { return pending_intent_overlay_paths() }
+fn verify_unmanaged_queries_overlay(receipt map[string]json2.Any) ! {
+	for name in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		if name in receipt { return error('unmanaged queries may only replace existing framework inputs') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('unmanaged-queries deployment delta absent') }))!
+	mut expected := unmanaged_queries_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('unmanaged-queries headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == unmanaged_queries_old_headless { return error('new unmanaged-queries headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('unmanaged-queries exact five deployment input changes differ') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('unmanaged-queries overlay inventory absent') }))!
+	paths := unmanaged_queries_overlay_paths()
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe unmanaged-queries overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != 0o644 { return error('unmanaged-queries regular allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected unmanaged-queries overlay inode') }
+	}
+	if regulars.len != 6 || regulars[service_query_deployment] or { '' } == unmanaged_queries_old_deployment { return error('exact six unmanaged-queries files required') }
+	for path, pin in expected { if regulars[path.trim_left('/')] or { '' } != pin { return error('unmanaged-queries input differs from inventory') } }
+}
+fn verify_unmanaged_queries_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [unmanaged_queries_base_seal, unmanaged_queries_boot, unmanaged_queries_base_overlay,
+		unmanaged_queries_old_deployment, unmanaged_queries_old_headless, unmanaged_queries_seal,
+		unmanaged_queries_build, unmanaged_queries_jar, unmanaged_queries_dex,
+		asset_locales_native_seal, asset_locales_native_build, asset_locales_native_pin,
+		asset_locales_seal, asset_locales_generated, asset_locales_c, asset_locales_bindings, asset_locales_consumed_headers] {
+		if !digest_valid(pin) { return error('completed unmanaged-queries SDK and retained locale native producer required') }
+	}
+	for values in [unmanaged_queries_source_delta(), unmanaged_queries_canonical_delta(), unmanaged_queries_helper_delta()] {
+		for _, pin in values { if !digest_valid(pin) { return error('completed unmanaged-queries class/helper pins required') } }
+	}
+	if unmanaged_queries_seal == asset_locales_seal || unmanaged_queries_jar == asset_locales_jar || unmanaged_queries_dex == asset_locales_dex { return error('new unmanaged-queries framework required') }
+	for name, expected in unmanaged_queries_fields() { if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('unmanaged-queries receipt differs: ' + name) } }
+	for name, expected in unmanaged_queries_proofs() { if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](expected)! { return error('unmanaged-queries proof differs: ' + name) } }
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 108 || seals != unmanaged_queries_inputs() { return error('unmanaged-queries exact one hundred eight dependency seals differ') }
+	for path in stage.inputs_sha256.keys() {
+		for root in [dialog_theme_relink_root(), resources_float_relink_root(), layout_alignment_relink_root(), window_animations_relink_root()] {
+			if path == root || path.starts_with(root + '/') { return error('historical relink leaves are not new unmanaged-queries direct inputs') }
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != unmanaged_queries_modules() || stage.preserved_modules_sha256 != unmanaged_queries_modules() { return error('unmanaged-queries original forty-five modules differ') }
+	verify_unmanaged_queries_overlay(receipt)!
+}
+fn unmanaged_queries_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_unmanaged_queries_receipt(receipt, stage)!
+	path := unmanaged_queries_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != unmanaged_queries_base_seal { return error('unmanaged-queries original asset-locales manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != unmanaged_queries_boot || pins['maps-asset-locales.tar'] or { '' } != unmanaged_queries_base_overlay { return error('unmanaged-queries original boot or asset-locales overlay differs') }
+	return unmanaged_queries_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -5969,6 +6130,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = stable_display_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-asset-locales' {
 		baseline = asset_locales_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-unmanaged-queries' {
+		baseline = unmanaged_queries_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -11420,6 +11583,173 @@ fn asset_locales_profile_self_test() ! {
 	println('MAPS-ASSET-LOCALES KERNEL-PROFILE-SELF-TEST PASS seven files one hundred six seals forty-four inherited modules same70 native classes721 exports stableSDK native provenance')
 }
 
+fn unmanaged_queries_entries_fixture() []ServiceQueryEntry {
+	paths := unmanaged_queries_overlay_paths()
+	mut parents := map[string]bool{}
+	for path in paths {
+		mut parent := os.dir(path)
+		for parent !in ['', '.'] { parents[parent] = true; parent = os.dir(parent) }
+	}
+	mut entries := []ServiceQueryEntry{}
+	for name in parents.keys().sorted() { entries << ServiceQueryEntry{name: name, kind: 'directory', mode: 0o755} }
+	mut pins := unmanaged_queries_known_delta()
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	pins['/' + service_query_deployment] = 'b'.repeat(64)
+	for path in paths { entries << ServiceQueryEntry{name: path, kind: 'regular', mode: 0o644, sha256: pins['/' + path]!} }
+	return entries
+}
+fn unmanaged_queries_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in unmanaged_queries_fields() { receipt[name] = json2.Any(value) }
+	for name, value in unmanaged_queries_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	mut delta := unmanaged_queries_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(unmanaged_queries_entries_fixture()))!
+	return receipt
+}
+fn unmanaged_queries_profile_self_test() ! {
+	profile := unmanaged_queries_profile()
+	if profile.baseline_sha != unmanaged_queries_boot || profile.modules.len != 45 || profile.modules.last() != 'maps-asset-locales.tar'
+		|| unmanaged_queries_inputs().len != 108 || unmanaged_queries_inputs().keys().filter(it.ends_with('/sha256.json')).len != 108 { return error('unmanaged-queries strict retained-native profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 46 || unmanaged_queries_overlay_paths().len != 6 || unmanaged_queries_known_delta().len != 4 { return error('unmanaged-queries exact modules, files or changes differ') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', modules.reverse()}, Config{'vinix', profile.modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('wrong unmanaged-queries module order accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: unmanaged_queries_inputs(), original_modules_sha256: unmanaged_queries_modules(), preserved_modules_sha256: unmanaged_queries_modules()}
+	receipt := unmanaged_queries_receipt_fixture()!
+	verify_unmanaged_queries_receipt(receipt, stage)!
+	mut fields := unmanaged_queries_fields().keys()
+	fields << unmanaged_queries_proofs().keys()
+	fields << ['deployment_input_delta', 'overlay_inventory']
+	for name in fields {
+		mut bad := unmanaged_queries_receipt_fixture()!
+		bad[name] = json2.Any('changed')
+		if _ := verify_unmanaged_queries_receipt(bad, stage) { return error('changed unmanaged-queries field/proof accepted') }
+		bad.delete(name)
+		if _ := verify_unmanaged_queries_receipt(bad, stage) { return error('missing unmanaged-queries field/proof accepted') }
+	}
+	for proof in ['framework_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta',
+		'framework_changed_method_counts', 'framework_added_method_counts', 'framework_added_fields',
+		'native_source_delta', 'native_builder_helper_delta', 'native_bindings_delta', 'native_generated_jni_delta',
+		'native_c_delta', 'native_consumed_header_additions', 'native_consumed_raw_delta', 'native_consumed_canonical_delta',
+		'native_consumed_raw_additions', 'native_consumed_canonical_additions', 'headless_input_delta'] {
+		original := json2.decode[map[string]json2.Any](json2.encode(receipt[proof]!))!
+		for name in original.keys() {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(original))!
+			changed[name] = json2.Any('changed')
+			mut bad := unmanaged_queries_receipt_fixture()!
+			bad[proof] = json2.Any(changed)
+			if _ := verify_unmanaged_queries_receipt(bad, stage) { return error('changed unmanaged-queries proof member accepted') }
+			changed.delete(name)
+			bad[proof] = json2.Any(changed)
+			if _ := verify_unmanaged_queries_receipt(bad, stage) { return error('missing unmanaged-queries proof member accepted') }
+		}
+		mut extra := json2.decode[map[string]json2.Any](json2.encode(original))!
+		extra['unreviewed'] = json2.Any('a'.repeat(64))
+		mut bad := unmanaged_queries_receipt_fixture()!
+		bad[proof] = json2.Any(extra)
+		if _ := verify_unmanaged_queries_receipt(bad, stage) { return error('extra unmanaged-queries proof member accepted') }
+	}
+	for field, wrong in {'native_framework_manifest_sha256': unmanaged_queries_seal,
+		'retained_native_framework_manifest_sha256': stable_display_seal,
+		'native_compatibility_framework_manifest_sha256': stable_display_seal,
+		'retained_framework_manifest_sha256': unmanaged_queries_seal,
+		'retained_native_manifest_sha256': stable_display_native_seal,
+		'native_manifest_sha256': stable_display_native_seal,
+		'native_consumed_headers_before_sha256': stable_display_seal} {
+		mut bad := unmanaged_queries_receipt_fixture()!
+		bad[field] = json2.Any(wrong)
+		if _ := verify_unmanaged_queries_receipt(bad, stage) { return error('unmanaged-queries retained native or SDK provenance substituted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := unmanaged_queries_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_unmanaged_queries_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed unmanaged-queries input accepted') }
+		pins.delete(path)
+		if _ := verify_unmanaged_queries_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing unmanaged-queries input accepted') }
+	}
+	for path in ['/unreviewed/sha256.json', dialog_theme_relink_root(), resources_float_relink_root(),
+		layout_alignment_relink_root(), window_animations_relink_root(), dialog_theme_relink_root() + '/out/canonical.so'] {
+		mut pins := unmanaged_queries_inputs()
+		pins[path] = 'a'.repeat(64)
+		if _ := verify_unmanaged_queries_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('extra unmanaged-queries seal or historical proof leaf accepted') }
+	}
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: asset_locales_modules()}, Stage{...stage, preserved_modules_sha256: asset_locales_modules()}] {
+		if _ := verify_unmanaged_queries_receipt(receipt, bad) { return error('wrong unmanaged-queries module inventory accepted') }
+	}
+	for addition in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		mut bad := unmanaged_queries_receipt_fixture()!
+		bad[addition] = json2.Any(map[string]json2.Any{})
+		if _ := verify_unmanaged_queries_receipt(bad, stage) { return error('unmanaged-queries addition or relink proof accepted') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta']!))!
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := unmanaged_queries_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_unmanaged_queries_receipt(bad, stage) { return error('missing unmanaged-queries actual input change accepted') }
+	}
+	mut wrong_delta := delta.clone()
+	wrong_delta['/' + native_onboarding_trace_path] = asset_locales_native_pin
+	mut wrong_native := unmanaged_queries_receipt_fixture()!
+	wrong_native['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(wrong_delta))!
+	if _ := verify_unmanaged_queries_receipt(wrong_native, stage) { return error('unmanaged-queries native deployment replacement accepted') }
+	entries := unmanaged_queries_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := unmanaged_queries_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_unmanaged_queries_receipt(bad, stage) { return error('unsafe unmanaged-queries overlay inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := unmanaged_queries_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_unmanaged_queries_receipt(bad, stage) { return error('missing unmanaged-queries overlay file accepted') }
+			if entry.name != service_query_deployment {
+				bad_entries = entries.clone()
+				bad_entries[index] = ServiceQueryEntry{...entry, sha256: '0'.repeat(64)}
+				bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+				if _ := verify_unmanaged_queries_receipt(bad, stage) { return error('changed unmanaged-queries overlay pin accepted') }
+			}
+		}
+	}
+	for extra in [entries.last(), ServiceQueryEntry{name: 'opt/unreviewed', kind: 'regular', mode: 0o644, sha256: 'a'.repeat(64)},
+		ServiceQueryEntry{name: native_onboarding_trace_path, kind: 'regular', mode: 0o755, sha256: asset_locales_native_pin}] {
+		mut changed := entries.clone()
+		changed << extra
+		mut bad := unmanaged_queries_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_unmanaged_queries_receipt(bad, stage) { return error('duplicate, native or unreviewed unmanaged-queries overlay file accepted') }
+	}
+	for stale_path, stale_pin in {service_query_headless + '/guest-inputs.json': unmanaged_queries_old_headless, service_query_deployment: unmanaged_queries_old_deployment} {
+		mut changed := entries.clone()
+		for index, entry in changed { if entry.name == stale_path { changed[index] = ServiceQueryEntry{...entry, sha256: stale_pin} } }
+		mut bad := unmanaged_queries_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if stale_path != service_query_deployment {
+			mut stale_delta := delta.clone()
+			stale_delta['/' + stale_path] = stale_pin
+			bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(stale_delta))!
+		}
+		if _ := verify_unmanaged_queries_receipt(bad, stage) { return error('stale unmanaged-queries metadata accepted') }
+	}
+	for old in [asset_locales_receipt_fixture()!, stable_display_receipt_fixture()!, pending_intent_receipt_fixture()!, resource_lock_receipt_fixture()!] {
+		if _ := verify_unmanaged_queries_receipt(old, stage) { return error('historical receipt accepted by unmanaged-queries profile') }
+	}
+	if _ := verify_asset_locales_receipt(receipt, stage) { return error('unmanaged-queries receipt accepted by asset-locales profile') }
+	if _ := verify_pending_intent_receipt(receipt, stage) { return error('unmanaged-queries receipt accepted by PendingIntent profile') }
+	println('MAPS-UNMANAGED-QUERIES KERNEL-PROFILE-SELF-TEST PASS six files one hundred eight seals forty-five inherited modules same70 native classes721 exports deviceSDK native provenance')
+}
+
 fn resource_lock_entries_fixture() []ServiceQueryEntry {
 	paths := resource_lock_overlay_paths()
 	mut parents := map[string]bool{}
@@ -11618,6 +11948,7 @@ fn self_test() ! {
 	pending_intent_profile_self_test()!
 	stable_display_profile_self_test()!
 	asset_locales_profile_self_test()!
+	unmanaged_queries_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -11701,6 +12032,7 @@ fn self_test() ! {
 	fat_self_test(root + '/pending-intent', 'maps-pending-intent.tar', pending_intent_profile().modules)!
 	fat_self_test(root + '/stable-display', 'maps-stable-display.tar', stable_display_profile().modules)!
 	fat_self_test(root + '/asset-locales', 'maps-asset-locales.tar', asset_locales_profile().modules)!
+	fat_self_test(root + '/unmanaged-queries', 'maps-unmanaged-queries.tar', unmanaged_queries_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -11751,9 +12083,10 @@ fn main() {
 	is_pending_intent := os.args.len == 5 && os.args[1] == '--maps-pending-intent'
 	is_stable_display := os.args.len == 5 && os.args[1] == '--maps-stable-display'
 	is_asset_locales := os.args.len == 5 && os.args[1] == '--maps-asset-locales'
-	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display || is_asset_locales
+	is_unmanaged_queries := os.args.len == 5 && os.args[1] == '--maps-unmanaged-queries'
+	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display || is_asset_locales || is_unmanaged_queries
 	if os.args.len != 4 && !is_selected {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display|--maps-asset-locales] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display|--maps-asset-locales|--maps-unmanaged-queries] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
 	offset := if is_selected { 1 } else { 0 }
@@ -11766,7 +12099,7 @@ fn main() {
 		exit(1)
 	}
 	profile := if is_seed_companion { seed_companion_profile() } else if is_broker_tail { broker_tail_profile() } else if is_window_system_ui { window_system_ui_profile() } else if is_imageview_bounds { imageview_bounds_profile() } else if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
-	selected_profile := if is_asset_locales { asset_locales_profile() } else if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
+	selected_profile := if is_unmanaged_queries { unmanaged_queries_profile() } else if is_asset_locales { asset_locales_profile() } else if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
 	patch(root, build_root, os.args[3 + offset], selected_profile) or {
 		eprintln(err)
 		exit(1)
