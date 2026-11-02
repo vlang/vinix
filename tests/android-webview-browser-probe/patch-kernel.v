@@ -787,6 +787,22 @@ const usage_inactive_provider_path = 'tests/native-android-tools/androidtools/fr
 const usage_inactive_provider_helper = 'f6ade1627c3b8fbf90af86e77473de55ef1e1bfbcc4c76c4f8bfde78a0799b44'
 const usage_inactive_raw = '2694087a4d3bf7130bdaec2b12450b89f95138ceaa5a4c0d6c4fd9f495fd75db'
 const usage_inactive_canonical = '069e3ac3375487f084f0cc5770c1787376ee9e36c1190b4e70beb441fb799433'
+const messenger_binder_base = '/Users/alex/.local/state/vinix/android/maps-usage-inactive-r1'
+const messenger_binder_base_seal = '8685761d98b7e3d395bde91d2ec2e7db9c23fa60aa4472aaa47d821d9ae2245c'
+const messenger_binder_boot = 'df650c8205b40e0f44bdf1cc9d5b934a157de57b277b729647721776f1164d7b'
+const messenger_binder_base_overlay = '7b7fbf48222c331f052bade63dc39ac21808219cdc9444a54284eb6ffda98e7b'
+const messenger_binder_old_deployment = 'ce4afbf0092a55f3683afe61b2272c54024c49e2a100c2e2c9ab1704721e0b86'
+const messenger_binder_old_headless = 'c9965777993a30a721cb21d352717516c55a2082bbf43c924920703ea21947a4'
+const messenger_binder_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-messenger-binder-framework-2026-11-02-r1'
+const messenger_binder_seal = 'e3d313ae3e51404da203344ef1a6db32a4aaf24fe01ac971a71fd69ae586aa85'
+const messenger_binder_build = '8804ebf214adfae4f07e0b59d88d4de558e857df674ebbee47eb60988852454e'
+const messenger_binder_jar = 'ddeeb613e7767cbfb3e2bf3818ff02f8f9ab10918f26868dba8047a2cc539129'
+const messenger_binder_dex = '72f53fda25f6165c5cde7ff769596153ab14b89ab2bc69f060bc40dc62f5b345'
+const messenger_binder_framework_helper = 'bf8217af5e8b9b68a6d05ee90e570ccc57d81abca384144f5a0add340fd53bb3'
+const messenger_binder_provider_path = 'tests/native-android-tools/androidtools/framework_messenger.v'
+const messenger_binder_provider_helper = 'ef5c6c6a6dd2ab61da6972b39a1c5735614c8a9157181f8233c501c9f2e2df3b'
+const messenger_binder_message_path = 'tests/native-android-tools/androidtools/framework_message_parcel.v'
+const messenger_binder_message_helper = '881f45173c3f042c1a19214f8a6bc4979a1eeb95cf739a30c079c71cb6c0637c'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -6579,6 +6595,164 @@ fn usage_inactive_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return usage_inactive_base + '/boot.img'
 }
 
+fn messenger_binder_profile() Profile {
+	mut modules := usage_inactive_profile().modules.clone()
+	modules << 'maps-usage-inactive.tar'
+	return Profile{'maps-messenger-binder', messenger_binder_boot, 'maps-messenger-binder.tar', modules}
+}
+fn messenger_binder_modules() map[string]string {
+	mut modules := usage_inactive_modules()
+	modules['maps-usage-inactive.tar'] = messenger_binder_base_overlay
+	return modules
+}
+fn messenger_binder_fields() map[string]string {
+	mut fields := usage_inactive_fields()
+	fields['kind'] = 'vinix-maps-messenger-binder-v1'
+	fields['base_root'] = messenger_binder_base
+	fields['base_manifest_sha256'] = messenger_binder_base_seal
+	fields['framework_build_root'] = messenger_binder_framework
+	fields['framework_manifest_sha256'] = messenger_binder_seal
+	fields['framework_jar_sha256'] = messenger_binder_jar
+	fields['framework_dex_sha256'] = messenger_binder_dex
+	fields['retained_framework_manifest_sha256'] = usage_inactive_seal
+	return fields
+}
+fn messenger_binder_inputs() map[string]string {
+	mut inputs := usage_inactive_inputs()
+	inputs[messenger_binder_base + '/sha256.json'] = messenger_binder_base_seal
+	inputs[messenger_binder_framework + '/sha256.json'] = messenger_binder_seal
+	return inputs
+}
+fn messenger_binder_known_delta() map[string]string {
+	return {'/' + service_query_jar_path: messenger_binder_jar,
+		'/' + service_query_dex_path: messenger_binder_dex,
+		'/' + service_query_headless + '/framework-build.json': messenger_binder_build,
+		'/' + service_query_headless + '/framework-sha256.json': messenger_binder_seal}
+}
+fn messenger_binder_source_delta() map[string]string {
+	return {'smali/android/os/Handler$MessengerImpl.smali': '0cf00be98a78ec089f6a9f7c485ce64f412e67daeaab8f6534116c82120b3b3b',
+		'smali/android/os/IMessenger.smali': '6d218a5e2b441c024e34eb64d7acf464431bab54d0c504be14421ded23f0c14a',
+		'smali/android/os/Message.smali': 'cb76b7f22e2bfa4bf1071e866410e1626de9e39c603f933cbc25a34166aa6df4',
+		'smali/android/os/Messenger$1.smali': '0089cb36f433a7741e2f77ec0a26e30ca6765778aada38b088e309c65977e2fd',
+		'smali/android/os/Messenger.smali': 'f66413432bef7c61dcfa59040b9ad24dedcba0331681de8165ab6cfa425c1ac5',
+		'smali/android/os/IMessenger$Stub$Proxy.smali': '4e629afec9f4539aa807ee0f12493df0e7d975df7f3e2049774b063a33d88fbe',
+		'smali/android/os/IMessenger$Stub.smali': '20291c6160fa837dd79c470f2804a64f6cc49582cc7445325532ecc01785480f',
+		'smali/android/os/VinixMessageCreator.smali': 'fa3cac14d37acbc1baa5104510321ac9d87d27ec53ed7dbd82ad0d18b9c20b9d'}
+}
+fn messenger_binder_canonical_delta() map[string]string {
+	return {'new-dex/android/os/Handler$MessengerImpl.smali': 'c1a6814b2793af8deeda66c4771078534751fd18846239612fb14e1c1131bb2a',
+		'new-dex/android/os/IMessenger.smali': '2650da658d7520821ed7552f0f8444bddf4db74cfc64d3668a65d2b4d044fe11',
+		'new-dex/android/os/Message.smali': '76aaced3d88a2001959401c1e539fe5487918cc9a90eaa9d15a9b8ecd60b6697',
+		'new-dex/android/os/Messenger$1.smali': '2580f0200e2beb8b0db21c6f402a3c92e05ff448e216219ab7359758c329d169',
+		'new-dex/android/os/Messenger.smali': 'ed9cd8dc9bfcd372488e5f7d97857f7892d036d53db43c460161c90fccde9f7f',
+		'new-dex/android/os/IMessenger$Stub$Proxy.smali': '19faf521401f97c0df20aad7ecfe3c7bf64957b0ed59b23f8ab8d9c4c5f9fd6a',
+		'new-dex/android/os/IMessenger$Stub.smali': '0183f7b7216d297fc67b0562be15e623374d1552fc4964d41ccf0ad04340f0f9',
+		'new-dex/android/os/VinixMessageCreator.smali': '2705c54f8e9a0c9b0a6b17f6b896c62fd3916ac3af929d019fac2c7a0cf809d7'}
+}
+fn messenger_binder_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework.v': messenger_binder_framework_helper,
+		messenger_binder_provider_path: messenger_binder_provider_helper,
+		messenger_binder_message_path: messenger_binder_message_helper}
+}
+fn messenger_binder_method_changes() map[string]int {
+	return {'android/os/Handler$MessengerImpl.smali': 2, 'android/os/IMessenger.smali': 0,
+		'android/os/Message.smali': 5, 'android/os/Messenger$1.smali': 0, 'android/os/Messenger.smali': 4}
+}
+fn messenger_binder_method_additions() map[string]int {
+	return {'android/os/Handler$MessengerImpl.smali': 0, 'android/os/IMessenger.smali': 0,
+		'android/os/Message.smali': 1, 'android/os/Messenger$1.smali': 5, 'android/os/Messenger.smali': 4}
+}
+fn messenger_binder_method_removals() map[string]int {
+	return {'android/os/Handler$MessengerImpl.smali': 0, 'android/os/IMessenger.smali': 0,
+		'android/os/Message.smali': 0, 'android/os/Messenger$1.smali': 2, 'android/os/Messenger.smali': 0}
+}
+fn messenger_binder_field_additions() map[string][]string {
+	return {'android/os/Message.smali': ['.field public static final CREATOR:Landroid/os/Parcelable$Creator;', '.field public sendingUid:I'],
+		'android/os/Messenger.smali': ['.field public static final CREATOR:Landroid/os/Parcelable$Creator;']}
+}
+fn messenger_binder_field_removals() map[string][]string {
+	return {'android/os/Messenger$1.smali': ['.field final synthetic this$0:Landroid/os/Messenger;']}
+}
+fn messenger_binder_added_classes() []string {
+	return ['android/os/IMessenger$Stub.smali', 'android/os/IMessenger$Stub$Proxy.smali', 'android/os/VinixMessageCreator.smali']
+}
+fn messenger_binder_proofs() map[string]string {
+	mut proofs := usage_inactive_proofs()
+	proofs['headless_input_delta'] = json2.encode({'/' + service_query_jar_path: messenger_binder_jar})
+	proofs['framework_source_delta'] = json2.encode(messenger_binder_source_delta())
+	proofs['framework_canonical_delta'] = json2.encode(messenger_binder_canonical_delta())
+	proofs['framework_builder_helper_delta'] = json2.encode(messenger_binder_helper_delta())
+	proofs['framework_class_count'] = json2.encode(2115)
+	proofs['framework_changed_method_counts'] = json2.encode(messenger_binder_method_changes())
+	proofs['framework_added_method_counts'] = json2.encode(messenger_binder_method_additions())
+	proofs['framework_removed_method_counts'] = json2.encode(messenger_binder_method_removals())
+	proofs['framework_added_fields'] = json2.encode(messenger_binder_field_additions())
+	proofs['framework_removed_fields'] = json2.encode(messenger_binder_field_removals())
+	proofs['framework_added_classes'] = json2.encode(messenger_binder_added_classes())
+	return proofs
+}
+fn messenger_binder_overlay_paths() []string { return usage_inactive_overlay_paths() }
+fn verify_messenger_binder_overlay(receipt map[string]json2.Any) ! {
+	for name in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		if name in receipt { return error('Messenger Binder may only replace existing framework inputs') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('messenger-binder deployment delta absent') }))!
+	mut expected := messenger_binder_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('messenger-binder headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == messenger_binder_old_headless { return error('new messenger-binder headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('messenger-binder exact five deployment input changes differ') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('messenger-binder overlay inventory absent') }))!
+	paths := messenger_binder_overlay_paths()
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe messenger-binder overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != 0o644 { return error('messenger-binder regular allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected messenger-binder overlay inode') }
+	}
+	if regulars.len != 6 || regulars[service_query_deployment] or { '' } == messenger_binder_old_deployment { return error('exact six messenger-binder files required') }
+	for path, pin in expected { if regulars[path.trim_left('/')] or { '' } != pin { return error('messenger-binder input differs from inventory') } }
+}
+fn verify_messenger_binder_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [messenger_binder_base_seal, messenger_binder_boot, messenger_binder_base_overlay,
+		messenger_binder_old_deployment, messenger_binder_old_headless, messenger_binder_seal,
+		messenger_binder_build, messenger_binder_jar, messenger_binder_dex,
+		broadcast_permission_native_seal, broadcast_permission_native_build, broadcast_permission_native_pin,
+		broadcast_permission_seal, asset_locales_generated, asset_locales_c, asset_locales_bindings, broadcast_permission_consumed_headers] {
+		if !digest_valid(pin) { return error('completed Messenger Binder SDK and retained broadcast native producer required') }
+	}
+	for values in [messenger_binder_source_delta(), messenger_binder_canonical_delta(), messenger_binder_helper_delta()] {
+		for path, pin in values { if !relative(path) || !digest_valid(pin) { return error('completed Messenger Binder class/helper pins required') } }
+	}
+	if messenger_binder_seal == usage_inactive_seal || messenger_binder_jar == usage_inactive_jar || messenger_binder_dex == usage_inactive_dex { return error('new Messenger Binder framework required') }
+	for name, expected in messenger_binder_fields() { if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('messenger-binder receipt differs: ' + name) } }
+	for name, expected in messenger_binder_proofs() { if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](expected)! { return error('messenger-binder proof differs: ' + name) } }
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 125 || seals != messenger_binder_inputs() { return error('messenger-binder exact one hundred twenty-five dependency seals differ') }
+	for path in stage.inputs_sha256.keys() {
+		for root in [dialog_theme_relink_root(), resources_float_relink_root(), layout_alignment_relink_root(), window_animations_relink_root()] {
+			if path == root || path.starts_with(root + '/') { return error('historical relink leaves are not new Messenger Binder direct inputs') }
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != messenger_binder_modules() || stage.preserved_modules_sha256 != messenger_binder_modules() { return error('messenger-binder original fifty-three modules differ') }
+	verify_messenger_binder_overlay(receipt)!
+}
+fn messenger_binder_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_messenger_binder_receipt(receipt, stage)!
+	path := messenger_binder_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != messenger_binder_base_seal { return error('messenger-binder original Usage manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != messenger_binder_boot || pins['maps-usage-inactive.tar'] or { '' } != messenger_binder_base_overlay { return error('messenger-binder original boot or Usage overlay differs') }
+	return messenger_binder_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -7237,6 +7411,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = secure_settings_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-usage-inactive' {
 		baseline = usage_inactive_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-messenger-binder' {
+		baseline = messenger_binder_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -14083,6 +14259,184 @@ fn usage_inactive_profile_self_test() ! {
 	println('MAPS-USAGE-INACTIVE KERNEL-PROFILE-SELF-TEST PASS six files one hundred twenty-three seals fifty-two inherited modules2112 classes disabled app standby retained broadcast native')
 }
 
+fn messenger_binder_entries_fixture() []ServiceQueryEntry {
+	paths := messenger_binder_overlay_paths()
+	mut parents := map[string]bool{}
+	for path in paths {
+		mut parent := os.dir(path)
+		for parent !in ['', '.'] { parents[parent] = true; parent = os.dir(parent) }
+	}
+	mut entries := []ServiceQueryEntry{}
+	for name in parents.keys().sorted() { entries << ServiceQueryEntry{name: name, kind: 'directory', mode: 0o755} }
+	mut pins := messenger_binder_known_delta()
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	pins['/' + service_query_deployment] = 'b'.repeat(64)
+	for path in paths { entries << ServiceQueryEntry{name: path, kind: 'regular', mode: 0o644, sha256: pins['/' + path]!} }
+	return entries
+}
+fn messenger_binder_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in messenger_binder_fields() { receipt[name] = json2.Any(value) }
+	for name, value in messenger_binder_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	mut delta := messenger_binder_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(messenger_binder_entries_fixture()))!
+	return receipt
+}
+fn messenger_binder_profile_self_test() ! {
+	profile := messenger_binder_profile()
+	if profile.baseline_sha != messenger_binder_boot || profile.modules.len != 53 || profile.modules.last() != 'maps-usage-inactive.tar'
+		|| messenger_binder_inputs().len != 125 || messenger_binder_inputs().keys().filter(it.ends_with('/sha256.json')).len != 125 { return error('messenger-binder retained-native profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 54 || messenger_binder_overlay_paths().len != 6 || messenger_binder_known_delta().len != 4
+		|| messenger_binder_source_delta().len != 8 || messenger_binder_canonical_delta().len != 8 || messenger_binder_added_classes().len != 3 { return error('messenger-binder exact modules, files or classes differ') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', modules.reverse()}, Config{'vinix', profile.modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('wrong messenger-binder module order accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: messenger_binder_inputs(), original_modules_sha256: messenger_binder_modules(), preserved_modules_sha256: messenger_binder_modules()}
+	receipt := messenger_binder_receipt_fixture()!
+	verify_messenger_binder_receipt(receipt, stage)!
+	mut fields := messenger_binder_fields().keys()
+	fields << messenger_binder_proofs().keys()
+	fields << ['deployment_input_delta', 'overlay_inventory']
+	for name in fields {
+		mut bad := messenger_binder_receipt_fixture()!
+		bad[name] = json2.Any('changed')
+		if _ := verify_messenger_binder_receipt(bad, stage) { return error('changed messenger-binder field/proof accepted') }
+		bad.delete(name)
+		if _ := verify_messenger_binder_receipt(bad, stage) { return error('missing messenger-binder field/proof accepted') }
+	}
+	for proof in ['framework_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta',
+		'framework_changed_method_counts', 'framework_added_method_counts', 'framework_removed_method_counts',
+		'framework_added_fields', 'framework_removed_fields',
+		'native_source_delta', 'native_builder_helper_delta', 'native_bindings_delta', 'native_generated_jni_delta',
+		'native_c_delta', 'native_consumed_header_additions', 'native_consumed_raw_delta', 'native_consumed_canonical_delta',
+		'native_consumed_raw_additions', 'native_consumed_canonical_additions', 'headless_input_delta'] {
+		original := json2.decode[map[string]json2.Any](json2.encode(receipt[proof]!))!
+		for name in original.keys() {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(original))!
+			changed[name] = json2.Any('changed')
+			mut bad := messenger_binder_receipt_fixture()!
+			bad[proof] = json2.Any(changed)
+			if _ := verify_messenger_binder_receipt(bad, stage) { return error('changed messenger-binder proof member accepted') }
+			changed.delete(name)
+			bad[proof] = json2.Any(changed)
+			if _ := verify_messenger_binder_receipt(bad, stage) { return error('missing messenger-binder proof member accepted') }
+		}
+		mut extra := json2.decode[map[string]json2.Any](json2.encode(original))!
+		extra['unreviewed'] = json2.Any('a'.repeat(64))
+		mut bad := messenger_binder_receipt_fixture()!
+		bad[proof] = json2.Any(extra)
+		if _ := verify_messenger_binder_receipt(bad, stage) { return error('extra messenger-binder proof member accepted') }
+	}
+	for added in [json2.encode([]string{}), json2.encode(['android/os/IMessenger$Stub$Proxy.smali', 'android/os/IMessenger$Stub.smali']),
+		json2.encode(['android/os/IMessenger$Stub$Proxy.smali', 'android/os/IMessenger$Stub.smali', 'android/os/VinixMessageCreator.smali', 'android/os/Unreviewed.smali']),
+		json2.encode(['android/service/quicksettings/TileService.smali'])] {
+		mut bad := messenger_binder_receipt_fixture()!
+		bad['framework_added_classes'] = json2.decode[json2.Any](added)!
+		if _ := verify_messenger_binder_receipt(bad, stage) { return error('wrong messenger-binder class additions accepted') }
+	}
+	for field, wrong in {'native_framework_manifest_sha256': usage_inactive_seal,
+		'native_compatibility_framework_manifest_sha256': messenger_binder_seal,
+		'retained_native_framework_manifest_sha256': usage_inactive_seal,
+		'retained_framework_manifest_sha256': secure_settings_seal,
+		'retained_native_manifest_sha256': asset_locales_native_seal,
+		'native_manifest_sha256': asset_locales_native_seal,
+		'native_build_root': asset_locales_native,
+		'native_build_sha256': asset_locales_native_build,
+		'native_sha256': asset_locales_native_pin,
+		'native_consumed_headers_before_sha256': asset_locales_consumed_headers} {
+		mut bad := messenger_binder_receipt_fixture()!
+		bad[field] = json2.Any(wrong)
+		if _ := verify_messenger_binder_receipt(bad, stage) { return error('stale or relabeled Messenger Binder native provenance accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := messenger_binder_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_messenger_binder_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed messenger-binder input accepted') }
+		pins.delete(path)
+		if _ := verify_messenger_binder_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing messenger-binder input accepted') }
+	}
+	for path in ['/unreviewed/sha256.json', dialog_theme_relink_root(), resources_float_relink_root(),
+		layout_alignment_relink_root(), window_animations_relink_root(), dialog_theme_relink_root() + '/out/canonical.so'] {
+		mut pins := messenger_binder_inputs()
+		pins[path] = 'a'.repeat(64)
+		if _ := verify_messenger_binder_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('extra messenger-binder seal or historical proof leaf accepted') }
+	}
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: usage_inactive_modules()}, Stage{...stage, preserved_modules_sha256: usage_inactive_modules()}] {
+		if _ := verify_messenger_binder_receipt(receipt, bad) { return error('wrong messenger-binder module inventory accepted') }
+	}
+	for addition in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		mut bad := messenger_binder_receipt_fixture()!
+		bad[addition] = json2.Any(map[string]json2.Any{})
+		if _ := verify_messenger_binder_receipt(bad, stage) { return error('messenger-binder addition or relink proof accepted') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta']!))!
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := messenger_binder_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_messenger_binder_receipt(bad, stage) { return error('missing messenger-binder actual input change accepted') }
+	}
+	mut wrong_delta := delta.clone()
+	wrong_delta['/' + native_onboarding_trace_path] = broadcast_permission_native_pin
+	mut wrong_native := messenger_binder_receipt_fixture()!
+	wrong_native['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(wrong_delta))!
+	if _ := verify_messenger_binder_receipt(wrong_native, stage) { return error('messenger-binder native deployment replacement accepted') }
+	entries := messenger_binder_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := messenger_binder_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_messenger_binder_receipt(bad, stage) { return error('unsafe messenger-binder overlay inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := messenger_binder_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_messenger_binder_receipt(bad, stage) { return error('missing messenger-binder overlay file accepted') }
+			if entry.name != service_query_deployment {
+				bad_entries = entries.clone()
+				bad_entries[index] = ServiceQueryEntry{...entry, sha256: '0'.repeat(64)}
+				bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+				if _ := verify_messenger_binder_receipt(bad, stage) { return error('changed messenger-binder overlay pin accepted') }
+			}
+		}
+	}
+	for extra in [entries.last(), ServiceQueryEntry{name: 'opt/unreviewed', kind: 'regular', mode: 0o644, sha256: 'a'.repeat(64)},
+		ServiceQueryEntry{name: native_onboarding_trace_path, kind: 'regular', mode: 0o755, sha256: broadcast_permission_native_pin}] {
+		mut changed := entries.clone()
+		changed << extra
+		mut bad := messenger_binder_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_messenger_binder_receipt(bad, stage) { return error('duplicate, native or unreviewed messenger-binder overlay file accepted') }
+	}
+	for stale_path, stale_pin in {service_query_headless + '/guest-inputs.json': messenger_binder_old_headless, service_query_deployment: messenger_binder_old_deployment} {
+		mut changed := entries.clone()
+		for index, entry in changed { if entry.name == stale_path { changed[index] = ServiceQueryEntry{...entry, sha256: stale_pin} } }
+		mut bad := messenger_binder_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if stale_path != service_query_deployment {
+			mut stale_delta := delta.clone()
+			stale_delta['/' + stale_path] = stale_pin
+			bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(stale_delta))!
+		}
+		if _ := verify_messenger_binder_receipt(bad, stage) { return error('stale messenger-binder metadata accepted') }
+	}
+	for old in [usage_inactive_receipt_fixture()!, secure_settings_receipt_fixture()!, broadcast_permission_receipt_fixture()!, keyguard_policy_receipt_fixture()!, autofill_service_receipt_fixture()!] {
+		if _ := verify_messenger_binder_receipt(old, stage) { return error('historical receipt accepted by messenger-binder profile') }
+	}
+	if _ := verify_usage_inactive_receipt(receipt, stage) { return error('messenger-binder receipt accepted by Usage profile') }
+	println('MAPS-MESSENGER-BINDER KERNEL-PROFILE-SELF-TEST PASS six files one hundred twenty-five seals fifty-three inherited modules2115 classes exact Messenger removals retained broadcast native')
+}
+
 fn resource_lock_entries_fixture() []ServiceQueryEntry {
 	paths := resource_lock_overlay_paths()
 	mut parents := map[string]bool{}
@@ -14289,6 +14643,7 @@ fn self_test() ! {
 	broadcast_permission_profile_self_test()!
 	secure_settings_profile_self_test()!
 	usage_inactive_profile_self_test()!
+	messenger_binder_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -14380,6 +14735,7 @@ fn self_test() ! {
 	fat_self_test(root + '/broadcast-permission', 'maps-broadcast-permission.tar', broadcast_permission_profile().modules)!
 	fat_self_test(root + '/secure-settings', 'maps-secure-settings.tar', secure_settings_profile().modules)!
 	fat_self_test(root + '/usage-inactive', 'maps-usage-inactive.tar', usage_inactive_profile().modules)!
+	fat_self_test(root + '/messenger-binder', 'maps-messenger-binder.tar', messenger_binder_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -14438,8 +14794,10 @@ fn main() {
 	is_broadcast_permission := os.args.len == 5 && os.args[1] == '--maps-broadcast-permission'
 	is_secure_settings := os.args.len == 5 && os.args[1] == '--maps-secure-settings'
 	is_usage_inactive := os.args.len == 5 && os.args[1] == '--maps-usage-inactive'
+	is_messenger_binder := os.args.len == 5 && os.args[1] == '--maps-messenger-binder'
 	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display || is_asset_locales || is_unmanaged_queries || is_stats_unavailable || is_subscription_service
-	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings && !is_usage_inactive {
+	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings && !is_usage_inactive && !is_messenger_binder {
+		eprintln('       patch-kernel --maps-messenger-binder FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-usage-inactive FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-secure-settings FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-broadcast-permission FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
@@ -14448,7 +14806,7 @@ fn main() {
 		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display|--maps-asset-locales|--maps-unmanaged-queries|--maps-stats-unavailable|--maps-subscription-service] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings || is_usage_inactive { 1 } else { 0 }
+	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings || is_usage_inactive || is_messenger_binder { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -14459,7 +14817,7 @@ fn main() {
 	}
 	profile := if is_seed_companion { seed_companion_profile() } else if is_broker_tail { broker_tail_profile() } else if is_window_system_ui { window_system_ui_profile() } else if is_imageview_bounds { imageview_bounds_profile() } else if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	selected_profile := if is_subscription_service { subscription_service_profile() } else if is_stats_unavailable { stats_unavailable_profile() } else if is_unmanaged_queries { unmanaged_queries_profile() } else if is_asset_locales { asset_locales_profile() } else if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
-	final_profile := if is_usage_inactive { usage_inactive_profile() } else if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
+	final_profile := if is_messenger_binder { messenger_binder_profile() } else if is_usage_inactive { usage_inactive_profile() } else if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
 	patch(root, build_root, os.args[3 + offset], final_profile) or {
 		eprintln(err)
 		exit(1)
