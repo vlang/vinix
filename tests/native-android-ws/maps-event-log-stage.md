@@ -98,3 +98,29 @@ Future preparation preserves the mandatory 5 GiB initial-space gate,
 600 MiB RSS, 900-second wall time, 4 GiB outer growth, 512 MiB internal growth,
 1 GiB reserve, 4 MiB output and shell file cap 16777216. No closed artifact is
 removed or weakened.
+
+The automatic preparation passed with the same qualified tools and unchanged
+guards. `maps-event-log-preparation-2026-11-02-r1` records guard/child exits zero,
+empty reason and complete cleanup in 359.564 seconds. All 127 inherited
+inventories were audited twice, the six-file overlay installed and all 56
+modules read back. Sampled RSS peaked at 90,439,680 bytes; detailed RSS was
+92,094,464 bytes, with zero swaps. Initial free space was 41,036,922,880 bytes,
+minimum 40,935,256,064 bytes, and observed outer growth 101,666,816 bytes.
+Final internal cumulative charge was 146,509,824 bytes; the earlier stage
+snapshot is 146,386,944 bytes before receipt and seal writes. All original
+limits remain unchanged and the interrupted tool-selftest evidence stays
+preserved in the three-root tool seal.
+
+The completed `maps-event-log-r1/sha256.json` hashes to
+`04e6b12c1b1a2336c6103b611c36989b4b869551c8f14e2c8c43ed588b0d462f`.
+Boot SHA256 is
+`922b70239f352901b56c5af54fbf01892b5847b89c6eaca5701fd2daec4a6f85`;
+overlay SHA256 is
+`2de692f19cc1c1c6a97c47e0375c4504beb8c98409b966470d624573a9158937`.
+Recorded source revision is
+`644b7f6d4f9b2c5229a86d38de2a9da2a84e0a80`. The preparation guard hashes to
+`d8fc831748b16c63a1c4dbce1ea845096f499cb6ad6b526c80f8d92d49417177`
+and its log to
+`10df052c7589f8b19ed5fe7d66c39c30c0e9834968fd679171ca11d3936dec41`.
+All tool, preparation and prepared roots are closed. This host preparation
+establishes no EventLog ARM, Google account, checkin or imagery result.
