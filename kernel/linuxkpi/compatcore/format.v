@@ -26,19 +26,19 @@ mut:
 struct FormatOutput {
 mut:
 	buf      &char
-	size     usize
-	position usize
+	size     uint
+	position uint
 	status   u32
 	stop     bool
 	count_checked  bool
-	count_limit    usize
+	count_limit    uint
 	count_overflow bool
 }
 
 @[export: 'vkr_format_key']
 pub fn vkr_format_key(key &u64) i32 {
 	unsafe {
-		if usize(key) == 0 { return -22 }
+		if uint(key) == 0 { return -22 }
 		if !C.vinix_linuxkpi_may_sleep() { return -11 }
 		mut expected := u32(0)
 		if !C.vkr_compare32(&vkr_pointer_key_state, &expected, 1, false, 4, 2) {
@@ -57,7 +57,7 @@ fn vkrf_alnum(c u8) bool {
 
 // Allocation sizing must reject a count before it can wrap or narrow to int.
 // Ordinary formatter callers keep the existing unchecked counting mode.
-fn vkrf_count_overflows(out &FormatOutput, len usize) bool {
+fn vkrf_count_overflows(out &FormatOutput, len uint) bool {
 	if !out.count_checked { return false }
 	if out.count_overflow { return true }
 	if out.position > out.count_limit || len > out.count_limit - out.position {
@@ -68,7 +68,7 @@ fn vkrf_count_overflows(out &FormatOutput, len usize) bool {
 	return false
 }
 
-fn vkrf_bytes(out &FormatOutput, data &char, len usize) {
+fn vkrf_bytes(out &FormatOutput, data &char, len uint) {
 	unsafe {
 		if vkrf_count_overflows(out, len) { return }
 		if out.position < out.size {
@@ -80,7 +80,7 @@ fn vkrf_bytes(out &FormatOutput, data &char, len usize) {
 	}
 }
 
-fn vkrf_pad(out &FormatOutput, c u8, len usize) {
+fn vkrf_pad(out &FormatOutput, c u8, len uint) {
 	unsafe {
 		if vkrf_count_overflows(out, len) { return }
 		if out.position < out.size {
@@ -137,7 +137,7 @@ fn vkrf_number(out &FormatOutput, input u64, original FormatSpec) {
 		if i32(count) > precision { precision = i32(count) }
 		width -= precision
 		if width > 0 && (spec.flags & (16 | 2)) == 0 {
-			vkrf_pad(out, ` `, usize(width))
+			vkrf_pad(out, ` `, uint(width))
 			width = 0
 		}
 		if sign != 0 { vkrf_char(out, sign) }
@@ -146,26 +146,26 @@ fn vkrf_number(out &FormatOutput, input u64, original FormatSpec) {
 			if spec.base == 16 { vkrf_char(out, `X` | u8(spec.flags & 32)) }
 		}
 		if width > 0 && (spec.flags & 2) == 0 {
-			vkrf_pad(out, if (spec.flags & 16) != 0 { u8(`0`) } else { u8(` `) }, usize(width))
+			vkrf_pad(out, if (spec.flags & 16) != 0 { u8(`0`) } else { u8(` `) }, uint(width))
 			width = 0
 		}
-		if precision > i32(count) { vkrf_pad(out, `0`, usize(precision - i32(count))) }
+		if precision > i32(count) { vkrf_pad(out, `0`, uint(precision - i32(count))) }
 		for count != 0 {
 			count--
 			vkrf_char(out, reversed[count])
 		}
-		if width > 0 { vkrf_pad(out, ` `, usize(width)) }
+		if width > 0 { vkrf_pad(out, ` `, uint(width)) }
 	}
 }
 
 fn vkrf_string(out &FormatOutput, str &char, spec FormatSpec) {
 	unsafe {
-		mut len := usize(0)
+		mut len := uint(0)
 		for (spec.precision < 0 || len < u32(spec.precision)) && str[len] != 0 { len++ }
-		spaces := if spec.width > 0 && usize(spec.width) > len {
-			usize(spec.width) - len
+		spaces := if spec.width > 0 && uint(spec.width) > len {
+			uint(spec.width) - len
 		} else {
-			usize(0)
+			uint(0)
 		}
 		if (spec.flags & 2) == 0 { vkrf_pad(out, ` `, spaces) }
 		vkrf_bytes(out, str, len)
@@ -182,11 +182,11 @@ fn vkrf_error(out &FormatOutput, text &char, original FormatSpec) {
 fn vkrf_is_err(ptr voidptr) bool { return u64(ptr) >= u64(-4095) }
 
 fn vkrf_bad_pointer(out &FormatOutput, ptr voidptr, spec FormatSpec) bool {
-	if usize(ptr) == 0 {
+	if uint(ptr) == 0 {
 		vkrf_error(out, c'(null)', spec)
 		return true
 	}
-	if usize(ptr) < 4096 || vkrf_is_err(ptr) {
+	if uint(ptr) < 4096 || vkrf_is_err(ptr) {
 		vkrf_error(out, c'(efault)', spec)
 		return true
 	}
@@ -210,7 +210,7 @@ fn vkrf_pointer_number(out &FormatOutput, value u64, original FormatSpec) {
 
 fn vkrf_pointer_id(out &FormatOutput, ptr voidptr, original FormatSpec) {
 	unsafe {
-		if usize(ptr) == 0 || vkrf_is_err(ptr) {
+		if uint(ptr) == 0 || vkrf_is_err(ptr) {
 			vkrf_pointer_number(out, u64(ptr), original)
 			return
 		}
@@ -379,17 +379,17 @@ fn vkrf_fourcc(out &FormatOutput, pointer voidptr, spec FormatSpec) {
 	}
 }
 
-fn vkrf_unsupported(out &FormatOutput, extension &char, len usize) {
+fn vkrf_unsupported(out &FormatOutput, extension &char, len uint) {
 	unsafe {
 		vkrf_bytes(out, c'(unsupported %p', 15)
-		vkrf_bytes(out, extension, if len < 12 { len } else { usize(12) })
+		vkrf_bytes(out, extension, if len < 12 { len } else { uint(12) })
 		vkrf_char(out, `)`)
 		out.status |= 2
 		out.stop = true
 	}
 }
 
-fn vkrf_pointer(out &FormatOutput, extension &char, len usize, ptr voidptr, original FormatSpec) {
+fn vkrf_pointer(out &FormatOutput, extension &char, len uint, ptr voidptr, original FormatSpec) {
 	unsafe {
 		mut spec := original
 		if len == 0 {
@@ -404,7 +404,7 @@ fn vkrf_pointer(out &FormatOutput, extension &char, len usize, ptr voidptr, orig
 				if vkrf_is_err(ptr) {
 					spec.flags |= 1
 					spec.base = 10
-					vkrf_number(out, u64(i64(i32(usize(ptr)))), spec)
+					vkrf_number(out, u64(i64(i32(uint(ptr)))), spec)
 				} else {
 					vkrf_pointer_id(out, ptr, spec)
 				}
@@ -429,11 +429,11 @@ fn vkrf_pointer(out &FormatOutput, extension &char, len usize, ptr voidptr, orig
 				if vkrf_bad_pointer(out, ptr, spec) { return }
 				mut inner := FormatOutput{
 					buf:  if out.position < out.size { out.buf + out.position } else { &char(0) }
-					size: if out.position < out.size { out.size - out.position } else { usize(0) }
+					size: if out.position < out.size { out.size - out.position } else { uint(0) }
 					count_checked: out.count_checked
 					count_limit: if out.count_checked && out.position <= out.count_limit {
 						out.count_limit - out.position
-					} else { usize(0) }
+					} else { uint(0) }
 				}
 				vkr_nested_parse(&inner, ptr)
 				if inner.count_overflow {
@@ -561,7 +561,7 @@ pub fn vkr_format_parse(out &FormatOutput, format &char, args voidptr) {
 			if conversion == `p` {
 				extension := fmt
 				for vkrf_alnum(u8(fmt[0])) { fmt++ }
-				vkrf_pointer(out, extension, usize(fmt) - usize(extension), vkr_arg_pointer(args), spec)
+				vkrf_pointer(out, extension, uint(fmt) - uint(extension), vkr_arg_pointer(args), spec)
 				continue
 			}
 			if conversion == `o` {
@@ -616,25 +616,25 @@ pub fn vkr_format_parse(out &FormatOutput, format &char, args voidptr) {
 }
 
 @[export: 'vkr_format_entry']
-pub fn vkr_format_entry(buf &char, size usize, fmt &char, args voidptr, status &u32) i32 {
+pub fn vkr_format_entry(buf &char, size uint, fmt &char, args voidptr, status &u32) i32 {
 	unsafe {
 		if size > 2147483647 {
-			if usize(status) != 0 { *status = 1 }
+			if uint(status) != 0 { *status = 1 }
 			return 0
 		}
 		mut out := FormatOutput{ buf: buf, size: size }
 		vkr_format_parse(&out, fmt, args)
 		if size != 0 { buf[if out.position < size { out.position } else { size - 1 }] = 0 }
 		if out.position >= size && out.position != 0 { out.status |= 4 }
-		if usize(status) != 0 { *status = out.status }
+		if uint(status) != 0 { *status = out.status }
 		return i32(out.position)
 	}
 }
 
 // scnprintf reports retained bytes and does not consume arguments at size zero.
 @[export: 'vkr_format_sc_entry']
-pub fn vkr_format_sc_entry(buf &char, size usize, fmt &char, args voidptr) i32 {
+pub fn vkr_format_sc_entry(buf &char, size uint, fmt &char, args voidptr) i32 {
 	if size == 0 { return 0 }
 	count := vkr_format_entry(buf, size, fmt, args, unsafe { nil })
-	return if usize(count) < size { count } else { i32(size - 1) }
+	return if uint(count) < size { count } else { i32(size - 1) }
 }

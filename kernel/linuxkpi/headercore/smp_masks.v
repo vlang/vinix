@@ -48,7 +48,7 @@ fn cpu_mask_original(kind u32) &C.cpumask {
 @[export: 'vkm_mask_storage']
 pub fn cpu_mask_storage(kind u32) voidptr {
 	mask := cpu_mask_original(kind)
-	if usize(mask) == 0 {
+	if uint(mask) == 0 {
 		return unsafe { nil }
 	}
 	return C.cpumask_bits(mask)
@@ -72,7 +72,7 @@ pub fn cpu_mask_has(kind u32, cpu u32) bool {
 		return false
 	}
 	mask := cpu_mask_original(kind)
-	return usize(mask) != 0 && C.cpumask_test_cpu(i32(cpu), mask)
+	return uint(mask) != 0 && C.cpumask_test_cpu(i32(cpu), mask)
 }
 
 @[export: 'vkm_mask_weight']
@@ -81,7 +81,7 @@ pub fn cpu_mask_weight(kind u32) u32 {
 		return 0
 	}
 	mask := cpu_mask_original(kind)
-	if usize(mask) == 0 {
+	if uint(mask) == 0 {
 		return 0
 	}
 	return C.cpumask_weight(mask)

@@ -25,28 +25,28 @@ fn C.vinix_linuxkpi_may_sleep() bool
 fn C.vinix_linuxkpi_task_queued(voidptr) bool
 fn C.vinix_linuxkpi_test_task_signal(voidptr, u64)
 fn C.vinix_linuxkpi_test_alloc_oom(i32)
-fn C.vinix_linuxkpi_irq_save() usize
-fn C.vinix_linuxkpi_irq_restore(usize)
+fn C.vinix_linuxkpi_irq_save() uint
+fn C.vinix_linuxkpi_irq_restore(uint)
 fn C.init_completion(&C.completion)
 fn C.complete(&C.completion)
 fn C.complete_all(&C.completion)
 fn C.completion_done(&C.completion) bool
 fn C.wait_for_completion(&C.completion)
-fn C.wait_for_completion_timeout(&C.completion, usize) usize
-fn C.wait_on_bit(&usize, i32, u32) i32
-fn C.wait_on_bit_lock(&usize, i32, u32) i32
-fn C.wait_on_bit_action(&usize, i32, BitAction, u32) i32
-fn C.wait_on_bit_lock_action(&usize, i32, BitAction, u32) i32
-fn C.wait_on_bit_timeout(&usize, i32, u32, usize) i32
-fn C.bit_waitqueue(&usize, i32) &C.wait_queue_head
+fn C.wait_for_completion_timeout(&C.completion, uint) uint
+fn C.wait_on_bit(&uint, i32, u32) i32
+fn C.wait_on_bit_lock(&uint, i32, u32) i32
+fn C.wait_on_bit_action(&uint, i32, BitAction, u32) i32
+fn C.wait_on_bit_lock_action(&uint, i32, BitAction, u32) i32
+fn C.wait_on_bit_timeout(&uint, i32, u32, uint) i32
+fn C.bit_waitqueue(&uint, i32) &C.wait_queue_head
 fn C.__var_waitqueue(voidptr) &C.wait_queue_head
-fn C.wake_up_bit(&usize, i32)
+fn C.wake_up_bit(&uint, i32)
 fn C.wake_up_var(voidptr)
-fn C.clear_and_wake_up_bit(i32, &usize)
+fn C.clear_and_wake_up_bit(i32, &uint)
 fn C.clear_bit_unlock(i32, voidptr)
-fn C.set_bit(i32, &usize)
-fn C.test_bit(i32, &usize) bool
-fn C.test_bit_acquire(i32, &usize) bool
+fn C.set_bit(i32, &uint)
+fn C.test_bit(i32, &uint) bool
+fn C.test_bit_acquire(i32, &uint) bool
 fn C.init_wait_entry(&C.wait_queue_entry, i32)
 fn C.prepare_to_wait(&C.wait_queue_head, &C.wait_queue_entry, i32)
 fn C.finish_wait(&C.wait_queue_head, &C.wait_queue_entry)
@@ -55,7 +55,7 @@ fn C.wait_var_event(voidptr, u32)
 fn C.wait_var_event_killable(voidptr, u32) i32
 fn C.__wait_var_event_killable(voidptr, u32) i32
 fn C.__wait_var_event_interruptible(voidptr, u32) i32
-fn C.wait_var_event_timeout(voidptr, u32, usize) isize
+fn C.wait_var_event_timeout(voidptr, u32, uint) int
 fn C.READ_ONCE(u32) u32
 fn C.WRITE_ONCE(u32, u32)
 fn C.smp_mb()
@@ -63,15 +63,15 @@ fn C.smp_mb__after_atomic()
 fn C.schedule()
 fn C.cond_resched() i32
 fn C.msleep(u32)
-fn C.time_after_eq(usize, usize) bool
-fn C.time_before(usize, usize) bool
+fn C.time_after_eq(uint, uint) bool
+fn C.time_before(uint, uint) bool
 fn C.__atomic_load_n(&u32, i32) u32
-fn C.kmalloc(usize, u32) voidptr
+fn C.kmalloc(uint, u32) voidptr
 fn C.kfree(voidptr)
 fn C.BUG_ON(bool)
 fn C.kprintf(&char, ...) i32
 @[c_extern] __global C.current &C.task_struct
-@[c_extern] __global C.jiffies usize
+@[c_extern] __global C.jiffies uint
 @[c_extern] __global C.TASK_DEAD u32
 @[c_extern] __global C.TASK_UNINTERRUPTIBLE u32
 @[c_extern] __global C.TASK_INTERRUPTIBLE u32
@@ -95,7 +95,7 @@ mut:
  acquired C.completion
  release C.completion
  done C.completion
- word &usize = unsafe { nil }
+ word &uint = unsafe { nil }
  var voidptr = unsafe { nil }
  ready &u32 = unsafe { nil }
  payload &u32 = unsafe { nil }
@@ -146,7 +146,7 @@ pub fn worker(argument voidptr) voidptr {
   return nil
  }
 }
-fn start(test &BitTest, operation Operation, word &usize, bit i32, state u32, variable voidptr, ready &u32, payload &u32) i32 {
+fn start(test &BitTest, operation Operation, word &uint, bit i32, state u32, variable voidptr, ready &u32, payload &u32) i32 {
  unsafe {
   *test = BitTest{operation: operation, word: word, bit: bit, state: state, var: variable, ready: ready, payload: payload}
   C.init_completion(&test.entered); C.init_completion(&test.acquired)
@@ -178,14 +178,14 @@ fn join(test &BitTest) i32 {
   return result
  }
 }
-fn collision(words &usize, excluded u32) u32 {
+fn collision(words &uint, excluded u32) u32 {
  unsafe {
   queue := C.bit_waitqueue(words, 0)
-  for i := u32(16); i < 1024; i++ { if i != excluded && usize(C.bit_waitqueue(&words[i], 0)) == usize(queue) { return i } }
+  for i := u32(16); i < 1024; i++ { if i != excluded && uint(C.bit_waitqueue(&words[i], 0)) == uint(queue) { return i } }
   return 0
  }
 }
-fn keyed_body(tests &BitTest, words &usize, wrong_bit i32, collided u32, payload &u32) i32 {
+fn keyed_body(tests &BitTest, words &uint, wrong_bit i32, collided u32, payload &u32) i32 {
  unsafe {
   mut result := i32(0)
   if start(&tests[0], .clear, words, 0, C.TASK_UNINTERRUPTIBLE, nil, nil, payload) != 0 ||
@@ -207,12 +207,12 @@ fn keyed_body(tests &BitTest, words &usize, wrong_bit i32, collided u32, payload
 }
 fn keyed() i32 {
  unsafe {
-  mut words := [1024]usize{}
+  mut words := [1024]uint{}
   mut tests := [3]BitTest{}
   mut payload := u32(0)
   mut wrong_bit := i32(0)
   for bit := i32(C.BITS_PER_LONG); bit < 1024 * C.BITS_PER_LONG; bit++ {
-   if usize(C.bit_waitqueue(&words[0], bit)) == usize(C.bit_waitqueue(&words[0], 0)) { wrong_bit = bit; break }
+   if uint(C.bit_waitqueue(&words[0], bit)) == uint(C.bit_waitqueue(&words[0], 0)) { wrong_bit = bit; break }
   }
   if wrong_bit == 0 { return -C.EIO }
   collided := collision(&words[0], u32(wrong_bit / C.BITS_PER_LONG))
@@ -226,12 +226,12 @@ fn keyed() i32 {
   return result
  }
 }
-fn quota_body(tests &BitTest, words &usize, collided u32, payload &u32) i32 {
+fn quota_body(tests &BitTest, words &uint, collided u32, payload &u32) i32 {
  unsafe {
   mut result := i32(0)
   for i in 0 .. 3 {
-   word := if i != 0 { usize(words) } else { usize(&words[collided]) }
-   if start(&tests[i], .lock, &usize(word), 0, C.TASK_UNINTERRUPTIBLE, nil, nil, payload) != 0 || parked(&tests[i]) != 0 { return -C.EIO }
+   word := if i != 0 { uint(words) } else { uint(&words[collided]) }
+   if start(&tests[i], .lock, &uint(word), 0, C.TASK_UNINTERRUPTIBLE, nil, nil, payload) != 0 || parked(&tests[i]) != 0 { return -C.EIO }
   }
   C.clear_and_wake_up_bit(0, words)
   deadline := C.jiffies + 500
@@ -249,7 +249,7 @@ fn quota_body(tests &BitTest, words &usize, collided u32, payload &u32) i32 {
 }
 fn quota() i32 {
  unsafe {
-  mut words := [1024]usize{}
+  mut words := [1024]uint{}
   mut tests := [3]BitTest{}
   mut payload := u32(42)
   collided := collision(&words[0], 0)
@@ -265,7 +265,7 @@ fn quota() i32 {
 }
 fn display() i32 {
  unsafe {
-  mut word := usize(0); mut payload := u32(0); mut test := BitTest{}
+  mut word := uint(0); mut payload := u32(0); mut test := BitTest{}
   mut result := start(&test, .set, &word, 0, C.TASK_UNINTERRUPTIBLE, nil, nil, &payload)
   if result == 0 && parked(&test) != 0 { result = -C.EIO }
   C.WRITE_ONCE(payload, u32(42)); C.set_bit(0, &word); C.smp_mb__after_atomic(); C.wake_up_bit(&word, 0)
@@ -276,7 +276,7 @@ fn display() i32 {
 }
 fn interrupt() i32 {
  unsafe {
-  mut word := usize(1); mut test := BitTest{}
+  mut word := uint(1); mut test := BitTest{}
   mut result := start(&test, .clear, &word, 0, C.TASK_INTERRUPTIBLE, nil, nil, nil)
   if result == 0 {
    if parked(&test) != 0 { result = -C.EIO }
@@ -312,7 +312,7 @@ fn variable_body(test &BitTest, killable bool, address voidptr, allocated &bool,
 fn variable(killable bool, inaccessible bool) i32 {
  unsafe {
   mut ready := u32(0); mut payload := u32(0); mut test := BitTest{}
-  address := if inaccessible { voidptr(usize(1)) } else { C.kmalloc(64, C.GFP_KERNEL) }
+  address := if inaccessible { voidptr(uint(1)) } else { C.kmalloc(64, C.GFP_KERNEL) }
   mut allocated := !inaccessible && address != nil
   if address == nil { return -C.ENOMEM }
   mut result := variable_body(&test, killable, address, &allocated, &ready, &payload)
@@ -328,7 +328,7 @@ pub fn action_error(key &C.wait_bit_key, mode i32) i32 { return -C.ENOSPC }
 pub fn action_clear(key &C.wait_bit_key, mode i32) i32 { C.clear_bit_unlock(key.bit_nr, key.flags); return -C.EINTR }
 fn repeated() i32 {
  unsafe {
-  mut word := usize(0); mut ready := u32(1); mut result := i32(0)
+  mut word := uint(0); mut ready := u32(1); mut result := i32(0)
   for _ in 0 .. 256 {
    C.set_bit(0, &word)
    if C.wait_on_bit_timeout(&word, 0, C.TASK_UNINTERRUPTIBLE, 0) != -C.EAGAIN ||

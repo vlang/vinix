@@ -3,7 +3,7 @@
 // The QCA9377 firmware uses WMI TLV ABI 1.0, namespace QCA_/ML.
 module ath10k
 
-fn C.__builtin_alloca(usize) voidptr
+fn C.__builtin_alloca(uint) voidptr
 
 struct Command {
 mut:

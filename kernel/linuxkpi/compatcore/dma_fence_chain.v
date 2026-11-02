@@ -33,7 +33,7 @@ fn C.vkiw_queue(voidptr, i32) bool
 
 fn chain_cast(fence voidptr) &C.vfc_chain {
 	unsafe {
-		if is_null(fence) || usize((&C.vdf_fence(fence)).ops) != usize(C.vfc_ops_identity()) {
+		if is_null(fence) || uint((&C.vdf_fence(fence)).ops) != uint(C.vfc_ops_identity()) {
 			return nil
 		}
 		return &C.vfc_chain(fence)
@@ -57,7 +57,7 @@ pub fn dma_fence_chain_walk(fence voidptr) voidptr {
 				replacement = C.vfc_get_prev(prev_chain)
 			} else if !C.vfc_is_signaled(prev) { break }
 			old := C.vfc_compare_prev(&chain.prev, prev, replacement)
-			if usize(old) == usize(prev) { C.vfc_put(old) } else { C.vfc_put(replacement) }
+			if uint(old) == uint(prev) { C.vfc_put(old) } else { C.vfc_put(replacement) }
 			C.vfc_put(prev)
 			prev = C.vfc_get_prev(chain)
 		}

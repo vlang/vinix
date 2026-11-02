@@ -131,22 +131,22 @@ fn C.mod_timer(voidptr, u64) i32
 const work_no_pool = u64(0xfffffffe0)
 
 fn wq_work_at(entry &C.vkw_list) &C.vks_work {
-	unsafe { return &C.vks_work(usize(entry) - __offsetof(C.vks_work, entry)) }
+	unsafe { return &C.vks_work(uint(entry) - __offsetof(C.vks_work, entry)) }
 }
 fn wq_run_at(entry &C.vkw_list) &WorkRun {
-	unsafe { return &WorkRun(usize(entry) - __offsetof(WorkRun, entry)) }
+	unsafe { return &WorkRun(uint(entry) - __offsetof(WorkRun, entry)) }
 }
 fn wq_wait_at(entry &C.vkw_list) &WorkWait {
-	unsafe { return &WorkWait(usize(entry) - __offsetof(WorkWait, entry)) }
+	unsafe { return &WorkWait(uint(entry) - __offsetof(WorkWait, entry)) }
 }
 fn wq_worker_at(entry &C.vkw_list) &WqWorker {
-	unsafe { return &WqWorker(usize(entry) - __offsetof(WqWorker, entry)) }
+	unsafe { return &WqWorker(uint(entry) - __offsetof(WqWorker, entry)) }
 }
 fn wq_queue_at(entry &C.vkw_list) &WorkQueue {
-	unsafe { return &WorkQueue(usize(entry) - __offsetof(WorkQueue, all)) }
+	unsafe { return &WorkQueue(uint(entry) - __offsetof(WorkQueue, all)) }
 }
 fn wq_barrier_at(work &C.vks_work) &WorkBarrier {
-	unsafe { return &WorkBarrier(usize(work) - __offsetof(WorkBarrier, work)) }
+	unsafe { return &WorkBarrier(uint(work) - __offsetof(WorkBarrier, work)) }
 }
 fn wq_is_barrier(work &C.vks_work) bool {
 	unsafe { return voidptr(work.func) == C.vkwq_barrier_callback() }
@@ -180,7 +180,7 @@ fn wq_current_locked() &WorkRun {
 fn wq_canceling_locked(work &C.vks_work) bool {
 	unsafe {
 		for entry := C.vkwq_canceling.next; entry != &C.vkwq_canceling; entry = entry.next {
-			cancel := &WorkCancel(usize(entry) - __offsetof(WorkCancel, entry))
+			cancel := &WorkCancel(uint(entry) - __offsetof(WorkCancel, entry))
 			if voidptr(cancel.work) == voidptr(work) { return true }
 		}
 		return false
@@ -270,7 +270,7 @@ pub fn queue_work_on(cpu i32, queue voidptr, record voidptr) bool {
 	unsafe {
 		wq := &WorkQueue(queue)
 		work := &C.vks_work(record)
-		require(!is_null(wq) && usize(work.func) != 0)
+		require(!is_null(wq) && uint(work.func) != 0)
 		valid := wq_cpu_request_valid(cpu)
 		C.vkwq_warn_queue_cpu(!valid)
 		if !valid { return false }
@@ -302,7 +302,7 @@ fn wq_promote_delayed_locked(dwork &C.vks_delayed_work) {
 @[export: 'delayed_work_timer_fn']
 pub fn delayed_work_timer_fn(timer &C.timer_list) {
 	unsafe {
-		dwork := &C.vks_delayed_work(usize(timer) - __offsetof(C.vks_delayed_work, timer))
+		dwork := &C.vks_delayed_work(uint(timer) - __offsetof(C.vks_delayed_work, timer))
 		C.vkwq_delayed_gate(timer)
 		require((C.vinix_linuxkpi_irq_flags() & 512) == 0)
 		flags := C.vkp_spin_lock_irqsave(&vkwq_work_lock)
@@ -335,7 +335,7 @@ pub fn queue_delayed_work_on(cpu i32, queue voidptr, record voidptr, delay u64) 
 	unsafe {
 		wq := &WorkQueue(queue)
 		dwork := &C.vks_delayed_work(record)
-		require(!is_null(wq) && usize(dwork.work.func) != 0)
+		require(!is_null(wq) && uint(dwork.work.func) != 0)
 		valid := wq_cpu_request_valid(cpu)
 		C.vkwq_warn_delayed_cpu(!valid)
 		if !valid { return false }
@@ -377,7 +377,7 @@ pub fn mod_delayed_work_on(cpu i32, queue voidptr, record voidptr, delay u64) bo
 	unsafe {
 		wq := &WorkQueue(queue)
 		dwork := &C.vks_delayed_work(record)
-		require(!is_null(wq) && usize(dwork.work.func) != 0)
+		require(!is_null(wq) && uint(dwork.work.func) != 0)
 		valid := wq_cpu_request_valid(cpu)
 		C.vkwq_warn_mod_cpu(!valid)
 		if !valid { return false }
@@ -686,7 +686,7 @@ pub fn workqueue_allocate(flags u32, requested i32) voidptr {
 		wq.unbound = unbound
 		wq.highpri = (flags & 16) != 0
 		wq.nr_pools = nr_pools
-		wq.pools = &WqPool(C.kzalloc(usize(nr_pools) * sizeof(WqPool), 3264))
+		wq.pools = &WqPool(C.kzalloc(uint(nr_pools) * sizeof(WqPool), 3264))
 		if is_null(wq.pools) { C.kfree(wq); return nil }
 		for cpu := u32(0); cpu < nr_pools; cpu++ {
 			wq.pools[cpu].wq = wq

@@ -6,13 +6,13 @@ module stubs
 // Word accesses are naturally aligned and entirely inside the requested
 // range. The kernel builds with -fno-strict-aliasing for raw memory accesses.
 @[export: 'memcpy']
-pub fn memcpy(dest voidptr, src voidptr, n usize) voidptr {
+pub fn memcpy(dest voidptr, src voidptr, n uint) voidptr {
 	unsafe {
 		mut d := &u8(dest)
 		mut s := &u8(src)
 		mut left := n
-		if (usize(d) ^ usize(s)) & 7 == 0 {
-			for left != 0 && usize(d) & 7 != 0 {
+		if (uint(d) ^ uint(s)) & 7 == 0 {
+			for left != 0 && uint(d) & 7 != 0 {
 				*d = *s
 				d++
 				s++
@@ -53,12 +53,12 @@ pub fn memcpy(dest voidptr, src voidptr, n usize) voidptr {
 }
 
 @[export: 'memset']
-pub fn memset(dest voidptr, value int, n usize) voidptr {
+pub fn memset(dest voidptr, value int, n uint) voidptr {
 	unsafe {
 		mut d := &u8(dest)
 		mut left := n
 		byte := u8(value)
-		for left != 0 && usize(d) & 7 != 0 {
+		for left != 0 && uint(d) & 7 != 0 {
 			*d = byte
 			d++
 			left--
@@ -93,15 +93,15 @@ pub fn memset(dest voidptr, value int, n usize) voidptr {
 }
 
 @[export: 'memmove']
-pub fn memmove(dest voidptr, src voidptr, n usize) voidptr {
+pub fn memmove(dest voidptr, src voidptr, n uint) voidptr {
 	unsafe {
 		mut d := &u8(dest)
 		s := &u8(src)
-		if usize(dest) < usize(src) {
-			for i := usize(0); i < n; i++ {
+		if uint(dest) < uint(src) {
+			for i := uint(0); i < n; i++ {
 				d[i] = s[i]
 			}
-		} else if usize(dest) > usize(src) {
+		} else if uint(dest) > uint(src) {
 			mut i := n
 			for i != 0 {
 				i--
@@ -113,11 +113,11 @@ pub fn memmove(dest voidptr, src voidptr, n usize) voidptr {
 }
 
 @[export: 'memcmp']
-pub fn memcmp(first voidptr, second voidptr, n usize) int {
+pub fn memcmp(first voidptr, second voidptr, n uint) int {
 	unsafe {
 		a := &u8(first)
 		b := &u8(second)
-		for i := usize(0); i < n; i++ {
+		for i := uint(0); i < n; i++ {
 			if a[i] != b[i] {
 				return if a[i] < b[i] { -1 } else { 1 }
 			}

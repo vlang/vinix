@@ -223,7 +223,7 @@ pub fn release(_backing &Backing) {
 	store_lock.release()
 	if backing.physical != unsafe { nil } { memory.pmm_free(backing.physical, 1) }
 	if backing.compressed != unsafe { nil } {
-		krandom.explicit_bzero(backing.compressed, usize(backing.length))
+		krandom.explicit_bzero(backing.compressed, uint(backing.length))
 		memory.free(backing.compressed)
 	}
 	krandom.explicit_bzero(&backing.tag[0], sizeof(backing.tag))
@@ -319,7 +319,7 @@ pub fn store(_backing &Backing) u64 {
 			return 0
 		}
 		backing.length = length
-		unsafe { C.memcpy(backing.compressed, &packed[0], usize(length)) }
+		unsafe { C.memcpy(backing.compressed, &packed[0], uint(length)) }
 	} else if reserve_slot(mut backing) {
 		if !write_disk(mut backing) {
 			store_lock.acquire()
@@ -351,10 +351,10 @@ fn write_disk(mut backing Backing) bool {
 	if scratch == unsafe { nil } { return false }
 	data := unsafe { &u8(u64(scratch) + memory.get_hhdm_offset()) }
 	defer {
-		krandom.explicit_bzero(data, usize(3 * memory.page_size))
+		krandom.explicit_bzero(data, uint(3 * memory.page_size))
 		memory.pmm_free(scratch, 3)
 	}
-	unsafe { C.memcpy(data, voidptr(u64(backing.physical) + memory.get_hhdm_offset()), usize(memory.page_size)) }
+	unsafe { C.memcpy(data, voidptr(u64(backing.physical) + memory.get_hhdm_offset()), uint(memory.page_size)) }
 	crypt(unsafe { &encryption_key }, unsafe { &backing.nonce }, data, int(memory.page_size))
 	disk_tag(backing, data, unsafe { &backing.tag })
 	mut res := pager_device
@@ -382,7 +382,7 @@ fn read_disk(backing &Backing, output voidptr) bool {
 	}
 	data := unsafe { &u8(u64(scratch) + memory.get_hhdm_offset()) }
 	defer {
-		krandom.explicit_bzero(data, usize(3 * memory.page_size))
+		krandom.explicit_bzero(data, uint(3 * memory.page_size))
 		memory.pmm_free(scratch, 3)
 	}
 	mut res := pager_device
@@ -403,7 +403,7 @@ fn read_disk(backing &Backing, output voidptr) bool {
 	}
 	krandom.explicit_bzero(&tag[0], sizeof(tag))
 	crypt(unsafe { &encryption_key }, unsafe { &backing.nonce }, data, int(memory.page_size))
-	unsafe { C.memcpy(output, data, usize(memory.page_size)) }
+	unsafe { C.memcpy(output, data, uint(memory.page_size)) }
 	return true
 }
 
@@ -427,7 +427,7 @@ pub fn load(_backing &Backing) ?voidptr {
 	output := voidptr(u64(physical) + memory.get_hhdm_offset())
 	mut valid := true
 	if backing.physical != unsafe { nil } {
-		unsafe { C.memcpy(output, voidptr(u64(backing.physical) + memory.get_hhdm_offset()), usize(memory.page_size)) }
+		unsafe { C.memcpy(output, voidptr(u64(backing.physical) + memory.get_hhdm_offset()), uint(memory.page_size)) }
 	} else if backing.compressed != unsafe { nil } {
 		valid = decompress(backing.compressed, backing.length, output, int(memory.page_size))
 		if !valid { errno.set(errno.eio) }

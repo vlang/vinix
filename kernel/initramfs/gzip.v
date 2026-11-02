@@ -7,7 +7,7 @@ module initramfs
 // member's recorded size. RFC 1952 frames the RFC 1951 deflate data. Nothing
 // in this file allocates; the caller provides the decoder and both buffers.
 
-fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
 
 const gzip_flag_hcrc = u8(0x02)
 const gzip_flag_extra = u8(0x04)
@@ -237,7 +237,7 @@ fn (mut d Inflater) stored() bool {
 		return false
 	}
 	unsafe {
-		C.memcpy(&u8(u64(d.output) + d.output_at), &u8(u64(d.input) + d.input_at), usize(length))
+		C.memcpy(&u8(u64(d.output) + d.output_at), &u8(u64(d.input) + d.input_at), uint(length))
 	}
 	d.input_at += length
 	d.output_at += length
@@ -461,7 +461,7 @@ fn (mut d Inflater) codes() bool {
 			mut to := &u8(u64(d.output) + d.output_at)
 			from := &u8(u64(d.output) + d.output_at - distance)
 			if distance >= length {
-				C.memcpy(to, from, usize(length))
+				C.memcpy(to, from, uint(length))
 			} else {
 				for i := u64(0); i < length; i++ {
 					to[i] = from[i]

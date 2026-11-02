@@ -57,7 +57,7 @@ pub enum Bw_error {
 // Initialize software only. Pool must already be isolated by DART; bus master
 // *remains disabled until platform code has established that isolation.
 
-fn C.bw_init(arg &C.bw_device, arg_2 &C.bw_ops, cookie voidptr, pool_cpu voidptr, pool_dma u64, pool_len usize, registers_size u32, tcm_size u32) i32
+fn C.bw_init(arg &C.bw_device, arg_2 &C.bw_ops, cookie voidptr, pool_cpu voidptr, pool_dma u64, pool_len uint, registers_size u32, tcm_size u32) i32
 
 // Probe only accesses the declared endpoint. Reads core inventory and OTP;
 // *it does not upload firmware or turn on the radio.
@@ -70,24 +70,24 @@ fn C.bw_radio(arg &C.bw_device, enabled i32) i32
 
 fn C.bw_scan(arg &C.bw_device) i32
 
-fn C.bw_networks(arg &C.bw_device, output &u8, capacity usize) i32
+fn C.bw_networks(arg &C.bw_device, output &u8, capacity uint) i32
 
-fn C.bw_join_wpa2(arg &C.bw_device, ssid &u8, ssid_len usize, passphrase &u8, passphrase_len usize) i32
+fn C.bw_join_wpa2(arg &C.bw_device, ssid &u8, ssid_len uint, passphrase &u8, passphrase_len uint) i32
 
 fn C.bw_disconnect(arg &C.bw_device) i32
 
 fn C.bw_poll(arg &C.bw_device, budget u32) i32
 
-fn C.bw_transmit(arg &C.bw_device, ethernet &u8, length usize) i32
+fn C.bw_transmit(arg &C.bw_device, ethernet &u8, length uint) i32
 
 fn C.bw_stop(arg &C.bw_device)
 
 // Bounded, bw_m1_host-testable parsers. NVRAM input is board-specific text; output
 // *includes double NUL, padding, and the Broadcom complement length token.
 
-fn C.bw_nvram_pack(arg &u8, arg_2 usize, arg_3 &u8, arg_4 usize, arg_5 &usize) i32
+fn C.bw_nvram_pack(arg &u8, arg_2 uint, arg_3 &u8, arg_4 uint, arg_5 &uint) i32
 
-fn C.bw_otp_parse(arg &u8, arg_2 usize, arg_3 &C.bw_otp) i32
+fn C.bw_otp_parse(arg &u8, arg_2 uint, arg_3 &C.bw_otp) i32
 
 fn C.bw_state_name(arg i32) &char
 
@@ -116,8 +116,8 @@ pub mut:
 	gpio_active_low u32
 	calibration     &u8
 	seed            &u8
-	calibration_len usize
-	seed_len        usize
+	calibration_len uint
+	seed_len        uint
 	mac             [6]u8
 	antenna         [16]char
 }
@@ -209,7 +209,7 @@ pub fn m1_put64(p &u8, v u64) {
 @[export: 'vinix_m1_core_r32']
 pub fn m1_r32(a u64) u32 {
 	unsafe {
-	v := C.vinix_mmio_read32(voidptr(usize(a)))
+	v := C.vinix_mmio_read32(voidptr(uint(a)))
 	m1_barrier()
 	return v
 
@@ -220,7 +220,7 @@ pub fn m1_r32(a u64) u32 {
 pub fn m1_w32(a u64, v u32) {
 	unsafe {
 	m1_barrier()
-	C.vinix_mmio_write32(voidptr(usize(a)), v)
+	C.vinix_mmio_write32(voidptr(uint(a)), v)
 
 	}
 }
@@ -229,7 +229,7 @@ pub fn m1_w32(a u64, v u32) {
 pub fn m1_w16(a u64, v u16) {
 	unsafe {
 	m1_barrier()
-	C.vinix_mmio_write16(voidptr(usize(a)), v)
+	C.vinix_mmio_write16(voidptr(uint(a)), v)
 
 	}
 }
@@ -274,8 +274,8 @@ pub mut:
 	head           u16
 	tail           u16
 	drops          u64
-	total          [4]usize
-	used           [4]usize
+	total          [4]uint
+	used           [4]uint
 	firmware       [4194304]u8
 	nvram          [65536]u8
 	clm            [1048576]u8
@@ -333,7 +333,7 @@ pub fn m1_bus_read(unused voidptr, space u32, off u32, width u32) u32 {
 	if (width != u32(1) && width != u32(2) && width != u32(4)) || width > limit || off > limit - width || (off & (width - u32(1))) {
 		return u32(4294967295)
 	}
-	p := voidptr(usize((base + u64(off))))
+	p := voidptr(uint((base + u64(off))))
 	v := if width == u32(1) {
 		u32(C.vinix_mmio_read8(voidptr(p)))
 	} else {
@@ -367,7 +367,7 @@ pub fn m1_bus_write(unused voidptr, space u32, off u32, width u32, v u32) {
 	if (width != u32(1) && width != u32(2) && width != u32(4)) || width > limit || off > limit - width || (off & (width - u32(1))) {
 		return
 	}
-	p := voidptr(usize((base + u64(off))))
+	p := voidptr(uint((base + u64(off))))
 	m1_barrier()
 	if width == u32(1) {
 		C.vinix_mmio_write8(voidptr(p), u8(v))
@@ -401,7 +401,7 @@ pub fn m1_bus_delay(u voidptr, v u32) {
 }
 
 @[export: 'vinix_m1_core_bus_sync']
-pub fn m1_bus_sync(u voidptr, p voidptr, n usize, to_device i32) {
+pub fn m1_bus_sync(u voidptr, p voidptr, n uint, to_device i32) {
 	unsafe {
 
 
@@ -411,12 +411,12 @@ pub fn m1_bus_sync(u voidptr, p voidptr, n usize, to_device i32) {
 }
 
 @[export: 'vinix_m1_core_receive']
-pub fn m1_receive(u voidptr, p &C.bw_const_byte, n usize) {
+pub fn m1_receive(u voidptr, p &C.bw_const_byte, n uint) {
 	unsafe {
 
 
 	next := (u32(bw_m1_host.tail) + 1) % u32(64)
-	if n > usize(1514) || next == u32(bw_m1_host.head) {
+	if n > uint(1514) || next == u32(bw_m1_host.head) {
 		bw_m1_host.drops++
 		return
 	}
@@ -455,7 +455,7 @@ pub fn m1_dart_prepare() i32 {
 	// Install an RID2SID entry ONLY for Wi-Fi's RID 0x100.
 	//     *Bluetooth has a separate DT stream and is not assigned this mapping.
 
-	root := &u64(voidptr(usize(p.tables_cpu)))
+	root := &u64(voidptr(uint(p.tables_cpu)))
 	leaf := root + 2048
 
 	C.memset(voidptr(root), 0, u64(32768))
@@ -463,7 +463,7 @@ pub fn m1_dart_prepare() i32 {
 	for i := u32(0); i < (4 * 1024 * 1024) / u32(16384); i++ {
 		leaf[i] = (p.pool_physical + u64(i) * u64(16384)) | u64(3)
 	}
-	m1_cache_sync(voidptr(root), usize(32768), 1)
+	m1_cache_sync(voidptr(root), uint(32768), 1)
 	bw_m1_host.prepared = 1
 	// revoke on any subsequent partial-initialization failure
 
@@ -680,7 +680,7 @@ pub fn m1_platform_start() i32 {
 	}
 
 	bw_m1_probe_stage = 11
-	e = C.bw_init(&bw_m1_host.dev, &ops, voidptr((voidptr(0))), voidptr(usize(p.pool_cpu)), u64(268435456), usize((4 * 1024 * 1024)), bw_m1_host.bar0_len, bw_m1_host.bar2_len)
+	e = C.bw_init(&bw_m1_host.dev, &ops, voidptr((voidptr(0))), voidptr(uint(p.pool_cpu)), u64(268435456), uint((4 * 1024 * 1024)), bw_m1_host.bar0_len, bw_m1_host.bar2_len)
 	if e { goto reset }
 	bw_m1_probe_stage = 12
 	e = C.bw_probe(&bw_m1_host.dev)
@@ -716,7 +716,7 @@ pub fn brcm_m1_prepare(p &C.bw_m1_plan) i32 {
 	unsafe {
 	mut __c2v_condition_0 := false
 	mut __c2v_condition_1 := false
-	__c2v_condition_1 = (usize(p) == 0)
+	__c2v_condition_1 = (uint(p) == 0)
 	__c2v_condition_0 = __c2v_condition_1
 	if !__c2v_condition_0 {
 		mut __c2v_condition_2 := false
@@ -855,7 +855,7 @@ pub fn brcm_m1_prepare(p &C.bw_m1_plan) i32 {
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_29 := false
-		__c2v_condition_29 = (usize(p.calibration) == 0)
+		__c2v_condition_29 = (uint(p.calibration) == 0)
 		__c2v_condition_0 = __c2v_condition_29
 	}
 	if !__c2v_condition_0 {
@@ -865,17 +865,17 @@ pub fn brcm_m1_prepare(p &C.bw_m1_plan) i32 {
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_31 := false
-		__c2v_condition_31 = p.calibration_len > usize(1024 * 1024)
+		__c2v_condition_31 = p.calibration_len > uint(1024 * 1024)
 		__c2v_condition_0 = __c2v_condition_31
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_32 := false
-		__c2v_condition_32 = (usize(p.seed) == 0)
+		__c2v_condition_32 = (uint(p.seed) == 0)
 		__c2v_condition_0 = __c2v_condition_32
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_33 := false
-		__c2v_condition_33 = p.seed_len != usize(256)
+		__c2v_condition_33 = p.seed_len != uint(256)
 		__c2v_condition_0 = __c2v_condition_33
 	}
 	if !__c2v_condition_0 {
@@ -901,7 +901,7 @@ pub fn brcm_m1_prepare(p &C.bw_m1_plan) i32 {
 @[export: 'brcm_m1_status']
 pub fn brcm_m1_status(out &u8) i32 {
 	unsafe {
-	if usize(out) == 0 {
+	if uint(out) == 0 {
 		return i32(i32(Bw_error.bw_einval))
 	}
 	C.memset(voidptr(out), 0, u64(256))
@@ -945,9 +945,9 @@ pub fn m1_part(k u32) &u8 {
 }
 
 @[export: 'vinix_m1_core_part_capacity']
-pub fn m1_part_capacity(k u32) usize {
+pub fn m1_part_capacity(k u32) uint {
 	unsafe {
-	return usize(if k == u32(0) {
+	return uint(if k == u32(0) {
 		sizeof([4194304]u8)
 	} else {
 		(if k == u32(1) { sizeof([65536]u8) } else { sizeof([1048576]u8) })
@@ -959,7 +959,7 @@ pub fn m1_part_capacity(k u32) usize {
 @[export: 'brcm_m1_upload']
 pub fn brcm_m1_upload(q &u8) i32 {
 	unsafe {
-	if (usize(q) == 0) || u32(bw_m1_host.dev.state) != u32(i32(Bw_state.bw_chip)) {
+	if (uint(q) == 0) || u32(bw_m1_host.dev.state) != u32(i32(Bw_state.bw_chip)) {
 		return i32(i32(Bw_error.bw_einval))
 	}
 	k := m1_get32(q)
@@ -988,12 +988,12 @@ pub fn brcm_m1_upload(q &u8) i32 {
 	}
 	if !__c2v_condition_36 {
 		mut __c2v_condition_41 := false
-		__c2v_condition_41 = usize(total) > m1_part_capacity(k)
+		__c2v_condition_41 = uint(total) > m1_part_capacity(k)
 		__c2v_condition_36 = __c2v_condition_41
 	}
 	if !__c2v_condition_36 {
 		mut __c2v_condition_42 := false
-		__c2v_condition_42 = usize(off) != bw_m1_host.used[k]
+		__c2v_condition_42 = uint(off) != bw_m1_host.used[k]
 		__c2v_condition_36 = __c2v_condition_42
 	}
 	if !__c2v_condition_36 {
@@ -1008,24 +1008,24 @@ pub fn brcm_m1_upload(q &u8) i32 {
 	}
 	if !__c2v_condition_36 {
 		mut __c2v_condition_45 := false
-		__c2v_condition_45 = (bw_m1_host.total[k] && usize(total) != bw_m1_host.total[k])
+		__c2v_condition_45 = (bw_m1_host.total[k] && uint(total) != bw_m1_host.total[k])
 		__c2v_condition_36 = __c2v_condition_45
 	}
 	if __c2v_condition_36 {
 		return i32(i32(Bw_error.bw_einval))
 	}
-	bw_m1_host.total[k] = usize(total)
+	bw_m1_host.total[k] = uint(total)
 	C.memcpy(voidptr(m1_part(k) + off), voidptr(q + 16), u64(n))
-	bw_m1_host.used[k] += usize(n)
+	bw_m1_host.used[k] += uint(n)
 	return 0
 
 	}
 }
 
 @[export: 'vinix_m1_core_string_equal']
-pub fn m1_string_equal(a &u8, b &char, n usize) i32 {
+pub fn m1_string_equal(a &u8, b &char, n uint) i32 {
 	unsafe {
-	len := usize(0)
+	len := uint(0)
 	for len < n && i32(b[len]) {
 		len++
 	}
@@ -1039,7 +1039,7 @@ pub fn brcm_m1_boot(q &u8) i32 {
 	unsafe {
 	mut __c2v_condition_46 := false
 	mut __c2v_condition_47 := false
-	__c2v_condition_47 = (usize(q) == 0)
+	__c2v_condition_47 = (uint(q) == 0)
 	__c2v_condition_46 = __c2v_condition_47
 	if !__c2v_condition_46 {
 		mut __c2v_condition_48 := false
@@ -1058,27 +1058,27 @@ pub fn brcm_m1_boot(q &u8) i32 {
 	}
 	if !__c2v_condition_46 {
 		mut __c2v_condition_51 := false
-		__c2v_condition_51 = !m1_string_equal(q + 8,  &char(&bw_m1_host.dev.otp.module_[0]) , usize(16))
+		__c2v_condition_51 = !m1_string_equal(q + 8,  &char(&bw_m1_host.dev.otp.module_[0]) , uint(16))
 		__c2v_condition_46 = __c2v_condition_51
 	}
 	if !__c2v_condition_46 {
 		mut __c2v_condition_52 := false
-		__c2v_condition_52 = !m1_string_equal(q + 24,  &char(&bw_m1_host.dev.otp.vendor[0]) , usize(16))
+		__c2v_condition_52 = !m1_string_equal(q + 24,  &char(&bw_m1_host.dev.otp.vendor[0]) , uint(16))
 		__c2v_condition_46 = __c2v_condition_52
 	}
 	if !__c2v_condition_46 {
 		mut __c2v_condition_53 := false
-		__c2v_condition_53 = !m1_string_equal(q + 40,  &char(&bw_m1_host.dev.otp.revision[0]) , usize(16))
+		__c2v_condition_53 = !m1_string_equal(q + 40,  &char(&bw_m1_host.dev.otp.revision[0]) , uint(16))
 		__c2v_condition_46 = __c2v_condition_53
 	}
 	if !__c2v_condition_46 {
 		mut __c2v_condition_54 := false
-		__c2v_condition_54 = !m1_string_equal(q + 56,  &char(&bw_m1_host.p.antenna[0]) , usize(16))
+		__c2v_condition_54 = !m1_string_equal(q + 56,  &char(&bw_m1_host.p.antenna[0]) , uint(16))
 		__c2v_condition_46 = __c2v_condition_54
 	}
 	if !__c2v_condition_46 {
 		mut __c2v_condition_55 := false
-		__c2v_condition_55 = !m1_string_equal(q + 72, c'apple,shikoku', usize(32))
+		__c2v_condition_55 = !m1_string_equal(q + 72, c'apple,shikoku', uint(32))
 		__c2v_condition_46 = __c2v_condition_55
 	}
 	if __c2v_condition_46 {
@@ -1126,10 +1126,10 @@ pub fn brcm_m1_boot(q &u8) i32 {
 @[export: 'brcm_m1_join']
 pub fn brcm_m1_join(q &u8) i32 {
 	unsafe {
-	if usize(q) == 0 {
+	if uint(q) == 0 {
 		return i32(i32(Bw_error.bw_einval))
 	}
-	return C.bw_join_wpa2(&bw_m1_host.dev, q + 8, usize(m1_get32(q)), q + 40, usize(m1_get32(q + 4)))
+	return C.bw_join_wpa2(&bw_m1_host.dev, q + 8, uint(m1_get32(q)), q + 40, uint(m1_get32(q + 4)))
 
 	}
 }
@@ -1137,7 +1137,7 @@ pub fn brcm_m1_join(q &u8) i32 {
 @[export: 'brcm_m1_radio']
 pub fn brcm_m1_radio(q &u8) i32 {
 	unsafe {
-	if usize(q) == 0 {
+	if uint(q) == 0 {
 		return i32(i32(Bw_error.bw_einval))
 	}
 	enabled := m1_get32(q)
@@ -1157,7 +1157,7 @@ pub fn brcm_m1_scan() i32 {
 @[export: 'brcm_m1_networks']
 pub fn brcm_m1_networks(out &u8) i32 {
 	unsafe {
-	return C.bw_networks(&bw_m1_host.dev, out, usize((16 + 32 * 48)))
+	return C.bw_networks(&bw_m1_host.dev, out, uint((16 + 32 * 48)))
 
 	}
 }
@@ -1184,15 +1184,15 @@ pub fn brcm_m1_poll() i32 {
 }
 
 @[export: 'brcm_m1_read']
-pub fn brcm_m1_read(p &u8, n usize) i32 {
+pub fn brcm_m1_read(p &u8, n uint) i32 {
 	unsafe {
-	if usize(p) == 0 {
+	if uint(p) == 0 {
 		return i32(i32(Bw_error.bw_einval))
 	}
 	if i32(bw_m1_host.head) == i32(bw_m1_host.tail) {
 		return if u32(bw_m1_host.dev.state) == u32(i32(Bw_state.bw_fault)) { i32(Bw_error.bw_enolink) } else { 0 }
 	}
-	len := usize(bw_m1_host.length[bw_m1_host.head])
+	len := uint(bw_m1_host.length[bw_m1_host.head])
 	if n < len {
 		return i32(i32(Bw_error.bw_enospc))
 	}
@@ -1204,7 +1204,7 @@ pub fn brcm_m1_read(p &u8, n usize) i32 {
 }
 
 @[export: 'brcm_m1_write']
-pub fn brcm_m1_write(p &u8, n usize) i32 {
+pub fn brcm_m1_write(p &u8, n uint) i32 {
 	unsafe {
 	return C.bw_transmit(&bw_m1_host.dev, p, n)
 
@@ -1216,7 +1216,7 @@ pub fn brcm_m1_stop() {
 	unsafe {
 	if bw_m1_host.prepared {
 		// DART may be prepared before bw_init installs the protocol callbacks.
-		if usize(bw_m1_host.dev.ops.stop_dma) == 0 {
+		if uint(bw_m1_host.dev.ops.stop_dma) == 0 {
 			m1_stop_dma(nil)
 			return
 		}

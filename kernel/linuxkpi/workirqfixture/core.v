@@ -26,7 +26,7 @@ fn C.vinix_linuxkpi_workirq_drainer(voidptr) voidptr
 fn C.INIT_WORK_ONSTACK(&C.work_struct, WorkFn)
 fn C.init_completion(&C.completion)
 fn C.complete(&C.completion)
-fn C.wait_for_completion_timeout(&C.completion, usize) usize
+fn C.wait_for_completion_timeout(&C.completion, uint) uint
 fn C.alloc_workqueue(&char, u32, i32, ...) &C.workqueue_struct
 fn C.destroy_workqueue(&C.workqueue_struct)
 fn C.drain_workqueue(&C.workqueue_struct)
@@ -41,9 +41,9 @@ fn C.vinix_linuxkpi_maskable_irq_depth() u32
 fn C.vinix_linuxkpi_preempt_count() u32
 fn C.vinix_linuxkpi_preempt_disable()
 fn C.vinix_linuxkpi_preempt_enable()
-fn C.vinix_linuxkpi_irq_flags() usize
-fn C.vinix_linuxkpi_irq_save() usize
-fn C.vinix_linuxkpi_irq_restore(usize)
+fn C.vinix_linuxkpi_irq_flags() uint
+fn C.vinix_linuxkpi_irq_save() uint
+fn C.vinix_linuxkpi_irq_restore(uint)
 fn C.vinix_linuxkpi_spin_wait()
 fn C.vinix_linuxkpi_clock_ns() u64
 fn C.vinix_linuxkpi_test_thread_reap_ready(voidptr) bool
@@ -107,7 +107,7 @@ pub fn probe(argument voidptr) {
 			|| (C.vinix_linuxkpi_irq_flags() & 512) != 0 || C.vinix_linuxkpi_preempt_count() == 0 {
 			fail(test, 1)
 		}
-		if usize(C.current_work()) != 0 { fail(test, 2) }
+		if uint(C.current_work()) != 0 { fail(test, 2) }
 		if !C.vinix_linuxkpi_workqueue_draining_for_test(test.queue) { fail(test, 4) }
 		if C.work_busy(&test.rejected) != 0 { fail(test, 8) }
 		if C.queue_work_on(1, test.queue, &test.rejected) { fail(test, 16) }
@@ -124,15 +124,15 @@ pub fn anchor(work &C.work_struct) {
 		mut test := &WorkIrqCase(work)
 		C.vinix_linuxkpi_preempt_disable()
 		if C.vinix_linuxkpi_cpu_id() != 1 || C.vinix_linuxkpi_maskable_irq_depth() != 0
-			|| usize(C.current_work()) != usize(work) { fail(test, 64) }
+			|| uint(C.current_work()) != uint(work) { fail(test, 64) }
 		flags := C.vinix_linuxkpi_irq_save()
-		if usize(C.current_work()) != usize(work) { fail(test, 128) }
+		if uint(C.current_work()) != uint(work) { fail(test, 128) }
 		C.vinix_linuxkpi_irq_restore(flags)
 		C.complete(&test.anchor_ready)
 		started := C.vinix_linuxkpi_clock_ns()
 		for C.__atomic_load_n(&test.release, 2) == 0 {
 			if C.__atomic_load_n(&test.irq_done, 2) != 0 && C.__atomic_load_n(&test.post_iret, 2) == 0 {
-				if C.vinix_linuxkpi_maskable_irq_depth() != 0 || usize(C.current_work()) != usize(work) {
+				if C.vinix_linuxkpi_maskable_irq_depth() != 0 || uint(C.current_work()) != uint(work) {
 					fail(test, 256)
 				}
 				C.__atomic_store_n(&test.post_iret, 1, 3)
@@ -140,7 +140,7 @@ pub fn anchor(work &C.work_struct) {
 			if C.__atomic_load_n(&test.chain_go, 2) != 0 && C.__atomic_load_n(&test.chain_accepted, 2) == 0 {
 				chain_flags := C.vinix_linuxkpi_irq_save()
 				if !C.vinix_linuxkpi_workqueue_draining_for_test(test.queue)
-					|| usize(C.current_work()) != usize(work) { fail(test, 512) }
+					|| uint(C.current_work()) != uint(work) { fail(test, 512) }
 				if !C.queue_work_on(1, test.queue, &test.chain) { fail(test, 1024) }
 				C.vinix_linuxkpi_irq_restore(chain_flags)
 				C.__atomic_store_n(&test.chain_accepted, 1, 3)
@@ -158,7 +158,7 @@ pub fn anchor(work &C.work_struct) {
 @[export: 'vinix_linuxkpi_workirq_rejected']
 pub fn rejected(work &C.work_struct) {
 	unsafe {
-		test := &WorkIrqCase(usize(work) - __offsetof(WorkIrqCase, rejected))
+		test := &WorkIrqCase(uint(work) - __offsetof(WorkIrqCase, rejected))
 		C.__atomic_fetch_or(&test.rejected_calls, 1, 0)
 	}
 }
@@ -166,9 +166,9 @@ pub fn rejected(work &C.work_struct) {
 @[export: 'vinix_linuxkpi_workirq_chain']
 pub fn chain(work &C.work_struct) {
 	unsafe {
-		test := &WorkIrqCase(usize(work) - __offsetof(WorkIrqCase, chain))
+		test := &WorkIrqCase(uint(work) - __offsetof(WorkIrqCase, chain))
 		if C.vinix_linuxkpi_cpu_id() != 1 || C.vinix_linuxkpi_maskable_irq_depth() != 0
-			|| usize(C.current_work()) != usize(work) { fail(test, 4096) }
+			|| uint(C.current_work()) != uint(work) { fail(test, 4096) }
 		C.__atomic_fetch_or(&test.chain_calls, 1, 0)
 	}
 }

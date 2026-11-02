@@ -88,10 +88,10 @@ fn C.wait_event(C.wait_queue_head, u32)
 fn C.swait_event_exclusive(C.swait_queue_head, u32)
 fn C.wake_up_all(&C.wait_queue_head)
 fn C.swake_up_all(&C.swait_queue_head)
-fn C.spin_lock_irqsave(&C.spinlock_t, usize)
-fn C.spin_unlock_irqrestore(&C.spinlock_t, usize)
-fn C.raw_spin_lock_irqsave(&C.raw_spinlock_t, usize)
-fn C.raw_spin_unlock_irqrestore(&C.raw_spinlock_t, usize)
+fn C.spin_lock_irqsave(&C.spinlock_t, uint)
+fn C.spin_unlock_irqrestore(&C.spinlock_t, uint)
+fn C.raw_spin_lock_irqsave(&C.raw_spinlock_t, uint)
+fn C.raw_spin_unlock_irqrestore(&C.raw_spinlock_t, uint)
 fn C.INIT_LIST_HEAD(&C.list_head)
 fn C.BUG_ON(bool)
 
@@ -211,7 +211,7 @@ pub fn worker(argument voidptr) voidptr {
 fn queue_count(head &C.list_head) u32 {
 	unsafe {
 		mut count := u32(0)
-		for entry := head.next; usize(entry) != usize(head); entry = entry.next { count++ }
+		for entry := head.next; uint(entry) != uint(head); entry = entry.next { count++ }
 		return count
 	}
 }
@@ -236,7 +236,7 @@ pub fn native_selftest() i32 {
 		for _ in 0 .. 4 { C.wait_for_completion(&test.ready) }
 		if test.counter != 4 * 32 { result = -C.EIO }
 		for {
-			mut flags := usize(0)
+			mut flags := uint(0)
 			C.spin_lock_irqsave(&test.queue.lock, flags)
 			count := queue_count(&test.queue.head)
 			C.spin_unlock_irqrestore(&test.queue.lock, flags)
@@ -247,7 +247,7 @@ pub fn native_selftest() i32 {
 		C.__atomic_store_n(&test.go, 1, 3)
 		C.wake_up_all(&test.queue)
 		for {
-			mut flags := usize(0)
+			mut flags := uint(0)
 			C.raw_spin_lock_irqsave(&test.simple.lock, flags)
 			count := queue_count(&test.simple.task_list)
 			C.raw_spin_unlock_irqrestore(&test.simple.lock, flags)
@@ -258,7 +258,7 @@ pub fn native_selftest() i32 {
 		C.swake_up_all(&test.simple)
 		for _ in 0 .. 4 * 2 { C.wait_for_completion(&test.stage) }
 		for {
-			mut flags := usize(0)
+			mut flags := uint(0)
 			C.raw_spin_lock_irqsave(&test.release.@wait.lock, flags)
 			count := queue_count(&test.release.@wait.task_list)
 			C.raw_spin_unlock_irqrestore(&test.release.@wait.lock, flags)

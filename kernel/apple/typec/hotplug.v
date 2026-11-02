@@ -14,16 +14,16 @@ mut:
 	initialized u8
 }
 
-fn C.memset(dest voidptr, value i32, length usize) voidptr
+fn C.memset(dest voidptr, value i32, length uint) voidptr
 
 @[export: 'vinix_display_hotplug_state_size']
-fn hotplug_state_size() usize {
+fn hotplug_state_size() uint {
 	return sizeof(C.vinix_display_hotplug_state)
 }
 
 @[export: 'vinix_display_hotplug_reset']
 fn hotplug_reset(state &C.vinix_display_hotplug_state) {
-	if usize(state) == 0 { return }
+	if uint(state) == 0 { return }
 	unsafe { C.memset(state, 0, sizeof(C.vinix_display_hotplug_state)) }
 }
 
@@ -41,7 +41,7 @@ fn hotplug_candidate(status u32, data_status u32) i32 {
 @[export: 'vinix_display_hotplug_sample']
 fn hotplug_sample(state &C.vinix_display_hotplug_state, status u32, data_status u32,
 	now_ms u64, debounce_ms u64) i32 {
-	if usize(state) == 0 { return C.VINIX_DISPLAY_HOTPLUG_NONE }
+	if uint(state) == 0 { return C.VINIX_DISPLAY_HOTPLUG_NONE }
 	connected := u8(hotplug_candidate(status, data_status))
 	unsafe {
 		state.status = status
@@ -69,7 +69,7 @@ fn hotplug_sample(state &C.vinix_display_hotplug_state, status u32, data_status 
 
 @[export: 'vinix_display_hotplug_connected']
 fn hotplug_connected(state &C.vinix_display_hotplug_state) i32 {
-	return i32(usize(state) != 0 && state.initialized != 0 && state.stable != 0)
+	return i32(uint(state) != 0 && state.initialized != 0 && state.stable != 0)
 }
 
 @[export: 'vinix_display_hotplug_choose_action']

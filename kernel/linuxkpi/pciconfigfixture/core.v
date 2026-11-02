@@ -26,7 +26,7 @@ fn C.init_completion(&C.completion)
 fn C.complete(&C.completion)
 fn C.complete_all(&C.completion)
 fn C.wait_for_completion(&C.completion)
-fn C.wait_for_completion_timeout(&C.completion, usize) usize
+fn C.wait_for_completion_timeout(&C.completion, uint) uint
 fn C.get_task_struct(&C.task_struct) &C.task_struct
 fn C.put_task_struct(&C.task_struct)
 fn C.task_is_running(&C.task_struct) bool
@@ -47,9 +47,9 @@ fn C.__atomic_load_n(&u32, i32) u32
 fn C.vinix_linuxkpi_worker_bind(u32) i32
 fn C.vinix_linuxkpi_cpu_id() u32
 fn C.vinix_linuxkpi_percpu_count() u32
-fn C.vinix_linuxkpi_irq_flags() usize
-fn C.vinix_linuxkpi_irq_save() usize
-fn C.vinix_linuxkpi_irq_restore(usize)
+fn C.vinix_linuxkpi_irq_flags() uint
+fn C.vinix_linuxkpi_irq_save() uint
+fn C.vinix_linuxkpi_irq_restore(uint)
 fn C.vinix_linuxkpi_preempt_count() u32
 fn C.vinix_linuxkpi_preempt_disable()
 fn C.vinix_linuxkpi_preempt_enable_no_resched()
@@ -57,7 +57,7 @@ fn C.vinix_linuxkpi_test_alloc_oom(i32)
 fn C.vinix_linuxkpi_test_worker_oom(u32)
 fn C.vinix_linuxkpi_may_sleep() bool
 fn C.vinix_linuxkpi_clock_ns() u64
-fn C.vinix_linuxkpi_test_task_time_waiters(&C.task_struct) usize
+fn C.vinix_linuxkpi_test_task_time_waiters(&C.task_struct) uint
 fn C.vinix_linuxkpi_test_thread_reap_ready(voidptr) bool
 fn C.vinix_linuxkpi_test_reap_quiescent() bool
 fn C.vinix_linuxkpi_pci_identity(u32, &u32, &u32, &u32) i32
@@ -144,7 +144,7 @@ fn pci_failed(worker &PciWorker, reason u32, offset u64, width u32, status i32, 
 	}
 }
 
-fn pci_context(worker &PciWorker, flags usize, depth u32) {
+fn pci_context(worker &PciWorker, flags uint, depth u32) {
 	if C.vinix_linuxkpi_irq_flags() != flags || C.vinix_linuxkpi_preempt_count() != depth {
 		pci_failed(worker, 4, 0, 0, 0, 0, 0)
 	}
@@ -153,7 +153,7 @@ fn pci_context(worker &PciWorker, flags usize, depth u32) {
 	}
 }
 
-fn pci_read(worker &PciWorker, device &PciIdentity, offset u64, width u32, expected u32, flags usize, depth u32) {
+fn pci_read(worker &PciWorker, device &PciIdentity, offset u64, width u32, expected u32, flags uint, depth u32) {
 	unsafe {
 		mut value := u32(0x5aa55aa5)
 		status := C.vinix_pci_config_read(0, device.bdf >> 8, (device.bdf >> 3) & 31, device.bdf & 7, offset, width, &value)
@@ -165,7 +165,7 @@ fn pci_read(worker &PciWorker, device &PciIdentity, offset u64, width u32, expec
 	}
 }
 
-fn pci_read_identity(worker &PciWorker, device &PciIdentity, flags usize, depth u32) {
+fn pci_read_identity(worker &PciWorker, device &PciIdentity, flags uint, depth u32) {
 	pci_read(worker, device, 0, 4, device.identity, flags, depth)
 	pci_read(worker, device, 0, 2, device.identity & 0xffff, flags, depth)
 	pci_read(worker, device, 2, 2, device.identity >> 16, flags, depth)
@@ -180,7 +180,7 @@ fn pci_read_identity(worker &PciWorker, device &PciIdentity, flags usize, depth 
 	}
 }
 
-fn pci_errors(worker &PciWorker, flags usize, depth u32) {
+fn pci_errors(worker &PciWorker, flags uint, depth u32) {
 	unsafe {
 		bad := C.VINIX_PCI_CONFIG_BAD_REGISTER
 		unavailable := C.VINIX_PCI_CONFIG_UNAVAILABLE
@@ -236,7 +236,7 @@ pub fn pci_thread(argument voidptr) voidptr {
 				}
 				original_flags := C.vinix_linuxkpi_irq_flags()
 				original_depth := C.vinix_linuxkpi_preempt_count()
-				mut saved_flags := usize(0)
+				mut saved_flags := uint(0)
 				if (round & 1) != 0 {
 					saved_flags = C.vinix_linuxkpi_irq_save()
 					C.vinix_linuxkpi_preempt_disable()
@@ -299,7 +299,7 @@ fn pci_retire(workers &PciWorker, count u32) i32 {
 			task := &C.task_struct(C.pci_load_ptr(&workers[i].task, 2))
 			C.BUG_ON(task == nil)
 			if workers[i].reasons != 0 {
-				C.kprintf(c'linuxkpi: PCI worker=%u reasons=0x%x offset=%lu width=%u status=%d value=%08x expected=%08x\n', i, workers[i].reasons, usize(workers[i].failed_offset), workers[i].failed_width, workers[i].failed_status, workers[i].failed_value, workers[i].failed_expected)
+				C.kprintf(c'linuxkpi: PCI worker=%u reasons=0x%x offset=%lu width=%u status=%d value=%08x expected=%08x\n', i, workers[i].reasons, uint(workers[i].failed_offset), workers[i].failed_width, workers[i].failed_status, workers[i].failed_value, workers[i].failed_expected)
 				result = -5
 			}
 			for C.__atomic_load_n(&task.__state, 2) != C.TASK_DEAD {

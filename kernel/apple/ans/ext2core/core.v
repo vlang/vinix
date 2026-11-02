@@ -5,8 +5,8 @@ module ext2core
 
 #include "apple_ans_ext2.h"
 
-pub type Vinix_ext2_reader = fn (voidptr, voidptr, u64, usize) i32
-pub type Vinix_ext2_writer = fn (voidptr, voidptr, u64, usize) i32
+pub type Vinix_ext2_reader = fn (voidptr, voidptr, u64, uint) i32
+pub type Vinix_ext2_writer = fn (voidptr, voidptr, u64, uint) i32
 
 // Native-endian u64 fields: size, mode, uid, gid, nlink, blocks(512-byte),
 // *atime, mtime, ctime, filesystem block size.
@@ -96,26 +96,26 @@ pub fn e2_p32(p &u8, v u32) {
 }
 
 @[export: 'e2_zero']
-pub fn e2_zero(p voidptr, n usize) {
+pub fn e2_zero(p voidptr, n uint) {
 	unsafe {
 		b := &u8(p)
-		for i := usize(0); i < n; i++ { b[i] = 0 }
+		for i := uint(0); i < n; i++ { b[i] = 0 }
 	}
 }
 
 @[export: 'e2_copy']
-pub fn e2_copy(d voidptr, s voidptr, n usize) {
+pub fn e2_copy(d voidptr, s voidptr, n uint) {
 	unsafe {
 		a := &u8(d)
 		b := &u8(s)
-		for i := usize(0); i < n; i++ { a[i] = b[i] }
+		for i := uint(0); i < n; i++ { a[i] = b[i] }
 	}
 }
 
 @[export: 'e2_disk']
-pub fn e2_disk(fs &E2_fs, p voidptr, off u64, n usize) i32 {
+pub fn e2_disk(fs &E2_fs, p voidptr, off u64, n uint) i32 {
 	unsafe {
-		if (usize(fs) == 0) || !fs.opened || (usize(fs.read_) == 0) || ((usize(p) == 0) && n) || off > fs.bytes || u64(n) > fs.bytes - off {
+		if (uint(fs) == 0) || !fs.opened || (uint(fs.read_) == 0) || ((uint(p) == 0) && n) || off > fs.bytes || u64(n) > fs.bytes - off {
 			return -22
 		}
 		return if fs.read_(voidptr(fs.cookie), voidptr(p), off, n) { (-5) } else { 0 }
@@ -123,9 +123,9 @@ pub fn e2_disk(fs &E2_fs, p voidptr, off u64, n usize) i32 {
 }
 
 @[export: 'e2_store']
-pub fn e2_store(fs &E2_fs, p voidptr, off u64, n usize) i32 {
+pub fn e2_store(fs &E2_fs, p voidptr, off u64, n uint) i32 {
 	unsafe {
-		if (usize(fs) == 0) || !fs.opened || !fs.writable || !fs.active || (usize(fs.write_) == 0) || ((usize(p) == 0) && n) || off > fs.bytes || u64(n) > fs.bytes - off {
+		if (uint(fs) == 0) || !fs.opened || !fs.writable || !fs.active || (uint(fs.write_) == 0) || ((uint(p) == 0) && n) || off > fs.bytes || u64(n) > fs.bytes - off {
 			return -30
 		}
 		if fs.write_(voidptr(fs.cookie), voidptr(p), off, n) {
@@ -153,7 +153,7 @@ pub fn e2_inode_get(fs &E2_fs, ino u32, out &E2_inode) i32 {
 		desc := [32]u8{}
 		raw := [128]u8{}
 
-		if (usize(fs) == 0) || !fs.opened || (usize(out) == 0) || !ino || ino > fs.inodes {
+		if (uint(fs) == 0) || !fs.opened || (uint(out) == 0) || !ino || ino > fs.inodes {
 			return -22
 		}
 		group := (ino - u32(1)) / fs.ipg
@@ -214,7 +214,7 @@ pub fn e2_inode_get(fs &E2_fs, ino u32, out &E2_inode) i32 {
 		for i := u32(0); i < u32(15); i++ {
 			v.ptr[i] = e2_u32(&raw[0] + 40 + (i * u32(4)))
 		}
-		e2_copy(v.data, voidptr(&raw[0] + 40), usize(60))
+		e2_copy(v.data, voidptr(&raw[0] + 40), uint(60))
 		acl := e2_u32(&raw[0] + 104)
 		if acl && !e2_block_valid(fs, acl) {
 			return -22
@@ -262,7 +262,7 @@ pub fn e2_map(fs &E2_fs, in_ &E2_inode, logical u64, out &u32) i32 {
 			index := logical / span
 			logical %= span
 			raw := [4]u8{}
-			if e2_disk(fs, voidptr(&raw[0]), u64(block) * u64(fs.block_size) + index * u64(4), usize(4)) {
+			if e2_disk(fs, voidptr(&raw[0]), u64(block) * u64(fs.block_size) + index * u64(4), uint(4)) {
 				return -5
 			}
 			block = e2_u32(&raw[0])
@@ -276,27 +276,27 @@ pub fn e2_map(fs &E2_fs, in_ &E2_inode, logical u64, out &u32) i32 {
 }
 
 @[export: 'e2_read_inode']
-pub fn e2_read_inode(fs &E2_fs, in_ &E2_inode, buffer voidptr, offset u64, count usize) i64 {
+pub fn e2_read_inode(fs &E2_fs, in_ &E2_inode, buffer voidptr, offset u64, count uint) i64 {
 	unsafe {
-		if ((usize(buffer) == 0) && count) || offset > in_.size {
+		if ((uint(buffer) == 0) && count) || offset > in_.size {
 			return i64((-22))
 		}
 		if u64(count) > in_.size - offset {
-			count = usize((in_.size - offset))
+			count = uint((in_.size - offset))
 		}
-		if count > usize(1048576) {
-			count = usize(1048576)
+		if count > uint(1048576) {
+			count = uint(1048576)
 		}
 		p := &u8(buffer)
 		if in_.fast_link {
 			e2_copy(voidptr(p), voidptr(&in_.data[0] + offset), count)
 			return i64(count)
 		}
-		done := usize(0)
+		done := uint(0)
 		for done < count {
 			pos := offset + u64(done)
 			within := u32((pos % u64(fs.block_size)))
-			n := usize(fs.block_size - within)
+			n := uint(fs.block_size - within)
 			if n > count - done {
 				n = count - done
 			}
@@ -317,16 +317,16 @@ pub fn e2_read_inode(fs &E2_fs, in_ &E2_inode, buffer voidptr, offset u64, count
 }
 
 @[export: 'vinix_ext2_context_size']
-pub fn vinix_ext2_context_size() usize {
+pub fn vinix_ext2_context_size() uint {
 	unsafe {
-		return usize(sizeof(E2_fs))
+		return uint(sizeof(E2_fs))
 	}
 }
 
 @[export: 'e2_open']
-pub fn e2_open(context voidptr, size usize, read Vinix_ext2_reader, write Vinix_ext2_writer, cookie voidptr, bytes u64) i32 {
+pub fn e2_open(context voidptr, size uint, read Vinix_ext2_reader, write Vinix_ext2_writer, cookie voidptr, bytes u64) i32 {
 	unsafe {
-		if (usize(context) == 0) || size < sizeof(E2_fs) || (usize(read) == 0) || bytes < u64(4096) {
+		if (uint(context) == 0) || size < sizeof(E2_fs) || (uint(read) == 0) || bytes < u64(4096) {
 			return -22
 		}
 		e2_zero(voidptr(context), sizeof(E2_fs))
@@ -346,7 +346,7 @@ pub fn e2_open(context voidptr, size usize, read Vinix_ext2_reader, write Vinix_
 		// Classic ext2 only: ext_attr, resize_inode, dir_index, FILETYPE,
 		//     *sparse_super and large_file. No journal/recovery, extents or checksums.
 
-		if (compat & ~56) || (incompat & ~2) || (rocompat & ~3) || (!(usize(write) == 0) && ((compat & ~8) || !(incompat & 2))) {
+		if (compat & ~56) || (incompat & ~2) || (rocompat & ~3) || (!(uint(write) == 0) && ((compat & ~8) || !(incompat & 2))) {
 			return -95
 		}
 		fs := E2_fs{}
@@ -363,7 +363,7 @@ pub fn e2_open(context voidptr, size usize, read Vinix_ext2_reader, write Vinix_
 		//     *sometimes leave s_first_ino zero. Never accept that ambiguity for a
 		//     *writable mount, but retain the established read-only compatibility.
 
-		if (usize(write) == 0) && !fs.first_inode {
+		if (uint(write) == 0) && !fs.first_inode {
 			fs.first_inode = u32(11)
 		}
 		if (fs.first != (if shift { 0 } else { 1 })) || (fs.blocks <= fs.first + u32(2)) || (fs.inodes < u32(2)) || (!fs.bpg) || (fs.bpg > fs.block_size * u32(8)) || (!fs.ipg) || (fs.ipg > fs.block_size * u32(8)) || (fs.inode_size < u32(128)) || (fs.inode_size > fs.block_size) || (fs.inode_size & (fs.inode_size - u32(1))) || (e2_u32(&sb[0] + 36) != fs.bpg) || (fs.first_inode < u32(11)) || (fs.first_inode > fs.inodes) || (u64(fs.blocks) * u64(fs.block_size) > bytes) {
@@ -392,16 +392,16 @@ pub fn e2_open(context voidptr, size usize, read Vinix_ext2_reader, write Vinix_
 }
 
 @[export: 'vinix_ext2_open']
-pub fn vinix_ext2_open(context voidptr, size usize, read Vinix_ext2_reader, cookie voidptr, bytes u64) i32 {
+pub fn vinix_ext2_open(context voidptr, size uint, read Vinix_ext2_reader, cookie voidptr, bytes u64) i32 {
 	unsafe {
 		return e2_open(voidptr(context), size, read, (voidptr(0)), voidptr(cookie), bytes)
 	}
 }
 
 @[export: 'vinix_ext2_open_rw']
-pub fn vinix_ext2_open_rw(context voidptr, size usize, read Vinix_ext2_reader, write Vinix_ext2_writer, cookie voidptr, bytes u64) i32 {
+pub fn vinix_ext2_open_rw(context voidptr, size uint, read Vinix_ext2_reader, write Vinix_ext2_writer, cookie voidptr, bytes u64) i32 {
 	unsafe {
-		if usize(write) == 0 {
+		if uint(write) == 0 {
 			return -22
 		}
 		return e2_open(voidptr(context), size, read, write, voidptr(cookie), bytes)
@@ -412,7 +412,7 @@ pub fn vinix_ext2_open_rw(context voidptr, size usize, read Vinix_ext2_reader, w
 pub fn vinix_ext2_begin_write(context voidptr) i32 {
 	unsafe {
 		fs := &E2_fs(context)
-		if (usize(fs) == 0) || !fs.opened || !fs.writable || fs.active {
+		if (uint(fs) == 0) || !fs.opened || !fs.writable || fs.active {
 			return -22
 		}
 		state := [2]u8{}
@@ -430,7 +430,7 @@ pub fn vinix_ext2_begin_write(context voidptr) i32 {
 pub fn vinix_ext2_close_clean(context voidptr) i32 {
 	unsafe {
 		fs := &E2_fs(context)
-		if (usize(fs) == 0) || !fs.opened || !fs.writable {
+		if (uint(fs) == 0) || !fs.opened || !fs.writable {
 			return -22
 		}
 		if fs.failed {
@@ -452,7 +452,7 @@ pub fn vinix_ext2_close_clean(context voidptr) i32 {
 @[export: 'vinix_ext2_stat']
 pub fn vinix_ext2_stat(context voidptr, ino u32, fields &u64) i32 {
 	unsafe {
-		if usize(fields) == 0 {
+		if uint(fields) == 0 {
 			return -22
 		}
 		fs := &E2_fs(context)
@@ -476,7 +476,7 @@ pub fn vinix_ext2_stat(context voidptr, ino u32, fields &u64) i32 {
 }
 
 @[export: 'vinix_ext2_read']
-pub fn vinix_ext2_read(context voidptr, ino u32, buffer voidptr, offset u64, n usize) i64 {
+pub fn vinix_ext2_read(context voidptr, ino u32, buffer voidptr, offset u64, n uint) i64 {
 	unsafe {
 		in_ := E2_inode{}
 		fs := &E2_fs(context)
@@ -489,9 +489,9 @@ pub fn vinix_ext2_read(context voidptr, ino u32, buffer voidptr, offset u64, n u
 }
 
 @[export: 'vinix_ext2_next']
-pub fn vinix_ext2_next(context voidptr, directory u32, offset &u64, inode &u32, name &char, capacity usize) i32 {
+pub fn vinix_ext2_next(context voidptr, directory u32, offset &u64, inode &u32, name &char, capacity uint) i32 {
 	unsafe {
-		if (usize(offset) == 0) || (usize(inode) == 0) || (usize(name) == 0) || capacity < usize(256) {
+		if (uint(offset) == 0) || (uint(inode) == 0) || (uint(name) == 0) || capacity < uint(256) {
 			return -22
 		}
 		fs := &E2_fs(context)
@@ -509,7 +509,7 @@ pub fn vinix_ext2_next(context voidptr, directory u32, offset &u64, inode &u32, 
 		pos := (*offset)
 		for pos < in_.size {
 			h := [8]u8{}
-			if e2_read_inode(fs, &in_, voidptr(&h[0]), pos, usize(8)) != i64(8) {
+			if e2_read_inode(fs, &in_, voidptr(&h[0]), pos, uint(8)) != i64(8) {
 				return -5
 			}
 			rec := u32(e2_u16(&h[0] + 4))
@@ -526,7 +526,7 @@ pub fn vinix_ext2_next(context voidptr, directory u32, offset &u64, inode &u32, 
 			if !len || (fs.filetype && i32(h[7]) > 7) {
 				return -22
 			}
-			if e2_read_inode(fs, &in_, voidptr(name), pos + u64(8), usize(len)) != i64(len) {
+			if e2_read_inode(fs, &in_, voidptr(name), pos + u64(8), uint(len)) != i64(len) {
 				return -5
 			}
 			for i := u32(0); i < len; i++ {
@@ -562,7 +562,7 @@ pub fn e2_desc_get(fs &E2_fs, group u32, raw &u8) i32 {
 		if group >= fs.groups {
 			return -22
 		}
-		return e2_disk(fs, voidptr(raw), e2_bgdt(fs) + u64(group) * u64(32), usize(32))
+		return e2_disk(fs, voidptr(raw), e2_bgdt(fs) + u64(group) * u64(32), uint(32))
 	}
 }
 
@@ -572,14 +572,14 @@ pub fn e2_desc_put(fs &E2_fs, group u32, raw &u8) i32 {
 		if group >= fs.groups {
 			return -22
 		}
-		return e2_store(fs, voidptr(raw), e2_bgdt(fs) + u64(group) * u64(32), usize(32))
+		return e2_store(fs, voidptr(raw), e2_bgdt(fs) + u64(group) * u64(32), uint(32))
 	}
 }
 
 @[export: 'e2_inode_offset']
 pub fn e2_inode_offset(fs &E2_fs, ino u32, off &u64) i32 {
 	unsafe {
-		if !ino || ino > fs.inodes || (usize(off) == 0) {
+		if !ino || ino > fs.inodes || (uint(off) == 0) {
 			return -22
 		}
 		group := (ino - u32(1)) / fs.ipg
@@ -645,7 +645,7 @@ pub fn e2_inode_put(fs &E2_fs, ino u32, in_ &E2_inode) i32 {
 pub fn e2_super_count(fs &E2_fs, offset u32, delta i32) i32 {
 	unsafe {
 		raw := [4]u8{}
-		rc := e2_disk(fs, voidptr(&raw[0]), u64(u32(1024) + offset), usize(4))
+		rc := e2_disk(fs, voidptr(&raw[0]), u64(u32(1024) + offset), uint(4))
 		if rc {
 			return rc
 		}
@@ -655,14 +655,14 @@ pub fn e2_super_count(fs &E2_fs, offset u32, delta i32) i32 {
 		}
 		value = if delta < 0 { value - u32(-delta) } else { value + u32(delta) }
 		e2_p32(&raw[0], value)
-		return e2_store(fs, voidptr(&raw[0]), u64(u32(1024) + offset), usize(4))
+		return e2_store(fs, voidptr(&raw[0]), u64(u32(1024) + offset), uint(4))
 	}
 }
 
 @[export: 'e2_block_allocate']
 pub fn e2_block_allocate(fs &E2_fs, out &u32) i32 {
 	unsafe {
-		if usize(out) == 0 {
+		if uint(out) == 0 {
 			return -22
 		}
 		for group := u32(0); group < fs.groups; group++ {
@@ -687,7 +687,7 @@ pub fn e2_block_allocate(fs &E2_fs, out &u32) i32 {
 			if !e2_block_valid(fs, map_) || group_first >= group_end {
 				return -22
 			}
-			rc = e2_disk(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), usize(fs.block_size))
+			rc = e2_disk(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), uint(fs.block_size))
 			if rc {
 				return rc
 			}
@@ -706,7 +706,7 @@ pub fn e2_block_allocate(fs &E2_fs, out &u32) i32 {
 				// corrupt bitmap tried to allocate metadata
 
 				bitmap[bit >> 3] |= i32(u8((1 << (bit & u32(7)))))
-				rc = e2_store(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), usize(fs.block_size))
+				rc = e2_store(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), uint(fs.block_size))
 				if rc {
 					return rc
 				}
@@ -719,8 +719,8 @@ pub fn e2_block_allocate(fs &E2_fs, out &u32) i32 {
 				if rc {
 					return rc
 				}
-				e2_zero(voidptr(&bitmap[0]), usize(fs.block_size))
-				rc = e2_store(fs, voidptr(&bitmap[0]), u64(block) * u64(fs.block_size), usize(fs.block_size))
+				e2_zero(voidptr(&bitmap[0]), uint(fs.block_size))
+				rc = e2_store(fs, voidptr(&bitmap[0]), u64(block) * u64(fs.block_size), uint(fs.block_size))
 				if rc {
 					return rc
 				}
@@ -755,7 +755,7 @@ pub fn e2_block_free(fs &E2_fs, block u32) i32 {
 		if !e2_block_valid(fs, map_) || bit >= fs.block_size * u32(8) {
 			return -22
 		}
-		rc = e2_disk(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), usize(fs.block_size))
+		rc = e2_disk(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), uint(fs.block_size))
 		if rc {
 			return rc
 		}
@@ -763,7 +763,7 @@ pub fn e2_block_free(fs &E2_fs, block u32) i32 {
 			return -22
 		}
 		bitmap[bit >> 3] &= i32(u8(~(1 << (bit & u32(7)))))
-		rc = e2_store(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), usize(fs.block_size))
+		rc = e2_store(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), uint(fs.block_size))
 		if rc {
 			return rc
 		}
@@ -783,7 +783,7 @@ pub fn e2_block_free(fs &E2_fs, block u32) i32 {
 @[export: 'e2_inode_allocate']
 pub fn e2_inode_allocate(fs &E2_fs, out &u32) i32 {
 	unsafe {
-		if usize(out) == 0 {
+		if uint(out) == 0 {
 			return -22
 		}
 		for group := u32(0); group < fs.groups; group++ {
@@ -802,7 +802,7 @@ pub fn e2_inode_allocate(fs &E2_fs, out &u32) i32 {
 			if !e2_block_valid(fs, map_) {
 				return -22
 			}
-			rc = e2_disk(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), usize(fs.block_size))
+			rc = e2_disk(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), uint(fs.block_size))
 			if rc {
 				return rc
 			}
@@ -816,7 +816,7 @@ pub fn e2_inode_allocate(fs &E2_fs, out &u32) i32 {
 					continue
 				}
 				bitmap[bit >> 3] |= i32(u8((1 << (bit & u32(7)))))
-				rc = e2_store(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), usize(fs.block_size))
+				rc = e2_store(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), uint(fs.block_size))
 				if rc {
 					return rc
 				}
@@ -834,8 +834,8 @@ pub fn e2_inode_allocate(fs &E2_fs, out &u32) i32 {
 				if rc {
 					return rc
 				}
-				e2_zero(voidptr(&bitmap[0]), usize(fs.inode_size))
-				rc = e2_store(fs, voidptr(&bitmap[0]), off, usize(fs.inode_size))
+				e2_zero(voidptr(&bitmap[0]), uint(fs.inode_size))
+				rc = e2_store(fs, voidptr(&bitmap[0]), off, uint(fs.inode_size))
 				if rc {
 					return rc
 				}
@@ -868,7 +868,7 @@ pub fn e2_inode_free(fs &E2_fs, ino u32) i32 {
 		if !e2_block_valid(fs, map_) {
 			return -22
 		}
-		rc = e2_disk(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), usize(fs.block_size))
+		rc = e2_disk(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), uint(fs.block_size))
 		if rc {
 			return rc
 		}
@@ -876,7 +876,7 @@ pub fn e2_inode_free(fs &E2_fs, ino u32) i32 {
 			return -22
 		}
 		bitmap[bit >> 3] &= i32(u8(~(1 << (bit & u32(7)))))
-		rc = e2_store(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), usize(fs.block_size))
+		rc = e2_store(fs, voidptr(&bitmap[0]), u64(map_) * u64(fs.block_size), uint(fs.block_size))
 		if rc {
 			return rc
 		}
@@ -903,7 +903,7 @@ pub fn e2_write_limit(fs &E2_fs) u64 {
 @[export: 'e2_map_write']
 pub fn e2_map_write(fs &E2_fs, in_ &E2_inode, logical u64, allocate i32, out &u32) i32 {
 	unsafe {
-		if usize(out) == 0 {
+		if uint(out) == 0 {
 			return -22
 		}
 		if logical < u64(12) {
@@ -935,7 +935,7 @@ pub fn e2_map_write(fs &E2_fs, in_ &E2_inode, logical u64, allocate i32, out &u3
 		}
 		raw := [4]u8{}
 		off := u64(in_.ptr[12]) * u64(fs.block_size) + logical * u64(4)
-		rc := e2_disk(fs, voidptr(&raw[0]), off, usize(4))
+		rc := e2_disk(fs, voidptr(&raw[0]), off, uint(4))
 		if rc {
 			return rc
 		}
@@ -949,7 +949,7 @@ pub fn e2_map_write(fs &E2_fs, in_ &E2_inode, logical u64, allocate i32, out &u3
 				return rc
 			}
 			e2_p32(&raw[0], block)
-			rc = e2_store(fs, voidptr(&raw[0]), off, usize(4))
+			rc = e2_store(fs, voidptr(&raw[0]), off, uint(4))
 			if rc {
 				return rc
 			}
@@ -975,7 +975,7 @@ pub fn e2_zero_tail(fs &E2_fs, in_ &E2_inode, size u64) i32 {
 		e2_zero(voidptr(&zero[0]), sizeof([256]u8))
 		pos := u32((size % u64(fs.block_size)))
 		for pos < fs.block_size {
-			n := usize(fs.block_size - pos)
+			n := uint(fs.block_size - pos)
 			if n > sizeof([256]u8) {
 				n = sizeof([256]u8)
 			}
@@ -993,14 +993,14 @@ pub fn e2_zero_tail(fs &E2_fs, in_ &E2_inode, size u64) i32 {
 pub fn e2_zero_range(fs &E2_fs, in_ &E2_inode, start u64, end u64) i32 {
 	unsafe {
 		zero := [4096]u8{}
-		e2_zero(voidptr(&zero[0]), usize(fs.block_size))
+		e2_zero(voidptr(&zero[0]), uint(fs.block_size))
 		for start < end {
 			within := u32((start % u64(fs.block_size)))
 			block := u32(0)
 
-			n := usize(fs.block_size - within)
+			n := uint(fs.block_size - within)
 			if u64(n) > end - start {
-				n = usize((end - start))
+				n = uint((end - start))
 			}
 			rc := e2_map(fs, in_, start / u64(fs.block_size), &block)
 			if rc {
@@ -1023,7 +1023,7 @@ pub fn vinix_ext2_truncate(context voidptr, ino u32, size u64) i32 {
 	unsafe {
 		fs := &E2_fs(context)
 		in_ := E2_inode{}
-		if (usize(fs) == 0) || !fs.active {
+		if (uint(fs) == 0) || !fs.active {
 			return -30
 		}
 		if size > e2_write_limit(fs) {
@@ -1068,7 +1068,7 @@ pub fn vinix_ext2_truncate(context voidptr, ino u32, size u64) i32 {
 					in_.ptr[logical] = u32(0)
 				} else {
 					zero := [4]u8{}
-					rc = e2_store(fs, voidptr(&zero[0]), u64(in_.ptr[12]) * u64(fs.block_size) + (logical - u64(12)) * u64(4), usize(4))
+					rc = e2_store(fs, voidptr(&zero[0]), u64(in_.ptr[12]) * u64(fs.block_size) + (logical - u64(12)) * u64(4), uint(4))
 					if rc {
 						return rc
 					}
@@ -1076,7 +1076,7 @@ pub fn vinix_ext2_truncate(context voidptr, ino u32, size u64) i32 {
 			}
 			if in_.ptr[12] {
 				pointers := [4096]u8{}
-				rc = e2_disk(fs, voidptr(&pointers[0]), u64(in_.ptr[12]) * u64(fs.block_size), usize(fs.block_size))
+				rc = e2_disk(fs, voidptr(&pointers[0]), u64(in_.ptr[12]) * u64(fs.block_size), uint(fs.block_size))
 				if rc {
 					return rc
 				}
@@ -1103,11 +1103,11 @@ pub fn vinix_ext2_truncate(context voidptr, ino u32, size u64) i32 {
 }
 
 @[export: 'vinix_ext2_write']
-pub fn vinix_ext2_write(context voidptr, ino u32, buffer voidptr, offset u64, count usize) i64 {
+pub fn vinix_ext2_write(context voidptr, ino u32, buffer voidptr, offset u64, count uint) i64 {
 	unsafe {
 		fs := &E2_fs(context)
 		in_ := E2_inode{}
-		if (usize(fs) == 0) || !fs.active || ((usize(buffer) == 0) && count) {
+		if (uint(fs) == 0) || !fs.active || ((uint(buffer) == 0) && count) {
 			return i64((-30))
 		}
 		if offset > e2_write_limit(fs) || u64(count) > e2_write_limit(fs) - offset {
@@ -1130,13 +1130,13 @@ pub fn vinix_ext2_write(context voidptr, ino u32, buffer voidptr, offset u64, co
 			}
 		}
 		p := &u8(buffer)
-		done := usize(0)
+		done := uint(0)
 		for done < count {
 			pos := offset + u64(done)
 			within := u32((pos % u64(fs.block_size)))
 			block := u32(0)
 
-			n := usize(fs.block_size - within)
+			n := uint(fs.block_size - within)
 			if n > count - done {
 				n = count - done
 			}
@@ -1159,18 +1159,18 @@ pub fn vinix_ext2_write(context voidptr, ino u32, buffer voidptr, offset u64, co
 }
 
 @[export: 'e2_name_valid']
-pub fn e2_name_valid(name &char, n usize) i32 {
+pub fn e2_name_valid(name &char, n uint) i32 {
 	unsafe {
-		if (usize(name) == 0) || !n {
+		if (uint(name) == 0) || !n {
 			return -22
 		}
-		if n > usize(255) {
+		if n > uint(255) {
 			return -36
 		}
-		if (n == usize(1) && i32(name[0]) == i8(`.`)) || (n == usize(2) && i32(name[0]) == i8(`.`) && i32(name[1]) == i8(`.`)) {
+		if (n == uint(1) && i32(name[0]) == i8(`.`)) || (n == uint(2) && i32(name[0]) == i8(`.`) && i32(name[1]) == i8(`.`)) {
 			return -22
 		}
-		for i := usize(0); i < n; i++ {
+		for i := uint(0); i < n; i++ {
 			if !name[i] || i32(name[i]) == i8(`/`) {
 				return -22
 			}
@@ -1180,12 +1180,12 @@ pub fn e2_name_valid(name &char, n usize) i32 {
 }
 
 @[export: 'e2_name_equal']
-pub fn e2_name_equal(a &char, an usize, b &char, bn usize) i32 {
+pub fn e2_name_equal(a &char, an uint, b &char, bn uint) i32 {
 	unsafe {
 		if an != bn {
 			return 0
 		}
-		for i := usize(0); i < an; i++ {
+		for i := uint(0); i < an; i++ {
 			if i32(a[i]) != i32(b[i]) {
 				return 0
 			}
@@ -1195,7 +1195,7 @@ pub fn e2_name_equal(a &char, an usize, b &char, bn usize) i32 {
 }
 
 @[export: 'e2_lookup']
-pub fn e2_lookup(fs &E2_fs, dir u32, name &char, n usize, ino &u32, type_ &u8) i32 {
+pub fn e2_lookup(fs &E2_fs, dir u32, name &char, n uint, ino &u32, type_ &u8) i32 {
 	unsafe {
 		pos := u64(0)
 		found := [256]char{}
@@ -1205,7 +1205,7 @@ pub fn e2_lookup(fs &E2_fs, dir u32, name &char, n usize, ino &u32, type_ &u8) i
 			if rc <= 0 {
 				return if rc { rc } else { -2 }
 			}
-			length := usize(0)
+			length := uint(0)
 			for length < sizeof([256]char) && i32(found[length]) {
 				length++
 			}
@@ -1234,7 +1234,7 @@ pub fn e2_lookup(fs &E2_fs, dir u32, name &char, n usize, ino &u32, type_ &u8) i
 }
 
 @[export: 'e2_dir_add']
-pub fn e2_dir_add(fs &E2_fs, dir u32, name &char, n usize, child u32, type_ u8) i32 {
+pub fn e2_dir_add(fs &E2_fs, dir u32, name &char, n uint, child u32, type_ u8) i32 {
 	unsafe {
 		rc := e2_name_valid(name, n)
 		if rc {
@@ -1256,7 +1256,7 @@ pub fn e2_dir_add(fs &E2_fs, dir u32, name &char, n usize, child u32, type_ u8) 
 		if (in_.mode & 61440) != 16384 || (in_.flags & 4096) {
 			return -20
 		}
-		needed := u16(((usize(8) + n + usize(3)) & usize(~3)))
+		needed := u16(((uint(8) + n + uint(3)) & uint(~3)))
 		block_data := [4096]u8{}
 		blocks := in_.size / u64(fs.block_size)
 		for logical := u64(0); logical < blocks; logical++ {
@@ -1265,7 +1265,7 @@ pub fn e2_dir_add(fs &E2_fs, dir u32, name &char, n usize, child u32, type_ u8) 
 			if rc || !block {
 				return if rc { rc } else { (-22) }
 			}
-			rc = e2_disk(fs, voidptr(&block_data[0]), u64(block) * u64(fs.block_size), usize(fs.block_size))
+			rc = e2_disk(fs, voidptr(&block_data[0]), u64(block) * u64(fs.block_size), uint(fs.block_size))
 			if rc {
 				return rc
 			}
@@ -1279,13 +1279,13 @@ pub fn e2_dir_add(fs &E2_fs, dir u32, name &char, n usize, child u32, type_ u8) 
 				if i32(rec) >= i32(actual) + i32(needed) {
 					e2_p16(&block_data[0] + pos + 4, actual)
 					entry := &block_data[0] + pos + i32(actual)
-					e2_zero(voidptr(entry), usize(i32(rec) - i32(actual)))
+					e2_zero(voidptr(entry), uint(i32(rec) - i32(actual)))
 					e2_p32(entry, child)
 					e2_p16(entry + 4, u16(i32(rec) - i32(actual)))
 					entry[6] = u8(n)
 					entry[7] = u8(if fs.filetype { i32(type_) } else { 0 })
 					e2_copy(voidptr(entry + 8), voidptr(name), n)
-					return e2_store(fs, voidptr(&block_data[0]), u64(block) * u64(fs.block_size), usize(fs.block_size))
+					return e2_store(fs, voidptr(&block_data[0]), u64(block) * u64(fs.block_size), uint(fs.block_size))
 				}
 				pos += u32(rec)
 			}
@@ -1298,13 +1298,13 @@ pub fn e2_dir_add(fs &E2_fs, dir u32, name &char, n usize, child u32, type_ u8) 
 		if rc {
 			return rc
 		}
-		e2_zero(voidptr(&block_data[0]), usize(fs.block_size))
+		e2_zero(voidptr(&block_data[0]), uint(fs.block_size))
 		e2_p32(&block_data[0], child)
 		e2_p16(&block_data[0] + 4, u16(fs.block_size))
 		block_data[6] = u8(n)
 		block_data[7] = u8(if fs.filetype { i32(type_) } else { 0 })
 		e2_copy(voidptr(&block_data[0] + 8), voidptr(name), n)
-		rc = e2_store(fs, voidptr(&block_data[0]), u64(block) * u64(fs.block_size), usize(fs.block_size))
+		rc = e2_store(fs, voidptr(&block_data[0]), u64(block) * u64(fs.block_size), uint(fs.block_size))
 		if rc {
 			return rc
 		}
@@ -1314,7 +1314,7 @@ pub fn e2_dir_add(fs &E2_fs, dir u32, name &char, n usize, child u32, type_ u8) 
 }
 
 @[export: 'e2_dir_remove']
-pub fn e2_dir_remove(fs &E2_fs, dir u32, name &char, n usize, removed &u32) i32 {
+pub fn e2_dir_remove(fs &E2_fs, dir u32, name &char, n uint, removed &u32) i32 {
 	unsafe {
 		in_ := E2_inode{}
 		rc := e2_inode_get(fs, dir, &in_)
@@ -1332,7 +1332,7 @@ pub fn e2_dir_remove(fs &E2_fs, dir u32, name &char, n usize, removed &u32) i32 
 			if rc || !block {
 				return if rc { rc } else { (-22) }
 			}
-			rc = e2_disk(fs, voidptr(&data[0]), u64(block) * u64(fs.block_size), usize(fs.block_size))
+			rc = e2_disk(fs, voidptr(&data[0]), u64(block) * u64(fs.block_size), uint(fs.block_size))
 			if rc {
 				return rc
 			}
@@ -1344,14 +1344,14 @@ pub fn e2_dir_remove(fs &E2_fs, dir u32, name &char, n usize, removed &u32) i32 
 				if i32(rec) < 8 || (i32(rec) & 3) || u32(rec) > fs.block_size - pos || i32(len) > i32(rec) - 8 {
 					return -22
 				}
-				if child && e2_name_equal(&char(voidptr(&data[0])) + pos + 8, usize(len), name, n) {
+				if child && e2_name_equal(&char(voidptr(&data[0])) + pos + 8, uint(len), name, n) {
 					if previous != u32(4294967295) {
 						e2_p16(&data[0] + previous + 4, u16((i32(e2_u16(&data[0] + previous + 4)) + i32(rec))))
 					} else {
 						e2_p32(&data[0] + pos, u32(0))
 					}
-					rc = e2_store(fs, voidptr(&data[0]), u64(block) * u64(fs.block_size), usize(fs.block_size))
-					if !rc && !(usize(removed) == 0) {
+					rc = e2_store(fs, voidptr(&data[0]), u64(block) * u64(fs.block_size), uint(fs.block_size))
+					if !rc && !(uint(removed) == 0) {
 						*removed = child
 					}
 					return rc
@@ -1426,10 +1426,10 @@ pub fn e2_release_inode(fs &E2_fs, ino u32, in_ &E2_inode) i32 {
 }
 
 @[export: 'vinix_ext2_create']
-pub fn vinix_ext2_create(context voidptr, parent u32, name &char, name_length usize, mode u32, created &u32) i32 {
+pub fn vinix_ext2_create(context voidptr, parent u32, name &char, name_length uint, mode u32, created &u32) i32 {
 	unsafe {
 		fs := &E2_fs(context)
-		if (usize(fs) == 0) || !fs.active || (usize(created) == 0) {
+		if (uint(fs) == 0) || !fs.active || (uint(created) == 0) {
 			return -30
 		}
 		kind := mode & 61440
@@ -1464,7 +1464,7 @@ pub fn vinix_ext2_create(context voidptr, parent u32, name &char, name_length us
 				return rc
 			}
 			data := [4096]u8{}
-			e2_zero(voidptr(&data[0]), usize(fs.block_size))
+			e2_zero(voidptr(&data[0]), uint(fs.block_size))
 			e2_p32(&data[0], ino)
 			e2_p16(&data[0] + 4, u16(12))
 			data[6] = u8(1)
@@ -1476,7 +1476,7 @@ pub fn vinix_ext2_create(context voidptr, parent u32, name &char, name_length us
 			data[19] = u8(if fs.filetype { 2 } else { 0 })
 			data[20] = u8(`.`)
 			data[21] = u8(`.`)
-			rc = e2_store(fs, voidptr(&data[0]), u64(block) * u64(fs.block_size), usize(fs.block_size))
+			rc = e2_store(fs, voidptr(&data[0]), u64(block) * u64(fs.block_size), uint(fs.block_size))
 			if rc {
 				return rc
 			}
@@ -1523,13 +1523,13 @@ pub fn vinix_ext2_create(context voidptr, parent u32, name &char, name_length us
 }
 
 @[export: 'vinix_ext2_symlink']
-pub fn vinix_ext2_symlink(context voidptr, parent u32, name &char, name_length usize, target &char, target_length usize, created &u32) i32 {
+pub fn vinix_ext2_symlink(context voidptr, parent u32, name &char, name_length uint, target &char, target_length uint, created &u32) i32 {
 	unsafe {
 		fs := &E2_fs(context)
-		if (usize(fs) == 0) || !fs.active || (usize(created) == 0) || (usize(target) == 0) || !target_length {
+		if (uint(fs) == 0) || !fs.active || (uint(created) == 0) || (uint(target) == 0) || !target_length {
 			return -30
 		}
-		if target_length > usize(60) {
+		if target_length > uint(60) {
 			return -36
 		}
 		rc := e2_name_valid(name, name_length)
@@ -1569,11 +1569,11 @@ pub fn vinix_ext2_symlink(context voidptr, parent u32, name &char, name_length u
 }
 
 @[export: 'vinix_ext2_link']
-pub fn vinix_ext2_link(context voidptr, parent u32, name &char, name_length usize, ino u32) i32 {
+pub fn vinix_ext2_link(context voidptr, parent u32, name &char, name_length uint, ino u32) i32 {
 	unsafe {
 		fs := &E2_fs(context)
 		in_ := E2_inode{}
-		if (usize(fs) == 0) || !fs.active {
+		if (uint(fs) == 0) || !fs.active {
 			return -30
 		}
 		rc := e2_inode_get(fs, ino, &in_)
@@ -1606,7 +1606,7 @@ pub fn vinix_ext2_drop_link(context voidptr, ino u32) i32 {
 	unsafe {
 		fs := &E2_fs(context)
 		in_ := E2_inode{}
-		if (usize(fs) == 0) || !fs.active {
+		if (uint(fs) == 0) || !fs.active {
 			return -30
 		}
 		rc := e2_inode_get(fs, ino, &in_)
@@ -1625,12 +1625,12 @@ pub fn vinix_ext2_drop_link(context voidptr, ino u32) i32 {
 }
 
 @[export: 'vinix_ext2_unlink']
-pub fn vinix_ext2_unlink(context voidptr, parent u32, name &char, name_length usize, directory i32) i32 {
+pub fn vinix_ext2_unlink(context voidptr, parent u32, name &char, name_length uint, directory i32) i32 {
 	unsafe {
 		fs := &E2_fs(context)
 		ino := u32(0)
 		type_ := u8(0)
-		if (usize(fs) == 0) || !fs.active {
+		if (uint(fs) == 0) || !fs.active {
 			return -30
 		}
 		rc := e2_name_valid(name, name_length)
@@ -1698,14 +1698,14 @@ pub fn vinix_ext2_unlink(context voidptr, parent u32, name &char, name_length us
 }
 
 @[export: 'vinix_ext2_rename']
-pub fn vinix_ext2_rename(context voidptr, old_parent u32, old_name &char, old_length usize, new_parent u32, new_name &char, new_length usize, replace i32) i32 {
+pub fn vinix_ext2_rename(context voidptr, old_parent u32, old_name &char, old_length uint, new_parent u32, new_name &char, new_length uint, replace i32) i32 {
 	unsafe {
 		fs := &E2_fs(context)
 		source := u32(0)
 		destination := u32(0)
 
 		type_ := u8(0)
-		if (usize(fs) == 0) || !fs.active {
+		if (uint(fs) == 0) || !fs.active {
 			return -30
 		}
 		rc := e2_name_valid(old_name, old_length)

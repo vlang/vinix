@@ -115,8 +115,8 @@ pub fn dma_resv_get_singleton(obj &C.dma_resv, usage C.vdr_usage, fence &&C.dma_
 }
 
 @[export: 'dma_resv_wait_timeout']
-pub fn dma_resv_wait_timeout(obj &C.dma_resv, usage C.vdr_usage, intr bool, timeout usize) isize {
-	return isize(C.vdr_wait(obj, resv_usage(usage), intr, u64(timeout)))
+pub fn dma_resv_wait_timeout(obj &C.dma_resv, usage C.vdr_usage, intr bool, timeout uint) int {
+	return int(C.vdr_wait(obj, resv_usage(usage), intr, u64(timeout)))
 }
 
 @[export: 'dma_resv_set_deadline']

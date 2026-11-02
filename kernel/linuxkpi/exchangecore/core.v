@@ -3,7 +3,7 @@
 @[translated]
 module exchangecore
 
-fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
 fn C.__builtin_trap()
 
 @[c: '__atomic_exchange_n']
@@ -26,7 +26,7 @@ fn C.vhx_compare64(&u64, &u64, u64, bool, i32, i32) bool
 // All input and result records retain the caller's exact native object width.
 // No pointer or signed integer is narrowed through a numeric conversion.
 @[export: 'vinix_arch_exchange_bits']
-pub fn exchange(storage voidptr, value voidptr, result voidptr, width usize) {
+pub fn exchange(storage voidptr, value voidptr, result voidptr, width uint) {
 	unsafe {
 		match width {
 			1 {
@@ -59,7 +59,7 @@ pub fn exchange(storage voidptr, value voidptr, result voidptr, width usize) {
 }
 
 @[export: 'vinix_arch_compare_exchange_bits']
-pub fn compare_exchange(storage voidptr, expected voidptr, value voidptr, result voidptr, width usize) {
+pub fn compare_exchange(storage voidptr, expected voidptr, value voidptr, result voidptr, width uint) {
 	unsafe {
 		match width {
 			1 {

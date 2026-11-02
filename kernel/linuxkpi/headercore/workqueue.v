@@ -26,7 +26,7 @@ fn C.vinix_linuxkpi_pool_manager(voidptr) voidptr
 fn C.vinix_linuxkpi_work_barrier(&C.work_struct)
 fn C.delayed_work_timer_fn(&C.timer_list)
 fn C.pthread_join(C.pthread_t, voidptr) i32
-fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
 fn C.pthread_exit(voidptr)
 fn C.get_task_struct(&C.task_struct) &C.task_struct
 fn C.put_task_struct(&C.task_struct)
@@ -39,8 +39,8 @@ fn C.vinix_linuxkpi_host_pool_publish_gate(&C.workqueue_struct, u32)
 fn C.vinix_linuxkpi_workqueue_allocate(u32, i32) voidptr
 fn C.vinix_linuxkpi_workqueue_name(voidptr) &char
 fn C.vinix_linuxkpi_workqueue_start(voidptr) voidptr
-fn C.vkr_format_entry(&char, usize, &char, voidptr, &u32) i32
-fn C.vp_snprintf(&char, usize, C.vkh_const_char_p, voidptr) i32
+fn C.vkr_format_entry(&char, uint, &char, voidptr, &u32) i32
+fn C.vp_snprintf(&char, uint, C.vkh_const_char_p, voidptr) i32
 
 @[export: 'vkwq_worker_callback']
 pub fn workqueue_worker_callback() voidptr { return voidptr(C.vinix_linuxkpi_work_worker) }

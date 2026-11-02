@@ -23,7 +23,7 @@ fn C.__atomic_load_n(&u32, i32) u32
 fn C.init_completion(&C.completion)
 fn C.complete(&C.completion)
 fn C.wait_for_completion(&C.completion)
-fn C.wait_for_completion_timeout(&C.completion, usize) usize
+fn C.wait_for_completion_timeout(&C.completion, uint) uint
 fn C.vinix_linuxkpi_test_worker_oom(i32)
 fn C.alloc_workqueue(&char, u32, i32, ...) &C.workqueue_struct
 fn C.destroy_workqueue(&C.workqueue_struct)
@@ -32,21 +32,21 @@ fn C.vinix_linuxkpi_cpu_id() u32
 fn C.vinix_linuxkpi_worker_bind(u32) i32
 fn C.vinix_linuxkpi_worker_set_nice(i32) i32
 fn C.vinix_linuxkpi_worker_nice() i32
-fn C.vinix_linuxkpi_worker_timeslice() usize
+fn C.vinix_linuxkpi_worker_timeslice() uint
 fn C.vinix_linuxkpi_may_sleep() bool
-fn C.vinix_linuxkpi_irq_flags() usize
-fn C.vinix_linuxkpi_irq_save() usize
-fn C.vinix_linuxkpi_irq_restore(usize)
+fn C.vinix_linuxkpi_irq_flags() uint
+fn C.vinix_linuxkpi_irq_save() uint
+fn C.vinix_linuxkpi_irq_restore(uint)
 fn C.vinix_linuxkpi_preempt_count() u32
 fn C.vinix_linuxkpi_preempt_disable()
 fn C.vinix_linuxkpi_preempt_enable()
 fn C.cond_resched() i32
 fn C.msleep(u32)
-fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
 fn C.kprintf(&char, ...) i32
 
 @[c_extern]
-__global C.jiffies usize
+__global C.jiffies uint
 
 @[c_extern]
 __global (
@@ -60,7 +60,7 @@ __global (
 	C.EWOULDBLOCK      i32
 )
 
-const exit_value = usize(0x51a9)
+const exit_value = uint(0x51a9)
 
 struct WorkerResult {
 mut:
@@ -88,9 +88,9 @@ fn join(native_thread C.pthread_t, test &WorkerResult) i32 {
 		}
 		if C.pthread_join(native_thread, &value) != 0 { return -C.EIO }
 		if C.VKF_WORKER_TRACE {
-			C.kprintf(c'linuxkpi: worker trace join complete ticks=%lu calls=%u result=%d value_ok=%u\n', C.jiffies, C.__atomic_load_n(&test.calls, 2), test.result, u32(usize(value) == exit_value))
+			C.kprintf(c'linuxkpi: worker trace join complete ticks=%lu calls=%u result=%d value_ok=%u\n', C.jiffies, C.__atomic_load_n(&test.calls, 2), test.result, u32(uint(value) == exit_value))
 		}
-		return if usize(value) == exit_value && C.__atomic_load_n(&test.calls, 2) == 1 && test.result == 0 {
+		return if uint(value) == exit_value && C.__atomic_load_n(&test.calls, 2) == 1 && test.result == 0 {
 			i32(0)
 		} else {
 			-C.EIO
@@ -124,7 +124,7 @@ fn failures() i32 {
 					if join(native_thread, &test) != 0 { result = -C.EIO }
 					result = -C.EIO
 				} else {
-					mut thread_bits := usize(0)
+					mut thread_bits := uint(0)
 					C.memcpy(&thread_bits, &native_thread, sizeof(C.pthread_t))
 					if error != C.EAGAIN || thread_bits != exit_value || C.__atomic_load_n(&test.calls, 2) != 0 {
 						result = -C.EIO
@@ -180,9 +180,9 @@ fn placement(test &WorkerResult, cpu u32, nice i32) {
 		C.cond_resched()
 		C.msleep(1)
 		if C.vinix_linuxkpi_cpu_id() != cpu || C.vinix_linuxkpi_worker_nice() != nice || C.vinix_linuxkpi_worker_timeslice() != (if nice == -20 {
-			usize(10000)
+			uint(10000)
 		} else {
-			usize(5000)
+			uint(5000)
 		}) {
 			test.result = -C.EIO
 		}
@@ -227,7 +227,7 @@ pub fn context(argument voidptr) voidptr {
 				C.kprintf(c'linuxkpi: worker trace context IRQ-off checks begin ticks=%lu\n', C.jiffies)
 			}
 			irq_flags := C.vinix_linuxkpi_irq_save()
-			if C.vinix_linuxkpi_worker_bind(other) != -C.EWOULDBLOCK || C.vinix_linuxkpi_worker_set_nice(-20) != -C.EWOULDBLOCK || C.vinix_linuxkpi_irq_flags() & (usize(1) << 9) != 0 || C.vinix_linuxkpi_worker_nice() != 0 || C.vinix_linuxkpi_cpu_id() != last {
+			if C.vinix_linuxkpi_worker_bind(other) != -C.EWOULDBLOCK || C.vinix_linuxkpi_worker_set_nice(-20) != -C.EWOULDBLOCK || C.vinix_linuxkpi_irq_flags() & (uint(1) << 9) != 0 || C.vinix_linuxkpi_worker_nice() != 0 || C.vinix_linuxkpi_cpu_id() != last {
 				test.result = -C.EIO
 			}
 			C.vinix_linuxkpi_irq_restore(irq_flags)

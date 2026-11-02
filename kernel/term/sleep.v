@@ -25,8 +25,8 @@ module term
 
 import memory
 
-fn C.memcpy(dest voidptr, source voidptr, length usize) voidptr
-fn C.memset(dest voidptr, value i32, length usize) voidptr
+fn C.memcpy(dest voidptr, source voidptr, length uint) voidptr
+fn C.memset(dest voidptr, value i32, length uint) voidptr
 
 __global (
 	// The physical address of each page of the picture put away.
@@ -85,9 +85,9 @@ pub fn screen_sleep() bool {
 	for i in 0 .. count {
 		offset := i * page_size
 		length := if bytes - offset < page_size { bytes - offset } else { page_size }
-		unsafe { C.memcpy(voidptr(list[i] + higher_half), picture + offset, usize(length)) }
+		unsafe { C.memcpy(voidptr(list[i] + higher_half), picture + offset, uint(length)) }
 	}
-	unsafe { C.memset(picture, 0, usize(bytes)) }
+	unsafe { C.memset(picture, 0, uint(bytes)) }
 	screen_pages = list
 	screen_page_count = count
 	screen_dark = true
@@ -109,7 +109,7 @@ pub fn screen_wake() {
 	for i in 0 .. count {
 		offset := i * page_size
 		length := if bytes - offset < page_size { bytes - offset } else { page_size }
-		unsafe { C.memcpy(picture + offset, voidptr(list[i] + higher_half), usize(length)) }
+		unsafe { C.memcpy(picture + offset, voidptr(list[i] + higher_half), uint(length)) }
 	}
 	screen_pages = unsafe { nil }
 	screen_page_count = 0

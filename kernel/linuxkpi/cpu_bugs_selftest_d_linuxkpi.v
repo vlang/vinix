@@ -77,7 +77,7 @@ fn cpu_bug_test_local(target u32) bool {
 }
 
 fn cpu_bug_test_actor(argument voidptr) {
-	index := u32(usize(argument))
+	index := u32(uint(argument))
 	// Every actor observes every installed CPU through real scheduler routing;
 	// no synthetic Local record can substitute for a live sample here.
 	for target in u32(0) .. boot_bug_count {

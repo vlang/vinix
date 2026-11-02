@@ -48,7 +48,7 @@ fn slot_of(pointer u64) u64 {
 @[export: 'vinix_alloc_track_enter']
 pub fn track_enter(pointer voidptr, size u64, frame &u64) {
 	unsafe {
-		if C.at_load(&at_enabled, 0) == 0 || usize(pointer) == 0 { return }
+		if C.at_load(&at_enabled, 0) == 0 || uint(pointer) == 0 { return }
 		mut pcs := [10]u64{}
 		mut fp := frame
 		minimum := kernel_address_min()
@@ -76,7 +76,7 @@ pub fn track_enter(pointer voidptr, size u64, frame &u64) {
 @[export: 'alloc_untrack']
 pub fn untrack(pointer voidptr) {
 	unsafe {
-		if C.at_load(&at_enabled, 0) == 0 || usize(pointer) == 0 { return }
+		if C.at_load(&at_enabled, 0) == 0 || uint(pointer) == 0 { return }
 		if !try_lock() { return }
 		mut index := slot_of(u64(pointer))
 		mut n := u64(0)
@@ -117,7 +117,7 @@ fn put_text(out &char, end &char, text &char) &char {
 	unsafe {
 		mut cursor := out
 		mut source := text
-		for *source != 0 && usize(cursor) < usize(end) { *cursor = *source; cursor++; source++ }
+		for *source != 0 && uint(cursor) < uint(end) { *cursor = *source; cursor++; source++ }
 		return cursor
 	}
 }
@@ -134,7 +134,7 @@ fn put_number(out &char, end &char, input u64, base u64) &char {
 			if value == 0 { break }
 		}
 		mut cursor := out
-		for count != 0 && usize(cursor) < usize(end) { count--; *cursor = char(scratch[count]); cursor++ }
+		for count != 0 && uint(cursor) < uint(end) { count--; *cursor = char(scratch[count]); cursor++ }
 		return cursor
 	}
 }

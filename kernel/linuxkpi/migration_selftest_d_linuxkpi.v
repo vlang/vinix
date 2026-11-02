@@ -164,7 +164,7 @@ fn migration_test_irq(_work &C.irq_work) {
 	owner := proc.current_thread()
 	depth := preempt_depth[local.cpu_number]
 	mut valid := !cpu.interrupt_state() && local.cpu_number == 1 && local.maskable_irq_depth != 0
-		&& depth != 0 && usize(owner) == usize(migration_test_ledger.owners[0])
+		&& depth != 0 && uint(owner) == uint(migration_test_ledger.owners[0])
 		&& katomic.load(&owner.linuxkpi_migration_pin) == 0
 	C.vinix_linuxkpi_migration_fixture_disable()
 	C.vinix_linuxkpi_migration_fixture_disable()
@@ -199,7 +199,7 @@ fn migration_test_irq_case() bool {
 }
 
 fn migration_test_actor(argument voidptr) {
-	index := u32(usize(argument))
+	index := u32(uint(argument))
 	if katomic.load(&proc.current_thread().linuxkpi_migration_pin) != 0 || worker_bind(index + 1) != 0 {
 		migration_test_fail(1)
 	}

@@ -42,7 +42,7 @@ fn C.vinix_linuxkpi_swf_timed(voidptr, voidptr) voidptr
 fn C.vinix_linuxkpi_swf_timed_value(voidptr, u32) u64
 fn C.vinix_linuxkpi_swf_timed_sync(voidptr)
 fn C.vinix_linuxkpi_swf_now() u64
-fn C.vinix_linuxkpi_timer_active() usize
+fn C.vinix_linuxkpi_timer_active() uint
 
 struct SwFenceTestNode {
 mut:
@@ -146,7 +146,7 @@ fn swf_notify(fence &C.i915_sw_fence, state C.vswf_notify) i32 {
 }
 
 fn swf_actor(argument voidptr) {
-	index := u32(usize(argument))
+	index := u32(uint(argument))
 	if worker_bind(index + 1) != 0 || !dma_fence_test_task(index + 1) { swf_fail(32) }
 	katomic.store(mut &swf_test_ledger.ready[index], true)
 	for !katomic.load(&swf_test_ledger.quit) {

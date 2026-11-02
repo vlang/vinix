@@ -36,10 +36,10 @@ fn C.vinix_linuxkpi_fixture_printk_produce(voidptr) voidptr
 fn C.vinix_linuxkpi_fixture_printk_flusher(voidptr) voidptr
 fn C.vinix_linuxkpi_fixture_nested_format(&char, ...) i32
 fn C.vinix_linuxkpi_fixture_nested_emit(&char, ...) i32
-fn C.vkr_format_entry(&char, usize, &char, voidptr, &u32) i32
-fn C.vinix_linuxkpi_irq_flags() usize
-fn C.vinix_linuxkpi_irq_save() usize
-fn C.vinix_linuxkpi_irq_restore(usize)
+fn C.vkr_format_entry(&char, uint, &char, voidptr, &u32) i32
+fn C.vinix_linuxkpi_irq_flags() uint
+fn C.vinix_linuxkpi_irq_save() uint
+fn C.vinix_linuxkpi_irq_restore(uint)
 fn C.vinix_linuxkpi_preempt_count() u32
 fn C.vinix_linuxkpi_preempt_disable()
 fn C.vinix_linuxkpi_preempt_enable_no_resched()
@@ -51,8 +51,8 @@ fn C.vinix_linuxkpi_test_worker_oom(i32)
 fn C.vinix_linuxkpi_test_alloc_oom(i32)
 fn C.vinix_linuxkpi_test_printk_locks() i32
 fn C._printk(&char, ...) i32
-fn C.snprintf(&char, usize, &char, ...) i32
-fn C.scnprintf(&char, usize, &char, ...) i32
+fn C.snprintf(&char, uint, &char, ...) i32
+fn C.scnprintf(&char, uint, &char, ...) i32
 fn C.vinix_linuxkpi_printk_snapshot() u64
 fn C.vinix_linuxkpi_printk_get_state(&C.vinix_linuxkpi_printk_state)
 fn C.vinix_linuxkpi_printk_flush(u64, u32) i32
@@ -68,22 +68,22 @@ fn C.init_completion(&C.completion)
 fn C.complete(&C.completion)
 fn C.complete_all(&C.completion)
 fn C.wait_for_completion(&C.completion)
-fn C.wait_for_completion_timeout(&C.completion, usize) usize
+fn C.wait_for_completion_timeout(&C.completion, uint) uint
 fn C.completion_done(&C.completion) bool
 fn C.__atomic_load_n(&u32, i32) u32
 fn C.__atomic_store_n(&u32, u32, i32)
 fn C.add_taint(u32, i32)
 fn C.test_taint(u32) bool
-fn C.get_taint() usize
+fn C.get_taint() uint
 fn C.cond_resched() i32
-fn C.kmalloc(usize, u32) voidptr
+fn C.kmalloc(uint, u32) voidptr
 fn C.kfree(voidptr)
-fn C.memset(voidptr, i32, usize) voidptr
-fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memset(voidptr, i32, uint) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
 fn C.strcpy(&char, &char) &char
 fn C.strcmp(&char, &char) i32
-fn C.memchr_inv(voidptr, i32, usize) voidptr
-fn C.ERR_PTR(isize) voidptr
+fn C.memchr_inv(voidptr, i32, uint) voidptr
+fn C.ERR_PTR(int) voidptr
 fn C.BUG_ON(bool)
 fn C.kprintf(&char, ...) i32
 @[c_extern] __global (
@@ -152,7 +152,7 @@ mut:
 fn expect(result &i32, condition bool, original_line i32) {
  unsafe { if !condition && *result == 0 { *result = -original_line } }
 }
-fn irqs_enabled() bool { return C.vinix_linuxkpi_irq_flags() & (usize(1) << 9) != 0 }
+fn irqs_enabled() bool { return C.vinix_linuxkpi_irq_flags() & (uint(1) << 9) != 0 }
 
 @[export: 'vinix_linuxkpi_printk_locked_probe']
 pub fn locked_probe() i32 {
@@ -230,12 +230,12 @@ fn formats() i32 {
   mut physical := u64(0x1234)
   mut fourcc := u32(0x3231564e)
   mut bytes := [u8(0xc0), u8(0xff), u8(0xee)]!
-  mut bitmap := usize(0xa28ac)
+  mut bitmap := uint(0xa28ac)
   expect(&result, C.snprintf(&text[0], sizeof(text), c'%pa', &physical) == 18 && C.strcmp(&text[0], c'0x0000000000001234') == 0, 112)
   expect(&result, C.snprintf(&text[0], sizeof(text), c'%p4cc', &fourcc) == 31 && C.strcmp(&text[0], c'NV12 little-endian (0x3231564e)') == 0, 114)
   expect(&result, C.snprintf(&text[0], sizeof(text), c'%3ph', &bytes[0]) == 8 && C.strcmp(&text[0], c'c0 ff ee') == 0, 116)
   expect(&result, C.snprintf(&text[0], sizeof(text), c'%20pbl', &bitmap) == 19 && C.strcmp(&text[0], c'2-3,5,7,11,13,17,19') == 0, 119)
-  expect(&result, C.snprintf(&text[0], sizeof(text), c'%pe', C.ERR_PTR(isize(-1234))) == 5 && C.strcmp(&text[0], c'-1234') == 0, 121)
+  expect(&result, C.snprintf(&text[0], sizeof(text), c'%pe', C.ERR_PTR(int(-1234))) == 5 && C.strcmp(&text[0], c'-1234') == 0, 121)
   C.memset(&text[0], i32(`x`), sizeof(text))
   expect(&result, C.snprintf(&text[0], 5, c'%s', c'abcdef') == 6 && C.strcmp(&text[0], c'abcd') == 0 && text[5] == char(`x`), 124)
   expect(&result, C.snprintf(&text[0], 0, c'%s', c'abcdef') == 6 && text[0] == char(`a`), 125)
@@ -427,7 +427,7 @@ pub fn produce(argument voidptr) voidptr {
    mut borrowed := [char(`s`), char(`t`), char(`a`), char(`b`), char(`l`), char(`e`), char(0)]!
    mut bytes := [u8(0xc0), u8(0xff), u8(0xee)]!
    pins := if round & 2 != 0 { u32(2) } else { u32(0) }
-   mut flags := usize(0)
+   mut flags := uint(0)
    if round & 1 != 0 { flags = C.vinix_linuxkpi_irq_save() }
    for i := u32(0); i < pins; i++ { C.vinix_linuxkpi_preempt_disable() }
    expect(&result, C._printk(c'\x01\x36native id=%u round=%02u str=%s bytes=%3ph\n', test.index, round, &borrowed[0], &bytes[0]) == 46, 342)
@@ -472,7 +472,7 @@ fn producers_body(tests &Producer, result &i32) {
   for i := u32(0); i < 4; i++ {
    if C.wait_for_completion_timeout(&tests[i].done, 2000) == 0 { *result = -C.EIO; return }
   }
-  expect(result, C.get_taint() & (taint_before | usize(15)) == taint_before | usize(15), 390)
+  expect(result, C.get_taint() & (taint_before | uint(15)) == taint_before | uint(15), 390)
  }
 }
 fn producers() i32 {

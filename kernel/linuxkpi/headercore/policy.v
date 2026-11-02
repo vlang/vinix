@@ -11,7 +11,7 @@ fn C.vinix_linuxkpi_may_sleep() bool
 fn C.vinix_linuxkpi_bug(C.vkh_const_char_p, i32)
 
 @[export: 'vinix_zero_or_null_ptr']
-pub fn zero_or_null(pointer usize) bool { return pointer <= 16 }
+pub fn zero_or_null(pointer uint) bool { return pointer <= 16 }
 
 @[export: 'vinix_preemptible']
 pub fn preemptible() bool {

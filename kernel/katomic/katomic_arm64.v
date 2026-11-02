@@ -46,7 +46,7 @@ pub fn bts[T](mut var T, bit u8) bool {
 	$if T is u32 || T is i32 || T is int {
 		old := C.vinix_ldset32(voidptr(var), u32(mask))
 		return old & u32(mask) != 0
-	} $else $if T is u64 || T is i64 || T is usize || T is isize || T is voidptr {
+	} $else $if T is u64 || T is i64 || T is uint || T is int || T is voidptr {
 		old := C.vinix_ldset64(voidptr(var), u64(mask))
 		return old & u64(mask) != 0
 	} $else {
@@ -62,7 +62,7 @@ pub fn btr[T](mut var T, bit u8) bool {
 	$if T is u32 || T is i32 || T is int {
 		old := C.vinix_ldclr32(voidptr(var), u32(mask))
 		return old & u32(mask) != 0
-	} $else $if T is u64 || T is i64 || T is usize || T is isize || T is voidptr {
+	} $else $if T is u64 || T is i64 || T is uint || T is int || T is voidptr {
 		old := C.vinix_ldclr64(voidptr(var), u64(mask))
 		return old & u64(mask) != 0
 	} $else {
@@ -131,7 +131,7 @@ pub fn cas_acquire[T](mut here T, _ifthis T, writethis T) bool {
 pub fn inc[T](mut var T) T {
 	$if T is u32 || T is i32 || T is int {
 		return T(C.vinix_ldadd32(voidptr(var), u32(1)))
-	} $else $if T is u64 || T is i64 || T is usize || T is isize || T is voidptr {
+	} $else $if T is u64 || T is i64 || T is uint || T is int || T is voidptr {
 		return T(C.vinix_ldadd64(voidptr(var), u64(1)))
 	} $else {
 		$compile_error('katomic.inc: unsupported operand width')
@@ -144,7 +144,7 @@ pub fn dec[T](mut var T) bool {
 	$if T is u32 || T is i32 || T is int {
 		old := C.vinix_ldadd32(voidptr(var), u32(0xffffffff))
 		return old - u32(1) != 0
-	} $else $if T is u64 || T is i64 || T is usize || T is isize || T is voidptr {
+	} $else $if T is u64 || T is i64 || T is uint || T is int || T is voidptr {
 		old := C.vinix_ldadd64(voidptr(var), u64(0xffffffffffffffff))
 		return old - u64(1) != 0
 	} $else {
@@ -164,7 +164,7 @@ pub fn store[T](mut var T, value T) {
 		C.vinix_stlr16(voidptr(var), u16(value))
 	} $else $if T is u32 || T is i32 || T is int {
 		C.vinix_stlr32(voidptr(var), u32(value))
-	} $else $if T is u64 || T is i64 || T is usize || T is isize || T is voidptr {
+	} $else $if T is u64 || T is i64 || T is uint || T is int || T is voidptr {
 		C.vinix_stlr64(voidptr(var), u64(value))
 	} $else {
 		$compile_error('katomic.store: unsupported operand width')
@@ -180,7 +180,7 @@ pub fn load[T](var &T) T {
 		return T(C.vinix_ldar16(voidptr(var)))
 	} $else $if T is u32 || T is i32 || T is int {
 		return T(C.vinix_ldar32(voidptr(var)))
-	} $else $if T is u64 || T is i64 || T is usize || T is isize || T is voidptr {
+	} $else $if T is u64 || T is i64 || T is uint || T is int || T is voidptr {
 		return T(C.vinix_ldar64(voidptr(var)))
 	} $else {
 		$compile_error('katomic.load: unsupported operand width')

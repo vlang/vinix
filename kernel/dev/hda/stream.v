@@ -248,7 +248,7 @@ fn (mut s HDAStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 			unsafe {
 				desc := &s.bdl[desc_index]
 				ptr := voidptr(desc.address + desc_offset + higher_half)
-				C.memcpy(ptr, voidptr(usize(buf) + i + progress), small_chunk_size)
+				C.memcpy(ptr, voidptr(uint(buf) + i + progress), small_chunk_size)
 			}
 			s.cur_user_pos += u32(small_chunk_size)
 			if s.cur_user_pos == u32(total_buffer_size) {

@@ -44,15 +44,15 @@ fn C.vdf_signal(voidptr) i32
 fn C.vdf_signal_locked(voidptr) i32
 fn C.vdf_signal_timestamp(voidptr, i64) i32
 fn C.vdf_signal_timestamp_locked(voidptr, i64) i32
-fn C.vdf_wait_timeout(voidptr, bool, isize) isize
+fn C.vdf_wait_timeout(voidptr, bool, int) int
 fn C.vdf_release(voidptr)
 fn C.vdf_free(voidptr)
 fn C.vdf_enable_sw_signaling(voidptr)
 fn C.vdf_add_callback(voidptr, voidptr, fn (&C.dma_fence, &C.dma_fence_cb)) i32
 fn C.vdf_get_status(voidptr) i32
 fn C.vdf_remove_callback(voidptr, voidptr) bool
-fn C.vdf_default_wait(voidptr, bool, isize) isize
-fn C.vdf_wait_any_timeout(voidptr, u32, bool, isize, &u32) isize
+fn C.vdf_default_wait(voidptr, bool, int) int
+fn C.vdf_wait_any_timeout(voidptr, u32, bool, int, &u32) int
 fn C.vdf_set_deadline(voidptr, i64)
 fn C.vdf_init(voidptr, voidptr, voidptr, u64, u64)
 fn C.dma_fence_get(&C.dma_fence) &C.dma_fence
@@ -93,7 +93,7 @@ pub fn dma_fence_signal_timestamp(fence &C.dma_fence, timestamp C.vdf_ktime_t) i
 @[export: 'dma_fence_signal_timestamp_locked']
 pub fn dma_fence_signal_timestamp_locked(fence &C.dma_fence, timestamp C.vdf_ktime_t) i32 { return C.vdf_signal_timestamp_locked(fence, fence_time_bits(timestamp)) }
 @[export: 'dma_fence_wait_timeout']
-pub fn dma_fence_wait_timeout(fence &C.dma_fence, intr bool, timeout isize) isize { return C.vdf_wait_timeout(fence, intr, timeout) }
+pub fn dma_fence_wait_timeout(fence &C.dma_fence, intr bool, timeout int) int { return C.vdf_wait_timeout(fence, intr, timeout) }
 @[export: 'dma_fence_release']
 pub fn dma_fence_release(refcount &C.kref) { C.vdf_release(refcount) }
 @[export: 'dma_fence_free']
@@ -109,9 +109,9 @@ pub fn dma_fence_get_status(fence &C.dma_fence) i32 { return C.vdf_get_status(fe
 @[export: 'dma_fence_remove_callback']
 pub fn dma_fence_remove_callback(fence &C.dma_fence, cb &C.dma_fence_cb) bool { return C.vdf_remove_callback(fence, cb) }
 @[export: 'dma_fence_default_wait']
-pub fn dma_fence_default_wait(fence &C.dma_fence, intr bool, timeout isize) isize { return C.vdf_default_wait(fence, intr, timeout) }
+pub fn dma_fence_default_wait(fence &C.dma_fence, intr bool, timeout int) int { return C.vdf_default_wait(fence, intr, timeout) }
 @[export: 'dma_fence_wait_any_timeout']
-pub fn dma_fence_wait_any_timeout(fences &&C.dma_fence, count u32, intr bool, timeout isize, index &u32) isize {
+pub fn dma_fence_wait_any_timeout(fences &&C.dma_fence, count u32, intr bool, timeout int, index &u32) int {
 	return C.vdf_wait_any_timeout(fences, count, intr, timeout, index)
 }
 @[export: 'dma_fence_set_deadline']

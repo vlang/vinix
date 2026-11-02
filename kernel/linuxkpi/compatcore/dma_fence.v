@@ -21,7 +21,7 @@ struct C.vdf_ops {
 	get_timeline_name fn (&C.dma_fence) C.vdf_const_char_p
 	enable_signaling fn (&C.dma_fence) bool
 	signaled fn (&C.dma_fence) bool
-	@wait fn (&C.dma_fence, bool, isize) isize
+	@wait fn (&C.dma_fence, bool, int) int
 	release fn (&C.dma_fence)
 	set_deadline fn (&C.dma_fence, C.vdf_ktime_t)
 }
@@ -64,7 +64,7 @@ __global vdf_context_counter u64 = 1
 fn fence_list_init(node &C.vdf_list) {
 	unsafe { node.next = node; node.prev = node }
 }
-fn fence_list_empty(node &C.vdf_list) bool { return unsafe { usize(node.next) == usize(node) } }
+fn fence_list_empty(node &C.vdf_list) bool { return unsafe { uint(node.next) == uint(node) } }
 fn fence_list_add(node &C.vdf_list, previous &C.vdf_list, next &C.vdf_list) {
 	unsafe { next.prev = node; node.next = next; node.prev = previous; previous.next = node }
 }
@@ -142,7 +142,7 @@ pub fn dma_fence_signal_timestamp_locked(storage voidptr, timestamp i64) i32 {
 		C.memcpy(&fence.cb_list, &timestamp, sizeof(timestamp))
 		C.vdf_or_flags(&fence.flags, 2)
 		mut node := sentinel.next
-		for usize(node) != usize(sentinel) {
+		for uint(node) != uint(sentinel) {
 			cb := &C.vdf_cb(node)
 			next := node.next
 			callback := cb.func
@@ -281,7 +281,7 @@ pub fn dma_fence_wait_timeout(storage voidptr, intr bool, timeout i64) i64 {
 	unsafe {
 		fence := &C.vdf_fence(storage)
 		custom_wait := fence.ops.@wait
-		if !is_null(voidptr(custom_wait)) { return i64(custom_wait(&C.dma_fence(storage), intr, isize(timeout))) }
+		if !is_null(voidptr(custom_wait)) { return i64(custom_wait(&C.dma_fence(storage), intr, int(timeout))) }
 	}
 	return dma_fence_default_wait(storage, intr, timeout)
 }
@@ -309,7 +309,7 @@ pub fn dma_fence_wait_any_timeout(storage voidptr, count u32, intr bool, timeout
 		}
 		require(fence_sleepable())
 		// Checked allocation precedes registration and already-signaled checks.
-		callbacks := &C.vdf_wait_cb(C.kmalloc_array(usize(count), sizeof(C.vdf_wait_cb), 3264 | 0x100))
+		callbacks := &C.vdf_wait_cb(C.kmalloc_array(uint(count), sizeof(C.vdf_wait_cb), 3264 | 0x100))
 		if is_null(callbacks) { return -12 }
 		task := C.vdf_current_get()
 		mut registered := u32(0)
@@ -350,12 +350,12 @@ pub fn dma_fence_set_deadline(storage voidptr, deadline i64) {
 }
 @[export: 'vdf_free']
 pub fn dma_fence_free(storage voidptr) {
-	unsafe { C.vkr_kvfree_call_rcu(voidptr(usize(storage) + 16), storage) }
+	unsafe { C.vkr_kvfree_call_rcu(voidptr(uint(storage) + 16), storage) }
 }
 @[export: 'vdf_release']
 pub fn dma_fence_release(refcount voidptr) {
 	unsafe {
-		fence := &C.vdf_fence(usize(refcount) - 56)
+		fence := &C.vdf_fence(uint(refcount) - 56)
 		if !fence_signaled(fence) && !fence_list_empty(&fence.cb_list) {
 			driver := fence.ops.get_driver_name(&C.dma_fence(fence))
 			timeline := fence.ops.get_timeline_name(&C.dma_fence(fence))

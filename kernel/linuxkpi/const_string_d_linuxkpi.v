@@ -15,8 +15,8 @@ fn C.rodata_end()
 
 @[export: 'vinix_linuxkpi_is_kernel_rodata']
 fn const_string_is_rodata(ptr &C.vks_const_void) bool {
-	address := usize(ptr)
-	first := usize(voidptr(C.rodata_start))
-	last := usize(voidptr(C.rodata_end))
+	address := uint(ptr)
+	first := uint(voidptr(C.rodata_start))
+	last := uint(voidptr(C.rodata_end))
 	return address >= first && address < last
 }

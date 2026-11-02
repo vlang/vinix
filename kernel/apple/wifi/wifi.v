@@ -44,8 +44,8 @@ mut:
 	gpio_active_low u32
 	calibration     &u8 = unsafe { nil }
 	seed            &u8 = unsafe { nil }
-	calibration_len usize
-	seed_len        usize
+	calibration_len uint
+	seed_len        uint
 	mac             [6]u8
 	antenna         [16]u8
 }
@@ -68,9 +68,9 @@ fn C.brcm_m1_networks(output &u8) i32
 
 fn C.brcm_m1_poll() i32
 
-fn C.brcm_m1_read(output &u8, capacity usize) i32
+fn C.brcm_m1_read(output &u8, capacity uint) i32
 
-fn C.brcm_m1_write(input &u8, count usize) i32
+fn C.brcm_m1_write(input &u8, count uint) i32
 
 fn C.brcm_m1_stop()
 
@@ -435,7 +435,7 @@ fn setup(mut p Plan) i32 {
 		sid: p.sid
 		gpio_active_low: p.gpio_low
 		calibration: &u8(p.cal.data)
-		calibration_len: usize(p.cal.len)
+		calibration_len: uint(p.cal.len)
 		seed: &wifi_seed[0]
 		seed_len: 256
 		mac: p.mac
@@ -536,7 +536,7 @@ pub fn poll() {
 		for _ in 0 .. 64 {
 			mut frame := [1514]u8{}
 			wifi_lock.acquire()
-			got := C.brcm_m1_read(&frame[0], usize(frame.len))
+			got := C.brcm_m1_read(&frame[0], uint(frame.len))
 			wifi_lock.release()
 			if got <= 0 {
 				break
@@ -555,7 +555,7 @@ pub fn network_send(frame voidptr, length u64) int {
 		return -1
 	}
 	wifi_lock.acquire()
-	result := C.brcm_m1_write(unsafe { &u8(frame) }, usize(length))
+	result := C.brcm_m1_write(unsafe { &u8(frame) }, uint(length))
 	wifi_lock.release()
 	return result
 }
@@ -595,7 +595,7 @@ fn (mut d WifiDevice) read(_ voidptr, output voidptr, _ u64, count u64) ?i64 {
 	capacity := if count < 1514 { count } else { u64(1514) }
 	wifi_lock.acquire()
 	defer { wifi_lock.release() }
-	got := C.brcm_m1_read(&data[0], usize(capacity))
+	got := C.brcm_m1_read(&data[0], uint(capacity))
 	if got == 0 {
 		d.status &= ~file.pollin
 		errno.set(errno.ewouldblock)
@@ -618,7 +618,7 @@ fn (mut d WifiDevice) write(_ voidptr, input voidptr, _ u64, count u64) ?i64 {
 	unsafe { C.memcpy(voidptr(&data[0]), input, count) }
 	wifi_lock.acquire()
 	defer { wifi_lock.release() }
-	result := C.brcm_m1_write(&data[0], usize(count))
+	result := C.brcm_m1_write(&data[0], uint(count))
 	if result != 0 {
 		error_code(result)
 		return none

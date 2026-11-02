@@ -17,8 +17,8 @@ struct C.srcu_struct {
 }
 
 struct C.srcu_usage {
-	srcu_gp_seq        usize
-	srcu_gp_seq_needed usize
+	srcu_gp_seq        uint
+	srcu_gp_seq_needed uint
 }
 
 struct C.srcu_data {
@@ -63,20 +63,20 @@ fn C.vinix_linuxkpi_may_sleep() bool
 fn C.vinix_linuxkpi_preempt_count() u32
 fn C.vinix_linuxkpi_preempt_disable()
 fn C.vinix_linuxkpi_preempt_enable()
-fn C.vinix_linuxkpi_irq_flags() usize
-fn C.vinix_linuxkpi_irq_save() usize
-fn C.vinix_linuxkpi_irq_restore(usize)
+fn C.vinix_linuxkpi_irq_flags() uint
+fn C.vinix_linuxkpi_irq_save() uint
+fn C.vinix_linuxkpi_irq_restore(uint)
 fn C.vinix_linuxkpi_spin_wait()
 fn C.vinix_linuxkpi_test_alloc_oom(i32)
 fn C.init_completion(&C.completion)
 fn C.complete(&C.completion)
 fn C.complete_all(&C.completion)
 fn C.wait_for_completion(&C.completion)
-fn C.wait_for_completion_timeout(&C.completion, usize) usize
+fn C.wait_for_completion_timeout(&C.completion, uint) uint
 fn C.completion_done(&C.completion) bool
 fn C.cond_resched() i32
 fn C.msleep(u32)
-fn C.time_after_eq(usize, usize) bool
+fn C.time_after_eq(uint, uint) bool
 fn C.init_srcu_struct(&C.srcu_struct) i32
 fn C.cleanup_srcu_struct(&C.srcu_struct)
 fn C.srcu_read_lock(&C.srcu_struct) i32
@@ -84,13 +84,13 @@ fn C.srcu_read_unlock(&C.srcu_struct, i32)
 fn C.synchronize_srcu(&C.srcu_struct)
 fn C.synchronize_srcu_expedited(&C.srcu_struct)
 fn C.srcu_barrier(&C.srcu_struct)
-fn C.get_state_synchronize_srcu(&C.srcu_struct) usize
-fn C.start_poll_synchronize_srcu(&C.srcu_struct) usize
-fn C.poll_state_synchronize_srcu(&C.srcu_struct, usize) bool
+fn C.get_state_synchronize_srcu(&C.srcu_struct) uint
+fn C.start_poll_synchronize_srcu(&C.srcu_struct) uint
+fn C.poll_state_synchronize_srcu(&C.srcu_struct, uint) bool
 fn C.call_srcu(&C.srcu_struct, &C.rcu_head, SrcuCallback)
 fn C.per_cpu_ptr(&C.srcu_data, u32) &C.srcu_data
-fn C.atomic_long_read(&C.atomic_long_t) isize
-fn C.kzalloc(usize, u32) voidptr
+fn C.atomic_long_read(&C.atomic_long_t) int
+fn C.kzalloc(uint, u32) voidptr
 fn C.kfree(voidptr)
 fn C.alloc_workqueue(&char, u32, i32, ...) &C.workqueue_struct
 fn C.destroy_workqueue(&C.workqueue_struct)
@@ -116,7 +116,7 @@ fn C.__atomic_fetch_add(&u32, u32, i32) u32
 fn C.srcu_read_u32(u32) u32
 
 @[c: 'READ_ONCE']
-fn C.srcu_read_word(usize) usize
+fn C.srcu_read_word(uint) uint
 
 fn C.BUG_ON(bool)
 fn C.kprintf(&char, ...) i32
@@ -125,7 +125,7 @@ fn C.kprintf(&char, ...) i32
 __global C.current &C.task_struct
 
 @[c_extern]
-__global C.jiffies usize
+__global C.jiffies uint
 
 @[c_extern]
 __global (
@@ -254,7 +254,7 @@ fn flip(ssp &C.srcu_struct, old u32) i32 {
 	}
 }
 
-fn poll(ssp &C.srcu_struct, cookie usize) i32 {
+fn poll(ssp &C.srcu_struct, cookie uint) i32 {
 	unsafe {
 		deadline := C.jiffies + 500
 		for !C.poll_state_synchronize_srcu(ssp, cookie) {
@@ -284,12 +284,12 @@ fn readers_body(ssp &C.srcu_struct, old &SrcuThread, late &SrcuThread,
 			locks := if bank <= 1 {
 				C.atomic_long_read(&source.srcu_lock_count[bank])
 			} else {
-				isize(-1)
+				int(-1)
 			}
 			unlocks := if bank <= 1 {
 				C.atomic_long_read(&destination.srcu_unlock_count[bank])
 			} else {
-				isize(-1)
+				int(-1)
 			}
 			C.kprintf(c'linuxkpi: SRCU self-test nested reader counts failed at line %u: bank=%u nested=%d locks=%ld unlocks=%ld\n', u32(155), bank, old.idx[1], locks, unlocks)
 			return -C.EIO
@@ -394,7 +394,7 @@ pub fn free_callback(head &C.rcu_head) {
 		mut test := callback.test
 		index := callback.index
 		if C.vinix_linuxkpi_may_sleep() || C.vinix_linuxkpi_preempt_count() == 0
-			|| C.vinix_linuxkpi_irq_flags() & (usize(1) << 9) == 0
+			|| C.vinix_linuxkpi_irq_flags() & (uint(1) << 9) == 0
 			|| C.__atomic_fetch_add(&test.count, 1, 4) != index {
 			if test.result == 0 { test.failure_line = 259 }
 			test.result = -C.EIO
@@ -602,7 +602,7 @@ mut:
 pub fn work_callback(work &C.work_struct) {
 	unsafe {
 		mut test := &WorkTest(work)
-		if !C.vinix_linuxkpi_may_sleep() || usize(C.current_work()) != usize(work) {
+		if !C.vinix_linuxkpi_may_sleep() || uint(C.current_work()) != uint(work) {
 			test.result = -C.EIO
 		}
 		C.synchronize_srcu(test.ssp)

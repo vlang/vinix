@@ -23,14 +23,14 @@ module anscore
 // *support only classic, non-journaled ext2; the filesystem is marked dirty
 // *before publication and clean only during an orderly shutdown.
 
-pub type Vinix_ext2_reader = fn (voidptr, voidptr, u64, usize) i32
-pub type Vinix_ext2_writer = fn (voidptr, voidptr, u64, usize) i32
+pub type Vinix_ext2_reader = fn (voidptr, voidptr, u64, uint) i32
+pub type Vinix_ext2_writer = fn (voidptr, voidptr, u64, uint) i32
 
-fn C.vinix_ext2_context_size() usize
+fn C.vinix_ext2_context_size() uint
 
-fn C.vinix_ext2_open(context voidptr, context_size usize, arg Vinix_ext2_reader, cookie voidptr, partition_bytes u64) i32
+fn C.vinix_ext2_open(context voidptr, context_size uint, arg Vinix_ext2_reader, cookie voidptr, partition_bytes u64) i32
 
-fn C.vinix_ext2_open_rw(context voidptr, context_size usize, arg Vinix_ext2_reader, arg_2 Vinix_ext2_writer, cookie voidptr, partition_bytes u64) i32
+fn C.vinix_ext2_open_rw(context voidptr, context_size uint, arg Vinix_ext2_reader, arg_2 Vinix_ext2_writer, cookie voidptr, partition_bytes u64) i32
 
 fn C.vinix_ext2_begin_write(context voidptr) i32
 
@@ -41,28 +41,28 @@ fn C.vinix_ext2_close_clean(context voidptr) i32
 
 fn C.vinix_ext2_stat(context voidptr, inode u32, fields &u64) i32
 
-fn C.vinix_ext2_read(context voidptr, inode u32, buffer voidptr, offset u64, capacity usize) i64
+fn C.vinix_ext2_read(context voidptr, inode u32, buffer voidptr, offset u64, capacity uint) i64
 
-fn C.vinix_ext2_write(context voidptr, inode u32, buffer voidptr, offset u64, count usize) i64
+fn C.vinix_ext2_write(context voidptr, inode u32, buffer voidptr, offset u64, count uint) i64
 
 fn C.vinix_ext2_truncate(context voidptr, inode u32, size u64) i32
 
 // Returns 1 for an entry, 0 for EOF, negative errno on failure. Offset is a
 // *directory byte cursor. Name capacity must be at least 256.
 
-fn C.vinix_ext2_next(context voidptr, directory u32, offset &u64, inode &u32, name &char, capacity usize) i32
+fn C.vinix_ext2_next(context voidptr, directory u32, offset &u64, inode &u32, name &char, capacity uint) i32
 
-fn C.vinix_ext2_create(context voidptr, parent u32, name &char, name_length usize, mode u32, inode &u32) i32
+fn C.vinix_ext2_create(context voidptr, parent u32, name &char, name_length uint, mode u32, inode &u32) i32
 
-fn C.vinix_ext2_symlink(context voidptr, parent u32, name &char, name_length usize, target &char, target_length usize, inode &u32) i32
+fn C.vinix_ext2_symlink(context voidptr, parent u32, name &char, name_length uint, target &char, target_length uint, inode &u32) i32
 
-fn C.vinix_ext2_link(context voidptr, parent u32, name &char, name_length usize, inode u32) i32
+fn C.vinix_ext2_link(context voidptr, parent u32, name &char, name_length uint, inode u32) i32
 
-fn C.vinix_ext2_unlink(context voidptr, parent u32, name &char, name_length usize, directory i32) i32
+fn C.vinix_ext2_unlink(context voidptr, parent u32, name &char, name_length uint, directory i32) i32
 
 fn C.vinix_ext2_drop_link(context voidptr, inode u32) i32
 
-fn C.vinix_ext2_rename(context voidptr, old_parent u32, old_name &char, old_length usize, new_parent u32, new_name &char, new_length usize, replace i32) i32
+fn C.vinix_ext2_rename(context voidptr, old_parent u32, old_name &char, old_length uint, new_parent u32, new_name &char, new_length uint, replace i32) i32
 
 // Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
 // Use of this source code is governed by a GPL v2 license
@@ -106,7 +106,7 @@ pub mut:
 	delay   fn (voidptr, u32)
 	// for_cpu=0: clean/invalidate before DMA; 1: invalidate after DMA.
 	//     *Both include a full completion barrier. All buffers are exclusive.
-	sync fn (voidptr, voidptr, usize, i32)
+	sync fn (voidptr, voidptr, uint, i32)
 }
 
 pub struct Ans_partition {
@@ -233,26 +233,26 @@ pub fn a_put64(p &u8, v u64) {
 }
 
 @[export: 'a_zero']
-pub fn a_zero(p voidptr, n usize) {
+pub fn a_zero(p voidptr, n uint) {
 	unsafe {
 		b := &u8(p)
-		for i := usize(0); i < n; i++ { b[i] = 0 }
+		for i := uint(0); i < n; i++ { b[i] = 0 }
 	}
 }
 
 @[export: 'a_copy']
-pub fn a_copy(d voidptr, s voidptr, n usize) {
+pub fn a_copy(d voidptr, s voidptr, n uint) {
 	unsafe {
 		a := &u8(d)
 		b := &u8(s)
-		for i := usize(0); i < n; i++ { a[i] = b[i] }
+		for i := uint(0); i < n; i++ { a[i] = b[i] }
 	}
 }
 
 @[export: 'a_equal']
-pub fn a_equal(a &u8, b &u8, n usize) i32 {
+pub fn a_equal(a &u8, b &u8, n uint) i32 {
 	unsafe {
-		for i := usize(0); i < n; i++ { if a[i] != b[i] { return 0 } }
+		for i := uint(0); i < n; i++ { if a[i] != b[i] { return 0 } }
 		return 1
 	}
 }
@@ -284,7 +284,7 @@ pub fn a_w32(a &Ans, base u64, off u32, v u32) {
 }
 
 @[export: 'a_sync']
-pub fn a_sync(a &Ans, off u32, n usize, cpu i32) {
+pub fn a_sync(a &Ans, off u32, n uint, cpu i32) {
 	unsafe {
 		a.ops.sync(voidptr(a.cookie), voidptr(a.dma + off), n, cpu)
 	}
@@ -321,13 +321,13 @@ pub const a_guid_order = [u8(3), u8(2), u8(1), u8(0), u8(5), u8(4), u8(7), u8(6)
 	u8(10), u8(11), u8(12), u8(13), u8(14), u8(15)]!
 
 @[export: 'a_guid_parse']
-pub fn a_guid_parse(s &char, n usize, guid &u8) i32 {
+pub fn a_guid_parse(s &char, n uint, guid &u8) i32 {
 	unsafe {
 		out := [16]u8{}
 		nonzero := u32(0)
 		byte_ := u32(0)
 
-		if (usize(s) == 0) || n != usize(36) {
+		if (uint(s) == 0) || n != uint(36) {
 			return 0
 		}
 		for i := u32(0); i < u32(36); {
@@ -349,7 +349,7 @@ pub fn a_guid_parse(s &char, n usize, guid &u8) i32 {
 		if !nonzero {
 			return 0
 		}
-		a_copy(voidptr(guid), voidptr(&out[0]), usize(16))
+		a_copy(voidptr(guid), voidptr(&out[0]), uint(16))
 		return 1
 	}
 }
@@ -380,21 +380,21 @@ pub fn a_space(c i8) i32 {
 }
 
 @[export: 'a_token']
-pub fn a_token(s &char, n usize, l &char, bytes usize) i32 {
+pub fn a_token(s &char, n uint, l &char, bytes uint) i32 {
 	unsafe {
 		return i32(n == bytes && a_equal(&u8(voidptr(s)), &u8(voidptr(l)), bytes))
 	}
 }
 
 @[export: 'a_prefix']
-pub fn a_prefix(s &char, n usize, p &char, bytes usize) i32 {
+pub fn a_prefix(s &char, n uint, p &char, bytes uint) i32 {
 	unsafe {
 		return i32(n >= bytes && a_equal(&u8(voidptr(s)), &u8(voidptr(p)), bytes))
 	}
 }
 
 @[export: 'a_parse_policy']
-pub fn a_parse_policy(s &char, n usize, out &Ans_policy) i32 {
+pub fn a_parse_policy(s &char, n uint, out &Ans_policy) i32 {
 	unsafe {
 		p := Ans_policy{}
 
@@ -412,10 +412,10 @@ pub fn a_parse_policy(s &char, n usize, out &Ans_policy) i32 {
 		a_parse_policy_rp := [i8(118), 105, 110, 105, 120, 46, 114, 111, 111, 116, 61, 80, 65,
 			82, 84, 85, 85, 73, 68, 61, 0]!
 
-		if (usize(out) == 0) || ((usize(s) == 0) && n) || n > usize(16384) {
+		if (uint(out) == 0) || ((uint(s) == 0) && n) || n > uint(16384) {
 			return -ans_config
 		}
-		for i := usize(0); i < n; {
+		for i := uint(0); i < n; {
 			for i < n && a_space(i8(s[i])) {
 				i++
 			}
@@ -478,7 +478,7 @@ pub fn a_parse_policy(s &char, n usize, out &Ans_policy) i32 {
 		if (type_ || mode || (p.flags & 8)) && !(p.flags & 4) {
 			return -ans_config
 		}
-		if (p.flags & (4 | 2)) == (4 | 2) && a_equal(&p.root_guid[0], &p.write_guid[0], usize(16)) {
+		if (p.flags & (4 | 2)) == (4 | 2) && a_equal(&p.root_guid[0], &p.write_guid[0], uint(16)) {
 			return -ans_config
 		}
 		*out = p
@@ -492,7 +492,7 @@ pub fn a_linux_partition(p &Ans_partition) i32 {
 		a_linux_partition_type_ := [u8(175), u8(61), u8(198), u8(15), u8(131), u8(132), u8(114),
 			u8(71), u8(142), u8(121), u8(61), u8(105), u8(216), u8(71), u8(125), u8(228)]!
 
-		return a_equal(&p.type_guid[0], &a_linux_partition_type_[0], usize(16))
+		return a_equal(&p.type_guid[0], &a_linux_partition_type_[0], uint(16))
 	}
 }
 
@@ -502,7 +502,7 @@ pub fn a_find_guid(a &Ans, guid &u8, ns &u32, part &u32) i32 {
 		found := u32(0)
 		for i := u32(0); i < a.nns; i++ {
 			for j := u32(0); j < a.ns[i].nparts; j++ {
-				if a_equal(&a.ns[i].parts[j].guid[0], guid, usize(16)) {
+				if a_equal(&a.ns[i].parts[j].guid[0], guid, uint(16)) {
 					*ns = i
 					*part = j
 					found++
@@ -723,8 +723,8 @@ pub fn a_buffer_request(a &Ans, ep u32, msg u64) i32 {
 		}
 		off := 393216 + a.shared_used
 		pa := a.physical + u64(off)
-		a_zero(voidptr(a.dma + off), usize(rounded))
-		a_sync(a, off, usize(rounded), 0)
+		a_zero(voidptr(a.dma + off), uint(rounded))
+		a_sync(a, off, uint(rounded), 0)
 		if a_sart_allow(a, pa, rounded) {
 			return -a.error
 		}
@@ -1029,9 +1029,9 @@ pub fn a_submit(a &Ans, qid u32, c &u8, result &u32) i32 {
 
 		stride := u32(64)
 		a_put16(c + 2, u16(cid))
-		a_zero(voidptr(a.dma + sq + (cid * stride)), usize(stride))
-		a_copy(voidptr(a.dma + sq + (cid * stride)), voidptr(c), usize(64))
-		a_zero(voidptr(a.dma + tcb), usize(128))
+		a_zero(voidptr(a.dma + sq + (cid * stride)), uint(stride))
+		a_copy(voidptr(a.dma + sq + (cid * stride)), voidptr(c), uint(64))
+		a_zero(voidptr(a.dma + tcb), uint(128))
 		t := a.dma + tcb
 		// Match the Linux ANS2 NVMMU contract: opcode is zero, and flags
 		//     *describe the DMA direction (bit 0 from device, bit 1 to device).
@@ -1046,8 +1046,8 @@ pub fn a_submit(a &Ans, qid u32, c &u8, result &u32) i32 {
 		a_put16(t + 4, a_le16(c + 48))
 		a_put64(t + 24, a_le64(c + 24))
 		a_put64(t + 32, a_le64(c + 32))
-		a_sync(a, sq + cid * stride, usize(stride), 0)
-		a_sync(a, tcb, usize(128), 0)
+		a_sync(a, sq + cid * stride, uint(stride), 0)
+		a_sync(a, tcb, uint(128), 0)
 		a_w32(a, a.nvme, if qid { 149776 } else { 149772 }, cid)
 		q := &a.queues[0] + qid
 		off := cq + q.head * u32(16)
@@ -1060,7 +1060,7 @@ pub fn a_submit(a &Ans, qid u32, c &u8, result &u32) i32 {
 			if (csts & 3) != 1 {
 				return a_fail(a, i32(ans_firmware))
 			}
-			a_sync(a, off, usize(16), 1)
+			a_sync(a, off, uint(16), 1)
 			e := a.dma + off
 			status := a_le16(e + 14)
 			if (u32(status) & 1) == q.phase {
@@ -1081,8 +1081,8 @@ pub fn a_submit(a &Ans, qid u32, c &u8, result &u32) i32 {
 					q.phase ^= u32(1)
 				}
 				a_w32(a, a.nvme, if qid { 4108 } else { 4100 }, q.head)
-				a_zero(voidptr(a.dma + tcb), usize(128))
-				a_sync(a, tcb, usize(128), 0)
+				a_zero(voidptr(a.dma + tcb), uint(128))
+				a_sync(a, tcb, uint(128), 0)
 				a_w32(a, a.nvme, 164120, cid)
 				if a_r32(a, a.nvme, 164128) {
 					return a_fail(a, i32(ans_protocol))
@@ -1117,11 +1117,11 @@ pub fn a_data_prps(a &Ans, c &u8, bytes u32) {
 			a_put64(c + 32, a.physical + u64(131072) + u64(4096))
 			return
 		}
-		a_zero(voidptr(a.dma + 98304), usize(4096))
+		a_zero(voidptr(a.dma + 98304), uint(4096))
 		for page := u32(1); page < (bytes + 4096 - u32(1)) / 4096; page++ {
 			a_put64(a.dma + 98304 + ((page - u32(1)) * u32(8)), a.physical + u64(131072) + u64(page * 4096))
 		}
-		a_sync(a, 98304, usize(4096), 0)
+		a_sync(a, 98304, uint(4096), 0)
 		a_put64(c + 32, a.physical + u64(98304))
 	}
 }
@@ -1134,11 +1134,11 @@ pub fn a_identify(a &Ans, id u32, cns u32) i32 {
 		a_put32(&c[0] + 4, id)
 		a_put32(&c[0] + 40, cns)
 		a_data_prps(a, &c[0], 4096)
-		a_zero(voidptr(a.dma + 131072), usize(4096))
-		a_sync(a, 131072, usize(4096), 0)
+		a_zero(voidptr(a.dma + 131072), uint(4096))
+		a_sync(a, 131072, uint(4096), 0)
 		rc := a_submit(a, u32(0), &c[0], (voidptr(0)))
 		if !rc {
-			a_sync(a, 131072, usize(4096), 1)
+			a_sync(a, 131072, uint(4096), 1)
 		}
 		return rc
 	}
@@ -1201,7 +1201,7 @@ pub fn a_enumerate_namespaces(a &Ans, nn u32) i32 {
 }
 
 @[export: 'a_read_bytes']
-pub fn a_read_bytes(a &Ans, index u32, buffer voidptr, offset u64, count usize) i32 {
+pub fn a_read_bytes(a &Ans, index u32, buffer voidptr, offset u64, count uint) i32 {
 	unsafe {
 		if a.dead {
 			return -a.error
@@ -1209,7 +1209,7 @@ pub fn a_read_bytes(a &Ans, index u32, buffer voidptr, offset u64, count usize) 
 		if a.stopping || a.stopped {
 			return -ans_stopped
 		}
-		if index >= a.nns || ((usize(buffer) == 0) && count) {
+		if index >= a.nns || ((uint(buffer) == 0) && count) {
 			return -ans_range
 		}
 		ns := &a.ns[0] + index
@@ -1220,11 +1220,11 @@ pub fn a_read_bytes(a &Ans, index u32, buffer voidptr, offset u64, count usize) 
 		out := &u8(buffer)
 		for count {
 			within := u32((offset % u64(ns.sector)))
-			n := usize(a.max_transfer - within)
+			n := uint(a.max_transfer - within)
 			if n > count {
 				n = count
 			}
-			sectors := u32(((usize(within) + n + usize(ns.sector) - usize(1)) / usize(ns.sector)))
+			sectors := u32(((uint(within) + n + uint(ns.sector) - uint(1)) / uint(ns.sector)))
 			bytes := sectors * ns.sector
 			c := [64]u8{}
 			c[0] = u8(2)
@@ -1232,14 +1232,14 @@ pub fn a_read_bytes(a &Ans, index u32, buffer voidptr, offset u64, count usize) 
 			a_put64(&c[0] + 40, offset / u64(ns.sector))
 			a_put16(&c[0] + 48, u16((sectors - u32(1))))
 			a_data_prps(a, &c[0], bytes)
-			a_sync(a, 131072, usize(bytes), 0)
+			a_sync(a, 131072, uint(bytes), 0)
 			rc := a_submit(a, u32(1), &c[0], (voidptr(0)))
 			if rc {
 				return rc
 			}
 			C.vinix_account_disk_transfer(index, u64(bytes), 0)
 			a_count_transfer(a, index, u64(bytes), false)
-			a_sync(a, 131072, usize(bytes), 1)
+			a_sync(a, 131072, uint(bytes), 1)
 			a_copy(voidptr(out), voidptr(a.dma + 131072 + within), n)
 			offset += u64(n)
 			out += n
@@ -1299,7 +1299,7 @@ pub fn a_flush_all(a &Ans) i32 {
 }
 
 @[export: 'a_write_partition']
-pub fn a_write_partition(a &Ans, index u32, part u32, buffer voidptr, offset u64, count usize) i32 {
+pub fn a_write_partition(a &Ans, index u32, part u32, buffer voidptr, offset u64, count uint) i32 {
 	unsafe {
 		if a.dead {
 			return -a.error
@@ -1310,7 +1310,7 @@ pub fn a_write_partition(a &Ans, index u32, part u32, buffer voidptr, offset u64
 		if !a.write_enabled || a.write_fault || index != a.write_ns || part != a.write_part {
 			return -ans_read_only
 		}
-		if index >= a.nns || part >= a.ns[index].nparts || ((usize(buffer) == 0) && count) {
+		if index >= a.nns || part >= a.ns[index].nparts || ((uint(buffer) == 0) && count) {
 			return -ans_range
 		}
 		ns := &a.ns[0] + index
@@ -1326,18 +1326,18 @@ pub fn a_write_partition(a &Ans, index u32, part u32, buffer voidptr, offset u64
 		absolute := p.start * u64(ns.sector) + offset
 		for count {
 			within := u32((absolute % u64(ns.sector)))
-			bytes := usize(a.max_transfer - within)
+			bytes := uint(a.max_transfer - within)
 			if bytes > count {
 				bytes = count
 			}
-			sectors := u32(((usize(within) + bytes + usize(ns.sector) - usize(1)) / usize(ns.sector)))
+			sectors := u32(((uint(within) + bytes + uint(ns.sector) - uint(1)) / uint(ns.sector)))
 			transfer := sectors * ns.sector
 			lba := absolute / u64(ns.sector)
 			// The V lock spans the RMW. Complete boundary LBAs remain inside the
 			//         *selected partition. Full-LBA writes never read stale bounce data.
 
-			if within || bytes != usize(transfer) {
-				rc := a_read_bytes(a, index, voidptr(a.dma + 131072), lba * u64(ns.sector), usize(transfer))
+			if within || bytes != uint(transfer) {
+				rc := a_read_bytes(a, index, voidptr(a.dma + 131072), lba * u64(ns.sector), uint(transfer))
 				if rc {
 					a.write_fault = u32(1)
 					return a_fail(a, -rc)
@@ -1353,7 +1353,7 @@ pub fn a_write_partition(a &Ans, index u32, part u32, buffer voidptr, offset u64
 			// FUA
 
 			a_data_prps(a, &c[0], transfer)
-			a_sync(a, 131072, usize(transfer), 0)
+			a_sync(a, 131072, uint(transfer), 0)
 			a.dirty_namespaces |= i32(u16((1 << index)))
 			rc := a_submit(a, u32(1), &c[0], (voidptr(0)))
 			if rc {
@@ -1503,10 +1503,10 @@ pub mut:
 }
 
 @[export: 'a_crc32']
-pub fn a_crc32(p &u8, n usize) u32 {
+pub fn a_crc32(p &u8, n uint) u32 {
 	unsafe {
 		mut crc := u32(-1)
-		for i := usize(0); i < n; i++ {
+		for i := uint(0); i < n; i++ {
 			crc ^= u32(p[i])
 			for b := u32(0); b < 8; b++ {
 				crc = (crc >> 1) ^ if crc & 1 != 0 { u32(0xedb88320) } else { u32(0) }
@@ -1528,7 +1528,7 @@ pub fn a_gpt_header(ns &Ans_namespace, p &u8, lba u64, out &Ans_gpt) i32 {
 		__c2v_condition_15 = __c2v_condition_16
 		if !__c2v_condition_15 {
 			mut __c2v_condition_17 := false
-			__c2v_condition_17 = !a_equal(p, &a_gpt_header_signature[0], usize(8))
+			__c2v_condition_17 = !a_equal(p, &a_gpt_header_signature[0], uint(8))
 			__c2v_condition_15 = __c2v_condition_17
 		}
 		if !__c2v_condition_15 {
@@ -1564,7 +1564,7 @@ pub fn a_gpt_header(ns &Ans_namespace, p &u8, lba u64, out &Ans_gpt) i32 {
 		}
 		expected := a_le32(p + 16)
 		a_put32(p + 16, u32(0))
-		actual := a_crc32(p, usize(bytes))
+		actual := a_crc32(p, uint(bytes))
 		a_put32(p + 16, expected)
 		if actual != expected {
 			return -ans_gpt
@@ -1577,7 +1577,7 @@ pub fn a_gpt_header(ns &Ans_namespace, p &u8, lba u64, out &Ans_gpt) i32 {
 		h.entries = a_le32(p + 80)
 		h.entry_size = a_le32(p + 84)
 		h.table_crc = a_le32(p + 88)
-		a_copy(h.guid, voidptr(p + 56), usize(16))
+		a_copy(h.guid, voidptr(p + 56), uint(16))
 		mut __c2v_condition_22 := false
 		mut __c2v_condition_23 := false
 		__c2v_condition_23 = !h.entries
@@ -1641,28 +1641,28 @@ pub fn a_gpt_header(ns &Ans_namespace, p &u8, lba u64, out &Ans_gpt) i32 {
 pub fn a_gpt_entries(ns &Ans_namespace, h &Ans_gpt, table &u8) i32 {
 	unsafe {
 		zero_guid := [16]u8{}
-		if a_crc32(table, usize(h.entries) * usize(h.entry_size)) != h.table_crc {
+		if a_crc32(table, uint(h.entries) * uint(h.entry_size)) != h.table_crc {
 			return -ans_gpt
 		}
 		// Validate the entire array before publishing even its first entry.
 
 		for i := u32(0); i < h.entries; i++ {
 			p := table + (i * h.entry_size)
-			if a_equal(p, &zero_guid[0], usize(16)) {
+			if a_equal(p, &zero_guid[0], uint(16)) {
 				continue
 			}
 			first := a_le64(p + 32)
 			last := a_le64(p + 40)
 
-			if a_equal(p + 16, &zero_guid[0], usize(16)) || first < h.first || last > h.last || first > last {
+			if a_equal(p + 16, &zero_guid[0], uint(16)) || first < h.first || last > h.last || first > last {
 				return -ans_gpt
 			}
 			for j := u32(0); j < i; j++ {
 				q := table + (j * h.entry_size)
-				if a_equal(q, &zero_guid[0], usize(16)) {
+				if a_equal(q, &zero_guid[0], uint(16)) {
 					continue
 				}
-				if a_equal(p + 16, q + 16, usize(16)) || (first <= a_le64(q + 40) && a_le64(q + 32) <= last) {
+				if a_equal(p + 16, q + 16, uint(16)) || (first <= a_le64(q + 40) && a_le64(q + 32) <= last) {
 					return -ans_gpt
 				}
 			}
@@ -1670,12 +1670,12 @@ pub fn a_gpt_entries(ns &Ans_namespace, h &Ans_gpt, table &u8) i32 {
 		ns.nparts = u32(0)
 		for i := u32(0); i < h.entries; i++ {
 			p := table + (i * h.entry_size)
-			if a_equal(p, &zero_guid[0], usize(16)) {
+			if a_equal(p, &zero_guid[0], uint(16)) {
 				continue
 			}
 			part := &ns.parts[0] + ns.nparts++
-			a_copy(part.type_guid, voidptr(p), usize(16))
-			a_copy(part.guid, voidptr(p + 16), usize(16))
+			a_copy(part.type_guid, voidptr(p), uint(16))
+			a_copy(part.guid, voidptr(p + 16), uint(16))
 			part.attributes = a_le64(p + 48)
 			part.number = i + u32(1)
 			// GPT slot numbers, including unused holes
@@ -1698,7 +1698,7 @@ pub fn a_scan_gpt(a &Ans, index u32) i32 {
 		ns.nparts = u32(0)
 		ns.gpt_complete = u32(0)
 		ns.gpt_hybrid = u32(0)
-		if ns.blocks < u64(6) || a_read_bytes(a, index, voidptr(&sector[0]), u64(0), usize(ns.sector)) {
+		if ns.blocks < u64(6) || a_read_bytes(a, index, voidptr(&sector[0]), u64(0), uint(ns.sector)) {
 			return -ans_gpt
 		}
 		if i32(sector[510]) != 85 || i32(sector[511]) != 170 {
@@ -1718,7 +1718,7 @@ pub fn a_scan_gpt(a &Ans, index u32) i32 {
 		}
 		for i := u32(0); i < u32(2); i++ {
 			lba := if i { ns.blocks - u64(1) } else { u64(1) }
-			if !a_read_bytes(a, index, voidptr(&sector[0]), lba * u64(ns.sector), usize(ns.sector)) {
+			if !a_read_bytes(a, index, voidptr(&sector[0]), lba * u64(ns.sector), uint(ns.sector)) {
 				valid[i] = !a_gpt_header(ns, &sector[0], lba, &h[0] + i)
 			}
 			if a.dead {
@@ -1732,7 +1732,7 @@ pub fn a_scan_gpt(a &Ans, index u32) i32 {
 			__c2v_condition_32 = valid[1]
 		}
 		if __c2v_condition_32 {
-			__c2v_condition_32 = (h[0].first != h[1].first || h[0].last != h[1].last || h[0].entries != h[1].entries || h[0].entry_size != h[1].entry_size || h[0].table_crc != h[1].table_crc || !a_equal(&h[0].guid[0], &h[1].guid[0], usize(16)))
+			__c2v_condition_32 = (h[0].first != h[1].first || h[0].last != h[1].last || h[0].entries != h[1].entries || h[0].entry_size != h[1].entry_size || h[0].table_crc != h[1].table_crc || !a_equal(&h[0].guid[0], &h[1].guid[0], uint(16)))
 		}
 		__c2v_condition_31 = __c2v_condition_32
 		if __c2v_condition_31 {
@@ -1744,7 +1744,7 @@ pub fn a_scan_gpt(a &Ans, index u32) i32 {
 			if !valid[i] {
 				continue
 			}
-			if a_read_bytes(a, index, voidptr(a.dma + 196608), h[i].table * u64(ns.sector), usize(h[i].entries) * usize(h[i].entry_size)) {
+			if a_read_bytes(a, index, voidptr(a.dma + 196608), h[i].table * u64(ns.sector), uint(h[i].entries) * uint(h[i].entry_size)) {
 				if a.dead {
 					return -a.error
 				}
@@ -1755,8 +1755,8 @@ pub fn a_scan_gpt(a &Ans, index u32) i32 {
 				//             *equal CRC32s. A single intact copy still permits read-only recovery.
 
 				if valid[0] && valid[1] {
-					total := usize(h[i].entries) * usize(h[i].entry_size)
-					off := usize(0)
+					total := uint(h[i].entries) * uint(h[i].entry_size)
+					off := uint(0)
 
 					for off < total {
 						n := total - off
@@ -1812,7 +1812,7 @@ pub fn a_start(a &Ans) i32 {
 		}
 		if !__c2v_condition_33 {
 			mut __c2v_condition_39 := false
-			__c2v_condition_39 = (usize(a.dma) == 0)
+			__c2v_condition_39 = (uint(a.dma) == 0)
 			__c2v_condition_33 = __c2v_condition_39
 		}
 		if !__c2v_condition_33 {
@@ -1832,7 +1832,7 @@ pub fn a_start(a &Ans) i32 {
 		}
 		if !__c2v_condition_33 {
 			mut __c2v_condition_43 := false
-			__c2v_condition_43 = (usize(voidptr(a.dma)) & usize((16384 - u32(1))))
+			__c2v_condition_43 = (uint(voidptr(a.dma)) & uint((16384 - u32(1))))
 			__c2v_condition_33 = __c2v_condition_43
 		}
 		if !__c2v_condition_33 {
@@ -1847,37 +1847,37 @@ pub fn a_start(a &Ans) i32 {
 		}
 		if !__c2v_condition_33 {
 			mut __c2v_condition_46 := false
-			__c2v_condition_46 = (usize(a.ops.read32) == 0)
+			__c2v_condition_46 = (uint(a.ops.read32) == 0)
 			__c2v_condition_33 = __c2v_condition_46
 		}
 		if !__c2v_condition_33 {
 			mut __c2v_condition_47 := false
-			__c2v_condition_47 = (usize(a.ops.write32) == 0)
+			__c2v_condition_47 = (uint(a.ops.write32) == 0)
 			__c2v_condition_33 = __c2v_condition_47
 		}
 		if !__c2v_condition_33 {
 			mut __c2v_condition_48 := false
-			__c2v_condition_48 = (usize(a.ops.read64) == 0)
+			__c2v_condition_48 = (uint(a.ops.read64) == 0)
 			__c2v_condition_33 = __c2v_condition_48
 		}
 		if !__c2v_condition_33 {
 			mut __c2v_condition_49 := false
-			__c2v_condition_49 = (usize(a.ops.write64) == 0)
+			__c2v_condition_49 = (uint(a.ops.write64) == 0)
 			__c2v_condition_33 = __c2v_condition_49
 		}
 		if !__c2v_condition_33 {
 			mut __c2v_condition_50 := false
-			__c2v_condition_50 = (usize(a.ops.now) == 0)
+			__c2v_condition_50 = (uint(a.ops.now) == 0)
 			__c2v_condition_33 = __c2v_condition_50
 		}
 		if !__c2v_condition_33 {
 			mut __c2v_condition_51 := false
-			__c2v_condition_51 = (usize(a.ops.delay) == 0)
+			__c2v_condition_51 = (uint(a.ops.delay) == 0)
 			__c2v_condition_33 = __c2v_condition_51
 		}
 		if !__c2v_condition_33 {
 			mut __c2v_condition_52 := false
-			__c2v_condition_52 = (usize(a.ops.sync) == 0)
+			__c2v_condition_52 = (uint(a.ops.sync) == 0)
 			__c2v_condition_33 = __c2v_condition_52
 		}
 		if !__c2v_condition_33 {
@@ -1905,8 +1905,8 @@ pub fn a_start(a &Ans) i32 {
 		a.ops.delay(voidptr(a.cookie), u32(10))
 		a_w32(a, a.reset, u32(0), (reset & ~((3 << 8) | (u32(1) << 31))) | (1 << 10))
 		a_w32(a, a.reset, u32(0), reset & ~((3 << 8) | (u32(1) << 31) | (1 << 10)))
-		a_zero(voidptr(a.dma), usize(393216))
-		a_sync(a, u32(0), usize(393216), 0)
+		a_zero(voidptr(a.dma), uint(393216))
+		a_sync(a, u32(0), uint(393216), 0)
 		a_w32(a, a.asc, 68, (1 << 4))
 		a.stage = u32(2)
 		if a_boot_rtkit(a) {
@@ -2014,7 +2014,7 @@ pub fn a_start(a &Ans) i32 {
 }
 
 @[export: 'vinix_ans_boot_flags']
-pub fn vinix_ans_boot_flags(s &char, n usize) i32 {
+pub fn vinix_ans_boot_flags(s &char, n uint) i32 {
 	unsafe {
 		p := Ans_policy{}
 		return if a_parse_policy(s, n, &p) { -ans_config } else { i32(p.flags) }
@@ -2022,7 +2022,7 @@ pub fn vinix_ans_boot_flags(s &char, n usize) i32 {
 }
 
 @[export: 'vinix_ans_requested']
-pub fn vinix_ans_requested(s &char, n usize) i32 {
+pub fn vinix_ans_requested(s &char, n uint) i32 {
 	unsafe {
 		vinix_ans_requested_yes := [i8(118), 105, 110, 105, 120, 46, 97, 112, 112, 108, 101, 95,
 			97, 110, 115, 61, 49, 0]!
@@ -2030,10 +2030,10 @@ pub fn vinix_ans_requested(s &char, n usize) i32 {
 			97, 110, 115, 61, 48, 0]!
 
 		found := i32(0)
-		if (usize(s) == 0) || n > usize(16384) {
+		if (uint(s) == 0) || n > uint(16384) {
 			return 0
 		}
-		for i := usize(0); i < n; {
+		for i := uint(0); i < n; {
 			for i < n && (i32(s[i]) == i8(` `) || i32(s[i]) == i8(`\t`) || i32(s[i]) == i8(`\n`) || i32(s[i]) == i8(`\r`)) {
 				i++
 			}
@@ -2055,7 +2055,7 @@ pub fn vinix_ans_requested(s &char, n usize) i32 {
 }
 
 @[export: 'a_root_disk']
-pub fn a_root_disk(cookie voidptr, buffer voidptr, offset u64, count usize) i32 {
+pub fn a_root_disk(cookie voidptr, buffer voidptr, offset u64, count uint) i32 {
 	unsafe {
 		a := &Ans(cookie)
 		if !a.live || !a.root_selected {
@@ -2072,7 +2072,7 @@ pub fn a_root_disk(cookie voidptr, buffer voidptr, offset u64, count usize) i32 
 }
 
 @[export: 'a_open_root']
-pub fn a_open_root(a &Ans, context voidptr, size usize) i32 {
+pub fn a_open_root(a &Ans, context voidptr, size uint) i32 {
 	unsafe {
 		if !a.live || !a.root_selected {
 			return -ans_stopped
@@ -2083,7 +2083,7 @@ pub fn a_open_root(a &Ans, context voidptr, size usize) i32 {
 }
 
 @[export: 'a_data_disk']
-pub fn a_data_disk(cookie voidptr, buffer voidptr, offset u64, count usize) i32 {
+pub fn a_data_disk(cookie voidptr, buffer voidptr, offset u64, count uint) i32 {
 	unsafe {
 		a := &Ans(cookie)
 		if !a.live || !a.write_enabled {
@@ -2100,7 +2100,7 @@ pub fn a_data_disk(cookie voidptr, buffer voidptr, offset u64, count usize) i32 
 }
 
 @[export: 'a_data_store']
-pub fn a_data_store(cookie voidptr, buffer voidptr, offset u64, count usize) i32 {
+pub fn a_data_store(cookie voidptr, buffer voidptr, offset u64, count uint) i32 {
 	unsafe {
 		a := &Ans(cookie)
 		return a_write_partition(a, a.write_ns, a.write_part, voidptr(buffer), offset, count)
@@ -2124,7 +2124,7 @@ __global a_cache_line u32
 @[export: 'a_kernel_read32']
 pub fn a_kernel_read32(cookie voidptr, p u64) u32 {
 	unsafe {
-		v := C.vinix_mmio_read32(voidptr(usize(p)))
+		v := C.vinix_mmio_read32(voidptr(uint(p)))
 		asm volatile aarch64 {
 		dmb sy
 		; ; ; memory
@@ -2136,7 +2136,7 @@ pub fn a_kernel_read32(cookie voidptr, p u64) u32 {
 @[export: 'a_kernel_read64']
 pub fn a_kernel_read64(cookie voidptr, p u64) u64 {
 	unsafe {
-		v := C.vinix_mmio_read64(voidptr(usize(p)))
+		v := C.vinix_mmio_read64(voidptr(uint(p)))
 		asm volatile aarch64 {
 		dmb sy
 		; ; ; memory
@@ -2152,7 +2152,7 @@ pub fn a_kernel_write32(cookie voidptr, p u64, v u32) {
 		dmb sy
 		; ; ; memory
 	}
-		C.vinix_mmio_write32(voidptr(usize(p)), v)
+		C.vinix_mmio_write32(voidptr(uint(p)), v)
 	}
 }
 
@@ -2163,7 +2163,7 @@ pub fn a_kernel_write64(cookie voidptr, p u64, v u64) {
 		dmb sy
 		; ; ; memory
 	}
-		C.vinix_mmio_write64(voidptr(usize(p)), v)
+		C.vinix_mmio_write64(voidptr(uint(p)), v)
 	}
 }
 
@@ -2192,15 +2192,15 @@ pub fn a_kernel_delay(cookie voidptr, us u32) {
 }
 
 @[export: 'a_kernel_sync']
-pub fn a_kernel_sync(cookie voidptr, buffer voidptr, n usize, cpu i32) {
+pub fn a_kernel_sync(cookie voidptr, buffer voidptr, n uint, cpu i32) {
 	unsafe {
-		begin := usize(buffer)
+		begin := uint(buffer)
 		end := begin + n
 		asm volatile aarch64 {
 		dsb sy
 		; ; ; memory
 	}
-		for p := begin & ~usize((a_cache_line - u32(1))); p < end; p += usize(a_cache_line) {
+		for p := begin & ~uint((a_cache_line - u32(1))); p < end; p += uint(a_cache_line) {
 			if cpu {
 				asm volatile aarch64 { dc ivac, p ; ; r (p) ; memory }
 			} else {
@@ -2215,9 +2215,9 @@ pub fn a_kernel_sync(cookie voidptr, buffer voidptr, n usize, cpu i32) {
 }
 
 @[export: 'vinix_ans_init']
-pub fn vinix_ans_init(nvme u64, asc u64, mailbox u64, sart u64, reset u64, dma voidptr, physical u64, bytes usize) i32 {
+pub fn vinix_ans_init(nvme u64, asc u64, mailbox u64, sart u64, reset u64, dma voidptr, physical u64, bytes uint) i32 {
 	unsafe {
-		if ans_controller.started || bytes < usize(4587520) || (usize(dma) == 0) || usize(dma) > u64(-1) - u64(4587520) {
+		if ans_controller.started || bytes < uint(4587520) || (uint(dma) == 0) || uint(dma) > u64(-1) - u64(4587520) {
 			return -ans_config
 		}
 		mut ctr := u64(0)
@@ -2324,7 +2324,7 @@ pub fn vinix_ans_partition_blocks(i u32, p u32) u64 {
 }
 
 @[export: 'vinix_ans_read']
-pub fn vinix_ans_read(i u32, buf voidptr, offset u64, count usize) i32 {
+pub fn vinix_ans_read(i u32, buf voidptr, offset u64, count uint) i32 {
 	unsafe {
 		return if ans_controller.live {
 			a_read_bytes(&ans_controller, i, voidptr(buf), offset, count)
@@ -2335,7 +2335,7 @@ pub fn vinix_ans_read(i u32, buf voidptr, offset u64, count usize) i32 {
 }
 
 @[export: 'vinix_ans_apply_policy']
-pub fn vinix_ans_apply_policy(s &char, n usize) i32 {
+pub fn vinix_ans_apply_policy(s &char, n uint) i32 {
 	unsafe {
 		p := Ans_policy{}
 		rc := a_parse_policy(s, n, &p)
@@ -2351,9 +2351,9 @@ pub fn vinix_ans_partition_writable(i u32, p u32) i32 {
 }
 
 @[export: 'vinix_ans_partition_uuid']
-pub fn vinix_ans_partition_uuid(i u32, p u32, out &char, n usize) i32 {
+pub fn vinix_ans_partition_uuid(i u32, p u32, out &char, n uint) i32 {
 	unsafe {
-		if (usize(out) == 0) || n < usize(37) || i >= ans_controller.nns || p >= ans_controller.ns[i].nparts {
+		if (uint(out) == 0) || n < uint(37) || i >= ans_controller.nns || p >= ans_controller.ns[i].nparts {
 			return -ans_range
 		}
 		a_guid_format(&ans_controller.ns[i].parts[p].guid[0], out)
@@ -2362,7 +2362,7 @@ pub fn vinix_ans_partition_uuid(i u32, p u32, out &char, n usize) i32 {
 }
 
 @[export: 'vinix_ans_write']
-pub fn vinix_ans_write(i u32, p u32, buf voidptr, off u64, n usize) i32 {
+pub fn vinix_ans_write(i u32, p u32, buf voidptr, off u64, n uint) i32 {
 	unsafe {
 		return a_write_partition(&ans_controller, i, p, voidptr(buf), off, n)
 	}
@@ -2427,7 +2427,7 @@ pub fn vinix_ans_root_stat(ino u32, fields &u64) i32 {
 }
 
 @[export: 'vinix_ans_root_read']
-pub fn vinix_ans_root_read(ino u32, buffer voidptr, offset u64, count usize) i64 {
+pub fn vinix_ans_root_read(ino u32, buffer voidptr, offset u64, count uint) i64 {
 	unsafe {
 		return if ans_controller.live {
 			C.vinix_ext2_read(voidptr(&a_root_context.bytes[0]), ino, voidptr(buffer), offset, count)
@@ -2438,7 +2438,7 @@ pub fn vinix_ans_root_read(ino u32, buffer voidptr, offset u64, count usize) i64
 }
 
 @[export: 'vinix_ans_root_next']
-pub fn vinix_ans_root_next(dir u32, offset &u64, ino &u32, name &char, cap usize) i32 {
+pub fn vinix_ans_root_next(dir u32, offset &u64, ino &u32, name &char, cap uint) i32 {
 	unsafe {
 		return if ans_controller.live {
 			C.vinix_ext2_next(voidptr(&a_root_context.bytes[0]), dir, offset, ino, name, cap)
@@ -2485,7 +2485,7 @@ pub fn vinix_ans_data_stat(ino u32, fields &u64) i32 {
 }
 
 @[export: 'vinix_ans_data_read']
-pub fn vinix_ans_data_read(ino u32, buffer voidptr, offset u64, count usize) i64 {
+pub fn vinix_ans_data_read(ino u32, buffer voidptr, offset u64, count uint) i64 {
 	unsafe {
 		return if ans_controller.live {
 			C.vinix_ext2_read(voidptr(&a_data_context.bytes[0]), ino, voidptr(buffer), offset, count)
@@ -2496,7 +2496,7 @@ pub fn vinix_ans_data_read(ino u32, buffer voidptr, offset u64, count usize) i64
 }
 
 @[export: 'vinix_ans_data_write']
-pub fn vinix_ans_data_write(ino u32, buffer voidptr, offset u64, count usize) i64 {
+pub fn vinix_ans_data_write(ino u32, buffer voidptr, offset u64, count uint) i64 {
 	unsafe {
 		return if ans_controller.live {
 			C.vinix_ext2_write(voidptr(&a_data_context.bytes[0]), ino, voidptr(buffer), offset, count)
@@ -2518,7 +2518,7 @@ pub fn vinix_ans_data_truncate(ino u32, size u64) i32 {
 }
 
 @[export: 'vinix_ans_data_next']
-pub fn vinix_ans_data_next(dir u32, offset &u64, ino &u32, name &char, cap usize) i32 {
+pub fn vinix_ans_data_next(dir u32, offset &u64, ino &u32, name &char, cap uint) i32 {
 	unsafe {
 		return if ans_controller.live {
 			C.vinix_ext2_next(voidptr(&a_data_context.bytes[0]), dir, offset, ino, name, cap)
@@ -2529,7 +2529,7 @@ pub fn vinix_ans_data_next(dir u32, offset &u64, ino &u32, name &char, cap usize
 }
 
 @[export: 'vinix_ans_data_create']
-pub fn vinix_ans_data_create(parent u32, name &char, n usize, mode u32, ino &u32) i32 {
+pub fn vinix_ans_data_create(parent u32, name &char, n uint, mode u32, ino &u32) i32 {
 	unsafe {
 		return if ans_controller.live {
 			C.vinix_ext2_create(voidptr(&a_data_context.bytes[0]), parent, name, n, mode, ino)
@@ -2540,7 +2540,7 @@ pub fn vinix_ans_data_create(parent u32, name &char, n usize, mode u32, ino &u32
 }
 
 @[export: 'vinix_ans_data_symlink']
-pub fn vinix_ans_data_symlink(parent u32, name &char, n usize, target &char, target_n usize, ino &u32) i32 {
+pub fn vinix_ans_data_symlink(parent u32, name &char, n uint, target &char, target_n uint, ino &u32) i32 {
 	unsafe {
 		return if ans_controller.live {
 			C.vinix_ext2_symlink(voidptr(&a_data_context.bytes[0]), parent, name, n, target, target_n, ino)
@@ -2551,7 +2551,7 @@ pub fn vinix_ans_data_symlink(parent u32, name &char, n usize, target &char, tar
 }
 
 @[export: 'vinix_ans_data_link']
-pub fn vinix_ans_data_link(parent u32, name &char, n usize, ino u32) i32 {
+pub fn vinix_ans_data_link(parent u32, name &char, n uint, ino u32) i32 {
 	unsafe {
 		return if ans_controller.live {
 			C.vinix_ext2_link(voidptr(&a_data_context.bytes[0]), parent, name, n, ino)
@@ -2562,7 +2562,7 @@ pub fn vinix_ans_data_link(parent u32, name &char, n usize, ino u32) i32 {
 }
 
 @[export: 'vinix_ans_data_unlink']
-pub fn vinix_ans_data_unlink(parent u32, name &char, n usize, directory i32) i32 {
+pub fn vinix_ans_data_unlink(parent u32, name &char, n uint, directory i32) i32 {
 	unsafe {
 		return if ans_controller.live {
 			C.vinix_ext2_unlink(voidptr(&a_data_context.bytes[0]), parent, name, n, directory)
@@ -2584,7 +2584,7 @@ pub fn vinix_ans_data_drop_link(ino u32) i32 {
 }
 
 @[export: 'vinix_ans_data_rename']
-pub fn vinix_ans_data_rename(old_parent u32, old_name &char, old_n usize, new_parent u32, new_name &char, new_n usize, replace i32) i32 {
+pub fn vinix_ans_data_rename(old_parent u32, old_name &char, old_n uint, new_parent u32, new_name &char, new_n uint, replace i32) i32 {
 	unsafe {
 		return if ans_controller.live {
 			C.vinix_ext2_rename(voidptr(&a_data_context.bytes[0]), old_parent, old_name, old_n, new_parent, new_name, new_n, replace)

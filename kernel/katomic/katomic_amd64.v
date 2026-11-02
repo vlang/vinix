@@ -177,7 +177,7 @@ pub fn load[T](var &T) T {
 	}
 	if sizeof(T) == 2 {
 		target := unsafe { &u16(var) }
-		if usize(var) & 1 != 0 {
+		if uint(var) & 1 != 0 {
 			asm volatile amd64 {
 				lock xadd target, ret
 				; +m (*target) as target
@@ -196,7 +196,7 @@ pub fn load[T](var &T) T {
 	}
 	if sizeof(T) == 4 {
 		target := unsafe { &u32(var) }
-		if usize(var) & 3 != 0 {
+		if uint(var) & 3 != 0 {
 			asm volatile amd64 {
 				lock xadd target, ret
 				; +m (*target) as target
@@ -215,7 +215,7 @@ pub fn load[T](var &T) T {
 	}
 	if sizeof(T) == 8 {
 		target := unsafe { &u64(var) }
-		if usize(var) & 7 != 0 {
+		if uint(var) & 7 != 0 {
 			asm volatile amd64 {
 				lock xadd target, ret
 				; +m (*target) as target

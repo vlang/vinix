@@ -5,7 +5,7 @@ module aggregatefixture
 
 #include "linuxkpi_aggregate_fixture_v_contract.h"
 
-fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
 
 @[typedef]
 struct C.vaf_record1 {}
@@ -87,7 +87,7 @@ fn C.vaf_x_pmd(&C.pmd_t, C.pmd_t) C.pmd_t
 @[c: 'cmpxchg']
 fn C.vaf_c_pmd(&C.pmd_t, C.pmd_t, C.pmd_t) C.pmd_t
 
-fn bits(storage voidptr, width usize) u64 {
+fn bits(storage voidptr, width uint) u64 {
 	mut value := u64(0)
 	unsafe { C.memcpy(&value, storage, width) }
 	return value

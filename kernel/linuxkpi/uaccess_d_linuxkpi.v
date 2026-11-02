@@ -7,8 +7,8 @@ import usercopy
 import linuxkpi.compatcore
 
 @[export: 'vinix_linuxkpi_user_address_limit']
-fn native_user_address_limit() usize {
-	return usize(memory.user_address_limit())
+fn native_user_address_limit() uint {
+	return uint(memory.user_address_limit())
 }
 
 fn require_usercopy_context() {
@@ -23,36 +23,36 @@ fn require_usercopy_context() {
 // Kernel buffers are synchronous borrows. The current syscall owns its
 // process/pagemap; page acquisition independently retains its backing source.
 @[export: 'vinix_linuxkpi_raw_copy_from_user']
-fn native_raw_from_user(destination voidptr, source voidptr, length usize) usize {
+fn native_raw_from_user(destination voidptr, source voidptr, length uint) uint {
 	if length == 0 { return 0 }
 	require_usercopy_context()
-	return usize(usercopy.raw_copy_from_user(destination, u64(source), u64(length)))
+	return uint(usercopy.raw_copy_from_user(destination, u64(source), u64(length)))
 }
 
 @[export: 'vinix_linuxkpi_raw_copy_to_user']
-fn native_raw_to_user(destination voidptr, source voidptr, length usize) usize {
+fn native_raw_to_user(destination voidptr, source voidptr, length uint) uint {
 	if length == 0 { return 0 }
 	require_usercopy_context()
-	return usize(usercopy.raw_copy_to_user(u64(destination), source, u64(length)))
+	return uint(usercopy.raw_copy_to_user(u64(destination), source, u64(length)))
 }
 
 @[export: 'vinix_linuxkpi_raw_copy_from_user_inatomic']
-fn native_raw_from_user_inatomic(destination voidptr, source voidptr, length usize) usize {
-	return usize(usercopy.raw_copy_from_user_inatomic(destination, u64(source), u64(length)))
+fn native_raw_from_user_inatomic(destination voidptr, source voidptr, length uint) uint {
+	return uint(usercopy.raw_copy_from_user_inatomic(destination, u64(source), u64(length)))
 }
 
 @[export: 'vinix_linuxkpi_raw_copy_to_user_inatomic']
-fn native_raw_to_user_inatomic(destination voidptr, source voidptr, length usize) usize {
-	return usize(usercopy.raw_copy_to_user_inatomic(u64(destination), source, u64(length)))
+fn native_raw_to_user_inatomic(destination voidptr, source voidptr, length uint) uint {
+	return uint(usercopy.raw_copy_to_user_inatomic(u64(destination), source, u64(length)))
 }
 
 fn uaccess_native_selftest() bool {
 	if !usercopy.remaining_selftest() { return false }
-	limit := usize(memory.user_address_limit())
+	limit := uint(memory.user_address_limit())
 	if !compatcore.user_access_ok(unsafe { nil }, 1)
 		|| !compatcore.user_access_ok(voidptr(limit), 0)
 		|| compatcore.user_access_ok(voidptr(limit), 1)
-		|| compatcore.user_access_ok(voidptr(usize(-1)), 0)
+		|| compatcore.user_access_ok(voidptr(uint(-1)), 0)
 		|| compatcore.user_access_ok(voidptr(limit - 1), 2) { return false }
 	// Public access rejection clears the full destination, whereas object-size
 	// rejection leaves it untouched. No invalid user pointer is dereferenced.
@@ -69,8 +69,8 @@ fn uaccess_native_selftest() bool {
 	// The zero-count fast paths also work with IRQs disabled and invalid
 	// pointers. Restoring the original flags is required on every return path.
 	flags := irq_save()
-	from := native_raw_from_user(unsafe { nil }, voidptr(usize(-1)), 0)
-	to := native_raw_to_user(voidptr(usize(-1)), unsafe { nil }, 0)
+	from := native_raw_from_user(unsafe { nil }, voidptr(uint(-1)), 0)
+	to := native_raw_to_user(voidptr(uint(-1)), unsafe { nil }, 0)
 	irq_restore(flags)
 	return from == 0 && to == 0
 }

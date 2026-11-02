@@ -32,11 +32,11 @@ pub fn vkr_arg_ulong(args voidptr) u64 { return abiargs.word(args) }
 @[export: 'vkr_arg_llong']
 pub fn vkr_arg_llong(args voidptr) i64 { return i64(abiargs.word(args)) }
 @[export: 'vkr_arg_size']
-pub fn vkr_arg_size(args voidptr) usize { return usize(abiargs.word(args)) }
+pub fn vkr_arg_size(args voidptr) uint { return uint(abiargs.word(args)) }
 @[export: 'vkr_arg_ptrdiff']
 pub fn vkr_arg_ptrdiff(args voidptr) i64 { return i64(abiargs.word(args)) }
 @[export: 'vkr_arg_pointer']
-pub fn vkr_arg_pointer(args voidptr) voidptr { return unsafe { voidptr(usize(abiargs.word(args))) } }
+pub fn vkr_arg_pointer(args voidptr) voidptr { return unsafe { voidptr(uint(abiargs.word(args))) } }
 
 @[export: 'vkr_nested_parse']
 pub fn vkr_nested_parse(out &FormatOutput, descriptor voidptr) {
@@ -101,18 +101,18 @@ pub fn vkr_pointer_hash(value u64, key voidptr) u64 {
 pub fn native_format_set_key(key &u64) i32 { return vkr_format_key(key) }
 
 @[export: 'vinix_linuxkpi_vformat']
-pub fn native_vformat(buf &char, size usize, fmt &char, args voidptr, status &u32) i32 {
+pub fn native_vformat(buf &char, size uint, fmt &char, args voidptr, status &u32) i32 {
  mut local := unsafe { nil }
  return vkr_format_entry(buf, size, fmt, abiargs.parameter(args, unsafe { &local }), status)
 }
 
 @[export: 'vsnprintf']
-pub fn native_vsnprintf(buf &char, size usize, fmt &char, args voidptr) i32 {
+pub fn native_vsnprintf(buf &char, size uint, fmt &char, args voidptr) i32 {
  return native_vformat(buf, size, fmt, args, unsafe { nil })
 }
 
 @[export: 'vscnprintf']
-pub fn native_vscnprintf(buf &char, size usize, fmt &char, args voidptr) i32 {
+pub fn native_vscnprintf(buf &char, size uint, fmt &char, args voidptr) i32 {
  mut local := unsafe { nil }
  return vkr_format_sc_entry(buf, size, fmt, abiargs.parameter(args, unsafe { &local }))
 }
@@ -124,11 +124,11 @@ pub fn native_vsprintf(buf &char, fmt &char, args voidptr) i32 {
 
 // Variadic prologues already provide an addressable cursor, unlike va_list parameters.
 @[export: 'vinix_linuxkpi_snprintf_entry']
-pub fn native_snprintf(buf &char, size usize, fmt &char, args voidptr) i32 {
+pub fn native_snprintf(buf &char, size uint, fmt &char, args voidptr) i32 {
  return vkr_format_entry(buf, size, fmt, args, unsafe { nil })
 }
 @[export: 'vinix_linuxkpi_scnprintf_entry']
-pub fn native_scnprintf(buf &char, size usize, fmt &char, args voidptr) i32 {
+pub fn native_scnprintf(buf &char, size uint, fmt &char, args voidptr) i32 {
  return vkr_format_sc_entry(buf, size, fmt, args)
 }
 @[export: 'vinix_linuxkpi_sprintf_entry']
@@ -156,6 +156,6 @@ const vkr_native_pci_ids = [PciMatch{0x8086, 0x9a40, u32(-1), u32(-1), 0x030000,
  PciMatch{0x8086, 0x9af8, u32(-1), u32(-1), 0x030000, 0xff0000, 0}]!
 
 @[export: 'vkr_tigerlake_table']
-pub fn native_tigerlake_table(count &usize) &PciMatch {
+pub fn native_tigerlake_table(count &uint) &PciMatch {
  unsafe { *count = 8; return &PciMatch(voidptr(&vkr_native_pci_ids[0])) }
 }

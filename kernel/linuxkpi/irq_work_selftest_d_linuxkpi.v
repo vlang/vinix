@@ -89,7 +89,7 @@ fn irq_work_test_task(target u32) bool {
 	return ok
 }
 fn irq_work_test_actor(argument voidptr) {
-	index := u32(usize(argument))
+	index := u32(uint(argument))
 	if worker_bind(index + 1) != 0 || !irq_work_test_task(index + 1) { irq_work_test_fail(1) }
 	katomic.store(mut &irqwork_test_ledger.ready[index], true)
 	for !katomic.load(&irqwork_test_ledger.quit) {

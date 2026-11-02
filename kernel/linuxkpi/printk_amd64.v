@@ -6,7 +6,7 @@ import krandom
 import sched
 
 @[export: 'vinix_linuxkpi_log_write']
-fn log_write(text &char, length usize) {
+fn log_write(text &char, length uint) {
 	assert may_sleep()
 	kprint.kwrite(text, u64(length))
 }

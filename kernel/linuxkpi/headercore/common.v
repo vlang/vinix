@@ -10,14 +10,14 @@ struct C.spinlock_t { locked u32 }
 struct C.refcount_t {}
 struct C.mutex {}
 struct C.task_struct { in_iowait u32, __state u32, vinix_thread voidptr, pid i32, tgid i32 }
-struct C.wait_bit_key { timeout usize }
+struct C.wait_bit_key { timeout uint }
 @[typedef]
 struct C.vkh_const_char_p {}
 fn C.spin_lock_init(&C.spinlock_t)
 fn C.spin_lock(&C.spinlock_t)
 fn C.spin_unlock(&C.spinlock_t)
-fn C.spin_lock_irqsave(&C.spinlock_t, usize)
-fn C.spin_unlock_irqrestore(&C.spinlock_t, usize)
+fn C.spin_lock_irqsave(&C.spinlock_t, uint)
+fn C.spin_unlock_irqrestore(&C.spinlock_t, uint)
 fn C.mutex_lock(&C.mutex)
 fn C.mutex_unlock(&C.mutex)
 fn C.refcount_dec_and_test(&C.refcount_t) bool
@@ -25,17 +25,17 @@ fn C.WARN_ON_ONCE(bool) bool
 @[c_extern]
 __global C.current &C.task_struct
 fn C.schedule()
-fn C.schedule_timeout(isize) isize
+fn C.schedule_timeout(int) int
 fn C.signal_pending_state(u32, &C.task_struct) i32
 @[c_extern]
-__global C.jiffies usize
-fn C.READ_ONCE(usize) usize
+__global C.jiffies uint
+fn C.READ_ONCE(uint) uint
 fn C.vinix_linuxkpi_warn_format(C.vkh_const_char_p, i32, &char, ...)
 fn C._printk(&char, ...) i32
 fn C.vinix_linuxkpi_test_warn_note(C.vkh_const_char_p, i32)
 fn C.vinix_linuxkpi_test_refcount_note(i32)
 @[export: '__per_cpu_offset']
-__global vkh_percpu_offsets [256]usize
+__global vkh_percpu_offsets [256]uint
 @[c_extern]
 __global C.__vinix_percpu_start u8
 @[c_extern]
@@ -48,13 +48,13 @@ pub fn common_spin_lock(storage voidptr) { unsafe { C.spin_lock(&C.spinlock_t(st
 @[export: 'vkp_spin_unlock']
 pub fn common_spin_unlock(storage voidptr) { unsafe { C.spin_unlock(&C.spinlock_t(storage)) } }
 @[export: 'vkp_spin_lock_irqsave']
-pub fn common_spin_lock_irqsave(storage voidptr) usize {
-	mut flags := usize(0)
+pub fn common_spin_lock_irqsave(storage voidptr) uint {
+	mut flags := uint(0)
 	unsafe { C.spin_lock_irqsave(&C.spinlock_t(storage), flags) }
 	return flags
 }
 @[export: 'vkp_spin_unlock_irqrestore']
-pub fn common_spin_unlock_irqrestore(storage voidptr, flags usize) { unsafe { C.spin_unlock_irqrestore(&C.spinlock_t(storage), flags) } }
+pub fn common_spin_unlock_irqrestore(storage voidptr, flags uint) { unsafe { C.spin_unlock_irqrestore(&C.spinlock_t(storage), flags) } }
 @[export: 'vkp_mutex_lock']
 pub fn common_mutex_lock(storage voidptr) { unsafe { C.mutex_lock(&C.mutex(storage)) } }
 @[export: 'vkp_mutex_unlock']
@@ -70,13 +70,13 @@ pub fn common_iowait_field(task voidptr) voidptr { return unsafe { &(&C.task_str
 @[export: 'vkp_schedule']
 pub fn common_schedule() { C.schedule() }
 @[export: 'vkp_schedule_timeout']
-pub fn common_schedule_timeout(timeout isize) isize { return C.schedule_timeout(timeout) }
+pub fn common_schedule_timeout(timeout int) int { return C.schedule_timeout(timeout) }
 @[export: 'vkp_signal_pending']
 pub fn common_signal_pending(mode i32) bool { return C.signal_pending_state(u32(mode), C.current) != 0 }
 @[export: 'vkp_jiffies']
-pub fn common_jiffies() usize { return C.READ_ONCE(C.jiffies) }
+pub fn common_jiffies() uint { return C.READ_ONCE(C.jiffies) }
 @[export: 'vkp_bit_timeout']
-pub fn common_bit_timeout(key voidptr) usize { return unsafe { (&C.wait_bit_key(key)).timeout } }
+pub fn common_bit_timeout(key voidptr) uint { return unsafe { (&C.wait_bit_key(key)).timeout } }
 @[export: 'vkp_warn']
 pub fn common_warn(file C.vkh_const_char_p, line i32) { unsafe { C.vinix_linuxkpi_warn_format(file, line, nil) } }
 @[export: 'vkp_refcount_warning']

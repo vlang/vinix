@@ -5,7 +5,7 @@ module compatcore
 
 import abiargs
 
-fn C.vinix_linuxkpi_log_write(&char, usize)
+fn C.vinix_linuxkpi_log_write(&char, uint)
 fn C.vinix_linuxkpi_log_key(&u64) bool
 fn C.vinix_linuxkpi_host_logger_enter()
 fn C.vinix_linuxkpi_host_logger_leave()
@@ -77,7 +77,7 @@ pub fn vkr_log_call_sink(sink voidptr, record voidptr, arg voidptr) {
  unsafe { call := LogSinkABI(sink); call(&C.vkr_const_printk_record(record), arg) }
 }
 @[export: 'vkr_log_write']
-pub fn vkr_log_write(text voidptr, size usize) { unsafe { C.vinix_linuxkpi_log_write(&char(text), size) } }
+pub fn vkr_log_write(text voidptr, size uint) { unsafe { C.vinix_linuxkpi_log_write(&char(text), size) } }
 @[export: 'vkr_log_key']
 pub fn vkr_log_key(key voidptr) bool { unsafe { return C.vinix_linuxkpi_log_key(&u64(key)) } }
 
@@ -97,7 +97,7 @@ pub fn native_printk_deferred(fmt &char, args voidptr) i32 { return vkr_log_emit
 pub fn native_warn(file &char, line i32, fmt &char, args voidptr) {
  add_taint(9, 0)
  unsafe {
-  if usize(fmt) == 0 {
+  if uint(fmt) == 0 {
    C._printk(c'\x01\x34linuxkpi: warning at %s:%d\n', file, voidptr(i64(line)))
    return
   }

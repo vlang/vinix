@@ -62,9 +62,9 @@ pub fn initialise() {
 	rsdp = unsafe { rsdp_ptr }
 
 	if use_xsdt() == true {
-		rsdt = unsafe { &RSDT(byteptr(usize(rsdp.xsdt_addr)) + higher_half) }
+		rsdt = unsafe { &RSDT(byteptr(uint(rsdp.xsdt_addr)) + higher_half) }
 	} else {
-		rsdt = unsafe { &RSDT(byteptr(usize(rsdp.rsdt_addr)) + higher_half) }
+		rsdt = unsafe { &RSDT(byteptr(uint(rsdp.rsdt_addr)) + higher_half) }
 	}
 
 	C.kprintf(c'acpi: Revision:  %llu\n', u64(rsdp.revision))
@@ -92,9 +92,9 @@ pub fn find_sdt(signature string, index int) ?voidptr {
 
 	for i := 0; i < entry_count; i++ {
 		ptr := if use_xsdt() == true {
-			unsafe { &SDT(byteptr(usize(&u64(&rsdt.ptrs_start)[i])) + higher_half) }
+			unsafe { &SDT(byteptr(uint(&u64(&rsdt.ptrs_start)[i])) + higher_half) }
 		} else {
-			unsafe { &SDT(byteptr(usize(&u32(&rsdt.ptrs_start)[i])) + higher_half) }
+			unsafe { &SDT(byteptr(uint(&u32(&rsdt.ptrs_start)[i])) + higher_half) }
 		}
 		if unsafe { C.memcmp(voidptr(&ptr.signature), signature.str, 4) == 0 } {
 			if count != index {

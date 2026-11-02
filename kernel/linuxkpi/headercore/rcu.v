@@ -36,13 +36,13 @@ pub fn rcu_synchronize_expedited() { C.vkr_rcu_synchronize(true) }
 @[export: 'rcu_barrier']
 pub fn rcu_callbacks_barrier() { C.vkr_rcu_barrier() }
 @[export: 'get_state_synchronize_rcu']
-pub fn rcu_get_state() usize { return usize(C.vkr_rcu_get_state()) }
+pub fn rcu_get_state() uint { return uint(C.vkr_rcu_get_state()) }
 @[export: 'start_poll_synchronize_rcu']
-pub fn rcu_start_poll() usize { return usize(C.vkr_rcu_start_poll()) }
+pub fn rcu_start_poll() uint { return uint(C.vkr_rcu_start_poll()) }
 @[export: 'poll_state_synchronize_rcu']
-pub fn rcu_poll_state(cookie usize) bool { return C.vkr_rcu_poll(u64(cookie)) }
+pub fn rcu_poll_state(cookie uint) bool { return C.vkr_rcu_poll(u64(cookie)) }
 @[export: 'cond_synchronize_rcu']
-pub fn rcu_cond_synchronize(cookie usize) { C.vkr_rcu_cond(u64(cookie)) }
+pub fn rcu_cond_synchronize(cookie uint) { C.vkr_rcu_cond(u64(cookie)) }
 
 @[export: 'vkr_rcu_worker_function']
 pub fn rcu_worker_function(callback bool) voidptr {

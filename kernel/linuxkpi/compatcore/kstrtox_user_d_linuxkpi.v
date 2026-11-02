@@ -5,7 +5,7 @@ module compatcore
 // Linux 6.6.157 lib/kstrtox.c user-memory wrappers. Copy the complete
 // clamped input before parsing, even when an earlier byte is NUL. The
 // fixed buffers and the result remain borrowed for this synchronous call.
-fn kstrtox_copy_user_text(buffer &char, capacity usize, source &char, count usize) i32 {
+fn kstrtox_copy_user_text(buffer &char, capacity uint, source &char, count uint) i32 {
 	mut copied := count
 	if copied >= capacity {
 		copied = capacity - 1
@@ -18,7 +18,7 @@ fn kstrtox_copy_user_text(buffer &char, capacity usize, source &char, count usiz
 }
 
 @[export: 'kstrtoull_from_user']
-pub fn kstrtoull_from_user(source &char, count usize, base u32, result &u64) i32 {
+pub fn kstrtoull_from_user(source &char, count uint, base u32, result &u64) i32 {
 	mut buffer := [67]char{}
 	if kstrtox_copy_user_text(unsafe { &buffer[0] }, 67, source, count) != 0 {
 		return -14
@@ -27,7 +27,7 @@ pub fn kstrtoull_from_user(source &char, count usize, base u32, result &u64) i32
 }
 
 @[export: 'kstrtoll_from_user']
-pub fn kstrtoll_from_user(source &char, count usize, base u32, result &i64) i32 {
+pub fn kstrtoll_from_user(source &char, count uint, base u32, result &i64) i32 {
 	mut buffer := [67]char{}
 	if kstrtox_copy_user_text(unsafe { &buffer[0] }, 67, source, count) != 0 {
 		return -14
@@ -36,7 +36,7 @@ pub fn kstrtoll_from_user(source &char, count usize, base u32, result &i64) i32 
 }
 
 @[export: 'kstrtoul_from_user']
-pub fn kstrtoul_from_user(source &char, count usize, base u32, result &u64) i32 {
+pub fn kstrtoul_from_user(source &char, count uint, base u32, result &u64) i32 {
 	mut buffer := [67]char{}
 	if kstrtox_copy_user_text(unsafe { &buffer[0] }, 67, source, count) != 0 {
 		return -14
@@ -45,7 +45,7 @@ pub fn kstrtoul_from_user(source &char, count usize, base u32, result &u64) i32 
 }
 
 @[export: 'kstrtol_from_user']
-pub fn kstrtol_from_user(source &char, count usize, base u32, result &i64) i32 {
+pub fn kstrtol_from_user(source &char, count uint, base u32, result &i64) i32 {
 	mut buffer := [67]char{}
 	if kstrtox_copy_user_text(unsafe { &buffer[0] }, 67, source, count) != 0 {
 		return -14
@@ -54,7 +54,7 @@ pub fn kstrtol_from_user(source &char, count usize, base u32, result &i64) i32 {
 }
 
 @[export: 'kstrtouint_from_user']
-pub fn kstrtouint_from_user(source &char, count usize, base u32, result &u32) i32 {
+pub fn kstrtouint_from_user(source &char, count uint, base u32, result &u32) i32 {
 	mut buffer := [35]char{}
 	if kstrtox_copy_user_text(unsafe { &buffer[0] }, 35, source, count) != 0 {
 		return -14
@@ -63,7 +63,7 @@ pub fn kstrtouint_from_user(source &char, count usize, base u32, result &u32) i3
 }
 
 @[export: 'kstrtoint_from_user']
-pub fn kstrtoint_from_user(source &char, count usize, base u32, result &i32) i32 {
+pub fn kstrtoint_from_user(source &char, count uint, base u32, result &i32) i32 {
 	mut buffer := [35]char{}
 	if kstrtox_copy_user_text(unsafe { &buffer[0] }, 35, source, count) != 0 {
 		return -14
@@ -72,7 +72,7 @@ pub fn kstrtoint_from_user(source &char, count usize, base u32, result &i32) i32
 }
 
 @[export: 'kstrtou16_from_user']
-pub fn kstrtou16_from_user(source &char, count usize, base u32, result &u16) i32 {
+pub fn kstrtou16_from_user(source &char, count uint, base u32, result &u16) i32 {
 	mut buffer := [19]char{}
 	if kstrtox_copy_user_text(unsafe { &buffer[0] }, 19, source, count) != 0 {
 		return -14
@@ -81,7 +81,7 @@ pub fn kstrtou16_from_user(source &char, count usize, base u32, result &u16) i32
 }
 
 @[export: 'kstrtos16_from_user']
-pub fn kstrtos16_from_user(source &char, count usize, base u32, result &i16) i32 {
+pub fn kstrtos16_from_user(source &char, count uint, base u32, result &i16) i32 {
 	mut buffer := [19]char{}
 	if kstrtox_copy_user_text(unsafe { &buffer[0] }, 19, source, count) != 0 {
 		return -14
@@ -90,7 +90,7 @@ pub fn kstrtos16_from_user(source &char, count usize, base u32, result &i16) i32
 }
 
 @[export: 'kstrtou8_from_user']
-pub fn kstrtou8_from_user(source &char, count usize, base u32, result &u8) i32 {
+pub fn kstrtou8_from_user(source &char, count uint, base u32, result &u8) i32 {
 	mut buffer := [11]char{}
 	if kstrtox_copy_user_text(unsafe { &buffer[0] }, 11, source, count) != 0 {
 		return -14
@@ -99,7 +99,7 @@ pub fn kstrtou8_from_user(source &char, count usize, base u32, result &u8) i32 {
 }
 
 @[export: 'kstrtos8_from_user']
-pub fn kstrtos8_from_user(source &char, count usize, base u32, result &i8) i32 {
+pub fn kstrtos8_from_user(source &char, count uint, base u32, result &i8) i32 {
 	mut buffer := [11]char{}
 	if kstrtox_copy_user_text(unsafe { &buffer[0] }, 11, source, count) != 0 {
 		return -14
@@ -108,7 +108,7 @@ pub fn kstrtos8_from_user(source &char, count usize, base u32, result &i8) i32 {
 }
 
 @[export: 'kstrtobool_from_user']
-pub fn kstrtobool_from_user(source &char, count usize, result &bool) i32 {
+pub fn kstrtobool_from_user(source &char, count uint, result &bool) i32 {
 	mut buffer := [4]char{}
 	if kstrtox_copy_user_text(unsafe { &buffer[0] }, 4, source, count) != 0 {
 		return -14

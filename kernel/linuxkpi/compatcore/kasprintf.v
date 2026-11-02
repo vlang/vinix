@@ -9,7 +9,7 @@ import abiargs
 
 fn C.vinix_linuxkpi_warn_format(&C.vks_const_char, i32, &C.vks_const_char, ...)
 
-const format_alloc_limit = usize(2147483646)
+const format_alloc_limit = uint(2147483646)
 
 // The cursor is already addressable on every supported native ABI. Its copied
 // pointers borrow the caller's still-live register-save and overflow storage.
@@ -26,7 +26,7 @@ pub fn format_alloc_vasprintf(flags u32, format voidptr, cursor voidptr) voidptr
 		vkr_format_parse(&measured, &char(format), &copied[0])
 		if measured.count_overflow { return nil }
 		first := measured.position
-		capacity := first + usize(1)
+		capacity := first + uint(1)
 		result := &char(C.kmalloc(capacity, flags))
 		if is_null(result) { return nil }
 		mut written := FormatOutput{

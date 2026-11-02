@@ -10,10 +10,10 @@ import x86.cpu.local as cpulocal
 
 fn C.vinix_linuxkpi_conststring_fixture_dup(voidptr, u32) voidptr
 fn C.vinix_linuxkpi_conststring_fixture_free(voidptr)
-fn C.vinix_linuxkpi_conststring_fixture_alloc(usize) voidptr
+fn C.vinix_linuxkpi_conststring_fixture_alloc(uint) voidptr
 fn C.vinix_linuxkpi_conststring_fixture_gfp() u32
 fn C.vinix_linuxkpi_conststring_fixture_literal() voidptr
-fn C.vinix_linuxkpi_conststring_fixture_address(u32) usize
+fn C.vinix_linuxkpi_conststring_fixture_address(u32) uint
 fn C.vinix_linuxkpi_conststring_fixture_rodata(voidptr) bool
 
 // Only actual read-only pointers enter the ownership fast path. In particular,
@@ -38,7 +38,7 @@ fn const_string_test_fast_batch() bool {
 		|| C.vinix_linuxkpi_conststring_fixture_rodata(voidptr(first - 1))
 		|| C.vinix_linuxkpi_conststring_fixture_rodata(voidptr(end))
 		|| C.vinix_linuxkpi_conststring_fixture_rodata(unsafe { nil })
-		|| C.vinix_linuxkpi_conststring_fixture_rodata(voidptr(usize(-1)))
+		|| C.vinix_linuxkpi_conststring_fixture_rodata(voidptr(uint(-1)))
 		|| C.vinix_linuxkpi_conststring_fixture_rodata(voidptr(text)) { return false }
 	unsafe {
 		bytes := &u8(literal)
@@ -46,8 +46,8 @@ fn const_string_test_fast_batch() bool {
 	}
 	for _ in 0 .. 200 {
 		if !const_string_test_borrowed(literal)
-			|| !const_string_test_borrowed(voidptr(usize(literal) + 6))
-			|| !const_string_test_borrowed(voidptr(usize(literal) + 21)) { return false }
+			|| !const_string_test_borrowed(voidptr(uint(literal) + 6))
+			|| !const_string_test_borrowed(voidptr(uint(literal) + 21)) { return false }
 		empty := C.vinix_linuxkpi_conststring_fixture_dup(unsafe { nil }, C.vinix_linuxkpi_conststring_fixture_gfp())
 		C.vinix_linuxkpi_conststring_fixture_free(empty)
 		if empty != unsafe { nil } { return false }

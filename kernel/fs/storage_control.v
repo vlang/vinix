@@ -186,7 +186,7 @@ fn (mut volume LogicalVolume) transfer(buffer voidptr, offset u64, bytes u64, wr
 			errno.set(errno.enomem)
 			return none
 		}
-		defer { if volume.encrypted { aesxts.erase(copy, usize(if bytes < 65536 { bytes } else { u64(65536) })) }; memory.free(copy) }
+		defer { if volume.encrypted { aesxts.erase(copy, uint(if bytes < 65536 { bytes } else { u64(65536) })) }; memory.free(copy) }
 		mut done := u64(0)
 		for done < bytes {
 			count := if bytes - done < 65536 { bytes - done } else { u64(65536) }

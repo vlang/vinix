@@ -77,7 +77,7 @@ fn smp_probe_task(target u32) bool {
 }
 
 fn smp_probe_actor(argument voidptr) {
-	index := u32(usize(argument) - 1)
+	index := u32(uint(argument) - 1)
 	mut state := unsafe { &smp_probes[index] }
 	if worker_bind(index) != 0 || !smp_probe_task(index) {
 		katomic.store(mut &state.failures, u64(1))
@@ -152,7 +152,7 @@ fn smp_probe_wait(index u32, sequence u64, entered bool) bool {
 fn smp_probe_many_condition(target i32, _argument voidptr) bool { return target & 1 == 0 }
 
 fn smp_probe_batch_callback(argument voidptr) {
-	ordinal := u32(usize(argument) - 1)
+	ordinal := u32(uint(argument) - 1)
 	if cpu.interrupt_state() || cpulocal.current().cpu_number != 1
 		|| cpulocal.current().maskable_irq_depth == 0 || ordinal != smp_batch_probe.next {
 		smp_batch_probe.failures = 1
@@ -216,7 +216,7 @@ fn smp_probe_lifecycle() bool {
 	}
 	for index in 0 .. smp_probe_cpus { smp_probes[index] = SmpProbe{} }
 	for index in 0 .. smp_probe_cpus {
-		mut actor := sched.try_new_kernel_thread(voidptr(smp_probe_actor), voidptr(usize(index + 1))) or { return false }
+		mut actor := sched.try_new_kernel_thread(voidptr(smp_probe_actor), voidptr(uint(index + 1))) or { return false }
 		proc.pin_thread(actor)
 		proc.pin_thread(actor)
 		actor.pthread_joinable = 1
@@ -305,10 +305,10 @@ fn smp_probe_lifecycle() bool {
 	// real target IRQs are disabled. The raw owner remains alive through every
 	// callback and the target task's matching post-IRET acknowledgement.
 	batch_count := u32(2048)
-	raw := C.kmalloc(usize(batch_count) * 32 + 31, 3264)
+	raw := C.kmalloc(uint(batch_count) * 32 + 31, 3264)
 	if raw == unsafe { nil } { return false }
-	C.memset(raw, 0, usize(batch_count) * 32 + 31)
-	aligned := (usize(raw) + 31) & ~usize(31)
+	C.memset(raw, 0, uint(batch_count) * 32 + 31)
+	aligned := (uint(raw) + 31) & ~uint(31)
 	smp_batch_probe = SmpBatchProbe{ count: batch_count }
 	katomic.store(mut &old.allow_irqs, false)
 	katomic.store(mut &old.hold, true)
@@ -318,8 +318,8 @@ fn smp_probe_lifecycle() bool {
 		sched.reschedule()
 	}
 	for ordinal := u32(0); ordinal < batch_count; ordinal++ {
-		csd := voidptr(aligned + usize(ordinal) * 32)
-		C.vks_smp_csd_set_callback(csd, smp_probe_batch_callback, voidptr(usize(ordinal + 1)))
+		csd := voidptr(aligned + uint(ordinal) * 32)
+		C.vks_smp_csd_set_callback(csd, smp_probe_batch_callback, voidptr(uint(ordinal + 1)))
 		if C.vks_smp_async(1, csd) != 0 { lib.kpanic(unsafe { nil }, c'linuxkpi: SMP intrusive batch submission failed') }
 	}
 	if smp_batch_probe.next != 0 { lib.kpanic(unsafe { nil }, c'linuxkpi: SMP batch bypassed hardware IRQ deferral') }

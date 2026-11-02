@@ -9,7 +9,7 @@ module usleepfixture
 struct C.pthread_t {}
 @[typedef]
 struct C.vkus_ull {}
-fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
 struct C.completion {}
 struct C.task_struct {
 	vinix_thread voidptr
@@ -27,30 +27,30 @@ fn C.init_completion(&C.completion)
 fn C.complete(&C.completion)
 fn C.complete_all(&C.completion)
 fn C.wait_for_completion(&C.completion)
-fn C.wait_for_completion_timeout(&C.completion, usize) usize
+fn C.wait_for_completion_timeout(&C.completion, uint) uint
 fn C.completion_done(&C.completion) bool
 fn C.vinix_linuxkpi_worker_bind(u32) i32
 fn C.vinix_linuxkpi_cpu_id() u32
 fn C.vinix_linuxkpi_percpu_count() u32
-fn C.vinix_linuxkpi_irq_flags() usize
+fn C.vinix_linuxkpi_irq_flags() uint
 fn C.vinix_linuxkpi_preempt_count() u32
 fn C.vinix_linuxkpi_clock_ns() u64
 fn C.vinix_linuxkpi_may_sleep() bool
 fn C.vinix_linuxkpi_test_alloc_oom(i32)
 fn C.vinix_linuxkpi_test_worker_oom(i32)
 fn C.vinix_linuxkpi_test_task_signal(voidptr, u64)
-fn C.vinix_linuxkpi_test_task_time_waiters(&C.task_struct) usize
+fn C.vinix_linuxkpi_test_task_time_waiters(&C.task_struct) uint
 fn C.vinix_linuxkpi_test_thread_reap_ready(voidptr) bool
 fn C.vinix_linuxkpi_test_reap_quiescent() bool
 fn C.vinix_linuxkpi_task_queued(voidptr) bool
 fn C.task_is_running(&C.task_struct) bool
 fn C.wake_up_process(&C.task_struct) i32
-fn C.usleep_range(usize, usize)
-fn C.usleep_idle_range(usize, usize)
-fn C.usleep_range_state(usize, usize, u32)
+fn C.usleep_range(uint, uint)
+fn C.usleep_idle_range(uint, uint)
+fn C.usleep_range_state(uint, uint, u32)
 fn C.msleep(u32)
 fn C.cond_resched() i32
-fn C.time_after_eq(usize, usize) bool
+fn C.time_after_eq(uint, uint) bool
 fn C.__atomic_load(voidptr, voidptr, i32)
 fn C.__atomic_store(voidptr, voidptr, i32)
 fn C.__atomic_load_n(&u32, i32) u32
@@ -61,7 +61,7 @@ fn C.kprintf(&char, ...) i32
 @[c_extern]
 __global C.current &C.task_struct
 @[c_extern]
-__global C.jiffies usize
+__global C.jiffies uint
 @[c_extern]
 __global (
 	C.TASK_RUNNING u32
@@ -75,7 +75,7 @@ __global (
 	C.EAGAIN i32
 )
 
-const long_us = usize(50000)
+const long_us = uint(50000)
 const long_ns = u64(50000000)
 
 struct NativeSleepWorker {
@@ -93,7 +93,7 @@ mut:
 	long_start u64
 	long_elapsed u64
 	failed_elapsed u64
-	failed_min usize
+	failed_min uint
 	cpu u32
 	state u32
 	kind u32
@@ -125,13 +125,13 @@ fn unsigned_long_long(value u64) C.vkus_ull {
 	return native
 }
 
-fn sleep_call(test &NativeSleepWorker, minimum usize, maximum usize) {
+fn sleep_call(test &NativeSleepWorker, minimum uint, maximum uint) {
 	if test.kind == 0 { C.usleep_range(minimum, maximum) }
 	else if test.kind == 1 { C.usleep_idle_range(minimum, maximum) }
 	else { C.usleep_range_state(minimum, maximum, test.state) }
 }
 
-fn check(test &NativeSleepWorker, index u32, minimum usize, elapsed u64, flags usize, depth u32) {
+fn check(test &NativeSleepWorker, index u32, minimum uint, elapsed u64, flags uint, depth u32) {
 	unsafe {
 		mut reasons := u32(0)
 		if elapsed < u64(minimum) * 1000 { reasons |= 1 }
@@ -152,9 +152,9 @@ fn check(test &NativeSleepWorker, index u32, minimum usize, elapsed u64, flags u
 // Return to the common original out path when cancellation is observed.
 fn series(test &NativeSleepWorker) bool {
 	unsafe {
-		ranges := [usize(0), usize(0), usize(0), usize(500), usize(1), usize(1),
-			usize(100), usize(250), usize(400), usize(500), usize(1000), usize(2000),
-			usize(3000), usize(4000)]!
+		ranges := [uint(0), uint(0), uint(0), uint(500), uint(1), uint(1),
+			uint(100), uint(250), uint(400), uint(500), uint(1000), uint(2000),
+			uint(3000), uint(4000)]!
 		C.vinix_linuxkpi_test_alloc_oom(0)
 		for round in 0 .. 4 {
 			for i in 0 .. 7 {

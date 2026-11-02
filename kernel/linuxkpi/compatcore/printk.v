@@ -3,7 +3,7 @@
 @[translated]
 module compatcore
 
-fn C.memmove(voidptr, voidptr, usize) voidptr
+fn C.memmove(voidptr, voidptr, uint) voidptr
 fn C.vinix_linuxkpi_log_caller() u64
 fn C.msleep(u32)
 fn C.__msecs_to_jiffies(u32) u64
@@ -81,14 +81,14 @@ fn vkrp_retired() u64 {
 @[export: 'vkr_log_emit']
 pub fn vkr_log_emit(facility i32, input_level i32, dev_info voidptr, fmt &char, args voidptr) i32 {
 	unsafe {
-		if facility != 0 || usize(dev_info) != 0 { return -95 }
-		if input_level < -2 || input_level > 7 || usize(fmt) == 0 { return -22 }
+		if facility != 0 || uint(dev_info) != 0 { return -95 }
+		if input_level < -2 || input_level > 7 || uint(fmt) == 0 { return -22 }
 		if vkr_log_suppress() != 0 { return 0 }
 		mut level := if input_level == -2 { i32(-1) } else { input_level }
 		mut record := PrintRecord{}
 		result := vkr_format_entry(&record.text[0], sizeof(record.text), fmt, args, &record.format_status)
 		if result < 0 { return result }
-		mut length := usize(u32(result))
+		mut length := uint(u32(result))
 		if length >= sizeof(record.text) {
 			length = sizeof(record.text) - 1
 			record.flags |= 4
@@ -97,7 +97,7 @@ pub fn vkr_log_emit(facility i32, input_level i32, dev_info voidptr, fmt &char, 
 			length--
 			record.flags |= 2
 		}
-		mut prefix := usize(0)
+		mut prefix := uint(0)
 		for length - prefix >= 2 {
 			mut header := i32(0)
 			if record.text[prefix] == char(1) {
@@ -161,7 +161,7 @@ pub fn vkr_log_state(state &PrintState) {
 			format_errors: vkr_log_errors
 			queued:        vkr_log_count
 			in_flight:     vkr_log_in_flight != 0
-			worker_live:   usize(vkr_log_task) != 0
+			worker_live:   uint(vkr_log_task) != 0
 			paused:        vkr_log_paused
 			key_ready:     vkr_log_key_ready
 		}
@@ -184,7 +184,7 @@ pub fn vkr_log_flush(snapshot u64, timeout_ms u32) i32 {
 				result = -35
 			} else if vkrp_retired() >= snapshot {
 				result = 0
-			} else if usize(vkr_log_task) == 0 {
+			} else if uint(vkr_log_task) == 0 {
 				result = -19
 			}
 			vkrp_unlock(flags)
@@ -239,11 +239,11 @@ fn vkrp_worker(_ voidptr) voidptr {
 				continue
 			}
 			require(C.vinix_linuxkpi_may_sleep())
-			if usize(sink) != 0 {
+			if uint(sink) != 0 {
 				vkr_log_call_sink(sink, &record, argument)
 			} else if i32(record.level) < vkr_log_console(0) {
 				record.text[record.length] = char(`\n`)
-				vkr_log_write(&record.text[0], usize(record.length) + 1)
+				vkr_log_write(&record.text[0], uint(record.length) + 1)
 			}
 			flags = vkrp_lock()
 			require(vkr_log_in_flight == record.sequence)
@@ -268,7 +268,7 @@ pub fn vkr_log_bootstrap() i32 {
 		lifecycle := vkr_log_lifecycle()
 		C.vkp_mutex_lock(lifecycle)
 		flags = vkrp_lock()
-		if usize(vkr_log_task) != 0 {
+		if uint(vkr_log_task) != 0 {
 			vkrp_unlock(flags)
 			C.vkp_mutex_unlock(lifecycle)
 			return 0
@@ -306,7 +306,7 @@ pub fn vkr_log_shutdown() i32 {
 			C.vkp_mutex_unlock(lifecycle)
 			return -35
 		}
-		if usize(task) == 0 {
+		if uint(task) == 0 {
 			vkrp_unlock(flags)
 			C.vkp_mutex_unlock(lifecycle)
 			return 0

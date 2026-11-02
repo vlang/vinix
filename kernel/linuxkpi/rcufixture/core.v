@@ -13,9 +13,9 @@ type Callback = fn (&C.callback_head)
 fn C.call_rcu(&C.callback_head, Callback)
 fn C.rcu_read_lock()
 fn C.rcu_read_unlock()
-fn C.get_state_synchronize_rcu() usize
-fn C.start_poll_synchronize_rcu() usize
-fn C.poll_state_synchronize_rcu(usize) bool
+fn C.get_state_synchronize_rcu() uint
+fn C.start_poll_synchronize_rcu() uint
+fn C.poll_state_synchronize_rcu(uint) bool
 fn C.synchronize_rcu()
 fn C.synchronize_rcu_expedited()
 fn C.rcu_barrier()
@@ -34,7 +34,7 @@ pub fn get_state() u64 { return u64(C.get_state_synchronize_rcu()) }
 @[export: 'vinix_linuxkpi_rcu_fixture_start_poll']
 pub fn start_poll() u64 { return u64(C.start_poll_synchronize_rcu()) }
 @[export: 'vinix_linuxkpi_rcu_fixture_poll']
-pub fn poll(cookie u64) bool { return C.poll_state_synchronize_rcu(usize(cookie)) }
+pub fn poll(cookie u64) bool { return C.poll_state_synchronize_rcu(uint(cookie)) }
 @[export: 'vinix_linuxkpi_rcu_fixture_synchronize']
 pub fn synchronize(expedited bool) {
 	if expedited { C.synchronize_rcu_expedited() } else { C.synchronize_rcu() }

@@ -12,7 +12,7 @@ struct C.vks_const_void {}
 
 fn C.kstrdup_const(&C.vks_const_char, u32) &C.vks_const_char
 fn C.kfree_const(&C.vks_const_void)
-fn C.kmalloc(usize, u32) voidptr
+fn C.kmalloc(uint, u32) voidptr
 fn C.vinix_conststring_gfp_kernel() u32
 fn C.vinix_linuxkpi_is_kernel_rodata(&C.vks_const_void) bool
 
@@ -33,7 +33,7 @@ pub fn free(ptr voidptr) {
 }
 
 @[export: 'vinix_linuxkpi_conststring_fixture_alloc']
-pub fn alloc(size usize) voidptr {
+pub fn alloc(size uint) voidptr {
 	return C.kmalloc(size, C.vinix_conststring_gfp_kernel())
 }
 
@@ -44,10 +44,10 @@ pub fn gfp() u32 { return C.vinix_conststring_gfp_kernel() }
 pub fn literal() voidptr { return unsafe { voidptr(c'vinix-constant-string') } }
 
 @[export: 'vinix_linuxkpi_conststring_fixture_address']
-pub fn address(which u32) usize {
-	if which == 0 { return usize(voidptr(C.rodata_start)) }
-	if which == 1 { return usize(voidptr(C.rodata_end)) }
-	if which == 2 { return usize(voidptr(C.text_start)) }
+pub fn address(which u32) uint {
+	if which == 0 { return uint(voidptr(C.rodata_start)) }
+	if which == 1 { return uint(voidptr(C.rodata_end)) }
+	if which == 2 { return uint(voidptr(C.text_start)) }
 	return 0
 }
 

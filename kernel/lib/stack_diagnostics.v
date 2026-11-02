@@ -6,7 +6,7 @@ module lib
 fn stack_guard_message(message charptr) {
 	unsafe {
 		bytes := &u8(message)
-		mut i := usize(0)
+		mut i := uint(0)
 		for bytes[i] != 0 {
 			stack_guard_byte(bytes[i])
 			i++

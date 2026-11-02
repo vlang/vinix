@@ -22,7 +22,7 @@ fn C.preempt_enable()
 fn C.preempt_count() u32
 fn C.vinix_linuxkpi_cpu_id() u32
 fn C.queue_work(voidptr, voidptr) bool
-fn C.queue_delayed_work(voidptr, voidptr, usize) bool
+fn C.queue_delayed_work(voidptr, voidptr, uint) bool
 
 @[export: 'vks_init_work']
 pub fn srcu_init_work(storage voidptr, callback voidptr) {
@@ -47,8 +47,8 @@ pub fn srcu_preempt_count() u32 { return C.preempt_count() }
 @[export: 'vks_cpu_id']
 pub fn srcu_cpu_id() u32 { return C.vinix_linuxkpi_cpu_id() }
 @[export: 'vks_data_alignment']
-pub fn srcu_data_alignment() usize { return __offsetof(C.vks_data_alignment_probe, data) }
+pub fn srcu_data_alignment() uint { return __offsetof(C.vks_data_alignment_probe, data) }
 @[export: 'vks_queue_work']
 pub fn srcu_queue_work(queue voidptr, work voidptr) bool { return C.queue_work(queue, work) }
 @[export: 'vks_queue_delayed_work']
-pub fn srcu_queue_delayed_work(queue voidptr, work voidptr, delay usize) bool { return C.queue_delayed_work(queue, work, delay) }
+pub fn srcu_queue_delayed_work(queue voidptr, work voidptr, delay uint) bool { return C.queue_delayed_work(queue, work, delay) }

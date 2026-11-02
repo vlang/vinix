@@ -100,7 +100,7 @@ fn vkt_modify_timer(timer &C.vkt_timer_view, expires u64, pending_only bool, red
 			C.vkp_spin_unlock_irqrestore(&vkt_timer_lock, flags)
 			return 0
 		}
-		if usize(timer.function) == 0 || (pending_only && pending == 0) {
+		if uint(timer.function) == 0 || (pending_only && pending == 0) {
 			C.vkp_spin_unlock_irqrestore(&vkt_timer_lock, flags)
 			return 0
 		}
@@ -203,7 +203,7 @@ pub fn timer_dispatch() u32 {
 			run.timer = timer
 			function := timer.function
 			irq_safe := (timer.flags & 0x200000) != 0
-			require(usize(function) != 0)
+			require(uint(function) != 0)
 			vkt_detach_locked(timer)
 			vkt_run_add(&run)
 			C.vinix_linuxkpi_preempt_disable()
@@ -227,10 +227,10 @@ pub fn timer_dispatch() u32 {
 }
 
 @[export: 'vinix_linuxkpi_timer_active']
-pub fn timer_active() usize {
+pub fn timer_active() uint {
 	unsafe {
 		flags := C.vkp_spin_lock_irqsave(&vkt_timer_lock)
-		mut count := usize(0)
+		mut count := uint(0)
 		for timer := vkt_pending_head; !is_null(timer); timer = timer.next { count++ }
 		for timer := vkt_ready_head; !is_null(timer); timer = timer.next { count++ }
 		for run := vkt_running_head; !is_null(run); run = run.next { count++ }
@@ -281,7 +281,7 @@ pub fn timer_selftest() i32 {
 		if timer_try_delete_sync(&timer) != 1 || timer_delete_sync(&timer) != 0 { result = -5 }
 		timer.expires = expires
 		timer_add(&timer)
-		if timer_shutdown_sync(&timer) != 1 || !is_null(timer.pprev) || usize(timer.function) != 0 { result = -5 }
+		if timer_shutdown_sync(&timer) != 1 || !is_null(timer.pprev) || uint(timer.function) != 0 { result = -5 }
 		if timer_mod(&timer, expires) != 0 || !is_null(timer.pprev) { result = -5 }
 		return result
 	}

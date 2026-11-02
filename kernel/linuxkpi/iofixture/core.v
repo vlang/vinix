@@ -36,9 +36,9 @@ struct C.completion {}
 
 struct C.wait_bit_key {
 mut:
-	flags &usize
+	flags &uint
 	bit_nr i32
-	timeout usize
+	timeout uint
 }
 
 type IoWorker = fn (voidptr) voidptr
@@ -56,22 +56,22 @@ fn C.init_completion(&C.completion)
 fn C.complete(&C.completion)
 fn C.complete_all(&C.completion)
 fn C.wait_for_completion(&C.completion)
-fn C.wait_for_completion_timeout(&C.completion, usize) usize
+fn C.wait_for_completion_timeout(&C.completion, uint) uint
 fn C.completion_done(&C.completion) bool
 fn C.io_schedule_prepare() i32
 fn C.io_schedule_finish(i32)
 fn C.io_schedule()
-fn C.io_schedule_timeout(isize) isize
+fn C.io_schedule_timeout(int) int
 fn C.schedule()
 fn C.set_current_state(u32)
 fn C.__set_current_state(u32)
 fn C.task_is_running(&C.task_struct) bool
 fn C.cond_resched() i32
 fn C.vinix_linuxkpi_may_sleep() bool
-fn C.vinix_linuxkpi_irq_save() usize
-fn C.vinix_linuxkpi_irq_restore(usize)
-fn C.raw_spin_lock_irqsave(&C.raw_spinlock_t, usize)
-fn C.raw_spin_unlock_irqrestore(&C.raw_spinlock_t, usize)
+fn C.vinix_linuxkpi_irq_save() uint
+fn C.vinix_linuxkpi_irq_restore(uint)
+fn C.raw_spin_lock_irqsave(&C.raw_spinlock_t, uint)
+fn C.raw_spin_unlock_irqrestore(&C.raw_spinlock_t, uint)
 fn C.vinix_linuxkpi_task_dequeue(voidptr)
 fn C.vinix_linuxkpi_task_queued(voidptr) bool
 fn C.vinix_linuxkpi_iowait_block(voidptr)
@@ -82,7 +82,7 @@ fn C.vinix_linuxkpi_test_park_preempt()
 fn C.nr_iowait_cpu(u32) u32
 fn C.nr_iowait() u32
 fn C.wake_up_process(&C.task_struct) i32
-fn C.time_after_eq(usize, usize) bool
+fn C.time_after_eq(uint, uint) bool
 fn C.msleep(u32)
 fn C.mutex_init(&C.mutex)
 fn C.mutex_destroy(&C.mutex)
@@ -91,13 +91,13 @@ fn C.mutex_lock_io(&C.mutex)
 fn C.mutex_lock_io_nested(&C.mutex, i32)
 fn C.mutex_unlock(&C.mutex)
 fn C.mutex_is_locked(&C.mutex) bool
-fn C.atomic_long_read(&C.atomic_long_t) isize
-fn C.wait_on_bit_io(&usize, i32, u32) i32
-fn C.wait_on_bit_lock_io(&usize, i32, u32) i32
+fn C.atomic_long_read(&C.atomic_long_t) int
+fn C.wait_on_bit_io(&uint, i32, u32) i32
+fn C.wait_on_bit_lock_io(&uint, i32, u32) i32
 fn C.bit_wait_io_timeout(&C.wait_bit_key, i32) i32
-fn C.test_bit(i32, &usize) bool
-fn C.clear_and_wake_up_bit(i32, &usize)
-fn C.bit_waitqueue(&usize, i32) voidptr
+fn C.test_bit(i32, &uint) bool
+fn C.clear_and_wake_up_bit(i32, &uint)
+fn C.bit_waitqueue(&uint, i32) voidptr
 fn C.waitqueue_active(voidptr) bool
 fn C.__atomic_load(voidptr, voidptr, i32)
 fn C.__atomic_store(voidptr, voidptr, i32)
@@ -109,7 +109,7 @@ fn C.kprintf(&char, ...) i32
 __global C.current &C.task_struct
 
 @[c_extern]
-__global C.jiffies usize
+__global C.jiffies uint
 
 @[c_extern]
 __global (
@@ -117,7 +117,7 @@ __global (
 	C.TASK_INTERRUPTIBLE u32
 	C.TASK_UNINTERRUPTIBLE u32
 	C.TASK_DEAD u32
-	C.MAX_SCHEDULE_TIMEOUT isize
+	C.MAX_SCHEDULE_TIMEOUT int
 	C.EIO i32
 	C.ENOMEM i32
 	C.EINTR i32
@@ -145,11 +145,11 @@ mut:
 	acquired C.completion
 	release C.completion
 	done C.completion
-	word &usize = unsafe { nil }
+	word &uint = unsafe { nil }
 	mutex &C.mutex = unsafe { nil }
 	baseline &u32 = unsafe { nil }
-	timeout isize
-	remaining isize
+	timeout int
+	remaining int
 	cpu u32
 	resumed_cpu u32
 	state u32
@@ -195,7 +195,7 @@ pub fn worker(argument voidptr) voidptr {
 				// Keep IRQs disabled through the actual dead dequeue and pthread exit.
 				token := C.io_schedule_prepare()
 				C.vinix_linuxkpi_irq_save()
-				mut wait_flags := usize(0)
+				mut wait_flags := uint(0)
 				C.raw_spin_lock_irqsave(&test.task.vinix_wait_lock, wait_flags)
 				C.set_current_state(C.TASK_UNINTERRUPTIBLE)
 				C.vinix_linuxkpi_task_dequeue(test.task.vinix_thread)
@@ -212,7 +212,7 @@ pub fn worker(argument voidptr) voidptr {
 				if test.operation == .mutex { C.mutex_lock_io_nested(test.mutex, 1) }
 				else { C.mutex_lock(test.mutex) }
 				if (C.current.in_iowait != 0) != test.nested ||
-					C.atomic_long_read(&test.mutex.owner) != isize(C.current) { test.result = -C.EIO }
+					C.atomic_long_read(&test.mutex.owner) != int(C.current) { test.result = -C.EIO }
 				if outer >= 0 { C.io_schedule_finish(outer); outer = -1 }
 				test.resumed_cpu = C.vinix_linuxkpi_cpu_id()
 				C.complete(&test.acquired)
@@ -255,8 +255,8 @@ pub fn worker(argument voidptr) voidptr {
 	}
 }
 
-fn start(test &IoThread, operation Operation, cpu u32, state u32, timeout isize,
-	word &usize, baseline &u32, nested bool) i32 {
+fn start(test &IoThread, operation Operation, cpu u32, state u32, timeout int,
+	word &uint, baseline &u32, nested bool) i32 {
 	unsafe {
 		*test = IoThread{ operation: operation, cpu: cpu, state: state, timeout: timeout,
 			word: word, baseline: baseline, nested: nested }
@@ -385,7 +385,7 @@ fn timeout(baseline &u32, expire bool, interrupt bool) i32 {
 
 fn bits(baseline &u32, want_lock bool, interrupt bool) i32 {
 	unsafe {
-		mut word := usize(1)
+		mut word := uint(1)
 		mut tests := [2]IoThread{}
 		nr := if want_lock && !interrupt { 2 } else { 1 }
 		mut result := i32(0)
@@ -432,7 +432,7 @@ fn fast_paths(baseline &u32) i32 {
 		mut result := i32(0)
 		for _ in 0 .. 128 {
 			C.mutex_lock_io(&mutex)
-			if task.in_iowait != 0 || C.atomic_long_read(&mutex.owner) != isize(task) ||
+			if task.in_iowait != 0 || C.atomic_long_read(&mutex.owner) != int(task) ||
 				counts(baseline, 0, 0) != 0 { result = -C.EIO }
 			C.mutex_unlock(&mutex)
 			outer := C.io_schedule_prepare()
@@ -441,7 +441,7 @@ fn fast_paths(baseline &u32) i32 {
 			C.io_schedule_finish(inner)
 			if task.in_iowait == 0 || counts(baseline, 0, 0) != 0 { result = -C.EIO }
 			C.mutex_lock_io_nested(&mutex, 1)
-			if task.in_iowait == 0 || C.atomic_long_read(&mutex.owner) != isize(task) ||
+			if task.in_iowait == 0 || C.atomic_long_read(&mutex.owner) != int(task) ||
 				counts(baseline, 0, 0) != 0 { result = -C.EIO }
 			C.mutex_unlock(&mutex)
 			C.io_schedule()
@@ -455,7 +455,7 @@ fn fast_paths(baseline &u32) i32 {
 			C.vinix_linuxkpi_test_task_signal(task.vinix_thread, 0)
 			token := C.io_schedule_prepare()
 			flags := C.vinix_linuxkpi_irq_save()
-			mut wait_flags := usize(0)
+			mut wait_flags := uint(0)
 			C.raw_spin_lock_irqsave(&task.vinix_wait_lock, wait_flags)
 			C.set_current_state(C.TASK_UNINTERRUPTIBLE)
 			C.vinix_linuxkpi_task_dequeue(task.vinix_thread)
@@ -467,7 +467,7 @@ fn fast_paths(baseline &u32) i32 {
 			C.io_schedule_finish(token)
 			C.vinix_linuxkpi_irq_restore(flags)
 			if !C.task_is_running(task) || task.in_iowait != 0 || counts(baseline, 0, 0) != 0 { result = -C.EIO }
-			mut word := usize(1)
+			mut word := uint(1)
 			mut key := C.wait_bit_key{ flags: &word, bit_nr: 0, timeout: C.jiffies }
 			if C.bit_wait_io_timeout(&key, i32(C.TASK_UNINTERRUPTIBLE)) != -C.EAGAIN || task.in_iowait != 0 {
 				result = -C.EIO
@@ -482,11 +482,11 @@ fn mutex_waiters(mutex &C.mutex, expected u32) i32 {
 	unsafe {
 		deadline := C.jiffies + 500
 		for {
-			mut flags := usize(0)
+			mut flags := uint(0)
 			mut count := u32(0)
 			C.raw_spin_lock_irqsave(&mutex.wait_lock, flags)
 			mut entry := mutex.wait_list.next
-			for usize(entry) != usize(&mutex.wait_list) { count++; entry = entry.next }
+			for uint(entry) != uint(&mutex.wait_list) { count++; entry = entry.next }
 			C.raw_spin_unlock_irqrestore(&mutex.wait_lock, flags)
 			if count == expected { return 0 }
 			if C.time_after_eq(C.jiffies, deadline) { return -C.EIO }
@@ -537,7 +537,7 @@ fn mutex_handoffs(baseline &u32, fail_after u32, oom_stage u32) i32 {
 						held = false
 						for i in 0 .. 3 {
 							if C.wait_for_completion_timeout(&tests[i].acquired, 500) == 0 ||
-								C.atomic_long_read(&mutex.owner) != isize(tests[i].task) ||
+								C.atomic_long_read(&mutex.owner) != int(tests[i].task) ||
 								(i == 0 && tests[i].resumed_cpu != 1) ||
 								(i + 1 < 3 && C.completion_done(&tests[i + 1].acquired)) ||
 								counts(baseline, 0, if i < 2 { u32(1) } else { u32(0) }) != 0 {

@@ -4,7 +4,7 @@
 module heapbench
 
 #include "heap_benchmark_v.h"
-fn C.vkb_alloc(usize) voidptr
+fn C.vkb_alloc(uint) voidptr
 fn C.vkb_free(voidptr)
 fn C.vkb_log(&char, ...voidptr) i32
 
@@ -25,17 +25,17 @@ struct Failure {
 mut:
  reason &char
  iteration u64
- size usize
- offset usize
+ size uint
+ offset uint
  value u8
 }
 
-const sizes = [usize(16), 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048]!
+const sizes = [uint(16), 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048]!
 
-fn zeroed(pointer voidptr, size usize, failure &Failure) i32 {
+fn zeroed(pointer voidptr, size uint, failure &Failure) i32 {
  unsafe {
   bytes := &u8(pointer)
-  for offset := usize(0); offset < size; offset++ {
+  for offset := uint(0); offset < size; offset++ {
    value := C.vkb_load8(bytes + offset, 0)
    if value != 0 {
     failure.reason = c'nonzero_allocation'
@@ -54,7 +54,7 @@ fn hot(measurement &Measurement, failure &Failure, validate_zero bool) i32 {
   start := ticks()
   for i := u64(0); i < 100000; i++ {
    pointer := C.vkb_alloc(64)
-   if usize(pointer) == 0 {
+   if uint(pointer) == 0 {
     failure.reason = c'allocation_failed'
     failure.iteration = i
     failure.size = 64
@@ -86,7 +86,7 @@ fn big(measurement &Measurement, failure &Failure, validate_zero bool) i32 {
   start := ticks()
   for i := u64(0); i < 128; i++ {
    pointer := C.vkb_alloc(262144)
-   if usize(pointer) == 0 {
+   if uint(pointer) == 0 {
     failure.reason = c'allocation_failed'
     failure.iteration = i
     failure.size = 262144
@@ -115,8 +115,8 @@ fn big(measurement &Measurement, failure &Failure, validate_zero bool) i32 {
 
 fn free_live(objects &voidptr) {
  unsafe {
-  for i := usize(0); i < 256; i++ {
-   if usize(objects[i]) != 0 { C.vkb_free(objects[i]); objects[i] = nil }
+  for i := uint(0); i < 256; i++ {
+   if uint(objects[i]) != 0 { C.vkb_free(objects[i]); objects[i] = nil }
   }
  }
 }
@@ -126,11 +126,11 @@ fn batch(measurement &Measurement, failure &Failure, validate_zero bool) i32 {
   mut objects := [256]voidptr{}
   start := ticks()
   for round := u64(0); round < 48; round++ {
-   for i := usize(0); i < 256; i++ {
+   for i := uint(0); i < 256; i++ {
     iteration := round * 256 + u64(i)
     size := sizes[iteration % 14]
     pointer := C.vkb_alloc(size)
-    if usize(pointer) == 0 {
+    if uint(pointer) == 0 {
      failure.reason = c'allocation_failed'
      failure.iteration = iteration
      failure.size = size
@@ -147,8 +147,8 @@ fn batch(measurement &Measurement, failure &Failure, validate_zero bool) i32 {
     C.vkb_store8(bytes, u8(i), 0)
     C.vkb_store8(bytes + size - 1, u8(round), 0)
    }
-   for i := usize(0); i < 256; i++ {
-    index := (i * 73 + usize(round) * 19) & 255
+   for i := uint(0); i < 256; i++ {
+    index := (i * 73 + uint(round) * 19) & 255
     size := sizes[(round * 256 + u64(index)) % 14]
     bytes := &u8(objects[index])
     measurement.checksum += u64(C.vkb_load8(bytes, 0)) + C.vkb_load8(bytes + size - 1, 0)
@@ -166,7 +166,7 @@ fn batch(measurement &Measurement, failure &Failure, validate_zero bool) i32 {
 
 fn sort(values &u64) {
  unsafe {
-  for i := usize(1); i < 5; i++ {
+  for i := uint(1); i < 5; i++ {
    value := values[i]
    mut position := i
    for position != 0 && values[position - 1] > value { values[position] = values[position - 1]; position-- }

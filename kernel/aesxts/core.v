@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module aesxts
 
-fn C.__builtin_alloca(usize) voidptr
+fn C.__builtin_alloca(uint) voidptr
 
 // AES-256-XTS with full 512/4096-byte storage data units. State and all
 // workspaces are caller-owned. No secret-indexed tables or secret branches.
@@ -24,8 +24,8 @@ mut:
 }
 
 // Volatile byte stores survive dead-store elimination, including on failure.
-pub fn erase(buffer voidptr, bytes usize) {
-	for i := usize(0); i < bytes; i++ { unsafe { (&SecretByte(usize(buffer) + i)).value = 0 } }
+pub fn erase(buffer voidptr, bytes uint) {
+	for i := uint(0); i < bytes; i++ { unsafe { (&SecretByte(uint(buffer) + i)).value = 0 } }
 }
 
 pub fn clear(mut cipher Cipher) { erase(unsafe { &cipher }, sizeof(Cipher)) }

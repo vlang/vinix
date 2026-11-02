@@ -3,7 +3,7 @@
 @[translated]
 module exchange128core
 
-fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
 fn C.__atomic_exchange_n(&u128, u128, i32) u128
 fn C.__atomic_compare_exchange_n(&u128, &u128, u128, bool, i32, i32) bool
 

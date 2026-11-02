@@ -282,7 +282,7 @@ fn irq_test_observer(index u32) {
 }
 
 fn irq_test_actor(argument voidptr) {
-	token := u32(usize(argument) - 1)
+	token := u32(uint(argument) - 1)
 	index := token / 2
 	observer := token & 1 != 0
 	mut state := unsafe { &irq_test_ledger[index] }
@@ -389,7 +389,7 @@ fn irq_test_lifecycle() bool {
 		irq_test_ledger[i].rejected_wait.pending = 1
 	}
 	for i in 0 .. irq_test_cpus * 2 {
-		mut actor := sched.try_new_kernel_thread(voidptr(irq_test_actor), voidptr(usize(i + 1))) or {
+		mut actor := sched.try_new_kernel_thread(voidptr(irq_test_actor), voidptr(uint(i + 1))) or {
 			return irq_test_require(false, c'IRQ actor creation')
 		}
 		proc.pin_thread(actor)

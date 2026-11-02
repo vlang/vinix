@@ -3,7 +3,7 @@ module anscore
 
 #define vinix_ans_stack_alloc __builtin_alloca
 
-fn C.vinix_ans_stack_alloc(size usize) voidptr
+fn C.vinix_ans_stack_alloc(size uint) voidptr
 
 // The caller holds the ANS operation lock across both commands and copies.
 // Use the existing pinned DMA bounce buffer; a failed controller must never
@@ -27,7 +27,7 @@ pub fn a_health(a &Ans, index u32, identify &u8, data &u8) i32 {
 				// LID=2, RAE=1, NUMDL=127; all other fields stay zero.
 				a_put32(command + 40, 0x007f8002)
 			}
-			bytes := usize(if step == 0 { 4096 } else { 512 })
+			bytes := uint(if step == 0 { 4096 } else { 512 })
 			a_zero(a.dma + 131072, bytes)
 			a_sync(a, 131072, bytes, 0)
 			result := a_submit(a, 0, command, nil)

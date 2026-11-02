@@ -84,8 +84,8 @@ fn (c &NVMEController) wait_awake() {
 // Empty a queue pair: what the controller knew of it is gone.
 fn (mut pair NVMEQueuePair) rewind() {
 	unsafe {
-		C.memset(voidptr(pair.submission_queue), 0, usize(pair.entry_cnt * sizeof(NVMECommand)))
-		C.memset(voidptr(pair.completion_queue), 0, usize(pair.entry_cnt * sizeof(NVMECompletion)))
+		C.memset(voidptr(pair.submission_queue), 0, uint(pair.entry_cnt * sizeof(NVMECommand)))
+		C.memset(voidptr(pair.completion_queue), 0, uint(pair.entry_cnt * sizeof(NVMECompletion)))
 	}
 	pair.sq_head = 0
 	pair.sq_tail = 0

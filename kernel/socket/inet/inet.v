@@ -520,7 +520,7 @@ pub fn detach_owned(driver int) {
 
 pub fn receive_owned(driver int, frame voidptr, length u64) bool {
 	net_lock.acquire()
-	ret := if C.vinix_net_owner() == driver { C.vinix_net_input(frame, usize(length)) } else { -19 }
+	ret := if C.vinix_net_owner() == driver { C.vinix_net_input(frame, uint(length)) } else { -19 }
 	net_lock.release()
 	return ret == 0
 }
