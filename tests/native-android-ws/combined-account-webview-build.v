@@ -3010,6 +3010,87 @@ fn secure_settings_tile_self_test() ! {
  }
 }
 
+fn usage_inactive_profile() NarrowProfile {
+ usage := 'android/app/usage/UsageStatsManager.smali'
+ return NarrowProfile{
+  name: 'usage-inactive'
+  baseline_name: 'combined-account-webview-secure-settings-framework-2026-11-02-r1'
+  manifest_pin: '0c7485f9a38c52dd6ef6ddd60c936f49d694da267ae30fccf6dea1163a21529b'
+  jar_pin: 'f7eef1e9b2a2a7730ce0b024823c9cc38dc1d510252dc6dccd30f1ada79f9768'
+  baseline_classes: 2112
+  providers: ['framework_usage_inactive.v']
+  calls: {usage: 'framework_usage_inactive_source'}
+  methods: {usage: ['isAppInactive(Ljava/lang/String;)Z']}
+  changed: {usage: 0}
+  added: {usage: 1}
+ }
+}
+
+fn usage_inactive_abi(source string) ! {
+ signature := 'isAppInactive(Ljava/lang/String;)Z'
+ method := store_parts(source)!.methods[signature] or { return error('usage inactivity query missing') }
+ if method.split_into_lines().map(it.trim_space()).filter(it != '' && !it.starts_with('#')) != [
+  '.method public ' + signature, '.registers 3', 'const/4 v0, 0x0', 'return v0', '.end method'] {
+  return error('disabled AppStandby query requires the exact public instance false result before any package lookup or validation')
+ }
+}
+
+fn usage_inactive_self_test() ! {
+ profile := usage_inactive_profile()
+ usage := 'android/app/usage/UsageStatsManager.smali'
+ signature := 'isAppInactive(Ljava/lang/String;)Z'
+ if profile.name != 'usage-inactive' || profile.baseline_classes != 2112
+  || profile.baseline_name != 'combined-account-webview-secure-settings-framework-2026-11-02-r1'
+  || profile.manifest_pin != '0c7485f9a38c52dd6ef6ddd60c936f49d694da267ae30fccf6dea1163a21529b'
+  || profile.jar_pin != 'f7eef1e9b2a2a7730ce0b024823c9cc38dc1d510252dc6dccd30f1ada79f9768'
+  || profile.providers != ['framework_usage_inactive.v'] || profile.directory_provider != ''
+  || profile.calls != {usage: 'framework_usage_inactive_source'} || profile.methods != {usage: [signature]}
+  || profile.changed != {usage: 0} || profile.added != {usage: 1} || profile.fields.len != 0
+  || profile.extra_classes.len != 0 || profile.class_provider != '' {
+  return error('usage inactivity profile requires exactly one added query in the retained constructor-only manager')
+ }
+ narrow_method_self_test([signature], 0, 1)!
+ method := '.method public ' + signature + '\n.registers 3\nconst/4 v0, 0x0\nreturn v0\n.end method\n'
+ usage_inactive_abi(method)!
+ for bad in [method.replace('public ', 'private '), method.replace('public ', 'public static '),
+  method.replace('public ', 'public native '), method.replace('public ', 'public final '),
+  method.replace('(Ljava/lang/String;)Z', '()Z'), method.replace('.registers 3', '.registers 2'),
+  method.replace('const/4 v0, 0x0', 'const/4 v0, 0x1'), method.replace('return v0', 'return-object v0'),
+  method.replace('return v0', 'return p1'), method.replace('const/4 v0, 0x0', 'invoke-virtual {p1}, Ljava/lang/String;->length()I\nmove-result v0'),
+  method + method] {
+  usage_inactive_abi(bad) or { continue }
+  return error('usage inactivity ABI/register/package-dependence/result mutation accepted')
+ }
+ metadata := '.class public Landroid/app/usage/UsageStatsManager;\n.super Ljava/lang/Object;\n'
+ constructor := '.method public constructor <init>()V\n.registers 1\ninvoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void\n.end method\n'
+ before_source := metadata + constructor
+ after_source := before_source + method
+ narrow_member_delta(before_source, after_source, [signature], 0, 1, []string{})!
+ for bad in [after_source.replace('public constructor <init>()V', 'private constructor <init>()V'),
+  after_source.replace('.super Ljava/lang/Object;', '.super Lother/Base;'),
+  after_source + '.field private history:Ljava/util/Map;\n', after_source + constructor] {
+  narrow_member_delta(before_source, bad, [signature], 0, 1, []string{}) or { continue }
+  return error('usage inactivity constructor/metadata or invented history state accepted')
+ }
+ mut before := {usage: 'old'}
+ for index in 0 .. 2111 { before['other/' + index.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ after[usage] = 'new'
+ narrow_profile_class_delta(before, after, [usage], []string{}, 2112)!
+ for case in 0 .. 5 {
+  mut bad := after.clone()
+  match case {
+   0 { bad[usage] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(usage) }
+   3 { bad['unrelated.smali'] = 'new' }
+   else { bad.delete(usage); bad['substituted.smali'] = 'new' }
+  }
+  narrow_profile_class_delta(before, bad, [usage], []string{}, 2112) or { continue }
+  return error('invalid UsageStatsManager-only class scope accepted')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -3951,6 +4032,7 @@ fn self_test() ! {
  keyguard_policy_self_test()!
  broadcast_permission_self_test()!
  secure_settings_self_test()!
+ usage_inactive_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -4256,6 +4338,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'keyguard-policy' { keyguard_policy_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'broadcast-permission' { broadcast_permission_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
   if profile.name == 'secure-settings' { secure_settings_abi(os.read_file(root + '/smali/' + target)!)! }
+  if profile.name == 'usage-inactive' { usage_inactive_abi(os.read_file(root + '/smali/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -4313,6 +4396,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'keyguard-policy' { keyguard_policy_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'broadcast-permission' { broadcast_permission_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
   if profile.name == 'secure-settings' { secure_settings_abi(os.read_file(root + '/new-dex/' + target)!)! }
+  if profile.name == 'usage-inactive' { usage_inactive_abi(os.read_file(root + '/new-dex/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -4683,11 +4767,15 @@ fn main() {
   build_narrow(secure_settings_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--usage-inactive' {
+  build_narrow(usage_inactive_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
