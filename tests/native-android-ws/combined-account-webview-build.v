@@ -2075,6 +2075,317 @@ fn stats_unavailable_self_test() ! {
  }
 }
 
+fn subscription_service_methods() map[string][]string {
+ return {
+  'android/app/ContextImpl.smali': [
+   'getSystemService(Ljava/lang/Class;)Ljava/lang/Object;',
+   'getSystemService(Ljava/lang/String;)Ljava/lang/Object;',
+   'vinixSubscriptionService()Landroid/telephony/SubscriptionManager;']
+  'android/telephony/SubscriptionManager.smali': [
+   'getActiveSubscriptionInfoList()Ljava/util/List;',
+   'getActiveSubscriptionInfo(I)Landroid/telephony/SubscriptionInfo;',
+   'getPhoneNumber(I)Ljava/lang/String;']
+  'android/telephony/TelephonyManager.smali': [
+   'getPhoneCount()I', 'getActiveModemCount()I',
+   'createForSubscriptionId(I)Landroid/telephony/TelephonyManager;']
+ }
+}
+
+fn subscription_service_fields() map[string][]string {
+ return {
+  'android/app/ContextImpl.smali': ['.field private vinixSubscriptionManager:Landroid/telephony/SubscriptionManager;']
+  'android/telephony/TelephonyManager.smali': ['.field private vinixSubscriptionId:I']
+ }
+}
+
+fn subscription_service_profile() NarrowProfile {
+ context := 'android/app/ContextImpl.smali'
+ subscriptions := 'android/telephony/SubscriptionManager.smali'
+ telephony := 'android/telephony/TelephonyManager.smali'
+ return NarrowProfile{
+  name: 'subscription-service'
+  baseline_name: 'combined-account-webview-stats-unavailable-framework-2026-11-02-r1'
+  manifest_pin: 'f0bdf43e99a7ada2b8ec52dde5e8da45ebf6162cd2b8a9a0b32bfc55bfa12106'
+  jar_pin: '86d1cc8dc592082aeb837fd260e36a4a0c93bbe5a23e3f22e4f97b5ba09e7ffd'
+  baseline_classes: 2109
+  providers: ['framework_subscription_service.v']
+  calls: {
+   context: 'framework_subscription_context_source'
+   subscriptions: 'framework_subscription_manager_source'
+   telephony: 'framework_subscription_telephony_source'
+  }
+  methods: subscription_service_methods()
+  changed: {context: 2, subscriptions: 0, telephony: 0}
+  added: {context: 1, subscriptions: 3, telephony: 3}
+  fields: subscription_service_fields()
+  class_provider: 'framework_subscription_service_classes'
+  extra_classes: ['android/telephony/SubscriptionInfo.smali']
+ }
+}
+
+fn subscription_service_type_abi(source string) ! {
+ parts := store_parts(source)!
+ if parts.methods.len != 0 || parts.metadata.split_into_lines().map(it.trim_space()).filter(it != '') != [
+  '.class public final Landroid/telephony/SubscriptionInfo;', '.super Ljava/lang/Object;'] {
+  return error('absent subscription info must remain a public final memberless type without constructors or invented subscriptions')
+ }
+}
+
+fn subscription_service_abi(source string, target string) ! {
+ parts := store_parts(source)!
+ signatures := subscription_service_methods()[target] or { return error('unsupported subscription service class') }
+ for signature in signatures {
+  method := parts.methods[signature] or { return error('missing subscription service method: ' + signature) }
+  flags := if signature.starts_with('vinixSubscriptionService(') { 'private' } else { 'public' }
+  if method.all_before('\n').trim_space() != '.method ' + flags + ' ' + signature {
+   return error('subscription service requires exact public instance queries and private explicit-monitor cache helper')
+  }
+ }
+}
+
+fn subscription_service_guard(signature string) !string {
+ helper := 'invoke-direct {p0}, Landroid/app/ContextImpl;->vinixSubscriptionService()Landroid/telephony/SubscriptionManager;\nmove-result-object v0\nreturn-object v0\n'
+ return match signature {
+  'getSystemService(Ljava/lang/Class;)Ljava/lang/Object;' {
+   'const-class v0, Landroid/telephony/SubscriptionManager;\nif-ne p1, v0, :vinix_subscription_typed_other\n' + helper + ':vinix_subscription_typed_other\n'
+  }
+  'getSystemService(Ljava/lang/String;)Ljava/lang/Object;' {
+   'const-string v0, "telephony_subscription_service"\ninvoke-virtual {v0, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\nmove-result v0\nif-eqz v0, :vinix_subscription_string_other\n' + helper + ':vinix_subscription_string_other\n'
+  }
+  else { return error('unexpected subscription lookup overload') }
+ }
+}
+
+// DEX may place the catchall directive beside its end label. Retain the exact
+// protected interval/handler and every instruction, rebasing label aliases only.
+fn subscription_service_method(source string) !string {
+ mut lines := []string{}
+ mut catches := []string{}
+ for original in source.split_into_lines() {
+  line := original.trim_space()
+  if line.starts_with('.catchall ') { catches << line.replace('{:', '{ :').replace('}', ' }') }
+  else if line != '.end method' { lines << line }
+ }
+ lines << catches
+ lines << '.end method'
+ return intent_extras_method(lines.join('\n'))
+}
+
+fn subscription_service_expected_methods() map[string]string {
+ return {
+  'vinixSubscriptionService()Landroid/telephony/SubscriptionManager;': '.method private vinixSubscriptionService()Landroid/telephony/SubscriptionManager;
+.registers 2
+monitor-enter p0
+:locked
+iget-object v0, p0, Landroid/app/ContextImpl;->vinixSubscriptionManager:Landroid/telephony/SubscriptionManager;
+if-nez v0, :unlock
+new-instance v0, Landroid/telephony/SubscriptionManager;
+invoke-direct {v0}, Landroid/telephony/SubscriptionManager;-><init>()V
+iput-object v0, p0, Landroid/app/ContextImpl;->vinixSubscriptionManager:Landroid/telephony/SubscriptionManager;
+:unlock
+monitor-exit p0
+return-object v0
+:failed
+move-exception v0
+monitor-exit p0
+throw v0
+.catchall {:locked .. :unlock} :failed
+.end method'
+  'getActiveSubscriptionInfoList()Ljava/util/List;': '.method public getActiveSubscriptionInfoList()Ljava/util/List;
+.registers 2
+const/4 v0, 0x0
+return-object v0
+.end method'
+  'getActiveSubscriptionInfo(I)Landroid/telephony/SubscriptionInfo;': '.method public getActiveSubscriptionInfo(I)Landroid/telephony/SubscriptionInfo;
+.registers 3
+const/4 v0, 0x0
+return-object v0
+.end method'
+  'getPhoneNumber(I)Ljava/lang/String;': '.method public getPhoneNumber(I)Ljava/lang/String;
+.registers 4
+new-instance v0, Ljava/lang/IllegalStateException;
+const-string v1, "subscription service unavailable."
+invoke-direct {v0, v1}, Ljava/lang/IllegalStateException;-><init>(Ljava/lang/String;)V
+throw v0
+.end method'
+  'getPhoneCount()I': '.method public getPhoneCount()I
+.registers 2
+const/4 v0, 0x0
+return v0
+.end method'
+  'getActiveModemCount()I': '.method public getActiveModemCount()I
+.registers 2
+const/4 v0, 0x0
+return v0
+.end method'
+  'createForSubscriptionId(I)Landroid/telephony/TelephonyManager;': '.method public createForSubscriptionId(I)Landroid/telephony/TelephonyManager;
+.registers 3
+new-instance v0, Landroid/telephony/TelephonyManager;
+invoke-direct {v0}, Landroid/telephony/TelephonyManager;-><init>()V
+iput p1, v0, Landroid/telephony/TelephonyManager;->vinixSubscriptionId:I
+return-object v0
+.end method'
+ }
+}
+
+fn subscription_service_members(before string, after string, target string) ! {
+ profile := subscription_service_profile()
+ allowed := profile.methods[target] or { return error('unexpected subscription target') }
+ narrow_member_delta(before, after, allowed, profile.changed[target]!, profile.added[target]!, profile.fields[target] or { []string{} })!
+ subscription_service_abi(after, target)!
+ old_parts := store_parts(before)!
+ new_parts := store_parts(after)!
+ expected_methods := subscription_service_expected_methods()
+ for signature in allowed {
+  actual := new_parts.methods[signature]!
+  if target == 'android/app/ContextImpl.smali' && signature.starts_with('getSystemService(') {
+   old := old_parts.methods[signature]!
+   if old.count('.registers 3\n') != 1 || old.contains('vinixSubscription') {
+    return error('retained subscription lookup requires original register layout and no preexisting guard')
+   }
+   expected := old.replace('.registers 3\n', '.registers 3\n' + subscription_service_guard(signature)!)
+   if subscription_service_method(actual)! != subscription_service_method(expected)! {
+    return error('subscription lookup must add only a shared-cache guard and preserve every fallback instruction')
+   }
+  } else {
+   if subscription_service_method(actual)! != subscription_service_method(expected_methods[signature]!)! {
+    return error('subscription service must retain exact explicit monitors, absent-backend results and fresh ID-carrying telephony wrappers')
+   }
+  }
+ }
+}
+
+fn subscription_service_instruction_self_test() ! {
+ profile := subscription_service_profile()
+ expected_methods := subscription_service_expected_methods()
+ context := 'android/app/ContextImpl.smali'
+ helper := 'vinixSubscriptionService()Landroid/telephony/SubscriptionManager;'
+ for target, signatures in profile.methods {
+  mut old := '.class public Lexample/Preserved;\n.super Ljava/lang/Object;\n' +
+   '.method public constructor <init>()V\n.registers 1\ninvoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void\n.end method\n'
+  if target == context {
+   for signature in signatures.filter(it.starts_with('getSystemService(')) {
+    old += '.method public ' + signature + '\n.registers 3\nconst/4 v0, 0x0\nreturn-object v0\n.end method\n'
+   }
+  }
+  mut good := old + (profile.fields[target] or { []string{} }).join('\n') + '\n'
+  if target == context {
+   for signature in signatures.filter(it.starts_with('getSystemService(')) {
+    method := store_parts(old)!.methods[signature]!
+    good = good.replace(method, method.replace('.registers 3\n', '.registers 3\n' + subscription_service_guard(signature)!))
+   }
+  }
+  for signature in signatures { if signature in expected_methods { good += expected_methods[signature]! + '\n' } }
+  subscription_service_members(old, good, target)!
+  if target == context {
+   relocated := good.replace('.catchall {:locked .. :unlock} :failed\n', '').replace(':unlock\nmonitor-exit', ':unlock\n.catchall {:locked .. :unlock} :failed\nmonitor-exit')
+   subscription_service_members(old, relocated.replace(':locked', ':try_start_1').replace(':unlock', ':goto_finish').replace(':failed', ':catchall_2'), target)!
+  }
+  mut bad_methods := []string{}
+  for signature in signatures {
+   method := store_parts(good)!.methods[signature]!
+   mut mutations := [method.replace('return-object v0', 'return-object p0'),
+    method.replace('const/4 v0, 0x0', 'const/4 v0, 0x1'), method.replace('return v0', 'return p0'),
+    method.replace('.registers 2', '.registers 3').replace('.registers 3', '.registers 4').replace('.registers 4', '.registers 5')]
+   if signature == helper {
+    mutations << [method.replace('monitor-enter p0', 'monitor-enter v0'),
+     method.replace('monitor-exit p0\nthrow v0', 'throw v0'),
+     method.replace('.catchall {:locked .. :unlock} :failed', '.catchall {:unlock .. :failed} :failed'),
+     method.replace('iput-object v0, p0', 'iput-object p0, p0')]
+   }
+   if signature == 'getPhoneNumber(I)Ljava/lang/String;' {
+    mutations << [method.replace('IllegalStateException', 'UnsupportedOperationException'),
+     method.replace('subscription service unavailable.', 'subscription available.'), method.replace('throw v0', 'return-object v0')]
+   }
+   if signature.starts_with('createForSubscriptionId(') {
+    mutations << [method.replace('iput p1, v0', 'iput p1, p0'), method.replace('return-object v0', 'return-object p0')]
+   }
+   if signature.starts_with('getSystemService(') {
+    mutations << [method.replace('vinixSubscriptionService()', 'vinixDevicePolicy()'),
+     method.replace('if-ne p1, v0', 'if-eq p1, v0').replace('if-eqz v0', 'if-nez v0'),
+     method.replace('const/4 v0, 0x0\nreturn-object v0', 'const/4 v0, 0x1\nreturn-object v0')]
+   }
+   for mutation in mutations { if mutation != method { bad_methods << good.replace(method, mutation) } }
+  }
+  for bad in bad_methods {
+   subscription_service_members(old, bad, target) or { continue }
+   return error('subscription instruction, exception, monitor, fallback or factory mutation accepted')
+  }
+ }
+}
+
+fn subscription_service_self_test() ! {
+ profile := subscription_service_profile()
+ context := 'android/app/ContextImpl.smali'
+ subscriptions := 'android/telephony/SubscriptionManager.smali'
+ telephony := 'android/telephony/TelephonyManager.smali'
+ marker := 'android/telephony/SubscriptionInfo.smali'
+ if profile.name != 'subscription-service' || profile.baseline_classes != 2109
+  || profile.baseline_name != 'combined-account-webview-stats-unavailable-framework-2026-11-02-r1'
+  || profile.manifest_pin != 'f0bdf43e99a7ada2b8ec52dde5e8da45ebf6162cd2b8a9a0b32bfc55bfa12106'
+  || profile.jar_pin != '86d1cc8dc592082aeb837fd260e36a4a0c93bbe5a23e3f22e4f97b5ba09e7ffd'
+  || profile.providers != ['framework_subscription_service.v'] || profile.directory_provider != ''
+  || profile.calls != {context: 'framework_subscription_context_source', subscriptions: 'framework_subscription_manager_source', telephony: 'framework_subscription_telephony_source'}
+  || profile.methods != subscription_service_methods()
+  || profile.changed != {context: 2, subscriptions: 0, telephony: 0}
+  || profile.added != {context: 1, subscriptions: 3, telephony: 3}
+  || profile.fields != subscription_service_fields()
+  || profile.extra_classes != [marker] || profile.class_provider != 'framework_subscription_service_classes' {
+  return error('subscription service profile requires exactly three retained classes, seven additions, two replacements, two private fields and one marker')
+ }
+ subscription_service_instruction_self_test()!
+ for target, signatures in profile.methods {
+  narrow_method_self_test(signatures, profile.changed[target]!, profile.added[target]!)!
+  metadata := '.class public Lexample/Preserved;\n.super Ljava/lang/Object;\n.field private retained:I\n'
+  unrelated := '.method public retained()V\n.locals 0\nreturn-void\n.end method\n'
+  mut before := metadata + unrelated
+  mut after := metadata + (profile.fields[target] or { []string{} }).join('\n') + '\n' + unrelated
+  for index, signature in signatures {
+   flags := if signature.starts_with('vinixSubscriptionService(') { 'private' } else { 'public' }
+   method := '.method ' + flags + ' ' + signature + '\n.locals 1\nreturn-void\n.end method\n'
+   if index < profile.changed[target]! { before += method }
+   after += method.replace('.locals 1', '.locals 2')
+  }
+  narrow_member_delta(before, after, signatures, profile.changed[target]!, profile.added[target]!, profile.fields[target] or { []string{} })!
+  subscription_service_abi(after, target)!
+  for bad in [after.replace('.field private retained:I', '.field public retained:I'), after + '\n.field private extra:I\n', after + unrelated] {
+   narrow_member_delta(before, bad, signatures, profile.changed[target]!, profile.added[target]!, profile.fields[target] or { []string{} }) or { continue }
+   return error('subscription unrelated member/metadata mutation accepted')
+  }
+  for signature in signatures {
+   flags := if signature.starts_with('vinixSubscriptionService(') { 'private' } else { 'public' }
+   declaration := '.method ' + flags + ' ' + signature
+   for bad_flags in ['public static', 'private native', 'public final', 'private synchronized'] {
+    subscription_service_abi(after.replace(declaration, '.method ' + bad_flags + ' ' + signature), target) or { continue }
+    return error('subscription visibility/static/native/monitor declaration mutation accepted')
+   }
+  }
+ }
+ marker_source := '.class public final Landroid/telephony/SubscriptionInfo;\n.super Ljava/lang/Object;\n'
+ subscription_service_type_abi(marker_source)!
+ for bad in [marker_source.replace('public final', 'public'), marker_source.replace('Ljava/lang/Object;', 'Ljava/lang/Exception;'),
+  marker_source + '.field public subscriptionId:I\n', marker_source + '.implements Ljava/lang/Runnable;\n',
+  marker_source + '.method public constructor <init>()V\n.locals 0\nreturn-void\n.end method\n'] {
+  subscription_service_type_abi(bad) or { continue }
+  return error('invented subscription marker members or metadata accepted')
+ }
+ targets := profile.methods.keys()
+ mut before := map[string]string{}
+ for target in targets { before[target] = 'old' }
+ for index in 0 .. 2106 { before['other/' + index.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ for target in targets { after[target] = 'new' }
+ after[marker] = 'marker'
+ narrow_profile_class_delta(before, after, targets, [marker], 2109)!
+ for target in [context, subscriptions, telephony, marker, 'other/0.smali'] {
+  mut bad := after.clone()
+  if target in before { bad[target] = before[target]! } else { bad.delete(target) }
+  if target.starts_with('other/') { bad[target] = 'changed' }
+  narrow_profile_class_delta(before, bad, targets, [marker], 2109) or { continue }
+  return error('subscription service class scope mutation accepted')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -3011,6 +3322,7 @@ fn self_test() ! {
  device_secure_self_test()!
  unmanaged_queries_self_test()!
  stats_unavailable_self_test()!
+ subscription_service_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -3303,6 +3615,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'device-secure' { device_secure_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'unmanaged-queries' { unmanaged_query_abi(os.read_file(root + '/smali/' + target)!, target)! }
   if profile.name == 'stats-unavailable' { stats_unavailable_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!)! }
+  if profile.name == 'subscription-service' { subscription_service_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -3312,6 +3625,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  }
  if profile.name == 'bundle-cross-profile' { cross_profile_type_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'stats-unavailable' { stats_unavailable_type_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
+ if profile.name == 'subscription-service' { subscription_service_type_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'paint-drawable' {
   raw := os.read_file(root + '/smali/' + profile.extra_classes[0])!
   paint_drawable_abi(raw, raw)!
@@ -3352,6 +3666,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'device-secure' { device_secure_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'unmanaged-queries' { unmanaged_query_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
   if profile.name == 'stats-unavailable' { stats_unavailable_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!)! }
+  if profile.name == 'subscription-service' { subscription_service_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -3361,6 +3676,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  }
  if profile.name == 'bundle-cross-profile' { cross_profile_type_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'stats-unavailable' { stats_unavailable_type_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
+ if profile.name == 'subscription-service' { subscription_service_type_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'paint-drawable' {
   paint_drawable_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!,
    os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)!
@@ -3699,11 +4015,15 @@ fn main() {
   build_narrow(stats_unavailable_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--subscription-service' {
+  build_narrow(subscription_service_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
