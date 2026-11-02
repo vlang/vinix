@@ -771,6 +771,22 @@ const secure_settings_raw = '2c8f8fb00e04f01c22c349319ba61d69059be983b4aaa91c9bd
 const secure_settings_canonical = '2fabe675a8e8cfc8c81907481c0a563d2645fc38998bee73e89bf31cbf049b05'
 const secure_settings_tile_raw = 'da380668dee963d39ddd449157f77bf3f6cd3d090f3dc9ba59fd030101c43956'
 const secure_settings_tile_canonical = '081ded9887866e7e10ecaaab066656068cee3743d5ece44e1363c9994f638f44'
+const usage_inactive_base = '/Users/alex/.local/state/vinix/android/maps-secure-settings-r1'
+const usage_inactive_base_seal = 'f5583243199173123a39498c8e461c139c7bd8878283f763613d0f98bf1f7cde'
+const usage_inactive_boot = '785e14c994c8c13c11892f8f0a261b17c4a9a2c59a8772268e87fc8ceb6b1ee1'
+const usage_inactive_base_overlay = '7eee97c52969a1959e91055e0fddd06ca246d8f127043fefe00d98d4856c6723'
+const usage_inactive_old_deployment = '01019845d619cc4689e9c7bfea8ba748e6b2e47d6436edbbf809c295440e2c15'
+const usage_inactive_old_headless = 'd1ca6787f6719611a85c358da559f6dddad93fe2b3fc65065234f0d7e5823073'
+const usage_inactive_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-usage-inactive-framework-2026-11-02-r1'
+const usage_inactive_seal = 'bfadac214671937539a4732b3ca6be22d561c366b96a72a9de045fc362aba1fe'
+const usage_inactive_build = 'ca4e6ef0b40adb682bd523ca4a3c24c7bceba3ae81667448ca38fda4f1e4beeb'
+const usage_inactive_jar = 'd7b6d8c37d5d09d200c19b429f07cf6666ed6d8cf5a1a1b4d29c0dfd27cd632b'
+const usage_inactive_dex = '214a30cc0daaa59f2dea3395321288dc0127c14eb4bb993cc2ea920efe4744b6'
+const usage_inactive_framework_helper = 'dad3433840fe2a69504dc2aab3492740dc95111f836c676a9027be612f77eb4f'
+const usage_inactive_provider_path = 'tests/native-android-tools/androidtools/framework_usage_inactive.v'
+const usage_inactive_provider_helper = 'f6ade1627c3b8fbf90af86e77473de55ef1e1bfbcc4c76c4f8bfde78a0799b44'
+const usage_inactive_raw = '2694087a4d3bf7130bdaec2b12450b89f95138ceaa5a4c0d6c4fd9f495fd75db'
+const usage_inactive_canonical = '069e3ac3375487f084f0cc5770c1787376ee9e36c1190b4e70beb441fb799433'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -6440,6 +6456,129 @@ fn secure_settings_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return secure_settings_base + '/boot.img'
 }
 
+fn usage_inactive_profile() Profile {
+	mut modules := secure_settings_profile().modules.clone()
+	modules << 'maps-secure-settings.tar'
+	return Profile{'maps-usage-inactive', usage_inactive_boot, 'maps-usage-inactive.tar', modules}
+}
+fn usage_inactive_modules() map[string]string {
+	mut modules := secure_settings_modules()
+	modules['maps-secure-settings.tar'] = usage_inactive_base_overlay
+	return modules
+}
+fn usage_inactive_fields() map[string]string {
+	mut fields := secure_settings_fields()
+	fields['kind'] = 'vinix-maps-usage-inactive-v1'
+	fields['base_root'] = usage_inactive_base
+	fields['base_manifest_sha256'] = usage_inactive_base_seal
+	fields['framework_build_root'] = usage_inactive_framework
+	fields['framework_manifest_sha256'] = usage_inactive_seal
+	fields['framework_jar_sha256'] = usage_inactive_jar
+	fields['framework_dex_sha256'] = usage_inactive_dex
+	fields['retained_framework_manifest_sha256'] = secure_settings_seal
+	return fields
+}
+fn usage_inactive_inputs() map[string]string {
+	mut inputs := secure_settings_inputs()
+	inputs[usage_inactive_base + '/sha256.json'] = usage_inactive_base_seal
+	inputs[usage_inactive_framework + '/sha256.json'] = usage_inactive_seal
+	return inputs
+}
+fn usage_inactive_known_delta() map[string]string {
+	return {'/' + service_query_jar_path: usage_inactive_jar,
+		'/' + service_query_dex_path: usage_inactive_dex,
+		'/' + service_query_headless + '/framework-build.json': usage_inactive_build,
+		'/' + service_query_headless + '/framework-sha256.json': usage_inactive_seal}
+}
+fn usage_inactive_source_delta() map[string]string {
+	return {'smali/android/app/usage/UsageStatsManager.smali': usage_inactive_raw}
+}
+fn usage_inactive_canonical_delta() map[string]string {
+	return {'new-dex/android/app/usage/UsageStatsManager.smali': usage_inactive_canonical}
+}
+fn usage_inactive_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework.v': usage_inactive_framework_helper,
+		usage_inactive_provider_path: usage_inactive_provider_helper}
+}
+fn usage_inactive_method_changes() map[string]int {
+	return {'android/app/usage/UsageStatsManager.smali': 0}
+}
+fn usage_inactive_method_additions() map[string]int {
+	return {'android/app/usage/UsageStatsManager.smali': 1}
+}
+fn usage_inactive_proofs() map[string]string {
+	mut proofs := secure_settings_proofs()
+	proofs['headless_input_delta'] = json2.encode({'/' + service_query_jar_path: usage_inactive_jar})
+	proofs['framework_source_delta'] = json2.encode(usage_inactive_source_delta())
+	proofs['framework_canonical_delta'] = json2.encode(usage_inactive_canonical_delta())
+	proofs['framework_builder_helper_delta'] = json2.encode(usage_inactive_helper_delta())
+	proofs['framework_changed_method_counts'] = json2.encode(usage_inactive_method_changes())
+	proofs['framework_added_method_counts'] = json2.encode(usage_inactive_method_additions())
+	proofs['framework_added_classes'] = json2.encode([]string{})
+	return proofs
+}
+fn usage_inactive_overlay_paths() []string { return secure_settings_overlay_paths() }
+fn verify_usage_inactive_overlay(receipt map[string]json2.Any) ! {
+	for name in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		if name in receipt { return error('usage inactivity may only replace existing framework inputs') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('usage-inactive deployment delta absent') }))!
+	mut expected := usage_inactive_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('usage-inactive headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == usage_inactive_old_headless { return error('new usage-inactive headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('usage-inactive exact five deployment input changes differ') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('usage-inactive overlay inventory absent') }))!
+	paths := usage_inactive_overlay_paths()
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe usage-inactive overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != 0o644 { return error('usage-inactive regular allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected usage-inactive overlay inode') }
+	}
+	if regulars.len != 6 || regulars[service_query_deployment] or { '' } == usage_inactive_old_deployment { return error('exact six usage-inactive files required') }
+	for path, pin in expected { if regulars[path.trim_left('/')] or { '' } != pin { return error('usage-inactive input differs from inventory') } }
+}
+fn verify_usage_inactive_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [usage_inactive_base_seal, usage_inactive_boot, usage_inactive_base_overlay,
+		usage_inactive_old_deployment, usage_inactive_old_headless, usage_inactive_seal,
+		usage_inactive_build, usage_inactive_jar, usage_inactive_dex,
+		broadcast_permission_native_seal, broadcast_permission_native_build, broadcast_permission_native_pin,
+		broadcast_permission_seal, asset_locales_generated, asset_locales_c, asset_locales_bindings, broadcast_permission_consumed_headers] {
+		if !digest_valid(pin) { return error('completed usage-inactive SDK and retained broadcast native producer required') }
+	}
+	for values in [usage_inactive_source_delta(), usage_inactive_canonical_delta(), usage_inactive_helper_delta()] {
+		for path, pin in values { if !relative(path) || !digest_valid(pin) { return error('completed usage-inactive class/helper pins required') } }
+	}
+	if usage_inactive_seal == secure_settings_seal || usage_inactive_jar == secure_settings_jar || usage_inactive_dex == secure_settings_dex { return error('new usage-inactive framework required') }
+	for name, expected in usage_inactive_fields() { if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('usage-inactive receipt differs: ' + name) } }
+	for name, expected in usage_inactive_proofs() { if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](expected)! { return error('usage-inactive proof differs: ' + name) } }
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 123 || seals != usage_inactive_inputs() { return error('usage-inactive exact one hundred twenty-three dependency seals differ') }
+	for path in stage.inputs_sha256.keys() {
+		for root in [dialog_theme_relink_root(), resources_float_relink_root(), layout_alignment_relink_root(), window_animations_relink_root()] {
+			if path == root || path.starts_with(root + '/') { return error('historical relink leaves are not new usage-inactive direct inputs') }
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != usage_inactive_modules() || stage.preserved_modules_sha256 != usage_inactive_modules() { return error('usage-inactive original fifty-two modules differ') }
+	verify_usage_inactive_overlay(receipt)!
+}
+fn usage_inactive_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_usage_inactive_receipt(receipt, stage)!
+	path := usage_inactive_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != usage_inactive_base_seal { return error('usage-inactive original secure-settings manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != usage_inactive_boot || pins['maps-secure-settings.tar'] or { '' } != usage_inactive_base_overlay { return error('usage-inactive original boot or secure-settings overlay differs') }
+	return usage_inactive_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -7096,6 +7235,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = broadcast_permission_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-secure-settings' {
 		baseline = secure_settings_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-usage-inactive' {
+		baseline = usage_inactive_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -13768,6 +13909,180 @@ fn secure_settings_profile_self_test() ! {
 	println('MAPS-SECURE-SETTINGS KERNEL-PROFILE-SELF-TEST PASS six files one hundred twenty-one seals fifty-one inherited modules2112 classes secure setting write API28 TileService broadcast retained broadcast native')
 }
 
+fn usage_inactive_entries_fixture() []ServiceQueryEntry {
+	paths := usage_inactive_overlay_paths()
+	mut parents := map[string]bool{}
+	for path in paths {
+		mut parent := os.dir(path)
+		for parent !in ['', '.'] { parents[parent] = true; parent = os.dir(parent) }
+	}
+	mut entries := []ServiceQueryEntry{}
+	for name in parents.keys().sorted() { entries << ServiceQueryEntry{name: name, kind: 'directory', mode: 0o755} }
+	mut pins := usage_inactive_known_delta()
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	pins['/' + service_query_deployment] = 'b'.repeat(64)
+	for path in paths { entries << ServiceQueryEntry{name: path, kind: 'regular', mode: 0o644, sha256: pins['/' + path]!} }
+	return entries
+}
+fn usage_inactive_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in usage_inactive_fields() { receipt[name] = json2.Any(value) }
+	for name, value in usage_inactive_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	mut delta := usage_inactive_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(usage_inactive_entries_fixture()))!
+	return receipt
+}
+fn usage_inactive_profile_self_test() ! {
+	profile := usage_inactive_profile()
+	if profile.baseline_sha != usage_inactive_boot || profile.modules.len != 52 || profile.modules.last() != 'maps-secure-settings.tar'
+		|| usage_inactive_inputs().len != 123 || usage_inactive_inputs().keys().filter(it.ends_with('/sha256.json')).len != 123 { return error('usage-inactive retained-native profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 53 || usage_inactive_overlay_paths().len != 6 || usage_inactive_known_delta().len != 4 { return error('usage-inactive exact modules, files or changes differ') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', modules.reverse()}, Config{'vinix', profile.modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('wrong usage-inactive module order accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: usage_inactive_inputs(), original_modules_sha256: usage_inactive_modules(), preserved_modules_sha256: usage_inactive_modules()}
+	receipt := usage_inactive_receipt_fixture()!
+	verify_usage_inactive_receipt(receipt, stage)!
+	mut fields := usage_inactive_fields().keys()
+	fields << usage_inactive_proofs().keys()
+	fields << ['deployment_input_delta', 'overlay_inventory']
+	for name in fields {
+		mut bad := usage_inactive_receipt_fixture()!
+		bad[name] = json2.Any('changed')
+		if _ := verify_usage_inactive_receipt(bad, stage) { return error('changed usage-inactive field/proof accepted') }
+		bad.delete(name)
+		if _ := verify_usage_inactive_receipt(bad, stage) { return error('missing usage-inactive field/proof accepted') }
+	}
+	for proof in ['framework_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta',
+		'framework_changed_method_counts', 'framework_added_method_counts', 'framework_added_fields',
+		'native_source_delta', 'native_builder_helper_delta', 'native_bindings_delta', 'native_generated_jni_delta',
+		'native_c_delta', 'native_consumed_header_additions', 'native_consumed_raw_delta', 'native_consumed_canonical_delta',
+		'native_consumed_raw_additions', 'native_consumed_canonical_additions', 'headless_input_delta'] {
+		original := json2.decode[map[string]json2.Any](json2.encode(receipt[proof]!))!
+		for name in original.keys() {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(original))!
+			changed[name] = json2.Any('changed')
+			mut bad := usage_inactive_receipt_fixture()!
+			bad[proof] = json2.Any(changed)
+			if _ := verify_usage_inactive_receipt(bad, stage) { return error('changed usage-inactive proof member accepted') }
+			changed.delete(name)
+			bad[proof] = json2.Any(changed)
+			if _ := verify_usage_inactive_receipt(bad, stage) { return error('missing usage-inactive proof member accepted') }
+		}
+		mut extra := json2.decode[map[string]json2.Any](json2.encode(original))!
+		extra['unreviewed'] = json2.Any('a'.repeat(64))
+		mut bad := usage_inactive_receipt_fixture()!
+		bad[proof] = json2.Any(extra)
+		if _ := verify_usage_inactive_receipt(bad, stage) { return error('extra usage-inactive proof member accepted') }
+	}
+	for added in [['android/service/quicksettings/TileService.smali'], ['android/app/usage/UsageStatsManager.smali'], ['android/atl/VinixBroadcastPolicy.smali']] {
+		mut bad := usage_inactive_receipt_fixture()!
+		bad['framework_added_classes'] = json2.decode[json2.Any](json2.encode(added))!
+		if _ := verify_usage_inactive_receipt(bad, stage) { return error('usage-inactive class addition accepted') }
+	}
+	for field, wrong in {'native_framework_manifest_sha256': secure_settings_seal,
+		'native_compatibility_framework_manifest_sha256': usage_inactive_seal,
+		'retained_native_framework_manifest_sha256': secure_settings_seal,
+		'retained_framework_manifest_sha256': broadcast_permission_seal,
+		'retained_native_manifest_sha256': asset_locales_native_seal,
+		'native_manifest_sha256': asset_locales_native_seal,
+		'native_build_root': asset_locales_native,
+		'native_build_sha256': asset_locales_native_build,
+		'native_sha256': asset_locales_native_pin,
+		'native_consumed_headers_before_sha256': asset_locales_consumed_headers} {
+		mut bad := usage_inactive_receipt_fixture()!
+		bad[field] = json2.Any(wrong)
+		if _ := verify_usage_inactive_receipt(bad, stage) { return error('stale or relabeled usage-inactive native provenance accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := usage_inactive_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_usage_inactive_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed usage-inactive input accepted') }
+		pins.delete(path)
+		if _ := verify_usage_inactive_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing usage-inactive input accepted') }
+	}
+	for path in ['/unreviewed/sha256.json', dialog_theme_relink_root(), resources_float_relink_root(),
+		layout_alignment_relink_root(), window_animations_relink_root(), dialog_theme_relink_root() + '/out/canonical.so'] {
+		mut pins := usage_inactive_inputs()
+		pins[path] = 'a'.repeat(64)
+		if _ := verify_usage_inactive_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('extra usage-inactive seal or historical proof leaf accepted') }
+	}
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: secure_settings_modules()}, Stage{...stage, preserved_modules_sha256: secure_settings_modules()}] {
+		if _ := verify_usage_inactive_receipt(receipt, bad) { return error('wrong usage-inactive module inventory accepted') }
+	}
+	for addition in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		mut bad := usage_inactive_receipt_fixture()!
+		bad[addition] = json2.Any(map[string]json2.Any{})
+		if _ := verify_usage_inactive_receipt(bad, stage) { return error('usage-inactive addition or relink proof accepted') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta']!))!
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := usage_inactive_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_usage_inactive_receipt(bad, stage) { return error('missing usage-inactive actual input change accepted') }
+	}
+	mut wrong_delta := delta.clone()
+	wrong_delta['/' + native_onboarding_trace_path] = broadcast_permission_native_pin
+	mut wrong_native := usage_inactive_receipt_fixture()!
+	wrong_native['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(wrong_delta))!
+	if _ := verify_usage_inactive_receipt(wrong_native, stage) { return error('usage-inactive native deployment replacement accepted') }
+	entries := usage_inactive_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := usage_inactive_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_usage_inactive_receipt(bad, stage) { return error('unsafe usage-inactive overlay inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := usage_inactive_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_usage_inactive_receipt(bad, stage) { return error('missing usage-inactive overlay file accepted') }
+			if entry.name != service_query_deployment {
+				bad_entries = entries.clone()
+				bad_entries[index] = ServiceQueryEntry{...entry, sha256: '0'.repeat(64)}
+				bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+				if _ := verify_usage_inactive_receipt(bad, stage) { return error('changed usage-inactive overlay pin accepted') }
+			}
+		}
+	}
+	for extra in [entries.last(), ServiceQueryEntry{name: 'opt/unreviewed', kind: 'regular', mode: 0o644, sha256: 'a'.repeat(64)},
+		ServiceQueryEntry{name: native_onboarding_trace_path, kind: 'regular', mode: 0o755, sha256: broadcast_permission_native_pin}] {
+		mut changed := entries.clone()
+		changed << extra
+		mut bad := usage_inactive_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_usage_inactive_receipt(bad, stage) { return error('duplicate, native or unreviewed usage-inactive overlay file accepted') }
+	}
+	for stale_path, stale_pin in {service_query_headless + '/guest-inputs.json': usage_inactive_old_headless, service_query_deployment: usage_inactive_old_deployment} {
+		mut changed := entries.clone()
+		for index, entry in changed { if entry.name == stale_path { changed[index] = ServiceQueryEntry{...entry, sha256: stale_pin} } }
+		mut bad := usage_inactive_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if stale_path != service_query_deployment {
+			mut stale_delta := delta.clone()
+			stale_delta['/' + stale_path] = stale_pin
+			bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(stale_delta))!
+		}
+		if _ := verify_usage_inactive_receipt(bad, stage) { return error('stale usage-inactive metadata accepted') }
+	}
+	for old in [secure_settings_receipt_fixture()!, broadcast_permission_receipt_fixture()!, keyguard_policy_receipt_fixture()!, autofill_service_receipt_fixture()!, subscription_service_receipt_fixture()!] {
+		if _ := verify_usage_inactive_receipt(old, stage) { return error('historical receipt accepted by usage-inactive profile') }
+	}
+	if _ := verify_secure_settings_receipt(receipt, stage) { return error('usage-inactive receipt accepted by secure-settings profile') }
+	println('MAPS-USAGE-INACTIVE KERNEL-PROFILE-SELF-TEST PASS six files one hundred twenty-three seals fifty-two inherited modules2112 classes disabled app standby retained broadcast native')
+}
+
 fn resource_lock_entries_fixture() []ServiceQueryEntry {
 	paths := resource_lock_overlay_paths()
 	mut parents := map[string]bool{}
@@ -13973,6 +14288,7 @@ fn self_test() ! {
 	keyguard_policy_profile_self_test()!
 	broadcast_permission_profile_self_test()!
 	secure_settings_profile_self_test()!
+	usage_inactive_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -14063,6 +14379,7 @@ fn self_test() ! {
 	fat_self_test(root + '/keyguard-policy', 'maps-keyguard-policy.tar', keyguard_policy_profile().modules)!
 	fat_self_test(root + '/broadcast-permission', 'maps-broadcast-permission.tar', broadcast_permission_profile().modules)!
 	fat_self_test(root + '/secure-settings', 'maps-secure-settings.tar', secure_settings_profile().modules)!
+	fat_self_test(root + '/usage-inactive', 'maps-usage-inactive.tar', usage_inactive_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -14120,8 +14437,10 @@ fn main() {
 	is_keyguard_policy := os.args.len == 5 && os.args[1] == '--maps-keyguard-policy'
 	is_broadcast_permission := os.args.len == 5 && os.args[1] == '--maps-broadcast-permission'
 	is_secure_settings := os.args.len == 5 && os.args[1] == '--maps-secure-settings'
+	is_usage_inactive := os.args.len == 5 && os.args[1] == '--maps-usage-inactive'
 	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display || is_asset_locales || is_unmanaged_queries || is_stats_unavailable || is_subscription_service
-	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings {
+	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings && !is_usage_inactive {
+		eprintln('       patch-kernel --maps-usage-inactive FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-secure-settings FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-broadcast-permission FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-keyguard-policy FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
@@ -14129,7 +14448,7 @@ fn main() {
 		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display|--maps-asset-locales|--maps-unmanaged-queries|--maps-stats-unavailable|--maps-subscription-service] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings { 1 } else { 0 }
+	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings || is_usage_inactive { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -14140,7 +14459,7 @@ fn main() {
 	}
 	profile := if is_seed_companion { seed_companion_profile() } else if is_broker_tail { broker_tail_profile() } else if is_window_system_ui { window_system_ui_profile() } else if is_imageview_bounds { imageview_bounds_profile() } else if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	selected_profile := if is_subscription_service { subscription_service_profile() } else if is_stats_unavailable { stats_unavailable_profile() } else if is_unmanaged_queries { unmanaged_queries_profile() } else if is_asset_locales { asset_locales_profile() } else if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
-	final_profile := if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
+	final_profile := if is_usage_inactive { usage_inactive_profile() } else if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
 	patch(root, build_root, os.args[3 + offset], final_profile) or {
 		eprintln(err)
 		exit(1)
