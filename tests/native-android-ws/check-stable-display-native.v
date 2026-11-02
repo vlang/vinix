@@ -91,6 +91,8 @@ fn main() {
 }
 
 const stable_probe = r'
+#include <alloca.h>
+fn C.alloca(usize) voidptr
 union Value {
 mut:
  l voidptr

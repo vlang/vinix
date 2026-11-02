@@ -72,7 +72,9 @@ fn ws_stable_display_size(e voidptr) voidptr {
 		defer { Drop(slot(e, 23))(e, c) }
 		init := Member(slot(e, 33))(e, c, c'<init>', c'(II)V')
 		if init == nil || pending(e) { return nil }
-		args := [Value{i: width}, Value{i: height}]!
-		return ObjectCall(slot(e, 30))(e, c, init, &args[0])
+		args := &Value(C.alloca(2 * sizeof(Value)))
+		args[0] = Value{i: width}
+		args[1] = Value{i: height}
+		return ObjectCall(slot(e, 30))(e, c, init, args)
 	}
 }
