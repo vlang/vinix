@@ -1605,6 +1605,151 @@ fn intent_extras_profile() NarrowProfile {
  }
 }
 
+fn pending_intent_existing_methods() []string {
+ return ['<clinit>()V',
+  'getActivities(Landroid/content/Context;I[Landroid/content/Intent;ILandroid/os/Bundle;)Landroid/app/PendingIntent;',
+  'getActivity(Landroid/content/Context;ILandroid/content/Intent;I)Landroid/app/PendingIntent;',
+  'getService(Landroid/content/Context;ILandroid/content/Intent;I)Landroid/app/PendingIntent;',
+  'getForegroundService(Landroid/content/Context;ILandroid/content/Intent;I)Landroid/app/PendingIntent;',
+  'getBroadcast(Landroid/content/Context;ILandroid/content/Intent;I)Landroid/app/PendingIntent;',
+  'cancel()V', 'send()V', 'send(Landroid/content/Context;ILandroid/content/Intent;)V',
+  'getCreatorPackage()Ljava/lang/String;', 'getCreatorUid()I', 'toString()Ljava/lang/String;']
+}
+
+fn pending_intent_helper_headers() map[string]string {
+ return {
+  'vinixCopyIntents(Landroid/content/Intent;[Landroid/content/Intent;)[Landroid/content/Intent;': 'private static'
+  'vinixGet(Landroid/content/Context;ILandroid/content/Intent;[Landroid/content/Intent;II)Landroid/app/PendingIntent;': 'private static'
+  'vinixCreatorContext(Landroid/content/Context;)Landroid/content/Context;': 'private static'
+  'vinixCancel(Landroid/app/PendingIntent;)V': 'private static'
+  'vinixPrepare(Landroid/app/PendingIntent;Landroid/content/Intent;)[Landroid/content/Intent;': 'private static'
+  'vinixDispatch(Landroid/app/PendingIntent;[Landroid/content/Intent;)V': 'private static'
+  'vinixFillIn(Landroid/content/Intent;Landroid/content/Intent;I)V': 'private static'
+ }
+}
+
+fn pending_intent_fields() []string {
+ return ['.field private static final vinixOperations:Ljava/util/ArrayList;',
+  '.field private vinixCreator:Landroid/content/Context;',
+  '.field private vinixCreatorPackage:Ljava/lang/String;', '.field private vinixCreatorUid:I',
+  '.field private vinixFlags:I', '.field private vinixIntents:[Landroid/content/Intent;',
+  '.field private vinixKey:Landroid/content/Intent;']
+}
+
+fn pending_intent_profile() NarrowProfile {
+ pending := 'android/app/PendingIntent.smali'
+ mut helpers := pending_intent_helper_headers().keys()
+ helpers.sort()
+ mut allowed := pending_intent_existing_methods()
+ allowed << helpers
+ return NarrowProfile{
+  name: 'pending-intent'
+  baseline_name: 'combined-account-webview-intent-extras-framework-2026-11-01-r2'
+  manifest_pin: 'bef486d060754858d51612b9c4bb8a24f7c2fdf8f37cc3565101e24a049bf52f'
+  jar_pin: '02aefc8136cb87eb8e9ebd0928cb15f3e1c2042e47d2a687170a0f9309ac4b20'
+  baseline_classes: 2108
+  providers: ['framework_pending_intent_successor.v']
+  directory_provider: 'framework_pending_intent_successor'
+  methods: {pending: allowed}
+  changed: {pending: 12}
+  added: {pending: 7}
+  fields: {pending: pending_intent_fields()}
+ }
+}
+
+fn pending_intent_abi(source string) ! {
+ parts := store_parts(source)!
+ mut headers := pending_intent_helper_headers()
+ for signature in pending_intent_existing_methods() {
+  headers[signature] = if signature == '<clinit>()V' { 'static constructor' }
+   else if signature.starts_with('getActivit') || signature.starts_with('getService(')
+    || signature.starts_with('getForegroundService(') || signature.starts_with('getBroadcast(') { 'public static' }
+   else { 'public' }
+ }
+ for signature, flags in headers {
+  method := parts.methods[signature] or { return error('missing PendingIntent operation member: ' + signature) }
+  if method.all_before('\n').trim_space() != '.method ' + flags + ' ' + signature {
+   return error('unexpected PendingIntent operation ABI or monitor boundary: ' + signature)
+  }
+ }
+}
+
+fn pending_intent_self_test() ! {
+ profile := pending_intent_profile()
+ pending := 'android/app/PendingIntent.smali'
+ mut helpers := pending_intent_helper_headers().keys()
+ helpers.sort()
+ mut allowed := pending_intent_existing_methods()
+ allowed << helpers
+ if profile.name != 'pending-intent' || profile.baseline_classes != 2108
+  || profile.baseline_name != 'combined-account-webview-intent-extras-framework-2026-11-01-r2'
+  || profile.manifest_pin != 'bef486d060754858d51612b9c4bb8a24f7c2fdf8f37cc3565101e24a049bf52f'
+  || profile.jar_pin != '02aefc8136cb87eb8e9ebd0928cb15f3e1c2042e47d2a687170a0f9309ac4b20'
+  || profile.methods != {pending: allowed} || allowed.len != 19
+  || pending_intent_existing_methods().len != 12 || helpers.len != 7
+  || profile.changed != {pending: 12} || profile.added != {pending: 7}
+  || profile.providers != ['framework_pending_intent_successor.v']
+  || profile.directory_provider != 'framework_pending_intent_successor'
+  || profile.fields != {pending: pending_intent_fields()} || pending_intent_fields().len != 7
+  || profile.calls.len != 0 || profile.extra_classes.len != 0 || profile.class_provider != '' {
+  return error('PendingIntent profile requires exactly one retained class with twelve replacements and seven private helpers/fields')
+ }
+ narrow_method_self_test(allowed, 12, 7)!
+ metadata := '.class public Landroid/app/PendingIntent;\n.super Ljava/lang/Object;\n.field private retained:I\n'
+ unrelated := '.method public retained()V\n.locals 0\nreturn-void\n.end method\n'
+ mut before := metadata + unrelated
+ mut after := metadata + pending_intent_fields().join('\n') + '\n' + unrelated
+ mut headers := pending_intent_helper_headers()
+ for signature in pending_intent_existing_methods() {
+  headers[signature] = if signature == '<clinit>()V' { 'static constructor' }
+   else if signature.starts_with('getActivit') || signature.starts_with('getService(')
+    || signature.starts_with('getForegroundService(') || signature.starts_with('getBroadcast(') { 'public static' }
+   else { 'public' }
+ }
+ for signature in allowed {
+  method := '.method ' + headers[signature]! + ' ' + signature + '\n.locals 1\nreturn-void\n.end method\n'
+  if signature in pending_intent_existing_methods() { before += method }
+  after += method.replace('.locals 1', '.locals 2')
+ }
+ narrow_member_delta(before, after, allowed, 12, 7, pending_intent_fields())!
+ pending_intent_abi(after)!
+ for bad in [after.replace('.field private vinixFlags:I', '.field public vinixFlags:I'),
+  after.replace('.field private vinixKey:Landroid/content/Intent;', ''),
+  after + '\n.field private unrelated:I\n',
+  after.replace('.field private retained:I', '.field public retained:I'),
+  after.replace('.method public retained()V', '.method private retained()V'),
+  after + unrelated] {
+  narrow_member_delta(before, bad, allowed, 12, 7, pending_intent_fields()) or { continue }
+  return error('PendingIntent metadata, retained member, duplicate or extra field mutation accepted')
+ }
+ for signature, flags in headers {
+  marker := '.method ' + flags + ' ' + signature
+  for replacement in ['.method public ' + signature, '.method private native ' + signature,
+   '.method public static final ' + signature] {
+   if marker == replacement { continue }
+   pending_intent_abi(after.replace(marker, replacement)) or { continue }
+   return error('PendingIntent method visibility/static/monitor mutation accepted')
+  }
+ }
+ mut old := {pending: 'old'}
+ for i in 0 .. 2107 { old['other/' + i.str() + '.smali'] = 'same' }
+ mut good := old.clone()
+ good[pending] = 'new'
+ narrow_profile_class_delta(old, good, [pending], []string{}, 2108)!
+ for case in 0 .. 5 {
+  mut bad := good.clone()
+  match case {
+   0 { bad[pending] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(pending) }
+   3 { bad['unrelated.smali'] = 'new' }
+   else { bad.delete(pending); bad['substituted.smali'] = 'new' }
+  }
+  narrow_profile_class_delta(old, bad, [pending], []string{}, 2108) or { continue }
+  return error('invalid PendingIntent-only class scope accepted')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -2536,6 +2681,7 @@ fn self_test() ! {
  paint_drawable_self_test()!
  dialog_theme_self_test()!
  intent_extras_self_test()!
+ pending_intent_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -2823,6 +2969,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'resources-float' { resources_float_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'dialog-theme' { dialog_theme_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'intent-extras' { intent_extras_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!)! }
+  if profile.name == 'pending-intent' { pending_intent_abi(os.read_file(root + '/smali/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -2866,6 +3013,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'resources-float' { resources_float_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'dialog-theme' { dialog_theme_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'intent-extras' { intent_extras_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!)! }
+  if profile.name == 'pending-intent' { pending_intent_abi(os.read_file(root + '/new-dex/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -3192,11 +3340,15 @@ fn main() {
   build_narrow(intent_extras_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--pending-intent' {
+  build_narrow(pending_intent_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
