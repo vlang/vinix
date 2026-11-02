@@ -579,6 +579,21 @@ const resource_lock_old_generated = '256807c4a8ff63a2e86cd726bf9782ac93ffa1a6b22
 const resource_lock_generated = '399511deb701154341664fda6927ee3935df8df599f65d794b463514f998b123'
 const resource_lock_old_c = 'b6f64efd407923433f2a0591f3a0cd6147a3da4372b93c3c9b091d3d912e3154'
 const resource_lock_c = 'e942097c854a4a1799c3c5abbd0889afce063f92e1c7008c0a3011ec3de0087c'
+const pending_intent_base = '/Users/alex/.local/state/vinix/android/maps-resource-lock-r1'
+const pending_intent_base_seal = 'd4dcdfa033e7e0fa21a634cae6087e95deedbbee4c4936d6be4b7af69f4d5171'
+const pending_intent_boot = 'e2b63e88a7c69703c87de688b793a4eaf2b028cd362db53142b3539b49e8e992'
+const pending_intent_base_overlay = 'cb5116865dfe41c40e880e8c8982d648871bc3e92db06f80d7419778a9ad0c28'
+const pending_intent_old_deployment = '27bc48db609e14c1ece4fda3cb2600dae2fba6306ba04c53cc5a9162ce86b705'
+const pending_intent_old_headless = 'c8c03c78c49b8b30984fc2e6ee40999d0c9cc99301bb238a39641b66750bea14'
+const pending_intent_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-pending-intent-framework-2026-11-02-r1'
+const pending_intent_seal = '8717d3d489e9f86b8c96d2689c7ec6811bc7c80fbade0e35f64e9e84014f7c36'
+const pending_intent_build = '28fe376e0e1bcc4106b699feab10ef232cc6e1c31a0bc9a525df567df9903a34'
+const pending_intent_jar = 'bc82567de6d8abd6a4084c68e0e4c698df12d2c7848c7d23b6af7e5d0e6df7cc'
+const pending_intent_dex = '649b148986fd95d7d42789e02170b4fdb59f7974a6fc5341631e3940b8e0531d'
+const pending_intent_framework_helper = 'f4756de6c6d4cd9fa3cbb1bc4a9350d45e3fba272377d6fed125e5a3e280b44f'
+const pending_intent_provider_helper = '7f0d36643ca45c4820b54df76d8762eb9c16ff1ba5a9288914d7297995fd5ea2'
+const pending_intent_raw = 'c71a0c7525e430ec0a492c5f03f290ef753065bd378974d680e8b1db17bf08d4'
+const pending_intent_canonical = 'a4692e2521f22789d2f785c5aa83413ccb708eff97a5ae213664bd10f800b93e'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -4779,6 +4794,149 @@ fn resource_lock_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return resource_lock_base + '/boot.img'
 }
 
+fn pending_intent_profile() Profile {
+	mut modules := resource_lock_profile().modules.clone()
+	modules << 'maps-resource-lock.tar'
+	return Profile{'maps-pending-intent', pending_intent_boot, 'maps-pending-intent.tar', modules}
+}
+fn pending_intent_modules() map[string]string {
+	mut modules := resource_lock_modules()
+	modules['maps-resource-lock.tar'] = pending_intent_base_overlay
+	return modules
+}
+fn pending_intent_fields() map[string]string {
+	mut fields := resource_lock_fields()
+	fields.delete('retained_native_framework_manifest_sha256')
+	fields['kind'] = 'vinix-maps-pending-intent-v1'
+	fields['base_root'] = pending_intent_base
+	fields['base_manifest_sha256'] = pending_intent_base_seal
+	fields['framework_build_root'] = pending_intent_framework
+	fields['framework_manifest_sha256'] = pending_intent_seal
+	fields['framework_jar_sha256'] = pending_intent_jar
+	fields['framework_dex_sha256'] = pending_intent_dex
+	fields['retained_native_manifest_sha256'] = resource_lock_native_seal
+	return fields
+}
+fn pending_intent_inputs() map[string]string {
+	mut inputs := resource_lock_inputs()
+	inputs[pending_intent_base + '/sha256.json'] = pending_intent_base_seal
+	inputs[pending_intent_framework + '/sha256.json'] = pending_intent_seal
+	return inputs
+}
+fn pending_intent_known_delta() map[string]string {
+	return {'/' + service_query_jar_path: pending_intent_jar,
+		'/' + service_query_dex_path: pending_intent_dex,
+		'/' + service_query_headless + '/framework-build.json': pending_intent_build,
+		'/' + service_query_headless + '/framework-sha256.json': pending_intent_seal}
+}
+fn pending_intent_source_delta() map[string]string {
+	return {'smali/android/app/PendingIntent.smali': pending_intent_raw}
+}
+fn pending_intent_canonical_delta() map[string]string {
+	return {'new-dex/android/app/PendingIntent.smali': pending_intent_canonical}
+}
+fn pending_intent_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework.v': pending_intent_framework_helper,
+		'tests/native-android-tools/androidtools/framework_pending_intent_successor.v': pending_intent_provider_helper}
+}
+fn pending_intent_added_fields() map[string][]string {
+	return {'android/app/PendingIntent.smali': [
+		'.field private static final vinixOperations:Ljava/util/ArrayList;',
+		'.field private vinixCreator:Landroid/content/Context;',
+		'.field private vinixCreatorPackage:Ljava/lang/String;', '.field private vinixCreatorUid:I',
+		'.field private vinixFlags:I', '.field private vinixIntents:[Landroid/content/Intent;',
+		'.field private vinixKey:Landroid/content/Intent;']}
+}
+fn pending_intent_proofs() map[string]string {
+	return {
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: pending_intent_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256'])
+		'framework_source_delta': json2.encode(pending_intent_source_delta())
+		'framework_canonical_delta': json2.encode(pending_intent_canonical_delta())
+		'framework_builder_helper_delta': json2.encode(pending_intent_helper_delta())
+		'framework_class_count': json2.encode(2108)
+		'framework_changed_method_counts': json2.encode({'android/app/PendingIntent.smali': 12})
+		'framework_added_method_counts': json2.encode({'android/app/PendingIntent.smali': 7})
+		'framework_added_fields': json2.encode(pending_intent_added_fields())
+		'framework_added_classes': json2.encode([]string{})
+		'native_source_delta': json2.encode(map[string]string{})
+		'native_builder_helper_delta': json2.encode(map[string]string{})
+		'native_bindings_delta': json2.encode(map[string][]string{})
+		'native_generated_jni_delta': json2.encode(map[string][]string{})
+		'native_c_delta': json2.encode(map[string][]string{})
+		'native_consumed_class_count': json2.encode(69)
+		'native_export_count': json2.encode(719)
+		'native_consumed_raw_delta': json2.encode(map[string][]string{})
+		'native_consumed_canonical_delta': json2.encode(map[string][]string{})
+		'native_consumed_raw_additions': json2.encode(map[string]string{})
+		'native_consumed_canonical_additions': json2.encode(map[string]string{})
+	}
+}
+fn pending_intent_overlay_paths() []string {
+	return intent_extras_overlay_paths()
+}
+fn verify_pending_intent_overlay(receipt map[string]json2.Any) ! {
+	for name in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		if name in receipt { return error('PendingIntent may only replace existing framework inputs') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('PendingIntent deployment delta absent') }))!
+	mut expected := pending_intent_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('PendingIntent headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == pending_intent_old_headless { return error('new PendingIntent headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('PendingIntent exact five deployment input changes differ') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('PendingIntent overlay inventory absent') }))!
+	paths := pending_intent_overlay_paths()
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe PendingIntent overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != 0o644 { return error('PendingIntent regular allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected PendingIntent overlay inode') }
+	}
+	if regulars.len != 6 || regulars[service_query_deployment] or { '' } == pending_intent_old_deployment { return error('exact six PendingIntent files required') }
+	for path, pin in expected { if regulars[path.trim_left('/')] or { '' } != pin { return error('PendingIntent input differs from inventory') } }
+}
+fn verify_pending_intent_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [pending_intent_base_seal, pending_intent_boot, pending_intent_base_overlay,
+		pending_intent_old_deployment, pending_intent_old_headless, pending_intent_seal,
+		pending_intent_build, pending_intent_jar, pending_intent_dex,
+		resource_lock_native_seal, resource_lock_native_build, resource_lock_native_pin,
+		resource_lock_native_framework, resource_lock_generated, resource_lock_c] {
+		if !digest_valid(pin) { return error('completed PendingIntent SDK and retained native producer required') }
+	}
+	for values in [pending_intent_source_delta(), pending_intent_canonical_delta(), pending_intent_helper_delta()] {
+		for _, pin in values { if !digest_valid(pin) { return error('completed PendingIntent class/helper pins required') } }
+	}
+	if pending_intent_seal == intent_extras_seal || pending_intent_jar == intent_extras_jar || pending_intent_dex == intent_extras_dex { return error('new PendingIntent framework required') }
+	for name, expected in pending_intent_fields() { if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('PendingIntent receipt differs: ' + name) } }
+	for name, expected in pending_intent_proofs() { if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](expected)! { return error('PendingIntent proof differs: ' + name) } }
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 100 || seals != pending_intent_inputs() { return error('PendingIntent exact one hundred dependency seals differ') }
+	for path in stage.inputs_sha256.keys() {
+		for root in [dialog_theme_relink_root(), resources_float_relink_root(), layout_alignment_relink_root(), window_animations_relink_root()] {
+			if path == root || path.starts_with(root + '/') { return error('historical relink leaves are not new PendingIntent direct inputs') }
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != pending_intent_modules() || stage.preserved_modules_sha256 != pending_intent_modules() { return error('PendingIntent original forty-two modules differ') }
+	verify_pending_intent_overlay(receipt)!
+}
+fn pending_intent_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_pending_intent_receipt(receipt, stage)!
+	path := pending_intent_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != pending_intent_base_seal { return error('PendingIntent original resource-lock manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != pending_intent_boot || pins['maps-resource-lock.tar'] or { '' } != pending_intent_base_overlay { return error('PendingIntent original boot or resource-lock overlay differs') }
+	return pending_intent_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -5415,6 +5573,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = intent_extras_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-resource-lock' {
 		baseline = resource_lock_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-pending-intent' {
+		baseline = pending_intent_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -10347,6 +10507,170 @@ fn intent_extras_profile_self_test() ! {
 	println('MAPS-INTENT-EXTRAS KERNEL-PROFILE-SELF-TEST PASS six files ninety-six seals forty inherited modules two Intent methods reused native with original Dialog provenance and historical rejection')
 }
 
+fn pending_intent_entries_fixture() []ServiceQueryEntry {
+	paths := pending_intent_overlay_paths()
+	mut parents := map[string]bool{}
+	for path in paths {
+		mut parent := os.dir(path)
+		for parent !in ['', '.'] { parents[parent] = true; parent = os.dir(parent) }
+	}
+	mut entries := []ServiceQueryEntry{}
+	for name in parents.keys().sorted() { entries << ServiceQueryEntry{name: name, kind: 'directory', mode: 0o755} }
+	mut pins := pending_intent_known_delta()
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	pins['/' + service_query_deployment] = 'b'.repeat(64)
+	for path in paths { entries << ServiceQueryEntry{name: path, kind: 'regular', mode: 0o644, sha256: pins['/' + path]!} }
+	return entries
+}
+fn pending_intent_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in pending_intent_fields() { receipt[name] = json2.Any(value) }
+	for name, value in pending_intent_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	mut delta := pending_intent_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(pending_intent_entries_fixture()))!
+	return receipt
+}
+fn pending_intent_profile_self_test() ! {
+	profile := pending_intent_profile()
+	if profile.baseline_sha != pending_intent_boot || profile.modules.len != 42 || profile.modules.last() != 'maps-resource-lock.tar'
+		|| pending_intent_inputs().len != 100 || pending_intent_inputs().keys().filter(it.ends_with('/sha256.json')).len != 100 { return error('PendingIntent strict Java-only profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 43 || pending_intent_overlay_paths().len != 6 || pending_intent_known_delta().len != 4 { return error('PendingIntent exact modules, files or changes differ') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', modules.reverse()}, Config{'vinix', profile.modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('wrong PendingIntent module order accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: pending_intent_inputs(), original_modules_sha256: pending_intent_modules(), preserved_modules_sha256: pending_intent_modules()}
+	receipt := pending_intent_receipt_fixture()!
+	verify_pending_intent_receipt(receipt, stage)!
+	mut fields := pending_intent_fields().keys()
+	fields << pending_intent_proofs().keys()
+	fields << ['deployment_input_delta', 'overlay_inventory']
+	for name in fields {
+		mut bad := pending_intent_receipt_fixture()!
+		bad[name] = json2.Any('changed')
+		if _ := verify_pending_intent_receipt(bad, stage) { return error('changed PendingIntent field/proof accepted') }
+		bad.delete(name)
+		if _ := verify_pending_intent_receipt(bad, stage) { return error('missing PendingIntent field/proof accepted') }
+	}
+	for proof in ['framework_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta',
+		'framework_changed_method_counts', 'framework_added_method_counts', 'framework_added_fields',
+		'native_source_delta', 'native_builder_helper_delta', 'native_bindings_delta', 'native_generated_jni_delta',
+		'native_c_delta', 'native_consumed_raw_delta', 'native_consumed_canonical_delta',
+		'native_consumed_raw_additions', 'native_consumed_canonical_additions', 'headless_input_delta'] {
+		original := json2.decode[map[string]json2.Any](json2.encode(receipt[proof]!))!
+		for name in original.keys() {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(original))!
+			changed[name] = json2.Any('changed')
+			mut bad := pending_intent_receipt_fixture()!
+			bad[proof] = json2.Any(changed)
+			if _ := verify_pending_intent_receipt(bad, stage) { return error('changed PendingIntent proof member accepted') }
+			changed.delete(name)
+			bad[proof] = json2.Any(changed)
+			if _ := verify_pending_intent_receipt(bad, stage) { return error('missing PendingIntent proof member accepted') }
+		}
+		mut extra := json2.decode[map[string]json2.Any](json2.encode(original))!
+		extra['unreviewed'] = json2.Any('a'.repeat(64))
+		mut bad := pending_intent_receipt_fixture()!
+		bad[proof] = json2.Any(extra)
+		if _ := verify_pending_intent_receipt(bad, stage) { return error('extra PendingIntent proof member accepted') }
+	}
+	for field in ['native_framework_manifest_sha256', 'native_compatibility_framework_manifest_sha256', 'retained_framework_manifest_sha256'] {
+		for wrong in [pending_intent_seal, dialog_theme_seal] {
+			mut bad := pending_intent_receipt_fixture()!
+			bad[field] = json2.Any(wrong)
+			if _ := verify_pending_intent_receipt(bad, stage) { return error('PendingIntent original Intent SDK provenance replaced') }
+		}
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := pending_intent_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_pending_intent_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed PendingIntent input accepted') }
+		pins.delete(path)
+		if _ := verify_pending_intent_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing PendingIntent input accepted') }
+	}
+	for path in ['/unreviewed/sha256.json', dialog_theme_relink_root(), resources_float_relink_root(),
+		layout_alignment_relink_root(), window_animations_relink_root(), dialog_theme_relink_root() + '/out/canonical.so'] {
+		mut pins := pending_intent_inputs()
+		pins[path] = 'a'.repeat(64)
+		if _ := verify_pending_intent_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('extra PendingIntent seal or historical proof leaf accepted') }
+	}
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: resource_lock_modules()}, Stage{...stage, preserved_modules_sha256: resource_lock_modules()}] {
+		if _ := verify_pending_intent_receipt(receipt, bad) { return error('wrong PendingIntent module inventory accepted') }
+	}
+	for addition in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		mut bad := pending_intent_receipt_fixture()!
+		bad[addition] = json2.Any(map[string]json2.Any{})
+		if _ := verify_pending_intent_receipt(bad, stage) { return error('PendingIntent addition or relink proof accepted') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta']!))!
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := pending_intent_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_pending_intent_receipt(bad, stage) { return error('missing PendingIntent actual input change accepted') }
+	}
+	for path, pin in {'/opt/vinix-maps-account/bin/maps-account-guest': seed_companion_controller_pin, '/' + native_onboarding_trace_path: resource_lock_native_pin} {
+		mut changed := delta.clone()
+		changed[path] = pin
+		mut bad := pending_intent_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_pending_intent_receipt(bad, stage) { return error('unrelated PendingIntent deployment input change accepted') }
+	}
+	entries := pending_intent_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := pending_intent_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_pending_intent_receipt(bad, stage) { return error('unsafe PendingIntent overlay inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := pending_intent_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_pending_intent_receipt(bad, stage) { return error('missing PendingIntent overlay file accepted') }
+			if entry.name != service_query_deployment {
+				bad_entries = entries.clone()
+				bad_entries[index] = ServiceQueryEntry{...entry, sha256: '0'.repeat(64)}
+				bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+				if _ := verify_pending_intent_receipt(bad, stage) { return error('changed PendingIntent overlay pin accepted') }
+			}
+		}
+	}
+	for extra in [entries.last(), ServiceQueryEntry{name: native_onboarding_trace_path, kind: 'regular', mode: 0o755, sha256: resource_lock_native_pin}] {
+		mut changed := entries.clone()
+		changed << extra
+		mut bad := pending_intent_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_pending_intent_receipt(bad, stage) { return error('duplicate or native PendingIntent overlay file accepted') }
+	}
+	for stale_path, stale_pin in {service_query_headless + '/guest-inputs.json': pending_intent_old_headless, service_query_deployment: pending_intent_old_deployment} {
+		mut changed := entries.clone()
+		for index, entry in changed { if entry.name == stale_path { changed[index] = ServiceQueryEntry{...entry, sha256: stale_pin} } }
+		mut bad := pending_intent_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if stale_path != service_query_deployment {
+			mut stale_delta := delta.clone()
+			stale_delta['/' + stale_path] = stale_pin
+			bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(stale_delta))!
+		}
+		if _ := verify_pending_intent_receipt(bad, stage) { return error('stale PendingIntent metadata accepted') }
+	}
+	for old in [resource_lock_receipt_fixture()!, intent_extras_receipt_fixture()!, dialog_theme_receipt_fixture()!] {
+		if _ := verify_pending_intent_receipt(old, stage) { return error('historical receipt accepted by PendingIntent profile') }
+	}
+	if _ := verify_resource_lock_receipt(receipt, stage) { return error('PendingIntent receipt accepted by resource-lock profile') }
+	if _ := verify_intent_extras_receipt(receipt, stage) { return error('PendingIntent receipt accepted by Intent extras profile') }
+	println('MAPS-PENDING-INTENT KERNEL-PROFILE-SELF-TEST PASS six files one hundred seals forty-two inherited modules retained resource-lock native and original Intent SDK provenance')
+}
+
 fn resource_lock_entries_fixture() []ServiceQueryEntry {
 	paths := resource_lock_overlay_paths()
 	mut parents := map[string]bool{}
@@ -10542,6 +10866,7 @@ fn self_test() ! {
 	dialog_theme_profile_self_test()!
 	intent_extras_profile_self_test()!
 	resource_lock_profile_self_test()!
+	pending_intent_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -10622,6 +10947,7 @@ fn self_test() ! {
 	fat_self_test(root + '/dialog-theme', 'maps-dialog-theme.tar', dialog_theme_profile().modules)!
 	fat_self_test(root + '/intent-extras', 'maps-intent-extras.tar', intent_extras_profile().modules)!
 	fat_self_test(root + '/resource-lock', 'maps-resource-lock.tar', resource_lock_profile().modules)!
+	fat_self_test(root + '/pending-intent', 'maps-pending-intent.tar', pending_intent_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -10669,9 +10995,10 @@ fn main() {
 	is_dialog_theme := os.args.len == 5 && os.args[1] == '--maps-dialog-theme'
 	is_intent_extras := os.args.len == 5 && os.args[1] == '--maps-intent-extras'
 	is_resource_lock := os.args.len == 5 && os.args[1] == '--maps-resource-lock'
-	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock
+	is_pending_intent := os.args.len == 5 && os.args[1] == '--maps-pending-intent'
+	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent
 	if os.args.len != 4 && !is_selected {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
 	offset := if is_selected { 1 } else { 0 }
@@ -10684,7 +11011,7 @@ fn main() {
 		exit(1)
 	}
 	profile := if is_seed_companion { seed_companion_profile() } else if is_broker_tail { broker_tail_profile() } else if is_window_system_ui { window_system_ui_profile() } else if is_imageview_bounds { imageview_bounds_profile() } else if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
-	selected_profile := if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
+	selected_profile := if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
 	patch(root, build_root, os.args[3 + offset], selected_profile) or {
 		eprintln(err)
 		exit(1)
