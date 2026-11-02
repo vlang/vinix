@@ -188,6 +188,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_broadcast_permission(smali)!
  framework_settings_secure(smali)!
  framework_quick_settings(smali)!
+ framework_usage_inactive(smali)!
  framework_assemble(smali, work + '/classes.dex', tools, java)!
  next := work + '/api-impl.jar'
  os.cp(input, next)!
