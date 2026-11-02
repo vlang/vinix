@@ -4021,6 +4021,187 @@ fn event_log_self_test() ! {
  }
 }
 
+fn build_abis_profile() NarrowProfile {
+ build_class := 'android/os/Build.smali'
+ properties := 'android/os/SystemProperties.smali'
+ return NarrowProfile{
+  name: 'build-abis'
+  baseline_name: 'combined-account-webview-event-log-framework-2026-11-02-r1'
+  manifest_pin: '56adef59b9210f72117709c26c5e008503379586407c70ab00297c32a70f5670'
+  jar_pin: '0a331f5595b4b6c1298dd0e944389cbeabe2b93f6e02e536c4d26d5d200967ad'
+  baseline_classes: 2117
+  providers: ['framework_build_abis.v']
+  calls: {build_class: 'framework_build_abis_source', properties: 'framework_build_abi_properties_source'}
+  methods: {build_class: ['<clinit>()V', 'getStringList(Ljava/lang/String;Ljava/lang/String;)[Ljava/lang/String;'],
+   properties: ['<clinit>()V']}
+  changed: {build_class: 1, properties: 1}
+  added: {build_class: 1, properties: 0}
+  fields: {build_class: ['.field public static final SUPPORTED_64_BIT_ABIS:[Ljava/lang/String;',
+   '.field public static final SUPPORTED_32_BIT_ABIS:[Ljava/lang/String;']}
+ }
+}
+
+fn build_abis_list_helper() string {
+ return messenger_binder_m('private static getStringList(Ljava/lang/String;Ljava/lang/String;)[Ljava/lang/String;', 4,
+  'const-string v0, ""
+invoke-static {p0, v0}, Landroid/os/SystemProperties;->get(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+move-result-object v0
+invoke-virtual {v0}, Ljava/lang/String;->isEmpty()Z
+move-result v1
+if-eqz v1, :split
+const/4 v0, 0x0
+new-array v0, v0, [Ljava/lang/String;
+return-object v0
+:split
+invoke-virtual {v0, p1}, Ljava/lang/String;->split(Ljava/lang/String;)[Ljava/lang/String;
+move-result-object v0
+return-object v0')
+}
+
+fn build_abis_anchor(target string) !string {
+ return match target {
+  'android/os/Build.smali' { 'sput-object v0, Landroid/os/Build;->SUPPORTED_ABIS:[Ljava/lang/String;' }
+  'android/os/SystemProperties.smali' {
+   'const-string v1, "ro.product.cpu.abilist"\nconst-string v2, "arm64-v8a"\ninvoke-virtual {v0, v1, v2}, Ljava/util/Properties;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;'
+  }
+  else { return error('unexpected Build ABI target') }
+ }
+}
+
+fn build_abis_insertion(target string) !string {
+ return match target {
+  'android/os/Build.smali' {
+   'const-string v0, "ro.product.cpu.abilist64"
+const-string v1, ","
+invoke-static {v0, v1}, Landroid/os/Build;->getStringList(Ljava/lang/String;Ljava/lang/String;)[Ljava/lang/String;
+move-result-object v0
+sput-object v0, Landroid/os/Build;->SUPPORTED_64_BIT_ABIS:[Ljava/lang/String;
+const-string v0, "ro.product.cpu.abilist32"
+const-string v1, ","
+invoke-static {v0, v1}, Landroid/os/Build;->getStringList(Ljava/lang/String;Ljava/lang/String;)[Ljava/lang/String;
+move-result-object v0
+sput-object v0, Landroid/os/Build;->SUPPORTED_32_BIT_ABIS:[Ljava/lang/String;'
+  }
+  'android/os/SystemProperties.smali' {
+   'const-string v1, "ro.product.cpu.abilist64"
+const-string v2, "arm64-v8a"
+invoke-virtual {v0, v1, v2}, Ljava/util/Properties;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+const-string v1, "ro.product.cpu.abilist32"
+const-string v2, ""
+invoke-virtual {v0, v1, v2}, Ljava/util/Properties;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+const-string v1, "ro.product.cpu.abi2"
+const-string v2, ""
+invoke-virtual {v0, v1, v2}, Ljava/util/Properties;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;'
+  }
+  else { return error('unexpected Build ABI insertion target') }
+ }
+}
+
+fn build_abis_members(old string, new string, target string) ! {
+ before, after := store_parts(old)!, store_parts(new)!
+ original := messenger_binder_lines(before.methods['<clinit>()V'] or { return error('original ABI initializer absent') })
+ updated := after.methods['<clinit>()V'] or { return error('updated ABI initializer absent') }
+ registers := if target == 'android/os/Build.smali' { 4 } else { 3 }
+ anchor := build_abis_anchor(target)!
+ if !original.starts_with('.method static constructor <clinit>()V\n.registers ' + registers.str() + '\n')
+  || original.count(anchor) != 1 || original.contains('ro.product.cpu.abilist64')
+  || original.contains('ro.product.cpu.abilist32') {
+  return error('exact retained ABI initializer and unique insertion point required')
+ }
+ expected := original.replace(anchor, anchor + '\n' + build_abis_insertion(target)!)
+ if intent_extras_method(updated)! != intent_extras_method(expected)! {
+  return error('Build ABI initializer must retain every old instruction and branch around the exact insertion')
+ }
+ if target == 'android/os/Build.smali' {
+  helper := after.methods['getStringList(Ljava/lang/String;Ljava/lang/String;)[Ljava/lang/String;'] or { return error('empty-aware ABI list helper absent') }
+  if intent_extras_method(helper)! != intent_extras_method(build_abis_list_helper())! {
+   return error('ABI list helper requires defaultempty/freshzeroarray/parameterseparator/private-static behavior')
+  }
+ }
+}
+
+fn build_abis_self_test() ! {
+ profile := build_abis_profile()
+ build_class := 'android/os/Build.smali'
+ properties := 'android/os/SystemProperties.smali'
+ helper := 'getStringList(Ljava/lang/String;Ljava/lang/String;)[Ljava/lang/String;'
+ fields := ['.field public static final SUPPORTED_64_BIT_ABIS:[Ljava/lang/String;',
+  '.field public static final SUPPORTED_32_BIT_ABIS:[Ljava/lang/String;']
+ if profile.name != 'build-abis' || profile.baseline_classes != 2117
+  || profile.baseline_name != 'combined-account-webview-event-log-framework-2026-11-02-r1'
+  || profile.manifest_pin != '56adef59b9210f72117709c26c5e008503379586407c70ab00297c32a70f5670'
+  || profile.jar_pin != '0a331f5595b4b6c1298dd0e944389cbeabe2b93f6e02e536c4d26d5d200967ad'
+  || profile.providers != ['framework_build_abis.v']
+  || profile.calls != {build_class: 'framework_build_abis_source', properties: 'framework_build_abi_properties_source'}
+  || profile.methods != {build_class: ['<clinit>()V', helper], properties: ['<clinit>()V']}
+  || profile.changed != {build_class: 1, properties: 1} || profile.added != {build_class: 1, properties: 0}
+  || profile.fields != {build_class: fields} || profile.class_provider != '' || profile.class_providers.len != 0
+  || profile.extra_classes.len != 0 || profile.directory_provider != ''
+  || profile.removed_fields.len != 0 || profile.removed_methods.len != 0 {
+  return error('Build ABI profile requires two narrow initializers, two Build fields and one private helper only')
+ }
+ for target in [build_class, properties] {
+  narrow_method_self_test(profile.methods[target]!, profile.changed[target]!, profile.added[target]!)!
+  metadata := '.class public L' + target.all_before_last('.smali') + ';\n.super Ljava/lang/Object;\n.field private static retained:Ljava/lang/String;\n'
+  retained := '.method public retained()V\n.registers 1\nreturn-void\n.end method\n'
+  registers := if target == build_class { 4 } else { 3 }
+  anchor := build_abis_anchor(target)!
+  body := '.method static constructor <clinit>()V\n.registers ' + registers.str() + '\nconst/4 v0, 0x0\nif-eqz v0, :arm\nreturn-void\n:arm\n' + anchor + '\n:done\nreturn-void\n.end method\n'
+  old := metadata + retained + body
+  mut good := old.replace(body, body.replace(anchor, anchor + '\n' + build_abis_insertion(target)!))
+  if target == build_class { good += fields.join('\n') + '\n' + build_abis_list_helper() + '\n' }
+  build_abis_members(old, good, target)!
+  build_abis_members(old, good.replace(':arm', ':changed_arm').replace(':done', ':changed_done').replace(':split', ':changed_split'), target)!
+  narrow_member_delta(old, good, profile.methods[target]!, profile.changed[target]!, profile.added[target]!, profile.fields[target] or { []string{} })!
+  for bad in [good.replace('ro.product.cpu.abilist64', 'ro.product.cpu.abilist32'),
+   good.replace('if-eqz v0, :arm', 'if-nez v0, :arm'), good.replace('.registers ' + registers.str(), '.registers 8'),
+   good.replace(anchor + '\n', anchor + '\nreturn-void\n'), good.replace('const/4 v0, 0x0', 'const/4 v0, 0x1')] {
+   build_abis_members(old, bad, target) or { continue }
+   return error('ABI initializer property/branch/register/insertion or old-code mutation accepted')
+  }
+  for bad in [good.replace('public retained()V', 'private retained()V'),
+   good.replace('.field private static retained:', '.field public static retained:'),
+   good.replace('.super Ljava/lang/Object;', '.super Lwrong/Base;'), good + retained] {
+   narrow_member_delta(old, bad, profile.methods[target]!, profile.changed[target]!, profile.added[target]!, profile.fields[target] or { []string{} }) or { continue }
+   return error('Build ABI unrelated old member/field/class metadata mutation accepted')
+  }
+  if target == build_class {
+   for bad in [good.replace('private static getStringList', 'public static getStringList'),
+    good.replace('const-string v0, ""', 'const-string v0, "unknown"'),
+    good.replace('if-eqz v1, :split', 'if-nez v1, :split'), good.replace('new-array v0, v0', 'new-array v0, p0'),
+    good.replace('invoke-virtual {v0, p1}', 'invoke-virtual {v0, p0}'),
+    good.replace('SUPPORTED_64_BIT_ABIS:[Ljava/lang/String;', 'SUPPORTED_32_BIT_ABIS:[Ljava/lang/String;')] {
+    build_abis_members(old, bad, target) or { continue }
+    return error('Build ABI helper/empty-list/default/array/field-target mutation accepted')
+   }
+   for bad in [good.replace(fields[0], ''), good.replace('public static final SUPPORTED_32', 'public static SUPPORTED_32'),
+    good.replace(fields[1], '.field public static final SUPPORTED_32_BIT_ABIS:Ljava/lang/String;')] {
+    narrow_member_delta(old, bad, profile.methods[target]!, 1, 1, fields) or { continue }
+    return error('Build ABI array field membership/finality/type mutation accepted')
+   }
+  } else {
+   for bad in [good.replace('const-string v2, ""', 'const-string v2, "armeabi-v7a"'),
+    good.replace('const-string v1, "ro.product.cpu.abi2"', 'const-string v1, "ro.build.version.sdk"'),
+    good.replace('const-string v1, "ro.product.cpu.abilist64"\nconst-string v2, "arm64-v8a"', 'const-string v1, "ro.product.cpu.abilist64"\nconst-string v2, "x86_64"')] {
+    build_abis_members(old, bad, target) or { continue }
+    return error('ARM ABI seeds advertised nonexistent 32-bit support or changed unrelated property')
+   }
+  }
+ }
+ mut before := {build_class: 'old-build', properties: 'old-properties'}
+ for i in 0 .. 2115 { before['other/' + i.str() + '.smali'] = 'same' }
+ mut good := before.clone()
+ good[build_class] = 'new-build'
+ good[properties] = 'new-properties'
+ narrow_profile_class_delta(before, good, [build_class, properties], []string{}, 2117)!
+ for target in [build_class, properties, 'other/0.smali'] {
+  mut bad := good.clone()
+  bad[target] = if target == 'other/0.smali' { 'changed' } else { before[target]! }
+  narrow_profile_class_delta(before, bad, [build_class, properties], []string{}, 2117) or { continue }
+  return error('Build ABI exact two-class scope mutation accepted')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -4966,6 +5147,7 @@ fn self_test() ! {
  messenger_binder_self_test()!
  component_parcel_self_test()!
  event_log_self_test()!
+ build_abis_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -5293,6 +5475,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'secure-settings' { secure_settings_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'usage-inactive' { usage_inactive_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'component-parcel' { component_parcel_abi(os.read_file(root + '/smali/' + target)!)! }
+  if profile.name == 'build-abis' { build_abis_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -5362,6 +5545,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'secure-settings' { secure_settings_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'usage-inactive' { usage_inactive_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'component-parcel' { component_parcel_abi(os.read_file(root + '/new-dex/' + target)!)! }
+  if profile.name == 'build-abis' { build_abis_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -5758,11 +5942,15 @@ fn main() {
   build_narrow(event_log_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--build-abis' {
+  build_narrow(build_abis_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder|--component-parcel|--event-log] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder|--component-parcel|--event-log|--build-abis] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
