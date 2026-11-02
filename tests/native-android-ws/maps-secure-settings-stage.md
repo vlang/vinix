@@ -67,3 +67,16 @@ The source base before this tool commit is
 `749cb77becbf8bf0750f857b8bc98519c41a4844`. Media preparation follows tool
 qualification. This report claims no ARM, account, checkin or current imagery
 result.
+
+The automatic preparation then passed in 299,036 ms with all 52 module readbacks
+and complete input rechecks. The closed `maps-secure-settings-r1` manifest is
+`f5583243199173123a39498c8e461c139c7bd8878283f763613d0f98bf1f7cde`,
+produced from tool commit `7709582881d68854fd5fb7e23557aa4a33f92d99`.
+Controls are at `maps-secure-settings-preparation-2026-11-02-r1` under the same
+external state directory. Guard and child exited zero, cleanup complete; sampled
+aggregate RSS peaked at 92,749,824 bytes, detailed RSS at 91,504,640 bytes, with
+zero swaps. Observed outer growth was 79,978,496 bytes and internal charged growth
+122,384,384 bytes; minimum free space was 10,737,541,120 bytes. The unchanged
+4 GiB outer / 512 MiB internal growth ceilings, 600 MiB RSS, 900-second deadline
+and 1 GiB reserve held. Clone, kernel installation and live ARM validation follow
+in the parent task.
