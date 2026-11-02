@@ -2549,6 +2549,269 @@ fn keyguard_policy_self_test() ! {
  }
 }
 
+fn broadcast_permission_profile() NarrowProfile {
+ context := 'android/content/Context.smali'
+ loaded := 'android/atl/ATLLoadedApp.smali'
+ return NarrowProfile{
+  name: 'broadcast-permission'
+  baseline_name: 'combined-account-webview-keyguard-policy-framework-2026-11-02-r1'
+  manifest_pin: '13ef4747529ec6d0d3669a3ad059e6eee82bf99b80900b835b7de2d40a007a92'
+  jar_pin: '1ff4080bbfdc95c4c370e88b3b283f004f165f4a93c816e224d823e98f7dc4b4'
+  baseline_classes: 2110
+  providers: ['framework_broadcast_permission.v']
+  calls: {context: 'framework_broadcast_permission_context_source', loaded: 'framework_broadcast_permission_loaded_source'}
+  methods: {
+   context: ['sendBroadcast(Landroid/content/Intent;Ljava/lang/String;)V']
+   loaded: ['<init>(Landroid/content/res/Resources;Ljava/lang/ClassLoader;Landroid/content/pm/PackageParser$Package;)V',
+    'vinixHasBroadcastPermission(Ljava/lang/String;)Z']
+  }
+  changed: {context: 0, loaded: 1}
+  added: {context: 1, loaded: 1}
+  fields: {loaded: ['.field private final vinixBroadcastPermissions:Ljava/util/Set;']}
+  class_provider: 'framework_broadcast_permission_classes'
+  extra_classes: ['android/atl/VinixBroadcastPolicy.smali']
+ }
+}
+
+fn broadcast_permission_expected_methods() map[string]string {
+ return {
+  'sendBroadcast(Landroid/content/Intent;Ljava/lang/String;)V': '.method public sendBroadcast(Landroid/content/Intent;Ljava/lang/String;)V
+.registers 3
+invoke-static {p0, p1, p2}, Landroid/atl/VinixBroadcastPolicy;->send(Landroid/content/Context;Landroid/content/Intent;Ljava/lang/String;)V
+return-void
+.end method'
+  'vinixHasBroadcastPermission(Ljava/lang/String;)Z': '.method public final vinixHasBroadcastPermission(Ljava/lang/String;)Z
+.registers 3
+iget-object v0, p0, Landroid/atl/ATLLoadedApp;->vinixBroadcastPermissions:Ljava/util/Set;
+invoke-interface {v0, p1}, Ljava/util/Set;->contains(Ljava/lang/Object;)Z
+move-result v0
+return v0
+.end method'
+  'snapshot(Landroid/content/pm/PackageParser$Package;)Ljava/util/Set;': '.method public static snapshot(Landroid/content/pm/PackageParser$Package;)Ljava/util/Set;
+.registers 12
+new-instance v0, Ljava/util/HashSet;
+invoke-direct {v0}, Ljava/util/HashSet;-><init>()V
+if-eqz p0, :freeze
+iget-object v1, p0, Landroid/content/pm/PackageParser$Package;->vinixSigningInfo:Landroid/content/pm/SigningInfo;
+if-eqz v1, :freeze
+invoke-virtual {v1}, Landroid/content/pm/SigningInfo;->getApkContentsSigners()[Landroid/content/pm/Signature;
+move-result-object v1
+if-eqz v1, :freeze
+array-length v2, v1
+if-lez v2, :freeze
+const/4 v3, 0x0
+:signers
+if-ge v3, v2, :metadata
+aget-object v4, v1, v3
+if-eqz v4, :freeze
+add-int/lit8 v3, v3, 0x1
+goto :signers
+:metadata
+iget-object v2, p0, Landroid/content/pm/PackageParser$Package;->packageName:Ljava/lang/String;
+if-eqz v2, :freeze
+invoke-virtual {v2}, Ljava/lang/String;->length()I
+move-result v1
+if-lez v1, :freeze
+iget-object v3, p0, Landroid/content/pm/PackageParser$Package;->requestedPermissions:Ljava/util/ArrayList;
+if-eqz v3, :freeze
+iget-object v4, p0, Landroid/content/pm/PackageParser$Package;->permissions:Ljava/util/ArrayList;
+if-eqz v4, :freeze
+invoke-virtual {v4}, Ljava/util/ArrayList;->iterator()Ljava/util/Iterator;
+move-result-object v4
+new-instance v5, Ljava/util/HashSet;
+invoke-direct {v5}, Ljava/util/HashSet;-><init>()V
+:next
+invoke-interface {v4}, Ljava/util/Iterator;->hasNext()Z
+move-result v1
+if-eqz v1, :freeze
+invoke-interface {v4}, Ljava/util/Iterator;->next()Ljava/lang/Object;
+move-result-object v6
+if-eqz v6, :next
+check-cast v6, Landroid/content/pm/PackageParser$Permission;
+iget-object v7, v6, Landroid/content/pm/PackageParser$Permission;->info:Landroid/content/pm/PermissionInfo;
+if-eqz v7, :next
+iget-object v8, v7, Landroid/content/pm/PackageItemInfo;->name:Ljava/lang/String;
+if-eqz v8, :next
+invoke-virtual {v8}, Ljava/lang/String;->length()I
+move-result v1
+if-lez v1, :next
+invoke-virtual {v5, v8}, Ljava/util/HashSet;->add(Ljava/lang/Object;)Z
+move-result v1
+if-nez v1, :unique
+invoke-virtual {v0, v8}, Ljava/util/HashSet;->remove(Ljava/lang/Object;)Z
+goto :next
+:unique
+iget-boolean v1, v6, Landroid/content/pm/PackageParser$Permission;->tree:Z
+if-nez v1, :next
+iget-object v9, v7, Landroid/content/pm/PackageItemInfo;->packageName:Ljava/lang/String;
+invoke-virtual {v2, v9}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v1
+if-eqz v1, :next
+iget v9, v7, Landroid/content/pm/PermissionInfo;->protectionLevel:I
+and-int/lit8 v9, v9, 0xf
+const/4 v1, 0x2
+if-ne v9, v1, :next
+invoke-virtual {v3, v8}, Ljava/util/ArrayList;->contains(Ljava/lang/Object;)Z
+move-result v1
+if-eqz v1, :next
+invoke-virtual {v0, v8}, Ljava/util/HashSet;->add(Ljava/lang/Object;)Z
+goto :next
+:freeze
+invoke-static {v0}, Ljava/util/Collections;->unmodifiableSet(Ljava/util/Set;)Ljava/util/Set;
+move-result-object v0
+return-object v0
+.end method'
+  'send(Landroid/content/Context;Landroid/content/Intent;Ljava/lang/String;)V': '.method public static send(Landroid/content/Context;Landroid/content/Intent;Ljava/lang/String;)V
+.registers 4
+invoke-static {p1}, Ljava/util/Objects;->requireNonNull(Ljava/lang/Object;)Ljava/lang/Object;
+if-eqz p2, :deliver
+invoke-static {}, Landroid/atl/ATLLoadedApp;->getPrimaryApplication()Landroid/atl/ATLLoadedApp;
+move-result-object v0
+invoke-virtual {v0, p2}, Landroid/atl/ATLLoadedApp;->vinixHasBroadcastPermission(Ljava/lang/String;)Z
+move-result v0
+if-nez v0, :deliver
+return-void
+:deliver
+invoke-virtual {p0, p1}, Landroid/content/Context;->sendBroadcast(Landroid/content/Intent;)V
+return-void
+.end method'
+ }
+}
+
+fn broadcast_permission_members(before string, after string, target string) ! {
+ previous := store_parts(before)!
+ updated := store_parts(after)!
+ expected := broadcast_permission_expected_methods()
+ signatures := broadcast_permission_profile().methods[target] or { return error('unsupported broadcast permission target') }
+ for signature in signatures {
+  method := updated.methods[signature] or { return error('required broadcast permission member absent') }
+  if signature.starts_with('<init>(') {
+   old := previous.methods[signature] or { return error('original loaded application constructor absent') }
+   normalized_old := intent_extras_method(old)!
+   anchor := 'iput-object p3, p0, Landroid/atl/ATLLoadedApp;->pkg:Landroid/content/pm/PackageParser$Package;'
+   inserted := '\ninvoke-static {p3}, Landroid/atl/VinixBroadcastPolicy;->snapshot(Landroid/content/pm/PackageParser$Package;)Ljava/util/Set;\nmove-result-object v0\niput-object v0, p0, Landroid/atl/ATLLoadedApp;->vinixBroadcastPermissions:Ljava/util/Set;'
+   if !normalized_old.starts_with('.method constructor ' + signature + '\n.registers 6\n')
+    || normalized_old.count(anchor) != 1 || normalized_old.contains('vinixBroadcast')
+    || intent_extras_method(method)! != normalized_old.replace(anchor, anchor + inserted) {
+    return error('loaded constructor must preserve every old instruction and snapshot exactly after the unpublished package assignment')
+   }
+  } else if intent_extras_method(method)! != intent_extras_method(expected[signature]!)! {
+   return error('broadcast permission member must preserve its exact validated forwarding or private snapshot lookup')
+  }
+ }
+ if target == 'android/content/Context.smali'
+  && (updated.methods['sendBroadcast(Landroid/content/Intent;)V'] or { '' }) !=
+   (previous.methods['sendBroadcast(Landroid/content/Intent;)V'] or { '' }) {
+  return error('original native broadcast declaration must remain unchanged')
+ }
+}
+
+fn broadcast_permission_helper_abi(source string) ! {
+ parts := store_parts(source)!
+ expected := broadcast_permission_expected_methods()
+ signatures := ['snapshot(Landroid/content/pm/PackageParser$Package;)Ljava/util/Set;',
+  'send(Landroid/content/Context;Landroid/content/Intent;Ljava/lang/String;)V']
+ if parts.metadata.split_into_lines().map(it.trim_space()).filter(it != '') != [
+  '.class public final Landroid/atl/VinixBroadcastPolicy;', '.super Ljava/lang/Object;']
+  || parts.methods.keys().sorted() != signatures.sorted() {
+  return error('broadcast policy requires one fieldless utility with exactly snapshot and send, without constructors or ambient grant state')
+ }
+ for signature in signatures {
+  if intent_extras_method(parts.methods[signature]!)! != intent_extras_method(expected[signature]!)! {
+   return error('broadcast policy requires exact authenticated immutable permission snapshot and deny-before-delivery flow')
+  }
+ }
+}
+
+fn broadcast_permission_self_test() ! {
+ profile := broadcast_permission_profile()
+ context := 'android/content/Context.smali'
+ loaded := 'android/atl/ATLLoadedApp.smali'
+ helper := 'android/atl/VinixBroadcastPolicy.smali'
+ signatures := profile.methods[loaded]!
+ if profile.name != 'broadcast-permission' || profile.baseline_classes != 2110
+  || profile.baseline_name != 'combined-account-webview-keyguard-policy-framework-2026-11-02-r1'
+  || profile.manifest_pin != '13ef4747529ec6d0d3669a3ad059e6eee82bf99b80900b835b7de2d40a007a92'
+  || profile.jar_pin != '1ff4080bbfdc95c4c370e88b3b283f004f165f4a93c816e224d823e98f7dc4b4'
+  || profile.providers != ['framework_broadcast_permission.v'] || profile.directory_provider != ''
+  || profile.calls != {context: 'framework_broadcast_permission_context_source', loaded: 'framework_broadcast_permission_loaded_source'}
+  || profile.methods != {context: ['sendBroadcast(Landroid/content/Intent;Ljava/lang/String;)V'],
+   loaded: ['<init>(Landroid/content/res/Resources;Ljava/lang/ClassLoader;Landroid/content/pm/PackageParser$Package;)V', 'vinixHasBroadcastPermission(Ljava/lang/String;)Z']}
+  || profile.changed != {context: 0, loaded: 1} || profile.added != {context: 1, loaded: 1}
+  || profile.fields != {loaded: ['.field private final vinixBroadcastPermissions:Ljava/util/Set;']}
+  || profile.class_provider != 'framework_broadcast_permission_classes' || profile.extra_classes != [helper] {
+  return error('broadcast permission profile requires exactly two retained classes, one constructor change, two method additions, one private final field and one policy utility')
+ }
+ for target, allowed in profile.methods { narrow_method_self_test(allowed, profile.changed[target]!, profile.added[target]!)! }
+ expected := broadcast_permission_expected_methods()
+ ctor := '.method constructor ' + signatures[0] + '\n.registers 6\ninvoke-direct {p0}, Ljava/lang/Object;-><init>()V\niput-object p3, p0, Landroid/atl/ATLLoadedApp;->pkg:Landroid/content/pm/PackageParser$Package;\niget-object v0, p3, Landroid/content/pm/PackageParser$Package;->applicationInfo:Landroid/content/pm/ApplicationInfo;\nreturn-void\n.end method'
+ insertion := '\ninvoke-static {p3}, Landroid/atl/VinixBroadcastPolicy;->snapshot(Landroid/content/pm/PackageParser$Package;)Ljava/util/Set;\nmove-result-object v0\niput-object v0, p0, Landroid/atl/ATLLoadedApp;->vinixBroadcastPermissions:Ljava/util/Set;'
+ anchor := 'iput-object p3, p0, Landroid/atl/ATLLoadedApp;->pkg:Landroid/content/pm/PackageParser$Package;'
+ patched_ctor := ctor.replace(anchor, anchor + insertion)
+ loaded_after := patched_ctor + '\n' + expected[signatures[1]]!
+ broadcast_permission_members(ctor, loaded_after, loaded)!
+ for bad in [loaded_after.replace('.registers 6', '.registers 7'), loaded_after.replace('{p3}, Landroid/atl/VinixBroadcastPolicy;', '{p0}, Landroid/atl/VinixBroadcastPolicy;'),
+  loaded_after.replace(anchor + insertion, insertion.trim_left('\n') + '\n' + anchor),
+  loaded_after.replace('->pkg:Landroid/content/pm/PackageParser$Package;', '->other:Landroid/content/pm/PackageParser$Package;'),
+  loaded_after.replace('iget-object v0, p3', 'iget-object v1, p3'),
+  loaded_after.replace('return v0', 'const/4 v0, 0x1\nreturn v0')] {
+  broadcast_permission_members(ctor, bad, loaded) or { continue }
+  return error('broadcast constructor publication/order/register/old-body or lookup mutation accepted')
+ }
+ loaded_metadata := '.class public final Landroid/atl/ATLLoadedApp;\n.super Ljava/lang/Object;\n'
+ field := profile.fields[loaded]![0]
+ loaded_with_field := loaded_metadata + field + '\n' + loaded_after
+ narrow_member_delta(loaded_metadata + ctor, loaded_with_field, signatures, 1, 1, [field])!
+ for bad in [loaded_with_field.replace(field, field.replace('private final', 'public final')),
+  loaded_with_field.replace(field, field.replace('private final', 'private')),
+  loaded_with_field.replace(field, field.replace('Ljava/util/Set;', 'Ljava/util/HashSet;')),
+  loaded_with_field + field + '\n', loaded_with_field + '.field private extra:I\n'] {
+  narrow_member_delta(loaded_metadata + ctor, bad, signatures, 1, 1, [field]) or { continue }
+  return error('broadcast snapshot field access/finality/type or metadata mutation accepted')
+ }
+ native := '.method public native sendBroadcast(Landroid/content/Intent;)V\n.end method'
+ context_after := native + '\n' + expected[profile.methods[context]![0]]!
+ broadcast_permission_members(native, context_after, context)!
+ for bad in [context_after.replace('{p0, p1, p2}', '{p0, p2, p1}'), context_after.replace('public native sendBroadcast', 'public sendBroadcast'),
+  context_after.replace('public sendBroadcast(Landroid/content/Intent;Ljava/lang/String;)', 'public static sendBroadcast(Landroid/content/Intent;Ljava/lang/String;)')] {
+  broadcast_permission_members(native, bad, context) or { continue }
+  return error('broadcast Context parameter forwarding or retained native ABI mutation accepted')
+ }
+ snapshot := expected['snapshot(Landroid/content/pm/PackageParser$Package;)Ljava/util/Set;']!
+ send := expected['send(Landroid/content/Context;Landroid/content/Intent;Ljava/lang/String;)V']!
+ metadata := '.class public final Landroid/atl/VinixBroadcastPolicy;\n.super Ljava/lang/Object;\n'
+ policy := metadata + snapshot + '\n' + send
+ broadcast_permission_helper_abi(policy)!
+ broadcast_permission_helper_abi(policy.replace(':freeze', ':alias_freeze').replace(':next', ':alias_next').replace(':deliver', ':alias_deliver'))!
+ for bad in [policy.replace('if-eqz v1, :freeze', 'if-nez v1, :freeze'),
+  policy.replace('if-lez v2, :freeze', 'if-ltz v2, :freeze'), policy.replace('if-eqz v4, :freeze', 'if-nez v4, :freeze'),
+  policy.replace('if-nez v1, :unique', 'if-eqz v1, :unique'), policy.replace('->remove(Ljava/lang/Object;)Z', '->add(Ljava/lang/Object;)Z'),
+  policy.replace('if-nez v1, :next', 'if-eqz v1, :next'), policy.replace('if-eqz v1, :next', 'if-nez v1, :next'),
+  policy.replace('and-int/lit8 v9, v9, 0xf', 'and-int/lit8 v9, v9, 0x0'), policy.replace('const/4 v1, 0x2', 'const/4 v1, 0x0'),
+  policy.replace('->requestedPermissions:Ljava/util/ArrayList;', '->permissions:Ljava/util/ArrayList;'),
+  policy.replace('->unmodifiableSet(Ljava/util/Set;)Ljava/util/Set;', '->emptySet()Ljava/util/Set;'),
+  policy.replace('->getPrimaryApplication()', '->getSystemApplication()'), policy.replace('if-nez v0, :deliver', 'if-eqz v0, :deliver'),
+  policy.replace('invoke-static {p1}, Ljava/util/Objects;->requireNonNull(Ljava/lang/Object;)Ljava/lang/Object;', ''),
+  policy.replace('.class public final ', '.class public '), policy + '.field public static grants:Ljava/util/Set;\n', policy + send] {
+  broadcast_permission_helper_abi(bad) or { continue }
+  return error('broadcast policy authentication/duplicates/owner/signature/requested/freeze/primary/gate/null/utility-state mutation accepted')
+ }
+ mut before := {context: 'context-old', loaded: 'loaded-old'}
+ for index in 0 .. 2108 { before['other/' + index.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ after[context] = 'context-new'
+ after[loaded] = 'loaded-new'
+ after[helper] = 'policy'
+ narrow_profile_class_delta(before, after, [context, loaded], [helper], 2110)!
+ for target in [context, loaded, helper, 'other/0.smali'] {
+  mut bad := after.clone()
+  if target in before { bad[target] = before[target]! } else { bad.delete(target) }
+  if target.starts_with('other/') { bad[target] = 'changed' }
+  narrow_profile_class_delta(before, bad, [context, loaded], [helper], 2110) or { continue }
+  return error('broadcast permission exact three-class scope mutation accepted')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -3488,6 +3751,7 @@ fn self_test() ! {
  subscription_service_self_test()!
  autofill_service_self_test()!
  keyguard_policy_self_test()!
+ broadcast_permission_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -3791,6 +4055,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'subscription-service' { subscription_service_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
   if profile.name == 'autofill-service' { autofill_service_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'keyguard-policy' { keyguard_policy_abi(os.read_file(root + '/smali/' + target)!)! }
+  if profile.name == 'broadcast-permission' { broadcast_permission_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -3801,6 +4066,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  if profile.name == 'bundle-cross-profile' { cross_profile_type_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'stats-unavailable' { stats_unavailable_type_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'subscription-service' { subscription_service_type_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
+ if profile.name == 'broadcast-permission' { broadcast_permission_helper_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'paint-drawable' {
   raw := os.read_file(root + '/smali/' + profile.extra_classes[0])!
   paint_drawable_abi(raw, raw)!
@@ -3844,6 +4110,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'subscription-service' { subscription_service_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
   if profile.name == 'autofill-service' { autofill_service_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'keyguard-policy' { keyguard_policy_abi(os.read_file(root + '/new-dex/' + target)!)! }
+  if profile.name == 'broadcast-permission' { broadcast_permission_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -3854,6 +4121,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  if profile.name == 'bundle-cross-profile' { cross_profile_type_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'stats-unavailable' { stats_unavailable_type_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'subscription-service' { subscription_service_type_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
+ if profile.name == 'broadcast-permission' { broadcast_permission_helper_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'paint-drawable' {
   paint_drawable_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!,
    os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)!
@@ -4204,11 +4472,15 @@ fn main() {
   build_narrow(keyguard_policy_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--broadcast-permission' {
+  build_narrow(broadcast_permission_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
