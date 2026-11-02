@@ -594,6 +594,29 @@ const pending_intent_framework_helper = 'f4756de6c6d4cd9fa3cbb1bc4a9350d45e3fba2
 const pending_intent_provider_helper = '7f0d36643ca45c4820b54df76d8762eb9c16ff1ba5a9288914d7297995fd5ea2'
 const pending_intent_raw = 'c71a0c7525e430ec0a492c5f03f290ef753065bd378974d680e8b1db17bf08d4'
 const pending_intent_canonical = 'a4692e2521f22789d2f785c5aa83413ccb708eff97a5ae213664bd10f800b93e'
+const stable_display_base = '/Users/alex/.local/state/vinix/android/maps-pending-intent-r1'
+const stable_display_base_seal = '87261cadaf528836f4f3903465110d9fb929588fa46b435bbe5ce846104ba473'
+const stable_display_boot = '61fad8b93273f7d62b3f11fd5bd7642bdee2aad76a92b89620a1434d0213b42b'
+const stable_display_base_overlay = '7a7d0dcf52da30ae44be6ffb34a58dbc4c51b6a53f79ed64e55c09a3ae8ad3e0'
+const stable_display_old_deployment = 'fdf233ce70202f3df53483c48bfd49fdb2fc7161e56f638b530305de1734b1b4'
+const stable_display_old_headless = 'e55e42a51bd6127b60f9ed6322048de1a1a677ea1811ec94e26ae3c0a5e5e58a'
+const stable_display_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-stable-display-framework-2026-11-02-r1'
+const stable_display_seal = '44a0ad6abdf51562e770a1848f6db06c2c2de75a1160868e999c1face01136df'
+const stable_display_build = '6c7ce8d04bf10b9433b3e8eaa37a950c8d1a064111e6ff2a45e1fec28d47179c'
+const stable_display_jar = '3b51a6cfe506db8e87908fdf74fcaebd585aaace383e8880a0183cd901780e52'
+const stable_display_dex = '207e71a5bc37a6c6aae59a436f70a9a07380adcba0d061c4e4502430e160f179'
+const stable_display_framework_helper = '635c432ff8859afde60a9a0206a6eaead371937dd38a73e8c535d9e47385eb61'
+const stable_display_provider_helper = '480d73ba0e7fe5af709d3a142aa51d3b2a43c0e7f2f1224ef443d4f6ae2f1b11'
+const stable_display_raw = 'f1d4a12057ce672b7ac1ca9d92031c4d843a12819cd4d5578544eef2232efe43'
+const stable_display_canonical = '97198ed1a377349d0d02e991ed73ac1625daa8ed498b6bb3dfe137231d96559e'
+const stable_display_native = '/Users/alex/.local/state/vinix/android/current-native-build-2026-11-02-stable-display-r2'
+const stable_display_native_seal = 'ebda45390f21abd3d45a6e51b9ea2bce22b9ce11b3e1eb19ea49927ff7e72daa'
+const stable_display_native_build = '4a8f8e707bdc428d3d6bac3736a37712838a3d8a323e8e424d8ed34beb0f3119'
+const stable_display_native_pin = '364f76761b57da6e0674d9a0c20f85e2589e5b8705d22aac6e6c3a9b82f8fcae'
+const stable_display_native_source = '8d8e8f2e81c6b0b4cd6a11648c59184dff1269c97ab7b0a636a4ef8cd517a6d8'
+const stable_display_bindings = '76f62e0ceefb04f147856b711cce651380841027ee3d3fd70e4bc9787b956d60'
+const stable_display_generated = 'd0b1eec6e60036e5d231d6ade0450ceeb71fb2fdcb95b2057ba111c2c6a3d19f'
+const stable_display_c = '881a321444643dda277089d591a27e110536f89c4f40f16e54196c62f7f9efba'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -4937,6 +4960,180 @@ fn pending_intent_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return pending_intent_base + '/boot.img'
 }
 
+fn stable_display_profile() Profile {
+	mut modules := pending_intent_profile().modules.clone()
+	modules << 'maps-pending-intent.tar'
+	return Profile{'maps-stable-display', stable_display_boot, 'maps-stable-display.tar', modules}
+}
+fn stable_display_modules() map[string]string {
+	mut modules := pending_intent_modules()
+	modules['maps-pending-intent.tar'] = stable_display_base_overlay
+	return modules
+}
+fn stable_display_fields() map[string]string {
+	mut fields := pending_intent_fields()
+	fields['kind'] = 'vinix-maps-stable-display-v1'
+	fields['base_root'] = stable_display_base
+	fields['base_manifest_sha256'] = stable_display_base_seal
+	fields['framework_build_root'] = stable_display_framework
+	fields['framework_manifest_sha256'] = stable_display_seal
+	fields['framework_jar_sha256'] = stable_display_jar
+	fields['framework_dex_sha256'] = stable_display_dex
+	fields['retained_framework_manifest_sha256'] = pending_intent_seal
+	fields['native_build_root'] = stable_display_native
+	fields['native_manifest_sha256'] = stable_display_native_seal
+	fields['native_build_sha256'] = stable_display_native_build
+	fields['native_sha256'] = stable_display_native_pin
+	fields['native_framework_manifest_sha256'] = stable_display_seal
+	fields['retained_native_framework_manifest_sha256'] = resource_lock_native_framework
+	fields['generated_jni_sha256'] = stable_display_generated
+	fields['native_c_sha256'] = stable_display_c
+	fields['native_consumed_headers_before_sha256'] = '769865526b3f876f16e976f5efbc0ff7275db952fdb42e5f4b89b1e4971b2c53'
+	fields['native_consumed_headers_sha256'] = 'a67e79c3f564113389a9606f872fea291f9ea5ea6ab2c351e55715d1d4542d14'
+	return fields
+}
+fn stable_display_inputs() map[string]string {
+	mut inputs := pending_intent_inputs()
+	inputs[stable_display_base + '/sha256.json'] = stable_display_base_seal
+	inputs[stable_display_framework + '/sha256.json'] = stable_display_seal
+	inputs[stable_display_native + '/sha256.json'] = stable_display_native_seal
+	return inputs
+}
+fn stable_display_known_delta() map[string]string {
+	return {'/' + service_query_jar_path: stable_display_jar,
+		'/' + service_query_dex_path: stable_display_dex,
+		'/' + native_onboarding_trace_path: stable_display_native_pin,
+		'/' + service_query_headless + '/framework-build.json': stable_display_build,
+		'/' + service_query_headless + '/framework-sha256.json': stable_display_seal}
+}
+fn stable_display_source_delta() map[string]string {
+	return {'smali/android/hardware/display/DisplayManager.smali': stable_display_raw}
+}
+fn stable_display_canonical_delta() map[string]string {
+	return {'new-dex/android/hardware/display/DisplayManager.smali': stable_display_canonical}
+}
+fn stable_display_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework.v': stable_display_framework_helper,
+		'tests/native-android-tools/androidtools/framework_stable_display.v': stable_display_provider_helper}
+}
+fn stable_display_native_source_delta() map[string]string {
+	return {'build-support/android/nativews/stable_display.v': stable_display_native_source,
+		'build-support/android/nativews/bindings.txt': stable_display_bindings}
+}
+fn stable_display_native_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework.v': stable_display_framework_helper,
+		'tests/native-android-tools/androidtools/framework_pending_intent.v': 'e7f3b2d5010afbe76793f707dcde24fe004aa6138b3a69d38b936dc00f1102ae',
+		'tests/native-android-tools/androidtools/framework_pending_intent_successor.v': pending_intent_provider_helper,
+		'tests/native-android-tools/androidtools/framework_stable_display.v': stable_display_provider_helper}
+}
+fn stable_display_export() string { return 'Java_android_hardware_display_DisplayManager_getStableDisplaySize__' }
+fn stable_display_consumed_header_additions() map[string]string {
+	base := '/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/aarch64-linux-musl/include/'
+	return {base + 'bits/ioctl.h': 'a1ef9fa70d6d1f14e1a370b21c428b27c5f89e88ebe7500174d60683b096219e',
+		base + 'bits/ioctl_fix.h': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+		base + 'sys/ioctl.h': '18cc2b9eee923943e198f03f77cae411bd8f34d9a3fc2202851a1e95dc73532e'}
+}
+fn stable_display_proofs() map[string]string {
+	return {
+		'headless_input_delta': json2.encode({'/' + service_query_jar_path: stable_display_jar})
+		'headless_top_level_delta': json2.encode(['inputs_sha256'])
+		'deployment_top_level_delta': json2.encode(['inputs_sha256', 'framework_manifest_sha256', 'native_manifest_sha256'])
+		'framework_source_delta': json2.encode(stable_display_source_delta())
+		'framework_canonical_delta': json2.encode(stable_display_canonical_delta())
+		'framework_builder_helper_delta': json2.encode(stable_display_helper_delta())
+		'framework_class_count': json2.encode(2108)
+		'framework_changed_method_counts': json2.encode({'android/hardware/display/DisplayManager.smali': 0})
+		'framework_added_method_counts': json2.encode({'android/hardware/display/DisplayManager.smali': 1})
+		'framework_added_fields': json2.encode(map[string][]string{})
+		'framework_added_classes': json2.encode([]string{})
+		'native_source_delta': json2.encode(stable_display_native_source_delta())
+		'native_builder_helper_delta': json2.encode(stable_display_native_helper_delta())
+		'native_bindings_delta': json2.encode({'native/bindings.txt': [resource_lock_bindings, stable_display_bindings]})
+		'native_generated_jni_delta': json2.encode({'native/atlframework/ws_generated.v': [resource_lock_generated, stable_display_generated]})
+		'native_c_delta': json2.encode({'native/android-native.c': [resource_lock_c, stable_display_c]})
+		'native_consumed_header_additions': json2.encode(stable_display_consumed_header_additions())
+		'native_consumed_class_count': json2.encode(70)
+		'retained_native_consumed_class_count': json2.encode(69)
+		'native_export_count': json2.encode(720)
+		'native_source_origin_count': json2.encode(90)
+		'native_input_count': json2.encode(91)
+		'native_export_additions': json2.encode([stable_display_export()])
+		'native_consumed_raw_delta': json2.encode(map[string][]string{})
+		'native_consumed_canonical_delta': json2.encode(map[string][]string{})
+		'native_consumed_raw_additions': json2.encode(stable_display_source_delta())
+		'native_consumed_canonical_additions': json2.encode(stable_display_canonical_delta())
+	}
+}
+fn stable_display_overlay_paths() []string {
+	mut paths := pending_intent_overlay_paths()
+	paths << native_onboarding_trace_path
+	return paths
+}
+fn verify_stable_display_overlay(receipt map[string]json2.Any) ! {
+	for name in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		if name in receipt { return error('stable display may only replace existing framework/native inputs') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('stable-display deployment delta absent') }))!
+	mut expected := stable_display_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('stable-display headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == stable_display_old_headless { return error('new stable-display headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('stable-display exact six deployment input changes differ') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('stable-display overlay inventory absent') }))!
+	paths := stable_display_overlay_paths()
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe stable-display overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			mode := if entry.name == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != mode { return error('stable-display regular allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected stable-display overlay inode') }
+	}
+	if regulars.len != 7 || regulars[service_query_deployment] or { '' } == stable_display_old_deployment { return error('exact seven stable-display files required') }
+	for path, pin in expected { if regulars[path.trim_left('/')] or { '' } != pin { return error('stable-display input differs from inventory') } }
+}
+fn verify_stable_display_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [stable_display_base_seal, stable_display_boot, stable_display_base_overlay,
+		stable_display_old_deployment, stable_display_old_headless, stable_display_seal,
+		stable_display_build, stable_display_jar, stable_display_dex,
+		stable_display_native_seal, stable_display_native_build, stable_display_native_pin,
+		stable_display_generated, stable_display_c, stable_display_bindings] {
+		if !digest_valid(pin) { return error('completed stable-display SDK and coupled native producer required') }
+	}
+	for values in [stable_display_source_delta(), stable_display_canonical_delta(), stable_display_helper_delta(),
+		stable_display_native_source_delta(), stable_display_native_helper_delta()] {
+		for _, pin in values { if !digest_valid(pin) { return error('completed stable-display class/helper/native pins required') } }
+	}
+	if stable_display_seal == pending_intent_seal || stable_display_jar == pending_intent_jar || stable_display_dex == pending_intent_dex
+		|| stable_display_native_seal == resource_lock_native_seal || stable_display_native_pin == resource_lock_native_pin
+		|| stable_display_generated == resource_lock_generated || stable_display_bindings == resource_lock_bindings || stable_display_c == resource_lock_c { return error('new stable-display SDK and native implementation required') }
+	for name, expected in stable_display_fields() { if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('stable-display receipt differs: ' + name) } }
+	for name, expected in stable_display_proofs() { if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](expected)! { return error('stable-display proof differs: ' + name) } }
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 103 || seals != stable_display_inputs() { return error('stable-display exact one hundred three dependency seals differ') }
+	for path in stage.inputs_sha256.keys() {
+		for root in [dialog_theme_relink_root(), resources_float_relink_root(), layout_alignment_relink_root(), window_animations_relink_root()] {
+			if path == root || path.starts_with(root + '/') { return error('historical relink leaves are not new stable-display direct inputs') }
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != stable_display_modules() || stage.preserved_modules_sha256 != stable_display_modules() { return error('stable-display original forty-three modules differ') }
+	verify_stable_display_overlay(receipt)!
+}
+fn stable_display_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_stable_display_receipt(receipt, stage)!
+	path := stable_display_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != stable_display_base_seal { return error('stable-display original PendingIntent manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != stable_display_boot || pins['maps-pending-intent.tar'] or { '' } != stable_display_base_overlay { return error('stable-display original boot or PendingIntent overlay differs') }
+	return stable_display_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -5575,6 +5772,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = resource_lock_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-pending-intent' {
 		baseline = pending_intent_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-stable-display' {
+		baseline = stable_display_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -10671,6 +10870,183 @@ fn pending_intent_profile_self_test() ! {
 	println('MAPS-PENDING-INTENT KERNEL-PROFILE-SELF-TEST PASS six files one hundred seals forty-two inherited modules retained resource-lock native and original Intent SDK provenance')
 }
 
+fn stable_display_entries_fixture() []ServiceQueryEntry {
+	paths := stable_display_overlay_paths()
+	mut parents := map[string]bool{}
+	for path in paths {
+		mut parent := os.dir(path)
+		for parent !in ['', '.'] { parents[parent] = true; parent = os.dir(parent) }
+	}
+	mut entries := []ServiceQueryEntry{}
+	for name in parents.keys().sorted() { entries << ServiceQueryEntry{name: name, kind: 'directory', mode: 0o755} }
+	mut pins := stable_display_known_delta()
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	pins['/' + service_query_deployment] = 'b'.repeat(64)
+	for path in paths { entries << ServiceQueryEntry{name: path, kind: 'regular', mode: if path == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }, sha256: pins['/' + path]!} }
+	return entries
+}
+fn stable_display_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in stable_display_fields() { receipt[name] = json2.Any(value) }
+	for name, value in stable_display_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	mut delta := stable_display_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(stable_display_entries_fixture()))!
+	return receipt
+}
+fn stable_display_profile_self_test() ! {
+	profile := stable_display_profile()
+	if profile.baseline_sha != stable_display_boot || profile.modules.len != 43 || profile.modules.last() != 'maps-pending-intent.tar'
+		|| stable_display_inputs().len != 103 || stable_display_inputs().keys().filter(it.ends_with('/sha256.json')).len != 103 { return error('stable-display strict coupled SDK/native profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 44 || stable_display_overlay_paths().len != 7 || stable_display_known_delta().len != 5 { return error('stable-display exact modules, files or changes differ') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', modules.reverse()}, Config{'vinix', profile.modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('wrong stable-display module order accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: stable_display_inputs(), original_modules_sha256: stable_display_modules(), preserved_modules_sha256: stable_display_modules()}
+	receipt := stable_display_receipt_fixture()!
+	verify_stable_display_receipt(receipt, stage)!
+	mut fields := stable_display_fields().keys()
+	fields << stable_display_proofs().keys()
+	fields << ['deployment_input_delta', 'overlay_inventory']
+	for name in fields {
+		mut bad := stable_display_receipt_fixture()!
+		bad[name] = json2.Any('changed')
+		if _ := verify_stable_display_receipt(bad, stage) { return error('changed stable-display field/proof accepted') }
+		bad.delete(name)
+		if _ := verify_stable_display_receipt(bad, stage) { return error('missing stable-display field/proof accepted') }
+	}
+	for proof in ['framework_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta',
+		'framework_changed_method_counts', 'framework_added_method_counts', 'framework_added_fields',
+		'native_source_delta', 'native_builder_helper_delta', 'native_bindings_delta', 'native_generated_jni_delta',
+		'native_c_delta', 'native_consumed_header_additions', 'native_consumed_raw_delta', 'native_consumed_canonical_delta',
+		'native_consumed_raw_additions', 'native_consumed_canonical_additions', 'headless_input_delta'] {
+		original := json2.decode[map[string]json2.Any](json2.encode(receipt[proof]!))!
+		for name in original.keys() {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(original))!
+			changed[name] = json2.Any('changed')
+			mut bad := stable_display_receipt_fixture()!
+			bad[proof] = json2.Any(changed)
+			if _ := verify_stable_display_receipt(bad, stage) { return error('changed stable-display proof member accepted') }
+			changed.delete(name)
+			bad[proof] = json2.Any(changed)
+			if _ := verify_stable_display_receipt(bad, stage) { return error('missing stable-display proof member accepted') }
+		}
+		mut extra := json2.decode[map[string]json2.Any](json2.encode(original))!
+		extra['unreviewed'] = json2.Any('a'.repeat(64))
+		mut bad := stable_display_receipt_fixture()!
+		bad[proof] = json2.Any(extra)
+		if _ := verify_stable_display_receipt(bad, stage) { return error('extra stable-display proof member accepted') }
+	}
+	for proof in ['native_bindings_delta', 'native_generated_jni_delta', 'native_c_delta'] {
+		original := json2.decode[map[string][]string](json2.encode(receipt[proof]!))!
+		for name, pair in original {
+			for index in 0 .. 2 {
+				mut changed := json2.decode[map[string][]string](json2.encode(original))!
+				mut pins := json2.decode[[]string](json2.encode(pair))!
+				pins[index] = '0'.repeat(64)
+				changed[name] = pins
+				mut bad := stable_display_receipt_fixture()!
+				bad[proof] = json2.decode[json2.Any](json2.encode(changed))!
+				if _ := verify_stable_display_receipt(bad, stage) { return error('changed stable-display native before-after pin accepted') }
+			}
+		}
+	}
+	for field, wrong in {'native_framework_manifest_sha256': resource_lock_native_framework,
+		'retained_native_framework_manifest_sha256': stable_display_seal,
+		'native_compatibility_framework_manifest_sha256': stable_display_seal,
+		'retained_framework_manifest_sha256': resource_lock_native_framework} {
+		mut bad := stable_display_receipt_fixture()!
+		bad[field] = json2.Any(wrong)
+		if _ := verify_stable_display_receipt(bad, stage) { return error('stable-display old/new native or SDK provenance substituted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := stable_display_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_stable_display_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed stable-display input accepted') }
+		pins.delete(path)
+		if _ := verify_stable_display_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing stable-display input accepted') }
+	}
+	for path in ['/unreviewed/sha256.json', dialog_theme_relink_root(), resources_float_relink_root(),
+		layout_alignment_relink_root(), window_animations_relink_root(), dialog_theme_relink_root() + '/out/canonical.so'] {
+		mut pins := stable_display_inputs()
+		pins[path] = 'a'.repeat(64)
+		if _ := verify_stable_display_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('extra stable-display seal or historical proof leaf accepted') }
+	}
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: pending_intent_modules()}, Stage{...stage, preserved_modules_sha256: pending_intent_modules()}] {
+		if _ := verify_stable_display_receipt(receipt, bad) { return error('wrong stable-display module inventory accepted') }
+	}
+	for addition in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof'] {
+		mut bad := stable_display_receipt_fixture()!
+		bad[addition] = json2.Any(map[string]json2.Any{})
+		if _ := verify_stable_display_receipt(bad, stage) { return error('stable-display addition or relink proof accepted') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta']!))!
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := stable_display_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_stable_display_receipt(bad, stage) { return error('missing stable-display actual input change accepted') }
+	}
+	mut wrong_delta := delta.clone()
+	wrong_delta['/' + native_onboarding_trace_path] = resource_lock_native_pin
+	mut wrong_native := stable_display_receipt_fixture()!
+	wrong_native['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(wrong_delta))!
+	if _ := verify_stable_display_receipt(wrong_native, stage) { return error('retained native DSO accepted with new native API') }
+	entries := stable_display_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := stable_display_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_stable_display_receipt(bad, stage) { return error('unsafe stable-display overlay inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := stable_display_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_stable_display_receipt(bad, stage) { return error('missing stable-display overlay file accepted') }
+			if entry.name != service_query_deployment {
+				bad_entries = entries.clone()
+				bad_entries[index] = ServiceQueryEntry{...entry, sha256: '0'.repeat(64)}
+				bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+				if _ := verify_stable_display_receipt(bad, stage) { return error('changed stable-display overlay pin accepted') }
+			}
+		}
+	}
+	for extra in [entries.last(), ServiceQueryEntry{name: 'opt/unreviewed', kind: 'regular', mode: 0o644, sha256: 'a'.repeat(64)}] {
+		mut changed := entries.clone()
+		changed << extra
+		mut bad := stable_display_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_stable_display_receipt(bad, stage) { return error('duplicate or unreviewed stable-display overlay file accepted') }
+	}
+	for stale_path, stale_pin in {service_query_headless + '/guest-inputs.json': stable_display_old_headless, service_query_deployment: stable_display_old_deployment} {
+		mut changed := entries.clone()
+		for index, entry in changed { if entry.name == stale_path { changed[index] = ServiceQueryEntry{...entry, sha256: stale_pin} } }
+		mut bad := stable_display_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if stale_path != service_query_deployment {
+			mut stale_delta := delta.clone()
+			stale_delta['/' + stale_path] = stale_pin
+			bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(stale_delta))!
+		}
+		if _ := verify_stable_display_receipt(bad, stage) { return error('stale stable-display metadata accepted') }
+	}
+	for old in [pending_intent_receipt_fixture()!, resource_lock_receipt_fixture()!, intent_extras_receipt_fixture()!] {
+		if _ := verify_stable_display_receipt(old, stage) { return error('historical receipt accepted by stable-display profile') }
+	}
+	if _ := verify_pending_intent_receipt(receipt, stage) { return error('stable-display receipt accepted by PendingIntent profile') }
+	if _ := verify_resource_lock_receipt(receipt, stage) { return error('stable-display receipt accepted by resource-lock profile') }
+	println('MAPS-STABLE-DISPLAY KERNEL-PROFILE-SELF-TEST PASS seven files one hundred three seals forty-three inherited modules new native70 classes720 exports separate original Intent provenance')
+}
+
 fn resource_lock_entries_fixture() []ServiceQueryEntry {
 	paths := resource_lock_overlay_paths()
 	mut parents := map[string]bool{}
@@ -10867,6 +11243,7 @@ fn self_test() ! {
 	intent_extras_profile_self_test()!
 	resource_lock_profile_self_test()!
 	pending_intent_profile_self_test()!
+	stable_display_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -10948,6 +11325,7 @@ fn self_test() ! {
 	fat_self_test(root + '/intent-extras', 'maps-intent-extras.tar', intent_extras_profile().modules)!
 	fat_self_test(root + '/resource-lock', 'maps-resource-lock.tar', resource_lock_profile().modules)!
 	fat_self_test(root + '/pending-intent', 'maps-pending-intent.tar', pending_intent_profile().modules)!
+	fat_self_test(root + '/stable-display', 'maps-stable-display.tar', stable_display_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -10996,9 +11374,10 @@ fn main() {
 	is_intent_extras := os.args.len == 5 && os.args[1] == '--maps-intent-extras'
 	is_resource_lock := os.args.len == 5 && os.args[1] == '--maps-resource-lock'
 	is_pending_intent := os.args.len == 5 && os.args[1] == '--maps-pending-intent'
-	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent
+	is_stable_display := os.args.len == 5 && os.args[1] == '--maps-stable-display'
+	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display
 	if os.args.len != 4 && !is_selected {
-		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
+		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
 	offset := if is_selected { 1 } else { 0 }
@@ -11011,7 +11390,7 @@ fn main() {
 		exit(1)
 	}
 	profile := if is_seed_companion { seed_companion_profile() } else if is_broker_tail { broker_tail_profile() } else if is_window_system_ui { window_system_ui_profile() } else if is_imageview_bounds { imageview_bounds_profile() } else if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
-	selected_profile := if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
+	selected_profile := if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
 	patch(root, build_root, os.args[3 + offset], selected_profile) or {
 		eprintln(err)
 		exit(1)
