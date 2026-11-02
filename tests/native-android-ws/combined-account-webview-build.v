@@ -2468,6 +2468,87 @@ fn autofill_service_self_test() ! {
  }
 }
 
+fn keyguard_policy_profile() NarrowProfile {
+ policy := 'android/app/admin/DevicePolicyManager.smali'
+ return NarrowProfile{
+  name: 'keyguard-policy'
+  baseline_name: 'combined-account-webview-autofill-service-framework-2026-11-02-r1'
+  manifest_pin: 'df8ec5e67f683f78dd5aca9b42291f4ebcd3638342d8e3a215dbfc42d60c3533'
+  jar_pin: 'e2bea62dcd6f59269c36612f76b806942018700f37fbf202915cc2e74329a54a'
+  baseline_classes: 2110
+  providers: ['framework_keyguard_policy.v']
+  calls: {policy: 'framework_keyguard_policy_source'}
+  methods: {policy: ['getKeyguardDisabledFeatures(Landroid/content/ComponentName;)I']}
+  changed: {policy: 0}
+  added: {policy: 1}
+ }
+}
+
+fn keyguard_policy_abi(source string) ! {
+ signature := 'getKeyguardDisabledFeatures(Landroid/content/ComponentName;)I'
+ method := store_parts(source)!.methods[signature] or { return error('missing keyguard policy query') }
+ if method.split_into_lines().map(it.trim_space()).filter(it != '' && !it.starts_with('#')) != [
+  '.method public ' + signature, '.registers 3', 'const/4 v0, 0x0', 'return v0', '.end method'] {
+  return error('keyguard policy query requires the exact public instance zero result for the absent backend')
+ }
+}
+
+fn keyguard_policy_self_test() ! {
+ profile := keyguard_policy_profile()
+ policy := 'android/app/admin/DevicePolicyManager.smali'
+ signature := 'getKeyguardDisabledFeatures(Landroid/content/ComponentName;)I'
+ if profile.name != 'keyguard-policy' || profile.baseline_classes != 2110
+  || profile.baseline_name != 'combined-account-webview-autofill-service-framework-2026-11-02-r1'
+  || profile.manifest_pin != 'df8ec5e67f683f78dd5aca9b42291f4ebcd3638342d8e3a215dbfc42d60c3533'
+  || profile.jar_pin != 'e2bea62dcd6f59269c36612f76b806942018700f37fbf202915cc2e74329a54a'
+  || profile.providers != ['framework_keyguard_policy.v']
+  || profile.calls != {policy: 'framework_keyguard_policy_source'}
+  || profile.methods != {policy: [signature]} || profile.changed != {policy: 0}
+  || profile.added != {policy: 1} || profile.fields.len != 0 || profile.directory_provider != ''
+  || profile.extra_classes.len != 0 || profile.class_provider != '' {
+  return error('keyguard policy profile requires exactly one added query in one retained class')
+ }
+ narrow_method_self_test([signature], 0, 1)!
+ method := '.method public ' + signature + '\n.registers 3\nconst/4 v0, 0x0\nreturn v0\n.end method\n'
+ keyguard_policy_abi(method)!
+ for bad in [method.replace('public ', 'private '), method.replace('public ', 'public static '),
+  method.replace('public ', 'public native '), method.replace('public ', 'public final '),
+  method.replace('(Landroid/content/ComponentName;)I', '()I'), method.replace('.registers 3', '.registers 2'),
+  method.replace('const/4 v0, 0x0', 'const/4 v0, 0x1'), method.replace('return v0', 'return-object v0'),
+  method.replace('return v0', 'return p1'), method.replace('return v0', 'return v0\nreturn v0'), method + method] {
+  keyguard_policy_abi(bad) or { continue }
+  return error('keyguard policy query ABI/register/result/body mutation accepted')
+ }
+ metadata := '.class public Landroid/app/admin/DevicePolicyManager;\n.super Ljava/lang/Object;\n'
+ retained := '.method public retained()V\n.locals 0\nreturn-void\n.end method\n'
+ before_source := metadata + retained
+ after_source := before_source + method
+ narrow_member_delta(before_source, after_source, [signature], 0, 1, []string{})!
+ for bad in [after_source.replace('public retained()V', 'private retained()V'),
+  after_source.replace('.super Ljava/lang/Object;', '.super Lother/Base;'),
+  after_source + '.field private unexpected:I\n', after_source + retained] {
+  narrow_member_delta(before_source, bad, [signature], 0, 1, []string{}) or { continue }
+  return error('keyguard policy unrelated member or metadata mutation accepted')
+ }
+ mut before := {policy: 'old'}
+ for i in 0 .. 2109 { before['other/' + i.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ after[policy] = 'new'
+ narrow_profile_class_delta(before, after, [policy], []string{}, 2110)!
+ for case in 0 .. 5 {
+  mut bad := after.clone()
+  match case {
+   0 { bad[policy] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(policy) }
+   3 { bad['unrelated.smali'] = 'new' }
+   else { bad.delete(policy); bad['substituted.smali'] = 'new' }
+  }
+  narrow_profile_class_delta(before, bad, [policy], []string{}, 2110) or { continue }
+  return error('invalid DevicePolicyManager-only class scope accepted')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -3406,6 +3487,7 @@ fn self_test() ! {
  stats_unavailable_self_test()!
  subscription_service_self_test()!
  autofill_service_self_test()!
+ keyguard_policy_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -3708,6 +3790,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'stats-unavailable' { stats_unavailable_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'subscription-service' { subscription_service_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
   if profile.name == 'autofill-service' { autofill_service_abi(os.read_file(root + '/smali/' + target)!)! }
+  if profile.name == 'keyguard-policy' { keyguard_policy_abi(os.read_file(root + '/smali/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -3760,6 +3843,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'stats-unavailable' { stats_unavailable_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'subscription-service' { subscription_service_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
   if profile.name == 'autofill-service' { autofill_service_abi(os.read_file(root + '/new-dex/' + target)!)! }
+  if profile.name == 'keyguard-policy' { keyguard_policy_abi(os.read_file(root + '/new-dex/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -4116,11 +4200,15 @@ fn main() {
   build_narrow(autofill_service_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--keyguard-policy' {
+  build_narrow(keyguard_policy_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
