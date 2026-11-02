@@ -49,6 +49,7 @@ fn framework_pending_intent(smali string) ! {
   '    iget-boolean v0, p0, ' + owner + '->vinixCanceled:Z\n' +
   '    if-eqz v0, :vinix_send\n    new-instance v0, Landroid/app/PendingIntent$CanceledException;\n' +
   '    invoke-direct {v0}, Landroid/app/PendingIntent$CanceledException;-><init>()V\n    throw v0\n:vinix_send\n')
+ text = framework_pending_intent_source(text)!
  os.write_file(path, text)!
  os.write_file(smali + '/android/app/PendingIntent$VinixToken.smali',
   '.class public final ' + token + '\n.super Landroid/os/Binder;\n.field public final operation:' + owner + '\n' +
