@@ -9,6 +9,7 @@ import probedesktop
 
 struct ProbeDesktopTask {
 	invocation []string
+	target_executable Arm64Executable
 	config     probedesktop.Config
 }
 
@@ -36,6 +37,12 @@ fn probe_desktop_validate(task ProbeDesktopTask) ! {
 		|| !os.is_abs_path(task.invocation[0]) {
 		return error('desktop task requires an explicit executable invocation')
 	}
+	if task.target_executable.path != '' {
+		if task.target_executable.path !in task.invocation {
+			return error('desktop target differs from its ARM64 executable baseline')
+		}
+		arm64_executable_unchanged(task.target_executable)!
+	}
 	if task.config.width !in 1 .. 8193 || task.config.height !in 1 .. 8193
 		|| task.config.startup_ms !in 1 .. 1800001 || task.config.reply_ms !in 1 .. 60001
 		|| task.config.session_ms !in 0 .. 60001 {
@@ -59,8 +66,12 @@ pub fn maybe_probe_desktop_child() !bool {
 	output := os.dir(path) + '/desktop-observation.json'
 	if os.exists(output) || os.is_link(output) { return error('desktop observation must be fresh') }
 	observation := probedesktop.run(task.invocation[0], task.invocation[1..],
-		probe_desktop_setup, '', task.config)!
+		probe_desktop_setup, '', task.config) or {
+		if task.target_executable.path != '' { arm64_executable_unchanged(task.target_executable)! }
+		return err
+	}
 	os.write_file(output, json2.encode(observation, prettify: true))!
+	if task.target_executable.path != '' { arm64_executable_unchanged(task.target_executable)! }
 	return true
 }
 
@@ -97,7 +108,7 @@ fn probe_desktop_observation(path string) !probedesktop.Observation {
 fn probe_desktop_application(out string, input ProbeInput, runtime ProbeRuntime,
 	command []string, env map[string]string, mut result ProbeResult) !string {
 	config := probe_desktop_config(runtime)!
-	task := ProbeDesktopTask{ invocation: command, config: config }
+	task := ProbeDesktopTask{ invocation: command, target_executable: runtime.target_executable, config: config }
 	probe_desktop_validate(task)!
 	path := out + '/desktop-task.json'
 	os.write_file(path, json2.encode(task, prettify: true))!

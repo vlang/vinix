@@ -40,6 +40,8 @@ pub:
 pub struct ProbeRuntime {
 pub:
 	invocation        []string
+	// Set by the maintained builder; empty for native protocol-control helpers.
+	target_executable Arm64Executable
 	arguments         []string
 	environment       map[string]string
 	profile           string
@@ -75,6 +77,7 @@ struct ProbeRuntimeReceipt {
 	built_backends       []string
 	required_backends    []string
 	invocation           []string
+	target_executable    Arm64Executable
 	arguments            []string
 	deadline_seconds     int
 	output_limit         u64
@@ -394,10 +397,17 @@ fn probe_require_runtime(runtime ProbeRuntime) ! {
 			return error('required probe backend was not built: ${name}')
 		}
 	}
+	if runtime.target_executable.path != '' {
+		if runtime.target_executable.path != runtime.invocation.last() {
+			return error('probe target differs from its ARM64 executable baseline')
+		}
+		arm64_executable_unchanged(runtime.target_executable)!
+	}
 	if runtime.desktop_driver != '' { probe_desktop_config(runtime)! }
 }
 
 fn probe_runtime_inputs(runtime ProbeRuntime) ![]FileDigest {
+	if runtime.target_executable.path != '' { arm64_executable_unchanged(runtime.target_executable)! }
 	mut inputs := []FileDigest{}
 	mut paths := [runtime.invocation[0], runtime.invocation.last()]
 	if runtime.desktop_driver != '' { paths << runtime.desktop_driver }
@@ -423,12 +433,12 @@ fn probe_commands(out string, input ProbeInput, runtime ProbeRuntime, env map[st
 	mut result ProbeResult) ! {
 	mut command := runtime.invocation.clone()
 	command << ['--inspect', input.executable]
-	inspect_code, _ := guarded_command(out, 'inspect', command, input.bundle, env, runtime.deadline_seconds)!
+	inspect_code, _ := probe_guarded_command(runtime, out, 'inspect', command, input.bundle, env)!
 	result.inspection_exit = inspect_code
 	if inspect_code != 0 { return error('probe inspection failed; application was not launched') }
 	command = runtime.invocation.clone()
 	command << ['--audit', input.executable]
-	audit_code, _ := guarded_command(out, 'audit', command, input.bundle, env, runtime.deadline_seconds)!
+	audit_code, _ := probe_guarded_command(runtime, out, 'audit', command, input.bundle, env)!
 	result.audit_exit = audit_code
 	// Audit remains strict, including SKAdNetwork. Missing imports are useful
 	// diagnostic evidence and do not suppress the explicit no-ads launch.
@@ -440,7 +450,7 @@ fn probe_commands(out string, input ProbeInput, runtime ProbeRuntime, env map[st
 	if runtime.desktop_driver != '' {
 		output = probe_desktop_application(out, input, runtime, command, env, mut result)!
 	} else {
-		app_code, captured := guarded_command(out, 'application', command, input.bundle, env, runtime.deadline_seconds)!
+		app_code, captured := probe_guarded_command(runtime, out, 'application', command, input.bundle, env)!
 		result.application_exit = app_code
 		output = captured
 	}
@@ -478,6 +488,7 @@ pub fn probe_capture(out string, input ProbeInput, runtime ProbeRuntime) !ProbeR
 		built_backends:       runtime.built_backends
 		required_backends:    runtime.required_backends
 		invocation:           runtime.invocation
+		target_executable:    runtime.target_executable
 		arguments:            runtime.arguments
 		deadline_seconds:     runtime.deadline_seconds
 		output_limit:         guard_output_limit

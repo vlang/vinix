@@ -93,16 +93,17 @@ fn cxx_sanitizer_controls(profile CxxProfile, sanitizer CxxSanitizer, out string
 	link << cxx_link(profile)
 	link << ['-pthread', '-ldl', '-lm', '-o', binary_path]
 	checked(out, 'cxx-sanitizer-control-link', link, out, build_env)!
-	require_arm64_elf(binary_path)!
+	target_executable := require_arm64_executable(binary_path)!
+	os.write_file(out + '/cxx-sanitizer-executable.json', json2.encode(target_executable, prettify: true))!
 	cxx_verify_linkage(out, 'cxx-sanitizer-control', binary_path, build_env)!
 	mut command := invocation[..invocation.len - 1].clone()
 	command << binary_path
-	valid := checked_exit(out, 'cxx-sanitizer-valid', [...command, 'valid'], out, run_env, 37)!
+	valid := checked_arm64_exit(target_executable, out, 'cxx-sanitizer-valid', [...command, 'valid'], out, run_env, 37)!
 	if valid.split_into_lines().filter(it == 'IOS-CXX-SANITIZER-CONTROL: valid virtual and function calls').len != 1 {
 		return error('C++ sanitizer positive control omitted its completed operations')
 	}
 	for mode in ['vptr', 'function'] {
-		code, output := guarded_command(out, 'cxx-sanitizer-' + mode, [...command, mode],
+		code, output := guarded_arm64_command(target_executable, out, 'cxx-sanitizer-' + mode, [...command, mode],
 			out, run_env, 60)!
 		expected := if mode == 'vptr' {
 			'does not point to an object of type'

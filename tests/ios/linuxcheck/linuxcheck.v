@@ -120,6 +120,10 @@ fn checked(out string, label string, args []string, cwd string, env map[string]s
 
 fn checked_exit(out string, label string, args []string, cwd string, env map[string]string, expected int) !string {
 	code, output := guarded_command(out, label, args, cwd, env, 600)!
+	return checked_result(out, label, code, output, expected)
+}
+
+fn checked_result(out string, label string, code int, output string, expected int) !string {
 	if code != expected {
 		return error('${label} exited ${code}, expected ${expected}; see ${out}/${label}.log')
 	}
@@ -447,7 +451,8 @@ pub fn run(repository string, mode string, requested string) ! {
 	link << cxx_link(cxx)
 	link << [tls, '-pthread', '-ldl', '-lresolv', '-lm', '-o', binary_path]
 	checked(out, 'link', link, out, env)!
-	require_arm64_elf(binary_path)!
+	target_executable := require_arm64_executable(binary_path)!
+	os.write_file(out + '/runtime-executable.json', json2.encode(target_executable, prettify: true))!
 	if cxx.enabled { cxx_verify_linkage(out, 'runtime', binary_path, env)! }
 	// Keep target graphics libraries out of host V/GCC processes. Only the
 	// ARM64 runtime (or QEMU's target loader) receives this environment.
@@ -485,7 +490,7 @@ pub fn run(repository string, mode string, requested string) ! {
 	if !sanitized {
 		mut help := invocation.clone()
 		help << '--help'
-		help_output := checked(out, 'help', help, out, execution_env)!
+		help_output := checked_arm64_exit(target_executable, out, 'help', help, out, execution_env, 0)!
 		if !help_output.contains('usage: run-ios ') {
 			return error('runner help output is missing')
 		}
@@ -493,12 +498,12 @@ pub fn run(repository string, mode string, requested string) ! {
 		write_smoke(smoke)!
 		mut command := invocation.clone()
 		command << ['--inspect', smoke]
-		checked(out, 'smoke-inspect', command, out, execution_env)!
+		checked_arm64_exit(target_executable, out, 'smoke-inspect', command, out, execution_env, 0)!
 		command = invocation.clone()
 		command << smoke
-		checked_exit(out, 'smoke-entry', command, out, execution_env, smoke_success_exit)!
+		checked_arm64_exit(target_executable, out, 'smoke-entry', command, out, execution_env, smoke_success_exit)!
 		command << 'extra'
-		checked_exit(out, 'smoke-arguments', command, out, execution_env, smoke_argument_error_exit)!
+		checked_arm64_exit(target_executable, out, 'smoke-arguments', command, out, execution_env, smoke_argument_error_exit)!
 	} else {
 		if fixture_name == 'ns_data_http_test.v' {
 			openssl := os.find_abs_path_of_executable('openssl')!
@@ -513,7 +518,7 @@ pub fn run(repository string, mode string, requested string) ! {
 		for deterministic in [false, true] {
 			label := if deterministic { 'runtime-deterministic' } else { 'runtime' }
 			if deterministic { execution_env['SWIFT_DETERMINISTIC_HASHING'] = '1' }
-			output := checked(out, label, invocation, out, execution_env)!
+			output := checked_arm64_exit(target_executable, out, label, invocation, out, execution_env, 0)!
 			require_markers(fixture_name, output)!
 		}
 	}
@@ -521,6 +526,7 @@ pub fn run(repository string, mode string, requested string) ! {
 	if mode == 'probe-no-ads' {
 		probe_result = probe_capture(out + '/application-probe', application, ProbeRuntime{
 			invocation: invocation
+			target_executable: target_executable
 			environment: execution_env
 			profile: 'GNU ARM64 iOS runtime with adapted C++ and Mesa softpipe plus a diagnostic VAPP peer without compositor or input; video, text and SQLite backends disabled; Metal unavailable'
 			built_backends: backends

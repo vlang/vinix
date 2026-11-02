@@ -404,11 +404,12 @@ fn cxx_native_fixture(profile CxxProfile, sanitizer CxxSanitizer, out string, ro
 	link << cxx_link(profile)
 	link << ['-pthread', '-ldl', '-lm', '-o', binary_path]
 	checked(out, 'cxx-native-link', link, out, build_env)!
-	require_arm64_elf(binary_path)!
+	target_executable := require_arm64_executable(binary_path)!
+	os.write_file(out + '/cxx-native-executable.json', json2.encode(target_executable, prettify: true))!
 	cxx_verify_linkage(out, 'cxx-native', binary_path, build_env)!
 	mut native := invocation[..invocation.len - 1].clone()
 	native << binary_path
-	output := checked(out, 'cxx-native-runtime', native, out, run_env)!
+	output := checked_arm64_exit(target_executable, out, 'cxx-native-runtime', native, out, run_env, 0)!
 	for marker in ['IOS-CXX-EXTENDED: native vector exception types and messages',
 		'IOS-CXX-EXTENDED: legacy strings, integer sorts, futures and weak ownership',
 		'IOS-CXX-EXTENDED: long ostream 1099511627776'] {
