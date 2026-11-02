@@ -20,7 +20,7 @@ fn framework_autofill(smali string) ! {
 		manager = framework_replace_method(manager, declaration,
 			signature_method('public ' + declaration, 'return-void'))!
 	}
-	os.write_file(manager_file, manager)!
+	os.write_file(manager_file, framework_autofill_service_source(manager)!)!
 	owner := 'Landroid/view/autofill/AutofillValue;'
 	creator := 'Landroid/view/autofill/VinixAutofillValueCreator;'
 	mut text := '.class public final ' + owner + '\n.super Ljava/lang/Object;\n.implements Landroid/os/Parcelable;\n' +
