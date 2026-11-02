@@ -4,9 +4,9 @@ module wificore
 struct C.bw_const_byte {}
 #include "brcm_wifi.h"
 #include <string.h>
-fn C.memcpy(voidptr, voidptr, usize) voidptr
-fn C.memset(voidptr, i32, usize) voidptr
-fn C.memcmp(voidptr, voidptr, usize) i32
+fn C.memcpy(voidptr, voidptr, uint) voidptr
+fn C.memset(voidptr, i32, uint) voidptr
+fn C.memcmp(voidptr, voidptr, uint) i32
 struct SecretByte {
 mut:
  volatile value u8
@@ -72,11 +72,11 @@ pub mut:
 	//     *to_device: clean/invalidate before publishing ownership to the device.
 	//     *to_cpu: invalidate after observing a device-written completion/index.
 	//     *Each allocated area is isolated on at least 128-byte cache boundaries.
-	sync fn (voidptr, voidptr, usize, i32)
+	sync fn (voidptr, voidptr, uint, i32)
 	// Must disable PCI bus mastering and drain/quiesce before return.
 	//     *The driver NEVER frees or reuses the DMA pool after a fatal error.
 	stop_dma fn (voidptr)
-	receive  fn (voidptr, &C.bw_const_byte, usize)
+	receive  fn (voidptr, &C.bw_const_byte, uint)
 }
 
 pub struct C.bw_core {
@@ -91,7 +91,7 @@ pub struct C.bw_mem {
 pub mut:
 	cpu &u8
 	dma u64
-	len usize
+	len uint
 }
 
 pub struct C.bw_ring {
@@ -130,12 +130,12 @@ pub mut:
 	txcap            &u8
 	calibration      &u8
 	seed             &u8
-	code_len         usize
-	nvram_len        usize
-	clm_len          usize
-	txcap_len        usize
-	calibration_len  usize
-	seed_len         usize
+	code_len         uint
+	nvram_len        uint
+	clm_len          uint
+	txcap_len        uint
+	calibration_len  uint
+	seed_len         uint
 	silicon_revision u8
 	mac              [6]u8
 }
@@ -179,7 +179,7 @@ pub mut:
 	otp              C.bw_otp
 	pool             C.bw_mem
 	indices          [4]C.bw_mem
-	allocated        usize
+	allocated        uint
 	rings            [6]C.bw_ring
 	// five common rings and station best-effort TX
 	rx              [528]C.bw_packet
@@ -319,17 +319,17 @@ pub fn wifi_s64(p voidptr, v u64) {
 }
 
 @[export: 'vinix_bw_core_erase']
-pub fn wifi_erase(p voidptr, n usize) {
+pub fn wifi_erase(p voidptr, n uint) {
 	unsafe {
-	for i := usize(0); i < n; i++ { (&SecretByte(usize(p) + i)).value = 0 }
+	for i := uint(0); i < n; i++ { (&SecretByte(uint(p) + i)).value = 0 }
 
 	}
 }
 
 @[export: 'vinix_bw_core_range']
-pub fn wifi_range(p u32, n usize, low u32, high u32) i32 {
+pub fn wifi_range(p u32, n uint, low u32, high u32) i32 {
 	unsafe {
-	return i32(p >= low && p <= high && n <= usize((high - p)))
+	return i32(p >= low && p <= high && n <= uint((high - p)))
 
 	}
 }
@@ -421,7 +421,7 @@ pub fn wifi_chip_address(p u32) i32 {
 }
 
 @[export: 'vinix_bw_core_ram_address']
-pub fn wifi_ram_address(d &C.bw_device, p u32, n usize) i32 {
+pub fn wifi_ram_address(d &C.bw_device, p u32, n uint) i32 {
 	unsafe {
 	return wifi_range(p, n, d.ram_base, d.ram_base + d.ram_size)
 
@@ -429,7 +429,7 @@ pub fn wifi_ram_address(d &C.bw_device, p u32, n usize) i32 {
 }
 
 @[export: 'vinix_bw_core_tcm_copy']
-pub fn wifi_tcm_copy(d &C.bw_device, a u32, p &u8, n usize) {
+pub fn wifi_tcm_copy(d &C.bw_device, a u32, p &u8, n uint) {
 	unsafe {
 	for n != 0 && (a & 3) != 0 { wifi_wr(d, u32(Bw_space.bw_tcm), a, 1, u32(*p)); a++; p += 1; n-- }
 	for n >= 4 { wifi_wr(d, u32(Bw_space.bw_tcm), a, 4, wifi_l32(voidptr(p))); a += 4; p += 4; n -= 4 }
@@ -439,9 +439,9 @@ pub fn wifi_tcm_copy(d &C.bw_device, a u32, p &u8, n usize) {
 }
 
 @[export: 'vinix_bw_core_alloc_mem']
-pub fn wifi_alloc_mem(d &C.bw_device, n usize, m &C.bw_mem) i32 {
+pub fn wifi_alloc_mem(d &C.bw_device, n uint, m &C.bw_mem) i32 {
 	unsafe {
-	off := (d.allocated + usize(127)) & ~usize(127)
+	off := (d.allocated + uint(127)) & ~uint(127)
 	if !n || n > d.pool.len || off > d.pool.len - n {
 		return i32(i32(Bw_error.bw_enospc))
 	}
@@ -457,20 +457,20 @@ pub fn wifi_alloc_mem(d &C.bw_device, n usize, m &C.bw_mem) i32 {
 }
 
 @[export: 'bw_nvram_pack']
-pub fn bw_nvram_pack(in_ &u8, n usize, out &u8, cap usize, used &usize) i32 {
+pub fn bw_nvram_pack(in_ &u8, n uint, out &u8, cap uint, used &uint) i32 {
 	unsafe {
-	pos := usize(0)
-	w := usize(0)
+	pos := uint(0)
+	w := uint(0)
 
 	lines := u32(0)
-	if (usize(in_) == 0) || (usize(out) == 0) || (usize(used) == 0) || !n || n > usize(65536) || cap < usize(8) {
+	if (uint(in_) == 0) || (uint(out) == 0) || (uint(used) == 0) || !n || n > uint(65536) || cap < uint(8) {
 		return i32(i32(Bw_error.bw_einval))
 	}
-	 *used = usize(0) 
+	 *used = uint(0)
 	for pos < n {
 		a := pos
-		b := usize(0)
-		e := usize(0)
+		b := uint(0)
+		e := uint(0)
 
 		for pos < n && i32(in_[pos]) != `\n` && i32(in_[pos]) != `\r` {
 			if !in_[pos] || (i32(in_[pos]) < 32 && i32(in_[pos]) != `\t`) || i32(in_[pos]) > 126 {
@@ -491,7 +491,7 @@ pub fn bw_nvram_pack(in_ &u8, n usize, out &u8, cap usize, used &usize) i32 {
 				break
 			}
 		}
-		for b > a && (i32(in_[b - usize(1)]) == ` ` || i32(in_[b - usize(1)]) == `\t`) {
+		for b > a && (i32(in_[b - uint(1)]) == ` ` || i32(in_[b - uint(1)]) == `\t`) {
 			b--
 		}
 		if a == b {
@@ -503,12 +503,12 @@ pub fn bw_nvram_pack(in_ &u8, n usize, out &u8, cap usize, used &usize) i32 {
 				return i32(i32(Bw_error.bw_einval))
 			}
 		}
-		if e == a || e == b || b - a > usize(1024) || wifi_increment_lines( &lines , u32(1)) > u32(1024) {
+		if e == a || e == b || b - a > uint(1024) || wifi_increment_lines( &lines , u32(1)) > u32(1024) {
 			return i32(i32(Bw_error.bw_einval))
 		}
 		// No duplicate keys: ambiguous board calibration must not be guessed.
 
-		for q := usize(0); q < w; {
+		for q := uint(0); q < w; {
 			k := q
 			for k < w && i32(out[k]) != `=` {
 				k++
@@ -521,36 +521,36 @@ pub fn bw_nvram_pack(in_ &u8, n usize, out &u8, cap usize, used &usize) i32 {
 			}
 			q++
 		}
-		if b - a + usize(1) > cap - w {
+		if b - a + uint(1) > cap - w {
 			return i32(i32(Bw_error.bw_enospc))
 		}
 		C.memcpy(voidptr(out + w), voidptr(in_ + a), b - a)
 		w += b - a
 		out[w++] = u8(0)
 	}
-	if !lines || w > usize(65528) {
+	if !lines || w > uint(65528) {
 		return i32(i32(Bw_error.bw_einval))
 	}
-	padded := (w + usize(1) + usize(3)) & ~usize(3)
-	if padded > cap - usize(4) {
+	padded := (w + uint(1) + uint(3)) & ~uint(3)
+	if padded > cap - uint(4) {
 		return i32(i32(Bw_error.bw_enospc))
 	}
 	C.memset(voidptr(out + w), 0, padded - w)
-	words := u32((padded / usize(4)))
+	words := u32((padded / uint(4)))
 	wifi_s32(voidptr(out + padded), words | ((~words & 65535) << 16))
-	 *used = padded + usize(4) 
+	 *used = padded + uint(4)
 	return 0
 
 	}
 }
 
 @[export: 'vinix_bw_core_otp_value']
-pub fn wifi_otp_value(out &char, in_ &u8, len usize) i32 {
+pub fn wifi_otp_value(out &char, in_ &u8, len uint) i32 {
 	unsafe {
-	if !len || len >= usize(16) {
+	if !len || len >= uint(16) {
 		return i32(i32(Bw_error.bw_eproto))
 	}
-	for i := usize(0); i < len; i++ {
+	for i := uint(0); i < len; i++ {
 		c := in_[i]
 		if !((i32(c) >= `A` && i32(c) <= `Z`) || (i32(c) >= `a` && i32(c) <= `z`) || (i32(c) >= `0` && i32(c) <= `9`) || i32(c) == `_` || i32(c) == `-` || i32(c) == `.`) {
 			return i32(i32(Bw_error.bw_eproto))
@@ -567,11 +567,11 @@ pub fn wifi_otp_value(out &char, in_ &u8, len usize) i32 {
 }
 
 @[export: 'bw_otp_parse']
-pub fn bw_otp_parse(in_ &u8, n usize, out &C.bw_otp) i32 {
+pub fn bw_otp_parse(in_ &u8, n uint, out &C.bw_otp) i32 {
 	unsafe {
-	p := usize(0)
+	p := uint(0)
 	found := i32(0)
-	if (usize(in_) == 0) || (usize(out) == 0) || !n || n > usize(4096) {
+	if (uint(in_) == 0) || (uint(out) == 0) || !n || n > uint(4096) {
 		return i32(i32(Bw_error.bw_einval))
 	}
 	C.memset(voidptr(out), 0, sizeof(C.bw_otp))
@@ -586,12 +586,12 @@ pub fn bw_otp_parse(in_ &u8, n usize, out &C.bw_otp) i32 {
 		if p == n {
 			return i32(i32(Bw_error.bw_eproto))
 		}
-		len := usize(in_[p++])
+		len := uint(in_[p++])
 		if len > n - p {
 			return i32(i32(Bw_error.bw_eproto))
 		}
-		if i32(tag) == 21 && len >= usize(4) && wifi_l32(voidptr(in_ + p)) == u32(8) {
-			q := p + usize(4)
+		if i32(tag) == 21 && len >= uint(4) && wifi_l32(voidptr(in_ + p)) == u32(8) {
+			q := p + uint(4)
 			end := p + len
 
 			for q < end {
@@ -605,7 +605,7 @@ pub fn bw_otp_parse(in_ &u8, n usize, out &C.bw_otp) i32 {
 				for q < end && i32(in_[q]) && i32(in_[q]) != ` ` && i32(in_[q]) != 255 {
 					q++
 				}
-				if q - s >= usize(3) && i32(in_[s + usize(1)]) == `=` {
+				if q - s >= uint(3) && i32(in_[s + uint(1)]) == `=` {
 					v :=  &char(nil) 
 					match i32(in_[s]) {
 						i32(`M`) { // case comp body kind=BinaryOperator is_enum=false
@@ -624,7 +624,7 @@ pub fn bw_otp_parse(in_ &u8, n usize, out &C.bw_otp) i32 {
 						}
 					}
 
-					if !(usize(v) == 0) && wifi_otp_value(v, in_ + s + 2, q - s - usize(2)) {
+					if !(uint(v) == 0) && wifi_otp_value(v, in_ + s + 2, q - s - uint(2)) {
 						return i32(i32(Bw_error.bw_eproto))
 					}
 				}
@@ -643,60 +643,60 @@ pub fn bw_otp_parse(in_ &u8, n usize, out &C.bw_otp) i32 {
 }
 
 @[export: 'bw_init']
-pub fn bw_init(d &C.bw_device, ops &C.bw_ops, cookie voidptr, cpu voidptr, dma u64, len usize, regs u32, tcm u32) i32 {
+pub fn bw_init(d &C.bw_device, ops &C.bw_ops, cookie voidptr, cpu voidptr, dma u64, len uint, regs u32, tcm u32) i32 {
 	unsafe {
 	mut __c2v_condition_0 := false
 	mut __c2v_condition_1 := false
-	__c2v_condition_1 = (usize(d) == 0)
+	__c2v_condition_1 = (uint(d) == 0)
 	__c2v_condition_0 = __c2v_condition_1
 	if !__c2v_condition_0 {
 		mut __c2v_condition_2 := false
-		__c2v_condition_2 = (usize(ops) == 0)
+		__c2v_condition_2 = (uint(ops) == 0)
 		__c2v_condition_0 = __c2v_condition_2
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_3 := false
-		__c2v_condition_3 = (usize(ops.read) == 0)
+		__c2v_condition_3 = (uint(ops.read) == 0)
 		__c2v_condition_0 = __c2v_condition_3
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_4 := false
-		__c2v_condition_4 = (usize(ops.write) == 0)
+		__c2v_condition_4 = (uint(ops.write) == 0)
 		__c2v_condition_0 = __c2v_condition_4
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_5 := false
-		__c2v_condition_5 = (usize(ops.sync) == 0)
+		__c2v_condition_5 = (uint(ops.sync) == 0)
 		__c2v_condition_0 = __c2v_condition_5
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_6 := false
-		__c2v_condition_6 = (usize(ops.time_us) == 0)
+		__c2v_condition_6 = (uint(ops.time_us) == 0)
 		__c2v_condition_0 = __c2v_condition_6
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_7 := false
-		__c2v_condition_7 = (usize(ops.delay_us) == 0)
+		__c2v_condition_7 = (uint(ops.delay_us) == 0)
 		__c2v_condition_0 = __c2v_condition_7
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_8 := false
-		__c2v_condition_8 = (usize(ops.stop_dma) == 0)
+		__c2v_condition_8 = (uint(ops.stop_dma) == 0)
 		__c2v_condition_0 = __c2v_condition_8
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_9 := false
-		__c2v_condition_9 = (usize(ops.receive) == 0)
+		__c2v_condition_9 = (uint(ops.receive) == 0)
 		__c2v_condition_0 = __c2v_condition_9
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_10 := false
-		__c2v_condition_10 = (usize(cpu) == 0)
+		__c2v_condition_10 = (uint(cpu) == 0)
 		__c2v_condition_0 = __c2v_condition_10
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_11 := false
-		__c2v_condition_11 = (usize(cpu) & usize(127))
+		__c2v_condition_11 = (uint(cpu) & uint(127))
 		__c2v_condition_0 = __c2v_condition_11
 	}
 	if !__c2v_condition_0 {
@@ -711,12 +711,12 @@ pub fn bw_init(d &C.bw_device, ops &C.bw_ops, cookie voidptr, cpu voidptr, dma u
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_14 := false
-		__c2v_condition_14 = len < usize((4 * 1024 * 1024))
+		__c2v_condition_14 = len < uint((4 * 1024 * 1024))
 		__c2v_condition_0 = __c2v_condition_14
 	}
 	if !__c2v_condition_0 {
 		mut __c2v_condition_15 := false
-		__c2v_condition_15 = len > usize(16 * 1024 * 1024)
+		__c2v_condition_15 = len > uint(16 * 1024 * 1024)
 		__c2v_condition_0 = __c2v_condition_15
 	}
 	if !__c2v_condition_0 {
@@ -850,7 +850,7 @@ pub fn wifi_inventory(d &C.bw_device) i32 {
 @[export: 'bw_probe']
 pub fn bw_probe(d &C.bw_device) i32 {
 	unsafe {
-	if (usize(d) == 0) || u32(d.state) != u32(i32(Bw_state.bw_off)) {
+	if (uint(d) == 0) || u32(d.state) != u32(i32(Bw_state.bw_off)) {
 		return i32(i32(Bw_error.bw_einval))
 	}
 	if wifi_rd(d, u32(Bw_space.bw_config), u32(0), u32(4)) != 1143280868 {
@@ -891,7 +891,7 @@ pub fn bw_probe(d &C.bw_device) i32 {
 @[export: 'vinix_bw_core_core_disable']
 pub fn wifi_core_disable(d &C.bw_device, c &C.bw_core, pre u32, reset u32) i32 {
 	unsafe {
-	if (usize(c) == 0) || !c.wrap {
+	if (uint(c) == 0) || !c.wrap {
 		return i32(i32(Bw_error.bw_eproto))
 	}
 	if !(wifi_bp_read(d, c.wrap + u32(2048)) & u32(1)) {
@@ -1024,7 +1024,7 @@ pub fn wifi_firmware_boot(d &C.bw_device, f &C.bw_firmware) i32 {
 		wifi_bp_write(d, ram.base + u32(16), i)
 		total += ((wifi_bp_read(d, ram.base + u32(64)) & u32(127)) + u32(1)) * u32(8192)
 	}
-	if f.code_len < usize(116) {
+	if f.code_len < uint(116) {
 		return i32(i32(Bw_error.bw_eproto))
 	}
 	// Apple's raw B1 firmware has no RAMS override. In that case the
@@ -1033,12 +1033,12 @@ pub fn wifi_firmware_boot(d &C.bw_device, f &C.bw_firmware) i32 {
 	if wifi_l32(voidptr(f.code + 108)) == u32(1397571922) {
 		d.ram_size = wifi_l32(voidptr(f.code + 112))
 	}
-	if !total || d.ram_size > total || d.ram_size < u32(131072) || !wifi_range(d.ram_base, usize(d.ram_size), u32(0), d.tcm_size) || (d.ram_size & u32(3)) {
+	if !total || d.ram_size > total || d.ram_size < u32(131072) || !wifi_range(d.ram_base, uint(d.ram_size), u32(0), d.tcm_size) || (d.ram_size & u32(3)) {
 		return i32(i32(Bw_error.bw_eproto))
 	}
 	packed := C.bw_mem{}
-	nvlen := usize(0)
-	e = wifi_alloc_mem(d, usize(65536), &packed)
+	nvlen := uint(0)
+	e = wifi_alloc_mem(d, uint(65536), &packed)
 	if e {
 		return e
 	}
@@ -1046,7 +1046,7 @@ pub fn wifi_firmware_boot(d &C.bw_device, f &C.bw_firmware) i32 {
 	if e {
 		return e
 	}
-	if nvlen + usize(264) >= usize(d.ram_size) || f.code_len > usize(d.ram_size) - nvlen - usize(264) {
+	if nvlen + uint(264) >= uint(d.ram_size) || f.code_len > uint(d.ram_size) - nvlen - uint(264) {
 		return i32(i32(Bw_error.bw_enospc))
 	}
 	wifi_tcm_copy(d, d.ram_base, f.code, f.code_len)
@@ -1057,7 +1057,7 @@ pub fn wifi_firmware_boot(d &C.bw_device, f &C.bw_firmware) i32 {
 	token := wifi_l32(voidptr(packed.cpu + nvlen - 4))
 	wifi_wr(d, u32(Bw_space.bw_tcm), nv - u32(8), u32(4), u32(256))
 	wifi_wr(d, u32(Bw_space.bw_tcm), nv - u32(4), u32(4), u32(4276994270))
-	wifi_tcm_copy(d, nv - u32(264), f.seed, usize(256))
+	wifi_tcm_copy(d, nv - u32(264), f.seed, uint(256))
 	wifi_wr(d, u32(Bw_space.bw_tcm), u32(0), u32(4), wifi_l32(voidptr(f.code)))
 	e = wifi_core_reset(d, wifi_core(d, 2119), u32(32), u32(0), u32(0))
 	if e {
@@ -1067,7 +1067,7 @@ pub fn wifi_firmware_boot(d &C.bw_device, f &C.bw_firmware) i32 {
 		d.ops.delay_us(voidptr(d.cookie), u32(10000))
 		shared_ := wifi_rd(d, u32(Bw_space.bw_tcm), top - u32(4), u32(4))
 		if shared_ && shared_ != token {
-			if (shared_ & u32(3)) || !wifi_ram_address(d, shared_, usize(116)) {
+			if (shared_ & u32(3)) || !wifi_ram_address(d, shared_, uint(116)) {
 				return i32(i32(Bw_error.bw_eproto))
 			}
 			d.shared_ = shared_
@@ -1084,7 +1084,7 @@ pub fn wifi_index_read(d &C.bw_device, r &C.bw_ring, writeindex i32) u16 {
 	unsafe {
 	a := if writeindex { r.wi } else { r.ri }
 	if r.dma_indices {
-		d.ops.sync(voidptr(d.cookie), voidptr(d.pool.cpu + a), usize(2), 0)
+		d.ops.sync(voidptr(d.cookie), voidptr(d.pool.cpu + a), uint(2), 0)
 		return wifi_l16(voidptr(d.pool.cpu + a))
 	}
 	return u16(wifi_rd(d, u32(Bw_space.bw_tcm), a, u32(2)))
@@ -1098,7 +1098,7 @@ pub fn wifi_index_write(d &C.bw_device, r &C.bw_ring, writeindex i32, v u16) {
 	a := if writeindex { r.wi } else { r.ri }
 	if r.dma_indices {
 		wifi_s16(voidptr(d.pool.cpu + a), v)
-		d.ops.sync(voidptr(d.cookie), voidptr(d.pool.cpu + a), usize(2), 1)
+		d.ops.sync(voidptr(d.cookie), voidptr(d.pool.cpu + a), uint(2), 1)
 	} else {
 		wifi_wr(d, u32(Bw_space.bw_tcm), a, u32(2), u32(v))
 	}
@@ -1115,7 +1115,7 @@ pub fn wifi_setup_ring(d &C.bw_device, k u32, count u32, item u32, wi u32, ri u3
 	r.wi = wi
 	r.ri = ri
 	r.dma_indices = u8(i32(d.index_size) != 0)
-	e := wifi_alloc_mem(d, usize(count) * usize(item), &r.mem)
+	e := wifi_alloc_mem(d, uint(count) * uint(item), &r.mem)
 	if e {
 		return e
 	}
@@ -1133,10 +1133,10 @@ pub fn wifi_setup_ring(d &C.bw_device, k u32, count u32, item u32, wi u32, ri u3
 }
 
 @[export: 'vinix_bw_core_submit']
-pub fn wifi_submit(d &C.bw_device, k u32, msg &u8, n usize) i32 {
+pub fn wifi_submit(d &C.bw_device, k u32, msg &u8, n uint) i32 {
 	unsafe {
 	r :=  &d.rings[0] + k 
-	if n > usize(r.item) || !r.count {
+	if n > uint(r.item) || !r.count {
 		return i32(i32(Bw_error.bw_einval))
 	}
 	ri := wifi_index_read(d, r, 0)
@@ -1147,10 +1147,10 @@ pub fn wifi_submit(d &C.bw_device, k u32, msg &u8, n usize) i32 {
 	if i32(next) == i32(ri) {
 		return i32(i32(Bw_error.bw_enospc))
 	}
-	p := r.mem.cpu + (usize(r.write) * usize(r.item))
+	p := r.mem.cpu + (uint(r.write) * uint(r.item))
 	C.memset(voidptr(p), 0, u64(r.item))
 	C.memcpy(voidptr(p), voidptr(msg), n)
-	d.ops.sync(voidptr(d.cookie), voidptr(p), usize(r.item), 1)
+	d.ops.sync(voidptr(d.cookie), voidptr(p), uint(r.item), 1)
 	r.write = next
 	wifi_index_write(d, r, 1, next)
 	wifi_bell(d)
@@ -1201,7 +1201,7 @@ pub fn wifi_post_one(d &C.bw_device, i u32) i32 {
 	// Buffer is device-owned only after the descriptor has been published.
 
 	d.ops.sync(voidptr(d.cookie), voidptr(p.mem.cpu), p.mem.len, 1)
-	e := wifi_submit(d, u32(if u32(p.kind) == 1 { 1 } else { 0 }),  &m[0] , usize(if u32(p.kind) == 1 {
+	e := wifi_submit(d, u32(if u32(p.kind) == 1 { 1 } else { 0 }),  &m[0] , uint(if u32(p.kind) == 1 {
 		32
 	} else {
 		40
@@ -1257,7 +1257,7 @@ pub fn wifi_rings_start(d &C.bw_device) i32 {
 	d.h2d_mb = wifi_rd(d, u32(Bw_space.bw_tcm), s + u32(40), u32(4))
 	d.d2h_mb = wifi_rd(d, u32(Bw_space.bw_tcm), s + u32(44), u32(4))
 	d.ring_info = wifi_rd(d, u32(Bw_space.bw_tcm), s + u32(48), u32(4))
-	if (d.ring_info & u32(3)) || !wifi_ram_address(d, d.ring_info, usize(60)) {
+	if (d.ring_info & u32(3)) || !wifi_ram_address(d, d.ring_info, uint(60)) {
 		return i32(i32(Bw_error.bw_eproto))
 	}
 	info := [60]u8{}
@@ -1282,7 +1282,7 @@ pub fn wifi_rings_start(d &C.bw_device) i32 {
 		return i32(i32(Bw_error.bw_eproto))
 	}
 	descriptors := wifi_l32(voidptr( &info[0] ))
-	if (descriptors & u32(3)) || !wifi_ram_address(d, descriptors, usize(80)) {
+	if (descriptors & u32(3)) || !wifi_ram_address(d, descriptors, uint(80)) {
 		return i32(i32(Bw_error.bw_eproto))
 	}
 	d.index_size = u8(if d.flags & u32(65536) {
@@ -1291,7 +1291,7 @@ pub fn wifi_rings_start(d &C.bw_device) i32 {
 		0
 	})
 	d.mb_via_ctl = u8(i32(d.version) >= 6 && !(d.flags & u32(33554432)))
-	if !d.mb_via_ctl && ((d.h2d_mb & u32(3)) || (d.d2h_mb & u32(3)) || !wifi_ram_address(d, d.h2d_mb, usize(4)) || !wifi_ram_address(d, d.d2h_mb, usize(4))) {
+	if !d.mb_via_ctl && ((d.h2d_mb & u32(3)) || (d.d2h_mb & u32(3)) || !wifi_ram_address(d, d.h2d_mb, uint(4)) || !wifi_ram_address(d, d.d2h_mb, uint(4))) {
 		return i32(i32(Bw_error.bw_eproto))
 	}
 	stride := u32(if i32(d.index_size) { i32(d.index_size) } else { 4 })
@@ -1299,16 +1299,16 @@ pub fn wifi_rings_start(d &C.bw_device) i32 {
 	for i := u32(0); i < u32(4); i++ {
 		count := u32(if i < u32(2) { i32(d.submission_count) } else { i32(d.completion_count) })
 		if d.index_size {
-			e := wifi_alloc_mem(d, usize(count) * usize(stride),  &d.indices[0] + i )
+			e := wifi_alloc_mem(d, uint(count) * uint(stride),  &d.indices[0] + i )
 			if e {
 				return e
 			}
-			idx[i] = u32((i64((isize(d.indices[i].cpu) - isize(d.pool.cpu)) / isize(sizeof(u8)))))
+			idx[i] = u32((i64((int(d.indices[i].cpu) - int(d.pool.cpu)) / int(sizeof(u8)))))
 			wifi_wr(d, u32(Bw_space.bw_tcm), d.ring_info + u32(20) + u32(8) * i, u32(4), u32(d.indices[i].dma))
 			wifi_wr(d, u32(Bw_space.bw_tcm), d.ring_info + u32(24) + u32(8) * i, u32(4), u32((d.indices[i].dma >> 32)))
 		} else {
 			idx[i] = wifi_l32(voidptr( &info[0]  + 4 + (u32(4) * i)))
-			if (idx[i] & u32(3)) || !wifi_ram_address(d, idx[i], usize(count) * usize(stride)) {
+			if (idx[i] & u32(3)) || !wifi_ram_address(d, idx[i], uint(count) * uint(stride)) {
 				return i32(i32(Bw_error.bw_eproto))
 			}
 		}
@@ -1334,12 +1334,12 @@ pub fn wifi_rings_start(d &C.bw_device) i32 {
 	scratch := C.bw_mem{}
 	updates := C.bw_mem{}
 
-	e := wifi_alloc_mem(d, usize(8), &scratch)
+	e := wifi_alloc_mem(d, uint(8), &scratch)
 	if e {
 		return e
 	}
-	e = wifi_alloc_mem(d, usize(1024), &updates)
-	if e || wifi_assign_error( &e , i32(wifi_alloc_mem(d, usize(8192), &d.request))) {
+	e = wifi_alloc_mem(d, uint(1024), &updates)
+	if e || wifi_assign_error( &e , i32(wifi_alloc_mem(d, uint(8192), &d.request))) {
 		return e
 	}
 	wifi_wr(d, u32(Bw_space.bw_tcm), s + u32(56), u32(4), u32(scratch.dma))
@@ -1355,7 +1355,7 @@ pub fn wifi_rings_start(d &C.bw_device) i32 {
 		} else {
 			(if i >= 512 { (if i < 512 + 8 { 2 } else { 3 }) } else { u32(0) })
 		})
-		if i32(p.kind) && wifi_assign_error( &e , i32(wifi_alloc_mem(d, usize(if u32(p.kind) == 1 {
+		if i32(p.kind) && wifi_assign_error( &e , i32(wifi_alloc_mem(d, uint(if u32(p.kind) == 1 {
 			u32(2048)
 		} else {
 			8192
@@ -1364,7 +1364,7 @@ pub fn wifi_rings_start(d &C.bw_device) i32 {
 		}
 	}
 	for i := u32(0); i < 128; i++ {
-		e = wifi_alloc_mem(d, usize(2048), &d.tx[i].mem)
+		e = wifi_alloc_mem(d, uint(2048), &d.tx[i].mem)
 		if e {
 			return e
 		}
@@ -1420,9 +1420,9 @@ pub fn wifi_mailbox(d &C.bw_device, data u32) i32 {
 }
 
 @[export: 'vinix_bw_core_same_network']
-pub fn wifi_same_network(a &C.bw_network, ssid &u8, n usize, bssid &u8, secure i32) i32 {
+pub fn wifi_same_network(a &C.bw_network, ssid &u8, n uint, bssid &u8, secure i32) i32 {
 	unsafe {
-	if usize(a.ssid_len) != n || i32(a.secure) != i32(u8(secure)) {
+	if uint(a.ssid_len) != n || i32(a.secure) != i32(u8(secure)) {
 		return 0
 	}
 	return if n {
@@ -1435,19 +1435,19 @@ pub fn wifi_same_network(a &C.bw_network, ssid &u8, n usize, bssid &u8, secure i
 }
 
 @[export: 'vinix_bw_core_scan_bss']
-pub fn wifi_scan_bss(d &C.bw_device, p &u8, n usize) i32 {
+pub fn wifi_scan_bss(d &C.bw_device, p &u8, n uint) i32 {
 	unsafe {
 	// brcmf_bss_info_le version 109. Check the record's own length before
 	//     *touching its fixed fields; information elements after byte 126 are not
 	//     *needed by this deliberately small station UI.
 
-	if n < usize(126) || wifi_l32(voidptr(p)) != u32(109) {
+	if n < uint(126) || wifi_l32(voidptr(p)) != u32(109) {
 		return i32(i32(Bw_error.bw_eproto))
 	}
-	length := usize(wifi_l32(voidptr(p + 4)))
-	ssid_len := usize(p[18])
+	length := uint(wifi_l32(voidptr(p + 4)))
+	ssid_len := uint(p[18])
 
-	if length < usize(126) || length > n || ssid_len > usize(32) || !wifi_mac_ok(p + 8) {
+	if length < uint(126) || length > n || ssid_len > uint(32) || !wifi_mac_ok(p + 8) {
 		return i32(i32(Bw_error.bw_eproto))
 	}
 	secure := i32((i32(wifi_l16(voidptr(p + 16))) & 16) != 0)
@@ -1485,7 +1485,7 @@ pub fn wifi_scan_bss(d &C.bw_device, p &u8, n usize) i32 {
 }
 
 @[export: 'vinix_bw_core_scan_event']
-pub fn wifi_scan_event(d &C.bw_device, status u32, p &u8, n usize) i32 {
+pub fn wifi_scan_event(d &C.bw_device, status u32, p &u8, n uint) i32 {
 	unsafe {
 	if !d.scan_pending {
 		return 0
@@ -1501,20 +1501,20 @@ pub fn wifi_scan_event(d &C.bw_device, status u32, p &u8, n usize) i32 {
 		}
 		return 0
 	}
-	if n < usize(12) || i32(wifi_l16(voidptr(p + 8))) != i32(d.scan_sync) {
+	if n < uint(12) || i32(wifi_l16(voidptr(p + 8))) != i32(d.scan_sync) {
 		return i32(i32(Bw_error.bw_eproto))
 	}
-	length := usize(wifi_l32(voidptr(p)))
+	length := uint(wifi_l32(voidptr(p)))
 	count := u32(wifi_l16(voidptr(p + 10)))
-	if length < usize(12) || length > n || !count || count > 32 {
+	if length < uint(12) || length > n || !count || count > 32 {
 		return i32(i32(Bw_error.bw_eproto))
 	}
-	off := usize(12)
+	off := uint(12)
 	for i := u32(0); i < count; i++ {
-		if off > length || length - off < usize(8) {
+		if off > length || length - off < uint(8) {
 			return i32(i32(Bw_error.bw_eproto))
 		}
-		record := usize(wifi_l32(voidptr(p + off + 4)))
+		record := uint(wifi_l32(voidptr(p + off + 4)))
 		if !record || record > length - off {
 			return i32(i32(Bw_error.bw_eproto))
 		}
@@ -1530,11 +1530,11 @@ pub fn wifi_scan_event(d &C.bw_device, status u32, p &u8, n usize) i32 {
 }
 
 @[export: 'vinix_bw_core_event_message']
-pub fn wifi_event_message(d &C.bw_device, p &u8, n usize) i32 {
+pub fn wifi_event_message(d &C.bw_device, p &u8, n uint) i32 {
 	unsafe {
 	mut __c2v_condition_19 := false
 	mut __c2v_condition_20 := false
-	__c2v_condition_20 = n < usize(72)
+	__c2v_condition_20 = n < uint(72)
 	__c2v_condition_19 = __c2v_condition_20
 	if !__c2v_condition_19 {
 		mut __c2v_condition_21 := false
@@ -1578,7 +1578,7 @@ pub fn wifi_event_message(d &C.bw_device, p &u8, n usize) i32 {
 	}
 	if !__c2v_condition_19 {
 		mut __c2v_condition_29 := false
-		__c2v_condition_29 = usize(wifi_b32(voidptr(p + 44))) > n - usize(72)
+		__c2v_condition_29 = uint(wifi_b32(voidptr(p + 44))) > n - uint(72)
 		__c2v_condition_19 = __c2v_condition_29
 	}
 	if __c2v_condition_19 {
@@ -1590,7 +1590,7 @@ pub fn wifi_event_message(d &C.bw_device, p &u8, n usize) i32 {
 	data_len := wifi_b32(voidptr(p + 44))
 
 	if type_ == u32(69) {
-		return wifi_scan_event(d, status, p + 72, usize(data_len))
+		return wifi_scan_event(d, status, p + 72, uint(data_len))
 	}
 	if u32(d.state) != u32(i32(Bw_state.bw_joining)) && u32(d.state) != u32(i32(Bw_state.bw_link)) {
 		return 0
@@ -1622,7 +1622,7 @@ pub fn wifi_event_message(d &C.bw_device, p &u8, n usize) i32 {
 }
 
 @[export: 'vinix_bw_core_completion']
-pub fn wifi_completion(d &C.bw_device, ring u32, m &u8, n usize) i32 {
+pub fn wifi_completion(d &C.bw_device, ring u32, m &u8, n uint) i32 {
 	unsafe {
 	type_ := u32(m[0])
 	token := wifi_l32(voidptr(m + 4))
@@ -1656,12 +1656,12 @@ pub fn wifi_completion(d &C.bw_device, ring u32, m &u8, n usize) i32 {
 			return i32(i32(Bw_error.bw_eproto))
 		}
 		p = wifi_find_packet(&d.rx[0], (512 + 2 * 8), token, if type_ == u32(12) { 2 } else { 3 })
-		if usize(p) == 0 {
+		if uint(p) == 0 {
 			return i32(i32(Bw_error.bw_eproto))
 		}
 		d.ops.sync(voidptr(d.cookie), voidptr(p.mem.cpu), p.mem.len, 0)
-		len := usize(wifi_l16(voidptr(m + 12)))
-		off := usize(if type_ == u32(14) { d.rx_offset } else { u32(0) })
+		len := uint(wifi_l16(voidptr(m + 12)))
+		off := uint(if type_ == u32(14) { d.rx_offset } else { u32(0) })
 
 		if off > p.mem.len || len > p.mem.len - off {
 			return i32(i32(Bw_error.bw_eproto))
@@ -1682,11 +1682,11 @@ pub fn wifi_completion(d &C.bw_device, ring u32, m &u8, n usize) i32 {
 		return e
 	}
 	if ring == u32(3) {
-		if type_ != u32(16) || n < usize(16) || i32(wifi_l16(voidptr(m + 10))) != 2 {
+		if type_ != u32(16) || n < uint(16) || i32(wifi_l16(voidptr(m + 10))) != 2 {
 			return i32(i32(Bw_error.bw_eproto))
 		}
 		p = wifi_find_packet(&d.tx[0], 128, token, u32(0))
-		if usize(p) == 0 {
+		if uint(p) == 0 {
 			return i32(i32(Bw_error.bw_eproto))
 		}
 		d.ops.sync(voidptr(d.cookie), voidptr(p.mem.cpu), p.mem.len, 0)
@@ -1696,18 +1696,18 @@ pub fn wifi_completion(d &C.bw_device, ring u32, m &u8, n usize) i32 {
 		}
 		return 0
 	}
-	if ring != u32(4) || type_ != u32(18) || n < usize(32) {
+	if ring != u32(4) || type_ != u32(18) || n < uint(32) {
 		return i32(i32(Bw_error.bw_eproto))
 	}
 	p = wifi_find_packet(&d.rx[0], (512 + 2 * 8), token, 1)
-	if usize(p) == 0 {
+	if uint(p) == 0 {
 		return i32(i32(Bw_error.bw_eproto))
 	}
-	len := usize(wifi_l16(voidptr(m + 14)))
-	off := usize(wifi_l16(voidptr(m + 16)))
+	len := uint(wifi_l16(voidptr(m + 14)))
+	off := uint(wifi_l16(voidptr(m + 16)))
 
 	if !off {
-		off = usize(d.rx_offset)
+		off = uint(d.rx_offset)
 	}
 	if off > p.mem.len || len > p.mem.len - off {
 		return i32(i32(Bw_error.bw_eproto))
@@ -1715,7 +1715,7 @@ pub fn wifi_completion(d &C.bw_device, ring u32, m &u8, n usize) i32 {
 	d.ops.sync(voidptr(d.cookie), voidptr(p.mem.cpu), p.mem.len, 0)
 	// Only authenticated data, never vendor-event interpretation of RX data.
 
-	if !wifi_l16(voidptr(m + 8)) && u32(d.state) == u32(i32(Bw_state.bw_link)) && len >= usize(14) && len <= usize(1514) && i32(wifi_b16(voidptr(p.mem.cpu + off + 12))) != 34924 {
+	if !wifi_l16(voidptr(m + 8)) && u32(d.state) == u32(i32(Bw_state.bw_link)) && len >= uint(14) && len <= uint(1514) && i32(wifi_b16(voidptr(p.mem.cpu + off + 12))) != 34924 {
 		d.ops.receive(voidptr(d.cookie), &C.bw_const_byte(p.mem.cpu + off), len)
 		d.rx_frames++
 	}
@@ -1728,7 +1728,7 @@ pub fn wifi_completion(d &C.bw_device, ring u32, m &u8, n usize) i32 {
 @[export: 'bw_poll']
 pub fn bw_poll(d &C.bw_device, budget u32) i32 {
 	unsafe {
-	if usize(d) == 0 {
+	if uint(d) == 0 {
 		return i32(i32(Bw_error.bw_einval))
 	}
 	if u32(d.state) == u32(i32(Bw_state.bw_fault)) {
@@ -1759,10 +1759,10 @@ pub fn bw_poll(d &C.bw_device, budget u32) i32 {
 		}
 		for i32(r.read) != i32(wi) && done < budget {
 			m := [40]u8{}
-			p := r.mem.cpu + (usize(r.read) * usize(r.item))
-			d.ops.sync(voidptr(d.cookie), voidptr(p), usize(r.item), 0)
+			p := r.mem.cpu + (uint(r.read) * uint(r.item))
+			d.ops.sync(voidptr(d.cookie), voidptr(p), uint(r.item), 0)
 			C.memcpy(voidptr( &m[0] ), voidptr(p), u64(r.item))
-			e := wifi_completion(d, k,  &m[0] , usize(r.item))
+			e := wifi_completion(d, k,  &m[0] , uint(r.item))
 			if e {
 				d.bad_completions++
 				return wifi_fail(d, e)
@@ -1787,7 +1787,7 @@ pub fn bw_poll(d &C.bw_device, budget u32) i32 {
 }
 
 @[export: 'vinix_bw_core_command']
-pub fn wifi_command(d &C.bw_device, cmd u32, in_ voidptr, inlen usize, out voidptr, cap usize, actual &usize) i32 {
+pub fn wifi_command(d &C.bw_device, cmd u32, in_ voidptr, inlen uint, out voidptr, cap uint, actual &uint) i32 {
 	unsafe {
 	mut __c2v_condition_30 := false
 	mut __c2v_condition_31 := false
@@ -1800,12 +1800,12 @@ pub fn wifi_command(d &C.bw_device, cmd u32, in_ voidptr, inlen usize, out voidp
 	}
 	if !__c2v_condition_30 {
 		mut __c2v_condition_33 := false
-		__c2v_condition_33 = inlen > usize(8192)
+		__c2v_condition_33 = inlen > uint(8192)
 		__c2v_condition_30 = __c2v_condition_33
 	}
 	if !__c2v_condition_30 {
 		mut __c2v_condition_34 := false
-		__c2v_condition_34 = cap > usize(8192)
+		__c2v_condition_34 = cap > uint(8192)
 		__c2v_condition_30 = __c2v_condition_34
 	}
 	if !__c2v_condition_30 {
@@ -1815,12 +1815,12 @@ pub fn wifi_command(d &C.bw_device, cmd u32, in_ voidptr, inlen usize, out voidp
 	}
 	if !__c2v_condition_30 {
 		mut __c2v_condition_36 := false
-		__c2v_condition_36 = ((usize(in_) == 0) && inlen)
+		__c2v_condition_36 = ((uint(in_) == 0) && inlen)
 		__c2v_condition_30 = __c2v_condition_36
 	}
 	if !__c2v_condition_30 {
 		mut __c2v_condition_37 := false
-		__c2v_condition_37 = ((usize(out) == 0) && cap)
+		__c2v_condition_37 = ((uint(out) == 0) && cap)
 		__c2v_condition_30 = __c2v_condition_37
 	}
 	if __c2v_condition_30 {
@@ -1862,7 +1862,7 @@ pub fn wifi_command(d &C.bw_device, cmd u32, in_ voidptr, inlen usize, out voidp
 			return e
 		}
 		if i32(d.reply_ready) && !d.request_busy {
-			count := usize(d.reply_length)
+			count := uint(d.reply_length)
 			if cap && count > cap {
 				return wifi_fail(d, i32(i32(Bw_error.bw_eproto)))
 			}
@@ -1889,22 +1889,22 @@ pub fn wifi_command(d &C.bw_device, cmd u32, in_ voidptr, inlen usize, out voidp
 }
 
 @[export: 'vinix_bw_core_var_set']
-pub fn wifi_var_set(d &C.bw_device, name &char, data voidptr, n usize) i32 {
+pub fn wifi_var_set(d &C.bw_device, name &char, data voidptr, n uint) i32 {
 	unsafe {
 	b := [8192]u8{}
-	k := usize(0)
-	for k < usize(64) && i32(name[k]) {
+	k := uint(0)
+	for k < uint(64) && i32(name[k]) {
 		k++
 	}
 	k++
-	if k > usize(64) || n > sizeof([8192]u8) - k {
+	if k > uint(64) || n > sizeof([8192]u8) - k {
 		return i32(i32(Bw_error.bw_einval))
 	}
 	C.memcpy(voidptr( &b[0] ), voidptr(name), k)
 	if n {
 		C.memcpy(voidptr( &b[0]  + k), voidptr(data), n)
 	}
-	e := wifi_command(d, 263, voidptr( &b[0] ), k + n, voidptr((voidptr(0))), usize(0), (voidptr(0)))
+	e := wifi_command(d, 263, voidptr( &b[0] ), k + n, voidptr((voidptr(0))), uint(0), (voidptr(0)))
 	wifi_erase(voidptr( &b[0] ), k + n)
 	return e
 
@@ -1916,7 +1916,7 @@ pub fn wifi_var_int(d &C.bw_device, name &char, val u32) i32 {
 	unsafe {
 	b := [4]u8{}
 	wifi_s32(voidptr( &b[0] ), val)
-	return wifi_var_set(d, name, voidptr( &b[0] ), usize(4))
+	return wifi_var_set(d, name, voidptr( &b[0] ), uint(4))
 
 	}
 }
@@ -1926,26 +1926,26 @@ pub fn wifi_cmd_int(d &C.bw_device, cmd u32, val u32) i32 {
 	unsafe {
 	b := [4]u8{}
 	wifi_s32(voidptr( &b[0] ), val)
-	return wifi_command(d, cmd, voidptr( &b[0] ), usize(4), voidptr((voidptr(0))), usize(0), (voidptr(0)))
+	return wifi_command(d, cmd, voidptr( &b[0] ), uint(4), voidptr((voidptr(0))), uint(0), (voidptr(0)))
 
 	}
 }
 
 @[export: 'vinix_bw_core_download_blob']
-pub fn wifi_download_blob(d &C.bw_device, name &char, p &u8, n usize) i32 {
+pub fn wifi_download_blob(d &C.bw_device, name &char, p &u8, n uint) i32 {
 	unsafe {
 	b := [1412]u8{}
-	off := usize(0)
-	if (usize(p) == 0) || !n || n > usize(1024 * 1024) {
+	off := uint(0)
+	if (uint(p) == 0) || !n || n > uint(1024 * 1024) {
 		return i32(i32(Bw_error.bw_einval))
 	}
 	for off < n {
 		take := n - off
-		if take > usize(1400) {
-			take = usize(1400)
+		if take > uint(1400) {
+			take = uint(1400)
 		}
 		C.memset(voidptr( &b[0] ), 0, u64(12))
-		wifi_s16(voidptr( &b[0] ), u16((4096 | (if off == usize(0) { 2 } else { 0 }) | (if off + take == n {
+		wifi_s16(voidptr( &b[0] ), u16((4096 | (if off == uint(0) { 2 } else { 0 }) | (if off + take == n {
 			4
 		} else {
 			0
@@ -1953,7 +1953,7 @@ pub fn wifi_download_blob(d &C.bw_device, name &char, p &u8, n usize) i32 {
 		wifi_s16(voidptr( &b[0]  + 2), u16(2))
 		wifi_s32(voidptr( &b[0]  + 4), u32(take))
 		C.memcpy(voidptr( &b[0]  + 12), voidptr(p + off), take)
-		e := wifi_var_set(d, name, voidptr( &b[0] ), take + usize(12))
+		e := wifi_var_set(d, name, voidptr( &b[0] ), take + uint(12))
 		if e {
 			return e
 		}
@@ -1969,11 +1969,11 @@ pub fn bw_start(d &C.bw_device, f &C.bw_firmware) i32 {
 	unsafe {
 	mut __c2v_condition_38 := false
 	mut __c2v_condition_39 := false
-	__c2v_condition_39 = (usize(d) == 0)
+	__c2v_condition_39 = (uint(d) == 0)
 	__c2v_condition_38 = __c2v_condition_39
 	if !__c2v_condition_38 {
 		mut __c2v_condition_40 := false
-		__c2v_condition_40 = (usize(f) == 0)
+		__c2v_condition_40 = (uint(f) == 0)
 		__c2v_condition_38 = __c2v_condition_40
 	}
 	if !__c2v_condition_38 {
@@ -1983,37 +1983,37 @@ pub fn bw_start(d &C.bw_device, f &C.bw_firmware) i32 {
 	}
 	if !__c2v_condition_38 {
 		mut __c2v_condition_42 := false
-		__c2v_condition_42 = (usize(f.code) == 0)
+		__c2v_condition_42 = (uint(f.code) == 0)
 		__c2v_condition_38 = __c2v_condition_42
 	}
 	if !__c2v_condition_38 {
 		mut __c2v_condition_43 := false
-		__c2v_condition_43 = (usize(f.nvram) == 0)
+		__c2v_condition_43 = (uint(f.nvram) == 0)
 		__c2v_condition_38 = __c2v_condition_43
 	}
 	if !__c2v_condition_38 {
 		mut __c2v_condition_44 := false
-		__c2v_condition_44 = (usize(f.clm) == 0)
+		__c2v_condition_44 = (uint(f.clm) == 0)
 		__c2v_condition_38 = __c2v_condition_44
 	}
 	if !__c2v_condition_38 {
 		mut __c2v_condition_45 := false
-		__c2v_condition_45 = (usize(f.txcap) == 0)
+		__c2v_condition_45 = (uint(f.txcap) == 0)
 		__c2v_condition_38 = __c2v_condition_45
 	}
 	if !__c2v_condition_38 {
 		mut __c2v_condition_46 := false
-		__c2v_condition_46 = (usize(f.calibration) == 0)
+		__c2v_condition_46 = (uint(f.calibration) == 0)
 		__c2v_condition_38 = __c2v_condition_46
 	}
 	if !__c2v_condition_38 {
 		mut __c2v_condition_47 := false
-		__c2v_condition_47 = (usize(f.seed) == 0)
+		__c2v_condition_47 = (uint(f.seed) == 0)
 		__c2v_condition_38 = __c2v_condition_47
 	}
 	if !__c2v_condition_38 {
 		mut __c2v_condition_48 := false
-		__c2v_condition_48 = f.seed_len != usize(256)
+		__c2v_condition_48 = f.seed_len != uint(256)
 		__c2v_condition_38 = __c2v_condition_48
 	}
 	if !__c2v_condition_38 {
@@ -2028,7 +2028,7 @@ pub fn bw_start(d &C.bw_device, f &C.bw_firmware) i32 {
 	}
 	if !__c2v_condition_38 {
 		mut __c2v_condition_51 := false
-		__c2v_condition_51 = f.code_len > usize(4 * 1024 * 1024)
+		__c2v_condition_51 = f.code_len > uint(4 * 1024 * 1024)
 		__c2v_condition_38 = __c2v_condition_51
 	}
 	if !__c2v_condition_38 {
@@ -2038,7 +2038,7 @@ pub fn bw_start(d &C.bw_device, f &C.bw_firmware) i32 {
 	}
 	if !__c2v_condition_38 {
 		mut __c2v_condition_53 := false
-		__c2v_condition_53 = f.nvram_len > usize(65536)
+		__c2v_condition_53 = f.nvram_len > uint(65536)
 		__c2v_condition_38 = __c2v_condition_53
 	}
 	if !__c2v_condition_38 {
@@ -2048,7 +2048,7 @@ pub fn bw_start(d &C.bw_device, f &C.bw_firmware) i32 {
 	}
 	if !__c2v_condition_38 {
 		mut __c2v_condition_55 := false
-		__c2v_condition_55 = f.clm_len > usize(1024 * 1024)
+		__c2v_condition_55 = f.clm_len > uint(1024 * 1024)
 		__c2v_condition_38 = __c2v_condition_55
 	}
 	if !__c2v_condition_38 {
@@ -2058,7 +2058,7 @@ pub fn bw_start(d &C.bw_device, f &C.bw_firmware) i32 {
 	}
 	if !__c2v_condition_38 {
 		mut __c2v_condition_57 := false
-		__c2v_condition_57 = f.txcap_len > usize(1024 * 1024)
+		__c2v_condition_57 = f.txcap_len > uint(1024 * 1024)
 		__c2v_condition_38 = __c2v_condition_57
 	}
 	if !__c2v_condition_38 {
@@ -2068,7 +2068,7 @@ pub fn bw_start(d &C.bw_device, f &C.bw_firmware) i32 {
 	}
 	if !__c2v_condition_38 {
 		mut __c2v_condition_59 := false
-		__c2v_condition_59 = f.calibration_len > usize(1024 * 1024)
+		__c2v_condition_59 = f.calibration_len > uint(1024 * 1024)
 		__c2v_condition_38 = __c2v_condition_59
 	}
 	if __c2v_condition_38 {
@@ -2084,7 +2084,7 @@ pub fn bw_start(d &C.bw_device, f &C.bw_firmware) i32 {
 		return wifi_fail(d, e)
 	}
 	C.memcpy(d.mac, f.mac, u64(6))
-	e = wifi_var_set(d, c'cur_etheraddr', f.mac, usize(6))
+	e = wifi_var_set(d, c'cur_etheraddr', f.mac, uint(6))
 	mut __c2v_condition_60 := false
 	mut __c2v_condition_61 := false
 	__c2v_condition_61 = e
@@ -2142,7 +2142,7 @@ pub fn bw_start(d &C.bw_device, f &C.bw_firmware) i32 {
 @[export: 'bw_radio']
 pub fn bw_radio(d &C.bw_device, enabled i32) i32 {
 	unsafe {
-	if (usize(d) == 0) || (enabled != 0 && enabled != 1) || u32(d.state) < u32(i32(Bw_state.bw_ready)) || u32(d.state) == u32(i32(Bw_state.bw_fault)) {
+	if (uint(d) == 0) || (enabled != 0 && enabled != 1) || u32(d.state) < u32(i32(Bw_state.bw_ready)) || u32(d.state) == u32(i32(Bw_state.bw_fault)) {
 		return i32(i32(Bw_error.bw_einval))
 	}
 	if i32(d.radio_on) == i32(u8(enabled)) {
@@ -2173,7 +2173,7 @@ pub fn bw_radio(d &C.bw_device, enabled i32) i32 {
 @[export: 'bw_scan']
 pub fn bw_scan(d &C.bw_device) i32 {
 	unsafe {
-	if (usize(d) == 0) || (u32(d.state) != u32(i32(Bw_state.bw_ready)) && u32(d.state) != u32(i32(Bw_state.bw_link))) || !d.radio_on || i32(d.scan_pending) {
+	if (uint(d) == 0) || (u32(d.state) != u32(i32(Bw_state.bw_ready)) && u32(d.state) != u32(i32(Bw_state.bw_link))) || !d.radio_on || i32(d.scan_pending) {
 		return i32(i32(Bw_error.bw_einval))
 	}
 	p := [72]u8{}
@@ -2208,9 +2208,9 @@ pub fn bw_scan(d &C.bw_device) i32 {
 }
 
 @[export: 'bw_networks']
-pub fn bw_networks(d &C.bw_device, out &u8, capacity usize) i32 {
+pub fn bw_networks(d &C.bw_device, out &u8, capacity uint) i32 {
 	unsafe {
-	if (usize(d) == 0) || (usize(out) == 0) || capacity < usize((16 + 32 * 48)) {
+	if (uint(d) == 0) || (uint(out) == 0) || capacity < uint((16 + 32 * 48)) {
 		return i32(i32(Bw_error.bw_einval))
 	}
 	C.memset(voidptr(out), 0, u64((16 + 32 * 48)))
@@ -2234,12 +2234,12 @@ pub fn bw_networks(d &C.bw_device, out &u8, capacity usize) i32 {
 }
 
 @[export: 'bw_join_wpa2']
-pub fn bw_join_wpa2(d &C.bw_device, ssid &u8, sn usize, pass &u8, pn usize) i32 {
+pub fn bw_join_wpa2(d &C.bw_device, ssid &u8, sn uint, pass &u8, pn uint) i32 {
 	unsafe {
-	if (usize(d) == 0) || u32(d.state) != u32(i32(Bw_state.bw_ready)) || !d.radio_on || i32(d.scan_pending) || (usize(ssid) == 0) || !sn || sn > usize(32) || (usize(pass) == 0) || pn < usize(8) || pn > usize(63) {
+	if (uint(d) == 0) || u32(d.state) != u32(i32(Bw_state.bw_ready)) || !d.radio_on || i32(d.scan_pending) || (uint(ssid) == 0) || !sn || sn > uint(32) || (uint(pass) == 0) || pn < uint(8) || pn > uint(63) {
 		return i32(i32(Bw_error.bw_einval))
 	}
-	for i := usize(0); i < pn; i++ {
+	for i := uint(0); i < pn; i++ {
 		if i32(pass[i]) < 32 || i32(pass[i]) > 126 {
 			return i32(i32(Bw_error.bw_einval))
 		}
@@ -2288,7 +2288,7 @@ pub fn bw_join_wpa2(d &C.bw_device, ssid &u8, sn usize, pass &u8, pn usize) i32 
 	wifi_s16(voidptr( &pmk[0] ), u16(pn))
 	wifi_s16(voidptr( &pmk[0]  + 2), u16(1))
 	C.memcpy(voidptr( &pmk[0]  + 4), voidptr(pass), pn)
-	e = wifi_command(d, u32(268), voidptr( &pmk[0] ), sizeof([68]u8), voidptr((voidptr(0))), usize(0), (voidptr(0)))
+	e = wifi_command(d, u32(268), voidptr( &pmk[0] ), sizeof([68]u8), voidptr((voidptr(0))), uint(0), (voidptr(0)))
 	wifi_erase(voidptr( &pmk[0] ), sizeof([68]u8))
 	if e {
 		return wifi_fail(d, e)
@@ -2300,16 +2300,16 @@ pub fn bw_join_wpa2(d &C.bw_device, ssid &u8, sn usize, pass &u8, pn usize) i32 
 	d.associated = d.keyed
 	d.state = i32(Bw_state.bw_joining)
 	d.join_deadline = d.ops.time_us(voidptr(d.cookie)) + u64(30000000)
-	e = wifi_command(d, u32(26), voidptr( &join[0] ), sizeof([36]u8), voidptr((voidptr(0))), usize(0), (voidptr(0)))
+	e = wifi_command(d, u32(26), voidptr( &join[0] ), sizeof([36]u8), voidptr((voidptr(0))), uint(0), (voidptr(0)))
 	return if e { wifi_fail(d, e) } else { 0 }
 
 	}
 }
 
 @[export: 'bw_transmit']
-pub fn bw_transmit(d &C.bw_device, p &u8, n usize) i32 {
+pub fn bw_transmit(d &C.bw_device, p &u8, n uint) i32 {
 	unsafe {
-	if (usize(d) == 0) || (usize(p) == 0) || n < usize(14) || n > usize(1514) {
+	if (uint(d) == 0) || (uint(p) == 0) || n < uint(14) || n > uint(1514) {
 		return i32(i32(Bw_error.bw_einval))
 	}
 	if u32(d.state) != u32(i32(Bw_state.bw_link)) {
@@ -2348,7 +2348,7 @@ pub fn bw_transmit(d &C.bw_device, p &u8, n usize) i32 {
 			break
 		}
 	}
-	if usize(t) == 0 {
+	if uint(t) == 0 {
 		return i32(i32(Bw_error.bw_enospc))
 	}
 	token := wifi_next_token(d)
@@ -2367,7 +2367,7 @@ pub fn bw_transmit(d &C.bw_device, p &u8, n usize) i32 {
 	m[22] = u8(1)
 	m[23] = u8(1)
 	wifi_s64(voidptr( &m[0]  + 32), t.mem.dma + u64(14))
-	wifi_s16(voidptr( &m[0]  + 42), u16((n - usize(14))))
+	wifi_s16(voidptr( &m[0]  + 42), u16((n - uint(14))))
 	e := wifi_submit(d, u32(5),  &m[0] , sizeof([48]u8))
 	if !e {
 		t.owner = u8(1)
@@ -2381,10 +2381,10 @@ pub fn bw_transmit(d &C.bw_device, p &u8, n usize) i32 {
 @[export: 'bw_disconnect']
 pub fn bw_disconnect(d &C.bw_device) i32 {
 	unsafe {
-	if (usize(d) == 0) || u32(d.state) < u32(i32(Bw_state.bw_ready)) || u32(d.state) == u32(i32(Bw_state.bw_fault)) {
+	if (uint(d) == 0) || u32(d.state) < u32(i32(Bw_state.bw_ready)) || u32(d.state) == u32(i32(Bw_state.bw_fault)) {
 		return i32(i32(Bw_error.bw_einval))
 	}
-	e := wifi_command(d, u32(52), voidptr((voidptr(0))), usize(0), voidptr((voidptr(0))), usize(0), (voidptr(0)))
+	e := wifi_command(d, u32(52), voidptr((voidptr(0))), uint(0), voidptr((voidptr(0))), uint(0), (voidptr(0)))
 	bw_stop(d)
 	return e
 
@@ -2394,7 +2394,7 @@ pub fn bw_disconnect(d &C.bw_device) i32 {
 @[export: 'bw_stop']
 pub fn bw_stop(d &C.bw_device) {
 	unsafe {
-	if usize(d) == 0 {
+	if uint(d) == 0 {
 		return
 	}
 	d.ops.stop_dma(voidptr(d.cookie))
@@ -2437,4 +2437,4 @@ pub fn wifi_increment_lines(p &u32, delta u32) u32 {
 	}
 }
 
-fn is_null(p voidptr) bool { return usize(p) == 0 }
+fn is_null(p voidptr) bool { return uint(p) == 0 }

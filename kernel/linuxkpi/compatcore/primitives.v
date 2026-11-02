@@ -5,15 +5,15 @@ module compatcore
 #include "linuxkpi_v_primitives.h"
 #include <string.h>
 
-fn C.kmalloc(usize, u32) voidptr
-fn C.kzalloc(usize, u32) voidptr
-fn C.kmalloc_array(usize, usize, u32) voidptr
+fn C.kmalloc(uint, u32) voidptr
+fn C.kzalloc(uint, u32) voidptr
+fn C.kmalloc_array(uint, uint, u32) voidptr
 fn C.kfree(voidptr)
 fn C.vinix_linuxkpi_bug(&char, i32)
-fn C.memcpy(voidptr, voidptr, usize) voidptr
-fn C.memset(voidptr, i32, usize) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
+fn C.memset(voidptr, i32, uint) voidptr
 fn C.strcmp(&char, &char) i32
-fn C.strlen(&char) usize
+fn C.strlen(&char) uint
 
 @[c: '__atomic_load_n']
 fn C.vkp_load32(&u32, i32) u32
@@ -39,11 +39,11 @@ fn C.vkp_exchange32(&u32, u32, i32) u32
 @[c: '__atomic_compare_exchange_n']
 fn C.vkp_compare_signed(&i32, &i32, i32, bool, i32, i32) bool
 
-fn C.vinix_linuxkpi_page_size() usize
+fn C.vinix_linuxkpi_page_size() uint
 fn C.vinix_linuxkpi_may_sleep() bool
 fn C.vinix_linuxkpi_gfp_supported(u32) bool
-fn C.vinix_linuxkpi_alloc_gfp_pages(usize, u32) voidptr
-fn C.vinix_linuxkpi_free_pages(voidptr, usize)
+fn C.vinix_linuxkpi_alloc_gfp_pages(uint, u32) voidptr
+fn C.vinix_linuxkpi_free_pages(voidptr, uint)
 fn C.vkp_spin_init(voidptr)
 fn C.vkp_spin_lock(voidptr)
 fn C.vkp_spin_unlock(voidptr)
@@ -89,4 +89,4 @@ fn native_test_bit(bit u32, bits &u64) bool {
 
 fn require(ok bool) { if !ok { C.vinix_linuxkpi_bug(c'V LinuxKPI helper invariant', 0) } }
 
-fn is_null(p voidptr) bool { return usize(p) == 0 }
+fn is_null(p voidptr) bool { return uint(p) == 0 }

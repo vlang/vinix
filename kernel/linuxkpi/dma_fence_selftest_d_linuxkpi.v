@@ -133,7 +133,7 @@ fn dma_fence_test_task(target u32) bool {
 	return ok
 }
 fn dma_fence_test_actor(argument voidptr) {
-	index := u32(usize(argument))
+	index := u32(uint(argument))
 	if worker_bind(index + 1) != 0 || !dma_fence_test_task(index + 1) { dma_fence_test_fail(1) }
 	katomic.store(mut &dmafence_test_ledger.ready[index], true)
 	for !katomic.load(&dmafence_test_ledger.quit) {

@@ -26,7 +26,7 @@ fn C.pthread_create(voidptr, voidptr, HeaderThreadFn, voidptr) i32
 fn C.pthread_detach(C.pthread_t) i32
 
 @[export: 'vkt_jiffies_address']
-pub fn task_jiffies_address() usize { return unsafe { usize(&C.jiffies) } }
+pub fn task_jiffies_address() uint { return unsafe { uint(&C.jiffies) } }
 @[export: 'vkt_guest_enter']
 pub fn task_guest_enter() { C.vtime_account_guest_enter() }
 @[export: 'vkt_guest_exit']

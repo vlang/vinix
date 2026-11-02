@@ -36,7 +36,7 @@ mut:
 
 struct C.timer_list {
 mut:
-	expires usize
+	expires uint
 	flags   u32
 }
 
@@ -46,7 +46,7 @@ struct C.dma_fence {
 mut:
 	@lock   voidptr
 	cb_list C.list_head
-	flags   usize
+	flags   uint
 }
 
 struct C.dma_resv {}
@@ -68,9 +68,9 @@ fn C.i915_sw_fence_signaled(&C.i915_sw_fence) bool
 fn C.i915_sw_fence_done(&C.i915_sw_fence) bool
 fn C.i915_sw_fence_await_sw_fence(&C.i915_sw_fence, &C.i915_sw_fence, &C.wait_queue_entry) i32
 fn C.i915_sw_fence_await_sw_fence_gfp(&C.i915_sw_fence, &C.i915_sw_fence, u32) i32
-fn C.i915_sw_fence_await_dma_fence(&C.i915_sw_fence, &C.dma_fence, usize, u32) i32
+fn C.i915_sw_fence_await_dma_fence(&C.i915_sw_fence, &C.dma_fence, uint, u32) i32
 fn C.__i915_sw_fence_await_dma_fence(&C.i915_sw_fence, &C.dma_fence, &C.i915_sw_dma_fence_cb) i32
-fn C.i915_sw_fence_await_reservation(&C.i915_sw_fence, &C.dma_resv, bool, usize, u32) i32
+fn C.i915_sw_fence_await_reservation(&C.i915_sw_fence, &C.dma_resv, bool, uint, u32) i32
 fn C.vswf_pending(&C.i915_sw_fence) i32
 fn C.vswf_timed_fence(&C.i915_sw_dma_fence_cb_timer) &C.i915_sw_fence
 fn C.vswf_timed_flags(&C.i915_sw_dma_fence_cb_timer) i32
@@ -79,10 +79,10 @@ fn C.irq_work_sync(&C.irq_work)
 fn C.spin_lock_irqsave(voidptr, u64)
 fn C.spin_unlock_irqrestore(voidptr, u64)
 fn C.BUG_ON(bool)
-fn C.vkr_page_allocation_size(voidptr) usize
+fn C.vkr_page_allocation_size(voidptr) uint
 
 @[c_extern]
-__global C.jiffies usize
+__global C.jiffies uint
 
 @[export: 'vinix_linuxkpi_swf_bytes']
 pub fn bytes(kind u32) u32 {
@@ -99,7 +99,7 @@ pub fn bytes(kind u32) u32 {
 
 @[export: 'vinix_linuxkpi_swf_init']
 pub fn init(storage voidptr, notify Notify) {
-	C.BUG_ON(usize(voidptr(notify)) < 4096)
+	C.BUG_ON(uint(voidptr(notify)) < 4096)
 	unsafe { C.__i915_sw_fence_init(&C.i915_sw_fence(storage), notify, nil, nil) }
 }
 
@@ -162,7 +162,7 @@ pub fn waiters(storage voidptr) u32 {
 		C.spin_lock_irqsave(&fence.@wait.@lock, flags)
 		mut count := u32(0)
 		head := &fence.@wait.head
-		for entry := head.next; usize(entry) != usize(head); entry = entry.next { count++ }
+		for entry := head.next; uint(entry) != uint(head); entry = entry.next { count++ }
 		C.spin_unlock_irqrestore(&fence.@wait.@lock, flags)
 		return count
 	}
@@ -189,7 +189,7 @@ pub fn dma(storage voidptr, producer voidptr, callback voidptr, timeout u64, gfp
 		return if callback != nil {
 			C.__i915_sw_fence_await_dma_fence(target, source, &C.i915_sw_dma_fence_cb(callback))
 		} else {
-			C.i915_sw_fence_await_dma_fence(target, source, usize(timeout), gfp)
+			C.i915_sw_fence_await_dma_fence(target, source, uint(timeout), gfp)
 		}
 	}
 }
@@ -197,7 +197,7 @@ pub fn dma(storage voidptr, producer voidptr, callback voidptr, timeout u64, gfp
 @[export: 'vinix_linuxkpi_swf_resv']
 pub fn resv(storage voidptr, reservation voidptr, write bool, timeout u64, gfp u32) i32 {
 	unsafe {
-		return C.i915_sw_fence_await_reservation(&C.i915_sw_fence(storage), &C.dma_resv(reservation), write, usize(timeout), gfp)
+		return C.i915_sw_fence_await_reservation(&C.i915_sw_fence(storage), &C.dma_resv(reservation), write, uint(timeout), gfp)
 	}
 }
 
@@ -212,12 +212,12 @@ pub fn timed(producer voidptr, target voidptr) voidptr {
 		C.spin_lock_irqsave(fence.@lock, flags)
 		head := &fence.cb_list
 		mut found := voidptr(nil)
-		if fence.flags & 1 == 0 && usize(head.next) != usize(head) && usize(head.next.next) == usize(head) {
+		if fence.flags & 1 == 0 && uint(head.next) != uint(head) && uint(head.next.next) == uint(head) {
 			entry := head.next
 			if C.vkr_page_allocation_size(entry) == 128 {
 				owner := &C.i915_sw_dma_fence_cb_timer(entry)
 				fence_target := C.vswf_timed_fence(owner)
-				if usize(owner.dma) == usize(producer) && (usize(fence_target) == usize(target) || fence_target == nil) {
+				if uint(owner.dma) == uint(producer) && (uint(fence_target) == uint(target) || fence_target == nil) {
 					found = entry
 				}
 			}
@@ -231,7 +231,7 @@ pub fn timed(producer voidptr, target voidptr) voidptr {
 pub fn timed_value(storage voidptr, kind u32) u64 {
 	unsafe {
 		owner := &C.i915_sw_dma_fence_cb_timer(storage)
-		if kind == 0 { return u64(usize(C.vswf_timed_fence(owner))) }
+		if kind == 0 { return u64(uint(C.vswf_timed_fence(owner))) }
 		if kind == 1 { return u64(owner.timer.expires) }
 		if kind == 2 { return u64(C.timer_pending(&owner.timer)) }
 		return if kind == 3 { u64(owner.timer.flags) } else { u64(u32(C.vswf_timed_flags(owner))) }

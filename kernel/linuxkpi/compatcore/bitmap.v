@@ -10,11 +10,11 @@ module compatcore
 // *implementation has no device/MM dependency and allocates only in alloc().
 // *Parsing, devres, user-buffer, remapping and region APIs remain unresolved.
 
-fn bitmap_words(nbits u32) usize {
+fn bitmap_words(nbits u32) uint {
 	unsafe {
 		// BITS_TO_LONGS(UINT_MAX) can overflow its unsigned rounding addition.
 
-		return usize(nbits / u32(64) + i32(u32((nbits % u32(64) != u32(0)))))
+		return uint(nbits / u32(64) + i32(u32((nbits % u32(64) != u32(0)))))
 	}
 }
 
@@ -61,8 +61,8 @@ pub fn bitmap_free(bitmap &u64) {
 @[export: '__bitmap_equal']
 pub fn bitmap_equal(a &u64, b &u64, nbits u32) bool {
 	unsafe {
-		full := usize(nbits / u32(64))
-		for i := usize(0); i < full; i++ {
+		full := uint(nbits / u32(64))
+		for i := uint(0); i < full; i++ {
 			if a[i] != b[i] {
 				return false != 0
 			}
@@ -74,8 +74,8 @@ pub fn bitmap_equal(a &u64, b &u64, nbits u32) bool {
 @[export: '__bitmap_or_equal']
 pub fn bitmap_or_equal(a &u64, b &u64, c &u64, nbits u32) bool {
 	unsafe {
-		full := usize(nbits / u32(64))
-		for i := usize(0); i < full; i++ {
+		full := uint(nbits / u32(64))
+		for i := uint(0); i < full; i++ {
 			if (a[i] | b[i]) != c[i] {
 				return false != 0
 			}
@@ -87,7 +87,7 @@ pub fn bitmap_or_equal(a &u64, b &u64, c &u64, nbits u32) bool {
 @[export: '__bitmap_complement']
 pub fn bitmap_complement(dst &u64, src &u64, nbits u32) {
 	unsafe {
-		i := usize(0)
+		i := uint(0)
 		words := bitmap_words(nbits)
 		for i < words {
 			dst[i] = ~src[i]
@@ -99,9 +99,9 @@ pub fn bitmap_complement(dst &u64, src &u64, nbits u32) {
 @[export: '__bitmap_and']
 pub fn bitmap_and(dst &u64, a &u64, b &u64, nbits u32) bool {
 	unsafe {
-		full := usize(nbits / u32(64))
+		full := uint(nbits / u32(64))
 		any := u64(0)
-		for i := usize(0); i < full; i++ {
+		for i := uint(0); i < full; i++ {
 			any |= assign_word(&dst[i], u64(a[i] & b[i]))
 		}
 		if nbits % u32(64) {
@@ -114,9 +114,9 @@ pub fn bitmap_and(dst &u64, a &u64, b &u64, nbits u32) bool {
 @[export: '__bitmap_andnot']
 pub fn bitmap_andnot(dst &u64, a &u64, b &u64, nbits u32) bool {
 	unsafe {
-		full := usize(nbits / u32(64))
+		full := uint(nbits / u32(64))
 		any := u64(0)
-		for i := usize(0); i < full; i++ {
+		for i := uint(0); i < full; i++ {
 			any |= assign_word(&dst[i], u64(a[i] & ~b[i]))
 		}
 		if nbits % u32(64) {
@@ -129,7 +129,7 @@ pub fn bitmap_andnot(dst &u64, a &u64, b &u64, nbits u32) bool {
 @[export: '__bitmap_or']
 pub fn bitmap_or(dst &u64, a &u64, b &u64, nbits u32) {
 	unsafe {
-		i := usize(0)
+		i := uint(0)
 		words := bitmap_words(nbits)
 		for i < words {
 			dst[i] = a[i] | b[i]
@@ -141,7 +141,7 @@ pub fn bitmap_or(dst &u64, a &u64, b &u64, nbits u32) {
 @[export: '__bitmap_xor']
 pub fn bitmap_xor(dst &u64, a &u64, b &u64, nbits u32) {
 	unsafe {
-		i := usize(0)
+		i := uint(0)
 		words := bitmap_words(nbits)
 		for i < words {
 			dst[i] = a[i] ^ b[i]
@@ -153,7 +153,7 @@ pub fn bitmap_xor(dst &u64, a &u64, b &u64, nbits u32) {
 @[export: '__bitmap_replace']
 pub fn bitmap_replace(dst &u64, old &u64, new &u64, mask &u64, nbits u32) {
 	unsafe {
-		i := usize(0)
+		i := uint(0)
 		words := bitmap_words(nbits)
 		for i < words {
 			dst[i] = (old[i] & ~mask[i]) | (new[i] & mask[i])
@@ -165,8 +165,8 @@ pub fn bitmap_replace(dst &u64, old &u64, new &u64, mask &u64, nbits u32) {
 @[export: '__bitmap_intersects']
 pub fn bitmap_intersects(a &u64, b &u64, nbits u32) bool {
 	unsafe {
-		full := usize(nbits / u32(64))
-		for i := usize(0); i < full; i++ {
+		full := uint(nbits / u32(64))
+		for i := uint(0); i < full; i++ {
 			if a[i] & b[i] {
 				return true != 0
 			}
@@ -178,8 +178,8 @@ pub fn bitmap_intersects(a &u64, b &u64, nbits u32) bool {
 @[export: '__bitmap_subset']
 pub fn bitmap_subset(a &u64, b &u64, nbits u32) bool {
 	unsafe {
-		full := usize(nbits / u32(64))
-		for i := usize(0); i < full; i++ {
+		full := uint(nbits / u32(64))
+		for i := uint(0); i < full; i++ {
 			if a[i] & ~b[i] {
 				return false != 0
 			}
@@ -191,9 +191,9 @@ pub fn bitmap_subset(a &u64, b &u64, nbits u32) bool {
 @[export: '__bitmap_weight']
 pub fn bitmap_weight(src &u64, nbits u32) u32 {
 	unsafe {
-		full := usize(nbits / u32(64))
+		full := uint(nbits / u32(64))
 		weight := u32(0)
-		for i := usize(0); i < full; i++ {
+		for i := uint(0); i < full; i++ {
 			weight += native_hweight_long(src[i])
 		}
 		if nbits % u32(64) {
@@ -206,9 +206,9 @@ pub fn bitmap_weight(src &u64, nbits u32) u32 {
 @[export: '__bitmap_weight_and']
 pub fn bitmap_weight_and(a &u64, b &u64, nbits u32) u32 {
 	unsafe {
-		full := usize(nbits / u32(64))
+		full := uint(nbits / u32(64))
 		weight := u32(0)
-		for i := usize(0); i < full; i++ {
+		for i := uint(0); i < full; i++ {
 			weight += native_hweight_long(a[i] & b[i])
 		}
 		if nbits % u32(64) {
@@ -285,21 +285,21 @@ pub fn bitmap_shift_right(dst &u64, src &u64, shift u32, nbits u32) {
 			C.memset(voidptr(dst), 0, words * sizeof(u64))
 			return
 		}
-		off := usize(shift / u32(64))
+		off := uint(shift / u32(64))
 		rem := shift % u32(64)
 		tail := (u64(-1) >> ((-u32(nbits)) & u32(63)))
 		// Ascending stores preserve src when dst == src.
 
-		for i := usize(0); i < words - off; i++ {
+		for i := uint(0); i < words - off; i++ {
 			from := i + off
 			lower := src[from]
-			if from == words - usize(1) {
+			if from == words - uint(1) {
 				lower &= tail
 			}
 			upper := u64(0)
-			if rem && from + usize(1) < words {
-				upper = src[from + usize(1)]
-				if from + usize(1) == words - usize(1) {
+			if rem && from + uint(1) < words {
+				upper = src[from + uint(1)]
+				if from + uint(1) == words - uint(1) {
 					upper &= tail
 				}
 				upper <<= u32(64) - rem
@@ -321,14 +321,14 @@ pub fn bitmap_shift_left(dst &u64, src &u64, shift u32, nbits u32) {
 			C.memset(voidptr(dst), 0, words * sizeof(u64))
 			return
 		}
-		off := usize(shift / u32(64))
+		off := uint(shift / u32(64))
 		rem := shift % u32(64)
 		// Descending stores preserve src when dst == src. Tail is unspecified,
 		//     *matching Linux's multiword left shift.
 
-		for i := words - off; i > usize(0); i-- {
-			from := i - usize(1)
-			lower := if rem && from { src[from - usize(1)] >> (u32(64) - rem) } else { u64(0) }
+		for i := words - off; i > uint(0); i-- {
+			from := i - uint(1)
+			lower := if rem && from { src[from - uint(1)] >> (u32(64) - rem) } else { u64(0) }
 			dst[from + off] = (src[from] << rem) | lower
 		}
 		C.memset(voidptr(dst), 0, off * sizeof(u64))
@@ -338,16 +338,16 @@ pub fn bitmap_shift_left(dst &u64, src &u64, shift u32, nbits u32) {
 @[export: 'bitmap_from_arr32']
 pub fn bitmap_from_arr32(dst &u64, src &u32, nbits u32) {
 	unsafe {
-		halfwords := usize(nbits / u32(32) + i32(u32((nbits % u32(32) != u32(0)))))
-		for i := usize(0); i < halfwords; i += usize(2) {
+		halfwords := uint(nbits / u32(32) + i32(u32((nbits % u32(32) != u32(0)))))
+		for i := uint(0); i < halfwords; i += uint(2) {
 			value := u64(src[i])
-			if i + usize(1) < halfwords {
-				value |= u64(src[i + usize(1)]) << 32
+			if i + uint(1) < halfwords {
+				value |= u64(src[i + uint(1)]) << 32
 			}
-			dst[i / usize(2)] = value
+			dst[i / uint(2)] = value
 		}
 		if nbits % u32(64) {
-			dst[bitmap_words(nbits) - usize(1)] &= (u64(-1) >> ((-u32(nbits)) & u32(63)))
+			dst[bitmap_words(nbits) - uint(1)] &= (u64(-1) >> ((-u32(nbits)) & u32(63)))
 		}
 	}
 }
@@ -355,16 +355,16 @@ pub fn bitmap_from_arr32(dst &u64, src &u32, nbits u32) {
 @[export: 'bitmap_to_arr32']
 pub fn bitmap_to_arr32(dst &u32, src &u64, nbits u32) {
 	unsafe {
-		halfwords := usize(nbits / u32(32) + i32(u32((nbits % u32(32) != u32(0)))))
-		for i := usize(0); i < halfwords; i += usize(2) {
-			value := src[i / usize(2)]
+		halfwords := uint(nbits / u32(32) + i32(u32((nbits % u32(32) != u32(0)))))
+		for i := uint(0); i < halfwords; i += uint(2) {
+			value := src[i / uint(2)]
 			dst[i] = u32(value)
-			if i + usize(1) < halfwords {
-				dst[i + usize(1)] = u32((value >> 32))
+			if i + uint(1) < halfwords {
+				dst[i + uint(1)] = u32((value >> 32))
 			}
 		}
 		if nbits % u32(32) {
-			dst[halfwords - usize(1)] &= u32(-1) >> (u32(32) - nbits % u32(32))
+			dst[halfwords - uint(1)] &= u32(-1) >> (u32(32) - nbits % u32(32))
 		}
 	}
 }

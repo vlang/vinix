@@ -44,11 +44,11 @@ fn C.vdr_later_or_same(voidptr, voidptr) bool
 fn C.vdr_container(voidptr) bool
 fn C.vdr_read_lock()
 fn C.vdr_read_unlock()
-fn C.kmalloc_size_roundup(usize) usize
-fn C.krealloc_array(voidptr, usize, usize, u32) voidptr
+fn C.kmalloc_size_roundup(uint) uint
+fn C.krealloc_array(voidptr, uint, uint, u32) voidptr
 
 fn resv_object(storage voidptr) &C.vdr_obj {
-	require(!is_null(storage) && usize(storage) % 8 == 0)
+	require(!is_null(storage) && uint(storage) % 8 == 0)
 	return unsafe { &C.vdr_obj(storage) }
 }
 
@@ -62,7 +62,7 @@ fn resv_writer(storage voidptr) &C.vdr_obj {
 }
 
 fn resv_cursor(storage voidptr) &C.vdr_iter {
-	require(!is_null(storage) && usize(storage) % 8 == 0)
+	require(!is_null(storage) && uint(storage) % 8 == 0)
 	unsafe {
 		cursor := &C.vdr_iter(storage)
 		resv_object(cursor.obj)
@@ -75,19 +75,19 @@ fn resv_list(obj &C.vdr_obj) &C.vdr_list {
 	return unsafe { &C.vdr_list(C.vdr_load_ptr(&obj.fences)) }
 }
 
-fn resv_entry(list &C.vdr_list, index u32) usize {
-	return unsafe { usize(C.vdr_load_ptr(&list.table[index])) }
+fn resv_entry(list &C.vdr_list, index u32) uint {
+	return unsafe { uint(C.vdr_load_ptr(&list.table[index])) }
 }
 
 fn resv_set(list &C.vdr_list, index u32, fence voidptr, usage u32) {
-	unsafe { C.vdr_store_ptr(&list.table[index], voidptr(usize(fence) | usize(usage)), 0) }
+	unsafe { C.vdr_store_ptr(&list.table[index], voidptr(uint(fence) | uint(usage)), 0) }
 }
 
 fn resv_alloc(capacity u32) &C.vdr_list {
-	if usize(capacity) > (usize(-1) - sizeof(C.vdr_list)) / sizeof(voidptr) {
+	if uint(capacity) > (uint(-1) - sizeof(C.vdr_list)) / sizeof(voidptr) {
 		return unsafe { nil }
 	}
-	size := C.kmalloc_size_roundup(sizeof(C.vdr_list) + usize(capacity) * sizeof(voidptr))
+	size := C.kmalloc_size_roundup(sizeof(C.vdr_list) + uint(capacity) * sizeof(voidptr))
 	unsafe {
 		list := &C.vdr_list(C.kmalloc(size, 3264))
 		if is_null(list) { return nil }
@@ -100,7 +100,7 @@ fn resv_free(list &C.vdr_list) {
 	unsafe {
 		if is_null(list) { return }
 		for i := u32(0); i < list.num_fences; i++ {
-			C.vdr_put(voidptr(resv_entry(list, i) & ~usize(3)))
+			C.vdr_put(voidptr(resv_entry(list, i) & ~uint(3)))
 		}
 		C.vkr_kvfree_call_rcu(list, list)
 	}
@@ -162,7 +162,7 @@ pub fn dma_resv_reserve(storage voidptr, additional u32) i32 {
 		count := if is_null(old) { u32(0) } else { C.vdr_load32(&old.num_fences) }
 		for i := u32(0); i < count; i++ {
 			tag := resv_entry(old, i)
-			fence := voidptr(tag & ~usize(3))
+			fence := voidptr(tag & ~uint(3))
 			if fence_is_signaled(&C.vdf_fence(fence), false) {
 				retired--
 				resv_set(fresh, retired, fence, 0)
@@ -185,7 +185,7 @@ pub fn dma_resv_add(storage voidptr, fence voidptr, usage u32) {
 	unsafe {
 		resv_usage_valid(usage)
 		obj := resv_writer(storage)
-		require(!is_null(fence) && usize(fence) % 8 == 0)
+		require(!is_null(fence) && uint(fence) % 8 == 0)
 		list := resv_list(obj)
 		require(!is_null(list))
 		count := C.vdr_load32(&list.num_fences)
@@ -193,7 +193,7 @@ pub fn dma_resv_add(storage voidptr, fence voidptr, usage u32) {
 		if C.vdr_container(fence) { C.vkp_warn(c'dma_resv_add_fence container', 0) }
 		for i := u32(0); i < count; i++ {
 			tag := resv_entry(list, i)
-			old := voidptr(tag & ~usize(3))
+			old := voidptr(tag & ~uint(3))
 			if ((&C.vdf_fence(old)).context == (&C.vdf_fence(fence)).context && u32(tag & 3) >= usage && C.vdr_later_or_same(fence, old))
 				|| fence_is_signaled(&C.vdf_fence(old), false) {
 				C.vdr_get(fence)
@@ -215,11 +215,11 @@ pub fn dma_resv_replace(storage voidptr, context u64, replacement voidptr, usage
 	unsafe {
 		resv_usage_valid(usage)
 		obj := resv_writer(storage)
-		require(!is_null(replacement) && usize(replacement) % 8 == 0)
+		require(!is_null(replacement) && uint(replacement) % 8 == 0)
 		list := resv_list(obj)
 		if is_null(list) { return }
 		for i := u32(0); i < C.vdr_load32(&list.num_fences); i++ {
-			old := voidptr(resv_entry(list, i) & ~usize(3))
+			old := voidptr(resv_entry(list, i) & ~uint(3))
 			if (&C.vdf_fence(old)).context != context { continue }
 			resv_set(list, i, C.vdr_get(replacement), usage)
 			C.vdr_put(old)
@@ -260,7 +260,7 @@ fn resv_walk_unlocked(cursor &C.vdr_iter) {
 			tag := resv_entry(cursor.fences, cursor.position)
 			cursor.position++
 			cursor.fence_usage = u32(tag & 3)
-			cursor.fence = C.vdr_get_rcu(voidptr(tag & ~usize(3)))
+			cursor.fence = C.vdr_get_rcu(voidptr(tag & ~uint(3)))
 			if is_null(cursor.fence) {
 				resv_restart(cursor)
 				continue
@@ -280,7 +280,7 @@ pub fn dma_resv_iter_first_unlocked(storage voidptr) voidptr {
 		for {
 			resv_restart(cursor)
 			resv_walk_unlocked(cursor)
-			if usize(resv_list(resv_object(cursor.obj))) == usize(cursor.fences) { break }
+			if uint(resv_list(resv_object(cursor.obj))) == uint(cursor.fences) { break }
 		}
 		C.vdr_read_unlock()
 		return cursor.fence
@@ -293,12 +293,12 @@ pub fn dma_resv_iter_next_unlocked(storage voidptr) voidptr {
 		cursor := resv_cursor(storage)
 		C.vdr_read_lock()
 		cursor.is_restarted = false
-		mut restart := usize(resv_list(resv_object(cursor.obj))) != usize(cursor.fences)
+		mut restart := uint(resv_list(resv_object(cursor.obj))) != uint(cursor.fences)
 		for {
 			if restart { resv_restart(cursor) }
 			resv_walk_unlocked(cursor)
 			restart = true
-			if usize(resv_list(resv_object(cursor.obj))) == usize(cursor.fences) { break }
+			if uint(resv_list(resv_object(cursor.obj))) == uint(cursor.fences) { break }
 		}
 		C.vdr_read_unlock()
 		return cursor.fence
@@ -331,7 +331,7 @@ pub fn dma_resv_iter_next(storage voidptr) voidptr {
 			tag := resv_entry(cursor.fences, cursor.position)
 			cursor.position++
 			cursor.fence_usage = u32(tag & 3)
-			if cursor.fence_usage <= cursor.usage { return voidptr(tag & ~usize(3)) }
+			if cursor.fence_usage <= cursor.usage { return voidptr(tag & ~uint(3)) }
 		}
 	}
 }
@@ -376,7 +376,7 @@ pub fn dma_resv_get_fences(storage voidptr, usage u32, count &u32, output &voidp
 	unsafe {
 		resv_object(storage)
 		resv_usage_valid(usage)
-		require(!is_null(count) && usize(count) % 4 == 0 && !is_null(output) && usize(output) % 8 == 0)
+		require(!is_null(count) && uint(count) % 4 == 0 && !is_null(output) && uint(output) % 8 == 0)
 		*count = 0
 		*output = nil
 		resv_begin(iterator, storage, usage)
@@ -384,12 +384,12 @@ pub fn dma_resv_get_fences(storage voidptr, usage u32, count &u32, output &voidp
 		for !is_null(fence) {
 			if cursor.is_restarted {
 				mut fresh := voidptr(nil)
-				if cursor.num_fences != u32(-1) && usize(cursor.num_fences + 1) <= usize(-1) / sizeof(voidptr) {
+				if cursor.num_fences != u32(-1) && uint(cursor.num_fences + 1) <= uint(-1) / sizeof(voidptr) {
 					for *count != 0 {
 						(*count)--
 						C.vdr_put((&voidptr(*output))[*count])
 					}
-					fresh = C.krealloc_array(*output, usize(cursor.num_fences + 1), sizeof(voidptr), 3264)
+					fresh = C.krealloc_array(*output, uint(cursor.num_fences + 1), sizeof(voidptr), 3264)
 				}
 				if is_null(fresh) {
 					for *count != 0 {
@@ -417,7 +417,7 @@ pub fn dma_resv_get_singleton(storage voidptr, usage u32, output &voidptr) i32 {
 	unsafe {
 		resv_object(storage)
 		resv_usage_valid(usage)
-		require(!is_null(output) && usize(output) % 8 == 0)
+		require(!is_null(output) && uint(output) % 8 == 0)
 		mut count := u32(0)
 		mut vector := voidptr(nil)
 		result := dma_resv_get_fences(storage, usage, &count, &vector)

@@ -64,13 +64,13 @@ fn sync_list_splice_init(source &C.vkw_list, destination &C.vkw_list) {
 	}
 }
 fn sync_wait_at(entry &C.vkw_list) &C.vkw_wait_entry {
-	unsafe { return &C.vkw_wait_entry(usize(entry) - __offsetof(C.vkw_wait_entry, entry)) }
+	unsafe { return &C.vkw_wait_entry(uint(entry) - __offsetof(C.vkw_wait_entry, entry)) }
 }
 fn sync_mutex_waiter(entry &C.vkw_list) &MutexWaiter {
-	unsafe { return &MutexWaiter(usize(entry) - __offsetof(MutexWaiter, entry)) }
+	unsafe { return &MutexWaiter(uint(entry) - __offsetof(MutexWaiter, entry)) }
 }
 fn sync_swait_at(entry &C.vkw_list) &C.vkw_swait {
-	unsafe { return &C.vkw_swait(usize(entry) - __offsetof(C.vkw_swait, task_list)) }
+	unsafe { return &C.vkw_swait(uint(entry) - __offsetof(C.vkw_swait, task_list)) }
 }
 
 @[export: '__mutex_init']

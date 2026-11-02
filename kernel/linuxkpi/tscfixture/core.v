@@ -8,7 +8,7 @@ module tscfixture
 struct C.vkt_cycles {}
 fn C.rdtsc() C.vkt_cycles
 fn C.get_cycles() C.vkt_cycles
-fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
 
 @[export: 'vinix_linuxkpi_tsc_fixture_queries']
 pub fn queries() i32 {

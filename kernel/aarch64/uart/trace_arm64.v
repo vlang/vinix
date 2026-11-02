@@ -2,7 +2,7 @@ module uart
 
 // Preserve the original bounded decimal trace, including its seven-digit cap.
 @[export: 'trace_syscall_nr']
-pub fn trace_syscall_nr(number usize) {
+pub fn trace_syscall_nr(number uint) {
 	unsafe {
 		putc(u8(`S`))
 		putc(u8(`C`))

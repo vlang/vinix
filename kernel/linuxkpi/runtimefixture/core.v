@@ -48,7 +48,7 @@ type CompareNode = fn (voidptr, C.vkf_constlistp, C.vkf_constlistp) i32
 
 fn C.vinix_linuxkpi_fixture_compare_int(C.vkf_constvoidp, C.vkf_constvoidp) i32
 fn C.vinix_linuxkpi_fixture_compare_node(voidptr, C.vkf_constlistp, C.vkf_constlistp) i32
-fn C.sort(voidptr, usize, usize, CompareInt, voidptr)
+fn C.sort(voidptr, uint, uint, CompareInt, voidptr)
 fn C.INIT_LIST_HEAD(&C.list_head)
 fn C.list_add_tail(&C.list_head, &C.list_head)
 fn C.list_sort(voidptr, &C.list_head, CompareNode)
@@ -62,28 +62,28 @@ fn C.refcount_set(&C.refcount_t, i32)
 fn C.refcount_inc(&C.refcount_t)
 fn C.refcount_dec_and_test(&C.refcount_t) bool
 fn C.refcount_inc_not_zero(&C.refcount_t) bool
-fn C.atomic_long_set(&C.atomic_long_t, isize)
-fn C.atomic_long_read(&C.atomic_long_t) isize
-fn C.atomic_long_try_cmpxchg(&C.atomic_long_t, &isize, isize) bool
+fn C.atomic_long_set(&C.atomic_long_t, int)
+fn C.atomic_long_read(&C.atomic_long_t) int
+fn C.atomic_long_try_cmpxchg(&C.atomic_long_t, &int, int) bool
 fn C.spin_lock_init(&C.spinlock_t)
-fn C.spin_lock_irqsave(&C.spinlock_t, usize)
-fn C.spin_lock_irqsave_nested(&C.spinlock_t, usize, i32)
+fn C.spin_lock_irqsave(&C.spinlock_t, uint)
+fn C.spin_lock_irqsave_nested(&C.spinlock_t, uint, i32)
 fn C.spin_is_locked(&C.spinlock_t) bool
-fn C.spin_unlock_irqrestore(&C.spinlock_t, usize)
+fn C.spin_unlock_irqrestore(&C.spinlock_t, uint)
 fn C.raw_spin_lock_init(&C.raw_spinlock_t)
 fn C.raw_spin_lock(&C.raw_spinlock_t)
 fn C.raw_spin_unlock(&C.raw_spinlock_t)
-fn C.raw_spin_trylock_irqsave(&C.raw_spinlock_t, usize) bool
-fn C.raw_spin_lock_irqsave_nested(&C.raw_spinlock_t, usize, i32)
+fn C.raw_spin_trylock_irqsave(&C.raw_spinlock_t, uint) bool
+fn C.raw_spin_lock_irqsave_nested(&C.raw_spinlock_t, uint, i32)
 fn C.raw_spin_is_locked(&C.raw_spinlock_t) bool
-fn C.raw_spin_unlock_irqrestore(&C.raw_spinlock_t, usize)
-fn C.bitmap_zero(&usize, u32)
-fn C.set_bit(i32, &usize)
-fn C.find_first_bit(&usize, usize) usize
-fn C.find_next_bit(&usize, usize, usize) usize
-fn C.find_last_bit(&usize, usize) usize
-fn C.find_nth_bit(&usize, usize, usize) usize
-fn C.hweight_long(usize) u32
+fn C.raw_spin_unlock_irqrestore(&C.raw_spinlock_t, uint)
+fn C.bitmap_zero(&uint, u32)
+fn C.set_bit(i32, &uint)
+fn C.find_first_bit(&uint, uint) uint
+fn C.find_next_bit(&uint, uint, uint) uint
+fn C.find_last_bit(&uint, uint) uint
+fn C.find_nth_bit(&uint, uint, uint) uint
+fn C.hweight_long(uint) u32
 fn C.put_unaligned_be64(u64, voidptr)
 fn C.get_unaligned_be64(voidptr) u64
 fn C.kstrtoull(&char, u32, &C.vkf_ull) i32
@@ -95,44 +95,44 @@ fn C.kstrtos8(&char, u32, &i8) i32
 fn C.kstrtos16(&char, u32, &i16) i32
 fn C.kstrtouint(&char, u32, &u32) i32
 fn C.kstrtoint(&char, u32, &i32) i32
-fn C._kstrtoul(&char, u32, &usize) i32
-fn C._kstrtol(&char, u32, &isize) i32
-fn C.kstrtoul(&char, u32, &usize) i32
-fn C.kstrtol(&char, u32, &isize) i32
+fn C._kstrtoul(&char, u32, &uint) i32
+fn C._kstrtol(&char, u32, &int) i32
+fn C.kstrtoul(&char, u32, &uint) i32
+fn C.kstrtol(&char, u32, &int) i32
 fn C.strsep(&&char, &char) &char
 fn C.strchr(&char, i32) &char
 fn C.strpbrk(&char, &char) &char
 fn C.skip_spaces(&char) &char
 fn C.strim(&char) &char
 fn C.strcmp(&char, &char) i32
-fn C.memcmp(voidptr, voidptr, usize) i32
-fn C.memchr_inv(voidptr, i32, usize) voidptr
-fn C.memcpy(voidptr, voidptr, usize) voidptr
-fn C.memset(voidptr, i32, usize) voidptr
-fn C.match_string(voidptr, usize, &char) i32
-fn C.__sysfs_match_string(voidptr, usize, &char) i32
+fn C.memcmp(voidptr, voidptr, uint) i32
+fn C.memchr_inv(voidptr, i32, uint) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
+fn C.memset(voidptr, i32, uint) voidptr
+fn C.match_string(voidptr, uint, &char) i32
+fn C.__sysfs_match_string(voidptr, uint, &char) i32
 fn C.sysfs_streq(&char, &char) bool
 fn C.strreplace(&char, i32, i32) &char
-fn C.strscpy_pad(&char, &char, usize) isize
-fn C.strscpy(&char, &char, usize) isize
-fn C.kstrndup(&char, usize, u32) &char
-fn C.kzalloc(usize, u32) voidptr
-fn C.krealloc(voidptr, usize, u32) voidptr
+fn C.strscpy_pad(&char, &char, uint) int
+fn C.strscpy(&char, &char, uint) int
+fn C.kstrndup(&char, uint, u32) &char
+fn C.kzalloc(uint, u32) voidptr
+fn C.krealloc(voidptr, uint, u32) voidptr
 fn C.kfree(voidptr)
-fn C.get_cpu_ptr(&usize) &usize
-fn C.this_cpu_add(usize, usize)
-fn C.this_cpu_read(usize) usize
-fn C.this_cpu_write(usize, usize)
-fn C.put_cpu_ptr(&usize)
-fn C.__alloc_percpu(usize, usize) voidptr
-fn C.per_cpu_ptr(&usize, u32) &usize
-fn C.per_cpu(usize, u32) usize
+fn C.get_cpu_ptr(&uint) &uint
+fn C.this_cpu_add(uint, uint)
+fn C.this_cpu_read(uint) uint
+fn C.this_cpu_write(uint, uint)
+fn C.put_cpu_ptr(&uint)
+fn C.__alloc_percpu(uint, uint) voidptr
+fn C.per_cpu_ptr(&uint, u32) &uint
+fn C.per_cpu(uint, u32) uint
 fn C.free_percpu(voidptr)
 fn C.vinix_linuxkpi_percpu_count() u32
 fn C.vinix_linuxkpi_tigerlake_id(u16, u16, u32) bool
-fn C.vinix_linuxkpi_irq_save() usize
-fn C.vinix_linuxkpi_irq_restore(usize)
-fn C.vinix_linuxkpi_irq_flags() usize
+fn C.vinix_linuxkpi_irq_save() uint
+fn C.vinix_linuxkpi_irq_restore(uint)
+fn C.vinix_linuxkpi_irq_flags() uint
 fn C.preempt_count() u32
 fn C.preempt_disable()
 fn C.preempt_enable_no_resched()
@@ -151,7 +151,7 @@ __global C.GFP_ATOMIC u32
 __global C.__GFP_ZERO u32
 
 @[c_extern]
-__global C.vinix_linuxkpi_fixture_percpu_probe usize
+__global C.vinix_linuxkpi_fixture_percpu_probe uint
 
 struct RuntimeNode {
 mut:
@@ -165,20 +165,20 @@ fn nested_spin_subclass(vns_effect_storage &u32) i32 {
 	return 3
 }
 
-fn nested_spin_guard(vns_guard &C.spinlock_t, vns_flags &usize, vns_irq usize, vns_depth u32,
+fn nested_spin_guard(vns_guard &C.spinlock_t, vns_flags &uint, vns_irq uint, vns_depth u32,
 	vns_calls &u32, vns_outcome &i32) &C.spinlock_t {
 	unsafe {
-		if *vns_flags != usize(0xf1a6) || C.vinix_linuxkpi_irq_flags() != vns_irq
+		if *vns_flags != uint(0xf1a6) || C.vinix_linuxkpi_irq_flags() != vns_irq
 			|| C.preempt_count() != vns_depth { *vns_outcome = -5 }
 		(*vns_calls)++
 		return vns_guard
 	}
 }
 
-fn nested_raw_spin_guard(vns_guard &C.raw_spinlock_t, vns_flags &usize, vns_irq usize,
+fn nested_raw_spin_guard(vns_guard &C.raw_spinlock_t, vns_flags &uint, vns_irq uint,
 	vns_depth u32, vns_calls &u32, vns_outcome &i32) &C.raw_spinlock_t {
 	unsafe {
-		if *vns_flags != usize(0xf1a6) || C.vinix_linuxkpi_irq_flags() != vns_irq
+		if *vns_flags != uint(0xf1a6) || C.vinix_linuxkpi_irq_flags() != vns_irq
 			|| C.preempt_count() != vns_depth { *vns_outcome = -5 }
 		(*vns_calls)++
 		return vns_guard
@@ -194,7 +194,7 @@ fn nested_spin_locks() i32 {
 			if pinned { C.preempt_disable() }
 			base := C.preempt_count()
 			for disabled in [false, true]! {
-				mut saved_entry := usize(0)
+				mut saved_entry := uint(0)
 				if disabled { saved_entry = C.vinix_linuxkpi_irq_save() }
 				incoming := C.vinix_linuxkpi_irq_flags()
 				for raw_first in [false, true]! {
@@ -202,8 +202,8 @@ fn nested_spin_locks() i32 {
 					mut raw := C.raw_spinlock_t{}
 					C.spin_lock_init(&normal)
 					C.raw_spin_lock_init(&raw)
-					mut first_flags := usize(0xf1a6)
-					mut second_flags := usize(0xf1a6)
+					mut first_flags := uint(0xf1a6)
+					mut second_flags := uint(0xf1a6)
 					mut vns_effects := u32(0)
 					mut vns_calls := u32(0)
 					if raw_first {
@@ -289,8 +289,8 @@ pub fn compare_int(a C.vkf_constvoidp, b C.vkf_constvoidp) i32 {
 @[export: 'vinix_linuxkpi_fixture_compare_node']
 pub fn compare_node(_private voidptr, a C.vkf_constlistp, b C.vkf_constlistp) i32 {
 	unsafe {
-		x := &RuntimeNode(usize(voidptr(a)) - __offsetof(RuntimeNode, list))
-		y := &RuntimeNode(usize(voidptr(b)) - __offsetof(RuntimeNode, list))
+		x := &RuntimeNode(uint(voidptr(a)) - __offsetof(RuntimeNode, list))
+		y := &RuntimeNode(uint(voidptr(b)) - __offsetof(RuntimeNode, list))
 		return i32(x.key > y.key) - i32(x.key < y.key)
 	}
 }
@@ -375,15 +375,15 @@ fn kstrtox() i32 {
 		mut medium_signed := i16(7)
 		mut integer_unsigned := u32(7)
 		mut integer_signed := i32(7)
-		mut long_unsigned := usize(7)
-		mut long_signed := isize(7)
+		mut long_unsigned := uint(7)
+		mut long_signed := int(7)
 		if C.kstrtou8(c'255', 10, &small_unsigned) != 0 || small_unsigned != 255 || C.kstrtou8(c'256', 10, &small_unsigned) != -34 || small_unsigned != 255
 			|| C.kstrtos8(c'-128', 10, &small_signed) != 0 || small_signed != -128 || C.kstrtos8(c'128', 10, &small_signed) != -34 || small_signed != -128
 			|| C.kstrtos16(c'-32768', 10, &medium_signed) != 0 || medium_signed != -32768 || C.kstrtos16(c'32768', 10, &medium_signed) != -34 || medium_signed != -32768
 			|| C.kstrtouint(c'4294967295', 10, &integer_unsigned) != 0 || integer_unsigned != ~u32(0) || C.kstrtouint(c'4294967296', 10, &integer_unsigned) != -34 || integer_unsigned != ~u32(0)
 			|| C.kstrtoint(c'-2147483648', 10, &integer_signed) != 0 || integer_signed != i32(-2147483647 - 1) || C.kstrtoint(c'2147483648', 10, &integer_signed) != -34 || integer_signed != i32(-2147483647 - 1)
-			|| C._kstrtoul(c'18446744073709551615', 10, &long_unsigned) != 0 || long_unsigned != ~usize(0) || C._kstrtol(c'-9223372036854775808', 10, &long_signed) != 0 || long_signed != isize(-9223372036854775807 - 1)
-			|| C.kstrtoul(c'18446744073709551615', 10, &long_unsigned) != 0 || long_unsigned != ~usize(0) || C.kstrtol(c'-9223372036854775808', 10, &long_signed) != 0 || long_signed != isize(-9223372036854775807 - 1) {
+			|| C._kstrtoul(c'18446744073709551615', 10, &long_unsigned) != 0 || long_unsigned != ~uint(0) || C._kstrtol(c'-9223372036854775808', 10, &long_signed) != 0 || long_signed != int(-9223372036854775807 - 1)
+			|| C.kstrtoul(c'18446744073709551615', 10, &long_unsigned) != 0 || long_unsigned != ~uint(0) || C.kstrtol(c'-9223372036854775808', 10, &long_signed) != 0 || long_signed != int(-9223372036854775807 - 1) {
 			result = -5
 		}
 		if !C.irqs_disabled() || C.preempt_count() != depth + 1 { result = -5 }
@@ -418,34 +418,34 @@ fn string_tokens() i32 {
 		depth := C.preempt_count()
 		C.preempt_disable()
 		mut token := C.strsep(&cursor, c',')
-		if usize(token) != usize(&force[0]) || C.strcmp(token, c'!9a49') != 0 || usize(cursor) != usize(&force[6]) {
+		if uint(token) != uint(&force[0]) || C.strcmp(token, c'!9a49') != 0 || uint(cursor) != uint(&force[6]) {
 			result = -5
 		}
 		token = C.strsep(&cursor, c',')
-		if usize(token) != usize(&force[6]) || *token != 0 || usize(cursor) != usize(&force[7]) {
+		if uint(token) != uint(&force[6]) || *token != 0 || uint(cursor) != uint(&force[7]) {
 			result = -5
 		}
 		token = C.strsep(&cursor, c',')
-		if usize(token) != usize(&force[7]) || C.strcmp(token, c'!1234') != 0 || usize(cursor) != usize(&force[13]) {
+		if uint(token) != uint(&force[7]) || C.strcmp(token, c'!1234') != 0 || uint(cursor) != uint(&force[13]) {
 			result = -5
 		}
 		token = C.strsep(&cursor, c',')
-		if usize(token) != usize(&force[13]) || *token != 0 || cursor != nil || C.strsep(&cursor, c',') != nil || cursor != nil || C.memcmp(&force[0], &force_expected[0], sizeof(force)) != 0 {
+		if uint(token) != uint(&force[13]) || *token != 0 || cursor != nil || C.strsep(&cursor, c',') != nil || cursor != nil || C.memcmp(&force[0], &force_expected[0], sizeof(force)) != 0 {
 			result = -5
 		}
 		cursor = &no_delimiter[1]
-		if usize(C.strsep(&cursor, c'')) != usize(&no_delimiter[1]) || cursor != nil || C.memcmp(&no_delimiter[0], c'!a,b\x00?', sizeof(no_delimiter)) != 0 {
+		if uint(C.strsep(&cursor, c'')) != uint(&no_delimiter[1]) || cursor != nil || C.memcmp(&no_delimiter[0], c'!a,b\x00?', sizeof(no_delimiter)) != 0 {
 			result = -5
 		}
-		if usize(C.strchr(search, 44)) != usize(search + 4) || usize(C.strchr(search, 0)) != usize(search + 14) || C.strchr(search, 63) != nil
-			|| usize(C.strchr(&high[0], 0x180)) != usize(&high[0]) || usize(C.strchr(&high[0], -1)) != usize(&high[2])
-			|| usize(C.strpbrk(search, c';,')) != usize(search + 4) || C.strpbrk(search, c'?+') != nil || C.strpbrk(search, c'') != nil
-			|| usize(C.skip_spaces(spaces)) != usize(spaces + 6) || usize(C.skip_spaces(&high[0])) != usize(&high[0]) || usize(C.skip_spaces(only_spaces)) != usize(only_spaces + 2) {
+		if uint(C.strchr(search, 44)) != uint(search + 4) || uint(C.strchr(search, 0)) != uint(search + 14) || C.strchr(search, 63) != nil
+			|| uint(C.strchr(&high[0], 0x180)) != uint(&high[0]) || uint(C.strchr(&high[0], -1)) != uint(&high[2])
+			|| uint(C.strpbrk(search, c';,')) != uint(search + 4) || C.strpbrk(search, c'?+') != nil || C.strpbrk(search, c'') != nil
+			|| uint(C.skip_spaces(spaces)) != uint(spaces + 6) || uint(C.skip_spaces(&high[0])) != uint(&high[0]) || uint(C.skip_spaces(only_spaces)) != uint(only_spaces + 2) {
 			result = -5
 		}
-		if usize(C.strim(&trim[1])) != usize(&trim[3]) || C.memcmp(&trim[0], &trim_expected[0], sizeof(trim)) != 0
-			|| usize(C.strim(&blank[1])) != usize(&blank[1]) || C.memcmp(&blank[0], &blank_expected[0], sizeof(blank)) != 0
-			|| usize(C.strim(&empty[1])) != usize(&empty[1]) || empty[0] != 33 || empty[2] != 63 {
+		if uint(C.strim(&trim[1])) != uint(&trim[3]) || C.memcmp(&trim[0], &trim_expected[0], sizeof(trim)) != 0
+			|| uint(C.strim(&blank[1])) != uint(&blank[1]) || C.memcmp(&blank[0], &blank_expected[0], sizeof(blank)) != 0
+			|| uint(C.strim(&empty[1])) != uint(&empty[1]) || empty[0] != 33 || empty[2] != 63 {
 			result = -5
 		}
 		if !C.irqs_disabled() || C.preempt_count() != depth + 1 { result = -5 }
@@ -491,20 +491,20 @@ fn string_helpers() i32 {
 			|| C.match_string(voidptr(&crc[0]), 14, c'TV') != 9 || C.match_string(voidptr(&crc[0]), 14, c'DP-C') != 11 || C.match_string(voidptr(&crc[0]), 14, c'auto') != 13
 			|| C.match_string(voidptr(&crc[0]), 13, c'auto') != -22 || C.match_string(voidptr(&crc[0]), 14, c'pipe\n') != -22 || C.match_string(voidptr(&crc[0]), 14, c'tv') != -22
 			|| C.match_string(voidptr(&crc[0]), 14, c'missing') != -22 || C.match_string(nil, 0, nil) != -22 || C.match_string(voidptr(&duplicates[0]), 1, c'pipe') != -22
-			|| C.match_string(voidptr(&duplicates[0]), 5, c'pipe') != 1 || C.match_string(voidptr(&duplicates[0]), ~usize(0), c'pipe') != 1 || C.match_string(voidptr(&duplicates[0]), ~usize(0), c'auto') != -22 || C.match_string(voidptr(&newline[0]), ~usize(0), c'pipe') != 1 {
+			|| C.match_string(voidptr(&duplicates[0]), 5, c'pipe') != 1 || C.match_string(voidptr(&duplicates[0]), ~uint(0), c'pipe') != 1 || C.match_string(voidptr(&duplicates[0]), ~uint(0), c'auto') != -22 || C.match_string(voidptr(&newline[0]), ~uint(0), c'pipe') != 1 {
 			result = -5
 		}
 		for pair in pairs { if C.sysfs_streq(pair.left, pair.right) != pair.equal { result = -5 } }
 		if C.__sysfs_match_string(nil, 0, nil) != -22 || C.__sysfs_match_string(voidptr(&newline[0]), 0, c'pipe') != -22 || C.__sysfs_match_string(voidptr(&newline[0]), 1, c'pipe') != 0
-			|| C.__sysfs_match_string(voidptr(&newline[0]), ~usize(0), c'pipe') != 0 || C.__sysfs_match_string(voidptr(&newline[0]), ~usize(0), c'pipe\n') != 0
-			|| C.__sysfs_match_string(voidptr(&newline[0]), 5, c'DP-B\n') != 2 || C.__sysfs_match_string(voidptr(&newline[0]), ~usize(0), c'DP-B\n\n') != -22
-			|| C.__sysfs_match_string(voidptr(&newline[0]), ~usize(0), c'dp-b') != -22 || C.__sysfs_match_string(voidptr(&newline[0]), ~usize(0), c'auto') != -22 {
+			|| C.__sysfs_match_string(voidptr(&newline[0]), ~uint(0), c'pipe') != 0 || C.__sysfs_match_string(voidptr(&newline[0]), ~uint(0), c'pipe\n') != 0
+			|| C.__sysfs_match_string(voidptr(&newline[0]), 5, c'DP-B\n') != 2 || C.__sysfs_match_string(voidptr(&newline[0]), ~uint(0), c'DP-B\n\n') != -22
+			|| C.__sysfs_match_string(voidptr(&newline[0]), ~uint(0), c'dp-b') != -22 || C.__sysfs_match_string(voidptr(&newline[0]), ~uint(0), c'auto') != -22 {
 			result = -5
 		}
-		if usize(C.strreplace(&pmu[1], 58, 95)) != usize(&pmu[1]) || C.memcmp(&pmu[0], pmu_expected, sizeof(pmu)) != 0
-			|| usize(C.strreplace(&replaced[1], 58, 0)) != usize(&replaced[1]) || C.memcmp(&replaced[0], &replaced_expected[0], sizeof(replaced)) != 0
-			|| usize(C.strreplace(&old_nul[1], 0, 33)) != usize(&old_nul[1]) || C.memcmp(&old_nul[0], &old_nul_expected[0], sizeof(old_nul)) != 0
-			|| usize(C.strreplace(&empty[1], 58, 95)) != usize(&empty[1]) || C.memcmp(&empty[0], &empty_expected[0], sizeof(empty)) != 0 {
+		if uint(C.strreplace(&pmu[1], 58, 95)) != uint(&pmu[1]) || C.memcmp(&pmu[0], pmu_expected, sizeof(pmu)) != 0
+			|| uint(C.strreplace(&replaced[1], 58, 0)) != uint(&replaced[1]) || C.memcmp(&replaced[0], &replaced_expected[0], sizeof(replaced)) != 0
+			|| uint(C.strreplace(&old_nul[1], 0, 33)) != uint(&old_nul[1]) || C.memcmp(&old_nul[0], &old_nul_expected[0], sizeof(old_nul)) != 0
+			|| uint(C.strreplace(&empty[1], 58, 95)) != uint(&empty[1]) || C.memcmp(&empty[0], &empty_expected[0], sizeof(empty)) != 0 {
 			result = -5
 		}
 		if !C.irqs_disabled() || C.preempt_count() != depth + 1 { result = -5 }
@@ -542,7 +542,7 @@ fn conditional_sleep_checks() i32 {
 			if pinned { C.preempt_disable() }
 			base := C.preempt_count()
 			for disabled in [false, true]! {
-				mut saved_entry := usize(0)
+				mut saved_entry := uint(0)
 				if disabled { saved_entry = C.vinix_linuxkpi_irq_save() }
 				incoming := C.vinix_linuxkpi_irq_flags()
 				for condition in [false, true]! {
@@ -593,7 +593,7 @@ pub fn selftest() i32 {
 		if C.this_cpu_read(C.vinix_linuxkpi_fixture_percpu_probe) != 22 { result = -5 }
 		C.this_cpu_write(C.vinix_linuxkpi_fixture_percpu_probe, 17)
 		C.put_cpu_ptr(local_probe)
-		slots := &usize(C.__alloc_percpu(sizeof(usize), sizeof(usize)))
+		slots := &uint(C.__alloc_percpu(sizeof(uint), sizeof(uint)))
 		if slots == nil {
 			result = -12
 		} else {
@@ -629,17 +629,17 @@ pub fn selftest() i32 {
 			mut parent := &C.rb_node(nil)
 			for *link != nil {
 				parent = *link
-				other := &RuntimeNode(usize(parent) - __offsetof(RuntimeNode, tree))
+				other := &RuntimeNode(uint(parent) - __offsetof(RuntimeNode, tree))
 				link = if nodes[i].key < other.key { &parent.rb_left } else { &parent.rb_right }
 			}
 			C.rb_link_node(&nodes[i].tree, parent, link)
 			C.rb_insert_color(&nodes[i].tree, &root)
 		}
 		C.list_sort(nil, &head, C.vinix_linuxkpi_fixture_compare_node)
-		mut index := usize(0)
+		mut index := uint(0)
 		mut entry := head.next
-		for usize(entry) != usize(&head) {
-			node := &RuntimeNode(usize(entry) - __offsetof(RuntimeNode, list))
+		for uint(entry) != uint(&head) {
+			node := &RuntimeNode(uint(entry) - __offsetof(RuntimeNode, list))
 			if node.key != i32(index) { result = -5 }
 			index++
 			entry = entry.next
@@ -647,7 +647,7 @@ pub fn selftest() i32 {
 		index = 0
 		mut p := C.rb_first(&root)
 		for p != nil {
-			if (&RuntimeNode(usize(p) - __offsetof(RuntimeNode, tree))).key != i32(index) {
+			if (&RuntimeNode(uint(p) - __offsetof(RuntimeNode, tree))).key != i32(index) {
 				result = -5
 			}
 			index++
@@ -662,14 +662,14 @@ pub fn selftest() i32 {
 			result = -5
 		}
 		mut wide := C.atomic_long_t{}
-		C.atomic_long_set(&wide, isize(1) << 40)
-		mut expected := isize(1) << 40
-		if !C.atomic_long_try_cmpxchg(&wide, &expected, expected + 1) || C.atomic_long_read(&wide) != (isize(1) << 40) + 1 {
+		C.atomic_long_set(&wide, int(1) << 40)
+		mut expected := int(1) << 40
+		if !C.atomic_long_try_cmpxchg(&wide, &expected, expected + 1) || C.atomic_long_read(&wide) != (int(1) << 40) + 1 {
 			result = -5
 		}
 		mut spin_guard := C.spinlock_t{}
 		C.spin_lock_init(&spin_guard)
-		mut flags := usize(0)
+		mut flags := uint(0)
 		C.spin_lock_irqsave(&spin_guard, flags)
 		if C.vinix_linuxkpi_may_sleep() { result = -5 }
 		atomic_object := C.kzalloc(48, C.GFP_ATOMIC)
@@ -687,7 +687,7 @@ pub fn selftest() i32 {
 		if !C.vinix_linuxkpi_may_sleep() { result = -5 }
 		if nested_spin_locks() != 0 { result = -5 }
 		if conditional_sleep_checks() != 0 { result = -5 }
-		mut bits := [3]usize{}
+		mut bits := [3]uint{}
 		C.bitmap_zero(&bits[0], 129)
 		C.set_bit(64, &bits[0])
 		C.set_bit(128, &bits[0])
@@ -724,8 +724,8 @@ $if !linuxkpi_host_test ? {
 	fn C.kernel_fpu_begin()
 	fn C.kernel_fpu_end()
 	fn C.i915_has_memcpy_from_wc() bool
-	fn C.i915_memcpy_from_wc(voidptr, voidptr, usize) bool
-	fn C.i915_unaligned_memcpy_from_wc(voidptr, voidptr, usize)
+	fn C.i915_memcpy_from_wc(voidptr, voidptr, uint) bool
+	fn C.i915_unaligned_memcpy_from_wc(voidptr, voidptr, uint)
 	fn C.vinix_linuxkpi_fixture_xmm_save(voidptr, &u32)
 	fn C.vinix_linuxkpi_fixture_xmm_set(voidptr, &u32)
 	fn C.vinix_linuxkpi_fixture_xmm_clear()
@@ -786,7 +786,7 @@ $if !linuxkpi_host_test ? {
 					&char(c'safe fallback')
 				})
 			} else {
-				C.kprintf(c'linuxkpi: WC copy failed checks 0x%x; XMM0 %lx:%lx, MXCSR %x (expected %x)\n', result, usize(observed.words[1]), usize(observed.words[0]), observed_csr, test_csr)
+				C.kprintf(c'linuxkpi: WC copy failed checks 0x%x; XMM0 %lx:%lx, MXCSR %x (expected %x)\n', result, uint(observed.words[1]), uint(observed.words[0]), observed_csr, test_csr)
 			}
 			return if result != 0 { i32(-5) } else { i32(0) }
 		}

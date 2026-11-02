@@ -1578,7 +1578,7 @@ pub fn apply_policy(s &Speakers, now u64) {
 @[export: 'vinix_spk_core_tx_at']
 pub fn tx_at(s &Speakers, position u64) &u8 {
 	unsafe {
-		return &u8(usize((s.cfg.tx_buffer + position % u64(s.tx_ring))))
+		return &u8(uint((s.cfg.tx_buffer + position % u64(s.tx_ring))))
 	}
 }
 
@@ -1798,7 +1798,7 @@ pub fn sense_service(s &Speakers, now u64) {
 		for done-- {
 			k := s.sense_done
 			address := s.cfg.sense_buffer + (k % u64(s.sense_periods)) * u64((512 * (4 * 2)))
-			frames := &i16(usize(address))
+			frames := &i16(uint(address))
 			i := u32(0)
 			s.io.invalidate(voidptr(s.io.cookie), address, (512 * (4 * 2)))
 			for i = u32(0); i < 2; i++ {
@@ -2341,7 +2341,7 @@ pub fn kernel_read32(cookie voidptr, address u64) u32 {
 	unsafe {
 		v := u32(0)
 
-		v = C.vinix_mmio_read32(voidptr(usize(address)))
+		v = C.vinix_mmio_read32(voidptr(uint(address)))
 		asm volatile aarch64 {
 		dmb ish
 		; ; ; memory
@@ -2357,7 +2357,7 @@ pub fn kernel_write32(cookie voidptr, address u64, value u32) {
 		dmb ish
 		; ; ; memory
 	}
-		C.vinix_mmio_write32(voidptr(usize(address)), value)
+		C.vinix_mmio_write32(voidptr(uint(address)), value)
 	}
 }
 
@@ -2435,7 +2435,7 @@ pub fn kernel_power(cookie voidptr, cluster_2 u32, on i32) i32 {
 pub fn vinix_apple_speakers_init(cfg &C.vinix_apple_speakers_config) i32 {
 	unsafe {
 		mut ctr := u64(0)
-		if (usize(cfg) == 0) || (usize(cfg.cluster_power) == 0) || spk_controller.state != st_off {
+		if (uint(cfg) == 0) || (uint(cfg.cluster_power) == 0) || spk_controller.state != st_off {
 			return 0
 		}
 		mut frequency := u64(0)

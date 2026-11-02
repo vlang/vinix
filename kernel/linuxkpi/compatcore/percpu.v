@@ -5,8 +5,8 @@ module compatcore
 __global (
 	compat_cpu_count       u32
 	compat_template_begin  voidptr
-	compat_template_size   usize
-	compat_static_stride   usize
+	compat_template_size   uint
+	compat_static_stride   uint
 	compat_static_copies   &u8
 	compat_allocations     &PerCPUAllocation
 	compat_allocation_lock u32
@@ -17,8 +17,8 @@ mut:
 	next   &PerCPUAllocation
 	prev   &PerCPUAllocation
 	data   &u8
-	size   usize
-	stride usize
+	size   uint
+	stride uint
 }
 
 // Export the original array symbol; callers still add byte offsets to their
@@ -39,20 +39,20 @@ pub fn percpu_count() u32 {
 pub fn percpu_init(count u32, begin voidptr, end voidptr) i32 {
 	unsafe {
 		if percpu_count() != 0 { return -16 }
-		if count == 0 || count > 256 || usize(end) < usize(begin) { return -22 }
-		size := usize(end) - usize(begin)
+		if count == 0 || count > 256 || uint(end) < uint(begin) { return -22 }
+		size := uint(end) - uint(begin)
 		page := C.vinix_linuxkpi_page_size()
-		if size > usize(-1) - (page - 1) { return -75 }
+		if size > uint(-1) - (page - 1) { return -75 }
 		stride := (size + page - 1) & ~(page - 1)
-		if stride != 0 && usize(count) > usize(-1) / stride { return -75 }
-		total := stride * usize(count)
+		if stride != 0 && uint(count) > uint(-1) / stride { return -75 }
+		total := stride * uint(count)
 		copies := if size != 0 { &u8(C.kzalloc(total, 3264)) } else { &u8(nil) }
-		if size != 0 && usize(copies) == 0 { return -12 }
+		if size != 0 && uint(copies) == 0 { return -12 }
 		offsets := &u64(C.vkp_percpu_offsets())
 		for cpu := u32(0); cpu < count; cpu++ {
-			if size != 0 { C.memcpy(copies + usize(cpu) * stride, begin, size) }
+			if size != 0 { C.memcpy(copies + uint(cpu) * stride, begin, size) }
 			offsets[cpu] = if size != 0 {
-				u64(usize(copies) + usize(cpu) * stride - usize(begin))
+				u64(uint(copies) + uint(cpu) * stride - uint(begin))
 			} else {
 				0
 			}
@@ -76,52 +76,52 @@ pub fn percpu_bootstrap(count u32) i32 {
 @[export: 'vinix_linuxkpi_percpu_ptr']
 pub fn percpu_ptr(ptr voidptr, cpu u32) voidptr {
 	unsafe {
-		if usize(ptr) == 0 { return nil }
+		if uint(ptr) == 0 { return nil }
 		require(cpu < percpu_count())
-		mut offset := usize(ptr) - usize(compat_template_begin)
+		mut offset := uint(ptr) - uint(compat_template_begin)
 		if offset < compat_template_size {
-			return compat_static_copies + usize(cpu) * compat_static_stride + offset
+			return compat_static_copies + uint(cpu) * compat_static_stride + offset
 		}
 		irq := C.vkp_spin_lock_irqsave(&compat_allocation_lock)
 		mut result := voidptr(nil)
-		for a := compat_allocations; usize(a) != 0; a = a.next {
-			offset = usize(ptr) - usize(a.data)
+		for a := compat_allocations; uint(a) != 0; a = a.next {
+			offset = uint(ptr) - uint(a.data)
 			if offset < a.size {
-				result = a.data + usize(cpu) * a.stride + offset
+				result = a.data + uint(cpu) * a.stride + offset
 				break
 			}
 		}
 		C.vkp_spin_unlock_irqrestore(&compat_allocation_lock, irq)
-		require(usize(result) != 0)
+		require(uint(result) != 0)
 		return result
 	}
 }
 
 @[export: '__alloc_percpu_gfp']
-pub fn alloc_percpu_gfp(size usize, align usize, flags u32) voidptr {
+pub fn alloc_percpu_gfp(size uint, align uint, flags u32) voidptr {
 	unsafe {
 		count := percpu_count()
 		page := C.vinix_linuxkpi_page_size()
 		if count == 0 || size == 0 || align == 0 || (align & (align - 1)) != 0 || align > page {
 			return nil
 		}
-		alignment := if align > 64 { align } else { usize(64) }
-		if size > usize(-1) - (alignment - 1) { return nil }
+		alignment := if align > 64 { align } else { uint(64) }
+		if size > uint(-1) - (alignment - 1) { return nil }
 		stride := (size + alignment - 1) & ~(alignment - 1)
-		if usize(count) > usize(-1) / stride { return nil }
-		mut total := stride * usize(count)
-		if total > usize(-1) - sizeof(PerCPUAllocation) { return nil }
+		if uint(count) > uint(-1) / stride { return nil }
+		mut total := stride * uint(count)
+		if total > uint(-1) - sizeof(PerCPUAllocation) { return nil }
 		total += sizeof(PerCPUAllocation)
-		if total > usize(-1) - (alignment - 1) { return nil }
+		if total > uint(-1) - (alignment - 1) { return nil }
 		total += alignment - 1
 		a := &PerCPUAllocation(C.kzalloc(total, flags))
-		if usize(a) == 0 { return nil }
-		a.data = &u8((usize(a) + sizeof(PerCPUAllocation) + alignment - 1) & ~(alignment - 1))
+		if uint(a) == 0 { return nil }
+		a.data = &u8((uint(a) + sizeof(PerCPUAllocation) + alignment - 1) & ~(alignment - 1))
 		a.size = size
 		a.stride = stride
 		irq := C.vkp_spin_lock_irqsave(&compat_allocation_lock)
 		a.next = compat_allocations
-		if usize(compat_allocations) != 0 { compat_allocations.prev = a }
+		if uint(compat_allocations) != 0 { compat_allocations.prev = a }
 		compat_allocations = a
 		C.vkp_spin_unlock_irqrestore(&compat_allocation_lock, irq)
 		return a.data
@@ -129,7 +129,7 @@ pub fn alloc_percpu_gfp(size usize, align usize, flags u32) voidptr {
 }
 
 @[export: '__alloc_percpu']
-pub fn alloc_percpu(size usize, align usize) voidptr {
+pub fn alloc_percpu(size uint, align uint) voidptr {
 	unsafe {
 		return alloc_percpu_gfp(size, align, 3264)
 	}
@@ -138,19 +138,19 @@ pub fn alloc_percpu(size usize, align usize) voidptr {
 @[export: 'free_percpu']
 pub fn free_percpu(ptr voidptr) {
 	unsafe {
-		if usize(ptr) == 0 { return }
+		if uint(ptr) == 0 { return }
 		irq := C.vkp_spin_lock_irqsave(&compat_allocation_lock)
 		mut found := &PerCPUAllocation(nil)
-		for a := compat_allocations; usize(a) != 0; a = a.next {
-			if usize(a.data) == usize(ptr) {
+		for a := compat_allocations; uint(a) != 0; a = a.next {
+			if uint(a.data) == uint(ptr) {
 				found = a
-				if usize(a.prev) != 0 { a.prev.next = a.next } else { compat_allocations = a.next }
-				if usize(a.next) != 0 { a.next.prev = a.prev }
+				if uint(a.prev) != 0 { a.prev.next = a.next } else { compat_allocations = a.next }
+				if uint(a.next) != 0 { a.next.prev = a.prev }
 				break
 			}
 		}
 		C.vkp_spin_unlock_irqrestore(&compat_allocation_lock, irq)
-		require(usize(found) != 0)
+		require(uint(found) != 0)
 		// Same caller-owned lifetime as Linux: all remote readers must have stopped.
 		C.kfree(found)
 	}
@@ -159,7 +159,7 @@ pub fn free_percpu(ptr voidptr) {
 @[export: 'vinix_linuxkpi_percpu_destroy_for_test']
 pub fn percpu_destroy_for_test() {
 	unsafe {
-		require(usize(compat_allocations) == 0)
+		require(uint(compat_allocations) == 0)
 		C.kfree(compat_static_copies)
 		compat_static_copies = nil
 		C.vkp_store32(&compat_cpu_count, 0, 3)

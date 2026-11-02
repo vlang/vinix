@@ -494,7 +494,7 @@ struct ChildChange {
 	err    u64
 }
 
-fn C.__builtin_alloca(usize) voidptr
+fn C.__builtin_alloca(uint) voidptr
 
 fn wake_child_waiters(mut parent proc.Process) {
 	parent.children_lock.acquire()

@@ -11,7 +11,7 @@ import x86.cpu.local as cpulocal
 fn C.vinix_linuxkpi_kasprintf_fixture_run(u32, u32, voidptr, &u32) voidptr
 fn C.vinix_linuxkpi_kasprintf_fixture_overflow(u32, &u32) bool
 fn C.vinix_linuxkpi_kasprintf_fixture_free(voidptr)
-fn C.vinix_linuxkpi_kasprintf_fixture_alloc(usize) voidptr
+fn C.vinix_linuxkpi_kasprintf_fixture_alloc(uint) voidptr
 fn C.vinix_linuxkpi_kasprintf_fixture_gfp() u32
 fn C.vinix_linuxkpi_kasprintf_fixture_literal() voidptr
 fn C.vinix_linuxkpi_kasprintf_fixture_rodata(voidptr) bool
@@ -51,8 +51,8 @@ fn kasprintf_test_fast_batch() bool {
 	}
 	for _ in 0 .. 200 {
 		if !kasprintf_test_borrowed(literal)
-			|| !kasprintf_test_borrowed(voidptr(usize(literal) + 6))
-			|| !kasprintf_test_borrowed(voidptr(usize(literal) + 21)) {
+			|| !kasprintf_test_borrowed(voidptr(uint(literal) + 6))
+			|| !kasprintf_test_borrowed(voidptr(uint(literal) + 21)) {
 			return false
 		}
 		mut state := u32(0)

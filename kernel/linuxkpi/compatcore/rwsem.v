@@ -33,7 +33,7 @@ fn vrs_assert(ok bool, message &char) {
 }
 
 fn vrs_storage(storage voidptr) &C.vrs_rwsem {
-	vrs_assert(!is_null(storage) && (usize(storage) & 7) == 0, c'invalid rwsem storage')
+	vrs_assert(!is_null(storage) && (uint(storage) & 7) == 0, c'invalid rwsem storage')
 	unsafe {
 		return &C.vrs_rwsem(storage)
 	}
@@ -41,13 +41,13 @@ fn vrs_storage(storage voidptr) &C.vrs_rwsem {
 
 fn vrs_current() voidptr {
 	task := C.vkp_current()
-	vrs_assert(!is_null(task) && (usize(task) & 3) == 0, c'rwsem requires a live aligned current task')
+	vrs_assert(!is_null(task) && (uint(task) & 3) == 0, c'rwsem requires a live aligned current task')
 	return task
 }
 
 fn vrs_waiter(entry &C.vkw_list) &RwsemWaiter {
 	unsafe {
-		return &RwsemWaiter(usize(entry) - __offsetof(RwsemWaiter, entry))
+		return &RwsemWaiter(uint(entry) - __offsetof(RwsemWaiter, entry))
 	}
 }
 

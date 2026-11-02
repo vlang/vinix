@@ -90,7 +90,7 @@ pub fn sha256_digest(data &u8, length u64, output &[32]u8) {
 	mut padding := [128]u8{}
 	remainder := int(length - at)
 	if remainder != 0 {
-		unsafe { C.memcpy(&padding[0], &data[at], usize(remainder)) }
+		unsafe { C.memcpy(&padding[0], &data[at], uint(remainder)) }
 	}
 	padding[remainder] = 0x80
 	blocks := if remainder < 56 { 64 } else { 128 }

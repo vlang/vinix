@@ -9,7 +9,7 @@ struct C.task_struct {
 }
 
 struct C.timer_list {
-	expires usize
+	expires uint
 }
 
 struct C.completion {}
@@ -28,18 +28,18 @@ fn C.pthread_exit(voidptr)
 fn C.get_task_struct(&C.task_struct) &C.task_struct
 fn C.put_task_struct(&C.task_struct)
 fn C.preempt_count() u32
-fn C.vinix_linuxkpi_irq_flags() usize
+fn C.vinix_linuxkpi_irq_flags() uint
 fn C.vinix_linuxkpi_may_sleep() bool
 fn C.timer_pending(&C.timer_list) bool
-fn C.time_before(usize, usize) bool
-fn C.mod_timer(&C.timer_list, usize) i32
+fn C.time_before(uint, uint) bool
+fn C.mod_timer(&C.timer_list, uint) i32
 fn C.complete(&C.completion)
 fn C.init_completion(&C.completion)
 fn C.timer_setup_on_stack(&C.timer_list, TimerCallback, u32)
-fn C.wait_for_completion_timeout(&C.completion, usize) usize
+fn C.wait_for_completion_timeout(&C.completion, uint) uint
 fn C.timer_shutdown_sync(&C.timer_list) i32
 fn C.destroy_timer_on_stack(&C.timer_list)
-fn C.vinix_linuxkpi_timer_active() usize
+fn C.vinix_linuxkpi_timer_active() uint
 fn C.__atomic_load_n(&u32, i32) u32
 fn C.cond_resched() i32
 fn C.BUG_ON(bool)
@@ -49,7 +49,7 @@ fn C.kprintf(&char, ...) i32
 __global C.current &C.task_struct
 
 @[c_extern]
-__global C.jiffies usize
+__global C.jiffies uint
 
 @[c_extern]
 __global C.TASK_DEAD u32
@@ -67,9 +67,9 @@ mut:
 	calls            u32
 	result           i32
 	callback_reasons u32
-	bad_tick         usize
-	bad_expires      usize
-	bad_irq_flags    usize
+	bad_tick         uint
+	bad_expires      uint
+	bad_irq_flags    uint
 	bad_depth        u32
 	irq_safe         bool
 }
@@ -80,10 +80,10 @@ mut:
 	callback_reasons u32
 	calls            u32
 	depth            u32
-	elapsed          usize
-	tick             usize
-	expires          usize
-	irq_flags        usize
+	elapsed          uint
+	tick             uint
+	expires          uint
+	irq_flags        uint
 }
 
 struct NativeTimerWorker {
@@ -104,7 +104,7 @@ pub fn callback(timer &C.timer_list) {
 		if C.vinix_linuxkpi_may_sleep() { reasons |= 1 }
 		if depth == 0 { reasons |= 2 }
 		if C.timer_pending(timer) { reasons |= 4 }
-		if ((flags & (usize(1) << 9)) != 0) == test.irq_safe { reasons |= 8 }
+		if ((flags & (uint(1) << 9)) != 0) == test.irq_safe { reasons |= 8 }
 		if C.time_before(now, timer.expires) { reasons |= 16 }
 		if reasons != 0 {
 			test.result = -C.EIO

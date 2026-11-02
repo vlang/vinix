@@ -16,7 +16,7 @@ __global C.jiffies_64 u64
 fn C.vinix_linuxkpi_clock_ns() u64
 fn C.vinix_linuxkpi_clock_resolution_ns() u32
 fn C.vinix_linuxkpi_timer_tick()
-fn C.vkt_jiffies_address() usize
+fn C.vkt_jiffies_address() uint
 fn C.vkt_max_sec_in_jiffies() u64
 fn C.vkt_sec_conversion() u32
 fn C.vkt_nsec_conversion() u32
@@ -90,10 +90,10 @@ pub fn time_tick(now_ns u64) {
 }
 
 @[export: 'vinix_linuxkpi_time_waiters']
-pub fn time_waiters() usize {
+pub fn time_waiters() uint {
 	unsafe {
 		flags := C.vkp_spin_lock_irqsave(&vkt_deadline_lock)
-		mut result := usize(0)
+		mut result := uint(0)
 		for wait := vkt_deadline_head; !is_null(wait); wait = wait.next { result++ }
 		C.vkp_spin_unlock_irqrestore(&vkt_deadline_lock, flags)
 		return result
@@ -101,10 +101,10 @@ pub fn time_waiters() usize {
 }
 
 @[export: 'vinix_linuxkpi_test_task_time_waiters']
-pub fn time_task_waiters(task voidptr) usize {
+pub fn time_task_waiters(task voidptr) uint {
 	unsafe {
 		flags := C.vkp_spin_lock_irqsave(&vkt_deadline_lock)
-		mut result := usize(0)
+		mut result := uint(0)
 		for wait := vkt_deadline_head; !is_null(wait); wait = wait.next {
 			if wait.task == task { result++ }
 		}
@@ -274,7 +274,7 @@ pub fn time_udelay(microseconds u64) { require(microseconds <= u64(-1) / 1000); 
 @[export: 'vinix_linuxkpi_time_selftest']
 pub fn time_selftest() i32 {
 	unsafe {
-		if C.vkt_jiffies_address() != usize(&C.jiffies_64) { return -5 }
+		if C.vkt_jiffies_address() != uint(&C.jiffies_64) { return -5 }
 		before := (C.vkp_jiffies() - 4294667296) * 1000000
 		mono := u64(time_ktime_get())
 		raw := u64(time_ktime_raw())

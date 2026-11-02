@@ -41,16 +41,16 @@ fn C.vkt_and32(&u32, u32, i32) u32
 @[c: '__atomic_thread_fence']
 fn C.vkt_fence(i32)
 
-fn vkt_copy_comm(destination &char, name &char, length usize) {
+fn vkt_copy_comm(destination &char, name &char, length uint) {
 	unsafe {
-		count := if length < 15 { length } else { usize(15) }
+		count := if length < 15 { length } else { uint(15) }
 		if count != 0 { C.memcpy(destination, name, count) }
 		C.memset(destination + count, 0, 16 - count)
 	}
 }
 
 @[export: 'vinix_linuxkpi_task_init']
-pub fn task_init(storage voidptr, thread voidptr, pid i32, tgid i32, name &char, length usize) {
+pub fn task_init(storage voidptr, thread voidptr, pid i32, tgid i32, name &char, length uint) {
 	unsafe {
 		require(!is_null(storage) && !is_null(thread))
 		mut task := &C.vkt_task_view(storage)
@@ -73,7 +73,7 @@ pub fn task_inherit(storage voidptr, thread voidptr, pid i32, tgid i32, source v
 }
 
 @[export: 'vinix_linuxkpi_task_view']
-pub fn task_view(storage voidptr, thread voidptr, pid i32, tgid i32, name &char, length usize, exiting bool) voidptr {
+pub fn task_view(storage voidptr, thread voidptr, pid i32, tgid i32, name &char, length uint, exiting bool) voidptr {
 	unsafe {
 		require(!is_null(storage) && !is_null(thread))
 		mut task := &C.vkt_task_view(storage)

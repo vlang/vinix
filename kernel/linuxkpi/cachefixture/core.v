@@ -15,27 +15,27 @@ struct C.pthread_t {}
 type CacheCtor = fn (voidptr)
 type CacheThread = fn (voidptr) voidptr
 
-fn C.kmem_cache_create(&char, usize, usize, usize, CacheCtor) &C.kmem_cache
+fn C.kmem_cache_create(&char, uint, uint, uint, CacheCtor) &C.kmem_cache
 fn C.kmem_cache_destroy(&C.kmem_cache)
 fn C.kmem_cache_zalloc(&C.kmem_cache, u32) voidptr
 fn C.kmem_cache_alloc(&C.kmem_cache, u32) voidptr
 fn C.kmem_cache_free(&C.kmem_cache, voidptr)
-fn C.kmem_cache_size(&C.kmem_cache) usize
+fn C.kmem_cache_size(&C.kmem_cache) uint
 fn C.kmem_cache_shrink(&C.kmem_cache) i32
 fn C.vinix_linuxkpi_test_alloc_oom(i32)
-fn C.vinix_linuxkpi_page_size() usize
-fn C.vinix_linuxkpi_alloc_gfp_pages(usize, u32) voidptr
-fn C.vinix_linuxkpi_free_pages(voidptr, usize)
-fn C.vinix_linuxkpi_irq_save() usize
-fn C.vinix_linuxkpi_irq_restore(usize)
-fn C.vinix_linuxkpi_irq_flags() usize
+fn C.vinix_linuxkpi_page_size() uint
+fn C.vinix_linuxkpi_alloc_gfp_pages(uint, u32) voidptr
+fn C.vinix_linuxkpi_free_pages(voidptr, uint)
+fn C.vinix_linuxkpi_irq_save() uint
+fn C.vinix_linuxkpi_irq_restore(uint)
+fn C.vinix_linuxkpi_irq_flags() uint
 fn C.vinix_linuxkpi_preempt_count() u32
 fn C.vinix_linuxkpi_worker_bind(u32) i32
 fn C.vinix_linuxkpi_cpu_id() u32
 fn C.vinix_linuxkpi_percpu_count() u32
 fn C.vinix_linuxkpi_may_sleep() bool
-fn C.memchr_inv(voidptr, i32, usize) voidptr
-fn C.memset(voidptr, i32, usize) voidptr
+fn C.memchr_inv(voidptr, i32, uint) voidptr
+fn C.memset(voidptr, i32, uint) voidptr
 fn C.__atomic_add_fetch(&u32, u32, i32) u32
 fn C.__atomic_load_n(&u32, i32) u32
 fn C.__atomic_store_n(&u32, u32, i32)
@@ -43,7 +43,7 @@ fn C.init_completion(&C.completion)
 fn C.complete(&C.completion)
 fn C.complete_all(&C.completion)
 fn C.wait_for_completion(&C.completion)
-fn C.wait_for_completion_timeout(&C.completion, usize) usize
+fn C.wait_for_completion_timeout(&C.completion, uint) uint
 fn C.cond_resched() i32
 fn C.pthread_create(voidptr, voidptr, CacheThread, voidptr) i32
 fn C.pthread_join(C.pthread_t, voidptr) i32
@@ -70,25 +70,25 @@ __global C.__GFP_NOFAIL u32
 __global C.__GFP_ACCOUNT u32
 
 @[c_extern]
-__global C.SLAB_TYPESAFE_BY_RCU usize
+__global C.SLAB_TYPESAFE_BY_RCU uint
 
 @[c_extern]
-__global C.SLAB_RECLAIM_ACCOUNT usize
+__global C.SLAB_RECLAIM_ACCOUNT uint
 
 @[c_extern]
-__global C.SLAB_CACHE_DMA usize
+__global C.SLAB_CACHE_DMA uint
 
 @[c_extern]
-__global C.SLAB_CACHE_DMA32 usize
+__global C.SLAB_CACHE_DMA32 uint
 
 @[c_extern]
-__global C.SLAB_PANIC usize
+__global C.SLAB_PANIC uint
 
 @[c_extern]
-__global C.SLAB_POISON usize
+__global C.SLAB_POISON uint
 
 @[c_extern]
-__global C.SLAB_HWCACHE_ALIGN usize
+__global C.SLAB_HWCACHE_ALIGN uint
 
 __global cache_ctor_calls u32
 
@@ -131,7 +131,7 @@ fn cache_basic() i32 {
 		mut result := i32(0)
 		C.vinix_linuxkpi_test_alloc_oom(0)
 		if C.vinix_linuxkpi_alloc_gfp_pages(0, C.GFP_KERNEL) != nil { result = -5 }
-		if C.vinix_linuxkpi_alloc_gfp_pages(~usize(0) / C.vinix_linuxkpi_page_size() + 1, C.GFP_KERNEL) != nil {
+		if C.vinix_linuxkpi_alloc_gfp_pages(~uint(0) / C.vinix_linuxkpi_page_size() + 1, C.GFP_KERNEL) != nil {
 			result = -5
 		}
 		unsupported := C.vinix_linuxkpi_alloc_gfp_pages(1, C.GFP_KERNEL | C.__GFP_DMA32)
@@ -174,10 +174,10 @@ fn cache_basic() i32 {
 		for i in 0 .. alignment.len {
 			cache := C.kmem_cache_create(c'native-alignment', 97, alignment[i], C.SLAB_HWCACHE_ALIGN, CacheCtor(nil))
 			if cache == nil { return -12 }
-			mut refill_irq := usize(0)
+			mut refill_irq := uint(0)
 			if i == 0 { refill_irq = C.vinix_linuxkpi_irq_save() }
 			object := C.kmem_cache_zalloc(cache, C.GFP_KERNEL)
-			if i == 0 && ((C.vinix_linuxkpi_irq_flags() & (usize(1) << 9)) != 0 || C.vinix_linuxkpi_preempt_count() != 0) {
+			if i == 0 && ((C.vinix_linuxkpi_irq_flags() & (uint(1) << 9)) != 0 || C.vinix_linuxkpi_preempt_count() != 0) {
 				result = -5
 			}
 			if i == 0 { C.vinix_linuxkpi_irq_restore(refill_irq) }
@@ -186,7 +186,7 @@ fn cache_basic() i32 {
 				return -12
 			}
 			align := if alignment[i] > 64 { alignment[i] } else { u32(64) }
-			if C.kmem_cache_size(cache) != 97 || (usize(object) & (align - 1)) != 0 || C.memchr_inv(object, 0, 97) != nil {
+			if C.kmem_cache_size(cache) != 97 || (uint(object) & (align - 1)) != 0 || C.memchr_inv(object, 0, 97) != nil {
 				result = -5
 			}
 			C.memset(object, 0x79, 97)
@@ -231,7 +231,7 @@ fn cache_basic() i32 {
 			objects[i].generation = i + 17
 			C.memset(&objects[i].payload[0], 0xb7, sizeof(objects[i].payload))
 			for j := u32(0); j < i; j++ {
-				if usize(objects[j]) == usize(objects[i]) { result = -5 }
+				if uint(objects[j]) == uint(objects[i]) { result = -5 }
 			}
 		}
 		only_free := objects[0]
@@ -249,11 +249,11 @@ fn cache_basic() i32 {
 		}
 		irq = C.vinix_linuxkpi_irq_save()
 		objects[0] = &CacheObject(C.kmem_cache_alloc(cache, C.GFP_KERNEL))
-		if (C.vinix_linuxkpi_irq_flags() & (usize(1) << 9)) != 0 || C.vinix_linuxkpi_preempt_count() != 0 {
+		if (C.vinix_linuxkpi_irq_flags() & (uint(1) << 9)) != 0 || C.vinix_linuxkpi_preempt_count() != 0 {
 			result = -5
 		}
 		C.vinix_linuxkpi_irq_restore(irq)
-		if usize(objects[0]) != usize(only_free) || objects[0] == nil || objects[0].magic != 0x6b70692d63616368 || objects[0].generation != 17 || C.memchr_inv(&objects[0].payload[0], 0xb7, sizeof(objects[0].payload)) != nil {
+		if uint(objects[0]) != uint(only_free) || objects[0] == nil || objects[0].magic != 0x6b70692d63616368 || objects[0].generation != 17 || C.memchr_inv(&objects[0].payload[0], 0xb7, sizeof(objects[0].payload)) != nil {
 			result = -5
 		}
 		if C.kmem_cache_shrink(cache) != 1 { result = -5 }
@@ -285,14 +285,14 @@ pub fn cache_thread(argument voidptr) voidptr {
 			mut objects := [16]&CacheObject{}
 			mut count := u32(0)
 			for count < 16 {
-				mut irq := usize(0)
+				mut irq := uint(0)
 				if (repeat & 1) != 0 { irq = C.vinix_linuxkpi_irq_save() }
 				objects[count] = &CacheObject(C.kmem_cache_alloc(test.cache, if (repeat & 1) != 0 {
 					C.GFP_ATOMIC
 				} else {
 					C.GFP_KERNEL
 				}))
-				if ((C.vinix_linuxkpi_irq_flags() & (usize(1) << 9)) != 0) != ((repeat & 1) == 0) || C.vinix_linuxkpi_preempt_count() != 0 {
+				if ((C.vinix_linuxkpi_irq_flags() & (uint(1) << 9)) != 0) != ((repeat & 1) == 0) || C.vinix_linuxkpi_preempt_count() != 0 {
 					test.result = -5
 				}
 				if (repeat & 1) != 0 { C.vinix_linuxkpi_irq_restore(irq) }

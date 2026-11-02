@@ -53,7 +53,7 @@ fn emit_literals(input &u8, begin int, end int, output &u8, initial int, capacit
 		if written + count + 1 > capacity { return -1 }
 		unsafe {
 			output[written] = u8(count - 1)
-			C.memcpy(&output[written + 1], &input[at], usize(count))
+			C.memcpy(&output[written + 1], &input[at], uint(count))
 		}
 		written += count + 1
 		at += count
@@ -70,7 +70,7 @@ pub fn decompress(input &u8, length int, output &u8, expected int) bool {
 		if token & 0x80 == 0 {
 			count := int(token) + 1
 			if count > length - at || count > expected - written { return false }
-			unsafe { C.memcpy(&output[written], &input[at], usize(count)) }
+			unsafe { C.memcpy(&output[written], &input[at], uint(count)) }
 			at += count
 			written += count
 		} else {

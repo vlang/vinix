@@ -129,7 +129,7 @@ pub fn deadline(storage voidptr, time i64) { unsafe { C.dma_fence_set_deadline(&
 @[export: 'vinix_linuxkpi_dmafence_fixture_compare']
 pub fn compare(first voidptr, second voidptr, mode u32) bool {
 	unsafe { a := &C.dma_fence(first); b := &C.dma_fence(second)
-		return if mode == 0 { C.dma_fence_is_later(a, b) } else if mode == 1 { C.dma_fence_is_later_or_same(a, b) } else { usize(C.dma_fence_later(a, b)) == usize(a) }
+		return if mode == 0 { C.dma_fence_is_later(a, b) } else if mode == 1 { C.dma_fence_is_later_or_same(a, b) } else { uint(C.dma_fence_later(a, b)) == uint(a) }
 	}
 }
 @[export: 'vinix_linuxkpi_dmafence_fixture_callbacks']
@@ -141,7 +141,7 @@ pub fn callbacks(storage voidptr) u32 {
 		mut count := u32(0)
 		if !C.dma_fence_is_signaled_locked(fence) {
 			head := &fence.cb_list
-			for entry := head.next; usize(entry) != usize(head); entry = entry.next { count++ }
+			for entry := head.next; uint(entry) != uint(head); entry = entry.next { count++ }
 		}
 		C.spin_unlock_irqrestore(fence.@lock, flags)
 		return count

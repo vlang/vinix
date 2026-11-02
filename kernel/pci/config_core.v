@@ -36,7 +36,7 @@ fn config_width_mask(width u32) u32 {
 @[export: 'vinix_pci_config_read']
 fn checked_config_read(domain u32, bus u32, slot u32, function u32,
 	offset u64, width u32, value &u32) i32 {
-	if usize(value) == 0 || !valid_config_address(bus, slot, function, offset, width) {
+	if uint(value) == 0 || !valid_config_address(bus, slot, function, offset, width) {
 		return 1
 	}
 	if domain != 0 { return 2 }

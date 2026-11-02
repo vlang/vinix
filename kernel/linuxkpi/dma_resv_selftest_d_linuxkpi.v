@@ -36,8 +36,8 @@ fn C.vinix_linuxkpi_resv_fixture_singleton(voidptr, u32, &voidptr) i32
 fn C.vinix_linuxkpi_resv_fixture_wait(voidptr, u32, bool, u64) i64
 fn C.vinix_linuxkpi_resv_fixture_deadline(voidptr, u32, i64)
 fn C.vinix_linuxkpi_resv_fixture_signaled(voidptr, u32) bool
-fn C.vinix_linuxkpi_resv_fixture_roundup(usize) usize
-fn C.vinix_linuxkpi_resv_fixture_realloc(voidptr, usize, usize) voidptr
+fn C.vinix_linuxkpi_resv_fixture_roundup(uint) uint
+fn C.vinix_linuxkpi_resv_fixture_realloc(voidptr, uint, uint) voidptr
 
 // Every output slot, cursor and cross-task borrow is boot-lifetime storage.
 // Reinitialization follows actor retirement, reference puts and an RCU barrier.
@@ -86,7 +86,7 @@ fn resv_wait(flag &bool) bool {
 	return katomic.load(&resv_test_ledger.failures) == 0
 }
 fn resv_actor(argument voidptr) {
-	index := u32(usize(argument))
+	index := u32(uint(argument))
 	if worker_bind(index + 1) != 0 || !dma_fence_test_task(index + 1) { resv_fail(1) }
 	katomic.store(mut &resv_test_ledger.ready[index], true)
 	for !katomic.load(&resv_test_ledger.quit) {
@@ -199,7 +199,7 @@ fn resv_leaf(kind u32, context u64, seqno u64) bool {
 }
 fn resv_allocators() bool {
 	// A fixed array stays local; no borrowed array or slice is published.
-	sizes := [usize(0), 1, 16, 17, 64, 128, usize(-1)]!
+	sizes := [uint(0), 1, 16, 17, 64, 128, uint(-1)]!
 	for i in 0 .. 7 { if C.vinix_linuxkpi_resv_fixture_roundup(sizes[i]) != sizes[i] { return false } }
 	mut owner := C.kmalloc(17, 3264)
 	if owner == unsafe { nil } { return false }
@@ -211,7 +211,7 @@ fn resv_allocators() bool {
 	if failed != unsafe { nil } { owner = failed; return false }
 	unsafe { for i in 0 .. 17 { if (&u8(owner))[i] != u8(i + 0x40) { return false } } }
 	test_alloc_oom(1)
-	overflow := C.vinix_linuxkpi_resv_fixture_realloc(owner, usize(-1), 2)
+	overflow := C.vinix_linuxkpi_resv_fixture_realloc(owner, uint(-1), 2)
 	gate := proc.current_thread().linuxkpi_alloc_fail_after
 	test_alloc_oom(-1)
 	if overflow != unsafe { nil } || gate != 1 { return false }
@@ -279,7 +279,7 @@ fn resv_usage_growth() bool {
 	for i in 0 .. 4 { C.vinix_linuxkpi_resv_fixture_add(obj, resv_test_ledger.leaves[i], u32(i)) }
 	list := C.vinix_linuxkpi_resv_fixture_list(obj)
 	for i in 0 .. 4 {
-		if C.vinix_linuxkpi_resv_fixture_list_value(list, 2, u32(i)) != (u64(usize(resv_test_ledger.leaves[i])) | u64(i))
+		if C.vinix_linuxkpi_resv_fixture_list_value(list, 2, u32(i)) != (u64(uint(resv_test_ledger.leaves[i])) | u64(i))
 			|| C.vinix_linuxkpi_fct_refs(resv_test_ledger.leaves[i]) != 2 { return false }
 	}
 	C.vinix_linuxkpi_dmafence_fixture_signal(resv_test_ledger.leaves[0], 0, 0)

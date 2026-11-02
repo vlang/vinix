@@ -280,7 +280,7 @@ fn linux_writev_flags(_ voidptr, fdnum int, iov_ptr u64, iovcnt int, flags u32) 
 		return errno.err, errno.enomem
 	}
 	defer {
-		krandom.explicit_bzero(buffer, usize(size))
+		krandom.explicit_bzero(buffer, uint(size))
 		unsafe { free(buffer) }
 	}
 
@@ -612,7 +612,7 @@ fn syscall_linux_sendfile(gpr_state voidptr, out_fd int, in_fd int, offset_ptr u
 		return errno.err, errno.enomem
 	}
 	defer {
-		krandom.explicit_bzero(buffer, usize(page_size))
+		krandom.explicit_bzero(buffer, uint(page_size))
 		unsafe { free(buffer) }
 	}
 
@@ -996,7 +996,7 @@ fn linux_readv_stream(mut fd file.FD, vector LinuxIOVector, count int) (u64, u64
 	buffer := memory.malloc_packed_fallible(size) @[freed]
 	if buffer == unsafe { nil } { return errno.err, errno.enomem }
 	defer {
-		krandom.explicit_bzero(buffer, usize(size))
+		krandom.explicit_bzero(buffer, uint(size))
 		unsafe { free(buffer) }
 	}
 	ret, err := fs.read_pinned_descriptor(mut fd, buffer, size, false)

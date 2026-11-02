@@ -33,7 +33,7 @@ fn nocache_test_source_unchanged(alias voidptr, start u64) bool {
 // prefix remains a sentinel, including both destination alignment guards.
 fn nocache_test_case(pagemap &memory.Pagemap, source u64, length u64,
 	alignment u64, prefix u64, pattern_offset u64) bool {
-	buffer := C.vinix_stack_alloc(usize(nocache_test_buffer_size))
+	buffer := C.vinix_stack_alloc(uint(nocache_test_buffer_size))
 	unsafe { C.memset(buffer, 0xcc, nocache_test_buffer_size) }
 	displacement := u64(16) + alignment
 	if length > nocache_test_buffer_size - displacement { return false }

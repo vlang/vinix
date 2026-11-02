@@ -54,7 +54,7 @@ pub fn parse_integer_fixup_radix(s &char, base &u32) &char {
 //
 
 @[export: '_parse_integer_limit']
-pub fn parse_integer_limit(s &char, base u32, p &u64, max_chars usize) u32 {
+pub fn parse_integer_limit(s &char, base u32, p &u64, max_chars uint) u32 {
 	unsafe {
 		res := u64(0)
 		rv := u32(0)
@@ -96,7 +96,7 @@ pub fn parse_integer_limit(s &char, base u32, p &u64, max_chars usize) u32 {
 @[export: '_parse_integer']
 pub fn parse_integer(s &char, base u32, p &u64) u32 {
 	unsafe {
-		return parse_integer_limit(s, base, p, usize(2147483647))
+		return parse_integer_limit(s, base, p, uint(2147483647))
 	}
 }
 

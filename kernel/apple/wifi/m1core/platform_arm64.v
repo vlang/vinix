@@ -11,12 +11,12 @@ fn m1_delay(us u32) {
  for m1_clock_us() - begin < us { asm volatile aarch64 { yield ; ; ; memory } }
 }
 fn m1_barrier() { asm volatile aarch64 { dsb sy ; ; ; memory } }
-fn m1_cache_sync(p voidptr, n usize, to_device i32) {
+fn m1_cache_sync(p voidptr, n uint, to_device i32) {
  mut ctr := u64(0)
  asm volatile aarch64 { mrs ctr, ctr_el0 ; =r (ctr) }
- line := usize(4) << ((ctr >> 16) & 15)
- end := usize(p) + n
- for a := usize(p) & ~(line - 1); a < end; a += line {
+ line := uint(4) << ((ctr >> 16) & 15)
+ end := uint(p) + n
+ for a := uint(p) & ~(line - 1); a < end; a += line {
   if to_device != 0 { asm volatile aarch64 { dc civac, a ; ; r (a) ; memory } }
   else { asm volatile aarch64 { dc ivac, a ; ; r (a) ; memory } }
  }

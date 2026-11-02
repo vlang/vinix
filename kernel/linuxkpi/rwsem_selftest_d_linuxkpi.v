@@ -114,7 +114,7 @@ fn rwsem_test_readers(add bool) {
 	}
 }
 fn rwsem_test_actor(argument voidptr) {
-	index := u32(usize(argument))
+	index := u32(uint(argument))
 	if worker_bind(index + 1) != 0 || !dma_fence_test_task(index + 1) { rwsem_test_fail(1) }
 	katomic.store(mut &rwsem_test_ledger.ready[index], true)
 	for !katomic.load(&rwsem_test_ledger.quit) {

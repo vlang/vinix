@@ -43,8 +43,8 @@ module spicore
 pub struct Touchpad {
 pub mut:
 	message        [536]u8
-	used           usize
-	total          usize
+	used           uint
+	total          uint
 	fragment_at    u64
 	report_at      u64
 	mode_at        u64
@@ -99,10 +99,10 @@ pub fn tp_put16(p &u8, n u16) {
 }
 
 @[export: 'vinix_spi_core_tp_crc']
-pub fn tp_crc(p &u8, n usize) u16 {
+pub fn tp_crc(p &u8, n uint) u16 {
 	unsafe {
 		mut crc := u16(0)
-		for i := usize(0); i < n; i++ {
+		for i := uint(0); i < n; i++ {
 			crc ^= u16(p[i])
 			for b := u32(0); b < 8; b++ {
 				crc = (crc >> 1) ^ if crc & 1 != 0 { u16(0xa001) } else { u16(0) }
@@ -129,8 +129,8 @@ pub fn tp_buttons(t &Touchpad, buttons u32) {
 @[export: 'vinix_spi_core_tp_discontinuity']
 pub fn tp_discontinuity(t &Touchpad) {
 	unsafe {
-		t.used = usize(0)
-		t.total = usize(0)
+		t.used = uint(0)
+		t.total = uint(0)
 		t.tracking = 0
 		tp_buttons(t, u32(0))
 	}
@@ -191,7 +191,7 @@ pub fn tp_mode_due(t &Touchpad, now u64) i32 {
 @[export: 'vinix_spi_core_tp_mode_packet']
 pub fn tp_mode_packet(t &Touchpad, p &u8, now u64) {
 	unsafe {
-		for i := usize(0); i < usize(256); i++ {
+		for i := uint(0); i < uint(256); i++ {
 			p[i] = u8(0)
 		}
 		p[0] = u8(64)
@@ -206,8 +206,8 @@ pub fn tp_mode_packet(t &Touchpad, p &u8, now u64) {
 		tp_put16(p + 14, u16(2))
 		p[16] = u8(2)
 		p[17] = u8(1)
-		tp_put16(p + 18, tp_crc(p + 8, usize(10)))
-		tp_put16(p + 254, tp_crc(p, usize(254)))
+		tp_put16(p + 18, tp_crc(p + 8, uint(10)))
+		tp_put16(p + 254, tp_crc(p, uint(254)))
 		t.mode_attempts++
 		t.mode_at = now + u64(1000000)
 	}
@@ -235,9 +235,9 @@ pub fn tp_move(t &Touchpad, dx i32, dy i32, gain i32) {
 }
 
 @[export: 'vinix_spi_core_tp_report']
-pub fn tp_report(t &Touchpad, r &u8, n usize, now u64) i32 {
+pub fn tp_report(t &Touchpad, r &u8, n uint, now u64) i32 {
 	unsafe {
-		if n == usize(0) {
+		if n == uint(0) {
 			return 0
 		}
 		if i32(r[0]) == 96 {
@@ -250,7 +250,7 @@ pub fn tp_report(t &Touchpad, r &u8, n usize, now u64) i32 {
 		// Boot mouse reports use signed relative bytes. Native reports contain
 		//     *this same prefix, but its deltas MUST NOT be added to finger motion.
 
-		if n == usize(8) {
+		if n == uint(8) {
 			t.tracking = 0
 			t.present = 1
 			t.reports++
@@ -259,12 +259,12 @@ pub fn tp_report(t &Touchpad, r &u8, n usize, now u64) i32 {
 			t.report_at = now
 			return 1
 		}
-		if n < usize(46) || (n - usize(46)) % usize(30) != usize(0) {
+		if n < uint(46) || (n - uint(46)) % uint(30) != uint(0) {
 			return 0
 		}
-		slots := (n - usize(46)) / usize(30)
+		slots := (n - uint(46)) / uint(30)
 		fingers := u32(r[30])
-		if slots > usize(16) || usize(fingers) > slots {
+		if slots > uint(16) || uint(fingers) > slots {
 			return 0
 		}
 		contacts := u32(0)
@@ -315,9 +315,9 @@ pub fn tp_report(t &Touchpad, r &u8, n usize, now u64) i32 {
 }
 
 @[export: 'vinix_spi_core_tp_decode']
-pub fn tp_decode(t &Touchpad, p &u8, size usize, now u64) {
+pub fn tp_decode(t &Touchpad, p &u8, size uint, now u64) {
 	unsafe {
-		if size != usize(256) {
+		if size != uint(256) {
 			tp_bad(t)
 			return
 		}
@@ -330,19 +330,19 @@ pub fn tp_decode(t &Touchpad, p &u8, size usize, now u64) {
 			tp_bad(t)
 			return
 		}
-		offset := usize(tp_le16(p + 2))
-		remaining := usize(tp_le16(p + 4))
-		n := usize(tp_le16(p + 6))
-		if !n || n > usize(246) || offset > usize((10 + 46 + 30 * 16)) || n > usize((10 + 46 + 30 * 16)) - offset || remaining > usize((10 + 46 + 30 * 16)) - offset - n {
+		offset := uint(tp_le16(p + 2))
+		remaining := uint(tp_le16(p + 4))
+		n := uint(tp_le16(p + 6))
+		if !n || n > uint(246) || offset > uint((10 + 46 + 30 * 16)) || n > uint((10 + 46 + 30 * 16)) - offset || remaining > uint((10 + 46 + 30 * 16)) - offset - n {
 			tp_bad(t)
 			return
 		}
 		total := offset + n + remaining
-		if total < usize(11) {
+		if total < uint(11) {
 			tp_bad(t)
 			return
 		}
-		if offset == usize(0) {
+		if offset == uint(0) {
 			if t.used {
 				tp_discontinuity(t)
 			}
@@ -358,21 +358,21 @@ pub fn tp_decode(t &Touchpad, p &u8, size usize, now u64) {
 			tp_bad(t)
 			return
 		}
-		for i := usize(0); i < n; i++ {
-			t.message[offset + i] = p[usize(8) + i]
+		for i := uint(0); i < n; i++ {
+			t.message[offset + i] = p[uint(8) + i]
 		}
 		t.used += n
 		if remaining {
 			return
 		}
-		t.used = usize(0)
-		t.total = usize(0)
+		t.used = uint(0)
+		t.total = uint(0)
 		m := &u8(&t.message[0])
-		if i32(tp_crc(m, total)) || usize(tp_le16(m + 6)) != total - usize(10) || i32(m[0]) != 16 || i32(m[2]) != 0 || (i32(m[8]) != 96 && i32(m[1]) != 2) {
+		if i32(tp_crc(m, total)) || uint(tp_le16(m + 6)) != total - uint(10) || i32(m[0]) != 16 || i32(m[2]) != 0 || (i32(m[8]) != 96 && i32(m[1]) != 2) {
 			tp_bad(t)
 			return
 		}
-		if !tp_report(t, m + 8, total - usize(10), now) {
+		if !tp_report(t, m + 8, total - uint(10), now) {
 			tp_bad(t)
 		}
 	}
@@ -384,7 +384,7 @@ pub fn tp_decode(t &Touchpad, p &u8, size usize, now u64) {
 @[export: 'vinix_spi_core_tp_snapshot']
 pub fn tp_snapshot(t &Touchpad, out &i32) i32 {
 	unsafe {
-		if (usize(out) == 0) || !t.present {
+		if (uint(out) == 0) || !t.present {
 			return 0
 		}
 		out[0] = t.x
@@ -430,7 +430,7 @@ pub struct Key_bytes {
 
 pub mut:
 	data [16]u8
-	len  usize
+	len  uint
 }
 
 pub struct Decoder {
@@ -448,7 +448,7 @@ pub mut:
 	alt_tab_chorded u8
 	repeat_at    u64
 	message      [20]u8
-	message_used usize
+	message_used uint
 	fragment_at  u64
 	reports      u64
 }
@@ -495,10 +495,10 @@ pub fn read_le16(p &u8) u16 {
 // *little-endian CRC makes the CRC of the complete packet/message zero.
 
 @[export: 'vinix_spi_core_crc16']
-pub fn crc16(p &u8, n usize) u16 {
+pub fn crc16(p &u8, n uint) u16 {
 	unsafe {
 		mut crc := u16(0)
-		for i := usize(0); i < n; i++ {
+		for i := uint(0); i < n; i++ {
 			crc ^= u16(p[i])
 			for b := u32(0); b < 8; b++ {
 				crc = (crc >> 1) ^ if crc & 1 != 0 { u16(0xa001) } else { u16(0) }
@@ -524,7 +524,7 @@ pub fn has_key(keys &u8, key u8) i32 {
 pub fn cancel_repeat(d &Decoder) {
 	unsafe {
 		d.repeat_at = u64(0)
-		d.message_used = usize(0)
+		d.message_used = uint(0)
 	}
 }
 
@@ -547,7 +547,7 @@ pub fn reset_input(d &Decoder) {
 @[export: 'vinix_spi_core_sequence']
 pub fn sequence(out &Key_bytes, s &char) {
 	unsafe {
-		mut i := usize(0)
+		mut i := uint(0)
 		for s[i] != 0 && out.len < sizeof(out.data) {
 			out.data[out.len++] = u8(s[i])
 			i++
@@ -856,14 +856,14 @@ pub fn encode_key(key u8, modifiers u8, caps i32, fn_ i32, application_cursor i3
 }
 
 @[export: 'vinix_spi_core_append_key']
-pub fn append_key(out &u8, capacity usize, used &usize, key Key_bytes) i32 {
+pub fn append_key(out &u8, capacity uint, used &uint, key Key_bytes) i32 {
 	unsafe {
 		// Drop a whole sequence rather than leaving a partial terminal escape.
 
-		if key.len == usize(0) || (*used) > capacity || key.len > capacity - (*used) {
+		if key.len == uint(0) || (*used) > capacity || key.len > capacity - (*used) {
 			return 0
 		}
-		for i := usize(0); i < key.len; i++ {
+		for i := uint(0); i < key.len; i++ {
 			out[(*used)++] = key.data[i]
 		}
 		return 1
@@ -871,10 +871,10 @@ pub fn append_key(out &u8, capacity usize, used &usize, key Key_bytes) i32 {
 }
 
 @[export: 'vinix_spi_core_accept_report']
-pub fn accept_report(d &Decoder, report &u8, now u64, app i32, out &u8, capacity usize) usize {
+pub fn accept_report(d &Decoder, report &u8, now u64, app i32, out &u8, capacity uint) uint {
 	unsafe {
 		keys := [6]u8{}
-		used := usize(0)
+		used := uint(0)
 		if app & 2 != 0 { return accept_key_events(d, report, now, out, capacity) }
 		d.modifiers = report[1]
 		d.fn_ = u8(!!report[9])
@@ -904,7 +904,7 @@ pub fn accept_report(d &Decoder, report &u8, now u64, app i32, out &u8, capacity
 
 			if i32(key) >= 1 && i32(key) <= 3 {
 				d.repeat_at = u64(0)
-				return usize(0)
+				return uint(0)
 			}
 			if i32(key) && !has_key(&keys[0], key) {
 				keys[i] = key
@@ -941,7 +941,7 @@ pub fn accept_report(d &Decoder, report &u8, now u64, app i32, out &u8, capacity
 		if i32(d.repeat_key) && d.repeat_at == u64(0) {
 			d.repeat_at = now + u64(500000)
 		}
-		return usize(used)
+		return uint(used)
 	}
 }
 
@@ -950,65 +950,65 @@ pub fn accept_report(d &Decoder, report &u8, now u64, app i32, out &u8, capacity
 // *is reassembled; arbitrary-sized HID descriptors/reports are out of scope.
 
 @[export: 'vinix_spi_core_decode_packet']
-pub fn decode_packet(d &Decoder, packet &u8, length usize, now u64, app i32, out &u8, capacity usize) usize {
+pub fn decode_packet(d &Decoder, packet &u8, length uint, now u64, app i32, out &u8, capacity uint) uint {
 	unsafe {
-		if length != usize(256) {
+		if length != uint(256) {
 			cancel_repeat(d)
-			return usize(0)
+			return uint(0)
 		}
 		if i32(packet[0]) != 32 || i32(packet[1]) != 1 {
-			return usize(0)
+			return uint(0)
 		}
-		if i32(crc16(packet, usize(256))) != 0 {
+		if i32(crc16(packet, uint(256))) != 0 {
 			cancel_repeat(d)
-			return usize(0)
+			return uint(0)
 		}
-		offset := usize(read_le16(packet + 2))
-		remaining := usize(read_le16(packet + 4))
-		n := usize(read_le16(packet + 6))
-		if !n || n > usize(20) || offset > usize(20) || remaining > usize(20) || offset + n + remaining != usize(20) {
+		offset := uint(read_le16(packet + 2))
+		remaining := uint(read_le16(packet + 4))
+		n := uint(read_le16(packet + 6))
+		if !n || n > uint(20) || offset > uint(20) || remaining > uint(20) || offset + n + remaining != uint(20) {
 			cancel_repeat(d)
-			return usize(0)
+			return uint(0)
 		}
-		if offset == usize(0) {
-			d.message_used = usize(0)
+		if offset == uint(0) {
+			d.message_used = uint(0)
 			d.fragment_at = now
-		} else if d.message_used == usize(0) || now - d.fragment_at >= u64(100000) {
+		} else if d.message_used == uint(0) || now - d.fragment_at >= u64(100000) {
 			cancel_repeat(d)
-			return usize(0)
+			return uint(0)
 		}
-		if offset != d.message_used || n > usize(20) - offset {
+		if offset != d.message_used || n > uint(20) - offset {
 			cancel_repeat(d)
-			return usize(0)
+			return uint(0)
 		}
-		for i := usize(0); i < n; i++ {
-			d.message[offset + i] = packet[usize(8) + i]
+		for i := uint(0); i < n; i++ {
+			d.message[offset + i] = packet[uint(8) + i]
 		}
 		d.message_used += n
 		if remaining {
 			d.repeat_at = u64(0)
-			return usize(0)
+			return uint(0)
 		}
-		d.message_used = usize(0)
+		d.message_used = uint(0)
 		m := &u8(&d.message[0])
-		if i32(crc16(m, usize(20))) || i32(m[0]) != 16 || i32(m[1]) != 1 || i32(read_le16(m + 6)) != 10 || i32(m[8]) != 1 {
+		if i32(crc16(m, uint(20))) || i32(m[0]) != 16 || i32(m[1]) != 1 || i32(read_le16(m + 6)) != 10 || i32(m[8]) != 1 {
 			cancel_repeat(d)
-			return usize(0)
+			return uint(0)
 		}
-		return usize(accept_report(d, m + 8, now, app, out, capacity))
+		return uint(accept_report(d, m + 8, now, app, out, capacity))
 	}
 }
 
 @[export: 'vinix_spi_core_repeat_key']
-pub fn repeat_key(d &Decoder, now u64, app i32, out &u8, capacity usize) usize {
+pub fn repeat_key(d &Decoder, now u64, app i32, out &u8, capacity uint) uint {
 	unsafe {
-		used := usize(0)
+		used := uint(0)
 		if !d.repeat_at || now < d.repeat_at || d.message_used {
-			return usize(0)
+			return uint(0)
 		}
 		if !d.repeat_key || !has_key(&d.keys[0], d.repeat_key) {
 			d.repeat_at = u64(0)
-			return usize(0)
+			return uint(0)
 		}
 		if app & 2 != 0 {
 			append_key(out, capacity, &used, physical_key(d.repeat_key, 2))
@@ -1024,7 +1024,7 @@ pub fn repeat_key(d &Decoder, now u64, app i32, out &u8, capacity usize) usize {
 		// Never emit an unbounded catch-up burst after a scheduler stall.
 
 		d.repeat_at = now + u64(33333)
-		return usize(used)
+		return uint(used)
 	}
 }
 
@@ -1110,19 +1110,19 @@ pub fn start_keyboard(k &Spi_keyboard, input_hz u32, maximum_hz u32) i32 {
 // *read can share one selection, with the required direction-change delay.
 
 @[export: 'vinix_spi_core_transfer_bytes']
-pub fn transfer_bytes(k &Spi_keyboard, output &u8, input &u8, length usize) i32 {
+pub fn transfer_bytes(k &Spi_keyboard, output &u8, input &u8, length uint) i32 {
 	unsafe {
-		tx := usize(0)
-		rx := usize(0)
+		tx := uint(0)
+		rx := uint(0)
 
 		ok := i32(0)
-		if !length || length > usize(256) {
+		if !length || length > uint(256) {
 			return 0
 		}
 		reg_write(k, u32(0), 12)
 		reg_write(k, u32(76), u32(length))
 		reg_write(k, u32(52), u32(length))
-		for ; tx < usize(16) && tx < length; tx++ {
+		for ; tx < uint(16) && tx < length; tx++ {
 			reg_write(k, u32(16), u32(if output { i32(output[tx]) } else { 0 }))
 		}
 		start := k.io.now_us(voidptr(k.cookie))
@@ -1130,7 +1130,7 @@ pub fn transfer_bytes(k &Spi_keyboard, output &u8, input &u8, length usize) i32 
 		for spins := u32(0); spins < u32(100000); spins++ {
 			status := reg_read(k, u32(268))
 			n := (status >> 24) & 255
-			if n > 16 || usize(n) > length - rx {
+			if n > 16 || uint(n) > length - rx {
 				break
 			}
 			for n-- {
@@ -1181,7 +1181,7 @@ pub fn read_packet(k &Spi_keyboard, packet &u8) i32 {
 	unsafe {
 		reg_write(k, u32(12), u32(0))
 		k.io.delay_us(voidptr(k.cookie), u32(100))
-		ok := transfer_bytes(k, (voidptr(0)), packet, usize(256))
+		ok := transfer_bytes(k, (voidptr(0)), packet, uint(256))
 		end_transfer(k, ok)
 		return ok
 	}
@@ -1195,7 +1195,7 @@ pub fn enable_touchpad(k &Spi_keyboard, now u64) {
 		tp_mode_packet(&k.touchpad, &packet[0], now)
 		reg_write(k, u32(12), u32(0))
 		k.io.delay_us(voidptr(k.cookie), u32(100))
-		ok := transfer_bytes(k, &packet[0], (voidptr(0)), usize(256))
+		ok := transfer_bytes(k, &packet[0], (voidptr(0)), uint(256))
 		if ok {
 			// No CS edge here: Asahi's write and status are one SPI message.
 
@@ -1214,7 +1214,7 @@ pub fn enable_touchpad(k &Spi_keyboard, now u64) {
 @[export: 'vinix_spi_core_boot_packet']
 pub fn boot_packet(p &u8) i32 {
 	unsafe {
-		return i32(i32(read_le16(p + 2)) == 0 && i32(read_le16(p + 4)) == 0 && i32(read_le16(p + 6)) == 4 && i32(p[8]) == 160 && i32(p[9]) == 128 && i32(p[10]) == 0 && i32(p[11]) == 0 && i32(crc16(p, usize(256))) == 0)
+		return i32(i32(read_le16(p + 2)) == 0 && i32(read_le16(p + 4)) == 0 && i32(read_le16(p + 6)) == 4 && i32(p[8]) == 160 && i32(p[9]) == 128 && i32(p[10]) == 0 && i32(p[11]) == 0 && i32(crc16(p, uint(256))) == 0)
 	}
 }
 
@@ -1226,8 +1226,8 @@ pub fn packet_envelope_valid(p &u8) i32 {
 		//     *device/report IDs forward-compatible, but require the Apple read flag,
 		//     *a payload that fits this packet and a valid outer CRC.
 
-		n := usize(read_le16(p + 6))
-		return i32(i32(p[0]) == 32 && n != usize(0) && n <= usize(256 - u32(10)) && i32(crc16(p, usize(256))) == 0)
+		n := uint(read_le16(p + 6))
+		return i32(i32(p[0]) == 32 && n != uint(0) && n <= uint(256 - u32(10)) && i32(crc16(p, uint(256))) == 0)
 	}
 }
 
@@ -1250,9 +1250,9 @@ pub fn read_error(k &Spi_keyboard) i32 {
 }
 
 @[export: 'vinix_spi_core_poll_keyboard']
-pub fn poll_keyboard(k &Spi_keyboard, out &u8, capacity usize, application_cursor i32) i32 {
+pub fn poll_keyboard(k &Spi_keyboard, out &u8, capacity uint, application_cursor i32) i32 {
 	unsafe {
-		if (usize(out) == 0) || capacity == usize(0) {
+		if (uint(out) == 0) || capacity == uint(0) {
 			return 0
 		}
 		if !k.active {
@@ -1269,7 +1269,7 @@ pub fn poll_keyboard(k &Spi_keyboard, out &u8, capacity usize, application_curso
 			k.revive_at = u64(0)
 			return -3
 		}
-		used := usize(0)
+		used := uint(0)
 		now := k.io.now_us(voidptr(k.cookie))
 		tp_tick(&k.touchpad, now)
 		if k.decoder.message_used && now - k.decoder.fragment_at >= u64(100000) {
@@ -1334,7 +1334,7 @@ __global spi_counter_frequency u64
 @[export: 'vinix_spi_core_kernel_read32']
 pub fn kernel_read32(cookie voidptr, address u64) u32 {
 	unsafe {
-		v := C.vinix_mmio_read32(voidptr(usize(address)))
+		v := C.vinix_mmio_read32(voidptr(uint(address)))
 		asm volatile aarch64 {
 		dmb ish
 		; ; ; memory
@@ -1350,7 +1350,7 @@ pub fn kernel_write32(cookie voidptr, address u64, value u32) {
 		dmb ish
 		; ; ; memory
 	}
-		C.vinix_mmio_write32(voidptr(usize(address)), value)
+		C.vinix_mmio_write32(voidptr(uint(address)), value)
 	}
 }
 
@@ -1409,7 +1409,7 @@ pub fn vinix_apple_spi_keyboard_init(spi_base u64, enable_reg u64, enable_active
 }
 
 @[export: 'vinix_apple_spi_keyboard_poll']
-pub fn vinix_apple_spi_keyboard_poll(out &u8, capacity usize, app i32) i32 {
+pub fn vinix_apple_spi_keyboard_poll(out &u8, capacity uint, app i32) i32 {
 	unsafe {
 		return poll_keyboard(&spi_controller, out, capacity, app)
 	}
@@ -1458,7 +1458,7 @@ fn physical_key(key u8, value u8) Key_bytes {
 		bytes.data[0] = 27
 		bytes.data[1] = `[`
 		bytes.data[2] = `?`
-		mut n := usize(3)
+		mut n := uint(3)
 		if key >= 100 {
 			bytes.data[n] = 48 + key / 100
 			n++
@@ -1476,13 +1476,13 @@ fn physical_key(key u8, value u8) Key_bytes {
 	}
 }
 
-fn accept_key_events(d &Decoder, report &u8, now u64, out &u8, capacity usize) usize {
+fn accept_key_events(d &Decoder, report &u8, now u64, out &u8, capacity uint) uint {
 	unsafe {
 		d.gui_chorded = 0
 		d.alt_tab_chorded = 0
-		mut used := usize(0)
+		mut used := uint(0)
 		mut keys := [6]u8{}
-		for i := usize(0); i < 6; i++ {
+		for i := uint(0); i < 6; i++ {
 			key := report[i + 3]
 			if key >= 1 && key <= 3 {
 				d.repeat_at = 0
@@ -1506,7 +1506,7 @@ fn accept_key_events(d &Decoder, report &u8, now u64, out &u8, capacity usize) u
 		}
 		d.fn_ = u8(!!report[9])
 		d.reports++
-		for i := usize(0); i < 6; i++ {
+		for i := uint(0); i < 6; i++ {
 			old := d.keys[i]
 			if old != 0 && !has_key(&keys[0], old) {
 				append_key(out, capacity, &used, physical_key(old, 0))
@@ -1516,7 +1516,7 @@ fn accept_key_events(d &Decoder, report &u8, now u64, out &u8, capacity usize) u
 			d.repeat_key = 0
 			d.repeat_at = 0
 		}
-		for i := usize(0); i < 6; i++ {
+		for i := uint(0); i < 6; i++ {
 			key := keys[i]
 			if key == 0 || has_key(&d.keys[0], key) { continue }
 			if key == 57 { d.caps = u8(!d.caps) }
@@ -1525,7 +1525,7 @@ fn accept_key_events(d &Decoder, report &u8, now u64, out &u8, capacity usize) u
 				d.repeat_at = now + 500000
 			}
 		}
-		for i := usize(0); i < 6; i++ { d.keys[i] = keys[i] }
+		for i := uint(0); i < 6; i++ { d.keys[i] = keys[i] }
 		return used
 	}
 }

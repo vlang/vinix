@@ -102,7 +102,7 @@ fn ww_release_context(ww_lock &C.vkw_ww_mutex) {
 	}
 }
 fn ww_waiter_at(entry &C.vkw_list) &WwWaiter {
-	unsafe { return &WwWaiter(usize(entry) - __offsetof(WwWaiter, entry)) }
+	unsafe { return &WwWaiter(uint(entry) - __offsetof(WwWaiter, entry)) }
 }
 fn ww_die_waiter(waiter &WwWaiter, older &C.vkw_ww_ctx) bool {
 	unsafe {

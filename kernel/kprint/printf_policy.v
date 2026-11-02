@@ -11,7 +11,7 @@ fn C.vp_arg_int(voidptr) i32
 struct PrintBuffer {
 mut:
 	data [256]u8
-	len usize
+	len uint
 }
 
 fn policy_putchar(character i32, _ voidptr) {

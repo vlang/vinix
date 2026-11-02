@@ -37,10 +37,10 @@ fn pagefault_native_selftest() bool {
 	// Public V frontends reach the same resident-only native backend. Reject
 	// invalid ranges without touching either pointer, including IRQ-off calls.
 	flags := irq_save()
-	from := compatcore.inatomic_from_user(unsafe { nil }, voidptr(usize(-1)), 8)
-	to := compatcore.inatomic_to_user(voidptr(usize(-1)), unsafe { nil }, 8)
-	zero_from := compatcore.inatomic_from_user(unsafe { nil }, voidptr(usize(-1)), 0)
-	zero_to := compatcore.inatomic_to_user(voidptr(usize(-1)), unsafe { nil }, 0)
+	from := compatcore.inatomic_from_user(unsafe { nil }, voidptr(uint(-1)), 8)
+	to := compatcore.inatomic_to_user(voidptr(uint(-1)), unsafe { nil }, 8)
+	zero_from := compatcore.inatomic_from_user(unsafe { nil }, voidptr(uint(-1)), 0)
+	zero_to := compatcore.inatomic_to_user(voidptr(uint(-1)), unsafe { nil }, 0)
 	irq_restore(flags)
 	return from == 8 && to == 8 && zero_from == 0 && zero_to == 0
 }

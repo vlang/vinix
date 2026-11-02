@@ -40,7 +40,7 @@ fn C.vinix_linuxkpi_smp_task_present() bool
 fn C.vinix_linuxkpi_rcu_force_quiescence()
 fn C.vinix_linuxkpi_maskable_irq_depth() u32
 fn C.vinix_linuxkpi_preempt_count() u32
-fn C.vkr_page_allocation_size(voidptr) usize
+fn C.vkr_page_allocation_size(voidptr) uint
 fn C.vkr_kvfree(voidptr)
 
 __global (
@@ -162,15 +162,15 @@ pub fn rcu_bootstrap(count u32) i32 {
 // The low 4096 values are private embedded-free offsets. Store the raw bits
 // without constructing or reading an invalid function-pointer value. The
 // typed original head and its layout stay unchanged.
-fn rcu_enqueue(storage voidptr, bits usize) {
+fn rcu_enqueue(storage voidptr, bits uint) {
 	unsafe {
 		require(rcu_domain_ready() && !is_null(storage)
-			&& usize(storage) % sizeof(voidptr) == 0)
+			&& uint(storage) % sizeof(voidptr) == 0)
 		head := &C.vkr_rcu_head(storage)
 		C.vkr_rcu_fence(5)
 		flags := C.vkp_spin_lock_irqsave(&vkr_rcu_guard)
 		head.next = nil
-		C.memcpy(&head.func, &bits, sizeof(usize))
+		C.memcpy(&head.func, &bits, sizeof(uint))
 		if is_null(vkr_rcu_pending_tail) { vkr_rcu_pending_head = head }
 		else { vkr_rcu_pending_tail.next = head }
 		vkr_rcu_pending_tail = head
@@ -185,8 +185,8 @@ fn rcu_enqueue(storage voidptr, bits usize) {
 @[export: 'vkr_rcu_call']
 pub fn rcu_call(storage voidptr, callback fn (&C.callback_head)) {
 	unsafe {
-		mut bits := usize(0)
-		C.memcpy(&bits, &callback, sizeof(usize))
+		mut bits := uint(0)
+		C.memcpy(&bits, &callback, sizeof(uint))
 		require(bits >= 4096)
 		rcu_enqueue(storage, bits)
 	}
@@ -199,18 +199,18 @@ pub fn rcu_kvfree(storage voidptr, base voidptr) {
 		// for a headless submission. It must be an ordinary sleepable task,
 		// and must start a real future GP before releasing the owned pages.
 		require(rcu_sleepable_context())
-		if usize(base) > 16 { C.vkr_page_allocation_size(base) }
+		if uint(base) > 16 { C.vkr_page_allocation_size(base) }
 		rcu_synchronize(false)
 		C.vkr_kvfree(base)
 		return
 	}
-	address := usize(storage)
-	owner := usize(base)
+	address := uint(storage)
+	owner := uint(base)
 	require(address % sizeof(voidptr) == 0 && owner > 16 && address >= owner)
 	offset := address - owner
 	require(offset < 4096)
 	span := C.vkr_page_allocation_size(base)
-	require(span <= usize(-1) - owner && span >= sizeof(C.vkr_rcu_head)
+	require(span <= uint(-1) - owner && span >= sizeof(C.vkr_rcu_head)
 		&& offset <= span - sizeof(C.vkr_rcu_head))
 	// Every ownership/range check precedes publication and head mutation.
 	// The enqueue path borrows only the existing intrusive record.
@@ -352,15 +352,15 @@ pub fn rcu_callback_worker(argument voidptr) voidptr {
 			for index := u64(0); index < count; index++ {
 				require(!is_null(head))
 				next := head.next
-				mut bits := usize(0)
-				C.memcpy(&bits, &head.func, sizeof(usize))
+				mut bits := uint(0)
+				C.memcpy(&bits, &head.func, sizeof(uint))
 				head.next = nil
 				require(rcu_sleepable_context())
 				C.vinix_linuxkpi_preempt_disable()
 				C.vkr_rcu_fence(5)
 				if bits < 4096 {
 					C.memset(&head.func, 0, sizeof(voidptr))
-					C.vkr_kvfree(voidptr(usize(head) - bits))
+					C.vkr_kvfree(voidptr(uint(head) - bits))
 				} else {
 					// Only the real-function branch reads the typed field.
 					callback := head.func

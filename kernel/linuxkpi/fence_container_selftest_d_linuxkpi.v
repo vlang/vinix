@@ -68,7 +68,7 @@ fn fct_wait(flag &bool) bool {
 	return katomic.load(&fence_container_ledger.failures) == 0
 }
 fn fct_actor(argument voidptr) {
-	index := u32(usize(argument))
+	index := u32(uint(argument))
 	if worker_bind(index + 1) != 0 || !dma_fence_test_task(index + 1) { fct_fail(1) }
 	katomic.store(mut &fence_container_ledger.ready[index], true)
 	for !katomic.load(&fence_container_ledger.quit) {
@@ -182,7 +182,7 @@ fn fct_leaves(count u32, kind u32, context u64) bool {
 fn fct_array_new(any bool) voidptr {
 	count := fence_container_ledger.count
 	unsafe {
-		vector := &voidptr(C.kmalloc(usize(count) * sizeof(voidptr), 3264))
+		vector := &voidptr(C.kmalloc(uint(count) * sizeof(voidptr), 3264))
 		if vector == nil { return nil }
 		for i in 0 .. count { vector[i] = C.vinix_linuxkpi_dmafence_fixture_get(fence_container_ledger.leaves[i], 0) }
 		head := C.vinix_linuxkpi_fct_array(i32(count), vector, C.vinix_linuxkpi_dmafence_fixture_context(1), 7, any)
@@ -346,7 +346,7 @@ fn fct_deferred() bool {
 		if fct_clock.nanoseconds() - start >= dmafence_test_timeout_ns { return false }
 		sched.reschedule()
 	}
-	for C.vkiw_running_count(voidptr(usize(head_chain) + 88)) != 0 {
+	for C.vkiw_running_count(voidptr(uint(head_chain) + 88)) != 0 {
 		if fct_clock.nanoseconds() - start >= dmafence_test_timeout_ns { return false }
 		sched.reschedule()
 	}

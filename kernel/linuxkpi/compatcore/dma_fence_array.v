@@ -64,7 +64,7 @@ fn array_clear_pending_error(aggregate &C.vfa_array) {
 
 fn array_irq_work(work &C.irq_work) {
 	unsafe {
-		aggregate := &C.vfa_array(usize(work) - 88)
+		aggregate := &C.vfa_array(uint(work) - 88)
 		array_clear_pending_error(aggregate)
 		dma_fence_signal(aggregate)
 		C.vfa_fence_put(aggregate)
@@ -90,7 +90,7 @@ fn array_child_callback(fence &C.dma_fence, callback &C.dma_fence_cb) {
 pub fn dma_fence_array_enable_signaling(fence &C.dma_fence) bool {
 	unsafe {
 		aggregate := &C.vfa_array(fence)
-		callbacks := &C.vfa_cb(usize(aggregate) + sizeof(C.vfa_array))
+		callbacks := &C.vfa_cb(uint(aggregate) + sizeof(C.vfa_array))
 		for i := u32(0); i < aggregate.num_fences; i++ {
 			callbacks[i].array = aggregate
 			// ANY can complete while other registered children remain pending.
@@ -174,8 +174,8 @@ pub fn dma_fence_array_create(count i32, storage voidptr, context u64, seqno u32
 				return nil
 			}
 		}
-		if usize(count) > (usize(-1) - sizeof(C.vfa_array)) / sizeof(C.vfa_cb) { return nil }
-		aggregate := &C.vfa_array(C.kzalloc(sizeof(C.vfa_array) + usize(count) * sizeof(C.vfa_cb), 3264))
+		if uint(count) > (uint(-1) - sizeof(C.vfa_array)) / sizeof(C.vfa_cb) { return nil }
+		aggregate := &C.vfa_array(C.kzalloc(sizeof(C.vfa_array) + uint(count) * sizeof(C.vfa_cb), 3264))
 		if is_null(aggregate) { return nil }
 		C.vkp_spin_init(&aggregate.@lock)
 		dma_fence_init(aggregate, C.vfa_ops(), &aggregate.@lock, context, u64(seqno))
@@ -196,7 +196,7 @@ pub fn dma_fence_array_create(count i32, storage voidptr, context u64, seqno u32
 
 fn array_from_fence(storage voidptr) &C.vfa_array {
 	unsafe {
-		if is_null(storage) || usize((&C.vdf_fence(storage)).ops) != usize(C.vfa_ops()) {
+		if is_null(storage) || uint((&C.vdf_fence(storage)).ops) != uint(C.vfa_ops()) {
 			return nil
 		}
 		return &C.vfa_array(storage)

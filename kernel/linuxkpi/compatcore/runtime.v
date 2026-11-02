@@ -4,7 +4,7 @@ module compatcore
 
 #include "linuxkpi_v_primitives.h"
 
-fn C.vinix_linuxkpi_alloc_pages(usize, bool) voidptr
+fn C.vinix_linuxkpi_alloc_pages(uint, bool) voidptr
 fn C.vkr_page_owner_byte(voidptr) u8
 fn C.vkr_page_owner_tag(voidptr) u64
 
@@ -14,8 +14,8 @@ const page_allocation_tag = u64(0x564b5049504147a5)
 // including its unused tail, immediately before the aligned payload.
 struct RuntimeAllocation {
 mut:
-	requested usize
-	pages     usize
+	requested uint
+	pages     uint
 	base      voidptr
 	owner_tag u64
 }
@@ -27,33 +27,33 @@ pub fn runtime_gfp_supported(flags u32) bool {
 }
 
 @[export: 'vinix_linuxkpi_alloc_gfp_pages']
-pub fn runtime_alloc_gfp_pages(pages usize, flags u32) voidptr {
+pub fn runtime_alloc_gfp_pages(pages uint, flags u32) voidptr {
 	if pages == 0 || !runtime_gfp_supported(flags) { return unsafe { nil } }
 	page_size := C.vinix_linuxkpi_page_size()
-	if page_size == 0 || pages > usize(-1) / page_size { return unsafe { nil } }
+	if page_size == 0 || pages > uint(-1) / page_size { return unsafe { nil } }
 	reclaim := (flags & 3264) == 3264 && C.vinix_linuxkpi_may_sleep()
 	return C.vinix_linuxkpi_alloc_pages(pages, reclaim)
 }
 
 @[export: 'vkr_kmalloc']
-pub fn runtime_kmalloc(size usize, flags u32) voidptr {
+pub fn runtime_kmalloc(size uint, flags u32) voidptr {
 	unsafe {
 		if size == 0 { return voidptr(16) }
 		if !runtime_gfp_supported(flags) { return nil }
 		page_size := C.vinix_linuxkpi_page_size()
-		mut alignment := size & (usize(0) - size)
+		mut alignment := size & (uint(0) - size)
 		if alignment < 16 { alignment = 16 }
-		if size > usize(-1) - sizeof(RuntimeAllocation) { return nil }
+		if size > uint(-1) - sizeof(RuntimeAllocation) { return nil }
 		mut total := size + sizeof(RuntimeAllocation)
-		if total > usize(-1) - (alignment - 1) { return nil }
+		if total > uint(-1) - (alignment - 1) { return nil }
 		total += alignment - 1
-		if total > usize(-1) - (page_size - 1) { return nil }
+		if total > uint(-1) - (page_size - 1) { return nil }
 		total += page_size - 1
 		pages := total / page_size
 		base := runtime_alloc_gfp_pages(pages, flags)
-		if usize(base) == 0 { return nil }
-		result := voidptr((usize(base) + sizeof(RuntimeAllocation) + alignment - 1) & ~(alignment - 1))
-		allocation := &RuntimeAllocation(usize(result) - sizeof(RuntimeAllocation))
+		if uint(base) == 0 { return nil }
+		result := voidptr((uint(base) + sizeof(RuntimeAllocation) + alignment - 1) & ~(alignment - 1))
+		allocation := &RuntimeAllocation(uint(result) - sizeof(RuntimeAllocation))
 		allocation.requested = size
 		allocation.pages = pages
 		allocation.base = base
@@ -64,26 +64,26 @@ pub fn runtime_kmalloc(size usize, flags u32) voidptr {
 }
 
 @[export: 'vkr_kzalloc']
-pub fn runtime_kzalloc(size usize, flags u32) voidptr {
+pub fn runtime_kzalloc(size uint, flags u32) voidptr {
 	return runtime_kmalloc(size, flags | 0x100)
 }
 
 @[export: 'vkr_kmalloc_array']
-pub fn runtime_kmalloc_array(count usize, size usize, flags u32) voidptr {
-	if size != 0 && count > usize(-1) / size { return unsafe { nil } }
+pub fn runtime_kmalloc_array(count uint, size uint, flags u32) voidptr {
+	if size != 0 && count > uint(-1) / size { return unsafe { nil } }
 	return runtime_kmalloc(count * size, flags)
 }
 
 @[export: 'vkr_kcalloc']
-pub fn runtime_kcalloc(count usize, size usize, flags u32) voidptr {
+pub fn runtime_kcalloc(count uint, size uint, flags u32) voidptr {
 	return runtime_kmalloc_array(count, size, flags | 0x100)
 }
 
 @[export: 'vkr_ksize']
-pub fn runtime_ksize(ptr voidptr) usize {
+pub fn runtime_ksize(ptr voidptr) uint {
 	unsafe {
-		if usize(ptr) <= 16 { return 0 }
-		return (&RuntimeAllocation(usize(ptr) - sizeof(RuntimeAllocation))).requested
+		if uint(ptr) <= 16 { return 0 }
+		return (&RuntimeAllocation(uint(ptr) - sizeof(RuntimeAllocation))).requested
 	}
 }
 
@@ -91,10 +91,10 @@ pub fn runtime_ksize(ptr voidptr) usize {
 // byte occupies the same offset and is always 0/1; inspect that initialized
 // byte before reading any word that could include cache padding.
 @[export: 'vkr_page_allocation_size']
-pub fn page_allocation_size(ptr voidptr) usize {
+pub fn page_allocation_size(ptr voidptr) uint {
 	unsafe {
 		require(sizeof(RuntimeAllocation) == 32 && __offsetof(RuntimeAllocation, owner_tag) == 24)
-		address := usize(ptr)
+		address := uint(ptr)
 		require(address >= sizeof(RuntimeAllocation) && (address & 15) == 0)
 		prefix := address - sizeof(RuntimeAllocation)
 		tag_address := voidptr(prefix + __offsetof(RuntimeAllocation, owner_tag))
@@ -103,18 +103,18 @@ pub fn page_allocation_size(ptr voidptr) usize {
 		allocation := &RuntimeAllocation(prefix)
 		requested := allocation.requested
 		pages := allocation.pages
-		base := usize(allocation.base)
+		base := uint(allocation.base)
 		page_size := C.vinix_linuxkpi_page_size()
 		require(requested != 0 && page_size != 0 && (page_size & (page_size - 1)) == 0)
-		require(pages != 0 && pages <= usize(-1) / page_size)
+		require(pages != 0 && pages <= uint(-1) / page_size)
 		require(base != 0 && (base & (page_size - 1)) == 0 && base <= prefix)
 		capacity := pages * page_size
-		require(base <= usize(-1) - capacity)
+		require(base <= uint(-1) - capacity)
 		offset := address - base
 		require(offset <= capacity && requested <= capacity - offset)
-		mut alignment := requested & (usize(0) - requested)
+		mut alignment := requested & (uint(0) - requested)
 		if alignment < 16 { alignment = 16 }
-		require(base <= usize(-1) - sizeof(RuntimeAllocation) - (alignment - 1))
+		require(base <= uint(-1) - sizeof(RuntimeAllocation) - (alignment - 1))
 		require(address == ((base + sizeof(RuntimeAllocation) + alignment - 1) & ~(alignment - 1)))
 		return requested
 	}
@@ -123,7 +123,7 @@ pub fn page_allocation_size(ptr voidptr) usize {
 @[export: 'vkr_kvfree']
 pub fn runtime_kvfree(ptr voidptr) {
 	unsafe {
-		if usize(ptr) <= 16 { return }
+		if uint(ptr) <= 16 { return }
 		page_allocation_size(ptr)
 		runtime_kfree(ptr)
 	}
@@ -132,22 +132,22 @@ pub fn runtime_kvfree(ptr voidptr) {
 @[export: 'vkr_kfree']
 pub fn runtime_kfree(ptr voidptr) {
 	unsafe {
-		if usize(ptr) <= 16 { return }
-		allocation := &RuntimeAllocation(usize(ptr) - sizeof(RuntimeAllocation))
+		if uint(ptr) <= 16 { return }
+		allocation := &RuntimeAllocation(uint(ptr) - sizeof(RuntimeAllocation))
 		pages := allocation.pages
 		C.vinix_linuxkpi_free_pages(allocation.base, pages)
 	}
 }
 
 @[export: 'vkr_krealloc']
-pub fn runtime_krealloc(old voidptr, size usize, flags u32) voidptr {
+pub fn runtime_krealloc(old voidptr, size uint, flags u32) voidptr {
 	unsafe {
 		if size == 0 {
 			runtime_kfree(old)
 			return voidptr(16)
 		}
 		result := runtime_kmalloc(size, flags)
-		if usize(result) == 0 { return nil }
+		if uint(result) == 0 { return nil }
 		previous := runtime_ksize(old)
 		if previous != 0 { C.memcpy(result, old, if previous < size { previous } else { size }) }
 		runtime_kfree(old)
@@ -156,9 +156,9 @@ pub fn runtime_krealloc(old voidptr, size usize, flags u32) voidptr {
 }
 
 @[export: 'vkr_kmemdup']
-pub fn runtime_kmemdup(src voidptr, size usize, flags u32) voidptr {
+pub fn runtime_kmemdup(src voidptr, size uint, flags u32) voidptr {
 	result := runtime_kmalloc(size, flags)
-	if usize(result) != 0 && size != 0 { C.memcpy(result, src, size) }
+	if uint(result) != 0 && size != 0 { C.memcpy(result, src, size) }
 	return result
 }
 
@@ -169,18 +169,18 @@ pub fn runtime_tigerlake_id(vendor u16, device u16, class_code u32) bool {
 }
 
 @[export: 'kmalloc']
-pub fn native_kmalloc(size usize, flags u32) voidptr { return runtime_kmalloc(size, flags) }
+pub fn native_kmalloc(size uint, flags u32) voidptr { return runtime_kmalloc(size, flags) }
 @[export: 'kzalloc']
-pub fn native_kzalloc(size usize, flags u32) voidptr { return runtime_kzalloc(size, flags) }
+pub fn native_kzalloc(size uint, flags u32) voidptr { return runtime_kzalloc(size, flags) }
 @[export: 'kmalloc_array']
-pub fn native_kmalloc_array(count usize, size usize, flags u32) voidptr { return runtime_kmalloc_array(count, size, flags) }
+pub fn native_kmalloc_array(count uint, size uint, flags u32) voidptr { return runtime_kmalloc_array(count, size, flags) }
 @[export: 'kcalloc']
-pub fn native_kcalloc(count usize, size usize, flags u32) voidptr { return runtime_kcalloc(count, size, flags) }
+pub fn native_kcalloc(count uint, size uint, flags u32) voidptr { return runtime_kcalloc(count, size, flags) }
 @[export: 'ksize']
-pub fn native_ksize(ptr voidptr) usize { return runtime_ksize(ptr) }
+pub fn native_ksize(ptr voidptr) uint { return runtime_ksize(ptr) }
 @[export: 'kfree']
 pub fn native_kfree(ptr voidptr) { runtime_kfree(ptr) }
 @[export: 'krealloc']
-pub fn native_krealloc(ptr voidptr, size usize, flags u32) voidptr { return runtime_krealloc(ptr, size, flags) }
+pub fn native_krealloc(ptr voidptr, size uint, flags u32) voidptr { return runtime_krealloc(ptr, size, flags) }
 @[export: 'kmemdup']
-pub fn native_kmemdup(ptr voidptr, size usize, flags u32) voidptr { return runtime_kmemdup(ptr, size, flags) }
+pub fn native_kmemdup(ptr voidptr, size uint, flags u32) voidptr { return runtime_kmemdup(ptr, size, flags) }

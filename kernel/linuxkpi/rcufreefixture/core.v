@@ -17,7 +17,7 @@ struct C.vkrf_boundary {
 mut:
 	magic u64
 }
-fn C.kzalloc(usize, u32) voidptr
+fn C.kzalloc(uint, u32) voidptr
 fn C.kvfree(voidptr)
 fn C.kvfree_rcu_mightsleep(voidptr)
 fn C.vkrf_kfree_zero(&C.vkrf_zero)

@@ -22,7 +22,7 @@ mut:
 }
 @[typedef]
 struct C.vrf_usage {}
-fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
 fn C.dma_resv_init(&C.dma_resv)
 fn C.dma_resv_fini(&C.dma_resv)
 fn C.dma_resv_lock(&C.dma_resv, &C.ww_acquire_ctx) i32
@@ -44,14 +44,14 @@ fn C.dma_resv_iter_usage(&C.dma_resv_iter) C.vrf_usage
 fn C.dma_resv_iter_is_restarted(&C.dma_resv_iter) bool
 fn C.dma_resv_get_fences(&C.dma_resv, C.vrf_usage, &u32, &&&C.dma_fence) i32
 fn C.dma_resv_get_singleton(&C.dma_resv, C.vrf_usage, &&C.dma_fence) i32
-fn C.dma_resv_wait_timeout(&C.dma_resv, C.vrf_usage, bool, usize) i64
+fn C.dma_resv_wait_timeout(&C.dma_resv, C.vrf_usage, bool, uint) i64
 fn C.dma_resv_set_deadline(&C.dma_resv, C.vrf_usage, i64)
 fn C.dma_resv_test_signaled(&C.dma_resv, C.vrf_usage) bool
 fn C.vrf_list_entry(&C.dma_resv_list, u32) &C.dma_fence
 fn C.vrf_list_load(&C.dma_resv) &C.dma_resv_list
 fn C.vrf_cursor_index(&C.dma_resv_iter) u32
-fn C.kmalloc_size_roundup(usize) usize
-fn C.krealloc_array(voidptr, usize, usize, u32) voidptr
+fn C.kmalloc_size_roundup(uint) uint
+fn C.krealloc_array(voidptr, uint, uint, u32) voidptr
 
 fn usage(value u32) C.vrf_usage {
 	mut result := C.vrf_usage{}
@@ -122,7 +122,7 @@ pub fn list_value(storage voidptr, kind u32, index u32) u64 {
 		if list == nil { return 0 }
 		if kind == 0 { return list.num_fences }
 		if kind == 1 { return list.max_fences }
-		return u64(usize(C.vrf_list_entry(list, index)))
+		return u64(uint(C.vrf_list_entry(list, index)))
 	}
 }
 @[export: 'vinix_linuxkpi_resv_fixture_get']
@@ -130,12 +130,12 @@ pub fn get(storage voidptr, value u32, count &u32, vector &voidptr) i32 { unsafe
 @[export: 'vinix_linuxkpi_resv_fixture_singleton']
 pub fn singleton(storage voidptr, value u32, output &voidptr) i32 { unsafe { return C.dma_resv_get_singleton(&C.dma_resv(storage), usage(value), &&C.dma_fence(output)) } }
 @[export: 'vinix_linuxkpi_resv_fixture_wait']
-pub fn wait(storage voidptr, value u32, intr bool, timeout u64) i64 { unsafe { return C.dma_resv_wait_timeout(&C.dma_resv(storage), usage(value), intr, usize(timeout)) } }
+pub fn wait(storage voidptr, value u32, intr bool, timeout u64) i64 { unsafe { return C.dma_resv_wait_timeout(&C.dma_resv(storage), usage(value), intr, uint(timeout)) } }
 @[export: 'vinix_linuxkpi_resv_fixture_deadline']
 pub fn deadline(storage voidptr, value u32, time i64) { unsafe { C.dma_resv_set_deadline(&C.dma_resv(storage), usage(value), time) } }
 @[export: 'vinix_linuxkpi_resv_fixture_signaled']
 pub fn signaled(storage voidptr, value u32) bool { unsafe { return C.dma_resv_test_signaled(&C.dma_resv(storage), usage(value)) } }
 @[export: 'vinix_linuxkpi_resv_fixture_roundup']
-pub fn roundup(size usize) usize { return C.kmalloc_size_roundup(size) }
+pub fn roundup(size uint) uint { return C.kmalloc_size_roundup(size) }
 @[export: 'vinix_linuxkpi_resv_fixture_realloc']
-pub fn realloc(storage voidptr, count usize, size usize) voidptr { return C.krealloc_array(storage, count, size, 3264) }
+pub fn realloc(storage voidptr, count uint, size uint) voidptr { return C.krealloc_array(storage, count, size, 3264) }

@@ -27,14 +27,14 @@ fn C.va_end(C.vkf_native_va)
 fn C.vkf_va_parameter(C.vkf_native_va) voidptr
 fn C.vinix_kasprintf_va_storage(C.vkf_native_va) voidptr
 fn C.vinix_kasprintf_descriptor_storage(C.va_format) voidptr
-fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
 fn C.kvasprintf(u32, &C.vks_const_char, C.vkf_native_va) &char
 fn C.kvasprintf_const(u32, &C.vks_const_char, C.vkf_native_va) &C.vks_const_char
 fn C.kasprintf(u32, &C.vks_const_char, ...) &char
 fn C.vkf_kvasprintf(u32, voidptr, voidptr) voidptr
 fn C.vkf_kvasprintf_const(u32, voidptr, voidptr) voidptr
 fn C.kfree_const(&C.vks_const_void)
-fn C.kmalloc(usize, u32) voidptr
+fn C.kmalloc(uint, u32) voidptr
 fn C.vinix_kasprintf_gfp_kernel() u32
 fn C.vinix_linuxkpi_is_kernel_rodata(&C.vks_const_void) bool
 
@@ -67,7 +67,7 @@ fn genuine(mode u32, flags u32, slots u32, state &u32, fmt &C.vks_const_char, ..
 		C.memcpy(&after[0], cursor, abiargs.native_size())
 		mut matches := true
 		mut unchanged := true
-		for index in usize(0) .. abiargs.native_size() / 8 {
+		for index in uint(0) .. abiargs.native_size() / 8 {
 			if after[index] != expected[index] { matches = false }
 			if after[index] != before[index] { unchanged = false }
 		}
@@ -93,7 +93,7 @@ fn genuine_nested(flags u32, state &u32, fmt &C.vks_const_char, ...) voidptr {
 		mut after := [4]u64{}
 		C.memcpy(&after[0], cursor, abiargs.native_size())
 		mut same := true
-		for index in usize(0) .. abiargs.native_size() / 8 {
+		for index in uint(0) .. abiargs.native_size() / 8 {
 			if before[index] != after[index] { same = false }
 		}
 		*state = if same { u32(3) } else { u32(0) }
@@ -114,7 +114,7 @@ pub fn run(which u32, flags u32, source voidptr, state &u32) voidptr {
 			return voidptr(C.kasprintf(flags, &C.vks_const_char(c'%u/%s/%u/%u/%u/%u/%u/%u'), u32(1), c'cursor', u32(2), u32(3), u32(4), u32(5), u32(6), u32(7)))
 		}
 		if which == 2 {
-			return genuine(0, flags, 10, state, &C.vks_const_char(c'%*.*s|%+d|%d|%ld|%lld|%zu|%#x|%c|%%'), i32(-6), i32(3), source, i32(7), i32(-8), i64(-1234567890), i64(-9223372036854775807), usize(1234), u32(42), i32(`!`))
+			return genuine(0, flags, 10, state, &C.vks_const_char(c'%*.*s|%+d|%d|%ld|%lld|%zu|%#x|%c|%%'), i32(-6), i32(3), source, i32(7), i32(-8), i64(-1234567890), i64(-9223372036854775807), uint(1234), u32(42), i32(`!`))
 		}
 		if which == 3 { return genuine(0, flags, 0, state, &C.vks_const_char(c'')) }
 		if which == 4 { return genuine(0, flags, 1, state, &C.vks_const_char(c'%s'), source) }
@@ -169,7 +169,7 @@ pub fn free(ptr voidptr) {
 }
 
 @[export:'vinix_linuxkpi_kasprintf_fixture_alloc']
-pub fn alloc(size usize) voidptr { return C.kmalloc(size, C.vinix_kasprintf_gfp_kernel()) }
+pub fn alloc(size uint) voidptr { return C.kmalloc(size, C.vinix_kasprintf_gfp_kernel()) }
 
 @[export:'vinix_linuxkpi_kasprintf_fixture_gfp']
 pub fn gfp() u32 { return C.vinix_kasprintf_gfp_kernel() }

@@ -39,9 +39,9 @@ fn C.vinix_linuxkpi_fixture_seq_worker(voidptr) voidptr
 fn C.pthread_create(voidptr, voidptr, SeqWorker, voidptr) i32
 fn C.pthread_join(C.pthread_t, voidptr) i32
 fn C.pthread_exit(voidptr)
-fn C.vinix_linuxkpi_irq_flags() usize
-fn C.vinix_linuxkpi_irq_save() usize
-fn C.vinix_linuxkpi_irq_restore(usize)
+fn C.vinix_linuxkpi_irq_flags() uint
+fn C.vinix_linuxkpi_irq_save() uint
+fn C.vinix_linuxkpi_irq_restore(uint)
 fn C.preempt_disable()
 fn C.preempt_enable()
 fn C.preempt_count() u32
@@ -68,13 +68,13 @@ fn C.raw_write_seqcount_end(voidptr)
 fn C.seqlock_init(&C.seqlock_t)
 fn C.read_seqbegin(&C.seqlock_t) u32
 fn C.read_seqretry(&C.seqlock_t, u32) bool
-fn C.write_seqlock_irqsave(&C.seqlock_t, usize)
-fn C.write_sequnlock_irqrestore(&C.seqlock_t, usize)
+fn C.write_seqlock_irqsave(&C.seqlock_t, uint)
+fn C.write_sequnlock_irqrestore(&C.seqlock_t, uint)
 fn C.read_seqbegin_or_lock(&C.seqlock_t, &i32)
 fn C.need_seqretry(&C.seqlock_t, i32) bool
 fn C.done_seqretry(&C.seqlock_t, i32)
-fn C.read_seqbegin_or_lock_irqsave(&C.seqlock_t, &i32) usize
-fn C.done_seqretry_irqrestore(&C.seqlock_t, i32, usize)
+fn C.read_seqbegin_or_lock_irqsave(&C.seqlock_t, &i32) uint
+fn C.done_seqretry_irqrestore(&C.seqlock_t, i32, uint)
 fn C.write_seqcount_latch_begin(&C.seqcount_latch_t)
 fn C.write_seqcount_latch(&C.seqcount_latch_t)
 fn C.write_seqcount_latch_end(&C.seqcount_latch_t)
@@ -82,11 +82,11 @@ fn C.read_seqcount_latch(&C.seqcount_latch_t) u32
 fn C.raw_read_seqcount_latch(&C.seqcount_latch_t) u32
 fn C.read_seqcount_latch_retry(&C.seqcount_latch_t, u32) bool
 fn C.raw_read_seqcount_latch_retry(&C.seqcount_latch_t, u32) bool
-fn C.WRITE_ONCE(usize, usize) usize
-fn C.READ_ONCE(usize) usize
+fn C.WRITE_ONCE(uint, uint) uint
+fn C.READ_ONCE(uint) uint
 fn C.spin_lock_init(&C.spinlock_t)
-fn C.spin_lock_irqsave(&C.spinlock_t, usize)
-fn C.spin_unlock_irqrestore(&C.spinlock_t, usize)
+fn C.spin_lock_irqsave(&C.spinlock_t, uint)
+fn C.spin_unlock_irqrestore(&C.spinlock_t, uint)
 fn C.spin_is_locked(&C.spinlock_t) bool
 fn C.mutex_init(&C.mutex)
 fn C.mutex_destroy(&C.mutex)
@@ -96,7 +96,7 @@ fn C.init_completion(&C.completion)
 fn C.complete(&C.completion)
 fn C.complete_all(&C.completion)
 fn C.wait_for_completion(&C.completion)
-fn C.wait_for_completion_timeout(&C.completion, usize) usize
+fn C.wait_for_completion_timeout(&C.completion, uint) uint
 fn C.vinix_linuxkpi_worker_bind(u32) i32
 fn C.vinix_linuxkpi_cpu_id() u32
 fn C.vinix_linuxkpi_percpu_count() u32
@@ -115,15 +115,15 @@ __global (
 
 __global native_seq_static_lock C.seqlock_t
 
-fn irqs_enabled() bool { return C.vinix_linuxkpi_irq_flags() & (usize(1) << 9) != 0 }
+fn irqs_enabled() bool { return C.vinix_linuxkpi_irq_flags() & (uint(1) << 9) != 0 }
 
 struct Pair {
 mut:
-	value usize
-	inverse usize
+	value uint
+	inverse uint
 }
 
-fn store(pair &Pair, value usize) {
+fn store(pair &Pair, value uint) {
 	unsafe {
 		C.WRITE_ONCE(pair.value, value)
 		C.WRITE_ONCE(pair.inverse, ~value)
@@ -163,7 +163,7 @@ fn basic() i32 {
 		C.spin_lock_init(&spin)
 		mut associated_spin := C.seqcount_spinlock_t{}
 		C.seqcount_spinlock_init(&associated_spin, &spin)
-		mut irq := usize(0)
+		mut irq := uint(0)
 		C.spin_lock_irqsave(&spin, irq)
 		C.write_seqcount_begin_nested(&associated_spin, 0)
 		if !(!irqs_enabled() && C.preempt_count() == 1) { result = -C.EIO }
@@ -264,7 +264,7 @@ mut:
 fn update(test &Shared, kind u32) i32 {
 	unsafe {
 		mut result := i32(0)
-		mut irq := usize(0)
+		mut irq := uint(0)
 		if kind < 2 { C.spin_lock_irqsave(&test.spinlock, irq) }
 		else if kind == 2 || kind == 4 { C.mutex_lock(&test.mutex) }
 		else { C.write_seqlock_irqsave(&test.seqlock, irq) }
@@ -304,8 +304,8 @@ fn update(test &Shared, kind u32) i32 {
 fn read(test &Shared, kind u32) i32 {
 	unsafe {
 		mut result := i32(0)
-		mut value := usize(0)
-		mut inverse := usize(0)
+		mut value := uint(0)
+		mut inverse := uint(0)
 		for {
 			mut start := u32(0)
 			if kind == 0 { start = C.read_seqcount_begin(&test.plain) }
@@ -410,10 +410,10 @@ pub fn selftest() i32 {
 		}
 		if result == 0 {
 			for i in 0 .. 4 {
-				if !(test.values[i].value == 256 && test.values[i].inverse == ~usize(256)) { result = -C.EIO }
+				if !(test.values[i].value == 256 && test.values[i].inverse == ~uint(256)) { result = -C.EIO }
 			}
 			for i in 0 .. 2 {
-				if !(test.copies[i].value == 256 && test.copies[i].inverse == ~usize(256)) { result = -C.EIO }
+				if !(test.copies[i].value == 256 && test.copies[i].inverse == ~uint(256)) { result = -C.EIO }
 			}
 		}
 		C.mutex_destroy(&test.mutex)

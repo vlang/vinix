@@ -100,9 +100,9 @@ pub mut:
 }
 
 @[export: 'vinix_smc_state_size']
-pub fn vinix_smc_state_size() usize {
+pub fn vinix_smc_state_size() uint {
 	unsafe {
-		return usize(sizeof(Smc_state))
+		return uint(sizeof(Smc_state))
 	}
 }
 
@@ -344,14 +344,14 @@ fn transaction(s &Smc_state, cmd u32, key u32, length u32, strict i32, result &u
 @[export: 'vinix_smc_boot']
 pub fn vinix_smc_boot(state voidptr, context voidptr, send Vinix_smc_send_fn, recv Vinix_smc_recv_fn, clock Vinix_smc_clock_fn, relax Vinix_smc_relax_fn, frequency u64, sram_base u64, sram_size u64) i32 {
 	unsafe {
-		if usize(state) == 0 {
+		if uint(state) == 0 {
 			return vinix_smc_protocol
 		}
 		s := &Smc_state(state)
 
 		*s = Smc_state{}
 
-		if (usize(send) == 0) || (usize(recv) == 0) || (usize(clock) == 0) || (usize(relax) == 0) || frequency == 0 || frequency > u64(-1) / 4 || sram_base == 0 || sram_size < 0x4000 || sram_size - 1 > u64(-1) - sram_base {
+		if (uint(send) == 0) || (uint(recv) == 0) || (uint(clock) == 0) || (uint(relax) == 0) || frequency == 0 || frequency > u64(-1) / 4 || sram_base == 0 || sram_size < 0x4000 || sram_size - 1 > u64(-1) - sram_base {
 			return fail(s, i32(vinix_smc_protocol))
 		}
 		s.context = context
@@ -486,8 +486,8 @@ pub fn vinix_smc_boot(state voidptr, context voidptr, send Vinix_smc_send_fn, re
 pub fn vinix_smc_poll(state voidptr, budget u32) i32 {
 	unsafe {
 		s := &Smc_state(state)
-		if (usize(s) == 0) || !s.ready {
-			return if (usize(s) != 0) && s.failed { s.failed } else { vinix_smc_not_ready }
+		if (uint(s) == 0) || !s.ready {
+			return if (uint(s) != 0) && s.failed { s.failed } else { vinix_smc_not_ready }
 		}
 		if budget > u32(64) {
 			budget = u32(64)
@@ -522,8 +522,8 @@ pub fn vinix_smc_poll(state voidptr, budget u32) i32 {
 pub fn vinix_smc_refresh(state voidptr) i32 {
 	unsafe {
 		s := &Smc_state(state)
-		if (usize(s) == 0) || !s.ready {
-			return if (usize(s) != 0) && s.failed { s.failed } else { vinix_smc_not_ready }
+		if (uint(s) == 0) || !s.ready {
+			return if (uint(s) != 0) && s.failed { s.failed } else { vinix_smc_not_ready }
 		}
 		now := s.clock(voidptr(s.context))
 		if s.sampled && now - s.sample_time < s.frequency {
@@ -570,8 +570,8 @@ pub fn vinix_smc_refresh(state voidptr) i32 {
 pub fn vinix_smc_cached_capacity(state voidptr) i32 {
 	unsafe {
 		s := &Smc_state(state)
-		if (usize(s) == 0) || !s.ready {
-			return if (usize(s) != 0) && s.failed { s.failed } else { vinix_smc_not_ready }
+		if (uint(s) == 0) || !s.ready {
+			return if (uint(s) != 0) && s.failed { s.failed } else { vinix_smc_not_ready }
 		}
 		if !s.sampled {
 			return vinix_smc_not_ready
@@ -591,8 +591,8 @@ pub fn vinix_smc_cached_capacity(state voidptr) i32 {
 pub fn vinix_smc_refresh_power(state voidptr, flags &u32, voltage &i32, current &i32, power &i32) i32 {
 	unsafe {
 		s := &Smc_state(state)
-		if (usize(s) == 0) || !s.ready {
-			return if (usize(s) != 0) && s.failed { s.failed } else { vinix_smc_not_ready }
+		if (uint(s) == 0) || !s.ready {
+			return if (uint(s) != 0) && s.failed { s.failed } else { vinix_smc_not_ready }
 		}
 		if !s.power_sampled || s.clock(voidptr(s.context)) - s.power_time >= s.frequency {
 			keys := [u32(0x42304156), u32(0x42304143), u32(0x42304150)]!
@@ -709,8 +709,8 @@ pub fn vinix_smc_format_power(flags u32, voltage i32, current i32, power i32, ou
 
 fn usable(s &Smc_state) i32 {
 	unsafe {
-		if (usize(s) == 0) || !s.ready {
-			return if (usize(s) != 0) && s.failed { s.failed } else { vinix_smc_not_ready }
+		if (uint(s) == 0) || !s.ready {
+			return if (uint(s) != 0) && s.failed { s.failed } else { vinix_smc_not_ready }
 		}
 		return 0
 	}
@@ -737,7 +737,7 @@ pub fn vinix_smc_set_shmem(state voidptr, shmem Vinix_smc_shmem_fn) i32 {
 pub fn vinix_smc_shmem_address(state voidptr) u64 {
 	unsafe {
 		s := &Smc_state(state)
-		return if (usize(s) != 0) && s.ready { s.shmem_addr } else { u64(0) }
+		return if (uint(s) != 0) && s.ready { s.shmem_addr } else { u64(0) }
 	}
 }
 
@@ -746,7 +746,7 @@ pub fn vinix_smc_shmem_address(state voidptr) u64 {
 pub fn vinix_smc_failure(state voidptr) i32 {
 	unsafe {
 		s := &Smc_state(state)
-		return if usize(s) != 0 { s.failed } else { vinix_smc_not_ready }
+		return if uint(s) != 0 { s.failed } else { vinix_smc_not_ready }
 	}
 }
 
@@ -755,7 +755,7 @@ pub fn vinix_smc_failure(state voidptr) i32 {
 pub fn vinix_smc_key_writes(state voidptr) u64 {
 	unsafe {
 		s := &Smc_state(state)
-		return if usize(s) != 0 { s.key_writes } else { u64(0) }
+		return if uint(s) != 0 { s.key_writes } else { u64(0) }
 	}
 }
 
@@ -769,7 +769,7 @@ pub fn vinix_smc_key_info(state voidptr, key u32, size &u8, kind &u32, flags &u8
 		if status < 0 {
 			return status
 		}
-		if usize(s.shmem) == 0 {
+		if uint(s.shmem) == 0 {
 			return vinix_smc_unsupported
 		}
 		word := u64(0)
@@ -781,13 +781,13 @@ pub fn vinix_smc_key_info(state voidptr, key u32, size &u8, kind &u32, flags &u8
 		if s.shmem(voidptr(s.context), 0, u32(0), &info[0], u32(6)) != 1 {
 			return vinix_smc_io
 		}
-		if usize(size) != 0 {
+		if uint(size) != 0 {
 			*size = info[0]
 		}
-		if usize(kind) != 0 {
+		if uint(kind) != 0 {
 			*kind = (u32(info[1]) << 24) | (u32(info[2]) << 16) | (u32(info[3]) << 8) | u32(info[4])
 		}
-		if usize(flags) != 0 {
+		if uint(flags) != 0 {
 			*flags = info[5]
 		}
 		return 0
@@ -806,10 +806,10 @@ pub fn vinix_smc_read_key(state voidptr, key u32, length u32, output &u8) i32 {
 		if status < 0 {
 			return status
 		}
-		if usize(output) == 0 || length == u32(0) || length > u32(vinix_smc_max_value) {
+		if uint(output) == 0 || length == u32(0) || length > u32(vinix_smc_max_value) {
 			return vinix_smc_argument
 		}
-		if length > u32(4) && usize(s.shmem) == 0 {
+		if length > u32(4) && uint(s.shmem) == 0 {
 			return vinix_smc_unsupported
 		}
 		word := u64(0)
@@ -842,10 +842,10 @@ pub fn vinix_smc_write_key(state voidptr, key u32, length u32, data &u8) i32 {
 		if status < 0 {
 			return status
 		}
-		if usize(data) == 0 || length == u32(0) || length > u32(vinix_smc_max_value) {
+		if uint(data) == 0 || length == u32(0) || length > u32(vinix_smc_max_value) {
 			return vinix_smc_argument
 		}
-		if usize(s.shmem) == 0 {
+		if uint(s.shmem) == 0 {
 			return vinix_smc_unsupported
 		}
 		if s.shmem(voidptr(s.context), 1, u32(0), data, length) != 1 {
@@ -861,14 +861,14 @@ pub fn vinix_smc_write_key(state voidptr, key u32, length u32, data &u8) i32 {
 pub fn vinix_smc_sample_time(state voidptr) u64 {
 	unsafe {
 		s := &Smc_state(state)
-		return if (usize(s) != 0) && s.sampled { s.sample_time } else { u64(0) }
+		return if (uint(s) != 0) && s.sampled { s.sample_time } else { u64(0) }
 	}
 }
 
 @[export: 'vinix_smc_format_capacity']
 pub fn vinix_smc_format_capacity(percent i32, output &u8) i32 {
 	unsafe {
-		if (usize(output) == 0) || percent < 0 || percent > 100 {
+		if (uint(output) == 0) || percent < 0 || percent > 100 {
 			return vinix_smc_range
 		}
 		length := i32(0)

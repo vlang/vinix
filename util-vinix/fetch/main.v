@@ -5,7 +5,7 @@ import os
 #include <unistd.h>
 
 fn C.getlogin() &char
-fn C.gethostname(name &char, len usize) i32
+fn C.gethostname(name &char, len uint) i32
 
 const escape_cyan = '\x1b[1;36m'
 const escape_blue = '\x1b[1;34m'
@@ -38,7 +38,7 @@ fn main() {
 	}
 
 	mut hostname_buffer := [256]u8{}
-	if unsafe { C.gethostname(&char(&hostname_buffer[0]), usize(hostname_buffer.len)) } != 0 {
+	if unsafe { C.gethostname(&char(&hostname_buffer[0]), uint(hostname_buffer.len)) } != 0 {
 		panic('gethostname() failed!')
 	}
 	uname_result := os.uname()

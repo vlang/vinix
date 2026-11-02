@@ -32,22 +32,22 @@ fn C.to_delayed_work(&C.work_struct) &C.delayed_work
 fn C.init_completion(&C.completion)
 fn C.complete(&C.completion)
 fn C.wait_for_completion(&C.completion)
-fn C.wait_for_completion_timeout(&C.completion, usize) usize
+fn C.wait_for_completion_timeout(&C.completion, uint) uint
 fn C.current_work() &C.work_struct
 fn C.vinix_linuxkpi_may_sleep() bool
 fn C.vinix_linuxkpi_percpu_count() u32
 fn C.vinix_linuxkpi_cpu_id() u32
 fn C.vinix_linuxkpi_worker_nice() i32
-fn C.vinix_linuxkpi_worker_timeslice() usize
-fn C.vinix_linuxkpi_irq_flags() usize
-fn C.vinix_linuxkpi_irq_save() usize
-fn C.vinix_linuxkpi_irq_restore(usize)
+fn C.vinix_linuxkpi_worker_timeslice() uint
+fn C.vinix_linuxkpi_irq_flags() uint
+fn C.vinix_linuxkpi_irq_save() uint
+fn C.vinix_linuxkpi_irq_restore(uint)
 fn C.vinix_linuxkpi_test_park_preempt()
 fn C.get_cpu() u32
 fn C.put_cpu()
 fn C.cond_resched() i32
 fn C.msleep(u32)
-fn C.kzalloc(usize, u32) voidptr
+fn C.kzalloc(uint, u32) voidptr
 fn C.kfree(voidptr)
 fn C.alloc_ordered_workqueue(&char, u32, ...) &C.workqueue_struct
 fn C.alloc_workqueue(&char, u32, i32, ...) &C.workqueue_struct
@@ -55,10 +55,10 @@ fn C.destroy_workqueue(&C.workqueue_struct)
 fn C.queue_work(&C.workqueue_struct, &C.work_struct) bool
 fn C.queue_work_on(i32, &C.workqueue_struct, &C.work_struct) bool
 fn C.schedule_work_on(i32, &C.work_struct) bool
-fn C.queue_delayed_work(&C.workqueue_struct, &C.delayed_work, usize) bool
-fn C.queue_delayed_work_on(i32, &C.workqueue_struct, &C.delayed_work, usize) bool
-fn C.mod_delayed_work(&C.workqueue_struct, &C.delayed_work, usize) bool
-fn C.mod_delayed_work_on(i32, &C.workqueue_struct, &C.delayed_work, usize) bool
+fn C.queue_delayed_work(&C.workqueue_struct, &C.delayed_work, uint) bool
+fn C.queue_delayed_work_on(i32, &C.workqueue_struct, &C.delayed_work, uint) bool
+fn C.mod_delayed_work(&C.workqueue_struct, &C.delayed_work, uint) bool
+fn C.mod_delayed_work_on(i32, &C.workqueue_struct, &C.delayed_work, uint) bool
 fn C.cancel_work_sync(&C.work_struct) bool
 fn C.cancel_delayed_work(&C.delayed_work) bool
 fn C.cancel_delayed_work_sync(&C.delayed_work) bool
@@ -68,8 +68,8 @@ fn C.flush_workqueue(&C.workqueue_struct)
 fn C.drain_workqueue(&C.workqueue_struct)
 fn C.work_busy(&C.work_struct) u32
 fn C.timer_pending(&C.timer_list) bool
-fn C.vinix_linuxkpi_timer_active() usize
-fn C.time_before(usize, usize) bool
+fn C.vinix_linuxkpi_timer_active() uint
+fn C.time_before(uint, uint) bool
 fn C.atomic_set(&C.atomic_t, i32)
 fn C.atomic_read(&C.atomic_t) i32
 fn C.atomic_inc_return(&C.atomic_t) i32
@@ -81,7 +81,7 @@ fn C.BUG_ON(bool)
 fn C.kprintf(&char, ...) i32
 
 @[c_extern]
-__global C.jiffies usize
+__global C.jiffies uint
 
 @[c_extern]
 __global (
@@ -117,7 +117,7 @@ mut:
 pub fn work_callback(work &C.work_struct) {
 	unsafe {
 		mut test := &WorkTest(work)
-		if !C.vinix_linuxkpi_may_sleep() || usize(C.current_work()) != usize(work) {
+		if !C.vinix_linuxkpi_may_sleep() || uint(C.current_work()) != uint(work) {
 			*test.result = -C.EIO
 		}
 		if test.count != nil {
@@ -247,7 +247,7 @@ mut:
 	queue    &C.workqueue_struct = unsafe { nil }
 	done     C.completion
 	frees    &DelayedFrees = unsafe { nil }
-	earliest usize
+	earliest uint
 	calls    u32
 	limit    u32
 	result   &i32 = unsafe { nil }
@@ -257,7 +257,7 @@ mut:
 pub fn delayed_callback(work &C.work_struct) {
 	unsafe {
 		mut test := &DelayedTest(C.to_delayed_work(work))
-		if !C.vinix_linuxkpi_may_sleep() || usize(C.current_work()) != usize(work) || C.time_before(C.jiffies, test.earliest) {
+		if !C.vinix_linuxkpi_may_sleep() || uint(C.current_work()) != uint(work) || C.time_before(C.jiffies, test.earliest) {
 			*test.result = -C.EIO
 		}
 		test.calls++
@@ -330,7 +330,7 @@ fn delayed_body(batch &DelayedBatch) i32 {
 			C.cancel_delayed_work_sync(&batch.tests[i].work)
 			delayed_init(&batch.tests[i], batch.queues[i], &batch.results[i])
 			flags := C.vinix_linuxkpi_irq_save()
-			if !C.queue_delayed_work(batch.queues[i], &batch.tests[i].work, 100000) || !C.mod_delayed_work(batch.queues[i], &batch.tests[i].work, 200000) || !C.cancel_delayed_work(&batch.tests[i].work) || C.vinix_linuxkpi_irq_flags() & (usize(1) << 9) != 0 {
+			if !C.queue_delayed_work(batch.queues[i], &batch.tests[i].work, 100000) || !C.mod_delayed_work(batch.queues[i], &batch.tests[i].work, 200000) || !C.cancel_delayed_work(&batch.tests[i].work) || C.vinix_linuxkpi_irq_flags() & (uint(1) << 9) != 0 {
 				batch.results[i] = -C.EIO
 			}
 			C.vinix_linuxkpi_irq_restore(flags)
@@ -417,7 +417,7 @@ fn parallel_failure(test &ParallelTest, reason u32) {
 	}
 }
 
-fn parallel_report(stage &char, queue u32, item u32, ticks usize, test &ParallelTest,
+fn parallel_report(stage &char, queue u32, item u32, ticks uint, test &ParallelTest,
 	observed i32, expected i32, reasons u32) {
 	unsafe {
 		calls := if test != nil { test.calls } else { u32(0) }
@@ -435,7 +435,7 @@ pub fn parallel_callback(work &C.work_struct) {
 		// Keep the original conditional active increment and failure order.
 		if !C.vinix_linuxkpi_may_sleep() {
 			parallel_failure(test, 1)
-		} else if usize(C.current_work()) != usize(work) {
+		} else if uint(C.current_work()) != uint(work) {
 			parallel_failure(test, 2)
 		} else if C.atomic_inc_return(&test.active) != 1 {
 			parallel_failure(test, 4)
@@ -701,15 +701,15 @@ pub fn bound_callback(work &C.work_struct) {
 		expected := test.expected_cpu[if call != 0 { 1 } else { 0 }]
 		if C.atomic_inc_return(&test.active) != 1 { bound_failure(test, 1) }
 		if !C.vinix_linuxkpi_may_sleep() { bound_failure(test, 2) }
-		if usize(C.current_work()) != usize(work) { bound_failure(test, 4) }
+		if uint(C.current_work()) != uint(work) { bound_failure(test, 4) }
 		if expected != C.WORK_CPU_UNBOUND && C.vinix_linuxkpi_cpu_id() != expected {
 			bound_failure(test, 8)
 		}
 		if C.vinix_linuxkpi_worker_nice() != test.expected_nice { bound_failure(test, 16) }
 		if C.vinix_linuxkpi_worker_timeslice() != (if test.expected_nice == -20 {
-			usize(10000)
+			uint(10000)
 		} else {
-			usize(5000)
+			uint(5000)
 		}) {
 			bound_failure(test, 32)
 		}
@@ -795,8 +795,8 @@ mut:
 	heap_submitted      bool
 	result              i32
 	failed_stages       u32
-	heap_watchdog_ticks usize
-	heap_final_ticks    usize
+	heap_watchdog_ticks uint
+	heap_final_ticks    uint
 	heap_watchdog_count i32
 	heap_final_count    i32
 }

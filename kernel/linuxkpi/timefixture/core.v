@@ -31,23 +31,23 @@ fn C.get_task_struct(&C.task_struct) &C.task_struct
 fn C.put_task_struct(&C.task_struct)
 fn C.task_is_running(&C.task_struct) bool
 fn C.cond_resched() i32
-fn C.schedule_timeout_uninterruptible(isize) isize
-fn C.schedule_timeout_killable(isize) isize
-fn C.time_before(usize, usize) bool
+fn C.schedule_timeout_uninterruptible(int) int
+fn C.schedule_timeout_killable(int) int
+fn C.time_before(uint, uint) bool
 fn C.init_waitqueue_head(&C.wait_queue_head_t)
-fn C.wait_event_timeout(C.wait_queue_head_t, bool, usize) isize
+fn C.wait_event_timeout(C.wait_queue_head_t, bool, uint) int
 fn C.waitqueue_active(&C.wait_queue_head_t) bool
 fn C.init_swait_queue_head(&C.swait_queue_head)
-fn C.swait_event_timeout_exclusive(C.swait_queue_head, bool, usize) isize
+fn C.swait_event_timeout_exclusive(C.swait_queue_head, bool, uint) int
 fn C.swait_active(&C.swait_queue_head) bool
 fn C.init_completion(&C.completion)
 fn C.complete(&C.completion)
-fn C.wait_for_completion_timeout(&C.completion, usize) usize
-fn C.wait_for_completion_interruptible_timeout(&C.completion, usize) isize
+fn C.wait_for_completion_timeout(&C.completion, uint) uint
+fn C.wait_for_completion_interruptible_timeout(&C.completion, uint) int
 fn C.vinix_linuxkpi_test_task_signal(voidptr, u64)
 fn C.vinix_linuxkpi_may_sleep() bool
 fn C.vinix_linuxkpi_clock_ns() u64
-fn C.vinix_linuxkpi_test_task_time_waiters(&C.task_struct) usize
+fn C.vinix_linuxkpi_test_task_time_waiters(&C.task_struct) uint
 fn C.vinix_linuxkpi_test_thread_reap_ready(voidptr) bool
 fn C.vinix_linuxkpi_test_reap_quiescent() bool
 fn C.__atomic_load_n(&u32, i32) u32
@@ -59,7 +59,7 @@ fn C.kprintf(&char, ...) i32
 __global C.current &C.task_struct
 
 @[c_extern]
-__global C.jiffies usize
+__global C.jiffies uint
 
 @[c_extern]
 __global C.TASK_DEAD u32
@@ -73,14 +73,14 @@ __global C.ERESTARTSYS i32
 struct TimeFailure {
 mut:
 	reasons     u32
-	elapsed     usize
-	timeout     isize
-	queue       isize
-	simple      isize
-	completion  isize
-	completed   isize
-	interrupted isize
-	killable    isize
+	elapsed     uint
+	timeout     int
+	queue       int
+	simple      int
+	completion  int
+	completed   int
+	interrupted int
+	killable    int
 }
 
 struct NativeTimeWorker {
@@ -112,12 +112,12 @@ pub fn worker(argument voidptr) voidptr {
 			if failure.simple != 0 || C.swait_active(&simple) { failure.reasons |= 8 }
 			mut completion := C.completion{}
 			C.init_completion(&completion)
-			failure.completion = isize(C.wait_for_completion_timeout(&completion, 1))
+			failure.completion = int(C.wait_for_completion_timeout(&completion, 1))
 			if failure.completion != 0 || C.swait_active(&completion.@wait) {
 				failure.reasons |= 16
 			}
 			C.complete(&completion)
-			failure.completed = isize(C.wait_for_completion_timeout(&completion, 0))
+			failure.completed = int(C.wait_for_completion_timeout(&completion, 0))
 			if failure.completed != 1 { failure.reasons |= 32 }
 			C.vinix_linuxkpi_test_task_signal(test_worker.task.vinix_thread, u64(1) << 14)
 			failure.interrupted = C.wait_for_completion_interruptible_timeout(&completion, 5)

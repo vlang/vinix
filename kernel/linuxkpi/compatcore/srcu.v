@@ -90,7 +90,7 @@ fn C.vks_preempt_disable()
 fn C.vks_preempt_enable()
 fn C.vks_preempt_count() u32
 fn C.vks_cpu_id() u32
-fn C.vks_data_alignment() usize
+fn C.vks_data_alignment() uint
 fn C.alloc_workqueue(&char, u32, i32, ...voidptr) voidptr
 fn C.vks_queue_work(voidptr, voidptr) bool
 fn C.vks_queue_delayed_work(voidptr, voidptr, u64) bool
@@ -263,7 +263,7 @@ fn srcu_kick_updater(sup &C.vks_srcu_usage) { unsafe { C.vks_queue_delayed_work(
 pub fn call_srcu(storage voidptr, record voidptr, function fn (&C.callback_head)) {
 	unsafe {
 		head := &C.vks_rcu_head(record)
-		require(!is_null(head) && usize(function) != 0)
+		require(!is_null(head) && uint(function) != 0)
 		ssp := &C.vks_srcu(storage)
 		sup := srcu_initialized_usage(ssp)
 		C.vks_fence(5)
@@ -285,7 +285,7 @@ pub fn call_srcu(storage voidptr, record voidptr, function fn (&C.callback_head)
 @[export: 'vinix_linuxkpi_srcu_gp_work']
 pub fn srcu_gp_work(work &C.work_struct) {
 	unsafe {
-		sup := &C.vks_srcu_usage(usize(work) - __offsetof(C.vks_srcu_usage, work))
+		sup := &C.vks_srcu_usage(uint(work) - __offsetof(C.vks_srcu_usage, work))
 		ssp := &C.vks_srcu(sup.srcu_ssp)
 		sdp := srcu_callback_data(ssp)
 		mut flags := C.vkp_spin_lock_irqsave(&sup.lock)
@@ -327,7 +327,7 @@ pub fn srcu_gp_work(work &C.work_struct) {
 @[export: 'vinix_linuxkpi_srcu_callback_work']
 pub fn srcu_callback_work(work &C.work_struct) {
 	unsafe {
-		sdp := &C.vks_srcu_data(usize(work) - __offsetof(C.vks_srcu_data, work))
+		sdp := &C.vks_srcu_data(uint(work) - __offsetof(C.vks_srcu_data, work))
 		sup := &C.vks_srcu_usage((&C.vks_srcu(sdp.ssp)).srcu_sup)
 		mut flags := C.vkp_spin_lock_irqsave(&sup.lock)
 		target := sdp.srcu_gp_seq_needed_exp

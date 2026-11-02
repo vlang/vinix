@@ -95,7 +95,7 @@ pub fn var_waitqueue(variable voidptr) voidptr {
 }
 
 fn bit_waiter(entry voidptr) &C.vkw_wait_bit {
-	unsafe { return &C.vkw_wait_bit(usize(entry) - __offsetof(C.vkw_wait_bit, wq_entry)) }
+	unsafe { return &C.vkw_wait_bit(uint(entry) - __offsetof(C.vkw_wait_bit, wq_entry)) }
 }
 
 @[export: 'wake_bit_function']

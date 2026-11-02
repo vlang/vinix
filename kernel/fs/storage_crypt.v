@@ -23,11 +23,11 @@ fn (mut volume LogicalVolume) encrypted_transfer(buffer voidptr, offset u64, byt
 	charge := proc.reserve_kernel(.file, sector)?; defer { kbudget.release(charge) }
 	workspace := memory.malloc_packed_fallible(sector) @[freed]
 	if workspace == unsafe { nil } { errno.set(errno.enomem); return none }
-	defer { aesxts.erase(workspace, usize(sector)); memory.free(workspace) }
+	defer { aesxts.erase(workspace, uint(sector)); memory.free(workspace) }
 	for done := u64(0); done < bytes; done += sector {
-		if writing { unsafe { C.memcpy(workspace, &u8(buffer) + done, usize(sector)) } }
+		if writing { unsafe { C.memcpy(workspace, &u8(buffer) + done, uint(sector)) } }
 		volume.encrypted_sector(workspace, offset + done, sector, writing)?
-		if !writing { unsafe { C.memcpy(&u8(buffer) + done, workspace, usize(sector)) } }
+		if !writing { unsafe { C.memcpy(&u8(buffer) + done, workspace, uint(sector)) } }
 	}
 	volume.metrics.completed(bytes, writing)
 	return i64(bytes)

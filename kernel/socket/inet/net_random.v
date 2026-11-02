@@ -6,12 +6,12 @@ module inet
 // These hooks also let host tests compile this file without the kernel.
 fn C.krandom__fill(buf voidptr, count u64, allow_insecure bool) bool
 fn C.time__monotonic_ns() u64
-fn C.vinix_explicit_bzero(buf voidptr, len usize)
-fn C.memcpy(dest voidptr, src voidptr, length usize) voidptr
+fn C.vinix_explicit_bzero(buf voidptr, len uint)
+fn C.memcpy(dest voidptr, src voidptr, length uint) voidptr
 
 __global (
 	net_pool           [256]u8
-	net_pool_left      usize
+	net_pool_left      uint
 	net_fallback_state u64
 	net_id_shuffle     [65536]u16
 	net_id_index       u32
@@ -43,8 +43,8 @@ fn net_cycle_counter() u64 {
 }
 
 fn net_refill() {
-	net_pool_left = usize(net_pool.len)
-	if C.krandom__fill(unsafe { &net_pool[0] }, usize(net_pool.len), true) {
+	net_pool_left = uint(net_pool.len)
+	if C.krandom__fill(unsafe { &net_pool[0] }, uint(net_pool.len), true) {
 		return
 	}
 	// Only used before inet.initialise() has initialized the generator.
@@ -61,16 +61,16 @@ fn net_refill() {
 // Batch small requests, clearing every byte as it leaves the pool, as
 // arc4random does. No caller can recover earlier output from the pool.
 @[export: 'vinix_net_random_bytes']
-fn net_random_bytes(out voidptr, length usize) {
+fn net_random_bytes(out voidptr, length uint) {
 	mut remaining := length
-	mut target := usize(out)
+	mut target := uint(out)
 	for remaining != 0 {
 		if net_pool_left == 0 {
 			net_refill()
 		}
 		take := if remaining < net_pool_left { remaining } else { net_pool_left }
 		unsafe {
-			from := &net_pool[usize(net_pool.len) - net_pool_left]
+			from := &net_pool[uint(net_pool.len) - net_pool_left]
 			C.memcpy(voidptr(target), from, take)
 			C.vinix_explicit_bzero(from, take)
 		}
@@ -141,9 +141,9 @@ fn net_ip_randomid() u16 {
 // under a secret key. Hash all address bytes; the tuple length separates
 // IPv4 and IPv6. Preserve the C bridge's raw address/port byte order.
 fn net_tuple_isn(now_ns u64, local voidptr, local_port u16, remote voidptr,
-	remote_port u16, length usize) u32 {
+	remote_port u16, length uint) u32 {
 	if !net_isn_keyed {
-		net_random_bytes(unsafe { &net_isn_key[0] }, usize(net_isn_key.len))
+		net_random_bytes(unsafe { &net_isn_key[0] }, uint(net_isn_key.len))
 		net_isn_keyed = true
 	}
 	mut tuple := [36]u8{}
@@ -178,7 +178,7 @@ fn net_tcp_isn_bytes(local voidptr, local_port u16, remote voidptr,
 		return 0
 	}
 	return net_tuple_isn(C.time__monotonic_ns(), local, local_port, remote,
-		remote_port, usize(length))
+		remote_port, uint(length))
 }
 
 @[export: 'vinix_tcp_isn6_at']
@@ -250,7 +250,7 @@ fn (mut state NetSipState) round() {
 // SipHash-2-4 (Aumasson and Bernstein), with a 64-bit result and borrowed
 // buffers. Unaligned input and the final short block use byte loads only.
 @[export: 'vinix_siphash24']
-fn net_siphash24(key &u8, data voidptr, length usize) u64 {
+fn net_siphash24(key &u8, data voidptr, length uint) u64 {
 	k0 := net_load64(key)
 	k1 := net_load64(unsafe { key + 8 })
 	mut state := NetSipState{
@@ -260,8 +260,8 @@ fn net_siphash24(key &u8, data voidptr, length usize) u64 {
 		v3: u64(0x7465646279746573) ^ k1
 	}
 	input := unsafe { &u8(data) }
-	whole := length & ~usize(7)
-	for at := usize(0); at < whole; at += 8 {
+	whole := length & ~uint(7)
+	for at := uint(0); at < whole; at += 8 {
 		word := net_load64(unsafe { input + at })
 		state.v3 ^= word
 		state.round()
@@ -269,7 +269,7 @@ fn net_siphash24(key &u8, data voidptr, length usize) u64 {
 		state.v0 ^= word
 	}
 	mut last := u64(length) << 56
-	for i := usize(0); i < length & 7; i++ {
+	for i := uint(0); i < length & 7; i++ {
 		last |= unsafe { u64(input[whole + i]) } << (8 * i)
 	}
 	state.v3 ^= last

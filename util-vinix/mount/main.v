@@ -4,7 +4,7 @@ import os
 
 #include <sys/mount.h>
 
-fn C.mount(source &char, target &char, filesystem &char, flags usize, data voidptr) i32
+fn C.mount(source &char, target &char, filesystem &char, flags uint, data voidptr) i32
 
 fn main() {
 	// Get command line options, and set defaults.

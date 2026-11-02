@@ -31,7 +31,7 @@ struct C.ww_class {
 }
 
 struct C.ww_acquire_ctx {
-	stamp    usize
+	stamp    uint
 	acquired u32
 	wounded  u16
 }
@@ -59,15 +59,15 @@ fn C.vinix_linuxkpi_may_sleep() bool
 fn C.cond_resched() i32
 fn C.msleep(u32)
 fn C.vinix_linuxkpi_task_queued(voidptr) bool
-fn C.time_after_eq(usize, usize) bool
+fn C.time_after_eq(uint, uint) bool
 fn C.__atomic_load_n(&u32, i32) u32
 
 @[c: '__atomic_load_n']
 fn C.ww_load_short(&u16, i32) u16
 
 fn C.READ_ONCE(&C.ww_acquire_ctx) &C.ww_acquire_ctx
-fn C.atomic_long_set(&C.atomic_long_t, isize)
-fn C.atomic_long_read(&C.atomic_long_t) isize
+fn C.atomic_long_set(&C.atomic_long_t, int)
+fn C.atomic_long_read(&C.atomic_long_t) int
 fn C.ww_mutex_init(&C.ww_mutex, &C.ww_class)
 fn C.ww_mutex_destroy(&C.ww_mutex)
 fn C.ww_mutex_is_locked(&C.ww_mutex) bool
@@ -83,11 +83,11 @@ fn C.init_completion(&C.completion)
 fn C.complete(&C.completion)
 fn C.complete_all(&C.completion)
 fn C.wait_for_completion(&C.completion)
-fn C.wait_for_completion_timeout(&C.completion, usize) usize
+fn C.wait_for_completion_timeout(&C.completion, uint) uint
 fn C.completion_done(&C.completion) bool
 fn C.vinix_linuxkpi_test_task_signal(voidptr, u64)
-fn C.raw_spin_lock_irqsave(&C.raw_spinlock_t, usize)
-fn C.raw_spin_unlock_irqrestore(&C.raw_spinlock_t, usize)
+fn C.raw_spin_lock_irqsave(&C.raw_spinlock_t, uint)
+fn C.raw_spin_unlock_irqrestore(&C.raw_spinlock_t, uint)
 fn C.list_empty(&C.list_head) bool
 fn C.BUG_ON(bool)
 fn C.kprintf(&char, ...) i32
@@ -96,7 +96,7 @@ fn C.kprintf(&char, ...) i32
 __global C.current &C.task_struct
 
 @[c_extern]
-__global C.jiffies usize
+__global C.jiffies uint
 
 @[c_extern]
 __global C.TASK_DEAD u32
@@ -142,7 +142,7 @@ mut:
 	task        &C.task_struct = unsafe { nil }
 	worker_id   C.pthread_t
 	operation   Operation
-	stamp       usize
+	stamp       uint
 	lock_result i32
 	result      i32
 	started     bool
@@ -250,7 +250,7 @@ pub fn worker(argument voidptr) voidptr {
 			} else {
 				test.lock_result = C.ww_mutex_lock(&test.locks[0], nil)
 			}
-			expected_context := if test.use_context { usize(&ctx) } else { usize(0) }
+			expected_context := if test.use_context { uint(&ctx) } else { uint(0) }
 			if test.lock_result == 0 { held[0] = true }
 			if test.operation == .interrupt {
 				C.vinix_linuxkpi_test_task_signal(test.task.vinix_thread, 0)
@@ -258,7 +258,7 @@ pub fn worker(argument voidptr) voidptr {
 					test.result = -C.EIO
 				}
 			} else if test.lock_result != 0 || (test.use_context && ctx.acquired != 1)
-				|| usize(C.READ_ONCE(test.locks[0].ctx)) != expected_context {
+				|| uint(C.READ_ONCE(test.locks[0].ctx)) != expected_context {
 				test.result = -C.EIO
 			}
 		}
@@ -319,7 +319,7 @@ fn finish(test &NativeWwTest) i32 {
 	}
 }
 
-fn inversion_body(test &NativeWwTest, ctx &C.ww_acquire_ctx, held &bool, wait_die bool, stamp usize) i32 {
+fn inversion_body(test &NativeWwTest, ctx &C.ww_acquire_ctx, held &bool, wait_die bool, stamp uint) i32 {
 	unsafe {
 		mut result := i32(0)
 		if C.ww_mutex_lock(&test.locks[0], ctx) != 0 { return -C.EIO }
@@ -329,7 +329,7 @@ fn inversion_body(test &NativeWwTest, ctx &C.ww_acquire_ctx, held &bool, wait_di
 			held[2] = true
 		}
 		if start(test) != 0 { return -C.EIO }
-		if isize(test.stamp - stamp) <= 0 { result = -C.EIO }
+		if int(test.stamp - stamp) <= 0 { result = -C.EIO }
 		C.complete(&test.go)
 		if !wait_die && parked(test.task, C.TASK_UNINTERRUPTIBLE) != 0 { result = -C.EIO }
 		if C.ww_mutex_lock(&test.locks[1], ctx) != 0 { return -C.EIO }
@@ -371,7 +371,7 @@ fn first_body(test &NativeWwTest, ctx &C.ww_acquire_ctx, held &bool, wait_die bo
 			return -C.EIO
 		}
 		if !wait_die { C.ww_acquire_init(ctx, &test.class) }
-		age := isize(test.stamp - ctx.stamp)
+		age := int(test.stamp - ctx.stamp)
 		age_bad := if wait_die { age <= 0 } else { age >= 0 }
 		if age_bad { result = -C.EIO }
 		if C.ww_mutex_lock(&test.locks[0], ctx) != 0 { return -C.EIO }
@@ -414,9 +414,9 @@ fn single_body(test &NativeWwTest, held &bool, interruptible bool) i32 {
 			if C.wait_for_completion_timeout(&test.done, 500) == 0 || test.lock_result != -C.EINTR {
 				result = -C.EIO
 			}
-			mut flags := usize(0)
+			mut flags := uint(0)
 			C.raw_spin_lock_irqsave(&test.locks[0].base.wait_lock, flags)
-			if !C.list_empty(&test.locks[0].base.wait_list) || C.atomic_long_read(&test.locks[0].base.owner) != isize(usize(C.current)) {
+			if !C.list_empty(&test.locks[0].base.wait_list) || C.atomic_long_read(&test.locks[0].base.owner) != int(uint(C.current)) {
 				result = -C.EIO
 			}
 			C.raw_spin_unlock_irqrestore(&test.locks[0].base.wait_lock, flags)
@@ -463,7 +463,7 @@ fn repeated() i32 {
 			if !C.ww_mutex_trylock(&b, &ctx) {
 				result = -C.EIO
 			} else {
-				if ctx.acquired != 2 || usize(a.ctx) != usize(&ctx) || usize(b.ctx) != usize(&ctx) {
+				if ctx.acquired != 2 || uint(a.ctx) != uint(&ctx) || uint(b.ctx) != uint(&ctx) {
 					result = -C.EIO
 				}
 				C.ww_acquire_done(&ctx)

@@ -32,13 +32,13 @@ fn C.up_read(&C.rw_semaphore)
 fn C.up_read_non_owner(&C.rw_semaphore)
 fn C.up_write(&C.rw_semaphore)
 fn C.downgrade_write(&C.rw_semaphore)
-fn C.atomic_long_read(&C.atomic_long_t) isize
-fn C.raw_spin_lock_irqsave(&C.raw_spinlock_t, usize)
-fn C.raw_spin_unlock_irqrestore(&C.raw_spinlock_t, usize)
+fn C.atomic_long_read(&C.atomic_long_t) int
+fn C.raw_spin_lock_irqsave(&C.raw_spinlock_t, uint)
+fn C.raw_spin_unlock_irqrestore(&C.raw_spinlock_t, uint)
 fn C.init_completion(&C.completion)
 fn C.complete_all(&C.completion)
 fn C.wait_for_completion(&C.completion)
-fn C.kzalloc(usize, u32) voidptr
+fn C.kzalloc(uint, u32) voidptr
 fn C.kfree(voidptr)
 @[c_extern]
 __global C.vinix_rwsem_fixture_static C.rw_semaphore
@@ -91,7 +91,7 @@ pub fn downgrade(storage voidptr) { unsafe { C.downgrade_write(&C.rw_semaphore(s
 pub fn value(storage voidptr, field u32) i64 {
 	unsafe {
 		sem := &C.rw_semaphore(storage)
-		mut flags := usize(0)
+		mut flags := uint(0)
 		C.raw_spin_lock_irqsave(&sem.wait_lock, flags)
 		mut result := i64(0)
 		if field == 0 { result = C.atomic_long_read(&sem.count) }

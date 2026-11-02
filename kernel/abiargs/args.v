@@ -26,7 +26,7 @@ fn slot(cursor voidptr) voidptr {
 		if C.VINIX_VA_ABI == 1 {
 			stack := &voidptr(cursor)
 			address := *stack
-			*stack = voidptr(usize(*stack) + 8)
+			*stack = voidptr(uint(*stack) + 8)
 			return address
 		}
 		if C.VINIX_VA_ABI == 2 {
@@ -35,20 +35,20 @@ fn slot(cursor voidptr) voidptr {
 			if offset < 0 {
 				list.gr_offs = offset + 8
 				if list.gr_offs <= 0 {
-					return voidptr(usize(list.gr_top) + usize(i64(offset)))
+					return voidptr(uint(list.gr_top) + uint(i64(offset)))
 				}
 			}
-			stack := usize(list.stack)
+			stack := uint(list.stack)
 			list.stack = voidptr(stack + 8)
 			return voidptr(stack)
 		}
 		list := &C.vinix_va_sysv64(cursor)
 		if list.gp_offset < 48 {
-			address := usize(list.reg_save_area) + usize(list.gp_offset)
+			address := uint(list.reg_save_area) + uint(list.gp_offset)
 			list.gp_offset += 8
 			return voidptr(address)
 		}
-		stack := usize(list.overflow_arg_area)
+		stack := uint(list.overflow_arg_area)
 		list.overflow_arg_area = voidptr(stack + 8)
 		return voidptr(stack)
 	}
@@ -70,7 +70,7 @@ pub fn parameter(args voidptr, local &voidptr) voidptr {
 	}
 }
 
-pub fn native_size() usize {
+pub fn native_size() uint {
 	if C.VINIX_VA_ABI == 1 { return sizeof(voidptr) }
 	if C.VINIX_VA_ABI == 2 { return sizeof(C.vinix_va_aapcs64) }
 	return sizeof(C.vinix_va_sysv64)

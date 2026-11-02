@@ -11,7 +11,7 @@ fn native_nocache_from_user(destination voidptr, source voidptr, length u32) u32
 
 fn nocache_native_selftest() bool {
 	return usercopy.nocache_selftest()
-		&& compatcore.nocache_from_user(unsafe { nil }, voidptr(usize(-1)), 0) == 0
-		&& compatcore.nocache_from_user(unsafe { nil }, voidptr(usize(-1)), u32(-1)) == -1
-		&& compatcore.nocache_from_user(unsafe { nil }, voidptr(usize(-1)), 8) == 8
+		&& compatcore.nocache_from_user(unsafe { nil }, voidptr(uint(-1)), 0) == 0
+		&& compatcore.nocache_from_user(unsafe { nil }, voidptr(uint(-1)), u32(-1)) == -1
+		&& compatcore.nocache_from_user(unsafe { nil }, voidptr(uint(-1)), 8) == 8
 }

@@ -281,7 +281,7 @@ fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) bool {
 			unsafe { full_name.free() }
 		}
 		current_header = unsafe {
-			&USTARHeader(usize(current_header) + usize(512) + usize(lib.align_up(size, 512)))
+			&USTARHeader(uint(current_header) + uint(512) + uint(lib.align_up(size, 512)))
 		}
 	}
 
@@ -418,7 +418,7 @@ fn archive_image_id(address voidptr, archive_size u64) string {
 			}
 			return unsafe { tos(text, length) }.clone()
 		}
-		header = unsafe { &USTARHeader(usize(header) + usize(512) + usize(lib.align_up(size, 512))) }
+		header = unsafe { &USTARHeader(uint(header) + uint(512) + uint(lib.align_up(size, 512))) }
 	}
 	return ''
 }

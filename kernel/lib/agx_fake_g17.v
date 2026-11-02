@@ -110,36 +110,36 @@ fn g17_range_allowed(address u64, size u64, access u32, ranges &C.vinix_fake_g17
 }
 
 @[export: 'vinix_fake_g17_expected_write_size']
-fn fake_g17_expected_write_size() usize { return sizeof(C.vinix_fake_g17_expected_write) }
+fn fake_g17_expected_write_size() uint { return sizeof(C.vinix_fake_g17_expected_write) }
 
 @[export: 'vinix_fake_g17_address_range_size']
-fn fake_g17_address_range_size() usize { return sizeof(C.vinix_fake_g17_address_range) }
+fn fake_g17_address_range_size() uint { return sizeof(C.vinix_fake_g17_address_range) }
 
 @[export: 'vinix_fake_g17_resource_reference_size']
-fn fake_g17_resource_reference_size() usize { return sizeof(C.vinix_fake_g17_resource_reference) }
+fn fake_g17_resource_reference_size() uint { return sizeof(C.vinix_fake_g17_resource_reference) }
 
 @[export: 'vinix_fake_g17_report_size']
-fn fake_g17_report_size() usize { return sizeof(C.vinix_fake_g17_report) }
+fn fake_g17_report_size() uint { return sizeof(C.vinix_fake_g17_report) }
 
 @[export: 'vinix_fake_g17_verify']
-fn fake_g17_verify(command_pointer voidptr, command_bytes usize, descriptor_pointer voidptr, descriptor_bytes usize,
+fn fake_g17_verify(command_pointer voidptr, command_bytes uint, descriptor_pointer voidptr, descriptor_bytes uint,
 	command_gpu_address u64, writes &C.vinix_fake_g17_expected_write, write_count u32,
 	ranges &C.vinix_fake_g17_address_range, range_count u32,
 	resources &C.vinix_fake_g17_resource_reference, resource_count u32, report &C.vinix_fake_g17_report) i32 {
 	unsafe {
 		command := &u8(command_pointer)
 		descriptor := &u8(descriptor_pointer)
-		if usize(report) == 0 { return C.VINIX_FAKE_G17_INVALID_ARGUMENT }
+		if uint(report) == 0 { return C.VINIX_FAKE_G17_INVALID_ARGUMENT }
 		*report = C.vinix_fake_g17_report{ expected_writes: write_count }
-		if usize(command) == 0 || usize(descriptor) == 0 || command_gpu_address == 0
-			|| (write_count != 0 && usize(writes) == 0) || (range_count != 0 && usize(ranges) == 0)
-			|| (resource_count != 0 && usize(resources) == 0) {
+		if uint(command) == 0 || uint(descriptor) == 0 || command_gpu_address == 0
+			|| (write_count != 0 && uint(writes) == 0) || (range_count != 0 && uint(ranges) == 0)
+			|| (resource_count != 0 && uint(resources) == 0) {
 			return g17_fail(report, C.VINIX_FAKE_G17_INVALID_ARGUMENT, 0, 0, 0, 0)
 		}
-		if command_bytes < usize(C.VINIX_FAKE_G17_COMMAND_BYTES) {
+		if command_bytes < uint(C.VINIX_FAKE_G17_COMMAND_BYTES) {
 			return g17_fail(report, C.VINIX_FAKE_G17_COMMAND_TOO_SMALL, 0, 0, u64(command_bytes), C.VINIX_FAKE_G17_COMMAND_BYTES)
 		}
-		if descriptor_bytes < usize(C.VINIX_FAKE_G17_DESCRIPTOR_BYTES) {
+		if descriptor_bytes < uint(C.VINIX_FAKE_G17_DESCRIPTOR_BYTES) {
 			return g17_fail(report, C.VINIX_FAKE_G17_DESCRIPTOR_TOO_SMALL, 0, 0, u64(descriptor_bytes), C.VINIX_FAKE_G17_DESCRIPTOR_BYTES)
 		}
 		for pass := u32(0); pass < resource_count; pass++ {
@@ -148,8 +148,8 @@ fn fake_g17_verify(command_pointer voidptr, command_bytes usize, descriptor_poin
 			bad_member := if pending {
 				item.descriptor_bytes != 0
 			} else {
-				item.descriptor_bytes != 8 || usize(item.descriptor_member) > descriptor_bytes
-					|| usize(item.descriptor_bytes) > descriptor_bytes - usize(item.descriptor_member)
+				item.descriptor_bytes != 8 || uint(item.descriptor_member) > descriptor_bytes
+					|| uint(item.descriptor_bytes) > descriptor_bytes - uint(item.descriptor_member)
 			}
 			if item.reserved != 0 || item.field >= u32(C.VINIX_FAKE_G17_RESOURCE_FIELD_COUNT)
 				|| (item.provenance != u32(C.VINIX_FAKE_G17_PROVENANCE_BO_RESOURCE) && item.provenance != u32(C.VINIX_FAKE_G17_PROVENANCE_GPU_VA))
@@ -165,9 +165,9 @@ fn fake_g17_verify(command_pointer voidptr, command_bytes usize, descriptor_poin
 		}
 		mut observed := u32(0)
 		for pass := u32(0); pass < u32(C.VINIX_FAKE_G17_REGISTER_PASSES); pass++ {
-			stream_offset := usize(pass) * usize(C.VINIX_FAKE_G17_REGISTER_STRIDE) + usize(C.VINIX_FAKE_G17_STREAM_OFFSET)
-			metadata_offset := usize(pass) * usize(C.VINIX_FAKE_G17_REGISTER_STRIDE) + usize(C.VINIX_FAKE_G17_METADATA_OFFSET)
-			summary_offset := usize(C.VINIX_FAKE_G17_SUMMARY_OFFSET) + usize(pass) * usize(C.VINIX_FAKE_G17_SUMMARY_STRIDE)
+			stream_offset := uint(pass) * uint(C.VINIX_FAKE_G17_REGISTER_STRIDE) + uint(C.VINIX_FAKE_G17_STREAM_OFFSET)
+			metadata_offset := uint(pass) * uint(C.VINIX_FAKE_G17_REGISTER_STRIDE) + uint(C.VINIX_FAKE_G17_METADATA_OFFSET)
+			summary_offset := uint(C.VINIX_FAKE_G17_SUMMARY_OFFSET) + uint(pass) * uint(C.VINIX_FAKE_G17_SUMMARY_STRIDE)
 			metadata := command + metadata_offset
 			summary := descriptor + summary_offset
 			stream_gpu := g17_read_le64(metadata)
@@ -193,7 +193,7 @@ fn fake_g17_verify(command_pointer voidptr, command_bytes usize, descriptor_poin
 			}
 			for entry := u32(0); entry < u32(entry_count); entry++ {
 				golden := &writes[observed]
-				encoded := command + stream_offset + usize(entry) * usize(C.VINIX_FAKE_G17_ENTRY_BYTES)
+				encoded := command + stream_offset + uint(entry) * uint(C.VINIX_FAKE_G17_ENTRY_BYTES)
 				word := g17_read_le32(encoded)
 				selector := word & u32(C.VINIX_FAKE_G17_SELECTOR_FIELD)
 				mode := word & u32(C.VINIX_FAKE_G17_MODE_FIELD)

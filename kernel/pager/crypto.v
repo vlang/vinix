@@ -67,7 +67,7 @@ pub fn authenticate(key &[32]u8, data &u8, length int, workspace &u8, output &[3
 	for i in 0 .. 64 {
 		unsafe { workspace[i] = (if i < 32 { key[i] } else { u8(0) }) ^ u8(0x36) }
 	}
-	unsafe { C.memcpy(&workspace[64], data, usize(length)) }
+	unsafe { C.memcpy(&workspace[64], data, uint(length)) }
 	mut inner := [32]u8{}
 	krandom.sha256_digest(workspace, u64(length + 64), unsafe { &inner })
 	mut outer := [96]u8{}
@@ -76,7 +76,7 @@ pub fn authenticate(key &[32]u8, data &u8, length int, workspace &u8, output &[3
 	krandom.sha256_digest(&outer[0], 96, output)
 	krandom.explicit_bzero(&inner[0], sizeof(inner))
 	krandom.explicit_bzero(&outer[0], sizeof(outer))
-	krandom.explicit_bzero(workspace, usize(length + 64))
+	krandom.explicit_bzero(workspace, uint(length + 64))
 }
 
 fn valid_tag(left &[32]u8, right &[32]u8) bool {

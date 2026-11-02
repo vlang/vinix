@@ -42,7 +42,7 @@ fn irqwork_flags_valid(flags u32) bool {
 		&& ((flags & 1) == 0 || (flags & 2) != 0)
 }
 fn irqwork_valid_head(storage voidptr) {
-	require(!is_null(storage) && usize(storage) % sizeof(voidptr) == 0)
+	require(!is_null(storage) && uint(storage) % sizeof(voidptr) == 0)
 }
 fn irqwork_sleepable_context() bool {
 	return C.vinix_linuxkpi_may_sleep() && C.vinix_linuxkpi_smp_task_present()
@@ -95,7 +95,7 @@ pub fn irq_work_queue(storage voidptr, requested i32) bool {
 		work := &C.vkiw_work(storage)
 		lock_flags := C.vkp_spin_lock_irqsave(&vkiw_guard)
 		flags := C.vkiw_load32(&work.flags, 0)
-		require(irqwork_flags_valid(flags) && usize(voidptr(work.func)) >= 4096)
+		require(irqwork_flags_valid(flags) && uint(voidptr(work.func)) >= 4096)
 		old := C.vkiw_or32(&work.flags, 0x23, 5)
 		if (old & 1) != 0 {
 			C.vkp_spin_unlock_irqrestore(&vkiw_guard, lock_flags)
@@ -130,7 +130,7 @@ pub fn irq_work_single(storage voidptr) {
 		lock_flags := C.vkp_spin_lock_irqsave(&vkiw_guard)
 		old := C.vkiw_load32(&work.flags, 0)
 		require(irqwork_flags_valid(old) && (old & 0x23) == 0x23
-			&& usize(voidptr(work.func)) >= 4096)
+			&& uint(voidptr(work.func)) >= 4096)
 		callback := work.func
 		flags := old & ~u32(1)
 		run.next = vkiw_running_head
@@ -150,7 +150,7 @@ pub fn irq_work_single(storage voidptr) {
 		C.vkiw_compare32(&work.flags, &expected, flags & ~u32(2), 5, 0)
 		mut previous := &IrqWorkRun(nil)
 		mut observed := vkiw_running_head
-		for !is_null(observed) && usize(observed) != usize(record) {
+		for !is_null(observed) && uint(observed) != uint(record) {
 			previous = observed
 			observed = observed.next
 		}

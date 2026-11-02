@@ -14,10 +14,10 @@ module compatcore
 // *Copyright (C) 1991, 1992 Linus Torvalds
 //
 
-pub fn memchr(s voidptr, c i32, n usize) voidptr {
+pub fn memchr(s voidptr, c i32, n uint) voidptr {
 	unsafe {
 		bytes := &u8(s)
-		for i := usize(0); i < n; i++ {
+		for i := uint(0); i < n; i++ {
 			if i32(bytes[i]) == i32(u8(c)) {
 				return voidptr((bytes + i))
 			}
@@ -26,10 +26,10 @@ pub fn memchr(s voidptr, c i32, n usize) voidptr {
 	}
 }
 
-pub fn memchr_inv(s voidptr, c i32, n usize) voidptr {
+pub fn memchr_inv(s voidptr, c i32, n uint) voidptr {
 	unsafe {
 		bytes := &u8(s)
-		for i := usize(0); i < n; i++ {
+		for i := uint(0); i < n; i++ {
 			if i32(bytes[i]) != i32(u8(c)) {
 				return voidptr((bytes + i))
 			}
@@ -38,52 +38,52 @@ pub fn memchr_inv(s voidptr, c i32, n usize) voidptr {
 	}
 }
 
-pub fn strnlen(s &char, n usize) usize {
+pub fn strnlen(s &char, n uint) uint {
 	unsafe {
-		len := usize(0)
+		len := uint(0)
 		for len < n && i32(s[len]) {
 			len++
 		}
-		return usize(len)
+		return uint(len)
 	}
 }
 
 @[export: 'strscpy']
-pub fn strscpy(dest &char, src &char, count usize) isize {
+pub fn strscpy(dest &char, src &char, count uint) int {
 	unsafe {
-		if !count || count > usize(2147483647) {
-			return isize(-7)
+		if !count || count > uint(2147483647) {
+			return int(-7)
 		}
-		for i := usize(0); i < count; i++ {
+		for i := uint(0); i < count; i++ {
 			c := src[i]
 			dest[i] = c
 			if !c {
-				return isize(isize(i))
+				return int(int(i))
 			}
 		}
-		dest[count - usize(1)] = i8(`\0`)
-		return isize(-7)
+		dest[count - uint(1)] = i8(`\0`)
+		return int(-7)
 	}
 }
 
 @[export: 'strscpy_pad']
-pub fn strscpy_pad(dest &char, src &char, count usize) isize {
+pub fn strscpy_pad(dest &char, src &char, count uint) int {
 	unsafe {
 		len := strscpy(dest, src, count)
-		if len >= isize(0) {
-			C.memset(voidptr(dest + len + 1), 0, count - usize(len) - usize(1))
+		if len >= int(0) {
+			C.memset(voidptr(dest + len + 1), 0, count - uint(len) - uint(1))
 		}
-		return isize(len)
+		return int(len)
 	}
 }
 
 @[export: 'kmemdup_nul']
-pub fn kmemdup_nul(s &char, n usize, flags u32) &char {
+pub fn kmemdup_nul(s &char, n uint, flags u32) &char {
 	unsafe {
-		if n == usize(-1) {
+		if n == uint(-1) {
 			return nil
 		}
-		copy := &char(C.kmalloc(n + usize(1), flags))
+		copy := &char(C.kmalloc(n + uint(1), flags))
 		if is_null(copy) {
 			return nil
 		}
@@ -96,7 +96,7 @@ pub fn kmemdup_nul(s &char, n usize, flags u32) &char {
 }
 
 @[export: 'kstrndup']
-pub fn kstrndup(s &char, max usize, flags u32) &char {
+pub fn kstrndup(s &char, max uint, flags u32) &char {
 	unsafe {
 		return if s { kmemdup_nul(s, strnlen(s, max), flags) } else { &char(nil) }
 	}
@@ -105,7 +105,7 @@ pub fn kstrndup(s &char, max usize, flags u32) &char {
 @[export: 'kstrdup']
 pub fn kstrdup(s &char, flags u32) &char {
 	unsafe {
-		return kstrndup(s, usize(-1), flags)
+		return kstrndup(s, uint(-1), flags)
 	}
 }
 
@@ -133,11 +133,11 @@ pub fn sysfs_streq(s1 &char, s2 &char) bool {
 }
 
 @[export: 'match_string']
-pub fn match_string(array &&char, n usize, string_ &char) i32 {
+pub fn match_string(array &&char, n uint, string_ &char) i32 {
 	unsafe {
 		// The explicit cast preserves Linux's usual conversion in index < n.
 
-		for index := i32(0); usize(index) < n; index++ {
+		for index := i32(0); uint(index) < n; index++ {
 			item := array[index]
 			if is_null(item) {
 				break
@@ -151,9 +151,9 @@ pub fn match_string(array &&char, n usize, string_ &char) i32 {
 }
 
 @[export: '__sysfs_match_string']
-pub fn sysfs_match_string(array &&char, n usize, str &char) i32 {
+pub fn sysfs_match_string(array &&char, n uint, str &char) i32 {
 	unsafe {
-		for index := i32(0); usize(index) < n; index++ {
+		for index := i32(0); uint(index) < n; index++ {
 			item := array[index]
 			if is_null(item) {
 				break
@@ -204,9 +204,9 @@ pub fn strpbrk(cs &char, ct &char) &char {
 pub fn strsep(s &&char, ct &char) &char {
 	unsafe {
 		sbegin := *s
-		if usize(sbegin) == 0 { return nil }
+		if uint(sbegin) == 0 { return nil }
 		mut end := strpbrk(sbegin, ct)
-		if usize(end) != 0 {
+		if uint(end) != 0 {
 			*end = 0
 			end += 1
 		}
@@ -227,7 +227,7 @@ pub fn skip_spaces(str &char) &char {
 @[export: 'strim']
 pub fn strim(s &char) &char {
 	unsafe {
-		size := usize(0)
+		size := uint(0)
 		end := &char(0)
 		size = C.strlen(s)
 		if !size {
@@ -237,7 +237,7 @@ pub fn strim(s &char) &char {
 		//	 *returned pointer and byte mutations while staying within the string.
 
 		end = s + size
-		for usize(end) > usize(s) && native_isspace(i32(end[-1])) {
+		for uint(end) > uint(s) && native_isspace(i32(end[-1])) {
 			end += -1
 		}
 		*end = i8(`\0`)
@@ -254,17 +254,17 @@ struct C.vks_const_char {}
 struct C.vks_const_void {}
 
 @[export: 'memchr']
-pub fn native_memchr(s &C.vks_const_void, c i32, n usize) voidptr {
+pub fn native_memchr(s &C.vks_const_void, c i32, n uint) voidptr {
  return unsafe { memchr(voidptr(s), c, n) }
 }
 
 @[export: 'memchr_inv']
-pub fn native_memchr_inv(s &C.vks_const_void, c i32, n usize) voidptr {
+pub fn native_memchr_inv(s &C.vks_const_void, c i32, n uint) voidptr {
  return unsafe { memchr_inv(voidptr(s), c, n) }
 }
 
 @[export: 'strnlen']
-pub fn native_strnlen(s &C.vks_const_char, n usize) usize {
+pub fn native_strnlen(s &C.vks_const_char, n uint) uint {
  return unsafe { strnlen(&char(s), n) }
 }
 

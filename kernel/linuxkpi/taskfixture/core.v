@@ -85,14 +85,14 @@ pub fn worker(argument voidptr) voidptr {
 			for C.__atomic_load_n(&test.phase, 2) < 2 { C.cond_resched() }
 		}
 		C.schedule()
-		test.result = if C.task_is_running(task) && usize(C.current) == usize(task)
+		test.result = if C.task_is_running(task) && uint(C.current) == uint(task)
 			&& (C.__atomic_load_n(&task.flags, 0) & task_test_flags) == task_test_flags {
 			i32(0)
 		} else {
 			-C.EIO
 		}
 		C.__atomic_store_n(&test.phase, 3, 3)
-		C.pthread_exit(voidptr(usize(0x1234)))
+		C.pthread_exit(voidptr(uint(0x1234)))
 		return nil
 	}
 }
@@ -126,7 +126,7 @@ pub fn selftest() i32 {
 			} else {
 				mut value := voidptr(nil)
 				C.BUG_ON(C.pthread_join(worker_id, &value) != 0)
-				if usize(value) != usize(0x1234) { result = -C.EIO }
+				if uint(value) != uint(0x1234) { result = -C.EIO }
 			}
 			if test.result != 0 { result = -C.EIO }
 			for !C.vinix_linuxkpi_task_is_dead(held[i].vinix_thread) { C.cond_resched() }
@@ -137,7 +137,7 @@ pub fn selftest() i32 {
 			for C.__atomic_load_n(&held[i].__state, 2) != C.TASK_DEAD { C.cond_resched() }
 			expected := task_test_flags | C.PF_EXITING
 			if (C.__atomic_load_n(&held[i].flags, 0) & expected) != expected { result = -C.EIO }
-			if usize(C.get_task_struct(held[i])) != usize(held[i]) { result = -C.EIO }
+			if uint(C.get_task_struct(held[i])) != uint(held[i]) { result = -C.EIO }
 			C.put_task_struct(held[i])
 			C.put_task_struct(held[i])
 		}

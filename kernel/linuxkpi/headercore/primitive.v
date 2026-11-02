@@ -29,7 +29,7 @@ struct C.vhp_const_voidp {}
 
 struct C.kmem_cache {}
 
-fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
 
 @[c: '__atomic_load_n']
 fn C.vhp_load32(&i32, i32) i32
@@ -106,9 +106,9 @@ fn C.vhp_store_unsigned(&u32, u32, i32)
 @[c: '__atomic_compare_exchange_n']
 fn C.vhp_compare_unsigned(&u32, &u32, u32, bool, i32, i32) bool
 
-fn C.vinix_linuxkpi_irq_save() usize
-fn C.vinix_linuxkpi_irq_flags() usize
-fn C.vinix_linuxkpi_irq_restore(usize)
+fn C.vinix_linuxkpi_irq_save() uint
+fn C.vinix_linuxkpi_irq_flags() uint
+fn C.vinix_linuxkpi_irq_restore(uint)
 fn C.vinix_linuxkpi_preempt_disable()
 fn C.vinix_linuxkpi_preempt_enable()
 fn C.vinix_linuxkpi_spin_wait()
@@ -192,7 +192,7 @@ pub fn spin_lock(guard &C.spinlock_t) {
 // The caller evaluates its lock operand before entering this leaf and stores
 // returned IRQ flags only after acquisition, matching the original wrapper.
 @[export: 'vinix_spin_lock_irqsave_nested_native']
-pub fn spin_lock_irqsave_nested(guard &C.spinlock_t) usize {
+pub fn spin_lock_irqsave_nested(guard &C.spinlock_t) uint {
 	flags := C.vinix_linuxkpi_irq_save()
 	spin_lock(guard)
 	return flags
@@ -227,7 +227,7 @@ pub fn spin_lock_irq(guard &C.spinlock_t) {
 @[export: 'spin_unlock_irq']
 pub fn spin_unlock_irq(guard &C.spinlock_t) {
 	spin_unlock(guard)
-	C.vinix_linuxkpi_irq_restore(usize(1) << 9)
+	C.vinix_linuxkpi_irq_restore(uint(1) << 9)
 }
 
 @[export: 'irqs_disabled']
@@ -236,8 +236,8 @@ pub fn irqs_disabled() bool {
 }
 
 @[export: 'irqs_disabled_flags']
-pub fn irqs_disabled_flags(flags usize) bool {
-	return (flags & (usize(1) << 9)) == 0
+pub fn irqs_disabled_flags(flags uint) bool {
+	return (flags & (uint(1) << 9)) == 0
 }
 
 @[export: 'vinix_local_irq_disable']
@@ -245,7 +245,7 @@ pub fn irq_disable() { C.vinix_linuxkpi_irq_save() }
 
 @[export: 'vinix_local_irq_enable']
 pub fn irq_enable() {
-	C.vinix_linuxkpi_irq_restore(usize(1) << 9)
+	C.vinix_linuxkpi_irq_restore(uint(1) << 9)
 }
 
 @[export: 'cpu_relax']
@@ -317,28 +317,28 @@ pub fn cache_zalloc(cache &C.kmem_cache, flags u32) voidptr {
 }
 
 @[export: 'array_size']
-pub fn array_size(a usize, b usize) usize {
-	if a != 0 && b > ~usize(0) / a { return ~usize(0) }
+pub fn array_size(a uint, b uint) uint {
+	if a != 0 && b > ~uint(0) / a { return ~uint(0) }
 	return a * b
 }
 
 @[export: 'size_add']
-pub fn size_add(a usize, b usize) usize {
-	if b > ~usize(0) - a { return ~usize(0) }
+pub fn size_add(a uint, b uint) uint {
+	if b > ~uint(0) - a { return ~uint(0) }
 	return a + b
 }
 
 @[export: 'size_mul']
-pub fn size_mul(a usize, b usize) usize { return array_size(a, b) }
+pub fn size_mul(a uint, b uint) uint { return array_size(a, b) }
 
 @[export: 'ERR_PTR']
-pub fn error_pointer(error isize) voidptr {
-	return unsafe { voidptr(usize(error)) }
+pub fn error_pointer(error int) voidptr {
+	return unsafe { voidptr(uint(error)) }
 }
 
 @[export: 'PTR_ERR']
-pub fn pointer_error(p C.vhp_const_voidp) isize {
-	return isize(usize(voidptr(p)))
+pub fn pointer_error(p C.vhp_const_voidp) int {
+	return int(uint(voidptr(p)))
 }
 
 @[export: 'ERR_CAST']
@@ -348,7 +348,7 @@ pub fn error_cast(p C.vhp_const_voidp) voidptr {
 
 @[export: 'IS_ERR']
 pub fn is_error(p C.vhp_const_voidp) bool {
-	return usize(voidptr(p)) >= ~usize(0) - 4094
+	return uint(voidptr(p)) >= ~uint(0) - 4094
 }
 
 @[export: 'IS_ERR_OR_NULL']
@@ -509,11 +509,11 @@ pub fn atomic64_xchg_relaxed(p &C.atomic64_t, value C.vhp_s64) C.vhp_s64 {
 
 // ABI adapters invoke this before evaluating the caller's lock expression.
 @[export: 'vinix_local_irq_save']
-pub fn irq_save() usize {
+pub fn irq_save() uint {
 	return C.vinix_linuxkpi_irq_save()
 }
 
 @[export: 'vinix_local_irq_restore']
-pub fn irq_restore(flags usize) {
+pub fn irq_restore(flags uint) {
 	C.vinix_linuxkpi_irq_restore(flags)
 }

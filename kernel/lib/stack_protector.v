@@ -9,7 +9,7 @@ module lib
 // It must have its placeholder before any V runtime initialization runs.
 @[cinit]
 @[export: '__stack_chk_guard']
-__global stack_chk_guard = usize(0x595e9fbd94fda700)
+__global stack_chk_guard = uint(0x595e9fbd94fda700)
 
 @[noreturn]
 @[export: '__stack_chk_fail']
@@ -34,8 +34,8 @@ fn stack_mix64(value u64) u64 {
 fn stack_guard_init() {
 	mut guard := stack_boot_entropy()
 	// Borrow the address of the stack local without moving it to the heap.
-	guard ^= u64(usize(unsafe { &guard }))
+	guard ^= u64(uint(unsafe { &guard }))
 	guard = stack_mix64(guard ^ u64(stack_chk_guard))
 	// A NUL low byte stops string overflows at the first canary byte.
-	stack_chk_guard = usize(guard & ~u64(0xff))
+	stack_chk_guard = uint(guard & ~u64(0xff))
 }
