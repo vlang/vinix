@@ -1976,6 +1976,105 @@ fn unmanaged_queries_self_test() ! {
  }
 }
 
+fn stats_unavailable_profile() NarrowProfile {
+ context := 'android/app/ContextImpl.smali'
+ return NarrowProfile{
+  name: 'stats-unavailable'
+  baseline_name: 'combined-account-webview-unmanaged-queries-framework-2026-11-02-r1'
+  manifest_pin: 'c54e83fadd83a1e74f2fc8938c5767c190d5783fba5f95fd583aa6432d8c361e'
+  jar_pin: '25500d52cf7c03a2a1c82656c00284c507dbdb03cff546dbc6e5840aa45b5c1c'
+  baseline_classes: 2108
+  providers: ['framework_stats_service.v']
+  calls: {context: 'framework_stats_service_source'}
+  methods: {context: ['getSystemService(Ljava/lang/Class;)Ljava/lang/Object;']}
+  changed: {context: 1}
+  added: {context: 0}
+  class_provider: 'framework_stats_service_classes'
+  extra_classes: ['android/app/StatsManager.smali']
+ }
+}
+
+fn stats_unavailable_guard() string {
+ return 'const-class v0, Landroid/app/StatsManager;\nif-ne p1, v0, :vinix_stats_unavailable_other\nconst/4 v0, 0x0\nreturn-object v0\n:vinix_stats_unavailable_other\n'
+}
+
+fn stats_unavailable_members(before string, after string) ! {
+ signature := 'getSystemService(Ljava/lang/Class;)Ljava/lang/Object;'
+ narrow_method_delta(before, after, [signature], 1, 0)!
+ old := cross_profile_lookup_method(before)!
+ updated := cross_profile_lookup_method(after)!
+ if old.count('\n.registers 3\n') != 1 || old.contains('Landroid/app/StatsManager;') {
+  return error('retained typed lookup required before absent stats guard')
+ }
+ expected := old.replace('\n.registers 3\n', '\n.registers 3\n' + stats_unavailable_guard())
+ if intent_extras_method(updated)! != intent_extras_method(expected)! {
+  return error('stats typed lookup must add only the exact early null guard and preserve all fallback instructions')
+ }
+}
+
+fn stats_unavailable_type_abi(source string) ! {
+ parts := store_parts(source)!
+ if parts.methods.len != 0 || parts.metadata.split_into_lines().map(it.trim_space()).filter(it != '') != [
+  '.class public final Landroid/app/StatsManager;', '.super Ljava/lang/Object;'] {
+  return error('unsupported StatsManager must remain one public final memberless marker without a constructor or backend')
+ }
+}
+
+fn stats_unavailable_self_test() ! {
+ profile := stats_unavailable_profile()
+ context := 'android/app/ContextImpl.smali'
+ marker := 'android/app/StatsManager.smali'
+ signature := 'getSystemService(Ljava/lang/Class;)Ljava/lang/Object;'
+ if profile.name != 'stats-unavailable' || profile.baseline_classes != 2108 || profile.methods != {context: [signature]}
+  || profile.calls != {context: 'framework_stats_service_source'}
+  || profile.providers != ['framework_stats_service.v'] || profile.changed != {context: 1}
+  || profile.added != {context: 0} || profile.fields.len != 0 || profile.directory_provider != ''
+  || profile.extra_classes != [marker] || profile.class_provider != 'framework_stats_service_classes'
+  || profile.baseline_name != 'combined-account-webview-unmanaged-queries-framework-2026-11-02-r1'
+  || profile.manifest_pin != 'c54e83fadd83a1e74f2fc8938c5767c190d5783fba5f95fd583aa6432d8c361e'
+  || profile.jar_pin != '25500d52cf7c03a2a1c82656c00284c507dbdb03cff546dbc6e5840aa45b5c1c' {
+  return error('stats unavailable profile requires one typed lookup guard and one marker class')
+ }
+ narrow_method_self_test([signature], 1, 0)!
+ old := '.method public ' + signature + '\n.registers 3\nconst-class v0, Landroid/content/pm/CrossProfileApps;\nif-ne p1, v0, :cond_6\nconst/4 v0, 0x0\nreturn-object v0\n:cond_6\nconst-class v0, Landroid/service/persistentdata/PersistentDataBlockManager;\nif-ne p1, v0, :cond_c\nconst/4 v0, 0x0\nreturn-object v0\n:cond_c\nconst-class v0, Landroid/net/wifi/rtt/WifiRttManager;\nif-ne p1, v0, :cond_12\nconst/4 v0, 0x0\nreturn-object v0\n:cond_12\ninvoke-direct {p0, p1}, Landroid/app/ContextImpl;->vinixRttFallbackClass(Ljava/lang/Class;)Ljava/lang/Object;\nmove-result-object v0\nreturn-object v0\n.end method\n'
+ raw := old.replace('.registers 3\n', '.registers 3\n' + stats_unavailable_guard())
+ canonical := raw.replace(':cond_12', ':cond_18').replace(':cond_c', ':cond_12').replace(':cond_6', ':cond_c').replace(':vinix_stats_unavailable_other', ':cond_6')
+ stats_unavailable_members(old, raw)!
+ stats_unavailable_members(old, canonical)!
+ stats_unavailable_members(old, raw.replace(':vinix_stats_unavailable_other\nconst-class', ':vinix_stats_unavailable_other\n:alias_fallback\nconst-class').replace('if-ne p1, v0, :vinix_stats_unavailable_other', 'if-ne p1, v0, :alias_fallback'))!
+ for bad in [old, raw.replace('public ' + signature, 'public final ' + signature),
+  raw.replace('.registers 3', '.registers 4'), raw.replace('Landroid/app/StatsManager;', 'Landroid/app/Activity;'),
+  raw.replace('if-ne p1, v0, :vinix_stats_unavailable_other', 'if-eq p1, v0, :vinix_stats_unavailable_other'),
+  raw.replace('if-ne p1, v0, :vinix_stats_unavailable_other', 'if-ne p1, v0, :cond_6'),
+  raw.replace('const/4 v0, 0x0', 'const/4 v0, 0x1'), raw.replace('vinixRttFallbackClass', 'otherFallback'),
+  raw.replace('return-object v0', 'return-object p0'), raw + '.method public extra()V\n.locals 0\nreturn-void\n.end method\n'] {
+  stats_unavailable_members(old, bad) or { continue }
+  return error('stats null-guard or retained fallback mutation accepted')
+ }
+ marker_source := '.class public final Landroid/app/StatsManager;\n.super Ljava/lang/Object;\n'
+ stats_unavailable_type_abi(marker_source)!
+ for bad in [marker_source.replace('public final', 'public'), marker_source.replace('public final', 'private final'),
+  marker_source.replace('Ljava/lang/Object;', 'Ljava/lang/Exception;'), marker_source + '.field public backend:I\n',
+  marker_source + '.implements Ljava/lang/Runnable;\n',
+  marker_source + '.method public constructor <init>()V\n.locals 0\nreturn-void\n.end method\n'] {
+  stats_unavailable_type_abi(bad) or { continue }
+  return error('StatsManager backend/member/constructor or marker metadata mutation accepted')
+ }
+ mut before := {context: 'old'}
+ for i in 0 .. 2107 { before['other/' + i.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ after[context] = 'new'
+ after[marker] = 'marker'
+ narrow_profile_class_delta(before, after, [context], [marker], 2108)!
+ for target in [context, marker, 'other/0.smali'] {
+  mut bad := after.clone()
+  if target in before { bad[target] = before[target]! } else { bad.delete(target) }
+  if target.starts_with('other/') { bad[target] = 'changed' }
+  narrow_profile_class_delta(before, bad, [context], [marker], 2108) or { continue }
+  return error('stats unavailable class scope mutation accepted')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -2911,6 +3010,7 @@ fn self_test() ! {
  stable_display_self_test()!
  device_secure_self_test()!
  unmanaged_queries_self_test()!
+ stats_unavailable_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -3202,6 +3302,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'stable-display' { stable_display_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'device-secure' { device_secure_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'unmanaged-queries' { unmanaged_query_abi(os.read_file(root + '/smali/' + target)!, target)! }
+  if profile.name == 'stats-unavailable' { stats_unavailable_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -3210,6 +3311,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   for target in profile.extra_classes { persistent_data_block_abi(target, os.read_file(root + '/smali/' + target)!)! }
  }
  if profile.name == 'bundle-cross-profile' { cross_profile_type_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
+ if profile.name == 'stats-unavailable' { stats_unavailable_type_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'paint-drawable' {
   raw := os.read_file(root + '/smali/' + profile.extra_classes[0])!
   paint_drawable_abi(raw, raw)!
@@ -3249,6 +3351,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'stable-display' { stable_display_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'device-secure' { device_secure_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'unmanaged-queries' { unmanaged_query_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
+  if profile.name == 'stats-unavailable' { stats_unavailable_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -3257,6 +3360,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   for target in profile.extra_classes { persistent_data_block_abi(target, os.read_file(root + '/new-dex/' + target)!)! }
  }
  if profile.name == 'bundle-cross-profile' { cross_profile_type_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
+ if profile.name == 'stats-unavailable' { stats_unavailable_type_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'paint-drawable' {
   paint_drawable_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!,
    os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)!
@@ -3591,11 +3695,15 @@ fn main() {
   build_narrow(unmanaged_queries_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--stats-unavailable' {
+  build_narrow(stats_unavailable_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
