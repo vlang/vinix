@@ -131,6 +131,11 @@ const stable_display_framework_sha = '3b51a6cfe506db8e87908fdf74fcaebd585aaace38
 const stable_display_native_sha = '364f76761b57da6e0674d9a0c20f85e2589e5b8705d22aac6e6c3a9b82f8fcae'
 const stable_display_apk_sha = '190b832396158ce1ac584ef41abf279d6f13b82b001d17c35e2bd711d5ebcee1'
 const stable_display_pass_marker = 'STABLE-DISPLAY-PASS physical-size window-size fresh-points mutation-isolation'
+// Asset locale enumeration uses its successor framework and real native asset manager.
+const asset_locales_framework_sha = '43e3e2b941677cda70021ae9cd674aac6f4897af4ab4bda1d2d751b805d1f137'
+const asset_locales_native_sha = 'c87ccc623d70b1d582cd5486a9a6316c5117091ca10113682aa07cc72c80912f'
+const asset_locales_apk_sha = '03877624fde8928fac5efb3a2c49d9306356f5cb1488c3fa343799a39044a265'
+const asset_locales_pass_marker = 'ASSET-LOCALES-PASS framework-app canonical-set fresh-arrays mutation-isolation default-locale device-secure'
 
 struct FixtureProfile {
 	name          string
@@ -450,6 +455,17 @@ fn stable_display_profile() FixtureProfile {
 	}
 }
 
+fn asset_locales_profile() FixtureProfile {
+	return FixtureProfile{
+		name: 'asset-locales'
+		apk_sha: asset_locales_apk_sha
+		framework_sha: asset_locales_framework_sha
+		native_sha: asset_locales_native_sha
+		pass_marker: asset_locales_pass_marker
+		scope: 'standalone compiled framework/application asset locale enumeration, fresh arrays, mutation isolation, default-locale independence and absent Android credential backend regression; Google Play Services and authentication are not exercised'
+	}
+}
+
 struct Configuration {
 	runtime   string
 	apk       string
@@ -564,7 +580,8 @@ fn health(line string, expected_marker string) ! {
 		|| line.contains('BUNDLE-BOOLEAN-PASS') || line.contains('RESOURCES-FLOAT-PASS')
 		|| line.contains('PAINT-DRAWABLE-PASS') || line.contains('DIALOG-THEME-PASS')
 		|| line.contains('INTENT-EXTRAS-PASS') || line.contains('RESOURCE-LOCKS-PASS')
-		|| line.contains('PENDING-INTENT-PASS') || line.contains('STABLE-DISPLAY-PASS')) && line != expected_marker {
+		|| line.contains('PENDING-INTENT-PASS') || line.contains('STABLE-DISPLAY-PASS')
+		|| line.contains('ASSET-LOCALES-PASS')) && line != expected_marker {
 		return error('conflicting fixture marker')
 	}
 }
@@ -765,7 +782,7 @@ fn export_evidence(output string) ! {
 
 fn selftest() ! {
 	mut cases := 0
-	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile(), authenticator_worker_profile(), maps_network_v2_profile(), authenticator_binder_identity_profile(), maps_network_v3_profile(), service_lifecycle_profile(), platform_fragments_profile(), image_bounds_profile(), window_system_ui_profile(), seed_account_options_profile(), persistent_data_block_profile(), bitmap_tiles_profile(), connectivity_truth_profile(), window_animations_profile(), layout_alignment_profile(), user_restrictions_profile(), bundle_cross_profile_profile(), user_restrictions_bundle_profile(), resources_float_profile(), paint_drawable_profile(), dialog_theme_profile(), intent_extras_profile(), resource_locks_profile(), pending_intent_profile(), stable_display_profile()]
+	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile(), authenticator_worker_profile(), maps_network_v2_profile(), authenticator_binder_identity_profile(), maps_network_v3_profile(), service_lifecycle_profile(), platform_fragments_profile(), image_bounds_profile(), window_system_ui_profile(), seed_account_options_profile(), persistent_data_block_profile(), bitmap_tiles_profile(), connectivity_truth_profile(), window_animations_profile(), layout_alignment_profile(), user_restrictions_profile(), bundle_cross_profile_profile(), user_restrictions_bundle_profile(), resources_float_profile(), paint_drawable_profile(), dialog_theme_profile(), intent_extras_profile(), resource_locks_profile(), pending_intent_profile(), stable_display_profile(), asset_locales_profile()]
 	require(child_attach_profile().framework_sha == framework_sha
 		&& settings_global_profile().framework_sha == framework_sha
 		&& application_restrictions_profile().framework_sha != framework_sha, 'exact per-profile framework identities')!
@@ -871,6 +888,11 @@ fn selftest() ! {
 		&& stable_display_profile().native_sha.len == 64
 		&& stable_display_profile().apk_sha != pending_intent_profile().apk_sha,
 		'stable display requires its successor framework, native framebuffer query and distinct signed fixture')!
+	require(asset_locales_profile().framework_sha != stable_display_profile().framework_sha
+		&& asset_locales_profile().native_sha != stable_display_profile().native_sha
+		&& asset_locales_profile().native_sha.len == 64
+		&& asset_locales_profile().apk_sha != stable_display_profile().apk_sha,
+		'asset locales require their successor framework, real native asset query and distinct signed fixture')!
 	for profile in profiles {
 		mut pins := [profile.apk_sha, profile.framework_sha]
 		if profile.native_sha != '' { pins << profile.native_sha }
@@ -916,7 +938,7 @@ fn selftest() ! {
 		cases++
 	}
 	require(canonical('/var/lib/onboarding-api-r1'), 'canonical path rejected')!
-	for selector in ['--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments', '--image-bounds', '--window-system-ui', '--seed-account-options', '--persistent-data-block', '--bitmap-tiles', '--connectivity-truth', '--window-animations', '--layout-alignment', '--user-restrictions', '--bundle-cross-profile', '--user-restrictions-bundle', '--resources-float', '--paint-drawable', '--dialog-theme', '--intent-extras', '--resource-locks', '--pending-intent', '--stable-display'] {
+	for selector in ['--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments', '--image-bounds', '--window-system-ui', '--seed-account-options', '--persistent-data-block', '--bitmap-tiles', '--connectivity-truth', '--window-animations', '--layout-alignment', '--user-restrictions', '--bundle-cross-profile', '--user-restrictions-bundle', '--resources-float', '--paint-drawable', '--dialog-theme', '--intent-extras', '--resource-locks', '--pending-intent', '--stable-display', '--asset-locales'] {
 		full := [selector, '/runtime', '/fixture.apk', '10117', '10117', '/results']
 		for count in 1 .. full.len {
 			mut argv := [os.executable()]
@@ -945,9 +967,10 @@ fn run() ! {
 		return
 	}
 	mut arguments := os.args[1..]
-	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network', '--authenticator-worker', '--maps-network-v2', '--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments', '--image-bounds', '--window-system-ui', '--seed-account-options', '--persistent-data-block', '--bitmap-tiles', '--connectivity-truth', '--window-animations', '--layout-alignment', '--user-restrictions', '--bundle-cross-profile', '--user-restrictions-bundle', '--resources-float', '--paint-drawable', '--dialog-theme', '--intent-extras', '--resource-locks', '--pending-intent', '--stable-display'],
-		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network|--authenticator-worker|--maps-network-v2|--authenticator-binder-identity|--maps-network-v3|--service-lifecycle|--platform-fragments|--image-bounds|--window-system-ui|--seed-account-options|--persistent-data-block|--bitmap-tiles|--connectivity-truth|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--user-restrictions-bundle|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--resource-locks|--pending-intent|--stable-display) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
+	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network', '--authenticator-worker', '--maps-network-v2', '--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments', '--image-bounds', '--window-system-ui', '--seed-account-options', '--persistent-data-block', '--bitmap-tiles', '--connectivity-truth', '--window-animations', '--layout-alignment', '--user-restrictions', '--bundle-cross-profile', '--user-restrictions-bundle', '--resources-float', '--paint-drawable', '--dialog-theme', '--intent-extras', '--resource-locks', '--pending-intent', '--stable-display', '--asset-locales'],
+		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network|--authenticator-worker|--maps-network-v2|--authenticator-binder-identity|--maps-network-v3|--service-lifecycle|--platform-fragments|--image-bounds|--window-system-ui|--seed-account-options|--persistent-data-block|--bitmap-tiles|--connectivity-truth|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--user-restrictions-bundle|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--resource-locks|--pending-intent|--stable-display|--asset-locales) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
 	profile := if arguments[0] == '--authenticator-private-exception' { authenticator_exception_profile() }
+		else if arguments[0] == '--asset-locales' { asset_locales_profile() }
 		else if arguments[0] == '--stable-display' { stable_display_profile() }
 		else if arguments[0] == '--pending-intent' { pending_intent_profile() }
 		else if arguments[0] == '--resource-locks' { resource_locks_profile() }
