@@ -1750,6 +1750,76 @@ fn pending_intent_self_test() ! {
  }
 }
 
+fn stable_display_profile() NarrowProfile {
+ manager := 'android/hardware/display/DisplayManager.smali'
+ return NarrowProfile{
+  name: 'stable-display'
+  baseline_name: 'combined-account-webview-pending-intent-framework-2026-11-02-r1'
+  manifest_pin: '8717d3d489e9f86b8c96d2689c7ec6811bc7c80fbade0e35f64e9e84014f7c36'
+  jar_pin: 'bc82567de6d8abd6a4084c68e0e4c698df12d2c7848c7d23b6af7e5d0e6df7cc'
+  baseline_classes: 2108
+  providers: ['framework_stable_display.v']
+  calls: {manager: 'framework_stable_display_source'}
+  methods: {manager: ['getStableDisplaySize()Landroid/graphics/Point;']}
+  changed: {manager: 0}
+  added: {manager: 1}
+ }
+}
+
+fn stable_display_abi(source string) ! {
+ signature := 'getStableDisplaySize()Landroid/graphics/Point;'
+ method := store_parts(source)!.methods[signature] or { return error('missing stable display native declaration') }
+ if method.split_into_lines().map(it.trim_space()).filter(it != '' && !it.starts_with('#')) != [
+  '.method public native ' + signature, '.end method'] {
+  return error('stable display requires exactly one public virtual native declaration without executable instructions')
+ }
+}
+
+fn stable_display_self_test() ! {
+ profile := stable_display_profile()
+ manager := 'android/hardware/display/DisplayManager.smali'
+ signature := 'getStableDisplaySize()Landroid/graphics/Point;'
+ if profile.name != 'stable-display' || profile.baseline_classes != 2108
+  || profile.baseline_name != 'combined-account-webview-pending-intent-framework-2026-11-02-r1'
+  || profile.manifest_pin != '8717d3d489e9f86b8c96d2689c7ec6811bc7c80fbade0e35f64e9e84014f7c36'
+  || profile.jar_pin != 'bc82567de6d8abd6a4084c68e0e4c698df12d2c7848c7d23b6af7e5d0e6df7cc'
+  || profile.providers != ['framework_stable_display.v']
+  || profile.calls != {manager: 'framework_stable_display_source'}
+  || profile.methods != {manager: [signature]} || profile.changed != {manager: 0}
+  || profile.added != {manager: 1} || profile.fields.len != 0 || profile.directory_provider != ''
+  || profile.extra_classes.len != 0 || profile.class_provider != '' {
+  return error('stable display profile requires exactly one added native method in one retained class')
+ }
+ narrow_method_self_test([signature], 0, 1)!
+ native := '.method public native ' + signature + '\n.end method\n'
+ stable_display_abi(native)!
+ for bad in [native.replace('public native', 'private native'),
+  native.replace('public native', 'public static native'), native.replace('public native', 'public'),
+  native.replace('public native', 'public final native'), native.replace('()Landroid/graphics/Point;', '(I)Landroid/graphics/Point;'),
+  native.replace('.end method', '.registers 1\n.end method'),
+  native.replace('.end method', 'return-object p0\n.end method'), native + native] {
+  stable_display_abi(bad) or { continue }
+  return error('stable display native visibility/static/signature/body mutation accepted')
+ }
+ mut before := {manager: 'old'}
+ for i in 0 .. 2107 { before['other/' + i.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ after[manager] = 'new'
+ narrow_profile_class_delta(before, after, [manager], []string{}, 2108)!
+ for case in 0 .. 5 {
+  mut bad := after.clone()
+  match case {
+   0 { bad[manager] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(manager) }
+   3 { bad['unrelated.smali'] = 'new' }
+   else { bad.delete(manager); bad['substituted.smali'] = 'new' }
+  }
+  narrow_profile_class_delta(before, bad, [manager], []string{}, 2108) or { continue }
+  return error('invalid DisplayManager-only class scope accepted')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -2682,6 +2752,7 @@ fn self_test() ! {
  dialog_theme_self_test()!
  intent_extras_self_test()!
  pending_intent_self_test()!
+ stable_display_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -2970,6 +3041,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'dialog-theme' { dialog_theme_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'intent-extras' { intent_extras_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'pending-intent' { pending_intent_abi(os.read_file(root + '/smali/' + target)!)! }
+  if profile.name == 'stable-display' { stable_display_abi(os.read_file(root + '/smali/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -3014,6 +3086,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'dialog-theme' { dialog_theme_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'intent-extras' { intent_extras_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'pending-intent' { pending_intent_abi(os.read_file(root + '/new-dex/' + target)!)! }
+  if profile.name == 'stable-display' { stable_display_abi(os.read_file(root + '/new-dex/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -3344,11 +3417,15 @@ fn main() {
   build_narrow(pending_intent_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--stable-display' {
+  build_narrow(stable_display_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
