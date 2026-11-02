@@ -73,3 +73,9 @@ The successful build records source revision
 ```text
 BROADCAST-PERMISSION-PASS actual-delivery signature-owned null-legacy denied-permissions fake-grants immutable-authority metadata-restored async-barriers
 ```
+
+The subsequent ARM run rejected Main before onCreate with a verifier conflict in
+the cleanup receiver register. No permission assertions ran. The unchanged r2
+artifacts remain preserved; [the V2 fixture](broadcast-permission-v2-fixture-host.md)
+fixes that register lifetime and bounds handler startup without changing the
+framework or its permission assertions.

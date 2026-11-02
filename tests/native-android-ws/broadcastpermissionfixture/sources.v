@@ -7,6 +7,7 @@ const context_type = 'Landroid/content/Context;'
 const intent_type = 'Landroid/content/Intent;'
 const receiver_type = 'Landroid/content/BroadcastReceiver;'
 const dynamic_type = 'Lorg/vinix/bootstrap/DynamicReceiver;'
+const thread_type = 'Lorg/vinix/bootstrap/ReadyHandlerThread;'
 const state_type = 'Lorg/vinix/bootstrap/MetadataState;'
 const package_type = 'Landroid/content/pm/PackageParser$Package;'
 const info_type = 'Landroid/content/pm/PermissionInfo;'
@@ -19,8 +20,8 @@ const normal_permission = 'org.vinix.bootstrap.permission.NORMAL'
 const dangerous_permission = 'org.vinix.bootstrap.permission.DANGEROUS'
 const tree_permission = 'org.vinix.bootstrap.permission.TREE'
 const unknown_permission = 'org.vinix.bootstrap.permission.UNKNOWN'
-const pass_marker = 'BROADCAST-PERMISSION-PASS actual-delivery signature-owned null-legacy denied-permissions fake-grants immutable-authority metadata-restored async-barriers'
-const fail_marker = 'BROADCAST-PERMISSION-FAIL'
+const pass_marker = 'BROADCAST-PERMISSION-V2-PASS actual-delivery signature-owned null-legacy denied-permissions fake-grants immutable-authority metadata-restored async-barriers bounded-startup'
+const fail_marker = 'BROADCAST-PERMISSION-V2-FAIL'
 
 fn method(signature string, locals int, body string) string {
 	return '.method ${signature}\n.locals ${locals}\n${body}\n.end method\n'
@@ -190,7 +191,7 @@ return-void
 move-exception v0
 invoke-static {p1, v0}, ${main_type}->merge(Ljava/lang/Throwable;Ljava/lang/Throwable;)Ljava/lang/Throwable;
 move-result-object v0
-throw v0') + method('private static cleanup(${context_type}${dynamic_type}Landroid/os/HandlerThread;ZLjava/lang/Throwable;)V', 4, '
+throw v0') + method('private static cleanup(${context_type}${dynamic_type}${thread_type}ZLjava/lang/Throwable;)V', 4, '
 move-object v0, p4
 if-eqz p3, :quit
 :unregister_start
@@ -204,7 +205,10 @@ invoke-static {v0, v1}, ${main_type}->merge(Ljava/lang/Throwable;Ljava/lang/Thro
 move-result-object v0
 :quit
 :quit_start
-invoke-virtual {p2}, Landroid/os/HandlerThread;->quit()Z
+iget-object v1, p2, ${thread_type}->preparedLooper:Landroid/os/Looper;
+if-eqz v1, :join
+invoke-virtual {v1}, Landroid/os/Looper;->quit()V
+:join
 const-wide/16 v1, 1000
 invoke-virtual {p2, v1, v2}, Ljava/lang/Thread;->join(J)V
 invoke-virtual {p2}, Ljava/lang/Thread;->isAlive()Z
@@ -240,31 +244,35 @@ const/4 v11, 0
 sput v11, ${main_type}->dynamicCalls:I
 sput v11, ${main_type}->manifestCalls:I
 sput-object v11, ${main_type}->failure:Ljava/lang/Throwable;
-new-instance v0, Landroid/os/HandlerThread;
-const-string v11, "broadcast-permission-fixture"
-invoke-direct {v0, v11}, Landroid/os/HandlerThread;-><init>(Ljava/lang/String;)V
+new-instance v0, ${thread_type}
+invoke-direct {v0}, ${thread_type}-><init>()V
 const/4 v3, 0
 const/4 v4, 0
+invoke-static {}, Ljava/lang/System;->nanoTime()J
+move-result-wide v5
+const-wide v7, 8000000000L
+add-long/2addr v5, v7
+sput-wide v5, ${main_type}->deadline:J
 :run_start
 invoke-virtual {v0}, Ljava/lang/Thread;->start()V
-invoke-virtual {v0}, Landroid/os/HandlerThread;->getLooper()Landroid/os/Looper;
+sget-wide v5, ${main_type}->deadline:J
+invoke-virtual {v0, v5, v6}, ${thread_type}->awaitLooper(J)Landroid/os/Looper;
 move-result-object v1
 sput-object v1, ${main_type}->expectedLooper:Landroid/os/Looper;
 new-instance v2, ${handler_type}
 invoke-direct {v2, v1}, ${handler_type}-><init>(Landroid/os/Looper;)V
-new-instance v3, ${dynamic_type}
-invoke-direct {v3}, ${dynamic_type}-><init>()V
+# The cleanup register stays null until receiver construction completes. An
+# exception from new-instance/<init> must not merge an uninitialized receiver
+# with the precise reference consumed by the outer catch handler.
+new-instance v5, ${dynamic_type}
+invoke-direct {v5}, ${dynamic_type}-><init>()V
+move-object v3, v5
 new-instance v5, Landroid/content/IntentFilter;
 const-string v11, "${broadcast_action}"
 invoke-direct {v5, v11}, Landroid/content/IntentFilter;-><init>(Ljava/lang/String;)V
 const/4 v11, 0
 invoke-virtual {p0, v3, v5, v11, v2}, ${context_type}->registerReceiver(${receiver_type}Landroid/content/IntentFilter;Ljava/lang/String;${handler_type})${intent_type}
 const/4 v4, 1
-invoke-static {}, Ljava/lang/System;->nanoTime()J
-move-result-wide v5
-const-wide v7, 8000000000L
-add-long/2addr v5, v7
-sput-wide v5, ${main_type}->deadline:J
 invoke-virtual {p0}, ${context_type}->getApplicationContext()${context_type}
 move-result-object v8
 invoke-static {p0, v2}, ${main_type}->legacy(${context_type}${handler_type})V
@@ -299,12 +307,12 @@ invoke-static {p0, v2, v9}, ${main_type}->metadata(${context_type}${handler_type
 ' + attempt('p0', signature_permission, 6, 15) + attempt('v8', '', 7, 16) + '
 :run_end
 const/4 v11, 0
-invoke-static {p0, v3, v0, v4, v11}, ${main_type}->cleanup(${context_type}${dynamic_type}Landroid/os/HandlerThread;ZLjava/lang/Throwable;)V
+invoke-static {p0, v3, v0, v4, v11}, ${main_type}->cleanup(${context_type}${dynamic_type}${thread_type}ZLjava/lang/Throwable;)V
 return-void
 .catchall {:run_start .. :run_end} :run_failed
 :run_failed
 move-exception v11
-invoke-static {p0, v3, v0, v4, v11}, ${main_type}->cleanup(${context_type}${dynamic_type}Landroid/os/HandlerThread;ZLjava/lang/Throwable;)V
+invoke-static {p0, v3, v0, v4, v11}, ${main_type}->cleanup(${context_type}${dynamic_type}${thread_type}ZLjava/lang/Throwable;)V
 throw v11'
 	return method('private static run(${context_type})V', 12, body)
 }
@@ -474,6 +482,40 @@ return-void') + method('public checkSelfPermission(Ljava/lang/String;)I', 1, 'co
 			'iget-object v0, p0, Lorg/vinix/bootstrap/FakeContext;->manager:Landroid/content/pm/PackageManager;\nreturn-object v0')
 }
 
+fn ready_thread_source() string {
+	return '.class public final ${thread_type}\n.super Landroid/os/HandlerThread;\n' +
+		'.field public volatile preparedLooper:Landroid/os/Looper;\n.field private final ready:Ljava/util/concurrent/CountDownLatch;\n' +
+		method('public constructor <init>()V', 2, '
+const-string v0, "broadcast-permission-fixture-v2"
+invoke-direct {p0, v0}, Landroid/os/HandlerThread;-><init>(Ljava/lang/String;)V
+new-instance v0, Ljava/util/concurrent/CountDownLatch;
+const/4 v1, 1
+invoke-direct {v0, v1}, Ljava/util/concurrent/CountDownLatch;-><init>(I)V
+iput-object v0, p0, ${thread_type}->ready:Ljava/util/concurrent/CountDownLatch;
+return-void') + method('protected onLooperPrepared()V', 1, '
+invoke-static {}, Landroid/os/Looper;->myLooper()Landroid/os/Looper;
+move-result-object v0
+iput-object v0, p0, ${thread_type}->preparedLooper:Landroid/os/Looper;
+iget-object v0, p0, ${thread_type}->ready:Ljava/util/concurrent/CountDownLatch;
+invoke-virtual {v0}, Ljava/util/concurrent/CountDownLatch;->countDown()V
+return-void') + method('public awaitLooper(J)Landroid/os/Looper;', 6, '
+invoke-static {}, Ljava/lang/System;->nanoTime()J
+move-result-wide v0
+sub-long v0, p1, v0
+const-wide/16 v2, 0
+cmp-long v4, v0, v2
+if-lez v4, :bad
+iget-object v2, p0, ${thread_type}->ready:Ljava/util/concurrent/CountDownLatch;
+sget-object v3, Ljava/util/concurrent/TimeUnit;->NANOSECONDS:Ljava/util/concurrent/TimeUnit;
+invoke-virtual {v2, v0, v1, v3}, Ljava/util/concurrent/CountDownLatch;->await(JLjava/util/concurrent/TimeUnit;)Z
+move-result v2
+if-eqz v2, :bad
+iget-object v0, p0, ${thread_type}->preparedLooper:Landroid/os/Looper;
+if-eqz v0, :bad
+return-object v0
+' + fail('broadcast handler startup must publish a looper before the shared deadline'))
+}
+
 fn main_class() string {
 	return '.class public final ${main_type}\n.super Landroid/app/Activity;\n' +
 		'.field public static volatile sequence:I\n.field public static volatile dynamicCalls:I\n.field public static volatile manifestCalls:I\n' +
@@ -517,6 +559,7 @@ fn fixture_sources() map[string]string {
 			method('public constructor <init>()V', 0, 'invoke-direct {p0}, Landroid/content/pm/PackageManager;-><init>()V\nreturn-void') +
 			method('public checkPermission(Ljava/lang/String;Ljava/lang/String;)I', 1, 'const/4 v0, 0\nreturn v0')
 		'org/vinix/bootstrap/MetadataState.smali': metadata_state_source()
+		'org/vinix/bootstrap/ReadyHandlerThread.smali': ready_thread_source()
 	}
 }
 
@@ -524,11 +567,25 @@ fn expected_classes() []string {
 	return ['org/vinix/bootstrap/Barrier.smali', 'org/vinix/bootstrap/DynamicReceiver.smali',
 		'org/vinix/bootstrap/FakeContext.smali', 'org/vinix/bootstrap/GrantPM.smali',
 		'org/vinix/bootstrap/Main.smali', 'org/vinix/bootstrap/ManifestReceiver.smali',
-		'org/vinix/bootstrap/MetadataState.smali']
+		'org/vinix/bootstrap/MetadataState.smali', 'org/vinix/bootstrap/ReadyHandlerThread.smali']
 }
 
 fn verify_source_references(name string, source string) {
+	assert !source.contains('->getLooper()Landroid/os/Looper;'), 'fixture startup and cleanup must not use unbounded getLooper'
+	assert !source.contains('Landroid/os/HandlerThread;->quit()Z'), 'cleanup must quit the published looper directly'
 	if name.ends_with('/Main.smali') {
+		run := source.all_after('.method private static run(Landroid/content/Context;)V').all_before('.end method')
+		lines := run.split_into_lines().map(it.all_before('#').trim_space()).filter(it != '')
+		ctor := lines.index('invoke-direct {v5}, ${dynamic_type}-><init>()V')
+		commit := lines.index('move-object v3, v5')
+		deadline := lines.index('sput-wide v5, ${main_type}->deadline:J')
+		start := lines.index('invoke-virtual {v0}, Ljava/lang/Thread;->start()V')
+		assert deadline >= 0 && start > deadline, 'shared startup/barrier deadline must be set before the thread starts'
+		assert ctor >= 0 && commit > ctor, 'cleanup receiver must be published only after scratch construction succeeds'
+		assert !lines.any(it.starts_with('new-instance v3,')), 'uninitialized receiver must not enter the outer catch merge'
+		assert lines.filter(it.starts_with('move-object v3,')) == ['move-object v3, v5'], 'cleanup receiver register must not be reused'
+		assert run.contains('${thread_type}->awaitLooper(J)Landroid/os/Looper;')
+		assert source.contains('${thread_type}->preparedLooper:Landroid/os/Looper;')
 		assert source.count('${context_type}->sendBroadcast(Landroid/content/Intent;Ljava/lang/String;)V') == 4,
 			'actual two-argument delivery and all null-intent cases must remain'
 		assert source.count('${context_type}->sendBroadcast(Landroid/content/Intent;)V') == 1,
@@ -550,5 +607,8 @@ fn verify_source_references(name string, source string) {
 		assert source.contains('${item_type}->packageName:Ljava/lang/String;')
 		assert !source.contains('vinixBroadcastPermissions') && !source.contains('getDeclaredField'),
 			'fixture must not access the private authority set'
+	} else if name.ends_with('/ReadyHandlerThread.smali') {
+		assert source.contains('.method protected onLooperPrepared()V')
+		assert source.contains('->countDown()V') && source.contains('->await(JLjava/util/concurrent/TimeUnit;)Z')
 	}
 }
