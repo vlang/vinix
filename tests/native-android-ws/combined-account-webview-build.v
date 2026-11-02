@@ -3788,6 +3788,239 @@ fn component_parcel_self_test() ! {
  }
 }
 
+fn event_log_profile() NarrowProfile {
+ return NarrowProfile{
+  name: 'event-log'
+  baseline_name: 'combined-account-webview-component-parcel-framework-2026-11-02-r1'
+  manifest_pin: '79d78a512ac764807a2ecd3ca39317a5030e133f3749c0dd349c037482dcd512'
+  jar_pin: '329a45c23bd981b67733f36cde2828b2d890597a384acf1e0ce30f8f8fb582f4'
+  baseline_classes: 2116
+  providers: ['framework_event_log.v']
+  class_provider: 'framework_event_log_classes'
+  extra_classes: ['android/util/EventLog.smali']
+ }
+}
+
+fn event_log_class_delta(old map[string]string, new map[string]string) ! {
+ added := 'android/util/EventLog.smali'
+ if old.len != 2116 || new.len != 2117 || added in old || added !in new {
+  return error('EventLog requires exactly one new class over the complete 2116-class parent')
+ }
+ for name, pin in old {
+  if name !in new || new[name]! != pin {
+   return error('EventLog changed existing class: ' + name)
+  }
+ }
+}
+
+fn event_log_expected_methods() map[string]string {
+ mut methods := {
+  '<init>()V': messenger_binder_m('public constructor <init>()V', 1,
+   'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void')
+ }
+ for signature, registers in {'writeEvent(II)I': 3, 'writeEvent(IJ)I': 4,
+  'writeEvent(IF)I': 3, 'writeEvent(ILjava/lang/String;)I': 3} {
+  methods[signature] = messenger_binder_m('public static ' + signature, registers,
+   'const/16 v0, -0x13\nreturn v0')
+ }
+ methods['writeEvent(I[Ljava/lang/Object;)I'] = messenger_binder_m('public static varargs writeEvent(I[Ljava/lang/Object;)I', 10,
+  'if-eqz p1, :unavailable
+const/4 v0, 0x0
+const/4 v1, 0x2
+array-length v2, p1
+const/16 v3, 0xff
+const/16 v7, 0xfe0
+:next_item
+if-ge v0, v2, :unavailable
+if-ge v0, v3, :unavailable
+aget-object v4, p1, v0
+if-eqz v4, :null_item
+instance-of v5, v4, Ljava/lang/String;
+if-nez v5, :string_item
+instance-of v5, v4, Ljava/lang/Integer;
+if-nez v5, :fixed_five
+instance-of v5, v4, Ljava/lang/Long;
+if-nez v5, :fixed_nine
+instance-of v5, v4, Ljava/lang/Float;
+if-nez v5, :fixed_five
+new-instance v4, Ljava/lang/IllegalArgumentException;
+const-string v5, "Invalid payload item type"
+invoke-direct {v4, v5}, Ljava/lang/IllegalArgumentException;-><init>(Ljava/lang/String;)V
+throw v4
+:fixed_five
+const/4 v5, 0x5
+goto :fixed_item
+:fixed_nine
+const/16 v5, 0x9
+:fixed_item
+add-int v6, v1, v5
+if-gt v6, v7, :encoding_error
+move v1, v6
+goto :advance
+:null_item
+const/4 v5, 0x4
+goto :string_length
+:string_item
+check-cast v4, Ljava/lang/String;
+invoke-static {v4}, Landroid/util/EventLog;->vinixUtf8Length(Ljava/lang/String;)I
+move-result v5
+:string_length
+add-int/lit8 v5, v5, 0x5
+add-int v6, v1, v5
+if-le v6, v7, :string_accepted
+add-int/lit8 v5, v1, 0x5
+if-ge v5, v7, :encoding_error
+:string_accepted
+move v1, v6
+:advance
+add-int/lit8 v0, v0, 0x1
+goto :next_item
+:encoding_error
+const/4 v0, -0x5
+return v0
+:unavailable
+const/16 v0, -0x13
+return v0')
+ methods['vinixUtf8Length(Ljava/lang/String;)I'] = messenger_binder_m('private static vinixUtf8Length(Ljava/lang/String;)I', 9,
+  'const/4 v0, 0x0
+const/4 v1, 0x0
+invoke-virtual {p0}, Ljava/lang/String;->length()I
+move-result v2
+const/16 v4, 0xfe0
+:next_character
+if-ge v0, v4, :capped
+if-ge v1, v2, :done
+invoke-virtual {p0, v1}, Ljava/lang/String;->charAt(I)C
+move-result v3
+if-eqz v3, :two_bytes
+const/16 v5, 0x80
+if-lt v3, v5, :one_byte
+const/16 v5, 0x800
+if-lt v3, v5, :two_bytes
+const v5, 0xd800
+if-lt v3, v5, :three_bytes
+const v5, 0xdc00
+if-ge v3, v5, :three_bytes
+add-int/lit8 v6, v1, 0x1
+if-ge v6, v2, :three_bytes
+invoke-virtual {p0, v6}, Ljava/lang/String;->charAt(I)C
+move-result v7
+const v5, 0xdc00
+if-lt v7, v5, :three_bytes
+const v5, 0xe000
+if-ge v7, v5, :three_bytes
+add-int/lit8 v0, v0, 0x4
+move v1, v6
+goto :advance
+:three_bytes
+add-int/lit8 v0, v0, 0x3
+goto :advance
+:one_byte
+add-int/lit8 v0, v0, 0x1
+goto :advance
+:two_bytes
+add-int/lit8 v0, v0, 0x2
+:advance
+add-int/lit8 v1, v1, 0x1
+goto :next_character
+:capped
+move v0, v4
+:done
+return v0')
+ return methods
+}
+
+fn event_log_abi(source string) ! {
+ parts := store_parts(source)!
+ expected := event_log_expected_methods()
+ if parts.metadata.split_into_lines().map(it.trim_space()).filter(it != '') != [
+  '.class public Landroid/util/EventLog;', '.super Ljava/lang/Object;']
+  || parts.methods.keys().sorted() != expected.keys().sorted() {
+  return error('EventLog requires one fieldless public class, five write overloads, constructor and private UTF helper only')
+ }
+ for signature, method in expected {
+  if intent_extras_method(parts.methods[signature]!)! != intent_extras_method(method)! {
+   return error('EventLog type/UTF/budget/error-precedence/unavailable-backend instructions differ: ' + signature)
+  }
+ }
+}
+
+fn event_log_self_test() ! {
+ profile := event_log_profile()
+ added := 'android/util/EventLog.smali'
+ if profile.name != 'event-log' || profile.baseline_classes != 2116
+  || profile.baseline_name != 'combined-account-webview-component-parcel-framework-2026-11-02-r1'
+  || profile.manifest_pin != '79d78a512ac764807a2ecd3ca39317a5030e133f3749c0dd349c037482dcd512'
+  || profile.jar_pin != '329a45c23bd981b67733f36cde2828b2d890597a384acf1e0ce30f8f8fb582f4'
+  || profile.providers != ['framework_event_log.v'] || profile.class_provider != 'framework_event_log_classes'
+  || profile.methods.len != 0 || profile.calls.len != 0 || profile.changed.len != 0 || profile.added.len != 0
+  || profile.fields.len != 0 || profile.extra_classes != [added] || profile.class_providers.len != 0
+  || profile.directory_provider != '' || profile.removed_methods.len != 0 || profile.removed_fields.len != 0 {
+  return error('EventLog requires one added class and no existing class/member/field/removal deltas')
+ }
+ expected := event_log_expected_methods()
+ raw := '.class public Landroid/util/EventLog;\n.super Ljava/lang/Object;\n' + expected.values().join('\n') + '\n'
+ event_log_abi(raw)!
+ event_log_abi(raw.replace(':unavailable', ':changed_unavailable').replace(':encoding_error', ':changed_error')
+  .replace(':next_item', ':changed_next').replace(':next_character', ':changed_character'))!
+ for bad in [raw.replace('.class public ', '.class public final '), raw.replace('.super Ljava/lang/Object;', '.super Lwrong/Base;'),
+  raw + '.field private state:I\n', raw + '.implements Ljava/lang/Runnable;\n',
+  raw + '.method public static readEvents()V\n.registers 0\nreturn-void\n.end method\n',
+  raw.replace('public static varargs ', 'public static '), raw.replace('private static vinixUtf8Length', 'public static vinixUtf8Length'),
+  raw.replace('const/16 v0, -0x13', 'const/16 v0, 0x13'), raw.replace('const/16 v0, -0x13', 'const/16 v0, 0x0'),
+  raw.replace('return v0', 'return-object v0'), raw.replace('public static writeEvent(II)', 'public static native writeEvent(II)')] {
+  event_log_abi(bad) or { continue }
+  return error('EventLog class/fields/readers/native/ABI/result mutation accepted')
+ }
+ for signature, method in expected {
+  for bad in [method.replace('.method ', '.method final '), method.replace('.registers ', '.registers 12 # '),
+   method.replace('return', 'throw'), method + '\n' + method] {
+   event_log_abi(raw.replace(method, bad)) or { continue }
+   return error('EventLog flags/register/return/duplicate mutation accepted: ' + signature)
+  }
+ }
+ array := expected['writeEvent(I[Ljava/lang/Object;)I']!
+ for bad in [array.replace('if-eqz p1, :unavailable', 'if-nez p1, :unavailable'),
+  array.replace('const/4 v1, 0x2', 'const/4 v1, 0x0'), array.replace('const/16 v3, 0xff', 'const/16 v3, 0x100'),
+  array.replace('const/16 v7, 0xfe0', 'const/16 v7, 0xfe1'), array.replace('Ljava/lang/Integer;', 'Ljava/lang/Double;'),
+  array.replace('Ljava/lang/Float;', 'Ljava/lang/Boolean;'), array.replace('const/16 v5, 0x9', 'const/16 v5, 0x5'),
+  array.replace('const/4 v5, 0x4', 'const/4 v5, 0x0'), array.replace('const/4 v0, -0x5', 'const/4 v0, -0x1'),
+  array.replace('Ljava/lang/IllegalArgumentException;', 'Ljava/lang/RuntimeException;'),
+  array.replace('"Invalid payload item type"', '"Invalid event"'), array.replace('if-gt v6, v7, :encoding_error', 'if-ge v6, v7, :encoding_error'),
+  array.replace('if-ge v5, v7, :encoding_error', 'if-gt v5, v7, :encoding_error'),
+  array.replace('move v1, v6', 'move v1, v7'), array.replace('if-ge v0, v3, :unavailable', 'if-ge v0, v3, :encoding_error')] {
+  event_log_abi(raw.replace(array, bad)) or { continue }
+  return error('EventLog array type/cap/budget/truncation/status/exception ordering mutation accepted')
+ }
+ utf := expected['vinixUtf8Length(Ljava/lang/String;)I']!
+ for bad in [utf.replace('if-eqz v3, :two_bytes', 'if-eqz v3, :one_byte'),
+  utf.replace('const v5, 0xd800', 'const v5, 0xd7ff'), utf.replace('const v5, 0xdc00', 'const v5, 0xdbff'),
+  utf.replace('const v5, 0xe000', 'const v5, 0xe001'), utf.replace('add-int/lit8 v0, v0, 0x4', 'add-int/lit8 v0, v0, 0x6'),
+  utf.replace('add-int/lit8 v0, v0, 0x3', 'add-int/lit8 v0, v0, 0x1'), utf.replace('move v1, v6', 'move v1, v2'),
+  utf.replace('if-ge v0, v4, :capped', 'if-ge v0, v4, :done'), utf.replace('const/16 v4, 0xfe0', 'const/16 v4, 0xfe1')] {
+  event_log_abi(raw.replace(utf, bad)) or { continue }
+  return error('EventLog ART28 NUL/surrogate/width/cap mutation accepted')
+ }
+ mut old := map[string]string{}
+ for i in 0 .. 2116 { old['other/' + i.str() + '.smali'] = 'same' }
+ mut good := old.clone()
+ good[added] = 'EventLog'
+ event_log_class_delta(old, good)!
+ for case in 0 .. 6 {
+  mut bad := good.clone()
+  match case {
+   0 { bad.delete(added) }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete('other/0.smali') }
+   3 { bad['unrelated.smali'] = 'extra' }
+   4 { bad.delete(added); bad['substitution.smali'] = 'EventLog' }
+   else { old[added] = 'preexisting' }
+  }
+  event_log_class_delta(old, bad) or { continue }
+  return error('EventLog-only addition or whole predecessor preservation mutation accepted')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -4732,6 +4965,7 @@ fn self_test() ! {
  usage_inactive_self_test()!
  messenger_binder_self_test()!
  component_parcel_self_test()!
+ event_log_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -5018,6 +5252,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  mut applied := map[string]string{}
  inventory(root + '/smali', '', mut applied)!
  if profile.name == 'paint-drawable' { paint_drawable_class_delta(old, applied)! }
+ else if profile.name == 'event-log' { event_log_class_delta(old, applied)! }
  else { narrow_profile_class_delta(old, applied, targets, profile.extra_classes, profile.baseline_classes)! }
  for target in targets {
   if profile.name == 'messenger-binder' {
@@ -5071,6 +5306,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  if profile.name == 'broadcast-permission' { broadcast_permission_helper_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'secure-settings' { secure_settings_tile_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'component-parcel' { component_parcel_creator_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
+ if profile.name == 'event-log' { event_log_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'messenger-binder' {
   for target in profile.extra_classes { messenger_binder_parts_equal(messenger_binder_new_parts(target)!, store_parts(os.read_file(root + '/smali/' + target)!)!)! }
  }
@@ -5085,6 +5321,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  mut new := map[string]string{}
  inventory(root + '/new-dex', '', mut new)!
  if profile.name == 'paint-drawable' { paint_drawable_class_delta(old, new)! }
+ else if profile.name == 'event-log' { event_log_class_delta(old, new)! }
  else { narrow_profile_class_delta(old, new, targets, profile.extra_classes, profile.baseline_classes)! }
  for target in targets {
   if profile.name == 'messenger-binder' {
@@ -5138,6 +5375,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  if profile.name == 'broadcast-permission' { broadcast_permission_helper_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'secure-settings' { secure_settings_tile_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'component-parcel' { component_parcel_creator_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
+ if profile.name == 'event-log' { event_log_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'messenger-binder' {
   for target in profile.extra_classes { messenger_binder_parts_equal(messenger_binder_new_parts(target)!, store_parts(os.read_file(root + '/new-dex/' + target)!)!)! }
  }
@@ -5516,11 +5754,15 @@ fn main() {
   build_narrow(component_parcel_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--event-log' {
+  build_narrow(event_log_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder|--component-parcel] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder|--component-parcel|--event-log] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
