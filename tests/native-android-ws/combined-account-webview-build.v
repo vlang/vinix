@@ -2812,6 +2812,204 @@ fn broadcast_permission_self_test() ! {
  }
 }
 
+fn secure_settings_profile() NarrowProfile {
+ secure := 'android/provider/Settings$Secure.smali'
+ return NarrowProfile{
+  name: 'secure-settings'
+  baseline_name: 'combined-account-webview-broadcast-permission-framework-2026-11-02-r1'
+  manifest_pin: '49daffbfa9dc1dcc598e453eaae3611df7702963aa5b659022545149af7132d5'
+  jar_pin: '9e998094f8e122c22195e0c9a8f79377dbf16cd04d321ab4d1a47650908082f9'
+  baseline_classes: 2111
+  providers: ['framework_settings_secure.v', 'framework_quick_settings.v']
+  calls: {secure: 'framework_settings_secure_source'}
+  methods: {secure: ['putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z']}
+  changed: {secure: 0}
+  added: {secure: 1}
+  class_provider: 'framework_quick_settings_classes'
+  extra_classes: ['android/service/quicksettings/TileService.smali']
+ }
+}
+
+fn secure_settings_expected_method() string {
+ return '.method public static putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z
+.registers 6
+new-instance v0, Landroid/content/ContentValues;
+invoke-direct {v0}, Landroid/content/ContentValues;-><init>()V
+const-string v1, "name"
+invoke-virtual {v0, v1, p1}, Landroid/content/ContentValues;->put(Ljava/lang/String;Ljava/lang/String;)V
+const-string v1, "value"
+invoke-virtual {v0, v1, p2}, Landroid/content/ContentValues;->put(Ljava/lang/String;Ljava/lang/String;)V
+sget-object v2, Landroid/provider/Settings$Secure;->CONTENT_URI:Landroid/net/Uri;
+:try_start
+invoke-virtual {p0, v2, v0}, Landroid/content/ContentResolver;->insert(Landroid/net/Uri;Landroid/content/ContentValues;)Landroid/net/Uri;
+move-result-object v0
+:try_end
+if-eqz v0, :failed
+const/4 v0, 0x1
+return v0
+:database_error
+move-exception v0
+:failed
+const/4 v0, 0x0
+return v0
+.catch Landroid/database/SQLException; {:try_start .. :try_end} :database_error
+.end method'
+}
+
+// DEX may move the catch directive beside the try-end label. Rebase its span
+// and handler to instruction positions while preserving type and all code.
+fn secure_settings_method(source string) !string {
+ mut code := []string{}
+ mut catches := []string{}
+ for original in source.split_into_lines() {
+  line := original.trim_space()
+  if line.starts_with('.catch ') { catches << line.replace('{:', '{ :').replace('}', ' }') }
+  else if line != '.end method' { code << line }
+ }
+ code << catches
+ code << '.end method'
+ return intent_extras_method(code.join('\n'))!
+}
+
+fn secure_settings_abi(source string) ! {
+ signature := 'putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z'
+ method := store_parts(source)!.methods[signature] or { return error('secure settings string writer missing') }
+ if secure_settings_method(method)! != secure_settings_method(secure_settings_expected_method())! {
+  return error('secure settings writer requires exact nullable name/value forwarding, secure URI, real insert result and SQLException-only failure')
+ }
+}
+
+fn secure_settings_tile_methods() map[string]string {
+ return {
+  '<init>()V': '.method public constructor <init>()V\n.registers 1\ninvoke-direct {p0}, Landroid/app/Service;-><init>()V\nreturn-void\n.end method'
+  'onBind(Landroid/content/Intent;)Landroid/os/IBinder;': '.method public onBind(Landroid/content/Intent;)Landroid/os/IBinder;\n.registers 3\nconst/4 v0, 0x0\nreturn-object v0\n.end method'
+  'requestListeningState(Landroid/content/Context;Landroid/content/ComponentName;)V': '.method public static final requestListeningState(Landroid/content/Context;Landroid/content/ComponentName;)V
+.registers 4
+new-instance v0, Landroid/content/Intent;
+const-string v1, "android.service.quicksettings.action.REQUEST_LISTENING"
+invoke-direct {v0, v1}, Landroid/content/Intent;-><init>(Ljava/lang/String;)V
+const-string v1, "android.intent.extra.COMPONENT_NAME"
+invoke-virtual {v0, v1, p1}, Landroid/content/Intent;->putExtra(Ljava/lang/String;Landroid/os/Parcelable;)Landroid/content/Intent;
+const-string v1, "com.android.systemui"
+invoke-virtual {v0, v1}, Landroid/content/Intent;->setPackage(Ljava/lang/String;)Landroid/content/Intent;
+const-string v1, "android.permission.BIND_QUICK_SETTINGS_TILE"
+invoke-virtual {p0, v0, v1}, Landroid/content/Context;->sendBroadcast(Landroid/content/Intent;Ljava/lang/String;)V
+return-void
+.end method'
+ }
+}
+
+fn secure_settings_tile_abi(source string) ! {
+ parts := store_parts(source)!
+ expected := secure_settings_tile_methods()
+ if parts.metadata.split_into_lines().map(it.trim_space()).filter(it != '') != [
+  '.class public Landroid/service/quicksettings/TileService;', '.super Landroid/app/Service;']
+  || parts.methods.keys().sorted() != expected.keys().sorted() {
+  return error('TileService requires a fieldless concrete Service with exactly constructor, unavailable binder and API-28 request delegation')
+ }
+ for signature, method in expected {
+  if intent_extras_method(parts.methods[signature]!)! != intent_extras_method(method)! {
+   return error('TileService must preserve exact API-28 intent/component/package/permission forwarding without invented status-bar or callback behavior')
+  }
+ }
+}
+
+fn secure_settings_self_test() ! {
+ profile := secure_settings_profile()
+ secure := 'android/provider/Settings$Secure.smali'
+ signature := 'putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z'
+ if profile.name != 'secure-settings' || profile.baseline_classes != 2111
+  || profile.baseline_name != 'combined-account-webview-broadcast-permission-framework-2026-11-02-r1'
+  || profile.manifest_pin != '49daffbfa9dc1dcc598e453eaae3611df7702963aa5b659022545149af7132d5'
+  || profile.jar_pin != '9e998094f8e122c22195e0c9a8f79377dbf16cd04d321ab4d1a47650908082f9'
+  || profile.providers != ['framework_settings_secure.v', 'framework_quick_settings.v'] || profile.directory_provider != ''
+  || profile.calls != {secure: 'framework_settings_secure_source'} || profile.methods != {secure: [signature]}
+  || profile.changed != {secure: 0} || profile.added != {secure: 1} || profile.fields.len != 0
+  || profile.class_provider != 'framework_quick_settings_classes'
+  || profile.extra_classes != ['android/service/quicksettings/TileService.smali'] {
+  return error('API-28 secure settings profile requires one added writer and one concrete TileService, without unrelated user or status-bar changes')
+ }
+ narrow_method_self_test([signature], 0, 1)!
+ method := secure_settings_expected_method()
+ secure_settings_abi(method)!
+ secure_settings_abi(method.replace(':try_start', ':start_alias').replace(':try_end', ':end_alias').replace(':database_error', ':handler_alias').replace(':failed', ':failure_alias'))!
+ moved_catch := method.replace('.catch Landroid/database/SQLException; {:try_start .. :try_end} :database_error\n', '')
+  .replace(':try_end\n', ':try_end\n.catch Landroid/database/SQLException; {:try_start .. :try_end} :database_error\n')
+ secure_settings_abi(moved_catch)!
+ for bad in [method.replace('public static ', 'public '), method.replace('public static ', 'private static '),
+  method.replace('public static ', 'public static native '), method.replace('.registers 6', '.registers 7'),
+  method.replace('"name"', '"key"'), method.replace('"value"', '"entry"'),
+  method.replace('{v0, v1, p1}', '{v0, v1, p2}'), method.replace('{v0, v1, p2}', '{v0, v1, p1}'),
+  method.replace('Settings$Secure;->CONTENT_URI', 'Settings$Global;->CONTENT_URI'),
+  method.replace('{p0, v2, v0}', '{p0, v0, v2}'), method.replace('if-eqz v0, :failed', 'if-nez v0, :failed'),
+  method.replace('const/4 v0, 0x0', 'const/4 v0, 0x1'), method.replace('const/4 v0, 0x1', 'const/4 v0, 0x0'),
+  method.replace('Landroid/database/SQLException;', 'Ljava/lang/RuntimeException;'),
+  method.replace('{:try_start .. :try_end}', '{:try_start .. :database_error}'),
+  method.replace('} :database_error', '} :failed'), method.replace('return v0', 'return-object v0'), method + method] {
+  secure_settings_abi(bad) or { continue }
+  return error('secure settings visibility/register/values/namespace/result/catch-scope mutation accepted')
+ }
+ metadata := '.class public final Landroid/provider/Settings$Secure;\n.super Landroid/provider/Settings$NameValueTable;\n'
+ retained := '.method public static retained()V\n.locals 0\nreturn-void\n.end method\n'
+ before_source := metadata + retained
+ after_source := before_source + method
+ narrow_member_delta(before_source, after_source, [signature], 0, 1, []string{})!
+ for bad in [after_source.replace('public static retained()V', 'private static retained()V'),
+  after_source.replace('.super Landroid/provider/Settings$NameValueTable;', '.super Ljava/lang/Object;'),
+  after_source + '\n.field private cache:Ljava/util/Map;\n', after_source + '\n' + retained] {
+  narrow_member_delta(before_source, bad, [signature], 0, 1, []string{}) or { continue }
+  return error('secure settings unrelated method, metadata or invented cache accepted')
+ }
+ mut before := {secure: 'old'}
+ for index in 0 .. 2110 { before['other/' + index.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ after[secure] = 'new'
+ tile := profile.extra_classes[0]
+ after[tile] = 'tile'
+ narrow_profile_class_delta(before, after, [secure], [tile], 2111)!
+ for case in 0 .. 5 {
+  mut bad := after.clone()
+  match case {
+   0 { bad[secure] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(secure) }
+   3 { bad['unrelated.smali'] = 'new' }
+   else { bad.delete(secure); bad['substitution.smali'] = 'new' }
+  }
+  narrow_profile_class_delta(before, bad, [secure], [tile], 2111) or { continue }
+  return error('invalid Settings.Secure plus TileService class scope accepted')
+ }
+ mut missing_tile := after.clone()
+ missing_tile.delete(tile)
+ narrow_profile_class_delta(before, missing_tile, [secure], [tile], 2111) or {
+  secure_settings_tile_self_test()!
+  return
+ }
+ return error('missing TileService accepted')
+}
+
+fn secure_settings_tile_self_test() ! {
+ expected := secure_settings_tile_methods()
+ metadata := '.class public Landroid/service/quicksettings/TileService;\n.super Landroid/app/Service;\n'
+ tile := metadata + expected.values().join('\n')
+ secure_settings_tile_abi(tile)!
+ for bad in [tile.replace('.class public ', '.class public abstract '), tile.replace('Landroid/app/Service;', 'Ljava/lang/Object;'),
+  tile + '\n.field private tile:Ljava/lang/Object;\n', tile + '\n.method public onStartListening()V\n.registers 1\nreturn-void\n.end method\n',
+  tile.replace('public static final requestListeningState', 'public static requestListeningState'),
+  tile.replace('public static final requestListeningState', 'public final requestListeningState'),
+  tile.replace('.registers 4', '.registers 3'), tile.replace('REQUEST_LISTENING', 'QS_TILE'),
+  tile.replace('android.intent.extra.COMPONENT_NAME', 'android.intent.extra.COMPONENT'),
+  tile.replace('putExtra(Ljava/lang/String;Landroid/os/Parcelable;)', 'putExtra(Ljava/lang/String;Ljava/lang/String;)'),
+  tile.replace('{v0, v1, p1}', '{v0, v1, p0}'), tile.replace('com.android.systemui', 'com.google.android.gms'),
+  tile.replace('android.permission.BIND_QUICK_SETTINGS_TILE', 'android.permission.BIND_JOB_SERVICE'),
+  tile.replace('{p0, v0, v1}', '{p0, v1, v0}'), tile.replace('sendBroadcast(Landroid/content/Intent;Ljava/lang/String;)', 'sendBroadcast(Landroid/content/Intent;)'),
+  tile.replace('const/4 v0, 0x0\nreturn-object v0', 'return-object p0'),
+  tile.replace('return-void\n.end method', 'return-void\nreturn-void\n.end method')] {
+  secure_settings_tile_abi(bad) or { continue }
+  return error('TileService class/state/dispatch/signature/intent/component/package/permission/binder mutation accepted')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -3752,6 +3950,7 @@ fn self_test() ! {
  autofill_service_self_test()!
  keyguard_policy_self_test()!
  broadcast_permission_self_test()!
+ secure_settings_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -4056,6 +4255,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'autofill-service' { autofill_service_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'keyguard-policy' { keyguard_policy_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'broadcast-permission' { broadcast_permission_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
+  if profile.name == 'secure-settings' { secure_settings_abi(os.read_file(root + '/smali/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -4067,6 +4267,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  if profile.name == 'stats-unavailable' { stats_unavailable_type_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'subscription-service' { subscription_service_type_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'broadcast-permission' { broadcast_permission_helper_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
+ if profile.name == 'secure-settings' { secure_settings_tile_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!)! }
  if profile.name == 'paint-drawable' {
   raw := os.read_file(root + '/smali/' + profile.extra_classes[0])!
   paint_drawable_abi(raw, raw)!
@@ -4111,6 +4312,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'autofill-service' { autofill_service_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'keyguard-policy' { keyguard_policy_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'broadcast-permission' { broadcast_permission_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
+  if profile.name == 'secure-settings' { secure_settings_abi(os.read_file(root + '/new-dex/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -4122,6 +4324,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
  if profile.name == 'stats-unavailable' { stats_unavailable_type_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'subscription-service' { subscription_service_type_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'broadcast-permission' { broadcast_permission_helper_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
+ if profile.name == 'secure-settings' { secure_settings_tile_abi(os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)! }
  if profile.name == 'paint-drawable' {
   paint_drawable_abi(os.read_file(root + '/smali/' + profile.extra_classes[0])!,
    os.read_file(root + '/new-dex/' + profile.extra_classes[0])!)!
@@ -4476,11 +4679,15 @@ fn main() {
   build_narrow(broadcast_permission_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--secure-settings' {
+  build_narrow(secure_settings_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
