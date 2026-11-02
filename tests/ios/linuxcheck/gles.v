@@ -20,7 +20,7 @@ struct GlesInput {
 }
 
 fn gles_profile(mode string) !GlesProfile {
-	if mode !in ['gles', 'build-run-ios-gles'] { return GlesProfile{} }
+	if mode !in ['gles', 'cxx-gles', 'build-run-ios-gles', 'build-run-ios-cxx-gles', 'probe-no-ads'] { return GlesProfile{} }
 	value := os.getenv('VINIX_IOS_LINUX_GLES_ROOT')
 	if value == '' {
 		return error('GLES modes require VINIX_IOS_LINUX_GLES_ROOT with ARM64 GNU Mesa headers, libraries and swrast driver')

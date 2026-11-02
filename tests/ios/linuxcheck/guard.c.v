@@ -25,7 +25,7 @@ struct C.siginfo_t {
 }
 
 fn C.waitid(int, u32, &C.siginfo_t, int) int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(i32, &i32, i32) i32
 fn C.fstat(int, &C.stat) int
 fn C.pread(int, voidptr, usize, i64) i64
 fn C.setsid() int
@@ -155,7 +155,7 @@ fn guard_retire(pid int) GuardRetirement {
 	time.sleep(100 * time.millisecond)
 	guard_signal_target(-pid, C.SIGKILL) or { signal_errors << err.msg() }
 	guard_signal_target(pid, C.SIGKILL) or { signal_errors << err.msg() }
-	mut status := 0
+	mut status := i32(0)
 	for {
 		child := C.waitpid(pid, &status, C.WNOHANG)
 		if child == pid { break }
@@ -176,7 +176,7 @@ fn guard_retire(pid int) GuardRetirement {
 			result.failure = 'descendants did not reap within five seconds after SIGKILL'
 			return result
 		}
-		mut child_status := 0
+		mut child_status := i32(0)
 		child := C.waitpid(-pid, &child_status, C.WNOHANG)
 		if child > 0 {
 			result.descendants++

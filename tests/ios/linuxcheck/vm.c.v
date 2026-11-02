@@ -10,7 +10,9 @@ fn isolated_build_environment() map[string]string {
 	mut env := os.environ()
 	for key in env.keys() {
 		if key in ['VFLAGS', 'VEXE', 'VCHILD', 'VNORUN', 'VCOVDIR', 'VBUILD_FACTS', 'VBUILD_DEFINES',
-			'CFLAGS', 'CPPFLAGS', 'LDFLAGS'] || key.starts_with('VTEST_')
+			'CFLAGS', 'CPPFLAGS', 'LDFLAGS', 'CPATH', 'C_INCLUDE_PATH', 'CPLUS_INCLUDE_PATH',
+			'OBJC_INCLUDE_PATH', 'LIBRARY_PATH', 'COMPILER_PATH', 'GCC_EXEC_PREFIX', 'SDKROOT',
+			'CCC_OVERRIDE_OPTIONS', 'CLANG_CONFIG_FILE_SYSTEM_DIR', 'CLANG_CONFIG_FILE_USER_DIR'] || key.starts_with('VTEST_')
 			|| key.starts_with('V3') || key.starts_with('V_MACOS_V3_')
 			|| key.starts_with('V_DIAGNOSTICS_') || key.starts_with('QEMU_') {
 			env.delete(key)

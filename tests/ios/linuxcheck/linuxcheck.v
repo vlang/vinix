@@ -22,6 +22,8 @@ struct Qualification {
 	optional_backends []string
 	graphics_root     string
 	graphics_driver   string
+	cxx_root          string
+	cxx_ubsan_archive string
 	compiler          string
 	toolchain         string
 	sysroot           string
@@ -136,9 +138,10 @@ pub fn fixture(mode string) !string {
 		'netdb-scope' { 'netdb_numeric_scope_test.v' }
 		'reachability' { 'reachability_test.v' }
 		'network-path' { 'network_path_test.v' }
-		'gles' { 'gles_linux_test.v' }
+		'gles', 'cxx-gles' { 'gles_linux_test.v' }
+		'cxx' { 'cxx_linux_test.v' }
 		'image-initializers' { 'image_initializers_test.v' }
-		'build-run-ios', 'build-run-ios-gles' { '' }
+		'build-run-ios', 'build-run-ios-gles', 'build-run-ios-cxx', 'build-run-ios-cxx-gles', 'probe-no-ads' { '' }
 		else { return error('unsupported Linux mode: ${mode}') }
 	}
 }
@@ -171,7 +174,8 @@ fn require_markers(fixture_name string, output string) ! {
 				'IOS-SESSION-ADAPTER-POLICY:', 'IOS-SESSION-ADAPTER-RESPONSE:',
 				'IOS-SESSION-ADAPTER-REENTRY:', 'IOS-SESSION-ADAPTER-BOUNDS:', 'IOS-SESSION-TRANSFER:',
 				'IOS-SESSION-TRANSFER-SHUTDOWN:', 'IOS-BUILTIN-PROTOCOL:',
-				'IOS-BUILTIN-PROTOCOL-POLICY:', 'IOS-SESSION-COOKIES-DISABLED:']
+				'IOS-BUILTIN-PROTOCOL-POLICY:', 'IOS-SESSION-COOKIES-DISABLED:',
+				'IOS-HTTP-SYSTEM-TRUST:']
 		}
 		'storekit_purchase_test.v' {
 			['IOS-STOREKIT-PURCHASE:', 'IOS-STOREKIT-PURCHASE-REJECT:', 'IOS-STOREKIT-QUEUE:',
@@ -184,6 +188,10 @@ fn require_markers(fixture_name string, output string) ! {
 		'gles_linux_test.v' {
 			['IOS-LINUX-GLES-CONTEXTS:', 'IOS-LINUX-GLES-DRAW:', 'IOS-LINUX-GLES-SURFACE:',
 				'IOS-LINUX-GLES-THREADS:', 'IOS-LINUX-GLES-CLEANUP:']
+		}
+		'cxx_linux_test.v' {
+			['IOS-LINUX-CXX-SYMBOLS:', 'IOS-LINUX-CXX-STRINGS:', 'IOS-LINUX-CXX-LOCALE:',
+				'IOS-LINUX-CXX-CONVERSIONS:', 'IOS-LINUX-CXX-THREADS:', 'IOS-LINUX-CXX-CLEANUP:']
 		}
 		'image_initializers_test.v' { ['IOS-IMAGE-INITIALIZERS:', 'IOS-IMAGE-INITIALIZER-ENTRY:'] }
 		else { []string{} }
@@ -223,12 +231,21 @@ pub fn maybe_tls_child() !bool {
 // Refuse existing output and resolve its parent before testing containment, so
 // a symlink cannot put generated C, binaries or logs inside the repository.
 pub fn fresh_output(root string, requested string) !string {
+	return fresh_output_outside_app(root, requested, '')
+}
+
+// Probe output must be rejected before creating anything in the supplied app,
+// including when an output-parent alias resolves into that app.
+fn fresh_output_outside_app(root string, requested string, bundle string) !string {
 	path := os.abs_path(requested)
 	parent := os.real_path(os.dir(path))
 	if !os.is_dir(parent) { return error('output parent must exist: ${os.dir(path)}') }
 	out := os.join_path(parent, os.file_name(path))
 	if out == root || out.starts_with(root + os.path_separator) {
 		return error('Linux evidence must be outside the repository')
+	}
+	if bundle != '' && (out == bundle || out.starts_with(bundle + os.path_separator)) {
+		return error('Linux evidence must be outside the supplied application')
 	}
 	if os.exists(out) || os.is_link(out) { return error('output must be fresh: ${out}') }
 	os.mkdir(out)!
@@ -242,7 +259,19 @@ pub fn run(repository string, mode string, requested string) ! {
 		return error('this execution path requires a Linux host')
 	}
 	fixture_name := fixture(mode)!
+	mut application := ProbeInput{}
+	mut probe_deadline := 600
+	if mode == 'probe-no-ads' {
+		deadline := os.getenv_opt('VINIX_IOS_LINUX_PROBE_SECONDS') or { '600' }
+		if !deadline.is_int() || deadline.int() < 1 || deadline.int() > 1800 {
+			return error('VINIX_IOS_LINUX_PROBE_SECONDS must be 1..1800')
+		}
+		probe_deadline = deadline.int()
+		application = probe_input_from_environment()!
+	}
 	graphics := gles_profile(mode)!
+	cxx := cxx_profile(mode)!
+	cxx_sanitizer := cxx_sanitizer_profile(cxx)!
 	low_memory_value := os.getenv('VINIX_IOS_LINUX_GCC_LOW_MEMORY')
 	if low_memory_value !in ['', '0', '1'] {
 		return error('VINIX_IOS_LINUX_GCC_LOW_MEMORY must be 0 or 1')
@@ -281,11 +310,16 @@ pub fn run(repository string, mode string, requested string) ! {
 			return error('VINIX_IOS_LINUX_LD_PREFIX must contain lib/ld-linux-aarch64.so.1')
 		}
 	}
-	out := fresh_output(root, requested)!
+	out := fresh_output_outside_app(root, requested, application.bundle)!
 	mut env := runtime_environment(out, vroot)!
+	cxx_sanitizer_copy(cxx_sanitizer, out)!
 	graphics_inputs := gles_inputs(graphics)!
+	cxx_before := cxx_inputs(cxx)!
 	if graphics.enabled {
 		os.write_file(out + '/gles-inputs.json', json2.encode(graphics_inputs, prettify: true))!
+	}
+	if cxx.enabled {
+		os.write_file(out + '/cxx-inputs.json', json2.encode(cxx_before, prettify: true))!
 	}
 	// tlsbuild uses child processes too; its objects remain in this output tree.
 	os.setenv('TMPDIR', env['TMPDIR'], true)
@@ -302,32 +336,43 @@ pub fn run(repository string, mode string, requested string) ! {
 	commit := checked(out, 'source-commit', ['git', 'rev-parse', 'HEAD'], root, env)!.trim_space()
 	// Source diffs can legitimately contain diagnostic strings such as "V panic".
 	diff_code, _ := guarded_command(out, 'source-diff', ['git', 'diff', '--binary', '--', 'compat/ios',
-		'tests/ios'], root, env, 600)!
+		'tests/ios', 'build-support/ios'], root, env, 600)!
 	if diff_code != 0 { return error('source-diff exited ${diff_code}') }
 	// Capture the exact V/ABI sources, including uncommitted fixes under test.
 	os.mkdir_all(out + '/source/compat')!
 	os.cp_all(root + '/compat/ios', out + '/source/compat/ios', false)!
 	os.mkdir_all(out + '/source/tests/ios')!
-	for name in ['linuxcheck', 'tlsbuild', 'frozenv', 'hosttools'] {
+	for name in ['linuxcheck', 'tlsbuild', 'frozenv', 'hosttools', 'probedesktop'] {
 		os.cp_all(root + '/tests/ios/' + name, out + '/source/tests/ios/' + name, false)!
 	}
 	os.cp(root + '/tests/ios/linux-checks.v', out + '/source/tests/ios/linux-checks.v')!
 	os.cp(root + '/tests/ios/notification-checks.v', out + '/source/tests/ios/notification-checks.v')!
+	if cxx.enabled {
+		os.cp(root + '/tests/ios/cxx-extended.cpp', out + '/source/tests/ios/cxx-extended.cpp')!
+		os.mkdir_all(out + '/source/build-support')!
+		os.cp_all(root + '/build-support/ios', out + '/source/build-support/ios', false)!
+	}
 	build_root := out + '/source'
 	self := os.find_abs_path_of_executable(os.args[0])!
 	os.cp(self, out + '/driver')!
 	mut inputs := [digest(v)!, digest(cc)!, digest(self)!,
 		digest(build_root + '/compat/ios/runner/abi/dispatch.S')!]
 	if emulator.len > 0 { inputs << digest(emulator)! }
+	if cxx_sanitizer.archive != '' { inputs << digest(cxx_sanitizer.archive)! }
 	sanitized := fixture_name.len > 0
+	mut backends := []string{}
+	if cxx.enabled { backends << 'cxx' }
+	if graphics.enabled { backends << 'gles' }
 	os.write_file(out + '/qualification.json', json2.encode(Qualification{
 		mode:          mode
 		host:          if native { 'linux-arm64' } else { 'linux-amd64' }
 		sanitizers:    sanitized
 		gcc_low_memory: low_memory
-		optional_backends: if graphics.enabled { ['gles'] } else { []string{} }
+		optional_backends: backends
 		graphics_root: graphics.root
 		graphics_driver: if graphics.enabled { 'softpipe' } else { '' }
+		cxx_root: cxx.root
+		cxx_ubsan_archive: cxx_sanitizer.archive
 		compiler:      cc
 		toolchain:     vroot
 		sysroot:       sysroot
@@ -342,13 +387,17 @@ pub fn run(repository string, mode string, requested string) ! {
 		build_root + '/compat/ios/runner'
 	}
 	generated := out + '/payload/runtime.c'
+	if mode == 'cxx' { cxx_probe_header(out)! }
 	mut generate := [v, '-enable-globals', '-nocache', '-gc', 'none', '-cc', 'gcc', '-os',
 		'linux', '-arch', 'arm64', '-d', 'glibc', '-d', 'no_backtrace', '-path',
 		'@vlib|' + build_root + '/compat/ios|' + build_root + '/tests/ios|@vmodules', '-o', generated]
 	if graphics.enabled { generate << ['-d', 'ios_gles'] }
+	if cxx.enabled { generate << ['-d', 'ios_cxx'] }
 	generate << source
 	checked(out, 'generate', generate, vroot, env)!
-	mut compile := [cc, '-D_GNU_SOURCE', '-DCUSTOM_DEFINE_no_backtrace', '-ffixed-x18', '-w', '-g',
+	// Pipe the large generated assembly directly to the assembler. This changes
+	// no optimization or sanitizer settings and avoids a large transient file.
+	mut compile := [cc, '-pipe', '-D_GNU_SOURCE', '-DCUSTOM_DEFINE_no_backtrace', '-ffixed-x18', '-w', '-g',
 		'-fno-omit-frame-pointer']
 	if sysroot.len > 0 { compile << '--sysroot=' + sysroot }
 	if sanitized { compile << '-fsanitize=address,undefined' }
@@ -385,17 +434,21 @@ pub fn run(repository string, mode string, requested string) ! {
 		checked(out, 'object-${i}', command, out, env)!
 		objects << object
 	}
+	if mode == 'cxx' { objects << cxx_probe_object(cxx, out, env)! }
 	binary_path := out + '/run-ios'
 	mut link := [cc, '-g', '-no-pie']
 	if sysroot.len > 0 { link << '--sysroot=' + sysroot }
 	if sanitized { link << '-fsanitize=address,undefined' }
+	link << cxx_sanitizer_link_flags(cxx_sanitizer, out)
 	link << objects
 	if graphics.enabled {
 		link << ['-L' + graphics.libraries, '-Wl,-rpath-link,' + graphics.libraries, '-lEGL', '-lGLESv2']
 	}
+	link << cxx_link(cxx)
 	link << [tls, '-pthread', '-ldl', '-lresolv', '-lm', '-o', binary_path]
 	checked(out, 'link', link, out, env)!
 	require_arm64_elf(binary_path)!
+	if cxx.enabled { cxx_verify_linkage(out, 'runtime', binary_path, env)! }
 	// Keep target graphics libraries out of host V/GCC processes. Only the
 	// ARM64 runtime (or QEMU's target loader) receives this environment.
 	mut execution_env := env.clone()
@@ -425,6 +478,10 @@ pub fn run(repository string, mode string, requested string) ! {
 		}
 	}
 	invocation << binary_path
+	if mode == 'cxx' {
+		cxx_sanitizer_controls(cxx, cxx_sanitizer, out, cc, sysroot, invocation, env, execution_env)!
+		cxx_native_fixture(cxx, cxx_sanitizer, out, build_root, cc, sysroot, invocation, env, execution_env)!
+	}
 	if !sanitized {
 		mut help := invocation.clone()
 		help << '--help'
@@ -450,6 +507,8 @@ pub fn run(repository string, mode string, requested string) ! {
 				'-keyout', out + '/server.key', '-out', out + '/server.pem'], out, env)!
 			execution_env['VINIX_IOS_HTTP_CERT'] = out + '/server.pem'
 			execution_env['VINIX_IOS_HTTP_KEY'] = out + '/server.key'
+			os.mkdir(out + '/payload/system-trust')!
+			execution_env['VINIX_IOS_HTTP_TRUST_EVIDENCE'] = out + '/payload/system-trust'
 		}
 		for deterministic in [false, true] {
 			label := if deterministic { 'runtime-deterministic' } else { 'runtime' }
@@ -458,10 +517,35 @@ pub fn run(repository string, mode string, requested string) ! {
 			require_markers(fixture_name, output)!
 		}
 	}
+	mut probe_result := ProbeResult{}
+	if mode == 'probe-no-ads' {
+		probe_result = probe_capture(out + '/application-probe', application, ProbeRuntime{
+			invocation: invocation
+			environment: execution_env
+			profile: 'GNU ARM64 iOS runtime with adapted C++ and Mesa softpipe plus a diagnostic VAPP peer without compositor or input; video, text and SQLite backends disabled; Metal unavailable'
+			built_backends: backends
+			required_backends: ['cxx', 'gles']
+			deadline_seconds: probe_deadline
+			desktop_driver: out + '/driver'
+		})!
+	}
 	if graphics.enabled && gles_inputs(graphics)! != graphics_inputs {
 		return error('Linux GLES SDK inputs changed during the capture')
 	}
-	result_text := if graphics.enabled && sanitized {
+	if cxx.enabled && cxx_inputs(cxx)! != cxx_before {
+		return error('GNU C++ backend inputs changed during the capture')
+	}
+	cxx_sanitizer_unchanged(cxx_sanitizer)!
+	cxx_sanitizer_copy_unchanged(cxx_sanitizer, out)!
+	result_text := if mode == 'probe-no-ads' {
+		'COMPLETE guarded Linux ARM64 application capture; application_exit=${probe_result.application_exit}; diagnostic=${probe_result.application_diagnostic}; capture completion does not establish a game frame, menu, login, gameplay or launch gate\n'
+	} else if mode == 'cxx-gles' {
+		'PASS Linux ARM64 GLES fixture with the adapted C++ backend linked, ASan/UBSan and Mesa softpipe; packaged Mesa and the ELF unwinder are not instrumented; LLVM RTTI internals omit their recursive vptr check only; no Fortnite execution\n'
+	} else if cxx.enabled && sanitized {
+		'PASS Linux ARM64 C++ runtime fixture with ASan/UBSan plus the native ELF C++ reference with V-generated constructor-lifetime adaptation and all original comparisons, and rejecting vptr/function sanitizer controls; LLVM RTTI internals omit their recursive vptr check only and the ELF unwinder is not instrumented; native Foundation and Fortnite not executed; Mach-O exception unwinding remains unsupported\n'
+	} else if cxx.enabled {
+		'PASS Linux ARM64 runner with ' + backends.join(', ') + ' backends and synthetic iOS application entry/arguments; no Fortnite execution; video, text and SQLite backends disabled\n'
+	} else if graphics.enabled && sanitized {
 		'PASS Linux ARM64 GLES runtime fixture with ASan/UBSan and Mesa softpipe; native Foundation and Fortnite not executed; packaged Mesa libraries are not sanitizer-instrumented\n'
 	} else if graphics.enabled {
 		'PASS Linux ARM64 GLES runner build and synthetic iOS application entry/arguments; no Fortnite execution; C++, video, text and SQLite backends disabled\n'
@@ -476,5 +560,9 @@ pub fn run(repository string, mode string, requested string) ! {
 	inventory.sort(a.path < b.path)
 	os.write_file(out + '/inventory.json', json2.encode(inventory, prettify: true))!
 	os.write_file(out + '/result.txt', result_text)!
-	println('${mode}: PASS (Linux ARM64 runtime; native Foundation not executed)')
+	if mode == 'probe-no-ads' {
+		println('probe-no-ads: capture COMPLETE; application exit ${probe_result.application_exit}; inspect application-probe/probe-result.json and application-wrapper.log; game success not inferred')
+	} else {
+		println('${mode}: PASS (Linux ARM64 runtime; native Foundation not executed)')
+	}
 }
