@@ -54,6 +54,20 @@ fn gles_profile_at(path string) !GlesProfile {
 	return profile
 }
 
+// Select only the validated EGL/GLES ELF files as direct linker inputs.
+// A broad SDK -L also selects unrelated glibc development scripts whose
+// absolute paths can refer outside the compiler sysroot.
+fn gles_link_flags(profile GlesProfile) ![]string {
+	if !profile.enabled { return []string{} }
+	mut flags := ['-Wl,-rpath-link,' + profile.libraries]
+	for name in ['libEGL.so', 'libGLESv2.so'] {
+		resolved := gles_resolved_input(profile, profile.libraries + '/' + name)!
+		require_arm64_elf(resolved)!
+		flags << resolved
+	}
+	return flags
+}
+
 fn gles_resolved_input(profile GlesProfile, path string) !string {
 	resolved := os.real_path(path)
 	if profile.root != '/' && !resolved.starts_with(profile.root + '/') {

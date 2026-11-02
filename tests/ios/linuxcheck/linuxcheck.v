@@ -445,9 +445,7 @@ pub fn run(repository string, mode string, requested string) ! {
 	if sanitized { link << '-fsanitize=address,undefined' }
 	link << cxx_sanitizer_link_flags(cxx_sanitizer, out)
 	link << objects
-	if graphics.enabled {
-		link << ['-L' + graphics.libraries, '-Wl,-rpath-link,' + graphics.libraries, '-lEGL', '-lGLESv2']
-	}
+	link << gles_link_flags(graphics)!
 	link << cxx_link(cxx)
 	link << [tls, '-pthread', '-ldl', '-lresolv', '-lm', '-o', binary_path]
 	checked(out, 'link', link, out, env)!

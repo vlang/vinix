@@ -112,3 +112,90 @@ fn test_gles_coverage_needs_all_distinct_markers() {
 		assert refused
 	}
 }
+
+fn test_gles_link_flags_keep_unrelated_linker_scripts_as_inventory_inputs() {
+	base := os.join_path(os.temp_dir(), 'ios-gles-link-scripts-${os.getpid()}')
+	defer { os.rmdir_all(base) or {} }
+	profile := gles_test_sdk(base) or { panic(err) }
+	for name in ['libm.so', 'libc.so'] {
+		os.write_file(profile.libraries + '/' + name,
+			'/* intentional GNU development linker script fixture */ GROUP ( /lib/aarch64-linux-gnu/' + name + '.6 )\n') or { panic(err) }
+	}
+	inputs := gles_inputs(profile) or { panic(err) }
+	assert inputs.len == 14
+	flags := gles_link_flags(profile) or { panic(err) }
+	assert flags == ['-Wl,-rpath-link,' + profile.libraries,
+		profile.libraries + '/libEGL.so', profile.libraries + '/libGLESv2.so']
+	for name in ['libm.so', 'libc.so'] {
+		path := profile.libraries + '/' + name
+		selected := inputs.filter(it.path == path)
+		assert selected.len == 1
+		assert selected[0].resolved == path
+		expected := digest(path) or { panic(err) }
+		assert selected[0].sha256 == expected.sha256
+	}
+	disabled := gles_link_flags(GlesProfile{}) or { panic(err) }
+	assert disabled.len == 0
+}
+
+fn test_gles_link_flags_resolve_sdk_aliases_to_exact_elf_inputs() {
+	base := os.join_path(os.temp_dir(), 'ios-gles-link-aliases-${os.getpid()}')
+	defer { os.rmdir_all(base) or {} }
+	initial := gles_test_sdk(base) or { panic(err) }
+	for names in [['libEGL.so', 'libEGL.so.1', 'libEGL.so.1.1.0'],
+		['libGLESv2.so', 'libGLESv2.so.2', 'libGLESv2.so.2.1.0']] {
+		os.rm(initial.libraries + '/' + names[0]) or { panic(err) }
+		os.mv(initial.libraries + '/' + names[1], initial.libraries + '/' + names[2]) or { panic(err) }
+		os.symlink(names[1], initial.libraries + '/' + names[0]) or { panic(err) }
+		os.symlink(names[2], initial.libraries + '/' + names[1]) or { panic(err) }
+	}
+	profile := gles_profile_at(base) or { panic(err) }
+	flags := gles_link_flags(profile) or { panic(err) }
+	assert flags == ['-Wl,-rpath-link,' + profile.libraries,
+		profile.libraries + '/libEGL.so.1.1.0', profile.libraries + '/libGLESv2.so.2.1.0']
+	inputs := gles_inputs(profile) or { panic(err) }
+	for name in ['libEGL.so', 'libGLESv2.so'] {
+		path := profile.libraries + '/' + name
+		selected := inputs.filter(it.path == path)
+		assert selected.len == 1
+		assert selected[0].resolved == os.real_path(path)
+		assert selected[0].resolved in flags
+	}
+}
+
+fn test_gles_link_flags_revalidate_alias_containment_after_profile_selection() {
+	base := os.join_path(os.temp_dir(), 'ios-gles-link-escape-${os.getpid()}')
+	outside := base + '-external.so'
+	defer {
+		os.rmdir_all(base) or {}
+		os.rm(outside) or {}
+	}
+	profile := gles_test_sdk(base) or { panic(err) }
+	path := profile.libraries + '/libEGL.so'
+	bytes := os.read_bytes(path) or { panic(err) }
+	os.write_file_array(outside, bytes) or { panic(err) }
+	os.rm(path) or { panic(err) }
+	os.symlink(outside, path) or { panic(err) }
+	mut refused := false
+	gles_link_flags(profile) or { refused = err.msg().contains('escapes selected SDK') }
+	assert refused
+}
+
+fn test_gles_link_flags_reject_required_linker_scripts_after_profile_selection() {
+	base := os.join_path(os.temp_dir(), 'ios-gles-link-required-${os.getpid()}')
+	defer { os.rmdir_all(base) or {} }
+	profile := gles_test_sdk(base) or { panic(err) }
+	for name in ['libEGL.so', 'libGLESv2.so'] {
+		path := profile.libraries + '/' + name
+		bytes := os.read_bytes(path) or { panic(err) }
+		os.write_file(path,
+			'/* required graphics input deliberately replaced by a linker script */ GROUP ( /lib/aarch64-linux-gnu/' + name + '.1 )\n') or { panic(err) }
+		mut refused_link := false
+		gles_link_flags(profile) or { refused_link = err.msg().contains('ARM64 ELF') }
+		assert refused_link
+		mut refused_profile := false
+		gles_profile_at(base) or { refused_profile = err.msg().contains('ARM64 ELF') }
+		assert refused_profile
+		os.write_file_array(path, bytes) or { panic(err) }
+	}
+}
