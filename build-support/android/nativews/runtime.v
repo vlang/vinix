@@ -277,8 +277,11 @@ fn ws_finish(e voidptr, activity voidptr, window i64) {
 fn ws_load_jni(e voidptr, path &char) bool {
 	loader := obj(e, cls(e, c'android/view/View'), c'java/lang/Class', c'getClassLoader', c'()Ljava/lang/ClassLoader;', unsafe { nil })
 	runtime := static_obj(e, c'java/lang/Runtime', c'getRuntime', c'()Ljava/lang/Runtime;', unsafe { nil })
-	args := [Value{ l: ws_string(e, c'vinix-android-native') }, Value{ l: loader }]!
-	call(e, runtime, c'java/lang/Runtime', c'loadLibrary', c'(Ljava/lang/String;Ljava/lang/ClassLoader;)V', unsafe { &args[0] })
+	// BootClassLoader has no findLibrary implementation. Load the qualified
+	// absolute path directly and associate JNI with the defining framework
+	// loader; ART normalizes BootClassLoader to its native boot-loader identity.
+	args := [Value{ l: ws_string(e, path) }, Value{ l: loader }]!
+	call(e, runtime, c'java/lang/Runtime', c'load', c'(Ljava/lang/String;Ljava/lang/ClassLoader;)V', unsafe { &args[0] })
 	return !ws_failure(e, c'ANDROID-WS-FAIL load JNI backend')
 }
 

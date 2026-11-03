@@ -2,6 +2,20 @@
 @[translated]
 module atlframework
 
+// Android framework types belong to the boot loader: isolated module loaders
+// deliberately use that loader as their only platform parent. Keep the pinned
+// ART libraries in their existing order, followed by the framework DEX. The
+// resource-only APK stays on the system class path: ART boot resources come
+// from loaded DexFiles. An explicit path also prevents BOOTCLASSPATH from
+// suppressing the standalone ART fork's append-only fallback.
+fn ws_boot_classpath(root &char, buffer &char, capacity usize) bool {
+	unsafe {
+		if root == nil || buffer == nil || capacity == 0 { return false }
+		written := C.snprintf(buffer, capacity, c'-Xbootclasspath:%s/usr/lib/java/dex/art/core-oj-hostdex.jar:%s/usr/lib/java/dex/art/apachehttp-hostdex.jar:%s/usr/lib/java/dex/art/apache-xml-hostdex.jar:%s/usr/lib/java/dex/art/bouncycastle-hostdex.jar:%s/usr/lib/java/dex/art/core-junit-hostdex.jar:%s/usr/lib/java/dex/art/core-libart-hostdex.jar:%s/usr/lib/java/dex/art/hamcrest-hostdex.jar:%s/usr/lib/java/dex/art/junit-runner-hostdex.jar:%s/usr/lib/java/dex/art/okhttp-hostdex.jar:%s/usr/lib/java/dex/art/wolfssljni-hostdex.jar:%s/usr/lib/java/dex/android_translation_layer/api-impl.jar', root, root, root, root, root, root, root, root, root, root, root)
+		return written >= 0 && usize(written) < capacity
+	}
+}
+
 // Shared ART, framework and main-Looper startup. No Application or component
 // callback runs here: service launch policy is checked before APK startup.
 fn ws_bootstrap(root &char, apk &char, display bool) voidptr {
@@ -33,6 +47,15 @@ fn ws_bootstrap(root &char, apk &char, display bool) voidptr {
 		*(&voidptr(debug_target)) = *(&voidptr(debug_host))
 		options := &WsOption(C.alloca(16 * sizeof(WsOption)))
 		buffer := &char(C.alloca(49152))
+		// Eleven entries still fit for a full PATH_MAX-sized root. This buffer
+		// lives through VM creation without allocating retained startup memory.
+		boot_classpath := &char(C.alloca(65536))
+		if !ws_boot_classpath(root, boot_classpath, 65536) {
+			C.puts(c'ANDROID-WS-FAIL boot class path')
+			return nil
+		}
+		// ATLPaths reads the API JAR from the first system class-path entry.
+		// The resource-only framework APK must also remain system-visible.
 		C.snprintf(buffer, 8192, c'-Djava.class.path=%s/usr/lib/java/dex/android_translation_layer/api-impl.jar:%s/usr/lib/java/dex/android_translation_layer/framework-res.apk', root, root)
 		options[0] = WsOption{buffer, nil}
 		C.snprintf(&buffer[8192], 8192, c'-Datl.app.class.path=%s', apk)
@@ -58,12 +81,13 @@ fn ws_bootstrap(root &char, apk &char, display bool) voidptr {
 		options[9] = WsOption{&buffer[40960], nil}
 		options[10] = WsOption{c'-Djavax.net.ssl.trustStoreType=JKS', nil}
 		options[11] = WsOption{c'-Djavax.net.ssl.trustStorePassword=changeit', nil}
-		mut args := WsVmArgs{ version: 0x10006, count: 12, options: options }
+		options[12] = WsOption{boot_classpath, nil}
+		mut args := WsVmArgs{ version: 0x10006, count: 13, options: options }
 		trace_tls := C.getenv(c'VINIX_ANDROID_TRACE_TLS')
 		if trace_tls != nil && trace_tls[0] == `1` {
-			options[12] = WsOption{c'-Dwolfjsse.debug=true', nil}
-			options[13] = WsOption{c'-Dwolfssljni.debug=true', nil}
-			args.count = 14
+			options[13] = WsOption{c'-Dwolfjsse.debug=true', nil}
+			options[14] = WsOption{c'-Dwolfssljni.debug=true', nil}
+			args.count = 15
 		}
 		create := CreateVM(C.dlsym(art, c'JNI_CreateJavaVM'))
 		if create(&ws.vm, &ws.e, &args) != 0 { return nil }
