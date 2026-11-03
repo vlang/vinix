@@ -8,7 +8,7 @@ class path. The complete caller trace is retained in
 `S=/Users/alex/.local/state/vinix/android`.
 
 The native bootstrap now sets an explicit boot class path: the pinned runtime's
-ten existing libraries in their original order, then the unchanged API JAR.
+ten existing libraries in their original order, then the API JAR.
 The APK stays in `atl.app.class.path`. The original system class path remains
 intact because ATLPaths parses its API-JAR prefix and the resource-only
 framework APK must remain available there. The two-method SDK companion uses
