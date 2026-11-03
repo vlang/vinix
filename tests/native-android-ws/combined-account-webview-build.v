@@ -4285,6 +4285,149 @@ fn webview_package_self_test() ! {
  }
 }
 
+struct FrameworkBootMethod {
+ signature string
+ owner string
+ register string
+ registers int
+ parameters int
+}
+
+fn framework_boot_details(target string) !FrameworkBootMethod {
+ return match target {
+  'android/content/res/Resources.smali' {
+   FrameworkBootMethod{'getSystem()Landroid/content/res/Resources;', 'android/content/res/Resources', 'v3', 5, 0}
+  }
+  'android/atl/ATLLoadedApp.smali' {
+   FrameworkBootMethod{'loadFromPath(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Landroid/atl/ATLLoadedApp;', 'android/atl/ATLLoadedApp', 'v1', 12, 3}
+  }
+  else { return error('unexpected framework boot resource-loader target') }
+ }
+}
+
+fn framework_boot_profile() NarrowProfile {
+ resources := 'android/content/res/Resources.smali'
+ loaded := 'android/atl/ATLLoadedApp.smali'
+ return NarrowProfile{
+  name: 'framework-boot'
+  baseline_name: 'combined-account-webview-webview-package-framework-2026-11-03-r1'
+  manifest_pin: 'c79d421bd385777aefd00b0be85a287af7907b1bb6dd55244d7546eb99ea958a'
+  jar_pin: '0e5e2632bc64ad9d548379491c59ed4e8a91d42fcfa6677b75aae4798dfeb7a9'
+  baseline_classes: 2117
+  providers: ['framework_boot_classpath.v']
+  calls: {resources: 'framework_boot_resources_source', loaded: 'framework_boot_loaded_source'}
+  methods: {resources: ['getSystem()Landroid/content/res/Resources;'], loaded: ['loadFromPath(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Landroid/atl/ATLLoadedApp;']}
+  changed: {resources: 1, loaded: 1}
+  added: {resources: 0, loaded: 0}
+ }
+}
+
+fn framework_boot_normalized_method(source string, parameters int) !string {
+ mut lines := source.split_into_lines().map(it.trim_space()).filter(it != '' && !it.starts_with('#'))
+ for index, line in lines {
+  if line.starts_with('.locals ') {
+   lines[index] = '.registers ' + (line.all_after(' ').int() + parameters).str()
+  } else if line.starts_with('.catch ') || line.starts_with('.catchall ') {
+   // Separate catch-range punctuation so the existing ordinal-label oracle
+   // verifies its protected start/end and handler just like branch targets.
+   lines[index] = line.replace('{:', '{ :').replace('}', ' }')
+  }
+ }
+ return intent_extras_method(lines.join('\n'))
+}
+
+fn framework_boot_old_site(details FrameworkBootMethod) string {
+ return 'const-class ' + details.register + ', L' + details.owner + ';\n' +
+  'invoke-virtual {' + details.register + '}, Ljava/lang/Class;->getClassLoader()Ljava/lang/ClassLoader;\n' +
+  'move-result-object ' + details.register
+}
+
+fn framework_boot_new_site(details FrameworkBootMethod) string {
+ return 'invoke-static {}, Ljava/lang/ClassLoader;->getSystemClassLoader()Ljava/lang/ClassLoader;\n' +
+  'move-result-object ' + details.register
+}
+
+fn framework_boot_members(old string, updated string, target string) ! {
+ details := framework_boot_details(target)!
+ narrow_member_delta(old, updated, [details.signature], 1, 0, []string{})!
+ before, after := store_parts(old)!, store_parts(updated)!
+ original := messenger_binder_lines(before.methods[details.signature] or { return error('retained framework resource-loader method absent') })
+ method := after.methods[details.signature] or { return error('updated framework resource-loader method absent') }
+ lines := original.split_into_lines()
+ registers := lines.filter(it.starts_with('.registers ') || it.starts_with('.locals '))
+ old_site := framework_boot_old_site(details)
+ if lines[0] != '.method public static ' + details.signature
+  || (registers != ['.registers ' + details.registers.str()] && registers != ['.locals ' + (details.registers - details.parameters).str()])
+  || original.count(old_site) != 1 || original.contains('Ljava/lang/ClassLoader;->getSystemClassLoader(') {
+  return error('exact retained framework resource-loader declaration/registers and unique loader site required')
+ }
+ expected := original.replace(old_site, framework_boot_new_site(details))
+ if framework_boot_normalized_method(method, details.parameters)! != framework_boot_normalized_method(expected, details.parameters)! {
+  return error('framework resource loading may replace only its exact defining-loader pair with the system-loader getter')
+ }
+}
+
+fn framework_boot_self_test() ! {
+ profile := framework_boot_profile()
+ resources, loaded := 'android/content/res/Resources.smali', 'android/atl/ATLLoadedApp.smali'
+ if profile.name != 'framework-boot' || profile.baseline_classes != 2117
+  || profile.baseline_name != 'combined-account-webview-webview-package-framework-2026-11-03-r1'
+  || profile.manifest_pin != 'c79d421bd385777aefd00b0be85a287af7907b1bb6dd55244d7546eb99ea958a'
+  || profile.jar_pin != '0e5e2632bc64ad9d548379491c59ed4e8a91d42fcfa6677b75aae4798dfeb7a9'
+  || profile.providers != ['framework_boot_classpath.v']
+  || profile.calls != {resources: 'framework_boot_resources_source', loaded: 'framework_boot_loaded_source'}
+  || profile.methods != {resources: ['getSystem()Landroid/content/res/Resources;'], loaded: ['loadFromPath(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Landroid/atl/ATLLoadedApp;']}
+  || profile.changed != {resources: 1, loaded: 1} || profile.added != {resources: 0, loaded: 0}
+  || profile.fields.len != 0 || profile.extra_classes.len != 0 || profile.class_provider != ''
+  || profile.class_providers.len != 0 || profile.directory_provider != ''
+  || profile.removed_methods.len != 0 || profile.removed_fields.len != 0 {
+  return error('framework boot SDK companion requires exactly two existing loader methods and no added API/state')
+ }
+ for target in [resources, loaded] {
+  details := framework_boot_details(target)!
+  narrow_method_self_test([details.signature], 1, 0)!
+  metadata := '.class public LExample;\n.super Ljava/lang/Object;\n.field private retained:Ljava/lang/Object;\n'
+  retained := '.method public native retainedNative()V\n.end method\n.method public retained()V\n.registers 1\nreturn-void\n.end method\n'
+  method := '.method public static ' + details.signature + '\n.registers ' + details.registers.str() +
+   '\nconst/4 v0, 0x0\n:loader\n:try_start\n' + framework_boot_old_site(details) +
+   '\nif-eqz ' + details.register + ', :done\nnop\n:try_end\ngoto :done\n:handler\nmove-exception v0\nthrow v0\n:done\nreturn-object v0\n.catchall {:try_start .. :try_end} :handler\n.end method\n'
+  before := metadata + retained + method
+  changed := method.replace(framework_boot_old_site(details), framework_boot_new_site(details))
+  after := metadata + retained + changed
+  framework_boot_members(before, after, target)!
+  framework_boot_members(before, after.replace(':loader', ':renamed_loader').replace(':done', ':renamed_done')
+   .replace('.registers ' + details.registers.str(), '.locals ' + (details.registers - details.parameters).str()), target)!
+  for bad in [after.replace('public static ' + details.signature, 'private static ' + details.signature),
+   after.replace('invoke-static {}, Ljava/lang/ClassLoader;->getSystemClassLoader()', 'invoke-static {}, Ljava/lang/Thread;->getContextClassLoader()'),
+   after.replace('move-result-object ' + details.register, 'move-result-object v0'),
+   after.replace('.registers ' + details.registers.str(), '.registers ' + (details.registers + 1).str()),
+   after.replace('nop', 'const/4 v0, 0x1'), after.replace('{:try_start .. :try_end}', '{:try_start .. :done}'),
+   after.replace('if-eqz ' + details.register + ', :done', 'if-eqz ' + details.register + ', :handler'),
+   after.replace('retainedNative()V', 'retainedNative(I)V'),
+   after + '.field private unrelated:Ljava/lang/ClassLoader;\n', before] {
+   framework_boot_members(before, bad, target) or { continue }
+   return error('framework boot unrelated member/instruction/register/branch/exception/state mutation accepted')
+  }
+  for bad_old in [before.replace(framework_boot_old_site(details), framework_boot_new_site(details)),
+   before.replace('const-class ' + details.register + ', L' + details.owner + ';', 'const-class ' + details.register + ', Landroid/content/Context;')] {
+   framework_boot_members(bad_old, after, target) or { continue }
+   return error('framework boot missing or preexisting old loader site accepted')
+  }
+ }
+ mut before_classes := {resources: 'old-resource', loaded: 'old-loaded'}
+ for i in 0 .. 2115 { before_classes['other/' + i.str() + '.smali'] = 'same' }
+ mut good := before_classes.clone()
+ good[resources] = 'new-resource'
+ good[loaded] = 'new-loaded'
+ narrow_profile_class_delta(before_classes, good, [resources, loaded], []string{}, 2117)!
+ for target in [resources, loaded, 'other/0.smali'] {
+  mut bad := good.clone()
+  bad[target] = if target == 'other/0.smali' { 'changed' } else { before_classes[target]! }
+  narrow_profile_class_delta(before_classes, bad, [resources, loaded], []string{}, 2117) or { continue }
+  return error('framework boot exact two-class change scope accepted an unrelated or missing change')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -5232,6 +5375,7 @@ fn self_test() ! {
  event_log_self_test()!
  build_abis_self_test()!
  webview_package_self_test()!
+ framework_boot_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -5561,6 +5705,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'component-parcel' { component_parcel_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'build-abis' { build_abis_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
   if profile.name == 'webview-package' { webview_package_abi(os.read_file(root + '/smali/' + target)!)! }
+  if profile.name == 'framework-boot' { framework_boot_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -5632,6 +5777,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'component-parcel' { component_parcel_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'build-abis' { build_abis_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
   if profile.name == 'webview-package' { webview_package_abi(os.read_file(root + '/new-dex/' + target)!)! }
+  if profile.name == 'framework-boot' { framework_boot_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -6036,11 +6182,15 @@ fn main() {
   build_narrow(webview_package_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--framework-boot' {
+  build_narrow(framework_boot_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder|--component-parcel|--event-log|--build-abis|--webview-package] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder|--component-parcel|--event-log|--build-abis|--webview-package|--framework-boot] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
