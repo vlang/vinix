@@ -8,11 +8,13 @@ import os
 // return and must not initialize either a provider or the browser transport.
 pub fn framework_webview_package_source(original string) !string {
 	lines := original.split_into_lines().map(it.trim_space())
+	mut fields := lines.filter(it.fields().len > 0 && it.fields()[0] == '.field')
+	fields.sort()
 	if lines.filter(it.fields().len > 0 && it.fields()[0] == '.class') != [
 		'.class public Landroid/webkit/WebView;',
 	] || lines.filter(it.fields().len > 0 && it.fields()[0] == '.super') != [
 		'.super Landroid/view/ViewGroup;',
-	] || lines.filter(it.fields().len > 0 && it.fields()[0] == '.field') != [
+	] || fields != [
 		'.field private vinixWebSettings:Landroid/webkit/WebSettings;',
 		'.field private webViewClient:Landroid/webkit/WebViewClient;',
 	] || lines.any(it.fields().len > 0 && it.fields()[0] == '.implements') {
@@ -49,6 +51,9 @@ pub fn framework_webview_package_source(original string) !string {
 			natives << '.method ' + header
 		}
 	}
+	// The generator and DEX disassembler order declarations differently.
+	// Compare the complete sets while returning the original bytes unchanged.
+	natives.sort()
 	if natives != [
 		'.method private native native_destroy()V',
 		'.method private native native_loadDataWithBaseURL(JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V',

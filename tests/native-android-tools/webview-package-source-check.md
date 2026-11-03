@@ -42,3 +42,18 @@ exited zero with complete cleanup. Proof took 7.203 seconds with sampled
 Split compiler sampled/detailed maxima were 269,762,560/278,511,616 bytes.
 Original limits remain 600 MiB RSS, 300 seconds, 512 MiB shared-volume growth,
 1 GiB reserve, 4 MiB output and file cap 16777216.
+
+The generator emits fields and native declarations in a different order from
+the DEX disassembler. The adapter now compares sorted complete declaration
+lists while preserving the input bytes. A reordered positive fixture passes;
+duplicate/replaced fields remain rejected. The follow-up proof passed sixteen
+atomic refusals, nine mutation controls and both stable API-28 DEX roundtrips.
+Complete evidence remains in the separate
+`webview-package-source-check-2026-11-03-r2` directory under the same state root;
+the original r1 evidence is unchanged. Guard/child exits were zero with complete
+cleanup in 12.966 seconds, sampled RSS 239,042,560 bytes, zero swaps and
+133,738,496 bytes observed growth under the same limits. The unchanged qualified
+driver from r1 froze and compiled the current provider/checker sources.
+Receipt SHA-256 is
+`4ed7ef111317d88860495463466beb739facee34600dbd9b4008f8d67c599d18`;
+source parent is `425ad93de`.

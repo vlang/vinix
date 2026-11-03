@@ -65,12 +65,26 @@ fn main() {
 	after := androidtools.framework_webview_package_source(before)!
 	verify(before, after, true)!
 	old := methods(before)!
+	// Exercise generator ordering independently of canonical DEX ordering.
+	mut reordered := before
+	fields := ['.field private vinixWebSettings:Landroid/webkit/WebSettings;',
+		'.field private webViewClient:Landroid/webkit/WebViewClient;']
+	for field in fields { reordered = reordered.replace(field, '') }
+	for field in fields.reverse() { reordered += '\n' + field + '\n' }
+	mut native_names := old.keys().filter(old[it].all_before('\n').fields().contains('native'))
+	native_names.sort()
+	for name in native_names { reordered = reordered.replace(old[name], '') }
+	for name in native_names.reverse() { reordered += '\n' + old[name] + '\n' }
+	assert reordered != before
+	verify(reordered, androidtools.framework_webview_package_source(reordered)!, true)!
 	invalids := [after,
 		before.replace('.class public Landroid/webkit/WebView;', '.class public final Landroid/webkit/WebView;'),
 		before + '\n.class public Landroid/webkit/WebView;\n',
 		before.replace('.super Landroid/view/ViewGroup;', '.super Landroid/view/View;'),
 		before + '\n.super Landroid/view/ViewGroup;\n',
 		before + '\n.field private fakePackage:Landroid/content/pm/PackageInfo;\n',
+		before + '\n' + fields[0] + '\n',
+		before.replace(fields[0], fields[1]),
 		before + '\n.implements Ljava/lang/Runnable;\n', before + '\n.end method\n',
 		before.replace('.method private static getFactory()', '.method\tprivate static getFactory()'),
 		before.replace('.end method', ''), before + '\n' + old['<init>(Landroid/content/Context;)V'],
@@ -104,5 +118,5 @@ fn main() {
 	os.write_file(path, before)!
 	androidtools.framework_webview_package(work + '/proof')!
 	assert os.read_file(path)! == after
-	println('WEBVIEW-PACKAGE-SOURCE-PASS refusals=' + invalids.len.str() + ' semantic-controls=' + controls.len.str() + ' retained42 null-package no-initialization six-native-declarations')
+	println('WEBVIEW-PACKAGE-SOURCE-PASS refusals=' + invalids.len.str() + ' semantic-controls=' + controls.len.str() + ' generator-order retained42 null-package no-initialization six-native-declarations')
 }

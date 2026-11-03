@@ -4202,6 +4202,89 @@ fn build_abis_self_test() ! {
  }
 }
 
+fn webview_package_profile() NarrowProfile {
+ webview_class := 'android/webkit/WebView.smali'
+ return NarrowProfile{
+  name: 'webview-package'
+  baseline_name: 'combined-account-webview-build-abis-framework-2026-11-02-r1'
+  manifest_pin: '23c75e5be1445f177d7a6a801f907235d166b7a0f541c41bf0895f861bbed3e9'
+  jar_pin: '251753fdee85367880a9b0c48d1cb0058fd17a819e4651a8dc29f232673f531f'
+  baseline_classes: 2117
+  providers: ['framework_webview_package.v']
+  calls: {webview_class: 'framework_webview_package_source'}
+  methods: {webview_class: ['getCurrentWebViewPackage()Landroid/content/pm/PackageInfo;']}
+  changed: {webview_class: 0}
+  added: {webview_class: 1}
+ }
+}
+
+fn webview_package_abi(source string) ! {
+ signature := 'getCurrentWebViewPackage()Landroid/content/pm/PackageInfo;'
+ method := store_parts(source)!.methods[signature] or { return error('current Android WebView package query missing') }
+ if method.split_into_lines().map(it.trim_space()).filter(it != '' && !it.starts_with('#')) != [
+  '.method public static ' + signature, '.registers 1', 'const/4 v0, 0x0', 'return-object v0', '.end method'] {
+  return error('absent Android WebView provider requires exact public static null PackageInfo without renderer/provider/PM initialization')
+ }
+}
+
+fn webview_package_self_test() ! {
+ profile := webview_package_profile()
+ webview_class := 'android/webkit/WebView.smali'
+ signature := 'getCurrentWebViewPackage()Landroid/content/pm/PackageInfo;'
+ if profile.name != 'webview-package' || profile.baseline_classes != 2117
+  || profile.baseline_name != 'combined-account-webview-build-abis-framework-2026-11-02-r1'
+  || profile.manifest_pin != '23c75e5be1445f177d7a6a801f907235d166b7a0f541c41bf0895f861bbed3e9'
+  || profile.jar_pin != '251753fdee85367880a9b0c48d1cb0058fd17a819e4651a8dc29f232673f531f'
+  || profile.providers != ['framework_webview_package.v']
+  || profile.calls != {webview_class: 'framework_webview_package_source'}
+  || profile.methods != {webview_class: [signature]} || profile.changed != {webview_class: 0}
+  || profile.added != {webview_class: 1} || profile.fields.len != 0
+  || profile.class_provider != '' || profile.class_providers.len != 0 || profile.extra_classes.len != 0
+  || profile.directory_provider != '' || profile.removed_methods.len != 0 || profile.removed_fields.len != 0 {
+  return error('WebView package profile requires exactly one Java static query and no other API/class/field changes')
+ }
+ narrow_method_self_test([signature], 0, 1)!
+ method := '.method public static ' + signature + '\n.registers 1\nconst/4 v0, 0x0\nreturn-object v0\n.end method\n'
+ webview_package_abi(method)!
+ for bad in [method.replace('public static ', 'private static '), method.replace('public static ', 'public '),
+  method.replace('public static ', 'public static native '), method.replace('public static ', 'public static final '),
+  method.replace('()Landroid/content/pm/PackageInfo;', '(Landroid/content/Context;)Landroid/content/pm/PackageInfo;'),
+  method.replace('.registers 1', '.registers 2'), method.replace('const/4 v0, 0x0', 'new-instance v0, Landroid/content/pm/PackageInfo;'),
+  method.replace('const/4 v0, 0x0', 'invoke-static {}, Landroid/webkit/WebView;->getFactory()Ljava/lang/Object;\nmove-result-object v0'),
+  method.replace('return-object v0', 'return v0'), method + method] {
+  webview_package_abi(bad) or { continue }
+  return error('WebView package query ABI/result or provider/renderer initialization mutation accepted')
+ }
+ metadata := '.class public Landroid/webkit/WebView;\n.super Landroid/view/ViewGroup;\n.field private vinixWebSettings:Landroid/webkit/WebSettings;\n.field private webViewClient:Landroid/webkit/WebViewClient;\n'
+ retained := '.method private native native_destroy()V\n.end method\n.method public loadUrl(Ljava/lang/String;)V\n.registers 2\nreturn-void\n.end method\n'
+ before := metadata + retained
+ after := before + method
+ narrow_member_delta(before, after, [signature], 0, 1, []string{})!
+ for bad in [after.replace('private native native_destroy', 'private native other_destroy'),
+  after.replace('public loadUrl', 'private loadUrl'), after.replace('private webViewClient:', 'public webViewClient:'),
+  after.replace('.super Landroid/view/ViewGroup;', '.super Landroid/view/View;'), after + '.field private provider:Landroid/content/pm/PackageInfo;\n'] {
+  narrow_member_delta(before, bad, [signature], 0, 1, []string{}) or { continue }
+  return error('WebView old native/Java member, field or class metadata mutation accepted')
+ }
+ mut before_classes := {webview_class: 'old'}
+ for i in 0 .. 2116 { before_classes['other/' + i.str() + '.smali'] = 'same' }
+ mut after_classes := before_classes.clone()
+ after_classes[webview_class] = 'new'
+ narrow_profile_class_delta(before_classes, after_classes, [webview_class], []string{}, 2117)!
+ for case in 0 .. 5 {
+  mut bad := after_classes.clone()
+  match case {
+   0 { bad[webview_class] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(webview_class) }
+   3 { bad['unrelated.smali'] = 'extra' }
+   else { bad.delete(webview_class); bad['substitution.smali'] = 'new' }
+  }
+  narrow_profile_class_delta(before_classes, bad, [webview_class], []string{}, 2117) or { continue }
+  return error('WebView-only package query class scope mutation accepted')
+ }
+}
+
 fn intent_extras_old_methods() map[string]string {
  return {
   'putExtras(Landroid/content/Intent;)Landroid/content/Intent;': '.method public putExtras(Landroid/content/Intent;)Landroid/content/Intent;
@@ -5148,6 +5231,7 @@ fn self_test() ! {
  component_parcel_self_test()!
  event_log_self_test()!
  build_abis_self_test()!
+ webview_package_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -5476,6 +5560,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'usage-inactive' { usage_inactive_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'component-parcel' { component_parcel_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'build-abis' { build_abis_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
+  if profile.name == 'webview-package' { webview_package_abi(os.read_file(root + '/smali/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -5546,6 +5631,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'usage-inactive' { usage_inactive_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'component-parcel' { component_parcel_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'build-abis' { build_abis_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
+  if profile.name == 'webview-package' { webview_package_abi(os.read_file(root + '/new-dex/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -5946,11 +6032,15 @@ fn main() {
   build_narrow(build_abis_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--webview-package' {
+  build_narrow(webview_package_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder|--component-parcel|--event-log|--build-abis] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder|--component-parcel|--event-log|--build-abis|--webview-package] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
