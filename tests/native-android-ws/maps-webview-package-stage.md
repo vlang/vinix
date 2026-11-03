@@ -104,3 +104,27 @@ actual producer pins, executable identities, retained failures and seal.
 Media preparation follows qualification under the original 5 GiB initial-space
 gate and 4 GiB outer growth cap. These host checks establish no WebView ARM,
 Maps rendering, Google account, checkin or imagery result.
+
+Automatic preparation passed under those unchanged limits. Controls at
+`maps-webview-package-preparation-2026-11-03-r1` record guard/child exits zero,
+empty reason and complete cleanup in 345,874 ms. Both complete audits of all
+131 inherited inventories passed, the nine-file overlay installed, and all
+58 final modules passed readback. Sampled/detailed RSS peaked at
+94,306,304/93,044,736 bytes with zero swaps. Initial/minimum free space was
+13,672,837,120/13,353,705,472 bytes; observed outer growth was 319,131,648 bytes.
+Final internal cumulative charge was 168,992,768 bytes. The earlier stage
+snapshot records 163,962,880 bytes before writable receipt/seal samples.
+
+Completed `maps-webview-package-r1/sha256.json` hashes to
+`d6ca42875b50ff239966e42933bd9eab711905e314371b9d68af3c3eb0226b87`.
+Boot and overlay hashes are respectively
+`638f4a8802751cb316c0318158504692bcdb9351f8f29dbbb5979624a8b655d8`
+and `a356be2163a6e77f8bdfb976c367a46caa21c851929fd9fe54ceeed5f4e4a66f`.
+The stage receipt hashes to
+`e50054c6db1463139e7c8637557a40404d9300a0c039054ac760f8cee35f2166`
+and records qualified source revision
+`0a150c3ba2d75166ca073b3d212ea9a386a5f3e7`. Preparation guard/log hashes are
+`b41c0e430da821dabd1eed3a143ce511b48d6de6853771e573adef3a797465a0`
+and `18ad9e693bc55b0b96e4d45d713234f0315b6123b2208857e501f0573ea1df82`.
+Tool, preparation and prepared roots are closed. This host preparation
+establishes no WebView ARM, Maps rendering, Google account or imagery result.
