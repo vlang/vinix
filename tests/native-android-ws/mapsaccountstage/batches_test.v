@@ -188,17 +188,22 @@ fn test_inventory_batch_plan_exact_boundaries_and_selectors() ! {
 		audit_one_hundred_twenty_seven_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 128, 130] {
+	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 128, 130, 131] {
 		mut refused := false
 		audit_one_hundred_twenty_nine_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [64, 66, 69, 71, 95, 97, 99, 101, 102, 104, 105, 107, 109, 111, 113, 115, 117, 118, 120, 122, 124, 126, 128, 130] {
+	for count in [0, 64, 65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129, 130, 132] {
+		mut refused := false
+		audit_one_hundred_thirty_one_inventories(batch_selectors(count)) or { refused = true }
+		assert refused
+	}
+	for count in [64, 66, 69, 71, 95, 97, 99, 101, 102, 104, 105, 107, 109, 111, 113, 115, 117, 118, 120, 122, 124, 126, 128, 130, 132] {
 		mut refused := false
 		inventory_batch_plan(batch_selectors(count), count) or { refused = true }
 		assert refused
 	}
-	for count in [70, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129] {
+	for count in [70, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129, 131] {
 		last := '/inventory/' + batch_index(count - 1)
 		for invalid_root in ['relative', '/inventory/../alias', '/inventory/trailing/', '/inventory/line\nfeed', '/inventory/back\\slash'] {
 			mut pins := batch_selectors(count)
@@ -218,69 +223,76 @@ fn test_inventory_batch_plan_exact_boundaries_and_selectors() ! {
 	}
 }
 
-fn test_inventory_batch_plan_129_crosses_second_boundary_without_exceeding_helper_bound() ! {
-	pins := batch_selectors(129)
-	before := pins.clone()
-	batches := inventory_batch_plan(pins, 129)!
-	assert batches.len == 3
-	mut combined := map[string]string{}
-	for index, batch in batches {
-		assert batch.len == [64, 64, 1][index]
-		assert batch.len <= 64
-		assert batch.keys().sorted().first() == ['/inventory/000', '/inventory/064', '/inventory/128'][index]
-		assert batch.keys().sorted().last() == ['/inventory/063', '/inventory/127', '/inventory/128'][index]
-		for root, pin in batch {
-			assert root !in combined
-			assert pin == before[root]!
-			combined[root] = pin
+fn test_inventory_batch_plans_129_and_131_cross_second_boundary_without_exceeding_helper_bound() ! {
+	for count in [129, 131] {
+		pins := batch_selectors(count)
+		before := pins.clone()
+		batches := inventory_batch_plan(pins, count)!
+		assert batches.len == 3
+		mut combined := map[string]string{}
+		for index, batch in batches {
+			assert batch.len == [64, 64, count - 128][index]
+			assert batch.len <= 64
+			assert batch.keys().sorted().first() == ['/inventory/000', '/inventory/064', '/inventory/128'][index]
+			assert batch.keys().sorted().last() == ['/inventory/063', '/inventory/127', '/inventory/' + batch_index(count - 1)][index]
+			for root, pin in batch {
+				assert root !in combined
+				assert pin == before[root]!
+				combined[root] = pin
+			}
 		}
+		assert combined == before
+		assert pins == before
 	}
-	assert combined == before
-	assert pins == before
 }
 
-fn test_inventory_129_batches_start_only_after_each_predecessor_completes() {
-	probe := &BatchProbe{}
-	started := chan int{cap: 3}
-	release := chan bool{cap: 3}
-	finished := chan int{cap: 3}
-	audit := fn [probe, started, release, finished] (pins map[string]string) ! {
-		active := stdatomic.add_u64(unsafe { &probe.active }, 1)
-		stdatomic.add_u64(unsafe { &probe.calls }, 1)
-		started <- pins.len
-		_ := <-release
-		stdatomic.sub_u64(unsafe { &probe.active }, 1)
-		stdatomic.add_u64(unsafe { &probe.completed }, 1)
-		finished <- pins.len
-		if active != 1 { return error('three-batch calls overlapped') }
-	}
-	handle := spawn batch_outcome(batch_selectors(129), 129, audit, probe)
-	for index, count in [64, 64, 1] {
-		assert <-started == count
-		assert stdatomic.load_u64(unsafe { &probe.calls }) == u64(index + 1)
-		assert stdatomic.load_u64(unsafe { &probe.completed }) == u64(index)
-		assert stdatomic.load_u64(unsafe { &probe.active }) == 1
-		release <- true
-		assert <-finished == count
-	}
-	outcome := handle.wait()
-	assert outcome.failure == ''
-	assert outcome.completed == 3
-	assert outcome.calls == 3
-	assert outcome.active == 0
-}
-
-fn test_inventory_129_batches_stop_at_first_second_or_third_failure() {
-	for failing in [u64(1), u64(2), u64(3)] {
+fn test_inventory_129_and_131_batches_start_only_after_each_predecessor_completes() {
+	for count in [129, 131] {
 		probe := &BatchProbe{}
-		audit := fn [probe, failing] (pins map[string]string) ! {
-			ordinal := stdatomic.add_u64(unsafe { &probe.calls }, 1)
-			assert pins.len == if ordinal < 3 { 64 } else { 1 }
-			if ordinal == failing { return error('batch-failure-' + ordinal.str()) }
+		started := chan int{cap: 3}
+		release := chan bool{cap: 3}
+		finished := chan int{cap: 3}
+		audit := fn [probe, started, release, finished] (pins map[string]string) ! {
+			active := stdatomic.add_u64(unsafe { &probe.active }, 1)
+			stdatomic.add_u64(unsafe { &probe.calls }, 1)
+			started <- pins.len
+			_ := <-release
+			stdatomic.sub_u64(unsafe { &probe.active }, 1)
+			stdatomic.add_u64(unsafe { &probe.completed }, 1)
+			finished <- pins.len
+			if active != 1 { return error('three-batch calls overlapped') }
 		}
-		outcome := batch_outcome(batch_selectors(129), 129, audit, probe)
-		assert outcome.failure == 'batch-failure-' + failing.str()
-		assert outcome.calls == failing
+		handle := spawn batch_outcome(batch_selectors(count), count, audit, probe)
+		for index, size in [64, 64, count - 128] {
+			assert <-started == size
+			assert stdatomic.load_u64(unsafe { &probe.calls }) == u64(index + 1)
+			assert stdatomic.load_u64(unsafe { &probe.completed }) == u64(index)
+			assert stdatomic.load_u64(unsafe { &probe.active }) == 1
+			release <- true
+			assert <-finished == size
+		}
+		outcome := handle.wait()
+		assert outcome.failure == ''
+		assert outcome.completed == 3
+		assert outcome.calls == 3
+		assert outcome.active == 0
+	}
+}
+
+fn test_inventory_129_and_131_batches_stop_at_first_second_or_third_failure() {
+	for count in [129, 131] {
+		tail := count - 128
+		for failing in [u64(1), u64(2), u64(3)] {
+			probe := &BatchProbe{}
+			audit := fn [probe, failing, tail] (pins map[string]string) ! {
+				ordinal := stdatomic.add_u64(unsafe { &probe.calls }, 1)
+				assert pins.len == if ordinal < 3 { 64 } else { tail }
+				if ordinal == failing { return error('batch-failure-' + ordinal.str()) }
+			}
+			outcome := batch_outcome(batch_selectors(count), count, audit, probe)
+			assert outcome.failure == 'batch-failure-' + failing.str()
+			assert outcome.calls == failing
+		}
 	}
 }
 
@@ -392,6 +404,77 @@ fn test_inventory_second_batch_joins_both_workers_before_error() {
 	}
 }
 
+fn test_inventory_131_third_batch_joins_both_workers_before_error_without_starting_tail() {
+	for failing in ['first', 'second', 'both'] {
+		probe := &BatchProbe{}
+		tail_probe := &BatchProbe{}
+		started := chan string{cap: 2}
+		finished := chan string{cap: 2}
+		first_release := chan bool{cap: 1}
+		second_release := chan bool{cap: 1}
+		worker := fn [probe, tail_probe, started, finished, first_release, second_release, failing] (job InventoryAuditJob) InventoryAuditResult {
+			if job.root == '/inventory/130' { stdatomic.add_u64(unsafe { &tail_probe.calls }, 1) }
+			active := stdatomic.add_u64(unsafe { &probe.active }, 1)
+			if job.root == '/inventory/128' || job.root == '/inventory/129' {
+				started <- job.root
+				if job.root == '/inventory/128' { _ := <-first_release } else { _ := <-second_release }
+			}
+			stdatomic.sub_u64(unsafe { &probe.active }, 1)
+			stdatomic.add_u64(unsafe { &probe.completed }, 1)
+			if job.root == '/inventory/128' || job.root == '/inventory/129' { finished <- job.root }
+			if active > 2 { return InventoryAuditResult{failure: 'worker bound exceeded'} }
+			failure := if (failing == 'first' || failing == 'both') && job.root == '/inventory/128' {
+				'failure-128'
+			} else if (failing == 'second' || failing == 'both') && job.root == '/inventory/129' {
+				'failure-129'
+			} else { '' }
+			return InventoryAuditResult{failure: failure}
+		}
+		audit := fn [probe, worker] (pins map[string]string) ! {
+			stdatomic.add_u64(unsafe { &probe.calls }, 1)
+			mut jobs := []InventoryAuditJob{}
+			for root in pins.keys().sorted() { jobs << InventoryAuditJob{root: root, seal: pins[root]!} }
+			audit_inventory_jobs(jobs, worker)!
+		}
+		handle := spawn batch_outcome(batch_selectors(131), 131, audit, probe)
+		mut third_pair := []string{}
+		third_pair << <-started
+		third_pair << <-started
+		third_pair.sort()
+		assert third_pair == ['/inventory/128', '/inventory/129']
+		assert stdatomic.load_u64(unsafe { &probe.completed }) == 128
+		assert stdatomic.load_u64(unsafe { &probe.active }) == 2
+		assert stdatomic.load_u64(unsafe { &probe.calls }) == 3
+		if failing == 'both' {
+			second_release <- true
+			assert <-finished == '/inventory/129'
+			time.sleep(25 * time.millisecond)
+			assert stdatomic.load_u64(unsafe { &probe.completed }) == 129
+			assert stdatomic.load_u64(unsafe { &probe.active }) == 1
+			assert stdatomic.load_u64(unsafe { &tail_probe.calls }) == 0
+			first_release <- true
+			assert <-finished == '/inventory/128'
+		} else {
+			first_release <- true
+			assert <-finished == '/inventory/128'
+			time.sleep(25 * time.millisecond)
+			assert stdatomic.load_u64(unsafe { &probe.completed }) == 129
+			assert stdatomic.load_u64(unsafe { &probe.active }) == 1
+			assert stdatomic.load_u64(unsafe { &tail_probe.calls }) == 0
+			second_release <- true
+			assert <-finished == '/inventory/129'
+		}
+		outcome := handle.wait()
+		assert outcome.completed == 130
+		assert outcome.active == 0
+		assert outcome.calls == 3
+		assert stdatomic.load_u64(unsafe { &tail_probe.calls }) == 0
+		assert outcome.failure == 'inventory dependency ' + if failing == 'second' {
+			'/inventory/129: failure-129'
+		} else { '/inventory/128: failure-128' }
+	}
+}
+
 fn batch_fixture_root(name string) !string {
 	parent := os.getenv('VINIX_INVENTORY_BATCH_TEST_ROOT')
 	assert parent != '' && os.is_abs_path(parent) && os.is_dir(parent) && os.real_path(parent) == parent
@@ -415,15 +498,16 @@ fn batch_fixture_selector(root string, payload string) !string {
 	return digest(root + '/sha256.json')!
 }
 
-fn test_inventory_batches_real_65_70_73_76_79_82_84_86_89_91_94_96_98_100_103_106_108_110_112_114_116_119_121_123_125_127_and_129_inputs_repeat_all_bytes() ! {
-	for count in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129] {
+fn test_inventory_batches_real_65_70_73_76_79_82_84_86_89_91_94_96_98_100_103_106_108_110_112_114_116_119_121_123_125_127_129_and_131_inputs_repeat_all_bytes() ! {
+	for count in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129, 131] {
 		root := batch_fixture_root('real-' + count.str())!
 		mut pins := map[string]string{}
 		for index := count - 1; index >= 0; index-- {
 			selected := root + '/node-' + batch_index(index)
 			pins[selected] = batch_fixture_selector(selected, batch_fixture_payload(index))!
 		}
-		if count == 129 { audit_one_hundred_twenty_nine_inventories(pins)! }
+		if count == 131 { audit_one_hundred_thirty_one_inventories(pins)! }
+		else if count == 129 { audit_one_hundred_twenty_nine_inventories(pins)! }
 		else if count == 127 { audit_one_hundred_twenty_seven_inventories(pins)! }
 		else if count == 125 { audit_one_hundred_twenty_five_inventories(pins)! }
 		else if count == 123 { audit_one_hundred_twenty_three_inventories(pins)! }
@@ -465,8 +549,8 @@ fn test_inventory_batches_real_65_70_73_76_79_82_84_86_89_91_94_96_98_100_103_10
 		assert second_failure.starts_with('inventory dependency ' + root + '/node-064: ')
 		assert second_failure.contains('nested/payload')
 		os.write_file(root + '/node-064/nested/payload', batch_fixture_payload(64))!
-		if count in [86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129] {
-			// Include every overflow tail, through the third batch's node-128 at 129 roots.
+		if count in [86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129, 131] {
+			// Include every overflow tail, through the third batch's node-130 at 131 roots.
 			last := '/node-' + batch_index(count - 1)
 			os.write_file(root + last + '/nested/payload', 'changed final overflow root')!
 			mut tail_failure := ''

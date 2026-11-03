@@ -8,7 +8,7 @@ type InventoryBatchAudit = fn (map[string]string) !
 // Each public image contract supplies its exact count. The private sixty-five
 // case exercises the boundary immediately above the unchanged helper limit.
 fn inventory_batch_plan(pins map[string]string, expected int) ![]map[string]string {
-	if expected !in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129] || pins.len != expected {
+	if expected !in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129, 131] || pins.len != expected {
 		return error('exact bounded inventory batch count required')
 	}
 	mut roots := pins.keys()
@@ -27,9 +27,9 @@ fn inventory_batch_plan(pins map[string]string, expected int) ![]map[string]stri
 			third[root.clone()] = pins[root]!.clone()
 		}
 	}
-	if first.len != 64 || second.len != (if expected == 129 { 64 } else { expected - 64 })
-		|| third.len != (if expected == 129 { 1 } else { 0 }) { return error('exact inventory batch partition required') }
-	batches := if expected == 129 { [first, second, third] } else { [first, second] }
+	if first.len != 64 || second.len != (if expected in [129, 131] { 64 } else { expected - 64 })
+		|| third.len != (if expected in [129, 131] { expected - 128 } else { 0 }) { return error('exact inventory batch partition required') }
+	batches := if expected in [129, 131] { [first, second, third] } else { [first, second] }
 	mut combined := map[string]string{}
 	for batch in batches {
 		for root, pin in batch {
@@ -177,4 +177,9 @@ pub fn audit_one_hundred_twenty_seven_inventories(pins map[string]string) ! {
 // The Build ABI successor crosses the second helper boundary: 64 + 64 + 1.
 pub fn audit_one_hundred_twenty_nine_inventories(pins map[string]string) ! {
 	audit_inventory_batches_with(pins, 129, audit_inventories_parallel)!
+}
+
+// The WebView package successor retains 64 + 64 + 3 complete inventories.
+pub fn audit_one_hundred_thirty_one_inventories(pins map[string]string) ! {
+	audit_inventory_batches_with(pins, 131, audit_inventories_parallel)!
 }

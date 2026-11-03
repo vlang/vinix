@@ -857,6 +857,28 @@ const build_abis_raw = 'e85746ba3c04aea7e89785a58d34fe1c9e280b2254e791230992b62c
 const build_abis_canonical = 'e51084623eaee7ca5e819af699497d6ddb9f9a6ea585cc1b42140c9c79b47166'
 const build_abis_properties_raw = 'd35c268b48d8f078bc416f88f9ee37dbca1c972f139637d3c753483bf7b2a84a'
 const build_abis_properties_canonical = '2740259e2ff3260d0ab93dc040752b52b1daaae3c037b89e39ab2d35f6c85c34'
+const webview_package_base = '/Users/alex/.local/state/vinix/android/maps-build-abis-r1'
+const webview_package_base_seal = '48aec518f620a1684c7ff471ac62b2e3744fc071b307ea584d10059be3170f51'
+const webview_package_boot = '1eb028f974695880d66363f1cba34b65f6f541c1e0e69866f90ff38038bdc3cb'
+const webview_package_base_overlay = '2eb06abfb8317faba4605656671e15a708fb03688a475621dd4ff0b9109d02b4'
+const webview_package_old_deployment = '87822ac7c036646a09707eaa7907c516137402f0252a961adaea09cef6697d81'
+const webview_package_old_headless = '08d98d2587d32c12177f81bc88762699f5ef7d87db03c61b538fba6e5fa233e4'
+const webview_package_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-webview-package-framework-2026-11-03-r1'
+// Complete SDK and its freshly coupled native producer.
+const webview_package_seal = 'c79d421bd385777aefd00b0be85a287af7907b1bb6dd55244d7546eb99ea958a'
+const webview_package_build = '4233d762a124f215eaa798f66af1c2c6407511aa829d30b3279ccdee6a01aba5'
+const webview_package_jar = '0e5e2632bc64ad9d548379491c59ed4e8a91d42fcfa6677b75aae4798dfeb7a9'
+const webview_package_dex = '5c6e4914d93c63566484ac907f69bb94fe7aef161a58cba589126922c0478f7b'
+const webview_package_framework_helper = 'b7992ff9053b0438bd2a832ccd7fa8594982287bacc0e6fa00269620017fa227'
+const webview_package_provider_path = 'tests/native-android-tools/androidtools/framework_webview_package.v'
+const webview_package_provider_helper = '1d1895922450974f4b2d6f5d54f2fc7c94a18f5b686788b2acf7e367308ea8d8'
+const webview_package_raw = '3cd08baf04f82e1f0d7587219f4f6e5c3310d439086ba6ad6c016b20e543ba1d'
+const webview_package_canonical = 'dd38134f402fbcb5297a50cea97eb7f903963e526026be3a49301ba67e69434e'
+const webview_package_native = '/Users/alex/.local/state/vinix/android/current-native-build-2026-11-03-webview-package-r2'
+const webview_package_native_seal = '1434754497efa741ddb2b378cbb693862ee96eb04cb304d9cbeeae5cc98b4dc0'
+const webview_package_native_build = '6ecd2f94ae08b0062d5830e3c8f2903ac6c0559c8615d81ac085646c85bf2e3c'
+const webview_package_native_pin = 'e72e10edd8fed637ec0053100afe535aca7ad6a763e5cd311e712d4d2362c8c2'
+const webview_package_consumed_headers = '7b6c9cac169e58e08656c278be9e7ec498c9cb1490b85b3832c3a3a8d932dff7'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -7192,6 +7214,194 @@ fn build_abis_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return build_abis_base + '/boot.img'
 }
 
+fn webview_package_profile() Profile {
+	mut modules := build_abis_profile().modules.clone()
+	modules << 'maps-build-abis.tar'
+	return Profile{'maps-webview-package', webview_package_boot, 'maps-webview-package.tar', modules}
+}
+fn webview_package_modules() map[string]string {
+	mut modules := build_abis_modules()
+	modules['maps-build-abis.tar'] = webview_package_base_overlay
+	return modules
+}
+fn webview_package_fields() map[string]string {
+	mut fields := build_abis_fields()
+	fields['kind'] = 'vinix-maps-webview-package-v1'
+	fields['base_root'] = webview_package_base
+	fields['base_manifest_sha256'] = webview_package_base_seal
+	fields['framework_build_root'] = webview_package_framework
+	fields['framework_manifest_sha256'] = webview_package_seal
+	fields['framework_jar_sha256'] = webview_package_jar
+	fields['framework_dex_sha256'] = webview_package_dex
+	fields['retained_framework_manifest_sha256'] = build_abis_seal
+	fields['native_build_root'] = webview_package_native
+	fields['native_manifest_sha256'] = webview_package_native_seal
+	fields['native_build_sha256'] = webview_package_native_build
+	fields['native_sha256'] = webview_package_native_pin
+	fields['retained_native_manifest_sha256'] = broadcast_permission_native_seal
+	fields['native_framework_manifest_sha256'] = webview_package_seal
+	fields['native_compatibility_framework_manifest_sha256'] = webview_package_seal
+	fields['retained_native_framework_manifest_sha256'] = broadcast_permission_seal
+	fields['native_consumed_headers_before_sha256'] = broadcast_permission_consumed_headers
+	fields['native_consumed_headers_sha256'] = webview_package_consumed_headers
+	return fields
+}
+fn webview_package_inputs() map[string]string {
+	mut inputs := build_abis_inputs()
+	inputs[webview_package_base + '/sha256.json'] = webview_package_base_seal
+	inputs[webview_package_framework + '/sha256.json'] = webview_package_seal
+	inputs[webview_package_native + '/sha256.json'] = webview_package_native_seal
+	return inputs
+}
+// Fresh producer metadata and all nine payload files are required even if the
+// rebuilt DSO is byte-identical. Only actual deployment/hash-map deltas shrink.
+fn webview_package_known_delta_for(native_pin string) map[string]string {
+	mut delta := {'/' + service_query_jar_path: webview_package_jar,
+		'/' + service_query_dex_path: webview_package_dex,
+		'/' + service_query_headless + '/framework-build.json': webview_package_build,
+		'/' + service_query_headless + '/framework-sha256.json': webview_package_seal,
+		'/' + service_query_headless + '/native-build.json': webview_package_native_build,
+		'/' + service_query_headless + '/native-sha256.json': webview_package_native_seal}
+	if native_pin != broadcast_permission_native_pin { delta['/' + native_onboarding_trace_path] = native_pin }
+	return delta
+}
+fn webview_package_known_delta() map[string]string { return webview_package_known_delta_for(webview_package_native_pin) }
+fn webview_package_headless_delta_for(native_pin string) map[string]string {
+	mut delta := {'/' + service_query_jar_path: webview_package_jar}
+	if native_pin != broadcast_permission_native_pin { delta['/' + native_onboarding_trace_path] = native_pin }
+	return delta
+}
+fn webview_package_source_delta() map[string]string {
+	return {'smali/android/webkit/WebView.smali': webview_package_raw}
+}
+fn webview_package_canonical_delta() map[string]string {
+	return {'new-dex/android/webkit/WebView.smali': webview_package_canonical}
+}
+fn webview_package_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework.v': webview_package_framework_helper,
+		webview_package_provider_path: webview_package_provider_helper}
+}
+fn webview_package_native_helper_delta() map[string]string {
+	// Complete measured normalized builder change: one registry and nine additions.
+	prefix := '/Users/alex/code/vinix/tests/native-android-tools/androidtools/'
+	return {prefix + 'framework.v': webview_package_framework_helper,
+		prefix + 'framework_build_abis.v': '44a6921633df56e14595d7f20d7de0d58eceae464cfb6a124e9131e74ab0ed16',
+		prefix + 'framework_component_parcel.v': 'a0ece9306f6aa5416f3f74f7e57791945cad041304ef95b1a709be98714786ff',
+		prefix + 'framework_event_log.v': 'a02d0d549d255bf47dd2ca95a0bf6b5ebb2251cc26fc79864ee02c18bdb38f42',
+		prefix + 'framework_message_parcel.v': '881f45173c3f042c1a19214f8a6bc4979a1eeb95cf739a30c079c71cb6c0637c',
+		prefix + 'framework_messenger.v': 'ef5c6c6a6dd2ab61da6972b39a1c5735614c8a9157181f8233c501c9f2e2df3b',
+		prefix + 'framework_quick_settings.v': '87b5c5cb651d21ec0e4f356e924a2685971effe46db742b9359642b138092949',
+		prefix + 'framework_settings_secure.v': 'dea6f0cdfeaaee7b717fa2a4d8602336e7af67e419ac9af17ab9dfd9756fb03c',
+		prefix + 'framework_usage_inactive.v': 'f6ade1627c3b8fbf90af86e77473de55ef1e1bfbcc4c76c4f8bfde78a0799b44',
+		prefix + 'framework_webview_package.v': webview_package_provider_helper}
+}
+fn webview_package_consumed_raw_delta() map[string][]string {
+	mut delta := consumed_raw_delta_for_retained_broadcast()
+	delta['smali/android/webkit/WebView.smali'] = ['c166edde745619d979459f2f1b796e862b293fdb1c5052731982a8d92782c40b', webview_package_raw]
+	return delta
+}
+fn consumed_raw_delta_for_retained_broadcast() map[string][]string {
+	return {'smali/android/content/Context.smali': ['3819dd399a1ac9e8fba32ada045cc250f670f4fa012d765126ded7d1acbba0e8', '60fdbab8aef10711d65afa9a0ddf5e64369ae21e0f9010291288109ebc305ab5'],
+		'smali/android/atl/ATLLoadedApp.smali': ['3e133e9cf9a3a2271bfef87917f2060c14b40a550dfb6f760c5b4278580b729f', '6e8d9800711ae17e8b8a86de267590c2bb702d7d6fe8db870c57e6a599e5b0bd']}
+}
+fn webview_package_consumed_canonical_delta() map[string][]string {
+	return {'android/webkit/WebView.smali': ['c166edde745619d979459f2f1b796e862b293fdb1c5052731982a8d92782c40b', webview_package_canonical]}
+}
+fn webview_package_proofs() map[string]string {
+	mut proofs := build_abis_proofs()
+	proofs['headless_input_delta'] = json2.encode(webview_package_headless_delta_for(webview_package_native_pin))
+	proofs['deployment_top_level_delta'] = json2.encode(['inputs_sha256', 'framework_manifest_sha256', 'native_manifest_sha256'])
+	proofs['framework_source_delta'] = json2.encode(webview_package_source_delta())
+	proofs['framework_canonical_delta'] = json2.encode(webview_package_canonical_delta())
+	proofs['framework_builder_helper_delta'] = json2.encode(webview_package_helper_delta())
+	proofs['framework_class_count'] = json2.encode(2117)
+	proofs['framework_changed_method_counts'] = json2.encode({'android/webkit/WebView.smali': 0})
+	proofs['framework_added_method_counts'] = json2.encode({'android/webkit/WebView.smali': 1})
+	proofs['framework_added_fields'] = json2.encode(map[string][]string{})
+	proofs['framework_added_classes'] = json2.encode([]string{})
+	proofs['native_builder_helper_delta'] = json2.encode(webview_package_native_helper_delta())
+	proofs['native_consumed_raw_delta'] = json2.encode(webview_package_consumed_raw_delta())
+	proofs['native_consumed_canonical_delta'] = json2.encode(webview_package_consumed_canonical_delta())
+	return proofs
+}
+fn webview_package_overlay_paths() []string {
+	mut paths := build_abis_overlay_paths()
+	paths << [native_onboarding_trace_path, service_query_headless + '/native-build.json', service_query_headless + '/native-sha256.json']
+	return paths
+}
+fn verify_webview_package_overlay_for(receipt map[string]json2.Any, native_pin string) ! {
+	for name in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof',
+		'framework_removed_method_counts', 'framework_removed_fields'] {
+		if name in receipt { return error('WebView package profile may only replace existing coupled framework/native inputs') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('webview-package deployment delta absent') }))!
+	mut expected := webview_package_known_delta_for(native_pin)
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('webview-package headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == webview_package_old_headless { return error('new WebView package headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('webview-package exact actual framework/native deployment changes differ') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('webview-package overlay inventory absent') }))!
+	paths := webview_package_overlay_paths()
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe webview-package overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			mode := if entry.name == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != mode { return error('webview-package regular allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected webview-package overlay inode') }
+	}
+	if regulars.len != 9 || regulars[service_query_deployment] or { '' } == webview_package_old_deployment { return error('exact nine webview-package files required') }
+	if regulars[native_onboarding_trace_path] or { '' } != native_pin { return error('payload must carry the fresh coupled native DSO') }
+	for path, pin in expected { if regulars[path.trim_left('/')] or { '' } != pin { return error('webview-package input differs from inventory') } }
+}
+fn verify_webview_package_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [webview_package_base_seal, webview_package_boot, webview_package_base_overlay,
+		webview_package_old_deployment, webview_package_old_headless, webview_package_seal,
+		webview_package_build, webview_package_jar, webview_package_dex, webview_package_native_seal,
+		webview_package_native_build, webview_package_native_pin, webview_package_consumed_headers,
+		broadcast_permission_native_seal, broadcast_permission_native_build, broadcast_permission_native_pin,
+		broadcast_permission_seal, broadcast_permission_consumed_headers] {
+		if !digest_valid(pin) { return error('completed WebView package SDK and fresh coupled native producer required') }
+	}
+	for values in [webview_package_source_delta(), webview_package_canonical_delta(), webview_package_helper_delta()] {
+		for path, pin in values { if !relative(path) || !digest_valid(pin) { return error('completed WebView package class/helper pins required') } }
+	}
+	for values in [webview_package_consumed_raw_delta(), webview_package_consumed_canonical_delta()] {
+		for path, pair in values { if !relative(path) || pair.len != 2 || !digest_valid(pair[0]) || !digest_valid(pair[1]) || pair[0] == pair[1] { return error('exact native WebView before/after class pins required') } }
+	}
+	for path, pin in webview_package_native_helper_delta() {
+		if !os.is_abs_path(path) || os.norm_path(path) != path || !digest_valid(pin) { return error('frozen complete WebView native builder helper delta required') }
+	}
+	if webview_package_seal == build_abis_seal || webview_package_jar == build_abis_jar || webview_package_dex == build_abis_dex
+		|| webview_package_native == broadcast_permission_native || webview_package_native_seal == broadcast_permission_native_seal
+		|| webview_package_native_build == broadcast_permission_native_build { return error('fresh WebView SDK and distinct directly coupled native producer required') }
+	for name, expected in webview_package_fields() { if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('webview-package receipt differs: ' + name) } }
+	for name, expected in webview_package_proofs() { if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](expected)! { return error('webview-package proof differs: ' + name) } }
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 134 || seals != webview_package_inputs() { return error('webview-package exact one hundred thirty-four dependency seals differ') }
+	for path in stage.inputs_sha256.keys() {
+		for root in [dialog_theme_relink_root(), resources_float_relink_root(), layout_alignment_relink_root(), window_animations_relink_root()] {
+			if path == root || path.starts_with(root + '/') { return error('historical relink leaves are not new WebView package direct inputs') }
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != webview_package_modules() || stage.preserved_modules_sha256 != webview_package_modules() { return error('webview-package original fifty-seven modules differ') }
+	verify_webview_package_overlay_for(receipt, webview_package_native_pin)!
+}
+fn webview_package_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_webview_package_receipt(receipt, stage)!
+	path := webview_package_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != webview_package_base_seal { return error('webview-package original Build ABI manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != webview_package_boot || pins['maps-build-abis.tar'] or { '' } != webview_package_base_overlay { return error('webview-package original boot or Build ABI overlay differs') }
+	return webview_package_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -7858,6 +8068,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = event_log_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-build-abis' {
 		baseline = build_abis_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-webview-package' {
+		baseline = webview_package_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -15578,6 +15790,214 @@ fn resource_lock_profile_self_test() ! {
 	println('MAPS-RESOURCE-LOCK KERNEL-PROFILE-SELF-TEST PASS two files ninety-eight seals forty-one inherited modules native-only source and C API delta unchanged Java SDK exact provenance and historical rejection')
 }
 
+fn webview_package_entries_fixture_for(native_pin string) []ServiceQueryEntry {
+	paths := webview_package_overlay_paths()
+	mut parents := map[string]bool{}
+	for path in paths {
+		mut parent := os.dir(path)
+		for parent !in ['', '.'] { parents[parent] = true; parent = os.dir(parent) }
+	}
+	mut entries := []ServiceQueryEntry{}
+	for name in parents.keys().sorted() { entries << ServiceQueryEntry{name: name, kind: 'directory', mode: 0o755} }
+	mut pins := webview_package_known_delta_for(native_pin)
+	pins['/' + native_onboarding_trace_path] = native_pin
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	pins['/' + service_query_deployment] = 'b'.repeat(64)
+	for path in paths {
+		entries << ServiceQueryEntry{name: path, kind: 'regular', mode: if path == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }, sha256: pins['/' + path]!}
+	}
+	return entries
+}
+fn webview_package_receipt_fixture_for(native_pin string) !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in webview_package_fields() { receipt[name] = json2.Any(value) }
+	for name, value in webview_package_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	receipt['native_sha256'] = json2.Any(native_pin)
+	receipt['headless_input_delta'] = json2.decode[json2.Any](json2.encode(webview_package_headless_delta_for(native_pin)))!
+	mut delta := webview_package_known_delta_for(native_pin)
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(webview_package_entries_fixture_for(native_pin)))!
+	return receipt
+}
+fn webview_package_receipt_fixture() !map[string]json2.Any { return webview_package_receipt_fixture_for(webview_package_native_pin) }
+fn webview_package_profile_self_test() ! {
+	profile := webview_package_profile()
+	if profile.baseline_sha != webview_package_boot || profile.modules.len != 57 || profile.modules.last() != 'maps-build-abis.tar'
+		|| webview_package_inputs().len != 134 || webview_package_inputs().keys().filter(it.ends_with('/sha256.json')).len != 134 { return error('webview-package fresh coupled profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 58 || webview_package_overlay_paths().len != 9
+		|| webview_package_known_delta().len != (if webview_package_native_pin == broadcast_permission_native_pin { 6 } else { 7 }) { return error('webview-package exact modules, files or actual changes differ') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', modules.reverse()}, Config{'vinix', profile.modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('wrong webview-package module order accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: webview_package_inputs(), original_modules_sha256: webview_package_modules(), preserved_modules_sha256: webview_package_modules()}
+	receipt := webview_package_receipt_fixture()!
+	verify_webview_package_receipt(receipt, stage)!
+	mut fields := webview_package_fields().keys()
+	fields << webview_package_proofs().keys()
+	fields << ['deployment_input_delta', 'overlay_inventory']
+	for name in fields {
+		mut bad := webview_package_receipt_fixture()!
+		bad[name] = json2.Any('changed')
+		if _ := verify_webview_package_receipt(bad, stage) { return error('changed webview-package field/proof accepted') }
+		bad.delete(name)
+		if _ := verify_webview_package_receipt(bad, stage) { return error('missing webview-package field/proof accepted') }
+	}
+	for proof in ['framework_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta',
+		'framework_changed_method_counts', 'framework_added_method_counts', 'framework_added_fields',
+		'native_source_delta', 'native_builder_helper_delta', 'native_bindings_delta', 'native_generated_jni_delta',
+		'native_c_delta', 'native_consumed_header_additions', 'native_consumed_raw_delta', 'native_consumed_canonical_delta',
+		'native_consumed_raw_additions', 'native_consumed_canonical_additions', 'headless_input_delta'] {
+		original := json2.decode[map[string]json2.Any](json2.encode(receipt[proof]!))!
+		for name in original.keys() {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(original))!
+			changed[name] = json2.Any('changed')
+			mut bad := webview_package_receipt_fixture()!
+			bad[proof] = json2.Any(changed)
+			if _ := verify_webview_package_receipt(bad, stage) { return error('changed webview-package proof member accepted') }
+			changed.delete(name)
+			bad[proof] = json2.Any(changed)
+			if _ := verify_webview_package_receipt(bad, stage) { return error('missing webview-package proof member accepted') }
+		}
+		mut extra := json2.decode[map[string]json2.Any](json2.encode(original))!
+		extra['unreviewed'] = json2.Any('a'.repeat(64))
+		mut bad := webview_package_receipt_fixture()!
+		bad[proof] = json2.Any(extra)
+		if _ := verify_webview_package_receipt(bad, stage) { return error('extra webview-package proof member accepted') }
+	}
+	for proof in ['native_consumed_raw_delta', 'native_consumed_canonical_delta'] {
+		original := json2.decode[map[string][]string](json2.encode(receipt[proof]!))!
+		for name, pair in original {
+			for index in 0 .. 2 {
+				mut changed := json2.decode[map[string][]string](json2.encode(original))!
+				mut altered := json2.decode[[]string](json2.encode(pair))!
+				altered[index] = '0'.repeat(64)
+				changed[name] = altered
+				mut bad := webview_package_receipt_fixture()!
+				bad[proof] = json2.decode[json2.Any](json2.encode(changed))!
+				if _ := verify_webview_package_receipt(bad, stage) { return error('changed webview-package native before/after pin accepted') }
+			}
+		}
+	}
+	for field, wrong in {'native_framework_manifest_sha256': broadcast_permission_seal,
+		'native_compatibility_framework_manifest_sha256': build_abis_seal,
+		'retained_native_framework_manifest_sha256': webview_package_seal,
+		'retained_framework_manifest_sha256': webview_package_seal,
+		'retained_native_manifest_sha256': webview_package_native_seal,
+		'native_manifest_sha256': broadcast_permission_native_seal,
+		'native_build_root': broadcast_permission_native,
+		'native_build_sha256': broadcast_permission_native_build,
+		'native_consumed_headers_before_sha256': asset_locales_consumed_headers} {
+		mut bad := webview_package_receipt_fixture()!
+		bad[field] = json2.Any(wrong)
+		if _ := verify_webview_package_receipt(bad, stage) { return error('stale or relabeled WebView native provenance accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := webview_package_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_webview_package_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed webview-package input accepted') }
+		pins.delete(path)
+		if _ := verify_webview_package_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing webview-package input accepted') }
+	}
+	for path in ['/unreviewed/sha256.json', dialog_theme_relink_root(), resources_float_relink_root(),
+		layout_alignment_relink_root(), window_animations_relink_root(), dialog_theme_relink_root() + '/out/canonical.so'] {
+		mut pins := webview_package_inputs()
+		pins[path] = 'a'.repeat(64)
+		if _ := verify_webview_package_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('extra webview-package seal or historical proof leaf accepted') }
+	}
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: build_abis_modules()}, Stage{...stage, preserved_modules_sha256: build_abis_modules()}] {
+		if _ := verify_webview_package_receipt(receipt, bad) { return error('wrong webview-package module inventory accepted') }
+	}
+	for addition in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof', 'framework_removed_method_counts', 'framework_removed_fields'] {
+		for value in [json2.Any(map[string]json2.Any{}), json2.Any('historical')] {
+			mut bad := webview_package_receipt_fixture()!
+			bad[addition] = value
+			if _ := verify_webview_package_receipt(bad, stage) { return error('webview-package addition, removal or relink proof accepted') }
+		}
+	}
+	for added in [['android/webkit/WebView$Unreviewed.smali'], ['android/util/EventLog.smali']] {
+		mut bad := webview_package_receipt_fixture()!
+		bad['framework_added_classes'] = json2.decode[json2.Any](json2.encode(added))!
+		if _ := verify_webview_package_receipt(bad, stage) { return error('webview-package class addition accepted') }
+	}
+	// Exercise equal/different DSO paths independently of the actual producer.
+	for native_pin in [broadcast_permission_native_pin, 'f'.repeat(64)] {
+		equal := native_pin == broadcast_permission_native_pin
+		headless := webview_package_headless_delta_for(native_pin)
+		if headless.len != (if equal { 1 } else { 2 }) || ('/' + native_onboarding_trace_path in headless) == equal { return error('actual WebView headless DSO delta differs') }
+		branch := webview_package_receipt_fixture_for(native_pin)!
+		verify_webview_package_overlay_for(branch, native_pin)!
+		delta := json2.decode[map[string]string](json2.encode(branch['deployment_input_delta']!))!
+		if delta.len != (if equal { 7 } else { 8 }) || ('/' + native_onboarding_trace_path in delta) == equal { return error('actual WebView deployment DSO delta differs') }
+		for path in delta.keys() {
+			mut changed := delta.clone()
+			changed.delete(path)
+			mut bad := webview_package_receipt_fixture_for(native_pin)!
+			bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+			if _ := verify_webview_package_overlay_for(bad, native_pin) { return error('missing WebView actual input change accepted') }
+		}
+		mut wrong := delta.clone()
+		if equal { wrong['/' + native_onboarding_trace_path] = native_pin } else { wrong.delete('/' + native_onboarding_trace_path) }
+		mut bad_delta := webview_package_receipt_fixture_for(native_pin)!
+		bad_delta['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(wrong))!
+		if _ := verify_webview_package_overlay_for(bad_delta, native_pin) { return error('nonactual or missing WebView DSO deployment change accepted') }
+		entries := webview_package_entries_fixture_for(native_pin)
+		for index, entry in entries {
+			for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+				mut bad_entries := entries.clone()
+				bad_entries[index] = changed
+				mut bad := webview_package_receipt_fixture_for(native_pin)!
+				bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+				if _ := verify_webview_package_overlay_for(bad, native_pin) { return error('unsafe WebView overlay inode accepted') }
+			}
+			if entry.kind == 'regular' {
+				mut bad_entries := entries.clone()
+				bad_entries.delete(index)
+				mut bad := webview_package_receipt_fixture_for(native_pin)!
+				bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+				if _ := verify_webview_package_overlay_for(bad, native_pin) { return error('missing WebView payload file accepted') }
+				if entry.name != service_query_deployment {
+					bad_entries = entries.clone()
+					bad_entries[index] = ServiceQueryEntry{...entry, sha256: '0'.repeat(64)}
+					bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+					if _ := verify_webview_package_overlay_for(bad, native_pin) { return error('changed WebView payload pin accepted') }
+				}
+			}
+		}
+		for extra in [entries.last(), ServiceQueryEntry{name: 'opt/unreviewed', kind: 'regular', mode: 0o644, sha256: 'a'.repeat(64)}] {
+			mut changed := entries.clone()
+			changed << extra
+			mut bad := webview_package_receipt_fixture_for(native_pin)!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+			if _ := verify_webview_package_overlay_for(bad, native_pin) { return error('duplicate or unreviewed WebView payload accepted') }
+		}
+		for path, stale in {service_query_headless + '/native-build.json': broadcast_permission_native_build,
+			service_query_headless + '/native-sha256.json': broadcast_permission_native_seal,
+			service_query_headless + '/guest-inputs.json': webview_package_old_headless,
+			service_query_deployment: webview_package_old_deployment} {
+			mut changed := entries.clone()
+			for index, entry in changed { if entry.name == path { changed[index] = ServiceQueryEntry{...entry, sha256: stale} } }
+			mut bad := webview_package_receipt_fixture_for(native_pin)!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+			if path != service_query_deployment {
+				mut stale_delta := delta.clone()
+				stale_delta['/' + path] = stale
+				bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(stale_delta))!
+			}
+			if _ := verify_webview_package_overlay_for(bad, native_pin) { return error('stale WebView native/headless metadata accepted') }
+		}
+	}
+	for old in [build_abis_receipt_fixture()!, event_log_receipt_fixture()!, broadcast_permission_receipt_fixture()!] {
+		if _ := verify_webview_package_receipt(old, stage) { return error('historical receipt accepted by WebView package profile') }
+	}
+	if _ := verify_build_abis_receipt(receipt, stage) { return error('WebView package receipt accepted by Build ABI profile') }
+	if _ := verify_broadcast_permission_receipt(receipt, stage) { return error('WebView package receipt accepted by historical broadcast profile') }
+	println('MAPS-WEBVIEW-PACKAGE KERNEL-PROFILE-SELF-TEST PASS nine files one hundred thirty-four seals fifty-seven inherited modules2117 classes one WebView addition fresh native70 raw3 canonical1 conditional DSO deltas')
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
@@ -15629,6 +16049,7 @@ fn self_test() ! {
 	component_parcel_profile_self_test()!
 	event_log_profile_self_test()!
 	build_abis_profile_self_test()!
+	webview_package_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -15724,6 +16145,7 @@ fn self_test() ! {
 	fat_self_test(root + '/component-parcel', 'maps-component-parcel.tar', component_parcel_profile().modules)!
 	fat_self_test(root + '/event-log', 'maps-event-log.tar', event_log_profile().modules)!
 	fat_self_test(root + '/build-abis', 'maps-build-abis.tar', build_abis_profile().modules)!
+	fat_self_test(root + '/webview-package', 'maps-webview-package.tar', webview_package_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -15786,8 +16208,10 @@ fn main() {
 	is_component_parcel := os.args.len == 5 && os.args[1] == '--maps-component-parcel'
 	is_event_log := os.args.len == 5 && os.args[1] == '--maps-event-log'
 	is_build_abis := os.args.len == 5 && os.args[1] == '--maps-build-abis'
+	is_webview_package := os.args.len == 5 && os.args[1] == '--maps-webview-package'
 	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display || is_asset_locales || is_unmanaged_queries || is_stats_unavailable || is_subscription_service
-	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings && !is_usage_inactive && !is_messenger_binder && !is_component_parcel && !is_event_log && !is_build_abis {
+	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings && !is_usage_inactive && !is_messenger_binder && !is_component_parcel && !is_event_log && !is_build_abis && !is_webview_package {
+		eprintln('       patch-kernel --maps-webview-package FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-build-abis FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-event-log FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-component-parcel FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
@@ -15800,7 +16224,7 @@ fn main() {
 		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display|--maps-asset-locales|--maps-unmanaged-queries|--maps-stats-unavailable|--maps-subscription-service] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings || is_usage_inactive || is_messenger_binder || is_component_parcel || is_event_log || is_build_abis { 1 } else { 0 }
+	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings || is_usage_inactive || is_messenger_binder || is_component_parcel || is_event_log || is_build_abis || is_webview_package { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -15811,7 +16235,7 @@ fn main() {
 	}
 	profile := if is_seed_companion { seed_companion_profile() } else if is_broker_tail { broker_tail_profile() } else if is_window_system_ui { window_system_ui_profile() } else if is_imageview_bounds { imageview_bounds_profile() } else if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	selected_profile := if is_subscription_service { subscription_service_profile() } else if is_stats_unavailable { stats_unavailable_profile() } else if is_unmanaged_queries { unmanaged_queries_profile() } else if is_asset_locales { asset_locales_profile() } else if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
-	final_profile := if is_build_abis { build_abis_profile() } else if is_event_log { event_log_profile() } else if is_component_parcel { component_parcel_profile() } else if is_messenger_binder { messenger_binder_profile() } else if is_usage_inactive { usage_inactive_profile() } else if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
+	final_profile := if is_webview_package { webview_package_profile() } else if is_build_abis { build_abis_profile() } else if is_event_log { event_log_profile() } else if is_component_parcel { component_parcel_profile() } else if is_messenger_binder { messenger_binder_profile() } else if is_usage_inactive { usage_inactive_profile() } else if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
 	patch(root, build_root, os.args[3 + offset], final_profile) or {
 		eprintln(err)
 		exit(1)
