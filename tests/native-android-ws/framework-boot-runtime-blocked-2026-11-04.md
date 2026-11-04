@@ -1,4 +1,16 @@
-# JNI correction host-qualified; ARM retry pending
+# JNI correction qualified; successor preparation awaits disk budget
+
+The [native-only successor tools](maps-framework-jni-load-stage.md) are now
+qualified and committed as `79c2eea86`, including the clean inherited-kernel
+checkpoint and unchanged signed fixture delivery. Four complete fresh
+[preparation attempts](maps-framework-jni-load-preparation-2026-11-04.md) stopped
+at the outer 512 MiB shared-filesystem growth guard during read-only auditing,
+before creating their output directories. Their complete controls are sealed
+and freshly verified. No functional validation failure appeared; no successor
+image or ARM/GMS/Maps result is established. CI remains running and unchanged.
+Retry requires a quieter interval or an explicitly approved larger outer
+shared-disk allowance; all provenance, stager write budgets and reserves remain
+required.
 
 The framework boot-classpath image is prepared and the frozen replacement
 kernel is installed, with complete readbacks passed. Installation reused the
