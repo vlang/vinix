@@ -1,4 +1,16 @@
-# JNI successor prepared and cloned; ARM retry ready
+# ARM JNI regression passed; GMS needs TrafficStats UID methods
+
+The [ARM replay](maps-framework-jni-load-runtime-2026-11-04.md) passed the
+unchanged signed boot-classpath fixture, including all six input identities,
+eleven checks and clean teardown. GMS reached readiness, then exited because
+Cronet could not reflect `TrafficStats.setThreadStatsUid(int)`. Complete logs,
+UART and the four-root runtime evidence are sealed and freshly verified.
+The own VM is stopped; CI remains running and unchanged. The next SDK fix adds
+per-thread UID set/get/clear state independently of existing traffic tags.
+No manual Maps launch, rendering, imagery or authentication result is established.
+
+The preparation and ready-to-run statements below describe the preceding
+checkpoint and are superseded by that ARM replay.
 
 The [native-only successor](maps-framework-jni-load-stage.md) is now
 [prepared and sealed](maps-framework-jni-load-preparation-2026-11-04.md) at
