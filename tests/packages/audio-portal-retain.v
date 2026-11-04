@@ -8,13 +8,14 @@ import math
 import os
 import tests.packages.audiotest
 import tests.packages.audioinputs
+import tests.packages.audiokernel
 
 const trees = ['tools/packages', 'tools/accounts', 'tools/security-events', 'tools/keyring',
 	'build-support/native-compat-tools/compathost', 'tools/sandbox', 'tests/qemu-core/fixturehost',
 	'tests/native-guest-tools/guesthost', 'tests/linuxkpi/hosttest', 'tests/native-policy-tools/nativepolicy',
 	'tests/native-policy-tools/cpufixture', 'tests/host-policy/policyhost', 'tests/hardware-platform/hwhost',
 	'tests/packages/audio-portal-guest', 'tests/packages/audio-portal-tone', 'tests/packages/audiotest',
-	'tests/packages/audioinputs', 'tests/packages/audioprepare']
+	'tests/packages/audioinputs', 'tests/packages/audioprepare', 'tests/packages/audiokernel']
 const files = ['tests/packages/audio-portal-runtime-check.v', 'tests/packages/audio-portal-retain.v',
 	'tests/packages/audio-portal-evidence-check.v', 'tests/packages/audio-portal-wave-check.v',
 	'build-support/native-compat-tools/main.v', 'build-support/security-tools/compile-v-core',
@@ -159,10 +160,18 @@ fn sealed_file(root string, path string, sum string) ! {
 	if digest(root + '/' + path)! != sum { return error('sealed kernel input differs: ' + path) }
 }
 
-fn admit_kernel(run string, receipt Receipt, arch string, synthetic bool) ! {
+fn admit_kernel(run string, out string, receipt Receipt, arch string, synthetic bool) ! {
 	root := run + '/inputs/kernel-evidence'
 	path := root + '/kernel-seal.json'
 	if receipt.artifact_paths['kernel-seal'] != path { return error('missing retained kernel seal') }
+	if audiokernel.matched(root)! {
+		if synthetic { return error('matched kernel profile requires complete native evidence') }
+		audiokernel.validate(root, arch, receipt.artifacts['kernel'])!
+		// Failed audit output is preserved in this fresh retention directory.
+		os.mkdir_all(out)!
+		audiokernel.check_audit(root, arch, receipt.artifacts['kernel'], out + '/kernel-audit-check.log')!
+		return
+	}
 	if !synthetic && (!hex(reviewed_kernel_seal, 64) || receipt.artifacts['kernel-seal'] != reviewed_kernel_seal) {
 		return error('requires independently reviewed native kernel seal')
 	}
@@ -297,6 +306,7 @@ fn embedded() map[string]string {
 		'tests/packages/audio-input-check.v': $embed_file('audio-input-check.v').to_string()
 		'tests/packages/audioinputs/tree.v': $embed_file('audioinputs/tree.v').to_string()
 		'tests/packages/audioprepare/prepare.v': $embed_file('audioprepare/prepare.v').to_string()
+		'tests/packages/audiokernel/kernel.v': $embed_file('audiokernel/kernel.v').to_string()
 		'tests/packages/audio-portal-prepare-check.v': $embed_file('audio-portal-prepare-check.v').to_string()
 		'build-support/limine.conf': $embed_file('../../build-support/limine.conf').to_string()
 		'tests/packages/audio-cross-cc.v': $embed_file('audio-cross-cc.v').to_string()
@@ -467,7 +477,7 @@ fn retain(run string, out string, arch string, synthetic bool) ! {
 	for name in ['guest', 'tone', 'package-cli', 'account-cli', 'session-cli', 'authd', 'kernel', 'sandbox'] {
 		target_elf(receipt.artifact_paths[name], arch)!
 	}
-	admit_kernel(run, receipt, arch, synthetic)!
+	admit_kernel(run, out, receipt, arch, synthetic)!
 	admit_cross(run, receipt, arch)!
 	for name in metadata {
 		if name !in receipt.artifacts || receipt.artifact_paths[name] != run + '/' + name + '.json' {

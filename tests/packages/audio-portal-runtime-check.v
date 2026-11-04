@@ -8,15 +8,20 @@ import json2
 import os
 import time
 import tests.packages.audioinputs
+import tests.packages.audiokernel
 import tests.packages.audioprepare
 import tools.packages.pkgcore
+
+#include <stdlib.h>
+
+fn C.mkdtemp(&char) &char
 
 const source_trees = ['tools/packages', 'tools/accounts', 'tools/security-events', 'tools/keyring',
 	'tools/sandbox', 'build-support/native-compat-tools/compathost', 'tests/qemu-core/fixturehost',
 	'tests/native-guest-tools/guesthost', 'tests/linuxkpi/hosttest', 'tests/native-policy-tools/nativepolicy',
 	'tests/native-policy-tools/cpufixture', 'tests/host-policy/policyhost', 'tests/hardware-platform/hwhost',
 	'tests/packages/audio-portal-guest', 'tests/packages/audio-portal-tone', 'tests/packages/audiotest',
-	'tests/packages/audioinputs', 'tests/packages/audioprepare']
+	'tests/packages/audioinputs', 'tests/packages/audioprepare', 'tests/packages/audiokernel']
 const source_files = ['tests/packages/audio-portal-runtime-check.v',
 	'tests/packages/audio-portal-retain.v', 'tests/packages/audio-portal-evidence-check.v',
 	'tests/packages/audio-portal-wave-check.v', 'build-support/native-compat-tools/main.v',
@@ -545,13 +550,23 @@ fn validate_preparation(out string, expected_sha string) !Preparation {
 		if p.artifact_paths[key] != out + '/' + relative { return error('prepared artifact location differs: ' + key) }
 	}
 	if p.inputs['controller'] != audioprepare.digest(os.executable())!
-		|| p.artifact_paths['kernel-seal'] != out + '/inputs/kernel-evidence/kernel-seal.json'
-		|| p.inputs['kernel-seal'] != reviewed_kernel_seal { return error('controller or reviewed kernel seal differs') }
-	seal := json2.decode[PreparedKernelSeal](os.read_file(p.artifact_paths['kernel-seal'])!)!
-	build := seal.kernels['aarch64']
-	if seal.format != 1 || build.elf_path != 'kernel-aarch64/bin/vinix'
-		|| digest(out + '/inputs/kernel-evidence/' + build.elf_path)! != build.elf_sha256
-		|| p.inputs['kernel'] != build.elf_sha256 { return error('prepared kernel differs from reviewed seal') }
+		|| p.artifact_paths['kernel-seal'] != out + '/inputs/kernel-evidence/kernel-seal.json' {
+		return error('controller or reviewed kernel seal differs')
+	}
+	kernel_root := out + '/inputs/kernel-evidence'
+	is_matched := audiokernel.matched(kernel_root) or {
+		return error('controller or reviewed kernel seal differs')
+	}
+	if is_matched {
+		audiokernel.validate(kernel_root, 'aarch64', p.inputs['kernel'])!
+	} else {
+		if p.inputs['kernel-seal'] != reviewed_kernel_seal { return error('controller or reviewed kernel seal differs') }
+		seal := json2.decode[PreparedKernelSeal](os.read_file(p.artifact_paths['kernel-seal'])!)!
+		build := seal.kernels['aarch64']
+		if seal.format != 1 || build.elf_path != 'kernel-aarch64/bin/vinix'
+			|| digest(out + '/inputs/kernel-evidence/' + build.elf_path)! != build.elf_sha256
+			|| p.inputs['kernel'] != build.elf_sha256 { return error('prepared kernel differs from reviewed seal') }
+	}
 	allowed := audioinputs.header_allowlist(out + '/inputs/source', p.sources, p.original_paths)
 	for name in audioinputs.trace_files() {
 		if p.artifact_paths['trace/' + name] != out + '/' + name
@@ -617,6 +632,22 @@ fn seal_preparation(options hwhost.Options, root string, out string, before map[
 
 fn prepared_command(resume bool, out string, expected_sha string) ! {
 	p := validate_preparation(out, expected_sha)!
+	if audiokernel.matched(out + '/inputs/kernel-evidence')! {
+		// Verify the complete original audit again without changing the sealed
+		// preparation. The reviewed outer runner supplies its charged TMPDIR.
+		parent := os.real_path(os.temp_dir())
+		if parent == out || parent.starts_with(out + '/')
+			|| os.lstat(parent)!.mode & 0o170000 != 0o040000 {
+			return error('kernel audit logs require an ordinary temporary directory outside prepared state')
+		}
+		mut pattern := (parent + '/vinix-audio-kernel-audit-XXXXXX').bytes()
+		pattern << u8(0)
+		if isnil(C.mkdtemp(unsafe { &char(pattern.data) })) { return error('cannot create fresh complete kernel audit log directory') }
+		directory := pattern[..pattern.len - 1].bytestr()
+		println('AUDIO KERNEL AUDIT LOG ' + directory)
+		audiokernel.check_audit(out + '/inputs/kernel-evidence', 'aarch64', p.inputs['kernel'],
+			directory + '/kernel-audit-check.log')!
+	}
 	if !resume { println('AUDIO PREPARATION VERIFIED ' + expected_sha + ' (read-only; no guest executed)'); return }
 	for name, path in p.original_paths {
 		if audioprepare.digest(path)! != p.inputs[name] { return error('external original changed before resume: ' + name) }
@@ -776,18 +807,32 @@ fn check() ! {
 			return error('--prepare-only requires a new state below an existing canonical ordinary parent')
 		}
 		evidence := os.getenv('VINIX_AUDIO_KERNEL_EVIDENCE')
-		if evidence == '' || audioprepare.digest(evidence + '/kernel-seal.json')! != reviewed_kernel_seal {
+		if evidence == '' {
 			return error('--prepare-only requires reviewed SO_PEERLOGIN kernel evidence')
 		}
-		seal := json2.decode[PreparedKernelSeal](os.read_file(evidence + '/kernel-seal.json')!)!
-		if audioprepare.digest(options.kernel)! != seal.kernels['aarch64'].elf_sha256 {
-			return error('--prepare-only kernel differs from reviewed AArch64 kernel')
+		if audiokernel.matched(evidence)! {
+			audiokernel.validate(evidence, 'aarch64', audioprepare.digest(options.kernel)!)!
+		} else {
+			if audioprepare.digest(evidence + '/kernel-seal.json')! != reviewed_kernel_seal {
+				return error('--prepare-only requires reviewed SO_PEERLOGIN kernel evidence')
+			}
+			seal := json2.decode[PreparedKernelSeal](os.read_file(evidence + '/kernel-seal.json')!)!
+			if audioprepare.digest(options.kernel)! != seal.kernels['aarch64'].elf_sha256 {
+				return error('--prepare-only kernel differs from reviewed AArch64 kernel')
+			}
 		}
 	}
 	selected_scenarios(options.scenarios)!
 	root := hwhost.find_root(@FILE)!
 	out := options.state_dir
 	os.mkdir_all(out + '/inputs/source')!
+	if prepare_only {
+		evidence := os.getenv('VINIX_AUDIO_KERNEL_EVIDENCE')
+		if audiokernel.matched(evidence)! {
+			audiokernel.check_audit(evidence, 'aarch64', audioprepare.digest(options.kernel)!,
+				out + '/kernel-audit-check.log')!
+		}
+	}
 	before := source_inventory(root)!
 	for name, _ in before {
 		target := out + '/inputs/source/' + name

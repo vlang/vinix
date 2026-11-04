@@ -56,9 +56,73 @@ fn put(path string, bytes []u8) ! {
 }
 
 fn linked(source string, target string) ! {
-	audioprepare.regular(source)!
+	before := os.lstat(source)!
+	if before.mode & 0o170000 != 0o100000 { return error('fixture copy requires regular source') }
+	sum := audioprepare.digest(source)!
+	if os.exists(target) || os.is_link(target) { return error('fixture copy requires fresh target: ' + target) }
 	os.mkdir_all(os.dir(target))!
-	os.link(source, target)!
+	os.cp(source, target, fail_if_exists: true)!
+	copy := os.lstat(target)!
+	if copy.mode != before.mode || copy.size != before.size || copy.nlink != 1
+		|| (copy.dev == before.dev && copy.inode == before.inode)
+		|| audioprepare.digest(target)! != sum {
+		return error('fixture requires independent mode-preserving copy: ' + target)
+	}
+	fixture_source_unchanged(source, before, sum)!
+}
+
+// Reads may update atime. The remaining os.Stat identity and status fields must
+// stay fixed, including an existing source link count greater than one.
+fn fixture_metadata_equal(a os.Stat, b os.Stat) bool {
+	return a.dev == b.dev && a.inode == b.inode && a.mode == b.mode && a.nlink == b.nlink
+		&& a.uid == b.uid && a.gid == b.gid && a.rdev == b.rdev && a.size == b.size
+		&& a.mtime == b.mtime && a.ctime == b.ctime
+}
+
+fn fixture_source_unchanged(source string, before os.Stat, sum string) ! {
+	if !fixture_metadata_equal(before, os.lstat(source)!) || audioprepare.digest(source)! != sum
+		|| !fixture_metadata_equal(before, os.lstat(source)!) {
+		return error('fixture copy changed source bytes or metadata: ' + source)
+	}
+}
+
+fn independent_copy_control(root string) ! {
+	os.mkdir(root)!
+	source := root + '/source'
+	target := root + '/copy'
+	os.write_file(source, 'shared read-only fixture source\n')!
+	os.chmod(source, 0o550)!
+	// Intentional aliases belong only to this new private regression fixture.
+	os.link(source, root + '/source-alias')!
+	before := os.lstat(source)!
+	sum := audioprepare.digest(source)!
+	if before.nlink != 2 { return error('shared-source regression lacks its intentional alias') }
+	linked(source, target)!
+	copy := os.lstat(target)!
+	mut refused := false
+	linked(source, target) or { refused = true }
+	if !refused || !fixture_metadata_equal(copy, os.lstat(target)!) { return error('duplicate fixture target was overwritten or accepted') }
+	// Write through the owned inode: detaching here would hide a hardlink bug.
+	os.chmod(target, 0o600)!
+	os.write_file(target, 'mutated independent fixture\n')!
+	fixture_source_unchanged(source, before, sum)!
+	fixture_source_unchanged(root + '/source-alias', before, sum)!
+	changed := os.lstat(target)!
+	changed_sum := audioprepare.digest(target)!
+	refused = false
+	linked(source, target) or { refused = true }
+	if !refused || !fixture_metadata_equal(changed, os.lstat(target)!)
+		|| audioprepare.digest(target)! != changed_sum { return error('mismatched fixture target was overwritten or accepted') }
+	for kind in ['hardlink', 'symlink'] {
+		path := root + '/' + kind
+		if kind == 'hardlink' { os.link(source, path)! } else { os.symlink('source', path)! }
+		current := os.lstat(source)!
+		entry := os.lstat(path)!
+		refused = false
+		linked(source, path) or { refused = true }
+		if !refused || !fixture_metadata_equal(entry, os.lstat(path)!) { return error('linked fixture target was overwritten or accepted') }
+		fixture_source_unchanged(source, current, sum)!
+	}
 }
 
 fn source_tree(root string, target string, name string, mut sources map[string]string) ! {
@@ -141,7 +205,7 @@ fn synthetic_preparation(out string, controller string, kernel string) !FixtureP
 		'build-support/native-compat-tools/compathost', 'tests/qemu-core/fixturehost', 'tests/native-guest-tools/guesthost',
 		'tests/linuxkpi/hosttest', 'tests/native-policy-tools/nativepolicy', 'tests/native-policy-tools/cpufixture', 'tests/host-policy/policyhost',
 		'tests/hardware-platform/hwhost', 'tests/packages/audio-portal-guest', 'tests/packages/audio-portal-tone',
-		'tests/packages/audiotest', 'tests/packages/audioinputs', 'tests/packages/audioprepare'] {
+		'tests/packages/audiotest', 'tests/packages/audioinputs', 'tests/packages/audioprepare', 'tests/packages/audiokernel'] {
 		source_tree(root, prep + '/inputs/source', name, mut sources)!
 	}
 	for name in ['tests/packages/audio-portal-runtime-check.v', 'tests/packages/audio-portal-retain.v',
@@ -581,6 +645,8 @@ fn run(out string, controller string, kernel string) ! {
 	if !regular_refused { return error('regular helper accepted a symbolic link') }
 	controls << 'regular-file-helper-refuses-symlink'
 	preparation := if controller == '' { '' } else { controller_controls(out, controller, kernel, mut controls)! }
+	independent_copy_control(out + '/independent-copy')!
+	controls << 'independent-fixture-copy-preserves-shared-source-bytes-and-metadata'
 	os.write_file(out + '/result.json', json2.encode(Report{
 		checker: audioprepare.digest(@FILE)!
 		helper: sha256.sum($embed_file('audioprepare/prepare.v').to_string().bytes()).hex()

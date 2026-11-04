@@ -95,10 +95,73 @@ fn call(program string, args []string) Control {
 }
 
 fn linked(source string, target string) ! {
-	if os.exists(target) { return }
-	if (os.lstat(source)!).mode & 0o170000 != 0o100000 { return error('clone requires regular source') }
-	os.mkdir_all(os.dir(target))!
-	os.link(source, target)!
+	before := os.lstat(source)!
+	if before.mode & 0o170000 != 0o100000 { return error('fixture copy requires regular source') }
+	sum := digest(source)!
+	if !os.exists(target) && !os.is_link(target) {
+		os.mkdir_all(os.dir(target))!
+		os.cp(source, target, fail_if_exists: true)!
+	}
+	copy := os.lstat(target)!
+	if copy.mode != before.mode || copy.size != before.size || copy.nlink != 1
+		|| (copy.dev == before.dev && copy.inode == before.inode)
+		|| digest(target)! != sum {
+		return error('fixture requires independent mode-preserving copy: ' + target)
+	}
+	fixture_source_unchanged(source, before, sum)!
+}
+
+// Reads may update atime. The remaining os.Stat identity and status fields must
+// stay fixed, including an existing source link count greater than one.
+fn fixture_metadata_equal(a os.Stat, b os.Stat) bool {
+	return a.dev == b.dev && a.inode == b.inode && a.mode == b.mode && a.nlink == b.nlink
+		&& a.uid == b.uid && a.gid == b.gid && a.rdev == b.rdev && a.size == b.size
+		&& a.mtime == b.mtime && a.ctime == b.ctime
+}
+
+fn fixture_source_unchanged(source string, before os.Stat, sum string) ! {
+	if !fixture_metadata_equal(before, os.lstat(source)!) || digest(source)! != sum
+		|| !fixture_metadata_equal(before, os.lstat(source)!) {
+		return error('fixture copy changed source bytes or metadata: ' + source)
+	}
+}
+
+fn independent_copy_control(root string) ! {
+	os.mkdir(root)!
+	source := root + '/source'
+	target := root + '/copy'
+	os.write_file(source, 'shared read-only fixture source\n')!
+	os.chmod(source, 0o550)!
+	// Intentional aliases belong only to this new private regression fixture.
+	os.link(source, root + '/source-alias')!
+	before := os.lstat(source)!
+	sum := digest(source)!
+	if before.nlink != 2 { return error('shared-source regression lacks its intentional alias') }
+	linked(source, target)!
+	copy := os.lstat(target)!
+	linked(source, target)!
+	if !fixture_metadata_equal(copy, os.lstat(target)!) { return error('duplicate fixture copy rewrote its target') }
+	// Write through the owned inode: detaching here would hide a hardlink bug.
+	os.chmod(target, 0o600)!
+	os.write_file(target, 'mutated independent fixture\n')!
+	fixture_source_unchanged(source, before, sum)!
+	fixture_source_unchanged(root + '/source-alias', before, sum)!
+	changed := os.lstat(target)!
+	changed_sum := digest(target)!
+	mut refused := false
+	linked(source, target) or { refused = true }
+	if !refused || !fixture_metadata_equal(changed, os.lstat(target)!)
+		|| digest(target)! != changed_sum { return error('mismatched fixture target was overwritten or accepted') }
+	for kind in ['hardlink', 'symlink'] {
+		path := root + '/' + kind
+		if kind == 'hardlink' { os.link(source, path)! } else { os.symlink('source', path)! }
+		current := os.lstat(source)!
+		entry := os.lstat(path)!
+		refused = false
+		linked(source, path) or { refused = true }
+		if !refused || !fixture_metadata_equal(entry, os.lstat(path)!) { return error('linked fixture target was overwritten or accepted') }
+		fixture_source_unchanged(source, current, sum)!
+	}
 }
 
 // Never write through a hard link: detach before replacing any mutated bytes.
@@ -425,6 +488,9 @@ fn run(program string, original string, proof string, arch string, synthetic boo
 	for name, sum in receipt.sources {
 		if digest(receipt.source_root + '/' + name)! != sum { return error('original source changed during controls: ' + name) }
 	}
+	independent_copy_control(proof + '/independent-copy')!
+	controls << Control{ name: 'independent-fixture-copy-preserves-shared-source-bytes-and-metadata', code: 0,
+		output: 'shared source unchanged after independent copy, duplicate validation and direct destination mutation' }
 	os.write_file(proof + '/evidence-controls.json', json2.encode(Report{ qualification: original_digest, platform: receipt.platform,
 		retainer: digest(program)!, checker: digest(os.executable())!, controls: controls }) + '\n')!
 	println('AUDIO PORTAL EVIDENCE PASS controls=' + controls.len.str() + ' platform=' + receipt.platform)
@@ -600,7 +666,7 @@ fn self_test(program string, out string, arch string) ! {
 		'tools/sandbox', 'tests/qemu-core/fixturehost', 'tests/native-guest-tools/guesthost', 'tests/linuxkpi/hosttest',
 		'tests/native-policy-tools/nativepolicy', 'tests/native-policy-tools/cpufixture', 'tests/host-policy/policyhost',
 		'tests/hardware-platform/hwhost', 'tests/packages/audio-portal-guest', 'tests/packages/audio-portal-tone', 'tests/packages/audiotest',
-		'tests/packages/audioinputs', 'tests/packages/audioprepare'] {
+		'tests/packages/audioinputs', 'tests/packages/audioprepare', 'tests/packages/audiokernel'] {
 		frozen_tree(root, raw + '/inputs/source', tree, mut sources)!
 	}
 	for path in ['tests/packages/audio-portal-runtime-check.v', 'tests/packages/audio-portal-retain.v', 'tests/packages/audio-portal-evidence-check.v',
