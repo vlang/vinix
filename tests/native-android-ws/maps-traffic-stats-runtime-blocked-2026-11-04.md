@@ -58,3 +58,36 @@ against the then-current foreign identity and leave CI running. Run the
 [signed TrafficStats fixture](traffic-stats-uid-fixture-run.md), validate the
 complete receipt and UART export, release its mount, then retry GMS stability
 and Maps. No SDK/native rebuild is required to reach that ARM check.
+
+## Resume attempt at 18:23 UTC
+
+At the next user continuation, free space had temporarily recovered to
+4,690,407,424 bytes. Original clone sidecars were copied into
+`S/maps-traffic-stats-runtime-audit-2026-11-04-r1/clone-evidence` for retention
+alongside the stopped run. No closed prepared image, original live controls,
+stopped VM or earlier seal attempt was changed.
+
+The fifth aggregate attempt at
+`S/maps-traffic-stats-preparation-sealed-2026-11-04-r5` covered nine roots:
+the prepared image and controls, all four earlier failed seals, the stopped
+VM, its live controls and its audit directory. It stopped at the unchanged
+64 MiB shared-growth cap after 8,215 ms: guard125/child137, complete cleanup,
+77,238,272 bytes observed growth, sampled RSS14,106,624 bytes. No functional
+validation error appeared; the complete failed attempt remains preserved.
+
+At 18:32 UTC a fresh clone was attempted with the same qualified tool and a
+**tighter** 512 MiB growth cap instead of the prior 2 GiB cap. The 1 GiB
+reserve, full byte/mode checks, RSS, wall and output/file limits were retained.
+Free space had fallen to 1,366,175,744 bytes, below reserve plus growth budget,
+so the guard refused preflight with reason `disk growth budget`, guard125,
+child-1, PID0, zero RSS samples/groups and `cleanup_complete=false`.
+No clone child started, and the intended fresh VM path
+`S/maps-traffic-stats-vm-2026-11-04-r2` was not created. Complete controls are
+in `S/maps-traffic-stats-live-controls-2026-11-04-r2`; its fresh audit directory
+is `S/maps-traffic-stats-runtime-audit-2026-11-04-r2`.
+
+At 18:33:59 UTC the filesystem had 1,113,354,240 bytes available, still below
+the required transfer/clone preflight allowance. CI PID23708 remained running;
+there was no owned VM. ARM fixture execution, aggregate sealing and the
+subsequent GMS/Maps replay remain blocked on stable free space. No guard was
+weakened and no retained evidence or other session's files were deleted.
