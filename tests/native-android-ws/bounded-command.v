@@ -318,6 +318,8 @@ fn run(args []string) !int {
 	separator := args.index('--')
 	if separator < 0 || separator + 1 >= args.len { return error('missing -- COMMAND [ARGS]') }
 	mut root := ''; mut log := ''; mut receipt_path := ''; mut limits := Limits{}
+	mut standard_wall := false
+	mut audit_wall := false
 	for item in args[..separator] {
 		key, value := item.split_once('=') or { return error('expected key=value') }
 		match key {
@@ -325,7 +327,19 @@ fn run(args []string) !int {
 			'log' { log = value }
 			'receipt' { receipt_path = value }
 			'rss' { limits.rss = number(value)! }
-			'wall_ms' { n := number(value)!; if n > 900_000 { return error('wall limit exceeds 900 seconds') }; limits.wall_ms = i64(n) }
+			'wall_ms' {
+				if audit_wall { return error('audit wall setting must be exclusive') }
+				n := number(value)!
+				if n > 900_000 { return error('wall limit exceeds 900 seconds') }
+				standard_wall = true
+				limits.wall_ms = i64(n)
+			}
+			'audit_wall_ms' {
+				if standard_wall || audit_wall { return error('audit wall setting must be exclusive') }
+				if value != '1800000' { return error('audit_wall_ms requires exactly 1800000') }
+				audit_wall = true
+				limits.wall_ms = 1_800_000
+			}
 			'reserve' { limits.reserve = number(value)! }
 			'growth' { limits.growth = number(value)! }
 			'output' { limits.output = number(value)! }

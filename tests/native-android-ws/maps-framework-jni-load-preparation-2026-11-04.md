@@ -88,11 +88,15 @@ and children exited zero with complete cleanup; observed growth was
 SHA-256 `2719100244e241677d6edfb9fc0604d77f3bc69d1698d518704c7d7238e38395`.
 The historical four-root seal above remains untouched.
 
-A proposed fresh attempt uses a 30-minute outer deadline with the same 4 GiB
-shared-growth allowance and all other limits unchanged. This deadline change
-is pending approval; it was not used in these attempts. The complete partial
-output is evidence of the stopped attempt, not a substitute for a fresh full
-preparation.
+The user then continued after the concrete 30-minute outer deadline proposal,
+retaining the same 4 GiB shared-growth allowance and every other limit. R7's
+legacy `wall_ms=1800000` invocation was rejected by the original guard before
+any child, receipt or output. The additive explicit
+[audit-wall option](audit-wall-guard-2026-11-04.md) is now qualified, including
+the unchanged original full suite and new focused controls. Its evidence seal
+also preserves the R7 record. A fresh full preparation will use
+`audit_wall_ms=1800000`; neither R6's partial output nor an interrupted audit
+can substitute for successful preparation.
 
 The qualified stager separately retains its own 512 MiB charged write budget and
 1 GiB free-space reserve, all 137 inherited inventories before and after,

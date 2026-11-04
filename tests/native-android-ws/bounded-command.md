@@ -16,6 +16,11 @@ Defaults are 2 GiB aggregate sampled RSS, 300 seconds, 1 GiB free disk reserve,
 `rss=BYTES` and `output=BYTES` can tighten those bounds; `reserve=BYTES` can
 raise the reserve. An explicit `wall_ms=MS` can select up to 900 seconds for
 complete input and readback audits; its default remains 300 seconds. An explicit
+`audit_wall_ms=1800000` selects exactly 30 minutes for separately authorized
+long audits. It cannot be repeated or combined with `wall_ms` in either order;
+other spellings and values are rejected before evidence creation or spawning.
+The selected duration remains in the existing receipt's `limits.wall_ms` field;
+the receipt shape and all other guards are unchanged. An explicit
 `growth=BYTES` can select a budget up to 8 GiB; its default remains 512 MiB.
 Before spawning, free space must
 cover the whole reserve plus the growth budget, with overflow-safe arithmetic.
@@ -54,6 +59,11 @@ external result directory:
 ```text
 check-bounded-command /absolute/bounded-command /external/fresh-controls
 ```
+
+The additive `check-bounded-command --audit-wall RUNNER FRESH_OUTPUT` mode
+checks the explicit 30-minute option, 33 prewrite refusals, unchanged receipt
+and resource fields, and a real short timeout with cleanup. It reports its
+focused scope and does not replace the full control suite above.
 
 The controls cover literal arguments, exit 37, merged output, absent generated
 root, exclusive evidence creation, output overflow, wall timeout, an exited
