@@ -1,11 +1,15 @@
-# Framework boot media prepared and cloned; runtime gates remain
+# Framework boot kernel installed; ARM checks await admission
 
-The framework boot-classpath image is prepared and its exact local clone
-passed complete readbacks. Kernel installation and ARM execution remain
-pending. The current host patcher has not completed its FAT suite under the
-original shared-growth cap; an unrelated active CI VM also prevents boot
-under the qualified coexistence policy. No new fixture, GMS, Maps rendering,
-imagery or authentication result is established.
+The framework boot-classpath image is prepared and the frozen replacement
+kernel is installed, with complete readbacks passed. Installation reused the
+exact qualified SDK 27.0 patcher; the SDK 27.2 draft remains unqualified.
+Boot and ARM execution await qualified host admission while the user's
+**Leave CI running** choice remains in force. No new fixture, GMS, Maps
+rendering, imagery or authentication result is established.
+
+The preparation, clone and first two handoffs below record historical states.
+Their pending-kernel statements are superseded by the current installation
+and admission results appended afterward; all original evidence remains required.
 
 Preparation used source `38aa4e5dd7ae9471427afde9e90a0adea33f75cf`, containing
 core `992b426c3`, SDK companion `a16baf6c3`, signed fixture `63ba81754`,
@@ -34,7 +38,8 @@ Source/destination inventories, typed metadata and manifest/stage hashes match.
 Guard/child exited zero with complete cleanup in 14,395 ms: sampled/detailed
 RSS 33,226,752/32,227,328 bytes and observed growth 52,682,752 bytes, under
 original 600 MiB RSS, 300-second, 2 GiB growth and 1 GiB reserve limits.
-This clone has not received the frozen replacement kernel or booted.
+At this earlier handoff, the clone had not received the frozen replacement
+kernel or booted.
 
 Complete failed attempts remain retained. The closed tool root
 `maps-framework-boot-tools-2026-11-03-r1` (`T`) preserves original SDK 27.0
@@ -50,13 +55,13 @@ log to `3f97205f4e9807de7bb81bea0a689bffb9a76ebb3946dd658b2647e71f1b2647`.
 Complete r5 scratch remains under `r5/scratch`; preservation passed 0/0 with
 complete cleanup in 63 ms. No functional failure appeared and no cap was raised.
 
-Aggregate tool evidence sealing remains pending. Both complete failed seal
+At that stage, aggregate tool evidence sealing remained pending. Both failed seal
 roots `maps-framework-boot-tools-sealed-2026-11-04-r1` and matching `r2` remain
 preserved. Closed `T`, the separate inventory-batch root and the original
 complete SDK 27.0 closure retain their original audits and source snapshots;
 the smaller handoff seal below does not substitute for that pending aggregate.
 
-The last root-requested read-only check at 08:03:56 +0300 found unrelated
+An earlier root-requested read-only check at 08:03:56 +0300 found unrelated
 Debian CI QEMU PID 89417, PPID 1, group 89416, started November 4 at 06:47:15
 local time, with unchanged 32 GiB/eight-CPU configuration and active owner
 evidence writes. Its workspace is `/Users/alex/code/v-linux-ci-followup-20261104`.
@@ -78,9 +83,9 @@ hashes to
 `2e5c92bda9e876a2a1696b4ebe3f54f312b386043659a54c2f33b747b34d3d86`.
 Seal and independent fresh-process readback passed guard/child zero with
 complete cleanup in 128/203 ms, observing 1,257,472/110,592 bytes growth under
-the unchanged 64 MiB cap. This binds only the complete small handoff controls;
-full aggregate qualification, kernel installation, boot admission and actual
-ARM/Maps checks remain required.
+the unchanged 64 MiB cap. This binds only the complete small handoff controls.
+At that historical handoff, full aggregate qualification, kernel installation,
+boot admission and actual ARM/Maps checks were still required.
 
 Later on November 4, the user selected **Leave CI running**. That preference
 remains in force; no foreign VM was stopped or changed. A fresh read-only
@@ -110,8 +115,72 @@ hashes to
 `228843b8581f64457da056f9db88f0d1f67e7b465d0aa77c11ebe61aea7f6336`.
 Both guards/children exited zero with complete cleanup in 208/306 ms,
 observing 438,272/40,960 bytes growth under the unchanged 64 MiB cap.
-This covers only the small current handoff controls. Full aggregate sealing,
-patcher qualification, kernel installation and runtime checks remain pending.
+This covers only the small second handoff controls. At that historical point,
+full aggregate sealing, patcher qualification, kernel installation and runtime
+checks remained pending.
 Future kernel output must use a fresh kernel-controls root; future live output
 must use live-controls-r3 or later, without appending to sealed C2. The existing
-exact clone remains unmodified and unbooted; no new runtime result is claimed.
+exact clone was then unmodified and unbooted; no runtime result was claimed.
+
+A later no-write probe observed 103,120,896 bytes shared growth in 10,890 ms;
+the next 45-second probe passed 0/0 with complete cleanup and 122,880 bytes
+growth. A fresh same-binary FAT r7 at
+`S/maps-framework-boot-patcher-fat-2026-11-04-r7` nevertheless stopped after
+37 FAT passes at the original growth cap: guard 125/child 137, complete
+cleanup, 155,018 ms and 539,459,584 bytes growth. Its complete scratch remains
+under `r7/scratch`; preservation passed 0/0 with complete cleanup in 131 ms.
+The brief quiet interval did not establish a quiet full-run window. All failed
+attempts remain retained; the SDK 27.2 draft `628cd967...` stays unqualified.
+
+The exact old SDK 27.0 executable
+`864cd44a611fc4e2f0a5ecb5bc85f2fecaed4ef0768e598a2769b817cc481542`
+was instead qualified for reuse by the
+[archived-input verifier](framework-boot-archived-patcher.md), source
+`461e2ac187db1a7db3b70dba2058ebd2b7a840a5` and report commit `6ba379aa9`.
+Its original complete 52-profile/45-FAT pass remains bound to that binary.
+The specific old-tool four-root, 8,408-entry seal hashes to
+`5b0218f4451713a99c86969a13659cdcd57e97f83b49f9b7700cac85494c51a1`
+and passed separate fresh readback. This does not transfer qualification to
+the new SDK 27.2 draft or weaken the original auditors.
+
+The separately granted kernel-only operation used that exact old executable
+against the existing clone and frozen kernel build receipt
+`1e9077779aaed08188e6f8111ca9ceb27b479517ece736a58157049f004fb36d`.
+All kernel, FAT, module and final readbacks passed. Fresh controls
+`S/maps-framework-boot-kernel-controls-2026-11-04-r1` (`K`) record guard/child
+zero, empty reason and complete cleanup in 75,639 ms, sampled RSS 39,976,960
+bytes and growth 1,203,974,144 bytes, below the original 2 GiB cap. Original
+600 MiB RSS, 300-second, 1 GiB reserve and output/file caps remained unchanged.
+
+| Installed artifact | SHA-256 |
+| --- | --- |
+| Kernel patch receipt | `4ae68440e0ae6525245cb6cafc00e0cdad4ddbdbce6c18f176b76098ce772d75` |
+| Frozen replacement kernel | `a54505e3725e11bb2f769d62c1260f0b447a4d9fbcde21ba7f9119e08ba75151` |
+| Patched stage receipt | `f89341c069721d053ac168dd1ddd2fadbf4262dcb4715fdd5d194ad17d15e60d` |
+| Patched boot image | `8a9ed7d36ef13c3006039cc8643b3eb7d0335abb5e1311f7c3121f10ba4c06bf` |
+
+The original stage remains at `stage-before-kernel.json`. Later qualified
+read-only admission at `S/maps-framework-boot-boot-admission-2026-11-04-r1`
+(`R`) refused with `exactly the selected foreign QEMU required`: multiple
+active QEMUs were present in its process snapshot. Guard/child exited 1/1
+with complete cleanup in 116 ms. No lifecycle start, boot, foreign stop,
+QMP/guest access or policy relaxation occurred. **Leave CI running** persists.
+
+Complete closed `K+R` passed a separate two-root, 13-entry seal and independent
+fresh readback at
+`S/maps-framework-boot-kernel-handoff-sealed-2026-11-04-r1/sealed/manifest.json`,
+SHA-256 `7bcaf0f32e78fa0d942e8b4877d6338b7635076d6c79fe3e2d62bde21ddfd7a9`.
+Seal/readback took 146/290 ms, both with complete cleanup. `R` retains snapshots
+of the actual stage/kernel JSONs at the identities above. All earlier sealed
+`A/C/P` and archival roots remain unchanged; future live controls require a
+fresh root beyond those already sealed.
+
+Whole `T/B/new-draft` aggregate sealing remains pending. Its further attempts
+at `S/maps-framework-boot-tools-sealed-2026-11-04-r3` and matching `r4` both
+stopped at the original 64 MiB shared-growth cap: guard 125/child 137 and
+complete cleanup. Q3 took 12,735 ms at 81,108,992 bytes growth; Q4 took
+18,181 ms at 67,657,728 bytes growth and produced no manifest. All complete
+attempt roots and partial outputs remain preserved. These aggregate stops do
+not undo the exact old-tool qualification or actual kernel installation pass.
+The new draft remains unqualified; boot admission and ARM/Maps checks remain
+outstanding. No additional aggregate or full-FAT retry is planned this turn.
