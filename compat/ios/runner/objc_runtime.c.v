@@ -132,6 +132,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := ns_operation_queue_types(info.name, info.meta, selector) { return types }
 	if types := ns_invocation_types(info.name, info.meta, selector) { return types }
 	if types := ns_thread_types(info.name, info.meta, selector) { return types }
+	if types := ns_run_loop_types(info.name, info.meta, selector) { return types }
 	if types := web_auth_types(info.name, info.meta, selector) { return types }
 	if types := image_view_types(info.name, info.meta, selector) { return types }
 	if types := ui_feedback_types(info.name, info.meta, selector) { return types }

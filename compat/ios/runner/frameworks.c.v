@@ -247,6 +247,9 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if library == '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation' && symbol == '_CFRunLoopGetMain' {
 		return u64(unsafe { voidptr(cf_run_loop_get_main) })
 	}
+	if library == '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation' && symbol == '_CFRunLoopGetCurrent' {
+		return u64(unsafe { voidptr(cf_run_loop_get_current) })
+	}
 	if library == '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation' && symbol == '_CFStringCompare' {
 		return u64(unsafe { voidptr(cf_string_compare) })
 	}

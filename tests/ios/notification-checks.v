@@ -146,6 +146,14 @@ fn main() {
 		run_host_fixture(root, old, out, 'audio_session_activation_test.v')!
 		return
 	}
+	if os.args[1] == 'run-loop-host' {
+		run_host_fixture(root, old, out, 'cf_run_loop_main_test.v')!
+		return
+	}
+	if os.args[1] == 'thread-host' {
+		run_host_fixture(root, old, out, 'ns_thread_test.v')!
+		return
+	}
 	if os.args[1] == 'audio-haptics-host' {
 		run_host_fixture(root, old, out, 'audio_session_haptics_test.v')!
 		return

@@ -10,6 +10,7 @@ mut:
 	object u64
 	name u64
 	dictionary u64
+	run_loop u64
 	target u64
 	argument u64
 	selector u64
@@ -107,6 +108,7 @@ fn ns_thread_dispose(mut header ObjHeader) {
 	if state.executing { panic('iOS: destroying an executing thread') }
 	objc_release(state.name)
 	objc_release(state.dictionary)
+	objc_release(state.run_loop)
 	objc_release(state.target)
 	objc_release(state.argument)
 	block_release(state.block)
@@ -165,7 +167,11 @@ fn ns_thread_cleanup(pointer voidptr) {
 	C.ios_objc_initialize_unlock()
 	objc_release(target); objc_release(argument); block_release(block)
 	objc_pool_free(C.pthread_getspecific(ios_runtime.pool_key))
-	C.ios_objc_initialize_lock(); state.finished = true; C.ios_objc_initialize_unlock()
+	C.ios_objc_initialize_lock()
+	state.finished = true
+	loop := state.run_loop; state.run_loop = 0
+	C.ios_objc_initialize_unlock()
+	objc_release(loop)
 	C.pthread_setspecific(ios_runtime.thread_key, unsafe { nil })
 	objc_release(state.object)
 	if worker != unsafe { nil } { C.ios_objc_initialize_lock(); worker.done = true; C.ios_objc_initialize_unlock() }
