@@ -94,6 +94,8 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if info.name == 'NSNumber' && !info.meta && selector == 'longLongValue' { return 'q16@0:8' }
 	if info.name == 'UIResponder' && !info.meta && selector == 'nextResponder' { return '@16@0:8' }
 	if info.name == 'UIView' && !info.meta {
+		if selector == 'clearsContextBeforeDrawing' { return 'B16@0:8' }
+		if selector == 'setClearsContextBeforeDrawing:' { return 'v20@0:8B16' }
 		if selector == 'viewWithTag:' { return '@24@0:8q16' }
 		if selector == 'tag' { return 'q16@0:8' }
 		if selector == 'setTag:' { return 'v24@0:8q16' }

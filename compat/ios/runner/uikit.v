@@ -332,6 +332,8 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	}
 	if objc_is_kind(object, ios_runtime.names['UIView']) {
 		match selector {
+			'clearsContextBeforeDrawing' { frame.x[0] = u64(!header.preserve_view_context); return true }
+			'setClearsContextBeforeDrawing:' { header.preserve_view_context = u8(frame.x[2]) == 0; return true }
 			'viewWithTag:' { frame.x[0] = ui_view_with_tag(object, i64(frame.x[2])); return true }
 			'window' {
 				mut view := object

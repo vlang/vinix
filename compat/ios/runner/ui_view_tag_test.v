@@ -11,10 +11,14 @@ fn C.sel_registerName(&char) voidptr
 fn C.class_getInstanceMethod(voidptr, voidptr) voidptr
 fn C.method_getTypeEncoding(voidptr) &char
 fn C.method_getImplementation(voidptr) voidptr
+fn C.objc_allocateClassPair(voidptr, &char, usize) voidptr
+fn C.objc_registerClassPair(voidptr)
 fn C.dlopen(&char, int) voidptr
 fn C.dlsym(voidptr, &char) voidptr
 
 type ViewTagSend = fn (u64, u64, u64) u64
+type ViewClearGet = fn (u64, u64) bool
+type ViewClearSet = fn (u64, u64, bool)
 struct ViewTagApi { native bool send u64 }
 
 fn (api ViewTagApi) selector(name &char) u64 {
@@ -113,6 +117,53 @@ fn view_tag_cases(api ViewTagApi, cls u64) {
 	}
 	for view in [outside, leaf, second, first, root]! { api.message(view, c'release', 0) }
 }
+
+fn view_clear_cases(api ViewTagApi, cls u64) {
+	first := api.view(cls); second := api.view(cls)
+	get := api.selector(c'clearsContextBeforeDrawing')
+	set := api.selector(c'setClearsContextBeforeDrawing:')
+	assert u8(api.message(first, c'clearsContextBeforeDrawing', 0)) == 1;
+	assert u8(api.message(second, c'clearsContextBeforeDrawing', 0)) == 1;
+	// Darwin's BOOL argument occupies w2: only bits above that slot are padding.
+	for value in [u64(0), 1, u64(1) << 32, (u64(1) << 32) | 1, u64(0xffffffff) << 32, (u64(0xffffffff) << 32) | 1]! {
+		api.message(first, c'setClearsContextBeforeDrawing:', value)
+		assert u8(api.message(first, c'clearsContextBeforeDrawing', 0)) == u8(value);
+		assert u8(api.message(second, c'clearsContextBeforeDrawing', 0)) == 1;
+	}
+	api.message(first, c'setClearsContextBeforeDrawing:', 0)
+	api.message(second, c'addSubview:', first)
+	assert u8(api.message(first, c'clearsContextBeforeDrawing', 0)) == 0;
+	api.message(first, c'removeFromSuperview', 0)
+	for i, selector in [get, set]! {
+		assert api.message(first, c'respondsToSelector:', selector) == 1;
+		assert api.message(cls, c'respondsToSelector:', selector) == 0;
+		mut types := ''; mut imp := u64(0)
+		$if macos { if api.native {
+			method := C.class_getInstanceMethod(voidptr(cls), voidptr(selector))
+			assert method != unsafe { nil };
+			types = ctext(u64(C.method_getTypeEncoding(method))); imp = u64(C.method_getImplementation(method))
+		} }
+		if !api.native {
+			method := objc_instance_method(cls, selector)
+			assert method != 0 && objc_instance_method(read64(cls), selector) == 0;
+			types = ctext(u64(objc_method_types(method))); imp = objc_method_imp(method)
+		}
+		assert types == if i == 0 { 'B16@0:8' } else { 'v20@0:8B16' };
+		assert imp != 0;
+		signature := api.message(first, c'methodSignatureForSelector:', selector)
+		assert signature != 0;
+		assert api.message(signature, c'numberOfArguments', 0) == if i == 0 { u64(2) } else { u64(3) };
+		assert api.message(signature, c'methodReturnLength', 0) == if i == 0 { u64(1) } else { u64(0) };
+		assert ctext(api.message(signature, c'methodReturnType', 0)) == if i == 0 { 'B' } else { 'v' };
+		if i == 0 { assert !unsafe { ViewClearGet(voidptr(imp))(first, selector) }; }
+		else {
+			assert ctext(api.message(signature, c'getArgumentTypeAtIndex:', 2)) == 'B';
+			unsafe { ViewClearSet(voidptr(imp))(first, selector, true) }
+			assert u8(api.message(first, c'clearsContextBeforeDrawing', 0)) == 1;
+		}
+	}
+	api.message(first, c'release', 0); api.message(second, c'release', 0)
+}
 fn test_view_tag_native() {
 	$if macos {
 		assert C.dlopen(c'/System/iOSSupport/System/Library/Frameworks/UIKit.framework/UIKit', 2) != unsafe { nil }
@@ -120,8 +171,23 @@ fn test_view_tag_native() {
 		assert api.send != 0
 		pool := api.message(u64(C.objc_getClass(c'NSAutoreleasePool')), c'new', 0)
 		view_tag_cases(api, u64(C.objc_getClass(c'UIView')))
+		view_clear_cases(api, u64(C.objc_getClass(c'UIView')))
+		clear_subclass := C.objc_allocateClassPair(C.objc_getClass(c'UIView'), c'VinixNativeClearView', 0)
+		assert clear_subclass != unsafe { nil };
+		C.objc_registerClassPair(clear_subclass)
+		view_clear_cases(api, u64(clear_subclass))
+		// UIWindow construction requires an application scene. Its inherited
+		// method identity can still be checked without creating a native window.
+		for name in [c'clearsContextBeforeDrawing', c'setClearsContextBeforeDrawing:']! {
+			selector := C.sel_registerName(name)
+			base := C.class_getInstanceMethod(C.objc_getClass(c'UIView'), selector)
+			window := C.class_getInstanceMethod(C.objc_getClass(c'UIWindow'), selector)
+			assert base != unsafe { nil } && window != unsafe { nil };
+			assert C.method_getImplementation(base) == C.method_getImplementation(window);
+		}
 		api.message(pool, c'drain', 0)
 		println('IOS-VIEW-TAG-NATIVE: signed tags, receiver-first depth-first lookup, scope, reparenting, deep hierarchy, metadata, signatures and direct IMP PASS')
+		println('IOS-VIEW-CLEAR-NATIVE: default YES, independent state, BOOL register width, hierarchy, metadata, signatures and direct IMP PASS')
 	}
 }
 fn test_view_tag_runtime() {
@@ -134,9 +200,13 @@ fn test_view_tag_runtime() {
 		subclass := objc_allocate_class(ios_runtime.names['UIView'], c'VinixTaggedView', 0)
 		objc_register_class(subclass)
 		view_tag_cases(api, subclass)
+		view_clear_cases(api, ios_runtime.names['UIView'])
+		view_clear_cases(api, ios_runtime.names['UIWindow'])
+		view_clear_cases(api, subclass)
 		objc_pool_pop(pool)
 		objc_stop()
 		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
 	}
 	println('IOS-VIEW-TAG: shared native cases, UIWindow/subclass inheritance, borrowed ownership and two drained runtimes PASS')
+	println('IOS-VIEW-CLEAR: shared native property cases, UIWindow/subclass inheritance and two drained runtimes PASS')
 }

@@ -275,6 +275,7 @@ mut:
 	deferred_system_edges u64
 	home_indicator_hidden bool
 	idle_timer_disabled bool
+	preserve_view_context bool // Inverse UIView.clearsContextBeforeDrawing; zero defaults to YES.
 	accessibility &AccessibilityState = unsafe { nil }
 	bitmap &BitmapState = unsafe { nil }
 }

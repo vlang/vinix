@@ -327,7 +327,7 @@ fn objc_responds(object u64, selector &char) bool {
 			'setNeedsUpdateOfScreenEdgesDeferringSystemGestures', 'setNeedsUpdateOfHomeIndicatorAutoHidden',
 			'presentViewController:animated:completion:', 'dismissViewControllerAnimated:completion:', 'presentedViewController', 'presentingViewController']
 	}
-	if objc_is_kind(object, ios_runtime.names['UIView']) { return name in ['frame', 'bounds', 'setFrame:', 'layer', 'addSubview:', 'removeFromSuperview', 'backgroundColor', 'setBackgroundColor:', 'tag', 'setTag:', 'viewWithTag:'] }
+	if objc_is_kind(object, ios_runtime.names['UIView']) { return name in ['frame', 'bounds', 'setFrame:', 'layer', 'addSubview:', 'removeFromSuperview', 'backgroundColor', 'setBackgroundColor:', 'tag', 'setTag:', 'viewWithTag:', 'clearsContextBeforeDrawing', 'setClearsContextBeforeDrawing:'] }
 	return false
 }
 
