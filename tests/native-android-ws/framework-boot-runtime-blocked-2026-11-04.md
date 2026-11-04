@@ -1,10 +1,11 @@
-# Framework boot kernel installed; ARM checks await admission
+# Framework boot kernel installed; live coexistence awaits approval
 
 The framework boot-classpath image is prepared and the frozen replacement
 kernel is installed, with complete readbacks passed. Installation reused the
 exact qualified SDK 27.0 patcher. The complete retained tool and attempt
 archives are now sealed and verified; the SDK 27.2 draft remains unqualified.
-Boot and ARM execution await qualified host admission while the user's
+The opt-in 64 GiB coexistence runner has passed host qualification and read-only
+admission; live use awaits explicit approval while the user's
 **Leave CI running** choice remains in force. No new fixture, GMS, Maps
 rendering, imagery or authentication result is established.
 
@@ -234,3 +235,20 @@ image is retained for a later admitted boot; the sole current 32 GiB CI guest
 still exceeds the qualified 20 GiB foreign/32 GiB total allowance with our
 fixed 12 GiB guest. **Leave CI running** persists. Boot admission and actual
 ARM fixture, GMS and Maps execution remain outstanding.
+
+The later [explicit 64 GiB runner qualification](../android-webview-browser-probe/coexist-64g-2026-11-04.md)
+records source `4fd71712c`, all original tests, 86 existing and 67 new refusal
+controls, and successful read-only admission of CI PID 6395. The default
+32 GiB/quarter-host policy and its refusals remain intact. The new mode requires
+at least 128 GiB host RAM, caps aggregate RAM at 64 GiB/half-host and retains
+CPU, pressure, disk and ownership checks. It records the declared QMP endpoint's
+absence and canonical parent identity without connecting to CI.
+
+Both complete attempt/control pairs passed a four-root, 39-entry seal and
+fresh readback, manifest
+`6718fb074d667f9aa3bc6ff03e8b7e7613ca43533cd73d8bbdfe92cd8925c0b5`.
+No guest was launched. The installed stage/kernel receipts above remain
+unchanged; ARM fixture, GMS and Maps checks still await an approved live run.
+The intended aggregate allocation is 44 GiB (32 GiB CI plus 12 GiB Maps).
+Explicit approval to use the larger allowance remains required; **Leave CI
+running** continues to apply. Future live controls must use a fresh root.
