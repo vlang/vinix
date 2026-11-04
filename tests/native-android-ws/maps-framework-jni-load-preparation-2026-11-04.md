@@ -98,9 +98,31 @@ also preserves the R7 record. A fresh full preparation will use
 `audit_wall_ms=1800000`; neither R6's partial output nor an interrupted audit
 can substitute for successful preparation.
 
-The qualified stager separately retains its own 512 MiB charged write budget and
-1 GiB free-space reserve, all 137 inherited inventories before and after,
-typed kernel verification and 60 module readbacks. Once preparation succeeds,
-clone its sealed result without another kernel patch and run the unchanged
-signed ARM fixture using the [new delivery profile](bootclasspath-jni-fixture-run.md),
-then retry GMS and Maps. No successor image or runtime result is established.
+R8 completed successfully from source `cd8b57df0add14767e5ba89f5b2d8e87f1885ef0`
+at `S/maps-framework-jni-load-r8`. Both complete 137-inventory audits, typed
+kernel verification and all 60 module readbacks passed. The completion manifest
+is `31cf35f40e606d6c08d7b6e4daaad3d8b935d2afccfb5971199819456eadbfdb`;
+stage receipt `1253d40b75878fd444946a55c86d4f48521d6756b5d1f427d99ca9615335769f`.
+Guard/child exited zero with complete cleanup in 764,657 ms, sampled RSS
+70,893,568 bytes and shared growth 2,133,159,936 bytes under the approved
+30-minute/4 GiB outer limits. The stager's unchanged 512 MiB charged write
+budget reached 189,050,880 bytes at seal completion, with 1 GiB reserve intact.
+
+The prepared image and complete R8 controls passed a two-root, 184-entry seal
+and independent fresh readback in 11,573/7,539 ms, guard/child zero and complete
+cleanup under the original 64 MiB seal allowance. Manifest:
+`S/maps-framework-jni-load-preparation-sealed-2026-11-04-r3/sealed/manifest.json`,
+SHA-256 `2e09250ad19f7b088af20c92de09cc03a235f629d2c7b245a6f937f1c625bf90`.
+Independent metadata review confirmed all native/SDK/kernel pins, 59 preserved
+modules plus the new overlay, five payload files and 141 dependency seals.
+
+The qualified exact clone at `S/maps-framework-jni-load-vm-2026-11-04-r1`
+passed complete source/destination inventory and inode checks in 18,027 ms,
+guard/child zero with complete cleanup and 67,198,976 bytes observed growth.
+Its sidecar receipt hashes to
+`b6cd2bbc9b3956ee340bc7eff49db40d555bd5573d62d6267c05ed4193fa924e`;
+controls are in `S/maps-framework-jni-load-live-controls-2026-11-04-r1`.
+The verified kernel is already inherited; no new kernel patch is required.
+Run the unchanged signed ARM fixture using the
+[new delivery profile](bootclasspath-jni-fixture-run.md), then retry GMS and
+Maps. Preparation establishes a sealed host image; ARM/GMS/Maps remain separate.

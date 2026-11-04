@@ -1,21 +1,22 @@
-# JNI correction and 30-minute guard qualified; fresh preparation pending
+# JNI successor prepared and cloned; ARM retry ready
 
-The [native-only successor tools](maps-framework-jni-load-stage.md) are now
-qualified and committed as `79c2eea86`, including the clean inherited-kernel
-checkpoint and unchanged signed fixture delivery. The user continued after the
-4 GiB outer shared-growth proposal. The latest fresh
-[preparation attempt](maps-framework-jni-load-preparation-2026-11-04.md) passed
-its initial full 137-inventory audit, all 60 module readbacks and inherited
-kernel checks, then hit the original 15-minute deadline during its final full
-input audit. No functional validation failure appeared. Complete controls and
-partial output are sealed and freshly verified; the partial image has no
-completion receipt or manifest and must not be booted. The user continued after
-the concrete 30-minute proposal. The explicit
-[audit-wall guard option](audit-wall-guard-2026-11-04.md) is qualified, including
-the original complete control suite and focused new-option tests. A fresh full
-preparation can use it with the same 4 GiB allowance and every other check and
-limit unchanged. No successor ARM/GMS/Maps result is established. CI remains
-running and unchanged.
+The [native-only successor](maps-framework-jni-load-stage.md) is now
+[prepared and sealed](maps-framework-jni-load-preparation-2026-11-04.md) at
+`S/maps-framework-jni-load-r8`, manifest
+`31cf35f40e606d6c08d7b6e4daaad3d8b935d2afccfb5971199819456eadbfdb`.
+Both full 137-inventory audits, all 60 module readbacks and inherited kernel
+checks passed. The user continued after the concrete 4 GiB growth and
+30-minute deadline proposals; the explicit audit guard was independently
+qualified. All other limits and the stager's own 512 MiB write budget remain
+unchanged. Complete prepared image/controls passed sealing and fresh readback.
+
+The exact clone `S/maps-framework-jni-load-vm-2026-11-04-r1` passed its complete
+inventory and inode checks. Independent metadata review and fresh host
+admission passed. The frozen kernel is already inherited; do not patch again.
+Next run the unchanged signed fixture with the new bootclasspath-jni delivery
+profile, then retry GMS and Maps. No successor ARM/GMS/Maps result is established
+yet. Historical partial R6 remains sealed and must not be booted. CI remains
+running and unchanged. Paths use `S=/Users/alex/.local/state/vinix/android`.
 
 The framework boot-classpath image is prepared and the frozen replacement
 kernel is installed, with complete readbacks passed. Installation reused the
