@@ -879,6 +879,33 @@ const webview_package_native_seal = '1434754497efa741ddb2b378cbb693862ee96eb04cb
 const webview_package_native_build = '6ecd2f94ae08b0062d5830e3c8f2903ac6c0559c8615d81ac085646c85bf2e3c'
 const webview_package_native_pin = 'e72e10edd8fed637ec0053100afe535aca7ad6a763e5cd311e712d4d2362c8c2'
 const webview_package_consumed_headers = '7b6c9cac169e58e08656c278be9e7ec498c9cb1490b85b3832c3a3a8d932dff7'
+const framework_boot_base = '/Users/alex/.local/state/vinix/android/maps-webview-package-r1'
+const framework_boot_base_seal = 'd6ca42875b50ff239966e42933bd9eab711905e314371b9d68af3c3eb0226b87'
+const framework_boot_boot = '638f4a8802751cb316c0318158504692bcdb9351f8f29dbbb5979624a8b655d8'
+const framework_boot_base_overlay = 'a356be2163a6e77f8bdfb976c367a46caa21c851929fd9fe54ceeed5f4e4a66f'
+const framework_boot_old_deployment = '3e7c6609a05b767fa72cbaa402e36836bcf8349496c4f72662ffaca5f0c82766'
+const framework_boot_old_headless = '954f1360db7482d22562e07739073a5e74df37c5f0a98621427a28ba9d948761'
+// Complete SDK/native pair and independently measured full input deltas.
+const framework_boot_framework = '/Users/alex/.local/state/vinix/android/combined-account-webview-framework-boot-framework-2026-11-03-r1'
+const framework_boot_seal = 'af23c13d90f557c4f7f208ae75c39ad8bcf0efd86fc88fddfe399fe2e66a4e91'
+const framework_boot_build = '031a22b17d85b79adee0ca93776ead247fee47fa6f3b3d48376242969c7baee4'
+const framework_boot_jar = 'd9633112327093e55d924ad658088f8dd3d0b712d5184bddcf7307bfc51bf974'
+const framework_boot_dex = 'c59bc24f43fcd5c40a18b118872186795127fbe309cd1a523823f01136f6f30b'
+const framework_boot_framework_helper = '2db0cbc1f4c7f391c995e5fcd024d6a7a9b47d7ea46fa2db875042ad496a9f32'
+const framework_boot_provider_path = 'tests/native-android-tools/androidtools/framework_boot_classpath.v'
+const framework_boot_provider_helper = '74123ef0d58ebf866287c7b81649bd02cc7f971cc8f8275976537fda39a6417f'
+const framework_boot_resources_raw = 'f7cd9fbce3ddbb6e59580065ae7fb93f36bf17875054710ea5386648101e1e1d'
+const framework_boot_resources_canonical = '43bff6c257c83e7a79894eb2ac32b3e927cb213e2c744376d62ea8df628f0d18'
+const framework_boot_loaded_raw = '644d12ccd65fb6ff5d6cb245b0168f8efc9f28e7fad3957519fc1c1a2926f08a'
+const framework_boot_loaded_canonical = '69b03bab991dc30d5808a4e970ad3dc13203f4e8e14b1404d818de1c33387b9b'
+const framework_boot_native = '/Users/alex/.local/state/vinix/android/current-native-build-2026-11-03-framework-boot-r1'
+const framework_boot_native_seal = '0a6d8126bd0842985123578550fc3fa60c0eb12543e8fcf680d1644f6b49f81f'
+const framework_boot_native_build = '33608b8877f74c4d35b354d66b43a0401d219c712bbf9fa8a1e2282678afbbae'
+const framework_boot_native_pin = 'f3dafa843033f7fb5245cde6007e66eb603ae0fb747fdc1824a33f731ca7088d'
+const framework_boot_consumed_headers = 'df1b7598fdb9fe687f8db41b04c9a0e887b655e9dd3a38af4814e7977e953a3c'
+const framework_boot_native_c = '8321888455233a0a01c657182b79320733fc4ef8f02f4b65f236f122d7bcfff3'
+const framework_boot_bootstrap = 'a716e6820e6581f018fe6bd25ebc6735251d6265c71f4290e8c9224c2dcf5bae'
+const framework_boot_runtime = 'bba5097f2ebfaad299af46192ec3b672630e9a3db2ca86d8cc73c84a6121440b'
 const source = $embed_file(@FILE).to_string()
 
 struct Profile {
@@ -7402,6 +7429,177 @@ fn webview_package_baseline(receipt map[string]json2.Any, stage Stage) !string {
 	return webview_package_base + '/boot.img'
 }
 
+fn framework_boot_profile() Profile {
+	mut modules := webview_package_profile().modules.clone()
+	modules << 'maps-webview-package.tar'
+	return Profile{'maps-framework-boot', framework_boot_boot, 'maps-framework-boot.tar', modules}
+}
+fn framework_boot_modules() map[string]string {
+	mut modules := webview_package_modules()
+	modules['maps-webview-package.tar'] = framework_boot_base_overlay
+	return modules
+}
+fn framework_boot_fields() map[string]string {
+	mut fields := webview_package_fields()
+	fields['kind'] = 'vinix-maps-framework-boot-v1'
+	fields['base_root'] = framework_boot_base
+	fields['base_manifest_sha256'] = framework_boot_base_seal
+	fields['framework_build_root'] = framework_boot_framework
+	fields['framework_manifest_sha256'] = framework_boot_seal
+	fields['framework_jar_sha256'] = framework_boot_jar
+	fields['framework_dex_sha256'] = framework_boot_dex
+	fields['retained_framework_manifest_sha256'] = webview_package_seal
+	fields['native_build_root'] = framework_boot_native
+	fields['native_manifest_sha256'] = framework_boot_native_seal
+	fields['native_build_sha256'] = framework_boot_native_build
+	fields['native_sha256'] = framework_boot_native_pin
+	fields['retained_native_manifest_sha256'] = webview_package_native_seal
+	fields['native_framework_manifest_sha256'] = framework_boot_seal
+	fields['native_compatibility_framework_manifest_sha256'] = framework_boot_seal
+	fields['retained_native_framework_manifest_sha256'] = webview_package_seal
+	fields['native_consumed_headers_before_sha256'] = webview_package_consumed_headers
+	fields['native_consumed_headers_sha256'] = framework_boot_consumed_headers
+	fields['native_c_sha256'] = framework_boot_native_c
+	return fields
+}
+fn framework_boot_inputs() map[string]string {
+	mut inputs := webview_package_inputs()
+	inputs[framework_boot_base + '/sha256.json'] = framework_boot_base_seal
+	inputs[framework_boot_framework + '/sha256.json'] = framework_boot_seal
+	inputs[framework_boot_native + '/sha256.json'] = framework_boot_native_seal
+	return inputs
+}
+fn framework_boot_source_delta() map[string]string {
+	return {'build-support/android/nativews/bootstrap.v': framework_boot_bootstrap,
+		'build-support/android/nativews/runtime.v': framework_boot_runtime}
+}
+fn framework_boot_framework_source_delta() map[string]string {
+	return {'smali/android/content/res/Resources.smali': framework_boot_resources_raw,
+		'smali/android/atl/ATLLoadedApp.smali': framework_boot_loaded_raw}
+}
+fn framework_boot_framework_canonical_delta() map[string]string {
+	return {'new-dex/android/content/res/Resources.smali': framework_boot_resources_canonical,
+		'new-dex/android/atl/ATLLoadedApp.smali': framework_boot_loaded_canonical}
+}
+fn framework_boot_helper_delta() map[string]string {
+	return {'tests/native-android-tools/androidtools/framework.v': framework_boot_framework_helper,
+		framework_boot_provider_path: framework_boot_provider_helper}
+}
+fn framework_boot_native_helper_delta() map[string]string {
+	mut after := map[string]string{}
+	for path, pin in framework_boot_helper_delta() { after['/Users/alex/code/vinix/' + path] = pin }
+	return after
+}
+fn framework_boot_consumed_raw_delta() map[string][]string {
+	return {'smali/android/content/res/Resources.smali': ['61c634f5dba23234794c9a0ec97336d9ec3dc3cf985ea5398a0b100d8f531c74', framework_boot_resources_raw],
+		'smali/android/atl/ATLLoadedApp.smali': ['6e8d9800711ae17e8b8a86de267590c2bb702d7d6fe8db870c57e6a599e5b0bd', framework_boot_loaded_raw],
+		// The canonical clone normalizes the preceding append-only getter.
+		'smali/android/webkit/WebView.smali': [webview_package_raw, webview_package_canonical]}
+}
+fn framework_boot_consumed_canonical_delta() map[string][]string {
+	return {'android/content/res/Resources.smali': ['61c634f5dba23234794c9a0ec97336d9ec3dc3cf985ea5398a0b100d8f531c74', framework_boot_resources_canonical],
+		'android/atl/ATLLoadedApp.smali': ['6e8d9800711ae17e8b8a86de267590c2bb702d7d6fe8db870c57e6a599e5b0bd', framework_boot_loaded_canonical]}
+}
+fn framework_boot_known_delta() map[string]string {
+	return {'/' + native_onboarding_trace_path: framework_boot_native_pin,
+		'/' + service_query_headless + '/native-build.json': framework_boot_native_build,
+		'/' + service_query_headless + '/native-sha256.json': framework_boot_native_seal,
+		'/' + service_query_jar_path: framework_boot_jar, '/' + service_query_dex_path: framework_boot_dex,
+		'/' + service_query_headless + '/framework-build.json': framework_boot_build,
+		'/' + service_query_headless + '/framework-sha256.json': framework_boot_seal}
+}
+fn framework_boot_proofs() map[string]string {
+	mut proofs := webview_package_proofs()
+	proofs['headless_input_delta'] = json2.encode({'/' + native_onboarding_trace_path: framework_boot_native_pin, '/' + service_query_jar_path: framework_boot_jar})
+	proofs['deployment_top_level_delta'] = json2.encode(['inputs_sha256', 'framework_manifest_sha256', 'native_manifest_sha256'])
+	proofs['framework_source_delta'] = json2.encode(framework_boot_framework_source_delta())
+	proofs['framework_canonical_delta'] = json2.encode(framework_boot_framework_canonical_delta())
+	proofs['framework_builder_helper_delta'] = json2.encode(framework_boot_helper_delta())
+	proofs['framework_changed_method_counts'] = json2.encode({'android/content/res/Resources.smali': 1, 'android/atl/ATLLoadedApp.smali': 1})
+	proofs['framework_added_method_counts'] = json2.encode({'android/content/res/Resources.smali': 0, 'android/atl/ATLLoadedApp.smali': 0})
+	proofs['framework_added_fields'] = json2.encode(map[string][]string{})
+	proofs['native_builder_helper_delta'] = json2.encode(framework_boot_native_helper_delta())
+	proofs['native_consumed_raw_delta'] = json2.encode(framework_boot_consumed_raw_delta())
+	proofs['native_consumed_canonical_delta'] = json2.encode(framework_boot_consumed_canonical_delta())
+	proofs['native_source_delta'] = json2.encode(framework_boot_source_delta())
+	proofs['native_c_delta'] = json2.encode({'native/android-native.c': [asset_locales_c, framework_boot_native_c]})
+	return proofs
+}
+fn framework_boot_overlay_paths() []string {
+	return webview_package_overlay_paths()
+}
+fn verify_framework_boot_overlay(receipt map[string]json2.Any) ! {
+	for name in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof',
+		'framework_removed_method_counts', 'framework_removed_fields'] {
+		if name in receipt { return error('framework boot may only replace existing coupled SDK/native inputs') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta'] or { return error('framework boot deployment delta absent') }))!
+	mut expected := framework_boot_known_delta()
+	guest := '/' + service_query_headless + '/guest-inputs.json'
+	guest_pin := delta[guest] or { return error('framework boot headless pin absent') }
+	if !digest_valid(guest_pin) || guest_pin == framework_boot_old_headless { return error('new framework boot headless receipt required') }
+	expected[guest] = guest_pin
+	if delta != expected { return error('framework boot exact eight coupled deployment input changes required') }
+	entries := json2.decode[[]ServiceQueryEntry](json2.encode(receipt['overlay_inventory'] or { return error('framework boot overlay inventory absent') }))!
+	paths := framework_boot_overlay_paths()
+	mut regulars := map[string]string{}
+	mut seen := map[string]bool{}
+	for entry in entries {
+		if entry.name in seen || !relative(entry.name) || entry.mode & 0o7022 != 0 { return error('unsafe framework boot overlay inode') }
+		seen[entry.name] = true
+		if entry.kind == 'regular' {
+			mode := if entry.name == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }
+			if entry.name !in paths || !digest_valid(entry.sha256) || entry.mode != mode { return error('framework boot regular allowlist or mode differs') }
+			regulars[entry.name] = entry.sha256
+		} else if entry.kind != 'directory' || entry.mode != 0o755 || !paths.any(it.starts_with(entry.name + '/')) { return error('unexpected framework boot overlay inode') }
+	}
+	if regulars.len != 9 || regulars[service_query_deployment] or { '' } == framework_boot_old_deployment { return error('exact nine new framework boot files required') }
+	for path, pin in expected { if regulars[path.trim_left('/')] or { '' } != pin { return error('framework boot input differs from inventory') } }
+}
+fn verify_framework_boot_receipt(receipt map[string]json2.Any, stage Stage) ! {
+	for pin in [framework_boot_base_seal, framework_boot_boot, framework_boot_base_overlay,
+		framework_boot_old_deployment, framework_boot_old_headless, framework_boot_native_seal,
+		framework_boot_native_build, framework_boot_native_pin, framework_boot_consumed_headers,
+		framework_boot_native_c, framework_boot_bootstrap, framework_boot_runtime,
+		framework_boot_seal, framework_boot_build, framework_boot_jar, framework_boot_dex,
+		framework_boot_framework_helper, framework_boot_provider_helper,
+		framework_boot_resources_raw, framework_boot_resources_canonical, framework_boot_loaded_raw, framework_boot_loaded_canonical] {
+		if !digest_valid(pin) { return error('completed framework boot SDK/native implementation required') }
+	}
+	for path, pin in framework_boot_helper_delta() { if !relative(path) || !digest_valid(pin) { return error('exact framework boot helper pins required') } }
+	for values in [framework_boot_consumed_raw_delta(), framework_boot_consumed_canonical_delta()] {
+		for path, pair in values { if !relative(path) || pair.len != 2 || !digest_valid(pair[0]) || !digest_valid(pair[1]) || pair[0] == pair[1] { return error('exact framework boot consumed class changes required') } }
+	}
+	if framework_boot_native == webview_package_native || framework_boot_native_seal == webview_package_native_seal
+		|| framework_boot_native_build == webview_package_native_build || framework_boot_native_pin == webview_package_native_pin
+		|| framework_boot_consumed_headers == webview_package_consumed_headers || framework_boot_native_c == asset_locales_c
+		|| framework_boot_framework == webview_package_framework || framework_boot_seal == webview_package_seal
+		|| framework_boot_jar == webview_package_jar || framework_boot_dex == webview_package_dex {
+		return error('fresh framework boot coupled SDK/native producer and changed implementation required')
+	}
+	for name, expected in framework_boot_fields() { if receipt[name] or { json2.Any('absent') } != json2.Any(expected) { return error('framework boot receipt differs: ' + name) } }
+	for name, expected in framework_boot_proofs() { if receipt[name] or { json2.Any('absent') } != json2.decode[json2.Any](expected)! { return error('framework boot proof differs: ' + name) } }
+	mut seals := map[string]string{}
+	for path, pin in stage.inputs_sha256 { if path.ends_with('/sha256.json') { seals[path] = pin } }
+	if seals.len != 137 || seals != framework_boot_inputs() { return error('framework boot exact one hundred thirty-seven dependency seals differ') }
+	for path in stage.inputs_sha256.keys() {
+		for root in [dialog_theme_relink_root(), resources_float_relink_root(), layout_alignment_relink_root(), window_animations_relink_root()] {
+			if path == root || path.starts_with(root + '/') { return error('historical relink leaves are not new framework boot direct inputs') }
+		}
+	}
+	if stage.format != 1 || stage.original_modules_sha256 != framework_boot_modules() || stage.preserved_modules_sha256 != framework_boot_modules() { return error('framework boot original fifty-eight modules differ') }
+	verify_framework_boot_overlay(receipt)!
+}
+fn framework_boot_baseline(receipt map[string]json2.Any, stage Stage) !string {
+	verify_framework_boot_receipt(receipt, stage)!
+	path := framework_boot_base + '/sha256.json'
+	regular(path)!
+	if os.lstat(path)!.size > 8 * 1024 * 1024 || hash(path)! != framework_boot_base_seal { return error('framework boot original WebView stage manifest differs') }
+	pins := json2.decode[map[string]string](os.read_file(path)!)!
+	if pins['boot.img'] or { '' } != framework_boot_boot || pins['maps-webview-package.tar'] or { '' } != framework_boot_base_overlay { return error('framework boot original boot or WebView overlay differs') }
+	return framework_boot_base + '/boot.img'
+}
+
 fn service_query_modules() map[string]string {
 	mut modules := controller_modules()
 	modules['maps-controller-diagnostic.tar'] = 'bef5f25859e77a9671a6a144ccb56891da5ed2f7b4324a93a96da7fdcab1987a'
@@ -8070,6 +8268,8 @@ fn patch(root string, build_root string, receipt_sha string, profile Profile) ! 
 		baseline = build_abis_baseline(stage_map, stage)!
 	} else if profile.name == 'maps-webview-package' {
 		baseline = webview_package_baseline(stage_map, stage)!
+	} else if profile.name == 'maps-framework-boot' {
+		baseline = framework_boot_baseline(stage_map, stage)!
 	} else {
 		for path, expected in stage.inputs_sha256 {
 			if os.file_name(path) == 'boot.img' && expected == baseline_pin {
@@ -15998,6 +16198,181 @@ fn webview_package_profile_self_test() ! {
 	println('MAPS-WEBVIEW-PACKAGE KERNEL-PROFILE-SELF-TEST PASS nine files one hundred thirty-four seals fifty-seven inherited modules2117 classes one WebView addition fresh native70 raw3 canonical1 conditional DSO deltas')
 }
 
+fn framework_boot_entries_fixture() []ServiceQueryEntry {
+	paths := framework_boot_overlay_paths()
+	mut parents := map[string]bool{}
+	for path in paths {
+		mut parent := os.dir(path)
+		for parent !in ['', '.'] { parents[parent] = true; parent = os.dir(parent) }
+	}
+	mut entries := []ServiceQueryEntry{}
+	for name in parents.keys().sorted() { entries << ServiceQueryEntry{name: name, kind: 'directory', mode: 0o755} }
+	mut pins := framework_boot_known_delta()
+	pins['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	pins['/' + service_query_deployment] = 'b'.repeat(64)
+	for path in paths {
+		entries << ServiceQueryEntry{name: path, kind: 'regular', mode: if path == native_onboarding_trace_path { u32(0o755) } else { u32(0o644) }, sha256: pins['/' + path]!}
+	}
+	return entries
+}
+fn framework_boot_receipt_fixture() !map[string]json2.Any {
+	mut receipt := map[string]json2.Any{}
+	for name, value in framework_boot_fields() { receipt[name] = json2.Any(value) }
+	for name, value in framework_boot_proofs() { receipt[name] = json2.decode[json2.Any](value)! }
+	mut delta := framework_boot_known_delta()
+	delta['/' + service_query_headless + '/guest-inputs.json'] = 'a'.repeat(64)
+	receipt['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(delta))!
+	receipt['overlay_inventory'] = json2.decode[json2.Any](json2.encode(framework_boot_entries_fixture()))!
+	return receipt
+}
+fn framework_boot_profile_self_test() ! {
+	profile := framework_boot_profile()
+	if profile.baseline_sha != framework_boot_boot || profile.modules.len != 58 || profile.modules.last() != 'maps-webview-package.tar'
+		|| framework_boot_inputs().len != 137 || framework_boot_inputs().keys().filter(it.ends_with('/sha256.json')).len != 137 { return error('framework boot coupled SDK profile differs') }
+	mut modules := profile.modules.clone()
+	modules << profile.overlay
+	if modules.len != 59 || framework_boot_overlay_paths().len != 9 || framework_boot_known_delta().len != 7 { return error('framework boot exact modules or nine coupled files differ') }
+	verify_modules(profile, Config{'vinix', profile.modules}, Config{'vinix', modules})!
+	for bad in [Config{'vinix', modules.reverse()}, Config{'vinix', profile.modules}, Config{'other', modules}] {
+		if _ := verify_modules(profile, Config{'vinix', profile.modules}, bad) { return error('wrong framework boot module order accepted') }
+	}
+	stage := Stage{format: 1, inputs_sha256: framework_boot_inputs(), original_modules_sha256: framework_boot_modules(), preserved_modules_sha256: framework_boot_modules()}
+	receipt := framework_boot_receipt_fixture()!
+	verify_framework_boot_receipt(receipt, stage)!
+	mut fields := framework_boot_fields().keys()
+	fields << framework_boot_proofs().keys()
+	fields << ['deployment_input_delta', 'overlay_inventory']
+	for name in fields {
+		mut bad := framework_boot_receipt_fixture()!
+		bad[name] = json2.Any('changed')
+		if _ := verify_framework_boot_receipt(bad, stage) { return error('changed framework boot field/proof accepted') }
+		bad.delete(name)
+		if _ := verify_framework_boot_receipt(bad, stage) { return error('missing framework boot field/proof accepted') }
+	}
+	for proof in ['framework_builder_helper_delta', 'framework_source_delta', 'framework_canonical_delta',
+		'framework_changed_method_counts', 'framework_added_method_counts', 'framework_added_fields',
+		'native_source_delta', 'native_builder_helper_delta', 'native_bindings_delta', 'native_generated_jni_delta',
+		'native_c_delta', 'native_consumed_header_additions', 'native_consumed_raw_delta', 'native_consumed_canonical_delta',
+		'native_consumed_raw_additions', 'native_consumed_canonical_additions', 'headless_input_delta'] {
+		original := json2.decode[map[string]json2.Any](json2.encode(receipt[proof]!))!
+		for name in original.keys() {
+			mut changed := json2.decode[map[string]json2.Any](json2.encode(original))!
+			changed[name] = json2.Any('changed')
+			mut bad := framework_boot_receipt_fixture()!
+			bad[proof] = json2.Any(changed)
+			if _ := verify_framework_boot_receipt(bad, stage) { return error('changed framework boot proof member accepted') }
+			changed.delete(name)
+			bad[proof] = json2.Any(changed)
+			if _ := verify_framework_boot_receipt(bad, stage) { return error('missing framework boot proof member accepted') }
+		}
+		mut extra := json2.decode[map[string]json2.Any](json2.encode(original))!
+		extra['unreviewed'] = json2.Any('a'.repeat(64))
+		mut bad := framework_boot_receipt_fixture()!
+		bad[proof] = json2.Any(extra)
+		if _ := verify_framework_boot_receipt(bad, stage) { return error('extra framework boot proof member accepted') }
+	}
+	for proof in ['native_c_delta', 'native_consumed_raw_delta', 'native_consumed_canonical_delta'] {
+		original := json2.decode[map[string][]string](json2.encode(receipt[proof]!))!
+		for name, pair in original {
+			for index in 0 .. 2 {
+				mut changed := json2.decode[map[string][]string](json2.encode(original))!
+				mut altered := pair.clone()
+				altered[index] = '0'.repeat(64)
+				changed[name] = altered
+				mut bad := framework_boot_receipt_fixture()!
+				bad[proof] = json2.decode[json2.Any](json2.encode(changed))!
+				if _ := verify_framework_boot_receipt(bad, stage) { return error('changed framework boot before/after pin accepted') }
+			}
+		}
+	}
+	for field, wrong in {'native_framework_manifest_sha256': webview_package_seal,
+		'native_compatibility_framework_manifest_sha256': webview_package_seal,
+		'framework_manifest_sha256': webview_package_seal, 'framework_build_root': webview_package_framework,
+		'framework_jar_sha256': webview_package_jar, 'framework_dex_sha256': webview_package_dex,
+		'retained_framework_manifest_sha256': framework_boot_seal,
+		'retained_native_framework_manifest_sha256': framework_boot_seal,
+		'retained_native_manifest_sha256': broadcast_permission_native_seal,
+		'native_manifest_sha256': webview_package_native_seal,
+		'native_build_root': webview_package_native, 'native_build_sha256': webview_package_native_build,
+		'native_consumed_headers_before_sha256': broadcast_permission_consumed_headers,
+		'native_consumed_headers_sha256': webview_package_consumed_headers, 'native_c_sha256': asset_locales_c} {
+		mut bad := framework_boot_receipt_fixture()!
+		bad[field] = json2.Any(wrong)
+		if _ := verify_framework_boot_receipt(bad, stage) { return error('stale framework boot native or SDK provenance accepted') }
+	}
+	for path in stage.inputs_sha256.keys() {
+		mut pins := framework_boot_inputs()
+		pins[path] = '0'.repeat(64)
+		if _ := verify_framework_boot_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('changed framework boot input accepted') }
+		pins.delete(path)
+		if _ := verify_framework_boot_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('missing framework boot input accepted') }
+	}
+	for path in ['/unreviewed/sha256.json', dialog_theme_relink_root(), resources_float_relink_root(),
+		layout_alignment_relink_root(), window_animations_relink_root(), dialog_theme_relink_root() + '/out/canonical.so'] {
+		mut pins := framework_boot_inputs()
+		pins[path] = 'a'.repeat(64)
+		if _ := verify_framework_boot_receipt(receipt, Stage{...stage, inputs_sha256: pins}) { return error('extra framework boot seal or historical proof leaf accepted') }
+	}
+	for bad in [Stage{...stage, format: 0}, Stage{...stage, original_modules_sha256: webview_package_modules()}, Stage{...stage, preserved_modules_sha256: webview_package_modules()}] {
+		if _ := verify_framework_boot_receipt(receipt, bad) { return error('wrong framework boot module inventory accepted') }
+	}
+	for addition in ['deployment_input_additions', 'deployment_top_level_additions', 'native_relink_proof', 'framework_removed_method_counts', 'framework_removed_fields'] {
+		mut bad := framework_boot_receipt_fixture()!
+		bad[addition] = json2.Any(map[string]json2.Any{})
+		if _ := verify_framework_boot_receipt(bad, stage) { return error('framework boot input/API additions/removals/relink proof accepted') }
+	}
+	delta := json2.decode[map[string]string](json2.encode(receipt['deployment_input_delta']!))!
+	for path in delta.keys() {
+		mut changed := delta.clone()
+		changed.delete(path)
+		mut bad := framework_boot_receipt_fixture()!
+		bad['deployment_input_delta'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_framework_boot_receipt(bad, stage) { return error('missing framework boot actual input change accepted') }
+	}
+	entries := framework_boot_entries_fixture()
+	for index, entry in entries {
+		for changed in [ServiceQueryEntry{...entry, name: '../escape'}, ServiceQueryEntry{...entry, kind: 'symlink'}, ServiceQueryEntry{...entry, mode: 0o777}, ServiceQueryEntry{...entry, mode: 0o4755}] {
+			mut bad_entries := entries.clone()
+			bad_entries[index] = changed
+			mut bad := framework_boot_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_framework_boot_receipt(bad, stage) { return error('unsafe framework boot overlay inode accepted') }
+		}
+		if entry.kind == 'regular' {
+			mut bad_entries := entries.clone()
+			bad_entries.delete(index)
+			mut bad := framework_boot_receipt_fixture()!
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_framework_boot_receipt(bad, stage) { return error('missing framework boot payload file accepted') }
+			bad_entries = entries.clone()
+			stale := if entry.name == service_query_deployment { framework_boot_old_deployment }
+				else if entry.name == service_query_headless + '/guest-inputs.json' { framework_boot_old_headless }
+				else if entry.name == service_query_headless + '/native-build.json' { webview_package_native_build }
+				else if entry.name == service_query_headless + '/native-sha256.json' { webview_package_native_seal }
+				else if entry.name == service_query_jar_path { webview_package_jar }
+				else if entry.name == service_query_dex_path { webview_package_dex }
+				else if entry.name == service_query_headless + '/framework-build.json' { webview_package_build }
+				else if entry.name == service_query_headless + '/framework-sha256.json' { webview_package_seal }
+				else { webview_package_native_pin }
+			bad_entries[index] = ServiceQueryEntry{...entry, sha256: stale}
+			bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(bad_entries))!
+			if _ := verify_framework_boot_receipt(bad, stage) { return error('stale framework boot payload pin accepted') }
+		}
+	}
+	for extra in [entries.last(), ServiceQueryEntry{name: 'opt/unreviewed', kind: 'regular', mode: 0o644, sha256: 'a'.repeat(64)}] {
+		mut changed := entries.clone()
+		changed << extra
+		mut bad := framework_boot_receipt_fixture()!
+		bad['overlay_inventory'] = json2.decode[json2.Any](json2.encode(changed))!
+		if _ := verify_framework_boot_receipt(bad, stage) { return error('duplicate or unreviewed framework boot payload accepted') }
+	}
+	for old in [webview_package_receipt_fixture()!, build_abis_receipt_fixture()!, broadcast_permission_receipt_fixture()!] {
+		if _ := verify_framework_boot_receipt(old, stage) { return error('historical receipt accepted by framework boot profile') }
+	}
+	if _ := verify_webview_package_receipt(receipt, stage) { return error('framework boot receipt accepted by WebView profile') }
+	println('MAPS-FRAMEWORK-BOOT KERNEL-PROFILE-SELF-TEST PASS nine files one hundred thirty-seven seals fifty-eight inherited modules SDK2117 methods2 native70 raw3 canonical2 source2 generatedC JNI unchanged')
+}
+
 fn self_test() ! {
 	protected_profile_self_test()!
 	controller_profile_self_test()!
@@ -16050,6 +16425,7 @@ fn self_test() ! {
 	event_log_profile_self_test()!
 	build_abis_profile_self_test()!
 	webview_package_profile_self_test()!
+	framework_boot_profile_self_test()!
 	maps := maps_profile()
 	before := Config{'vinix', maps.modules}
 	mut modules := maps.modules.clone()
@@ -16146,6 +16522,7 @@ fn self_test() ! {
 	fat_self_test(root + '/event-log', 'maps-event-log.tar', event_log_profile().modules)!
 	fat_self_test(root + '/build-abis', 'maps-build-abis.tar', build_abis_profile().modules)!
 	fat_self_test(root + '/webview-package', 'maps-webview-package.tar', webview_package_profile().modules)!
+	fat_self_test(root + '/framework-boot', 'maps-framework-boot.tar', framework_boot_profile().modules)!
 	println('BROWSER-KERNEL-PATCH SELF-TEST PASS configuration inventory digest symlink launched-stage guards')
 }
 
@@ -16209,8 +16586,10 @@ fn main() {
 	is_event_log := os.args.len == 5 && os.args[1] == '--maps-event-log'
 	is_build_abis := os.args.len == 5 && os.args[1] == '--maps-build-abis'
 	is_webview_package := os.args.len == 5 && os.args[1] == '--maps-webview-package'
+	is_framework_boot := os.args.len == 5 && os.args[1] == '--maps-framework-boot'
 	is_selected := is_maps || is_protected || is_controller || is_service_query || is_controller_memory || is_direct_boot || is_context_storage || is_broadcast_result || is_onboarding_trace || is_native_onboarding_trace || is_onboarding_framework || is_native_heartbeat || is_browser_poll || is_account_pump || is_application_restrictions || is_account_handoff || is_auth_exception || is_auth_worker || is_binder_identity || is_service_lifecycle || is_platform_fragments || is_imageview_bounds || is_window_system_ui || is_broker_tail || is_seed_companion || is_persistent_data_block || is_bitmap_tiles || is_window_animations || is_layout_alignment || is_user_restrictions || is_bundle_cross_profile || is_resources_float || is_paint_drawable || is_dialog_theme || is_intent_extras || is_resource_lock || is_pending_intent || is_stable_display || is_asset_locales || is_unmanaged_queries || is_stats_unavailable || is_subscription_service
-	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings && !is_usage_inactive && !is_messenger_binder && !is_component_parcel && !is_event_log && !is_build_abis && !is_webview_package {
+	if os.args.len != 4 && !is_selected && !is_autofill_service && !is_keyguard_policy && !is_broadcast_permission && !is_secure_settings && !is_usage_inactive && !is_messenger_binder && !is_component_parcel && !is_event_log && !is_build_abis && !is_webview_package && !is_framework_boot {
+		eprintln('       patch-kernel --maps-framework-boot FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-webview-package FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-build-abis FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		eprintln('       patch-kernel --maps-event-log FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
@@ -16224,7 +16603,7 @@ fn main() {
 		eprintln('usage: patch-kernel [--maps-account|--protected-storage-maps|--maps-controller|--maps-service-query|--maps-controller-memory|--maps-direct-boot|--maps-context-storage|--maps-broadcast-result|--maps-onboarding-trace|--maps-native-onboarding-trace|--maps-onboarding-framework|--maps-native-heartbeat|--maps-browser-poll|--maps-account-pump|--maps-application-restrictions|--maps-account-handoff|--maps-auth-exception|--maps-auth-worker|--maps-binder-identity|--maps-service-lifecycle|--maps-platform-fragments|--maps-imageview-bounds|--maps-window-system-ui|--maps-broker-tail|--maps-seed-account-companion|--maps-persistent-data-block|--maps-bitmap-tiles|--maps-window-animations|--maps-layout-alignment|--maps-user-restrictions|--maps-bundle-cross-profile|--maps-resources-float|--maps-paint-drawable|--maps-dialog-theme|--maps-intent-extras|--maps-resource-lock|--maps-pending-intent|--maps-stable-display|--maps-asset-locales|--maps-unmanaged-queries|--maps-stats-unavailable|--maps-subscription-service] FRESH_STAGE FROZEN_KERNEL_BUILD BUILD_JSON_SHA256')
 		exit(2)
 	}
-	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings || is_usage_inactive || is_messenger_binder || is_component_parcel || is_event_log || is_build_abis || is_webview_package { 1 } else { 0 }
+	offset := if is_selected || is_autofill_service || is_keyguard_policy || is_broadcast_permission || is_secure_settings || is_usage_inactive || is_messenger_binder || is_component_parcel || is_event_log || is_build_abis || is_webview_package || is_framework_boot { 1 } else { 0 }
 	root := external(os.args[1 + offset]) or {
 		eprintln(err)
 		exit(1)
@@ -16235,7 +16614,7 @@ fn main() {
 	}
 	profile := if is_seed_companion { seed_companion_profile() } else if is_broker_tail { broker_tail_profile() } else if is_window_system_ui { window_system_ui_profile() } else if is_imageview_bounds { imageview_bounds_profile() } else if is_platform_fragments { platform_fragments_profile() } else if is_service_lifecycle { service_lifecycle_profile() } else if is_binder_identity { binder_identity_profile() } else if is_auth_worker { auth_worker_profile() } else if is_auth_exception { auth_exception_profile() } else if is_account_handoff { account_handoff_profile() } else if is_application_restrictions { application_restrictions_profile() } else if is_account_pump { account_pump_profile() } else if is_browser_poll { browser_poll_profile() } else if is_native_heartbeat { native_heartbeat_profile() } else if is_onboarding_framework { onboarding_framework_profile() } else if is_native_onboarding_trace { native_onboarding_trace_profile() } else if is_onboarding_trace { onboarding_trace_profile() } else if is_broadcast_result { broadcast_result_profile() } else if is_context_storage { context_storage_profile() } else if is_direct_boot { direct_boot_profile() } else if is_controller_memory { controller_memory_profile() } else if is_service_query { service_query_profile() } else if is_controller { controller_profile() } else if is_protected { protected_maps_profile() } else if is_maps { maps_profile() } else { browser_profile() }
 	selected_profile := if is_subscription_service { subscription_service_profile() } else if is_stats_unavailable { stats_unavailable_profile() } else if is_unmanaged_queries { unmanaged_queries_profile() } else if is_asset_locales { asset_locales_profile() } else if is_stable_display { stable_display_profile() } else if is_pending_intent { pending_intent_profile() } else if is_resource_lock { resource_lock_profile() } else if is_intent_extras { intent_extras_profile() } else if is_dialog_theme { dialog_theme_profile() } else if is_paint_drawable { paint_drawable_profile() } else if is_resources_float { resources_float_profile() } else if is_bundle_cross_profile { bundle_cross_profile_profile() } else if is_user_restrictions { user_restrictions_profile() } else if is_layout_alignment { layout_alignment_profile() } else if is_window_animations { window_animations_profile() } else if is_bitmap_tiles { bitmap_tiles_profile() } else if is_persistent_data_block { persistent_data_block_profile() } else { profile }
-	final_profile := if is_webview_package { webview_package_profile() } else if is_build_abis { build_abis_profile() } else if is_event_log { event_log_profile() } else if is_component_parcel { component_parcel_profile() } else if is_messenger_binder { messenger_binder_profile() } else if is_usage_inactive { usage_inactive_profile() } else if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
+	final_profile := if is_framework_boot { framework_boot_profile() } else if is_webview_package { webview_package_profile() } else if is_build_abis { build_abis_profile() } else if is_event_log { event_log_profile() } else if is_component_parcel { component_parcel_profile() } else if is_messenger_binder { messenger_binder_profile() } else if is_usage_inactive { usage_inactive_profile() } else if is_secure_settings { secure_settings_profile() } else if is_broadcast_permission { broadcast_permission_profile() } else if is_keyguard_policy { keyguard_policy_profile() } else if is_autofill_service { autofill_service_profile() } else { selected_profile }
 	patch(root, build_root, os.args[3 + offset], final_profile) or {
 		eprintln(err)
 		exit(1)
