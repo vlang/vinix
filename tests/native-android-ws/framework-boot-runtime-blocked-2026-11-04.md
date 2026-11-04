@@ -81,3 +81,37 @@ complete cleanup in 128/203 ms, observing 1,257,472/110,592 bytes growth under
 the unchanged 64 MiB cap. This binds only the complete small handoff controls;
 full aggregate qualification, kernel installation, boot admission and actual
 ARM/Maps checks remain required.
+
+Later on November 4, the user selected **Leave CI running**. That preference
+remains in force; no foreign VM was stopped or changed. A fresh read-only
+snapshot at 11:24:41 +0300 found replacement QEMU PID 6395, PPID 1, group 6394,
+started at 09:45:45 local time, with the same 32 GiB/eight-CPU allocation and
+unsupported foreign-argv options. Its writable CI state now resides under
+`/Volumes/V-CI-RAM-20261104`. The same qualified admission constraints still
+block our fixed 12 GiB guest. Earlier sealed `A/C/P` remain unchanged.
+
+The same-binary FAT r6 at `S/maps-framework-boot-patcher-fat-2026-11-04-r6`
+again stopped at the original shared-growth cap after 17 FAT passes: guard
+125/child 137, complete cleanup, 29,478 ms and 538,308,608 bytes growth.
+Receipt SHA-256 is
+`fcce211235be9800dc8558e63b1f2de8fee3717030fc94f3f2b6c028616a4d3a`;
+log SHA-256 is
+`158f6da2078b484226745b37075c76076630932d632a24a336cdf10d57f9fd5b`.
+Its full scratch remains intact under `r6/scratch`; preservation passed 0/0
+with complete cleanup in 127 ms. No cap was raised or functional failure found.
+No further retry is planned while host writes persist.
+
+Fresh complete read-only handoff roots
+`maps-framework-boot-runtime-audit-2026-11-04-r2` and matching
+`maps-framework-boot-live-controls-2026-11-04-r2` passed a separate two-root,
+11-entry seal and independent fresh-process readback. Manifest at
+`S/maps-framework-boot-handoff-sealed-2026-11-04-r2/sealed/manifest.json`
+hashes to
+`228843b8581f64457da056f9db88f0d1f67e7b465d0aa77c11ebe61aea7f6336`.
+Both guards/children exited zero with complete cleanup in 208/306 ms,
+observing 438,272/40,960 bytes growth under the unchanged 64 MiB cap.
+This covers only the small current handoff controls. Full aggregate sealing,
+patcher qualification, kernel installation and runtime checks remain pending.
+Future kernel output must use a fresh kernel-controls root; future live output
+must use live-controls-r3 or later, without appending to sealed C2. The existing
+exact clone remains unmodified and unbooted; no new runtime result is claimed.
