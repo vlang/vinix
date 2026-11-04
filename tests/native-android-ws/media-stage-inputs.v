@@ -25,7 +25,7 @@ fn headers(directory string, mut selected map[string]bool) ! {
 	}
 }
 fn run(profile string, project string, sources string, root string) ! {
-	if profile !in ['stager', 'patcher', 'persistent-stager', 'bitmap-stager', 'window-stager', 'layout-stager', 'restrictions-stager', 'bundle-cross-profile-stager', 'resources-float-stager', 'paint-drawable-stager', 'dialog-theme-stager', 'intent-extras-stager', 'resource-lock-stager', 'pending-intent-stager', 'stable-display-stager', 'asset-locales-stager', 'unmanaged-queries-stager', 'stats-unavailable-stager', 'subscription-service-stager', 'autofill-service-stager', 'keyguard-policy-stager', 'broadcast-permission-stager', 'secure-settings-stager', 'usage-inactive-stager', 'messenger-binder-stager', 'component-parcel-stager', 'event-log-stager', 'build-abis-stager', 'webview-package-stager'] { return error('literal media discovery profile required') }
+	if profile !in ['stager', 'patcher', 'persistent-stager', 'bitmap-stager', 'window-stager', 'layout-stager', 'restrictions-stager', 'bundle-cross-profile-stager', 'resources-float-stager', 'paint-drawable-stager', 'dialog-theme-stager', 'intent-extras-stager', 'resource-lock-stager', 'pending-intent-stager', 'stable-display-stager', 'asset-locales-stager', 'unmanaged-queries-stager', 'stats-unavailable-stager', 'subscription-service-stager', 'autofill-service-stager', 'keyguard-policy-stager', 'broadcast-permission-stager', 'secure-settings-stager', 'usage-inactive-stager', 'messenger-binder-stager', 'component-parcel-stager', 'event-log-stager', 'build-abis-stager', 'webview-package-stager', 'framework-boot-stager'] { return error('literal media discovery profile required') }
 	if os.real_path(project) != project || !os.is_dir(project) || os.real_path(sources) != sources || !os.is_dir(sources)
 		|| os.exists(root) || os.is_link(root) || os.real_path(os.dir(root)) != os.dir(root) { return error('canonical project/frozen sources and fresh discovery output required') }
 	main_relative := match profile {
@@ -57,6 +57,7 @@ fn run(profile string, project string, sources string, root string) ! {
 		'event-log-stager' { '/tests/native-android-ws/maps-event-log-stage.v' }
 		'build-abis-stager' { '/tests/native-android-ws/maps-build-abis-stage.v' }
 		'webview-package-stager' { '/tests/native-android-ws/maps-webview-package-stage.v' }
+		'framework-boot-stager' { '/tests/native-android-ws/maps-framework-boot-stage.v' }
 		else { '/tests/android-webview-browser-probe/patch-kernel.v' }
 	}
 	main_source := sources + main_relative
@@ -106,6 +107,6 @@ fn run(profile string, project string, sources string, root string) ! {
 	println('MEDIA-STAGE-INPUTS PASS profile=' + profile + ' V=' + v_inputs.len.str() + ' C=' + c_inputs.len.str() + ' post-build discovery only')
 }
 fn main() {
-	if os.args.len != 5 { eprintln('usage: media-stage-inputs stager|patcher|persistent-stager|bitmap-stager|window-stager|layout-stager|restrictions-stager|bundle-cross-profile-stager|resources-float-stager|paint-drawable-stager|dialog-theme-stager|intent-extras-stager|resource-lock-stager|pending-intent-stager|stable-display-stager|asset-locales-stager|unmanaged-queries-stager|stats-unavailable-stager|subscription-service-stager|autofill-service-stager|keyguard-policy-stager|broadcast-permission-stager|secure-settings-stager|usage-inactive-stager|messenger-binder-stager|component-parcel-stager|event-log-stager|build-abis-stager|webview-package-stager GENERATED_PROJECT FROZEN_SOURCES FRESH_DISCOVERY_OUTPUT'); exit(2) }
+	if os.args.len != 5 { eprintln('usage: media-stage-inputs stager|patcher|persistent-stager|bitmap-stager|window-stager|layout-stager|restrictions-stager|bundle-cross-profile-stager|resources-float-stager|paint-drawable-stager|dialog-theme-stager|intent-extras-stager|resource-lock-stager|pending-intent-stager|stable-display-stager|asset-locales-stager|unmanaged-queries-stager|stats-unavailable-stager|subscription-service-stager|autofill-service-stager|keyguard-policy-stager|broadcast-permission-stager|secure-settings-stager|usage-inactive-stager|messenger-binder-stager|component-parcel-stager|event-log-stager|build-abis-stager|webview-package-stager|framework-boot-stager GENERATED_PROJECT FROZEN_SOURCES FRESH_DISCOVERY_OUTPUT'); exit(2) }
 	run(os.args[1], os.args[2], os.args[3], os.args[4]) or { eprintln(err); exit(1) }
 }
