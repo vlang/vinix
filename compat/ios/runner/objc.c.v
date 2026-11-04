@@ -531,6 +531,9 @@ mut:
 	swift_unknown_weak map[u64]u64 // Opaque Swift weak cells, zeroed before referent teardown.
 	timers       []u64
 	display_links []u64
+	display_links_stopping bool
+	run_loop_wait_mutex voidptr
+	run_loop_wait_condition voidptr
 	run_loop u64
 	main_thread u64
 	first_responder u64
@@ -1126,6 +1129,7 @@ fn objc_new(cls u64) u64 {
 }
 
 fn objc_stop() {
+	display_links_shutdown()
 	connection_require_shutdown()
 	url_session_task_require_shutdown()
 	url_session_workers_stop()
@@ -1181,6 +1185,7 @@ fn objc_stop() {
 	objc_release(ios_runtime.run_loop)
 	webkit_stop()
 	ns_threads_stop()
+	run_loop_wait_stop()
 	ns_operation_queue_stop()
 	objc_block_imps_stop()
 	objc_associations_stop()

@@ -34,6 +34,7 @@ fn objc_responds(object u64, selector &char) bool {
 	name := ctext(u64(selector))
 	if ui_screen_selector(object, name) { return true }
 	if ns_run_loop_selector(object, name) { return true }
+	if display_link_selector(object, name) { return true }
 	if ui_device_feedback_selector(object, name) { return true }
 	if app_attest_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| capture_discovery_family(if object in ios_runtime.classes { object } else { read64(object) })

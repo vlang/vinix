@@ -19,6 +19,7 @@ $if macos {
 	fn C.class_getClassMethod(voidptr, voidptr) voidptr
 	fn C.method_getTypeEncoding(voidptr) &char
 	fn C.method_getImplementation(voidptr) voidptr
+	fn C.dlopen(&char, int) voidptr
 }
 
 type RunLoopMainCall = fn () u64
@@ -306,4 +307,188 @@ fn test_cf_run_loop_main() {
 	}
 	println('IOS-CF-RUN-LOOP-MAIN: scoped no-argument borrowed ABI, protected x0–x8, preserved x20/x21, synchronized worker-first publication, shared Foundation handle, main-thread display-link schedule/fire/remove/invalidate, balanced caller references, no per-call objects/autoreleases and two released runtime caches')
 	println('IOS-CF-RUN-LOOP-CURRENT: native identity/metadata, eight distinct workers, stable pool-independent handles, thread-exit cache release with retained NSThread, repeated worker lifetimes, scoped symbol, direct IMP, signatures, ABI guards and two drained runtimes PASS')
+}
+
+struct DisplayPumpProbe {
+mut:
+	owner u64
+	link u64
+	weak_target u64
+	calls i64
+	phase u64
+	go u64
+	done u64
+	kind int
+}
+
+fn display_pump_tick(target u64, selector &char, link u64) {
+	probe := unsafe { &DisplayPumpProbe(u64(obj_header(target).tag)) }
+	assert probe.owner == u64(C.pthread_self());
+	assert obj_header(link).fields[1] == cf_run_loop_get_current();
+	assert obj_header(link).real_number > 0;
+	C.ios_ref_change(unsafe { &probe.calls }, 1)
+	if probe.kind == 1 { display_link_invalidate(link) }
+	if probe.kind == 3 {
+		C.ios_store_pointer(unsafe { &probe.phase }, 3)
+		for C.ios_load_pointer(unsafe { &probe.go }) != 3 { time.sleep(time.microsecond) }
+	}
+}
+
+fn display_pump_once(loop u64, mode u64, seconds f64) bool {
+	date := cf_date_create(0, cf_absolute_time() + seconds)
+	result := run_loop_main_message(loop, c'runMode:beforeDate:', mode, date) != 0
+	objc_release(date)
+	return result
+}
+
+fn display_pump_worker(probe &DisplayPumpProbe) {
+	C.ios_store_pointer(unsafe { &probe.owner }, u64(C.pthread_self()))
+	pool := objc_pool_push()
+	loop := cf_run_loop_get_current()
+	mode := owned_string('kCFRunLoopDefaultMode'); common := owned_string('kCFRunLoopCommonModes'); other := owned_string('VinixUnregisteredMode')
+	assert !display_pump_once(loop, other, 0.01) && !display_pump_once(loop, mode, 0.01);
+	target := objc_new(ios_runtime.names['NSObject'])
+	obj_header(target).tag = i64(u64(probe))
+	objc_store_weak(unsafe { &probe.weak_target }, target)
+	link := run_loop_main_message(ios_runtime.names['CADisplayLink'], c'displayLinkWithTarget:selector:', target, u64(c'vinixDisplayPumpTick:'))
+	objc_retain(link); objc_release(target)
+	mut pause_frame := RegisterFrame{}
+	pause_frame.x[0] = link; pause_frame.x[1] = u64(c'setPaused:'); pause_frame.x[2] = 0x1234567800
+	assert objc_dispatch(mut pause_frame, 0) == 0 && !obj_header(link).repeat;
+	pause_frame.x[0] = link; pause_frame.x[2] = 0x1234567801
+	assert objc_dispatch(mut pause_frame, 0) == 0 && obj_header(link).repeat;
+	run_loop_main_message(link, c'addToRunLoop:forMode:', loop, mode)
+	run_loop_main_message(link, c'addToRunLoop:forMode:', loop, mode)
+	run_loop_main_message(link, c'addToRunLoop:forMode:', loop, common)
+	assert obj_header(link).section == 3 && obj_header(loop).refs == 2;
+	run_loop_main_message(link, c'removeFromRunLoop:forMode:', loop, mode)
+	assert obj_header(link).section == 2 && obj_header(link).loaded;
+	run_loop_main_message(link, c'setPaused:', 1, 0)
+	assert display_pump_once(loop, mode, 0.02) && probe.calls == 0;
+	objc_pool_pop(pool)
+	C.ios_store_pointer(unsafe { &probe.link }, link)
+	C.ios_store_pointer(unsafe { &probe.phase }, 1)
+	for C.ios_load_pointer(unsafe { &probe.go }) == 0 { time.sleep(time.microsecond) }
+	if probe.kind != 2 {
+		run_loop_main_message(link, c'setPaused:', 0, 0)
+		assert display_pump_once(loop, mode, 1);
+		assert probe.calls == 1;
+	}
+	if probe.kind == 0 {
+		run_loop_main_message(link, c'setPaused:', 1, 0)
+		C.ios_store_pointer(unsafe { &probe.phase }, 2)
+		assert !display_pump_once(loop, mode, 60); // Foreign invalidation wakes this wait.
+		assert probe.calls == 1 && probe.weak_target == 0;
+	} else if probe.kind == 1 || probe.kind == 3 {
+		assert !display_pump_once(loop, mode, 0.01) && probe.weak_target == 0;
+	}
+	objc_release(link); objc_release(mode); objc_release(common); objc_release(other)
+	C.ios_store_pointer(unsafe { &probe.done }, 1)
+}
+
+fn display_pump_wait(probe &DisplayPumpProbe, phase u64) {
+	deadline := time.sys_mono_now() + 5_000_000_000
+	for C.ios_load_pointer(unsafe { &probe.phase }) != phase {
+		assert time.sys_mono_now() < deadline;
+		time.sleep(time.millisecond)
+	}
+}
+
+fn display_pump_managed(target u64, selector &char, argument u64) {
+	probe := unsafe { &DisplayPumpProbe(u64(obj_header(target).tag)) }
+	pool := objc_pool_push()
+	loop := cf_run_loop_get_current(); mode := owned_string('kCFRunLoopDefaultMode')
+	link := run_loop_main_message(ios_runtime.names['CADisplayLink'], c'displayLinkWithTarget:selector:', target, u64(c'vinixDisplayPumpTick:'))
+	run_loop_main_message(link, c'setPaused:', 1, 0)
+	run_loop_main_message(link, c'addToRunLoop:forMode:', loop, mode)
+	C.ios_store_pointer(unsafe { &probe.phase }, 1)
+	assert !display_pump_once(loop, mode, 60);
+	objc_release(mode); objc_pool_pop(pool)
+	C.ios_store_pointer(unsafe { &probe.done }, 1)
+}
+
+fn display_pump_shutdown_guard(probe &DisplayPumpProbe) {
+	deadline := time.sys_mono_now() + 15_000_000_000
+	for C.ios_load_pointer(unsafe { &probe.go }) == 0 {
+		assert time.sys_mono_now() < deadline;
+		time.sleep(time.millisecond)
+	}
+}
+
+fn test_display_link_pump() {
+	for _ in 0 .. 2 {
+		objc_start()
+		system_data_start()!
+		objc_record_method(ios_runtime.names['NSObject'], c'vinixDisplayPumpTick:', u64(unsafe { voidptr(display_pump_tick) }), c'v@:@', false)
+		objc_record_method(ios_runtime.names['NSObject'], c'vinixDisplayPumpManaged:', u64(unsafe { voidptr(display_pump_managed) }), c'v@:@', false)
+		cf_run_loop_get_main()
+		for kind in 0 .. 4 {
+			mut probe := DisplayPumpProbe{kind: kind}
+			worker := spawn display_pump_worker(unsafe { &probe })
+			display_pump_wait(unsafe { &probe }, 1)
+			assert !display_links_fire() && probe.calls == 0; // Main never executes a worker's link.
+			C.ios_store_pointer(unsafe { &probe.go }, 1)
+			if kind == 0 || kind == 3 {
+				display_pump_wait(unsafe { &probe }, if kind == 0 { u64(2) } else { u64(3) })
+				run_loop_main_message(probe.link, c'invalidate', 0, 0)
+				if kind == 3 { assert probe.weak_target != 0; C.ios_store_pointer(unsafe { &probe.go }, 3) }
+			}
+			worker.wait()
+			assert probe.done == 1 && probe.weak_target == 0 && ios_runtime.display_links.len == 0 && ios_runtime.live == 1;
+		}
+		for _ in 0 .. 4 {
+			mut probes := [4]DisplayPumpProbe{}
+			mut workers := []thread{}
+			for i in 0 .. 4 {
+				probes[i].kind = 1
+				workers << spawn display_pump_worker(unsafe { &probes[i] })
+			}
+			for i in 0 .. 4 { display_pump_wait(unsafe { &probes[i] }, 1) }
+			assert !display_links_fire();
+			for i in 0 .. 4 { C.ios_store_pointer(unsafe { &probes[i].go }, 1) }
+			workers.wait()
+			for probe in probes { assert probe.done == 1 && probe.calls == 1 && probe.weak_target == 0; }
+			unsafe { workers.free() }
+			assert ios_runtime.display_links.len == 0 && ios_runtime.live == 1;
+		}
+		mut probe := DisplayPumpProbe{}
+		target := objc_new(ios_runtime.names['NSObject']); obj_header(target).tag = i64(u64(unsafe { &probe }))
+		objc_store_weak(unsafe { &probe.weak_target }, target)
+		thread_object := objc_allocate(ios_runtime.names['NSThread'])
+		mut frame := RegisterFrame{}
+		frame.x[0] = thread_object; frame.x[1] = u64(c'initWithTarget:selector:object:')
+		frame.x[2] = target; frame.x[3] = u64(c'vinixDisplayPumpManaged:')
+		assert objc_dispatch(mut frame, 0) == 0;
+		run_loop_main_message(thread_object, c'start', 0, 0)
+		objc_release(target); objc_release(thread_object)
+		display_pump_wait(unsafe { &probe }, 1)
+		guard := spawn display_pump_shutdown_guard(unsafe { &probe })
+		objc_stop() // Must wake the paused worker before joining Foundation threads.
+		C.ios_store_pointer(unsafe { &probe.go }, 1)
+		guard.wait()
+		assert probe.done == 1 && probe.weak_target == 0 && ios_runtime.live == 0 && ios_runtime.objects.len == 0;
+		assert ios_runtime.run_loop_wait_mutex == unsafe { nil } && ios_runtime.run_loop_wait_condition == unsafe { nil };
+		system_data_stop()
+	}
+	println('IOS-DISPLAY-PUMP: concurrent owner-thread callbacks, common/default memberships, duplicate add, pause/deadline, foreign/self/in-flight invalidation, main isolation, thread-exit removal and bounded managed shutdown across two drained runtimes PASS')
+}
+
+fn test_display_link_native_metadata() {
+	$if macos {
+		assert C.dlopen(c'/System/iOSSupport/System/Library/Frameworks/UIKit.framework/UIKit', 2) != unsafe { nil };
+		pool := C.objc_autoreleasePoolPush()
+		cls := C.objc_getClass(c'CADisplayLink')
+		for index, name in [c'displayLinkWithTarget:selector:', c'preferredFramesPerSecond', c'setPreferredFramesPerSecond:', c'frameInterval', c'setFrameInterval:', c'isPaused', c'setPaused:', c'timestamp', c'duration', c'targetTimestamp', c'addToRunLoop:forMode:', c'removeFromRunLoop:forMode:', c'invalidate']! {
+			meta := index == 0
+			method := if meta { C.class_getClassMethod(cls, C.sel_registerName(name)) } else { C.class_getInstanceMethod(cls, C.sel_registerName(name)) }
+			assert method != unsafe { nil };
+			actual := ctext(u64(C.method_getTypeEncoding(method)))
+			expected := display_link_types('CADisplayLink', meta, ctext(u64(name))) or { panic('missing display-link encoding') }
+			assert actual == expected;
+		}
+		method := C.class_getInstanceMethod(C.objc_getClass(c'NSRunLoop'), C.sel_registerName(c'runMode:beforeDate:'))
+		assert ctext(u64(C.method_getTypeEncoding(method))) == 'B32@0:8@16@24';
+		C.objc_autoreleasePoolPop(pool)
+		println('NATIVE-DISPLAY-PUMP: CADisplayLink and NSRunLoop pump method encodings match Catalyst PASS')
+	}
 }

@@ -166,6 +166,7 @@ fn ns_thread_cleanup(pointer voidptr) {
 	ios_runtime.foundation_thread_count--
 	C.ios_objc_initialize_unlock()
 	objc_release(target); objc_release(argument); block_release(block)
+	if state.run_loop != 0 { display_links_retire_loop(state.run_loop) }
 	objc_pool_free(C.pthread_getspecific(ios_runtime.pool_key))
 	C.ios_objc_initialize_lock()
 	state.finished = true
