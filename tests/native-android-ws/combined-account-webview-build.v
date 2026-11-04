@@ -4455,6 +4455,177 @@ fn traffic_stats_self_test() ! {
  println('TRAFFIC-STATS-PRODUCER-SELFTEST-PASS controls=' + controls.str() + ' independent-UID-state exact-two-changed-two-added private-ThreadLocal raw-canonical-forms 2116-unchanged')
 }
 
+fn process_packages_profile() NarrowProfile {
+ target := 'android/app/ActivityManager\$RunningAppProcessInfo.smali'
+ return NarrowProfile{
+  name: 'process-packages'
+  baseline_name: 'combined-account-webview-traffic-stats-framework-2026-11-04-r1'
+  manifest_pin: 'bffa5dedc87d80979b09d517fcfb752b470d7f9e76a8e44bc24452f152d42025'
+  jar_pin: 'dd3af0444459410f28d20f04928e37a19eb6b076d433498b05eac9a922b49f0e'
+  baseline_classes: 2117
+  providers: ['framework_activity_manager.v']
+  calls: {target: 'framework_process_packages_source'}
+  methods: {target: []string{}}
+  changed: {target: 0}
+  added: {target: 0}
+  fields: {target: ['.field public pkgList:[Ljava/lang/String;']}
+ }
+}
+
+fn process_packages_helper_source(source string) !string {
+ helper := helper_function(source, 'fn interface_class(')!
+ if !helper.starts_with('fn interface_class(name string, methods []string) string {\n') {
+  return error('exact interface_class helper signature required')
+ }
+ return 'module androidtools\n' + helper
+}
+
+fn process_packages_helper_self_test() ! {
+ helper := '\nfn interface_class(name string, methods []string) string {\n return name + methods.join("")\n}\n'
+ source := 'module androidtools\n' + helper + '\nfn unrelated() string {\n return "excluded"\n}\n'
+ if process_packages_helper_source(source)! != 'module androidtools\n' + helper.trim_left('\n') {
+  return error('process packages must extract only the single interface helper')
+ }
+ mut controls := 0
+ for bad in [source.replace(helper, ''), source + helper,
+  '\nfn interface_class(name string, methods []string) string {\n',
+  source.replace('methods []string', 'methods string')] {
+  if bad == source { return error('inactive process package helper mutation') }
+  process_packages_helper_source(bad) or { controls++; continue }
+  return error('missing, duplicate, unterminated or incompatible process package helper accepted')
+ }
+ println('PROCESS-PACKAGES-HELPER-SELFTEST-PASS controls=' + controls.str() + ' single-interface-helper unrelated-functions-excluded')
+}
+
+fn process_packages_original_fields() []string {
+ return ['.field public static final IMPORTANCE_CACHED:I = 0x190',
+  '.field public static final IMPORTANCE_FOREGROUND:I = 0x64',
+  '.field public static final IMPORTANCE_FOREGROUND_SERVICE:I = 0x7d',
+  '.field public static final IMPORTANCE_GONE:I = 0x3e8',
+  '.field public static final IMPORTANCE_PERCEPTIBLE:I = 0xe6',
+  '.field public static final IMPORTANCE_SERVICE:I = 0x12c',
+  '.field public static final IMPORTANCE_VISIBLE:I = 0xc8',
+  '.field public importance:I', '.field public pid:I',
+  '.field public processName:Ljava/lang/String;', '.field public uid:I']
+}
+
+// Independent constructor oracle: package attribution belongs to process
+// enumeration. Constructing this value object does not populate pkgList.
+fn process_packages_original_methods() map[string]string {
+ owner := 'Landroid/app/ActivityManager\$RunningAppProcessInfo;'
+ return {
+  '<init>()V': '.method public constructor <init>()V\n.registers 1\n' +
+   'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void\n.end method'
+  '<init>(ILjava/lang/String;)V': '.method private constructor <init>(ILjava/lang/String;)V\n.registers 3\n' +
+   'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\niput p1, p0, ' + owner + '->pid:I\n' +
+   'iput-object p2, p0, ' + owner + '->processName:Ljava/lang/String;\nreturn-void\n.end method'
+  '<init>(ILjava/lang/String;Landroid/app/ActivityManager\$1;)V':
+   '.method synthetic constructor <init>(ILjava/lang/String;Landroid/app/ActivityManager\$1;)V\n.registers 4\n' +
+   'invoke-direct {p0, p1, p2}, ' + owner + '-><init>(ILjava/lang/String;)V\nreturn-void\n.end method'
+ }
+}
+
+fn process_packages_members(old string, updated string) ! {
+ field := '.field public pkgList:[Ljava/lang/String;'
+ narrow_member_delta(old, updated, []string{}, 0, 0, [field])!
+ before, after := store_parts(old)!, store_parts(updated)!
+ metadata := before.metadata.split_into_lines().map(it.trim_space())
+ if metadata.filter(it.starts_with('.class ')) != ['.class public Landroid/app/ActivityManager\$RunningAppProcessInfo;']
+  || metadata.filter(it.starts_with('.super ')) != ['.super Ljava/lang/Object;']
+  || metadata.filter(it.starts_with('.field ')).sorted() != process_packages_original_fields().sorted() {
+  return error('process package field requires exact original class and eleven existing fields')
+ }
+ expected := process_packages_original_methods()
+ if before.methods.keys().sorted() != expected.keys().sorted() || after.methods.keys().sorted() != expected.keys().sorted() {
+  return error('process package field must preserve exactly the three original constructors')
+ }
+ for signature, body in expected {
+  parameters := if signature == '<init>()V' { 1 } else if signature == '<init>(ILjava/lang/String;)V' { 3 } else { 4 }
+  if framework_boot_normalized_method(before.methods[signature]!, parameters)!
+   != framework_boot_normalized_method(body, parameters)! {
+   return error('process package field cannot change constructor behavior or add package attribution')
+  }
+ }
+}
+
+fn process_packages_self_test() ! {
+ process_packages_helper_self_test()!
+ profile := process_packages_profile()
+ target := 'android/app/ActivityManager\$RunningAppProcessInfo.smali'
+ field := '.field public pkgList:[Ljava/lang/String;'
+ if profile.name != 'process-packages' || profile.baseline_classes != 2117
+  || profile.baseline_name != 'combined-account-webview-traffic-stats-framework-2026-11-04-r1'
+  || profile.manifest_pin != 'bffa5dedc87d80979b09d517fcfb752b470d7f9e76a8e44bc24452f152d42025'
+  || profile.jar_pin != 'dd3af0444459410f28d20f04928e37a19eb6b076d433498b05eac9a922b49f0e'
+  || profile.providers != ['framework_activity_manager.v'] || profile.calls != {target: 'framework_process_packages_source'}
+  || profile.methods != {target: []string{}} || profile.changed != {target: 0} || profile.added != {target: 0}
+  || profile.fields != {target: [field]} || profile.class_provider != '' || profile.class_providers.len != 0
+  || profile.extra_classes.len != 0 || profile.directory_provider != ''
+  || profile.removed_methods.len != 0 || profile.removed_fields.len != 0 {
+  return error('process packages profile must add one public instance String array field and no methods')
+ }
+ metadata := '.class public Landroid/app/ActivityManager\$RunningAppProcessInfo;\n.super Ljava/lang/Object;\n' +
+  '.annotation system Ldalvik/annotation/EnclosingClass;\nvalue = Landroid/app/ActivityManager;\n.end annotation\n' +
+  process_packages_original_fields().join('\n') + '\n'
+ methods := process_packages_original_methods()
+ mut old := metadata
+ mut raw_old := metadata
+ for signature in methods.keys().sorted() {
+  method := methods[signature]!
+  old += method + '\n'
+  registers := if signature == '<init>()V' { 1 } else if signature == '<init>(ILjava/lang/String;)V' { 3 } else { 4 }
+  raw_old += method.replace('.registers ' + registers.str(), '.locals 0') + '\n'
+ }
+ good := old + field + '\n'
+ process_packages_members(old, good)!
+ process_packages_members(raw_old, raw_old + field + '\n')!
+ mut controls := 0
+ for bad in [old, good + field + '\n', good.replace(field, '.field private pkgList:[Ljava/lang/String;'),
+  good.replace(field, '.field public static pkgList:[Ljava/lang/String;'),
+  good.replace(field, '.field public final pkgList:[Ljava/lang/String;'),
+  good.replace(field, '.field public pkgList:Ljava/lang/String;'),
+  good.replace(field, '.field public pkgList:[Ljava/lang/Object;'),
+  good.replace('value = Landroid/app/ActivityManager;', 'value = Lwrong/Manager;'),
+  good.replace('.field public pid:I', '.field public pid:J'),
+  good + '.field private unrelated:I\n',
+  good + '.method public constructor <init>(Ljava/lang/String;I[Ljava/lang/String;)V\n.registers 4\nreturn-void\n.end method\n',
+  good + '.method public native unrelated()V\n.end method\n'] {
+  if bad == good { return error('inactive process package field mutation') }
+  process_packages_members(old, bad) or { controls++; continue }
+  return error('process package field ABI or unrelated-member mutation accepted')
+ }
+ for signature, method in methods {
+  for replacement in [method.replace('constructor ', 'static constructor '),
+   method.replace('return-void', 'nop\nreturn-void'), method.replace('.registers ', '.registers 9 # ')] {
+   if replacement == method { return error('inactive process package constructor mutation') }
+   process_packages_members(old, good.replace(method, replacement)) or { controls++; continue }
+   return error('process package constructor change accepted: ' + signature)
+  }
+  changed := old.replace(method, method.replace('return-void', 'nop\nreturn-void'))
+  process_packages_members(changed, changed + field + '\n') or { controls++; continue }
+  return error('unknown process package predecessor constructor accepted')
+ }
+ mut before_classes := {target: 'old', 'android/net/TrafficStats.smali': 'retained-traffic-stats'}
+ for i in 0 .. 2115 { before_classes['other/' + i.str() + '.smali'] = 'same' }
+ mut after_classes := before_classes.clone()
+ after_classes[target] = 'new'
+ narrow_profile_class_delta(before_classes, after_classes, [target], []string{}, 2117)!
+ for case in 0 .. 6 {
+  mut bad := after_classes.clone()
+  match case {
+   0 { bad[target] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(target) }
+   3 { bad['extra.smali'] = 'extra' }
+   4 { bad['android/net/TrafficStats.smali'] = 'changed' }
+   else { bad.delete(target); bad['substituted.smali'] = 'new' }
+  }
+  narrow_profile_class_delta(before_classes, bad, [target], []string{}, 2117) or { controls++; continue }
+  return error('process packages-only 2117-class scope mutation accepted')
+ }
+ println('PROCESS-PACKAGES-PRODUCER-SELFTEST-PASS controls=' + controls.str() + ' one-instance-String-array three-constructors eleven-fields-preserved no-new-methods 2116-unchanged')
+}
+
 struct FrameworkBootMethod {
  signature string
  owner string
@@ -5547,6 +5718,7 @@ fn self_test() ! {
  webview_package_self_test()!
  framework_boot_self_test()!
  traffic_stats_self_test()!
+ process_packages_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -5773,6 +5945,16 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
    return error('autofill integration source copy differs')
   }
  }
+ if profile.name == 'process-packages' {
+  classes := repo + '/tests/native-android-tools/androidtools/framework_classes.v'
+  inputs[classes] = digest(classes)!
+  os.cp(classes, root + '/provider-helper-inputs/framework_classes.v')!
+  if digest(root + '/provider-helper-inputs/framework_classes.v')! != inputs[classes]! {
+   return error('process packages transitive helper source copy differs')
+  }
+  os.write_file(root + '/provider-source/androidtools/framework_process_packages_helpers.v',
+   process_packages_helper_source(os.read_file(root + '/provider-helper-inputs/framework_classes.v')!)!)!
+ }
  os.write_file(root + '/provider-source/androidtools/framework_account_helpers.v',
   'module androidtools\n' + helper_function(os.read_file(root + '/provider-helper-inputs/framework.v')!, 'pub fn framework_replace_method(')!)!
  mut application := 'module main\nimport androidtools\nimport os\nfn main() {\n'
@@ -5878,6 +6060,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'webview-package' { webview_package_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'framework-boot' { framework_boot_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
   if profile.name == 'traffic-stats' { traffic_stats_uid_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!)! }
+  if profile.name == 'process-packages' { process_packages_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -5951,6 +6134,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'webview-package' { webview_package_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'framework-boot' { framework_boot_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
   if profile.name == 'traffic-stats' { traffic_stats_uid_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!)! }
+  if profile.name == 'process-packages' { process_packages_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -6363,11 +6547,15 @@ fn main() {
   build_narrow(traffic_stats_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--process-packages' {
+  build_narrow(process_packages_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder|--component-parcel|--event-log|--build-abis|--webview-package|--framework-boot|--traffic-stats] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder|--component-parcel|--event-log|--build-abis|--webview-package|--framework-boot|--traffic-stats|--process-packages] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
