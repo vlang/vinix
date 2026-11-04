@@ -1,4 +1,10 @@
-# Process-package successor qualified; image preparation blocked by disk
+# Process-package successor qualified; image preparation resumed
+
+Preparation [resumed after the scoped cache cleanup](process-packages-cache-resume-2026-11-05.md)
+at `S/maps-process-packages-preparation-2026-11-05-r1`, targeting the fresh
+`S/maps-process-packages-r1` image. The first full parent audit passed;
+preparation completion and ARM execution remain pending. The disk refusal
+below is the preserved preceding attempt.
 
 The [TrafficStats ARM regression passed](maps-traffic-stats-runtime-2026-11-04.md).
 GMS reached readiness, then failed on the missing
