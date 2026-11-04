@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Fixed fresh-atomic build observer. It does not qualify a build or its descendants.
+// Fixed fresh-atomic build/audit observer. Original controllers remain authoritative.
 @[has_globals]
 module main
 
@@ -21,6 +21,12 @@ const worktree = '/Users/alex/code/vinix/build/package-peer-login-atomic-fresh-w
 const raw = '/Users/alex/Library/Caches/vinix-codex/section14/matched-peer-frame-atomic-fresh-20261026'
 const seal = raw + '-seal-01'
 const observer = raw + '/native-observer-01'
+const second_controls = seal + '/native-controls-02'
+const audit_private = seal + '/native-environment-01'
+const original_checker = '/Users/alex/Library/Caches/vinix-codex/section14/alloc-track-frame-kernel-20261026-seal-02/frame-page-seal'
+const original_checker_sha = 'fcc0e1f0d557e980a99dbcaf68d45ed8da851b07bf0810e8c99c931c865001b6'
+const original_checker_source = '/Users/alex/code/vinix/tests/kernel-allocs/frame-page-seal.v'
+const original_checker_source_sha = '8cd5e58df42e07760d0e1b73c49807b0ee2c7e353412e7d54aca34a7597577d4'
 const controller = raw + '/bootstrap-01/guarded-build-check'
 const controller_sha = '1e00428250ca71542a00b5d50de57f9bddfe2488c48db844ab3e3a234f1d45df'
 const controller_source_sha = '20aa8efe95413e461a2cb95f1a0fd94331709fa79225029f334cc72103cc43dd'
@@ -60,6 +66,7 @@ struct Watch {
 	state string
 	wall u64
 	build bool
+	audit bool
 	log_limit i64 = log_cap
 	log_roots []string
 mut:
@@ -98,6 +105,33 @@ fn ordinary_directory(path string) ! {
 		'canonical ordinary directory required: ' + path)!
 }
 
+fn audit_state(state string) bool {
+	return state in [seal + '/native-seal-01', seal + '/native-check-01',
+		second_controls, second_controls + '/quiet', second_controls + '/flood']
+}
+
+fn environment_for_state(state string) map[string]string {
+	mut environment := child_environment()
+	if audit_state(state) {
+		environment['HOME'] = audit_private + '/home'
+		environment['VMODULES'] = audit_private + '/modules'
+		environment['V3CACHE'] = audit_private + '/cache'
+		environment['XDG_CACHE_HOME'] = audit_private + '/cache'
+		environment['VTMP'] = audit_private + '/tmp'
+		environment['TMPDIR'] = audit_private + '/tmp'
+	}
+	return environment
+}
+
+fn prepare_audit_environment() ! {
+	ordinary_directory(seal)!
+	for suffix in ['', '/home', '/modules', '/cache', '/tmp'] {
+		path := audit_private + suffix
+		if !present(path) { os.mkdir(path)! }
+		ordinary_directory(path)!
+	}
+}
+
 fn regular_hash(path string, limit u64) !string {
 	a := os.lstat(path)!
 	require(a.mode & 0o170000 == 0o100000 && a.size <= limit, 'bounded regular input required')!
@@ -107,6 +141,45 @@ fn regular_hash(path string, limit u64) !string {
 		&& a.gid == b.gid && a.size == b.size && a.mtime == b.mtime && a.ctime == b.ctime
 		&& u64(bytes.len) == b.size, 'input changed during read: ' + path)!
 	return sha256.sum(bytes).hex()
+}
+
+fn pinned_regular(path string, limit u64, expected string) ! {
+	require(regular_hash(path, limit)! == expected, 'fixed original input changed: ' + path)!
+}
+
+fn original_checker_pins() ! {
+	pinned_regular(original_checker, 8 * 1024 * 1024, original_checker_sha)!
+	pinned_regular(original_checker_source, 1024 * 1024, original_checker_source_sha)!
+}
+
+fn build_state(retry bool) string {
+	return observer + if retry { '/run-02' } else { '/run-01' }
+}
+
+fn audit_command(check bool) []string {
+	return if check { [original_checker, 'check', raw, seal + '/complete/inventory.json'] }
+		else { [original_checker, 'seal', raw, seal + '/complete'] }
+}
+
+fn require_fresh(path string) ! { require(!present(path), 'fresh fixed state required: ' + path)! }
+
+fn require_audit_marker(text string, check bool, manifest_sha string) ! {
+	expected := if check { 'FRAME-PAGE COMPLETE STATE CHECK PASS\n' }
+		else { 'FRAME-PAGE COMPLETE STATE PASS ' + manifest_sha + '\n' }
+	require(text == expected, 'original complete audit marker differs')!
+}
+
+fn audit_end_timing(started u64, previous u64, now u64, wall u64) ! {
+	require(now >= started && now - started <= wall, 'audit wall deadline after status')!
+	require(previous > 0 && now >= previous && now - previous <= sample_window,
+		'audit final observation gap exceeds 5s')!
+}
+
+fn audit_final_deadline(watch Watch) ! {
+	if watch.audit {
+		now := time.sys_mono_now()
+		audit_end_timing(watch.started, watch.previous, now, watch.wall)!
+	}
 }
 
 // Decimal conversion is bounded before arithmetic, including hostile probe text.
@@ -215,7 +288,7 @@ fn probe_observe(pid int, pointer voidptr) ! {
 	}
 }
 
-fn probe_command(kind string) ![]string {
+fn probe_command(kind string, state string) ![]string {
 	if kind == 'allocated' || kind == 'apparent' {
 		mut argv := ['/usr/bin/du', '-P', if kind == 'allocated' { '-skl' } else { '-skAl' }]
 		argv << charged_roots()!
@@ -223,7 +296,10 @@ fn probe_command(kind string) ![]string {
 	}
 	return match kind {
 		'df' { ['/bin/df', '-k', raw] }
-		'transient', 'failure' { [os.executable(), '--control-probe-' + kind] }
+		'transient', 'failure' {
+			require(state in [observer + '/controls-01', second_controls], 'closed control probe state required')!
+			[os.executable(), '--control-probe-' + kind + if state == second_controls { '2' } else { '' }]
+		}
 		else { return error('unknown closed probe') }
 	}
 }
@@ -231,9 +307,15 @@ fn probe_command(kind string) ![]string {
 fn probe_route(state string) !string {
 	return match state {
 		observer + '/run-01' { 'run' }
+		observer + '/run-02' { 'run2' }
 		observer + '/controls-01' { 'controls' }
 		observer + '/controls-01/quiet' { 'quiet' }
 		observer + '/controls-01/flood' { 'flood' }
+		seal + '/native-seal-01' { 'seal1' }
+		seal + '/native-check-01' { 'check1' }
+		second_controls { 'controls2' }
+		second_controls + '/quiet' { 'quiet2' }
+		second_controls + '/flood' { 'flood2' }
 		else { return error('unknown closed probe state') }
 	}
 }
@@ -241,9 +323,15 @@ fn probe_route(state string) !string {
 fn probe_state(route string) !string {
 	return match route {
 		'run' { observer + '/run-01' }
+		'run2' { observer + '/run-02' }
 		'controls' { observer + '/controls-01' }
 		'quiet' { observer + '/controls-01/quiet' }
 		'flood' { observer + '/controls-01/flood' }
+		'seal1' { seal + '/native-seal-01' }
+		'check1' { seal + '/native-check-01' }
+		'controls2' { second_controls }
+		'quiet2' { second_controls + '/quiet' }
+		'flood2' { second_controls + '/flood' }
 		else { return error('unknown closed probe route') }
 	}
 }
@@ -254,17 +342,18 @@ fn probe_state(route string) !string {
 fn probe_child(mode string) ! {
 	parts := mode.split('-')
 	require(parts.len == 5 && parts[0] == '' && parts[1] == '' && parts[2] == 'probe'
-		&& parts[4] in ['run', 'controls', 'quiet', 'flood'], 'unknown closed probe mode')!
+		&& parts[4] in ['run', 'run2', 'controls', 'quiet', 'flood', 'seal1', 'check1', 'controls2', 'quiet2', 'flood2'],
+		'unknown closed probe mode')!
 	state := probe_state(parts[4])!
 	ordinary_directory(state)!
 	require(!present(state + '/status.json') && !present(state + '/controls.json'), 'completed observation is immutable')!
-	command := probe_command(parts[3])!
+	command := probe_command(parts[3], state)!
 	mut out := os.open_file(state + '/probe.stdout', 'w')!
 	mut err := os.open_file(state + '/probe.stderr', 'w')!
 	require(os.fd_dup2(out.fd, 1) == 1 && os.fd_dup2(err.fd, 2) == 2, 'probe stream redirection')!
 	out.close(); err.close()
 	mut environment := []string{}
-	for key, value in child_environment() { environment << key + '=' + value }
+	for key, value in environment_for_state(state) { environment << key + '=' + value }
 	os.execve(command[0], command[1..], environment)!
 }
 
@@ -276,7 +365,7 @@ fn probe(kind string, deadline u64, label string, mut watch Watch) !string {
 		budget_ms := if remaining_ms > 1200 { u64(1000) } else { remaining_ms - 200 }
 		mode := '--probe-' + kind + '-' + probe_route(watch.state)!
 		command := ['/opt/homebrew/bin/gtimeout', '--signal=KILL', '${f64(budget_ms) / 1000.0}s', os.executable(), mode]
-		actual_probe := probe_command(kind)!
+		actual_probe := probe_command(kind, watch.state)!
 		for suffix in ['stdout', 'stderr', 'owner'] {
 			path := watch.state + '/probe.' + suffix
 			if present(path) { require(os.lstat(path)!.mode & 0o170000 == 0o100000, 'ordinary probe scratch file required')! }
@@ -285,7 +374,7 @@ fn probe(kind string, deadline u64, label string, mut watch Watch) !string {
 		started := time.sys_mono_now()
 		mut child := ProbeWatch{state: watch.state, deadline: started + (budget_ms + 150) * u64(time.millisecond)}
 		mut failure := ''
-		result := sourcecommand.run_logged_owned(command, child_environment(), never, watch.state + '/probe.owner',
+		result := sourcecommand.run_logged_owned(command, environment_for_state(watch.state), never, watch.state + '/probe.owner',
 			false, '', probe_observe, &child, 0) or {
 			failure = err.msg()
 			sourcecommand.Output{status: -999}
@@ -450,8 +539,9 @@ fn direct_cleanup(pid int) !map[string]string {
 fn run_observed(argv []string, mut watch Watch) ! {
 	if watch.started == 0 { watch.started = time.sys_mono_now() }
 	mut failure := ''
-	result := sourcecommand.run_logged_owned(argv, child_environment(), cancelled,
-		watch.state + '/child.log', false, '', observe, &watch, 10) or {
+	grace := if watch.audit { f64(0) } else { f64(10) }
+	result := sourcecommand.run_logged_owned(argv, environment_for_state(watch.state), cancelled,
+		watch.state + '/child.log', false, '', observe, &watch, grace) or {
 		failure = err.msg()
 		sourcecommand.Output{status: -999}
 	}
@@ -484,13 +574,18 @@ fn run_observed(argv []string, mut watch Watch) ! {
 	journal(mut watch, 'status.json', json2.encode({'return_status': result.status.str(),
 		'error': failure, 'watch': json2.encode(watch), 'direct_cleanup': json2.encode(cleanup),
 		'inner_controller_receipts': json2.encode(inner),
+		'qualification': if watch.audit { 'PROVISIONAL: this receipt precedes the final deadline and original-marker checks; audit qualification requires external actual exit0 plus the exact original checker marker and the native observer PASS marker.' }
+			else { 'Observation only; original build qualification and complete audit remain required.' },
 		'scope': 'Observation only. Build qualification and separate descendant cleanup remain the unchanged controller authority.'}) + '\n')!
+	audit_final_deadline(watch)!
 	require(failure == '' && result.status == 0 && watch.observed_exit && result.status == watch.observed_status,
 		'observed command refused: ' + failure)!
 }
 
-fn production() ! {
-	require(!present(observer + '/run-01') && !present(raw + '/build-03'), 'fresh fixed build/observer attempt required')!
+fn production(retry bool) ! {
+	state := build_state(retry)
+	require_fresh(state)!
+	require(!present(raw + '/build-03'), 'fresh fixed build attempt required')!
 	for path in [donor, worktree, raw, observer] { ordinary_directory(path)! }
 	for relative in ['kernel/obj', 'kernel/bin', 'kernel/cc-runtime-x86_64', 'kernel/cc-runtime-aarch64'] {
 		require(!present(worktree + '/' + relative), 'prior kernel transient output remains')!
@@ -498,8 +593,8 @@ fn production() ! {
 	require(regular_hash(controller, 8 * 1024 * 1024)! == controller_sha
 		&& regular_hash(worktree + '/tests/socket-peer-login/guarded-build-check.v', 1024 * 1024)! == controller_source_sha,
 		'fixed guarded controller changed')!
-	os.mkdir(observer + '/run-01')!
-	mut watch := Watch{state: observer + '/run-01', wall: build_wall, build: true, started: time.sys_mono_now()}
+	os.mkdir(state)!
+	mut watch := Watch{state: state, wall: build_wall, build: true, started: time.sys_mono_now()}
 	journal(mut watch, 'plan.json', json2.encode({'argv': json2.encode([controller, raw + '/build-03']),
 		'environment': json2.encode(child_environment()), 'controller_sha256': controller_sha,
 		'controller_source_sha256': controller_source_sha, 'roots': json2.encode(roots()),
@@ -510,6 +605,48 @@ fn production() ! {
 	sample(true, mut watch)!
 	run_observed([controller, raw + '/build-03'], mut watch)!
 	println('FRESH ATOMIC NATIVE OBSERVATION PASS; REQUIRE ORIGINAL BUILD QUALIFICATION AND FULL AUDIT')
+}
+
+fn audit(check bool) ! {
+	started := time.sys_mono_now()
+	state := seal + if check { '/native-check-01' } else { '/native-seal-01' }
+	for path in roots() { ordinary_directory(path)! }
+	require_fresh(state)!
+	original_checker_pins()!
+	// A complete audit records the original controller's result; it supplies no
+	// substitute for successful build qualification or the later independent check.
+	regular_hash(raw + '/build-03/qualification.json', 65536)!
+	mut before_manifest := ''
+	if check {
+		ordinary_directory(seal + '/complete')!
+		before_manifest = regular_hash(seal + '/complete/inventory.json', 16 * 1024 * 1024)!
+	} else {
+		require_fresh(seal + '/complete')!
+	}
+	prepare_audit_environment()!
+	os.mkdir(state)!
+	argv := audit_command(check)
+	mut watch := Watch{state: state, audit: true, started: started,
+		wall: u64(if check { 300 } else { 600 }) * u64(time.second)}
+	journal(mut watch, 'plan.json', json2.encode({'argv': json2.encode(argv),
+		'environment': json2.encode(environment_for_state(state)), 'roots': json2.encode(roots()),
+		'original_checker_sha256': original_checker_sha, 'original_checker_source': original_checker_source,
+		'original_checker_source_sha256': original_checker_source_sha,
+		'wall_seconds': if check { '300' } else { '600' }, 'term_grace_seconds': '0',
+		'max_sample_gap_ms': '5000', 'max_sample_window_ms': '5000', 'cap_kib': kib_cap.str(),
+		'observer_tail_kib': observer_tail_kib.str(), 'admission_kib': admission_kib.str(),
+		'live_kib': live_kib.str(), 'journal_cap': journal_cap.str(),
+		'scope': 'Frozen raw root; all new writes stay in seal root. Deadline applies through final PASS; refused cleanup may exceed it.'}) + '\n')!
+	sample(true, mut watch)!
+	run_observed(argv, mut watch)!
+	original_checker_pins()!
+	manifest_sha := regular_hash(seal + '/complete/inventory.json', 16 * 1024 * 1024)!
+	require(!check || before_manifest == manifest_sha, 'manifest changed during original check')!
+	require(small_text(seal + '/complete/inventory.sha256')! == manifest_sha + '  inventory.json\n',
+		'original complete checksum differs')!
+	require_audit_marker(small_text(state + '/child.log')!, check, manifest_sha)!
+	audit_final_deadline(watch)!
+	println(if check { 'FRESH ATOMIC NATIVE CHECK OBSERVATION PASS' } else { 'FRESH ATOMIC NATIVE SEAL OBSERVATION PASS' })
 }
 
 // Closed child modes are used only by --controls. They run no compiler/build.
@@ -532,10 +669,12 @@ fn inner_observe(pid int, pointer voidptr) ! {
 	}
 }
 
-fn control_controller() ! {
-	mut watch := Watch{state: observer + '/controls-01', started: time.sys_mono_now()}
+fn control_root(second bool) string { return if second { second_controls } else { observer + '/controls-01' } }
+
+fn control_controller(second bool) ! {
+	mut watch := Watch{state: control_root(second), started: time.sys_mono_now()}
 	mut interrupted_inner := false
-	sourcecommand.run_logged_owned([os.executable(), '--control-worker'], child_environment(), never,
+	sourcecommand.run_logged_owned([os.executable(), '--control-worker'], environment_for_state(watch.state), never,
 		watch.state + '/inner.log', false, '', inner_observe, &watch, 1) or { interrupted_inner = err.msg() == 'control inner interrupted' }
 	cleanup := direct_cleanup(watch.pid)!
 	require(interrupted_inner, 'nested control did not observe controller interruption')!
@@ -561,11 +700,13 @@ fn verify_inner(text string, outer_pid int) ! {
 		&& result['group_probe_errno'] == int(C.ESRCH).str(), 'separate inner cleanup receipt differs')!
 }
 
-fn controls() ! {
+fn controls(second bool) ! {
 	ordinary_directory(observer)!
-	require(!present(observer + '/controls-01'), 'fresh controls state required')!
-	os.mkdir(observer + '/controls-01')!
-	mut watch := Watch{state: observer + '/controls-01', wall: 5 * u64(time.second)}
+	state := control_root(second)
+	require_fresh(state)!
+	if second { prepare_audit_environment()! }
+	os.mkdir(state)!
+	mut watch := Watch{state: state, wall: 5 * u64(time.second), audit: second}
 	mut count := 0
 	good := '1\t' + donor + '\n2\t' + worktree + '\n'
 	require(du_total(good, [donor, worktree])! == 3, 'valid du parser control')!; count++
@@ -615,7 +756,7 @@ fn controls() ! {
 	// must interrupt, retire/reap, preserve refusal and observe direct cleanup.
 	quiet_state := watch.state + '/quiet'
 	os.mkdir(quiet_state)!
-	mut quiet := Watch{state: quiet_state, wall: 600 * u64(time.millisecond)}
+	mut quiet := Watch{state: quiet_state, wall: 600 * u64(time.millisecond), audit: second}
 	sample(true, mut quiet)!
 	mut quiet_refused := false
 	run_observed([os.executable(), '--control-quiet'], mut quiet) or { quiet_refused = err.msg().contains('wall deadline') }
@@ -626,7 +767,7 @@ fn controls() ! {
 	flood_state := watch.state + '/flood'
 	os.mkdir(flood_state)!; os.write_file(flood_state + '/child.log', '')!
 	mut flood := Watch{state: flood_state, wall: 5 * u64(time.second), log_limit: 128 * 1024,
-		log_roots: [flood_state + '/child.log']}
+		log_roots: [flood_state + '/child.log'], audit: second}
 	sample(true, mut flood)!
 	mut flood_refused := false
 	run_observed([os.executable(), '--control-flood'], mut flood) or { flood_refused = err.msg().contains('closed control log cap') }
@@ -634,7 +775,8 @@ fn controls() ! {
 		'actual fast-exit final-sample log refusal')!; count++
 	mut nested := Watch{state: watch.state}
 	mut nested_refused := false
-	sourcecommand.run_logged_owned([os.executable(), '--control-controller'], child_environment(), never,
+	sourcecommand.run_logged_owned([os.executable(), if second { '--control-controller2' } else { '--control-controller' }],
+		environment_for_state(watch.state), never,
 		watch.state + '/nested.log', false, '', interrupt_nested, &nested, 10) or { nested_refused = err.msg() == 'deliberate outer control refusal' }
 	cleanup := direct_cleanup(nested.pid)!
 	require(nested_refused, 'outer nested interruption control')!
@@ -657,9 +799,75 @@ fn controls() ! {
 	require(journal_refused, 'journal byte boundary accepted')!
 	journal(mut full, 'status.json', '{"error":"control journal cap","cleanup":"no child launched"}\n')!
 	require(present(full_state + '/status.json'), 'journal cap erased final refusal')!; count++
+	if second { count += seam_controls(watch)! }
 	journal(mut watch, 'controls.json', json2.encode({'controls': count.str(), 'status': 'PASS',
 		'outer_direct_cleanup': json2.encode(cleanup), 'nested_scope': 'Explicit cooperative inner owner receipt required; outer PGID alone supplies no descendant cleanup claim.'}) + '\n')!
 	println('FRESH ATOMIC NATIVE OBSERVER CONTROLS PASS ${count}')
+}
+
+fn seam_controls(watch Watch) !int {
+	mut count := 0
+	require(build_state(false) == observer + '/run-01' && build_state(true) == observer + '/run-02'
+		&& build_state(false) != build_state(true), 'retry overwrites the consumed route')!; count++
+	for state in [build_state(true), seal + '/native-seal-01', seal + '/native-check-01',
+		second_controls, second_controls + '/quiet', second_controls + '/flood'] {
+		require(probe_state(probe_route(state)!)! == state, 'new fixed probe route differs')!; count++
+	}
+	for route in ['run03', '../foreign', 'seal-01'] {
+		mut refused := false
+		probe_state(route) or { refused = true }
+		require(refused, 'unknown probe route accepted')!; count++
+	}
+	for state in [seal + '/native-seal-01', seal + '/native-check-01', second_controls] {
+		environment := environment_for_state(state)
+		for key in ['HOME', 'VMODULES', 'V3CACHE', 'XDG_CACHE_HOME', 'VTMP', 'TMPDIR'] {
+			require(environment[key].starts_with(audit_private + '/'), 'audit scratch escapes seal root')!
+		}
+		require(environment['V'] == compiler && environment['VEXE'] == compiler
+			&& environment['V_MACOS_V3_CALLER_VEXE'] == compiler, 'audit compiler identity differs')!; count++
+	}
+	require(audit_command(false) == [original_checker, 'seal', raw, seal + '/complete']
+		&& audit_command(true) == [original_checker, 'check', raw, seal + '/complete/inventory.json'],
+		'closed original auditor argv differs')!; count++
+	original_checker_pins()!; count++
+	pin_path := watch.state + '/pin-fixture'
+	os.write_file(pin_path, 'fixed bytes')!
+	pin := regular_hash(pin_path, 64)!
+	pinned_regular(pin_path, 64, pin)!; count++
+	os.write_file(pin_path, 'other bytes')!
+	mut changed_refused := false
+	pinned_regular(pin_path, 64, pin) or { changed_refused = true }
+	require(changed_refused, 'changed pinned input accepted')!; count++
+	link_path := watch.state + '/pin-link'
+	os.symlink('pin-fixture', link_path)!
+	mut link_refused := false
+	pinned_regular(link_path, 64, pin) or { link_refused = true }
+	require(link_refused, 'symlink admitted as a pinned regular input')!; count++
+	mut reused_refused := false
+	require_fresh(watch.state) or { reused_refused = true }
+	require(reused_refused, 'consumed state accepted for reuse')!; count++
+	for check in [false, true] {
+		marker := if check { 'FRAME-PAGE COMPLETE STATE CHECK PASS\n' }
+			else { 'FRAME-PAGE COMPLETE STATE PASS ' + pin + '\n' }
+		require_audit_marker(marker, check, pin)!; count++
+		for bad in [marker + 'extra\n', marker.trim_space(), marker.replace('PASS', 'FAIL')] {
+			mut refused := false
+			require_audit_marker(bad, check, pin) or { refused = true }
+			require(refused, 'inexact original marker accepted')!; count++
+		}
+	}
+	status := json2.decode[map[string]string](small_text(watch.state + '/status.json')!)!
+	require(status['return_status'] == '0' && status['error'] == ''
+		&& status['qualification'].starts_with('PROVISIONAL:')
+		&& status['qualification'].contains('external actual exit0'), 'audit status manufactures final success')!; count++
+	audit_end_timing(1, 1, sample_window + 1, sample_window)!; count++
+	mut wall_refused := false
+	audit_end_timing(1, 1, sample_window + 1, sample_window - 1) or { wall_refused = err.msg().contains('wall deadline') }
+	require(wall_refused, 'late audit phase completion accepted')!; count++
+	mut stale_refused := false
+	audit_end_timing(1, 1, sample_window + 2, sample_window + 1) or { stale_refused = err.msg().contains('observation gap') }
+	require(stale_refused, 'late audit final observation accepted')!; count++
+	return count
 }
 
 fn run() ! {
@@ -668,16 +876,22 @@ fn run() ! {
 	if os.args[1] == '--control-worker' { control_worker(); return }
 	if os.args[1] == '--control-quiet' { time.sleep(5 * time.second); return }
 	if os.args[1] == '--control-flood' { control_flood(); return }
-	if os.args[1] in ['--control-probe-transient', '--control-probe-failure'] {
-		if os.args[1] == '--control-probe-transient' && present(observer + '/controls-01/probe-count') { println('eventual'); return }
-		if os.args[1] == '--control-probe-transient' { os.write_file(observer + '/controls-01/probe-count', '1')! }
+	if os.args[1] in ['--control-probe-transient', '--control-probe-failure', '--control-probe-transient2', '--control-probe-failure2'] {
+		state := control_root(os.args[1].ends_with('2'))
+		if os.args[1].starts_with('--control-probe-transient') && present(state + '/probe-count') { println('eventual'); return }
+		if os.args[1].starts_with('--control-probe-transient') { os.write_file(state + '/probe-count', '1')! }
 		println('raw failing stdout'); eprintln('raw failing stderr'); exit(7)
 	}
 	for signal in [os.Signal.int, .term, .hup] { os.signal_opt(signal, interrupt)! }
 	match os.args[1] {
-		'--controls' { controls()! }
-		'--control-controller' { control_controller()! }
-		'--build-03' { production()! }
+		'--controls' { controls(false)! }
+		'--controls-02' { controls(true)! }
+		'--control-controller' { control_controller(false)! }
+		'--control-controller2' { control_controller(true)! }
+		'--build-03' { production(false)! }
+		'--build-03-retry02' { production(true)! }
+		'--seal-01' { audit(false)! }
+		'--check-01' { audit(true)! }
 		else { return error('unknown fixed mode') }
 	}
 }
