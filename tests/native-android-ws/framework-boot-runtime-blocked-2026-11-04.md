@@ -1,12 +1,17 @@
-# Process-package image prepared; ARM regression in progress
+# Process-package ARM pass; Global string-write API is next
 
 The [process-package image is prepared and sealed](process-packages-preparation-2026-11-05.md),
 with both complete input audits, all 62 modules and inherited kernel checks
 passed. Preparation and its independent evidence readback passed after the
 [scoped cache cleanup](process-packages-cache-resume-2026-11-05.md). The exact
-clone and fresh coexistence admission passed; own guest PID6224 is running
-with 12 GiB/four CPUs while CI PID23708 remains untouched. The signed ARM
-fixture and separate GMS/Maps retry are in progress, without a result yet.
+clone and fresh coexistence admission passed. The [signed ARM regression passed](process-packages-runtime-2026-11-05.md)
+with all six input pins and eleven checks, independently reviewed. GMS reached
+readiness, then exited on missing `Settings.Global.putString`; Maps was not
+manually launched. The complete fatal log matches its guest hash and length.
+Own guest PID6224 is stopped and confirmed gone; CI PID23708 remains untouched.
+The runtime seal passed its internal complete check; separate fresh readback
+is pending after disk-reserve preflight refusals. The next adapter and focused
+checks are source drafts, with no successor SDK or ARM result yet.
 
 ## Prior checkpoints
 
