@@ -51,6 +51,26 @@ The [earlier alias diagnosis](audio-binding-alias-diagnose.md) remains a record
 of four historical fixture mutations. Its original snapshots and refusals are
 preserved without repair or requalification; this checkpoint supersedes its
 pending-151-validation note. Original source/legacy aliases remain fixed.
-Source N and this new run are frozen. A separate whole-history seal/check/root
-audit is still pending. This is host qualification only: no target compilation,
-guest execution, native audio backend/device or hermetic toolchain acceptance.
+Source N and this new run are frozen. The subsequent whole-history seal,
+separate check and root-owned independent check all returned actual exit 0 with
+exact original markers. The original checker and source remained unchanged.
+
+The complete raw run remains at the path above. Its complete inventory and
+audit output are retained in the adjacent `a4-independent-fixtures-host-20261104-01-seal-01`
+directory. `complete/inventory.json` is 8,464,458 bytes with SHA-256
+`7ff70ca14f128ac8dc204d4a95ca9b2a687caf7871125ba296146114a40f9caa`.
+That manifest stayed identical through both checks. The first two actual
+results are retained in `first-two-audits-status.json`, SHA-256
+`b9b13184ec389ffd50bdcd4ceb615fca83e909dec8979895315eb01ea4df7d3a`.
+The root-owned third result is `root-independent-status-03.json`, SHA-256
+`34d8ad7ad00592fb4bd5ae8e8a1e69bcfa35797dd434b7787501572c8598b6b3`.
+
+All ten audit anchors and 27 retained input pins verified unchanged before and
+after the root check. Its log contained exactly the 37-byte original PASS marker.
+Final seven-root observations were 1,066,636 KiB allocated/1,239,013 KiB apparent
+under the 2 GiB cap, with 35,227,504 KiB actual free. The unchanged original leaf
+used 600/300-second timeouts and five-second kill grace; these audits provide
+endpoint observations, without continuous resource, RSS or group-cleanup claims.
+Retain the complete raw run together with its inventory; this new audit does
+not requalify any historical refusal. No target compilation, guest execution,
+native audio backend/device or hermetic toolchain acceptance is claimed.
