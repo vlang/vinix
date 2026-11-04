@@ -42,8 +42,10 @@ the qualified 30-minute guard remains
 `82bf70451bb01ccb09ff162e388f8b64869b63f823e463c51fe0ffa785dd91ec`.
 Fresh preparation controls are at
 `S/maps-process-packages-preparation-2026-11-05-r1`, targeting
-`S/maps-process-packages-r1`. Preparation has started its immutable-input audit;
-completion and the final image seal remain pending. The 4 GiB outer growth
+`S/maps-process-packages-r1`. [Preparation and sealing passed](process-packages-preparation-2026-11-05.md),
+including the complete three-root aggregate that preserves these cleanup
+records, manifest `aafacf7484fdddcc5b39062a1c8815d42ff2340bb0905c07e8cded2ccf67c923`.
+The independent fresh readback also passed. The 4 GiB outer growth
 allowance, 1 GiB reserve, 600 MiB RSS and stager's separate 512 MiB budget are
 unchanged. This report establishes no ARM, GMS or Maps result. The earlier
 [disk-refused preparation](process-packages-preparation-blocked-2026-11-04.md)
