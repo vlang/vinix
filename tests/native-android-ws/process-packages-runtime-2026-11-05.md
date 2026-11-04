@@ -148,5 +148,8 @@ exceeded64 MiB after1,775 ms, guard125/child137 with complete cleanup. The two
 separate fresh readback attempts on the successful aggregate were then refused
 before launch for `disk growth budget`, with initial free bytes1,105,698,816
 and1,074,941,952. Both record guard125/child-1, PID0, zero samples/groups and
-`cleanup_complete=false`. Independent fresh aggregate readback remains pending;
-the successful seal-time check and complete original bundles are retained.
+`cleanup_complete=false`. The third separate fresh readback, recorded in
+`readback-r3.guard.json` with its matching log, passed 0/0 with complete cleanup
+in 2,641 ms, sampled RSS12,124,160 bytes and observed growth6,725,632 bytes.
+It checked the same manifest pin under the original limits. The successful
+seal-time check, both refused readbacks and complete original bundles are retained.
