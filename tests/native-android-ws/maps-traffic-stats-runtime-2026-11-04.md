@@ -93,8 +93,8 @@ Storage coverage is retained in four component seals under
 | Component | Entries | Manifest SHA-256 | Separate fresh readback |
 | --- | ---: | --- | --- |
 | prepared | 185 | `1525d9e0e3dc3da8537250ae88d25667beb5b2783cf4ec1d040289f4beaaeb5c` | Passed |
-| stopped-r1 | 212 | `e6658ef52e719092849f351868a6c340af9f2fe0c65828f641dab66363e81eaf` | Pending; attempts1–5 hit shared-growth limit |
-| stopped-r3 | 234 | `d6177f72d7f9d2281d7f1b3bf2c14fb8808c1aa0fefd48e458eaeb670c959ef7` | Pending; attempts1–2 hit shared-growth limit |
+| stopped-r1 | 212 | `e6658ef52e719092849f351868a6c340af9f2fe0c65828f641dab66363e81eaf` | Passed in separate recheck root; earlier five stops retained |
+| stopped-r3 | 234 | `d6177f72d7f9d2281d7f1b3bf2c14fb8808c1aa0fefd48e458eaeb670c959ef7` | Passed in separate recheck root; earlier two stops retained |
 | controls (17 roots) | 299 | `a0e680253c50ce95793dc1a28961078d9ba8aa2ec901d6ec3278a95f15f17bd3` | Passed |
 
 Every component completed its seal-time internal check. The controls seal
@@ -103,8 +103,9 @@ directories, including each interrupted fresh readback. Across the four
 component seals, all 17 original roots remain covered; no input or historical
 full-bundle requirement was waived. The seven separate VM readbacks record
 guard125/child137, reason `observed disk growth` and complete cleanup. Their
-independent fresh validation remains pending; neither a full aggregate fresh
-readback nor successful independent VM readback is claimed.
+initial fresh validation stopped. Subsequent independent VM readbacks passed
+under unchanged limits in the separate root described below. No single combined
+aggregate fresh readback is claimed.
 
 The original 600 MiB RSS, 900-second, 64 MiB growth and 1 GiB reserve limits
 remained unchanged. Prepared-evidence seal r6 at
@@ -112,3 +113,25 @@ remained unchanged. Prepared-evidence seal r6 at
 guard125/child137, complete cleanup, 10,452 ms and 70,606,848 bytes growth.
 All failed seal roots, original controls and partial outputs remain preserved,
 together with every unchanged original checker and complete bundle.
+
+At 20:54 UTC, both pending complete VM readbacks passed in
+`S/maps-traffic-stats-checkpoint-rechecks-2026-11-04-r1`, with controls outside
+the already sealed component roots. R1 passed in 2,708 ms, sampled RSS
+11,354,112 bytes and observed growth 4,157,440 bytes; R3 passed in 2,208 ms,
+sampled RSS 12,353,536 bytes and observed growth 12,288 bytes. Both guards and
+children exited zero with empty reasons and complete cleanup under the original
+600 MiB RSS, 900-second, 64 MiB growth and 1 GiB reserve limits. The qualified
+checker received each exact original manifest pin. All four component seals
+now have successful separate fresh readbacks; the original complete bundles
+remain required.
+
+The new five-entry control root is sealed at
+`S/maps-traffic-stats-checkpoint-rechecks-sealed-2026-11-04-r1/sealed/manifest.json`,
+SHA-256 `ea45ee40ff767160fd889e4c2efd07cb3aad9c11a3bd4f4bfcda4d8f5f2671bd`.
+Sealing and its internal check passed with guard/child zero and complete
+cleanup. The separate control-seal readback was refused before launch when
+free space fell to 1,139,257,344 bytes, below the 1 GiB reserve plus 64 MiB
+growth allowance: guard125, child-1, PID0, zero samples/groups and
+`cleanup_complete=false`. Its independent readback remains pending. The two
+complete VM readbacks themselves passed; the earlier component and controls
+seals were not modified.
