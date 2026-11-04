@@ -2,7 +2,8 @@
 
 Source base: `4e52d3561e267e96735c91b65ddc4057cffb0ed6`. Qualification ran
 against the exact source/tool hashes retained in the external receipts.
-The frame kernel itself is still unbuilt and unqualified.
+The subsequent [native kernel build](fresh-frame-native-build.md) passed;
+original full audits and guest/performance validation remain pending.
 
 The fixed V preparer is
 `prepare-fresh-frame.v` SHA256
@@ -47,9 +48,9 @@ All raw evidence is outside Git under:
 - `native-control-actions-01/closed-controls-summary.json`: SHA256 `c837d56667d7d1997905ab888620ea88e9346889b7cefa84d463afcbd79c9fef`.
 
 Setup and bootstrap evidence covers admission/completion endpoints; the
-native timing evidence above covers closed controls. Production kernel
-execution still requires native observations within five seconds, a total
-1,100-second entry-through-final-PASS bound and the unchanged inner controller.
+native timing evidence above covers closed controls. The subsequent kernel
+build passed native observations within five seconds, the total 1,100-second
+entry-through-final-PASS bound and the unchanged inner controller.
 Original full seal/check/root-independent check and VM/performance validation
 remain pending. Referenced historical frame/atomic bundles and preflight documents
 are unchanged.

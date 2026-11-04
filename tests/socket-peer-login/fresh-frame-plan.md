@@ -5,7 +5,9 @@ source generation and both strict native bootstraps have passed. Each native
 profile passed all 67 closed controls; see
 [`fresh-frame-native-qualification.md`](fresh-frame-native-qualification.md)
 for the pinned source bytes and external receipts. The fresh x86 frame kernel
-build, original complete audits, staging and guest remain unexecuted. The
+build also passed its original controller and native guards; see
+[`fresh-frame-native-build.md`](fresh-frame-native-build.md). Original complete
+audits, staging and guest remain unexecuted. The
 original baseline refusal in `frame-baseline-preflight.md` remains historical;
 the separate fresh atomic success does not qualify this frame kernel.
 Require root review and a reserved host phase for each remaining heavy phase.
@@ -22,9 +24,9 @@ The subsequent held-plan bytes (SHA256
 are preserved with their checksum at
 `/Users/alex/Library/Caches/vinix-codex/section14/frame-peer-baseline-planning-20261104-02`.
 That read-only planning snapshot measured 24 KiB allocated/19 KiB apparent,
-outside fresh execution growth. The setup/bootstrap recipes below retain the
+outside fresh execution growth. The setup/bootstrap/build recipes below retain the
 completed attempt's provenance; do not rerun them against consumed output
-names. Remaining build/audit sections are still prospective requirements.
+names. Full-audit and later consumer sections remain prospective requirements.
 
 ## Fixed bindings and budget
 
@@ -273,7 +275,8 @@ Record this bounded setup operation and its pre/post observations. The native
 core requires that directory for controls and build owner state; S profile
 directories do not replace it. Never create it after the raw-root freeze.
 
-After root reviews actual native controls and fresh admission, invoke:
+The completed build used this invocation after native control review and
+fresh admission; a future attempt requires separate review and fresh outputs:
 
 ```
 [NATIVE, "--build-frame-01"]
