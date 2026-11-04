@@ -1,13 +1,14 @@
-# Framework boot kernel installed; live coexistence awaits approval
+# Framework boot ARM failure preserved; JNI loading needs correction
 
 The framework boot-classpath image is prepared and the frozen replacement
 kernel is installed, with complete readbacks passed. Installation reused the
 exact qualified SDK 27.0 patcher. The complete retained tool and attempt
 archives are now sealed and verified; the SDK 27.2 draft remains unqualified.
-The opt-in 64 GiB coexistence runner has passed host qualification and read-only
-admission; live use awaits explicit approval while the user's
-**Leave CI running** choice remains in force. No new fixture, GMS, Maps
-rendering, imagery or authentication result is established.
+The user continued after the concrete 64 GiB coexistence approval request.
+The admitted run booted successfully, but its signed ARM fixture failed at
+JNI backend loading before its assertions. The VM is stopped and complete
+evidence is sealed. **Leave CI running** remains in force. No fixture pass,
+GMS, Maps rendering, imagery or authentication result is established.
 
 The preparation, clone, early handoffs and Q1–Q4 aggregate stops below record
 historical states. Their pending-kernel and pending-archive statements are
@@ -252,3 +253,13 @@ unchanged; ARM fixture, GMS and Maps checks still await an approved live run.
 The intended aggregate allocation is 44 GiB (32 GiB CI plus 12 GiB Maps).
 Explicit approval to use the larger allowance remains required; **Leave CI
 running** continues to apply. Future live controls must use a fresh root.
+
+That pending-live state is superseded by the later
+[ARM bootstrap failure](maps-framework-boot-runtime-2026-11-04.md). Qualified
+64 GiB admission and owned launch/stop succeeded while CI remained untouched.
+The unchanged fixture failed at `ANDROID-WS-FAIL load JNI backend`; its complete
+5,943-byte log is preserved against a separate guest hash and length.
+The four-root, 515-entry seal and fresh readback passed, manifest
+`98ed3835f33f1045b1db57e6933cfb92ca703d1db78ffc12d52a0cc2fb311b65`.
+The VM and all runtime roots are closed. Correct the guarded Runtime.load
+overload and requalify a successor native/image before another ARM fixture run.
