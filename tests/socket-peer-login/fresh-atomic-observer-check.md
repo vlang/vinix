@@ -119,3 +119,46 @@ observer PASS, with the 600/300-second deadline and final observation gap checke
 after provisional status writing and again after original marker/input checks.
 Refused cleanup can exceed its deadline and remains refused. These host controls
 do not claim a fresh kernel build, full raw audit or guest qualification.
+
+## Fresh build03 and original complete audits
+
+The fixed retry02 subsequently returned actual0 for both architecture builds
+and the native observer. The kernel source base remains
+`9acefa77bee69247c837e97987a2377536aa41cc`. Source, compiler, module and seven kernel-input maps
+matched before and after. The unchanged controller retained its complete
+input inventories, generated-C checks (18 frame and 29 peer mutations per
+architecture), ELF/symbol checks and each make group's successful cleanup.
+Its qualification SHA256 is
+`c0e3942385c75abb45bb24615f35a6bd154fc54fd12ca88a8e21bf3189c7b4b5`.
+The retained `build-03` ELF pins are:
+
+- x86_64: `2a7973b2dcb21c7b40aa4fb0fd1de6c9c29c8c6c246a4353445f5698b5150eac`.
+- AArch64: `a9d79c09a0d575facafc23b2f65be8e94ffa423cb92e183b5d4c73719f13a469`.
+
+The native build watch recorded306 samples, maximum gap1016ms and sample786ms,
+with peak430922KiB apparent and285768KiB allocated, and minimum7863492KiB free.
+Its direct leader83083 and both separately owned make groups have their own
+completed cleanup observations. Worktree outputs were moved into retained
+state and remain absent from the worktree. S retains the final actual status
+and freeze receipt as `native-build-03-retry02-outer-status.json`, SHA256
+`fd37e64fd5427374282916be19784d6bd16e520e5d4c310386c23fad39a6ef74`.
+All owned writers to R have exited; subsequent owner state stays in S.
+
+The original complete sealer then returned actual0 through the native600s
+owner, followed by a separate original check returning actual0 through its
+native300s owner. Both exact original and observer markers, final wall/tail
+guards and unchanged checker/source pins pass. The complete manifest is
+S `complete/inventory.json` (2930169 bytes), SHA256
+`e82671ca13c4d46b18d1d9762d661f4f392be0ee888d0fb20d1de21f540c54f0`.
+Seal sampling recorded124 samples/max gap1018ms/sample908ms; the separate
+check recorded32 samples/max gap1012ms/sample694ms. Each direct leader has
+actual ECHILD/ESRCH observations and independent raw status/journal receipts.
+
+Root's independently executed original check remains required before retained
+consumers. The first derived independent-owner profile compiled successfully
+but its fresh controls03 refused at the quiet-control expectation: admission
+and phase clocks were misaligned, so a valid sample-window refusal preceded
+the expected wall message. Its complete failed state is preserved in S;
+it supplies no independent-check qualification. Original build/seal/check
+results remain scoped as above. Guest/runtime/performance gates and production
+kernel integration remain open; no historical refused bundle is restored.
