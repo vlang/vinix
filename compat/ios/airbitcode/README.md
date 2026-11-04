@@ -37,6 +37,10 @@ or provide GPU capabilities. The runtime's default Metal device stays
 unavailable. Native macOS framework samples establish format coverage only;
 Fortnite's packed shaders are not yet covered.
 
+The separate [`stream.ir_module(data)` layer](IR.md) indexes and checks a strict
+subset of LLVM types and function signatures. Raw `parse` remains a bitstream
+decoder; instruction semantics and execution require further backend work.
+
 `stream_test.v` builds synthetic fixtures in V, checks malformed input and
 mutations, and exercises expansion/work limits. `tests/ios/air-bitcode-inspect.v`
 provides these modes:
