@@ -2035,6 +2035,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   on both production architectures and Linux; originals fail 84 on AArch64
   and 30 on x86-64. See [the one-shot qualification](docs/linux-signal-one-shot.md).
 
+- [x] Preserve a masked wait's live mask during native handler entry while
+  saving the original mask for sigreturn. Five waits, recursive SA_NODEFER,
+  action masks and timeout restoration pass 1,256 checks on both architectures
+  and Linux; original x86-64 fails 160. Eight maintained suites pass per
+  architecture. See [the handler-mask qualification](docs/linux-masked-wait-handlers.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

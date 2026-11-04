@@ -91,8 +91,10 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	sigaction := take_signal_action(mut t, which, true)
 	handler := u64(sigaction.sa_sigaction)
 
-	// A mask sigsuspend() put in place for the wait belongs to the handler's
-	// frame, which puts the one from before it back on return.
+	// The frame restores the mask from before a masked wait. Handler entry
+	// still uses the live temporary mask, plus sa_mask and (unless NODEFER)
+	// the delivered signal; restoring the saved mask here changes which
+	// signals can interrupt the handler itself.
 	previous_mask := if t.saved_mask_valid { t.saved_mask } else { t.masked_signals }
 	t.saved_mask_valid = false
 
@@ -196,7 +198,7 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 		t.sigaltstack_flags = u32(ss_disable)
 	}
 
-	t.masked_signals = previous_mask | sigaction.sa_mask
+	t.masked_signals |= sigaction.sa_mask
 	if sigaction.sa_flags & linux_sa_nodefer == 0 {
 		t.masked_signals |= signal_bit(which)
 	}

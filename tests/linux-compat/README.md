@@ -12,6 +12,12 @@ must pass; bad pointers, errno, compiler failure, panic, timeout and late failur
 remain failures. Sources, init/ISO/kernel hashes, receipts and raw serial logs
 stay in the required fresh artifact directory, including on failure.
 
+`--cases maskwait` checks the live mask inside handlers interrupting
+rt_sigsuspend, ppoll, pselect6, epoll_pwait and epoll_pwait2. It checks saved
+frame/return masks, recursive SA_NODEFER delivery, action masks, SA_RESTART,
+ordinary unmasking and timeout restoration as root and UID1000. The pselect6
+control uses a finite deadline. See [qualification and retained evidence](../../docs/linux-masked-wait-handlers.md).
+
 Receipt audit sources use V assertions. Build them without `-prod`, which
 removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
 the checks while optimizing hashing. Confirm a deliberate failing assertion
