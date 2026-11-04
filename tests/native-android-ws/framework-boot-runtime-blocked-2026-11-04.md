@@ -1,4 +1,4 @@
-# TrafficStats ARM pass; process-package successor awaiting ARM replay
+# Process-package successor qualified; image preparation blocked by disk
 
 The [TrafficStats ARM regression passed](maps-traffic-stats-runtime-2026-11-04.md).
 GMS reached readiness, then failed on the missing
@@ -6,11 +6,16 @@ GMS reached readiness, then failed on the missing
 self-process package snapshots are committed in `2443f94f0` and `24f606459`;
 the successor SDK producer is committed in `9071f1164`. Complete SDK production,
 fresh native production/readback and signed-fixture host checks passed.
-Delivery/image qualification and the successor ARM replay remain pending.
+[Delivery qualification](process-packages-host-2026-11-04.md) is committed in
+`e20a0ea14`, and [image staging](maps-process-packages-stage.md) in `385535613`.
+All 15 image-tool phases and complete tool sealing/fresh readback passed.
+[Preparation was refused before launch](process-packages-preparation-blocked-2026-11-04.md)
+with only 927,457,280 bytes free, below the original disk reserve. At least
+5 GiB initial free space is required; the successor ARM replay remains pending.
 No manual Maps launch, rendering, imagery or authentication result is established.
 Our VM is stopped; CI remains untouched. Complete original evidence and failed
-attempts are retained. The TrafficStats report distinguishes completed component
-seals from pending separate VM readbacks. Historical checkpoints below remain
+attempts are retained. The TrafficStats report records successful separate VM
+readbacks and the remaining small control-seal readback. Historical checkpoints below remain
 evidence, not current pending implementation work.
 
 ## Preceding ARM JNI replay
