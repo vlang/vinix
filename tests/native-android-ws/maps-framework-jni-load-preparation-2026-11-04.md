@@ -13,7 +13,7 @@ SHA-256 `ef7fb7ef6976a3b4d44451bc8ba197472f4c6e5c7a2ab7399867bd0aaa71aec8`.
 The separate [clean kernel checkpoint](framework-jni-load-kernel-checkpoint.md)
 remains intact. Complete original bundles and historical auditors remain required.
 
-All four preparation attempts stopped at the unchanged shared disk-growth
+The first four preparation attempts stopped at the original shared disk-growth
 limit while auditing immutable inputs. Each log contains only the 50-byte
 `MAPS-FRAMEWORK-JNI-LOAD auditing immutable inputs` announcement. No destination
 directory or prepared image was created by these attempts, and no functional
@@ -27,8 +27,8 @@ do not establish successful preparation.
 | r3 | 205,688 | 547,295,232 | 55,001,088 |
 | r4 | 229,844 | 586,403,840 | 54,034,432 |
 
-Every stopped attempt records guard exit 125, child exit 137, reason
-`observed disk growth`, and complete cleanup. Limits remain 600 MiB aggregate
+Each of these four attempts records guard exit 125, child exit 137, reason
+`observed disk growth`, and complete cleanup. Their limits were 600 MiB aggregate
 RSS, 900 seconds, 512 MiB observed disk growth, 1 GiB reserve, 4 MiB output
 and shell file-size cap 16777216. Complete receipts and logs remain in
 `S/maps-framework-jni-load-preparation-2026-11-04-r1` through matching `r4`;
@@ -47,10 +47,54 @@ growth under the original 64 MiB seal allowance. Manifest:
 `S/maps-framework-jni-load-preparation-sealed-2026-11-04-r1/sealed/manifest.json`,
 SHA-256 `e6a121a21cea3abe36594ba1d6c758c8686e342d296ee9cd20a1b9634692df81`.
 
-Preparation needs a sufficiently quiet full-audit interval under the existing
-outer 512 MiB shared-filesystem allowance. A larger outer allowance requires
-an explicit resource-policy decision; no allowance was increased here. The
-qualified stager separately retains its own 512 MiB charged write budget and
+After that sealed handoff, the user replied **continue** to the concrete
+proposal for a 4 GiB outer shared-filesystem growth allowance. The next attempt
+used that allowance with the same qualified binary. The stager's separate
+512 MiB charged write budget, 1 GiB reserve and all audits remained unchanged;
+the outer RSS, wall, reserve, output and file-size limits also stayed unchanged.
+
+R5 again stopped during the read-only input audit, before creating its
+destination. Its receipt records 319,407 ms, initial free space 11,384,578,048
+bytes, minimum free space 7,074,250,752 bytes, observed growth 4,310,327,296
+bytes and sampled peak RSS 55,066,624 bytes. Guard/child exited 125/137 with
+reason `observed disk growth` and complete cleanup. The log contains only the
+same 50-byte audit announcement; no functional validation error appeared and
+no prepared image was created. Complete controls remain at
+`S/maps-framework-jni-load-preparation-2026-11-04-r5`; the absent destination
+was `S/maps-framework-jni-load-r5`.
+
+R6 used the same binary and 4 GiB outer allowance, recording checkout revision
+`5de25f37c684c1de7db3a7fb17d3e2c6a9b8f100`. Its initial full 137-inventory
+audit passed, and the five-file native overlay was installed. All 60 module
+readbacks, the inherited kernel and boot configuration passed. The stager's
+charged write budget reached 135,344,128 bytes, within its 512 MiB allowance.
+The final full input audit was still progressing when the original 900-second
+outer deadline stopped it. No functional validation error appeared.
+
+The R6 receipt records 900,132 ms, initial/minimum free space
+7,102,328,832/3,218,063,360 bytes, observed shared growth 3,884,265,472 bytes and
+sampled peak RSS 72,384,512 bytes. Guard/child exited 125/137 with reason
+`wall time` and complete cleanup. Controls remain at
+`S/maps-framework-jni-load-preparation-2026-11-04-r6`. The partial output at
+`S/maps-framework-jni-load-r6` has neither `stage.json` nor `sha256.json` and
+must not be treated as prepared or used for a guest run. It remains preserved;
+any retry must use a fresh output and complete every audit again.
+
+The complete R5 controls, R6 controls and partial R6 output passed a three-root,
+186-entry seal and independent fresh readback in 17,691/9,385 ms. Both guards
+and children exited zero with complete cleanup; observed growth was
+33,456,128/58,368,000 bytes under the original 64 MiB seal allowance. Manifest:
+`S/maps-framework-jni-load-preparation-sealed-2026-11-04-r2/sealed/manifest.json`,
+SHA-256 `2719100244e241677d6edfb9fc0604d77f3bc69d1698d518704c7d7238e38395`.
+The historical four-root seal above remains untouched.
+
+A proposed fresh attempt uses a 30-minute outer deadline with the same 4 GiB
+shared-growth allowance and all other limits unchanged. This deadline change
+is pending approval; it was not used in these attempts. The complete partial
+output is evidence of the stopped attempt, not a substitute for a fresh full
+preparation.
+
+The qualified stager separately retains its own 512 MiB charged write budget and
 1 GiB free-space reserve, all 137 inherited inventories before and after,
 typed kernel verification and 60 module readbacks. Once preparation succeeds,
 clone its sealed result without another kernel patch and run the unchanged

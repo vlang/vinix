@@ -1,16 +1,18 @@
-# JNI correction qualified; successor preparation awaits disk budget
+# JNI correction qualified; successor preparation awaits time budget
 
 The [native-only successor tools](maps-framework-jni-load-stage.md) are now
 qualified and committed as `79c2eea86`, including the clean inherited-kernel
-checkpoint and unchanged signed fixture delivery. Four complete fresh
-[preparation attempts](maps-framework-jni-load-preparation-2026-11-04.md) stopped
-at the outer 512 MiB shared-filesystem growth guard during read-only auditing,
-before creating their output directories. Their complete controls are sealed
-and freshly verified. No functional validation failure appeared; no successor
-image or ARM/GMS/Maps result is established. CI remains running and unchanged.
-Retry requires a quieter interval or an explicitly approved larger outer
-shared-disk allowance; all provenance, stager write budgets and reserves remain
-required.
+checkpoint and unchanged signed fixture delivery. The user continued after the
+4 GiB outer shared-growth proposal. The latest fresh
+[preparation attempt](maps-framework-jni-load-preparation-2026-11-04.md) passed
+its initial full 137-inventory audit, all 60 module readbacks and inherited
+kernel checks, then hit the original 15-minute deadline during its final full
+input audit. No functional validation failure appeared. Complete controls and
+partial output are sealed and freshly verified; the partial image has no
+completion receipt or manifest and must not be booted. A proposed fresh
+30-minute attempt, retaining the same 4 GiB allowance and every other check and
+limit, awaits approval. No successor ARM/GMS/Maps result is established. CI
+remains running and unchanged.
 
 The framework boot-classpath image is prepared and the frozen replacement
 kernel is installed, with complete readbacks passed. Installation reused the
