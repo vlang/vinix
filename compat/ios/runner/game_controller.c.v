@@ -79,6 +79,8 @@ fn game_controller_types(name string, meta bool, selector string) ?string {
 	if name != 'GCController' || !meta { return none }
 	return match selector {
 		'controllers', 'current' { '@16@0:8' }
+		'startWirelessControllerDiscoveryWithCompletionHandler:' { 'v24@0:8@?16' }
+		'stopWirelessControllerDiscovery' { 'v16@0:8' }
 		'shouldMonitorBackgroundEvents' { 'B16@0:8' }
 		'setShouldMonitorBackgroundEvents:' { 'v20@0:8B16' }
 		else { none }
@@ -108,6 +110,18 @@ fn game_controller_dispatch(object u64, selector string, mut frame RegisterFrame
 	}
 	if !meta { return false }
 	match selector {
+		'startWirelessControllerDiscoveryWithCompletionHandler:' {
+			controller_discovery_start(frame.x[2])
+			frame.x[0] = 0
+		}
+		'stopWirelessControllerDiscovery' {
+			// The queued completion still owns its captures. A subsequent start
+			// begins a new operation instead of replacing this stopped one's handler.
+			C.ios_objc_initialize_lock()
+			ios_runtime.controller_discovery = unsafe { nil }
+			C.ios_objc_initialize_unlock()
+			frame.x[0] = 0
+		}
 		'controllers' {
 			frame.x[0] = ns_empty_array_symbol('___NSArray0__struct') or { panic('iOS: controller discovery after shutdown') }
 		}
@@ -126,6 +140,72 @@ fn game_controller_dispatch(object u64, selector string, mut frame RegisterFrame
 		else { return false }
 	}
 	return true
+}
+
+@[heap]
+struct ControllerDiscovery {
+mut:
+	handler u64
+}
+
+// There is no wireless transport to wait for. Complete an empty search on the
+// next main-queue turn. The job owns the operation; the shared pointer only
+// identifies the search whose handler can still be replaced. Stop detaches it
+// while preserving its completion. No callback or capture helper runs locked.
+fn controller_discovery_start(handler u64) {
+	copied := block_copy(handler)
+	C.ios_objc_initialize_lock()
+	if ios_runtime.controller_discovery_retired {
+		C.ios_objc_initialize_unlock()
+		block_release(copied)
+		return
+	}
+	mut operation := ios_runtime.controller_discovery
+	if operation != unsafe { nil } {
+		previous := operation.handler
+		operation.handler = copied
+		C.ios_objc_initialize_unlock()
+		block_release(previous)
+		return
+	}
+	operation = &ControllerDiscovery{handler: copied}
+	ios_runtime.controller_discovery = operation
+	C.ios_objc_initialize_unlock()
+	dispatch_submit_owned(darwin_dispatch_get_main_queue(), operation,
+		controller_discovery_complete, controller_discovery_cleanup)
+}
+
+fn controller_discovery_complete(context voidptr) {
+	mut operation := unsafe { &ControllerDiscovery(context) }
+	C.ios_objc_initialize_lock()
+	if ios_runtime.controller_discovery == operation {
+		ios_runtime.controller_discovery = unsafe { nil }
+	}
+	handler := if ios_runtime.controller_discovery_retired { u64(0) } else { operation.handler }
+	if handler != 0 { operation.handler = 0 }
+	C.ios_objc_initialize_unlock()
+	block_invoke_void(handler)
+	block_release(handler)
+}
+
+fn controller_discovery_cleanup(context voidptr) {
+	mut operation := unsafe { &ControllerDiscovery(context) }
+	C.ios_objc_initialize_lock()
+	if ios_runtime.controller_discovery == operation {
+		ios_runtime.controller_discovery = unsafe { nil }
+	}
+	handler := operation.handler
+	operation.handler = 0
+	C.ios_objc_initialize_unlock()
+	block_release(handler)
+	unsafe { free(operation) }
+}
+
+fn controller_discovery_shutdown() {
+	C.ios_objc_initialize_lock()
+	ios_runtime.controller_discovery_retired = true
+	ios_runtime.controller_discovery = unsafe { nil }
+	C.ios_objc_initialize_unlock()
 }
 
 fn game_controller_constant_index(symbol string) ?int {

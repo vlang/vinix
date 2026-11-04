@@ -2,6 +2,7 @@
 module main
 
 import math.bits
+import time
 
 $if macos {
 	#flag -framework Foundation
@@ -15,6 +16,8 @@ fn C.objc_getMetaClass(&char) voidptr
 fn C.sel_registerName(&char) voidptr
 fn C.class_getInstanceSize(voidptr) usize
 fn C.class_getSuperclass(voidptr) voidptr
+fn C.class_getClassMethod(voidptr, voidptr) voidptr
+fn C.method_getTypeEncoding(voidptr) &char
 type ControllerSend = fn (u64, u64, u64) u64
 struct ControllerApi { native bool send u64 cls u64 }
 fn (api ControllerApi) msg(object u64, selector &char, arg u64) u64 {
@@ -71,13 +74,20 @@ fn test_game_controller_native() {
 	$if macos {
 		assert C.dlopen(c'/System/Library/Frameworks/GameController.framework/GameController', 2) != unsafe { nil }
 		cls := u64(C.objc_getClass(c'GCController'))
-		assert cls != 0 && C.class_getInstanceSize(unsafe { voidptr(cls) }) == 232
+		native_size := C.class_getInstanceSize(unsafe { voidptr(cls) })
+		// The original reference used 232 bytes; macOS 27.2 uses 296. No
+		// physical controller storage is constructed by the empty backend.
+		assert cls != 0 && native_size in [usize(232), 296]!
 		assert C.class_getSuperclass(unsafe { voidptr(cls) }) == C.objc_getClass(c'NSObject')
 		api := ControllerApi{native: true, send: u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend')), cls: cls}
 		pool := api.msg(u64(C.objc_getClass(c'NSAutoreleasePool')), c'new', 0)
 		controller_discovery(api); controller_constants(api)
+		for selector, types in {'startWirelessControllerDiscoveryWithCompletionHandler:': 'v24@0:8@?16', 'stopWirelessControllerDiscovery': 'v16@0:8'} {
+			method := C.class_getClassMethod(voidptr(cls), C.sel_registerName(selector.str))
+			assert method != unsafe { nil } && ctext(u64(C.method_getTypeEncoding(method))) == types
+		}
 		api.msg(pool, c'drain', 0)
-		println('IOS-GAME-CONTROLLER-NATIVE: 232-byte NSObject class, empty discovery, nil current, background flag and three notification values')
+		println('IOS-GAME-CONTROLLER-NATIVE: ' + native_size.str() + '-byte NSObject class, empty discovery, nil current, background flag, three notification values and wireless method encodings')
 	}
 }
 fn test_game_controller_runtime() {
@@ -94,19 +104,21 @@ fn test_game_controller_runtime() {
 			}
 		}
 		if _ := game_controller_symbol('_GCControllerUnknownNotification') { assert false }
-		for selector, types in {'controllers': '@16@0:8', 'current': '@16@0:8', 'shouldMonitorBackgroundEvents': 'B16@0:8', 'setShouldMonitorBackgroundEvents:': 'v20@0:8B16'} {
+		for selector, types in {'controllers': '@16@0:8', 'current': '@16@0:8', 'shouldMonitorBackgroundEvents': 'B16@0:8', 'setShouldMonitorBackgroundEvents:': 'v20@0:8B16', 'startWirelessControllerDiscoveryWithCompletionHandler:': 'v24@0:8@?16', 'stopWirelessControllerDiscovery': 'v16@0:8'} {
 			method := objc_class_method(cls, u64(selector.str))
 			assert method != 0 && ctext(u64(objc_method_types(method))) == types
 			assert objc_responds(cls, selector.str) && objc_instance_method(cls, u64(selector.str)) == 0
 			signature := api.msg(cls, c'methodSignatureForSelector:', u64(selector.str))
 			assert signature != 0
 			setter := selector == 'setShouldMonitorBackgroundEvents:'
-			assert api.msg(signature, c'numberOfArguments', 0) == if setter { u64(3) } else { u64(2) }
+			start := selector == 'startWirelessControllerDiscoveryWithCompletionHandler:'
+			assert api.msg(signature, c'numberOfArguments', 0) == if setter || start { u64(3) } else { u64(2) }
 			assert ctext(api.msg(signature, c'methodReturnType', 0)) == types[..1]
-			assert api.msg(signature, c'methodReturnLength', 0) == if setter { u64(0) } else if selector == 'shouldMonitorBackgroundEvents' { u64(1) } else { u64(8) }
+			assert api.msg(signature, c'methodReturnLength', 0) == if types.starts_with('v') { u64(0) } else if selector == 'shouldMonitorBackgroundEvents' { u64(1) } else { u64(8) }
 			if setter { assert ctext(api.msg(signature, c'getArgumentTypeAtIndex:', 2)) == 'B' }
+			if start { assert ctext(api.msg(signature, c'getArgumentTypeAtIndex:', 2)) == '@?' }
 		}
-		for selector in [c'alloc', c'new', c'copy', c'init', c'supportsSecureCoding', c'controllerWithExtendedGamepad', c'controllerWithMicroGamepad', c'snapshotWithProfile:', c'startWirelessControllerDiscoveryWithCompletionHandler:', c'stopWirelessControllerDiscovery']! {
+		for selector in [c'alloc', c'new', c'copy', c'init', c'supportsSecureCoding', c'controllerWithExtendedGamepad', c'controllerWithMicroGamepad', c'snapshotWithProfile:']! {
 			assert !objc_responds(cls, selector) && objc_class_method(cls, u64(selector)) == 0
 		}
 		controller_discovery(api); controller_constants(api)
@@ -133,7 +145,7 @@ fn test_game_controller_runtime() {
 }
 fn test_game_controller_rejections() {
 	objc_start(); api := controller_api(ios_runtime.names['GCController'])
-	for mode in ['alloc', 'new', 'allocate', 'caller', 'subclass', 'copy', 'supportsSecureCoding', 'controllerWithExtendedGamepad', 'startWirelessControllerDiscoveryWithCompletionHandler:', 'stopWirelessControllerDiscovery']! {
+	for mode in ['alloc', 'new', 'allocate', 'caller', 'subclass', 'copy', 'supportsSecureCoding', 'controllerWithExtendedGamepad']! {
 		mut fds := [2]i32{}; assert C.pipe(unsafe { &fds[0] }) == 0
 		pid := C.fork(); assert pid >= 0
 		if pid == 0 {
@@ -150,11 +162,138 @@ fn test_game_controller_rejections() {
 		for { assert length < bytes.len; count := C.read(fds[0], unsafe { &bytes[length] }, usize(bytes.len - length)); if count == 0 { break }; if count < 0 && unsafe { *C.ios_errno_address() } == C.EINTR { continue }; assert count > 0; length += int(count) }
 		C.close(fds[0]); mut status := i32(0); assert C.ios_waitpid(pid, &status, 0) == pid && status == 256
 		output := unsafe { tos(&bytes[0], length) }
-		reason := if mode in ['controllerWithExtendedGamepad', 'startWirelessControllerDiscoveryWithCompletionHandler:', 'stopWirelessControllerDiscovery']! { 'unimplemented Objective-C method' } else { 'GCController construction requires an implemented physical input profile' }
+		reason := if mode == 'controllerWithExtendedGamepad' { 'unimplemented Objective-C method' } else { 'GCController construction requires an implemented physical input profile' }
 		assert output.contains(reason) && !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output
 	}
 	objc_stop(); assert ios_runtime.live == 0
-	println('IOS-GAME-CONTROLLER-REJECT: ten construction, caller storage, subclass, copying, coding, factory and wireless discovery cases fail explicitly')
+	println('IOS-GAME-CONTROLLER-REJECT: eight construction, caller storage, subclass, copying, coding and factory cases fail explicitly')
+}
+
+struct ControllerSearchProbe {
+	api ControllerApi
+	thread u64
+	object u64
+mut:
+	copied u64
+	disposed u64
+	called u64
+	restarts int
+	reenter_dispose bool
+	worker_done u64
+}
+struct ControllerSearchBlock {
+	isa u64
+	flags u32 = u32(1) << 25
+	reserved u32
+	invoke u64 = u64(unsafe { voidptr(controller_search_call) })
+	descriptor u64
+	state &ControllerSearchProbe
+}
+fn controller_search_add(value &u64) { C.ios_ref_change(unsafe { &i64(value) }, 1) }
+fn controller_search_copy(dst u64, src u64) {
+	state := unsafe { (&ControllerSearchBlock(src)).state }
+	controller_search_add(unsafe { &state.copied })
+	objc_retain(state.object)
+}
+fn controller_search_lock_worker(state &ControllerSearchProbe) {
+	pool := objc_pool_push()
+	state.api.msg(state.api.cls, c'setShouldMonitorBackgroundEvents:', 0)
+	objc_pool_pop(pool)
+	C.ios_store_pointer(unsafe { &state.worker_done }, 1)
+}
+fn controller_search_dispose(block u64) {
+	state := unsafe { (&ControllerSearchBlock(block)).state }
+	if state.reenter_dispose {
+		worker := spawn controller_search_lock_worker(state)
+		deadline := time.sys_mono_now() + 10_000_000_000
+		for C.ios_load_pointer(unsafe { &state.worker_done }) == 0 {
+			assert time.sys_mono_now() < deadline
+			time.sleep(time.millisecond)
+		}
+		worker.wait()
+	}
+	objc_release(state.object)
+	controller_search_add(unsafe { &state.disposed })
+}
+fn controller_search_call(block u64) {
+	mut state := unsafe { (&ControllerSearchBlock(block)).state }
+	assert u64(C.pthread_self()) == state.thread
+	controller_search_add(unsafe { &state.called })
+	assert state.api.msg(state.api.cls, c'current', 0) == 0
+	if state.restarts > 0 {
+		state.restarts--
+		state.api.msg(state.api.cls, c'startWirelessControllerDiscoveryWithCompletionHandler:', block)
+	}
+}
+fn controller_search_worker(api ControllerApi, block u64) {
+	pool := objc_pool_push()
+	for _ in 0 .. 128 { api.msg(api.cls, c'startWirelessControllerDiscoveryWithCompletionHandler:', block) }
+	objc_pool_pop(pool)
+}
+fn test_game_controller_wireless_completion() {
+	for _ in 0 .. 2 {
+		objc_start(); system_data_start()!
+		pool := objc_pool_push()
+		api := controller_api(ios_runtime.names['GCController'])
+		descriptor := [u64(0), u64(sizeof(ControllerSearchBlock)),
+			u64(unsafe { voidptr(controller_search_copy) }), u64(unsafe { voidptr(controller_search_dispose) })]!
+		object := owned_string('discovery capture')
+		mut first := ControllerSearchProbe{api: api, thread: u64(C.pthread_self()), object: object}
+		mut second := ControllerSearchProbe{api: api, thread: first.thread, object: object}
+		a := ControllerSearchBlock{isa: block_isa(0), descriptor: u64(unsafe { &descriptor[0] }), state: &first}
+		b := ControllerSearchBlock{isa: block_isa(0), descriptor: a.descriptor, state: &second}
+		start := c'startWirelessControllerDiscoveryWithCompletionHandler:'
+		stop := c'stopWirelessControllerDiscovery'
+		api.msg(api.cls, stop, 0); assert !dispatch_main_drain()
+		api.msg(api.cls, start, u64(unsafe { &a }))
+		api.msg(api.cls, start, u64(unsafe { &b }))
+		assert first.called == 0 && first.copied == 1 && first.disposed == 1
+		assert second.called == 0 && second.copied == 1 && second.disposed == 0
+		assert dispatch_main_drain() && second.called == 1 && second.disposed == 1
+		assert !dispatch_main_drain()
+		// A nullable replacement suppresses the previous handler.
+		api.msg(api.cls, start, u64(unsafe { &a })); api.msg(api.cls, start, 0)
+		assert first.disposed == 2 && dispatch_main_drain() && first.called == 0
+		// Stop finishes once, asynchronously. It cannot let a new start steal
+		// the stopped operation's completion, even before either job runs.
+		api.msg(api.cls, start, u64(unsafe { &a })); api.msg(api.cls, stop, 0)
+		api.msg(api.cls, stop, 0); api.msg(api.cls, start, u64(unsafe { &b }))
+		assert first.called == 0 && second.called == 1
+		assert dispatch_main_drain() && first.called == 1 && second.called == 2
+		assert !dispatch_main_drain()
+		first.restarts = 1
+		api.msg(api.cls, start, u64(unsafe { &a }))
+		assert dispatch_main_drain() && first.called == 2
+		assert dispatch_main_drain() && first.called == 3
+		assert !dispatch_main_drain()
+		first.reenter_dispose = true
+		api.msg(api.cls, start, u64(unsafe { &a })); api.msg(api.cls, start, 0)
+		assert first.worker_done == 1 && dispatch_main_drain()
+		first.reenter_dispose = false
+		// Concurrent starts share one search; only the last retained handler runs.
+		before := first.called
+		mut workers := []thread{}
+		for _ in 0 .. 4 { workers << spawn controller_search_worker(api, u64(unsafe { &a })) }
+		workers.wait(); unsafe { workers.free() }
+		assert first.called == before && dispatch_main_drain() && first.called == before + 1
+		assert first.copied == first.disposed && second.copied == second.disposed
+		// Subclasses share discovery state and expose the inherited IMP.
+		sub := objc_allocate_class(api.cls, c'VinixWirelessController', 0); objc_register_class(sub)
+		assert objc_class_method(sub, u64(start)) != 0
+		api.msg(sub, start, u64(unsafe { &a })); api.msg(api.cls, start, u64(unsafe { &b }))
+		assert dispatch_main_drain() && first.called == before + 1 && second.called == 3
+		// Shutdown drops both stopped and active jobs without invoking callbacks.
+		api.msg(api.cls, start, u64(unsafe { &a })); api.msg(api.cls, stop, 0)
+		api.msg(api.cls, start, u64(unsafe { &b }))
+		objc_release(object); objc_pool_pop(pool)
+		objc_stop(); system_data_stop()
+		assert first.called == before + 1 && second.called == 3
+		assert first.copied == first.disposed && second.copied == second.disposed
+		assert ios_runtime.controller_discovery == unsafe { nil }
+		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0 && ios_runtime.block_refs.len == 0
+		assert dispatch_runtime == unsafe { nil }
+	}
+	println('IOS-GAME-CONTROLLER-WIRELESS: asynchronous empty search, nullable replacement, stop/restart, reentry, unlocked destruction, 512 concurrent starts, subclass sharing and shutdown; two drained runtimes')
 }
 
 fn test_gamepad_native_hierarchy() {

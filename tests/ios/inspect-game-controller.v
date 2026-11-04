@@ -9,6 +9,9 @@ fn C.objc_getClass(&char) voidptr
 fn C.sel_registerName(&char) voidptr
 fn C.dlsym(voidptr, &char) voidptr
 fn C.dlopen(&char, int) voidptr
+fn C.class_getInstanceSize(voidptr) usize
+fn C.class_getClassMethod(voidptr, voidptr) voidptr
+fn C.method_getTypeEncoding(voidptr) &char
 type Send = fn (u64, voidptr, u64) u64
 fn msg(object u64, selector &char, argument u64) u64 {
 	return unsafe { Send(C.dlsym(voidptr(i64(-2)), c'objc_msgSend'))(object, C.sel_registerName(selector), argument) }
@@ -18,6 +21,12 @@ fn main() {
 	pool := msg(u64(C.objc_getClass(c'NSAutoreleasePool')), c'new', 0)
 	cls := u64(C.objc_getClass(c'GCController'))
 	assert cls != 0
+	println('GCController native size=' + C.class_getInstanceSize(voidptr(cls)).str())
+	for selector in ['startWirelessControllerDiscoveryWithCompletionHandler:', 'stopWirelessControllerDiscovery']! {
+		method := C.class_getClassMethod(voidptr(cls), C.sel_registerName(selector.str))
+		assert method != unsafe { nil }
+		println(selector + ' types=' + unsafe { C.method_getTypeEncoding(method).vstring() })
+	}
 	for _ in 0 .. 3 {
 		controllers := msg(cls, c'controllers', 0)
 		assert controllers != 0

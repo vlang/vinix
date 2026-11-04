@@ -515,6 +515,8 @@ mut:
 	corehaptics_constants_arena u64 // Sealed CoreHaptics NSString cells, records and bytes.
 	controller_constants_arena u64 // Sealed GameController NSString notification cells and records.
 	controller_background_events bool // Shared across GCController and its subclasses.
+	controller_discovery &ControllerDiscovery = unsafe { nil } // Borrowed from its main-queue job.
+	controller_discovery_retired bool
 	storekit_constants_arena u64 // Sealed StoreKit conversion NSString cells, records and bytes.
 	file_manager u64 // One owned NSFileManager cache reference, retired at shutdown.
 	gk_local_player u64 // One owned unauthenticated GameKit singleton reference.
@@ -1130,6 +1132,7 @@ fn objc_new(cls u64) u64 {
 
 fn objc_stop() {
 	display_links_shutdown()
+	controller_discovery_shutdown()
 	connection_require_shutdown()
 	url_session_task_require_shutdown()
 	url_session_workers_stop()
