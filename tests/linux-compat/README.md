@@ -18,6 +18,12 @@ frame/return masks, recursive SA_NODEFER delivery, action masks, SA_RESTART,
 ordinary unmasking and timeout restoration as root and UID1000. The pselect6
 control uses a finite deadline. See [qualification and retained evidence](../../docs/linux-masked-wait-handlers.md).
 
+`--cases selectempty` checks empty select/pselect descriptor sets with an
+absent timeout, including raw and musl calls, pending signals and a sibling
+that observes sleep before and after an ignored signal. It verifies handled
+EINTR, masks, bitmap guards, timeout controls and flat repeated cleanup as
+root and UID1000. See [qualification and evidence](../../docs/linux-empty-select-waits.md).
+
 Receipt audit sources use V assertions. Build them without `-prod`, which
 removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
 the checks while optimizing hashing. Confirm a deliberate failing assertion

@@ -26,11 +26,12 @@ fn pins(paths []string) map[string]string {
 fn stable(before map[string]string) ! {
 	for path, pin in before { if digest(path) != pin { return error('Changed input: ' + path) } }
 }
-fn compile_probe(root string, support string, state string, arch string) ! {
+fn compile_probe(root string, support string, state string, arch string, case_name string) ! {
 	os.mkdir_all(state)!
 	mut inputs := pins([@FILE, os.executable(), support + '/generate-module',
-		root + '/tests/linux-compat/maskwaitfixture/core.v',
-		root + '/tests/linux-compat/maskwaitreferenceinit/core.v', support + '/frozen/serialcore/core.v'])
+		root + '/tests/linux-compat/' + case_name + 'fixture/core.v',
+		root + '/tests/linux-compat/' + case_name + 'referenceinit/core.v', support + '/frozen/serialcore/core.v'])
+	for path in os.walk_ext(root + '/tests/linux-compat/' + case_name + 'fixture', '.v') { inputs[path] = digest(path) }
 	cc := if arch == 'aarch64' { os.find_abs_path_of_executable('clang')! } else { os.find_abs_path_of_executable('x86_64-linux-musl-gcc')! }
 	inputs[cc] = digest(cc)
 	mut flags := [cc]
@@ -39,7 +40,7 @@ fn compile_probe(root string, support string, state string, arch string) ! {
 			'--target=aarch64-linux-musl', '--sysroot=' + support + '/sdk', '-fno-stack-protector']
 	}
 	flags << ['-static', '-O2', '-D_GNU_SOURCE', '-fno-strict-aliasing', '-Wall', '-Wextra', '-Werror']
-	for name, source in {'serial': support + '/frozen/serialcore', 'fixture': root + '/tests/linux-compat/maskwaitfixture', 'reference': root + '/tests/linux-compat/maskwaitreferenceinit'} {
+	for name, source in {'serial': support + '/frozen/serialcore', 'fixture': root + '/tests/linux-compat/' + case_name + 'fixture', 'reference': root + '/tests/linux-compat/' + case_name + 'referenceinit'} {
 		execute([support + '/generate-module', source, state + '/' + name + '.c', '--arch',
 			if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'nofloat'], root, state + '/generate-' + name + '.log')!
 		execute([...flags, '-Wno-unused-function', '-Wno-unused-parameter', '-fPIC', '-I', source,
@@ -87,7 +88,7 @@ fn build_kernel(root string, state string, arch string) ! {
 	os.cp(root + '/kernel/obj/blob.c', state + '/blob.c')!
 	os.write_file(state + '/outputs.json', json2.encode(pins([state + '/kernel/bin/vinix', state + '/blob.c']), prettify: true) + '\n')!
 }
-fn native(probe string, kernel string, support string, state string, arch string) ! {
+fn native(probe string, kernel string, support string, state string, arch string, case_name string) ! {
 	os.mkdir_all(state + '/kernel/bin')!
 	for name in ['sbin', 'dev', 'proc', 'sys', 'tmp', 'root'] { os.mkdir_all(state + '/rootfs/' + name)! }
 	os.cp(probe, state + '/rootfs/sbin/init')!; os.chmod(state + '/rootfs/sbin/init', 0o755)!
@@ -102,8 +103,8 @@ fn native(probe string, kernel string, support string, state string, arch string
 	// A baseline is expected to report semantic mismatches. Complete all cases
 	// before interpreting success/failure using the separate log checker.
 	result := guesthost.boot_session(launch.command, launch.env, state, guesthost.SessionPolicy{
-		pass: 'LINUX MASKWAIT SUMMARY:'
-		failures: ['LINUX MASKWAIT FAIL:', 'KERNEL PANIC', 'FATAL EXCEPTION']
+		pass: 'LINUX ' + case_name.to_upper() + ' SUMMARY:'
+		failures: ['LINUX ' + case_name.to_upper() + ' FAIL:', 'KERNEL PANIC', 'FATAL EXCEPTION']
 		settle: 1
 		log: state + '/live.log'
 	}, 240, true)!
@@ -117,13 +118,16 @@ fn native(probe string, kernel string, support string, state string, arch string
 fn main() {
 	if os.args.len < 6 { eprintln('Usage: maskwait-host compile|build|native ROOT SUPPORT FRESH-STATE ARCH [PROBE KERNEL-DIR]'); exit(2) }
 	mode, root, support, state, arch := os.args[1], os.real_path(os.args[2]), os.real_path(os.args[3]), os.args[4], os.args[5]
+	// Keep the original maskwait command line and default behavior intact.
+	case_name := os.getenv_opt('VINIX_COMPAT_CASE') or { 'maskwait' }
+	if case_name.len == 0 || !case_name.bytes().all(it >= `a` && it <= `z`) { panic('Invalid fixture name') }
 	if arch !in ['aarch64', 'x86_64'] || os.exists(state) { eprintln('Architecture invalid or state already exists'); exit(2) }
 	match mode {
-		'compile' { compile_probe(root, support, state, arch) or { panic(err) } }
+		'compile' { compile_probe(root, support, state, arch, case_name) or { panic(err) } }
 		'build' { build_kernel(root, state, arch) or { panic(err) } }
 		'native' {
 			if os.args.len != 8 { panic('PROBE KERNEL-DIR required') }
-			native(os.args[6], os.args[7], support, state, arch) or { panic(err) }
+			native(os.args[6], os.args[7], support, state, arch, case_name) or { panic(err) }
 		}
 		else { panic('Unknown mode') }
 	}

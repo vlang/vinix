@@ -63,6 +63,9 @@ initial maintained attempt used the shared launcher and was terminated after
 its failed probe; final runs use frozen launcher modules. Neither attempt is
 counted as a passing regression run.
 
+The subsequent [empty-select qualification](linux-empty-select-waits.md)
+fixes and validates that separate untimed-wait refusal.
+
 This does not qualify blocked-to-running wakeup races, ready-descriptor
 precedence, arbitrary nested waits, signal storms, handler-modified contexts,
 GNU libc or foreign/32-bit execution. Section 15's libc, installation/integration

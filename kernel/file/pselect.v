@@ -161,7 +161,9 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 	if polls.len == 0 {
 		// Nothing to watch: this is select() being used purely as a sleep.
 		if !timed {
-			return errno.err, errno.einval
+			// An absent timeout is an interruptible, indefinite sleep. Reuse
+			// ppoll's synchronous stack event without replacing a pselect mask.
+			return ppoll(unsafe { nil }, 0, unsafe { nil }, unsafe { nil })
 		}
 		if deadline.tv_sec != 0 || deadline.tv_nsec != 0 {
 			mut timer := time.new_timer(deadline)

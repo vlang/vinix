@@ -2041,6 +2041,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and Linux; original x86-64 fails 160. Eight maintained suites pass per
   architecture. See [the handler-mask qualification](docs/linux-masked-wait-handlers.md).
 
+- [x] Sleep in native select/pselect6 with empty descriptor sets and no
+  timeout; preserve temporary masks, ignored-signal sleep and handled EINTR.
+  Raw and musl paths pass 2,176 AArch64 and 2,752 x86-64 checks against Linux;
+  originals fail 576 and 704 respectively. Repeated cleanup stays flat and
+  eight of nine maintained suites pass per architecture, with the existing
+  JIT slab double-free reproduced on both original kernels. See
+  [the empty-wait qualification](docs/linux-empty-select-waits.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
