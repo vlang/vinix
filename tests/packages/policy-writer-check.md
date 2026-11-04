@@ -99,5 +99,11 @@ vlib/thirdparty, complete musl sysroots or transitive host tools. The build is
 not qualified as hermetic or reproducible. LeakSanitizer is disabled on this
 host; the stated manualfree scopes are measured separately.
 
+The later [native SDK contract check](sdk-contract-check.md) executes this
+consumer on both architectures. Separate [policy UI](policy-ui-check.md) and
+[policy lifecycle](policy-lifecycle-check.md) checks qualify authenticated
+ordinary-account apply and fingerprint-bound persistence with their own fixtures;
+their fixtures do not combine this public writer with authenticated apply.
+
 The retained result is
 [sdk-policy-writer.json](results/2026-10-23/sdk-policy-writer.json).

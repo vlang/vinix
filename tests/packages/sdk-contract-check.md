@@ -42,6 +42,12 @@ This is read-only SDK/CLI qualification. It grants no publisher authority,
 applies no policy/deployment, accesses no network and does not qualify graphical
 apps, runtime availability or the complete section 14 release.
 
+Separate [policy UI qualification](policy-ui-check.md) covers authenticated
+ordinary-account policy apply on both guest targets. The [policy lifecycle
+checks](policy-lifecycle-check.md) cover configuration/state/proposal fingerprint
+binding and persistence. Those fixtures do not combine this profile's public
+writer with authenticated apply.
+
 ## Results
 
 On 2026-10-26, the controller compiled with `-prod -gc none -manualfree` against
