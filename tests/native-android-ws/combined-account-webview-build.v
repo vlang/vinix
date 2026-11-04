@@ -3013,6 +3013,151 @@ fn secure_settings_tile_self_test() ! {
  }
 }
 
+fn global_settings_string_profile() NarrowProfile {
+ target := 'android/provider/Settings$Global.smali'
+ return NarrowProfile{
+  name: 'global-settings-string'
+  baseline_name: 'combined-account-webview-process-packages-framework-2026-11-04-r2'
+  manifest_pin: '4a354ead173048b39fb26cce709922f8954e27e53e2d3a5d92ecdf427db0645d'
+  jar_pin: '875f854ddf662dcaf55ebe05df06f5833eb5ca1e15f94066ffdf0fef18e829a8'
+  baseline_classes: 2117
+  providers: ['framework_settings_global.v']
+  calls: {target: 'framework_settings_global_put_string_source'}
+  methods: {target: ['putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z']}
+  changed: {target: 0}
+  added: {target: 1}
+ }
+}
+
+// Independent of the provider's method generator: retain the full instruction
+// sequence, supplied resolver and nullable values, and SQLException-only catch.
+fn global_settings_string_expected_method() string {
+ return '.method public static putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z
+.registers 6
+new-instance v0, Landroid/content/ContentValues;
+invoke-direct {v0}, Landroid/content/ContentValues;-><init>()V
+const-string v1, "name"
+invoke-virtual {v0, v1, p1}, Landroid/content/ContentValues;->put(Ljava/lang/String;Ljava/lang/String;)V
+const-string v1, "value"
+invoke-virtual {v0, v1, p2}, Landroid/content/ContentValues;->put(Ljava/lang/String;Ljava/lang/String;)V
+sget-object v2, Landroid/provider/Settings$Global;->CONTENT_URI:Landroid/net/Uri;
+:try_start
+invoke-virtual {p0, v2, v0}, Landroid/content/ContentResolver;->insert(Landroid/net/Uri;Landroid/content/ContentValues;)Landroid/net/Uri;
+move-result-object v0
+:try_end
+if-eqz v0, :failed
+const/4 v0, 0x1
+return v0
+:database_error
+move-exception v0
+:failed
+const/4 v0, 0x0
+return v0
+.catch Landroid/database/SQLException; {:try_start .. :try_end} :database_error
+.end method'
+}
+
+fn global_settings_string_abi(source string) ! {
+ signature := 'putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z'
+ method := store_parts(source)!.methods[signature] or { return error('global settings string writer missing') }
+ // Reuse only the existing label/catch-position canonicalizer; expected code
+ // above is a separate literal, not the provider or Secure method generator.
+ if secure_settings_method(method)! != secure_settings_method(global_settings_string_expected_method())! {
+  return error('global settings writer requires exact nullable name/value forwarding, global URI, real insert result and SQLException-only failure')
+ }
+}
+
+fn global_settings_string_members(old string, updated string) ! {
+ signature := 'putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z'
+ narrow_member_delta(old, updated, [signature], 0, 1, []string{})!
+ global_settings_string_abi(updated)!
+}
+
+fn global_settings_string_self_test() ! {
+ profile := global_settings_string_profile()
+ target := 'android/provider/Settings$Global.smali'
+ signature := 'putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z'
+ if profile.name != 'global-settings-string' || profile.baseline_classes != 2117
+  || profile.baseline_name != 'combined-account-webview-process-packages-framework-2026-11-04-r2'
+  || profile.manifest_pin != '4a354ead173048b39fb26cce709922f8954e27e53e2d3a5d92ecdf427db0645d'
+  || profile.jar_pin != '875f854ddf662dcaf55ebe05df06f5833eb5ca1e15f94066ffdf0fef18e829a8'
+  || profile.providers != ['framework_settings_global.v'] || profile.directory_provider != ''
+  || profile.calls != {target: 'framework_settings_global_put_string_source'}
+  || profile.methods != {target: [signature]} || profile.changed != {target: 0}
+  || profile.added != {target: 1} || profile.fields.len != 0
+  || profile.class_provider != '' || profile.class_providers.len != 0 || profile.extra_classes.len != 0
+  || profile.removed_methods.len != 0 || profile.removed_fields.len != 0 {
+  return error('global settings string profile requires one added writer, zero old-method changes and no field, class or native additions')
+ }
+ narrow_method_self_test([signature], 0, 1)!
+ method := global_settings_string_expected_method()
+ global_settings_string_abi(method)!
+ global_settings_string_abi(method.replace(':try_start', ':start_alias').replace(':try_end', ':end_alias').replace(':database_error', ':handler_alias').replace(':failed', ':failure_alias'))!
+ moved_catch := method.replace('.catch Landroid/database/SQLException; {:try_start .. :try_end} :database_error\n', '')
+  .replace(':try_end\n', ':try_end\n.catch Landroid/database/SQLException; {:try_start .. :try_end} :database_error\n')
+ global_settings_string_abi(moved_catch)!
+ mut method_controls := 0
+ for bad in [method.replace('public static ', 'public '), method.replace('public static ', 'private static '),
+  method.replace('public static ', 'public static native '), method.replace('.registers 6', '.registers 7'),
+  method.replace('Ljava/lang/String;)Z\n', 'Ljava/lang/String;)V\n'),
+  method.replace('"name"', '"key"'), method.replace('"value"', '"entry"'),
+  method.replace('{v0, v1, p1}', '{v0, v1, p2}'), method.replace('{v0, v1, p2}', '{v0, v1, p1}'),
+  method.replace('Settings$Global;->CONTENT_URI', 'Settings$Secure;->CONTENT_URI'),
+  method.replace('{p0, v2, v0}', '{p0, v0, v2}'), method.replace('{p0, v2, v0}', '{v0, v2, v0}'),
+  method.replace('if-eqz v0, :failed', 'if-nez v0, :failed'),
+  method.replace('const/4 v0, 0x0', 'const/4 v0, 0x1'), method.replace('const/4 v0, 0x1', 'const/4 v0, 0x0'),
+  method.replace('Landroid/database/SQLException;', 'Ljava/lang/RuntimeException;'),
+  method.replace('Landroid/database/SQLException;', 'Ljava/lang/SecurityException;'),
+  method.replace('{:try_start .. :try_end}', '{:try_start .. :database_error}'),
+  method.replace('} :database_error', '} :failed'), method.replace('return v0', 'return-object v0'),
+  method.replace('move-result-object v0\n', 'move-result-object v1\n'),
+  method.replace('.catch Landroid/database/SQLException; {:try_start .. :try_end} :database_error\n', ''),
+  method + '\n' + method] {
+  if bad == method { return error('inactive global settings string method mutation') }
+  global_settings_string_abi(bad) or { method_controls++; continue }
+  return error('global settings visibility/register/values/namespace/result/catch-scope mutation accepted')
+ }
+ metadata := '.class public final Landroid/provider/Settings$Global;\n.super Landroid/provider/Settings$NameValueTable;\n' +
+  '.field public static final CONTENT_URI:Landroid/net/Uri;\n.field private static final TAG:Ljava/lang/String; = "Settings$Global"\n'
+ retained := '.method public static retained()V\n.locals 0\nreturn-void\n.end method\n'
+ before_source := metadata + retained
+ after_source := before_source + method
+ global_settings_string_members(before_source, after_source)!
+ mut member_controls := 0
+ for bad in [after_source.replace('public static retained()V', 'private static retained()V'),
+  after_source.replace('.locals 0', '.locals 1'), after_source.replace(retained, ''),
+  after_source.replace('.super Landroid/provider/Settings$NameValueTable;', '.super Ljava/lang/Object;'),
+  after_source.replace('CONTENT_URI:Landroid/net/Uri;', 'CONTENT_URI:Ljava/lang/String;'),
+  after_source + '\n.field private cache:Ljava/util/Map;\n', after_source + '\n' + retained,
+  after_source + '\n.method public static unrelated()V\n.locals 0\nreturn-void\n.end method\n',
+  before_source] {
+  global_settings_string_members(before_source, bad) or { member_controls++; continue }
+  return error('global settings old method, metadata, field, class or unrelated addition mutation accepted')
+ }
+ if _ := global_settings_string_members(after_source, after_source) { return error('preexisting global settings string writer accepted') }
+ member_controls++
+ mut before := {target: 'old'}
+ for index in 0 .. 2116 { before['other/' + index.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ after[target] = 'new'
+ narrow_profile_class_delta(before, after, [target], []string{}, 2117)!
+ mut class_controls := 0
+ for case in 0 .. 6 {
+  mut bad := after.clone()
+  match case {
+   0 { bad[target] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(target) }
+   3 { bad['unrelated.smali'] = 'new' }
+   4 { bad.delete(target); bad['substitution.smali'] = 'new' }
+   else { bad.delete('other/0.smali') }
+  }
+  narrow_profile_class_delta(before, bad, [target], []string{}, 2117) or { class_controls++; continue }
+  return error('global settings-only 2117-class scope mutation accepted')
+ }
+ println('GLOBAL-SETTINGS-STRING-SELFTEST-PASS method_controls=' + method_controls.str() + ' member_controls=' + member_controls.str() + ' class_controls=' + class_controls.str() + ' exact-one-added-writer old-methods-preserved provider-result SQLException-only')
+}
+
 fn usage_inactive_profile() NarrowProfile {
  usage := 'android/app/usage/UsageStatsManager.smali'
  return NarrowProfile{
@@ -5710,6 +5855,7 @@ fn self_test() ! {
  keyguard_policy_self_test()!
  broadcast_permission_self_test()!
  secure_settings_self_test()!
+ global_settings_string_self_test()!
  usage_inactive_self_test()!
  messenger_binder_self_test()!
  component_parcel_self_test()!
@@ -6054,6 +6200,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'keyguard-policy' { keyguard_policy_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'broadcast-permission' { broadcast_permission_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
   if profile.name == 'secure-settings' { secure_settings_abi(os.read_file(root + '/smali/' + target)!)! }
+  if profile.name == 'global-settings-string' { global_settings_string_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'usage-inactive' { usage_inactive_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'component-parcel' { component_parcel_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'build-abis' { build_abis_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
@@ -6128,6 +6275,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'keyguard-policy' { keyguard_policy_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'broadcast-permission' { broadcast_permission_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
   if profile.name == 'secure-settings' { secure_settings_abi(os.read_file(root + '/new-dex/' + target)!)! }
+  if profile.name == 'global-settings-string' { global_settings_string_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'usage-inactive' { usage_inactive_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'component-parcel' { component_parcel_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'build-abis' { build_abis_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -6515,6 +6663,10 @@ fn main() {
   build_narrow(secure_settings_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--global-settings-string' {
+  build_narrow(global_settings_string_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] == '--usage-inactive' {
   build_narrow(usage_inactive_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
@@ -6556,6 +6708,6 @@ fn main() {
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder|--component-parcel|--event-log|--build-abis|--webview-package|--framework-boot|--traffic-stats|--process-packages] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--global-settings-string|--usage-inactive|--messenger-binder|--component-parcel|--event-log|--build-abis|--webview-package|--framework-boot|--traffic-stats|--process-packages] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }

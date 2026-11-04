@@ -10,10 +10,12 @@ readiness, then exited on missing `Settings.Global.putString`; Maps was not
 manually launched. The complete fatal log matches its guest hash and length.
 Own guest PID6224 is stopped and confirmed gone; CI PID23708 remains untouched.
 The runtime seal and separate fresh readback passed; both earlier readback
-refusals remain preserved. The [next adapter and focused checks](global-settings-string-host-blocked-2026-11-05.md)
-are source drafts. The focused-check driver compiled, but actual qualification
-was refused before launch below the 1 GiB disk reserve. No successor SDK or ARM
-result is established yet.
+refusals remain preserved. The next adapter and focused checks are committed
+in `8db2b7541`, and [full SDK production passed](global-settings-string-sdk-2026-11-05.md)
+after space recovered. Only Global changed, adding one method while preserving
+all other classes. The [earlier disk refusals](global-settings-string-host-blocked-2026-11-05.md)
+remain historical evidence. Retained-native compatibility, signed fixture,
+image and ARM replay are next; no successor GMS or Maps result is established.
 
 ## Prior checkpoints
 

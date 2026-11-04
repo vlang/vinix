@@ -1,5 +1,10 @@
 # Global string-write draft; focused execution blocked by disk reserve
 
+This checkpoint is superseded by the focused-check pass and adapter commit
+`8db2b7541`, followed by [complete SDK host qualification](global-settings-string-sdk-2026-11-05.md).
+The refusals below remain intact; shared free space later recovered without
+another cleanup by this session.
+
 The [process-package ARM regression passed](process-packages-runtime-2026-11-05.md).
 The subsequent GMS failure identifies the missing static
 `Settings.Global.putString(ContentResolver,String,String)Z` API. Its complete
