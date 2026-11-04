@@ -4,7 +4,9 @@ The atomic-v3 build-02 and frame-only baseline records below describe their
 creation-time results. Later complete metadata checks refused those original
 bundles; they remain preserved and are not current consumer qualification.
 Use the separately built and audited [fresh atomic retention profile](matched-atomic-fresh-kernel-check.md).
-Guest, performance and production kernel integration remain open.
+The [native runtime check](runtime-check.md) separately qualifies tuple and
+concurrent-connect behavior on the fresh kernels. Cross-login provenance,
+performance and production kernel integration remain open.
 
 ## Atomic-v3 creation-time qualification
 

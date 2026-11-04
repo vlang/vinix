@@ -16,6 +16,10 @@ endpoint must report the process identity obtained from the initial socketpair.
 The fixture checks transport ownership with equal process labels; differing
 login-session provenance is qualified separately by the account/audio fixtures.
 
+The [native runtime check](runtime-check.md) passes on both fresh kernel ELFs,
+including all 32 concurrent rounds and natural guest shutdown. Cross-login
+provenance, allocation/performance and production integration remain separate.
+
 `guarded-build-check.v` builds the isolated allocation-tracked kernel for both
 architectures and retains source, complete input closures, generated C and
 linked symbols. Its generated-C checks include coherent process snapshots,
