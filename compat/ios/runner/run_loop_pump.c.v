@@ -4,6 +4,13 @@ module main
 import math
 import time
 
+fn run_loop_run(loop u64) {
+	mode := owned_string('kCFRunLoopDefaultMode')
+	date := cf_date_create(0, 63113904000.0)
+	for run_loop_run_mode(loop, mode, date) {}
+	objc_release(date); objc_release(mode)
+}
+
 // State uses the Objective-C registry lock. The native condition has a separate
 // mutex, always acquired after that lock. A waiter holds both until it releases
 // the registry lock and atomically waits, preventing lost mutation/shutdown wakes.

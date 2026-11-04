@@ -44,6 +44,7 @@ fn ns_run_loop_types(name string, meta bool, selector string) ?string {
 	if meta { return if selector in ['mainRunLoop', 'currentRunLoop']! { ?string('@16@0:8') } else { none } }
 	return match selector {
 		'getCFRunLoop' { '^{__CFRunLoop=}16@0:8' }
+		'run' { 'v16@0:8' }
 		'runMode:beforeDate:' { 'B32@0:8@16@24' }
 		else { none }
 	}
@@ -51,7 +52,7 @@ fn ns_run_loop_types(name string, meta bool, selector string) ?string {
 
 fn ns_run_loop_selector(object u64, selector string) bool {
 	if object !in ios_runtime.classes {
-		return selector in ['getCFRunLoop', 'runMode:beforeDate:']! && objc_is_kind(object, ios_runtime.names['NSRunLoop'])
+		return selector in ['getCFRunLoop', 'run', 'runMode:beforeDate:']! && objc_is_kind(object, ios_runtime.names['NSRunLoop'])
 	}
 	if selector !in ['mainRunLoop', 'currentRunLoop']! { return false }
 	mut cls := object
@@ -69,6 +70,7 @@ fn ns_run_loop_dispatch(object u64, selector string, mut frame RegisterFrame) bo
 	match selector {
 		'mainRunLoop' { frame.x[0] = cf_run_loop_get_main() }
 		'currentRunLoop' { frame.x[0] = cf_run_loop_get_current() }
+		'run' { run_loop_run(object) }
 		'runMode:beforeDate:' { frame.x[0] = u64(run_loop_run_mode(object, frame.x[2], frame.x[3])) }
 		else {
 			if !obj_header(object).valid { panic('iOS: NSRunLoop has no thread-owned handle') }

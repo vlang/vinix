@@ -371,13 +371,14 @@ fn display_pump_worker(probe &DisplayPumpProbe) {
 	for C.ios_load_pointer(unsafe { &probe.go }) == 0 { time.sleep(time.microsecond) }
 	if probe.kind != 2 {
 		run_loop_main_message(link, c'setPaused:', 0, 0)
-		assert display_pump_once(loop, mode, 1);
+		if probe.kind == 1 { run_loop_main_message(loop, c'run', 0, 0) }
+		else { assert display_pump_once(loop, mode, 1); }
 		assert probe.calls == 1;
 	}
 	if probe.kind == 0 {
 		run_loop_main_message(link, c'setPaused:', 1, 0)
 		C.ios_store_pointer(unsafe { &probe.phase }, 2)
-		assert !display_pump_once(loop, mode, 60); // Foreign invalidation wakes this wait.
+		run_loop_main_message(loop, c'run', 0, 0) // Foreign invalidation wakes and empties this loop.
 		assert probe.calls == 1 && probe.weak_target == 0;
 	} else if probe.kind == 1 || probe.kind == 3 {
 		assert !display_pump_once(loop, mode, 0.01) && probe.weak_target == 0;
@@ -402,7 +403,7 @@ fn display_pump_managed(target u64, selector &char, argument u64) {
 	run_loop_main_message(link, c'setPaused:', 1, 0)
 	run_loop_main_message(link, c'addToRunLoop:forMode:', loop, mode)
 	C.ios_store_pointer(unsafe { &probe.phase }, 1)
-	assert !display_pump_once(loop, mode, 60);
+	run_loop_main_message(loop, c'run', 0, 0)
 	objc_release(mode); objc_pool_pop(pool)
 	C.ios_store_pointer(unsafe { &probe.done }, 1)
 }
@@ -488,6 +489,8 @@ fn test_display_link_native_metadata() {
 		}
 		method := C.class_getInstanceMethod(C.objc_getClass(c'NSRunLoop'), C.sel_registerName(c'runMode:beforeDate:'))
 		assert ctext(u64(C.method_getTypeEncoding(method))) == 'B32@0:8@16@24';
+		run_method := C.class_getInstanceMethod(C.objc_getClass(c'NSRunLoop'), C.sel_registerName(c'run'))
+		assert ctext(u64(C.method_getTypeEncoding(run_method))) == 'v16@0:8';
 		C.objc_autoreleasePoolPop(pool)
 		println('NATIVE-DISPLAY-PUMP: CADisplayLink and NSRunLoop pump method encodings match Catalyst PASS')
 	}
