@@ -132,6 +132,9 @@ Sealing and its internal check passed with guard/child zero and complete
 cleanup. The separate control-seal readback was refused before launch when
 free space fell to 1,139,257,344 bytes, below the 1 GiB reserve plus 64 MiB
 growth allowance: guard125, child-1, PID0, zero samples/groups and
-`cleanup_complete=false`. Its independent readback remains pending. The two
-complete VM readbacks themselves passed; the earlier component and controls
-seals were not modified.
+`cleanup_complete=false`. After space recovered, the independent readback
+passed against the exact original pin in `readback-r2.guard.json`: guard/child
+zero, empty reason and complete cleanup, 56 ms, sampled RSS 4,194,304 bytes and
+observed growth 16,384 bytes. All original limits were retained. Independent
+receipt/log/manifest review confirmed the result. The earlier preflight refusal
+remains preserved; the component and controls seals were not modified.

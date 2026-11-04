@@ -48,6 +48,14 @@ Maps through the supported controller.
 
 CI PID23708 remained running and untouched. The previous owned VM remains
 stopped. No cache or evidence was deleted. Preserve all complete host/tool
-bundles and failed attempts. This preflight refusal has not been aggregate-sealed
-because the original disk reserve is unavailable; its complete original
-controls and pinned receipt remain required.
+bundles and failed attempts. After space temporarily recovered to about 2 GiB,
+the complete preparation controls were sealed and independently read back at
+`S/process-packages-preparation-attempts-sealed-2026-11-05-r1/sealed/manifest.json`,
+SHA-256 `844a37353405044def332444bc07ffb0630b58e3fb14c0c44a04d255add3604a`.
+This one-root/three-entry seal retains the original refused guard and empty log.
+Seal and fresh readback passed with guard/child zero, empty reasons and complete
+cleanup in 55/58 ms; sampled RSS was 3,063,808/6,635,520 bytes and observed
+growth 413,696/12,288 bytes. Both retain 600 MiB RSS, 900 seconds, 64 MiB growth,
+1 GiB reserve and 4 MiB output limits. This closes the pending evidence check;
+it does not create an image or establish ARM success. Preparation still needs
+5 GiB initial free space. Complete original controls remain required.

@@ -14,8 +14,9 @@ with only 927,457,280 bytes free, below the original disk reserve. At least
 5 GiB initial free space is required; the successor ARM replay remains pending.
 No manual Maps launch, rendering, imagery or authentication result is established.
 Our VM is stopped; CI remains untouched. Complete original evidence and failed
-attempts are retained. The TrafficStats report records successful separate VM
-readbacks and the remaining small control-seal readback. Historical checkpoints below remain
+attempts are retained. The TrafficStats VM and control-seal readbacks have all
+passed. The preparation refusal is also sealed and freshly verified; disk
+space still blocks image preparation. Historical checkpoints below remain
 evidence, not current pending implementation work.
 
 ## Preceding ARM JNI replay
