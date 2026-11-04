@@ -278,6 +278,10 @@ fn objc_responds(object u64, selector &char) bool {
 		return object in ios_runtime.classes && objc_is_kind(object, read64(ios_runtime.names['NSDictionary']))
 	}
 	if name in ['class', 'isKindOfClass:', 'respondsToSelector:', 'conformsToProtocol:', 'methodSignatureForSelector:', 'performSelectorOnMainThread:withObject:waitUntilDone:', 'copy', 'init', 'dealloc'] { return true }
+	queue_meta := object in ios_runtime.classes
+	if (queue_meta && ns_operation_queue_family(object)) || (!queue_meta && objc_is_kind(object, ios_runtime.names['NSOperationQueue'])) {
+		if ns_operation_queue_types('NSOperationQueue', queue_meta, name) != none { return true }
+	}
 	if object in ios_runtime.classes {
 		if name in ['alloc', 'new', 'instanceMethodSignatureForSelector:'] { return true }
 		info := ios_runtime.classes[object] or { return false }
@@ -316,10 +320,6 @@ fn objc_responds(object u64, selector &char) bool {
 	if objc_is_kind(object, ios_runtime.names['NSURL']) { return http_url_builtin_types('NSURL', false, name) != none }
 	if objc_is_kind(object, ios_runtime.names['NSLocale']) { return name in ['objectForKey:', 'localeIdentifier'] }
 	if objc_is_kind(object, ios_runtime.names['NSBundle']) && name in ['appStoreReceiptURL', 'bundleIdentifier', 'infoDictionary'] { return true }
-	queue_meta := object in ios_runtime.classes
-	if (queue_meta && object == ios_runtime.names['NSOperationQueue']) || (!queue_meta && objc_is_kind(object, ios_runtime.names['NSOperationQueue'])) {
-		return ns_operation_queue_types('NSOperationQueue', queue_meta, name) != none
-	}
 	if objc_is_kind(object, ios_runtime.names['CLLocationManager']) { return name in ['delegate', 'setDelegate:'] }
 	if objc_is_kind(object, ios_runtime.names['UIApplication']) { return name in ['delegate', 'setDelegate:', 'applicationState', 'isIdleTimerDisabled', 'setIdleTimerDisabled:', 'applicationIconBadgeNumber', 'setApplicationIconBadgeNumber:'] }
 	if objc_is_kind(object, ios_runtime.names['UIViewController']) {

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
-// Block work uses a private serial executor. Serial execution satisfies every
+// Ordinary block work uses a private serial executor; mainQueue uses the
+// existing main-thread dispatch executor. Serial execution satisfies every
 // configured upper bound; dependencies, priorities and NSOperation submission
 // remain unsupported. Jobs pin both the queue and their captured work.
 struct FoundationOperationQueue {
@@ -11,6 +12,7 @@ mut:
 	condition voidptr
 	pending u64
 	suspended bool
+	main bool
 }
 
 struct FoundationQueueJob {
@@ -22,9 +24,10 @@ struct FoundationQueueJob {
 
 fn ns_operation_queue_types(name string, meta bool, selector string) ?string {
 	if name != 'NSOperationQueue' { return none }
-	// currentQueue/mainQueue need main-queue singleton ownership too. Keep
-	// those selectors absent until that lifecycle is implemented.
-	if meta { return none }
+	if meta {
+		if selector in ['mainQueue', 'currentQueue']! { return '@16@0:8' }
+		return none
+	}
 	return match selector {
 		'name' { '@16@0:8' }
 		'setName:' { 'v24@0:8@16' }
@@ -37,6 +40,52 @@ fn ns_operation_queue_types(name string, meta bool, selector string) ?string {
 		'waitUntilAllOperationsAreFinished' { 'v16@0:8' }
 		else { return none }
 	}
+}
+
+fn ns_operation_queue_family(cls u64) bool {
+	mut current := cls
+	for _ in 0 .. 128 {
+		if current == ios_runtime.names['NSOperationQueue'] { return true }
+		info := ios_runtime.classes[current] or { return false }
+		current = info.parent
+		if current == 0 { return false }
+	}
+	panic('iOS: cyclic operation queue superclass chain')
+}
+
+fn ns_operation_queue_main() u64 {
+	C.ios_objc_initialize_lock()
+	retired := ios_runtime.main_operation_queue_retired
+	C.ios_objc_initialize_unlock()
+	if retired { return 0 }
+	cls := ios_runtime.names['NSOperationQueue']
+	// +initialize may invoke application code. Publish a built-in instance
+	// under the cache lock only after initialization has completed.
+	objc_initialize(cls)
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	if ios_runtime.main_operation_queue_retired { return 0 }
+	if ios_runtime.main_operation_queue == 0 {
+		if dispatch_runtime == unsafe { nil } || dispatch_runtime.stopping { panic('iOS: main operation queue requires a running dispatch runtime') }
+		object := objc_allocate(cls)
+		mut header := obj_header(object)
+		header.number = 1
+		header.fields[0] = owned_string('NSOperationQueue Main Queue')
+		ios_runtime.main_operation_queue = object // Cache owns the allocation reference.
+		ns_operation_queue_state(object)
+	}
+	return ios_runtime.main_operation_queue
+}
+
+fn ns_operation_queue_stop() {
+	C.ios_objc_initialize_lock()
+	ios_runtime.main_operation_queue_retired = true
+	object := ios_runtime.main_operation_queue
+	ios_runtime.main_operation_queue = 0
+	C.ios_objc_initialize_unlock()
+	// Release outside the cache lock. Dispatch jobs/capture destructors have
+	// already drained, but the dispatch metadata still exists for disposal.
+	objc_release(object)
 }
 
 fn ns_operation_queue_state(object u64) &FoundationOperationQueue {
@@ -56,7 +105,9 @@ fn ns_operation_queue_state(object u64) &FoundationOperationQueue {
 		|| C.ios_mutex_create(state.mutex, 0) != 0 || C.pthread_cond_init(state.condition, unsafe { nil }) != 0 {
 		panic('iOS: cannot initialize operation queue executor')
 	}
-	state.backing = darwin_dispatch_queue_create(c'org.vinix.operation-queue', 0)
+	state.main = object == ios_runtime.main_operation_queue
+	state.backing = if state.main { darwin_dispatch_get_main_queue() }
+		else { darwin_dispatch_queue_create(c'org.vinix.operation-queue', 0) }
 	C.pthread_mutex_lock(dispatch_runtime.mutex)
 	dispatch_queue_locked(state.backing).operation_owner = object
 	C.pthread_mutex_unlock(dispatch_runtime.mutex)
@@ -69,7 +120,11 @@ fn ns_operation_queue_state(object u64) &FoundationOperationQueue {
 fn ns_operation_queue_current() u64 {
 	if dispatch_runtime == unsafe { nil } { return 0 }
 	queue := dispatch_current_queue()
-	return if queue == unsafe { nil } { u64(0) } else { queue.operation_owner }
+	if queue != unsafe { nil } && queue.operation_owner != 0 { return queue.operation_owner }
+	// A dispatch queue targeted at main has its own TLS identity, but still
+	// executes on the main operation queue's thread.
+	if u64(C.pthread_self()) == ios_runtime.main_thread { return ns_operation_queue_main() }
+	return 0
 }
 
 fn ns_operation_queue_run(context voidptr) {
@@ -110,7 +165,13 @@ fn ns_operation_queue_submit(object u64, context voidptr, run DispatchFunction, 
 fn ns_operation_queue_block_free(context voidptr) { block_release(u64(context)) }
 
 fn ns_operation_queue_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
-	if object in ios_runtime.classes || !objc_is_kind(object, ios_runtime.names['NSOperationQueue']) { return false }
+	if object in ios_runtime.classes {
+		if !ns_operation_queue_family(object) || selector !in ['mainQueue', 'currentQueue']! { return false }
+		value := if selector == 'mainQueue' { ns_operation_queue_main() } else { ns_operation_queue_current() }
+		frame.x[0] = objc_retain_autorelease(value)
+		return true
+	}
+	if !objc_is_kind(object, ios_runtime.names['NSOperationQueue']) { return false }
 	if selector !in ['addOperationWithBlock:', 'operationCount', 'isSuspended', 'setSuspended:', 'waitUntilAllOperationsAreFinished']! { return false }
 	objc_retain(object)
 	defer { objc_release(object) }
@@ -121,16 +182,17 @@ fn ns_operation_queue_dispatch(object u64, selector string, mut frame RegisterFr
 		ns_operation_queue_submit(object, unsafe { voidptr(copied) }, dispatch_block, ns_operation_queue_block_free)
 		return true
 	}
-	if selector == 'waitUntilAllOperationsAreFinished' && ns_operation_queue_current() == object {
+	current := if selector == 'waitUntilAllOperationsAreFinished' { ns_operation_queue_current() } else { u64(0) }
+	C.pthread_mutex_lock(state.mutex)
+	if selector == 'waitUntilAllOperationsAreFinished' && state.pending != 0 && current == object {
 		panic('iOS: an operation cannot wait for its own queue')
 	}
-	C.pthread_mutex_lock(state.mutex)
 	match selector {
 		'operationCount' { frame.x[0] = state.pending }
 		'isSuspended' { frame.x[0] = u64(state.suspended) }
 		'setSuspended:' {
 			wanted := u8(frame.x[2]) != 0
-			if wanted != state.suspended {
+			if !state.main && wanted != state.suspended {
 				if wanted { darwin_dispatch_suspend(state.backing) } else { darwin_dispatch_resume(state.backing) }
 				state.suspended = wanted
 			}

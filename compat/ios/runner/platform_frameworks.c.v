@@ -56,6 +56,9 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 			}
 			'maxConcurrentOperationCount' { frame.x[0] = u64(queue.number) }
 			'setMaxConcurrentOperationCount:' {
+				// Foundation ignores this setting on its main-thread singleton,
+				// including values invalid for ordinary queues.
+				if queue.operation_queue != unsafe { nil } && queue.operation_queue.main { return true }
 				value := i64(frame.x[2])
 				if value != -1 && value < 1 { panic('iOS: invalid operation queue concurrency') }
 				queue.number = value

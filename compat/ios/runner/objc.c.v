@@ -483,6 +483,8 @@ mut:
 	thread_key u64
 	uncaught_exception_handler u64 // Borrowed process-wide C callback, cleared before image unmapping.
 	foundation_main_thread u64
+	main_operation_queue u64
+	main_operation_queue_retired bool
 	foundation_multithreaded bool
 	foundation_thread_count int
 	foundation_workers &FoundationWorker = unsafe { nil }
@@ -1179,6 +1181,7 @@ fn objc_stop() {
 	objc_release(ios_runtime.run_loop)
 	webkit_stop()
 	ns_threads_stop()
+	ns_operation_queue_stop()
 	objc_block_imps_stop()
 	objc_associations_stop()
 	// Keep the immortal empty dictionary available through all collection and
