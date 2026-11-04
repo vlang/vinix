@@ -440,6 +440,10 @@ fn replacement_selftest(out string) ! {
 }
 
 fn main() {
+	if os.args.len == 3 && os.args[1] == 'resume-queue-build' {
+		resume_queue_build(os.abs_path(os.args[2]))!
+		return
+	}
 	if os.args.len == 3 && os.args[1] == 'selftest' { replacement_selftest(os.abs_path(os.args[2]))!; return }
 	if os.args.len == 3 && os.args[1] == 'inspect-queue' {
 		out := os.real_path(os.args[2])
@@ -602,6 +606,75 @@ fn main() {
 			panic('changed reused fixture or driver: ' + path)
 		}
 		hashes << digest(out + '/' + path)! + '  ' + path
+	}
+	os.write_file(out + '/built-inputs.sha256', hashes.join('\n') + '\n')!
+	replay(out)!
+}
+
+// Resume only the pre-launch queue build. The original source snapshot and
+// completed runtime/init receipts are retained before rebuilding; this
+// coordinator is recorded separately. Never replay a completed launch or
+// accept changed build sources.
+fn resume_queue_build(out string) ! {
+	root := os.real_path(os.getwd())
+	if out == root || out.starts_with(root + '/') || os.is_link(out)
+		|| !os.is_dir(out) || !os.is_file(out + '/queue-probe.txt') {
+		return error('resume requires an external queue preparation')
+	}
+	for extra in ['data-task-probe.txt', 'url-resource-values-probe.txt', 'number-long-long-probe.txt', 'task-delegate-probe.txt', 'manifest.sha256'] {
+		if os.exists(out + '/' + extra) { return error('resume supports an unsealed base queue preparation only') }
+	}
+	state := os.read_file(out + '/probe-no-ads-state.txt')!.trim_space()
+	if os.dir(state) == out || !os.file_name(state).starts_with('probe-no-ads-') {
+		return error('resume requires preparation before media replacement or launch')
+	}
+	for label in ['source-check', 'source-snapshot', 'build-runtime', 'build-native-init'] {
+		if os.read_file(out + '/' + label + '.status.txt')! != '0\n' { return error('incomplete queue build: ' + label) }
+	}
+	revision := os.read_file(out + '/source-revision.txt')!.trim_space()
+	if revision.len != 40 || revision.bytes().any(!it.is_hex_digit()) { return error('invalid saved source revision') }
+	if os.read_file(out + '/source.sha256')! != digest(out + '/source.tar')! + '  source.tar\n' {
+		return error('changed saved source snapshot')
+	}
+	guard_dir := out + '/resume-build.lock'
+	os.mkdir(guard_dir)!
+	os.write_file(guard_dir + '/pid', os.getpid().str() + '\n')!
+	defer {
+		os.rm(guard_dir + '/pid') or {}
+		os.rmdir(guard_dir) or {}
+	}
+	checked := ['git', 'diff', '--exit-code', revision, '--', 'compat/ios', 'tests/ios', ':(exclude)tests/ios/storekit-operation-probe.v']
+	capture(out + '/resume-source-check', checked)!
+	os.cp(os.executable(), out + '/resume-driver')!
+	os.cp(@FILE, out + '/resume-driver.v')!
+	capture(out + '/resume-revision', ['git', 'rev-parse', 'HEAD'])!
+	retained := out + '/interrupted-build-' + os.getpid().str()
+	os.mkdir(retained)!
+	for name in ['build-runtime.log', 'build-runtime.status.txt', 'run-ios-gles', 'run-ios-gles.c',
+		'build-native-init.log', 'build-native-init.status.txt', 'native-init', 'native-init.c', 'storekit-purchase-checks.c'] {
+		if os.is_file(out + '/' + name) { os.cp(out + '/' + name, retained + '/' + name)! }
+	}
+	os.setenv('VINIX_IOS_CHECK_NAME', 'notification-center-checks', true)
+	os.setenv('V_RESOURCE_PATH', root + '/build/ios/fortnite/ns-calendar-checks/toolchain', true)
+	os.setenv('V_MACOS_V3_NO_FALLBACK', '1', true)
+	capture(out + '/build-runtime', [out + '/notification-vm', 'build-run-ios-gles', out])!
+	capture(out + '/build-native-init', [out + '/notification-vm', 'build-init', out])!
+	capture(out + '/build-storekit', [out + '/notification-vm', 'build-storekit-purchase', out])!
+	capture(out + '/built-source-check', checked)!
+	mut hashes := []string{}
+	for line in os.read_lines(out + '/built-inputs.sha256')! {
+		if line.len < 67 || line[64..66] != '  ' || line[..64].bytes().any(!it.is_hex_digit()) {
+			return error('invalid reused build input record')
+		}
+		path := line[66..]
+		if path.starts_with('/') || path.split('/').any(it in ['', '.', '..']) || path.contains_any('\\\r\n\t') || os.is_link(out + '/' + path) {
+			return error('unsafe reused build input path')
+		}
+		hash := digest(out + '/' + path)!
+		if path !in ['run-ios-gles', 'run-ios-gles.c', 'native-init', 'native-init.c'] && hash != line[..64] {
+			return error('changed reused build input: ' + path)
+		}
+		hashes << hash + '  ' + path
 	}
 	os.write_file(out + '/built-inputs.sha256', hashes.join('\n') + '\n')!
 	replay(out)!
