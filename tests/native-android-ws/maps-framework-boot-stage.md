@@ -17,7 +17,7 @@ binding declarations, all 721 exports, native source membership and copied
 header bytes remain unchanged. The fresh native producer must couple to the
 exact completed new SDK; old native provenance remains historical.
 
-The planned nine-file overlay inherits prepared `maps-webview-package-r1`,
+The prepared nine-file overlay inherits `maps-webview-package-r1`,
 manifest `d6ca42875b50ff239966e42933bd9eab711905e314371b9d68af3c3eb0226b87`.
 It replaces the JAR, DEX, native DSO, four framework/native metadata files,
 headless input receipt and deployment receipt. All eight replacement input
@@ -134,14 +134,40 @@ outside the batch import closure and remains unchanged.
 Complete evidence is retained below `/Users/alex/.local/state/vinix/android`:
 `maps-framework-boot-tools-2026-11-03-r1`, the separate
 `maps-framework-boot-inventory-batches-tests-2026-11-03-r1`, and the original
-complete SDK 27.0 input closure. These roots are closed. The first joint seal
-at `maps-framework-boot-tools-sealed-2026-11-04-r1` stopped at the original
-64 MiB shared-growth cap: guard 125, child 137, complete cleanup, 16,134 ms
-and 73,519,104 bytes observed growth, with no output. Its entire failed
-attempt is preserved for inclusion as a fourth root in a fresh seal retry.
-Final evidence sealing, media preparation, kernel installation and runtime
-checks remain pending; these source and stager checks establish no Maps
-completion result.
+complete SDK 27.0 input closure. These roots are closed. Two joint tool-seal
+attempts stopped at the original 64 MiB shared-growth cap, both with guard 125,
+child 137 and complete cleanup. Complete attempts remain preserved:
+
+| Tool seal root | Elapsed milliseconds | Observed growth bytes |
+| --- | ---: | ---: |
+| `maps-framework-boot-tools-sealed-2026-11-04-r1` | 16,134 | 73,519,104 |
+| `maps-framework-boot-tools-sealed-2026-11-04-r2` | 6,191 | 90,341,376 |
+
+The first attempt produced no output. The second retained that first failed
+root alongside the three evidence roots. Aggregate tool evidence sealing
+remains pending; a fresh retry must retain both complete failed attempts.
+
+Media preparation completed independently using the qualified stager and
+source revision `38aa4e5dd7ae9471427afde9e90a0adea33f75cf`. The prepared root
+`maps-framework-boot-r1` has completion manifest
+`43309208792e5ce55ed9c4b8af9e0ae5b6ff1f849f43b27a04948659224dd499`
+and stage receipt
+`a87760cf0daef526558da7b2b24068b868fe16f194e2f8692da8548eed8f465b`.
+Both complete 134-inventory audits and all 59 module readbacks passed, with
+the 58 inherited module digests retained and the nine-file overlay appended.
+
+Controls at `maps-framework-boot-preparation-2026-11-04-r1` record guard/child
+zero, empty reason and complete cleanup in 606,929 ms. Sampled/detailed RSS
+peaked at 91,766,784/92,241,920 bytes with zero swaps. Observed outer growth
+was 1,628,585,984 bytes under the original 4 GiB limit. The stage receipt
+records 137,650,176 bytes internal charge; the final completion sample was
+153,235,456 bytes, below the unchanged 512 MiB internal budget. The original
+5 GiB initial-space gate, 600 MiB RSS, 900-second, 1 GiB reserve and output
+bounds remained unchanged. Preparation required no kernel-patcher invocation.
+
+Aggregate tool sealing, new SDK 27.2 patcher FAT qualification, kernel
+installation and runtime checks remain pending. The guest has not booted
+this prepared image; preparation establishes no Maps completion result.
 No Android SDK, native library or signed fixture rebuild is needed for this
 host SDK change. These host checks establish no Cronet, Maps rendering,
 Google authentication or imagery result.
