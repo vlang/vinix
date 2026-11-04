@@ -49,7 +49,9 @@ along with the historical self-tests. Each phase retained 600 MiB RSS,
 shell file cap was8 GiB. Frozen sources/executable and compiler input listing
 are at `S/global-settings-string-sdk-tools-2026-11-05-r2`.
 
-Full retained-native compatibility, signed fixture, delivery, image and ARM
-qualification remain outstanding. No successor GMS stability, Maps rendering
-or authentication result is established. Complete original bundles and failed
-attempts remain required; aggregate evidence sealing/readback is separate.
+[Retained-native compatibility](global-settings-string-native-host.md) and
+[signed-fixture host checks](global-settings-string-fixture-host.md) subsequently
+passed. Delivery, image and ARM qualification remain outstanding. No successor
+GMS stability, Maps rendering or authentication result is established. Complete
+original bundles and failed attempts remain required; aggregate evidence
+sealing/readback is separate.

@@ -14,8 +14,9 @@ refusals remain preserved. The next adapter and focused checks are committed
 in `8db2b7541`, and [full SDK production passed](global-settings-string-sdk-2026-11-05.md)
 after space recovered. Only Global changed, adding one method while preserving
 all other classes. The [earlier disk refusals](global-settings-string-host-blocked-2026-11-05.md)
-remain historical evidence. Retained-native compatibility, signed fixture,
-image and ARM replay are next; no successor GMS or Maps result is established.
+remain historical evidence. [Retained-native compatibility](global-settings-string-native-host.md)
+and [signed-fixture host checks](global-settings-string-fixture-host.md) passed.
+Delivery, image and ARM replay are next; no successor GMS or Maps result is established.
 
 ## Prior checkpoints
 
