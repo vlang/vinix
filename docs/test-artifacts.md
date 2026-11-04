@@ -22,6 +22,14 @@ checksum. The existing `.github/workflows/m1-wifi-build.yml` demonstrates
 artifact uploads. Do not remove checks from an auditor to make a partial bundle
 pass.
 
+For a complete diagnostic bundle whose outcome falls outside a historical
+auditor's contract, preserve that auditor and its rejection. The V tool
+`tests/ios/evidence-delta-archive.v record-inventory BUNDLE EXTERNAL-RECEIPT`
+records every file's bytes, size and permissions, directories and root mode;
+`check-inventory BUNDLE RECEIPT` compares them again. Pin the receipt's SHA-256
+in the report. This protects evidence integrity; it does not certify launch
+success or replace the historical qualification checks.
+
 For a large cold-storage candidate, `tests/native-android-ws/cold-archive-estimate.v`
 can count a complete gzip archive stream without storing the archive. Pass the
 bundle directory, its pinned `sha256.json` checksum and a fresh external JSON

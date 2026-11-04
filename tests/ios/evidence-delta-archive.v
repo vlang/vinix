@@ -591,6 +591,27 @@ fn compare_trees(source string, target string) ! {
 	compare(Recipe{root_mode: int(os.stat(source)!.mode) & 0o7777, entries: walk(source, '')!}, target)!
 }
 
+// Integrity receipts also cover diagnostic outcomes that cannot satisfy a
+// historical launch-specific auditor. They do not certify application success.
+fn record_inventory(source string, receipt string) ! {
+	if os.is_link(source) || !os.is_dir(source) || os.real_path(source) != source {
+		return error('inventory source must be a canonical directory')
+	}
+	canonical_receipt := os.real_path(os.dir(receipt)) + '/' + os.file_name(receipt)
+	if os.exists(receipt) || os.is_link(receipt) || canonical_receipt.starts_with(source + '/') {
+		return error('inventory needs a fresh external receipt')
+	}
+	r := Recipe{original: source, root_mode: int(os.stat(source)!.mode) & 0o7777, entries: walk(source, '')!}
+	os.write_file(receipt, json2.encode(r, prettify: true))!
+}
+
+fn check_inventory(source string, receipt string) ! {
+	if os.is_link(source) || !os.is_dir(source) { return error('inventory source must be a directory, not a link') }
+	r := json2.decode[Recipe](os.read_file(receipt)!)!
+	if r.version != 3 || r.root_mode < 0 || r.root_mode > 0o7777 { return error('invalid inventory receipt') }
+	compare(r, source)!
+}
+
 fn reject_load(archive string) ! {
 	load_archive(archive) or { return }
 	return error('selftest accepted invalid archive')
@@ -858,13 +879,39 @@ fn selftest(root string, zstd string) ! {
 	os.chmod(target, 0o750)!
 	compare(r, target)!
 	compare_trees(source, target)!
+	receipt := root + '/standalone-inventory.json'
+	record_inventory(os.real_path(source), receipt)!
+	check_inventory(target, receipt)!
+	mut receipt_rejections := 0
+	record_inventory(source, receipt) or { receipt_rejections++ }
+	record_inventory(source, source + '/forbidden-inventory.json') or { receipt_rejections++ }
+	os.symlink('source', root + '/receipt-parent')!
+	record_inventory(os.real_path(source), root + '/receipt-parent/forbidden-inventory.json') or { receipt_rejections++ }
+	os.rm(root + '/receipt-parent')!
+	original_receipt := os.read_file(receipt)!
+	os.write_file(receipt, 'invalid receipt')!
+	check_inventory(target, receipt) or { receipt_rejections++ }
+	os.write_file(receipt, original_receipt)!
+	if receipt_rejections != 4 { return error('inventory receipt negative controls failed') }
+	check_inventory(source, receipt)!
+	println('Standalone typed inventory: relocation passes; overwrite, direct/aliased in-tree receipts and malformed receipt rejected PASS')
 	println('Selftest: 22 negative controls rejected; final complete inventory: PASS')
 	alignment_selftest(root, zstd)!
 }
 
 fn main() {
-	if os.args.len < 3 { panic('usage: evidence-delta-archive create SOURCE PRIOR ARCHIVE ZSTD WORK | verify ARCHIVE | restore ARCHIVE TARGET WORK | compare ARCHIVE TARGET | compare-trees SOURCE TARGET | selftest FRESH_DIR ZSTD') }
+	if os.args.len < 3 { panic('usage: evidence-delta-archive record-inventory SOURCE RECEIPT | check-inventory SOURCE RECEIPT | create SOURCE PRIOR ARCHIVE ZSTD WORK | verify ARCHIVE | restore ARCHIVE TARGET WORK | compare ARCHIVE TARGET | compare-trees SOURCE TARGET | selftest FRESH_DIR ZSTD') }
 	match os.args[1] {
+		'record-inventory' {
+			if os.args.len != 4 { panic('record-inventory needs SOURCE FRESH_EXTERNAL_RECEIPT') }
+			record_inventory(os.abs_path(os.args[2]), os.abs_path(os.args[3]))!
+			println('Complete typed inventory recorded: ' + digest(os.args[3])!)
+		}
+		'check-inventory' {
+			if os.args.len != 4 { panic('check-inventory needs SOURCE RECEIPT') }
+			check_inventory(os.abs_path(os.args[2]), os.abs_path(os.args[3]))!
+			println('Complete typed inventory receipt: PASS')
+		}
 		'create' {
 			if os.args.len != 7 { panic('create needs SOURCE PRIOR ARCHIVE ZSTD WORK') }
 			create(os.abs_path(os.args[2]), os.abs_path(os.args[3]), os.abs_path(os.args[4]), os.real_path(os.args[5]), os.abs_path(os.args[6]))!
