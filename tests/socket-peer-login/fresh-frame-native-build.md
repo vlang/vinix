@@ -6,6 +6,8 @@ This records kernel compilation and generated-output qualification only;
 original full seal/check/root-independent check and guest/performance validation
 remain pending at this report's cutoff.
 
+The subsequent [complete-state audits](fresh-frame-full-audit.md) also passed.
+
 Source preparation/control tools are recorded in component commit
 `88e0ffc8aebe982676a73747a22bfe9d33fec8ad` and main integration `1ce0e8656`.
 The kernel uses source base `9acefa77` at detached checkout `b262bf48`, with

@@ -6,8 +6,10 @@ profile passed all 67 closed controls; see
 [`fresh-frame-native-qualification.md`](fresh-frame-native-qualification.md)
 for the pinned source bytes and external receipts. The fresh x86 frame kernel
 build also passed its original controller and native guards; see
-[`fresh-frame-native-build.md`](fresh-frame-native-build.md). Original complete
-audits, staging and guest remain unexecuted. The
+[`fresh-frame-native-build.md`](fresh-frame-native-build.md). The original full
+seal, first check and root-owned independent check also passed; see
+[`fresh-frame-full-audit.md`](fresh-frame-full-audit.md). Guest/performance
+staging and execution remain pending. The
 original baseline refusal in `frame-baseline-preflight.md` remains historical;
 the separate fresh atomic success does not qualify this frame kernel.
 Require root review and a reserved host phase for each remaining heavy phase.
@@ -24,9 +26,9 @@ The subsequent held-plan bytes (SHA256
 are preserved with their checksum at
 `/Users/alex/Library/Caches/vinix-codex/section14/frame-peer-baseline-planning-20261104-02`.
 That read-only planning snapshot measured 24 KiB allocated/19 KiB apparent,
-outside fresh execution growth. The setup/bootstrap/build recipes below retain the
+outside fresh execution growth. The setup/bootstrap/build/audit recipes below retain the
 completed attempt's provenance; do not rerun them against consumed output
-names. Full-audit and later consumer sections remain prospective requirements.
+names. Later guest/performance and consumer work still requires a reviewed phase.
 
 ## Fixed bindings and budget
 
@@ -324,7 +326,7 @@ there is no ARM baseline or peer ABI qualification claim.
 After successful build/postflight finish every R status/report and stop all
 writers. Subsequent audit logs, probes, status and every new module/cache/temp
 path live under S outside R. Recheck space and unchanged checker/source hashes.
-After actual native-profile qualification, invoke:
+The completed original full-audit sequence used:
 
 ```
 [NATIVE, "--seal-01"]

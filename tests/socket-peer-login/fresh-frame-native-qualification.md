@@ -2,8 +2,9 @@
 
 Source base: `4e52d3561e267e96735c91b65ddc4057cffb0ed6`. Qualification ran
 against the exact source/tool hashes retained in the external receipts.
-The subsequent [native kernel build](fresh-frame-native-build.md) passed;
-original full audits and guest/performance validation remain pending.
+The subsequent [native kernel build](fresh-frame-native-build.md) and
+[complete-state audits](fresh-frame-full-audit.md) passed; guest/performance
+validation remains pending.
 
 The fixed V preparer is
 `prepare-fresh-frame.v` SHA256
@@ -51,6 +52,5 @@ Setup and bootstrap evidence covers admission/completion endpoints; the
 native timing evidence above covers closed controls. The subsequent kernel
 build passed native observations within five seconds, the total 1,100-second
 entry-through-final-PASS bound and the unchanged inner controller.
-Original full seal/check/root-independent check and VM/performance validation
-remain pending. Referenced historical frame/atomic bundles and preflight documents
-are unchanged.
+Guest/performance validation remains pending. Referenced historical frame/atomic
+bundles and preflight documents are unchanged.
