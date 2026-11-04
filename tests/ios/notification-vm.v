@@ -758,8 +758,12 @@ fn main() {
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out) or { panic(err) }
 	mode := os.args[1]
-	if mode in ['view-tag', 'notification-block']! {
-		build(root, out, if mode == 'view-tag' { 'view-tag-checks' } else { 'notification-block-checks' })
+	if mode in ['view-tag', 'notification-block', 'feedback']! {
+		build(root, out, match mode {
+			'view-tag' { 'view-tag-checks' }
+			'notification-block' { 'notification-block-checks' }
+			else { 'feedback-checks' }
+		})
 		build(root, out, 'native-init')
 		vm(root, out, mode)
 		return

@@ -1,6 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+$if macos {
+	#flag -framework Foundation
+	#include <objc/runtime.h>
+}
+#include <dlfcn.h>
+fn C.objc_getClass(&char) voidptr
+fn C.sel_registerName(&char) voidptr
+fn C.class_getInstanceMethod(voidptr, voidptr) voidptr
+fn C.method_getTypeEncoding(voidptr) &char
+fn C.dlsym(voidptr, &char) voidptr
+fn C.dlopen(&char, int) voidptr
+
 type FeedbackSend = fn (u64, u64, u64) u64
 type FeedbackIntensitySend = fn (u64, u64, f64)
 
@@ -14,6 +26,73 @@ fn feedback_invoke(imp u64, object u64, selector &char, value u64) u64 {
 
 fn feedback_message(object u64, selector &char, value u64) u64 {
 	return feedback_invoke(u64(unsafe { voidptr(C.ios_objc_msgsend) }), object, selector, value)
+}
+
+fn device_feedback_message(native bool, object u64, selector &char, value u64) u64 {
+	$if macos { if native {
+		return unsafe { FeedbackSend(C.dlsym(voidptr(-2), c'objc_msgSend'))(object, u64(C.sel_registerName(selector)), value) }
+	} }
+	return feedback_message(object, selector, value)
+}
+
+fn device_feedback_case(native bool, cls u64, number_cls u64, string_cls u64) {
+	device := device_feedback_message(native, cls, c'currentDevice', 0)
+	for text in ['_feedbackSupportLevel', 'feedbackSupportLevel']! {
+		key := device_feedback_message(native, string_cls, c'stringWithUTF8String:', u64(text.str))
+		value := device_feedback_message(native, device, c'valueForKey:', key)
+		assert value != 0 && device_feedback_message(native, value, c'isKindOfClass:', number_cls) != 0;
+		assert device_feedback_message(native, value, c'longLongValue', 0) == 0;
+		assert device_feedback_message(native, value, c'intValue', 0) == 0;
+		assert ctext(device_feedback_message(native, value, c'objCType', 0)) == 'q';
+	}
+	assert device_feedback_message(native, device, c'_feedbackSupportLevel', 0) == 0;
+	for selector in [c'valueForKey:', c'_feedbackSupportLevel']! {
+		mut types := ''
+		$if macos { if native {
+			method := C.class_getInstanceMethod(unsafe { voidptr(cls) }, C.sel_registerName(selector))
+			assert method != unsafe { nil };
+			types = unsafe { cstring_to_vstring(C.method_getTypeEncoding(method)) }
+		} }
+		if !native {
+			assert objc_responds(device, selector) && !objc_responds(cls, selector);
+			method := objc_instance_method(cls, u64(selector))
+			assert method != 0 && objc_instance_method(ios_runtime.names['NSObject'], u64(selector)) == 0;
+			types = ctext(u64(objc_method_types(method)))
+		}
+		assert types == if ctext(u64(selector)) == 'valueForKey:' { '@24@0:8@16' } else { 'q16@0:8' };
+	}
+}
+
+fn device_feedback_override(_ u64, _ u64) u64 { return 2 }
+fn device_feedback_worker(cls u64) {
+	for _ in 0 .. 128 {
+		pool := objc_pool_push()
+		device_feedback_case(false, cls, ios_runtime.names['NSNumber'], ios_runtime.names['NSString'])
+		objc_pool_pop(pool)
+	}
+}
+
+fn device_feedback_runtime() {
+	cls := ios_runtime.names['UIDevice']
+	device_feedback_case(false, cls, ios_runtime.names['NSNumber'], ios_runtime.names['NSString'])
+	device := feedback_message(cls, c'currentDevice', 0)
+	subclass := objc_allocate_class(cls, c'VinixDeviceFeedbackFixture', 0)
+	objc_register_class(subclass)
+	assert objc_class_method(subclass, u64(c'valueForKey:')) == 0;
+	key := objc_autorelease(owned_string('_feedbackSupportLevel'))
+	object := objc_new(subclass)
+	method := objc_instance_method(subclass, u64(c'valueForKey:'))
+	assert method != 0;
+	first := feedback_invoke(objc_method_imp(method), object, c'valueForKey:', key)
+	assert feedback_message(first, c'longLongValue', 0) == 0;
+	assert objc_add_method(subclass, u64(c'_feedbackSupportLevel'), u64(unsafe { voidptr(device_feedback_override) }), c'q16@0:8');
+	second := feedback_message(object, c'valueForKey:', key)
+	assert feedback_message(second, c'longLongValue', 0) == 2;
+	assert feedback_message(device, c'_feedbackSupportLevel', 0) == 0;
+	objc_release(object)
+	mut workers := []thread{}
+	for _ in 0 .. 4 { workers << spawn device_feedback_worker(cls) }
+	workers.wait(); unsafe { workers.free() }
 }
 
 __global feedback_override_calls int
@@ -147,12 +226,21 @@ fn feedback_runtime() {
 }
 
 fn test_feedback_runtime() {
+	$if macos {
+		assert C.dlopen(c'/System/iOSSupport/System/Library/Frameworks/UIKit.framework/UIKit', 2) != unsafe { nil };
+		pool := device_feedback_message(true, u64(C.objc_getClass(c'NSAutoreleasePool')), c'new', 0)
+		device_feedback_case(true, u64(C.objc_getClass(c'UIDevice')), u64(C.objc_getClass(c'NSNumber')), u64(C.objc_getClass(c'NSString')))
+		device_feedback_message(true, pool, c'drain', 0)
+		println('IOS-DEVICE-FEEDBACK-NATIVE: both KVC keys, boxed q zero, private getter and method signatures PASS')
+	}
 	for _ in 0 .. 2 {
 		system_data_start() or { panic(err) }; objc_start(); pool := objc_pool_push()
 		feedback_runtime()
+		device_feedback_runtime()
 		objc_pool_pop(pool); objc_stop()
 		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0 && ios_runtime.block_refs.len == 0
 		system_data_stop()
 	}
 	println('IOS-FEEDBACK: UIKit imports, hierarchy, instance-only object/void/integer/double ABI, reflection, guarded storage, all five impact styles, concurrent no-op requests, subclass overrides and two balanced shutdown cycles PASS')
+	println('IOS-DEVICE-FEEDBACK: scoped KVC capability lookup, NSNumber ownership, getter overrides, inherited IMPs, four concurrent readers and two clean lifetimes PASS')
 }
