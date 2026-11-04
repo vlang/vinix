@@ -23,6 +23,7 @@ type ViewClearGet = fn (u64, u64) bool
 type ViewClearSet = fn (u64, u64, bool)
 type ScreenRectGet = fn (u64, u64) ObjRect
 type ScreenScaleGet = fn (u64, u64) f64
+type ScreenRateGet = fn (u64, u64) i64
 struct ViewTagApi { native bool send u64 }
 
 fn (api ViewTagApi) selector(name &char) u64 {
@@ -173,7 +174,7 @@ fn screen_geometry_cases(api ViewTagApi, cls u64) u64 {
 	screen := api.message(cls, c'mainScreen', 0)
 	assert screen != 0 && api.message(cls, c'mainScreen', 0) == screen;
 	mut native_rect := ObjRect{}
-	for index, name in [c'bounds', c'nativeBounds', c'scale', c'nativeScale']! {
+	for index, name in [c'bounds', c'nativeBounds', c'scale', c'nativeScale', c'maximumFramesPerSecond']! {
 		selector := api.selector(name)
 		assert api.message(screen, c'respondsToSelector:', selector) == 1;
 		mut method := u64(0); mut imp := u64(0); mut types := ''
@@ -204,7 +205,7 @@ fn screen_geometry_cases(api ViewTagApi, cls u64) u64 {
 			assert via_message == via_imp && via_imp.x == 0 && via_imp.y == 0;
 			assert math.is_finite(via_imp.width) && math.is_finite(via_imp.height) && via_imp.width > 0 && via_imp.height > 0;
 			if index == 1 { native_rect = via_imp }
-		} else {
+		} else if index < 4 {
 			assert types == 'd16@0:8';
 			signature := api.message(screen, c'methodSignatureForSelector:', selector)
 			assert signature != 0 && api.message(signature, c'numberOfArguments', 0) == 2;
@@ -212,6 +213,14 @@ fn screen_geometry_cases(api ViewTagApi, cls u64) u64 {
 			scale := unsafe { ScreenScaleGet(voidptr(api.send))(screen, selector) }
 			assert scale == unsafe { ScreenScaleGet(voidptr(imp))(screen, selector) } && scale > 0 && math.is_finite(scale);
 			if !api.native { assert scale == 1; }
+		} else {
+			assert types == 'q16@0:8';
+			signature := api.message(screen, c'methodSignatureForSelector:', selector)
+			assert signature != 0 && api.message(signature, c'numberOfArguments', 0) == 2;
+			assert api.message(signature, c'methodReturnLength', 0) == 8;
+			rate := unsafe { ScreenRateGet(voidptr(api.send))(screen, selector) }
+			assert rate == unsafe { ScreenRateGet(voidptr(imp))(screen, selector) } && rate > 0;
+			if !api.native { assert rate == 60; }
 		}
 	}
 	if !api.native { assert native_rect == ObjRect{0, 0, 390, 680}; }
@@ -233,6 +242,28 @@ fn screen_geometry_runtime(api ViewTagApi) {
 	assert frame_double(&frame, 0) == 0 && frame_double(&frame, 1) == 0 && frame_double(&frame, 2) == 390 && frame_double(&frame, 3) == 680;
 	for i in 0 .. 4 { assert frame.q[i * 2 + 1] == 0; }
 	assert guarded == [u64(0x1234), 0x5678, 0x9abc, 0xdef0, 0x4321, 0x8765]!;
+	frame.x[0] = screen; frame.x[1] = u64(c'maximumFramesPerSecond')
+	for i in 0 .. frame.q.len { frame.q[i] = ~u64(0) }
+	assert objc_dispatch(mut frame, 0) == 0 && frame.x[0] == 60;
+	for lane in frame.q { assert lane == ~u64(0); }
+	assert guarded == [u64(0x1234), 0x5678, 0x9abc, 0xdef0, 0x4321, 0x8765]!;
+	// Lower preferred cadence never changes the screen's maximum capability.
+	mut link_frame := RegisterFrame{}
+	link_frame.x[0] = ios_runtime.names['CADisplayLink']; link_frame.x[1] = u64(c'displayLinkWithTarget:selector:')
+	link_frame.x[2] = screen; link_frame.x[3] = u64(c'nativeBounds')
+	assert objc_dispatch(mut link_frame, 0) == 0;
+	link := link_frame.x[0]
+	assert link != 0 && api.message(link, c'preferredFramesPerSecond', 0) == 60;
+	for preference in [u64(30), 1, 120, 0]! {
+		api.message(link, c'setPreferredFramesPerSecond:', preference)
+		expected := if preference == 0 || preference > 60 { u64(60) } else { preference }
+		assert api.message(link, c'preferredFramesPerSecond', 0) == expected;
+		assert api.message(screen, c'maximumFramesPerSecond', 0) == 60;
+		assert unsafe { ScreenScaleGet(voidptr(api.send))(link, api.selector(c'duration')) } == 1.0 / f64(expected);
+	}
+	api.message(link, c'setFrameInterval:', 2)
+	assert api.message(link, c'frameInterval', 0) == 2 && api.message(link, c'preferredFramesPerSecond', 0) == 30;
+	api.message(link, c'invalidate', 0)
 	window := objc_new(ios_runtime.names['UIWindow'])
 	api.message(window, c'makeKeyAndVisible', 0)
 	for size in [[640, 360]!, [320, 720]!, [1024, 768]!]! {
@@ -267,7 +298,7 @@ fn test_view_tag_native() {
 		api.message(pool, c'drain', 0)
 		println('IOS-VIEW-TAG-NATIVE: signed tags, receiver-first depth-first lookup, scope, reparenting, deep hierarchy, metadata, signatures and direct IMP PASS')
 		println('IOS-VIEW-CLEAR-NATIVE: default YES, independent state, BOOL register width, hierarchy, metadata, signatures and direct IMP PASS')
-		println('IOS-SCREEN-NATIVE: CGRect/double returns, positive screen geometry, method metadata, signatures and direct IMP PASS')
+		println('IOS-SCREEN-NATIVE: CGRect/double/NSInteger returns, positive geometry and maximum cadence, metadata, signatures and direct IMP PASS')
 	}
 }
 fn test_view_tag_runtime() {
@@ -290,5 +321,5 @@ fn test_view_tag_runtime() {
 	}
 	println('IOS-VIEW-TAG: shared native cases, UIWindow/subclass inheritance, borrowed ownership and two drained runtimes PASS')
 	println('IOS-VIEW-CLEAR: shared native property cases, UIWindow/subclass inheritance and two drained runtimes PASS')
-	println('IOS-SCREEN: fixed portrait native pixels, scale one, CGRect HFA guards, inherited metadata, window resize independence and two clean lifetimes PASS')
+	println('IOS-SCREEN: fixed portrait native pixels, scale one, 60 Hz ceiling, display-link cadence, integer/CGRect ABI guards, inherited metadata, window resize independence and two clean lifetimes PASS')
 }

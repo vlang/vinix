@@ -5,12 +5,17 @@ module main
 // per point. Window resizing changes the window, not this display's geometry.
 fn ui_screen_native_bounds() ObjRect { return ObjRect{0, 0, 390, 680} }
 
+// This is the virtual display's nominal ceiling, shared with CADisplayLink.
+// Actual callback delivery still depends on the desktop's main event loop.
+fn ui_screen_maximum_frames_per_second() i64 { return 60 }
+
 fn ui_screen_types(name string, meta bool, selector string) ?string {
 	if name != 'UIScreen' { return none }
 	if meta { return if selector == 'mainScreen' { ?string('@16@0:8') } else { none } }
 	return match selector {
 		'bounds', 'nativeBounds' { '{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8' }
 		'scale', 'nativeScale' { 'd16@0:8' }
+		'maximumFramesPerSecond' { 'q16@0:8' }
 		else { none }
 	}
 }
@@ -28,7 +33,7 @@ fn ui_screen_family(cls u64) bool {
 
 fn ui_screen_selector(object u64, selector string) bool {
 	if object in ios_runtime.classes { return selector == 'mainScreen' && ui_screen_family(object) }
-	return selector in ['bounds', 'nativeBounds', 'scale', 'nativeScale']!
+	return selector in ['bounds', 'nativeBounds', 'scale', 'nativeScale', 'maximumFramesPerSecond']!
 		&& objc_is_kind(object, ios_runtime.names['UIScreen'])
 }
 
@@ -37,6 +42,7 @@ fn ui_screen_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	match selector {
 		'mainScreen' { frame.x[0] = ui_main_screen() }
 		'nativeBounds' { return_rect(mut frame, ui_screen_native_bounds()) }
+		'maximumFramesPerSecond' { frame.x[0] = u64(ui_screen_maximum_frames_per_second()) }
 		'bounds' {
 			logical := obj_header(object).frame
 			return_rect(mut frame, ObjRect{0, 0, logical.width, logical.height})

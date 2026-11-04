@@ -67,7 +67,7 @@ fn display_link_dispatch(object u64, selector string, mut frame RegisterFrame) b
 		link := objc_allocate(object)
 		mut header := obj_header(link)
 		header.valid = true
-		header.number = 60
+		header.number = ui_screen_maximum_frames_per_second()
 		header.action = frame.x[3]
 		store_field(link, 0, frame.x[2])
 		frame.x[0] = objc_autorelease(link)
@@ -84,12 +84,14 @@ fn display_link_dispatch(object u64, selector string, mut frame RegisterFrame) b
 		'setPreferredFramesPerSecond:' {
 			fps := i64(frame.x[2])
 			if fps < 0 { panic('iOS: negative display-link frame rate') }
-			header.number = if fps == 0 || fps > 60 { i64(60) } else { fps }
+			maximum := ui_screen_maximum_frames_per_second()
+			header.number = if fps == 0 || fps > maximum { maximum } else { fps }
 		}
-		'frameInterval' { frame.x[0] = u64(60 / header.number) }
+		'frameInterval' { frame.x[0] = u64(ui_screen_maximum_frames_per_second() / header.number) }
 		'setFrameInterval:' {
-			if frame.x[2] == 0 || frame.x[2] > 60 { panic('iOS: invalid display-link frame interval') }
-			header.number = i64(60 / frame.x[2])
+			maximum := u64(ui_screen_maximum_frames_per_second())
+			if frame.x[2] == 0 || frame.x[2] > maximum { panic('iOS: invalid display-link frame interval') }
+			header.number = i64(maximum / frame.x[2])
 		}
 		'isPaused' { frame.x[0] = u64(header.repeat) }
 		'setPaused:' { header.repeat = frame.x[2] != 0 }
