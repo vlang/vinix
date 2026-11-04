@@ -136,6 +136,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := image_view_types(info.name, info.meta, selector) { return types }
 	if types := ui_feedback_types(info.name, info.meta, selector) { return types }
 	if types := ui_device_feedback_types(info.name, info.meta, selector) { return types }
+	if types := ui_screen_types(info.name, info.meta, selector) { return types }
 	if types := game_keyboard_types(info.name, info.meta, selector) { return types }
 	if types := game_controller_types(info.name, info.meta, selector) { return types }
 	if types := app_attest_types(info.name, info.meta, selector) { return types }

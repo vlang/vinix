@@ -32,6 +32,7 @@ fn objc_responds(object u64, selector &char) bool {
 	}
 	C.ios_objc_initialize_unlock()
 	name := ctext(u64(selector))
+	if ui_screen_selector(object, name) { return true }
 	if ui_device_feedback_selector(object, name) { return true }
 	if app_attest_family(if object in ios_runtime.classes { object } else { read64(object) })
 		|| capture_discovery_family(if object in ios_runtime.classes { object } else { read64(object) })
@@ -401,7 +402,7 @@ fn ui_main_screen() u64 {
 	if ios_runtime.screen == 0 {
 		ios_runtime.screen = objc_allocate(ios_runtime.names['UIScreen'])
 		mut header := obj_header(ios_runtime.screen)
-		header.frame = ObjRect{0, 0, 390, 680}
+		header.frame = ui_screen_native_bounds()
 	}
 	return ios_runtime.screen
 }

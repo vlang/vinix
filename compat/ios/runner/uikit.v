@@ -108,6 +108,7 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 }
 
 fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if ui_screen_dispatch(object, selector, mut frame) { return true }
 	if ui_device_feedback_dispatch(object, selector, mut frame) { return true }
 	if snapshot_configuration_dispatch(object, selector, mut frame) { return true }
 	if match_request_dispatch(object, selector, mut frame) { return true }
@@ -358,10 +359,6 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 			'setMultipleTouchEnabled:' { header.multiple_touch = frame.x[2] != 0; return true }
 			else {}
 		}
-	}
-	if objc_is_kind(object, ios_runtime.names['UIScreen']) && selector in ['scale', 'nativeScale'] {
-		frame_float_return(mut frame, 0, 1)
-		return true
 	}
 	if objc_is_kind(object, ios_runtime.names['UIResponder']) {
 		match selector {

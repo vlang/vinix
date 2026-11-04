@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import math
+
 $if macos {
 	#flag -framework Foundation
 	#include <objc/runtime.h>
@@ -19,6 +21,8 @@ fn C.dlsym(voidptr, &char) voidptr
 type ViewTagSend = fn (u64, u64, u64) u64
 type ViewClearGet = fn (u64, u64) bool
 type ViewClearSet = fn (u64, u64, bool)
+type ScreenRectGet = fn (u64, u64) ObjRect
+type ScreenScaleGet = fn (u64, u64) f64
 struct ViewTagApi { native bool send u64 }
 
 fn (api ViewTagApi) selector(name &char) u64 {
@@ -164,12 +168,87 @@ fn view_clear_cases(api ViewTagApi, cls u64) {
 	}
 	api.message(first, c'release', 0); api.message(second, c'release', 0)
 }
+
+fn screen_geometry_cases(api ViewTagApi, cls u64) u64 {
+	screen := api.message(cls, c'mainScreen', 0)
+	assert screen != 0 && api.message(cls, c'mainScreen', 0) == screen;
+	mut native_rect := ObjRect{}
+	for index, name in [c'bounds', c'nativeBounds', c'scale', c'nativeScale']! {
+		selector := api.selector(name)
+		assert api.message(screen, c'respondsToSelector:', selector) == 1;
+		mut method := u64(0); mut imp := u64(0); mut types := ''
+		$if macos { if api.native {
+			method = u64(C.class_getInstanceMethod(unsafe { voidptr(cls) }, unsafe { voidptr(selector) }))
+			assert method != 0;
+			imp = u64(C.method_getImplementation(unsafe { voidptr(method) }))
+			types = ctext(u64(C.method_getTypeEncoding(unsafe { voidptr(method) })))
+		} }
+		if !api.native {
+			method = objc_instance_method(cls, selector)
+			assert method != 0 && objc_instance_method(ios_runtime.names['NSObject'], selector) == 0;
+			assert objc_class_method(cls, selector) == 0;
+			imp = objc_method_imp(method); types = ctext(u64(objc_method_types(method)))
+		}
+		assert imp != 0;
+		if index < 2 {
+			assert types == '{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8';
+			// NSMethodSignature's existing runtime profile is scalar-only.
+			// Verify aggregate metadata and the actual HFA call directly here.
+			if api.native {
+				signature := api.message(screen, c'methodSignatureForSelector:', selector)
+				assert signature != 0 && api.message(signature, c'numberOfArguments', 0) == 2;
+				assert api.message(signature, c'methodReturnLength', 0) == 32;
+			}
+			via_message := unsafe { ScreenRectGet(voidptr(api.send))(screen, selector) }
+			via_imp := unsafe { ScreenRectGet(voidptr(imp))(screen, selector) }
+			assert via_message == via_imp && via_imp.x == 0 && via_imp.y == 0;
+			assert math.is_finite(via_imp.width) && math.is_finite(via_imp.height) && via_imp.width > 0 && via_imp.height > 0;
+			if index == 1 { native_rect = via_imp }
+		} else {
+			assert types == 'd16@0:8';
+			signature := api.message(screen, c'methodSignatureForSelector:', selector)
+			assert signature != 0 && api.message(signature, c'numberOfArguments', 0) == 2;
+			assert api.message(signature, c'methodReturnLength', 0) == 8;
+			scale := unsafe { ScreenScaleGet(voidptr(api.send))(screen, selector) }
+			assert scale == unsafe { ScreenScaleGet(voidptr(imp))(screen, selector) } && scale > 0 && math.is_finite(scale);
+			if !api.native { assert scale == 1; }
+		}
+	}
+	if !api.native { assert native_rect == ObjRect{0, 0, 390, 680}; }
+	return screen
+}
+
+fn screen_geometry_runtime(api ViewTagApi) {
+	cls := ios_runtime.names['UIScreen']
+	screen := screen_geometry_cases(api, cls)
+	subclass := objc_allocate_class(cls, c'VinixScreenGeometryFixture', 0)
+	objc_register_class(subclass)
+	assert screen_geometry_cases(api, subclass) == screen;
+	// Raw ABI lanes: CGRect is a four-double HFA, not an indirect x8 result.
+	mut guarded := [u64(0x1234), 0x5678, 0x9abc, 0xdef0, 0x4321, 0x8765]!
+	mut frame := RegisterFrame{}
+	frame.x[0] = screen; frame.x[1] = u64(c'nativeBounds'); frame.x[8] = u64(unsafe { &guarded[1] })
+	for i in 0 .. frame.q.len { frame.q[i] = ~u64(0) }
+	assert objc_dispatch(mut frame, 0) == 0;
+	assert frame_double(&frame, 0) == 0 && frame_double(&frame, 1) == 0 && frame_double(&frame, 2) == 390 && frame_double(&frame, 3) == 680;
+	for i in 0 .. 4 { assert frame.q[i * 2 + 1] == 0; }
+	assert guarded == [u64(0x1234), 0x5678, 0x9abc, 0xdef0, 0x4321, 0x8765]!;
+	window := objc_new(ios_runtime.names['UIWindow'])
+	api.message(window, c'makeKeyAndVisible', 0)
+	for size in [[640, 360]!, [320, 720]!, [1024, 768]!]! {
+		ui_layout(size[0], size[1])
+		assert obj_header(window).frame.width == f64(size[0]) && obj_header(window).frame.height == f64(size[1]);
+		assert screen_geometry_cases(api, cls) == screen;
+	}
+	objc_release(window)
+}
 fn test_view_tag_native() {
 	$if macos {
 		assert C.dlopen(c'/System/iOSSupport/System/Library/Frameworks/UIKit.framework/UIKit', 2) != unsafe { nil }
 		api := ViewTagApi{true, u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend'))}
 		assert api.send != 0
 		pool := api.message(u64(C.objc_getClass(c'NSAutoreleasePool')), c'new', 0)
+		screen_geometry_cases(api, u64(C.objc_getClass(c'UIScreen')))
 		view_tag_cases(api, u64(C.objc_getClass(c'UIView')))
 		view_clear_cases(api, u64(C.objc_getClass(c'UIView')))
 		clear_subclass := C.objc_allocateClassPair(C.objc_getClass(c'UIView'), c'VinixNativeClearView', 0)
@@ -188,6 +267,7 @@ fn test_view_tag_native() {
 		api.message(pool, c'drain', 0)
 		println('IOS-VIEW-TAG-NATIVE: signed tags, receiver-first depth-first lookup, scope, reparenting, deep hierarchy, metadata, signatures and direct IMP PASS')
 		println('IOS-VIEW-CLEAR-NATIVE: default YES, independent state, BOOL register width, hierarchy, metadata, signatures and direct IMP PASS')
+		println('IOS-SCREEN-NATIVE: CGRect/double returns, positive screen geometry, method metadata, signatures and direct IMP PASS')
 	}
 }
 fn test_view_tag_runtime() {
@@ -203,10 +283,12 @@ fn test_view_tag_runtime() {
 		view_clear_cases(api, ios_runtime.names['UIView'])
 		view_clear_cases(api, ios_runtime.names['UIWindow'])
 		view_clear_cases(api, subclass)
+		screen_geometry_runtime(api)
 		objc_pool_pop(pool)
 		objc_stop()
 		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
 	}
 	println('IOS-VIEW-TAG: shared native cases, UIWindow/subclass inheritance, borrowed ownership and two drained runtimes PASS')
 	println('IOS-VIEW-CLEAR: shared native property cases, UIWindow/subclass inheritance and two drained runtimes PASS')
+	println('IOS-SCREEN: fixed portrait native pixels, scale one, CGRect HFA guards, inherited metadata, window resize independence and two clean lifetimes PASS')
 }
