@@ -24,9 +24,14 @@ packed atomic loads/stores, and the store/barrier/publication order. All 29 peer
 mutations must be refused. `--frame-baseline` builds the independent frame-only
 x86 baseline with its separate fixed source pins.
 
-`matched-kernel-retain.v` derives the small format-2 consumer receipt from the
-original complete atomic-v3 build-02 bundle only after the original strict audit passes.
-The derivative keeps the original audit reference. A derivative or a content
-match does not replace a complete bundle's metadata audit.
+`matched-atomic-fresh-kernel-retain.v` derives the fresh format-2 consumer
+receipt from the complete atomic build-03 bundle after its strict audit passes.
+The derivative retains the original audit reference; consumers must recheck the
+complete original. The [fresh retention report](matched-atomic-fresh-kernel-check.md)
+records the source revision, checksums and external evidence location. Guest,
+allocation/performance and production integration gates remain separate.
 
-Actual results and external evidence locations are in `matched-kernel-check.md`.
+`matched-kernel-retain.v` and [its report](matched-kernel-check.md) retain the
+historical atomic-v3 build-02 profile. Its later complete metadata audit refused;
+the fresh profile does not requalify that bundle. A derivative or a content
+match does not replace a complete bundle's metadata audit.

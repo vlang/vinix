@@ -1,6 +1,12 @@
 # Matched frame and peer kernel qualification
 
-## Current atomic-v3 qualification
+The atomic-v3 build-02 and frame-only baseline records below describe their
+creation-time results. Later complete metadata checks refused those original
+bundles; they remain preserved and are not current consumer qualification.
+Use the separately built and audited [fresh atomic retention profile](matched-atomic-fresh-kernel-check.md).
+Guest, performance and production kernel integration remain open.
+
+## Atomic-v3 creation-time qualification
 
 Current raw evidence is `B/matched-peer-frame-atomic-20261026/build-02`
 (`B` is defined below): both architectures passed, actual outer zero/312.17s,
