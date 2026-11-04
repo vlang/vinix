@@ -18,6 +18,7 @@ mut:
 	constrained bool
 	cookies bool
 	cookies_explicit bool // An unset cookie policy inherits session configuration.
+	timeout_explicit bool // Setting 60 is explicit; initializing with 60 inherits (native).
 	pipelining bool
 	http3 bool
 	dnssec bool
@@ -85,6 +86,7 @@ fn request_initialize(object u64, url u64, cache u64, timeout f64) {
 	header.request.refs[0] = if url == 0 { u64(0) } else { objc_copy_value(url, false) }
 	header.request.refs[2] = owned_string('GET')
 	header.request.timeout = timeout
+	header.request.timeout_explicit = timeout != 60
 	header.request.cache_policy = cache
 	header.request.mutable = objc_is_kind(object, ios_runtime.names['NSMutableURLRequest'])
 	header.request.cellular = true
@@ -237,7 +239,7 @@ fn request_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 		'setAllHTTPHeaderFields:' { copy := request_headers(value); objc_store_strong(unsafe { &state.refs[4] }, copy); objc_release(copy) }
 		'setValue:forHTTPHeaderField:', 'addValue:forHTTPHeaderField:' { if state.refs[4] == 0 { state.refs[4] = objc_allocate(ios_runtime.names['NSMutableDictionary']) }; request_header_put(state.refs[4], frame.x[3], value, selector.starts_with('addValue:')) }
 		'timeoutInterval' { frame_float_return(mut frame, 0, state.timeout) }
-		'setTimeoutInterval:' { timeout := frame_double(frame, 0); if !math.is_finite(timeout) { panic('iOS: request timeout must be finite') }; state.timeout = timeout }
+		'setTimeoutInterval:' { timeout := frame_double(frame, 0); if !math.is_finite(timeout) { panic('iOS: request timeout must be finite') }; state.timeout = timeout; state.timeout_explicit = true }
 		'cachePolicy' { frame.x[0] = state.cache_policy }
 		'setCachePolicy:' { if value > 5 { panic('iOS: request cache policy is not implemented') }; state.cache_policy = value }
 		'networkServiceType' { frame.x[0] = state.network_service }

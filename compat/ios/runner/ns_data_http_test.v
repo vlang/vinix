@@ -414,6 +414,7 @@ type TaskHTTPNative5 = fn (u64, u64, u64, u64, u64) u64
 type TaskHTTPDisposition = fn (u64, u64)
 struct TaskHTTPOracle {
 	send u64
+	native bool = true
 	session_delegate u64
 	task_delegate u64
 	queue u64
@@ -437,15 +438,16 @@ fn task_http_oracle_event(delegate u64, kind u64) {
 	if p.count >= 8 { C.__atomic_store_n(unsafe { &p.bad_queue }, 1, 5); return }
 	p.events[p.count] = kind + if delegate == p.task_delegate { u64(10) } else { u64(0) }
 	p.count++
-	api := DataHTTPApi{native: true, send: p.send}
-	if api.msg(api.cls(c'NSOperationQueue'), c'currentQueue', 0) != p.queue { p.bad_queue = 1 }
+	api := DataHTTPApi{native: p.native, send: p.send}
+	current := if p.native { api.msg(api.cls(c'NSOperationQueue'), c'currentQueue', 0) } else { ns_operation_queue_current() }
+	if current != p.queue { p.bad_queue = 1 }
 }
 fn task_http_oracle_response(delegate u64, _ &char, _session u64, _task u64, _response u64, complete u64) {
 	task_http_oracle_event(delegate, 1)
 	mut p := task_http_oracle
 	if p.deferred {
-		api := DataHTTPApi{native: true, send: p.send}
-		p.pending_block = api.msg(complete, c'copy', 0)
+		api := DataHTTPApi{native: p.native, send: p.send}
+		p.pending_block = if p.native { api.msg(complete, c'copy', 0) } else { block_copy(complete) }
 		flags := read32(complete + 8)
 		if flags & (u32(1) << 30) != 0 {
 			descriptor := read64(complete + 24)
@@ -460,7 +462,7 @@ fn task_http_oracle_response(delegate u64, _ &char, _session u64, _task u64, _re
 fn task_http_oracle_data(delegate u64, _ &char, _session u64, _task u64, data u64) {
 	task_http_oracle_event(delegate, 2)
 	mut p := task_http_oracle
-	api := DataHTTPApi{native: true, send: p.send}
+	api := DataHTTPApi{native: p.native, send: p.send}
 	length := api.msg(data, c'length', 0)
 	if length > 8 - p.body_size { p.bad_queue = 1; return }
 	unsafe { C.memcpy(&p.body[int(p.body_size)], voidptr(api.msg(data, c'bytes', 0)), usize(length)) }
@@ -469,7 +471,7 @@ fn task_http_oracle_data(delegate u64, _ &char, _session u64, _task u64, data u6
 fn task_http_oracle_complete(delegate u64, _ &char, _session u64, task u64, error_object u64) {
 	task_http_oracle_event(delegate, 3)
 	mut p := task_http_oracle
-	api := DataHTTPApi{native: true, send: p.send}
+	api := DataHTTPApi{native: p.native, send: p.send}
 	p.state = api.msg(task, c'state', 0)
 	p.error_code = if error_object == 0 { i64(0) } else { i64(api.msg(error_object, c'code', 0)) }
 	C.__atomic_store_n(unsafe { &p.finished }, 1, 5)
@@ -1371,7 +1373,7 @@ fn test_session_adapter_policy_boundaries() {
 			'header-nonascii' { api.header(local_request, 'X-Test', 'café') }
 			'method' { session_adapter_change_string(obj_header(local_request).request.refs[2], 'POST bad') }
 			'framing' { api.header(local_request, 'Content-Length', '5') }
-			'timeout' { obj_header(local_request).request.timeout = 0 }
+			'timeout' { session_timeout_set(api, local_request, c'setTimeoutInterval:', 0) }
 			'large-body' { data := objc_autorelease(objc_allocate(api.cls(c'NSData'))); obj_header(data).external_data = u64(c'x'); obj_header(data).external_size = u64(data_http_limit) + 1; objc_store_strong(unsafe { &obj_header(local_request).request.refs[3] }, data) }
 			else {}
 		}
@@ -1649,7 +1651,7 @@ fn test_session_transfer_delegate_lifecycle() {
 			config, request := session_transfer_inputs(api, address, mode.starts_with('post'))
 			session_adapter_configure(api, config, request)
 			if mode == 'timeout' {
-				obj_header(request).request.timeout = 0.02
+				session_timeout_set(api, request, c'setTimeoutInterval:', 0.02)
 				unsafe { *(&f64(config + 176)) = 0.02 }
 			}
 			session := unsafe { TaskHTTPNative5(voidptr(api.send))(api.cls(c'NSURLSession'), u64(c'sessionWithConfiguration:delegate:delegateQueue:'), config, session_delegate, queue) }
@@ -2279,4 +2281,164 @@ fn test_session_cookie_response_policy_rejection() {
 		unsafe { output.free() }
 	}
 	println('IOS-SESSION-COOKIE-REJECT: public resume rejects unsupported response persistence, Domain and SameSite before successful task delivery PASS')
+}
+
+type SessionTimeoutSet = fn (u64, u64, f64)
+type SessionTimeoutGet = fn (u64, u64) f64
+type SessionTimeoutInit = fn (u64, u64, u64, u64, f64) u64
+fn session_timeout_selector(api DataHTTPApi, selector &char) u64 {
+	$if macos { if api.native { return u64(C.sel_registerName(selector)) } }
+	return u64(selector)
+}
+fn session_timeout_set(api DataHTTPApi, object u64, selector &char, value f64) {
+	unsafe { SessionTimeoutSet(voidptr(api.send))(object, session_timeout_selector(api, selector), value) }
+}
+fn session_timeout_get(api DataHTTPApi, object u64) f64 {
+	return unsafe { SessionTimeoutGet(voidptr(api.send))(object, session_timeout_selector(api, c'timeoutInterval')) }
+}
+struct SessionTimeoutCase {
+	name string
+	request f64 = 60
+	configuration f64 = 0.2
+	resource f64 = 5
+	explicit bool
+	initialize bool
+	copy bool
+	progress bool
+	deferred bool
+	immediate bool
+	tls bool
+	gap bool
+	cancel bool
+	error i64 = -1001
+	hold_ms int = 1000
+}
+
+fn session_timeout_server(listener DataHTTPListener, entry SessionTimeoutCase) bool {
+	defer { C.close(listener.fd) }
+	deadline := time.sys_mono_now() + 5 * time.second
+	if !data_http_wait(listener.fd, false, deadline) { return false }
+	fd := C.accept(listener.fd, unsafe { nil }, unsafe { nil })
+	if fd < 0 { return false }
+	data_http_no_sigpipe(fd)
+	assert C.fcntl(fd, C.F_SETFL, usize(C.O_NONBLOCK)) == 0;
+	mut stream := &DataHTTPStream{fd: fd, deadline: deadline}
+	defer { stream.close(); unsafe { free(stream) } }
+	mut key := C.mbedtls_pk_context{}
+	C.mbedtls_pk_init(&key)
+	defer { C.mbedtls_pk_free(&key) }
+	if entry.tls && !data_http_server_tls(mut stream, os.getenv('VINIX_IOS_HTTP_CERT'), os.getenv('VINIX_IOS_HTTP_KEY'), mut key) { return false }
+	mut headers := []u8{cap: data_http_headers}; headers.flags |= .noslices
+	defer { unsafe { headers.free() } }
+	for { line := stream.line(mut headers) or { return false }; if line.len == 0 { break } }
+	if entry.progress {
+		if !stream.send('HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\n') { return false }
+		for i, byte in ['p', 'i', 'n', 'g']! { time.sleep(if entry.gap && i == 2 { 1200 * time.millisecond } else { 350 * time.millisecond }); if !stream.send(byte) { return false } }
+		return true
+	}
+	if !entry.immediate { time.sleep(1200 * time.millisecond) }
+	return stream.send('HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nping')
+}
+
+fn session_timeout_round_trips(api DataHTTPApi, cls u64) {
+		for entry in [
+			SessionTimeoutCase{name: 'inherited'},
+			SessionTimeoutCase{name: 'explicit-default', explicit: true, error: 0},
+			SessionTimeoutCase{name: 'initializer-default', initialize: true},
+			SessionTimeoutCase{name: 'initializer-short', initialize: true, request: 0.2, configuration: 3},
+			SessionTimeoutCase{name: 'initializer-long', initialize: true, request: 3, error: 0},
+			SessionTimeoutCase{name: 'configuration-long', configuration: 3, error: 0},
+			SessionTimeoutCase{name: 'copy-inherited', copy: true},
+			SessionTimeoutCase{name: 'copy-explicit-default', explicit: true, copy: true, error: 0},
+			SessionTimeoutCase{name: 'explicit-short', request: 0.2, configuration: 3, explicit: true},
+			SessionTimeoutCase{name: 'resource-cap', configuration: 3, resource: 0.4},
+			SessionTimeoutCase{name: 'progress', configuration: 0.6, progress: true, error: 0},
+			SessionTimeoutCase{name: 'progress-gap', configuration: 0.6, progress: true, gap: true},
+			SessionTimeoutCase{name: 'progress-resource-cap', configuration: 0.6, resource: 0.8, progress: true},
+			SessionTimeoutCase{name: 'deferred', configuration: 0.6, deferred: true, progress: true, error: 0},
+			SessionTimeoutCase{name: 'deferred-complete-body', deferred: true, immediate: true, error: 0},
+			SessionTimeoutCase{name: 'deferred-resource-cap', configuration: 3, resource: 0.4, deferred: true, immediate: true, hold_ms: 2000},
+			SessionTimeoutCase{name: 'deferred-incomplete-resource-cap', configuration: 0.6, resource: 0.8, deferred: true, progress: true},
+			SessionTimeoutCase{name: 'deferred-cancel', resource: 0.4, deferred: true, immediate: true, cancel: true, error: -999},
+			SessionTimeoutCase{name: 'tls-progress', configuration: 0.6, progress: true, tls: true, error: 0},
+			SessionTimeoutCase{name: 'tls-resource-cap', configuration: 0.6, resource: 0.8, progress: true, tls: true},
+			SessionTimeoutCase{name: 'tls-idle', tls: true},
+		]! {
+			if api.native && entry.tls { continue }
+			pool := api.pool()
+			listener := data_http_listener(); server := spawn session_timeout_server(listener, entry)
+			address := '${if entry.tls { 'https' } else { 'http' }}://localhost:${listener.port}/'
+			config := api.msg(api.cls(c'NSURLSessionConfiguration'), c'defaultSessionConfiguration', 0)
+			mutable := if entry.initialize { unsafe { SessionTimeoutInit(voidptr(api.send))(api.cls(c'NSMutableURLRequest'), session_timeout_selector(api, c'requestWithURL:cachePolicy:timeoutInterval:'), api.url(address), 1, entry.request) } }
+				else { api.msg(api.cls(c'NSMutableURLRequest'), c'requestWithURL:', api.url(address)) }
+			mut request := mutable
+			if entry.explicit { session_timeout_set(api, request, c'setTimeoutInterval:', entry.request) }
+			api.msg(mutable, c'setCachePolicy:', 1)
+			if entry.copy { request = api.msg(api.msg(request, c'copy', 0), c'autorelease', 0) }
+			api.msg(config, c'setHTTPShouldSetCookies:', 0); api.msg(config, c'setRequestCachePolicy:', 1)
+			session_timeout_set(api, config, c'setTimeoutIntervalForRequest:', entry.configuration)
+			session_timeout_set(api, config, c'setTimeoutIntervalForResource:', entry.resource)
+			queue := api.msg(api.cls(c'NSOperationQueue'), c'new', 0)
+			api.msg(queue, c'setMaxConcurrentOperationCount:', 1)
+			delegate := api.msg(cls, c'new', 0)
+			mut p := unsafe { &TaskHTTPOracle(C.calloc(1, sizeof(TaskHTTPOracle))) }
+			unsafe { *p = TaskHTTPOracle{send: api.send, native: api.native, session_delegate: delegate, queue: queue, deferred: entry.deferred} }
+			task_http_oracle = p
+			session := unsafe { TaskHTTPNative5(voidptr(api.send))(api.cls(c'NSURLSession'), session_timeout_selector(api, c'sessionWithConfiguration:delegate:delegateQueue:'), config, delegate, queue) }
+			task := api.msg(session, c'dataTaskWithRequest:', request)
+			// Inputs may change after session/task creation without changing the load.
+			session_timeout_set(api, config, c'setTimeoutIntervalForRequest:', 5)
+			session_timeout_set(api, config, c'setTimeoutIntervalForResource:', 5)
+			session_timeout_set(api, mutable, c'setTimeoutInterval:', 10)
+			start := time.sys_mono_now()
+			if entry.tls { url_session_task_resume_with_ca(task, os.getenv('VINIX_IOS_HTTP_CERT')) } else { api.msg(task, c'resume', 0) }
+			if entry.deferred {
+				for C.__atomic_load_n(unsafe { &p.response_seen }, 5) == 0 && C.__atomic_load_n(unsafe { &p.finished }, 5) == 0 { if time.sys_mono_now() - start > 4 * time.second { C._exit(124) }; time.sleep(time.millisecond) }
+				if p.pending_block != 0 {
+					if entry.cancel { api.msg(task, c'cancel', 0) }
+					time.sleep(i64(entry.hold_ms) * time.millisecond)
+					unsafe { TaskHTTPDisposition(voidptr(read64(p.pending_block + 16)))(p.pending_block, 1) }
+					if api.native { api.msg(p.pending_block, c'release', 0) } else { block_release(p.pending_block) }
+				}
+			}
+			for C.__atomic_load_n(unsafe { &p.finished }, 5) == 0 { if time.sys_mono_now() - start > 6 * time.second { C._exit(124) }; time.sleep(time.millisecond) }
+			elapsed := (time.sys_mono_now() - start) / time.millisecond
+			api.msg(queue, c'waitUntilAllOperationsAreFinished', 0)
+			if !api.native { darwin_dispatch_sync_f(ns_operation_queue_state(queue).backing, unsafe { nil }, session_transfer_barrier) }
+			println('IOS-SESSION-TIMEOUT: native=${api.native} ${entry.name} code=${p.error_code} elapsed_ms=${elapsed} bytes=${p.body_size}')
+			assert p.bad_queue == 0 && p.error_code == entry.error, entry.name;
+			assert session_timeout_get(api, api.msg(task, c'currentRequest', 0)) == entry.request;
+			assert session_timeout_get(api, api.msg(task, c'originalRequest', 0)) == entry.request;
+			if entry.error == 0 { assert p.body_size == 4 && p.body[..4] == [u8(112), 105, 110, 103]; }
+			if entry.gap { assert elapsed >= 900, 'idle timer did not rearm after received data'; }
+			server.wait(); if api.native { api.msg(session, c'invalidateAndCancel', 0) }
+			api.msg(delegate, c'release', 0); api.msg(queue, c'release', 0); api.drain(pool)
+			task_http_oracle = unsafe { nil }; unsafe { address.free(); C.free(p) }
+		}
+	}
+
+fn test_session_timeout_policy() {
+	$if macos {
+		api := DataHTTPApi{native: true, send: u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend'))}
+		cls := C.objc_allocateClassPair(unsafe { voidptr(api.cls(c'NSObject')) }, c'VinixSessionTimeoutOracle', 0)
+		assert cls != unsafe { nil };
+		assert C.class_addProtocol(cls, C.objc_getProtocol(c'NSURLSessionDataDelegate'));
+		assert C.class_addMethod(cls, C.sel_registerName(c'URLSession:dataTask:didReceiveResponse:completionHandler:'), unsafe { voidptr(task_http_oracle_response) }, c'v48@0:8@16@24@32@?40');
+		assert C.class_addMethod(cls, C.sel_registerName(c'URLSession:dataTask:didReceiveData:'), unsafe { voidptr(task_http_oracle_data) }, c'v40@0:8@16@24@32');
+		assert C.class_addMethod(cls, C.sel_registerName(c'URLSession:task:didCompleteWithError:'), unsafe { voidptr(task_http_oracle_complete) }, c'v40@0:8@16@24@32');
+		C.objc_registerClassPair(cls)
+		session_timeout_round_trips(api, u64(cls))
+	}
+	for _ in 0 .. 2 {
+		objc_start(); system_data_start()!
+		cls := objc_allocate_class(ios_runtime.names['NSObject'], c'VinixSessionTimeoutOracle', 0)
+		assert objc_add_method(cls, u64(c'URLSession:dataTask:didReceiveResponse:completionHandler:'), u64(unsafe { voidptr(task_http_oracle_response) }), c'v48@0:8@16@24@32@?40');
+		assert objc_add_method(cls, u64(c'URLSession:dataTask:didReceiveData:'), u64(unsafe { voidptr(task_http_oracle_data) }), c'v40@0:8@16@24@32');
+		assert objc_add_method(cls, u64(c'URLSession:task:didCompleteWithError:'), u64(unsafe { voidptr(task_http_oracle_complete) }), c'v40@0:8@16@24@32');
+		objc_register_class(cls)
+		session_timeout_round_trips(DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}, cls)
+		assert ios_runtime.live == 0 && ios_runtime.block_refs.len == 0;
+		objc_stop(); system_data_stop()
+	}
+	println('IOS-SESSION-TIMEOUT-POLICY: native precedence, copied inputs, HTTP/TLS idle progress and stalls, absolute resource limits, pending response handlers, cancellation and drained lifetimes PASS')
 }

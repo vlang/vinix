@@ -124,7 +124,7 @@ fn url_session_request_snapshot(request u64, configuration u64) &URLSessionReque
 	header := obj_header(request); config := url_session_configuration_state(configuration)
 	if !header.request_owned || header.request == unsafe { nil } || header.destroying || header.destroyed { return result }
 	source := header.request
-	result.request = URLSessionRequestPolicy{timeout: source.timeout, cache: source.cache_policy,
+	result.request = URLSessionRequestPolicy{timeout: if source.timeout_explicit { source.timeout } else { unsafe { *(&f64(configuration + 176)) } }, cache: source.cache_policy,
 		service: source.network_service, attribution: source.attribution, cellular: source.cellular,
 		expensive: source.expensive, constrained: source.constrained,
 		cookies: if source.cookies_explicit { source.cookies } else { url_session_snapshot_flag(configuration, 71) },

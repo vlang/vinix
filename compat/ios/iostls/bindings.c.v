@@ -38,7 +38,7 @@ pub fn C.mbedtls_ssl_conf_authmode(&C.mbedtls_ssl_config, int)
 pub fn C.mbedtls_ssl_conf_rng(&C.mbedtls_ssl_config, fn (voidptr, &u8, usize) int, voidptr)
 pub fn C.mbedtls_ssl_conf_ca_chain(&C.mbedtls_ssl_config, &C.mbedtls_x509_crt, &C.mbedtls_x509_crl)
 pub fn C.mbedtls_ssl_set_hostname(&C.mbedtls_ssl_context, &char) int
-pub fn C.mbedtls_ssl_set_bio(&C.mbedtls_ssl_context, &C.mbedtls_net_context, &C.mbedtls_ssl_send_t, fn (voidptr, &u8, usize) i32, fn (voidptr, &u8, usize, u32) i32)
+pub fn C.mbedtls_ssl_set_bio(&C.mbedtls_ssl_context, voidptr, &C.mbedtls_ssl_send_t, fn (voidptr, &u8, usize) i32, fn (voidptr, &u8, usize, u32) i32)
 pub fn C.mbedtls_ssl_handshake(&C.mbedtls_ssl_context) int
 pub fn C.mbedtls_ssl_read(&C.mbedtls_ssl_context, &u8, usize) int
 pub fn C.mbedtls_ssl_write(&C.mbedtls_ssl_context, &u8, usize) int

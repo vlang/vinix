@@ -161,6 +161,8 @@ mut:
 	fd int = -1
 	tls bool
 	deadline i64
+	resource_deadline i64 // Absolute cap used by the optional inactivity clock.
+	idle_timeout i64
 	cancel &u64 = unsafe { nil }
 	ssl C.mbedtls_ssl_context
 	config C.mbedtls_ssl_config
@@ -172,6 +174,28 @@ mut:
 	position int
 	length int
 	eof bool
+}
+
+fn (mut stream DataHTTPStream) activity() {
+	if stream.idle_timeout == 0 { return }
+	next := time.sys_mono_now() + stream.idle_timeout
+	stream.deadline = if next < stream.resource_deadline { next } else { stream.resource_deadline }
+}
+
+fn data_http_stream_tls_send(context voidptr, bytes &u8, count usize) i32 {
+	mut stream := unsafe { &DataHTTPStream(context) }
+	if data_http_cancelled(stream.cancel) || time.sys_mono_now() >= stream.deadline { return C.MBEDTLS_ERR_SSL_TIMEOUT }
+	result := data_http_tls_send(unsafe { &stream.net }, bytes, count)
+	if result > 0 { stream.activity() }
+	return result
+}
+
+fn data_http_stream_tls_recv(context voidptr, bytes &u8, count usize) i32 {
+	mut stream := unsafe { &DataHTTPStream(context) }
+	if data_http_cancelled(stream.cancel) || time.sys_mono_now() >= stream.deadline { return C.MBEDTLS_ERR_SSL_TIMEOUT }
+	result := C.mbedtls_net_recv(unsafe { &stream.net }, bytes, count)
+	if result > 0 { stream.activity() }
+	return result
 }
 
 fn (mut stream DataHTTPStream) close() {
@@ -213,7 +237,7 @@ fn (mut stream DataHTTPStream) secure(host string, ca_file string) bool {
 	result = C.mbedtls_ssl_set_hostname(&stream.ssl, name.str)
 	if result != 0 { return stream.tls_failure('hostname', result) }
 	stream.net.fd = stream.fd
-	C.mbedtls_ssl_set_bio(&stream.ssl, &stream.net, unsafe { &C.mbedtls_ssl_send_t(voidptr(data_http_tls_send)) }, C.mbedtls_net_recv, unsafe { nil })
+	C.mbedtls_ssl_set_bio(&stream.ssl, stream, unsafe { &C.mbedtls_ssl_send_t(voidptr(data_http_stream_tls_send)) }, data_http_stream_tls_recv, unsafe { nil })
 	for time.sys_mono_now() < stream.deadline && !data_http_cancelled(stream.cancel) {
 		result = C.mbedtls_ssl_handshake(&stream.ssl)
 		if result == 0 { return true }
@@ -244,6 +268,7 @@ fn (mut stream DataHTTPStream) send_counted(request string, sent &u64) bool {
 		result := if stream.tls { int(C.mbedtls_ssl_write(&stream.ssl, unsafe { request.str + offset }, usize(request.len - offset))) }
 			else { int(C.send(stream.fd, unsafe { request.str + offset }, usize(request.len - offset), C.MSG_NOSIGNAL)) }
 		if result > 0 {
+			stream.activity()
 			offset += result
 			if sent != unsafe { nil } { C.ios_store_pointer(sent, u64(offset)) }
 			continue
@@ -267,7 +292,7 @@ fn (mut stream DataHTTPStream) read() ?u8 {
 			if time.sys_mono_now() >= stream.deadline || data_http_cancelled(stream.cancel) { return none }
 			result := if stream.tls { int(C.mbedtls_ssl_read(&stream.ssl, &stream.buffer[0], usize(stream.buffer.len))) }
 				else { int(C.recv(stream.fd, &stream.buffer[0], usize(stream.buffer.len), 0)) }
-			if result > 0 { stream.position = 0; stream.length = result; break }
+			if result > 0 { stream.activity(); stream.position = 0; stream.length = result; break }
 			if result == 0 || (stream.tls && result == C.MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) {
 				stream.eof = !stream.tls || result == C.MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY
 				return none

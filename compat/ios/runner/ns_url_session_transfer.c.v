@@ -20,6 +20,9 @@ mut:
 	body []u8
 	worker u64
 	timeout i64
+	idle_timeout i64
+	resource_deadline i64
+	decision_time i64
 	failure HTTPTransportFailure
 	cancelled bool
 	denied bool
@@ -85,6 +88,7 @@ fn url_session_transfer_code(work &URLSessionTransfer) i64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if work.cancelled || work.denied { return -999 }
+	if work.resource_deadline != 0 && work.decision_time >= work.resource_deadline { return -1001 }
 	return match work.failure {
 		.none { i64(0) }
 		.cancelled { i64(-999) }
@@ -117,7 +121,7 @@ fn url_session_transfer_maybe_finish(work &URLSessionTransfer) {
 	C.ios_objc_initialize_lock()
 	mut state := unsafe { &URLSessionTransfer(work) }
 	mut ready := state.network_done && !state.finish_queued && !state.retired && !ios_runtime.url_session_workers_stopping
-	if ready && state.gate != unsafe { nil } { settled, _ := url_session_response_decision_status(state.gate); ready = settled }
+	if ready && state.gate != unsafe { nil } { settled, _ := url_session_response_decision_status(state.gate); ready = settled && state.decision_time != 0 }
 	if ready { state.finish_queued = true }
 	C.ios_objc_initialize_unlock()
 	if ready { url_session_transfer_queue(work, .finish) }
@@ -127,11 +131,14 @@ fn url_session_transfer_decision(context voidptr) {
 	mut work := unsafe { &URLSessionTransfer(context) }
 	_, allow := url_session_response_decision_status(work.gate)
 	C.ios_objc_initialize_lock()
+	if !work.retired { work.decision_time = time.sys_mono_now() }
 	if !allow && !work.retired {
 		work.denied = true
 		write64(work.task + 232, 2)
 	}
+	identity := if !allow && !work.retired { work.worker } else { u64(0) }
 	C.ios_objc_initialize_unlock()
+	if identity != 0 { url_session_workers_cancel(identity) }
 	url_session_transfer_maybe_finish(work)
 }
 
@@ -151,6 +158,7 @@ fn url_session_transfer_response(context voidptr, head HTTPTransportResponseHead
 	C.ios_objc_initialize_lock()
 	mut header := url_session_task_state(work.task)
 	work.gate = gate
+	work.resource_deadline = deadline
 	retired := header.fields[5]
 	header.fields[5] = response
 	write64(work.task + 160, response)
@@ -162,7 +170,11 @@ fn url_session_transfer_response(context voidptr, head HTTPTransportResponseHead
 	url_session_response_decision_observe(gate, URLSessionDecisionObservation{context: work,
 		notify: url_session_transfer_decision, cleanup: url_session_transfer_release})
 	url_session_transfer_queue(work, .response)
-	return url_session_response_decision_wait(gate, exchange.cancel, deadline)
+	// Receive under the network clocks while the application decides. Terminal
+	// delivery still waits for the gate; a late allow cannot revive a timeout,
+	// and a deny cancels the worker. A completed body may wait beyond the idle
+	// timer; the resource bound still applies to a deferred response decision.
+	return true
 }
 
 fn url_session_transfer_run(context voidptr, cancel &u64) {
@@ -174,8 +186,8 @@ fn url_session_transfer_run(context voidptr, cancel &u64) {
 	defer { C.free(exchange) }
 	// The policy context and cancellation cell are borrowed only during this
 	// synchronous exchange. Delegate jobs capture the transfer and gate only.
-	if result := http_transport_exchange_observed(work.snapshot.url, work.snapshot.borrowed_request(), work.ca,
-		work.timeout, cancel, exchange, url_session_transfer_response, unsafe { &work.failure },
+	if result := http_transport_exchange_timed(work.snapshot.url, work.snapshot.borrowed_request(), work.ca,
+		work.idle_timeout, work.timeout, cancel, exchange, url_session_transfer_response, unsafe { &work.failure },
 		unsafe { &u64(work.task + 208) }, unsafe { &u64(work.task + 184) }) {
 		C.ios_objc_initialize_lock()
 		work.body = result.body
@@ -349,12 +361,12 @@ fn url_session_task_resume_with_ca(object u64, ca string) {
 	work.snapshot = url_session_request_snapshot(request, configuration)
 	profile := work.snapshot.transport_profile()
 	if profile != .supported { panic('iOS: URL session request transport profile is not implemented: ' + profile.str()) }
-	if work.snapshot.request.timeout != work.snapshot.configuration.request_timeout {
-		panic('iOS: URL session distinct request/configuration timeouts are not implemented')
+	idle := work.snapshot.request.timeout; resource := work.snapshot.configuration.resource_timeout
+	if idle < 0.000000001 || idle > 86400 || resource < 0.000000001 || resource > 604800 {
+		panic('iOS: URL session timeout exceeds the bounded transport profile')
 	}
-	seconds := if work.snapshot.request.timeout < work.snapshot.configuration.resource_timeout { work.snapshot.request.timeout } else { work.snapshot.configuration.resource_timeout }
-	if seconds < 0.000000001 || seconds > 86400 { panic('iOS: URL session timeout exceeds the bounded transport profile') }
-	work.timeout = i64(seconds * f64(time.second))
+	work.idle_timeout = i64(idle * f64(time.second))
+	work.timeout = i64(resource * f64(time.second))
 	work.ca = ca.clone()
 	work.queue = objc_retain(url_session_delegate_queue(session))
 	C.ios_objc_initialize_lock()
@@ -371,7 +383,7 @@ fn url_session_task_resume_with_ca(object u64, ca string) {
 	identity := url_session_workers_submit(work, url_session_transfer_run, url_session_transfer_worker_cleanup)
 	C.ios_objc_initialize_lock()
 	if !work.retired { work.worker = identity }
-	cancelled := work.cancelled
+	cancelled := work.cancelled || work.denied
 	C.ios_objc_initialize_unlock()
 	if cancelled { url_session_workers_cancel(identity) }
 	url_session_transfer_release(work)

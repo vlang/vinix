@@ -138,6 +138,14 @@ fn http_transport_exchange_policy(text string, input HTTPTransportRequest, ca_fi
 
 fn http_transport_exchange_observed(text string, input HTTPTransportRequest, ca_file string, timeout i64, cancel &u64,
 	context voidptr, policy HTTPTransportResponsePolicy, failure &HTTPTransportFailure, sent &u64, received &u64) ?HTTPTransportResult {
+	return http_transport_exchange_timed(text, input, ca_file, 0, timeout, cancel, context, policy, failure, sent, received)
+}
+
+// Legacy/NSData callers keep one absolute deadline. URLSession additionally
+// resets its inactivity deadline on socket/TLS progress; the resource deadline
+// remains absolute, including response-policy waits and cached body decoding.
+fn http_transport_exchange_timed(text string, input HTTPTransportRequest, ca_file string, idle_timeout i64, resource_timeout i64, cancel &u64,
+	context voidptr, policy HTTPTransportResponsePolicy, failure &HTTPTransportFailure, sent &u64, received &u64) ?HTTPTransportResult {
 	mut stage := HTTPTransportFailure.invalid_request
 	mut deadline := i64(0)
 	defer {
@@ -152,12 +160,19 @@ fn http_transport_exchange_observed(text string, input HTTPTransportRequest, ca_
 	url := data_http_url(text) or { return none }
 	wire := http_transport_wire(url, input) or { return none }
 	defer { unsafe { wire.free() } }
-	if timeout <= 0 || timeout > 24 * time.hour { return none }
-	deadline = time.sys_mono_now() + timeout
+	if idle_timeout < 0 || idle_timeout > 24 * time.hour || resource_timeout <= 0
+		|| resource_timeout > if idle_timeout == 0 { 24 * time.hour } else { 7 * 24 * time.hour } { return none }
+	resource_deadline := time.sys_mono_now() + resource_timeout
+	deadline = resource_deadline
+	if idle_timeout != 0 && idle_timeout < resource_timeout { deadline = time.sys_mono_now() + idle_timeout }
 	stage = .connection
-	mut stream := &DataHTTPStream{fd: data_http_connect_control(url, deadline, cancel), deadline: deadline, cancel: cancel}
-	defer { stream.close(); unsafe { free(stream) } }
+	mut stream := &DataHTTPStream{fd: data_http_connect_control(url, deadline, cancel), deadline: deadline,
+		resource_deadline: resource_deadline, idle_timeout: idle_timeout, cancel: cancel}
+	// Copy the effective deadline before retiring the stream. Failure's outer
+	// defer must never inspect freed worker storage to classify an idle timeout.
+	defer { deadline = stream.deadline; stream.close(); unsafe { free(stream) } }
 	if stream.fd < 0 || data_http_cancelled(cancel) { return none }
+	stream.activity()
 	stage = .tls
 	if url.tls && !stream.secure(url.host, ca_file) { return none }
 	stage = .request
@@ -198,13 +213,14 @@ fn http_transport_exchange_observed(text string, input HTTPTransportRequest, ca_
 		offset = line_end + 2
 	}
 	stage = .policy
-	if policy != unsafe { nil } && !policy(context, HTTPTransportResponseHead{status: response.status, fields: fields}, deadline) { return none }
+	policy_deadline := if idle_timeout == 0 { stream.deadline } else { resource_deadline }
+	if policy != unsafe { nil } && !policy(context, HTTPTransportResponseHead{status: response.status, fields: fields}, policy_deadline) { return none }
 	// A deferred decision cannot extend the exchange deadline or revive a
 	// cancelled load, even when all body bytes were coalesced with the headers.
-	if time.sys_mono_now() >= deadline || data_http_cancelled(cancel) { return none }
+	if time.sys_mono_now() >= stream.deadline || data_http_cancelled(cancel) { return none }
 	stage = .body
 	body := data_http_body_counted(mut stream, response, mut storage, input.method == 'HEAD', received) or { return none }
-	if data_http_cancelled(cancel) { unsafe { body.free() }; return none }
+	if data_http_cancelled(cancel) || time.sys_mono_now() >= stream.deadline { unsafe { body.free() }; return none }
 	success = true
 	stage = .none
 	return HTTPTransportResult{status: response.status, fields: fields, body: body}
