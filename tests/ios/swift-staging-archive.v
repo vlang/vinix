@@ -71,6 +71,17 @@ fn check(archive string, restored string) ! {
 fn check_archive(archive string, expected_sha string, restored string) ! {
 	if expected_sha.len != 64 || digest(archive)! != expected_sha { return error('archive checksum mismatch') }
 	if os.is_link(archive) || os.is_link(restored) || !os.is_dir(restored) { return error('requires regular archive and restoration directory') }
+	mut expected, top := archive_inventory(archive)!
+	if top == '' || os.ls(restored)! != [top] || os.is_link(restored + '/' + top) || !os.is_dir(restored + '/' + top) { return error('unexpected restored root') }
+	mut actual := inventory(restored, top)!
+	actual << 'directory\t' + (int(os.lstat(restored + '/' + top)!.mode) & 0o7777).str() + '\t' + top
+	expected.sort(); actual.sort()
+	if expected != actual { return error('archive/restoration typed inventories differ') }
+	if digest(archive)! != expected_sha { return error('archive changed during verification') }
+	println('Pinned archive and complete restored bytes, paths, types, modes and link targets: PASS')
+}
+
+fn archive_inventory(archive string) !([]string, string) {
 	result := os.exec(['/usr/bin/tar', '--format=mtree', '--options=mtree:sha256', '-cf', '-', '@' + archive])
 	if result.exit_code != 0 { return error('archive decode failed: ' + result.output) }
 	mut expected := []string{}
@@ -109,13 +120,28 @@ fn check_archive(archive string, expected_sha string, restored string) ! {
 			else { return error('unsupported archive entry type') }
 		}
 	}
-	if top == '' || os.ls(restored)! != [top] || os.is_link(restored + '/' + top) || !os.is_dir(restored + '/' + top) { return error('unexpected restored root') }
-	mut actual := inventory(restored, top)!
-	actual << 'directory\t' + (int(os.lstat(restored + '/' + top)!.mode) & 0o7777).str() + '\t' + top
-	expected.sort(); actual.sort()
-	if expected != actual { return error('archive/restoration typed inventories differ') }
-	if digest(archive)! != expected_sha { return error('archive changed during verification') }
-	println('Pinned archive and complete restored bytes, paths, types, modes and link targets: PASS')
+	if top == '' || top !in seen { return error('missing archive root') }
+	return expected, top
+}
+
+// Prove backup coverage, never launch qualification. Every retiring entry must
+// exist with identical bytes and metadata in a retained checksum-bound archive.
+fn check_coverage(retained string, retained_sha string, retiring string, retiring_sha string) ! {
+	if os.is_link(retained) || os.is_link(retiring) || !os.is_file(retained) || !os.is_file(retiring)
+		|| retained_sha.len != 64 || retiring_sha.len != 64
+		|| digest(retained)! != retained_sha || digest(retiring)! != retiring_sha {
+		return error('requires regular checksum-bound archives')
+	}
+	full, root := archive_inventory(retained)!
+	partial, partial_root := archive_inventory(retiring)!
+	if root != partial_root { return error('archive roots differ') }
+	mut entries := map[string]bool{}
+	for line in full { entries[line] = true }
+	for line in partial { if line !in entries { return error('retained archive does not cover: ' + line) } }
+	if digest(retained)! != retained_sha || digest(retiring)! != retiring_sha { return error('archive changed during coverage check') }
+	println('Archive coverage: PASS; retained=' + retained + ' sha256=' + retained_sha
+		+ '; retiring=' + retiring + ' sha256=' + retiring_sha
+		+ '; identical covered entries=' + partial.len.str() + '; retained entries=' + full.len.str())
 }
 
 fn create(source string, archive string, scratch string) ! {
@@ -153,6 +179,33 @@ fn selftest(root string) ! {
 	check(archive, restored)!
 	archive_sha := digest(archive)!
 	check_archive(archive, archive_sha, restored)!
+	// Coverage permits extra retained entries; every retiring entry must match.
+	subset := root + '/subset/input'
+	os.mkdir_all(subset + '/nested')!
+	os.write_file(subset + '/nested/data', 'payload')!
+	os.chmod(subset + '/nested/data', 0o750)!
+	partial := root + '/partial.tar.gz'
+	run(['/usr/bin/tar', '-czpf', partial, '-C', os.dir(subset), 'input'])!
+	partial_sha := digest(partial)!
+	check_coverage(archive, archive_sha, partial, partial_sha)!
+	check_coverage(archive, archive_sha, archive, archive_sha)!
+	if _ := check_coverage(partial, partial_sha, archive, archive_sha) { return error('accepted uncovered entries') }
+	if _ := check_coverage(archive, '0'.repeat(64), partial, partial_sha) { return error('accepted wrong retained checksum') }
+	if _ := check_coverage(archive, archive_sha, partial, '0'.repeat(64)) { return error('accepted wrong retiring checksum') }
+	for change in ['bytes', 'mode', 'type', 'root', 'link']! {
+		os.rm(subset + '/nested/data')!
+		os.write_file(subset + '/nested/data', if change == 'bytes' { 'payloae' } else { 'payload' })!
+		os.chmod(subset + '/nested/data', if change == 'mode' { 0o644 } else { 0o750 })!
+		if change == 'type' { os.rm(subset + '/nested/data')!; os.mkdir(subset + '/nested/data')! }
+		if change == 'root' { os.chmod(subset, 0o700)! }
+		if change == 'link' { os.symlink('wrong', subset + '/link')! }
+		changed := root + '/coverage-' + change + '.tar.gz'
+		run(['/usr/bin/tar', '-czpf', changed, '-C', os.dir(subset), 'input'])!
+		if _ := check_coverage(archive, archive_sha, changed, digest(changed)!) { return error('accepted coverage ' + change) }
+		if change == 'type' { os.rmdir(subset + '/nested/data')!; os.write_file(subset + '/nested/data', 'payload')! }
+		os.chmod(subset, 0o755)!
+	}
+	println('Archive coverage checker: eight corruption controls PASS')
 	path := restored + '/input/nested/data'
 	os.write_file(path, 'payloae')!
 	if _ := check(archive, restored) { return error('accepted changed bytes') }
@@ -189,6 +242,9 @@ fn selftest(root string) ! {
 }
 
 fn main() {
+	if os.args.len == 6 && os.args[1] == 'check-coverage' {
+		check_coverage(os.abs_path(os.args[2]), os.args[3], os.abs_path(os.args[4]), os.args[5])!; return
+	}
 	if os.args.len == 5 && os.args[1] == 'check-archive' {
 		check_archive(os.abs_path(os.args[2]), os.args[3], os.abs_path(os.args[4]))!; return
 	}

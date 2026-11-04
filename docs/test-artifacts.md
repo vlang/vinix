@@ -30,6 +30,16 @@ records every file's bytes, size and permissions, directories and root mode;
 in the report. This protects evidence integrity; it does not certify launch
 success or replace the historical qualification checks.
 
+`tests/ios/swift-staging-archive.v check-coverage RETAINED SHA256 RETIRING SHA256`
+can prove that a retained archive contains every entry of a redundant backup.
+It decodes both complete archives and compares paths, file bytes and sizes,
+types, permissions and link targets, binding both inputs to checksums before
+and after the comparison. Retained archives may contain additional entries.
+Keep the coverage proof, retiring inventory, checksums and retained archive;
+establish the retained bundle's complete restoration and unchanged historical
+audit separately before retiring a backup. Coverage is not launch qualification
+and never permits a partial bundle to pass a historical auditor.
+
 For a large cold-storage candidate, `tests/native-android-ws/cold-archive-estimate.v`
 can count a complete gzip archive stream without storing the archive. Pass the
 bundle directory, its pinned `sha256.json` checksum and a fresh external JSON
