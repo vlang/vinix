@@ -2,14 +2,16 @@
 
 The framework boot-classpath image is prepared and the frozen replacement
 kernel is installed, with complete readbacks passed. Installation reused the
-exact qualified SDK 27.0 patcher; the SDK 27.2 draft remains unqualified.
+exact qualified SDK 27.0 patcher. The complete retained tool and attempt
+archives are now sealed and verified; the SDK 27.2 draft remains unqualified.
 Boot and ARM execution await qualified host admission while the user's
 **Leave CI running** choice remains in force. No new fixture, GMS, Maps
 rendering, imagery or authentication result is established.
 
-The preparation, clone and first two handoffs below record historical states.
-Their pending-kernel statements are superseded by the current installation
-and admission results appended afterward; all original evidence remains required.
+The preparation, clone, early handoffs and Q1–Q4 aggregate stops below record
+historical states. Their pending-kernel and pending-archive statements are
+superseded by the later installation, archive and admission results appended
+afterward; all original evidence remains required.
 
 Preparation used source `38aa4e5dd7ae9471427afde9e90a0adea33f75cf`, containing
 core `992b426c3`, SDK companion `a16baf6c3`, signed fixture `63ba81754`,
@@ -175,7 +177,7 @@ of the actual stage/kernel JSONs at the identities above. All earlier sealed
 `A/C/P` and archival roots remain unchanged; future live controls require a
 fresh root beyond those already sealed.
 
-Whole `T/B/new-draft` aggregate sealing remains pending. Its further attempts
+Before Q5, whole `T/B/new-draft` aggregate sealing remained pending. Attempts
 at `S/maps-framework-boot-tools-sealed-2026-11-04-r3` and matching `r4` both
 stopped at the original 64 MiB shared-growth cap: guard 125/child 137 and
 complete cleanup. Q3 took 12,735 ms at 81,108,992 bytes growth; Q4 took
@@ -183,4 +185,52 @@ complete cleanup. Q3 took 12,735 ms at 81,108,992 bytes growth; Q4 took
 attempt roots and partial outputs remain preserved. These aggregate stops do
 not undo the exact old-tool qualification or actual kernel installation pass.
 The new draft remains unqualified; boot admission and ARM/Maps checks remain
-outstanding. No additional aggregate or full-FAT retry is planned this turn.
+outstanding. No further retry was planned at that historical handoff.
+
+The complete Q5 aggregate at
+`S/maps-framework-boot-tools-sealed-2026-11-04-r5/sealed/manifest.json`
+then passed sealing and independent fresh readback: 15 roots, 67,595 entries,
+SHA-256 `773f284250307ed0e40ca1481094d4e768b6069990bd0a39e843f08a81ba1124`.
+Both guards/children exited zero with complete cleanup in 21,219/12,448 ms,
+observing 22,810,624/33,484,800 bytes growth under the unchanged 64 MiB cap.
+All earlier Q1–Q4 raw roots and partial outputs remain preserved and covered.
+This completes retained storage verification; the original auditors remain
+required and the new `628cd967...` executable still lacks a complete FAT pass.
+
+After a quiet cleanup interval, same-binary FAT r8 at
+`S/maps-framework-boot-patcher-fat-2026-11-04-r8` again stopped at the original
+shared-growth cap after 38 FAT passes: guard 125/child 137, complete cleanup,
+134,064 ms and 538,034,176 bytes growth. Its complete scratch remains under
+`r8/scratch`; preservation passed 0/0 with complete cleanup in 176 ms.
+Before/after executable comparison confirmed the unchanged `628cd967...`
+binary. This incomplete run does not change its qualification status or the
+successful old-tool kernel installation; no kernel reinstall occurred.
+
+Fresh qualified read-only admission at
+`S/maps-framework-boot-boot-admission-2026-11-04-r2` (`R2`) found only selected
+CI guest PID 6395 after the other guests ended. It returned
+`unsupported foreign drive configuration`, guard/child 1/1 with complete
+cleanup in 171 ms. Its unchanged 32 GiB/eight-CPU argv contains discard,
+detect-zeroes and QMP options outside the qualified schema; the source RAM
+budget also remains 32 + 12 = 44 GiB against 32 GiB allowed. **Leave CI running**
+persists. No foreign stop, own guest boot, QMP/guest access or policy change
+was performed. The installed kernel receipt `4ae68440...`, patched stage
+`f89341c0...` and boot image `8a9ed7d3...` remain unchanged.
+
+The final supplement at
+`S/maps-framework-boot-resume-handoff-sealed-2026-11-04-r1/sealed/manifest.json`
+hashes to
+`1529cc760e8b75f610a55df2ecb1b106e5c55df443bcb141a26d575aa18138ab`.
+It covers four complete roots and 6,339 entries: full r8 attempt/scratch,
+current R2, Q5 archive with controls, and the earlier kernel-handoff archive
+with controls. Seal and independent fresh readback passed 0/0 with complete
+cleanup in 2,980/1,502 ms, observing 5,931,008/2,215,936 bytes growth under the
+unchanged 64 MiB cap. Complete retained storage is verified; every historical
+auditor and its original full inputs remain required.
+
+This storage result does not qualify `628cd967...`. The installed old-tool
+kernel and image identities above remain unchanged. The kernel-installed
+image is retained for a later admitted boot; the sole current 32 GiB CI guest
+still exceeds the qualified 20 GiB foreign/32 GiB total allowance with our
+fixed 12 GiB guest. **Leave CI running** persists. Boot admission and actual
+ARM fixture, GMS and Maps execution remain outstanding.
