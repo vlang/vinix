@@ -218,6 +218,11 @@ const traffic_stats_uid_framework_sha = 'dd3af0444459410f28d20f04928e37a19eb6b07
 const traffic_stats_uid_native_sha = '13cf020729373ad8d20cfa4c5588c0878eee4be4fdf85700f2cf911ded08e81e'
 const traffic_stats_uid_apk_sha = 'bf1045fb4fd9c5fb468c7c59f7f594654de15cd6b54f9e07bc3f2aa4bc199cc1'
 const traffic_stats_uid_pass_marker = 'TRAFFIC-STATS-UID-PASS public-static-reflection signed-uid clear-default tag-independent thread-isolation no-inheritance bounded-worker'
+// Completed SDK/native/APK artifact pins; coupled readback is a separate phase.
+const process_packages_framework_sha = '875f854ddf662dcaf55ebe05df06f5833eb5ca1e15f94066ffdf0fef18e829a8'
+const process_packages_native_sha = 'b69c62304448c1aa0fd5f0cc660acf81cfdd8614b280dad691f53a07d8abcc5f'
+const process_packages_apk_sha = 'db555d086522f003e912e3de5fcf0905d3079025c92397c7b92c6ba714d497e7'
+const process_packages_pass_marker = 'PROCESS-PACKAGES-PASS public-instance-field default-null actual-self package-not-process fresh-arrays caller-memory-state bounded-worker'
 
 struct FixtureProfile {
 	name          string
@@ -669,6 +674,17 @@ fn traffic_stats_uid_profile() FixtureProfile {
 	}
 }
 
+fn process_packages_profile() FixtureProfile {
+	return FixtureProfile{
+		name: 'process-packages'
+		apk_sha: process_packages_apk_sha
+		framework_sha: process_packages_framework_sha
+		native_sha: process_packages_native_sha
+		pass_marker: process_packages_pass_marker
+		scope: 'standalone RunningAppProcessInfo public String-array package field, null default, real native self-package snapshots, fresh arrays and caller memory-state preservation with a bounded worker; global process enumeration, Google Play Services, Maps and authentication are not exercised'
+	}
+}
+
 fn webview_package_profile() FixtureProfile {
 	return FixtureProfile{
 		name: 'webview-package'
@@ -857,7 +873,8 @@ fn health(line string, expected_marker string) ! {
 		|| line.contains('SECURE-SETTINGS-PASS') || line.contains('USAGE-INACTIVE-PASS')
 		|| line.contains('MESSENGER-BINDER-PASS') || line.contains('EVENT-LOG-PASS')
 		|| line.contains('BUILD-ABIS-PASS') || line.contains('WEBVIEW-PACKAGE-PASS')
-		|| line.contains('BOOTCLASSPATH-PASS') || line.contains('TRAFFIC-STATS-UID-PASS')) && line != expected_marker {
+		|| line.contains('BOOTCLASSPATH-PASS') || line.contains('TRAFFIC-STATS-UID-PASS')
+		|| line.contains('PROCESS-PACKAGES-PASS')) && line != expected_marker {
 		return error('conflicting fixture marker')
 	}
 }
@@ -1058,7 +1075,7 @@ fn export_evidence(output string) ! {
 
 fn selftest() ! {
 	mut cases := 0
-	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile(), authenticator_worker_profile(), maps_network_v2_profile(), authenticator_binder_identity_profile(), maps_network_v3_profile(), service_lifecycle_profile(), platform_fragments_profile(), image_bounds_profile(), window_system_ui_profile(), seed_account_options_profile(), persistent_data_block_profile(), bitmap_tiles_profile(), connectivity_truth_profile(), window_animations_profile(), layout_alignment_profile(), user_restrictions_profile(), bundle_cross_profile_profile(), user_restrictions_bundle_profile(), resources_float_profile(), paint_drawable_profile(), dialog_theme_profile(), intent_extras_profile(), resource_locks_profile(), pending_intent_profile(), stable_display_profile(), asset_locales_profile(), unmanaged_queries_profile(), stats_unavailable_profile(), subscription_service_profile(), autofill_service_profile(), keyguard_policy_profile(), broadcast_permission_profile(), broadcast_permission_v2_profile(), secure_settings_profile(), usage_inactive_profile(), messenger_binder_profile(), messenger_binder_v2_profile(), event_log_profile(), build_abis_profile(), webview_package_profile(), bootclasspath_profile(), bootclasspath_jni_profile(), traffic_stats_uid_profile()]
+	profiles := [child_attach_profile(), settings_global_profile(), application_restrictions_profile(), authenticator_exception_profile(), maps_network_profile(), authenticator_worker_profile(), maps_network_v2_profile(), authenticator_binder_identity_profile(), maps_network_v3_profile(), service_lifecycle_profile(), platform_fragments_profile(), image_bounds_profile(), window_system_ui_profile(), seed_account_options_profile(), persistent_data_block_profile(), bitmap_tiles_profile(), connectivity_truth_profile(), window_animations_profile(), layout_alignment_profile(), user_restrictions_profile(), bundle_cross_profile_profile(), user_restrictions_bundle_profile(), resources_float_profile(), paint_drawable_profile(), dialog_theme_profile(), intent_extras_profile(), resource_locks_profile(), pending_intent_profile(), stable_display_profile(), asset_locales_profile(), unmanaged_queries_profile(), stats_unavailable_profile(), subscription_service_profile(), autofill_service_profile(), keyguard_policy_profile(), broadcast_permission_profile(), broadcast_permission_v2_profile(), secure_settings_profile(), usage_inactive_profile(), messenger_binder_profile(), messenger_binder_v2_profile(), event_log_profile(), build_abis_profile(), webview_package_profile(), bootclasspath_profile(), bootclasspath_jni_profile(), traffic_stats_uid_profile(), process_packages_profile()]
 	require(child_attach_profile().framework_sha == framework_sha
 		&& settings_global_profile().framework_sha == framework_sha
 		&& application_restrictions_profile().framework_sha != framework_sha, 'exact per-profile framework identities')!
@@ -1242,6 +1259,11 @@ fn selftest() ! {
 		&& traffic_stats_uid_profile().apk_sha != bootclasspath_jni_profile().apk_sha
 		&& traffic_stats_uid_profile().pass_marker != bootclasspath_jni_profile().pass_marker,
 		'TrafficStats UID requires its successor framework, distinct signed fixture and verified retained native')!
+	require(process_packages_profile().framework_sha != traffic_stats_uid_profile().framework_sha
+		&& process_packages_profile().native_sha != traffic_stats_uid_profile().native_sha
+		&& process_packages_profile().apk_sha != traffic_stats_uid_profile().apk_sha
+		&& process_packages_profile().pass_marker != traffic_stats_uid_profile().pass_marker,
+		'process packages requires its field successor framework, freshly coupled native and distinct signed fixture')!
 	for profile in profiles {
 		mut pins := [profile.apk_sha, profile.framework_sha]
 		if profile.native_sha != '' { pins << profile.native_sha }
@@ -1287,7 +1309,7 @@ fn selftest() ! {
 		cases++
 	}
 	require(canonical('/var/lib/onboarding-api-r1'), 'canonical path rejected')!
-	for selector in ['--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments', '--image-bounds', '--window-system-ui', '--seed-account-options', '--persistent-data-block', '--bitmap-tiles', '--connectivity-truth', '--window-animations', '--layout-alignment', '--user-restrictions', '--bundle-cross-profile', '--user-restrictions-bundle', '--resources-float', '--paint-drawable', '--dialog-theme', '--intent-extras', '--resource-locks', '--pending-intent', '--stable-display', '--asset-locales', '--unmanaged-queries', '--stats-unavailable', '--subscription-service', '--autofill-service', '--keyguard-policy', '--broadcast-permission', '--broadcast-permission-v2', '--secure-settings', '--usage-inactive', '--messenger-binder', '--messenger-binder-v2', '--event-log', '--build-abis', '--webview-package', '--bootclasspath', '--bootclasspath-jni', '--traffic-stats-uid'] {
+	for selector in ['--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments', '--image-bounds', '--window-system-ui', '--seed-account-options', '--persistent-data-block', '--bitmap-tiles', '--connectivity-truth', '--window-animations', '--layout-alignment', '--user-restrictions', '--bundle-cross-profile', '--user-restrictions-bundle', '--resources-float', '--paint-drawable', '--dialog-theme', '--intent-extras', '--resource-locks', '--pending-intent', '--stable-display', '--asset-locales', '--unmanaged-queries', '--stats-unavailable', '--subscription-service', '--autofill-service', '--keyguard-policy', '--broadcast-permission', '--broadcast-permission-v2', '--secure-settings', '--usage-inactive', '--messenger-binder', '--messenger-binder-v2', '--event-log', '--build-abis', '--webview-package', '--bootclasspath', '--bootclasspath-jni', '--traffic-stats-uid', '--process-packages'] {
 		full := [selector, '/runtime', '/fixture.apk', '10117', '10117', '/results']
 		for count in 1 .. full.len {
 			mut argv := [os.executable()]
@@ -1316,9 +1338,10 @@ fn run() ! {
 		return
 	}
 	mut arguments := os.args[1..]
-	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network', '--authenticator-worker', '--maps-network-v2', '--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments', '--image-bounds', '--window-system-ui', '--seed-account-options', '--persistent-data-block', '--bitmap-tiles', '--connectivity-truth', '--window-animations', '--layout-alignment', '--user-restrictions', '--bundle-cross-profile', '--user-restrictions-bundle', '--resources-float', '--paint-drawable', '--dialog-theme', '--intent-extras', '--resource-locks', '--pending-intent', '--stable-display', '--asset-locales', '--unmanaged-queries', '--stats-unavailable', '--subscription-service', '--autofill-service', '--keyguard-policy', '--broadcast-permission', '--broadcast-permission-v2', '--secure-settings', '--usage-inactive', '--messenger-binder', '--messenger-binder-v2', '--event-log', '--build-abis', '--webview-package', '--bootclasspath', '--bootclasspath-jni', '--traffic-stats-uid'],
-		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network|--authenticator-worker|--maps-network-v2|--authenticator-binder-identity|--maps-network-v3|--service-lifecycle|--platform-fragments|--image-bounds|--window-system-ui|--seed-account-options|--persistent-data-block|--bitmap-tiles|--connectivity-truth|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--user-restrictions-bundle|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--resource-locks|--pending-intent|--stable-display|--asset-locales|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--broadcast-permission-v2|--secure-settings|--usage-inactive|--messenger-binder|--messenger-binder-v2|--event-log|--build-abis|--webview-package|--bootclasspath|--bootclasspath-jni|--traffic-stats-uid) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
+	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network', '--authenticator-worker', '--maps-network-v2', '--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments', '--image-bounds', '--window-system-ui', '--seed-account-options', '--persistent-data-block', '--bitmap-tiles', '--connectivity-truth', '--window-animations', '--layout-alignment', '--user-restrictions', '--bundle-cross-profile', '--user-restrictions-bundle', '--resources-float', '--paint-drawable', '--dialog-theme', '--intent-extras', '--resource-locks', '--pending-intent', '--stable-display', '--asset-locales', '--unmanaged-queries', '--stats-unavailable', '--subscription-service', '--autofill-service', '--keyguard-policy', '--broadcast-permission', '--broadcast-permission-v2', '--secure-settings', '--usage-inactive', '--messenger-binder', '--messenger-binder-v2', '--event-log', '--build-abis', '--webview-package', '--bootclasspath', '--bootclasspath-jni', '--traffic-stats-uid', '--process-packages'],
+		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network|--authenticator-worker|--maps-network-v2|--authenticator-binder-identity|--maps-network-v3|--service-lifecycle|--platform-fragments|--image-bounds|--window-system-ui|--seed-account-options|--persistent-data-block|--bitmap-tiles|--connectivity-truth|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--user-restrictions-bundle|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--resource-locks|--pending-intent|--stable-display|--asset-locales|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--broadcast-permission-v2|--secure-settings|--usage-inactive|--messenger-binder|--messenger-binder-v2|--event-log|--build-abis|--webview-package|--bootclasspath|--bootclasspath-jni|--traffic-stats-uid|--process-packages) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
 	profile := if arguments[0] == '--authenticator-private-exception' { authenticator_exception_profile() }
+		else if arguments[0] == '--process-packages' { process_packages_profile() }
 		else if arguments[0] == '--traffic-stats-uid' { traffic_stats_uid_profile() }
 		else if arguments[0] == '--bootclasspath-jni' { bootclasspath_jni_profile() }
 		else if arguments[0] == '--bootclasspath' { bootclasspath_profile() }
