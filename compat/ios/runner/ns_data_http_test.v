@@ -1252,7 +1252,7 @@ fn test_session_adapter_owned_requests() {
 		config, request := session_adapter_request(api, address)
 		unsafe { address.free() }
 		defaults := url_session_request_snapshot(request, config)
-		assert defaults.issue == .none && defaults.transport_profile() == .cookies;
+		assert defaults.issue == .none && defaults.transport_profile() == .cache;
 		assert defaults.protocol_route() == .http;
 		assert defaults.request.cookies && defaults.configuration.cookies && defaults.configuration.default_protocols;
 		assert defaults.configuration.request_timeout == 60 && defaults.configuration.resource_timeout == 604800;
@@ -1302,7 +1302,7 @@ fn test_session_adapter_policy_boundaries() {
 	config, request := session_adapter_request(api, 'https://localhost/submit?q=%00')
 	session_adapter_configure(api, config, request)
 	for entry in [
-		SessionAdapterPolicyCase{false, c'setHTTPShouldHandleCookies:', 1, .cookies},
+		SessionAdapterPolicyCase{false, c'setHTTPShouldHandleCookies:', 1, .supported},
 		SessionAdapterPolicyCase{true, c'setHTTPShouldSetCookies:', 1, .supported},
 		SessionAdapterPolicyCase{false, c'setCachePolicy:', 0, .cache},
 		SessionAdapterPolicyCase{true, c'setRequestCachePolicy:', 0, .cache},
@@ -1342,6 +1342,20 @@ fn test_session_adapter_policy_boundaries() {
 			else if selector == c'setProtocolClasses:' { URLSessionTransportProfile.protocols } else { URLSessionTransportProfile.cookies };
 		snapshot.dispose(); api.msg(object, selector, 0)
 	}
+	api.msg(request, c'setHTTPShouldHandleCookies:', 1)
+	for policy in [u64(0), 1, 3]! {
+		api.msg(config, c'setHTTPCookieAcceptPolicy:', policy)
+		snapshot := url_session_request_snapshot(request, config)
+		assert snapshot.transport_profile() == .cookies;
+		snapshot.dispose()
+	}
+	api.msg(config, c'setHTTPCookieAcceptPolicy:', 2)
+	api.msg(request, c'setMainDocumentURL:', api.url('https://localhost/document'))
+	document := url_session_request_snapshot(request, config)
+	assert document.transport_profile() == .cookies;
+	document.dispose()
+	api.msg(request, c'setMainDocumentURL:', 0)
+	api.msg(request, c'setHTTPShouldHandleCookies:', 0)
 	// Invalid and unsupported wire values return a typed issue/profile, never
 	// an empty successful request. Every partial snapshot is still disposable.
 	for mode in ['nil', 'uninitialized', 'url', 'header-type', 'header-control', 'header-nonascii', 'method', 'framing', 'timeout', 'large-body'] {
@@ -1889,6 +1903,7 @@ fn test_session_builtin_protocol_policy_boundaries() {
 			address := 'http://localhost:${listener.port}/'
 			config, request := session_transfer_inputs(api, address, false)
 			mut list := u64(0)
+			if mode == 'cookies' { api.msg(request, c'setCookiePartitionIdentifier:', api.string('unsupported')) }
 			if mode != 'cookies' { api.msg(config, c'setHTTPShouldSetCookies:', 0); api.msg(request, c'setHTTPShouldHandleCookies:', 0) }
 			if mode == 'protocols' {
 				session_protocol_preferences(api, config, request)
@@ -2068,4 +2083,200 @@ fn test_session_request_disables_cookies() {
 		objc_stop(); system_data_stop()
 	}
 	println('IOS-SESSION-COOKIES-DISABLED: explicit overrides and inherited defaults, copy isolation, manual headers preserved, duplicate response cookies not replayed, ordered callbacks and two drained runtimes PASS')
+}
+
+struct SessionCookieRoundTrip {
+	path string
+	headers string
+	expected string
+	manual bool
+	disabled bool
+	configuration_off bool
+	explicit_on bool
+	ip bool
+}
+
+fn session_cookie_wire_equal(wire string, expected string) bool {
+	if wire.len == 0 || expected.len == 0 { return wire == expected }
+	mut actual := wire.split('; '); mut wanted := expected.split('; ')
+	defer { unsafe { actual.free(); wanted.free() } }
+	actual.sort(); wanted.sort()
+	return actual == wanted
+}
+
+fn session_cookie_round_trips(api DataHTTPApi, cls u64) {
+	outer := api.pool()
+	// Native ephemeral storage isolates the oracle from the user's cookie store.
+	// The Vinix private backend is intentionally process-lifetime only.
+	config := api.msg(api.cls(c'NSURLSessionConfiguration'), if api.native { c'ephemeralSessionConfiguration' } else { c'defaultSessionConfiguration' }, 0)
+	api.msg(config, c'setRequestCachePolicy:', 1)
+	for entry in [
+		SessionCookieRoundTrip{path: '/scope/start', headers: 'Set-Cookie: root=one; Path=/\r\nSet-Cookie: branch=two; Path=/scope\r\nSet-Cookie: auto=three\r\nSet-Cookie: hidden=four; HttpOnly; Path=/\r\nSet-Cookie: secure=five; Secure; Path=/\r\n'},
+		SessionCookieRoundTrip{path: '/scope/next', expected: 'root=one; branch=two; auto=three; hidden=four', headers: 'Set-Cookie: root=updated; Path=/\r\nSet-Cookie: branch=gone; Path=/scope; Max-Age=0\r\n'},
+		SessionCookieRoundTrip{path: '/scopex', expected: 'root=updated; hidden=four'},
+		SessionCookieRoundTrip{path: '/scope/deep?q=/other', expected: 'root=updated; auto=three; hidden=four', headers: 'Set-Cookie: auto=; Path=/scope\r\nSet-Cookie: root=gone; Path=/; Max-Age=-1\r\n'},
+		SessionCookieRoundTrip{path: '/other', expected: 'hidden=four'},
+		SessionCookieRoundTrip{path: '/scope', ip: true},
+		SessionCookieRoundTrip{path: '/scope', expected: 'auto=; hidden=four'},
+		SessionCookieRoundTrip{path: '/scope', manual: true, expected: 'manual=override', headers: 'Set-Cookie: manual_received=yes; Path=/\r\n'},
+		SessionCookieRoundTrip{path: '/scope', disabled: true, headers: 'Set-Cookie: ignored=no; Path=/\r\n'},
+		SessionCookieRoundTrip{path: '/scope', configuration_off: true},
+		SessionCookieRoundTrip{path: '/scope', configuration_off: true, explicit_on: true, expected: 'auto=; hidden=four; manual_received=yes'},
+		SessionCookieRoundTrip{path: '/scope', expected: 'auto=; hidden=four; manual_received=yes'},
+	]! {
+		pool := api.pool()
+		listener := data_http_listener()
+		reply := 'HTTP/1.1 200 OK\r\n' + entry.headers + 'Content-Length: 4\r\n\r\nping'
+		server := spawn session_cookie_server(listener, reply)
+		address := 'http://' + if entry.ip { '127.0.0.1' } else { 'localhost' } + ':${listener.port}' + entry.path
+		request := api.msg(api.cls(c'NSMutableURLRequest'), c'requestWithURL:', api.url(address))
+		api.msg(request, c'setCachePolicy:', 1)
+		api.msg(config, c'setHTTPShouldSetCookies:', u64(!entry.configuration_off))
+		if entry.disabled || entry.explicit_on { api.msg(request, c'setHTTPShouldHandleCookies:', u64(entry.explicit_on)) }
+		if entry.manual { api.header(request, 'cOoKiE', 'manual=override') }
+		queue := api.msg(api.cls(c'NSOperationQueue'), c'new', 0)
+		api.msg(queue, c'setMaxConcurrentOperationCount:', 1)
+		delegate := api.msg(cls, c'new', 0)
+		mut selector := u64(c'sessionWithConfiguration:delegate:delegateQueue:')
+		$if macos { if api.native { selector = u64(C.sel_registerName(c'sessionWithConfiguration:delegate:delegateQueue:')) } }
+		session := unsafe { TaskHTTPNative5(voidptr(api.send))(api.cls(c'NSURLSession'), selector, config, delegate, queue) }
+		task := api.msg(session, c'dataTaskWithRequest:', request)
+		if api.native {
+			mut p := unsafe { &TaskHTTPOracle(C.calloc(1, sizeof(TaskHTTPOracle))) }
+			unsafe { *p = TaskHTTPOracle{send: api.send, session_delegate: delegate, queue: queue} }
+			task_http_oracle = p
+			api.msg(task, c'resume', 0)
+			deadline := time.sys_mono_now() + 6 * time.second
+			for C.__atomic_load_n(unsafe { &p.finished }, 5) == 0 { if time.sys_mono_now() >= deadline { C._exit(124) }; time.sleep(time.millisecond) }
+			api.msg(queue, c'waitUntilAllOperationsAreFinished', 0)
+			assert p.bad_queue == 0 && p.error_code == 0 && p.body_size == 4;
+			task_http_oracle = unsafe { nil }; C.free(p)
+		} else {
+			mut p := unsafe { &SessionTransferProbe(C.calloc(1, sizeof(SessionTransferProbe))) }
+			unsafe { *p = SessionTransferProbe{queue: queue} }
+			session_transfer_probe = p
+			api.msg(task, c'resume', 0)
+			session_transfer_wait(p, task, queue, false)
+			assert p.bad == 0 && p.error_code == 0 && p.status == 200 && p.length == 4 && p.events == [u64(1), 2, 3, 0, 0, 0, 0, 0]!, address + ': code=${p.error_code} status=${p.status} bad=${p.bad} bytes=${p.length}';
+			current := api.msg(task, c'currentRequest', 0)
+			assert api.msg(current, c'valueForHTTPHeaderField:', api.string('Cookie')) == 0 || entry.manual;
+			session_transfer_probe = unsafe { nil }; C.free(p)
+		}
+		wire := server.wait()
+		assert session_cookie_wire_equal(wire, entry.expected), address + ': ' + wire + ' expected ' + entry.expected;
+		if api.native { api.msg(session, c'invalidateAndCancel', 0) }
+		api.msg(delegate, c'release', 0); api.msg(queue, c'release', 0)
+		api.drain(pool)
+		unsafe { address.free(); reply.free(); wire.free() }
+	}
+	api.drain(outer)
+}
+
+fn test_session_automatic_cookie_round_trips() {
+	$if macos {
+		api := DataHTTPApi{native: true, send: u64(C.dlsym(unsafe { voidptr(-2) }, c'objc_msgSend'))}
+		cls := C.objc_allocateClassPair(unsafe { voidptr(api.cls(c'NSObject')) }, c'VinixSessionCookieRoundTripOracle', 0)
+		assert cls != unsafe { nil };
+		assert C.class_addProtocol(cls, C.objc_getProtocol(c'NSURLSessionDataDelegate'));
+		assert C.class_addMethod(cls, C.sel_registerName(c'URLSession:dataTask:didReceiveResponse:completionHandler:'), unsafe { voidptr(task_http_oracle_response) }, c'v48@0:8@16@24@32@?40');
+		assert C.class_addMethod(cls, C.sel_registerName(c'URLSession:dataTask:didReceiveData:'), unsafe { voidptr(task_http_oracle_data) }, c'v40@0:8@16@24@32');
+		assert C.class_addMethod(cls, C.sel_registerName(c'URLSession:task:didCompleteWithError:'), unsafe { voidptr(task_http_oracle_complete) }, c'v40@0:8@16@24@32');
+		C.objc_registerClassPair(cls)
+		session_cookie_round_trips(api, u64(cls))
+	}
+	for _ in 0 .. 2 {
+		objc_start(); system_data_start()!
+		assert ios_runtime.url_session_cookies.len == 0;
+		all, _ := session_transfer_classes()
+		session_cookie_round_trips(DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}, all)
+		assert ios_runtime.live == 0 && ios_runtime.block_refs.len == 0;
+		assert ios_runtime.url_session_cookies.len == 4;
+		objc_stop(); system_data_stop()
+	}
+	println('IOS-SESSION-COOKIES-AUTOMATIC: native and runtime loopback send/store, host and path isolation, default path, replacement, expiry deletion, empty values, Secure/HttpOnly, manual override, policy inheritance, separate sessions and drained lifetimes PASS')
+}
+
+fn session_cookie_stress(index int) {
+	name := 'thread_${index}'
+	defer { unsafe { name.free() } }
+	url := data_http_url('https://cookie.test/scope/page') or { panic('cookie test URL') }
+	for _ in 0 .. 64 {
+		session_cookie_store(URLSessionCookie{host: url.host, path: '/scope', name: name, value: 'value', secure: true})
+		header := session_cookie_header(url)
+		assert header.contains(name);
+		unsafe { header.free() }
+		session_cookie_store(URLSessionCookie{host: url.host, path: '/scope', name: name, remove: true})
+	}
+}
+
+fn test_session_cookie_storage_boundaries() {
+	objc_start()
+	url := data_http_url('https://cookie.test/scope/page?q=/other') or { panic('cookie test URL') }
+	for text in ['a=1; Expires=Wed, 21 Oct 2037 07:28:00 GMT', 'a=1; Max-Age=1']! { assert session_cookie_parse(text, url).issue == .persistence; }
+	assert session_cookie_parse('a=1; Domain=cookie.test', url).issue == .domain;
+	for text in ['a=1; SameSite=Lax', 'a=1; Port=443', 'a=1; Version=1', 'a=1; Secure=yes']! { assert session_cookie_parse(text, url).issue == .attribute; }
+	for text in ['a="quoted"', 'a=bad,combined=2', 'a=bad\x01', '__Host-a=1', 'a=1; Max-Age=+2']! { assert session_cookie_parse(text, url).issue == .syntax; }
+	for text in ['invalid', '=empty']! { assert session_cookie_parse(text, url).issue == .ignored; }
+	padding := 'x'.repeat(4095)
+	large := 'a=' + padding
+	assert session_cookie_parse(large, url).issue == .limit;
+	unsafe { padding.free(); large.free() }
+	for text in ['a=1; Path=relative', 'a=1; Path=']! { assert session_cookie_parse(text, url).cookie.path == '/scope'; }
+	for text in ['a=1; Max-Age=0', 'a=1; Max-Age=-9999999999999999999999999999']! { assert session_cookie_parse(text, url).cookie.remove; }
+	for text in ['root=one; Path=/', 'long=two; Path=/scope', 'same=three; Path=/scope; Secure']! {
+		parsed := session_cookie_parse(text, url); assert parsed.issue == .none; session_cookie_store(parsed.cookie)
+	}
+	header := session_cookie_header(url)
+	assert header == 'long=two; same=three; root=one';
+	unsafe { header.free() }
+	http := data_http_url('http://COOKIE.test/scope') or { panic('cookie test URL') }
+	insecure := session_cookie_header(http)
+	assert insecure == 'long=two; root=one';
+	unsafe { insecure.free() }
+	mut workers := []thread{}
+	for i in 0 .. 8 { workers << spawn session_cookie_stress(i) }
+	for worker in workers { worker.wait() }
+	unsafe { workers.free() }
+	assert ios_runtime.url_session_cookies.len == 3 && ios_runtime.live == 0;
+	objc_stop()
+	println('IOS-SESSION-COOKIE-STORE: bounded parsing, unsupported persistence/domain/attributes, path-length ordering, TLS selection, case-insensitive hosts and concurrent store/read/delete PASS')
+}
+
+fn test_session_cookie_response_policy_rejection() {
+	for text in ['cookie=one; Max-Age=60', 'cookie=one; Domain=localhost', 'cookie=one; SameSite=Lax']! {
+		listener := data_http_listener()
+		mut fds := [2]i32{}
+		assert C.pipe(&fds[0]) == 0;
+		pid := C.fork(); assert pid >= 0;
+		if pid == 0 {
+			C.close(fds[0]); C.dup2(fds[1], 2); C.close(fds[1]); C.alarm(8)
+			objc_start(); system_data_start() or { C._exit(125) }
+			api := DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
+			reply := 'HTTP/1.1 200 OK\r\nSet-Cookie: ' + text + '\r\nContent-Length: 0\r\n\r\n'
+			server := spawn session_cookie_server(listener, reply)
+			address := 'http://localhost:${listener.port}/'
+			config, request := session_transfer_inputs(api, address, false)
+			api.msg(config, c'setRequestCachePolicy:', 1); api.msg(request, c'setCachePolicy:', 1)
+			session := api.msg(api.cls(c'NSURLSession'), c'sessionWithConfiguration:', config)
+			task := api.msg(session, c'dataTaskWithRequest:', request)
+			api.msg(task, c'resume', 0)
+			for api.msg(task, c'state', 0) != 3 { time.sleep(time.millisecond) }
+			server.wait()
+			C._exit(0)
+		}
+		C.close(fds[1])
+		mut bytes := [16384]u8{}
+		mut length := 0
+		for {
+			assert length < bytes.len;
+			count := C.read(fds[0], unsafe { &bytes[length] }, usize(bytes.len - length))
+			if count <= 0 { break }; length += int(count)
+		}
+		C.close(fds[0]); C.close(listener.fd)
+		mut status := i32(0); assert C.waitpid(pid, &status, 0) == pid;
+		output := unsafe { tos_clone(&bytes[0]) }
+		assert status != 0 && output.contains('URL session response cookie profile is not implemented:'), output;
+		unsafe { output.free() }
+	}
+	println('IOS-SESSION-COOKIE-REJECT: public resume rejects unsupported response persistence, Domain and SameSite before successful task delivery PASS')
 }

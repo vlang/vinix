@@ -144,6 +144,7 @@ fn url_session_transfer_response(context voidptr, head HTTPTransportResponseHead
 	if head.status in [401, 407] && (head.field('WWW-Authenticate') != none || head.field('Proxy-Authenticate') != none) {
 		panic('iOS: URL session authentication challenges are not implemented')
 	}
+	session_cookie_receive(work.snapshot, head)
 	response := url_session_response_object(work.url, head)
 	if response == 0 { return false }
 	gate := url_session_response_decision_new()
@@ -166,6 +167,7 @@ fn url_session_transfer_response(context voidptr, head HTTPTransportResponseHead
 
 fn url_session_transfer_run(context voidptr, cancel &u64) {
 	mut work := unsafe { &URLSessionTransfer(context) }
+	session_cookie_prepare(mut work.snapshot)
 	exchange := unsafe { &URLSessionTransferExchange(C.calloc(1, sizeof(URLSessionTransferExchange))) }
 	if exchange == unsafe { nil } { panic('iOS: cannot allocate URL session exchange context') }
 	unsafe { *exchange = URLSessionTransferExchange{transfer: work, cancel: cancel} }

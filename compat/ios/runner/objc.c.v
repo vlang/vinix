@@ -523,6 +523,7 @@ mut:
 	connections []u64 // Main-thread pending connections, one owning reference each.
 	connection_callbacks int
 	url_session_workers_stopping bool
+	url_session_cookies []URLSessionCookie // Owned plain session records, under the runtime lock.
 	weak         map[u64]u64 // Location -> object; weak loads retain before returning.
 	swift_unknown_weak map[u64]u64 // Opaque Swift weak cells, zeroed before referent teardown.
 	timers       []u64
@@ -600,6 +601,7 @@ fn objc_start() {
 	ios_runtime.load_categories.flags |= .noslices
 	ios_runtime.display_links.flags |= .noslices
 	ios_runtime.connections.flags |= .noslices
+	ios_runtime.url_session_cookies.flags |= .noslices
 	ios_runtime.main_thread = u64(C.pthread_self())
 	ios_runtime.observers.flags |= .noslices
 	ios_runtime.storekit_observers.flags |= .noslices
@@ -1137,6 +1139,7 @@ fn objc_stop() {
 	nw_free()
 	connection_stop()
 	url_session_workers_free()
+	session_cookies_stop()
 	audio_stop()
 	ui_context_stop()
 	$if ios_gles ? { gles_set_current(0) }

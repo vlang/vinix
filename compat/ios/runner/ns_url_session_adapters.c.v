@@ -184,7 +184,10 @@ fn (snapshot &URLSessionRequestSnapshot) transport_profile() URLSessionTransport
 	if c.proxy { return .proxy }
 	// A request that disables cookie handling neither loads nor stores cookies,
 	// even when HTTPShouldSetCookies remains enabled on the configuration.
-	if r.cookies || r.cookie_partition { return .cookies }
+	// The built-in store currently handles only host-only session cookies. The
+	// default main-document acceptance policy is characterized with no explicit
+	// main document. Partitioning and other policies still need real backends.
+	if r.cookie_partition || (r.cookies && (c.cookie_accept != 2 || snapshot.main_document.len != 0)) { return .cookies }
 	if r.cache != 1 || c.cache != 1 { return .cache }
 	if !r.cellular || !r.expensive || !r.constrained || r.service != 0 || r.pipelining || r.http3 || r.dnssec
 		|| !c.cellular || !c.expensive || !c.constrained || c.waits || c.discretionary || c.service != 0
