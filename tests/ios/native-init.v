@@ -64,6 +64,10 @@ fn main() {
 		require_child('/opt/ios/data-http-checks')
 		println('VINIX iOS DATAHTTP: PASS')
 		C.fflush(unsafe { nil })
+	} else if mode == 'notification-block' {
+		require_child('/opt/ios/notification-block-checks')
+		println('VINIX iOS NOTIFICATIONBLOCK: PASS')
+		C.fflush(unsafe { nil })
 	} else if mode == 'view-tag' {
 		require_child('/opt/ios/view-tag-checks')
 		println('VINIX iOS VIEWTAG: PASS')

@@ -271,10 +271,12 @@ fn vm(root string, out string, mode string) {
 		budget = bytes.str()
 	}
 	if mode != 'view-tag' && mode !in ['session-cancel', 'data-http', 'operation-queue', 'class-update', 'native-value', 'capture-audio-output', 'gk-match-request', 'gk-achievement', 'gk-achievement-description', 'gk-player', 'gk-turn-based-participant', 'gk-turn-based-match', 'gk-local-player', 'gk-leaderboard', 'capture-discovery', 'app-attest', 'gc-event-view-controller', 'snapshot-configuration', 'text-field', 'haptic-dynamic-parameter', 'haptic-pattern', 'haptic-event', 'haptic-event-parameter', 'long-press-gesture', 'tap-gesture', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'av-player', 'ns-proxy', 'swift-object', 'storekit-purchase', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications', 'probe', 'probe-no-ads', 'audit', 'static-audit'] {
-		panic('invalid check mode: ' + mode)
+		if mode != 'notification-block' { panic('invalid check mode: ' + mode) }
 	}
 	require_arm64_elf(out + '/native-init')
-	if mode == 'view-tag' {
+	if mode == 'notification-block' {
+		require_arm64_elf(out + '/notification-block-checks')
+	} else if mode == 'view-tag' {
 		require_arm64_elf(out + '/view-tag-checks')
 	} else if mode == 'session-cancel' {
 		require_arm64_elf(out + '/session-cancel-checks')
@@ -369,7 +371,9 @@ fn vm(root string, out string, mode string) {
 	os.mkdir_all(payload + '/rootfs') or { panic(err) }
 	fs := payload + '/rootfs'
 	copy_file('/etc/ssl/cert.pem', fs + '/etc/ssl/cert.pem')
-	if mode == 'view-tag' {
+	if mode == 'notification-block' {
+		copy_file(out + '/notification-block-checks', fs + '/opt/ios/notification-block-checks')
+	} else if mode == 'view-tag' {
 		copy_file(out + '/view-tag-checks', fs + '/opt/ios/view-tag-checks')
 	} else if mode == 'session-cancel' {
 		copy_file(out + '/session-cancel-checks', fs + '/opt/ios/session-cancel-checks')
@@ -718,7 +722,12 @@ fn run_vm(mode string, state string, guest_mb string, timeout_seconds int) {
 	p.run()
 	marker := if mode == 'session-cancel' { 'VINIX iOS SESSIONCANCEL: PASS' } else if mode == 'data-http' { 'VINIX iOS DATAHTTP: PASS' } else if mode == 'operation-queue' { 'VINIX iOS OPERATIONQUEUE: PASS' } else if mode == 'class-update' { 'VINIX iOS CLASSUPDATE: PASS' } else if mode == 'native-value' { 'VINIX iOS NATIVEVALUE: PASS' } else if mode == 'gk-match-request' { 'VINIX iOS GKMATCHREQUEST: PASS' } else if mode == 'gk-achievement' { 'VINIX iOS GKACHIEVEMENT: PASS' } else if mode == 'gk-player' { 'VINIX iOS GKPLAYER: PASS' } else if mode == 'gk-turn-based-participant' { 'VINIX iOS GKTURNBASEDPARTICIPANT: PASS' } else if mode == 'gk-turn-based-match' { 'VINIX iOS GKTURNBASEDMATCH: PASS' } else if mode == 'gk-local-player' { 'VINIX iOS GKLOCALPLAYER: PASS' } else if mode == 'gk-leaderboard' { 'VINIX iOS GKLEADERBOARD: PASS' } else if mode == 'gk-achievement-description' { 'VINIX iOS GKACHIEVEMENTDESCRIPTION: PASS' } else if mode == 'capture-audio-output' { 'VINIX iOS CAPTUREAUDIOOUTPUT: PASS' } else if mode == 'capture-discovery' { 'VINIX iOS CAPTUREDISCOVERY: PASS' } else if mode == 'app-attest' { 'VINIX iOS APPATTEST: PASS' } else if mode == 'gc-event-view-controller' { 'VINIX iOS GCEVENT: PASS' } else if mode == 'snapshot-configuration' { 'VINIX iOS WKSNAPSHOT: PASS' } else if mode == 'text-field' { 'VINIX iOS UITEXTFIELD: PASS' } else if mode == 'haptic-dynamic-parameter' { 'VINIX iOS HAPTICDYNAMICPARAMETER: PASS' } else if mode == 'haptic-pattern' { 'VINIX iOS HAPTICPATTERN: PASS' } else if mode == 'haptic-event' { 'VINIX iOS HAPTICEVENT: PASS' } else if mode == 'haptic-event-parameter' { 'VINIX iOS HAPTICEVENTPARAMETER: PASS' } else if mode == 'long-press-gesture' { 'VINIX iOS LONGPRESSGESTURE: PASS' } else if mode == 'tap-gesture' { 'VINIX iOS TAPGESTURE: PASS' } else if mode == 'rotation-gesture' { 'VINIX iOS ROTATIONGESTURE: PASS' } else if mode == 'pinch-gesture' { 'VINIX iOS PINCHGESTURE: PASS' } else if mode == 'pan-gesture' { 'VINIX iOS PANGESTURE: PASS' } else if mode == 'text-input' { 'VINIX iOS TEXTINPUT: PASS' } else if mode == 'game-center' { 'VINIX iOS GAMECENTER: PASS' } else if mode == 'av-player' { 'VINIX iOS AVPLAYER: PASS' } else if mode == 'ns-proxy' { 'VINIX iOS NSPROXY: PASS' } else if mode == 'swift-object' { 'VINIX iOS SWIFTOBJECT: PASS' } else if mode == 'storekit-purchase' { 'VINIX iOS STOREKITPURCHASE: PASS' } else if mode == 'storyboard' { 'VINIX iOS STORYBOARD: PASS' } else if mode == 'audio-application' { 'VINIX iOS AUDIOAPPLICATION: PASS' } else if mode == 'game-controller' { 'VINIX iOS GAMECONTROLLER: PASS' } else if mode == 'session-task' { 'VINIX iOS SESSIONTASK: PASS' } else if mode == 'feedback' { 'VINIX iOS FEEDBACK: PASS' } else if mode == 'notifications' { 'VINIX iOS NOTIFICATIONS: PASS' } else { 'FORTNITE PROBE COMPLETE' }
 	mut failure := ''
-	await_checks(mut p, log, if mode == 'view-tag' { 'VINIX iOS VIEWTAG: PASS' } else { marker }, timeout_seconds) or { failure = err.msg() }
+	focused_marker := match mode {
+		'view-tag' { 'VINIX iOS VIEWTAG: PASS' }
+		'notification-block' { 'VINIX iOS NOTIFICATIONBLOCK: PASS' }
+		else { marker }
+	}
+	await_checks(mut p, log, focused_marker, timeout_seconds) or { failure = err.msg() }
 	// V panics do not unwind defers. Close our VM before reporting failure.
 	if p.is_alive() {
 		p.signal_term()
@@ -732,6 +741,7 @@ fn run_vm(mode string, state string, guest_mb string, timeout_seconds int) {
 	}
 	p.close()
 	if failure != '' { panic(failure) }
+	if mode == 'notification-block' { println('notification-block: PASS'); return }
 	println('${mode}: ${if mode in ['session-cancel', 'data-http', 'operation-queue', 'class-update', 'native-value', 'capture-audio-output', 'gk-match-request', 'gk-achievement', 'gk-achievement-description', 'gk-player', 'gk-turn-based-participant', 'gk-turn-based-match', 'gk-local-player', 'gk-leaderboard', 'capture-discovery', 'app-attest', 'gc-event-view-controller', 'snapshot-configuration', 'text-field', 'haptic-dynamic-parameter', 'haptic-pattern', 'haptic-event', 'haptic-event-parameter', 'long-press-gesture', 'tap-gesture', 'rotation-gesture', 'pinch-gesture', 'pan-gesture', 'text-input', 'game-center', 'av-player', 'ns-proxy', 'swift-object', 'storekit-purchase', 'storyboard', 'audio-application', 'game-controller', 'session-task', 'feedback', 'notifications'] {
 		'PASS'
 	} else {
@@ -748,8 +758,8 @@ fn main() {
 	if out == root || out.starts_with(root + "/") { panic('notification evidence must be outside the repository') }
 	os.mkdir_all(out) or { panic(err) }
 	mode := os.args[1]
-	if mode == 'view-tag' {
-		build(root, out, 'view-tag-checks')
+	if mode in ['view-tag', 'notification-block']! {
+		build(root, out, if mode == 'view-tag' { 'view-tag-checks' } else { 'notification-block-checks' })
 		build(root, out, 'native-init')
 		vm(root, out, mode)
 		return

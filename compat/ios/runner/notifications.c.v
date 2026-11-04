@@ -8,6 +8,7 @@ mut:
 	filter u64
 	filtered bool
 	name u64
+	queue u64 // Retained operation queue; nil delivers on the posting thread.
 	action u64
 	block bool // Owns an opaque token; selector registrations remain weak.
 }
@@ -16,6 +17,69 @@ struct NotificationCall {
 	observer u64
 	action u64
 	block u64
+	queue u64
+}
+
+// A posting thread waits only for its own delivery. The snapshot pins the
+// block, notification and queue until cleanup signals this private waiter.
+struct NotificationDelivery {
+mut:
+	block u64
+	note u64
+	observer u64
+	mutex voidptr
+	condition voidptr
+	done bool
+}
+
+fn notification_delivery_run(context voidptr) {
+	delivery := unsafe { &NotificationDelivery(context) }
+	if notification_delivery_active(delivery.observer) {
+		unsafe { NotificationBlockInvoke(voidptr(read64(delivery.block + 16)))(delivery.block, delivery.note) }
+	}
+}
+
+fn notification_delivery_active(observer u64) bool {
+	C.ios_objc_initialize_lock()
+	active := obj_header(observer).notification_block != 0
+	C.ios_objc_initialize_unlock()
+	return active
+}
+
+fn notification_delivery_finish(context voidptr) {
+	mut delivery := unsafe { &NotificationDelivery(context) }
+	C.pthread_mutex_lock(delivery.mutex)
+	delivery.done = true
+	C.pthread_cond_signal(delivery.condition)
+	C.pthread_mutex_unlock(delivery.mutex)
+}
+
+fn notification_deliver(call NotificationCall, note u64) {
+	if call.queue == 0 || ns_operation_queue_current() == call.queue {
+		if call.queue != 0 && !notification_delivery_active(call.observer) { return }
+		unsafe { NotificationBlockInvoke(voidptr(read64(call.block + 16)))(call.block, note) }
+		return
+	}
+	mut delivery := unsafe { &NotificationDelivery(C.calloc(1, sizeof(NotificationDelivery))) }
+	if delivery == unsafe { nil } { panic('iOS: cannot allocate notification delivery') }
+	delivery.block = call.block
+	delivery.note = note
+	delivery.observer = call.observer
+	delivery.mutex = C.calloc(1, C.ios_sizeof_mutex())
+	delivery.condition = C.calloc(1, C.ios_sizeof_cond())
+	if delivery.mutex == unsafe { nil } || delivery.condition == unsafe { nil }
+		|| C.ios_mutex_create(delivery.mutex, 0) != 0 || C.pthread_cond_init(delivery.condition, unsafe { nil }) != 0 {
+		panic('iOS: cannot initialize notification delivery')
+	}
+	// The same cleanup signals completion when shutdown discards pending work.
+	// Neither the registry lock nor the scheduler lock is held while waiting.
+	ns_operation_queue_submit(call.queue, delivery, notification_delivery_run, notification_delivery_finish)
+	C.pthread_mutex_lock(delivery.mutex)
+	for !delivery.done { C.pthread_cond_wait(delivery.condition, delivery.mutex) }
+	C.pthread_mutex_unlock(delivery.mutex)
+	C.pthread_cond_destroy(delivery.condition)
+	C.pthread_mutex_destroy(delivery.mutex)
+	C.free(delivery.condition); C.free(delivery.mutex); C.free(delivery)
 }
 
 fn notification_dispose(record &NotificationObserver) {
@@ -23,12 +87,15 @@ fn notification_dispose(record &NotificationObserver) {
 	objc_destroy_weak(unsafe { &record.filter })
 	objc_release(record.name)
 	if record.block {
+		C.ios_objc_initialize_lock()
 		mut token := obj_header(record.observer)
 		capture := token.notification_block
 		token.notification_block = 0
+		C.ios_objc_initialize_unlock()
 		block_release(capture)
 		objc_release(record.observer)
 	}
+	objc_release(record.queue)
 	unsafe { free(record) }
 }
 
@@ -106,16 +173,17 @@ fn notification_post(center u64, notification u64) {
 		recipient := if record.block { objc_retain(record.observer) } else { objc_load_weak(unsafe { &record.observer }) }
 		if recipient == 0 { continue }
 		capture := if record.block { block_retain(obj_header(recipient).notification_block) } else { u64(0) }
-		calls << NotificationCall{recipient, record.action, capture}
+		calls << NotificationCall{recipient, record.action, capture, objc_retain(record.queue)}
 	}
 	C.ios_objc_initialize_unlock()
 	objc_retain(notification)
 	defer { objc_release(notification) }
 	for call in calls {
-		if call.block != 0 { unsafe { NotificationBlockInvoke(voidptr(read64(call.block + 16)))(call.block, notification) } }
+		if call.block != 0 { notification_deliver(call, notification) }
 		else { invoke_action(call.observer, call.action, notification) }
 		if call.block != 0 { block_release(call.block) }
 		objc_release(call.observer)
+		objc_release(call.queue)
 	}
 }
 
@@ -147,13 +215,13 @@ fn notification_dispatch(object u64, selector string, mut frame RegisterFrame) b
 	}
 	match selector {
 		'addObserverForName:object:queue:usingBlock:' {
-			if frame.x[4] != 0 { panic('iOS: notification observer operation queues are not implemented') }
+			if frame.x[4] != 0 && !objc_is_kind(frame.x[4], ios_runtime.names['NSOperationQueue']) { panic('iOS: notification observer queue must be NSOperationQueue') }
 			if frame.x[5] == 0 || !is_block(frame.x[5]) { panic('iOS: notification observer requires a block') }
 			// Compiler capture helpers can reenter; copy outside the table lock.
 			block := block_copy(frame.x[5])
 			token := objc_allocate(ios_runtime.names['VinixNotificationObserver'])
 			obj_header(token).notification_block = block
-			mut record := &NotificationObserver{observer: token, block: true, name: objc_retain(frame.x[2]), filtered: frame.x[3] != 0}
+			mut record := &NotificationObserver{observer: token, block: true, name: objc_retain(frame.x[2]), queue: objc_retain(frame.x[4]), filtered: frame.x[3] != 0}
 			C.ios_objc_initialize_lock()
 			record.center = object
 			objc_store_weak(unsafe { &record.filter }, frame.x[3])
