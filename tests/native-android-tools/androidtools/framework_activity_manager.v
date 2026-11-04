@@ -32,7 +32,7 @@ fn framework_activity_manager(smali string) ! {
  for name, value in {'FOREGROUND': 100, 'FOREGROUND_SERVICE': 125, 'VISIBLE': 200, 'PERCEPTIBLE': 230, 'SERVICE': 300, 'CACHED': 400, 'GONE': 1000} {
   info_text += '.field public static final IMPORTANCE_' + name + ':I = ' + value.str() + '\n'
  }
- os.write_file(info, info_text)!
+ os.write_file(info, framework_process_packages_source(info_text)!)!
  // One ART VM hosts the foreground APK and its companions under one Unix UID.
  // Keep a single registry across ActivityManager instances, with owner identity
  // so one manager cannot unregister another manager's listener.
@@ -61,4 +61,86 @@ fn framework_activity_manager(smali string) ! {
   '.field public listener:Landroid/app/ActivityManager$OnUidImportanceListener;\n.field public uid:I\n.field public importance:I\n' +
   '.method public constructor <init>()V\n.locals 0\ninvoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void\n.end method\n' +
   '.method public native run()V\n.end method\n')!
+}
+
+fn process_packages_methods(source string) !map[string]string {
+ mut methods := map[string]string{}
+ mut body := []string{}
+ mut signature := ''
+ for line in source.split_into_lines() {
+  trimmed := line.trim_space()
+  if trimmed.starts_with('.method ') {
+   if signature != '' { return error('unterminated process info constructor') }
+   signature = trimmed.all_after_last(' ')
+   if !signature.contains('(') || signature in methods { return error('unique process info constructor required') }
+   body = [line]
+  } else if trimmed == '.end method' {
+   if signature == '' { return error('unexpected process info constructor end') }
+   body << line
+   methods[signature] = body.join('\n')
+   signature = ''
+  } else if signature != '' {
+   body << line
+  }
+ }
+ if signature != '' { return error('unterminated process info constructor') }
+ return methods
+}
+
+fn process_packages_code(source string) string {
+ return source.split_into_lines().map(it.all_before('#').trim_space()).filter(it != '').join('\n')
+}
+
+// This is only the public data field. The native process enumeration populates
+// fresh package snapshots; constructing an empty info object still leaves null.
+// Refuse repeated application and unexpected input before returning any output.
+pub fn framework_process_packages_source(original string) !string {
+ lines := original.split_into_lines().map(it.all_before('#').trim_space())
+ if lines.filter(it.starts_with('.class ')) != ['.class public Landroid/app/ActivityManager$RunningAppProcessInfo;']
+  || lines.filter(it.starts_with('.super ')) != ['.super Ljava/lang/Object;'] {
+  return error('exact process info class and superclass required')
+ }
+ mut fields := lines.filter(it.starts_with('.field '))
+ for index, field in fields {
+  for name, values in {'CACHED': '400:0x190', 'FOREGROUND': '100:0x64',
+   'FOREGROUND_SERVICE': '125:0x7d', 'GONE': '1000:0x3e8',
+   'PERCEPTIBLE': '230:0xe6', 'SERVICE': '300:0x12c', 'VISIBLE': '200:0xc8'} {
+   prefix := '.field public static final IMPORTANCE_' + name + ':I = '
+   parts := values.split(':')
+   if field == prefix + parts[0] { fields[index] = prefix + parts[1] }
+  }
+ }
+ expected_fields := ['.field public static final IMPORTANCE_CACHED:I = 0x190',
+  '.field public static final IMPORTANCE_FOREGROUND:I = 0x64',
+  '.field public static final IMPORTANCE_FOREGROUND_SERVICE:I = 0x7d',
+  '.field public static final IMPORTANCE_GONE:I = 0x3e8',
+  '.field public static final IMPORTANCE_PERCEPTIBLE:I = 0xe6',
+  '.field public static final IMPORTANCE_SERVICE:I = 0x12c',
+  '.field public static final IMPORTANCE_VISIBLE:I = 0xc8',
+  '.field public importance:I', '.field public pid:I',
+  '.field public processName:Ljava/lang/String;', '.field public uid:I']
+ if fields.sorted() != expected_fields.sorted() { return error('exact original eleven process info fields required') }
+ methods := process_packages_methods(original)!
+ signatures := ['<init>()V', '<init>(ILjava/lang/String;)V', '<init>(ILjava/lang/String;Landroid/app/ActivityManager$1;)V']
+ if methods.keys().sorted() != signatures.sorted() { return error('exact original three process info constructors required') }
+ for signature in signatures {
+  declaration := if signature == '<init>()V' { '.method public constructor ' }
+   else if signature == '<init>(ILjava/lang/String;)V' { '.method private constructor ' }
+   else { '.method synthetic constructor ' }
+  registers := if signature == '<init>()V' { '1' }
+   else if signature == '<init>(ILjava/lang/String;)V' { '3' } else { '4' }
+  invoke := if signature == signatures[2] {
+   'invoke-direct {p0, p1, p2}, Landroid/app/ActivityManager$RunningAppProcessInfo;-><init>(ILjava/lang/String;)V\n'
+  } else { 'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\n' }
+  assignments := if signature == signatures[1] {
+   'iput p1, p0, Landroid/app/ActivityManager$RunningAppProcessInfo;->pid:I\n' +
+   'iput-object p2, p0, Landroid/app/ActivityManager$RunningAppProcessInfo;->processName:Ljava/lang/String;\n'
+  } else { '' }
+  expected := declaration + signature + '\n.registers ' + registers + '\n' + invoke + assignments + 'return-void\n.end method'
+  actual := process_packages_code(methods[signature]!)
+  if actual != expected && actual != expected.replace('.registers ' + registers, '.locals 0') {
+   return error('exact original process info constructor required: ' + signature)
+  }
+ }
+ return original + '\n.field public pkgList:[Ljava/lang/String;\n'
 }
