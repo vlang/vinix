@@ -42,12 +42,46 @@ fn ws_memory_state(e voidptr, info voidptr) {
 
 fn ws_running_processes(e voidptr) voidptr {
  unsafe {
+  if pending(e) { return nil }
+  if FramePush(slot(e, 19))(e, 32) != 0 { return nil }
+  mut popped := false
+  defer { if !popped { FramePop(slot(e, 20))(e, nil) } }
+  loaded := static_obj(e, c'android/atl/ATLLoadedApp', c'getPrimaryApplication', c'()Landroid/atl/ATLLoadedApp;', nil)
+  if loaded == nil || pending(e) {
+   if !pending(e) { throw(e, c'java/lang/IllegalStateException', c'primary application is unavailable') }
+   return nil
+  }
+  pkg := get_object(e, loaded, c'android/atl/ATLLoadedApp', c'pkg', c'Landroid/content/pm/PackageParser$Package;')
+  if pkg == nil || pending(e) {
+   if !pending(e) { throw(e, c'java/lang/IllegalStateException', c'primary package is unavailable') }
+   return nil
+  }
+  name := get_object(e, pkg, c'android/content/pm/PackageParser$Package', c'packageName', c'Ljava/lang/String;')
+  if name == nil || pending(e) {
+   if !pending(e) { throw(e, c'java/lang/IllegalStateException', c'primary package name is unavailable') }
+   return nil
+  }
+  string_class := cls(e, c'java/lang/String')
+  if string_class == nil || pending(e) { return nil }
+  // Only this process's loaded package is running. The String is immutable;
+  // each query owns a new array, independent of processName and prior results.
+  packages := ObjectArrayNew(slot(e, 172))(e, 1, string_class, name)
+  if packages == nil || pending(e) { return nil }
   list := new_object(e, c'java/util/ArrayList', c'()V', nil)
+  if list == nil || pending(e) { return nil }
   info := new_object(e, c'android/app/ActivityManager$RunningAppProcessInfo', c'()V', nil)
+  if info == nil || pending(e) { return nil }
   ws_memory_state(e, info)
+  if pending(e) { return nil }
+  put_object(e, info, c'android/app/ActivityManager$RunningAppProcessInfo', c'pkgList', c'[Ljava/lang/String;', packages)
+  if pending(e) { return nil }
   args := [Value{ l: info }]!
   boolean(e, list, c'java/util/ArrayList', c'add', c'(Ljava/lang/Object;)Z', &args[0])
-  return list
+  if pending(e) { return nil }
+  // Pop releases every temporary JNI reference, including the existing
+  // memory-state helper's references; the returned list owns info and pkgList.
+  popped = true
+  return FramePop(slot(e, 20))(e, list)
  }
 }
 
