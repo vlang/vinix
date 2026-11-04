@@ -1,4 +1,4 @@
-# Framework boot ARM failure preserved; JNI loading needs correction
+# JNI correction host-qualified; ARM retry pending
 
 The framework boot-classpath image is prepared and the frozen replacement
 kernel is installed, with complete readbacks passed. Installation reused the
@@ -9,6 +9,9 @@ The admitted run booted successfully, but its signed ARM fixture failed at
 JNI backend loading before its assertions. The VM is stopped and complete
 evidence is sealed. **Leave CI running** remains in force. No fixture pass,
 GMS, Maps rendering, imagery or authentication result is established.
+The class-based JNI correction is committed; native production and full
+[host readback](framework-jni-load-pair-2026-11-04.md) passed. A successor image
+and another run of the unchanged signed ARM fixture remain required.
 
 The preparation, clone, early handoffs and Q1–Q4 aggregate stops below record
 historical states. Their pending-kernel and pending-archive statements are
