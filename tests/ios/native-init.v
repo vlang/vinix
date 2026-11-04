@@ -644,7 +644,7 @@ fn main() {
 		mut forced := false
 		if desktop == '1' {
 			observation := probedesktop.run('/opt/ios/run-ios', args, probebudget.enter, group,
-				probedesktop.Config{}) or { panic(err) }
+				probedesktop.Config{session_ms: 60000}) or { panic(err) }
 			status = i32(observation.wait_status)
 			forced = observation.forced
 		} else {

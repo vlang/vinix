@@ -128,7 +128,14 @@ fn stream_copy_selftest(out string) ! {
 	os.rm(large)!
 	os.rm(out + '/copy/sparse')!
 	os.rm(out + '/source/nested/link')!
-	println('Stream copy: nested and empty directories, exact bytes and modes, sparse input above 2 GiB, existing target and symlink rejection PASS')
+	capture(out + '/apfs-clone', ['/bin/cp', '-cRp', out + '/source', out + '/clone'])!
+	assert digest(out + '/source/nested/small')! == digest(out + '/clone/nested/small')!
+	assert os.is_dir(out + '/clone/nested/empty')
+	assert int(os.stat(out + '/clone/nested/empty')!.mode) & 0o7777 == 0o750
+	assert int(os.stat(out + '/clone/nested/small')!.mode) & 0o7777 == 0o640
+	os.write_file(out + '/clone/nested/small', 'changed clone')!
+	assert os.read_file(out + '/source/nested/small')! == 'exact bytes\x00\xff'
+	println('Stream copy: exact bytes/modes, sparse input above 2 GiB, existing target/symlink rejection; APFS clone modes and independent mutation PASS')
 }
 
 fn replace_runtime(out string, state string) ! {
@@ -500,8 +507,9 @@ fn main() {
 		replay(out)!
 		return
 	}
-	if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] !in ['--queue-copy', '--data-task-copy', '--url-resource-values-copy', '--number-long-long-copy', '--task-delegate-copy']) { panic('usage: storekit-operation-probe COMPLETE_PARENT FRESH_EXTERNAL_OUT FRESH_HOST [--queue-copy|--data-task-copy|--url-resource-values-copy|--number-long-long-copy|--task-delegate-copy]') }
+	if os.args.len !in [4, 5] || (os.args.len == 5 && os.args[4] !in ['--queue-copy', '--queue-clone', '--data-task-copy', '--url-resource-values-copy', '--number-long-long-copy', '--task-delegate-copy']) { panic('usage: storekit-operation-probe COMPLETE_PARENT FRESH_EXTERNAL_OUT FRESH_HOST [--queue-copy|--queue-clone|--data-task-copy|--url-resource-values-copy|--number-long-long-copy|--task-delegate-copy]') }
 	queue := os.args.len == 5
+	stream := queue && os.args[4] != '--queue-clone'
 	task_delegate := queue && os.args[4] == '--task-delegate-copy'
 	number_long_long := queue && os.args[4] in ['--number-long-long-copy', '--task-delegate-copy']
 	resource_values := queue && os.args[4] in ['--url-resource-values-copy', '--number-long-long-copy', '--task-delegate-copy']
@@ -515,17 +523,20 @@ fn main() {
 		panic('requires external evidence and a fresh independent output directory')
 	}
 	verify_parent(parent)!
-	// Default mode requires an APFS clone. Queue mode explicitly permits a
-	// complete cross-volume copy, for example to a guarded RAM disk.
-	if os.disk_usage(os.dir(out).clone())!.available < u64(if queue { 12 } else { 8 }) * 1024 * 1024 * 1024 {
-		panic('runtime replacement and its full media audit need 8 GiB free (12 GiB in queue mode)')
+	// Clones preserve independent bytes on the same APFS volume. Copy modes
+	// permit cross-volume staging, including guarded RAM disks.
+	if os.disk_usage(os.dir(out).clone())!.available < u64(if stream { 12 } else { 8 }) * 1024 * 1024 * 1024 {
+		panic('runtime replacement and its full media audit need 8 GiB free (12 GiB in stream-copy mode)')
 	}
-	if queue {
+	if stream {
 		stream_copy(parent, out)!
 		verify_parent(out)!
 		os.write_file(out + '-clone.log', 'V stream copy: complete bytes and permissions verified\n')!
 		os.write_file(out + '-clone.status.txt', '0\n')!
-	} else { capture(out + '-clone', ['/bin/cp', '-cRp', parent, out])! }
+	} else {
+		capture(out + '-clone', ['/bin/cp', '-cRp', parent, out])!
+		verify_parent(out)!
+	}
 	if queue { os.write_file(out + '/queue-probe.txt', 'fresh StoreKit fixture and native init; 45 reused guest fixtures\n')! }
 	if data_task { os.write_file(out + '/data-task-probe.txt', 'fresh suspended data-task and StoreKit fixtures; fresh native init and VM driver; 45 reused guest fixtures\n')! }
 	if resource_values { os.write_file(out + '/url-resource-values-probe.txt', 'fresh URL resources, suspended data-task and StoreKit fixtures; fresh native init and VM driver; 45 reused guest fixtures\n')! }
