@@ -38,6 +38,10 @@ Calling convention and linkage fields are retained as encoded numbers. The
 index does not establish that a module is executable, select AIR entry points,
 translate a shader or enable Metal capabilities.
 
+The separate [`ir.constant_pools(stream)` layer](CONSTANTS.md) indexes module and
+function-local value IDs and decodes supported literals. Expressions retain an
+explicit opaque tag; instruction results and executable semantics remain absent.
+
 `ir_test.v` uses deliberate semantic record fixtures for precise corruptions;
 these are not standalone executable bitcode. It checks recursive types, legacy
 and opaque pointers, signatures, packed/scalable types, name escaping, ownership,
