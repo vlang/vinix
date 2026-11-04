@@ -1,4 +1,17 @@
-# ARM JNI regression passed; GMS needs TrafficStats UID methods
+# TrafficStats successor prepared; ARM replay blocked by disk reserve
+
+The TrafficStats UID fix, full SDK/native qualification, signed fixture and
+image tools are committed. The [successor image and exact clone](maps-traffic-stats-preparation-2026-11-04.md)
+passed all preparation/inventory checks. Its [ARM replay](maps-traffic-stats-runtime-blocked-2026-11-04.md)
+booted but stopped before transfer because host free space fell below the
+required reserve. The fixture has not executed, and successor GMS/Maps results
+remain pending. Our VM is stopped; CI remains untouched. Complete original
+evidence is preserved. Four aggregate seals stopped at their unchanged shared
+growth cap; sealing/readback and a fresh guest run remain required when space
+is available. The historical checkpoints below remain evidence, not current
+pending implementation work.
+
+## Preceding ARM JNI replay
 
 The [ARM replay](maps-framework-jni-load-runtime-2026-11-04.md) passed the
 unchanged signed boot-classpath fixture, including all six input identities,
