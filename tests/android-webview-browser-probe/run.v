@@ -46,6 +46,26 @@ enum NetworkMode {
 	ipv4_only
 }
 
+// The larger budget is available only through explicitly named CLI selectors.
+// It does not change the default policy or the diagnostic guest's resources.
+enum CoexistPolicy {
+	quarter_host_32g
+	half_host_64g
+}
+
+fn (policy CoexistPolicy) limit_mib() u64 {
+	return if policy == .half_host_64g { u64(65536) } else { u64(32768) }
+}
+
+fn (policy CoexistPolicy) host_divisor() u64 {
+	return if policy == .half_host_64g { u64(2) } else { u64(4) }
+}
+
+fn (policy CoexistPolicy) limits() string {
+	budget := if policy == .half_host_64g { '<=64GiB and host/2; host >=128GiB' } else { '<=32GiB and host/4' }
+	return 'one foreign QEMU; aggregate RAM ' + budget + '; aggregate CPU <=host logical; sysctl pressure1; disk reserve1GiB; own12GiB/fourCPU unchanged'
+}
+
 fn (mode NetworkMode) backend() string {
 	return if mode == .ipv4_only { 'user,id=net0,ipv6=off' } else { 'user,id=net0' }
 }
@@ -70,12 +90,23 @@ struct StopReceipt {
 	requested_utc string
 }
 
+struct ForeignDirectoryIdentity {
+	path string
+	dev u64
+	inode u64
+	mode u32
+	uid u32
+}
+
 struct ForeignResourceIdentity {
 	path string
 	dev u64
 	inode u64
 	mode u32
 	nlink u64
+	uid u32
+	absent bool
+	socket_parent ForeignDirectoryIdentity
 }
 
 struct ForeignAdmission {
@@ -92,6 +123,9 @@ struct ForeignAdmission {
 	disk_report string
 	sampled_utc string
 	referenced_paths map[string]ForeignResourceIdentity
+	budget_policy string
+	aggregate_limit_mib u64
+	host_memory_divisor u64
 }
 
 fn positive_decimal(value string) !u64 {
@@ -124,10 +158,15 @@ fn available_disk_bytes(output string) !u64 {
 }
 
 fn foreign_drive(value string) ! {
+	foreign_drive_policy(value, .quarter_host_32g)!
+}
+
+fn foreign_drive_policy(value string, policy CoexistPolicy) ! {
 	mut fields := map[string]string{}
 	for item in value.split(',') {
 		key, data := item.all_before('='), item.all_after('=')
-		if key == item || key in fields || key !in ['if', 'format', 'file', 'readonly'] {
+		if key == item || key in fields || (key !in ['if', 'format', 'file', 'readonly']
+			&& !(policy == .half_host_64g && key in ['discard', 'detect-zeroes'])) {
 			return error('unsupported foreign drive configuration')
 		}
 		fields[key] = data
@@ -136,11 +175,32 @@ fn foreign_drive(value string) ! {
 		|| !(fields['file'] or { '' }).starts_with('/') || fields['readonly'] or { 'on' } != 'on' {
 		return error('simple foreign disk/firmware configuration required')
 	}
+	for key in ['discard', 'detect-zeroes'] {
+		if key in fields && (fields[key] != 'unmap' || fields['if'] != 'virtio'
+			|| fields['format'] != 'qcow2' || 'readonly' in fields) {
+			return error('foreign unmap options require a writable virtio qcow2 drive')
+		}
+	}
+}
+
+fn foreign_qmp_path(value string) !string {
+	if !value.starts_with('unix:/') || !value.ends_with(',server=on,wait=off') {
+		return error('foreign QMP requires an exact nonblocking Unix server')
+	}
+	path := value[5..value.len - ',server=on,wait=off'.len]
+	if path.len >= 104 || path.contains_any(' ,\t\r\n\x00') || os.abs_path(path) != path {
+		return error('bounded absolute foreign QMP path required')
+	}
+	return path
 }
 
 // This opt-in deliberately accepts only simple, unquoted argv forms. Unknown
 // options and alternate memory/CPU configurations are not inferred from ps.
 fn foreign_resources(command string) !(u64, u64) {
+	return foreign_resources_policy(command, .quarter_host_32g)
+}
+
+fn foreign_resources_policy(command string, policy CoexistPolicy) !(u64, u64) {
 	if command.contains_any('\t\r\n\x00\'"\\') { return error('unsupported quoted foreign argv') }
 	args := command.fields()
 	if args.len < 2 || args.join(' ') != command { return error('canonical foreign argv required') }
@@ -158,8 +218,9 @@ fn foreign_resources(command string) !(u64, u64) {
 			if daemon > 1 { return error('duplicate foreign daemon option') }
 			continue
 		}
-		if flag !in ['-machine', '-cpu', '-m', '-smp', '-drive', '-device', '-netdev',
-			'-display', '-serial', '-monitor', '-pidfile', '-D'] || at >= args.len
+		if (flag !in ['-machine', '-cpu', '-m', '-smp', '-drive', '-device', '-netdev',
+			'-display', '-serial', '-monitor', '-pidfile', '-D']
+			&& !(policy == .half_host_64g && flag == '-qmp')) || at >= args.len
 			|| args[at].starts_with('-') { return error('unsupported foreign QEMU option: ' + flag) }
 		value := args[at]
 		at++
@@ -183,7 +244,8 @@ fn foreign_resources(command string) !(u64, u64) {
 			'-display' { if value != 'none' { return error('foreign display must be disabled') } }
 			'-cpu' { if value != 'host' { return error('foreign CPU must be host') } }
 			'-device' { if value != 'virtio-net-pci,netdev=net0' { return error('unsupported foreign device') } }
-			'-drive' { foreign_drive(value)! }
+			'-drive' { foreign_drive_policy(value, policy)! }
+			'-qmp' { foreign_qmp_path(value)! }
 			'-netdev' {
 				parts := value.split(',')
 				if parts.len !in [2, 3] || parts[0] != 'user' || parts[1] != 'id=net0'
@@ -214,10 +276,46 @@ fn foreign_path(path string, root string, readonly bool) !ForeignResourceIdentit
 		owned_info := os.lstat(root + '/' + name)!
 		if info.dev == owned_info.dev && info.inode == owned_info.inode { return error('foreign resource aliases owned media') }
 	}
-	return ForeignResourceIdentity{resolved, info.dev, info.inode, info.mode, info.nlink}
+	return ForeignResourceIdentity{path: resolved, dev: info.dev, inode: info.inode,
+		mode: info.mode, nlink: info.nlink, uid: info.uid}
 }
 
 fn foreign_paths(command string, root string) !map[string]ForeignResourceIdentity {
+	return foreign_paths_policy(command, root, .quarter_host_32g)
+}
+
+fn foreign_directory(path string) !ForeignDirectoryIdentity {
+	resolved := os.real_path(path)
+	info := os.lstat(resolved)!
+	if info.get_filetype() != .directory { return error('existing foreign QMP parent directory required') }
+	return ForeignDirectoryIdentity{resolved, info.dev, info.inode, info.mode, info.uid}
+}
+
+// lstat only: admission never connects to, reads from or writes to foreign QMP.
+fn foreign_socket(path string, root string) !ForeignResourceIdentity {
+	if !os.is_abs_path(path) { return error('absolute foreign QMP path required') }
+	parent := foreign_directory(os.dir(path))!
+	resolved := os.join_path(parent.path, os.file_name(path))
+	if resolved == root || resolved.starts_with(root + '/')
+		|| resolved == repo || resolved.starts_with(repo + '/') {
+		return error('separate foreign QMP socket required')
+	}
+	info := os.lstat(resolved) or {
+		if err.code() != C.ENOENT { return error('cannot inspect foreign QMP endpoint: ' + err.msg()) }
+		if foreign_directory(os.dir(path))! != parent { return error('foreign QMP parent changed during inspection') }
+		// QEMU can retain an unlinked listener. This records only absence in the
+		// namespace and its existing parent, never the state of a listener.
+		return ForeignResourceIdentity{path: resolved, absent: true, socket_parent: parent}
+	}
+	if info.get_filetype() != .socket || info.uid != u32(os.geteuid()) || info.nlink != 1 {
+		return error('single-linked foreign QMP socket owned by this user required')
+	}
+	if foreign_directory(os.dir(path))! != parent { return error('foreign QMP parent changed during inspection') }
+	return ForeignResourceIdentity{path: resolved, dev: info.dev, inode: info.inode,
+		mode: info.mode, nlink: info.nlink, uid: info.uid, socket_parent: parent}
+}
+
+fn foreign_paths_policy(command string, root string, policy CoexistPolicy) !map[string]ForeignResourceIdentity {
 	args := command.fields()
 	mut paths := map[string]ForeignResourceIdentity{}
 	mut at := 1
@@ -227,6 +325,12 @@ fn foreign_paths(command string, root string) !map[string]ForeignResourceIdentit
 		if flag == '-daemonize' { continue }
 		value := args[at]
 		at++
+		if flag == '-qmp' {
+			if policy != .half_host_64g { return error('foreign QMP requires explicit 64GiB policy') }
+			path := foreign_qmp_path(value)!
+			paths[path] = foreign_socket(path, root)!
+			continue
+		}
 		mut path := ''
 		mut readonly := false
 		if flag == '-drive' {
@@ -262,17 +366,26 @@ fn qemu_inventory(output string) ![]int {
 }
 
 fn admit_resources(memory u64, cpus u64, physical u64, logical u64, pressure u64, available u64) ! {
-	if memory > 32768 - 12288 || cpus > 1024 - 4 || logical > 1024
+	admit_resources_policy(memory, cpus, physical, logical, pressure, available, .quarter_host_32g)!
+}
+
+fn admit_resources_policy(memory u64, cpus u64, physical u64, logical u64, pressure u64, available u64, policy CoexistPolicy) ! {
+	if memory > policy.limit_mib() - 12288 || cpus > 1024 - 4 || logical > 1024
 		|| memory == 0 || cpus == 0 || logical == 0 {
 		return error('coexisting guest resource bounds exceeded')
 	}
-	if (memory + 12288) * 1024 * 1024 > physical / 4 || cpus + 4 > logical
+	if (policy == .half_host_64g && physical < u64(128) * 1024 * 1024 * 1024)
+		|| (memory + 12288) * 1024 * 1024 > physical / policy.host_divisor() || cpus + 4 > logical
 		|| pressure != 1 || available < u64(1024) * 1024 * 1024 {
 		return error('coexisting guest host admission refused')
 	}
 }
 
 fn foreign_admission(root string, pid int) !ForeignAdmission {
+	return foreign_admission_policy(root, pid, .quarter_host_32g)
+}
+
+fn foreign_admission_policy(root string, pid int, policy CoexistPolicy) !ForeignAdmission {
 	if pid <= 1 { return error('explicit foreign PID required') }
 	inventory := checked(['/bin/ps', '-ww', '-axo', 'pid=,comm='])!
 	if qemu_inventory(inventory)! != [pid] { return error('exactly the selected foreign QEMU required') }
@@ -295,22 +408,25 @@ fn foreign_admission(root string, pid int) !ForeignAdmission {
 	if foreign_exe.dev == owned_exe.dev && foreign_exe.inode == owned_exe.inode {
 		return error('foreign executable aliases audited QEMU')
 	}
-	memory, cpus := foreign_resources(owner.command)!
-	paths := foreign_paths(owner.command, root)!
+	memory, cpus := foreign_resources_policy(owner.command, policy)!
+	paths := foreign_paths_policy(owner.command, root, policy)!
 	physical := checked(['/usr/sbin/sysctl', '-n', 'hw.memsize'])!
 	logical := checked(['/usr/sbin/sysctl', '-n', 'hw.logicalcpu'])!
 	pressure := checked(['/usr/sbin/sysctl', '-n', 'kern.memorystatus_vm_pressure_level'])!
 	disk := checked(['/usr/bin/env', 'LC_ALL=C', '/bin/df', '-kP', root])!
 	available := available_disk_bytes(disk)!
-	admit_resources(memory, cpus, positive_decimal(physical)!, positive_decimal(logical)!, positive_decimal(pressure)!, available)!
+	admit_resources_policy(memory, cpus, positive_decimal(physical)!, positive_decimal(logical)!, positive_decimal(pressure)!, available, policy)!
 	return ForeignAdmission{owner, executable, hash(executable)!, memory, cpus, inventory,
-		physical, logical, pressure, available, disk, time.utc().str(), paths}
+		physical, logical, pressure, available, disk, time.utc().str(), paths,
+		policy.str(), policy.limit_mib(), policy.host_divisor()}
 }
 
 fn same_foreign(before ForeignAdmission, after ForeignAdmission) ! {
 	if before.owner != after.owner || before.executable != after.executable
 		|| before.executable_sha256 != after.executable_sha256 || before.memory_mib != after.memory_mib
-		|| before.cpus != after.cpus || before.referenced_paths != after.referenced_paths {
+		|| before.cpus != after.cpus || before.referenced_paths != after.referenced_paths
+		|| before.budget_policy != after.budget_policy || before.aggregate_limit_mib != after.aggregate_limit_mib
+		|| before.host_memory_divisor != after.host_memory_divisor {
 		return error('foreign guest identity or resources changed during admission')
 	}
 }
@@ -536,12 +652,16 @@ fn start(root string, mode NetworkMode) ! {
 }
 
 fn start_admitted(root string, mode NetworkMode, foreign_pid int) ! {
+	start_admitted_policy(root, mode, foreign_pid, .quarter_host_32g)!
+}
+
+fn start_admitted_policy(root string, mode NetworkMode, foreign_pid int, policy CoexistPolicy) ! {
 	qmp_check(root)!
 	fresh_launch(root)!
 	mut initial := ForeignAdmission{}
 	if foreign_pid != 0 {
 		if mode != .user_default { return error('coexistence requires the unchanged default network') }
-		initial = foreign_admission(root, foreign_pid)!
+		initial = foreign_admission_policy(root, foreign_pid, policy)!
 	} else {
 		strict_guest_check(checked(['/bin/ps', '-axo', 'pid=,command='])!)!
 	}
@@ -557,7 +677,7 @@ fn start_admitted(root string, mode NetworkMode, foreign_pid int) ! {
 	runner_sha := hash(os.executable())!
 	mut final := ForeignAdmission{}
 	if foreign_pid != 0 {
-		final = foreign_admission(root, foreign_pid)!
+		final = foreign_admission_policy(root, foreign_pid, policy)!
 		same_foreign(initial, final)!
 	}
 	log_before := create_daemon_log(root)!
@@ -582,7 +702,7 @@ fn start_admitted(root string, mode NetworkMode, foreign_pid int) ! {
 			'initial': json2.decode[json2.Any](json2.encode(initial))!
 			'final': json2.decode[json2.Any](json2.encode(final))!
 			'scope': json2.Any('Read-only admission snapshots; foreign guest is never signalled or modified. Not continuous resource monitoring.')
-			'limits': json2.Any('one foreign QEMU; aggregate RAM <=32GiB and host/4; aggregate CPU <=host logical; sysctl pressure1; disk reserve1GiB; own12GiB/fourCPU unchanged')
+			'limits': json2.Any(policy.limits())
 		}))!
 	}
 	write_json(root + '/launch.json', json2.Any(launch))!
@@ -1045,6 +1165,147 @@ fn coexist_self_test(temporary_root string) ! {
 	println('COEXISTENCE SELF-TEST PASS refusals=' + refusals.str() + ' unchanged-default explicit-single-foreign canonical-argv bounded-host-resources identity-recheck')
 }
 
+fn coexist_64g_self_test(temporary_root string) ! {
+	root := os.real_path(temporary_root)
+	policy := CoexistPolicy.half_host_64g
+	gi := u64(1024) * 1024 * 1024
+	command := '/foreign/qemu-system-aarch64 -machine virt,accel=hvf,highmem=on -cpu host -m 32768 -smp 8 -drive if=virtio,file=/foreign/disk,format=qcow2,discard=unmap,detect-zeroes=unmap -device virtio-net-pci,netdev=net0 -display none -monitor none -qmp unix:/tmp/foreign.sock,server=on,wait=off -daemonize'
+	memory, cpus := foreign_resources_policy(command, policy)!
+	assert memory == 32768 && cpus == 8
+	mut refusals := 0
+	for legacy in [command, command.replace(' -qmp unix:/tmp/foreign.sock,server=on,wait=off', ''),
+		command.replace(',discard=unmap,detect-zeroes=unmap', '')] {
+		if _, _ := foreign_resources(legacy) { return error('legacy parser accepted 64GiB extensions') }
+		refusals++
+	}
+	if _ := admit_resources(memory, cpus, 128 * gi, 18, 1, gi) { return error('legacy RAM cap changed') }
+	refusals++
+	admit_resources_policy(memory, cpus, 128 * gi, 18, 1, gi, policy)!
+	admit_resources_policy(53248, 14, 128 * gi, 18, 1, gi, policy)!
+	for values in [[u64(53249), 8, 128 * gi, 18, 1, gi], [u64(32768), 8, 128 * gi - 1, 18, 1, gi],
+		[u64(32768), 8, 128 * gi, 11, 1, gi], [u64(32768), 15, 128 * gi, 18, 1, gi],
+		[u64(32768), 8, 128 * gi, 18, 0, gi], [u64(32768), 8, 128 * gi, 18, 2, gi],
+		[u64(32768), 8, 128 * gi, 18, 4, gi], [u64(32768), 8, 128 * gi, 18, 1, gi - 1],
+		[u64(0), 8, 128 * gi, 18, 1, gi], [u64(32768), 0, 128 * gi, 18, 1, gi],
+		[u64(32768), 8, 128 * gi, 0, 1, gi], [u64(32768), 8, 128 * gi, 1025, 1, gi],
+		[u64(18446744073709551615), 8, 128 * gi, 18, 1, gi],
+		[u64(32768), 18446744073709551615, 128 * gi, 18, 1, gi]] {
+		admit_resources_policy(values[0], values[1], values[2], values[3], values[4], values[5], policy) or { refusals++; continue }
+		return error('64GiB resource boundary accepted')
+	}
+	for changed in [command + ' -qmp unix:/tmp/other.sock,server=on,wait=off',
+		command.replace('discard=unmap', 'discard=ignore'), command.replace('detect-zeroes=unmap', 'detect-zeroes=on'),
+		command.replace('discard=unmap', 'discard=unmap,discard=unmap'),
+		command.replace('if=virtio', 'if=pflash'), command.replace('format=qcow2', 'format=raw'),
+		command.replace('discard=unmap', 'readonly=on,discard=unmap'),
+		command.replace('discard=unmap', 'cache-size=64G'), command + ' -object memory-backend-ram,id=m,size=64G',
+		command + ' -device pc-dimm,memdev=m', command + ' -m 1', command + ' -smp 1'] {
+		if _, _ := foreign_resources_policy(changed, policy) { return error('unsafe 64GiB grammar accepted') }
+		refusals++
+	}
+	for value in ['tcp:127.0.0.1:4444,server=on,wait=off', 'unix:relative,server=on,wait=off',
+		'unix:/tmp/sock', 'unix:/tmp/sock,server=on', 'unix:/tmp/sock,server=on,wait=on',
+		'unix:/tmp/sock,wait=off,server=on', 'unix:/tmp/sock,server=on,wait=off,nowait',
+		'unix:/tmp/sock,server=on,server=on,wait=off', 'unix:/tmp/../sock,server=on,wait=off',
+		'unix:/' + 's'.repeat(103) + ',server=on,wait=off'] {
+		if _, _ := foreign_resources_policy(command.replace('unix:/tmp/foreign.sock,server=on,wait=off', value), policy) {
+			return error('unsupported QMP configuration accepted')
+		}
+		refusals++
+	}
+	before := ForeignAdmission{budget_policy: policy.str(), aggregate_limit_mib: policy.limit_mib(), host_memory_divisor: policy.host_divisor()}
+	for changed in [ForeignAdmission{...before, budget_policy: CoexistPolicy.quarter_host_32g.str()},
+		ForeignAdmission{...before, aggregate_limit_mib: 32768}, ForeignAdmission{...before, host_memory_divisor: 4}] {
+		if _ := same_foreign(before, changed) { return error('mixed admission policies accepted') }
+		refusals++
+	}
+	owned_root := root + '/socket-owned'
+	path := root + '/foreign.sock'
+	os.mkdir(owned_root)!
+	defer {
+		for name in ['foreign.sock', 'foreign-link.sock', 'foreign-parent', 'foreign-regular'] { os.rm(root + '/' + name) or {} }
+		os.rmdir_all(owned_root) or {}
+	}
+	mut listener := unix.listen_stream(path)!
+	defer {
+		unix.shutdown(listener.sock.handle)
+		C.close(listener.sock.handle)
+	}
+	reference := foreign_socket(path, owned_root)!
+	assert reference.path == path
+	// An alias of the parent is safe for read-only identity inspection; the
+	// endpoint itself cannot be a symlink. No connection to the listener occurs.
+	os.symlink(root, root + '/foreign-parent')!
+	assert foreign_socket(root + '/foreign-parent/foreign.sock', owned_root)! == reference
+	if _ := foreign_paths_policy(command.replace('/tmp/foreign.sock', path).replace('/foreign/disk', root + '/foreign-regular'), owned_root, policy) {
+		return error('missing foreign drive skipped during QMP admission')
+	}
+	refusals++
+	os.write_file(root + '/foreign-regular', 'not a socket')!
+	full_paths := foreign_paths_policy(command.replace('/tmp/foreign.sock', path).replace('/foreign/disk', root + '/foreign-regular'), owned_root, policy)!
+	assert full_paths[path]! == reference && full_paths.len == 2
+	os.symlink(path, root + '/foreign-link.sock')!
+	for bad in ['relative', root + '/foreign-link.sock', root + '/foreign-regular', root + '/missing-parent/sock',
+		root + '/foreign-regular/sock', owned_root, repo + '/qmp.sock'] {
+		if _ := foreign_socket(bad, owned_root) { return error('unsafe foreign socket accepted') }
+		refusals++
+	}
+	mut owned_listener := unix.listen_stream(owned_root + '/qmp.sock')!
+	defer {
+		unix.shutdown(owned_listener.sock.handle)
+		C.close(owned_listener.sock.handle)
+	}
+	if _ := foreign_socket(owned_root + '/qmp.sock', owned_root) { return error('owned socket accepted') }
+	refusals++
+	socket_before := ForeignAdmission{...before, referenced_paths: {path: reference}}
+	for changed in [ForeignResourceIdentity{...reference, path: '/changed'}, ForeignResourceIdentity{...reference, dev: reference.dev + 1},
+		ForeignResourceIdentity{...reference, inode: reference.inode + 1}, ForeignResourceIdentity{...reference, mode: reference.mode ^ 0o002},
+		ForeignResourceIdentity{...reference, nlink: reference.nlink + 1}, ForeignResourceIdentity{...reference, uid: reference.uid + 1},
+		ForeignResourceIdentity{...reference, absent: true}] {
+		if _ := same_foreign(socket_before, ForeignAdmission{...socket_before, referenced_paths: {path: changed}}) {
+			return error('changed foreign socket identity accepted')
+		}
+		refusals++
+	}
+	missing_path := root + '/unlinked.sock'
+	missing := foreign_socket(missing_path, owned_root)!
+	assert missing.absent && missing.path == missing_path
+	assert missing.socket_parent == reference.socket_parent
+	assert foreign_socket(root + '/foreign-parent/unlinked.sock', owned_root)! == missing
+	missing_before := ForeignAdmission{...before, referenced_paths: {missing_path: missing}}
+	for changed_parent in [ForeignDirectoryIdentity{...missing.socket_parent, path: '/changed'},
+		ForeignDirectoryIdentity{...missing.socket_parent, dev: missing.socket_parent.dev + 1},
+		ForeignDirectoryIdentity{...missing.socket_parent, inode: missing.socket_parent.inode + 1},
+		ForeignDirectoryIdentity{...missing.socket_parent, mode: missing.socket_parent.mode ^ 0o002},
+		ForeignDirectoryIdentity{...missing.socket_parent, uid: missing.socket_parent.uid + 1}] {
+		if _ := same_foreign(missing_before, ForeignAdmission{...missing_before, referenced_paths: {
+			missing_path: ForeignResourceIdentity{...missing, socket_parent: changed_parent}
+		}}) { return error('changed absent socket parent accepted') }
+		refusals++
+	}
+	os.symlink(root + '/does-not-exist', missing_path)!
+	if _ := foreign_socket(missing_path, owned_root) { return error('dangling QMP symlink treated as absent') }
+	os.rm(missing_path)!
+	refusals++
+	mut appeared := unix.listen_stream(missing_path)!
+	present := foreign_socket(missing_path, owned_root)!
+	unix.shutdown(appeared.sock.handle)
+	C.close(appeared.sock.handle)
+	os.rm(missing_path)!
+	if _ := same_foreign(missing_before, ForeignAdmission{...missing_before, referenced_paths: {missing_path: present}}) {
+		return error('socket appearance during admission accepted')
+	}
+	refusals++
+	if _ := same_foreign(ForeignAdmission{...before, referenced_paths: {missing_path: present}}, missing_before) {
+		return error('socket disappearance during admission accepted')
+	}
+	refusals++
+	assert CoexistPolicy.quarter_host_32g.limit_mib() == 32768
+	assert CoexistPolicy.quarter_host_32g.host_divisor() == 4
+	assert policy.limits().contains('host >=128GiB')
+	println('COEXISTENCE-64G SELF-TEST PASS refusals=' + refusals.str() + ' unchanged-32g-default explicit-64g host-128g-minimum bounded-parser socket-lstat-only explicit-absence-parent-identity policy-recheck')
+}
+
 fn self_test() ! {
 	network_self_test()!
 	qmp_check('/tmp/browser-probe')!
@@ -1063,6 +1324,7 @@ fn self_test() ! {
 	os.mkdir(root)!
 	defer { os.rmdir_all(root) or {} }
 	coexist_self_test(root)!
+	coexist_64g_self_test(root)!
 	daemon_log_self_test(root)!
 	hash_self_test(root)!
 	os.write_file(root + '/qemu.pid', os.getpid().str())!
@@ -1146,21 +1408,23 @@ fn main() {
 		}
 		return
 	}
-	if os.args.len == 4 && os.args[1] in ['start-coexisting', 'admit-coexisting'] {
+	if os.args.len == 4 && os.args[1] in ['start-coexisting', 'admit-coexisting', 'start-coexisting-64g', 'admit-coexisting-64g'] {
 		root := canonical_root(os.args[2]) or { eprintln(err.msg()); exit(1) }
 		value := positive_decimal(os.args[3]) or { eprintln(err.msg()); exit(1) }
 		if value <= 1 || value > 2147483647 { eprintln('explicit safe foreign PID required'); exit(1) }
-		if os.args[1] == 'admit-coexisting' {
-			admission := foreign_admission(root, int(value)) or { eprintln(err.msg()); exit(1) }
+		policy := if os.args[1].ends_with('-64g') { CoexistPolicy.half_host_64g } else { CoexistPolicy.quarter_host_32g }
+		if os.args[1] in ['admit-coexisting', 'admit-coexisting-64g'] {
+			admission := foreign_admission_policy(root, int(value), policy) or { eprintln(err.msg()); exit(1) }
 			println(json2.encode(admission, prettify: true))
 		} else {
-			start_admitted(root, .user_default, int(value)) or { eprintln(err.msg()); exit(1) }
+			start_admitted_policy(root, .user_default, int(value), policy) or { eprintln(err.msg()); exit(1) }
 		}
 		return
 	}
 	if os.args.len != 3 || os.args[1] !in ['start', 'start-ipv4', 'status', 'stop', 'reconcile-stop', 'observe-gone', 'cleanup-gone'] {
 		eprintln('usage: run start|start-ipv4|status|stop|reconcile-stop|observe-gone|cleanup-gone STAGED_EXTERNAL_DIRECTORY')
 		eprintln('       run start-coexisting|admit-coexisting STAGED_EXTERNAL_DIRECTORY FOREIGN_PID')
+		eprintln('       run start-coexisting-64g|admit-coexisting-64g STAGED_EXTERNAL_DIRECTORY FOREIGN_PID (explicit opt-in; host >=128GiB)')
 		exit(2)
 	}
 	root := canonical_root(os.args[2]) or {
