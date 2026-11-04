@@ -11,6 +11,13 @@ import crypto.sha256
 import frozenv
 import os
 
+#include <unistd.h>
+#include <fcntl.h>
+fn C.daemon(i32, i32) i32
+fn C.open(&char, i32, ...i32) i32
+fn C.dup2(i32, i32) i32
+fn C.close(i32) i32
+
 const parent_manifest = 'c1163dfbb2bf9b0f096eba6123246028b00a43902ebd9963b115909b999e3dbb'
 
 fn digest(path string) !string {
@@ -440,6 +447,22 @@ fn replacement_selftest(out string) ! {
 }
 
 fn main() {
+	if os.args.len == 4 && os.args[1] == 'start-queue-build' {
+		root := os.real_path(os.getwd())
+		out := os.abs_path(os.args[2])
+		log := os.abs_path(os.args[3])
+		if out == root || out.starts_with(root + '/') || log == root || log.starts_with(root + '/') {
+			panic('detached probe paths must be external')
+		}
+		fd := C.open(log.str, C.O_WRONLY | C.O_CREAT | C.O_EXCL, i32(0o600))
+		if fd < 0 { panic('detached probe needs a fresh writable log') }
+		if C.daemon(1, 0) != 0 { C.close(fd); panic('cannot detach probe coordinator') }
+		if C.dup2(fd, 1) != 1 || C.dup2(fd, 2) != 2 { C.close(fd); exit(125) }
+		C.close(fd)
+		println('Detached queue coordinator pid=' + os.getpid().str())
+		resume_queue_build(out)!
+		return
+	}
 	if os.args.len == 3 && os.args[1] == 'resume-queue-build' {
 		resume_queue_build(os.abs_path(os.args[2]))!
 		return
