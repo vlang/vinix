@@ -222,6 +222,11 @@ const bootclasspath_api_runner = '/Users/alex/.local/state/vinix/android/bootcla
 const bootclasspath_api_runner_pin = '047ec4bd70628a7b7e2c81621f306a2065537cbcb8d711d25403c99a19e8a3fb'
 const bootclasspath_apk = '/Users/alex/.local/state/vinix/android/bootclasspath-fixture-2026-11-03-r1/probe.apk'
 const bootclasspath_apk_pin = 'bd7384342cb18c6d9d519186f921bba9c6acfe5c0f07b75f3db16dfc650a22e4'
+// The JNI retry retains the exact signed fixture; its ARM runner is separate.
+const bootclasspath_jni_api_runner = '/Users/alex/.local/state/vinix/android/bootclasspath-jni-api-run-2026-11-04-r1/run'
+const bootclasspath_jni_api_runner_pin = '1b1103b948baf32b7b71741887cbdb033b7833c9833ce114ad0addbe0b4eb24c'
+const bootclasspath_jni_apk = bootclasspath_apk
+const bootclasspath_jni_apk_pin = bootclasspath_apk_pin
 const file_limit = 32 * 1024 * 1024
 const request_limit = 12
 const seconds_limit = 600
@@ -660,6 +665,57 @@ fn bootclasspath_api_assets() []Asset {
 		Asset{url: '/bootclasspath.apk', path: bootclasspath_apk, sha256: bootclasspath_apk_pin}]
 }
 
+fn bootclasspath_jni_api_assets() []Asset {
+	return [Asset{url: '/bootclasspath-jni-api-run', path: bootclasspath_jni_api_runner, sha256: bootclasspath_jni_api_runner_pin},
+		Asset{url: '/bootclasspath-jni.apk', path: bootclasspath_jni_apk, sha256: bootclasspath_jni_apk_pin}]
+}
+
+// Only the exact old/new signed boot APK pair may share a source path/hash.
+// Both routes remain distinct, and every other collision still fails closed.
+fn bootclasspath_jni_distinct(asset Asset, old Asset) ! {
+	if asset.url == old.url { return error('bootclasspath JNI route collision') }
+	if asset.url == '/bootclasspath-jni.apk' && old.url == '/bootclasspath.apk' {
+		if asset.path != bootclasspath_apk || old.path != bootclasspath_apk
+			|| asset.sha256 != bootclasspath_apk_pin || old.sha256 != bootclasspath_apk_pin {
+			return error('only the exact signed bootclasspath APK may be reused')
+		}
+	} else if asset.path == old.path || asset.sha256 == old.sha256 {
+		return error('bootclasspath JNI artifact collision')
+	}
+}
+
+// Keep historical selector dispatch byte-for-byte intact. This additive pair
+// uses the same pinned snapshots, bounded GET server, request limit and deadline.
+fn serve_bootclasspath_jni(root string, port string) ! {
+	$if !net_nonblocking_sockets ? { return error('build with -d net_nonblocking_sockets for socket deadlines') }
+	external(root)!
+	if port == '' || port.len > 5 || !port.bytes().all(it >= `0` && it <= `9`)
+		|| port.u64() > 65535 || port != port.u64().str() { return error('canonical port 0..65535 required') }
+	if unsafe { C.mkdir(root.str, 0o700) } != 0 { return error('fresh private output directory required') }
+	inputs := bootclasspath_jni_api_assets()
+	mut assets := []Asset{}
+	for asset in inputs { assets << snapshot(asset, root + asset.url)! }
+	mut listener := net.listen_tcp(.ip, '127.0.0.1:' + port)!
+	defer { listener.close() or {} }
+	address := listener.addr()!.str()
+	deadline := time.now().add(seconds_limit * time.second)
+	write_json(root + '/ready.json', json2.encode({
+		'kind': json2.Any('vinix-bootclasspath-jni-api-http-v1')
+		'scope': json2.Any(scope)
+		'address': json2.Any(address)
+		'deadline_utc': json2.Any(deadline.str())
+		'request_limit': json2.Any(request_limit)
+		'inputs': json2.decode[json2.Any](json2.encode(inputs))!
+		'snapshots': json2.decode[json2.Any](json2.encode(assets))!
+	}, prettify: true))!
+	println('SERVICE-QUERY-HTTP READY ' + address)
+	flush_stdout()
+	result := serve_loop(mut listener, assets, request_limit, deadline)
+	write_json(root + '/result.json', json2.encode(result, prettify: true))!
+	if !result.success { return error(result.reason) }
+	println('SERVICE-QUERY-HTTP PASS two pinned files transferred')
+}
+
 fn serve(root string, port string, is_direct_boot bool, is_credential_storage bool, is_broadcast_result bool, is_onboarding_api bool, is_application_restrictions bool, is_auth_exception_api bool, is_auth_worker_api bool, is_binder_identity_api bool, is_service_lifecycle_api bool, is_platform_fragments_api bool, is_image_bounds_api bool, is_window_system_ui_api bool, is_seed_account_options_api bool, is_persistent_data_block_api bool, is_bitmap_tiles_api bool, is_connectivity_truth_api bool, is_window_animations_api bool, is_layout_alignment_api bool, is_user_restrictions_api bool, is_bundle_cross_profile_api bool, is_user_restrictions_bundle_api bool, is_resources_float_api bool, is_paint_drawable_api bool, is_dialog_theme_api bool, is_intent_extras_api bool, is_resource_locks_api bool, is_pending_intent_api bool, is_stable_display_api bool, is_asset_locales_api bool, is_unmanaged_queries_api bool, is_stats_unavailable_api bool, is_subscription_service_api bool, is_autofill_service_api bool, is_keyguard_policy_api bool, is_broadcast_permission_api bool, is_broadcast_permission_v2_api bool, is_secure_settings_api bool, is_usage_inactive_api bool, is_messenger_binder_api bool, is_messenger_binder_v2_api bool, is_event_log_api bool, is_build_abis_api bool, is_webview_package_api bool, is_bootclasspath_api bool) ! {
 	$if !net_nonblocking_sockets ? { return error('build with -d net_nonblocking_sockets for socket deadlines') }
 	external(root)!
@@ -693,6 +749,14 @@ fn serve(root string, port string, is_direct_boot bool, is_credential_storage bo
 fn main() {
 	if os.args.len == 3 && os.args[1] == '--self-test' {
 		self_test(os.args[2]) or { eprintln(err); exit(1) }
+		return
+	}
+	if os.args.len > 2 && os.args[1] == 'serve' && os.args[2] == '--bootclasspath-jni-api' {
+		if os.args.len != 5 {
+			eprintln('usage: transfer serve --bootclasspath-jni-api FRESH_EXTERNAL_DIR PORT')
+			exit(2)
+		}
+		serve_bootclasspath_jni(os.args[3], os.args[4]) or { eprintln(err); exit(1) }
 		return
 	}
 	is_direct_boot := os.args.len == 5 && os.args[1] == 'serve' && os.args[2] == '--direct-boot'
@@ -764,10 +828,54 @@ fn get(address string, request string) !string {
 	return result.bytestr()
 }
 
+fn bootclasspath_jni_self_test(root string) ! {
+	for bad in [['serve', '--bootclasspath-jni-api'],
+		['serve', '--bootclasspath-jni-api', root + '/must-not-exist'],
+		['serve', '--bootclasspath-jni-api-other', root + '/must-not-exist', '0'],
+		['serve', '--bootclasspath-jni-api', root + '/must-not-exist', '0', 'extra'],
+		['serve', '--bootclasspath-jni-api', '--bootclasspath-api', root + '/must-not-exist', '0'],
+		['serve', '--bootclasspath-api', '--bootclasspath-jni-api', root + '/must-not-exist', '0']] {
+		mut argv := [os.executable()]
+		argv << bad
+		result := os.exec(argv)
+		assert result.exit_code != 0, 'malformed bootclasspath JNI transfer CLI accepted'
+		assert !os.exists(root + '/must-not-exist')
+	}
+	for port in ['', '-1', '65536', '00', '01', '+1', '1x', ' 1'] {
+		result := os.exec([os.executable(), 'serve', '--bootclasspath-jni-api', root + '/must-not-exist', port])
+		assert result.exit_code == 1 && result.output.contains('canonical port 0..65535 required'), 'noncanonical bootclasspath JNI port accepted'
+		assert !os.exists(root + '/must-not-exist')
+	}
+	current := bootclasspath_jni_api_assets()
+	prior := bootclasspath_api_assets()
+	assert current.len == 2
+	assert current.map(it.url) == ['/bootclasspath-jni-api-run', '/bootclasspath-jni.apk']
+	assert current[0].path != current[1].path && current[0].sha256 != current[1].sha256
+	assert current[1].path == prior[1].path && current[1].sha256 == prior[1].sha256
+	for asset in current {
+		assert valid_digest(asset.sha256)
+		for older in [pinned_assets(), direct_boot_assets(), credential_storage_assets(), broadcast_result_assets(), onboarding_api_assets(), application_restrictions_assets(), auth_exception_api_assets(), auth_worker_api_assets(), binder_identity_api_assets(), service_lifecycle_api_assets(), platform_fragments_api_assets(), image_bounds_api_assets(), window_system_ui_api_assets(), seed_account_options_api_assets(), persistent_data_block_api_assets(), bitmap_tiles_api_assets(), connectivity_truth_api_assets(), window_animations_api_assets(), layout_alignment_api_assets(), user_restrictions_api_assets(), bundle_cross_profile_api_assets(), user_restrictions_bundle_api_assets(), resources_float_api_assets(), paint_drawable_api_assets(), dialog_theme_api_assets(), intent_extras_api_assets(), resource_locks_api_assets(), pending_intent_api_assets(), stable_display_api_assets(), asset_locales_api_assets(), unmanaged_queries_api_assets(), stats_unavailable_api_assets(), subscription_service_api_assets(), autofill_service_api_assets(), keyguard_policy_api_assets(), broadcast_permission_api_assets(), broadcast_permission_v2_api_assets(), secure_settings_api_assets(), usage_inactive_api_assets(), messenger_binder_api_assets(), messenger_binder_v2_api_assets(), event_log_api_assets(), build_abis_api_assets(), webview_package_api_assets(), bootclasspath_api_assets()] {
+			for old in older { bootclasspath_jni_distinct(asset, old)! }
+		}
+	}
+	for pair in [[Asset{...current[1], path: '/wrong'}, prior[1]],
+		[Asset{...current[1], sha256: '0'.repeat(64)}, prior[1]],
+		[current[1], Asset{...prior[1], path: '/wrong'}],
+		[current[1], Asset{...prior[1], sha256: '0'.repeat(64)}],
+		[Asset{...current[1], url: '/wrong.apk'}, prior[1]],
+		[Asset{...current[1], url: prior[1].url}, prior[1]],
+		[Asset{...current[0], path: prior[0].path}, prior[0]],
+		[Asset{...current[0], sha256: prior[0].sha256}, prior[0]]] {
+		if _ := bootclasspath_jni_distinct(pair[0], pair[1]) { return error('broadened bootclasspath shared-APK exception accepted') }
+	}
+	println('BOOTCLASSPATH-JNI-HTTP SELF-TEST PASS exact-selector routes pins shared-apk-only collision-controls8')
+}
+
 fn self_test(root string) ! {
 	$if !net_nonblocking_sockets ? { return error('self-test requires nonblocking sockets') }
 	external(root)!
 	if unsafe { C.mkdir(root.str, 0o700) } != 0 { return error('fresh self-test output required') }
+	bootclasspath_jni_self_test(root)!
 	for bad in [['serve', '--binder-identity-apis'],
 		['serve', '--binder-identity-apis', root + '/must-not-exist'],
 		['serve', '--binder-identity-apis-other', root + '/must-not-exist', '0'],
