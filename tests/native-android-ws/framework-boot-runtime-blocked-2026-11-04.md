@@ -1,16 +1,17 @@
-# TrafficStats successor prepared; ARM replay blocked by disk reserve
+# TrafficStats ARM pass; process-package successor awaiting ARM replay
 
-The TrafficStats UID fix, full SDK/native qualification, signed fixture and
-image tools are committed. The [successor image and exact clone](maps-traffic-stats-preparation-2026-11-04.md)
-passed all preparation/inventory checks. Its [ARM replay](maps-traffic-stats-runtime-blocked-2026-11-04.md)
-booted but stopped before transfer because host free space fell below the
-required reserve. The fixture has not executed, and successor GMS/Maps results
-remain pending. Our VM is stopped; CI remains untouched. Complete original
-evidence is preserved. Five aggregate seals stopped at their unchanged shared
-growth cap. A fresh clone with a tighter growth allowance was also refused
-before launch when free space fell again. Sealing/readback and a fresh guest
-run remain required when space is available. The historical checkpoints below
-remain evidence, not current pending implementation work.
+The [TrafficStats ARM regression passed](maps-traffic-stats-runtime-2026-11-04.md).
+GMS reached readiness, then failed on the missing
+`ActivityManager.RunningAppProcessInfo.pkgList` field. The field and native
+self-process package snapshots are committed in `2443f94f0` and `24f606459`;
+the successor SDK producer is committed in `9071f1164`. Complete SDK production,
+fresh native production/readback and signed-fixture host checks passed.
+Delivery/image qualification and the successor ARM replay remain pending.
+No manual Maps launch, rendering, imagery or authentication result is established.
+Our VM is stopped; CI remains untouched. Complete original evidence and failed
+attempts are retained. The TrafficStats report distinguishes completed component
+seals from pending separate VM readbacks. Historical checkpoints below remain
+evidence, not current pending implementation work.
 
 ## Preceding ARM JNI replay
 

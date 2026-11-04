@@ -1,4 +1,9 @@
-# TrafficStats ARM replay blocked by disk reserve
+# Historical TrafficStats disk-reserve stops
+
+Superseded by the [successful TrafficStats ARM replay](maps-traffic-stats-runtime-2026-11-04.md).
+That later run reached a new GMS `RunningAppProcessInfo.pkgList` failure.
+The stopped attempts and pending storage readbacks described here remain
+required evidence; their statements about unexecuted fixtures are historical.
 
 Core `417211d3a` implements the TrafficStats UID APIs. The complete
 [SDK/native/fixture qualification](traffic-stats-uid-pair-2026-11-04.md)
