@@ -4285,6 +4285,176 @@ fn webview_package_self_test() ! {
  }
 }
 
+fn traffic_stats_profile() NarrowProfile {
+ target := 'android/net/TrafficStats.smali'
+ return NarrowProfile{
+  name: 'traffic-stats'
+  baseline_name: 'combined-account-webview-framework-boot-framework-2026-11-03-r1'
+  manifest_pin: 'af23c13d90f557c4f7f208ae75c39ad8bcf0efd86fc88fddfe399fe2e66a4e91'
+  jar_pin: 'd9633112327093e55d924ad658088f8dd3d0b712d5184bddcf7307bfc51bf974'
+  baseline_classes: 2117
+  providers: ['framework_atomic_file.v']
+  calls: {target: 'framework_traffic_stats_uid_source'}
+  methods: {target: ['<clinit>()V', 'clearThreadStatsUid()V', 'setThreadStatsUid(I)V', 'getThreadStatsUid()I']}
+  changed: {target: 2}
+  added: {target: 2}
+  fields: {target: ['.field private static uids:Ljava/lang/ThreadLocal;']}
+ }
+}
+
+// Independent complete method bodies: the provider is never used as its own
+// production oracle. Only register directives, blank lines and branch-label
+// spelling may differ after API-28 DEX assembly and disassembly.
+fn traffic_stats_uid_methods() map[string]string {
+ owner := 'Landroid/net/TrafficStats;'
+ construct := 'new-instance v0, Ljava/lang/ThreadLocal;\n' +
+  'invoke-direct {v0}, Ljava/lang/ThreadLocal;-><init>()V\n'
+ return {
+  '<clinit>()V': '.method static constructor <clinit>()V\n.registers 1\n' + construct +
+   'sput-object v0, ' + owner + '->tags:Ljava/lang/ThreadLocal;\n' + construct +
+   'sput-object v0, ' + owner + '->uids:Ljava/lang/ThreadLocal;\nreturn-void\n.end method'
+  'clearThreadStatsUid()V': '.method public static clearThreadStatsUid()V\n.registers 1\n' +
+   'sget-object v0, ' + owner + '->uids:Ljava/lang/ThreadLocal;\n' +
+   'invoke-virtual {v0}, Ljava/lang/ThreadLocal;->remove()V\nreturn-void\n.end method'
+  'setThreadStatsUid(I)V': '.method public static setThreadStatsUid(I)V\n.registers 3\n' +
+   'sget-object v0, ' + owner + '->uids:Ljava/lang/ThreadLocal;\n' +
+   'invoke-static {p0}, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;\nmove-result-object v1\n' +
+   'invoke-virtual {v0, v1}, Ljava/lang/ThreadLocal;->set(Ljava/lang/Object;)V\nreturn-void\n.end method'
+  'getThreadStatsUid()I': '.method public static getThreadStatsUid()I\n.registers 1\n' +
+   'sget-object v0, ' + owner + '->uids:Ljava/lang/ThreadLocal;\n' +
+   'invoke-virtual {v0}, Ljava/lang/ThreadLocal;->get()Ljava/lang/Object;\nmove-result-object v0\n' +
+   'if-nez v0, :uid\nconst/4 v0, -0x1\nreturn v0\n:uid\ncheck-cast v0, Ljava/lang/Integer;\n' +
+   'invoke-virtual {v0}, Ljava/lang/Integer;->intValue()I\nmove-result v0\nreturn v0\n.end method'
+ }
+}
+
+fn traffic_stats_uid_normalized(source string, parameters int) !string {
+ mut lines := source.split_into_lines().map(it.trim_space())
+ for index, line in lines {
+  if line == 'const/4 v0, -1' { lines[index] = 'const/4 v0, -0x1' }
+ }
+ return framework_boot_normalized_method(lines.join('\n'), parameters)
+}
+
+fn traffic_stats_uid_members(old string, updated string) ! {
+ profile := traffic_stats_profile()
+ target := 'android/net/TrafficStats.smali'
+ narrow_member_delta(old, updated, profile.methods[target]!, 2, 2, profile.fields[target]!)!
+ before, after := store_parts(old)!, store_parts(updated)!
+ old_init := '.method static constructor <clinit>()V\n.registers 1\n' +
+  'new-instance v0, Ljava/lang/ThreadLocal;\ninvoke-direct {v0}, Ljava/lang/ThreadLocal;-><init>()V\n' +
+  'sput-object v0, Landroid/net/TrafficStats;->tags:Ljava/lang/ThreadLocal;\nreturn-void\n.end method'
+ old_clear := '.method public static clearThreadStatsUid()V\n.registers 0\nreturn-void\n.end method'
+ for signature, expected in {'<clinit>()V': old_init, 'clearThreadStatsUid()V': old_clear} {
+  actual := before.methods[signature] or { return error('retained TrafficStats UID method missing') }
+  if traffic_stats_uid_normalized(actual, 0)! != traffic_stats_uid_normalized(expected, 0)! {
+   return error('exact retained TrafficStats tag initializer and no-op UID clear required')
+  }
+ }
+ for signature, expected in traffic_stats_uid_methods() {
+  actual := after.methods[signature] or { return error('TrafficStats UID method missing') }
+  parameters := if signature == 'setThreadStatsUid(I)V' { 1 } else { 0 }
+  if traffic_stats_uid_normalized(actual, parameters)! != traffic_stats_uid_normalized(expected, parameters)! {
+   return error('TrafficStats UID API requires exact independent ThreadLocal state, unset sentinel and public Java ABI')
+  }
+ }
+}
+
+fn traffic_stats_self_test() ! {
+ profile := traffic_stats_profile()
+ target := 'android/net/TrafficStats.smali'
+ signatures := ['<clinit>()V', 'clearThreadStatsUid()V', 'setThreadStatsUid(I)V', 'getThreadStatsUid()I']
+ field := '.field private static uids:Ljava/lang/ThreadLocal;'
+ if profile.name != 'traffic-stats' || profile.baseline_classes != 2117
+  || profile.baseline_name != 'combined-account-webview-framework-boot-framework-2026-11-03-r1'
+  || profile.manifest_pin != 'af23c13d90f557c4f7f208ae75c39ad8bcf0efd86fc88fddfe399fe2e66a4e91'
+  || profile.jar_pin != 'd9633112327093e55d924ad658088f8dd3d0b712d5184bddcf7307bfc51bf974'
+  || profile.providers != ['framework_atomic_file.v'] || profile.calls != {target: 'framework_traffic_stats_uid_source'}
+  || profile.methods != {target: signatures} || profile.changed != {target: 2} || profile.added != {target: 2}
+  || profile.fields != {target: [field]} || profile.class_provider != '' || profile.class_providers.len != 0
+  || profile.extra_classes.len != 0 || profile.directory_provider != ''
+  || profile.removed_methods.len != 0 || profile.removed_fields.len != 0 {
+  return error('TrafficStats profile requires one private ThreadLocal field, two changed and two added methods over exact 2117 classes')
+ }
+ narrow_method_self_test(signatures, 2, 2)!
+ metadata := '.class public Landroid/net/TrafficStats;\n.super Ljava/lang/Object;\n' +
+  '.field public static final UNSUPPORTED:I = -0x1\n.field private static tags:Ljava/lang/ThreadLocal;\n'
+ retained := '.method public constructor <init>()V\n.registers 1\ninvoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void\n.end method\n' +
+  '.method public static setThreadStatsTag(I)V\n.registers 3\nreturn-void\n.end method\n' +
+  '.method public static clearThreadStatsTag()V\n.registers 1\nreturn-void\n.end method\n' +
+  '.method public static getThreadStatsTag()I\n.registers 1\nconst/4 v0, -0x1\nreturn v0\n.end method\n' +
+  '.method public static getUidRxBytes(I)J\n.registers 3\nconst-wide/16 v0, -0x1\nreturn-wide v0\n.end method\n' +
+  '.method public static getUidTxBytes(I)J\n.registers 3\nconst-wide/16 v0, -0x1\nreturn-wide v0\n.end method\n'
+ expected := traffic_stats_uid_methods()
+ init := expected['<clinit>()V']!
+ second := 'new-instance v0, Ljava/lang/ThreadLocal;\ninvoke-direct {v0}, Ljava/lang/ThreadLocal;-><init>()V\n' +
+  'sput-object v0, Landroid/net/TrafficStats;->uids:Ljava/lang/ThreadLocal;\n'
+ old := metadata + retained + init.replace(second, '') + '\n' +
+  '.method public static clearThreadStatsUid()V\n.registers 0\nreturn-void\n.end method\n'
+ mut methods := ''
+ mut raw_methods := ''
+ for signature in signatures {
+  method := expected[signature]!
+  methods += method + '\n'
+  locals := if signature == 'setThreadStatsUid(I)V' { 2 } else { 1 }
+  registers := if signature == 'setThreadStatsUid(I)V' { 3 } else { 1 }
+  raw_methods += method.replace('.registers ' + registers.str(), '.locals ' + locals.str())
+   .replace(':uid', ':renamed_uid').replace('const/4 v0, -0x1', 'const/4 v0, -1') + '\n'
+ }
+ good := metadata + field + '\n' + retained + methods
+ traffic_stats_uid_members(old, good)!
+ traffic_stats_uid_members(old, metadata + field + '\n' + retained + raw_methods)!
+ mut controls := 0
+ getter := expected['getThreadStatsUid()I']!
+ setter := expected['setThreadStatsUid(I)V']!
+ clear := expected['clearThreadStatsUid()V']!
+ for bad in [good.replace(field + '\n', ''), good.replace(field, field + '\n' + field),
+  good.replace('private static uids:', 'public static uids:'), good.replace('private static uids:', 'private static final uids:'),
+  good.replace('uids:Ljava/lang/ThreadLocal;', 'uids:Ljava/lang/InheritableThreadLocal;'),
+  good.replace(init, init.replace(second, '')), good.replace(init, init.replace('->uids:', '->tags:')),
+  good.replace(clear, clear.replace('->uids:', '->tags:')), good.replace(clear, clear.replace('->remove()V', '->get()Ljava/lang/Object;')),
+  good.replace(setter, setter.replace('->uids:', '->tags:')), good.replace(setter, setter.replace('{p0}', '{v0}')),
+  good.replace(setter, setter.replace('{v0, v1}', '{v1, v0}')), good.replace(setter, setter.replace('.registers 3', '.registers 4')),
+  good.replace(getter, getter.replace('->uids:', '->tags:')), good.replace(getter, getter.replace('if-nez', 'if-eqz')),
+  good.replace(getter, getter.replace('const/4 v0, -0x1', 'const/4 v0, 0x0')),
+  good.replace(getter, getter.replace('()I', '()J')), good.replace(getter, getter.replace('public static ', 'private static ')),
+  good.replace(getter, getter.replace('public static ', 'public static native ')),
+  good.replace(getter, getter.replace('move-result v0', 'move-result v1')),
+  good.replace('const-wide/16 v0, -0x1', 'const-wide/16 v0, 0x0'),
+  good.replace('static getThreadStatsTag()I', 'static getThreadStatsTag()J'),
+  good.replace('private static tags:', 'private static tagValues:'), good + '.field private static unrelated:I\n',
+  good + '.method public static unrelated()V\n.registers 0\nreturn-void\n.end method\n'] {
+  if bad == good { return error('inactive TrafficStats producer mutation') }
+  traffic_stats_uid_members(old, bad) or { controls++; continue }
+  return error('TrafficStats UID behavior, metadata or unrelated-body mutation accepted')
+ }
+ for bad_old in [old.replace('return-void\n.end method\n.method public static clearThreadStatsUid', 'nop\nreturn-void\n.end method\n.method public static clearThreadStatsUid'),
+  old.replace('clearThreadStatsUid()V\n.registers 0\nreturn-void', 'clearThreadStatsUid()V\n.registers 1\nreturn-void'),
+  old + field + '\n'] {
+  if bad_old == old { return error('inactive TrafficStats predecessor mutation') }
+  traffic_stats_uid_members(bad_old, good) or { controls++; continue }
+  return error('unknown TrafficStats predecessor accepted')
+ }
+ mut before_classes := {target: 'old'}
+ for i in 0 .. 2116 { before_classes['other/' + i.str() + '.smali'] = 'same' }
+ mut after_classes := before_classes.clone()
+ after_classes[target] = 'new'
+ narrow_profile_class_delta(before_classes, after_classes, [target], []string{}, 2117)!
+ for case in 0 .. 5 {
+  mut bad := after_classes.clone()
+  match case {
+   0 { bad[target] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(target) }
+   3 { bad['extra.smali'] = 'extra' }
+   else { bad.delete(target); bad['substituted.smali'] = 'new' }
+  }
+  narrow_profile_class_delta(before_classes, bad, [target], []string{}, 2117) or { controls++; continue }
+  return error('TrafficStats-only 2117-class scope mutation accepted')
+ }
+ println('TRAFFIC-STATS-PRODUCER-SELFTEST-PASS controls=' + controls.str() + ' independent-UID-state exact-two-changed-two-added private-ThreadLocal raw-canonical-forms 2116-unchanged')
+}
+
 struct FrameworkBootMethod {
  signature string
  owner string
@@ -5376,6 +5546,7 @@ fn self_test() ! {
  build_abis_self_test()!
  webview_package_self_test()!
  framework_boot_self_test()!
+ traffic_stats_self_test()!
  query_profile := service_query_profile()
  narrow_method_self_test(query_profile.methods['android/content/pm/PackageManager.smali']!, 1, 0)!
  boot_profile := direct_boot_profile()
@@ -5706,6 +5877,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'build-abis' { build_abis_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
   if profile.name == 'webview-package' { webview_package_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'framework-boot' { framework_boot_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
+  if profile.name == 'traffic-stats' { traffic_stats_uid_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/smali/' + target)!, target)! }
@@ -5778,6 +5950,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'build-abis' { build_abis_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
   if profile.name == 'webview-package' { webview_package_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'framework-boot' { framework_boot_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
+  if profile.name == 'traffic-stats' { traffic_stats_uid_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!)! }
  }
  if profile.name == 'platform-fragments' {
   for target in profile.extra_classes { platform_fragments_abi(os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -6186,11 +6359,15 @@ fn main() {
   build_narrow(framework_boot_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--traffic-stats' {
+  build_narrow(traffic_stats_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] in ['--store', '--auth', '--cache', '--descriptions', '--protected-storage', '--service-query', '--direct-boot', '--credential-storage', '--broadcast-result', '--onboarding', '--application-restrictions', '--auth-exception', '--binder-identity', '--service-lifecycle', '--platform-fragments', '--imageview-bounds', '--window-system-ui'] {
   profile := match os.args[1] { '--store' { storage_profile() } '--auth' { auth_profile() } '--cache' { cache_profile() } '--descriptions' { descriptions_profile() } '--protected-storage' { protected_storage_profile() } '--service-query' { service_query_profile() } '--direct-boot' { direct_boot_profile() } '--credential-storage' { credential_storage_profile() } '--broadcast-result' { broadcast_result_profile() } '--application-restrictions' { application_restrictions_profile() } '--auth-exception' { auth_exception_profile() } '--binder-identity' { binder_identity_profile() } '--service-lifecycle' { service_lifecycle_profile() } '--platform-fragments' { platform_fragments_profile() } '--imageview-bounds' { imageview_bounds_profile() } '--window-system-ui' { window_system_ui_profile() } else { onboarding_profile() } }
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder|--component-parcel|--event-log|--build-abis|--webview-package|--framework-boot] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--usage-inactive|--messenger-binder|--component-parcel|--event-log|--build-abis|--webview-package|--framework-boot|--traffic-stats] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
