@@ -9,9 +9,11 @@ with all six input pins and eleven checks, independently reviewed. GMS reached
 readiness, then exited on missing `Settings.Global.putString`; Maps was not
 manually launched. The complete fatal log matches its guest hash and length.
 Own guest PID6224 is stopped and confirmed gone; CI PID23708 remains untouched.
-The runtime seal passed its internal complete check; separate fresh readback
-is pending after disk-reserve preflight refusals. The next adapter and focused
-checks are source drafts, with no successor SDK or ARM result yet.
+The runtime seal and separate fresh readback passed; both earlier readback
+refusals remain preserved. The [next adapter and focused checks](global-settings-string-host-blocked-2026-11-05.md)
+are source drafts. The focused-check driver compiled, but actual qualification
+was refused before launch below the 1 GiB disk reserve. No successor SDK or ARM
+result is established yet.
 
 ## Prior checkpoints
 
