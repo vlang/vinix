@@ -103,10 +103,10 @@ inputs, including the rebuilt batch tests and today's ancestry/discovery
 helpers. A fresh readback of the complete original three-root SDK 27.0
 provenance seal also passed; that full input closure remains separate history.
 
-The SDK 27.2 patcher suite has reached the later FAT cases but full
-qualification remains pending after three stops at the original shared-volume
-growth cap. Each stopped with guard 125, child 137 and complete cleanup; no
-functional failure appeared. All three complete scratch trees are retained.
+The SDK 27.2 patcher remains functionally unqualified. Its first three full
+suite attempts stopped at the original shared-volume growth cap, each with
+guard 125, child 137 and complete cleanup; no functional failure appeared.
+All complete scratch trees remain retained.
 
 | SDK 27.2 FAT attempt | Elapsed milliseconds | Observed growth bytes | FAT cases passed |
 | --- | ---: | ---: | ---: |
@@ -144,8 +144,8 @@ child 137 and complete cleanup. Complete attempts remain preserved:
 | `maps-framework-boot-tools-sealed-2026-11-04-r2` | 6,191 | 90,341,376 |
 
 The first attempt produced no output. The second retained that first failed
-root alongside the three evidence roots. Aggregate tool evidence sealing
-remains pending; a fresh retry must retain both complete failed attempts.
+root alongside the three evidence roots. Both complete failed attempts, and
+the later failed retries, remain in the completed aggregate seal below.
 
 Media preparation completed independently using the qualified stager and
 source revision `38aa4e5dd7ae9471427afde9e90a0adea33f75cf`. The prepared root
@@ -165,9 +165,43 @@ records 137,650,176 bytes internal charge; the final completion sample was
 5 GiB initial-space gate, 600 MiB RSS, 900-second, 1 GiB reserve and output
 bounds remained unchanged. Preparation required no kernel-patcher invocation.
 
-Aggregate tool sealing, new SDK 27.2 patcher FAT qualification, kernel
-installation and runtime checks remain pending. The guest has not booted
-this prepared image; preparation establishes no Maps completion result.
+The completed aggregate tool-data seal is
+`maps-framework-boot-tools-sealed-2026-11-04-r5/sealed/manifest.json`, SHA-256
+`773f284250307ed0e40ca1481094d4e768b6069990bd0a39e843f08a81ba1124`.
+Its 15 roots and 67,595 entries retain the original tool/batch/SDK closures,
+all earlier failed seal roots, later r5–r7 FAT attempts, resource preflight
+history and the qualified old-tool archive. Seal and separate fresh readback
+both exited zero with complete cleanup in 21,219/12,448 ms and observed
+growth 22,810,624/33,484,800 bytes under the unchanged 64 MiB growth cap.
+This completes storage of those closed artifacts and does not qualify the
+new SDK 27.2 patcher. Original pending notes remain historical records.
+
+A later same-byte SDK 27.2 r8 suite stopped at the original 512 MiB growth
+cap after 38 FAT passes: guard 125, child 137, complete cleanup, 134,064 ms
+and 538,034,176 bytes observed growth. Its complete scratch is retained at
+`maps-framework-boot-patcher-fat-2026-11-04-r8/scratch`; guarded preservation
+passed zero/zero with complete cleanup in 176 ms, and executable comparisons
+before and after matched. No reinstall used this unqualified executable.
+
+The final four-root, 6,339-entry supplement is
+`maps-framework-boot-resume-handoff-sealed-2026-11-04-r1/sealed/manifest.json`,
+SHA-256 `1529cc760e8b75f610a55df2ecb1b106e5c55df443bcb141a26d575aa18138ab`.
+It retains complete r8 evidence/scratch, the current CI-only R2 admission,
+the Q5 aggregate archive with controls, and the kernel-handoff archive with
+controls. Seal/fresh readback passed zero/zero with complete cleanup in
+2,980/1,502 ms and growth 5,931,008/2,215,936 bytes under the original 64 MiB
+cap. Current evidence storage is complete, including prior failed attempts;
+this adds no functional qualification for `628cd967...`.
+
+The installed frozen kernel uses the qualified original `864cd44...`
+[archived patcher](framework-boot-archived-patcher.md).
+
+Runtime checks remain pending. The guest has not booted this prepared image.
+The current read-only admission attempt, with only the existing CI VM present,
+refused its unsupported foreign drive configuration: guard/child one with
+complete cleanup in 171 ms. CI remains running with its configured 32 GiB
+and eight CPUs; no foreign action or guest boot followed. These stored
+artifacts and preparation results establish no Maps completion result.
 No Android SDK, native library or signed fixture rebuild is needed for this
 host SDK change. These host checks establish no Cronet, Maps rendering,
 Google authentication or imagery result.
