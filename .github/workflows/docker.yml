@@ -1,0 +1,61 @@
+name: Build the Vinix Docker image
+
+# The Dockerfile is the distro-agnostic build path in the README, so it has to
+# keep working. This builds it on every change and checks that both V compilers
+# inside it actually start, which is the same check the build scripts run (see
+# build-support/find-v.sh). It does not push: publishing an image is a separate
+# decision, and the build is the part that rots.
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'tools/m1-wifi/get-v.sh'
+      - '.github/workflows/docker.yml'
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'tools/m1-wifi/get-v.sh'
+      - '.github/workflows/docker.yml'
+  schedule:
+    # Weekly: the pins and the Ubuntu packages both move under a Dockerfile
+    # that nobody has touched.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: docker-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build and load the image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: false
+          # Load into the runner's image store, so the checks below run the
+          # image that was just built rather than a second one.
+          load: true
+          tags: vinix:build
+
+      - name: Check the kernel compiler inside the image
+        run: docker run --rm vinix:build v version
+
+      - name: Check the utility compiler inside the image
+        run: docker run --rm vinix:build /opt/vinix-tools/v-util/v version
