@@ -441,7 +441,7 @@ fn data_http_body_counted(mut stream DataHTTPStream, response DataHTTPResponse, 
 }
 
 fn data_http_load(url u64, cls u64) u64 {
-	bytes := data_http_fetch(ctext(u64(obj_header(obj_header(url).fields[1]).text)), '/etc/ssl/cert.pem', 10 * time.second) or { return 0 }
+	bytes := data_http_fetch(ctext(u64(obj_header(obj_header(url).fields[1]).text)), data_http_system_ca_file(), 10 * time.second) or { return 0 }
 	result := objc_allocate(cls)
 	mut header := obj_header(result)
 	header.data = bytes

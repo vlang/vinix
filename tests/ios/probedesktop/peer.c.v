@@ -36,6 +36,9 @@ pub struct Config {
 pub:
 	width int = 1024
 	height int = 768
+	// Zero retains the historical behavior: the initial handshake uses
+	// reply_ms. GNU probes may explicitly allow slow application startup.
+	startup_ms int
 	reply_ms int = 30000
 	session_ms int = 10000
 }
@@ -168,7 +171,8 @@ fn (mut peer Peer) build(mut result Observation) ! {
 }
 
 fn (mut peer Peer) session(mut result Observation) ! {
-	hello := peer.reply(time.sys_mono_now() + i64(peer.config.reply_ms) * 1000000)!
+	startup := if peer.config.startup_ms == 0 { peer.config.reply_ms } else { peer.config.startup_ms }
+	hello := peer.reply(time.sys_mono_now() + i64(startup) * 1000000)!
 	defer { unsafe { hello.free() } }
 	if hello.len != 0 { return error('nonempty desktop handshake') }
 	result.handshake = true
@@ -197,6 +201,7 @@ fn (mut peer Peer) session(mut result Observation) ! {
 // not successful app exits. Always close pipes, bound the exit wait and reap.
 pub fn run(path string, args []string, setup fn (string) !, context string, config Config) !Observation {
 	if config.width !in 1 .. 8193 || config.height !in 1 .. 8193
+		|| config.startup_ms !in 0 .. 1800001
 		|| config.reply_ms !in 1 .. 60001 || config.session_ms !in 0 .. 60001 {
 		return error('invalid desktop probe configuration')
 	}

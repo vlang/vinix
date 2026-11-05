@@ -4,17 +4,23 @@ module main
 
 import os
 import frozenv
+import hosttools
 import probebudget
 import time
 import tlsbuild
-
-const llvm = '/opt/homebrew/opt/llvm/bin/clang'
 
 fn checked(args []string) {
 	println('IOS-BUILD-COMMAND: ' + args.join(' '))
 	mut p := os.new_process(args[0])
 	p.set_args(args[1..])
 	frozenv.configure(mut p, args[0]) or { panic(err) }
+	if os.file_name(args[0]) == 'v' {
+		mut environment := os.environ()
+		environment['V_RESOURCE_PATH'] = os.dir(args[0])
+		environment['V_MACOS_V3_NO_FALLBACK'] = '1'
+		p.set_environment(environment)
+		p.set_work_folder(os.dir(args[0]))
+	}
 	p.run()
 	p.wait()
 	defer { p.close() }
@@ -44,14 +50,20 @@ fn require_arm64_elf(path string) {
 }
 
 fn compile_c(root string, generated string, output string, gles bool) {
-	sysroot := root + '/build/ios/fortnite/date-encoding-checks/sdk'
-	gcc := root + '/build/useralloc-pipe/static-desktop-v5/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0'
-	mesa := root + '/build/ios/fortnite/date-encoding-checks/sdk'
+	llvm := hosttools.clang() or { panic(err) }
+	linker := hosttools.linker(llvm) or { panic(err) }
+	sysroot := hosttools.directory('VINIX_IOS_SYSROOT', root + '/build/ios/fortnite/date-encoding-checks/sdk') or { panic(err) }
+	gcc := hosttools.directory('VINIX_IOS_GCC_LIB', root + '/build/useralloc-pipe/static-desktop-v5/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0') or { panic(err) }
+	mesa := if gles { hosttools.directory('VINIX_IOS_MESA_SYSROOT', sysroot) or { panic(err) } } else { sysroot }
+	cxx := hosttools.directory('VINIX_IOS_CXX_DIR', root + '/build/ios/cxx') or { panic(err) }
+	video := hosttools.directory('VINIX_IOS_VIDEO_DIR', root + '/build/ios/fortnite/video-decode-deps') or { panic(err) }
+	sqlite := hosttools.directory('VINIX_IOS_SQLITE_DIR', root + '/build/ios/sqlite') or { panic(err) }
+	gles_libs := if gles { hosttools.directory('VINIX_IOS_GLES_LIBDIR', root + '/build/ios/fortnite/staging/usr/lib/vinix/ios-gles') or { panic(err) } } else { '' }
 	mut args := [llvm, '--target=aarch64-linux-musl', '-nostdinc', '-nostdlib', '-isystem',
 		root + '/build-support/aarch64-cc-shim', '-isystem', gcc + '/include', '-isystem',
 		sysroot + '/usr/include', '-O2', '-D_GNU_SOURCE', '-fno-stack-protector', '-w']
-	args << ['-I'+root+'/build/ios/sqlite/source']
-	args << ['-I'+root+'/build/ios/fortnite/video-decode-deps/arm64','-I'+root+'/build/ios/fortnite/video-decode-deps/source']
+	args << ['-I' + sqlite + '/source']
+	args << ['-I' + video + '/arm64', '-I' + video + '/source']
 	if gles {
 		args << ['-no-pie', '-isystem', mesa + '/usr/include', '-isystem',
 			mesa + '/usr/include/freetype2']
@@ -61,7 +73,7 @@ fn compile_c(root string, generated string, output string, gles bool) {
 	args << [sysroot + '/usr/lib/crt1.o', sysroot + '/usr/lib/crti.o',
 		gcc + if gles { '/crtbegin.o' } else { '/crtbeginT.o' }, generated]
 	// Newer V toolchains keep these runtime helpers outside generated C.
-	vroot := root + '/build/ios/fortnite/ns-calendar-checks/toolchain'
+	vroot := hosttools.toolchain(root) or { panic(err) }
 	if !generated.ends_with('/native-init.c') {
 		args << tlsbuild.includes(vroot)
 		// TLS uses ARM intrinsics: pair clang with its own intrinsic headers.
@@ -76,18 +88,18 @@ fn compile_c(root string, generated string, output string, gles bool) {
 	args << '-DCUSTOM_DEFINE_no_backtrace'
 	if !generated.ends_with('/native-init.c') { args << root + '/compat/ios/runner/abi/dispatch.S' }
 	args << ['-ffixed-x18', '-L' + sysroot + '/usr/lib', '-L' + gcc,
-		root + '/build/ios/cxx/libcxx-ios.a', root + '/build/ios/cxx/sysroot/usr/lib/libc++abi.a',
-		root + '/build/ios/cxx/sysroot/usr/lib/libunwind.a']
+		cxx + '/libcxx-ios.a', cxx + '/sysroot/usr/lib/libc++abi.a',
+		cxx + '/sysroot/usr/lib/libunwind.a']
 	if gles {
-		args << ['-L' + root + '/build/ios/fortnite/staging/usr/lib/vinix/ios-gles', '-lEGL', '-lGLESv2',
+		args << ['-L' + gles_libs, '-lEGL', '-lGLESv2',
 			'-lfreetype', '-Wl,--dynamic-linker=/usr/lib/vinix/ios-gles/ld-musl-aarch64.so.1',
 			'-Wl,-rpath,/usr/lib/vinix/ios-gles',
-			'-Wl,-rpath-link,' + root + '/build/ios/fortnite/staging/usr/lib/vinix/ios-gles']
+			'-Wl,-rpath-link,' + gles_libs]
 	}
-	args << [root+'/build/ios/fortnite/video-decode-deps/arm64/libavcodec/libavcodec.a',root+'/build/ios/fortnite/video-decode-deps/arm64/libswscale/libswscale.a',root+'/build/ios/fortnite/video-decode-deps/arm64/libavutil/libavutil.a']
-	args << root+'/build/ios/sqlite/arm64/libsqlite3.a'
+	args << [video + '/arm64/libavcodec/libavcodec.a', video + '/arm64/libswscale/libswscale.a', video + '/arm64/libavutil/libavutil.a']
+	args << sqlite + '/arm64/libsqlite3.a'
 	args << ['-lgcc_eh', '-lc', '-lgcc', '-lm', gcc + '/crtend.o', sysroot + '/usr/lib/crtn.o',
-		'-fuse-ld=lld', '-B/opt/homebrew/opt/llvm/bin', '-o', output]
+		'-fuse-ld=' + linker, '-o', output]
 	checked(args)
 	require_arm64_elf(output)
 }
@@ -203,16 +215,17 @@ fn native_fixture_source(item string) string {
 }
 
 fn build(root string, out string, only string) {
+	vroot := hosttools.toolchain(root) or { panic(err) }
 	if only !in ['session-cancel-checks', 'data-http-checks', 'operation-queue-checks', 'session-task-delegate-checks', 'number-long-long-checks', 'url-resource-values-checks', 'session-data-task-checks', 'dictionary-variadic-checks', 'dictionary-single-checks', 'number-unsigned-checks', 'object-equality-checks', 'optional-metadata-checks', 'optional-encoding-checks', 'optional-decoding-checks', 'session-configured-checks', 'session-defaults-checks', 'swift-optional-lookup-checks', 'error-description-checks', 'audio-activation-checks', 'audio-haptics-checks', 'audio-configuration-checks', 'string-compare-checks', 'audio-category-checks', 'audio-activity-checks', 'notification-block-checks', 'metal-device-checks', 'locale-preferred-checks', 'bundle-info-checks', 'string-get-cstring-checks', 'dictionary-file-checks', 'bundle-identifier-checks', 'string-path-checks', 'url-resource-checks', 'number-bool-checks', 'string-cstring-output-checks', 'string-normalization-checks', 'responder-checks', 'view-tag-checks', 'main-selector-checks', 'application-badge-checks', 'window-checks', 'string-float-checks', 'string-cstring-checks', 'bundle-receipt-checks', 'cf-string-output-checks', 'search-path-checks', 'home-directory-checks', 'inline-pthread-self-checks', 'dictionary-snapshot-checks', 'block-byref-checks', 'processinfo-checks', 'vm-probe-checks', 'class-update-checks', 'native-value-checks', 'capture-audio-output-checks', 'gk-match-request-checks', 'gk-achievement-checks', 'gk-achievement-description-checks', 'gk-player-checks', 'gk-turn-based-participant-checks', 'gk-turn-based-match-checks', 'gk-local-player-checks', 'gk-leaderboard-checks', 'capture-discovery-checks', 'app-attest-checks', 'gc-event-view-controller-checks', 'snapshot-configuration-checks', 'text-field-checks', 'haptic-dynamic-parameter-checks', 'haptic-pattern-checks', 'haptic-event-checks', 'haptic-event-parameter-checks', 'long-press-gesture-checks', 'tap-gesture-checks', 'rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'av-player-checks', 'ns-proxy-checks', 'swift-object-checks', 'storekit-purchase-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! { panic('unknown notification build target') }
 	for item in ['session-cancel-checks', 'data-http-checks', 'operation-queue-checks', 'session-task-delegate-checks', 'number-long-long-checks', 'url-resource-values-checks', 'session-data-task-checks', 'dictionary-variadic-checks', 'dictionary-single-checks', 'number-unsigned-checks', 'object-equality-checks', 'optional-metadata-checks', 'optional-encoding-checks', 'optional-decoding-checks', 'session-configured-checks', 'session-defaults-checks', 'swift-optional-lookup-checks', 'error-description-checks', 'audio-activation-checks', 'audio-haptics-checks', 'audio-configuration-checks', 'string-compare-checks', 'audio-category-checks', 'audio-activity-checks', 'notification-block-checks', 'metal-device-checks', 'locale-preferred-checks', 'bundle-info-checks', 'string-get-cstring-checks', 'dictionary-file-checks', 'bundle-identifier-checks', 'string-path-checks', 'url-resource-checks', 'number-bool-checks', 'string-cstring-output-checks', 'string-normalization-checks', 'responder-checks', 'view-tag-checks', 'main-selector-checks', 'application-badge-checks', 'window-checks', 'string-float-checks', 'string-cstring-checks', 'bundle-receipt-checks', 'cf-string-output-checks', 'search-path-checks', 'home-directory-checks', 'inline-pthread-self-checks', 'dictionary-snapshot-checks', 'block-byref-checks', 'processinfo-checks', 'vm-probe-checks', 'class-update-checks', 'native-value-checks', 'capture-audio-output-checks', 'gk-match-request-checks', 'gk-achievement-checks', 'gk-achievement-description-checks', 'gk-player-checks', 'gk-turn-based-participant-checks', 'gk-turn-based-match-checks', 'gk-local-player-checks', 'gk-leaderboard-checks', 'capture-discovery-checks', 'app-attest-checks', 'gc-event-view-controller-checks', 'snapshot-configuration-checks', 'text-field-checks', 'haptic-dynamic-parameter-checks', 'haptic-pattern-checks', 'haptic-event-checks', 'haptic-event-parameter-checks', 'long-press-gesture-checks', 'tap-gesture-checks', 'rotation-gesture-checks', 'pinch-gesture-checks', 'pan-gesture-checks', 'text-input-checks', 'game-center-checks', 'av-player-checks', 'ns-proxy-checks', 'swift-object-checks', 'storekit-purchase-checks', 'storyboard-checks', 'audio-application-checks', 'game-controller-checks', 'session-task-checks', 'feedback-checks', 'adsupport-checks', 'bundle-resource-checks', 'number-formatter-checks', 'date-formatter-checks', 'lock-checks', 'recursive-lock-checks', 'map-table-checks', 'credential-checks', 'telephony-checks', 'cache-checks', 'notification-attachment-checks', 'notification-sound-checks', 'notification-content-checks', 'notification-center-checks', 'notification-request-checks', 'calendar-trigger-checks', 'calendar-checks','native-init','run-ios','run-ios-gles']! {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
-			checked([root + '/build/ios/fortnite/ns-calendar-checks/toolchain/v', '-enable-globals','-nocache', '-cc', 'clang', '-os', 'linux', '-arch', 'arm64', '-gc', 'none', '-prod', '-d', 'no_backtrace',
+			checked([vroot + '/v', '-enable-globals','-nocache', '-cc', 'clang', '-os', 'linux', '-arch', 'arm64', '-gc', 'none', '-prod', '-d', 'no_backtrace',
 				'-path', '@vlib|' + root + '/compat/ios|' + root + '/tests/ios|@vmodules',
 				'-o', generated, root + '/tests/ios/native-init.v'])
 		} else {
-			mut args := [root + '/build/ios/fortnite/ns-calendar-checks/toolchain/v', '-enable-globals','-nocache', '-cc', 'clang', '-os', 'linux', '-arch', 'arm64', '-enable-globals', '-gc', 'none',
+			mut args := [vroot + '/v', '-enable-globals','-nocache', '-cc', 'clang', '-os', 'linux', '-arch', 'arm64', '-enable-globals', '-gc', 'none',
 				'-prod', '-d', 'ios_video', '-d', 'glibc', '-d', 'no_backtrace', '-d', 'ios_cxx', '-d', 'ios_sqlite', '-path',
 				'@vlib|' + root + '/compat/ios|' + root + '/tests/ios|@vmodules', '-o', generated]
 			if item.ends_with('-checks') { args = args.filter(it != '-prod') }
@@ -250,11 +263,11 @@ fn await_checks(mut p os.Process, log string, marker string, timeout_seconds int
 fn vm(root string, out string, mode string) {
 	// Preserve the historical default; allow checkpoints to select and record
 	// an existing kernel with the required budget/signal fixes.
-	kernel := os.real_path(os.getenv_opt('VINIX_IOS_KERNEL') or {
-		root + '/build/ios/fortnite/socket-kernel-arm64/bin/vinix'
-	})
+	kernel := hosttools.file('VINIX_IOS_KERNEL', root + '/build/ios/fortnite/socket-kernel-arm64/bin/vinix') or { panic(err) }
 	require_arm64_elf(kernel)
 	println('VM kernel: ' + kernel)
+	archiver := hosttools.bsdtar() or { panic(err) }
+	limine := hosttools.file('VINIX_IOS_LIMINE', root + '/boot-image/limine-bin/BOOTAA64.EFI') or { panic(err) }
 	desktop := os.getenv('VINIX_IOS_PROBE_DESKTOP')
 	if desktop !in ['', '1'] || (desktop == '1' && mode != 'probe-no-ads') {
 		panic('VINIX_IOS_PROBE_DESKTOP=1 requires probe-no-ads')
@@ -366,7 +379,8 @@ fn vm(root string, out string, mode string) {
 	payload := state
 	os.mkdir_all(payload + '/rootfs') or { panic(err) }
 	fs := payload + '/rootfs'
-	copy_file('/etc/ssl/cert.pem', fs + '/etc/ssl/cert.pem')
+	ca_bundle := hosttools.ca_bundle() or { panic(err) }
+	copy_file(ca_bundle, fs + '/etc/ssl/cert.pem')
 	if mode == 'session-cancel' {
 		copy_file(out + '/session-cancel-checks', fs + '/opt/ios/session-cancel-checks')
 	} else if mode == 'data-http' {
@@ -505,10 +519,11 @@ fn vm(root string, out string, mode string) {
 		copy_file(out + '/credential-checks', fs + '/opt/ios/credential-checks')
 		copy_file(out + '/telephony-checks', fs + '/opt/ios/telephony-checks')
 		copy_file(out + '/notification-attachment-checks', fs + '/opt/ios/notification-attachment-checks')
-		tree(root+'/build/ios/fortnite/staging/usr/lib/vinix/ios-gles',fs+'/usr/lib/vinix/ios-gles')
+		tree(hosttools.directory('VINIX_IOS_GLES_LIBDIR', root + '/build/ios/fortnite/staging/usr/lib/vinix/ios-gles') or { panic(err) }, fs + '/usr/lib/vinix/ios-gles')
 	} else {
 		os.mkdir_all(fs + '/opt/ios') or { panic(err) }
-		tree(root + '/build/ios/fortnite/local/Payload/FortniteClient-IOS-Shipping.app/Frameworks', fs + '/opt/ios/Frameworks')
+		app := hosttools.directory('VINIX_IOS_APP_BUNDLE', root + '/build/ios/fortnite/local/Payload/FortniteClient-IOS-Shipping.app') or { panic(err) }
+		tree(app + '/Frameworks', fs + '/opt/ios/Frameworks')
 		copy_file(out + '/' + if mode == 'static-audit' { 'run-ios' } else { 'run-ios-gles' }, fs + '/opt/ios/run-ios')
 		if mode == 'probe-no-ads' {
 			// Keep full cooked game content opt-in: historical checkpoints only
@@ -635,7 +650,7 @@ fn vm(root string, out string, mode string) {
 			copy_file(out + '/inline-pthread-self-checks', fs + '/opt/ios/inline-pthread-self-checks')
 			copy_file(out + '/dictionary-snapshot-checks', fs + '/opt/ios/dictionary-snapshot-checks')
 		}
-		tree(root + '/build/ios/fortnite/staging/usr/lib/vinix/ios-gles', fs + '/usr/lib/vinix/ios-gles')
+		tree(hosttools.directory('VINIX_IOS_GLES_LIBDIR', root + '/build/ios/fortnite/staging/usr/lib/vinix/ios-gles') or { panic(err) }, fs + '/usr/lib/vinix/ios-gles')
 	}
 	copy_file(out + '/native-init', fs + '/sbin/init')
 	if mode == 'notifications' {
@@ -658,13 +673,14 @@ fn vm(root string, out string, mode string) {
 	println('VM initramfs gzip compression level: ' + compression)
 	gzip_option := 'gzip:compression-level=' + compression
 	if mode in ['probe', 'probe-no-ads', 'audit', 'static-audit'] {
-		// This Mac's libarchive copies the preserved IPA executable directly
+		// libarchive copies the preserved IPA executable directly
 		// between archives. Omit its old runner; the overlay path starts ./
 		// and supplies exactly one current replacement. No large extraction.
-		checked(['tar', '--format=ustar', '--options', gzip_option, '-czf', archive, '-s', ',^opt/ios/run-ios$,,',
-			'@' + root + '/build/ios/fortnite/probe-initramfs.tar.gz', '-C', fs, '.'])
+		base := hosttools.file('VINIX_IOS_PROBE_INITRAMFS', root + '/build/ios/fortnite/probe-initramfs.tar.gz') or { panic(err) }
+		checked([archiver, '--format=ustar', '--options', gzip_option, '-czf', archive, '-s', ',^opt/ios/run-ios$,,',
+			'@' + base, '-C', fs, '.'])
 	} else {
-		checked(['tar', '--format=ustar', '--options', gzip_option, '-czf', archive, '-C', fs, '.'])
+		checked([archiver, '--format=ustar', '--options', gzip_option, '-czf', archive, '-C', fs, '.'])
 	}
 	// Release staged files once the complete archive is ready.
 	os.rmdir_all(fs) or { panic(err) }
@@ -673,13 +689,14 @@ fn vm(root string, out string, mode string) {
 	// filesystem overhead and the kernel; retain the old size for small probes.
 	archive_mb := (os.file_size(archive) + 1024 * 1024 - 1) / (1024 * 1024)
 	boot_mb := if archive_mb + 128 > 384 { ((archive_mb + 128 + 63) / 64) * 64 } else { u64(384) }
-	checked(['mkfile', '-n', boot_mb.str() + 'm', disk])
+	hosttools.sparse_file(disk, boot_mb * 1024 * 1024) or { panic(err) }
+	println('VM boot image: ' + disk + ' bytes=' + (boot_mb * 1024 * 1024).str())
 	checked(['mformat', '-F', '-i', disk, '::'])
 	for path in ['::/EFI', '::/EFI/BOOT', '::/boot'] { checked(['mmd', '-i', disk, path]) }
 	conf := state + '/limine.conf'
 	os.write_file(conf, 'timeout: 0\nverbose: yes\n/Vinix\n    protocol: limine\n    kernel_path: boot():/boot/vinix\n    module_path: \$boot():/boot/initramfs.tar.gz\n    resolution: 1024x768x32\n    kbacktracer: no\n') or { panic(err) }
 	for source, target in {
-		root + '/boot-image/limine-bin/BOOTAA64.EFI':               '::/EFI/BOOT/BOOTAA64.EFI'
+		limine:                                                     '::/EFI/BOOT/BOOTAA64.EFI'
 		conf:                                                       '::/boot/limine.conf'
 		kernel:                                                     '::/boot/vinix'
 		archive:                                                    '::/boot/initramfs.tar.gz'
@@ -693,23 +710,38 @@ fn vm(root string, out string, mode string) {
 fn run_vm(mode string, state string, guest_mb string, timeout_seconds int) {
 	cpus := os.getenv_opt('VINIX_IOS_VM_CPUS') or { '4' }
 	if cpus !in ['1', '2', '3', '4'] { panic('VINIX_IOS_VM_CPUS must be 1 through 4') }
+	tools := hosttools.vm_tools() or { panic(err) }
 	disk := state + '/boot.img'
 	vars := state + '/efivars.fd'
-	if os.exists(vars) { os.rm(vars) or { panic(err) } }
-	checked(['mkfile', '-n', '64m', vars])
+	if os.real_path(vars) in [tools.firmware_code, tools.firmware_vars] {
+		panic('private EFI variable output must not alias a selected firmware input')
+	}
+	if os.exists(vars) || os.is_link(vars) { os.rm(vars) or { panic(err) } }
+	if tools.firmware_vars == '' {
+		hosttools.sparse_file(vars, 64 * 1024 * 1024) or { panic(err) }
+		println('VM EFI variables: fresh zero-filled 64 MiB image')
+	} else {
+		copy_file(tools.firmware_vars, vars)
+		println('VM EFI variables: private copy of ' + tools.firmware_vars)
+	}
+	// Packaged templates may be read-only. Only the private copy is writable.
+	os.chmod(vars, 0o600) or { panic(err) }
 	log := state + '/serial.log'
 	// A replay can otherwise accept the old completion/failure marker before
 	// QEMU opens its serial device. The checkpoint caller preserves old logs.
 	os.write_file(log, '') or { panic(err) }
 	println('Serial capture reset before VM launch')
-	mut p := os.new_process('/opt/homebrew/bin/qemu-system-aarch64')
+	mut p := os.new_process(tools.qemu)
 	println('VM startup limit: ${timeout_seconds} seconds; guest memory: ${guest_mb} MiB; virtual CPUs: ${cpus}')
-	p.set_args(['-machine', 'virt,gic-version=3', '-accel', 'hvf', '-cpu', 'host', '-m', guest_mb,
+	qemu_args := ['-machine', 'virt,gic-version=3', '-accel', tools.accel, '-cpu', tools.cpu, '-m', guest_mb,
 		'-smp', cpus, '-device', 'ramfb', '-display', 'none', '-monitor', 'none', '-serial',
 		'file:' + log, '-drive',
-		'if=pflash,format=raw,readonly=on,file=/opt/homebrew/share/qemu/edk2-aarch64-code.fd',
-		'-drive', 'if=pflash,format=raw,file=' + vars, '-drive', 'format=raw,file=' + disk, '-device',
-		'virtio-keyboard-device', '-device', 'virtio-tablet-device'])
+		'if=pflash,format=raw,readonly=on,file=' + (hosttools.qemu_drive_file(tools.firmware_code) or { panic(err) }),
+		'-drive', 'if=pflash,format=raw,file=' + (hosttools.qemu_drive_file(vars) or { panic(err) }),
+		'-drive', 'format=raw,file=' + (hosttools.qemu_drive_file(disk) or { panic(err) }), '-device',
+		'virtio-keyboard-device', '-device', 'virtio-tablet-device']
+	p.set_args(qemu_args)
+	println('VM QEMU command: ' + os.quoted_path(tools.qemu) + ' ' + qemu_args.map(os.quoted_path(it)).join(' '))
 	p.set_redirect_stdio()
 	p.run()
 	marker := if mode == 'session-cancel' { 'VINIX iOS SESSIONCANCEL: PASS' } else if mode == 'data-http' { 'VINIX iOS DATAHTTP: PASS' } else if mode == 'operation-queue' { 'VINIX iOS OPERATIONQUEUE: PASS' } else if mode == 'class-update' { 'VINIX iOS CLASSUPDATE: PASS' } else if mode == 'native-value' { 'VINIX iOS NATIVEVALUE: PASS' } else if mode == 'gk-match-request' { 'VINIX iOS GKMATCHREQUEST: PASS' } else if mode == 'gk-achievement' { 'VINIX iOS GKACHIEVEMENT: PASS' } else if mode == 'gk-player' { 'VINIX iOS GKPLAYER: PASS' } else if mode == 'gk-turn-based-participant' { 'VINIX iOS GKTURNBASEDPARTICIPANT: PASS' } else if mode == 'gk-turn-based-match' { 'VINIX iOS GKTURNBASEDMATCH: PASS' } else if mode == 'gk-local-player' { 'VINIX iOS GKLOCALPLAYER: PASS' } else if mode == 'gk-leaderboard' { 'VINIX iOS GKLEADERBOARD: PASS' } else if mode == 'gk-achievement-description' { 'VINIX iOS GKACHIEVEMENTDESCRIPTION: PASS' } else if mode == 'capture-audio-output' { 'VINIX iOS CAPTUREAUDIOOUTPUT: PASS' } else if mode == 'capture-discovery' { 'VINIX iOS CAPTUREDISCOVERY: PASS' } else if mode == 'app-attest' { 'VINIX iOS APPATTEST: PASS' } else if mode == 'gc-event-view-controller' { 'VINIX iOS GCEVENT: PASS' } else if mode == 'snapshot-configuration' { 'VINIX iOS WKSNAPSHOT: PASS' } else if mode == 'text-field' { 'VINIX iOS UITEXTFIELD: PASS' } else if mode == 'haptic-dynamic-parameter' { 'VINIX iOS HAPTICDYNAMICPARAMETER: PASS' } else if mode == 'haptic-pattern' { 'VINIX iOS HAPTICPATTERN: PASS' } else if mode == 'haptic-event' { 'VINIX iOS HAPTICEVENT: PASS' } else if mode == 'haptic-event-parameter' { 'VINIX iOS HAPTICEVENTPARAMETER: PASS' } else if mode == 'long-press-gesture' { 'VINIX iOS LONGPRESSGESTURE: PASS' } else if mode == 'tap-gesture' { 'VINIX iOS TAPGESTURE: PASS' } else if mode == 'rotation-gesture' { 'VINIX iOS ROTATIONGESTURE: PASS' } else if mode == 'pinch-gesture' { 'VINIX iOS PINCHGESTURE: PASS' } else if mode == 'pan-gesture' { 'VINIX iOS PANGESTURE: PASS' } else if mode == 'text-input' { 'VINIX iOS TEXTINPUT: PASS' } else if mode == 'game-center' { 'VINIX iOS GAMECENTER: PASS' } else if mode == 'av-player' { 'VINIX iOS AVPLAYER: PASS' } else if mode == 'ns-proxy' { 'VINIX iOS NSPROXY: PASS' } else if mode == 'swift-object' { 'VINIX iOS SWIFTOBJECT: PASS' } else if mode == 'storekit-purchase' { 'VINIX iOS STOREKITPURCHASE: PASS' } else if mode == 'storyboard' { 'VINIX iOS STORYBOARD: PASS' } else if mode == 'audio-application' { 'VINIX iOS AUDIOAPPLICATION: PASS' } else if mode == 'game-controller' { 'VINIX iOS GAMECONTROLLER: PASS' } else if mode == 'session-task' { 'VINIX iOS SESSIONTASK: PASS' } else if mode == 'feedback' { 'VINIX iOS FEEDBACK: PASS' } else if mode == 'notifications' { 'VINIX iOS NOTIFICATIONS: PASS' } else { 'FORTNITE PROBE COMPLETE' }

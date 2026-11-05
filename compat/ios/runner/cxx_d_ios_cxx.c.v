@@ -5,6 +5,8 @@ module main
 
 fn C.ios_cxx_symbol(&char) usize
 
+type CxxNativeThreadJoin = fn (u64)
+
 fn cxx_symbol(symbol string) !u64 {
 	if address := cxx_pthread_symbol(symbol) { return address }
 	if address := cxx_platform_symbol(symbol) { return address }
@@ -29,6 +31,11 @@ fn cxx_platform_symbol(symbol string) ?u64 {
 }
 
 fn cxx_pthread_symbol(symbol string) ?u64 {
+	$if linux {
+		if symbol == '__ZNSt3__16thread4joinEv' {
+			return u64(unsafe { voidptr(cxx_thread_join) })
+		}
+	}
 	return match symbol {
 		'__ZNSt3__15mutex4lockEv', '__ZNSt3__115recursive_mutex4lockEv' { u64(unsafe { voidptr(cxx_mutex_lock) }) }
 		'__ZNSt3__15mutex6unlockEv', '__ZNSt3__115recursive_mutex6unlockEv' { u64(unsafe { voidptr(cxx_mutex_unlock) }) }
@@ -42,6 +49,20 @@ fn cxx_pthread_symbol(symbol string) ?u64 {
 		'__ZNSt3__118condition_variable15__do_timed_waitERNS_11unique_lockINS_5mutexEEENS_6chrono10time_pointINS5_12system_clockENS5_8durationIxNS_5ratioILl1ELl1000000000EEEEEEE' { u64(unsafe { voidptr(cxx_cond_timedwait) }) }
 		else { return none }
 	}
+}
+
+fn cxx_thread_join(object u64) {
+	handle := read64(object)
+	name := if handle != 0 && system_data != unsafe { nil } {
+		mach_threads_join_begin(handle)
+	} else { u32(0) }
+	// Retain libc++'s native join behavior, including clearing its object only
+	// on success and throwing system_error on failure. Bypass our resolver to
+	// avoid recursion, and retire the adapter registration only on return.
+	address := C.ios_cxx_symbol(c'__ZNSt3__16thread4joinEv')
+	if address == 0 { panic('iOS: native C++ thread join is not available') }
+	unsafe { CxxNativeThreadJoin(voidptr(address))(object) }
+	mach_threads_join_end(name)
 }
 
 fn cxx_mutex_lock(object u64) { if darwin_mutex_lock(object) != 0 { panic('iOS: C++ mutex unique_lock failed') } }

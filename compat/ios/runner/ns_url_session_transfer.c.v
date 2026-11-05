@@ -320,10 +320,10 @@ fn url_session_transfer_job_cleanup(context voidptr) {
 	url_session_worker_leave(previous)
 }
 
-fn url_session_task_resume(object u64) { url_session_task_resume_with_ca(object, '/etc/ssl/cert.pem') }
+fn url_session_task_resume(object u64) { url_session_task_resume_with_ca(object, data_http_system_ca_file()) }
 
 // Private CA injection is used only by the loopback fixture. Public resume
-// always uses the production CA path; no environment trust override exists.
+// always selects the system CA bundle; no environment trust override exists.
 fn url_session_task_resume_with_ca(object u64, ca string) {
 	previous := url_session_worker_enter()
 	pool := objc_pool_push()

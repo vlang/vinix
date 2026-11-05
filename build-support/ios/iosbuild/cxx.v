@@ -198,6 +198,11 @@ pub fn build_cxx(tools Tools, output string, sysroot string, llvm string) ! {
 }
 
 pub fn build_cxx_cli(tools Tools, argv []string) !int {
+	// The GNU backend has separate source pins, headers and cache keys. Keep
+	// the established musl invocation and its default behavior unchanged.
+	if argv.len >= 2 && argv[0] == '--target' && argv[1] == 'aarch64-linux-gnu' {
+		return build_gnu_cxx_cli(tools, argv[2..])!
+	}
 	args := cachecli.arguments(argv, ['--output', '--sysroot'], [], [], 0, 0, 'Build musl libc++ with the Apple ARM64 string and mbstate_t ABI.\nUsage: build-cxx [--output DIR --sysroot DIR]') or { return error_with_code(err.msg(), 2) }
 	output := resolved(args.value('--output', tools.root + '/build/ios/cxx'))!
 	sysroot := resolved(args.value('--sysroot', tools.root + '/build-aarch64-userland/staging'))!

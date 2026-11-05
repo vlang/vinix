@@ -356,7 +356,7 @@ fn reachability_dispose(mut header ObjHeader) {
 fn reachability_stop() {
 	if reachability_runtime==unsafe{nil} { return }
 	C.ios_objc_initialize_lock();reachability_runtime.stopping=true;C.ios_objc_initialize_unlock()
-	if reachability_runtime.started && C.pthread_join(unsafe{voidptr(reachability_runtime.worker)},unsafe{nil})!=0 { panic('iOS: cannot join reachability monitor') }
+	if reachability_runtime.started && darwin_pthread_join(u64(reachability_runtime.worker),unsafe{nil})!=0 { panic('iOS: cannot join reachability monitor') }
 	reachability_runtime.started=false
 	for i in 0..64 {
 		mut queue:=u64(0);C.ios_objc_initialize_lock();target:=reachability_runtime.targets[i]

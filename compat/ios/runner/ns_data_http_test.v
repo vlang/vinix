@@ -3,6 +3,7 @@ module main
 
 import os
 import time
+import crypto.sha256
 
 $if macos {
 	#flag -framework Foundation
@@ -192,6 +193,229 @@ fn test_data_http_tls() {
 	println('IOS-DATA-HTTP-TLS: trusted certificate, hostname and CA verification, close-notify and downgrade rejection')
 }
 
+fn http_system_trust_expect(first string, second string, expected string) {
+	candidates := [first.clone(), second.clone()]
+	defer { unsafe { candidates.free() } }
+	assert data_http_select_ca_file(candidates) == expected;
+}
+
+fn http_system_trust_parse(path string) int {
+	mut chain := C.mbedtls_x509_crt{}
+	C.mbedtls_x509_crt_init(&chain)
+	defer { C.mbedtls_x509_crt_free(&chain) }
+	return C.mbedtls_x509_crt_parse_file(&chain, path.str)
+}
+
+fn http_system_trust_paths(cert string) {
+	directory := os.join_path(os.temp_dir(), 'ios-system-trust-${C.getpid()}')
+	assert !os.exists(directory) && !os.is_link(directory);
+	os.mkdir(directory) or { panic(err) }
+	defer { os.rmdir_all(directory) or { panic(err) }; unsafe { directory.free() } }
+	first := directory + '/first.pem'
+	second := directory + '/second.pem'
+	missing := directory + '/missing.pem'
+	link := directory + '/link.pem'
+	broken := directory + '/broken.pem'
+	defer { unsafe { first.free(); second.free(); missing.free(); link.free(); broken.free() } }
+	os.cp(cert, first) or { panic(err) }
+	os.cp(cert, second) or { panic(err) }
+	os.chmod(directory, 0o755) or { panic(err) }
+	os.chmod(second, 0o644) or { panic(err) }
+	http_system_trust_expect(first, second, first)
+	http_system_trust_expect(missing, second, second)
+	http_system_trust_expect(missing, missing, '')
+	assert data_http_select_ca_file([]string{}) == '';
+	assert http_system_trust_parse(first) == 0 && http_system_trust_parse(second) == 0;
+	assert http_system_trust_parse('') != 0;
+	os.symlink(first, link) or { panic(err) }
+	os.symlink(missing, broken) or { panic(err) }
+	http_system_trust_expect(link, second, link)
+	http_system_trust_expect(broken, second, '')
+	http_system_trust_expect(directory, second, '')
+	// A malformed first bundle stays selected. Parsing must fail rather than
+	// silently substituting the valid second bundle.
+	os.write_file(first, 'this is not a PEM certificate\n') or { panic(err) }
+	http_system_trust_expect(first, second, first)
+	assert http_system_trust_parse(first) != 0 && http_system_trust_parse(second) == 0;
+	os.chmod(first, 0) or { panic(err) }
+	if os.geteuid() != 0 {
+		http_system_trust_expect(first, second, '')
+	} else {
+		// Root can read mode-000 files. Drop privileges only in this bounded
+		// child; cwd avoids depending on permissions of the evidence parents.
+		pid := C.fork()
+		assert pid >= 0;
+		if pid == 0 {
+			C.alarm(4)
+			os.chdir(directory) or { C._exit(125) }
+			if C.setuid(65534) != 0 { C._exit(126) }
+			readable := C.open(c'second.pem', C.O_RDONLY | C.O_CLOEXEC)
+			if readable < 0 || C.close(readable) != 0 { C._exit(127) }
+			if C.open(c'first.pem', C.O_RDONLY | C.O_CLOEXEC) >= 0 { C._exit(128) }
+			selected := data_http_select_ca_file(['first.pem', 'second.pem'])
+			C._exit(if selected.len == 0 { 0 } else { 129 })
+		}
+		mut status := i32(0)
+		assert C.ios_waitpid(pid, &status, 0) == pid && status == 0;
+	}
+}
+
+struct HTTPSystemTrustPeer {
+	hello bool
+	accepted bool
+}
+
+// Peeking does not consume the record. A missing bundle closes the socket
+// before sending a ClientHello; valid system roots reach TLS and reject our
+// fresh fixture certificate. If verification is disabled, serve a body so
+// both the peer and public API assertions detect that regression.
+fn http_system_trust_peer(listener DataHTTPListener) HTTPSystemTrustPeer {
+	defer { C.close(listener.fd) }
+	deadline := time.sys_mono_now() + 5 * time.second
+	if !data_http_wait(listener.fd, false, deadline) { return HTTPSystemTrustPeer{} }
+	fd := C.accept(listener.fd, unsafe { nil }, unsafe { nil })
+	if fd < 0 { return HTTPSystemTrustPeer{} }
+	data_http_no_sigpipe(fd)
+	assert C.fcntl(fd, C.F_SETFL, usize(C.O_NONBLOCK)) == 0;
+	mut stream := &DataHTTPStream{fd: fd, deadline: deadline}
+	defer { stream.close(); unsafe { free(stream) } }
+	mut record := [3]u8{}
+	for {
+		if !data_http_wait(fd, false, deadline) { return HTTPSystemTrustPeer{} }
+		count := C.recv(fd, &record[0], record.len, C.MSG_PEEK)
+		if count <= 0 {
+			if count < 0 && unsafe { *C.ios_errno_address() } in [C.EINTR, C.EAGAIN, C.EWOULDBLOCK]! { continue }
+			return HTTPSystemTrustPeer{}
+		}
+		if count < record.len { time.sleep(time.millisecond); continue }
+		if record[0] != 22 || record[1] != 3 { return HTTPSystemTrustPeer{} }
+		break
+	}
+	cert := os.getenv('VINIX_IOS_HTTP_CERT')
+	key_path := os.getenv('VINIX_IOS_HTTP_KEY')
+	defer { unsafe { cert.free(); key_path.free() } }
+	mut key := C.mbedtls_pk_context{}
+	C.mbedtls_pk_init(&key)
+	defer { C.mbedtls_pk_free(&key) }
+	if !data_http_server_tls(mut stream, cert, key_path, mut key) { return HTTPSystemTrustPeer{hello: true} }
+	mut headers := []u8{cap: data_http_headers}
+	headers.flags |= .noslices
+	defer { unsafe { headers.free() } }
+	for {
+		line := stream.line(mut headers) or { return HTTPSystemTrustPeer{hello: true, accepted: true} }
+		if line.len == 0 { break }
+	}
+	stream.send('HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nfail')
+	C.mbedtls_ssl_close_notify(&stream.ssl)
+	return HTTPSystemTrustPeer{hello: true, accepted: true}
+}
+
+fn http_system_trust_public(system_ca string) {
+	api := DataHTTPApi{send: u64(unsafe { voidptr(C.ios_objc_msgsend) })}
+	for _ in 0 .. 2 {
+		objc_start(); system_data_start() or { panic(err) }
+		pool := api.pool()
+		for name in [c'NSData', c'NSMutableData']! {
+			listener := data_http_listener()
+			worker := spawn http_system_trust_peer(listener)
+			address := 'https://localhost:${listener.port}/'
+			data := api.msg(api.cls(name), c'dataWithContentsOfURL:', api.url(address))
+			peer := worker.wait()
+			assert data == 0 && peer.hello && !peer.accepted;
+			unsafe { address.free() }
+		}
+		listener := data_http_listener()
+		worker := spawn http_system_trust_peer(listener)
+		address := 'https://localhost:${listener.port}/'
+		config, request := session_transfer_inputs(api, address, false)
+		session_adapter_configure(api, config, request)
+		queue := api.msg(api.cls(c'NSOperationQueue'), c'new', 0)
+		api.msg(queue, c'setSuspended:', 1)
+		session := unsafe { TaskHTTPNative5(voidptr(api.send))(api.cls(c'NSURLSession'), u64(c'sessionWithConfiguration:delegate:delegateQueue:'), config, 0, queue) }
+		task := api.msg(session, c'dataTaskWithRequest:', request)
+		api.msg(task, c'resume', 0)
+		// Suspension keeps terminal delivery pending while we inspect the CA
+		// snapshot created by public resume, without changing its trust input.
+		C.ios_objc_initialize_lock()
+		work := url_session_task_state(task).url_session_transfer
+		captured := if work == unsafe { nil } { '' } else { work.ca.clone() }
+		C.ios_objc_initialize_unlock()
+		assert captured == system_ca;
+		unsafe { captured.free() }
+		api.msg(queue, c'setSuspended:', 0)
+		session_transfer_wait(unsafe { nil }, task, queue, true)
+		error_object := api.msg(task, c'error', 0)
+		assert error_object != 0 && i64(api.msg(error_object, c'code', 0)) == -1200;
+		assert api.msg(task, c'response', 0) == 0;
+		peer := worker.wait()
+		assert peer.hello && !peer.accepted;
+		objc_release(queue); api.drain(pool)
+		assert ios_runtime.live == 0 && ios_runtime.block_refs.len == 0;
+		objc_stop(); system_data_stop()
+		unsafe { address.free() }
+	}
+}
+
+// This optional variable selects only an evidence output directory. Production
+// trust selection never reads it. A second run must reproduce the first bytes
+// and source receipt; it cannot replace an earlier capture with changed trust.
+fn http_system_trust_evidence(system_ca string, bytes []u8, digest string) {
+	out := os.getenv('VINIX_IOS_HTTP_TRUST_EVIDENCE')
+	defer { unsafe { out.free() } }
+	if out.len == 0 { return }
+	if info := os.lstat(out) {
+		assert info.get_filetype() == .directory;
+	} else {
+		assert err.code() == C.ENOENT;
+		os.mkdir(out) or { panic(err) }
+	}
+	bundle := out + '/bundle.pem'
+	receipt := out + '/source.txt'
+	text := 'path: ${system_ca}\nsha256: ${digest}\n'
+	defer { unsafe { bundle.free(); receipt.free(); text.free() } }
+	if info := os.lstat(bundle) {
+		assert info.get_filetype() == .regular;
+		saved_info := os.lstat(receipt) or { panic(err) }
+		assert saved_info.get_filetype() == .regular;
+		saved_bytes := os.read_bytes(bundle) or { panic(err) }
+		saved_text := os.read_file(receipt) or { panic(err) }
+		defer { unsafe { saved_bytes.free(); saved_text.free() } }
+		assert saved_bytes == bytes && saved_text == text, 'system trust changed between captured runs';
+	} else {
+		assert err.code() == C.ENOENT;
+		if _ := os.lstat(receipt) { assert false, 'partial system trust capture'; }
+		else { assert err.code() == C.ENOENT; }
+		os.write_file_array(bundle, bytes) or { panic(err) }
+		os.write_file(receipt, text) or { panic(err) }
+	}
+}
+
+fn test_http_system_trust() {
+	$if linux {
+		$if glibc ? {
+			cert := os.getenv('VINIX_IOS_HTTP_CERT')
+			defer { unsafe { cert.free() } }
+			assert cert.len != 0;
+			http_system_trust_paths(cert)
+			system_ca := data_http_system_ca_file()
+			assert system_ca.len != 0 && http_system_trust_parse(system_ca) == 0;
+			bytes := os.read_bytes(system_ca) or { panic(err) }
+			digest := sha256.sum(bytes).hex()
+			defer { unsafe { bytes.free(); digest.free() } }
+			http_system_trust_evidence(system_ca, bytes, digest)
+			println('IOS-HTTP-SYSTEM-TRUST-INPUT: path=${system_ca} sha256=${digest}')
+			http_system_trust_public(system_ca)
+			after := os.read_bytes(system_ca) or { panic(err) }
+			defer { unsafe { after.free() } }
+			assert data_http_system_ca_file() == system_ca && after == bytes, 'system trust changed during public TLS tests';
+			println('IOS-HTTP-SYSTEM-TRUST: GNU Linux system roots parsed, missing-path fallback, malformed/unreadable/broken-link/non-file fail closed, public NSData/NSMutableData/NSURLSession ClientHello and untrusted rejection, captured public CA path and two drained runtimes PASS')
+			return
+		}
+	}
+	assert data_http_system_ca_file() == '/etc/ssl/cert.pem';
+	println('IOS-HTTP-SYSTEM-TRUST: existing fixed cert.pem profile preserved PASS')
+}
+
 fn data_http_factory(api DataHTTPApi) {
 	for name in [c'NSData', c'NSMutableData']! {
 		listener := data_http_listener()
@@ -227,6 +451,55 @@ fn test_data_http_factory() {
 	println('IOS-DATA-HTTP-FACTORY: native ABI and binary oracle, mutable results, retained data, concurrent loads and two zero-live-object shutdowns')
 }
 
+// Compare each cached body span in one operation. Keep read() responsible for
+// refills, TLS, EOF and deadlines; the fixture must not spend the client's
+// request deadline dispatching one instrumented read per already buffered byte.
+fn http_transport_body_matches(mut stream DataHTTPStream, expected string) bool {
+	mut offset := 0
+	for offset < expected.len {
+		first := stream.read() or { return false }
+		if first != expected[offset] { return false }
+		offset++
+		cached := stream.length - stream.position
+		remaining := expected.len - offset
+		count := if cached < remaining { cached } else { remaining }
+		if count > 0 {
+			if C.memcmp(&stream.buffer[stream.position], unsafe { expected.str + offset }, usize(count)) != 0 { return false }
+			stream.position += count
+			offset += count
+		}
+	}
+	return true
+}
+
+fn test_http_transport_fixture_body_check() {
+	// Preserve unread bytes on both sides of an exact binary body. Checking
+	// every mismatch position also covers the scalar and bulk comparison paths.
+	bytes := 'pa\x00\xffzq'
+	for mismatch in -1 .. 4 {
+		mut stream := &DataHTTPStream{deadline: time.sys_mono_now() + 5 * time.second, position: 1, length: bytes.len}
+		C.memcpy(&stream.buffer[0], bytes.str, usize(bytes.len))
+		if mismatch >= 0 { stream.buffer[mismatch + 1] ^= 1 }
+		assert http_transport_body_matches(mut stream, 'a\x00\xffz') == (mismatch == -1);
+		if mismatch == -1 {
+			assert stream.position == 5 && stream.buffer[0] == `p`;
+			assert stream.read() or { panic('fixture body consumed the next byte') } == `q`;
+		}
+		unsafe { free(stream) }
+	}
+	mut empty := &DataHTTPStream{}
+	defer { unsafe { free(empty) } }
+	assert http_transport_body_matches(mut empty, '');
+	assert empty.position == 0;
+	mut short := &DataHTTPStream{deadline: time.sys_mono_now() + 5 * time.second, length: 3}
+	defer { unsafe { free(short) } }
+	C.memcpy(&short.buffer[0], c'a\x00\xff', 3)
+	assert !http_transport_body_matches(mut short, 'a\x00\xffz');
+	mut expired := &DataHTTPStream{deadline: 1}
+	defer { unsafe { free(expired) } }
+	assert !http_transport_body_matches(mut expired, 'a');
+}
+
 fn http_transport_serve(listener DataHTTPListener, method string, expected_body string, reply string, tls bool) bool {
 	defer { C.close(listener.fd) }
 	deadline := time.sys_mono_now() + 5 * time.second
@@ -255,7 +528,7 @@ fn http_transport_serve(listener DataHTTPListener, method string, expected_body 
 		if header == 'Content-Type: application/octet-stream' { content_type++ }
 	}
 	if host != 1 || lengths != 1 || custom != 1 || content_type != 1 { return false }
-	for byte in expected_body { if stream.read() or { return false } != byte { return false } }
+	if !http_transport_body_matches(mut stream, expected_body) { return false }
 	if !stream.send(reply) { return false }
 	if tls { C.mbedtls_ssl_close_notify(&stream.ssl) }
 	return true
@@ -277,7 +550,9 @@ fn http_transport_case(method string, payload string, reply string, status int, 
 	input := HTTPTransportRequest{method: method, fields: fields, body: bytes}
 	address := '${if tls { 'https' } else { 'http' }}://localhost:${listener.port}/submit?q=%00#fragment'
 	defer { unsafe { address.free() } }
-	result := http_transport_exchange(address, input, os.getenv('VINIX_IOS_HTTP_CERT'), 2 * time.second) or { panic('request/response exchange failed') }
+	result := http_transport_exchange(address, input, os.getenv('VINIX_IOS_HTTP_CERT'), 2 * time.second) or {
+		panic('request/response exchange failed: ${method}, ${payload.len} bytes, TLS=${tls}')
+	}
 	defer { result.dispose() }
 	assert worker.wait() && result.status == status && result.body.len == expected.len;
 	if expected.len > 0 { assert C.memcmp(result.body.data, expected.str, usize(expected.len)) == 0; }
@@ -1091,8 +1366,26 @@ fn test_session_workers_http_callbacks_and_shutdown() {
 			}
 			for server in servers { session_worker_require(server.wait(), 'loopback server failed') }
 			unsafe { servers.free() }
+			mut dispatch_names := [4]u32{}
+			$if linux {
+				session_worker_require(dispatch_runtime.worker_count == dispatch_names.len, 'delegate worker pool was not started')
+				for i in 0 .. dispatch_names.len {
+					dispatch_names[i] = mach_threads_join_begin(u64(dispatch_runtime.workers[i]))
+					session_worker_require(dispatch_names[i] != 0, 'delegate worker has no registered lifetime')
+				}
+			}
 			objc_release(queue); objc_pool_pop(pool)
 			objc_stop()
+			$if linux {
+				// A successful join must retire the borrowed registration itself.
+				// Do not refresh here: native owner-death discovery could hide a
+				// raw pthread_join that bypasses the adapter's retirement path.
+				C.ios_mach_threads_lock()
+				for name in dispatch_names {
+					session_worker_require(mach_thread_find(name) == unsafe { nil }, 'joined delegate worker retained its registration')
+				}
+				C.ios_mach_threads_unlock()
+			}
 			assert p.bad == 0 && p.responses == if mode == 'allow' { u64(4) } else { u64(0) };
 			assert p.completed == if mode == 'stop' { u64(0) } else { u64(4) };
 			for i in 0 .. 9 {
@@ -1105,7 +1398,7 @@ fn test_session_workers_http_callbacks_and_shutdown() {
 			system_data_stop(); C.free(p)
 		}
 	}
-	println('IOS-SESSION-WORKERS-HTTP: four blocked HTTP/TLS exchanges leave delegate workers available; cancellation, late response blocks, stop/join before dispatch discard, queued work retirement and weak ownership PASS')
+	println('IOS-SESSION-WORKERS-HTTP: four blocked HTTP/TLS exchanges leave delegate workers available; cancellation, late response blocks, stop/join before dispatch discard, retired delegate thread registrations, queued work retirement and weak ownership PASS')
 }
 
 fn session_worker_shutdown_run(_ voidptr, _ &u64) { objc_stop() }
@@ -1121,11 +1414,17 @@ fn test_session_worker_shutdown_rejections() {
 		assert pid >= 0;
 		if pid == 0 {
 			C.close(fds[0]); C.dup2(fds[1], 2); C.close(fds[1])
-			spawn session_worker_reject_watchdog()
+			eprintln('IOS-SESSION-WORKERS-REJECT-CHILD: ${mode} starting runtime')
 			objc_start(); system_data_start()!
+			// Bound the rejected operation after setup. Complete runtime
+			// construction can itself exceed five seconds under emulation.
+			spawn session_worker_reject_watchdog()
+			eprintln('IOS-SESSION-WORKERS-REJECT-CHILD: ${mode} runtime started')
 			if mode == 'rejected-cleanup' { url_session_workers_stop() }
+			eprintln('IOS-SESSION-WORKERS-REJECT-CHILD: ${mode} submitting work')
 			url_session_workers_submit(unsafe { nil }, if mode == 'run' { session_worker_shutdown_run } else { session_worker_noop_run },
 				if mode == 'run' { session_worker_noop_cleanup } else { session_worker_shutdown_cleanup })
+			eprintln('IOS-SESSION-WORKERS-REJECT-CHILD: ${mode} submission returned')
 			time.sleep(6 * time.second); C._exit(0)
 		}
 		C.close(fds[1]); mut bytes := [8192]u8{}; mut length := 0
@@ -1137,8 +1436,11 @@ fn test_session_worker_shutdown_rejections() {
 			length += int(count)
 		}
 		C.close(fds[0]); mut status := i32(0)
-		assert C.ios_waitpid(pid, &status, 0) == pid && status == 256;
+		waited := C.ios_waitpid(pid, &status, 0)
+		wait_errno := unsafe { *C.ios_errno_address() }
 		output := unsafe { tos(&bytes[0], length) }
+		assert waited == pid, 'mode=${mode} pid=${pid} waited=${waited} status=${status} errno=${wait_errno}\nchild stderr:\n${output}';
+		assert status == 256, 'mode=${mode} pid=${pid} status=${status}\nchild stderr:\n${output}';
 		assert output.contains('runtime shutdown inside URL session work or cleanup is not implemented'), output;
 		assert !output.contains('AddressSanitizer') && !output.contains('runtime error:'), output;
 	}

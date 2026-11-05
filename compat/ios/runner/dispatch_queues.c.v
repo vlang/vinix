@@ -568,7 +568,7 @@ fn dispatch_stop() {
 	C.pthread_mutex_unlock(dispatch_runtime.mutex)
 	// Join before releasing captures, framework objects, TLS or Mach-O mappings.
 	for i in 0 .. dispatch_runtime.worker_count {
-		if C.pthread_join(unsafe { voidptr(dispatch_runtime.workers[i]) }, unsafe { nil }) != 0 { panic('iOS: cannot join dispatch worker') }
+		if darwin_pthread_join(u64(dispatch_runtime.workers[i]), unsafe { nil }) != 0 { panic('iOS: cannot join dispatch worker') }
 	}
 	dispatch_runtime.worker_count = 0
 	for {

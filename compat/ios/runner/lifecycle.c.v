@@ -69,7 +69,7 @@ fn image_runtime_start(image macho.Image, layout macho.Layout, base u64) {
 	image_tls_start()
 }
 
-fn (loaded LoadedModule) code_address(address u64) bool {
+fn (loaded &LoadedModule) code_address(address u64) bool {
 	for segment in loaded.image.segments {
 		if segment.name == '__PAGEZERO' || segment.prot & 4 == 0 { continue }
 		start := loaded.base + segment.address - loaded.layout.base
@@ -86,6 +86,12 @@ fn (loaded LoadedModule) section_address(section macho.Section) u64 {
 // including routines and terminators, while admitting that table.
 const image_initializer_limit = u64(262144)
 
+fn image_initializer_offset_address(header u64, offset u32) !u64 {
+	if header == 0 { return error('iOS: initializer offsets require a mapped Mach-O header') }
+	if u64(offset) > ~u64(0) - header { return error('iOS: initializer offset address overflows') }
+	return header + u64(offset)
+}
+
 fn image_initializers(loaded &LoadedModule) ![]u64 {
 	mut count := u64(loaded.image.routines.len)
 	if count > image_initializer_limit { return error('iOS: invalid initializer section') }
@@ -95,6 +101,7 @@ fn image_initializers(loaded &LoadedModule) ![]u64 {
 			if kind !in [u32(9), 10, 0x16] { continue }
 			stride := if kind == 0x16 { u64(4) } else { u64(8) }
 			if section.size % stride != 0 || section.size / stride > image_initializer_limit - count
+				|| (kind == 0x16 && section.address % 4 != 0)
 				|| section.address < segment.address
 				|| section.address - segment.address > segment.filesize
 				|| section.size > segment.filesize - (section.address - segment.address) {
@@ -107,6 +114,9 @@ fn image_initializers(loaded &LoadedModule) ![]u64 {
 	mut functions := []u64{cap: int(count)}
 	mut complete := false
 	defer { if !complete { unsafe { functions.free() } } }
+	// S_INIT_FUNC_OFFSETS entries are relative to the Mach-O header, which
+	// can follow a lower-addressed segment in the image reservation.
+	offset_header := dyld_mapped_header(loaded)
 	for address in loaded.image.routines {
 		functions << loaded.base + address - loaded.layout.base
 	}
@@ -117,7 +127,7 @@ fn image_initializers(loaded &LoadedModule) ![]u64 {
 			stride := if kind == 0x16 { u64(4) } else { u64(8) }
 			for offset := u64(0); offset < section.size; offset += stride {
 				address := if kind == 0x16 {
-					loaded.base + read32(loaded.section_address(section) + offset)
+					image_initializer_offset_address(offset_header, read32(loaded.section_address(section) + offset))!
 				} else { read64(loaded.section_address(section) + offset) }
 				if !loaded.code_address(address) { return error('iOS: initializer/terminator is not executable') }
 				if kind == 10 {

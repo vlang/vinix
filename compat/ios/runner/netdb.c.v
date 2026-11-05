@@ -186,6 +186,34 @@ fn darwin_getaddrinfo(node &char, service &char, hints &DarwinAddrinfo, output &
 	return 0
 }
 
+// Linux getnameinfo can spell a link-local IPv6 zone as an interface name,
+// even with NI_NUMERICHOST. Darwin's separate NI_NUMERICSCOPE requests the
+// decimal scope ID. Preserve resolved names: only rewrite a complete numeric
+// IPv6 literal, after the native resolver has honored the other flags.
+fn netdb_numeric_scope(mut host [1025]char, scope u32) {
+	if scope == 0 { return }
+	mut length := 0
+	for length < 46 && host[length] != 0 && host[length] != char(`%`) { length++ }
+	if length == 0 || length == 46 { return }
+	mut literal := [46]char{}
+	for i in 0 .. length { literal[i] = host[i] }
+	mut address := [16]u8{}
+	if C.inet_pton(C.AF_INET6, unsafe { &literal[0] }, unsafe { &address[0] }) != 1 { return }
+	mut digits := [10]char{}
+	mut remaining := scope
+	mut start := digits.len
+	for remaining != 0 {
+		start--
+		digits[start] = char(48 + remaining % 10)
+		remaining /= 10
+	}
+	// At most 45 address bytes, '%', ten decimal digits and the terminator.
+	host[length] = char(`%`)
+	length++
+	for i in start .. digits.len { host[length] = digits[i]; length++ }
+	host[length] = 0
+}
+
 fn darwin_getnameinfo(address voidptr, length u32, host &char, host_length u32, service &char, service_length u32, flags i32) i32 {
 	previous := unsafe { *C.ios_errno_address() }
 	mut system_error := false
@@ -198,9 +226,10 @@ fn darwin_getnameinfo(address voidptr, length u32, host &char, host_length u32, 
 	mut native_flags := i32(0)
 	for pair in [[i32(1), i32(C.NI_NOFQDN)]!, [i32(2), i32(C.NI_NUMERICHOST)]!,
 		[i32(4), i32(C.NI_NAMEREQD)]!, [i32(8), i32(C.NI_NUMERICSERV)]!,
-		[i32(16), i32(C.NI_DGRAM)]!, [i32(256), i32(C.NI_NUMERICSCOPE)]!]! {
+		[i32(16), i32(C.NI_DGRAM)]!]! {
 		if flags & pair[0] != 0 { native_flags |= pair[1] }
 	}
+	$if macos { if flags & 256 != 0 { native_flags |= i32(C.NI_NUMERICSCOPE) } }
 	// Modern native resolvers include a nonzero IPv6 scope already.
 	mut storage := [16]u64{}
 	if !socket_address_in(address, length, unsafe { &storage[0] }) { return 5 }
@@ -214,6 +243,15 @@ fn darwin_getnameinfo(address voidptr, length u32, host &char, host_length u32, 
 		if want_service { unsafe { &service_buffer[0] } } else { unsafe { nil } }, if want_service { 32 } else { 0 }, native_flags)
 	system_error = result == C.EAI_SYSTEM
 	if result != 0 { return netdb_error(result) }
+	$if linux {
+		if want_host && family == 30 && flags & 256 != 0 {
+			// The input length/family were validated and copied to aligned
+			// storage. memcpy also permits an unaligned caller sockaddr.
+			mut scope := u32(0)
+			unsafe { C.memcpy(&scope, &u8(&storage[0]) + 24, sizeof(scope)) }
+			netdb_numeric_scope(mut host_buffer, scope)
+		}
+	}
 	// Darwin copies host first. A host overflow writes neither output; a
 	// service overflow leaves a successfully written host intact.
 	if want_host {
