@@ -8,6 +8,17 @@ import json2
 import os
 import time
 
+$if macos {
+ #include <CommonCrypto/CommonDigest.h>
+}
+
+@[typedef]
+struct C.CC_SHA256_CTX {}
+
+fn C.CC_SHA256_Init(voidptr) i32
+fn C.CC_SHA256_Update(voidptr, voidptr, u32) i32
+fn C.CC_SHA256_Final(&u8, voidptr) i32
+
 const repo = '/Users/alex/code/vinix'
 const state = '/Users/alex/.local/state/vinix/android/'
 const compiler = '/Users/alex/code/v/v'
@@ -3158,6 +3169,151 @@ fn global_settings_string_self_test() ! {
  println('GLOBAL-SETTINGS-STRING-SELFTEST-PASS method_controls=' + method_controls.str() + ' member_controls=' + member_controls.str() + ' class_controls=' + class_controls.str() + ' exact-one-added-writer old-methods-preserved provider-result SQLException-only')
 }
 
+fn default_network_active_profile() NarrowProfile {
+ target := 'android/net/ConnectivityManager.smali'
+ return NarrowProfile{
+  name: 'default-network-active'
+  baseline_name: 'combined-account-webview-global-settings-string-framework-2026-11-05-r1'
+  manifest_pin: 'cadfaa0105eb24580f1cdcef590f707e52aab334e9d7bf164524a403f1b43cbc'
+  jar_pin: '9207dab7a6a37e09fb049bb636ba6ebad3e63e43bfe7fd95821f67fc2aebeeb7'
+  baseline_classes: 2117
+  providers: ['framework_default_network_active.v']
+  calls: {target: 'framework_default_network_active_source'}
+  methods: {target: ['isDefaultNetworkActive()Z']}
+  changed: {target: 0}
+  added: {target: 1}
+ }
+}
+
+// Independent of the provider: activity monitoring is absent, so the AOSP
+// no-idle-timer result is active. This is not a connectivity or route query.
+fn default_network_active_expected_method() string {
+ return '.method public isDefaultNetworkActive()Z
+.registers 2
+const/4 v0, 0x1
+return v0
+.end method'
+}
+
+fn default_network_active_abi(source string) ! {
+ signature := 'isDefaultNetworkActive()Z'
+ method := store_parts(source)!.methods[signature] or { return error('default network activity method missing') }
+ if intent_extras_method(method)! != intent_extras_method(default_network_active_expected_method())! {
+  return error('default network activity requires the exact public virtual no-idle-monitor result without native, connectivity, callback or state operations')
+ }
+}
+
+fn default_network_active_members(old string, updated string) ! {
+ before := store_parts(old)!
+ lines := before.metadata.split_into_lines().map(it.trim_space())
+ if before.methods.len != 28 || lines.filter(it.starts_with('.field ')).len != 4
+  || lines.filter(it.starts_with('.class ')) != ['.class public Landroid/net/ConnectivityManager;']
+  || lines.filter(it.starts_with('.super ')) != ['.super Ljava/lang/Object;'] {
+  return error('exact 28-method, four-field ConnectivityManager predecessor required')
+ }
+ for signature in ['nativeGetNetworkAvailable()Z', 'nativeGetNetworkState()I'] {
+  method := before.methods[signature] or { return error('original ConnectivityManager native query missing') }
+  if intent_extras_method(method)! != '.method protected native ' + signature + '\n.end method' {
+   return error('original ConnectivityManager native declarations differ')
+  }
+ }
+ narrow_member_delta(old, updated, ['isDefaultNetworkActive()Z'], 0, 1, []string{})!
+ default_network_active_abi(updated)!
+}
+
+fn default_network_active_self_test() ! {
+ profile := default_network_active_profile()
+ target := 'android/net/ConnectivityManager.smali'
+ signature := 'isDefaultNetworkActive()Z'
+ if profile.name != 'default-network-active' || profile.baseline_classes != 2117
+  || profile.baseline_name != 'combined-account-webview-global-settings-string-framework-2026-11-05-r1'
+  || profile.manifest_pin != 'cadfaa0105eb24580f1cdcef590f707e52aab334e9d7bf164524a403f1b43cbc'
+  || profile.jar_pin != '9207dab7a6a37e09fb049bb636ba6ebad3e63e43bfe7fd95821f67fc2aebeeb7'
+  || profile.providers != ['framework_default_network_active.v'] || profile.directory_provider != ''
+  || profile.calls != {target: 'framework_default_network_active_source'}
+  || profile.methods != {target: [signature]} || profile.changed != {target: 0}
+  || profile.added != {target: 1} || profile.fields.len != 0
+  || profile.class_provider != '' || profile.class_providers.len != 0 || profile.extra_classes.len != 0
+  || profile.removed_methods.len != 0 || profile.removed_fields.len != 0 {
+  return error('default network activity profile requires one added virtual method and no old-member, field, class or native additions')
+ }
+ narrow_method_self_test([signature], 0, 1)!
+ method := default_network_active_expected_method()
+ default_network_active_abi(method)!
+ default_network_active_abi('\n# formatting only\n' + method.split_into_lines().map('  ' + it).join('\n') + '\n')!
+ mut method_controls := 0
+ for bad in [method.replace('.method public ', '.method private '),
+  method.replace('.method public ', '.method public static '),
+  method.replace('.method public ', '.method public native '),
+  method.replace('.method public ', '.method public final '),
+  method.replace('.method public ', '.method public abstract '),
+  method.replace('.method public ', '.method public synchronized '),
+  method.replace('isDefaultNetworkActive()Z', 'isDefaultNetworkActive(I)Z'),
+  method.replace('isDefaultNetworkActive()Z', 'isDefaultNetworkActive()I'),
+  method.replace('.registers 2', '.registers 1'), method.replace('.registers 2', '.registers 3'),
+  method.replace('const/4 v0, 0x1', 'const/4 v0, 0x0'),
+  method.replace('const/4 v0, 0x1', 'const/4 v0, 0x2'),
+  method.replace('return v0', 'return p0'), method.replace('return v0', 'return-object v0'),
+  method.replace('const/4 v0, 0x1', 'const/4 v1, 0x1'),
+  method.replace('const/4 v0, 0x1', 'invoke-virtual {p0}, Landroid/net/ConnectivityManager;->nativeGetNetworkAvailable()Z\nmove-result v0'),
+  method.replace('const/4 v0, 0x1', 'invoke-virtual {p0}, Landroid/net/ConnectivityManager;->nativeGetNetworkState()I\nmove-result v0'),
+  method.replace('const/4 v0, 0x1', 'sget-boolean v0, Landroid/net/ConnectivityManager;->active:Z'),
+  method.replace('return v0', 'const/4 v0, 0x0\nreturn v0'), method + '\n' + method] {
+  if bad == method { return error('inactive default network activity mutation') }
+  default_network_active_abi(bad) or { method_controls++; continue }
+  return error('default network activity visibility, ABI, register, result, connectivity or state mutation accepted')
+ }
+ metadata := '.class public Landroid/net/ConnectivityManager;\n.super Ljava/lang/Object;\n' +
+  '.field private static callbacks:Ljava/util/concurrent/ConcurrentHashMap;\n' +
+  '.field public static final RESTRICT_BACKGROUND_STATUS_DISABLED:I = 0x1\n' +
+  '.field public static final RESTRICT_BACKGROUND_STATUS_WHITELISTED:I = 0x2\n' +
+  '.field public static final RESTRICT_BACKGROUND_STATUS_ENABLED:I = 0x3\n'
+ mut before_source := metadata
+ for index in 0 .. 26 {
+  before_source += '.method public retained' + index.str() + '()V\n.locals 0\nreturn-void\n.end method\n'
+ }
+ for native_signature in ['nativeGetNetworkAvailable()Z', 'nativeGetNetworkState()I'] {
+  before_source += '.method protected native ' + native_signature + '\n.end method\n'
+ }
+ after_source := before_source + method
+ default_network_active_members(before_source, after_source)!
+ retained := '.method public retained0()V\n.locals 0\nreturn-void\n.end method\n'
+ mut member_controls := 0
+ for bad in [after_source.replace('public retained0()V', 'private retained0()V'),
+  after_source.replace(retained, ''), after_source.replace('.locals 0', '.locals 1'),
+  after_source.replace('.super Ljava/lang/Object;', '.super Landroid/content/Context;'),
+  after_source.replace('callbacks:Ljava/util/concurrent/ConcurrentHashMap;', 'callbacks:Ljava/util/Map;'),
+  after_source.replace('protected native nativeGetNetworkAvailable', 'public native nativeGetNetworkAvailable'),
+  after_source.replace('protected native nativeGetNetworkState', 'protected native nativeGetNetworkStateChanged'),
+  after_source + '\n.field private active:Z\n', after_source + '\n' + retained,
+  after_source + '\n.method public unrelated()V\n.locals 0\nreturn-void\n.end method\n', before_source] {
+  default_network_active_members(before_source, bad) or { member_controls++; continue }
+  return error('default network activity changed an old method, native declaration, field, class or unrelated member')
+ }
+ if _ := default_network_active_members(after_source, after_source) { return error('preexisting default network activity method accepted') }
+ member_controls++
+ mut before := {target: 'old'}
+ for index in 0 .. 2116 { before['other/' + index.str() + '.smali'] = 'same' }
+ mut after := before.clone()
+ after[target] = 'new'
+ narrow_profile_class_delta(before, after, [target], []string{}, 2117)!
+ mut class_controls := 0
+ for mutation in 0 .. 6 {
+  mut bad := after.clone()
+  match mutation {
+   0 { bad[target] = 'old' }
+   1 { bad['other/0.smali'] = 'changed' }
+   2 { bad.delete(target) }
+   3 { bad['unrelated.smali'] = 'new' }
+   4 { bad.delete(target); bad['substitution.smali'] = 'new' }
+   else { bad.delete('other/0.smali') }
+  }
+  narrow_profile_class_delta(before, bad, [target], []string{}, 2117) or { class_controls++; continue }
+  return error('invalid ConnectivityManager-only 2117-class scope mutation accepted')
+ }
+ println('DEFAULT-NETWORK-ACTIVE-SELFTEST-PASS method_controls=' + method_controls.str() + ' member_controls=' + member_controls.str() + ' class_controls=' + class_controls.str() + ' one-public-virtual-addition old-methods28 fields4 native-queries2-preserved no-idle-monitor-result')
+}
+
 fn usage_inactive_profile() NarrowProfile {
  usage := 'android/app/usage/UsageStatsManager.smali'
  return NarrowProfile{
@@ -5318,17 +5474,92 @@ fn narrow_method_self_test(allowed []string, changed int, added int) ! {
 }
 
 fn digest(path string) !string {
+ return digest_with_backend(path, false)
+}
+
+// Keep the same complete file read on every call. Native host hashing makes
+// repeated inventories practical without changing their scope or caching proof.
+fn digest_with_backend(path string, portable bool) !string {
  if os.lstat(path)!.get_filetype() != .regular { return error('regular input required: ' + path) }
  mut file := os.open(path)!
  defer { file.close() }
- mut sum := sha256.new()
  mut bytes := []u8{len: 1024 * 1024}
+ defer { unsafe { bytes.free() } }
+ mut checksum := []u8{len: 32}
+ defer { unsafe { checksum.free() } }
+ $if macos {
+  if !portable {
+   mut context := C.CC_SHA256_CTX{}
+   if C.CC_SHA256_Init(unsafe { &context }) != 1 { return error('SHA256 initialization') }
+   for {
+    n := file.read(mut bytes) or { if err is os.Eof { break }; return err }
+    if n == 0 { break }
+    if n < 0 || n > bytes.len { return error('SHA256 read length exceeds buffer') }
+    if C.CC_SHA256_Update(unsafe { &context }, bytes.data, u32(n)) != 1 {
+     return error('SHA256 update')
+    }
+   }
+   if C.CC_SHA256_Final(checksum.data, unsafe { &context }) != 1 { return error('SHA256 finalization') }
+   return checksum.hex()
+  }
+ }
+ mut sum := sha256.new()
+ defer { unsafe { sum.free(); free(sum) } }
  for {
   n := file.read(mut bytes) or { if err is os.Eof { break }; return err }
   if n == 0 { break }
+  if n < 0 || n > bytes.len { return error('SHA256 read length exceeds buffer') }
   sum.write(bytes[..n])!
  }
- return sum.sum([]u8{}).hex()
+ sum.checksum_into(mut checksum)
+ return checksum.hex()
+}
+
+fn digest_parity_self_test(root string) ! {
+ if !root.starts_with(state) || os.real_path(os.dir(root)) != os.dir(root)
+  || os.exists(root) || os.is_link(root) {
+  return error('fresh canonical external hash controls required')
+ }
+ os.mkdir(root, mode: 0o700)!
+ mut pins := map[string]string{}
+ sizes := [0, 1, 3, 55, 56, 63, 64, 65, 1024 * 1024 - 1, 1024 * 1024,
+  1024 * 1024 + 1, 2 * 1024 * 1024 + 17]
+ for index, size in sizes {
+  mut bytes := []u8{len: size}
+  for offset in 0 .. size { bytes[offset] = u8((offset * 37 + index * 13 + 0x80) & 0xff) }
+  if size == 3 { bytes = 'abc'.bytes() }
+  path := root + '/fixture-' + index.str() + '.bin'
+  os.write_file(path, bytes.bytestr())!
+  os.chmod(path, 0o400)!
+  actual := digest(path)!
+  reference := digest_with_backend(path, true)!
+  if actual != reference { return error('native and portable file hashes differ: ' + path) }
+  expected := match size {
+   0 { 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' }
+   3 { 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad' }
+   else { '' }
+  }
+  if expected != '' && actual != expected { return error('standard SHA256 vector differs') }
+  pins[os.file_name(path)] = actual
+ }
+ alias := root + '/linked-fixture'
+ os.symlink(root + '/fixture-0.bin', alias)!
+ mut refusals := 0
+ for portable in [false, true] {
+  for path in [root, root + '/missing', alias] {
+   digest_with_backend(path, portable) or { refusals++; continue }
+   return error('hash accepted a missing, directory or symlink input')
+  }
+ }
+ os.rm(alias)!
+ write_json(root + '/receipt.json', {
+  'scope': json2.Any('Default native host and forced portable SHA256 parity over complete files; no inventory cache or audit waiver'),
+  'file_sha256': json2.decode[json2.Any](json2.encode(pins))!,
+  'sizes': json2.decode[json2.Any](json2.encode(sizes))!, 'refusals': json2.Any(refusals),
+  'known_vectors': json2.Any(['empty', 'abc']), 'chunk_bytes': json2.Any(1024 * 1024),
+ })!
+ println('FRAMEWORK-DIGEST-SELFTEST-PASS files=' + pins.len.str() + ' refusals=' + refusals.str()
+  + ' empty-abc binary-block-and-stream-boundaries native-portable-parity root=' + root)
 }
 
 fn write_json[T](path string, value T) ! {
@@ -5856,6 +6087,7 @@ fn self_test() ! {
  broadcast_permission_self_test()!
  secure_settings_self_test()!
  global_settings_string_self_test()!
+ default_network_active_self_test()!
  usage_inactive_self_test()!
  messenger_binder_self_test()!
  component_parcel_self_test()!
@@ -6201,6 +6433,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'broadcast-permission' { broadcast_permission_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
   if profile.name == 'secure-settings' { secure_settings_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'global-settings-string' { global_settings_string_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!)! }
+  if profile.name == 'default-network-active' { default_network_active_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'usage-inactive' { usage_inactive_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'component-parcel' { component_parcel_abi(os.read_file(root + '/smali/' + target)!)! }
   if profile.name == 'build-abis' { build_abis_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/smali/' + target)!, target)! }
@@ -6276,6 +6509,7 @@ fn build_narrow(profile NarrowProfile, baseline string, manifest_pin string, jar
   if profile.name == 'broadcast-permission' { broadcast_permission_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
   if profile.name == 'secure-settings' { secure_settings_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'global-settings-string' { global_settings_string_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!)! }
+  if profile.name == 'default-network-active' { default_network_active_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'usage-inactive' { usage_inactive_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'component-parcel' { component_parcel_abi(os.read_file(root + '/new-dex/' + target)!)! }
   if profile.name == 'build-abis' { build_abis_members(os.read_file(root + '/old-dex/' + target)!, os.read_file(root + '/new-dex/' + target)!, target)! }
@@ -6573,6 +6807,11 @@ fn build(baseline string, manifest_pin string, jar_pin string, root string) ! {
 }
 
 fn main() {
+ if os.args.len > 1 && os.args[1] == '--hash-self-test' {
+  if os.args.len != 3 { eprintln('usage: combined-account-webview-build --hash-self-test FRESH_EXTERNAL_OUTPUT'); exit(2) }
+  digest_parity_self_test(os.abs_path(os.args[2])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 2 && os.args[1] == '--self-test' { self_test() or { eprintln(err); exit(1) }; return }
  if os.args.len == 4 && os.args[1] == '--check' {
   sealed_baseline(os.abs_path(os.args[2]), os.args[3]) or { eprintln(err); exit(1) }
@@ -6667,6 +6906,10 @@ fn main() {
   build_narrow(global_settings_string_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
+ if os.args.len == 6 && os.args[1] == '--default-network-active' {
+  build_narrow(default_network_active_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
+  return
+ }
  if os.args.len == 6 && os.args[1] == '--usage-inactive' {
   build_narrow(usage_inactive_profile(), os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
@@ -6708,6 +6951,6 @@ fn main() {
   build_narrow(profile, os.abs_path(os.args[2]), os.args[3], os.args[4], os.abs_path(os.args[5])) or { eprintln(err); exit(1) }
   return
  }
- if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--global-settings-string|--usage-inactive|--messenger-binder|--component-parcel|--event-log|--build-abis|--webview-package|--framework-boot|--traffic-stats|--process-packages] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
+ if os.args.len != 5 { eprintln('usage: combined-account-webview-build [--store|--auth|--cache|--descriptions|--protected-storage|--service-query|--direct-boot|--credential-storage|--broadcast-result|--onboarding|--application-restrictions|--auth-exception|--binder-identity|--service-lifecycle|--platform-fragments|--imageview-bounds|--window-system-ui|--bitmap-tiles|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--pending-intent|--stable-display|--device-secure|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--secure-settings|--global-settings-string|--default-network-active|--usage-inactive|--messenger-binder|--component-parcel|--event-log|--build-abis|--webview-package|--framework-boot|--traffic-stats|--process-packages] BASELINE BASELINE_MANIFEST_SHA256 BASELINE_JAR_SHA256 FRESH_OUTPUT | --self-test'); exit(2) }
  build(os.abs_path(os.args[1]), os.args[2], os.args[3], os.abs_path(os.args[4])) or { eprintln(err); exit(1) }
 }
