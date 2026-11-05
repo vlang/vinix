@@ -5,6 +5,8 @@ immutable input, call `bodies := ir.function_bodies(stream, pools)!`.
 The index owns four arrays; call `bodies.free()` once. It borrows no strings.
 Keep the original indexes alive when following its scope, type and record IDs.
 This is a structural index, not an LLVM verifier or instruction translator.
+The separate [partial typed operand decoder](OPERANDS.md) adds a checked core
+subset while explicitly retaining opaque/deferred instructions.
 
 `scopes` uses the existing convention: scope 0 is the module, and function index
 plus 1 is its local scope. Module/declaration body scopes are inactive.
