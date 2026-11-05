@@ -514,7 +514,14 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	mut resolving := true
 	defer { if resolving { vfs_lock.release() } }
 	mut source_node := &VFSNode(unsafe { nil })
-	if source.len != 0 && kind !in pseudo_filesystems {
+	// Probe the registered template without instantiating or boxing it. Only
+	// opt-in backends interpret source as a specifier rather than a VFS path.
+	mut raw_specifier := false
+	if kind in filesystems {
+		template := unsafe { filesystems[kind] }
+		raw_specifier = template != unsafe { nil } && template is MountSpecifier
+	}
+	if source.len != 0 && kind !in pseudo_filesystems && !raw_specifier {
 		_, source_node, _ = walk_path(parent, source, 0, true)
 		if voidptr(source_node) == unsafe { nil } {
 			errno.set(errno.enoent)
@@ -631,9 +638,17 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 			unsafe { basename.free() }
 			return none
 		}
-		mount_node = f_sys.mount(parent_of_tgt_node, basename, source_node) or {
-			unsafe { basename.free() }
-			return none
+		if raw_specifier {
+			mount_node = mount_filesystem_specifier(mut f_sys, parent_of_tgt_node, basename,
+				source, flags, options) or {
+				unsafe { basename.free() }
+				return none
+			}
+		} else {
+			mount_node = f_sys.mount(parent_of_tgt_node, basename, source_node) or {
+				unsafe { basename.free() }
+				return none
+			}
 		}
 	}
 	if mount_node.read_only { mount_flags |= ms_rdonly }
