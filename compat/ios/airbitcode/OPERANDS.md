@@ -6,7 +6,7 @@ from the same immutable raw module, call
 freeing the original indexes. Treat the returned indexes as immutable.
 
 The program owns six arrays: instruction descriptors, typed value operands,
-block targets, types, type references and literal aggregate indexes. Original
+block targets, types, type references and aggregate/shuffle indexes. Original
 type IDs remain unchanged.
 Original type names are borrowed from `ir`, without cloning or freeing them.
 Scalar/vector boolean types needed by comparisons are interned when absent from
@@ -63,6 +63,23 @@ its result representation. With no original pointer types, allocas use opaque
 pointers. Unsized/cyclic allocation/storage types are not
 fully verified. Memory operations remain data descriptions, without execution.
 
+SHUFFLEVEC reads two identically typed vector inputs and a constant vector mask
+with i32 elements. `source_type` retains the input vector type; the result has
+its element type and the mask's length/scalability. Its three value operands
+retain input/input/mask IDs. The instruction's `indices` range contains normalized
+mask lanes: an index into the concatenated inputs, or `~u32(0)` for poison/legacy
+undef. Negative integer literals are rejected rather than treated as poison.
+DATA, aggregate, zero, undef and poison masks are materialized. Constant-expression
+masks defer without being evaluated, retaining the inferred result type. Source
+types that remain unknown also defer. Deferred ranges are not consumable.
+
+Scalable masks support zero/undef/poison splats only. The stored mask range is the
+minimum lane pattern, repeated for the runtime vscale; it does not assert a fixed
+runtime vector width. Mask lanes share the aggregate-index expansion budget.
+No vector selection or instruction execution occurs here. The builder borrows
+the immutable Stream while reading aggregate constants; the returned program
+retains no additional Stream ownership.
+
 Explicit-type CALL records decode a scalar pointer callee, fixed arguments and
 value/type-pair varargs. The operand range starts with the callee, then arguments
 in source order. `call_signature` indexes the original function type;
@@ -101,14 +118,14 @@ width and scalability. This is a bounded strict profile, not an LLVM verifier.
 Unsupported cast categories can fail even when another LLVM profile permits
 them. No data-layout pointer width or address calculation is inferred.
 
-Atomic memory operations, shuffle operations, switches, exception
+Atomic memory operations, switches, exception
 instructions and other families remain opaque. Constant expressions retain the
 previous pool layer's opaque tags. This layer does not evaluate constants, prove
 CFG/dominance/PHI predecessor relationships, verify every flag encoding, lower
 instructions, submit Metal commands or render a frame.
 
 Limits are 4,194,304 typed operands, 1,048,576 targets, 327,682 total types and
-524,288 total type references. Literal aggregate paths have a separate
+524,288 total type references. Aggregate paths and shuffle masks share a separate
 1,048,576-index cap. The
 existing body/stream limits also apply. Boolean/vector/pointer interning
 and scoped lookup avoid repeated type scans; passes are linear in instructions,
@@ -136,6 +153,11 @@ and mutations. The V inspector `tests/ios/air-operands-inspect.v` supports:
   are normalized for LLVM's disassembly only; original AIR operands stay intact.
   Indirect value identities, raw call flags/attributes and intrinsic behavior
   are not compared. The text comparator requires a named @/% callee.
+- `shuffle-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR`: independently assemble
+  fixed/pointer/scalable vectors, width-changing permutations and zero/undef/
+  poison masks. Compare both input types, mask type, every normalized mask lane
+  and inferred result shape; reject eight corrupted dumps or indexes. Input
+  value identities and vector execution remain unqualified.
 - `corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR`: copy raw modules and independently
   disassemble them. Compare exact arithmetic/cast/predicate mnemonics and selected
   operand/result type spellings only for `decoded` instructions. Named type

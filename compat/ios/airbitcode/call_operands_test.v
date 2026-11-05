@@ -82,7 +82,7 @@ fn test_call_forward_types_and_incomplete_paths() {
 	f.replace(10, 58, [u64(6)]); f.add(2, 10, []u64{})
 	p := f.decode()!; defer { p.free() }
 	assert p.instructions[3].status == .decoded && p.operands[p.instructions[3].operands_start].number == 11
-	f.replace(6, 8, [u64(1)]) // Unknown result %8; sink argument and indirect callee depend on it.
+	f.replace(6, 23, [u64(1)]) // Unknown result %8; sink argument and indirect callee depend on it.
 	f.replace(9, 34, [u64(0), 32768, 6, 2, 4])
 	q := f.decode()!; defer { q.free() }
 	assert q.instructions[0].status == .opaque && q.instructions[1].status == .deferred && q.instructions[3].status == .deferred

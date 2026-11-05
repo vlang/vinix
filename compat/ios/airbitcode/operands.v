@@ -22,11 +22,11 @@ pub:
 	operands_count int
 	targets_start int
 	targets_count int // PHI predecessors or branch destinations, as global block indexes.
-	source_type int = -1 // Memory data/GEP source/alloca element/aggregate container type.
+	source_type int = -1 // Memory/GEP/alloca/aggregate source type, or shuffle input vector.
 	alignment u64 // 0 = ABI default remains unresolved; otherwise explicit byte alignment.
 	is_volatile bool
 	indices_start int
-	indices_count int // Literal extractvalue/insertvalue index path.
+	indices_count int // Aggregate path or normalized shuffle mask (~u32(0) = poison).
 	call_signature int = -1
 	callee_function int = -1 // IRModule.functions index, only for a direct declaration.
 	attribute_set u64 // Raw attribute-list ID, not interpreted.
@@ -58,6 +58,7 @@ pub fn (p IRTypedProgram) complete(bodies IRFunctionBodies, scope int) bool {
 	return true
 }
 struct OperandBuilder {
+	stream Stream
 	ir IRModule
 	pools IRConstantPools
 	bodies IRFunctionBodies
@@ -178,6 +179,7 @@ fn (b &OperandBuilder) cast_valid(op u32, source int, dest int) bool {
 }
 
 fn (mut b OperandBuilder) decode(inst IRInstruction, code u64, values []u64, seed int) !IRTypedInstruction {
+	if code == 8 { return b.shuffle(inst, values, seed)! }
 	if code == 34 { return b.call(inst, values, seed)! }
 	if code in [u64(4), 19, 20, 24, 26, 27, 30, 43, 44]! { return b.memory(inst, code, values, seed)! }
 	start := b.p.operands.len; targets := b.p.targets.len
@@ -289,7 +291,7 @@ fn (mut b OperandBuilder) decode(inst IRInstruction, code u64, values []u64, see
 // Partial typed core: opaque/deferred instructions are explicit, and complete()
 // must succeed before a consumer treats a function as fully decoded. No execution.
 pub fn (ir IRModule) typed_operands(stream Stream, pools IRConstantPools, bodies IRFunctionBodies) !IRTypedProgram {
-	mut b := OperandBuilder{ir: ir, pools: pools, bodies: bodies, alloc_space: operand_layout_space(ir.data_layout, `A`)!, declaration_types: []int{len: pools.declarations.len, init: -1}, declaration_functions: []int{len: pools.declarations.len, init: -1}, p: IRTypedProgram{instructions: []IRTypedInstruction{len: bodies.instructions.len}, references: ir.references.clone()}}
+	mut b := OperandBuilder{stream: stream, ir: ir, pools: pools, bodies: bodies, alloc_space: operand_layout_space(ir.data_layout, `A`)!, declaration_types: []int{len: pools.declarations.len, init: -1}, declaration_functions: []int{len: pools.declarations.len, init: -1}, p: IRTypedProgram{instructions: []IRTypedInstruction{len: bodies.instructions.len}, references: ir.references.clone()}}
 	b.p.types.flags |= .noslices; b.p.operands.flags |= .noslices; b.p.targets.flags |= .noslices; b.p.references.flags |= .noslices
 	b.p.indices.flags |= .noslices
 	mut keep := false

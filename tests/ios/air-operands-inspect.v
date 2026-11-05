@@ -60,6 +60,7 @@ fn typed_line(ir airbitcode.IRModule, stream airbitcode.Stream, bodies airbitcod
 	raw := stream.records[bodies.instructions[index].record]
 	text := if line.starts_with('%') { line.all_after(' = ') } else { line }
 	if raw.code == 34 { compare_call(ir, p, op, text)!; return }
+	if raw.code == 8 { compare_shuffle(ir, p, op, text)!; return }
 	mut mnemonic := ''
 	mut typ := -1
 	match raw.code {
@@ -313,11 +314,100 @@ entry:
 	println('LLVM-OPERANDS-SELFTEST: 29 decoded, no opaque/deferred; five complete function indexes, scalar/vector/FP/flags/forward-PHI checks and ${controls} rejected evidence corruptions PASS')
 }
 fn main() {
+	if os.args.len == 5 && os.args[1] == 'shuffle-self-test' { shuffle_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'call-self-test' { call_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'memory-self-test' { memory_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'self-test' { self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'corpus' { corpus(os.args[2], os.args[3], os.args[4])!; return }
-	panic('usage: air-operands-inspect corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR | self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | memory-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | call-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR')
+	panic('usage: air-operands-inspect corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR | self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | memory-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | call-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | shuffle-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR')
+}
+
+fn compare_shuffle(ir airbitcode.IRModule, p airbitcode.IRTypedProgram, op airbitcode.IRTypedInstruction, text string) ! {
+	if !text.starts_with('shufflevector ') { return error('LLVM shuffle opcode differs') }
+	body := '(' + text.all_after(' ').all_before(', !') + ')'; defer { unsafe { body.free() } }
+	args := call_arguments(body, 0)!; defer { unsafe { args.free() } }
+	if args.len != 3 || op.operands_count != 3 { return error('LLVM shuffle operand count differs') }
+	source := oracle_type(p, ir, op.source_type)!; defer { unsafe { source.free() } }
+	if !args[0].starts_with(source + ' ') || !args[1].starts_with(source + ' ') { return error('LLVM shuffle input type differs') }
+	mask := p.types[p.operands[op.operands_start + 2].type_index]
+	mask_text := oracle_type(p, ir, p.operands[op.operands_start + 2].type_index)!; defer { unsafe { mask_text.free() } }
+	if !args[2].starts_with(mask_text + ' ') || u64(op.indices_count) != mask.count { return error('LLVM shuffle mask type/width differs') }
+	result := p.types[op.result_type]; input := p.types[op.source_type]
+	if result.kind != .vector_t || result.count != mask.count || result.scalable != mask.scalable || p.references[result.refs_start] != p.references[input.refs_start] { return error('decoded shuffle result shape differs') }
+	value := args[2][mask_text.len + 1..].trim_space()
+	if value in ['zeroinitializer', 'undef', 'poison'] {
+		expected := if value == 'zeroinitializer' { u32(0) } else { ~u32(0) }
+		for lane in p.indices[op.indices_start..op.indices_start + op.indices_count] { if lane != expected { return error('LLVM shuffle splat differs') } }
+		return
+	}
+	if !value.starts_with('<') || !value.ends_with('>') || mask.scalable { return error('LLVM shuffle literal mask syntax') }
+	lanes_text := '(' + value[1..value.len - 1] + ')'; defer { unsafe { lanes_text.free() } }
+	lanes := call_arguments(lanes_text, 0)!; defer { unsafe { lanes.free() } }
+	if lanes.len != op.indices_count { return error('LLVM shuffle literal width differs') }
+	for i, lane in lanes {
+		if !lane.starts_with('i32 ') { return error('LLVM shuffle lane type differs') }
+		number := lane[4..].trim_space()
+		expected := if number in ['poison', 'undef'] { ~u32(0) } else { u32(strconv.parse_uint(number, 10, 32)!) }
+		if p.indices[op.indices_start + i] != expected { return error('LLVM shuffle lane differs') }
+	}
+}
+
+fn shuffle_self_test(assembler string, llvm string, out string) ! {
+	fresh(out)!
+	source := 'target triple = "x86_64-unknown-linux-gnu"
+define <3 x float> @permute(<4 x float> %a, <4 x float> %b) {
+  %r = shufflevector <4 x float> %a, <4 x float> %b, <3 x i32> <i32 7, i32 0, i32 poison>
+  ret <3 x float> %r
+}
+define <2 x float> @zero(<4 x float> %a) {
+  %r = shufflevector <4 x float> %a, <4 x float> poison, <2 x i32> zeroinitializer
+  ret <2 x float> %r
+}
+define <2 x float> @undefined(<4 x float> %a) {
+  %r = shufflevector <4 x float> %a, <4 x float> poison, <2 x i32> undef
+  ret <2 x float> %r
+}
+define <2 x ptr> @pointers(<2 x ptr> %a, <2 x ptr> %b) {
+  %r = shufflevector <2 x ptr> %a, <2 x ptr> %b, <2 x i32> <i32 1, i32 2>
+  ret <2 x ptr> %r
+}
+define <vscale x 2 x i32> @scalable(<vscale x 4 x i32> %a) {
+  %r = shufflevector <vscale x 4 x i32> %a, <vscale x 4 x i32> poison, <vscale x 2 x i32> zeroinitializer
+  ret <vscale x 2 x i32> %r
+}
+'
+	os.write_file(out + '/input.ll', source)!
+	run_saved([assembler, out + '/input.ll', '-o', out + '/input.bc'], out + '/assemble')!
+	d, o, f, c := inspect(out + '/input.bc', llvm, out + '/fixture')!
+	if d != 10 || o != 0 || f != 0 || c != 5 { return error('shuffle fixture coverage differs') }
+	data := os.read_bytes(out + '/fixture.bc')!; defer { unsafe { data.free() } }
+	stream := airbitcode.parse(data)!; defer { stream.free() }
+	ir := stream.ir_module(data)!; defer { ir.free() }
+	pools := ir.constant_pools(stream)!; defer { pools.free() }
+	bodies := ir.function_bodies(stream, pools)!; defer { bodies.free() }
+	p := ir.typed_operands(stream, pools, bodies)!; defer { p.free() }
+	if p.indices != [u32(7), 0, ~u32(0), 0, 0, ~u32(0), ~u32(0), 1, 2, 0, 0] { return error('shuffle fixture normalized masks differ') }
+	if !p.types[p.instructions[8].result_type].scalable { return error('shuffle fixture scalable result differs') }
+	oracle := os.read_file(out + '/fixture.ll')!; defer { unsafe { oracle.free() } }
+	mut controls := 0
+	for pair in [['i32 7, i32 0', 'i32 6, i32 0'], ['<3 x i32> <', '<3 x i64> <'], ['shufflevector <4 x float>', 'shufflevector <4 x double>'],
+		['<4 x float> %b', '<3 x float> %b'], ['i32 poison>', 'i32 1>']] {
+		if !oracle.contains(pair[0]) { return error('missing shuffle negative input') }
+		changed := oracle.replace(pair[0], pair[1]); defer { unsafe { changed.free() } }
+		compare(ir, stream, bodies, p, changed) or { controls++; continue }
+		return error('accepted changed LLVM shuffle evidence')
+	}
+	for mode in ['lane', 'result', 'width'] {
+		mut instructions := p.instructions.clone(); mut indices := p.indices.clone()
+		defer { unsafe { instructions.free(); indices.free() } }
+		if mode == 'lane' { indices[0] = 6 }
+		else if mode == 'result' { instructions[0] = airbitcode.IRTypedInstruction{...instructions[0], result_type: instructions[2].result_type} }
+		else { instructions[0] = airbitcode.IRTypedInstruction{...instructions[0], indices_count: 2} }
+		changed := airbitcode.IRTypedProgram{...p, instructions: instructions, indices: indices}
+		compare(ir, stream, bodies, changed, oracle) or { controls++; continue }
+		return error('accepted changed decoded shuffle evidence')
+	}
+	println('LLVM-SHUFFLE-SELFTEST: 10 decoded instructions, five complete function indexes; fixed/pointer/scalable vectors, width changes, poison/undef/zero masks and ${controls} rejected evidence corruptions PASS')
 }
 
 // Find a named direct/indirect callee followed by its argument list, ignoring
