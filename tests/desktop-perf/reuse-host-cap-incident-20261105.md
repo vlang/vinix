@@ -73,6 +73,12 @@ allocated and 304,974 KiB apparent. It is frozen at complete literal inventory
 root mode 16877, checksum
 `3b2dce99844628718cfe3310f8845b47e79f8b76228eca6a80d124921c2f0787`.
 The inventory stays outside H; no subsequent H writes are allowed.
+Root independently captured the complete unchanged H tree to
+`S/reuse-failed-host-inventory-01/root-independent.tsv`. Its actual status was
+0 and its complete bytes, entry count, root mode and checksum matched the
+primary inventory; direct byte comparison returned 0. Root's separate
+`kill(-PGID, 0)` probes also returned ESRCH for both observed former groups.
+Those probes retain the present-day-absence limitation described above.
 
 | Artifact relative to H | SHA256 |
 | --- | --- |
