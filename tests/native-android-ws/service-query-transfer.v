@@ -236,6 +236,11 @@ const process_packages_api_runner = '/Users/alex/.local/state/vinix/android/proc
 const process_packages_api_runner_pin = '725710de6957816c0ece03008c54bf3ca78bc31635d9495c18a04a922f12d21f'
 const process_packages_apk = '/Users/alex/.local/state/vinix/android/process-packages-fixture-2026-11-04-r2/probe.apk'
 const process_packages_apk_pin = 'db555d086522f003e912e3de5fcf0905d3079025c92397c7b92c6ba714d497e7'
+// Distinct qualified static ARM runner and signed Global String-write fixture.
+const global_settings_string_api_runner = '/Users/alex/.local/state/vinix/android/global-settings-string-api-run-2026-11-05-r1/run'
+const global_settings_string_api_runner_pin = '7dedaf0f25f4eb3daa9a6af9f94b6d65329dded9d90645fa2d1f37c195010ae7'
+const global_settings_string_apk = '/Users/alex/.local/state/vinix/android/global-settings-string-fixture-2026-11-05-r1/probe.apk'
+const global_settings_string_apk_pin = 'faee136b4cdb500ff165b7b7aceb6649f8af27054593a5905a64f217553c806a'
 const file_limit = 32 * 1024 * 1024
 const request_limit = 12
 const seconds_limit = 600
@@ -689,6 +694,53 @@ fn process_packages_api_assets() []Asset {
 		Asset{url: '/process-packages.apk', path: process_packages_apk, sha256: process_packages_apk_pin}]
 }
 
+fn global_settings_string_api_assets() []Asset {
+	return [Asset{url: '/global-settings-string-api-run', path: global_settings_string_api_runner, sha256: global_settings_string_api_runner_pin},
+		Asset{url: '/global-settings-string.apk', path: global_settings_string_apk, sha256: global_settings_string_apk_pin}]
+}
+
+fn global_settings_string_distinct(asset Asset, old Asset) ! {
+	if asset.url == old.url || asset.path == old.path || asset.sha256 == old.sha256 {
+		return error('Global settings String route or artifact collision')
+	}
+}
+
+// This independent selector keeps all historical dispatch and shared-APK
+// exceptions intact. Only its two pinned snapshots enter the bounded server.
+fn serve_global_settings_string(root string, port string) ! {
+	$if !net_nonblocking_sockets ? { return error('build with -d net_nonblocking_sockets for socket deadlines') }
+	external(root)!
+	if port == '' || port.len > 5 || !port.bytes().all(it >= `0` && it <= `9`)
+		|| port.u64() > 65535 || port != port.u64().str() { return error('canonical port 0..65535 required') }
+	if global_settings_string_api_runner == '' || global_settings_string_apk == ''
+		|| !valid_digest(global_settings_string_api_runner_pin) || !valid_digest(global_settings_string_apk_pin) {
+		return error('qualified Global settings String artifact paths and pins required')
+	}
+	if unsafe { C.mkdir(root.str, 0o700) } != 0 { return error('fresh private output directory required') }
+	inputs := global_settings_string_api_assets()
+	mut assets := []Asset{}
+	for asset in inputs { assets << snapshot(asset, root + asset.url)! }
+	mut listener := net.listen_tcp(.ip, '127.0.0.1:' + port)!
+	defer { listener.close() or {} }
+	address := listener.addr()!.str()
+	deadline := time.now().add(seconds_limit * time.second)
+	write_json(root + '/ready.json', json2.encode({
+		'kind': json2.Any('vinix-global-settings-string-api-http-v1')
+		'scope': json2.Any(scope)
+		'address': json2.Any(address)
+		'deadline_utc': json2.Any(deadline.str())
+		'request_limit': json2.Any(request_limit)
+		'inputs': json2.decode[json2.Any](json2.encode(inputs))!
+		'snapshots': json2.decode[json2.Any](json2.encode(assets))!
+	}, prettify: true))!
+	println('SERVICE-QUERY-HTTP READY ' + address)
+	flush_stdout()
+	result := serve_loop(mut listener, assets, request_limit, deadline)
+	write_json(root + '/result.json', json2.encode(result, prettify: true))!
+	if !result.success { return error(result.reason) }
+	println('SERVICE-QUERY-HTTP PASS two pinned files transferred')
+}
+
 fn process_packages_distinct(asset Asset, old Asset) ! {
 	if asset.url == old.url || asset.path == old.path || asset.sha256 == old.sha256 {
 		return error('process packages route or artifact collision')
@@ -848,6 +900,14 @@ fn serve(root string, port string, is_direct_boot bool, is_credential_storage bo
 fn main() {
 	if os.args.len == 3 && os.args[1] == '--self-test' {
 		self_test(os.args[2]) or { eprintln(err); exit(1) }
+		return
+	}
+	if os.args.len > 2 && os.args[1] == 'serve' && os.args[2] == '--global-settings-string-api' {
+		if os.args.len != 5 {
+			eprintln('usage: transfer serve --global-settings-string-api FRESH_EXTERNAL_DIR PORT')
+			exit(2)
+		}
+		serve_global_settings_string(os.args[3], os.args[4]) or { eprintln(err); exit(1) }
 		return
 	}
 	if os.args.len > 2 && os.args[1] == 'serve' && os.args[2] == '--process-packages-api' {
@@ -1058,6 +1118,43 @@ fn process_packages_self_test(root string) ! {
 	println('PROCESS-PACKAGES-HTTP SELF-TEST PASS exact-selector routes pins distinct-artifacts collision-controls6')
 }
 
+fn global_settings_string_self_test(root string) ! {
+	for bad in [['serve', '--global-settings-string-api'],
+		['serve', '--global-settings-string-api', root + '/must-not-exist'],
+		['serve', '--global-settings-string-api-other', root + '/must-not-exist', '0'],
+		['serve', '--global-settings-string-api', root + '/must-not-exist', '0', 'extra'],
+		['serve', '--global-settings-string-api', '--process-packages-api', root + '/must-not-exist', '0'],
+		['serve', '--process-packages-api', '--global-settings-string-api', root + '/must-not-exist', '0']] {
+		mut argv := [os.executable()]
+		argv << bad
+		result := os.exec(argv)
+		assert result.exit_code != 0, 'malformed Global settings String transfer CLI accepted'
+		assert !os.exists(root + '/must-not-exist')
+	}
+	for port in ['', '-1', '65536', '00', '01', '+1', '1x', ' 1'] {
+		result := os.exec([os.executable(), 'serve', '--global-settings-string-api', root + '/must-not-exist', port])
+		assert result.exit_code == 1 && result.output.contains('canonical port 0..65535 required'),
+			'noncanonical Global settings String port accepted'
+		assert !os.exists(root + '/must-not-exist')
+	}
+	current := global_settings_string_api_assets()
+	assert current.len == 2
+	assert current.map(it.url) == ['/global-settings-string-api-run', '/global-settings-string.apk']
+	global_settings_string_distinct(current[0], current[1])!
+	for asset in current {
+		assert valid_digest(asset.sha256)
+		assert os.is_abs_path(asset.path) && os.abs_path(asset.path) == asset.path
+		for older in [pinned_assets(), direct_boot_assets(), credential_storage_assets(), broadcast_result_assets(), onboarding_api_assets(), application_restrictions_assets(), auth_exception_api_assets(), auth_worker_api_assets(), binder_identity_api_assets(), service_lifecycle_api_assets(), platform_fragments_api_assets(), image_bounds_api_assets(), window_system_ui_api_assets(), seed_account_options_api_assets(), persistent_data_block_api_assets(), bitmap_tiles_api_assets(), connectivity_truth_api_assets(), window_animations_api_assets(), layout_alignment_api_assets(), user_restrictions_api_assets(), bundle_cross_profile_api_assets(), user_restrictions_bundle_api_assets(), resources_float_api_assets(), paint_drawable_api_assets(), dialog_theme_api_assets(), intent_extras_api_assets(), resource_locks_api_assets(), pending_intent_api_assets(), stable_display_api_assets(), asset_locales_api_assets(), unmanaged_queries_api_assets(), stats_unavailable_api_assets(), subscription_service_api_assets(), autofill_service_api_assets(), keyguard_policy_api_assets(), broadcast_permission_api_assets(), broadcast_permission_v2_api_assets(), secure_settings_api_assets(), usage_inactive_api_assets(), messenger_binder_api_assets(), messenger_binder_v2_api_assets(), event_log_api_assets(), build_abis_api_assets(), webview_package_api_assets(), bootclasspath_api_assets(), bootclasspath_jni_api_assets(), traffic_stats_uid_api_assets(), process_packages_api_assets()] {
+			for old in older { global_settings_string_distinct(asset, old)! }
+		}
+		old := process_packages_api_assets()[0]
+		for changed in [Asset{...asset, url: old.url}, Asset{...asset, path: old.path}, Asset{...asset, sha256: old.sha256}] {
+			if _ := global_settings_string_distinct(changed, old) { return error('Global settings String collision accepted') }
+		}
+	}
+	println('GLOBAL-SETTINGS-STRING-HTTP SELF-TEST PASS exact-selector routes pins distinct-artifacts collision-controls6')
+}
+
 fn self_test(root string) ! {
 	$if !net_nonblocking_sockets ? { return error('self-test requires nonblocking sockets') }
 	external(root)!
@@ -1065,6 +1162,7 @@ fn self_test(root string) ! {
 	bootclasspath_jni_self_test(root)!
 	traffic_stats_uid_self_test(root)!
 	process_packages_self_test(root)!
+	global_settings_string_self_test(root)!
 	for bad in [['serve', '--binder-identity-apis'],
 		['serve', '--binder-identity-apis', root + '/must-not-exist'],
 		['serve', '--binder-identity-apis-other', root + '/must-not-exist', '0'],
