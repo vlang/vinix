@@ -32,8 +32,9 @@ Formatting is limited to 64 KiB, depth 64 and 65,536 visits. It stops at identif
 struct names, so recursive types need not be expanded.
 The returned text is owned by the caller; free it when using `-gc none`.
 
-Constants, attributes, metadata links, instruction operands, symbol value IDs,
-control flow and data-layout size/alignment rules remain opaque or unverified.
+Constants, attributes, metadata links, instruction operands, symbol value IDs
+and control flow remain opaque or unverified by this index. The separate
+[type-layout layer](LAYOUT.md) computes supported ABI sizes and alignments.
 Calling convention and linkage fields are retained as encoded numbers. The
 index does not establish that a module is executable, select AIR entry points,
 translate a shader or enable Metal capabilities.

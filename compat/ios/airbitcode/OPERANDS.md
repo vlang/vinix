@@ -55,7 +55,9 @@ treated as bounds checks.
 
 `alignment` is the explicitly encoded byte alignment, or 0 when the ABI default
 is unresolved. The decoder does not infer size, padding, ABI alignment or pointer
-width. `is_volatile` retains load/store volatility. Alloca's count is an absolute
+width. The separate [type-layout layer](LAYOUT.md) supplies supported sizes,
+padding, alignments and structure offsets without changing operand decoding.
+`is_volatile` retains load/store volatility. Alloca's count is an absolute
 value ID. Its packed alignment/flags and optional address space are retained;
 the data-layout `A` component supplies a default allocation address space.
 Mixed typed/opaque pointer tables are rejected for alloca rather than guessing
