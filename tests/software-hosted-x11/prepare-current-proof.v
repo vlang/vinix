@@ -15,6 +15,7 @@ const frozen = consumer + '/current-profile-draft-01'
 const capture = consumer + '/source-before-current-01'
 const output = consumer + '/current-proof-setup-01'
 const controller_output = consumer + '/current-controller-setup-01'
+const retainer_output = consumer + '/current-retainer-setup-01'
 const base_sha = '558e3d949d310b54d8550bb8d51bbabfab395655f58afdb6167bf1f42fc58f80'
 const module_map_sha = '7574aa941eeea3b7beb3dc58c14f6c23e57aea93bd5349a09f1aa8a51da9abce'
 const file_limit = u64(1024 * 1024)
@@ -468,8 +469,144 @@ fn prepare_controller() ! {
 	println('PREPARED private current controller source; no compile, import or guest')
 }
 
+// The reviewed controller exceeds the unchanged1MiB source/receipt reader.
+// Only this fixed ordinary executable has a streamed size-specific exception.
+fn check03_digest() !string {
+	path := consumer + '/check-03'
+	before := os.lstat(path)!
+	need(os.real_path(path) == path && before.mode & 0o170000 == 0o100000
+		&& before.size == 1644608, 'reviewed check03 executable size/type differs')!
+	mut file := os.open(path)!
+	defer { file.close() }
+	mut hash := sha256.new()
+	defer { unsafe { hash.free() } }
+	mut buffer := []u8{len: 65536}
+	defer { unsafe { buffer.free() } }
+	mut size := u64(0)
+	for {
+		n := file.read(mut buffer) or { if err is os.Eof { break }; return err }
+		if n == 0 { break }
+		size += u64(n)
+		need(size <= 1644608, 'reviewed check03 executable grew during read')!
+		hash.write(buffer[..n])!
+	}
+	need(size == 1644608 && same(before, os.lstat(path)!), 'reviewed check03 executable changed during read')!
+	return hash.sum([]u8{}).hex()
+}
+
+fn retainer_gate_inputs(mut inputs map[string]string) ! {
+	controller_gate_inputs(mut inputs)!
+	for path, hash in {
+		controller_output + '/preparer-source.v': '2fc88bb831f5f43f40b35b042defcdbc1523048a56b956bab51ca3d3d21dfc83'
+		controller_output + '/result.json': '676e5f66a8815d4e16a8e2cb5f422b4218786243efc39c225c0f8703bb817af1'
+		controller_output + '/check-before.v': 'b524e00ebb8e72601c773ed58e6da4660ea99304459a7991a4f4d5ae29a135a5'
+		controller_output + '/check-after.v': '5f72e85d943ade7d8306fe7db1d05f9651613b22270c1bc3e07888a0d40d890a'
+		suite + '/check.v': '5f72e85d943ade7d8306fe7db1d05f9651613b22270c1bc3e07888a0d40d890a'
+		consumer + '/check-03.build.json': 'd2019599810b4f5c8ed468f29f8481e80d53734f900643560f028688fccf6807'
+		consumer + '/check-03.monitor/result.json': '232a7d3f63d3b1fd7936dd352f5db1d20c17d10d75c51d141a310d487b1ae171'
+		consumer + '/check-03.argv.json': '50e595de896fcb1ad6d5cc91c947130fc3e1be2e41987e6593f3dbe1b6d4bc98'
+		consumer + '/check-03.log': '7c607305c1067f3a4530e1fe4c69d88926c7ab7ef08568192118b4bb5f36b61e'
+	} { pin(path, hash, mut inputs)! }
+	for name in ['modules-before.json', 'modules-after.json'] {
+		pin(controller_output + '/' + name,
+			'710351295e1be60a49b75f84348493ee85cf1f0777991a8b457ac3f4b83201d4', mut inputs)!
+		pin(consumer + '/check-03.monitor/' + name,
+			'710351295e1be60a49b75f84348493ee85cf1f0777991a8b457ac3f4b83201d4', mut inputs)!
+	}
+	pin(consumer + '/check-03.exit.json', sha256.hexhash(json2.encode({'exit_code': 0})), mut inputs)!
+	controller_hash := 'eb67ac1ece3e91bc7d4fca9372ce40a2355810d827d88f15947311d256b8e811'
+	need(check03_digest()! == controller_hash, 'reviewed check03 executable digest differs')!
+	inputs[consumer + '/check-03'] = controller_hash
+	build := json2.decode[map[string]string](text(consumer + '/check-03.build.json')!, strict: true)!
+	need(build['exit_code'] == '0', 'actual check03 compile did not succeed')!
+}
+
+fn prepare_retainer() ! {
+	$if prod {} $else { return error('requires production embedded source binding') }
+	need(os.args == [os.executable(), '--prepare-retainer'], 'requires exact --prepare-retainer')!
+	bound := sha256.hexhash($embed_file('prepare-current-proof.v').to_string())
+	need(sha256.hexhash(text(@FILE)!) == bound, 'compiled retainer preparer source changed')!
+	ordinary_directory(consumer)!
+	ordinary_directory(suite)!
+	fresh(retainer_output)!
+	mut inputs := map[string]string{}
+	pin(@FILE, bound, mut inputs)!
+	pin(repository + '/tests/software-hosted-x11/prepare-current-proof.v', bound, mut inputs)!
+	pin(os.executable(), sha256.hexhash(text(os.executable())!), mut inputs)!
+	frozen_inputs(mut inputs)!
+	retainer_gate_inputs(mut inputs)!
+	snapshot := json2.decode[CaptureSnapshot](text(capture + '/sources-before.json')!, strict: true)!
+	need(sha256.hexhash(proof.source()) == snapshot.files[suite + '/proof/admit.v'],
+		'compiled source reader differs from preserved private bytes')!
+	before_trees := module_trees()!
+	before_modules := module_sources(before_trees)!
+	need(before_modules == json2.decode[map[string]string](text(output + '/modules-after.json')!, strict: true)!,
+		'proof-qualified current module map differs')!
+	for name in ['evidence-check.v', 'run-native06.v', 'run-evidence06.v',
+		'build-supervision-consumer-01.v', 'nativeguard/guard.v', 'diagnostics/recoveryguard/recoveryguard.v'] {
+		pin(suite + '/' + name, snapshot.files[suite + '/' + name], mut inputs)!
+	}
+	path := suite + '/retain.v'
+	old_sha := 'a500b35f3aca1e016b02525bf2712f1addc3c834ce8c7ff380159a91f7faeef7'
+	pin(path, old_sha, mut inputs)!
+	need(snapshot.files[path] == old_sha, 'original retainer source capture differs')!
+	old_stat := os.lstat(path)!
+	need(old_stat.nlink == 1 && old_stat.mode == snapshot.modes[path], 'retainer must be an independent original source')!
+	before := text(path)!
+	mut after := replace_exact(before, 'compactproof.recorded_assembled(', 'compactproof.recorded_current_assembled(', 1)!
+	after = replace_exact(after, 'compact-original-', 'compact-current-', 2)!
+	for leaf in ['check.v', 'guest/main.v', 'guest/options.v', 'optionsfixture/fixture.v'] {
+		old_condition := "if path.ends_with('/tests/software-hosted-x11/" + leaf + "') {"
+		new_condition := "if path in [os.dir(@FILE) + '/" + leaf
+			+ "', work + '/source/tests/software-hosted-x11/" + leaf + "'] {"
+		after = replace_exact(after, old_condition, new_condition, 1)!
+	}
+	invariant := "if controllers != 2 || guests != 2 || guest_options != 2 || fixture_sources != 2 { return error('original and staged fixture source pins missing') }"
+	need(before.count(invariant) == 1 && after.count(invariant) == 1, 'two-source counter invariant changed')!
+	os.mkdir(retainer_output, mode: 0o700)!
+	copy_one(@FILE, retainer_output + '/preparer-source.v')!
+	copy_one(path, retainer_output + '/retain-before.v')!
+	os.write_file(retainer_output + '/retain.diff', full_diff(before, after, 'retain.v'))!
+	os.write_file(path, after)!
+	copy_one(path, retainer_output + '/retain-after.v')!
+	new_stat := os.lstat(path)!
+	need(text(path)! == after && new_stat.mode == old_stat.mode && new_stat.nlink == 1
+		&& new_stat.dev == old_stat.dev && new_stat.inode == old_stat.inode
+		&& new_stat.uid == old_stat.uid && new_stat.gid == old_stat.gid,
+		'prepared retainer bytes, mode or ordinary identity differ')!
+	need(text(retainer_output + '/retain-before.v')! == before
+		&& os.lstat(retainer_output + '/retain-before.v')!.mode == old_stat.mode
+		&& os.lstat(retainer_output + '/retain-before.v')!.nlink == 1,
+		'original retainer preservation changed')!
+	frozen_inputs(mut inputs)!
+	retainer_gate_inputs(mut inputs)!
+	after_trees := module_trees()!
+	need(before_trees == after_trees && before_modules == module_sources(after_trees)!,
+		'qualified proof module changed during retainer preparation')!
+	for input, hash in inputs {
+		if input == path { continue }
+		actual := if input == consumer + '/check-03' { check03_digest()! } else { sha256.hexhash(text(input)!) }
+		need(actual == hash, 'retainer preparation input changed')!
+	}
+	os.write_file(retainer_output + '/inputs-before.json', json2.encode(inputs) + '\n')!
+	os.write_file(retainer_output + '/modules-before.json', json2.encode(before_modules))!
+	os.write_file(retainer_output + '/modules-after.json', json2.encode(before_modules))!
+	os.write_file(retainer_output + '/module-trees-before.json', json2.encode(before_trees) + '\n')!
+	os.write_file(retainer_output + '/module-trees-after.json', json2.encode(after_trees) + '\n')!
+	os.write_file(retainer_output + '/result.json', json2.encode({
+		'outcome': 'PREPARED_RETAINER_SOURCE', 'preparer_sha256': bound, 'source': path,
+		'before_sha256': old_sha, 'after_sha256': sha256.hexhash(after),
+		'original_capture': retainer_output + '/retain-before.v',
+		'replacement_counts': '{"recorded_assembly":1,"callback_labels":2,"exact_source_conditions":4}',
+		'scope': 'Only private Suite/retain.v changed by exact invertible current-profile substitutions and four exact current/staged source conditions. Existing error strings and count-two invariants retained. Controller, proof modules and other frontends unchanged. No retainer compile, target, import, audit or native execution.'
+	}) + '\n')!
+	println('PREPARED private current retainer source; no compile, import or guest')
+}
+
 fn main() {
 	if os.args == [os.executable(), '--prepare-controller'] {
 		prepare_controller() or { eprintln(err); exit(1) }
+	} else if os.args == [os.executable(), '--prepare-retainer'] {
+		prepare_retainer() or { eprintln(err); exit(1) }
 	} else { run() or { eprintln(err); exit(1) } }
 }
