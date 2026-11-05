@@ -48,12 +48,14 @@ No historical artifact was removed or rewritten. Future phases must compare
 the complete frozen inventory before and after consumption and charge it,
 all failed attempts and both tool roots in aggregate allocation checks.
 
-The subsequent explicit current-profile preparation reserves another 128 KiB
+The subsequent explicit current-profile preparation reserves another 256 KiB
 for private source paths outside the consumer tool root. The maintained staging
 ledger names `compactproof/current.v`, `current_controls.v`, `currentcheck/`,
-the flat proof entry, `check.v` and `retain.v` explicitly. Including that reserve
-brings the forecast to 265,895,936 bytes, below the unchanged 254 MiB pre-final
-threshold by 442,368 bytes. It does not enlarge the 40 MiB consumer tool bound;
+the flat proof entry, `check.v`, `retain.v` and `evidence-check.v` explicitly.
+The source allowance was increased from 128 KiB within the remaining pre-final
+headroom before the evidence-checker preparation. Including that reserve brings
+the forecast to 266,027,008 bytes, below the unchanged 254 MiB pre-final
+threshold by 311,296 bytes. It does not enlarge the 40 MiB consumer tool bound;
 all source-preparation snapshots, tools, generated C, controls and failures
 inside that root remain charged there. Each later producer requires fresh
 admission and a forecast based on the preceding actual allocation. The updated

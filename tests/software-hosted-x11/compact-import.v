@@ -287,7 +287,7 @@ fn run() ! {
 		state + '/compact-wrapper-binding-01', state + '/compact-supervisor-binding-01',
 		suite + '/compactproof/current.v', suite + '/compactproof/current_controls.v',
 		suite + '/compactproof/currentcheck', suite + '/compactproof-check.v', suite + '/check.v',
-		suite + '/retain.v']
+		suite + '/retain.v', suite + '/evidence-check.v']
 	for role in ['import', 'current-audit'] {
 		for suffix in ['', '.barrier.json', '.cleanup.json', '.barrier-cleanup.json'] {
 			charged << state + '/compact-' + role + '-admission-df' + suffix
