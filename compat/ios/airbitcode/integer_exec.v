@@ -1,0 +1,202 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module airbitcode
+
+pub const max_integer_execution_steps = 1000000
+pub struct IRIntegerRun {
+pub:
+	bits u32
+	value u64 // Ignored when poison is true.
+	poison bool
+	steps int
+}
+struct IntegerValue { value u64 poison bool }
+struct IntegerProfile {
+	scope int
+	return_bits u32
+	max_phis int
+}
+fn (p IRTypedProgram) integer_bits(index int) !u32 {
+	if index < 0 || index >= p.types.len { return error('AIR integer: type index') }
+	t := p.types[index]
+	if t.kind != .integer_t || t.bits == 0 || t.bits > 64 { return error('AIR integer: scalar i1..i64 profile required') }
+	return t.bits
+}
+fn integer_binary(op u32, bits u32, a IntegerValue, b IntegerValue) !IntegerValue {
+	if bits == 0 || bits > 64 || op > 12 { return error('AIR integer: binary width/opcode') }
+	mask := constant_mask(bits); sign := u64(1) << (bits - 1)
+	x := a.value & mask; y := b.value & mask
+	if op in [u32(3), 4, 5, 6]! {
+		if a.poison || b.poison { return error('AIR integer: poison division/remainder outside profile') }
+		if y == 0 || (op in [u32(4), 6]! && x == sign && y == mask) { return error('AIR integer: undefined division/remainder') }
+	}
+	if a.poison || b.poison { return IntegerValue{poison: true} }
+	if op in [u32(7), 8, 9]! && y >= bits { return IntegerValue{poison: true} }
+	mut result := u64(0)
+	match op {
+		0 { result = x + y } 1 { result = x - y } 2 { result = x * y }
+		3 { result = x / y } 5 { result = x % y }
+		4, 6 {
+			negative_x := x & sign != 0; negative_y := y & sign != 0
+			magnitude_x := if negative_x { (u64(0) - x) & mask } else { x }
+			magnitude_y := if negative_y { (u64(0) - y) & mask } else { y }
+			magnitude := if op == 4 { magnitude_x / magnitude_y } else { magnitude_x % magnitude_y }
+			negative := if op == 4 { negative_x != negative_y } else { negative_x }
+			result = if negative { u64(0) - magnitude } else { magnitude }
+		}
+		7 { result = x << y } 8 { result = x >> y }
+		9 { result = x >> y; if y > 0 && x & sign != 0 { result |= ~u64(0) << (u64(bits) - y) } }
+		10 { result = x & y } 11 { result = x | y } 12 { result = x ^ y }
+		else {}
+	}
+	return IntegerValue{value: result & mask}
+}
+fn integer_compare(op u32, bits u32, a IntegerValue, b IntegerValue) !IntegerValue {
+	if bits == 0 || bits > 64 || op < 32 || op > 41 { return error('AIR integer: comparison width/predicate') }
+	if a.poison || b.poison { return IntegerValue{poison: true} }
+	mask := constant_mask(bits); sign := u64(1) << (bits - 1)
+	x := a.value & mask; y := b.value & mask
+	signed_x := x ^ sign; signed_y := y ^ sign
+	result := match op { 32 { x == y } 33 { x != y } 34 { x > y } 35 { x >= y } 36 { x < y } 37 { x <= y } 38 { signed_x > signed_y } 39 { signed_x >= signed_y } 40 { signed_x < signed_y } else { signed_x <= signed_y } }
+	return IntegerValue{value: u64(result)}
+}
+fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunctionBodies, function int) !IntegerProfile {
+	if function < 0 || function >= ir.functions.len || function + 1 >= bodies.scopes.len || p.instructions.len != bodies.instructions.len { return error('AIR integer: function index') }
+	f := ir.functions[function]; scope := function + 1; s := bodies.scopes[scope]
+	if f.declaration || !s.active || f.calling_convention != 0 || f.signature < 0 || f.signature >= ir.types.len || f.record < 0 || f.record >= stream.records.len { return error('AIR integer: defined ordinary function required') }
+	signature := ir.types[f.signature]
+	if signature.kind != .function_t || signature.vararg || signature.refs_count < 1 || signature.refs_start < 0 || signature.refs_start > ir.references.len || signature.refs_count > ir.references.len - signature.refs_start { return error('AIR integer: fixed signature required') }
+	return_bits := p.integer_bits(ir.references[signature.refs_start])!
+	for i in 1 .. signature.refs_count { p.integer_bits(ir.references[signature.refs_start + i])! }
+	raw := stream.records[f.record]
+	if raw.code != 8 || raw.values_count < 10 { return error('AIR integer: module-v2 function record required') }
+	if ir_values(stream, raw)[6] != 0 { return error('AIR integer: function attributes unsupported') }
+	if s.instructions_start < 0 || s.instructions_count < 1 || s.instructions_start > p.instructions.len || s.instructions_count > p.instructions.len - s.instructions_start || s.blocks_start < 0 || s.blocks_count < 1 || s.blocks_start > bodies.blocks.len || s.blocks_count > bodies.blocks.len - s.blocks_start || s.results_count < 0 || s.results_count > max_body_instructions { return error('AIR integer: body ranges') }
+	mut max_phis := 0
+	for block_index in s.blocks_start .. s.blocks_start + s.blocks_count {
+		block := bodies.blocks[block_index]
+		if block.scope != scope || block.first < s.instructions_start || block.count < 1 || block.first > s.instructions_start + s.instructions_count || block.count > s.instructions_start + s.instructions_count - block.first { return error('AIR integer: block range') }
+		mut phis := 0
+		for index in block.first .. block.first + block.count {
+			inst := bodies.instructions[index]; op := p.instructions[index]
+			if inst.scope != scope || inst.block != block_index || inst.record < 0 || inst.record >= stream.records.len || op.status != .decoded || op.flags != 0 { return error('AIR integer: decoded flag-free instructions required') }
+			if op.operands_start < 0 || op.operands_count < 0 || op.operands_start > p.operands.len || op.operands_count > p.operands.len - op.operands_start || op.targets_start < 0 || op.targets_count < 0 || op.targets_start > p.targets.len || op.targets_count > p.targets.len - op.targets_start { return error('AIR integer: operand/target range') }
+			for operand in p.operands[op.operands_start..op.operands_start + op.operands_count] { p.integer_bits(operand.type_index)! }
+			for target in p.targets[op.targets_start..op.targets_start + op.targets_count] { if target < s.blocks_start || target >= s.blocks_start + s.blocks_count { return error('AIR integer: foreign block target') } }
+			code := stream.records[inst.record].code
+			if inst.has_result { p.integer_bits(op.result_type)!; if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR integer: result slot') } }
+			match code {
+				2, 9, 28 { if op.operands_count != 2 { return error('AIR integer: binary/comparison arity') }; if code == 2 && op.opcode > 12 { return error('AIR integer: binary opcode') }; if code != 2 && (op.opcode < 32 || op.opcode > 41) { return error('AIR integer: predicate') } }
+				3 { if op.operands_count != 1 || op.opcode > 2 { return error('AIR integer: trunc/zext/sext profile required') } }
+				5, 29 { if op.operands_count != 3 { return error('AIR integer: select arity') } }
+				16 { if phis != index - block.first || op.operands_count == 0 || op.targets_count != op.operands_count { return error('AIR integer: PHI grouping/arity') }; phis++ }
+				10 { if op.operands_count != 1 || p.integer_bits(p.operands[op.operands_start].type_index)! != return_bits { return error('AIR integer: return type') } }
+				11 { if !((op.operands_count == 0 && op.targets_count == 1) || (op.operands_count == 1 && op.targets_count == 2)) { return error('AIR integer: branch arity') } }
+				15 { if op.operands_count != 0 { return error('AIR integer: unreachable arity') } }
+				else { return error('AIR integer: instruction outside execution profile') }
+			}
+		}
+		if phis > max_phis { max_phis = phis }
+	}
+	return IntegerProfile{scope, return_bits, max_phis}
+}
+struct IntegerMachine {
+	p IRTypedProgram
+	pools IRConstantPools
+	bodies IRFunctionBodies
+	scope int
+	arguments []u64
+	limit int
+mut:
+	values []IntegerValue
+	known []bool
+	steps int
+}
+fn (mut m IntegerMachine) step() ! {
+	if m.steps >= m.limit { return error('AIR integer: step budget exhausted') }
+	m.steps++
+}
+fn (m &IntegerMachine) read(operand_index int) !IntegerValue {
+	operand := m.p.operands[operand_index]
+	bits := m.p.integer_bits(operand.type_index)!
+	s := m.bodies.scopes[m.scope]
+	if operand.number >= s.base_id {
+		slot := u64(operand.number) - s.base_id
+		if slot >= u64(m.values.len) || !m.known[int(slot)] { return error('AIR integer: result unavailable on executed path') }
+		return m.values[int(slot)]
+	}
+	value := m.pools.lookup(m.scope, operand.number)!
+	if value.kind == .argument {
+		slot := u64(operand.number) - m.pools.module_values
+		if slot >= u64(m.arguments.len) { return error('AIR integer: argument slot') }
+		return IntegerValue{value: m.arguments[int(slot)] & constant_mask(bits)}
+	}
+	if value.kind != .constant { return error('AIR integer: declarations are not integer values') }
+	c := m.pools.constants[value.constant_index]
+	if c.kind == .poison { return IntegerValue{poison: true} }
+	if c.kind != .zero && (c.kind != .integer || c.splat) { return error('AIR integer: undef/expressions unsupported') }
+	return IntegerValue{value: m.pools.scalar_bits(value.constant_index)! & constant_mask(bits)}
+}
+fn (mut m IntegerMachine) put(inst IRInstruction, value IntegerValue) {
+	slot := int(inst.next_value - m.bodies.scopes[m.scope].base_id)
+	m.values[slot] = value; m.known[slot] = true
+}
+
+// Execute valid LLVM IR within the checked scalar profile. No host pointers,
+// global state, memory operations, calls, floating point or Metal submission.
+pub fn (p IRTypedProgram) run_integer_function(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, arguments []u64, step_limit int) !IRIntegerRun {
+	if step_limit < 1 || step_limit > max_integer_execution_steps { return error('AIR integer: step limit range') }
+	profile := p.integer_profile(ir, stream, bodies, function)!
+	s := bodies.scopes[profile.scope]; signature := ir.types[ir.functions[function].signature]
+	if profile.scope >= pools.scopes.len { return error('AIR integer: constant-pool scope') }
+	if arguments.len != signature.refs_count - 1 || pools.scopes[profile.scope].arguments_count != arguments.len { return error('AIR integer: argument count') }
+	mut m := IntegerMachine{p: p, pools: pools, bodies: bodies, scope: profile.scope, arguments: arguments, limit: step_limit, values: []IntegerValue{len: s.results_count}, known: []bool{len: s.results_count}}
+	mut pending := []IntegerValue{len: profile.max_phis}
+	defer { unsafe { m.values.free(); m.known.free(); pending.free() } }
+	mut block_index := s.blocks_start; mut previous := -1
+	for {
+		block := bodies.blocks[block_index]
+		mut phis := 0
+		for index in block.first .. block.first + block.count {
+			op := p.instructions[index]
+			if stream.records[bodies.instructions[index].record].code != 16 { break }
+			m.step()!
+			mut incoming := -1
+			for i in 0 .. op.targets_count { if p.targets[op.targets_start + i] == previous { incoming = op.operands_start + i; break } }
+			if incoming < 0 { return error('AIR integer: PHI lacks executed predecessor') }
+			pending[phis] = m.read(incoming)!; phis++
+		}
+		// All incoming PHIs read the previous iteration before any is assigned.
+		for i in 0 .. phis { m.put(bodies.instructions[block.first + i], pending[i]) }
+		mut next := -1
+		for index in block.first + phis .. block.first + block.count {
+			m.step()!
+			inst := bodies.instructions[index]; op := p.instructions[index]
+			code := stream.records[inst.record].code
+			start := op.operands_start
+			mut result := IntegerValue{}
+			match code {
+				2 { result = integer_binary(op.opcode, p.integer_bits(op.result_type)!, m.read(start)!, m.read(start + 1)!)! }
+				9, 28 { result = integer_compare(op.opcode, p.integer_bits(p.operands[start].type_index)!, m.read(start)!, m.read(start + 1)!)! }
+				3 {
+					input := m.read(start)!; source_bits := p.integer_bits(p.operands[start].type_index)!; dest_bits := p.integer_bits(op.result_type)!
+					mut value := input.value & constant_mask(source_bits)
+					if op.opcode == 2 && value & (u64(1) << (source_bits - 1)) != 0 { value |= ~constant_mask(source_bits) }
+					result = IntegerValue{value: value & constant_mask(dest_bits), poison: input.poison}
+				}
+				5, 29 { condition := m.read(start + 2)!; result = if condition.poison { IntegerValue{poison: true} } else { m.read(start + if condition.value & 1 != 0 { 0 } else { 1 })! } }
+				10 { value := m.read(start)!; return IRIntegerRun{profile.return_bits, value.value & constant_mask(profile.return_bits), value.poison, m.steps} }
+				11 {
+					mut target := 0
+					if op.operands_count == 1 { condition := m.read(start)!; if condition.poison { return error('AIR integer: poison branch condition') }; target = if condition.value & 1 != 0 { 0 } else { 1 } }
+					next = p.targets[op.targets_start + target]; break
+				}
+				15 { return error('AIR integer: reached unreachable') }
+				else { return error('AIR integer: invalid executed instruction') }
+			}
+			m.put(inst, result)
+		}
+		if next < 0 { return error('AIR integer: block did not transfer control') }
+		previous = block_index; block_index = next
+	}
+	return error('AIR integer: no return')
+}

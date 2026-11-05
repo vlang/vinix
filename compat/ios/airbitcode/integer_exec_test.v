@@ -1,0 +1,106 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module airbitcode
+
+fn test_integer_alu_bit_patterns_poison_and_undefined_inputs() {
+	cases := [
+		[u64(8), 0, 255, 1, 0], [u64(8), 1, 0, 1, 255], [u64(8), 2, 128, 2, 0],
+		[u64(8), 3, 255, 2, 127], [u64(8), 4, 249, 2, 253], [u64(8), 4, 7, 254, 253],
+		[u64(8), 5, 255, 2, 1], [u64(8), 6, 249, 2, 255], [u64(8), 6, 7, 254, 1],
+		[u64(8), 7, 1, 7, 128], [u64(8), 8, 128, 7, 1], [u64(8), 9, 128, 7, 255],
+		[u64(8), 10, 0xaa, 0x55, 0], [u64(8), 11, 0xaa, 0x55, 255], [u64(8), 12, 255, 0xaa, 0x55],
+		[u64(64), 2, ~u64(0), 2, ~u64(1)], [u64(64), 4, u64(1) << 63, 2, u64(3) << 62],
+		[u64(64), 3, ~u64(0), 2, ~u64(0) >> 1], [u64(1), 0, 1, 1, 0],
+	]
+	defer { unsafe { for row in cases { row.free() }; cases.free() } }
+	for row in cases { value := integer_binary(u32(row[1]), u32(row[0]), IntegerValue{value: row[2]}, IntegerValue{value: row[3]})!; assert !value.poison && value.value == row[4] }
+	for op in [u32(7), 8, 9] { assert integer_binary(op, 8, IntegerValue{value: 1}, IntegerValue{value: 8})!.poison }
+	assert integer_binary(10, 8, IntegerValue{poison: true}, IntegerValue{})!.poison
+	for op in [u32(3), 4, 5, 6] {
+		if _ := integer_binary(op, 64, IntegerValue{}, IntegerValue{}) { assert false, 'zero divisor' }
+		if _ := integer_binary(op, 64, IntegerValue{poison: true}, IntegerValue{value: 2}) { assert false, 'unsupported poison division' }
+	}
+	for op in [u32(4), 6] { if _ := integer_binary(op, 64, IntegerValue{value: u64(1) << 63}, IntegerValue{value: ~u64(0)}) { assert false, 'signed division/remainder overflow' } }
+	expected := [u64(0), 1, 1, 1, 0, 0, 0, 0, 1, 1]; defer { unsafe { expected.free() } }
+	for i, value in expected { assert integer_compare(u32(i + 32), 8, IntegerValue{value: 255}, IntegerValue{value: 1})!.value == value }
+	assert integer_compare(32, 64, IntegerValue{poison: true}, IntegerValue{})!.poison
+	println('AIR-INTEGER-ALU: 19 exact arithmetic patterns, all predicates, narrow/wide wrapping, overshift poison and undefined division guards PASS')
+}
+struct IntegerFixture {
+mut:
+	blocks []Block
+	records []Record
+	values []u64
+	types []IRType
+	refs []int
+	functions []IRFunction
+	scopes []IRConstantScope
+	constants []IRConstant
+	words []u64
+	arguments []int
+}
+fn integer_fixture() IntegerFixture {
+	mut f := IntegerFixture{
+		blocks: [Block{parent: -1}, Block{id: 8, parent: 0}, Block{id: 12, parent: 1}]
+		types: [IRType{kind: .integer_t, bits: 64}, IRType{kind: .integer_t, bits: 1}, IRType{kind: .function_t, refs_count: 3}]
+		refs: [0, 0, 0]
+		functions: [IRFunction{signature: 2, record: 0, body_block: 2, basic_blocks: 3}]
+		scopes: [IRConstantScope{active: true}, IRConstantScope{active: true, base_id: 3, count: 1, arguments_count: 2}]
+		constants: [IRConstant{kind: .integer, type_index: 0, bits: 64, scope: 1, number: 3, words_count: 1}]
+		words: [u64(1)]
+		arguments: [0, 0]
+	}
+	f.records.flags |= .noslices; f.values.flags |= .noslices
+	f.header()
+	f.add(1, [u64(3)]); f.add(2, [u64(3), 2, 0]); f.add(28, [u64(1), 2, 34]); f.add(11, [u64(1), 2, 1]); f.add(10, [u64(2)]); f.add(10, [u64(3)])
+	return f
+}
+fn (mut f IntegerFixture) header() { f.records << Record{block: 1, code: 8, values_start: f.values.len, values_count: 10}; f.values << [u64(0), 1, 2, 0, 0, 0, 0, 0, 0, 0] }
+fn (mut f IntegerFixture) add(code u64, values []u64) { f.records << Record{block: 2, code: code, values_start: f.values.len, values_count: values.len}; f.values << values }
+fn (f IntegerFixture) ir() IRModule { return IRModule{types: f.types, references: f.refs, functions: f.functions} }
+fn (f IntegerFixture) stream() Stream { return Stream{blocks: f.blocks, records: f.records, values: f.values} }
+fn (f IntegerFixture) run(arguments []u64, limit int) !IRIntegerRun {
+	declarations := [0]; defer { unsafe { declarations.free() } }
+	pools := IRConstantPools{declarations: declarations, scopes: f.scopes, constants: f.constants, words: f.words, arguments: f.arguments, module_values: 1}
+	ir := f.ir(); stream := f.stream(); bodies := ir.function_bodies(stream, pools)!; defer { bodies.free() }
+	p := ir.typed_operands(stream, pools, bodies)!; defer { p.free() }
+	return p.run_integer_function(ir, stream, pools, bodies, 0, arguments, limit)!
+}
+fn (f &IntegerFixture) free() { unsafe { f.blocks.free(); f.records.free(); f.values.free(); f.types.free(); f.refs.free(); f.functions.free(); f.scopes.free(); f.constants.free(); f.words.free(); f.arguments.free() } }
+fn test_integer_function_branches_arguments_and_budgets() {
+	mut f := integer_fixture(); defer { f.free() }
+	a := f.run([u64(2), 3], 4)!; b := f.run([u64(0), 0], 4)!
+	assert a.bits == 64 && a.value == 5 && !a.poison && a.steps == 4
+	assert b.value == 1 && b.steps == 4
+	for limit in [0, 3, max_integer_execution_steps + 1] { if _ := f.run([u64(2), 3], limit) { assert false, 'budget accepted' } }
+	if _ := f.run([u64(1)], 10) { assert false, 'argument count' }
+	f.values[6] = 1
+	if _ := f.run([u64(2), 3], 10) { assert false, 'function attributes' }
+	f.values[6] = 0
+	f.values[f.records[2].values_start + 2] = 7
+	if _ := f.run([u64(1), 64], 10) { assert false, 'poison branch' }
+	f.records.clear(); f.values.clear(); f.functions[0] = IRFunction{...f.functions[0], basic_blocks: 2}
+	f.header(); f.add(1, [u64(2)]); f.add(11, [u64(1)]); f.add(11, [u64(1)])
+	if _ := f.run([u64(0), 0], 7) { assert false, 'infinite loop budget' }
+	println('AIR-INTEGER-CONTROL: both branch paths, scoped arguments/constants, precise steps, argument/attribute/poison guards and bounded infinite loop PASS')
+}
+fn test_integer_select_laziness_poison_and_unsupported_instructions() {
+	mut f := integer_fixture(); defer { f.free() }
+	f.records.clear(); f.values.clear(); f.functions[0] = IRFunction{...f.functions[0], basic_blocks: 1}; f.refs[2] = 1; f.arguments[1] = 1
+	f.constants[0] = IRConstant{...f.constants[0], kind: .undef}
+	f.header(); f.add(1, [u64(1)]); f.add(29, [u64(3), 1, 2]); f.add(10, [u64(1)])
+	assert f.run([u64(19), 1], 5)!.value == 19
+	if _ := f.run([u64(19), 0], 5) { assert false, 'selected undef' }
+	f.constants[0] = IRConstant{...f.constants[0], kind: .poison}
+	assert f.run([u64(19), 0], 5)!.poison && !f.run([u64(19), 1], 5)!.poison
+	f.records.clear(); f.values.clear(); f.refs[2] = 0; f.arguments[1] = 0
+	f.header(); f.add(1, [u64(1)]); f.add(2, [u64(3), 2, 0, 1]); f.add(10, [u64(1)])
+	if _ := f.run([u64(1), 2], 5) { assert false, 'unsupported integer flags' }
+	println('AIR-INTEGER-VALUES: lazy select, undef rejection, explicit poison return and fail-closed flag handling PASS')
+}
+fn test_integer_narrow_argument_and_return_masks() {
+	mut f := integer_fixture(); defer { f.free() }
+	f.types[0] = IRType{kind: .integer_t, bits: 8}; f.constants[0] = IRConstant{...f.constants[0], bits: 8}
+	a := f.run([u64(0x101), 0x102], 8)!; b := f.run([u64(255), 1], 8)!
+	assert a.bits == 8 && a.value == 3 && b.bits == 8 && b.value == 1
+	println('AIR-INTEGER-NARROW: incoming argument masking, narrow result slots/wrap and returned bit width PASS')
+}
