@@ -25,6 +25,8 @@ flags, disjoint/samesign and cast flags reject; they are not silently ignored.
 Function attributes are rejected rather than assuming their boundary semantics.
 Floating point, vectors, pointers, memory operations, calls and freeze are
 outside this profile.
+The separate [mixed scalar entry point](BINARY32.md) adds software binary32
+execution while preserving this integer-only API.
 
 Arithmetic uses explicit unsigned bit patterns to avoid host signed-overflow
 behavior. Flag-free arithmetic wraps at its declared width. `nuw`/`nsw` overflow

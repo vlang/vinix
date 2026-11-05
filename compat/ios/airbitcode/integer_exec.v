@@ -100,14 +100,14 @@ fn integer_compare(op u32, bits u32, a IntegerValue, b IntegerValue) !IntegerVal
 	result := match op { 32 { x == y } 33 { x != y } 34 { x > y } 35 { x >= y } 36 { x < y } 37 { x <= y } 38 { signed_x > signed_y } 39 { signed_x >= signed_y } 40 { signed_x < signed_y } else { signed_x <= signed_y } }
 	return IntegerValue{value: u64(result)}
 }
-fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunctionBodies, function int) !IntegerProfile {
+fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunctionBodies, function int, binary32 bool) !IntegerProfile {
 	if function < 0 || function >= ir.functions.len || function + 1 >= bodies.scopes.len || p.instructions.len != bodies.instructions.len { return error('AIR integer: function index') }
 	f := ir.functions[function]; scope := function + 1; s := bodies.scopes[scope]
 	if f.declaration || !s.active || f.calling_convention != 0 || f.signature < 0 || f.signature >= ir.types.len || f.record < 0 || f.record >= stream.records.len { return error('AIR integer: defined ordinary function required') }
 	signature := ir.types[f.signature]
 	if signature.kind != .function_t || signature.vararg || signature.refs_count < 1 || signature.refs_start < 0 || signature.refs_start > ir.references.len || signature.refs_count > ir.references.len - signature.refs_start { return error('AIR integer: fixed signature required') }
-	return_bits := p.integer_bits(ir.references[signature.refs_start])!
-	for i in 1 .. signature.refs_count { p.integer_bits(ir.references[signature.refs_start + i])! }
+	return_bits := p.execution_bits(ir.references[signature.refs_start], binary32)!
+	for i in 1 .. signature.refs_count { p.execution_bits(ir.references[signature.refs_start + i], binary32)! }
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR integer: module-v2 function record required') }
 	if ir_values(stream, raw)[6] != 0 { return error('AIR integer: function attributes unsupported') }
@@ -121,21 +121,34 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunct
 			inst := bodies.instructions[index]; op := p.instructions[index]
 			if inst.scope != scope || inst.block != block_index || inst.record < 0 || inst.record >= stream.records.len || op.status != .decoded { return error('AIR integer: decoded instructions required') }
 			if op.operands_start < 0 || op.operands_count < 0 || op.operands_start > p.operands.len || op.operands_count > p.operands.len - op.operands_start || op.targets_start < 0 || op.targets_count < 0 || op.targets_start > p.targets.len || op.targets_count > p.targets.len - op.targets_start { return error('AIR integer: operand/target range') }
-			for operand in p.operands[op.operands_start..op.operands_start + op.operands_count] { p.integer_bits(operand.type_index)! }
+			for operand in p.operands[op.operands_start..op.operands_start + op.operands_count] { p.execution_bits(operand.type_index, binary32)! }
 			for target in p.targets[op.targets_start..op.targets_start + op.targets_count] { if target < s.blocks_start || target >= s.blocks_start + s.blocks_count { return error('AIR integer: foreign block target') } }
 			code := stream.records[inst.record].code
-			allowed_flags := if code == 2 { integer_binary_flag_mask(op.opcode) } else { u64(0) }
+			if inst.has_result { p.execution_bits(op.result_type, binary32)!; if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR integer: result slot') } }
+			floating_result := inst.has_result && p.types[op.result_type].kind == .float_t
+			allowed_flags := if code == 2 && !floating_result { integer_binary_flag_mask(op.opcode) } else { u64(0) }
 			if op.flags & ~allowed_flags != 0 { return error('AIR integer: unsupported instruction flags') }
-			if inst.has_result { p.integer_bits(op.result_type)!; if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR integer: result slot') } }
 			match code {
-				2, 9, 28 { if op.operands_count != 2 { return error('AIR integer: binary/comparison arity') }; if code == 2 && op.opcode > 12 { return error('AIR integer: binary opcode') }; if code != 2 && (op.opcode < 32 || op.opcode > 41) { return error('AIR integer: predicate') } }
-				3 { if op.operands_count != 1 || op.opcode > 2 { return error('AIR integer: trunc/zext/sext profile required') } }
+				2, 9, 28 {
+					if op.operands_count != 2 { return error('AIR integer: binary/comparison arity') }
+					fp := p.types[p.operands[op.operands_start].type_index].kind == .float_t
+					if code == 2 {
+						if (fp && op.opcode !in [u32(0), 1, 2, 4]!) || (!fp && op.opcode > 12) { return error('AIR scalar: binary opcode') }
+					} else if (fp && op.opcode > 15) || (!fp && (op.opcode < 32 || op.opcode > 41)) { return error('AIR scalar: predicate') }
+				}
+				3 {
+					if op.operands_count != 1 { return error('AIR scalar: cast arity') }
+					source := p.operands[op.operands_start].type_index
+					if op.opcode <= 2 { p.integer_bits(source)!; p.integer_bits(op.result_type)! }
+					else if !binary32 || op.opcode != 11 || p.execution_bits(source, binary32)! != 32 || p.execution_bits(op.result_type, binary32)! != 32 || (p.types[source].kind == .float_t) == floating_result { return error('AIR scalar: unsupported cast') }
+				}
 				5, 29 { if op.operands_count != 3 { return error('AIR integer: select arity') } }
 				16 { if phis != index - block.first || op.operands_count == 0 || op.targets_count != op.operands_count { return error('AIR integer: PHI grouping/arity') }; phis++ }
-				10 { if op.operands_count != 1 || p.integer_bits(p.operands[op.operands_start].type_index)! != return_bits { return error('AIR integer: return type') } }
+				10 { if op.operands_count != 1 || p.execution_bits(p.operands[op.operands_start].type_index, binary32)! != return_bits { return error('AIR integer: return type') } }
 				11 { if !((op.operands_count == 0 && op.targets_count == 1) || (op.operands_count == 1 && op.targets_count == 2)) { return error('AIR integer: branch arity') } }
 				12 { if op.operands_count < 1 || op.targets_count != op.operands_count { return error('AIR integer: switch arity') } }
 				15 { if op.operands_count != 0 { return error('AIR integer: unreachable arity') } }
+				56 { if !binary32 || !floating_result || op.operands_count != 1 { return error('AIR scalar: binary32 fneg required') } }
 				else { return error('AIR integer: instruction outside execution profile') }
 			}
 		}
@@ -150,6 +163,7 @@ struct IntegerMachine {
 	scope int
 	arguments []u64
 	limit int
+	binary32 bool
 mut:
 	values []IntegerValue
 	known []bool
@@ -161,7 +175,7 @@ fn (mut m IntegerMachine) step() ! {
 }
 fn (m &IntegerMachine) read(operand_index int) !IntegerValue {
 	operand := m.p.operands[operand_index]
-	bits := m.p.integer_bits(operand.type_index)!
+	bits := m.p.execution_bits(operand.type_index, m.binary32)!
 	s := m.bodies.scopes[m.scope]
 	if operand.number >= s.base_id {
 		slot := u64(operand.number) - s.base_id
@@ -177,7 +191,8 @@ fn (m &IntegerMachine) read(operand_index int) !IntegerValue {
 	if value.kind != .constant { return error('AIR integer: declarations are not integer values') }
 	c := m.pools.constants[value.constant_index]
 	if c.kind == .poison { return IntegerValue{poison: true} }
-	if c.kind != .zero && (c.kind != .integer || c.splat) { return error('AIR integer: undef/expressions unsupported') }
+	expected := if m.p.types[operand.type_index].kind == .float_t { IRConstantKind.floating } else { IRConstantKind.integer }
+	if c.kind != .zero && (c.kind != expected || c.splat) { return error('AIR scalar: undef/expressions unsupported') }
 	return IntegerValue{value: m.pools.scalar_bits(value.constant_index)! & constant_mask(bits)}
 }
 fn (mut m IntegerMachine) put(inst IRInstruction, value IntegerValue) {
@@ -188,12 +203,15 @@ fn (mut m IntegerMachine) put(inst IRInstruction, value IntegerValue) {
 // Execute valid LLVM IR within the checked scalar profile. No host pointers,
 // global state, memory operations, calls, floating point or Metal submission.
 pub fn (p IRTypedProgram) run_integer_function(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, arguments []u64, step_limit int) !IRIntegerRun {
+	return p.run_scalar_bits(ir, stream, pools, bodies, function, arguments, step_limit, false)!
+}
+fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, arguments []u64, step_limit int, binary32 bool) !IRIntegerRun {
 	if step_limit < 1 || step_limit > max_integer_execution_steps { return error('AIR integer: step limit range') }
-	profile := p.integer_profile(ir, stream, bodies, function)!
+	profile := p.integer_profile(ir, stream, bodies, function, binary32)!
 	s := bodies.scopes[profile.scope]; signature := ir.types[ir.functions[function].signature]
 	if profile.scope >= pools.scopes.len { return error('AIR integer: constant-pool scope') }
 	if arguments.len != signature.refs_count - 1 || pools.scopes[profile.scope].arguments_count != arguments.len { return error('AIR integer: argument count') }
-	mut m := IntegerMachine{p: p, pools: pools, bodies: bodies, scope: profile.scope, arguments: arguments, limit: step_limit, values: []IntegerValue{len: s.results_count}, known: []bool{len: s.results_count}}
+	mut m := IntegerMachine{p: p, pools: pools, bodies: bodies, scope: profile.scope, arguments: arguments, limit: step_limit, binary32: binary32, values: []IntegerValue{len: s.results_count}, known: []bool{len: s.results_count}}
 	mut pending := []IntegerValue{len: profile.max_phis}
 	defer { unsafe { m.values.free(); m.known.free(); pending.free() } }
 	mut block_index := s.blocks_start; mut previous := -1
@@ -219,15 +237,28 @@ pub fn (p IRTypedProgram) run_integer_function(ir IRModule, stream Stream, pools
 			start := op.operands_start
 			mut result := IntegerValue{}
 			match code {
-				2 { result = integer_binary_flags(op.opcode, op.flags, p.integer_bits(op.result_type)!, m.read(start)!, m.read(start + 1)!)! }
-				9, 28 { result = integer_compare(op.opcode, p.integer_bits(p.operands[start].type_index)!, m.read(start)!, m.read(start + 1)!)! }
+				2 {
+					a := m.read(start)!; b := m.read(start + 1)!
+					if p.types[op.result_type].kind == .float_t { result = if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: binary32_binary(op.opcode, u32(a.value), u32(b.value))!} } }
+					else { result = integer_binary_flags(op.opcode, op.flags, p.integer_bits(op.result_type)!, a, b)! }
+				}
+				9, 28 {
+					fp := p.types[p.operands[start].type_index].kind == .float_t
+					if fp && op.opcode in [u32(0), 15]! { result = IntegerValue{value: u64(op.opcode == 15)} }
+					else {
+						a := m.read(start)!; b := m.read(start + 1)!
+						if fp { result = if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: u64(binary32_compare(op.opcode, u32(a.value), u32(b.value))!)} } }
+						else { result = integer_compare(op.opcode, p.integer_bits(p.operands[start].type_index)!, a, b)! }
+					}
+				}
 				3 {
-					input := m.read(start)!; source_bits := p.integer_bits(p.operands[start].type_index)!; dest_bits := p.integer_bits(op.result_type)!
+					input := m.read(start)!; source_bits := p.execution_bits(p.operands[start].type_index, binary32)!; dest_bits := p.execution_bits(op.result_type, binary32)!
 					mut value := input.value & constant_mask(source_bits)
 					if op.opcode == 2 && value & (u64(1) << (source_bits - 1)) != 0 { value |= ~constant_mask(source_bits) }
 					result = IntegerValue{value: value & constant_mask(dest_bits), poison: input.poison}
 				}
 				5, 29 { condition := m.read(start + 2)!; result = if condition.poison { IntegerValue{poison: true} } else { m.read(start + if condition.value & 1 != 0 { 0 } else { 1 })! } }
+				56 { input := m.read(start)!; result = IntegerValue{value: input.value ^ 0x80000000, poison: input.poison} }
 				10 { value := m.read(start)!; return IRIntegerRun{profile.return_bits, value.value & constant_mask(profile.return_bits), value.poison, m.steps} }
 				11 {
 					mut target := 0

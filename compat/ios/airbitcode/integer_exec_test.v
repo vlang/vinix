@@ -65,6 +65,13 @@ fn (f IntegerFixture) run(arguments []u64, limit int) !IRIntegerRun {
 	p := ir.typed_operands(stream, pools, bodies)!; defer { p.free() }
 	return p.run_integer_function(ir, stream, pools, bodies, 0, arguments, limit)!
 }
+fn (f IntegerFixture) scalar(arguments []u64, limit int) !IRScalarRun {
+	declarations := [0]; defer { unsafe { declarations.free() } }
+	pools := IRConstantPools{declarations: declarations, scopes: f.scopes, constants: f.constants, words: f.words, arguments: f.arguments, module_values: 1}
+	ir := f.ir(); stream := f.stream(); bodies := ir.function_bodies(stream, pools)!; defer { bodies.free() }
+	p := ir.typed_operands(stream, pools, bodies)!; defer { p.free() }
+	return p.run_scalar_function(ir, stream, pools, bodies, 0, arguments, limit)!
+}
 fn (f &IntegerFixture) free() { unsafe { f.blocks.free(); f.records.free(); f.values.free(); f.types.free(); f.refs.free(); f.functions.free(); f.scopes.free(); f.constants.free(); f.words.free(); f.arguments.free() } }
 fn test_integer_function_branches_arguments_and_budgets() {
 	mut f := integer_fixture(); defer { f.free() }
@@ -226,4 +233,34 @@ fn test_integer_switch_empty_poison_undef_and_loop_guards() {
 	if _ := f.run([u64(1), 2], 63) { assert false, 'matched switch loop budget' }
 	if _ := f.run([u64(7), 2], 64) { assert false, 'default switch loop budget' }
 	println('AIR-INTEGER-SWITCH-GUARDS: empty-table condition evaluation, poison/undef rejection and bounded matched/default self-loops PASS')
+}
+fn test_scalar_binary32_arguments_constants_poison_and_profile() {
+	mut f := integer_fixture(); defer { f.free() }
+	f.types[0] = IRType{kind: .float_t}; f.constants[0] = IRConstant{...f.constants[0], kind: .floating, bits: 32}; f.words[0] = 0x3f800000
+	f.functions[0] = IRFunction{...f.functions[0], basic_blocks: 1}
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(2, [u64(3), 2, 0]); f.add(10, [u64(1)])
+	run := f.scalar([u64(0x3f800000), 0x40000000], 2)!
+	assert run.kind == .binary32 && run.bits == 32 && run.value == 0x40400000 && !run.poison && run.steps == 2
+	if _ := f.run([u64(0x3f800000), 0x40000000], 2) { assert false, 'integer entry point accepted floating types' }
+	if _ := f.scalar([u64(0x3f800000), 0x40000000], 1) { assert false, 'binary32 budget' }
+	f.values[f.records[2].values_start] = 1 // Read the floating constant rather than the first argument.
+	assert f.scalar([u64(0), 0x40000000], 2)!.value == 0x40400000
+	f.constants[0] = IRConstant{...f.constants[0], kind: .poison}
+	assert f.scalar([u64(0), 0x40000000], 2)!.poison
+	f.constants[0] = IRConstant{...f.constants[0], kind: .undef}
+	if _ := f.scalar([u64(0), 0x40000000], 2) { assert false, 'selected undef' }
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(56, [u64(3), 0]); f.add(10, [u64(1)])
+	assert f.scalar([u64(0x7f800123), 0], 2)!.value == 0xff800123
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(2, [u64(3), 2, 0, 2]); f.add(10, [u64(1)])
+	if _ := f.scalar([u64(0), 0], 4) { assert false, 'fast math flags' }
+	f.refs[0] = 1
+	for predicate in [u64(0), 15]! {
+		f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(28, [u64(3), 1, predicate]); f.add(10, [u64(1)])
+		for kind in [IRConstantKind.poison, .undef]! {
+			f.constants[0] = IRConstant{...f.constants[0], kind: kind}
+			comparison := f.scalar([u64(0), 0], 2)!
+			assert comparison.kind == .integer && comparison.bits == 1 && !comparison.poison && comparison.value == u64(predicate == 15)
+		}
+	}
+	println('AIR-SCALAR-BINARY32: float arguments/constants/returns, integer API isolation, exact fneg bits, poison/undef, constant predicates, FMF rejection and budgets PASS')
 }
