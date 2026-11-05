@@ -32,6 +32,24 @@ struct Profile {
 	input_roots []string
 }
 
+struct AuditProfile {
+	format int = 1
+	charged_limit_kib int = 524288
+	charged_roots []string
+}
+
+struct AuditSpec {
+	root string
+	manifest string
+	manifest_sha256 string
+}
+
+const audit_checker = '/Users/alex/Library/Caches/vinix-codex/section14/alloc-track-frame-kernel-20261026-seal-02/frame-page-seal'
+const audit_checker_sha256 = 'fcc0e1f0d557e980a99dbcaf68d45ed8da851b07bf0810e8c99c931c865001b6'
+const audit_source = '/Users/alex/code/vinix/tests/kernel-allocs/frame-page-seal.v'
+const audit_source_sha256 = '8cd5e58df42e07760d0e1b73c49807b0ee2c7e353412e7d54aca34a7597577d4'
+const audit_marker = 'FRAME-PAGE COMPLETE STATE CHECK PASS\n'
+
 struct PreparedView {
 	arch string = 'x86_64'
 	root string
@@ -46,6 +64,8 @@ struct PreparedView {
 	firmware string
 	sysroot string
 	sysroot_manifest string
+	gcc string
+	gcc_manifest string
 }
 
 // A fixed preparation operation, not a caller-supplied command or environment.
@@ -257,20 +277,45 @@ fn literal_inventory(path string, depth int, deadline u64, mut context Inventory
 
 fn prepare_inputs(p PrepareProfile, paths []string) !map[string]string {
 	mut result := inputs(paths)!
-	if p.arch == 'aarch64' {
-		mut context := Inventory{}
-		literal_inventory(p.sysroot, 0, time.sys_mono_now() + 120 * u64(time.second), mut context, mut result)!
-	}
+	mut context := Inventory{}
+	deadline := time.sys_mono_now() + 120 * u64(time.second)
+	literal_inventory(p.sysroot, 0, deadline, mut context, mut result)!
+	if p.arch == 'x86_64' { literal_inventory(p.gcc, 0, deadline, mut context, mut result)! }
 	return result
 }
 
 fn runtime_inputs(p PreparedView, paths []string) !map[string]string {
-	mut result := inputs(paths)!
-	if p.arch == 'aarch64' {
+	literal_roots := prepared_literal_roots(p)
+	mut filtered := []string{}
+	for path in paths {
+		if !literal_roots.any(inside(path, it)) { filtered << path }
+	}
+	mut result := inputs(filtered)!
+	if literal_roots.len > 0 {
 		mut context := Inventory{}
-		literal_inventory(p.sysroot, 0, time.sys_mono_now() + 120 * u64(time.second), mut context, mut result)!
+		deadline := time.sys_mono_now() + 120 * u64(time.second)
+		for root in literal_roots { literal_inventory(root, 0, deadline, mut context, mut result)! }
 	}
 	return result
+}
+
+fn x86_closure_present(p PreparedView) bool {
+	return p.sysroot != '' || p.gcc != '' || p.sysroot_manifest != '' || p.gcc_manifest != ''
+}
+
+fn prepared_literal_roots(p PreparedView) []string {
+	if p.arch == 'aarch64' { return [p.sysroot] }
+	if p.arch == 'x86_64' && x86_closure_present(p) { return [p.sysroot, p.gcc].filter(it != '') }
+	return []string{}
+}
+
+fn x86_prepared(p PreparedView, state string) ! {
+	for path in [p.sysroot, p.gcc] {
+		require(path != '' && path == os.real_path(path) && os.is_dir(path), 'canonical prepared x86 build directories required')!
+	}
+	for pair in [['sysroot-before.tsv', p.sysroot_manifest], ['gcc-before.tsv', p.gcc_manifest]] {
+		require(digest_text(pair[1]) && hash(state + '/' + pair[0])! == pair[1], 'prepared x86 literal manifest differs')!
+	}
 }
 
 fn arm_command(qemu string, firmware string, state string, socket string) []string {
@@ -423,15 +468,19 @@ fn log_chunk(chunk string, context voidptr) ! {
 fn observe(pid int, context voidptr) ! {
 	mut watch := unsafe { &Watch(context) }
 	watch.pid = pid
-	watch.started = time.sys_mono_now()
-	watch.next_budget = watch.started
+	if watch.started == 0 { watch.started = time.sys_mono_now() }
+	watch.next_budget = time.sys_mono_now()
 	os.write_file(watch.state + '/child.json', json2.encode({'pid': pid.str(), 'ownership': 'SDK private process group; leader reserved with WNOWAIT until retirement'}) + '\n')!
 	watch.tasks << spawn budget_watch(mut watch)
 }
 
 fn supervise(profile Profile, state string, argv []string) !int {
+	return supervise_core(profile, state, argv, 0, 30)
+}
+
+fn supervise_core(profile Profile, state string, argv []string, started u64, grace int) !int {
 	guard := perfconsole.own_commands(); defer { guard.close() }
-	mut watch := Watch{state: state, profile: profile}
+	mut watch := Watch{state: state, profile: profile, started: started}
 	active_watch = &watch
 	defer { active_watch = unsafe { nil } }
 	os.write_file(state + '/argv.json', json2.encode(argv) + '\n')!
@@ -440,7 +489,7 @@ fn supervise(profile Profile, state string, argv []string) !int {
 	os.write_file(state + '/budgets.jsonl', '')!
 	mut failure := ''
 	output := sourcecommand.capture_combined_owned(argv, os.environ(), f64(profile.timeout_seconds),
-		profile.log_limit_bytes, cancel, log_chunk, observe, &watch, 30, profile.directory) or {
+		profile.log_limit_bytes, cancel, log_chunk, observe, &watch, f64(grace), profile.directory) or {
 		failure = err.msg()
 		sourcecommand.Output{}
 	}
@@ -490,6 +539,185 @@ fn fresh(state string) ! {
 		&& !os.exists(state) && !os.is_link(state), 'fresh canonical external state required')!
 }
 
+fn fixed_audit(which string) !AuditSpec {
+	prefix := '/Users/alex/Library/Caches/vinix-codex/section14/'
+	return match which {
+		'frame' { AuditSpec{prefix + 'frame-peer-baseline-fresh-20261026',
+			prefix + 'frame-peer-baseline-fresh-20261026-seal-01/complete/inventory.json',
+			'918073b63294c83608ef2d08b7420929c1d5148fc0464df4798a95459d71e8d9'} }
+		'atomic' { AuditSpec{prefix + 'matched-peer-frame-atomic-fresh-20261026',
+			prefix + 'matched-peer-frame-atomic-fresh-20261026-seal-01/complete/inventory.json',
+			'e82671ca13c4d46b18d1d9762d661f4f392be0ee888d0fb20d1de21f540c54f0'} }
+		else { return error('audit requires fixed frame or atomic selection') }
+	}
+}
+
+fn audit_argv(spec AuditSpec) []string {
+	return [audit_checker, 'check', spec.root, spec.manifest]
+}
+
+fn audit_output(path string, value string) ! {
+	observation_capacity(0, u64(value.len))!
+	fd := C.open(path.str, C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NOFOLLOW, 0o600)
+	if fd < 0 { return error('cannot exclusively create audit output') }
+	if C.close(fd) != 0 { return error('audit output create close failed') }
+	journal_append(path, value, 0)!
+}
+
+fn audit_admission(p AuditProfile, spec AuditSpec, state string) !Profile {
+	fresh(state)!
+	require(p.format == 1, 'audit profile format must be 1')!
+	require(p.charged_limit_kib >= 524288 && p.charged_limit_kib <= 4718592,
+		'charged limit must be 512 MiB..4.5 GiB')!
+	require(p.charged_roots.len > 0, 'audit charged roots required')!
+	for index, root in p.charged_roots {
+		require(root == os.real_path(root) && os.is_dir(root), 'canonical audit charged root required')!
+		for other in p.charged_roots[..index] {
+			require(!inside(root, other) && !inside(other, root), 'overlapping audit charged roots')!
+		}
+	}
+	require(p.charged_roots.any(inside(state, it)), 'audit state must be covered by charged roots')!
+	for input in [spec.root, os.dir(spec.manifest), os.dir(audit_checker),
+		'/Users/alex/code/vinix', os.real_path(@DIR + '/../..')] {
+		require(!inside(state, input) && !inside(input, state), 'audit output overlaps fixed input')!
+	}
+	return Profile{directory: '/Users/alex/code/vinix', timeout_seconds: 300,
+		log_limit_bytes: 2 * 1024 * 1024, charged_limit_kib: p.charged_limit_kib,
+		charged_roots: p.charged_roots}
+}
+
+fn audit_pinned(path string, expected string, deadline u64) !string {
+	require(path == os.real_path(path) && os.lstat(path)!.get_filetype() == .regular,
+		'canonical ordinary audit input required')!
+	actual := hash_bounded(path, deadline)!
+	require(actual == expected, 'fixed audit input digest differs: ' + path)!
+	return actual
+}
+
+fn audit_root_identity(path string) !string {
+	require(path == os.real_path(path), 'canonical audit root required')!
+	info := os.lstat(path)!
+	require(info.get_filetype() == .directory, 'ordinary audit root required')!
+	return json2.encode({'dev': info.dev.str(), 'inode': info.inode.str(), 'mode': info.mode.str(),
+		'uid': info.uid.str(), 'gid': info.gid.str(), 'size': info.size.str(), 'nlink': info.nlink.str(),
+		'mtime': info.mtime.str(), 'ctime': info.ctime.str()})
+}
+
+fn audit_pins(spec AuditSpec, profile_path string, deadline u64) !map[string]string {
+	mut pins := {
+		audit_checker: audit_pinned(audit_checker, audit_checker_sha256, deadline)!
+		audit_source: audit_pinned(audit_source, audit_source_sha256, deadline)!
+		spec.manifest: audit_pinned(spec.manifest, spec.manifest_sha256, deadline)!
+		'root_identity': audit_root_identity(spec.root)!
+	}
+	for path in [audit_checker, audit_source, spec.manifest] {
+		pins['mode:' + path] = os.lstat(path)!.mode.str()
+	}
+	for path in [@FILE, os.executable(), profile_path] {
+		require(path == os.real_path(path) && os.lstat(path)!.get_filetype() == .regular,
+			'canonical ordinary audit owner/profile input required')!
+		pins[path] = hash_bounded(path, deadline)!
+		pins['mode:' + path] = os.lstat(path)!.mode.str()
+	}
+	return pins
+}
+
+fn audit_completion(status int, output string) ! {
+	require(status == 0, 'original audit child exited nonzero')!
+	require(output == audit_marker, 'original audit exact marker differs')!
+}
+
+fn audit_equal(before map[string]string, after map[string]string) ! {
+	require(before == after, 'audit fixed inputs changed')!
+}
+
+fn audit_tail(started u64, sampled u64, now u64) ! {
+	observation_timing(sampled, sampled, now)!
+	require(now >= started && now - started <= 300 * u64(time.second), 'audit total 300-second deadline exceeded')!
+}
+
+fn audit_integer(raw string) !u64 {
+	require(raw != '' && raw.len <= 20, 'invalid audit timing integer')!
+	mut value := u64(0)
+	for byte in raw.bytes() {
+		require(byte >= `0` && byte <= `9`, 'invalid audit timing integer')!
+		digit := u64(byte - `0`)
+		require(value <= (u64(18446744073709551615) - digit) / 10, 'audit timing integer overflow')!
+		value = value * 10 + digit
+	}
+	return value
+}
+
+fn audit_watch(profile Profile, state string, started u64) !Watch {
+	receipt := json2.decode[map[string]string](os.read_file(state + '/supervisor.json')!, strict: true)!
+	require(receipt['failure'] == '' && receipt['owner_status'] == '0'
+		&& receipt['cleanup'] == 'waitpid(-1,WNOHANG)=-1;errno=ECHILD', 'audit child receipt is not successful')!
+	samples := audit_integer(receipt['samples'])!
+	require(samples > 0 && samples < 1000000, 'audit sample count invalid')!
+	return Watch{state: state, profile: profile, started: started,
+		last_budget: audit_integer(receipt['last_sample_start_ns'])!,
+		last_finish: audit_integer(receipt['last_sample_finish_ns'])!,
+		max_gap: audit_integer(receipt['max_start_gap_ns'])!,
+		max_window: audit_integer(receipt['max_sample_window_ns'])!,
+		samples: int(samples), journal_bytes: audit_integer(receipt['journal_bytes'])!}
+}
+
+fn audit_owned(which string, state string, profile_path string) ! {
+	started := time.sys_mono_now()
+	deadline := started + 300 * u64(time.second)
+	spec := fixed_audit(which)!
+	require(profile_path == os.real_path(profile_path)
+		&& os.lstat(profile_path)!.get_filetype() == .regular && os.file_size(profile_path) <= 65536,
+		'canonical ordinary audit profile of at most 64 KiB required')!
+	text := os.read_file(profile_path)!
+	p := json2.decode[AuditProfile](text, strict: true)!
+	require(text == json2.encode(p) + '\n', 'audit profile must use canonical typed encoding')!
+	profile := audit_admission(p, spec, state)!
+	admission := budget(profile, state, true)!
+	os.mkdir(state)!
+	audit_output(state + '/profile.json', text)!
+	audit_output(state + '/budget-before.log', admission)!
+	before := audit_pins(spec, profile_path, deadline)!
+	require(before[profile_path] == sha256.hexhash(text), 'audit profile changed before pinning')!
+	audit_output(state + '/inputs-before.json', json2.encode(before) + '\n')!
+	observation_timing(started, started, time.sys_mono_now())!
+	now := time.sys_mono_now()
+	require(now < deadline, 'audit total deadline expired before child')!
+	remaining := (deadline - now) / u64(time.second)
+	require(remaining > 0 && remaining <= 300, 'audit total deadline expired before child')!
+	mut failure := ''
+	status := supervise_core(Profile{...profile, timeout_seconds: int(remaining)}, state,
+		audit_argv(spec), started, 0) or { failure = err.msg(); -1 }
+	after := audit_pins(spec, profile_path, deadline) or {
+		if failure == '' { failure = err.msg() }
+		map[string]string{}
+	}
+	audit_output(state + '/inputs-after.json', json2.encode(after) + '\n')!
+	audit_equal(before, after) or { if failure == '' { failure = err.msg() } }
+	audit_completion(status, os.read_file(state + '/command.log')!) or { if failure == '' { failure = err.msg() } }
+	if failure != '' { return error(failure) }
+	mut watch := audit_watch(profile, state, started)!
+	budget_sample(mut watch)!
+	audit_output(state + '/audit.json', json2.encode({
+		'verdict': 'PASS'
+		'which': which
+		'actual_child_status': status.str()
+		'checker_sha256': before[audit_checker]
+		'checker_source_sha256': before[audit_source]
+		'manifest_sha256': before[spec.manifest]
+		'inputs_sha256': sha256.hexhash(json2.encode(before) + '\n')
+		'phase_start_ns': started.str()
+		'last_sample_start_ns': watch.last_budget.str()
+		'last_sample_finish_ns': watch.last_finish.str()
+		'samples': watch.samples.str()
+		'max_start_gap_ns': watch.max_gap.str()
+		'max_sample_window_ns': watch.max_window.str()
+		'cleanup': 'waitpid(-1,WNOHANG)=-1;errno=ECHILD; original group absent'
+	}) + '\n')!
+	audit_tail(started, watch.last_budget, time.sys_mono_now())!
+	println('PERF ORIGINAL AUDIT PASS ' + which)
+}
+
 fn digest_text(value string) bool {
 	return value.len == 64 && value.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`))
 }
@@ -527,21 +755,27 @@ fn prepare_validated(p PrepareProfile, state string) !Profile {
 	}
 	require(p.firmware == os.real_path(p.firmware) && os.is_file(p.firmware), 'canonical firmware required')!
 	for path in [p.limine, p.sdk] { require(path == os.real_path(path) && os.is_dir(path), 'canonical preparation tool directory required')! }
+	require(p.linker.starts_with('/') && os.base(p.linker) == 'ld.lld' && os.is_executable(p.linker)
+		&& os.is_file(os.real_path(p.linker)), 'absolute selected ld.lld driver required')!
+	for path in [p.sysroot, p.gcc] {
+		require(path != '' && path == os.real_path(path) && os.is_dir(path), 'canonical build directory required')!
+	}
 	if p.arch == 'aarch64' {
 		require(p.xorriso == '', 'ARM preparation does not select xorriso')!
-		require(p.linker.starts_with('/') && os.base(p.linker) == 'ld.lld' && os.is_executable(p.linker)
-			&& os.is_file(os.real_path(p.linker)), 'absolute selected ld.lld driver required')!
 		require(p.firmware_vars == os.real_path(p.firmware_vars) && os.is_file(p.firmware_vars)
 			&& p.firmware_vars != p.firmware, 'separate canonical ARM firmware variables required')!
-		for path in [p.sysroot, p.gcc] { require(path == os.real_path(path) && os.is_dir(path), 'canonical ARM build directory required')! }
 		require(inside(p.gcc, p.sysroot), 'ARM GCC directory must be inside sysroot')!
 		require(os.is_file(p.limine + '/BOOTAA64.EFI'), 'ARM Limine loader required')!
 	} else { require(os.base(p.xorriso) == 'xorriso', 'selected xorriso filename required')! }
 	require(p.input_roots.len > 0 && p.charged_roots.len > 0, 'declared input and charged roots required')!
+	literal_roots := if p.arch == 'aarch64' { [p.sysroot] } else { [p.sysroot, p.gcc] }
 	for root in p.input_roots {
 		resolved := os.real_path(root)
 		require(!inside(resolved, p.base) && !inside(p.base, resolved), 'base must use its literal adapter manifest, not the host input inventory')!
-		if p.arch == 'aarch64' { require(!inside(resolved, p.sysroot) && !inside(p.sysroot, resolved), 'ARM sysroot must use its literal input inventory')! }
+		for literal in literal_roots {
+			require(!inside(resolved, literal) && !inside(literal, resolved),
+				'build directories must use their literal input inventory')!
+		}
 	}
 	for index, root in p.charged_roots {
 		require(root == os.real_path(root) && os.is_dir(root), 'canonical charged root required')!
@@ -554,7 +788,10 @@ fn prepare_validated(p PrepareProfile, state string) !Profile {
 			resolved := os.real_path(root)
 			require(!inside(output, resolved) && !inside(resolved, output), 'preparation output overlaps an input tree')!
 		}
-		if p.arch == 'aarch64' { require(!inside(output, p.sysroot) && !inside(p.sysroot, output), 'preparation output overlaps ARM sysroot')! }
+		for literal in literal_roots {
+			require(!inside(output, literal) && !inside(literal, output),
+				if p.arch == 'aarch64' { 'preparation output overlaps ARM sysroot' } else { 'preparation output overlaps x86 build directory' })!
+		}
 	}
 	return Profile{adapter: p.adapter, directory: p.directory, timeout_seconds: p.timeout_seconds,
 		log_limit_bytes: p.log_limit_bytes, charged_limit_kib: p.charged_limit_kib,
@@ -603,6 +840,9 @@ fn prepare_environment(p PrepareProfile, state string) ! {
 			'VINIX_QEMU_X86_64': p.qemu
 			'VINIX_OVMF_CODE_X86_64': p.firmware
 			'CC_AMD64': p.cc
+			'VINIX_PERF_X86_SYSROOT': p.sysroot
+			'VINIX_PERF_X86_GCC': p.gcc
+			'VINIX_PERF_X86_LINKER': p.linker
 			'VINIX_PLAIN_ISO_LIMINE': p.limine
 			'VINIX_PERF_X86_APFS_CLONE': '1'
 		} { os.setenv(key, value, true) }
@@ -616,14 +856,14 @@ fn prepare_paths(p PrepareProfile, profile_path string) ![]string {
 		'tests/linuxkpi/hosttest', 'tools/hosttest', 'tools/sourcecommand', 'tools/qmpclient'] { paths << p.directory + '/' + directory }
 	clang := '/Library/Developer/CommandLineTools/usr/bin/clang'
 	resource := command([clang, '-print-resource-dir'])!.trim_space()
-	paths << [p.adapter, p.kernel, p.desktop, os.dir(p.compiler), p.qemu, p.firmware, p.cc, p.readelf, p.mkfs,
+	paths << [p.adapter, p.kernel, p.desktop, os.dir(p.compiler), p.qemu, p.firmware, p.cc, p.readelf, p.mkfs, p.linker,
 		p.sdk + '/SDKSettings.json', p.sdk + '/SDKSettings.plist',
 		'/bin/cp', '/usr/bin/tar', '/bin/df', '/usr/bin/du', '/usr/bin/xcrun', clang,
 		'/Library/Developer/CommandLineTools/usr/bin/ld', resource + '/include', os.executable(), @FILE, profile_path]
 	if p.arch == 'aarch64' {
 		// The whole selected sysroot, including headers and all library search
 		// directories, is inventoried. It is read in place, never copied.
-		paths << [p.base, p.firmware_vars, p.linker, p.mformat, p.mmd, p.mcopy, p.limine + '/BOOTAA64.EFI']
+		paths << [p.base, p.firmware_vars, p.mformat, p.mmd, p.mcopy, p.limine + '/BOOTAA64.EFI']
 	} else { paths << [p.xorriso, p.limine + '/BOOTX64.EFI', p.limine + '/limine-uefi-cd.bin'] }
 	return paths
 }
@@ -641,7 +881,11 @@ fn prepared_checked(p PrepareProfile, profile Profile, state string, before map[
 		arm_prepared(prepared, p.prepared_state)!
 		require(hash(p.base)! == p.base_manifest_sha256 && os.read_file(p.prepared_state + '/base-before.tsv')!
 			== 'file\t' + p.base_manifest_sha256 + '\t' + p.base_mode.str() + '\t' + p.base + '\n', 'prepared base archive differs')!
-	} else { require(hash(p.prepared_state + '/base-before.tsv')! == p.base_manifest_sha256, 'prepared base manifest differs')! }
+	} else {
+		require(prepared.sysroot == p.sysroot && prepared.gcc == p.gcc, 'prepared x86 selected paths differ')!
+		x86_prepared(prepared, p.prepared_state)!
+		require(hash(p.prepared_state + '/base-before.tsv')! == p.base_manifest_sha256, 'prepared base manifest differs')!
+	}
 	require(digest_text(prepared.staged_manifest)
 		&& hash(p.prepared_state + '/staged-before.tsv')! == prepared.staged_manifest, 'prepared staged manifest differs')!
 	require(prepared.command.len > 0 && prepared.command[0] == p.qemu, 'prepared QEMU differs')!
@@ -755,6 +999,16 @@ fn validated(profile Profile, state string) !PreparedView {
 			require(!inside(resolved, p.sysroot) && !inside(p.sysroot, resolved), 'ARM sysroot must use its literal input inventory')!
 		}
 		require(!inside(state, p.sysroot) && !inside(p.sysroot, state), 'runtime output overlaps ARM sysroot')!
+	} else if x86_closure_present(p) {
+		x86_prepared(p, profile.prepared_state)!
+		for literal in prepared_literal_roots(p) {
+			for root in profile.input_roots {
+				resolved := os.real_path(root)
+				require(!inside(resolved, literal) && !inside(literal, resolved),
+					'x86 build directories must use their literal input inventory')!
+			}
+			require(!inside(state, literal) && !inside(literal, state), 'runtime output overlaps x86 build directory')!
+		}
 	}
 	require(!inside(state, p.root) && !inside(state, profile.prepared_state), 'supervisor state must be external to source and prepared state')!
 	require(p.inputs[profile.adapter] == hash(profile.adapter)!, 'adapter must match prepared input pin')!
@@ -988,13 +1242,18 @@ fn prepare_controls(state string, compiler string) !string {
 	root := state + '/prepare-source'; base := state + '/prepare-base'; output := state + '/prepare-output'
 	prepared := state + '/prepare-staged'
 	os.mkdir(root)!; os.mkdir(base)!
+	os.mkdir(state + '/prepare-sysroot')!; os.mkdir(state + '/prepare-gcc')!
+	// The driver alias must retain the ELF spelling even in a host fixture.
+	os.symlink(os.executable(), state + '/ld.lld')!
 	xorriso := state + '/xorriso'; os.cp(os.executable(), xorriso)!; os.chmod(xorriso, 0o755)!
 	pin := hash(os.executable())!
 	p := PrepareProfile{adapter: os.executable(), adapter_sha256: pin, directory: root, base: base,
 		base_mode: os.lstat(base)!.mode, base_manifest_sha256: '0'.repeat(64), kernel: os.executable(),
 		kernel_sha256: pin, desktop: os.executable(), desktop_sha256: pin, prepared_state: prepared,
 		compiler: compiler, qemu: os.executable(), firmware: xorriso, cc: os.executable(), readelf: os.executable(),
-		mkfs: os.executable(), xorriso: xorriso, limine: root, sdk: root, charged_roots: [state], input_roots: [root]}
+		mkfs: os.executable(), xorriso: xorriso, limine: root, sdk: root,
+		sysroot: state + '/prepare-sysroot', gcc: state + '/prepare-gcc', linker: state + '/ld.lld',
+		charged_roots: [state], input_roots: [root]}
 	prepare_validated(p, output)!
 	require(prepare_argv(p) == [p.adapter, 'prepare', root, base, p.kernel, prepared,
 		'new=' + p.desktop, '--scenarios=ops,churn,cache,idle,apps,drag', '--settle=3', '--seconds=5',
@@ -1008,6 +1267,136 @@ fn prepare_controls(state string, compiler string) !string {
 	prepare_refuses(PrepareProfile{...p, base_manifest_sha256: 'invalid'}, output, 'base mode and manifest pin')!
 	require(!os.exists(output) && !os.exists(prepared), 'prepare admission control staged output')!
 	return 'PASS eight prepare controls including six refusals; fixed argv and fresh charged output admission only; no adapter execution'
+}
+
+fn x86_owner_controls(state string, compiler string) !string {
+	work := state + '/x86-owner'; os.mkdir(work)!
+	root := work + '/source'; base := work + '/base'; sysroot := work + '/sysroot'; gcc := work + '/gcc'
+	for path in [root, base, sysroot, gcc, work + '/staged'] { os.mkdir(path)! }
+	xorriso := work + '/xorriso'; os.cp(os.executable(), xorriso)!; os.chmod(xorriso, 0o755)!
+	os.symlink(os.executable(), work + '/ld.lld')!
+	os.symlink(sysroot, work + '/sysroot-alias')!
+	pin := hash(os.executable())!
+	p := PrepareProfile{adapter: os.executable(), adapter_sha256: pin, directory: root, base: base,
+		base_mode: os.lstat(base)!.mode, base_manifest_sha256: '0'.repeat(64), kernel: os.executable(),
+		kernel_sha256: pin, desktop: os.executable(), desktop_sha256: pin, prepared_state: work + '/new-staged',
+		compiler: compiler, qemu: os.executable(), firmware: xorriso, cc: os.executable(), readelf: os.executable(),
+		mkfs: os.executable(), xorriso: xorriso, limine: root, sdk: root, sysroot: sysroot, gcc: gcc,
+		linker: work + '/ld.lld', charged_roots: [work], input_roots: [root]}
+	output := work + '/output'
+	prepare_validated(p, output)!
+	mut count := 1
+	prepare_refuses(PrepareProfile{...p, sysroot: ''}, output, 'canonical build directory')!; count++
+	prepare_refuses(PrepareProfile{...p, gcc: ''}, output, 'canonical build directory')!; count++
+	prepare_refuses(PrepareProfile{...p, sysroot: work + '/sysroot-alias'}, output, 'canonical build directory')!; count++
+	prepare_refuses(PrepareProfile{...p, linker: os.executable()}, output, 'ld.lld driver')!; count++
+	prepare_refuses(PrepareProfile{...p, input_roots: [sysroot]}, output, 'literal input inventory')!; count++
+	prepare_refuses(PrepareProfile{...p, input_roots: [gcc]}, output, 'literal input inventory')!; count++
+	prepare_refuses(p, sysroot + '/output', 'overlaps x86 build directory')!; count++
+	prepare_refuses(p, gcc + '/output', 'overlaps x86 build directory')!; count++
+	require(!x86_closure_present(PreparedView{}), 'historical empty closure no longer admitted')!; count++
+	staged := work + '/staged'
+	os.write_file(staged + '/sysroot-before.tsv', 'sysroot fixture\n')!
+	os.write_file(staged + '/gcc-before.tsv', 'gcc fixture\n')!
+	prepared := PreparedView{sysroot: sysroot, gcc: gcc,
+		sysroot_manifest: hash(staged + '/sysroot-before.tsv')!, gcc_manifest: hash(staged + '/gcc-before.tsv')!}
+	x86_prepared(prepared, staged)!; count++
+	mut failure := ''
+	partial := PreparedView{...prepared, gcc: ''}
+	require(x86_closure_present(partial), 'partial x86 closure bypasses validation')!
+	x86_prepared(partial, staged) or { failure = err.msg() }
+	require(failure.contains('canonical prepared x86'), 'partial x86 closure accepted')!; count++
+	failure = ''
+	x86_prepared(PreparedView{...prepared, gcc_manifest: '0'.repeat(64)}, staged) or { failure = err.msg() }
+	require(failure == 'prepared x86 literal manifest differs', 'altered x86 manifest accepted')!; count++
+	for path in [sysroot + '/loader', gcc + '/loader'] { os.symlink('/lib/libc.so', path)! }
+	paths := [root, sysroot + '/loader', gcc + '/loader']
+	before := runtime_inputs(prepared, paths)!
+	for path in [sysroot + '/loader', gcc + '/loader'] {
+		require(before['literal-link:' + path] == '/lib/libc.so' && 'resolved:' + path !in before,
+			'x86 guest link was host-resolved')!
+	}
+	count++
+	os.rm(gcc + '/loader')!; os.symlink('/other-gcc', gcc + '/loader')!
+	second := runtime_inputs(prepared, paths)!
+	require(before != second, 'changed GCC literal link accepted')!; count++
+	os.rm(sysroot + '/loader')!; os.symlink('/other-sysroot', sysroot + '/loader')!
+	require(second != runtime_inputs(prepared, paths)!, 'changed sysroot literal link accepted')!; count++
+	require(count == 16 && !os.exists(output) && !os.exists(p.prepared_state), 'x86 owner control count or output differs')!
+	return 'PASS sixteen x86 closure owner controls; no adapter or guest executed'
+}
+
+fn audit_controls(state string, profile Profile) !string {
+	mut count := 0
+	frame := fixed_audit('frame')!
+	atomic_spec := fixed_audit('atomic')!
+	require(audit_argv(frame) == [audit_checker, 'check',
+		'/Users/alex/Library/Caches/vinix-codex/section14/frame-peer-baseline-fresh-20261026',
+		'/Users/alex/Library/Caches/vinix-codex/section14/frame-peer-baseline-fresh-20261026-seal-01/complete/inventory.json'], 'fixed frame argv differs')!; count++
+	require(audit_argv(atomic_spec) == [audit_checker, 'check',
+		'/Users/alex/Library/Caches/vinix-codex/section14/matched-peer-frame-atomic-fresh-20261026',
+		'/Users/alex/Library/Caches/vinix-codex/section14/matched-peer-frame-atomic-fresh-20261026-seal-01/complete/inventory.json'], 'fixed atomic argv differs')!; count++
+	mut failure := ''
+	fixed_audit('/arbitrary') or { failure = err.msg(); AuditSpec{} }
+	require(failure == 'audit requires fixed frame or atomic selection', 'arbitrary audit selection accepted')!; count++
+	for item in [audit_marker, 'FRAME-PAGE COMPLETE STATE CHECK PASS', audit_marker + audit_marker] {
+		failure = ''; audit_completion(0, item) or { failure = err.msg() }
+		require(failure == if item == audit_marker { '' } else { 'original audit exact marker differs' }, 'audit marker control differs')!
+		count++
+	}
+	failure = ''; audit_completion(1, audit_marker) or { failure = err.msg() }
+	require(failure == 'original audit child exited nonzero', 'nonzero audit accepted')!; count++
+	fixture := state + '/audit-input'; os.write_file(fixture, 'fixture manifest')!
+	audit_pinned(fixture, sha256.hexhash('fixture manifest'), time.sys_mono_now() + u64(time.second))!; count++
+	failure = ''; audit_pinned(fixture, '0'.repeat(64), time.sys_mono_now() + u64(time.second)) or { failure = err.msg(); '' }
+	require(failure.contains('fixed audit input digest differs'), 'wrong audit manifest accepted')!; count++
+	audit_equal({'manifest': 'one'}, {'manifest': 'one'})!; count++
+	failure = ''; audit_equal({'manifest': 'one'}, {'manifest': 'two'}) or { failure = err.msg() }
+	require(failure == 'audit fixed inputs changed', 'changed audit pins accepted')!; count++
+	p := AuditProfile{charged_roots: [state]}
+	output := state + '/audit-admission'
+	audit_admission(p, frame, output)!; count++
+	failure = ''; audit_admission(AuditProfile{...p, format: 2}, frame, output) or { failure = err.msg(); Profile{} }
+	require(failure == 'audit profile format must be 1', 'unknown audit format accepted')!; count++
+	failure = ''; audit_admission(AuditProfile{...p, charged_roots: []}, frame, output) or { failure = err.msg(); Profile{} }
+	require(failure == 'audit charged roots required', 'empty audit roots accepted')!; count++
+	os.mkdir(state + '/audit-sub')!
+	failure = ''; audit_admission(AuditProfile{...p, charged_roots: [state, state + '/audit-sub']}, frame, output) or { failure = err.msg(); Profile{} }
+	require(failure == 'overlapping audit charged roots', 'overlapping audit roots accepted')!; count++
+	os.mkdir(output)!
+	failure = ''; audit_admission(p, frame, output) or { failure = err.msg(); Profile{} }
+	require(failure == 'fresh canonical external state required', 'stale audit state accepted')!; count++
+	os.write_file(output + '/keep', 'unchanged existing state')!
+	existing_before := inputs([output])!
+	profile_path := state + '/audit-profile.json'
+	os.write_file(profile_path, json2.encode(p) + '\n')!
+	stale_driver := state + '/audit-stale-driver'; os.mkdir(stale_driver)!
+	require(supervise(Profile{...profile, timeout_seconds: 5}, stale_driver,
+		[os.executable(), 'audit', 'frame', output, profile_path])! == 1, 'stale audit CLI did not refuse')!
+	require(inputs([output])! == existing_before, 'stale audit CLI changed existing state')!; count++
+	owner_root := os.real_path(@DIR + '/../..')
+	failure = ''; audit_admission(AuditProfile{charged_roots: [owner_root]}, frame,
+		owner_root + '/audit-must-not-exist') or { failure = err.msg(); Profile{} }
+	require(failure == 'audit output overlaps fixed input', 'audit output inside owner source accepted')!; count++
+	audit_tail(1, 300 * u64(time.second) + 1, 300 * u64(time.second) + 1)!; count++
+	failure = ''; audit_tail(1, 300 * u64(time.second) + 2, 300 * u64(time.second) + 2) or { failure = err.msg() }
+	require(failure == 'audit total 300-second deadline exceeded', 'late audit wall accepted')!; count++
+	failure = ''; audit_tail(1, 1, observation_bound + 2) or { failure = err.msg() }
+	require(failure == 'observation window exceeds five seconds', 'late audit tail accepted')!; count++
+	require(audit_integer('18446744073709551615')! == u64(18446744073709551615), 'audit integer boundary differs')!; count++
+	for raw in ['', '18446744073709551616'] {
+		failure = ''; audit_integer(raw) or { failure = err.msg(); u64(0) }
+		require(failure != '', 'invalid audit timing integer accepted')!; count++
+	}
+	child := state + '/audit-timeout'; os.mkdir(child)!
+	failure = ''
+	supervise_core(Profile{...profile, timeout_seconds: 1}, child,
+		[os.executable(), '--fixture', 'timeout'], time.sys_mono_now(), 0) or { failure = err.msg(); -1 }
+	require(failure == 'command timed out', 'audit zero-grace refusal differs: ' + failure)!
+	receipt := json2.decode[map[string]string](os.read_file(child + '/supervisor.json')!)!
+	require(receipt['cleanup'] == 'waitpid(-1,WNOHANG)=-1;errno=ECHILD', 'audit zero-grace child remains')!; count++
+	require(count == 25, 'audit control count differs')!
+	return 'PASS twenty-five fixed audit controls; no original bundle or guest executed'
 }
 
 fn profile_controls(state string) !string {
@@ -1148,6 +1537,8 @@ fn selfcheck(state string, compiler string) ! {
 	checks['profile_controls'] = profile_controls(state)!
 	checks['prepare_controls'] = prepare_controls(state, compiler)!
 	checks['observation_controls'] = observation_controls(profile, state)!
+	checks['x86_closure_controls'] = x86_owner_controls(state, compiler)!
+	checks['audit_controls'] = audit_controls(state, profile)!
 	for kind in ['ok', 'nonzero', 'timeout', 'output', 'signal', 'descendant'] {
 		work := state + '/' + kind; os.mkdir(work)!
 		started := time.sys_mono_now()
@@ -1168,7 +1559,7 @@ fn selfcheck(state string, compiler string) ! {
 	os.write_file(state + '/inputs-after.json', json2.encode(after) + '\n')!
 	require(before == after, 'host control input identity changed')!
 	checks['inputs_sha256'] = hash(state + '/inputs-before.json')!
-	checks['verdict'] = 'PASS six process controls, ten profile/completion controls, eight preparation admission controls and twenty-one observation controls'
+	checks['verdict'] = 'PASS forty-five historical owner controls, sixteen x86 closure controls and twenty-five fixed audit controls'
 	os.write_file(state + '/qualification.json', json2.encode(checks) + '\n')!
 	println('PERF FOREGROUND HOST PASS ' + hash(state + '/qualification.json')!)
 }
@@ -1266,7 +1657,7 @@ fn qualify(state string, compiler string, mode string) ! {
 			require(checks.len == 18, 'ARM adapter control receipt count differs')!
 			results[kind + ':selfcheck_sha256'] = hash(work + '/controls/result.json')!
 		} else if adapter {
-			require(os.read_file(work + '/controls/result')!.starts_with('PASS 32 checks including 19 refusals:'), 'adapter control receipt differs')!
+			require(os.read_file(work + '/controls/result')!.starts_with('PASS 37 checks including 22 refusals:'), 'adapter control receipt differs')!
 			results[kind + ':selfcheck_sha256'] = hash(work + '/controls/result')!
 			clone_driver := work + '/clone-driver'; os.mkdir(clone_driver)!
 			require(supervise(profile, clone_driver, [work + '/' + target, 'clonecheck', work + '/clone-controls'])! == 0, kind + ' clone controls failed')!
@@ -1290,7 +1681,7 @@ fn qualify(state string, compiler string, mode string) ! {
 	require(before == after, 'build/control input identity changed')!
 	os.write_file(state + '/budget-after.log', budget(profile, state, false)!)!
 	results['inputs_sha256'] = hash(state + '/inputs-before.json')!
-	results['verdict'] = if arm { 'PASS normal and production; eighteen ARM adapter controls each; no guest execution' } else if arm_owner { 'PASS normal and production; forty-five owner and sixteen ARM owner controls each; no guest execution' } else if adapter { 'PASS normal and production; 32 selfcheck and 18 clone controls each; no guest execution' } else { 'PASS normal and production; forty-five controls each; no guest execution' }
+	results['verdict'] = if arm { 'PASS normal and production; eighteen ARM adapter controls each; no guest execution' } else if arm_owner { 'PASS normal and production; eighty-six owner and sixteen ARM owner controls each; no guest execution' } else if adapter { 'PASS normal and production; 37 selfcheck and 18 clone controls each; no guest execution' } else { 'PASS normal and production; eighty-six controls each; no guest execution' }
 	results['scope'] = 'selected complete compiler, maintained sources and recorded host compiler/SDK metadata; installed loader and SDK dependency closure is not hermetic'
 	os.write_file(state + '/qualification.json', json2.encode(results) + '\n')!
 	println('PERF FOREGROUND QUALIFIED ' + hash(state + '/qualification.json')!)
@@ -1298,6 +1689,11 @@ fn qualify(state string, compiler string, mode string) ! {
 
 fn main() {
 	if os.args.len == 3 && os.args[1] == '--fixture' { fixture(os.args[2]); return }
+	if os.args.len == 5 && os.args[1] == 'audit' {
+		audit_owned(os.args[2], os.args[3], os.args[4]) or {
+			eprintln(err); exit(1)
+		}; return
+	}
 	if os.args.len == 4 && os.args[1] == 'selfcheck' {
 		selfcheck(os.args[2], os.args[3]) or { eprintln(err); exit(1) }; return
 	}
@@ -1322,6 +1718,6 @@ fn main() {
 			eprintln(err); exit(1)
 		}; exit(status)
 	}
-	eprintln('usage: foreground-supervise run|admit-prepare|prepare NEW-STATE PROFILE.json\n       foreground-supervise selfcheck|armcheck|qualify|qualify-adapter|qualify-arm-adapter|qualify-arm-owner NEW-STATE COMPLETE-V\n       foreground-supervise limitcheck NEW-STATE')
+	eprintln('usage: foreground-supervise run|admit-prepare|prepare NEW-STATE PROFILE.json\n       foreground-supervise audit frame|atomic NEW-STATE PROFILE.json\n       foreground-supervise selfcheck|armcheck|qualify|qualify-adapter|qualify-arm-adapter|qualify-arm-owner NEW-STATE COMPLETE-V\n       foreground-supervise limitcheck NEW-STATE')
 	exit(2)
 }
