@@ -233,6 +233,30 @@ fn frozen_inputs(mut pins map[string]string) ! {
 	} { pin(path, hash, mut pins)! }
 }
 
+// Explicitly reviewed current host bytes; never accept an arbitrary current
+// digest. All other original global tool pins remain unchanged.
+fn rebound_tools() map[string]string {
+	return {
+		'/bin/df': '84b985a1e447eb674bd1e8b2209dac5ca2a6803cad6cd0a9543bbd9e6b4e28bd'
+		'/bin/cp': 'a589d802b1c0dcafb205223774d7652a1d0a08b835a2dfbcf72692bfbe412880'
+		'/usr/bin/tar': '640f174362e1c0bd27450d0cbf77583d1811f8011a6de54de81c3118b7be0863'
+	}
+}
+
+fn rebind_tool_pins(original string) !string {
+	old := {
+		'/bin/df': 'f57b43da7cc2f701db5ebad1b78ae9a30f10f9a102b2a83b0707031e69367e8a'
+		'/bin/cp': '07cdcfe6a6474d9abac66f0b1959e2e9e4877bf4629e2e400249a3e7641b09f9'
+		'/usr/bin/tar': '9ab7f0793033dc9dc4809d83d695118801bd687cbacda59a0cbbf151ba25dc2b'
+	}
+	mut result := original
+	for path, wanted in rebound_tools() {
+		result = replace_exact(result, '\t\t' + literal(path) + ': ' + literal(old[path]),
+			'\t\t' + literal(path) + ': ' + literal(wanted), 1)!
+	}
+	return result
+}
+
 fn expected_build_argv(stem string, version string) []string {
 	return [compiler, '-prod', '-enable-globals', '-nocache', '-keepc', '-cc',
 		'/opt/homebrew/opt/llvm/bin/clang', '-cflags',
@@ -390,6 +414,7 @@ fn generate(original string, native string, evidence string, inputs map[string]s
 	mut result := replace_exact(original, "const state = '" + old_state + "'", "const state = '" + state + "'", 1)!
 	result = replace_exact(result, "const source_root = '" + old_source + "'", "const source_root = '" + source_root + "'", 1)!
 	result = replace_exact(result, "const compiler = '" + old_compiler + "'", "const compiler = '" + compiler + "'", 1)!
+	result = rebind_tool_pins(result)!
 	for name in ['process_nix.c.v', 'execute_capture_nix.h'] {
 		result = replace_exact(result, old_compiler.all_before_last('/') + '/vlib/os/' + name,
 			os.dir(compiler) + '/vlib/os/' + name, 1)!
@@ -409,7 +434,14 @@ fn generate(original string, native string, evidence string, inputs map[string]s
 	kept.delete_last()
 	mut paths := inputs.keys()
 	paths.sort()
+	rebound := rebound_tools()
 	for path in paths {
+		if path in rebound {
+			// The original global map entry has already been replaced exactly.
+			// Inputs pin the same reviewed bytes without emitting a duplicate key.
+			need(inputs[path] == rebound[path], 'reviewed host tool pin differs')!
+			continue
+		}
 		if path == compiler {
 			need(inputs[path] == 'ff75a30180b1de305e3c62acc1ebd85341ff83ae5d852c819d11f27d5260c4c5',
 				'original global compiler pin differs')!
@@ -490,6 +522,7 @@ fn bind_supervisor() ! {
 	for path in [@FILE, os.executable()] { remember(path, mut pins)! }
 	native, evidence := wrapper_inputs(mut pins)!
 	frozen_inputs(mut pins)!
+	for path, wanted in rebound_tools() { pin(path, wanted, mut pins)! }
 	qualified_compiler(mut pins)!
 	pin(suite + '/nativeguard/guard.v', guard_sha, mut pins)!
 	pin(suite + '/diagnostics/recoveryguard/recoveryguard.v', recovery_sha, mut pins)!
