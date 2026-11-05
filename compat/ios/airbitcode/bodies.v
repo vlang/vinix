@@ -13,6 +13,7 @@ pub:
 	has_result bool // Result ID equals next_value when true.
 	terminator bool
 	call_signature int = -1 // Only explicit CALL/INVOKE/CALLBR types are supported.
+	has_operand_bundles bool // Prefix semantics must not be silently discarded.
 }
 pub struct IRBasicBlock {
 pub:
@@ -173,11 +174,12 @@ pub fn (ir IRModule) function_bodies(stream Stream, pools IRConstantPools) !IRFu
 				else { return error('AIR bodies: unsupported function record ${record.code}') }
 			}
 			if pending_bundles && signature < 0 { return error('AIR bodies: operand bundles without call consumer') }
+			has_bundles := pending_bundles
 			pending_bundles = false
 			if record.code == 16 && saw_non_phi { return error('AIR bodies: PHI after non-PHI instruction') }
 			if record.code != 16 { saw_non_phi = true }
 			instruction_index := instructions.len
-			instructions << IRInstruction{scope, first_block + int(block_number), index, value, has_result, terminator, signature}
+			instructions << IRInstruction{scope, first_block + int(block_number), index, value, has_result, terminator, signature, has_bundles}
 			if has_result {
 				if value == 0xffffffff { return error('AIR bodies: value ID overflow') }
 				results << instruction_index; value++

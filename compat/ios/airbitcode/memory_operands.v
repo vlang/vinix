@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-// Read only the alloca address-space component; size/alignment layout is not
+// Read only an address-space component; size/alignment layout is not
 // implemented here. Scan without allocating a split string per instruction.
-fn operand_alloc_space(layout string) !u32 {
+fn operand_layout_space(layout string, marker u8) !u32 {
 	mut result := u32(0)
 	mut seen := false
 	mut i := 0
 	for i < layout.len {
 		start := i
 		for i < layout.len && layout[i] != `-` { i++ }
-		if i > start && layout[start] == `A` {
-			if seen || i == start + 1 { return error('AIR memory: invalid/duplicate alloca address space') }
+		if i > start && layout[start] == marker {
+			if seen || i == start + 1 { return error('AIR operands: invalid/duplicate layout address space') }
 			seen = true
 			mut number := u64(0)
 			for j in start + 1 .. i {
-				if layout[j] < `0` || layout[j] > `9` { return error('AIR memory: invalid alloca address space') }
+				if layout[j] < `0` || layout[j] > `9` { return error('AIR operands: invalid layout address space') }
 				number = number * 10 + u64(layout[j] - `0`)
-				if number > 0xffffff { return error('AIR memory: alloca address space limit') }
+				if number > 0xffffff { return error('AIR operands: layout address space limit') }
 			}
 			result = u32(number)
 		}

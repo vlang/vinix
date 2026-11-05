@@ -22,6 +22,8 @@ explicit status:
   matching definition types.
 - `opaque`: its instruction family has no operand decoder here. The raw record
   remains in `Stream`. Explicit call result signatures may still supply a type.
+  This also covers calls with unimplemented bundles or fixed metadata/label/token
+  arguments, even when ordinary calls in that family decode.
 - `deferred`: decoding or type verification depends on an unknown producer type.
   Cast, PHI, alloca and explicit-load definitions may still have known result types.
 
@@ -61,6 +63,27 @@ its result representation. With no original pointer types, allocas use opaque
 pointers. Unsized/cyclic allocation/storage types are not
 fully verified. Memory operations remain data descriptions, without execution.
 
+Explicit-type CALL records decode a scalar pointer callee, fixed arguments and
+value/type-pair varargs. The operand range starts with the callee, then arguments
+in source order. `call_signature` indexes the original function type;
+`callee_function` indexes `ir.functions` for a direct function declaration,
+otherwise it is -1. Function declaration pointers are recovered from their raw
+records, retaining the original typed/opaque representation and explicit or
+data-layout `P` program address space. Other global declarations remain untyped.
+Forward callee claims and fixed argument types undergo the final definition
+check. An unknown callee or argument type causes deferral, preserving the known
+result type. Void calls consume no result ID.
+
+`attribute_set` retains the uninterpreted attribute-list ID, `flags` retains the
+packed call header, `calling_convention` extracts its convention and
+`fast_math_flags` retains its optional FMF word. Attribute contents, tail-call
+legality, convention compatibility and intrinsic implementations are unverified.
+Explicit signatures may reinterpret typed pointers; their historical pointee
+signatures are not required to match. Bundled calls and calls with fixed
+metadata/label/token parameters remain opaque. INVOKE/CALLBR stay opaque.
+Metadata varargs are outside the supported value/type profile and may fail.
+Recognizing an AIR or LLVM intrinsic does not provide execution semantics.
+
 Unsigned relative operands use the instruction's current value ID and u32 wrap
 arithmetic. Forward value/type pairs consume an explicit type word. PHI uses a
 separate signed-VBR delta convention, including forward loop references. Lookup
@@ -78,7 +101,7 @@ width and scalability. This is a bounded strict profile, not an LLVM verifier.
 Unsupported cast categories can fail even when another LLVM profile permits
 them. No data-layout pointer width or address calculation is inferred.
 
-Calls, atomic memory operations, shuffle operations, switches, exception
+Atomic memory operations, shuffle operations, switches, exception
 instructions and other families remain opaque. Constant expressions retain the
 previous pool layer's opaque tags. This layer does not evaluate constants, prove
 CFG/dominance/PHI predecessor relationships, verify every flag encoding, lower
@@ -98,13 +121,21 @@ forward PHIs, synthetic boolean vectors, type-name ownership, malformed input
 and mutations. The V inspector `tests/ios/air-operands-inspect.v` supports:
 
 - `self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR`: assemble portable LLVM fixture
-  data, check four complete function indexes plus an opaque call, flags and
+  data, check five complete function indexes, an ordinary call, flags and
   forward PHI identity, and reject eight corrupted dumps
   or decoded indexes. These functions are format fixtures, not iOS apps.
 - `memory-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR`: assemble memory fixture
   data with three complete function indexes, scalar/vector GEP, aliasing accesses,
   alloca A5, aggregate paths, explicit alignment/volatility and eight corruption
   controls. It does not execute the fixture.
+- `call-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR`: independently assemble
+  direct/indirect/void/vararg calls, CC/tail/FMF fields and unsupported bundled/
+  metadata calls; reject eight corrupted dumps or decoded indexes. Its call
+  comparison checks exact direct callee names, argument count/types and return
+  type or vararg signature. Specific legacy lifetime/memory intrinsic upgrades
+  are normalized for LLVM's disassembly only; original AIR operands stay intact.
+  Indirect value identities, raw call flags/attributes and intrinsic behavior
+  are not compared. The text comparator requires a named @/% callee.
 - `corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR`: copy raw modules and independently
   disassemble them. Compare exact arithmetic/cast/predicate mnemonics and selected
   operand/result type spellings only for `decoded` instructions. Named type

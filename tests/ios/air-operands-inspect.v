@@ -59,6 +59,7 @@ fn typed_line(ir airbitcode.IRModule, stream airbitcode.Stream, bodies airbitcod
 	if op.status != .decoded { return }
 	raw := stream.records[bodies.instructions[index].record]
 	text := if line.starts_with('%') { line.all_after(' = ') } else { line }
+	if raw.code == 34 { compare_call(ir, p, op, text)!; return }
 	mut mnemonic := ''
 	mut typ := -1
 	match raw.code {
@@ -279,7 +280,7 @@ entry:
 	os.write_file(out + '/input.ll', source)!
 	run_saved([assembler, out + '/input.ll', '-o', out + '/input.bc'], out + '/assemble')!
 	d, o, f, c := inspect(out + '/input.bc', llvm, out + '/fixture')!
-	if d != 28 || o != 1 || f != 0 || c != 4 { return error('fixture completeness/coverage differs') }
+	if d != 29 || o != 0 || f != 0 || c != 5 { return error('fixture completeness/coverage differs') }
 	data := os.read_bytes(out + '/fixture.bc')!; defer { unsafe { data.free() } }
 	stream := airbitcode.parse(data)!; defer { stream.free() }
 	ir := stream.ir_module(data)!; defer { ir.free() }
@@ -309,13 +310,180 @@ entry:
 		compare(ir, stream, bodies, changed, oracle) or { controls++; continue }
 		return error('accepted corrupted typed index')
 	}
-	println('LLVM-OPERANDS-SELFTEST: 28 decoded, one opaque, no deferred; four complete function indexes, scalar/vector/FP/flags/forward-PHI checks and ${controls} rejected evidence corruptions PASS')
+	println('LLVM-OPERANDS-SELFTEST: 29 decoded, no opaque/deferred; five complete function indexes, scalar/vector/FP/flags/forward-PHI checks and ${controls} rejected evidence corruptions PASS')
 }
 fn main() {
+	if os.args.len == 5 && os.args[1] == 'call-self-test' { call_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'memory-self-test' { memory_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'self-test' { self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'corpus' { corpus(os.args[2], os.args[3], os.args[4])!; return }
-	panic('usage: air-operands-inspect corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR | self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | memory-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR')
+	panic('usage: air-operands-inspect corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR | self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | memory-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | call-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR')
+}
+
+// Find a named direct/indirect callee followed by its argument list, ignoring
+// named return types, nested signature types and quoted/escaped identifiers.
+fn call_callee(text string) !(int, int) {
+	mut depth := 0
+	mut i := 0
+	for i < text.len {
+		ch := text[i]
+		if depth == 0 && ch in [u8(`@`), `%`]! {
+			start := i; i++
+			if i < text.len && text[i] == `"` {
+				i++
+				for i < text.len && text[i] != `"` { if text[i] == `\\` { i += 2 }; i++ }
+				if i >= text.len { return error('LLVM call quoted identifier') }; i++
+			} else { for i < text.len && text[i] !in [u8(` `), `(`, `,`]! { i++ } }
+			if i < text.len && text[i] == `(` { return start, i }
+			continue
+		}
+		if ch in [u8(`(`), `[`, `{`, `<`]! { depth++ }
+		if ch in [u8(`)`), `]`, `}`, `>`]! { depth-- }
+		if depth < 0 { return error('LLVM call header nesting') }
+		i++
+	}
+	return error('LLVM call has no named callee')
+}
+fn call_arguments(text string, open int) ![]string {
+	mut args := []string{}
+	args.flags |= .noslices
+	mut keep := false
+	defer { if !keep { unsafe { args.free() } } }
+	mut start := open + 1
+	mut depth := 0
+	mut quoted := false
+	mut i := start
+	for i < text.len {
+		ch := text[i]
+		if ch == `\\` && quoted { i += 3; continue }
+		if ch == `"` { quoted = !quoted; i++; continue }
+		if !quoted {
+			if ch == `)` && depth == 0 {
+				if i > start { args << text[start..i].trim_space().clone() }
+				keep = true; return args
+			}
+			if ch == `,` && depth == 0 { args << text[start..i].trim_space().clone(); start = i + 1 }
+			if ch in [u8(`(`), `[`, `{`, `<`]! { depth++ }
+			if ch in [u8(`)`), `]`, `}`, `>`]! { depth-- }
+			if depth < 0 { return error('LLVM call argument nesting') }
+		}
+		i++
+	}
+	return error('LLVM call has no argument list ending')
+}
+// LLVM upgrades a small set of legacy pointer intrinsic names and removes the
+// lifetime size argument. Check the original signature before normalizing it.
+fn call_oracle_name(ir airbitcode.IRModule, index int) !(string, int) {
+	f := ir.functions[index]
+	if f.declaration && (f.name.starts_with('llvm.lifetime.start.') || f.name.starts_with('llvm.lifetime.end.')) && f.name.ends_with('i8') {
+		typ := ir.types[f.signature]; refs := ir.references[typ.refs_start..typ.refs_start + typ.refs_count]
+		if refs.len != 3 || ir.types[refs[0]].kind != .void_t || ir.types[refs[1]].kind != .integer_t || ir.types[refs[1]].bits != 64 { return error('legacy lifetime call signature') }
+		pointer := ir.types[refs[2]]
+		if pointer.kind != .pointer_t || pointer.refs_count != 1 || ir.types[ir.references[pointer.refs_start]].kind != .integer_t || ir.types[ir.references[pointer.refs_start]].bits != 8 || !f.name.ends_with('.p${pointer.address_space}i8') { return error('legacy lifetime call pointer') }
+		return f.name[..f.name.len - 2].clone(), 1
+	}
+	if f.declaration && (f.name.starts_with('llvm.memcpy.') || f.name.starts_with('llvm.memmove.') || f.name.starts_with('llvm.memset.')) {
+		mut parts := f.name.split('.')
+		defer { unsafe { parts.free() } }
+		for i, part in parts {
+			if part.starts_with('p') && part.ends_with('i8') && part.len > 3 { strconv.parse_uint(part[1..part.len - 2], 10, 24)!; parts[i] = part[..part.len - 2] }
+		}
+		return parts.join('.'), 0
+	}
+	return f.name.clone(), 0
+}
+fn compare_call(ir airbitcode.IRModule, p airbitcode.IRTypedProgram, op airbitcode.IRTypedInstruction, text string) ! {
+	mut body := text
+	if body.starts_with('tail ') || body.starts_with('musttail ') || body.starts_with('notail ') { body = body.all_after(' ') }
+	if !body.starts_with('call ') { return error('LLVM call opcode differs') }
+	callee, open := call_callee(body)!
+	args := call_arguments(body, open)!
+	defer { unsafe { args.free() } }
+	mut skip := 0
+	if op.callee_function >= 0 {
+		if body[callee] != `@` { return error('LLVM direct callee differs') }
+		name := function_name(body[callee..])!; defer { unsafe { name.free() } }
+		expected, removed := call_oracle_name(ir, op.callee_function)!; defer { unsafe { expected.free() } }
+		if name != expected { return error('LLVM direct callee name differs: ' + name + ' expected ' + expected) }
+		skip = removed
+	}
+	if args.len != op.operands_count - 1 - skip { return error('LLVM call argument count differs') }
+	for i, arg in args {
+		typ := oracle_type(p, ir, p.operands[op.operands_start + 1 + skip + i].type_index)!; defer { unsafe { typ.free() } }
+		if !arg.starts_with(typ + ' ') { return error('LLVM call argument type differs: ' + arg + ' expected ' + typ) }
+	}
+	signature := p.types[op.call_signature]
+	ret := p.references[signature.refs_start]
+	if op.result_type != (if p.types[ret].kind == .void_t { -1 } else { ret }) { return error('decoded call result differs from signature') }
+	result := oracle_type(p, ir, if signature.vararg { op.call_signature } else { p.references[signature.refs_start] })!
+	defer { unsafe { result.free() } }
+	if !body[..callee].trim_space().ends_with(' ' + result) { return error('LLVM call result/signature type differs') }
+}
+
+fn call_self_test(assembler string, llvm string, out string) ! {
+	fresh(out)!
+	source := 'target triple = "x86_64-unknown-linux-gnu"
+declare fastcc i32 @target(i32)
+declare void @sink(i32)
+declare float @variadic(i32, ...)
+declare void @llvm.experimental.noalias.scope.decl(metadata)
+define i32 @calls(ptr %fn, i32 %x, float %f) {
+entry:
+  %a = tail call fastcc i32 @target(i32 %x)
+  call void @sink(i32 %a)
+  %v = call fast float (i32, ...) @variadic(i32 %x, float %f, <2 x i32> <i32 1, i32 2>)
+  %b = call i32 %fn(i32 %a)
+  ret i32 %b
+}
+define void @bundled(i32 %x) {
+entry:
+  call void @sink(i32 %x) [ "deopt"(i32 %x) ]
+  ret void
+}
+define void @with_metadata() {
+entry:
+  call void @llvm.experimental.noalias.scope.decl(metadata !0)
+  ret void
+}
+!0 = !{!1}
+!1 = distinct !{!1, !2, !"scope"}
+!2 = distinct !{!2, !"domain"}
+'
+	os.write_file(out + '/input.ll', source)!
+	run_saved([assembler, out + '/input.ll', '-o', out + '/input.bc'], out + '/assemble')!
+	d, o, f, c := inspect(out + '/input.bc', llvm, out + '/fixture')!
+	if d != 7 || o != 2 || f != 0 || c != 1 { return error('call fixture coverage differs') }
+	data := os.read_bytes(out + '/fixture.bc')!; defer { unsafe { data.free() } }
+	stream := airbitcode.parse(data)!; defer { stream.free() }
+	ir := stream.ir_module(data)!; defer { ir.free() }
+	pools := ir.constant_pools(stream)!; defer { pools.free() }
+	bodies := ir.function_bodies(stream, pools)!; defer { bodies.free() }
+	p := ir.typed_operands(stream, pools, bodies)!; defer { p.free() }
+	first := p.instructions[0]
+	if first.flags & 1 == 0 || first.calling_convention != 8 || p.instructions[1].result_type != -1 || p.instructions[2].fast_math_flags != 254 { return error('call fixture flags/CC/void differ') }
+	if p.instructions[2].operands_count != 4 || p.instructions[3].callee_function != -1 || p.operands[p.instructions[3].operands_start].number != pools.module_values { return error('call fixture indirect/vararg fields differ') }
+	if !bodies.instructions[5].has_operand_bundles || p.instructions[5].status != .opaque || p.instructions[7].status != .opaque { return error('call fixture lost unsupported states') }
+	oracle := os.read_file(out + '/fixture.ll')!; defer { unsafe { oracle.free() } }
+	mut controls := 0
+	for pair in [['@target(', '@wrong('], ['call fastcc i32 @target', 'call fastcc i64 @target'], ['@target(i32 %x)', '@target(float %x)'],
+		['@sink(i32 %a)', '@sink(i32 %a, i32 0)'], ['(i32, ...) @variadic', '(float, ...) @variadic']] {
+		if !oracle.contains(pair[0]) { return error('missing call negative input') }
+		// Change a call site, not a preceding declaration.
+		changed := oracle.replace(pair[0], pair[1]); defer { unsafe { changed.free() } }
+		compare(ir, stream, bodies, p, changed) or { controls++; continue }
+		return error('accepted changed LLVM call evidence')
+	}
+	for mode in ['callee', 'argument-type', 'result-type'] {
+		mut instructions := p.instructions.clone(); mut operands := p.operands.clone()
+		defer { unsafe { instructions.free(); operands.free() } }
+		if mode == 'callee' { instructions[0] = airbitcode.IRTypedInstruction{...first, callee_function: p.instructions[1].callee_function} }
+		else if mode == 'result-type' { instructions[0] = airbitcode.IRTypedInstruction{...first, result_type: p.instructions[2].result_type} }
+		else { operands[first.operands_start + 1] = airbitcode.IRTypedOperand{...operands[first.operands_start + 1], type_index: p.instructions[2].result_type} }
+		changed := airbitcode.IRTypedProgram{...p, instructions: instructions, operands: operands}
+		compare(ir, stream, bodies, changed, oracle) or { controls++; continue }
+		return error('accepted changed decoded call evidence')
+	}
+	println('LLVM-CALL-SELFTEST: 7 decoded, two opaque, no deferred, one complete function index; direct/indirect/void/vararg calls, CC/tail/FMF, bundled/metadata states and ${controls} rejected evidence corruptions PASS')
 }
 
 fn memory_self_test(assembler string, llvm string, out string) ! {

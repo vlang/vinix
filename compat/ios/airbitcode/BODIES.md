@@ -42,6 +42,8 @@ Debug locations/records, block-address users and operand bundles consume neither
 instruction nor value IDs. Their raw records remain in `Stream`; debug schemas,
 bundle arguments/tag IDs and block-address references are not verified. Nested
 constant, metadata, attachment and symbol-table blocks are not instructions.
+`has_operand_bundles` records whether prefixes attach to each call consumer so
+later decoding cannot silently discard them.
 
 Known LLVM instruction codes through the LLVM 23 profile are classified by
 result/terminator behavior. Reserved/unknown codes and implicit call types fail

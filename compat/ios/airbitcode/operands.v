@@ -27,6 +27,11 @@ pub:
 	is_volatile bool
 	indices_start int
 	indices_count int // Literal extractvalue/insertvalue index path.
+	call_signature int = -1
+	callee_function int = -1 // IRModule.functions index, only for a direct declaration.
+	attribute_set u64 // Raw attribute-list ID, not interpreted.
+	calling_convention u32
+	fast_math_flags u64
 }
 pub struct IRTypedProgram {
 pub mut:
@@ -64,6 +69,8 @@ mut:
 	alloc_space u32
 	opaque_allocas bool
 	mixed_pointers bool
+	declaration_types []int // Transient: only function declaration pointers are resolved.
+	declaration_functions []int
 }
 struct OperandCursor {
 mut:
@@ -104,7 +111,9 @@ fn (mut b OperandBuilder) bool_type(shape int) !int {
 }
 fn (b &OperandBuilder) actual(scope int, number u32) !int {
 	value := b.bodies.lookup(b.pools, scope, number)!
-	return if value.kind == .instruction { b.p.instructions[value.instruction].result_type } else { value.pooled.type_index }
+	if value.kind == .instruction { return b.p.instructions[value.instruction].result_type }
+	if value.pooled.kind == .declaration { return b.declaration_types[int(number)] }
+	return value.pooled.type_index
 }
 fn (mut b OperandBuilder) operand(inst IRInstruction, number u32, typ int) ! {
 	if b.p.operands.len >= max_typed_operands { return error('AIR operands: operand limit') }
@@ -169,6 +178,7 @@ fn (b &OperandBuilder) cast_valid(op u32, source int, dest int) bool {
 }
 
 fn (mut b OperandBuilder) decode(inst IRInstruction, code u64, values []u64, seed int) !IRTypedInstruction {
+	if code == 34 { return b.call(inst, values, seed)! }
 	if code in [u64(4), 19, 20, 24, 26, 27, 30, 43, 44]! { return b.memory(inst, code, values, seed)! }
 	start := b.p.operands.len; targets := b.p.targets.len
 	mut cursor := OperandCursor{}
@@ -279,11 +289,11 @@ fn (mut b OperandBuilder) decode(inst IRInstruction, code u64, values []u64, see
 // Partial typed core: opaque/deferred instructions are explicit, and complete()
 // must succeed before a consumer treats a function as fully decoded. No execution.
 pub fn (ir IRModule) typed_operands(stream Stream, pools IRConstantPools, bodies IRFunctionBodies) !IRTypedProgram {
-	mut b := OperandBuilder{ir: ir, pools: pools, bodies: bodies, alloc_space: operand_alloc_space(ir.data_layout)!, p: IRTypedProgram{instructions: []IRTypedInstruction{len: bodies.instructions.len}, references: ir.references.clone()}}
+	mut b := OperandBuilder{ir: ir, pools: pools, bodies: bodies, alloc_space: operand_layout_space(ir.data_layout, `A`)!, declaration_types: []int{len: pools.declarations.len, init: -1}, declaration_functions: []int{len: pools.declarations.len, init: -1}, p: IRTypedProgram{instructions: []IRTypedInstruction{len: bodies.instructions.len}, references: ir.references.clone()}}
 	b.p.types.flags |= .noslices; b.p.operands.flags |= .noslices; b.p.targets.flags |= .noslices; b.p.references.flags |= .noslices
 	b.p.indices.flags |= .noslices
 	mut keep := false
-	defer { unsafe { b.vectors.free(); b.pointers.free() }; if !keep { b.p.free() } }
+	defer { unsafe { b.vectors.free(); b.pointers.free(); b.declaration_types.free(); b.declaration_functions.free() }; if !keep { b.p.free() } }
 	// Borrow original type-name strings without a derived deep clone.
 	unsafe { b.p.types.push_many(ir.types.data, ir.types.len) }
 	mut has_typed_pointer := false
@@ -296,6 +306,7 @@ pub fn (ir IRModule) typed_operands(stream Stream, pools IRConstantPools, bodies
 	}
 	b.opaque_allocas = has_opaque_pointer || !has_typed_pointer
 	b.mixed_pointers = has_opaque_pointer && has_typed_pointer
+	b.function_declarations(stream)!
 	if b.boolean < 0 { b.boolean = b.p.types.len; b.p.types << IRType{kind: .integer_t, bits: 1} }
 	// Explicit definitions seed types independently of producer order.
 	for i, inst in bodies.instructions {

@@ -68,6 +68,7 @@ fn test_body_blocks_values_calls_and_scopes() {
 	assert bodies.scopes[1].base_id == 5 && bodies.scopes[1].results_count == 3
 	assert bodies.instructions[0].next_value == 5 && bodies.instructions[0].has_result
 	assert bodies.instructions[1].next_value == 6 && !bodies.instructions[1].has_result && bodies.instructions[1].call_signature == 2
+	assert bodies.instructions[1].has_operand_bundles && !bodies.instructions[4].has_operand_bundles
 	assert bodies.instructions[3].next_value == 6 && bodies.instructions[4].next_value == 7
 	assert bodies.instructions[4].call_signature == 3 && bodies.instructions[4].has_result
 	assert bodies.blocks[0].first == 0 && bodies.blocks[0].count == 3 && bodies.blocks[1].count == 3 && bodies.blocks[2].count == 1
