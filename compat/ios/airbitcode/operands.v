@@ -21,8 +21,8 @@ pub:
 	operands_start int
 	operands_count int
 	targets_start int
-	targets_count int // PHI predecessors or branch destinations, as global block indexes.
-	source_type int = -1 // Memory/GEP/alloca/aggregate source type, or shuffle input vector.
+	targets_count int // PHI predecessors or branch/switch destinations, as global block indexes.
+	source_type int = -1 // Memory/GEP/alloca/aggregate/shuffle/switch source type.
 	alignment u64 // 0 = ABI default remains unresolved; otherwise explicit byte alignment.
 	is_volatile bool
 	indices_start int
@@ -72,6 +72,7 @@ mut:
 	mixed_pointers bool
 	declaration_types []int // Transient: only function declaration pointers are resolved.
 	declaration_functions []int
+	switch_words int // Cumulative wide-case hashing/copy work, including implicit zeros.
 }
 struct OperandCursor {
 mut:
@@ -179,6 +180,7 @@ fn (b &OperandBuilder) cast_valid(op u32, source int, dest int) bool {
 }
 
 fn (mut b OperandBuilder) decode(inst IRInstruction, code u64, values []u64, seed int) !IRTypedInstruction {
+	if code == 12 { return b.switch_instruction(inst, values)! }
 	if code == 8 { return b.shuffle(inst, values, seed)! }
 	if code == 34 { return b.call(inst, values, seed)! }
 	if code in [u64(4), 19, 20, 24, 26, 27, 30, 43, 44]! { return b.memory(inst, code, values, seed)! }

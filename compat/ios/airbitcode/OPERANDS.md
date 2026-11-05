@@ -80,6 +80,19 @@ No vector selection or instruction execution occurs here. The builder borrows
 the immutable Stream while reading aggregate constants; the returned program
 retains no additional Stream ownership.
 
+Ordinary SWITCH records retain a relative condition ID followed by absolute
+integer-constant case IDs in their value operand range. Their target range starts
+with the default block, followed by each case destination in table order.
+`source_type` retains the scalar integer type and the instruction has no result.
+Case bits stay in the owning constant pools. Equal case values are rejected
+even if they have different IDs or use implicit versus materialized zero. Shared
+destinations are allowed. Wide cases compare canonical limbs without truncation.
+Transient duplicate-check keys are cloned from borrowed pool bytes and freed.
+A cumulative 4,194,304-word work cap includes the width of implicit zero cases.
+The reverted legacy range encoding remains explicitly opaque. An unknown
+condition type defers the ordinary switch; no branch is evaluated. Destination
+bounds do not establish reachability, dominance or other CFG validity.
+
 Explicit-type CALL records decode a scalar pointer callee, fixed arguments and
 value/type-pair varargs. The operand range starts with the callee, then arguments
 in source order. `call_signature` indexes the original function type;
@@ -118,7 +131,7 @@ width and scalability. This is a bounded strict profile, not an LLVM verifier.
 Unsupported cast categories can fail even when another LLVM profile permits
 them. No data-layout pointer width or address calculation is inferred.
 
-Atomic memory operations, switches, exception
+Atomic memory operations, exception
 instructions and other families remain opaque. Constant expressions retain the
 previous pool layer's opaque tags. This layer does not evaluate constants, prove
 CFG/dominance/PHI predecessor relationships, verify every flag encoding, lower
@@ -158,6 +171,13 @@ and mutations. The V inspector `tests/ios/air-operands-inspect.v` supports:
   poison masks. Compare both input types, mask type, every normalized mask lane
   and inferred result shape; reject eight corrupted dumps or indexes. Input
   value identities and vector execution remain unqualified.
+- `switch-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR`: independently assemble
+  signed/boolean/i128 cases, shared targets, empty tables and quoted labels.
+  Compare exact case bits and default/case destinations using LLVM's printed
+  block order; reject eight corrupted dumps/indexes. The independent decimal
+  parser supports widths up to 4096 bits. Condition value identity and switch
+  execution are outside the comparison. Other operand comparisons retain their
+  documented limits; branch/PHI edges are not compared by this switch checker.
 - `corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR`: copy raw modules and independently
   disassemble them. Compare exact arithmetic/cast/predicate mnemonics and selected
   operand/result type spellings only for `decoded` instructions. Named type

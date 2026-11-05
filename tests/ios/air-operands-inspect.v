@@ -151,16 +151,18 @@ fn typed_line(ir airbitcode.IRModule, stream airbitcode.Stream, bodies airbitcod
 		if !body.starts_with(expected + ' ') && !(comma_type && body.starts_with(expected + ', ')) { return error('LLVM operand/result type differs: ' + text + ' expected ' + expected) }
 	}
 }
-fn compare(ir airbitcode.IRModule, stream airbitcode.Stream, bodies airbitcode.IRFunctionBodies, p airbitcode.IRTypedProgram, oracle string) !int {
+fn compare(ir airbitcode.IRModule, stream airbitcode.Stream, pools airbitcode.IRConstantPools, bodies airbitcode.IRFunctionBodies, p airbitcode.IRTypedProgram, oracle string) !int {
 	mut functions := map[string]int{}
 	defer { unsafe { functions.free() } }
 	for i, f in ir.functions { if !f.declaration { functions[f.name] = i + 1 } }
+	lines := oracle.split_into_lines(); defer { unsafe { lines.free() } }
+	labels := oracle_switch_labels(functions, bodies, lines)!; defer { unsafe { labels.free() } }
 	mut seen := []bool{len: bodies.scopes.len}
 	defer { unsafe { seen.free() } }
 	mut scope := -1
 	mut ordinal := 0
 	mut checked := 0
-	for raw in oracle.split_into_lines() {
+	for line_index, raw in lines {
 		line := raw.trim_space()
 		if line.starts_with('define ') {
 			name := function_name(line)!
@@ -178,7 +180,9 @@ fn compare(ir airbitcode.IRModule, stream airbitcode.Stream, bodies airbitcode.I
 		if !raw.starts_with('  ') || raw.len <= 2 || raw[2] == ` ` || line.starts_with(';') || line == ']' || line.starts_with('to label ') { continue }
 		if ordinal >= entry.instructions_count { return error('extra LLVM instruction') }
 		index := entry.instructions_start + ordinal
-		typed_line(ir, stream, bodies, p, index, line)!
+		if stream.records[bodies.instructions[index].record].code == 12 && p.instructions[index].status == .decoded {
+			compare_switch(ir, pools, bodies, p, index, labels, lines, line_index)!
+		} else { typed_line(ir, stream, bodies, p, index, line)! }
 		if p.instructions[index].status == .decoded { checked++ }
 		ordinal++
 	}
@@ -207,7 +211,7 @@ fn inspect(path string, llvm string, base string) !(int, int, int, int) {
 	os.cp(path, base + '.bc')!
 	run_saved([llvm, base + '.bc', '-o', base + '.ll'], base + '.dis')!
 	oracle := os.read_file(base + '.ll')!; defer { unsafe { oracle.free() } }
-	decoded := compare(ir, stream, bodies, p, oracle)!
+	decoded := compare(ir, stream, pools, bodies, p, oracle)!
 	mut opaque := 0; mut deferred := 0; mut complete := 0
 	for op in p.instructions { if op.status == .opaque { opaque++ }; if op.status == .deferred { deferred++ } }
 	for scope in 1 .. bodies.scopes.len { if p.complete(bodies, scope) { complete++ } }
@@ -296,7 +300,7 @@ entry:
 	for pair in [['add nuw nsw i32', 'sub nuw nsw i32'], ['icmp slt i32', 'icmp sgt i32'], [' to i64', ' to i32'], ['fdiv fast float', 'fdiv fast double'], ['define i32 @core(', 'define i32 @other(']] {
 		if !oracle.contains(pair[0]) { return error('missing negative control input') }
 		changed := oracle.replace_once(pair[0], pair[1]); defer { unsafe { changed.free() } }
-		compare(ir, stream, bodies, p, changed) or { controls++; continue }
+		compare(ir, stream, pools, bodies, p, changed) or { controls++; continue }
 		return error('accepted corrupted LLVM typed evidence')
 	}
 	for mode in ['opcode', 'result-type', 'operand-type'] {
@@ -308,18 +312,99 @@ entry:
 		// source operand for the independent operand-type corruption control.
 		if mode == 'operand-type' { index := instructions[1].operands_start; operands[index] = airbitcode.IRTypedOperand{...operands[index], type_index: p.instructions[1].result_type} }
 		changed := airbitcode.IRTypedProgram{...p, instructions: instructions, operands: operands}
-		compare(ir, stream, bodies, changed, oracle) or { controls++; continue }
+		compare(ir, stream, pools, bodies, changed, oracle) or { controls++; continue }
 		return error('accepted corrupted typed index')
 	}
 	println('LLVM-OPERANDS-SELFTEST: 29 decoded, no opaque/deferred; five complete function indexes, scalar/vector/FP/flags/forward-PHI checks and ${controls} rejected evidence corruptions PASS')
 }
 fn main() {
+	if os.args.len == 5 && os.args[1] == 'switch-self-test' { switch_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'shuffle-self-test' { shuffle_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'call-self-test' { call_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'memory-self-test' { memory_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'self-test' { self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'corpus' { corpus(os.args[2], os.args[3], os.args[4])!; return }
-	panic('usage: air-operands-inspect corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR | self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | memory-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | call-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | shuffle-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR')
+	panic('usage: air-operands-inspect corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR | self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | memory-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | call-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | shuffle-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | switch-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR')
+}
+
+fn switch_self_test(assembler string, llvm string, out string) ! {
+	fresh(out)!
+	source := 'target triple = "x86_64-unknown-linux-gnu"
+define i32 @choose(i32 %x) {
+entry:
+  switch i32 %x, label %fallback [
+    i32 0, label %zero
+    i32 -1, label %neg
+    i32 7, label %zero
+  ]
+zero:
+  ret i32 1
+neg:
+  ret i32 2
+fallback:
+  ret i32 3
+}
+define i32 @wide(i128 %x) {
+entry:
+  switch i128 %x, label %fallback [
+    i128 18446744073709551617, label %high
+    i128 -1, label %neg
+  ]
+high:
+  ret i32 4
+neg:
+  ret i32 5
+fallback:
+  ret i32 6
+}
+define void @empty(i1 %x) {
+entry:
+  switch i1 %x, label %"a; end" []
+"a; end":
+  ret void
+}
+define i1 @boolean(i1 %x) {
+entry:
+  switch i1 %x, label %fallback [ i1 true, label %yes ]
+yes:
+  ret i1 true
+fallback:
+  ret i1 false
+}
+'
+	os.write_file(out + '/input.ll', source)!
+	run_saved([assembler, out + '/input.ll', '-o', out + '/input.bc'], out + '/assemble')!
+	d, o, f, c := inspect(out + '/input.bc', llvm, out + '/fixture')!
+	if d != 13 || o != 0 || f != 0 || c != 4 { return error('switch fixture coverage differs') }
+	data := os.read_bytes(out + '/fixture.bc')!; defer { unsafe { data.free() } }
+	stream := airbitcode.parse(data)!; defer { stream.free() }
+	ir := stream.ir_module(data)!; defer { ir.free() }
+	pools := ir.constant_pools(stream)!; defer { pools.free() }
+	bodies := ir.function_bodies(stream, pools)!; defer { bodies.free() }
+	p := ir.typed_operands(stream, pools, bodies)!; defer { p.free() }
+	first := p.instructions[0]
+	if first.targets_count != 4 || p.targets[first.targets_start] != 3 || p.targets[first.targets_start + 1] != 1 || p.targets[first.targets_start + 2] != 2 || p.targets[first.targets_start + 3] != 1 { return error('switch fixture default/case ordering differs') }
+	if p.operands[first.operands_start].number != pools.module_values { return error('switch fixture normalized condition differs') }
+	oracle := os.read_file(out + '/fixture.ll')!; defer { unsafe { oracle.free() } }
+	mut controls := 0
+	for pair in [['i32 7, label %zero', 'i32 8, label %zero'], ['i128 18446744073709551617', 'i128 18446744073709551618'],
+		['i32 -1, label %neg', 'i32 -1, label %fallback'], ['switch i32 %x, label %fallback', 'switch i32 %x, label %zero'], ['i1 true, label %yes', 'i1 false, label %yes']] {
+		if !oracle.contains(pair[0]) { return error('missing switch negative input') }
+		changed := oracle.replace(pair[0], pair[1]); defer { unsafe { changed.free() } }
+		compare(ir, stream, pools, bodies, p, changed) or { controls++; continue }
+		return error('accepted changed LLVM switch evidence')
+	}
+	for mode in ['target', 'case', 'type'] {
+		mut instructions := p.instructions.clone(); mut operands := p.operands.clone(); mut targets := p.targets.clone()
+		defer { unsafe { instructions.free(); operands.free(); targets.free() } }
+		if mode == 'target' { targets[first.targets_start] = 1 }
+		else if mode == 'case' { operands[first.operands_start + 1] = operands[first.operands_start + 2] }
+		else { instructions[0] = airbitcode.IRTypedInstruction{...first, source_type: instructions[4].source_type} }
+		changed := airbitcode.IRTypedProgram{...p, instructions: instructions, operands: operands, targets: targets}
+		compare(ir, stream, pools, bodies, changed, oracle) or { controls++; continue }
+		return error('accepted changed decoded switch evidence')
+	}
+	println('LLVM-SWITCH-SELFTEST: 13 decoded instructions, four complete function indexes; exact destinations/case bits, i128/negative/boolean literals, shared targets, empty tables, quoted labels and ${controls} rejected evidence corruptions PASS')
 }
 
 fn compare_shuffle(ir airbitcode.IRModule, p airbitcode.IRTypedProgram, op airbitcode.IRTypedInstruction, text string) ! {
@@ -394,7 +479,7 @@ define <vscale x 2 x i32> @scalable(<vscale x 4 x i32> %a) {
 		['<4 x float> %b', '<3 x float> %b'], ['i32 poison>', 'i32 1>']] {
 		if !oracle.contains(pair[0]) { return error('missing shuffle negative input') }
 		changed := oracle.replace(pair[0], pair[1]); defer { unsafe { changed.free() } }
-		compare(ir, stream, bodies, p, changed) or { controls++; continue }
+		compare(ir, stream, pools, bodies, p, changed) or { controls++; continue }
 		return error('accepted changed LLVM shuffle evidence')
 	}
 	for mode in ['lane', 'result', 'width'] {
@@ -404,7 +489,7 @@ define <vscale x 2 x i32> @scalable(<vscale x 4 x i32> %a) {
 		else if mode == 'result' { instructions[0] = airbitcode.IRTypedInstruction{...instructions[0], result_type: instructions[2].result_type} }
 		else { instructions[0] = airbitcode.IRTypedInstruction{...instructions[0], indices_count: 2} }
 		changed := airbitcode.IRTypedProgram{...p, instructions: instructions, indices: indices}
-		compare(ir, stream, bodies, changed, oracle) or { controls++; continue }
+		compare(ir, stream, pools, bodies, changed, oracle) or { controls++; continue }
 		return error('accepted changed decoded shuffle evidence')
 	}
 	println('LLVM-SHUFFLE-SELFTEST: 10 decoded instructions, five complete function indexes; fixed/pointer/scalable vectors, width changes, poison/undef/zero masks and ${controls} rejected evidence corruptions PASS')
@@ -560,7 +645,7 @@ entry:
 		if !oracle.contains(pair[0]) { return error('missing call negative input') }
 		// Change a call site, not a preceding declaration.
 		changed := oracle.replace(pair[0], pair[1]); defer { unsafe { changed.free() } }
-		compare(ir, stream, bodies, p, changed) or { controls++; continue }
+		compare(ir, stream, pools, bodies, p, changed) or { controls++; continue }
 		return error('accepted changed LLVM call evidence')
 	}
 	for mode in ['callee', 'argument-type', 'result-type'] {
@@ -570,7 +655,7 @@ entry:
 		else if mode == 'result-type' { instructions[0] = airbitcode.IRTypedInstruction{...first, result_type: p.instructions[2].result_type} }
 		else { operands[first.operands_start + 1] = airbitcode.IRTypedOperand{...operands[first.operands_start + 1], type_index: p.instructions[2].result_type} }
 		changed := airbitcode.IRTypedProgram{...p, instructions: instructions, operands: operands}
-		compare(ir, stream, bodies, changed, oracle) or { controls++; continue }
+		compare(ir, stream, pools, bodies, changed, oracle) or { controls++; continue }
 		return error('accepted changed decoded call evidence')
 	}
 	println('LLVM-CALL-SELFTEST: 7 decoded, two opaque, no deferred, one complete function index; direct/indirect/void/vararg calls, CC/tail/FMF, bundled/metadata states and ${controls} rejected evidence corruptions PASS')
@@ -625,7 +710,7 @@ entry:
 		['%agg, 1, 2', '%agg, 1, 3'], ['ptr addrspace(3) %field', 'ptr addrspace(4) %field']] {
 		if !oracle.contains(pair[0]) { return error('missing memory negative input') }
 		changed := oracle.replace_once(pair[0], pair[1]); defer { unsafe { changed.free() } }
-		compare(ir, stream, bodies, p, changed) or { controls++; continue }
+		compare(ir, stream, pools, bodies, p, changed) or { controls++; continue }
 		return error('accepted changed LLVM memory evidence')
 	}
 	for mode in ['alignment', 'volatile', 'index'] {
@@ -635,8 +720,113 @@ entry:
 		else if mode == 'volatile' { instructions[2] = airbitcode.IRTypedInstruction{...instructions[2], is_volatile: false} }
 		else { indices[0] = 0 }
 		changed := airbitcode.IRTypedProgram{...p, instructions: instructions, indices: indices}
-		compare(ir, stream, bodies, changed, oracle) or { controls++; continue }
+		compare(ir, stream, pools, bodies, changed, oracle) or { controls++; continue }
 		return error('accepted changed decoded memory evidence')
 	}
 	println('LLVM-MEMORY-SELFTEST: 12 decoded instructions, three complete function indexes; alloca absolute ID/A5, scalar/vector GEP, aliasing, aggregate paths, alignment/volatile and ${controls} rejected evidence corruptions PASS')
+}
+
+
+fn switch_label_name(text string) !string {
+	encoded := '@' + text + '('; defer { unsafe { encoded.free() } }
+	return function_name(encoded)!
+}
+fn switch_label_key(scope int, name string) string {
+	prefix := scope.str(); defer { unsafe { prefix.free() } }
+	return prefix + ':' + name
+}
+fn oracle_switch_labels(functions map[string]int, bodies airbitcode.IRFunctionBodies, lines []string) !map[string]int {
+	mut labels := map[string]int{}
+	mut keep := false
+	defer { if !keep { unsafe { labels.free() } } }
+	mut scope := -1; mut block := 0
+	for raw in lines {
+		line := raw.trim_space()
+		if line.starts_with('define ') {
+			name := function_name(line)!; defer { unsafe { name.free() } }
+			scope = functions[name] or { return error('extra LLVM label function') }; block = 0; continue
+		}
+		if scope < 0 { continue }
+		if line == '}' { if block != bodies.scopes[scope].blocks_count { return error('LLVM block total differs') }; scope = -1; continue }
+		if line.len == 0 || line.starts_with(';') { continue }
+		if !raw.starts_with(' ') {
+			mut quoted := false
+			mut end := -1
+			mut i := 0
+			for i < line.len {
+				if line[i] == `\\` && quoted { i += 3; continue }
+				if line[i] == `"` { quoted = !quoted }
+				if line[i] == `:` && !quoted { end = i; break }; i++
+			}
+			if end < 0 || block >= bodies.scopes[scope].blocks_count { return error('LLVM label syntax/order') }
+			name := switch_label_name(line[..end])!; defer { unsafe { name.free() } }
+			key := switch_label_key(scope, name); defer { unsafe { key.free() } }
+			if key in labels { return error('duplicate LLVM block label') }
+			labels[key] = bodies.scopes[scope].blocks_start + block
+			continue
+		}
+		if !raw.starts_with('  ') || raw.len <= 2 || raw[2] == ` ` || line == ']' || line.starts_with('to label ') { continue }
+		mut operation := if line.starts_with('%') { line.all_after(' = ') } else { line }
+		if operation.starts_with('tail ') || operation.starts_with('musttail ') || operation.starts_with('notail ') { operation = operation.all_after(' ') }
+		if operation.all_before(' ') in ['ret', 'br', 'switch', 'invoke', 'unreachable', 'indirectbr', 'resume', 'cleanupret', 'catchret', 'catchswitch', 'callbr'] { block++ }
+	}
+	keep = true; return labels
+}
+fn oracle_switch_target(labels map[string]int, scope int, text string) !int {
+	if !text.starts_with('label %') { return error('LLVM switch destination syntax') }
+	name := switch_label_name(text[7..].trim_space())!; defer { unsafe { name.free() } }
+	key := switch_label_key(scope, name); defer { unsafe { key.free() } }
+	return labels[key] or { return error('missing LLVM switch destination') }
+}
+// The oracle parser handles bounded decimal literals independently of the
+// bitcode constant reader. Its comparison profile permits up to 4096 bits.
+fn oracle_switch_integer(text string, bits u32) ![]u32 {
+	if bits == 0 || bits > 4096 || text.len > 1235 { return error('LLVM switch decimal comparison limit') }
+	mut words := []u32{len: int((bits + 31) / 32)}
+	mut keep := false
+	defer { if !keep { unsafe { words.free() } } }
+	value := if text == 'true' { '1' } else if text == 'false' { '0' } else { text }
+	negative := value.starts_with('-')
+	digits := if negative { value[1..] } else { value }
+	if digits.len == 0 { return error('LLVM switch empty integer') }
+	for digit in digits {
+		if digit < `0` || digit > `9` { return error('LLVM switch non-decimal integer') }
+		mut carry := u64(digit - `0`)
+		for i in 0 .. words.len { next := u64(words[i]) * 10 + carry; words[i] = u32(next); carry = next >> 32 }
+		if carry != 0 { return error('LLVM switch integer overflow') }
+	}
+	if bits % 32 != 0 && words.last() >> (bits % 32) != 0 { return error('LLVM switch integer width') }
+	if negative {
+		mut carry := u64(1)
+		for i in 0 .. words.len { next := u64(~words[i]) + carry; words[i] = u32(next); carry = next >> 32 }
+	}
+	if bits % 32 != 0 { words[words.len - 1] &= (u32(1) << (bits % 32)) - 1 }
+	keep = true; return words
+}
+fn compare_switch(ir airbitcode.IRModule, pools airbitcode.IRConstantPools, bodies airbitcode.IRFunctionBodies, p airbitcode.IRTypedProgram, index int, labels map[string]int, lines []string, line_index int) ! {
+	op := p.instructions[index]; inst := bodies.instructions[index]
+	typ := oracle_type(p, ir, op.source_type)!; defer { unsafe { typ.free() } }
+	header := lines[line_index].trim_space()
+	if !header.starts_with('switch ' + typ + ' ') || op.result_type != -1 || op.operands_count != op.targets_count { return error('LLVM switch header/type differs') }
+	if oracle_switch_target(labels, inst.scope, header.all_after(', ').all_before(' ['))! != p.targets[op.targets_start] { return error('LLVM switch default destination differs') }
+	if header.contains('[ ]') || header.contains('[]') { if op.operands_count != 1 { return error('LLVM empty switch differs') }; return }
+	if !header.ends_with('[') { return error('LLVM switch table opening') }
+	mut count := 0
+	for row in lines[line_index + 1..] {
+		line := row.trim_space()
+		if line.starts_with(']') { if count != op.operands_count - 1 { return error('LLVM switch case count differs') }; return }
+		if line.len == 0 || line.starts_with(';') { continue }
+		if count >= op.operands_count - 1 || !line.starts_with(typ + ' ') { return error('LLVM switch case type/count differs') }
+		if oracle_switch_target(labels, inst.scope, line.all_after(', '))! != p.targets[op.targets_start + 1 + count] { return error('LLVM switch case destination differs') }
+		words := oracle_switch_integer(line[typ.len + 1..].all_before(','), p.types[op.source_type].bits)!; defer { unsafe { words.free() } }
+		value := pools.lookup(inst.scope, p.operands[op.operands_start + 1 + count].number)!
+		if value.kind != .constant { return error('decoded switch case is not constant') }
+		constant := pools.constants[value.constant_index]
+		for i, word in words {
+			expected := if constant.kind == .zero { u32(0) } else { u32(pools.words[constant.words_start + i / 2] >> (u32(i % 2) * 32)) }
+			if word != expected { return error('LLVM switch case bits differ') }
+		}
+		count++
+	}
+	return error('LLVM switch table has no ending')
 }
