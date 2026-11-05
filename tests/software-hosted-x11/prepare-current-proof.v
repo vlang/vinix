@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Fixed first-proof source preparation only; no compiler or process owner.
+// Fixed proof/controller source preparation only; no compiler or process owner.
 module main
 
 import crypto.sha256
@@ -14,6 +14,7 @@ const consumer = state + '/native-consumer-tools-01'
 const frozen = consumer + '/current-profile-draft-01'
 const capture = consumer + '/source-before-current-01'
 const output = consumer + '/current-proof-setup-01'
+const controller_output = consumer + '/current-controller-setup-01'
 const base_sha = '558e3d949d310b54d8550bb8d51bbabfab395655f58afdb6167bf1f42fc58f80'
 const module_map_sha = '7574aa941eeea3b7beb3dc58c14f6c23e57aea93bd5349a09f1aa8a51da9abce'
 const file_limit = u64(1024 * 1024)
@@ -359,4 +360,116 @@ fn run() ! {
 	println('PREPARED private current proof candidate and flat entry; no compiler, audit or guest')
 }
 
-fn main() { run() or { eprintln(err); exit(1) } }
+fn controller_gate_inputs(mut inputs map[string]string) ! {
+	for path, hash in {
+		output + '/preparer-source.v': 'afc2878103a458067fbe0eff43be933ce7d26b4c22f0f3e3d8436a7e573e720a'
+		output + '/result.json': '34a882a54b23f8fb411503ac9e9bb74a837f77b67f676c7328fdf92f1b70c933'
+		output + '/modules-after.json': '710351295e1be60a49b75f84348493ee85cf1f0777991a8b457ac3f4b83201d4'
+		output + '/candidate-current.v': '69f152fa74e534d7ce0e203d2d01a088159e8b9f8cbc97ea2c227be5acc2dfde'
+		output + '/candidate-current_controls.v': 'f5a82076a420255e6ebff067c5c539dccdef800900f84fbd60fcbfa2b3fbc7b8'
+		consumer + '/compactproof-check-02': '246b4cb824e85b819338f65cce5d7ee5ca68f137bc3900291ceda719444f3f8a'
+		consumer + '/compactproof-check-02.build.json': '461d1fb3e0199e97a66f8a47389f6802547548df1401b10542d5d3e7ca771876'
+		consumer + '/compactproof-check-02.monitor/result.json': 'b3d183dfca6c994cbaafcba3de619405ba57bd01239b354c45ad62bbd6b5e783'
+		consumer + '/compactproof-check-02-controls.run.json': '656880024d84c5a496a12293351c56676e20d6698c7c3e4c09b1f5fc33c9ac6e'
+		consumer + '/compactproof-check-02-controls.monitor/result.json': '45110b70f4ed10f2d6de1a83697eb90b710b042c55c0d337add56df6031dd0e2'
+		consumer + '/compactproof-check-02-controls/result.json': '985d5a811ded63a22ea45a6dccb60ff748e31b460fac0f6db349dcaa47c20449'
+		suite + '/compactproof/current.v': '69f152fa74e534d7ce0e203d2d01a088159e8b9f8cbc97ea2c227be5acc2dfde'
+		suite + '/compactproof/current_controls.v': 'f5a82076a420255e6ebff067c5c539dccdef800900f84fbd60fcbfa2b3fbc7b8'
+		suite + '/compactproof/currentcheck/main.v': '2f79a191c7cb551f49bd7ca9b5279ec85447531e53f05cbd8a7355a591e14730'
+		suite + '/compactproof-check.v': '2f79a191c7cb551f49bd7ca9b5279ec85447531e53f05cbd8a7355a591e14730'
+	} { pin(path, hash, mut inputs)! }
+	for stem in ['compactproof-check-02', 'compactproof-check-02-controls'] {
+		for name in ['modules-before.json', 'modules-after.json'] {
+			pin(consumer + '/' + stem + '.monitor/' + name,
+				'710351295e1be60a49b75f84348493ee85cf1f0777991a8b457ac3f4b83201d4', mut inputs)!
+		}
+		pin(consumer + '/' + stem + '.exit.json', sha256.hexhash(json2.encode({'exit_code': 0})), mut inputs)!
+	}
+	pin(consumer + '/compactproof-check-02.log', sha256.hexhash(''), mut inputs)!
+	result := json2.decode[map[string]string](text(consumer + '/compactproof-check-02-controls/result.json')!, strict: true)!
+	need(result['outcome'] == 'PASS' && result['historical_categories'] == '8'
+		&& result['current_categories'] == '7' && result['profile_inputs'] == '132'
+		&& result['encoded_current_record_bytes'] == '36699', 'actual current proof result differs')!
+	build := json2.decode[map[string]string](text(consumer + '/compactproof-check-02.build.json')!, strict: true)!
+	controls := json2.decode[map[string]string](text(consumer + '/compactproof-check-02-controls.run.json')!, strict: true)!
+	need(build['exit_code'] == '0' && controls['actual_exit'] == '0', 'actual proof build/control status differs')!
+}
+
+fn prepare_controller() ! {
+	$if prod {} $else { return error('requires production embedded source binding') }
+	need(os.args == [os.executable(), '--prepare-controller'], 'requires exact --prepare-controller')!
+	bound := sha256.hexhash($embed_file('prepare-current-proof.v').to_string())
+	need(sha256.hexhash(text(@FILE)!) == bound, 'compiled controller preparer source changed')!
+	ordinary_directory(consumer)!
+	ordinary_directory(suite)!
+	fresh(controller_output)!
+	mut inputs := map[string]string{}
+	pin(@FILE, bound, mut inputs)!
+	pin(repository + '/tests/software-hosted-x11/prepare-current-proof.v', bound, mut inputs)!
+	pin(os.executable(), sha256.hexhash(text(os.executable())!), mut inputs)!
+	frozen_inputs(mut inputs)!
+	controller_gate_inputs(mut inputs)!
+	snapshot := json2.decode[CaptureSnapshot](text(capture + '/sources-before.json')!, strict: true)!
+	need(sha256.hexhash(proof.source()) == snapshot.files[suite + '/proof/admit.v'],
+		'compiled source reader differs from preserved private bytes')!
+	before_trees := module_trees()!
+	before_modules := module_sources(before_trees)!
+	need(before_modules == json2.decode[map[string]string](text(output + '/modules-after.json')!, strict: true)!,
+		'proof-qualified current module map differs')!
+	for name in ['retain.v', 'evidence-check.v', 'run-native06.v', 'run-evidence06.v',
+		'build-supervision-consumer-01.v', 'nativeguard/guard.v', 'diagnostics/recoveryguard/recoveryguard.v'] {
+		pin(suite + '/' + name, snapshot.files[suite + '/' + name], mut inputs)!
+	}
+	path := suite + '/check.v'
+	old_sha := 'b524e00ebb8e72601c773ed58e6da4660ea99304459a7991a4f4d5ae29a135a5'
+	pin(path, old_sha, mut inputs)!
+	old_stat := os.lstat(path)!
+	need(old_stat.nlink == 1 && old_stat.mode == snapshot.modes[path], 'controller must be an independent original source')!
+	before := text(path)!
+	mut after := replace_exact(before, 'compactproof.Audits{}', 'compactproof.CurrentAudits{}', 1)!
+	after = replace_exact(after, 'compactproof.check_audits(', 'compactproof.check_current_audits(', 2)!
+	after = replace_exact(after, 'compactproof.assembled(', 'compactproof.current_assembled(', 2)!
+	os.mkdir(controller_output, mode: 0o700)!
+	copy_one(@FILE, controller_output + '/preparer-source.v')!
+	copy_one(path, controller_output + '/check-before.v')!
+	os.write_file(controller_output + '/check.diff', full_diff(before, after, 'check.v'))!
+	os.write_file(path, after)!
+	copy_one(path, controller_output + '/check-after.v')!
+	new_stat := os.lstat(path)!
+	need(text(path)! == after && new_stat.mode == old_stat.mode && new_stat.nlink == 1
+		&& new_stat.dev == old_stat.dev && new_stat.inode == old_stat.inode
+		&& new_stat.uid == old_stat.uid && new_stat.gid == old_stat.gid,
+		'prepared controller bytes, mode or ordinary identity differ')!
+	need(text(controller_output + '/check-before.v')! == before
+		&& os.lstat(controller_output + '/check-before.v')!.mode == old_stat.mode
+		&& os.lstat(controller_output + '/check-before.v')!.nlink == 1,
+		'original controller preservation changed')!
+	frozen_inputs(mut inputs)!
+	controller_gate_inputs(mut inputs)!
+	after_trees := module_trees()!
+	need(before_trees == after_trees && before_modules == module_sources(after_trees)!,
+		'qualified proof module changed during controller preparation')!
+	for input, hash in inputs {
+		if input == path { continue }
+		need(sha256.hexhash(text(input)!) == hash, 'controller preparation input changed')!
+	}
+	os.write_file(controller_output + '/inputs-before.json', json2.encode(inputs) + '\n')!
+	os.write_file(controller_output + '/modules-before.json', json2.encode(before_modules))!
+	os.write_file(controller_output + '/modules-after.json', json2.encode(before_modules))!
+	os.write_file(controller_output + '/module-trees-before.json', json2.encode(before_trees) + '\n')!
+	os.write_file(controller_output + '/module-trees-after.json', json2.encode(after_trees) + '\n')!
+	os.write_file(controller_output + '/result.json', json2.encode({
+		'outcome': 'PREPARED_CONTROLLER_SOURCE', 'preparer_sha256': bound, 'source': path,
+		'before_sha256': old_sha, 'after_sha256': sha256.hexhash(after),
+		'original_capture': controller_output + '/check-before.v',
+		'replacement_counts': '{"token":1,"whole_root_checks":2,"assembly_calls":2}',
+		'scope': 'Only private Suite/check.v changed by the five exact invertible current-profile substitutions. Proof-qualified modules and other frontends unchanged. No controller compile, target, import, audit or native execution.'
+	}) + '\n')!
+	println('PREPARED private current controller source; no compile, import or guest')
+}
+
+fn main() {
+	if os.args == [os.executable(), '--prepare-controller'] {
+		prepare_controller() or { eprintln(err); exit(1) }
+	} else { run() or { eprintln(err); exit(1) } }
+}
