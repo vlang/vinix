@@ -173,6 +173,9 @@ pub fn initialise() {
 	filesystems['procfs'] = &ProcFS{}
 	filesystems['sysfs'] = &SysFS{}
 	filesystems['cgroup2'] = &CGroupFS{}
+	filesystems['9p'] = &NinePFS{}
+	filesystems['smb2'] = &SMB2FS{}
+	filesystems['nfs'] = &NFSFS{}
 	init_mount_tables()
 }
 
@@ -2338,8 +2341,8 @@ fn rename_on_mount(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpa
 			errno.set(errno.exdev)
 			return none
 		}
-		old_parent_of.filesystem.rename(old_parent_of, old_basename, new_parent_of,
-			new_basename, flags)?
+		guarded := rename_before_publish(mut old_parent_of.filesystem, old_parent_of,
+			old_basename, old_node, new_parent_of, new_basename, new_node, flags)?
 
 		children_lock.acquire()
 		unsafe {
@@ -2349,6 +2352,7 @@ fn rename_on_mount(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpa
 		children_lock.release()
 		adopt(mut old_node, mut new_parent_of, new_basename.clone())
 		adopt(mut new_node, mut old_parent_of, old_basename.clone())
+		rename_after_publish(mut old_parent_of.filesystem, guarded)
 		first_cookie := inotify_next_cookie()
 		old_dir_flag := if stat.isdir(old_node.resource.stat.mode) { in_isdir } else { u32(0) }
 		new_dir_flag := if stat.isdir(new_node.resource.stat.mode) { in_isdir } else { u32(0) }
@@ -2414,8 +2418,8 @@ fn rename_on_mount(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpa
 
 	// Give an on-disk filesystem the complete validated operation before the
 	// in-memory namespace changes. RAM filesystems use a no-op implementation.
-	old_parent_of.filesystem.rename(old_parent_of, old_basename, new_parent_of,
-		new_basename, flags)?
+	guarded := rename_before_publish(mut old_parent_of.filesystem, old_parent_of,
+		old_basename, old_node, new_parent_of, new_basename, new_node, flags)?
 
 	// Publish the replacement before retiring its old node, without deleting
 	// the destination key. Keep source deletion under the same map lock: its
@@ -2436,6 +2440,7 @@ fn rename_on_mount(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpa
 	old_parent_of.children.delete(old_basename)
 	children_lock.release()
 	adopt(mut old_node, mut new_parent_of, new_basename.clone())
+	rename_after_publish(mut old_parent_of.filesystem, guarded)
 
 	if unsafe { new_node != 0 } {
 		// The filesystem rename hook already removed the destination name. Drop
@@ -2757,7 +2762,7 @@ pub fn syscall_statfs(_ voidptr, _path charptr, buf u64) (u64, u64) {
 
 	mut res := node.resource
 	if !fill_statfs_resource(mut res, buf, statfs_flags(mount_flags(identity), node.read_only)) {
-		return errno.err, errno.efault
+		return errno.err, errno.get()
 	}
 
 	return 0, 0
@@ -2774,7 +2779,7 @@ pub fn syscall_fstatfs(_ voidptr, fdnum int, buf u64) (u64, u64) {
 	node := unsafe { &VFSNode(fd.handle.node) }
 	backend_readonly := node != unsafe { nil } && node.read_only
 	if !fill_statfs_resource(mut res, buf, statfs_flags(raw_mount_flags(&fd.handle.mount), backend_readonly)) {
-		return errno.err, errno.efault
+		return errno.err, errno.get()
 	}
 	return 0, 0
 }
@@ -2789,7 +2794,7 @@ fn statfs_flags(policy u64, backend_readonly bool) u64 {
 }
 
 fn fill_statfs_resource(mut res resource.Resource, buf u64, flags u64) bool {
-	info := resource.filesystem_stat(mut res)
+	info := resource.filesystem_stat(mut res) or { return false }
 	mut raw := [15]u64{}
 	raw[0] = info.@type
 	raw[1] = info.bsize
@@ -2802,7 +2807,11 @@ fn fill_statfs_resource(mut res resource.Resource, buf u64, flags u64) bool {
 	raw[9] = info.frsize
 	raw[10] = info.flags | flags
 
-	return usercopy.copy_to_user(buf, voidptr(&raw[0]), sizeof(u64) * 15)
+	if !usercopy.copy_to_user(buf, voidptr(&raw[0]), sizeof(u64) * 15) {
+		errno.set(errno.efault)
+		return false
+	}
+	return true
 }
 
 pub const utime_now = i64(0x3fffffff)

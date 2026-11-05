@@ -1,0 +1,48 @@
+module fs
+import lib
+import resource
+import stat
+import klock
+import event.eventstruct
+
+#flag -Dvinix_stack_alloc=__builtin_alloca
+fn C.vinix_stack_alloc(u64) voidptr
+
+pub const at_fdcwd = -100
+pub const ms_nosuid = u64(2)
+pub const ms_nodev = u64(4)
+pub const ms_noexec = u64(8)
+pub const ms_noatime = u64(1024)
+pub const ms_nodiratime = u64(2048)
+pub const ms_relatime = u64(1 << 21)
+__global ( statfs_node &VFSNode )
+fn user_path(p charptr) ?string { return unsafe { cstring_to_vstring(p).clone() } }
+fn parent_and_mount_for(_ int, _ string, _ &lib.MountContext) ?&VFSNode { return statfs_node }
+fn get_node_on_mount(_ &VFSNode, _ string, _ bool, _ &lib.MountContext) ?&VFSNode { return statfs_node }
+fn policy_check(_ &VFSNode, _ int) bool { return true }
+fn mount_flags(identity &lib.MountContext) u64 { return identity.flags }
+fn raw_mount_flags(identity &lib.MountContext) u64 { return identity.flags }
+
+// Concrete local/default providers exercise the unchanged infallible and
+// no-capability paths through the same production resource dispatcher.
+struct PlainResource {
+pub mut:
+	stat stat.Stat
+	refcount int
+	l klock.Lock
+	event eventstruct.Event
+	status int
+	can_mmap bool
+}
+fn (mut r PlainResource) grow(_ voidptr, _ u64) ? {}
+fn (mut r PlainResource) read(_ voidptr, _ voidptr, _ u64, _ u64) ?i64 { return 0 }
+fn (mut r PlainResource) write(_ voidptr, _ voidptr, _ u64, _ u64) ?i64 { return 0 }
+fn (mut r PlainResource) ioctl(_ voidptr, _ u64, _ voidptr) ?int { return 0 }
+fn (mut r PlainResource) unref(_ voidptr) ? {}
+fn (mut r PlainResource) link(_ voidptr) ? {}
+fn (mut r PlainResource) unlink(_ voidptr) ? {}
+fn (mut r PlainResource) mmap(_ voidptr, _ u64, _ int) voidptr { return unsafe { nil } }
+struct LocalStatResource { PlainResource }
+fn (mut r LocalStatResource) filesystem_stat() resource.FileSystemStat {
+	return resource.FileSystemStat{@type: 0xef53, bsize: 4096, blocks: 42}
+}

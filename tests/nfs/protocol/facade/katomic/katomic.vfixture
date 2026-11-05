@@ -1,0 +1,3 @@
+module katomic
+pub fn dec(mut p &int) int { unsafe { *p -= 1; return *p } }
+pub fn inc(mut p &int) int { unsafe { *p += 1; return *p } }

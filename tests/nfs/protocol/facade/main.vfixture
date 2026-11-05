@@ -1,0 +1,3 @@
+module main
+import fs
+fn main() { fs.contract_tests() }
