@@ -148,11 +148,13 @@ fn (mut this EXT2Resource) list_xattrs(mut names []u8) ? {
 }
 
 fn (mut this EXT2Resource) write_xattr(name string, value []u8, flags int) ? {
+	if this.filesystem.read_only { errno.set(errno.erofs); return none }
 	if posix_acl.is_name(name) { this.write_acl(name, value, flags)?; return }
 	this.ea_change(name, value, flags, false)?
 }
 
 fn (mut this EXT2Resource) write_acl(name string, value []u8, flags int) ? {
+	if this.filesystem.read_only { errno.set(errno.erofs); return none }
 	if value.len != 0 && !posix_acl.valid(value) { errno.set(errno.einval); return none }
 	this.l.acquire()
 	defer { this.l.release() }
@@ -182,6 +184,7 @@ fn (mut this EXT2Resource) write_acl(name string, value []u8, flags int) ? {
 }
 
 fn (mut this EXT2Resource) delete_xattr(name string) ? {
+	if this.filesystem.read_only { errno.set(errno.erofs); return none }
 	empty := []u8{} @[freed]
 	defer { unsafe { empty.free() } }
 	this.ea_change(name, empty, if posix_acl.is_name(name) { 0 } else { 2 }, true)?

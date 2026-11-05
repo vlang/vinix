@@ -11,6 +11,7 @@ fn image_fixture(kind string, block_size int) &EXT2Filesystem {
 	assert layout.read_only == (kind == 'ext4')
 	fs.block_size = layout.block_bytes
 	fs.descriptor_size = layout.descriptor_bytes
+	fs.ext4 = kind == 'ext4'
 	fs.bgd_cnt = (u64(fs.superblock.block_cnt - fs.superblock.sb_block) + fs.superblock.blocks_per_group - 1) / fs.superblock.blocks_per_group
 	return fs
 }
