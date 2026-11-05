@@ -5,6 +5,9 @@ checker refused backing-page flatness. The atomic run then stopped at the
 native free-space floor; atomic runtime qualification and Section 14 remain
 open. This report records a blocked checkpoint.
 
+Subsequent post-run checks and complete failed-bundle preservation are recorded
+in [the evidence closure report](failed-runtime-bundle-check-20261105.md).
+
 Artifacts remain outside Git. Let `C` be
 `/Users/alex/Library/Caches/vinix-codex/section14`,
 `R=C/perf-six-x86-20261105-01`, and
