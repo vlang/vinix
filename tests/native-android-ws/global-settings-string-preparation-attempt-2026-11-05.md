@@ -82,9 +82,29 @@ unchanged other limits. Observed shared growth was 83,279,872/152,207,360 bytes.
 This preserves the failed attempt's complete evidence; it does not
 qualify its partial image for use.
 
-A fresh `maps-global-settings-string-r3` preparation has started with the
-approved 8 GiB outer growth allowance. Its controls are
-`S/maps-global-settings-string-preparation-2026-11-05-r3`; no completed
-preparation or runtime result is established here. All failed attempts and
-original audit bundles remain retained. CI remains running and untouched; the active shared compiler cache
-was not deleted.
+The third preparation, targeting `maps-global-settings-string-r3`, stopped
+after 333,154 ms with `RSS probe failed: monitor command exceeded one second`.
+Guard/child exited 125/137 with complete cleanup. Sampled RSS was 64,913,408
+bytes and observed shared growth was 677,130,240 bytes, below the approved
+600 MiB and 8 GiB limits. The fixed one-second host `ps` monitoring deadline
+expired; this was not a measured target-RSS excess. The log contains only the
+initial immutable-input auditing marker. No output directory was created and
+no dependency audit or preparation completion is established. Preserve
+`S/maps-global-settings-string-preparation-2026-11-05-r3`.
+
+Those controls passed a complete one-root, three-entry seal and separate fresh
+readback at
+`S/maps-global-settings-string-preparation-attempts-sealed-2026-11-05-r4/sealed/manifest.json`,
+SHA-256 `06f311bd96b6ece99d63532b95fde0e1082dd52cd3a16f916d3e7ac169f2bc6a`.
+Both guard/child results were 0/0, with empty reasons and complete cleanup,
+using the approved 512 MiB sealing growth allowance and unchanged other caps.
+This preserves the monitoring failure without waiving or changing its
+one-second deadline.
+
+A fresh `maps-global-settings-string-r4` preparation has started, with controls
+`S/maps-global-settings-string-preparation-2026-11-05-r4`. It uses the same
+qualified tool and approved 8 GiB outer growth allowance; the 30-minute,
+600 MiB RSS, 1 GiB reserve, 4 MiB output and internal 512 MiB stage budget
+remain unchanged. No completed preparation or runtime result is established
+here. All failed attempts and original audit bundles remain retained. CI
+remains running and untouched; the active shared compiler cache was not deleted.
