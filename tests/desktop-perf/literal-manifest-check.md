@@ -53,3 +53,26 @@ below the 512 MiB allowance. Free space exceeded the 2 GiB admission and 1 GiB
 continued-execution floors. No continuous resource-monitoring, complete host
 SDK/loader closure, real release-base capture or whole host-bundle seal is
 claimed by this host qualification.
+
+## NUL path admission follow-up
+
+The helper now refuses NUL bytes in source and output paths before passing
+either pathname to native path APIs. Two additional controls use real NUL
+strings, require the exact refusal, and check that no truncated-prefix output
+was created. The prior source, successful outputs and receipts remain unchanged.
+
+Fresh `normal-03` and `production-03` builds each exited 0 with the same pinned
+V/clang23, strict pointer flags, cleared coherent compiler environment and
+private cache/module/temp directories. Both passed all 18 controls. The amended
+source SHA256 is
+`bc406265573aff340b0000d58b7cc8f6733ea4993ba5bcde5d237fc611062e47`.
+Normal executable SHA256 is
+`266f8c67e3d376b55009e1eb385accaf062f90c64192c5121920e362a9641b63`;
+production is
+`30a48af5d270e03950314a66b1376a3b311ef100f0f6d59d01d388d048991001`.
+Both control receipts have SHA256
+`b6dddca5448f47d33da401b6a89cebd1e8e43229b51065dc046ee022ef1f6d75`.
+The focused owned-source/V-binary/clang before/after maps matched, SHA256
+`737b1638cb7e6aa9b1f42a63d92f7e3f4c5a6e84382753f07588d0e591e12d0c`.
+These focused checks reuse the preceding compiler qualification; they do not
+claim a fresh full compiler/SDK inventory. No real base was captured.

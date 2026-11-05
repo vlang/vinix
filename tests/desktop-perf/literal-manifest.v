@@ -122,6 +122,7 @@ fn walk(root string, relative string, depth int, mut capture Capture) ! {
 }
 
 fn capture(root string) !(string, u32, int) {
+	require(!root.contains('\x00'), 'canonical ordinary source directory required')!
 	require(os.is_abs_path(root) && root == os.real_path(root)
 		&& !root.contains_any('\t\r\n') && os.lstat(root)!.get_filetype() == .directory,
 		'canonical ordinary source directory required')!
@@ -135,6 +136,7 @@ fn capture(root string) !(string, u32, int) {
 }
 
 fn output_admit(root string, output string) ! {
+	require(!output.contains('\x00'), 'canonical ordinary output parent required')!
 	require(os.is_abs_path(output) && !output.contains_any('\t\r\n')
 		&& os.real_path(os.dir(output)) == os.dir(output)
 		&& os.lstat(os.dir(output))!.get_filetype() == .directory,
@@ -200,6 +202,14 @@ fn selfcheck(state string) ! {
 		'created manifest differs')!
 	mut controls := ['exact legacy rows, modes and order', 'literal absolute/dangling/intermediate guest links',
 		'unchanged source metadata', 'exclusive complete manifest output']
+	for triple in [[root + '\x00ignored', state + '/nul-root.tsv', 'canonical ordinary source directory required'],
+		[root, state + '/nul-output.tsv\x00ignored', 'canonical ordinary output parent required']] {
+		mut refused := ''
+		create(triple[0], triple[1]) or { refused = err.msg(); map[string]string{} }
+		require(refused == triple[2] && !os.exists(state + '/nul-root.tsv')
+			&& !os.exists(state + '/nul-output.tsv'), 'NUL pathname refusal created a prefix output')!
+		controls << 'refused NUL pathname before native path use'
+	}
 	for pair in [[root, state + '/manifest.tsv', 'manifest output must be fresh'],
 		[root, root + '/inside', 'manifest output overlaps source']] {
 		mut refused := ''
@@ -257,9 +267,9 @@ fn selfcheck(state string) ! {
 	row(mut limited, 'x') or { failure = err.msg() }
 	require(failure == 'manifest text exceeds 32 MiB', 'text bound accepted')!
 	controls << 'text bound'
-	require(controls.len == 16, 'selfcheck count differs')!
+	require(controls.len == 18, 'selfcheck count differs')!
 	os.write_file(state + '/result.json', json2.encode(controls) + '\n')!
-	println('LITERAL MANIFEST PASS 16 controls')
+	println('LITERAL MANIFEST PASS 18 controls')
 }
 
 fn run() ! {
