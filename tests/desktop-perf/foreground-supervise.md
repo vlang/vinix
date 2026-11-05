@@ -56,16 +56,32 @@ only the runtime disk digest to change), and the exact guest completion
 line. Failure does not prove cleanup of arbitrary escaped descendants.
 
 The outer deadline must exceed the adapter deadline by 60 seconds and is
-limited to two hours. Actual df and du observations run every five seconds,
-with three-second bounded probes: admission needs 2 GiB free, continued
+limited to two hours. While the child owner runs through cleanup, actual df,
+allocated `du -skl` and apparent `du -skAl` observations are scheduled one second
+from each actual sample start. A start gap or complete probe/journal window
+over five seconds refuses qualification. Admission needs 2 GiB free, continued
 execution needs 1 GiB, and declared nonoverlapping roots plus supervisor
-state default to at most 512 MiB. An explicitly reviewed `charged_limit_kib`
+state default to at most 512 MiB in either measure. Both du invocations count
+each hard-link occurrence. One MiB is reserved inside the selected ceiling for
+the next journal row and final receipts. An explicitly reviewed `charged_limit_kib`
 may select a limit from 524288 to 4718592 KiB (4.5 GiB). The prepared runtime
 must be covered by a charged root. These are sampled bounds, not a filesystem
 quota. The retained phase12 baseline preparation used its approved 2 GiB
 limit; each subsequent phase needs its own reviewed profile and inclusive
 projection. Historical states outside its declared roots remain outside that phase's
 inclusive total and must be reported separately.
+
+The append-only `budgets.jsonl` retains actual starts, raw df/du output and
+completed probe times. Each next row carries the previous sample's completion
+after its checked journal write/close; `supervisor.json` supplies the final
+sample's completion and maximum complete window/start gap. Rows are limited to
+256 KiB and the journal to 32 MiB. Cap/floor refusals retain the measured raw
+data before reporting failure; failed probe commands and malformed output
+retain their errors. A successful child gets a final sample after group/child
+cleanup, then a five-second final receipt guard. This timing scope covers the
+owned child and cleanup. Preparation/run input inventories and later result
+writing are separate operations and need their own observations if a caller
+requires continuous supervision across that entire phase.
 
 Build with a complete selected V installation and private temporary/module
 directories; preserve coherent V, VEXE and caller compiler environment
@@ -112,9 +128,14 @@ pipe prevents EOF after the leader exits.
 Eight additional preparation admission controls check the fixed argv and
 fresh charged outputs, with six refusals; these use fixture documents and
 paths and never execute an adapter.
+Twenty-one observation controls check exact timing boundaries, backward clocks,
+journal/row and dual-size boundaries, malformed du output, a 65 MiB sparse
+file against a 64 MiB size helper and synthetic full-budget reserved-tail
+refusal, actual one-second cadence with reconstructed completed
+sample windows, and cleanup after a live journal failure. These do not run a VM.
 
 `qualify NEW-STATE COMPLETE-V` rebuilds normal and production binaries and
-runs all twenty-four controls on each. It clears inherited tool selection,
+runs all forty-five controls on each. It clears inherited tool selection,
 uses private temp/module/cache directories and `-nocache`, selects the
 inventoried absolute clang with an explicit SDKROOT, and charges the whole
 qualification state throughout. It retains source copies, generated C,
@@ -160,8 +181,8 @@ successful local completion receipt.
 
 `armcheck NEW-STATE COMPLETE-V` adds sixteen document, fixed-argv, disk and
 literal-sysroot controls without executing an adapter. `qualify-arm-owner`
-builds normal and production owners and runs the historical twenty-four
-controls plus these sixteen on each. `qualify-arm-adapter` builds normal
+builds normal and production owners and runs the forty-five owner controls
+plus these sixteen on each. `qualify-arm-adapter` builds normal
 and production ARM adapters and runs their eighteen controls on each. Both
 use the existing bounded qualifier; neither stages a guest nor runs QEMU.
 Normal and production ARM owner and adapter controls passed in the separate

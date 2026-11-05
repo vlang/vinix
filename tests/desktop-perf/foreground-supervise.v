@@ -13,6 +13,7 @@ import sourcecommand
 import time
 
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>
 fn C.getpgid(i32) i32
@@ -87,6 +88,13 @@ struct PrepareProfile {
 
 struct Inventory { mut: count int }
 
+struct BudgetReading {
+	raw string
+	free_kib i64
+	allocated_kib i64
+	apparent_kib i64
+}
+
 struct Watch {
 	state string
 	profile Profile
@@ -94,12 +102,25 @@ mut:
 	pid int
 	started u64
 	next_budget u64
+	last_budget u64
+	last_finish u64
+	attempt_start u64
+	attempt_previous u64
+	max_gap u64
+	max_window u64
+	samples int
+	journal_bytes u64
 	reason string
-	budgets []string
 	stopped i32
 	failed i32
 	tasks []thread
 }
+
+const observation_interval = u64(time.second)
+const observation_bound = 5 * u64(time.second)
+const observation_log_limit = u64(32 * 1024 * 1024)
+const observation_row_limit = u64(256 * 1024)
+const observation_reserve_kib = 1024
 
 __global active_watch = unsafe { &Watch(nil) }
 
@@ -130,27 +151,58 @@ fn number(text string) !i64 {
 	return text.i64()
 }
 
-fn budget(profile Profile, state string, admission bool) !string {
+fn usage_total(text string) !i64 {
+	mut total := i64(0)
+	for line in text.trim_space().split_into_lines() {
+		fields := line.fields()
+		if fields.len < 2 { return error('unexpected du output') }
+		value := number(fields[0])!
+		if value > 9223372036854775807 - total { return error('du total overflow') }
+		total += value
+	}
+	return total
+}
+
+fn usage_within(allocated i64, apparent i64, limit int) ! {
+	if allocated > i64(limit) { return error('allocated charged-root budget exceeded') }
+	if apparent > i64(limit) { return error('apparent charged-root budget exceeded') }
+}
+
+fn budget_read(profile Profile, state string) !BudgetReading {
 	require(profile.charged_limit_kib >= 524288 && profile.charged_limit_kib <= 4718592, 'charged limit must be 512 MiB..4.5 GiB')!
 	df := command(['/bin/df', '-k', os.dir(state)])!
 	rows := df.trim_space().split_into_lines()
 	if rows.len != 2 || rows[1].fields().len < 4 { return error('unexpected df output') }
-	minimum := if admission { i64(2097152) } else { i64(1048576) }
-	if number(rows[1].fields()[3])! < minimum { return error('actual df below required floor') }
+	free_kib := number(rows[1].fields()[3])!
 	mut roots := profile.charged_roots.clone()
 	if os.exists(state) && !roots.any(inside(state, it)) { roots << state }
-	mut usage := ''
-	mut total := i64(0)
+	mut allocated := ''
+	mut apparent := ''
+	mut allocated_kib := i64(0)
+	mut apparent_kib := i64(0)
 	if roots.len > 0 {
-		usage = command(['/usr/bin/du', '-sk', ...roots])!
-		for line in usage.trim_space().split_into_lines() {
-			fields := line.fields()
-			if fields.len < 2 { return error('unexpected du output') }
-			total += number(fields[0])!
-		}
+		allocated = command(['/usr/bin/du', '-skl', ...roots])!
+		apparent = command(['/usr/bin/du', '-skAl', ...roots])!
+		allocated_kib = usage_total(allocated)!
+		apparent_kib = usage_total(apparent)!
 	}
-	if total > i64(profile.charged_limit_kib) { return error('declared charged-root budget exceeded') }
-	return df + '\n' + usage
+	return BudgetReading{raw: df + '\nallocated KiB (du -skl):\n' + allocated
+		+ '\napparent KiB (du -skAl):\n' + apparent, free_kib: free_kib,
+		allocated_kib: allocated_kib, apparent_kib: apparent_kib}
+}
+
+fn budget_admit(reading BudgetReading, profile Profile, admission bool) ! {
+	minimum := if admission { i64(2097152) } else { i64(1048576) }
+	if reading.free_kib < minimum { return error('actual df below required floor') }
+	// Leave room inside the inclusive ceiling for this sample and final receipts.
+	usage_within(reading.allocated_kib, reading.apparent_kib,
+		profile.charged_limit_kib - observation_reserve_kib)!
+}
+
+fn budget(profile Profile, state string, admission bool) !string {
+	reading := budget_read(profile, state)!
+	budget_admit(reading, profile, admission)!
+	return reading.raw
 }
 
 fn inventory(path string, ancestors []string, deadline u64, mut context Inventory, mut values map[string]string) ! {
@@ -281,21 +333,78 @@ fn no_children() !string {
 	return 'waitpid(-1,WNOHANG)=-1;errno=ECHILD'
 }
 
+fn observation_timing(previous u64, start u64, finish u64) ! {
+	if start < previous || finish < start { return error('observation clock moved backwards') }
+	if previous != 0 && start - previous > observation_bound { return error('observation start gap exceeds five seconds') }
+	if finish - start > observation_bound { return error('observation window exceeds five seconds') }
+}
+
+fn observation_capacity(used u64, extra u64) ! {
+	if extra > observation_row_limit { return error('observation row exceeds 256 KiB') }
+	if used > observation_log_limit || extra > observation_log_limit - used {
+		return error('observation journal exceeds 32 MiB')
+	}
+}
+
+fn journal_append(path string, text string, expected u64) ! {
+	before := os.lstat(path)!
+	require(before.get_filetype() == .regular && before.size == expected, 'observation journal changed')!
+	fd := C.open(path.str, C.O_WRONLY | C.O_APPEND | C.O_NOFOLLOW)
+	if fd < 0 { return error('cannot open observation journal') }
+	mut closed := false
+	defer { if !closed { C.close(fd) } }
+	mut offset := 0
+	for offset < text.len {
+		count := C.write(fd, unsafe { text.str + offset }, usize(text.len - offset))
+		if count < 0 && C.errno == C.EINTR { continue }
+		if count <= 0 || count > isize(text.len - offset) { return error('observation journal write failed') }
+		offset += int(count)
+	}
+	closed = true
+	if C.close(fd) != 0 { return error('observation journal close failed') }
+	after := os.lstat(path)!
+	require(after.get_filetype() == .regular && after.dev == before.dev && after.inode == before.inode
+		&& after.size == expected + u64(text.len), 'observation journal identity or length changed')!
+}
+
+fn budget_sample(mut watch Watch) ! {
+	start := time.sys_mono_now()
+	previous := if watch.last_budget == 0 { watch.started } else { watch.last_budget }
+	watch.attempt_start = start
+	watch.attempt_previous = previous
+	observation_timing(previous, start, start)!
+	observation := budget_read(watch.profile, watch.state)!
+	probes_done := time.sys_mono_now()
+	line := json2.encode({
+		'start_ns': start.str()
+		'previous_start_ns': previous.str()
+		'previous_finish_ns': watch.last_finish.str()
+		'probes_done_ns': probes_done.str()
+		'raw': observation.raw
+	}) + '\n'
+	observation_capacity(watch.journal_bytes, u64(line.len))!
+	journal_append(watch.state + '/budgets.jsonl', line, watch.journal_bytes)!
+	finish := time.sys_mono_now()
+	gap := if previous == 0 { u64(0) } else { start - previous }
+	if gap > watch.max_gap { watch.max_gap = gap }
+	if finish - start > watch.max_window { watch.max_window = finish - start }
+	watch.last_budget = start
+	watch.last_finish = finish
+	watch.next_budget = start + observation_interval
+	watch.journal_bytes += u64(line.len)
+	watch.samples++
+	observation_timing(previous, start, finish)!
+	budget_admit(observation, watch.profile, false)!
+}
+
 fn budget_watch(mut watch Watch) {
 	for unsafe { C.__atomic_load_n(&watch.stopped, C.__ATOMIC_RELAXED) } == 0 {
 		if time.sys_mono_now() >= watch.next_budget {
-			observation := budget(watch.profile, watch.state, false) or {
+			budget_sample(mut watch) or {
 				watch.reason = err.msg()
 				unsafe { C.__atomic_store_n(&watch.failed, 1, C.__ATOMIC_RELEASE) }
 				return
 			}
-			watch.budgets << observation
-			os.write_file(watch.state + '/budgets.json', json2.encode(watch.budgets) + '\n') or {
-				watch.reason = err.msg()
-				unsafe { C.__atomic_store_n(&watch.failed, 1, C.__ATOMIC_RELEASE) }
-				return
-			}
-			watch.next_budget = time.sys_mono_now() + 5 * u64(time.second)
 		}
 		time.sleep(20 * time.millisecond)
 	}
@@ -328,6 +437,7 @@ fn supervise(profile Profile, state string, argv []string) !int {
 	os.write_file(state + '/argv.json', json2.encode(argv) + '\n')!
 	os.write_file(state + '/environment.json', json2.encode(os.environ()) + '\n')!
 	os.write_file(state + '/command.log', '')!
+	os.write_file(state + '/budgets.jsonl', '')!
 	mut failure := ''
 	output := sourcecommand.capture_combined_owned(argv, os.environ(), f64(profile.timeout_seconds),
 		profile.log_limit_bytes, cancel, log_chunk, observe, &watch, 30, profile.directory) or {
@@ -348,7 +458,29 @@ fn supervise(profile Profile, state string, argv []string) !int {
 	os.write_file(state + '/supervisor.json', json2.encode(receipt) + '\n')!
 	if watch.pid > 1 { group_absent(watch.pid)! }
 	receipt['cleanup'] = no_children()!
+	if failure == '' {
+		budget_sample(mut watch) or { failure = err.msg(); watch.reason = failure }
+	}
+	receipt['failure'] = failure
+	receipt['reason'] = watch.reason
+	receipt['owner_status'] = if failure == '' { output.status.str() } else { 'unavailable after observer refusal' }
+	receipt['samples'] = watch.samples.str()
+	receipt['max_start_gap_ns'] = watch.max_gap.str()
+	receipt['max_sample_window_ns'] = watch.max_window.str()
+	receipt['journal_bytes'] = watch.journal_bytes.str()
+	receipt['last_sample_start_ns'] = watch.last_budget.str()
+	receipt['last_sample_finish_ns'] = watch.last_finish.str()
+	receipt['attempt_start_ns'] = watch.attempt_start.str()
+	receipt['attempt_previous_start_ns'] = watch.attempt_previous.str()
 	os.write_file(state + '/supervisor.json', json2.encode(receipt) + '\n')!
+	if failure == '' {
+		observation_timing(watch.last_budget, watch.last_budget, time.sys_mono_now()) or {
+			failure = err.msg()
+			receipt['failure'] = failure
+			receipt['owner_status'] = 'unavailable after observer refusal'
+			os.write_file(state + '/supervisor.json', json2.encode(receipt) + '\n')!
+		}
+	}
 	if failure != '' { return error(failure) }
 	return output.status
 }
@@ -700,6 +832,12 @@ fn run(state string, profile_path string) !int {
 fn fixture(kind string) {
 	match kind {
 		'ok' { println('fixture complete') }
+		'quiet' { time.sleep(2200 * time.millisecond); println('fixture complete') }
+		'journal-failure' {
+			os.rm('budgets.jsonl') or { exit(26) }
+			os.mkdir('budgets.jsonl') or { exit(27) }
+			for { time.sleep(10 * time.millisecond) }
+		}
 		'nonzero' { eprintln('fixture refused'); exit(23) }
 		'timeout' { for { time.sleep(10 * time.millisecond) } }
 		'output' { for { println('x'.repeat(8192)); time.sleep(1 * time.millisecond) } }
@@ -733,6 +871,117 @@ fn completion_refuses(profile Profile, p PreparedView, expected string) ! {
 fn prepare_refuses(p PrepareProfile, state string, expected string) ! {
 	prepare_validated(p, state) or { require(err.msg().contains(expected), 'different prepare refusal: ' + err.msg())!; return }
 	return error('prepare control accepted: ' + expected)
+}
+
+struct TimingCase {
+	previous u64
+	start u64
+	finish u64
+	failure string
+}
+
+fn observation_controls(profile Profile, state string) !string {
+	bound := observation_bound
+	mut passed := 0
+	for item in [
+		TimingCase{0, 1, 1, ''},
+		TimingCase{1, bound + 1, bound + 1, ''},
+		TimingCase{1, 1, bound + 1, ''},
+		TimingCase{1, bound + 2, bound + 2, 'observation start gap exceeds five seconds'},
+		TimingCase{1, 1, bound + 2, 'observation window exceeds five seconds'},
+		TimingCase{2, 1, 2, 'observation clock moved backwards'},
+		TimingCase{1, 2, 1, 'observation clock moved backwards'},
+	] {
+		mut failure := ''
+		observation_timing(item.previous, item.start, item.finish) or { failure = err.msg() }
+		require(failure == item.failure, 'different observation timing result')!
+		passed++
+	}
+	for item in [[observation_log_limit, u64(0)], [observation_log_limit + 1, u64(0)],
+		[observation_log_limit, u64(1)]] {
+		mut failure := ''
+		observation_capacity(item[0], item[1]) or { failure = err.msg() }
+		require(failure == if item[0] == observation_log_limit && item[1] == 0 { '' }
+			else { 'observation journal exceeds 32 MiB' }, 'different journal bound result')!
+		passed++
+	}
+	observation_capacity(0, observation_row_limit)!
+	passed++
+	mut row_failure := ''
+	observation_capacity(0, observation_row_limit + 1) or { row_failure = err.msg() }
+	require(row_failure == 'observation row exceeds 256 KiB', 'observation row cap differs')!
+	passed++
+	for item in [[524288, 0], [0, 524288], [524289, 0], [0, 524289]] {
+		mut failure := ''
+		usage_within(item[0], item[1], 524288) or { failure = err.msg() }
+		expected := if item[0] > 524288 { 'allocated charged-root budget exceeded' }
+			else if item[1] > 524288 { 'apparent charged-root budget exceeded' } else { '' }
+		require(failure == expected, 'different dual budget result')!
+		passed++
+	}
+	require(usage_total('1\t/one\n2\t/two\n')! == 3, 'du totals differ')!
+	passed++
+	mut failure := ''
+	usage_total('1\n') or { failure = err.msg(); i64(0) }
+	require(failure == 'unexpected du output', 'malformed du output accepted')!
+	passed++
+	sparse_root := state + '/sparse'; os.mkdir(sparse_root)!
+	sparse := sparse_root + '/unallocated'; os.write_file(sparse, '')!
+	// Keep this real fixture below the outer qualifier's unchanged 512 MiB cap.
+	os.truncate(sparse, u64(65) << 20)!
+	sparse_profile := Profile{...profile, charged_roots: [sparse_root]}
+	reading := budget_read(sparse_profile, sparse_root)!
+	os.write_file(state + '/sparse-budget.log', reading.raw)!
+	failure = ''
+	usage_within(reading.allocated_kib, reading.apparent_kib, 65536) or { failure = err.msg() }
+	os.rm(sparse)!
+	require(failure == 'apparent charged-root budget exceeded' && reading.allocated_kib < 65536,
+		'sparse apparent budget refusal differs')!
+	failure = ''
+	budget_admit(BudgetReading{...reading, apparent_kib: 524288 - observation_reserve_kib + 1},
+		sparse_profile, false) or { failure = err.msg() }
+	require(failure == 'apparent charged-root budget exceeded', 'full-budget reserved-tail refusal differs')!
+	passed++
+	quiet := state + '/quiet'; os.mkdir(quiet)!
+	require(supervise(Profile{...profile, timeout_seconds: 5}, quiet,
+		[os.executable(), '--fixture', 'quiet'])! == 0, 'quiet child failed')!
+	receipt := json2.decode[map[string]string](os.read_file(quiet + '/supervisor.json')!)!
+	require(receipt['samples'].int() >= 3 && receipt['max_start_gap_ns'].u64() <= observation_bound
+		&& receipt['max_sample_window_ns'].u64() <= observation_bound, 'quiet live observation timing differs')!
+	mut samples := 0
+	mut prior_start := u64(0)
+	mut prior_probe := u64(0)
+	for line in os.read_lines(quiet + '/budgets.jsonl')! {
+		row := json2.decode[map[string]string](line)!
+		observation_timing(row['previous_start_ns'].u64(), row['start_ns'].u64(), row['probes_done_ns'].u64())!
+		if samples > 0 {
+			require(row['previous_start_ns'].u64() == prior_start
+				&& row['previous_finish_ns'].u64() >= prior_probe
+				&& row['previous_finish_ns'].u64() <= row['start_ns'].u64(), 'previous completed sample differs')!
+			observation_timing(prior_start, prior_start, row['previous_finish_ns'].u64())!
+		}
+		require(row['raw'].contains('allocated KiB (du -skl):')
+			&& row['raw'].contains('apparent KiB (du -skAl):'), 'live dual observation missing')!
+		samples++
+		prior_start = row['start_ns'].u64()
+		prior_probe = row['probes_done_ns'].u64()
+	}
+	require(samples == receipt['samples'].int(), 'observation journal count differs')!
+	require(receipt['last_sample_start_ns'].u64() == prior_start
+		&& receipt['last_sample_finish_ns'].u64() >= prior_probe, 'final completed sample differs')!
+	observation_timing(prior_start, prior_start, receipt['last_sample_finish_ns'].u64())!
+	passed++
+	journal_failure := state + '/journal-failure'; os.mkdir(journal_failure)!
+	failure = ''
+	supervise(Profile{...profile, directory: journal_failure, timeout_seconds: 5}, journal_failure,
+		[os.executable(), '--fixture', 'journal-failure']) or { failure = err.msg(); -1 }
+	require(failure == 'observation journal changed', 'live journal failure differs: ' + failure)!
+	failed_receipt := json2.decode[map[string]string](os.read_file(journal_failure + '/supervisor.json')!)!
+	require(failed_receipt['cleanup'] == 'waitpid(-1,WNOHANG)=-1;errno=ECHILD'
+		&& failed_receipt['failure'] == failure, 'journal refusal cleanup differs')!
+	passed++
+	require(passed == 21, 'observation control count differs')!
+	return 'PASS twenty-one observation controls including live cadence, journal refusal and sparse apparent-cap refusal'
 }
 
 fn prepare_controls(state string, compiler string) !string {
@@ -898,6 +1147,7 @@ fn selfcheck(state string, compiler string) ! {
 	mut checks := map[string]string{}
 	checks['profile_controls'] = profile_controls(state)!
 	checks['prepare_controls'] = prepare_controls(state, compiler)!
+	checks['observation_controls'] = observation_controls(profile, state)!
 	for kind in ['ok', 'nonzero', 'timeout', 'output', 'signal', 'descendant'] {
 		work := state + '/' + kind; os.mkdir(work)!
 		started := time.sys_mono_now()
@@ -918,7 +1168,7 @@ fn selfcheck(state string, compiler string) ! {
 	os.write_file(state + '/inputs-after.json', json2.encode(after) + '\n')!
 	require(before == after, 'host control input identity changed')!
 	checks['inputs_sha256'] = hash(state + '/inputs-before.json')!
-	checks['verdict'] = 'PASS six process controls, ten profile/completion controls and eight preparation admission controls'
+	checks['verdict'] = 'PASS six process controls, ten profile/completion controls, eight preparation admission controls and twenty-one observation controls'
 	os.write_file(state + '/qualification.json', json2.encode(checks) + '\n')!
 	println('PERF FOREGROUND HOST PASS ' + hash(state + '/qualification.json')!)
 }
@@ -1040,7 +1290,7 @@ fn qualify(state string, compiler string, mode string) ! {
 	require(before == after, 'build/control input identity changed')!
 	os.write_file(state + '/budget-after.log', budget(profile, state, false)!)!
 	results['inputs_sha256'] = hash(state + '/inputs-before.json')!
-	results['verdict'] = if arm { 'PASS normal and production; eighteen ARM adapter controls each; no guest execution' } else if arm_owner { 'PASS normal and production; twenty-four historical and sixteen ARM owner controls each; no guest execution' } else if adapter { 'PASS normal and production; 32 selfcheck and 18 clone controls each; no guest execution' } else { 'PASS normal and production; twenty-four controls each; no guest execution' }
+	results['verdict'] = if arm { 'PASS normal and production; eighteen ARM adapter controls each; no guest execution' } else if arm_owner { 'PASS normal and production; forty-five owner and sixteen ARM owner controls each; no guest execution' } else if adapter { 'PASS normal and production; 32 selfcheck and 18 clone controls each; no guest execution' } else { 'PASS normal and production; forty-five controls each; no guest execution' }
 	results['scope'] = 'selected complete compiler, maintained sources and recorded host compiler/SDK metadata; installed loader and SDK dependency closure is not hermetic'
 	os.write_file(state + '/qualification.json', json2.encode(results) + '\n')!
 	println('PERF FOREGROUND QUALIFIED ' + hash(state + '/qualification.json')!)
