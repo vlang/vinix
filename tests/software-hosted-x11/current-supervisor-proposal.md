@@ -1,5 +1,11 @@
 # Inactive combined supervisor proposal
 
+This historical checkpoint is superseded by the still-uncompiled
+[finite front/import phase plan](current-supervisor-phases.md). Its withdrawn
+44/258/260 MiB option remains withdrawn; historical inputs and receipts remain
+unchanged. The continuation reuses nativeguard directly and requires actual C
+measurement before later build admission.
+
 `bind-current-options.v` is **uncompiled and unexecuted**. Independent source
 review covered its exact derivation from the frozen
 `bind-options-compact.v` (`4ae43bc0e197ea15ecbfde302a0d4105299f628e23ffc09b43f8286023423a4b`).
