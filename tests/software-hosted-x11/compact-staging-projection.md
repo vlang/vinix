@@ -47,3 +47,15 @@ second projection helper omitted `-keepc`; its source and executable remain.
 No historical artifact was removed or rewritten. Future phases must compare
 the complete frozen inventory before and after consumption and charge it,
 all failed attempts and both tool roots in aggregate allocation checks.
+
+The subsequent explicit current-profile preparation reserves another 128 KiB
+for private source paths outside the consumer tool root. The maintained staging
+ledger names `compactproof/current.v`, `current_controls.v`, `currentcheck/`,
+the flat proof entry, `check.v` and `retain.v` explicitly. Including that reserve
+brings the forecast to 265,895,936 bytes, below the unchanged 254 MiB pre-final
+threshold by 442,368 bytes. It does not enlarge the 40 MiB consumer tool bound;
+all source-preparation snapshots, tools, generated C, controls and failures
+inside that root remain charged there. Each later producer requires fresh
+admission and a forecast based on the preceding actual allocation. The updated
+ledger is preparation for future import admission; no import execution is
+established by this accounting change.

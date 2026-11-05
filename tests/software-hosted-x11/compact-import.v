@@ -284,7 +284,10 @@ fn run() ! {
 	mut charged := [staging, observer, current_audit, current_observer,
 		state + '/import-aarch64', state + '/import-x86_64', bootstrap,
 		old_tools, consumer_tools, projection, frozen_record, state + '/compact-stage-projection-01.json',
-		state + '/compact-wrapper-binding-01', state + '/compact-supervisor-binding-01']
+		state + '/compact-wrapper-binding-01', state + '/compact-supervisor-binding-01',
+		suite + '/compactproof/current.v', suite + '/compactproof/current_controls.v',
+		suite + '/compactproof/currentcheck', suite + '/compactproof-check.v', suite + '/check.v',
+		suite + '/retain.v']
 	for role in ['import', 'current-audit'] {
 		for suffix in ['', '.barrier.json', '.cleanup.json', '.barrier-cleanup.json'] {
 			charged << state + '/compact-' + role + '-admission-df' + suffix
