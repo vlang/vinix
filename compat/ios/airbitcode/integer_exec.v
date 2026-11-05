@@ -50,6 +50,47 @@ fn integer_binary(op u32, bits u32, a IntegerValue, b IntegerValue) !IntegerValu
 	}
 	return IntegerValue{value: result & mask}
 }
+fn integer_binary_flag_mask(op u32) u64 {
+	// Serialized LLVM bitcode bits: NUW=1, NSW=2, EXACT=1 by family.
+	return match op { 0, 1, 2, 7 { u64(3) } 3, 4, 8, 9 { u64(1) } else { u64(0) } }
+}
+fn integer_binary_flags(op u32, flags u64, bits u32, a IntegerValue, b IntegerValue) !IntegerValue {
+	if flags & ~integer_binary_flag_mask(op) != 0 { return error('AIR integer: unsupported binary flags') }
+	result := integer_binary(op, bits, a, b)!
+	if flags == 0 || result.poison { return result }
+	mask := constant_mask(bits); sign := u64(1) << (bits - 1)
+	x := a.value & mask; y := b.value & mask; r := result.value
+	mut unsigned_overflow := false; mut signed_overflow := false
+	match op {
+		0 { unsigned_overflow = x > mask - y; signed_overflow = (x ^ r) & (y ^ r) & sign != 0 }
+		1 { unsigned_overflow = x < y; signed_overflow = (x ^ y) & (x ^ r) & sign != 0 }
+		2 {
+			unsigned_overflow = y != 0 && x > mask / y
+			negative_x := x & sign != 0; negative_y := y & sign != 0
+			magnitude_x := if negative_x { (u64(0) - x) & mask } else { x }
+			magnitude_y := if negative_y { (u64(0) - y) & mask } else { y }
+			limit := if negative_x != negative_y { sign } else { sign - 1 }
+			signed_overflow = magnitude_y != 0 && magnitude_x > limit / magnitude_y
+		}
+		7 {
+			unsigned_overflow = r >> y != x
+			// Arithmetic reverse shift must reconstruct the entire input pattern.
+			mut reversed := r >> y
+			if y > 0 && r & sign != 0 { reversed |= ~u64(0) << (u64(bits) - y) }
+			signed_overflow = reversed & mask != x
+		}
+		3 { if x % y != 0 { return IntegerValue{poison: true} } }
+		4 {
+			magnitude_x := if x & sign != 0 { (u64(0) - x) & mask } else { x }
+			magnitude_y := if y & sign != 0 { (u64(0) - y) & mask } else { y }
+			if magnitude_x % magnitude_y != 0 { return IntegerValue{poison: true} }
+		}
+		8, 9 { if x & ((u64(1) << y) - 1) != 0 { return IntegerValue{poison: true} } }
+		else {}
+	}
+	if (flags & 1 != 0 && unsigned_overflow) || (flags & 2 != 0 && signed_overflow) { return IntegerValue{poison: true} }
+	return result
+}
 fn integer_compare(op u32, bits u32, a IntegerValue, b IntegerValue) !IntegerValue {
 	if bits == 0 || bits > 64 || op < 32 || op > 41 { return error('AIR integer: comparison width/predicate') }
 	if a.poison || b.poison { return IntegerValue{poison: true} }
@@ -78,11 +119,13 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunct
 		mut phis := 0
 		for index in block.first .. block.first + block.count {
 			inst := bodies.instructions[index]; op := p.instructions[index]
-			if inst.scope != scope || inst.block != block_index || inst.record < 0 || inst.record >= stream.records.len || op.status != .decoded || op.flags != 0 { return error('AIR integer: decoded flag-free instructions required') }
+			if inst.scope != scope || inst.block != block_index || inst.record < 0 || inst.record >= stream.records.len || op.status != .decoded { return error('AIR integer: decoded instructions required') }
 			if op.operands_start < 0 || op.operands_count < 0 || op.operands_start > p.operands.len || op.operands_count > p.operands.len - op.operands_start || op.targets_start < 0 || op.targets_count < 0 || op.targets_start > p.targets.len || op.targets_count > p.targets.len - op.targets_start { return error('AIR integer: operand/target range') }
 			for operand in p.operands[op.operands_start..op.operands_start + op.operands_count] { p.integer_bits(operand.type_index)! }
 			for target in p.targets[op.targets_start..op.targets_start + op.targets_count] { if target < s.blocks_start || target >= s.blocks_start + s.blocks_count { return error('AIR integer: foreign block target') } }
 			code := stream.records[inst.record].code
+			allowed_flags := if code == 2 { integer_binary_flag_mask(op.opcode) } else { u64(0) }
+			if op.flags & ~allowed_flags != 0 { return error('AIR integer: unsupported instruction flags') }
 			if inst.has_result { p.integer_bits(op.result_type)!; if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR integer: result slot') } }
 			match code {
 				2, 9, 28 { if op.operands_count != 2 { return error('AIR integer: binary/comparison arity') }; if code == 2 && op.opcode > 12 { return error('AIR integer: binary opcode') }; if code != 2 && (op.opcode < 32 || op.opcode > 41) { return error('AIR integer: predicate') } }
@@ -175,7 +218,7 @@ pub fn (p IRTypedProgram) run_integer_function(ir IRModule, stream Stream, pools
 			start := op.operands_start
 			mut result := IntegerValue{}
 			match code {
-				2 { result = integer_binary(op.opcode, p.integer_bits(op.result_type)!, m.read(start)!, m.read(start + 1)!)! }
+				2 { result = integer_binary_flags(op.opcode, op.flags, p.integer_bits(op.result_type)!, m.read(start)!, m.read(start + 1)!)! }
 				9, 28 { result = integer_compare(op.opcode, p.integer_bits(p.operands[start].type_index)!, m.read(start)!, m.read(start + 1)!)! }
 				3 {
 					input := m.read(start)!; source_bits := p.integer_bits(p.operands[start].type_index)!; dest_bits := p.integer_bits(op.result_type)!

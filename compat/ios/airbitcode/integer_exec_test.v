@@ -93,7 +93,7 @@ fn test_integer_select_laziness_poison_and_unsupported_instructions() {
 	f.constants[0] = IRConstant{...f.constants[0], kind: .poison}
 	assert f.run([u64(19), 0], 5)!.poison && !f.run([u64(19), 1], 5)!.poison
 	f.records.clear(); f.values.clear(); f.refs[2] = 0; f.arguments[1] = 0
-	f.header(); f.add(1, [u64(1)]); f.add(2, [u64(3), 2, 0, 1]); f.add(10, [u64(1)])
+	f.header(); f.add(1, [u64(1)]); f.add(2, [u64(3), 2, 0, 4]); f.add(10, [u64(1)])
 	if _ := f.run([u64(1), 2], 5) { assert false, 'unsupported integer flags' }
 	println('AIR-INTEGER-VALUES: lazy select, undef rejection, explicit poison return and fail-closed flag handling PASS')
 }
@@ -103,4 +103,83 @@ fn test_integer_narrow_argument_and_return_masks() {
 	a := f.run([u64(0x101), 0x102], 8)!; b := f.run([u64(255), 1], 8)!
 	assert a.bits == 8 && a.value == 3 && b.bits == 8 && b.value == 1
 	println('AIR-INTEGER-NARROW: incoming argument masking, narrow result slots/wrap and returned bit width PASS')
+}
+fn test_integer_flags_against_widened_narrow_arithmetic() {
+	mut comparisons := 0
+	for bits in u32(1) .. 9 {
+		width := int(bits); limit := 1 << width; sign := limit / 2; mask := u64(limit - 1)
+		for x in 0 .. limit {
+			for y in 0 .. limit {
+				sx := if x >= sign { x - limit } else { x }; sy := if y >= sign { y - limit } else { y }
+				for op in [u32(0), 1, 2, 7]! {
+					for flags in u64(1) .. 4 {
+						actual := integer_binary_flags(op, flags, bits, IntegerValue{value: u64(x)}, IntegerValue{value: u64(y)})!
+						mut poison := op == 7 && y >= width
+						if !poison {
+							unsigned := match op { 0 { x + y } 1 { x - y } 2 { x * y } else { x * (1 << y) } }
+							signed := match op { 0 { sx + sy } 1 { sx - sy } 2 { sx * sy } else { sx * (1 << y) } }
+							poison = (flags & 1 != 0 && (unsigned < 0 || unsigned >= limit)) || (flags & 2 != 0 && (signed < -sign || signed >= sign))
+							if !poison { assert actual.value == u64(unsigned) & mask }
+						}
+						assert actual.poison == poison
+						comparisons++
+					}
+				}
+				for op in [u32(3), 4, 8, 9]! {
+					if op in [u32(3), 4]! && (y == 0 || (op == 4 && sx == -sign && sy == -1)) { continue }
+					actual := integer_binary_flags(op, 1, bits, IntegerValue{value: u64(x)}, IntegerValue{value: u64(y)})!
+					mut poison := op in [u32(8), 9]! && y >= width
+					if !poison {
+						poison = match op { 3 { x % y != 0 } 4 { sx % sy != 0 } else { x % (1 << y) != 0 } }
+						if !poison {
+							value := match op { 3 { x / y } 4 { sx / sy } 8 { x >> y } else { sx >> y } }
+							assert actual.value == u64(value) & mask
+						}
+					}
+					assert actual.poison == poison
+					comparisons++
+				}
+			}
+		}
+	}
+	println('AIR-INTEGER-FLAGS-NARROW: ${comparisons} exhaustive i1..i8 NUW/NSW/EXACT comparisons against widened arithmetic PASS')
+}
+fn test_integer_flags_wide_limits_and_instruction_integration() {
+	max := ~u64(0); sign := u64(1) << 63
+	cases := [
+		[u64(0), 1, max, 1, 1, 0], [u64(0), 2, max, 1, 0, 0],
+		[u64(0), 2, sign - 1, 1, 1, 0], [u64(0), 3, 1, 1, 0, 2],
+		[u64(1), 1, 0, 1, 1, 0], [u64(1), 2, sign, 1, 1, 0],
+		[u64(1), 2, 0, 1, 0, max], [u64(1), 3, sign - 1, sign - 1, 0, 0],
+		[u64(2), 1, max, 2, 1, 0], [u64(2), 2, sign, max, 1, 0],
+		[u64(2), 2, sign, 1, 0, sign], [u64(2), 2, max, max, 0, 1],
+		[u64(2), 2, sign >> 1, 2, 1, 0], [u64(2), 1, sign >> 1, 2, 0, sign],
+		[u64(2), 3, sign, 0, 0, 0], [u64(2), 2, sign, 2, 1, 0],
+		[u64(7), 1, sign, 1, 1, 0], [u64(7), 2, 1, 63, 1, 0],
+		[u64(7), 2, max, 63, 0, sign], [u64(7), 3, max, 0, 0, max],
+		[u64(3), 1, max, 2, 1, 0], [u64(3), 1, max - 1, 2, 0, (max - 1) / 2],
+		[u64(4), 1, sign, 2, 0, u64(3) << 62], [u64(4), 1, max - 1, 2, 0, max],
+		[u64(4), 1, max, 2, 1, 0], [u64(8), 1, sign, 63, 0, 1],
+		[u64(9), 1, sign, 63, 0, max], [u64(9), 1, max, 1, 1, 0],
+	]
+	defer { unsafe { for row in cases { row.free() }; cases.free() } }
+	for row in cases {
+		actual := integer_binary_flags(u32(row[0]), row[1], 64, IntegerValue{value: row[2]}, IntegerValue{value: row[3]})!
+		assert actual.poison == (row[4] != 0)
+		if !actual.poison { assert actual.value == row[5] }
+	}
+	for op in u32(0) .. 13 {
+		if _ := integer_binary_flags(op, u64(1) << 63, 64, IntegerValue{value: 1}, IntegerValue{value: 1}) { assert false, 'unknown flag accepted' }
+		for flags in u64(0) .. 8 {
+			if flags & ~integer_binary_flag_mask(op) != 0 { if _ := integer_binary_flags(op, flags, 64, IntegerValue{value: 1}, IntegerValue{value: 1}) { assert false, 'wrong-family flag accepted' } }
+		}
+	}
+	assert integer_binary_flags(0, 3, 64, IntegerValue{poison: true}, IntegerValue{})!.poison
+	mut f := integer_fixture(); defer { f.free() }
+	f.records.clear(); f.values.clear(); f.functions[0] = IRFunction{...f.functions[0], basic_blocks: 1}
+	f.header(); f.add(1, [u64(1)]); f.add(2, [u64(3), 2, 0, 2]); f.add(10, [u64(1)])
+	assert f.run([u64(1), 2], 2)!.value == 3
+	assert f.run([sign - 1, u64(1)], 2)!.poison
+	if _ := f.run([u64(1), 2], 1) { assert false, 'flagged instruction budget' }
+	println('AIR-INTEGER-FLAGS-WIDE: 28 i64 limits, unknown/wrong-family masks, poison propagation and decoded-instruction/budget integration PASS')
 }

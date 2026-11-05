@@ -211,9 +211,9 @@ and mutations. The V inspector `tests/ios/air-operands-inspect.v` supports:
   calculations remain outside that comparison.
 
 Build with the [README flags](README.md); keep generated evidence outside Git.
-The separate [scalar integer interpreter](INTEGER.md) executes a bounded,
-flag-free subset of valid IR. Completeness in this decoder alone does not make
-a function executable by that interpreter or provide Metal capabilities.
+The separate [scalar integer interpreter](INTEGER.md) executes a bounded
+subset of valid IR with checked integer flags. Completeness in this decoder
+alone does not make a function executable by that interpreter or provide Metal capabilities.
 `tests/ios/air-operands-deferred.v CORPUS_DIR [...]` diagnoses remaining deferred
 records and prints per-opcode counts plus a total, without invoking LLVM or
 qualifying execution. It accepts the same copied `module-*.bc` inputs.

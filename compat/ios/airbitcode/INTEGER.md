@@ -15,18 +15,25 @@ i64. Arguments are u64 bit patterns masked to their declared widths. The result
 retains its declared width, masked bits, poison state and executed step count.
 Result bits must not be consumed when `poison` is true.
 
-The interpreter supports flag-free integer add/sub/mul, unsigned/signed division
+The interpreter supports integer add/sub/mul, unsigned/signed division
 and remainder, shifts, and/or/xor, all ten integer comparisons, trunc/zext/sext,
 scalar select, direct branches, PHIs and return. It rejects opaque/deferred
-instructions and other instruction families, even in unvisited blocks. Nonzero
-instruction flags are unsupported, including overflow/exact/disjoint/samesign
-flags; they are not silently ignored. Function attributes are rejected rather
-than assuming their boundary semantics. Floating point, vectors, pointers,
+instructions and other instruction families, even in unvisited blocks. It checks
+`nuw`/`nsw` on add/sub/mul/shl and `exact` on udiv/sdiv/lshr/ashr. Flags use
+their serialized, family-specific bit positions. Unknown bits, wrong-family
+flags, disjoint/samesign and cast flags reject; they are not silently ignored.
+Function attributes are rejected rather than assuming their boundary semantics.
+Floating point, vectors, pointers,
 memory operations, calls, switch and freeze are outside this profile.
 
 Arithmetic uses explicit unsigned bit patterns to avoid host signed-overflow
-behavior. Flag-free arithmetic wraps at its declared width. Overshifts produce
-poison. Poison propagates through arithmetic, casts and comparisons; select reads
+behavior. Flag-free arithmetic wraps at its declared width. `nuw`/`nsw` overflow
+produces poison rather than a wrapped result. Multiplication checks unsigned
+magnitudes against the appropriate signed/unsigned limit without widening to a
+host signed type. Left-shift overflow checks whether reversing the shift
+reconstructs the input. `exact` division with a remainder and `exact` right shifts
+that discard nonzero bits produce poison. Overshifts produce poison independently
+of flags. Poison propagates through arithmetic, casts and comparisons; select reads
 only its chosen value and a poison condition produces poison. A return may
 retain poison, while a poison branch condition errors. Division/remainder by
 zero and signed minimum divided/remaindered by -1 error rather than invoke host
@@ -58,7 +65,25 @@ production interpreter, which is V only and has no LLVM runtime dependency.
 `integer_exec_test.v` checks exact arithmetic/compare patterns, narrow and wide
 wrapping, overshift poison, undefined division guards, both branch paths,
 scoped values, precise budgets, a bounded infinite loop, lazy select, poison
-return, unsupported flags/attributes and narrow argument/return masking.
+return, unsupported flags/attributes and narrow argument/return masking. It also
+compares 1,397,052 exhaustive i1..i8 flagged operations against widened arithmetic,
+checks 28 i64 limits and rejects unknown/wrong-family masks. Decoded-instruction
+tests verify a flagged defined result, poison return and precise budget.
+
+`tests/ios/air-integer-flags.v self-test LLVM_AS FRESH_EXTERNAL_DIR` generates
+five bounded fixture modules, one per i1/i8/i16/i32/i64 width. Its 10,240 functions
+cover 128 input pairs for each supported flag combination/family at every width.
+Vinix executes the original instructions. A separate LLVM module computes the
+result and an explicit poison tag using unflagged i128 arithmetic and range
+checks. Its masked shifts and nonzero divisors keep the reference fully defined.
+LLVM verifies and folds that reference with instcombine. Exact values and tags
+must match, with no unresolved results accepted. Division inputs avoid zero/overflow UB;
+overflow, inexact and overshift cases remain included as poison comparisons.
+Each width rejects four corrupted results. Source, original/oracle bitcode, folded IR,
+assembler status and every comparison are saved externally. No fixture in this
+tool runs through a JIT or a native function pointer. Folding the flagged
+instructions directly cannot establish an exact poison oracle: LLVM may legally
+[refine poison to an ordinary value](https://llvm.org/docs/LangRef.html#poison-values).
 
 `tests/ios/air-integer-execute.v self-test LLVM_AS FRESH_EXTERNAL_DIR` generates
 portable LLVM fixture IR in V and assembles it independently. LLVM verifies the

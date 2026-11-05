@@ -99,7 +99,7 @@ define i64 @guard_zero(i64 %a, i64 %b, i64 %c) { %v = udiv i64 %a, 0
   ret i64 %v }
 define i64 @guard_overflow(i64 %a, i64 %b, i64 %c) { %v = sdiv i64 -9223372036854775808, -1
   ret i64 %v }
-define i64 @guard_flags(i64 %a, i64 %b, i64 %c) { %v = add nsw i64 %a, %b
+define i64 @guard_flags(i64 %a, i64 %b, i64 %c) { %v = or disjoint i64 %a, %b
   ret i64 %v }
 define noundef i64 @guard_attributes(i64 %a, i64 %b, i64 %c) { ret i64 %a }
 define i64 @guard_undef(i64 %a, i64 %b, i64 %c) { ret i64 undef }
