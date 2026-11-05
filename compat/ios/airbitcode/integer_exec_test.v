@@ -264,3 +264,25 @@ fn test_scalar_binary32_arguments_constants_poison_and_profile() {
 	}
 	println('AIR-SCALAR-BINARY32: float arguments/constants/returns, integer API isolation, exact fneg bits, poison/undef, constant predicates, FMF rejection and budgets PASS')
 }
+fn test_scalar_binary32_numeric_conversion_instructions() {
+	mut f := integer_fixture(); defer { f.free() }
+	f.types.flags |= .noslices; f.types[0] = IRType{kind: .float_t}; f.types << IRType{kind: .integer_t, bits: 64}
+	f.refs[0] = 3; f.constants[0] = IRConstant{...f.constants[0], kind: .floating, bits: 32}
+	f.functions[0] = IRFunction{...f.functions[0], basic_blocks: 1}
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(3, [u64(3), 3, 4]); f.add(10, [u64(1)])
+	integer := f.scalar([u64(0xbfc00000), 0], 2)!
+	assert integer.kind == .integer && integer.bits == 64 && integer.value == ~u64(0) && !integer.poison && integer.steps == 2
+	assert f.scalar([u64(0x7f800000), 0], 2)!.poison
+	f.refs[0] = 0; f.refs[1] = 3; f.arguments[0] = 3
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(3, [u64(3), 0, 6]); f.add(10, [u64(1)])
+	floating := f.scalar([u64(1) << 63, 0], 2)!
+	assert floating.kind == .binary32 && floating.bits == 32 && floating.value == 0xdf000000 && !floating.poison
+	f.constants[0] = IRConstant{...f.constants[0], kind: .poison, type_index: 3, bits: 64}
+	f.values[f.records[2].values_start] = 1
+	assert f.scalar([u64(0), 0], 2)!.poison
+	f.constants[0] = IRConstant{...f.constants[0], kind: .undef}
+	if _ := f.scalar([u64(0), 0], 2) { assert false, 'conversion read undef' }
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(3, [u64(3), 0, 5, 1]); f.add(10, [u64(1)])
+	if _ := f.scalar([u64(1), 0], 3) { assert false, 'conversion nneg flags' }
+	println('AIR-SCALAR-CASTS: decoded numeric conversions, result kinds/widths, range/operand poison, undef and nonzero flag rejection PASS')
+}

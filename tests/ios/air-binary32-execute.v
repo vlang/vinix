@@ -94,7 +94,8 @@ define float @guard_fmf(float %x, float %y, i64 %c) { %r = fadd fast float %x, %
   ret float %r }
 define float @guard_frem(float %x, float %y, i64 %c) { %r = frem float %x, %y
   ret float %r }
-define float @guard_conversion(float %x, float %y, i64 %c) { %r = sitofp i64 %c to float
+define float @guard_precision(float %x, float %y, i64 %c) { %d = fpext float %x to double
+  %r = fptrunc double %d to float
   ret float %r }
 define float @guard_half(float %x, float %y, i64 %c) { %h = fptrunc float %x to half
   %r = fpext half %h to float
@@ -185,15 +186,16 @@ fn main() {
 	}
 	args := [u64(0x3f800000), 0x40000000, 0]; defer { unsafe { args.free() } }
 	mut guards := 0
-	for name in ['guard_fmf', 'guard_frem', 'guard_conversion', 'guard_half', 'guard_undef', 'guard_freeze', 'guard_attributes'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported binary32 fixture') }
+	for name in ['guard_fmf', 'guard_frem', 'guard_precision', 'guard_half', 'guard_undef', 'guard_freeze', 'guard_attributes'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported binary32 fixture') }
 	for name in ['poison_add', 'poison_divide', 'poison_compare'] { if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64)!.poison { panic('binary32 poison lost') } }
 	if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'lazy_select')!, args, 64)!.value != args[0] { panic('binary32 select was not lazy') }
 	baseline := p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'fadd')!, args, 64)!; mut controls := 0
 	for changed in [airbitcode.IRScalarRun{...baseline, value: baseline.value ^ 1}, airbitcode.IRScalarRun{...baseline, kind: .integer}, airbitcode.IRScalarRun{...baseline, bits: 64}, airbitcode.IRScalarRun{...baseline, poison: true}, airbitcode.IRScalarRun{...baseline, steps: 0}] { compare(changed, baseline.value, .arithmetic) or { controls++; continue }; panic('accepted corrupted binary32 result') }
 	for mode in [C.FE_UPWARD, C.FE_DOWNWARD]! {
 		if C.fesetround(mode) != 0 { panic('cannot set non-default rounding control') }
-		rounding_args := [u64(0x3f800000), 0x34400000, 0]; defer { unsafe { rounding_args.free() } }
-		if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'fadd')!, rounding_args, 64)!.value != 0x3f800002 { panic('software binary32 depended on host rounding mode') }
+		rounding_args := [u64(0x3f800000), if mode == C.FE_UPWARD { u64(0x33800000) } else { u64(0x34400000) }, 0]; defer { unsafe { rounding_args.free() } }
+		expected := if mode == C.FE_UPWARD { u64(0x3f800000) } else { u64(0x3f800002) }
+		if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'fadd')!, rounding_args, 64)!.value != expected { panic('software binary32 depended on host rounding mode') }
 	}
 	println('LLVM-BINARY32-EXECUTION: ${cases.len} functions, ${comparisons} native comparisons (${nan_cases} arithmetic NaN-class comparisons); ${guards} guarded failures, three poison results, lazy select, ${controls} corruptions and two host-rounding controls PASS; no AIR shader or iOS app executed')
 }

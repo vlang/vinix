@@ -140,6 +140,13 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunct
 					if op.operands_count != 1 { return error('AIR scalar: cast arity') }
 					source := p.operands[op.operands_start].type_index
 					if op.opcode <= 2 { p.integer_bits(source)!; p.integer_bits(op.result_type)! }
+					else if binary32 && op.opcode in [u32(3), 4]! {
+						if p.types[source].kind != .float_t { return error('AIR scalar: binary32 conversion source required') }
+						p.integer_bits(op.result_type)!
+					} else if binary32 && op.opcode in [u32(5), 6]! {
+						p.integer_bits(source)!
+						if !floating_result { return error('AIR scalar: binary32 conversion result required') }
+					}
 					else if !binary32 || op.opcode != 11 || p.execution_bits(source, binary32)! != 32 || p.execution_bits(op.result_type, binary32)! != 32 || (p.types[source].kind == .float_t) == floating_result { return error('AIR scalar: unsupported cast') }
 				}
 				5, 29 { if op.operands_count != 3 { return error('AIR integer: select arity') } }
@@ -253,9 +260,14 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				}
 				3 {
 					input := m.read(start)!; source_bits := p.execution_bits(p.operands[start].type_index, binary32)!; dest_bits := p.execution_bits(op.result_type, binary32)!
-					mut value := input.value & constant_mask(source_bits)
-					if op.opcode == 2 && value & (u64(1) << (source_bits - 1)) != 0 { value |= ~constant_mask(source_bits) }
-					result = IntegerValue{value: value & constant_mask(dest_bits), poison: input.poison}
+					if input.poison { result = IntegerValue{poison: true} }
+					else if op.opcode in [u32(3), 4]! { result = binary32_to_integer(dest_bits, op.opcode == 4, u32(input.value))! }
+					else if op.opcode in [u32(5), 6]! { result = IntegerValue{value: binary32_from_integer(source_bits, op.opcode == 6, input.value)!} }
+					else {
+						mut value := input.value & constant_mask(source_bits)
+						if op.opcode == 2 && value & (u64(1) << (source_bits - 1)) != 0 { value |= ~constant_mask(source_bits) }
+						result = IntegerValue{value: value & constant_mask(dest_bits)}
+					}
 				}
 				5, 29 { condition := m.read(start + 2)!; result = if condition.poison { IntegerValue{poison: true} } else { m.read(start + if condition.value & 1 != 0 { 0 } else { 1 })! } }
 				56 { input := m.read(start)!; result = IntegerValue{value: input.value ^ 0x80000000, poison: input.poison} }

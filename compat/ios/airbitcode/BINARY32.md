@@ -15,7 +15,8 @@ point keeps its integer-only profile and result type.
 
 The function must be valid LLVM IR with ordinary calling convention, no
 attribute set and no varargs. The profile adds flag-free `fadd`, `fsub`, `fmul`,
-`fdiv`, all sixteen `fcmp` predicates, `fneg` and bitcasts between i32 and float.
+`fdiv`, all sixteen `fcmp` predicates, `fneg`, bitcasts between i32 and float,
+and [numeric i1..i64 conversions](BINARY32-CASTS.md).
 Integer operations and control flow remain available. Select and simultaneous
 PHIs can carry either kind. All instructions, including unvisited blocks, must
 belong to the supported profile. Floating-point fast-math flags reject.
@@ -44,8 +45,8 @@ charges and three owned temporary arrays. It borrows its inputs and frees those
 arrays on success/error. Input validity, dominance and full CFG/PHI correctness
 remain caller preconditions; this is not a general LLVM verifier.
 
-Outside this profile: half/bfloat16/double, vectors, numeric float/integer
-conversions, precision conversions, remainder, fast/constrained operations,
+Outside this profile: half/bfloat16/double, vectors,
+precision conversions, remainder, fast/constrained operations,
 function attributes, calls/intrinsics, pointers, memory and Metal commands.
 These are explicit unsupported cases, not approximated operations.
 
@@ -65,7 +66,8 @@ preferred representation; native NaN sign/payload equality is not qualified.
 Every other result is compared bit for bit, including non-arithmetic NaNs.
 Seven unsupported/undef guards, three poison results, lazy select and five
 corrupted-result controls are checked separately. After native calls, software
-execution is checked under upward/downward host rounding. No reference call runs
+execution is checked under upward/downward host rounding, using a distinguishing
+tie input for each mode. No reference call runs
 under those altered modes. Original IR, bitcode, assembler status, JIT/fenv
 identity and every comparison are saved externally. LLVM/native machine code
 is not sanitizer-instrumented. The tool can execute only its generated fixture.
