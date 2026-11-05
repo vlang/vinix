@@ -80,6 +80,8 @@ This layer does not compute GEP byte offsets, allocate globals/buffers, enforce
 load/store alignment, evaluate instructions, lower shaders or enable Metal
 capabilities. The typed operand decoder retains its existing behavior. Native
 macOS samples provide layout coverage; Fortnite's packed shaders remain untested.
+The separate [GEP offset layer](GEP.md) uses these layouts for scalar numeric
+address arithmetic, without executing memory operations.
 
 References: [LLVM data layout](https://llvm.org/docs/LangRef.html#data-layout),
 [implementation](https://github.com/llvm/llvm-project/blob/main/llvm/lib/IR/DataLayout.cpp)

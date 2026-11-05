@@ -53,6 +53,10 @@ constants; array/vector indexes may be dynamic. Vector GEP bases/indexes must
 have matching shapes. No byte offset is computed and GEP array offsets are not
 treated as bounds checks.
 
+The separate [GEP offset layer](GEP.md) builds scalar offset plans from decoded
+instructions and ABI layouts. It does not change this decoder or implement
+poison rules or memory access.
+
 `alignment` is the explicitly encoded byte alignment, or 0 when the ABI default
 is unresolved. The decoder does not infer size, padding, ABI alignment or pointer
 width. The separate [type-layout layer](LAYOUT.md) supplies supported sizes,
