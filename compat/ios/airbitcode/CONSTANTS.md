@@ -73,7 +73,9 @@ The native corpus consists of copied macOS framework AIR; Fortnite's packed
 shaders have not been covered. Metal's default device remains unavailable.
 The [metadata layer](METADATA.md) links classic AIR entry points to stages and
 bindings; the [body index](BODIES.md) adds instruction-result IDs and block
-boundaries. Constant expression lowering, typed operand/instruction decoding
-and the actual execution backend remain future work.
+boundaries. The [typed operand layer](OPERANDS.md) decodes supported instructions.
+The separate [constant image layer](IMAGE.md) materializes supported literals
+and aggregates into ABI-shaped bytes with an explicit padding mask. Constant
+expression lowering and the actual execution backend remain future work.
 
 Format reference: [LLVM's constant reader](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Bitcode/Reader/BitcodeReader.cpp).

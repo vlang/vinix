@@ -82,6 +82,8 @@ capabilities. The typed operand decoder retains its existing behavior. Native
 macOS samples provide layout coverage; Fortnite's packed shaders remain untested.
 The separate [GEP offset layer](GEP.md) uses these layouts for scalar numeric
 address arithmetic, without executing memory operations.
+The [constant image layer](IMAGE.md) uses these layouts to serialize supported
+literals and aggregates, retaining a mask for unconstrained padding.
 
 References: [LLVM data layout](https://llvm.org/docs/LangRef.html#data-layout),
 [implementation](https://github.com/llvm/llvm-project/blob/main/llvm/lib/IR/DataLayout.cpp)
