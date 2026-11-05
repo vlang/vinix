@@ -16,6 +16,7 @@ const capture = consumer + '/source-before-current-01'
 const output = consumer + '/current-proof-setup-01'
 const controller_output = consumer + '/current-controller-setup-01'
 const retainer_output = consumer + '/current-retainer-setup-01'
+const evidence_output = consumer + '/current-evidence-setup-01'
 const base_sha = '558e3d949d310b54d8550bb8d51bbabfab395655f58afdb6167bf1f42fc58f80'
 const module_map_sha = '7574aa941eeea3b7beb3dc58c14f6c23e57aea93bd5349a09f1aa8a51da9abce'
 const file_limit = u64(1024 * 1024)
@@ -603,10 +604,139 @@ fn prepare_retainer() ! {
 	println('PREPARED private current retainer source; no compile, import or guest')
 }
 
+// The second fixed executable exception keeps the1MiB text reader unchanged.
+fn retain02_digest() !string {
+	path := consumer + '/retain-02'
+	before := os.lstat(path)!
+	need(os.real_path(path) == path && before.mode & 0o170000 == 0o100000
+		&& before.size == 1155408, 'reviewed retain02 executable size/type differs')!
+	mut file := os.open(path)!
+	defer { file.close() }
+	mut hash := sha256.new()
+	defer { unsafe { hash.free() } }
+	mut buffer := []u8{len: 65536}
+	defer { unsafe { buffer.free() } }
+	mut size := u64(0)
+	for {
+		n := file.read(mut buffer) or { if err is os.Eof { break }; return err }
+		if n == 0 { break }
+		size += u64(n)
+		need(size <= 1155408, 'reviewed retain02 executable grew during read')!
+		hash.write(buffer[..n])!
+	}
+	need(size == 1155408 && same(before, os.lstat(path)!), 'reviewed retain02 executable changed during read')!
+	return hash.sum([]u8{}).hex()
+}
+
+fn evidence_gate_inputs(mut inputs map[string]string) ! {
+	retainer_gate_inputs(mut inputs)!
+	for path, hash in {
+		retainer_output + '/preparer-source.v': 'dbff3b0bbb3e066e10e3f9288305575f56b6cd32ee6c91133a1343b5ba7e4610'
+		retainer_output + '/result.json': '224fe798ebde083efe7a67a451c95cb2ac6ed163817d17e09c3037fc1eae8a02'
+		retainer_output + '/retain-before.v': 'a500b35f3aca1e016b02525bf2712f1addc3c834ce8c7ff380159a91f7faeef7'
+		retainer_output + '/retain-after.v': 'bb582b6b0f097bc0003daea66fdb6906ae06a7abecc4b67f4cea01144b38839a'
+		suite + '/retain.v': 'bb582b6b0f097bc0003daea66fdb6906ae06a7abecc4b67f4cea01144b38839a'
+		consumer + '/retain-02.build.json': 'caae830f864f8062440533b00d6649edebde31748e374fee1114312ec4dc8734'
+		consumer + '/retain-02.monitor/result.json': '475d8e5ee0303873ef0b3cad508e003663f4d704f6d53ebd887bee4ba723b185'
+		consumer + '/retain-02.argv.json': 'eed341a4db46d8b57d3b6d8f66275f3593632738feb0364ca6752e011119d51a'
+		consumer + '/retain-02.log': '3c5b498c65ba0977f8efeeed8fcb1724b06e7a75c5983b5a741f60384fedb0c9'
+	} { pin(path, hash, mut inputs)! }
+	for name in ['modules-before.json', 'modules-after.json'] {
+		pin(retainer_output + '/' + name,
+			'710351295e1be60a49b75f84348493ee85cf1f0777991a8b457ac3f4b83201d4', mut inputs)!
+		pin(consumer + '/retain-02.monitor/' + name,
+			'710351295e1be60a49b75f84348493ee85cf1f0777991a8b457ac3f4b83201d4', mut inputs)!
+	}
+	pin(consumer + '/retain-02.exit.json', sha256.hexhash(json2.encode({'exit_code': 0})), mut inputs)!
+	retainer_hash := '209a1c0fd2808c8ca734ba342d3f34fcba3b610d2e22fd3bacd76702b7d0511c'
+	need(retain02_digest()! == retainer_hash, 'reviewed retain02 executable digest differs')!
+	inputs[consumer + '/retain-02'] = retainer_hash
+	build := json2.decode[map[string]string](text(consumer + '/retain-02.build.json')!, strict: true)!
+	need(build['exit_code'] == '0', 'actual retain02 compile did not succeed')!
+}
+
+fn prepare_evidence() ! {
+	$if prod {} $else { return error('requires production embedded source binding') }
+	need(os.args == [os.executable(), '--prepare-evidence'], 'requires exact --prepare-evidence')!
+	bound := sha256.hexhash($embed_file('prepare-current-proof.v').to_string())
+	need(sha256.hexhash(text(@FILE)!) == bound, 'compiled evidence preparer source changed')!
+	ordinary_directory(consumer)!
+	ordinary_directory(suite)!
+	fresh(evidence_output)!
+	mut inputs := map[string]string{}
+	pin(@FILE, bound, mut inputs)!
+	pin(repository + '/tests/software-hosted-x11/prepare-current-proof.v', bound, mut inputs)!
+	pin(os.executable(), sha256.hexhash(text(os.executable())!), mut inputs)!
+	frozen_inputs(mut inputs)!
+	evidence_gate_inputs(mut inputs)!
+	snapshot := json2.decode[CaptureSnapshot](text(capture + '/sources-before.json')!, strict: true)!
+	need(sha256.hexhash(proof.source()) == snapshot.files[suite + '/proof/admit.v'],
+		'compiled source reader differs from preserved private bytes')!
+	before_trees := module_trees()!
+	before_modules := module_sources(before_trees)!
+	need(before_modules == json2.decode[map[string]string](text(output + '/modules-after.json')!, strict: true)!,
+		'proof-qualified current module map differs')!
+	for name in ['run-native06.v', 'run-evidence06.v', 'build-supervision-consumer-01.v',
+		'nativeguard/guard.v', 'diagnostics/recoveryguard/recoveryguard.v'] {
+		pin(suite + '/' + name, snapshot.files[suite + '/' + name], mut inputs)!
+	}
+	path := suite + '/evidence-check.v'
+	old_sha := '842b49a78ae764803837a804c852d270fc3c18691d0c0dd3c94f2cc1f052642d'
+	pin(path, old_sha, mut inputs)!
+	need(snapshot.files[path] == old_sha, 'original evidence source capture differs')!
+	old_stat := os.lstat(path)!
+	need(old_stat.nlink == 1 && old_stat.mode == snapshot.modes[path], 'evidence checker must be an independent original source')!
+	before := text(path)!
+	mut after := replace_exact(before, 'compact imported receipt differs', 'current imported receipt identity differs', 1)!
+	after = replace_exact(after, 'recorded compact audit header differs', 'current recorded audit header differs', 1)!
+	after = replace_exact(after, 'recorded original complete input path differs', 'current recorded fixed path differs', 1)!
+	os.mkdir(evidence_output, mode: 0o700)!
+	copy_one(@FILE, evidence_output + '/preparer-source.v')!
+	copy_one(path, evidence_output + '/evidence-before.v')!
+	os.write_file(evidence_output + '/evidence.diff', full_diff(before, after, 'evidence-check.v'))!
+	os.write_file(path, after)!
+	copy_one(path, evidence_output + '/evidence-after.v')!
+	new_stat := os.lstat(path)!
+	need(text(path)! == after && new_stat.mode == old_stat.mode && new_stat.nlink == 1
+		&& new_stat.dev == old_stat.dev && new_stat.inode == old_stat.inode
+		&& new_stat.uid == old_stat.uid && new_stat.gid == old_stat.gid,
+		'prepared evidence bytes, mode or ordinary identity differ')!
+	need(text(evidence_output + '/evidence-before.v')! == before
+		&& os.lstat(evidence_output + '/evidence-before.v')!.mode == old_stat.mode
+		&& os.lstat(evidence_output + '/evidence-before.v')!.nlink == 1,
+		'original evidence preservation changed')!
+	frozen_inputs(mut inputs)!
+	evidence_gate_inputs(mut inputs)!
+	after_trees := module_trees()!
+	need(before_trees == after_trees && before_modules == module_sources(after_trees)!,
+		'qualified proof module changed during evidence preparation')!
+	for input, hash in inputs {
+		if input == path { continue }
+		actual := if input == consumer + '/check-03' { check03_digest()! }
+			else if input == consumer + '/retain-02' { retain02_digest()! }
+			else { sha256.hexhash(text(input)!) }
+		need(actual == hash, 'evidence preparation input changed')!
+	}
+	os.write_file(evidence_output + '/inputs-before.json', json2.encode(inputs) + '\n')!
+	os.write_file(evidence_output + '/modules-before.json', json2.encode(before_modules))!
+	os.write_file(evidence_output + '/modules-after.json', json2.encode(before_modules))!
+	os.write_file(evidence_output + '/module-trees-before.json', json2.encode(before_trees) + '\n')!
+	os.write_file(evidence_output + '/module-trees-after.json', json2.encode(after_trees) + '\n')!
+	os.write_file(evidence_output + '/result.json', json2.encode({
+		'outcome': 'PREPARED_EVIDENCE_SOURCE', 'preparer_sha256': bound, 'source': path,
+		'before_sha256': old_sha, 'after_sha256': sha256.hexhash(after),
+		'original_capture': evidence_output + '/evidence-before.v', 'replacement_counts': '{"expected_reasons":3}',
+		'scope': 'Only three expected refusal-message strings in private Suite/evidence-check.v changed by exact invertible replacements. Existing69+20case logic, controller, retainer, proof modules, wrappers and binder unchanged. No evidence compile, refusal execution, target, import, audit or native execution.'
+	}) + '\n')!
+	println('PREPARED private current evidence source; no compile, refusal run, import or guest')
+}
+
 fn main() {
 	if os.args == [os.executable(), '--prepare-controller'] {
 		prepare_controller() or { eprintln(err); exit(1) }
 	} else if os.args == [os.executable(), '--prepare-retainer'] {
 		prepare_retainer() or { eprintln(err); exit(1) }
+	} else if os.args == [os.executable(), '--prepare-evidence'] {
+		prepare_evidence() or { eprintln(err); exit(1) }
 	} else { run() or { eprintln(err); exit(1) } }
 }
