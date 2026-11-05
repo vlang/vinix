@@ -1158,11 +1158,27 @@ microbenchmark. Those host timings do not measure physical framebuffer writes.
 
 ## Building and running
 
-ui2 is not vendored; check out its current VML version beside the sources,
-where the build points V's module path. Compile-time `$vml` also requires a
-current V3 compiler; set `V=/path/to/current/v3` when it is not your default:
+ui2 is not vendored. Both desktop build scripts and AArch64 preparation use
+`build-support/resolve-ui2.v`: `VINIX_UI2_SOURCE` takes precedence, followed by
+a sibling `../ui2` with `v.mod`, then the automatic `third_party/ui2` checkout.
+The automatic source is pinned to
+`293e845e2bf2557c7100996d82fcc23160e57dd9`, fetched by exact SHA without
+depending on the default branch. Existing automatic checkouts must be clean
+(including untracked and ignored files) and at that SHA; unexpected trees are
+rejected without being changed. Move an old automatic checkout aside to fetch
+the pin, or explicitly select it with `VINIX_UI2_SOURCE=/path/to/ui2`.
+Explicit and sibling sources remain caller owned: they are checked for VML
+inputs but never fetched, reset or required to match the pin.
+Concurrent automatic fetches use `third_party/ui2.lock`. If a builder crashes,
+remove that lock only after confirming no resolver remains active.
 
-    git clone https://github.com/vlang/ui2 third_party/ui2
+This pin bounds the existing `stage_ui2` compatibility rewrites: it is the last
+revision before `59d092e` added clipboard calls to deprecated `os.execute`;
+`f6a2123` put `g_key_modifiers` behind the nonheadless backend, and later `fd1aa4b` changed
+dialog `execute` beyond the existing rewrite. Moving upstream `main` can
+therefore break desktop C translation even when VML files are present.
+Overrides may need their own compatibility work. Compile-time `$vml` also
+requires a current V3 compiler; select it explicitly when needed:
 
     V=/path/to/current/v3 ./scripts/run-desktop-aarch64.sh
 
