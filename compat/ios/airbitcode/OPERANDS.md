@@ -5,12 +5,15 @@ from the same immutable raw module, call
 `p := ir.typed_operands(stream, pools, bodies)!`. Call `p.free()` once before
 freeing the original indexes. Treat the returned indexes as immutable.
 
-The program owns five arrays: instruction descriptors, typed value operands,
-block targets, types and type references. Original type IDs remain unchanged.
+The program owns six arrays: instruction descriptors, typed value operands,
+block targets, types, type references and literal aggregate indexes. Original
+type IDs remain unchanged.
 Original type names are borrowed from `ir`, without cloning or freeing them.
 Scalar/vector boolean types needed by comparisons are interned when absent from
 the original table. `p.type_text(ir, index)!` renders original/synthetic types;
 the caller owns and frees the returned string.
+Pointer types needed by GEP/alloca are also interned, retaining address spaces
+and the original module's typed or opaque pointer representation.
 
 Instruction indexes match `bodies.instructions`. Every instruction has an
 explicit status:
@@ -20,7 +23,7 @@ explicit status:
 - `opaque`: its instruction family has no operand decoder here. The raw record
   remains in `Stream`. Explicit call result signatures may still supply a type.
 - `deferred`: decoding or type verification depends on an unknown producer type.
-  Cast and PHI definitions may still have independently encoded result types.
+  Cast, PHI, alloca and explicit-load definitions may still have known result types.
 
 `p.complete(bodies, scope)` checks that every instruction in an active function
 has status `decoded`. A decoded consumer may use an independently known type of
@@ -36,6 +39,27 @@ numbers, result types, value operands and selected flags are retained. Operand
 ordering follows bitcode: select's true/false values precede its condition.
 PHI value operands and predecessor targets have matching positions. Targets
 are global indexes into `bodies.blocks`; value numbers remain scoped IDs.
+
+Non-atomic load/store, alloca, GEP and extractvalue/insertvalue also decode.
+Legacy implicit-pointee memory/GEP encodings remain supported where a typed
+pointer supplies the missing element. Modern explicit load/GEP types also work
+with opaque pointers. `source_type` retains the accessed data type, initial GEP
+element, allocation element or aggregate container, depending on the family.
+`indices` stores literal aggregate field paths; dynamic GEP indexes remain
+typed value operands. Struct GEP indexes require materialized scalar i32
+constants; array/vector indexes may be dynamic. Vector GEP bases/indexes must
+have matching shapes. No byte offset is computed and GEP array offsets are not
+treated as bounds checks.
+
+`alignment` is the explicitly encoded byte alignment, or 0 when the ABI default
+is unresolved. The decoder does not infer size, padding, ABI alignment or pointer
+width. `is_volatile` retains load/store volatility. Alloca's count is an absolute
+value ID. Its packed alignment/flags and optional address space are retained;
+the data-layout `A` component supplies a default allocation address space.
+Mixed typed/opaque pointer tables are rejected for alloca rather than guessing
+its result representation. With no original pointer types, allocas use opaque
+pointers. Unsized/cyclic allocation/storage types are not
+fully verified. Memory operations remain data descriptions, without execution.
 
 Unsigned relative operands use the instruction's current value ID and u32 wrap
 arithmetic. Forward value/type pairs consume an explicit type word. PHI uses a
@@ -54,15 +78,16 @@ width and scalability. This is a bounded strict profile, not an LLVM verifier.
 Unsupported cast categories can fail even when another LLVM profile permits
 them. No data-layout pointer width or address calculation is inferred.
 
-Calls, memory operations, GEP, shuffle/aggregate operations, switches, exception
+Calls, atomic memory operations, shuffle operations, switches, exception
 instructions and other families remain opaque. Constant expressions retain the
 previous pool layer's opaque tags. This layer does not evaluate constants, prove
 CFG/dominance/PHI predecessor relationships, verify every flag encoding, lower
 instructions, submit Metal commands or render a frame.
 
-Limits are 4,194,304 typed operands, 1,048,576 targets, original IR types plus at
-most 262,146 additional types, and original type-reference capacity plus 262,144
-references. The existing body/stream limits also apply. Boolean/vector interning
+Limits are 4,194,304 typed operands, 1,048,576 targets, 327,682 total types and
+524,288 total type references. Literal aggregate paths have a separate
+1,048,576-index cap. The
+existing body/stream limits also apply. Boolean/vector/pointer interning
 and scoped lookup avoid repeated type scans; passes are linear in instructions,
 operands and targets, apart from bounded hash lookups. All owned arrays and
 transient maps are released on success/error; borrowed type names stay owned
@@ -73,9 +98,13 @@ forward PHIs, synthetic boolean vectors, type-name ownership, malformed input
 and mutations. The V inspector `tests/ios/air-operands-inspect.v` supports:
 
 - `self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR`: assemble portable LLVM fixture
-  data, check three complete core function indexes plus explicit opaque/deferred
-  functions, flags and forward PHI identity, and reject eight corrupted dumps
+  data, check four complete function indexes plus an opaque call, flags and
+  forward PHI identity, and reject eight corrupted dumps
   or decoded indexes. These functions are format fixtures, not iOS apps.
+- `memory-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR`: assemble memory fixture
+  data with three complete function indexes, scalar/vector GEP, aliasing accesses,
+  alloca A5, aggregate paths, explicit alignment/volatility and eight corruption
+  controls. It does not execute the fixture.
 - `corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR`: copy raw modules and independently
   disassemble them. Compare exact arithmetic/cast/predicate mnemonics and selected
   operand/result type spellings only for `decoded` instructions. Named type
@@ -83,6 +112,10 @@ and mutations. The V inspector `tests/ios/air-operands-inspect.v` supports:
   native value IDs, operand values, branch/PHI edge identity, raw flags and opaque
   families are not compared to LLVM here. It expects LLVM's normal two-space
   primary-instruction format and ignores indented continuation lines.
+  For decoded memory forms it additionally compares source/base pointer type
+  spellings, explicit alignment, volatility, alloca address space and literal
+  aggregate indexes. GEP byte offsets, native value identities and layout
+  calculations remain outside that comparison.
 
 Build with the [README flags](README.md); keep generated evidence outside Git.
 Layouts follow [LLVM's reader](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Bitcode/Reader/BitcodeReader.cpp)

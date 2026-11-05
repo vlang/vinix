@@ -24,7 +24,7 @@ fn strip_flags(text string) string {
 	mut result := text
 	for _ in 0 .. 16 {
 		word := result.all_before(' ')
-		if word !in ['nuw', 'nsw', 'exact', 'disjoint', 'nneg', 'samesign', 'nnan', 'ninf', 'nsz', 'arcp', 'contract', 'afn', 'reassoc', 'fast', 'nonnull'] { break }
+		if word !in ['nuw', 'nsw', 'exact', 'disjoint', 'nneg', 'samesign', 'nnan', 'ninf', 'nsz', 'arcp', 'contract', 'afn', 'reassoc', 'fast', 'nonnull', 'volatile', 'inbounds', 'nusw', 'inalloca', 'swifterror'] { break }
 		result = result.all_after(' ')
 	}
 	return result
@@ -111,15 +111,42 @@ fn typed_line(ir airbitcode.IRModule, stream airbitcode.Stream, bodies airbitcod
 		15 { mnemonic = 'unreachable' }
 		56 { mnemonic = 'fneg'; typ = op.result_type }
 		58 { mnemonic = 'freeze'; typ = op.result_type }
+		4, 30, 43 { mnemonic = 'getelementptr'; typ = op.source_type }
+		19 { mnemonic = 'alloca'; typ = op.source_type }
+		20 { mnemonic = 'load'; typ = op.result_type }
+		24, 44 { mnemonic = 'store'; typ = op.source_type }
+		26, 27 {
+			mnemonic = if raw.code == 26 { 'extractvalue' } else { 'insertvalue' }; typ = op.source_type
+			mut suffix := ''
+			for field in p.indices[op.indices_start..op.indices_start + op.indices_count] { suffix += ', ${field}' }
+			defer { unsafe { suffix.free() } }
+			if !text.all_before(', !').ends_with(suffix) { return error('LLVM aggregate index path differs') }
+		}
 		else { return error('unhandled decoded instruction in comparator') }
 	}
 	if text.all_before(' ') != mnemonic { return error('LLVM exact opcode differs: ' + text) }
+	if raw.code in [u64(19), 20, 24, 44]! && op.alignment != 0 {
+		align_text := ', align ${op.alignment}'
+		if !text.ends_with(align_text) && !text.contains(align_text + ',') { return error('LLVM explicit memory alignment differs') }
+	}
+	if raw.code in [u64(20), 24, 44]! && text.all_after(' ').starts_with('volatile ') != op.is_volatile { return error('LLVM volatile flag differs') }
+	if raw.code in [u64(4), 20, 24, 30, 43, 44]! {
+		pointer := oracle_type(p, ir, p.operands[op.operands_start].type_index)!
+		defer { unsafe { pointer.free() } }
+		if !text.contains(', ' + pointer + ' ') { return error('LLVM memory base pointer type/address space differs') }
+	}
+	if raw.code == 19 {
+		space := p.types[op.result_type].address_space
+		if space == 0 { if text.contains(', addrspace(') { return error('LLVM alloca address space differs') } }
+		else if !text.all_before(', !').ends_with(', addrspace(${space})') { return error('LLVM alloca address space differs') }
+	}
 	if typ >= 0 {
 		expected := oracle_type(p, ir, typ)!
 		defer { unsafe { expected.free() } }
 		mut body := strip_flags(text.all_after(' '))
 		if raw.code in [u64(9), 28]! { body = body.all_after(' ') }
-		if !body.starts_with(expected + ' ') { return error('LLVM operand/result type differs: ' + text + ' expected ' + expected) }
+		comma_type := raw.code in [u64(4), 19, 20, 30, 43]!
+		if !body.starts_with(expected + ' ') && !(comma_type && body.starts_with(expected + ', ')) { return error('LLVM operand/result type differs: ' + text + ' expected ' + expected) }
 	}
 }
 fn compare(ir airbitcode.IRModule, stream airbitcode.Stream, bodies airbitcode.IRFunctionBodies, p airbitcode.IRTypedProgram, oracle string) !int {
@@ -252,7 +279,7 @@ entry:
 	os.write_file(out + '/input.ll', source)!
 	run_saved([assembler, out + '/input.ll', '-o', out + '/input.bc'], out + '/assemble')!
 	d, o, f, c := inspect(out + '/input.bc', llvm, out + '/fixture')!
-	if d != 25 || o != 2 || f != 2 || c != 3 { return error('fixture completeness/coverage differs') }
+	if d != 28 || o != 1 || f != 0 || c != 4 { return error('fixture completeness/coverage differs') }
 	data := os.read_bytes(out + '/fixture.bc')!; defer { unsafe { data.free() } }
 	stream := airbitcode.parse(data)!; defer { stream.free() }
 	ir := stream.ir_module(data)!; defer { ir.free() }
@@ -282,10 +309,76 @@ entry:
 		compare(ir, stream, bodies, changed, oracle) or { controls++; continue }
 		return error('accepted corrupted typed index')
 	}
-	println('LLVM-OPERANDS-SELFTEST: 25 decoded, two opaque, two deferred; three complete function indexes, scalar/vector/FP/flags/forward-PHI checks and ${controls} rejected evidence corruptions PASS')
+	println('LLVM-OPERANDS-SELFTEST: 28 decoded, one opaque, no deferred; four complete function indexes, scalar/vector/FP/flags/forward-PHI checks and ${controls} rejected evidence corruptions PASS')
 }
 fn main() {
+	if os.args.len == 5 && os.args[1] == 'memory-self-test' { memory_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'self-test' { self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'corpus' { corpus(os.args[2], os.args[3], os.args[4])!; return }
-	panic('usage: air-operands-inspect corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR | self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR')
+	panic('usage: air-operands-inspect corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR | self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | memory-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR')
+}
+
+fn memory_self_test(assembler string, llvm string, out string) ! {
+	fresh(out)!
+	source := 'target datalayout = "e-p:64:64-p3:64:64-A5"
+target triple = "x86_64-unknown-linux-gnu"
+%Packet = type { i32, [4 x i32] }
+define i32 @memory(ptr addrspace(3) %base, i64 %count, i32 %index) {
+entry:
+  %slot = alloca i32, i64 %count, align 16, addrspace(5)
+  %field = getelementptr inbounds %Packet, ptr addrspace(3) %base, i64 0, i32 1, i32 %index
+  %value = load volatile i32, ptr addrspace(3) %field, align 4
+  store volatile i32 %value, ptr addrspace(5) %slot, align 16
+  %agg = insertvalue %Packet zeroinitializer, i32 %value, 1, 2
+  %r = extractvalue %Packet %agg, 1, 2
+  ret i32 %r
+}
+define <2 x ptr addrspace(3)> @vector_gep(ptr addrspace(3) %base, <2 x i64> %indices) {
+entry:
+  %p = getelementptr i32, ptr addrspace(3) %base, <2 x i64> %indices
+  ret <2 x ptr addrspace(3)> %p
+}
+define i32 @byte_alias(ptr %p) {
+entry:
+  %a = load i32, ptr %p, align 1
+  store float 1.0, ptr %p, align 1
+  ret i32 %a
+}
+'
+	os.write_file(out + '/input.ll', source)!
+	run_saved([assembler, out + '/input.ll', '-o', out + '/input.bc'], out + '/assemble')!
+	d, o, f, c := inspect(out + '/input.bc', llvm, out + '/fixture')!
+	if d != 12 || o != 0 || f != 0 || c != 3 { return error('memory fixture coverage differs') }
+	data := os.read_bytes(out + '/fixture.bc')!; defer { unsafe { data.free() } }
+	stream := airbitcode.parse(data)!; defer { stream.free() }
+	ir := stream.ir_module(data)!; defer { ir.free() }
+	pools := ir.constant_pools(stream)!; defer { pools.free() }
+	bodies := ir.function_bodies(stream, pools)!; defer { bodies.free() }
+	p := ir.typed_operands(stream, pools, bodies)!; defer { p.free() }
+	alloca := p.instructions[0]
+	if alloca.alignment != 16 || p.types[alloca.result_type].address_space != 5 || p.operands[alloca.operands_start].number != pools.module_values + 1 { return error('memory fixture alloca fields/count ID differ') }
+	if !p.instructions[2].is_volatile || p.instructions[2].alignment != 4 || !p.instructions[3].is_volatile { return error('memory fixture volatility/alignment differ') }
+	if p.indices != [u32(1), 2, 1, 2] { return error('memory fixture aggregate paths differ') }
+	vector := p.types[p.instructions[7].result_type]
+	if vector.kind != .vector_t || vector.count != 2 || p.types[p.references[vector.refs_start]].address_space != 3 { return error('memory fixture vector GEP type differs') }
+	oracle := os.read_file(out + '/fixture.ll')!; defer { unsafe { oracle.free() } }
+	mut controls := 0
+	for pair in [['load volatile i32', 'load i32'], [', align 16', ', align 8'], ['getelementptr inbounds %Packet', 'getelementptr inbounds i32'],
+		['%agg, 1, 2', '%agg, 1, 3'], ['ptr addrspace(3) %field', 'ptr addrspace(4) %field']] {
+		if !oracle.contains(pair[0]) { return error('missing memory negative input') }
+		changed := oracle.replace_once(pair[0], pair[1]); defer { unsafe { changed.free() } }
+		compare(ir, stream, bodies, p, changed) or { controls++; continue }
+		return error('accepted changed LLVM memory evidence')
+	}
+	for mode in ['alignment', 'volatile', 'index'] {
+		mut instructions := p.instructions.clone(); mut indices := p.indices.clone()
+		defer { unsafe { instructions.free(); indices.free() } }
+		if mode == 'alignment' { instructions[0] = airbitcode.IRTypedInstruction{...instructions[0], alignment: 8} }
+		else if mode == 'volatile' { instructions[2] = airbitcode.IRTypedInstruction{...instructions[2], is_volatile: false} }
+		else { indices[0] = 0 }
+		changed := airbitcode.IRTypedProgram{...p, instructions: instructions, indices: indices}
+		compare(ir, stream, bodies, changed, oracle) or { controls++; continue }
+		return error('accepted changed decoded memory evidence')
+	}
+	println('LLVM-MEMORY-SELFTEST: 12 decoded instructions, three complete function indexes; alloca absolute ID/A5, scalar/vector GEP, aliasing, aggregate paths, alignment/volatile and ${controls} rejected evidence corruptions PASS')
 }

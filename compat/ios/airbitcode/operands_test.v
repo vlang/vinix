@@ -94,7 +94,7 @@ fn test_synthetic_boolean_vectors_and_opaque_dependencies() {
 	text := p.type_text(f.ir(), p.instructions[0].result_type)!
 	assert text == '<2 x i1>'
 	unsafe { text.free() }; p.free()
-	f.replace(1, 20, [u64(1)]) // An unsupported result type is never guessed.
+	f.replace(1, 8, [u64(1)]) // Shuffle remains outside this profile.
 	f.replace(2, 2, [u64(1), 1, 0])
 	f.add(10, []u64{})
 	q := f.decode()!

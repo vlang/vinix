@@ -3,6 +3,7 @@ module airbitcode
 
 const max_typed_operands = 4194304
 const max_typed_targets = 1048576
+const max_typed_indices = 1048576
 const max_typed_types = max_ir_types + max_body_instructions + 2
 
 pub enum IROperandStatus { opaque deferred decoded }
@@ -21,6 +22,11 @@ pub:
 	operands_count int
 	targets_start int
 	targets_count int // PHI predecessors or branch destinations, as global block indexes.
+	source_type int = -1 // Memory data/GEP source/alloca element/aggregate container type.
+	alignment u64 // 0 = ABI default remains unresolved; otherwise explicit byte alignment.
+	is_volatile bool
+	indices_start int
+	indices_count int // Literal extractvalue/insertvalue index path.
 }
 pub struct IRTypedProgram {
 pub mut:
@@ -29,9 +35,10 @@ pub mut:
 	targets []int
 	types []IRType // Original IDs plus interned boolean/vector types. Names borrow IRModule.
 	references []int
+	indices []u32
 }
 pub fn (p &IRTypedProgram) free() {
-	unsafe { p.instructions.free(); p.operands.free(); p.targets.free(); p.types.free(); p.references.free() }
+	unsafe { p.instructions.free(); p.operands.free(); p.targets.free(); p.types.free(); p.references.free(); p.indices.free() }
 }
 pub fn (p IRTypedProgram) type_text(ir IRModule, index int) !string {
 	view := IRModule{...ir, types: p.types, references: p.references}
@@ -52,7 +59,11 @@ struct OperandBuilder {
 mut:
 	p IRTypedProgram
 	vectors map[u64]int
+	pointers map[u64]int
 	boolean int = -1
+	alloc_space u32
+	opaque_allocas bool
+	mixed_pointers bool
 }
 struct OperandCursor {
 mut:
@@ -158,6 +169,7 @@ fn (b &OperandBuilder) cast_valid(op u32, source int, dest int) bool {
 }
 
 fn (mut b OperandBuilder) decode(inst IRInstruction, code u64, values []u64, seed int) !IRTypedInstruction {
+	if code in [u64(4), 19, 20, 24, 26, 27, 30, 43, 44]! { return b.memory(inst, code, values, seed)! }
 	start := b.p.operands.len; targets := b.p.targets.len
 	mut cursor := OperandCursor{}
 	mut result := seed
@@ -261,22 +273,29 @@ fn (mut b OperandBuilder) decode(inst IRInstruction, code u64, values []u64, see
 	}
 	if optional_flags && cursor.pos < values.len { flags = values[cursor.pos]; cursor.pos++ }
 	if cursor.pos != values.len { return error('AIR operands: trailing/missing operands') }
-	return IRTypedInstruction{.decoded, result, opcode, flags, start, b.p.operands.len - start, targets, b.p.targets.len - targets}
+	return IRTypedInstruction{status: .decoded, result_type: result, opcode: opcode, flags: flags, operands_start: start, operands_count: b.p.operands.len - start, targets_start: targets, targets_count: b.p.targets.len - targets}
 }
 
 // Partial typed core: opaque/deferred instructions are explicit, and complete()
 // must succeed before a consumer treats a function as fully decoded. No execution.
 pub fn (ir IRModule) typed_operands(stream Stream, pools IRConstantPools, bodies IRFunctionBodies) !IRTypedProgram {
-	mut b := OperandBuilder{ir: ir, pools: pools, bodies: bodies, p: IRTypedProgram{instructions: []IRTypedInstruction{len: bodies.instructions.len}, references: ir.references.clone()}}
+	mut b := OperandBuilder{ir: ir, pools: pools, bodies: bodies, alloc_space: operand_alloc_space(ir.data_layout)!, p: IRTypedProgram{instructions: []IRTypedInstruction{len: bodies.instructions.len}, references: ir.references.clone()}}
 	b.p.types.flags |= .noslices; b.p.operands.flags |= .noslices; b.p.targets.flags |= .noslices; b.p.references.flags |= .noslices
+	b.p.indices.flags |= .noslices
 	mut keep := false
-	defer { unsafe { b.vectors.free() }; if !keep { b.p.free() } }
+	defer { unsafe { b.vectors.free(); b.pointers.free() }; if !keep { b.p.free() } }
 	// Borrow original type-name strings without a derived deep clone.
 	unsafe { b.p.types.push_many(ir.types.data, ir.types.len) }
+	mut has_typed_pointer := false
+	mut has_opaque_pointer := false
 	for i, typ in ir.types {
 		if typ.kind == .integer_t && typ.bits == 1 { b.boolean = i }
 		if typ.kind == .vector_t { b.vectors[(typ.count << 21) | (u64(ir.references[typ.refs_start]) << 1) | u64(typ.scalable)] = i }
+		if typ.kind == .pointer_t { b.pointers[(u64(typ.address_space) << 20) | (if typ.refs_count == 0 { u64(0) } else { u64(ir.references[typ.refs_start] + 1) })] = i }
+		if typ.kind == .pointer_t { if typ.refs_count == 0 { has_opaque_pointer = true } else { has_typed_pointer = true } }
 	}
+	b.opaque_allocas = has_opaque_pointer || !has_typed_pointer
+	b.mixed_pointers = has_opaque_pointer && has_typed_pointer
 	if b.boolean < 0 { b.boolean = b.p.types.len; b.p.types << IRType{kind: .integer_t, bits: 1} }
 	// Explicit definitions seed types independently of producer order.
 	for i, inst in bodies.instructions {
@@ -291,13 +310,20 @@ pub fn (ir IRModule) typed_operands(stream Stream, pools IRConstantPools, bodies
 			if cursor >= values.len { return error('AIR operands: cast destination missing') }
 			typ = b.type_id(values[cursor])!
 		}
+		if record.code == 19 { _, typ = b.alloca_types(values)! }
+		if record.code == 20 {
+			if values.len == 0 { return error('AIR operands: empty load') }
+			number := operand_number(inst, values[0], false)!
+			cursor := if number >= inst.next_value { 2 } else { 1 }
+			if values.len == cursor + 3 { typ = b.type_id(values[cursor])! }
+		}
 		b.p.instructions[i] = IRTypedInstruction{result_type: typ}
 	}
 	for i, inst in bodies.instructions {
 		record := stream.records[inst.record]
-		start := b.p.operands.len; target_start := b.p.targets.len
+		start := b.p.operands.len; target_start := b.p.targets.len; index_start := b.p.indices.len
 		op := b.decode(inst, record.code, ir_values(stream, record), b.p.instructions[i].result_type)!
-		if op.status != .decoded { b.p.operands.trim(start); b.p.targets.trim(target_start) }
+		if op.status != .decoded { b.p.operands.trim(start); b.p.targets.trim(target_start); b.p.indices.trim(index_start) }
 		b.p.instructions[i] = op
 	}
 	// Resolve forward type claims only after all supported definitions have types.
