@@ -7,7 +7,7 @@ pub:
 	bits u32
 	value u64 // Ignored when poison is true.
 	poison bool
-	steps int
+	steps int // Visited instructions plus switch case comparisons.
 }
 struct IntegerValue { value u64 poison bool }
 struct IntegerProfile {
@@ -134,6 +134,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunct
 				16 { if phis != index - block.first || op.operands_count == 0 || op.targets_count != op.operands_count { return error('AIR integer: PHI grouping/arity') }; phis++ }
 				10 { if op.operands_count != 1 || p.integer_bits(p.operands[op.operands_start].type_index)! != return_bits { return error('AIR integer: return type') } }
 				11 { if !((op.operands_count == 0 && op.targets_count == 1) || (op.operands_count == 1 && op.targets_count == 2)) { return error('AIR integer: branch arity') } }
+				12 { if op.operands_count < 1 || op.targets_count != op.operands_count { return error('AIR integer: switch arity') } }
 				15 { if op.operands_count != 0 { return error('AIR integer: unreachable arity') } }
 				else { return error('AIR integer: instruction outside execution profile') }
 			}
@@ -232,6 +233,19 @@ pub fn (p IRTypedProgram) run_integer_function(ir IRModule, stream Stream, pools
 					mut target := 0
 					if op.operands_count == 1 { condition := m.read(start)!; if condition.poison { return error('AIR integer: poison branch condition') }; target = if condition.value & 1 != 0 { 0 } else { 1 } }
 					next = p.targets[op.targets_start + target]; break
+				}
+				12 {
+					condition := m.read(start)!
+					if condition.poison { return error('AIR integer: poison switch condition') }
+					next = p.targets[op.targets_start]
+					for i in 1 .. op.operands_count {
+						// Charge each comparison as well as the switch instruction.
+						m.step()!
+						candidate := m.read(start + i)!
+						if candidate.poison { return error('AIR integer: poison switch case') }
+						if condition.value == candidate.value { next = p.targets[op.targets_start + i]; break }
+					}
+					break
 				}
 				15 { return error('AIR integer: reached unreachable') }
 				else { return error('AIR integer: invalid executed instruction') }

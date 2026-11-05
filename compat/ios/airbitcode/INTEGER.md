@@ -17,14 +17,14 @@ Result bits must not be consumed when `poison` is true.
 
 The interpreter supports integer add/sub/mul, unsigned/signed division
 and remainder, shifts, and/or/xor, all ten integer comparisons, trunc/zext/sext,
-scalar select, direct branches, PHIs and return. It rejects opaque/deferred
+scalar select, direct branches/switches, PHIs and return. It rejects opaque/deferred
 instructions and other instruction families, even in unvisited blocks. It checks
 `nuw`/`nsw` on add/sub/mul/shl and `exact` on udiv/sdiv/lshr/ashr. Flags use
 their serialized, family-specific bit positions. Unknown bits, wrong-family
 flags, disjoint/samesign and cast flags reject; they are not silently ignored.
 Function attributes are rejected rather than assuming their boundary semantics.
-Floating point, vectors, pointers,
-memory operations, calls, switch and freeze are outside this profile.
+Floating point, vectors, pointers, memory operations, calls and freeze are
+outside this profile.
 
 Arithmetic uses explicit unsigned bit patterns to avoid host signed-overflow
 behavior. Flag-free arithmetic wraps at its declared width. `nuw`/`nsw` overflow
@@ -48,8 +48,19 @@ remain scoped; arguments/constants use the existing pools and results occupy
 function-local slots. An unavailable result read, missing PHI predecessor,
 executed unreachable or block without a control transfer errors.
 
+Switches compare masked i1..i64 bit patterns in decoded table order, stopping
+at the first matching case or taking the default after the full scan. The
+existing decoder validates literal cases, uniqueness, absolute case IDs and
+function-local destinations. Shared destinations preserve the actual predecessor
+for PHIs, including duplicate edges with identical incoming values. Empty
+tables still evaluate their condition. Poison/undef conditions error. Wider
+integers and the reverted legacy range encoding remain outside execution.
+
 The caller supplies a positive step limit up to 1,000,000. Every visited
-instruction, including PHIs, branches and return, consumes one step. Exhaustion
+instruction, including PHIs, branches and return, consumes one step. Every
+tested switch case consumes an additional step, bounding scans and repeated
+dispatch within the same budget. An empty table adds no case-comparison steps.
+`IRIntegerRun.steps` reports this combined count. Exhaustion
 returns an error and releases all execution arrays. No partial mutable state
 escapes. Each run borrows its inputs and owns three temporary arrays: result
 slots, known-slot flags and pending PHIs. Pending capacity is the maximum PHI
@@ -69,6 +80,9 @@ return, unsupported flags/attributes and narrow argument/return masking. It also
 compares 1,397,052 exhaustive i1..i8 flagged operations against widened arithmetic,
 checks 28 i64 limits and rejects unknown/wrong-family masks. Decoded-instruction
 tests verify a flagged defined result, poison return and precise budget.
+Switch tests cover first/middle/last matches, high-bit and zero cases, shared
+destinations, default and empty tables, precise comparison/return budgets,
+invalid conditions and bounded matched/default self-loops.
 
 `tests/ios/air-integer-flags.v self-test LLVM_AS FRESH_EXTERNAL_DIR` generates
 five bounded fixture modules, one per i1/i8/i16/i32/i64 width. Its 10,240 functions
@@ -88,12 +102,16 @@ instructions directly cannot establish an exact poison oracle: LLVM may legally
 `tests/ios/air-integer-execute.v self-test LLVM_AS FRESH_EXTERNAL_DIR` generates
 portable LLVM fixture IR in V and assembles it independently. LLVM verifies the
 fixture, then MCJIT compiles reference functions for the host. The tool executes
-122 scalar functions for 128 input triples each and compares 15,616 interpreter
-results with actual native reference calls. These cover i1/i8/i16/i32/i64,
+134 scalar functions and compares 17,280 interpreter results with actual native
+reference calls. These cover i1/i8/i16/i32/i64,
 arithmetic, predicates, casts, a branch diamond, select and a loop whose PHIs
-swap values simultaneously. Division and shift inputs avoid undefined reference
-executions. Nine guarded cases and two poison-return cases run only in the V
-interpreter; their undefined/poison results are not compared with native bits.
+swap values simultaneously. Switches cover nine widths including i2/i7/i31/i63,
+shared PHI edges, empty tables, loop dispatch and every key in a dense 256-case
+table. High input bits exercise truncation, and dense scans check exact budget
+accounting. Division and shift inputs avoid undefined reference executions.
+Twelve guarded cases and two poison-return cases run only in the V interpreter;
+their undefined/poison results are not compared with native bits. A separate
+test requires dense-scan budget exhaustion.
 Four corrupted result controls must reject. Results and step counts are retained
 in `comparisons.tsv`, alongside source, bitcode, assembler status and JIT target.
 
@@ -109,5 +127,6 @@ floating-point/vector execution, resource/pipeline objects and presentation
 remain separate backend work. The default Metal device remains unavailable.
 
 References: [LLVM integer semantics and poison](https://llvm.org/docs/LangRef.html),
-[PHI semantics](https://llvm.org/docs/LangRef.html#phi-instruction) and
+[PHI semantics](https://llvm.org/docs/LangRef.html#phi-instruction),
+[switch semantics](https://llvm.org/docs/LangRef.html#switch-instruction) and
 [LLVM execution-engine C API](https://llvm.org/doxygen/group__LLVMCExecutionEngine.html).

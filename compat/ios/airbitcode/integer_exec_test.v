@@ -183,3 +183,47 @@ fn test_integer_flags_wide_limits_and_instruction_integration() {
 	if _ := f.run([u64(1), 2], 1) { assert false, 'flagged instruction budget' }
 	println('AIR-INTEGER-FLAGS-WIDE: 28 i64 limits, unknown/wrong-family masks, poison propagation and decoded-instruction/budget integration PASS')
 }
+fn integer_switch_fixture() IntegerFixture {
+	mut f := integer_fixture()
+	f.constants.flags |= .noslices; f.words.flags |= .noslices
+	f.constants << IRConstant{kind: .integer, type_index: 0, bits: 64, scope: 1, number: 4, words_start: 1, words_count: 1}
+	f.constants << IRConstant{kind: .zero, type_index: 0, bits: 64, scope: 1, number: 5}
+	f.words << ~u64(0)
+	f.scopes[1] = IRConstantScope{...f.scopes[1], count: 3}
+	f.functions[0] = IRFunction{...f.functions[0], basic_blocks: 4}
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(4)])
+	// Argument %1 is relative; case IDs %3/%4/%5 are absolute. Shared targets.
+	f.add(12, [u64(0), 5, 3, 3, 1, 4, 2, 5, 2])
+	f.add(10, [u64(4)]); f.add(10, [u64(3)]); f.add(10, [u64(5)])
+	return f
+}
+fn test_integer_switch_cases_default_and_precise_budget() {
+	f := integer_switch_fixture(); defer { f.free() }
+	first := f.run([u64(1), 99], 3)!; second := f.run([~u64(0), 99], 4)!
+	third := f.run([u64(0), 99], 5)!; fallback := f.run([u64(2), 99], 5)!
+	assert first.value == 99 && first.steps == 3 && second.value == 1 && second.steps == 4
+	assert third.value == 1 && third.steps == 5 && fallback.value == 2 && fallback.steps == 5
+	if _ := f.run([u64(1), 99], 2) { assert false, 'switch budget must include return' }
+	if _ := f.run([u64(0), 99], 4) { assert false, 'switch budget must include comparisons' }
+	if _ := f.run([u64(2), 99], 4) { assert false, 'default scan budget' }
+	println('AIR-INTEGER-SWITCH: first/middle/last/zero/high-bit cases, shared destinations, default and precise comparison/return budgets PASS')
+}
+fn test_integer_switch_empty_poison_undef_and_loop_guards() {
+	mut f := integer_switch_fixture(); defer { f.free() }
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(4)])
+	f.add(12, [u64(0), 5, 3]); f.add(10, [u64(4)]); f.add(10, [u64(3)]); f.add(10, [u64(5)])
+	result := f.run([u64(123), 99], 2)!
+	assert result.value == 123 && result.steps == 2
+	// Even an empty table must evaluate its condition rather than jump blindly.
+	f.values[f.records[2].values_start + 1] = 3
+	for kind in [IRConstantKind.poison, .undef]! {
+		f.constants[0] = IRConstant{...f.constants[0], kind: kind}
+		if _ := f.run([u64(1), 2], 8) { assert false, 'invalid switch condition accepted' }
+	}
+	f.constants[0] = IRConstant{...f.constants[0], kind: .integer}
+	f.functions[0] = IRFunction{...f.functions[0], basic_blocks: 1}
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(12, [u64(0), 5, 0, 3, 0])
+	if _ := f.run([u64(1), 2], 63) { assert false, 'matched switch loop budget' }
+	if _ := f.run([u64(7), 2], 64) { assert false, 'default switch loop budget' }
+	println('AIR-INTEGER-SWITCH-GUARDS: empty-table condition evaluation, poison/undef rejection and bounded matched/default self-loops PASS')
+}
