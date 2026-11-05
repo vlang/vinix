@@ -9,6 +9,7 @@ import json2
 import os
 import perfconsole
 import perfrunner
+import perfproducer
 
 struct Prepared {
 	arch string = 'aarch64'
@@ -132,6 +133,7 @@ fn compile_command(cc string, linker string, sysroot string, gcc string, source 
 	lib := sysroot + '/usr/lib'
 	mut argv := [cc, '--no-default-config', '--target=aarch64-linux-musl', '-static', '-nostdinc', '-nostdlib',
 		'-isystem', gcc + '/include', '-isystem', sysroot + '/usr/include', '-O2', '-Wall',
+		'-Werror=incompatible-pointer-types', '-Werror=format',
 		'-D_GNU_SOURCE', '-fno-stack-protector', lib + '/crt1.o', lib + '/crti.o', gcc + '/crtbeginT.o', source,
 		'-L' + lib, '-L' + gcc]
 	if init { argv << ['-lm', '-lpthread'] }
@@ -228,7 +230,8 @@ fn prepare(args []string, stage bool) ! {
 		'-d', 'no_segfault_handler', '-o', c_file, root + '/tests/desktop-perf/arm-init'], state, 'init-v')!
 	tool(compile_command(cc, linker, sysroot, gcc, c_file, init, true), state, 'init-link')!
 	perf := state + '/rootfs/opt/vinix-perf'
-	tool(compile_command(cc, linker, sysroot, gcc, root + '/tests/desktop-perf/measure.c', perf + '/measure', false), state, 'measure-link')!
+	measure_c := perfproducer.generate(compiler, root, state + '/guest', 'aarch64')!
+	tool(compile_command(cc, linker, sysroot, gcc, measure_c, perf + '/measure', true), state, 'measure-link')!
 	for path in [init, perf + '/measure'] {
 		elf(path)!
 		tool([readelf, '-h', '-l', '-d', path], state, if path == init { 'init-elf' } else { 'measure-elf' })!
@@ -260,7 +263,8 @@ fn finish_prepare(root string, base string, kernel string, state string, argumen
 	os.write_file(state + '/root.ext2', '')!; os.truncate(state + '/root.ext2', u64(256) << 20)!
 	tool([mkfs, '-q', '-F', '-t', 'ext2', '-b', '4096', '-I', '128', '-O',
 		'filetype,sparse_super,^has_journal,^resize_inode,^dir_index,^extent,^64bit,^metadata_csum', state + '/root.ext2'], state, 'ext2')!
-	for path in [c_file, init, perf + '/measure', archive, image, state + '/vars.fd', state + '/root.ext2', state + '/limine.conf',
+	for path in [c_file, init, perf + '/measure', state + '/guest/measure-v.c', state + '/guest/measure-legacy.c',
+		state + '/guest/measure-combined.c', archive, image, state + '/vars.fd', state + '/root.ext2', state + '/limine.conf',
 		state + '/base-before.tsv', state + '/sysroot-before.tsv'] { pin(mut pins, path)! }
 	sources := pins.keys().filter(it.starts_with(root + '/') && (it.ends_with('.v') || it.ends_with('.c') || it.ends_with('.h') || it.ends_with('.sh')))
 	for path in sources {

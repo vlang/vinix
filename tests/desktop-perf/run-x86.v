@@ -9,6 +9,7 @@ import json2
 import os
 import perfconsole
 import perfrunner
+import perfproducer
 import plainiso
 
 $if macos {
@@ -27,6 +28,59 @@ struct Prepared {
 	base_manifest   string
 	staged_manifest string
 	storage         string
+	sysroot         string
+	sysroot_manifest string
+	gcc             string
+	gcc_manifest    string
+}
+
+struct GuestTools {
+	sysroot string
+	gcc string
+	linker string
+}
+
+fn guest_tools() !GuestTools {
+	return guest_tools_values(os.getenv('VINIX_PERF_X86_SYSROOT'),
+		os.getenv('VINIX_PERF_X86_GCC'), os.getenv('VINIX_PERF_X86_LINKER'))!
+}
+
+fn guest_tools_values(sysroot string, gcc string, linker string) !GuestTools {
+	for path in [sysroot, gcc] {
+		if path == '' || path != os.real_path(path) || !os.is_dir(path) {
+			return error('canonical selected x86 build directory required')
+		}
+	}
+	if !linker.starts_with('/') || os.file_name(linker) != 'ld.lld'
+		|| !os.is_executable(linker) || !os.is_file(os.real_path(linker)) {
+		return error('absolute selected x86 ld.lld driver required')
+	}
+	return GuestTools{sysroot, gcc, linker}
+}
+
+fn guest_link_command(cc string, tools GuestTools, source string, output string) []string {
+	lib := tools.sysroot + '/lib'
+	return [cc, '--no-default-config', '--target=x86_64-linux-musl', '-static', '-nostdinc', '-nostdlib',
+		'-isystem', tools.gcc + '/include', '-isystem', tools.gcc + '/include-fixed',
+		'-isystem', tools.sysroot + '/include', '-O2', '-Wall',
+		'-Werror=incompatible-pointer-types', '-Werror=format', '-D_GNU_SOURCE', '-fno-stack-protector',
+		lib + '/crt1.o', lib + '/crti.o', tools.gcc + '/crtbeginT.o', source, '-L' + lib, '-L' + tools.gcc,
+		'-lm', '-lpthread', '-lc', '-lgcc', '-lgcc_eh', tools.gcc + '/crtend.o', lib + '/crtn.o',
+		'-fuse-ld=' + tools.linker, '-o', output]
+}
+
+fn guest_tool(argv []string, directory string, name string) ! {
+	os.write_file(directory + '/' + name + '-argv.json', json2.encode(argv) + '\n')!
+	hwhost.run_tool(argv, {}, directory + '/' + name + '.log', 300)!
+}
+
+fn guest_elf(readelf string, path string, directory string, name string) ! {
+	elf(path)!
+	guest_tool([readelf, '-h', '-l', '-d', path], directory, name + '-elf')!
+	text := os.read_file(directory + '/' + name + '-elf.log')!
+	if text.contains('INTERP') || text.contains('NEEDED') {
+		return error('x86 guest ELF requires an interpreter or shared library')
+	}
 }
 
 fn serial_console_arguments() []string {
@@ -275,6 +329,15 @@ fn source_inputs(root string, mut pins map[string]string) ! {
 }
 
 fn verify(p Prepared, state string) ! {
+	if p.sysroot != '' || p.gcc != '' {
+		if p.sysroot != os.real_path(p.sysroot) || p.gcc != os.real_path(p.gcc)
+			|| digest(state + '/sysroot-before.tsv')! != p.sysroot_manifest
+			|| digest(state + '/gcc-before.tsv')! != p.gcc_manifest
+			|| os.read_file(state + '/sysroot-before.tsv')! != inventory(p.sysroot, '')! + '\n'
+			|| os.read_file(state + '/gcc-before.tsv')! != inventory(p.gcc, '')! + '\n' {
+			return error('selected x86 sysroot or GCC tree changed')
+		}
+	}
 	for path, expected in p.inputs {
 		if digest(path)! != expected { return error('input changed: ' + path) }
 	}
@@ -349,7 +412,16 @@ fn prepare(args []string, stage bool) ! {
 		firmware: os.real_path(found.firmware)
 	}
 	tools := plainiso.inputs(root)!
-	cc := os.find_abs_path_of_executable(os.getenv_opt('CC_AMD64') or { 'x86_64-linux-musl-gcc' })!
+	cc := os.getenv('CC_AMD64')
+	if cc == '' || !os.is_abs_path(cc) || cc != os.real_path(cc) || !os.is_executable(cc)
+		|| !(os.file_name(cc) == 'clang' || os.file_name(cc).starts_with('clang-')) {
+		return error('CC_AMD64 requires an explicitly selected canonical Clang executable')
+	}
+	guest := guest_tools()!
+	for input in [guest.sysroot, guest.gcc] {
+		output := destination_path(state)!
+		if inside(output, input) || inside(input, output) { return error('state overlaps selected x86 build tree') }
+	}
 	readelf := os.find_abs_path_of_executable(os.getenv_opt('VINIX_PERF_READELF') or { 'llvm-readelf' })!
 	mkfs := os.find_abs_path_of_executable(os.getenv_opt('VINIX_PERF_MKFS') or { 'mkfs.ext2' })!
 	mut pins := map[string]string{}
@@ -358,6 +430,7 @@ fn prepare(args []string, stage bool) ! {
 		os.find_abs_path_of_executable('cp')!, os.find_abs_path_of_executable('tar')!] {
 		pin(mut pins, path)!
 	}
+	pin(mut pins, guest.linker)!
 	for _, path in tools { pin(mut pins, path)! }
 	elf(kernel)!
 	mut programs := []string{}
@@ -384,6 +457,8 @@ fn prepare(args []string, stage bool) ! {
 		time_as_unix:   true
 	) + '\n')!
 	os.write_file(state + '/base-before.tsv', base_manifest)!
+	os.write_file(state + '/sysroot-before.tsv', inventory(guest.sysroot, '')! + '\n')!
+	os.write_file(state + '/gcc-before.tsv', inventory(guest.gcc, '')! + '\n')!
 	if clone {
 		clone_tree(base, state + '/rootfs')!
 	} else {
@@ -401,15 +476,25 @@ fn prepare(args []string, stage bool) ! {
 		if os.exists(path) || os.is_link(path) { os.rm(path)! }
 		os.symlink('/bin/busybox', path)!
 	}
-	init := hwhost.build_program(host, root + '/tests/desktop-perf/x86-init', state + '/guest', 'init', [])!
+	os.mkdir_all(state + '/guest')!
+	init := state + '/guest/init'
+	init_c := state + '/guest/init.c'
+	guest_tool([host.v, '-nocache', '-os', 'linux', '-arch', 'amd64', '-gc', 'none',
+		'-d', 'no_backtrace', '-d', 'no_segfault_handler', '-o', init_c,
+		root + '/tests/desktop-perf/x86-init'], state + '/guest', 'init-v')!
+	guest_tool(guest_link_command(cc, guest, init_c, init), state + '/guest', 'init-link')!
 	os.rm(state + '/rootfs/sbin/init') or {}
 	os.cp(init, state + '/rootfs/sbin/init')!
 	os.chmod(state + '/rootfs/sbin/init', 0o755)!
 	perf := state + '/rootfs/opt/vinix-perf'
 	os.mkdir_all(perf)!
-	hwhost.run_tool([cc, '-static', '-O2', '-Wall', root + '/tests/desktop-perf/measure.c', '-o',
-		perf + '/measure'], {}, state + '/measure-build.log', 300)!
-	for path in [init, state + '/guest/init.c', perf + '/measure'] { pins[path] = digest(path)! }
+	measure_c := perfproducer.generate(host.v, root, state + '/guest', 'x86_64')!
+	guest_tool(guest_link_command(cc, guest, measure_c, perf + '/measure'),
+		state + '/guest', 'measure-link')!
+	guest_elf(readelf, init, state + '/guest', 'init')!
+	guest_elf(readelf, perf + '/measure', state + '/guest', 'measure')!
+	for path in [init, state + '/guest/init.c', perf + '/measure', state + '/guest/measure-v.c',
+		state + '/guest/measure-legacy.c', state + '/guest/measure-combined.c'] { pins[path] = digest(path)! }
 	for build in plan.builds { stage_file(build.binary, perf + '/vinix-desktop-' + build.name, clone)! }
 	os.cp(root + '/tests/desktop-perf/perf-init.sh', perf + '/perf-init.sh')!
 	os.write_file(perf + '/config', "VARIANTS='" + plan.builds.map(it.name).join(' ') + "'\nSCENARIOS='" + plan.scenarios.join(' ') + "'\nROUNDS=${plan.rounds}\nSETTLE=${plan.settle}\nMEASURE=${plan.seconds}\nDESKTOP_ARGS='" + plan.desktop_args + "'\n")!
@@ -439,7 +524,8 @@ fn prepare(args []string, stage bool) ! {
 		'usb-tablet,bus=gui-input.0', '-m', plan.mem.str(), '-smp', '2', ...media, '-display',
 		'none', ...console, '-qmp', 'unix:' + socket + ',server=on,wait=off', '-no-reboot',
 		'-nic', 'none', '-drive', 'if=ide,format=raw,file=' + state + '/root.ext2']
-	for path in [archive, state + '/test.iso', state + '/root.ext2'] { pins[path] = digest(path)! }
+	for path in [archive, state + '/test.iso', state + '/root.ext2', state + '/sysroot-before.tsv',
+		state + '/gcc-before.tsv'] { pins[path] = digest(path)! }
 	// Preserve the actual maintained adapter and unchanged supervisor/workloads.
 	sources := pins.keys().filter(it.starts_with(root + '/')
 		&& (it.ends_with('.v') || it.ends_with('.c') || it.ends_with('.h') || it.ends_with('.sh')))
@@ -450,7 +536,11 @@ fn prepare(args []string, stage bool) ! {
 		pins[destination] = digest(destination)!
 	}
 	os.write_file(state + '/staged-before.tsv', inventory(state + '/rootfs', '')! + '\n')!
-	p := Prepared{root, base, arguments, command, socket, pins, digest(state + '/base-before.tsv')!, digest(state + '/staged-before.tsv')!, if clone { 'apfs-clone' } else { 'copy' }}
+	p := Prepared{root: root, base: base, arguments: arguments, command: command, socket: socket,
+		inputs: pins, base_manifest: digest(state + '/base-before.tsv')!,
+		staged_manifest: digest(state + '/staged-before.tsv')!, storage: if clone { 'apfs-clone' } else { 'copy' },
+		sysroot: guest.sysroot, sysroot_manifest: digest(state + '/sysroot-before.tsv')!,
+		gcc: guest.gcc, gcc_manifest: digest(state + '/gcc-before.tsv')!}
 	verify(p, state)!
 	os.write_file(state + '/prepared.json', json2.encode(p,
 		escape_unicode: true
@@ -488,6 +578,7 @@ fn run(state string, expected string) !int {
 fn selfcheck(state string) ! {
 	if os.exists(state) || os.is_link(state) { return error('selfcheck state must be fresh') }
 	os.mkdir_all(state + '/base/bin')!
+	guest_link_controls(state)!
 	os.mkdir_all(state + '/rootfs')!
 	os.write_file(state + '/base/bin/busybox', 'runtime')!
 	os.symlink('/bin/busybox', state + '/base/bin/sh')!
@@ -600,8 +691,33 @@ fn selfcheck(state string) ! {
 		return error('invalid base pin option accepted')
 	}
 	if os.exists(state + '/never') || os.is_link(state + '/never') { return error('base admission created staging') }
-	os.write_file(state + '/result', 'PASS 32 checks including 19 refusals: final/intermediate absolute and relative guest links, escape/cycle/referral/link/staged mutations, streaming digest, restore, geometry, production disk boot arguments, foreground serial monitor escape, timeout/memory/scenario/quote controls, host-tool symlink retarget, optional/matching/mismatched/malformed/duplicate base manifest pin before staging\n')!
-	println('PERF X86 SELFCHECK PASS 32 checks including 19 refusals')
+	os.write_file(state + '/result', 'PASS 37 checks including 22 refusals: explicit strict Clang/musl argv and selected-tree admission; final/intermediate absolute and relative guest links, escape/cycle/referral/link/staged mutations, streaming digest, restore, geometry, production disk boot arguments, foreground serial monitor escape, timeout/memory/scenario/quote controls, host-tool symlink retarget, optional/matching/mismatched/malformed/duplicate base manifest pin before staging\n')!
+	println('PERF X86 SELFCHECK PASS 37 checks including 22 refusals')
+}
+
+fn guest_link_controls(state string) ! {
+	tools := GuestTools{'/sysroot', '/gcc', '/ld.lld'}
+	actual := guest_link_command('/clang', tools, '/source', '/program')
+	expected := ['/clang', '--no-default-config', '--target=x86_64-linux-musl', '-static', '-nostdinc', '-nostdlib',
+		'-isystem', '/gcc/include', '-isystem', '/gcc/include-fixed', '-isystem', '/sysroot/include', '-O2', '-Wall',
+		'-Werror=incompatible-pointer-types', '-Werror=format', '-D_GNU_SOURCE', '-fno-stack-protector',
+		'/sysroot/lib/crt1.o', '/sysroot/lib/crti.o', '/gcc/crtbeginT.o', '/source', '-L/sysroot/lib', '-L/gcc',
+		'-lm', '-lpthread', '-lc', '-lgcc', '-lgcc_eh', '/gcc/crtend.o', '/sysroot/lib/crtn.o', '-fuse-ld=/ld.lld', '-o', '/program']
+	if actual != expected { return error('explicit x86 Clang/musl link argv differs') }
+	os.mkdir(state + '/sysroot')!; os.mkdir(state + '/gcc')!
+	os.write_file(state + '/ld.lld', '')!; os.chmod(state + '/ld.lld', 0o755)!
+	_ := guest_tools_values(state + '/sysroot', state + '/gcc', state + '/ld.lld')!
+	os.symlink('sysroot', state + '/sysroot-alias')!
+	for triple in [[state + '/sysroot-alias', state + '/gcc', state + '/ld.lld'],
+		[state + '/sysroot', state + '/missing-gcc', state + '/ld.lld'],
+		[state + '/sysroot', state + '/gcc', state + '/not-an-ld-driver']] {
+		mut refused := ''
+		guest_tools_values(triple[0], triple[1], triple[2]) or { refused = err.msg(); GuestTools{} }
+		expected_error := if triple[2].ends_with('/not-an-ld-driver') {
+			'absolute selected x86 ld.lld driver required'
+		} else { 'canonical selected x86 build directory required' }
+		if refused != expected_error { return error('selected x86 tool refusal differs: ' + refused) }
+	}
 }
 
 fn clonecheck(state string) ! {
