@@ -44,6 +44,27 @@ for `-new-compiler`, line 414 checks the explicit refusal markers, and line 1332
 starts the compatibility-install path. This source inspection is separate from
 proof of the binary's full build provenance.
 
+Read-only follow-up matched the private tree's `vlib/v/driver/driver.v`
+(`7112d951708a9114b0e35c6045b87ff991eb85104740db6249c109f84c29cade`)
+and `vlib/v/pref/pref.v`
+(`7d7112feaa2ed7bb0ca1f07a7183d9fbac5f44dc2ba7edc1c82a11b1bfed2779`)
+to the same fd996 Git source. Pref lines 350–354 default to baked `@VMODROOT`.
+Driver lines 11968–11975 select `embedded_vroot` only when the caller-presence
+markers pass pref lines 279–282. Otherwise, `resolve_vroot_for_input` at 20259
+searches the input/cwd and then retains the initial baked root. The embedded
+branch at 20272 instead accepts the VEXE parent when it has `vlib/builtin`
+(20316). The failed invocation omitted those markers. Both retained qualified
+owner C files instead contain the private ff75 tzdata path and `i32 cstatus`,
+and their recorded environment includes the caller markers. This supports the
+resolution diagnosis; no corrected invocation was executed. GNUmakefile is a
+requirement of the launcher's fallback installer, not of this driver vlib test.
+
+The existing precision compiler `53debcfe...ec7e` has the same driver source.
+Its retained compiler C and qualified heap-check C contain its private toolchain
+root, and its qualification environment includes the caller/refusal markers.
+Those retained observations offer a possible future input choice, not proof
+that swapping binaries alone fixes this invocation or permits another run.
+
 An initial in-progress measurement of 148,196 KiB was superseded by the
 post-termination measurement of **369,712 KiB allocated / 302,597 KiB apparent**
 for H. It is an actual allowance breach. The compiler's private fallback HOME
