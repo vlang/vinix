@@ -173,6 +173,7 @@ pub fn initialise() {
 	filesystems['procfs'] = &ProcFS{}
 	filesystems['sysfs'] = &SysFS{}
 	filesystems['cgroup2'] = &CGroupFS{}
+	filesystems['9p'] = &NinePFS{}
 	init_mount_tables()
 }
 
