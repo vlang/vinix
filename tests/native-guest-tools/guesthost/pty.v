@@ -28,6 +28,8 @@ mut:
 	revents i16
 }
 
+struct C.sockaddr {}
+
 struct C.sockaddr_un {
 mut:
 	sun_len    u8
@@ -40,7 +42,7 @@ fn C.execve(&char, &&char, &&char) i32
 fn C.killpg(i32, i32) i32
 fn C.poll(&C.pollfd, usize, i32) i32
 fn C.socket(i32, i32, i32) i32
-fn C.connect(i32, voidptr, u32) i32
+fn C.connect(i32, &C.sockaddr, u32) i32
 fn C.getsockopt(i32, i32, i32, voidptr, &u32) i32
 fn C.send(i32, voidptr, usize, i32) i32
 fn C.recv(i32, voidptr, usize, i32) i32
@@ -214,7 +216,7 @@ fn quit_monitor(path string) ! {
 	if fd < 0 { return posix_error() }
 	defer { C.close(fd) }
 	if C.fcntl(fd, C.F_SETFL, C.O_NONBLOCK) < 0 { return posix_error() }
-	if C.connect(fd, &address, u32(sizeof(C.sockaddr_un))) < 0 {
+	if C.connect(fd, unsafe { &C.sockaddr(&address) }, u32(sizeof(C.sockaddr_un))) < 0 {
 		if C.errno !in [C.EINPROGRESS, C.EAGAIN] { return posix_error() }
 		if !ready(fd, true, now() + 1)! { return error('QMP connect timed out') }
 		mut failure := i32(0)

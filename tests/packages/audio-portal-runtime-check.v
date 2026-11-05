@@ -185,11 +185,17 @@ fn publisher(root string, host hwhost.Host, out string) !string {
 	return key
 }
 
-fn sandbox_build(root string, host hwhost.Host, out string, compiler string) !string {
+fn sandbox_build(root string, host hwhost.Host, out string, compiler string, host_cc string) !string {
 	directory := out + '/sandbox-build'
 	os.mkdir_all(directory)!
 	source := directory + '/sandbox.c'
-	invoke([root + '/build-support/security-tools/compile-v-core', 'sandbox', source,
+	generator := directory + '/security-compiler'
+	build := audioinputs.sandbox_generator_arguments(root, host.v, host_cc, generator)!
+	environment := audioinputs.sandbox_generator_environment()
+	os.write_file(directory + '/generator-arguments.json', json2.encode(build) + '\n')!
+	os.write_file(directory + '/generator-environment.json', json2.encode(environment) + '\n')!
+	hwhost.run_tool(build, environment, directory + '/generator-build.log', 300)!
+	invoke([generator, 'security-compile', 'sandbox', source,
 		'--arch', if host.arch == 'aarch64' { 'arm64' } else { 'amd64' }], directory + '/generate.log')!
 	mut args := [compiler]
 	if host.arch == 'aarch64' {
@@ -362,7 +368,11 @@ fn prepare_check(options hwhost.Options, root string, out string, before map[str
 		retain_tree(kernel_evidence, 'kernel-evidence', out, [], mut paths, mut originals)!
 		paths['kernel-seal'] = out + '/inputs/kernel-evidence/kernel-seal.json'
 	}
-	sandbox := sandbox_build(root, host, out, frozen_cc)!
+	host_cc := originals['adapter-host-cc']
+	if host_cc == '' || digest(host_cc)! != digest(paths['adapter-host-cc'])! {
+		return error('sandbox generator host compiler differs from captured adapter input')
+	}
+	sandbox := sandbox_build(root, host, out, frozen_cc, host_cc)!
 	key := publisher(root, host, out)!
 	suite := audio_suite(root, out, host.arch, sandbox, key)!
 	extras := hwhost.build_extras(host, suite, out + '/tools')!
@@ -371,6 +381,12 @@ fn prepare_check(options hwhost.Options, root string, out string, before map[str
 	paths['tone'] = out + '/tone-build/tone'
 	paths['sandbox'] = sandbox
 	paths['sandbox-c'] = out + '/sandbox-build/sandbox.c'
+	for name, relative in {'sandbox-generator': 'security-compiler',
+		'sandbox-generator-c': 'security-compiler.c', 'sandbox-generator-build': 'generator-build.log',
+		'sandbox-generator-arguments': 'generator-arguments.json',
+		'sandbox-generator-environment': 'generator-environment.json'} {
+		paths[name] = out + '/sandbox-build/' + relative
+	}
 	for index, name in ['package-cli', 'account-cli', 'session-cli', 'authd'] {
 		paths[name] = out + '/tools/program-${index}/' + os.file_name(suite.programs[index].path)
 	}
