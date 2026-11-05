@@ -64,8 +64,12 @@ charged roots. The 1,078 child/cleanup samples had maximum start gap
 1.892540667 seconds and complete window 1.868043208 seconds. Cleanup reports
 ECHILD; child status remains explicitly unavailable after observer refusal.
 Fresh direct PID/PGID probes confirmed owned QEMU 51656 absent; the frame QEMU
-87581 was also independently confirmed absent. Unrelated guests were retained.
-Host identities, exact argv, executable pins and conditions are in
+87581 was also independently confirmed absent. Unrelated guests were left
+untouched. The after-endpoint files record Debian 23708 only; they do not prove
+Android 93372 remained present. The pre-atomic guest regex matched a concurrent
+hash command and missed symlink-launched guests. That raw file is preserved as
+an incomplete host guest inventory. Direct own-QEMU probes selected exact
+PIDs/PGIDs. Host identities, exact argv, executable pins and conditions are in
 `R/host-before-{frame,atomic}-01` and `R/host-after-{frame,atomic}-01`.
 
 The retired atomic serial contains 34 ops rows, 68 snapshot blocks and 544
