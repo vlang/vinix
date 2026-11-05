@@ -71,7 +71,9 @@ Build with the same frozen V toolchain and normal/sanitizer flags documented in
 [README.md](README.md). Keep generated inputs, binaries and results outside Git.
 The native corpus consists of copied macOS framework AIR; Fortnite's packed
 shaders have not been covered. Metal's default device remains unavailable.
-Next work includes entry-point metadata, instruction-result IDs, constant
-expression lowering, instruction decoding and the actual execution backend.
+The [metadata layer](METADATA.md) links classic AIR entry points to stages and
+bindings; the [body index](BODIES.md) adds instruction-result IDs and block
+boundaries. Constant expression lowering, typed operand/instruction decoding
+and the actual execution backend remain future work.
 
 Format reference: [LLVM's constant reader](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Bitcode/Reader/BitcodeReader.cpp).

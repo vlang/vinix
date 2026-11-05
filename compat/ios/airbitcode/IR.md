@@ -40,7 +40,11 @@ translate a shader or enable Metal capabilities.
 
 The separate [`ir.constant_pools(stream)` layer](CONSTANTS.md) indexes module and
 function-local value IDs and decodes supported literals. Expressions retain an
-explicit opaque tag; instruction results and executable semantics remain absent.
+explicit opaque tag. That pool layer does not index instruction results or
+executable semantics.
+
+The [function-body index](BODIES.md) adds structural instruction/result IDs and
+basic-block boundaries. It leaves most instruction types/operands unverified.
 
 `ir_test.v` uses deliberate semantic record fixtures for precise corruptions;
 these are not standalone executable bitcode. It checks recursive types, legacy
