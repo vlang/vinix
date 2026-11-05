@@ -781,6 +781,17 @@ fn kmain() {
 		}
 	}
 
+	// Before allocator/runtime and framebuffer output. The firmware walker
+	// uses only Limine responses and scalar reads; the DT parser allocates.
+	early_hhdm := memory.bootloader_hhdm_offset()
+	if early_hhdm != 0 {
+		qemu_console := early_cmdline_has_token('vinix.qemu_platform=1')
+			|| (!early_cmdline_has_token('vinix.platform=acpi') && firmware.is_qemu())
+		if uart_phys := firmware.boot_console_uart(qemu_console) {
+			uart.initialise(early_hhdm + uart_phys)
+		}
+	}
+
 	// From here on a fault resets the machine instead of dying quietly, so the
 	// three outcomes a stage halt can produce stay distinguishable: power off
 	// means the stage was reached, reboot means something faulted before it,
@@ -857,7 +868,6 @@ fn kmain() {
 	// Optional QEMU virt MMIO path (PL011/GIC/Virtio-input). Keep this opt-in
 	// so missing DTB on real hardware does not trigger invalid MMIO accesses.
 	if force_qemu_platform {
-		uart.initialise(memory.get_hhdm_offset() + 0x09000000)
 		uart.puts(c'\n=== Vinix aarch64 booting (qemu mode) ===\n')
 	}
 	security.initialise_boot_policy()

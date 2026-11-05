@@ -25,15 +25,6 @@ const com1_3_irq = 4
 
 const com2_4_irq = 3
 
-__global (
-	com1_lock klock.Lock // Lock for COM1 kernel debug reporting.
-)
-
-// Fast initialization of COM1 for early kernel reporting.
-pub fn early_initialise() {
-	initialise_port(com1_port)
-}
-
 // Initialize the rest of ports apart of COM1.
 pub fn initialise() {
 	// Route the COM IRQs to vectors.
@@ -42,7 +33,11 @@ pub fn initialise() {
 	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, com1_3_vector, com1_3_irq, true)
 	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, com2_4_vector, com2_4_irq, true)
 
-	// Add the hardcoded port 1.
+	// Enable RX only after IRQ routing exists. A kernel TX timeout does not
+	// disable the device's RX path, and the historical /dev/com1 stays present.
+	if com1_present {
+		enable_port_interrupts(com1_port)
+	}
 	mut com1_res := &COMPort{}
 	com1_res.stat.size = 0
 	com1_res.stat.blocks = 0
@@ -59,6 +54,7 @@ pub fn initialise() {
 		port := u16(com_ports[i])
 		success := initialise_port(port)
 		if success {
+			enable_port_interrupts(port)
 			// Construct and add device.
 			mut com_res := &COMPort{}
 			com_res.stat.size = 0
@@ -76,52 +72,6 @@ pub fn initialise() {
 			fs.devtmpfs_add_device(com_res, name.str())
 		}
 	}
-}
-
-// Initialize a port.
-fn initialise_port(port u16) bool {
-	// Check if the port exists by writing a value and checking it back.
-	kio.port_out[u8](port + 7, 0x55)
-	if kio.port_in[u8](port + 7) != 0x55 {
-		return false
-	}
-
-	// Enable data available interrupts and enable DLAB.
-	kio.port_out[u8](port + 1, 0x01)
-	kio.port_out[u8](port + 3, 0x80)
-
-	// Set divisor to low 1 hi 0 (115200 baud)
-	kio.port_out[u8](port + 0, 0x01)
-	kio.port_out[u8](port + 1, 0x00)
-
-	// Enable FIFO and interrupts
-	kio.port_out[u8](port + 3, 0x03)
-	kio.port_out[u8](port + 2, 0xc7)
-	kio.port_out[u8](port + 4, 0x0b)
-	return true
-}
-
-// Kernel reporting to COM1.
-pub fn out(value u8) {
-	com1_lock.acquire()
-	if value == `\n` {
-		for !is_transmiter_empty(com1_port) {}
-		kio.port_out[u8](com1_port, `\r`)
-	}
-	for !is_transmiter_empty(com1_port) {}
-	kio.port_out[u8](com1_port, value)
-	com1_lock.release()
-}
-
-// Unlocked COM1 reporting.
-@[markused]
-pub fn panic_out(value u8) {
-	if value == `\n` {
-		for !is_transmiter_empty(com1_port) {}
-		kio.port_out[u8](com1_port, `\r`)
-	}
-	for !is_transmiter_empty(com1_port) {}
-	kio.port_out[u8](com1_port, value)
 }
 
 fn is_transmiter_empty(port u16) bool {

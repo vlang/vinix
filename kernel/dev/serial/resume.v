@@ -19,7 +19,13 @@ module serial
 pub fn resume() int {
 	mut programmed := 0
 	for port in com_ports {
-		if initialise_port(u16(port)) {
+		present := initialise_port(u16(port))
+		if port == com1_port {
+			com1_present = present
+			com1_tx_failed = false
+		}
+		if present {
+			enable_port_interrupts(u16(port))
 			programmed++
 		}
 	}
