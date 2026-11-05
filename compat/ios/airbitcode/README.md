@@ -22,7 +22,8 @@ stream is structurally valid, without establishing any LLVM module semantics.
 METADATA_STRINGS record (block 15, code 35). It decodes the VBR6 lengths and
 returns borrowed byte ranges into the concatenated string data. Free that
 range array separately. Pass the same immutable raw input used for parsing.
-Other LLVM metadata remains opaque.
+The separate [metadata/reflection layer](METADATA.md) indexes module metadata
+and classic AIR shader entry points; raw stream parsing keeps other records.
 
 Limits are 32 MiB of input, depth 64, 65,536 blocks and abbreviations, 262,144
 records and abbreviation operands, and 4,194,304 expanded scalar operands.
