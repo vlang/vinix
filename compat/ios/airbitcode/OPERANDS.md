@@ -99,7 +99,14 @@ in source order. `call_signature` indexes the original function type;
 `callee_function` indexes `ir.functions` for a direct function declaration,
 otherwise it is -1. Function declaration pointers are recovered from their raw
 records, retaining the original typed/opaque representation and explicit or
-data-layout `P` program address space. Other global declarations remain untyped.
+data-layout `P` program address space. Global variable records also supply their
+pointer types: legacy records retain an encoded typed pointer; explicit-element
+records retain their encoded address space and the original module's typed or
+opaque pointer representation. With no original pointer types, explicit globals
+use opaque pointers. Explicit globals in mixed pointer tables fail rather than
+guess a representation. Aliases and ifuncs remain untyped. Initializer, linkage,
+storage, name and attribute schemas are not verified or executed by this typing
+step. Unsized/cyclic storage validation and global allocation remain future work.
 Forward callee claims and fixed argument types undergo the final definition
 check. An unknown callee or argument type causes deferral, preserving the known
 result type. Void calls consume no result ID.
@@ -178,6 +185,11 @@ and mutations. The V inspector `tests/ios/air-operands-inspect.v` supports:
   parser supports widths up to 4096 bits. Condition value identity and switch
   execution are outside the comparison. Other operand comparisons retain their
   documented limits; branch/PHI edges are not compared by this switch checker.
+- `global-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR`: independently assemble
+  scalar/array/pointer globals across address spaces and an unsupported alias.
+  Check accessed types/address spaces, exact declaration IDs, preserved alias
+  deferral and eight corrupted dump/index controls. Initializer values and global
+  execution are outside this comparison.
 - `corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR`: copy raw modules and independently
   disassemble them. Compare exact arithmetic/cast/predicate mnemonics and selected
   operand/result type spellings only for `decoded` instructions. Named type
@@ -191,5 +203,8 @@ and mutations. The V inspector `tests/ios/air-operands-inspect.v` supports:
   calculations remain outside that comparison.
 
 Build with the [README flags](README.md); keep generated evidence outside Git.
+`tests/ios/air-operands-deferred.v CORPUS_DIR [...]` diagnoses remaining deferred
+records and prints per-opcode counts plus a total, without invoking LLVM or
+qualifying execution. It accepts the same copied `module-*.bc` inputs.
 Layouts follow [LLVM's reader](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Bitcode/Reader/BitcodeReader.cpp)
 and [opcode definitions](https://github.com/llvm/llvm-project/blob/main/llvm/include/llvm/Bitcode/LLVMBitCodes.h).

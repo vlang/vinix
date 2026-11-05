@@ -1,16 +1,22 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-// Global variables, aliases and ifuncs remain untyped. Function records provide
-// enough information to recover their pointer types without guessing a callee.
-fn (mut b OperandBuilder) function_declarations(stream Stream) ! {
+// Resolve pointer types for functions and global variables. Initializers,
+// aliases and ifunc targets are not interpreted or executed here.
+fn (mut b OperandBuilder) module_declarations(stream Stream) ! {
 	mut functions := map[int]int{}
 	defer { unsafe { functions.free() } }
 	for i, function in b.ir.functions { functions[function.record] = i }
 	program_space := operand_layout_space(b.ir.data_layout, `P`)!
 	for number, record_index in b.pools.declarations {
 		record := stream.records[record_index]
-		if record.code != 8 || stream.blocks[record.block].id != 8 { continue }
+		if stream.blocks[record.block].id != 8 { continue }
+		if record.code == 7 {
+			if record.has_blob { return error('AIR globals: unexpected declaration blob') }
+			b.declaration_types[number] = b.global_pointer(ir_values(stream, record))!
+			continue
+		}
+		if record.code != 8 { continue }
 		function := functions[record_index] or { return error('AIR calls: unindexed function declaration') }
 		values := ir_values(stream, record)
 		if values.len < 10 || values[2] >= u64(b.ir.types.len) { return error('AIR calls: function declaration type') }

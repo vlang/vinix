@@ -70,7 +70,7 @@ mut:
 	alloc_space u32
 	opaque_allocas bool
 	mixed_pointers bool
-	declaration_types []int // Transient: only function declaration pointers are resolved.
+	declaration_types []int // Transient: function/global variable declaration pointers.
 	declaration_functions []int
 	switch_words int // Cumulative wide-case hashing/copy work, including implicit zeros.
 }
@@ -310,7 +310,7 @@ pub fn (ir IRModule) typed_operands(stream Stream, pools IRConstantPools, bodies
 	}
 	b.opaque_allocas = has_opaque_pointer || !has_typed_pointer
 	b.mixed_pointers = has_opaque_pointer && has_typed_pointer
-	b.function_declarations(stream)!
+	b.module_declarations(stream)!
 	if b.boolean < 0 { b.boolean = b.p.types.len; b.p.types << IRType{kind: .integer_t, bits: 1} }
 	// Explicit definitions seed types independently of producer order.
 	for i, inst in bodies.instructions {

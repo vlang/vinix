@@ -318,13 +318,70 @@ entry:
 	println('LLVM-OPERANDS-SELFTEST: 29 decoded, no opaque/deferred; five complete function indexes, scalar/vector/FP/flags/forward-PHI checks and ${controls} rejected evidence corruptions PASS')
 }
 fn main() {
+	if os.args.len == 5 && os.args[1] == 'global-self-test' { global_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'switch-self-test' { switch_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'shuffle-self-test' { shuffle_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'call-self-test' { call_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'memory-self-test' { memory_self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'self-test' { self_test(os.args[2], os.args[3], os.args[4])!; return }
 	if os.args.len == 5 && os.args[1] == 'corpus' { corpus(os.args[2], os.args[3], os.args[4])!; return }
-	panic('usage: air-operands-inspect corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR | self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | memory-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | call-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | shuffle-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | switch-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR')
+	panic('usage: air-operands-inspect corpus INPUT_DIR LLVM_DIS FRESH_EXTERNAL_DIR | self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | memory-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | call-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | shuffle-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | switch-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR | global-self-test LLVM_AS LLVM_DIS FRESH_EXTERNAL_DIR')
+}
+
+fn global_self_test(assembler string, llvm string, out string) ! {
+	fresh(out)!
+	source := 'target triple = "x86_64-unknown-linux-gnu"
+@counter = addrspace(2) global i32 7, align 4
+@table = addrspace(3) global [4 x i32] zeroinitializer, align 16
+@slot = global ptr null, align 8
+@marker = addrspace(2) constant float 1.0, align 4
+@unknown = alias i32, ptr addrspace(2) @counter
+define i32 @globals(i32 %index) {
+  %a = load i32, ptr addrspace(2) @counter, align 4
+  %p = getelementptr [4 x i32], ptr addrspace(3) @table, i32 0, i32 %index
+  store i32 %a, ptr addrspace(3) %p, align 4
+  %f = load float, ptr addrspace(2) @marker, align 4
+  %q = load ptr, ptr @slot, align 8
+  %r = load i32, ptr %q, align 4
+  ret i32 %r
+}
+define i32 @alias_access() {
+  %a = load i32, ptr addrspace(2) @unknown, align 4
+  ret i32 %a
+}
+'
+	os.write_file(out + '/input.ll', source)!
+	run_saved([assembler, out + '/input.ll', '-o', out + '/input.bc'], out + '/assemble')!
+	d, o, f, c := inspect(out + '/input.bc', llvm, out + '/fixture')!
+	if d != 8 || o != 0 || f != 1 || c != 1 { return error('global fixture coverage differs') }
+	data := os.read_bytes(out + '/fixture.bc')!; defer { unsafe { data.free() } }
+	stream := airbitcode.parse(data)!; defer { stream.free() }
+	ir := stream.ir_module(data)!; defer { ir.free() }
+	pools := ir.constant_pools(stream)!; defer { pools.free() }
+	bodies := ir.function_bodies(stream, pools)!; defer { bodies.free() }
+	p := ir.typed_operands(stream, pools, bodies)!; defer { p.free() }
+	if p.operands[0].number != 0 || p.operands[p.instructions[1].operands_start].number != 1 || p.operands[p.instructions[3].operands_start].number != 3 || p.operands[p.instructions[4].operands_start].number != 2 { return error('global fixture normalized declaration IDs differ') }
+	if p.instructions[7].status != .deferred || p.instructions[8].status != .decoded { return error('global fixture alias dependency differs') }
+	oracle := os.read_file(out + '/fixture.ll')!; defer { unsafe { oracle.free() } }
+	mut controls := 0
+	for pair in [['ptr addrspace(2) @counter', 'ptr addrspace(1) @counter'], ['load i32, ptr addrspace(2)', 'load float, ptr addrspace(2)'],
+		['getelementptr [4 x i32]', 'getelementptr [5 x i32]'], ['ptr addrspace(3) %p', 'ptr addrspace(4) %p'], ['load ptr, ptr @slot', 'load i64, ptr @slot']] {
+		if !oracle.contains(pair[0]) { return error('missing global negative input') }
+		changed := oracle.replace(pair[0], pair[1]); defer { unsafe { changed.free() } }
+		compare(ir, stream, pools, bodies, p, changed) or { controls++; continue }
+		return error('accepted changed LLVM global evidence')
+	}
+	for mode in ['address-space', 'load-type', 'GEP-type'] {
+		mut instructions := p.instructions.clone(); mut types := p.types.clone()
+		defer { unsafe { instructions.free(); types.free() } }
+		if mode == 'address-space' { index := p.operands[0].type_index; types[index] = airbitcode.IRType{...types[index], address_space: 1} }
+		else if mode == 'load-type' { instructions[0] = airbitcode.IRTypedInstruction{...instructions[0], result_type: instructions[3].result_type} }
+		else { instructions[1] = airbitcode.IRTypedInstruction{...instructions[1], source_type: instructions[0].result_type} }
+		changed := airbitcode.IRTypedProgram{...p, instructions: instructions, types: types}
+		compare(ir, stream, pools, bodies, changed, oracle) or { controls++; continue }
+		return error('accepted changed decoded global evidence')
+	}
+	println('LLVM-GLOBAL-SELFTEST: eight decoded, one deferred alias access, one complete function index; scalar/array/pointer globals, address spaces, exact declaration IDs and ${controls} rejected evidence corruptions PASS')
 }
 
 fn switch_self_test(assembler string, llvm string, out string) ! {
