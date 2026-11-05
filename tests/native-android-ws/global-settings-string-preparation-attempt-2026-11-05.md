@@ -53,12 +53,12 @@ The second attempt's evidence-sealing run also stopped for shared disk growth:
 72,810,496 bytes exceeded its original 64 MiB allowance after 8,788 ms,
 guard/child 125/137 with complete cleanup and zero output. Preserve
 `S/maps-global-settings-string-preparation-attempts-sealed-2026-11-05-r2`,
-including its partial seal, root list and original guard/log. That run does
-not establish a complete evidence seal or independent readback. No seal retry
-or further preparation has been launched after these second-attempt failures.
+including its partial seal, root list and original guard/log. That run
+does not establish a complete evidence seal or independent readback. The failed
+sealing attempt remains part of the retained history.
 
-Further attempts await explicit approval to select an 8 GiB outer preparation
-growth allowance and 512 MiB evidence-sealing growth allowance. These are
+The user subsequently explicitly approved an 8 GiB outer preparation growth
+allowance and 512 MiB evidence-sealing growth allowance. These are
 supported options of the existing [qualified host guard](audit-wall-guard-2026-11-04.md),
 not implemented guard changes. Its original full checker passed backed 8 GiB
 acceptance, larger-value refusals and default 512 MiB selection; its separate
@@ -67,9 +67,24 @@ The acceptance controls select limits without consuming a large disk fixture.
 The supervisor requires free space covering reserve plus the complete growth
 budget before launch, and retains monitoring and cleanup throughout the run.
 
-The proposal keeps preparation at 30 minutes, evidence sealing at 900 seconds,
-600 MiB RSS, 1 GiB reserve and 4 MiB output, with the stage's separate internal
-512 MiB charged-write budget unchanged. It changes only the outer shared-volume
-growth allowances. All failed attempts and original audit bundles remain
-retained. CI remains running and untouched; the active shared compiler cache
+The approved limits keep preparation at 30 minutes, evidence sealing at
+900 seconds, 600 MiB RSS, 1 GiB reserve and 4 MiB output, with the stage's
+separate internal 512 MiB charged-write budget unchanged. It changes only the outer shared-volume
+growth allowances. A fresh seal retry at
+`S/maps-global-settings-string-preparation-attempts-sealed-2026-11-05-r3`
+retains the second partial image, its preparation controls and the failed
+second seal directory. The complete three-root, 202-entry manifest at
+`sealed/manifest.json` is SHA-256
+`8fb98c164313bb2c5345c76b46e4b0b9208ec48ae6d077551a3758af9532f1e8`.
+Seal and separate fresh readback passed 0/0, with empty reasons and complete
+cleanup in 31,662/12,936 ms, using the approved 512 MiB growth allowance and
+unchanged other limits. Observed shared growth was 83,279,872/152,207,360 bytes.
+This preserves the failed attempt's complete evidence; it does not
+qualify its partial image for use.
+
+A fresh `maps-global-settings-string-r3` preparation has started with the
+approved 8 GiB outer growth allowance. Its controls are
+`S/maps-global-settings-string-preparation-2026-11-05-r3`; no completed
+preparation or runtime result is established here. All failed attempts and
+original audit bundles remain retained. CI remains running and untouched; the active shared compiler cache
 was not deleted.
