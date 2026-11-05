@@ -113,6 +113,8 @@ use opaque pointers. Explicit globals in mixed pointer tables fail rather than
 guess a representation. Aliases and ifuncs remain untyped. Initializer, linkage,
 storage, name and attribute schemas are not verified or executed by this typing
 step. Unsized/cyclic storage validation and global allocation remain future work.
+The separate [global descriptor layer](GLOBALS.md) indexes names, declared
+initializers and selected storage flags without changing this operand decoder.
 Forward callee claims and fixed argument types undergo the final definition
 check. An unknown callee or argument type causes deferral, preserving the known
 result type. Void calls consume no result ID.

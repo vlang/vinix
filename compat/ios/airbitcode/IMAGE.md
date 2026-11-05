@@ -78,6 +78,8 @@ Production materialization uses V only and does not depend on LLVM.
 An image is data for future initialization/lowering. It does not allocate guest
 globals, enforce pointer provenance, execute load/store instructions or enable
 Metal capabilities. Fortnite's packed shaders remain untested.
+The separate [global descriptor layer](GLOBALS.md) links declared initializers
+to these images, preserving external/TLS flags without installing storage.
 
 References: [LLVM constants and memory](https://llvm.org/docs/LangRef.html#constants)
 and [LLVM constant load folding](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Analysis/ConstantFolding.cpp).
