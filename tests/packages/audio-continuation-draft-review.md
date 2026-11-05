@@ -16,6 +16,15 @@ test and plan files. Its SHA256 is
 all thirteen listed checksums were independently reread and matched. This
 checkpoint does not commit unvalidated implementation.
 
+Before later source edits, all thirteen files were independently preserved at
+the adjacent `audio-continuation-draft-before-review-01` root, with the same
+relative paths. They match that checksum manifest. The complete source/copy
+map is `audio-continuation-draft-before-review-01.copy-map`, SHA256
+`eaa052c9b6716fe6bd29010b28552259336ab66a58e1deb0a2878b6edf74e6e1`.
+Copies are ordinary 0644 files with one link and distinct source/copy inodes.
+The original worktree may contain later fixes; this review binds the frozen
+initial snapshot rather than qualifying those changes.
+
 The draft separates immutable failed captures/content store from fresh target
 outputs. Review found the fixed donor roles, canonical containment, complete
 inventory comparison and hard-link closure sound in principle. Its budget
@@ -51,5 +60,6 @@ inside that ceiling. It must also fit the unchanged 2 GiB aggregate audio cap
 and pass fresh 2 GiB free-space admission with a 1 GiB live floor. This scope
 does not authorize real manifests, preparation, audits or guests. Source fixes,
 independent review and a concrete rounded projection/argv/closure plan must
-precede any such validation. Repeated shared-disk admission failures currently
-block execution; all draft findings above remain unresolved.
+precede any such validation. Repeated shared-disk admission failures blocked
+execution during this checkpoint. Later recovery still requires fresh admission
+and source review; findings above describe the unvalidated initial snapshot.
