@@ -17,16 +17,18 @@ fn overlay_persistent_storage(mut filesystem FileSystem) bool {
 }
 
 fn overlay_storage_rename(mut filesystem FileSystem, old_parent &VFSNode,
-	old_name string, new_parent &VFSNode, new_name string, whiteout &VFSNode) ? {
+	old_name string, source &VFSNode, new_parent &VFSNode, new_name string,
+	destination &VFSNode, whiteout &VFSNode) ?bool {
 	if whiteout != unsafe { nil } && voidptr(whiteout.parent) != voidptr(old_parent) {
 		if mut filesystem is OverlayStorage {
 			mut backend := OverlayStorage(filesystem)
 			mut stack := unsafe { &backend }
 			stack.rename_whiteout(old_parent, old_name, new_parent, new_name, whiteout)?
-			return
+			return false
 		}
 		errno.set(errno.enotsup)
 		return none
 	}
-	filesystem.rename(old_parent, old_name, new_parent, new_name, 0)?
+	return rename_before_publish(mut filesystem, old_parent, old_name, source,
+		new_parent, new_name, destination, 0)
 }

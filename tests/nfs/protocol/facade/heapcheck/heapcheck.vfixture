@@ -1,0 +1,48 @@
+module heapcheck
+
+// Fixed storage: the accounting callbacks must never allocate themselves.
+// These hooks count V manual allocations/frees, not RSS or warning groups.
+__global (
+	tracking bool
+	tracked [16384]voidptr
+	sizes [16384]u64
+	live_objects int
+	live_bytes u64
+)
+
+@[export: 'vheap_alloc']
+fn heap_alloc(p voidptr, n u64) {
+	if !tracking || p == unsafe { nil } { return }
+	for i in 0 .. tracked.len {
+		if tracked[i] == unsafe { nil } {
+			tracked[i] = p; sizes[i] = n
+			live_objects++; live_bytes += n
+			return
+		}
+	}
+	panic('heap tracker capacity exhausted')
+}
+
+@[export: 'vheap_free']
+fn heap_free(p voidptr) {
+	if !tracking || p == unsafe { nil } { return }
+	for i in 0 .. tracked.len {
+		if tracked[i] == p {
+			tracked[i] = unsafe { nil }
+			live_objects--; live_bytes -= sizes[i]
+			return
+		}
+	}
+}
+
+pub fn start_accounting() {
+	assert live_objects == 0
+	tracking = true
+	// Reject a compiler/vlib that accepts the flag without implementing its
+	// hooks; zero counts from absent instrumentation are not leak evidence.
+	probe := unsafe { malloc(17) }
+	assert live_objects == 1 && live_bytes == 17
+	unsafe { free(probe) }
+	assert live_objects == 0 && live_bytes == 0
+}
+pub fn stop_accounting() (int, u64) { tracking = false; return live_objects, live_bytes }
