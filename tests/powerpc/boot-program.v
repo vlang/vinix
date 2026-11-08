@@ -25,6 +25,16 @@ fn capture_screen(mut child os.Process, capture string, name string) ! {
 	if !os.is_file(path) { return error('QEMU did not capture ' + path) }
 }
 
+fn click_at(mut child os.Process, position string) {
+	monitor(mut child, 'mouse_move -2000 -2000')
+	time.sleep(200 * time.millisecond)
+	monitor(mut child, 'mouse_move ' + position)
+	time.sleep(200 * time.millisecond)
+	monitor(mut child, 'mouse_button 1')
+	time.sleep(180 * time.millisecond)
+	monitor(mut child, 'mouse_button 0')
+}
+
 fn boot(output string, marker string) ! {
 	if marker == '' { return error('An expected application marker is required') }
 	capture := os.getenv_opt('VINIX_PPC_CAPTURE_DIR') or { output }
@@ -118,6 +128,12 @@ fn boot(output string, marker string) ! {
 		// Use the persisted GUI fixture with its initial System window. Cross
 		// many two-second output-discovery polls, including a held mouse drag.
 		for i in 0 .. 20 { capture_screen(mut child, capture, 'display-idle-${i:02}')! }
+		// Fresh accounts restore Files on login now that it can launch. Close
+		// that known fixture window so the existing checker sees only System.
+		if os.read_file(logfile)!.contains('vinix-desktop: opened Files') {
+			click_at(mut child, '784 98')
+			time.sleep(2 * time.second)
+		}
 		monitor(mut child, 'mouse_move -2000 -2000')
 		time.sleep(300 * time.millisecond)
 		monitor(mut child, 'mouse_move 480 70')
@@ -149,6 +165,61 @@ fn boot(output string, marker string) ! {
 		}
 		for i in 0 .. 20 { capture_screen(mut child, capture, 'display-settled-${i:02}')! }
 	}
+	if log.contains(marker) && os.getenv('VINIX_PPC_TEST_APPS') == '1' {
+		for app in ['files', 'settings', 'editor', 'calculator', 'terminal'] {
+			position := match app {
+				'files' { '60 43' }
+				'settings' { '60 370' }
+				'editor' { '150 43' }
+				'calculator' { '60 207' }
+				else { '60 289' }
+			}
+			click_at(mut child, position)
+			title := match app { 'files' { 'Files' } 'settings' { 'Settings' } 'editor' { 'Text Editor' } 'calculator' { 'Calculator' } else { 'Terminal' } }
+			limit := time.now().add(90 * time.second)
+			for child.is_alive() && time.now() < limit {
+				if os.read_file(logfile)!.contains('vinix-desktop: opened ' + title) { break }
+				time.sleep(100 * time.millisecond)
+			}
+			time.sleep(2 * time.second)
+			capture_screen(mut child, capture, 'apps-' + app)!
+			if !os.read_file(logfile)!.contains('vinix-desktop: opened ' + title) { return error('Shortcut did not open ' + title) }
+			keys := match app {
+				'editor' { ['p', 'p', 'c', 'spc', 'e', 'd', 'i', 't', 'o', 'r'] }
+				'calculator' { ['2', 'shift-equal', '2', 'ret'] }
+				'terminal' { ['u', 'n', 'a', 'm', 'e', 'ret'] }
+				else { []string{} }
+			}
+			for key in keys { monitor(mut child, 'sendkey ' + key); time.sleep(200 * time.millisecond) }
+			if keys.len > 0 {
+				time.sleep(2 * time.second)
+				capture_screen(mut child, capture, 'apps-' + app + '-typed')!
+			}
+			close_position := match app { 'files' { '784 98' } 'settings' { '776 124' } 'calculator' { '548 59' } else { '784 202' } }
+			// Editor has unsaved text; leave it open for now instead of answering
+			// its save prompt. Later app placement still follows monotonically increasing IDs.
+			if app != 'editor' { click_at(mut child, close_position) }
+			time.sleep(time.second)
+		}
+		// Reuse slots more times than the kernel's process table can hold.
+		// The calculator is clamped vertically to y=48 at this resolution.
+		for cycle in 0 .. 8 {
+			opened := 'vinix-desktop: opened Calculator'
+			before := os.read_file(logfile)!.count(opened)
+			click_at(mut child, '60 207')
+			limit := time.now().add(90 * time.second)
+			for child.is_alive() && time.now() < limit {
+				if os.read_file(logfile)!.count(opened) > before { break }
+				time.sleep(100 * time.millisecond)
+			}
+			if os.read_file(logfile)!.count(opened) != before + 1 { return error('Calculator slot reuse failed') }
+			time.sleep(time.second)
+			capture_screen(mut child, capture, 'apps-reopen-${cycle}')!
+			click_at(mut child, '${444 + (cycle % 6) * 26} 59')
+			time.sleep(time.second)
+			capture_screen(mut child, capture, 'apps-closed-${cycle}')!
+		}
+	}
 	log = os.read_file(logfile)!
 	print(log)
 	os.cp(@FILE, capture + '/boot-program.v')!
@@ -166,7 +237,7 @@ fn boot(output string, marker string) ! {
 		}
 	}
 	for name in os.ls(capture)! {
-		if (name.starts_with('stability-') || name.starts_with('display-')) && name.ends_with('.ppm') {
+		if (name.starts_with('stability-') || name.starts_with('display-') || name.starts_with('apps-')) && name.ends_with('.ppm') {
 			path := capture + '/' + name
 			sums += sha256.hexhash(os.read_bytes(path)!.bytestr()) + '  ' + path + '\n'
 		}
