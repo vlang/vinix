@@ -24,3 +24,11 @@ The initial passing bundle is `/tmp/vinix-ppc-ext2-audit`, built from
 the formatter, fixture, disk, logs, source copies and SHA-256 manifest.
 Manifest SHA-256:
 `d63555590d38e0ddbf6d4a4e69326de50f7d59382a70d66ddb976d0dd8093950`.
+
+The follow-up `/tmp/vinix-ppc-ext2-final-audit` adds replacement of an open
+file by a symlink, checks the directory entry type with e2fsck, and uses
+borrowed inode pointers to prevent V's automatic heap promotion in the
+freestanding kernel. Invalid nonzero block references fail instead of being
+read as sparse holes. Base revision: `0bf9a3b04`, with exact sources retained.
+Manifest SHA-256:
+`165454bd6573532757d2ff80dd7013a5d5565490a3bdf9cc8c27527aa60f4657`.

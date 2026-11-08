@@ -78,6 +78,7 @@ pub fn (mut v Volume) mount(device Device) bool {
 	v.block_bitmap = le32(unsafe { &b[0] }, 0)
 	v.inode_bitmap = le32(unsafe { &b[0] }, 4)
 	v.inode_table = le32(unsafe { &b[0] }, 8)
+	if v.inode_table >= v.blocks || (v.inodes + 31) / 32 > v.blocks - v.inode_table { return false }
 	v.first_data = v.inode_table + (v.inodes + 31) / 32
 	if v.block_bitmap < 2 || v.inode_bitmap <= v.block_bitmap || v.inode_table <= v.inode_bitmap
 		|| v.first_data >= v.blocks { return false }
@@ -157,7 +158,7 @@ fn (mut v Volume) release(number u32, inodes bool, directory bool) bool {
 	return v.write_block(bitmap, unsafe { &b[0] }) && v.accounting(inodes, 1, if directory { -1 } else { 0 })
 }
 
-fn (mut v Volume) data_block(mut n Node, index u32, create bool) u32 {
+fn (mut v Volume) data_block(n &Node, index u32, create bool) u32 {
 	if index >= 1036 { return 0 }
 	mut indirect := [4096]u8{}
 	mut p := unsafe { &n.raw[0] }
@@ -171,7 +172,9 @@ fn (mut v Volume) data_block(mut n Node, index u32, create bool) u32 {
 			put32(p, 88, table); put32(p, 28, n.blocks() + 8)
 			if !v.save(n) { return 0 }
 		}
-		if table < v.first_data || table >= v.blocks || !v.read_block(table, unsafe { &indirect[0] }) { return 0 }
+		if table == 0 { return 0 }
+		if table < v.first_data || table >= v.blocks { v.failed = true; return 0 }
+		if !v.read_block(table, unsafe { &indirect[0] }) { return 0 }
 		p = unsafe { &indirect[0] }; offset = (index - 12) * 4
 	}
 	mut block := le32(p, offset)
@@ -183,7 +186,8 @@ fn (mut v Volume) data_block(mut n Node, index u32, create bool) u32 {
 		if table != 0 && !v.write_block(table, p) { return 0 }
 		if !v.save(n) { return 0 }
 	}
-	return if block >= v.first_data && block < v.blocks { block } else { u32(0) }
+	if block != 0 && (block < v.first_data || block >= v.blocks) { v.failed = true; return 0 }
+	return block
 }
 
 pub fn (mut v Volume) read(number u32, offset u32, data &u8, count u32) int {
@@ -197,7 +201,8 @@ pub fn (mut v Volume) read(number u32, offset u32, data &u8, count u32) int {
 	mut done := u32(0)
 	for done < actual {
 		pos := offset + done
-		block := v.data_block(mut n, pos / 4096, false)
+		block := v.data_block(unsafe { &n }, pos / 4096, false)
+		if v.failed { return -5 }
 		if block == 0 { clear(unsafe { &b[0] }, 4096) }
 		else if !v.read_block(block, unsafe { &b[0] }) { return -5 }
 		amount := if actual - done < 4096 - pos % 4096 { actual - done } else { 4096 - pos % 4096 }
@@ -216,7 +221,7 @@ pub fn (mut v Volume) write(number u32, offset u32, data &u8, count u32) int {
 	mut done := u32(0)
 	for done < count {
 		pos := offset + done
-		block := v.data_block(mut n, pos / 4096, true)
+		block := v.data_block(unsafe { &n }, pos / 4096, true)
 		if block == 0 { return if done > 0 { int(done) } else if v.failed { -5 } else { -28 } }
 		if !v.read_block(block, unsafe { &b[0] }) { return if done > 0 { int(done) } else { -5 } }
 		amount := if count - done < 4096 - pos % 4096 { count - done } else { 4096 - pos % 4096 }
@@ -224,7 +229,7 @@ pub fn (mut v Volume) write(number u32, offset u32, data &u8, count u32) int {
 		if !v.write_block(block, unsafe { &b[0] }) { return -5 }
 		done += amount
 		if offset + done > n.size() { put32(unsafe { &n.raw[0] }, 4, offset + done) }
-		if !v.save(&n) { return -5 }
+		if !v.save(unsafe { &n }) { return -5 }
 	}
 	return int(done)
 }
@@ -233,19 +238,20 @@ pub fn (mut v Volume) chmod(number u32, mode u32) int {
 	mut n := Node{}
 	if !v.inode(number, mut n) { return -5 }
 	put16(unsafe { &n.raw[0] }, 0, (n.mode() & 0xf000) | (mode & 0xfff))
-	return if v.save(&n) { 0 } else { -5 }
+	return if v.save(unsafe { &n }) { 0 } else { -5 }
 }
 
 pub fn (mut v Volume) truncate(number u32) int {
 	mut n := Node{}
 	if !v.inode(number, mut n) || n.mode() & 0xf000 != 0x8000 { return -5 }
-	return if v.clear_blocks(mut n) && v.save(&n) { 0 } else { -5 }
+	return if v.clear_blocks(unsafe { &n }) && v.save(unsafe { &n }) { 0 } else { -5 }
 }
 
-fn (mut v Volume) clear_blocks(mut n Node) bool {
+fn (mut v Volume) clear_blocks(n &Node) bool {
 	if le32(unsafe { &n.raw[0] }, 92) != 0 || le32(unsafe { &n.raw[0] }, 96) != 0 { return false }
 	for i := u32(0); i < 1036; i++ {
-		block := v.data_block(mut n, i, false)
+		block := v.data_block(n, i, false)
+		if v.failed { return false }
 		if block != 0 && !v.release(block, false, false) { return false }
 		if i == 11 && le32(unsafe { &n.raw[0] }, 88) == 0 { break }
 	}

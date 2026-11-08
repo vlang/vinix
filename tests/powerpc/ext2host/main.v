@@ -55,6 +55,17 @@ fn main() {
 	assert volume.walk(c'/root/loop', 10, true) == -40
 	assert volume.unlink(u32(root), c'loop', 4, false, false) == 0
 	assert volume.write(u32(file), 1036 * 4096, c'x', 1) == -27
+	// Replacing a different inode must preserve an open target until close.
+	replaced := volume.create(u32(newdir), c'replaced', 8, 0x8180)
+	assert replaced > 0
+	assert volume.write(u32(replaced), 0, c'old', 3) == 3
+	assert volume.symlink(u32(newdir), c'replacement', 11, c'profile', 7) == 0
+	assert volume.rename(u32(newdir), c'replacement', 11, u32(newdir), c'replaced', 8, true) == 0
+	assert volume.read(u32(replaced), 0, result.data, 3) == 3
+	assert result[..3].bytestr() == 'old'
+	assert volume.reap(u32(replaced))
+	assert volume.walk(c'/root/persist/replaced', 22, true) == file
+	assert volume.unlink(u32(newdir), c'replaced', 8, false, false) == 0
 	assert volume.unlink(u32(root), c'persist', 7, true, false) == -39
 	for i in 0 .. 60 {
 		name := 'entry-${i}'

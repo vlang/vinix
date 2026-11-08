@@ -19,7 +19,7 @@ pub fn (mut v Volume) next(number u32, offset u32, mut e Entry) int {
 	mut cached := u32(0xffffffff)
 	for pos < n.size() {
 		if pos / 4096 != cached {
-			block := v.data_block(mut n, pos / 4096, false)
+			block := v.data_block(unsafe { &n }, pos / 4096, false)
 			if block == 0 || !v.read_block(block, unsafe { &b[0] }) { return -5 }
 			cached = pos / 4096
 		}
@@ -133,7 +133,7 @@ fn (mut v Volume) insert(parent u32, name &u8, length u32, n &Node) int {
 	mut b := [4096]u8{}
 	for index := u32(0); index <= dir.size() / 4096 && index < 12; index++ {
 		fresh := index * 4096 == dir.size()
-		block := v.data_block(mut dir, index, fresh)
+		block := v.data_block(unsafe { &dir }, index, fresh)
 		if block == 0 { return if v.failed { -5 } else { -28 } }
 		if fresh {
 			clear(unsafe { &b[0] }, 4096)
@@ -150,7 +150,7 @@ fn (mut v Volume) insert(parent u32, name &u8, length u32, n &Node) int {
 				entry_bytes(unsafe { &b[at + used] }, n.number, record - used, name, length, n.mode())
 				if !v.write_block(block, unsafe { &b[0] }) { return -5 }
 				if fresh { put32(unsafe { &dir.raw[0] }, 4, dir.size() + 4096) }
-				return if v.save(&dir) { 0 } else { -5 }
+				return if v.save(unsafe { &dir }) { 0 } else { -5 }
 			}
 			at += record
 		}
@@ -173,13 +173,18 @@ fn (mut v Volume) erase(parent u32, name &u8, length u32, replacement u32) int {
 			for i := u32(0); i < length; i++ { if e.name[i] != unsafe { name[i] } { same = false; break } }
 			if same {
 				mut b := [4096]u8{}
-				block := v.data_block(mut dir, (e.next - 1) / 4096, false)
+				block := v.data_block(unsafe { &dir }, (e.next - 1) / 4096, false)
 				if block == 0 || !v.read_block(block, unsafe { &b[0] }) { return -5 }
 				for pos := u32(0); pos < 4096; {
 					record := le16(unsafe { &b[0] }, pos + 4)
 					if record < 8 || record > 4096 - pos { return -5 }
 					if (e.next - 1) / 4096 * 4096 + pos + record == e.next {
 						put32(unsafe { &b[0] }, pos, replacement)
+						if replacement != 0 {
+							mut target := Node{}
+							if !v.inode(replacement, mut target) { return -5 }
+							b[pos + 7] = if target.mode() & 0xf000 == 0xa000 { u8(7) } else { u8(1) }
+						}
 						return if v.write_block(block, unsafe { &b[0] }) { 0 } else { -5 }
 					}
 					pos += record
@@ -204,23 +209,23 @@ pub fn (mut v Volume) create(parent u32, name &u8, length u32, mode u32) int {
 	put32(unsafe { &n.raw[0] }, 12, v.epoch)
 	put32(unsafe { &n.raw[0] }, 16, v.epoch)
 	put16(unsafe { &n.raw[0] }, 26, if directory { u32(2) } else { u32(1) })
-	if !v.save(&n) { return -5 }
+	if !v.save(unsafe { &n }) { return -5 }
 	if directory {
 		mut b := [4096]u8{}
-		block := v.data_block(mut n, 0, true)
-		if block == 0 { v.abandon(mut n); return -28 }
+		block := v.data_block(unsafe { &n }, 0, true)
+		if block == 0 { v.abandon(unsafe { &n }); return -28 }
 		entry_bytes(unsafe { &b[0] }, n.number, 12, unsafe { &u8(c'.') }, 1, 0x4000)
 		entry_bytes(unsafe { &b[12] }, parent, 4084, unsafe { &u8(c'..') }, 2, 0x4000)
 		put32(unsafe { &n.raw[0] }, 4, 4096)
-		if !v.write_block(block, unsafe { &b[0] }) || !v.save(&n) { return -5 }
+		if !v.write_block(block, unsafe { &b[0] }) || !v.save(unsafe { &n }) { return -5 }
 	}
-	result := v.insert(parent, name, length, &n)
-	if result != 0 { v.abandon(mut n); return result }
+	result := v.insert(parent, name, length, unsafe { &n })
+	if result != 0 { v.abandon(unsafe { &n }); return result }
 	if directory {
 		mut dir := Node{}
 		if !v.inode(parent, mut dir) { return -5 }
 		put16(unsafe { &dir.raw[0] }, 26, dir.links() + 1)
-		if !v.save(&dir) { return -5 }
+		if !v.save(unsafe { &dir }) { return -5 }
 	}
 	return int(n.number)
 }
@@ -228,15 +233,15 @@ pub fn (mut v Volume) create(parent u32, name &u8, length u32, mode u32) int {
 pub fn (mut v Volume) reap(number u32) bool {
 	mut n := Node{}
 	if !v.inode(number, mut n) || n.links() != 0 { return false }
-	if !(n.mode() & 0xf000 == 0xa000 && n.blocks() == 0) && !v.clear_blocks(mut n) { return false }
+	if !(n.mode() & 0xf000 == 0xa000 && n.blocks() == 0) && !v.clear_blocks(unsafe { &n }) { return false }
 	put32(unsafe { &n.raw[0] }, 20, v.epoch)
-	if !v.save(&n) { return false }
+	if !v.save(unsafe { &n }) { return false }
 	return v.release(number, true, n.mode() & 0xf000 == 0x4000)
 }
 
-fn (mut v Volume) abandon(mut n Node) {
+fn (mut v Volume) abandon(n &Node) {
 	put16(unsafe { &n.raw[0] }, 26, 0)
-	if v.save(&n) { v.reap(n.number) }
+	if v.save(n) { v.reap(n.number) }
 }
 
 pub fn (mut v Volume) unlink(parent u32, name &u8, length u32, directory bool, keep_open bool) int {
@@ -259,12 +264,12 @@ pub fn (mut v Volume) unlink(parent u32, name &u8, length u32, directory bool, k
 	result := v.erase(parent, name, length, 0)
 	if result != 0 { return result }
 	put16(unsafe { &n.raw[0] }, 26, if directory { u32(0) } else { n.links() - 1 })
-	if !v.save(&n) { return -5 }
+	if !v.save(unsafe { &n }) { return -5 }
 	if directory {
 		mut dir := Node{}
 		if !v.inode(parent, mut dir) { return -5 }
 		put16(unsafe { &dir.raw[0] }, 26, dir.links() - 1)
-		if !v.save(&dir) { return -5 }
+		if !v.save(unsafe { &dir }) { return -5 }
 	}
 	if n.links() == 0 && !keep_open && !v.reap(n.number) { return -5 }
 	return 0
@@ -287,7 +292,7 @@ pub fn (mut v Volume) rename(old_parent u32, old_name &u8, old_length u32, new_p
 	// Namespace updates are serialized by the single-process kernel. fsync
 	// flushes all metadata; ext2 itself is not a power-loss journal.
 	result := if target > 0 { v.erase(new_parent, new_name, new_length, n.number) }
-		else { v.insert(new_parent, new_name, new_length, &n) }
+		else { v.insert(new_parent, new_name, new_length, unsafe { &n }) }
 	if result != 0 { return result }
 	removed := v.erase(old_parent, old_name, old_length, 0)
 	if removed != 0 { return removed }
@@ -295,7 +300,7 @@ pub fn (mut v Volume) rename(old_parent u32, old_name &u8, old_length u32, new_p
 		mut other := Node{}
 		if !v.inode(u32(target), mut other) { return -5 }
 		put16(unsafe { &other.raw[0] }, 26, other.links() - 1)
-		if !v.save(&other) || (other.links() == 0 && !keep_replaced && !v.reap(other.number)) { return -5 }
+		if !v.save(unsafe { &other }) || (other.links() == 0 && !keep_replaced && !v.reap(other.number)) { return -5 }
 	}
 	return 0
 }
@@ -308,7 +313,7 @@ pub fn (mut v Volume) symlink(parent u32, name &u8, length u32, target &u8, size
 	if !v.inode(u32(id), mut n) { return -5 }
 	copy_bytes(unsafe { &n.raw[40] }, target, size)
 	put32(unsafe { &n.raw[0] }, 4, size)
-	return if v.save(&n) { 0 } else { -5 }
+	return if v.save(unsafe { &n }) { 0 } else { -5 }
 }
 
 pub fn (mut v Volume) readlink(number u32, target &u8, capacity u32) int {
