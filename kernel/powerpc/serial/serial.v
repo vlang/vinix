@@ -2,6 +2,8 @@
 @[has_globals]
 module serial
 
+import powerpc.video
+
 __global control u32
 __global data_port u32
 
@@ -48,6 +50,7 @@ pub fn init(ctrl u32, data u32) {
 }
 
 pub fn put(byte u8) {
+	video.put(byte)
 	if control == 0 { return }
 	for read(control) & 4 == 0 {
 	}

@@ -7,6 +7,7 @@ import powerpc.cpu
 import powerpc.exception
 import powerpc.pages
 import powerpc.serial
+import powerpc.video
 import powerpc.runtime as _
 
 __global physical_pages pages.Pool
@@ -41,6 +42,7 @@ fn start(info &boot.Info) {
 		|| info.available_count > 64 || info.serial_control == 0 || info.timebase_hz < 100 {
 		halt(c'boot information')
 	}
+	if video.init(info) { serial.text(c'VINIX-PPC: PASS framebuffer console\n') }
 	for i := u32(0); i < info.available_count; i++ {
 		range := info.available[i]
 		if !physical_pages.add(range.base, range.size) { halt(c'physical memory map') }

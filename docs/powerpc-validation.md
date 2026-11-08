@@ -104,3 +104,16 @@ Bundle: `/tmp/vinix-ppc-shell-128`, base revision `9875519d2` plus the source
 snapshot. `qemu.txt` records the emulator version and arguments.
 `SHA256SUMS` digest:
 `d8ade0131037fb97b56dc1f4375b262d6fc279865f3417259f6be86252202dab`.
+
+## Framebuffer console
+
+The inherited 800x600 32-bit framebuffer renders the shell with a readable
+mixed-case font, line wrapping, scrolling and backspace. QEMU screenshot
+validation checks separate RGB swatches and foreground pixels after the
+complete shell command suite. The screenshot was also visually inspected.
+Firmware diagnostics are mirrored to SCC when stdout is the display.
+
+Bundle: `/tmp/vinix-ppc-video`, base `775898128` plus preserved sources.
+`SHA256SUMS`: `86863aef30576e3ebf766c1657517695422986e8499a39a24bfabe9d2a7a6737`.
+This verifies the graphical console, not accelerated GPU rendering or the
+shared Vinix desktop; keyboard input in this stage is still serial.

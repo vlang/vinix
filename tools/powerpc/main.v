@@ -76,10 +76,12 @@ fn cross_build(root string, output string, v string, zig string, headers string,
 
 fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 	qemu := tool('VINIX_PPC_QEMU', 'qemu-system-ppc')!
+	graphics := os.getenv('VINIX_PPC_GRAPHICS') == '1'
 	memory := strconv.parse_uint(os.getenv_opt('VINIX_PPC_MEMORY') or { '512' }, 10, 32)!
 	if memory < 128 || memory > 2048 { return error('VINIX_PPC_MEMORY must be 128..2048 MiB') }
 	mut args := ['-M', 'mac99,via=pmu', '-cpu', '7450', '-accel', 'tcg', '-m', memory.str(), '-smp', '1',
 		'-nic', 'none', '-no-reboot']
+	if graphics { args << ['-prom-env', 'output-device=scca'] }
 	if media {
 		args << ['-cdrom', output + '/vinix-ppc-boot.iso', '-boot', 'd', '-prom-env',
 			'boot-device=cd:\\BOOT.ELF;1', '-prom-env',
@@ -94,7 +96,8 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 		args << ['-kernel', output + '/vinix-of.bin']
 	}
 	if !test {
-		args << ['-nographic', '-serial', 'mon:stdio']
+		if !graphics { args << '-nographic' }
+		args << ['-serial', 'mon:stdio']
 		record_qemu(output, qemu, args)!
 		mut argv := [qemu]
 		argv << args
@@ -118,7 +121,8 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 		'VINIX-PPC: PASS firmware discovery'
 	}
 	os.write_file(log_path, '')!
-	args << ['-nographic', '-monitor', 'stdio']
+	if graphics { args << ['-display', 'none'] } else { args << '-nographic' }
+	args << ['-monitor', 'stdio']
 	if shell {
 		args << ['-chardev', 'socket,id=console,path=' + (output + '/serial.sock').replace(',', ',,') +
 			',server=on,wait=off,logfile=' + log_path.replace(',', ',,'), '-serial', 'chardev:console']
@@ -151,6 +155,25 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 		return error('PPC boot did not reach the requested milestone; see ${log_path}')
 	}
 	if shell { exercise_shell(output, log_path)! }
+	if graphics {
+		if !log.contains('VINIX-PPC: PASS framebuffer console') { return error('Framebuffer console missing') }
+		path := output + '/screen.ppm'
+		if os.exists(path) { os.rm(path)! }
+		child.stdin_write('screendump "${path}"\n')
+		deadline_image := time.now().add(3 * time.second)
+		mut valid_image := false
+		for time.now() < deadline_image {
+			if os.exists(path) {
+				data := os.read_bytes(path)!
+				validate_screen(data) or { time.sleep(10 * time.millisecond); continue }
+				valid_image = true
+				break
+			}
+			time.sleep(10 * time.millisecond)
+		}
+		if !valid_image { return error('Screenshot failed framebuffer validation') }
+		println('PASS framebuffer RGB byte order and rendered console')
+	}
 	for line in log.split_into_lines() {
 		if !line.starts_with('VINIX-PPC: FDT ') { continue }
 		fields := line.trim_space().split(' ')

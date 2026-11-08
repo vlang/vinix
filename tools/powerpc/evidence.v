@@ -44,7 +44,7 @@ fn seal_results(output string) ! {
 	mut checksums := ''
 	for file in ['build.txt', 'sources.sha256', 'loader.c', 'probe.c', 'handoff-probe.elf', 'kernel.c',
 		'init.c', 'init-ppc.elf', 'ramfs.tar', 'vinix-ppc.elf', 'kernel-boot.log', 'vinix-of.elf',
-		'vinix-of.bin', 'vinix-ppc-boot.iso', 'firmware.dtb', 'boot.log', 'media-boot.log', 'shell-commands.log', 'qemu.txt'] {
+		'vinix-of.bin', 'vinix-ppc-boot.iso', 'firmware.dtb', 'boot.log', 'media-boot.log', 'shell-commands.log', 'qemu.txt', 'screen.ppm'] {
 		if !os.is_file(output + '/' + file) { continue }
 		data := os.read_bytes(output + '/' + file)!
 		checksums += sha256.hexhash(data.bytestr()) + '  ' + file + '\n'

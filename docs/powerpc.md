@@ -73,8 +73,10 @@ This command boots the PPC kernel and initial userspace shell. This ISO
 has no partition map, so OpenBIOS takes the filename immediately after the
 colon; adding a comma prevents lookup. Keep the ISO file version `;1`.
 Input/output uses the emulated SCC serial port. Graphical console and USB
-keyboard support remain pending; typing in an old Open Firmware window will
-not control this shell.
+keyboard work is tracked below. Set `VINIX_PPC_GRAPHICS=1` to enable the
+inherited 32-bit framebuffer and a scrolling graphical console. The same
+variable on `test-shell` captures and checks the framebuffer's RGB colors
+and text. Input currently still uses serial until the USB driver is enabled.
 
 The separate direct test uses `-kernel vinix-of.bin`. QEMU's
 `-kernel` ELF loader relocates PowerMac load addresses by 16 MiB, so this path
