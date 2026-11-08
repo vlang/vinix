@@ -38,16 +38,18 @@ QEMU monitor, and independently validates its structure and node count.
 It has a 20-second boot deadline, kills/reaps its own emulator, and saves
 `boot.log`, `firmware.dtb`, and binary/FDT SHA-256 files in the output directory.
 `test-media` instead loads the ELF from the generated ISO through OpenBIOS,
-and records `media-boot.log`. `run` opens this CD boot in a QEMU window.
+then reads and executes a separate ELF32 handoff probe. It records
+`media-boot.log`. `run` opens this CD boot in a QEMU window.
 The V image builder writes ISO9660 directly, without external image utilities.
 Each build saves its base Git revision, tool versions, exact source inputs,
 and SHA-256 manifests (`sources.sha256` and `SHA256SUMS`) outside Git.
 Host corruption tests run with `v test tools/powerpc/validate_test.v`.
+ELF validation tests run with `v test kernel/powerpc/elf32`.
 
 Direct QEMU command after building:
 
 ```
-qemu-system-ppc -M mac99,via=pmu -cpu 7450 -accel tcg -m 512 -smp 1 -nic none -cdrom /tmp/vinix-ppc-state/vinix-ppc-boot.iso -boot d -prom-env 'boot-device=cd:\BOOT.ELF;1' -serial stdio
+qemu-system-ppc -M mac99,via=pmu -cpu 7450 -accel tcg -m 512 -smp 1 -nic none -cdrom /tmp/vinix-ppc-state/vinix-ppc-boot.iso -boot d -prom-env 'boot-device=cd:\BOOT.ELF;1' -prom-env 'boot-file=cd:\PROBE.ELF;1' -serial stdio
 ```
 
 This command boots the firmware bring-up program, not the whole OS. This ISO
@@ -61,20 +63,52 @@ deliberately uses a flat binary linked at 0x01000000. The separate ELF output
 has its ordinary physical/virtual addresses for loading from real firmware.
 Add `-S -s` to stop at reset and attach a PowerPC-capable GDB on port 1234.
 
+## Kernel loader boundary
+
+`/chosen/bootargs` supplies one absolute Open Firmware path. An empty value
+runs only firmware discovery. The CD test passes `cd:\PROBE.ELF;1` through
+the firmware's `boot-file` option. This is a diagnostic ELF, not Vinix's
+main kernel. It is built from `tests/powerpc/handoff/`.
+
+The loader accepts static ELF32 MSB PowerPC ET_EXEC files below 16 MiB,
+with at most 16 nonoverlapping load segments and matching virtual/physical
+addresses. It rejects dynamic linking, TLS, malformed tables, overflowed
+ranges and entries outside file-backed executable instructions. It checks
+the complete image before claiming destination memory, loads segments,
+zeros BSS and publishes instructions to the G4 caches. Source memory and
+file handles are released if the image returns or loading fails.
+
+The initial handoff ABI is PPC32 SysV: `r3` points to `powerpc.boot.Info`,
+`r4` is the firmware client pointer, and `r1` uses a claimed 64 KiB stack
+aligned to 16 bytes. Firmware is still active. The available-memory snapshot
+is refreshed after claims and excludes the loader, copied FDT, source image,
+kernel and stack. The `Info` map is authoritative; the copied firmware tree's
+earlier `available` property is not an allocator input. Kernels must retain
+firmware reservations until they can replace firmware mappings and services.
+The loader checks identity translations for every page of the executable,
+stack, copied tree and loader; nonidentity mappings currently fail safely.
+
+The probe checks initialized data, zeroed/writable BSS, stack alignment/range,
+boot-info version/size, FDT magic and kernel/stack exclusion from free memory.
+It returns to the loader for an explicit PASS marker. The full kernel must
+eventually establish exception vectors, MMU mappings, interrupts and its own
+console, then stop using firmware. That takeover is not implemented yet.
+
 ## Milestones
 
 1. **Working:** V cross-build, ELF32 MSB link, Open Firmware entry and automated
    QEMU boot check. No dependency on the amd64/arm64 kernel build products.
 2. **Working in QEMU:** available-memory map with loader exclusions, copied
-   device tree, optional framebuffer metadata. Pending: kernel/initramfs loading,
-   physical-address translation on real firmware. The ISO-to-ELF firmware
+   device tree, optional framebuffer metadata, checked ELF32 loading and
+   stack/boot-info handoff. Pending: initramfs loading and support for
+   nonidentity firmware mappings. The ISO-to-ELF firmware
    boot path works in QEMU; Apple's firmware and physical CD boot are untested.
 3. **Working in QEMU:** kernel `powerpc.cpu` primitives for PVR/MSR, coherent
    64-bit timebase reads, 32-bit CAS and G4 instruction-cache publication.
    The guest checks successful/failed CAS, clock progress, and executing code
    after cache synchronization. Pending: exceptions, TLB/MMU, interrupt
    controller, timer interrupt, 64-bit atomic policy and scheduler integration.
-4. Pending: common kernel pointer-width/endian audit, ELF32 execution and
+4. Pending: common kernel pointer-width/endian audit, userspace ELF32 execution and
    PPC32 Linux syscall ABI, signals, TLS and floating-point/vector state.
 5. Pending: PPC32 libc, init, shell and desktop userland; small-memory profile.
 6. Pending: real-machine ATA/DBDMA, USB OHCI/EHCI, GEM Ethernet, framebuffer,

@@ -46,9 +46,20 @@ fn build(root string, output string) ! {
 	zig := tool('VINIX_PPC_ZIG', 'zig')!
 	headers := zig_headers(zig)!
 	preserve_sources(root, output, v, zig)!
+	cross_build(root, output, v, zig, headers, 'powerpc-boot', 'loader', 'vinix-of', 'vinix_of_entry')!
+	cross_build(root, output, v, zig, headers, 'tests/powerpc/handoff', 'probe', 'handoff-probe', 'vinix_handoff_probe')!
+	command([zig, 'objcopy', '-O', 'binary', output + '/vinix-of.elf', output + '/vinix-of.bin'])!
+	make_iso(output)!
+	for name in ['vinix-of.elf', 'vinix-of.bin', 'handoff-probe.elf', 'vinix-ppc-boot.iso'] {
+		data := os.read_bytes(output + '/' + name)!
+		os.write_file(output + '/' + name + '.sha256', sha256.hexhash(data.bytestr()) + '  ' + name + '\n')!
+	}
+}
+
+fn cross_build(root string, output string, v string, zig string, headers string, source string, generated string, binary string, entry string) ! {
 	command([v, '-shared', '-no-builtin', '-no-closures', '-enable-globals', '-os', 'vinix', '-arch',
 		'ppc', '-target-libc-headers', '-nofloat', '-gc', 'none', '-manualfree', '-o',
-		output + '/loader.c', '-path', '@vlib|' + root + '/kernel', root + '/powerpc-boot'])!
+		output + '/${generated}.c', '-path', '@vlib|' + root + '/kernel', root + '/' + source])!
 	// Use musl's type declarations, but the V freestanding runtime owns
 	// memcpy/memset. V's exported voidptr lacks C's const qualifier.
 	command([zig, 'cc', '-target', 'powerpc-linux-musl', '-mcpu=7450', '-O2', '-D_STRING_H', '-isystem',
@@ -56,14 +67,8 @@ fn build(root string, output string) ! {
 		headers + '/powerpc-linux-any', '-isystem', headers + '/any-linux-any', '-ffreestanding',
 		'-fno-builtin', '-fno-stack-protector', '-fno-pic', '-fno-pie', '-ffunction-sections',
 		'-fdata-sections', '-mno-altivec', '-nostdlib', '-static', '-Wl,--gc-sections',
-		'-Wl,--build-id=none', '-Wl,-e,vinix_of_entry', '-Wl,-T,' + root + '/powerpc-boot/linker.ld',
-		output + '/loader.c', '-o', output + '/vinix-of.elf'])!
-	command([zig, 'objcopy', '-O', 'binary', output + '/vinix-of.elf', output + '/vinix-of.bin'])!
-	make_iso(output)!
-	for name in ['vinix-of.elf', 'vinix-of.bin', 'vinix-ppc-boot.iso'] {
-		data := os.read_bytes(output + '/' + name)!
-		os.write_file(output + '/' + name + '.sha256', sha256.hexhash(data.bytestr()) + '  ' + name + '\n')!
-	}
+		'-Wl,--build-id=none', '-Wl,-e,' + entry, '-Wl,-T,' + root + '/' + source + '/linker.ld',
+		output + '/${generated}.c', '-o', output + '/${binary}.elf'])!
 }
 
 fn boot(output string, test bool, media bool) ! {
@@ -72,7 +77,7 @@ fn boot(output string, test bool, media bool) ! {
 		'-nic', 'none', '-no-reboot']
 	if media {
 		args << ['-cdrom', output + '/vinix-ppc-boot.iso', '-boot', 'd', '-prom-env',
-			'boot-device=cd:\\BOOT.ELF;1']
+			'boot-device=cd:\\BOOT.ELF;1', '-prom-env', 'boot-file=cd:\\PROBE.ELF;1']
 	} else {
 		args << ['-kernel', output + '/vinix-of.bin']
 	}
@@ -99,12 +104,19 @@ fn boot(output string, test bool, media bool) ! {
 	deadline := time.now().add(20 * time.second)
 	for time.now() < deadline && child.is_alive() {
 		log = os.read_file(log_path)!
-		if log.contains('VINIX-PPC: PASS firmware discovery') { break }
+		if log.contains(if media {
+			'VINIX-PPC: PASS ELF32 handoff probe'
+		} else {
+			'VINIX-PPC: PASS firmware discovery'
+		}) || log.contains('VINIX-PPC: FAIL') {
+			break
+		}
 		time.sleep(10 * time.millisecond)
 	}
 	print(log)
 	if !log.contains('VINIX-PPC: PASS firmware discovery')
-		|| !log.contains('VINIX-PPC: PASS cpu clock atomics cache') || log.contains('VINIX-PPC: FAIL') {
+		|| !log.contains('VINIX-PPC: PASS cpu clock atomics cache')
+		|| (media && !log.contains('VINIX-PPC: PASS ELF32 handoff probe')) || log.contains('VINIX-PPC: FAIL') {
 		return error('PPC boot did not reach the firmware milestone; see ${log_path}')
 	}
 	for line in log.split_into_lines() {

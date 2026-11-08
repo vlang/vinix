@@ -25,3 +25,20 @@ guest tests above.
 
 This does not validate the complete Vinix kernel, userspace, desktop, or
 physical iMac hardware. The loader currently returns to firmware.
+
+## ELF32 handoff
+
+The subsequent CD-to-loader-to-ELF probe also passes. It verifies initialized
+data, zeroed/writable BSS, an aligned claimed stack, boot-info fields, FDT
+magic and exclusion of kernel/stack pages from the available-memory map.
+The loader checks each claimed page through the firmware MMU `translate`
+method before transferring control. Host ELF tests cover every truncated
+prefix, malformed headers, integer/bounds/alignment errors, unsupported
+dynamic loaders, nonexecutable entries and overlapping segments. Both the
+ELF and FDT host test files pass.
+
+Artifact bundle: `/tmp/vinix-ppc-handoff-verified`.
+Base revision: `86ca85518e2161512ab64a61ab5623670bf60ccb`; exact inputs are
+preserved in the bundle's source snapshot and manifest. `SHA256SUMS` digest:
+`79830df8a4334c22292869630d5062ad998a8dbe818eb3e575cc4d9ee5f69d0f`.
+The loaded ELF is a test fixture; this is not a full-kernel boot.

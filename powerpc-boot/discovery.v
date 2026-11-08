@@ -1,29 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
-struct MemoryRange {
-mut:
-	base u32
-	size u32
-}
+import powerpc.boot
 
-struct BootInfo {
-mut:
-	magic           u32
-	version         u32
-	bytes           u32
-	tree            u32
-	tree_size       u32
-	available_count u32
-	available       [64]MemoryRange
-	framebuffer     u32
-	width           u32
-	height          u32
-	pitch           u32
-	depth           u32
-}
-
-__global boot_info BootInfo
+__global boot_info boot.Info
 
 fn C.vinix_image_end()
 
@@ -100,7 +80,7 @@ fn discover_memory() bool {
 
 fn add_memory(base u32, size u32) bool {
 	if boot_info.available_count >= 64 { return false }
-	boot_info.available[boot_info.available_count] = MemoryRange{base, size}
+	boot_info.available[boot_info.available_count] = boot.MemoryRange{base, size}
 	boot_info.available_count++
 	puts(c'VINIX-PPC: available ')
 	hex(base)
@@ -134,7 +114,7 @@ fn discover_framebuffer() {
 }
 
 fn discover() bool {
-	boot_info = BootInfo{ magic: 0x564f4631, version: 1, bytes: sizeof(BootInfo) }
+	boot_info = boot.Info{ magic: boot.magic, version: boot.version, bytes: sizeof(boot.Info) }
 	if !copy_device_tree() { return false }
 	discover_framebuffer()
 	// Read available after claims: firmware-owned and loader-owned pages must

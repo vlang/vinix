@@ -90,6 +90,13 @@ Linux's `/dev/kvm` API is not implemented. See
 [Virtualization and KVM support](docs/virtualization.md) for host requirements,
 launch commands, and the current limits.
 
+### PowerPC G4 bring-up
+
+The experimental [PowerPC G4 port](docs/powerpc.md) has a V Open Firmware
+loader, G4 CPU primitives, and an ISO-to-ELF32 handoff test under QEMU `mac99`.
+Build and run it with `v run tools/powerpc run`. The full kernel, userspace,
+desktop and physical iMac G4 boot are not supported yet.
+
 ## Roadmap
 
 See [the roadmap to 1.0](roadmap.md) for the full feature-parity plan for macOS,

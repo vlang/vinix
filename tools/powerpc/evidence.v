@@ -18,11 +18,9 @@ fn capture(args []string) !string {
 
 fn preserve_sources(root string, output string, compiler string, zig string) ! {
 	mut files := []string{}
-	for folder in ['powerpc-boot', 'kernel/powerpc', 'tools/powerpc'] {
-		files << os.walk_ext(root + '/' + folder, '.v')
+	for folder in ['powerpc-boot', 'kernel/powerpc', 'tools/powerpc', 'tests/powerpc'] {
+		for suffix in ['.v', '.mod', '.ld'] { files << os.walk_ext(root + '/' + folder, suffix) }
 	}
-	files << [root + '/powerpc-boot/linker.ld', root + '/powerpc-boot/v.mod',
-		root + '/tools/powerpc/v.mod']
 	files.sort()
 	mut checksums := ''
 	for path in files {
@@ -43,8 +41,9 @@ fn preserve_sources(root string, output string, compiler string, zig string) ! {
 
 fn seal_results(output string) ! {
 	mut checksums := ''
-	for file in ['build.txt', 'sources.sha256', 'loader.c', 'vinix-of.elf', 'vinix-of.bin',
-		'vinix-ppc-boot.iso', 'firmware.dtb', 'boot.log', 'media-boot.log'] {
+	for file in ['build.txt', 'sources.sha256', 'loader.c', 'probe.c', 'handoff-probe.elf',
+		'vinix-of.elf', 'vinix-of.bin', 'vinix-ppc-boot.iso', 'firmware.dtb', 'boot.log',
+		'media-boot.log'] {
 		if !os.is_file(output + '/' + file) { continue }
 		data := os.read_bytes(output + '/' + file)!
 		checksums += sha256.hexhash(data.bytestr()) + '  ' + file + '\n'

@@ -40,8 +40,11 @@ fn directory_record(mut image []u8, at int, extent u32, size u32, flags u8, name
 // PC El Torito boot records and UEFI executables have no role here.
 fn make_iso(output string) ! {
 	loader := os.read_bytes(output + '/vinix-of.elf')!
+	probe := os.read_bytes(output + '/handoff-probe.elf')!
 	if loader.len == 0 || loader.len > 16 * 1024 * 1024 { return error('Invalid loader size') }
-	blocks := 21 + (loader.len + sector_size - 1) / sector_size
+	if probe.len == 0 || probe.len > 16 * 1024 * 1024 { return error('Invalid probe size') }
+	probe_block := 21 + (loader.len + sector_size - 1) / sector_size
+	blocks := probe_block + (probe.len + sector_size - 1) / sector_size
 	mut image := []u8{len: blocks * sector_size}
 	pvd := 16 * sector_size
 	image[pvd] = 1
@@ -81,7 +84,9 @@ fn make_iso(output string) ! {
 	mut at := 20 * sector_size
 	at += directory_record(mut image, at, 20, sector_size, 2, [u8(0)])
 	at += directory_record(mut image, at, 20, sector_size, 2, [u8(1)])
-	directory_record(mut image, at, 21, u32(loader.len), 0, 'BOOT.ELF;1'.bytes())
+	at += directory_record(mut image, at, 21, u32(loader.len), 0, 'BOOT.ELF;1'.bytes())
+	directory_record(mut image, at, u32(probe_block), u32(probe.len), 0, 'PROBE.ELF;1'.bytes())
 	copy(mut image[21 * sector_size..21 * sector_size + loader.len], loader)
+	copy(mut image[probe_block * sector_size..probe_block * sector_size + probe.len], probe)
 	os.write_file_array(output + '/vinix-ppc-boot.iso', image)!
 }

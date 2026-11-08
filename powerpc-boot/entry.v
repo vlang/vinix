@@ -11,7 +11,7 @@ mut:
 	cells   [12]u32
 }
 
-type Client = fn (&Call) int
+type Client = fn (&Call) i32
 
 __global firmware Client
 __global stdout_handle u32
@@ -74,5 +74,9 @@ fn entry(_ u32, _ u32, client Client) {
 		puts(c'VINIX-PPC: FAIL cpu primitives\r\n')
 		return
 	}
-	if !discover() { puts(c'VINIX-PPC: FAIL firmware discovery\r\n') }
+	if !discover() {
+		puts(c'VINIX-PPC: FAIL firmware discovery\r\n')
+		return
+	}
+	if !load_image() { puts(c'VINIX-PPC: FAIL ELF32 load or handoff\r\n') }
 }
