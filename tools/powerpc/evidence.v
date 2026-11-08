@@ -44,10 +44,14 @@ fn seal_results(output string) ! {
 	mut checksums := ''
 	for file in ['build.txt', 'sources.sha256', 'loader.c', 'probe.c', 'handoff-probe.elf', 'kernel.c',
 		'init.c', 'init-ppc.elf', 'ramfs.tar', 'vinix-ppc.elf', 'kernel-boot.log', 'vinix-of.elf',
-		'vinix-of.bin', 'vinix-ppc-boot.iso', 'firmware.dtb', 'boot.log', 'media-boot.log', 'shell-commands.log'] {
+		'vinix-of.bin', 'vinix-ppc-boot.iso', 'firmware.dtb', 'boot.log', 'media-boot.log', 'shell-commands.log', 'qemu.txt'] {
 		if !os.is_file(output + '/' + file) { continue }
 		data := os.read_bytes(output + '/' + file)!
 		checksums += sha256.hexhash(data.bytestr()) + '  ' + file + '\n'
 	}
 	os.write_file(output + '/SHA256SUMS', checksums)!
+}
+
+fn record_qemu(output string, qemu string, args []string) ! {
+	os.write_file(output + '/qemu.txt', capture([qemu, '--version'])! + '\nArguments (one per line):\n' + args.join('\n') + '\n')!
 }

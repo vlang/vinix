@@ -91,3 +91,16 @@ Media regression bundle: `/tmp/vinix-ppc-initramfs-media`, base revision
 This validates the initial PPC kernel and freestanding V shell under QEMU,
 not the shared Vinix kernel, ordinary Linux programs, desktop, or physical
 iMac G4. The default runner now selects the shell and terminal serial I/O.
+
+## 128 MiB guest
+
+The same complete shell suite passes with `VINIX_PPC_MEMORY=128`, including
+protection checks, commands, descriptor reuse, stable free pages and exit.
+The allocator reports 86,416 KiB managed and 86,204 KiB free, with firmware
+and boot-file claims still reserved. This is the initial shell's footprint,
+not a measurement of the future desktop.
+
+Bundle: `/tmp/vinix-ppc-shell-128`, base revision `9875519d2` plus the source
+snapshot. `qemu.txt` records the emulator version and arguments.
+`SHA256SUMS` digest:
+`d8ade0131037fb97b56dc1f4375b262d6fc279865f3417259f6be86252202dab`.

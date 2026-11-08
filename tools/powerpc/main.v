@@ -76,7 +76,9 @@ fn cross_build(root string, output string, v string, zig string, headers string,
 
 fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 	qemu := tool('VINIX_PPC_QEMU', 'qemu-system-ppc')!
-	mut args := ['-M', 'mac99,via=pmu', '-cpu', '7450', '-accel', 'tcg', '-m', '512', '-smp', '1',
+	memory := strconv.parse_uint(os.getenv_opt('VINIX_PPC_MEMORY') or { '512' }, 10, 32)!
+	if memory < 128 || memory > 2048 { return error('VINIX_PPC_MEMORY must be 128..2048 MiB') }
+	mut args := ['-M', 'mac99,via=pmu', '-cpu', '7450', '-accel', 'tcg', '-m', memory.str(), '-smp', '1',
 		'-nic', 'none', '-no-reboot']
 	if media {
 		args << ['-cdrom', output + '/vinix-ppc-boot.iso', '-boot', 'd', '-prom-env',
@@ -93,6 +95,7 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 	}
 	if !test {
 		args << ['-nographic', '-serial', 'mon:stdio']
+		record_qemu(output, qemu, args)!
 		mut argv := [qemu]
 		argv << args
 		command(argv)!
@@ -122,6 +125,7 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 	} else {
 		args << ['-serial', 'file:' + log_path]
 	}
+	record_qemu(output, qemu, args)!
 	mut child := os.new_process(qemu)
 	child.set_args(args)
 	child.set_redirect_stdio_merged()
@@ -154,7 +158,7 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 		address := strconv.parse_uint(fields[2], 0, 32)!
 		length := strconv.parse_uint(fields[4], 0, 32)!
 		nodes := strconv.parse_uint(fields[6], 0, 32)!
-		if length < 88 || length > 512 * 1024 || address + length > 512 * 1024 * 1024 {
+		if length < 88 || length > 512 * 1024 || address + length > memory * 1024 * 1024 {
 			return error('Invalid FDT guest address')
 		}
 		path := output + '/firmware.dtb'

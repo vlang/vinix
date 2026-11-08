@@ -25,7 +25,14 @@ v run tools/powerpc run /tmp/vinix-ppc-state
 ```
 
 Override executable locations with `VINIX_V_COMPILER`, `VINIX_PPC_ZIG` and
-`VINIX_PPC_QEMU`. The optional directory defaults to a worktree-specific path
+`VINIX_PPC_QEMU`. Set `VINIX_PPC_MEMORY` to the guest RAM in MiB (128..2048,
+default 512). For the small-memory check:
+
+```
+VINIX_PPC_MEMORY=128 v run tools/powerpc test-shell /tmp/vinix-ppc-128
+```
+
+The optional directory defaults to a worktree-specific path
 under the system temporary directory. Keep output outside Git.
 
 The test cross-compiles a freestanding V firmware client, links an ELF32 MSB
@@ -51,6 +58,7 @@ It no longer selects the returning handoff probe that showed `0 >`.
 The V image builder writes ISO9660 directly, without external image utilities.
 Each build saves its base Git revision, tool versions, exact source inputs,
 and SHA-256 manifests (`sources.sha256` and `SHA256SUMS`) outside Git.
+`qemu.txt` records the emulator version and exact launch arguments.
 Host corruption tests run with `v test tools/powerpc/validate_test.v`.
 ELF validation tests run with `v test kernel/powerpc/elf32`.
 Archive validation tests run with `v test kernel/powerpc/ramfs`.
@@ -154,7 +162,8 @@ Shared Vinix scheduler, filesystem and desktop integration remain pending.
    floating-point/vector state.
 5. **Working in QEMU:** freestanding V init/shell with serial input and file
    commands. Pending: PPC32 libc and ordinary applications, shared Vinix
-   userland, desktop and small-memory profile.
+   userland and desktop. The initial shell also boots with 128 MiB guest RAM;
+   that does not establish a memory budget for the eventual desktop.
 6. Pending: real-machine ATA/DBDMA, USB OHCI/EHCI, GEM Ethernet, framebuffer,
    PMU and hardware boot tests. Identify the exact iMac revision first.
 
