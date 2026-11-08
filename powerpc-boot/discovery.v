@@ -99,7 +99,7 @@ fn discover_framebuffer() {
 	pitch := property_u32(screen, c'linebytes', 0)
 	depth := property_u32(screen, c'depth', 0)
 	if address == 0 || width == 0 || height == 0 || height > 16384 || width > 16384
-		|| (depth != 8 && depth != 16 && depth != 24 && depth != 32)
+		|| (depth != 8 && depth != 15 && depth != 16 && depth != 24 && depth != 32)
 		|| pitch < width * ((depth + 7) / 8) || pitch > (0xffffffff - address) / height {
 		return
 	}

@@ -78,10 +78,13 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 	qemu := tool('VINIX_PPC_QEMU', 'qemu-system-ppc')!
 	graphics := os.getenv('VINIX_PPC_GRAPHICS') == '1'
 	hubs := os.getenv('VINIX_PPC_USB_HUB') == '1'
+	depth := os.getenv_opt('VINIX_PPC_DEPTH') or { '32' }
+	if depth != '15' && depth != '32' { return error('VINIX_PPC_DEPTH must be 15 or 32') }
 	memory := strconv.parse_uint(os.getenv_opt('VINIX_PPC_MEMORY') or { '512' }, 10, 32)!
 	if memory < 128 || memory > 2048 { return error('VINIX_PPC_MEMORY must be 128..2048 MiB') }
 	mut args := ['-M', if hubs { 'mac99,via=pmu,usb=off' } else { 'mac99,via=pmu' }, '-cpu', '7450', '-accel', 'tcg', '-m', memory.str(), '-smp', '1',
 		'-nic', 'user,model=sungem,id=net0', '-no-reboot']
+	args << ['-g', '800x600x' + depth]
 	if hubs {
 		args << ['-device', 'pci-ohci,id=ohci', '-device', 'usb-hub,id=hub,bus=ohci.0,port=1',
 			'-device', 'usb-kbd,bus=ohci.0,port=1.1', '-device', 'usb-hub,id=nested,bus=ohci.0,port=1.2,ports=4,port-power=on',

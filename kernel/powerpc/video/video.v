@@ -9,6 +9,7 @@ __global surface u32
 __global width u32
 __global height u32
 __global stride u32
+__global pixel_bytes u32
 __global column u32
 __global row u32
 __global columns u32
@@ -26,7 +27,11 @@ const foreground = u32(0xdce9f2)
 
 pub fn pixel(x u32, y u32, color u32) {
 	if surface == 0 || x >= width || y >= height { return }
-	mmio.write_be32(surface + y * stride + x * 4, color)
+	if pixel_bytes == 2 {
+		mmio.write_be16(surface + y * stride + x * 2, (color >> 9 & 0x7c00) | (color >> 6 & 0x3e0) | (color >> 3 & 31))
+	} else {
+		mmio.write_be32(surface + y * stride + x * 4, color)
+	}
 }
 
 fn rectangle(x u32, y u32, w u32, h u32, color u32) {
@@ -50,13 +55,16 @@ fn label(x u32, y u32, text &char, color u32, bg u32) {
 }
 
 pub fn init(info &boot.Info) bool {
-	if info.framebuffer == 0 || info.depth != 32 || info.width < 320 || info.width > 1920
-		|| info.height < 240 || info.height > 1200 || info.pitch < info.width * 4
+	bytes := if info.depth == 15 { u32(2) } else { u32(4) }
+	if info.framebuffer == 0 || (info.depth != 32 && info.depth != 15) || info.width < 320 || info.width > 1920
+		|| info.height < 240 || info.height > 1200 || info.pitch < info.width * bytes
+		|| info.framebuffer % bytes != 0 || info.pitch % bytes != 0
 		|| info.pitch > (0xffffffff - info.framebuffer) / info.height { return false }
 	surface = info.framebuffer
 	width = info.width
 	height = info.height
 	stride = info.pitch
+	pixel_bytes = bytes
 	columns = (width - 32) / 12
 	rows = (height - 96) / 18
 	if columns * rows > 16384 { surface = 0; return false }
@@ -108,7 +116,12 @@ pub fn put(byte u8) {
 fn hide_pointer() {
 	if !mouse_visible { return }
 	for y in 0 .. 24 {
-		for x in 0 .. 16 { pixel(u32(mouse_x + x), u32(mouse_y + y), mouse_saved[y * 16 + x]) }
+		for x in 0 .. 16 {
+			address := surface + u32(mouse_y + y) * stride + u32(mouse_x + x) * pixel_bytes
+			// Restore the exact native pixel, without quantizing it a second time.
+			if pixel_bytes == 2 { mmio.write_be16(address, mouse_saved[y * 16 + x]) }
+			else { mmio.write_be32(address, mouse_saved[y * 16 + x]) }
+		}
 	}
 	mouse_visible = false
 }
@@ -117,8 +130,8 @@ fn show_pointer() {
 	if !mouse_enabled || mouse_visible || surface == 0 { return }
 	for y in 0 .. 24 {
 		for x in 0 .. 16 {
-			address := surface + u32(mouse_y + y) * stride + u32(mouse_x + x) * 4
-			mouse_saved[y * 16 + x] = mmio.read_be32(address)
+			address := surface + u32(mouse_y + y) * stride + u32(mouse_x + x) * pixel_bytes
+			mouse_saved[y * 16 + x] = if pixel_bytes == 2 { mmio.read_be16(address) } else { mmio.read_be32(address) }
 			if y < 20 && x <= y / 2 {
 				color := if x == 0 || x == y / 2 || y == 19 { u32(0x000000) } else if mouse_buttons & 1 != 0 { u32(0xffb454) } else { u32(0xffffff) }
 				pixel(u32(mouse_x + x), u32(mouse_y + y), color)

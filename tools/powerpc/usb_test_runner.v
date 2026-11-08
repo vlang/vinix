@@ -41,6 +41,7 @@ fn exercise_usb(mut child os.Process, output string, log_path string, graphics b
 	}
 	if !typed { return error('USB keyboard failed shell typing, shift or backspace') }
 	if graphics {
+		background := screenshot(mut child, output + '/usb-background.ppm')!
 		child.stdin_write('mouse_move 50 30\n')
 		time.sleep(150 * time.millisecond)
 		data := screenshot(mut child, output + '/usb-pointer.ppm')!
@@ -52,6 +53,10 @@ fn exercise_usb(mut child os.Process, output string, log_path string, graphics b
 		child.stdin_write('mouse_button 0\n')
 		time.sleep(150 * time.millisecond)
 		validate_pointer(screenshot(mut child, output + '/usb-released.ppm')!, false)!
+		child.stdin_write('mouse_move 64 0\n')
+		time.sleep(150 * time.millisecond)
+		validate_pointer_restore(background, screenshot(mut child, output + '/usb-restored.ppm')!)!
+		child.stdin_write('mouse_move -64 0\n')
 	}
 	println('PASS USB HID keyboard typing, modifiers and editing' + if graphics { ', mouse movement and buttons' } else { '' })
 }

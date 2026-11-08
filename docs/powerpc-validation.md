@@ -188,3 +188,19 @@ bounded USB 1.1 hub traversal; reconnection remains separate work.
 
 Bundle: `/tmp/vinix-ppc-hubs-final`, base `6fa5980cd` plus preserved sources.
 `SHA256SUMS`: `81ffb33dd9d52f5af5eb53daedb301e719e92d095f3800208b854353bb40b1aa`.
+
+## RGB555 framebuffer
+
+The full shell suite passes in both 15-bit and 32-bit modes. RGB swatches,
+text and pointer colors are checked at their exact expected precision.
+Moving the pointer away restores all 384 underlying pixels byte for byte
+against a pre-movement screenshot. The RGB555 console was also visually
+inspected. The loader now accepts the firmware's 15-bit depth property;
+the renderer rejects unaligned framebuffer addresses and scanline strides.
+
+Bundles, both based on `2e85fd5b1` plus preserved sources:
+
+- `/tmp/vinix-ppc-rgb555`, `SHA256SUMS`:
+  `d1c64d3a1c1f61d23949bb6868c5652c743a62b9d72d085dd972405324ffb63a`.
+- `/tmp/vinix-ppc-rgb32-regression`, `SHA256SUMS`:
+  `a36967ff740da54d11353c9d3744ede8b3cd6b720485e0a652842094699cfce4`.

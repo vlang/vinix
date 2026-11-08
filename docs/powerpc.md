@@ -73,13 +73,18 @@ This command boots the PPC kernel and initial userspace shell. This ISO
 has no partition map, so OpenBIOS takes the filename immediately after the
 colon; adding a comma prevents lookup. Keep the ISO file version `;1`.
 Input/output uses the emulated SCC serial port. Set `VINIX_PPC_GRAPHICS=1`
-to enable the inherited 32-bit framebuffer, scrolling console and USB mouse
+to enable the inherited framebuffer, scrolling console and USB mouse
 pointer. USB boot-protocol keyboard input works alongside serial input.
 For a window with keyboard and mouse, use:
 
 ```
 VINIX_PPC_GRAPHICS=1 v run tools/powerpc run /tmp/vinix-ppc-state
 ```
+
+The renderer supports 32-bit RGB and 15-bit RGB555 in big-endian pixel
+order. `VINIX_PPC_DEPTH=15` selects QEMU's RGB555 mode; the default is 32.
+Other framebuffer depths and mode switching remain unsupported. The mouse
+cursor saves and restores native pixels without repeated color conversion.
 
 The same variable on `test-shell` verifies framebuffer RGB colors and text,
 types a command through QEMU's USB keyboard, and checks mouse movement and
@@ -224,7 +229,7 @@ Shared Vinix scheduler, filesystem and desktop integration remain pending.
    commands. Pending: PPC32 libc and ordinary applications, shared Vinix
    userland and desktop. The initial shell also boots with 128 MiB guest RAM;
    that does not establish a memory budget for the eventual desktop.
-6. **Working in QEMU:** inherited 32-bit framebuffer console and OHCI USB
+6. **Working in QEMU:** inherited 15/32-bit framebuffer console and OHCI USB
    keyboard/mouse, GEM Ethernet DMA, DHCP/ARP/ICMP and USB PCM output. Pending:
    full desktop, USB hotplug/EHCI, TCP/IP sockets, built-in iMac audio,
    real-machine ATA/DBDMA, PMU and
