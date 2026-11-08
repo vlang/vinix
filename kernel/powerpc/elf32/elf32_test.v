@@ -67,3 +67,36 @@ fn test_reject_overlapping_loads() {
 	assert parse(data.data, u32(data.len), mut image)
 	assert image.count == 2
 }
+
+fn tls_fixture() []u8 {
+	mut data := fixture()
+	put32(mut data, 24, 0x40000100)
+	put32(mut data, 44, 0x00020000)
+	put32(mut data, 56, 0)
+	put32(mut data, 60, 0x40000000)
+	put32(mut data, 64, 0x40000000)
+	put32(mut data, 68, u32(data.len))
+	for i, value in [u32(7), 256, 0x40000100, 0x40000100, 4, 16, 4, 8] {
+		put32(mut data, 84 + i * 4, value)
+	}
+	return data
+}
+
+fn test_user_tls_requires_mapped_headers_and_template() {
+	data := tls_fixture()
+	mut image := Image{}
+	assert !parse(data.data, u32(data.len), mut image)
+	assert parse_user(data.data, u32(data.len), mut image)
+	assert image.phdr == 0x40000034 && image.phnum == 2
+	for change in [[u32(88), 255]!, [u32(92), 0x41000000]!, [u32(100), 17]!,
+		[u32(104), 0xffffffff]!, [u32(112), 3]!, [u32(84), 3]!, [u32(84), 2]!] {
+		mut bad := data.clone()
+		put32(mut bad, int(change[0]), change[1])
+		assert !parse_user(bad.data, u32(bad.len), mut image)
+		assert image.count == 0
+	}
+	mut duplicate := data.clone()
+	put32(mut duplicate, 44, 0x00030000)
+	copy(mut duplicate[116..148], data[84..116])
+	assert !parse_user(duplicate.data, u32(duplicate.len), mut image)
+}

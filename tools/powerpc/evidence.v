@@ -43,7 +43,7 @@ fn preserve_sources(root string, output string, compiler string, zig string) ! {
 fn seal_results(output string) ! {
 	mut checksums := ''
 	for file in ['build.txt', 'sources.sha256', 'loader.c', 'probe.c', 'handoff-probe.elf', 'kernel.c',
-		'init.c', 'init-ppc.elf', 'ramfs.tar', 'vinix-ppc.elf', 'kernel-boot.log', 'vinix-of.elf',
+		'init.c', 'init-ppc.elf', 'libc.c', 'libc.elf', 'ramfs.tar', 'vinix-ppc.elf', 'kernel-boot.log', 'vinix-of.elf',
 		'vinix-of.bin', 'vinix-ppc-boot.iso', 'firmware.dtb', 'boot.log', 'media-boot.log', 'shell-commands.log', 'qemu.txt', 'qemu.log', 'screen.ppm', 'usb-pointer.ppm', 'usb-pressed.ppm', 'usb-released.ppm', 'usb-background.ppm', 'usb-restored.ppm', 'userspace-framebuffer.ppm', 'framebuffer-console-restored.ppm', 'network.pcap', 'audio.wav'] {
 		if !os.is_file(output + '/' + file) { continue }
 		data := os.read_bytes(output + '/' + file)!

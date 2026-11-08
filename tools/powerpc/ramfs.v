@@ -33,6 +33,8 @@ fn make_ramfs(output string) ! {
 	mut archive := []u8{}
 	tar_entry(mut archive, 'bin/', []u8{}, true)
 	tar_entry(mut archive, 'etc/', []u8{}, true)
+	init := os.getenv_opt('VINIX_PPC_INIT') or { output + '/init-ppc.elf' }
+	if init != output + '/init-ppc.elf' { os.cp(init, output + '/init-ppc.elf')! }
 	tar_entry(mut archive, 'bin/init', os.read_bytes(output + '/init-ppc.elf')!, false)
 	tar_entry(mut archive, 'etc/motd', 'Vinix PowerPC development system\nProtected userspace, read-only boot filesystem, serial console.\n'.bytes(), false)
 	tar_entry(mut archive, 'README', 'This is the initial PPC32 userspace. Desktop, disks and networking are still being ported.\n'.bytes(), false)

@@ -74,9 +74,19 @@ asm ppc raw {
 	"lmw 2,40(1)\nlwz 0,32(1)\nlwz 1,36(1)\nrfi\n"
 	".globl vinix_vector_end\nvinix_vector_end:\n"
 	".globl vinix_enter_user\nvinix_enter_user:\n"
+	// The initial kernel forbids implicit FP and has one process. User FPRs
+	// survive traps untouched. Initialize every register before first entry;
+	// scheduling will require an explicit per-thread FPU context.
+	"mfmsr 5\nori 5,5,0x2000\nmtmsr 5\nisync\n"
+	"lis 5,vinix_fpu_zero@ha\nlfd 0,vinix_fpu_zero@l(5)\nmtfsf 255,0\n"
+	"fmr 1,0\nfmr 2,0\nfmr 3,0\nfmr 4,0\nfmr 5,0\nfmr 6,0\nfmr 7,0\n"
+	"fmr 8,0\nfmr 9,0\nfmr 10,0\nfmr 11,0\nfmr 12,0\nfmr 13,0\nfmr 14,0\nfmr 15,0\n"
+	"fmr 16,0\nfmr 17,0\nfmr 18,0\nfmr 19,0\nfmr 20,0\nfmr 21,0\nfmr 22,0\nfmr 23,0\n"
+	"fmr 24,0\nfmr 25,0\nfmr 26,0\nfmr 27,0\nfmr 28,0\nfmr 29,0\nfmr 30,0\nfmr 31,0\n"
 	"mtsrr0 3\nli 0,0\nmtlr 0\nmtctr 0\nmtxer 0\nmtcr 0\n"
-	"mr 1,4\nli 0,0\nori 0,0,0xc030\nmtsrr1 0\n"
+	"mr 1,4\nli 0,0\nori 0,0,0xe030\nmtsrr1 0\n"
 	"li 2,0\nli 3,0\nli 4,0\nli 5,0\nli 6,0\nli 7,0\nli 8,0\nli 9,0\nli 10,0\nli 11,0\nli 12,0\nli 13,0\n"
 	"li 14,0\nli 15,0\nli 16,0\nli 17,0\nli 18,0\nli 19,0\nli 20,0\nli 21,0\nli 22,0\nli 23,0\nli 24,0\nli 25,0\nli 26,0\nli 27,0\nli 28,0\nli 29,0\nli 30,0\nli 31,0\nli 0,0\nrfi\n"
 	".popsection\n"
+	".pushsection .rodata.vinix_fpu_zero,\"a\"\n.balign 8\nvinix_fpu_zero: .long 0,0\n.popsection\n"
 }

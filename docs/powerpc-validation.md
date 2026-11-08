@@ -269,3 +269,24 @@ Base revision: `8d6c7461e`, with the source overlay preserved in
 `/tmp/vinix-ppc-fbdev-abi-final/sources/`. Bundle:
 `/tmp/vinix-ppc-fbdev-abi-final/SHA256SUMS`, digest
 `5ee0e99a2efcd77ba5fcb502286b976051da96a6c25e346c82ea7c14fc1277e9`.
+
+## Native desktop cross-link and libc startup (2026-11-08)
+
+The actual desktop links as a static PPC32 MSB executable with the compiler/ui2
+revisions documented in `powerpc.md`. The two staging tests passed. The complete
+build/source archive is `/tmp/vinix-ppc-desktop-audit`, base `77947bc7b`;
+`SHA256SUMS`: `e9ce54ee18b0c626ad592212d71a9354c5bda42c072fb4aee79bbbaf19523708`.
+This is an application cross-build, not proof of a running desktop session.
+
+The native musl-linked V runtime probe boots through Open Firmware, enters user
+mode, passes argv/environment/auxv/TLS checks, performs 200 heap/mapping cycles
+with stable free-page counts, checks zeroed reused mappings and rollback after
+capacity exhaustion, uses libm across syscalls, checks monotonic time and exits
+with status zero. Host ELF tests also cover malformed and duplicate TLS headers.
+The unchanged graphics/USB/audio/network shell suite passed at 128 MiB with two
+USB hub tiers. Both bundles preserve the `77947bc7b` source overlays:
+
+- `/tmp/vinix-ppc-libc-final`: runtime test. `SHA256SUMS`:
+  `336ef43120c3033ab94fa0a501580d4f73291fb4ce7a8b1c376f4334e2d9d6a4`.
+- `/tmp/vinix-ppc-libc-regression`: full device regression. `SHA256SUMS`:
+  `38de388be8066bcc69f064555e4b9b94b61beae76a96ceef17cca517f7b2dc48`.

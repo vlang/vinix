@@ -86,3 +86,4 @@ kernel/tmp.v
 /tests/**/results/
 /artifacts/
 /tools/powerpc/powerpc
+/tools/powerpc-desktop/powerpc-desktop

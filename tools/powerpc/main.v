@@ -40,7 +40,7 @@ fn zig_headers(zig string) !string {
 	return error('Cannot locate Zig musl headers')
 }
 
-fn build(root string, output string) ! {
+fn build(root string, output string, runtime_probe bool) ! {
 	os.mkdir_all(output)!
 	v := tool('VINIX_V_COMPILER', 'v')!
 	zig := tool('VINIX_PPC_ZIG', 'zig')!
@@ -50,6 +50,16 @@ fn build(root string, output string) ! {
 	cross_build(root, output, v, zig, headers, 'tests/powerpc/handoff', 'probe', 'handoff-probe', 'vinix_handoff_probe')!
 	cross_build(root, output, v, zig, headers, 'kernel/powerpc/start', 'kernel', 'vinix-ppc', 'vinix_ppc_entry')!
 	cross_build(root, output, v, zig, headers, 'userland/powerpc/init', 'init', 'init-ppc', 'vinix_user_init')!
+	if runtime_probe {
+		command([v, '-shared', '-no-builtin', '-no-closures', '-os', 'vinix', '-arch', 'ppc',
+			'-target-libc-headers', '-gc', 'none', '-manualfree', '-o', output + '/libc.c', root + '/tests/powerpc/libc'])!
+		command([zig, 'cc', '-target', 'powerpc-linux-musleabihf', '-mcpu=7450', '-mno-altivec',
+			'-O2', '-fno-pic', '-fno-pie', '-fno-stack-protector', '-static', '-D_GNU_SOURCE',
+			'-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-Wl,--build-id=none',
+			'-Wl,-T,' + root + '/tests/powerpc/libc/linker.ld', output + '/libc.c', '-lc', '-lm',
+			'-o', output + '/libc.elf'])!
+		os.setenv('VINIX_PPC_INIT', output + '/libc.elf', true)
+	}
 	make_ramfs(output)!
 	command([zig, 'objcopy', '-O', 'binary', output + '/vinix-of.elf', output + '/vinix-of.bin'])!
 	make_iso(output)!
@@ -65,7 +75,7 @@ fn cross_build(root string, output string, v string, zig string, headers string,
 		output + '/${generated}.c', '-path', '@vlib|' + root + '/kernel', root + '/' + source])!
 	// Use musl's type declarations, but the V freestanding runtime owns
 	// memcpy/memset. V's exported voidptr lacks C's const qualifier.
-	command([zig, 'cc', '-target', 'powerpc-linux-musl', '-mcpu=7450', '-O2', '-D_STRING_H', '-isystem',
+	command([zig, 'cc', '-target', 'powerpc-linux-musl', '-mcpu=7450-hard_float', '-O2', '-D_STRING_H', '-isystem',
 		headers + '/powerpc-linux-musl', '-isystem', headers + '/generic-musl', '-isystem',
 		headers + '/powerpc-linux-any', '-isystem', headers + '/any-linux-any', '-ffreestanding',
 		'-fno-builtin', '-fno-stack-protector', '-fno-pic', '-fno-pie', '-ffunction-sections',
@@ -74,7 +84,7 @@ fn cross_build(root string, output string, v string, zig string, headers string,
 		output + '/${generated}.c', '-o', output + '/${binary}.elf'])!
 }
 
-fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
+fn boot(output string, test bool, media bool, kernel bool, shell bool, runtime_probe bool) ! {
 	qemu := tool('VINIX_PPC_QEMU', 'qemu-system-ppc')!
 	graphics := os.getenv('VINIX_PPC_GRAPHICS') == '1'
 	hubs := os.getenv('VINIX_PPC_USB_HUB') == '1'
@@ -98,7 +108,7 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 	if media {
 		args << ['-cdrom', output + '/vinix-ppc-boot.iso', '-boot', 'd', '-prom-env',
 			'boot-device=cd:\\BOOT.ELF;1', '-prom-env',
-			if shell {
+			if shell || runtime_probe {
 				'boot-file=cd:\\KERNEL.ELF;1 cd:\\RAMFS.TAR;1'
 			} else if kernel {
 				'boot-file=cd:\\KERNEL.ELF;1'
@@ -124,7 +134,9 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 	} else {
 		'/boot.log'
 	}
-	marker := if shell {
+	marker := if runtime_probe {
+		'Vinix: init exited, status 0x00000000'
+	} else if shell {
 		'vinix$ '
 	} else if kernel {
 		'VINIX-PPC: PASS userspace MMU syscall and protection'
@@ -169,6 +181,9 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 		|| !log.contains('VINIX-PPC: PASS cpu clock atomics cache')
 		|| !log.contains(marker) || log.contains('VINIX-PPC: FAIL') || log.contains('VINIX-PPC: PANIC') {
 		return error('PPC boot did not reach the requested milestone; see ${log_path}')
+	}
+	if runtime_probe && !log.contains('VINIX-PPC: PASS libc argv auxv TLS heap mmap FPU clock') {
+		return error('Libc runtime probe did not pass')
 	}
 	if shell {
 		if hubs && (!log.contains('USB hub ready, depth 0x00000001') || !log.contains('USB hub ready, depth 0x00000002')) {
@@ -224,8 +239,8 @@ fn main() {
 	root := os.real_path(@VMODROOT + '/../..')
 	mut output := os.join_path(os.temp_dir(), 'vinix-powerpc-' + sha256.hexhash(root)[..12])
 	args := os.args[1..]
-	if args.len == 0 || args[0] !in ['build', 'run', 'test', 'test-media', 'test-kernel', 'test-shell'] {
-		eprintln('Usage: v run tools/powerpc {build|run|test|test-media|test-kernel|test-shell} [OUTPUT_DIRECTORY]')
+	if args.len == 0 || args[0] !in ['build', 'run', 'test', 'test-media', 'test-kernel', 'test-shell', 'test-runtime'] {
+		eprintln('Usage: v run tools/powerpc {build|run|test|test-media|test-kernel|test-shell|test-runtime} [OUTPUT_DIRECTORY]')
 		exit(2)
 	}
 	if args.len > 2 {
@@ -237,16 +252,16 @@ fn main() {
 		eprintln('Invalid output path')
 		exit(2)
 	}
-	build(root, output) or {
+	build(root, output, args[0] == 'test-runtime') or {
 		eprintln(err)
 		exit(1)
 	}
 	println('PowerPC build: ${output}')
 	if args[0] != 'build' {
-		boot(output, args[0] != 'run', args[0] != 'test', args[0] in ['run', 'test-kernel', 'test-shell'], args[0] in [
+		boot(output, args[0] != 'run', args[0] != 'test', args[0] in ['run', 'test-kernel', 'test-shell', 'test-runtime'], args[0] in [
 			'run',
 			'test-shell',
-		]) or {
+		], args[0] == 'test-runtime') or {
 			eprintln(err)
 			exit(1)
 		}

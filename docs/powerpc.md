@@ -45,6 +45,7 @@ v run tools/powerpc test /tmp/vinix-ppc-state
 v run tools/powerpc test-media /tmp/vinix-ppc-cd-state
 v run tools/powerpc test-kernel /tmp/vinix-ppc-kernel-state
 v run tools/powerpc test-shell /tmp/vinix-ppc-shell-state
+v run tools/powerpc test-runtime /tmp/vinix-ppc-runtime-state
 v run tools/powerpc run /tmp/vinix-ppc-state
 ```
 
@@ -55,6 +56,17 @@ default 512). For the small-memory check:
 ```
 VINIX_PPC_MEMORY=128 v run tools/powerpc test-shell /tmp/vinix-ppc-128
 ```
+
+`test-runtime` boots a V test program linked with real musl crt1/libc/libm.
+It verifies the initial argument/environment/auxiliary stack, ELF TLS, errno,
+200 malloc/free and anonymous mmap/munmap cycles, zero filling, failed-map
+rollback, monotonic time and floating-point values surviving system calls.
+The single-process kernel now supports a bounded `brk` heap and private RW
+anonymous mappings. Executable/shared/fixed anonymous mappings remain rejected.
+Its integer-only kernel build disables the LLVM hard-float feature; the one
+user process owns the FPU until scheduling and per-thread FPU contexts exist.
+`VINIX_PPC_INIT` can select an alternate static executable for the boot archive;
+its ELF segments must respect the existing PPC text/data address ranges.
 
 The optional directory defaults to a worktree-specific path
 under the system temporary directory. Keep output outside Git.

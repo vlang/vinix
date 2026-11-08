@@ -32,6 +32,50 @@ fn copy_to_user(address u32, source &u8, size u32) bool {
 	return true
 }
 
+fn copy_from_user(destination &u8, address u32, size u32) bool {
+	if !user_space.accessible(address, size, false) { return false }
+	mut done := u32(0)
+	for done < size {
+		mut count := 4096 - ((address + done) & 4095)
+		if count > size - done { count = size - done }
+		runtime.copy(unsafe { &destination[done] }, voidptr(user_space.translate(address + done, false)), count)
+		done += count
+	}
+	return true
+}
+
+fn sys_writev(fd u32, vectors u32, count u32) int {
+	if fd != 1 && fd != 2 { return -9 }
+	if count > 1024 { return -22 }
+	if !user_space.accessible(vectors, count * 8, false) { return -14 }
+	mut total := 0
+	for i := u32(0); i < count; i++ {
+		mut pair := [2]u32{}
+		if !copy_from_user(unsafe { &u8(&pair[0]) }, vectors + i * 8, 8) { return -14 }
+		if pair[1] > u32(0x7fffffff - total) { return if total > 0 { total } else { -22 } }
+		mut sent := u32(0)
+		for sent < pair[1] {
+			result := sys_write(fd, pair[0] + sent, pair[1] - sent)
+			if result < 0 { return if total > 0 { total } else { result } }
+			if result == 0 { return total }
+			sent += u32(result)
+			total += result
+		}
+	}
+	return total
+}
+
+fn sys_clock64(clock_id u32, address u32) int {
+	if clock_id != 1 && clock_id != 4 { return -22 } // monotonic and monotonic raw
+	elapsed := cpu.timebase() - boot_clock
+	seconds := runtime.divide_u64(elapsed, startup_info.timebase_hz)
+	nanos := runtime.divide_u64((elapsed - seconds * startup_info.timebase_hz) * 1000000000, startup_info.timebase_hz)
+	buffer_word(0, u32(seconds >> 32)); buffer_word(4, u32(seconds))
+	buffer_word(8, 0); buffer_word(12, u32(nanos))
+	if !copy_to_user(address, unsafe { &io_buffer[0] }, 16) { return -14 }
+	return 0
+}
+
 fn user_path(address u32) int {
 	for i := u32(0); i < 128; i++ {
 		if i > 0xffffffff - address { return -14 }
@@ -250,7 +294,7 @@ fn sys_ioctl(fd u32, request u32, address u32) int {
 fn syscall(mut frame exception.Frame) {
 	mut result := -38
 	match frame.gpr[0] {
-		1 {
+		1, 234 {
 			if framebuffer_length != 0 { framebuffer_unmap(framebuffer_virtual, framebuffer_length) }
 			serial.text(c'\nVinix: init exited, status ')
 			serial.hex(frame.gpr[3])
@@ -269,12 +313,22 @@ fn syscall(mut frame exception.Frame) {
 			}
 		}
 		20 { result = 1 }
+		45 { result = sys_brk(frame.gpr[3]) }
 		54 { result = sys_ioctl(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
-		91 { result = framebuffer_unmap(frame.gpr[3], frame.gpr[4]) }
+		91 {
+			result = if frame.gpr[3] == framebuffer_virtual { framebuffer_unmap(frame.gpr[3], frame.gpr[4]) }
+				else { anonymous_unmap(frame.gpr[3], frame.gpr[4]) }
+		}
 		116 { result = sys_info(frame.gpr[3]) }
 		122 { result = sys_uname(frame.gpr[3]) }
 		141 { result = sys_getdents(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
-		192 { result = framebuffer_map(frame.gpr[3], frame.gpr[4], frame.gpr[5], frame.gpr[6], frame.gpr[7], frame.gpr[8]) }
+		146 { result = sys_writev(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
+		192 {
+			result = if frame.gpr[6] & 0x20 != 0 { anonymous_map(frame.gpr[3], frame.gpr[4], frame.gpr[5], frame.gpr[6], frame.gpr[8]) }
+				else { framebuffer_map(frame.gpr[3], frame.gpr[4], frame.gpr[5], frame.gpr[6], frame.gpr[7], frame.gpr[8]) }
+		}
+		232 { result = if frame.gpr[3] == 0 || user_space.accessible(frame.gpr[3], 4, true) { 1 } else { -14 } }
+		403 { result = sys_clock64(frame.gpr[3], frame.gpr[4]) }
 		else {}
 	}
 	frame.cr &= ~u32(0x10000000)
