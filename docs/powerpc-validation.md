@@ -252,3 +252,20 @@ pass; malformed USB report injection is not part of this emulator run.
 Bundle: `/tmp/vinix-ppc-hid-serial-final`, base `695cb08f4` plus preserved
 sources. `SHA256SUMS`:
 `f9440c4ed340613fdd4ff4ba8e47af7324427482b8fbf55e46a16f461d85b155`.
+
+## Desktop framebuffer ABI (2026-11-08)
+
+The desktop's shared fbdev structures now use pointer-width physical addresses.
+The previous `u64` fields displaced the pitch and length on PPC32. The V checker
+compiles size and field-offset assertions against the unmodified Linux v6.12
+`include/uapi/linux/fb.h` for PowerPC32, x86-64 and AArch64; all three passed.
+
+Reproduce with `v run tests/powerpc/check-fbdev.v UAPI_INCLUDE OUTPUT_DIRECTORY`,
+where `UAPI_INCLUDE/linux/fb.h` is the upstream header. The checker uses Zig's
+target-specific libc and Linux type headers. This verifies the ioctl layout,
+not a running desktop.
+
+Base revision: `8d6c7461e`, with the source overlay preserved in
+`/tmp/vinix-ppc-fbdev-abi-final/sources/`. Bundle:
+`/tmp/vinix-ppc-fbdev-abi-final/SHA256SUMS`, digest
+`5ee0e99a2efcd77ba5fcb502286b976051da96a6c25e346c82ea7c14fc1277e9`.
