@@ -118,6 +118,13 @@ pub mut:
 	box &resource.Resource = unsafe { nil }
 }
 
+// Preserve this asynchronous object's existing status rather than treating
+// its regular-file metadata as ordinary filesystem readiness. Fence-driven
+// DMA-BUF readiness remains a separate implementation.
+fn (mut this GemPrimeResource) poll_status() int {
+	return this.status
+}
+
 fn (mut this GemPrimeResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	if this.obj == unsafe { nil } || page > u64(-1) / page_size
 		|| (this.obj.external && (this.obj.phys_addr == 0 || flags & mmap.map_shared == 0)) {

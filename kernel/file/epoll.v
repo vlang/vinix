@@ -232,6 +232,15 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, event_ptr u64) (u6
 	mut watched_fd := fd_from_fdnum(unsafe { nil }, fd) or {
 		return errno.err, errno.ebadf
 	}
+	// Synchronous filesystem descriptions use poll's default readiness mask,
+	// but cannot be registered with epoll. Refuse them before retaining a
+	// watch or consulting the registration list (including MOD and DEL).
+	mut target := watched_fd.handle.resource
+	if (statmod.isreg(target.stat.mode) || statmod.isdir(target.stat.mode))
+		&& !(target is resource.PollableResource) {
+		watched_fd.unref()
+		return errno.err, errno.eperm
+	}
 
 	// The set's own lock, held only for the list mutation, keeps a concurrent
 	// epoll_pwait on another thread from scanning entries as they move. No

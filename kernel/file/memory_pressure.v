@@ -88,6 +88,12 @@ fn notify_memory_pressure(generation u64) {
 	}
 }
 
+fn (mut this MemoryPressureFile) poll_status() int {
+	this.l.acquire()
+	defer { this.l.release() }
+	return this.status
+}
+
 fn (mut this MemoryPressureFile) append_text(value string) {
 	for byte in value {
 		if this.length == this.buffer.len { return }

@@ -142,6 +142,10 @@ fn (mut this PidFile) unref(_handle voidptr) ? {
 	unlock_table()
 }
 
+fn (mut this PidFile) poll_status() int {
+	return katomic.load(&this.status)
+}
+
 fn (mut this PidFile) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	errno.set(errno.einval)
 	return none

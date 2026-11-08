@@ -915,6 +915,12 @@ fn (this &ProcFSResource) shows_layout() bool {
 	}
 }
 
+// Virtual filesystem files have a poll operation even when their contents
+// need no wait. Keep them distinct from ordinary files for epoll admission.
+fn (mut this ProcFSResource) poll_status() int {
+	return 0x145 // IN | OUT | RDNORM | WRNORM
+}
+
 fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	if stat.isdir(this.stat.mode) {
 		errno.set(errno.eisdir)

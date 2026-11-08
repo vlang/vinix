@@ -62,3 +62,7 @@ This qualifies the listed native musl memory-backed descriptions. Disk-backed
 files, concurrent mutation, O_PATH errors, epoll admission, cancellation and
 GNU/foreign/32-bit paths remain separate. Section 15's three broad acceptance
 gates remain open.
+
+The [epoll follow-up](linux-epoll-file-admission.md) qualifies ordinary-file
+refusals separately and preserves asynchronous pressure/pidfd readiness and
+virtual-file admission through explicit callbacks.

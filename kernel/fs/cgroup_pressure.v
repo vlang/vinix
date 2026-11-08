@@ -97,6 +97,12 @@ fn (mut this CGroupPressureFile) text(value string) {
 	}
 }
 
+fn (mut this CGroupPressureFile) poll_status() int {
+	this.l.acquire()
+	defer { this.l.release() }
+	return this.status
+}
+
 fn (mut this CGroupPressureFile) number(value u64) {
 	mut digits := [20]u8{}
 	mut remaining := value

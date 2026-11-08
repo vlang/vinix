@@ -13,8 +13,8 @@ fn read_pressure(mut pressure resource.Resource, loc u64, count u64) string {
 }
 
 fn open_pressure(mut source resource.Resource) &resource.Resource {
-	mut file := source as MemoryPressureFile
-	mut opened := file.open(resource.o_rdonly) or { panic('open failed') }
+	mut source_file := source as MemoryPressureFile
+	mut opened := source_file.open(resource.o_rdonly) or { panic('open failed') }
 	katomic.inc(mut &opened.refcount)
 	return opened
 }
@@ -65,4 +65,16 @@ fn test_subscription_limit_reuse_path_opens_and_access_modes() {
 		assert errno.get() == errno.enospc
 		for mut subscription in opened { subscription.unref(unsafe { nil }) or {} }
 	}
+}
+
+fn test_regular_metadata_keeps_asynchronous_readiness() {
+	memory.set_snapshot(0, 0)
+	mut source := new_memory_pressure_source(stat.Stat{mode: 0x8000 | 0o444})
+	mut opened := open_pressure(mut source)
+	assert resource.poll_status(mut opened) == pollin
+	read_pressure(mut opened, 0, 512)
+	assert resource.poll_status(mut opened) == 0
+	memory.set_snapshot(1, 1)
+	assert resource.poll_status(mut opened) == pollin
+	opened.unref(unsafe { nil }) or { panic('close failed') }
 }

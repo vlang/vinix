@@ -859,6 +859,10 @@ fn (mut this CGroupResource) open(flags int) ?&resource.Resource {
 	return open_cgroup_pressure(this.group, this.stat)
 }
 
+fn (mut this CGroupResource) poll_status() int {
+	return 0x145 // IN | OUT | RDNORM | WRNORM
+}
+
 fn (mut this CGroupResource) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	if stat.isdir(this.stat.mode) {
 		errno.set(errno.eisdir)

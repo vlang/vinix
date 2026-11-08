@@ -387,6 +387,10 @@ fn add_node_meminfo_line(mut text lib.Text, node int, label string, kb u64) {
 	text.add(' kB\n')
 }
 
+fn (mut this SysFSResource) poll_status() int {
+	return 0x145 // IN | OUT | RDNORM | WRNORM
+}
+
 fn (mut this SysFSResource) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	if stat.isdir(this.stat.mode) {
 		errno.set(errno.eisdir)
