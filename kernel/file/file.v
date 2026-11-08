@@ -289,6 +289,14 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 			ret++
 			continue
 		}
+		// Path-only descriptions are metadata handles, not pollable files.
+		// POLLNVAL is unconditional, including an empty requested event mask.
+		if fd.handle.flags & resource.o_path != 0 {
+			fd.unref()
+			fdd.revents = pollnval
+			ret++
+			continue
+		}
 
 		mut resource_ := fd.handle.resource
 
