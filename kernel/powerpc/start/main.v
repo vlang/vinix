@@ -57,6 +57,7 @@ fn start(info &boot.Info) {
 	gem.init(info, mut physical_pages)
 	ata.init(info)
 	$if ppc_test_ata ? { ata.check_disposable_disk() }
+	storage_init()
 	stack := physical_pages.take(16, 1)
 	if stack == 0 || !exception.install(stack + 65536) { halt(c'exception stack') }
 	interval = info.timebase_hz / 100

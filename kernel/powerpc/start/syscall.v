@@ -15,6 +15,8 @@ mut:
 	writable bool
 	file   int
 	offset u32
+	inode u32
+	flags u32
 }
 
 __global descriptors [16]Descriptor
@@ -46,7 +48,6 @@ fn copy_from_user(destination &u8, address u32, size u32) bool {
 }
 
 fn sys_writev(fd u32, vectors u32, count u32) int {
-	if fd != 1 && fd != 2 { return -9 }
 	if count > 1024 { return -22 }
 	if !user_space.accessible(vectors, count * 8, false) { return -14 }
 	mut total := 0
@@ -66,11 +67,33 @@ fn sys_writev(fd u32, vectors u32, count u32) int {
 	return total
 }
 
+fn sys_readv(fd u32, vectors u32, count u32) int {
+	if count > 1024 { return -22 }
+	if !user_space.accessible(vectors, count * 8, false) { return -14 }
+	mut total := 0
+	for i := u32(0); i < count; i++ {
+		mut pair := [2]u32{}
+		if !copy_from_user(unsafe { &u8(&pair[0]) }, vectors + i * 8, 8) { return if total > 0 { total } else { -14 } }
+		if pair[1] > u32(0x7fffffff - total) { return if total > 0 { total } else { -22 } }
+		mut done := u32(0)
+		for done < pair[1] {
+			request := if pair[1] - done > 4096 { u32(4096) } else { pair[1] - done }
+			result := sys_read(fd, pair[0] + done, request)
+			if result < 0 { return if total > 0 { total } else { result } }
+			total += result
+			if result < int(request) { return total }
+			done += u32(result)
+		}
+	}
+	return total
+}
+
 fn sys_clock64(clock_id u32, address u32) int {
-	if clock_id != 1 && clock_id != 4 { return -22 } // monotonic and monotonic raw
+	if clock_id != 0 && clock_id != 1 && clock_id != 4 { return -22 }
 	elapsed := cpu.timebase() - boot_clock
-	seconds := runtime.divide_u64(elapsed, startup_info.timebase_hz)
+	mut seconds := runtime.divide_u64(elapsed, startup_info.timebase_hz)
 	nanos := runtime.divide_u64((elapsed - seconds * startup_info.timebase_hz) * 1000000000, startup_info.timebase_hz)
+	if clock_id == 0 { seconds += persistent_volume.epoch } // initial wall-clock estimate from disk
 	buffer_word(0, u32(seconds >> 32)); buffer_word(4, u32(seconds))
 	buffer_word(8, 0); buffer_word(12, u32(nanos))
 	if !copy_to_user(address, unsafe { &io_buffer[0] }, 16) { return -14 }
@@ -78,7 +101,7 @@ fn sys_clock64(clock_id u32, address u32) int {
 }
 
 fn user_path(address u32) int {
-	for i := u32(0); i < 128; i++ {
+	for i := u32(0); i < 512; i++ {
 		if i > 0xffffffff - address { return -14 }
 		physical := user_space.translate(address + i, false)
 		if physical == 0 { return -14 }
@@ -89,13 +112,28 @@ fn user_path(address u32) int {
 	return -36
 }
 
-fn sys_open(path u32, requested_flags u32) int {
+fn sys_open(path u32, requested_flags u32, mode u32) int {
 	// The read-only archive has no symlinks, controlling terminals or 32-bit
 	// file-size limit. CLOEXEC becomes relevant when exec is implemented.
 	flags := requested_flags & ~u32(0x9c100)
 	length := user_path(path)
 	if length < 0 { return length }
 	if length == 0 || io_buffer[0] != `/` { return -2 }
+	if path_equal(c'/dev/urandom', length) || path_equal(c'/dev/random', length) {
+		if !persistent_random.ready { return -19 }
+		if requested_flags & 3 != 0 { return -13 }
+		for fd in 3 .. 16 {
+			if !descriptors[fd].used {
+				descriptors[fd] = Descriptor{used: true, file: -7, flags: requested_flags}
+				return fd
+			}
+		}
+		return -24
+	}
+	if length < 5 || !(io_buffer[1] == `d` && io_buffer[2] == `e` && io_buffer[3] == `v` && io_buffer[4] == `/`) {
+		opened := storage_open(length, requested_flags, mode)
+		if opened != -2 { return opened }
+	}
 	mut end := length
 	for end > 1 && io_buffer[end - 1] == `/` { end-- }
 	mut packet_device := end == 9
@@ -119,7 +157,7 @@ fn sys_open(path u32, requested_flags u32) int {
 	if requested_flags & 0x4000 != 0 && node != -2 && (node < 0 || !rootfs.files[node].directory) { return -20 }
 	for fd in 3 .. 16 {
 		if !descriptors[fd].used {
-			descriptors[fd] = Descriptor{ used: true, writable: flags == 1 || flags == 2, file: node }
+			descriptors[fd] = Descriptor{ used: true, writable: flags == 1 || flags == 2, file: node, flags: requested_flags }
 			return fd
 		}
 	}
@@ -131,6 +169,7 @@ fn sys_read(fd u32, address u32, requested u32) int {
 	if fd != 0 && (fd < 3 || fd >= 16 || !descriptors[fd].used) { return -9 }
 	if !user_space.accessible(address, count, true) { return -14 }
 	if count == 0 { return 0 }
+	if disk_fd(fd) { return storage_read(fd, address, count) }
 	if fd == 0 {
 		mut byte := serial.get()
 		if byte < 0 { byte = ohci.get() }
@@ -140,6 +179,7 @@ fn sys_read(fd u32, address u32, requested u32) int {
 		return 1
 	}
 	node := descriptors[fd].file
+	if node == -7 { return sys_random(address, count, 0) }
 	if node == -6 {
 		if count < 32 { return -22 }
 		packet := ohci.pointer_snapshot()
@@ -170,6 +210,7 @@ fn sys_read(fd u32, address u32, requested u32) int {
 }
 
 fn sys_write(fd u32, address u32, requested u32) int {
+	if disk_fd(fd) { return storage_write(fd, address, if requested > 4096 { u32(4096) } else { requested }) }
 	if fd >= 3 && fd < 16 && descriptors[fd].used && descriptors[fd].file == -4 {
 		if !descriptors[fd].writable { return -9 }
 		if requested == 0 || requested > 192000 || requested % 192 != 0 { return -22 }
@@ -209,6 +250,7 @@ fn buffer_word(at u32, value u32) {
 
 fn sys_getdents(fd u32, address u32, requested u32) int {
 	if fd < 3 || fd >= 16 || !descriptors[fd].used { return -9 }
+	if disk_fd(fd) { return storage_getdents(fd, address, requested, false) }
 	parent := descriptors[fd].file
 	if parent < -2 { return -20 }
 	if parent >= 0 && !rootfs.files[parent].directory { return -20 }
@@ -308,27 +350,34 @@ fn syscall(mut frame exception.Frame) {
 		}
 		3 { result = sys_read(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
 		4 { result = sys_write(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
-		5 { result = sys_open(frame.gpr[3], frame.gpr[4]) }
-		6 {
-			fd := frame.gpr[3]
-			result = -9
-			if fd >= 3 && fd < 16 && descriptors[fd].used {
-				descriptors[fd].used = false
-				result = 0
-			}
-		}
+		5 { result = sys_open(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
+		6 { result = sys_close(frame.gpr[3]) }
+		10, 15, 39, 40 { result = sys_path_change(frame.gpr[3], frame.gpr[4], frame.gpr[0]) }
+		19 { result = sys_seek(frame.gpr[3], i64(i32(frame.gpr[4])), frame.gpr[5], 0) }
+		36 { result = if !persistent_volume.mounted || persistent_volume.sync() { 0 } else { -5 } }
+		38 { result = sys_rename(frame.gpr[3], frame.gpr[4]) }
 		20 { result = 1 }
+		33 { result = sys_access(frame.gpr[3], frame.gpr[4]) }
 		24, 47, 49, 50 { result = 0 } // the initial process has real/effective UID/GID 0
 		45 { result = sys_brk(frame.gpr[3]) }
 		54 { result = sys_ioctl(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
+		55, 204 { result = sys_fcntl(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
+		60 { result = int(process_umask); process_umask = frame.gpr[3] & 0x1ff }
+		83 { result = sys_symlink(frame.gpr[3], frame.gpr[4]) }
+		85 { result = sys_readlink(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
+		94 { result = if disk_fd(frame.gpr[3]) { persistent_volume.chmod(descriptors[frame.gpr[3]].inode, frame.gpr[4]) } else { -9 } }
 		91 {
 			result = if frame.gpr[3] == framebuffer_virtual { framebuffer_unmap(frame.gpr[3], frame.gpr[4]) }
 				else { anonymous_unmap(frame.gpr[3], frame.gpr[4]) }
 		}
 		116 { result = sys_info(frame.gpr[3]) }
+		118, 148 { result = sys_fsync(frame.gpr[3]) }
 		122 { result = sys_uname(frame.gpr[3]) }
 		141 { result = sys_getdents(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
+		140 { result = if frame.gpr[6] == 0 { -14 } else { sys_seek(frame.gpr[3], i64(u64(frame.gpr[4]) << 32 | frame.gpr[5]), frame.gpr[7], frame.gpr[6]) } }
+		202 { result = storage_getdents(frame.gpr[3], frame.gpr[4], frame.gpr[5], true) }
 		146 { result = sys_writev(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
+		145 { result = sys_readv(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
 		162 { result = sys_nanosleep(frame.gpr[3]) }
 		167 { result = sys_poll(frame.gpr[3], frame.gpr[4], i32(frame.gpr[5])) }
 		182 {
@@ -347,6 +396,8 @@ fn syscall(mut frame exception.Frame) {
 				else if copy_to_user(frame.gpr[5], unsafe { &io_buffer[0] }, 4) { 4 } else { -14 }
 		}
 		403 { result = sys_clock64(frame.gpr[3], frame.gpr[4]) }
+		359 { result = sys_random(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
+		383 { result = sys_statx(frame.gpr[3], frame.gpr[4], frame.gpr[5], frame.gpr[7]) }
 		else {}
 	}
 	frame.cr &= ~u32(0x10000000)
