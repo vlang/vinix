@@ -108,7 +108,7 @@ fn wait_services() bool {
 		fds[2] = C.pollfd{fd: 123, events: 0}
 		if C.poll(&fds[0], 3, -1) != 2 || fds[0].revents != 0 || fds[1].revents != 4 || fds[2].revents != 32 { return false }
 		if C.poll(&C.pollfd(1), 1, 0) != -1 || *C.__errno_location() != 14 { return false }
-		if C.poll(&fds[0], 17, 0) != -1 || *C.__errno_location() != 22 { return false }
+		if C.poll(&fds[0], 65, 0) != -1 || *C.__errno_location() != 22 { return false }
 		before := monotonic_ns()
 		if C.poll(nil, 0, 15) != 0 || monotonic_ns() - before < 15000000 { return false }
 		file := C.open(c'/etc/motd', C.O_RDONLY)
@@ -174,6 +174,7 @@ fn fail(stage &char) i32 {
 @[export: 'main']
 fn entry(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc == 2 && C.strcmp(argv[1], c'--exec-child') == 0 { return exec_child() }
 		if argc != 1 || C.strcmp(argv[0], c'/bin/init') != 0 || argv[1] != nil { return fail(c'argv') }
 		path := C.getenv(c'PATH')
 		if path == nil || C.strcmp(path, c'/bin:/usr/bin') != 0 { return fail(c'environment') }
@@ -183,6 +184,12 @@ fn entry(argc i32, argv &&char) i32 {
 		if !device_discovery() { return fail(c'consistent device discovery') }
 		C.printf(c'VINIX-PPC: PASS libc consistent device discovery\n')
 		C.printf(c'VINIX-PPC: PASS libc identity cwd affinity open flags\n')
+		if !process_services() { return fail(c'fork exec pipes wait isolation and reclamation') }
+		C.printf(c'VINIX-PPC: PASS libc fork exec pipes wait isolation and reclamation\n')
+		if !terminal_services() { return fail(c'pseudo-terminal lifecycle') }
+		C.printf(c'VINIX-PPC: PASS libc pseudo-terminal lifecycle\n')
+		if !sandbox_services() { return fail(c'irreversible app sandbox') }
+		C.printf(c'VINIX-PPC: PASS libc irreversible app sandbox\n')
 		if !wait_services() { return fail(c'poll nanosleep input readiness') }
 		C.printf(c'VINIX-PPC: PASS libc poll nanosleep input readiness\n')
 		mut start := C.timespec{}

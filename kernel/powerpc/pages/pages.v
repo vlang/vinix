@@ -41,6 +41,10 @@ pub fn (mut pool Pool) take(count u32, alignment u32) u32 {
 	// Never allocate frame zero: a zero return denotes exhaustion.
 	mut first := alignment
 	for first <= 0x100000 - count {
+		if pool.free[first >> 5] == 0 {
+			first = (((first & ~u32(31)) + 32) + alignment - 1) & ~(alignment - 1)
+			continue
+		}
 		mut available := u32(0)
 		for available < count {
 			frame := first + available

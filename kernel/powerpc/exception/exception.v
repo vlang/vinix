@@ -90,3 +90,32 @@ asm ppc raw {
 	".popsection\n"
 	".pushsection .rodata.vinix_fpu_zero,\"a\"\n.balign 8\nvinix_fpu_zero: .long 0,0\n.popsection\n"
 }
+
+// Kernel code is built -nofloat. Save all user FPRs and FPSCR when scheduling;
+// the temporary FP enable is cleared again before returning to kernel C.
+asm ppc raw {
+	".pushsection .text.vinix_fpu_context,\"ax\"\n.balign 4\n"
+	".globl vinix_save_fpu\nvinix_save_fpu:\n"
+	"mfmsr 4\nori 5,4,0x2000\nmtmsr 5\nisync\n"
+	"stfd 0,0(3)\nstfd 1,8(3)\nstfd 2,16(3)\nstfd 3,24(3)\n"
+	"stfd 4,32(3)\nstfd 5,40(3)\nstfd 6,48(3)\nstfd 7,56(3)\n"
+	"stfd 8,64(3)\nstfd 9,72(3)\nstfd 10,80(3)\nstfd 11,88(3)\n"
+	"stfd 12,96(3)\nstfd 13,104(3)\nstfd 14,112(3)\nstfd 15,120(3)\n"
+	"stfd 16,128(3)\nstfd 17,136(3)\nstfd 18,144(3)\nstfd 19,152(3)\n"
+	"stfd 20,160(3)\nstfd 21,168(3)\nstfd 22,176(3)\nstfd 23,184(3)\n"
+	"stfd 24,192(3)\nstfd 25,200(3)\nstfd 26,208(3)\nstfd 27,216(3)\n"
+	"stfd 28,224(3)\nstfd 29,232(3)\nstfd 30,240(3)\nstfd 31,248(3)\n"
+	"mffs 0\nstfd 0,256(3)\nlfd 0,0(3)\nmtmsr 4\nisync\nblr\n"
+	".globl vinix_restore_fpu\nvinix_restore_fpu:\n"
+	"mfmsr 4\nori 5,4,0x2000\nmtmsr 5\nisync\n"
+	"lfd 0,256(3)\nmtfsf 255,0\n"
+	"lfd 0,0(3)\nlfd 1,8(3)\nlfd 2,16(3)\nlfd 3,24(3)\n"
+	"lfd 4,32(3)\nlfd 5,40(3)\nlfd 6,48(3)\nlfd 7,56(3)\n"
+	"lfd 8,64(3)\nlfd 9,72(3)\nlfd 10,80(3)\nlfd 11,88(3)\n"
+	"lfd 12,96(3)\nlfd 13,104(3)\nlfd 14,112(3)\nlfd 15,120(3)\n"
+	"lfd 16,128(3)\nlfd 17,136(3)\nlfd 18,144(3)\nlfd 19,152(3)\n"
+	"lfd 20,160(3)\nlfd 21,168(3)\nlfd 22,176(3)\nlfd 23,184(3)\n"
+	"lfd 24,192(3)\nlfd 25,200(3)\nlfd 26,208(3)\nlfd 27,216(3)\n"
+	"lfd 28,224(3)\nlfd 29,232(3)\nlfd 30,240(3)\nlfd 31,248(3)\n"
+	"mtmsr 4\nisync\nblr\n.popsection\n"
+}

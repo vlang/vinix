@@ -85,6 +85,7 @@ fn dispatch(mut frame exception.Frame) {
 	if frame.vector == 0x900 {
 		ticks++
 		exception.decrementer(interval)
+		if frame.msr & 0x4000 != 0 && !user_check_active { switch_process(mut frame) }
 		return
 	}
 	if frame.vector == 0xc00 {
@@ -133,5 +134,15 @@ fn dispatch(mut frame exception.Frame) {
 	serial.hex(frame.pc)
 	serial.text(c' dar ')
 	serial.hex(frame.dar)
+	serial.text(c' pid '); serial.hex(processes[current_process].pid)
+	serial.text(c' msr '); serial.hex(frame.msr)
+	serial.text(c' lr '); serial.hex(frame.lr)
+	serial.text(c' sp '); serial.hex(frame.gpr[1])
+	if process_ready && frame.msr & 0x4000 != 0 && current_process != 0 {
+		serial.text(c' process fault\n')
+		finish_process(11)
+		switch_process(mut frame)
+		return
+	}
 	halt(c'unhandled exception')
 }

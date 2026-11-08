@@ -119,9 +119,9 @@ fn boundary_check() {
 		|| C.vinix_user_syscall(4, 3, 0, 0) != -9
 		|| open(c'/missing') != -2 { failed_check() }
 	// Exhaust all file slots and check that closing them restores capacity.
-	for fd in 3 .. 16 { if open(c'/etc/motd') != fd { failed_check() } }
+	for fd in 3 .. 64 { if open(c'/etc/motd') != fd { failed_check() } }
 	if open(c'/etc/motd') != -24 { failed_check() }
-	for fd in 3 .. 16 { close(fd) }
+	for fd in 3 .. 64 { close(fd) }
 	if C.vinix_user_syscall(6, 3, 0, 0) != -9 { failed_check() }
 	fd := open(c'/etc/motd')
 	// Deliberately span two virtual pages; physical frames need not be adjacent.
@@ -151,7 +151,7 @@ fn failed_check() {
 
 @[export: 'vinix_user_init']
 fn start() {
-	boundary_check()
+	if C.vinix_user_syscall(20, 0, 0, 0) == 1 { boundary_check() }
 	cat(c'/etc/motd')
 	print_text(c'Type help for commands.\n')
 	for {

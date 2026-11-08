@@ -13,7 +13,7 @@ pub mut:
 pub struct Image {
 pub mut:
 	count u32
-	files [32]File
+	files [128]File
 }
 
 fn octal(data &u8, count u32) u32 {
@@ -49,7 +49,8 @@ pub fn (image &Image) find(name &u8, length u32) int {
 	return -1
 }
 
-// Bounded read-only USTAR archive; no heap, links, PAX extensions or devices.
+// Bounded read-only USTAR archive. Hardlinks may refer only to an earlier
+// regular file; no symlinks, PAX extensions, devices or forward references.
 pub fn parse(data &u8, size u32, mut image Image) bool {
 	image.count = 0
 	if size < 1024 || size % 512 != 0 { return false }
@@ -66,14 +67,14 @@ pub fn parse(data &u8, size u32, mut image Image) bool {
 			for j := u32(148); j < 156; j++ { sum = sum - data[at + j] + 32 }
 			if sum != octal(&data[at + 148], 8) || data[at + 257] != `u`
 				|| data[at + 258] != `s` || data[at + 259] != `t` || data[at + 260] != `a`
-				|| data[at + 261] != `r` || data[at + 345] != 0 || image.count == 32 {
+				|| data[at + 261] != `r` || data[at + 345] != 0 || image.count == 128 {
 				return false
 			}
 			length := octal(&data[at + 124], 12)
 			if length == 0xffffffff || length > size - at - 512 { return false }
 			kind := data[at + 156]
-			if kind != 0 && kind != `0` && kind != `5` { return false }
-			if kind == `5` && length != 0 { return false }
+			if kind != 0 && kind != `0` && kind != `5` && kind != `1` { return false }
+			if (kind == `5` || kind == `1`) && length != 0 { return false }
 			mut file := File{ data: &data[at + 512], size: length, directory: kind == `5` }
 			for file.name_size < 100 && data[at + file.name_size] != 0 {
 				byte := data[at + file.name_size]
@@ -97,6 +98,15 @@ pub fn parse(data &u8, size u32, mut image Image) bool {
 			}
 			file.name[file.name_size] = 0
 			if image.find(&file.name[0], file.name_size) >= 0 { return false }
+			if kind == `1` {
+				mut target_length := u32(0)
+				for target_length < 100 && data[at + 157 + target_length] != 0 { target_length++ }
+				if target_length == 0 || target_length == 100 { return false }
+				target := image.find(&data[at + 157], target_length)
+				if target < 0 || image.files[target].directory { return false }
+				file.data = image.files[target].data
+				file.size = image.files[target].size
+			}
 			image.files[image.count] = file
 			image.count++
 			next := u64(at) + 512 + ((u64(length) + 511) & ~u64(511))

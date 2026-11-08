@@ -69,12 +69,40 @@ fn test_duplicate_unsupported_entries_and_terminator() {
 	bad[2047] = 1
 	assert !parse(bad.data, u32(bad.len), mut image)
 	mut full := []u8{}
-	for i in 0 .. 33 {
+	for i in 0 .. 129 {
 		mut entry := good[..1024].clone()
-		entry[0] = `A` + u8(i)
+		entry[0] = `A` + u8(i % 26)
+		entry[1] = `A` + u8(i / 26)
 		checksum(mut entry)
 		full << entry
 	}
 	full << []u8{len: 1024}
 	assert !parse(full.data, u32(full.len), mut image)
+}
+
+fn test_hardlinks_share_only_existing_regular_files() {
+	good := archive()
+	mut link := good[..512].clone()
+	for i in 0 .. 100 { link[i] = 0 }
+	copy(mut link[..5], 'alias'.bytes())
+	copy(mut link[124..135], '00000000000'.bytes())
+	link[156] = `1`
+	copy(mut link[157..165], 'etc/motd'.bytes())
+	checksum(mut link)
+	mut data := good[..1024].clone()
+	data << link
+	data << []u8{len: 1024}
+	mut image := Image{}
+	assert parse(data.data, u32(data.len), mut image)
+	assert image.count == 2 && image.files[1].size == 5
+	assert image.files[1].data == image.files[0].data
+	mut forward := link.clone()
+	forward << good
+	assert !parse(forward.data, u32(forward.len), mut image)
+	link[157] = `x`
+	checksum(mut link)
+	mut missing := good[..1024].clone()
+	missing << link
+	missing << []u8{len: 1024}
+	assert !parse(missing.data, u32(missing.len), mut image)
 }

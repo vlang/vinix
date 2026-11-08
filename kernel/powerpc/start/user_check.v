@@ -8,7 +8,8 @@ import powerpc.hash32
 import powerpc.runtime
 import powerpc.serial
 
-__global user_space mmu.Space
+__global bootstrap_space mmu.Space
+__global user_space &mmu.Space
 __global user_faults u32
 __global resume_stack u32
 __global user_check_active bool
@@ -19,6 +20,7 @@ fn C.vinix_user_check_end()
 fn C.vinix_user_check_done()
 
 fn check_userspace(stack u32) {
+	user_space = unsafe { &bootstrap_space }
 	user_check_active = true
 	resume_stack = stack
 	table := physical_pages.take(hash32.bytes / 4096, hash32.bytes / 4096)

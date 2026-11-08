@@ -40,16 +40,23 @@ fn storage_seed() bool {
 	return true
 }
 
-fn disk_fd(fd u32) bool { return fd >= 3 && fd < 16 && descriptors[fd].used && descriptors[fd].inode != 0 }
+fn disk_fd(fd u32) bool { return fd < 64 && descriptors[fd].used && descriptors[fd].inode != 0 }
 fn inode_open(id u32) bool {
-	for fd in 3 .. 16 { if descriptors[fd].used && descriptors[fd].inode == id { return true } }
+	for i in 0 .. 256 { if open_files[i].refs != 0 && open_files[i].inode == id { return true } }
 	return false
 }
 
 fn sys_close(fd u32) int {
-	if fd < 3 || fd >= 16 || !descriptors[fd].used { return -9 }
+	if fd >= 64 || !descriptors[fd].used { return -9 }
 	id := descriptors[fd].inode
-	descriptors[fd] = Descriptor{}
+	descriptors[fd].refs--
+	if descriptors[fd].refs == 0 {
+		if descriptors[fd].pipe != 0 { close_pipe(descriptors[fd]) }
+		if descriptors[fd].pty != 0 { pty_close(descriptors[fd]) }
+		descriptors[fd].used = false
+	}
+	descriptors[fd] = unsafe { &empty_descriptor }
+	close_on_exec[fd] = false
 	if id != 0 && !inode_open(id) {
 		mut n := ext2.Node{}
 		if !persistent_volume.inode(id, mut n) { return -5 }
@@ -68,7 +75,7 @@ fn path_equal(name &char, length int) bool {
 fn storage_open(length int, flags u32, mode u32) int {
 	if !persistent_volume.mounted { return -2 }
 	mut available := -1
-	for fd in 3 .. 16 { if !descriptors[fd].used { available = fd; break } }
+	for fd in 3 .. 64 { if !descriptors[fd].used { available = fd; break } }
 	if available < 0 { return -24 }
 	if flags & ~u32(0x1ddfc3) != 0 || flags & 3 == 3 { return -22 }
 	mut id := persistent_volume.walk(unsafe { &io_buffer[0] }, u32(length), flags & 0x8000 == 0 && flags & 0xc0 != 0xc0)
@@ -90,7 +97,7 @@ fn storage_open(length int, flags u32, mode u32) int {
 		result := persistent_volume.truncate(u32(id))
 		if result < 0 { return result }
 	}
-	descriptors[available] = Descriptor{used: true, writable: flags & 3 != 0, inode: u32(id), flags: flags}
+	if !install_fd(available, Descriptor{used: true, writable: flags & 3 != 0, inode: u32(id), flags: flags}) { return -24 }
 	return available
 }
 
@@ -128,16 +135,17 @@ fn sys_random(address u32, requested u32, flags u32) int {
 }
 
 fn sys_fsync(fd u32) int {
-	if fd < 3 || fd >= 16 || !descriptors[fd].used { return -9 }
+	if fd >= 64 || !descriptors[fd].used { return -9 }
 	if !disk_fd(fd) { return if descriptors[fd].file >= -2 { 0 } else { -22 } }
 	return if persistent_volume.sync() { 0 } else { -5 }
 }
 
 fn sys_fcntl(fd u32, command u32, arg u32) int {
-	if fd >= 16 || (fd >= 3 && !descriptors[fd].used) { return -9 }
+	if fd >= 64 || !descriptors[fd].used { return -9 }
 	match command {
-		1 { return int((descriptors[fd].flags >> 19) & 1) }
-		2 { descriptors[fd].flags = (descriptors[fd].flags & ~u32(0x80000)) | ((arg & 1) << 19); return 0 }
+		0, 1030 { return sys_dup_min(fd, arg, if command == 1030 { u32(0x80000) } else { u32(0) }) }
+		1 { return if close_on_exec[fd] { 1 } else { 0 } }
+		2 { close_on_exec[fd] = arg & 1 != 0; return 0 }
 		3 { return int(descriptors[fd].flags & ~u32(0x80000)) }
 		4 { descriptors[fd].flags = (descriptors[fd].flags & ~u32(0xc00)) | (arg & 0xc00); return 0 }
 		else { return -22 }
@@ -145,7 +153,7 @@ fn sys_fcntl(fd u32, command u32, arg u32) int {
 }
 
 fn sys_seek(fd u32, delta i64, whence u32, result_address u32) int {
-	if fd < 3 || fd >= 16 || !descriptors[fd].used { return -9 }
+	if fd >= 64 || !descriptors[fd].used { return -9 }
 	if result_address != 0 && !user_space.accessible(result_address, 8, true) { return -14 }
 	mut size := u32(0)
 	if disk_fd(fd) {

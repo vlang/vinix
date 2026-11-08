@@ -43,9 +43,9 @@ fn sys_statx(dirfd u32, path u32, flags u32, address u32) int {
 	mut mode := u32(0)
 	mut size := u32(0)
 	if length == 0 && flags & 0x1000 != 0 {
-		if dirfd >= 16 || (dirfd >= 3 && !descriptors[dirfd].used) { return -9 }
-		if dirfd < 3 { mode = 0x2180 }
-		else { id = descriptors[dirfd].inode; archive = descriptors[dirfd].file }
+		if dirfd >= 64 || !descriptors[dirfd].used { return -9 }
+		id = descriptors[dirfd].inode; archive = descriptors[dirfd].file
+		if descriptors[dirfd].pipe != 0 { mode = 0x1180 }
 	} else {
 		if length == 0 { return -2 }
 		if io_buffer[0] != `/` && i32(dirfd) != -100 { return -95 }
@@ -94,7 +94,7 @@ fn sys_statx(dirfd u32, path u32, flags u32, address u32) int {
 }
 
 fn storage_getdents(fd u32, address u32, requested u32, wide bool) int {
-	if fd < 3 || fd >= 16 || !descriptors[fd].used { return -9 }
+	if fd >= 64 || !descriptors[fd].used { return -9 }
 	if !disk_fd(fd) { return -20 }
 	capacity := if requested > 4096 { u32(4096) } else { requested }
 	if !user_space.accessible(address, capacity, true) { return -14 }

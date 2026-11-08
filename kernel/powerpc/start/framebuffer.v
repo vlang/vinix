@@ -6,6 +6,7 @@ import powerpc.video
 
 const framebuffer_virtual = u32(0x58000000)
 __global framebuffer_length u32
+__global framebuffer_users u32
 
 // Linux fbdev layouts use 32-bit unsigned long on this ABI. In particular,
 // fb_fix_screeninfo is 68 bytes here, rather than the LP64 structure size.
@@ -39,7 +40,7 @@ fn framebuffer_ioctl(request u32, address u32) int {
 // Initially mmap2 supports one complete shared fbdev mapping. It cannot map
 // arbitrary physical addresses, device registers, executable or private pages.
 fn framebuffer_map(address u32, length u32, protection u32, flags u32, fd u32, offset u32) int {
-	if fd < 3 || fd >= 16 || !descriptors[fd].used { return -9 }
+	if fd >= 64 || !descriptors[fd].used { return -9 }
 	if descriptors[fd].file != -5 { return -19 }
 	screen := video.info()
 	if screen.base == 0 { return -19 }
@@ -58,6 +59,7 @@ fn framebuffer_map(address u32, length u32, protection u32, flags u32, fd u32, o
 		mapped += 4096
 	}
 	framebuffer_length = length
+	framebuffer_users++
 	video.claim()
 	return int(framebuffer_virtual)
 }
@@ -69,6 +71,8 @@ fn framebuffer_unmap(address u32, length u32) int {
 		if !user_space.unmap(framebuffer_virtual + at) { halt(c'framebuffer mapping ownership') }
 	}
 	framebuffer_length = 0
-	video.release()
+	if framebuffer_users == 0 { halt(c'framebuffer owner count') }
+	framebuffer_users--
+	if framebuffer_users == 0 { video.release() }
 	return 0
 }

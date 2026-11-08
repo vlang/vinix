@@ -9,6 +9,7 @@ import powerpc.runtime
 import powerpc.serial
 
 __global rootfs ramfs.Image
+const user_stack_start = u32(0x5f800000)
 
 fn launch_init() {
 	archive := startup_info.initramfs
@@ -48,11 +49,11 @@ fn launch_init() {
 			copied += count
 		}
 	}
-	for i := u32(0); i < 512; i++ {
+	for i := u32(0); i < 2048; i++ {
 		physical := physical_pages.take(1, 1)
 		if physical == 0 { halt(c'user stack allocation') }
 		runtime.fill(voidptr(physical), 0, 4096)
-		if !user_space.map(0x5fe00000 + i * 4096, physical, true) { halt(c'user stack mapping') }
+		if !user_space.map(user_stack_start + i * 4096, physical, true) { halt(c'user stack mapping') }
 	}
 	for i := u32(0); i < user_space.count; i++ {
 		mapping := user_space.mappings[i]
@@ -63,6 +64,7 @@ fn launch_init() {
 	process_break = process_break_min
 	if process_break_min >= 0x52000000 { halt(c'init data exceeds heap boundary') }
 	stack := prepare_user_stack(image)
+	initialize_processes()
 	serial.text(c'Vinix: starting /bin/init in protected userspace\n')
 	exception.enter_user(image.entry, stack)
 	halt(c'init returned')

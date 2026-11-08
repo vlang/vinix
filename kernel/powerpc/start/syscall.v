@@ -10,6 +10,9 @@ import powerpc.cpu
 
 struct Descriptor {
 mut:
+	refs u32
+	pipe int
+	pty int
 	used   bool
 	writable bool
 	file   int
@@ -18,7 +21,7 @@ mut:
 	flags u32
 }
 
-__global descriptors [16]Descriptor
+__global descriptors [64]&Descriptor
 __global io_buffer [4096]u8
 __global syscall_trace_count u32
 
@@ -112,19 +115,20 @@ fn user_path(address u32) int {
 }
 
 fn sys_open(path u32, requested_flags u32, mode u32) int {
-	// The read-only archive has no symlinks, controlling terminals or 32-bit
-	// file-size limit. CLOEXEC becomes relevant when exec is implemented.
+	// Strip lookup/descriptor flags before validating archive device access.
 	flags := requested_flags & ~u32(0x9c100)
 	length := user_path(path)
 	if length < 0 { return length }
 	if length == 0 || io_buffer[0] != `/` { return -2 }
+	terminal := pty_open(length, requested_flags)
+	if terminal != -2 { return terminal }
 	device := device_node(length)
 	if device != -1 && !device_present(device) { return -19 }
 	if device == -7 {
 		if requested_flags & 3 != 0 { return -13 }
-		for fd in 3 .. 16 {
+		for fd in 3 .. 64 {
 			if !descriptors[fd].used {
-				descriptors[fd] = Descriptor{used: true, file: -7, flags: requested_flags}
+				if !install_fd(fd, Descriptor{used: true, file: -7, flags: requested_flags}) { return -24 }
 				return fd
 			}
 		}
@@ -144,9 +148,9 @@ fn sys_open(path u32, requested_flags u32, mode u32) int {
 	node := if pointer_device { -6 } else if framebuffer_device { -5 } else if audio_device { -4 } else if packet_device { -3 } else if end == 1 { -2 } else { rootfs.find(unsafe { &io_buffer[1] }, u32(end - 1)) }
 	if node == -1 { return -2 }
 	if requested_flags & 0x4000 != 0 && node != -2 && (node < 0 || !rootfs.files[node].directory) { return -20 }
-	for fd in 3 .. 16 {
+	for fd in 3 .. 64 {
 		if !descriptors[fd].used {
-			descriptors[fd] = Descriptor{ used: true, writable: flags == 1 || flags == 2, file: node, flags: requested_flags }
+			if !install_fd(fd, Descriptor{ used: true, writable: flags == 1 || flags == 2, file: node, flags: requested_flags }) { return -24 }
 			return fd
 		}
 	}
@@ -155,11 +159,14 @@ fn sys_open(path u32, requested_flags u32, mode u32) int {
 
 fn sys_read(fd u32, address u32, requested u32) int {
 	count := if requested > 4096 { u32(4096) } else { requested }
-	if fd != 0 && (fd < 3 || fd >= 16 || !descriptors[fd].used) { return -9 }
+	if fd >= 64 || !descriptors[fd].used { return -9 }
+	if descriptors[fd].pipe != 0 { return pipe_read(fd, address, count) }
+	if descriptors[fd].pty != 0 { return pty_read(fd, address, requested) }
 	if !user_space.accessible(address, count, true) { return -14 }
 	if count == 0 { return 0 }
 	if disk_fd(fd) { return storage_read(fd, address, count) }
-	if fd == 0 {
+	if descriptors[fd].file == -8 {
+		if descriptors[fd].writable { return -9 }
 		mut byte := serial.get()
 		if byte < 0 { byte = ohci.get() }
 		if byte < 0 { return -11 }
@@ -199,8 +206,11 @@ fn sys_read(fd u32, address u32, requested u32) int {
 }
 
 fn sys_write(fd u32, address u32, requested u32) int {
+	if fd >= 64 || !descriptors[fd].used { return -9 }
+	if descriptors[fd].pipe != 0 { return pipe_write(fd, address, requested) }
+	if descriptors[fd].pty != 0 { return pty_write(fd, address, requested) }
 	if disk_fd(fd) { return storage_write(fd, address, if requested > 4096 { u32(4096) } else { requested }) }
-	if fd >= 3 && fd < 16 && descriptors[fd].used && descriptors[fd].file == -4 {
+	if descriptors[fd].file == -4 {
 		if !descriptors[fd].writable { return -9 }
 		if requested == 0 || requested > 192000 || requested % 192 != 0 { return -22 }
 		if !user_space.accessible(address, requested, false) { return -14 }
@@ -215,14 +225,14 @@ fn sys_write(fd u32, address u32, requested u32) int {
 		}
 		return ohci.sound_play(requested)
 	}
-	if fd >= 3 && fd < 16 && descriptors[fd].used && descriptors[fd].file == -3 {
+	if descriptors[fd].file == -3 {
 		if !descriptors[fd].writable { return -9 }
 		if requested < 14 || requested > 1514 { return -90 }
 		if !user_space.accessible(address, requested, false) { return -14 }
 		for i := u32(0); i < requested; i++ { io_buffer[i] = unsafe { *(&u8(user_space.translate(address + i, false))) } }
 		return gem.send(unsafe { &io_buffer[0] }, requested)
 	}
-	if fd != 1 && fd != 2 { return -9 }
+	if descriptors[fd].file != -8 || !descriptors[fd].writable { return -9 }
 	count := if requested > 4096 { u32(4096) } else { requested }
 	if !user_space.accessible(address, count, false) { return -14 }
 	for i := u32(0); i < count; i++ {
@@ -238,7 +248,7 @@ fn buffer_word(at u32, value u32) {
 }
 
 fn sys_getdents(fd u32, address u32, requested u32) int {
-	if fd < 3 || fd >= 16 || !descriptors[fd].used { return -9 }
+	if fd >= 64 || !descriptors[fd].used { return -9 }
 	if disk_fd(fd) { return storage_getdents(fd, address, requested, false) }
 	parent := descriptors[fd].file
 	if parent < -2 { return -20 }
@@ -307,7 +317,7 @@ fn sys_info(address u32) int {
 	buffer_word(0, u32(runtime.divide_u64(cpu.timebase() - boot_clock, startup_info.timebase_hz)))
 	buffer_word(16, managed_pages * 4096)
 	buffer_word(20, physical_pages.count * 4096)
-	io_buffer[41] = 1 // one live userspace process
+	for i in 0 .. 8 { if processes[i].state != 0 { io_buffer[41]++ } }
 	buffer_word(52, 1)
 	if !copy_to_user(address, unsafe { &io_buffer[0] }, 64) { return -14 }
 	return 0
@@ -316,7 +326,8 @@ fn sys_info(address u32) int {
 // Development packet device ABI: MAC[6], reserved[2], BE link and MTU words.
 // It is deliberately not advertised as a POSIX socket interface.
 fn sys_ioctl(fd u32, request u32, address u32) int {
-	if fd < 3 || fd >= 16 || !descriptors[fd].used { return -9 }
+	if fd >= 64 || !descriptors[fd].used { return -9 }
+	if descriptors[fd].pty != 0 { return pty_ioctl(fd, request, address) }
 	if descriptors[fd].file == -5 { return framebuffer_ioctl(request, address) }
 	if descriptors[fd].file != -3 || request != 0x564e0001 { return -25 }
 	runtime.fill(unsafe { &io_buffer[0] }, 0, 16)
@@ -328,14 +339,24 @@ fn sys_ioctl(fd u32, request u32, address u32) int {
 }
 
 fn syscall(mut frame exception.Frame) {
+	if processes[current_process].sandbox && !sandbox_allows(frame.gpr[0]) {
+		frame.gpr[3] = 1
+		frame.cr |= 0x10000000
+		switch_process(mut frame)
+		return
+	}
 	mut result := -38
 	match frame.gpr[0] {
 		1, 234 {
-			if framebuffer_length != 0 { framebuffer_unmap(framebuffer_virtual, framebuffer_length) }
-			serial.text(c'\nVinix: init exited, status ')
-			serial.hex(frame.gpr[3])
-			serial.text(c'\n')
-			for {}
+			finish_process((frame.gpr[3] & 255) << 8)
+			switch_process(mut frame)
+			return
+		}
+		2 { result = sys_fork(&frame) }
+		7, 114 { result = sys_waitpid(i32(frame.gpr[3]), frame.gpr[4], frame.gpr[5]) }
+		11 {
+			result = sys_exec(frame.gpr[3], frame.gpr[4], frame.gpr[5], mut frame)
+			if result == 0 { switch_process(mut frame); return }
 		}
 		3 { result = sys_read(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
 		4 { result = sys_write(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
@@ -345,9 +366,27 @@ fn syscall(mut frame exception.Frame) {
 		19 { result = sys_seek(frame.gpr[3], i64(i32(frame.gpr[4])), frame.gpr[5], 0) }
 		36 { result = if !persistent_volume.mounted || persistent_volume.sync() { 0 } else { -5 } }
 		38 { result = sys_rename(frame.gpr[3], frame.gpr[4]) }
-		20 { result = 1 }
+		20, 207 { result = int(processes[current_process].pid) }
+		64 { result = int(processes[current_process].parent) }
+		66 { result = int(processes[current_process].pid) } // single-process terminal sessions
+		41 { result = sys_dup_min(frame.gpr[3], 0, 0) }
+		63 { result = sys_dup(frame.gpr[3], frame.gpr[4], 0) }
+		42 { result = sys_pipe(frame.gpr[3], 0) }
+		317 { result = sys_pipe(frame.gpr[3], frame.gpr[4]) }
+		316 { result = if frame.gpr[3] == frame.gpr[4] { -22 } else { sys_dup(frame.gpr[3], frame.gpr[4], frame.gpr[5]) } }
+		158 { result = 0 }
+		175 {
+			// Signal delivery is limited to process termination for now. Musl
+			// blocks signals around fork; always return a defined old mask.
+			result = if frame.gpr[6] != 8 || frame.gpr[3] > 2 { -22 } else { 0 }
+			if result == 0 && frame.gpr[5] != 0 {
+				runtime.fill(unsafe { &io_buffer[0] }, 0, 8)
+				if !copy_to_user(frame.gpr[5], unsafe { &io_buffer[0] }, 8) { result = -14 }
+			}
+		}
 		33 { result = sys_access(frame.gpr[3], frame.gpr[4]) }
-		24, 47, 49, 50 { result = 0 } // the initial process has real/effective UID/GID 0
+		37 { result = sys_kill(i32(frame.gpr[3]), frame.gpr[4]) }
+		24, 47, 49, 50 { result = if processes[current_process].sandbox { 65534 } else { 0 } }
 		45 { result = sys_brk(frame.gpr[3]) }
 		54 { result = sys_ioctl(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
 		55, 204 { result = sys_fcntl(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
@@ -367,8 +406,8 @@ fn syscall(mut frame exception.Frame) {
 		202 { result = storage_getdents(frame.gpr[3], frame.gpr[4], frame.gpr[5], true) }
 		146 { result = sys_writev(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
 		145 { result = sys_readv(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
-		162 { result = sys_nanosleep(frame.gpr[3]) }
-		167 { result = sys_poll(frame.gpr[3], frame.gpr[4], i32(frame.gpr[5])) }
+		162 { result = sys_nanosleep(frame.gpr[3], frame.pc) }
+		167 { result = sys_poll(frame.gpr[3], frame.gpr[4], i32(frame.gpr[5]), frame.pc) }
 		182 {
 			result = if frame.gpr[4] < 2 { -34 }
 				else if copy_to_user(frame.gpr[3], unsafe { &u8(c'/') }, 2) { 2 } else { -14 }
@@ -377,7 +416,7 @@ fn syscall(mut frame exception.Frame) {
 			result = if frame.gpr[6] & 0x20 != 0 { anonymous_map(frame.gpr[3], frame.gpr[4], frame.gpr[5], frame.gpr[6], frame.gpr[8]) }
 				else { framebuffer_map(frame.gpr[3], frame.gpr[4], frame.gpr[5], frame.gpr[6], frame.gpr[7], frame.gpr[8]) }
 		}
-		232 { result = if frame.gpr[3] == 0 || user_space.accessible(frame.gpr[3], 4, true) { 1 } else { -14 } }
+		232 { result = if frame.gpr[3] == 0 || user_space.accessible(frame.gpr[3], 4, true) { int(processes[current_process].pid) } else { -14 } }
 		223 {
 			buffer_word(0, 1)
 			result = if frame.gpr[3] != 0 && frame.gpr[3] != 1 { -3 }
@@ -386,9 +425,20 @@ fn syscall(mut frame exception.Frame) {
 		}
 		403 { result = sys_clock64(frame.gpr[3], frame.gpr[4]) }
 		359 { result = sys_random(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
+		436 {
+			result = if frame.gpr[3] > frame.gpr[4] || frame.gpr[5] != 0 { -22 } else { 0 }
+			if result == 0 { for fd := frame.gpr[3]; fd < 64 && fd <= frame.gpr[4]; fd++ { if descriptors[fd].used { sys_close(fd) } } }
+		}
 		383 { result = sys_statx(frame.gpr[3], frame.gpr[4], frame.gpr[5], frame.gpr[7]) }
+		0x7f10 { result = sys_app_sandbox(frame.gpr[3], frame.gpr[4]) }
 		else {}
 	}
+	if result == restart_call {
+		frame.pc -= 4
+		switch_process(mut frame)
+		return
+	}
+	processes[current_process].wait_pc = 0
 	frame.cr &= ~u32(0x10000000)
 	if result < 0 {
 		$if ppc_trace_syscalls ? {
@@ -404,4 +454,5 @@ fn syscall(mut frame exception.Frame) {
 	} else {
 		frame.gpr[3] = u32(result)
 	}
+	switch_process(mut frame)
 }
