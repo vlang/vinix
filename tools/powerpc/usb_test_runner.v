@@ -4,19 +4,25 @@ module main
 import os
 import time
 
-fn screenshot(mut child os.Process, path string) ![]u8 {
+fn screen_dump(mut child os.Process, path string) ![]u8 {
 	if os.exists(path) { os.rm(path)! }
 	child.stdin_write('screendump "${path}"\n')
 	deadline := time.now().add(3 * time.second)
 	for time.now() < deadline {
 		if os.exists(path) {
 			data := os.read_bytes(path)!
-			validate_screen(data) or { time.sleep(10 * time.millisecond); continue }
+			screen_header(data) or { time.sleep(10 * time.millisecond); continue }
 			return data
 		}
 		time.sleep(10 * time.millisecond)
 	}
-	return error('Screenshot failed framebuffer validation: ${path}')
+	return error('Screenshot failed: ${path}')
+}
+
+fn screenshot(mut child os.Process, path string) ![]u8 {
+	data := screen_dump(mut child, path)!
+	validate_screen(data)!
+	return data
 }
 
 fn exercise_usb(mut child os.Process, output string, log_path string, graphics bool) ! {

@@ -204,3 +204,26 @@ Bundles, both based on `2e85fd5b1` plus preserved sources:
   `d1c64d3a1c1f61d23949bb6868c5652c743a62b9d72d085dd972405324ffb63a`.
 - `/tmp/vinix-ppc-rgb32-regression`, `SHA256SUMS`:
   `a36967ff740da54d11353c9d3744ede8b3cd6b720485e0a652842094699cfce4`.
+
+## Protected userspace graphics
+
+`/dev/fb0` geometry queries and bounded shared mappings pass in both display
+formats. The userspace test rejects invalid pointers, executable/private
+mappings, nonzero offsets, oversized mappings, duplicate mappings and writes
+through a read-only descriptor. Sixteen map/write/read/unmap cycles preserve
+free memory. A final mapping remains valid after its descriptor is closed;
+all 480000 pixels of its generated image match an independent screenshot
+check. Unmapping restores console text and the pointer. The RGB555 image was
+also visually inspected.
+
+The kernel protection fixture now primes a data TLB entry, removes its PTE
+and requires a fault on the next userspace load at the expected PC/address.
+Hash lookup tests cover primary/secondary collisions and slot reuse.
+The complete input, audio and Ethernet suites pass alongside these checks.
+
+Bundles, based on `9b822d048` plus preserved sources:
+
+- `/tmp/vinix-ppc-fbdev-final`: RGB555, nested hubs, 128 MiB; `SHA256SUMS`
+  `fe359b84a93951d39ef603a8cf25812c77c239c759d20f63513eb05792c60013`.
+- `/tmp/vinix-ppc-fbdev-32-final`: RGB32, direct USB, 512 MiB; `SHA256SUMS`
+  `89e9b8b28fd0637eb2e17e15d89601dc50cfba27d5f8049abcb552b4f9fd83d4`.

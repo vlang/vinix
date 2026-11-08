@@ -33,3 +33,15 @@ pub fn slot(table &Pte, vsid u32, address u32) int {
 	}
 	return empty
 }
+
+pub fn find(table &Pte, vsid u32, address u32) int {
+	group := primary(vsid, address)
+	for secondary in 0 .. 2 {
+		first := (if secondary == 0 { group } else { group ^ 1023 }) * 8
+		wanted := tag(vsid, address, secondary != 0)
+		for i := first; i < first + 8; i++ {
+			if unsafe { table[i].tag } == wanted { return int(i) }
+		}
+	}
+	return -1
+}

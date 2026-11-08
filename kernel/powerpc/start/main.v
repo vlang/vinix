@@ -93,7 +93,12 @@ fn dispatch(mut frame exception.Frame) {
 				frame.gpr[3] = 1
 				return
 			}
-			if frame.gpr[0] == 0x7f00 && user_faults == 4 {
+			if frame.gpr[0] == 0x7f02 && user_faults == 4 && frame.pc == 0x4000003c {
+				revoked_frame = user_space.translate(0x50000000, false)
+				if revoked_frame == 0 || !user_space.unmap(0x50000000) { halt(c'user mapping revocation') }
+				return
+			}
+			if frame.gpr[0] == 0x7f00 && user_faults == 5 {
 				frame.pc = u32(voidptr(C.vinix_user_check_done))
 				frame.msr = 0
 				frame.gpr[1] = resume_stack
@@ -106,7 +111,8 @@ fn dispatch(mut frame exception.Frame) {
 	}
 	if user_check_active && frame.msr & 0x4000 != 0 && ((frame.vector == 0x300 && user_faults == 0 && frame.dar == 0x02000000 && frame.pc == 0x40000014)
 		|| (frame.vector == 0x700 && user_faults == 1 && frame.pc == 0x40000018)
-		|| (frame.vector == 0x300 && user_faults == 2 && frame.dar == 0x40000000 && frame.pc == 0x40000020)) {
+		|| (frame.vector == 0x300 && user_faults == 2 && frame.dar == 0x40000000 && frame.pc == 0x40000020)
+		|| (frame.vector == 0x300 && user_faults == 4 && frame.dar == 0x50000000 && frame.pc == 0x4000003c)) {
 		user_faults++
 		frame.pc += 4
 		return

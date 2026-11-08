@@ -86,6 +86,22 @@ order. `VINIX_PPC_DEPTH=15` selects QEMU's RGB555 mode; the default is 32.
 Other framebuffer depths and mode switching remain unsupported. The mouse
 cursor saves and restores native pixels without repeated color conversion.
 
+`/dev/fb0` exposes PPC32 Linux-layout `FBIOGET_VSCREENINFO` (160 bytes) and
+`FBIOGET_FSCREENINFO` (68 bytes). `mmap2` can map the entire framebuffer at
+`0x58000000`, with `MAP_SHARED`, offset zero and read-only or read/write
+permissions. The mapping is non-executable, cache-inhibited and guarded;
+it survives closing the descriptor. This is a bounded fbdev mapping API,
+not general anonymous/file-backed mmap. Partial mappings, mode switching,
+read/write calls and additional simultaneous mappings are not implemented.
+`munmap` revokes the mapping and restores the console; exit does the same.
+The kernel keeps console text in memory while userspace owns the screen.
+
+Run `fbtest` in the shell to draw directly from protected userspace. It
+checks geometry layouts, access restrictions, mapping reuse and pixel
+readback, then displays a color pattern until Enter. Graphical shell tests
+check every captured pixel and the restored console. This is the display
+interface needed by future applications, not the shared Vinix desktop.
+
 The same variable on `test-shell` verifies framebuffer RGB colors and text,
 types a command through QEMU's USB keyboard, and checks mouse movement and
 button press/release against screenshot pixels. OHCI uses little-endian

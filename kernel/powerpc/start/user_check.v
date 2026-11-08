@@ -11,6 +11,7 @@ __global user_space mmu.Space
 __global user_faults u32
 __global resume_stack u32
 __global user_check_active bool
+__global revoked_frame u32
 
 fn C.vinix_user_check()
 fn C.vinix_user_check_end()
@@ -50,6 +51,7 @@ fn user_check_done() {
 	// The CPU is back in real mode with interrupts disabled. Revoke the old
 	// mappings before reusing the probe's frames, then flush on activation.
 	old_count := user_space.count
+	if revoked_frame == 0 || !physical_pages.give(revoked_frame, 1) { halt(c'revoked probe frame ownership') }
 	if !user_space.init(user_space.table) { halt(c'user address space reset') }
 	for i := u32(0); i < old_count; i++ {
 		if !physical_pages.give(user_space.mappings[i].physical, 1) {
@@ -67,6 +69,9 @@ asm ppc raw {
 	"li 0,20\nsc\ncmpwi 3,1\nbne 1f\n"
 	"lis 4,0x0200\nlwz 5,0(4)\nmfmsr 5\n"
 	"lis 4,0x4000\nstw 5,0(4)\nmtctr 1\nbctrl\n"
+	// Populate a data TLB entry, revoke it through a fixture-only syscall,
+	// then require a DSI at the following load (PC 0x4000003c).
+	"lis 4,0x5000\nlwz 5,0(4)\nli 0,0x7f02\nsc\nlwz 5,0(4)\n"
 	"li 0,0x7f00\nsc\n"
 	"1: li 0,0x7f01\nsc\nb 1b\n"
 	".globl vinix_user_check_end\nvinix_user_check_end:\n.popsection\n"

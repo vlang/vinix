@@ -16,7 +16,7 @@ pub struct Space {
 pub mut:
 	table    u32
 	count    u32
-	mappings [1024]Mapping
+	mappings [4096]Mapping
 }
 
 pub fn (mut space Space) init(table u32) bool {
@@ -28,17 +28,28 @@ pub fn (mut space Space) init(table u32) bool {
 }
 
 pub fn (mut space Space) map(address u32, physical u32, writable bool) bool {
+	return space.map_page(address, physical, writable, false)
+}
+
+pub fn (mut space Space) map_device(address u32, physical u32, writable bool) bool {
+	return space.map_page(address, physical, writable, true)
+}
+
+fn (mut space Space) map_page(address u32, physical u32, writable bool, device bool) bool {
 	if space.table == 0 || address < 0x40000000 || address >= 0x60000000
-		|| (address | physical) & 4095 != 0 || physical == 0 || space.count >= 1024
+		|| (address | physical) & 4095 != 0 || physical == 0 || space.count >= 4096
 		|| (writable && address < 0x50000000) {
 		return false
 	}
+	if device && address < 0x50000000 { return false }
 	vsid := address >> 28
 	mut table := unsafe { &hash32.Pte(space.table) }
 	index := hash32.slot(table, vsid, address)
 	if index < 0 { return false }
 	secondary := u32(index) / 8 != hash32.primary(vsid, address)
-	unsafe { table[index].page = physical | 0x180 | if writable { u32(2) } else { u32(3) } }
+	// Device memory is cache-inhibited and guarded (WIMG I/G), never executable
+	// because framebuffer addresses live in the non-executable data segment.
+	unsafe { table[index].page = physical | 0x180 | (if device { u32(0x28) } else { u32(0) }) | if writable { u32(2) } else { u32(3) } }
 	cpu.sync()
 	unsafe { table[index].tag = hash32.tag(vsid, address, secondary) }
 	cpu.sync()
@@ -46,6 +57,24 @@ pub fn (mut space Space) map(address u32, physical u32, writable bool) bool {
 	space.count++
 	invalidate(address)
 	return true
+}
+
+pub fn (mut space Space) unmap(address u32) bool {
+	if space.table == 0 || address & 4095 != 0 { return false }
+	mut table := unsafe { &hash32.Pte(space.table) }
+	index := hash32.find(table, address >> 28, address)
+	if index < 0 { return false }
+	unsafe { table[index].tag = 0 }
+	invalidate(address)
+	unsafe { table[index].page = 0 }
+	for i := u32(0); i < space.count; i++ {
+		if space.mappings[i].virtual == address {
+			space.count--
+			space.mappings[i] = space.mappings[space.count]
+			return true
+		}
+	}
+	return false
 }
 
 pub fn (space &Space) translate(address u32, write bool) u32 {

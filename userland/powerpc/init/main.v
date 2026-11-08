@@ -111,6 +111,7 @@ fn boundary_check() {
 		|| C.vinix_user_syscall(4, 1, 0x5fffffff, 2) != -14
 		|| C.vinix_user_syscall(9999, 0, 0, 0) != -38
 		|| C.vinix_user_syscall(0x7f00, 0, 0, 0) != -38
+		|| C.vinix_user_syscall(0x7f02, 0, 0, 0) != -38
 		|| C.vinix_user_syscall(5, 0x02000000, 0, 0) != -14
 		|| C.vinix_user_syscall(116, 0x40000000, 0, 0) != -14
 		|| C.vinix_user_syscall(122, 0x5fffffff, 0, 0) != -14
@@ -189,7 +190,7 @@ fn start() {
 			}
 			arg := &char(&input[argument])
 			if same(input, c'help') {
-				print_text(c'help  ls [path]  cat path  pwd  ps  uname  mem  net  ping [IPv4]  tone  echo text  exit\n')
+				print_text(c'help  ls [path]  cat path  pwd  ps  uname  mem  net  ping [IPv4]  tone  fbtest  echo text  exit\n')
 			} else if same(input, c'ls') {
 				ls(if argument < used { arg } else { c'/' })
 			} else if same(input, c'cat') {
@@ -228,6 +229,8 @@ fn start() {
 				network_command(arg, true)
 			} else if same(input, c'tone') {
 				tone()
+			} else if same(input, c'fbtest') {
+				framebuffer_test()
 			} else if same(input, c'exit') {
 				C.vinix_user_syscall(1, 0, 0, 0)
 			} else if used != 0 {

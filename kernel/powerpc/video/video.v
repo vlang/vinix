@@ -21,6 +21,29 @@ __global mouse_buttons u8
 __global mouse_visible bool
 __global mouse_enabled bool
 __global mouse_saved [384]u32
+__global user_owned bool
+
+pub struct Surface {
+pub:
+	base u32
+	width u32
+	height u32
+	pitch u32
+	bits u32
+}
+
+pub fn info() Surface { return Surface{surface, width, height, stride, pixel_bytes * 8} }
+
+pub fn claim() { hide_pointer(); user_owned = true }
+
+pub fn release() {
+	user_owned = false
+	decoration()
+	for y := u32(0); y < rows; y++ {
+		for x := u32(0); x < columns; x++ { draw_cell(x, y) }
+	}
+	show_pointer()
+}
 
 const background = u32(0x15212e)
 const foreground = u32(0xdce9f2)
@@ -68,6 +91,12 @@ pub fn init(info &boot.Info) bool {
 	columns = (width - 32) / 12
 	rows = (height - 96) / 18
 	if columns * rows > 16384 { surface = 0; return false }
+	decoration()
+	for i := u32(0); i < 16384; i++ { cells[i] = ` ` }
+	return true
+}
+
+fn decoration() {
 	rectangle(0, 0, width, height, background)
 	rectangle(0, 0, width, 40, 0x256a83)
 	label(16, 12, c'Vinix / PowerPC', 0xffffff, 0x256a83)
@@ -76,11 +105,10 @@ pub fn init(info &boot.Info) bool {
 	rectangle(width - 80, 12, 16, 16, 0xff0000)
 	rectangle(width - 56, 12, 16, 16, 0x00ff00)
 	rectangle(width - 32, 12, 16, 16, 0x0000ff)
-	for i := u32(0); i < 16384; i++ { cells[i] = ` ` }
-	return true
 }
 
 fn draw_cell(x u32, y u32) {
+	if user_owned { return }
 	character(16 + x * 12, 56 + y * 18, cells[y * columns + x], foreground, background)
 }
 
@@ -127,7 +155,7 @@ fn hide_pointer() {
 }
 
 fn show_pointer() {
-	if !mouse_enabled || mouse_visible || surface == 0 { return }
+	if user_owned || !mouse_enabled || mouse_visible || surface == 0 { return }
 	for y in 0 .. 24 {
 		for x in 0 .. 16 {
 			address := surface + u32(mouse_y + y) * stride + u32(mouse_x + x) * pixel_bytes

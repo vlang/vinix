@@ -46,7 +46,7 @@ fn exercise_shell(mut child os.Process, output string, log_path string) ! {
 	defer { console.close() or {} }
 	mut transcript := ''
 	checks := {
-		'help':          'help  ls [path]  cat path  pwd  ps  uname  mem  net  ping [IPv4]  tone  echo text  exit\n'
+		'help':          'help  ls [path]  cat path  pwd  ps  uname  mem  net  ping [IPv4]  tone  fbtest  echo text  exit\n'
 		'ls':            'bin/\netc/\nREADME\n'
 		'ls /bin':       '\ninit\n'
 		'ls /etc/':      '\nmotd\n'
@@ -68,6 +68,7 @@ fn exercise_shell(mut child os.Process, output string, log_path string) ! {
 	}
 	before := shell_command(mut console, log_path, 'mem')!
 	transcript += before
+	if os.getenv('VINIX_PPC_GRAPHICS') == '1' { transcript += exercise_framebuffer(mut child, mut console, output, log_path)! }
 	transcript += audio_with_keyboard(mut child, mut console, log_path)!
 	sound := shell_command(mut console, log_path, 'tone')!
 	transcript += sound
