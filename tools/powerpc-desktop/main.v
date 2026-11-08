@@ -102,5 +102,5 @@ fn build(output string) ! {
 	}
 	os.write_file(output + '/SHA256SUMS', sums)!
 	println('Built PPC32 desktop: ' + output + '/vinix-desktop')
-	println('This builds the application; the PPC kernel still needs its process/runtime services.')
+	println('Use VINIX_PPC_INIT=' + output + '/vinix-desktop with tools/powerpc build to bundle the native apps and shell.')
 }

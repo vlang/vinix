@@ -75,8 +75,13 @@ mut:
 	close_app()
 }
 
-// Both userlands bundle Zsh and a ready-to-use Oh My Zsh configuration.
-const terminal_shell = '/bin/zsh'
+// The PPC32 bootstrap image supplies its native shell; the other userlands use Zsh.
+const terminal_shell = terminal_shell_path()
+
+fn terminal_shell_path() string {
+	$if ppc { return '/bin/sh' }
+	return '/bin/zsh'
+}
 const terminal_scrollback = 400
 const terminal_read_chunk = 4096
 const terminal_reads_per_frame = 8
