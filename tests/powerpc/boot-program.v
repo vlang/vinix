@@ -84,12 +84,15 @@ fn boot(output string, marker string) ! {
 		}
 		time.sleep(2 * time.second)
 		capture_screen(mut child, capture, 'program-clicked')!
+		time.sleep(2 * time.second)
+		child.stdin_write('info registers\n')
+		capture_screen(mut child, capture, 'program-settled')!
 	}
 	log = os.read_file(logfile)!
 	print(log)
 	os.cp(@FILE, capture + '/boot-program.v')!
 	mut sums := ''
-	for name in ['program.log', 'program.ppm', 'program-typed.ppm', 'program-clicked.ppm',
+	for name in ['program.log', 'program.ppm', 'program-typed.ppm', 'program-clicked.ppm', 'program-settled.ppm',
 		'boot-program.v', 'program-qemu.txt', 'init-ppc.elf', 'vinix-ppc.elf', 'vinix-ppc-boot.iso'] {
 		path := if name.starts_with('program') || name == 'boot-program.v' {
 			capture + '/' + name

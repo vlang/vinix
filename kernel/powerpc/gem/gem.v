@@ -170,6 +170,13 @@ pub fn send(data &u8, size u32) int {
 	return -110
 }
 
+pub fn receive_pending() bool {
+	if !gem_ready { return false }
+	desc := gem_dma + gem_rx * 16
+	mmio.acquire(desc & ~u32(31), 32)
+	return mmio.read32(desc) & 0x80000000 == 0
+}
+
 pub fn receive(destination &u8, capacity u32) int {
 	if !gem_ready { return -19 }
 	desc := gem_dma + gem_rx * 16

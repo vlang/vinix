@@ -329,6 +329,8 @@ fn syscall(mut frame exception.Frame) {
 		122 { result = sys_uname(frame.gpr[3]) }
 		141 { result = sys_getdents(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
 		146 { result = sys_writev(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
+		162 { result = sys_nanosleep(frame.gpr[3]) }
+		167 { result = sys_poll(frame.gpr[3], frame.gpr[4], i32(frame.gpr[5])) }
 		182 {
 			result = if frame.gpr[4] < 2 { -34 }
 				else if copy_to_user(frame.gpr[3], unsafe { &u8(c'/') }, 2) { 2 } else { -14 }

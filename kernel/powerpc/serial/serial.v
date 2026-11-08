@@ -58,8 +58,12 @@ pub fn put(byte u8) {
 }
 
 pub fn get() int {
-	if control == 0 || read(control) & 1 == 0 { return -1 }
+	if !pending() { return -1 }
 	return int(read(data_port))
+}
+
+pub fn pending() bool {
+	return control != 0 && read(control) & 1 != 0
 }
 
 pub fn text(message &char) {

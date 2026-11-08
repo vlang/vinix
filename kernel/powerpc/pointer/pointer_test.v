@@ -27,3 +27,25 @@ fn test_clamping_and_initialization_are_bounded() {
 	assert packet.x == 0 && packet.y == 599
 	assert packet.pressed == 7 && packet.released == 7
 }
+
+fn test_readiness_preserves_edges_until_read() {
+	mut state := State{}
+	assert !state.changed
+	state.attach(800, 600)
+	assert state.changed
+	state.take()
+	assert !state.changed
+	state.move(0, 0, 0)
+	assert !state.changed
+	state.move(1, 0, 1)
+	assert state.changed
+	state.move(0, 0, 0)
+	assert state.changed
+	packet := state.take()
+	assert packet.pressed == 1 && packet.released == 1
+	assert !state.changed
+	state.move(2147483647, 0, 0)
+	state.take()
+	state.move(2147483647, 0, 0)
+	assert !state.changed // clamped motion does not create a new position
+}

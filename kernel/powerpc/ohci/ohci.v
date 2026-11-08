@@ -48,6 +48,11 @@ pub fn pointer_snapshot() pointer.Packet {
 	return pointer_state.take()
 }
 
+// Readiness never consumes key bytes or pointer edges. The syscall wait loop
+// pumps poll() before testing these predicates.
+pub fn key_pending() bool { return key_read != key_write }
+pub fn pointer_pending() bool { return pointer_state.changed }
+
 fn delay(ms u32) {
 	end := cpu.timebase() + u64(frequency / 1000) * ms
 	for cpu.timebase() < end {}

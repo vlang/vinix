@@ -171,9 +171,21 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool, runtime_p
 		child.close()
 	}
 	mut log := ''
+	mut runtime_keyboard_sent := false
+	mut runtime_pointer_sent := false
 	deadline := time.now().add(60 * time.second)
 	for time.now() < deadline && child.is_alive() {
 		log = os.read_file(log_path)!
+		if runtime_probe && !runtime_keyboard_sent && log.contains('VINIX-PPC: WAIT libc poll keyboard') {
+			time.sleep(100 * time.millisecond)
+			child.stdin_write('sendkey k 30\n')
+			runtime_keyboard_sent = true
+		}
+		if runtime_probe && !runtime_pointer_sent && log.contains('VINIX-PPC: WAIT libc poll pointer') {
+			time.sleep(100 * time.millisecond)
+			child.stdin_write('mouse_move 7 -4\n')
+			runtime_pointer_sent = true
+		}
 		if log.contains(marker) || log.contains('VINIX-PPC: FAIL') || log.contains('VINIX-PPC: PANIC') {
 			break
 		}

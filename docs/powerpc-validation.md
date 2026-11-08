@@ -347,3 +347,36 @@ Preserve these bundles together (base `d4591db06`/`9a7253674` and source overlay
   `SHA256SUMS`: `f1e137690f0db5d8c1332b2c4389b8a3fcb23ffbdcd51a37e07d988acac302fb`.
 - `/tmp/vinix-ppc-desktop-input`, capture runner, logs and three PPMs,
   `PROGRAM-SHA256SUMS`: `1fc6bd3a5c959583761335b446b2e03832f93c90e1cf0fbeb236b99dad5f8cf0`.
+
+## Desktop input waits (2026-11-08)
+
+PPC32 `poll` and the time32 `nanosleep` used by musl now wait against the
+timebase while servicing OHCI. Readiness does not consume keyboard bytes,
+pointer edges or Ethernet packets. Negative descriptors, error event masks,
+timeouts, invalid buffers, invalid times and the descriptor bound are handled.
+The kernel remains single-process and these waits still spin; CPU idle and
+signal interruption need interrupt-driven drivers and a scheduler.
+
+The musl probe passes measured 20 ms sleep and 15 ms empty-poll deadlines,
+mixed-descriptor/error tests, infinite keyboard wait and timed pointer wait.
+Repeated polls preserve pending input until read. Host pointer readiness tests
+pass, and the 128 MiB graphics/nested-hub/audio/Ethernet regression passes.
+Base `3289116b1`, with complete source snapshots:
+
+- `/tmp/vinix-ppc-wait-runtime2`, `SHA256SUMS`:
+  `51ee9fb555738cc80852322474c941df51a5451f1eea14e80e94d14f8cbad3a1`.
+- `/tmp/vinix-ppc-wait-regression`, `SHA256SUMS`:
+  `1a865a14b2e33da3f4d015855e1674fa6028c8d69f49bd2b05da35655a43f0bc`.
+
+The desktop again renders its form and accepts typing and mouse focus. One
+capture contained only the backdrop after a click; a repeat run's clicked
+and later settled frames both show the complete form and masked input. Keep
+both runs: the transient blank capture is not yet explained, so this is not
+a claim of flicker-free presentation.
+
+- `/tmp/vinix-ppc-desktop-ready`, boot `SHA256SUMS`:
+  `0c1e0596d47e160098368eb6067b675f9154172d9b273bc672c7fff3436b2b0a`;
+  capture `PROGRAM-SHA256SUMS`:
+  `882dcc8f6f6b56fa2e139fe62d382965eb497b12b8e29f2761c5c13d4980c989`.
+- `/tmp/vinix-ppc-desktop-waits-recheck`, `PROGRAM-SHA256SUMS`:
+  `574af8e4fff8430717c3948c4b84b5833db2230edf30d6649222cea0e4e14f6f`.

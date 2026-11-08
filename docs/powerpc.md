@@ -90,6 +90,10 @@ The single-process kernel now supports a bounded `brk` heap and private RW
 anonymous mappings. Executable/shared/fixed anonymous mappings remain rejected.
 Its integer-only kernel build disables the LLVM hard-float feature; the one
 user process owns the FPU until scheduling and per-thread FPU contexts exist.
+The runtime probe also checks identity/cwd/affinity and libc open flags, then
+times `nanosleep` and `poll` and wakes blocked polls through injected USB input.
+The single-process wait loops service polled devices; they do not yet idle
+the CPU or support signal interruption.
 `VINIX_PPC_INIT` can select an alternate static executable for the boot archive;
 its ELF segments must respect the existing PPC text/data address ranges.
 

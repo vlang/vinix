@@ -14,11 +14,13 @@ module main
 #include <math.h>
 #include <fcntl.h>
 #include <sched.h>
+#include <poll.h>
 
 struct C.timespec { tv_sec i64 tv_nsec i64 }
 struct C.sysinfo { freeram u32 }
 fn C.sysinfo(&C.sysinfo) i32
 fn C.printf(&char, ...voidptr) i32
+fn C.fflush(voidptr) i32
 fn C.strcmp(&char, &char) i32
 fn C.getenv(&char) &char
 fn C.malloc(usize) voidptr
@@ -39,6 +41,69 @@ fn C.getcwd(&char, usize) &char
 fn C.open(&char, i32, ...voidptr) i32
 fn C.read(i32, voidptr, usize) i32
 fn C.sched_getaffinity(i32, usize, voidptr) i32
+struct C.pollfd {
+mut:
+	fd i32
+	events i16
+	revents i16
+}
+fn C.poll(&C.pollfd, usize, i32) i32
+fn C.nanosleep(&C.timespec, &C.timespec) i32
+
+fn monotonic_ns() i64 {
+	mut stamp := C.timespec{}
+	if C.clock_gettime(1, &stamp) != 0 { return -1 }
+	return stamp.tv_sec * 1000000000 + stamp.tv_nsec
+}
+
+fn wait_services() bool {
+	unsafe {
+		mut request := C.timespec{tv_nsec: 20000000}
+		start := monotonic_ns()
+		if C.nanosleep(&request, nil) != 0 || monotonic_ns() - start < 20000000 { return false }
+		request.tv_nsec = 1000000000
+		if C.nanosleep(&request, nil) != -1 || *C.__errno_location() != 22 { return false }
+		request.tv_sec = -1
+		request.tv_nsec = 0
+		if C.nanosleep(&request, nil) != -1 || *C.__errno_location() != 22 { return false }
+		mut fds := [3]C.pollfd{}
+		fds[0] = C.pollfd{fd: -1, events: 1, revents: 99}
+		fds[1] = C.pollfd{fd: 1, events: 4}
+		fds[2] = C.pollfd{fd: 123, events: 0}
+		if C.poll(&fds[0], 3, -1) != 2 || fds[0].revents != 0 || fds[1].revents != 4 || fds[2].revents != 32 { return false }
+		if C.poll(&C.pollfd(1), 1, 0) != -1 || *C.__errno_location() != 14 { return false }
+		if C.poll(&fds[0], 17, 0) != -1 || *C.__errno_location() != 22 { return false }
+		before := monotonic_ns()
+		if C.poll(nil, 0, 15) != 0 || monotonic_ns() - before < 15000000 { return false }
+		file := C.open(c'/etc/motd', C.O_RDONLY)
+		if file < 0 { return false }
+		fds[0] = C.pollfd{fd: file, events: 1}
+		if C.poll(&fds[0], 1, 0) != 1 || fds[0].revents != 1 || C.close(file) != 0 { return false }
+		fds[0] = C.pollfd{fd: 0, events: 1}
+		if C.poll(&fds[0], 1, 0) != 0 { return false }
+		C.printf(c'VINIX-PPC: WAIT libc poll keyboard\n')
+		C.fflush(unsafe { nil })
+		if C.poll(&fds[0], 1, -1) != 1 || fds[0].revents != 1 { return false }
+		// Readiness must leave the byte queued, including on a second poll.
+		if C.poll(&fds[0], 1, 0) != 1 { return false }
+		mut byte := u8(0)
+		if C.read(0, &byte, 1) != 1 || byte != `k` || C.poll(&fds[0], 1, 0) != 0 { return false }
+		pointer := C.open(c'/dev/pointer', C.O_RDONLY | C.O_NONBLOCK)
+		if pointer < 0 { return false }
+		mut packet := [9]u32{}
+		if C.read(pointer, &packet[0], 36) != 36 { return false }
+		old_x := packet[0]
+		old_y := packet[1]
+		fds[0] = C.pollfd{fd: pointer, events: 1}
+		if C.poll(&fds[0], 1, 0) != 0 { return false }
+		C.printf(c'VINIX-PPC: WAIT libc poll pointer\n')
+		C.fflush(unsafe { nil })
+		if C.poll(&fds[0], 1, 3000) != 1 || C.poll(&fds[0], 1, 0) != 1 { return false }
+		if C.read(pointer, &packet[0], 36) != 36 || packet[0] != old_x + 7
+			|| packet[1] != old_y - 4 || C.poll(&fds[0], 1, 0) != 0 || C.close(pointer) != 0 { return false }
+		return true
+	}
+}
 
 fn startup_services() bool {
 	unsafe {
@@ -80,6 +145,8 @@ fn entry(argc i32, argv &&char) i32 {
 		if C.getpid() != 1 || C.close(-1) != -1 || *C.__errno_location() != 9 { return fail(c'TLS errno') }
 		if !startup_services() { return fail(c'identity cwd affinity open flags') }
 		C.printf(c'VINIX-PPC: PASS libc identity cwd affinity open flags\n')
+		if !wait_services() { return fail(c'poll nanosleep input readiness') }
+		C.printf(c'VINIX-PPC: PASS libc poll nanosleep input readiness\n')
 		mut start := C.timespec{}
 		if C.clock_gettime(1, &start) != 0 { return fail(c'monotonic clock') }
 		mut stable_free := u32(0)
