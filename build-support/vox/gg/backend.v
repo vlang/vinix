@@ -668,6 +668,33 @@ pub fn native_raster_vector(path string, width int, height int, background u32, 
 	unsafe { C.free(context.pixel_storage) }
 }
 
+// Favicons already belong to Vox's decoder/cache. Publish those pixels through
+// the same native surface protocol, without asking the desktop to open a PNG
+// from the browser's writable cache directory.
+pub fn native_publish_icon(id int, path string, width int, height int, background u32) bool {
+	ctx := vinix_gg_context
+	if id < 0 || id >= ctx.image_cache.len || width <= 0 || height <= 0 || width > 256 || height > 256 {
+		return false
+	}
+	img := &ctx.image_cache[id]
+	if !img.ok || img.data == unsafe { nil } { return false }
+	mut icon := Context{
+		width:  width
+		height: height
+		path:   path
+		clip:   Rect{0, 0, f32(width), f32(height)}
+	}
+	icon.ensure_pixels()
+	defer {
+		icon.release_surface()
+		unsafe { C.free(icon.pixel_storage) }
+	}
+	icon.draw_rect_filled(0, 0, f32(width), f32(height), rgb(u8(background >> 16), u8(background >> 8), u8(background)))
+	icon.draw_image_with_config(img: img, img_rect: Rect{0, 0, f32(width), f32(height)})
+	icon.publish()
+	return icon.surface != unsafe { nil }
+}
+
 @[params]
 pub struct TextCfg {
 pub:
@@ -686,7 +713,7 @@ pub fn (ctx &Context) draw_text(x int, y int, text string, cfg TextCfg) {
 	mut owner := unsafe { &Context(ctx) }
 	previous := owner.native_cache_enter()
 	defer { owner.native_cache_leave(previous) }
-	ui2.native_add_text(x, y, text, cfg.size, u32(cfg.color.r) << 16 | u32(cfg.color.g) << 8 | u32(cfg.color.b), cfg.bold, cfg.italic)
+	ui2.native_add_text(x, y, text, cfg.size, u32(cfg.color.r) << 16 | u32(cfg.color.g) << 8 | u32(cfg.color.b), cfg.bold, cfg.italic, cfg.mono, ctx.clip)
 }
 
 @[export: 'gg__gg_event_fn']

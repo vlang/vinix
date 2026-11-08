@@ -97,7 +97,7 @@ fn test_native_frame_storage_and_cached_text_survive_request_recycling() {
 		context.draw_text(0, 0, 'persistent text', gg.TextCfg{})
 		elements := ui2.native_embedded_elements()
 		gg.native_runtime_end()
-		assert elements.len > 0 && elements[0].text == 'persistent text'
+		assert elements.len > 0 && elements[0].children[0].text == 'persistent text'
 		assert context.pixels.data == buffer
 		assert context.pixels[..4] == [u8(0), 0, 255, 255]
 	}
@@ -228,12 +228,65 @@ fn test_native_text_survives_the_document_frame_arena() {
 		unsafe { prealloc_scope_end(scope) }
 	}
 	elements := ui2.native_embedded_elements()
-	assert elements.len > 0 && elements[0].text == 'temporary frame text'
-	assert elements[0].frame.x == 2 && elements[0].frame.y == 3
+	assert elements.len > 0 && elements[0].children[0].text == 'temporary frame text'
+	assert elements[0].children[0].frame.x == 2 && elements[0].children[0].frame.y == 3
 	ui2.native_release_resources()
 	$if prealloc {
 		unsafe { prealloc_scope_free_after(context.host_scope) }
 	}
+}
+
+fn test_native_chrome_keeps_favicon_pixels_and_uses_native_buttons() {
+	ui2.native_release_resources()
+	defer { ui2.native_release_resources() }
+	mut context := gg.new_context(width: 320, height: 200)
+	mut pixels := [u8(255), 0, 0, 128, 0, 255, 0, 255]
+	id := context.new_streaming_image(2, 1, 4, gg.StreamingImageConfig{})
+	context.update_pixel_data(id, pixels.data)
+	defer { context.remove_cached_image_by_idx(id) }
+	path := '/root/.cache/vox/favicon.png'
+	elements := [
+		ui2.image('tab-icon-0', path, ui2.rect(0, 0, 16, 16)),
+		ui2.button_with_image('bookmark-open:0', 'Example', path, ui2.rect(0, 20, 120, 24), ui2.BoxStyle{ transparent: true }, ui2.TextStyle{}),
+		ui2.button('back', '‹', ui2.rect(0, 50, 22, 22), ui2.BoxStyle{ transparent: true }, ui2.TextStyle{}),
+		ui2.button('window-close', '', ui2.rect(0, 0, 12, 12), ui2.BoxStyle{}, ui2.TextStyle{}),
+	]
+	for _ in 0 .. 2 {
+		ui2.draw_embedded_elements(context, elements, {
+			path: id
+		}, fn (_ string) {})
+		tree := ui2.native_embedded_elements()
+		assert tree[0].image_path.starts_with('vinix-surface:')
+		bytes := os.read_bytes(tree[0].image_path.all_after('vinix-surface:')) or { panic(err) }
+		active := int(bytes[28])
+		offset := 48 + active * 16 * 16 * 4
+		assert bytes[offset..offset + 4] == [u8(127), 127, 255, 255]
+		assert tree[1].native_style && !tree[1].box.transparent
+		assert tree[1].children[0].image_path.starts_with('vinix-surface:')
+		assert tree[1].children[0].frame.width == 16
+		assert tree[1].children[1].text == 'Example'
+		assert tree[1].children[1].frame.x > tree[1].children[0].frame.x
+		assert tree[2].native_style && tree[2].text == ''
+		assert tree[2].children[0].image_path == 'builtin:arrow_left'
+		assert tree[2].children[0].frame == ui2.rect(0, 0, 22, 22)
+		assert tree[3].hidden && !tree[3].enabled
+	}
+}
+
+fn test_native_document_text_uses_desktop_fonts_and_preserves_clip_and_monospace() {
+	ui2.native_release_resources()
+	defer { ui2.native_release_resources() }
+	mut context := gg.new_context(width: 100, height: 50)
+	context.scissor_rect(5, 6, 80, 30)
+	context.draw_text(2, 3, 'Roboto', gg.TextCfg{ size: 13, bold: true, mono: true })
+	tree := ui2.native_embedded_elements()
+	assert tree.len == 1
+	assert tree[0].frame == ui2.rect(5, 6, 80, 30)
+	label := tree[0].children[0]
+	assert label.text == 'Roboto' && label.text_style.bold
+	assert label.text_style.font_family == 'mono'
+	assert label.frame.x == -3 && label.frame.y == -3
+	assert label.frame.height == 18
 }
 
 fn test_vector_surface_has_the_compositors_real_buffer_layout() {

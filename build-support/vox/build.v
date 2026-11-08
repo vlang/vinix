@@ -167,6 +167,10 @@ fn build() ! {
 		native(repo, vox, work, sysroot)!
 		return
 	}
+	if os.args.len > 1 && os.args[1] == 'finish-source' {
+		finish_browser_source(vox, work + '/browser-source', work)!
+		return
+	}
 	if os.args.len > 1 && os.args[1] == 'skia' {
 		build_skia(repo, work, sysroot, v)!
 		return
@@ -232,13 +236,22 @@ fn build() ! {
 		return
 	}
 	entry := stage_browser_source(vox, work)!
-	println(run_in(os.dir(compiler), [compiler, '-memory-limit', '10G', '-enable-globals', '-os',
-		'linux', '-arch', 'arm64', '-gc', 'none', '-prealloc', '-w', '-n', '-nocache', '-prod',
-		'-d', 'ui2_headless', '-d', 'no_backtrace', '-d', 'no_segfault_handler', '-d', 'use_openssl',
-		'-exclude', '@vlib/time/zoneinfo.native.v', '-path', vox + '|' + modules + '|@vlib|@vmodules',
-		'-o', work + '/vox.c', entry])!)
+	println(run_in(os.dir(compiler), [compiler, '-new-compiler', '-memory-limit', '10G',
+		'-enable-globals', '-os', 'linux', '-arch', 'arm64', '-gc', 'none', '-prealloc', '-w',
+		'-n', '-nocache', '-prod', '-d', 'ui2_headless', '-d', 'no_backtrace', '-d',
+		'no_segfault_handler', '-d', 'use_openssl', '-exclude', '@vlib/time/zoneinfo.native.v',
+		'-path', vox + '|' + modules + '|@vlib|@vmodules', '-o', work + '/vox.c', entry])!)
+	finish_browser_source(vox, entry, work)!
+}
+
+// Also usable after a separately recorded successful compiler invocation.
+// Keep the same allocator and ABI-header checks as the normal full build.
+fn finish_browser_source(vox string, entry string, work string) ! {
 	path := work + '/vox.c'
 	generated := os.read_file(path)!
+	if !generated.trim_space().ends_with('// THE END.') {
+		return error('incomplete generated browser source')
+	}
 	if !generated.contains('CUSTOM_DEFINE_prealloc') || !generated.contains('prealloc_realloc_copy_size') || !generated.contains('closure_metadata_enter') {
 		return error('cross-generated browser is missing its arena allocator')
 	}
@@ -279,10 +292,14 @@ fn stage_browser_source(vox string, work string) !string {
 	shadow_start := '\tindex := app.portable_shadow_image_index\n'
 	shadow_end := '\tapp.ctx.update_pixel_data(slot.image_id, bitmap.pixels.data)'
 	shadow_trim := '\t\t\tapp.portable_shadow_images = app.portable_shadow_images[..app.portable_shadow_image_index].clone()'
+	text_raster := '\t\t\t\t$if linux {\n\t\t\t\t\tif command.glyph_run != none {'
 	if main_source.count(shadow_start) != 1 || main_source.count(shadow_end) != 1 || main_source.count(shadow_trim) != 1 {
 		return error('unsupported portable shadow cache')
 	}
+	if main_source.count(text_raster) != 1 { return error('unsupported portable text replay') }
+	// Native labels are painted by the compositor's Roboto coverage atlas.
 	os.write_file(entry + '/main.v', main_source
+		.replace(text_raster, text_raster.replace('$if linux {', '$if linux && !ui2_headless ? {'))
 		.replace(shadow_start, '\tpersistent := platform.enter_persistent()\n' + shadow_start)
 		.replace(shadow_end, '\tplatform.leave_persistent(persistent)\n' + shadow_end)
 		.replace(shadow_trim, '\t\t\tshadow_cache := platform.enter_persistent()\n' + shadow_trim + '\n\t\t\tplatform.leave_persistent(shadow_cache)'))!
@@ -443,6 +460,7 @@ fn stage_native_host(repo string, vox string, work string, v string) ! {
 	}
 	os.write_file(modules + '/sokol/sapp/enums.v', enums)!
 	os.cp(repo + '/build-support/vox/ui2/embed.v', modules + '/ui2/ui/vox_native_embed.v')!
+	stage_font_metrics(repo, modules + '/ui2/ui/vox_native_font_metrics.v')!
 	backend := modules + '/ui2/ui/vinix_headless_backend.v'
 	text := os.read_file(backend)!
 		.replace('import math.bits', 'import gg\nimport math.bits')
@@ -469,6 +487,26 @@ fn stage_native_host(repo string, vox string, work string, v string) ! {
 		'#include <spawn.h>\nint vox_native_worker_close_actions(void *, int);\n' +
 			os.read_file(vox + '/browserjs/worker_process.h')!
 				.replace('posix_spawn_file_actions_addclosefrom_np', 'vox_native_worker_close_actions'))!
+}
+
+// Use exactly the compositor's face-selection metrics for label line boxes;
+// coverage stays in the desktop, rather than duplicating its atlases in Vox.
+fn stage_font_metrics(repo string, output string) ! {
+	source := os.read_file(repo + '/desktop/font_data.v')!
+	mut entries := []string{}
+	for section in source.split('const face_')[1..] {
+		mut fields := map[string]string{}
+		for line in section.all_before('metrics:').split_into_lines() {
+			parts := line.trim_space().split(':')
+			if parts.len == 2 { fields[parts[0]] = parts[1].trim_space() }
+		}
+		if fields['raster_scale'] != '1' { continue }
+		entries << 'NativeFontMetrics{size: ${fields['size']}, bold: ${fields['bold']}, mono: ${fields['mono']}, height: ${fields['ascent'].int() + fields['descent'].int()}}'
+	}
+	if entries.len == 0 { return error('desktop font metrics are missing') }
+	os.write_file(output, 'module ui2\nstruct NativeFontMetrics { size int\n bold bool\n mono bool\n height int }\n' +
+		'const native_font_metrics = [\n' + entries.join(',\n') + '\n]\n' +
+		'fn native_text_line_height(size int, bold bool, mono bool) int {\nmut height := 0\nmut best := 1 << 30\nfor face in native_font_metrics {\nmut score := if face.size > size { face.size - size } else { size - face.size }\nif face.mono != mono { score += 100000 }\nif face.bold != bold { score += 1000 }\nif score < best { best = score\nheight = face.height }\n}\nreturn height\n}\n')!
 }
 
 struct RegexFile {

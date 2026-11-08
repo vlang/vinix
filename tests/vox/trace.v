@@ -93,4 +93,5 @@ fn init() {
 	C.write(2, c'VOX-TRACE loaded\n', 17)
 	mut action := C.sigaction{ sa_sigaction: native_fault, sa_flags: C.SA_SIGINFO }
 	C.sigaction(C.SIGSEGV, &action, unsafe { nil })
+	C.sigaction(C.SIGABRT, &action, unsafe { nil })
 }

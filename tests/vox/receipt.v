@@ -46,6 +46,7 @@ fn receipt() ! {
 	if first_free - last_free > 128 * 1024 {
 		return error('guest memory grew by more than 128 MiB over the final 45 seconds')
 	}
+	println('Memory guard: ${memory.len} samples; system used-memory change over final 45 seconds: ${first_free - last_free} KiB')
 	guest_executable := work + '/guest/usr/libexec/vinix-vox/root/usr/bin/vox'
 	if fingerprint(guest_executable)! != fingerprint(work + '/vox')! {
 		return error('guest executable differs from the checked build')
@@ -69,6 +70,7 @@ fn receipt() ! {
 	os.cp(work + '/browser-source/browserapp/browser_chrome_portable.v', work + '/browser-chrome-portable.v')!
 	os.cp(work + '/browser-source/main.v', work + '/browser-main.v')!
 	os.cp(work + '/browser-source/native/replay_scratch.v', work + '/browser-replay-scratch.v')!
+	os.cp(work + '/modules/ui2/ui/vox_native_font_metrics.v', work + '/native-font-metrics.v')!
 	command(['mcopy', '-o', '-i', work + '/boot.img', '::/boot/vinix', work + '/kernel'])!
 	os.setenv('COPYFILE_DISABLE', '1', true)
 	command(['tar', '--format=ustar', '-cf', work + '/port-source.tar', '-C', root, 'desktop/app.v',
@@ -90,7 +92,7 @@ fn receipt() ! {
 		work + '/arena-tests-final.log', work + '/arena-runtime-receipt.tsv',
 		work + '/browser-chrome-portable.v', work + '/vox.o.flags', work + '/include/worker_process.h',
 		work + '/browser-main.v', work + '/browser-replay-scratch.v', work + '/include/native-tabs.h',
-		work + '/include/EGL/eglext_angle.h'] {
+		work + '/include/EGL/eglext_angle.h', work + '/native-font-metrics.v'] {
 		lines << fingerprint(path)! + '\t' + path
 	}
 	mut files := os.walk_ext(work + '/guest', '')
@@ -111,7 +113,7 @@ fn receipt() ! {
 		'glvnd-build-final.log', 'port-source.tar', 'include', 'vinix-source.patch', 'vox2-source.patch',
 		'ui2-source.patch', 'arena-tests-final.log', 'arena-runtime-receipt.tsv', 'initramfs.tar',
 		'boot.img', 'vars.fd', 'browser-chrome-portable.v', 'browser-main.v', 'browser-replay-scratch.v',
-		'vox.o.flags'])!
+		'vox.o.flags', 'native-font-metrics.v'])!
 	os.write_file(archive + '.sha256', fingerprint(archive)! + '\t' + archive + '\n')!
 	println('Guest checks passed; receipt: ' + work + '/receipt.tsv')
 	println(os.read_file(archive + '.sha256')!)

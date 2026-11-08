@@ -3,6 +3,10 @@ module main
 
 import hwhost
 import json2
+import encoding.base64
+import image
+import image.color
+import image.png
 import os
 import qmpclient
 import time
@@ -180,7 +184,10 @@ fn start() ! {
 	os.write_file(guest + '/etc/passwd', 'root:x:0:0:root:/root:/bin/zsh\n')!
 	os.write_file(guest + '/etc/group', 'root:x:0:\n')!
 	os.write_file(guest + '/etc/resolv.conf', 'nameserver 10.0.2.3\n')!
-	copy_file(root + '/build-support/vox/welcome.html', guest + '/usr/share/vinix/vox-welcome.html')!
+	os.mkdir_all(guest + '/usr/share/vinix')!
+	welcome := os.read_file(root + '/build-support/vox/welcome.html')!
+	os.write_file(guest + '/usr/share/vinix/vox-welcome.html', welcome.replace('<!-- native-favicon -->',
+		'<link rel="icon" href="data:image/png;base64,' + welcome_favicon()! + '">'))!
 	os.setenv('COPYFILE_DISABLE', '1', true)
 	archive := work + '/initramfs.tar'
 	run(['tar', '--format=ustar', '-cf', archive, '-C', guest, '.'])!
@@ -206,6 +213,22 @@ fn start() ! {
 	if process.code != 0 { return error('QEMU failed: ${process.code}') }
 }
 
+fn welcome_favicon() !string {
+	mut icon := image.new_nrgba(image.rect(0, 0, 16, 16))
+	for y in 0 .. 16 {
+		for x in 0 .. 16 {
+			stroke := y >= 3 && y <= 13 && ((x >= 2 + (y - 3) / 3 && x <= 5 + (y - 3) / 3)
+				|| (x <= 13 - (y - 3) / 3 && x >= 10 - (y - 3) / 3))
+			icon.set_nrgba(x, y, if stroke {
+				color.NRGBA{ r: 255, g: 255, b: 255, a: 255 }
+			} else {
+				color.NRGBA{ r: 36, g: 85, b: 162, a: 255 }
+			})
+		}
+	}
+	return base64.encode(png.encode_to_bytes(icon)!)
+}
+
 fn package(root string, work string, staging string) ! {
 	private := staging + '/usr/libexec/vinix-vox/root'
 	if os.exists(private) { os.rmdir_all(private)! }
@@ -222,4 +245,11 @@ fn package(root string, work string, staging string) ! {
 		os.mkdir_all(private + '/' + directory)!
 		run(['cp', '-Rp', source + '/.', private + '/' + directory])!
 	}
+	fonts := private + '/usr/share/fonts/vinix'
+	os.mkdir_all(fonts)!
+	for name in ['Roboto-Regular.ttf', 'Roboto-Bold.ttf', 'Roboto-Italic.ttf', 'Roboto-BoldItalic.ttf',
+		'RobotoMono-Regular.ttf', 'RobotoMono-Bold.ttf', 'Roboto-OFL.txt', 'RobotoMono-OFL.txt'] {
+		copy_file(root + '/third_party/ui2/assets/fonts/' + name, fonts + '/' + name)!
+	}
+	copy_file(root + '/build-support/vox/fonts.conf', private + '/etc/fonts/vox.conf')!
 }

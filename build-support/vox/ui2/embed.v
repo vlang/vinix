@@ -14,6 +14,7 @@ __global vox_native_text_cache = []Element{}
 __global vox_native_wheel = fn (_ f64, _ f64, _ f64, _ f64) bool { return false }
 __global vox_native_vector_cache = map[string]string{}
 __global vox_native_vector_paths = map[string]string{}
+__global vox_native_icon_paths = map[string]string{}
 
 pub fn native_embedded_elements() []Element {
 	mut elements := vox_native_text.clone()
@@ -40,23 +41,39 @@ fn native_scroll_state(id string, value f64) {
 	gg.native_state_leave(previous)
 }
 
-pub fn draw_embedded_elements(_ &gg.Context, elements []Element, _ map[string]int, handler EventFn) {
-	vox_native_elements = elements.map(native_element(it, 0xffffff))
+pub fn draw_embedded_elements(_ &gg.Context, elements []Element, images map[string]int, handler EventFn) {
+	vox_native_elements = elements.map(native_element(it, 0xffffff, images))
 	vox_native_action = handler
 }
 
-pub fn native_add_text(x int, y int, text string, size int, color u32, bold bool, italic bool) {
+pub fn native_add_text(x int, y int, text string, size int, color u32, bold bool, italic bool, mono bool, clip gg.Rect) {
 	index := vox_native_text.len
 	if index >= vox_native_text_cache.len {
-		vox_native_text_cache << label('native-text-${index}', text.clone(), rect(0, 0, 0, 0), TextStyle{})
+		vox_native_text_cache << view('native-text-clip-${index}', rect(0, 0, 0, 0), BoxStyle{ transparent: true }, [
+			label('native-text-${index}', text.clone(), rect(0, 0, 0, 0), TextStyle{}),
+		])
 	}
-	previous := vox_native_text_cache[index]
-	vox_native_text_cache[index] = Element{
+	previous := vox_native_text_cache[index].children[0]
+	// This child is the cache's reusable label, owned by the host arena.
+	mut cached_children := unsafe { vox_native_text_cache[index].children }
+	cached_children[0] = Element{
 		...previous
 		text:       if previous.text == text { previous.text } else { text.clone() }
-		frame:      rect(x, y, vinix_width - x, size * 2)
-		text_style: TextStyle{ size: f64(size), color: color, bold: bold, italic: italic, valign: .top }
+		frame:      rect(x - clip.x, y - clip.y, math.max(0, int(clip.x + clip.width) - x), native_text_line_height(size, bold, mono))
+		text_style: TextStyle{
+			size:        f64(size)
+			color:       color
+			bold:        bold
+			italic:      italic
+			font_family: if mono {
+				'mono'
+			} else {
+				''
+			}
+			valign:      .top
+		}
 	}
+	vox_native_text_cache[index] = Element{ ...vox_native_text_cache[index], frame: rect(clip.x, clip.y, clip.width, clip.height) }
 	vox_native_text << vox_native_text_cache[index]
 }
 
@@ -90,20 +107,57 @@ pub fn native_quit() { vinix_running = false }
 fn close_menu_bar() {}
 
 pub fn native_release_resources() {
+	vox_native_elements = []Element{}
+	vox_native_action = EventFn(unsafe { nil })
 	vox_native_text = []Element{}
 	vox_native_text_cache = []Element{}
 	for _, path in vox_native_vector_paths { os.rm(path) or {} }
+	for _, path in vox_native_icon_paths { os.rm(path) or {} }
 	vox_native_vector_paths.clear()
 	vox_native_vector_cache.clear()
+	vox_native_icon_paths.clear()
 }
 
-fn native_element(source Element, inherited u32) Element {
-	background := if source.box.transparent { inherited } else { source.box.bg }
-	mut children := source.children.map(native_element(it, background))
-	if source.kind == .button && source.box.transparent && source.text != '' {
-		children << label(source.id + '-caption', source.text, rect(0, 0, source.frame.width, source.frame.height),
-			TextStyle{ ...source.text_style, align: .center })
-		return Element{ ...source, text: '', children: children }
+fn native_icon_path(source string, width int, height int, background u32, images map[string]int) string {
+	if source.starts_with('builtin:') || source.starts_with('vinix-surface:') { return source }
+	id := images[source] or { return '' }
+	key := '${id}:${width}:${height}:${background}'
+	if path := vox_native_icon_paths[key] { return 'vinix-surface:' + path }
+	path := '/tmp/vox-${os.getpid()}-icon-' + sha256.sum(key.bytes()).hex() + '.surface'
+	if !gg.native_publish_icon(id, path, width, height, background) { return '' }
+	vox_native_icon_paths[key.clone()] = path
+	return 'vinix-surface:' + path
+}
+
+fn native_element(source Element, inherited u32, images map[string]int) Element {
+	// Vinix already owns window management. Do not draw an inert second set
+	// of platform-specific traffic lights inside the browser's client area.
+	if source.id in ['window-close', 'window-minimize', 'window-zoom'] {
+		return Element{ ...source, hidden: true, enabled: false }
+	}
+	background := if source.vector.fill_enabled && source.vector.points.len > 0 {
+		source.vector.fill
+	} else if source.box.transparent {
+		inherited
+	} else {
+		source.box.bg
+	}
+	mut children := source.children.map(native_element(it, background, images))
+	if source.kind == .image {
+		return Element{ ...source, image_path: native_icon_path(source.image_path, int(source.frame.width), int(source.frame.height), background, images), children: children }
+	}
+	if source.id == 'address-info' {
+		return Element{ ...source, text: 'i', text_style: TextStyle{ ...source.text_style, bold: true, align: .center } }
+	}
+	if source.id.starts_with('tab-') && source.accessibility_role == 'tab' {
+		return Element{ ...source, vector: VectorPath{}, box: BoxStyle{ bg: background, radius: 4 }, children: children }
+	}
+	if source.kind == .button && (source.text != '' || source.image_path != '' || source.id == 'tab-new') {
+		return native_button(source, children, images)
+	}
+	if source.id == 'tab-strip' {
+		children << image('vox-native-brand', 'builtin:browser', rect(12, 5, 22, 22))
+		return Element{ ...source, box: BoxStyle{ bg: 0xf3f5f9, border_bottom: 1, border_color: 0xe8ebf0 }, children: children }
 	}
 	if source.vector.points.len < 2 { return Element{ ...source, children: children } }
 	key := '${source.frame.width}:${source.frame.height}:${background}:${source.vector}'
@@ -119,6 +173,70 @@ fn native_element(source Element, inherited u32) Element {
 	}
 	children.insert(0, image(source.id + '-vector', 'vinix-surface:' + path, rect(0, 0, source.frame.width, source.frame.height)))
 	return Element{ ...source, children: children }
+}
+
+fn native_button(source Element, children_ []Element, images map[string]int) Element {
+	background := if source.enabled { u32(0xe4e9f1) } else { u32(0xf3f5f9) }
+	color := if source.enabled { u32(0x30394a) } else { u32(0x9aa5b4) }
+	mut children := children_.clone()
+	mut caption := source.text
+	mut icon := match source.id {
+		'back' { 'builtin:arrow_left' }
+		'forward' { 'builtin:arrow_right' }
+		'history' { 'builtin:clock' }
+		'tab-new' { 'builtin:zoom' }
+		else {
+			if source.id.starts_with('tab-close:') { 'builtin:close' } else { source.image_path }
+		}
+	}
+	// Use geometry for reload, whose Unicode glyph is not in the desktop atlas.
+	if source.id == 'reload' {
+		mut points := []VectorPoint{}
+		for step in 0 .. 33 {
+			angle := math.pi / 4 + f64(step) * math.pi * 1.5 / 32
+			points << VectorPoint{ x: 8 + 5 * math.cos(angle), y: 8 + 5 * math.sin(angle) }
+		}
+		points << [VectorPoint{ x: 12, y: 3 }, VectorPoint{ x: 12, y: 7 }, VectorPoint{ x: 8, y: 7 }]
+		children << native_element(Element{
+			...view('native-reload-icon', rect(3, 3, 16, 16), BoxStyle{ transparent: true }, [])
+			vector: VectorPath{ points: points, closed: false, fill_enabled: false, stroke: color, stroke_width: 1.5 }
+		}, background, images)
+		caption = ''
+	}
+	if caption.starts_with('○ ') && icon == '' {
+		caption = caption.all_after('○ ')
+		icon = 'builtin:browser'
+	}
+	mut frame := source.frame
+	if source.id == 'tab-new' { frame = rect(frame.x, 4, 24, 22) }
+	icon_only := source.id in ['back', 'forward', 'history', 'tab-new'] || source.id.starts_with('tab-close:')
+	// Vinix's builtin symbols include their own inset. Giving them the full
+	// control bounds matches Files and keeps the tab close mark legible.
+	image_frame := if icon_only {
+		rect(0, 0, frame.width, frame.height)
+	} else {
+		embedded_button_image_frame(Element{ ...source, frame: frame, text: caption, button_image_size: 16 })
+	}
+	if icon != '' {
+		path := native_icon_path(icon, int(image_frame.width), int(image_frame.height), background, images)
+		children << Element{ ...image(source.id + '-icon', path, image_frame), text_style: TextStyle{ color: color } }
+		if source.image_path != '' || source.id.starts_with('bookmark-open:') {
+			left := image_frame.x + image_frame.width + 6
+			children << label(source.id + '-caption', caption, rect(left, 0, math.max(0.0, frame.width - left - 5), frame.height), TextStyle{ ...source.text_style, font_family: '', color: color, align: .left })
+		}
+		caption = ''
+	}
+	return Element{
+		...source
+		frame:        frame
+		text:         caption
+		image_path:   ''
+		vector:       VectorPath{}
+		box:          BoxStyle{ bg: background, radius: 4 }
+		text_style:   TextStyle{ ...source.text_style, font_family: '', color: color, align: .center }
+		native_style: true
+		children:     children
+	}
 }
 
 pub fn native_pointer(kind int, button int, scroll int, x f64, y f64) {

@@ -6,6 +6,17 @@ JavaScript, browser tabs and UI2 chrome. The module overlay in
 UI2's native desktop embedding API. Frames use Vinix's shared surface protocol;
 keyboard and pointer events return through the desktop IPC connection.
 
+Browser controls use Vinix UI2 buttons and builtin navigation symbols; window
+management uses the desktop's outer title bar. Tab and bookmark favicons are
+published from Vox's decoded image cache as small shared surfaces, preserving
+their alpha against the control background. The desktop never opens arbitrary
+PNG paths from the browser's cache.
+
+Page text is sent as clipped UI2 labels to the same Roboto coverage renderer as
+other Vinix apps. Line-box metrics are generated from `desktop/font_data.v`,
+including its nearest-size and weight selection. The private fontconfig setup
+uses the same bundled Roboto and Roboto Mono files for document layout.
+
 The runtime dependency closure rejects X11, XCB, Wayland and GTK libraries.
 EGL/GLES dispatch libraries are built with X11 and GLX disabled. No display
 server or Sokol window is started. A WebGL vendor is not provided by this port.
@@ -83,7 +94,7 @@ from the desktop application factory. The VM uses the retained PTY kernel in
 `build/pty-kernels/aarch64/vinix`, rather than building concurrent kernel edits.
 Its QMP socket and serial log are in the external state directory.
 
-From another terminal:
+From another terminal, after the Vox window appears:
 
 ```sh
 "$VINIX_VOX_STATE/runner" key ctrl-l
@@ -100,8 +111,16 @@ composition, ellipse geometry, image cropping and compositor buffer ownership.
 The same tests also check worker descriptor closure on the host and in Vinix.
 Arena checks cover PNG's initial null realloc, decoded pixel ownership, cached
 image records and fallback text surviving the document frame's reset. The
+chrome checks also cover favicon alpha, cached surfaces, native button styles,
+icon/caption spacing, clipping and monospaced text. The screenshot fixture
+includes a generated PNG data-URL favicon so its tab icon works offline. The
 builder invokes the staged compiler from its runtime root and checks for the
 bounded realloc and closure helpers in generated C.
+`full` selects the explicit compiler so failures are reported directly. If
+generation is run separately for diagnostics, preserve its successful command
+and log, copy its complete output to `$VINIX_VOX_STATE/vox.c`, then run
+`builder finish-source` before `builder native`. That step applies the same
+allocator, completeness and ABI-header checks as `full`.
 The guest logs system memory and browser process status every 15 seconds for
 interaction and idle measurements.
 The portable chrome uses its existing state comparison to reuse unchanged

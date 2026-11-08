@@ -12,7 +12,7 @@ fn main() {
 		eprintln('Vox is not installed. Stage its native runtime first.')
 		exit(127)
 	}
-	os.setenv('FONTCONFIG_FILE', runtime_root + '/etc/fonts/fonts.conf', true)
+	os.setenv('FONTCONFIG_FILE', runtime_root + '/etc/fonts/vox.conf', true)
 	os.setenv('FONTCONFIG_PATH', runtime_root + '/etc/fonts', true)
 	os.setenv('FONTCONFIG_SYSROOT', runtime_root, true)
 	os.setenv('SSL_CERT_FILE', runtime_root + '/etc/ssl/certs/ca-certificates.crt', true)
