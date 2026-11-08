@@ -97,8 +97,24 @@ pub fn generate_module_capture(source string, output string, arch string, define
 // copy, ABI metadata, compiler flags or generated symbol policy.
 pub fn generate_module_with_capture(source string, output string, arch string, defines []string,
 	runner fn ([]string, string, int, map[string]string) !Result) !Result {
-	selected := command(['sh', '-c', '. "$1/build-support/find-v.sh"; printf "%s" "$V"', 'find-v',
-		root()], '', -1, os.environ())!.stdout
+	return generate_module_with_runners(source, output, arch, defines, command, runner)
+}
+
+// Opt in to the same supplied owner for selection and C emission. Existing
+// with_capture callers retain their original selection capture contract.
+pub fn generate_module_with_full_capture(source string, output string, arch string, defines []string,
+	runner fn ([]string, string, int, map[string]string) !Result) !Result {
+	return generate_module_with_runners(source, output, arch, defines, runner, runner)
+}
+
+fn generate_module_with_runners(source string, output string, arch string, defines []string,
+	selection_runner fn ([]string, string, int, map[string]string) !Result,
+	runner fn ([]string, string, int, map[string]string) !Result) !Result {
+	selection := ['sh', '-c', '. "$1/build-support/find-v.sh"; printf "%s" "$V"', 'find-v', root()]
+	selected_result := selection_runner(selection, '', -1, os.environ())!
+	// Preserve command()'s original selection failure diagnostic.
+	if selected_result.code != 0 { return error('Command failed: see ') }
+	selected := selected_result.stdout
 	work := work_dir('', 'vinix-v-module-')!
 	defer { module_remove_tree(work) or { eprintln(err) } }
 	name := module_name(source)

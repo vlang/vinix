@@ -24,15 +24,24 @@ fn captured(argv []string, _log string, timeout int, env map[string]string) !hos
 }
 
 fn checked(argv []string) !hosttest.Result {
+	return checked_with_capture(argv, captured)
+}
+
+fn checked_with_capture(argv []string,
+	runner fn ([]string, string, int, map[string]string) !hosttest.Result) !hosttest.Result {
 	mut env := os.environ()
 	env['V_C_ERROR_BUG_REPORT_DISABLED'] = '1'
-	result := captured(argv, '', -1, env)!
+	result := runner(argv, '', -1, env)!
 	if result.code != 0 { return hosttest.ModuleCommandError{argv, result} }
 	return result
 }
 
 fn compiler() !string {
-	return checked(['sh', '-c', '. "$1/build-support/find-v.sh"; printf "%s" "$V"', 'find-v', root()])!.stdout
+	return compiler_with_capture(captured)
+}
+
+fn compiler_with_capture(runner fn ([]string, string, int, map[string]string) !hosttest.Result) !string {
+	return checked_with_capture(['sh', '-c', '. "$1/build-support/find-v.sh"; printf "%s" "$V"', 'find-v', root()], runner)!.stdout
 }
 
 fn show(result hosttest.Result) {
@@ -75,7 +84,12 @@ pub fn compile_fixture(source string, output string, arch string, flags []string
 }
 
 fn project(kind string, output string, arch string, host_clock bool) ! {
-	selected := compiler()!
+	_ = project_with_capture(kind, output, arch, host_clock, captured, true)!
+}
+
+fn project_with_capture(kind string, output string, arch string, host_clock bool,
+	runner fn ([]string, string, int, map[string]string) !hosttest.Result, display bool) !hosttest.Result {
+	selected := compiler_with_capture(runner)!
 	work := hosttest.work_dir('', 'vinix-' + kind + '-')!
 	defer { hosttest.remove_work_dir(work) or { eprintln(err) } }
 	name := if kind == 'compat' { 'compatcore' } else { 'heapbench' }
@@ -115,16 +129,25 @@ fn project(kind string, output string, arch string, host_clock bool) ! {
 	argv << ['-shared', '-no-builtin', '-no-closures', '-os', 'vinix']
 	if kind != 'compat' { argv << ['-arch', arch] }
 	argv << ['-target-libc-headers', '-nofloat', '-gc', 'none', '-manualfree', '-o', output, work]
-	show(checked(argv)!)
+	compiled := checked_with_capture(argv, runner)!
+	if display { show(compiled) }
 	if kind != 'compat' {
 		os.write_file(output, '#pragma GCC diagnostic ignored "-Wunused-function"\n' + os.read_file(output)!)!
 	}
+	return compiled
 }
 
 pub fn generate_compat(output string, arch string) ! { project('compat', output, arch, false)! }
 
 pub fn generate_sampler(output string, arch string, host_clock bool) ! {
 	project('kalloc-v', output, arch, host_clock)!
+}
+
+// A caller may retain inputs while the private project exists. The same
+// runner owns compiler selection and emission; ordinary callers keep captured.
+pub fn generate_sampler_with_capture(output string, arch string, host_clock bool,
+	runner fn ([]string, string, int, map[string]string) !hosttest.Result) !hosttest.Result {
+	return project_with_capture('kalloc-v', output, arch, host_clock, runner, false)
 }
 
 pub fn generate_bench(output_path string, arch string) !map[string]json2.Any {

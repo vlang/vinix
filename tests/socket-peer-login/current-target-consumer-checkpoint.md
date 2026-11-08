@@ -1,5 +1,48 @@
 # Compiler-consumer checkpoint
 
+## Continuation, 2026-11-08
+
+Work resumed at `a8e4f7d68` with about 375 GiB available. The strict stager
+build passed, including nine original source seals/postchecks, complete HOST
+checks and exact tool/header comparisons. Independent SDK/C-ABI review passed.
+Stage02 returned 0 and captured 65 producer entries plus eight helpers in a
+fresh source02 tree. The failed original capture remains untouched.
+
+The opt-in sampler/module capture APIs now pass six ordinary controls in both
+normal and production builds. One supplied owner handles selection and C
+emission; existing callers retain their original contracts. Selection/emission
+refusals, successful normalization and temporary-project cleanup pass. The
+production C retains explicit failure branches. Assertion-based `_test.v`
+companions were not run; the ordinary fixture supplies both build-mode results.
+
+Complete evidence is under T below. `resume-bootstrap-01` retains a refused
+runner build with an incomplete module path; `resume-bootstrap-02` passed after
+the path correction. `bootstrap-04` and `stage-02` retain stager commands,
+environments, original audits, generated C and the exact-count/inverse proof.
+`bootstrap-05-callback-normal` and `bootstrap-06-callback-prod` retain both
+six-case runs, strict compiler outputs and complete SRC/header/HOST pre/post
+audits. All four native manifests per build use canonical SDK26.5. Builds and
+fixture runs use GNU timeout and endpoint accounting; they make no nativeguard
+typed cleanup claim. No TARGET consumer, native sampler, rename, kernel or VM
+has started. Section 14 remains open.
+
+| Artifact under T | SHA256 |
+| --- | --- |
+| source-02-stage.json | `67cb4f6083b4f61f4d67a9ac6ad4f0c162fbcb34a1ceaa2563e29025aa05b2db` |
+| source-02-comparer-derivation.json | `5211ab9d66b9e09cded73fec20538685232771c867192310bda59620da46bf8a` |
+| bootstrap-05-callback-normal/controls-status.json | `7275e533fedb541f5351c8d18d825cc0d6b5235b35d15ae04f476088b7a3acfc` |
+| bootstrap-06-callback-prod/controls-status.json | `e93e3bc001027e491533828f19fa496181a885cbb7838f787cec2c85fd314f34` |
+
+Review found that source02 omits the original checker used by a relative
+embed, although its declared 73-entry filesystem capture passed. The pinned
+compiler may compile a missing embed without its payload, so source02 is not
+a complete embedded-input closure. A fresh source03 capture must include that
+template; source02 must remain unchanged. The full consumer route still needs
+that correction and its own execution evidence. The revised plan keeps the
+80 MiB working subtotal, full 16 MiB tail and 96/512 MiB caps unchanged.
+
+## Earlier checkpoint
+
 2026-11-05. Work resumed after checkpoint `900d8fa50` when disk admission
 recovered. SDK03 compiled successfully and passed its actual SDK/C-ABI/input
 checks; source stage01 then refused an exact-count rule. The latest root
