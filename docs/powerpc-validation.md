@@ -154,3 +154,24 @@ Bundle: `/tmp/vinix-ppc-network`, base `224d57e15` plus preserved sources.
 `SHA256SUMS`: `4ced056c490690650b908ca7442f079ea65f029ef873db205ae0986c14e2299f`.
 This validates GEM DMA and the small userspace network utility in QEMU,
 not shared-kernel sockets, TCP, gigabit PHYs or physical iMac Ethernet.
+
+## USB PCM playback
+
+The OHCI driver enumerates a UAC1 speaker, unmutes it, selects its streaming
+interface and submits checked isochronous TDs. Two independent writes of
+48000 stereo frames complete successfully. The host WAV contains exactly
+96000 nonzero frames, with expected channel amplitudes and 1000/500 Hz sign
+transitions. This checks actual output, byte order, channel order, timing
+and buffer reuse. USB key events injected during the first write are queued
+and subsequently execute `echo ok`. Framebuffer, mouse, Ethernet, memory
+stability and invalid-buffer checks pass in the same boot.
+
+Uptime now uses the 64-bit timebase instead of counting timer interrupts,
+so synchronous playback does not lose elapsed seconds. The freestanding
+64/32 division helper passes host tests through maximum-width operands.
+
+Bundle: `/tmp/vinix-ppc-audio-final`, base `984ff5b92` plus preserved sources.
+`SHA256SUMS`: `682b86277054d11b5d1e19b7062e7ac26fe19a296c5decc92fee3cf89c0683c4`.
+This verifies the fixed-format USB output in QEMU. Native iMac speakers,
+other USB audio profiles, input capture and asynchronous mixing are untested
+or unimplemented, as detailed in the port document.

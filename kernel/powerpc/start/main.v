@@ -18,6 +18,7 @@ __global interval u32
 __global traps u32
 __global startup_info &boot.Info
 __global managed_pages u32
+__global boot_clock u64
 
 fn C.vinix_ppc_kernel_start(info &boot.Info)
 
@@ -45,6 +46,7 @@ fn start(info &boot.Info) {
 		halt(c'boot information')
 	}
 	if video.init(info) { serial.text(c'VINIX-PPC: PASS framebuffer console\n') }
+	boot_clock = cpu.timebase()
 	for i := u32(0); i < info.available_count; i++ {
 		range := info.available[i]
 		if !physical_pages.add(range.base, range.size) { halt(c'physical memory map') }

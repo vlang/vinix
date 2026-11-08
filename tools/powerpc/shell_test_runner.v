@@ -22,12 +22,31 @@ fn shell_command(mut console unix.StreamConn, log_path string, command string) !
 	return error('Shell command timed out: ${command}')
 }
 
+fn audio_with_keyboard(mut child os.Process, mut console unix.StreamConn, log_path string) !string {
+	before := os.read_file(log_path)!
+	console.write_string('tone\n')!
+	time.sleep(80 * time.millisecond)
+	for key in ['e', 'c', 'h', 'o', 'spc', 'o', 'k', 'ret'] {
+		child.stdin_write('sendkey ${key} 20\n')
+		time.sleep(60 * time.millisecond)
+	}
+	deadline := time.now().add(4 * time.second)
+	for time.now() < deadline {
+		log := os.read_file(log_path)!
+		if log.len < before.len { return error('Console log truncated') }
+		result := log[before.len..].replace('\r', '')
+		if result.contains('audio: played 48000 stereo frames') && result.contains('\nok\nvinix$ ') { return result }
+		time.sleep(10 * time.millisecond)
+	}
+	return error('USB keyboard stopped responding during audio playback')
+}
+
 fn exercise_shell(mut child os.Process, output string, log_path string) ! {
 	mut console := unix.connect_stream(output + '/serial.sock')!
 	defer { console.close() or {} }
 	mut transcript := ''
 	checks := {
-		'help':          'help  ls [path]  cat path  pwd  ps  uname  mem  net  ping [IPv4]  echo text  exit\n'
+		'help':          'help  ls [path]  cat path  pwd  ps  uname  mem  net  ping [IPv4]  tone  echo text  exit\n'
 		'ls':            'bin/\netc/\nREADME\n'
 		'ls /bin':       '\ninit\n'
 		'ls /etc/':      '\nmotd\n'
@@ -49,6 +68,10 @@ fn exercise_shell(mut child os.Process, output string, log_path string) ! {
 	}
 	before := shell_command(mut console, log_path, 'mem')!
 	transcript += before
+	transcript += audio_with_keyboard(mut child, mut console, log_path)!
+	sound := shell_command(mut console, log_path, 'tone')!
+	transcript += sound
+	if !sound.contains('audio: played 48000 stereo frames') { return error('USB audio failed: ${sound}') }
 	network := shell_command(mut console, log_path, 'net')!
 	transcript += network
 	if !network.contains('DHCP: 10.0.2.15 gateway 10.0.2.2') { return error('GEM DHCP failed: ${network}') }

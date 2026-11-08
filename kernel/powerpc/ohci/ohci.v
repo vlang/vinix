@@ -124,7 +124,7 @@ fn arm(mut host Controller, index u32) {
 	mmio.publish(ed, 32)
 }
 
-fn enumerate(mut host Controller, port u32) {
+fn enumerate(mut host Controller, port u32, mut pool pages.Pool) {
 	status := host.base + 0x54 + port * 4
 	if mmio.read32(status) & 1 == 0 { return }
 	mmio.write32(status, 0x10)
@@ -143,6 +143,7 @@ fn enumerate(mut host Controller, port u32) {
 	if transfer(mut host, address, low, packet, 0x0680, 0x0200, 0, 9) < 9 { return }
 	length := unsafe { u32(buffer[2]) | u32(buffer[3]) << 8 }
 	if length < 9 || length > 1024 || transfer(mut host, address, low, packet, 0x0680, 0x0200, 0, length) != int(length) { return }
+	if !low && discover_audio(mut host, address, packet, port, length, mut pool) { return }
 	configuration := unsafe { u32(buffer[5]) }
 	mut kind := u32(0)
 	mut interface_number := u32(0)
@@ -207,9 +208,15 @@ pub fn init(info &boot.Info, mut pool pages.Pool) {
 		mmio.write32(host.base + 0x50, 0x10000)
 		for port := u32(0); port < host.ports; port++ { mmio.write32(host.base + 0x54 + port * 4, 0x100) }
 		delay(200)
-		for port := u32(0); port < host.ports; port++ { enumerate(mut host, port) }
-		if host.count > 0 {
-			for slot := u32(0); slot < 32; slot++ { mmio.write32(host.dma + slot * 4, host.dma + 2048 + (host.count - 1) * 256) }
+		for port := u32(0); port < host.ports; port++ { enumerate(mut host, port, mut pool) }
+		if host.count > 0 || (audio_ready && audio_host == controller_count) {
+			mut head := if host.count == 0 { u32(0) } else { host.dma + 2048 + (host.count - 1) * 256 }
+			if audio_ready && audio_host == controller_count {
+				mmio.write32(audio_dma + 12, head)
+				mmio.publish(audio_dma, 32)
+				head = audio_dma
+			}
+			for slot := u32(0); slot < 32; slot++ { mmio.write32(host.dma + slot * 4, head) }
 			mmio.publish(host.dma, 128)
 			mmio.write32(host.base + 4, 0x94)
 		}

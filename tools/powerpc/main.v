@@ -82,6 +82,10 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 	mut args := ['-M', 'mac99,via=pmu', '-cpu', '7450', '-accel', 'tcg', '-m', memory.str(), '-smp', '1',
 		'-nic', 'user,model=sungem,id=net0', '-no-reboot']
 	if graphics { args << ['-prom-env', 'output-device=scca'] }
+	if shell {
+		args << ['-audiodev', if test { 'wav,id=sound,path=' + (output + '/audio.wav').replace(',', ',,') + ',out.frequency=48000,out.channels=2,out.format=s16' } else { (os.getenv_opt('VINIX_PPC_AUDIO') or { 'coreaudio' }) + ',id=sound' },
+			'-device', 'usb-audio,id=usb_sound,audiodev=sound,port=3']
+	}
 	if media {
 		args << ['-cdrom', output + '/vinix-ppc-boot.iso', '-boot', 'd', '-prom-env',
 			'boot-device=cd:\\BOOT.ELF;1', '-prom-env',
@@ -135,9 +139,11 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 	child.set_args(args)
 	child.set_redirect_stdio_merged()
 	child.run()
+	child.stdin_write('info usb\n')
 	defer {
 		if child.is_alive() { child.signal_kill() }
 		child.wait()
+		os.write_file(output + '/qemu.log', child.stdout_slurp()) or {}
 		child.close()
 	}
 	mut log := ''
@@ -187,6 +193,16 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 		if u64(validate_tree(data)!) != nodes { return error('FDT node count mismatch') }
 		os.write_file(path + '.sha256', sha256.hexhash(data.bytestr()) + '  firmware.dtb\n')!
 		println('Validated copied FDT (${nodes} nodes)')
+		if shell {
+			child.stdin_write('device_del usb_sound\n')
+			time.sleep(100 * time.millisecond)
+			child.stdin_write('quit\n')
+			quit_deadline := time.now().add(3 * time.second)
+			for child.is_alive() && time.now() < quit_deadline { time.sleep(10 * time.millisecond) }
+			if child.is_alive() { return error('QEMU did not flush audio on shutdown') }
+			child.wait()
+			validate_audio(os.read_bytes(output + '/audio.wav')!)!
+		}
 		return
 	}
 	return error('Missing FDT report')

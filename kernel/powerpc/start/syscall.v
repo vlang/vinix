@@ -6,6 +6,7 @@ import powerpc.runtime
 import powerpc.serial
 import powerpc.ohci
 import powerpc.gem
+import powerpc.cpu
 
 struct Descriptor {
 mut:
@@ -51,13 +52,17 @@ fn sys_open(path u32, flags u32) int {
 	mut packet_device := end == 9
 	name := c'/dev/net0'
 	unsafe { for i := 0; packet_device && i < end; i++ { if io_buffer[i] != u8(name[i]) { packet_device = false } } }
+	mut audio_device := end == 10
+	audio_name := c'/dev/audio'
+	unsafe { for i := 0; audio_device && i < end; i++ { if io_buffer[i] != u8(audio_name[i]) { audio_device = false } } }
 	if packet_device && !gem.present() { return -19 }
-	if flags != 0 && !(packet_device && flags == 2) { return -30 }
-	node := if packet_device { -3 } else if end == 1 { -2 } else { rootfs.find(unsafe { &io_buffer[1] }, u32(end - 1)) }
+	if audio_device && !ohci.sound_present() { return -19 }
+	if flags != 0 && !(packet_device && flags == 2) && !(audio_device && (flags == 1 || flags == 2)) { return -30 }
+	node := if audio_device { -4 } else if packet_device { -3 } else if end == 1 { -2 } else { rootfs.find(unsafe { &io_buffer[1] }, u32(end - 1)) }
 	if node == -1 { return -2 }
 	for fd in 3 .. 16 {
 		if !descriptors[fd].used {
-			descriptors[fd] = Descriptor{ used: true, writable: flags == 2, file: node }
+			descriptors[fd] = Descriptor{ used: true, writable: flags == 1 || flags == 2, file: node }
 			return fd
 		}
 	}
@@ -78,6 +83,7 @@ fn sys_read(fd u32, address u32, requested u32) int {
 		return 1
 	}
 	node := descriptors[fd].file
+	if node == -4 { return -9 }
 	if node == -3 {
 		actual := gem.receive(unsafe { &io_buffer[0] }, count)
 		if actual <= 0 { return actual }
@@ -95,6 +101,21 @@ fn sys_read(fd u32, address u32, requested u32) int {
 }
 
 fn sys_write(fd u32, address u32, requested u32) int {
+	if fd >= 3 && fd < 16 && descriptors[fd].used && descriptors[fd].file == -4 {
+		if !descriptors[fd].writable { return -9 }
+		if requested == 0 || requested > 192000 || requested % 192 != 0 { return -22 }
+		if !user_space.accessible(address, requested, false) { return -14 }
+		destination := ohci.sound_buffer()
+		if destination == 0 { return -19 }
+		mut done := u32(0)
+		for done < requested {
+			mut size := 4096 - ((address + done) & 4095)
+			if size > requested - done { size = requested - done }
+			runtime.copy(voidptr(destination + done), voidptr(user_space.translate(address + done, false)), size)
+			done += size
+		}
+		return ohci.sound_play(requested)
+	}
 	if fd >= 3 && fd < 16 && descriptors[fd].used && descriptors[fd].file == -3 {
 		if !descriptors[fd].writable { return -9 }
 		if requested < 14 || requested > 1514 { return -90 }
@@ -120,7 +141,7 @@ fn buffer_word(at u32, value u32) {
 fn sys_getdents(fd u32, address u32, requested u32) int {
 	if fd < 3 || fd >= 16 || !descriptors[fd].used { return -9 }
 	parent := descriptors[fd].file
-	if parent == -3 { return -20 }
+	if parent == -3 || parent == -4 { return -20 }
 	if parent >= 0 && !rootfs.files[parent].directory { return -20 }
 	capacity := if requested > 4096 { u32(4096) } else { requested }
 	if !user_space.accessible(address, capacity, true) { return -14 }
@@ -183,7 +204,7 @@ fn sys_uname(address u32) int {
 
 fn sys_info(address u32) int {
 	runtime.fill(unsafe { &io_buffer[0] }, 0, 64)
-	buffer_word(0, ticks / 100)
+	buffer_word(0, u32(runtime.divide_u64(cpu.timebase() - boot_clock, startup_info.timebase_hz)))
 	buffer_word(16, managed_pages * 4096)
 	buffer_word(20, physical_pages.count * 4096)
 	io_buffer[41] = 1 // one live userspace process
